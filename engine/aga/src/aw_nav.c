@@ -66,6 +66,13 @@ int AW_NavStart(edict_t *actor,vec3_t goal) {
     }
     VectorCopy(goal,destination);walker=actor;blocked=animation=stalled=0;player_wait=0;best_distance=1e30f;return 1;
 }
+/* PIER-GUARD-WALKS-INTO-DOOR-65: a walk straight to GOAL with no path grid (route_count 0: AW_NavStep steers to the
+ * destination itself), for a short measured leg whose straight line is known clear; the grid's nearest point there can
+ * lie where the walker must not go (the census door's corner) */
+int AW_NavStartDirect(edict_t *actor,vec3_t goal) {
+    walker=NULL;route_count=route_at=0;if(!actor)return 0;
+    VectorCopy(goal,destination);walker=actor;blocked=animation=stalled=0;player_wait=0;best_distance=1e30f;return 1;
+}
 int AW_NavStep(double dt,int wait_for_player) {
     vec3_t delta,move,target,side;float length,step,angle;eval_t *field;int i,moved;
     static const int avoid[6]={30,-30,60,-60,90,-90};

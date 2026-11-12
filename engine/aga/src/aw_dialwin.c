@@ -1364,9 +1364,16 @@ int AW_DialWindowOpen(edict_t *e,const char *greeting,int again){
                                       "refresh","panel"};
     int ph_ms[PH_N];unsigned long ph_reads[PH_N];double tp=t0;unsigned long fr=file_reads;int ph=0;
 #define PHASE() do{double tn_=Sys_FloatTime();ph_ms[ph]=(int)((tn_-tp)*1000);ph_reads[ph]=file_reads-fr;tp=tn_;fr=file_reads;ph++;}while(0)
-    if(active || !e || !load())return 0;
+    /* SELLUS-GRAVIUS-GREETING-ONLY-64: every refusal says why on the console (the talk then stays a subtitle) */
+    if(active || !e)return 0;
+    if(!load()){Con_Printf("Dialogue: the dialogue table is not loaded; %s answers with a line only.\n",pr_strings+e->v.netname);return 0;}
     PHASE();
-    if((row=AW_GlutSpeaker(e,again,&cond,&state))<0 || row>=table.npcs)return 0;
+    if((row=AW_GlutSpeaker(e,again,&cond,&state))<0 || row>=table.npcs){
+        eval_t *id=GetEdictFieldValue(e,"aw_source_id");
+        Con_Printf("Dialogue: no dialogue row for %s (record %s); a line only.\n",pr_strings+e->v.netname,
+                   id && id->string?pr_strings+id->string:"?");
+        return 0;
+    }
     PHASE();
     {   /* the derived disposition: the bar, and what every Disposition test of this conversation reads */
         eval_t *id=GetEdictFieldValue(e,"aw_source_id"),*ref=GetEdictFieldValue(e,"aw_ref");
@@ -1380,7 +1387,7 @@ int AW_DialWindowOpen(edict_t *e,const char *greeting,int again){
         AW_MwscriptResultsPrepare();   /* MWSCRIPT-RESULT-LONG-FRAME-62: the results' index, once per load (in "facts") */
     }
     PHASE();
-    if(COM_FOpenFile((char *)path,&file)<0 || !file){file=NULL;return 0;}
+    if(COM_FOpenFile((char *)path,&file)<0 || !file){file=NULL;Con_Printf("Dialogue: %s does not open; a line only.\n",path);return 0;}
     file_start=ftell(file);
     if(!read_cache)read_cache=(aw_dial_cache_t *)AW_TryMalloc(sizeof(aw_dial_cache_t));   /* kept for the session */
     if(read_cache)AW_DialCacheInit(read_cache,read_disk,NULL,file_size);
@@ -1421,7 +1428,13 @@ int AW_DialWindowOpen(edict_t *e,const char *greeting,int again){
     if(key_dest==key_console)key_dest=key_game;
     active=1;
     bar_drag=-1;
-    if(!AW_WorldUIOpenPanel(draw,key,closed)){key_dest=was;release();return 0;}
+    /* RC2-SELLUS-NO-TALK-65: the dialogue window's own opener (no opening menu rule), and its refusal on the console */
+    if(!AW_WorldUIOpenDialoguePanel(draw,key,closed)){
+        Con_Printf(aw_census_take_refused && aw_census_take_refused()?
+                   "Dialogue: not before the character sheet is done (the registration comes first).\n":
+                   "Dialogue: the window cannot open now (another window, the console or a scene holds the screen).\n");
+        key_dest=was;release();return 0;
+    }
     aw_worldui_panel_drag=bar_dragged;
     aw_worldui_panel_holds_escape=choice_count>0;   /* DIALOGUE-CHOICES-62: a greeting's Choice must be answered */
     PHASE();

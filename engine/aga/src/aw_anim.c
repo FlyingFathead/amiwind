@@ -411,10 +411,16 @@ void AW_AnimPrep(edict_t *e) {
      * dragged through a walk or a fight (ANIMKIT-COVERAGE-35, WALK-CYCLES-57 sweep of v0.0.57-dev2) */
     prep_layout(m,m->name,m->numframes>0?m->numframes:AW_ANIM_UNLOADED_FRAMES);
     if(!(a=slot(m)) || !a->mover[0])return;
-    /* the mover's layout now (spawn time: its sounds are precached); its frames are checked when it loads */
+    /* the mover's layout now (spawn time: its sounds are precached); its frames are checked when it loads (AW_AnimOf).
+     * Parsed against a fixed 256 before, which only the creature movers (38 frames) met: the opening's people wear a
+     * skeletal full kit (attack at frame 2340 of 2587), so all eight layouts were refused and they fought standing in
+     * their idle (CENSUS-NPC-NO-ATTACK-ANIM-65, seen on v0.0.65-rc3: "invalid against 256 model frames, idle only").
+     * Never its numframes here: a mover is registered by name only (lazy_index, Mod_FindName), and a reused model slot
+     * still holds the frame count of the model it held before (Sellus Gravius' kit was refused against "2 model frames"
+     * on the rc4 test engine); its real frames are checked when it loads */
     if(!(i=lazy_index(a->mover))){a->mover[0]=0;return;}
     mover=sv.models[i];
-    if(mover && !slot(mover))prep_layout(mover,a->mover,256);
+    if(mover && !slot(mover))prep_layout(mover,a->mover,AW_ANIM_UNLOADED_FRAMES);
 }
 
 const aw_anim_t *AW_AnimOf(edict_t *e) {

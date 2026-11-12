@@ -105,7 +105,10 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [CENSUS-DOOR-STUCK-29](CENSUS-DOOR-STUCK-29.md): Player stuck after opening Census Office hall door
 - CENSUS-INTRO-NOT-SCRIPTED-62 (no report page): Opening: the Census and Excise Office and its courtyard run on hand-written story steps, not the game's own character-creation scripts
 - [CENSUS-INTRO-SCRIPTS-62](CENSUS-INTRO-SCRIPTS-62.md): The opening in the Census and Excise Office and its courtyard runs on hand-written rules, not on the game's own character-creation scripts
+- CENSUS-OFFICE-HOLDS-OFF-64 (no report page): In the census office the clerk's message boxes do not show and the player is not held during his talk
+- CENSUS-OFFICE-NO-EXIT-64 (no report page): The player cannot leave the census office after the registration
 - CENSUS-TABLE-TAKE-GRAB-HIM-62 (no report page): Census and Excise Office: taking an item from the table in front of Sellus Gravius makes a guard call out a theft line
+- CENSUS-THEFT-NO-ARREST-65 (no report page): A theft in the census office after the papers brings no guard and no arrest talk
 - CHARGEN-INVENTORY-LOCKED-60 (no report page): After character creation the inventory key does not open the inventory
 - CHARGEN-NO-STARTING-CLOTHES-60 (no report page): The player has no starting clothes after character creation, also after leaving the Census and Excise Office
 - CHARGEN-TUTORIAL-ITEM-MESSAGES-59 (no report page): Character creation: taking the bread, crab meat, candle, lockpick, whiskey, note or dagger in the Census Office shows no tutorial message
@@ -168,6 +171,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [GODMODE-COMBAT-DAMAGE-61](GODMODE-COMBAT-DAMAGE-61.md): With god mode on, a fight's blows still take the player's health and kill the player
 - GODMODE-LAVA-DEATH-62 (no report page): The player can die in a lava pool with god mode on
 - GUARD-RESIST-ARREST-NOTHING-61 (no report page): Choosing to resist arrest in a guard's conversation does nothing: the guard does not attack
+- [HAND-TO-HAND-NO-HIT-64](HAND-TO-HAND-NO-HIT-64.md): Fists rarely land and do almost nothing, even after the stats are raised during the fight
 - [INTRO-CAMERA-GATING-38](INTRO-CAMERA-GATING-38.md): Opening vanity and third-person cameras expose an unselected default race
 - [INVENTORY-CATALOG-LOOKUP-40](INVENTORY-CATALOG-LOOKUP-40.md): Inventory catalogue lookup and name sorting use an equality-only comparison
 - INVENTORY-CATALOGUE-PARTIAL-54 (no report page): The item catalogue holds Morrowind items only: no lockpicks, probes, repair tools, apparatus or carried lights
@@ -177,6 +181,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - JOURNAL-LOWER-INDEX-ENTRY-64 (no report page): A Journal command at or below the quest index adds no entry, no finished or restart mark and no notice
 - LAVA-NO-DAMAGE-63 (no report page): Lava does no damage and is not drawn in the Red Mountain lava pool
 - [LOADED-ITEMS-NOT-WEIGHED-61](LOADED-ITEMS-NOT-WEIGHED-61.md): After loading a save of another character the carried weight reads 0 until the next place load
+- [MAP-MENU-BLOCKED-COURTYARD-65](MAP-MENU-BLOCKED-COURTYARD-65.md): In the opening the courtyard announces the map, but the map key stays blocked until the opening ends
 - MARKS-SUMMON-CARRIERS-NOT-LIVE-63 (no report page): The guarded items whose taking summons a guardian are not live references, so the summon never comes
 - MWSCRIPT-CELLCHANGED-VOLATILE-54 (no report page): CellChanged made the sound-marker scripts volatile: 85 percent of Vivec's per-frame script work
 - MWSCRIPT-CONSOLE-LOCAL-NAMES-63 (no report page): Show and ShowVars cannot name a script's local variables: Show reads globals only, ShowVars lists the locals by slot number, and ToggleScripts flips the saved scripts switch
@@ -196,10 +201,14 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [MWSCRIPT-STATE-NOT-SAVED-48](MWSCRIPT-STATE-NOT-SAVED-48.md): The compiled scripts' values (globals, object and script locals, journal indexes) are not in saved games
 - MWSCRIPT-STOPCOMBAT-UNWIRED-62 (no report page): A script's StopCombat never ended a fight: the combat layer's end of one actor's fight was never connected to it
 - [MWSCRIPT-UNPLACED-RECORD-SCRIPTS-61](MWSCRIPT-UNPLACED-RECORD-SCRIPTS-61.md): Scripts of records that are never placed in a cell (items carried, given or sold, actors from levelled lists) are compiled but never run
+- [NEWGAME-OPENING-UNRESTRICTED-64](NEWGAME-OPENING-UNRESTRICTED-64.md): After New Game the opening runs as a free game: the dock guard stays idle on the pier, the race menu never opens, the pier and the census office hold nothing
 - [NEWGAME-STATE-RESET-62](NEWGAME-STATE-RESET-62.md): A New Game started from the menu after playing leaves the fireplace of the Census and Excise Office unlit
+- [OBJECT-ENABLE-NOT-DRAWN-65](OBJECT-ENABLE-NOT-DRAWN-65.md): Objects switched back on by a script stay invisible: the release papers in the census office can be read but are not drawn on the table
 - OPENING-CAPTAIN-HINT-SUBTITLE-63 (no report page): The hint about talking to the captain shows as a subtitle instead of the original message box with an Ok button
+- OPENING-HOLDS-OFF-NEWGAME-64 (no report page): A New Game clears the opening's state right after setting it: the dock guard does not meet the player and no race can be chosen
 - OPENING-SHIP-BLOCKER-NOT-CONVERTED-63 (no report page): The invisible blocker inside the prison ship, one of the opening's 23 blockers, is not converted; the 22 outdoor ones are
 - OPENING-SHIP-GUARD-STEPS-63 (no report page): On the prison ship the guard waits for the cellmate's warning before he speaks, and the movement hint is a box to close with Enter instead of the original message box
+- [OPENING-VANITY-CAMERA-64](OPENING-VANITY-CAMERA-64.md): The idle camera orbit and the view switch run on the prison ship and the pier before the race is chosen
 - OPENING-WEATHER-NOT-CLOUDY-63 (no report page): A new game does not start with the Bitter Coast weather set to cloudy, as the original opening script does
 - PERSUASION-BROKEN-62 (no report page): Persuasion in dialogue does nothing: Admire and Intimidate return to the topic list, Taunt shows nothing
 - [PHYSICS-GRAVITY-SCALE-36](PHYSICS-GRAVITY-SCALE-36.md): Gravity is Quake's 800 although the world is scaled 0.25: jumps and falls are several times faster than the original
@@ -219,6 +228,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - PLAYER-WALK-SPEED-SLOW-51 (no report page): The starting walk speed feels very slow; check it against the original and OpenMW
 - [QC-AW-FLAME-SPAWN-32](QC-AW-FLAME-SPAWN-32.md): Every aw_flame entity prints load errors: the game logic has no aw_flame spawn function or aw_flame_size/aw_flame_shape fields
 - RACE-RESIST-NOT-ON-SPELL-DAMAGE-64 (no report page): A race ability that resists an element does not reduce spell damage of that element
+- READY-MAGIC-SHOWS-WEAPON-65 (no report page): Readying magic (R by default) raises the equipped weapon instead of the spell-casting hands
 - RENDER-METADATA-29 (no report page): Native renderer metadata warns as an unknown QuakeC field
 - RESIST-NORMAL-WEAPONS-61 (no report page): Ghosts and other creatures that resist normal weapons take full damage from ordinary weapons, with no "no effect" message
 - REST-CENSUS-NO-CELL-ID-61 (no report page): The rest window offers Rest in the Census and Excise Office, a cell the game marks as no sleeping
@@ -235,6 +245,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [SCRIPTED-EVENT-FALLING-MAGE-61](SCRIPTED-EVENT-FALLING-MAGE-61.md): The falling mage north of Seyda Neen does not fall: he is in the world from the start and his scripted fall does not run
 - [SCRIPTED-EVENT-PAST-DRAW-DISTANCE-62](SCRIPTED-EVENT-PAST-DRAW-DISTANCE-62.md): The falling mage near Seyda Neen plays out past the default draw distance: on his platform and for most of his fall he is too far up to be drawn from anywhere the player can stand when his event starts
 - SCROLL-CAST-MISSING-64 (no report page): Scrolls cannot be cast: a scroll opens like a book and its spell never takes effect
+- SELLUS-GRAVIUS-GREETING-ONLY-64 (no report page): Using Sellus Gravius gives only his greeting line instead of his dialogue
 - [SERVER-FRAME-ARRIVAL-33](SERVER-FRAME-ARRIVAL-33.md): The server frame costs about 226 ms per frame at the Balmora arrival camera on a slow 68040
 - SERVICE-REFUSAL-UNCLOTHED-60 (no report page): Arrille refuses to barter at disposition 80 (player without clothes)
 - SKILL-BOOKS-MISSING-62 (no report page): Reading a skill book does not raise its skill: the original raises it by one on the first read

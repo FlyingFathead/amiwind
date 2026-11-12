@@ -12,7 +12,7 @@
 | Persists in | v0.0.64-dev4 (last seen) |
 | Severity | critical: Regressed in v0.0.64-dev4 (was high): Builds waited up to an hour in the queue on the rc1 path while real memory use was a third of the lease |
 | Family | Build speed (`build-speed`) |
-| Deferred by the maintainer | 2026-11-11: deferred by the maintainer to v0.0.65 (the v0.0.64 release ships early); its "came back" mark is checked against its evidence first |
+| Deferred by the maintainer | 2026-11-12: deferred by the maintainer to v0.0.66 (the v0.0.65 release fixes the opening only and ships early); its "came back" mark is checked against its evidence first |
 | Came back (regression) | in v0.0.64-dev4 (fixed in v0.0.36-dev5 before) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
 | From commit | source and engine 5822e0a |
@@ -223,8 +223,10 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [CHIM-PVS-SLOW-33](CHIM-PVS-SLOW-33.md): Seyda Neen's CHIM visibility rows take 5.5 minutes and are rebuilt whenever the worker count changes
 - [CHIM-ROOM-FAIL-STAGE-48](CHIM-ROOM-FAIL-STAGE-48.md): One CHIM room that cannot be made failed the whole CHIM interiors stage (HOLD-LEVEL with every room batch by default)
 - [CHIM-ROOM-OVER-BUDGET-RETRY-48](CHIM-ROOM-OVER-BUDGET-RETRY-48.md): A model over the image budget is tried whole again on every run before its cached tiles are used: its room runs on one core
+- CHIM-SOL-FLORA-PATH-64 (no report page): The Solstheim test frame converts its trees as full models, not through the world flora cards Vvardenfell uses
 - [CHIM-STAIR-GATE-WORLD-RELOAD-36](CHIM-STAIR-GATE-WORLD-RELOAD-36.md): The CHIM stair gate's workers read the whole CHIM world again every time they switch frames (about 14.5 s per read on the 273-frame world)
 - [CHIM-STAIRGATE-SLOW-33](CHIM-STAIRGATE-SLOW-33.md): The CHIM stair gate takes over 10 minutes on the Balmora and Vivec Arena world
+- EXPANSION-READER-ONE-MASTER-64 (no report page): Most builder readers load only the base game file; the roadmap calls the readers master-list readers
 - GATE-IMAGE-REMOVED-52 (no report page): A cleanup removed the image the gate s Linux host-parity step runs: the in-use check looked at containers only
 - GATE-PRIVACY-NOT-IN-PREGATE-52 (no report page): The privacy word check runs only in the full gate: the quick pre-gate checks passed text the gate then refused
 - [HARVEST-CHIM-COVERAGE-ONE-AREA-48](HARVEST-CHIM-COVERAGE-ONE-AREA-48.md): The image step harvest coverage check failed on every CHIM world of one area (every MiniWind sandbox of one town)

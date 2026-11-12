@@ -1,6 +1,6 @@
 # Animation kit
 
-_Last updated with AmiWind v0.0.57-dev4 (30 October 2026)._
+_Last updated with AmiWind v0.0.64 (12 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -11,6 +11,7 @@ _Last updated with AmiWind v0.0.57-dev4 (30 October 2026)._
 - [Morrowind's groups: wired and not wired yet](#morrowinds-groups-wired-and-not-wired-yet)
 - [Every group hooked up](#every-group-hooked-up)
 - [Walk or run: the rules and their sources](#walk-or-run-the-rules-and-their-sources)
+- [Actor animation coverage table](#actor-animation-coverage-table)
 - [MiniWind sandbox](#miniwind-sandbox)
 - [Known limits](#known-limits)
 
@@ -201,6 +202,28 @@ play their run group (walk when a model has no run group). The companion's defau
 (`dbg companion mimic speed on`) copies the player's speed, so it runs when the player runs: this is an
 AmiWind extension, not the original rule (the original follower runs only when it falls behind). With
 mimic speed off it follows the distance rule.
+
+## Actor animation coverage table
+
+Every image build writes `actor-anim-coverage.json` into its run folder (beside the other build tables): one
+row per actor placed in the image's maps, with its record id, map, name, model, which of idle, walk, run,
+attack, hit and death its fights can play (from its own layout or its full-kit model), the full-kit model it
+is linked to, whether it can turn hostile, and any exception. The image step refuses an actor that can turn
+hostile and has no attack group, unless it is a named exception (`COVERAGE_EXCEPTIONS` in
+`tools/actor_library.py`, each with the script line that keeps it out of every fight; none at present).
+The table can be read later without playing the game.
+
+Each row also says how the actor reaches its own record (`record_binding`): its combat sheet (level,
+attributes, skills, health, magicka, fatigue, fight and flee from the original record), whether its
+reference number is that record's in the game data, whether its room's area record holds its stat entry
+(stats, AI settings, faction, spells, gold), and whether it has a wander row. The image step refuses an
+actor that misses any of the first three, naming the record and what is missing.
+
+The opening's own characters (the census office, the prison ship, the dock) have standing models with only
+their talk, blink and walk frames. The actor library also bakes their appearances with the full kit, and
+each standing model's layout (`np_<name>.anm`) names that model; the engine wears it when a fight starts and
+takes it off when the fight ends. A scripted walk of the opening keeps the standing model
+(CENSUS-NPC-NO-ATTACK-ANIM-65).
 
 ## MiniWind sandbox
 

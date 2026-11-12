@@ -46,6 +46,7 @@ eval_t *GetEdictFieldValue(edict_t *e,char *name){
 int AW_BarrierLoad(void){return barriers;}
 int AW_NavLoad(const char *map){return 1;}
 int AW_NavStart(edict_t *e,vec3_t p){return 1;}
+int AW_NavStartDirect(edict_t *e,vec3_t p){return 1;}   /* PIER-GUARD-WALKS-INTO-DOOR-65 */
 int AW_NavStep(double dt,int follow){return 0;}
 int AW_InteriorPlace(edict_t *e,vec3_t at){
     if(placement)VectorCopy(at,e->v.origin);return placement;

@@ -113,7 +113,8 @@ static void every_entry_translates(void){
        (!strcmp(bar1+1,"setlvl") || !strcmp(bar1+1,"setlevel"))?" setlevel":
        (!strcmp(bar1+1,"maxstats") || !strcmp(bar1+1,"maxstat"))?" max":
        (!strcmp(bar1+1,"restorestats") || !strcmp(bar1+1,"restore stats") || !strcmp(bar1+1,"stats restore"))?" restore":
-       (!strcmp(bar1+1,"torch") || !strcmp(bar1+1,"give dbgtorch") || !strcmp(bar1+1,"give debugtorch"))?" give debugtorch":
+       (!strcmp(bar1+1,"torch") || !strcmp(bar1+1,"dbgtorch") || !strcmp(bar1+1,"debugtorch") ||
+        !strcmp(bar1+1,"give dbgtorch") || !strcmp(bar1+1,"give debugtorch"))?" give debugtorch":
        !strcmp(bar1+1,"door roulette")?" roulette":!strcmp(bar1+1,"doorlocks")?" locks":
        !strcmp(bar1+1,"date")?" date":
        !strcmp(bar1+1,"creatures")?" actors creatures":!strcmp(bar1+1,"mwscript")?" about":

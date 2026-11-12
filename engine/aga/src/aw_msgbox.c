@@ -23,9 +23,16 @@ static void hook(void) {
     aw_msgbox_mouse=AW_MsgBoxMouse;      /* the pointer over a box with buttons (MSGBOX-NO-CURSOR-62) */
     ready=1;
 }
+/* OPENING-TUTORIAL-KEYS-65 (aw_textdef.c sets it): a box that names a control or announces a window gets the player's
+ * bound key (config/tutorial-texts.json); NULL in fixtures without it */
+int (*aw_msgbox_tutorial)(const char *text,char *out,int capacity);
 void AW_MsgBoxShow(const char *raw,const char *const *buttons,int count) {
-    static char text[1024];
+    static char text[1024],keyed[1024];int row=0;
     hook();
+    /* -1: a box its row hides (the original's second menu hint, which the box before it already says in our text,
+     * TUTORIAL-BOX-SHOWN-TWICE-65); the script goes on as after its Ok (none of them reads the button) */
+    if(aw_msgbox_tutorial && (row=aw_msgbox_tutorial(raw,keyed,sizeof(keyed)))<0){Con_DPrintf("MessageBox: not shown (said by the box before it)\n");return;}
+    if(aw_msgbox_tutorial && row>0)raw=keyed;
     AW_ExpandDialogue(text,sizeof(text),raw);    /* the text defines (BOOK-TEXT-MACROS-58), as OpenMW's message boxes */
     if(count<1){AW_UIPickupNotice(text,AW_MsgBoxSeconds(text));return;}
     AW_MsgBoxOpen(&box,text,buttons,count);
@@ -71,12 +78,17 @@ static int box_frame(int frame[4],int *shown) {
     if(shown)*shown=n;
     return n*lh;
 }
+/* UI-TEXT-BOX-CLEARANCE-64: each button's label width in the button font, for buttons sized to their labels */
+static void label_widths(int *w) {
+    int i;
+    for(i=0;i<box.count && i<AW_MSGBOX_BUTTONS;i++)w[i]=AW_UIWidth(box.button[i]);
+}
 /* the mouse over a box with buttons: the pointer, a button under it is the selection (OpenMW: hover highlights) */
 static int button_at(int px,int py) {
-    int frame[4];
+    int frame[4],w[AW_MSGBOX_BUTTONS];
     if(!box.open || box.count<1)return -1;
-    box_frame(frame,NULL);
-    return AW_MsgBoxButtonAt(box.count,frame,px,py);
+    box_frame(frame,NULL);label_widths(w);
+    return AW_MsgBoxButtonAtSized(box.count,frame,w,px,py);
 }
 int AW_MsgBoxMouse(int dx,int dy) {
     int i;
@@ -91,7 +103,7 @@ int AW_MsgBoxMouse(int dx,int dy) {
     return 1;
 }
 void AW_MsgBoxDraw(void) {
-    int i,f[4],r[4],lines,shown,gold,grey;
+    int i,f[4],r[4],lines,shown,gold,grey,w[AW_MSGBOX_BUTTONS];
     extern int scr_copyeverything;
     if(!AW_MsgBoxActive() || !box_here())return;
     scr_copyeverything=1;
@@ -99,8 +111,9 @@ void AW_MsgBoxDraw(void) {
     lines=box_frame(f,&shown);
     AW_UIBox(f[0],f[1],f[2],f[3]);
     AW_UICenteredLinesUpTo(f[0]+6,f[1]+4,f[2]-12,lines+8,box.text,shown);
+    label_widths(w);
     for(i=0;i<box.count;i++){
-        AW_MsgBoxButtonRect(box.count,i,f,r);
+        AW_MsgBoxButtonRectSized(box.count,i,f,w,r);
         AW_UIBox(r[0],r[1],r[2],r[3]);
         if(i==box.selection)AW_UIFill(r[0]+3,r[1]+3,r[2]-6,16,AW_UIColor(70,52,30));
         AW_UITextBox(r[0],r[1],r[2],r[3],box.button[i],i==box.selection?gold:grey);

@@ -16,7 +16,8 @@ PLAYTESTING|cast ready|aw_magicfx|raise or lower the magic (the R key): the hand
 PLAYTESTING|cast spell|aw_magicfx|[list / none / N / mN / grant N] your spells: no argument or list shows the known spells, the selected one, the counts of casts, magic items used and your active effects; N or mN selects a spell or a made spell; none clears it; grant N gives you spell row N and selects it (for tests)
 PLAYTESTING|cast start|aw_magicfx|the starting spells chosen for the character: what the start gave and why (report)
 PLAYTESTING|cast strike|aw_magicfx|for tests: the held enchanted weapon's blow lands on the actor in reach and its enchantment casts; prints the count of strikes cast
-PLAYTESTING|census legacy|aw_census_legacy|[0 / 1; no argument prints it] the census office's registration (default 0, not saved): 0 = the original's own scripts and dialogue (the clerk, the captain, the door guard, the papers, the doors, the courtyard barrel and ring); 1 = the project's earlier hand-written registration, kept for an A/B; set it before the office loads
+PLAYTESTING|census legacy|aw_census_legacy|[0 / 1; no argument prints it] the older name of census type: 1 = legacy, 0 = original
+PLAYTESTING|census type|aw_census_type_set|[amiwind / legacy / original (0 / 1 / 2); no argument prints it] census office registration (default amiwind, not saved; set before the office): amiwind = the scripts with AmiWind's own (the clerk talks as you walk up and holds you, lines boxed, nothing taken before his review); legacy = old hand-written; original = scripts alone
 PLAYTESTING|characterchange|aw_quickchar|[race class birthsign review / all] reopen the pier race, gender, head and hair menu over the current scene; confirm to apply (after registration)
 PLAYTESTING|choosecompanion|aw_pickcompanion|same as companion pick
 PLAYTESTING|combat|aw_combat_cmd|[on/off / seed N / readout on/off / music on/off / dice / style amiwind/original / block hold/auto / flee / sounds / bestattack / contact on/off / loadout NAME/off / resistnormal N/off / calm] melee combat: no argument = status; bestattack = Options > Prefs best attack; contact off = crosshair ray only (defaults: flee off, the rest on, block auto)
@@ -25,6 +26,8 @@ PLAYTESTING|companion|aw_companion|[pick/choose/test/off/distance N/mimic speed 
 PLAYTESTING|companiontest|aw_companiontest|[on/off] same as companion test / companion off; no argument: status
 PLAYTESTING|creatures|chim|[on/off, true/false or 1/0; no argument toggles] the outdoor creatures (default on; not saved): off removes the wild creatures alive (their state kept) and spawns none, to compare frame rate, memory and behaviour; on brings them back as their cells join again
 PLAYTESTING|daycycle gallery|aw_daycycle_gallery|[here/off] (eight-stage camera tour; here keeps this view; Esc returns)
+PLAYTESTING|dbgtorch|aw_inventory|same as torch: one more debug torch in the inventory, with a message
+PLAYTESTING|debugtorch|aw_inventory|same as torch: one more debug torch in the inventory, with a message
 PLAYTESTING|demowind|aw_demowind|[on / off / next / prev / effect 1-2 / dist 0-7 / status] DemoWind (docs/DEMOWIND.md): the effects test kit, fullscreen, no world; each effect with its ms a frame and bytes on screen; Left/Right effect, Up/Down distance to Red Mountain, Esc off
 PLAYTESTING|gallery|aw_charplane|[number/name/ID; next/previous/body/browse/help/exit]
 PLAYTESTING|gear|aw_inventory|every armour and clothing piece in a list box by piece and weight class (type to search: glass, heavy, boots; Enter gives one and wears it), test only, saved like any grant (docs/INVENTORY.md)

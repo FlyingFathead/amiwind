@@ -28,6 +28,7 @@
 #include "aw_pcstanding.h"
 #include "aw_effects.h"
 #include "aw_cast.h"
+#include "aw_hand_models.h"
 #include "aw_talk.h"
 #include "aw_glut.h"
 #include "aw_dial.h"
@@ -300,14 +301,25 @@ static int host_sound_playing(int instance,int target,int sound){
  * sample in the pool), and the entity and length of the last one started (aw_mwscript_status) */
 static unsigned long says_started,says_missed;static int say_last_entity;static float say_last_seconds;
 static void host_say(int instance,int target,int voice,int text){
-    unsigned char hash[8];int centis,entity,i,slot=0;vec3_t at;sfx_t *s;
-    (void)text;
+    unsigned char hash[8];int centis=0,entity,i,slot=0,voiced,row;vec3_t at;sfx_t *s=NULL;char line[256];double seconds;
     entity=locate(instance,target,at);
-    if(entity<=0 || !AW_MwvmVoice(voice,hash,&centis) || !(s=pool_sound(hash))){says_missed++;return;}
-    S_StartSound(entity,CHAN_SCRIPT_VOICE,s,at,1.0f,1.0f);
-    says_started++;say_last_entity=entity;say_last_seconds=centis/100.0f;
+    if(entity<=0){says_missed++;return;}
+    row=AW_MwvmVoice(voice,hash,&centis);
+    voiced=row && (s=pool_sound(hash))!=NULL;
+    line[0]=0;
+    if(text>=0 && !read_string(text,line,sizeof(line)))line[0]=0;
+    seconds=row && centis>0?centis/100.0:AW_MsgBoxSeconds(line);
+    /* OPENING-REGRESSION-64: the Say's own text in the speech box (OpenMW soundextensions.cpp OpSay shows the text
+     * with subtitles on, ours always): the clerk's and the dock guard's lines were voice only, nothing to read on a
+     * machine without sound */
+    if(line[0]){edict_t *e=EDICT_NUM(entity);AW_UIVoiceSubtitle(e->v.netname?pr_strings+e->v.netname:"",line,seconds);}
+    if(voiced){S_StartSound(entity,CHAN_SCRIPT_VOICE,s,at,1.0f,1.0f);says_started++;}
+    else says_missed++;
+    /* SayDone keeps the original's pacing without a sample too: the line's time is recorded either way */
+    if(!voiced && !line[0])return;
+    say_last_entity=entity;say_last_seconds=(float)seconds;
     for(i=0;i<SAYS;i++){if(says[i].entity==entity){slot=i;break;}if(says[i].until<says[slot].until)slot=i;}
-    says[slot].entity=entity;says[slot].until=(float)realtime+centis/100.0f;
+    says[slot].entity=entity;says[slot].until=(float)(realtime+seconds);
 }
 static int host_say_done(int instance,int target){
     int entity,i;vec3_t at;
@@ -382,6 +394,7 @@ typedef struct {
 } object_t;
 static object_t objects[OBJECTS];static int object_count;
 static void object_activate(uint32_t reference);
+static void shown_state(edict_t *e,float *model,float *solid);
 static unsigned long objects_hidden,objects_full;
 static object_t *object_find(uint32_t ref,int create){
     int i;
@@ -410,7 +423,7 @@ static void object_hide(object_t *o){
     ChimRoom_Hide(o->ref,1);           /* its placements in a CHIM room (no edict) leave too */
     if(!e || e->free)return;
     if(o->entity!=number || o->map!=attached_map || e->v.modelindex){
-        o->model=e->v.modelindex;o->solid=e->v.solid;o->entity=number;o->map=attached_map;
+        float m,s;shown_state(e,&m,&s);o->model=m;o->solid=s;o->entity=number;o->map=attached_map;
     }
     e->v.modelindex=0;e->v.solid=SOLID_NOT;SV_LinkEdict(e,false);objects_hidden++;
 }
@@ -447,6 +460,18 @@ static hidden_t *hidden_find(uint32_t ref,int create){
     hidden[hidden_count].ref=ref;hidden[hidden_count].entity=-1;hidden[hidden_count].map=attached_map;
     return &hidden[hidden_count++];
 }
+/* CENSUS-PAPERS-INVISIBLE-65: what an edict shows when it is switched back on. An edict another rule had already
+ * hidden (the opening's papers: aw_opening.c AW_OpeningSpawn clears their model until their step) kept model 0 here,
+ * so a script's Enable gave back their use and name but nothing drawn. The model comes from its own model name then,
+ * and the solidity from its kind (a brush model "*N" solid as a brush, any other as a box). */
+static void shown_state(edict_t *e,float *model,float *solid){
+    *model=e->v.modelindex;*solid=e->v.solid;
+    if(!*model && e->v.model && pr_strings[e->v.model]){
+        const char *name=pr_strings+e->v.model;
+        *model=(float)SV_ModelIndex((char *)name);
+        if(*solid==SOLID_NOT)*solid=name[0]=='*'?SOLID_BSP:SOLID_BBOX;
+    }
+}
 /* REF leaves this map: its edict (what it had is kept to show it again) and its CHIM room placements */
 static void ledger_hide(uint32_t ref){
     int number=entity_of_reference(ref);edict_t *e=edict_of(number);hidden_t *h;
@@ -454,7 +479,7 @@ static void ledger_hide(uint32_t ref){
     ChimRoom_Hide(ref,1);
     if(!e || e->free || hidden_find(ref,0))return;
     if(!(h=hidden_find(ref,1))){ledger_refused++;return;}
-    h->entity=number;h->model=e->v.modelindex;h->solid=e->v.solid;
+    h->entity=number;shown_state(e,&h->model,&h->solid);
     e->v.modelindex=0;e->v.solid=SOLID_NOT;SV_LinkEdict(e,false);ledger_hidden++;
 }
 static void ledger_show(uint32_t ref){
@@ -3959,7 +3984,8 @@ static int disposition_weapon_drawn(void){
     edict_t *p;eval_t *goal,*torch;
     if(!sv.active || svs.maxclients<1 || !(p=svs.clients[0].edict))return 0;
     goal=GetEdictFieldValue(p,"aw_hand_goal");torch=GetEdictFieldValue(p,"aw_torch");
-    return goal && goal->_float==1 && !(torch && torch->_float!=0);
+    /* the spell stance is not a drawn weapon (OpenMW DrawState::Spell; READY-MAGIC-SHOWS-WEAPON-65) */
+    return goal && AW_HandShowsWeapon(goal->_float==1,aw_magic_readied) && !(torch && torch->_float!=0);
 }
 static float disposition_charm(unsigned long reference){(void)reference;return 0;}
 static int crime_set_global(const char *name,int value);   /* below, CRIME-59 */
@@ -4376,6 +4402,30 @@ static void join_fights(float dt){
         if(why==1)joins_allies++;else joins_guards++;
     }
 }
+/* OPENING-REGRESSION-64: CharGenState is ONE value. The engine's opening keeps it in aw_state (AW_StoryReset sets
+ * the game's 10 at New Game, the release and the presets -1: aw_story.c, aw_character.c); the scripts and the
+ * dialogue filters read the interpreter's own global of that name (live_global), which starts at the file's start
+ * value. Every tick, before any script runs: a change on the engine's side since the last sync goes into the
+ * interpreter, else a script's own change (a SET of CharGenState) goes back into aw_state. One global lookup per file
+ * load (the index is kept), then two reads per tick. */
+static int chargen_global=-2;static int32_t chargen_synced=0x7fffffff;
+static void chargen_sync(void){
+    int32_t story,script;int type=0;aw_mwcell_t c;
+    if(chargen_global==-2){
+        int g;chargen_global=-1;global_names_load();
+        for(g=0;global_names && global_offsets && g<global_count;g++)
+            if(global_offsets[g]>=0 && same_id(global_names+global_offsets[g],"CharGenState")){chargen_global=g;break;}
+    }
+    if(chargen_global<0)return;
+    AW_MwvmGlobalName(chargen_global,&type);
+    c.i=(int32_t)AW_MwvmGlobalBits(chargen_global);
+    script=type==2?(int32_t)c.f:c.i;
+    story=AW_StateGet(&aw_state,AW_GLOBAL,"CharGenState");
+    if(story!=chargen_synced){
+        if(script!=story){if(type==2)c.f=(float)story;else c.i=story;AW_MwvmGlobalSetBits(chargen_global,(uint32_t)c.i);}
+    }else if(script!=story && AW_StateSet(&aw_state,AW_GLOBAL,"CharGenState",script))story=script;
+    chargen_synced=story;
+}
 void AW_MwscriptTick(float dt){
     int k,n,i;vec3_t player;
     /* no game running (a load, the main menu): a script's message box goes with it */
@@ -4398,6 +4448,7 @@ void AW_MwscriptTick(float dt){
             new_game_weather();   /* CharGen's ChangeWeather, carried by AmiWind's own opening (v0.0.63) */
         }
         t1=Sys_FloatTime();
+        chargen_sync();   /* OPENING-REGRESSION-64: before any script runs this tick */
         if(script_model!=map_model){script_model=map_model;attach_map();carried_sync();}
         t2=Sys_FloatTime();
         if(t2-t0>.3)Con_Printf("MWScript first tick: file %s %.0f ms, map attach %.0f ms.\n",was?"kept":"loaded",
@@ -5039,6 +5090,7 @@ static void script_import(const aw_ledger_t *l){
         AW_LedgerRecordsSet((aw_ledger_t *)l,NULL,0);
     }
     if(!resident || !AW_MwvmLoaded())return;     /* load() applies the list when the scripts come */
+    chargen_synced=0x7fffffff;   /* OPENING-REGRESSION-64: after the save's globals, the engine's CharGenState goes in */
     global_names_load();
     for(g=0;g<AW_MwvmGlobalCount();g++){
         uint32_t bits=AW_MwvmGlobalStart(g);
@@ -5218,6 +5270,7 @@ static void actors_import(const unsigned char *data,int bytes){
  * scripts ran on with the first game's instances: the Census office's lights out, its items not to be taken. */
 void AW_MwscriptNewGameReset(void){
     actors_import(NULL,0);
+    chargen_synced=0x7fffffff;   /* the interpreter starts again from its start values: the engine's value goes in */
     if(resident && AW_MwvmLoaded()){
         if(!AW_MwvmLoad(resident,resident_bytes,&host)){free(resident);resident=NULL;load_failed=0;}
         else AW_MwscriptResultsPrepare();
@@ -5289,6 +5342,7 @@ void AW_MwscriptInit(void){
     aw_item_added=item_added;   /* OnPCAdd (CENSUS-INTRO-SCRIPTS-62) */
     aw_item_removed=item_removed;   /* a carried item's script stops with the last one (MWSCRIPT-UNPLACED-ATTACH-62) */
     aw_actors_levelled_spawned=levelled_spawned;   /* a levelled pick runs its record's script (the same item) */
+    aw_opening_activate=object_intercept;      /* census type amiwind: the clerk starts his talk (OPENING-REGRESSION-64) */
     aw_inventory_intercept=object_intercept;   /* OnActivate takes a placed item's use */   /* OnActivate takes a door's use */
     aw_actor_disabled=AW_ObjectDisabled;   /* the CHIM window spawns no disabled actor */
     aw_actors_visitors=room_visitors;      /* PositionCell: a room spawns the actors moved into it (v0.0.62) */

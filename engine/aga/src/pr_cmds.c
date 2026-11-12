@@ -1917,19 +1917,37 @@ static void PF_aw_bark(void)
  * voice, the previous method, which every NPC without a conversation greeting still uses. */
 static void PF_aw_converse(void)
 {
-    edict_t *e=G_EDICT(OFS_PARM0);eval_t *v=NULL;char text[1024];double seconds;
-    G_FLOAT(OFS_RETURN)=0;
-    if(G_FLOAT(OFS_PARM1))v=GetEdictFieldValue(e,"aw_greeting_again");
+    edict_t *e=G_EDICT(OFS_PARM0);eval_t *v=NULL;char text[1024];double seconds;int again=G_FLOAT(OFS_PARM1)!=0;
+    G_FLOAT(OFS_RETURN)=0;text[0]=0;
+    if(again)v=GetEdictFieldValue(e,"aw_greeting_again");
     if(!v || !v->string || !pr_strings[v->string])v=GetEdictFieldValue(e,"aw_greeting");
     if(v && v->string && pr_strings[v->string])AW_ExpandDialogue(text,sizeof(text),pr_strings+v->string);
     /* no greeting of its own (library, region and batch-room actors; NPC-GREETINGS-LIBRARY-MUTE-48): the voice
-     * table's conversation greeting, the same rule picked when the talk opens (aw_glut.c) */
-    else if(!AW_GlutConverse(e,G_FLOAT(OFS_PARM1)!=0,text,sizeof(text)))return;
+     * table's conversation greeting, the same rule picked when the talk opens (aw_glut.c). Its pick may be a row the
+     * voice table keeps WITHOUT text (a guard's crime greeting with a bounty: greeting_lut.py blanks lines whose
+     * defines are filled only at run time), so an empty text must not keep the dialogue window shut. */
+    else if(!AW_GlutConverse(e,again,text,sizeof(text)))text[0]=0;
     seconds=strlen(text)/12.0;if(seconds<8)seconds=8;if(seconds>40)seconds=40;
-    /* the dialogue window (aw_dialwin.c, DIALOGUE-57) when the NPC has topics: the greeting opens the conversation
-     * there; otherwise (or aw_dialogue_window 0) the greeting as a subtitle, as before */
-    if(!AW_DialWindowOpen(e,text,G_FLOAT(OFS_PARM1)!=0))
-        AW_UISubtitle(pr_strings+e->v.netname,text,seconds);
+    /* the dialogue window (aw_dialwin.c, DIALOGUE-57) FIRST when the NPC has topics: it picks its own greeting from the
+     * dialogue table (the text here only when that table has none), as the guards' crime greeting already does
+     * (aw_mwhost.c crime_greet). SELLUS-GRAVIUS-GREETING-ONLY-64: with any bounty Sellus Gravius' voice-table pick was
+     * a text-less crime row, this function returned before the window, and only his hello voice line played. */
+    if(AW_DialWindowOpen(e,text,again)){G_FLOAT(OFS_RETURN)=(float)seconds;return;}
+    /* RC2-SELLUS-NO-TALK-65 (the maintainer, 12 November 2026: in the original and in OpenMW a person talks only in the
+     * dialogue window): a person of the original game (a record id) never answers the use key with a subtitle or the
+     * hello line in its place; the window's refusal is on the console (aw_dialwin.c says why), and a nonzero return
+     * keeps QC (world.qc aw_greet) from saying the hello line instead. The subtitle below is only for AmiWind's own
+     * actors without a record. */
+    {eval_t *id=GetEdictFieldValue(e,"aw_source_id");
+     if(id && id->string && pr_strings[id->string]){
+         Con_Printf("Talk: the dialogue window did not open for %s (record %s); no line shown in its place.\n",
+                    pr_strings+e->v.netname,pr_strings+id->string);
+         G_FLOAT(OFS_RETURN)=.1f;return;
+     }}
+    /* no window and no record (AmiWind's own actors): the greeting as a subtitle, as before; no text at all -> 0, and
+     * QC says the hello line and its voice */
+    if(!text[0])return;
+    AW_UISubtitle(pr_strings+e->v.netname,text,seconds);
     G_FLOAT(OFS_RETURN)=(float)seconds;
 }
 

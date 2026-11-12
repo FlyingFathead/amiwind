@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.53 at 2026-10-27 07:45 +0200: Seen again: the v0.0.53 final run 2026_10_27_v0.0.53_final_45f4c426 ran its image stage under half its cores with units queued, 4 times (the build summary Needs attention item)
 - Reported with v0.0.64-dev1 at 2026-11-10 05:31 +0200: dev1 build of 4bd67418: the image step's hidden-surface cull walked its 1,136 maps at about one core (107 percent of 24)
+- Reported with v0.0.65-rc1 at 2026-11-12 01:55 +0200: v0.0.65-rc1 build (reusing the v0.0.65-dev1 world): the image step ran on 1.5 of 24 cores for 95 s with 1136 units queued and none running, in the actor ground check phase; in the v0.0.65-dev1 build the same phase took 53 s on 12.4 cores. The check is redone on every build although its inputs are unchanged (BUILD-TABLE-UNITS-REBAKE-63).
 
 <!-- END GENERATED PERSISTING -->
 
@@ -21,7 +22,7 @@
 | Persists in | v0.0.52-dev1, v0.0.53, v0.0.64-dev1 (last seen) |
 | Severity | medium: About 3 minutes of a 16-minute image step on a few of 24 cores |
 | Family | Build speed (`build-speed`) |
-| Deferred by the maintainer | 2026-11-11: deferred by the maintainer to v0.0.65 (the v0.0.64 release ships early); its "came back" mark is checked against its evidence first |
+| Deferred by the maintainer | 2026-11-12: deferred by the maintainer to v0.0.66 (the v0.0.65 release fixes the opening only and ships early); its "came back" mark is checked against its evidence first |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
 | Playtest version | 2026_10_25_v0.0.52-dev1_dev1-try2_d27706d6 |
 | From commit | source d27706d, engine d27706d, CHIM world d27706d |
@@ -35,7 +36,7 @@ _Last updated with AmiWind v0.0.64-dev2 (10 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
 - [Status: 10 November 2026](#status-10-november-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -212,8 +213,10 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [CHIM-PVS-SLOW-33](CHIM-PVS-SLOW-33.md): Seyda Neen's CHIM visibility rows take 5.5 minutes and are rebuilt whenever the worker count changes
 - [CHIM-ROOM-FAIL-STAGE-48](CHIM-ROOM-FAIL-STAGE-48.md): One CHIM room that cannot be made failed the whole CHIM interiors stage (HOLD-LEVEL with every room batch by default)
 - [CHIM-ROOM-OVER-BUDGET-RETRY-48](CHIM-ROOM-OVER-BUDGET-RETRY-48.md): A model over the image budget is tried whole again on every run before its cached tiles are used: its room runs on one core
+- CHIM-SOL-FLORA-PATH-64 (no report page): The Solstheim test frame converts its trees as full models, not through the world flora cards Vvardenfell uses
 - [CHIM-STAIR-GATE-WORLD-RELOAD-36](CHIM-STAIR-GATE-WORLD-RELOAD-36.md): The CHIM stair gate's workers read the whole CHIM world again every time they switch frames (about 14.5 s per read on the 273-frame world)
 - [CHIM-STAIRGATE-SLOW-33](CHIM-STAIRGATE-SLOW-33.md): The CHIM stair gate takes over 10 minutes on the Balmora and Vivec Arena world
+- EXPANSION-READER-ONE-MASTER-64 (no report page): Most builder readers load only the base game file; the roadmap calls the readers master-list readers
 - GATE-IMAGE-REMOVED-52 (no report page): A cleanup removed the image the gate s Linux host-parity step runs: the in-use check looked at containers only
 - GATE-PRIVACY-NOT-IN-PREGATE-52 (no report page): The privacy word check runs only in the full gate: the quick pre-gate checks passed text the gate then refused
 - [HARVEST-CHIM-COVERAGE-ONE-AREA-48](HARVEST-CHIM-COVERAGE-ONE-AREA-48.md): The image step harvest coverage check failed on every CHIM world of one area (every MiniWind sandbox of one town)

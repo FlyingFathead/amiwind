@@ -1,6 +1,6 @@
 # HUD: weapon and magic boxes
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.64 (12 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -10,6 +10,7 @@ _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 - [Inventory icons](#inventory-icons)
 - [Window title bar](#window-title-bar)
 - [Engine (aw_icons.c)](#engine-aw_iconsc)
+- [Boxes on screen](#boxes-on-screen)
 
 <!-- contents end -->
 
@@ -173,3 +174,30 @@ components/widgets/windowcaption.cpp (WindowCaption::align).
   for each method in the same session.
 * `aw_hud_icons 0` selects the interim marks of v0.0.40 (a fist or sword mark
   and a dash); an image without the converted table also falls back to them.
+
+## Boxes on screen
+
+Every message box, tutorial box and notice goes through one pipeline. Nothing is placed by hand: a missing feature
+is added to the pipeline once.
+
+- **Showing a box.** Call `AW_MsgBoxShow(text, buttons, count)` with plain text; `count` 0 makes a timed notice. The
+  game's text defines (`%PCName`, `^ActionActivate` and the rest) are filled in by the same call.
+- **Line breaks and empty rows.** `\n` ends a line; `\n\n` leaves an empty row. Long lines wrap inside the box's
+  inner margins. The frame is sized from the lines, empty rows included (`AW_MsgBoxLayout`).
+- **The key column.** A tab in a line splits it: the part before the tab stands at the left inner margin, the part
+  after it right-aligned at the right inner margin. Lines without a tab are centred.
+- **Keys come from the bindings.** A hint never names a fixed letter. Inside the engine use
+  `AW_TextBoundKeyForCommand("aw_inventory")` (a letter in upper case, the mouse buttons in words, `NULL` when
+  nothing is bound) or the game's `^Action` defines. The game's own tutorial boxes are matched by the hash of their
+  text in `config/tutorial-texts.json` (rendered into the engine by `tools/tutorial_texts.py render`), where
+  `{key:COMMAND}` is the key bound now and `(not bound)` shows when none is. The inventory window's own keys are
+  bindable too (`aw_key_inv_use`, default `E ENTER`; `aw_key_inv_drop`, default `D`). A test fails on any new
+  player-facing text in the engine that names a fixed key letter; `tests/key-hint-allowlist.json` lists the ones
+  left to convert.
+- **Clearance.** Inside the frame's 4-pixel edge, the text keeps at least 4 clear pixel rows above its first line and
+  below its last, and at least one clear row between lines. `tests/aga_ui_clearance_test.c` renders the box layouts
+  at the game's font size and measures them; a box that gets too tall rises over the view instead of cutting its text.
+- **The house layout of a tutorial box.** One plain sentence of what you got; an empty row; one line per action with
+  its key in parentheses in the right column (`Open it\t(I)`); an empty row; the `Ok` button centred and sized to its
+  label. Lines stay within about 36 characters for the 320-pixel box. Keys go in parentheses: the game font's square
+  brackets are ornaments, not brackets.

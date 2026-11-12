@@ -51,6 +51,12 @@ int AW_MsgBoxLinesShown(int lines,int rows,int screen,int line);
 void AW_MsgBoxLayout(int count,int vw,int vh,int text_px,int frame[4]);
 void AW_MsgBoxButtonRect(int count,int i,const int frame[4],int rect[4]);
 int AW_MsgBoxButtonAt(int count,const int frame[4],int px,int py);
+/* UI-TEXT-BOX-CLEARANCE-64: the same with each button as wide as its label (LABEL_W[i] pixels) plus AW_MSGBOX_BUTTON_PAD
+ * on each side, at least AW_MSGBOX_BUTTON_MIN, at most its share; a row's buttons centred in the box. */
+#define AW_MSGBOX_BUTTON_PAD 12
+#define AW_MSGBOX_BUTTON_MIN 48
+void AW_MsgBoxButtonRectSized(int count,int i,const int frame[4],const int *label_w,int rect[4]);
+int AW_MsgBoxButtonAtSized(int count,const int frame[4],const int *label_w,int px,int py);
 void AW_DeathBoxButtonRect(int count,int i,int vw,int vh,int rect[4]);
 int AW_DeathBoxButtonAt(int count,int vw,int vh,int px,int py);
 

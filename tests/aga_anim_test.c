@@ -19,6 +19,16 @@ static const char *layout =
 static int heard[2];
 static void emit(void *context,int kind) {(void)context;heard[kind]++;}
 
+/* CENSUS-NPC-NO-ATTACK-ANIM-65: an opening actor's layout (tools/actor_library.py opening_layout) parses against its
+ * 21 frames, keeps its own idle and walk and names its full-kit mover, which combat wears */
+static void opening_layout(void) {
+    aw_anim_t a;
+    assert(AW_AnimParse(&a,"idle:0:8:0.1500 walk:13:8:0.1250 >progs/n_67bdae9dfda6bc38.mdl\n",21));
+    assert(a.from_layout && a.g[AW_ANIM_IDLE].count==8 && a.g[AW_ANIM_WALK].base==13 && a.g[AW_ANIM_WALK].count==8);
+    assert(!strcmp(a.mover,"progs/n_67bdae9dfda6bc38.mdl"));
+    assert(!a.g[AW_ANIM_ATTACK].present);     /* the attack comes from the mover's own layout */
+}
+
 static void player_jump(void) {
     aw_anim_t a;aw_anim_air_t s;int i;
     memset(&s,0,sizeof(s));
@@ -178,6 +188,7 @@ int main(void) {
     assert(AW_AnimParse(&a,"idle:0:8:0.3",8));
     f=AW_AnimAdvance(&a,&p,AW_ANIM_RUN,.1f,1,&crossed);assert(f==0 && p.group==AW_ANIM_IDLE);
     player_jump();
+    opening_layout();
     player_ready();
     puts("aga_anim_test: ok");
     return 0;

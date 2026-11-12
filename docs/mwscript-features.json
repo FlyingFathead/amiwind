@@ -1,7 +1,7 @@
 {
  "schema": "mwscript-features 1",
- "updated": "2026-11-11",
- "version": "0.0.64",
+ "updated": "2026-11-12",
+ "version": "0.0.65",
  "intro": "One row per script record of the game: what names it, where it stands, which functions it calls and what its conditions test, and what state AmiWind has it in. The data is measured from the game's masters with the builder's own compiler; the page lists record ids, counts and states only. When the work list runs dry, the scripting work is taken from here row by row, toward the next landmark: every game script running as in the original. On Vvardenfell the scripts left are the character creation ones; the rest belong to Mournhold and Solstheim.",
  "measured": {
   "masters": {
@@ -281,7 +281,7 @@
    "user4",
    "wakeuppc"
   ],
-  "date": "2026-11-11",
+  "date": "2026-11-12",
   "bindings": 9095,
   "start_scripts": 4,
   "placed_scripted": 11171

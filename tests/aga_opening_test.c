@@ -10,7 +10,7 @@ aw_character_t aw_character;char *pr_strings;
 int pr_edict_size=sizeof(edict_t);client_state_t cl;
 static edict_t object,clerk;static eval_t reference;static int occluded,reads;
 static int obstructed,door_sounds,links,probes,world_hit;static vec3_t hit_pos;
-static edict_t captain;extern cvar_t aw_census_legacy;
+static edict_t captain;extern cvar_t aw_census_type;
 edict_t *EDICT_NUM(int n){return n==1?&object:n==3?&captain:&clerk;}
 trace_t SV_Move(vec3_t a,vec3_t mi,vec3_t ma,vec3_t b,int type,edict_t *p){
  trace_t t;memset(&t,0,sizeof(t));t.fraction=occluded?.5f:1;
@@ -27,6 +27,8 @@ edict_t *AW_IntroRole(int role){return role==5?&guard:role==6 && clerk.v.modelin
     role==7 && captain.v.modelindex && !guard_role8?&captain:role==8 && guard_role8?&captain:NULL;}
 int AW_NavLoad(const char *s){nav_stops++;return 1;}
 int AW_NavStart(edict_t *e,vec3_t goal){nav_starts++;VectorCopy(goal,nav_goal);return 1;}
+/* PIER-GUARD-WALKS-INTO-DOOR-65: the dock guard's two measured legs go straight, without the path grid */
+int AW_NavStartDirect(edict_t *e,vec3_t goal){nav_starts++;VectorCopy(goal,nav_goal);return 1;}
 int AW_NavStep(double dt,int wait){return nav_result;}
 int AW_IntroSpeak(int role,const char *s){if(speech)return 0;strcpy(line,s);speech=1;return 1;}
 double AW_SpeechRemaining(void){return speech;}
@@ -53,9 +55,9 @@ int SV_ModelIndex(char *s){return 0;}
 int main(void)
 {
     edict_t player;client_t client;int i;
-    /* the old hand-written path (aw_census_legacy 1) for the checks written for it; the census office's own
+    /* the old hand-written path (census type legacy) for the checks written for it; the census office's own
      * scripts (the default, 0) where a block says so (CENSUS-INTRO-SCRIPTS-62) */
-    aw_census_legacy.value=1;
+    aw_census_type.value=1;
     /* Original camera unlock is after the papers instruction, not race
      * selection, office entry, or merely making the papers visible. */
     AW_StoryReset(1);
@@ -85,12 +87,16 @@ int main(void)
     done=1;menu=0;AW_OpeningTick();assert(aw_story.stage==AW_STAGE_OFFICE && AW_OpeningLocked());
     for(i=0;i<16;i++)AW_OpeningTick();assert(aw_story.dock==50 && !strcmp(line,"chargendock2") && AW_OpeningLocked());
     speech=0;AW_OpeningTick();assert(aw_story.dock==-1 && !AW_OpeningLocked() && nav_starts==2);
-    /* v0.0.63 (the parity check): CharGenRaceNPC's own post, AITravel -9944 -72481 "next to door", in the dock map's
-     * units ((x+11264)/4, (y+71680)/4): 330 -200.25; he stands as the travel left him (no forced facing) */
-    assert(nav_goal[0]==330.f && nav_goal[1]==-200.25f);
+    /* PIER-GUARD-WALKS-INTO-DOOR-65 (the maintainer's design, 12 November 2026): after the race form he walks to a fixed
+     * point in front of the census office door (320.7 -213.4), then steps aside to his post beside the door (286 -214),
+     * both straight and measured from the door table; on arrival he faces the sea, the pier and the ship (native yaw
+     * 225) and keeps it; while walking his facing is the travel's. Before (v0.0.54-v0.0.62 and rc2): one walk on the
+     * path grid to 299 -202, whose nearest grid point is the door's corner, where he pushed against the door */
+    assert(nav_goal[0]==320.7f && nav_goal[1]==-213.4f);
     guard.v.angles[1]=10;nav_result=0;AW_OpeningTick();assert(guard.v.angles[1]==10);
-    nav_result=1;AW_OpeningTick();assert(guard.v.angles[1]==10);
-    for(i=0;i<5;i++)AW_OpeningTick();assert(nav_starts==2 && guard.v.angles[1]==10);
+    nav_result=1;AW_OpeningTick();assert(nav_starts==2 && guard.v.angles[1]==10);   /* in front of the door */
+    AW_OpeningTick();assert(nav_starts==3 && nav_goal[0]==286.f && nav_goal[1]==-214.f && guard.v.angles[1]==225);
+    for(i=0;i<5;i++)AW_OpeningTick();assert(nav_starts==3 && guard.v.angles[1]==225);
     /* INTRO-DOCK-GUARD-BLOCKS-DOOR-62, by numbers: his box at the post (half widths 7.32 x 7.12, as the converted
      * actors') and the office door's box of the shipped door table (doors-seyda.txt 113893: 308.86..332.61,
      * -173.38..-149.62) do not overlap, and the space between them is wider than the player's box (2 x 7.32): the
@@ -177,10 +183,10 @@ int main(void)
         assert(!AW_OpeningHint(&name,&action));
         /* CENSUS-INTRO-SCRIPTS-62: Sellus Gravius talks through the dialogue window (his Greeting 1 and "duties"
          * answers with their result scripts), not the old hand-written box; the box only behind
-         * aw_census_legacy 1. The greeting's take of the papers, seen in his reach, records his state -1. */
+         * census type legacy. The greeting's take of the papers, seen in his reach, records his state -1. */
         {
             int before=reads;
-            aw_census_legacy.value=0;
+            aw_census_type.value=2;
             clerk.v.modelindex=0;sv.num_edicts=4;captain.v.modelindex=1;captain.v.netname=1;
             captain.v.origin[0]=20;captain.v.origin[2]=-14;
             /* OPENING-CAPTAIN-HINT-SUBTITLE-63: within 75 map units (300 original) the hint is CharGenDialogueMessage's
@@ -194,10 +200,10 @@ int main(void)
             assert(!AW_CensusLegacy());
             assert(!AW_OpeningHint(&name,&action));
             assert(!AW_OpeningUse() && reads==before);
-            aw_census_legacy.value=1;
+            aw_census_type.value=1;
             assert(AW_OpeningHint(&name,&action) && !strcmp(action,"Talk: E"));
             assert(AW_OpeningUse() && reads==before+1);
-            aw_census_legacy.value=0;
+            aw_census_type.value=2;
             AW_OpeningTick();assert(aw_story.captain==0);              /* he has not taken them yet */
             assert(AW_ItemAdd(&aw_state,"chargen statssheet",-1));
             AW_OpeningTick();assert(aw_story.captain==-1);             /* Greeting 1: removeitem, state -1 */
@@ -218,7 +224,7 @@ int main(void)
             assert(AW_ItemAdd(&aw_state,"chargen statssheet",1));
             for(i=0;i<40;i++)AW_OpeningTick();
             assert(!aw_story.hall && !line[0]);
-            aw_census_legacy.value=1;
+            aw_census_type.value=1;
             for(i=0;i<40 && !aw_story.hall;i++)AW_OpeningTick();
             assert(aw_story.hall && !strcmp(line,"chargen_door2"));
             assert(AW_OpeningHingedStory(AW_REF_CENSUS_HALL_DOOR,AW_HINGE_STORY_LOCK)==0);
@@ -256,7 +262,7 @@ int main(void)
      * the review's end restoring the new character's health and allowing the view. On the old path he speaks. */
     {
         const char *name,*action;
-        aw_census_legacy.value=0;
+        aw_census_type.value=2;
         strcpy(sv.name,"census");sv.active=1;sv.num_edicts=3;object.v.modelindex=0;
         clerk.v.modelindex=1;clerk.v.origin[0]=15;clerk.v.origin[1]=0;clerk.v.origin[2]=0;
         player.v.origin[0]=player.v.origin[1]=0;player.v.origin[2]=0;player.v.movetype=MOVETYPE_WALK;
@@ -285,13 +291,13 @@ int main(void)
         assert(AW_ItemAdd(&aw_state,"Chargen StatsSheet",1) && added==2 && !strcmp(added_id,"chargen statssheet"));
         aw_item_added=NULL;
         AW_OpeningTick();assert(aw_story.stage==AW_STAGE_COURTYARD);
-        aw_census_legacy.value=1;
+        aw_census_type.value=1;
         assert(AW_ItemAdd(&aw_state,"chargen statssheet",-1));
         AW_StoryReset(1);aw_story.stage=AW_STAGE_PAPERS;
         assert(AW_OpeningHint(&name,&action) && !strcmp(action,"Read: E"));
-        aw_census_legacy.value=0;object.v.modelindex=0;clerk.v.modelindex=1;
+        aw_census_type.value=2;object.v.modelindex=0;clerk.v.modelindex=1;
         AW_StoryReset(1);aw_story.stage=AW_STAGE_OFFICE;
-        aw_census_legacy.value=1;
+        aw_census_type.value=1;
         AW_StoryReset(1);aw_story.stage=AW_STAGE_OFFICE;speech=0;
         AW_OpeningTick();assert(aw_story.census==10 && !strcmp(line,"chargen_class1"));
         clerk.v.modelindex=0;speech=0;

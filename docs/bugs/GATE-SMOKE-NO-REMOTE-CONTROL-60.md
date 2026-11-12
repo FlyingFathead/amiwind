@@ -23,7 +23,7 @@
 | Persists in | v0.0.64-dev3 (last seen) |
 | Severity | high: Regressed in v0.0.64-dev3 (was medium): Seen in gates 6858 and 6866 on the corpseaim branch; the reruns passed, so each hit costs a gate rerun |
 | Family | Gates, CI and tests (`tests-ci`) |
-| Deferred by the maintainer | 2026-11-11: deferred by the maintainer to v0.0.65 (the v0.0.64 release ships early); its "came back" mark is checked against its evidence first |
+| Deferred by the maintainer | 2026-11-12: deferred by the maintainer to v0.0.66 (the v0.0.65 release fixes the opening only and ships early); its "came back" mark is checked against its evidence first |
 | Came back (regression) | in v0.0.64-dev3 (fixed in v0.0.61-dev1 before) |
 | Playtest version | unknown |
 | From commit | source unknown, engine unknown, CHIM world unknown |
@@ -98,6 +98,7 @@ To be decided once the cause is found.
 
 Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wrong tree or depends on the host is not a check; skips fail loudly. See [families](README.md#families).
 
+- ARRIVAL-CHECK-EMPTY-65 (no report page): The image's arrival check passes while it checks no door arrival
 - [AW-RESULT-RECIPE-SAVED-36](AW-RESULT-RECIPE-SAVED-36.md): The master builder's result of a failed build from a requested recipe does not validate (recipe.saved left in)
 - [AW-RUN-NAME-LONG-REASON-36](AW-RUN-NAME-LONG-REASON-36.md): aw gate refuses a long --reason after leasing the gate number: the run name, used as the request id, passes 128 characters
 - [BUILD-CHECKLIST-JSON-CELLS-39](BUILD-CHECKLIST-JSON-CELLS-39.md): Exterior checklist rejects JSON cell coordinates before scenery conversion

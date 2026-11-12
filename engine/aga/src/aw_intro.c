@@ -336,6 +336,9 @@ int AW_IntroNamePrompt(void) {
 }
 int AW_IntroNamePromptOpen(void) {return prompt==1;}
 void (*aw_cstrip_draw)(void);
+/* OPENING-TUTORIAL-KEYS-65 (aw_textdef.c sets it): SOURCE's text defines filled in with the player's values and bound
+ * keys into OUT; 1 when done (NULL in fixtures without the text defines) */
+int (*aw_intro_hint_text)(const char *source,char *out,int capacity);
 int AW_IntroKey(int key) {
     if(AW_ReaderKey(key) || (aw_cstrip_key && aw_cstrip_key(key)) || AW_CharacterKey(key) || AW_QuickCharKey(key))return 1;
     if(!active || !prompt || key_dest!=key_game)return 0;
@@ -354,11 +357,20 @@ void AW_IntroDraw(void) {
     if(key_dest==key_game && (character_modal() || AW_ReaderActive() || prompt))scr_copyeverything=1;
     AW_CharacterDraw();AW_QuickCharDraw();AW_ReaderDraw();if(aw_cstrip_draw)aw_cstrip_draw();
     if(!prompt || key_dest!=key_game)return;
-    y=r_refdef.vrect.y+r_refdef.vrect.height;AW_UIBox(0,y,vid.width,vid.height-y);
-    if(prompt==1){AW_UIText(10,y+4,"Name (Enter to accept)",-1);AW_NameDraw(10,y+22,player_name);}
-    /* CharGenWalkNPC's own hint, with AmiWind's keys for its key names (OPENING-SHIP-GUARD-STEPS-63) */
-    else AW_UICenteredLines(0,y,vid.width,vid.height-y,"W and S move forward and back. A and D move side to side, "
-                                                        "and the mouse looks around.\nEnter: Ok");
+    y=r_refdef.vrect.y+r_refdef.vrect.height;
+    if(prompt==1){AW_UIBox(0,y,vid.width,vid.height-y);AW_UIText(10,y+4,"Name (Enter to accept)",-1);AW_NameDraw(10,y+22,player_name);}
+    /* CharGenWalkNPC's own hint, with AmiWind's keys for its key names (OPENING-SHIP-GUARD-STEPS-63); the panel rises
+     * over the view when its lines need the room (UI-TEXT-BOX-CLEARANCE-64: the last line touched the bottom edge) */
+    else{
+        /* OPENING-TUTORIAL-KEYS-65: the player's bound movement keys (the script's own ^Action defines, filled in by the
+         * text defines when the engine has them, aw_textdef.c), the fixed letters only without them */
+        static char hint[256];
+        const char *text="W and S move forward and back. A and D move side to side, and the mouse looks around.\nEnter: Ok";
+        if(aw_intro_hint_text && aw_intro_hint_text("^ActionForward and ^ActionBack move forward and back. "
+           "^ActionSlideLeft and ^ActionSlideRight move side to side, and the mouse looks around.\nEnter: Ok",hint,sizeof(hint)))
+            text=hint;
+        AW_UITextPanel(0,vid.height,vid.width,vid.height-y,text,3);
+    }
 }
 static void status(void){Con_Printf("Intro active %ld / Jiub %ld / guard %ld / prompt %ld / unlocked %ld / failed %ld\n",
     (long)active,(long)jiub_state,(long)guard_state,(long)prompt,(long)unlocked,(long)failed);

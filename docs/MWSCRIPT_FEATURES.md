@@ -1,6 +1,6 @@
 # MWScript features
 
-_Last updated with AmiWind v0.0.64 (11 November 2026)._
+_Last updated with AmiWind v0.0.65 (12 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -66,7 +66,7 @@ Dialogue answers that start or change a fight (StartCombat, SetFight, ModFight):
 | the speaker attacks (StartCombat): found by the answer's reference | 124 |
 | a fight between two actors: both are set against each other (since v0.0.63) | 5 |
 
-Measured on 11 November 2026 from the three masters (Morrowind, Tribunal, Bloodmoon) with the builder's own compiler (tools/mwscript), 11,171 placed scripted references, 9,095 bindings in the compiled file, 4 start scripts. The states are worked out again from the interpreter's function table (tools/mwscript/functions.py) whenever the page is rendered, so a function carried out later moves its scripts without a new measurement.
+Measured on 12 November 2026 from the three masters (Morrowind, Tribunal, Bloodmoon) with the builder's own compiler (tools/mwscript), 11,171 placed scripted references, 9,095 bindings in the compiled file, 4 start scripts. The states are worked out again from the interpreter's function table (tools/mwscript/functions.py) whenever the page is rendered, so a function carried out later moves its scripts without a new measurement.
 
 ## Why the others do not run
 

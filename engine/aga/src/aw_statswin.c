@@ -229,7 +229,8 @@ void AW_StatsOpen(void){
     if(!aw_character.valid){Con_Printf("Stats: no character yet.\n");return;}
     memset(&standing_cache,0,sizeof(standing_cache));
     if(aw_stats_standing && aw_stats_standing(&standing_cache))standing_cache.standing=1;
-    AW_WorldUIOpenPanel(stats_draw,stats_key,NULL);
+    /* MAP-MENU-BLOCKED-COURTYARD-65: open in the opening once a script's EnableStatsMenu switched it on */
+    AW_WorldUIOpenMenuPanel(stats_draw,stats_key,NULL,AW_MENU_STATS);
 }
 
 /* character/spells.aws (tools/prepare_character.py): "AWS1", u16 count, then per spell
@@ -331,7 +332,7 @@ void AW_MagicMenuOpen(void){
     free(magic);magic=(aw_magic_list_t *)AW_TryCalloc(1,sizeof(*magic));
     if(!magic){Con_Printf("Magic: not enough memory.\n");return;}
     AW_MagicList(magic);
-    if(!AW_WorldUIOpenPanel(magic_draw,magic_key,magic_closed))magic_closed();
+    if(!AW_WorldUIOpenMenuPanel(magic_draw,magic_key,magic_closed,AW_MENU_MAGIC))magic_closed();   /* EnableMagicMenu */
 }
 void AW_StatsWindowInit(void){
     Cmd_AddCommand("aw_stats",AW_StatsOpen);

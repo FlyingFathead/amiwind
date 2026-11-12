@@ -327,6 +327,14 @@ class SkelSourceTests(unittest.TestCase):
         anim = (SOURCE / 'aw_anim.c').read_text()
         self.assertIn('prep_layout(m,m->name,m->numframes>0?m->numframes:AW_ANIM_UNLOADED_FRAMES);', anim)
         self.assertIn('if(table[g].model==m && m->numframes>0 && table[g].needed>m->numframes)', anim)
+        # CENSUS-NPC-NO-ATTACK-ANIM-65 (v0.0.65-rc3): a mover's layout was parsed against a fixed 256 frames at spawn;
+        # the opening's people wear a skeletal full kit (attack at frame 2340 of 2587), so all eight were refused and
+        # fought in their idle. A mover is parsed against the table limit and checked against its frames when it loads;
+        # never its numframes at spawn: it is registered by name only and a reused model slot keeps the frame count of
+        # the model it held before (Sellus Gravius' kit was refused against "2 model frames" on the rc4 test engine).
+        self.assertIn('prep_layout(mover,a->mover,AW_ANIM_UNLOADED_FRAMES);', anim)
+        self.assertNotIn('prep_layout(mover,a->mover,256)', anim)
+        self.assertNotIn('prep_layout(mover,a->mover,mover->numframes', anim)
         # the generic alias loader keeps a skeletal model's block and links its table as the stream does (Seyda's
         # dreamers were read by it, stood in their rest frame and had their layouts refused against 1 frame)
         model = (SOURCE / 'model.c').read_text()

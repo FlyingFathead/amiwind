@@ -24,8 +24,9 @@ static char footer[80];static int footer_left,footer_right;
 static const char *region_override;
 static int cyan_pixels,cyan_left,cyan_right,cyan_top,cyan_bottom,button_x,button_y;
 /* Model the registered values used by the real panel; do not bypass mode logic. */
-static cvar_t *map_vars[4];static int map_var_count,debug_overlays=1;
-void Cvar_RegisterVariable(cvar_t *v){assert(map_var_count<4);v->value=atof(v->string);map_vars[map_var_count++]=v;}
+/* six since OPENING-TUTORIAL-KEYS-65: the inventory's own key lists (aw_key_inv_use, aw_key_inv_drop) */
+static cvar_t *map_vars[6];static int map_var_count,debug_overlays=1;
+void Cvar_RegisterVariable(cvar_t *v){assert(map_var_count<6);v->value=atof(v->string);map_vars[map_var_count++]=v;}
 void Cvar_SetValue(char *name,float value){int i;for(i=0;i<map_var_count;i++)if(!strcmp(name,map_vars[i]->name)){map_vars[i]->value=value;return;}assert(0);}
 int AW_DebugOverlaysEnabled(void){return debug_overlays;}
 int Cmd_Argc(void){return 1;}
@@ -37,6 +38,14 @@ int AW_StoryRestricted(void){return story_restricted;}
 /* CHARGEN-INVENTORY-LOCKED-60: the registration's inventory rule (aw_story.c); story_inventory = the papers activated */
 static int story_inventory;
 int AW_StoryInventoryAllowed(void){return !story_restricted || story_inventory;}
+/* MAP-MENU-BLOCKED-COURTYARD-65: the menus the opening's scripts switched on (aw_story.c AW_StoryMenus) */
+static int story_menus;
+int AW_StoryMenus(void){return story_menus;}
+int AW_WorldUIOpenPanel(void (*draw)(void),int (*key)(int key,int mouse_x,int mouse_y),void (*closed)(void));
+int AW_WorldUIOpenMenuPanel(void (*draw)(void),int (*key)(int key,int mouse_x,int mouse_y),void (*closed)(void),int menu);
+void AW_WorldUIClose(void);
+static void menu_panel_draw(void){}
+static int menu_panel_key(int key,int x,int y){(void)key;(void)x;(void)y;return 1;}
 int AW_ReaderActive(void){return 0;}
 int AW_CharacterActive(void){return 0;}
 int AW_GalleryActive(void){return 0;}
@@ -475,7 +484,26 @@ int main(void){
     teleport_command();assert(!AW_WorldUIActive() && key_dest==key_console);
     assert(strstr(console_message,"active single-player gameplay"));
     story_restricted=0;teleport_command();assert(AW_WorldUIActive());
-    AW_WorldUIKey(K_ESCAPE,1);debug_overlays=1;
+    AW_WorldUIKey(K_ESCAPE,1);
+    /* MAP-MENU-BLOCKED-COURTYARD-65: in the restricted opening M stays shut until the courtyard barrel's EnableMapMenu;
+     * then it opens; the debug teleport map keeps the full rule; the journal stays shut */
+    story_restricted=1;story_menus=0;
+    map_command();assert(!AW_WorldUIActive());
+    story_menus=AW_MENU_MAP;map_command();assert(AW_WorldUIActive());AW_WorldUIKey(K_ESCAPE,1);
+    assert(!AW_WorldUIActive());
+    key_dest=key_game;teleport_command();assert(!AW_WorldUIActive());key_dest=key_game;
+    journal_command();assert(!AW_WorldUIActive());
+    story_menus=AW_MENU_STATS|AW_MENU_MAGIC;map_command();assert(!AW_WorldUIActive());   /* only its own switch opens it */
+    /* the Stats and Magic windows the same way (EnableStatsMenu, EnableMagicMenu): a panel of their menu opens */
+    story_menus=0;assert(!AW_WorldUIOpenMenuPanel(menu_panel_draw,menu_panel_key,NULL,AW_MENU_STATS));
+    story_menus=AW_MENU_STATS;assert(AW_WorldUIOpenMenuPanel(menu_panel_draw,menu_panel_key,NULL,AW_MENU_STATS));
+    AW_WorldUIClose();assert(!AW_WorldUIActive());key_dest=key_game;
+    assert(!AW_WorldUIOpenMenuPanel(menu_panel_draw,menu_panel_key,NULL,AW_MENU_MAGIC));
+    story_menus=AW_MENU_MAGIC;assert(AW_WorldUIOpenMenuPanel(menu_panel_draw,menu_panel_key,NULL,AW_MENU_MAGIC));
+    AW_WorldUIClose();key_dest=key_game;
+    assert(!AW_WorldUIOpenPanel(menu_panel_draw,menu_panel_key,NULL));            /* any other panel: the full rule */
+    story_restricted=0;story_menus=0;key_dest=key_game;
+    debug_overlays=1;
     strcpy(sv.name,"balmora");memset(player.v.origin,0,sizeof player.v.origin);
     drag_test_secondary(K_MOUSE3);drag_test_secondary(K_MOUSE2);
     drag_test_normal();drag_test_selection();drag_test_boundaries();drag_test_cancel();

@@ -1,18 +1,18 @@
 # CHIM Engine tracker
 
-_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.64._
+_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.65._
 
 <!-- Generated whole by tools/bug_register.py render from docs/bugs/bugs.json and docs/BUG_JOURNAL.md; do not edit by hand. -->
 
 Every bug of the CHIM engine: its streaming and memory, world format, builder, stairs and collision on CHIM worlds, rendering and performance. Generated together with the [bug register](../BUGS.md) from [`bugs.json`](bugs.json); a test fails when this page is stale or a CHIM bug is missing. Which bugs appear here and how to add one: [CHIM bugs](README.md#chim-bugs). Design: [world streamer](../WORLD_STREAMER.md).
 
-CHIM version: 0.2.2. 378 CHIM bugs: 190 open, 170 fixed, 18 closed.
+CHIM version: 0.2.2. 379 CHIM bugs: 191 open, 170 fixed, 18 closed.
 
 | Part | Open | Fixed | Closed |
 | --- | --- | --- | --- |
 | [Engine streaming and memory](#engine-streaming-and-memory) | 30 | 27 | 2 |
 | [World format](#world-format) | 3 | 4 | 0 |
-| [Builder](#builder) | 102 | 113 | 11 |
+| [Builder](#builder) | 103 | 113 | 11 |
 | [Stairs and collision on CHIM worlds](#stairs-and-collision-on-chim-worlds) | 19 | 11 | 2 |
 | [Rendering and visibility](#rendering-and-visibility) | 16 | 4 | 2 |
 | [Performance](#performance) | 20 | 11 | 1 |
@@ -40,6 +40,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [BUILD-CHIM-FRAME-SWAP-LATE-36](BUILD-CHIM-FRAME-SWAP-LATE-36.md): The image step builds 335 legacy maps of cells already on CHIM, then removes them before packing (reported 3 times, fixed)
 - [BUILD-CHIM-MAIN-MEMORY-46](BUILD-CHIM-MAIN-MEMORY-46.md): The CHIM stage main process holds so much memory that the memory guard starves its own workers (reported 3 times, open)
 - [BUILD-IMAGE-AUDIO-SERIAL-36](BUILD-IMAGE-AUDIO-SERIAL-36.md): The image step puts the audio payload in one file at a time while 22 of 24 cores sit idle (reported 3 times, fixed)
+- [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): The image step scans maps on about one core and runs the actor ground check under half the pool (reported 3 times, open)
 - [BUILD-LEGACY-TOWN-MAPS-SHIPPED-36](BUILD-LEGACY-TOWN-MAPS-SHIPPED-36.md): CHIM-native Seyda Neen is still built through the legacy chain: 65 sn maps are built and removed before packing (build time, not payload) (reported 3 times, fixed)
 - [BUILD-PARTITION-GROWTH-UNGATED-36](BUILD-PARTITION-GROWTH-UNGATED-36.md): Nothing gates the number of world partitions or the growth of the image (reported 3 times, open)
 - [BUILD-PROGRESS-ETA-BASIS-36](BUILD-PROGRESS-ETA-BASIS-36.md): The live build progress took a stage's expected time from earlier runs of any size: dev3's chim stage was expected at 154 s and ran 1 h 48 min (reported 3 times, open)
@@ -60,7 +61,6 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [BUILD-CHIM-STAGE-IDLE-START-36](BUILD-CHIM-STAGE-IDLE-START-36.md): The chim stage of the 270-frame coast build spends its first 35-45 minutes on 1-4 cores while it holds 12-24 workers (reported 2 times, open)
 - [BUILD-IMAGE-CHIM-NATIVE-TOWN-36](BUILD-IMAGE-CHIM-NATIVE-TOWN-36.md): The image step of a CHIM-native town read legacy region maps that are never built: the Bitter Coast test build failed at the end of its image step on maps/bc000.bsp (reported 2 times, fixed)
 - [BUILD-IMAGE-REGION-MAPS-SERIAL-43](BUILD-IMAGE-REGION-MAPS-SERIAL-43.md): The image step's CHIM frame-map phases run on one core: the world read six times, ground traces on whole frames (reported 2 times, open)
-- [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): The image step scans maps on about one core and runs the actor ground check under half the pool (reported 2 times, open)
 - [BUILD-LEGACY-CHAIN-DEFAULT-36](BUILD-LEGACY-CHAIN-DEFAULT-36.md): Builds still prepared CHIM towns through the legacy region-map chain by default, and a retired flag (--legacy-area) was accepted with only a warning (reported 2 times, fixed)
 - [BUILD-PLAN-PESSIMISTIC-48](BUILD-PLAN-PESSIMISTIC-48.md): The start-up resource plan predicts hours for stages that run in minutes: it sums every stage that could run beside one at full speed (reported 2 times, open)
 - [BUILD-SILENT-PHASES-36](BUILD-SILENT-PHASES-36.md): Builder phases run silent: no start/end timing, no progress, no heartbeat; the CHIM stats step is a single-core tail (reported 2 times, open)
@@ -235,6 +235,7 @@ Newest first: the last 10 [journal](../BUG_JOURNAL.md) entries that name a CHIM 
 | [CHIM-ROOM-CLIP-DRAWN-BOX-48](CHIM-ROOM-CLIP-DRAWN-BOX-48.md) | A CHIM room's runtime collision skips a placement by its drawn box, and a store model's hull can reach past that box | open | low | 23 October 2026, in v0.0.48-dev2 | - | 2026_10_23_v0.0.48-dev2_dev2-try11_b8c6b6e9: CHIM 0.2.1, format 0.12, engine b8c6b6e, source b8c6b6e, world b8c6b6e | Open (23 October 2026): engine/aga/src/chim/chim_room.c ChimRoom_Clip tests a placement only when the move's box grown by 1 unit meets its drawn box; in ri68c97f8719 the hull of placement 91935 reaches 1.01 units past its store model's bounds. Not yet seen in game. |
 | CHIM-ROOM-LIGHT-FLAT-48 | CHIM rooms light each placement at one level: Temple arch trims and Rithleen walls look flat and brighter than the room maps baked light | open | medium | 23 October 2026, in v0.0.48-dev2 | - | 2026_10_23_v0.0.48-dev2_miniwind-balmora-rooms-chim_aa411f39: CHIM 0.2.1, format 0.12, engine aa411f3, source aa411f3, world aa411f3 | Accepted for now by the maintainer (23 October 2026): a regression traded for disk space, since CHIM rooms drop the per-room baked light. Get the interiors in 100% first; then look for a method that imitates the baked look without bloating the game (ideas to measure: a few light levels per placement or per face group from the room lights, vertex-style shading baked into the shared model per light step, light zones per room section). |
 | CHIM-ROOMS-WATER-SOUND-48 | CHIM water rooms have no ambient water sound in their water: room maps got it from their visibility pass | open | low | 22 October 2026, in v0.0.48-dev2 | - | source: CHIM 0.2.1, format 0.12, engine 0cbd59d, source 0cbd59d, world 0cbd59d | Reported in v0.0.48-dev2; cause unknown. |
+| CHIM-SOL-FLORA-PATH-64 | The Solstheim test frame converts its trees as full models, not through the world flora cards Vvardenfell uses | open | high | 11 November 2026, in v0.0.64 | - | v0.0.64 Solstheim test frame (chim-sol): CHIM 0.2.2, format 0.11, engine ffdf7d9, source ffdf7d9, world ffdf7d9 | Open: the expansions have no path through the island's build pipeline. The --dlc and --no-dlc options only record the chosen layers; the one expansion path is the test-only Solstheim stage, which runs the CHIM world step alone on chosen cells: none of the world terrain, scenery, flora card, harvest, room, resident or NPC stages, and none of their reductions. (full text: the register) |
 | [CHIM-TERRAIN-DIAGONAL-40](CHIM-TERRAIN-DIAGONAL-40.md) | Terrain triangle diagonals differ from the OpenMW 0.48 reference | open | high | 15 October 2026, in v0.0.40-dev2 | - | v0.0.40-dev2 source comparison: CHIM 0.2.0, format 0.7, source 138bbdd, engine, world not recorded | 16 October 2026: Fix shipped in v0.0.40: alternating diamond diagonals at original sample spacing (tools/prepare_world_regions.py); native seam check and comparison with OpenMW pending. |
 | [CHIM-TERRAIN-ROCK-EXEMPT-38](CHIM-TERRAIN-ROCK-EXEMPT-38.md) | Terrain-named placed rocks bypass experimental buried-surface clipping | open | medium | 12 October 2026, in v0.0.38 | - | unknown: CHIM, format, engine, source, world not recorded | Candidate correction under verification; not shipped or maintainer accepted. |
 | [CHIM-UNIT-CACHE-RACE-33](CHIM-UNIT-CACHE-RACE-33.md) | Two processes storing the same CHIM unit at once: the second rename fails | open | medium | 9 October 2026, in v0.0.33-dev | - | source: CHIM 0.1.0, format 0.5, engine d10af66, source d10af66, world not recorded | 16 October 2026: Open: the CHIM builder writes cache units under a per-process temporary name since v0.0.35 (5357a62, tools/chim/units.py); no regression test for concurrent puts recorded. |

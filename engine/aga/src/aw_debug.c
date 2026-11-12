@@ -26,6 +26,7 @@
 #include "aw_inspect.h"
 #include "aw_inventory.h"
 #include "aw_statswin.h"
+#include "aw_textdef.h"
 #include "aw_alchemy.h"
 #include "aw_glut.h"
 #include "aw_dial.h"
@@ -350,7 +351,7 @@ void AW_DebugInit(void) {
     {extern void (*aw_walkto_move)(usercmd_t *);aw_walkto_move=walkto_move;}
     Cvar_RegisterVariable(&aw_logs_live);Cmd_AddCommand("aw_logs_live_set",logs_live_command);Cmd_AddCommand("aw_savelogs",savelogs_command);Cmd_AddCommand("aw_godmode",godmode_command);
     AW_ResetRegister("god mode across maps",godmode_reset,godmode_digest);
-    AW_GalleryInit();AW_SweepInit();AW_WorldUIInit();AW_PlacedInit();AW_StatsWindowInit();AW_AlchemyInit();AW_DebugTorchInit();    AW_StreamInit();AW_PhotoInit();AW_SpikeInit();Chim_Init();
+    AW_GalleryInit();AW_SweepInit();AW_WorldUIInit();AW_PlacedInit();AW_StatsWindowInit();AW_TextDefineInit();AW_AlchemyInit();AW_DebugTorchInit();    AW_StreamInit();AW_PhotoInit();AW_SpikeInit();Chim_Init();
     /* CHIM's window (type 1 crossings) names a cell's region map through the world directory. */
     {extern int (*chim_cell_map)(int,int,char *,int);chim_cell_map=AW_CellMap;}
     {extern int (*aw_chim_window_slot)(int,int *,int *,float *);extern int (*aw_chim_map_frame)(const char *,int *,int *);
@@ -359,7 +360,10 @@ void AW_DebugInit(void) {
     {extern void (*aw_session_shift)(const float *);aw_session_shift=AW_SessionShift;}
     AW_MiniwindInit();AW_QuickCharInit();AW_TestBoxInit();
     {extern void AW_LoadTraceInit(void);AW_LoadTraceInit();}   /* dbg loadtrace, aw_loadtrace (LOAD-HANG-WATCHDOG-62) */
-    Cvar_RegisterVariable(&aw_census_legacy);aw_intro_census_legacy=AW_CensusLegacy;   /* CENSUS-INTRO-SCRIPTS-62 */
+    Cvar_RegisterVariable(&aw_census_type);aw_intro_census_legacy=AW_CensusLegacy;   /* CENSUS-INTRO-SCRIPTS-62 */
+    Cmd_AddCommand("aw_census_type_set",AW_CensusTypeCommand);       /* census type amiwind|legacy|original */
+    Cmd_AddCommand("aw_census_legacy",AW_CensusLegacyCommand);       /* the older alias (OPENING-REGRESSION-64) */
+    aw_census_take_refused=AW_OpeningTakeRefused;                    /* nothing taken during the registration */
     AW_NpcPartsInit();     /* aw_npc_tables_areas (NPC-RECIPES-PER-AREA-59) */
     AW_CamInit();AW_InputDebugInit();AW_BoundsInit();AW_DoorAudioInit();AW_HingedDoorInit();aw_hinged_story=AW_OpeningHingedStory;AW_TalkInit();AW_MwscriptInit();AW_CompanionInit();AW_CombatInit();AW_AmbientInit();AW_MoveInit();AW_ActorsInit();AW_ViewInit();AW_LavaInit();AW_BreathInit();AW_MagicInit();AW_AnimInit();AW_GlutInit();AW_DialWindowInit();AW_AnimKitInit();AW_HalloweenInit();AW_DemoWindInit();AW_WaitInit();AW_LevelupInit();AW_ConsoleInit();AW_SceneInit();AW_LoadFailInit();AW_CensusInit();AW_UIInit();AW_IconsInit();AW_IntroInit();AW_SaveInit();AW_RecorderInit();
     aw_save_entry_refuse=AW_SceneSaveEntryRefuse;   /* a save in a 32 MB place on less Fast RAM (CHIM-32MB-SAVE-ENTRY-48) */

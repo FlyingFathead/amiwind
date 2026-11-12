@@ -32,6 +32,202 @@ for _p in (ROOT / 'tools', ROOT / 'src'):
     sys.path.insert(0, str(_p))
 
 
+# The opening's own actors (tools/prepare_intro.py INTRO_ACTORS, the placed roles): the opening stage bakes their
+# progs/np_<stem>.mdl with its 21 talk, blink and walk frames only (idle 0-7, walk 13-20), so a fight showed no
+# attack, hit or death (CENSUS-NPC-NO-ATTACK-ANIM-65). Their appearances are baked here too, and np_<stem>.anm names
+# that full-kit model as the mover the engine wears in a fight (aw_combat.c AW_CombatEngage). The list is kept equal
+# to INTRO_ACTORS by tests/test_actor_library.py; prepare_intro.py itself is not changed (its stage key stays).
+OPENING_ACTORS = (('chargen name', 'jiub'), ('chargen boat guard 2', 'escort'), ('chargen boat guard 3', 'upper'),
+                  ('chargen boat guard 1', 'deck'), ('chargen dock guard', 'dock'), ('chargen class', 'census'),
+                  ('chargen captain', 'captain'), ('chargen door guard', 'hall'))
+
+
+def opening_layout(key):
+    """np_<stem>.anm of an opening actor: its own idle and walk frames (AW_AnimDefault's 21-frame layout) and the
+    library model of its appearance (KEY) as its full-kit mover."""
+    import npc_library as NL
+    return 'idle:0:8:0.1500 walk:13:8:0.1250 >%s\n' % NL.model_path(key)
+
+
+def write_opening_layouts(npc_manifest, id1):
+    """Write id1/progs/np_<stem>.anm for every opening actor the NPC library baked; {stem: library model}."""
+    out = {}
+    for ident, stem in OPENING_ACTORS:
+        npc = npc_manifest.get('npcs', {}).get(ident)
+        if not npc:
+            continue
+        (Path(id1) / 'progs').mkdir(parents=True, exist_ok=True)
+        (Path(id1) / 'progs' / ('np_%s.anm' % stem)).write_text(opening_layout(npc['key']), encoding='ascii',
+                                                                 newline='\n')
+        out[stem] = 'progs/n_%s.mdl' % npc['key']
+    return out
+
+
+def _layout_groups(id1, model):
+    """(group names, mover model or None) of MODEL's .anm in ID1; None when it has none."""
+    path = Path(id1) / (model[:-4] + '.anm')
+    if not path.is_file():
+        return None
+    words = path.read_text(encoding='cp1252').split()
+    groups = {w.split(':')[0] for w in words if w[:1] not in '@!~>'}
+    movers = [w[1:] for w in words if w.startswith('>')]
+    return groups, (movers[0] if movers else None)
+
+
+COVERAGE_GROUPS = ('idle', 'walk', 'run', 'attack', 'hit', 'death')
+# Placed actors a fight can never reach, by record id: {id: reason with the script line}. Empty: every placed actor
+# is checked (the opening's eight are all linked to their full kit, which also covers a console teleport).
+COVERAGE_EXCEPTIONS = {}
+# The opening actors' lifecycle, from the original scripts (Morrowind.esm SCPT text; line numbers of that text):
+# CharGenClassNPC state 0 (lines 31-51, the clerk's script on the player's first frame in the census office)
+# disables "CharGen Boat", "CharGen Boat Guard 1", "CharGen Boat Guard 2", "CharGen Dock Guard" and the ship's props
+# and cabin door; nothing disables Jiub or Boat Guard 3, who stay in the ship's hold, which is out of reach once the
+# cabin door is gone. The engine does the same: aw_opening.c AW_OpeningSpawn sets ship_disabled in the census
+# office and hides roles 4 and 5 and the ship in Seyda Neen; aw_scene.c leaves out the link back to the ship.
+# No script disables the three census people: they can be met and attacked for the rest of the game.
+_SHIP = 'until the census office; the ship is out of reach after CharGenClassNPC state 0 disables its cabin door'
+OPENING_LIFECYCLE = {
+    'chargen name': ('ship hold (prison.bsp), the opening', 'never disabled; ' + _SHIP, False),
+    'chargen boat guard 3': ('ship hold (prison.bsp), the opening', 'never disabled; ' + _SHIP, False),
+    'chargen boat guard 2': ('ship (prison.bsp), the opening',
+                             'disabled by CharGenClassNPC state 0 (line 38)', False),
+    'chargen boat guard 1': ('ship deck, Seyda Neen dock', 'disabled by CharGenClassNPC state 0 (line 37)', False),
+    'chargen dock guard': ('Seyda Neen dock', 'disabled by CharGenClassNPC state 0 (line 39)', False),
+    'chargen class': ('census office (census.bsp)', 'never disabled', True),
+    'chargen captain': ('census office (census.bsp)', 'never disabled', True),
+    'chargen door guard': ('census hall (census.bsp)', 'never disabled', True),
+}
+
+
+def _record_tables(id1):
+    """What an actor's record reaches in ID1 (OPENING-ACTORS-FULL-RECORD-65): the combat sheets {record: row cells}
+    (combat/actors.txt), focus.awf's reference identities {reference: record hash}, the area pack's records
+    {room key: bytes} (areas.awa) and the ambient rows' references (npc-ambient.lut). A missing file gives empty."""
+    import struct
+    id1 = Path(id1)
+    sheets, refs, areas, ambient = {}, {}, {}, set()
+    path = id1 / 'combat/actors.txt'
+    if path.is_file():
+        for line in path.read_text(encoding='ascii', errors='replace').splitlines():
+            cols = line.split('\t')
+            if len(cols) > 6:
+                sheets[cols[0]] = cols
+    if (id1 / 'focus.awf').is_file():
+        import prepare_area_tables as PAT
+        refs = PAT.reference_hashes((id1 / 'focus.awf').read_bytes())
+    if (id1 / 'areas.awa').is_file():
+        raw = (id1 / 'areas.awa').read_bytes()
+        for i in range(struct.unpack_from('<I', raw, 4)[0]):
+            key, off, size = struct.unpack_from('<III', raw, 24 + 12 * i)
+            areas[key] = raw[off:off + size]
+    if (id1 / 'npc-ambient.lut').is_file():
+        import ambient_lut
+        ambient = {r['ref'] & 0xFFFFFF for r in ambient_lut.read_table((id1 / 'npc-ambient.lut').read_bytes())[1]}
+    return sheets, refs, areas, ambient
+
+
+def record_binding(f, room, tables):
+    """How a placed actor (entity fields F, its map's room key ROOM) reaches its own record: the combat sheet, the
+    reference identity, the stat entry in its room's area record (stats, behaviour, faction, spells, gold) and an ambient
+    row; 'missing' lists what it lacks (an ambient row is only needed by a wanderer, so it is not required)."""
+    import struct
+    import prepare_area_tables as PAT
+    sheets, refs, areas, ambient = tables
+    ident = f.get('aw_source_id', '').casefold()
+    try:
+        ref = int(float(f.get('aw_ref', '0'))) & 0xFFFFFF
+    except ValueError:
+        ref = 0
+    h = PAT.name_hash(ident) if ident else 0
+    sheet = sheets.get(ident)
+    out = {'record': ident, 'reference': ref,
+           'sheet': {'level': int(sheet[2]), 'attributes': sheet[3], 'skills': sheet[4],
+                     'health_magicka_fatigue': sheet[5], 'fight_flee': sheet[6]} if sheet else None,
+           'reference_is_record': bool(ref) and refs.get(ref) == h,
+           'room': room, 'stat_entry_in_room': bool(room in areas and h and struct.pack('>I', h) in areas[room]),
+           'ambient_row': ref in ambient}
+    out['missing'] = [k for k, ok in (('record id', bool(ident)), ('combat sheet', bool(sheet)),
+                                      ('reference identity', out['reference_is_record']),
+                                      ('stat entry in its room', out['stat_entry_in_room'])) if not ok]
+    return out
+
+
+def coverage_rows(id1):
+    """The actor animation coverage table of ID1 (actor-anim-coverage.json, CENSUS-NPC-NO-ATTACK-ANIM-65): one row
+    per aw_npc placed in its .bsp maps: record id, map, name, model, the groups its fight can play (its own layout's
+    or its full-kit mover's), the mover, can_be_hostile, exception and ok (an attack group, or a named exception)."""
+    import re
+    import struct
+    rows = []
+    tables = _record_tables(id1)
+    checked = bool(tables[0])      # an image with its record tables (a bare test image has none)
+    for path in sorted((Path(id1) / 'maps').glob('*.bsp')):
+        raw = path.read_bytes()
+        if len(raw) < 12:
+            continue
+        off, size = struct.unpack_from('<ii', raw, 4)
+        text = raw[off:off + size].decode('cp1252', 'replace')
+        blocks = re.findall(r'\{[^{}]*\}', text)
+        world = dict(re.findall(r'"([^"]+)"\s+"([^"]*)"', blocks[0])) if blocks else {}
+        room = int(world['_aw_cell_int']) if world.get('_aw_cell_int', '').isdigit() else None
+        for block in blocks:
+            f = dict(re.findall(r'"([^"]+)"\s+"([^"]*)"', block))
+            model = f.get('model', '')
+            if f.get('classname') != 'aw_npc' or not model.endswith('.mdl'):
+                continue
+            own = _layout_groups(id1, model)
+            groups = set(own[0]) if own else set()
+            link = own[1] if own else None
+            if link:
+                mover = _layout_groups(id1, link) if (Path(id1) / link).is_file() else None
+                if mover:
+                    groups |= mover[0]
+                else:
+                    link = None      # a link to a model or layout the image lacks plays nothing
+            ident = f.get('aw_source_id', '').casefold()
+            exception = COVERAGE_EXCEPTIONS.get(ident)
+            present = {g: g in groups for g in COVERAGE_GROUPS}
+            life = OPENING_LIFECYCLE.get(ident)
+            lifecycle = {'placed_by': 'map entity (%s)' % path.name + ('; ' + life[0] if life else ''),
+                         'removed_by': life[1] if life else 'not read yet (only the opening actors are)'}
+            rows.append({'record': ident, 'map': path.name, 'name': f.get('netname', ''), 'model': model,
+                         'layout': own is not None, 'groups': present, 'full_kit': link, 'lifecycle': lifecycle,
+                         # attacked in the opening's own window or later; unknown lifecycles count as attackable
+                         'can_be_met_and_attacked': life[2] if life else True,
+                         'can_be_hostile': True, 'exception': exception,
+                         # OPENING-ACTORS-FULL-RECORD-65: its stats, inventory, behaviour and faction through its own record
+                         'record_binding': record_binding(f, room, tables) if checked else None,
+                         'ok': present['attack'] or bool(exception)})
+            b = rows[-1]['record_binding']
+            if b and b['missing'] and not exception:
+                rows[-1]['ok'] = False
+    return rows
+
+
+def fight_layout_failures(id1):
+    """Every aw_npc of ID1's .bsp maps that would fight with no attack group, or (an image with its record tables)
+    does not reach its own record (a coverage row not ok): [(map, name, model and what is missing)]."""
+    out = []
+    for r in coverage_rows(id1):
+        if r['ok']:
+            continue
+        why = ([] if r['groups']['attack'] else ['attack group']) + \
+            (r['record_binding']['missing'] if r['record_binding'] else [])
+        out.append((r['map'], r['name'], '%s; %s: %s' % (r['model'], r['record'] or '?', ', '.join(why))))
+    return out
+
+
+def write_coverage(id1, out):
+    """Write OUT/actor-anim-coverage.json from ID1 and return its rows."""
+    rows = coverage_rows(id1)
+    doc = {'format': 'AmiWind actor animation coverage 1', 'groups': list(COVERAGE_GROUPS),
+           'actors': len(rows), 'failing': sum(1 for r in rows if not r['ok']), 'rows': rows}
+    Path(out).mkdir(parents=True, exist_ok=True)
+    (Path(out) / 'actor-anim-coverage.json').write_text(json.dumps(doc, indent=1, sort_keys=True) + '\n',
+                                                         encoding='utf-8', newline='\n')
+    return rows
+
+
 def town_residents(run):
     """The NPC and creature record ids the CHIM town stages of RUN made models for (their residents.json)."""
     return town_cast(run)[0]
@@ -45,6 +241,12 @@ def town_cast(run):
         ids |= {k.casefold() for k in doc.get('models', {})}
         refs |= {int(c['number']) for c in doc.get('cast', []) if 'number' in c}
     return ids, refs
+
+
+def opening_ids(master):
+    """The OPENING_ACTORS record ids MASTER has (a test master without them adds none)."""
+    low = master.lower()
+    return {i for i, _ in OPENING_ACTORS if i.encode('cp1252') + b'\0' in low}
 
 
 def plan(master, residents=(), town_refs=None):
@@ -94,7 +296,7 @@ def plan(master, residents=(), town_refs=None):
     residents = {r.casefold() for r in residents}
     npcs = sorted({b.casefold() for n, b, t, *_ in refs if t == 'NPC_' and
                    (b.casefold() not in residents or (town_refs is not None and n not in town_refs))} |
-                  set(by_script['NPC_']))
+                  set(by_script['NPC_']) | opening_ids(master))
     return meshes, bipedal, {m: sorted(v) for m, v in scales.items()}, npcs, planned, corpses
 
 
@@ -256,6 +458,9 @@ def main(argv=None):
                                                                                   len(failed)), flush=True)
     (a.out / 'npc-library.json').write_text(json.dumps(npc_manifest, indent=1, sort_keys=True) + '\n',
                                             encoding='utf-8', newline='\n')
+    opening = write_opening_layouts(npc_manifest, id1)
+    print('Actor library: %d of %d opening actors linked to their full-kit model (%s)' % (
+        len(opening), len(OPENING_ACTORS), ', '.join('%s=%s' % kv for kv in sorted(opening.items()))), flush=True)
     print('Actor library: NPCs done - took %.1fs, %d appearances, %d left out' % (
         npc_seconds, len(npc_manifest['models']), len(npc_manifest['left_out'])), flush=True)
     summary = {'creature_meshes': len(meshes), 'corpse_meshes': len(corpses),
@@ -268,6 +473,7 @@ def main(argv=None):
                'npc_anim_fallback': {key: {'level': f['level'], 'npcs': f['npcs']}
                                      for key, f in npc_manifest.get('anim_fallback', {}).items()},
                'npc_bytes': sum(m['bytes'] for m in npc_manifest['models'].values()),
+               'opening_links': opening,
                'scaled_variants': bool(a.scaled_variants), 'town_residents_left_to_towns': len(residents),
                'seconds': round(time.time() - t0, 1)}
     (a.out / 'actor-library.json').write_text(json.dumps(summary, indent=1, sort_keys=True) + '\n', encoding='utf-8',
@@ -292,6 +498,11 @@ def install(library, id1, jobs=1):
     with ThreadPoolExecutor(max_workers=max(1, jobs)) as pool:
         list(pool.map(lambda pair: shutil.copyfile(*pair), pairs))
     copied = len(pairs)
+    # every aw_npc of the image's maps fights with attack frames (its own or its mover's; CENSUS-NPC-NO-ATTACK-ANIM-65)
+    bad = fight_layout_failures(id1)
+    if bad:
+        raise ValueError('Actors without attack frames (no attack group in their layout or mover): ' +
+                         ', '.join('%s %s (%s)' % b for b in bad))
     texts = L.base_texts(library / 'creature-library.json')
     texts.update(NL.base_texts(library / 'npc-library.json'))
     return texts, copied

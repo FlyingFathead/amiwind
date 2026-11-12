@@ -1,10 +1,16 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.64 (11 November 2026)._
+_Last updated with AmiWind v0.0.65 (12 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.65: Reintroducing Vvardenfell, 12 November 2026](#v0065-reintroducing-vvardenfell-12-november-2026)
+- [v0.0.65-rc4: Reintroducing Vvardenfell, release candidate, 12 November 2026](#v0065-rc4-reintroducing-vvardenfell-release-candidate-12-november-2026)
+- [v0.0.65-rc3: Reintroducing Vvardenfell, release candidate, 12 November 2026](#v0065-rc3-reintroducing-vvardenfell-release-candidate-12-november-2026)
+- [v0.0.65-rc2: Reintroducing Vvardenfell, release candidate, 12 November 2026](#v0065-rc2-reintroducing-vvardenfell-release-candidate-12-november-2026)
+- [v0.0.65-rc1: Reintroduction, release candidate, 11 November 2026](#v0065-rc1-reintroduction-release-candidate-11-november-2026)
+- [v0.0.65-dev1: first snapshot of v0.0.65, Reintroduction, 11 November 2026](#v0065-dev1-first-snapshot-of-v0065-reintroduction-11-november-2026)
 - [v0.0.64: Gone Beyond The Gate, 11 November 2026](#v0064-gone-beyond-the-gate-11-november-2026)
 - [v0.0.64-dev5: fifth snapshot of v0.0.64, 11 November 2026](#v0064-dev5-fifth-snapshot-of-v0064-11-november-2026)
 - [v0.0.64-dev4: fourth snapshot of v0.0.64, 10 November 2026](#v0064-dev4-fourth-snapshot-of-v0064-10-november-2026)
@@ -184,6 +190,131 @@ _Last updated with AmiWind v0.0.64 (11 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.65: Reintroducing Vvardenfell, 12 November 2026
+
+v0.0.65 is a fix release made from v0.0.64 ([release notes](releases/notes/RELEASE-v0.0.65.md)); it covers everything of
+the snapshot (dev1) and the four release candidates (rc1 to rc4). Most of what it fixes were regressions that came in
+when the opening was moved onto the original game's own scripts (v0.0.62 to v0.0.64): the opening's scenes still kept
+some of their earlier, separate handling, and the two did not always agree. The dock guard, the race choice, the census
+office and Sellus Gravius' papers had stopped working properly. v0.0.65 fixes them, and the opening now follows the
+original Morrowind more exactly: the original's own scripts run the opening, with AmiWind's rules on top (the speech
+boxes, the hold, nothing taken before the papers, hints that name your own keys). It needs 32 MB of Fast RAM. The
+opening was played through on the candidates' images before the release, and by the maintainer on the Raspberry Pi 4B
+through the census office to Seyda Neen.
+
+- **The opening:** a New Game keeps the state the opening sets (the dock guard walks up on the pier, faces it at his post
+  and can be talked to; the pier is closed until the opening lets the player through; the census office has its message
+  boxes and the lock-in during the clerk's talk; the idle camera stays still before a race is chosen); nothing in the
+  census office can be used or taken before the papers, on every route of the use key; the clerk's hold and facing follow
+  when his own script starts first; talking opens the dialogue window while the player has a bounty, so Sellus Gravius
+  can take the papers, and the window says in the console why it does not open; the tutorial boxes name the player's own
+  keys, and the inventory's use and drop keys can be rebound; the people of the opening talk in the dialogue window from
+  the papers on (Sellus Gravius takes the papers and gives the package, the directions, 87 gold and the first journal
+  entry), and no box stands in for the window; a theft in the census office after the papers brings the guard and his
+  talk, as in the original; the dock guard steps aside at the census office door; each tutorial box after the papers
+  comes once; no hidden door by the census office drops the player under its floor (no prison marker is a door anywhere);
+  the player no longer leaves the census office with the preview builds' test torch.
+- **Fights, magic and the torch:** the opening's people fight with their attack animations (their full sets of movements
+  are no longer refused when they are placed; the build refuses an attackable actor without them and checks every
+  actor's binding to its own record); readying magic no longer draws the
+  weapon (the bare hands come up, for now the fists of hand-to-hand); the debug torch lights with V, fists fight with a
+  torch lit, an unequipped torch is not drawn in the hand, and the fight reads the player's live attributes and skills
+  each frame.
+- Known: readied magic shows the fists of hand-to-hand (the open spell-casting hands come in v0.0.66); a carried light
+  (torch, lantern or candlestick) shows in the hand only when it is equipped while the hands are raised, while the
+  original holds it whenever it is equipped (v0.0.66); a player jailed in Seyda Neen may be placed where the census office
+  has no floor (v0.0.66); the pack guar at Ahemmusa Camp is drawn with its parts apart, shalks on
+  Azura's Coast hang in the air, and the battle music can keep playing after a fight; the trip from Seyda Neen to Balmora
+  sometimes stalls on the loading screen in the emulator; the shores and pond edges still run in saw-tooth steps; every
+  other open entry is in the bug register. Mournhold and Solstheim are not in the game: the work on the expansions moves
+  to v0.0.66.
+
+## v0.0.65-rc4: Reintroducing Vvardenfell, release candidate, 12 November 2026
+
+The fourth release candidate of v0.0.65 ([release notes](releases/notes/RELEASE-v0.0.65-rc4.md)): three fixes found in
+the play of rc3's opening (the attack animations, the tutorial boxes once, no hidden door by the census office), and no
+test torch at the census exit. It needs 32 MB of Fast RAM.
+
+- The people of the opening fight with their attack animations. Their full sets of movements were refused when they
+  were placed (checked against a fixed 256 frames, which only the creatures' smaller models met), so they fought
+  standing in their idle; the notes of rc2 and rc3 said these fights already had their animations, and they did not.
+- The tutorial boxes after the papers come once each: the original's second box, a hint on using menus with the mouse,
+  had been given the same text as the box before it.
+- No hidden door by the census office drops the player under its floor: the original's prison marker of Seyda Neen,
+  the place an arrest sends the player to, had been read as a door; no prison marker is a door anywhere in the game.
+- No test torch at the census office: the never-burning torch of the preview builds is no longer given when the player
+  leaves (the debug console still gives one).
+- A theft in the census office after the papers is answered as in the original (already in rc3): a guard who saw it
+  walks up and talks to you in the dialogue window, and the bounty is cleared.
+- Known: readied magic shows the fists of hand-to-hand (the open spell-casting hands come in v0.0.66); the pack guar at
+  Ahemmusa Camp is drawn with its parts apart, shalks on Azura's Coast hang in the air, and the battle music can keep
+  playing after a fight.
+
+## v0.0.65-rc3: Reintroducing Vvardenfell, release candidate, 12 November 2026
+
+The third release candidate of v0.0.65 ([release notes](releases/notes/RELEASE-v0.0.65-rc3.md)). In rc2, Sellus Gravius
+still could not take the papers, so the census office could not be left; rc3 fixes it. Its opening was played in the
+emulator before the candidate: the registration, the dialogue windows and the package. It needs 32 MB of Fast RAM.
+
+- The people of the opening talk in the dialogue window once the papers are on the table, the same moment taking things
+  from the tables unlocks: Sellus Gravius takes the papers in his greeting, and his duties answer gives the package, the
+  directions, 87 gold and the first journal entry, as in the original.
+- No box stands in for the dialogue window when it does not open; the greeting shown as a row of dots is gone. Spoken
+  lines keep their subtitles while their voice plays.
+- After the race menu the dock guard walks to the front of the census office door and steps aside beside it, clear of
+  the doorway, facing the sea.
+- Known: readied magic shows the fists of hand-to-hand (the open spell-casting hands come in v0.0.66); a crime in the
+  census office is not yet seen answered with the guards' arrest; the pack guar at Ahemmusa Camp is drawn with its parts
+  apart, shalks on Azura's Coast hang in the air, and the battle music can keep playing after a fight.
+
+## v0.0.65-rc2: Reintroducing Vvardenfell, release candidate, 12 November 2026
+
+The second release candidate of v0.0.65, now titled "Reintroducing Vvardenfell", a fix release made from v0.0.64 alone
+([release notes](releases/notes/RELEASE-v0.0.65-rc2.md)). v0.0.65 completes the opening on the original game's own
+scripts: the simplified logic for the prison ship, the pier, the census office and Sellus Gravius gives way to the
+original scripts running for real, with AmiWind's own rules kept on top. It needs 32 MB of Fast RAM. Its changes are
+checked by tests, not yet in play.
+
+- Nothing in the census office can be used or taken before the papers, on every route of the use key.
+- The census office's people fight with attack animations; the build refuses an attackable actor without them and checks
+  every actor's binding to its own record.
+- The opening's tutorial boxes name the player's own keys in one layout; the inventory's use and drop keys can be rebound.
+- Readying magic no longer draws the weapon: the bare hands come up (for now the fists of hand-to-hand).
+- Talking to someone opens the dialogue window while the player has a bounty (Sellus Gravius could not take the papers);
+  the window says in the console why it does not open.
+- The clerk's hold and facing also follow when his own script starts first.
+- Known: the pack guar at Ahemmusa Camp is drawn with its parts apart, shalks on Azura's Coast hang in the air, and the
+  battle music can keep playing after a fight.
+
+## v0.0.65-rc1: Reintroduction, release candidate, 11 November 2026
+
+The release candidate of v0.0.65, "Reintroduction", a fix release made from v0.0.64 alone
+([release notes](releases/notes/RELEASE-v0.0.65-rc1.md)). It carries everything of the snapshot below and needs 32 MB of
+Fast RAM. Its changes are checked by tests, not yet in play.
+
+- The opening's state is kept in step: the engine and the scripts read one value of the character generation state, so
+  Sellus Gravius talks again; the dock guard's walk to his post is tried again when the player stands in his way, and at
+  his post he faces the pier; a check refuses a reset that writes the state of another module.
+- The torch and the fists: the debug torch lights with V again; fists fight with a torch lit (F raises them, V alone
+  switches the torch); an unequipped torch is no longer drawn in the hand; the fight reads the player's live attributes
+  and skills each frame.
+- Known: the pack guar at Ahemmusa Camp is drawn with its parts apart, shalks on Azura's Coast hang in the air, and the
+  battle music can keep playing after a fight.
+
+## v0.0.65-dev1: first snapshot of v0.0.65, Reintroduction, 11 November 2026
+
+The first development snapshot of v0.0.65, "Reintroduction", a fix release made from v0.0.64 alone, in development
+([release notes](releases/notes/RELEASE-v0.0.65-dev1.md)). It needs 32 MB of Fast RAM. Its changes are checked by tests,
+not yet in play.
+
+- The opening runs with its holds again. Since v0.0.62 a New Game cleared the opening's state right after setting it:
+  the dock guard did not walk up on the pier and could not be talked to (no race choice), the pier was open, the census
+  office had no message boxes and no lock-in during the clerk's talk, things could be taken before the papers were
+  accepted, Sellus Gravius only greeted, and the idle camera orbited before a race was chosen. The snapshot restores the
+  opening as it was.
+- Everything else is v0.0.64 unchanged. The pack guar at Ahemmusa Camp is drawn with its body parts apart (open entry).
+  The work on the expansions moves to v0.0.66.
 
 ## v0.0.64: Gone Beyond The Gate, 11 November 2026
 

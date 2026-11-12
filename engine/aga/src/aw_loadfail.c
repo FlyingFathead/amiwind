@@ -98,7 +98,9 @@ static void game_reset(int new_game){
 void AW_ResetBootMark(void){
     void (*queue)(void)=aw_save_new_game;
     aw_save_new_game=NULL;
-    AW_ResetAll(1);AW_ResetMarkBoot();AW_ResetAll(0);
+    /* OPENING-VANITY-CAMERA-64: each module marked right after its own reset, not after the whole run (that compared
+     * the registry with itself and kept a later module's overwrite of an earlier one in the reference) */
+    AW_ResetMarkBootInterleaved(1);AW_ResetAll(0);
     aw_save_new_game=queue;
 }
 static void restart_command(void) {

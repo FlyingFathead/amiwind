@@ -255,6 +255,7 @@ Family: First-person hands and torch (`torch-hands`). First-person hands, punche
 
 - AW-20260928-18 (no report page): Punch blocked after Census office exit
 - [DEBUG-GALLERY-TIMING-29](DEBUG-GALLERY-TIMING-29.md): Hands unavailable in the combat and torch test rooms
+- [DEBUG-TORCH-64](DEBUG-TORCH-64.md): The debug torch no longer lights with V: the console says no light is equipped
 - FIRST-PERSON-BLOCK-ITEM-TABLE-59 (no report page): The first-person shield block refuses a shield whose model comes from the shared item model table
 - FIRST-PERSON-WEAPON-SETS-MISSING-54 (no report page): First-person hands have only 4 of the 103 original animation groups: no weapon stance or attack, spellcast, hit, swim or storm
 - [FP-ARMS-CUT-62](FP-ARMS-CUT-62.md): In first person, looking down shows the forearms ending in mid-air, with no upper arms or shoulders behind them
@@ -264,6 +265,7 @@ Family: First-person hands and torch (`torch-hands`). First-person hands, punche
 - HAND-PUNCH-COVERAGE-29 (no report page): Near-plane opening at maximum punch extension
 - HAND-PUNCH-TRANSITION-29 (no report page): Hands briefly disappear when changing into the punch animation
 - [HELD-LIGHT-ALWAYS-TORCH-61](HELD-LIGHT-ALWAYS-TORCH-61.md): Any carried light held in the hand is drawn and lit as a torch
+- HELD-LIGHT-NOT-IN-HAND-65 (no report page): An equipped candlestick is not held in the hand; readying shows only the fists
 - [PLAYER-BODY-LEG-SHAPE-39](PLAYER-BODY-LEG-SHAPE-39.md): Nord player legs appear abnormally thin in RC1
 - PLAYER-EQUIPMENT-NOT-WORN-54 (no report page): The player body shows no chosen head or hair, no worn clothing or armour and no weapon: it is baked per race and sex with fixed new-game looks
 - [PLAYER-MOVEMENT-FRAME-SKIP-39](PLAYER-MOVEMENT-FRAME-SKIP-39.md): Third-person Nord and Khajiit fast movement loses smooth foot animation
@@ -274,7 +276,9 @@ Family: First-person hands and torch (`torch-hands`). First-person hands, punche
 - TORCH-FUEL-29 (no report page): Torch never burns out; no unlit or fuel state
 - TORCH-HAND-NORD-29 (no report page): Detached-looking left grip fragment in dev4
 - TORCH-HAND-SEPARATION-29 (no report page): Torch grip and hand appear to break during idle and running
+- [TORCH-HAND-TO-HAND-64](TORCH-HAND-TO-HAND-64.md): With a torch equipped the fists cannot fight, raising them brings the torch back and V cannot put it away
 - TORCH-INPUT-29 (no report page): F cannot raise hands; V only prints torch state
+- [TORCH-INVENTORY-PICTURE-64](TORCH-INVENTORY-PICTURE-64.md): Unequipping the torch in the inventory still shows a torch in the hand
 
 Related bugs in other categories:
 

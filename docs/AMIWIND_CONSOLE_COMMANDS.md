@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.64._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.65._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -41,7 +41,8 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg cast spell` | - | [list / none / N / mN / grant N] your spells: no argument or list shows the known spells, the selected one, the counts of casts, magic items used and your active effects; N or mN selects a spell or a made spell; none clears it; grant N gives you spell row N and selects it (for tests) |
 | `dbg cast start` | - | the starting spells chosen for the character: what the start gave and why (report) |
 | `dbg cast strike` | - | for tests: the held enchanted weapon's blow lands on the actor in reach and its enchantment casts; prints the count of strikes cast |
-| `dbg census legacy` | - | [0 / 1; no argument prints it] the census office's registration (default 0, not saved): 0 = the original's own scripts and dialogue (the clerk, the captain, the door guard, the papers, the doors, the courtyard barrel and ring); 1 = the project's earlier hand-written registration, kept for an A/B; set it before the office loads |
+| `dbg census legacy` | - | [0 / 1; no argument prints it] the older name of census type: 1 = legacy, 0 = original |
+| `dbg census type` | - | [amiwind / legacy / original (0 / 1 / 2); no argument prints it] census office registration (default amiwind, not saved; set before the office): amiwind = the scripts with AmiWind's own (the clerk talks as you walk up and holds you, lines boxed, nothing taken before his review); legacy = old hand-written; original = scripts alone |
 | `dbg characterchange` | `dbg quickchar` | [race class birthsign review / all] reopen the pier race, gender, head and hair menu over the current scene; confirm to apply (after registration) |
 | `dbg choosecompanion` | `dbg pickcompanion` | same as companion pick |
 | `dbg combat` | - | [on/off / seed N / readout on/off / music on/off / dice / style amiwind/original / block hold/auto / flee / sounds / bestattack / contact on/off / loadout NAME/off / resistnormal N/off / calm] melee combat: no argument = status; bestattack = Options > Prefs best attack; contact off = crosshair ray only (defaults: flee off, the rest on, block auto) |
@@ -50,8 +51,8 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg companiontest` | - | [on/off] same as companion test / companion off; no argument: status |
 | `dbg creatures` | `dbg kill` | [on/off, true/false or 1/0; no argument toggles] the outdoor creatures (default on; not saved): off removes the wild creatures alive (their state kept) and spawns none, to compare frame rate, memory and behaviour; on brings them back as their cells join again |
 | `dbg daycycle gallery` | - | [here/off] (eight-stage camera tour; here keeps this view; Esc returns) |
+| `dbg dbgtorch` | `dbg debugtorch`, `dbg gear`, `dbg give dbgtorch`, `dbg give debugtorch`, `dbg give weapons`, `dbg inventory grant`, `dbg torch`, `dbg weapon` | same as torch: one more debug torch in the inventory, with a message |
 | `dbg demowind` | - | [on / off / next / prev / effect 1-2 / dist 0-7 / status] DemoWind (docs/DEMOWIND.md): the effects test kit, fullscreen, no world; each effect with its ms a frame and bytes on screen; Left/Right effect, Up/Down distance to Red Mountain, Esc off |
-| `dbg gear` | `dbg give dbgtorch`, `dbg give debugtorch`, `dbg give weapons`, `dbg inventory grant`, `dbg torch`, `dbg weapon` | every armour and clothing piece in a list box by piece and weight class (type to search: glass, heavy, boots; Enter gives one and wears it), test only, saved like any grant (docs/INVENTORY.md) |
 | `dbg give money` | `dbg give coin`, `dbg give rich` | [N] N gold (default 1000000; at most 999999999, the gold limit, which every gold gain keeps to), saved like any grant, with a message |
 | `dbg halloween` | - | [dagoth / skeletons / bench [skeletons] / fps on/off / camera wide/director / stop / status] Halloween scene (docs/HALLOWEEN.md, an image with the cast): skeletons, Desele's dancers, Dagoth Ur dance on the beat; dagoth (default) or skeletons alone; bench: the standard benchmark, one result line |
 | `dbg halloweentest` | - | [same words as halloween] the Halloween scene with the FPS counter on (bottom left) |

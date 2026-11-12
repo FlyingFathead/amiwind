@@ -595,6 +595,14 @@ void AW_UIButton(int x,int y,int w,int h,const char *text,int lit,int colour) {
     AW_UIThinBox(x,y,w,h,lit);AW_UIThinInner(x,y,w,h,&ix,&iy,&iw,&ih);
     AW_UITextBox(ix,iy,iw,ih,text,colour);
 }
+/* RACE-MENU-OK-HIGHLIGHT-65: a button that has the keyboard focus shows it as the menus' rows do (the dark gold bar
+ * under the text, aw_character.c AW_UI_FOCUS_FILL) besides its lit line; the lit line alone was hardly seen. */
+void AW_UIButtonFocus(int x,int y,int w,int h,const char *text,int focused,int colour) {
+    int ix,iy,iw,ih;
+    AW_UIThinBox(x,y,w,h,focused);AW_UIThinInner(x,y,w,h,&ix,&iy,&iw,&ih);
+    if(focused)AW_UIFill(ix,iy,iw,ih,AW_UIColor(54,47,32));
+    AW_UITextBox(ix,iy,iw,ih,text,colour);
+}
 void AW_UIOuterFrame(void) {
     if(ui_frame.value && key_dest==key_game && cls.state==ca_connected)
         AW_UIFrame(0,0,vid.width,vid.height);
@@ -888,10 +896,48 @@ void AW_UICenteredLinesUpTo(int x,int y,int w,int h,const char *text,int most) {
     if(!n)return;
     row=y+(h-(bottom-top))/2-top;
     for(p=text,i=0;i<n;i++){
+        char *tab;
         p=AW_UILine(p,w-16,line,sizeof(line));
+        /* OPENING-TUTORIAL-KEYS-65: a tab splits a line into a key column: the part before it at the left inner margin,
+         * the part after it (the bound key, "[I]") right-aligned at the right inner margin; lines without one centred */
+        if((tab=strchr(line,'\t'))!=NULL){
+            *tab=0;
+            AW_UIText(x+8,row+i*line_height,line,-1);
+            AW_UIText(x+w-8-AW_UIWidth(tab+1),row+i*line_height,tab+1,-1);
+            continue;
+        }
         text_bounds(line,&l,&t,&r,&b);
         AW_UIText(x+(w-(r-l))/2-l,row+i*line_height,line,-1);
     }
+}
+/* UI-TEXT-BOX-CLEARANCE-64: the ink height of the first MOST lines of TEXT wrapped as AW_UICenteredLinesUpTo wraps
+ * them in a text area W wide (0: no text). */
+int AW_UICenteredLinesInk(int w,const char *text,int most) {
+    const char *p;char line[256];int n=0,l,t,r,b,top=32767,bottom=-32767;
+    initialize();
+    if(!text)return 0;
+    for(p=text;*p && n<most;n++){
+        p=AW_UILine(p,w-16,line,sizeof(line));
+        text_bounds(line,&l,&t,&r,&b);
+        if(r<=l)continue;
+        if(t+n*line_height<top)top=t+n*line_height;
+        if(b+n*line_height>bottom)bottom=b+n*line_height;
+    }
+    return bottom>top?bottom-top:0;
+}
+/* The height a framed box needs for INK rows of text: the frame's edge and AW_UI_TEXT_CLEAR clear rows above and below
+ * the ink (the same clearance the text keeps from the sides: the 8-pixel inset less the 4-pixel edge). */
+int AW_UITextBoxNeeds(int ink_rows){return ink_rows+2*(AW_UI_FRAME_EDGE+AW_UI_TEXT_CLEAR);}
+/* A framed text panel standing on BOTTOM, at least MIN_H tall and taller (rising over what is above it) when its text
+ * needs the room; the lines centred in it by their ink. Returns the panel's top. Every strip-sized text box under the
+ * view goes through this (the opening's hints, UI-TEXT-BOX-CLEARANCE-64). */
+int AW_UITextPanel(int x,int bottom,int w,int min_h,const char *text,int most) {
+    int ink_rows=AW_UICenteredLinesInk(w,text,most),h=AW_UITextBoxNeeds(ink_rows),y;
+    if(h<min_h)h=min_h;
+    y=bottom-h;if(y<0){y=0;h=bottom;}
+    AW_UIBox(x,y,w,h);
+    AW_UICenteredLinesUpTo(x,y+AW_UI_FRAME_EDGE,w,h-2*AW_UI_FRAME_EDGE,text,most);
+    return y;
 }
 /* Sentence-aware paging without a regex engine or per-frame allocation.
  * End punctuation can be followed by quotes; decimal points and common

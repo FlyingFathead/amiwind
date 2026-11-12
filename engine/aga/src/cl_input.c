@@ -136,6 +136,12 @@ void IN_AWUseDown(void) {
     /* a script's DisablePlayerControls: no activation (OpenMW ActionManager::activate) */
     if (!AW_ControlAllowed(AW_CONTROL_PLAYER)) return;
     if (AW_OpeningUse()) return;
+    /* OPENING-REGRESSION-64, census type amiwind: during the census office's registration (before the papers' stage)
+     * the use key reaches people only; every other route (a placed item, a container, a book, a dropped item and the
+     * game code's own use, impulse 201) is refused here in one place */
+    if (aw_census_take_refused && aw_census_take_refused() && !AW_SceneNpcAimed()) {
+        AW_UISubtitle("","Finish your registration with the clerk first.",3);return;
+    }
     if (!(in_up.state & 1) && AW_SceneUse()) return;
     if (!(in_up.state & 1)) in_impulse = 201;
     KeyDown(&in_up);

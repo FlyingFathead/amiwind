@@ -1,6 +1,6 @@
 # Inventory
 
-_Last updated with AmiWind v0.0.64-dev5 (11 November 2026)._
+_Last updated with AmiWind v0.0.65-rc4 (12 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -386,8 +386,10 @@ and load times, the cache and that count. Tests: `tests/aga_area_tables_test.c`.
 
 ## Debug torch (test only)
 
-While AmiWind is a preview, the player leaves the census office with a torch that never burns out: the
-maintainer's request of 17 October 2026, so a tester gets a torch and uses it. It will not be in the final game.
+Since v0.0.65 no torch is given at the census office: the switch `aw_debug_torch` in `config/game.cfg` is 0, as in
+the original game (the maintainer's decision of 12 November 2026). `dbg torch` still gives one for tests. From
+17 October 2026 to v0.0.65-rc4 the player left the census office with a torch that never burns out, the maintainer's
+request while AmiWind was a preview, so a tester got a torch to use. The rest of this section describes that torch.
 
 - **What it is:** one catalogue row, `aw_debug_torch`, named "Debug torch (test only)", made by
   `tools/prepare_inventory.py` from the original torch (the LIGH record `torch`: its model, icon, weight, value,

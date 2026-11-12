@@ -21,24 +21,26 @@ def code(name):
 
 
 class DebugTorchTests(unittest.TestCase):
-    def test_game_config_turns_it_on_until_the_final_game(self):
+    def test_game_config_gives_no_torch_since_v065(self):
+        # the maintainer's decision of 12 November 2026: the census exit gives no torch (as in the original);
+        # dbg torch still gives one for tests
         lines = (ROOT / 'config/game.cfg').read_text(encoding='utf-8').splitlines()
-        self.assertEqual([l for l in lines if l.startswith('aw_debug_torch')], ['aw_debug_torch 1'])
+        self.assertEqual([l for l in lines if l.startswith('aw_debug_torch')], ['aw_debug_torch 0'])
 
     def test_receipt_record_follows_the_staged_switch(self):
         from build_aga import debug_torch_record, stage_game_config
         with tempfile.TemporaryDirectory() as tmp:
             stage_game_config(tmp)
             record = debug_torch_record(tmp)
-            self.assertTrue(record['on'])
-            self.assertEqual(record['item'], 'Debug torch (test only)')
-            self.assertEqual(record['line'], 'aw_debug_torch 1')
+            self.assertFalse(record['on'])
+            self.assertEqual(record['line'], 'aw_debug_torch 0')
+            self.assertEqual(record['note'], 'not given')
             cfg = Path(tmp) / 'default-game.cfg'
-            cfg.write_text(cfg.read_text(encoding='utf-8').replace('aw_debug_torch 1', 'aw_debug_torch 0'),
+            cfg.write_text(cfg.read_text(encoding='utf-8').replace('aw_debug_torch 0', 'aw_debug_torch 1'),
                            encoding='utf-8', newline='\n')
             record = debug_torch_record(tmp)
-            self.assertFalse(record['on'])
-            self.assertEqual(record['note'], 'not given')
+            self.assertTrue(record['on'])
+            self.assertEqual(record['item'], 'Debug torch (test only)')
         source = (ROOT / 'tools/build_aga.py').read_text(encoding='utf-8')
         self.assertIn("build_json['debug_torch'] = args.image_debug_torch_record", source)
 
@@ -61,7 +63,8 @@ class DebugTorchTests(unittest.TestCase):
         self.assertIn('int (*aw_torch_item_lit)(void);', torch)
         update = torch[torch.index('void AW_TorchUpdate(void)'):]
         self.assertLess(update.index('item_torch();'), update.index('torch=AW_TorchEquipped();'))
-        self.assertIn('if(v){if(lit && raised)v->_float=1;else if(!lit && was_lit)v->_float=0;}', torch)
+        # TORCH-HAND-TO-HAND-64: only equipping lights it (raising the hands does not), only unequipping puts it out
+        self.assertIn('if(v){if(lit && !was_lit && raised)v->_float=1;else if(!lit && was_lit)v->_float=0;}', torch)
 
 
 if __name__ == '__main__':

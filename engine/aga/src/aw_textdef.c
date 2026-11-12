@@ -145,6 +145,8 @@ int AW_TextDefines(char *out, int capacity, const char *p, const aw_textdef_valu
 #include "aw_mwvm.h"
 #include "aw_clock.h"
 #include "aw_state.h"
+#include "aw_tutorial.h"
+#include "aw_reset.h"
 
 /* A written global define (%GameHour) is looked up on disk, nothing kept: the builder codes the defines it knows
  * (AW_TEXTDEF_GLOBAL), so this runs only for a text that was not converted. */
@@ -162,21 +164,61 @@ static const char *const action_commands[AW_TD_ACTIONS] = {
 /* The first key (lowest key number, so a letter before the arrows) bound to the action's command, a single letter in
  * upper case as the original's settings show it; a loop over the 256 bindings, run only for a text holding an action
  * define. */
-const char *AW_TextDefineBoundKey(int action)
+/* OPENING-TUTORIAL-KEYS-65: the first key bound to COMMAND now, as a player reads it: a letter in upper case, the mouse
+ * buttons in words (the Amiga's right button arrives as MOUSE3); NULL when nothing is bound. */
+const char *AW_TextBoundKeyForCommand(const char *command)
 {
-    static char key[16];
+    static char key[24];
     int k;
     const char *name;
-    if (action < 0 || action >= AW_TD_ACTIONS || !action_commands[action]) return NULL;
+    if (!command || !*command) return NULL;
+    /* a window's own bindable keys (aw_worldui.c aw_key_inv_use, aw_key_inv_drop): "winkey:inv_use" */
+    if (!strncmp(command, "winkey:", 7)) {
+        char cvar[40];
+        snprintf(cvar, sizeof(cvar), "aw_key_%s", command + 7);
+        AW_WinKeyWords(Cvar_VariableString((char *)cvar), key, sizeof(key));
+        return key[0] ? key : NULL;
+    }
     for (k = 0; k < 256; k++) {
-        if (!keybindings[k] || Q_strcasecmp(keybindings[k], (char *)action_commands[action])) continue;
+        if (!keybindings[k] || Q_strcasecmp(keybindings[k], (char *)command)) continue;
         if (!(name = Key_KeynumToString(k)) || !*name) continue;
+        if (!Q_strcasecmp((char *)name, "MOUSE1")) name = "the left mouse button";
+        else if (!Q_strcasecmp((char *)name, "MOUSE3")) name = "the right mouse button";
+        else if (!Q_strcasecmp((char *)name, "MOUSE2")) name = "the middle mouse button";
         strncpy(key, name, sizeof(key) - 1);
         key[sizeof(key) - 1] = 0;
         if (key[0] >= 'a' && key[0] <= 'z' && !key[1]) key[0] = (char)(key[0] - 'a' + 'A');
         return key;
     }
     return NULL;
+}
+const char *AW_TextDefineBoundKey(int action)
+{
+    if (action < 0 || action >= AW_TD_ACTIONS || !action_commands[action]) return NULL;
+    return AW_TextBoundKeyForCommand(action_commands[action]);
+}
+/* OPENING-TUTORIAL-KEYS-65: every message box passes the tutorial table first (aw_msgbox.c aw_msgbox_tutorial) */
+extern int (*aw_msgbox_tutorial)(const char *text, char *out, int capacity);
+static int tutorial(const char *text, char *out, int capacity)
+{
+    return AW_TutorialApply(text, AW_TextBoundKeyForCommand, out, capacity);
+}
+extern int (*aw_intro_hint_text)(const char *source, char *out, int capacity);
+extern int (*aw_opening_defines)(const char *source, char *out, int capacity);
+static int defines_filled(const char *source, char *out, int capacity)
+{
+    aw_textdef_values_t v;
+    AW_TextDefinesPlayer(&v);
+    AW_TextDefines(out, capacity, source, &v);
+    return 1;
+}
+static void reset_tutorial(int new_game) { (void)new_game; AW_TutorialReset(); }   /* the "once" rows shown again */
+void AW_TextDefineInit(void)
+{
+    aw_msgbox_tutorial = tutorial;
+    aw_intro_hint_text = defines_filled;
+    aw_opening_defines = defines_filled;
+    AW_ResetRegister("tutorial texts shown once", reset_tutorial, NULL);
 }
 static char cell_name[64];
 void AW_TextDefinesPlayer(aw_textdef_values_t *v)

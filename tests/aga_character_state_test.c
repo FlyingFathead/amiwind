@@ -26,6 +26,11 @@ void AW_UIButton(int x,int y,int w,int h,const char *s,int lit,int colour){
     if(lit && !strcmp(s,"OK"))ok_focused++;   /* the focused OK is the lit one (UI-THIN-BUTTON-62) */
     AW_UITextBox(x,y,w,h,s,colour);
 }
+/* RACE-MENU-OK-HIGHLIGHT-65: the OK button with the focus shown (aw_ui.c AW_UIButtonFocus) */
+void AW_UIButtonFocus(int x,int y,int w,int h,const char *s,int focused,int colour){
+    if(focused && !strcmp(s,"OK"))ok_focused++;
+    AW_UITextBox(x,y,w,h,s,colour);
+}
 void AW_UISmallBegin(void){}void AW_UISmallEnd(void){}
 void AW_BirthArt(int index,int x,int y){}
 static void draw_covered(void){

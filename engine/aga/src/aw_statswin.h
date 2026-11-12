@@ -49,6 +49,11 @@ int AW_MagicList(aw_magic_list_t *out);
 void AW_MagicDrawList(const aw_magic_list_t *list);
 /* Opens a full-screen panel on the inventory's modal (aw_worldui.c); 0 when it cannot open. */
 int AW_WorldUIOpenPanel(void (*draw)(void),int (*key)(int key,int mouse_x,int mouse_y),void (*closed)(void));
+/* RC2-SELLUS-NO-TALK-65: the dialogue window's own opener: in play only, never shut by the opening's menu rule */
+int AW_WorldUIOpenDialoguePanel(void (*draw)(void),int (*key)(int key,int mouse_x,int mouse_y),void (*closed)(void));
+/* MAP-MENU-BLOCKED-COURTYARD-65: the same for a window the opening's scripts can switch on (MENU: aw_story.h AW_MENU_*):
+ * it opens while the opening restricts the rest once a script enabled it */
+int AW_WorldUIOpenMenuPanel(void (*draw)(void),int (*key)(int key,int mouse_x,int mouse_y),void (*closed)(void),int menu);
 /* set after AW_WorldUIOpenPanel: called with the pointer while the left button is held (a scroll bar's drag);
  * cleared on every close */
 extern void (*aw_worldui_panel_drag)(int mouse_x,int mouse_y);

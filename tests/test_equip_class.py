@@ -106,7 +106,7 @@ class EquipClassEngineTests(unittest.TestCase):
         inv = (ROOT / 'tools/prepare_inventory.py').read_text(encoding='utf-8')
         self.assertNotIn('torch_mesh_skipped', inv)
         catalogue = (ROOT / 'config/debug-commands.txt').read_text(encoding='utf-8')
-        for words in ('torch', 'give dbgtorch', 'give debugtorch'):
+        for words in ('torch', 'dbgtorch', 'debugtorch', 'give dbgtorch', 'give debugtorch'):
             self.assertIn('PLAYTESTING|%s|aw_inventory|' % words, catalogue)
         torch = (ROOT / 'engine/aga/src/aw_debug_torch.c').read_text(encoding='utf-8')
         give = torch[torch.index('void AW_DebugTorchGive(void)'):torch.index('void AW_DebugTorchInit(')]
@@ -122,8 +122,29 @@ class EquipClassEngineTests(unittest.TestCase):
     def test_v_lights_only_an_equipped_light(self):
         torch = (ROOT / 'engine/aga/src/aw_torch.c').read_text(encoding='utf-8')
         toggle = torch[torch.index('static void toggle(void)'):torch.index('void AW_TorchInit(void)')]
-        self.assertIn('if(v->_float!=1 && aw_torch_item_lit && !aw_torch_item_lit()){', toggle)
+        # DEBUG-TORCH-64: with no light equipped V first asks the debug torch's equip (aw_debug_torch.c debug_equip)
+        self.assertIn('if(v->_float!=1 && aw_torch_item_lit && !aw_torch_item_lit() && '
+                      '!(aw_torch_debug_equip && aw_torch_debug_equip())){', toggle)
         self.assertLess(toggle.index('aw_torch_item_lit()'), toggle.index('v->_float=v->_float==1?0:1;'))
+        # the maintainer's path: F (hands raised: past the hand check) then V reaches the debug torch's equip, which
+        # comes before the "No light equipped" refusal and before the light is switched on
+        self.assertLess(toggle.index('if(!hand_state(p)){'), toggle.index('aw_torch_debug_equip()'))
+        self.assertLess(toggle.index('aw_torch_debug_equip()'), toggle.index('No light equipped'))
+
+    def test_v_equips_the_debug_torch(self):
+        # DEBUG-TORCH-64: carried: equipped; not carried with aw_debug_torch 1: given, then equipped; otherwise the
+        # original's rule (nothing equipped, nothing lit)
+        torch = (ROOT / 'engine/aga/src/aw_debug_torch.c').read_text(encoding='utf-8')
+        body = torch[torch.index('static int debug_equip(void)'):]
+        body = body[:body.index('\n}\n')]
+        self.assertLess(body.index('if(item_lit())return 1;'), body.index('AW_InventoryEquip('))
+        self.assertIn('if(AW_StateGet(&aw_state,AW_ITEM,AW_DEBUG_TORCH_ID)<1){', body)
+        self.assertIn('if(!aw_debug_torch.value || !AW_ItemAdd(&aw_state,AW_DEBUG_TORCH_ID,1))return 0;', body)
+        self.assertLess(body.index('AW_ItemAdd('), body.index('AW_InventoryEquip('))
+        self.assertIn('return AW_InventoryEquip(&aw_state,&item) && item_lit();', body)
+        self.assertIn('aw_torch_debug_equip=debug_equip;', torch)
+        self.assertIn('V with hands raised equips and lights it', torch)   # the grant message says what V does
+        self.assertIn('int (*aw_torch_debug_equip)(void);', (ROOT / 'engine/aga/src/aw_torch.c').read_text(encoding='utf-8'))
 
     def test_books_offer_read(self):
         source = (ROOT / 'engine/aga/src/aw_worldui.c').read_text(encoding='utf-8')

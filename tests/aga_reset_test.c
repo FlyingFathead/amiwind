@@ -16,6 +16,9 @@ static int forget;
 static void reset_effects(int new_game){if(!forget)effects=0;calls[2]++;order[ordered++]=2;}
 static unsigned long digest_effects(void){return AW_ResetHash(AW_RESET_SEED,&effects,sizeof(effects));}
 
+static int clobber;
+static void reset_scene(int new_game){(void)new_game;if(clobber)stage=0;}   /* resets the story again, restart form */
+
 int main(void){
     char names[128];
     assert(AW_ResetHash(AW_RESET_SEED,"a",1)!=AW_ResetHash(AW_RESET_SEED,"b",1));
@@ -41,6 +44,17 @@ int main(void){
     assert(AW_ResetCompareBoot(names,sizeof(names))==1 && !strcmp(names,"effects again"));
     forget=0;AW_ResetAll(1);assert(AW_ResetCompareBoot(names,sizeof(names))==0);
     assert(AW_ResetModuleName(99)==NULL && AW_ResetModuleDigest(-1)==(unsigned long)-1);
+    /* OPENING-VANITY-CAMERA-64: a later module that overwrites an earlier module's state (the scene reset set the story
+     * back to its restart form). Marked after the whole run, the reference holds the overwrite and nothing is named;
+     * marked interleaved (each module right after its own reset), the earlier module is named after a New Game. */
+    clobber=1;assert(AW_ResetRegister("scene",reset_scene,NULL) && AW_ResetModules()==4);
+    AW_ResetAll(1);AW_ResetMarkBoot();AW_ResetAll(1);
+    assert(stage==0 && AW_ResetCompareBoot(names,sizeof(names))==0);      /* the old mark: blind to it */
+    assert(AW_ResetMarkBootInterleaved(1)==4);AW_ResetAll(0);
+    AW_ResetAll(1);
+    assert(AW_ResetCompareBoot(names,sizeof(names))==1 && !strcmp(names,"story"));
+    clobber=0;AW_ResetMarkBootInterleaved(1);AW_ResetAll(1);
+    assert(stage==1 && AW_ResetCompareBoot(names,sizeof(names))==0);      /* fixed: the story keeps its New Game form */
     printf("reset registry ok\n");
     return 0;
 }

@@ -365,6 +365,8 @@ static int hand_parts_ready(const char *race,int female) {
 /* aw_hand_models.c (aw_hand_parts_apply): the view model becomes the first part at the hands' FRAME (0..27) of
  * STANCE (0 bare hands, 1 one-handed, 2 two-handed close, 3 two-handed wide, 4 bow, 5 crossbow, 6 thrown; the last three
  * only in a table that has them, FIRST-PERSON-WEAPONS-56). 1 = drawn from parts. */
+/* READY-MAGIC-SHOWS-WEAPON-65: the spell stance (magic ready, R) shows the empty hands in first person */
+static int weapon_hidden(void) {return aw_magic_readied;}
 static int hand_parts_apply(const char *race,int female,int stance,int frame) {
     hparts_shown=0;
     if(stance<0 || stance>=HAND_PART_STANCES || !hand_parts_ready(race,female) ||
@@ -801,7 +803,8 @@ static int body_stance_frame(edict_t *p,int group,int air,float dt,float rate){
         run=group==AW_ANIM_RUN || group==AW_ANIM_READYRUN;
         if(side*side>fwd*fwd)move=side>0?AW_PM_RIGHT:AW_PM_LEFT;else move=fwd>=0?AW_PM_FORWARD:AW_PM_BACK;
     }
-    if(!AW_PickPlayerState(AW_InventoryEquippedWeaponType(),hand,goal,move,run,AW_CombatPlayerAttackType(),air,
+    /* READY-MAGIC-SHOWS-WEAPON-65: the spell stance holds no weapon: the bare-hand stance (no spellcast group yet) */
+    if(!AW_PickPlayerState(aw_magic_readied?-1:AW_InventoryEquippedWeaponType(),hand,goal,move,run,AW_CombatPlayerAttackType(),air,
                            p->v.waterlevel>=2,&s)){stance.picked=0;return -1;}
     if(!stance.picked || stance.table!=parts_table || memcmp(&s,&stance.last,sizeof(s))){
         int from=-1,to=-1;
@@ -926,7 +929,7 @@ static void parts_draws(edict_t *p) {
     }
     if(!p || p->v.health<=0 || p->v.waterlevel>=2 || !parts_table)return;
     goal=GetEdictFieldValue(p,"aw_hand_goal");
-    drawn=goal && goal->_float==1;
+    drawn=goal && AW_HandShowsWeapon(goal->_float==1,aw_magic_readied);   /* the spell stance: no weapon in the hand */
     right=parts_hand_item(0);
     scale[0]=scale[1]=parts.weight*.25f;scale[2]=parts.height*.25f;
     light=AW_HeldLight();
@@ -1001,7 +1004,7 @@ static entity_t *view_held(entity_t *draw) {
     else if(!held_cursor){
         held_draw_count=0;
         goal=p?GetEdictFieldValue(p,"aw_hand_goal"):NULL;
-        if(p && goal && goal->_float==1 && p->v.health>0 && p->v.waterlevel<2 && AW_ViewEquipmentReady()){
+        if(p && goal && AW_HandShowsWeapon(goal->_float==1,aw_magic_readied) && p->v.health>0 && p->v.waterlevel<2 && AW_ViewEquipmentReady()){
             int have_right=AW_InventoryEquippedItem(AW_SLOT_RIGHT,&right);
             for(kind=0;kind<2 && held_draw_count<2;kind++){
                 model_t *model;entity_t *out=&inventory_held[kind];
@@ -1624,7 +1627,7 @@ void AW_ViewInit(void) {
     Cvar_RegisterVariable(&death_cvar);Cvar_RegisterVariable(&retry_cvar);Cvar_RegisterVariable(&body_cvar);
     Cvar_RegisterVariable(&parts_cvar);Cvar_RegisterVariable(&hand_parts_cvar);Cvar_RegisterVariable(&player_cache_cvar);
     Cvar_RegisterVariable(&stances_cvar);
-    aw_hand_parts_apply=hand_parts_apply;aw_view_hand_part=hand_part;aw_inventory_preview_pending=parts_pending;
+    aw_hand_weapon_hidden=weapon_hidden;aw_hand_parts_apply=hand_parts_apply;aw_view_hand_part=hand_part;aw_inventory_preview_pending=parts_pending;
     aw_inventory_player_beast=player_beast;
     Cvar_RegisterVariable(&fullview_cvar);Cvar_RegisterVariable(&aw_inventory_preview_reserve);Cvar_RegisterVariable(&aw_inventory_preview_live);
     AW_ViewRulesDefault(&rules);AW_ViewReset(&view,&rules);

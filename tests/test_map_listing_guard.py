@@ -15,6 +15,9 @@ ROOT = Path(__file__).resolve().parents[1]
 LISTING = re.compile(r"""\.r?glob\([^)\n]*\.bsp['"]|\.suffix(?:\.lower\(\))?\s*==\s*['"]\.bsp['"]""")
 
 ALLOWED = {
+    'tools/actor_library.py': (1, 'the actor coverage table reads the aw_npc entity lump of BSP maps (the opening and room '
+                                  'maps); the CHIM frame maps\' actors (the deck and dock guards) are linked the same way '
+                                  'and join the table with a CHIM entity reader (TODO OPENING-ACTORS-FULL-RECORD-65)'),
     'tools/actor_grounding.py': (2, 'annotates and fits actors on legacy map collision; a frame map is an empty '
                                     'world, its residents are fitted on the CHIM frame by the chim-town stage'),
     'tools/analyze_subcell_redundancy.py': (1, 'measures legacy sub-cell maps (sn/bm prefix) only'),

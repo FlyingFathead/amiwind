@@ -55,6 +55,24 @@ int AW_HandClipFrame(const aw_hand_table_t *t,int clip,float elapsed) {
     return t->first[clip]+f;
 }
 
+/* ---- READY-MAGIC-SHOWS-WEAPON-65: weapon ready (F) and magic ready (R), exclusive, pure ----
+ * As in the original (OpenMW 0.51 mwinput actionmanager.cpp toggleWeapon / toggleSpell and the draw state of
+ * mechanics/drawstate.hpp, read not copied): the player's draw state is one of nothing, weapon or spell. Readying the
+ * weapon from the spell stance puts the magic away and brings the weapon up; readying magic from the weapon stance
+ * puts the weapon away and raises the empty hands (the spell stance); the same key again lowers its own stance. The
+ * hands are up (GOAL 1) in both stances; the weapon is drawn only in the weapon stance. */
+int aw_magic_readied;
+void AW_HandReadyPress(int key,int *goal,int *magic) {
+    if(key==AW_READY_MAGIC_KEY){
+        if(*magic){*magic=0;*goal=0;}
+        else{*magic=1;*goal=1;}
+        return;
+    }
+    if(*magic){*magic=0;*goal=1;}
+    else *goal=!*goal;
+}
+int AW_HandShowsWeapon(int goal,int magic) {return goal && !magic;}
+
 #ifndef AW_HANDS_HOST_TEST
 #include "quakedef.h"
 
@@ -98,7 +116,10 @@ void AW_HandsTick(void) {
     if(!sv.active || sv.paused || AW_ModalWorldFrozen() || (svs.maxclients==1 && key_dest!=key_game))return;
     if(svs.maxclients<1 || !svs.clients || !(p=svs.clients[0].edict) || p->free)return;
     if(!GetEdictFieldValue(p,"aw_hand_state"))return;      /* progs without hands */
-    if(p->v.impulse==202){p->v.impulse=0;hand_set(p,"aw_hand_goal",1-hand_get(p,"aw_hand_goal"));}
+    if(p->v.impulse==202){   /* F: the weapon stance (from the spell stance: the magic goes away, the hands stay up) */
+        int g=hand_get(p,"aw_hand_goal")!=0;
+        p->v.impulse=0;AW_HandReadyPress(AW_READY_WEAPON_KEY,&g,&aw_magic_readied);hand_set(p,"aw_hand_goal",(float)g);
+    }
     goal=hand_get(p,"aw_hand_goal")!=0;state=(int)hand_get(p,"aw_hand_state");
     /* no valid table in the image: never an invisible raising state that takes V forever */
     if((goal || state) && !AW_HandTableReady()){
@@ -113,7 +134,9 @@ void AW_HandsTick(void) {
     if(p->v.button0 && !hand_get(p,"aw_attack_latched")){
         /* a press held while raising is still pending when the hands are ready; a held attack never repeats */
         if(state!=1)hand_set(p,"aw_attack_latched",1);
-        if(state==2 && !hand_get(p,"aw_torch")){hand_begin(p,3);state=3;}
+        /* TORCH-HAND-TO-HAND-64: a torch in the left hand does not stop the fists (the original fights hand to hand with
+         * a torch lit); before, a lit torch took the place of the punch */
+        if(state==2){hand_begin(p,3);state=3;}
     }
     if(state==0){hand_show(p,0);return;}
     hand_show(p,1);

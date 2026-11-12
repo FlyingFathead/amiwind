@@ -35,7 +35,9 @@ class CurrentStateBlockTests(unittest.TestCase):
         label_version = state['in_game_label'].lstrip('v').split(' ')[0]
         if label_version != version:
             self.assertIn('has no ingested build yet', block)     # a newer VERSION says so
-        self.assertEqual(cps.release_of(label_version), cps.release_of(version))   # the data is of this release line
+        # the data is stamped for this release line (the newest ingested build may still be of the release before, until
+        # the first build of a new line is ingested: the block then says so, above)
+        self.assertEqual(state['version_stamp']['release'], cps.release_of(version))
 
     def test_a_hand_edited_or_stale_block_is_refused(self):
         page, state, scripts, version = load()

@@ -876,7 +876,9 @@ void AW_CharacterDraw(void)
         AW_UISmallEnd();
         /* the house button style (UI-THIN-BUTTON-62): a 1 pixel line, lit on hover or selection */
         if(sub)AW_UIButton(CANCEL_X,OK_Y,OK_W,OK_H,"Cancel",mouse_visible && over_cancel(),gold);
-        AW_UIButton(OK_X,OK_Y,OK_W,OK_H,"OK",row==4 || (mouse_visible && over_ok()),gold);
+        /* RACE-MENU-OK-HIGHLIGHT-65: OK with the focus (Enter or Tab reached it, or the pointer is over it) shows the rows'
+         * highlight, in the race, class, birthsign and review windows alike */
+        AW_UIButtonFocus(OK_X,OK_Y,OK_W,OK_H,"OK",row==4 || (mouse_visible && over_ok()),gold);
     }else {
     AW_UITextBox(10,166,300,22,menu==4?"Enter: accept  Arrows/WASD: pages":menu==1?"Enter: next / accept   LMB: rotate":"Arrows/WASD: Choose  Enter: accept",gold);
     }

@@ -59,6 +59,19 @@ void AW_ResetMarkBoot(void)
         modules[i].boot = AW_ResetModuleDigest(i);
     booted = 1;
 }
+/* OPENING-VANITY-CAMERA-64: the reference digests taken interleaved: module i's digest right after its own reset in the
+ * New Game form, before module i+1 runs. A later module that changes an earlier module's state then shows in
+ * AW_ResetCompareBoot after a real New Game (marking after the whole run baked such an overwrite into the reference). */
+int AW_ResetMarkBootInterleaved(int new_game)
+{
+    int i;
+    for (i = 0; i < count; i++) {
+        modules[i].reset(new_game);
+        modules[i].boot = AW_ResetModuleDigest(i);
+    }
+    booted = 1;
+    return count;
+}
 int AW_ResetCompareBoot(char *out, int capacity)
 {
     int i, differ = 0, used = 0, n;

@@ -63,6 +63,10 @@ int AW_TextDefines(char *out, int capacity, const char *source, const aw_textdef
 void AW_TextDefinesPlayer(aw_textdef_values_t *v);
 /* The key bound to action A (an AW_TD_ACTION_FIRST offset; the player's bindings, keys.c), NULL when none is bound. */
 const char *AW_TextDefineBoundKey(int action);
+/* OPENING-TUTORIAL-KEYS-65: the key bound to a console COMMAND ("aw_stats", "+attack") as a player reads it, NULL none;
+ * and the init that routes every message box through the tutorial table (aw_tutorial.h). */
+const char *AW_TextBoundKeyForCommand(const char *command);
+void AW_TextDefineInit(void);
 /* aw_mwhost.c: the longest global name at TEXT (global_prefix above) and a global's type (0 short, 1 long, 2 float,
  * -1 none), from the compiled scripts' file. */
 int AW_MwscriptGlobalPrefix(const char *text, int run, int *length);

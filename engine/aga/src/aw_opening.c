@@ -8,14 +8,63 @@
 #include "aw_activated.h"
 #include "aw_hinged_door.h"
 #include "aw_msgbox.h"
+/* OPENING-TUTORIAL-KEYS-65 (aw_textdef.c sets it): SOURCE's text defines filled in with the bound keys; NULL in fixtures */
+int (*aw_opening_defines)(const char *source,char *out,int capacity);
 static int route_started,route_failed,route_done;
+static int post_retries;static double post_retry;   /* the walk to his post tried again (OPENING-REGRESSION-64) */
+/* PIER-GUARD-WALKS-INTO-DOOR-65 (the maintainer's design, 12 November 2026): after the race form the dock guard walks to a
+ * fixed point in front of the census office door, then steps aside to the side of the door and faces the sea, the pier
+ * and the ship; never a straight line from wherever he met the player (from further down the pier that line ran into the
+ * door frame and he pushed against it for half a minute). The points come from the built door table, seyda census
+ * 113893 (doors-seyda.txt: box x 308.86..332.61, y -173.38..-149.62, map units): FRONT is the door's middle, 40 units out
+ * from its face; POST is a straight step aside from it, left of the door, far enough that a player walking up the door's
+ * middle passes him (his half width 16 plus the player's 16). Measured in the emulator 12 November 2026 (v0.0.65-rc3
+ * test engine): nearer the wall (276 -191) the step aside stuck at 289 -200 on the wall's corner left of the door.
+ * tests/test_pier_guard_route.py keeps these numbers to the door row. */
+#define AW_PIER_GUARD_FRONT_X 320.7f
+#define AW_PIER_GUARD_FRONT_Y -213.4f
+#define AW_PIER_GUARD_POST_X 286.0f
+#define AW_PIER_GUARD_POST_Y -214.0f
+static int post_leg;   /* 0: to the point in front of the door, 1: aside to the post */
+/* the player's use of a placed reference as E gives it (aw_mwhost.c: its script's OnActivate); 1 when taken */
+int (*aw_opening_activate)(unsigned reference);
 /* CENSUS-INTRO-SCRIPTS-62: Sellus Gravius ("chargen captain") talks through the ordinary dialogue window, as in the
  * original: his Greeting 1 result takes the papers ("player->removeitem chargen statssheet" and his local state -1)
  * and his "duties" answer gives the package, the directions, 87 gold and journal A1_1_FindSpymaster 1. The project's
  * early hand-written box (reading/captain_greeting, captain_duties: "Enter: Duties") is kept only behind this switch,
  * off by default, for an A/B of the old path. */
-cvar_t aw_census_legacy={"aw_census_legacy","0"};   /* registered in aw_debug.c */
-int AW_CensusLegacy(void){return aw_census_legacy.value!=0;}
+/* OPENING-REGRESSION-64: the census office's registration is ONE setting, "census type" (aw_census_type, not saved, set
+ * before the office loads): 0 amiwind (the default): the original's scripts (the clerk's menus, the papers, the
+ * tutorial items, the door guard, the courtyard, Sellus Gravius, the doors) with AmiWind's own registration around
+ * them: the clerk turns to the player and starts his talk as the player walks up, the player is held from then until
+ * the stat review is done, his lines show in the speech box (aw_mwhost.c host_say), nothing in the office is taken or
+ * used before the class and birthsign (aw_scene.c AW_SceneUse); 1 legacy: the project's earlier hand-written
+ * registration; 2 original: the original's scripts alone (the v0.0.62-v0.0.64 default). "census legacy 0/1" (the
+ * console command aw_census_legacy) stays as an alias: 1 = legacy, 0 = original. */
+cvar_t aw_census_type={"aw_census_type","0"};   /* registered in aw_debug.c */
+int AW_CensusType(void){int t=(int)aw_census_type.value;return t<0 || t>2?0:t;}
+int AW_CensusLegacy(void){return AW_CensusType()==1;}
+int AW_CensusAmiwind(void){return AW_CensusType()==0;}
+static const char *const census_type_names[]={"amiwind","legacy","original"};
+void AW_CensusTypeCommand(void){
+    int i;
+    if(Cmd_Argc()<2){Con_Printf("census type %d (%s): 0 amiwind, 1 legacy, 2 original\n",AW_CensusType(),
+                                census_type_names[AW_CensusType()]);return;}
+    for(i=0;i<3;i++)if(!Q_strcasecmp(Cmd_Argv(1),(char *)census_type_names[i]))break;
+    if(i==3)i=Q_atoi(Cmd_Argv(1));
+    if(i<0 || i>2){Con_Printf("census type: 0 amiwind, 1 legacy, 2 original\n");return;}
+    Cvar_SetValue("aw_census_type",(float)i);
+}
+/* census type amiwind: in the census office nothing is taken or used before the papers' stage (the clerk's class,
+ * birthsign and stat review done); aw_inventory.c placed_use asks this through aw_census_take_refused */
+int AW_OpeningTakeRefused(void){
+    return AW_CensusAmiwind() && AW_StoryRestricted() && sv.active && !strcmp(sv.name,"census") &&
+           aw_story.stage<AW_STAGE_PAPERS;
+}
+void AW_CensusLegacyCommand(void){
+    if(Cmd_Argc()<2){Con_Printf("census legacy %d (census type %s)\n",AW_CensusLegacy(),census_type_names[AW_CensusType()]);return;}
+    Cvar_SetValue("aw_census_type",Q_atoi(Cmd_Argv(1))?1.f:2.f);
+}
 /* EnableClassMenu / EnableBirthMenu / EnableStatReviewMenu of the clerk's script (CharGenClassNPC; aw_mwhost.c host
  * call): KIND 2, 3, 4 as AW_CharacterOpen takes them. The class window opening is the office's CLASS stage, as the
  * old path's census step 10 made it; the windows' results move the stages on in AW_OpeningTick. 1 opened. */
@@ -50,10 +99,18 @@ static int dock_route(int second)
      * Leave the doorway clear and face southeast, out toward the docks. */
     /* CharGenRaceNPC's own two AITravel points (state 0: -8914 -73093, before the plank; state 50: -9944 -72481, next
      * to the door), in the dock map's units; the second was moved left of the door for INTRO-DOCK-GUARD-BLOCKS-DOOR-62
-     * and is the script's own again since v0.0.63 (the parity check, config/mwscript-counterparts.json) */
-    goal[0]=second?(-9944.f+11264)*.25f:(-8914.f+11264)*.25f;
-    goal[1]=second?(-72481.f+71680)*.25f:(-73093.f+71680)*.25f;goal[2]=31.5f;
-    route_started=AW_NavStart(AW_IntroRole(5),goal);
+     * and was the script's own in v0.0.63 (the parity check). OPENING-REGRESSION-64: AmiWind's own post is back, as
+     * it stood through v0.0.54-v0.0.62 (decided for the project 11 November 2026): 299 -202, left of the door, the
+     * doorway clear, facing the dock (yaw 225, set at arrival below) */
+    /* PIER-GUARD-WALKS-INTO-DOOR-65: the second walk in two legs, the point in front of the door, then the post */
+    goal[0]=second?(post_leg?AW_PIER_GUARD_POST_X:AW_PIER_GUARD_FRONT_X):(-8914.f+11264)*.25f;
+    goal[1]=second?(post_leg?AW_PIER_GUARD_POST_Y:AW_PIER_GUARD_FRONT_Y):(-73093.f+71680)*.25f;goal[2]=31.5f;
+    /* PIER-GUARD-WALKS-INTO-DOOR-65: the step aside goes straight from the front point to the post (both measured, the
+     * line clear of the door); the path grid's nearest point to the post is the door's corner (338 -178), where he
+     * stood pushing */
+    /* both legs of the second walk go straight (measured, 12 November 2026): on the grid the first leg aimed at the grid
+     * point beside the plank (556 -337), where the player stands after the race, and he pushed against the player */
+    route_started=second?AW_NavStartDirect(AW_IntroRole(5),goal):AW_NavStart(AW_IntroRole(5),goal);
     if(!route_started){
         route_failed=1;Con_Printf("Dock route unavailable; story held for inspection.\n");
         AW_UISubtitle("Dock guard","Route unavailable. Please report this checkpoint.",10);
@@ -73,7 +130,7 @@ int AW_OpeningStoryHidden(void)
 void AW_OpeningSpawn(void)
 {
     int i,reference;edict_t *e;eval_t *v;
-    route_started=route_failed=route_done=0;captain_papers=-1;
+    route_started=route_failed=route_done=0;captain_papers=-1;post_retries=0;post_retry=0;post_leg=0;
     if(aw_story.stage==AW_STAGE_DEMO)return;
     if(!strcmp(sv.name,"census") && aw_story.stage>=AW_STAGE_OFFICE)aw_story.ship_disabled=1;
     for(i=1;i<sv.num_edicts;i++){
@@ -150,11 +207,29 @@ int AW_OpeningTick(void)
             if(aw_story.stage==AW_STAGE_OFFICE)aw_story.dock_timer+=dt;
             if(aw_story.dock_timer>=1.5 && AW_IntroSpeak(5,"chargendock2")){aw_story.dock=50;aw_story.dock_timer=0;}
         }else if(aw_story.dock==50 && AW_SpeechRemaining()<=0){
-            aw_story.dock=-1;route_started=route_failed=route_done=0;dock_route(1);IN_AWClearButtons();
+            aw_story.dock=-1;route_started=route_failed=route_done=0;post_leg=0;dock_route(1);IN_AWClearButtons();
         }else if(aw_story.dock==-1){
+            /* OPENING-REGRESSION-64: a walk to his post held up (the player standing in his way after the race
+             * menu: a plain travel does not wait for the player, nav.c) is tried again after a short pause instead
+             * of leaving him on the pier for good; the post beside the door is where CharGenRaceNPC's AITravel ends */
+            if(route_failed && !route_done && post_retries<30){post_retry+=dt;if(post_retry>2){post_retry=0;post_retries++;route_failed=0;}}
             if(!route_started && !route_failed && !route_done)dock_route(1);
             if(route_started && !route_failed){result=AW_NavStep(dt,0);
-                if(result>0){route_started=0;route_done=1;}
+                if(result>0 && !post_leg){
+                    /* PIER-GUARD-WALKS-INTO-DOOR-65: in front of the door; the next tick starts the step aside */
+                    route_started=0;post_leg=1;post_retries=0;
+                }else if(result>0){
+                    /* at his post he faces the dock (AmiWind's opening through v0.0.62, restored 11 November 2026):
+                     * converted actors face local +Y, so native yaw 225 faces the dock at world yaw 315 */
+                    edict_t *g=AW_IntroRole(5);
+                    route_started=0;route_done=1;
+                    if(g){g->v.angles[1]=225;SV_LinkEdict(g,false);}
+                }
+                else if(result<0 && !post_leg){
+                    /* PIER-GUARD-WALKS-INTO-DOOR-65: the front of the door taken (the player stands there): he steps
+                     * aside to his post at once instead of pushing toward it */
+                    route_started=0;post_leg=1;post_retries=0;Con_Printf("Dock guard: the front of the door is taken; to the post.\n");
+                }
                 else if(result<0){route_started=0;route_failed=1;Con_Printf("Dock guard post blocked.\n");}}
             if(near_actor(5)<37.5 && AW_SpeechRemaining()<=0){
                 aw_story.dock_timer+=dt;
@@ -168,7 +243,8 @@ int AW_OpeningTick(void)
     if(!aw_story.captain_hint && near_actor(7)<75){   /* CharGenDialogueMessage: GetDistance Player < 300 */
         aw_story.captain_hint=1;
         /* CharGenDialogueMessage's own message box with its Ok button (OPENING-CAPTAIN-HINT-SUBTITLE-63) */
-        AW_MsgBoxShow("Press E to talk to the Captain. Select topics to ask about them. Don't try persuasion on him. "
+        /* OPENING-TUTORIAL-KEYS-65: the bound activate key, not a fixed E (the box fills ^ActionActivate in) */
+        AW_MsgBoxShow("Press ^ActionActivate to talk to the Captain. Select topics to ask about them. Don't try persuasion on him. "
                       "If you're not good at it, he will start to dislike you.",captain_hint_ok,1);
     }
     if(!AW_CensusLegacy() && aw_story.stage>=AW_STAGE_CAPTAIN && !aw_story.captain){
@@ -176,6 +252,24 @@ int AW_OpeningTick(void)
         int papers=AW_Papers();
         if(near_actor(7)>=75)captain_papers=-1;
         else{if(captain_papers>0 && papers==0)aw_story.captain=-1;captain_papers=papers;}
+    }
+    if(AW_CensusAmiwind()){
+        /* census type amiwind (OPENING-REGRESSION-64): as AmiWind's registration played, the clerk starts his talk by
+         * himself when the player walks up (the hand-written path's 25 units), through his own script's activation
+         * (CharGenClassNPC's OnActivate, as E would), turns to the player and holds him there (AW_OpeningLocked:
+         * census 10) until the stat review is done (census -1 below) */
+        edict_t *clerk=AW_IntroRole(6);
+        if(clerk && aw_story.stage==AW_STAGE_OFFICE && aw_story.census==0 && near_actor(6)<25 && aw_opening_activate){
+            eval_t *r=GetEdictFieldValue(clerk,"aw_ref");
+            if(r && r->_float>0 && aw_opening_activate((unsigned)r->_float))aw_story.census=10;
+        }
+        /* his own script may start first (CharGenClassNPC's GetDistance Player < 100): the hold and the facing
+         * follow it as well, from his class window on until the review is done */
+        if(aw_story.census==0 && aw_story.stage>=AW_STAGE_CLASS && aw_story.stage<AW_STAGE_PAPERS)aw_story.census=10;
+        if(clerk && aw_story.census==10){
+            edict_t *p=svs.clients[0].edict;
+            clerk->v.angles[1]=Q_atan2(p->v.origin[1]-clerk->v.origin[1],p->v.origin[0]-clerk->v.origin[0])*180/M_PI-90;
+        }
     }
     if(!AW_CensusLegacy()){
         /* the clerk runs his own script (CharGenClassNPC: his lines, EnableClassMenu / -BirthMenu / -StatReviewMenu,
@@ -214,7 +308,13 @@ int AW_OpeningTick(void)
         svs.clients[0].edict->v.health=aw_character.current[0];
     }else if(aw_story.census==30 && AW_SpeechRemaining()<=0){
         aw_story.census_timer+=dt;
-        if(aw_story.census_timer>1){AW_UISubtitle("Registration","E: read your papers, then take them to the captain.",8);aw_story.census=-1;aw_story.census_timer=0;}
+        if(aw_story.census_timer>1){
+            /* OPENING-TUTORIAL-KEYS-65: the bound activate key (the text defines, aw_textdef.c), E only without them */
+            static char line[96];const char *say="E: read your papers, then take them to the captain.";
+            if(aw_opening_defines && aw_opening_defines("^ActionActivate: read your papers, then take them to the captain.",
+                                                        line,sizeof(line)))say=line;
+            AW_UISubtitle("Registration",say,8);aw_story.census=-1;aw_story.census_timer=0;
+        }
     }else if(aw_story.census==-1 && !AW_Papers() && !aw_story.captain && near_actor(6)<45 && AW_SpeechRemaining()<=0){
         aw_story.census_timer+=dt;
         if(aw_story.census_timer>5 && AW_IntroSpeak(6,"chargen_class4"))aw_story.census_timer=0;

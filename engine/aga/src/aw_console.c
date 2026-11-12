@@ -162,9 +162,11 @@ static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capa
         if(used+7>capacity)return 0;
         strcpy(out+used," grant");used+=6;
     }
-    /* dbg torch, dbg give dbgtorch, dbg give debugtorch (TORCH-HIDES-HELM-62): one more debug torch, through the
-     * inventory command, no resident command of its own */
-    if(!strcmp(r->command,"aw_inventory") && (!strcmp(r->words,"torch") || !strcmp(r->words,"give dbgtorch") ||
+    /* dbg torch, dbg dbgtorch, dbg debugtorch, dbg give dbgtorch, dbg give debugtorch (TORCH-HIDES-HELM-62; the two short
+     * names since v0.0.65, when the census exit stopped giving it): one more debug torch, through the inventory
+     * command, no resident command of its own */
+    if(!strcmp(r->command,"aw_inventory") && (!strcmp(r->words,"torch") || !strcmp(r->words,"dbgtorch") ||
+                                              !strcmp(r->words,"debugtorch") || !strcmp(r->words,"give dbgtorch") ||
                                               !strcmp(r->words,"give debugtorch"))){
         if(argc!=j || used+17>capacity)return 0;
         strcpy(out+used," give debugtorch");used+=16;

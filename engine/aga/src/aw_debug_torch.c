@@ -12,6 +12,7 @@
 static cvar_t aw_debug_torch={"aw_debug_torch","0"};
 extern void (*aw_scene_census_exit)(void);
 extern int (*aw_torch_item_lit)(void);
+extern int (*aw_torch_debug_equip)(void);
 static void census_exit(void)
 {
     aw_inventory_item_t item;
@@ -20,7 +21,7 @@ static void census_exit(void)
         Con_Printf("Debug torch (test only) unavailable in this image's item catalogue.\n");return;
     }
     if(AW_DebugTorchGrant(&aw_state,1)){
-        Con_Printf("%s received (never burns out; equip it in the inventory, or V with hands raised).\n",item.name);
+        Con_Printf("%s received (never burns out; V with hands raised equips and lights it, or equip it in the inventory).\n",item.name);
         AW_UISubtitle("","Debug torch (test only) received.",4);
     }
 }
@@ -28,6 +29,20 @@ static int item_lit(void)
 {
     aw_inventory_item_t item;
     return AW_InventoryEquippedItem(AW_SLOT_LEFT,&item) && (item.flags&AW_INV_LIGHT);
+}
+/* DEBUG-TORCH-64 (aw_torch.c aw_torch_debug_equip): V with no light in the left hand. The debug torch carried: it is
+ * equipped. Not carried while aw_debug_torch is 1 (the preview's game config): one is given and equipped. Otherwise
+ * nothing (the original's rule: only an equipped light is carried, TORCH-HIDES-HELM-62). 1 when a light is equipped now. */
+static int debug_equip(void)
+{
+    aw_inventory_item_t item;
+    if(item_lit())return 1;
+    if(!AW_InventoryRead(AW_DEBUG_TORCH_ID,&item) || !(item.flags&AW_INV_LIGHT))return 0;
+    if(AW_StateGet(&aw_state,AW_ITEM,AW_DEBUG_TORCH_ID)<1){
+        if(!aw_debug_torch.value || !AW_ItemAdd(&aw_state,AW_DEBUG_TORCH_ID,1))return 0;
+        Con_Printf("%s added to your inventory (debug torch, test only).\n",item.name);
+    }
+    return AW_InventoryEquip(&aw_state,&item) && item_lit();
 }
 /* HELD-LIGHT-OWN-MODEL-61 (aw_torch.h aw_held_light_item): the light in the left hand and the torch record's radius,
  * the torch's catalogue row read once (the debug torch's row is the torch's record: the same radius). */
@@ -65,4 +80,5 @@ void AW_DebugTorchInit(void)
 {
     Cvar_RegisterVariable(&aw_debug_torch);
     aw_scene_census_exit=census_exit;aw_torch_item_lit=item_lit;aw_held_light_item=held_item;
+    aw_torch_debug_equip=debug_equip;
 }

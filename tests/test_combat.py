@@ -28,6 +28,31 @@ def code(name):
     return re.sub(r'/\*.*?\*/', '', (SRC / name).read_text(encoding='utf-8'), flags=re.S)
 
 
+class LiveSheetTests(unittest.TestCase):
+    """HAND-TO-HAND-NO-HIT-64: the player's fight sheet was taken at the fight's start and kept, so dbg maxstats (or a
+    level, a potion) during a fight changed neither the hit chance nor the damage of the fists."""
+
+    def test_the_fight_reads_the_live_attributes_and_skills_each_frame(self):
+        combat = code('aw_combat.c')
+        refresh = combat[combat.index('static void you_refresh(aw_fighter_t *o) {'):]
+        refresh = refresh[:refresh.index('\n}\n')]
+        for part in ('o->attributes[i]=', 'o->skills[i]=', 'o->level=', 'o->health_max=', 'o->fatigue_max='):
+            self.assertIn(part, refresh)
+        self.assertIn('if(!aw_character.valid || aw_combat_player_preset)return;', refresh)   # the arena keeps its fighter
+        for kept in ('o->health=', 'o->fatigue=', 'o->knocked', 'aw_combat_equipment'):
+            self.assertNotIn(kept, refresh)                    # the fight's own state stays
+        block = combat[combat.index('    if(you_valid){\n        you_refresh(&you);'):]
+        self.assertLess(block.index('you_refresh(&you);'), block.index('watch_punch(p);'))
+
+    def test_hand_to_hand_damage_follows_the_original(self):
+        # OpenMW 0.51 combat.cpp getHandToHandDamage: Hand-to-hand skill x (fMin + (fMax - fMin) x strength), fatigue
+        # damage unless the victim is down or paralysed (NPCs and creatures alike), then x fHandtoHandHealthPer
+        rules = code('aw_combat_rules.c')
+        self.assertIn('d=a->skills[AW_SK_H2H]*(s->fMinHandToHandMult+(s->fMaxHandToHandMult-s->fMinHandToHandMult)*strength);',
+                      rules)
+        self.assertIn('health=v->knocked!=0;', rules)
+
+
 @unittest.skipIf(os.name == 'nt', 'native fixtures run on Linux, including the Docker gate')
 @unittest.skipUnless(shutil.which('cc'), 'a host C compiler is required')
 class CombatNativeTests(unittest.TestCase):

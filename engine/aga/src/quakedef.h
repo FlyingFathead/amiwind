@@ -730,6 +730,8 @@ void AW_UIVoiceSubtitle(const char *name,const char *text,double duration);
 void AW_UIThinInner(int x,int y,int w,int h,int *ix,int *iy,int *iw,int *ih);
 void AW_UIThinBox(int x,int y,int w,int h,int lit);
 void AW_UIButton(int x,int y,int w,int h,const char *text,int lit,int colour);   /* the house button style (UI-THIN-BUTTON-62) */
+/* the same with the keyboard focus shown as the menus' rows show it (RACE-MENU-OK-HIGHLIGHT-65) */
+void AW_UIButtonFocus(int x,int y,int w,int h,const char *text,int focused,int colour);
 int AW_SceneUIOption(int option,int change);   /* 0 aimed NPC names, 1 NPC place, 2 object place, 3 name labels (1 AmiWind, 0 Morrowind) */
 int AW_SceneNameLabelsAmiWind(void);          /* INFO-BOX-TEXT-CUT-62: 1 = no box over the view (the default) */
 #define AW_FOCUS_ROWS 12
@@ -797,6 +799,7 @@ void AW_SpeechShiftTiming(int elapsed,int start_time);
 int AW_NavDecode(const byte *,int);
 int AW_NavLoad(const char *);
 int AW_NavStart(edict_t *,vec3_t);
+int AW_NavStartDirect(edict_t *,vec3_t);   /* aw_nav.c: straight to the goal, no path grid (PIER-GUARD-WALKS-INTO-DOOR-65) */
 int AW_NavStep(double,int);
 qboolean AW_ActorStep(edict_t *,vec3_t,double);
 qboolean AW_ActorSettle(edict_t *);   /* aw_walk.c: one stuck search after a failed step, its clear spot kept */
@@ -913,8 +916,16 @@ int AW_OpeningTick(void);
 int AW_OpeningLocked(void);
 void AW_OpeningSpawn(void);
 int AW_OpeningUse(void);
-extern cvar_t aw_census_legacy;   /* CENSUS-INTRO-SCRIPTS-62, aw_opening.c; registered in aw_debug.c */
-int AW_CensusLegacy(void);   /* 1: the old hand-written captain box instead of his dialogue */
+extern cvar_t aw_census_type;   /* OPENING-REGRESSION-64, aw_opening.c; registered in aw_debug.c */
+int AW_CensusLegacy(void);   /* 1: the old hand-written captain box instead of his dialogue (census type legacy) */
+int AW_CensusAmiwind(void);  /* 1: census type amiwind (the default): AmiWind's registration around the scripts */
+int AW_CensusType(void);
+extern int (*aw_opening_activate)(unsigned reference);   /* aw_mwhost.c: a reference's use as E (its OnActivate) */
+void AW_CensusTypeCommand(void);
+void AW_CensusLegacyCommand(void);
+int AW_OpeningTakeRefused(void);
+int AW_SceneNpcAimed(void);   /* aw_scene.c: a person under the crosshair within reach */
+extern int (*aw_census_take_refused)(void);   /* aw_inventory.c; set to AW_OpeningTakeRefused in aw_debug.c */
 int AW_OpeningScriptMenu(int kind);  /* a script's race (1), class (2), birth (3), review (4) window; 1 opened */
 int AW_IntroNamePrompt(void);        /* a script's name window (EnableNameMenu, v0.0.63); 1 opened */
 int AW_IntroNamePromptOpen(void);    /* 1 while the name window is open */
@@ -943,6 +954,12 @@ int AW_WaitDraw(void);
 
 void AW_UICenteredLines(int x,int y,int w,int h,const char *text);
 void AW_UICenteredLinesUpTo(int x,int y,int w,int h,const char *text,int most);
+/* UI-TEXT-BOX-CLEARANCE-64: the skin frame's edge and the clear rows every text box keeps between it and the ink */
+#define AW_UI_FRAME_EDGE 4
+#define AW_UI_TEXT_CLEAR 4
+int AW_UICenteredLinesInk(int w,const char *text,int most);
+int AW_UITextBoxNeeds(int ink);
+int AW_UITextPanel(int x,int bottom,int w,int min_h,const char *text,int most);
 const char *AW_UIPage(const char *text,int width,int rows,char *out,int capacity);
 
 const char *AW_SceneWorldModel(const char *name);

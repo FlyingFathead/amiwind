@@ -36,6 +36,8 @@
 #include "aw_move.h"
 #include "aw_statswin.h"
 #include "aw_inventory.h"
+#include "aw_hand_models.h"
+#include "aw_reset.h"
 
 static int cast_on=1;              /* dbg cast casting on|off */
 #define SCALE .25f                 /* original units -> map units (tools/prepare_quake.py SCALE) */
@@ -45,7 +47,9 @@ static int cast_on=1;              /* dbg cast casting on|off */
 #define BOLT_SECONDS 6.0f          /* a bolt that hits nothing goes after this */
 #define BOLTS 4
 #define POWERS 8
-static int ready,held,light_set,sel_kind=-1,sel_index=-1;
+/* the magic ready flag is the hands' (aw_hands.c aw_magic_readied: F and R are exclusive stances there) */
+#define ready aw_magic_readied
+static int held,light_set,sel_kind=-1,sel_index=-1;
 static float last_burden,last_feather;
 /* the selected spell, read once */
 static struct {
@@ -503,6 +507,7 @@ static int window_status(char *out,int size){
     Q_snprintf(out,size,"%s: cost %d, chance %.0f %%",spell.name,spell.cost,AW_CastChanceNow());
     return 1;
 }
+static void ready_reset(int new_game){(void)new_game;ready=0;held=0;}
 void AW_CastFrame(void){
     edict_t *p=sv_player;
     aw_magic_castables=window_castables;aw_magic_select=window_select;aw_magic_status=window_status;
@@ -514,6 +519,7 @@ void AW_CastFrame(void){
         Q_strncpy(item_seen,aw_state.magic.selected,sizeof(item_seen)-1);item_seen[sizeof(item_seen)-1]=0;
         if(item_seen[0] && sel_index>=0){sel_kind=-1;sel_index=-1;memset(&spell,0,sizeof(spell));}
     }
+    AW_ResetRegister("cast ready",ready_reset,NULL);   /* idempotent: New Game lowers the magic */
     if(cast_on)worn_frame();
     /* Light on the player: Quake's own entity light (EF_DIMLIGHT, the client's dynamic light) while the effect lasts
      * (OpenMW: a light attached to the actor while its Light magnitude is above 0); only the bit set here is cleared */
@@ -539,12 +545,14 @@ void AW_CastFrame(void){
     }else held=0;
 }
 static void ready_command(void){
-    eval_t *goal;
+    eval_t *goal;int g;
     if(!cast_on)return;
     if(!sv.active || !sv_player){Con_Printf("Ready magic: no game.\n");return;}
-    ready=!ready;
-    /* the hands come up as for a fight, and go down with the magic */
-    if((goal=GetEdictFieldValue(sv_player,"aw_hand_goal"))!=NULL)goal->_float=ready?1:0;
+    /* READY-MAGIC-SHOWS-WEAPON-65: the spell stance: the empty hands come up (the weapon is put away), and go down
+     * with the magic; from the weapon stance the hands stay up and only the weapon goes */
+    goal=GetEdictFieldValue(sv_player,"aw_hand_goal");g=goal && goal->_float!=0;
+    AW_HandReadyPress(AW_READY_MAGIC_KEY,&g,&ready);
+    if(goal)goal->_float=(float)g;
     if(ready && sel_index<0 && !aw_state.magic.selected[0])say("You have no spell selected.");
     Con_DPrintf("Magic %s.\n",ready?"ready":"lowered");
 }

@@ -12,7 +12,7 @@
 | Persists in | v0.0.64-dev3 (last seen) |
 | Severity | high: Regressed in v0.0.64-dev3 (was medium): a frozen game in play, or a session that cannot finish its check |
 | Family | Loading and disk reads (`disk-loading`) |
-| Deferred by the maintainer | 2026-11-11: deferred by the maintainer to v0.0.65 (the v0.0.64 release ships early); its "came back" mark is checked against its evidence first |
+| Deferred by the maintainer | 2026-11-12: deferred by the maintainer to v0.0.66 (the v0.0.65 release fixes the opening only and ships early); its "came back" mark is checked against its evidence first |
 | Came back (regression) | in v0.0.64-dev3 (fixed in v0.0.62-dev1 before) |
 | Playtest version | MiniWind v0.0.62-dev1 seyda-enabledraw2 7bb679e |
 | From commit | source 7bb679e, engine 7bb679e, CHIM world 7bb679e |

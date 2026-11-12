@@ -747,7 +747,9 @@ static void walk_frames(slot_t *s,float speed,float dt) {
 static void begin_walk(slot_t *s) {
     const aw_anim_t *a=AW_AnimOf(s->e);
     /* by what is worn, not the slot's own mark: a fight that ended took the mover off (aw_combat.c release) */
-    if(a && a->mover[0] && !AW_AnimMoving(s->e) && AW_AnimMover(s->e,1))s->mover=1;
+    /* an opening actor walked by its script (aw_intro_role set: the ship and the dock) keeps its own walk frames; its
+     * full kit is for a fight only (CENSUS-NPC-NO-ATTACK-ANIM-65) */
+    if(a && a->mover[0] && field(s->e,"aw_intro_role",0)<=0 && !AW_AnimMoving(s->e) && AW_AnimMover(s->e,1))s->mover=1;
     else if(!AW_AnimMoving(s->e))s->mover=0;
     set_field(s->e,"aw_moving",1);memset(&s->play,0,sizeof(s->play));s->stuck=0;s->state=S_WALK;st.walks++;
 }

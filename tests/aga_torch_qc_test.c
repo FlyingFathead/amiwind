@@ -156,7 +156,8 @@ static void held_attack_during_draw(edict_t *p,edict_t *world,int fn)
         if(mode==3)*field(p,"aw_hand_goal")=0; /* cancelled draw */
         sv.time=40.45f;AW_HandsTick();
         sv.time=40.47f;AW_HandsTick();
-        if(!mode){
+        /* mode 2, a lit torch: the fists still strike (TORCH-HAND-TO-HAND-64; before, the torch took the punch's place) */
+        if(!mode || mode==2){
             assert(*field(p,"aw_hand_state")==3);
             assert(*field(p,"aw_attack_latched")==1);
             for(tick=0;tick<100;tick++){
@@ -240,6 +241,42 @@ static void transition_states(edict_t *p,int fn)
     active_torch_model=&torch_model_fixture;
     AW_TorchResetAnimation();assert(AW_TorchAnimationTime()==cl.time);
 }
+/* TORCH-HAND-TO-HAND-64, the maintainer's path with a torch (the debug torch) equipped in the inventory: F raises the
+ * fists and they stay up (the torch is not lit again by raising), V lights it, V puts it out and it stays out, V lights
+ * it again, and the fists strike with the torch lit, which stays lit through the punch. */
+extern int (*aw_torch_item_lit)(void);
+static int item_equipped;
+static int item_lit_fixture(void){return item_equipped;}
+static void torch_hand_to_hand(edict_t *p)
+{
+    int i;
+    set_table(.4f,2,.3f,.5f);
+    memset(&p->v,0,progs->entityfields*4);p->v.health=100;
+    aw_torch_item_lit=item_lit_fixture;item_equipped=1;sv.time=50;
+    AW_TorchUpdate();assert(!*field(p,"aw_torch"));              /* equipped with the hands down: nothing lit */
+    p->v.impulse=202;AW_HandsTick();AW_TorchUpdate();
+    sv.time=50.5;AW_HandsTick();AW_TorchUpdate();
+    assert(*field(p,"aw_hand_state")==2 && *field(p,"aw_hand_goal")==1);
+    for(i=0;i<10;i++){sv.time=50.5+i*.02;AW_HandsTick();AW_TorchUpdate();}
+    assert(!*field(p,"aw_torch") && !AW_TorchEquipped());       /* F: the fists stay up */
+    hands_model(p);
+    toggle_torch();AW_TorchUpdate();assert(AW_TorchEquipped() && cl_dlights[0].radius>0);   /* V: on */
+    toggle_torch();
+    for(i=0;i<10;i++){sv.time=51+i*.02;AW_HandsTick();AW_TorchUpdate();}
+    assert(!*field(p,"aw_torch") && !AW_TorchEquipped() && cl_dlights[0].radius==0);       /* V: off, and stays off */
+    toggle_torch();AW_TorchUpdate();assert(AW_TorchEquipped());                             /* V: on again */
+    p->v.button0=1;sv.time=52;AW_HandsTick();AW_TorchUpdate();
+    assert(*field(p,"aw_hand_state")==3 && AW_TorchEquipped());   /* the fists strike, the torch stays lit */
+    p->v.button0=0;
+    for(i=0;i<40;i++){sv.time=52+i*.02;AW_HandsTick();AW_TorchUpdate();assert(AW_TorchEquipped());}
+    assert(*field(p,"aw_hand_state")==2);
+    /* TORCH-INVENTORY-PICTURE-64: unequipped in the inventory, the torch is gone at once, before any update runs (the
+     * inventory's picture re-renders in that moment) */
+    item_equipped=0;assert(!AW_TorchEquipped());
+    AW_TorchUpdate();assert(!*field(p,"aw_torch") && !AW_TorchEquipped() && cl_dlights[0].radius==0);
+    item_equipped=1;AW_TorchUpdate();assert(AW_TorchEquipped());   /* equipped again with the hands up: lit */
+    aw_torch_item_lit=NULL;
+}
 int main(int argc,char **argv)
 {
     FILE *f;byte *raw;long size;int fn,i,before,baseline;edict_t *p,*world;
@@ -282,16 +319,18 @@ int main(int argc,char **argv)
     assert(AW_TorchEquipped());AW_TorchUpdate();
     assert(cl_dlights[0].radius>=189 && cl_dlights[0].radius<=196);
     AW_TorchViewModel();assert(cl.viewent.model==&torch_model_fixture);
+    /* TORCH-HAND-TO-HAND-64: the fists strike with the torch lit, and it stays lit through the punch */
     p->v.button0=1;AW_HandsTick();
-    assert(*field(p,"aw_hand_state")==2 && *field(p,"aw_torch")==1);
+    assert(*field(p,"aw_hand_state")==3 && *field(p,"aw_torch")==1 && AW_TorchEquipped());
+    p->v.button0=0;sv.time=1.2;AW_HandsTick();assert(*field(p,"aw_hand_state")==2 && AW_TorchEquipped());
     toggle_torch();AW_TorchUpdate();assert(!AW_TorchEquipped() && cl_dlights[0].radius==0);
     toggle_torch();AW_TorchUpdate();assert(AW_TorchEquipped() && cl_dlights[0].radius>0);
     p->v.impulse=202;AW_HandsTick();AW_TorchUpdate();
     assert(!*field(p,"aw_hand_goal") && !*field(p,"aw_torch") && *field(p,"aw_hand_state")==4);
     assert(cl_dlights[0].radius==0);
-    sv.time=1;AW_HandsTick();
+    sv.time=1.6;AW_HandsTick();
     assert(!*field(p,"aw_hand_state") && !pr_strings[p->v.weaponmodel]);
-    p->v.button0=0;p->v.impulse=202;AW_HandsTick();sv.time=2;AW_HandsTick();
+    p->v.button0=0;p->v.impulse=202;AW_HandsTick();sv.time=2.1;AW_HandsTick();
     p->v.button0=1;AW_HandsTick();assert(*field(p,"aw_hand_state")==3);
     *field(p,"aw_torch")=1;p->v.health=0;AW_HandsTick();assert(!*field(p,"aw_torch"));
     animation_boundaries(p,world,fn);
@@ -304,6 +343,7 @@ int main(int argc,char **argv)
     before=metadata_warnings;AW_HandsTick();AW_TorchUpdate();
     assert(!*field(p,"aw_hand_state") && !*field(p,"aw_torch") && !pr_strings[p->v.weaponmodel]);
     assert(cl_dlights[0].radius==0 && metadata_warnings==before+1);
+    torch_hand_to_hand(p);
     puts("QC/torch lifecycle passed: missing metadata, raise, V toggle, viewmodel, light, lower, punch, death and zeroed-VM handoff phases.");
     free(sv.edicts);free(raw);return 0;
 }

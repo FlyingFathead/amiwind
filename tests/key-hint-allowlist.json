@@ -1,0 +1,75 @@
+{
+ "format": "AmiWind key hint allowlist 1",
+ "count": 41,
+ "files": {
+  "aw_arena.c": [
+   "Enter: rematch  S: same seed",
+   "F1: help  Ctrl+X: leave",
+   "N/B: next/prev  P: pick  Esc: leave"
+  ],
+  "aw_character.c": [
+   "Make own (M)",
+   "Questions (Q)",
+   "R: race  C: class  B: birthsign"
+  ],
+  "aw_corpse.c": [
+   "E: Search"
+  ],
+  "aw_cstrip.c": [
+   "E: Put  Q: stack  Tab: back",
+   "E: Steal  Q: stack  T: all  Tab: put",
+   "E: Take  Q: stack  T: all  Tab: put"
+  ],
+  "aw_gallery.c": [
+   "Attack: punch  F: draw/lower  F1: help",
+   "Ctrl+X: return to the captured game",
+   "E: converted greeting, when available",
+   "E: talk, as in the game",
+   "F: draw/lower using normal animation",
+   "F: hands; weapon retains minimum visibility",
+   "G: play every animation group",
+   "Shift+B: equipped / base body",
+   "Shift+N / Shift+P: next / previous",
+   "T: turntable on/off",
+   "Tab / B: browse friendly names",
+   "Tab / B: browse; keywords match name,",
+   "V: torch  F: hands  F1: help  Ctrl+X: return",
+   "WASD + mouse: move; V: torch on/off",
+   "Wheel / Shift+N/P: next/prev  F1: help"
+  ],
+  "aw_inventory.c": [
+   "E: Read",
+   "E: Steal"
+  ],
+  "aw_mwhost.c": [
+   "dbg mwscript result TOPIC NPC [N]: the result script of NPC's answer on TOPIC (N: its N-th answer)\\n"
+  ],
+  "aw_opening.c": [
+   "E: read your papers, then take them to the captain."
+  ],
+  "aw_photo.c": [
+   "You are in photo mode. Type dbg photomode off to return to the normal HUD.\\nCtrl+F: fog on/off, Ctrl+H: debug HUD (dbg hud).\\n"
+  ],
+  "aw_recorder.c": [
+   " - Ctrl+R: record",
+   "Ctrl+R: close the window first"
+  ],
+  "aw_savemenu.c": [
+   "Enter / Y: yes   Esc / N: cancel"
+  ],
+  "aw_scene.c": [
+   "E: Pick",
+   "E: Talk",
+   "Mushroom spot %ld: %s [%s]. Aim and E: Pick.\\n"
+  ],
+  "aw_statswin.c": [
+   "P/Esc close"
+  ],
+  "aw_worldui.c": [
+   "Home fit M/Esc close",
+   "I/Esc close",
+   "Pan/zoom  P player  M/Esc close",
+   "Sort: %s (O)"
+  ]
+ }
+}

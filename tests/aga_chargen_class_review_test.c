@@ -45,6 +45,7 @@ void AW_UIText(int x,int y,const char *s,int color){
 }
 /* the house button (aw_ui.c AW_UIButton): the fixture records its text box like any other text */
 void AW_UIButton(int x,int y,int w,int h,const char *s,int lit,int colour){(void)lit;AW_UITextBox(x,y,w,h,s,colour);}
+void AW_UIButtonFocus(int x,int y,int w,int h,const char *s,int focused,int colour){(void)focused;AW_UITextBox(x,y,w,h,s,colour);}
 static int shown(const char *s){int i;for(i=0;i<seen_count;i++)if(!strcmp(seen[i],s))return 1;return 0;}
 /* the hint rows drawn: texts that name keys ("Enter:") */
 static int hint_rows(void){int i,n=0;for(i=0;i<seen_count;i++)if(strstr(seen[i],"Enter:"))n++;return n;}

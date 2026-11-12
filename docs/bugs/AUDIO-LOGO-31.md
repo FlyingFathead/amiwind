@@ -93,6 +93,7 @@ Family: Music and sound (`audio`). The mixer must stay fed through loads and sce
 - CHIM-ROOMS-WATER-SOUND-48 (no report page): CHIM water rooms have no ambient water sound in their water: room maps got it from their visibility pass
 - [COMBAT-AMBIENT-SPEECH-GATING-38](COMBAT-AMBIENT-SPEECH-GATING-38.md): Ambient greetings and subtitles interrupt combat
 - [COMBAT-MUSIC-AIR-SWING-35](COMBAT-MUSIC-AIR-SWING-35.md): Swinging at the air starts the combat music; it should start only when the player attacks a valid combat target (an NPC or creature)
+- COMBAT-MUSIC-STUCK-64 (no report page): The battle music keeps playing after the fight has ended
 - COMBAT-SOUNDS-RULE-OFF-58 (no report page): The original's combat sounds are switched off by default: normal play hears one sound per outcome, not OpenMW's set (swing swish, the armour piece struck, blocks, punches, criticals)
 - [COMBAT-VOICES-SILENT-33](COMBAT-VOICES-SILENT-33.md): Player pain grunts and hostile NPC taunts are not heard in fights
 - CREATURE-ANIM-SOUND-54 (no report page): A creature's sound generators from its animations are not played

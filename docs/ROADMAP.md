@@ -1,10 +1,11 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.64 (11 November 2026)._
+_Last updated with AmiWind v0.0.65 (12 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.65: Reintroducing Vvardenfell](#v0065-reintroducing-vvardenfell)
 - [Next version: the two expansion worlds](#next-version-the-two-expansion-worlds)
 - [v0.0.64: Gone Beyond The Gate, released 11 November 2026](#v0064-gone-beyond-the-gate-released-11-november-2026)
 - [v0.0.63: Every Script Of Vvardenfell, released 9 November 2026](#v0063-every-script-of-vvardenfell-released-9-november-2026)
@@ -114,9 +115,25 @@ _Last updated with AmiWind v0.0.64 (11 November 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
+## v0.0.65: Reintroducing Vvardenfell
+
+v0.0.65, "Reintroducing Vvardenfell" (titled "Reintroduction" in dev1 and rc1), is a fix release made from v0.0.64,
+released on 12 November 2026 ([release notes](releases/notes/RELEASE-v0.0.65.md)). The previous version had a fault in
+the game's scripting of the start area that kept the opening from working properly (the dock guard, the race choice, the
+census office, Sellus Gravius' papers). v0.0.65 fixes it, and the opening now follows the original Morrowind more
+exactly: the original game's own scripts run the opening, with AmiWind's own rules kept on top. It also mends the torch,
+the fists, readying magic and the census office's fights. Everything else is v0.0.64 unchanged. The release follows the
+snapshot [dev1](releases/notes/RELEASE-v0.0.65-dev1.md) and the candidates
+[rc1](releases/notes/RELEASE-v0.0.65-rc1.md), [rc2](releases/notes/RELEASE-v0.0.65-rc2.md),
+[v0.0.65-rc3](releases/notes/RELEASE-v0.0.65-rc3.md) (the opening's dialogue windows and Sellus Gravius' papers) and
+[v0.0.65-rc4](releases/notes/RELEASE-v0.0.65-rc4.md) (the opening's fights, the tutorial boxes once, no hidden door by the
+census office). The opening was played in the emulator on the candidates' images, and by the maintainer on the
+Raspberry Pi 4B through the census office to Seyda Neen. The work on the expansions moves to
+v0.0.66, and in it the census office becomes a room built like every other interior.
+
 ## Next version: the two expansion worlds
 
-The version after v0.0.64 takes up what v0.0.64 moved on; no dates are promised.
+The version after v0.0.65 (v0.0.66) takes up what v0.0.64 moved on; no dates are promised.
 
 - **Tribunal (Mournhold) and Bloodmoon (Solstheim) built in by default** where the player owns them. The builder warns
   when their files are not found and has a switch to build the base game only. The builder already reports what it
@@ -129,6 +146,9 @@ The version after v0.0.64 takes up what v0.0.64 moved on; no dates are promised.
   function), so that the scripts of all three game files run, and the scripted world events of the two worlds.
 - **The Heart Chamber on the full image,** and the end of the main quest: the heart placed in the room and the chamber's
   collapse animated.
+- **The spell-casting hands and every animation mode of a character:** readied magic shows the open hands of the
+  original and casts with them (v0.0.65 raises the fists of hand-to-hand), and every character has all of the original's
+  animation modes.
 - **The remaining partial systems** of the [game systems table](GAME_FEATURES.md) (7 of 49 done, 39 partial, 3 missing),
   among them pickpocketing and owned locks, locks on doors, enchanting at an altar and spellmaking in play, per-area data
   tables, outdoor items that can be picked up, dropped lights with their flame, the werewolf's body, and the in-game

@@ -160,6 +160,7 @@ WEAK void AW_UIBox(int x,int y,int w,int h){(void)x;(void)y;(void)w;(void)h;}
 WEAK int AW_UICursor(int x,int y){(void)x;(void)y;return 0;}
 WEAK void AW_UIThinBox(int x,int y,int w,int h,int lit){(void)x;(void)y;(void)w;(void)h;(void)lit;}
 WEAK void AW_UIButton(int x,int y,int w,int h,const char *text,int lit,int colour){(void)x;(void)y;(void)w;(void)h;(void)text;(void)lit;(void)colour;}
+WEAK void AW_UIButtonFocus(int x,int y,int w,int h,const char *text,int focused,int colour){(void)x;(void)y;(void)w;(void)h;(void)text;(void)focused;(void)colour;}
 WEAK void AW_UISmallBegin(void){}
 WEAK void AW_UISmallEnd(void){}
 /* aw_character.c's class page draws its skill rows with AW_UIText at one fixed line (CLASS-LIST-LAYOUT-62) */

@@ -28,6 +28,7 @@ int AW_MapTeleport(const float *p){int i;for(i=0;i<3;i++)destination[i]=p[i];if(
 void Cmd_AddCommand(char *name,void (*fn)(void)){if(!strcmp(name,"aw_teleport_map"))teleport_command=fn;else if(!strcmp(name,"aw_worldmap"))map_command=fn;else if(!strcmp(name,"aw_journal"))journal_command=fn;}
 int AW_StoryRestricted(void){return story_restricted;}
 int AW_StoryInventoryAllowed(void){return !story_restricted;}
+int AW_StoryMenus(void){return 0;}   /* no script switched a window on (MAP-MENU-BLOCKED-COURTYARD-65) */
 static int ui_kind;
 int AW_ReaderActive(void){return ui_kind==2;}
 int AW_CharacterActive(void){return ui_kind==3;}

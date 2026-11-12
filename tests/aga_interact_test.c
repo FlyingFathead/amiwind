@@ -33,3 +33,7 @@ int main(void) {
 int AW_IntroUse(void){return 0;}
 
 int AW_OpeningUse(void){return 0;}
+/* OPENING-REGRESSION-64: the census registration's use gate (NULL: no registration running) */
+int (*aw_census_take_refused)(void);
+int AW_SceneNpcAimed(void){return 0;}
+void AW_UISubtitle(const char *name,const char *text,double duration){(void)name;(void)text;(void)duration;}

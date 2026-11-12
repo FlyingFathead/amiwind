@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.64 (11 November 2026)._
+_Last updated with AmiWind v0.0.65 (12 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -25,9 +25,11 @@ Like community projects such as
 
 More in the [gallery](docs/GALLERY.md).
 
-## Where AmiWind stands (11 November 2026)
+## Where AmiWind stands (12 November 2026)
 
-The newest release is **v0.0.64: Gone Beyond The Gate**, the release that prepares the road to the two expansion worlds
+The newest release is **v0.0.65: Reintroducing Vvardenfell**, a fix release made from v0.0.64 ([release notes](docs/releases/notes/RELEASE-v0.0.65.md)). The previous version had a fault in the game's scripting of the start area that kept the opening from working properly (the dock guard, the race choice, the census office, Sellus Gravius' papers). v0.0.65 fixes it, and the opening now follows the original Morrowind more exactly: the original's own scripts run the prison ship, the pier, the census office and Sellus Gravius' conversation, with AmiWind's rules on top (the speech boxes, the hold, nothing taken before the papers, hints that name your own keys). It also mends the torch and the fists, readying magic (no weapon drawn) and the census office's fights. It follows the snapshot [dev1](docs/releases/notes/RELEASE-v0.0.65-dev1.md) and the candidates [rc1](docs/releases/notes/RELEASE-v0.0.65-rc1.md), [rc2](docs/releases/notes/RELEASE-v0.0.65-rc2.md), [v0.0.65-rc3](docs/releases/notes/RELEASE-v0.0.65-rc3.md) (the people of the opening talk in the dialogue window, Sellus Gravius takes the papers and gives the package, the dock guard steps aside at the door) and [v0.0.65-rc4](docs/releases/notes/RELEASE-v0.0.65-rc4.md) (the opening's people fight with their attack animations, the tutorial boxes after the papers come once, and no hidden door by the census office drops the player under its floor), runs on CHIM Engine v0.2.2 and needs 32 MB of Fast RAM. Most of its fixes were regressions that came in when the opening was moved onto the original game's own scripts, while the opening's scenes still kept some of their earlier, separate handling. The opening was played in the emulator on the candidates' images, and by the maintainer on the Raspberry Pi 4B through the census office to Seyda Neen. Known: readied magic shows the fists of hand-to-hand for now (the open spell-casting hands come in v0.0.66), a carried light shows in the hand only when it is equipped while the hands are raised (v0.0.66), a player jailed in Seyda Neen may be placed where the census office has no floor (v0.0.66), the pack guar at Ahemmusa Camp is drawn with its parts apart, shalks on Azura's Coast hang in the air, the battle music can keep playing after a fight, the trip from Seyda Neen to Balmora sometimes stalls on the loading screen in the emulator and the shores still run in saw-tooth steps; every other open entry is in the [bug register](docs/BUGS.md). Mournhold and Solstheim are not in the game: the work on the expansions moves to v0.0.66.
+
+The previous release is **v0.0.64: Gone Beyond The Gate**, the release that prepares the road to the two expansion worlds
 and mends what the v0.0.63 checks found ([release notes](docs/releases/notes/RELEASE-v0.0.64.md)). It follows five
 development snapshots ([dev1](docs/releases/notes/RELEASE-v0.0.64-dev1.md),
 [dev2](docs/releases/notes/RELEASE-v0.0.64-dev2.md), [dev3](docs/releases/notes/RELEASE-v0.0.64-dev3.md),
@@ -137,10 +139,11 @@ a new game and the falling mage, and its second ([dev2 notes](docs/releases/note
 delivered. v0.0.61 shipped as its third snapshot with the final version number
 ([release notes](docs/releases/notes/RELEASE-v0.0.61.md)).
 
-What comes next is in the [roadmap](docs/ROADMAP.md). The next release carries what v0.0.64 did not:
+What comes next is in the [roadmap](docs/ROADMAP.md). The release after the fix release v0.0.65 (released: [notes](docs/releases/notes/RELEASE-v0.0.65.md)) is v0.0.66, and carries what v0.0.64 did not:
 Tribunal (Mournhold) and Bloodmoon (Solstheim) built in by default where you own them (a warning when the files are
 not found, and a builder switch for the base game only), their scripting, and scripted world events such as the
-Ghostgate's doors and the traps of their worlds, with the tree method Solstheim's forests need; then the remaining
+Ghostgate's doors and the traps of their worlds, with the tree method Solstheim's forests need; the open spell-casting
+hands and every animation mode of a character; then the remaining
 partial systems, among them the rest of the crime system (pickpocketing, picking owned locks), locks on doors, enchanting
 and spellmaking in play, per-area data tables for containers, doors, items, activators and creatures, outdoor items that
 can be picked up, dropped lights with their flame, the Constant Effect items of non-player characters, summoned
@@ -422,8 +425,20 @@ test image of one spot see [MiniWind: the test ground](docs/MINIWIND.md), the
 Everything else about building, the build speed options, the FPU support library and running the image in FS-UAE or
 WinUAE: [Building and playing](docs/BUILDING_AND_PLAYING.md), the [Linux build guide](docs/LINUX_BUILD.md) and the
 [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md). The newest emulator presets are
+[`AmiWind-v0.0.65-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.65-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.65-WinUAE.uae`](resources/emulators/AmiWind-v0.0.65-WinUAE.uae) (for the fourth candidate:
+[`AmiWind-v0.0.65-rc4-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.65-rc4-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.65-rc4-WinUAE.uae`](resources/emulators/AmiWind-v0.0.65-rc4-WinUAE.uae); for the third candidate:
+[`AmiWind-v0.0.65-rc3-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.65-rc3-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.65-rc3-WinUAE.uae`](resources/emulators/AmiWind-v0.0.65-rc3-WinUAE.uae); for the second candidate:
+[`AmiWind-v0.0.65-rc2-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.65-rc2-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.65-rc2-WinUAE.uae`](resources/emulators/AmiWind-v0.0.65-rc2-WinUAE.uae); for the first candidate:
+[`AmiWind-v0.0.65-rc1-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.65-rc1-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.65-rc1-WinUAE.uae`](resources/emulators/AmiWind-v0.0.65-rc1-WinUAE.uae); for the first snapshot:
+[`AmiWind-v0.0.65-dev1-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.65-dev1-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.65-dev1-WinUAE.uae`](resources/emulators/AmiWind-v0.0.65-dev1-WinUAE.uae); for the v0.0.64 release:
 [`AmiWind-v0.0.64-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.64-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.64-WinUAE.uae`](resources/emulators/AmiWind-v0.0.64-WinUAE.uae) (for the last snapshot:
+[`AmiWind-v0.0.64-WinUAE.uae`](resources/emulators/AmiWind-v0.0.64-WinUAE.uae); for the last snapshot of it:
 [`AmiWind-v0.0.64-dev5-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.64-dev5-FS-UAE.fs-uae) and
 [`AmiWind-v0.0.64-dev5-WinUAE.uae`](resources/emulators/AmiWind-v0.0.64-dev5-WinUAE.uae); then
 [`AmiWind-v0.0.64-dev4-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.64-dev4-FS-UAE.fs-uae) and

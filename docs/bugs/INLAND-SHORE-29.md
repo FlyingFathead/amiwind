@@ -21,7 +21,7 @@
 | Persists in | v0.0.61 (last seen) |
 | Severity | medium: Regressed in v0.0.61 (was low): Angular jagged shoreline in terrain and water; visual only, cause unconfirmed. |
 | Family | Mesh converter geometry (`converter-geometry`) |
-| Deferred by the maintainer | 2026-11-11: deferred by the maintainer to v0.0.65 (the v0.0.64 release ships early); its "came back" mark is checked against its evidence first |
+| Deferred by the maintainer | 2026-11-12: deferred by the maintainer to v0.0.66 (the v0.0.65 release fixes the opening only and ships early); its "came back" mark is checked against its evidence first |
 | Came back (regression) | in v0.0.61 (closed before) |
 
 <!-- END GENERATED FACTS -->

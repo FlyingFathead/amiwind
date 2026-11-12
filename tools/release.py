@@ -141,7 +141,8 @@ CHIM_EFFECTS_DIR = PurePosixPath("tools/chim/effects")
 TEST_SESSIONS_DIR = PurePosixPath("tests/sessions")
 # Exact project-authored C include, validated as bounded UTF-8 source.
 NATIVE_SOURCE_INCLUDES = {"engine/aga/src/model_alias_stream.inc", "engine/aga/src/aw_animpick_rules.inc",
-                          "engine/aga/src/aw_animpick_catalogue.inc"} | {
+                          "engine/aga/src/aw_animpick_catalogue.inc",
+                          "engine/aga/src/aw_tutorial_table.inc"} | {
     # Upstream AmiQuake 68k assembly (vasm Motorola syntax), linked only by the upstream engine profile
     # (docs/ENGINE_PROFILES.md); exact names, validated as bounded UTF-8 source like the C files.
     "engine/aga/src/" + name for name in ("c2p8.s", "d_scan_68k.s", "d_scan_68k_nofpu.s", "fixedpoint_asm.s", "mathlib_68k.s")}

@@ -1,11 +1,17 @@
 # AmiWind releases
 
-_Generated from `docs/releases/` with AmiWind v0.0.64._
+_Generated from `docs/releases/` with AmiWind v0.0.65._
 
 Every release line, newest first: its release notes (docs/releases/notes/) and the whitespace baseline of the published release it was built on (docs/releases/patches/). Until v0.0.54 these files sat at the docs/ root; the table at the end maps every old path to the new one. Links into an old release tag (https://github.com/FlyingFathead/amiwind/blob/v0.0.37/docs/releases/notes/RELEASE-v0.0.37.md) keep working, because every tag keeps its own tree.
 
 | Version | Kind | Title | Notes | Whitespace baseline | GitHub |
 | --- | --- | --- | --- | --- | --- |
+| v0.0.65 | final | AmiWind v0.0.65: Reintroducing Vvardenfell | [RELEASE-v0.0.65.md](notes/RELEASE-v0.0.65.md) | [PATCH-v0.0.65.json](patches/PATCH-v0.0.65.json) | [tag v0.0.65](https://github.com/FlyingFathead/amiwind/releases/tag/v0.0.65) |
+| v0.0.65-rc4 | rc | AmiWind v0.0.65-rc4: Reintroducing Vvardenfell | [RELEASE-v0.0.65-rc4.md](notes/RELEASE-v0.0.65-rc4.md) | none | - |
+| v0.0.65-rc3 | rc | AmiWind v0.0.65-rc3: Reintroducing Vvardenfell | [RELEASE-v0.0.65-rc3.md](notes/RELEASE-v0.0.65-rc3.md) | none | - |
+| v0.0.65-rc2 | rc | AmiWind v0.0.65-rc2: Reintroducing Vvardenfell | [RELEASE-v0.0.65-rc2.md](notes/RELEASE-v0.0.65-rc2.md) | none | - |
+| v0.0.65-rc1 | rc | AmiWind v0.0.65-rc1: Reintroduction | [RELEASE-v0.0.65-rc1.md](notes/RELEASE-v0.0.65-rc1.md) | none | - |
+| v0.0.65-dev1 | dev | AmiWind v0.0.65-dev1 (Reintroduction, in development) | [RELEASE-v0.0.65-dev1.md](notes/RELEASE-v0.0.65-dev1.md) | none | - |
 | v0.0.64 | final | AmiWind v0.0.64: Gone Beyond The Gate | [RELEASE-v0.0.64.md](notes/RELEASE-v0.0.64.md) | [PATCH-v0.0.64.json](patches/PATCH-v0.0.64.json) | [tag v0.0.64](https://github.com/FlyingFathead/amiwind/releases/tag/v0.0.64) |
 | v0.0.64-dev5 | dev | AmiWind v0.0.64-dev5 (in development) | [RELEASE-v0.0.64-dev5.md](notes/RELEASE-v0.0.64-dev5.md) | none | - |
 | v0.0.64-dev4 | dev | AmiWind v0.0.64-dev4 (in development) | [RELEASE-v0.0.64-dev4.md](notes/RELEASE-v0.0.64-dev4.md) | none | - |

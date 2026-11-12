@@ -3391,8 +3391,18 @@ int AW_PlacedActivate(unsigned reference){
     if((row->action&3)==FOCUS_ACT_READ && aw_book_reader && aw_book_reader(row->reference))return 1;
     return take_row(row);
 }
+/* OPENING-REGRESSION-64: 1 while the census office's registration forbids taking and using (aw_opening.c
+ * AW_OpeningTakeRefused, set in aw_debug.c); NULL in the host tests */
+int (*aw_census_take_refused)(void);
 static int placed_use(void){
     int best=placed_target();focus_row_t *row;
+    /* OPENING-REGRESSION-64, census type amiwind: in the census office nothing is used or taken while the clerk's
+     * registration runs (the story stage before PAPERS: the class, the birthsign, the stat review); from PAPERS on
+     * (the review done, the papers shown) the normal rules: take, use and steal (the original's tutorial items,
+     * CharGenStuffRoom, the crime rules) */
+    if(best>=0 && aw_census_take_refused && aw_census_take_refused()){
+        AW_UISubtitle("","Finish your registration with the clerk first.",3);return 1;
+    }
     if(best>=0 && focus_rows[best].kind=='C')return container_open(&focus_rows[best]);   /* CONTAINER-WINDOW-59 */
     if(best<0 || (row=&focus_rows[best])->kind!='I')return 0;
     /* an item whose script reads OnActivate takes the use (the original's rule, as for doors and actors: aw_mwhost.c

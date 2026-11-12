@@ -214,12 +214,34 @@ static int allowed_in_play(void){
         !AW_ReaderActive() && !AW_CharacterActive() && !AW_GalleryActive();
 }
 static int allowed(void){return allowed_in_play() && !AW_StoryRestricted();}
+/* MAP-MENU-BLOCKED-COURTYARD-65: a window the opening's scripts switched on (EnableMapMenu, EnableStatsMenu,
+ * EnableMagicMenu: CharGenFatigueBarrel, the census office) opens while the opening still restricts the rest, as the
+ * inventory does (aw_story.c AW_StoryInventoryAllowed); before, M stayed shut after "You now have a map menu". */
+static int menu_allowed(int menu){return allowed_in_play() && (!AW_StoryRestricted() || (AW_StoryMenus()&menu));}
 static void opened(int kind){
     strncpy(opened_scene,sv.name,sizeof(opened_scene)-1);opened_scene[sizeof(opened_scene)-1]=0;
     modal=kind;key_dest=key_menu;IN_AWClearButtons();
 }
 int AW_WorldUIOpenPanel(void (*draw)(void),int (*key)(int key,int mouse_x,int mouse_y),void (*closed)(void)){
     if(!draw || !key || !allowed())return 0;
+    panel_draw=draw;panel_key=key;panel_closed=closed;opened(4);return 1;
+}
+/* RC2-SELLUS-NO-TALK-65: the dialogue window (OpenMW: the use key on a person is ActionTalk, GM_Dialogue) is never one
+ * of the menus the opening keeps shut until a script switches it on; it opens whenever the game is in play, so Sellus
+ * Gravius, the clerk and the door guard talk in it during the registration, as in the original. Before, it went through
+ * AW_WorldUIOpenPanel, whose AW_StoryRestricted refused every window until the registration ended, silently. */
+int AW_WorldUIOpenDialoguePanel(void (*draw)(void),int (*key)(int key,int mouse_x,int mouse_y),void (*closed)(void)){
+    /* the order of the registration (the maintainer, 12 November 2026: the character sheet FIRST, and the talk unlocked
+     * the same way as taking things from the tables): the census office's one rule, aw_census_take_refused
+     * (aw_opening.c AW_OpeningTakeRefused: census type amiwind, before the papers' stage), shuts the window as it shuts
+     * the takes; from the papers on the table the clerk, the hall guard and Sellus Gravius talk in it, and Sellus takes
+     * the papers in it */
+    if(!draw || !key || !allowed_in_play() || (aw_census_take_refused && aw_census_take_refused()))return 0;
+    panel_draw=draw;panel_key=key;panel_closed=closed;opened(4);return 1;
+}
+/* the same for a window a script can switch on in the opening (MENU: AW_MENU_STATS, AW_MENU_MAGIC) */
+int AW_WorldUIOpenMenuPanel(void (*draw)(void),int (*key)(int key,int mouse_x,int mouse_y),void (*closed)(void),int menu){
+    if(!draw || !key || !menu_allowed(menu))return 0;
     panel_draw=draw;panel_key=key;panel_closed=closed;opened(4);return 1;
 }
 void AW_InventoryOpen(void){
@@ -552,6 +574,45 @@ static void inventory_scroll(int top){
         minmax(inventory->top+INV_VISIBLE-1,0,inventory->count?inventory->count-1:0));
     inventory->context=0;
 }
+/* OPENING-TUTORIAL-KEYS-65: the inventory window's own action keys, bindable and saved (the maintainer: the window's
+ * keys too, so a hint names what the player bound): a list of key names, a letter or ENTER, TAB, SPACE, BACKSPACE, DEL.
+ * The defaults are the keys of before (use/equip E and Enter, drop D). The hints read the same lists (aw_textdef.c
+ * {key:winkey:...}). Sort (O) and the category (Tab) keep their fixed keys for now (listed for v0.0.66). */
+cvar_t aw_key_inv_use={"aw_key_inv_use","E ENTER",true};
+cvar_t aw_key_inv_drop={"aw_key_inv_drop","D",true};
+static int win_key(const char *list,int key){
+    static const struct {const char *name;int key;} named[]={{"ENTER",K_ENTER},{"TAB",K_TAB},{"SPACE",K_SPACE},
+        {"BACKSPACE",K_BACKSPACE},{"DEL",K_DEL}};
+    const char *p=list;int n,i,c;
+    while(p && *p){
+        while(*p==' ')p++;
+        for(n=0;p[n] && p[n]!=' ';n++);
+        if(n==1){c=(unsigned char)p[0];if(c>='A' && c<='Z')c+='a'-'A';if(c==key)return 1;}
+        else if(n>1)for(i=0;i<(int)(sizeof(named)/sizeof(named[0]));i++){
+            int j;
+            if((int)strlen(named[i].name)!=n || named[i].key!=key)continue;
+            for(j=0;j<n;j++){c=(unsigned char)p[j];if(c>='a' && c<='z')c-='a'-'A';if(c!=named[i].name[j])break;}
+            if(j==n)return 1;
+        }
+        p+=n;
+    }
+    return 0;
+}
+/* a key list as the footer shows it: "E ENTER" -> "E/Enter" */
+static void win_key_words(const char *list,char *out,int capacity){
+    const char *p=list;int n,k=0,i,c;
+    if(capacity<1)return;
+    while(p && *p){
+        while(*p==' ')p++;
+        for(n=0;p[n] && p[n]!=' ';n++);
+        if(!n)break;
+        if(k && k<capacity-1)out[k++]='/';
+        for(i=0;i<n && k<capacity-1;i++){c=(unsigned char)p[i];
+            if(i==0 && c>='a' && c<='z')c-='a'-'A';else if(i>0 && n>1 && c>='A' && c<='Z')c+='a'-'A';out[k++]=(char)c;}
+        p+=n;
+    }
+    out[k]=0;
+}
 static void inventory_key(int key){
     int i,x,y,row,top;aw_inventory_item_t *item=inventory_selected();
     if(!inventory)return;
@@ -564,8 +625,8 @@ static void inventory_key(int key){
     if(AW_ListNavKey(key,&inventory->selected,&inventory->top,inventory->count,INV_VISIBLE)){inventory->context=0;return;}
     if(key==K_TAB){inventory->category=(inventory->category+1)%8;inventory->selected=inventory->top=0;inventory_filter();}
     if(key=='o'){inventory->sort=(inventory->sort+1)%3;inventory_filter();}
-    if(key==K_ENTER || key=='e'){inventory_action(inventory_usable(item)?3:inventory_readable(item)?4:1);return;}
-    if(key=='d'){inventory_action(2);return;}
+    if(win_key(aw_key_inv_use.string,key)){inventory_action(inventory_usable(item)?3:inventory_readable(item)?4:1);return;}
+    if(win_key(aw_key_inv_drop.string,key)){inventory_action(2);return;}
     if(key==K_MOUSE3 || key==K_MOUSE2){
         if(mouse_x<128 || mouse_x>=inventory_list_right() || mouse_y<INV_LIST_Y || mouse_y>=INV_LIST_Y+INV_VISIBLE*INV_ROW_H)return;
         row=inventory->top+(mouse_y-INV_LIST_Y)/INV_ROW_H;if(row>=inventory->count)return;
@@ -825,13 +886,17 @@ static void inventory_draw(void){
         if(index)sprintf(line,"Weight %.2f  Value %ld",item->weight,(long)item->value);
         else strcpy(line,"Item details unavailable");
         inventory_text(132,INV_DETAILS_Y,180,8,line,muted);
-        inventory_status(inventory->message[0]?inventory->message:
-            inventory_usable(item)?(item->alchemy_kind==AW_ALCHEMY_POTION?"E/Enter drink  D drop  RMB actions":
-                                      item->alchemy_kind==AW_ALCHEMY_INGREDIENT?"E/Enter eat  D drop  RMB actions":
-                                      "E/Enter use  D drop  RMB actions"):
-            inventory_readable(item)?"E/Enter read  D drop  RMB actions":
-            inventory_equippable(item)?"E/Enter equip  D drop  RMB actions":
-            inventory_droppable(item)?"D drop  RMB actions":"Actions unavailable for this item",muted);
+        {   /* OPENING-TUTORIAL-KEYS-65: the footer names the keys bound now (aw_key_inv_use, aw_key_inv_drop) */
+            char use[32],drop[32],foot[96];
+            const char *verb=inventory_usable(item)?(item->alchemy_kind==AW_ALCHEMY_POTION?"drink":
+                             item->alchemy_kind==AW_ALCHEMY_INGREDIENT?"eat":"use"):
+                             inventory_readable(item)?"read":inventory_equippable(item)?"equip":NULL;
+            win_key_words(aw_key_inv_use.string,use,sizeof(use));win_key_words(aw_key_inv_drop.string,drop,sizeof(drop));
+            if(verb)snprintf(foot,sizeof(foot),"%s %s  %s drop  RMB actions",use,verb,drop);
+            else if(inventory_droppable(item))snprintf(foot,sizeof(foot),"%s drop  RMB actions",drop);
+            else snprintf(foot,sizeof(foot),"Actions unavailable for this item");
+            inventory_status(inventory->message[0]?inventory->message:foot,muted);
+        }
     }
     if(inventory->context && item){
         x=inventory->context_x;j=inventory->context_y;row=0;
@@ -917,7 +982,7 @@ static int lava_section(const byte *p,int size){
 }
 static void open_map(void){
     FILE *f=NULL;int size,i,off,version;byte *p;
-    if(!allowed())return;
+    if(!menu_allowed(AW_MENU_MAP))return;   /* the teleport map checked the full rule before calling */
     map_in_game();
     size=COM_FOpenFile("world/map.awm",&f);
     if(!f || size<32 || size>MAP_MAX)goto bad;
@@ -955,7 +1020,7 @@ static void open_map(void){
 /* M follows the current HUD preference; explicit teleport remains independent. */
 static void open_normal_map(void){
     /* a script's DisablePlayerControls keeps the player's own windows shut (OpenMW playercontrols.lua uiAllowed) */
-    if(!allowed() || !AW_ControlAllowed(AW_CONTROL_PLAYER))return;
+    if(!menu_allowed(AW_MENU_MAP) || !AW_ControlAllowed(AW_CONTROL_PLAYER))return;
     Cvar_SetValue(aw_map_mode.name,AW_DebugOverlaysEnabled() && map_debug_enabled()?0:1);
     open_map();
 }
@@ -1332,8 +1397,11 @@ static int journal_entry_exists(const char *id,int32_t index){
     low[i]=0;
     return journal_row(low,(int)index,&offset,&length,&flags);
 }
-void AW_WorldUIInit(void){aw_journal_entry_exists=journal_entry_exists;AW_InventoryInit();Cvar_RegisterVariable(&aw_map_mode);Cvar_RegisterVariable(&aw_map_debug_available);
-    Cvar_RegisterVariable(&aw_map_lava);Cvar_RegisterVariable(&aw_map_format);Cmd_AddCommand("aw_teleport_map",open_teleport_map);Cmd_AddCommand("aw_worldmap",open_normal_map);Cmd_AddCommand("aw_journal",open_journal);Cmd_AddCommand("aw_inventory",inventory_command);}
+void AW_WorldUIInit(void){aw_journal_entry_exists=journal_entry_exists;AW_InventoryInit();Cvar_RegisterVariable(&aw_map_mode);
+    Cvar_RegisterVariable(&aw_map_debug_available);
+    Cvar_RegisterVariable(&aw_map_lava);Cvar_RegisterVariable(&aw_map_format);
+    Cvar_RegisterVariable(&aw_key_inv_use);Cvar_RegisterVariable(&aw_key_inv_drop);   /* OPENING-TUTORIAL-KEYS-65 */
+    Cmd_AddCommand("aw_teleport_map",open_teleport_map);Cmd_AddCommand("aw_worldmap",open_normal_map);Cmd_AddCommand("aw_journal",open_journal);Cmd_AddCommand("aw_inventory",inventory_command);}
 void AW_WorldUIMouse(int dx,int dy){
     int top;
     if(!modal || key_dest!=key_menu)return;

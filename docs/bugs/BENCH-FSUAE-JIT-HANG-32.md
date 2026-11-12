@@ -9,7 +9,7 @@
 | Where | FS-UAE JIT session with a host-folder hard file |
 | Reproduction | once |
 | Duplicate of | no |
-| Persists in | v0.0.33-dev (last seen) |
+| Persists in | v0.0.33-dev, v0.0.65-rc3 (last seen) |
 | Severity | low: Seen once in a benchmark sweep; cause unknown. |
 | Family | Emulator measurement method (`benchmark-method`) |
 

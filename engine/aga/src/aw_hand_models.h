@@ -73,6 +73,15 @@ void AW_HandsTick(void);
 /* FP-WEAPON-SWAY-61: 1 = Morrowind stiff (aw_fp_sway 2): the ready hands hold the idle's first frame (aw_hands.c;
  * view.c sets it from the setting) */
 extern int aw_fp_stiff;
+/* READY-MAGIC-SHOWS-WEAPON-65 (aw_hands.c): the player's magic is readied (R; aw_cast.c reads and sets it). The
+ * weapon key and the magic key are exclusive stances: AW_HandReadyPress changes the hands' goal and the magic flag
+ * for one press; AW_HandShowsWeapon = the drawn weapon is shown (the weapon stance only). Pure. */
+enum {AW_READY_WEAPON_KEY,AW_READY_MAGIC_KEY};
+extern int aw_magic_readied;
+void AW_HandReadyPress(int key,int *goal,int *magic);
+int AW_HandShowsWeapon(int goal,int magic);
+/* aw_view.c installs it: 1 while the equipped weapon must not be drawn in first person (the spell stance). */
+extern int (*aw_hand_weapon_hidden)(void);
 int AW_HandModelsDecode(const unsigned char *data,int size);
 void AW_HandModelsLoad(void);
 void AW_HandModelsReset(void);

@@ -1,0 +1,109 @@
+{
+ "format": "AmiWind tutorial texts 1",
+ "note": "OPENING-TUTORIAL-KEYS-65: the game's message boxes that name a control or announce a window, by the normalized FNV-1a hash of their text (lower case, white space folded; engine/aga/src/aw_tutorial_rules.c AW_TutorialHash; the game's own text is never kept here). Each row's AmiWind text replaces the box's text: {text} is the original text as shown, {key:COMMAND} the key the player has bound to COMMAND now (aw_textdef.c AW_TextBoundKeyForCommand; 'not bound' when none), so a rebound key shows as rebound; winkey:NAME is a window's own bindable key list (aw_key_NAME). The wording and the format were set with the maintainer: one plain sentence of what you got, then one line per action with its key in parentheses in a column at the right (a tab before the key: aw_ui.c AW_UICenteredLinesUpTo draws the part before it at the left inner margin and the key right-aligned), an empty row between the sentences and the actions and one before the button, lines of about 36 characters at most for the 320-pixel box. kind 'once' shows the row the first time in a game only, the original text after it. Rendered into engine/aga/src/aw_tutorial_table.inc by tools/tutorial_texts.py render; tests/test_tutorial_texts.py checks both agree. The key marker is parentheses, decided by the maintainer (12 November 2026): the game font's '[' and ']' are ornaments, not brackets.",
+ "rows": [
+  {
+   "hash": "0xa1068e72",
+   "kind": "replace",
+   "source": "CharGenClassNPC, the stats menu announced after the review",
+   "text": "Your papers are filled in.\n\nView your character\t({key:aw_stats})\n\n"
+  },
+  {
+   "hash": "0x63f76653",
+   "kind": "hide",
+   "source": "CharGenClassNPC, after the review (the right-click menu hint): not shown, the stats box before it says it (TUTORIAL-BOX-SHOWN-TWICE-65)",
+   "text": ""
+  },
+  {
+   "hash": "0xf9e6cc51",
+   "kind": "replace",
+   "source": "CharGenStatsSheet, the inventory announced (taking the papers)",
+   "text": "You now have an inventory.\n\nOpen it\t({key:aw_inventory})\nEquip or use an item\t({key:winkey:inv_use})\n\n"
+  },
+  {
+   "hash": "0x0640f16d",
+   "kind": "hide",
+   "source": "CharGenStatsSheet, the inventory (the right-click menu hint): not shown, the inventory box before it says it (TUTORIAL-BOX-SHOWN-TWICE-65)",
+   "text": ""
+  },
+  {
+   "hash": "0x8f93f071",
+   "kind": "replace",
+   "source": "CharGen papers (read them by activating them)",
+   "text": "Read your papers\t(^ActionActivate)\nThen choose Take to pick them up.\n\n"
+  },
+  {
+   "hash": "0xc2ddd5ca",
+   "kind": "replace",
+   "source": "CharGen dagger picked up (the drop-on-your-picture equip hint)",
+   "text": "To equip the dagger:\n\nOpen your inventory\t({key:aw_inventory})\nSelect the dagger\t({key:winkey:inv_use})\n(or double-click it)\t\nReady or sheathe it\t({key:impulse 202})\n\n"
+  },
+  {
+   "hash": "0xdccbb17b",
+   "kind": "replace",
+   "alternative_of": "0xc2ddd5ca",
+   "source": "CharGen dagger picked up (the short equip hint): the other branch of the same if/else, never shown with it",
+   "text": "To equip the dagger:\n\nOpen your inventory\t({key:aw_inventory})\nSelect the dagger\t({key:winkey:inv_use})\n(or double-click it)\t\nReady or sheathe it\t({key:impulse 202})\n\n"
+  },
+  {
+   "hash": "0xe6c264d8",
+   "kind": "replace",
+   "source": "CharGen dagger (the left-mouse-button swing hint)",
+   "text": "Ready or sheathe it\t({key:impulse 202})\nSwing: hold, then let go\t({key:+attack})\nA harder swing hurts more\nbut tires you more.\n\n"
+  },
+  {
+   "hash": "0x85f66d2b",
+   "kind": "replace",
+   "source": "CharGenFatigueBarrel, the map announced",
+   "text": "You now have a map. It shows\nwhere you are and your facing.\n\nOpen it\t({key:aw_worldmap})\n\n"
+  },
+  {
+   "hash": "0xbf4fbd1d",
+   "kind": "replace",
+   "source": "CharGen, the magic menu announced",
+   "text": "You now have a magic menu: your\npowers, spells and magic items.\n\nOpen it\t({key:aw_magicmenu})\nReady magic\t({key:aw_magicfx ready})\n\n"
+  },
+  {
+   "hash": "0x6c83fe81",
+   "kind": "replace",
+   "source": "CharGen magic menu (the right-click menu hint)",
+   "text": "Choose your active magic\nin the magic menu.\n\nOpen it\t({key:aw_magicmenu})\nReady magic\t({key:aw_magicfx ready})\n\n"
+  },
+  {
+   "hash": "0x14a11b94",
+   "kind": "once",
+   "source": "the journal's update notice, its first time (GMST sJournalEntry)",
+   "text": "Your journal keeps your quests.\n\nOpen it\t({key:aw_journal})\n\n"
+  },
+  {
+   "hash": "0xa829cbe5",
+   "kind": "add",
+   "source": "CharGen ingredients (equip in the inventory menu)",
+   "text": "{text}\n\nOpen your inventory\t({key:aw_inventory})\nSelect the item\t({key:winkey:inv_use})\n\n"
+  },
+  {
+   "hash": "0x62ac0e03",
+   "kind": "add",
+   "source": "CharGen lights and torches (equip in the inventory menu)",
+   "text": "{text}\n\nOpen your inventory\t({key:aw_inventory})\nSelect the item\t({key:winkey:inv_use})\n\n"
+  },
+  {
+   "hash": "0x176ba7f3",
+   "kind": "add",
+   "source": "CharGen lockpicks (equip in the inventory menu)",
+   "text": "{text}\n\nOpen your inventory\t({key:aw_inventory})\nSelect the item\t({key:winkey:inv_use})\n\n"
+  },
+  {
+   "hash": "0x62b8ae86",
+   "kind": "add",
+   "source": "CharGen regional liquor (drink by equipping in the inventory menu)",
+   "text": "{text}\n\nOpen your inventory\t({key:aw_inventory})\nSelect the item\t({key:winkey:inv_use})\n\n"
+  },
+  {
+   "hash": "0x3dca591a",
+   "kind": "add",
+   "source": "CharGen letters, books and scrolls (read by equipping in the inventory menu)",
+   "text": "{text}\n\nOpen your inventory\t({key:aw_inventory})\nSelect the item\t({key:winkey:inv_use})\n\n"
+  }
+ ]
+}

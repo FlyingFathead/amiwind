@@ -31,6 +31,9 @@ unsigned long AW_ResetHash(unsigned long seed, const void *bytes, unsigned long 
 /* The boot digests kept (AW_ResetMarkBoot) and the modules whose state differs from them now: their names written
  * into OUT (comma separated), the count returned. */
 void AW_ResetMarkBoot(void);
+/* Every reset in order, each module's digest kept right after its own reset (before the next runs): a later module
+ * that touches an earlier one's state is then named by AW_ResetCompareBoot (OPENING-VANITY-CAMERA-64). The count. */
+int AW_ResetMarkBootInterleaved(int new_game);
 int AW_ResetCompareBoot(char *out, int capacity);
 
 #endif

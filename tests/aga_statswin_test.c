@@ -77,6 +77,11 @@ static void (*panel_draw)(void);static int (*panel_key)(int,int,int);static void
 int AW_WorldUIOpenPanel(void (*draw)(void),int (*key)(int,int,int),void (*closed)(void)){
     panel_draw=draw;panel_key=key;panel_closed=closed;opens++;return 1;
 }
+/* MAP-MENU-BLOCKED-COURTYARD-65: the stats and magic windows open through the menu-aware call */
+int menu_asked;
+int AW_WorldUIOpenMenuPanel(void (*draw)(void),int (*key)(int,int,int),void (*closed)(void),int menu){
+    menu_asked=menu;return AW_WorldUIOpenPanel(draw,key,closed);
+}
 
 static void draw(void){
     text_count=0;memset(frame,0,sizeof(frame));vid.buffer=frame;vid.rowbytes=vid.width=320;vid.height=200;

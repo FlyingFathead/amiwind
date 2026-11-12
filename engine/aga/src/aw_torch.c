@@ -86,6 +86,9 @@ static double torch_animation_offset;
 int (*aw_view_torch_emitter)(vec3_t out);
 /* aw_debug_torch.c: 1 while a carried light from the inventory (the debug torch) is equipped. */
 int (*aw_torch_item_lit)(void);
+/* aw_debug_torch.c (DEBUG-TORCH-64): with no light equipped, equips the debug torch (given first while aw_debug_torch
+ * is 1); 1 when a light is equipped now. */
+int (*aw_torch_debug_equip)(void);
 int (*aw_view_torch_light)(vec3_t out);
 double AW_TorchAnimationTime(void)
 {
@@ -147,15 +150,20 @@ static int hand_state(edict_t *p)
     eval_t *v=GetEdictFieldValue(p,"aw_hand_goal");
     if(!v || v->_float!=1)return 0;
     v=GetEdictFieldValue(p,"aw_hand_state");
-    return v && (v->_float==1 || v->_float==2)?(int)v->_float:0;
+    /* TORCH-HAND-TO-HAND-64: punching (3) is hands up too: the torch stays lit while the fists strike */
+    return v && (v->_float==1 || v->_float==2 || v->_float==3)?(int)v->_float:0;
 }
 static int held_own(void);
 /* the carried light is lit (V or the equip) with the hands raised */
 static int light_lit(void)
 {
     edict_t *p=torch_player();eval_t *v;
-    if(!p || hand_state(p)!=2)return 0;
+    if(!p || hand_state(p)<2)return 0;
     v=GetEdictFieldValue(p,"aw_torch");
+    /* TORCH-INVENTORY-PICTURE-64: the torch follows the equip state at once: with no light in the left hand nothing is
+     * lit (before, the inventory's picture re-rendered on an unequip while the lit flag still waited for the next update,
+     * and the old baked torch showed in the hand); the torch test room sets the flag itself */
+    if(aw_torch_item_lit && !aw_torch_item_lit() && !AW_TorchTestActive())return 0;
     return v && v->_float==1;
 }
 /* the torch: lit, and the left hand holds no light of its own (HELD-LIGHT-OWN-MODEL-61) */
@@ -184,7 +192,9 @@ static void toggle(void)
     if(!v){Con_Printf("Torch requires matching AmiWind game rules.\n");return;}
     /* TORCH-HIDES-HELM-62: as in the original, only an equipped light is carried (OpenMW: a light in the carried-left
      * slot); V with no light equipped lights nothing, so the old baked torch body is no longer reached that way */
-    if(v->_float!=1 && aw_torch_item_lit && !aw_torch_item_lit()){
+    /* DEBUG-TORCH-64: the debug torch (test only) is equipped by V as its grant message says; the original's rule holds
+     * for every other case */
+    if(v->_float!=1 && aw_torch_item_lit && !aw_torch_item_lit() && !(aw_torch_debug_equip && aw_torch_debug_equip())){
         Con_Printf("No light equipped: equip a torch or another light in the inventory (dbg torch gives one).\n");return;
     }
     v->_float=v->_float==1?0:1;
@@ -321,7 +331,11 @@ static void item_torch(void)
     lit=aw_torch_item_lit()!=0;raised=hand_state(p)!=0;
     if(lit==was_lit && raised==was_raised && world==sv.worldmodel)return;
     v=GetEdictFieldValue(p,"aw_torch");
-    if(v){if(lit && raised)v->_float=1;else if(!lit && was_lit)v->_float=0;}
+    /* TORCH-HAND-TO-HAND-64: only equipping (with the hands up) lights it and only unequipping puts it out; raising the
+     * hands no longer lights it again, so F raises the fists or the weapon and V alone switches the torch (before, every
+     * change of the hands, a punch among them, lit it again: the fists showed for a moment, then the torch, and V could
+     * not put it away) */
+    if(v){if(lit && !was_lit && raised)v->_float=1;else if(!lit && was_lit)v->_float=0;}
     was_lit=lit;was_raised=raised;world=sv.worldmodel;
 }
 void AW_TorchUpdate(void)

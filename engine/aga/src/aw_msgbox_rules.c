@@ -107,6 +107,29 @@ void AW_MsgBoxButtonRect(int count,int i,const int frame[4],int rect[4]) {
     rect[2]=(frame[2]-16-(in_row-1)*8)/in_row;rect[3]=22;
     rect[0]=frame[0]+8+col*(rect[2]+8);rect[1]=frame[1]+frame[3]-rows*24+row*24-2;
 }
+/* UI-TEXT-BOX-CLEARANCE-64: a button as wide as its label (LABEL_W pixels) and its padding, at least
+ * AW_MSGBOX_BUTTON_MIN and never wider than its share of the row; the row's buttons centred with 8 pixels between them
+ * (the original's message box: buttons sized to their text, not stretched across the box). LABEL_W NULL: the shares. */
+static int sized(int share,int label){int w=label+2*AW_MSGBOX_BUTTON_PAD;if(w<AW_MSGBOX_BUTTON_MIN)w=AW_MSGBOX_BUTTON_MIN;return w<share?w:share;}
+void AW_MsgBoxButtonRectSized(int count,int i,const int frame[4],const int *label_w,int rect[4]) {
+    int rows=(count+AW_MSGBOX_PER_ROW-1)/AW_MSGBOX_PER_ROW,row=i/AW_MSGBOX_PER_ROW,first=row*AW_MSGBOX_PER_ROW,k,total=0,x;
+    int in_row=row==rows-1?count-first:AW_MSGBOX_PER_ROW;
+    AW_MsgBoxButtonRect(count,i,frame,rect);
+    if(!label_w)return;
+    for(k=0;k<in_row;k++)total+=sized(rect[2],label_w[first+k]);
+    total+=(in_row-1)*8;
+    x=frame[0]+(frame[2]-total)/2;
+    for(k=first;k<i;k++)x+=sized(rect[2],label_w[k])+8;
+    rect[0]=x;rect[2]=sized(rect[2],label_w[i]);
+}
+int AW_MsgBoxButtonAtSized(int count,const int frame[4],const int *label_w,int px,int py) {
+    int i,r[4];
+    for(i=0;i<count && i<AW_MSGBOX_BUTTONS;i++){
+        AW_MsgBoxButtonRectSized(count,i,frame,label_w,r);
+        if(px>=r[0] && px<r[0]+r[2] && py>=r[1] && py<r[1]+r[3])return i;
+    }
+    return -1;
+}
 int AW_MsgBoxButtonAt(int count,const int frame[4],int px,int py) {
     int i,r[4];
     for(i=0;i<count && i<AW_MSGBOX_BUTTONS;i++){

@@ -9,17 +9,17 @@
  },
  "totals": {
   "commands": {
-   "count": 302,
-   "hunk_bytes": 9664
+   "count": 304,
+   "hunk_bytes": 9728
   },
   "cvars": {
-   "count": 372,
-   "static_bytes": 8928,
-   "zone_bytes": 12128
+   "count": 374,
+   "static_bytes": 8976,
+   "zone_bytes": 12200
   },
   "tables": {
-   "count": 0,
-   "bytes": 0
+   "count": 1,
+   "bytes": 1557
   },
   "growing": {
    "count": 33,
@@ -113,7 +113,10 @@
   "2026-11-10: ROOM-DECAL-ALPHA-62, two-sided see-through planes (cobwebs, hanging moss and vines visible from both sides, asked for by the maintainer): aw_fence_twosided, one console variable (24 structure bytes, 32 zone bytes; default 0 until the A/B on a full image decides; 1 = the fence pass draws a see-through face seen from behind). The converter route is a build option and adds no setting.",
   "2026-11-10: LARGE-ROOM-FOG-SETTING-64, the maintainer's request for its own setting for the large-room fog: aw_fog_large_rooms, one saved console variable (0 off, 1 on, the default) with an Options > Video row; no command, no static name table.",
   "2026-11-10: LARGE-ROOM-FOG-SETTING-64, the maintainer's request for an indoor fog distance of its own: aw_fog_distance_interior, one saved console variable (100..4096 local units, default 300 as the shared value before) with an Options > Video row; the outdoor aw_drawdistance unchanged; no command, no static name table.",
-  "2026-11-10: aw_tree_crowns, the Tree crowns player setting the maintainer asked for (saved with the other settings, Options > Video > Tree crowns; TREES-DEPTH-56): one console variable"
+  "2026-11-10: aw_tree_crowns, the Tree crowns player setting the maintainer asked for (saved with the other settings, Options > Video > Tree crowns; TREES-DEPTH-56): one console variable",
+  "2026-11-12: OPENING-TUTORIAL-KEYS-65, the maintainer (via the coordinator, 2026-11-12): the tutorial boxes must name the keys the player has bound, and the inventory window's own keys must be bindable too. aw_key_inv_use and aw_key_inv_drop, two saved cvars (48 structure bytes, 72 zone bytes) holding the inventory's use/equip (E ENTER) and drop (D) key lists; the tutorial table (rows, 1.5 KiB of static row text and hashes, config/tutorial-texts.json rendered into aw_tutorial_table.inc) read by every message box. No command added.",
+  "2026-11-12: OPENING-TUTORIAL-KEYS-65, the tutorial table grew with the rows the maintainer added the same day (the magic menu with its ready key, the inventory with its equip key): 1,725 bytes of static row text and hashes.",
+  "2026-11-12: the maintainer asked for dbg dbgtorch and dbg debugtorch as names of the debug torch once the census exit stopped giving it (two catalogue rows routed to the inventory command, no resident command of their own); the tutorial table is 168 bytes smaller (two hint rows hidden, TUTORIAL-BOX-SHOWN-TWICE-65)"
  ],
  "entries": {
   "commands": [
@@ -181,6 +184,8 @@
    "aw_cam",
    "aw_camera",
    "aw_cell",
+   "aw_census_legacy",
+   "aw_census_type_set",
    "aw_charplane",
    "aw_cloud_control_set",
    "aw_cloud_type_set",
@@ -458,7 +463,7 @@
    "aw_cell_change_method",
    "aw_cell_prefetch_kib",
    "aw_cell_prefetch_seconds",
-   "aw_census_legacy",
+   "aw_census_type",
    "aw_cloud_control",
    "aw_cloud_type",
    "aw_clouds",
@@ -522,6 +527,8 @@
    "aw_intro_text_overlay",
    "aw_inventory_preview_live",
    "aw_inventory_preview_reserve",
+   "aw_key_inv_drop",
+   "aw_key_inv_use",
    "aw_lamp_lights",
    "aw_lamp_radius",
    "aw_land_fill",
@@ -794,7 +801,9 @@
    "viewsize",
    "volume"
   ],
-  "tables": [],
+  "tables": [
+   "rows"
+  ],
   "growing": [
    "NPC faction ranks (CELL-CHANGES-59)",
    "actor item and spell changes (ACTOR-STATE-POOL-LIMITS-54)",

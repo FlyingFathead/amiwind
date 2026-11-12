@@ -426,7 +426,8 @@ int main(void){
  assert(names_option->value==1);names_option->value=0;assert(!AW_SceneTargetName());names_option->value=1;
  names_option->value=0;voice_aim=1;assert(!AW_SceneTargetName());
  names_option->value=1;voice_aim=0;
- aw_story.stage=AW_STAGE_SHIP;assert(!AW_SceneTargetName());aw_story.stage=AW_STAGE_REVIEW;assert(!AW_SceneTargetName());
+ /* OPENING-REGRESSION-64: no names on the ship and the pier; a person's name from the census office on */
+ aw_story.stage=AW_STAGE_SHIP;assert(!AW_SceneTargetName());aw_story.stage=AW_STAGE_REVIEW;assert(!strcmp(AW_SceneTargetName(),"Fargoth"));
  voice_aim=1;assert(!AW_SceneTargetName());
  prompt=1;assert(!AW_SceneTargetName());prompt=0;voice_aim=0;
  aw_story.stage=AW_STAGE_PAPERS;assert(!strcmp(AW_SceneTargetName(),"Fargoth"));

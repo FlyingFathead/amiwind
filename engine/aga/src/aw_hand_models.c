@@ -327,6 +327,7 @@ static int probe_frames(const char *name,int frames)
  * model, both loaded only while that weapon is equipped; a missing or invalid file falls back to the bare hands once,
  * with one console line. */
 int (*aw_hand_weapon_item)(int *weapon,char model[64]);
+int (*aw_hand_weapon_hidden)(void);
 /* The first-person arms from parts (aw_view.c hand_parts_apply, PLAYER-GEAR-VISUAL-59): NULL in fixtures without it. */
 int (*aw_hand_parts_apply)(const char *race,int female,int stance,int frame);
 static aw_hand_weapons_t weapon_data;
@@ -349,6 +350,8 @@ static int hand_weapon(int index,int with_arms) {
     static const char *suffix[AW_HAND_STANCES]={"_1h.mdl","_2c.mdl","_2w.mdl","_bw.mdl","_xb.mdl","_1t.mdl"};
     char path[64]={0},arms[64];int weapon=0,stance,n,mark;byte *raw;
     weapon_visible=0;
+    /* READY-MAGIC-SHOWS-WEAPON-65: the spell stance shows the empty hands, never the weapon */
+    if(aw_hand_weapon_hidden && aw_hand_weapon_hidden())return 0;
     if(!aw_hand_weapon_item || !aw_hand_weapon_item(&weapon,path) || !memchr(path,0,sizeof(path)) ||
        (stance=AW_HandStance(weapon))<0 || !AW_HandItemPath(path))return 0;
     if(!weapon_loaded){

@@ -3083,6 +3083,12 @@ def finalize_image(args):
         actor_library_texts, installed = install_actor_library(args.actor_library, boot/'id1', jobs=jobs)
         print('Image: actor library: %d files installed, %d base texts' % (installed, len(actor_library_texts)),
               flush=True)
+        # the actor animation coverage table (CENSUS-NPC-NO-ATTACK-ANIM-65): install refused a fighter without
+        # attack frames; the table is the lookup for later (docs/ANIMKIT.md)
+        from actor_library import write_coverage
+        coverage = write_coverage(boot/'id1', out)
+        print('Image: actor animation coverage: %d placed actors, all with attack frames (actor-anim-coverage.json)'
+              % len(coverage), flush=True)
     # With --chim-region-actors on the table is written after the frame maps, so it takes the region frames' placed
     # rows (positions grounded on the frame collision) as built rows; otherwise here, as before.
     if getattr(args, 'chim_actor_table', 'off') == 'on' and not region_actors_on(args):

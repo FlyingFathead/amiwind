@@ -363,6 +363,21 @@ void AW_CombatPlayerSheet(aw_fighter_t *o) {
     o->armor=settings_ok?AW_CombatUnarmoredRating(&aw_combat_settings,o):0;
     if(aw_combat_equipment)aw_combat_equipment(o);
 }
+/* HAND-TO-HAND-NO-HIT-64: the fight's sheet of the player is taken when the fight starts and kept until it ends; the
+ * character's attributes, skills, level and maxima are read into it again every frame, so a change during the fight (dbg
+ * maxstats, a level, a potion or spell on the sheet) counts at the next blow, as OpenMW reads the live stats at each hit.
+ * The fight's own state (health, fatigue, knocked down, the worn equipment) stays. The arena's set fighter keeps its
+ * own numbers (only higher maxima are taken, as AW_CombatPlayerSheet does). */
+static void you_refresh(aw_fighter_t *o) {
+    int i;
+    if(!aw_character.valid || aw_combat_player_preset)return;
+    for(i=0;i<8;i++){int v=aw_character.attributes[i]+aw_character.modifiers[i]-aw_character.damage[i];
+                     o->attributes[i]=(unsigned char)(v<0?0:v>255?255:v);}
+    for(i=0;i<27;i++){int v=aw_character.skills[i];o->skills[i]=(unsigned char)(v<0?0:v>255?255:v);}
+    o->level=(short)aw_character.level;
+    if(aw_character.maximum[0]>0)o->health_max=aw_character.maximum[0];
+    if(aw_character.maximum[2]>0)o->fatigue_max=aw_character.maximum[2];
+}
 /* INVENTORY-NO-ARMOR-RATING-61: the player's armour rating as the inventory window shows it under the picture (OpenMW
  * 0.51 mwgui/inventorywindow.cpp updateArmorRating: the whole number of mwclass/npc.cpp getArmorRating): the worn pieces
  * by slot share, each by its class's skill and its condition, an empty slot by the unarmored skill (the combat sheet,
@@ -1475,6 +1490,7 @@ void AW_CombatPhysics(void) {
     /* The player: punch, fatigue return, the knockout clock. */
     if((watching || p->v.button0 || any) && !you_valid && AW_CombatSettingsLoad()){AW_CombatPlayerSheet(&you);you_valid=1;}
     if(you_valid){
+        you_refresh(&you);   /* HAND-TO-HAND-NO-HIT-64: the live attributes and skills, not the fight's start */
         you.health=p->v.health;
         if(you.health<=0)you.dead=1;
         if(!you.dead){

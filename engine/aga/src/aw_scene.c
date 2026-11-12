@@ -462,13 +462,23 @@ static edict_t *npc_target(void) {
     VectorCopy(cl.viewangles,cached_angles);
     return cached;
 }
+/* 1 when a person is under the crosshair within reach (the use key would talk to him) */
+int AW_SceneNpcAimed(void) {return npc_target()!=NULL;}
 const char *AW_SceneTargetName(void) {
     edict_t *driver;
     if(!target_names.value || key_dest!=key_game || pending || AW_PlayerDead() || AW_CharacterActive() ||
-       AW_ReaderActive() || AW_IntroPromptActive() ||
-       (aw_story.stage!=AW_STAGE_DEMO && aw_story.stage<AW_STAGE_PAPERS))return NULL;
+       AW_ReaderActive() || AW_IntroPromptActive())return NULL;
     driver=travel_target();if(driver)return pr_strings+driver->v.netname;
-    {const char *npc=npc_hint(),*item;item=AW_InventoryHint();return npc?npc:item?item:AW_HarvestHint();}
+    {const char *npc=npc_hint(),*item;
+     /* OPENING-REGRESSION-64: a person's name shows over the talk prompt from the census office on (the clerk's
+      * "Talk" had no name); before it, and for objects until the papers, the opening shows none, as before */
+     if(aw_story.stage!=AW_STAGE_DEMO && aw_story.stage<AW_STAGE_OFFICE)return NULL;
+     if(aw_story.stage!=AW_STAGE_DEMO && aw_story.stage<AW_STAGE_PAPERS){
+         /* during the registration a line in the speech box names its speaker already */
+         return npc && !AW_UIVoiceAimOnly()?npc:NULL;
+     }
+     if(npc)return npc;
+     item=AW_InventoryHint();return item?item:AW_HarvestHint();}
 }
 const char *AW_SceneWorldModel(const char *name) {
     FILE *f=NULL;const char *region;
@@ -488,6 +498,9 @@ int AW_Interior(void) {return sv.active && (!strcmp(sv.name,"torchtest") || (AW_
 /* ENGINE-SCENE-NAME-BOUND-35: map names go into 16-byte fields; copy bounded. */
 static void copy_name(char *out,size_t size,const char *in){Q_strcpy_bounded(out,in,size);}
 static int map_valid(const char *name) {return AW_MapId(name)>=0;}
+/* DOOR-PRISON-MARKER-65 (aw_crime.c sets it): 1 when a bank row's reference is a prison marker, never a door to use;
+ * NULL in fixtures without the crime layer */
+int (*aw_door_is_marker)(unsigned long ref);
 static void read_links_for(const char *map) {
     FILE *f=NULL;char line[384],extra,path[64];aw_scene_link_t r;int n,i,version;
     if(!map_valid(map))return;
@@ -515,6 +528,9 @@ static void read_links_for(const char *map) {
             for(i=0;i<3;i++)if(!(fabs(r.mins[i])<32768 && fabs(r.maxs[i])<32768 &&
                 r.maxs[i]>=r.mins[i] && r.maxs[i]-r.mins[i]<=256 && fabs(r.arrival[i])<32768))break;
             if(i!=3 || !(r.yaw>=0 && r.yaw<360))continue;
+            if(version==3 && aw_door_is_marker && aw_door_is_marker(r.reference)){
+                Con_DPrintf("Door bank %s: reference %u is a prison marker, not a door\n",path,r.reference);continue;
+            }
             r.bounds=1;links[count++]=r;
         }
         fclose(f);return;
@@ -970,7 +986,8 @@ void AW_SceneDraw(void) {
     /* The two name-label styles are exclusive (INFO-BOX-TEXT-CUT-62): AmiWind draws only the title and the action
      * below the view, Morrowind only the framed box. */
     if(ami && (!AW_UISpeakerAtRight() || target_style.value!=2))AW_UIObjectName(AW_SceneTargetName(),(int)target_style.value);
-    if(key_dest!=key_game || pending || AW_IntroUse() || AW_PlayerDead() || !sv.active || (aw_cstrip_open_now && aw_cstrip_open_now()) ||
+    /* OPENING-REGRESSION-64: no use prompt or focus box while a script holds the player (DisablePlayerControls) */
+    if(key_dest!=key_game || pending || AW_IntroUse() || !AW_ControlAllowed(AW_CONTROL_PLAYER) || AW_PlayerDead() || !sv.active || (aw_cstrip_open_now && aw_cstrip_open_now()) ||
        svs.maxclients!=1 || !svs.clients || cls.state!=ca_connected ||
        svs.clients[0].edict->v.movetype!=MOVETYPE_WALK)return;
     driver=travel_target();
@@ -1883,13 +1900,14 @@ static void demo_start(void) {
 }
 static void scene_entry(void) {tp_cmd=1;scene_command();tp_cmd=0;}
 static void teleport_entry(void) {tp_cmd=1;teleport_command();tp_cmd=0;}
-/* dbg restartgame (aw_loadfail.c): the scene's state dropped, the followers left behind, the story and the save state
- * reset (the game itself is ended there). */
+/* The game-state reset's "scene loads" module (aw_loadfail.c): the scene's state dropped, the followers left behind.
+ * OPENING-VANITY-CAMERA-64: the story and the save state are modules of their own, reset before this one; this reset
+ * reset them again in their dbg restartgame form (AW_StoryReset(0)), so a New Game's opening lost its stage and its
+ * CharGenState and ran as an unrestricted game (the idle orbit and the view switch on the ship and the pier). */
 void AW_SceneLoadReset(void) {
     AW_SceneCancelTransition();
     load_recovering=0;load_from.valid=0;load_box_wanted=0;travel_pending=NULL;
     if(aw_scene_followers && sv.active && svs.clients && svs.clients[0].edict)aw_scene_followers(svs.clients[0].edict,-1);
-    AW_StoryReset(0);AW_SaveReset();
 }
 void AW_SceneInit(void) {
     AW_HarvestInit();

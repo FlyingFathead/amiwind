@@ -202,6 +202,122 @@ class InstallTests(unittest.TestCase):
             self.assertEqual(crab['flags'] & A.FLAG_SCALED_MODEL, A.FLAG_SCALED_MODEL)
 
 
+def _bsp(entities):
+    """A minimal BSP29 file whose entity lump is ENTITIES (fight_layout_failures reads lump 0 only)."""
+    import struct
+    text = entities.encode('cp1252') + b'\0'
+    return struct.pack('<iii', 29, 124, len(text)) + b'\0' * (124 - 12) + text
+
+
+class OpeningActorTests(unittest.TestCase):
+    """CENSUS-NPC-NO-ATTACK-ANIM-65: the opening's actors (the census office, the ship, the dock) had only their
+    21 talk and walk frames and fought with no attack animation."""
+
+    def test_list_is_the_openings_placed_roles(self):
+        import re
+        import actor_library as AL
+        text = (ROOT / 'tools/prepare_intro.py').read_text(encoding='utf-8')
+        body = text[text.index('INTRO_ACTORS=('):text.index('INTRO_MAPS=')]
+        roles = [(i, s) for i, s, r in re.findall(r"\('([^']+)','([^']+)',(\d+)\)", body) if r != '0']
+        self.assertEqual(sorted(roles), sorted(AL.OPENING_ACTORS))
+        self.assertEqual(len(AL.OPENING_ACTORS), 8)
+
+    def test_plan_bakes_the_opening_records(self):
+        import actor_library as AL
+        master = b'NPC_....NAME\x10\0\0\0Chargen Captain\0....NAME\x0e\0\0\0chargen class\0'
+        self.assertEqual(AL.opening_ids(master), {'chargen captain', 'chargen class'})
+        self.assertEqual(AL.opening_ids(b'nothing'), set())
+
+    def test_layouts_link_the_full_kit_and_every_fighter_has_attack_frames(self):
+        import actor_library as AL
+        with tempfile.TemporaryDirectory(prefix='amiwind-opening-') as tmp:
+            id1 = Path(tmp) / 'id1'
+            (id1 / 'maps').mkdir(parents=True)
+            (id1 / 'progs').mkdir()
+            (id1 / 'maps/census.bsp').write_bytes(_bsp(
+                '{\n"classname" "worldspawn"\n}\n'
+                '{\n"classname" "aw_npc"\n"model" "progs/np_captain.mdl"\n"netname" "Sellus Gravius"\n}\n'
+                '{\n"classname" "aw_npc"\n"model" "progs/np_census.mdl"\n"netname" "Socucius Ergalla"\n}\n'))
+            for stem in ('captain', 'census'):
+                (id1 / ('progs/np_%s.mdl' % stem)).write_bytes(b'mdl')
+            # before: no layout, so no attack group anywhere
+            self.assertEqual([b[1] for b in AL.fight_layout_failures(id1)], ['Sellus Gravius', 'Socucius Ergalla'])
+            manifest = {'npcs': {'chargen captain': {'key': 'aaaa'}, 'chargen class': {'key': 'bbbb'}}}
+            links = AL.write_opening_layouts(manifest, id1)
+            self.assertEqual(links, {'captain': 'progs/n_aaaa.mdl', 'census': 'progs/n_bbbb.mdl'})
+            self.assertEqual((id1 / 'progs/np_captain.anm').read_text(encoding='ascii'),
+                             'idle:0:8:0.1500 walk:13:8:0.1250 >progs/n_aaaa.mdl\n')
+            # a link to a model that is missing or has no attack group still fails
+            self.assertEqual(len(AL.fight_layout_failures(id1)), 2)
+            for key in ('aaaa', 'bbbb'):
+                (id1 / ('progs/n_%s.mdl' % key)).write_bytes(b'mdl')
+                (id1 / ('progs/n_%s.anm' % key)).write_text('idle:0:21:0.1270 walk:1102:8:0.1333:48.14\n',
+                                                          encoding='ascii')
+            self.assertEqual(len(AL.fight_layout_failures(id1)), 2)
+            for key in ('aaaa', 'bbbb'):
+                (id1 / ('progs/n_%s.anm' % key)).write_text(
+                    'idle:0:21:0.1270 walk:1102:8:0.1333:48.14 attack:2340:8:0.1253:0.714\n', encoding='ascii')
+            self.assertEqual(AL.fight_layout_failures(id1), [])
+            # the lookup table the check reads (actor-anim-coverage.json)
+            rows = AL.write_coverage(id1, Path(tmp) / 'run')
+            doc = json.loads((Path(tmp) / 'run/actor-anim-coverage.json').read_text(encoding='utf-8'))
+            self.assertEqual((doc['actors'], doc['failing']), (2, 0))
+            captain = next(r for r in rows if r['name'] == 'Sellus Gravius')
+            self.assertEqual(captain['full_kit'], 'progs/n_aaaa.mdl')
+            self.assertEqual(captain['groups'], {'idle': True, 'walk': True, 'run': False, 'attack': True,
+                                                 'hit': False, 'death': False})
+            self.assertTrue(captain['can_be_hostile'] and captain['ok'] and captain['exception'] is None)
+            self.assertEqual(AL.COVERAGE_EXCEPTIONS, {})
+
+    def test_record_binding_names_what_an_actor_lacks(self):
+        # OPENING-ACTORS-FULL-RECORD-65: with the image's record tables present, an actor must reach its own combat
+        # sheet, reference identity and room stat entry; the failure names the record and the missing part
+        import actor_library as AL
+        with tempfile.TemporaryDirectory(prefix='amiwind-opening-record-') as tmp:
+            id1 = Path(tmp) / 'id1'
+            (id1 / 'maps').mkdir(parents=True)
+            (id1 / 'progs').mkdir()
+            (id1 / 'combat').mkdir()
+            (id1 / 'maps/census.bsp').write_bytes(_bsp(
+                '{\n"classname" "worldspawn"\n"_aw_cell_int" "763"\n}\n'
+                '{\n"classname" "aw_npc"\n"model" "progs/np_hall.mdl"\n"netname" "Ganciele Douar"\n'
+                '"aw_source_id" "chargen door guard"\n"aw_ref" "172857"\n}\n'))
+            (id1 / 'progs/np_hall.anm').write_text('idle:0:8:0.15 attack:8:8:0.1:0.7\n', encoding='ascii')
+            (id1 / 'combat/actors.txt').write_text(
+                'AWCA1 1\nchargen door guard\tGanciele Douar\t15\t1 2 3 4 5 6 7 8\t' + ' '.join(['6'] * 27) +
+                '\t170 110 265\t10 0\tx\n', encoding='ascii')
+            rows = AL.coverage_rows(id1)
+            b = rows[0]['record_binding']
+            self.assertEqual(b['room'], 763)
+            self.assertEqual(b['sheet']['level'], 15)
+            self.assertEqual(b['missing'], ['reference identity', 'stat entry in its room'])
+            self.assertFalse(rows[0]['ok'])
+            fail = AL.fight_layout_failures(id1)
+            self.assertIn('chargen door guard: reference identity, stat entry in its room', fail[0][2])
+
+    def test_install_refuses_a_fighter_without_attack_frames(self):
+        import actor_library as AL
+        import npc_library as NL
+        with tempfile.TemporaryDirectory(prefix='amiwind-opening-install-') as tmp:
+            lib, id1 = Path(tmp) / 'actor-library', Path(tmp) / 'image-id1'
+            (lib / 'id1/progs').mkdir(parents=True)
+            (lib / 'creature-library.json').write_text(json.dumps({'format': 'x', 'models': {}, 'creatures': {}}),
+                                                       encoding='utf-8')
+            (lib / 'npc-library.json').write_text(json.dumps(
+                {'format': NL.FORMAT, 'profile': 'react', 'models': {}, 'npcs': {}, 'left_out': {}}), encoding='utf-8')
+            (id1 / 'maps').mkdir(parents=True)
+            (id1 / 'maps/census.bsp').write_bytes(_bsp(
+                '{\n"classname" "aw_npc"\n"model" "progs/np_hall.mdl"\n"netname" "Ganciele Douar"\n}\n'))
+            with self.assertRaisesRegex(ValueError, 'Ganciele Douar'):
+                AL.install(lib, id1)
+
+    def test_script_walk_keeps_the_opening_model(self):
+        src = (ROOT / 'engine/aga/src/aw_ambient.c').read_text(encoding='utf-8')
+        self.assertIn('a->mover[0] && field(s->e,"aw_intro_role",0)<=0 && !AW_AnimMoving(s->e)', src)
+        combat = (ROOT / 'engine/aga/src/aw_combat.c').read_text(encoding='utf-8')
+        self.assertIn('AW_AnimMover(e,1);', combat[combat.index('int AW_CombatEngage('):])
+
+
 class LeftOutTests(unittest.TestCase):
     """ACTOR-LIBRARY-LEFT-OUT-48: the library dropped the authored-dead creatures (no model at all, no reason) and
     the NPC records a CHIM town also places ('hlaalu guard_outside', 'ordinator wander') although they also stand

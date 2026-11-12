@@ -57,10 +57,13 @@ class Counterparts(unittest.TestCase):
         self.assertIn('"CharGenState",10);', (ROOT / 'engine/aga/src/aw_story.c').read_text(encoding='utf-8'))
 
     def test_the_dock_post_and_the_ship_blocker_are_the_scripts(self):
-        # v0.0.63 parity: CharGenRaceNPC's own post next to the door; CharGenDisable's 23rd blocker inside the ship
+        # The dock guard's walk after the race (PIER-GUARD-WALKS-INTO-DOOR-65, the maintainer's design of 12 November
+        # 2026): CharGenRaceNPC's second travel in two measured legs, to the front of the census office door and then a
+        # step aside to his post beside it (left of the door, the doorway clear, facing the dock); the first travel is
+        # still the script's own point before the plank. CharGenDisable's 23rd blocker inside the ship.
         opening = (ROOT / 'engine/aga/src/aw_opening.c').read_text(encoding='utf-8')
-        self.assertIn('goal[0]=second?(-9944.f+11264)*.25f:(-8914.f+11264)*.25f;', opening)
-        self.assertNotIn('AW_IntroRole(5)->v.angles[1]=225;', opening)
+        self.assertIn('goal[0]=second?(post_leg?AW_PIER_GUARD_POST_X:AW_PIER_GUARD_FRONT_X):(-8914.f+11264)*.25f;', opening)
+        self.assertIn('g->v.angles[1]=225;', opening)
         barrier = (ROOT / 'engine/aga/src/aw_barrier.c').read_text(encoding='utf-8')
         self.assertIn('"intro/barriers-ship.awb"', barrier)
         self.assertIn('if(!strcmp(sv.name,"prison")){for(i=0;i<ship_count;i++)', barrier)

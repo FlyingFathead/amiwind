@@ -727,10 +727,22 @@ static void command(void){
 }
 static void combat_assault(edict_t *e){AW_CrimeAssault(e);}
 static void combat_killed(edict_t *e){AW_CrimeKilled(e,-1);}
+/* DOOR-PRISON-MARKER-65: 1 when REF is one of the image's prison markers. A PrisonMarker is a door record of the
+ * original only to hold the jail's destination: never drawn, never used by hand (OpenMW: an editor marker). The
+ * opening's Seyda Neen door bank listed 474482 as a door labelled "Census and Excise Office", and the use key by the
+ * census building took the player to the jail spot, where the office has no floor. Read once (the image's file). */
+static int prison_marker(unsigned long ref){
+    static marker_t m[MARKERS];static int n=-1;int i;
+    if(n<0)n=markers_read(m,MARKERS);
+    for(i=0;i<n;i++)if(m[i].ref==ref)return 1;
+    return 0;
+}
+extern int (*aw_door_is_marker)(unsigned long ref);
 void AW_CrimeInit(void){
     aw_inventory_theft=inventory_theft;aw_harvest_theft=harvest_theft;aw_rest_bed_crime=bed_crime;
     aw_combat_assault=combat_assault;aw_combat_killed=combat_killed;
     aw_placed_crime=command;
+    aw_door_is_marker=prison_marker;
     /* the settings at engine start, not at the first theft: in s11 that read alone made the first theft's frame 734 ms
      * on FS-UAE at 32 MB Fast (combat/settings.txt read line by line); later thefts took 14-250 ms */
     load();

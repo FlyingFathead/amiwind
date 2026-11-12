@@ -55,8 +55,9 @@ class EngineWiringTests(unittest.TestCase):
         box = code('aw_msgbox.c')
         self.assertIn('aw_msgbox_mouse=AW_MsgBoxMouse;', box)
         self.assertIn('AW_UICursor(mouse_x,mouse_y)', box)
-        self.assertIn('AW_MsgBoxButtonAt(box.count,frame,px,py)', box)
-        self.assertIn('AW_MsgBoxButtonRect(box.count,i,f,r);', box)
+        # UI-TEXT-BOX-CLEARANCE-64: the same rectangles for the click and the drawing, each button sized to its label
+        self.assertIn('AW_MsgBoxButtonAtSized(box.count,frame,w,px,py)', box)
+        self.assertIn('AW_MsgBoxButtonRectSized(box.count,i,f,w,r);', box)
         view = code('aw_view.c')
         self.assertIn('aw_death_mouse=AW_ViewDeathMouse;', view)
         self.assertIn('AW_UICursor(death_mouse_x,death_mouse_y)', view)

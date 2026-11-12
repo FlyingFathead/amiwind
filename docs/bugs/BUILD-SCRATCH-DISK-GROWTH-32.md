@@ -123,6 +123,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [DEBUG-TP-ROOM-ENTRANCE-50](DEBUG-TP-ROOM-ENTRANCE-50.md): dbg tp <room map> finds a batch room s entrance only in Balmora s door list: rooms entered from Seyda Neen, Vivec or a region frame say No converted entrance
 - DELIVER-OUTPUT-NAMES-LATE-59 (no report page): deliver_dev.py checks that its output names are free only after the smoke and hops
 - DOC-STATE-01 (no report page): Published release documentation retained stale candidate/current-version claims
+- DOCS-BUGS-FOLDER-OVER-1000-64 (no report page): The bug report folder holds more than 1,000 files, so the GitHub folder view leaves some out
 - [DOCS-CELL-COUNTS-44](DOCS-CELL-COUNTS-44.md): Cell counts in the docs and tracker are stated without saying what they count
 - [DOCS-CHANGELOG-STALE-39](DOCS-CHANGELOG-STALE-39.md): Maintained changelog stops at v0.0.35 while current development reaches v0.0.39-rc1
 - [DOCS-CHIM-PROGRESS-STALE-38](DOCS-CHIM-PROGRESS-STALE-38.md): Main README CHIM progress map still shows the v0.0.36 snapshot
