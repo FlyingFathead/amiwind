@@ -380,5 +380,6 @@ static void status(void){Con_Printf("Intro active %ld / Jiub %ld / guard %ld / p
     Con_Printf("CharGenState %ld / FindSpymaster %ld / papers %ld / ring %ld / package %ld\n",
         (long)AW_StateGet(&aw_state,AW_GLOBAL,"CharGenState"),
         (long)AW_StateGet(&aw_state,AW_JOURNAL,"A1_1_FindSpymaster"),
-        (long)AW_Papers(),(long)AW_Ring(),(long)AW_Package());}
+        (long)AW_Papers(),(long)AW_Ring(),(long)AW_Package());
+    AW_OpeningDockStatus();}
 void AW_IntroInit(void){AW_MovieInit();Cmd_AddCommand("aw_new_game",new_game);Cmd_AddCommand("aw_intro_status",status);Cmd_AddCommand("aw_tpscene",debug_scene_command);}

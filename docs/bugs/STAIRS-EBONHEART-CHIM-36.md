@@ -6,7 +6,7 @@
 
 - Reported with v0.0.36-dev4 at 2026-10-11 05:32 +0300: found: whole-city frame vivec_city stage B, 7 flight steps (refs 113805, 124537, 124459)
 - Reported with v0.0.36-dev5 at 2026-10-11 09:41 +0300: PERSISTING: whole-city Vivec with rooms f6e08fe (dev5), accepted by ID for the dev MiniWind: same 7 flight steps
-- Reported with v0.0.36-dev5 at 2026-10-11 09:56 +0300: maintainer order (TG): fix for rc1
+- Reported with v0.0.36-dev5 at 2026-10-11 09:56 +0300: maintainer order: fix for rc1
 
 <!-- END GENERATED PERSISTING -->
 

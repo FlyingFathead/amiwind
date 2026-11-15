@@ -21,8 +21,10 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from PIL import Image
-from mwad.audit import audit, BSA, normpath
+from mwad.audit import audit, normpath
+from mwad.archives import layered_bsa
 from mwad.paths import child_ci, ensure_external, resolve_data_files
+from mwad.masters import master_path
 from mwad.npc import load_master, outfit, greeting_fixture, behavior_record, greeting_settings
 from town_config import load_settings, registry_row, resident_exclusions, town_field
 from town_regions import (regions, select_references, audit_coverage, owner, town_model_profile, collision_coverage,
@@ -65,9 +67,13 @@ _RECEIPT_HASHES = {}
 def _receipt_files(data):
     key = str(Path(data).resolve())
     if key not in _RECEIPT_LISTING:
-        files = [child_ci(data, 'Morrowind.esm'), child_ci(data, 'Morrowind.bsa')]
+        files = [master_path(data), child_ci(data, 'Morrowind.bsa')]
         files += [p for p in data.rglob('*') if p.is_file() and p.relative_to(data).parts[0].casefold() in ('meshes', 'textures')]
-        _RECEIPT_LISTING[key] = [(p.relative_to(data).as_posix(), p) for p in sorted(files)]
+        # with the expansions selected master_path() is the merged master in the build's scratch, outside the data
+        # folder: it is listed by its file name (Morrowind.esm, as the base game's master is) and its bytes are hashed
+        # below as before (v0.0.66-dev2: "is not in the subpath of '/owned'" stopped the CHIM world)
+        _RECEIPT_LISTING[key] = [(p.relative_to(data).as_posix() if p.is_relative_to(data) else p.name, p)
+                                 for p in sorted(files)]
     rows = {}
     for name, path in _RECEIPT_LISTING[key]:
         st = path.stat()
@@ -182,7 +188,7 @@ def write_fixed_visibility(data, out, settings):
     requested = fixed_visibility_cells(settings)
     if not requested:
         return
-    raw = child_ci(data, 'Morrowind.esm').read_bytes()
+    raw = master_path(data).read_bytes()
     reports = [audit_cell(raw, row['cell'], row['requested_state']) for row in requested]
     write_json(out / 'fixed-visibility.json', {'schema': 'source-cell-visibility-1', 'reports': reports})
 
@@ -249,7 +255,7 @@ def lava_split(data, selected, deferred):
     import lava
     if lava.lava_mode() != 'quake':
         return selected, deferred, []
-    molten = lava.molten_objects_of(child_ci(data, 'Morrowind.esm'))
+    molten = lava.molten_objects_of(master_path(data))
     hot = [r for r in selected if r.get('id', '').casefold() in molten]
     if not hot:
         return selected, deferred, []
@@ -268,7 +274,7 @@ def lava_pools(out, data=None, references=None):
     if data is not None and references is not None:
         import lava
         if lava.lava_mode() == 'quake':
-            molten = lava.molten_objects_of(child_ci(data, 'Morrowind.esm'))
+            molten = lava.molten_objects_of(master_path(data))
             if any(r.get('id', '').casefold() in molten for r in references):
                 raise ValueError('This source stage predates the lava conversion and its town has lava pools: '
                                  'use a new work folder (or --lava static)')
@@ -339,7 +345,7 @@ def collect(data, out, jobs, settings):
 def ground_assets(data, audit_path, palette, pools=()):
     pal = Image.new('P', (1, 1)); pal.putpalette(palette)
     materials = json.loads((audit_path / 'materials.json').read_text())
-    bsa = BSA(child_ci(data, 'Morrowind.bsa'))
+    bsa = layered_bsa(data)
     textures = []
     for key, record in materials.items():
         if record['texture']:
@@ -640,7 +646,7 @@ def prepare(town, data_files, scene, out, qbsp, vis, light, ffmpeg='ffmpeg', job
         if not (out / 'source-receipt.json').is_file() or json.loads((out / 'source-receipt.json').read_text()) != source_receipt(data, settings):
             raise ValueError('Resume geometry inputs differ or are unverified; use a fresh output directory')
         receipt = json.loads((out / 'audit/audit.json').read_text())
-        if receipt['input']['esm_sha256'] != input_sha256(child_ci(data, 'Morrowind.esm')):
+        if receipt['input']['esm_sha256'] != input_sha256(master_path(data)):
             raise ValueError('Resume source master differs')
         index = json.loads((out / 'scenery/scenery-index.json').read_text())
         entries = regions(settings)
@@ -656,7 +662,7 @@ def prepare(town, data_files, scene, out, qbsp, vis, light, ffmpeg='ffmpeg', job
     import lava
     lava_volumes = lava.convert_sounds(data, pools, scene / 'id1/sound', ffmpeg)[0] if pools else {}
     terrain_wad = ground_assets(data, out / 'audit', palette, pools)
-    kinds, cells, topics = load_master(child_ci(data, 'Morrowind.esm'))
+    kinds, cells, topics = load_master(master_path(data))
     arrival, yaw = arrival_point(kinds, settings)
     returning, return_yaw = return_point(kinds, settings)
     npc_entities = residents(data, scene, out, references, settings, kinds, topics, palette, ffmpeg, jobs, cells)

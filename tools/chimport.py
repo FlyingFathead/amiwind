@@ -245,10 +245,13 @@ def order_cells(cells):
 def make_plan(data_files):
     from mwad.audit import load_esm
     from mwad.paths import child_ci, resolve_data_files
+    from mwad.masters import master_path, selected_masters
     data = resolve_data_files(data_files)
-    esm = load_esm(child_ci(data, 'Morrowind.esm'))
+    esm = load_esm(master_path(data))
     from chim.ocean_runtime import land_cells
-    cells = census(esm, land_cells(data, ('Morrowind.esm',)))   # the base master's own seabed cells only
+    # the LAND records of the masters the merged file holds (AMIWIND_MASTERS): a layer's seabed cells (LAND without
+    # heights) are seabed like the island's; with the base game alone this is the base master's own, as before
+    cells = census(esm, land_cells(data, selected_masters()))
     order = order_cells(cells)
     rows = []
     for i, (c, ring) in enumerate(order, 1):
@@ -861,8 +864,118 @@ CELL_NOT_POOLED_DIRS = ('work',)
 # Environment variables that name places, worker counts or bookkeeping, never what a cell's bytes are.
 CELL_KEY_IGNORED_ENV = {'AMIWIND_INPUTS_LOCK', 'AMIWIND_STORAGE_POOL', 'AMIWIND_CACHE_FALLBACK', 'AMIWIND_BUILD_JOBS',
                         'AMIWIND_BUILD_JOBS_FILE', 'AMIWIND_PROFILE_SECTIONS', 'AMIWIND_BUILD_PROFILE',
-                        'AMIWIND_PROFILE_INTERVAL', 'AMIWIND_STAGE_TRACE', 'AMIWIND_BUILD_BUDGET'}
+                        'AMIWIND_PROFILE_INTERVAL', 'AMIWIND_STAGE_TRACE', 'AMIWIND_BUILD_BUDGET',
+                        # the selected layers: keyed per cell by what they change there (layer_touch), never whole
+                        'AMIWIND_MASTERS'}
+# The expansion layers' game files: never in a cell key as whole files; a cell keys what they change in it
+# (layer_touch: its own and its neighbours' merged CELL and LAND records, the records of the objects placed there
+# and the layer archives' copies of those objects' models). CHIMPORT-CELL-KEY-LAYERS-65.
+LAYER_INPUT_FILES = frozenset(('tribunal.esm', 'tribunal.bsa', 'bloodmoon.esm', 'bloodmoon.bsa'))
+LAYER_ARCHIVES = {'Tribunal.esm': 'Tribunal.bsa', 'Bloodmoon.esm': 'Bloodmoon.bsa'}
+TOUCH_RADIUS = 1          # cell_settings source_radius: the frame reads its 3 x 3 cells
+_TOUCH = {}
 _CODE = {}
+
+
+def _index_master(raw):
+    """({(x, y): CELL payload}, {(x, y): LAND payload}, {object id: payload}) of one standalone master's bytes."""
+    import struct
+    from mwad.esm import records, subrecords
+    cells, lands, objects = {}, {}, {}
+    for tag, _flags, payload in records(raw):
+        if tag == 'CELL':
+            data = next((d for t, d in subrecords(payload) if t == 'DATA'), b'')
+            if len(data) >= 12:
+                bits, x, y = struct.unpack_from('<Iii', data)
+                if not bits & 1:
+                    cells[(x, y)] = payload
+        elif tag == 'LAND':
+            data = next((d for t, d in subrecords(payload) if t == 'INTV'), b'')
+            if len(data) >= 8:
+                lands[struct.unpack_from('<ii', data)] = payload
+        elif tag not in ('TES3', 'DIAL', 'INFO', 'PGRD', 'LTEX'):
+            name = next((d for t, d in subrecords(payload) if t == 'NAME'), None)
+            if name is not None:
+                objects[bytes(name).split(b'\0', 1)[0].decode('cp1252', 'replace').casefold()] = payload
+    return cells, lands, objects
+
+
+def _placed_ids(payload):
+    """The object ids a CELL payload places (the NAME of every reference after its FRMR)."""
+    from mwad.esm import subrecords
+    out, inside = set(), False
+    for tag, data in subrecords(payload):
+        if tag == 'FRMR':
+            inside = True
+        elif tag == 'NAME' and inside:
+            out.add(bytes(data).split(b'\0', 1)[0].decode('cp1252', 'replace').casefold())
+    return out
+
+
+def _model(payload):
+    from mwad.esm import subrecords
+    data = next((d for t, d in subrecords(payload) if t == 'MODL'), None)
+    if data is None:
+        return None
+    path = bytes(data).split(b'\0', 1)[0].decode('cp1252', 'replace').replace('\\', '/').casefold()
+    return path if path.startswith('meshes/') else 'meshes/' + path
+
+
+def _touch_index(data_files, masters):
+    key = (str(data_files), tuple(masters))
+    if key not in _TOUCH:
+        from mwad.masters import master_bytes
+        from mwad.paths import child_ci
+        base = _index_master(master_bytes(data_files, masters[:1]))
+        merged = _index_master(master_bytes(data_files, masters))
+        archives = {}
+        for name in masters[1:]:
+            try:
+                path = child_ci(Path(data_files), LAYER_ARCHIVES[name])
+            except (FileNotFoundError, ValueError, KeyError):
+                continue
+            if path.is_file():
+                import hashlib
+                from mwad.audit import BSA
+                digest = hashlib.sha256(path.read_bytes()).hexdigest()
+                for entry in BSA(path).entries:
+                    archives[str(entry).replace('\\', '/').casefold()] = digest
+        _TOUCH[key] = (base, merged, archives)
+    return _TOUCH[key]
+
+
+def layer_touch(cell, data_files, masters=None):
+    """What the selected expansion layers change in CELL's frame, as a digest, or None when they change nothing
+    there (then the cell's key is the base game's own key): its own and its neighbours' (TOUCH_RADIUS) merged CELL
+    and LAND records against the base game's, the merged records of every object placed there against the base
+    game's, and the layer archives holding a copy of one of those objects' models."""
+    from mwad.masters import selected_masters
+    from file_cache import digest_json
+    import hashlib
+    masters = selected_masters(masters)
+    if len(masters) == 1:
+        return None
+    (b_cells, b_lands, b_objects), (m_cells, m_lands, m_objects), archives = _touch_index(data_files, masters)
+    x, y = cell
+    changed, ids = [], set()
+    for dx in range(-TOUCH_RADIUS, TOUCH_RADIUS + 1):
+        for dy in range(-TOUCH_RADIUS, TOUCH_RADIUS + 1):
+            near = (x + dx, y + dy)
+            for kind, base, merged in (('cell', b_cells, m_cells), ('land', b_lands, m_lands)):
+                if base.get(near) != merged.get(near):
+                    changed.append([kind, list(near), hashlib.sha256(merged.get(near) or b'').hexdigest()])
+            if near in m_cells:
+                ids |= _placed_ids(m_cells[near])
+    for ident in sorted(ids):
+        payload = m_objects.get(ident)
+        if b_objects.get(ident) != payload:
+            changed.append(['object', ident, hashlib.sha256(payload or b'').hexdigest()])
+        model = _model(payload) if payload else None
+        if model and model in archives:
+            changed.append(['archive model', model, archives[model]])
+    if not changed:
+        return None
+    return digest_json({'format': 'chimport-layer-touch-1', 'masters': list(masters), 'changed': changed})
 
 
 def pool_choice(args):
@@ -942,6 +1055,12 @@ def cell_key(cell, data_files, palette, qbsp=None, abi_sizes=None, missing_land=
     inputs = inputs_identity(data_files)
     if inputs is None:
         return None, 'no input lock: the game inputs of this cell are not hashed'
+    # the layers' files are keyed per cell by what they change in it (CHIMPORT-CELL-KEY-LAYERS-65)
+    inputs = [row for row in inputs if Path(row[0]).name.casefold() not in LAYER_INPUT_FILES]
+    try:
+        touch = layer_touch(tuple(cell), data_files)
+    except (OSError, ValueError) as exc:
+        return None, 'the layers of this cell cannot be read: %s' % exc
     q = None
     if qbsp:
         found = shutil.which(str(qbsp)) or str(qbsp)
@@ -960,6 +1079,8 @@ def cell_key(cell, data_files, palette, qbsp=None, abi_sizes=None, missing_land=
              'env': {k: v for k, v in sorted(os.environ.items())
                      if k.startswith('AMIWIND_') and k not in CELL_KEY_IGNORED_ENV},
              'hashseed': os.environ.get('PYTHONHASHSEED'), 'python': sys.version, 'numpy': numpy_version}
+    if touch:
+        parts['layers'] = touch      # absent when the layers change nothing here: the base game's own key
     return digest_json(parts), None
 
 
@@ -1560,8 +1681,9 @@ def master_lands(data_files):
     from mwad.audit import load_esm
     from mwad.esm import is_deleted, records, subrecords
     from mwad.paths import child_ci, resolve_data_files
+    from mwad.masters import master_path
     data = resolve_data_files(data_files)
-    esm = load_esm(child_ci(data, 'Morrowind.esm'))
+    esm = load_esm(master_path(data))
     base = {k: v['heights'] for k, v in esm['lands'].items()}
     others = set()
     for path in sorted(p for p in data.iterdir() if p.is_file() and p.suffix.casefold() == '.esm'

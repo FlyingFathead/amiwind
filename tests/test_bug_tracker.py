@@ -175,6 +175,26 @@ class BugTrackerTest(unittest.TestCase):
                                                      persists_in='fixed in v0.0.31-dev2')]), [])
         self.assertEqual(bug_register.validate([dict(base, fixed_in='v0.0.31', persists_in='fixed in v0.0.31')]), [])
 
+    def test_fix_record_fields(self):
+        # TRACKER-DONE-VIEW-66: a fixed bug may carry the fix commit, the fix date and the planning item
+        base = bug(id='TEST-FIXREC-32', state='fixed', fixed_in='v0.0.31', persists_in='fixed in v0.0.31')
+        full = dict(base, fix_commit='abcdef0123', fixed_date='2026-11-13', todo='SOME-ITEM-66')
+        self.assertEqual(bug_register.validate([full]), [])
+        for field, wrong in (('fix_commit', 'XYZ'), ('fix_commit', 'abc'), ('fixed_date', '13 Nov'), ('todo', 'lower-case')):
+            self.assertTrue(bug_register.validate([dict(full, **{field: wrong})]), (field, wrong))
+        # only a fixed bug carries them
+        self.assertTrue(bug_register.validate([bug(id='TEST-FIXREC-33', fix_commit='abcdef0123')]))
+        # the fields survive the register's round trip and are shown on the bug page's fact table
+        self.assertEqual(json.loads(bug_register.live_text([full]))[0]['fix_commit'], 'abcdef0123')
+        table = bug_register.facts_table(full, {}, {})
+        for row in ('| Fix commit | `abcdef0123` |', '| Fixed on | 2026-11-13 |', '| Planning item | `SOME-ITEM-66` |'):
+            self.assertIn(row, table)
+        self.assertNotIn('Fix commit', bug_register.facts_table(base, {}, {}))
+        # a fix that did not hold takes its record with it
+        back = dict(full)
+        bug_register.reopen(back, 'v0.0.66', '2026-11-14', None, None)
+        self.assertFalse({'fix_commit', 'fixed_date', 'todo'} & set(back))
+
     def test_owner_acceptance_can_be_cleared_when_a_bug_is_reported_again(self):
         # a fixed and accepted bug reported again is opened again: set ID --state open --owner-accepted none
         source = (Path(__file__).resolve().parents[1] / 'tools' / 'bug_register.py').read_text(encoding='utf-8')
@@ -208,7 +228,7 @@ class BugTrackerTest(unittest.TestCase):
 
     def test_fact_values_are_checked(self):
         bad = dict(reported_by=['someone', 'gate:', 'Owner', ''], found_date=['8 October 2026', '2026-13-01', ''],
-                   found_in=['0.0.32', 'dev3', ''], where=['', 'a|b', 'x' * 101, 'two\nlines'],
+                   found_in=['0.0.32', 'dev3', ''], where=['', 'a|b', 'x' * (bug_register.LINE_MAX + 1), 'two\nlines'],
                    reproduction=['often', None], persists_in=[[], ['v0.0.32 dev3'], 'fixed in v0.0.31', 'v0.0.31'],
                    severity=['blocker', 'unknown', None], severity_reason=['', 'a|b'], family=['nope', None],
                    related=['TEST-BUG-32', ['ZZZ-NOPE-32'], ['TEST-BUG-32']])
@@ -698,7 +718,9 @@ class BugTrackerTest(unittest.TestCase):
             self.assertEqual(bug_register.validate([dict(bare, platform=v, platform_reason='not recorded')]), [])
         self.assertTrue(bug_register.validate([dict(bare, platform='FS-UAE', platform_reason='x')]), 'reason only for unknown')
         self.assertTrue(bug_register.validate([dict(bare, platform='a' + chr(10) + 'b')]), 'one line')
-        self.assertTrue(bug_register.validate([dict(bare, platform='x' * 121)]), 'at most 120 characters')
+        # one line, no |, only the generous cap against a pasted page (the tight caps were removed on 2026-11-12)
+        self.assertTrue(bug_register.validate([dict(bare, platform='x' * (bug_register.LINE_MAX + 1))]), 'the cap')
+        self.assertEqual(bug_register.validate([dict(bare, platform='x' * 300)]), [], 'a long platform line is fine')
         table = bug_register.facts_table(dict(bare, platform='FS-UAE 3.1.66, JIT'), {}, {})
         self.assertIn('| Platform or emulator | FS-UAE 3.1.66, JIT |', table)
         self.assertEqual([b['id'] for b in bug_register.load() if bug_register.needs_platform(b) and not b.get('platform')], [])

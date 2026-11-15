@@ -62,7 +62,25 @@ CUT_KEEP_WHOLE = ('f/flora_',)
 # area (chim_build --cut-models-over).
 # detail_budget: a named per-mesh triangle budget (config/chim-detail-budgets.json) as an area setting, so one area
 # (all of Vivec in one frame: 'vivec-deep') takes it and the others stay whole; the build-wide --detail-budget wins
-AREA_CUT_KEYS = ('cut_models_over', 'cut_mode', 'cut_keep_whole', 'detail_budget', 'clip_to_terrain')
+AREA_CUT_KEYS = ('cut_models_over', 'cut_mode', 'cut_keep_whole', 'detail_budget', 'clip_to_terrain', 'draw_tiles')
+# Draw tiles for named models (PRISON-SHIP-POLY-COLLISION-65): {variant name prefix: grain}. A listed model is stored
+# as the large-model cut's tiles (mode tiles: every face and convex piece whole in the tile of its centre, at the
+# listed grain in the model's own frame), whatever its width, so the engine's per-model frustum test leaves out the
+# parts behind the view. Empty by default (nothing changes); the builder option --chim-draw-tiles on sets
+# DRAW_TILES_ON: the Seyda Neen ship (one model, in view at every heading from its deck) and the silt strider, at a
+# 128 grain (measured offline from the deck and the pier, docs/SHIP_INTERIOR.md). It re-keys their tile units only.
+DRAW_TILES_ON = {'x/ex_de_ship@': 128.0, 'r/siltstrider@': 128.0}   # '@': the mesh itself, not ex_de_ship_door
+
+
+def draw_tile_grain(variant, draw_tiles):
+    """The draw-tile grain of a variant (its name starts with a key of draw_tiles), or None."""
+    if not draw_tiles or variant.get('over_budget'):
+        return None
+    name = str(variant.get('name', '')).lower()
+    for prefix, grain in sorted(draw_tiles.items()):
+        if name.startswith(prefix.lower()) and float(grain) > 0:
+            return float(grain)
+    return None
 
 
 def cut_candidate(variant, cut_over, keep_whole=CUT_KEEP_WHOLE):
@@ -708,19 +726,24 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
                                             'grain': grain, 'tiles': len(tiles)}
         _log('model over the image budget stored as %d tiles at grain %g: %s (%s)' % (
             len(tiles), grain, variants[k]['name'], variants[k]['over_budget']))
-    if cut_over > 0 and cut_mode == 'tiles':
+    draw_tiles = dict((settings or {}).get('draw_tiles') or {})
+    if (cut_over > 0 or draw_tiles) and cut_mode == 'tiles':
         # the model is cut once in its own frame; every placement of it places the shared tiles
         from chim.cut import tile_unit
         with timer.section('large-model cut'):
             items = []
+            keys = []
             for k in order:
-                if not cut_candidate(variants[k], cut_over, keep_whole):
+                # a model named by draw_tiles at its own grain, else the width rule at the frame's grain
+                grain = draw_tile_grain(variants[k], draw_tiles) or (g if cut_candidate(variants[k], cut_over, keep_whole)
+                                                                     else None)
+                if grain is None:
                     continue
-                task = dict(variant_tasks[k], grain=g)
+                task = dict(variant_tasks[k], grain=grain)
                 task.pop('qbsp', None)
                 task.pop('collision_cache', None)
-                items.append((fingerprint('tiles-placed' if task.get('placed') else 'tiles', variant_fps[k], g), task))
-            keys = [k for k in order if cut_candidate(variants[k], cut_over, keep_whole)]
+                items.append((fingerprint('tiles-placed' if task.get('placed') else 'tiles', variant_fps[k], grain), task))
+                keys.append(k)
             if any('bevel_tolerance' in t for _, t in items):
                 from chim.bevels import tile_unit_bevels
                 tile_results = run_units('tiles-bevels', items, tile_unit_bevels, jobs, cache)
@@ -1807,10 +1830,10 @@ def cell_reference_counts(data):
     without history), never an input of what a frame builds."""
     import struct
     from mwad.esm import records, subrecords
-    from mwad.paths import child_ci
+    from mwad.masters import master_bytes
     counts = {}
     try:
-        raw = Path(child_ci(data, 'Morrowind.esm')).read_bytes()
+        raw = master_bytes(data)
         for tag, _flags, body in records(raw):
             if tag != 'CELL':
                 continue

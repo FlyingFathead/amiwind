@@ -307,6 +307,18 @@ static parked_t *park_slot(uint32_t ref,int script){
     memset(&vm.park[p->at],0,n*sizeof(aw_mwcell_t));
     return p;
 }
+/* an attached instance leaves (a map change, a detach): its values parked. SAVE-ITEM-SCRIPT-LOCALS-66: a held item's
+ * (AWB_HELD_KEY, MWSCRIPT-INVENTORY-HITONME-62: they were never parked, so each visit started them again and a save had
+ * none) only when it holds a value or was parked before: the 491 held items need no room in the store until their
+ * script changes something (OpenMW 0.51 keeps an item's locals with the item in its holder's inventory). */
+static void park_instance(const aw_mwvm_instance_t *in){
+    parked_t *p;int i,n=nlocals(in->script),any=0;
+    if(AWB_HELD_KEY(in->reference) && !find_parked(in->reference)){
+        for(i=0;i<n && !any;i++)any=vm.cells[in->locals+i].i!=0;
+        if(!any)return;
+    }
+    if((p=park_slot(in->reference,in->script))!=NULL)memcpy(&vm.park[p->at],&vm.cells[in->locals],p->count*sizeof(aw_mwcell_t));
+}
 void AW_MwvmBeginMap(void){
     int k;
     if(!ON)return;
@@ -314,11 +326,7 @@ void AW_MwvmBeginMap(void){
         aw_mwvm_instance_t *in=&vm.inst[k];
         if(!(in->flags&AWI_USED))continue;
         if(in->flags&AWI_GLOBAL){in->flags|=AWI_CELLCHANGED;in->flags&=~AWI_QUIET;continue;}
-        /* MWSCRIPT-INVENTORY-HITONME-62: a held item's values are not parked (each visit starts them again; the
-         * parking store stays for the placed objects) */
-        if(AWB_HELD_KEY(in->reference)){in->flags=0;continue;}
-        {parked_t *p=park_slot(in->reference,in->script);
-         if(p)memcpy(&vm.park[p->at],&vm.cells[in->locals],p->count*sizeof(aw_mwcell_t));}
+        park_instance(in);   /* a held item's too, when it holds a value (SAVE-ITEM-SCRIPT-LOCALS-66) */
         in->flags=0;
     }
     while(vm.ninst>0 && !(vm.inst[vm.ninst-1].flags&AWI_USED))vm.ninst--;
@@ -371,10 +379,9 @@ int AW_MwvmDetach(uint32_t reference){
     int k;
     if(!ON || !reference)return 0;
     for(k=0;k<vm.ninst;k++){
-        aw_mwvm_instance_t *in=&vm.inst[k];parked_t *p;
+        aw_mwvm_instance_t *in=&vm.inst[k];
         if(!(in->flags&AWI_USED) || (in->flags&AWI_GLOBAL) || in->reference!=reference)continue;
-        if(!AWB_HELD_KEY(reference) && (p=park_slot(in->reference,in->script))!=NULL)
-            memcpy(&vm.park[p->at],&vm.cells[in->locals],p->count*sizeof(aw_mwcell_t));
+        park_instance(in);   /* a held item's too, when it holds a value (SAVE-ITEM-SCRIPT-LOCALS-66) */
         in->flags=0;in->entity=-1;
         return 1;
     }
@@ -469,6 +476,16 @@ static int attached_instance(uint32_t ref){
     int k;
     for(k=0;k<vm.ninst;k++)if((vm.inst[k].flags&(AWI_USED|AWI_GLOBAL))==AWI_USED && vm.inst[k].reference==ref)return k;
     return -1;
+}
+/* CAPTAIN-EXIT-DOOR-DEAD-AFTER-REENTRY-66: the player's use of REFERENCE (aw_mwvm.h). Its script takes it only while
+ * it holds AWI_TAKES_USE (it read OnActivate since its own Activate), as OpenMW 0.51 mwworld/refdata.cpp activate()
+ * suppresses the object's own use only after onActivate(); a script that has returned before its OnActivate line
+ * since then (CharGenDoorExitCaptain's "done") leaves the use to the object. */
+int AW_MwvmUse(uint32_t reference){
+    int k=ON && reference?attached_instance(reference):-1;
+    if(k<0 || !(vm.inst[k].flags&AWI_TAKES_USE))return 0;
+    vm.inst[k].flags|=AWI_ACTIVATED;vm.inst[k].flags&=~AWI_QUIET;
+    return 1;
 }
 int AW_MwvmStartsAtLoad(int script){
     int i;
@@ -730,7 +747,9 @@ static int run(int k){
              * arguments as the script gave them; else logged once, nothing done, 0 read */
             int fn=(int)U16(pc),flags=pc[4],n=flags&0x1F,done;aw_mwcell_t r;
             sp-=n;vm.stats.notyet_calls++;vm.fcalls[fn]++;r.i=0;
-            done=h && h->call?h->call(k,target,fn,sp,n,pc+6,pc[5],&r):0;
+            {double c0=aw_mwvm_clock?aw_mwvm_clock():0;   /* MWSCRIPT-TICK-SHARE-66: the host's part */
+             done=h && h->call?h->call(k,target,fn,sp,n,pc+6,pc[5],&r):0;
+             if(aw_mwvm_clock)vm.stats.host_time+=aw_mwvm_clock()-c0;}
             if(done){vm.stats.host_calls++;if(done!=AW_MWVM_CALL_READ)acted=1;in=&vm.inst[k];}
             else{log_notyet((int)U16(pc+2),in->script);r.i=0;}   /* did nothing: not an action for the quiet rule */
             if(flags&0x80)*sp++=r;
@@ -800,15 +819,23 @@ static int run(int k){
             acted=1;target=AW_MWVM_SELF;break;
         case AWM_GETDISABLED:case AWM_GETLOCKED:
             sp->i=h && h->object?h->object(k,target,(int)op,0):0;sp++;target=AW_MWVM_SELF;break;
-        /* activation: OnActivate is 1 once after the player's use (the instance's AWI_ACTIVATED, set by the host
-         * when it took the use); Activate hands the use back to the object */
+        /* activation: OnActivate is 1 once after the player's use (the instance's AWI_ACTIVATED, set by AW_MwvmUse
+         * when the script took the use); Activate hands the use back to the object.
+         * CAPTAIN-EXIT-DOOR-DEAD-AFTER-REENTRY-66 (OpenMW 0.51 mwworld/refdata.cpp onActivate, activateByScript):
+         * reading OnActivate makes the next use the script's (AWI_TAKES_USE), the object's Activate (its own, or the
+         * object named before ->) makes it the object's own again */
         case AWM_ONACTIVATE:
             sp->i=0;
             if(vm.inst[k].flags&AWI_ACTIVATED){vm.inst[k].flags&=~AWI_ACTIVATED;sp->i=1;}
+            vm.inst[k].flags|=AWI_TAKES_USE;
             sp++;target=AW_MWVM_SELF;break;
-        case AWM_ACTIVATE:
+        case AWM_ACTIVATE:{
+            int ak=-1;uint32_t aref=target>=0?AW_MwvmObjectReference(target):0;
+            if(target==AW_MWVM_SELF)ak=k;else if(aref)ak=attached_instance(aref);
+            if(ak>=0)vm.inst[ak].flags&=~(AWI_TAKES_USE|AWI_ACTIVATED);
             if(h && h->object)h->object(k,target,(int)op,0);
-            acted=1;target=AW_MWVM_SELF;break;
+            in=&vm.inst[k];
+            acted=1;target=AW_MWVM_SELF;break;}
         /* messages: the numbers leave the stack in the order they were pushed */
         case AWM_MESSAGEBOX:{
             int number=pc[2],i;float numbers[0x1F];
@@ -874,9 +901,11 @@ static int active(const aw_mwvm_instance_t *in,const float player[3]){
     r=(float)vm.range*0.25f;   /* game units to engine units */
     return d[0]*d[0]+d[1]*d[1]+d[2]*d[2]<=r*r;
 }
+double (*aw_mwvm_clock)(void);
 void AW_MwvmTick(float dt,const float player[3]){
-    int i,n,used=0,start,next=-1;
+    int i,n,used=0,start,next=-1;double t0;
     if(!ON)return;
+    t0=aw_mwvm_clock?aw_mwvm_clock():0;
     vm.dt=dt>0 && dt<10?dt:0;
     vm.now+=vm.dt;
     vm.stats.frames++;
@@ -896,6 +925,7 @@ void AW_MwvmTick(float dt,const float player[3]){
     vm.cursor=next>=0?next:start+1;
     vm.stats.ops+=used;
     if((unsigned long)used>vm.stats.max_ops_frame)vm.stats.max_ops_frame=used;
+    if(aw_mwvm_clock)vm.stats.tick_time+=aw_mwvm_clock()-t0;   /* MWSCRIPT-TICK-SHARE-66: the interpreter with its calls */
 }
 /* A dialogue result script (DIALOGUE-COMPLETE-58): SCRIPT (a _dlg_N row of DRSC) runs once on the speaker's instance
  * (REFERENCE, its SPEAKER script: the result reads and sets the speaker's locals, as the original runs it in the

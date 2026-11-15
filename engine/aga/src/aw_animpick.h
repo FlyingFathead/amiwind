@@ -81,6 +81,15 @@ int AW_PickWanderIdle(const unsigned char chances[8],int multiplier100,int roll_
  * refreshMovementAnims: drawing plays "equip", putting away "unequip", a swing the weapon's chop/slash/thrust, else the
  * stance's idle, walk, run and jump groups (rules read there, written here). */
 int AW_PickPlayerState(int weapon,int hand,int goal,int move,int run,int attack,int air,int swim,aw_pick_state_t *out);
+/* PLAYER-ANIM-GROUPS-NOT-PLAYED-66 (v0.0.66): the player body's whole state, the stance above plus the groups the body
+ * did not play: SNEAK (the sneak key or a script's ForceSneak) the sneak idle and gaits; TURN (AW_PM_TURNLEFT /
+ * AW_PM_TURNRIGHT, 0 none) turning on the spot while standing, never while sneaking; REACT (AW_PE_HIT, AW_PE_KNOCKDOWN,
+ * AW_PE_KNOCKOUT, 0 none) the hit recovery hit1..hitN by ROLL, the knockdown and the knockout, over any stance
+ * (OpenMW 0.51 character.cpp refreshHitRecoilAnims, refreshMovementAnims: turning only standing, not sneaking).
+ * With nothing drawn and none of these, 0: the body keeps its own layout; with fists drawing, swinging or putting away
+ * too (the hand layer). */
+typedef struct {int weapon,hand,goal,move,run,attack,air,swim,sneak,turn,react,roll;} aw_pick_player_t;
+int AW_PickPlayerBody(const aw_pick_player_t *in,aw_pick_state_t *out);
 
 /* The coverage catalogue: every group of the humanoid animation files (base_anim, base_animkna, base_anim_female
  * and an NPC's own file), how the game logic reaches it. tools/anim_coverage.py reads this table from the source. */

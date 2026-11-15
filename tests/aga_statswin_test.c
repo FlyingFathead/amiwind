@@ -74,6 +74,7 @@ int COM_FOpenFile(char *name,FILE **file){
     fseek(*file,0,SEEK_END);size=ftell(*file);fseek(*file,0,SEEK_SET);return (int)size;
 }
 static void (*panel_draw)(void);static int (*panel_key)(int,int,int);static void (*panel_closed)(void);static int opens;
+int aw_worldui_panel_holds_escape;   /* aw_worldui.c: the effects list (HUD-ACTIVE-EFFECTS-ROW-64) holds Esc */
 int AW_WorldUIOpenPanel(void (*draw)(void),int (*key)(int,int,int),void (*closed)(void)){
     panel_draw=draw;panel_key=key;panel_closed=closed;opens++;return 1;
 }
@@ -166,7 +167,8 @@ int main(void){
     c->maximum[0]=52;c->current[0]=40;c->maximum[1]=120;c->current[1]=99.5f;c->maximum[2]=210;c->current[2]=180;
 
     AW_StatsWindowInit();assert(stats_command && magic_command);
-    stats_command();assert(opens==1 && panel_draw && panel_key && !panel_closed);
+    /* HUD-ACTIVE-EFFECTS-ROW-64: the window now has a close callback (it frees the effects list behind V) */
+    stats_command();assert(opens==1 && panel_draw && panel_key && panel_closed);
     draw();
     /* Title: the player's name, in the title band, centred in the window title font. */
     assert(find("Tester") && find("Tester")->centred && find("Tester")->y==6);

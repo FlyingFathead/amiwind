@@ -1,6 +1,6 @@
 # aw: the master builder command line
 
-_Last updated with AmiWind v0.0.63 (9 November 2026)._
+_Last updated with AmiWind v0.0.66-dev2 (14 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -14,6 +14,7 @@ _Last updated with AmiWind v0.0.63 (9 November 2026)._
 - [Build requests](#build-requests)
 - [Broadcast](#broadcast)
 - [Perf database step](#perf-database-step)
+- [Stall fallback](#stall-fallback)
 
 <!-- contents end -->
 
@@ -211,8 +212,18 @@ full version, the commit, the requester and the reason.
      "override": {"reason": "...", "allow": ["version-mismatch"]}}
 
 The options of each kind are in the schema's `$defs`. Kind `gate` runs `aw gate`; kind
-`build` is described here; `chimport-region` and `smoke` have a fixed request form and are
-refused as not implemented yet.
+`build` is described here; `smoke` has a fixed request form and is refused as not implemented
+yet.
+
+Kind `chimport-region` measures CHIMport cells (docs/chim/CHIMPORT.md), new cells of an
+expansion's land included: `aw request --kind chimport-region --purpose NAME --cells "x,y x,y ..."
+[--masters Morrowind.esm,Tribunal.esm,Bloodmoon.esm] [--workers N] [--cell-jobs N]`. It takes the
+checks of a build (version, entry check, published integration head, build holds), a run name
+and a core lease, exports the commit's source, runs `tools/chimport.py run --dry-run` as the
+check (seconds), then the run itself (`--no-world`: the cells alone) in a named container with
+the masters in AMIWIND_MASTERS. The result lists the run's tracker result files
+(`RUN/tracker/result-NNNN.json`), which `tools/cell_progress.py result --file` stores. Config:
+`build.chimport.palette`, `build.chimport.qbsp`, `build.chimport.sdk`, `build.chimport.cell_jobs`.
 
 Kind `miniwind` is a MiniWind build of one test spot through the same path as kind `build`
 (every check below, the run name, the storage pool, the result, the trial line and the perf
@@ -244,7 +255,9 @@ A build request is checked first, in this order; any failure refuses it before t
    (`--legacy-area`, `--chim-native-towns off`) are refused unless `override.allow` names
    `retired-flags` - an A/B test of a historical regression: the run name then carries
    `ab-regression`. The config's `default_flags` are added when the request does not name
-   that option. `--reuse-all-available` and `--allow-rebuild STAGE:REASON` go in the
+   that option. A byte-order mark in front of the first flag (flags or a request file
+   written by an editor or shell that starts a file with one) is removed, and the result
+   says so; a mark anywhere else is refused, naming the flag that holds it. `--reuse-all-available` and `--allow-rebuild STAGE:REASON` go in the
    request's flags: the builder then takes each stage from the newest earlier run of the
    workspace that holds it, the request's `reuse_from` run first (docs/BUILD_CACHE.md
    "Reuse every earlier run"). The project's development and release builds add
@@ -258,11 +271,18 @@ A build request is checked first, in this order; any failure refuses it before t
 7. **Developer-mode check:** the build command itself with `--check`: the builder's own
    entry block (version, imports, run name) and its reuse preflight, computed in the
    build's own environment, plus the build preflight (cache ownership, game data), with
-   no stage run. A reuse preflight with rebuilds the source diff does not explain ("keys
+   no stage run. With a reuse source the check also runs the build's own first-minute reuse stop and fails with its
+   `STOP` lines (exit code 6; [reuse every earlier run](BUILD_CACHE.md#reuse-every-earlier-run)). A reuse preflight with rebuilds the source diff does not explain ("keys
    too broad") or with unexpected rebuilds is refused unless `override.allow` names
    `unexplained-rebuilds` (the builder then gets `--accept-rebuild`). The source diff
    against the reuse source's commit (the hash at the end of its run name, or
-   `options.reuse_from_commit`) is recorded with the result.
+   `options.reuse_from_commit`) is recorded with the result. A check that fails says why:
+   its own error line first (an `Error:` line, or the builder's command line refusing an
+   option), then the last 40 lines of the check's own output, in the result's refusals and
+   notes, in the step's `output_tail`, in the server's output, and in two files beside the
+   build logs that the result's `logs` names: `RUN.FAILURE.md` (the refused check's page,
+   in the form of a failed build's `FAILURE.md`) and `RUN.console.log`, which the Toolkit
+   Monitor's console view reads.
 
 Then the build runs in the configured image with `--pull never`, no network, the build
 user, `PYTHONPATH` from the exported source, `--developer-mode`, `--storage-pool on` and,
@@ -379,3 +399,29 @@ switches the step off without removing it; `timeout_s` (default 900) bounds it. 
 typically a small wrapper that starts a throwaway container running `tools/perf_db.py ingest`
 with the result, the run folder and the ledgers (see
 [Running it in a container](PERF_DATABASE.md#running-it-in-a-container)).
+
+## Stall fallback
+
+Every long step `aw` runs (a build request, a CHIM import run, `aw gate`) runs under the stall
+fallback (`tools/stall_guard.py`), on by default. A step counts as stalled when, for the whole
+limit, it prints no new output line (the builder's `[heartbeat]` lines do not count: they say a
+stage is silent), its log files do not grow, and its own containers together stay under 5 % of
+one core (the cores a heartbeat line reports count as a reading too). The limit is 20 minutes,
+or three times the longest silence the same stage showed in an earlier passing run of the same
+kind (kept in `stall-history-<kind>.json` in the state folder), whichever is longer. With no
+CPU reading at all, the step must be silent for twice the limit.
+
+A stalled step prints its last lines, the processes of its own containers and, when
+`AW_STALL_SHELL_CONTAINER` names a long-lived shell container, that container's processes and
+any process there older than 45 minutes. It then ends only its own containers and process
+(never another job's), fails with exit 75 and the reason, and prints the resume command (a
+build resumes with `--reuse-from` the stopped run; a gate takes a new number).
+
+A known wait is not a stall: a gate queue line, a lease or memory wait holds the clock, and the
+step prints `waiting, not stalled: ...` every five minutes instead. `AW_STALL=off` switches the
+fallback off for one run (a debugging switch); `AW_STALL_LIMIT_S` and `AW_STALL_IDLE_CPU`
+change the limit and the CPU share. Tests: `tests/test_stall_guard.py`.
+
+A step that keeps working but stays under half of its planned cores (the request's `cpus`)
+for over five minutes is flagged, not stopped: it prints `UNDERUSED` with what runs, how long,
+and the cores used against the cores planned, and the line goes into the result's notes.

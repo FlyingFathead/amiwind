@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.65._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.66-dev4._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -45,7 +45,7 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg census type` | - | [amiwind / legacy / original (0 / 1 / 2); no argument prints it] census office registration (default amiwind, not saved; set before the office): amiwind = the scripts with AmiWind's own (the clerk talks as you walk up and holds you, lines boxed, nothing taken before his review); legacy = old hand-written; original = scripts alone |
 | `dbg characterchange` | `dbg quickchar` | [race class birthsign review / all] reopen the pier race, gender, head and hair menu over the current scene; confirm to apply (after registration) |
 | `dbg choosecompanion` | `dbg pickcompanion` | same as companion pick |
-| `dbg combat` | - | [on/off / seed N / readout on/off / music on/off / dice / style amiwind/original / block hold/auto / flee / sounds / bestattack / contact on/off / loadout NAME/off / resistnormal N/off / calm] melee combat: no argument = status; bestattack = Options > Prefs best attack; contact off = crosshair ray only (defaults: flee off, the rest on, block auto) |
+| `dbg combat` | - | [on/off / seed N / readout on/off / music on/off / dice / style amiwind/original / block hold/auto / flee / sounds / bestattack / contact on/off / spells on/off / loadout NAME/off / resistnormal N/off / calm] melee combat: no argument = status; bestattack = Options > Prefs; contact off = ray only (defaults: all on, block auto) |
 | `dbg combattest` | - | [opponent] same as arenapit; combattest gallery (or floor): the empty floor test, current hands, then idle/draw/lower/punch/center/help/exit |
 | `dbg companion` | - | [pick/choose/test/off/distance N/mimic speed on/off] NPC follower test (not saved): no argument = status and counters; pick = attack the NPC under the red crosshair; test = spawn one beside you; off = it goes home / is removed; distance 48..512 (default 96); mimic speed (default on) |
 | `dbg companiontest` | - | [on/off] same as companion test / companion off; no argument: status |
@@ -111,7 +111,7 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg killhud` | `dbg photomode` | [on/off, true/false or 1/0; no argument toggles; hud: Ctrl+Alt+H] clean shots: hides bars, crosshair, hands, prompts, names, subtitles and overlays; full view; fog off and free camera (aw_photomode_nofog, aw_photomode_noclip, aw_photomode_hands); Ctrl+F fog, Ctrl+H dbg hud; off returns to the start point (not saved; Options > Video > Photo mode) |
 | `dbg land fill` | `dbg landfill` | 1/0 (default 1): Land Fill Independence v1, enabled LAND passes with fog on or off; 0 disables for A/B |
 | `dbg land method` | - | 1/0 legacy resident LAND rasterizer (default 0, experimental); separate from the CHIM far layer |
-| `dbg magicfx` | - | [0 / 1 / 2; no argument shows the value] magic effects (docs/MAGIC_EFFECTS.md, experimental): 0 off (default, saved), 1 sprites and particles, 2 also their light |
+| `dbg magicfx` | - | [0 / 1 / 2; no argument shows the value] the look of spells (docs/MAGIC_EFFECTS.md): 0 off, 1 sprites and particles (the game's default, saved), 2 also their light |
 | `dbg noclipbob` | `dbg noclipwobble` | same as noclipwobble |
 | `dbg photomode ui` | - | [on/off or 1/0] photo mode's own notice box and hints (saved; default on; off hides them; the Halloween scene turns them off while it runs) |
 | `dbg playvid` | `dbg playvideo`, `dbg videoplay`, `dbg vidplay` | <1..17 / 01..17 / catalogue name> (drains queued game audio first) |
@@ -128,8 +128,11 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg door` | `dbg doorlocks` | [status / list; no argument: open or close the hinged door under the crosshair, locks ignored] ordinary hinged doors (docs/DOOR_MAPPING.md): status counts the table and this map's doors, list prints each (reference, edict or CHIM, how far open, lock) |
 | `dbg door roulette` | - | [SEED] one random interior: loads you straight into a room of this disk at the room's own start and prints which (name, map id, cell number) and the seed; the same SEED loads the same room again (random tests of interior loading) |
 | `dbg god` | `dbg godmode` | [on/off, true/false or 1/0; no argument toggles] Quake god mode (no damage of any kind: blows, lava, falls, drowning, spells and scripts; the HUD shows GOD) (not saved) |
+| `dbg map compass` | - | 1/0 the compass strip at the top of the view: north and the hot marker's direction, here / near / far (default 0, saved; docs/WORLD_MAP_AND_JOURNAL.md) |
 | `dbg map format` | - | 2 draws the v2 world map layers (default) / 1 draws a v2 map as the v1 map (terrain and settlements only) |
 | `dbg map lava` | - | 1/0 molten lava pools on the world map (M), v2 maps only (default 1, saved) |
+| `dbg map marker` | - | [find TEXT / show NAME or N / add NAME / del NAME or N / clear / hot [off / NAME]; no argument lists them] the named map markers (also the marker command): find lists them with their region, show opens the map on one, add sets one at the player, clear asks Yes/No, hot sets the hot marker (saved) |
+| `dbg map markers max` | - | 1-4096 how many named map markers can be set (default 256, saved); lowering it keeps the markers already set |
 | `dbg map tp` | `dbg tp map` | select a destination on the world map (alias) |
 | `dbg noburden` | `dbg noweight`, `dbg unburdened` | [on/off, true/false or 1/0; no argument toggles] no burden (not saved; off at New Game): the carried weight counts in no rule, no slower walk, run, swim or jump, no extra fatigue, never over-encumbered; the inventory's bar shows the load over 999999; a message says on or off (docs/INVENTORY.md) |
 | `dbg noclip` | - | - |
@@ -138,7 +141,7 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg scene` | - | ship/town/balmora/<map name> |
 | `dbg scene change` | `dbg tp menu` | (scene picker) |
 | `dbg superspeed` | - | [on/off, true/false or 1/0; no argument toggles; then the speeds] the old fixed fast walk/run (cl_forwardspeed, Shift x cl_movespeedkey), not the original's speed from Speed, Athletics and load; endless stamina; Speed, Athletics, Acrobatics read as 100 while on (default off; not saved; also plain superspeed) |
-| `dbg tp` | - | [X Y [Z] original global coordinates (Z: the floor at or below it) / mark or marker (your map screen marker) / seydaneen / prisonship / balmora / vivec (the whole city vivec_city, else the Vivec Arena) / tel_uvirith (teluvirith) / heartchamber / suran / suranclub / aldruhn / khuul / arenapit / <map or room name>; no argument: place and room list] |
+| `dbg tp` | - | [X Y [Z] original coordinates (Z: floor at/below) / mark/marker (map marker) / seydaneen / prisonship / balmora / vivec (the city, else the Arena) / tel_uvirith (teluvirith) / heartchamber / suran / suranclub / aldruhn / khuul / arenapit / <map/room name>; alone: list, All/Exteriors/Interiors/Beings (by name, beside them); mid-load: runs on arrival] |
 | `dbg unstuck` | - | (nearest clear standing spot below or beside you; never into a wall or water; leaves noclip) |
 | `dbg view` | - | x y z yaw pitch |
 | `dbg worldbounds` | - | [on/off, true/false or 1/0; no argument toggles] the sea current along the edge of the open world that turns you back (an AmiWind extension; on in a default build) (not saved) |
@@ -193,7 +196,9 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | --- | --- | --- |
 | `dbg console bg color` | - | black/blue/gray or R G B |
 | `dbg console font` | - | small/normal |
+| `dbg effects` | - | (no argument) the active effects on you (docs/HUD_ACTIVE_EFFECTS.md): each icon's effect and sources, the pictures held and read, the strip lines the debug HUD gives them |
 | `dbg font` | - | readable/retro |
+| `dbg hudeffects` | - | [on/off, true/false or 1/0] the active-effect icons under the view and on the Stats window (default on, saved): up to three rows, the last place "+N" for the ones that do not fit; off hides them (V in the Stats window still lists every active effect) |
 | `dbg mw help` | - | the original game's console commands that work in AmiWind (tgm, coc, player->AddItem, SetStrength and the rest; docs/CONSOLE_COMMANDS_MORROWIND.md), page by page from the disk; also dbg help mw |
 | `dbg mw target` | - | [ID / clear; no argument: the finder] the target of the original's commands typed without id->: a list of this map's references with an id, nearest first (name, id, kind, distance), typed to filter; Enter sets it and the input line shows [id->]; clear: the player again |
 | `dbg ui dialogue` | - | 1/2/3/4 (default 3) |

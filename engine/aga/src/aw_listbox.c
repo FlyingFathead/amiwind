@@ -9,7 +9,8 @@
  *   | 1 of 214    Enter: go   Esc: close |
  *   +------------------------------------+
  * Typing filters (letters and digits; Backspace), Up/Down/PgUp/PgDn/Home/End and the wheel move, Enter or a click
- * on a row chooses, the scroll bar scrolls, Escape / F10 close. While open it holds only the shown-row list (one
+ * on a row chooses, the scroll bar scrolls, Escape / F10 close. A box with categories (TP-MENU-CATEGORY-FILTER-66) has a
+ * row of buttons under the title (Left/Right or a click choose one; the search filters within it). While open it holds only the shown-row list (one
  * int per row, freed on close); the rows themselves stay with the caller.
  */
 #include "quakedef.h"
@@ -62,7 +63,9 @@ static void keep(void){
 static int char_w(void){int w=AW_ConsoleCharWidth();return w<1?8:w;}
 static int char_h(void){int h=AW_ConsoleCharHeight();return h<1?8:h;}
 static int row_h(void){return char_h()+2;}
-static int search_y(void){return BOX_Y+PAD+char_h()+4;}
+/* TP-MENU-CATEGORY-FILTER-66: the category buttons, a row under the title when the box has them */
+static int buttons_y(void){return BOX_Y+PAD+char_h()+4;}
+static int search_y(void){return buttons_y()+(box.categories?char_h()+8:0);}
 static int list_y(void){return search_y()+char_h()+8;}
 static int footer_y(void){return BOX_Y+BOX_H-PAD-char_h();}
 static int list_h(void){int h=footer_y()-4-list_y();return h<row_h()?row_h():h;}
@@ -102,6 +105,14 @@ static void draw(void){
     AW_ListBoxSetVisible(&box,rows=list_rows());
     AW_UIBox(BOX_X,BOX_Y,BOX_W,BOX_H);
     centred(BOX_Y+PAD,spec.title?spec.title:"");
+    if(box.categories){
+        int n=box.categories,w=(BOX_W-2*PAD)/n,k,x;const char *name;
+        for(k=0;k<n;k++){
+            x=BOX_X+PAD+k*w;name=spec.category_names && spec.category_names[k]?spec.category_names[k]:"";
+            AW_UIFill(x+1,buttons_y()-2,w-2,char_h()+4,k==box.chosen?pick:dark);
+            text(x+(w-(int)strlen(name)*char_w())/2,buttons_y(),name,x+w-1);
+        }
+    }
     AW_UIFill(BOX_X+PAD,search_y()-2,BOX_W-2*PAD,char_h()+4,dark);
     Q_snprintf(line,sizeof(line),"Find: %s_",box.search);
     text(BOX_X+PAD+2,search_y(),line,BOX_X+BOX_W-PAD-2);
@@ -131,12 +142,18 @@ static int key(int k,int mouse_x,int mouse_y){
     case K_PGDN:r=AW_ListBoxKey(&box,AW_LBKEY_PAGEDOWN);break;
     case K_HOME:r=AW_ListBoxKey(&box,AW_LBKEY_HOME);break;
     case K_END:r=AW_ListBoxKey(&box,AW_LBKEY_END);break;
+    case K_LEFTARROW:r=AW_ListBoxKey(&box,AW_LBKEY_LEFT);break;
+    case K_RIGHTARROW:r=AW_ListBoxKey(&box,AW_LBKEY_RIGHT);break;
     case K_BACKSPACE:case K_DEL:r=AW_ListBoxKey(&box,AW_LBKEY_BACKSPACE);break;
     case K_ENTER:r=AW_ListBoxKey(&box,AW_LBKEY_CHOOSE);break;
     case K_MOUSE1:
         if(box.shown_count>box.visible){
             top=AW_UIScrollHit(mouse_x,mouse_y,scroll_x(),list_y()-1,box.visible*row_h(),box.shown_count,box.visible,box.top);
             if(top>=0){AW_ListBoxScroll(&box,top);return 1;}
+        }
+        if(box.categories && mouse_x>=BOX_X+PAD && mouse_x<BOX_X+BOX_W-PAD && mouse_y>=buttons_y()-2 &&
+           mouse_y<buttons_y()+char_h()+2){
+            AW_ListBoxChoose(&box,(mouse_x-(BOX_X+PAD))/((BOX_W-2*PAD)/box.categories));return 1;
         }
         if(mouse_x>=BOX_X+PAD && mouse_x<BOX_X+BOX_W-PAD && mouse_y>=list_y()-1)
             r=AW_ListBoxClick(&box,(mouse_y-(list_y()-1))/row_h());
@@ -157,6 +174,8 @@ int AW_ListBoxOpen(const aw_listbox_spec_t *s){
     backdrop_bytes=(long)vid.width*(long)vid.height;backdrop_held=0;
     if(!(backdrop=(byte *)AW_TryMalloc((unsigned long)backdrop_bytes)))backdrop_bytes=0;
     AW_ListBoxReset(&box,s->count,s->label,s->ctx,shown,list_rows());
+    if(s->category && s->categories>1)AW_ListBoxCategories(&box,s->category,s->categories);
+    AW_ListBoxSetVisible(&box,list_rows());
     /* typed in the console: the box replaces it (as the scene picker does) */
     if(key_dest==key_console)key_dest=key_game;
     if(!AW_WorldUIOpenPanel(draw,key,closed)){

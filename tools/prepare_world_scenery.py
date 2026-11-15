@@ -218,7 +218,16 @@ def prepare(terrain, scenery, palette, out, jobs, only=None):
     checklist = baseline.get('exterior_checklist')
     on_chim = {(tuple(r['cell']), r['number']) for r in index['references']
                if checklist and reference_in_chim_town(r, checklist)}
-    if not only and (covered - expected or {k for k in expected - covered - on_chim if k[0] not in chim_cells}):
+    # the placements of the exterior cells only an expansion adds (Solstheim): listed by the survey, not planned, in
+    # no map of this stage (exterior_plan.unplanned, EXTERIOR-EXPANSION-ONLY-CELLS-66)
+    from exterior_plan import unplanned
+    outside = {(tuple(r['cell']), r['number']) for r in unplanned(index['references'], checklist)}
+    if outside:
+        print('World scenery: %d placements in %d exterior cells only an expansion adds are not planned (the survey '
+              'lists those cells; no map of this build holds them)' % (len(outside), len({k[0] for k in outside})),
+              flush=True)
+    if not only and (covered - expected or {k for k in expected - covered - on_chim - outside
+                                            if k[0] not in chim_cells}):
         raise ValueError('Full-world overlay omitted source references')
     receipt = {'format': 'AmiWind world scenery overlay 1', 'diagnostic_subset': bool(only),
                'terrain_directory_sha256': hashlib.sha256((terrain / 'world-regions.json').read_bytes()).hexdigest(),
@@ -226,6 +235,8 @@ def prepare(terrain, scenery, palette, out, jobs, only=None):
                'palette_sha256': hashlib.sha256(palette.read_bytes()).hexdigest(),
                'covered_source_references': len(covered),
                **({'chim_region_cells': sorted([list(c) for c in chim_cells])} if chim_cells else {}),
+               # absent for the base game alone, so its receipt bytes do not move
+               **({'unplanned_source_references': len(outside)} if outside else {}),
                'scope': 'Retained terrain BSPs with original rock/giant-mushroom placements. Town handoff and emulator acceptance remain separate.',
                'regions': results}
     (out / 'world-scenery.json').write_text(json.dumps(receipt, indent=2) + '\n', encoding='utf-8')

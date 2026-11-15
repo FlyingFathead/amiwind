@@ -25,7 +25,9 @@ enum {AW_ANIM_IDLE, AW_ANIM_WALK, AW_ANIM_RUN, AW_ANIM_SWIM, AW_ANIM_SWIMIDLE,
       /* Player-only takeoff/air hold and landing; append to preserve existing group IDs. */
       AW_ANIM_JUMP, AW_ANIM_LAND,
       AW_ANIM_READY, AW_ANIM_READYWALK, AW_ANIM_READYRUN,
-      AW_ANIM_READYJUMP, AW_ANIM_READYLAND, AW_ANIM_GROUPS};
+      AW_ANIM_READYJUMP, AW_ANIM_READYLAND,
+      /* a creature's own spellcast group (tools/creature_tables.py KIT 'cast'; DAGOTH-UR-NO-ANIMATIONS-65) */
+      AW_ANIM_CAST, AW_ANIM_GROUPS};
 enum {AW_ANIM_LEFT, AW_ANIM_RIGHT, AW_ANIM_EVENT_KINDS};     /* the events with sound files (~EVENT:...) */
 /* The creature sound generator events (@NAME:OFFSET:moan ...; CREATURE-ANIM-SOUND-54): no files in the layout, the
  * creature's row of the voice table names them (aw_creature_sound). ev_kind values after the footstep kinds. */

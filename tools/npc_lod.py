@@ -951,15 +951,16 @@ def _survey_one(task):
     data, palette, identifier, bake_models = task
     import time
     import numpy as np
-    from mwad.audit import BSA
+    from mwad.archives import layered_bsa
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     from mwad.npc import load_master, outfit
     from npc_geometry import Assets, Skeleton, assemble
     key = str(data)
     if key not in _survey_state:
         _survey_state.clear()
-        _survey_state[key] = {'assets': Assets(data, BSA(child_ci(data, 'Morrowind.bsa'))), 'rigs': {},
-                              'kinds': load_master(child_ci(data, 'Morrowind.esm'))[0]}
+        _survey_state[key] = {'assets': Assets(data, layered_bsa(data)), 'rigs': {},
+                              'kinds': load_master(master_path(data))[0]}
     state = _survey_state[key]
     try:
         appearance = outfit(state['kinds'], identifier)
@@ -986,10 +987,11 @@ def survey(data, palette, out, jobs=None, only=None, bake_models=False):
     every humanoid NPC record's equipped appearance; the distribution and what each policy selects."""
     from mwad.npc import load_master
     from mwad.paths import child_ci, resolve_data_files
+    from mwad.masters import master_path
     from build_jobs import resolve_jobs
     from build_parallel import ordered_map
     data = resolve_data_files(Path(data))
-    kinds = load_master(child_ci(data, 'Morrowind.esm'))[0]
+    kinds = load_master(master_path(data))[0]
     ids = sorted(kinds['NPC_']) if only is None else sorted(only)
     palette = Path(palette).read_bytes()
     tasks = [(data, palette, i, bake_models) for i in ids]

@@ -239,14 +239,16 @@ def picture(raw, palette, size):
 
 
 def prepare(data_files, id1):
-    from mwad.audit import BSA, string
+    from mwad.audit import string
+    from mwad.archives import layered_bsa
     from mwad.paths import child_ci, resolve_data_files
+    from mwad.masters import master_path
     from npc_geometry import Assets
     from prepare_combat import convert_wav
     data = resolve_data_files(Path(data_files))
     id1 = Path(id1)
-    kinds = load(child_ci(data, 'Morrowind.esm'))
-    assets = Assets(data, BSA(child_ci(data, 'Morrowind.bsa')))
+    kinds = load(master_path(data))
+    assets = Assets(data, layered_bsa(data))
     (id1 / 'levelup').mkdir(parents=True, exist_ok=True)
     report = {'pictures': {}, 'held': {}}
     sound = None
@@ -281,11 +283,11 @@ def prepare(data_files, id1):
         (id1 / 'levelup/coin.awi').write_bytes(raw)
         report['coin'] = source
         break
-    rest = rest_text(child_ci(data, 'Morrowind.esm').read_bytes(), kinds)
+    rest = rest_text(master_path(data).read_bytes(), kinds)
     (id1 / 'levelup/rest.txt').write_bytes(rest.encode('cp1252'))
     report['rest'] = {'lines': rest.count('\n'), 'no_sleep_cells': rest.count('\nnosleep'),
                       'owned_beds': rest.count('\nbed '), 'sleep_regions': rest.count('\nsleepregion ')}
-    books, book_count = books_text(child_ci(data, 'Morrowind.esm').read_bytes())
+    books, book_count = books_text(master_path(data).read_bytes())
     (id1 / 'levelup/books.txt').write_bytes(books.encode('cp1252'))
     report['skill_books'] = book_count
     levels = ini_levels(data_files)

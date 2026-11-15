@@ -111,6 +111,7 @@ TAGS = ('struct', 'union', 'enum')
 
 _PARSED = {}       # header text -> items
 _TREES = {}        # module text -> (tree, parents, unit of each node)
+_CONSTANTS = {}    # module text -> its tree's string constant nodes in ast.walk order (_string_constants)
 
 
 # --------------------------------------------------------------------------
@@ -474,6 +475,15 @@ def _module_tree(text):
     return _TREES[text]
 
 
+def _string_constants(text):
+    """The string constant nodes of _module_tree(TEXT)'s tree in ast.walk order ([] when it does not parse)."""
+    if text not in _CONSTANTS:
+        parsed = _module_tree(text)
+        _CONSTANTS[text] = [] if parsed is None else [node for node in ast.walk(parsed[0]) if isinstance(
+            node, ast.Constant) and isinstance(node.value, str)]
+    return _CONSTANTS[text]
+
+
 def _context(node, parents, units, relative, readers=DEFINE_READ_FUNCTIONS):
     """'doc', 'define', 'receipt' or 'text': how the string constant NODE names a file (READERS: the define readers
     of the reading's version)."""
@@ -552,13 +562,17 @@ def narrow(index, script, selected, folders, readers):
                     roots.update(IDENTIFIER.findall(text))
                 if relative not in readers and posixpath.normpath(text.replace('\\', '/')) in folders:
                     return selected        # an engine folder named whole: every file of it counts whole
-        parsed = _module_tree((index.root / relative).read_text(encoding='utf-8', errors='replace'))
+        text = (index.root / relative).read_text(encoding='utf-8', errors='replace')
+        parsed = _module_tree(text)
         if parsed is None:
             return selected
         tree, parents, units = parsed
-        for node in ast.walk(tree):
-            if not (isinstance(node, ast.Constant) and isinstance(node.value, str)) \
-                    or not set(units.get(node, ())) & set(unit_names):
+        wanted = set(unit_names)
+        # the module's string constants in ast.walk order, listed once per text (the walk over every node of every
+        # reached module, once per stage script and key form, was most of this function's time:
+        # BUILD-PREFLIGHT-SERIAL-REPEATED-66); the same nodes in the same order as walking the tree here
+        for node in _string_constants(text):
+            if not wanted.intersection(units.get(node, ())):
                 continue
             if version >= 5 and not isinstance(parents.get(node), ast.Expr) \
                     and not ('\n' in node.value and relative in readers):
@@ -694,6 +708,11 @@ def translate(old_components, new_components, old_run, name, current=None):
         key = (str(root), scope, facts)
         if key not in _OLD_INDEXES:
             _OLD_INDEXES[key] = B.SourceIndex(root, scope=scope, top_format=B.STAGE_TOP_FORMAT, engine_facts=facts)
+            if B.ANALYSIS_STORE is not None or B.PREFLIGHT_WORKERS is not None:
+                # the build's pre-flight: an earlier run's checkout is analysed once and kept with the others
+                # (tools/fingerprint_prefetch.py, BUILD-PREFLIGHT-SERIAL-REPEATED-66)
+                from fingerprint_prefetch import attach_old
+                attach_old(_OLD_INDEXES[key])
         index = _OLD_INDEXES[key]
         try:
             chosen = (index.selection(script)[0] if wanted in (None, index.top_format)

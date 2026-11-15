@@ -404,17 +404,19 @@ def main(argv=None):
     p.add_argument('--jobs', type=int, default=1)
     p.add_argument('--scaled-variants', action='store_true',
                    help='also bake creature models at the instance scales the exterior uses (the previous method)')
-    p.add_argument('--creature-method', choices=('kf', 'skeletal'), default='kf',
-                   help='kf (default): the baked standing and mover models; skeletal: each creature mesh on its own '
-                        'animation table, every group of its own files (tools/creature_tables.py, CREATURE-TABLES)')
+    p.add_argument('--creature-method', choices=('kf', 'skeletal'), default='skeletal',
+                   help='skeletal (default since v0.0.66): each creature mesh on its own animation table, every group '
+                        'of its own files (tools/creature_tables.py, CREATURE-TABLES), a refused mesh baked with kf; '
+                        'kf: the baked standing and mover models (six groups)')
     a = p.parse_args(argv)
     path = list(sys.path)
     import creature_library as L
     import npc_library as NL
     sys.path[:] = path   # keep src/mwad ahead of tools/mwad.py whatever those imports did
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     t0 = time.time()
-    master = child_ci(a.data_files, 'Morrowind.esm').read_bytes()
+    master = master_path(a.data_files).read_bytes()
     residents, town_refs = town_cast(a.run) if a.run else (set(), set())
     meshes, bipedal, scales, npcs, planned, corpses = plan(master, residents, town_refs)
     print('Actor library: %d creature meshes, %d corpse meshes, %d NPC records (%d town residents: those placed '

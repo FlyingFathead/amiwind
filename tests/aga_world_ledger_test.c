@@ -72,7 +72,16 @@ static int same(const aw_ledger_t *a,const aw_ledger_t *b)
     for(i=0;i<a->local_count;i++){
         const aw_ledger_local_t *x=&a->local[i],*y=&b->local[i];
         if(x->global!=y->global || x->key!=y->key || x->script!=y->script || x->hint!=y->hint || x->slot!=y->slot ||
-           x->value!=y->value)return 0;
+           x->value!=y->value || x->name!=y->name)return 0;
+    }
+    /* slice 8: the scripts' layouts and the items' locals */
+    if(a->layout_count!=b->layout_count || a->item_local_count!=b->item_local_count)return 0;
+    for(i=0;i<a->layout_count;i++)
+        if(a->layout[i].script!=b->layout[i].script || a->layout[i].signature!=b->layout[i].signature)return 0;
+    for(i=0;i<a->item_local_count;i++){
+        const aw_ledger_item_local_t *x=&a->item_local[i],*y=&b->item_local[i];
+        if(x->holder!=y->holder || x->item!=y->item || x->serial!=y->serial || x->script!=y->script ||
+           x->hint!=y->hint || x->slot!=y->slot || x->value!=y->value || x->name!=y->name)return 0;
     }
     for(i=0;i<a->script_count;i++)
         if(a->script[i].script!=b->script[i].script || a->script[i].hint!=b->script[i].hint ||
@@ -161,6 +170,13 @@ static void make_table(int rows,int step){
 static aw_refs_t test_refs;
 static int refs_lookup(void *context,uint32_t key,uint32_t *record){return AW_RefsFind((aw_refs_t *)context,key,record,NULL);}
 static int item_known(void *context,const char *id){(void)context;return strncmp(id,"gone_",5)!=0;}
+/* slice 8: a variable's key as the compiler writes it (tools/mwscript/awms.py local_key): the folded name's FNV-1a in
+ * bits 0-29, its type in bits 30-31, never 0 */
+static uint32_t lkey(const char *name,unsigned type){
+    uint32_t k=(AW_LedgerNameHash(name)&0x3FFFFFFFU)|((uint32_t)type<<30);
+    return k?k:1;
+}
+static int only_four(void *context,uint32_t key,uint32_t *record){(void)context;if(key!=4)return 0;*record=1;return 1;}
 /* host mode (tests/test_world_ledger.py, a changed content list): two tables the builder wrote from two masters */
 static FILE *host_file;
 static int file_read(void *context,long at,void *out,long bytes){
@@ -650,8 +666,10 @@ int main(int argc,char **argv)
          if(i<200){int slot;for(slot=0;slot<4;slot++)assert(AW_LedgerLocalSet(&other_list,1,sh,sh,i+1000,slot,-(slot+1)));}}
      assert(other_list.local_count==8188 && other_list.script_count==604);
      n=round_trip(&other_list);size=save_trip(&other_list);
-     /* the ceiling: 4 more values fit, the next is refused and counted, nothing else changes */
-     for(i=0;i<4;i++)assert(AW_LedgerLocalSet(&other_list,0,0xFFFFF0u+(uint32_t)i,h,1,0,1));
+     /* the bound (65,536 since v0.0.66, eight times the game's counts above): every value up to it fits, the next is
+      * refused and counted, nothing else changes */
+     for(i=0;other_list.local_count<AW_LEDGER_LOCALS_MAX;i++)assert(AW_LedgerLocalSet(&other_list,0,0x100000u+(uint32_t)i,h,1,0,1));
+     assert(i==AW_LEDGER_LOCALS_MAX-8188);
      {unsigned long before=other_list.refused;
       assert(!AW_LedgerLocalSet(&other_list,0,0xFFFFFEu,h,1,0,1) && other_list.refused==before+1 &&
              other_list.local_count==AW_LEDGER_LOCALS_MAX);}
@@ -769,6 +787,27 @@ int main(int argc,char **argv)
      /* an older row (no death time): its capture time stands for it */
      a=AW_LedgerActor(&s,13,1);a->dead=1;a->moved=1;a->hours=50;
      assert(AW_LedgerActorRespawns(a,1,122,&rule) && !AW_LedgerActorRespawns(a,1,121.5f,&rule));
+     /* ACTOR-RESPAWN-CORPSE-RULES-66, the body clearing (OpenMW 0.51 clearCorpse, fCorpseClearDelay 72): a dead actor
+      * that does not respawn and is not Persistent loses its body 72 h after its death and stays dead; a Persistent one,
+      * a Respawn-flagged one, a levelled one and an alive one never; the clock moved forward */
+     {aw_ledger_actor_t *b=AW_LedgerActor(&s,14,1);b->dead=1;b->died=100;
+      assert(!AW_LedgerActorClears(b,0,171.9f,&rule) && !b->cleared && AW_LedgerActorClears(b,0,172,&rule) && b->cleared &&
+             b->dead && !AW_LedgerActorClears(b,0,9999,&rule) && !AW_LedgerActorRespawns(b,0,1000000,&rule));
+      b=AW_LedgerActor(&s,15,1);b->dead=1;b->died=100;
+      assert(!AW_LedgerActorClears(b,AW_REFS_PERSISTENT,1000000,&rule) && !AW_LedgerActorClears(b,AW_REFS_RESPAWN,1000000,&rule) &&
+             !AW_LedgerActorClears(b,AW_REFS_LEVELLED,1000000,&rule) && !b->cleared);
+      b->pick=3;assert(!AW_LedgerActorClears(b,0,1000000,&rule));b->pick=0;
+      {aw_ledger_respawn_t r3={4,72.0f,24.0f};assert(!AW_LedgerActorClears(b,0,123.5f,&r3) && AW_LedgerActorClears(b,0,124,&r3));}
+      b=AW_LedgerActor(&s,16,1);b->fight=1;assert(!AW_LedgerActorClears(b,0,1000000,&rule));
+      /* an older row without a death time: its capture time; the clock not running (0): never */
+      b=AW_LedgerActor(&s,17,1);b->dead=1;b->moved=1;b->hours=10;assert(!AW_LedgerActorClears(b,0,0,&rule) &&
+             AW_LedgerActorClears(b,0,82,&rule));
+      /* a cleared body survives the save: CLEARED needs the seventh form (a row with no death time too) */
+      {static aw_ledger_t c7;aw_ledger_actor_t *cb;
+       AW_LedgerClear(&c7);cb=AW_LedgerActor(&c7,30,1);cb->dead=1;cb->cleared=1;
+       k=AW_LedgerEncode(&c7,one,sizeof(one));assert(k>0 && !memcmp(one,"AWL7",4));
+       round_trip(&c7);assert((cb=AW_LedgerActor(&got,30,0)) && cb->dead && cb->cleared);
+       AW_LedgerClear(&c7);}}
      /* back: the row is as in the data (a levelled list rolls again), so it is not saved */
      a=AW_LedgerActor(&s,10,0);AW_LedgerActorReset(a);assert(a->key==10 && !a->dead && !a->pick && !a->died && !a->moved);
      a->fight=1;            /* (an empty row is not saved; this one gets a field again for the round trips below) */
@@ -857,6 +896,90 @@ int main(int argc,char **argv)
             got.stolen_count==1 && got.file_count==1 && AW_LedgerIdent(&got,4,&rec) && rec==29);
      round_trip(&got);
      AW_RefsClose(&test_refs);AW_LedgerClear(&s);AW_LedgerClear(&m);}
+
+    /* slice 8 (SAVE-SCRIPT-ROW-HINT-ONLY-65, SAVE-ITEM-SCRIPT-LOCALS-66): the locals with their variables' names, the
+     * scripts' layouts and the items' locals by (holder, item, serial): round trip and save; refusals; an item held by
+     * a holder this game no longer has goes in a migration; a script rebuilt with a variable inserted before the others,
+     * one removed, the order reversed and the types changed: every saved value lands in its own variable; a name gone,
+     * a local with no name in a changed script and a name two variables share are dropped, never mixed. */
+    {static aw_ledger_t e;int k,moved,j;int32_t v;aw_ledger_dropped_t d;unsigned long before;
+     uint32_t sh=AW_LedgerNameHash("guardScript"),ih=AW_LedgerNameHash("sunder"),bits,sig;float f;
+     uint32_t was[3],ins[4],rem[2],rev[3],typ[3],dup[3];
+     int32_t saved[3];int got_slot[3];
+     was[0]=lkey("done",AW_LEDGER_LOCAL_SHORT);was[1]=lkey("count",AW_LEDGER_LOCAL_LONG);was[2]=lkey("timer",AW_LEDGER_LOCAL_FLOAT);
+     f=2.5f;memcpy(&bits,&f,4);saved[0]=1;saved[1]=70000;saved[2]=(int32_t)bits;
+     sig=AW_LedgerLayoutSignature(was,3);
+     assert(sig && !AW_LedgerLayoutSignature(NULL,0) && AW_LedgerLayoutSignature(was,2)!=sig);
+     /* the list: the object's three locals with their names, its layout, an item the player wears (holder 0) and one a
+      * placed holder keeps */
+     for(j=0;j<3;j++)assert(AW_LedgerLocalNamed(&e,0,4,sh,77,j,was[j],saved[j]));
+     assert(AW_LedgerLayoutSet(&e,sh,sig) && AW_LedgerLayout(&e,sh,&bits) && bits==sig && !AW_LedgerLayout(&e,ih,NULL));
+     assert(AW_LedgerItemLocalSet(&e,0,ih,0,AW_LedgerNameHash("ouch_sunder"),55,2,lkey("onpcequip",0),1));
+     assert(AW_LedgerItemLocalSet(&e,4,ih,0,AW_LedgerNameHash("ouch_sunder"),55,1,lkey("done",0),1));
+     assert(AW_LedgerItemLocalSet(&e,9,AW_LedgerNameHash("keening"),3,AW_LedgerNameHash("ouch_keening"),56,0,0,-4));
+     assert(e.item_local_count==3 && e.item_local[0].holder==0 && e.item_local[2].holder==9);
+     /* refusals: no item, no script, a holder with bit 30 (a drop's key), a slot past 255; a value back at 0 goes */
+     before=e.refused;
+     assert(!AW_LedgerItemLocalSet(&e,0,0,0,sh,1,0,0,1) && !AW_LedgerItemLocalSet(&e,0,ih,0,0,1,0,0,1) &&
+            !AW_LedgerItemLocalSet(&e,AW_LEDGER_PLAYER|4,ih,0,sh,1,0,0,1) && !AW_LedgerItemLocalSet(&e,0,ih,0,sh,1,256,0,1) &&
+            e.refused==before+4 && e.item_local_count==3);
+     assert(AW_LedgerItemLocalSet(&e,0,ih,7,sh,1,0,0,5) && e.item_local_count==4 &&
+            AW_LedgerItemLocalSet(&e,0,ih,7,sh,1,0,0,0) && e.item_local_count==3);
+     k=AW_LedgerEncode(&e,one,sizeof(one));assert(k>0 && !memcmp(one,"AWL8",4));
+     round_trip(&e);save_trip(&e);
+     /* reading refusals: cut, one byte more, the names' count not the locals', an eighth form with nothing of its own */
+     assert(!AW_LedgerDecode(one,k-1,&got) && !AW_LedgerDecode(one,k+1,&got));
+     {aw_ledger_t plain;memset(&plain,0,sizeof(plain));
+      assert(AW_LedgerLocalSet(&plain,0,20,sh,1,0,5));k=AW_LedgerEncode(&plain,one,sizeof(one));
+      assert(k==48+16 && !memcmp(one,"AWL5",4));          /* no name, no layout: the fifth form, byte for byte as before */
+      assert(AW_LedgerDecode(one,k,&got) && got.local_count==1 && !got.local[0].name && !got.layout_count);
+      /* the same list written as an eighth form by hand, after the fifth form's parts: 0 actor rows and 0 record bytes
+       * (8), 0 files, idents and stamps (9), 0 layouts (at +17), the names' count (+21), the name (+25), 0 items (+29) */
+      memcpy(two,one,(size_t)k);memcpy(two,"AWL8",4);memset(two+k,0,37);two[k+21]=1;
+      assert(AW_LedgerDecode(two,k+33,NULL)==0);              /* nothing only the eighth form holds */
+      two[k+25]=9;assert(AW_LedgerDecode(two,k+33,&got) && got.local[0].name==9);   /* a name: an eighth form */
+      two[k+21]=2;assert(!AW_LedgerDecode(two,k+37,&got));   /* two names for one local */
+      AW_LedgerClear(&plain);}
+     /* a migration: the item a placed holder this game no longer has (9) goes; the player's and holder 4's stay */
+     AW_LedgerClear(&got);k=AW_LedgerEncode(&e,one,sizeof(one));assert(AW_LedgerDecode(one,k,&got));
+     AW_LedgerMigrate(&got,NULL,0,only_four,NULL,NULL,&d);
+     assert(d.locals==1 && got.item_local_count==2 && got.item_local[1].holder==4 && got.local_count==3);
+     /* the layout check and the restore by name (the object's three values, saved by slot 0, 1, 2) */
+     for(j=0;j<3;j++){
+         /* unchanged: by the slot */
+         assert(AW_LedgerLocalSlot(j,was[j],saved[j],1,sig,was,3,&v,&moved)==j && v==saved[j] && !moved);
+         /* an older save (no layout) or an older file (no names): by the slot */
+         assert(AW_LedgerLocalSlot(j,0,saved[j],0,0,was,3,&v,&moved)==j && v==saved[j]);
+         assert(AW_LedgerLocalSlot(j,was[j],saved[j],1,sig,NULL,3,&v,&moved)==j);
+     }
+     assert(AW_LedgerLocalSlot(3,0,1,0,0,NULL,3,&v,&moved)==-1);        /* past the script's variables: dropped */
+     /* a variable inserted before the others */
+     ins[0]=lkey("greeted",AW_LEDGER_LOCAL_SHORT);ins[1]=was[0];ins[2]=was[1];ins[3]=was[2];
+     for(j=0;j<3;j++){got_slot[j]=AW_LedgerLocalSlot(j,was[j],saved[j],1,sig,ins,4,&v,&moved);assert(v==saved[j] && moved);}
+     assert(got_slot[0]==1 && got_slot[1]==2 && got_slot[2]==3);
+     /* one removed: its value is dropped, the others land in their own */
+     rem[0]=was[0];rem[1]=was[2];
+     assert(AW_LedgerLocalSlot(0,was[0],saved[0],1,sig,rem,2,&v,&moved)==0 && v==1 && !moved);
+     assert(AW_LedgerLocalSlot(1,was[1],saved[1],1,sig,rem,2,&v,&moved)==-1);
+     assert(AW_LedgerLocalSlot(2,was[2],saved[2],1,sig,rem,2,&v,&moved)==1 && v==saved[2] && moved);
+     /* the order reversed */
+     rev[0]=was[2];rev[1]=was[1];rev[2]=was[0];
+     for(j=0;j<3;j++){got_slot[j]=AW_LedgerLocalSlot(j,was[j],saved[j],1,sig,rev,3,&v,&moved);assert(v==saved[j]);}
+     assert(got_slot[0]==2 && got_slot[1]==1 && got_slot[2]==0);
+     /* the types changed (OpenMW's Locals::read converts): the short a float, the long a short (cut to 16 bits), the
+      * float a long (cut toward 0) */
+     typ[0]=lkey("done",AW_LEDGER_LOCAL_FLOAT);typ[1]=lkey("count",AW_LEDGER_LOCAL_SHORT);typ[2]=lkey("timer",AW_LEDGER_LOCAL_LONG);
+     assert(AW_LedgerLocalSlot(0,was[0],saved[0],1,sig,typ,3,&v,&moved)==0);memcpy(&f,&v,4);assert(f==1.0f);
+     assert(AW_LedgerLocalSlot(1,was[1],saved[1],1,sig,typ,3,&v,&moved)==1 && v==(int32_t)(int16_t)70000);
+     assert(AW_LedgerLocalSlot(2,was[2],saved[2],1,sig,typ,3,&v,&moved)==2 && v==2);
+     /* two variables of one name hash: never mixed; a saved local without a name in a changed script: dropped */
+     dup[0]=was[0];dup[1]=was[0]^0x40000000U;dup[2]=was[1];
+     assert(AW_LedgerLocalSlot(0,was[0],saved[0],1,sig,dup,3,&v,&moved)==-1);
+     assert(AW_LedgerLocalSlot(1,was[1],saved[1],1,sig,dup,3,&v,&moved)==2);
+     assert(AW_LedgerLocalSlot(1,0,saved[1],1,sig,rev,3,&v,&moved)==-1);
+     fprintf(o,"script locals by name: inserted, removed, reversed, retyped ok; %d item locals\n",e.item_local_count);
+     fprintf(o,"variable keys %08lx %08lx %08lx\n",(unsigned long)was[0],(unsigned long)was[1],(unsigned long)was[2]);
+     AW_LedgerClear(&e);AW_LedgerClear(&got);}
 
     AW_LedgerClear(&list);AW_LedgerClear(&got);AW_LedgerClear(&other_list);
     fprintf(o,"done\n");

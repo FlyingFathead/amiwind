@@ -289,6 +289,92 @@ if [ "${SWEEP:-report}" != off ]; then
   log "sweep: ${sw:-no SWEEP RESULT line}"
   [ "${SWEEP:-report}" = fail ] && { case "$sw" in *"RESULT ok"*) ;; *) finish "FAIL dbg sweep: ${sw:-no result line}";; esac; }
 fi
+# WALKER-STEPS-BEGIN (JOURNEY-WALK-DIALOGUE-DESYNC-66): script steps that wait for the game and stop the run at the
+# first wrong turn, instead of key counts that run on blind (the v0.0.66-dev2 journey pressed Enter into the clerk's
+# persuasion list and every later step ran in the wrong window):
+#   walkto X Y SECS     walk to the map-local point (aw_view walk X Y) until the engine says it is reached; a message
+#                       box that comes up on the way is answered with Enter (logged); not reached in SECS = FAIL
+#   waitfor KEY SECS T  the state value KEY holds the text T within SECS seconds (screen dialogue, map census, ...)
+#   boxes               Enter on every message box showing (at most 8), logged
+#   mark / saw SECS T   a console line holding T printed after the last mark, within SECS seconds
+#   topic T             the dialogue window is open: T typed into its Find box (spaces left out, as the box ignores
+#                       them) and Enter: the topic or answer chosen by its name, never by a count of keys; the box
+#                       is cleared after it (a topic the speaker does not offer yet, such as Sellus Gravius' duties
+#                       before his Morrowind answer names them, leaves its name there)
+#   face X Y Z          turn the view to a map-local point from where the eye stands now (aw_aim yaw pitch)
+#   lookat REF          turn the view to a placed item the map does not draw itself (aw_placed look N, the game's own
+#                       test aim at the Nth nearest such item) until it names REF; else FAIL (a small item on a table,
+#                       the crab meat on its plate, which neither the pick nor the printed focus rows name)
+#   aimed REF [SECS]    the use key would go to the placed reference REF: the game's own focus row (aw_placed aim) or
+#                       the crosshair's pick (aw_inspect) names it, else FAIL (a flat scroll on a desk: the pick hits
+#                       the desk while the focus is on the scroll)
+clines(){ n=$(wc -l < $R/awctl/console.log 2>/dev/null); echo "${n:-0}" | tr -d ' '; }
+since(){ tail -n +$((${1:-0}+1)) $R/awctl/console.log 2>/dev/null; }
+walk_to(){ n0=$(clines); rc "aw_view walk $1 $2"; s=0
+  while [ $s -lt $((${3:-30}*K)) ]; do alive || finish "FAIL emulator exited walking to $1 $2"
+    sleep 1; s=$((s+1))
+    since "$n0" | grep -q 'Walk to: reached' && { log "walkto $1 $2: reached after $s s at local $(st local)"; return 0; }
+    [ "$(st screen)" = messagebox ] && { key Return; log "walkto $1 $2: a message box on the way, Enter"; }
+  done
+  rc "aw_view walk off"; sleep 1; shot "walkto-stuck-$1_$2"
+  finish "FAIL walkto $1 $2: not reached in ${3:-30} s; the player stands at local $(st local) (screen $(st screen), map $(st map))"; }
+wait_for(){ k=$1; secs=$2; shift 2; s=0
+  while [ $s -lt $((secs*K)) ]; do alive || finish "FAIL emulator exited waiting for $k $*"
+    case "$(st $k)" in *"$*"*) log "waitfor $k $*: after $s s"; return 0;; esac
+    sleep 1; s=$((s+1)); done
+  shot "waitfor-$k"; finish "FAIL waitfor $k $*: read '$(st $k)' after $secs s (map $(st map), screen $(st screen), local $(st local))"; }
+boxes(){ i=0; while [ $i -lt 8 ] && [ "$(st screen)" = messagebox ]; do key Return; i=$((i+1)); log "boxes: Enter on message box $i"; sleep $((2*K)); done; }
+saw(){ secs=$1; shift; s=0
+  while [ $s -lt $((secs*K)) ]; do alive || finish "FAIL emulator exited waiting for the console line '$*'"
+    since "${M0:-0}" | grep -F -q -- "$*" && { log "saw '$*' after $s s"; return 0; }
+    sleep 1; s=$((s+1)); done
+  shot saw-missing; finish "FAIL saw: no console line '$*' within $secs s of the mark (map $(st map), screen $(st screen), local $(st local))"; }
+topic(){ [ "$(st screen)" = dialogue ] || { shot topic-no-window; finish "FAIL topic $*: the dialogue window is not open (screen $(st screen), map $(st map))"; }
+  t=$(printf '%s' "$*" | tr -d ' '); xdo "type --delay 60 $t"; sleep 1; key Return; log "topic $* (typed $t, Enter)"; sleep $((2*K))
+  # a name the list does not hold leaves it in the search box ("(no topics)"); an asked topic empties it: either way
+  # the box is cleared so the next topic starts from an empty search (BackSpace on an empty search does nothing)
+  i=0; while [ $i -lt ${#t} ]; do key BackSpace; i=$((i+1)); done; }
+face(){ e=$(st local); a=$(echo "$1 $2 $3 $e" | awk '{dx=$1-$4; dy=$2-$5; d=sqrt(dx*dx+dy*dy); y=atan2(dy,dx)*57.29578
+    if(y<0)y+=360; if(y>=359.95)y=0; p=atan2($6-$3,d)*57.29578; if(p>80)p=80; if(p<-70)p=-70; printf "%.1f %.1f", y, p}')
+  rc "aw_aim $a"; log "face $1 $2 $3 from local $e: aw_aim $a"; sleep 1; }
+aimed(){ ref=$1; secs=${2:-3}; set -- $(st angles); bp=${1:-0}; by=${2:-0}; n=0; lrow=; lpick=
+  # as a player nudges the mouse until the prompt shows: the aim as it is, then small turns around it (degrees of
+  # pitch and yaw); the v0.0.66-dev2 papers answered at 319.6 29.4 and not at 317.8 28.7 from almost the same spot
+  for d in "0 0" "1.5 0" "-1.5 0" "0 1.5" "0 -1.5" "3 0" "-3 0" "0 3" "0 -3" "1.5 1.5" "1.5 -1.5" "-1.5 1.5" "-1.5 -1.5"; do
+    set -- $d; n=$((n+1))
+    if [ "$1" != 0 ] || [ "$2" != 0 ]; then
+      a=$(echo "$bp $by $1 $2" | awk '{p=$1+$3; y=$2+$4; if(y<0)y+=360; if(y>=360)y-=360; if(p>80)p=80; if(p<-70)p=-70
+        printf "%.1f %.1f", y, p}'); rc "aw_aim $a"; sleep 1; fi
+    M0=$(clines); rc "aw_placed aim"; rc "aw_inspect"; s=0
+    while [ $s -lt $((secs*K)) ]; do alive || finish "FAIL emulator exited checking the aim at $ref"
+      sleep 1; s=$((s+1)); out=$(since "$M0")
+      row=$(echo "$out" | sed -n 's/.*aimed row \([0-9][0-9]*\).*/\1/p' | tail -n 1); [ -n "$row" ] && lrow=$row
+      pick=$(echo "$out" | sed -n 's/^source ref: //p' | tail -n 1); [ -n "$pick" ] && lpick=$pick
+      rowline=; [ -n "$row" ] && rowline=$(echo "$out" | grep "^ *$row [A-Za-z] " | head -n 1)
+      # the focus row, when the report prints it, is what the use key takes: it decides (the v0.0.66-dev2 journey's
+      # pick named the crab meat while the focus, and E, took the silver plate under it)
+      if [ -n "$rowline" ]; then
+        case "$rowline" in *" $ref "*) log "aimed $ref: the use key's focus row $row (aw_placed aim), try $n"; return 0;; esac
+        [ -n "$pick" ] && break
+      elif echo "$out" | grep -E -q "source ref: $ref( /|$)"; then
+        log "aimed $ref: the crosshair's pick (aw_inspect; the focus row ${row:-none} not in the report), try $n"; return 0
+      fi
+      [ -n "$row" ] && [ -n "$pick" ] && break
+    done
+  done
+  shot "aimed-missing-$ref"
+  finish "FAIL aimed $ref: neither the use key's focus (aw_placed aim, aimed row ${lrow:--}) nor the crosshair's pick (aw_inspect: ${lpick:--}) is on it in $n tries around pitch $bp yaw $by (local $(st local))"; }
+look_at(){ k=0; seen=
+  while [ $k -lt 10 ]; do alive || finish "FAIL emulator exited turning to $1"
+    M0=$(clines); rc "aw_placed look $k"; s=0; got=
+    while [ $s -lt $((3*K)) ] && [ -z "$got" ]; do sleep 1; s=$((s+1))
+      got=$(since "$M0" | sed -n 's/.*aw_placed look: reference \([0-9][0-9]*\) at.*/\1/p' | tail -n 1)
+      since "$M0" | grep -q 'aw_placed look: [0-9]* drawn placed items near here' && got=none; done
+    [ "$got" = "$1" ] && { log "lookat $1: the nearest drawn placed item number $k"; sleep 1; return 0; }
+    [ "$got" = none ] && break
+    seen="$seen ${got:-?}"; k=$((k+1)); done
+  shot "lookat-missing-$1"; finish "FAIL lookat $1: not among the nearest drawn placed items (saw:${seen:- none}; local $(st local))"; }
+# WALKER-STEPS-END
 # SCRIPT: a scripted session instead of the music and second-load steps (evidence shots, replays). One step per line:
 # "cmd TEXT" console command, "key NAME" key press, "xdo ARGS" raw xdotool steps (mouse, held keys), "wait S" S seconds of game time (the game must keep running),
 # "shot NAME" screenshot shots/NAME.png, "rec NAME" starts the clip shots/NAME.mp4, "recstop" ends it,
@@ -305,6 +391,15 @@ if [ -s $R/script.txt ]; then
     rec\ *) rec "${line#rec }";;
     recstop) recstop;;
     state\ *) log "state ${line#state }: $(st ${line#state })";;
+    walkto\ *) set -- ${line#walkto }; walk_to "$1" "$2" "$3";;
+    waitfor\ *) set -- ${line#waitfor }; wait_for "$@";;
+    boxes) boxes;;
+    mark) M0=$(clines); log "mark at console line $M0";;
+    saw\ *) set -- ${line#saw }; saw "$@";;
+    topic\ *) topic "${line#topic }";;
+    face\ *) set -- ${line#face }; face "$1" "$2" "$3";;
+    aimed\ *) set -- ${line#aimed }; aimed "$1" "$2";;
+    lookat\ *) look_at "${line#lookat }";;
     esac
     alive || finish "FAIL emulator exited after script step: $line"
   done 3< $R/script.txt

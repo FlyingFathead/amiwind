@@ -14,6 +14,7 @@ from PIL import Image
 from mwad.audit import BSA, normpath, records, subrecords
 from mwad.npc import load_master, text
 from mwad.paths import child_ci, ensure_external
+from mwad.masters import master_path
 from npc_geometry import Assets, Skeleton, assemble, bake, animated_mdl, rigid_attachment
 from prepare_hands import nord_parts, appearance_parts
 from prepare_hand_sprites import decode_mdl, render_frame, pack_frame
@@ -103,7 +104,7 @@ class TorchSource:
     """One bounded owned-data cache shared by a batch of appearance bakes."""
     def __init__(self,data_files):
         self.data_files=ensure_external(data_files,'owned data')
-        master=child_ci(self.data_files,'Morrowind.esm')
+        master=master_path(self.data_files)
         archive=child_ci(self.data_files,'Morrowind.bsa')
         self.kinds,_,_=load_master(master);record=None
         for kind,flags,payload in records(master.read_bytes()):

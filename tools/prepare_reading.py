@@ -14,9 +14,11 @@ import struct
 import sys
 from PIL import Image
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
-from mwad.audit import records,subrecords,string,BSA
+from mwad.audit import records, subrecords, string
+from mwad.archives import layered_bsa
 from mwad.npc import load_master,text
 from mwad.paths import child_ci,resolve_data_files,ensure_external
+from mwad.masters import master_path
 from mwad import font_sources
 from npc_geometry import Assets
 from prepare_ui import pack_truetype, pack_font
@@ -134,7 +136,7 @@ def prepare(data_files,scene,bitmap_paper_ink="filled"):
     from mwad.paths import unshare_tree
     unshare_tree(scene)  # in place: BUILD-POOL-READONLY-SCENE-WRITE-35
     font_report=prepare_paper_font(data_files,scene,bitmap_paper_ink)
-    master=child_ci(data_files,'Morrowind.esm');assets=Assets(data_files,BSA(child_ci(data_files,'Morrowind.bsa')))
+    master=master_path(data_files);assets=Assets(data_files,layered_bsa(data_files))
     dest=scene/'id1/reading';dest.mkdir(exist_ok=True)
     palette=(scene/'id1/gfx/palette.lmp').read_bytes();pal=Image.new('P',(1,1));pal.putpalette(palette)
     def art(path,out,size):

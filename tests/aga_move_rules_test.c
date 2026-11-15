@@ -18,8 +18,34 @@ int main(void) {
     aw_move_settings_t s;aw_move_inputs_t in;
     AW_MoveSettingsDefault(&s);
     assert(AW_MoveSettingIndex("fminwalkspeed")==0 && AW_MoveSettingIndex("fFatigueMult")==29 &&
-           AW_MoveSettingIndex("fFallAcroMult")==AW_MOVE_SETTING_COUNT-2 &&
-           AW_MoveSettingIndex("fWerewolfRunMult")==AW_MOVE_SETTING_COUNT-1 && near(s.fWerewolfRunMult,1.3f));
+           AW_MoveSettingIndex("fFallAcroMult")==AW_MOVE_SETTING_COUNT-4 &&
+           AW_MoveSettingIndex("fWerewolfRunMult")==AW_MOVE_SETTING_COUNT-3 && near(s.fWerewolfRunMult,1.3f) &&
+           AW_MoveSettingIndex("fMaxWalkSpeedCreature")==AW_MOVE_SETTING_COUNT-1 &&
+           s.fMinWalkSpeedCreature==5 && s.fMaxWalkSpeedCreature==300);
+    /* ACTOR-MECHANICS-USE-STATS-66: every actor's own speed, worked out by hand from OpenMW 0.51 npc.cpp and
+     * creature.cpp getWalkSpeed / getRunSpeed / getMaxSpeed with the original settings (example sheets; the
+     * records' own values come from the actor table at run time):
+     * - a small creature at Speed 25: 5 + 0.25 x 295 = 78.75, its run the same (creatures do not run faster);
+     * - a creature at Speed 30: 5 + 0.3 x 295 = 93.5;
+     * - a creature at Speed 100: 5 + 295 = 300;
+     * - a flyer at Speed 70: 5 + 0.7 x 295 = 211.5 by fMinFlySpeed 5 .. fMaxFlySpeed 300;
+     * - an NPC (a guard sheet) at Speed 50, Athletics 45: walk 100 + 0.5 x 100 = 150, run 150 x (1.75 + 0.45) = 330.
+     * The old fixed chase was 200 Quake units/s = 800 original units/s for all of them. */
+    assert(near(AW_MoveActorSpeed(&s,1,0,25,0,1),78.75f) && near(AW_MoveActorSpeed(&s,1,0,25,0,0),78.75f));
+    assert(near(AW_MoveActorSpeed(&s,1,0,30,0,1),93.5f));
+    assert(near(AW_MoveActorSpeed(&s,1,0,100,0,1),300));
+    assert(near(AW_MoveActorSpeed(&s,1,1,70,0,1),211.5f));
+    assert(near(AW_MoveActorSpeed(&s,0,0,50,45,0),150) && near(AW_MoveActorSpeed(&s,0,0,50,45,1),330));
+    assert(AW_MoveActorSpeed(&s,1,0,-5,0,1)==5);
+    /* a swimmer at Speed 40, Athletics 20: (5 + 0.4 x 295) x (0.5 + 0.2 x 0.1) = 123 x 0.52 = 63.96 */
+    assert(near(AW_MoveActorSpeed(&s,1,AW_MEDIUM_WATER,40,20,1),63.96f));
+    assert(AW_MEDIUM_AIR==1);
+    /* ACTOR-MECHANICS-USE-STATS-66 row 23 (getMaxSpeed with the actor's own load): over the limit nobody moves; an NPC
+     * at half its capacity runs 330 x (1 - fEncumberedMoveEffect x 0.5); a creature's walk is not slowed, its flight is */
+    assert(AW_MoveActorLoaded(&s,0,0,330,1.2f)==0 && AW_MoveActorLoaded(&s,1,0,300,1.2f)==0);
+    assert(near(AW_MoveActorLoaded(&s,0,0,330,.5f),330*(1-s.fEncumberedMoveEffect*.5f)));
+    assert(near(AW_MoveActorLoaded(&s,1,0,300,.5f),300) && near(AW_MoveActorLoaded(&s,0,0,330,0),330));
+    assert(near(AW_MoveActorLoaded(&s,1,AW_MEDIUM_AIR,211.5f,.5f),211.5f*(1-s.fEncumberedMoveEffect*.5f)));
     assert(AW_MoveSettingIndex("fCombatDistance")<0 && !AW_MoveSettingSet(&s,"nonsense",1));
     /* WEREWOLF-RUN-SPEED-63 (OpenMW npc.cpp getMaxSpeed): the werewolf's run is fWerewolfRunMult times the run */
     memset(&in,0,sizeof in);in.speed=50;in.athletics=35;in.scale=1;

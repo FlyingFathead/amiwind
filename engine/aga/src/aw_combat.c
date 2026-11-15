@@ -10,7 +10,7 @@
  * only watches its state and strikes at the hit key, so the progs CRC does
  * not change. Rolls come from one seeded generator per encounter.
  *
- * Cost per hostile NPC: one slot of about 300 bytes (no allocation), one think per
+ * Cost per hostile NPC: one slot of about 1.9 KB with its kept spells (no allocation), one think per
  * 0.1 s (at most AW_PATH_TRACES search traces plus the step's own moves),
  * and per frame a pointer test and a frame index. Nothing runs while no NPC
  * is hostile apart from the player's fatigue return.
@@ -29,12 +29,14 @@
 #include "aw_hand_models.h"
 #include "aw_ambient.h"
 #include "aw_effects.h"
+#include "aw_cast.h"
+#include "aw_animkit.h"
 
-#define SLOTS 4                /* hostile NPCs at a time */
+#define SLOTS 4               /* hostile NPCs at a time */
 #define SCALE .25f              /* original units -> game units (tools/prepare_quake.py SCALE) */
 #define STEP_UP 8.5f
-enum {S_CHASE,S_SWING,S_HIT,S_KNOCK,S_DEAD,S_FLEE,S_BLOCK,S_DODGE};
-enum {G_IDLE,G_RUN,G_ATTACK,G_HIT,G_KNOCK,G_DEATH,G_BLOCK,G_DODGEL,G_DODGER,G_COUNT};
+enum {S_CHASE,S_SWING,S_HIT,S_KNOCK,S_DEAD,S_FLEE,S_BLOCK,S_DODGE,S_CAST};
+enum {G_IDLE,G_RUN,G_ATTACK,G_HIT,G_KNOCK,G_DEATH,G_BLOCK,G_DODGEL,G_DODGER,G_CAST,G_COUNT};   /* G_CAST: DAGOTH-UR-NO-ANIMATIONS-65 */
 #define G_REQUIRED 6            /* the groups a fighters.txt layout must have; block/dodge optional */
 /* The dodge (AmiWind extension, docs/COMBAT.md): a quick step aside, 10 game units
  * (40 original) over 0.3 s, a real move through collision. */
@@ -56,13 +58,30 @@ typedef struct {
     func_t think;float nextthink;
     edict_t *item[AW_ITEMS_KINDS];  /* carried weapon/shield while fighting (aw_items.c) */
     float run_x;                /* the run group's own speed (layout X, units a second; 0: by time) */
+    float step_carry;           /* ACTOR-MECHANICS-USE-STATS-66: the part of a game unit the last step left over */
     float gait;vec3_t gait_at;  /* WALK-CYCLES-57: seconds into the run group by distance, and where it was counted */
     signed char sound_group,sound_frame;   /* the group frame whose sound keys last played (CREATURE-ANIM-SOUND-54) */
     short target_num;           /* COMBAT-ACTOR-VS-ACTOR-62: the actor it fights (edict number), 0 = the player */
+    /* NPC-NO-SPELLCASTING-65: the spell it chose (ASPT row, -1 its weapon), that spell's ranges, chance and range (map
+     * units), when it decides again, and the cast under way: its release (seconds into S_CAST), end and the look */
+    short spell;unsigned char spell_ranges,cast_left;
+    float spell_chance,spell_range,spell_at,cast_release,cast_end;
+    int cast_look;
+    /* its spells read once when the fight starts (the cheaper version: no disk read in the think after that): the
+     * castable spells (ASPT row, cost, always-succeeds, their effects in sp_e/sp_m from FIRST, N of them) */
+    unsigned char spells_cached,nspells,neffects;
+    struct {short row;unsigned short cost;unsigned char first,n,always;} sp[32];
+    aw_spell_effect_t sp_e[48];
+    struct {uint32_t flags;float base_cost;int school;} sp_m[48];
+    /* ACTOR-RANGED-COMBAT-MISSING-66: a bow, crossbow or thrown weapon on its sheet: the ammunition read once from its
+     * live record (AITM row, rounds left, its chop), and 1 while the swing under way is a shot */
+    unsigned char shooting,ammo_known,ammo_chop[2];
+    short ammo_item;int ammo_left;
 } slot_t;
 
 aw_combat_settings_t aw_combat_settings;
 aw_combat_ai_t aw_combat_ai;
+static float were_level,were_flee_mod;     /* iWereWolfLevelToAttack, iWereWolfFleeMod (0: not in the image) */
 static int settings_ok,ai_ok,settings_tried;   /* settings_tried: read this load already (COMBAT-SETTINGS-REREAD-63) */
 static char sound_path[AW_SND_COUNT][32];
 static const char *const sound_key[AW_SND_COUNT]={"health","miss","punch","light","medium","heavy","swish","critical","fall","punch2"};
@@ -75,6 +94,9 @@ static int you_valid,battle,dead_music;
 static aw_combat_rng_t rng;
 static unsigned long seed_used,encounters;
 static float punch_started=-1;static int punch_struck;
+/* PLAYER-ANIM-GROUPS-NOT-PLAYED-66: the last damaging blow on the player (-1 none) and its random hit group; when the
+ * player went down (knocked, the state AW_CombatPlayerReaction last saw); cleared with the fight (AW_CombatClear) */
+static float you_hit_at=-1,you_down_at;static int you_hit_roll,you_down_seen;
 /* The quick retry of a lost fight (an AmiWind extension, aw_view.c, aw_death_retry): where
  * everyone stood and how they were when the fight began. */
 static struct {
@@ -91,7 +113,42 @@ static cvar_t music={"aw_combat_music","1"};
 static cvar_t seed_cvar={"aw_combat_seed","0"};
 static cvar_t punch_hit={"aw_combat_punch_hit","0.71"};
 static cvar_t think_interval={"aw_combat_think","0.1"};
-static cvar_t chase_speed={"aw_combat_speed","200"};
+/* ACTOR-MECHANICS-USE-STATS-66: the chase, flee and flight speed. 0 (default) = each fighter's own speed from its Speed
+ * and Athletics (AW_MoveActorSpeed: OpenMW 0.51 npc.cpp / creature.cpp getMaxSpeed; an NPC runs, a creature moves at its
+ * walk, a flyer by the fly speeds, a swimmer by the swim speed); above 0 = that fixed speed in game units a second for
+ * everyone (the earlier rule, 200, kept selectable). */
+static cvar_t chase_speed={"aw_combat_speed","0"};
+static aw_move_settings_t move_rules;static int move_rules_set;   /* the original's movement settings (as aw_ambient.c) */
+static float fighter_speed(const slot_t *s) {
+    int medium=AW_MEDIUM_GROUND;
+    if(chase_speed.value>0)return chase_speed.value;
+    if(!move_rules_set){AW_MoveSettingsDefault(&move_rules);move_rules_set=1;}
+    if(AW_AmbientFlags(s->e)&AW_AMBIENT_FLYER)medium=AW_MEDIUM_AIR;
+    else if(AW_AmbientFlags(s->e)&AW_AMBIENT_SWIMMER)medium=AW_MEDIUM_WATER;
+    /* row 23: its own load (s->f.encumbrance, set when it engages, fighter_load) */
+    return AW_MoveActorLoaded(&move_rules,s->f.creature!=0,medium,
+                              AW_MoveActorSpeed(&move_rules,s->f.creature!=0,medium,(float)s->f.attributes[AW_SPD],
+                                                (float)s->f.skills[8],1),s->f.encumbrance)*SCALE;
+}
+/* ACTOR-MECHANICS-USE-STATS-66 row 23 (OpenMW 0.51 mwworld/class.cpp getNormalizedEncumbrance, actor.cpp
+ * getEncumbrance): a fighter's own load when it engages: what its live record carries (AW_ActorCarriedWeight) plus
+ * Burden less Feather on it, over its Strength x fEncumbranceStrMult; its swings, blocks and speed read it. Once per
+ * fight (about one read per inventory entry); an actor without a live record keeps 0, as before. */
+static void fighter_load(slot_t *s) {
+    aw_actor_t *a=AW_MwscriptActorOf(s->e,NULL);float load,cap;
+    if(!a)return;
+    if(!move_rules_set){AW_MoveSettingsDefault(&move_rules);move_rules_set=1;}
+    load=AW_ActorCarriedWeight(a);
+    if(aw_combat_effect_magnitude)load+=aw_combat_effect_magnitude(s->e,AW_EFFECT_BURDEN)-aw_combat_effect_magnitude(s->e,AW_EFFECT_FEATHER);
+    cap=AW_ActorStat(a,AWA_ATTRIBUTE+0)*move_rules.fEncumbranceStrMult;
+    s->f.encumbrance=load<=0?0:cap>0?load/cap:1.000001f;
+}
+/* one think's step in whole game units; the fraction carries to the next think so a slow actor keeps its speed */
+static int fighter_step(slot_t *s,float dt) {
+    float x=fighter_speed(s)*dt+s->step_carry;int n=(int)x;
+    s->step_carry=x-(float)n;
+    return n;
+}
 /* Options (Controls > Combat style / Dice rolls; saved with the game config):
  * aw_combat_miss 1 = AmiWind style (AmiWind extension: a failed roll shows the
  * defender's dodge or block), 0 = Original Morrowind (the swish/miss sound);
@@ -121,7 +178,10 @@ static cvar_t block_cvar={"aw_combat_block","0",true};
  * sounds (one per outcome), 1 (default since v0.0.58, COMBAT-SOUNDS-RULE-OFF-58) = every swing its swing sound, the armour hit sound of the piece struck, the miss sound
  * for the player's misses only, the two punch sounds. The combat playground's modes switch it on for their session.
  * Both switches are AW_CombatRule's (dbg combat flee|sounds on/off), not console variables. */
-static int rules[AW_RULE_COUNT]={0,1,1};            /* flee off (A/B), sounds on, contact on (shipped features default on) */
+/* flee on since v0.0.66 (ACTOR-MECHANICS-USE-STATS-66 row 16: the original's rule, as OpenMW plays it; was off for an
+ * A/B), sounds on, contact on, spells on (shipped features default on) */
+static int rules[AW_RULE_COUNT]={1,1,1,1};
+#define spells_on rules[AW_RULE_SPELLS]
 #define flee_on rules[AW_RULE_FLEE]
 #define sounds_on rules[AW_RULE_SOUNDS]
 #define contact_on rules[AW_RULE_CONTACT]
@@ -162,12 +222,18 @@ int AW_CombatSettingsLoad(void) {
     if(settings_tried)return 0;
     settings_tried=1;
     memset(&aw_combat_settings,0,sizeof(aw_combat_settings));memset(sound_path,0,sizeof(sound_path));
-    memset(&aw_combat_ai,0,sizeof(aw_combat_ai));ai_ok=0;
+    memset(&aw_combat_ai,0,sizeof(aw_combat_ai));ai_ok=0;were_level=were_flee_mod=0;
     if(COM_FOpenFile("combat/settings.txt",&f)<0 || !f)return 0;
     if(!read_line(f,line,sizeof(line)) || strcmp(line,"AWCS1")){fclose(f);return 0;}
     while(read_line(f,line,sizeof(line))){
         /* "ai NAME VALUE": the aggro and flee ratings' settings (tools/prepare_combat.py AI_SETTINGS) */
         if(Q_sscanf(line,"ai %63s %f",name,&value)==2){if(AW_CombatAiSet(&aw_combat_ai,name,value))ai++;continue;}
+        /* "werewolf NAME VALUE" (ACTOR-MECHANICS-USE-STATS-66 row 16; from the expansions' masters, optional) */
+        if(Q_sscanf(line,"werewolf %63s %f",name,&value)==2){
+            if(!Q_strcasecmp(name,"iWereWolfLevelToAttack"))were_level=value;
+            else if(!Q_strcasecmp(name,"iWereWolfFleeMod"))were_flee_mod=value;
+            continue;
+        }
         {float a=0,b=0;
          if(Q_sscanf(line,"anim %63s %f %f",name,&a,&b)>=2){
             if(!strcmp(name,"knockdown") && a>0 && a<10)knock_seconds=a;
@@ -242,7 +308,11 @@ static int creature_sheet(const char *id,aw_fighter_t *out) {
     if(!id[0] || !AW_MwscriptActors())return 0;
     row=AW_ActorFind(id);
     if(row==AW_ACTOR_NONE || !AW_ActorBase(row,&b))return 0;
-    return AW_CombatCreatureSheet(&b,id,out);
+    if(!AW_CombatCreatureSheet(&b,id,out))return 0;
+    /* NPC-CREATURE-COMBAT-STYLE-STATS-66: a creature with the weapon flag fights with the weapon its row equips */
+    {int item;aw_item_t it;(void)AW_ActorWeaponEnchant(row,&item);
+     if(item>=0 && AW_ActorItem(item,&it))(void)AW_CombatCreatureWeapon(out,&it);}
+    return 1;
 }
 /* ESSENTIAL-DEATH-60: an actor whose record carries the essential flag (AWR_ESSENTIAL) dies, in a fight or by dbg kill:
  * the game's own message (GMST sKilledEssential, view/settings.txt by tools/prepare_player_view.py; OpenMW 0.51 shows the
@@ -258,10 +328,14 @@ int AW_CombatEssentialRecord(const char *id,int *essential) {
     if(row==AW_ACTOR_NONE || row<0 || !AW_ActorBase(row,&b))return 0;
     *essential=(b.flags&AWR_ESSENTIAL)?1:0;return 1;
 }
-static void essential_death(edict_t *e) {
-    eval_t *v;int essential;FILE *f=NULL;char line[320],*s,*bs;const char *key="sKilledEssential ";size_t n=strlen(key);
-    if(!(v=GetEdictFieldValue(e,"aw_source_id")) || !v->string || !AW_CombatEssentialRecord(pr_strings+v->string,&essential) || !essential)return;
-    Con_Printf("Essential: %s has died.\n",e->v.netname?pr_strings+e->v.netname:"?");
+/* ESSENTIAL-DEATH-MESSAGE-66: the box once per death of REF (0 unknown): a fight's death and the record's own death
+ * (aw_actorstate.c AW_ActorKill, a script's SetHealth 0, a spell or a fall: AW_CombatEssentialKilled) both report it */
+static void essential_message(unsigned long ref,const char *name) {
+    static unsigned long last_ref;static double last_time=-100;
+    FILE *f=NULL;char line[320],*s,*bs;const char *key="sKilledEssential ";size_t n=strlen(key);
+    if(ref && ref==last_ref && realtime-last_time<10)return;
+    last_ref=ref;last_time=realtime;
+    Con_Printf("Essential: %s has died.\n",name?name:"?");
     if(COM_FOpenFile("view/settings.txt",&f)>=0 && f){
         while(fgets(line,sizeof(line),f)){
             line[strcspn(line,"\r\n")]=0;
@@ -274,6 +348,13 @@ static void essential_death(edict_t *e) {
     }
     Con_Printf("Essential: this image has no death message (view/settings.txt sKilledEssential).\n");
 }
+static void essential_death(edict_t *e) {
+    eval_t *v,*r;int essential;
+    if(!(v=GetEdictFieldValue(e,"aw_source_id")) || !v->string || !AW_CombatEssentialRecord(pr_strings+v->string,&essential) || !essential)return;
+    r=GetEdictFieldValue(e,"aw_ref");
+    essential_message(r && r->_float>=1 && r->_float<=16777215.0f?(unsigned long)r->_float:0,e->v.netname?pr_strings+e->v.netname:NULL);
+}
+void AW_CombatEssentialKilled(unsigned long ref,const char *name) {essential_message(ref,name);}
 /* ACTOR-STATS-ALL-61: the stats of a fighter's sheet from the being's one stat block (the host, aw_mwhost.c: the loaded
  * areas' block of record ID; NULL or none found: the sheet's own numbers, the previous method). Weapon, armour and the
  * attacks stay the sheet's. */
@@ -377,6 +458,7 @@ static void you_refresh(aw_fighter_t *o) {
     o->level=(short)aw_character.level;
     if(aw_character.maximum[0]>0)o->health_max=aw_character.maximum[0];
     if(aw_character.maximum[2]>0)o->fatigue_max=aw_character.maximum[2];
+    {float cap=0,load=AW_PlayerEncumbrance(&cap);o->encumbrance=load<=0?0:cap>0?load/cap:1.000001f;}   /* getNormalizedEncumbrance */
 }
 /* INVENTORY-NO-ARMOR-RATING-61: the player's armour rating as the inventory window shows it under the picture (OpenMW
  * 0.51 mwgui/inventorywindow.cpp updateArmorRating: the whole number of mwclass/npc.cpp getArmorRating): the worn pieces
@@ -483,7 +565,7 @@ static void layout_default(slot_t *s) {
     int i=(int)s->e->v.modelindex,n=i>0 && i<MAX_MODELS && sv.models[i]?sv.models[i]->numframes:1,g;
     /* Animation kit models (<model>.anm, aw_anim.c): their own groups; a group they lack plays idle. */
     static const unsigned char kit[G_COUNT]={AW_ANIM_IDLE,AW_ANIM_RUN,AW_ANIM_ATTACK,AW_ANIM_HIT,AW_ANIM_KNOCK,AW_ANIM_DEATH,
-        AW_ANIM_BLOCK,AW_ANIM_DODGEL,AW_ANIM_DODGER};
+        AW_ANIM_BLOCK,AW_ANIM_DODGEL,AW_ANIM_DODGER,AW_ANIM_CAST};
     const aw_anim_t *a=AW_AnimOf(s->e);
     if(a->from_layout){
         for(g=0;g<G_COUNT;g++){
@@ -507,7 +589,7 @@ static void layout_default(slot_t *s) {
 }
 /* "idle:0:4:0.6667 run:4:6:0.1556 attack:10:8:0.1500:0.667 ..." (fighters.txt) */
 static int layout_parse(slot_t *s,const char *text) {
-    static const char *names[G_COUNT]={"idle","run","attack","hit","knock","death","block","dodgel","dodger"};
+    static const char *names[G_COUNT]={"idle","run","attack","hit","knock","death","block","dodgel","dodger","cast"};
     char word[64];int g,base,count,got=0,n;float step,hit;const char *p=text;
     int frames=s->e->v.modelindex>0 && sv.models[(int)s->e->v.modelindex]?sv.models[(int)s->e->v.modelindex]->numframes:0;
     while(*p){
@@ -530,6 +612,7 @@ static int layout_parse(slot_t *s,const char *text) {
     s->has_block=(got>>G_BLOCK)&1;s->has_dodge=((got>>G_DODGEL)&1) && ((got>>G_DODGER)&1);
     if(!s->has_block){s->base[G_BLOCK]=s->base[G_IDLE];s->count[G_BLOCK]=1;s->step[G_BLOCK]=block_seconds;}
     if(!s->has_dodge)for(g=G_DODGEL;g<=G_DODGER;g++){s->base[g]=s->base[G_RUN];s->count[g]=s->count[G_RUN];s->step[g]=s->step[G_RUN];}
+    if(!((got>>G_CAST)&1)){s->base[G_CAST]=s->base[G_IDLE];s->count[G_CAST]=s->count[G_IDLE];s->step[G_CAST]=s->step[G_IDLE];}
     s->rolled=0;return 1;
 }
 static float duration(slot_t *s,int g);
@@ -538,7 +621,7 @@ static float duration(slot_t *s,int g);
  * creature's from its voice-table row, CREATURE-ANIM-SOUND-54). Only for a fighter that plays its layout's groups. */
 static void group_sounds(slot_t *s,int g,int i) {
     static const int kit[G_COUNT]={AW_ANIM_IDLE,AW_ANIM_RUN,AW_ANIM_ATTACK,AW_ANIM_HIT,AW_ANIM_KNOCK,AW_ANIM_DEATH,
-                                   AW_ANIM_BLOCK,AW_ANIM_DODGEL,AW_ANIM_DODGER};
+                                   AW_ANIM_BLOCK,AW_ANIM_DODGEL,AW_ANIM_DODGER,AW_ANIM_CAST};
     const aw_anim_t *a=AW_AnimOf(s->e);unsigned long crossed=0;int k,last=s->sound_frame;
     if(i<0 || i>=32)return;
     if(s->sound_group!=g){last=-1;s->sound_group=(signed char)g;}
@@ -621,6 +704,7 @@ void (*aw_combat_actor_died)(edict_t *e);
 static void release(slot_t *s) {
     edict_t *alive=s->e && !s->e->free && s->state!=S_DEAD?s->e:NULL;
     AW_ItemsHide(s->item);
+    if(s->cast_look)AW_MagicCastLookRelease(s->cast_look,-1);   /* a cast under way ends with the fight */
     if(alive)AW_AnimMover(alive,0);
     if(alive){alive->v.think=s->think;alive->v.nextthink=s->nextthink>0?(float)sv.time+.1f:0;}
     memset(s,0,sizeof(*s));
@@ -688,6 +772,7 @@ static void begin_encounter(void) {
 /* Set by AW_CombatTestEngage(t,1): the slot is taken only to hold a corpse (a killed actor's saved death applied on
  * a scene load): no encounter starts, no weapon is drawn, no battle cry and no "attacks" line (COMBAT-DEAD-ACTOR-RELOAD-59). */
 static int engage_dead;
+static int lay_saved;       /* AW_CombatLayCorpse: a saved death laid down again (no essential message) */
 int AW_CombatEngage(edict_t *e,const aw_fighter_t *fighter,const char *layout) {
     slot_t *s=slot_of(e);int i;
     if(!combat_on.value || !e || e->free || !fighter || !AW_CombatSettingsLoad())return 0;
@@ -716,6 +801,8 @@ int AW_CombatEngage(edict_t *e,const aw_fighter_t *fighter,const char *layout) {
     if(!layout || !layout_parse(s,layout))layout_default(s);
     AW_PathReset(&s->path,(int)floor(e->v.origin[0]),(int)floor(e->v.origin[1]));
     s->next_think=s->last_think=(float)sv.time;s->cooldown=.5f;
+    s->spell=-1;s->spell_at=(float)sv.time;   /* the first decision at its first think */
+    fighter_load(s);
     set_state(s,S_CHASE,G_IDLE);
     if(retry.valid && retry.npc[s-slots].e!=e){
         retry.npc[s-slots].e=e;VectorCopy(e->v.origin,retry.npc[s-slots].origin);VectorCopy(e->v.angles,retry.npc[s-slots].angles);
@@ -727,7 +814,22 @@ int AW_CombatEngage(edict_t *e,const aw_fighter_t *fighter,const char *layout) {
     voice(e,AW_VOICE_START);
     return 1;
 }
-void AW_CombatClear(void) {int i;for(i=0;i<SLOTS;i++)if(slots[i].e)release(&slots[i]);enemy=NULL;you_valid=0;retry.valid=0;}
+static void shots_clear(void);
+void AW_CombatClear(void) {
+    int i;for(i=0;i<SLOTS;i++)if(slots[i].e)release(&slots[i]);enemy=NULL;you_valid=0;retry.valid=0;
+    you_hit_at=-1;you_down_seen=0;shots_clear();
+}
+int AW_CombatPlayerReaction(float *age,int *roll) {
+    if(age)*age=0;
+    if(roll)*roll=0;
+    if(!you_valid || you.dead){you_down_seen=0;return 0;}
+    if(you.knocked!=you_down_seen){you_down_seen=you.knocked;you_down_at=(float)sv.time;}
+    if(you.knocked){if(age)*age=(float)sv.time-you_down_at;return you.knocked==2?3:2;}
+    if(you_hit_at<0 || sv.time<you_hit_at)return 0;
+    if(age)*age=(float)sv.time-you_hit_at;
+    if(roll)*roll=you_hit_roll;
+    return 1;
+}
 /* The player died in the current fight and its start is known (aw_view.c offers "Retry fight"). */
 int AW_CombatRetryAvailable(void) {return retry.valid && you_valid && you.dead && player()!=NULL;}
 /* The death music is combat's (the death in a fight): aw_view.c does not play it again. */
@@ -763,6 +865,12 @@ const aw_combat_stats_t *AW_CombatStats(void) {return &totals;}
 unsigned long AW_CombatSeedUsed(void) {return seed_used;}
 const aw_fighter_t *AW_CombatPlayer(void) {return you_valid?&you:NULL;}
 const aw_fighter_t *AW_CombatFighter(edict_t *e) {slot_t *s=slot_of(e);return s?&s->f:NULL;}
+/* MWSCRIPT-TICK-SHARE-66: the edicts that hold a fight slot now (in slot order), up to MAX; how many */
+int AW_CombatFighterEdicts(edict_t **out,int max) {
+    int i,n=0;
+    for(i=0;i<SLOTS && n<max;i++)if(slots[i].e && !slots[i].e->free)out[n++]=slots[i].e;
+    return n;
+}
 int AW_CombatAttackType(edict_t *e) {slot_t *s=slot_of(e);return s?s->attack:-1;}
 
 /* ---- reactions: the AmiWind style miss (dodge or block), stagger ---- */
@@ -863,6 +971,10 @@ static void npc_strike(slot_t *s,edict_t *p) {
         else{totals.taken_fatigue+=out.damage;if(!mapped)sound(SND_PUNCH);}
     }
     print_swing(s->f.name,"you",s->attack,&out);
+    /* the hit recovery: a blow that did damage and did not knock the player down (not in god mode: no damage) */
+    if(out.outcome!=AW_HIT_BLOCKED && out.outcome!=AW_HIT_MISS && out.damage>0 && !out.knockdown && !you.knocked){
+        you_hit_at=(float)sv.time;you_hit_roll=(int)((sound_state>>4)&0xFF);
+    }
     if(out.knockdown && you.knocked==1){
         totals.player_down_until=sv.time+knock_seconds;   /* the knockdown clip (base_anim) */
         if(readout.value)Con_Printf("Combat: you are knocked down\n");
@@ -949,6 +1061,15 @@ int AW_CombatEngageAgainst(edict_t *e,const aw_fighter_t *a,edict_t *v,const aw_
     return 1;
 }
 /* aw_combat.h: the actor E fights (NULL: the player or no fight; *player 1 when it fights the player) */
+/* The frames a fighter's group NAME plays (fighters.txt names: idle run attack hit knock death block dodgel dodger
+ * cast): 1 with *base and *count, 0 when E fights in no slot or NAME is none (DAGOTH-UR-NO-ANIMATIONS-65). */
+int AW_CombatGroupFrames(edict_t *e,const char *name,int *base,int *count) {
+    static const char *names[G_COUNT]={"idle","run","attack","hit","knock","death","block","dodgel","dodger","cast"};
+    slot_t *s=e?slot_of(e):NULL;int g;
+    if(!s || !name)return 0;
+    for(g=0;g<G_COUNT;g++)if(!strcmp(names[g],name)){*base=s->base[g];*count=s->count[g];return 1;}
+    return 0;
+}
 edict_t *AW_CombatTargetOf(edict_t *e,int *fights_player) {
     slot_t *s=e?slot_of(e):NULL,*v;
     if(fights_player)*fights_player=s && !s->f.dead && !s->target_num;
@@ -1092,8 +1213,9 @@ static short effect_rounded(edict_t *e,int effect){
 }
 static void hit_effects(edict_t *e,aw_fighter_t *f){
     short sanctuary;
-    f->attack_mod=0;f->sanctuary=f->unseen=0;
+    f->attack_mod=0;f->sanctuary=f->unseen=0;f->paralyzed=0;
     if(!e || !aw_combat_effect_magnitude)return;
+    f->paralyzed=aw_combat_effect_magnitude(e,AW_EFFECT_PARALYZE)>0;   /* ACTOR-MECHANICS-USE-STATS-66 row 4 */
     f->attack_mod=(short)(effect_rounded(e,AW_EFFECT_FORTIFY_ATTACK)-effect_rounded(e,AW_EFFECT_BLIND));
     sanctuary=effect_rounded(e,AW_EFFECT_SANCTUARY);
     f->sanctuary=(unsigned char)(sanctuary<0?0:sanctuary>100?100:sanctuary);   /* getEvasion: at most 100 */
@@ -1254,7 +1376,290 @@ static void watch_punch(edict_t *p) {
     punch_struck=1;player_strike(p);
 }
 
+/* ---- NPC-NO-SPELLCASTING-65: the fighter's spells (aw_cast.h AW_SpellAi*, OpenMW aicombataction.cpp) ---- */
+#define SPELL_DECIDE 1.0f           /* seconds between two choices of the next action (OpenMW: when an action ends) */
+#define SPELL_LIST 32               /* the spells of one fighter weighed */
+#define CAST_FALLBACK .5f           /* the release of a fighter without a spellcast group (seconds) */
+#define CAST_TAIL .4f               /* the group's rest after the release, before the next action */
+typedef struct {aw_actor_t *self;uint32_t enemy_ref;} spell_ctx_t;
+static float ai_has(void *ctx,int who,int effect) {
+    spell_ctx_t *c=(spell_ctx_t *)ctx;
+    return AW_EffectsMagnitude(who?c->enemy_ref:c->self->reference,effect,AW_EFFECT_NO_ARG);
+}
+static float ai_resist(void *ctx,int effect) {
+    spell_ctx_t *c=(spell_ctx_t *)ctx;int resist=-1,weakness=-1,shield=-1;float r=0;
+    if(AW_CastResistEffects(effect,&resist,&weakness,&shield)){
+        if(resist>=0)r+=AW_EffectsMagnitude(c->enemy_ref,resist,AW_EFFECT_NO_ARG);
+        if(weakness>=0)r-=AW_EffectsMagnitude(c->enemy_ref,weakness,AW_EFFECT_NO_ARG);
+    }
+    return r;
+}
+static int ai_active(void *ctx,int who,int spell) {
+    spell_ctx_t *c=(spell_ctx_t *)ctx;aw_effect_info_t fx[32];int i,n=AW_EffectsList(who?c->enemy_ref:c->self->reference,fx,32);
+    for(i=0;i<n;i++)if(fx[i].source==spell)return 1;
+    return 0;
+}
+/* numEffectsToDispel (OpenMW spellpriority.cpp): WHO's active effects lasting over 3 s more, harmful (NEGATIVE) or
+ * helpful, of EFFECT, or with EFFECT -1 those of spells (a spell row as the source; the constant entries of
+ * abilities, items and scripts never end, so they are left out by the time) */
+static int ai_dispel(void *ctx,int who,int effect,int negative) {
+    spell_ctx_t *c=(spell_ctx_t *)ctx;aw_effect_info_t fx[32];int i,k=0,n=AW_EffectsList(who?c->enemy_ref:c->self->reference,fx,32);
+    for(i=0;i<n;i++){
+        if(effect>=0?fx[i].effect!=effect:(fx[i].source<0 || fx[i].source>=AW_EFFECT_SOURCE_ITEM))continue;
+        if(!(fx[i].left>3))continue;
+        if((AW_EffectHarmful(fx[i].effect)!=0)==(negative!=0))k++;
+    }
+    return k;
+}
+static unsigned long spell_ratings;
+/* The fighter's castable spells, read from the actor table once per fight (at its first choice): the list, each
+ * spell's row, cost and flags, its effects and their MGEF values (about 1 + 3n reads for n spells, then none). A spell
+ * whose effects no longer fit the slot's effect store is left out. Powers and abilities are never cast here. */
+static void cache_spells(slot_t *s,aw_actor_t *a) {
+    int known[SPELL_LIST],n,i,k,type,mcost,ne;char name[32];aw_spell_effect_t e[AW_MADE_EFFECTS];aw_mgef_t m;
+    s->spells_cached=1;s->nspells=s->neffects=0;
+    n=AW_ActorSpells(a,known,SPELL_LIST);totals.npc_spell_reads++;
+    for(i=0;i<n && s->nspells<(int)(sizeof(s->sp)/sizeof(*s->sp));i++){
+        totals.npc_spell_reads++;
+        if(!AW_ActorSpellInfo(known[i],&type,name,sizeof(name),&mcost) || type!=AW_SPELL_TYPE_SPELL)continue;
+        totals.npc_spell_reads++;
+        if((ne=AW_ActorSpellEffects(known[i],e,AW_MADE_EFFECTS))<=0)continue;
+        if(s->neffects+ne>(int)(sizeof(s->sp_e)/sizeof(*s->sp_e)))continue;
+        s->sp[s->nspells].row=(short)known[i];s->sp[s->nspells].cost=(unsigned short)mcost;
+        totals.npc_spell_reads++;
+        s->sp[s->nspells].always=(AW_ActorSpellFlags(known[i])&AW_SPELL_ALWAYS)!=0;
+        s->sp[s->nspells].first=s->neffects;s->sp[s->nspells].n=(unsigned char)ne;
+        for(k=0;k<ne;k++){
+            totals.npc_spell_reads++;
+            if(!AW_ActorMagicEffect(e[k].effect,&m))memset(&m,0,sizeof(m));
+            if(AW_EffectHarmful(e[k].effect))m.flags|=AW_MGEF_HARMFUL;   /* the hardcoded flag the data lacks */
+            s->sp_e[s->neffects]=e[k];
+            s->sp_m[s->neffects].flags=m.flags;s->sp_m[s->neffects].base_cost=m.base_cost;s->sp_m[s->neffects].school=m.school;
+            s->neffects++;
+        }
+        s->nspells++;
+    }
+}
+/* the cached effects of spell I of S as the rules take them (the MGEF name is not used by the rules) */
+static int cached_effects(const slot_t *s,int i,aw_spell_effect_t *e,aw_mgef_t *m) {
+    int k,ne=s->sp[i].n;
+    for(k=0;k<ne;k++){
+        e[k]=s->sp_e[s->sp[i].first+k];memset(&m[k],0,sizeof(m[k]));
+        m[k].flags=s->sp_m[s->sp[i].first+k].flags;m[k].base_cost=s->sp_m[s->sp[i].first+k].base_cost;
+        m[k].school=s->sp_m[s->sp[i].first+k].school;
+    }
+    return ne;
+}
+static int cached_index(const slot_t *s,int row) {int i;for(i=0;i<s->nspells;i++)if(s->sp[i].row==row)return i;return -1;}
+/* The next action of S against the player P: the best spell when it rates above the weapon (OpenMW prepareNextAction:
+ * hand to hand and a creature's own attacks rate 0, so any useful spell wins there); S->spell -1 = the weapon. */
+static void choose_spell(slot_t *s,edict_t *p) {
+    aw_actor_t *a=AW_MwscriptActorOf(s->e,NULL);aw_spell_ai_t c;spell_ctx_t ctx;
+    int n,i,best=-1;float best_rating,cost_mult=AW_DialwinEffectCostMult();
+    s->spell=-1;
+    if(!a || !p)return;
+    if(!s->spells_cached)cache_spells(s,a);
+    n=s->nspells;
+    if(n<=0)return;
+    if(!(cost_mult>0))cost_mult=.5f;   /* the masters' fEffectCostMult */
+    memset(&c,0,sizeof(c));ctx.self=a;ctx.enemy_ref=AW_ACTOR_PLAYER_REF;
+    c.npc=!s->f.creature;c.beast=0;   /* the beast races' helm and boots rule: the race is not on the sheet yet */
+    c.health=s->f.health;c.health_max=s->f.health_max;c.fatigue=s->f.fatigue;c.fatigue_max=s->f.fatigue_max;
+    for(i=0;i<27;i++)c.skills[i]=AW_ActorStat(a,AWA_SKILL+i);
+    c.underwater=AW_AmbientInWater(s->e->v.origin);
+    c.enemy=1;c.enemy_npc=1;c.enemy_down=you.knocked!=0;c.enemy_underwater=AW_AmbientInWater(p->v.origin);
+    c.enemy_ready=AW_CastReady()?2:field(p,"aw_hand_goal",0)!=0?1:0;
+    c.enemy_armor=you.armor>0;c.enemy_weapon=you.weapon!=0;
+    for(i=0;i<8;i++)c.enemy_attributes[i]=you.attributes[i];
+    for(i=0;i<27;i++)c.enemy_skills[i]=you.skills[i];
+    c.enemy_magicka=you.magicka;
+    c.has=ai_has;c.resist=ai_resist;c.active=ai_active;c.dispel=ai_dispel;c.ctx=&ctx;
+    /* Restore and Absorb Magicka: the need (getRestoreMagickaPriority) from the kept spells' costs */
+    c.magicka=AW_ActorStat(a,AWA_MAGICKA);c.magicka_max=a->dyn_base[1];
+    for(i=0;i<n;i++)if((float)s->sp[i].cost>c.magicka && (float)s->sp[i].cost<c.magicka_max){c.magicka_need=2;break;}
+    /* Burden on the player by the player's load (AW_PlayerEncumbrance); Feather on itself by the Burden and Feather on
+     * it (a character's carried weight is not summed in a fight: 0); no fighter carries arrows here (the bound bow) */
+    if(!s->target_num){c.enemy_inventory=1;c.enemy_encumbrance=AW_PlayerEncumbrance(&c.enemy_capacity);}
+    c.inventory=c.npc;
+    c.encumbrance=ai_has(&ctx,0,AW_EFFECT_BURDEN)-ai_has(&ctx,0,AW_EFFECT_FEATHER);if(c.encumbrance<0)c.encumbrance=0;
+    c.capacity=AW_ActorStat(a,AWA_ATTRIBUTE+0)*5;   /* Strength x fEncumbranceStrMult (5 in the masters) */
+    c.ammo=0;
+    /* the masters' values (Morrowind.esm): fAIMagicSpellMult 3, fAIRangeMagicSpellMult 5, fCombatInvisoMult 0.2 */
+    c.spell_mult=3;c.range_spell_mult=5;c.effect_cost_mult=cost_mult;
+    c.inviso_mult=aw_combat_settings.fCombatInvisoMult>0?aw_combat_settings.fCombatInvisoMult:.2f;
+    /* the weapon's rating (rateWeapon): an NPC's melee weapon; hand to hand and a creature's attacks rate 0 */
+    best_rating=0;
+    if(s->f.weapon && s->f.creature!=1){
+        float strength=aw_combat_settings.fDamageStrengthBase+aw_combat_settings.fDamageStrengthMult*s->f.attributes[AW_STR]*.1f;
+        float condition=s->f.weapon_health_max>0?s->f.weapon_health/s->f.weapon_health_max:1;
+        best_rating=AW_SpellAiRateWeapon(s->f.damage,strength,condition,(float)AW_CombatHitChance(&aw_combat_settings,&s->f,&you),
+                                         s->f.speed>0?s->f.speed:1,s->f.skills[s->f.weapon_skill<27?s->f.weapon_skill:AW_SK_H2H],
+                                         aw_combat_ai.fAIMeleeWeaponMult>0?aw_combat_ai.fAIMeleeWeaponMult:2);
+    }
+    for(i=0;i<n;i++){
+        aw_spell_effect_t e[AW_MADE_EFFECTS];aw_mgef_t m[AW_MADE_EFFECTS];int type=AW_SPELL_TYPE_SPELL,mcost=s->sp[i].cost,school,ne,row=s->sp[i].row;
+        float chance,base,r;
+        ne=cached_effects(s,i,e,m);
+        base=AW_CastBaseChance(e,m,ne,c.skills,AW_ActorStat(a,AWA_ATTRIBUTE+2),AW_ActorStat(a,AWA_ATTRIBUTE+7),mcost,cost_mult,&school);
+        chance=AW_CastChance(base,type,1,s->sp[i].always,
+                             AW_EffectsMagnitude(a->reference,AW_EFFECT_SILENCE,AW_EFFECT_NO_ARG),
+                             AW_EffectsMagnitude(a->reference,AW_EFFECT_SOUND,AW_EFFECT_NO_ARG),
+                             AW_CastFatigueTerm(1.25f,.5f,s->f.fatigue,s->f.fatigue_max),AW_ActorStat(a,AWA_MAGICKA),mcost,1);
+        r=AW_SpellAiRateSpell(&c,row,type,e,m,ne,chance);
+        spell_ratings++;
+        if(r>best_rating){
+            best_rating=r;best=row;s->spell_chance=chance;s->spell_ranges=(unsigned char)AW_CastRanges(e,ne);
+        }
+    }
+    if(best<0)return;
+    s->spell=(short)best;totals.npc_spell_choices++;
+    /* the range it casts from (suggestCombatRange), in map units */
+    s->spell_range=AW_SpellAiCombatRange(s->spell_ranges,aw_combat_settings.fCombatDistance,
+                                         aw_combat_settings.fHandToHandReach)*SCALE;
+}
+/* the start of the chosen cast (OpenMW startSpellCast: the magicka is paid now; CharacterController plays the
+ * spellcast group of the first effect's range and casts on its release key) */
+static int start_cast(slot_t *s,edict_t *p) {
+    static const char *const variant[3]={"self","touch","target"};
+    aw_actor_t *a=AW_MwscriptActorOf(s->e,NULL);aw_spell_effect_t e[AW_MADE_EFFECTS];aw_mgef_t m[AW_MADE_EFFECTS];
+    int mcost,range,ci=cached_index(s,s->spell);float r;
+    (void)p;
+    if(!a || s->spell<0 || ci<0 || cached_effects(s,ci,e,m)<=0)return 0;
+    mcost=s->sp[ci].cost;
+    if(AW_ActorStat(a,AWA_MAGICKA)<(float)mcost)return 0;
+    AW_ActorModCurrent(a,1,-(float)mcost);
+    range=e[0].range<=AW_RANGE_TARGET?(int)e[0].range:AW_RANGE_TARGET;
+    r=AW_AnimKitCast(s->e,variant[range]);
+    s->cast_release=r>=0 && r<3?r:CAST_FALLBACK;s->cast_end=s->cast_release+CAST_TAIL;s->cast_left=0;
+    /* the look (hand glow, cast sound, the orb or egg) starts with the animation and leaves on the release */
+    s->cast_look=AW_MagicCastLookStart(NUM_FOR_EDICT(s->e),e[0].effect,range,0);
+    set_state(s,S_CAST,r>=0?G_IDLE:G_CAST);s->f.attacking=1;   /* no kit cast (a skeletal creature): its own cast group */
+    voice(s->e,AW_VOICE_SWING);
+    if(readout.value){
+        char name[32];   /* the readout's name only: one read while the readout is on */
+        if(!AW_ActorSpellInfo(s->spell,NULL,name,sizeof(name),NULL))name[0]=0;
+        Con_Printf("Combat: %s casts %s (chance %.0f %%)\n",s->f.name,name,s->spell_chance);
+    }
+    return 1;
+}
+/* the release of a cast under way: the roll (CastSpell::cast), then the delivery as the player's */
+static void cast_release(slot_t *s) {
+    int ok=AW_CombatRoll100(&rng)<(int)s->spell_chance || s->spell_chance>=100;
+    s->cast_left=1;
+    if(ok && AW_CastActorRelease(s->e,NULL,s->spell,AW_CombatReach(&aw_combat_settings,&s->f)*SCALE)>=0)totals.npc_casts++;
+    else{ok=0;totals.npc_cast_fails++;}
+    if(s->cast_look){AW_MagicCastLookRelease(s->cast_look,ok);s->cast_look=0;}
+}
+
 /* ---- the think ---- */
+/* ---- ranged fighters (ACTOR-RANGED-COMBAT-MISSING-66; rules from OpenMW 0.51 aicombat.cpp, aicombataction.cpp,
+ * projectilemanager.cpp, combat.cpp projectileHit, our own code): an actor whose sheet holds a bow, crossbow or thrown
+ * weapon keeps its place while the player is in range and in sight and shoots; the shot is one entry of a 16-entry
+ * pool, moved and traced once a frame (one SV_Move each), falling with the original's projectile gravity, drawn as a
+ * short shaft of particles; it hits the first body or wall on its path; on the player it is a hit roll and damage as
+ * a melee blow with the weapon's and the ammunition's chop, never blocked; one round of ammunition per shot, taken
+ * from the actor's live record (so a save keeps it). Out of ammunition: hand to hand. ---- */
+#define SHOT_LIFE 5.0f
+#define SHOT_GRAVITY (686.0f*.1f*SCALE)   /* projectilemanager.cpp: GravityUnits x 0.1, in game units */
+static struct {
+    unsigned char used,slot;float strength,born;vec3_t pos,vel;edict_t *from;
+} shots[AW_PROJECTILES];
+static unsigned long shots_fired,shots_hit,shots_missed;
+extern int AW_FxParticles(const float at[3],int count,float spread,const float vel[3],float vel_rand,float life,
+                          int r,int g,int b,int gravity);
+/* the ammunition of S's ranged weapon, read once: the best round of the needed type its live record carries (a thrown
+ * weapon: the held weapon itself) */
+static void ammo_read(slot_t *s) {
+    aw_actor_t *a;int items[64],counts[64],equipped[64],n,i,need=AW_CombatAmmoType(s->f.weapon),best=-1;aw_item_t it;
+    s->ammo_known=1;s->ammo_item=-1;s->ammo_left=0;s->ammo_chop[0]=s->ammo_chop[1]=0;
+    if(need<0 || !(a=AW_MwscriptActorOf(s->e,NULL)))return;
+    n=AW_ActorItems(a,items,counts,equipped,64);
+    for(i=0;i<n;i++){
+        if(!AW_ActorItem(items[i],&it) || it.kind!=AWK_WEAPON || counts[i]<=0)continue;
+        if(need?it.type+1==need:(it.type==11 && equipped[i])){
+            if(best<0 || it.damage[0]+it.damage[1]>best){
+                best=it.damage[0]+it.damage[1];s->ammo_item=(short)items[i];s->ammo_left=counts[i];
+                s->ammo_chop[0]=it.damage[0];s->ammo_chop[1]=it.damage[1];
+            }
+        }
+    }
+    if(!need){s->ammo_chop[0]=s->f.damage[0][0];s->ammo_chop[1]=s->f.damage[0][1];}   /* the weapon is the round */
+}
+/* out of ammunition: OpenMW rates the bow 0 and the actor fights with what is left; here hand to hand */
+static void ammo_out(slot_t *s) {
+    if(readout.value)Con_Printf("Combat: %s is out of ammunition\n",s->f.name);
+    s->f.weapon=0;s->f.weapon_skill=AW_SK_H2H;memset(s->f.damage,0,sizeof(s->f.damage));s->f.reach=0;s->f.speed=1;
+}
+static void shot_fire(slot_t *s,edict_t *p) {
+    int i;vec3_t from,to,dir;float speed;aw_actor_t *a;
+    for(i=0;i<AW_PROJECTILES && shots[i].used;i++);
+    if(i==AW_PROJECTILES)return;                      /* the pool is full: no shot this time */
+    if(s->ammo_left<=0){ammo_out(s);return;}
+    VectorCopy(s->e->v.origin,from);from[2]+=s->e->v.mins[2]+(s->e->v.maxs[2]-s->e->v.mins[2])*.75f;
+    VectorCopy(p->v.origin,to);to[2]+=(p->v.view_ofs[2]>1?p->v.view_ofs[2]:22)*.7f;
+    speed=AW_CombatShotSpeed(s->strength)*SCALE;
+    AW_CombatShotAim(from,to,speed,SHOT_GRAVITY,dir);
+    shots[i].used=1;shots[i].slot=(unsigned char)(s-slots);shots[i].strength=s->strength;shots[i].born=(float)sv.time;
+    shots[i].from=s->e;VectorCopy(from,shots[i].pos);VectorScale(dir,speed,shots[i].vel);
+    s->ammo_left--;shots_fired++;
+    if((a=AW_MwscriptActorOf(s->e,NULL)) && s->ammo_item>=0)(void)AW_ActorRemoveItem(a,s->ammo_item,1);
+    s->f.fatigue-=aw_combat_settings.fFatigueAttackBase+s->f.weight*s->strength*aw_combat_settings.fWeaponFatigueMult;
+    totals.npc_swings++;sound(SND_SWISH);
+    if(readout.value)Con_Printf("Combat: %s shoots (%d left)\n",s->f.name,s->ammo_left);
+}
+/* the shot of slot S reaches the player: OpenMW projectileHit (the hit chance, the weapon's and the round's chop by the
+ * draw strength, armour; no block) */
+static void shot_hit(slot_t *s,edict_t *p,float strength) {
+    aw_swing_t out;aw_fighter_t shooter,before;
+    you.health=p->v.health;
+    if(you.dead)return;
+    AW_CombatShotSheet(&s->f,s->ammo_chop,&shooter);
+    you.staggered=0;you.block_off=1;                  /* a shot is never blocked */
+    shooter.weapon_normal=1;you.resist_normal=normal_resistance(p,0);
+    hit_effects(s->e,&shooter);hit_effects(p,&you);
+    before=you;
+    AW_CombatSwing(&aw_combat_settings,&shooter,&you,0,strength,0,1,&rng,&out);
+    if((int)p->v.flags&FL_GODMODE){AW_CombatGodVictim(&you,&before,&out);god_blows++;}
+    you.block_off=0;
+    s->f.weapon_health=shooter.weapon_health;
+    if(out.outcome==AW_HIT_MISS || out.outcome==AW_HIT_BLOCKED){totals.npc_misses++;shots_missed++;}
+    else{
+        totals.npc_hits++;shots_hit++;
+        if(out.outcome==AW_HIT_HEALTH && out.damage>0){totals.taken_health+=out.damage;flash(out.damage);sound(SND_HEALTH);
+            if(!you.dead)voice(p,AW_VOICE_HIT);}
+        else if(out.outcome==AW_HIT_FATIGUE)totals.taken_fatigue+=out.damage;
+    }
+    print_swing(s->f.name,"you",0,&out);
+    if(out.knockdown && you.knocked==1)totals.player_down_until=sv.time+knock_seconds;
+    you_store(p);
+    if(you.dead){
+        if(readout.value)Con_Printf("Combat: you have been killed by %s\n",s->f.name);
+        voice(p,AW_VOICE_DEATH);sound(SND_FALL);ended(0);
+    }
+}
+/* every shot in flight, once a frame: the move, one trace, the shaft */
+static void shots_update(edict_t *p,float dt) {
+    int i,k;vec3_t next,back;trace_t tr;
+    for(i=0;i<AW_PROJECTILES;i++){
+        if(!shots[i].used)continue;
+        if(shots[i].from->free || sv.time-shots[i].born>SHOT_LIFE){shots[i].used=0;continue;}
+        AW_CombatShotStep(shots[i].pos,shots[i].vel,SHOT_GRAVITY,dt,next);
+        tr=SV_Move(shots[i].pos,vec3_origin,vec3_origin,next,MOVE_NORMAL,shots[i].from);
+        cost.traces++;
+        if(tr.fraction<1 || tr.startsolid){
+            slot_t *s=&slots[shots[i].slot];
+            if(tr.ent==p && s->e==shots[i].from)shot_hit(s,p,shots[i].strength);
+            else shots_missed++;                      /* a wall, the ground or another body: it stops there */
+            shots[i].used=0;continue;
+        }
+        VectorCopy(next,shots[i].pos);
+        /* the shaft: four points behind the head, along the flight, for one frame */
+        {float len=(float)Length(shots[i].vel);if(len<1)len=1;
+         for(k=0;k<4;k++){VectorMA(shots[i].pos,-2.5f*k/len,shots[i].vel,back);
+                          (void)AW_FxParticles(back,1,0,NULL,0,.05f,k?110:200,k?80:200,k?50:200,0);}}
+    }
+}
+static void shots_clear(void) {memset(shots,0,sizeof(shots));}
 static void think(slot_t *s,edict_t *p,float dt) {
     int self[3],goal[3],heading,moved=0,step;float dz,gap,reach;aw_path_io_t io;unsigned long before;
     s->f.moving=0;s->f.attacking=s->state==S_SWING;
@@ -1270,7 +1675,7 @@ static void think(slot_t *s,edict_t *p,float dt) {
     if(s->state==S_HIT){if(s->state_time>=duration(s,G_HIT))set_state(s,S_CHASE,G_IDLE);s->f.staggered=s->state==S_HIT;return;}
     if(s->state==S_BLOCK){if(s->state_time>=(s->has_block?duration(s,G_BLOCK):block_seconds))set_state(s,S_CHASE,G_IDLE);return;}
     if(s->state==S_DODGE){
-        if(s->dodged<DODGE_UNITS){
+        if(s->dodged<DODGE_UNITS && !AW_ActorStationary(s->e)){
             float yaw=(s->e->v.angles[1]+90)*(float)M_PI/180,dstep=DODGE_UNITS*dt/DODGE_SECONDS;vec3_t move;
             if(dstep>DODGE_UNITS-s->dodged)dstep=DODGE_UNITS-s->dodged;
             move[0]=Q_SinRad(yaw)*dstep*s->dodge_dir;move[1]=-Q_CosRad(yaw)*dstep*s->dodge_dir;move[2]=0;
@@ -1291,11 +1696,11 @@ static void think(slot_t *s,edict_t *p,float dt) {
      * for 1.0 s, then stands and watches; the decision is retaken every
      * 3.0 s, so it fights again as soon as the player is reachable. */
     if(s->state==S_FLEE){
-        if(s->state_time<1.0f){
+        if(s->state_time<1.0f && !AW_ActorStationary(s->e)){
             vec3_t away;float len;int fled;
             away[0]=s->e->v.origin[0]-p->v.origin[0];away[1]=s->e->v.origin[1]-p->v.origin[1];away[2]=0;
             len=(float)AW_PathLength((int)away[0],(int)away[1]);if(len<1)len=1;
-            VectorScale(away,chase_speed.value*dt/len,away);
+            VectorScale(away,fighter_speed(s)*dt/len,away);
             pass_player(1);fled=AW_ActorStep(s->e,away,host_frametime>0?host_frametime:dt);pass_player(0);
             s->e->v.angles[1]=AW_PathHeading((int)-away[0],(int)-away[1])*360.0f/AW_PATH_FAN+90;
             s->f.moving=(unsigned char)fled;s->group=fled?G_RUN:G_IDLE;
@@ -1313,6 +1718,7 @@ static void think(slot_t *s,edict_t *p,float dt) {
         set_state(s,S_CHASE,G_IDLE);
     }
     face_player(s->e,p);
+    if(s->state==S_CAST)return;                          /* the cast and its release: per frame */
     /* A flyer near the player holds its striking place in the air (COMBAT-FLYER-FLEES-57 reopened: it fought from
      * inside the player, drawn at the player's feet): in front of the player, at 70 % of its striking gap from the
      * player's hull, a little above the player's eyes (Quake's 22 when view_ofs is unset), moving there at the chase speed
@@ -1326,7 +1732,7 @@ static void think(slot_t *s,edict_t *p,float dt) {
         /* above the eyes: a player standing in water has the eyes at the surface, and a flyer at that height is
          * hidden under the drawn water (seen in game, 30 October 2026) */
         hold[2]=p->v.origin[2]+(p->v.view_ofs[2]>1?p->v.view_ofs[2]:22)+16;
-        VectorSubtract(hold,fe->v.origin,dv);len=(float)Length(dv);mv=chase_speed.value*dt;
+        VectorSubtract(hold,fe->v.origin,dv);len=(float)Length(dv);mv=fighter_speed(s)*dt;
         if(len>2){
             if(mv>len)mv=len;
             VectorMA(fe->v.origin,mv/len,dv,end);
@@ -1342,16 +1748,64 @@ static void think(slot_t *s,edict_t *p,float dt) {
      * ready; a melee action has no cooldown, ActionFlee 3 s) */
     if(flee_on && ai_ok && s->state==S_CHASE){
         float d=original_distance(s->e,p);
-        if(AW_CombatFleeDecision(&aw_combat_ai,&s->f,d)){
+        /* ACTOR-MECHANICS-USE-STATS-66 row 16: the werewolf case, and a spell that is the best action rates against
+         * fleeing by its own success chance (prepareNextAction: the masters' fAIMagicSpellMult 3, fAIRangeMagicSpellMult 5) */
+        float were=AW_CombatWerewolfFleeMod(&s->f,aw_move_werewolf,were_level,were_flee_mod);
+        float anti=spells_on && s->spell>=0?AW_CombatSpellAntiFlee(s->spell_chance,s->spell_ranges,3,5,AW_AmbientInWater(p->v.origin)):
+                   AW_CombatAntiFleeRating(&aw_combat_ai,&s->f);
+        if(AW_CombatFleeDecisionVs(&aw_combat_ai,&s->f,d,were,anti)){
             totals.npc_flees++;
             if(readout.value)Con_Printf("Combat: %s flees (health %ld/%ld, Flee %ld, rating %ld over %ld)\n",s->f.name,
-                (long)s->f.health,(long)s->f.health_max,(long)s->f.flee,(long)AW_CombatFleeRating(&aw_combat_ai,&s->f,d),
-                (long)AW_CombatAntiFleeRating(&aw_combat_ai,&s->f));
+                (long)s->f.health,(long)s->f.health_max,(long)s->f.flee,(long)AW_CombatFleeRatingVs(&aw_combat_ai,&s->f,d,were),
+                (long)anti);
             voice(s->e,AW_VOICE_FLEE);
             set_state(s,S_FLEE,G_RUN);s->decide_at=(float)sv.time+3.0f;return;
         }
     }
     if(s->cooldown>0)s->cooldown-=dt;
+    /* NPC-NO-SPELLCASTING-65: the next action, weighed each SPELL_DECIDE seconds against the player: a spell that rates
+     * above the weapon is cast once the player is within its range and in sight (OpenMW AiCombat: the action's combat
+     * range, then the attack); otherwise the chase and the swing below */
+    if(spells_on && !s->target_num && s->cooldown<=0 && sv.time>=s->spell_at && !you.dead){
+        s->spell_at=(float)sv.time+SPELL_DECIDE;
+        choose_spell(s,p);
+    }
+    if(spells_on && s->spell>=0 && !s->target_num && s->cooldown<=0 && gap<=s->spell_range && !you.dead){
+        trace_t tr;vec3_t from,to;
+        VectorCopy(s->e->v.origin,from);from[2]+=s->e->v.mins[2]+(s->e->v.maxs[2]-s->e->v.mins[2])*.75f;
+        VectorCopy(p->v.origin,to);to[2]+=p->v.view_ofs[2]>1?p->v.view_ofs[2]:22;
+        tr=SV_Move(from,vec3_origin,vec3_origin,to,MOVE_NOMONSTERS,s->e);
+        if(tr.fraction>=1 && !tr.startsolid){
+            AW_PathIdle(&s->path,(int)s->e->v.origin[0],(int)s->e->v.origin[1]);
+            if(start_cast(s,p))return;
+            s->spell=-1;   /* not enough magicka now: the weapon until the next choice */
+        }
+    }
+    /* ACTOR-RANGED-COMBAT-MISSING-66: a bow, crossbow or thrown weapon against the player: the actor keeps its place
+     * and shoots while the player is within the weapon's combat range (fProjectileMaxSpeed) and in sight; otherwise
+     * it closes in as below (OpenMW aicombat.cpp: a ranged action does not chase once in range and in view) */
+    if(AW_COMBAT_RANGED(s->f.weapon) && !s->target_num && !you.dead){
+        if(!s->ammo_known)ammo_read(s);
+        if(s->ammo_left<=0)ammo_out(s);
+        else{
+            trace_t tr;vec3_t from,to;
+            VectorCopy(s->e->v.origin,from);from[2]+=s->e->v.mins[2]+(s->e->v.maxs[2]-s->e->v.mins[2])*.75f;
+            VectorCopy(p->v.origin,to);to[2]+=p->v.view_ofs[2]>1?p->v.view_ofs[2]:22;
+            tr=SV_Move(from,vec3_origin,vec3_origin,to,MOVE_NOMONSTERS,s->e);
+            if(AW_CombatShootNow(&s->f,s->ammo_left,gap/SCALE,tr.fraction>=1 && !tr.startsolid)){
+                if(s->group!=G_IDLE)set_state(s,S_CHASE,G_IDLE);
+                AW_PathIdle(&s->path,(int)s->e->v.origin[0],(int)s->e->v.origin[1]);
+                if(s->cooldown<=0){
+                    /* the draw: the actor's attack strength in OpenMW, min(1, 0.1 + a roll) */
+                    float x=.1f+AW_CombatRoll01(&rng);
+                    s->attack=0;s->strength=x>1?1:x;s->struck=0;s->shooting=1;
+                    s->swing_time=duration(s,G_ATTACK)/(s->f.speed>0?s->f.speed:1);
+                    set_state(s,S_SWING,G_ATTACK);s->f.attacking=1;
+                }
+                return;
+            }
+        }
+    }
     /* a flyer strikes from its place above the player's eyes, so its height gap may be larger by that much */
     if(gap<=reach*.8f && dz<reach+((AW_AmbientFlags(s->e)&AW_AMBIENT_FLYER)?64:0) &&
        dz>-reach-((AW_AmbientFlags(s->e)&AW_AMBIENT_FLYER)?64:0)){
@@ -1360,12 +1814,14 @@ static void think(slot_t *s,edict_t *p,float dt) {
         if(s->cooldown<=0){
             /* AiCombat: best attack, swing strength, then a cooldown */
             s->attack=(unsigned char)AW_CombatBestAttack(&s->f,&rng);s->strength=AW_CombatRoll01(&rng);
-            s->struck=0;s->swing_time=duration(s,G_ATTACK)/(s->f.weapon && s->f.speed>0?s->f.speed:1);
+            s->struck=0;s->shooting=0;s->swing_time=duration(s,G_ATTACK)/(s->f.weapon && s->f.speed>0?s->f.speed:1);
             voice(s->e,AW_VOICE_SWING);
             set_state(s,S_SWING,G_ATTACK);s->f.attacking=1;
         }
         return;
     }
+    /* HEART-OF-LORKHAN-FOLLOWS-DAGOTH-65: a creature that can move by no means strikes only within its reach */
+    if(AW_ActorStationary(s->e)){if(s->group!=G_IDLE)set_state(s,S_CHASE,G_IDLE);return;}
     /* A flying fighter (COMBAT-FLYER-FLEES-57): OpenMW 0.51 aipackage.cpp pathTo lets an actor that can move by the
      * Z axis shortcut straight to its target while it is in line of sight (shortcutPath, UpdateFlag_CanMoveByZ),
      * never the walkers' ground route. Here: the standing hull swept straight toward the player's height in three
@@ -1373,7 +1829,7 @@ static void think(slot_t *s,edict_t *p,float dt) {
      * through the air). Walkers keep the ground chase below. Our own code. */
     if(AW_AmbientFlags(s->e)&(AW_AMBIENT_FLYER|AW_AMBIENT_SWIMMER)){
         vec3_t d,end;trace_t tr;float len;edict_t *fe=s->e;
-        step=(int)(chase_speed.value*dt);if(step>(int)(gap-reach*.6f))step=(int)(gap-reach*.6f);if(step<1)step=1;
+        step=fighter_step(s,dt);if(step>(int)(gap-reach*.6f))step=(int)(gap-reach*.6f);if(step<1)step=1;
         /* the goal is not the player's centre (it flew into the player and fought from inside, drawn out of sight:
          * COMBAT-FLYER-FLEES-57 reopened) but a point in front of the player at striking distance, a flyer at the
          * player's eye height (a swimmer at the player's own height); the player stays solid to the sweep */
@@ -1409,7 +1865,7 @@ static void think(slot_t *s,edict_t *p,float dt) {
     }
     self[0]=(int)floor(s->e->v.origin[0]);self[1]=(int)floor(s->e->v.origin[1]);self[2]=(int)floor(s->e->v.origin[2]+s->e->v.mins[2]);
     goal[0]=(int)floor(p->v.origin[0]);goal[1]=(int)floor(p->v.origin[1]);goal[2]=(int)floor(p->v.origin[2]+p->v.mins[2]);
-    step=(int)(chase_speed.value*dt);if(step>(int)(gap-reach*.6f))step=(int)(gap-reach*.6f);if(step<1)step=1;
+    step=fighter_step(s,dt);if(step>(int)(gap-reach*.6f))step=(int)(gap-reach*.6f);if(step<1)step=1;
     io.context=s->e;io.sweep=sweep;io.cell=cell;
     pass_player(1);
     if(AW_PathThink(&s->path,&io,self,goal,step,&heading)){
@@ -1464,15 +1920,25 @@ void AW_CombatPhysics(void) {
         if(s->state==S_SWING){
             if(!s->struck && s->state_time>=s->swing_time*s->hit_fraction){
                 s->struck=1;
-                if(s->target_num){slot_t *v=actor_target(s);if(v)npc_strike_actor(s,v);}
+                if(s->shooting){if(!you.dead && !((int)p->v.flags&FL_NOTARGET))shot_fire(s,p);}   /* the release */
+                else if(s->target_num){slot_t *v=actor_target(s);if(v)npc_strike_actor(s,v);}
                 else if(!you.dead && !((int)p->v.flags&FL_NOTARGET))npc_strike(s,p);
             }
             if(s->state_time>=s->swing_time){
-                s->f.attacking=0;set_state(s,S_CHASE,G_IDLE);
+                s->f.attacking=0;s->shooting=0;set_state(s,S_CHASE,G_IDLE);
                 s->cooldown=aw_combat_settings.fCombatDelayNPC+.01f*AW_CombatRoll100(&rng);
                 if(s->cooldown>aw_combat_settings.fCombatDelayNPC+.9f)s->cooldown=aw_combat_settings.fCombatDelayNPC+.9f;
             }
         }
+        /* NPC-NO-SPELLCASTING-65: a cast leaves on its release key, then the group's rest, then the next action */
+        if(s->state==S_CAST){
+            if(!s->cast_left && s->state_time>=s->cast_release){if(!you.dead)cast_release(s);else s->cast_left=1;}
+            if(s->state_time>=s->cast_end){
+                s->f.attacking=0;set_state(s,S_CHASE,G_IDLE);s->spell_at=(float)sv.time;
+                s->cooldown=aw_combat_settings.fCombatDelayNPC+.01f*AW_CombatRoll100(&rng);
+                if(s->cooldown>aw_combat_settings.fCombatDelayNPC+.9f)s->cooldown=aw_combat_settings.fCombatDelayNPC+.9f;
+            }
+        }else if(s->cast_look){AW_MagicCastLookRelease(s->cast_look,-1);s->cast_look=0;}   /* interrupted (a hit) */
         if(sv.time>=s->next_think){
             interval=think_interval.value<.05f?.05f:think_interval.value>.2f?.2f:think_interval.value;
             dt=(float)(sv.time-s->last_think);if(dt>.3f)dt=.3f;if(dt<0)dt=interval;
@@ -1487,6 +1953,7 @@ void AW_CombatPhysics(void) {
         animate(s);
         AW_ItemsUpdate(s->e,s->item);
     }
+    shots_update(p,(float)host_frametime);            /* ACTOR-RANGED-COMBAT-MISSING-66: the shots in flight */
     /* The player: punch, fatigue return, the knockout clock. */
     if((watching || p->v.button0 || any) && !you_valid && AW_CombatSettingsLoad()){AW_CombatPlayerSheet(&you);you_valid=1;}
     if(you_valid){
@@ -1567,7 +2034,7 @@ void AW_CombatCost(float *per_second,float *ms_mean,float *ms_max,int *fighters)
 void AW_CombatSceneSpawn(void) {
     int i;for(i=0;i<SLOTS;i++)memset(&slots[i],0,sizeof(slots[i]));
     memset(&pv,0,sizeof(pv));block_shown_until=0;settings_tried=0;
-    enemy=NULL;you_valid=0;memset(&retry,0,sizeof(retry));
+    enemy=NULL;you_valid=0;memset(&retry,0,sizeof(retry));shots_clear();
     if(battle){battle=0;AW_MusicCombat(0);}
 }
 
@@ -1584,12 +2051,18 @@ static void report(void) {
     Con_Printf("Sounds: %s\n",sounds_on?"as OpenMW (dbg combat sounds on)":"one per outcome (dbg combat sounds off)");
     Con_Printf("Best attack: %s; hit contact: %s (swings found by the cone %ld)\n",best_cvar.value?"on":"off",
         contact_on?"cone when the crosshair misses":"crosshair only",(long)totals.player_contacts);
+    Con_Printf("Spells: %s; spell choices %lu, casts %lu, failed %lu (ratings %lu; all actors' casts %lu; spell reads %lu, at the fight's start only)\n",
+        spells_on?"fighters cast the spells they know (dbg combat spells off: weapons only)":"weapons only",
+        totals.npc_spell_choices,totals.npc_casts,totals.npc_cast_fails,spell_ratings,AW_CastActorCasts(),totals.npc_spell_reads);
     for(i=0;i<SLOTS;i++)if(slots[i].e)Con_Printf(" %s: health %ld/%ld fatigue %ld/%ld %s\n",slots[i].f.name,
         (long)slots[i].f.health,(long)slots[i].f.health_max,(long)slots[i].f.fatigue,(long)slots[i].f.fatigue_max,
         slots[i].f.dead?"dead":slots[i].f.knocked?"down":"fighting");
     if(you_valid)Con_Printf(" You: health %ld/%ld fatigue %ld/%ld\n",(long)you.health,(long)you.health_max,(long)you.fatigue,(long)you.fatigue_max);
     Con_Printf("thinks %lu (%.1f/s) swings %lu move traces %lu; ms/think avg %.3f max %.3f\n",cost.thinks,cost.thinks/span,
         cost.swings,cost.traces,cost.thinks?cost.seconds*1000/cost.thinks:0.0,cost.max*1000);
+    {int n=0;for(i=0;i<AW_PROJECTILES;i++)n+=shots[i].used;
+     Con_Printf("Shots: fired %lu, hit you %lu, missed %lu; in flight %d of %d (%ld bytes)\n",shots_fired,shots_hit,
+        shots_missed,n,AW_PROJECTILES,(long)sizeof(shots));}
     if(god_blows)Con_Printf("god mode turned away %lu blows (no damage, no knockdown)\n",god_blows);
     Con_Printf("bytes: per hostile NPC %ld, all slots %ld, player sheet %ld; no allocation\n",(long)sizeof(slot_t),
         (long)sizeof(slots),(long)sizeof(you));
@@ -1676,9 +2149,11 @@ static void command(void) {
         Con_Printf("Always use best attack: %s (Options > Prefs shows the same setting).\n",on?"on (the weapon's strongest attack)":"off (the attack follows your movement)");return;}
     if(Cmd_Argc()==3 && !Q_strcasecmp(a,"contact") && (on=AW_CompanionToggleWord(Cmd_Argv(2)))>=0){AW_CombatRule(AW_RULE_CONTACT,on);
         Con_Printf("Hit contact: %s.\n",on?"the original's hit cone when the crosshair misses (OpenMW getHitContact)":"the crosshair's ray only (the earlier rule)");return;}
+    if(Cmd_Argc()==3 && !Q_strcasecmp(a,"spells") && (on=AW_CompanionToggleWord(Cmd_Argv(2)))>=0){AW_CombatRule(AW_RULE_SPELLS,on);
+        Con_Printf("Fighters' spells: %s.\n",on?"each fighter weighs its spells against its weapon and casts the best (OpenMW prepareNextAction)":"weapons and fists only (the earlier rule)");return;}
     if(!Q_strcasecmp(a,"calm") && Cmd_Argc()==2){AW_CombatClear();if(battle){battle=0;AW_MusicCombat(0);}Con_Printf("Combat: everyone calms down.\n");return;}
     if((on=AW_CompanionToggleWord(a))>=0 && Cmd_Argc()==2){Cvar_SetValue(combat_on.name,(float)on);if(!on)AW_CombatClear();return;}
-    Con_Printf("Usage: dbg combat [on/off | seed N | readout on/off | music on/off | dice on/off | style amiwind/original | block hold/auto | flee on/off | sounds on/off | bestattack on/off | contact on/off | loadout NAME/off | calm]\n");
+    Con_Printf("Usage: dbg combat [on/off | seed N | readout on/off | music on/off | dice on/off | style amiwind/original | block hold/auto | flee on/off | sounds on/off | bestattack on/off | contact on/off | spells on/off | loadout NAME/off | calm]\n");
 }
 void AW_CombatInit(void) {
     Cvar_RegisterVariable(&combat_on);Cvar_RegisterVariable(&readout);Cvar_RegisterVariable(&music);
@@ -1725,9 +2200,14 @@ int AW_CombatTestEngage(edict_t *t,int dead) {
         if(s->rolled && s->e->v.angles[2]!=90){s->e->v.angles[2]=90;s->e->v.origin[2]+=2;}   /* stand-in: lie down */
         SV_LinkEdict(s->e,false);
         if(aw_combat_actor_died)aw_combat_actor_died(s->e);   /* on the change list at once, as a fight's death */
-        essential_death(s->e);
+        if(!lay_saved)essential_death(s->e);   /* a saved death laid down again is not a new death */
     }
     return 1;
+}
+/* OUTDOOR-DEAD-BODY-GONE-66: a saved death laid down again (a room's, the home map's or a joining cell's body, aw_actors.c):
+ * the corpse as AW_CombatTestEngage(t,1) leaves one, without the essential message a new death shows */
+int AW_CombatLayCorpse(edict_t *t) {
+    int ok;lay_saved=1;ok=AW_CombatTestEngage(t,1);lay_saved=0;return ok;
 }
 /* PLAYER-CASTING-59 (aw_mwhost.c AW_MwscriptLand): a spell's effects changed an actor's health to HEALTH. A harmful
  * spell is an attack: an actor not yet fighting joins the fight with the player (OpenMW spellcasting.cpp inflict,

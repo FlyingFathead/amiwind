@@ -121,11 +121,14 @@ def unit_hashes(path, units, root=ROOT):
     return rows
 
 
-def code_key(entries, data=(), root=ROOT):
+def code_key(entries, data=(), root=ROOT, content_keyed=True):
     """{'form', 'entries', 'uncertain', 'files': {path: digest}, 'digest'} of ENTRIES' reach and the DATA files.
-    Uncertain reach (dynamic code) counts every repository file whole."""
+    Uncertain reach (dynamic code) counts every repository file whole. CONTENT_KEYED: a content-keyed reader
+    (build_cache.CONTENT_KEYED_READERS) counts as its fixed text; False: as its code (the form before
+    BUILD-UNIT-KEYS-REACH-64, which chim.units looks stored units up under)."""
+    from build_cache import content_keyed_value
     entries = tuple((str(path), str(name)) for path, name in entries)
-    key = (str(Path(root).resolve()), entries, tuple(sorted(data)))
+    key = (str(Path(root).resolve()), entries, tuple(sorted(data)), bool(content_keyed))
     if key in _KEYS:
         return _KEYS[key]
     index = source_index(root)
@@ -135,7 +138,10 @@ def code_key(entries, data=(), root=ROOT):
         files = dict(index.files)
     else:
         for path in sorted(python | found | set(data)):
-            if path.endswith('.py') and path in units:
+            fixed = content_keyed_value(path, content_keyed)
+            if fixed is not None:
+                files[path] = fixed
+            elif path.endswith('.py') and path in units:
                 files[path] = digest(unit_hashes(path, units[path], root))
             elif path in index.files:
                 files[path] = index.files[path]

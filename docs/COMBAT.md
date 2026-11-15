@@ -1,6 +1,6 @@
 # Combat and the Vivec Arena minigame
 
-_Last updated with AmiWind v0.0.62 (8 November 2026)._
+_Last updated with AmiWind v0.0.66-dev1 (13 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -136,8 +136,10 @@ The rules the aggro mode runs, with the game settings read from your master file
   x fAIMeleeWeaponMult. The original settings (7, 0.3) mean that only actors with a very high Flee ever run.
   A fleeing actor runs for one second, then stands and watches. It runs again whenever you come within its reach.
   It decides again after three seconds (ActionFlee).
-- The Flee rule is the switch `dbg combat flee on/off`. It is off by default, so fights in the
-  world keep the earlier rule: a fighter flees only when it cannot reach you. The aggro and group modes switch it
+- The Flee rule is the switch `dbg combat flee on/off`. It is on by default since v0.0.66, as the original plays it
+  (off: the earlier rule, where a fighter flees only when it cannot reach you). An NPC below iWereWolfLevelToAttack
+  rates iWereWolfFleeMod against a werewolf, and a spell that is the fighter's best action rates against fleeing by
+  its success chance ([MECHANICS_PARITY.md](MECHANICS_PARITY.md) row 16). The aggro and group modes switch it
   on for their session and restore it afterwards. The sounds rule (`dbg combat sounds on/off`, see Sounds) is on
   by default since v0.0.58; the aggro, group and sounds modes switch it on for their session too. Since v0.0.57 attack on sight also runs in the
   world for the creatures that wander (placed and levelled ones): the same rule, on the same one-second check, see
@@ -211,7 +213,8 @@ your own master file when the image is built.
   term, minus the attacker's (skill + Agility/5 + Luck/10) x fatigue term,
   clamped to iBlockMinChance..iBlockMaxChance. A block stops the damage, wears
   the shield by it (at 0 the shield is gone), costs the blocker
-  fFatigueBlockBase + weapon weight x swing x fWeaponFatigueBlockMult fatigue,
+  fFatigueBlockBase + load x fFatigueBlockMult (the load over the capacity,
+  at most 1) + weapon weight x swing x fWeaponFatigueBlockMult fatigue,
   plays the shield's light, medium or heavy armour hit sound and the original
   block animation. Reference: `combat.cpp` blockMeleeAttack. "Not moving
   forward" is the forward key, as in the original (sideways or backwards still
@@ -233,9 +236,21 @@ your own master file when the image is built.
   step-cell search) never warps and never gives up: it flees, running straight away for one second,
   then stands and watches, and decides again every three seconds, so it comes back as soon as you
   are reachable. Reference: `aicombat.cpp` (no path: flee; flee cooldown 3 s; no combat timeout).
-- Every swing costs fatigue: fFatigueAttackBase + weapon weight x swing x
-  fWeaponFatigueMult. NPCs wait fCombatDelayNPC plus up to 0.9 s between
-  swings.
+- Every swing costs fatigue: fFatigueAttackBase + load x fFatigueAttackMult +
+  weapon weight x swing x fWeaponFatigueMult (the load counts since v0.0.66;
+  the original masters set both load factors to 0, a mod may not). NPCs wait
+  fCombatDelayNPC plus up to 0.9 s between swings. Reference: `combat.cpp`
+  applyFatigueLoss.
+- Chase and flee speed (v0.0.66): every fighter moves at its own speed. An NPC
+  runs at its run speed from Speed and Athletics, a creature moves at its walk
+  speed (fMinWalkSpeedCreature + Speed / 100 x (fMaxWalkSpeedCreature -
+  fMinWalkSpeedCreature); creatures do not run faster), a flyer by the fly
+  speeds, a swimmer by the swim speed. Until v0.0.65 every fighter chased at
+  one fixed 200 game units a second, about 2.4 times the run of an NPC with
+  Speed 50 and Athletics 45 (82.5 game units a second);
+  `aw_combat_speed` above 0 still sets such a fixed speed. Reference:
+  `npc.cpp` and `creature.cpp` getMaxSpeed, `actor.hpp` getSwimSpeedImpl. The
+  formula table: [MECHANICS_PARITY.md](MECHANICS_PARITY.md).
 - Rolls come from one seeded generator per fight (xorshift, 4 bytes), so a
   seed replays a fight swing for swing when both fighters act the same.
 - Levelling: your stats in these rolls are your character's own (skills, attributes, level), so a skill or
@@ -447,6 +462,9 @@ message text the image carries.
   take. Guards who pursue to arrest, pickpocketing, trespass, assault and murder are not in yet. Several witnesses
   that start fights in the same frame hold that frame for about 0.6 s, because each fight start reads its sheet from
   disk ([COMBAT-START-SHEET-READS-61](bugs/COMBAT-START-SHEET-READS-61.md)).
+- From v0.0.66 the fighters cast the spells they know: about once a second each one weighs its spells against its
+  weapon and casts the best from that spell's range, with its spellcast animation
+  ([MAGIC_EFFECTS.md](MAGIC_EFFECTS.md), "Characters cast too"). `dbg combat spells off` keeps them to their weapons.
 
 ## Two-handed weapons
 
@@ -507,12 +525,14 @@ the four fighters (about 0.3 MB each).
   (the original also stretches it with the actor's race width and height).
 - First-person weapon views: since v0.0.59 an equipped melee weapon is drawn in the hands in the original's three
   stances (one-handed, two-handed close, two-handed wide; see [FIRST_PERSON_HANDS.md](FIRST_PERSON_HANDS.md)), and
-  v0.0.61-dev2 adds the bow, crossbow and thrown stances (not yet seen in game as stills). The shot of a ranged weapon
-  waits for ranged combat. A weapon loadout (`dbgmode arenapit loadout sword_shield`, config/arena_player.json) fights
+  v0.0.61-dev2 adds the bow, crossbow and thrown stances (not yet seen in game as stills). The player's own shot of a
+  ranged weapon waits for ranged combat; since v0.0.66 people and creatures shoot theirs (bows, crossbows, thrown
+  weapons with their ammunition; the rules and the budget in [ACTOR_RECORDS.md](ACTOR_RECORDS.md#ranged-fighters),
+  not yet checked in a running game). A weapon loadout (`dbgmode arenapit loadout sword_shield`, config/arena_player.json) fights
   with the weapon's rules.
 - The world's NPCs do not yet start fights on their own, other than the witnesses of a theft (their disposition toward the player is not modelled);
   creatures that wander do since v0.0.57, at most four at once; in a larger pack the next one joins as soon as one
-  falls (a fallen fighter's slot is reused and its death kept, COMBAT-PACK-SLOTS-57). Alarms are not in. Fleeing by the Flee rating is in, behind `dbg combat flee on` (off by default).
+  falls (a fallen fighter's slot is reused and its death kept, COMBAT-PACK-SLOTS-57). Alarms are not in. Fleeing by the Flee rating is in, on by default since v0.0.66 (`dbg combat flee off` for the earlier rule).
 - Sounds play at the listener, not from the fighter's position. Creatures do not yet play their own sound
   generators from their animations' sound keys; the table is built and the `sounds` mode plays it.
 - Creatures: combat/actors.txt holds NPC records only, so until v0.0.54 a creature had no sheet and a blow passed

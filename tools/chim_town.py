@@ -157,6 +157,7 @@ def prepare(town, data_files, scene, chim_world, out, ffmpeg='ffmpeg', jobs=None
     from build_jobs import resolve_jobs
     from mwad.npc import load_master
     from mwad.paths import child_ci, ensure_external, resolve_data_files
+    from mwad.masters import master_path
     from town_config import load_settings, town_field
     from town_regions import regions
     from import_town import (arrival_point, door_bank_text, frame_references, region_directory_text, residents,
@@ -178,7 +179,7 @@ def prepare(town, data_files, scene, chim_world, out, ffmpeg='ffmpeg', jobs=None
         raise ValueError('The CHIM world has no source stage for ' + town + ': ' + str(work))
     references = frame_references(work, settings)
     index = json.loads((work / 'scenery/scenery-index.json').read_text())
-    kinds, cells, topics = load_master(child_ci(data, 'Morrowind.esm'))
+    kinds, cells, topics = load_master(master_path(data))
     palette = (scene / 'id1/gfx/palette.lmp').read_bytes()
     texts = residents(data, out, out, references, settings, kinds, topics, palette, ffmpeg, jobs, cells)
     # the hand timings: the hands stage's report (BUILD-SEYDA-BSP-CARRIER-48)

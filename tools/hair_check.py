@@ -175,10 +175,11 @@ class Context:
         from halloween_cast import _assets
         from mwad.npc import load_master
         from mwad.paths import child_ci
+        from mwad.masters import master_path
         self.data = Path(data)
         self.palette = Path(palette).read_bytes()
         self.assets = _assets(self.data)
-        self.kinds, _, _ = load_master(child_ci(self.data, 'Morrowind.esm'))
+        self.kinds, _, _ = load_master(master_path(self.data))
         self.profile = npc_anim.plan_profile('react+full')
         self.rigs = {}
 

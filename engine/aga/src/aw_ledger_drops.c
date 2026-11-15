@@ -21,7 +21,7 @@ static int drop_id_ok(const char *id){
 }
 uint32_t AW_LedgerDrop(aw_state_t *s,aw_ledger_t *l,const aw_inventory_item_t *item,int32_t count,
                        int at,int32_t where,const float position[3],float yaw){
-    aw_ledger_row_t *r;aw_ledger_extra_t *x;uint32_t key;int index,j;int32_t old;
+    aw_ledger_row_t *r;aw_ledger_extra_t *x;uint32_t key;int index,j,k,inst;int32_t old;
     if(!s || !l || !item || !position || !drop_id_ok(item->id) || !(item->flags&AW_INV_DROP) || !item->model[0] ||
        count<1 || at<AW_AT_CELL || at>AW_AT_SCENE)return 0;
     old=AW_StateGet(s,AW_ITEM,item->id);
@@ -31,20 +31,36 @@ uint32_t AW_LedgerDrop(aw_state_t *s,aw_ledger_t *l,const aw_inventory_item_t *i
     if(count==old && AW_ITEM_HAS(s,index,AW_ITEM_CHARGE))return 0;
     for(j=0;j<3;j++)if(!(position[j]>=-1000000 && position[j]<=1000000))return 0;
     if(!(yaw>=-360 && yaw<=360))return 0;
-    key=AW_LEDGER_PLAYER|(s->inventory.next_serial+1);
+    /* SAVE-ITEM-INSTANCES-ONE-PER-KIND-66: the plain copies drop first (the kind's condition on the drop); past them one
+     * copy at a time, an instance no slot wears first, under its own serial (the same thing on the ground as in the
+     * pack); a copy with its own spent charge never refills by dropping */
+    inst=-1;
+    if(count>AW_ItemPlain(s,index)){
+        if(count!=1)return 0;
+        for(k=0;k<AW_ItemInstCount(s) && inst<0;k++)
+            if(AW_ItemInst(s,k)->row==index && !AW_ItemInstNamed(s,AW_ItemInst(s,k)->serial))inst=k;
+        for(k=0;k<AW_ItemInstCount(s) && inst<0;k++)if(AW_ItemInst(s,k)->row==index)inst=k;
+        if(inst<0 || (AW_ItemInst(s,inst)->flags&AW_ITEM_CHARGE))return 0;
+    }
+    key=AW_LEDGER_PLAYER|(inst>=0?AW_ItemInst(s,inst)->serial:s->inventory.next_serial+1);
     if(AW_LedgerFind(l,key)>=0 || !(r=AW_LedgerPut(l,key)))return 0;
     if(!(x=AW_LedgerExtra(l,r))){AW_LedgerTidy(l,key);return 0;}
     r->fields=AW_LEDGER_DROPPED;AW_LedgerSetPlace(l,r,at,where);
     memcpy(x->position,position,sizeof(x->position));x->yaw=yaw;x->count=count;
     memset(x->item,0,sizeof(x->item));strcpy(x->item,item->id);
-    if(AW_ITEM_HAS(s,index,AW_ITEM_CONDITION)){
+    if(inst>=0){
+        if(AW_ItemInst(s,inst)->flags&AW_ITEM_CONDITION){r->fields|=AW_LEDGER_CONDITION;x->condition=AW_ItemInst(s,inst)->condition;}
+    }else if(AW_ITEM_HAS(s,index,AW_ITEM_CONDITION)){
         r->fields|=AW_LEDGER_CONDITION;x->condition=AW_ITEM_ROW(s,index)->condition;
     }
-    /* AW_ItemAdd is the only fallible change of the inventory: the row goes again when it says no */
+    /* the instance goes first (its copy is the one leaving), then AW_ItemAdd, the only fallible change of the
+     * inventory: the row goes again when it says no */
+    if(inst>=0)AW_ItemInstRemove(s,inst);
     if(!AW_ItemAdd(s,item->id,-count)){r->fields=0;AW_LedgerTidy(l,key);return 0;}
     if(AW_InventoryEquipped(s,item->id)>old-count)AW_InventoryUnequip(s,item->id);
     if(old==count)AW_ItemUnmark(s,index,AW_ITEM_CONDITION);
-    s->inventory.initialized=1;s->inventory.next_serial++;
+    s->inventory.initialized=1;
+    if(inst<0)s->inventory.next_serial++;
     return key;
 }
 /* v0.0.62 (MWSCRIPT-PLACE-OBJECTS-62): an item a script placed (PlaceAtPC, PlaceAtMe, PlaceItem, PlaceItemCell; OpenMW
@@ -74,10 +90,17 @@ int AW_LedgerPickup(aw_state_t *s,aw_ledger_t *l,uint32_t key){
     index=drop_item_index(s,x->item);old=AW_StateGet(s,AW_ITEM,x->item);
     current=AW_ITEM_HAS(s,index,AW_ITEM_CONDITION)?AW_ITEM_ROW(s,index)->condition:1;
     incoming=(r->fields&AW_LEDGER_CONDITION)?x->condition:1;
-    if(!(incoming>=0 && incoming<=1) || (old>0 && current!=incoming))return 0;
+    if(!(incoming>=0 && incoming<=1))return 0;
     if(!AW_ItemAdd(s,x->item,x->count))return 0;
     index=drop_item_index(s,x->item);
-    if(r->fields&AW_LEDGER_CONDITION)AW_ItemMark(s,index,AW_ITEM_CONDITION,incoming);
+    /* SAVE-ITEM-INSTANCES-ONE-PER-KIND-66: a copy whose condition differs from the carried plain ones is its own
+     * instance, under the drop's serial (the same thing it was; was: the pickup refused); the one copy of a kind marks
+     * the kind, as before */
+    if(old>0 && current!=incoming){
+        int32_t n=x->count;
+        if(AW_ItemInstMake(s,index,n,AW_ITEM_CONDITION,incoming,0,key&AW_LEDGER_ID)<0)
+            AW_ItemInstMake(s,index,n,AW_ITEM_CONDITION,incoming,0,0);
+    }else if(r->fields&AW_LEDGER_CONDITION)AW_ItemMark(s,index,AW_ITEM_CONDITION,incoming);
     s->inventory.initialized=1;
     r->fields=0;AW_LedgerTidy(l,key);
     return 1;

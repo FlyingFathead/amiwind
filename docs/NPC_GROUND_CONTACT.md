@@ -1,6 +1,6 @@
 # Initial NPC placement and ground-contact workflow
 
-_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
+_Last updated with AmiWind v0.0.66-dev2 (14 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -82,6 +82,12 @@ Levelled creature lists are not placed in a frame map: the game rolls a list at 
 loads, and a frame map row holds one fixed creature, so the builder does not pick one. They are listed per frame as
 deferred with that reason; the actor table rolls them when a cell joins the type 1 window.
 
+The cells inside a town map (Seyda Neen, Balmora, Vivec) never join the window, and a town frame places its NPCs
+only. When a town map starts, the engine takes the creatures and levelled creature points of those cells from the
+actor table (residents stay with the town frame). The build check `tools/chim/actor_census_check.py` counts the
+original's exterior people and creatures per area kind against what the image places and fails the build on a
+shortfall that `config/actor_census_allowlist.json` does not track.
+
 The ordinary ground contact keeps the reference's x and y. The towns' sideways search, which may move a resident
 up to 48 units to find a spot where every sole touches, is not used here: it would move the actor off the spot
 the game gave it. An actor whose soles do not all touch at its own spot (a slope, a rock edge) stands on the
@@ -148,6 +154,28 @@ in 100 s on 6 cores:
 
 The file is made from the game data and lists only reference numbers and record IDs. Run the census again when the
 room list changes (a new room makes the preflight name it and the command to run).
+
+With the expansions (v0.0.66): the census measures the rooms a build converts, by the build's own rules. The batches
+of an expansion count only when its master is selected (`AMIWIND_MASTERS`, as every reader; with the base game alone
+only the base batches), and the cells flagged "behave like exterior" (Tribunal's five Mournhold districts) are set
+aside and named, by the same code the room stage runs, waiting for the Mournhold exterior work. `--write-rooms`
+measures the whole list with every master it names and refuses a master selection that would leave a layer out. It
+writes two files: the base game's references to `config/actor_grounding_rooms.json`, exactly as before the expansions
+(an added expansion moves none of its bytes, so no stage or unit key that names it moves), and the expansions'
+references, in their own rooms and the ones they add to base-game rooms, to `config/actor_grounding_rooms_layers.json`
+(`set_aside` names the districts, `game_data` each master's SHA-256). `tools/actor_grounding.py` reads the two
+together. An expansion's reference carries the merged reference number (`src/mwad/masters.py`), so it never meets a
+base-game number.
+
+Measured on 14 November 2026 on the room list of 1,328 rooms (50 batches: the base game's 40, five of Tribunal, five
+of Bloodmoon), read only, in 137 s on 16 cores: 1,323 rooms measured, 1,048 with actors, 3,637 references. 3,422 stand
+on the floor, 157 are authored dead, 56 are kept off the floor and 2 have no floor under them. The base game's 3,007
+references keep exactly their classes of 23 October; 356 references are Tribunal's (one of them in Ebonheart's Grand
+Council Chambers, a base-game room) and 274 Bloodmoon's. 1,532 levelled lists are deferred.
+
+The build checks the classes before any stage (`tools/build_preflight.py` `room_grounding_problems`): every NPC and
+creature resident of every room the room batches convert, with the selected expansions, in about 6 seconds
+(ROOM-BATCH-NPC-GROUNDING-48: the v0.0.66-dev2 build met the gap only at the room batches stage, 14 minutes in).
 
 ### Where a CHIM room's residents are fitted (v0.0.48)
 

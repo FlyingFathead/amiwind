@@ -39,7 +39,9 @@ class HostAssetFormats(unittest.TestCase):
             # Host parity intentionally has only NumPy/Pillow. Real NIF markers
             # are covered by converter tests; here verify metadata propagation.
             collision = {'mode': 'nonsolid', 'no_collision_markers': ['NCO']}
+            # export_refs opens the archives through the layered reader (ASSETS-ARCHIVE-ORDER-32, src/mwad/archives.py)
             with patch.object(scenery, 'BSA', return_value=bsa), \
+                 patch('mwad.archives.layered_bsa', return_value=bsa), \
                  patch.object(scenery, 'nif_reader', return_value=None), \
                  patch.object(scenery, 'source_collision_metadata', return_value=collision), \
                  patch.object(scenery, 'ordered_map', return_value=[

@@ -59,6 +59,9 @@ CHART_JS = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js'
 TRACE_ENV = 'AMIWIND_STAGE_TRACE'
 TRACE_HOOK_FOLDER = 'trace-hook'
 READS_FOLDER = 'reads'
+# The stage wrapper's process id, given to the stage: the hook prints the traceback of an error the stage's own
+# process exits on, never one of its workers or the tools it starts (BUILD-FAILURE-NO-DETAILS-66)
+STAGE_WRAPPER_ENV = 'AMIWIND_STAGE_WRAPPER_PID'
 
 
 def enabled(metadata=None):
@@ -848,7 +851,7 @@ def stage_main(argv):
         print('usage: build_profile.py _stage STATS SECTIONS -- command...', file=sys.stderr)
         return 2
     stats_path, sections_path, command = Path(argv[0]), argv[1], argv[3:]
-    environment = dict(os.environ, **{SECTIONS_ENV: sections_path})
+    environment = dict(os.environ, **{SECTIONS_ENV: sections_path, STAGE_WRAPPER_ENV: str(os.getpid())})
     try:  # The stage's read list, checked against its fingerprint (tools/build_cache.py).
         environment.update(trace_environment(stats_path, environment))
     except Exception as exc:  # noqa: BLE001 - tracing must never stop a stage

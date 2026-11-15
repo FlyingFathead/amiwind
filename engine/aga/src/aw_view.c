@@ -35,6 +35,7 @@
 #include "aw_player_parts.h"
 #include "aw_skel.h"
 #include "aw_animpick.h"
+#include "aw_move.h"       /* the sneak for the body's sneak groups (PLAYER-ANIM-GROUPS-NOT-PLAYED-66) */
 #include "aw_msgbox.h"     /* the death box's button rectangles (MSGBOX-NO-CURSOR-62) */
 
 extern cvar_t chase_active;
@@ -302,7 +303,9 @@ static cvar_t hand_parts_cvar={"aw_hand_parts","1",true};
 #define HAND_PART_FRAMES 28     /* aw_hand_models.c: the hands' frame contract */
 /* bare hands, then AW_HandStance's six (an older table: the first four), then the held light (v0.0.61,
  * HELD-LIGHT-OWN-MODEL-61: aw_hand_models.h AW_HAND_LIGHT_STANCE; an older table has no such frames) */
-#define HAND_PART_STANCES 8
+/* then the spell stance by range (v0.0.66, PLAYER-CASTING-59: aw_hand_models.h AW_HAND_SPELL_STANCE + self, touch,
+ * target; an older table has no such frames: the bare hands) */
+#define HAND_PART_STANCES 11
 #define HAND_PART_MELEE 4       /* the stances every table has */
 static aw_parts_body_t hparts;
 static model_t *hpart_models[AW_PARTS_MAX];
@@ -367,6 +370,9 @@ static int hand_parts_ready(const char *race,int female) {
  * only in a table that has them, FIRST-PERSON-WEAPONS-56). 1 = drawn from parts. */
 /* READY-MAGIC-SHOWS-WEAPON-65: the spell stance (magic ready, R) shows the empty hands in first person */
 static int weapon_hidden(void) {return aw_magic_readied;}
+/* READY-MAGIC-SHOWS-WEAPON-65 (v0.0.66): the left hand's torch or light put away while magic is ready (aw_torch.h
+ * aw_torch_put_away; aw_hand_models.h AW_HandCarriesLeft) */
+static int left_put_away(void) {return !AW_HandCarriesLeft(aw_magic_readied);}
 static int hand_parts_apply(const char *race,int female,int stance,int frame) {
     hparts_shown=0;
     if(stance<0 || stance>=HAND_PART_STANCES || !hand_parts_ready(race,female) ||
@@ -789,9 +795,22 @@ static float hand_fraction(edict_t *p,int clip){
     f=((float)sv.time-v->_float)/d;
     return f<0?0:f>1?1:f;
 }
+/* PLAYER-ANIM-GROUPS-NOT-PLAYED-66: turning on the spot (OpenMW character.cpp: any turn while standing, held 0.05 s
+ * after the last one: mTurnAnimationThreshold); the view's yaw a frame before */
+static struct {float yaw,hold;int dir,seen;} turn;
+static int body_turn(int move,float dt){
+    float d=cl.viewangles[YAW]-turn.yaw;
+    while(d>180)d-=360;
+    while(d<-180)d+=360;
+    if(!turn.seen){turn.seen=1;d=0;}
+    turn.yaw=cl.viewangles[YAW];
+    if(move==AW_PM_NONE && (d>.01f || d<-.01f)){turn.dir=d>0?AW_PM_TURNLEFT:AW_PM_TURNRIGHT;turn.hold=.05f;}
+    else if((turn.hold-=dt)<=0 || move!=AW_PM_NONE){turn.dir=0;turn.hold=0;}
+    return turn.dir;
+}
 /* The body's frame for the drawn weapon's stance, or -1 (nothing drawn, bare hands, swimming, a torch, no such group). */
 static int body_stance_frame(edict_t *p,int group,int air,float dt,float rate){
-    eval_t *v;aw_pick_state_t s;aw_pick_t o;int hand,goal,move=AW_PM_NONE,run=0,gi;
+    eval_t *v;aw_pick_state_t s;aw_pick_t o;aw_pick_player_t in;int hand,goal,move=AW_PM_NONE,run=0,gi,react,roll;float age;
     if(!stances_cvar.value || !body_parts || !parts_table || !p || p->v.health<=0)return -1;
     if((v=GetEdictFieldValue(p,"aw_torch")) && v->_float==1)return -1;
     hand=(v=GetEdictFieldValue(p,"aw_hand_state"))?(int)v->_float:0;
@@ -803,9 +822,19 @@ static int body_stance_frame(edict_t *p,int group,int air,float dt,float rate){
         run=group==AW_ANIM_RUN || group==AW_ANIM_READYRUN;
         if(side*side>fwd*fwd)move=side>0?AW_PM_RIGHT:AW_PM_LEFT;else move=fwd>=0?AW_PM_FORWARD:AW_PM_BACK;
     }
-    /* READY-MAGIC-SHOWS-WEAPON-65: the spell stance holds no weapon: the bare-hand stance (no spellcast group yet) */
-    if(!AW_PickPlayerState(aw_magic_readied?-1:AW_InventoryEquippedWeaponType(),hand,goal,move,run,AW_CombatPlayerAttackType(),air,
-                           p->v.waterlevel>=2,&s)){stance.picked=0;return -1;}
+    /* READY-MAGIC-SHOWS-WEAPON-65 / PLAYER-CASTING-59 (v0.0.66): the spell stance holds no weapon: the original's spell
+     * groups (idlespell, spellcast equip / unequip, the cast by the selected spell's first range) */
+    /* PLAYER-ANIM-GROUPS-NOT-PLAYED-66 (v0.0.66): with the stance, the sneak (the key or ForceSneak), the turn on the
+     * spot and the reaction to the last blow (hit1..5, knockdown, knockout: AW_CombatPlayerReaction) */
+    memset(&in,0,sizeof(in));
+    in.weapon=aw_magic_readied?AW_PW_SPELL:AW_InventoryEquippedWeaponType();in.hand=hand;in.goal=goal;in.move=move;
+    in.run=run;in.attack=AW_CombatPlayerAttackType();in.air=air;in.swim=p->v.waterlevel>=2;
+    in.sneak=AW_MoveSneaking() || aw_move_force_sneak;in.turn=body_turn(move,dt);
+    react=AW_CombatPlayerReaction(&age,&roll);
+    in.react=react==1?AW_PE_HIT:react==2?AW_PE_KNOCKDOWN:react==3?AW_PE_KNOCKOUT:0;in.roll=roll;
+again:
+    if(!AW_PickPlayerBody(&in,&s)){stance.picked=0;return -1;}
+    if(aw_magic_readied)s.range=(unsigned char)(aw_magic_cast_range>=0 && aw_magic_cast_range<3?aw_magic_cast_range:AW_PR_TARGET);
     if(!stance.picked || stance.table!=parts_table || memcmp(&s,&stance.last,sizeof(s))){
         int from=-1,to=-1;
         stance.last=s;stance.picked=1;stance.table=parts_table;
@@ -818,7 +847,20 @@ static int body_stance_frame(edict_t *p,int group,int air,float dt,float rate){
         }else stance.group[0]=0;
         stance.from=from;stance.to=to;
     }
-    if(stance.from<0 || stance.to>=parts_table->frames)return -1;
+    if(stance.from<0 || stance.to>=parts_table->frames){
+        if(in.react==AW_PE_HIT){in.react=0;goto again;}   /* no hit group in the table: the stance */
+        return -1;
+    }
+    if(s.event==AW_PE_HIT || s.event==AW_PE_KNOCKDOWN || s.event==AW_PE_KNOCKOUT){
+        /* the reaction from the moment of the blow (or of going down), at the table's rate: a hit plays once and then
+         * gives way to the stance; a knockdown holds its last frame until the player gets up; a knockout loops from its
+         * "loop start" while the player is out */
+        float f=(float)stance.from+age*(parts_table->rate>0?parts_table->rate:15);
+        if(s.event==AW_PE_HIT && f>(float)stance.to){in.react=0;goto again;}
+        if(s.event==AW_PE_KNOCKOUT && stance.lfrom>stance.from && stance.lfrom<stance.to && f>(float)stance.to)
+            f=(float)(stance.lfrom+(int)(f-(float)stance.lfrom)%(stance.to-stance.lfrom));   /* whole frames: no libm */
+        return f>(float)stance.to?stance.to:(int)f;
+    }
     switch(s.event){
     case AW_PE_EQUIP:return stance.from+(int)(hand_fraction(p,AW_HAND_DRAW)*(float)(stance.to-stance.from)+.5f);
     case AW_PE_UNEQUIP:return stance.from+(int)(hand_fraction(p,AW_HAND_LOWER)*(float)(stance.to-stance.from)+.5f);
@@ -943,8 +985,10 @@ static void parts_draws(edict_t *p) {
             if(!model || model->type!=mod_alias || !Cache_Check(&model->cache))continue;
         }else{
             if(!kind){if(!drawn || !right)continue;item=right;}
+            /* READY-MAGIC-SHOWS-WEAPON-65 (v0.0.66): the shield is put away while magic is ready, as for a drawn
+             * two-handed weapon (AW_HandCarriesLeft; OpenMW: the spell is a two-handed draw) */
             else if(!(item=parts_hand_item(1)) || item->category!=AW_INV_ARMOUR || item->subtype!=8 ||
-                    (drawn && right && AW_TWO_HANDED(right->weapon)))continue;
+                    !AW_HandCarriesLeft(aw_magic_readied) || (drawn && right && AW_TWO_HANDED(right->weapon)))continue;
             if(!item->model[0])continue;
             model=Mod_ForName((char *)item->model,false);
             if(!model || model->type!=mod_alias || !Cache_Check(&model->cache))continue;
@@ -1628,6 +1672,7 @@ void AW_ViewInit(void) {
     Cvar_RegisterVariable(&parts_cvar);Cvar_RegisterVariable(&hand_parts_cvar);Cvar_RegisterVariable(&player_cache_cvar);
     Cvar_RegisterVariable(&stances_cvar);
     aw_hand_weapon_hidden=weapon_hidden;aw_hand_parts_apply=hand_parts_apply;aw_view_hand_part=hand_part;aw_inventory_preview_pending=parts_pending;
+    aw_torch_put_away=left_put_away;   /* READY-MAGIC-SHOWS-WEAPON-65: the carried light put away while magic is ready */
     aw_inventory_player_beast=player_beast;
     Cvar_RegisterVariable(&fullview_cvar);Cvar_RegisterVariable(&aw_inventory_preview_reserve);Cvar_RegisterVariable(&aw_inventory_preview_live);
     AW_ViewRulesDefault(&rules);AW_ViewReset(&view,&rules);

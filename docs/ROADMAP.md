@@ -1,6 +1,6 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.65 (12 November 2026)._
+_Last updated with AmiWind v0.0.66-dev4 (15 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -133,9 +133,93 @@ v0.0.66, and in it the census office becomes a room built like every other inter
 
 ## Next version: the two expansion worlds
 
-The version after v0.0.65 (v0.0.66) takes up what v0.0.64 moved on; no dates are promised.
+The version after v0.0.65 (v0.0.66) takes up what v0.0.64 moved on; no dates are promised. The measured speed figures of
+the line (the prison ship's hold, the builder's build records) and what is still to be measured, among it the frame rate
+on the Raspberry Pi 4B, are on the [v0.0.66 performance page](performance/V0.0.66-PERFORMANCE.md).
 
-- **Tribunal (Mournhold) and Bloodmoon (Solstheim) built in by default** where the player owns them. The builder warns
+**Planned, in progress: every table reads the expansions.** With Tribunal and/or Bloodmoon selected (both are selected by
+default), every table the builder makes from the game data reads the expansions' data too: the people and creatures with
+their stats and variables, the scripts (checked against the reference engine), the places and points of interest, the
+items, the dialogue and the rest. With the base game alone the tables stay as they are. Done so far: the focus boxes of
+named objects and the teleport place list. Next: a table-by-table census with a check that no table reads the base game
+alone while an expansion is selected.
+
+**The plan for Bloodmoon and Tribunal, in order** (the [expansions page](EXPANSIONS.md) has the detail and the
+chains from person to place):
+
+1. **The files checked.** The selected expansions' files are required and compared with known SHA-256 values before any
+   stage (done in dev3), and every stage reads the selected archives (done in dev2).
+2. **Every change the expansions make to Vvardenfell, working end to end.** The changes are listed from the game files
+   and checked in the build: the people and objects placed in the base game's cells, the changed records, the new dialogue
+   topics and the scripts. For each one the speaker is placed, the dialogue line can be reached, its script runs and the
+   destination is present. This covers the boat at Khuul to Fort Frostmoth and the Khuul topic, Louis Beauchamp outside
+   the Mages Guild in Ald'ruhn and The Patchwork Airship, Asciene Rane in Ebonheart and the way to Mournhold and back,
+   the Mazed Band, and the Dark Brotherhood's attacks while resting. The list is being made.
+3. **Solstheim built like the island:** the next island of the one outdoor grid, through the same conversion and
+   reduction methods as Vvardenfell, with Raven Rock's stages measured, the sea between the islands, and its rooms as
+   ordinary rooms.
+4. **Mournhold's five districts as one exterior of their own** with the universal sky, the region's weather and the sun,
+   joined by their doors; set aside in dev2. Its rooms are ordinary interiors. A playtest of the trip there and back
+   follows.
+5. **The expansions' scripts and dialogue,** the journal and the topics. The limit of 256 script instances and the store
+   of script variables have to be widened first, or the expansions' scripts do not run.
+6. **The save with the expansions' counts** (about 13,800 placed actors and about 3,300 scripted references with
+   variables).
+7. **The Toolkit's Solstheim and Mournhold views,** with the completion map and the heatmap.
+8. **Playtests:** every chain from person to place in game, the Mournhold transfer, Raven Rock's stages and a walk across Solstheim.
+
+Alongside, every item the game places in the world (weapons, armor, books, ingredients, keys and the rest, loose in the
+wild and in rooms) is counted from the game files and checked in the build.
+
+**Fourth snapshot, 15 November 2026:** [v0.0.66-dev4](releases/notes/RELEASE-v0.0.66-dev4.md) is in development and
+carries dev3. **Done in dev4** (checked by tests, not yet in play): a scripted object takes the player's use only while
+its script reads it, as in the original, so the census captain's two doors, which opened only once, open every time; the
+play journey walks the opening on foot as a player plays it, through the census office to the release and on, and stops
+at the first wrong turn; and, in the dev3 build already, a teleport typed during a load runs on arrival and the image
+step's actor check reads the room stage's empty rooms. **Still open in dev4:** fighting switched on before the release
+papers, the crab meat's use going to the plate under it, a stuck arrival in the census courtyard seen once, the console's
+count of an item no script names, and the slower sound loading on area changes since dev2 (a fix in the image step's
+layout).
+
+**Third snapshot, 14 November 2026:** [v0.0.66-dev3](releases/notes/RELEASE-v0.0.66-dev3.md) is in development and carries
+dev2. **Done in dev3** (checked by tests, not yet in play): the save without the fixed limits that could refuse it or drop
+state (the actors' rows on the world change list, the explored map in a section of its own, script values saved by name
+and an item's with it, two copies of one item kept apart, made spells, items, potions, soul gems, crime marks and revealed
+places growing with the game, saves all or nothing with the failed part named, and a save asked for inside a script step
+written when it ends); the selected expansions' files required and checked by size and SHA-256 before any stage; every
+table reading the expansions' data; the seven expansion rooms the room stage refused built or listed; the builder's new
+work first, its stall alert and failure page; `dbg tp` by category and to people and creatures by name. **Still open in
+dev3:** the save's round trip in the emulator with its times on the Amiga presets, a sparser record for each changed
+actor, the flora slot count with the expansions, and a player model for Bloodmoon's werewolf form.
+
+**Second snapshot, 13 November 2026:** [v0.0.66-dev2](releases/notes/RELEASE-v0.0.66-dev2.md) is in development and carries
+dev1. The data of Tribunal and Bloodmoon is part of the build by default, and the build's cache keys know which
+expansions are selected, so switching them rebuilds only what they change; the cells and rooms of Mournhold and
+Solstheim are not played yet. **Done in dev2** (checked by tests, not yet in play): the unit caches keyed by what each
+unit reads and an early check of the image step's file formats; an explored-land map, a local map and an interior room
+plan, named places on hover, up to 256 named markers with a Markers menu, a hot marker and a compass, names for
+signposts and named objects; people and creatures that cast the spells they know, with the cast look on by default;
+fighters that move at their own speeds, the load in fatigue, bows and crossbows held and shot, the audit of every
+actor's record and creatures baked on the skeletal method, Dagoth Ur's own animations, the Heart of Lorkhan staying in
+place, the original's murder bounty; the dead staying dead across area changes and saves, bodies cleared as in the
+original, the essential message, saves refused when part of the state fails to go in; outdoor containers that can be
+pointed at, a lighter prison ship hold, the outdoor creatures of the town cells, the inventory page arrows, the script
+timers and `SetDelete` as in the original, a play journey that checks the opening after every build, each fighter's
+weapon chosen by its own skills, outdoor bodies kept until the original's delay, and the builder's check of every actor
+against the original. **Still open in dev2:** the crime audit and potions as a fighter's best action, the stop in an
+ancestral tomb, and the Heart chamber's collapse animation.
+
+**First snapshot, 12 November 2026:** [v0.0.66-dev1](releases/notes/RELEASE-v0.0.66-dev1.md) is in development, built on
+the v0.0.65 release with all of its fixes to the opening. It has the
+builder's reader that merges the base game file with the Tribunal and Bloodmoon files, stage keys that follow the selected
+expansion layers with a check of the expansion files, the expansions' cells and rooms in the base lists (Solstheim's
+finished cells, Mournhold's rooms as their own batches), archives read in load order, layer stores in the image, the Heart of Lorkhan as a room resident, the row of active-effect
+icons, and groundwork for the Heart chamber's collapse (a track reader the game does not use yet). The expansions' cells
+and rooms are being brought in through the same builder and stages as Vvardenfell; no expansion area is built in this
+snapshot, and the dev1 build itself has not been made yet.
+
+- **Tribunal (Mournhold) and Bloodmoon (Solstheim) built in by default** where the player owns them
+  ([the expansions page](EXPANSIONS.md) says what is in and what is planned). The builder warns
   when their files are not found and has a switch to build the base game only. The builder already reports what it
   finds of each, chooses the expansion layers (`--dlc`, `--no-dlc`) and counts both from the game files
   ([census](performance/EXPANSIONS-CENSUS-v0.0.64.md)).

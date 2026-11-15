@@ -27,6 +27,7 @@
 #include "aw_tryalloc.h"
 #include "aw_listbox.h"
 #include "aw_activate.h"
+#include "aw_mapmarks.h"
 /* Ordinary hinged doors (aw_hinged_door.c sets these; NULL: none). */
 int (*aw_hinged_use)(void);
 int (*aw_hinged_hint)(const char **name,const char **action);
@@ -560,6 +561,50 @@ static struct {
     int valid,kind,movetype;char map[16];vec3_t origin,angles;float health;
 } load_from;
 static int tp_cmd;              /* a dbg tp / aw_scene console command is running */
+/* DBG-TP-DURING-LOAD-66: a dbg tp (aw_teleport) or dbg scene (aw_scene) typed while a load still runs (the scene's
+ * load pending, or the client not yet in play) was lost. load_scene returns at once while a load is pending and
+ * map_teleport refuses, so a town name (balmora) fell through to the town route and did nothing, a place of
+ * teleport-names.txt (aldruhn) said "no map on this disk holds that point", and a room (arenapit) printed its name
+ * and stayed where it was. Typed in the middle of a load, it is now held (one command; a newer one replaces it, said)
+ * and runs once that load has arrived and the player is in play (AW_SceneTick); a failed load or New Game drops it,
+ * said. Held: the command and its arguments, each quoted, as Cbuf runs it. */
+#define TP_HELD_SIZE 160
+static char tp_held[TP_HELD_SIZE];
+static int tp_loading(void) {
+    return sv.active && (pending || cls.state!=ca_connected || cls.signon!=SIGNONS);
+}
+/* 1 when COMMAND (its arguments are the console's) was held or refused because a load runs; 0: run it now */
+static int tp_hold(const char *command) {
+    char line[TP_HELD_SIZE];int i,used;
+    if(!tp_loading())return 0;
+    used=snprintf(line,sizeof(line),"%s",command);
+    for(i=1;i<Cmd_Argc() && used>0 && used<(int)sizeof(line);i++){
+        const char *a=Cmd_Argv(i);
+        if(strpbrk(a,"\";\r\n")){used=-1;break;}   /* nothing that could end the quoted argument or the line */
+        used+=snprintf(line+used,sizeof(line)-used," \"%s\"",a);
+    }
+    if(used<=0 || used>=(int)sizeof(line)){
+        Con_Printf("dbg tp: a load is in progress; try again when it has arrived.\n");return 1;
+    }
+    if(tp_held[0])Con_Printf("dbg tp: %s replaces the held %s.\n",line,tp_held);
+    else Con_Printf("dbg tp: a load is in progress (%s); %s runs when it has arrived.\n",pending?next.target:sv.name,line);
+    memcpy(tp_held,line,(size_t)used+1);return 1;
+}
+/* each frame (AW_SceneTick): a held dbg tp runs once the load has arrived and the player is in play */
+static void tp_held_tick(void) {
+    char line[TP_HELD_SIZE+2];
+    if(!tp_held[0] || tp_loading())return;
+    if(!sv.active)Con_Printf("dbg tp: the held %s is dropped: no game is running.\n",tp_held);
+    else{
+        Con_Printf("dbg tp: the load has arrived; %s runs now.\n",tp_held);
+        snprintf(line,sizeof(line),"%s\n",tp_held);Cbuf_AddText(line);
+    }
+    tp_held[0]=0;
+}
+static void tp_held_drop(const char *why) {
+    if(tp_held[0])Con_Printf("dbg tp: the held %s is dropped: %s.\n",tp_held,why);
+    tp_held[0]=0;
+}
 static int load_recovering;     /* the way back is loading */
 static int load_box_wanted;     /* 1: the box (OK / Load Game), 2: the load menu (no way back); aw_loadfail.c shows it */
 static char load_reason[160];
@@ -578,6 +623,7 @@ const char *AW_SceneLoadBoxText(void) {
 void AW_SceneLoadFailed(const char *why) {
     char command[32];
     if(!pending)return;
+    tp_held_drop("the load failed");   /* DBG-TP-DURING-LOAD-66 */
     if(why && why[0]){Q_strcpy_bounded(load_reason,why,sizeof(load_reason));}
     if(load_recovering || !load_from.valid){
         /* the way back failed too, or there was no place to go back to: no load stays pending; the menus work */
@@ -627,7 +673,7 @@ static void load_scene(aw_scene_link_t *link,int immediate) {
     shroompicker_view=0;travel_rows_for=NULL;   /* edicts are reused by the next map: look the provider up again */
     load_from_capture(p,tp_cmd?AW_LOAD_TELEPORT:no_followers?AW_LOAD_SCRIPT:AW_LOAD_DOOR);
     next=*link;pending=1;started=Sys_FloatTime();AW_StreamTransitionBegin();
-    AW_SaveCapture();
+    AW_SaveLeave();   /* the place unloads: its actors' rows and change-list rows first (SAVE-ACTOR-ROWS-256-66) */
     /* the player's followers go along (v0.0.62; OpenMW ActionTeleport teleports them with the player at a door, a
      * travel and here a region map's load too); not on a coordinate teleport (dbg tp, Position) */
     if(aw_scene_followers && !no_followers)aw_scene_followers(p,1);
@@ -823,6 +869,7 @@ static edict_t *travel_target(void) {
     if(travel_service(e))return e;
     return NULL;
 }
+static int travel_built(const char *map,void *ctx) {(void)ctx;return map_valid(map) && AW_SceneTargetBuilt(map);}
 static int travel_use(void) {
     edict_t *e=travel_target();int i;float local[3],source[3],*player=NULL;
     if(!e)return 0;
@@ -836,6 +883,12 @@ static int travel_use(void) {
         /* the price from where the player stands (original coordinates), else the provider's own placement */
         VectorCopy(svs.clients[0].edict->v.origin,local);
         if(AW_WorldToSource(sv.name,local,source))player=source;
+        {   /* destinations this image does not hold (an expansion layer not built) are not offered, as OpenMW's
+             * travel window leaves out an unknown cell (apps/openmw/mwgui/travelwindow.cpp): logged, not listed */
+            char skipped[AW_TRAVEL_MAP];int left=AW_TravelKeepBuilt(&travel_rows,travel_built,NULL,skipped,sizeof(skipped));
+            if(left)Con_Printf("Travel: %d destination(s) not in this build left out (first: %s).\n",left,skipped);
+            if(!travel_rows.count){travel_rows_for=NULL;AW_UISubtitle("","No destination of this ride is in this build.",3);return 1;}
+        }
         for(i=0;i<travel_rows.count;i++)AW_TravelCost(&travel_rows,i,player,&travel_price[i],&travel_hours[i]);
         travel_services=1;travel_count=travel_rows.count+1;
     }
@@ -848,7 +901,7 @@ static void travel_ride(int i) {
     aw_scene_link_t r;const aw_travel_row_t *row=&travel_rows.rows[i];long gold=AW_StateGet(&aw_state,AW_ITEM,"gold_001");
     char path[40];
     if(gold<travel_price[i]){travel_message="You do not have enough gold.";return;}
-    if(!map_valid(row->map) || AW_SceneMapSize(row->map,path,sizeof(path))<0){
+    if(!map_valid(row->map) || AW_SceneMapSize(row->map,path,sizeof(path))<0 || !AW_SceneTargetBuilt(row->map)){
         travel_message=AW_MiniwindActive()?AREA_UNAVAILABLE:"Destination not in this build.";return;
     }
     memset(&r,0,sizeof(r));copy_name(r.target,sizeof(r.target),row->map);
@@ -958,6 +1011,12 @@ static int use_link(int i) {
         /* A quick test build without interiors (aw_excluded.c): a friendly line, not a repair message. */
         if(AW_ContentExcludedSay("interiors",1)){AW_UISubtitle("","Area unavailable in this quick test build.",3);return 1;}
         AW_UISubtitle("",AW_MiniwindActive()?AREA_UNAVAILABLE:"Interior not found.",3);return 1;
+    }
+    if(!AW_SceneTargetBuilt(links[i].target)){
+        /* the unbuilt-target guard: the map is here but its CHIM store (an expansion this build did not select) is
+         * not, so nothing loads; said in game, never a load that stops the game */
+        Con_Printf("Door to %s: its area is not in this build.\n",links[i].target);
+        AW_UISubtitle("",AW_MiniwindActive()?AREA_UNAVAILABLE:"Area not in this build.",3);return 1;
     }
     if(AW_SceneRoomRefuse(links[i].target))return 1;   /* a CHIM room this start's Fast RAM cannot hold: nothing loads */
     if(AW_StoryRestricted() && links[i].reference==119659 && AW_StoryTransition(AW_STAGE_RELEASED) && aw_scene_census_exit)
@@ -1250,6 +1309,7 @@ static int stream_cross(edict_t *p,aw_scene_link_t *r){
  * every teleport, door and load. The switch is kept here (Host_God_f sets it) and put back on each spawn; New Game
  * clears it (aw_debug.c registers the reset). Not saved, as before. */
 int aw_godmode_kept;
+void (*aw_tp_being_arrive)(void);   /* aw_tpplaces.c AW_TpBeingArrive (bound by AW_TpPlacesInit) */
 void AW_SceneSpawn(edict_t *p) {
     int placed=0;float eye;
     if(aw_godmode_kept)p->v.flags=(float)((int)p->v.flags|FL_GODMODE);
@@ -1315,6 +1375,7 @@ void AW_SceneSpawn(edict_t *p) {
         AW_MusicSceneEvent("scene-enter");pending=0;AW_StreamTransitionReady();
         load_recovered(p);load_from.valid=0;
         if(aw_scene_followers)aw_scene_followers(p,0);    /* the followers that came along arrive beside the player */
+        if(aw_tp_being_arrive)aw_tp_being_arrive();       /* dbg tp to a being: beside it, facing it (DBG-TP-TO-NPC-66) */
     } else {
         if(aw_scene_followers)aw_scene_followers(p,-1);   /* another map loaded (a load, a restart): none come along */
         pending=shroompicker_view=0;memset(&hand_snapshot,0,sizeof(hand_snapshot));AW_TorchResetAnimation();
@@ -1351,6 +1412,7 @@ void AW_SceneTick(void) {
     }
     aw_scene_link_t r;edict_t *p;
     if(aw_loadfail_tick)aw_loadfail_tick();
+    tp_held_tick();     /* DBG-TP-DURING-LOAD-66: a dbg tp typed during the load runs now that it has arrived */
     AW_NPCFloorRetry();
     if(!pending && aw_hinged_tick)aw_hinged_tick(host_frametime);   /* nothing unless a door turns */
     if(!pending && sv.active && cls.state==ca_connected && cls.signon==SIGNONS &&
@@ -1642,14 +1704,32 @@ static void shroompicker_command(void) {
         spot.verified?"playtested":"source checked; native unverified");
     Con_Printf("Standing surface checked on arrival. Picked/empty plants remain absent; dbg shroomtracker counts picks.\n");
 }
-/* dbg tp mark / dbg tp marker: the user map marker (the map screen's right click, MAP-MARKER-29, saved in the
- * globals under aw_worldui.c's keys, original global X Y), by the same route as dbg tp X Y: the map that
- * holds the point (a CHIM frame on a CHIM disk) and the highest standing surface there. 0: no marker. */
+/* dbg tp mark / dbg tp marker: the user map marker, by the same route as dbg tp X Y: the map that holds the point (a
+ * CHIM frame on a CHIM disk) and the highest standing surface there. MAP-MULTI-MARKERS-66: the hot marker, else
+ * marker 1 of the list (aw_mapmarks.c), else an older save's single marker (the globals, MAP-MARKER-29) not yet
+ * carried into the list. 0: no marker. */
 int AW_SceneMapMarker(float *source) {
+    const aw_mapmark_t *m=AW_MapMark(0);
+    if(AW_MapHotGet(&source[0],&source[1])){source[2]=0;return 1;}
+    if(m){source[0]=m->x;source[1]=m->y;source[2]=0;return 1;}
     if(AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:map:marker:ready")!=1)return 0;
     source[0]=(float)AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:map:marker:x");
     source[1]=(float)AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:map:marker:y");
     source[2]=0;return 1;
+}
+/* MAP-ORIGINAL-POI-66 stage 3: the I-th teleport door of the loaded scene for the map's door markers (OpenMW
+ * MapWindow: a marker per door with a destination, named after where it leads). POINT gets the door's middle in the
+ * running map's units; NAME its destination's name (the bank's label, else the target map). 1 a door of this scene,
+ * 0 a row of another scene or a prison marker, -1 past the last row. */
+int AW_SceneMapDoor(int i,float *point,const char **name) {
+    vec3_t shift;int k;
+    if(i==0)read_links_for(door_scene());
+    if(i<0 || i>=count)return -1;
+    if(strcmp(door_scene(),links[i].source) || !strcmp(links[i].target,"-"))return 0;
+    door_shift(shift);
+    for(k=0;k<3;k++)point[k]=(links[i].bounds?(links[i].mins[k]+links[i].maxs[k])*.5f:links[i].point[k])+shift[k];
+    *name=links[i].label[0]?links[i].label:links[i].target;
+    return 1;
 }
 static void roulette_command(int first);
 /* DEBUG-TP-MINIWIND-36: after a refused coordinate teleport, which maps this disk holds (the town list of dbg tp) and,
@@ -1898,13 +1978,14 @@ static void demo_start(void) {
         } else Cbuf_AddText("map seyda\n");
     }
 }
-static void scene_entry(void) {tp_cmd=1;scene_command();tp_cmd=0;}
-static void teleport_entry(void) {tp_cmd=1;teleport_command();tp_cmd=0;}
+static void scene_entry(void) {if(tp_hold("aw_scene"))return;tp_cmd=1;scene_command();tp_cmd=0;}
+static void teleport_entry(void) {if(tp_hold("aw_teleport"))return;tp_cmd=1;teleport_command();tp_cmd=0;}
 /* The game-state reset's "scene loads" module (aw_loadfail.c): the scene's state dropped, the followers left behind.
  * OPENING-VANITY-CAMERA-64: the story and the save state are modules of their own, reset before this one; this reset
  * reset them again in their dbg restartgame form (AW_StoryReset(0)), so a New Game's opening lost its stage and its
  * CharGenState and ran as an unrestricted game (the idle orbit and the view switch on the ship and the pier). */
 void AW_SceneLoadReset(void) {
+    tp_held_drop("a new game starts");   /* DBG-TP-DURING-LOAD-66: a held dbg tp is session state (New Game resets it) */
     AW_SceneCancelTransition();
     load_recovering=0;load_from.valid=0;load_box_wanted=0;travel_pending=NULL;
     if(aw_scene_followers && sv.active && svs.clients && svs.clients[0].edict)aw_scene_followers(svs.clients[0].edict,-1);

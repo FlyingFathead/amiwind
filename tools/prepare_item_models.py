@@ -90,6 +90,7 @@ def _convert(task):
         from npc_geometry import Assets
         from mwad.audit import BSA
         from mwad.paths import child_ci
+        from mwad.masters import master_path
         from prepare_scenery import nif_reader
         _STATE.clear()
         _STATE.update(data=data, nif=nif_reader(), assets=Assets(Path(data), BSA(child_ci(Path(data), 'Morrowind.bsa'))))
@@ -374,11 +375,12 @@ def install_placed(stage, id1, receipt, table):
 
 def build_placed(data, table):
     """(payload, receipt part) of the placed item list for the item model TABLE ({mesh key: path}, file order)."""
-    from cell_numbers import load_table
+    from cell_numbers import load_table, room_numbers
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     from prepare_inventory import source_items
-    numbers = {row['cell'].casefold(): row['number'] for row in load_table(data)[0] if row['master'] == 'Morrowind.esm'}
-    rows, missing = placement_list(child_ci(data, 'Morrowind.esm').read_bytes(), source_items(data)[0], table, numbers)
+    numbers = room_numbers(load_table(data)[0])   # EXPANSION-BASE-ONLY-TABLES-66: every selected master's rooms
+    rows, missing = placement_list(master_path(data).read_bytes(), source_items(data)[0], table, numbers)
     counts = check_placed(rows)
     payload = pack_placed(rows)
     rooms = {k: v for k, v in counts.items() if not k & 0x80000000}

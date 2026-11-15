@@ -17,10 +17,11 @@ import wave
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 import numpy as np
 from PIL import Image
-from mwad.audit import BSA
+from mwad.archives import layered_bsa
 from mwad.interior import read_interior, select_geometry
 from mwad.npc import load_master, outfit, greeting_fixture, behavior_record, greeting_settings, first
 from mwad.paths import resolve_data_files, child_ci, ensure_external, replace_bytes, replace_copy
+from mwad.masters import master_path
 from area_config import SCENES, inside
 from build_jobs import add_jobs, resolve_jobs
 from build_parallel import ordered_map
@@ -77,7 +78,7 @@ class TalkGreetings:
         # no Greeting topic (a synthetic master): nothing to pick, the master is not read again
         self.names = {}
         if greeting_topics(topics):
-            kinds = dialogue_records(child_ci(data, 'Morrowind.esm'), kinds)
+            kinds = dialogue_records(master_path(data), kinds)
             self.names = exterior_cell_names(kinds, cells)
         self.kinds, self.topics = kinds, topics
         self.cache = {}
@@ -254,7 +255,7 @@ def build_room(task):
     # interior_dressing); other callers keep the earlier skip rule (receipted).
     dressing = task[9] if len(task) > 9 else False
     slug = entry['map']
-    cell = read_interior(child_ci(data, 'Morrowind.esm'), entry['cell'],
+    cell = read_interior(master_path(data), entry['cell'],
                          include_interior_entrances=entry.get('original_door_arrivals', False))
     if entry.get('recentre'):
         # A room moved toward the origin (INTERIOR-COORDS-31; town_interiors.room_offsets): every position of
@@ -281,7 +282,7 @@ def build_room(task):
         from prepare_scenery import bsa_read, nif_reader
         from prepare_tree_sprites import collision_metadata
         from world_flora import flora_kind
-        bsa=BSA(child_ci(data,'Morrowind.bsa'));reader=nif_reader();collisions={}
+        bsa=layered_bsa(data);reader=nif_reader();collisions={}
         def collision_of(model):
             if model not in collisions:
                 collisions[model]=collision_metadata(bsa_read(bsa,'meshes/'+model),reader,flora_kind(model))
@@ -302,7 +303,7 @@ def build_room(task):
     # the earlier rule (the pool activator is left out, select_geometry).
     import lava as lava_rules
     lava_mode=lava_rules.lava_mode()
-    pools=(lava_rules.pools_of(data,cell['refs'],lava_rules.molten_objects_of(child_ci(data,'Morrowind.esm')))
+    pools=(lava_rules.pools_of(data,cell['refs'],lava_rules.molten_objects_of(master_path(data)))
            if lava_mode=='quake' else [])
     if pools:
         lighting={**lighting,'lights':list(lighting.get('lights',[]))+
@@ -335,7 +336,7 @@ def build_room(task):
     lava_brushes,lava_entities,lava_records=lava_rules.map_parts(pools,[0,0,0],SCALE)
     if pools:
         walls+=lava_brushes
-        assets=Assets(data,BSA(child_ci(data,'Morrowind.bsa')))
+        assets=Assets(data,layered_bsa(data))
         layers=max((p['layers'] for p in pools),key=len)
         textures+=lava_rules.wad_entries(assets.texture,layers,tile)
     (root/'room.wad').write_bytes(wad(textures))
@@ -487,10 +488,34 @@ def open_residents():
         previous_digests((__file__, 'build_resident'), (__file__, 'publish_resident')), (__file__,),
         covered_lines((__file__, 'build_resident'), (__file__, 'publish_resident')), neutral=WORK_PLACE_SETTINGS,
         entries=((__file__, 'build_resident'), (__file__, 'publish_resident')))
-    identity = game_data_digest() if cache is not None else None
+    # the input lock alone: each resident adds its own view of what the selected expansion layers change
+    # (resident_unit, tools/layer_view.py; BUILD-UNIT-KEYS-LAYER-BLIND-66)
+    identity = game_data_digest(layers=False) if cache is not None else None
     if identity is None:
         return None, None
     return cache, identity
+
+
+def resident_reads(data, appearance):
+    """(record keys, asset names) a resident's bake reads from the game data beside the appearance and greeting the
+    stage resolved (both in its key): its NPC record (the guard torch rule reads its class and inventory), the light
+    records of its inventory and the original torch (prepare_guard_torches.guard_sources), the footstep, wading and
+    swimming sounds (npc_anim.soun_records, event_sounds for every foot kind). No archive file: the bake reads its
+    models, textures and sounds from the selected masters' archives and the loose files (npc_geometry.Assets over
+    mwad.archives.layered_bsa, _bake_resident; the plain base archive for the base game alone); a layer's replaced
+    archive file a bake reads is caught by layer_view.gaps (not stored). The master_path reads of build_resident's reach are listed in
+    tests/test_layer_view.py, so a new one fails the gate until it is named here."""
+    import layer_view
+    if not layer_view.layers_selected():
+        return [], []                    # the base game alone: nothing a layer changes (no master read here)
+    ident = str(appearance.get('id', ''))
+    records = [layer_view.record_key('NPC_', ident), layer_view.record_key('LIGH', 'torch')]
+    fields = layer_view.merged_record(data, layer_view.record_key('NPC_', ident)) or ()
+    for tag, raw in fields:
+        if tag == 'NPCO' and len(raw) >= 36:
+            item = raw[4:36].split(b'\0', 1)[0].decode('latin-1')
+            records.append(layer_view.record_key('LIGH', item))
+    return records + layer_view.footstep_records(), []
 
 
 def resident_unit(task, opened=None, digests=None):
@@ -526,10 +551,15 @@ def resident_unit(task, opened=None, digests=None):
 
     def digest(value):
         return hashlib.sha256(json.dumps(value, sort_keys=True, default=repr).encode()).hexdigest()
+    # the lock digest, or with the selected expansion layers the lock digest and what they change that this resident
+    # reads (layer_view.identity: the lock digest itself when they change nothing it reads, so it keeps its base key)
+    import layer_view
+    records, assets = resident_reads(data, appearance)
+    game = layer_view.identity(data, records, assets, base=identity)
     return cache, {'entry': {'name': appearance['id']}, 'format': RESIDENT_UNIT_FORMAT,
                    'appearance': digest(appearance), 'greeting': digest(greeting),
                    'palette': hashlib.sha256(palette).hexdigest(), 'lod': lod, 'ffmpeg': tool_digest(program),
-                   'game_data': identity}
+                   'game_data': game}
 
 
 def resident_files(task, folder):
@@ -598,6 +628,35 @@ def store_resident(cache, inputs, folder, identifier, record):
         cache.store_unit(inputs, {'identifier': identifier, 'record': record}, folder)
 
 
+def build_resident_reads(task):
+    """Pool worker: build_resident(task) with the layer archive files the bake read (layer_view.reads) in its
+    record under '_layer_reads' (the same result shape as build_resident; taken off in populate). No module constant
+    for the name: a module-level line is import-time code of every unit key that reaches this module."""
+    import layer_view
+    layer_view.begin()
+    identifier, raw, voice, record = build_resident(task)
+    read = layer_view.reads()
+    if read:
+        record['_layer_reads'] = read
+    return identifier, raw, voice, record
+
+
+def resident_layer_gaps(task, read):
+    """The layer archive files a resident's bake READ that its key's view leaves out (layer_view.gaps), printed: such a
+    resident is not stored (a gap costs reuse, never a resident reused for files its key does not hold)."""
+    if not read:
+        return []
+    import layer_view
+    data, appearance = task[0], task[2]
+    records, assets = resident_reads(data, appearance)
+    missing = layer_view.gaps(read, layer_view.view(data, records, assets), data)
+    if missing:
+        print('[warning] resident %s read expansion archive files its unit key does not hold (%s): not stored in the '
+              'unit cache (fix: prepare_area.resident_reads)' % (appearance.get('id'), ', '.join(missing[:5])),
+              flush=True)
+    return missing
+
+
 def build_resident_cached(job):
     """One resident's bake into its unit folder: restored from the unit cache when its inputs are unchanged, else
     baked and stored. Returns (identifier, record, made)."""
@@ -605,8 +664,12 @@ def build_resident_cached(job):
     cache, inputs, record = restore_resident(task, folder)
     if record is not None:
         return task[2]['id'], record, False
+    import layer_view
+    layer_view.begin()
     identifier, record = resident_files(task, folder)
     record = json_record(record)
+    if resident_layer_gaps(task, layer_view.reads()):
+        cache = None
     store_resident(cache, inputs, folder, identifier, record)
     return identifier, record, True
 
@@ -708,7 +771,7 @@ def _guard_torch(key,data,assets,appearance,palette):
     (--npc-anim-type 1) get theirs from the image step's guard torch registry instead."""
     import prepare_guard_torches as G
     if key not in _resident_guards:
-        npcs,lights,mesh=G.guard_sources(child_ci(data,'Morrowind.esm'))
+        npcs,lights,mesh=G.guard_sources(master_path(data))
         _resident_guards[key]={'npcs':npcs,'lights':lights,'mesh':mesh,'items':{}}
     guards=_resident_guards[key]
     fields=guards['npcs'].get(appearance['id'].casefold())
@@ -748,7 +811,7 @@ def warm_resident_table(task):
     import skeletal_actor
     data,appearance=task[0],task[2]
     key=str(Path(data).resolve())
-    if key not in _resident_assets:_resident_assets[key]=Assets(data,BSA(child_ci(data,'Morrowind.bsa')))
+    if key not in _resident_assets:_resident_assets[key]=Assets(data,layered_bsa(data))
     assets=_resident_assets[key]
     def rig_of(path):
         rig=(key,path)
@@ -775,7 +838,7 @@ def _skeletal_resident(task, profile_name, profile, key, assets):
     table_bytes,_,_,table_path,_,_=skeletal_actor.game_table(key,appearance,rig_of)
     foot=appearance.get('foot','bare')
     if key not in _resident_sounds:
-        _resident_sounds[key]=npc_anim.soun_records(child_ci(data,'Morrowind.esm'))
+        _resident_sounds[key]=npc_anim.soun_records(master_path(data))
     lines={t:[(s,tuple(tuple(x) for x in c) if c else None) for s,c in v] for t,v in (appearance.get('voices') or {}).items()}
     barks=npc_anim.voice_words(lines)
     described=[{k:v for k,v in g.items() if k!='events'}|{'events':[list(e) for e in g['events']]} for g in groups]
@@ -800,7 +863,7 @@ def _bake_resident(task, profile_name):
     data, palette, appearance, greeting, ffmpeg = task[:5]
     lod = task[5] if len(task) > 5 else None
     key=str(Path(data).resolve())
-    if key not in _resident_assets:_resident_assets[key]=Assets(data,BSA(child_ci(data,'Morrowind.bsa')))
+    if key not in _resident_assets:_resident_assets[key]=Assets(data,layered_bsa(data))
     assets=_resident_assets[key];rig=(key,appearance['skeleton'])
     if rig not in _resident_rigs:_resident_rigs[rig]=Skeleton(assets,appearance['skeleton'])
     skeleton=_resident_rigs[rig]
@@ -859,7 +922,7 @@ def _bake_resident(task, profile_name):
                 return [{k:v for k,v in g.items() if k!='events'}|{'events':[list(e) for e in g['events']]} for g in gs]
             foot=appearance.get('foot','bare')
             if key not in _resident_sounds:
-                _resident_sounds[key]=npc_anim.soun_records(child_ci(data,'Morrowind.esm'))
+                _resident_sounds[key]=npc_anim.soun_records(master_path(data))
             try:
                 if mover_name:
                     mover_groups,mover_index=npc_anim.fit(groups,nv,nt,sw,sh,npc_anim.ACTOR_BYTE_BUDGET)
@@ -965,7 +1028,7 @@ def resident_work_folder(scene,report_name='area-report.json'):
 def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
              include_exterior=True,report_name='area-report.json',doors=True,exclude_residents=()):
     palette=(scene/'id1/gfx/palette.lmp').read_bytes()
-    kinds,cells,topics=load_master(child_ci(data,'Morrowind.esm'))
+    kinds,cells,topics=load_master(master_path(data))
     # Actors the original's start scripts disable at a new game stay out with --start-disabled original
     # (tools/start_disabled.py; off by default), listed in left_out with their enable rule.
     import start_disabled
@@ -1049,9 +1112,11 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
     from unit_store import progress_line
     if tasks:print('Residents [%d/%d] cached, %d to make'%(len(tasks)-len(pending),len(tasks),len(pending)),flush=True)
     began=time.perf_counter()
-    for (task,cache,inputs,folder),baked in zip(pending,ordered_map(build_resident,[p[0] for p in pending],max(1,min(resolve_jobs(jobs),len(pending) or 1))) if pending else ()):
+    for (task,cache,inputs,folder),baked in zip(pending,ordered_map(build_resident_reads,[p[0] for p in pending],max(1,min(resolve_jobs(jobs),len(pending) or 1))) if pending else ()):
+        read=baked[3].pop('_layer_reads',None) if isinstance(baked[3],dict) else None
         identifier,record=publish_resident(folder,*baked)
         record=json_record(record)
+        if resident_layer_gaps(task,read):cache=None
         store_resident(cache,inputs,folder,identifier,record)
         done[identifier]=(record,folder,True)
         print(progress_line('Residents',len(tasks)-len(pending)+sum(1 for d in done.values() if d[2]),len(tasks),
@@ -1097,8 +1162,14 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
             left_out.extend({'map':slug,'reference':r['number'],'id':r['id'],'type':'CREA','reason':'model: '+record}
                             for slug,r in creatures if r['id'].casefold()==identifier)
             continue
-        stem='a_'+hashlib.sha256(identifier.encode()).hexdigest()[:12]
-        record.update(model='progs/'+stem+'.mdl',voice='')
+        if record.get('method')=='skeletal':
+            # one skeletal model on the creature's own table (creature_residents.skeletal_task): the model, its table
+            # and its layout under the table's own names (HEART-OF-LORKHAN-LOOK-62)
+            record['voice']=''
+            for path,data_bytes in record.pop('_files'):replace_bytes(scene/'id1'/path,data_bytes)
+        else:
+            stem='a_'+hashlib.sha256(identifier.encode()).hexdigest()[:12]
+            record.update(model='progs/'+stem+'.mdl',voice='')
         replace_bytes(scene/'id1'/record['model'],raw)
         behavior=behavior_record(kinds['CREA'][identifier],SCALE)
         # no creature greeting or dialogue yet: hello distance 0 (the entity never greets)

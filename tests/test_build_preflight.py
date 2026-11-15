@@ -4,6 +4,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+import unittest.mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
@@ -68,6 +69,62 @@ class PreflightTests(unittest.TestCase):
         check = text.index('build_preflight.run(args.workspace')
         self.assertLess(text.index('require_previous_release(ROOT, VERSION)'), check)
         self.assertLess(check, text.index("        if getattr(args, 'accept_known_stair_findings', None):\n"))
+
+
+@unittest.skipUnless(hasattr(os, 'geteuid') and hasattr(os, 'fork'), 'POSIX owners, forked workers')
+class CacheWalkPoolTests(unittest.TestCase):
+    """BUILD-PREFLIGHT-SERIAL-REPEATED-66: the cache walk on a process pool names the same counts and the same first
+    entries as the serial walk and as the earlier one-core method (cache_problems_walk), in os.walk's order."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.cache = Path(self.temp.name) / 'cache'
+        for a in range(3):
+            for b in range(3):
+                for c in range(2):
+                    folder = self.cache / f'pool-{a}' / f'{b:02x}' / f'{c:02x}' / 'deep'
+                    folder.mkdir(parents=True)
+                    for n in range(3):
+                        (folder / f'entry-{n}.json').write_text('{}')
+                    (folder.parent / f'top-{c}.bin').write_bytes(b'x')
+            (self.cache / f'pool-{a}' / 'flat.json').write_text('{}')
+        (self.cache / 'index.json').write_text('{}')
+        os.symlink(self.cache / 'pool-0', self.cache / 'pool-link')       # a link to a folder: never walked
+        os.symlink(self.cache / 'missing', self.cache / 'pool-1' / 'dangling')
+
+    def messages(self, uid):
+        # no fallback to this process: a pool that stopped would only give the serial answer again
+        with unittest.mock.patch.object(build_preflight, 'FALLBACK', False), \
+                unittest.mock.patch.object(build_preflight, 'TASK_CHUNK', 2):
+            return (build_preflight.cache_problems_walk(self.cache, uid=uid),
+                    build_preflight.cache_problems(self.cache, uid=uid),
+                    build_preflight.cache_problems(self.cache, uid=uid, workers=1),
+                    build_preflight.cache_problems(self.cache, uid=uid, workers=3))
+
+    def test_every_entry_foreign_gives_the_same_message_every_way(self):
+        earlier, serial, one, pool = self.messages(os.geteuid() + 4242)
+        self.assertEqual(len(earlier), 1)
+        self.assertEqual(serial, earlier)
+        self.assertEqual(one, earlier)
+        self.assertEqual(pool, earlier)
+        walked = sum(1 + len(files) for _, _, files in os.walk(self.cache))
+        self.assertIn(f'{walked} cache entries owned by another user', pool[0])
+
+    def test_a_clean_cache_passes_every_way(self):
+        self.assertEqual(self.messages(os.geteuid()), ([], [], [], []))
+
+    def test_the_tasks_cover_the_walk_in_its_order(self):
+        tasks = list(build_preflight._walk_tasks(str(self.cache), depth=2))
+        self.assertTrue(any(task[0] == 'tree' for task in tasks))
+        flat = []
+        for task in tasks:
+            if task[0] == 'here':
+                flat.append((task[1], task[2]))
+            else:
+                flat += [(folder, files) for folder, _, files in os.walk(task[1])]
+        self.assertEqual(flat, [(folder, files) for folder, _, files in os.walk(str(self.cache))])
+        self.assertFalse(any(task[-1].endswith('pool-link') for task in tasks if task[0] == 'tree'))
 
 
 class HarvestTownPlanTests(unittest.TestCase):

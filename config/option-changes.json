@@ -1223,6 +1223,33 @@
       "to": null,
       "source": "tools/build.py, tools/mesh_geometry_env.py, tools/chim/interior.py (COLLISION-WORLDWIDE-REDUCTION-64)",
       "note": "null = config/chim-rooms.json hollow_bevels (2: approximate standing bevels on every room's hollow collision plates, as every solid model; the method up to v0.0.64-dev4 was 0, exact on every plate); 0, 1 (exact on near-horizontal plates only) or 2 override it; a room or room type opts back in with its own hollow_bevels; checked by tools/hollow_bevel_sweep.py"
+    },
+    {
+      "version": "0.0.66-dev1",
+      "option": "room_draw_tiles",
+      "flag": "--room-draw-tiles",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py, tools/bsp_model_tiles.py, tools/prepare_interior.py (PRISON-SHIP-POLY-COLLISION-65)",
+      "note": "null = 512: the prison ship hold's shell (7,997 faces, one model whose box is the whole room) is split into draw tiles of at most 512 faces, each with its own box, so the engine's per-model frustum test leaves out the parts behind the view; the faces themselves are unchanged; 0 = the shell as one model (the method before). The same change gives the shell's collision plates the room rule of --chim-hollow-bevels (the hold's own value 1 when the option is not given: exact standing bevels on the walkable plates, approximate on the walls; 0 = exact on every plate, the method before)"
+    },
+    {
+      "version": "0.0.66-dev1",
+      "option": "room_small_parts",
+      "flag": "--room-small-parts",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py, tools/room_map_parts.py, tools/prepare_interior.py (PRISON-SHIP-POLY-COLLISION-65)",
+      "note": "null = box: in the prison ship's hold the hammocks' closed parts of at most 2.5 units (rings and knots) are drawn as their boxes, six faces each, in their own material (the table room_map_parts.ROOM_MAP_SMALL_PARTS); collision unchanged; off = every part as authored (the method before)"
+    },
+    {
+      "version": "0.0.66-dev1",
+      "option": "chim_draw_tiles",
+      "flag": "--chim-draw-tiles",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py, tools/chim_build.py, tools/chim/build.py (PRISON-SHIP-POLY-COLLISION-65)",
+      "note": "null = off: nothing changes; on = the Seyda Neen ship (ex_de_ship) and the silt strider stored as the large-model cut's tiles at a 128 grain (chim.build.DRAW_TILES_ON: every face and convex piece whole in its tile), so the engine's per-model frustum test leaves out the parts behind the view; measured offline from the deck and the pier (faces tested per view, the heaviest view 16,378 to 12,927 from the deck and 16,494 to 11,805 from the pier); it re-keys those models' tile units, so it waits for a planned world rebuild"
     }
   ],
   "current": {
@@ -1275,6 +1302,7 @@
       "chim_cut_models_over": null,
       "chim_detail_budget": null,
       "chim_draw_distance": null,
+      "chim_draw_tiles": null,
       "chim_fence_twosided_faces": null,
       "chim_fire_light": "on",
       "chim_frame_ext": "chim",
@@ -1385,8 +1413,10 @@
       "resource_threads": null,
       "reuse_all_available": false,
       "room_batches": "all",
+      "room_draw_tiles": null,
       "room_levelled_creatures": "table",
       "room_placed_creatures": "table",
+      "room_small_parts": null,
       "scale_snap": null,
       "scenery_reduce": null,
       "scenery_reduce_texels": null,

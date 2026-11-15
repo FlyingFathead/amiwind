@@ -5,6 +5,7 @@ import argparse,json,sys
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from mwad.paths import ensure_external,resolve_data_files,child_ci
+from mwad.masters import master_path
 from mwad.vicinity import region_audit,roster_markdown
 
 def main():
@@ -15,7 +16,7 @@ def main():
     p.add_argument('--radius',type=int,default=1)
     a=p.parse_args();data=resolve_data_files(a.data_files);out=ensure_external(a.out,'private area audit')
     if out.exists():p.error('Output exists; use a new checkpoint directory')
-    report=region_audit(child_ci(data,'Morrowind.esm').read_bytes(),a.center,a.radius)
+    report=region_audit(master_path(data).read_bytes(),a.center,a.radius)
     out.mkdir(parents=True,exist_ok=False)
     (out/'vicinity-audit.json').write_text(json.dumps(report,indent=2)+'\n')
     (out/'SEYDA_NEEN_CAST.md').write_text(roster_markdown(report))

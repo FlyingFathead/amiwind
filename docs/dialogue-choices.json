@@ -3,7 +3,7 @@
   "Bloodmoon.esm": {
    "branches": 281,
    "calls": 125,
-   "in_table": false,
+   "in_table": true,
    "infos_with_choice": 125,
    "max_options": 9,
    "max_text": 197,
@@ -35,7 +35,7 @@
   "Tribunal.esm": {
    "branches": 637,
    "calls": 267,
-   "in_table": false,
+   "in_table": true,
    "infos_with_choice": 267,
    "max_options": 9,
    "max_text": 96,
@@ -472,5 +472,10 @@
   }
  ],
  "schema": "dialogue-choices 1",
- "table_master": "Morrowind.esm"
+ "table_master": "Morrowind.esm",
+ "table_masters": [
+  "Morrowind.esm",
+  "Tribunal.esm",
+  "Bloodmoon.esm"
+ ]
 }

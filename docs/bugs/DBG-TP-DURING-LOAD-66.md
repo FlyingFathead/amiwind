@@ -1,0 +1,174 @@
+# DBG-TP-DURING-LOAD-66: A dbg tp typed while a load is still running is lost: a town name does nothing, a place says no map holds the point, a room prints its name and stays
+
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | test |
+| First noticed | 15 November 2026, in v0.0.66-dev2 |
+| Where | dbg tp (aw_teleport) and dbg scene (aw_scene) in engine/aga/src/aw_scene.c, typed while a map load is pending or the client is not yet in play |
+| Reproduction | always |
+| Duplicate of | no |
+| Persists in | v0.0.66-dev2 (last seen) |
+| Severity | medium: debug teleports and scripted sessions only, but it made the release smoke hops wrong both ways: a lost Arena Pit hop passed on v0.0.66-dev1, three hops failed on v0.0.66-dev2 |
+| Family | Debug commands and remote control (`debug-commands`) |
+| Playtest version | v0.0.66-dev2 |
+| From commit | source unknown, engine unknown, CHIM world unknown |
+| CHIM engine version | CHIM 0.2.2, engine unknown, world format 0.11 |
+| Unknown because | the build receipt does not record source commit, engine commit, world commit |
+| Platform or emulator | FS-UAE 3.1.66, JIT, A1200 68040 preset, 32 MB Fast RAM |
+
+<!-- END GENERATED FACTS -->
+
+_Last updated with AmiWind v0.0.66-dev2 (15 November 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [Status: 15 November 2026](#status-15-november-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
+## Status: 15 November 2026
+
+Fixed in source on the v0.0.66-dev2 line (engine only). Pending the next v0.0.66-dev2 image's smoke hops in game.
+
+## Symptom
+
+The release smoke hops type one `dbg tp` after another with a fixed wait between them. On the v0.0.66-dev2 image
+three of them were typed while the area before was still loading, and each was lost in its own way:
+
+- `dbg tp balmora`, typed in the last frame of the Seyda Neen load: no load and no console line. The player stayed in
+  Seyda Neen.
+- `dbg tp arenapit`, typed during the Vivec load: the console printed "Vivec, Arena Pit" and nothing loaded.
+- `dbg tp aldruhn`, typed during the same load: "Ald'ruhn: no map on this disk holds that point; player state
+  unchanged." Ald'ruhn is on the disk: the same command loaded its map (vf0877) on the v0.0.66-dev1 image.
+
+The Arena Pit hop was lost the same way on v0.0.66-dev1: typed during the Vivec load, it printed its name and the
+player stayed at the Vivec arrival. The hop check passed it, because the reading before it had been taken in the
+middle of that load.
+
+## Where
+
+The console commands `dbg tp` (aw_teleport) and `dbg scene` (aw_scene) in `engine/aga/src/aw_scene.c`.
+
+## How it happened
+
+A scene load sets a pending flag when it starts and clears it when the player arrives. `load_scene` returns at once
+while the flag is set, and the coordinate route (`map_teleport`) refuses while a load is pending or the client is not
+yet in play. None of the callers said why:
+
+- a town name fell through to its town route, whose `load_scene` did nothing;
+- a place of `teleport-names.txt` printed the message meant for a point outside every map;
+- a room printed its name before its `load_scene`.
+
+## Why it was not caught
+
+A command typed by hand comes after the arrival. The smoke hops type theirs after a fixed wait, and loads on
+v0.0.66-dev2 take longer than that wait (IMAGE-LOADS-SLOWER-66). The hop check counts a reading taken in the middle of
+a load as a change of place.
+
+## Repair
+
+A `dbg tp` or `dbg scene` typed while a load runs (the load pending, or the client not yet in play) is held:
+
+- One command is held. A newer one replaces it and the console says so. An argument with a quote, a semicolon or a
+  line break is refused instead of held.
+- The held command runs as soon as the load has arrived and the player is in play, from the scene tick, with a
+  console line.
+- A failed load and New Game drop it, with a console line.
+
+The console lines:
+
+- `dbg tp: a load is in progress (MAP); aw_teleport "balmora" runs when it has arrived.`
+- `dbg tp: aw_teleport "vivec" replaces the held aw_teleport "balmora".`
+- `dbg tp: the load has arrived; aw_teleport "vivec" runs now.`
+- `dbg tp: the held aw_teleport "vivec" is dropped: the load failed.` (or `a new game starts`, `no game is running`)
+
+## Verification
+
+`tests/aga_scene_test.c` (run by `tests/test_aga_native_source.py`: the scene links test and the strider test) types
+`dbg tp` during a pending load on the real scene code and checks:
+
+- it is held and nothing loads;
+- it does not run while the client is still signing on, and runs once after the arrival;
+- a newer one replaces it, and `dbg scene` is held the same way;
+- coordinates keep their words;
+- New Game and a game that is gone drop it.
+
+In game: pending the smoke hops of the next v0.0.66-dev2 image.
+
+## Prevention
+
+The hop check should take each hop's own arrival (its map loaded and the player in play), not only a reading that
+differs from the one before.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Debug commands and remote control (`debug-commands`). dbg commands, teleports, debug map loads and the remote console. See [families](README.md#families).
+
+- AW-20260928-14 (no report page): Master debug toggle omits coordinates
+- [COMPANION-PICK-RMB-33](COMPANION-PICK-RMB-33.md): The right mouse button does not pick a companion: "MOUSE3 is unbound"
+- [CONSOLE-COMMAND-SHADOWED-BY-CVAR-36](CONSOLE-COMMAND-SHADOWED-BY-CVAR-36.md): dbg combat and dbg animkit options never ran: their console commands share a name with a cvar, so Quake refused the command and the cvar answered
+- CONSOLE-TP-ROOM-NAME-63 (no report page): The console teleport to a room map name stays in the current town instead of entering the room
+- DBG-CONTAINER-AIM-NO-SPOT-59 (no report page): aw_placed container aim finds no standing spot the room collision accepts in Arrille's Tradehouse
+- DBG-DOOR-GO-AIM-CHIM-59 (no report page): aw_hinged_door go does not bring the door under the crosshair in a CHIM room
+- [DBG-ENTITY-INSPECT-39](DBG-ENTITY-INSPECT-39.md): Requested click-to-pin raw entity and reference inspection
+- DBG-PLACED-LOOK-VIEW-NOT-TURNED-61 (no report page): The test commands aw_placed look and aw_view set the view angles but the view does not turn
+- DBG-QUOTED-ID-REFUSED-62 (no report page): A debug command with a quoted record ID holding a space is refused as an unknown debug command (dbg npcs talk "agronian guy")
+- [DBG-TOGGLE-WORDS-31](DBG-TOGGLE-WORDS-31.md): dbg on/off words turned settings off
+- DBG-TP-BEINGS-66 (no report page): Requested: the dbg tp list chooses All, Exteriors, Interiors or Beings and reaches any person or creature by name
+- DBG-TP-DOORLIST-NO-ARRIVAL-LINE-63 (no report page): dbg tp into a room reached through a door list prints no arrival line
+- DBG-TP-NO-FLOOR-FALLBACK-63 (no report page): dbg tp to a spot with no floor under it falls back to the frame centre
+- DBG-TP-SAME-MAP-54 (no report page): dbg tp X Y finds no map for a point on a MiniWind CHIM frame
+- DEBUG-ALIASES-29 (no report page): Discoverable video-player aliases and disk-backed help
+- DEBUG-GOD-LOCKED-DOORS-51 (no report page): Requested: in god mode a locked door opens, with a framed notice God mode used to enter a locked door
+- DEBUG-POSE-AFTER-RELOAD-52 (no report page): After a map reload a scripted check cannot return to the same view: aw_view does not take and dbg tp seyda lands on a different spot each time
+- [DEBUG-TP-CHIM-33](DEBUG-TP-CHIM-33.md): dbg tp to original coordinates fails in a CHIM town on a pure-CHIM disk, and its help offers towns the disk does not have
+- [DEBUG-TP-CHIMTOWNS-33](DEBUG-TP-CHIMTOWNS-33.md): After chim_towns 0, dbg tp from a CHIM town reloads that town on legacy maps at the current position
+- [DEBUG-TP-MINIWIND-36](DEBUG-TP-MINIWIND-36.md): dbg tp X Y does nothing in a MiniWind build: the coordinate teleport needs the open-world region table, which a MiniWind image leaves out
+- [DEBUG-TP-SHIP-FREEZE-32](DEBUG-TP-SHIP-FREEZE-32.md): The game froze once on dbg tp balmora issued 6 s after dbg tp prisonship
+- [DEBUG-TP-TOWN-NAMES-32](DEBUG-TP-TOWN-NAMES-32.md): dbg tp help omits new towns and has no short town names
+- DEBUG-VIEW-PITCH-DRIFT-54 (no report page): aw_view alone lets the pitch drift, and the greeting camera takes the view during scripted sessions
+- DEV2-REGION-LOAD-CRASH-57 (no report page): v0.0.57-dev1 dev2 image crashes with NUM_FOR_EDICT: bad pointer when a teleport loads another region (dev1 did not)
+- [ENGINE-UNLINK-STUB-35](ENGINE-UNLINK-STUB-35.md): unlink was a stub that deleted nothing, so -condebug appended to the previous console log
+- GAME-RECORDER-FIGHT-SEED-61 (no report page): A recording made while an NPC fights the player does not replay the same: the fight takes a seed of its own on the replay's load
+- GAME-RECORDER-HOTKEY-DIALOGUE-61 (no report page): While a recording runs, Ctrl+R does not stop it when the dialogue window is open: the key goes into the dialogue search field
+- [GAME-RECORDER-MISSING-61](GAME-RECORDER-MISSING-61.md): Requested: a gameplay recorder that records a play session and plays it back in another game instance
+- GODMODE-LOST-ON-MAP-CHANGE-64 (no report page): God mode switched on before a teleport, a door or a load is off again after the map change
+- HORS-FROM-MENU-58 (no report page): dbg aw hors cannot be started from the main menu
+- [HUD-GLOBAL-NO-REGIONS-33](HUD-GLOBAL-NO-REGIONS-33.md): The debug HUD said "GLOBAL XYZ: unavailable" on a CHIM town on a disk without the world directory (MiniWind)
+- [INSPECT-CHIM-PLACEMENT-UNNAMED-42](INSPECT-CHIM-PLACEMENT-UNNAMED-42.md): Inspect pin on a placed mesh in a CHIM frame reports only worldspawn, no mesh or reference
+- [INSPECT-NO-RIGHT-CLICK-EXIT-42](INSPECT-NO-RIGHT-CLICK-EXIT-42.md): Inspect mode cannot be left with the mouse: only the console command dbg hud off
+- [INSPECT-OVER-VIEWPORT-42](INSPECT-OVER-VIEWPORT-42.md): Inspect mode (dbg hud) draws its hint and pinned panel on black boxes over the 3D view
+- [INSPECT-PIN-LOAD-DOOR-51](INSPECT-PIN-LOAD-DOOR-51.md): The inspect pin at an exterior load door names the building shell around it, not the door: the drawn door looks absent
+- MAP-TELEPORT-28 (no report page): F10 map teleport intermittently fails
+- [MINIWIND-CITY-COORD-TP-36](MINIWIND-CITY-COORD-TP-36.md): dbg tp X Y Z does not work inside the whole-city Vivec MiniWind: Coordinate teleport unavailable (no map on this disk holds that point)
+- [REMOTE-CONSOLE-APPEND-31](REMOTE-CONSOLE-APPEND-31.md): Remote console log keeps only the last message
+- [REMOTE-CONSOLE-LOG-COST-32](REMOTE-CONSOLE-LOG-COST-32.md): With the remote console on, every console line costs about 7-18 ms in FS-UAE
+- [REMOTE-STATE-WIDTH-31](REMOTE-STATE-WIDTH-31.md): Remote state file printed 51.*ld for fractional fields
+- SWEEP-GNISIS-LOAD-STALL-57 (no report page): Settlement sweep: the teleport to Gnisis shows no game-clock progress for 20 s (hang or a load over 20 s)
+- [SWEEP-SLOW-ARRIVALS-57](SWEEP-SLOW-ARRIVALS-57.md): Settlement sweep: 13 of 82 places run above 50 ms a frame just after arrival at 32 MB Fast
+- TELEPORT-XY-006 (no report page): No dbg tp X Y; map teleport could land underwater
+- TP-ARRIVAL-ABOVE-DOOR-57 (no report page): Settlement sweep: Bal Isra lands about 250 units above its door arrival (on top of the ruin?)
+- TP-ARRIVAL-BELOW-DOOR-57 (no report page): Settlement sweep: Vivec, Temple and Uvirith s Grave land 160 to 290 units below their door arrivals
+- TP-MENU-LABEL-CUT-63 (no report page): The dbg tp list box is narrower than the longest room names, so their (interior) mark can be cut off
+- TP-PICKER-OPEN-FRAME-COST-57 (no report page): The dbg tp list box redraws the whole paused world every frame: 100 ms a frame open against 16 ms closed
+- TP-PLACES-NO-DOOR-SEA-57 (no report page): Settlement list: Fields of Kummu arrives in the water (a place without a door used its cell middle)
+
+Related bugs in other categories:
+
+- [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): Travelling from Seyda Neen to Balmora sometimes hangs on the Loading screen (boot smoke, 2 of about 5 runs)
+- [IMAGE-LOADS-SLOWER-66](IMAGE-LOADS-SLOWER-66.md): Area loads on the v0.0.66-dev2 image take 1.3 to 2.2 times as long as on v0.0.66-dev1 with the same file work (Vivec 13.6 s against 29.9 s)
+
+<!-- END GENERATED CATEGORY -->

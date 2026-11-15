@@ -178,6 +178,7 @@ class DirectSourceTests(unittest.TestCase):
                 self.assertEqual(kwargs,{'allow_append':False});events.append('opening');return {}
             with patch.object(carrier,'resolve_data_files',return_value=root), \
                  patch.object(carrier,'child_ci',return_value=root/'master'), \
+                 patch.object(carrier,'master_path',return_value=root/'master'), \
                  patch.object(carrier,'file_digest',return_value='fixture-hash'), \
                  patch.object(carrier,'load_master',return_value=({},[],{})), \
                  patch.object(carrier,'read_interior',return_value={'flags':1,'refs':[]}), \

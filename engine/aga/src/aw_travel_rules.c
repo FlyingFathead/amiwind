@@ -87,3 +87,13 @@ void AW_TravelCost(const aw_travel_t *t,int row,const float *player,int *price,i
     if(*price<1)*price=1;
     *hours=t->time_mult>0?(int)(d2/t->time_mult):0;
 }
+int AW_TravelKeepBuilt(aw_travel_t *t,int (*built)(const char *map,void *ctx),void *ctx,char *skipped,int size){
+    int i,kept=0,left=0;
+    if(skipped && size>0)skipped[0]=0;
+    if(!t || !built)return 0;
+    for(i=0;i<t->count;i++){
+        if(built(t->rows[i].map,ctx)){if(kept!=i)t->rows[kept]=t->rows[i];kept++;continue;}
+        if(!left++ && skipped && size>0){strncpy(skipped,t->rows[i].map,size-1);skipped[size-1]=0;}
+    }
+    t->count=kept;return left;
+}

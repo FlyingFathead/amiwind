@@ -160,8 +160,7 @@ int AW_WeatherScriptModRegion(aw_weather_script_t *s,const aw_weather_table_t *t
 #define SCRIPT_ROW_BYTES 17
 int AW_WeatherScriptExport(const aw_weather_script_t *s,unsigned char *out,int capacity)
 {
-    int i,n=s?s->count:0,at=5;
-    if(n>AW_WEATHER_SCRIPT_ROWS)n=AW_WEATHER_SCRIPT_ROWS;
+    int i,n=s?s->count:0,at=5;   /* every row: the table refuses a row past AW_WEATHER_SCRIPT_ROWS when it is set */
     if(!out || 5+n*SCRIPT_ROW_BYTES>capacity)return -1;
     memcpy(out,"AWWR",4);out[4]=(unsigned char)n;
     for(i=0;i<n;i++){

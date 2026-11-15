@@ -1,0 +1,1495 @@
+{
+ "build": "2026_11_12_v0.0.65_full-v0.0.65-release_20c6b9c",
+ "records": {
+  "npc": 3041,
+  "creature": 396
+ },
+ "refs": 4798,
+ "worst": [
+  "inventory levelled",
+  "anim knockdown",
+  "anim idle",
+  "anim death",
+  "anim walk",
+  "anim hit",
+  "anim run",
+  "wander",
+  "anim swim",
+  "anim spellcast",
+  "anim attack one-handed",
+  "anim block",
+  "anim attack thrown",
+  "anim sneak",
+  "anim attack two-wide",
+  "anim attack two-handed",
+  "anim attack hand-to-hand",
+  "anim attack crossbow",
+  "anim attack bow",
+  "anim attack",
+  "follow",
+  "scale",
+  "armour",
+  "ranged weapon",
+  "travel",
+  "weapon",
+  "script locals",
+  "escort"
+ ],
+ "anim_methods": {
+  "not in this build": {
+   "records": 559,
+   "refs": 809,
+   "refs_mw": 2
+  },
+  "room resident": {
+   "records": 2073,
+   "refs": 2442,
+   "refs_mw": 2439
+  },
+  "NPC library": {
+   "records": 412,
+   "refs": 419,
+   "refs_mw": 419
+  },
+  "corpse": {
+   "records": 77,
+   "refs": 117,
+   "refs_mw": 113
+  },
+  "town resident": {
+   "records": 51,
+   "refs": 63,
+   "refs_mw": 63
+  },
+  "opening standing model + full kit": {
+   "records": 6,
+   "refs": 6,
+   "refs_mw": 6
+  },
+  "room resident (no layout: idle only)": {
+   "records": 5,
+   "refs": 5,
+   "refs_mw": 5
+  },
+  "creature library kf": {
+   "records": 209,
+   "refs": 863,
+   "refs_mw": 785
+  },
+  "creature library skeletal": {
+   "records": 45,
+   "refs": 74,
+   "refs_mw": 74
+  }
+ },
+ "opening": {
+  "chargen boat guard 1": {
+   "idle": "carried",
+   "walk": "carried",
+   "run": "carried",
+   "attack hand-to-hand": "carried",
+   "attack one-handed": "carried",
+   "attack two-handed": "carried",
+   "attack two-wide": "carried",
+   "attack bow": "carried",
+   "attack crossbow": "carried",
+   "attack thrown": "carried",
+   "hit": "carried",
+   "knockdown": "carried",
+   "death": "carried",
+   "spellcast": "carried",
+   "block": "carried",
+   "sneak": "carried",
+   "swim": "carried"
+  },
+  "chargen boat guard 2": {
+   "idle": "carried",
+   "walk": "carried",
+   "run": "carried",
+   "attack hand-to-hand": "carried",
+   "attack one-handed": "carried",
+   "attack two-handed": "carried",
+   "attack two-wide": "carried",
+   "attack bow": "carried",
+   "attack crossbow": "carried",
+   "attack thrown": "carried",
+   "hit": "carried",
+   "knockdown": "carried",
+   "death": "carried",
+   "spellcast": "carried",
+   "block": "carried",
+   "sneak": "carried",
+   "swim": "carried"
+  },
+  "chargen boat guard 3": {
+   "idle": "carried",
+   "walk": "carried",
+   "run": "carried",
+   "attack hand-to-hand": "carried",
+   "attack one-handed": "carried",
+   "attack two-handed": "carried",
+   "attack two-wide": "carried",
+   "attack bow": "carried",
+   "attack crossbow": "carried",
+   "attack thrown": "carried",
+   "hit": "carried",
+   "knockdown": "carried",
+   "death": "carried",
+   "spellcast": "carried",
+   "block": "carried",
+   "sneak": "carried",
+   "swim": "carried"
+  },
+  "chargen captain": {
+   "idle": "carried",
+   "walk": "carried",
+   "run": "carried",
+   "attack hand-to-hand": "carried",
+   "attack one-handed": "carried",
+   "attack two-handed": "carried",
+   "attack two-wide": "carried",
+   "attack bow": "carried",
+   "attack crossbow": "carried",
+   "attack thrown": "carried",
+   "hit": "carried",
+   "knockdown": "carried",
+   "death": "carried",
+   "spellcast": "carried",
+   "block": "carried",
+   "sneak": "carried",
+   "swim": "carried"
+  },
+  "chargen class": {
+   "idle": "carried",
+   "walk": "carried",
+   "run": "carried",
+   "attack hand-to-hand": "carried",
+   "attack one-handed": "carried",
+   "attack two-handed": "carried",
+   "attack two-wide": "carried",
+   "attack bow": "carried",
+   "attack crossbow": "carried",
+   "attack thrown": "carried",
+   "hit": "carried",
+   "knockdown": "carried",
+   "death": "carried",
+   "spellcast": "carried",
+   "block": "carried",
+   "sneak": "carried",
+   "swim": "carried"
+  },
+  "chargen dock guard": {
+   "idle": "carried",
+   "walk": "carried",
+   "run": "carried",
+   "attack hand-to-hand": "carried",
+   "attack one-handed": "carried",
+   "attack two-handed": "carried",
+   "attack two-wide": "carried",
+   "attack bow": "carried",
+   "attack crossbow": "carried",
+   "attack thrown": "carried",
+   "hit": "carried",
+   "knockdown": "carried",
+   "death": "carried",
+   "spellcast": "carried",
+   "block": "carried",
+   "sneak": "carried",
+   "swim": "carried"
+  },
+  "chargen door guard": {
+   "idle": "carried",
+   "walk": "carried",
+   "run": "carried",
+   "attack hand-to-hand": "carried",
+   "attack one-handed": "carried",
+   "attack two-handed": "carried",
+   "attack two-wide": "carried",
+   "attack bow": "carried",
+   "attack crossbow": "carried",
+   "attack thrown": "carried",
+   "hit": "carried",
+   "knockdown": "carried",
+   "death": "carried",
+   "spellcast": "carried",
+   "block": "carried",
+   "sneak": "carried",
+   "swim": "carried"
+  },
+  "chargen name": {
+   "idle": "carried",
+   "walk": "carried",
+   "run": "carried",
+   "attack hand-to-hand": "carried",
+   "attack one-handed": "carried",
+   "attack two-handed": "carried",
+   "attack two-wide": "carried",
+   "attack bow": "carried",
+   "attack crossbow": "carried",
+   "attack thrown": "carried",
+   "hit": "carried",
+   "knockdown": "carried",
+   "death": "carried",
+   "spellcast": "carried",
+   "block": "carried",
+   "sneak": "carried",
+   "swim": "carried"
+  }
+ },
+ "fields": {
+  "level": {
+   "carried": {
+    "records": 3437,
+    "refs": 4798,
+    "refs_mw": 3906
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   }
+  },
+  "attributes": {
+   "carried": {
+    "records": 1498,
+    "refs": 2773,
+    "refs_mw": 2030
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 1939,
+    "refs": 2025,
+    "refs_mw": 1876
+   }
+  },
+  "skills": {
+   "carried": {
+    "records": 1102,
+    "refs": 1416,
+    "refs_mw": 1167
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 2335,
+    "refs": 3382,
+    "refs_mw": 2739
+   }
+  },
+  "health": {
+   "carried": {
+    "records": 1498,
+    "refs": 2773,
+    "refs_mw": 2030
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 1939,
+    "refs": 2025,
+    "refs_mw": 1876
+   }
+  },
+  "magicka": {
+   "carried": {
+    "records": 1498,
+    "refs": 2773,
+    "refs_mw": 2030
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 1939,
+    "refs": 2025,
+    "refs_mw": 1876
+   }
+  },
+  "fatigue": {
+   "carried": {
+    "records": 1498,
+    "refs": 2773,
+    "refs_mw": 2030
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 1939,
+    "refs": 2025,
+    "refs_mw": 1876
+   }
+  },
+  "hello": {
+   "carried": {
+    "records": 3436,
+    "refs": 4798,
+    "refs_mw": 3906
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 1,
+    "refs": 0,
+    "refs_mw": 0
+   }
+  },
+  "fight": {
+   "carried": {
+    "records": 3436,
+    "refs": 4798,
+    "refs_mw": 3906
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 1,
+    "refs": 0,
+    "refs_mw": 0
+   }
+  },
+  "flee": {
+   "carried": {
+    "records": 3436,
+    "refs": 4798,
+    "refs_mw": 3906
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 1,
+    "refs": 0,
+    "refs_mw": 0
+   }
+  },
+  "alarm": {
+   "carried": {
+    "records": 3436,
+    "refs": 4798,
+    "refs_mw": 3906
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 1,
+    "refs": 0,
+    "refs_mw": 0
+   }
+  },
+  "services": {
+   "carried": {
+    "records": 766,
+    "refs": 1038,
+    "refs_mw": 921
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 2671,
+    "refs": 3760,
+    "refs_mw": 2985
+   }
+  },
+  "disposition": {
+   "carried": {
+    "records": 3041,
+    "refs": 3441,
+    "refs_mw": 3043
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 396,
+    "refs": 1357,
+    "refs_mw": 863
+   }
+  },
+  "reputation": {
+   "carried": {
+    "records": 3041,
+    "refs": 3441,
+    "refs_mw": 3043
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 396,
+    "refs": 1357,
+    "refs_mw": 863
+   }
+  },
+  "rank": {
+   "carried": {
+    "records": 3041,
+    "refs": 3441,
+    "refs_mw": 3043
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 396,
+    "refs": 1357,
+    "refs_mw": 863
+   }
+  },
+  "gold": {
+   "carried": {
+    "records": 3437,
+    "refs": 4798,
+    "refs_mw": 3906
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   }
+  },
+  "race": {
+   "carried": {
+    "records": 3041,
+    "refs": 3441,
+    "refs_mw": 3043
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 396,
+    "refs": 1357,
+    "refs_mw": 863
+   }
+  },
+  "class": {
+   "carried": {
+    "records": 3041,
+    "refs": 3441,
+    "refs_mw": 3043
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 396,
+    "refs": 1357,
+    "refs_mw": 863
+   }
+  },
+  "faction": {
+   "carried": {
+    "records": 1115,
+    "refs": 1503,
+    "refs_mw": 1344
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 2322,
+    "refs": 3295,
+    "refs_mw": 2562
+   }
+  },
+  "creature type": {
+   "carried": {
+    "records": 396,
+    "refs": 1357,
+    "refs_mw": 863
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 3041,
+    "refs": 3441,
+    "refs_mw": 3043
+   }
+  },
+  "attacks": {
+   "carried": {
+    "records": 396,
+    "refs": 1357,
+    "refs_mw": 863
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 3041,
+    "refs": 3441,
+    "refs_mw": 3043
+   }
+  },
+  "soul": {
+   "carried": {
+    "records": 396,
+    "refs": 1357,
+    "refs_mw": 863
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 3041,
+    "refs": 3441,
+    "refs_mw": 3043
+   }
+  },
+  "flags": {
+   "carried": {
+    "records": 3437,
+    "refs": 4798,
+    "refs_mw": 3906
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   }
+  },
+  "weapon and shield flag": {
+   "carried": {
+    "records": 58,
+    "refs": 178,
+    "refs_mw": 77
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 3379,
+    "refs": 4620,
+    "refs_mw": 3829
+   }
+  },
+  "blood": {
+   "carried": {
+    "records": 3437,
+    "refs": 4798,
+    "refs_mw": 3906
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   }
+  },
+  "spells": {
+   "carried": {
+    "records": 798,
+    "refs": 1419,
+    "refs_mw": 910
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 2639,
+    "refs": 3379,
+    "refs_mw": 2996
+   }
+  },
+  "inventory": {
+   "carried": {
+    "records": 3146,
+    "refs": 3694,
+    "refs_mw": 3163
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 291,
+    "refs": 1104,
+    "refs_mw": 743
+   }
+  },
+  "inventory levelled": {
+   "carried": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "missing": {
+    "records": 5,
+    "refs": 5,
+    "refs_mw": 3
+   },
+   "different": {
+    "records": 1271,
+    "refs": 2258,
+    "refs_mw": 1817
+   },
+   "absent": {
+    "records": 2161,
+    "refs": 2535,
+    "refs_mw": 2086
+   }
+  },
+  "weapon": {
+   "carried": {
+    "records": 1954,
+    "refs": 2487,
+    "refs_mw": 2176
+   },
+   "missing": {
+    "records": 2,
+    "refs": 2,
+    "refs_mw": 2
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 1481,
+    "refs": 2309,
+    "refs_mw": 1728
+   }
+  },
+  "ranged weapon": {
+   "carried": {
+    "records": 202,
+    "refs": 237,
+    "refs_mw": 222
+   },
+   "missing": {
+    "records": 7,
+    "refs": 7,
+    "refs_mw": 7
+   },
+   "different": {
+    "records": 43,
+    "refs": 50,
+    "refs_mw": 43
+   },
+   "absent": {
+    "records": 3185,
+    "refs": 4504,
+    "refs_mw": 3634
+   }
+  },
+  "armour": {
+   "carried": {
+    "records": 1547,
+    "refs": 1879,
+    "refs_mw": 1633
+   },
+   "missing": {
+    "records": 23,
+    "refs": 62,
+    "refs_mw": 44
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 1867,
+    "refs": 2857,
+    "refs_mw": 2229
+   }
+  },
+  "stats vocabulary": {
+   "carried": {
+    "records": 3437,
+    "refs": 4798,
+    "refs_mw": 3906
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   }
+  },
+  "wander": {
+   "carried": {
+    "records": 2742,
+    "refs": 3816,
+    "refs_mw": 3738
+   },
+   "missing": {
+    "records": 520,
+    "refs": 750,
+    "refs_mw": 6
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 175,
+    "refs": 232,
+    "refs_mw": 162
+   }
+  },
+  "travel": {
+   "carried": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "missing": {
+    "records": 57,
+    "refs": 54,
+    "refs_mw": 54
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 3380,
+    "refs": 4744,
+    "refs_mw": 3852
+   }
+  },
+  "follow": {
+   "carried": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "missing": {
+    "records": 100,
+    "refs": 118,
+    "refs_mw": 69
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 3337,
+    "refs": 4680,
+    "refs_mw": 3837
+   }
+  },
+  "escort": {
+   "carried": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "missing": {
+    "records": 1,
+    "refs": 1,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 3436,
+    "refs": 4797,
+    "refs_mw": 3906
+   }
+  },
+  "activate": {
+   "carried": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 3437,
+    "refs": 4798,
+    "refs_mw": 3906
+   }
+  },
+  "script": {
+   "carried": {
+    "records": 1243,
+    "refs": 1499,
+    "refs_mw": 968
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 2194,
+    "refs": 3299,
+    "refs_mw": 2938
+   }
+  },
+  "script locals": {
+   "carried": {
+    "records": 1242,
+    "refs": 1498,
+    "refs_mw": 968
+   },
+   "missing": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 1,
+    "refs": 1,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 2194,
+    "refs": 3299,
+    "refs_mw": 2938
+   }
+  },
+  "scale": {
+   "carried": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "missing": {
+    "records": 42,
+    "refs": 116,
+    "refs_mw": 0
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 3395,
+    "refs": 4682,
+    "refs_mw": 3906
+   }
+  },
+  "anim idle": {
+   "carried": {
+    "records": 2799,
+    "refs": 3867,
+    "refs_mw": 3786
+   },
+   "missing": {
+    "records": 561,
+    "refs": 814,
+    "refs_mw": 7
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 77,
+    "refs": 117,
+    "refs_mw": 113
+   }
+  },
+  "anim walk": {
+   "carried": {
+    "records": 2775,
+    "refs": 3834,
+    "refs_mw": 3753
+   },
+   "missing": {
+    "records": 561,
+    "refs": 811,
+    "refs_mw": 6
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 101,
+    "refs": 153,
+    "refs_mw": 147
+   }
+  },
+  "anim run": {
+   "carried": {
+    "records": 2769,
+    "refs": 3820,
+    "refs_mw": 3739
+   },
+   "missing": {
+    "records": 559,
+    "refs": 801,
+    "refs_mw": 6
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 109,
+    "refs": 177,
+    "refs_mw": 161
+   }
+  },
+  "anim attack": {
+   "carried": {
+    "records": 229,
+    "refs": 839,
+    "refs_mw": 782
+   },
+   "missing": {
+    "records": 119,
+    "refs": 365,
+    "refs_mw": 2
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 3089,
+    "refs": 3594,
+    "refs_mw": 3122
+   }
+  },
+  "anim attack hand-to-hand": {
+   "carried": {
+    "records": 2542,
+    "refs": 2930,
+    "refs_mw": 2927
+   },
+   "missing": {
+    "records": 465,
+    "refs": 542,
+    "refs_mw": 81
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 430,
+    "refs": 1326,
+    "refs_mw": 898
+   }
+  },
+  "anim attack one-handed": {
+   "carried": {
+    "records": 2542,
+    "refs": 2930,
+    "refs_mw": 2927
+   },
+   "missing": {
+    "records": 485,
+    "refs": 598,
+    "refs_mw": 81
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 410,
+    "refs": 1270,
+    "refs_mw": 898
+   }
+  },
+  "anim attack two-handed": {
+   "carried": {
+    "records": 2542,
+    "refs": 2930,
+    "refs_mw": 2927
+   },
+   "missing": {
+    "records": 464,
+    "refs": 542,
+    "refs_mw": 81
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 431,
+    "refs": 1326,
+    "refs_mw": 898
+   }
+  },
+  "anim attack two-wide": {
+   "carried": {
+    "records": 2542,
+    "refs": 2930,
+    "refs_mw": 2927
+   },
+   "missing": {
+    "records": 464,
+    "refs": 542,
+    "refs_mw": 81
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 431,
+    "refs": 1326,
+    "refs_mw": 898
+   }
+  },
+  "anim attack bow": {
+   "carried": {
+    "records": 2542,
+    "refs": 2930,
+    "refs_mw": 2927
+   },
+   "missing": {
+    "records": 464,
+    "refs": 542,
+    "refs_mw": 81
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 431,
+    "refs": 1326,
+    "refs_mw": 898
+   }
+  },
+  "anim attack crossbow": {
+   "carried": {
+    "records": 2542,
+    "refs": 2930,
+    "refs_mw": 2927
+   },
+   "missing": {
+    "records": 464,
+    "refs": 542,
+    "refs_mw": 81
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 431,
+    "refs": 1326,
+    "refs_mw": 898
+   }
+  },
+  "anim attack thrown": {
+   "carried": {
+    "records": 2542,
+    "refs": 2930,
+    "refs_mw": 2927
+   },
+   "missing": {
+    "records": 466,
+    "refs": 544,
+    "refs_mw": 81
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 429,
+    "refs": 1324,
+    "refs_mw": 898
+   }
+  },
+  "anim hit": {
+   "carried": {
+    "records": 2793,
+    "refs": 3862,
+    "refs_mw": 3781
+   },
+   "missing": {
+    "records": 561,
+    "refs": 811,
+    "refs_mw": 6
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 83,
+    "refs": 125,
+    "refs_mw": 119
+   }
+  },
+  "anim knockdown": {
+   "carried": {
+    "records": 2586,
+    "refs": 3003,
+    "refs_mw": 3000
+   },
+   "missing": {
+    "records": 770,
+    "refs": 1674,
+    "refs_mw": 791
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 81,
+    "refs": 121,
+    "refs_mw": 115
+   }
+  },
+  "anim death": {
+   "carried": {
+    "records": 2873,
+    "refs": 3984,
+    "refs_mw": 3899
+   },
+   "missing": {
+    "records": 562,
+    "refs": 812,
+    "refs_mw": 7
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 2,
+    "refs": 2,
+    "refs_mw": 0
+   }
+  },
+  "anim spellcast": {
+   "carried": {
+    "records": 2556,
+    "refs": 2953,
+    "refs_mw": 2950
+   },
+   "missing": {
+    "records": 496,
+    "refs": 614,
+    "refs_mw": 129
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 385,
+    "refs": 1231,
+    "refs_mw": 827
+   }
+  },
+  "anim block": {
+   "carried": {
+    "records": 2542,
+    "refs": 2930,
+    "refs_mw": 2927
+   },
+   "missing": {
+    "records": 477,
+    "refs": 570,
+    "refs_mw": 81
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 418,
+    "refs": 1298,
+    "refs_mw": 898
+   }
+  },
+  "anim sneak": {
+   "carried": {
+    "records": 2542,
+    "refs": 2930,
+    "refs_mw": 2927
+   },
+   "missing": {
+    "records": 465,
+    "refs": 542,
+    "refs_mw": 81
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 430,
+    "refs": 1326,
+    "refs_mw": 898
+   }
+  },
+  "anim swim": {
+   "carried": {
+    "records": 2542,
+    "refs": 2930,
+    "refs_mw": 2927
+   },
+   "missing": {
+    "records": 469,
+    "refs": 625,
+    "refs_mw": 81
+   },
+   "different": {
+    "records": 0,
+    "refs": 0,
+    "refs_mw": 0
+   },
+   "absent": {
+    "records": 426,
+    "refs": 1243,
+    "refs_mw": 898
+   }
+  }
+ }
+}

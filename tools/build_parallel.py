@@ -1205,9 +1205,12 @@ WORLD_STAGES = ('world-terrain', 'world-scenery', 'world-flora', 'chim', 'cell-p
 WORLD_PREFIXES = ('chim-town-', 'chim-rooms-')
 
 
-def risk_first(ready):
-    """READY [(position, (name, command))] with the RISK_FIRST stages first, the rest in plan order."""
-    return sorted(ready, key=lambda item: (item[1][0] not in RISK_FIRST, item[0]))
+def risk_first(ready, new=()):
+    """READY [(position, (name, command))] in start order: NEW WORK FIRST (NEW-WORK-FIRST-66: NEW, the stages the
+    resource plan found with no history, the new content of a build, whose failure would otherwise show hours in),
+    then the RISK_FIRST stages, then the rest in plan order. Scheduling only: no stage's key or output changes."""
+    new = set(new or ())
+    return sorted(ready, key=lambda item: (item[1][0] not in new, item[1][0] not in RISK_FIRST, item[0]))
 
 
 def world_stage(name):
@@ -1344,7 +1347,10 @@ def budget_command(command, jobs):
 def create_run(run, metadata):
     """Make the new run folder (refused when it exists: one run per name) and write the files the plan prepared
     for it before any stage (metadata '_run_files': {name: text}, e.g. world-manifest.json; never in a receipt)."""
-    run.mkdir(parents=True, exist_ok=False)
+    # the start-up's own status folder (tools/build_stall.py, status/) may already be there; anything else is refused
+    if run.exists() and any(p.name != 'status' for p in run.iterdir()):
+        raise FileExistsError(f'build run already exists: {run}')
+    run.mkdir(parents=True, exist_ok=True)
     (run / 'logs').mkdir()
     for name, text in sorted(metadata.pop('_run_files', {}).items()):
         (run / name).write_text(text, encoding='utf-8', newline='\n')
@@ -1456,7 +1462,8 @@ def execute_parallel(steps, run, metadata, root):
             print('[summary] not updated: %s' % exc, flush=True)
     try:
         while pending or active:
-            ready = risk_first([item for item in pending if set(dependencies[item[1][0]]) <= passed])
+            ready = risk_first([item for item in pending if set(dependencies[item[1][0]]) <= passed],
+                               metadata.get('resource_plan_new'))
             if alone_stages:
                 # BUILD-CHIM-POOL-MEMORY-THROTTLE-59: a stage the plan runs alone gets the memory without the other
                 # memory-heavy stages; they wait and run at full width after it
@@ -1580,6 +1587,14 @@ def execute_parallel(steps, run, metadata, root):
         save()
         digest()
         profile.close(receipt)
+        if receipt['status'] == 'failed':
+            # the failure details beside the logs, FAILURE.md and failure.json (BUILD-FAILURE-NO-DETAILS-66;
+            # tools/build_failure.py never raises)
+            try:
+                import build_failure
+                build_failure.write(run, exc)
+            except ImportError:
+                pass
         raise
     if guard.changes:
         receipt['scheduler_guard_changes'] = guard.changes

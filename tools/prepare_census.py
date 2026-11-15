@@ -14,6 +14,7 @@ import numpy as np
 from PIL import Image
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'src'))
 from mwad.paths import resolve_data_files, child_ci, ensure_external
+from mwad.masters import master_path
 from mwad.interior import read_interior, select_geometry
 from mwad.npc import load_master, text
 from prepare_scenery import export_refs
@@ -95,12 +96,12 @@ def prepare(data_files, scene, qbsp, vis, light, jobs=None, vis_mode='fast'):
     from build_parallel import Background
     from prepare_doors import door_sources
     doors=Background(door_sources,data_files,jobs=jobs)
-    names=Background(actor_names,child_ci(data_files,'Morrowind.esm'),[i for i,_,_ in CENSUS_ACTORS],jobs=jobs)
+    names=Background(actor_names,master_path(data_files),[i for i,_,_ in CENSUS_ACTORS],jobs=jobs)
     from ui_palette import reserve
     reserve(data_files,scene/'id1')
     target=scene/'id1/maps/census.bsp'
     if target.exists():raise ValueError('Census map already exists; use a fresh scene')
-    cell=read_interior(child_ci(data_files,'Morrowind.esm'),'Seyda Neen, Census and Excise Office')
+    cell=read_interior(master_path(data_files),'Seyda Neen, Census and Excise Office')
     refs,omitted=select_geometry(cell)
     # The small items (INTERIOR-PLACED-ITEMS-47): the registration paper, the Iron Dagger, the meal and the rest
     # are placed statics like the furniture (a func_wall with aw_ref each, identical items share one inline

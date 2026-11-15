@@ -77,6 +77,10 @@ int AW_HeldLightParse(const char *text,int size,const char *model,aw_held_light_
 float AW_HeldLightRadius(float torch_light,int item_radius,int torch_record);
 /* The held light now when one is held lit (hands raised, V or the equip) and it is not the torch; NULL otherwise. */
 const aw_held_light_t *AW_HeldLight(void);
+/* READY-MAGIC-SHOWS-WEAPON-65 (v0.0.66): aw_view.c installs it: 1 while the carried torch or light is put away (magic
+ * ready; aw_hand_models.h AW_HandCarriesLeft): AW_TorchEquipped and AW_HeldLight answer none, no light is cast, V says
+ * so. NULL in fixtures without it. */
+extern int (*aw_torch_put_away)(void);
 /* aw_debug_torch.c: the light in the left hand (1) with its catalogue id, item model, radius and catalogue byte 511
  * flags, and the torch record's radius (0 unknown); 0 when the left hand holds no light. NULL in fixtures. */
 extern int (*aw_held_light_item)(char id[64],char model[64],int *radius,int *flags,int *torch_radius);

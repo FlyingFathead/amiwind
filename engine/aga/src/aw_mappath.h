@@ -37,5 +37,14 @@ int AW_MapRefused (const char *path, const char *entities, char *why, int size);
 /* After a failed load: 1 (reason in why) when maps/<name>.chim exists but
  * this image has no CHIM world to run it. */
 int AW_MapChimOrphan (const char *name, char *why, int size);
+/* The unbuilt-target guard (an expansion layer's cell or room not in this
+ * image): set by Chim_Init; 1 when the map file PATH names a CHIM store this
+ * image carries (worldspawn "_chim_world", default chim), 0 when its store is
+ * not here. NULL (no CHIM world): every existing map counts as built. */
+extern int (*aw_chim_map_store_built) (const char *path);
+/* 1 when the map NAME is in this image and can load here: its file exists and
+ * its CHIM store is carried (aw_region.c). Doors and travel ask it first and
+ * say so in game instead of loading a map that cannot run. */
+int AW_SceneTargetBuilt (const char *name);
 
 #endif

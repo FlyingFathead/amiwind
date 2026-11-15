@@ -1,0 +1,460 @@
+# The standard gameplay journey (GAMEPLAY-JOURNEY-SMOKE-66; docs/GAME_RECORDER.md "Gameplay journeys").
+# A FULL image, FS-UAE at 32 MB Fast, started with --map seyda. Every check reads the game's state (console answers,
+# the state file), never a picture. Part A is New Game through the opening as a player plays it: the ship, the pier,
+# the clerk's registration, the papers off the table, the hall guard and his door, the back room (a take), out to the
+# courtyard and back in (the take stays taken), Keley's ring, Sellus Gravius (his duties topic chosen by its name),
+# the release through the exit door, a kill, a room and back, a spell and a fight, then the game's own quicksave;
+# part B is a fresh engine that loads that save through the Load game window and goes on through a door.
+# JOURNEY-WALK-DIALOGUE-DESYNC-66: the walk waits for the game and stops at the first wrong turn (tools/engine_smoke.py
+# WALKER steps: walkto, waitfor, boxes, mark/saw, topic, face, aimed); the earlier key counts pressed Enter into the
+# clerk's persuasion list on the v0.0.66-dev2 image. Map-local points are the maps' own: the census office from its
+# entities and doors-census.txt (room units = the original's / 4), the courtyard and the street from doors-seyda.txt
+# and the courtyard barrel's frame-map entity (reference 172851). Item ids and the reward are the game's own
+# (engine/aga/src/aw_state.c AW_CaptainDuties: the directions, the package and 87 gold, A1_1_FindSpymaster 1).
+part A
+wait 8
+cmd developer 1
+cmd dbg all on
+cmd dbg headlamp off
+cmd aw_new_game
+wait 6
+key Escape
+waitfor map 90 prison
+state map
+
+step 1 the opening to the papers: the controls held from the start until the papers are taken at the census office
+# the original's CharGen script switches fighting off at the start; the papers' own script switches it on
+probe fight_ship aw_mwscript_status call getplayerfightingdisabled
+expect fight_ship == 1
+# the ship: Jiub asks the name; the guard's movement box; the guard leads on (then the console map change of the
+# v0.0.65 opening walk, in place of the hatch)
+wait 12
+xdo type Hors
+key Return
+# the guard's movement prompt is the intro prompt, not a message box (the state's screen stays game): his line, then
+# Enter answers it
+mark
+saw 90 Intro speech: chargenwalk1
+wait 6
+key Return
+wait 2
+cmd aw_view walk role 2
+wait 40
+cmd aw_view walk off
+cmd map seyda
+waitfor map 90 intro_docks
+wait 10
+cmd dbg all on
+boxes
+cmd noclip
+cmd aw_view walk 470 -290
+wait 6
+boxes
+cmd aw_view walk 470 -290
+wait 35
+cmd aw_view walk off
+cmd noclip
+wait 4
+cmd aw_view walk 640 -250
+wait 8
+cmd aw_view walk off
+cmd aw_view walk 568 -350
+wait 15
+cmd aw_view walk off
+# the race menu on the pier: Enter through its pages
+waitfor screen 40 character
+key Right
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+waitfor screen 20 game
+wait 50
+cmd aw_view walk 470 -420
+wait 12
+cmd aw_view walk off
+wait 25
+# up the pier to the office door (113893, its box 309..333 x -173..-150 in the town's door table): walked until the
+# engine says each point is reached, the door aimed at (timed walks ended short of it on a loaded host; the walk
+# stands at 331 -193 at the door's corner, from where E opened it in the dev2 plays)
+walkto 432 -266 45
+walkto 330 -200 50
+walkto 330 -190 25
+face 320.7 -161.5 58
+shot a1-office-door
+# into the office (the door with E), the clerk's registration: Enter through his class, birthsign and review pages
+key e
+waitfor map 40 census
+state map
+cmd dbg all on
+cmd aw_view walk role 6
+wait 8
+cmd aw_view walk off
+wait 2
+key e
+wait 6
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 7
+waitfor screen 20 game
+boxes
+shot a2-after-review
+probe papers_before player->getitemcount "chargen statssheet"
+probe fight_before aw_mwscript_status call getplayerfightingdisabled
+expect papers_before == 0
+expect fight_before == 1
+# the papers lie on the table at the clerk's right: look at them, E reads them, E (Take) picks them up
+face 37.3 -45.7 66.2
+aimed 172859
+key e
+waitfor screen 8 book
+key e
+wait 3
+boxes
+probe papers_after player->getitemcount "chargen statssheet"
+probe fight_after aw_mwscript_status call getplayerfightingdisabled
+probe magic_after aw_mwscript_status call getplayermagicdisabled
+expect papers_after == 1
+expect fight_after == 0
+expect magic_after == 0
+shot a3-papers
+
+step 2 the hall door and the back room: the guard opens his door, an item is taken
+walkto 38 28 25
+wait 8
+boxes
+face 47 60 72
+aimed 172860
+key e
+wait 3
+walkto 47 100 25
+walkto 47 232 40
+walkto 76 232 15
+walkto 120 212 25
+walkto 145 205 20
+boxes
+# the iron dagger on the back-room table (chargen dagger, reference 119577; the clerk's tutorial box asks for it):
+# from the table's edge, looking down at it. Not the crab meat: on the dev2 image the use key's focus at the crab
+# meat is the silver plate under it (CENSUS-CRAB-PLATE-FOCUS-66), and the plate is owned.
+# The take is read from the game's aim report (the dagger's row switched off): the console's getitemcount does not
+# know "chargen dagger", which no script names (CONSOLE-GETITEMCOUNT-UNNAMED-ITEM-66).
+walkto 130 181 20
+face 129.9 177.2 66.8
+aimed 119577
+probe dagger_before aw_placed aim
+key e
+wait 3
+boxes
+probe dagger_taken aw_placed aim
+expect has dagger_before 119577 Iron Dagger: at 130 177 67, edict 0 drawn 0 disabled 0
+expect has dagger_taken 119577 Iron Dagger: at 130 177 67, edict 0 drawn 0 disabled 1
+shot a4-dagger-taken
+
+step 3 out to the courtyard and back in: the taken item stays taken
+walkto 185 218 30
+face 201.5 224 71
+aimed 119665
+key e
+waitfor map 45 sncourt
+wait 6
+boxes
+probe away_map state map
+# the door back into the back room is behind the arrival point
+face 78 -175.5 66
+aimed 113864
+key e
+waitfor map 45 census
+wait 4
+boxes
+probe back_map state map
+# the same look at the same spot: the game's aim report lists the dagger's row switched off (taken), not back on
+walkto 150 205 20
+walkto 130 181 20
+face 129.9 177.2 66.8
+probe table_back aw_placed aim
+expect away_map != back_map
+expect has table_back 119577 Iron Dagger: at 130 177 67, edict 0 drawn 0 disabled 1
+walkto 185 218 30
+face 201.5 224 71
+aimed 119665
+key e
+waitfor map 45 sncourt
+wait 6
+boxes
+
+step 4 Keley's ring and Sellus Gravius: papers taken, the package given, the journal on, the reward once
+walkto 106 -60 40
+boxes
+face 120.7 -45.8 46.3
+aimed 172851
+key e
+wait 3
+boxes
+probe ring_taken player->getitemcount ring_keley
+expect ring_taken == 1
+# the captain's door: the walk ends in front of it (its face is at x 144; the dev2 play stood at 123 -71 against it)
+walkto 122 -70 25
+boxes
+face 155.8 -65.3 64
+aimed 113889
+key e
+waitfor map 45 census
+wait 4
+boxes
+probe gold_before player->getitemcount gold_001
+walkto 315 -95 20
+boxes
+face 341.6 -95.1 76
+aimed 172858
+key e
+waitfor screen 10 dialogue
+probe talk_screen state screen
+# his greeting takes the papers and names Morrowind; the Morrowind answer names his duties (the v0.0.66-dev2 play
+# asked duties first: the list did not offer it yet)
+topic Morrowind
+wait 2
+topic duties
+wait 3
+shot a5-sellus-duties
+key Escape
+waitfor screen 8 game
+boxes
+probe papers_sellus player->getitemcount "chargen statssheet"
+probe package_sellus player->getitemcount bk_a1_1_caiuspackage
+probe directions_sellus player->getitemcount bk_a1_1_directionscaiuscosades
+probe gold_sellus player->getitemcount gold_001
+probe journal_sellus getjournalindex A1_1_FindSpymaster
+expect talk_screen == dialogue
+expect papers_sellus == 0
+expect package_sellus == 1
+expect directions_sellus == 1
+expect gold_sellus == gold_before+87
+expect journal_sellus == 1
+# the same topic again: nothing is given twice
+face 341.6 -95.1 76
+key e
+waitfor screen 10 dialogue
+topic duties
+wait 3
+key Escape
+waitfor screen 8 game
+boxes
+probe package_again player->getitemcount bk_a1_1_caiuspackage
+probe gold_again player->getitemcount gold_001
+probe journal_again getjournalindex A1_1_FindSpymaster
+expect package_again == 1
+expect gold_again == gold_sellus
+expect journal_again == 1
+
+step 5 the release: the exit door lets the player go with the package
+walkto 286 -125 25
+walkto 285 -160 25
+walkto 292 -175 20
+face 292.7 -186 71
+aimed 119659
+key e
+waitfor server 45 seyda
+wait 8
+boxes
+probe release_map state map
+probe state_released aw_mwscript_status call getglobal CharGenState
+expect lacks release_map census
+expect state_released == -1
+shot a6-released
+
+step 6 kill an actor, enter an interior, come back: the dead stay dead, and the captain's room lets the player out by either door
+cmd dbg god on
+probe victim chim actors kill
+wait 4
+probe list_killed chim actors list
+expect dead victim in list_killed
+# into the captain's room by the street door beside the release point (113833)
+face 242.6 10.3 61
+aimed 113833
+key e
+waitfor map 45 census
+wait 4
+boxes
+probe room_map state map
+# out by the courtyard door (119660), in again from the courtyard (113889), out by the exit door (119659): after the
+# v0.0.66-dev2 journey's re-entry by the street door the exit door did nothing (CAPTAIN-EXIT-DOOR-DEAD-AFTER-REENTRY-66);
+# a stop at either door here names which one
+walkto 285 -125 25
+walkto 290 -75 25
+face 291.3 -60.3 71
+aimed 119660
+key e
+waitfor map 45 sncourt
+wait 4
+boxes
+probe court_map state map
+face 155.8 -65.3 64
+aimed 113889
+key e
+waitfor map 45 census
+wait 4
+boxes
+walkto 286 -125 25
+walkto 285 -160 25
+walkto 292 -175 20
+face 292.7 -186 71
+aimed 119659
+key e
+waitfor server 45 seyda
+wait 10
+probe list_back chim actors list
+expect has room_map census
+expect has court_map sncourt
+expect dead victim in list_back
+
+step 7 cast a spell and fight: the effect and the damage happen
+cmd dbg maxstats
+wait 2
+cmd player->modcurrenthealth -60
+wait 2
+probe health_hurt player->gethealth
+# a made spell: Restore Health (effect 75) on self, 10 points a second for 5 seconds
+cmd dbg cast spell make 75 0 0 5 10
+wait 2
+cmd dbg cast now
+wait 8
+probe health_healed player->gethealth
+probe cast_list dbg cast spell list
+expect health_healed > health_hurt
+expect cast_list >= 1
+cmd dbg god off
+cmd dbg combat seed 7
+probe fighter chim actors fight
+wait 20
+probe list_fight chim actors list
+probe health_fought player->gethealth
+expect has fighter ref
+expect health_fought < health_healed
+cmd dbg combat calm
+wait 4
+cmd dbg god on
+
+step 8 the game's own quicksave: the inventory, the quest, the changed actors and the script state are written
+probe state_saved aw_mwscript_status call getglobal CharGenState
+mark
+cmd aw_quicksave
+saw 30 bytes, generation
+wait 4
+shot a7-saved
+
+part B
+wait 8
+cmd dbg all on
+cmd dbg headlamp off
+# Load game: the pause menu (its Load game row is three up from Return to game, past Main menu and Options), then the
+# newest character's quicksave (the only one: the session carries part A's saves)
+key Escape
+waitfor screen 10 menu
+key Up
+key Up
+key Up
+key Return
+waitfor screen 10 save
+key Return
+wait 2
+key Return
+wait 20
+waitfor screen 60 game
+boxes
+state map
+probe package_loaded player->getitemcount bk_a1_1_caiuspackage
+probe gold_loaded player->getitemcount gold_001
+probe ring_loaded player->getitemcount ring_keley
+probe journal_loaded getjournalindex A1_1_FindSpymaster
+probe state_loaded aw_mwscript_status call getglobal CharGenState
+probe list_loaded chim actors list
+expect package_loaded == package_again
+expect gold_loaded == gold_again
+expect ring_loaded == ring_taken
+expect journal_loaded == 1
+expect state_loaded == state_saved
+expect dead victim in list_loaded
+shot b1-loaded
+
+step 9 through a door: the restored game goes on
+probe door_from state map
+face 242.6 10.3 61
+aimed 113833
+key e
+waitfor map 45 census
+wait 4
+probe door_to state map
+probe package_door player->getitemcount bk_a1_1_caiuspackage
+expect door_to != door_from
+expect has door_to census
+expect package_door == 1
+shot b2-through-the-door

@@ -23,8 +23,10 @@ from functools import lru_cache
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 import numpy as np
 from PIL import Image
-from mwad.audit import BSA, load_esm
+from mwad.audit import load_esm
+from mwad.archives import layered_bsa
 from mwad.paths import ensure_external, child_ci
+from mwad.masters import master_path
 from npc_geometry import Assets
 from prepare_quake import brush, box, miptex, wad
 from player_hull import lumps, rebuild_world_hull
@@ -342,15 +344,15 @@ def ground_miptex(master, assets, key, pal):
 
 def ground_textures(data, keys, palette):
     """{'gKEY': miptex} for the given LAND materials, made as terrain_wad makes them."""
-    master = load_esm(child_ci(data, 'Morrowind.esm'))
-    assets = Assets(data, BSA(child_ci(data, 'Morrowind.bsa')))
+    master = load_esm(master_path(data))
+    assets = Assets(data, layered_bsa(data))
     pal = Image.new('P', (1, 1)); pal.putpalette(palette)
     return {'g'+str(key): ground_miptex(master, assets, key, pal) for key in sorted(keys)}
 
 
 def terrain_wad(data, survey, palette, pools=()):
-    master = load_esm(child_ci(data, 'Morrowind.esm'))
-    assets = Assets(data, BSA(child_ci(data, 'Morrowind.bsa')))
+    master = load_esm(master_path(data))
+    assets = Assets(data, layered_bsa(data))
     pal = Image.new('P', (1, 1)); pal.putpalette(palette)
     with np.load(survey / 'terrain-source.npz', allow_pickle=False) as packet:
         used = sorted(set(packet['materials'].flatten().tolist()) | {0})
@@ -652,7 +654,7 @@ def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=No
     ownership = classify_regions(checklist, entries, report['master_sha256'], set(chim_cells or ()),
                                  before_ocean_routing=True) if checklist else {}
     routing_only = {name for name, kind in ownership.items() if kind == 'routing-only'}
-    if digest(child_ci(data,'Morrowind.esm'))!=report['master_sha256'] or digest(child_ci(data,'Morrowind.bsa'))!=report['bsa_sha256']:
+    if digest(master_path(data))!=report['master_sha256'] or digest(child_ci(data,'Morrowind.bsa'))!=report['bsa_sha256']:
         raise ValueError('Original inputs differ from the measured survey')
     if (out/'world-regions.json').exists():
         raise ValueError('Completed conversion is immutable; choose a fresh directory')

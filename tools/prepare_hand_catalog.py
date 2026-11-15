@@ -26,9 +26,13 @@ WEAPON_STANCES=('1h','2c','2w')
 WEAPON_TAG_STANCES=WEAPON_STANCES+('bow','xb','1t')
 WEAPON_FRAMES=28
 WEAPON_METADATA='gfx/hand-weapons.aww'
+# PLAYER-CASTING-59 (v0.0.66): the baked arms' spell stance (the open hands and the target cast of the original's
+# spellcast group, prepare_hands SPELL_STANCES), one more model per appearance: <stem>_sp.mdl (engine aw_hand_models.c
+# spell_arms). The arms from parts carry all three ranges (tools/prepare_player_fp_parts.py SPELL_STANCES).
+SPELL_STANCE='sp'
 
 def stance_path(race,female,stance):
-    if stance not in WEAPON_STANCES:raise ValueError('Unknown armed stance '+str(stance))
+    if stance not in WEAPON_STANCES+(SPELL_STANCE,):raise ValueError('Unknown armed stance '+str(stance))
     return model_paths(race,female)[0][:-4]+'_'+stance+'.mdl'
 
 def stance_weapon_tags(skeleton,stance):
@@ -129,10 +133,21 @@ def _bake_pair(task):
         stances[stance]={'model':path,'sha256':hashlib.sha256(armed).hexdigest(),'bytes':len(armed),
                          'triangles':armed_report['triangles'],'vertices':armed_report['vertices']}
         stance_reports[stance]=armed_report
-    (out/'reports'/(Path(hand).stem+'.json')).write_text(json.dumps({'hands':report,'torch':torch_report,'armed':stance_reports},indent=2)+'\n')
+    # the spell stance (PLAYER-CASTING-59): the same contract, the hands open, loaded only while magic is ready
+    spell,spell_report=bake_appearance(source.assets,source.kinds,palette,race,female,budget,topology,stance=SPELL_STANCE)
+    if surface_normals:
+        spell,normal_report=rewrite_normals(spell,table)
+        spell_report['lighting_normals']=normal_report
+    if spell_report['frames']!=WEAPON_FRAMES or len(spell)>512*1024:
+        raise ValueError('Spell arms outside the hand model contract: '+race)
+    path=stance_path(race,female,SPELL_STANCE);(out/path).write_bytes(spell);spell_report['model']=path
+    spell_row={'model':path,'sha256':hashlib.sha256(spell).hexdigest(),'bytes':len(spell),
+               'triangles':spell_report['triangles'],'vertices':spell_report['vertices']}
+    (out/'reports'/(Path(hand).stem+'.json')).write_text(json.dumps({'hands':report,'torch':torch_report,'armed':stance_reports,
+                                                                     'spell':spell_report},indent=2)+'\n')
     return report['clips'],meta,{'race':race,'female':female,'hand_model':hand,'torch_model':torch,
                                  'hand_sha256':hashlib.sha256(raw).hexdigest(),'torch_sha256':hashlib.sha256(torch_raw).hexdigest(),
-                                 'hand_bytes':len(raw),'torch_bytes':len(torch_raw),'stances':stances}
+                                 'hand_bytes':len(raw),'torch_bytes':len(torch_raw),'stances':stances,'spell':spell_row}
 
 
 def prepare(data_files,palette_path,out,budget=320,topology='reduced',normal_mode='auto',runtime=False,jobs=None):
@@ -262,6 +277,13 @@ def install(catalog,id1):
                     raise ValueError('Invalid armed arms model path')
                 files[path]=row['sha256']
         files[WEAPON_METADATA]=weapon['metadata_sha256']
+    # the spell arms (PLAYER-CASTING-59): every entry or none (an older catalogue)
+    spells=[entry.get('spell') for entry in report['entries']]
+    if any(spells):
+        for entry,row in zip(report['entries'],spells):
+            if not row or row.get('model')!=stance_path(entry['race'],entry['female'],SPELL_STANCE) or row['model'] in files:
+                raise ValueError('Hand catalogue entry lacks its spell arms')
+            files[row['model']]=row['sha256']
     files['gfx/hand-models.awh']=report['catalog_sha256'];files['gfx/hand-torch.awt']=report['torch_metadata_sha256']
     payload={}
     for path,digest in files.items():

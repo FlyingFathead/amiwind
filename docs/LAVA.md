@@ -1,6 +1,6 @@
 # Lava
 
-_Last updated with AmiWind v0.0.62 (8 November 2026)._
+_Last updated with AmiWind v0.0.66 (14 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -127,7 +127,12 @@ Where it is implemented, once for every builder:
   become brushes and `aw_lava` entities of the region map that holds their centre;
 - CHIM chunks (`tools/chim/terrain.py`): the same prisms are carved into each chunk's world BSP (a `CONTENTS_LAVA`
   leaf with the two-sided warp face on its top plane), and the bed joins the chunk's standing hull; a chunk without
-  lava is built byte for byte as before, so its cached unit is reused.
+  lava is built byte for byte as before, so its cached unit is reused;
+- the batch rooms (`tools/chim_room_batches.py`, `lava.room_pools_of`): a molten pool none of whose layers is named
+  lava takes its surface from its flowing layers (the textures that scroll). Sotha Sil's hot oil (Tribunal) is such a
+  pool: the lava pools' stack with oil textures and a script that hurts a standing actor (20 a second, a bubbling
+  loop). Its activator leaves the room's statics, so the oil is drawn as its liquid only, with the oil's own textures
+  as the warp texture. Every lava-named pool gives exactly what it gave before (LAVA-POOL-NOT-LAVA-NAMED-66).
 
 ## Engine settings
 

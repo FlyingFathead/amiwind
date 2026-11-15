@@ -12,7 +12,10 @@
 #include "aw_placed.h"
 #include "aw_tryalloc.h"
 #include "aw_ledger.h"
-#define PLACED_MAX 1024                   /* the focus table's rows (aw_inventory.c FOCUS_ROWS) */
+/* the focus table's item rows (aw_inventory.c FOCUS_ROWS holds every kind): FOCUS-ROWS-WINDOW-OVERFLOW-66 measured the
+ * most items the original data places in one room (601) and in one 3 x 3 outdoor window (100): 1024 holds them, so the
+ * focus table grew to 1536 rows and this list (the resident registry's worst case) stays */
+#define PLACED_MAX 1024
 #define PLACED_PATH 40                     /* "progs/items/m" + 16 hex + ".mdl" + NUL = 34 bytes */
 #define PLACED_STEP 64                     /* the table grows by this many rows when a room or cell needs more */
 #define PLACED_ENTRY 320                   /* bytes per row at most: an entity, its reference and its base position */

@@ -83,6 +83,14 @@ def load_table(data_files):
     return number_cells(masters), hashes
 
 
+def room_numbers(table):
+    """EXPANSION-BASE-ONLY-TABLES-66: folded cell ID -> room number of every interior in TABLE (load_table), the base
+    master's and each expansion's: the tables keyed by room number (focus.awf, the placed item list, the per-area
+    tables) read the merged master (src/mwad/masters.py), whose interiors are those of every selected master. With the
+    base master alone its cells are the only ones looked up, so those tables do not change."""
+    return {row['cell'].casefold(): row['number'] for row in table}
+
+
 def cell_fields(row):
     """Worldspawn fields for one numbered interior."""
     cell = row['cell']

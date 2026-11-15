@@ -25,6 +25,7 @@ static void far_probe(byte colour,int distance){assert(colour==173 && distance==
 static void (*horizon_migrate)(void);
 extern void (*aw_defaults_migrate)(int level);      /* aw_combat.c in the game; here the level it is handed */
 static int migrate_level=-1;
+static float magic_fx;                              /* CAST-EGG-SYNC-62: the saved aw_magic_fx (aw_magic.c in the game) */
 static void migrate_hook(int level){migrate_level=level;}
 static byte fog_colours[4096];static int inside;
 int AW_Interior(void){return inside;}
@@ -34,6 +35,7 @@ void Cvar_RegisterVariable(cvar_t *v){v->value=atof(v->string);if(!strcmp(v->nam
 void Cvar_SetValue(char *name,float value){
     if(!strcmp(name,"aw_skyline_fill"))skyline_switch->value=value;
     else if(!strcmp(name,"aw_horizon_defaults"))defaults_switch->value=value;
+    else if(!strcmp(name,"aw_magic_fx"))magic_fx=value;
     else aw_drawdistance.value=value;
 }
 void Cmd_AddCommand(char *name,void (*fn)(void)){if(!strcmp(name,"aw_horizon_migrate"))horizon_migrate=fn;}
@@ -175,12 +177,16 @@ int main(void) {
     skyline_switch->value=0;reset();depth[10*80+10]=30;AW_FogDraw();
     assert(screen[10*80+10]==173);for(j=11;j<53;j++)assert(sky_kept(j*80+10));
     /* Migration: a saved 1 becomes 0 once; a later explicit 1 is kept. */
-    skyline_switch->value=1;horizon_migrate();assert(skyline_switch->value==0 && defaults_switch->value==2);
+    skyline_switch->value=1;magic_fx=0;horizon_migrate();assert(skyline_switch->value==0 && defaults_switch->value==3 && magic_fx==1);
     skyline_switch->value=1;horizon_migrate();assert(skyline_switch->value==1);
     /* BEST-ATTACK-OPTION-62: the defaults level 2 hands a level-1 configuration to the combat options once */
     aw_defaults_migrate=migrate_hook;defaults_switch->value=1;skyline_switch->value=1;horizon_migrate();
-    assert(skyline_switch->value==1 && defaults_switch->value==2 && migrate_level==1);
+    assert(skyline_switch->value==1 && defaults_switch->value==3 && migrate_level==1);
     migrate_level=-1;horizon_migrate();assert(migrate_level==-1);aw_defaults_migrate=NULL;
+    /* CAST-EGG-SYNC-62: a level-2 configuration saved with the cast look off gets it on once; a later 0 stays */
+    defaults_switch->value=2;magic_fx=0;skyline_switch->value=1;horizon_migrate();
+    assert(magic_fx==1 && defaults_switch->value==3 && skyline_switch->value==1);
+    magic_fx=0;horizon_migrate();assert(magic_fx==0);
     puts("horizon methods: land outline (default) keeps the sky; object silhouetting still fills below far scenery; migration once");
 #endif
     puts("resident LAND: 30 independent ray/plane camera cases; valleys, depth, water/material, closure and bounds gates passed");

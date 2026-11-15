@@ -7,12 +7,13 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from mwad.npc import load_master,outfit
 from mwad.dialogue_lookup import build_lookup
 from mwad.paths import ensure_external
+from mwad.masters import master_path
 from known_inputs import input_sha256
 
 def prepare(data,out):
     data=ensure_external(data,'owned game data');out=ensure_external(out,'private dialogue lookup')
     if out.exists():raise ValueError('Output already exists')
-    master=data/'Morrowind.esm';kinds,_,topics=load_master(master)
+    master=master_path(data);kinds,_,topics=load_master(master)
     result=build_lookup(topics,[outfit(kinds,a) for a in ('fargoth','imperial guard')])
     result['master_sha256']=input_sha256(master)
     out.parent.mkdir(parents=True,exist_ok=True)

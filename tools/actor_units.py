@@ -47,12 +47,15 @@ def reach_environment(*entries):
     return {key: os.environ.get(key) for key in sorted(names) if key not in IGNORED_ENV and key != SCRATCH_ENV}
 
 
-def open_cache(name, entries, sources, previous, covered):
+def open_cache(name, entries, sources, previous, covered, game=None):
     """The unit cache NAME keyed on SOURCES (the bake-reach digest of ENTRIES, computed by the caller), or None: cache
-    off, or no input lock naming the game data by SHA-256."""
+    off, or no input lock naming the game data by SHA-256. GAME: the game data identity when the caller keys what
+    the expansion layers change for its units itself (tools/layer_view.py identity); default
+    pass_cache.game_data_digest (the selected layers in it)."""
     import pass_cache
     root = pass_cache.folder()
-    game = pass_cache.game_data_digest()
+    if game is None:
+        game = pass_cache.game_data_digest()
     if root is None or game is None:
         return None
     import unit_store
@@ -60,8 +63,9 @@ def open_cache(name, entries, sources, previous, covered):
     # setting of mesh_geometry_env for every NPC and creature bake, BUILD-UNIT-KEYS-REACH-64); stored units are
     # looked up under the full set too
     keyed, older = unit_store.keyed_environment(reach_environment(*entries), list(entries))
+    # with the older whole-file and bake-reach keys of unit_store.LEGACY_SOURCES (proven equal there)
     return pass_cache.UnitCache(name, {'game_data': game, 'environment': keyed}, sources, root,
-                                previous=tuple(previous), covered=covered,
+                                previous=tuple(previous) + unit_store.legacy_sources(name, sources), covered=covered,
                                 previous_options=[{'game_data': game, 'environment': value} for value in older])
 
 

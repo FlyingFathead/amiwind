@@ -167,10 +167,25 @@ int main(void)
         assert(a && b && a!=b && a->crime_id==-1 && AW_CrimeActorMake(table,3,5)==a && !AW_CrimeActorMake(table,3,0));
         a->crime_id=3;a->alarmed=1;a->disposition=-50;a->pursue=1;b->crime_id=7;b->murdered=1;
         {aw_crime_actor_t *c=AW_CrimeActorMake(table,3,8);assert(c);c->alarmed=1;}     /* alarmed without a crime */
-        assert(!AW_CrimeActorMake(table,3,9));                                          /* full: no calm row */
+        /* CRIME-KILL-BOUNTY-65 (d): full, no calm row: the alarmed bystander's row goes (never the pursuing guard's or
+         * the murdered NPC's); with those two alone nothing is made */
+        {aw_crime_actor_t *c=AW_CrimeActorFind(table,3,8),*d=AW_CrimeActorMake(table,3,9);
+         assert(d==c && d->ref==9 && d->crime_id==-1 && !d->alarmed && !AW_CrimeActorFind(table,3,8));
+         d->pursue=1;assert(!AW_CrimeActorMake(table,3,10));d->pursue=0;}
         assert(AW_CrimeActorsCalm(table,3,5)==1 && a->crime_id==-1 && !a->alarmed && !a->disposition && !a->pursue);
         assert(b->crime_id==7 && AW_CrimeActorFind(table,3,6)==b);
-        assert(AW_CrimeActorMake(table,3,9)!=NULL && !AW_CrimeActorFind(table,3,5) && AW_CrimeActorFind(table,3,6)==b);
+        assert(AW_CrimeActorMake(table,3,11)!=NULL && AW_CrimeActorFind(table,3,6)==b && AW_CrimeActorFind(table,3,9));
+        assert(!AW_CrimeActorFind(table,3,5));                                          /* the calm row reused */
+        /* a bystander with a crime number only goes before an alarmed one, the oldest crime first */
+        memset(table,0,sizeof(table));
+        a=AW_CrimeActorMake(table,3,5);b=AW_CrimeActorMake(table,3,6);
+        {aw_crime_actor_t *c=AW_CrimeActorMake(table,3,7);
+         a->crime_id=4;a->alarmed=1;b->crime_id=9;c->crime_id=8;
+         assert(AW_CrimeActorMake(table,3,12)==c && AW_CrimeActorFind(table,3,5)==a && AW_CrimeActorFind(table,3,6)==b);}
+        /* (c): a row kept by an edict (no placed reference) is never saved */
+        {aw_crime_actor_t one[1];unsigned char blk[32];
+         memset(one,0,sizeof(one));one[0].ref=AW_CRIME_REFLESS_KEY|12;one[0].crime_id=3;one[0].alarmed=1;
+         assert(AW_CrimeActorsPack(one,1,blk,sizeof(blk))==6 && blk[5]==0);}
     }
     /* CRIME-SAVE-PURSUERS-62: the rows in a saved game. The Seyda Neen guard of session s9 (reference 128967)
      * alarmed and pursuing for crime 3 with the disposition change -8; Fargoth (128964) murdered (no crime of his
@@ -200,6 +215,26 @@ int main(void)
         /* none to keep: the block is its 6 bytes */
         memset(table,0,sizeof(table));table[0].ref=5;table[0].crime_id=-1;
         assert(AW_CrimeActorsPack(table,4,block,sizeof(block))==6 && block[5]==0);
+        assert(AW_CrimeActorsPackMore(table,4,block,sizeof(block))==0);          /* nothing past the first 255 */
+    }
+    /* SAVE-CRIME-MARKS-32-ROWS-66: a full table (no free and no calm row), and 300 marked NPCs through a save: AWCR holds
+     * the first 255 (6 + 255 x 12 bytes), AWC2 the other 45 (6 + 45 x 12), all 300 read back; a short AWC2 adds nothing */
+    {
+        static aw_crime_actor_t many[300],got[300];static unsigned char blk[8192];int n,m,i,found=0;
+        memset(many,0,sizeof(many));
+        for(i=0;i<300;i++){many[i].ref=1000+(unsigned long)i;many[i].crime_id=i;many[i].alarmed=1;}
+        assert(AW_CrimeActorsFull(many,300));
+        many[7].crime_id=-1;many[7].alarmed=0;assert(!AW_CrimeActorsFull(many,300));   /* a calm row: not full */
+        many[7].crime_id=7;many[7].alarmed=1;
+        n=AW_CrimeActorsPack(many,300,blk,sizeof(blk));assert(n==6+255*12 && blk[5]==255);
+        m=AW_CrimeActorsPackMore(many,300,blk+n,(int)sizeof(blk)-n);
+        assert(m==6+45*12 && !memcmp(blk+n,"AWC2",4) && blk[n+4]==0 && blk[n+5]==45);
+        assert(AW_CrimeActorsPackMore(many,300,blk+n,20)==-1);                                   /* short */
+        assert(AW_CrimeActorsUnpack(got,300,blk,n)==n && AW_CrimeActorsUnpackMore(got,300,blk+n,m)==m);
+        for(i=0;i<300;i++){const aw_crime_actor_t *r=AW_CrimeActorFind(got,300,1000+(unsigned long)i);if(r && r->crime_id==i && r->alarmed)found++;}
+        assert(found==300);
+        assert(AW_CrimeActorsUnpack(got,300,blk,n)==n && AW_CrimeActorsUnpackMore(got,300,blk+n,m-1)==-1);
+        assert(!AW_CrimeActorFind(got,300,1299) && AW_CrimeActorFind(got,300,1254));          /* the first 255 alone */
     }
     printf("crime rules ok\n");
     return 0;

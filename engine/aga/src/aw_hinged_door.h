@@ -81,7 +81,7 @@ void AW_TrapDisarm(unsigned reference);
 void AW_TrapCounts(unsigned long out[4]);
 extern int (*aw_trap_cast)(const char *spell);
 extern int (*aw_trap_spring)(unsigned reference);   /* aw_inventory.c; set by AW_HingedDoorInit */
-/* The maintainer's words (TG, 25 October 2026). */
+/* The maintainer's words (25 October 2026). */
 #define AW_DOOR_GOD_TEXT "God mode used to enter a locked door"
 /* Activation: a script that reads OnActivate takes the use (aw_mwhost.c sets it); its Activate opens the door. */
 extern int (*aw_hinged_intercept)(unsigned reference);

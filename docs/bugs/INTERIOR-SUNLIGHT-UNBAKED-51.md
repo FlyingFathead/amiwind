@@ -168,6 +168,7 @@ Family: Lighting, lamps and night (`lighting-night`). Morrowind lights become Qu
 - [SKY-STAR-TWINKLE-LATE-42](SKY-STAR-TWINKLE-LATE-42.md): Star twinkle seen only late at night: before the midnight clearing the night clouds hide the few twinkling stars
 - TAKEN-LIGHT-BAKED-LIGHT-61 (no report page): A taken candle or lamp leaves its own light baked into the room around it
 - [TERRAIN-LIGHT-UNIFORM-32](TERRAIN-LIGHT-UNIFORM-32.md): Open-world terrain lightmaps are nearly uniform
+- THIRALAS-HOUSE-RED-LIGHT-65 (no report page): Draren Thiralas' house in Seyda Neen is lit all red and yellow inside
 - TORCH-LIGHT-29 (no report page): Torch flames look weak and provide little immediate light
 - TORCH-NPC-LIGHT-29 (no report page): Nearby NPCs do not visibly respond to torchlight
 - TORCHTEST-DARKNESS-29 (no report page): Torch test room floor stays dim gray at zero light
@@ -176,5 +177,6 @@ Family: Lighting, lamps and night (`lighting-night`). Morrowind lights become Qu
 Related bugs in other categories:
 
 - [BUILD-CUTOFF-WHOLE-ANCESTOR-51](BUILD-CUTOFF-WHOLE-ANCESTOR-51.md): An interior light change reran exterior stages: the reuse cutoff refuses a stage when any earlier stage's whole output differs, not the files it reads
+- [INTERIOR-NO-AMBI-66](INTERIOR-NO-AMBI-66.md): The room stage stops on interior cells without AMBI: the Mournhold plazas with Tribunal on
 
 <!-- END GENERATED CATEGORY -->

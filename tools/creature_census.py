@@ -383,6 +383,7 @@ def check(report):
 def read_masters(data_files, config=None):
     """[(name, raw)] of the config's masters that the data files hold, the base master first (required)."""
     from mwad.paths import child_ci, resolve_data_files
+    from mwad.masters import master_path
     config = config or load_config()
     data = resolve_data_files(data_files)
     out = []
@@ -565,9 +566,10 @@ def partial_reason(args):
 def stage(id1, data_files, out, library=None, partial=None, jobs=1):
     """The image step's census: writes OUT/creature-census.json and stops (ValueError) on a problem of a full build."""
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     config = load_config()
     masters = read_masters(data_files, config)
-    master = child_ci(Path(data_files), 'Morrowind.esm').read_bytes()
+    master = master_path(Path(data_files)).read_bytes()
     report = census(masters, config, image_facts(id1, out, library, data_files, master, partial, jobs))
     for line in summary(report):
         print(line, flush=True)

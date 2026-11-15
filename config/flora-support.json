@@ -1,0 +1,1587 @@
+{
+ "format": "AmiWind flora support 1",
+ "about": "Plants that grow on another object: seats (original units) put a bracket fungus on the trunk its tree is drawn with; mesh_hosts are trees drawn as a mesh because a plant grows on them. Measured and checked by tools/chim/flora_support_audit.py.",
+ "seats": [
+  {
+   "reference": 208643,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -7,
+    4
+   ],
+   "shift": [
+    -10.63,
+    36.19,
+    6.87
+   ],
+   "support": 208638,
+   "gap": 9.84
+  },
+  {
+   "reference": 208644,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -7,
+    4
+   ],
+   "shift": [
+    -11.3,
+    38.47,
+    7.3
+   ],
+   "support": 208638,
+   "gap": 10.44
+  },
+  {
+   "reference": 208913,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -8,
+    4
+   ],
+   "shift": [
+    -13.75,
+    -37.05,
+    7.2
+   ],
+   "support": 208903,
+   "gap": 10.29
+  },
+  {
+   "reference": 208914,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -8,
+    4
+   ],
+   "shift": [
+    -12.53,
+    -33.76,
+    6.56
+   ],
+   "support": 208903,
+   "gap": 9.4
+  },
+  {
+   "reference": 209345,
+   "id": "flora_bc_shelffungus_03",
+   "cell": [
+    -9,
+    4
+   ],
+   "shift": [
+    3.23,
+    32.99,
+    6.04
+   ],
+   "support": 209328,
+   "gap": 8.67
+  },
+  {
+   "reference": 209347,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -9,
+    4
+   ],
+   "shift": [
+    3.37,
+    34.47,
+    6.31
+   ],
+   "support": 209328,
+   "gap": 9.05
+  },
+  {
+   "reference": 209348,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -9,
+    4
+   ],
+   "shift": [
+    2.38,
+    24.36,
+    4.46
+   ],
+   "support": 209328,
+   "gap": 6.47
+  },
+  {
+   "reference": 210040,
+   "id": "flora_bc_shelffungus_01",
+   "cell": [
+    -6,
+    4
+   ],
+   "shift": [
+    4.6,
+    -7.82,
+    4.86
+   ],
+   "support": 210007,
+   "gap": 2.82
+  },
+  {
+   "reference": 210043,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -6,
+    4
+   ],
+   "shift": [
+    4.06,
+    -6.9,
+    4.29
+   ],
+   "support": 210007,
+   "gap": 2.52
+  },
+  {
+   "reference": 210126,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -7,
+    4
+   ],
+   "shift": [
+    -5.22,
+    -6.51,
+    5.46
+   ],
+   "support": 210122,
+   "gap": 2.74
+  },
+  {
+   "reference": 210171,
+   "id": "flora_bc_shelffungus_03",
+   "cell": [
+    -7,
+    4
+   ],
+   "shift": [
+    -43.5,
+    22.93,
+    8.96
+   ],
+   "support": 210163,
+   "gap": 12.75
+  },
+  {
+   "reference": 210172,
+   "id": "flora_bc_shelffungus_03",
+   "cell": [
+    -7,
+    4
+   ],
+   "shift": [
+    -43.27,
+    22.81,
+    8.91
+   ],
+   "support": 210163,
+   "gap": 12.68
+  },
+  {
+   "reference": 210173,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -7,
+    4
+   ],
+   "shift": [
+    -32.1,
+    -22.68,
+    6.94
+   ],
+   "support": 210163,
+   "gap": 10.23
+  },
+  {
+   "reference": 210174,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -7,
+    4
+   ],
+   "shift": [
+    -24.95,
+    -17.63,
+    5.4
+   ],
+   "support": 210163,
+   "gap": 8.01
+  },
+  {
+   "reference": 210388,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -7,
+    3
+   ],
+   "shift": [
+    12.72,
+    -10.46,
+    -8.86
+   ],
+   "support": 210382,
+   "gap": 4.93
+  },
+  {
+   "reference": 210389,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -7,
+    3
+   ],
+   "shift": [
+    10.37,
+    -8.53,
+    -7.22
+   ],
+   "support": 210382,
+   "gap": 4.06
+  },
+  {
+   "reference": 210423,
+   "id": "flora_bc_shelffungus_03",
+   "cell": [
+    -8,
+    4
+   ],
+   "shift": [
+    23.66,
+    -25.69,
+    6.17
+   ],
+   "support": 210418,
+   "gap": 9.12
+  },
+  {
+   "reference": 210424,
+   "id": "flora_bc_shelffungus_03",
+   "cell": [
+    -8,
+    4
+   ],
+   "shift": [
+    25.06,
+    -27.21,
+    6.54
+   ],
+   "support": 210418,
+   "gap": 9.64
+  },
+  {
+   "reference": 210425,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -8,
+    4
+   ],
+   "shift": [
+    20.96,
+    -22.76,
+    5.47
+   ],
+   "support": 210418,
+   "gap": 8.1
+  },
+  {
+   "reference": 210426,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -8,
+    4
+   ],
+   "shift": [
+    17.97,
+    -19.51,
+    4.69
+   ],
+   "support": 210418,
+   "gap": 6.98
+  },
+  {
+   "reference": 228506,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -5,
+    2
+   ],
+   "shift": [
+    13.98,
+    -29.37,
+    5.75
+   ],
+   "support": 228499,
+   "gap": 8.51
+  },
+  {
+   "reference": 228507,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -5,
+    2
+   ],
+   "shift": [
+    17.01,
+    -35.73,
+    6.99
+   ],
+   "support": 228499,
+   "gap": 10.29
+  },
+  {
+   "reference": 228695,
+   "id": "flora_bc_shelffungus_03",
+   "cell": [
+    -5,
+    2
+   ],
+   "shift": [
+    -1.4,
+    11.45,
+    3.37
+   ],
+   "support": 228692,
+   "gap": 3.25
+  },
+  {
+   "reference": 228972,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -6,
+    3
+   ],
+   "shift": [
+    12.26,
+    11.57,
+    2.98
+   ],
+   "support": 228968,
+   "gap": 4.53
+  },
+  {
+   "reference": 228973,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -6,
+    3
+   ],
+   "shift": [
+    38.24,
+    -13.68,
+    7.4
+   ],
+   "support": 228968,
+   "gap": 10.57
+  },
+  {
+   "reference": 229011,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -6,
+    3
+   ],
+   "shift": [
+    -5.03,
+    15.1,
+    4.64
+   ],
+   "support": 228999,
+   "gap": 4.39
+  },
+  {
+   "reference": 229012,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -6,
+    3
+   ],
+   "shift": [
+    -4.93,
+    14.81,
+    4.55
+   ],
+   "support": 228999,
+   "gap": 4.31
+  },
+  {
+   "reference": 229707,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -7,
+    4
+   ],
+   "shift": [
+    -30.33,
+    -21.43,
+    6.56
+   ],
+   "support": 210163,
+   "gap": 9.68
+  },
+  {
+   "reference": 229708,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -7,
+    4
+   ],
+   "shift": [
+    -26.66,
+    -18.83,
+    5.77
+   ],
+   "support": 210163,
+   "gap": 8.54
+  },
+  {
+   "reference": 229811,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -7,
+    3
+   ],
+   "shift": [
+    -18.52,
+    22.64,
+    5.17
+   ],
+   "support": 229807,
+   "gap": 7.68
+  },
+  {
+   "reference": 229812,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -7,
+    3
+   ],
+   "shift": [
+    -14.57,
+    17.8,
+    4.06
+   ],
+   "support": 229807,
+   "gap": 6.09
+  },
+  {
+   "reference": 229816,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -7,
+    3
+   ],
+   "shift": [
+    -14.6,
+    17.83,
+    4.07
+   ],
+   "support": 229807,
+   "gap": 6.1
+  },
+  {
+   "reference": 229871,
+   "id": "flora_bc_shelffungus_03",
+   "cell": [
+    -7,
+    3
+   ],
+   "shift": [
+    7.66,
+    1.63,
+    2.29
+   ],
+   "support": 229862,
+   "gap": 2.29
+  },
+  {
+   "reference": 229873,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -7,
+    3
+   ],
+   "shift": [
+    8.46,
+    1.8,
+    2.52
+   ],
+   "support": 229862,
+   "gap": 2.5
+  },
+  {
+   "reference": 229874,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -7,
+    3
+   ],
+   "shift": [
+    14.11,
+    3.0,
+    4.21
+   ],
+   "support": 229862,
+   "gap": 4.01
+  },
+  {
+   "reference": 229875,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -7,
+    3
+   ],
+   "shift": [
+    8.6,
+    10.18,
+    3.26
+   ],
+   "support": 229862,
+   "gap": 3.68
+  },
+  {
+   "reference": 230624,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -8,
+    4
+   ],
+   "shift": [
+    6.75,
+    -7.33,
+    1.76
+   ],
+   "support": 210418,
+   "gap": 2.78
+  },
+  {
+   "reference": 230625,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -8,
+    3
+   ],
+   "shift": [
+    13.32,
+    -14.47,
+    3.47
+   ],
+   "support": 210418,
+   "gap": 5.24
+  },
+  {
+   "reference": 231037,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -8,
+    2
+   ],
+   "shift": [
+    -30.21,
+    -21.34,
+    6.53
+   ],
+   "support": 231032,
+   "gap": 9.64
+  },
+  {
+   "reference": 231038,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -8,
+    2
+   ],
+   "shift": [
+    -15.53,
+    -10.97,
+    3.36
+   ],
+   "support": 231032,
+   "gap": 5.08
+  },
+  {
+   "reference": 231042,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -8,
+    2
+   ],
+   "shift": [
+    -25.01,
+    -17.67,
+    5.41
+   ],
+   "support": 231032,
+   "gap": 8.03
+  },
+  {
+   "reference": 231057,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -8,
+    2
+   ],
+   "shift": [
+    4.03,
+    -7.44,
+    2.47
+   ],
+   "support": 231046,
+   "gap": 2.45
+  },
+  {
+   "reference": 231058,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -8,
+    2
+   ],
+   "shift": [
+    -4.46,
+    -4.46,
+    3.54
+   ],
+   "support": 231046,
+   "gap": 2.06
+  },
+  {
+   "reference": 231059,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -8,
+    2
+   ],
+   "shift": [
+    3.47,
+    -6.41,
+    2.13
+   ],
+   "support": 231046,
+   "gap": 2.15
+  },
+  {
+   "reference": 231099,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -8,
+    1
+   ],
+   "shift": [
+    11.31,
+    -3.82,
+    2.17
+   ],
+   "support": 231092,
+   "gap": 3.28
+  },
+  {
+   "reference": 231524,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -8,
+    0
+   ],
+   "shift": [
+    13.15,
+    2.08,
+    2.43
+   ],
+   "support": 231519,
+   "gap": 3.63
+  },
+  {
+   "reference": 231525,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -8,
+    0
+   ],
+   "shift": [
+    14.12,
+    2.23,
+    2.6
+   ],
+   "support": 231519,
+   "gap": 3.88
+  },
+  {
+   "reference": 231527,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -8,
+    0
+   ],
+   "shift": [
+    21.41,
+    3.38,
+    3.95
+   ],
+   "support": 231519,
+   "gap": 5.76
+  },
+  {
+   "reference": 231550,
+   "id": "flora_bc_shelffungus_03",
+   "cell": [
+    -8,
+    0
+   ],
+   "shift": [
+    17.34,
+    -4.87,
+    5.26
+   ],
+   "support": 231541,
+   "gap": 4.94
+  },
+  {
+   "reference": 231551,
+   "id": "flora_bc_shelffungus_03",
+   "cell": [
+    -8,
+    0
+   ],
+   "shift": [
+    12.49,
+    -3.51,
+    3.79
+   ],
+   "support": 231541,
+   "gap": 3.63
+  },
+  {
+   "reference": 231552,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -8,
+    0
+   ],
+   "shift": [
+    20.21,
+    -5.68,
+    6.13
+   ],
+   "support": 231541,
+   "gap": 5.72
+  },
+  {
+   "reference": 231553,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -8,
+    0
+   ],
+   "shift": [
+    26.98,
+    -7.58,
+    8.18
+   ],
+   "support": 231541,
+   "gap": 7.55
+  },
+  {
+   "reference": 231554,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -8,
+    0
+   ],
+   "shift": [
+    22.57,
+    -6.34,
+    6.84
+   ],
+   "support": 231541,
+   "gap": 6.36
+  },
+  {
+   "reference": 234970,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -5,
+    2
+   ],
+   "shift": [
+    -8.29,
+    11.17,
+    4.06
+   ],
+   "support": 234966,
+   "gap": 3.87
+  },
+  {
+   "reference": 235175,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -5,
+    1
+   ],
+   "shift": [
+    8.82,
+    0.23,
+    2.58
+   ],
+   "support": 235164,
+   "gap": 2.55
+  },
+  {
+   "reference": 235176,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -5,
+    1
+   ],
+   "shift": [
+    12.99,
+    0.34,
+    3.79
+   ],
+   "support": 235164,
+   "gap": 3.63
+  },
+  {
+   "reference": 235391,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -5,
+    1
+   ],
+   "shift": [
+    -32.05,
+    2.73,
+    5.68
+   ],
+   "support": 235384,
+   "gap": 8.41
+  },
+  {
+   "reference": 235392,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -5,
+    1
+   ],
+   "shift": [
+    -29.52,
+    2.51,
+    5.23
+   ],
+   "support": 235384,
+   "gap": 7.77
+  },
+  {
+   "reference": 235576,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -5,
+    0
+   ],
+   "shift": [
+    -15.37,
+    -6.77,
+    2.97
+   ],
+   "support": 235569,
+   "gap": 4.51
+  },
+  {
+   "reference": 235757,
+   "id": "flora_bc_shelffungus_03",
+   "cell": [
+    -5,
+    -1
+   ],
+   "shift": [
+    -10.92,
+    6.68,
+    3.74
+   ],
+   "support": 235753,
+   "gap": 3.59
+  },
+  {
+   "reference": 235758,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -5,
+    -1
+   ],
+   "shift": [
+    2.54,
+    9.53,
+    5.54
+   ],
+   "support": 235753,
+   "gap": 3.08
+  },
+  {
+   "reference": 235760,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -5,
+    -1
+   ],
+   "shift": [
+    -17.18,
+    10.51,
+    5.88
+   ],
+   "support": 235753,
+   "gap": 5.49
+  },
+  {
+   "reference": 236168,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -6,
+    0
+   ],
+   "shift": [
+    -9.07,
+    14.59,
+    9.66
+   ],
+   "support": 236163,
+   "gap": 5.18
+  },
+  {
+   "reference": 237715,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -8,
+    -2
+   ],
+   "shift": [
+    -36.52,
+    -15.36,
+    7.22
+   ],
+   "support": 237710,
+   "gap": 10.32
+  },
+  {
+   "reference": 237716,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -8,
+    -2
+   ],
+   "shift": [
+    -25.56,
+    -10.75,
+    5.05
+   ],
+   "support": 237710,
+   "gap": 7.3
+  },
+  {
+   "reference": 237718,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -8,
+    -2
+   ],
+   "shift": [
+    -27.89,
+    -11.73,
+    5.51
+   ],
+   "support": 237710,
+   "gap": 7.94
+  },
+  {
+   "reference": 237971,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -9,
+    -1
+   ],
+   "shift": [
+    10.86,
+    -1.71,
+    6.18
+   ],
+   "support": 237959,
+   "gap": 3.4
+  },
+  {
+   "reference": 249287,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -4,
+    -9
+   ],
+   "shift": [
+    -19.46,
+    -10.55,
+    7.2
+   ],
+   "support": 249280,
+   "gap": 6.07
+  },
+  {
+   "reference": 249288,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -4,
+    -9
+   ],
+   "shift": [
+    -12.49,
+    -6.77,
+    4.62
+   ],
+   "support": 249280,
+   "gap": 3.98
+  },
+  {
+   "reference": 249337,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -5,
+    -9
+   ],
+   "shift": [
+    27.36,
+    -24.32,
+    6.47
+   ],
+   "support": 249330,
+   "gap": 9.54
+  },
+  {
+   "reference": 249338,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -5,
+    -9
+   ],
+   "shift": [
+    24.59,
+    -21.85,
+    5.81
+   ],
+   "support": 249330,
+   "gap": 8.6
+  },
+  {
+   "reference": 249393,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -5,
+    -9
+   ],
+   "shift": [
+    -10.35,
+    35.24,
+    6.69
+   ],
+   "support": 249386,
+   "gap": 9.58
+  },
+  {
+   "reference": 249394,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -5,
+    -9
+   ],
+   "shift": [
+    -9.13,
+    31.09,
+    5.9
+   ],
+   "support": 249386,
+   "gap": 8.48
+  },
+  {
+   "reference": 252938,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -5,
+    -2
+   ],
+   "shift": [
+    26.38,
+    16.42,
+    5.49
+   ],
+   "support": 252931,
+   "gap": 8.14
+  },
+  {
+   "reference": 252939,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -5,
+    -2
+   ],
+   "shift": [
+    28.97,
+    18.03,
+    6.03
+   ],
+   "support": 252931,
+   "gap": 8.91
+  },
+  {
+   "reference": 253736,
+   "id": "flora_bc_shelffungus_03",
+   "cell": [
+    -5,
+    -4
+   ],
+   "shift": [
+    8.94,
+    1.25,
+    3.49
+   ],
+   "support": 253727,
+   "gap": 2.67
+  },
+  {
+   "reference": 253756,
+   "id": "flora_bc_shelffungus_03",
+   "cell": [
+    -5,
+    -5
+   ],
+   "shift": [
+    -7.75,
+    -4.58,
+    2.63
+   ],
+   "support": 253749,
+   "gap": 2.59
+  },
+  {
+   "reference": 253759,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -5,
+    -5
+   ],
+   "shift": [
+    -14.86,
+    -8.79,
+    5.04
+   ],
+   "support": 253749,
+   "gap": 4.75
+  },
+  {
+   "reference": 254254,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -6,
+    -2
+   ],
+   "shift": [
+    -5.08,
+    11.3,
+    6.96
+   ],
+   "support": 254243,
+   "gap": 3.8
+  },
+  {
+   "reference": 254628,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -6,
+    -3
+   ],
+   "shift": [
+    8.22,
+    25.29,
+    4.7
+   ],
+   "support": 254621,
+   "gap": 7.0
+  },
+  {
+   "reference": 254629,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -6,
+    -3
+   ],
+   "shift": [
+    9.17,
+    28.22,
+    5.24
+   ],
+   "support": 254621,
+   "gap": 7.78
+  },
+  {
+   "reference": 254993,
+   "id": "flora_bc_shelffungus_03",
+   "cell": [
+    -6,
+    -4
+   ],
+   "shift": [
+    -9.89,
+    -6.09,
+    6.53
+   ],
+   "support": 254986,
+   "gap": 3.58
+  },
+  {
+   "reference": 254995,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -6,
+    -4
+   ],
+   "shift": [
+    3.9,
+    -14.49,
+    4.38
+   ],
+   "support": 254986,
+   "gap": 4.16
+  },
+  {
+   "reference": 254996,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -6,
+    -4
+   ],
+   "shift": [
+    4.56,
+    -16.92,
+    5.11
+   ],
+   "support": 254986,
+   "gap": 4.81
+  },
+  {
+   "reference": 254997,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -6,
+    -4
+   ],
+   "shift": [
+    6.47,
+    -24.01,
+    7.26
+   ],
+   "support": 254986,
+   "gap": 6.73
+  },
+  {
+   "reference": 255029,
+   "id": "flora_bc_shelffungus_03",
+   "cell": [
+    -6,
+    -4
+   ],
+   "shift": [
+    -4.02,
+    -8.61,
+    2.77
+   ],
+   "support": 255022,
+   "gap": 2.72
+  },
+  {
+   "reference": 255031,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -6,
+    -4
+   ],
+   "shift": [
+    -18.71,
+    2.8,
+    10.63
+   ],
+   "support": 255022,
+   "gap": 5.68
+  },
+  {
+   "reference": 255032,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -6,
+    -4
+   ],
+   "shift": [
+    -12.9,
+    1.93,
+    7.33
+   ],
+   "support": 255022,
+   "gap": 3.99
+  },
+  {
+   "reference": 255334,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -6,
+    -5
+   ],
+   "shift": [
+    17.41,
+    24.68,
+    5.5
+   ],
+   "support": 255327,
+   "gap": 7.93
+  },
+  {
+   "reference": 255335,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -6,
+    -5
+   ],
+   "shift": [
+    21.1,
+    29.91,
+    6.67
+   ],
+   "support": 255327,
+   "gap": 9.55
+  },
+  {
+   "reference": 255611,
+   "id": "flora_bc_shelffungus_03",
+   "cell": [
+    -6,
+    -6
+   ],
+   "shift": [
+    -13.6,
+    -4.72,
+    4.2
+   ],
+   "support": 255604,
+   "gap": 4.0
+  },
+  {
+   "reference": 255612,
+   "id": "flora_bc_shelffungus_03",
+   "cell": [
+    -6,
+    -6
+   ],
+   "shift": [
+    -10.68,
+    -3.71,
+    3.3
+   ],
+   "support": 255604,
+   "gap": 3.19
+  },
+  {
+   "reference": 255613,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -6,
+    -6
+   ],
+   "shift": [
+    -15.4,
+    -5.34,
+    4.76
+   ],
+   "support": 255604,
+   "gap": 4.49
+  },
+  {
+   "reference": 255614,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -6,
+    -6
+   ],
+   "shift": [
+    -20.46,
+    -7.1,
+    6.32
+   ],
+   "support": 255604,
+   "gap": 5.89
+  },
+  {
+   "reference": 255615,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -6,
+    -6
+   ],
+   "shift": [
+    -19.75,
+    -6.85,
+    6.1
+   ],
+   "support": 255604,
+   "gap": 5.69
+  },
+  {
+   "reference": 256230,
+   "id": "flora_bc_shelffungus_03",
+   "cell": [
+    -7,
+    -3
+   ],
+   "shift": [
+    -8.93,
+    2.99,
+    5.29
+   ],
+   "support": 256224,
+   "gap": 2.95
+  },
+  {
+   "reference": 256232,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -7,
+    -3
+   ],
+   "shift": [
+    -17.09,
+    5.72,
+    10.13
+   ],
+   "support": 256224,
+   "gap": 5.42
+  },
+  {
+   "reference": 256234,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -7,
+    -3
+   ],
+   "shift": [
+    -10.67,
+    -15.21,
+    5.42
+   ],
+   "support": 256224,
+   "gap": 5.09
+  },
+  {
+   "reference": 256943,
+   "id": "flora_bc_shelffungus_03",
+   "cell": [
+    -7,
+    -5
+   ],
+   "shift": [
+    11.96,
+    -5.16,
+    3.8
+   ],
+   "support": 256936,
+   "gap": 3.64
+  },
+  {
+   "reference": 256944,
+   "id": "flora_bc_shelffungus_03",
+   "cell": [
+    -7,
+    -5
+   ],
+   "shift": [
+    10.08,
+    -4.35,
+    3.2
+   ],
+   "support": 256936,
+   "gap": 3.11
+  },
+  {
+   "reference": 256945,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -7,
+    -5
+   ],
+   "shift": [
+    15.93,
+    -6.88,
+    5.06
+   ],
+   "support": 256936,
+   "gap": 4.77
+  },
+  {
+   "reference": 256946,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -7,
+    -5
+   ],
+   "shift": [
+    -1.87,
+    -15.63,
+    8.85
+   ],
+   "support": 256936,
+   "gap": 4.77
+  },
+  {
+   "reference": 266382,
+   "id": "flora_bc_shelffungus_02",
+   "cell": [
+    -2,
+    -7
+   ],
+   "shift": [
+    -18.41,
+    -29.65,
+    6.16
+   ],
+   "support": 266375,
+   "gap": 9.11
+  },
+  {
+   "reference": 266383,
+   "id": "flora_bc_shelffungus_04",
+   "cell": [
+    -2,
+    -7
+   ],
+   "shift": [
+    -20.04,
+    -32.27,
+    6.71
+   ],
+   "support": 266375,
+   "gap": 9.89
+  }
+ ],
+ "mesh_hosts": [
+  {
+   "reference": 266728,
+   "id": "flora_bc_tree_08",
+   "cell": [
+    -2,
+    -9
+   ],
+   "plant": 266735
+  }
+ ],
+ "known_floating": [
+  {
+   "reference": 266734,
+   "reason": "Seyda Neen, by the lighthouse: its tree (reference 266728, flora_bc_tree_08) was drawn as a sprite; it is drawn as a mesh from v0.0.66-dev2 (mesh_hosts). The seat on that mesh is measured on the first build that draws it; until then the check reports this plant and does not stop the build."
+  },
+  {
+   "reference": 266735,
+   "reason": "Seyda Neen, by the lighthouse: its tree (reference 266728, flora_bc_tree_08) was drawn as a sprite; it is drawn as a mesh from v0.0.66-dev2 (mesh_hosts). The seat on that mesh is measured on the first build that draws it; until then the check reports this plant and does not stop the build."
+  }
+ ]
+}

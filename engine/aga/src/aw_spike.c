@@ -56,6 +56,7 @@ static double		frame_start;
 double				aw_wait_time[AW_WAITS];
 int					aw_disk_depth;
 static double		wait_sum[AW_WAITS], wait_frames_time;
+static double		slot_total[AW_SP_SLOTS];	/* MWSCRIPT-TICK-SHARE-66: every frame's slot time since the last report */
 static unsigned long	wait_frames;
 static const char	*wait_name[AW_WAITS] = {"disk", "c2p", "vbl"};
 
@@ -162,6 +163,10 @@ void AW_SpikeFrame (void)
 			wait_sum[i] += aw_wait_time[i];
 		wait_frames++;
 		wait_frames_time += dt;
+		/* MWSCRIPT-TICK-SHARE-66: every slot's time in every frame, so the report gives its share of all frames
+		 * (spikes on or off; the stages were timed already: one addition per slot a frame) */
+		for (i=0 ; i<AW_SP_SLOTS ; i++)
+			slot_total[i] += frame_time[i];
 	}
 	aw_disk_total += aw_wait_time[AW_WAIT_DISK];
 	memset (aw_wait_time, 0, sizeof(aw_wait_time));
@@ -277,7 +282,17 @@ void AW_SpikeReport (void)
 		WaitText (waits, sizeof(waits), wait_sum);
 		Con_Printf ("  waits in %lu frames (%ld ms): %s; the rest %ld ms\n", wait_frames,
 			(long)(wait_frames_time*1000 + .5), waits, (long)(busy*1000 + .5));
+		/* MWSCRIPT-TICK-SHARE-66: each timed stage's share of all those frames, in tenths of a percent (no float
+		 * printing needed); stages under 0.1 % left out */
+		for (i=0 ; i<AW_SP_SLOTS ; i++)
+		{
+			long tenths = wait_frames_time > 0 ? (long)(slot_total[i] * 1000 / wait_frames_time + .5) : 0;
+			if (tenths > 0)
+				Con_Printf ("  share of all frames: %-9s %ld ms, %ld.%ld %%\n", slot_name[i],
+					(long)(slot_total[i]*1000 + .5), tenths / 10, tenths % 10);
+		}
 	}
+	memset (slot_total, 0, sizeof(slot_total));
 	memset (wait_sum, 0, sizeof(wait_sum));
 	wait_frames = 0;
 	wait_frames_time = 0;

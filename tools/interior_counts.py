@@ -105,9 +105,12 @@ def counts(run):
         for stage in held.values():
             by_stage[stage] = by_stage.get(stage, 0) + 1
         refused = batches.get('refused') or {}
-        out['plan'] = {'rooms': len(batches.get('rooms') or []) + len(held) + len(refused),
+        # rooms the game data leaves empty (no scenery to convert; tools/chim_room_batches.py empty_rooms): in the
+        # plan, never a classic map and never refused (ROOM-EMPTY-CELL-66)
+        empty = batches.get('empty') or {}
+        out['plan'] = {'rooms': len(batches.get('rooms') or []) + len(held) + len(refused) + len(empty),
                        'selection': batches.get('selection'), 'by_stage': dict(sorted(by_stage.items())),
-                       'refused': len(refused)}
+                       'refused': len(refused), **({'empty': len(empty)} if empty else {})}
     classic = []
     if isinstance(receipt, dict):
         rooms = receipt.get('rooms') or []
@@ -161,9 +164,10 @@ def summary_lines(record):
     lines = []
     plan = record.get('plan')
     if plan:
-        lines.append('Interiors in the plan: %d rooms (selection %s; %s)' % (
+        lines.append('Interiors in the plan: %d rooms (selection %s; %s)%s' % (
             plan['rooms'], plan.get('selection') or 'n/a',
-            ', '.join('%s %d' % (stage, n) for stage, n in plan['by_stage'].items())))
+            ', '.join('%s %d' % (stage, n) for stage, n in plan['by_stage'].items()),
+            '; %d empty in the game data' % plan['empty'] if plan.get('empty') else ''))
     else:
         lines.append('Interiors in the plan: not recorded (no room batches record)')
     chim = record.get('chim')

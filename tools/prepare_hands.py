@@ -9,6 +9,7 @@ import numpy as np
 from mwad.npc import load_master,first,text,PART_NAMES
 from mwad.audit import BSA
 from mwad.paths import copy_tree,ensure_external
+from mwad.masters import master_path
 from npc_geometry import Assets,Skeleton,assemble,bake,animated_mdl,add_root_rule_arg,apply_root_rule
 from player_hull import lumps,pack_lumps
 from build_jobs import add_jobs
@@ -23,12 +24,26 @@ STANCES={'hh':('idlehh','handtohand'),'1h':('idle1h','weapononehand'),
          # attack is the shot, "shoot start" to "shoot follow stop", in the swing's 10 frames
          'bow':('idle1h','bowandarrow'),'xb':('idlecrossbow','crossbow'),'1t':('idle1h','throwweapon')}
 RANGED=('bow','xb','1t')
+# PLAYER-CASTING-59 / READY-MAGIC-SHOWS-WEAPON-65 (v0.0.66): the spell stance of base_anim.1st.nif, one per spell range
+# (the engine's range order: self, touch, target): the open hands of 'idlespell', 'spellcast: equip' / 'unequip' to
+# raise and lower them, and the cast 'spellcast: <range> start' .. 'stop' in the attack's 10 frames. The cast is
+# sampled in two pieces so the original's 'release' key (where the spell leaves the hands) is always the attack's
+# frame SPELL_RELEASE_FRAME: the engine lets the spell go at that fraction of the attack (aw_cast.c).
+SPELL_STANCES={'sps':'self','spt':'touch','sp':'target'}
+SPELL_RELEASE_FRAME=6
+for _s in SPELL_STANCES:STANCES[_s]=('idlespell','spellcast')
 
 def stance_clips(stance='hh'):
     """The fixed frame contract (idle 8, draw 6, lower 4, punch 10 = 28 frames) for one stance;
     the runtime state logic is the same for every stance."""
     if stance not in STANCES:raise ValueError('Unknown first-person stance '+str(stance))
     idle,group=STANCES[stance]
+    if stance in SPELL_STANCES:
+        r=SPELL_STANCES[stance]
+        return (('idle',idle+': start',idle+': stop',8,False),
+                ('draw',group+': equip start',group+': equip stop',6,True),
+                ('lower',group+': unequip start',group+': unequip stop',4,True),
+                ('punch',group+': '+r+' start',group+': '+r+' stop',10,True,group+': '+r+' release'))
     attack=(group+': shoot start',group+': shoot follow stop') if stance in RANGED else \
         (group+': chop start',group+': chop large follow stop')
     return (('idle',idle+': start',idle+': stop',8,False),
@@ -41,11 +56,18 @@ CLIPS=stance_clips('hh')
 
 def sample_clips(events,stance='hh'):
     times=[];clips={}
-    for name,start,stop,count,endpoint in stance_clips(stance):
+    for name,start,stop,count,endpoint,*release in stance_clips(stance):
         if start not in events or stop not in events:raise ValueError('Missing first-person animation '+name+' ('+stance+')')
         a=events[start];b=events[stop]
         if not np.isfinite([a,b]).all() or b<=a:raise ValueError('Invalid first-person animation '+name)
         clips[name]={'first':len(times),'count':count,'duration':float(b-a)}
+        if release:
+            # the cast: start..release in the first SPELL_RELEASE_FRAME frames, release..stop in the rest
+            if release[0] not in events or not a<events[release[0]]<b:raise ValueError('Invalid spell release key ('+stance+')')
+            r=events[release[0]];clips[name]['release']=float(r-a)
+            times.extend(np.linspace(a,r,SPELL_RELEASE_FRAME,endpoint=False))
+            times.extend(np.linspace(r,b,count-SPELL_RELEASE_FRAME,endpoint=True))
+            continue
         times.extend(np.linspace(a,b,count,endpoint=endpoint))
     return np.array(times),clips
 
@@ -134,7 +156,7 @@ def prepare(data,scene,out,jobs=None):
     if ready.get('hands'):raise ValueError('Scene already has hands')
     # The master file loads beside the first-person skeleton read (two single-core reads).
     from build_parallel import Background
-    kinds=Background(hand_kinds,data/'Morrowind.esm',jobs=jobs)
+    kinds=Background(hand_kinds,master_path(data),jobs=jobs)
     assets=Assets(data,BSA(data/'Morrowind.bsa'));skeleton=Skeleton(assets,'meshes/base_anim.1st.nif')
     raw,report=bake_appearance(assets,kinds.result(),(scene/'id1/gfx/palette.lmp').read_bytes(),skeleton=skeleton)
     copy_tree(scene,out);(out/'id1/progs/v_nord.mdl').write_bytes(raw)

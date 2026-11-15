@@ -275,7 +275,8 @@ def convert(data, scene, settings, qbsp, vis, light, timings, jobs, vis_mode, dr
     # interior entrances (the converter's original_door_arrivals option).
     from mwad.interior import original_doors
     from mwad.paths import child_ci
-    outside = {door['destination_cell'].casefold() for door in original_doors(child_ci(data, 'Morrowind.esm').read_bytes())
+    from mwad.masters import master_path
+    outside = {door['destination_cell'].casefold() for door in original_doors(master_path(data).read_bytes())
                if not door['source_interior'] and door['destination_interior']}
     workers = min(jobs, len(work))
     tasks = [(data, scene, {'map': room['map'], 'cell': room['cell'], 'interior': True, 'area': 'balmora',
@@ -312,10 +313,11 @@ def convert(data, scene, settings, qbsp, vis, light, timings, jobs, vis_mode, dr
 
 def door_mesh_bounds(data, doors):
     """Original door mesh bounds (source units) per door reference."""
-    from mwad.audit import BSA
+    from mwad.archives import layered_bsa
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     from prepare_scenery import bsa_read, model_geometry, nif_reader, world_bounds
-    bsa = BSA(child_ci(data, 'Morrowind.bsa')); reader = nif_reader(); cache = {}; out = {}
+    bsa = layered_bsa(data); reader = nif_reader(); cache = {}; out = {}
     for door in doors:
         model = 'meshes/' + door['model'].replace('\\', '/').lower()
         if model not in cache:
@@ -328,6 +330,7 @@ def write_room_banks(data, scene, result, root=None, prefer=()):
     """doors-<room>.txt for every converted room; returns the link receipt."""
     from mwad.interior import original_doors
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     if not result['rooms']:
         return []
     converted = {cell: True for cell in result['cells']}
@@ -339,7 +342,7 @@ def write_room_banks(data, scene, result, root=None, prefer=()):
     offsets = room_offsets(root)
     towns = frame_towns(root, prefer)
     by_cell = {}
-    for door in original_doors(child_ci(data, 'Morrowind.esm').read_bytes()):
+    for door in original_doors(master_path(data).read_bytes()):
         if door['source_interior']:
             by_cell.setdefault(door['source_cell'].casefold(), []).append(door)
     receipt = []

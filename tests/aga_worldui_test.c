@@ -6,6 +6,9 @@
 #include "aw_save.h"
 #include "aw_jhist.h"
 #include "aw_ledger.h"
+#include "aw_mapfog.h"
+#include "aw_mapmarks.h"
+#include "aw_msgbox.h"
 #include <assert.h>
 server_t sv;server_static_t svs;client_state_t cl;client_static_t cls;viddef_t vid;
 aw_story_t aw_story;aw_character_t aw_character;
@@ -25,8 +28,9 @@ static const char *region_override;
 static int cyan_pixels,cyan_left,cyan_right,cyan_top,cyan_bottom,button_x,button_y;
 /* Model the registered values used by the real panel; do not bypass mode logic. */
 /* six since OPENING-TUTORIAL-KEYS-65: the inventory's own key lists (aw_key_inv_use, aw_key_inv_drop) */
-static cvar_t *map_vars[6];static int map_var_count,debug_overlays=1;
-void Cvar_RegisterVariable(cvar_t *v){assert(map_var_count<6);v->value=atof(v->string);map_vars[map_var_count++]=v;}
+/* eight since MAP-MULTI-MARKERS-66: aw_map_markers_max and aw_compass, registered last */
+static cvar_t *map_vars[8];static int map_var_count,debug_overlays=1;
+void Cvar_RegisterVariable(cvar_t *v){assert(map_var_count<8);v->value=atof(v->string);map_vars[map_var_count++]=v;}
 void Cvar_SetValue(char *name,float value){int i;for(i=0;i<map_var_count;i++)if(!strcmp(name,map_vars[i]->name)){map_vars[i]->value=value;return;}assert(0);}
 int AW_DebugOverlaysEnabled(void){return debug_overlays;}
 int Cmd_Argc(void){return 1;}
@@ -66,7 +70,13 @@ int AW_ConsoleCharWidth(void){return char_width;}
 void AW_ConsoleCharacter(int x,int y,int c){int n=strlen(drawn);assert(n<16383);drawn[n]=c;drawn[n+1]=0;
     if(y==188 && x>=96){n=strlen(footer);assert(n<79);if(!n)footer_left=x;footer[n]=c;footer[n+1]=0;footer_right=x+char_width;}
 }
+/* MAP-ORIGINAL-POI-66: the 5x5 place squares drawn, by centre */
+static int squares_n,square_xy[16][2];
+/* stage 3: the door markers drawn (3x3 in the door colour), the last one's centre */
+static int door_fills,door_x,door_y;
 void AW_UIFill(int x,int y,int w,int h,int c){
+    if(w==3 && h==3 && c==AW_UIColor(214,96,64)){door_fills++;door_x=x+1;door_y=y+1;}
+    if(w==5 && h==5 && c==AW_UIColor(202,165,96) && squares_n<16){square_xy[squares_n][0]=x+2;square_xy[squares_n][1]=y+2;squares_n++;}
     if(c==AW_UIColor(48,240,240) && w==1 && h==1){
         cyan_pixels++;if(x<cyan_left)cyan_left=x;if(x>cyan_right)cyan_right=x;
         if(y<cyan_top)cyan_top=y;if(y>cyan_bottom)cyan_bottom=y;
@@ -143,10 +153,18 @@ int COM_FOpenFile(char *name,FILE **out){
         fixed(f,"quest",64);word(f,1);word(f,0);word(f,strlen(body)+1);
         fixed(f,"quest",64);word(f,10);word(f,strlen(body)+1);word(f,sizeof(body)-strlen(body)-1);
     }else if(!strcmp(name,"world/entries.dat"))fwrite(body,1,sizeof(body),f);
+    else if(!strcmp(name,"world/region-names.awn")){
+        /* MAP-ORIGINAL-POI-66: one region, three places, three cells (sorted by x, y); the two Vivec cells are one marker */
+        fputs("ARN2",f);word(f,1);word(f,3);word(f,3);
+        fixed(f,"Test Region",64);fixed(f,"Pelagiad",64);fixed(f,"Vivec, Arena",64);fixed(f,"Vivec, Foreign Quarter",64);
+        word(f,(unsigned)-1);word(f,0);word(f,0);word(f,0);
+        word(f,0);word(f,(unsigned)-1);word(f,0);word(f,1);
+        word(f,0);word(f,0);word(f,0);word(f,2);
+    }
     else assert(0);
     size=ftell(f)-base;fseek(f,base,SEEK_SET);return size;
 }
-static void draw(void){cyan_pixels=red_pixels=0;cyan_left=cyan_top=1000;cyan_right=cyan_bottom=-1;button_x=button_y=-1;drawn[0]=footer[0]=0;heading_rows=0;marker_x=marker_y=-1;assert(AW_WorldUIDraw());}
+static void draw(void){squares_n=0;door_fills=0;door_x=door_y=-1;cyan_pixels=red_pixels=0;cyan_left=cyan_top=1000;cyan_right=cyan_bottom=-1;button_x=button_y=-1;drawn[0]=footer[0]=0;heading_rows=0;marker_x=marker_y=-1;assert(AW_WorldUIDraw());}
 /* Exercise physical right/middle virtual keys through the real panel.
  * Map-marker movement proves pan state; host pointer transport is separate. */
 static void drag_test_require(int good,const char *reason)
@@ -246,6 +264,8 @@ static void lava_layer_test(void){
     int l,r,t,b,dot,mode;
     for(mode=0;mode<2;mode++){
         map_version=2;Cvar_SetValue("aw_map_mode",mode);Cvar_SetValue("aw_map_lava",0);
+        /* the in-game view hides unexplored land, lava too: both pools walked past first (MAP-ORIGINAL-POI-66) */
+        AW_MapFogReset();if(mode){AW_MapFogReveal(2048,2048);AW_MapFogReveal(-4000,-4000);}
         map_command();assert(AW_WorldUIActive());AW_WorldUIKey(K_HOME,1);
         draw();assert(!strstr(drawn,"LAVA"));memcpy(lava_before,pixels,sizeof pixels);
         Cvar_SetValue("aw_map_lava",1);draw();assert(strstr(drawn,"LAVA"));
@@ -254,6 +274,11 @@ static void lava_layer_test(void){
         Cvar_SetValue("aw_map_format",1);draw();assert(!strstr(drawn,"LAVA") && !memcmp(pixels,lava_before,sizeof pixels));
         Cvar_SetValue("aw_map_format",2);AW_WorldUIKey('m',1);
     }
+    /* unexplored: in play the pools stay under the fog */
+    map_version=2;debug_overlays=0;Cvar_SetValue("aw_map_mode",1);AW_MapFogReset();map_command();assert(AW_WorldUIActive());AW_WorldUIKey(K_HOME,1);
+    Cvar_SetValue("aw_map_lava",0);draw();memcpy(lava_before,pixels,sizeof pixels);
+    Cvar_SetValue("aw_map_lava",1);draw();assert(lava_diff(&l,&r,&t,&b,&dot)==0 && !dot);
+    AW_WorldUIKey('m',1);debug_overlays=1;Cvar_SetValue("aw_map_mode",0);
     map_version=3;map_command();assert(!AW_WorldUIActive());
     map_version=0;map_command();assert(AW_WorldUIActive());draw();assert(!strstr(drawn,"LAVA"));AW_WorldUIKey('m',1);
 }
@@ -273,58 +298,97 @@ static void marker_save_roundtrip(void)
     assert(AW_SaveDecode(bytes,length,&decoded));AW_StateReset();aw_state=decoded.state;
     assert(!memcmp(&aw_state,&saved.state,sizeof(aw_state)));
 }
+/* MAP-MULTI-MARKERS-66: the named markers on the map (the middle button in this debug view with teleport; the
+ * right one picks the teleport target here), their box, the Markers menu, the hot marker and the saved block */
+static void type_text(const char *s){for(;*s;s++)AW_WorldUIKey(*s,1);}
+static void marker_save_block_roundtrip(void)
+{
+    static aw_save_t saved,decoded;static unsigned char bytes[AW_SAVE_BYTES+16384];static aw_changes_t c;int length,n=AW_MapMarksCount();
+    memset(&saved,0,sizeof(saved));saved.sequence=1;saved.profile=1;
+    strcpy(saved.scene,"balmora");strcpy(saved.story.name,"Synthetic");
+    saved.story.stage=AW_STAGE_RELEASED;saved.story.ship_disabled=1;saved.story.captain=-1;
+    saved.character.level=1;saved.character.hair=1;
+    strcpy(aw_races[0].id,"race");strcpy(aw_classes[0].id,"class");strcpy(aw_births[0].id,"birth");
+    strcpy(aw_parts[0].id,"head");strcpy(aw_parts[1].id,"hair");aw_parts[1].kind=1;
+    assert(AW_StateSet(&aw_state,AW_GLOBAL,"chargenstate",-1));saved.state=aw_state;memset(&c,0,sizeof(c));c.markers=1;
+    length=AW_SaveEncodeChanges(bytes,sizeof(bytes),&saved,&c);assert(length>0);
+    AW_MapMarksClear();
+    assert(AW_SaveDecodeChanges(bytes,length,&decoded,&c));aw_save_markers_loaded();AW_SaveRelease(&decoded);
+    assert(AW_MapMarksCount()==n);
+    /* without a hook the block is not read: a save that has it is refused, never half-read */
+    {int (*keep)(const unsigned char *,int,int)=aw_save_markers_decode;aw_save_markers_decode=NULL;
+     assert(!n || !AW_SaveDecodeChanges(bytes,length,&decoded,&c));aw_save_markers_decode=keep;}
+}
 static void custom_marker_test(void)
 {
-    int x,y,i,old_count;int32_t source_x,source_y;static aw_state_t before;
-    AW_StateReset();debug_overlays=1;drag_test_start(0);
+    int x,y,i;float sx,sy;
+    AW_StateReset();AW_MapMarksReset();debug_overlays=1;drag_test_start(0);
     /* One source-world marker: a click never invokes the teleport path. */
-    drag_test_point(120,80);map_click(K_MOUSE1);draw();
-    assert(marked("ready")==1 && marked("x")==-4369 && marked("y")==1748);
-    assert(cyan_pixels==17 && red_pixels==0 && jumps==0 && key_dest==key_menu);
+    drag_test_point(120,80);map_click(K_MOUSE2);draw();
+    assert(AW_MapMarksCount()==1 && AW_MapMark(0)->x==-4369 && AW_MapMark(0)->y==1748 && !strcmp(AW_MapMark(0)->name,"West test region"));
+    assert(cyan_pixels==17 && red_pixels==0 && jumps==0 && key_dest==key_menu && strstr(drawn,"West test region"));
     assert(abs((cyan_left+cyan_right)/2-120)<=1 && abs((cyan_top+cyan_bottom)/2-80)<=1);
-    source_x=marked("x");source_y=marked("y");old_count=aw_state.count[AW_GLOBAL];
+    sx=AW_MapMark(0)->x;sy=AW_MapMark(0)->y;
     AW_WorldUIKey(K_MWHEELUP,1);draw();x=(cyan_left+cyan_right)/2;y=(cyan_top+cyan_bottom)/2;
     assert(abs(x-80)<=1 && abs(y-64)<=1);
     AW_WorldUIKey(K_RIGHTARROW,1);draw();assert(abs((cyan_left+cyan_right)/2-x+24)<=1);
     AW_WorldUIKey(K_LEFTARROW,1);AW_WorldUIKey(K_MWHEELDOWN,1);draw();
     assert(abs((cyan_left+cyan_right)/2-120)<=1 && abs((cyan_top+cyan_bottom)/2-80)<=1);
-    assert(marked("x")==source_x && marked("y")==source_y && aw_state.count[AW_GLOBAL]==old_count);
     /* Inverse pick uses the same source transform after zoom AND pan. */
     AW_WorldUIKey(K_MWHEELUP,1);AW_WorldUIKey(K_RIGHTARROW,1);
-    drag_test_point(100,80);map_click(K_MOUSE1);assert(marked("x")==-1966 && marked("y")==874);
-    AW_WorldUIKey(K_HOME,1);drag_test_point(120,80);map_click(K_MOUSE1);draw();
-    /* The complete drag delta is applied at threshold, without placing a marker. */
-    drag_test_point(120,80);x=marker_x;y=marker_y;AW_WorldUIKey(K_MOUSE1,1);
+    drag_test_point(100,80);map_click(K_MOUSE2);assert(AW_MapMarksCount()==2 && AW_MapMark(1)->x==-1966 && AW_MapMark(1)->y==874);
+    AW_MapMarkDelete(1);AW_WorldUIKey(K_HOME,1);
+    /* a left click and drag pans and never places a marker */
+    drag_test_point(150,90);x=marker_x;y=marker_y;AW_WorldUIKey(K_MOUSE1,1);
     AW_WorldUIMouse(2,1);drag_test_assert_shift(x,y,0,0,"click jitter panned map");
     AW_WorldUIMouse(10,-7);drag_test_assert_shift(x,y,12,-6,"threshold lost initial pan delta");
-    AW_WorldUIKey(K_MOUSE1,0);assert(marked("x")==source_x && marked("y")==source_y);
-    AW_WorldUIKey(K_HOME,1);drag_test_point(4,96);before=aw_state;map_click(K_MOUSE1);draw();
-    assert(!memcmp(&before,&aw_state,sizeof(before)) && strstr(drawn,"Outside map bounds"));
-    drag_test_point(3,96);map_click(K_MOUSE1);assert(!memcmp(&before,&aw_state,sizeof(before)));
+    AW_WorldUIKey(K_MOUSE1,0);assert(AW_MapMarksCount()==1);
+    AW_WorldUIKey(K_HOME,1);drag_test_point(150,90);map_click(K_MOUSE1);assert(AW_MapMarksCount()==1);
+    drag_test_point(4,96);map_click(K_MOUSE2);draw();assert(AW_MapMarksCount()==1 && strstr(drawn,"Outside map bounds"));
     /* Letterbox edge is invalid; first and last source pixels remain bounded. */
-    drag_test_point(86,22);map_click(K_MOUSE1);draw();
-    assert(marked("x")>=-8192 && marked("x")<-8000 && marked("y")<=8192 && cyan_pixels>0 && cyan_left>=4);
-    drag_test_point(234,170);map_click(K_MOUSE1);draw();
-    assert(marked("x")<8192 && marked("x")>-8192 && marked("y")>-8192 && cyan_bottom<173);
-    drag_test_point(120,80);map_click(K_MOUSE1);source_x=marked("x");source_y=marked("y");
-    /* Save/reload and close/reopen keep source position, independent of map pan. */
-    marker_save_roundtrip();AW_WorldUIKey('m',1);map_command();draw();
-    assert(marked("x")==source_x && marked("y")==source_y && cyan_pixels==17);
-    AW_WorldUIKey('c',1);draw();assert(!marked("ready") && cyan_pixels==0 && strstr(drawn,"Marker cleared"));
-    marker_save_roundtrip();assert(!marked("ready"));
-    drag_test_point(120,80);map_click(K_MOUSE1);drag_test_point(260,178);map_click(K_MOUSE1);
-    assert(!marked("ready") && AW_WorldUIActive() && jumps==0);
-    /* Focus loss cancels a pending click; explicit teleport and journal cannot place/clear a marker. */
-    drag_test_point(120,80);AW_WorldUIKey(K_MOUSE1,1);AW_WorldUICancelDrag();AW_WorldUIKey(K_MOUSE1,0);assert(!marked("ready"));
-    map_click(K_MOUSE1);before=aw_state;AW_WorldUIKey(K_ESCAPE,1);teleport_command();
-    map_click(K_MOUSE1);AW_WorldUIKey('c',1);assert(!memcmp(&before,&aw_state,sizeof(before)));
-    AW_WorldUIKey(K_ESCAPE,1);journal_command();map_click(K_MOUSE1);AW_WorldUIKey('c',1);
-    assert(!memcmp(&before,&aw_state,sizeof(before)));AW_WorldUIKey(K_ESCAPE,1);
-    /* Insufficient slots refuse atomically; no dynamic allocation or table growth. */
-    AW_StateReset();for(i=0;i<AW_STATE_VALUES-2;i++){char id[16];sprintf(id,"fixture%d",i);assert(AW_StateSet(&aw_state,AW_GLOBAL,id,i));}
-    map_command();AW_WorldUIKey(K_HOME,1);drag_test_point(120,80);before=aw_state;map_click(K_MOUSE1);draw();
-    assert(!memcmp(&before,&aw_state,sizeof(before)) && strstr(drawn,"globals full"));
-    AW_WorldUIKey('c',1);assert(!memcmp(&before,&aw_state,sizeof(before)));
+    drag_test_point(86,22);map_click(K_MOUSE2);draw();
+    assert(AW_MapMark(1)->x>=-8192 && AW_MapMark(1)->x<-8000 && AW_MapMark(1)->y<=8192 && cyan_left>=4);
+    drag_test_point(234,170);map_click(K_MOUSE2);
+    assert(AW_MapMark(2)->x<8192 && AW_MapMark(2)->y>-8192);
+    AW_MapMarkDelete(2);AW_MapMarkDelete(1);
+    /* left click on the marker: its box; a typed name, OK; Escape cancels; Delete removes */
+    drag_test_point(120,80);map_click(K_MOUSE1);draw();assert(strstr(drawn,"Marker name:") && strstr(drawn,"Cancel"));
+    for(i=0;i<40;i++)AW_WorldUIKey(K_BACKSPACE,1);
+    type_text("Fort");AW_WorldUIKey(K_ENTER,1);assert(!strcmp(AW_MapMark(0)->name,"Fort") && AW_WorldUIActive());
+    map_click(K_MOUSE1);type_text("xx");AW_WorldUIKey(K_ESCAPE,1);assert(!strcmp(AW_MapMark(0)->name,"Fort") && AW_WorldUIActive());
+    /* the hot marker: H at the pointer, its own colour, never in the list; H on it clears it */
+    drag_test_point(200,120);AW_WorldUIKey('h',1);draw();assert(AW_MapHotGet(&sx,&sy) && AW_MapMarksCount()==1 && strstr(drawn,"Hot marker"));
+    AW_WorldUIKey('h',1);assert(!AW_MapHotGet(NULL,NULL));
+    /* the Markers menu (K): the list, the Find line, Tab sorts, Enter centres, Delete removes, Remove all asks */
+    region_override="Zed region";drag_test_point(150,90);map_click(K_MOUSE2);region_override=NULL;
+    assert(AW_MapMarksCount()==2 && !strcmp(AW_MapMark(1)->name,"Zed region"));
+    drag_test_point(300,30);   /* the pointer off both markers: no hover box under the menu */
+    AW_WorldUIKey('k',1);draw();assert(strstr(drawn,"MARKERS 2/256") && strstr(drawn,"Fort") && strstr(drawn,"Zed region"));
+    type_text("fo");draw();assert(strstr(drawn,"Find: fo_") && strstr(drawn,"Fort") && !strstr(drawn,"Zed region"));
+    AW_WorldUIKey(K_BACKSPACE,1);AW_WorldUIKey(K_BACKSPACE,1);AW_WorldUIKey(K_TAB,1);draw();assert(strstr(drawn,"Sort: region"));
+    AW_WorldUIKey(K_TAB,1);AW_WorldUIKey(K_DOWNARROW,1);AW_WorldUIKey(K_DEL,1);assert(AW_MapMarksCount()==1 && !strcmp(AW_MapMark(0)->name,"Fort"));
+    AW_WorldUIKey(K_ENTER,1);draw();assert(!strstr(drawn,"MARKERS 1/256") && AW_WorldUIActive());   /* centred, menu shut */
+    AW_WorldUIKey('k',1);AW_WorldUIKey(K_ESCAPE,1);assert(AW_WorldUIActive());
+    /* save and load keep the markers (feature 2048), then the old single marker becomes marker 2 once */
+    marker_save_block_roundtrip();
+    assert(AW_StateSet(&aw_state,AW_GLOBAL,"amiwind:map:marker:x",-300) && AW_StateSet(&aw_state,AW_GLOBAL,"amiwind:map:marker:y",400));
+    assert(AW_StateSet(&aw_state,AW_GLOBAL,"amiwind:map:marker:ready",1));
+    aw_save_markers_loaded();assert(AW_MapMarksCount()==2 && AW_MapMark(1)->x==-300 && !marked("ready"));
+    aw_save_markers_loaded();assert(AW_MapMarksCount()==2);
+    /* Remove all behind its Yes/No box: No keeps them, Yes removes them */
+    {   /* the Remove all button is the fifth of the menu's six, laid out by the box pipeline */
+        static const char *const labels[6]={"Centre","Rename","Follow","Delete","Remove all","Close"};
+        int frame[4],w[6],r[4],k;
+        for(k=0;k<6;k++)w[k]=(int)strlen(labels[k])*AW_ConsoleCharWidth();
+        AW_MsgBoxLayout(6,320,200,12*10,frame);AW_MsgBoxButtonRectSized(6,4,frame,w,r);
+        AW_WorldUIKey('k',1);drag_test_point(r[0]+r[2]/2,r[1]+r[3]/2);map_click(K_MOUSE1);draw();
+        assert(strstr(drawn,"Remove all 2 markers?"));
+        AW_WorldUIKey('n',1);assert(AW_MapMarksCount()==2);
+        map_click(K_MOUSE1);AW_WorldUIKey(K_ENTER,1);assert(AW_MapMarksCount()==0);
+        AW_WorldUIKey(K_ESCAPE,1);assert(AW_WorldUIActive());
+    }
+    /* New Game: no marker */
+    aw_save_markers_reset();assert(AW_MapMarksCount()==0 && !AW_MapHotGet(NULL,NULL));
     AW_WorldUIKey(K_ESCAPE,1);AW_StateReset();
 }
 static void normal_debug_teleport_test(void)
@@ -339,7 +403,7 @@ static void normal_debug_teleport_test(void)
     x=marker_x;y=marker_y;map_click(K_MOUSE3);drag_test_assert_shift(x,y,0,0,"right click moved map");
     assert(jumps==0);expected_x=-4369.0667f;expected_y=1747.6267f;
     /* A normal marker may coexist; red selection remains independent. */
-    drag_test_point(190,90);map_click(K_MOUSE1);draw();assert(cyan_pixels==17 && red_pixels==22 && jumps==0);
+    AW_MapMarksReset();drag_test_point(190,90);map_click(K_MOUSE2);draw();assert(cyan_pixels==17 && red_pixels==22 && jumps==0);
     before=aw_state;AW_WorldUIKey(K_MWHEELUP,1);AW_WorldUIKey(K_RIGHTARROW,1);draw();
     drag_test_point(button_x+4,button_y+5);map_click(K_MOUSE3);assert(jumps==0);
     jump_available=0;map_click(K_MOUSE1);draw();
@@ -361,9 +425,112 @@ static void normal_debug_teleport_test(void)
     assert(strstr(drawn,"DEBUG MAP") && red_pixels==0 && button_x==-1);
     AW_WorldUIKey(K_ESCAPE,1);key_dest=key_console;teleport_command();AW_WorldUIKey(K_HOME,1);
     drag_test_point(120,80);map_click(K_MOUSE1);draw();assert(red_pixels==22 && button_y==184);
-    AW_WorldUIKey(K_ESCAPE,1);debug_overlays=1;AW_StateReset();
+    AW_WorldUIKey(K_ESCAPE,1);debug_overlays=1;AW_StateReset();AW_MapMarksReset();
 }
 
+/* MAP-ORIGINAL-POI-66: the places known on the map (aw_actorstate.c's list: ShowMap and the cells entered) */
+static const char *revealed_list[4];static int revealed_n;
+int AW_RevealedCount(void){return revealed_n;}
+const char *AW_RevealedAt(int i){return i>=0 && i<revealed_n?revealed_list[i]:NULL;}
+/* The place squares and their names on mouse-over: Vivec (cells 0,0 and 0,-1: source 4096,0) at screen 197,96 and
+ * Pelagiad (cell -1,0: -4096,4096) at 122,58 on the fitted 32x32 test map. The debug view shows every place; the
+ * in-game view only the known ones (a ShowMap text held by the cell's name, any case). */
+static int square_near(int x,int y){   /* a place square drawn centred within 1 pixel of x,y */
+    int i;
+    for(i=0;i<squares_n;i++)if(abs(square_xy[i][0]-x)<=1 && abs(square_xy[i][1]-y)<=1)return 1;
+    return 0;
+}
+static void place_markers_test(void){
+    if(AW_WorldUIActive())AW_WorldUIKey(K_ESCAPE,1);
+    map_version=0;debug_overlays=1;revealed_n=0;Cvar_SetValue("aw_map_mode",0);
+    map_command();assert(AW_WorldUIActive());AW_WorldUIKey(K_HOME,1);
+    drag_test_point(197,96);draw();
+    assert(strstr(drawn,"Vivec") && !strstr(drawn,"Arena") && !strstr(drawn,"Pelagiad"));
+    drag_test_point(122,58);draw();assert(strstr(drawn,"Pelagiad") && !strstr(drawn,"Vivec"));
+    drag_test_point(150,140);draw();assert(!strstr(drawn,"Pelagiad") && !strstr(drawn,"Vivec"));
+    assert(square_near(197,96) && square_near(122,58));
+    AW_WorldUIKey('m',1);
+    debug_overlays=0;Cvar_SetValue("aw_map_mode",1);map_command();AW_WorldUIKey(K_HOME,1);   /* M without the debug HUD: the in-game view */
+    drag_test_point(122,58);draw();assert(strstr(drawn,"IN-GAME MAP") && !strstr(drawn,"Pelagiad"));
+    drag_test_point(150,140);draw();assert(!square_near(122,58) && !square_near(197,96));
+    AW_WorldUIKey('m',1);
+    revealed_list[0]="pelagiad";revealed_n=1;map_command();AW_WorldUIKey(K_HOME,1);
+    drag_test_point(122,58);draw();assert(strstr(drawn,"Pelagiad"));
+    drag_test_point(150,140);draw();assert(square_near(122,58) && !square_near(197,96));
+    drag_test_point(197,96);draw();assert(!strstr(drawn,"Vivec"));
+    AW_WorldUIKey('m',1);
+    revealed_list[1]="Vivec";revealed_n=2;map_command();AW_WorldUIKey(K_HOME,1);
+    drag_test_point(197,96);draw();assert(strstr(drawn,"Vivec"));
+    AW_WorldUIKey('m',1);revealed_n=0;
+    /* stage 2: the explored land. Nothing walked: the in-game map is all fog, no square, no name */
+    AW_MapFogReset();map_command();AW_WorldUIKey(K_HOME,1);
+    drag_test_point(150,140);draw();assert(!square_near(122,58) && !square_near(197,96) && !square_near(160,96));
+    AW_WorldUIKey('m',1);
+    /* walked around Pelagiad's spot (-4096,4096): its square shows and is named on hover; Vivec still hidden;
+     * Balmora (the area at 0,0) once walked there, a square named only on hover */
+    AW_MapFogReveal(-4096,4096);map_command();AW_WorldUIKey(K_HOME,1);
+    drag_test_point(150,140);draw();assert(square_near(122,58) && !square_near(197,96));
+    drag_test_point(122,58);draw();assert(strstr(drawn,"Pelagiad"));
+    AW_WorldUIKey('m',1);
+    AW_MapFogReveal(0,0);map_command();AW_WorldUIKey(K_HOME,1);
+    drag_test_point(150,140);draw();assert(square_near(160,96) && !strstr(drawn,"Balmora"));
+    drag_test_point(160,96);draw();assert(strstr(drawn,"Balmora"));
+    AW_WorldUIKey('m',1);
+    /* persistent: saved, cleared (New Game or a load), read back: the same land is open */
+    {static unsigned char saved[4096];int n=AW_MapFogExport(saved,sizeof saved);assert(n>6);
+     AW_MapFogReset();map_command();AW_WorldUIKey(K_HOME,1);drag_test_point(150,140);draw();assert(!square_near(122,58));
+     AW_WorldUIKey('m',1);assert(AW_MapFogImport(saved,n)==n);
+     map_command();AW_WorldUIKey(K_HOME,1);drag_test_point(150,140);draw();assert(square_near(122,58) && square_near(160,96));
+     AW_WorldUIKey('m',1);}
+    AW_MapFogReset();debug_overlays=1;Cvar_SetValue("aw_map_mode",0);
+}
+/* stage 3: the local map. The scene's doors (aw_scene.c AW_SceneMapDoor) and the interior test (aw_scene.c AW_Interior)
+ * as the fixture sets them; a room of a floor and its west wall (1024 x 512 units around 0,0) as the loaded map. */
+static int inside,doors_on;
+int AW_Interior(void){return inside;}
+int AW_SceneMapDoor(int i,float *p,const char **name){
+    if(!doors_on || i>1)return -1;
+    if(i==1)return 0;                                     /* a row of another scene */
+    p[0]=inside?-450:100;p[1]=inside?100:0;p[2]=0;*name=inside?"Seyda Neen":"Balmora";return 1;
+}
+static void local_map_test(void){
+    static mvertex_t v[8];static medge_t e[8];static int se[8];static msurface_t s[2];static mplane_t pl[2];static model_t room;
+    static const float corner[8][3]={{-512,-256,0},{512,-256,0},{512,256,0},{-512,256,0},
+                                     {-512,-256,0},{-512,256,0},{-512,256,128},{-512,-256,128}};
+    edict_t *player=svs.clients[0].edict;int i,wall=AW_UIColor(232,214,160),fog=AW_UIColor(20,18,14);
+    if(AW_WorldUIActive())AW_WorldUIKey(K_ESCAPE,1);
+    for(i=0;i<8;i++){memcpy(v[i].position,corner[i],sizeof corner[i]);e[i].v[0]=(unsigned short)i;e[i].v[1]=(unsigned short)(i%4==3?i-3:i+1);se[i]=i;}
+    pl[0].normal[2]=1;pl[1].normal[0]=1;
+    s[0].plane=&pl[0];s[0].firstedge=0;s[0].numedges=4;s[1].plane=&pl[1];s[1].firstedge=4;s[1].numedges=4;
+    room.type=mod_brush;room.numsurfaces=2;room.surfaces=s;room.surfedges=se;room.edges=e;room.vertexes=v;
+    room.mins[0]=-512;room.mins[1]=-256;room.maxs[0]=512;room.maxs[1]=256;room.maxs[2]=128;
+    map_version=0;debug_overlays=0;Cvar_SetValue("aw_map_mode",1);AW_MapFogReset();doors_on=1;
+    /* outdoors: World first; Tab = Local, the doors of the scene on explored land, named on hover; Tab back */
+    strcpy(sv.name,"vf0000");memset(player->v.origin,0,sizeof player->v.origin);AW_MapFogReveal(4096,0);
+    map_command();assert(AW_WorldUIActive());draw();assert(!door_fills && strstr(drawn,"WORLD") && strstr(drawn,"LOCAL"));
+    AW_WorldUIKey(K_TAB,1);draw();assert(door_fills==1);
+    drag_test_point(door_x,door_y);draw();assert(strstr(drawn,"Balmora"));
+    AW_WorldUIKey(K_TAB,1);draw();assert(!door_fills);
+    AW_WorldUIKey(K_TAB,1);AW_WorldUIKey('m',1);
+    map_command();draw();assert(door_fills==1);   /* outdoors the last choice is kept */
+    AW_WorldUIKey(K_TAB,1);AW_WorldUIKey('m',1);
+    /* inside: always the room's plan, its fog and doors; no marker by a click */
+    inside=1;strcpy(sv.name,"census");sv.worldmodel=&room;player->v.origin[0]=-400;
+    AW_MapFogReset();map_command();assert(AW_WorldUIActive() && AW_MapFogRooms()==1);
+    drag_test_point(160,180);draw();
+    assert(abs(marker_x-45)<=1 && marker_y==96);                         /* the player, on the plan */
+    assert(pixels[96*320+14]==wall && pixels[96*320+306]==fog);           /* the west wall seen, the east end fogged */
+    assert(door_fills==1 && abs(door_x-31)<=1 && abs(door_y-67)<=1);
+    drag_test_point(door_x,door_y);draw();assert(strstr(drawn,"Seyda Neen"));
+    {int before=AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:map:marker:ready");
+     AW_WorldUIKey(K_MOUSE1,1);AW_WorldUIKey(K_MOUSE1,0);assert(AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:map:marker:ready")==before);}
+    AW_WorldUIKey(K_TAB,1);draw();assert(!door_fills && pixels[96*320+14]!=wall);   /* the world map */
+    AW_WorldUIKey(K_TAB,1);draw();assert(door_fills==1);
+    AW_WorldUIKey('m',1);
+    map_command();draw();assert(door_fills==1);AW_WorldUIKey('m',1);   /* inside it always opens on the room */
+    inside=doors_on=0;sv.worldmodel=NULL;strcpy(sv.name,"balmora");memset(player->v.origin,0,sizeof player->v.origin);
+    AW_MapFogReset();debug_overlays=1;Cvar_SetValue("aw_map_mode",0);
+}
 int main(void){
     edict_t player;client_t client;int before;
     memset(&player,0,sizeof(player));memset(&client,0,sizeof(client));
@@ -459,7 +626,7 @@ int main(void){
     /* The default hidden HUD must not disable map tabs or explicit commands.
      * Keep the independent debug-map availability setting authoritative. */
     strcpy(sv.name,"balmora");debug_overlays=0;Cvar_SetValue("aw_map_mode",1);map_command();AW_WorldUIKey(K_HOME,1);draw();
-    assert(strstr(drawn,"IN-GAME MAP PROTOTYPE") && strstr(drawn,"Balmora"));
+    assert(strstr(drawn,"IN-GAME MAP PROTOTYPE") && !strstr(drawn,"Balmora"));   /* in play: names on mouse-over only */
     AW_WorldUIKey('m',1);debug_overlays=0;
     map_command();
     AW_WorldUIMouse(-1000,-1000);AW_WorldUIMouse(20,8);
@@ -511,5 +678,7 @@ int main(void){
     custom_marker_test();normal_debug_teleport_test();
     if(AW_WorldUIActive())AW_WorldUIKey(K_ESCAPE,1);
     lava_layer_test();
+    place_markers_test();
+    local_map_test();
     return 0;
 }

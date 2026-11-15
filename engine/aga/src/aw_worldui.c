@@ -17,7 +17,17 @@
 #include "aw_jhist.h"
 #include "aw_save.h"
 #include "aw_listnav.h"
+#include "aw_actorstate.h"
+#include "aw_mapfog.h"
+#include "aw_links.h"
+#include "aw_mapmarks.h"
+#include "aw_listbox.h"
+#include "aw_msgbox.h"
 #include <stdint.h>
+#include <ctype.h>
+static void mm_close_all(void);   /* the map markers' boxes and menu (MAP-MULTI-MARKERS-66) */
+static void mm_max(void);
+static void mm_migrate(void);
 /* AWM1: header, areas, pixels. AWM2 adds the LAVA section (docs/WORLD_MAP_AND_JOURNAL.md "Map file formats"). */
 #define LAVA_POOLS_MAX 2048
 #define LAVA_POINTS 16
@@ -29,7 +39,7 @@ static int modal,mouse_x=160,mouse_y=100,drag,grid,zoom;
 static int marker_click;
 static float marker_drag_x,marker_drag_y;
 static const char *marker_message;
-/* Existing global codec persists these three bounded facts without a schema change. */
+/* The old single marker (MAP-MARKER-29): read once into the marker list (aw_mapmarks.c, mm_migrate), then cleared. */
 static const char *const marker_keys[3]={"amiwind:map:marker:x","amiwind:map:marker:y","amiwind:map:marker:ready"};
 #define TELEPORT_X 244
 #define TELEPORT_W 72
@@ -130,6 +140,22 @@ static int lava_count,lava_colour,lava_painted;
 static float teleport_point[3];
 static const char *teleport_message;
 static char teleport_region[64];
+/* MAP-ORIGINAL-POI-66: the original's place markers (OpenMW MapWindow: a square per named exterior cell, its cells
+ * grouped by the name before the first comma, placed at their average, named on mouse-over). Read from
+ * world/region-names.awn (the cells' original names) when the map opens, freed when it closes; known = entered by
+ * the player or revealed by ShowMap (aw_actorstate.c, saved); the debug view shows them all. */
+#define MAP_PLACES_MAX 128
+typedef struct {char name[32];float x,y;int cells,known;} map_place_t;
+static map_place_t *map_places;static int map_place_count,map_place_hover=-1;
+/* Stage 2: the explored land (aw_mapfog.c) as one bit per fog square (1024 source units) over the map's bounds, built
+ * when the map opens from the explored cells' rows and freed on close; the in-game view hides the rest. */
+static byte *fog_mask;static int fog_gx0,fog_gy0,fog_w,fog_h;
+static const char *map_hover_name;
+/* Stage 3, the local map (local_build): local_room = the plan of the loaded room is in local_pixels */
+static int map_local,map_local_choice,local_room;
+static byte *local_pixels;static float local_min[2],local_max[2],local_scale,local_ox,local_oy;
+static char local_name[16];
+static void local_free(void){free(local_pixels);local_pixels=NULL;local_room=0;}
 #define BOOK_TOPICS 256       /* the topics the reader lists (sorted by name) */
 #define BOOK_LINKS 512        /* the links one topic page holds (its text is 16 KB; the spans are a few per entry) */
 #define BOOK_HITS 96          /* the link pieces drawn on one spread */
@@ -194,6 +220,8 @@ static void close_panel(void){
     if(inventory){free(inventory->keys);free(inventory->rows);}
     free(inventory);inventory=NULL;AW_InventoryPreviewClear();
     free(map_data);map_data=map_pixels=NULL;lava_pools=lava_points=NULL;lava_count=0;
+    free(map_places);map_places=NULL;map_place_count=0;map_place_hover=-1;
+    free(fog_mask);fog_mask=NULL;local_free();map_local=0;mm_close_all();
     book_free();
     if(modal && key_dest==key_menu)key_dest=key_game;
     modal=drag=marker_click=teleport_mode=teleport_selected=0;teleport_message=marker_message=NULL;IN_AWClearButtons();
@@ -980,6 +1008,164 @@ static int lava_section(const byte *p,int size){
     if(total!=points)return 0;
     lava_pools=p+16;lava_points=pt;lava_count=pools;return 1;
 }
+/* case-insensitive: does TEXT hold PART (ShowMap's rule, aw_mwhost.c) */
+static int ci_holds(const char *text,const char *part){
+    int i,j;
+    if(!*part)return 0;
+    for(i=0;text[i];i++){
+        for(j=0;part[j] && text[i+j] && tolower((unsigned char)text[i+j])==tolower((unsigned char)part[j]);j++){}
+        if(!part[j])return 1;
+    }
+    return 0;
+}
+/* The place markers from world/region-names.awn (ARN2: names, places, cells; 64-byte labels; rows <iiII> x, y,
+ * region, place). Bounded: 128 groups; a missing or bad file leaves the map without markers. */
+static void map_places_load(void){
+    FILE *f=NULL;byte head[16],row[16];char *labels=NULL;short *group=NULL;long base;
+    int size,i,j,k,n;unsigned names,places,cells,where;const char *cut;map_place_t *m;
+    free(map_places);map_places=NULL;map_place_count=0;map_place_hover=-1;
+    size=COM_FOpenFile("world/region-names.awn",&f);
+    if(!f)return;
+    base=ftell(f);
+    if(base<0 || size<16 || fread(head,1,16,f)!=16 || memcmp(head,"ARN2",4))goto done;
+    names=u32(head+4);places=u32(head+8);cells=u32(head+12);
+    if(names>1024 || places<1 || places>1024 || cells>65536 || size!=16+(long)(names+places)*64+(long)cells*16)goto done;
+    labels=(char *)AW_TryMalloc((unsigned long)places*64);group=(short *)AW_TryMalloc((unsigned long)places*sizeof(short));
+    map_places=(map_place_t *)AW_TryMalloc(sizeof(map_place_t)*MAP_PLACES_MAX);
+    if(!labels || !group || !map_places)goto fail;
+    memset(map_places,0,sizeof(map_place_t)*MAP_PLACES_MAX);
+    if(fseek(f,base+16+(long)names*64,SEEK_SET) || fread(labels,64,places,f)!=places)goto fail;
+    for(i=0;i<(int)places;i++){
+        char *label=labels+i*64;
+        if(!memchr(label,0,64))goto fail;
+        cut=strchr(label,',');n=cut?(int)(cut-label):(int)strlen(label);
+        while(n>0 && label[n-1]==' ')n--;
+        if(n>31)n=31;
+        group[i]=-1;if(n<1)continue;
+        for(j=0;j<map_place_count;j++)if(!strncmp(map_places[j].name,label,(size_t)n) && !map_places[j].name[n])break;
+        if(j==map_place_count){
+            if(map_place_count>=MAP_PLACES_MAX)continue;   /* past the bound: that place has no marker */
+            memcpy(map_places[j].name,label,(size_t)n);map_places[j].name[n]=0;map_place_count++;
+        }
+        group[i]=(short)j;
+        for(k=0;k<AW_RevealedCount();k++){const char *r=AW_RevealedAt(k);if(r && ci_holds(label,r)){map_places[j].known=1;break;}}
+    }
+    for(i=0;i<(int)cells;i++){
+        if(fread(row,1,16,f)!=16)goto fail;
+        where=u32(row+12);if(where==0xFFFFFFFFu)continue;
+        if(where>=places)goto fail;
+        if(group[where]<0)continue;
+        m=&map_places[group[where]];
+        m->x+=((int32_t)u32(row)+.5f)*8192.0f;m->y+=((int32_t)u32(row+4)+.5f)*8192.0f;m->cells++;
+    }
+    for(i=j=0;i<map_place_count;i++){
+        if(!map_places[i].cells)continue;
+        map_places[j]=map_places[i];map_places[j].x/=map_places[j].cells;map_places[j].y/=map_places[j].cells;j++;
+    }
+    map_place_count=j;
+    goto done;
+ fail:
+    free(map_places);map_places=NULL;map_place_count=0;
+ done:
+    free(labels);free(group);
+    fclose(f);
+}
+static void map_fog_build(void){
+    const float square=AW_MAPFOG_CELL/AW_MAPFOG_GRID;int i,j,k,x,y,gx,gy,gx1,gy1;const unsigned char *bits;
+    free(fog_mask);fog_mask=NULL;
+    fog_gx0=(int)floor(map_bounds[0]/square);gx1=(int)floor((map_bounds[2]-1)/square);
+    fog_gy0=(int)floor(map_bounds[1]/square);gy1=(int)floor((map_bounds[3]-1)/square);
+    fog_w=gx1-fog_gx0+1;fog_h=gy1-fog_gy0+1;
+    if(fog_w<1 || fog_h<1 || fog_w>2048 || fog_h>2048)return;
+    if(!(fog_mask=(byte *)AW_TryMalloc((unsigned long)(fog_w*fog_h+7)/8)))return;   /* no mask: nothing explored */
+    memset(fog_mask,0,(size_t)(fog_w*fog_h+7)/8);
+    for(i=0;AW_MapFogRow(i,&x,&y,&bits);i++)
+        for(j=0;j<AW_MAPFOG_GRID;j++)for(k=0;k<AW_MAPFOG_GRID;k++){
+            int bit=j*AW_MAPFOG_GRID+k;
+            if(!((bits[bit>>3]>>(bit&7))&1))continue;
+            gx=x*AW_MAPFOG_GRID+k-fog_gx0;gy=y*AW_MAPFOG_GRID+j-fog_gy0;
+            if(gx<0 || gy<0 || gx>=fog_w || gy>=fog_h)continue;
+            bit=gy*fog_w+gx;fog_mask[bit>>3]|=(byte)(1<<(bit&7));
+        }
+}
+/* 1 when the fog square (mask column GX, row GY) is explored */
+static int fog_open(int gx,int gy){
+    int bit;
+    if(!fog_mask || gx<0 || gy<0 || gx>=fog_w || gy>=fog_h)return 0;
+    bit=gy*fog_w+gx;return (fog_mask[bit>>3]>>(bit&7))&1;
+}
+static int fog_open_at(float x,float y){
+    const float square=AW_MAPFOG_CELL/AW_MAPFOG_GRID;
+    return fog_open((int)floor(x/square)-fog_gx0,(int)floor(y/square)-fog_gy0);
+}
+/* MAP-ORIGINAL-POI-66 stage 3: the local map (OpenMW's map window: a Local and a World view; inside, the local view is
+ * the room's own map). Outdoors the local view is the world map at the zoom where about the 3 x 3 cells around the
+ * player fill the window, with the doors of the loaded scene. Inside, the room's top-down plan is drawn once when the
+ * map opens from the loaded map's own faces (walls bright, floors dim, ceilings left out) into a 312 x 154 picture
+ * (48,048 bytes, freed on close; no file read), under the room's own fog (aw_mapfog.c AW_MapFogRoom*), with the
+ * room's doors named on mouse-over after where they lead (docs/WORLD_MAP_AND_JOURNAL.md "Local map"). */
+#define LOCAL_W 312
+#define LOCAL_H 154
+#define LOCALBTN_WORLD_X 168
+#define LOCALBTN_LOCAL_X 208
+#define LOCALBTN_W 38
+static void local_line(int x0,int y0,int x1,int y1,int color){
+    int dx=abs(x1-x0),sx=x0<x1?1:-1,dy=-abs(y1-y0),sy=y0<y1?1:-1,error=dx+dy,e2,n=0;
+    for(;n<2048;n++){
+        if(x0>=0 && x0<LOCAL_W && y0>=0 && y0<LOCAL_H)local_pixels[y0*LOCAL_W+x0]=(byte)color;
+        if(x0==x1 && y0==y1)break;
+        e2=2*error;if(e2>=dy){error+=dy;x0+=sx;}if(e2<=dx){error+=dx;y0+=sy;}
+    }
+}
+/* the room's point X, Y (engine units) on the screen */
+static void local_to_screen(float x,float y,int *mx,int *my){
+    *mx=4+(int)floor(local_ox+(x-local_min[0])*local_scale);*my=19+(int)floor(local_oy+(local_max[1]-y)*local_scale);
+}
+static void local_build(void){
+    model_t *m=sv.worldmodel;int i,j,edges=0,faces=0,wall=AW_UIColor(232,214,160),floorc=AW_UIColor(110,92,58);
+    float w,h,nz;double t0=Sys_FloatTime();
+    local_free();
+    if(!sv.active || !m || m->type!=mod_brush || m->numsurfaces<1 || !AW_Interior())return;
+    local_min[0]=m->mins[0];local_min[1]=m->mins[1];local_max[0]=m->maxs[0];local_max[1]=m->maxs[1];
+    w=local_max[0]-local_min[0];h=local_max[1]-local_min[1];
+    if(!(w>=1 && h>=1 && w<1e6f && h<1e6f))return;
+    if(!(local_pixels=(byte *)AW_TryMalloc(LOCAL_W*LOCAL_H)))return;
+    memset(local_pixels,AW_UIColor(15,20,23),LOCAL_W*LOCAL_H);
+    local_scale=(LOCAL_W-8)/w<(LOCAL_H-8)/h?(LOCAL_W-8)/w:(LOCAL_H-8)/h;
+    local_ox=(LOCAL_W-w*local_scale)*.5f;local_oy=(LOCAL_H-h*local_scale)*.5f;
+    for(i=0;i<m->numsurfaces;i++){
+        msurface_t *s=&m->surfaces[i];int color,x0=0,y0=0,first=1,fx=0,fy=0;
+        if(!s->plane || s->numedges<2)continue;
+        nz=s->plane->normal[2];if(s->flags&SURF_PLANEBACK)nz=-nz;
+        if(nz<-.7f)continue;                                  /* a ceiling: not on a plan */
+        color=nz>.7f?floorc:nz>-.3f && nz<.3f?wall:floorc;
+        faces++;
+        for(j=0;j<s->numedges;j++){
+            int e=m->surfedges[s->firstedge+j];const float *v;int x,y;
+            v=m->vertexes[m->edges[e<0?-e:e].v[e<0?1:0]].position;
+            x=(int)floor(local_ox+(v[0]-local_min[0])*local_scale);y=(int)floor(local_oy+(local_max[1]-v[1])*local_scale);
+            if(first){fx=x;fy=y;first=0;}else{local_line(x0,y0,x,y,color);edges++;}
+            x0=x;y0=y;
+        }
+        local_line(x0,y0,fx,fy,color);edges++;
+    }
+    local_room=1;strncpy(local_name,sv.name,sizeof(local_name)-1);local_name[sizeof(local_name)-1]=0;
+    Con_Printf("Local map: %s, %d faces, %d edges, %d bytes, %d ms.\n",sv.name,faces,edges,LOCAL_W*LOCAL_H,
+        (int)((Sys_FloatTime()-t0)*1000));
+}
+/* outdoors: the zoom where about 3 x 3 cells fill the window, centred on the player */
+static void local_zoom(void){
+    float cells=map_w*(3*AW_MAPFOG_CELL)/(float)(map_bounds[2]-map_bounds[0]),want=cells/310,base;int z;
+    zoom=0;map_fit();base=map_step;
+    for(z=0;z<5 && base/(1<<(z+1))>=want*.75f;z++){}
+    zoom=z;map_fit();map_player();
+}
+static void map_set_local(int local){
+    map_local=local && !teleport_mode;
+    if(!AW_Interior())map_local_choice=map_local;
+    if(map_local && !local_room && !AW_Interior() && marker)local_zoom();
+    else if(!map_local && !marker)map_home();
+}
 static void open_map(void){
     FILE *f=NULL;int size,i,off,version;byte *p;
     if(!menu_allowed(AW_MENU_MAP))return;   /* the teleport map checked the full rule before calling */
@@ -1006,7 +1192,14 @@ static void open_map(void){
              areas[i].y>=-2000000 && areas[i].y<=2000000))goto bad;
     }
     update_player();map_pixels=map_data+off;
+    map_places_load();map_fog_build();local_build();
     if(!map_view_ready){map_home();map_view_ready=1;}else map_fit();
+    /* stage 3: inside, always the room's own map; outdoors the view last chosen there */
+    if(local_room){
+        map_local=1;
+        AW_MapFogRoomReveal(sv.name,svs.clients[0].edict->v.origin[0],svs.clients[0].edict->v.origin[1],local_min,local_max);
+    }else{map_local=0;if(map_local_choice && marker)map_set_local(1);}
+    mm_close_all();mm_max();mm_migrate();
     opened(1);
     if(marker)Con_Printf("World map position: %ld %ld %ld (%s).\n",(long)player_x,(long)player_y,(long)player_z,sv.name);
     Con_Printf("World map: %ld bytes on demand; %s position.\n",(long)size,marker?"exterior":"no exterior");
@@ -1046,33 +1239,248 @@ static int map_source_at(float point[3]){
     point[1]=map_bounds[3]-py*(map_bounds[3]-map_bounds[1])/map_h;
     point[2]=0;return 1;
 }
-static int custom_marker(float point[3]){
-    if(AW_StateGet(&aw_state,AW_GLOBAL,marker_keys[2])!=1)return 0;
-    point[0]=AW_StateGet(&aw_state,AW_GLOBAL,marker_keys[0]);
-    point[1]=AW_StateGet(&aw_state,AW_GLOBAL,marker_keys[1]);point[2]=0;
-    return point[0]>=map_bounds[0] && point[0]<map_bounds[2] && point[1]>map_bounds[1] && point[1]<=map_bounds[3];
+/* MAP-MULTI-MARKERS-66 and NAV-HOT-MARKER-COMPASS-66: the player's named markers (up to aw_map_markers_max, 256 by
+ * default) and the one hot marker, kept by aw_mapmarks.c and saved in their own block (AWMK). On the map: right click
+ * on the map sets a named marker at once (named after the region, else the nearest place); left click on a marker
+ * opens its box (the name, OK / Cancel / Delete); left drag pans; H sets the hot marker at the pointer (H on it
+ * clears it); K (or the MARKERS button) opens the Markers menu. The old single marker (globals
+ * amiwind:map:marker:x/y/ready) becomes marker 1 once. Every box is laid out by the box pipeline (AW_MsgBoxLayout). */
+static cvar_t aw_map_markers_max={"aw_map_markers_max","256",true};
+static cvar_t aw_compass={"aw_compass","0",true};
+#define MM_ROWS 10
+static int mm_edit=-1,mm_edit_len,mm_menu,mm_sort,mm_confirm;
+static char mm_text[AW_MAPMARK_NAME+1];
+static aw_listbox_t mm_box;
+/* while the menu is open (one block of 3 KB, taken when it opens, freed when it closes): the rows' sorted order, the
+ * rows the Find line keeps, and the region names looked up when it opens or changes */
+static int *mm_order,*mm_shown;
+static const char **mm_regions;
+static void *mm_block;
+static const char *const mm_edit_buttons[3]={"OK","Cancel","Delete"};
+static const char *const mm_menu_buttons[6]={"Centre","Rename","Follow","Delete","Remove all","Close"};
+static const char *const mm_yes_no[2]={"Yes","No"};
+static void mm_max(void){AW_MapMarksSetMax((int)aw_map_markers_max.value);}
+static void source_to_screen(float x,float y,int *mx,int *my){
+    float left=map_x-156*map_step,top=map_y-77*map_step;
+    float px=(x-map_bounds[0])*map_w/(map_bounds[2]-map_bounds[0]),py=(map_bounds[3]-y)*map_h/(map_bounds[3]-map_bounds[1]);
+    *mx=4+(int)((px-left)/map_step);*my=19+(int)((py-top)/map_step);
+}
+static int map_point_inside(float x,float y){
+    return x>=map_bounds[0] && x<map_bounds[2] && y>map_bounds[1] && y<=map_bounds[3];
+}
+/* the default name: the region at the point, else the nearest known place of the open map, else "Marker N" */
+static const char *mm_default_name(const float *point){
+    const char *r=AW_RegionNameAt(point);int i,best=-1;float bd=0,d;
+    if(r && *r)return r;
+    for(i=0;i<map_place_count;i++){
+        d=(map_places[i].x-point[0])*(map_places[i].x-point[0])+(map_places[i].y-point[1])*(map_places[i].y-point[1]);
+        if(best<0 || d<bd){best=i;bd=d;}
+    }
+    return best>=0?map_places[best].name:NULL;
+}
+/* the old single marker (MAP-MARKER-29, globals) carried into the list once */
+static void mm_migrate(void){
+    float p[3];
+    if(AW_StateGet(&aw_state,AW_GLOBAL,marker_keys[2])!=1)return;
+    p[0]=(float)AW_StateGet(&aw_state,AW_GLOBAL,marker_keys[0]);p[1]=(float)AW_StateGet(&aw_state,AW_GLOBAL,marker_keys[1]);p[2]=0;
+    if(AW_MapMarkAdd(p[0],p[1],mm_default_name(p))>=0){
+        AW_StateSet(&aw_state,AW_GLOBAL,marker_keys[2],0);Con_Printf("Map marker: the old marker is marker %d now.\n",AW_MapMarksCount());
+    }
+}
+static void mm_loaded(void){AW_MapMarksLoaded();mm_max();mm_migrate();}
+static void mm_reset(void){mm_close_all();AW_MapMarksReset();}
+static int mm_at_pointer(void){
+    int i,mx,my,d,best=17,hit=-1;const aw_mapmark_t *m;
+    for(i=0;(m=AW_MapMark(i))!=NULL;i++){
+        if(!map_point_inside(m->x,m->y))continue;
+        source_to_screen(m->x,m->y,&mx,&my);d=(mx-mouse_x)*(mx-mouse_x)+(my-mouse_y)*(my-mouse_y);
+        if(d<best){best=d;hit=i;}
+    }
+    return hit;
+}
+static int mm_hot_at_pointer(void){
+    float x,y;int mx,my;
+    if(!AW_MapHotGet(&x,&y))return 0;
+    source_to_screen(x,y,&mx,&my);return (mx-mouse_x)*(mx-mouse_x)+(my-mouse_y)*(my-mouse_y)<17;
 }
 static void place_marker(void){
-    float point[3];int i,j,missing=0;int32_t x,y;
+    float point[3];int i;
+    mm_max();
     if(!map_source_at(point)){marker_message="Outside map bounds";return;}
-    /* Preflight all keys: a full global table must not partially move a marker. */
-    for(i=0;i<3;i++){
-        for(j=0;j<aw_state.count[AW_GLOBAL];j++)if(!strcmp(aw_state.values[AW_GLOBAL][j].id,marker_keys[i]))break;
-        if(j==aw_state.count[AW_GLOBAL])missing++;
-    }
-    if(missing>AW_STATE_VALUES-aw_state.count[AW_GLOBAL]){
-        marker_message="Marker not saved: globals full";Con_Printf("Map marker: global state capacity exhausted.\n");return;
-    }
-    x=minmax((int)floor(point[0]+.5f),map_bounds[0],map_bounds[2]-1);
-    y=minmax((int)floor(point[1]+.5f),map_bounds[1]+1,map_bounds[3]);
-    AW_StateSet(&aw_state,AW_GLOBAL,marker_keys[0],x);
-    AW_StateSet(&aw_state,AW_GLOBAL,marker_keys[1],y);
-    AW_StateSet(&aw_state,AW_GLOBAL,marker_keys[2],1);marker_message=NULL;
+    point[0]=(float)minmax((int)floor(point[0]+.5f),map_bounds[0],map_bounds[2]-1);
+    point[1]=(float)minmax((int)floor(point[1]+.5f),map_bounds[1]+1,map_bounds[3]);
+    i=AW_MapMarkAdd(point[0],point[1],mm_default_name(point));
+    if(i==-1){marker_message="Markers full (aw_map_markers_max)";return;}
+    if(i<0){marker_message="Marker not set: not enough memory";return;}
+    marker_message=NULL;
+    Con_Printf("Map marker %d: %s at %ld %ld.\n",i+1,AW_MapMark(i)->name,(long)point[0],(long)point[1]);
 }
-static void clear_marker(void){
-    /* Clearing an absent marker must not consume another global slot. */
-    if(AW_StateGet(&aw_state,AW_GLOBAL,marker_keys[2]))AW_StateSet(&aw_state,AW_GLOBAL,marker_keys[2],0);
-    marker_message="Marker cleared";marker_click=0;
+static void mm_hot_key(void){
+    float point[3];
+    if(mm_hot_at_pointer()){AW_MapHotOff();marker_message="Hot marker cleared";return;}
+    if(!map_source_at(point)){marker_message="Outside map bounds";return;}
+    AW_MapHotSet((float)floor(point[0]+.5f),(float)floor(point[1]+.5f));marker_message="Hot marker set";
+}
+static void mm_centre(int i){
+    const aw_mapmark_t *m=AW_MapMark(i);
+    if(!m)return;
+    if(map_local)map_set_local(0);
+    map_x=(m->x-map_bounds[0])*map_w/(map_bounds[2]-map_bounds[0]);
+    map_y=(map_bounds[3]-m->y)*map_h/(map_bounds[3]-map_bounds[1]);
+}
+/* the Markers menu's rows: sorted by name or by region; the Find line filters on both (aw_listbox_rules.c) */
+static int mm_casecmp(const char *a,const char *b){
+    for(;*a || *b;a++,b++){int x=tolower((unsigned char)*a),y=tolower((unsigned char)*b);if(x!=y)return x-y;}
+    return 0;
+}
+static const char *mm_region(int i){return mm_regions && mm_regions[i]?mm_regions[i]:"";}
+static int mm_cmp(const void *a,const void *b){
+    int i=*(const int *)a,j=*(const int *)b,c=0;
+    if(mm_sort)c=mm_casecmp(mm_region(i),mm_region(j));
+    if(!c)c=mm_casecmp(AW_MapMark(i)->name,AW_MapMark(j)->name);
+    return c?c:i-j;
+}
+static const char *mm_label(void *ctx,int row){
+    static char s[AW_MAPMARK_NAME+80];const aw_mapmark_t *m=AW_MapMark(mm_order[row]);
+    (void)ctx;
+    if(!m)return "";
+    snprintf(s,sizeof(s),"%s %s",m->name,mm_region(mm_order[row]));return s;
+}
+static void mm_refresh(void){
+    int i,n=AW_MapMarksCount(),keep=AW_ListBoxSelected(&mm_box);char search[AW_LISTBOX_SEARCH+1];
+    float p[3];
+    strcpy(search,mm_box.search);
+    for(i=0;i<n;i++){
+        mm_order[i]=i;
+        if(mm_regions){p[0]=AW_MapMark(i)->x;p[1]=AW_MapMark(i)->y;p[2]=0;mm_regions[i]=AW_RegionNameAt(p);}
+    }
+    qsort(mm_order,(size_t)n,sizeof(int),mm_cmp);
+    AW_ListBoxReset(&mm_box,n,mm_label,NULL,mm_shown,MM_ROWS);
+    strcpy(mm_box.search,search);AW_ListBoxFilter(&mm_box);
+    if(keep>=0 && keep<mm_box.shown_count)mm_box.selection=keep;
+}
+static void mm_menu_open(void){
+    /* the tables hold the allowance (3 KB at the default 256), or the markers now when a lowered allowance left more */
+    int room=AW_MapMarksMax()>AW_MapMarksCount()?AW_MapMarksMax():AW_MapMarksCount();
+    if(mm_menu)return;
+    if(room<1)room=1;
+    mm_block=AW_TryMalloc((unsigned long)room*(2*sizeof(int)+sizeof(*mm_regions)));
+    if(!mm_block){marker_message="Markers menu: not enough memory";return;}
+    mm_regions=(const char **)mm_block;mm_order=(int *)(mm_regions+room);mm_shown=mm_order+room;
+    mm_menu=1;mm_confirm=0;mm_edit=-1;drag=marker_click=0;mm_box.search[0]=0;mm_box.selection=0;
+    AW_ListBoxReset(&mm_box,0,mm_label,NULL,mm_shown,MM_ROWS);mm_refresh();
+}
+static void mm_menu_close(void){free(mm_block);mm_block=NULL;mm_regions=NULL;mm_order=mm_shown=NULL;mm_menu=mm_confirm=0;}
+static void mm_close_all(void){mm_menu_close();mm_edit=-1;}
+static int mm_selected(void){int r=AW_ListBoxSelected(&mm_box);return r>=0?mm_order[r]:-1;}
+static void mm_edit_open(int i){
+    const aw_mapmark_t *m=AW_MapMark(i);
+    if(!m)return;
+    mm_edit=i;strcpy(mm_text,m->name);mm_edit_len=(int)strlen(mm_text);drag=marker_click=0;
+}
+static void mm_edit_close(int button){   /* 0 OK, 1 Cancel, 2 Delete */
+    if(button==0)AW_MapMarkRename(mm_edit,mm_text);
+    else if(button==2)AW_MapMarkDelete(mm_edit);
+    mm_edit=-1;
+    if(mm_menu)mm_refresh();
+}
+static void mm_delete(int i){if(AW_MapMarkDelete(i) && mm_menu)mm_refresh();}
+/* the box pipeline: the frame of a box of COUNT buttons and LINES console lines, its buttons sized to their labels */
+static void mm_frame(int count,int lines,int frame[4]){AW_MsgBoxLayout(count,320,200,lines*10,frame);}
+static void mm_widths(const char *const *labels,int count,int *w){
+    int i;for(i=0;i<count;i++)w[i]=(int)strlen(labels[i])*AW_ConsoleCharWidth();
+}
+static int mm_button_at(const char *const *labels,int count,int lines){
+    int frame[4],w[AW_MSGBOX_BUTTONS];
+    mm_frame(count,lines,frame);mm_widths(labels,count,w);return AW_MsgBoxButtonAtSized(count,frame,w,mouse_x,mouse_y);
+}
+static void mm_box_draw(const char *const *labels,int count,int lines,int frame[4]){
+    int i,r[4],w[AW_MSGBOX_BUTTONS],edge=AW_UIColor(202,165,96);
+    mm_frame(count,lines,frame);mm_widths(labels,count,w);
+    AW_UIFill(frame[0],frame[1],frame[2],frame[3],edge);AW_UIFill(frame[0]+1,frame[1]+1,frame[2]-2,frame[3]-2,AW_UIColor(15,20,23));
+    for(i=0;i<count;i++){
+        AW_MsgBoxButtonRectSized(count,i,frame,w,r);
+        AW_UIFill(r[0],r[1]+5,r[2],12,AW_UIColor(44,36,20));
+        text(r[0]+(r[2]-w[i])/2,r[1]+7,labels[i],r[0]+r[2]-1);
+    }
+}
+static void mm_draw(void){
+    int frame[4],i,y,cw=AW_ConsoleCharWidth();char line[AW_MAPMARK_NAME+80];
+    if(mm_menu){
+        mm_box_draw(mm_menu_buttons,6,MM_ROWS+2,frame);
+        snprintf(line,sizeof(line),"MARKERS %d/%d  Sort: %s (Tab)",AW_MapMarksCount(),AW_MapMarksMax(),mm_sort?"region":"name");
+        text(frame[0]+8,frame[1]+8,line,frame[0]+frame[2]-8);
+        snprintf(line,sizeof(line),"Find: %s_",mm_box.search);text(frame[0]+8,frame[1]+18,line,frame[0]+frame[2]-8);
+        for(i=0;i<MM_ROWS && mm_box.top+i<mm_box.shown_count;i++){
+            int k=mm_order[mm_shown[mm_box.top+i]],right=frame[0]+frame[2]-8,rw;const char *reg=mm_region(k);
+            y=frame[1]+28+i*10;
+            if(mm_box.top+i==mm_box.selection)AW_UIFill(frame[0]+6,y-1,frame[2]-12,10,AW_UIColor(44,36,20));
+            text(right-3*cw,y,"Del",right);
+            rw=(int)strlen(reg)*cw;if(rw>(frame[2]-16)/2)rw=(frame[2]-16)/2;
+            text(right-4*cw-rw,y,reg,right-4*cw);
+            text(frame[0]+8,y,AW_MapMark(k)->name,right-5*cw-rw);
+        }
+        if(!mm_box.shown_count)text(frame[0]+8,frame[1]+28,AW_MapMarksCount()?"No marker matches":"No markers: right click on the map",frame[0]+frame[2]-8);
+    }
+    if(mm_confirm){
+        mm_box_draw(mm_yes_no,2,1,frame);
+        snprintf(line,sizeof(line),"Remove all %d markers?",AW_MapMarksCount());text(frame[0]+8,frame[1]+8,line,frame[0]+frame[2]-8);
+    }
+    if(mm_edit>=0){
+        mm_box_draw(mm_edit_buttons,3,2,frame);
+        text(frame[0]+8,frame[1]+8,"Marker name:",frame[0]+frame[2]-8);
+        snprintf(line,sizeof(line),"%s_",mm_text);text(frame[0]+8,frame[1]+18,line,frame[0]+frame[2]-8);
+    }
+}
+static void mm_remove_all(void){AW_MapMarksClear();mm_confirm=0;if(mm_menu)mm_refresh();marker_message="Markers removed";}
+/* a key while a marker box or the menu is up: 1 when it took the key (every key, so the map under it rests) */
+static int mm_key(int key){
+    int b,frame[4];
+    if(mm_edit>=0){
+        if(key==K_ENTER)mm_edit_close(0);
+        else if(key==K_ESCAPE)mm_edit_close(1);
+        else if(key==K_BACKSPACE){if(mm_edit_len)mm_text[--mm_edit_len]=0;}
+        else if(key==K_MOUSE1){if((b=mm_button_at(mm_edit_buttons,3,2))>=0)mm_edit_close(b);}
+        else if(key>=32 && key<127 && mm_edit_len<AW_MAPMARK_NAME){mm_text[mm_edit_len++]=(char)key;mm_text[mm_edit_len]=0;}
+        return 1;
+    }
+    if(mm_confirm){
+        if(key==K_ENTER || key=='y' || key=='Y')mm_remove_all();
+        else if(key==K_ESCAPE || key=='n' || key=='N')mm_confirm=0;
+        else if(key==K_MOUSE1 && (b=mm_button_at(mm_yes_no,2,1))>=0){if(b==0)mm_remove_all();else mm_confirm=0;}
+        return 1;
+    }
+    if(!mm_menu)return 0;
+    if(key==K_ESCAPE){mm_menu_close();return 1;}
+    if(key==K_TAB){mm_sort=!mm_sort;mm_refresh();return 1;}
+    if(key==K_ENTER){if((b=mm_selected())>=0){mm_centre(b);mm_menu_close();}return 1;}
+    if(key==K_DEL || (key==K_BACKSPACE && !mm_box.search[0])){if((b=mm_selected())>=0)mm_delete(b);return 1;}
+    if(key==K_UPARROW)AW_ListBoxKey(&mm_box,AW_LBKEY_UP);
+    else if(key==K_DOWNARROW)AW_ListBoxKey(&mm_box,AW_LBKEY_DOWN);
+    else if(key==K_PGUP || key==K_MWHEELUP)AW_ListBoxKey(&mm_box,AW_LBKEY_PAGEUP);
+    else if(key==K_PGDN || key==K_MWHEELDOWN)AW_ListBoxKey(&mm_box,AW_LBKEY_PAGEDOWN);
+    else if(key==K_HOME)AW_ListBoxKey(&mm_box,AW_LBKEY_HOME);
+    else if(key==K_END)AW_ListBoxKey(&mm_box,AW_LBKEY_END);
+    else if(key==K_BACKSPACE)AW_ListBoxKey(&mm_box,AW_LBKEY_BACKSPACE);
+    else if(key==K_MOUSE1){
+        mm_frame(6,MM_ROWS+2,frame);
+        if((b=mm_button_at(mm_menu_buttons,6,MM_ROWS+2))>=0){
+            int i=mm_selected();
+            if(b==5)mm_menu_close();
+            else if(b==4){if(AW_MapMarksCount())mm_confirm=1;}
+            else if(i>=0){
+                if(b==0){mm_centre(i);mm_menu_close();}
+                else if(b==1)mm_edit_open(i);
+                else if(b==2){AW_MapHotSet(AW_MapMark(i)->x,AW_MapMark(i)->y);marker_message="Hot marker follows the marker";}
+                else mm_delete(i);
+            }
+        }else if(mouse_y>=frame[1]+6 && mouse_y<frame[1]+16){mm_sort=!mm_sort;mm_refresh();}
+        else if(mouse_y>=frame[1]+27 && mouse_y<frame[1]+27+MM_ROWS*10){
+            int line=(mouse_y-frame[1]-27)/10,right=frame[0]+frame[2]-8;
+            if(AW_ListBoxClick(&mm_box,line)==AW_LB_CHOSEN && mouse_x>=right-3*AW_ConsoleCharWidth()-2)mm_delete(mm_selected());
+        }
+    }else if(key>=32 && key<127)AW_ListBoxType(&mm_box,key);
+    return 1;
 }
 static void open_teleport_map(void){
     keydest_t previous=key_dest;
@@ -1090,7 +1498,7 @@ static void open_teleport_map(void){
     }
     open_map();
     if(modal!=1){key_dest=previous;return;}
-    teleport_mode=1;teleport_selected=0;teleport_message=NULL;
+    teleport_mode=1;teleport_selected=0;teleport_message=NULL;map_local=0;
     mouse_x=160;mouse_y=100;
 }
 static void select_teleport_point(void){
@@ -1296,7 +1704,7 @@ static int quest_status(const char *id,int32_t stage,void *ctx){
 }
 static int book_quests(void){
     FILE *f=NULL;byte header[8],row[160];int i,j,count=0,size,kept=0,ok;aw_qb_dated_t *dated=NULL;
-    if(aw_save_script_export)aw_save_script_export(&aw_ledger);
+    if(aw_save_script_export)(void)aw_save_script_export(&aw_ledger);   /* the book reads the tables only */
     size=COM_FOpenFile("world/quests.awq",&f);
     if(f && (size<8 || fread(header,1,8,f)!=8 || memcmp(header,"AWQ1",4) ||
              (count=(int)u32(header+4))<0 || count>AW_QB_QUESTS || size!=8+count*160))count=0;
@@ -1397,10 +1805,88 @@ static int journal_entry_exists(const char *id,int32_t index){
     low[i]=0;
     return journal_row(low,(int)index,&offset,&length,&flags);
 }
+/* the console's marker commands (MAP-MULTI-MARKERS-66), in the style of dbg tp and dbg item's searches */
+static int mm_player_point(float *point){
+    edict_t *e;
+    if(!sv.active || !svs.clients || !(e=svs.clients[0].edict))return 0;
+    return AW_WorldToSource(sv.name,e->v.origin,point);
+}
+static int mm_open_map(void){
+    keydest_t previous=key_dest;
+    if(modal==1)return 1;
+    if(modal){Con_Printf("Close the current panel first.\n");return 0;}
+    key_dest=key_game;open_normal_map();
+    if(modal!=1){key_dest=previous;Con_Printf("The map cannot open now.\n");return 0;}
+    return 1;
+}
+static void mm_command(void){
+    const char *sub=Cmd_Argc()>1?Cmd_Argv(1):"";char arg[96];int i,k,n=0;float p[3];const aw_mapmark_t *m;
+    arg[0]=0;
+    for(i=2;i<Cmd_Argc();i++){
+        if(arg[0] && strlen(arg)+1<sizeof(arg))strcat(arg," ");
+        strncat(arg,Cmd_Argv(i),sizeof(arg)-strlen(arg)-1);
+    }
+    mm_max();mm_migrate();
+    if(!*sub || !strcmp(sub,"find") || !strcmp(sub,"list")){
+        for(k=0;(k=AW_MapMarkFind(arg,k))>=0;k++){
+            m=AW_MapMark(k);p[0]=m->x;p[1]=m->y;p[2]=0;
+            Con_Printf("%3d %s (%s) %ld %ld\n",k+1,m->name,AW_RegionNameAt(p)?AW_RegionNameAt(p):"no region",(long)m->x,(long)m->y);n++;
+        }
+        Con_Printf("%d of %d markers (at most %d)%s%s.\n",n,AW_MapMarksCount(),AW_MapMarksMax(),arg[0]?" match ":"",arg);
+        if(!*sub)Con_Printf("Usage: marker find|show|add|del|clear|hot [text]\n");
+    }else if(!strcmp(sub,"show")){
+        if((i=AW_MapMarkLookup(arg))<0){Con_Printf("No marker %s.\n",arg);return;}
+        if(mm_open_map())mm_centre(i);
+    }else if(!strcmp(sub,"add")){
+        if(!mm_player_point(p)){Con_Printf("Marker not set: no outdoor position here.\n");return;}
+        i=AW_MapMarkAdd(p[0],p[1],arg[0]?arg:mm_default_name(p));
+        if(i==-1)Con_Printf("Markers full: %d (aw_map_markers_max).\n",AW_MapMarksMax());
+        else if(i<0)Con_Printf("Marker not set: not enough memory.\n");
+        else Con_Printf("Map marker %d: %s at %ld %ld.\n",i+1,AW_MapMark(i)->name,(long)p[0],(long)p[1]);
+    }else if(!strcmp(sub,"del")){
+        if((i=AW_MapMarkLookup(arg))<0){Con_Printf("No marker %s.\n",arg);return;}
+        Con_Printf("Map marker %d (%s) removed.\n",i+1,AW_MapMark(i)->name);mm_delete(i);
+    }else if(!strcmp(sub,"clear")){
+        if(!AW_MapMarksCount()){Con_Printf("No markers.\n");return;}
+        if(mm_open_map()){mm_menu_open();mm_confirm=1;}   /* the Yes/No box on the map */
+    }else if(!strcmp(sub,"hot")){
+        if(!strcmp(arg,"off")){AW_MapHotOff();Con_Printf("Hot marker off.\n");return;}
+        if(arg[0]){
+            if((i=AW_MapMarkLookup(arg))<0){Con_Printf("No marker %s.\n",arg);return;}
+            AW_MapHotSet(AW_MapMark(i)->x,AW_MapMark(i)->y);Con_Printf("Hot marker follows %s.\n",AW_MapMark(i)->name);return;
+        }
+        if(!mm_player_point(p)){Con_Printf("Hot marker not set: no outdoor position here.\n");return;}
+        AW_MapHotSet((float)floor(p[0]+.5f),(float)floor(p[1]+.5f));Con_Printf("Hot marker at %ld %ld.\n",(long)p[0],(long)p[1]);
+    }else Con_Printf("Usage: marker find|show|add|del|clear|hot [text]\n");
+}
+/* NAV-HOT-MARKER-COMPASS-66: a thin strip at the top of the view (aw_compass 1, off by default): north (N) and the
+ * hot marker (an orange mark; at the strip's end when behind), with its distance in rough steps. 120 x 7 pixels. */
+static void compass_draw(void){
+    float here[3],hx,hy,yaw=cl.viewangles[YAW],rel,dist;int w=120,x0,y,cx,x;edict_t *e;const char *how;
+    if(!aw_compass.value || modal || !sv.active || !svs.clients || !(e=svs.clients[0].edict))return;
+    cx=r_refdef.vrect.x+r_refdef.vrect.width/2;x0=cx-w/2;y=r_refdef.vrect.y+1;
+    if(x0<0)return;
+    AW_UIFill(x0,y,w,7,AW_UIColor(15,20,23));AW_UIFill(x0,y+7,w,1,AW_UIColor(202,165,96));
+    AW_UIFill(cx,y,1,2,AW_UIColor(202,165,96));
+    /* a bearing B (degrees, 90 = north as the map shows it) left of the view is left on the strip; 90 degrees a side */
+    rel=90-yaw;while(rel>180)rel-=360;while(rel<-180)rel+=360;
+    if(rel>=-90 && rel<=90)AW_UIText(cx-(int)(rel*(w/2-4)/90)-2,y,"N",-1);
+    if(!AW_MapHotGet(&hx,&hy) || !AW_WorldToSource(sv.name,e->v.origin,here))return;
+    rel=(float)(atan2(hy-here[1],hx-here[0])*180/M_PI)-yaw;while(rel>180)rel-=360;while(rel<-180)rel+=360;
+    x=cx-(int)((rel<-90?-90:rel>90?90:rel)*(w/2-4)/90);
+    AW_UIFill(x-1,y+1,3,5,AW_UIColor(255,140,0));
+    dist=(float)sqrt((hx-here[0])*(hx-here[0])+(hy-here[1])*(hy-here[1]));
+    how=dist<AW_MAPFOG_CELL/16?"here":dist<AW_MAPFOG_CELL*2?"near":"far";
+    AW_UIText(x0+w+3,y,how,-1);
+}
 void AW_WorldUIInit(void){aw_journal_entry_exists=journal_entry_exists;AW_InventoryInit();Cvar_RegisterVariable(&aw_map_mode);
+    Cmd_AddCommand("marker",mm_command);
+    aw_save_markers_encode=AW_MapMarksEncode;aw_save_markers_decode=AW_MapMarksDecode;
+    aw_save_markers_loaded=mm_loaded;aw_save_markers_reset=mm_reset;aw_hud_compass_draw=compass_draw;
     Cvar_RegisterVariable(&aw_map_debug_available);
     Cvar_RegisterVariable(&aw_map_lava);Cvar_RegisterVariable(&aw_map_format);
     Cvar_RegisterVariable(&aw_key_inv_use);Cvar_RegisterVariable(&aw_key_inv_drop);   /* OPENING-TUTORIAL-KEYS-65 */
+    Cvar_RegisterVariable(&aw_map_markers_max);Cvar_RegisterVariable(&aw_compass);    /* MAP-MULTI-MARKERS-66 */
     Cmd_AddCommand("aw_teleport_map",open_teleport_map);Cmd_AddCommand("aw_worldmap",open_normal_map);Cmd_AddCommand("aw_journal",open_journal);Cmd_AddCommand("aw_inventory",inventory_command);}
 void AW_WorldUIMouse(int dx,int dy){
     int top;
@@ -1440,13 +1926,13 @@ int AW_WorldUIKey(int key,int down){
     if(!modal)return 0;
     if(key_dest!=key_menu){close_panel();return 0;}
     if(!down){
-        if(modal==1 && key==K_MOUSE1 && marker_click){
-            marker_click=0;if(!teleport_mode && !teleport_button_hit())place_marker();
-        }
+        /* a left click without a drag no longer places a marker (the right button does, MAP-MULTI-MARKERS-66) */
+        if(modal==1 && key==K_MOUSE1 && marker_click)marker_click=0;
         if((modal==1 && key==drag) || (modal==4 && key==K_MOUSE1) || (modal==2 && (key==K_MOUSE1 || key==K_MOUSE2)) || (modal==3 && key==K_MOUSE1))drag=0;
         return 1;
     }
     if(key==K_F10 || key=='`'){close_panel();return 0;}
+    if(modal==1 && mm_key(key))return 1;   /* a marker's box, the Yes/No box or the Markers menu takes every key */
     /* a panel that must be finished (the level-up box, LEVEL-UP-58: the original's box has no cancel) takes Esc itself */
     if(key==K_ESCAPE && modal==4 && aw_worldui_panel_holds_escape){if(!panel_key(key,mouse_x,mouse_y))close_panel();return 1;}
     /* INVENTORY-DOUBLECLICK-62: Esc (or I) in the consumable's box is its Cancel, the window stays */
@@ -1460,8 +1946,13 @@ int AW_WorldUIKey(int key,int down){
             marker_click=drag=teleport_selected=0;teleport_message=NULL;
             if(mouse_x>=4 && mouse_x<66 && map_debug_enabled())Cvar_SetValue(aw_map_mode.name,0);
             else if(mouse_x>=250 && mouse_x<316)Cvar_SetValue(aw_map_mode.name,1);
+            else if(map_in_game() && mouse_x>=LOCALBTN_WORLD_X && mouse_x<LOCALBTN_WORLD_X+LOCALBTN_W)map_set_local(0);
+            else if(map_in_game() && mouse_x>=LOCALBTN_LOCAL_X && mouse_x<LOCALBTN_LOCAL_X+LOCALBTN_W && (marker || local_room))map_set_local(1);
             return 1;
         }
+        if(key==K_TAB && !teleport_mode && (map_local || marker || local_room)){map_set_local(!map_local);return 1;}
+        /* the room's plan has no pan, zoom or marker: the pointer only names doors */
+        if(map_local && local_room && key==K_MOUSE1 && mouse_x>=4 && mouse_x<316 && mouse_y>=19 && mouse_y<173)return 1;
         if(key==K_MWHEELUP || key=='+' || key=='='){zoom=minmax(zoom+1,0,5);map_fit();}
         if(key==K_MWHEELDOWN || key=='-'){zoom=minmax(zoom-1,0,5);map_fit();}
         if(key==K_LEFTARROW || key=='a')map_x-=24*map_step;
@@ -1481,15 +1972,22 @@ int AW_WorldUIKey(int key,int down){
                 else if(teleport_button_hit())confirm_teleport();
             }
         }else{
-            if(key=='c' || key=='C')clear_marker();
+            int on_map=mouse_x>=4 && mouse_x<316 && mouse_y>=19 && mouse_y<173 && !(map_local && local_room);
+            if(key=='k' || key=='K'){mm_menu_open();return 1;}
+            if((key=='h' || key=='H') && !(map_local && local_room))mm_hot_key();
             if(normal_teleport_enabled()){
                 if(key==K_MOUSE3 && !drag && !teleport_button_hit())select_teleport_point();
                 if(key==K_ENTER)confirm_teleport();
             }
+            /* MAP-MULTI-MARKERS-66: the right button sets a named marker (in the debug view with teleport, the middle
+             * button; the right one picks the teleport target there) */
+            if(on_map && !drag && (key==K_MOUSE2 || (key==K_MOUSE3 && !normal_teleport_enabled())))place_marker();
             if(key==K_MOUSE1){
+                int hit;
                 marker_click=drag=0;
                 if(teleport_button_hit())confirm_teleport();
-                else if(clear_button_hit())clear_marker();
+                else if(clear_button_hit())mm_menu_open();
+                else if(on_map && (hit=mm_at_pointer())>=0)mm_edit_open(hit);
                 else if(mouse_x>=4 && mouse_x<316 && mouse_y>=19 && mouse_y<173){
                     drag=K_MOUSE1;marker_click=1;marker_drag_x=marker_drag_y=0;
                 }else if(mouse_y>=184)close_panel();
@@ -1675,18 +2173,73 @@ static int map_arrow(int cx,int cy,float yaw){
     }
     return 1;
 }
+/* a door marker (3 x 3, OpenMW draws a door icon) at MX, MY; the nearest within 4 pixels of the pointer is named */
+static void door_marker(int mx,int my,const char *name,int *best){
+    int d;
+    if(mx<5 || mx>=315 || my<20 || my>=172)return;
+    AW_UIFill(mx-1,my-1,3,3,AW_UIColor(214,96,64));
+    d=(mx-mouse_x)*(mx-mouse_x)+(my-mouse_y)*(my-mouse_y);
+    if(d<*best){*best=d;map_hover_name=name;}
+}
+/* the room's plan under its fog, its doors and the player (stage 3, inside) */
+static void local_draw(int in_game,int *best){
+    int x,y,gx,gy,fog=AW_UIColor(20,18,14),i,mx,my;byte seen[AW_MAPFOG_ROOM_GRID*AW_MAPFOG_ROOM_GRID],*dst;
+    int cols[LOCAL_W];float w=(local_max[0]-local_min[0])/AW_MAPFOG_ROOM_GRID,h=(local_max[1]-local_min[1])/AW_MAPFOG_ROOM_GRID;
+    float point[3];const char *name;
+    /* MAP-EXPLORED-ROOMS-CAP-66: the room's bits looked up once a frame (was 256 searches by name) */
+    const unsigned char *bits=in_game?AW_MapFogRoomBits(local_name):NULL;
+    for(gy=0;gy<AW_MAPFOG_ROOM_GRID;gy++)for(gx=0;gx<AW_MAPFOG_ROOM_GRID;gx++){
+        int bit=gy*AW_MAPFOG_ROOM_GRID+gx;
+        seen[bit]=!in_game || (bits && ((bits[bit>>3]>>(bit&7))&1));
+    }
+    for(x=0;x<LOCAL_W;x++){
+        gx=(int)floor(((x+.5f-local_ox)/local_scale)/w);cols[x]=gx<0?0:gx>=AW_MAPFOG_ROOM_GRID?AW_MAPFOG_ROOM_GRID-1:gx;
+    }
+    for(y=0;y<LOCAL_H;y++){
+        const byte *row=local_pixels+y*LOCAL_W,*s;
+        gy=(int)floor((local_max[1]-local_min[1]-(y+.5f-local_oy)/local_scale)/h);
+        gy=gy<0?0:gy>=AW_MAPFOG_ROOM_GRID?AW_MAPFOG_ROOM_GRID-1:gy;
+        s=seen+gy*AW_MAPFOG_ROOM_GRID;dst=vid.buffer+(y+19)*vid.rowbytes+4;
+        for(x=0;x<LOCAL_W;x++)dst[x]=s[cols[x]]?row[x]:(byte)fog;
+    }
+    for(i=0;(x=AW_SceneMapDoor(i,point,&name))>=0;i++){
+        if(!x || (in_game && !AW_MapFogRoomSeen(local_name,point[0],point[1],local_min,local_max)))continue;
+        local_to_screen(point[0],point[1],&mx,&my);door_marker(mx,my,name,best);
+    }
+    if(svs.clients && svs.clients[0].edict){
+        edict_t *e=svs.clients[0].edict;
+        local_to_screen(e->v.origin[0],e->v.origin[1],&mx,&my);
+        if(mx>=9 && mx<311 && my>=24 && my<168 && !map_arrow(mx,my,cl.viewangles[YAW])){
+            AW_UIFill(mx-4,my,9,1,AW_UIColor(255,255,255));AW_UIFill(mx,my-4,1,9,AW_UIColor(255,255,255));
+        }
+    }
+}
 static void map_draw(void){
-    int x,y,sx,sy,cols[312],ocean=map_ocean,gold=AW_UIColor(248,225,136),i,mx,my,in_game=map_in_game();
+    int x,y,sx,sy,cols[312],fog_cols[312],ocean=map_ocean,gold=AW_UIColor(248,225,136),i,mx,my,in_game=map_in_game();
+    int fog=AW_UIColor(20,18,14),best=17,edge=AW_UIColor(202,165,96),inner=AW_UIColor(15,20,23),d;
     float left=map_x-156*map_step,top=map_y-77*map_step,px,py,angle,dx,dy;byte *dst;char line[96];
     const char *region;float source[3];int width,limit;
-    update_player();
+    update_player();map_hover_name=NULL;
     AW_UIFill(0,0,320,200,AW_UIColor(15,20,23));
+    if(map_local && local_pixels){
+        local_draw(in_game,&best);snprintf(line,sizeof(line),"Local map: %s",local_name);goto chrome;
+    }
     for(x=0;x<312;x++)cols[x]=(int)floor(left+x*map_step);
+    if(in_game){   /* MAP-ORIGINAL-POI-66 stage 2: the fog square of each column, once per frame */
+        const float square=AW_MAPFOG_CELL/AW_MAPFOG_GRID;
+        for(x=0;x<312;x++)fog_cols[x]=(int)floor((map_bounds[0]+(cols[x]+.5f)*(map_bounds[2]-map_bounds[0])/map_w)/square)-fog_gx0;
+    }
     for(y=0;y<154;y++){
         sy=(int)floor(top+y*map_step);dst=vid.buffer+(y+19)*vid.rowbytes+4;
         for(x=0;x<312;x++){sx=cols[x];dst[x]=(sx>=0 && sx<map_w && sy>=0 && sy<map_h)?map_pixels[sy*map_w+sx]:ocean;}
     }
     if(lava_visible())lava_draw(left,top);
+    if(in_game)for(y=0;y<154;y++){   /* the unexplored land, sea and lava in the fog colour */
+        int gy;
+        sy=(int)floor(top+y*map_step);dst=vid.buffer+(y+19)*vid.rowbytes+4;
+        gy=(int)floor((map_bounds[3]-(sy+.5f)*(map_bounds[3]-map_bounds[1])/map_h)/(AW_MAPFOG_CELL/AW_MAPFOG_GRID))-fog_gy0;
+        for(x=0;x<312;x++)if(!fog_open(fog_cols[x],gy))dst[x]=(byte)fog;
+    }
     if(grid && !in_game){
         for(i=map_bounds[0]/8192;i<=map_bounds[2]/8192;i++){
             px=(i*8192.0f-map_bounds[0])*map_w/(map_bounds[2]-map_bounds[0]);mx=4+(int)((px-left)/map_step);
@@ -1706,7 +2259,37 @@ static void map_draw(void){
     for(i=0;i<area_count;i++){
         px=(areas[i].x-map_bounds[0])*map_w/(map_bounds[2]-map_bounds[0]);py=(map_bounds[3]-areas[i].y)*map_h/(map_bounds[3]-map_bounds[1]);
         mx=4+(int)((px-left)/map_step);my=19+(int)((py-top)/map_step);
-        if(mx>=6 && mx<313 && my>=22 && my<161){AW_UIFill(mx-1,my-1,3,3,gold);text(mx+4,my,areas[i].title,314);}
+        if(!in_game){if(mx>=6 && mx<313 && my>=22 && my<161){AW_UIFill(mx-1,my-1,3,3,gold);text(mx+4,my,areas[i].title,314);}}
+        else if(mx>=6 && mx<314 && my>=21 && my<171 && fog_open_at(areas[i].x,areas[i].y)){
+            /* in play a settlement is a place square like the others, named only on mouse-over */
+            AW_UIFill(mx-2,my-2,5,5,edge);AW_UIFill(mx-1,my-1,3,3,inner);
+            d=(mx-mouse_x)*(mx-mouse_x)+(my-mouse_y)*(my-mouse_y);
+            if(d<best){best=d;map_hover_name=areas[i].title;}
+        }
+    }
+    /* MAP-ORIGINAL-POI-66: the known places as small squares (all of them in the debug view); the one nearest the
+     * pointer (within 4 pixels) is named in a box after the player's marker is drawn */
+    {   int k;
+        for(i=0;i<map_place_count;i++){
+            if(in_game && !map_places[i].known && !fog_open_at(map_places[i].x,map_places[i].y))continue;
+            for(k=0;k<area_count && strcmp(areas[k].title,map_places[i].name);k++){}
+            if(k<area_count)continue;                      /* a settlement already drawn above */
+            px=(map_places[i].x-map_bounds[0])*map_w/(map_bounds[2]-map_bounds[0]);
+            py=(map_bounds[3]-map_places[i].y)*map_h/(map_bounds[3]-map_bounds[1]);
+            mx=4+(int)((px-left)/map_step);my=19+(int)((py-top)/map_step);
+            if(mx<6 || mx>=314 || my<21 || my>=171)continue;
+            AW_UIFill(mx-2,my-2,5,5,edge);AW_UIFill(mx-1,my-1,3,3,inner);
+            d=(mx-mouse_x)*(mx-mouse_x)+(my-mouse_y)*(my-mouse_y);
+            if(d<best){best=d;map_hover_name=map_places[i].name;}
+        }
+    }
+    if(map_local){   /* stage 3, outdoors: the doors of the loaded scene, on explored land */
+        float point[3],world[3];const char *name;int n;
+        for(i=0;(n=AW_SceneMapDoor(i,point,&name))>=0;i++){
+            if(!n || !AW_WorldToSource(sv.name,point,world) || (in_game && !fog_open_at(world[0],world[1])))continue;
+            px=(world[0]-map_bounds[0])*map_w/(map_bounds[2]-map_bounds[0]);py=(map_bounds[3]-world[1])*map_h/(map_bounds[3]-map_bounds[1]);
+            door_marker(4+(int)((px-left)/map_step),19+(int)((py-top)/map_step),name,&best);
+        }
     }
     if(marker){
         px=(player_x-map_bounds[0])*map_w/(map_bounds[2]-map_bounds[0]);py=(map_bounds[3]-player_y)*map_h/(map_bounds[3]-map_bounds[1]);
@@ -1724,14 +2307,21 @@ static void map_draw(void){
         else sprintf(line,"Cell %ld,%ld XYZ %ld %ld %ld",(long)floor(player_x/8192),(long)floor(player_y/8192),
             (long)player_x,(long)player_y,(long)player_z);
     }else strcpy(line,in_game?"No exterior position fix":"Interior: no exterior position fix");
-    if(custom_marker(source)){
-        int cyan=AW_UIColor(48,240,240),ox,oy;
-        px=(source[0]-map_bounds[0])*map_w/(map_bounds[2]-map_bounds[0]);
-        py=(map_bounds[3]-source[1])*map_h/(map_bounds[3]-map_bounds[1]);
-        mx=4+(int)((px-left)/map_step);my=19+(int)((py-top)/map_step);
-        /* A clipped cyan diamond remains distinct from the red teleport cross. */
-        for(oy=-4;oy<=4;oy++)for(ox=-4;ox<=4;ox++)if(abs(ox)+abs(oy)==4 || (!ox && !oy))
-            if(mx+ox>=4 && mx+ox<316 && my+oy>=19 && my+oy<173)AW_UIFill(mx+ox,my+oy,1,1,cyan);
+    {   /* MAP-MULTI-MARKERS-66: the player's named markers (cyan diamonds) and the hot marker (an orange diamond with
+         * a centre square), above the fog; the hovered one is named */
+        int cyan=AW_UIColor(48,240,240),orange=AW_UIColor(255,140,0),ox,oy,k,r;const aw_mapmark_t *m;float hx,hy;
+        for(k=-1;k<AW_MapMarksCount();k++){
+            if(k<0){if(!AW_MapHotGet(&hx,&hy))continue;source[0]=hx;source[1]=hy;}
+            else{m=AW_MapMark(k);source[0]=m->x;source[1]=m->y;}
+            if(!map_point_inside(source[0],source[1]))continue;
+            source_to_screen(source[0],source[1],&mx,&my);
+            r=k<0?5:4;
+            /* A clipped diamond remains distinct from the red teleport cross. */
+            for(oy=-r;oy<=r;oy++)for(ox=-r;ox<=r;ox++)if(abs(ox)+abs(oy)==r || (!ox && !oy) || (k<0 && abs(ox)<=1 && abs(oy)<=1))
+                if(mx+ox>=4 && mx+ox<316 && my+oy>=19 && my+oy<173)AW_UIFill(mx+ox,my+oy,1,1,k<0?orange:cyan);
+            d=(mx-mouse_x)*(mx-mouse_x)+(my-mouse_y)*(my-mouse_y);
+            if(d<=best){best=d;map_hover_name=k<0?"Hot marker":AW_MapMark(k)->name;}
+        }
     }
     if(teleport_selected && (teleport_mode || normal_teleport_enabled())){
         px=(teleport_point[0]-map_bounds[0])*map_w/(map_bounds[2]-map_bounds[0]);
@@ -1741,6 +2331,18 @@ static void map_draw(void){
             if(mx+i>=4 && mx+i<316 && my>=19 && my<173)AW_UIFill(mx+i,my,1,1,AW_UIColor(255,32,32));
             if(mx>=4 && mx<316 && my+i>=19 && my+i<173)AW_UIFill(mx,my+i,1,1,AW_UIColor(255,32,32));
         }
+    }
+ chrome:
+    if(map_hover_name){   /* the hovered place's name, in a box beside the pointer, kept inside the map view */
+        const char *name=map_hover_name;
+        int bw=(int)strlen(name)*AW_ConsoleCharWidth()+6,bx=mouse_x+10,by=mouse_y-14;
+        if(bw>312)bw=312;
+        if(bx+bw>316)bx=mouse_x-10-bw;
+        if(bx<4)bx=4;
+        if(by<19)by=mouse_y+12;
+        if(by+11>173)by=162;
+        AW_UIFill(bx,by,bw,11,AW_UIColor(202,165,96));AW_UIFill(bx+1,by+1,bw-2,9,AW_UIColor(15,20,23));
+        text(bx+3,by+2,name,bx+bw-2);
     }
     if(teleport_mode){
         text(8,1,"DEBUG TELEPORT",315);
@@ -1752,11 +2354,15 @@ static void map_draw(void){
         }else if(teleport_message)text(8,176,teleport_message,315);
         text(8,188,"R-drag/arrows pan +/- zoom Esc close",240);
     }else{
-        if(in_game){text(77,5,"IN-GAME MAP PROTOTYPE",315);
+        if(in_game){text(77,5,"IN-GAME MAP PROTOTYPE",LOCALBTN_WORLD_X-2);
             text(8,188,"Pan/zoom  P player  M/Esc close",315);}
         else{text(77,5,"DEBUG MAP",315);text(116,5,line,315);}
         map_mode_button(4,62,"DEBUG",!in_game,map_debug_enabled());
         map_mode_button(250,66,"IN-GAME",in_game,1);
+        if(in_game){   /* stage 3: the World / Local switch (Tab), as OpenMW's map window has it */
+            map_mode_button(LOCALBTN_WORLD_X,LOCALBTN_W,"WORLD",!map_local,1);
+            map_mode_button(LOCALBTN_LOCAL_X,LOCALBTN_W,"LOCAL",map_local,marker || local_room);
+        }
         if(!in_game){
             width=AW_ConsoleCharWidth();
             text(8,188,width<=4?"Home fit M/Esc close":"P/G/Home",88);
@@ -1771,12 +2377,13 @@ static void map_draw(void){
         }
         text(8,176,marker_message?marker_message:
             (normal_teleport_enabled() && teleport_message?teleport_message:
-             AW_ConsoleCharWidth()<=4?(normal_teleport_enabled()?"Click mark / R-click target / drag pan / +/- zoom":"Click mark / drag pan / +/- zoom / P player"):
-             (normal_teleport_enabled()?"L mark / drag / R target":"Click mark / drag pan / +/-")),240);
+             AW_ConsoleCharWidth()<=4?(normal_teleport_enabled()?"Mid-click mark / R-click target / click edit / H hot":"R-click mark / click edit / H hot / drag pan"):
+             (normal_teleport_enabled()?"Mid mark / R target / H hot":"R-click mark / H hot")),240);
         AW_UIFill(CLEAR_X,CLEAR_Y,CLEAR_W,CLEAR_H,AW_UIColor(35,43,47));
-        text(CLEAR_X+4,CLEAR_Y+1,"C CLEAR",CLEAR_X+CLEAR_W-1);
+        text(CLEAR_X+4,CLEAR_Y+1,"K MARKERS",CLEAR_X+CLEAR_W-1);
         if(normal_teleport_enabled() && teleport_selected)teleport_button_draw(gold);
     }
+    mm_draw();
 }
 static void journal_draw(void){
     int i,j,x,y,entry=book->entry,page,ink=AW_UIColor(38,29,20),gold=AW_UIColor(103,65,27);

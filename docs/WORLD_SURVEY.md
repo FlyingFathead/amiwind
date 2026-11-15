@@ -1,6 +1,13 @@
 # Vvardenfell terrain and cell-density survey
 
-_Last updated with AmiWind v0.0.25-dev1 (1 October 2026)._
+_Last updated with AmiWind v0.0.66-dev2 (13 November 2026)._
+
+**With the expansions selected** (the default since v0.0.66), the survey reads the merged master of the selected
+masters and their archives (Morrowind.bsa, then Tribunal.bsa and Bloodmoon.bsa). It plans the base game's exterior
+grid, including the expansions' edits to it. The 155 exterior cells that only an expansion adds (Solstheim) are
+listed in `world-survey.json` under `expansion_only_cells` and are not planned until that exterior is converted.
+A base-game-only survey writes the same bytes as before. When the atlas refuses a cell, its error names every
+refused cell and the reason (WORLD-SURVEY-EXPANSION-ATLAS-66).
 
 The first complete base-master survey places Seyda Neen and Balmora in a shared
 world coordinate system. It is a conversion plan and inspection dataset. The

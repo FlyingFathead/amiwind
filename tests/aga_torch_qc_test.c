@@ -277,6 +277,35 @@ static void torch_hand_to_hand(edict_t *p)
     item_equipped=1;AW_TorchUpdate();assert(AW_TorchEquipped());   /* equipped again with the hands up: lit */
     aw_torch_item_lit=NULL;
 }
+/* READY-MAGIC-SHOWS-WEAPON-65 (v0.0.66): readied magic puts the carried torch away, as the original (the spell is a
+ * two-handed draw, which hides the carried-left item): with the torch lit, R (the magic key; the hands stay up) leaves no
+ * torch and no light, its lit flag kept, and V changes nothing; F (the weapon stance) brings the torch back lit. In the
+ * game the hook is aw_view.c's left_put_away. v0.0.66-dev1 kept the torch lit, and its arms took the place of the open
+ * hands. */
+extern int (*aw_torch_put_away)(void);
+static int magic_put_away(void){return aw_magic_readied;}
+static void torch_magic_ready(edict_t *p)
+{
+    int i,g;
+    set_table(.4f,2,.3f,.5f);
+    memset(&p->v,0,progs->entityfields*4);p->v.health=100;
+    aw_torch_item_lit=item_lit_fixture;item_equipped=1;aw_torch_put_away=magic_put_away;aw_magic_readied=0;sv.time=60;
+    p->v.impulse=202;AW_HandsTick();AW_TorchUpdate();
+    for(i=0;i<30;i++){sv.time=60.02+i*.02;AW_HandsTick();AW_TorchUpdate();}
+    assert(*field(p,"aw_hand_state")==2 && !aw_magic_readied);
+    toggle_torch();AW_TorchUpdate();assert(AW_TorchEquipped() && cl_dlights[0].radius>0);      /* V: the torch lit */
+    /* R, as aw_cast.c ready_command presses it */
+    g=*field(p,"aw_hand_goal")!=0;AW_HandReadyPress(AW_READY_MAGIC_KEY,&g,&aw_magic_readied);*field(p,"aw_hand_goal")=(float)g;
+    for(i=0;i<10;i++){sv.time=61+i*.02;AW_HandsTick();AW_TorchUpdate();}
+    assert(aw_magic_readied && *field(p,"aw_hand_state")==2);
+    assert(!AW_TorchEquipped() && !AW_HeldLight() && cl_dlights[0].radius==0);   /* put away: no torch, no light */
+    assert(*field(p,"aw_torch")==1);                                              /* its lit flag kept */
+    toggle_torch();assert(*field(p,"aw_torch")==1 && !AW_TorchEquipped());        /* V changes nothing */
+    /* F: the weapon stance; the magic goes, the hands stay up, the torch is back lit */
+    p->v.impulse=202;AW_HandsTick();AW_TorchUpdate();
+    assert(!aw_magic_readied && *field(p,"aw_hand_goal")==1 && AW_TorchEquipped() && cl_dlights[0].radius>0);
+    aw_torch_put_away=NULL;aw_torch_item_lit=NULL;
+}
 int main(int argc,char **argv)
 {
     FILE *f;byte *raw;long size;int fn,i,before,baseline;edict_t *p,*world;
@@ -344,6 +373,7 @@ int main(int argc,char **argv)
     assert(!*field(p,"aw_hand_state") && !*field(p,"aw_torch") && !pr_strings[p->v.weaponmodel]);
     assert(cl_dlights[0].radius==0 && metadata_warnings==before+1);
     torch_hand_to_hand(p);
-    puts("QC/torch lifecycle passed: missing metadata, raise, V toggle, viewmodel, light, lower, punch, death and zeroed-VM handoff phases.");
+    torch_magic_ready(p);
+    puts("QC/torch lifecycle passed: missing metadata, raise, V toggle, viewmodel, light, lower, punch, death, zeroed-VM handoff and readied-magic phases.");
     free(sv.edicts);free(raw);return 0;
 }

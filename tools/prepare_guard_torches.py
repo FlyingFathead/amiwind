@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from mwad.audit import BSA, records, subrecords, normpath
 from mwad.npc import load_master, outfit, text, first
 from mwad.paths import child_ci, ensure_external
+from mwad.masters import master_path
 from npc_geometry import Assets, Skeleton, assemble, bake, animated_mdl, rigid_attachment
 from npc_faces import ActorSkeleton, actor_samples
 from npc_anim import BoneLayer
@@ -187,7 +188,7 @@ def staged_guard_records(map_paths, data_files, unstamped=None):
     first seconds (tools/payload_preflight.py check_guard_records, GUARD-TORCH-TYPES-LIMIT-48). UNSTAMPED, a list:
     NPCs with no aw_source_id yet are appended as (map, aw_ref) and skipped instead of refused; the image step stamps
     the scene maps' NPCs later (PREFLIGHT-GUARD-UNSTAMPED-NPCS-48: the census NPCs in v0.0.48-rc1)."""
-    master = child_ci(Path(data_files), 'Morrowind.esm')
+    master = master_path(Path(data_files))
     kinds, _, _ = load_master(master)
     lights = _source_records(master)
     return set(_scan_guards(map_paths, kinds, lights, text(lights['torch'], 'MODL'), _creature_ids(master),
@@ -493,7 +494,7 @@ def prepare(data_files, id1, output_id1=None, jobs=None):
     data_files = ensure_external(data_files, 'owned guard data')
     id1 = ensure_external(id1, 'guard source stage')
     output = ensure_external(output_id1 or id1, 'guard companion output')
-    master = child_ci(data_files, 'Morrowind.esm')
+    master = master_path(data_files)
     kinds, _, _ = load_master(master)
     lights = _source_records(master); mesh = text(lights['torch'], 'MODL')
     entries = _guard_models(id1, kinds, lights, mesh, _creature_ids(master))

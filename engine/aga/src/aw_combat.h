@@ -17,7 +17,7 @@
 enum {AW_STR,AW_INT,AW_WIL,AW_AGI,AW_SPD,AW_END,AW_PER,AW_LUC};
 enum {
     AW_SK_BLOCK=0,AW_SK_ARMORER=1,AW_SK_MEDIUM=2,AW_SK_HEAVY=3,AW_SK_BLUNT=4,AW_SK_LONG=5,
-    AW_SK_AXE=6,AW_SK_SPEAR=7,AW_SK_UNARMORED=17,AW_SK_LIGHT=21,AW_SK_SHORT=22,AW_SK_H2H=26
+    AW_SK_AXE=6,AW_SK_SPEAR=7,AW_SK_UNARMORED=17,AW_SK_LIGHT=21,AW_SK_SHORT=22,AW_SK_MARKSMAN=23,AW_SK_H2H=26
 };
 enum {AW_ATTACK_CHOP,AW_ATTACK_SLASH,AW_ATTACK_THRUST};
 enum {AW_HIT_MISS,AW_HIT_BLOCKED,AW_HIT_FATIGUE,AW_HIT_HEALTH};
@@ -93,6 +93,16 @@ typedef struct {
     unsigned int hit_classes;          /* the armour a blow can land on, 2 bits per AW_CombatArmorHitSlot slot: 0 none,
                                            1 light, 2 medium, 3 heavy (its hit sound; sheet field 12); AW_HIT_CLASS */
     float weapon_health,weapon_health_max,shield_health,shield_health_max;  /* condition; max 0 = unknown (full) */
+    /* ACTOR-MECHANICS-USE-STATS-66 (OpenMW 0.51 combat.cpp applyFatigueLoss and blockMeleeAttack): the load over the
+     * capacity (Class::getNormalizedEncumbrance); each swing costs fFatigueAttackMult x it more fatigue, each block
+     * fFatigueBlockMult x min(1, it). The player's from the inventory every frame; 0 for an actor whose load is not
+     * counted (+4 bytes: the sheet is 188) */
+    float encumbrance;
+    /* ACTOR-MECHANICS-USE-STATS-66 row 4 (OpenMW 0.51 combat.cpp getHandToHandDamage, getHitChance, blockMeleeAttack):
+     * 1 while a Paralyze effect holds it, set before each swing at it (hit_effects): a punch then does health damage,
+     * it has no evasion and cannot block, as when knocked down; the knockdown's extra damage (fCombatKODamageMult) is
+     * not counted for it (+4 bytes with the padding: the sheet is 192) */
+    unsigned char paralyzed;
 } aw_fighter_t;
 #define AW_HIT_CLASS(f,slot) ((int)(((f)->hit_classes>>(2*(slot)))&3u))
 /* Two-handed weapon types (and hand to hand, which OpenMW's weapon table also marks
@@ -199,6 +209,33 @@ int AW_CombatSwingSounds(const aw_swing_t *out,const aw_fighter_t *victim,int by
  * no strength modifier and no condition), a bipedal one punching by hand to hand instead. Carried weapons are not
  * read yet: a creature with one fights with its own attacks. 0 when ROW is not a creature. ID names the sheet. */
 int AW_CombatCreatureSheet(const aw_actor_base_t *row,const char *id,aw_fighter_t *out);
+/* NPC-CREATURE-COMBAT-STYLE-STATS-66: the melee weapon IT (the creature's equipped AITM item) onto sheet OUT: weapon,
+ * its skill, damage, reach, speed, weight and condition. 0 (nothing changed) for no item or a ranged weapon. */
+int AW_CombatCreatureWeapon(aw_fighter_t *out,const aw_item_t *it);
+/* ACTOR-RANGED-COMBAT-MISSING-66, the shot (rules from OpenMW 0.51 aicombataction.cpp, weapontype.cpp,
+ * projectilemanager.cpp, combat.cpp projectileHit; our own code). A sheet's weapon 10 bow, 11 crossbow, 12 thrown. */
+#define AW_COMBAT_RANGED(w) ((w)==10 || (w)==11 || (w)==12)
+/* the original's game settings fProjectileMinSpeed and fProjectileMaxSpeed (units a second; the ranged weapon's
+ * combat range is the maximum speed, ActionWeapon::getCombatRange) and the projectile pool */
+#define AW_PROJECTILE_MIN_SPEED 400.0f
+#define AW_PROJECTILE_MAX_SPEED 3000.0f
+#define AW_PROJECTILES 16
+/* The ammunition type a ranged sheet weapon needs (13 arrow, 14 bolt as 1 + WPDT type), 0 for a thrown weapon (its
+ * own), -1 not ranged. Pure. */
+int AW_CombatAmmoType(int weapon);
+/* 1 when F shoots now at a target GAP original units away: a ranged weapon, AMMO rounds left (a thrown weapon: its own
+ * count), the target within the combat range and in sight (SIGHT). Pure. */
+int AW_CombatShootNow(const aw_fighter_t *f,int ammo,float gap,int sight);
+/* The flight speed of a shot drawn with STRENGTH 0..1 (OpenMW: min + (max - min) x attack strength). Pure. */
+float AW_CombatShotSpeed(float strength);
+/* The aim of a shot from FROM at TO (game units) at SPEED with GRAVITY (both game units a second): the unit DIR,
+ * raised by the drop over the flight time (g t^2 / 2) so it lands at TO. Pure. */
+void AW_CombatShotAim(const float from[3],const float to[3],float speed,float gravity,float dir[3]);
+/* One step of a shot: NEXT = POS + VEL x DT, then VEL's z less GRAVITY x DT. Pure. */
+void AW_CombatShotStep(const float pos[3],float vel[3],float gravity,float dt,float next[3]);
+/* The sheet a shot hits with (OUT from A): the weapon's chop plus the ammunition's AMMO_CHOP (min, max), capped at 255;
+ * a thrown weapon passes its own chop (OpenMW: the weapon and the ammunition both count). Pure. */
+void AW_CombatShotSheet(const aw_fighter_t *a,const unsigned char ammo_chop[2],aw_fighter_t *out);
 /* Fatigue return per second of game time; knocked-out fighters stand when
  * fatigue is back above zero. Returns 1 when the fighter got up. */
 int AW_CombatRecover(const aw_combat_settings_t *s,aw_fighter_t *f,float seconds);
@@ -216,6 +253,16 @@ int AW_CombatFightRating(const aw_combat_ai_t *a,int fight,int disposition,float
 float AW_CombatFleeRating(const aw_combat_ai_t *a,const aw_fighter_t *f,float distance);
 float AW_CombatAntiFleeRating(const aw_combat_ai_t *a,const aw_fighter_t *f);
 int AW_CombatFleeDecision(const aw_combat_ai_t *a,const aw_fighter_t *f,float distance);
+/* ACTOR-MECHANICS-USE-STATS-66 row 16, the rest of vanillaRateFlee and prepareNextAction: the werewolf case
+ * (AW_CombatWerewolfFleeMod: iWereWolfFleeMod for an NPC below iWereWolfLevelToAttack against a werewolf, else -1), the
+ * rating with it (WERE_MOD >= 0 replaces the health and Flee terms), and the decision against ANTI, the anti-flee
+ * rating of the best action: the weapon's (AW_CombatAntiFleeRating) or, when a spell is the best action, that spell's
+ * (AW_CombatSpellAntiFlee, spellpriority.cpp vanillaRateSpell: success chance x fAIRangeMagicSpellMult with a Target
+ * effect, 0 against a swimming enemy, else x fAIMagicSpellMult; RANGES = AW_CastRanges bits). */
+float AW_CombatWerewolfFleeMod(const aw_fighter_t *f,int enemy_werewolf,float level_to_attack,float flee_mod);
+float AW_CombatFleeRatingVs(const aw_combat_ai_t *a,const aw_fighter_t *f,float distance,float were_mod);
+int AW_CombatFleeDecisionVs(const aw_combat_ai_t *a,const aw_fighter_t *f,float distance,float were_mod,float anti);
+float AW_CombatSpellAntiFlee(float chance,int ranges,float spell_mult,float range_spell_mult,int enemy_swimming);
 
 /* One encounter's totals (the arena's result screen). */
 typedef struct {
@@ -226,6 +273,9 @@ typedef struct {
     int player_contacts;                 /* the player's swings that found their fighter by the hit cone (AW_RULE_CONTACT) */
     float dealt_health,dealt_fatigue,taken_health,taken_fatigue;
     unsigned long player_blocks,npc_blocks,guards;   /* blocked blows (the player's, the NPCs'), block button presses with a shield */
+    unsigned long npc_casts,npc_cast_fails,npc_spell_choices;   /* NPC-NO-SPELLCASTING-65: casts that left, failed rolls,
+                                                                 * decisions that chose a spell over the weapon */
+    unsigned long npc_spell_reads;       /* the actor table reads of the fighters' spells (once per fight, at the start) */
 } aw_combat_stats_t;
 
 /* aw_combat.c: the engine side. */
@@ -235,13 +285,18 @@ int AW_CombatSettingsLoad(void);
 int AW_CombatAiLoaded(void);            /* every "ai" line was in combat/settings.txt */
 /* The combat layer's rule switches (dbg combat flee|sounds on/off; plain switches, not console variables: the
  * resident registry budget). AW_RULE_FLEE: flee by the Flee rating (OpenMW aicombataction.cpp makeFleeDecision);
- * AW_RULE_SOUNDS: the swing's sounds by AW_CombatSwingSounds. Flee off by default (A/B); sounds ON by default since
+ * AW_RULE_SOUNDS: the swing's sounds by AW_CombatSwingSounds. Flee ON by default since v0.0.66 (ACTOR-MECHANICS-USE-
+ * STATS-66 row 16; off before, for an A/B); sounds ON by default since
  * v0.0.58 (COMBAT-SOUNDS-RULE-OFF-58; the player's own footsteps are their own setting, off). The combat playground
  * switches both on for its session. ON < 0 only reads; returns the value before the call.
  * AW_RULE_CONTACT (v0.0.63, ENEMY-HEALTH-BAR-62; dbg combat contact on/off, ON by default): when the crosshair's ray
  * finds nobody, the player's swing takes the nearest fighter in the original's hit cone (AW_CombatContact; OpenMW
- * getHitContact), so a flyer or a small creature is struck as in the original; off = the ray alone (the earlier rule). */
-enum {AW_RULE_FLEE,AW_RULE_SOUNDS,AW_RULE_CONTACT,AW_RULE_COUNT};
+ * getHitContact), so a flyer or a small creature is struck as in the original; off = the ray alone (the earlier rule).
+ * AW_RULE_SPELLS (v0.0.66, NPC-NO-SPELLCASTING-65; dbg combat spells on/off, ON by default): a fighter that knows
+ * spells weighs them against its weapon each second (AW_SpellAiRateSpell / AW_SpellAiRateWeapon, OpenMW
+ * prepareNextAction) and casts the best one from its range, its spellcast group playing and the spell leaving on the
+ * release key (AW_CastActorRelease); off = weapons and fists only (the earlier rule). */
+enum {AW_RULE_FLEE,AW_RULE_SOUNDS,AW_RULE_CONTACT,AW_RULE_SPELLS,AW_RULE_COUNT};
 int AW_CombatRule(int rule,int on);
 /* Combat sound KEY (AW_SND_*): its file (sound/ relative, "" when the image has none) and playing it locally. */
 const char *AW_CombatSoundPath(int key);
@@ -265,6 +320,9 @@ int AW_CombatActorLoad(const char *id,aw_fighter_t *out);
 extern void (*aw_combat_sheet_stats)(const char *id,aw_fighter_t *out);
 /* ESSENTIAL-DEATH-60: 1 when the actor record of ID is known (ESSENTIAL set from its essential flag) */
 int AW_CombatEssentialRecord(const char *id,int *essential);
+/* ESSENTIAL-DEATH-MESSAGE-66: an essential actor (reference REF, NAME or NULL) died outside a fight (its actor record's
+ * death): the game's sKilledEssential box, once per death (a fight's own report of the same death is not repeated) */
+void AW_CombatEssentialKilled(unsigned long ref,const char *name);
 void AW_CombatPlayerSheet(aw_fighter_t *out);
 /* INVENTORY-NO-ARMOR-RATING-61: the player's armour rating as the inventory window shows it (the sheet's, with an
  * active Shield effect's magnitude; OpenMW npc.cpp getArmorRating); -1 without the game's settings */
@@ -275,6 +333,11 @@ void AW_CombatEquipmentStore(void);
 /* The movement rules' view of the player (aw_move.c): knocked down/out, the one fatigue value
  * (and its maximum), and a fatigue loss (never below 0 unless already there). */
 int AW_CombatPlayerKnocked(void);
+/* PLAYER-ANIM-GROUPS-NOT-PLAYED-66: the player's reaction to the last blow for the body's groups: 3 knocked out, 2
+ * knocked down (*AGE seconds since it went down), 1 a blow that landed and did damage, not in god mode (OpenMW
+ * combat/local.lua applyStagger: the hit recovery when it did not knock down; *AGE since it, *ROLL its random
+ * hit group), 0 none. The caller ends a hit by its group's length. */
+int AW_CombatPlayerReaction(float *age,int *roll);
 float AW_CombatPlayerFatigue(float *maximum);
 void AW_CombatPlayerFatigueLoss(float loss);
 /* DBG-SUPERSPEED-62: the player's fatigue to its maximum (the fight sheet and the character sheet) */
@@ -306,6 +369,9 @@ int AW_PlayerInCombat(void);
  * E fights V. TargetOf: the actor E fights, NULL for the player or no fight (*fights_player 1 for the player). */
 int AW_CombatEngageAgainst(struct edict_s *e,const aw_fighter_t *a,struct edict_s *v,const aw_fighter_t *b);
 struct edict_s *AW_CombatTargetOf(struct edict_s *e,int *fights_player);
+/* The frames a fighter's group NAME plays (idle run attack hit knock death block dodgel dodger cast): 1 with *base
+ * and *count, 0 when E fights in no slot or NAME is none (DAGOTH-UR-NO-ANIMATIONS-65). */
+int AW_CombatGroupFrames(struct edict_s *e,const char *name,int *base,int *count);
 struct edict_s;
 int AW_CombatEngage(struct edict_s *e,const aw_fighter_t *fighter,const char *layout);
 /* THE hand-off between combat and the other actor layers (ambient wander/idles, MWScript): one check, one end, one
@@ -321,6 +387,9 @@ extern void (*aw_combat_actor_released)(struct edict_s *e);
  * than slots), so the owner records the death before the slot forgets it (aw_actors.c: the change list). */
 extern void (*aw_combat_actor_died)(struct edict_s *e);
 const aw_fighter_t *AW_CombatFighter(struct edict_s *e);
+/* the edicts holding a fight slot now, up to MAX (MWSCRIPT-TICK-SHARE-66: a fighter list, not an edict scan) */
+#define AW_COMBAT_FIGHTERS_MAX 16
+int AW_CombatFighterEdicts(struct edict_s **out,int max);
 /* PLAYER-CASTING-59: a spell set an actor's health to HEALTH; HARMFUL 1 makes it an attack (the actor joins the fight
  * with the player); at 0 it dies as by a blow. 1 when the actor has a fight slot. */
 int AW_CombatSpellHit(struct edict_s *e,float health,int harmful);

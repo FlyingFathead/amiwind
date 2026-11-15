@@ -103,7 +103,8 @@ def room_sizes(data, rooms):
     try:
         from mwad.interior import read_interiors
         from mwad.paths import child_ci
-        cells = read_interiors(child_ci(data, 'Morrowind.esm'), [cell for _, cell in rooms])
+        from mwad.masters import master_path
+        cells = read_interiors(master_path(data), [cell for _, cell in rooms])
     except (OSError, ValueError, KeyError):
         return {}
     return {name: len(cell['refs']) + 1 for (name, _), cell in zip(rooms, cells)}

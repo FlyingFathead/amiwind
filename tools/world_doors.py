@@ -117,11 +117,36 @@ def room_target(destination, cell, rooms, offsets):
     return name, arrival, yaw
 
 
-def table(doors, rooms, towns, regions, offsets=None):
+def held_back_reason(door, planned=None, held_back=None):
+    """Why a door or marker that does not resolve is a place this build knowingly does not hold, or None (then it is
+    a problem). PLANNED: the exterior cells the exterior checklist plans (None: every cell); an exterior point outside
+    them is in a cell only an expansion adds (Solstheim: the survey lists those cells, no frame holds them yet).
+    HELD_BACK: {room cell casefold: reason} of the rooms the room batch stage records as not made (an exterior-like
+    cell waiting for its exterior work, a refused room with its error). EXPANSION-DOORS-HELD-BACK-66: with Tribunal
+    and Bloodmoon selected 273 doors and markers did not resolve, 192 of them Solstheim's, 81 of Mournhold's
+    exterior-like cells and refused rooms."""
+    from room_batches import exterior_cell
+    if planned is not None:
+        if not door['source_interior'] and tuple(exterior_cell(door['position'])) not in planned:
+            return 'its own place is in exterior cell %d,%d, which this build does not plan' % tuple(
+                exterior_cell(door['position']))
+        if not door['destination_interior'] and \
+                tuple(exterior_cell(door['destination']['position'])) not in planned:
+            return 'its exterior arrival is in exterior cell %d,%d, which this build does not plan' % tuple(
+                exterior_cell(door['destination']['position']))
+    for cell, side in ((door['source_cell'], 'its own room'), (door['destination_cell'], 'room')):
+        reason = (held_back or {}).get((cell or '').casefold())
+        if reason:
+            return '%s %s is held back: %s' % (side, cell, reason)
+    return None
+
+
+def table(doors, rooms, towns, regions, offsets=None, planned=None, held_back=None):
     """The world door table: one row per authored door and marker. rooms: {original cell casefold: room map} of every
     room the image holds; towns: town_holders; regions: {(x, y): (map, origin)}; offsets: town_interiors.room_offsets.
     Each row: reference, kind, direction, source (map, holder kind) and target (map, arrival, yaw) or the reason it
-    does not resolve."""
+    does not resolve: 'held_back' when it lies in a place this build knowingly does not hold (held_back_reason:
+    PLANNED exterior cells, HELD_BACK rooms), else 'problem'. Without PLANNED and HELD_BACK every row is as before."""
     offsets = offsets or {}
     rows = []
     for door in sorted(doors, key=lambda d: d['number']):
@@ -136,7 +161,10 @@ def table(doors, rooms, towns, regions, offsets=None):
             target = room_target(door['destination'], door['destination_cell'].casefold(), rooms, offsets)
         else:
             target = exit_target(door['destination'], towns, regions)
-        if source is None:
+        reason = held_back_reason(door, planned, held_back) if source is None or target is None else None
+        if reason:
+            row['held_back'] = reason
+        elif source is None:
             row['problem'] = 'its own place is in no frame or room of this image'
         elif target is None:
             row['problem'] = ('room %s is not in this image' % door['destination_cell'] if door['destination_interior']
@@ -356,7 +384,22 @@ def summary(rows):
     for row in rows:
         entry = out.setdefault(row['kind'] + ' ' + row['direction'], {'rows': 0, 'resolved': 0})
         entry['rows'] += 1
-        entry['resolved'] += 'problem' not in row
+        entry['resolved'] += 'problem' not in row and 'held_back' not in row
+        if 'held_back' in row:
+            # only on a table with held-back places, so a base game table's summary does not move
+            entry['held_back'] = entry.get('held_back', 0) + 1
+    return out
+
+
+def held_back_places(record):
+    """{room cell casefold: reason} of the rooms a room batch stage record (tools/chim_room_batches.py,
+    room-batches.json) does not make: its exterior-like cells (waiting for their exterior work) and the rooms it
+    refused, with its error (held_back_reason)."""
+    out = {}
+    for row in record.get('exterior_like') or ():
+        out[row['cell'].casefold()] = row.get('state') or 'an exterior-like cell'
+    for cell, why in sorted((record.get('refused') or {}).items()):
+        out.setdefault(cell.casefold(), 'refused by the room batch stage (%s)' % why)
     return out
 
 
@@ -367,8 +410,9 @@ def audit(data_files, id1):
     from map_files import map_file, town_map_present
     from mwad.interior import original_doors
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     from room_batches import parse_row
-    doors = original_doors(child_ci(data_files, 'Morrowind.esm').read_bytes())
+    doors = original_doors(master_path(data_files).read_bytes())
     id1 = Path(id1)
     maps = id1 / 'maps'
     banks = {}

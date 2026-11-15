@@ -192,7 +192,8 @@ def area_problems(data_files, areas, root=None, policy=None):
     """[problem] for every CHIM area of a build with an NPC resident the grounding policy does not
     classify (the chim-town stage would stop on it, 40 minutes in). Empty when all are classified."""
     from mwad.paths import child_ci
-    raw = Path(child_ci(Path(data_files), 'Morrowind.esm')).read_bytes()
+    from mwad.masters import master_path
+    raw = Path(master_path(Path(data_files))).read_bytes()
     cells, npcs = _exterior_cells(raw)
     problems = []
     for area in areas:
@@ -299,12 +300,14 @@ def _read_model(task):
 def measure(data_files, jobs=1, log=print):
     """The census rows of every exterior NPC placement (see the module docstring)."""
     import numpy as np
-    from mwad.audit import BSA, decode_heights, normpath, records, subrecords
+    from mwad.audit import decode_heights, normpath, records, subrecords
+    from mwad.archives import layered_bsa
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     from build_parallel import ordered_map
     from prepare_scenery import reference_rotation
     data_files = Path(data_files)
-    raw = Path(child_ci(data_files, 'Morrowind.esm')).read_bytes()
+    raw = Path(master_path(data_files)).read_bytes()
     cells, npcs = _exterior_cells(raw)
     lands, objects = {}, {}
     for tag, flags, payload in records(raw):
@@ -326,9 +329,9 @@ def measure(data_files, jobs=1, log=print):
                 if k in cells:
                     near[k] = [r for r in cells[k]['refs'] if not r.get('deleted') and r['id'].casefold() in objects]
     names = sorted({objects[r['id'].casefold()] for refs in near.values() for r in refs})
-    bsa = BSA(child_ci(data_files, 'Morrowind.bsa'))
+    bsa = layered_bsa(data_files)
     # Models from the base archive, as the scenery converter reads them (prepare_scenery.export_refs).
-    tasks = [(name, str(bsa.path), bsa.entries[name], None) for name in names if name in bsa.entries]
+    tasks = [(name, str(bsa.entries[name].get('path', bsa.path)), bsa.entries[name], None) for name in names if name in bsa.entries]
     log('Census: %d exterior NPC placements, %d support models' % (len(placements), len(tasks)))
     models, errors = {}, {}
     for name, verts, faces, error in ordered_map(_read_model, tasks, max(1, min(jobs, len(tasks) or 1))):
@@ -459,22 +462,23 @@ _ROOM_WORKER = {}
 def _room_unit(task):
     """Worker: (room, rows, deferred, model errors) of one room: its actors measured on its support placements."""
     import numpy as np
-    from mwad.audit import BSA
+    from mwad.archives import layered_bsa
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     from prepare_scenery import reference_rotation
     data_files, room, actors, statics, facts = task
     if _ROOM_WORKER.get('data') != data_files:
         _ROOM_WORKER.clear()
-        _ROOM_WORKER.update(data=data_files, bsa=BSA(child_ci(Path(data_files), 'Morrowind.bsa')), models={})
+        _ROOM_WORKER.update(data=data_files, bsa=layered_bsa(Path(data_files)), models={})
     bsa, models = _ROOM_WORKER['bsa'], _ROOM_WORKER['models']
     errors = {}
 
     def model(name):
         if name not in models:
             if name in bsa.entries:    # the base archive, as the scenery converter reads it (the exterior census)
-                _, verts, faces, error = _read_model((name, str(bsa.path), bsa.entries[name], None))
+                _, verts, faces, error = _read_model((name, str(bsa.entries[name].get('path', bsa.path)), bsa.entries[name], None))
             else:
-                verts, faces, error = None, None, 'not in Morrowind.bsa'
+                verts, faces, error = None, None, 'not in the selected archives'
             models[name] = None if error else (verts, faces)
             if error:
                 errors[name] = error
@@ -506,6 +510,92 @@ def room_names(root=None):
     return [(b['batch'], r['room']) for b in doc['batches'] for r in b['rooms']]
 
 
+def room_list_masters(doc):
+    """The masters a room list names, in load order: the base game file and every expansion a batch's 'layer' names
+    (config/room-batches.json; the layer batches are built only with their master)."""
+    from mwad.esm import GAME_MASTERS
+    layers = {str(b.get('layer') or '').casefold() for b in doc['batches']}
+    return [GAME_MASTERS[0]] + [m for m in GAME_MASTERS[1:] if m.casefold() in layers]
+
+
+def room_selection(batches, masters=None, data_files=None, root=None):
+    """The rooms a build with the selected MASTERS converts in the batches BATCHES (a --room-batches text or a list of
+    batch numbers), by the build's own rules: a layer's batches only when its master is selected
+    (room_batches.parse_selection, as tools/build.py room_batch_selection), and the cells flagged "behave like exterior"
+    set aside with their master (tools/chim_room_batches.py exterior_like_rooms, INTERIOR-NO-AMBI-66: the same code the
+    stage runs, so the census never asks the reader for a room the stage does not convert). Returns
+    (doc, chosen batch numbers, [(batch, room)] in list order, [{cell, master, state}] set aside)."""
+    import room_batches
+    from chim_room_batches import exterior_like_rooms
+    from mwad.masters import selected_masters
+    masters = selected_masters(masters)
+    doc = room_batches.load(root)
+    if doc is None:
+        raise ValueError('The repo has no room list (config/%s)' % room_batches.CONFIG)
+    if isinstance(batches, (list, tuple, set, frozenset)):
+        have = set(room_batches.numbers(doc, masters))
+        chosen = sorted(int(b) for b in batches)
+        missing = [b for b in chosen if b not in have]
+        if missing:
+            raise ValueError('room batches %s are not in config/%s with the masters %s'
+                             % (', '.join(map(str, missing)), room_batches.CONFIG, ', '.join(masters)))
+    else:
+        chosen = room_batches.parse_selection(batches, doc, masters)
+    wanted = set(chosen)
+    rows = [row for row in room_batches.rows(doc) if row['batch'] in wanted]
+    aside = []
+    if rows and data_files is not None:
+        rows, aside = exterior_like_rooms(Path(data_files), rows, masters)
+    return doc, chosen, [(row['batch'], row['room']) for row in rows], aside
+
+
+def room_problems(data_files, batches, masters=None, root=None, log=None):
+    """[problem] for the build preflight (tools/build_preflight.py room_grounding_problems): every NPC and creature
+    resident of every room the build's room batches convert (room_selection: the selected batches and masters, the
+    exterior-like cells set aside) has its grounding class, the policy's (config/actor_grounding.json) or its room
+    reference's (config/actor_grounding_rooms.json), by actor_grounding.initial_state with its reference number, as the
+    stage's own preflight (chim_room_batches.unclassified_residents) and its residents step (prepare_area.populate:
+    NPCs and the placed creatures) ask for it. Seconds: one pass over the merged master, no geometry. Empty when all
+    are classified (ROOM-BATCH-NPC-GROUNDING-48: the v0.0.66-dev2 build stopped on 179 unclassified residents of the
+    expansion rooms 14 minutes in, at the stage's own check)."""
+    import time
+    import room_batches
+    from actor_grounding import initial_state
+    from mwad.interior import read_interiors
+    from mwad.masters import master_path, selected_masters
+    started = time.perf_counter()
+    masters = selected_masters(masters)
+    _, chosen, names, aside = room_selection(batches, masters, data_files, root)
+    if not names:
+        return []
+    master = master_path(Path(data_files), masters)
+    cells = read_interiors(master, [room for _, room in names])
+    missing, actors = {}, 0
+    for (batch, room), cell in zip(names, cells):
+        for ref in cell['refs']:
+            if ref.get('deleted') or ref.get('type') not in ROOM_ACTOR_TYPES:
+                continue
+            actors += 1
+            try:
+                initial_state(ref['id'], ref.get('number'))
+            except ValueError:
+                missing.setdefault(room, []).append('%s (%s %d)' % (ref['id'], ref['type'], ref['number']))
+    if log is not None:
+        log('Room grounding preflight: %d actor references (NPCs and creatures) in %d rooms of batches %s with %s, '
+            '%d exterior-like cells set aside, %d unclassified (%.1f s)' % (
+                actors, len(names), room_batches.selection_text(chosen), ', '.join(masters),
+                len(aside), sum(len(v) for v in missing.values()), time.perf_counter() - started))
+    if not missing:
+        return []
+    listed = sorted(missing.items())
+    return ['room batches: %d resident actors in %d rooms have no grounding class in config/actor_grounding.json or '
+            'the room files (config/actor_grounding_rooms.json, the expansions\' config/actor_grounding_rooms_layers.json; '
+            'the chim-room-batches stage would stop on them); fix: python3 '
+            'tools/actor_grounding_census.py --rooms --data-files DATA --write-rooms (ROOM-BATCH-NPC-GROUNDING-48): %s'
+            % (sum(len(v) for v in missing.values()), len(missing),
+               '; '.join('%s: %s' % (room, ', '.join(ids)) for room, ids in listed))]
+
+
 def measure_rooms(data_files, names, jobs=1, log=print):
     """(rows, deferred, model errors, master SHA-256) of every actor reference of the rooms NAMES (see above)."""
     import hashlib
@@ -513,7 +603,8 @@ def measure_rooms(data_files, names, jobs=1, log=print):
     from mwad.audit import normpath
     from mwad.interior import read_interiors
     from mwad.paths import child_ci
-    master = child_ci(Path(data_files), 'Morrowind.esm')
+    from mwad.masters import master_path
+    master = master_path(Path(data_files))
     raw = Path(master).read_bytes()
     cells = read_interiors(master, names)
     _, npcs = _exterior_cells(raw)
@@ -546,9 +637,27 @@ def measure_rooms(data_files, names, jobs=1, log=print):
     return rows, deferred, errors, hashlib.sha256(raw).hexdigest()
 
 
-def rooms_document(rows, names, master_sha256):
+def layers_about():
+    """The 'about' text of the expansions' room file (config/actor_grounding_rooms_layers.json)."""
+    return ('The initial support class of every NPC and creature reference of the expansions in the rooms of '
+            'config/room-batches.json: the rooms of the layer batches and the expansions\' references in base-game '
+            'rooms, measured from the game data with every expansion the list names (ROOM-BATCH-NPC-GROUNDING-48; '
+            'docs/NPC_GROUND_CONTACT.md "Room residents by rule"). The base game\'s references are in '
+            'config/actor_grounding_rooms.json, unchanged by the expansions. Read by tools/actor_grounding.py '
+            'room_classes with that file, only for an actor config/actor_grounding.json does not name, by its '
+            'reference number (the merged number of src/mwad/masters.py: never a base-game number). floor: the '
+            'ordinary ground contact; off_floor and no_floor: kept at the authored spot (the third field is its '
+            'script); authored_dead: its death pose at the authored spot. The cells flagged behave like exterior are '
+            'set aside as the room batches stage sets them aside (set_aside). No positions or heights.')
+
+
+def rooms_document(rows, names, master_sha256, game_data=None, listed=None, set_aside=(), about=None):
     """The generated room file (config/actor_grounding_rooms.json, actor_grounding.ROOMS_FORMAT): per room, per class,
-    [reference, id] rows ([reference, id, script] for a reference kept off the floor). No positions or heights."""
+    [reference, id] rows ([reference, id, script] for a reference kept off the floor). No positions or heights.
+    GAME_DATA: {master file: SHA-256} of the masters measured (default the base game file's, MASTER_SHA256); LISTED: the
+    room list's room count (default len(NAMES)); SET_ASIDE: the exterior-like cells the room stage sets aside
+    (room_selection), listed with their master, holding no class; ABOUT: the file's description (default the base
+    game file's). The defaults give the base game's file exactly as before the expansions (rooms_files)."""
     from actor_grounding import ROOMS_FORMAT
     rooms = {}
     for row in sorted(rows, key=lambda r: (r['room'], r['reference'])):
@@ -556,16 +665,42 @@ def rooms_document(rows, names, master_sha256):
         if row['class'] in ('off_floor', 'no_floor'):
             entry.append(row.get('script', ''))
         rooms.setdefault(row['room'], {}).setdefault(row['class'], []).append(entry)
-    return {'format': ROOMS_FORMAT, 'generator': 'tools/actor_grounding_census.py --rooms --write-rooms',
-            'about': 'The initial support class of every NPC and creature reference of the rooms of '
-                     'config/room-batches.json, measured from the game data (ROOM-BATCH-NPC-GROUNDING-48; '
-                     'docs/NPC_GROUND_CONTACT.md "Room residents by rule"). Read by tools/actor_grounding.py only for '
-                     'an actor config/actor_grounding.json does not name, by its reference number. floor: the '
-                     'ordinary ground contact; off_floor and no_floor: kept at the authored spot (the third field is '
-                     'its script); authored_dead: its death pose at the authored spot. No positions or heights.',
-            'tolerance': {'units': 'Morrowind', 'step_up': STEP_UP, 'drop': DROP, 'foot_radius': FOOT_RADIUS},
-            'game_data': {'Morrowind.esm': master_sha256}, 'room_list_rooms': len(names),
-            'rooms': rooms}
+    doc = {'format': ROOMS_FORMAT, 'generator': 'tools/actor_grounding_census.py --rooms --write-rooms',
+           'about': about or ('The initial support class of every NPC and creature reference of the rooms of '
+                              'config/room-batches.json, measured from the game data (ROOM-BATCH-NPC-GROUNDING-48; '
+                              'docs/NPC_GROUND_CONTACT.md "Room residents by rule"). Read by tools/actor_grounding.py '
+                              'only for an actor config/actor_grounding.json does not name, by its reference number. '
+                              'floor: the ordinary ground contact; off_floor and no_floor: kept at the authored spot '
+                              '(the third field is its script); authored_dead: its death pose at the authored spot. No '
+                              'positions or heights.'),
+           'tolerance': {'units': 'Morrowind', 'step_up': STEP_UP, 'drop': DROP, 'foot_radius': FOOT_RADIUS},
+           'game_data': dict(game_data) if game_data else {'Morrowind.esm': master_sha256},
+           'room_list_rooms': len(names) if listed is None else int(listed),
+           'rooms': rooms}
+    if set_aside:
+        doc['set_aside'] = [{'cell': row['cell'], 'master': row['master'], 'state': row['state']} for row in set_aside]
+    return doc
+
+
+def rooms_files(rows, doc, aside, game_data, base_path, layers_path):
+    """{path: document} of the two generated room files from a census of the whole list (ROOM-BATCH-NPC-GROUNDING-48,
+    v0.0.66): BASE_PATH (config/actor_grounding_rooms.json) holds the base game's references of the base batches' rooms,
+    written exactly as before the expansions (its classes, header and bytes do not move when an expansion is added, so
+    no stage or unit key that names it moves either); LAYERS_PATH (config/actor_grounding_rooms_layers.json) holds every
+    other reference: the layer batches' rooms and the expansions' references in base-game rooms (merged numbers,
+    mwad.masters), with each master's SHA-256 and the exterior-like cells set aside. DOC: the room list."""
+    from mwad.masters import ADDON_KEY_STRIDE
+    base_batches = {b['batch'] for b in doc['batches'] if not b.get('layer')}
+    base_rooms = [r['room'] for b in doc['batches'] if b['batch'] in base_batches for r in b['rooms']]
+    layer_rooms = [r['room'] for b in doc['batches'] if b['batch'] not in base_batches for r in b['rooms']]
+    base_set = set(base_rooms)
+    base = [r for r in rows if r['room'] in base_set and r['reference'] < ADDON_KEY_STRIDE]
+    layers = [r for r in rows if not (r['room'] in base_set and r['reference'] < ADDON_KEY_STRIDE)]
+    files = {Path(base_path): rooms_document(base, base_rooms, game_data['Morrowind.esm'])}
+    if layer_rooms:
+        files[Path(layers_path)] = rooms_document(layers, layer_rooms, None, game_data=game_data,
+                                                  listed=len(layer_rooms), set_aside=aside, about=layers_about())
+    return files
 
 
 def rooms_text(doc):
@@ -634,25 +769,59 @@ def merged_policy(policy, ground, dead):
 
 
 def rooms_main(args, policy_path):
-    """--rooms: measure, print the counts per class and per batch, write the report and (--write-rooms) the file."""
+    """--rooms: measure, print the counts per class, per batch and per layer, write the report and (--write-rooms) the
+    file. The rooms are the ones the build converts (room_selection): the selected masters' batches (AMIWIND_MASTERS,
+    as every reader; --write-rooms: the whole list with every master it names, the file holds the whole list), the
+    exterior-like cells set aside and listed by name."""
+    import hashlib
+    import os
     import time
     from collections import Counter
     from build_jobs import resolve_jobs
+    from mwad.esm import GAME_MASTERS
+    from mwad.masters import ADDON_KEY_STRIDE, MASTERS_ENV, selected_masters
+    from mwad.paths import child_ci
     import room_batches
     started = time.time()
-    listed = room_names()
-    chosen = set(room_batches.parse_selection(args.batches, room_batches.load()))
-    names = [room for batch, room in listed if batch in chosen]
-    if args.write_rooms and len(names) != len(listed):
-        raise SystemExit('--write-rooms needs every batch (--batches all): the file holds the whole room list')
+    doc = room_batches.load()
+    if doc is None:
+        raise SystemExit('The repo has no room list (config/%s)' % room_batches.CONFIG)
+    listed = [(b['batch'], r['room']) for b in doc['batches'] for r in b['rooms']]
+    if args.write_rooms:
+        whole = room_list_masters(doc)
+        given = os.environ.get(MASTERS_ENV, '').strip()
+        masters = selected_masters(given or whole)
+        lacking = [m for m in whole if m.casefold() not in {n.casefold() for n in masters}]
+        if lacking or str(args.batches).strip().casefold() != room_batches.SELECTION_ALL:
+            raise SystemExit('--write-rooms measures the whole room list (the file holds it): --batches all with every '
+                             'master the list names (%s); %s=%s leaves out %s (leave it unset)'
+                             % (', '.join(whole), MASTERS_ENV, given, ', '.join(lacking) or 'no master'))
+        os.environ[MASTERS_ENV] = ','.join(masters)   # the readers below and the measuring workers read this list
+    else:
+        masters = selected_masters()
+    _, chosen, selected, aside = room_selection(args.batches, masters, args.data_files)
+    names = [room for _, room in selected]
+    print('Room census: masters %s; batches %s; %d of the list\'s %d rooms measured, %d exterior-like cells set aside'
+          % (', '.join(masters), room_batches.selection_text(chosen), len(names), len(listed), len(aside)), flush=True)
+    for row in aside:
+        print('Set aside, as the room batches stage does: %s (%s): %s' % (row['cell'], row['master'], row['state']),
+              flush=True)
     batch_of = {room: batch for batch, room in listed}
+    layer_of = {b['batch']: b.get('layer') or GAME_MASTERS[0] for b in doc['batches']}
     rows, deferred, errors, master_sha = measure_rooms(args.data_files, names, resolve_jobs(args.jobs))
     policy = json.loads(Path(policy_path).read_text())
     summary = rooms_summary(rows, deferred, errors, names, policy)
-    per_batch = {}
+    per_batch, per_layer, owners = {}, {}, Counter()
     for row in rows:
         per_batch.setdefault(batch_of[row['room']], Counter())[row['class']] += 1
+        per_layer.setdefault(layer_of[batch_of[row['room']]], Counter())[row['class']] += 1
+        # the reference's own file (the merged numbering, mwad.masters: owner x ADDON_KEY_STRIDE + its number)
+        owners[GAME_MASTERS[min(row['reference'] // ADDON_KEY_STRIDE, len(GAME_MASTERS) - 1)]] += 1
     summary['by_batch'] = {b: dict(per_batch.get(b, {})) for b in sorted(chosen)}
+    summary['by_layer'] = {layer: dict(counts) for layer, counts in sorted(per_layer.items())}
+    summary['by_reference_owner'] = dict(sorted(owners.items()))
+    summary['masters'] = list(masters)
+    summary['set_aside'] = aside
     summary['seconds'] = round(time.time() - started, 1)
     print(json.dumps({k: v for k, v in summary.items() if k not in ('kept_off_floor', 'conflicts')}, indent=1))
     for row in summary['kept_off_floor']:
@@ -667,9 +836,15 @@ def rooms_main(args, policy_path):
                                            'master_sha256': master_sha}, indent=1) + '\n',
                                encoding='utf-8', newline='\n')
     if args.write_rooms:
-        out = args.rooms_policy or ROOMS_POLICY
-        Path(out).write_text(rooms_text(rooms_document(rows, names, master_sha)), encoding='utf-8', newline='\n')
-        print('Room classes written:', out)
+        out = Path(args.rooms_policy or ROOMS_POLICY)
+        game_data = {name: hashlib.sha256(child_ci(Path(args.data_files), name).read_bytes()).hexdigest()
+                     for name in masters}
+        # the base game's file and, beside it, the expansions' (rooms_files; read together by actor_grounding)
+        for path, document in rooms_files(rows, doc, aside, game_data, out,
+                                          out.parent / 'actor_grounding_rooms_layers.json').items():
+            path.write_text(rooms_text(document), encoding='utf-8', newline='\n')
+            print('Room classes written: %s (%d rooms, %d references)'
+                  % (path, len(document['rooms']), sum(len(v) for c in document['rooms'].values() for v in c.values())))
     return 0
 
 

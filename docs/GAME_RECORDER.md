@@ -1,6 +1,22 @@
 # Gameplay recorder
 
-_Last updated with AmiWind v0.0.62-dev1 (2026-11-07)._
+_Last updated with AmiWind v0.0.66-dev3 (15 November 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [How to use it](#how-to-use-it)
+- [What a recording holds](#what-a-recording-holds)
+- [How a playback retraces the session](#how-a-playback-retraces-the-session)
+- [Budget](#budget)
+- [Checked in game](#checked-in-game)
+- [Not yet covered](#not-yet-covered)
+- [Recordings as benchmarks](#recordings-as-benchmarks)
+- [Gameplay journeys](#gameplay-journeys)
+- [Gameplay smoke tests](#gameplay-smoke-tests)
+- [Workflow](#workflow)
+
+<!-- contents end -->
 
 **In development for v0.0.61** (register: GAME-RECORDER-MISSING-61). The first slice below is in v0.0.61-dev3 and
 records and replays a session on the emulator; the hotkey for benchmark segments, the mouse in windows, replay on the Raspberry Pi 4B and the
@@ -115,6 +131,83 @@ than expected ([BUILD-VERSION-HEADER-RACE-61](bugs/BUILD-VERSION-HEADER-RACE-61.
 Planned. A recording is also a frame-rate benchmark: playback measures frame times over the whole replay and per
 marked segment, so the same places are measured on every build. The results are saved with the build and the commit,
 in the same way as the other measurements in [docs/performance](performance/): measured once, compared later.
+
+## Gameplay journeys
+
+A journey is a fixed play route with checks that read the game's own state, never a picture: the inventory counts,
+the journal index, the control switches, health, the actor list (who is alive, fighting or dead) and the script
+globals, each through the console commands the game already has (`player->getitemcount`, `getjournalindex`,
+`player->gethealth`, `chim actors list` and the `aw_mwscript_status call` reads). The standard journey is
+`tests/sessions/journey_opening.txt`. It plays the opening the way a player does: the ship, the pier, the clerk's
+registration, then the census office on foot (the papers taken off the table, the hall guard's door, the back room,
+the courtyard, the captain's door), with the use key on what the view is aimed at and Sellus Gravius' topics chosen
+by name (Morrowind, whose answer names his duties, then duties). Its nine steps:
+
+1. The opening to the papers taken at the census office: fighting is switched off from the ship until the papers;
+   after them the papers are carried and fighting and magic are on.
+2. The hall guard's door and the back room: the door opens once the papers are carried, and the iron dagger on the
+   back-room table (the one the clerk's tutorial box asks for) is taken.
+3. Out to the courtyard and back in through the other door: the dagger is not on the table again (the game's aim
+   report lists its row switched off; the console cannot count an item no script names).
+4. Keley's ring from the courtyard barrel, then Sellus Gravius: the papers are gone, the package and the directions
+   are carried, 87 gold more, the journal of `A1_1_FindSpymaster` is at 1; asking again gives nothing a second time.
+5. The release: the exit door lets the player out with the package, and the opening's state is over (`CharGenState`
+   -1).
+6. An actor killed, an interior entered (the captain's room by the street door), out by its courtyard door, in
+   again and out by the exit door to the street: the actor is still listed dead, and both doors let the player out.
+7. A spell cast (a Restore Health made for the test) and a fight: the health rises, the cast is counted as landed,
+   and the fight takes health.
+8. The game's own quicksave, then a new start of the engine and the load through the Load game window: the package,
+   the gold, the ring, the journal, the dead actor and a script global are as they were saved.
+9. Through a door with E: the next area loads and the game goes on with the loaded inventory.
+
+A second journey, `tests/sessions/journey_tarhiel.txt`, checks the falling mage on the Bitter Coast near Seyda Neen.
+Outside the trigger it checks that the mage is still held on his platform and that nothing has landed. After a walk
+to within 2000 units of his journal it checks from `aw_mwscript_status` that he fell, landed and died.
+
+Each part of a journey (`part A`, `part B`) runs as its own game: part B starts the engine again and loads the save
+part A wrote. The journey file is the session-script language of `tools/engine_smoke.py` with three more words:
+`step` (a numbered stage), `probe NAME COMMAND` (read one value) and `expect` (a check on it, for example
+`expect gold_again == gold_sellus`, `expect dead victim in list_back`, or `expect lacks table_back reference 454283`).
+
+The walk itself never counts key presses blindly. Its steps wait for the game and stop the session at the first wrong
+turn, naming where the player stands:
+
+- `walkto X Y SECS`: walk to a point of the map until the engine says it is there; a message box on the way is
+  answered with Enter;
+- `waitfor KEY SECS TEXT`: wait until the game's state says so (the dialogue window is open, the census map runs);
+- `boxes`: answer the message boxes that are showing;
+- `face X Y Z` and `aimed REF`: turn the view to a point and check that the use key would go to that placed
+  reference (the game's own focus or the crosshair's pick), nudging the aim a little around the point as a player
+  does;
+- `lookat REF`: turn the view to a small placed item that the map does not draw itself (the town's items, not a
+  room's own) with the game's own test aim at the nearest placed items;
+- `topic NAME`: in the open dialogue window, type the topic's name into its search box and choose it;
+- `mark` and `saw SECS TEXT`: a console line printed after the mark.
+
+A part whose session stopped is reported with the step it stopped in and why, and every check it never reached says
+so. `tools/journey_smoke.py`:
+
+- `check JOURNEY`: the file is well formed and every check names values read before it;
+- `scripts JOURNEY OUTDIR`: the session script of each part (`part-A.txt`, `part-B.txt`);
+- `judge JOURNEY RUN-A RUN-B`: reads each session's `logs/steps.log` and `logs/console.log`, prints one line per
+  check, `PASS` or `FAIL` with the value read and the value wanted, and a last line
+  `JOURNEY RESULT PASS 39/39 checks, 9 steps` or `JOURNEY RESULT FAIL ... (steps 6)`;
+- `walkthrough JOURNEY`: the same journey as a checklist to play by hand.
+
+### Playing a journey by hand
+
+`python3 tools/journey_smoke.py walkthrough tests/sessions/journey_opening.txt` prints, step by step, the console lines
+to type and what each answer must show. Play the opening as usual; at each step open the console (the backquote key)
+and type the lines, for example `player->getitemcount gold_001` before and after talking to Sellus Gravius, or
+`chim actors kill` next to an actor, then `chim actors list` after a visit to a room (the actor's line must end in
+`DEAD`). In step 8, quicksave; then quit the game, start it again and load that quicksave from Load game. Any answer
+that differs from the checklist is a finding, with the step it belongs to.
+
+### What it costs
+
+Nothing in the game: the journey uses only existing console commands, and a probe is one console line and its answer.
+A run is two emulator sessions (the opening walk takes most of the first).
 
 ## Gameplay smoke tests
 

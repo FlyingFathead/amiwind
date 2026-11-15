@@ -82,6 +82,8 @@ class FakeRunner:
             return 0, json.dumps(self.summary) + '\n', ''
         if '-ingest-' in name:
             return 0, 'ingested 36 stages\n', ''
+        if '-feed-' in name:
+            return 0, '/vol/ws8/chimport/r/tracker/result-0001.json\n', ''
         if '-perf-guard-' in name:
             if self.guard_err:
                 return self.guard_exit, '', self.guard_err
@@ -99,8 +101,9 @@ class FakeRunner:
         self.ran.append(self.name(consumer))
         return 0, f'aw: source exists\n{self.version}\n', ''
 
-    def logged(self, command, log_path):
+    def logged(self, command, log_path, **stall):
         self.ran.append(self.name(command))
+        self.stall = stall
         Path(log_path).write_text('build log\n', encoding='utf-8')
         return self.build_exit
 
@@ -788,6 +791,73 @@ class ServiceTests(unittest.TestCase):
         self.assertRefused(self.request(), 'developer mode: storage pool not writable',
                            FakeRunner(check=refused, check_exit=1))
 
+    # ---- a refused check says why, and a byte-order mark in the flags (BUILD-FLAGS-MARK-SILENT-REFUSAL-66)
+
+    def test_a_refused_check_carries_the_last_lines_of_its_own_output(self):
+        # the v0.0.66-dev2 start: the builder's command line refused the first option, which carried a byte-order
+        # mark; the refusal said only "build check exited 2"
+        check = '\n'.join(['Run name: 2026_10_10_v0.0.36-dev3_full_abc1234'] + ['check line %02d' % i for i in range(60)]
+                          + ['usage: build.py [-h] [--stage {terrain,aga}] ...',
+                             'build.py: error: unrecognized arguments: ﻿--data-files /owned'])
+        code, result, runner = self.submit(self.request(), FakeRunner(check=check, check_exit=2))
+        self.assertNotEqual(code, 0)
+        self.assertFalse(any('-build-' in name for name in runner.ran))
+        self.assertEqual(aw.validate(result, aw.schema('aw-result-1')), [])
+        refusals = result['refusals']
+        self.assertTrue(refusals[0].startswith('build check: build.py: error: unrecognized arguments'), refusals)
+        tail = [text for text in refusals if text.startswith("the build check's own output, its last 40 lines:")]
+        self.assertEqual(len(tail), 1, refusals)
+        self.assertIn('  build.py: error: unrecognized arguments', tail[0])
+        self.assertIn('  check line 22', tail[0])
+        self.assertNotIn('check line 21', tail[0])                         # 40 lines, the newest
+        self.assertIn(tail[0], result['notes'])
+        self.assertEqual(len(result['steps']['check']['output_tail']), 40)
+        # beside the build logs: the refused check's page and its console log, named by the result
+        page, log = (Path(path) for path in result['logs'])
+        self.assertEqual(page.name, result['run_name'] + '.FAILURE.md')
+        text = page.read_text(encoding='utf-8')
+        for part in ('# Build refused: ' + result['run_name'], '- **Refused at:** the build check, before any stage',
+                     '- **Error:** build check: build.py: error: unrecognized arguments',
+                     "## The last 40 lines of the check's own output", 'check line 59'):
+            self.assertIn(part, text)
+        self.assertEqual(log.name, result['run_name'] + '.console.log')
+        self.assertIn('check line 59', log.read_text(encoding='utf-8'))
+
+    def test_a_check_that_printed_nothing_says_so(self):
+        code, result, _ = self.submit(self.request(), FakeRunner(check='', check_exit=2))
+        self.assertIn('build check exited 2 without "Checks completed"', result['refusals'])
+        self.assertIn('the build check printed nothing', result['refusals'])
+
+    def test_a_leading_byte_order_mark_is_removed_and_any_other_refused(self):
+        self.assertEqual(aw_service.byte_order_marks(['﻿--no-npc-gallery', '--jobs', '4']),
+                         (['--no-npc-gallery', '--jobs', '4'], []))
+        self.assertEqual(aw_service.byte_order_marks(['﻿', '--live-logs']), (['--live-logs'], []))
+        flags, refusals = aw_service.byte_order_marks(['--live-logs', '--extra-town﻿', 'x'])
+        self.assertEqual(len(refusals), 1)
+        self.assertIn("'--extra-town\\ufeff'", refusals[0])                # named, the mark shown
+        self.assertEqual(aw_service.flag_text('﻿--no-npc-gallery --live-logs'), ['--no-npc-gallery', '--live-logs'])
+        # through the build server: removed (and said so) in front, refused by name anywhere else
+        code, result, runner = self.submit(self.request(options=dict(self.request()['options'],
+                                                                     flags=['﻿--no-npc-gallery'])))
+        self.assertEqual(code, 0, result['notes'])
+        self.assertTrue(any('byte-order mark in front of the first flag was removed' in n for n in result['notes']))
+        command = [c for c in result['commands'] if ' --check' in c][0]
+        self.assertNotIn('﻿', command)
+        self.assertIn('--no-npc-gallery', command)
+        self.assertRefused(self.request(options=dict(self.request()['options'], flags=['--no-npc-gallery﻿'])),
+                           'holds a byte-order mark')
+
+    def test_a_request_file_with_a_byte_order_mark_is_read(self):
+        path = self.base / 'request.json'
+        path.write_bytes(b'\xef\xbb\xbf' + json.dumps(self.request()).encode('utf-8'))
+        seen = []
+        args = aw.parser().parse_args(['submit', str(path)])
+        with mock.patch.object(aw_service, 'submit', lambda config, request, **kw: seen.append(request) or (0, None)), \
+                contextlib.redirect_stderr(io.StringIO()) as err:
+            code = aw_service.main(args, self.config)
+        self.assertEqual(code, 0, err.getvalue())
+        self.assertEqual(seen[0]['id'], 'req-1')
+
     def test_declared_inputs_are_hashed_and_recorded(self):
         options = dict(self.request()['options'], flags=['--chim-regions', '@/vol/in/cells.csv'],
                        inputs=[{'path': '/vol/in/cells.csv', 'sha256': SHA, 'role': 'cells'}])
@@ -801,6 +871,43 @@ class ServiceTests(unittest.TestCase):
         self.assertRefused(self.request(commit='fff0000'), 'is not in /src/wt')
         for kind in aw_service.NOT_YET:
             self.assertRefused(self.request(kind=kind, options={}), 'not implemented yet')
+
+    def test_chimport_region_measures_the_cells_with_the_selected_masters(self):
+        # CHIM-SOL-FLORA-PATH-65: the island's CHIMport method for a layer's cells, through the master builder
+        options = {'cells': '-20,23 -21,23', 'masters': ['Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm'],
+                   'cell_jobs': 2}
+        code, result, runner = self.submit(self.request(kind='chimport-region', purpose='solstheim-easy',
+                                                        options=options))
+        self.assertEqual(code, 0, result['notes'])
+        self.assertEqual(aw.validate(result, aw.schema('aw-result-1')), [])
+        run = [c for c in result['commands'] if 'tools/chimport.py run' in c and '--dry-run' not in c][0]
+        for part in ("--cells '-20,23 -21,23'", '--no-world', '--jobs 2',
+                     'AMIWIND_MASTERS=Morrowind.esm,Tribunal.esm,Bloodmoon.esm', '--pull never', '--network none',
+                     'amiwind.purpose='):
+            self.assertIn(part, run)
+        self.assertTrue(any('--dry-run' in c for c in result['commands']))
+        self.assertEqual(result['numbers'], {'cells': 2, 'tracker_results': 1})
+        self.assertIn('/vol/ws8/chimport/r/tracker/result-0001.json', result['artifacts'])
+        names = runner.ran
+        self.assertLess(names.index([n for n in names if '-check-' in n][0]),
+                        names.index([n for n in names if '-build-' in n][0]))
+
+    def test_chimport_masters_copy_matches_the_reader(self):
+        sys.path.insert(0, str(ROOT / 'src'))
+        from mwad import esm
+        self.assertEqual(aw_service.GAME_MASTERS, tuple(esm.GAME_MASTERS))
+        self.assertIn("MASTERS_ENV = 'AMIWIND_MASTERS'",
+                      (ROOT / 'src' / 'mwad' / 'masters.py').read_text(encoding='utf-8'))
+
+    def test_chimport_region_refusals(self):
+        def req(**options):
+            return self.request(kind='chimport-region', purpose='solstheim-easy', options=options)
+        self.assertRefused(req(), 'options.cells is required')
+        self.assertRefused(req(cells='here'), 'options.cells must be')
+        self.assertRefused(req(cells='1,1', masters=['Bloodmoon.esm']), 'options.masters')
+        code, result, runner = self.submit(req(cells='1,1'), FakeRunner(check_exit=1, check='no plan'))
+        self.assertNotEqual(code, 0)
+        self.assertFalse(any('-build-' in n for n in runner.ran))
 
     def test_miniwind_kind_builds_the_preset_through_the_build_path(self):
         request = self.request(kind='miniwind', purpose='miniwind',

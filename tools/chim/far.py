@@ -279,7 +279,8 @@ def write_layers(out, frames, data_dir, margin=DEFAULT_MARGIN, step=DEFAULT_STEP
     54 s on one core at the end of the v0.0.44-dev1 world conversion). JOBS 1: one frame after another, the
     method before v0.0.44."""
     from mwad.paths import child_ci
-    esm = child_ci(Path(data_dir), 'Morrowind.esm')
+    from mwad.masters import master_path
+    esm = master_path(Path(data_dir))
     lands = land_heights(esm, cells_needed(frames, margin, step))
     from build_parallel import stage_ceiling
     if stage_ceiling(jobs) > 1 and len(frames) > 1:

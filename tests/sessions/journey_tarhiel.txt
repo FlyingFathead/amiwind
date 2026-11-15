@@ -1,0 +1,27 @@
+# The falling mage near Seyda Neen (SCRIPTED-EVENT-FALLING-MAGE-61, TOWN-OUTDOOR-SCRIPTS-NOT-ATTACHED-66; docs/GAME_RECORDER.md
+# "Gameplay journeys"). A FULL image, FS-UAE at 32 MB Fast, started with --map seyda. The journal on the Bitter Coast
+# (bk_falljournal_unique, reference 476746) runs fallingScript: within 2000 game units of it the script enables Tarhiel,
+# then removes his platform; he falls, lands and dies (aw_fall.c). Every check reads the game's state from the console
+# (aw_mwscript_status: the held-actor line and the script host's outdoor places), never a picture.
+part A
+wait 8
+cmd developer 1
+cmd dbg all on
+cmd god
+wait 15
+cmd noclip
+step 1 Outside the trigger: Tarhiel still held on his platform, nothing landed
+cmd aw_view -1372 2700 200 90 -10
+wait 4
+probe places_before aw_mwscript_status
+expect has places_before ref 474443 on 476745: held
+expect places_before == 0
+step 2 Inside 2000 units of the journal: the platform goes, he falls and lands
+cmd aw_view -1372 2950 230 90 -50
+wait 25
+probe landed_after aw_mwscript_status
+expect landed_after == 1
+expect has landed_after 1 killed
+cmd aw_view -1372 3150 260 90 30
+wait 3
+shot tarhiel_body

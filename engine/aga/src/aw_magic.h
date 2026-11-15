@@ -102,6 +102,21 @@ int AW_MagicFadeFrame(float age,float length);
 float AW_MagicAreaScale(float feet);
 /* The hit or area sprite's world size at AGE: grows from SIZE to SIZE x GROW over the phase. */
 float AW_MagicGrow(float size,float grow,float age,float length);
+/* CAST-EGG-SYNC-62: the look of a cast that plays with the cast animation is held (its release AW_MAGIC_HELD_RELEASE)
+ * until the spell itself leaves; a held look whose spell never leaves ends after AW_MAGIC_HELD_MAX seconds. */
+#define AW_MAGIC_HELD_RELEASE 1000.0f
+#define AW_MAGIC_HELD_MAX 4.0f
+/* 1 when a look's moment AT seconds falls in this frame, from T0 to T1 seconds of its age (T0 < 0 on its first
+ * frame, which takes everything at 0): every start of a phase uses it, so they share one frame. */
+int AW_MagicDue(float t0,float t1,float at);
+/* 1 on the one frame a look's start phases (the cast sound, the glow, the shell) begin: the first frame at age T1 >= 0
+ * while STARTED (its own once-flag) is 0. Not by T0: two frames' ages rounded around 0 would start them twice. */
+int AW_MagicStartDue(int started,float t1);
+/* the release of a held look, AGE seconds after its start, when its spell leaves now: AGE itself (0 if negative), so
+ * the look's bolt, touch or self hit starts on the frame the spell leaves */
+float AW_MagicCastRelease(float age);
+/* 1 when the cast animation, the cast sound and the shell started on the same host frame (all non-zero) */
+int AW_MagicInSync(int anim_frame,int sound_frame,int shell_frame);
 
 /* ---- engine glue (aw_magic.c) ---- */
 /* The shared effect path (stable API for other effects: rain, smoke ...; independent of aw_magic_fx):

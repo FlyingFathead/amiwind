@@ -117,28 +117,29 @@ def code_keys_on():
     return os.environ.get(CODE_KEYS_VARIABLE, 'on') != 'off'
 
 
-def tool_fingerprint(kind, files=None):
+def tool_fingerprint(kind, files=None, content_keyed=True):
     """Hash of the code and switches of one unit kind: its code key (CODE_ENTRIES, tools/code_key.py) and the data
     files of TOOLS; with FILES, or for a kind without entries, or with AMIWIND_UNIT_CODE_KEYS=off, the whole files
-    (files_fingerprint, the form before)."""
+    (files_fingerprint, the form before). CONTENT_KEYED False: the code key with the content-keyed readers counted as
+    their code (the form before BUILD-UNIT-KEYS-REACH-64; UnitKey.reader_code)."""
     if files or kind not in CODE_ENTRIES or not code_keys_on():
         return files_fingerprint(kind, files)
     switches = tuple(os.environ.get(name, '') for name in SWITCHES)
-    key = ('code', kind, switches)
+    key = ('code', kind, switches, bool(content_keyed))
     if key not in _TOOL_HASH:
         h = hashlib.sha256(('chim-unit-%d|%s|code|' % (UNIT_FORMAT, kind)).encode())
-        h.update(unit_code_key(kind)['digest'].encode() + b'\0')
+        h.update(unit_code_key(kind, content_keyed)['digest'].encode() + b'\0')
         for name, value in zip(SWITCHES, switches):
             h.update(('%s=%s\0' % (name, value)).encode())
         _TOOL_HASH[key] = h.hexdigest()
     return _TOOL_HASH[key]
 
 
-def unit_code_key(kind):
+def unit_code_key(kind, content_keyed=True):
     """tools/code_key.py code_key of a unit kind: its CODE_ENTRIES' reach and the data files of TOOLS."""
     import code_key
     data = [rel for rel in TOOLS.get(kind, ()) if not rel.endswith('.py')]
-    return code_key.code_key(CODE_ENTRIES[kind], data, ROOT)
+    return code_key.code_key(CODE_ENTRIES[kind], data, ROOT, content_keyed=content_keyed)
 
 
 def files_fingerprint(kind, files=None):
@@ -184,15 +185,43 @@ class UnitKey(str):
     key among its parts in that form too), or None. A unit not found under its key is looked up under previous
     (run_units), so the change of key form costs no unit a rebuild."""
     previous = None
+    # the same unit's key with the content-keyed readers counted as their code (the form before
+    # BUILD-UNIT-KEYS-REACH-64), or None when it equals the key: a unit stored under it is found and stored again
+    reader_code = None
 
     def __reduce__(self):
-        return (_unit_key, (str(self), self.previous))
+        return (_unit_key, (str(self), self.previous, self.reader_code))
 
 
-def _unit_key(value, previous):
+def _unit_key(value, previous, reader_code=None):
     key = UnitKey(value)
     key.previous = previous
+    key.reader_code = reader_code
     return key
+
+
+def _holds_reader_code(value):
+    """True when a UnitKey with a reader_code form is among VALUE (nested dicts, lists, tuples)."""
+    if isinstance(value, UnitKey):
+        return value.reader_code is not None
+    if isinstance(value, dict):
+        return any(_holds_reader_code(v) for v in value.values())
+    if isinstance(value, (list, tuple)):
+        return any(_holds_reader_code(v) for v in value)
+    return False
+
+
+def _reader_code_parts(value):
+    """VALUE with every UnitKey among it replaced by its reader_code form (itself when it has none)."""
+    if isinstance(value, UnitKey):
+        return value.reader_code or str(value)
+    if isinstance(value, dict):
+        return {k: _reader_code_parts(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_reader_code_parts(v) for v in value]
+    if isinstance(value, tuple):
+        return tuple(_reader_code_parts(v) for v in value)
+    return value
 
 
 def _previous_parts(value):
@@ -213,10 +242,19 @@ def _previous_parts(value):
 def fingerprint(kind, *parts):
     """Fingerprint of one unit: its kind's tool hash and its own inputs (a UnitKey that also holds its key in the
     'files' form)."""
-    blob = json.dumps([tool_fingerprint(kind), _canonical(list(parts))], sort_keys=True, separators=(',', ':'))
+    tool = tool_fingerprint(kind)
+    canon = _canonical(list(parts))
+    blob = json.dumps([tool, canon], sort_keys=True, separators=(',', ':'))
     import cache_provenance
     cache_provenance.remember_unit(kind, blob)
     key = UnitKey(hashlib.sha256(blob.encode()).hexdigest())
+    # the key the unit had before the content-keyed readers (BUILD-UNIT-KEYS-REACH-64): the readers' code in the code
+    # key, and every UnitKey among the parts in that form too
+    legacy = tool_fingerprint(kind, content_keyed=False)
+    nested = _canonical(_reader_code_parts(list(parts))) if _holds_reader_code(parts) else canon
+    if legacy != tool or nested != canon:
+        value = hashlib.sha256(json.dumps([legacy, nested], sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+        key.reader_code = value if value != str(key) else None
     if kind in CODE_ENTRIES and code_keys_on():
         try:
             old = _canonical(_previous_parts(list(parts)))
@@ -503,6 +541,12 @@ def run_units(kind, items, worker, jobs, cache, soft=None):
     previous_hits = 0
     for i, (fp, task) in enumerate(items):
         hit = cache.get(kind, fp)
+        if hit is None and getattr(fp, 'reader_code', None):
+            # stored before the content-keyed readers (BUILD-UNIT-KEYS-REACH-64): kept under the current key too
+            hit = cache.get(kind, fp.reader_code)
+            if hit is not None and not isinstance(hit, SoftError):
+                cache.put(kind, fp, hit)
+            previous_hits += hit is not None
         if hit is None and getattr(fp, 'previous', None):
             hit = cache.get(kind, fp.previous)
             previous_hits += hit is not None

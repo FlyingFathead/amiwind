@@ -83,9 +83,10 @@ typedef struct {
  * next weather change (here: the end of its period); ModRegion replaces the region's first chances for the rest of the
  * game, and a weather the new chances still allow stays until that change, else the new chances choose. The player in
  * that region moves to it as to any new weather (a transition, queued behind a running one). One row per changed
- * region, AW_WEATHER_SCRIPT_ROWS at most (the game's scripts change one region of Vvardenfell, Red Mountain, at the end
- * of the main quest); saved in the scripts' block (AWWR) and emptied by New Game and every save load. */
-#define AW_WEATHER_SCRIPT_ROWS 8
+ * region, AW_WEATHER_SCRIPT_ROWS at most: a guard above the regions of the three masters (16: nine of Vvardenfell, one
+ * of Mournhold, six of Solstheim; was 8, under them, SAVE-STATE-FIXED-CAPS-66), never reached since a region has one
+ * row; saved in the scripts' block (AWWR) and emptied by New Game and every save load. */
+#define AW_WEATHER_SCRIPT_ROWS 32
 typedef struct {
     int count;
     struct {short region;signed char weather;unsigned char has_chances;int period;unsigned char chances[AW_WEATHERS];}
@@ -134,7 +135,7 @@ int AW_WeatherIsStorm(int current,int next,double progress);
  * mountain (the storm origin above) the sky, fog and land light are pulled toward the Blight weather's own colours,
  * before the Red Mountain region's border is reached, and the clouds speed up toward Blight's. The pull 0..
  * AW_WEATHER_STEPS: 0 from AW_WEATHER_MOUNTAIN_REACH units away (Ald'ruhn, about 40,800, keeps its region weather:
- * the maintainer, TG 2026-10-29 09:01 +0200 / 07:01 UTC, on the shots: "ald'ruhn is good with the region weather"),
+ * the maintainer, 2026-10-29, on the shots: "ald'ruhn is good with the region weather"),
  * rising linearly with the closeness (about 2 outside the Ghostfence at 35,000, 9 inside it at 23,000), full within
  * AW_WEATHER_MOUNTAIN_CRATER (the crater), where the sky also darkens by AW_WEATHER_MOUNTAIN_DARK/256. Our own choice, not the original's (the
  * original switches the sky at the region border); aw_redmountain 0 keeps the region weather alone. Cloud Speed as

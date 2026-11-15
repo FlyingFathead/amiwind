@@ -717,6 +717,7 @@ class Tracker:
             self.thread.join(timeout=5)
         with self.lock:
             self.status = status or 'unknown'
+            self.ended_epoch = time.time()          # the monitor's "Ended at" and the status heartbeat
             for stage in self.stages.values():
                 if stage['status'] == 'running':
                     stage.update(status=self.status if self.status in STOPPED else 'unknown',
@@ -850,8 +851,10 @@ class Tracker:
             build_warnings = self.warnings_reading(now)
         except Exception:  # noqa: BLE001 - progress must never fail a build
             build_warnings = None
-        return {'schema': SCHEMA, 'run': self.run.name, 'status': status,
+        ended = getattr(self, 'ended_epoch', None)
+        data = {'schema': SCHEMA, 'run': self.run.name, 'status': status,
                 'started_at': _now_iso(self.started_epoch), 'updated_at': _now_iso(epoch),
+                'ended_at': _now_iso(ended) if ended else None,
                 'updated_epoch': round(epoch, 3), 'interval': self.interval,
                 'elapsed_seconds': round(now, 1), 'budget': self.budget,
                 'percent': result['percent'], 'eta_seconds': eta, 'eta_basis': result['eta_basis'],
@@ -866,6 +869,25 @@ class Tracker:
                 'no_history': result['no_history'], 'fallback_seconds': result['fallback_seconds'],
                 'history': {'runs': self.history_runs, 'defaults': self.defaults_used},
                 'writes': self.writes + 1}
+        # the builder's own stall alert (tools/build_stall.py), on by default: ok | slow | under-cores | stalled
+        try:
+            import build_stall
+            if getattr(self, 'stall_assessor', None) is None:
+                # the file interface (docs/BUILD_STATUS.md): RUN/status/heartbeat.json and stall.jsonl
+                self.status_writer = build_stall.StatusWriter(
+                    self.run / build_stall.STATUS_DIR,
+                    resume=f'build.py with the same options, --reuse-from {self.run} (its finished stages and units '
+                           f'are kept)')
+                self.stall_assessor = build_stall.Assessor(on_incident=self.status_writer.incident)
+            running = [row for row in rows if row['status'] == 'running']
+            data['seconds_since_progress'] = (min(float((row.get('heartbeat') or {}).get('silent_seconds') or 0.0)
+                                                  for row in running) if running else None)
+            data['stall'] = (build_stall.from_progress(self.stall_assessor, data) if status == 'running'
+                             else {'state': 'ok', 'since': round(now, 1), 'reason': ''})
+            self.status_writer.heartbeat(build_stall.heartbeat_of(data))
+        except Exception:  # noqa: BLE001 - progress must never fail a build
+            pass
+        return data
 
     def memory_reading(self, now, running):
         """The build's memory now and its peak so far (the Toolkit monitor's memory curve, TOOLKIT-MONITOR-NO-MEMORY-55):

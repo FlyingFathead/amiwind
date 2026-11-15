@@ -18,6 +18,7 @@ int AW_TorchFrame(void){return metadata_active?6:2;}
 int AW_TorchEquipped(void){return torch;}
 /* the held light's half in aw_torch.c and the renderer's frame (HELD-LIGHT-OWN-MODEL-61): no held light here */
 int r_framecount;
+int aw_magic_cast_range=2;   /* aw_hands.c: the selected spell's range for the spell stance (PLAYER-CASTING-59) */
 int (*aw_hand_held_light)(float origin[3],float angles[3]);
 const aw_held_light_t *AW_HeldLight(void){return NULL;}
 void Con_Printf(char *fmt,...){warnings++;}

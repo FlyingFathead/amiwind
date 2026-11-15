@@ -1,0 +1,14 @@
+{
+ "note": "Tracked shortfalls the actor placement checks (tools/chim/actor_census_check.py, tools/actor_spec_check.py) accept: area/kind -> missing count, its register entry and why. A gap that closes lowers its number here in the same commit; anything else short of the original stops the build. set_aside: the places a build with the expansions selected sets aside on purpose, by the group the stages record them under; tools/actor_spec_check.py leaves an expansion's references there out of both sides and lists each place with this register entry (a base game reference there still counts as missing).",
+ "allow": {
+  "interior/CREA": {"missing": 3, "register": "INTERIOR-CREATURES-MISSING-41", "why": "the three placed rats of Drarayne Thelas' house and storage (Balmora town stage rooms)"},
+  "interior/LEVC": {"missing": 4, "register": "ROOM-LEVELLED-INTRO-ROOMS-62", "why": "Addamasartus (1) and Tharys Ancestral Tomb (3): the intro scene stage converts them with the older room path"},
+  "interior/NPC_": {"missing": 2, "register": "ROOM-NPC-DEFERRED-VIVEC-66", "why": "one NPC of Vivec, Telvanni Mage and one of Vivec, The Lizard's Head, skipped by the room converter"}
+ },
+ "set_aside": {
+  "exterior_like": {"register": "INTERIOR-NO-AMBI-66", "why": "an interior that behaves like an exterior (Mournhold's districts): the room batch stage leaves it out until the Mournhold exterior work (room-batches.json exterior_like)"},
+  "refused": {"register": "EXPANSION-ROOMS-REFUSED-66", "why": "an expansion room the room batch stage refused, with its error (room-batches.json refused)"},
+  "empty": {"register": "ROOM-EMPTY-CELL-66", "why": "an interior cell the game data leaves empty (no scenery the room converter keeps, at most an actor; no door leads into it): the room batch stage lists it with what it holds and the doors into it, and makes no room of it (room-batches.json empty)"},
+  "unplanned_exterior": {"register": "EXTERIOR-EXPANSION-ONLY-CELLS-66", "why": "an exterior cell only an expansion adds (Solstheim): the exterior plan does not plan it, so no map of the build holds it"}
+ }
+}

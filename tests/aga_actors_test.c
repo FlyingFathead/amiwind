@@ -43,7 +43,20 @@ void (*chim_actors_cmd)(void);
 int (*aw_save_changes_export)(aw_changes_t *changes);
 void (*aw_save_changes_import)(const aw_changes_t *changes);
 aw_state_t aw_state;
-int32_t AW_StateGet (const aw_state_t *state, int kind, const char *id) {return 0;}
+/* the game clock (amiwind:clock:*): stopped (0) unless a check sets test_hours (ACTOR-RESPAWN-CORPSE-RULES-66) */
+static long test_hours;
+int32_t AW_StateGet (const aw_state_t *state, int kind, const char *id)
+{
+	if (!test_hours)
+		return 0;
+	if (!strcmp (id, "amiwind:clock:ready"))
+		return 1;
+	if (!strcmp (id, "amiwind:clock:days"))
+		return (int32_t)(test_hours / 24);
+	if (!strcmp (id, "amiwind:clock:ms"))
+		return (int32_t)((test_hours % 24) * 3600000L);
+	return 0;
+}
 uint32_t AW_SaveChangeKey (uint32_t reference)
 {
 	return reference >= 0x800000U && reference <= 0xffffffU ? AW_CHANGE_BUILDER | (reference - 0x800000U) : reference;
@@ -296,12 +309,37 @@ void AW_ItemsPrep (edict_t *e) {}
 int AW_CompanionEdict (edict_t *e) {return 0;}
 /* combat: the reference DEAD_REF counts as killed (slot state 2) */
 static float dead_ref;
+static int is_laid (float ref);
+static int on_map (float ref);
 int AW_CombatSlotState (edict_t *e, float *health)
 {
 	eval_t *v = GetEdictFieldValue (e, "aw_ref");
-	return dead_ref && v && v->_float == dead_ref ? 2 : 0;
+	return v && ((dead_ref && v->_float == dead_ref) || is_laid (v->_float)) ? 2 : 0;
 }
-int AW_CombatTestEngage (edict_t *e, int dead) {return 0;}
+/* ACTOR-DEAD-RESPAWN-INTERIOR-65: the bodies laid down (AW_CombatTestEngage with DEAD), as the combat slots hold them;
+ * the scene's set-up empties them (AW_CombatSceneSpawn: combat_scene_reset) */
+static float laid[8];
+static int nlaid;
+int AW_CombatTestEngage (edict_t *e, int dead)
+{
+	eval_t *v = GetEdictFieldValue (e, "aw_ref");
+	if (!dead || !v || nlaid == 8)
+		return 0;
+	laid[nlaid++] = v->_float;
+	return 1;
+}
+/* a saved death laid down again (OUTDOOR-DEAD-BODY-GONE-66): the same corpse, counted apart */
+static int nlay_saved;
+int AW_CombatLayCorpse (edict_t *e) {nlay_saved++; return AW_CombatTestEngage (e, 1);}
+static void combat_scene_reset (void) {nlaid = 0;}
+static int is_laid (float ref)
+{
+	int i;
+	for (i=0 ; i<nlaid ; i++)
+		if (laid[i] == ref)
+			return 1;
+	return 0;
+}
 int AW_CombatSetHealth (edict_t *e, float health) {return 0;}
 void AW_CombatForget (edict_t *e) {}
 void AW_CompanionKillMode (void) {}
@@ -638,12 +676,13 @@ static void save_round_trip (void)
 		assert (aw_ledger.actor_count == 3);
 		chim_actors_join (0, 0, "frame", none);
 		chim_actors_tick ();
-		assert (actors_alive () == 2);
+		/* OUTDOOR-DEAD-BODY-GONE-66: the killed one is back as its body, laid down where it fell (the clock stopped:
+		 * its clear delay has not passed) */
+		assert (actors_alive () == 3 && on_map (501) && is_laid (501));
 		found = 0;
 		for (i=2 ; i<sv.num_edicts ; i++)
 			if (!ents[i].free && (v = GetEdictFieldValue (&ents[i], "aw_ref")) != NULL)
 			{
-				assert (v->_float != 501);
 				if (v->_float == 502)
 				{
 					assert (fabs (ents[i].v.origin[1] - 333) < 0.01f);
@@ -761,6 +800,248 @@ static void room_levelled (void)
 	puts ("room levelled passed");
 }
 
+/* ACTOR-DEAD-RESPAWN-INTERIOR-65: the dead stay dead across an area change and a save. A town map's own residents
+ * (701 killed in a fight, 702 killed by a script on its actor record only), a room entered and left, the town map
+ * spawned again: its first window tick runs inside the player's scene set-up (not spawned yet), which then empties the
+ * combat slots; after that both bodies lie dead, 703 lives. The same after a save of the change list and a load. */
+static client_t *test_client;
+extern int (*aw_actor_dead_record)(unsigned reference);
+void AW_ActorsRoomTick (void);
+static int record_dead_stub (unsigned reference) {return reference == 702;}
+static void town_residents (void)
+{
+	reset_level ();
+	strcpy (sv.name, "town");
+	map_actor ("\"classname\" \"aw_npc\" \"model\" \"progs/a_near.mdl\" \"origin\" \"100 0 0\" \"aw_ref\" \"701\" }");
+	map_actor ("\"classname\" \"aw_npc\" \"model\" \"progs/a_mid.mdl\" \"origin\" \"200 0 0\" \"aw_ref\" \"702\" }");
+	map_actor ("\"classname\" \"aw_npc\" \"model\" \"progs/a_far_mover.mdl\" \"origin\" \"300 0 0\" \"aw_ref\" \"703\" }");
+}
+static void scene_arrives (void)
+{
+	int i;
+	test_client->spawned = false;		/* AW_SceneSpawn primes the ring: the first window tick of the map */
+	chim_actors_tick ();
+	combat_scene_reset ();				/* then AW_CombatSceneSpawn empties the slots */
+	test_client->spawned = true;
+	for (i=0 ; i<4 ; i++)
+	{
+		chim_actors_tick ();
+		AW_ActorsRoomTick ();			/* every server frame (sv_phys.c), outdoors too */
+	}
+	assert (is_laid (701) && is_laid (702) && !is_laid (703));
+}
+static void dead_stay_dead (void)
+{
+	static model_t room;
+	static aw_ledger_t loaded;
+	static unsigned char bytes[65536];
+	static aw_changes_t saved;
+	int i, k, pass;
+	nlaid = 0;
+	command ("clear", NULL);
+	town_residents ();
+	for (i=0 ; i<3 ; i++)
+		chim_actors_tick ();
+	dead_ref = 701;							/* killed in a fight */
+	chim_actors_tick ();
+	dead_ref = 0;
+	aw_actor_dead_record = record_dead_stub;	/* 702: SetHealth 0 of a script, no fight */
+	for (pass=0 ; pass<2 ; pass++)
+	{
+		/* a room: its map holds its cell number; its tick clears the town's map memory */
+		reset_level ();
+		strcpy (sv.name, "room");
+		room.entities = "{\n\"classname\" \"worldspawn\"\n\"_aw_cell_int\" \"77\"\n}\n";
+		sv.worldmodel = &room;
+		for (i=0 ; i<4 ; i++)
+			AW_ActorsRoomTick ();
+		sv.worldmodel = NULL;
+		/* back out: the town map spawns its residents again */
+		combat_scene_reset ();
+		town_residents ();
+		scene_arrives ();
+	}
+	/* a save of the change list and a load of it (the map spawned again by the load) */
+	k = AW_LedgerEncode (&aw_ledger, bytes, sizeof(bytes));
+	AW_LedgerClear (&loaded);
+	assert (k > 0 && AW_LedgerDecode (bytes, k, &loaded));
+	saved.count = 0;
+	saved.ledger = &loaded;
+	command ("clear", NULL);
+	assert (aw_ledger.actor_count == 0);
+	aw_save_changes_import (&saved);
+	AW_LedgerMove (&aw_ledger, &loaded);
+	saved.ledger = NULL;
+	combat_scene_reset ();
+	town_residents ();
+	scene_arrives ();
+	for (i=0, k=0 ; i<aw_ledger.actor_count ; i++)
+		k += aw_ledger.actor[i].dead;
+	assert (k == 2);
+	aw_actor_dead_record = NULL;
+	sv.name[0] = 0;
+	puts ("dead stay dead passed");
+}
+
+/* ACTOR-RESPAWN-CORPSE-RULES-66: the original's death rules over time (OpenMW 0.51 CellStore::respawn and clearCorpse,
+ * Morrowind.esm's fCorpseRespawnDelay 72 and fCorpseClearDelay 72). Three town residents die at game hour 10: 701 an
+ * ordinary NPC (no flag), 702 flagged Respawn, 703 Persistent. At hour 81 (71 h later) the town is entered again: all
+ * three lie dead. At hour 83 (73 h): 701's body is cleared away and it stays dead for good (its row DEAD and CLEARED),
+ * 702 is back alive as the game data has it, 703's body still lies there. The same after a save and a load, and still
+ * after another 10,000 hours (701 never comes back). */
+extern uint32_t (*aw_actors_ref_flags)(uint32_t key, aw_ledger_respawn_t *rule);
+extern int (*aw_actors_forget)(uint32_t reference);
+static int forgot_702;
+static uint32_t ref_flags_stub (uint32_t key, aw_ledger_respawn_t *rule)
+{
+	aw_ledger_respawn_t r = AW_LEDGER_RESPAWN_DEFAULT;
+	if (rule)
+		*rule = r;
+	return key == 702 ? AW_REFS_RESPAWN : key == 703 ? AW_REFS_PERSISTENT : 0;
+}
+static int forget_stub (uint32_t reference) {if (reference == 702) forgot_702 = 1; return 1;}
+static int record_dead_three (unsigned reference) {return reference == 701 || reference == 703 || (reference == 702 && !forgot_702);}
+static int on_map (float ref)
+{
+	int i;
+	for (i=2 ; i<sv.num_edicts ; i++)
+	{
+		eval_t *v = GetEdictFieldValue (&ents[i], "aw_ref");
+		if (!ents[i].free && v && v->_float == ref)
+			return 1;
+	}
+	return 0;
+}
+static void town_again (void)
+{
+	static model_t room;
+	int i;
+	reset_level ();
+	strcpy (sv.name, "room");
+	room.entities = "{\n\"classname\" \"worldspawn\"\n\"_aw_cell_int\" \"77\"\n}\n";
+	sv.worldmodel = &room;
+	for (i=0 ; i<4 ; i++)
+		AW_ActorsRoomTick ();
+	sv.worldmodel = NULL;
+	combat_scene_reset ();
+	town_residents ();
+	test_client->spawned = false;
+	chim_actors_tick ();
+	combat_scene_reset ();
+	test_client->spawned = true;
+	for (i=0 ; i<4 ; i++)
+	{
+		chim_actors_tick ();
+		AW_ActorsRoomTick ();
+	}
+}
+static void corpse_rules (void)
+{
+	static aw_ledger_t loaded;
+	static unsigned char bytes[65536];
+	static aw_changes_t saved;
+	{
+	aw_ledger_actor_t *a;
+	int k;
+	nlaid = 0;
+	command ("clear", NULL);
+	aw_actors_ref_flags = ref_flags_stub;
+	aw_actors_forget = forget_stub;
+	aw_actor_dead_record = record_dead_three;
+	test_hours = 10;
+	town_residents ();
+	for (k=0 ; k<3 ; k++)
+		chim_actors_tick ();
+	town_again ();
+	assert ((a = AW_LedgerActor (&aw_ledger, 701, 0)) && a->dead && a->died == 10 && !a->cleared);
+	test_hours = 81;					/* 71 h after: nothing yet */
+	town_again ();
+	assert (is_laid (701) && is_laid (702) && is_laid (703) && !forgot_702);
+	test_hours = 83;					/* 73 h after */
+	town_again ();
+	assert ((a = AW_LedgerActor (&aw_ledger, 701, 0)) && a->dead && a->cleared && !on_map (701) && !is_laid (701));
+	assert (forgot_702 && on_map (702) && !is_laid (702));		/* back alive */
+	assert ((a = AW_LedgerActor (&aw_ledger, 703, 0)) && a->dead && !a->cleared && is_laid (703));
+	/* a save and a load: the cleared body stays gone, the persistent one lies there */
+	k = AW_LedgerEncode (&aw_ledger, bytes, sizeof(bytes));
+	AW_LedgerClear (&loaded);
+	assert (k > 0 && !memcmp (bytes, "AWL7", 4) && AW_LedgerDecode (bytes, k, &loaded));
+	saved.count = 0;
+	saved.ledger = &loaded;
+	command ("clear", NULL);
+	aw_save_changes_import (&saved);
+	AW_LedgerMove (&aw_ledger, &loaded);
+	saved.ledger = NULL;
+	test_hours = 10083;					/* long after: the ordinary NPC never comes back */
+	town_again ();
+	assert ((a = AW_LedgerActor (&aw_ledger, 701, 0)) && a->dead && a->cleared && !on_map (701));
+	assert (on_map (702) && is_laid (703));
+	}
+	aw_actors_ref_flags = NULL;
+	aw_actors_forget = NULL;
+	aw_actor_dead_record = NULL;
+	test_hours = 0;
+	sv.name[0] = 0;
+	puts ("corpse rules passed");
+}
+
+/* OUTDOOR-DEAD-BODY-GONE-66: an outdoor cell's actor (a window join, not a map's own) killed at hour 10 lies there as
+ * its body on every later join until its clear delay (fCorpseClearDelay 72, OpenMW 0.51 cellstore.cpp clearCorpse):
+ * at hour 50 the body is laid down again (as a saved death: no second essential message); "chim actors corpses 0" (the
+ * method before) does not spawn it; at hour 83 the body is cleared away and stays gone. */
+static void join_frame_again (void)
+{
+	static const float none[2] = {0, 0};
+	ents[1].v.origin[0] = 100000;
+	chim_actors_leave (0, 0);
+	ents[1].v.origin[0] = 0;
+	chim_actors_join (0, 0, "frame", none);
+	chim_actors_tick ();
+}
+static void outdoor_corpse (void)
+{
+	static const float none[2] = {0, 0};
+	aw_ledger_actor_t *a;
+	int lays;
+	reset_level ();
+	nlaid = 0;
+	command ("clear", NULL);
+	command ("budget", "0");
+	aw_actors_ref_flags = ref_flags_stub;		/* 501: no Respawn flag, not Persistent */
+	test_hours = 10;
+	chim_actors_join (0, 0, "frame", none);
+	chim_actors_tick ();
+	assert (actors_alive () == 3 && on_map (501));
+	dead_ref = 501;					/* killed in a fight */
+	ents[1].v.origin[0] = 100000;
+	chim_actors_leave (0, 0);
+	ents[1].v.origin[0] = 0;
+	dead_ref = 0;
+	assert ((a = AW_LedgerActor (&aw_ledger, 501, 0)) && a->dead && a->died == 10 && !a->cleared);
+	test_hours = 50;				/* 40 h later: the body lies there, lootable */
+	lays = nlay_saved;
+	chim_actors_join (0, 0, "frame", none);
+	chim_actors_tick ();
+	assert (actors_alive () == 3 && on_map (501) && is_laid (501) && nlay_saved == lays + 1);
+	command ("corpses", "0");			/* the older method: not spawned */
+	join_frame_again ();
+	assert (actors_alive () == 2 && !on_map (501));
+	command ("corpses", "1");
+	join_frame_again ();
+	assert (on_map (501));
+	test_hours = 83;				/* 73 h after: cleared away, dead for good */
+	join_frame_again ();
+	assert (actors_alive () == 2 && !on_map (501));
+	assert ((a = AW_LedgerActor (&aw_ledger, 501, 0)) && a->dead && a->cleared);
+	test_hours = 10083;
+	join_frame_again ();
+	assert (!on_map (501));
+	aw_actors_ref_flags = NULL;
+	test_hours = 0;
+	command ("budget", "1");
+	puts ("outdoor corpse passed");
+}
+
 /* COMBAT-PLAYGROUND-CREATURE-HUMANOID-61: a creature record ID's world model from its table base (any case); a
  * creature with no model in this build, an unknown id and a buffer too small for the path give none */
 static void base_model (void)
@@ -790,6 +1071,9 @@ int main (int argc, char **argv)
 	sv.state = ss_active;
 	svs.clients = &client;
 	client.active = true;
+	client.spawned = true;		/* in play (the change list waits for it, ACTOR-DEAD-RESPAWN-INTERIOR-65) */
+	svs.maxclients = 1;
+	test_client = &client;
 	client.edict = &ents[1];
 	ents[1].v.origin[0] = 0;
 	ents[1].v.origin[1] = 0;
@@ -817,6 +1101,12 @@ int main (int argc, char **argv)
 		room_levelled ();
 	else if (!strcmp (argv[1], "basemodel"))
 		base_model ();
+	else if (!strcmp (argv[1], "deadstay"))
+		dead_stay_dead ();
+	else if (!strcmp (argv[1], "corpse"))
+		corpse_rules ();
+	else if (!strcmp (argv[1], "outdoorcorpse"))
+		outdoor_corpse ();
 	else
 		return 2;
 	return 0;

@@ -50,7 +50,7 @@ class LiveSheetTests(unittest.TestCase):
         rules = code('aw_combat_rules.c')
         self.assertIn('d=a->skills[AW_SK_H2H]*(s->fMinHandToHandMult+(s->fMaxHandToHandMult-s->fMinHandToHandMult)*strength);',
                       rules)
-        self.assertIn('health=v->knocked!=0;', rules)
+        self.assertIn('health=v->knocked!=0 || v->paralyzed;', rules)   # paralysed too since v0.0.66 (row 4)
 
 
 @unittest.skipIf(os.name == 'nt', 'native fixtures run on Linux, including the Docker gate')
@@ -62,7 +62,7 @@ class CombatNativeTests(unittest.TestCase):
     def test_engine_layer_chase_swings_punch_bar_music_death_and_residents(self):
         native.NativeSourceTests().compile_run(
             'aga_combat_test.c', [SRC / n for n in ('aw_combat.c', 'aw_combat_rules.c', 'aw_move_rules.c', 'aw_npcpath.c',
-                                                    'mathlib.c', 'aw_anim.c')],
+                                                    'mathlib.c', 'aw_anim.c', 'aw_cast_rules.c', 'aw_effects.c')],
             defines=('AW_ANIM_HOST_TEST',), cflags=UBSAN)
 
     def test_actual_no_dice_readout_and_negative_sentinels(self):
@@ -97,12 +97,16 @@ class CombatSourceContractTests(unittest.TestCase):
         spawn = text[text.index('void AW_CombatSceneSpawn(void) {'):]
         self.assertIn('settings_tried=0;', spawn[:spawn.index('\n}\n')])
 
-    def test_combat_sounds_on_and_flee_off_by_default(self):
+    def test_combat_sounds_on_and_flee_on_by_default(self):
         # COMBAT-SOUNDS-RULE-OFF-58: the swing sounds as OpenMW plays them are a shipped feature, default on;
-        # the flee rule stays an A/B switch, default off. Order follows the enum in aw_combat.h.
+        # the flee rule is on by default since v0.0.66 (ACTOR-MECHANICS-USE-STATS-66 row 16, the original's rule as
+        # OpenMW plays it; `dbg combat flee off` keeps the earlier one). Order follows the enum in aw_combat.h.
         # ENEMY-HEALTH-BAR-62: the hit contact (the original's hit cone when the crosshair misses) is on by default too.
-        self.assertIn('enum {AW_RULE_FLEE,AW_RULE_SOUNDS,AW_RULE_CONTACT,AW_RULE_COUNT};', (SRC / 'aw_combat.h').read_text())
-        self.assertRegex(code('aw_combat.c'), r'static int rules\[AW_RULE_COUNT\]=\{0,1,1\};')
+        self.assertIn('enum {AW_RULE_FLEE,AW_RULE_SOUNDS,AW_RULE_CONTACT,AW_RULE_SPELLS,AW_RULE_COUNT};', (SRC / 'aw_combat.h').read_text())
+        self.assertRegex(code('aw_combat.c'), r'static int rules\[AW_RULE_COUNT\]=\{1,1,1,1\};')
+        # the werewolf case and a spell's anti-flee rating reach the decision
+        self.assertIn('AW_CombatFleeDecisionVs(&aw_combat_ai,&s->f,d,were,anti)', code('aw_combat.c'))
+        self.assertIn('werewolf %63s %f', code('aw_combat.c'))
 
     def test_best_attack_on_by_default_in_prefs_and_migrated_once(self):
         # BEST-ATTACK-OPTION-62: on by default (an AmiWind default), one saved value shown on Options > Prefs, and a
@@ -112,7 +116,7 @@ class CombatSourceContractTests(unittest.TestCase):
         self.assertIn('ROW_LABELS,ROW_BEST,ROW_AUTOSAVE};', menu)
         self.assertIn('Cvar_SetValue("aw_combat_best_attack",Cvar_VariableValue("aw_combat_best_attack")?0:1)', menu)
         self.assertIn('aw_defaults_migrate=AW_CombatDefaultsMigrate;', code('aw_combat.c'))
-        self.assertIn('#define DEFAULTS_LEVEL 2', (SRC / 'aw_fog.c').read_text(encoding='utf-8'))
+        self.assertIn('#define DEFAULTS_LEVEL 3',(SRC / 'aw_fog.c').read_text(encoding='utf-8'))
 
     def test_settings_names_match_the_builder(self):
         names = re.findall(r'"(\w+)"', code('aw_combat_rules.c').split('names[AW_COMBAT_SETTING_COUNT]={')[1].split('};')[0])
@@ -136,8 +140,12 @@ class CombatSourceContractTests(unittest.TestCase):
         start = combat[combat.index('static void start_block'):combat.index('static void npc_react_miss')]
         self.assertIn('*block_hit', start)
         # one per strike, at the hit key: the player's, an actor's on the player, and since v0.0.63 an actor's on
-        # another actor (COMBAT-ACTOR-VS-ACTOR-62)
-        self.assertEqual(combat.count('AW_CombatSwing('), 3)
+        # another actor (COMBAT-ACTOR-VS-ACTOR-62), and since v0.0.66 a shot's on the player when it lands
+        # (ACTOR-RANGED-COMBAT-MISSING-66, shot_hit)
+        self.assertEqual(combat.count('AW_CombatSwing('), 4)
+        shot = combat[combat.index('static void shot_hit'):combat.index('static void shots_update')]
+        self.assertEqual(shot.count('AW_CombatSwing('), 1)
+        self.assertIn('you.block_off=1', shot)
 
     def test_right_mouse_button_default_bind(self):
         # COMPANION-PICK-RMB-33: the Amiga right button arrives as MOUSE3 (vid_amiga.c maps
@@ -448,8 +456,10 @@ class CombatBuilderTests(unittest.TestCase):
         count = int(re.search(r'#define AW_COMBAT_AI_COUNT (\d+)', code('aw_combat.h')).group(1))
         self.assertEqual(count, len(prepare_combat.AI_SETTINGS))
         # the Flee and sounds rules are plain switches (no console variables: the resident registry budget); Flee
-        # off at start (A/B), sounds on since v0.0.58 (COMBAT-SOUNDS-RULE-OFF-58, test_combat_sounds_on_and_flee_off)
-        self.assertIn('static int rules[AW_RULE_COUNT]={0,1,1};', code('aw_combat.c'))   # + hit contact on (v0.0.63)
+        # on since v0.0.66, sounds on since v0.0.58 (COMBAT-SOUNDS-RULE-OFF-58, test_combat_sounds_on_and_flee_on)
+        self.assertIn('static int rules[AW_RULE_COUNT]={1,1,1,1};', code('aw_combat.c'))   # + spells on (v0.0.66)   # + hit contact on (v0.0.63)
+        # the werewolf flee settings come from the expansions' masters, as their own optional lines
+        self.assertEqual(prepare_combat.WEREWOLF_SETTINGS, ('iWereWolfLevelToAttack', 'iWereWolfFleeMod'))
         self.assertNotIn('aw_combat_flee', code('aw_combat.c'))
 
     def test_sound_generators_follow_openmw(self):

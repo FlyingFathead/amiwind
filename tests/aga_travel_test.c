@@ -20,8 +20,21 @@ static const char table[]=
     "D|broken|0||0|0|0|0|0|0|0|1|0|No map\n"
     "D|broken|0|vf0001|99999|0|0|0|0|0|0|1|0|Out of range\n";
 
+/* the unbuilt-target guard's stand-in for the image: only the maps named in CTX ("|a|b|") are built */
+static int built_in(const char *map,void *ctx){
+    char key[24];if(strlen(map)>16)return 0;sprintf(key,"|%s|",map);return strstr((const char *)ctx,key)!=NULL;
+}
+
 int main(void){
-    aw_travel_t t;int price,hours;float player[3]={-21319.f,-18232.f,1178.f};
+    aw_travel_t t;int price,hours;float player[3]={-21319.f,-18232.f,1178.f};char skipped[16];
+    /* a destination whose map is not in this image (an expansion layer not built) is left out, order kept */
+    CHECK(AW_TravelParse(table,"Darvame Hleran",&t)==2);
+    CHECK(AW_TravelKeepBuilt(&t,built_in,"|vf0147|",skipped,sizeof skipped)==1 && t.count==1);
+    CHECK(!strcmp(t.rows[0].map,"vf0147") && !strcmp(skipped,"balmora-chim"));
+    CHECK(AW_TravelParse(table,"Darvame Hleran",&t)==2);
+    CHECK(AW_TravelKeepBuilt(&t,built_in,"|vf0147|balmora-chim|",skipped,sizeof skipped)==0 && t.count==2 && !skipped[0]);
+    CHECK(AW_TravelKeepBuilt(&t,built_in,"||",NULL,0)==2 && t.count==0);
+    CHECK(AW_TravelKeepBuilt(NULL,built_in,"",skipped,sizeof skipped)==0);
     /* not a table */
     CHECK(AW_TravelParse("AWD3\n",NULL,&t)==-1);
     CHECK(AW_TravelParse(NULL,"x",&t)==-1);

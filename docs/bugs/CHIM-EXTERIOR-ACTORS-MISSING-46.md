@@ -2,12 +2,13 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 4 times; something has to be done
+## PERSISTING: reported 5 times; something has to be done
 
 - Reported with v0.0.48-dev2 at 2026-10-22 (time not recorded): the maintainer: outdoors NPCs only in Seyda Neen, Balmora and Vivec
 - Reported with v0.0.54-dev1 at 2026-10-27 15:58 +0200: Still no outdoor creature in the v0.0.54-dev1 MiniWinds. The maintainer asked, 27 October 2026, about the in-game creatures: none is seen anywhere in game (wild guars, cliff racers, slaughterfish and the rest). The image carries all 5,981 exterior creature references and the frames place 317 direct ones; the 4,853 levelled ones are rolled at run time. Taken by the creatures worker, who is diagnosing the run time cause in game.
 - Reported with v0.0.54-dev1 at 2026-10-27 16:30 +0200: Cause found 27 October 2026 by the creatures worker: the actor table setting was dropped silently at game start (CHIM-ACTOR-TABLE-OFF-IN-GAME-47), so only 317 direct creature rows appeared outdoors and the 5,082 levelled references were never rolled. Fix on branch v0.0.54-creatures, in-game check pending.
 - Reported with v0.0.61 at 2026-11-07 (time not recorded): Seen again on the v0.0.61 release image: no worms, wild guars or mudcrabs are seen in the wilderness. Per the register the region frames place 317 direct creature references of 5,981 and the 4,853 levelled ones are rolled at run time; the builder default for placing region actors is on in build_parser.py but off in build_aga.py (tracker WILD-CREATURES-MISSING-62).
+- Reported with v0.0.65 at 2026-11-13 10:28 +0200: Seen again with v0.0.65: no mudcrabs or slaughterfish around Seyda Neen. Counted on the v0.0.65 release image: the region frames reach all 325 placed creatures and 4,970 levelled points of their cells, but the cells inside a town map (Seyda Neen 16 cells: 3 placed and 97 levelled; Balmora 7 cells: 1 and 15) never join the actor table, and the town frames place NPCs only, so 116 creature points there were never spawned. Fix on branch v0.0.66-outdoorcreatures: a town map joins its own cells' creatures and levelled points from the actor table, and a build check (tools/chim/actor_census_check.py) fails a build whose placed counts per area fall short of the original.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -20,7 +21,7 @@
 | Where | CHIM region frames (1,348); town frames place their residents |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.46, v0.0.48-dev2 (last seen) |
+| Persists in | v0.0.46, v0.0.48-dev2, v0.0.65 (last seen) |
 | Severity | high: the open world is empty of people and creatures; gameplay outdoors is missing |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -37,7 +38,7 @@ _Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
+- [PERSISTING: reported 5 times; something has to be done](#persisting-reported-5-times-something-has-to-be-done)
 - [Status: 22 October 2026](#status-22-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -309,5 +310,6 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 Related bugs in other categories:
 
 - [CREATURE-BAKE-NIF-UNSUPPORTED-47](CREATURE-BAKE-NIF-UNSUPPORTED-47.md): The creature bake refuses 14 of the 39 creature meshes the outdoor world can show, the cliff racer, the rat, the guar and the nix-hound among them
+- [OUTDOOR-CREATURES-REGRESSION-66](OUTDOOR-CREATURES-REGRESSION-66.md): Regression: no outdoor creatures spawn, no mudcrabs or slaughterfish, though earlier versions had them
 
 <!-- END GENERATED CATEGORY -->

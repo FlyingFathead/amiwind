@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "aw_inspect.h"
 #include "r_local.h"
+int (*aw_fx_strip_lines)(void);   /* aw_fxrow.c: the debug HUD's lines for the active effects' icons (HUD-ACTIVE-EFFECTS-ROW-64) */
 
 // only the refresh window will be updated unless these variables are flagged
 int			scr_copytop;
@@ -279,6 +280,9 @@ static void SCR_CalcRefdef (void)
     /* dbg hud inspect: the hint and the pinned snapshot go underneath the stat bars, never over
      * the view (INSPECT-OVER-VIEWPORT-42): four more lines of strip while inspect is on. */
     if (AW_InspectEnabled() && !cl.intermission && !SCR_AWFullView () && sb_lines < AW_INSPECT_SB_LINES) sb_lines = AW_INSPECT_SB_LINES;
+    /* HUD-ACTIVE-EFFECTS-ROW-64: with the debug HUD on, the active effects' icon rows get lines of their own under the
+     * name line (aw_fxrow.c; 0 without the debug HUD, where the icons fit beside the bars) */
+    if (aw_fx_strip_lines && !cl.intermission && !SCR_AWFullView () && sb_lines > 0) sb_lines += aw_fx_strip_lines ();
 
 // these calculations mirror those in R_Init() for r_refdef, but take no
 // account of water warping

@@ -16,11 +16,11 @@ static const char *names[AW_MOVE_SETTING_COUNT]={
     "fFatigueSwimRunBase","fFatigueSwimRunMult","fFatigueSneakBase","fFatigueSneakMult",
     "fFatigueJumpBase","fFatigueJumpMult","fFatigueBase","fFatigueMult",
     "fFallDamageDistanceMin","fFallDistanceBase","fFallDistanceMult","fFallAcroBase","fFallAcroMult",
-    "fWerewolfRunMult"};
+    "fWerewolfRunMult","fMinWalkSpeedCreature","fMaxWalkSpeedCreature"};
 /* Morrowind.esm values of the same settings, in the same order. */
 static const float originals[AW_MOVE_SETTING_COUNT]={
     100,200,.3f,1.75f,1, .5f,.1f,.75f,5, 5,300, 128,4,.5f,1, 1,.5f,.5f,
-    5,2,2.5f,0, 7,0,1.5f,1.5f, 5,0,1.25f,.5f, 400,0,.07f,.25f,.01f, 1.3f};
+    5,2,2.5f,0, 7,0,1.5f,1.5f, 5,0,1.25f,.5f, 400,0,.07f,.25f,.01f, 1.3f, 5,300};
 
 const char *AW_MoveSettingName(int index) {
     return index>=0 && index<AW_MOVE_SETTING_COUNT?names[index]:0;
@@ -92,6 +92,28 @@ float AW_MoveMaxSpeed(const aw_move_settings_t *s,const aw_move_inputs_t *in) {
     if(in->swimming)return AW_MoveSwimSpeed(s,in);
     if(in->running && !in->sneaking)return AW_MoveRunSpeed(s,in);
     return AW_MoveWalkSpeed(s,in);
+}
+/* ACTOR-MECHANICS-USE-STATS-66 (aw_move.h) */
+float AW_MoveActorSpeed(const aw_move_settings_t *s,int creature,int medium,float speed,float athletics,int running) {
+    aw_move_inputs_t in;float base;
+    if(speed<0)speed=0;
+    if(medium==AW_MEDIUM_AIR){
+        float fly=s->fMinFlySpeed+.01f*speed*(s->fMaxFlySpeed-s->fMinFlySpeed);
+        return fly<0?0:fly;
+    }
+    memset(&in,0,sizeof(in));in.speed=speed;in.athletics=athletics;in.scale=1;
+    if(creature)base=s->fMinWalkSpeedCreature+.01f*speed*(s->fMaxWalkSpeedCreature-s->fMinWalkSpeedCreature);
+    else base=running?AW_MoveRunSpeed(s,&in):AW_MoveWalkSpeed(s,&in);
+    /* actor.hpp getSwimSpeedImpl: the speed on foot x (fSwimRunBase + Athletics / 100 x fSwimRunAthleticsMult) */
+    if(medium==AW_MEDIUM_WATER)base*=s->fSwimRunBase+.01f*athletics*s->fSwimRunAthleticsMult;
+    return base;
+}
+/* ACTOR-MECHANICS-USE-STATS-66 row 23 (aw_move.h) */
+float AW_MoveActorLoaded(const aw_move_settings_t *s,int creature,int medium,float base,float load) {
+    float v=base;
+    if(load>1)return 0;
+    if(load>0 && (!creature || medium==AW_MEDIUM_AIR))v*=1-s->fEncumberedMoveEffect*load;
+    return v<0?0:v;
 }
 int AW_MoveStrafing(float forward,float side) {
     return fabs(side)>fabs(forward)*2;

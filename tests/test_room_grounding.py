@@ -138,16 +138,20 @@ class Preflight(unittest.TestCase):
         """The generated file is sound: its format, every class known, no reference twice, no positions."""
         if not G.ROOMS.is_file():
             self.skipTest('no generated room file')
-        doc = json.loads(G.ROOMS.read_text(encoding='utf-8'))
-        self.assertEqual(doc['format'], G.ROOMS_FORMAT)
         seen = set()
-        for room, classes in doc['rooms'].items():
-            self.assertTrue(set(classes) <= set(G.ROOM_STATES), room)
-            for rows in classes.values():
-                for row in rows:
-                    self.assertNotIn(row[0], seen)
-                    seen.add(row[0])
-                    self.assertTrue(all(not isinstance(v, float) for v in row))
+        # the base game's file and the expansions' beside it (ROOM-BATCH-NPC-GROUNDING-48, v0.0.66), read together
+        for path in (G.ROOMS, G.ROOMS.parent / 'actor_grounding_rooms_layers.json'):
+            if not path.is_file():
+                continue
+            doc = json.loads(path.read_text(encoding='utf-8'))
+            self.assertEqual(doc['format'], G.ROOMS_FORMAT)
+            for room, classes in doc['rooms'].items():
+                self.assertTrue(set(classes) <= set(G.ROOM_STATES), room)
+                for rows in classes.values():
+                    for row in rows:
+                        self.assertNotIn(row[0], seen)
+                        seen.add(row[0])
+                        self.assertTrue(all(not isinstance(v, float) for v in row))
         self.assertEqual(len(G.room_classes()), len(seen))
 
 

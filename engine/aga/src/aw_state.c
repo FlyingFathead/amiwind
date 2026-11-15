@@ -124,7 +124,7 @@ void AW_ItemsFree(aw_state_t *s)
 {
     int i;aw_items_t *t=&s->items;
     for(i=0;i<t->blocks;i++)free(t->block[i]);
-    free(t->block);free(t->names);memset(t,0,sizeof(*t));
+    free(t->block);free(t->names);free(t->inst);memset(t,0,sizeof(*t));
 }
 int AW_ItemsClone(aw_items_t *out,const aw_items_t *in)
 {
@@ -135,7 +135,130 @@ int AW_ItemsClone(aw_items_t *out,const aw_items_t *in)
     for(i=0;i<in->count;i++)copy.items.block[i/AW_ITEM_BLOCK][i%AW_ITEM_BLOCK]=in->block[i/AW_ITEM_BLOCK][i%AW_ITEM_BLOCK];
     if(in->count){memcpy(copy.items.names,in->names,in->names_used);copy.items.names_size=in->names_size;}
     copy.items.names_used=in->count?in->names_used:0;copy.items.count=in->count;copy.items.burden=in->burden;
+    /* the instances too (SAVE-ITEM-INSTANCES-ONE-PER-KIND-66) */
+    if(in->inst_count){
+        if(!(copy.items.inst=(aw_item_inst_t *)AW_TryMalloc(sizeof(aw_item_inst_t)*(unsigned long)in->inst_count))){
+            AW_ItemsFree(&copy);return 0;}
+        memcpy(copy.items.inst,in->inst,sizeof(aw_item_inst_t)*(size_t)in->inst_count);
+        copy.items.inst_count=copy.items.inst_capacity=in->inst_count;
+    }
     *out=copy.items;return 1;
+}
+/* ---- the item instances (SAVE-ITEM-INSTANCES-ONE-PER-KIND-66, aw_state.h) ---- */
+int AW_ItemInstCount(const aw_state_t *s){return s?s->items.inst_count:0;}
+const aw_item_inst_t *AW_ItemInst(const aw_state_t *s,int i){return s && i>=0 && i<s->items.inst_count?&s->items.inst[i]:NULL;}
+int AW_ItemInstFind(const aw_state_t *s,uint32_t serial)
+{
+    int i;
+    if(!s || !serial)return -1;
+    for(i=0;i<s->items.inst_count;i++)if(s->items.inst[i].serial==serial)return i;
+    return -1;
+}
+int32_t AW_ItemInstCopies(const aw_state_t *s,int row)
+{
+    int i;int32_t n=0;
+    if(!s)return 0;
+    for(i=0;i<s->items.inst_count;i++)if(s->items.inst[i].row==row)n+=s->items.inst[i].count;
+    return n;
+}
+int32_t AW_ItemPlain(const aw_state_t *s,int row)
+{
+    if(!s || row<0 || row>=s->items.count)return 0;
+    return AW_ITEM_ROW(s,row)->value-AW_ItemInstCopies(s,row);
+}
+int AW_ItemInstNamed(const aw_state_t *s,uint32_t serial)
+{
+    int i;
+    if(!s || !serial)return 0;
+    if(s->magic.selected_serial==serial)return 1;
+    for(i=0;i<AW_INVENTORY_SLOTS;i++)if(s->inventory.equipped_serial[i]==serial)return 1;
+    return 0;
+}
+static int inst_room(aw_items_t *t)
+{
+    int want;aw_item_inst_t *grown;
+    if(t->inst_count<t->inst_capacity)return 1;
+    if(t->inst_count>=AW_ITEM_INSTANCES_MAX)return 0;
+    want=t->inst_capacity?t->inst_capacity*2:8;
+    if(want>AW_ITEM_INSTANCES_MAX)want=AW_ITEM_INSTANCES_MAX;
+    if(!(grown=(aw_item_inst_t *)AW_TryRealloc(t->inst,sizeof(aw_item_inst_t)*(unsigned long)want)))return 0;
+    t->inst=grown;t->inst_capacity=want;return 1;
+}
+int AW_ItemInstAppend(aw_state_t *s,const aw_item_inst_t *x)
+{
+    if(!s || !x || !inst_room(&s->items))return 0;
+    s->items.inst[s->items.inst_count++]=*x;return 1;
+}
+int AW_ItemInstMake(aw_state_t *s,int row,int32_t count,unsigned flags,float condition,float charge,uint32_t serial)
+{
+    aw_item_inst_t x;int fresh=!serial;
+    if(!s || row<0 || row>=s->items.count || count<1 || count>AW_ItemPlain(s,row) || (flags&~(AW_ITEM_CONDITION|AW_ITEM_CHARGE)))return -1;
+    if((flags&AW_ITEM_CONDITION) && !(condition>=0 && condition<=1))return -1;
+    if((flags&AW_ITEM_CHARGE) && !(charge>=0 && charge<=1000000))return -1;
+    if(fresh){if(s->inventory.next_serial>=0xFFFFFFU)return -1;serial=s->inventory.next_serial+1;}
+    else if(AW_ItemInstFind(s,serial)>=0)return -1;
+    memset(&x,0,sizeof(x));x.serial=serial;x.row=row;x.count=count;x.flags=flags;
+    x.condition=(flags&AW_ITEM_CONDITION)?condition:0;x.charge=(flags&AW_ITEM_CHARGE)?charge:0;
+    if(!AW_ItemInstAppend(s,&x))return -1;
+    if(fresh)s->inventory.next_serial=serial;
+    return s->items.inst_count-1;
+}
+void AW_ItemInstRemove(aw_state_t *s,int i)
+{
+    aw_items_t *t;uint32_t serial;int k;
+    if(!s || i<0 || i>=s->items.inst_count)return;
+    t=&s->items;serial=t->inst[i].serial;
+    memmove(&t->inst[i],&t->inst[i+1],sizeof(aw_item_inst_t)*(size_t)(t->inst_count-i-1));
+    if(!--t->inst_count){free(t->inst);t->inst=NULL;t->inst_capacity=0;}
+    for(k=0;k<AW_INVENTORY_SLOTS;k++)if(s->inventory.equipped_serial[k]==serial)s->inventory.equipped_serial[k]=0;
+    if(s->magic.selected_serial==serial)s->magic.selected_serial=0;
+}
+/* an instance whose condition and charge are the plain copies' (its row's marks: none = full), and that nothing names,
+ * is a plain copy again */
+static int inst_merge(aw_state_t *s,int i)
+{
+    const aw_item_inst_t *x=&s->items.inst[i];const aw_item_row_t *r=AW_ITEM_ROW(s,x->row);
+    float xc=(x->flags&AW_ITEM_CONDITION)?x->condition:1,rc=(AW_ITEM_FLAGS(r)&AW_ITEM_CONDITION)?r->condition:1;
+    float xq=(x->flags&AW_ITEM_CHARGE)?x->charge:-1,rq=(AW_ITEM_FLAGS(r)&AW_ITEM_CHARGE)?r->charge:-1;
+    if(xc!=rc || xq!=rq || AW_ItemInstNamed(s,x->serial))return 1;
+    AW_ItemInstRemove(s,i);return 2;
+}
+int AW_ItemInstSet(aw_state_t *s,int i,unsigned flag,float value)
+{
+    aw_item_inst_t *x;
+    if(!s || i<0 || i>=s->items.inst_count || (flag!=AW_ITEM_CONDITION && flag!=AW_ITEM_CHARGE))return 0;
+    if(flag==AW_ITEM_CONDITION && !(value>=0 && value<=1))return 0;
+    if(flag==AW_ITEM_CHARGE && !(value>=0 && value<=1000000))return 0;
+    x=&s->items.inst[i];x->flags|=flag;
+    if(flag==AW_ITEM_CONDITION)x->condition=value;else x->charge=value;
+    return inst_merge(s,i);
+}
+/* every instance that is a plain copy again goes (after a slot or the selection let one go) */
+static void inst_sweep(aw_state_t *s)
+{
+    int i;
+    for(i=s->items.inst_count-1;i>=0;i--)inst_merge(s,i);
+}
+void AW_ItemInstSweep(aw_state_t *s){if(s)inst_sweep(s);}
+int AW_ItemInstUnmark(aw_state_t *s,int i,unsigned flag)
+{
+    aw_item_inst_t *x;
+    if(!s || i<0 || i>=s->items.inst_count)return 0;
+    x=&s->items.inst[i];x->flags&=~flag;
+    if(flag&AW_ITEM_CONDITION)x->condition=0;
+    if(flag&AW_ITEM_CHARGE)x->charge=0;
+    return inst_merge(s,i);
+}
+/* ROW has NOW copies: the instances past that go, the last first (the plain copies went first) */
+static void inst_trim(aw_state_t *s,int row,int32_t now)
+{
+    int i;
+    for(i=s->items.inst_count-1;i>=0 && AW_ItemInstCopies(s,row)>now;i--){
+        aw_item_inst_t *x=&s->items.inst[i];int32_t over;
+        if(x->row!=row)continue;
+        over=AW_ItemInstCopies(s,row)-now;
+        if(x->count>over)x->count-=over;else AW_ItemInstRemove(s,i);
+    }
 }
 void AW_ItemMark(aw_state_t *s,int i,unsigned flag,float value)
 {
@@ -305,8 +428,9 @@ int AW_ItemAdd(aw_state_t *state,const char *id,int32_t count)
     if(count<0){
         int i,index=AW_ItemIndex(state,id),used=0;
         for(i=0;i<AW_INVENTORY_SLOTS;i++)if(!strcmp(state->inventory.equipped[i],id)){
-            if(++used>old+count)memset(state->inventory.equipped[i],0,64);
+            if(++used>old+count){memset(state->inventory.equipped[i],0,64);state->inventory.equipped_serial[i]=0;}
         }
+        if(index>=0){inst_trim(state,index,old+count);inst_sweep(state);}   /* the instances never outnumber the copies */
         if(old+count==0 && index>=0){
             aw_item_row_t *r=AW_ITEM_ROW(state,index);
             AW_ITEM_CLEAR_FLAG(r,AW_ITEM_CONDITION|AW_ITEM_CHARGE);r->condition=r->charge=0;

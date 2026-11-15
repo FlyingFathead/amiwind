@@ -75,7 +75,8 @@ class TableTests(unittest.TestCase):
         data, rep = T.table(rig)
         groups = {g['name']: g for g in T.kit(rig, data, rep['times'])}
         t = skeletal_actor.read_table(data)
-        self.assertEqual([g for g in T.KIT], list(groups))
+        # an optional group (the cast) only when the creature has it: none here, so no line
+        self.assertEqual([g for g in T.KIT if g not in T.OPTIONAL], list(groups))
         idle = t['groups']['idle']
         self.assertEqual((groups['idle']['base'], groups['idle']['count']), (idle[0], idle[1] - idle[0]))
         death = t['groups']['death1']
@@ -86,6 +87,48 @@ class TableTests(unittest.TestCase):
                              ('idle', idle[0], 1))
         self.assertAlmostEqual(groups['idle']['step'], 1 / skeletal_actor.TABLE_RATE, places=4)
         self.assertTrue(T.layout(list(groups.values())).startswith('idle:%d:%d:' % (idle[0], idle[1] - idle[0])))
+
+    def test_own_spellcast_is_the_cast_group(self):
+        """DAGOTH-UR-NO-ANIMATIONS-65: a creature whose own file has a spellcast group gets a 'cast' layout line on
+        its frames (Dagoth Ur's spellcast), the target cast first."""
+        import creature_tables as T
+        import skeletal_actor
+        from test_creature_pose import kf
+        files = dict(self.files)
+        files['meshes/r/xbeast.kf'] = kf(
+            [(0.0, 'idle: start'), (1.0, 'idle: stop'), (1.0, 'spellcast: target start'),
+             (2.0, 'spellcast: target stop'), (2.0, 'death1: start'), (3.0, 'death1: stop')],
+            [(b'Bone', (1, [(0.0, (0, 0, 0)), (3.0, (8, 0, 0))]))])
+        saved, self.files = self.files, files
+        try:
+            rig = self.rig()
+            data, rep = T.table(rig)
+            groups = {g['name']: g for g in T.kit(rig, data, rep['times'])}
+        finally:
+            self.files = saved
+        cast = skeletal_actor.read_table(data)['groups']['spellcast']
+        self.assertEqual((groups['cast']['source'], groups['cast']['base'], groups['cast']['count']),
+                         ('table', cast[0], cast[1] - cast[0]))
+        self.assertIn('cast:%d:%d:' % (cast[0], cast[1] - cast[0]), T.layout(list(groups.values())))
+
+    def test_skin_cut_to_the_rows_used(self):
+        """DAGOTH-UR-NO-ANIMATIONS-65: a bake skin of 512 rows (face_limit 1,024) whose tiles end within 480 rows is
+        cut to them, so a model over 512 faces is not refused as 'Unsupported alias skin'; one whose tiles reach
+        past 480 rows, or a skin already within 480, is returned unchanged."""
+        import numpy as np
+        from PIL import Image
+        from skeletal_actor import fit_skin_rows
+        SKIN_ROWS = fit_skin_rows.__defaults__[0]        # the renderer's limit, a default (no module constant)
+        skin = Image.new('P', (512, 512))
+        cut = fit_skin_rows(skin, np.array([[0, 0], [15, 464], [0, 479]]))
+        self.assertEqual(cut.size, (512, 480))
+        self.assertEqual(fit_skin_rows(skin, np.array([[0, 300]])).size, (512, 304))
+        self.assertIs(fit_skin_rows(skin, np.array([[0, 495]])), skin)
+        small = Image.new('P', (512, 256))
+        self.assertIs(fit_skin_rows(small, np.array([[0, 10]])), small)
+        self.assertEqual(SKIN_ROWS, 480)
+        import creature_tables as T
+        self.assertEqual(T.DAGOTH_SEAM_TOTAL, 32 * SKIN_ROWS // 16)     # 32 tiles a row, 16-pixel tiles: 960 faces
 
     def test_two_legged_walk_from_the_shared_file(self):
         import creature_tables as T
@@ -219,16 +262,42 @@ class RecordTests(unittest.TestCase):
 
 
 class LibraryTests(unittest.TestCase):
-    def test_skeletal_beside_kf_default_unchanged(self):
+    def test_skeletal_default_kf_kept(self):
+        # NPC-ATTACK-ANIMS-MISSING-65: 'skeletal' is the default (every group of the creature's files); 'kf' stays
         import creature_library as L
-        self.assertEqual(L.DEFAULT_METHOD, 'kf')
+        self.assertEqual(L.DEFAULT_METHOD, 'skeletal')
         self.assertEqual(L.METHODS, ('kf', 'resident', 'skeletal'))
         with self.assertRaises(ValueError):
             L.bake('.', b'', {}, '.', method='baked')
 
     def test_actor_library_option(self):
         text = (ROOT / 'tools/actor_library.py').read_text(encoding='utf-8')
-        self.assertIn("'--creature-method', choices=('kf', 'skeletal'), default='kf'", text)
+        self.assertIn("'--creature-method', choices=('kf', 'skeletal'), default='skeletal'", text)
+
+    def test_refused_skeletal_mesh_falls_back_to_kf(self):
+        import creature_library as L
+        import actor_units
+        calls = []
+
+        def fake_bake(tasks, jobs, cache, inputs):
+            out = []
+            for t in tasks:
+                calls.append(t[0])
+                key = L.variant_key(t[3]['mesh'])
+                if t[0] == 'skeletal':
+                    out.append((key, None, 0.0, 'ValueError: Shape Tri Rock_1 0 hangs on a bone with no kept ancestor'))
+                else:
+                    out.append((key, {'files': [], 'record': {'model': 'progs/c_x.mdl', 'roles': []}}, 0.0, None))
+            return out, 0
+        saved = (actor_units.bake_creatures, actor_units.open_cache)
+        actor_units.bake_creatures, actor_units.open_cache = fake_bake, lambda *a, **k: None
+        try:
+            done, failed = L.bake('.', b'', {'r/atronach_storm.nif': ['atronach_storm']}, '.', method='skeletal')
+        finally:
+            actor_units.bake_creatures, actor_units.open_cache = saved
+        self.assertEqual(calls, ['skeletal', 'kf'])
+        self.assertEqual(failed, {})
+        self.assertIn('hangs on a bone', done['r/atronach_storm.nif'][L.KF_FALLBACK])
 
 
 class SoundEventTests(unittest.TestCase):
@@ -250,6 +319,41 @@ class SoundEventTests(unittest.TestCase):
                   {'name': 'attack', 'base': 8, 'count': 6, 'step': .1, 'hit': .5, 'events': [(1, 'roar')]}]
         self.assertEqual(creature_pose.layout(groups),
                          'idle:0:8:0.1000 attack:8:6:0.1000:0.500 @idle:2:moan @attack:1:roar')
+
+
+class EffectShapesSkeletal(unittest.TestCase):
+    """HEART-OF-LORKHAN-LOOK-62: the skeletal model leaves out the shapes the baked resident leaves out."""
+
+    def test_effect_shapes_are_dropped_before_the_skeletal_bake(self):
+        from unittest import mock
+        import creature_tables as T
+        import halloween_cast
+        import skeletal_actor
+        shapes = [{'name': 'Heart'}, {'name': 'Shield'}, {'name': 'Rays'}]
+        sources = [{'name': 'Heart'}, {'name': 'Shield'}, {'name': 'Rays'}]
+        got = {}
+
+        def bake(shapes_in, materials, textures, palette, sources_in, *args, **kwargs):
+            got['shapes'] = [s['name'] for s in shapes_in]
+            got['sources'] = [s['name'] for s in sources_in]
+            return b'model', {'faces': 1}
+        rig = type('R', (), {'raw': b'', 'model': 'r/heart.nif', 'mesh': 'r/heart_akulakhan.nif'})()
+        with mock.patch.object(halloween_cast, 'creature_shapes',
+                               return_value=(shapes, ['m'] * 3, {}, sources, {}, None)), \
+                mock.patch.object(skeletal_actor, 'skeletal_from_shapes', side_effect=bake):
+            raw, _ = T._model_without(None, rig, None, [], None, b'', b'', {'bone_names': []}, (480,),
+                                      [{'shape': 'Shield'}, {'shape': 'Rays'}])
+        self.assertEqual((raw, got['shapes'], got['sources']), (b'model', ['Heart'], ['Heart']))
+
+    def test_nothing_left_refused(self):
+        from unittest import mock
+        import creature_tables as T
+        import halloween_cast
+        rig = type('R', (), {'raw': b'', 'model': 'r/x.nif', 'mesh': 'r/x.nif'})()
+        with mock.patch.object(halloween_cast, 'creature_shapes',
+                               return_value=([{'name': 'A'}], ['m'], {}, [{'name': 'A'}], {}, None)):
+            with self.assertRaises(ValueError):
+                T._model_without(None, rig, None, [], None, b'', b'', {'bone_names': []}, (480,), [{'shape': 'A'}])
 
 
 if __name__ == '__main__':

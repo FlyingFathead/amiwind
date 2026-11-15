@@ -397,7 +397,9 @@ class PageTests(unittest.TestCase):
         self.assertIn('<input type="checkbox" id="followlatest" checked autocomplete="off">', html)
         self.assertIn('<input type="checkbox" id="follow" checked autocomplete="off">', html)
         self.assertIn("const FOLLOW_KEY = 'amiwind-monitor-follow-1';", html)
-        self.assertIn('return {latest: true, stage: true};', html)          # nothing saved: both on
+        # follow latest starts on at every load (a saved "latest" is ignored; this visit only via sessionStorage)
+        self.assertIn('let stage = true, latest = true;', html)
+        self.assertNotIn("localStorage.setItem(FOLLOW_KEY, JSON.stringify({latest", html)
         self.assertIn("$('followlatest').checked = saved.latest; $('follow').checked = saved.stage;", html)
         # every way a choice changes is saved (the fifth: a run opened from Recent builds, TOOLKIT-RESULTS-NO-OPEN-55)
         self.assertEqual(html.count('saveFollowPrefs();'), 5)
@@ -465,6 +467,32 @@ class PageTests(unittest.TestCase):
         self.assertEqual((page['overallDone']['width'], page['overallDone']['cls']), ('75%', 'passed'))
         self.assertEqual(page['overallDone']['text'], '75 % done · passed')
         self.assertTrue(page['overallNone'])
+        # a failed run: the failed stage and its error line under the progress line, the link to its FAILURE.md
+        # (BUILD-FAILURE-NO-DETAILS-66); hidden for a running or passed run
+        self.assertTrue(page['failureRunning'])
+        self.assertFalse(page['failure']['hidden'])
+        self.assertEqual(page['failure']['what'], 'Failed: chim (stage 27, exit 1): ValueError: x is not in the subpath of /owned')
+        self.assertEqual(page['failure']['href'], '/monitor/run/%s/FAILURE.md' % RUN)
+        self.assertEqual(page['failureBare'], 'Failed: rooms')
+        self.assertTrue(page['failurePassed'])
+        # a finished run says when it ran; "failed" counts the failed stages of its own stage list
+        self.assertIn('Started at', page['finished'])
+        self.assertIn('Ended at', page['finished'])
+        self.assertIn('1 failed, 1 stopped of 3', page['finished'])
+        # no build running: the machine leads; a running build stays first
+        self.assertEqual(page['idleLayout']['now'], 'Running now: 1 gate, 2 jobs, 2.2 of 24 cores')
+        self.assertEqual(page['idleLayout']['order'], '-1')
+        self.assertTrue(page['idleLayout']['title'].startswith('Last build: failed, ended at '))
+        self.assertEqual(page['busyLayout']['order'], '')
+        self.assertEqual(page['busyLayout']['title'], 'Progress')
+        self.assertEqual(page['busyLayout']['now'], 'Running now: 1 gate, 2 jobs, 2.2 of 24 cores')
+        # the stall banner is on by default and names the run, the state and the reason
+        self.assertFalse(page['banner']['hidden'])
+        self.assertIn('r1: stalled - chim: no progress', page['banner']['text'])
+        self.assertNotIn('r2', page['banner']['text'])
+        self.assertTrue(page['bannerOff'])
+        # "follow latest" starts on at every load, whatever an earlier visit saved
+        self.assertTrue(page['followLatestAtLoad'])
         # a build whose stages passed and whose perf guard failed is its own amber state, sections on hover
         self.assertEqual((page['perfCell']['text'], page['perfCell']['cls']), ('passed, perf guard failed', 'perfonly'))
         self.assertIn('fog 12 % | draw 9 %', page['perfCell']['title'])

@@ -54,6 +54,16 @@ static aw_stats_sheet_t standing_cache;
 #define ROW_REPUTATION (-5)
 #define ROW_BOUNTY (-6)
 #define ROW_FACTION(k,line) (100+(k)*8+(line))
+/* HUD-ACTIVE-EFFECTS-ROW-64 (aw_fxrow.c sets them; NULL in fixtures without it): the active effects' icons under the
+ * birthsign, and V: the list of every active effect, drawn over this window until V or Esc */
+void (*aw_stats_effects_row)(int x,int y,int w);
+int (*aw_stats_effects_open)(void);
+void (*aw_stats_effects_draw)(void);
+int (*aw_stats_effects_key)(int key,int mouse_x,int mouse_y);   /* 0: the list closed */
+void (*aw_stats_effects_close)(void);
+extern int aw_worldui_panel_holds_escape;
+static int effects_shown;
+#define EFFECTS_Y 162
 
 /* the name cut to the field (no strncpy: -O2 warns on the cut, -Wstringop-truncation) */
 static void copy(char *out,int size,const char *in){int n=0;if(in)while(n<size-1 && in[n]){out[n]=in[n];n++;}out[n]=0;}
@@ -171,9 +181,10 @@ void AW_StatsDrawSheet(const aw_stats_sheet_t *s,int top){
     }
     AW_UIFill(8,150,122,1,muted);
     pair(8,154,130,"Birthsign",s->birth[0]?s->birth:"-",gold,gold);
+    if(aw_stats_effects_row)aw_stats_effects_row(8,EFFECTS_Y,122);
     AW_UIFill(8,CLOSE_Y-2,122,1,muted);
     small(CLOSE_X,CLOSE_Y,CLOSE_W,"P/Esc close",gold);
-    small(8,CLOSE_Y+8,122,"Up/Down skills",gold);
+    small(8,CLOSE_Y+8,122,aw_stats_effects_open?"Up/Down skills, V effects":"Up/Down skills",gold);
     n=AW_StatsRows(s,rows);
     if(top>n-LIST_VISIBLE)top=n-LIST_VISIBLE;
     if(top<0)top=0;
@@ -202,14 +213,33 @@ void AW_StatsDrawSheet(const aw_stats_sheet_t *s,int top){
     if(n>LIST_VISIBLE)AW_UIScrollbar(SCROLL_X,LIST_Y,SCROLL_H,n,LIST_VISIBLE,top);
 }
 static int stats_rows(void){aw_stats_sheet_t s;int rows[AW_STATS_ROWS];AW_StatsSheet(&s);return AW_StatsRows(&s,rows);}
-static void stats_draw(void){aw_stats_sheet_t s;AW_StatsSheet(&s);AW_StatsDrawSheet(&s,skill_top);}
+static void stats_draw(void){
+    aw_stats_sheet_t s;
+    if(effects_shown && aw_stats_effects_draw){aw_stats_effects_draw();return;}
+    AW_StatsSheet(&s);AW_StatsDrawSheet(&s,skill_top);
+}
+static void effects_hide(void){
+    if(effects_shown && aw_stats_effects_close)aw_stats_effects_close();
+    effects_shown=0;aw_worldui_panel_holds_escape=0;
+}
+static void stats_closed(void){effects_hide();}
 /* The key bound to this window's command closes it too (I/J/M close theirs the same way). */
 static int own_key(int key,const char *command,int fallback){
     return key==fallback || key==fallback-32 || (key>=0 && key<256 && keybindings[key] && !Q_strcasecmp(keybindings[key],(char *)command));
 }
 static int stats_key(int key,int mouse_x,int mouse_y){
-    int n=stats_rows(),top;
+    int n,top;
     if(own_key(key,"aw_stats",'p'))return 0;
+    /* the effects list over the window: its keys are its own; V or Esc go back to the sheet */
+    if(effects_shown){
+        if(!aw_stats_effects_key || !aw_stats_effects_key(key,mouse_x,mouse_y)){effects_shown=0;aw_worldui_panel_holds_escape=0;}
+        return 1;
+    }
+    if((key=='v' || key=='V') && aw_stats_effects_open){
+        if(aw_stats_effects_open()){effects_shown=1;aw_worldui_panel_holds_escape=1;}
+        return 1;
+    }
+    n=stats_rows();
     if(key==K_UPARROW || key=='w' || key==K_MWHEELUP)skill_top--;
     if(key==K_DOWNARROW || key=='s' || key==K_MWHEELDOWN)skill_top++;
     if(key==K_PGUP)skill_top-=LIST_VISIBLE;
@@ -229,8 +259,9 @@ void AW_StatsOpen(void){
     if(!aw_character.valid){Con_Printf("Stats: no character yet.\n");return;}
     memset(&standing_cache,0,sizeof(standing_cache));
     if(aw_stats_standing && aw_stats_standing(&standing_cache))standing_cache.standing=1;
+    effects_shown=0;
     /* MAP-MENU-BLOCKED-COURTYARD-65: open in the opening once a script's EnableStatsMenu switched it on */
-    AW_WorldUIOpenMenuPanel(stats_draw,stats_key,NULL,AW_MENU_STATS);
+    AW_WorldUIOpenMenuPanel(stats_draw,stats_key,stats_closed,AW_MENU_STATS);
 }
 
 /* character/spells.aws (tools/prepare_character.py): "AWS1", u16 count, then per spell

@@ -56,6 +56,11 @@ def mesh_profile(model, refs, mode='mesh'):
 def effective_representation(ref):
     if ref.get('requires_interaction'):
         return 'mesh_pending_interaction'
+    if ref['renderer_policy'] == 'sprite' and ref.get('number') is not None:
+        # a tree a bracket fungus grows on keeps its trunk: drawn as a mesh (tools/flora_support.py)
+        from flora_support import mesh_hosts
+        if int(ref['number']) in mesh_hosts():
+            return 'mesh'
     return ref['renderer_policy']
 
 
@@ -731,7 +736,14 @@ def prepare(terrain, base, flora, palette, out, jobs=None, only=None, aggregate_
     checklist = directory.get('exterior_checklist')
     if checklist:
         in_chim |= {identity(r['source_key']) for r in receipt['placements'] if reference_in_chim_town(r, checklist)}
-    if not only and (covered - expected or (expected - covered) - in_chim):
+    # the placements of the exterior cells only an expansion adds (Solstheim): listed by the survey, not planned, in
+    # no map of this stage (exterior_plan.unplanned, EXTERIOR-EXPANSION-ONLY-CELLS-66)
+    from exterior_plan import unplanned
+    outside = {identity(r['source_key']) for r in unplanned(receipt['placements'], checklist)}
+    if outside:
+        print('World flora: %d placements in exterior cells only an expansion adds are not planned (the survey lists '
+              'those cells; no map of this build holds them)' % len(outside), flush=True)
+    if not only and (covered - expected or (expected - covered) - in_chim - outside):
         raise ValueError('Full-world flora overlay omitted/invented source references')
     for asset in receipt['assets']:
         source = flora / asset['sprite_asset_name'];target = out / asset['sprite_asset_name']
@@ -749,6 +761,8 @@ def prepare(terrain, base, flora, palette, out, jobs=None, only=None, aggregate_
               'region_copy_instances': sum(len(r['source_references']) for r in results),
               'regions': results,
               **({'chim_region_cells': sorted([list(c) for c in chim_cells])} if chim_cells else {}),
+              # absent for the base game alone, so its receipt bytes do not move
+              **({'unplanned_source_references': len(outside)} if outside else {}),
               'scope': 'Original flora placement overlay; retained LAND/rocks/mushrooms verified. Town consumers and stateful interactions have separate acceptance.'}
     # The wall time goes to the log only: an output another stage reads carries no timing, so a rerun with the
     # same inputs writes the same bytes (BUILD-FLORA-RECEIPT-SECONDS-36).

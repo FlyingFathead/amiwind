@@ -1,10 +1,14 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.65 (12 November 2026)._
+_Last updated with AmiWind v0.0.66-dev4 (15 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.66-dev4: fourth snapshot of v0.0.66, 15 November 2026](#v0066-dev4-fourth-snapshot-of-v0066-15-november-2026)
+- [v0.0.66-dev3: third snapshot of v0.0.66, 14 November 2026](#v0066-dev3-third-snapshot-of-v0066-14-november-2026)
+- [v0.0.66-dev2: second snapshot of v0.0.66, 13 November 2026](#v0066-dev2-second-snapshot-of-v0066-13-november-2026)
+- [v0.0.66-dev1: first snapshot of v0.0.66, 12 November 2026](#v0066-dev1-first-snapshot-of-v0066-12-november-2026)
 - [v0.0.65: Reintroducing Vvardenfell, 12 November 2026](#v0065-reintroducing-vvardenfell-12-november-2026)
 - [v0.0.65-rc4: Reintroducing Vvardenfell, release candidate, 12 November 2026](#v0065-rc4-reintroducing-vvardenfell-release-candidate-12-november-2026)
 - [v0.0.65-rc3: Reintroducing Vvardenfell, release candidate, 12 November 2026](#v0065-rc3-reintroducing-vvardenfell-release-candidate-12-november-2026)
@@ -114,9 +118,9 @@ _Last updated with AmiWind v0.0.65 (12 November 2026)._
 - [v0.0.30-dev4: The Temple](#v0030-dev4-the-temple)
 - [v0.0.30-dev3: The Temple](#v0030-dev3-the-temple)
 - [v0.0.29-rc2: Let There Be (Just a Bit More) Light](#v0029-rc2-let-there-be-just-a-bit-more-light)
-- [0.0.28 â€” Trees and Grass, Day and Night â€” in preparation, 4 October 2026](#0028-â-trees-and-grass-day-and-night-â-in-preparation-4-october-2026)
-- [0.0.28-rc1 â€” Trees and Grass, Day and Night â€” candidate, 4 October 2026](#0028-rc1-â-trees-and-grass-day-and-night-â-candidate-4-october-2026)
-- [0.0.27 â€” Rocks, Mushrooms, and Then Some â€” 3 October 2026](#0027-â-rocks-mushrooms-and-then-some-â-3-october-2026)
+- [0.0.28 — Trees and Grass, Day and Night — in preparation, 4 October 2026](#0028--trees-and-grass-day-and-night--in-preparation-4-october-2026)
+- [0.0.28-rc1 — Trees and Grass, Day and Night — candidate, 4 October 2026](#0028-rc1--trees-and-grass-day-and-night--candidate-4-october-2026)
+- [0.0.27 — Rocks, Mushrooms, and Then Some — 3 October 2026](#0027--rocks-mushrooms-and-then-some--3-october-2026)
 - [0.0.26](#0026)
 - [0.0.26-rc1](#0026-rc1)
 - [0.0.25](#0025)
@@ -124,42 +128,42 @@ _Last updated with AmiWind v0.0.65 (12 November 2026)._
 - [v0.0.25-rc9](#v0025-rc9)
 - [v0.0.25-rc8](#v0025-rc8)
 - [v0.0.25-rc7](#v0025-rc7)
-- [v0.0.25-rc6 â€” 1 October 2026](#v0025-rc6-â-1-october-2026)
-- [v0.0.25-rc5 â€” 1 October 2026](#v0025-rc5-â-1-october-2026)
-- [v0.0.25-rc4 â€” 1 October 2026](#v0025-rc4-â-1-october-2026)
-- [v0.0.25-rc3 â€” 1 October 2026](#v0025-rc3-â-1-october-2026)
-- [v0.0.25-rc2 â€” 1 October 2026](#v0025-rc2-â-1-october-2026)
-- [v0.0.25-rc1 â€” 1 October 2026](#v0025-rc1-â-1-october-2026)
-- [v0.0.25-dev1 â€” 1 October 2026](#v0025-dev1-â-1-october-2026)
+- [v0.0.25-rc6 — 1 October 2026](#v0025-rc6--1-october-2026)
+- [v0.0.25-rc5 — 1 October 2026](#v0025-rc5--1-october-2026)
+- [v0.0.25-rc4 — 1 October 2026](#v0025-rc4--1-october-2026)
+- [v0.0.25-rc3 — 1 October 2026](#v0025-rc3--1-october-2026)
+- [v0.0.25-rc2 — 1 October 2026](#v0025-rc2--1-october-2026)
+- [v0.0.25-rc1 — 1 October 2026](#v0025-rc1--1-october-2026)
+- [v0.0.25-dev1 — 1 October 2026](#v0025-dev1--1-october-2026)
 - [v0.0.24 - Welcome to Balmora (and Vvardenfell!) - 1 October 2026](#v0024---welcome-to-balmora-and-vvardenfell---1-october-2026)
-- [v0.0.24-rc4 â€” 1 October 2026](#v0024-rc4-â-1-october-2026)
-- [v0.0.24-rc3 â€” 1 October 2026](#v0024-rc3-â-1-october-2026)
-- [v0.0.24-rc2 â€” 1 October 2026](#v0024-rc2-â-1-october-2026)
-- [v0.0.24-rc1 â€” 30 September 2026](#v0024-rc1-â-30-september-2026)
-- [v0.0.24-dev4 â€” 30 September 2026](#v0024-dev4-â-30-september-2026)
-- [v0.0.24-dev3 â€” 30 September 2026](#v0024-dev3-â-30-september-2026)
-- [v0.0.24-dev2 â€” 30 September 2026](#v0024-dev2-â-30-september-2026)
-- [v0.0.24-dev1 â€” 30 September 2026](#v0024-dev1-â-30-september-2026)
-- [v0.0.23-dev4 â€” 29 September 2026](#v0023-dev4-â-29-september-2026)
-- [0.0.23-dev2 â€” 29 September 2026](#0023-dev2-â-29-september-2026)
+- [v0.0.24-rc4 — 1 October 2026](#v0024-rc4--1-october-2026)
+- [v0.0.24-rc3 — 1 October 2026](#v0024-rc3--1-october-2026)
+- [v0.0.24-rc2 — 1 October 2026](#v0024-rc2--1-october-2026)
+- [v0.0.24-rc1 — 30 September 2026](#v0024-rc1--30-september-2026)
+- [v0.0.24-dev4 — 30 September 2026](#v0024-dev4--30-september-2026)
+- [v0.0.24-dev3 — 30 September 2026](#v0024-dev3--30-september-2026)
+- [v0.0.24-dev2 — 30 September 2026](#v0024-dev2--30-september-2026)
+- [v0.0.24-dev1 — 30 September 2026](#v0024-dev1--30-september-2026)
+- [v0.0.23-dev4 — 29 September 2026](#v0023-dev4--29-september-2026)
+- [0.0.23-dev2 — 29 September 2026](#0023-dev2--29-september-2026)
 - [v0.0.23-dev1 - parallel builds, 29 September 2026](#v0023-dev1---parallel-builds-29-september-2026)
 - [v0.0.22 - normal public source release, 29 September 2026](#v0022---normal-public-source-release-29-september-2026)
 - [v0.0.21-dev8 - reconciled boot/launcher and paper-font sources, 29 September 2026](#v0021-dev8---reconciled-bootlauncher-and-paper-font-sources-29-september-2026)
 - [v0.0.21-dev7 - visible five-second preflight and dry-run boot order, 29 September 2026](#v0021-dev7---visible-five-second-preflight-and-dry-run-boot-order-29-september-2026)
 - [v0.0.21-dev6 - versioned boot/environment preflight, 29 September 2026](#v0021-dev6---versioned-bootenvironment-preflight-29-september-2026)
-- [v0.0.21-dev5 â€” GOG TTF preference and Steam font fallback, 28 September 2026](#v0021-dev5-â-gog-ttf-preference-and-steam-font-fallback-28-september-2026)
-- [v0.0.21-dev4 â€” evening world-mapping checkpoint, 28 September 2026](#v0021-dev4-â-evening-world-mapping-checkpoint-28-september-2026)
-- [v0.0.21-dev3 â€” opening maintenance and interaction hints, 28 September 2026](#v0021-dev3-â-opening-maintenance-and-interaction-hints-28-september-2026)
-- [v0.0.21-dev2 â€” opening barrier correction, 28 September 2026](#v0021-dev2-â-opening-barrier-correction-28-september-2026)
-- [Portable launcher helper â€” 28 September 2026](#portable-launcher-helper-â-28-september-2026)
-- [v0.0.20 â€” 28 September 2026](#v0020-â-28-september-2026)
-- [v0.0.19 â€” 28 September 2026](#v0019-â-28-september-2026)
-- [v0.0.18-dev5 â€” 28 September 2026](#v0018-dev5-â-28-september-2026)
-- [v0.0.18-dev4 â€” 28 September 2026](#v0018-dev4-â-28-september-2026)
-- [v0.0.18-dev3 â€” 28 September 2026](#v0018-dev3-â-28-september-2026)
-- [v0.0.18-dev2 â€” 28 September 2026](#v0018-dev2-â-28-september-2026)
-- [v0.0.18-dev1 â€” 28 September 2026](#v0018-dev1-â-28-september-2026)
-- [v0.0.17 â€” 28 September 2026](#v0017-â-28-september-2026)
+- [v0.0.21-dev5 — GOG TTF preference and Steam font fallback, 28 September 2026](#v0021-dev5--gog-ttf-preference-and-steam-font-fallback-28-september-2026)
+- [v0.0.21-dev4 — evening world-mapping checkpoint, 28 September 2026](#v0021-dev4--evening-world-mapping-checkpoint-28-september-2026)
+- [v0.0.21-dev3 — opening maintenance and interaction hints, 28 September 2026](#v0021-dev3--opening-maintenance-and-interaction-hints-28-september-2026)
+- [v0.0.21-dev2 — opening barrier correction, 28 September 2026](#v0021-dev2--opening-barrier-correction-28-september-2026)
+- [Portable launcher helper — 28 September 2026](#portable-launcher-helper--28-september-2026)
+- [v0.0.20 — 28 September 2026](#v0020--28-september-2026)
+- [v0.0.19 — 28 September 2026](#v0019--28-september-2026)
+- [v0.0.18-dev5 — 28 September 2026](#v0018-dev5--28-september-2026)
+- [v0.0.18-dev4 — 28 September 2026](#v0018-dev4--28-september-2026)
+- [v0.0.18-dev3 — 28 September 2026](#v0018-dev3--28-september-2026)
+- [v0.0.18-dev2 — 28 September 2026](#v0018-dev2--28-september-2026)
+- [v0.0.18-dev1 — 28 September 2026](#v0018-dev1--28-september-2026)
+- [v0.0.17 — 28 September 2026](#v0017--28-september-2026)
 - [v0.0.16](#v0016)
 - [0.12.1.dev1 / runtime source still v0.0.15-dev2](#0121dev1--runtime-source-still-v0015-dev2)
 - [0.12.0.dev2 / runtime v0.0.15-dev2](#0120dev2--runtime-v0015-dev2)
@@ -171,9 +175,9 @@ _Last updated with AmiWind v0.0.65 (12 November 2026)._
 - [0.8.3.dev4 / runtime v0.0.11-dev4](#083dev4--runtime-v0011-dev4)
 - [0.8.3.dev3 / runtime v0.0.11-dev3](#083dev3--runtime-v0011-dev3)
 - [Development source 0.8.3.dev1 / runtime v0.0.11-dev1](#development-source-083dev1--runtime-v0011-dev1)
-- [Runtime v0.0.10 / source 0.8.2 â€” 27 September 2026](#runtime-v0010--source-082-â-27-september-2026)
-- [Runtime v0.0.9 / source 0.8.1 â€” 27 September 2026](#runtime-v009--source-081-â-27-september-2026)
-- [Runtime v0.0.8 / source 0.8.0 â€” 27 September 2026](#runtime-v008--source-080-â-27-september-2026)
+- [Runtime v0.0.10 / source 0.8.2 — 27 September 2026](#runtime-v0010--source-082--27-september-2026)
+- [Runtime v0.0.9 / source 0.8.1 — 27 September 2026](#runtime-v009--source-081--27-september-2026)
+- [Runtime v0.0.8 / source 0.8.0 — 27 September 2026](#runtime-v008--source-080--27-september-2026)
 - [Changelog](#changelog-1)
 - [0.7.0 source / AmiWind v0.0.6 checkpoint-005](#070-source--amiwind-v006-checkpoint-005)
 - [0.6.0 source / demo v0.0.5 checkpoint-004](#060-source--demo-v005-checkpoint-004)
@@ -181,16 +185,119 @@ _Last updated with AmiWind v0.0.65 (12 November 2026)._
 - [0.4.0 source / demo v0.0.3 checkpoint-002](#040-source--demo-v003-checkpoint-002)
 - [0.3.0 source / opening and terrain walk v0.0.2](#030-source--opening-and-terrain-walk-v002)
 - [0.2.0 source / opening v0.0.1](#020-source--opening-v001)
-- [0.1.3 â€” 27 September 2026](#013-â-27-september-2026)
-- [0.1.2 â€” 27 September 2026](#012-â-27-september-2026)
-- [0.1.1 â€” 27 September 2026](#011-â-27-september-2026)
-- [0.1.0 â€” 27 September 2026](#010-â-27-september-2026)
+- [0.1.3 — 27 September 2026](#013--27-september-2026)
+- [0.1.2 — 27 September 2026](#012--27-september-2026)
+- [0.1.1 — 27 September 2026](#011--27-september-2026)
+- [0.1.0 — 27 September 2026](#010--27-september-2026)
   - [rc6 image recovery follow-up](#rc6-image-recovery-follow-up)
-- [Validation finding â€” 14 October 2026, v0.0.40-dev1](#validation-finding-â-14-october-2026-v0040-dev1)
+- [Validation finding — 14 October 2026, v0.0.40-dev1](#validation-finding--14-october-2026-v0040-dev1)
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
 
+## v0.0.66-dev4: fourth snapshot of v0.0.66, 15 November 2026
+
+The fourth development snapshot of v0.0.66, in development ([release notes](releases/notes/RELEASE-v0.0.66-dev4.md)). It
+carries dev3 and needs 32 MB of Fast RAM. Its changes are checked by tests, not yet in play. No finished Mournhold or
+Solstheim content is in this snapshot.
+
+- A scripted object takes the player's use only while its script reads it, as in the original: the census captain's
+  two doors, which opened only once, open every time.
+- The play journey walks the opening on foot as a player plays it, through the census office to the release and on,
+  and stops at the first wrong turn.
+- Also in the dev3 build, not in its notes: a teleport typed during a load runs on arrival, and the image step's actor
+  check reads the room stage's list of empty rooms.
+- Known: fighting is on before the release papers, the crab meat's use goes to the plate under it, and area loads read
+  their sounds more slowly since dev2.
+
+## v0.0.66-dev3: third snapshot of v0.0.66, 14 November 2026
+
+The third development snapshot of v0.0.66, in development ([release notes](releases/notes/RELEASE-v0.0.66-dev3.md)). It
+carries dev2 and needs 32 MB of Fast RAM. Its changes are checked by tests, not yet in play. No finished Mournhold or
+Solstheim content is in this snapshot.
+
+- The save holds the game's changes without the fixed limits that could refuse it or drop state: the actors' rows, the
+  explored map, script values (saved by name, items' too), made spells, items and potions, soul gems, crime marks and
+  revealed places grow with the game up to guards above the game's counts; a save is written only when every part went
+  in and names the part that did not; two copies of one item keep their own condition and charge; a save asked for inside
+  a script step waits for it ([saved game plan](SAVEGAME_PLAN.md), [budget](performance/SAVE-BUDGET.md)).
+- The selected expansions' files (masters and archives) are required and checked by size and SHA-256 before any stage;
+  every table the build makes reads the expansions' data; the seven expansion rooms the room stage refused are built or
+  listed.
+- The builder runs new work first, writes its own stall alert and, for a failed build, a failure page the monitor links.
+- `dbg tp` lists All, Exteriors, Interiors or Beings and takes the player to a person or creature by name.
+- Bloodmoon's werewolf form has no player model yet; the form is not in the game.
+
+## v0.0.66-dev2: second snapshot of v0.0.66, 13 November 2026
+
+The second development snapshot of v0.0.66, in development ([release notes](releases/notes/RELEASE-v0.0.66-dev2.md)). It
+carries dev1 and needs 32 MB of Fast RAM. Its changes are checked by tests, not yet in play. The data of Tribunal and
+Bloodmoon is part of the build by default, and the build's cache keys know which expansions are selected, so switching
+them rebuilds only what they change; no finished Mournhold or Solstheim content is in this snapshot.
+
+- Unit caches are keyed by what each unit reads: the readers that merge the expansion files are keyed by what they hand
+  out, not by their code, and a unit the expansions do not touch is reused (55 of 1,769 room residents change with both
+  expansions selected). The image step checks every file format it reads before the long steps.
+- The `dbg tp` place list holds the selected expansions' places too: Mournhold's and the other expansion rooms the image
+  holds, and the Solstheim places whose world the build holds (the rest are named in the build report); with the base
+  game alone the list is unchanged.
+- Map and navigation: an explored-land map, a local map, an interior room plan with fog, named places on hover, up to
+  256 named markers with a Markers menu, a hot marker and a compass; signposts and named objects show their names.
+- Character creation: the birthsign and race windows list each ability, power and spell with its effects under it.
+- Scripts: the scripted objects of the Seyda Neen and Balmora maps run again (none was attached before); Tarhiel falls
+  near his journal as in the original.
+- Magic: people and creatures cast the spells they know in a fight, and the cast look is on by default and starts with
+  the cast animation.
+- Actors and combat: each fighter moves at its own speed, the load counts in fatigue, bows and crossbows are held and
+  shot, every actor's record is audited, creatures are baked on the skeletal method, Dagoth Ur has his own animations,
+  the Heart of Lorkhan stays in its place, and killing someone adds the original's murder bounty. Each fighter picks its
+  weapon by its own skills as the reference engine does (35 of 3,437 records chose differently before), fighters flee by
+  their Flee rating, a paralysed victim takes punch damage, and the carried load counts in a fighter's fatigue and speed.
+  A scripted walker walks round a post on its way instead of pressing against it (the dock guard on the pier in the
+  opening).
+- Death and respawn: the dead stay dead across area changes and saves, bodies are cleared as in the original (outdoors
+  too: a body lies until the delay and can be looted), and killing an essential character shows the original's message
+  once per death. A save is refused, keeping the previous one, when part of the game state fails to go into it.
+- World: bracket fungi sit on their trees again (106 floated), outdoor containers can be pointed at, the prison ship's hold draws and collides lighter, the mudcrabs and
+  slaughterfish of the town cells are placed again, and the inventory page arrows match the race screen.
+- Performance (checked by tests; the frame rate on the Raspberry Pi 4B is still to be measured): the prison ship's hold is
+  drawn in tiles of at most 512 faces, with its small hammock parts boxed and its collision under the room rule (measured
+  from four spots in the hold: faces tested per view 14,128 to 10,749 on average, 23,386 to 21,356 in the worst view;
+  collision clipnodes 29,182 to 18,054; a collision point test 837 to 649 steps on average); the
+  script interpreter's timers share their work and script lookups are cheaper; fighters read their spells once per fight,
+  not at every choice; shots come from a pool with no allocation in play; the character windows' ability lists read
+  nothing while drawing. For builds: the cache keys follow what each unit reads, so switching the expansions on rebuilds
+  only what they change instead of most of the world.
+- Builder: script timers share their work, `SetDelete` works as in the original, a play journey checks the opening after
+  every build, the image step checks the people and creatures placed per kind of area and every actor's record against
+  the original (a build out of spec stops), and the bug register records each fix's commit and date. New work runs
+  first: stages with no history start before the known ones, and the new units of a unit stage before the known units;
+  the resource plan counts the units each stage bakes again instead of adding up full-rebuild times.
+- Known: the new weapon choice, fleeing and the outdoor bodies are checked by tests, not yet in play, and the game can stop
+  in an ancestral tomb.
+
+## v0.0.66-dev1: first snapshot of v0.0.66, 12 November 2026
+
+The first development snapshot of v0.0.66, in development ([release notes](releases/notes/RELEASE-v0.0.66-dev1.md)). It
+is built on v0.0.65 and carries all of its fixes to the opening. It needs 32 MB of Fast RAM. Its changes are checked by
+tests, not yet in play. The expansions' cells and rooms are being brought in through the same builder and stages as
+Vvardenfell; no expansion area is built in this snapshot (its build was made with the expansions switched off).
+
+- The builder has one reader that merges the base game file with the files of Tribunal and Bloodmoon by the rules the
+  reference engine uses.
+- The build stages are keyed by the selected expansion layers (both are selected by default); when they are selected, the
+  builder first checks that the expansion files are present and their SHA-256.
+- The expansions' cells and rooms join the base lists when selected: Solstheim's cells only where finished (the rest
+  dropped with their reason), and the expansions' rooms, Mournhold's five districts among them, as batches after the
+  island's; the island's batches and ids are unchanged.
+- The room converter reads the selected archives in load order; CHIMport cells are keyed by what the layers change in
+  their frame and are measured through the master builder; the image carries the layer stores, and the engine has a
+  store table that refuses a target that was not built.
+- The Heart of Lorkhan is a resident of its room.
+- The active effects are shown as a row of icons under the view, with the same icons on the Stats window
+  ([active-effect HUD](HUD_ACTIVE_EFFECTS.md)).
+- Groundwork for the Heart chamber's collapse: the engine has a reader and sampler for the tracks of the moving parts; the
+  game does not use it yet.
 ## v0.0.65: Reintroducing Vvardenfell, 12 November 2026
 
 v0.0.65 is a fix release made from v0.0.64 ([release notes](releases/notes/RELEASE-v0.0.65.md)); it covers everything of
@@ -1169,7 +1276,7 @@ In v0.0.61-dev3 (the third snapshot; [release notes](releases/notes/RELEASE-v0.0
 
 [CHIM-MODEL-ARENA-RESERVE-41](bugs/CHIM-MODEL-ARENA-RESERVE-41.md) — 15 October 2026: exact allocation and predecessor-world checks remain separately recorded. The later 941 world stopped at its ownership guard because named aprons bypassed ten existing deferred-owner dispositions. The source-only disposition repair passes 38 focused checks; fresh world, boundary/model review and native/package acceptance remain pending.
 
-[CHIM-RECIPE-APRON-SCOPE-41](bugs/CHIM-RECIPE-APRON-SCOPE-41.md) â€” 15 October 2026, v0.0.41 candidate: recipe repair converted all four affected frames with structural PASS. Three still failed the unchanged memory gate (peaks 6,957,632; 6,939,952; 6,644,768 bytes for (10,0), (10,1), (9,2)); (11,0) passed at 5,875,568 bytes. The separate placed-model reserve repair passes all four on identical world bytes. A complete successor world and recipe/model/sprite equivalence and native checks remain pending.
+[CHIM-RECIPE-APRON-SCOPE-41](bugs/CHIM-RECIPE-APRON-SCOPE-41.md) — 15 October 2026, v0.0.41 candidate: recipe repair converted all four affected frames with structural PASS. Three still failed the unchanged memory gate (peaks 6,957,632; 6,939,952; 6,644,768 bytes for (10,0), (10,1), (9,2)); (11,0) passed at 5,875,568 bytes. The separate placed-model reserve repair passes all four on identical world bytes. A complete successor world and recipe/model/sprite equivalence and native checks remain pending.
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
@@ -1220,7 +1327,7 @@ remain separate and pending. No coverage count is promoted.
 
 ## Compiled apron selection, 15 October 2026
 
-CHIM-FRAME-STATIC-SEAM-40 â€” The full combined conversion found a conservative
+CHIM-FRAME-STATIC-SEAM-40 — The full combined conversion found a conservative
 source box overlapping an apron although the compiled rock footprint ends
 0.83 game units outside it. The selection now records and excludes only external
 references whose compiled pieces all miss that apron. Owned originals, reaching
@@ -1235,7 +1342,7 @@ acceptance remain pending; no converted or accepted coverage count is promoted.
 
 ## Paired boundary validation, 15 October 2026
 
-CHIM-FRAME-STATIC-SEAM-40 â€” The latest v0.0.40 paired conversion passes structural, heap, zone-walk and
+CHIM-FRAME-STATIC-SEAM-40 — The latest v0.0.40 paired conversion passes structural, heap, zone-walk and
 stair validation. The 3,836 tested steps and ramps pass; 610 advisory results
 remain recorded. Across 2,816 paired positions, full-static support states agree
 and the maximum supported-height difference is 0.000077 game units. Terrain,
@@ -1652,7 +1759,7 @@ gates pass; native checks and packaging remain pending. Four original
 leveled-creature references remain deferred; packaged coverage is unchanged.
 [Coverage and required original-cell town boundaries](bugs/CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md).
 
-- BUILD-PLAYER-BODY-BUDGET-FALLBACK-39 â€” 15 October 2026, v0.0.40-dev2:
+- BUILD-PLAYER-BODY-BUDGET-FALLBACK-39 — 15 October 2026, v0.0.40-dev2:
   continue past reduced animation fits to seek full action sampling under
   unchanged geometry and memory guards. The canonical Argonian diagnostic
   fits122 frames; production and native verification remain pending.
@@ -1925,13 +2032,13 @@ shipment remain pending. [Candidate notes](releases/notes/RELEASE-v0.0.40-dev2.m
   third-person start-pose failure remains open.
   [COMBAT-BLOCKING-36](bugs/COMBAT-BLOCKING-36.md).
 
-- Scoped female-Nord WALK3 shore entry and depth control: z39.5â†’-66.4, idle5s
+- Scoped female-Nord WALK3 shore entry and depth control: z39.5→-66.4, idle5s
   holds depth; pitch45+forward descends to-175.3 and settles, pitch-45+forward
   ascends to-37.9. Upright-body/surface-entry/original parity and maintainer acceptance
   remain open. [WATER-GAMEPLAY-PARITY-38](bugs/WATER-GAMEPLAY-PARITY-38.md).
 
 - Scope native Nord male-to-female confirmation: same world point, expected
-  health55â†’50 stat rebuild, equipped clothes1/gold87/picked Russula1 retained.
+  health55→50 stat rebuild, equipped clothes1/gold87/picked Russula1 retained.
   Appearance-menu head distortion remains unbound and unaccepted; a valid
   inventory body display does not accept full appearance quality.
   [Head quality](bugs/NPC-HEAD-DECIMATION-33.md),
@@ -2812,7 +2919,7 @@ RC2 keeps the original RC1 Balmora Temple map. A narrowly scoped converter corre
 This is a release candidate for continued playtesting. Final source, package checksums, and delivery status belong with the completed release artifacts. Remote public-source publication is not claimed by this draft.
 
 
-## 0.0.28 â€” Trees and Grass, Day and Night â€” in preparation, 4 October 2026
+## 0.0.28 — Trees and Grass, Day and Night — in preparation, 4 October 2026
 
 - Selected stable release identity 0.0.28; scoped local native acceptance passed. Public publication remains pending.
 - V3 is default: stronger red/gold twilight, purple/blue hour, two original-cloud
@@ -2856,7 +2963,7 @@ This is a release candidate for continued playtesting. Final source, package che
   Historical rc1/V1 captures retain attribution; v0.0.27 is still published.
   See [stable preparation](releases/notes/RELEASE-v0.0.28.md).
 
-## 0.0.28-rc1 â€” Trees and Grass, Day and Night â€” candidate, 4 October 2026
+## 0.0.28-rc1 — Trees and Grass, Day and Night — candidate, 4 October 2026
 
 - Prepared original-placement world foliage with 76 shared sprite types;
   preserved rocks, giant mushrooms and detailed Balmora mesh foliage.
@@ -2872,7 +2979,7 @@ This is a release candidate for continued playtesting. Final source, package che
   for byte. New HDF assembly/readback passed. Independent gameplay acceptance
   and publication remain pending. See [candidate scope](releases/notes/RELEASE-v0.0.28-rc1.md).
 
-## 0.0.27 â€” Rocks, Mushrooms, and Then Some â€” 3 October 2026
+## 0.0.27 — Rocks, Mushrooms, and Then Some — 3 October 2026
 
 - Published stable source release with 37,960 exterior rock placements and 816
   giant mushrooms across 2,526 world regions; joined mushroom caps preserve
@@ -2966,7 +3073,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
   [rc7 release notes](releases/notes/RELEASE-v0.0.25-rc7.md).
 
 
-## v0.0.25-rc6 â€” 1 October 2026
+## v0.0.25-rc6 — 1 October 2026
 
 - Default compass/heading HUD to hidden; add saved `aw_compass` and
   `dbg compass on/off`, `1/0`, `true/false`.
@@ -2991,7 +3098,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
 - Include matching rc6 emulator templates, source receipt and direct-update
   metadata. Preserve all earlier source and release records.
 
-## v0.0.25-rc5 â€” 1 October 2026
+## v0.0.25-rc5 — 1 October 2026
 
 - Add a terminal-width completion footer with local start/end timestamps and
   timezone offsets, monotonic elapsed time, final file size in GiB/bytes and SHA-256.
@@ -3007,7 +3114,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
   and asset-free test image on Linux. Full game conversion and Windows remain
   separate, incomplete acceptance work.
 
-## v0.0.25-rc4 â€” 1 October 2026
+## v0.0.25-rc4 — 1 October 2026
 
 - Add host-aware executable and virtual-environment discovery plus a read-only
   `--host-plan` inventory. Windows automatic setup remains unimplemented.
@@ -3022,7 +3129,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
 - Record the prior rc3 full-build disk exhaustion separately from native
   compilation. Full image and native Windows acceptance remain open.
 
-## v0.0.25-rc3 â€” 1 October 2026
+## v0.0.25-rc3 — 1 October 2026
 
 - Restrict exterior window flattening to exterior scenes. Preserve the original
   window mesh and collision when the same asset is placed inside an interior.
@@ -3034,7 +3141,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
 - Document the generic installed-game layout and remove account-specific path
   examples from maintained documentation. Deliver public source only.
 
-## v0.0.25-rc2 â€” 1 October 2026
+## v0.0.25-rc2 — 1 October 2026
 
 - Reconcile original rc1 and checkpoints 001/004/006 without losing later modifier,
   launcher and configurable five-autosave fixes.
@@ -3043,7 +3150,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
 - Retain only the current dev1 journal screenshot; preserve maintainer cleanup.
 - Source-only handoff for local compilation; native rc2 acceptance remains open.
 
-## v0.0.25-rc1 â€” 1 October 2026
+## v0.0.25-rc1 — 1 October 2026
 
 - Move Seyda Neen's island handoff inside actual ground coverage; retain both
   detailed town conversions and the frozen polymap's 2,526 region divisions.
@@ -3056,7 +3163,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
 - Separate editable keymaps from settings and maintain [KEYMAPS.md](KEYMAPS.md).
 - Defer unexplored-map masking; retain the 23 existing contact findings.
 
-## v0.0.25-dev1 â€” 1 October 2026
+## v0.0.25-dev1 — 1 October 2026
 
 - Convert the surveyed island footprint into 2,526 terrain/water regions, using
   the recovered polymap subdivisions and preserving detailed Seyda Neen and Balmora.
@@ -3085,7 +3192,7 @@ gallery coverage, protected geometry and runtime rendering remain unchanged.
   release approval does not change the automated audit result.
 - [Release notes](releases/notes/RELEASE-v0.0.24.md).
 
-## v0.0.24-rc4 â€” 1 October 2026
+## v0.0.24-rc4 — 1 October 2026
 
 Whole-base-master terrain/geometry survey, private interactive atlas and terrain
 inspection mesh; native M map and J two-page journal with earned dated history,
@@ -3094,7 +3201,7 @@ Includes screenshot-tracking validation. Whole-island 3D traversal, inventory
 and complete quest scripting remain future work; the 23 placement findings
 remain open. See [scope and evidence](releases/notes/RELEASE-v0.0.24-rc4.md).
 
-## v0.0.24-rc3 â€” 1 October 2026
+## v0.0.24-rc3 — 1 October 2026
 
 Maintainer-requested recovery candidate: complete gallery conversion, bounded exact-model
 allowances up to 1,024 triangles, preserved Dagoth mask detail, two authored airborne
@@ -3103,7 +3210,7 @@ collision-trace correction for the three RC2 walking stalls. Adds the island
 terrain/polygon-density plan and M/I/J interface roadmap. The 23 strict ground
 contact findings remain open. See [scope and evidence](releases/notes/RELEASE-v0.0.24-rc3.md).
 
-## v0.0.24-rc2 â€” 1 October 2026
+## v0.0.24-rc2 — 1 October 2026
 
 Interim maintainer-testing checkpoint: gallery browser/help/return, bounded per-model
 geometry allowances, canonical ground placement and independent contact audit,
@@ -3111,9 +3218,9 @@ close NPC targeting, birthsign ordering, guarded hill-material repair, Options
 scrolling and measured experimental read-ahead. The strict contact and walking
 findings remain open. See [full scope and limits](releases/notes/RELEASE-v0.0.24-rc2.md).
 
-## v0.0.24-rc1 â€” 30 September 2026
+## v0.0.24-rc1 — 30 September 2026
 
-**AmiWind v0.0.24-rc1 â€” candidate for Welcome to Balmora.**
+**AmiWind v0.0.24-rc1 — candidate for Welcome to Balmora.**
 
 Balmora now includes 43 destination interiors (42 city interiors plus Tharys
 Ancestral Tomb), 93 NPC placements (90 living and three authored corpses), and
@@ -3142,7 +3249,7 @@ v0.0.24 needs the maintainer's green light. See [RC scope](releases/notes/RELEAS
 [conversion lessons](BALMORA_CONVERSION_LESSONS.md) and
 [Amiga naming constraints](RELEASE_WORKFLOW.md#amiga-limitations).
 
-## v0.0.24-dev4 â€” 30 September 2026
+## v0.0.24-dev4 — 30 September 2026
 
 - Add `dbg tp` for the existing destination menu, and direct `balmora`,
   `seydaneen`, `prisonship` and converted-map shortcuts. Retain `dbg scene`.
@@ -3161,11 +3268,11 @@ v0.0.24 needs the maintainer's green light. See [RC scope](releases/notes/RELEAS
   whole-map polygon-density study to the next version.
 - See [scope and validation](releases/notes/RELEASE-v0.0.24-dev4.md).
 
-## v0.0.24-dev3 â€” 30 September 2026
+## v0.0.24-dev3 — 30 September 2026
 
 - Share Seyda Neen's inspected Strider profile in Balmora; rebuild the 16 affected
   regions. Collision, entities and the other 48 maps remain unchanged.
-- Add Options â†’ Area loading: Freeze frame / Black screen. Freeze is the default
+- Add Options → Area loading: Freeze frame / Black screen. Freeze is the default
   for region crossings; hold the displayed image and palette with a small top
   Loading box. Reuse the existing loading-art storage; retain music servicing.
 - Record positive dev2 exterior feedback, missing Balmora interiors, the reported
@@ -3173,7 +3280,7 @@ v0.0.24 needs the maintainer's green light. See [RC scope](releases/notes/RELEAS
 - Pass 279 host tests; native warning review remains 82, with no new diagnostics.
   See [validation and limitations](releases/notes/RELEASE-v0.0.24-dev3.md).
 
-## v0.0.24-dev2 â€” 30 September 2026
+## v0.0.24-dev2 — 30 September 2026
 
 - Restore original Balmora architectural geometry after generic reduction
   destroyed open facades; rebuild all 64 regions with bounded 896-unit overlap.
@@ -3188,19 +3295,19 @@ v0.0.24 needs the maintainer's green light. See [RC scope](releases/notes/RELEAS
   [the investigation](history/investigations/INVESTIGATION-v0.0.24-dev2.md) and the existing mesh notes.
 - Pass 278 host tests. Review native warnings: 85 to 82, no added diagnostic.
 
-## v0.0.24-dev1 â€” 30 September 2026
+## v0.0.24-dev1 — 30 September 2026
 
 Initial Balmora exterior, 64 overlapping regions, 1,488 scenery placements,
 18 residents and return Strider travel. See [original scope](history/other/BALMORA-v0.0.24-dev1.md).
 Its generic architectural reduction was defective; dev2 corrects that conversion.
 
-## v0.0.23-dev4 â€” 29 September 2026
+## v0.0.23-dev4 — 29 September 2026
 
 Padded content-sized dialogue and caret/rotation regressions; 2/5/1-second logo
 with continuous title music; optional opening quote overlay; sprite background
 depth and deferred NPC floor placement. See [release notes](releases/notes/RELEASE-v0.0.23-dev4.md).
 
-## 0.0.23-dev2 â€” 29 September 2026
+## 0.0.23-dev2 — 29 September 2026
 
 - Expand the exterior beyond the port; retain crossing object bounds, the missing
   rock mound, original Silt Strider and Darvame.
@@ -3293,7 +3400,7 @@ See RELEASE-v0.0.21-dev7.md for scope and validation.
 
 See RELEASE-v0.0.21-dev6.md for scope and validation.
 
-## v0.0.21-dev5 â€” GOG TTF preference and Steam font fallback, 28 September 2026
+## v0.0.21-dev5 — GOG TTF preference and Steam font fallback, 28 September 2026
 
 - Prefer the GOG GOTY `BookArt/*.ttf` font sources for host-side AmiWind
   rasterization when present. GOG GOTY remains the recommended source edition.
@@ -3309,7 +3416,7 @@ See RELEASE-v0.0.21-dev6.md for scope and validation.
 
 See RELEASE-v0.0.21-dev5.md for validation and the remaining real-install test.
 
-## v0.0.21-dev4 â€” evening world-mapping checkpoint, 28 September 2026
+## v0.0.21-dev4 — evening world-mapping checkpoint, 28 September 2026
 
 - Record Horstator's optional polygonal POI-region fallback if cell streaming
   cannot meet the Amiga's measured budgets, starting with Seyda Neen.
@@ -3321,7 +3428,7 @@ See RELEASE-v0.0.21-dev5.md for validation and the remaining real-install test.
 
 See RELEASE-v0.0.21-dev4.md for validation and save compatibility.
 
-## v0.0.21-dev3 â€” opening maintenance and interaction hints, 28 September 2026
+## v0.0.21-dev3 — opening maintenance and interaction hints, 28 September 2026
 
 - Two-line lower-right NPC hints: 12 px Morrowind name and current console-font
   action (`npc_interaction_layout_template_001`); matching opening aim/use query.
@@ -3338,7 +3445,7 @@ Highlight New Game when opening its confirmation dialog, so Enter starts the
 intro immediately. Esc and explicit Cancel return to the menu. The hidden mouse
 position starts over the selected button as well. See RELEASE-v0.0.21-dev3.md.
 
-## v0.0.21-dev2 â€” opening barrier correction, 28 September 2026
+## v0.0.21-dev2 — opening barrier correction, 28 September 2026
 
 Correct compound rotations of the 22 collision-only opening references. Preserve
 the original positions, dimensions and CharGenState lifetime. Add converter and
@@ -3346,7 +3453,7 @@ state regression coverage, an indexed journal incident, and persistent opening
 access/research priorities. See RELEASE-v0.0.21-dev2.md for exact validation
 coverage and pending maintainer acceptance.
 
-## Portable launcher helper â€” 28 September 2026
+## Portable launcher helper — 28 September 2026
 
 Add `tools/AmiWind-FS-UAE-launcher.py` for existing local images: numeric release
 and development-version selection, date tie-breaking, saved ROM/settings,
@@ -3354,7 +3461,7 @@ non-blocking ROM checksum warnings and automatic FS-UAE configuration with
 backups. Enter accepts the suggested image; `--yes` launches immediately.
 This host-tool follow-up leaves runtime v0.0.20 unchanged. See FS-UAE-LAUNCHER.md.
 
-## v0.0.20 â€” 28 September 2026
+## v0.0.20 — 28 September 2026
 
 Prison-ship hull ambience reduced by 5 dB per static mixer channel; audio files
 and other uses remain unchanged. Enabling debug overlays also enables coordinates.
@@ -3363,7 +3470,7 @@ array-row bounds violations. Recorded intermittent ship-exit/menu freezes and
 the persistent Silt Strider-port report; their causes remain unresolved.
 See RELEASE-v0.0.20.md and BUGS.md.
 
-## v0.0.19 â€” 28 September 2026
+## v0.0.19 — 28 September 2026
 
 Public release of the accumulated 0.0.18 checkpoints: intro/movie, UI/menus,
 loading screens, entrance prompts and parallel builds.
@@ -3371,7 +3478,7 @@ Routine soundtrack notices now obey the debug-overlay switch at their source.
 Music events still log privately, and explicit status queries still work.
 See RELEASE-v0.0.19.md.
 
-## v0.0.18-dev5 â€” 28 September 2026
+## v0.0.18-dev5 — 28 September 2026
 
 Original main-menu art with bottom-right version, centered Esc menu and New Game
 confirmation, larger logo/movie frames and readable private title cards. Original
@@ -3380,7 +3487,7 @@ default off. Deck guard greeting/reminder, visible town entrance names and safe
 missing-interior feedback, private source layout reference, automatic compiler
 jobs with explicit overrides. See RELEASE-v0.0.18-dev5.md.
 
-## v0.0.18-dev4 â€” 28 September 2026
+## v0.0.18-dev4 — 28 September 2026
 
 Project-logo startup fade and upper-menu/README branding, main-menu title music,
 reset of the selected New Game track,
@@ -3389,14 +3496,14 @@ ship NPC body collision and escort waiting, default-off disk indicator,
 actor-cache staging correction and three-line loading credits. See
 RELEASE-v0.0.18-dev4.md for validation and unfinished work.
 
-## v0.0.18-dev3 â€” 28 September 2026
+## v0.0.18-dev3 — 28 September 2026
 
 Original main-menu background with a separate palette, distinct return-to-game
 and main-menu flows, disabled Load, and New Game into the ship. Conservative
 animated alias bounds permit rejecting off-screen actors before disk-cache
 loads. See RELEASE-v0.0.18-dev3.md for verification and remaining work.
 
-## v0.0.18-dev2 â€” 28 September 2026
+## v0.0.18-dev2 — 28 September 2026
 
 First ship-script adapter, original introductory voices/name entry, talking and
 blinking head poses, female appearances, path-grid escort movement, ship ambience
@@ -3404,14 +3511,14 @@ and darker hold lighting. Distinct HUD colors, optional outer frame off by defau
 New Game entry and integrated private conversion. See RELEASE-v0.0.18-dev2.md for
 verification and remaining dock/Census work. Journal filename corrected.
 
-## v0.0.18-dev1 â€” 28 September 2026
+## v0.0.18-dev1 — 28 September 2026
 
 Original proportional Magic Cards UI, private original border/bar conversion,
 black lower-strip sliding subtitles, font selection with preserved console, and
 native font/clipping validation. See RELEASE-v0.0.18-dev1.md for the exact scope;
 this checkpoint does not claim the completed intro or gameplay resource systems.
 
-## v0.0.17 â€” 28 September 2026
+## v0.0.17 — 28 September 2026
 
 One-command confirmed dependency setup and continuation, isolated fresh tools,
 bounded game-directory discovery, actionable download failures, corrected tool
@@ -3460,7 +3567,7 @@ See REPOSITORY_LAYOUT.md for migration and verification.
 
 - Preserve structural ship-interior source surfaces and UVs to repair hull intrusion.
 - Add a scene-picker popup via `dbg scene change`, retaining direct commands.
-- Add live fog/draw-distance commands and Options â†’ Graphics slider; replace
+- Add live fog/draw-distance commands and Options → Graphics slider; replace
   floating-point depth-table rebuilds with integer threshold bands.
 - Add default-off FPS HUD using existing profiler timing.
 - Add a private base-master NPC/door/container audit and synthetic deletion tests.
@@ -3577,7 +3684,7 @@ See CHECKPOINT_010_VALIDATION.md for verified scope and remaining limitations.
 - 47 host tests passed; full guided HDF build/readback passed. Native acceptance pending.
 - See [development record](history/superseded/DEVELOPMENT_011.md); v0.0.10 remains the latest released playable checkpoint.
 
-# Runtime v0.0.10 / source 0.8.2 â€” 27 September 2026
+# Runtime v0.0.10 / source 0.8.2 — 27 September 2026
 
 - Reproduced the reported 80000027 failure with 4 MiB Fast RAM.
 - Added a small 68000 preflight before the engine: OS, CPU/FPU, AGA, free and contiguous memory checks.
@@ -3586,7 +3693,7 @@ See CHECKPOINT_010_VALIDATION.md for verified scope and remaining limitations.
 - Scene, textures and all 18 music streams remain byte-identical to checkpoint-007.
 - Maintainer reports v0.0.9 boots in WinUAE after complete-ROM selection, and that selecting maximum CPU speed resolved the slow/glitching run; corrected config preserves that setting. No new hardware-performance claim.
 
-# Runtime v0.0.9 / source 0.8.1 â€” 27 September 2026
+# Runtime v0.0.9 / source 0.8.1 — 27 September 2026
 
 - Fixed the missing icon.library requester on bare-ROM boot by removing unused
   Workbench tooltype/icon handling and desktop close/reopen code.
@@ -3598,7 +3705,7 @@ See CHECKPOINT_010_VALIDATION.md for verified scope and remaining limitations.
   native executable changes in the filesystem payload.
 - Added startup regression tests and separate 3.1/3.1.4 ROM validation records.
 
-# Runtime v0.0.8 / source 0.8.0 â€” 27 September 2026
+# Runtime v0.0.8 / source 0.8.0 — 27 September 2026
 
 - First AGA HDF checkpoint: bounded walkable Seyda Neen, static BSP proxies,
   baked facade textures, foliage sprites, palette fog and distance controls.
@@ -3689,23 +3796,23 @@ Earlier checkpoint notes follow unchanged.
 - Keep all game-derived assets and the optional private ROM out of source releases.
 - Free movement is the next requested renderer milestone, not part of this vignette.
 
-## 0.1.3 â€” 27 September 2026
+## 0.1.3 — 27 September 2026
 
 - Specified OpenMW itself as the intended host character-rendering backend.
 - Documented capture integration work and the verified engine licence reference.
 
-## 0.1.2 â€” 27 September 2026
+## 0.1.2 — 27 September 2026
 
 - Documented the host-side reduce/bake/map/pack pipeline and final image assembly.
 - Distinguished implemented terrain conversion from the planned native build.
 
-## 0.1.1 â€” 27 September 2026
+## 0.1.1 — 27 September 2026
 
 - Added humanoid body/appearance template design configuration.
 - Separated body rig, equipment, combat style and animation state in the design.
 - Kept the previously packaged source version immutable.
 
-## 0.1.0 â€” 27 September 2026
+## 0.1.0 — 27 September 2026
 
 - Created the named proof-of-concept repository from the initial extraction tools.
 - Added the user-supplied game-folder setup and external-workspace conversion flow.
@@ -3727,7 +3834,7 @@ Earlier checkpoint notes follow unchanged.
 - Record maintainer-reported successful rc3 private assembly; retain rc6 game/runtime
   validation limits. Include both rc3 hotfixes in the complete rc6 overlay.
 
-## Validation finding â€” 14 October 2026, v0.0.40-dev1
+## Validation finding — 14 October 2026, v0.0.40-dev1
 
 The full integration gate failed. Its fixture write errors repeat [GATE-SUITE-WRITABLE-32](bugs/GATE-SUITE-WRITABLE-32.md): copied read-only permissions blocked temporary test edits. A hash-matched writable test copy is required. This setup finding does not dismiss separate inventory, blocking, documentation and version-resource failures, and establishes no native or release acceptance.
 

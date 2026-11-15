@@ -133,8 +133,10 @@ def from_plan(plan, graph, previous=None):
             if name.casefold() in states:
                 row['state'] = states[name.casefold()]
             out.append(row)
-        batches.append({'batch': b['batch'], 'kind': b['kind'], 'groups': list(b['groups']), 'part': b.get('part', 0),
-                        'rooms': out})
+        meta = {'batch': b['batch'], 'kind': b['kind'], 'groups': list(b['groups']), 'part': b.get('part', 0)}
+        if b.get('master'):
+            meta['layer'] = b['master']      # an expansion's batch: built only when that layer is selected
+        batches.append(dict(meta, rooms=out))
     doc = {'format': FORMAT, 'generator': 'tools/door_graph.py room-batches',
            'about': 'The interior rooms the builder converts by batch (--room-batches; docs/chim/DOOR_GRAPH.md "Rooms '
                     'by batch in the builder"), made from the batch plan of the door graph: per room its name (the '
@@ -142,10 +144,30 @@ def from_plan(plan, graph, previous=None):
                     'in the batch, the exterior cell its door chain starts from, the exterior cells with a load door '
                     'straight into it and its door depth. Rooms with water, lava or reached only by Levitate are '
                     'listed like any room; rooms set aside (lava at or under the water, over the size limit of the '
-                    '32 MiB minimum machine, behaves like an exterior) and the expansions\' later batches are not '
-                    'listed. No positions or other game data.',
+                    '32 MiB minimum machine) are not listed. A batch with a "layer" holds an expansion\'s rooms '
+                    '(after the island\'s batches) and is built only when that expansion is selected. No positions or '
+                    'other game data.',
            'island': plan.get('island', 'Vvardenfell'), 'order': plan.get('order'), 'next_id': next_id,
            'batches': batches}
+    problems = check(doc)
+    if problems:
+        raise ValueError('room list: ' + '; '.join(problems[:6]))
+    return doc
+
+
+def append_layers(plan, graph, previous):
+    """The previous room list with the plan's expansion batches (plan --layers: the batches that name a 'master')
+    appended: the island's batches, rooms and ids stay exactly as they are (save IDs never move), any earlier layer
+    batches are made again from the plan, numbered after the island's, and their rooms take ids from the previous
+    'next_id' on (a room the list had already keeps its id). CHIM-SOL-FLORA-PATH-65."""
+    base = [b for b in previous['batches'] if not b.get('layer')]
+    layer = [b for b in plan['batches'] if b.get('master')]
+    if not layer:
+        raise ValueError('room list: the plan has no layer batches (make it with door_graph.py plan --layers)')
+    sub = from_plan({'batches': [dict(b, batch=len(base) + k + 1) for k, b in enumerate(layer)],
+                     'island': plan.get('island'), 'order': plan.get('order')}, graph, previous)
+    doc = dict(previous, about=sub['about'], next_id=max(previous.get('next_id', 0), sub['next_id']),
+               batches=base + sub['batches'])
     problems = check(doc)
     if problems:
         raise ValueError('room list: ' + '; '.join(problems[:6]))
@@ -169,17 +191,22 @@ def rows(doc):
     return [dict(row, batch=b['batch']) for b in (doc or {}).get('batches', []) for row in b['rooms']]
 
 
-def numbers(doc):
-    return [b['batch'] for b in (doc or {}).get('batches', [])]
+def numbers(doc, masters=None):
+    """The list's batch numbers; with MASTERS (the build's selected masters in load order) only the base batches and
+    the batches of a selected layer (a batch's 'layer' names its expansion master)."""
+    keep = None if masters is None else {m.casefold() for m in masters}
+    return [b['batch'] for b in (doc or {}).get('batches', [])
+            if keep is None or not b.get('layer') or b['layer'].casefold() in keep]
 
 
-def parse_selection(text, doc=None):
+def parse_selection(text, doc=None, masters=None):
     """The batch numbers a --room-batches value names: none, all (every batch of the list), N, N-M, or a comma list
-    of those. A number the list does not hold is refused (with the list's numbers)."""
+    of those. A number the list does not hold is refused (with the list's numbers). MASTERS: the build's selected
+    masters; a layer's batches exist only when its master is among them (--no-dlc: the base batches alone)."""
     if text is None:
         text = DEFAULT
     value = str(text).strip().casefold()
-    have = numbers(doc)
+    have = numbers(doc, masters)
     if value == SELECTION_NONE:
         return []
     if value == SELECTION_ALL:

@@ -629,6 +629,16 @@ static int walks_on_ground(edict_t *e) {
         return 0;
     return b.kind==1 && !(b.flags&(AWR_FLIES|AWR_SWIMS));
 }
+/* HEART-OF-LORKHAN-FOLLOWS-DAGOTH-65: a creature whose record neither walks, swims, flies nor is bipedal never moves
+ * (OpenMW 0.51 mwclass/creature.cpp canWalk/canSwim/canFly, isBipedal; mwmechanics/aipackage.cpp: no movement when
+ * the actor can move by none of them): the Heart of Lorkhan and the Kwama Queens of Morrowind.esm. It plays its loop
+ * where it stands, and in a fight it only strikes what comes within its reach (aw_combat.c). One memoized lookup. */
+int AW_ActorStationary(edict_t *e) {
+    aw_actor_base_t b;int row;
+    if(!e || !AW_ActorStateReady() || (row=AW_ActorFind(source_id(e)))==AW_ACTOR_NONE || row<0 || !AW_ActorBase(row,&b))
+        return 0;
+    return AW_ActorBaseStationary(b.kind,b.flags);
+}
 static slot_t *start(edict_t *e,const aw_ambient_row_t *row) {
     slot_t *s=free_slot();aw_ambient_row_t r;long pa,pb,ha,hb;int n=NUM_FOR_EDICT(e);
     if(!s || n<0 || n>=MAX_EDICTS)return NULL;
@@ -734,6 +744,11 @@ static float walk_speed(slot_t *s) {
     memset(&in,0,sizeof(in));in.speed=(float)(attr>=0?attr:50);in.scale=1;
     /* ForceRun (OpenMW controlextensions.cpp OpSetMovementFlag; character.cpp: the forced flag makes the actor run) */
     in.running=aw_ambient_forced_run && aw_ambient_forced_run(s->e);
+    /* ACTOR-MECHANICS-USE-STATS-66: a creature walks by the creature speeds (OpenMW 0.51 creature.cpp getWalkSpeed; a
+     * flyer by the fly speeds), an NPC by the NPC walk as before */
+    if(s->flags&AW_AMBIENT_CREATURE)
+        return AW_MoveActorSpeed(&move_defaults,1,(s->flags&AW_AMBIENT_FLYER)?AW_MEDIUM_AIR:AW_MEDIUM_GROUND,in.speed,0,0)*
+               AW_MOVE_UNIT_SCALE;
     return AW_MoveWalkSpeed(&move_defaults,&in)*AW_MOVE_UNIT_SCALE;
 }
 static void walk_frames(slot_t *s,float speed,float dt) {
@@ -925,6 +940,7 @@ static void walk(slot_t *s,float dt) {
     float target[2],dx,dy,len,speed=walk_speed(s),step;vec3_t move,from;int xyz[3],heading,stepped;
     unsigned long before,searches,tests;
     int flyer=(s->flags&(AW_AMBIENT_FLYER|AW_AMBIENT_SWIMMER))!=0;float tz=s->home[2];   /* swimmers move the same way, in water */
+    if(AW_ActorStationary(s->e))return;   /* HEART-OF-LORKHAN-FOLLOWS-DAGOTH-65: it cannot move: no step */
     if(s->manual_walk){target[0]=s->manual_goal[0];target[1]=s->manual_goal[1];}
     else{AW_AmbientPoint(&s->pkg,s->at,xyz,NULL);target[0]=s->home[0]+xyz[0];target[1]=s->home[1]+xyz[1];tz=s->home[2]+xyz[2];}
     if(flyer){

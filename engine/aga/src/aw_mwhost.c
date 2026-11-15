@@ -52,6 +52,7 @@
 #include "aw_listbox.h"        /* the console target finder */
 #include "aw_clock.h"          /* GetCurrentTime, the moons' phases (v0.0.63, MWSCRIPT-GAPS-63) */
 #include "aw_sky.h"
+#include "aw_mapfog.h"      /* the map's explored land (MAP-ORIGINAL-POI-66) */
 #include <ctype.h>
 
 #define FILE_NAME "mwscript.awm"
@@ -62,6 +63,23 @@
 #define LOOP_ENTITY 30000          /* sound channels of placements without an edict (never a real edict) */
 #define CHAN_SCRIPT 5
 #define CHAN_SCRIPT_VOICE 2
+
+/* MWSCRIPT-TICK-SHARE-66: the two fields this file reads on every edict (aw_ref, aw_source_id) found once per loaded
+ * game code, not by name per edict (GetEdictFieldValue keeps only two names, and other files ask for others between
+ * these calls); the same value as GetEdictFieldValue gives, NULL when the game code has no such field */
+ddef_t *ED_FindField(char *name);   /* pr_edict.c */
+static eval_t *field_of(edict_t *e,int which){
+    static const char *names[2]={"aw_ref","aw_source_id"};
+    static const void *loaded[2];static int ofs[2];
+    if(!e || !progs)return NULL;
+    if(loaded[which]!=(const void *)pr_fielddefs){
+        ddef_t *d=ED_FindField((char *)names[which]);
+        ofs[which]=d?(int)d->ofs:-1;loaded[which]=(const void *)pr_fielddefs;
+    }
+    return ofs[which]<0?NULL:(eval_t *)((char *)&e->v+ofs[which]*4);
+}
+#define field_ref(e) field_of((e),0)
+#define field_source(e) field_of((e),1)
 
 static cvar_t mwscript={"aw_mwscript","1",true};
 static unsigned char *resident;static unsigned long resident_bytes,file_bytes;
@@ -99,6 +117,11 @@ static int read_string_from(FILE *f,long base,int index,char *out,int capacity){
 static struct {int index;short length;char text[64];} str_cache[STR_CACHE];static int str_cache_next,str_cache_ready;
 static unsigned long string_reads;
 unsigned long AW_MwscriptStringReads(void){return string_reads;}
+/* SAVE-INSIDE-SCRIPT-STEP-66 (aw_save.h aw_save_busy): above 0 while the frame's script tick or a dialogue answer's
+ * result script runs; a save asked for in there (a console command a script's message box lets through, the save
+ * menu) is queued and written by AW_SaveTick at the next settled frame */
+static int script_depth;
+static int save_busy(void){return script_depth>0;}
 /* ARRIVAL-LONG-FRAME-DEV6-59: the file is opened once and kept open while it is loaded (one handle), never once per
  * string read (five opens, about 1 s, in the arrival frame); closed when the scripts load again */
 static FILE *str_file;static long str_base;
@@ -682,6 +705,37 @@ static int door_open(unsigned reference,int set){
     if(r && (r->fields&AW_LEDGER_OPEN)){r->fields&=~AW_LEDGER_OPEN;AW_LedgerTidy(&aw_ledger,reference);}
     return 0;
 }
+/* MWSCRIPT-SETDELETE-STOPS-66 (OpenMW 0.51 miscextensions.cpp OpSetDelete, worldimp.cpp deleteObject / undeleteObject;
+ * our own code): SetDelete 1 deletes the reference for good: its count is 0, as an item the player took (TAKEN on its
+ * row, saved), so Enable never brings it back, it leaves the scene and its local script stops; the map's attach binds
+ * no script to a deleted reference. SetDelete 0 undeletes it: shown again (its script binds at the next map load). The
+ * script stops after the frame's run (a script may delete its own object): DELETED_FLUSH. */
+#define DELETED_PENDING 32
+static uint32_t deleted_pending[DELETED_PENDING];static int deleted_count;
+static unsigned long objects_deleted,objects_undeleted,deleted_refused;
+static void deleted_flush(void){
+    int i;
+    for(i=0;i<deleted_count;i++)AW_MwvmDetach(deleted_pending[i]);
+    deleted_count=0;
+}
+static int object_deleted(uint32_t ref){
+    aw_ledger_row_t *r=aw_ledger_on && ref?ledger_row(ref):NULL;
+    return r && (r->fields&AW_LEDGER_TAKEN) && !(ref&AW_LEDGER_PLAYER);
+}
+static void object_set_deleted(uint32_t ref,int deleted){
+    aw_ledger_row_t *r=ledger_row(ref);
+    if(deleted){
+        if(r && (r->fields&AW_LEDGER_TAKEN))return;
+        if(!(r=AW_LedgerPut(&aw_ledger,ref))){deleted_refused++;return;}
+        r->fields|=AW_LEDGER_TAKEN;ledger_place(r);ledger_hide(ref);objects_deleted++;
+        if(deleted_count<DELETED_PENDING)deleted_pending[deleted_count++]=ref;else AW_MwvmDetach(ref);
+        return;
+    }
+    if(!r || !(r->fields&AW_LEDGER_TAKEN))return;
+    r->fields&=~(AW_LEDGER_TAKEN|AW_LEDGER_STOLEN);objects_undeleted++;
+    if(!(r->fields&AW_LEDGER_DISABLED)){ledger_show(ref);enabled(ref);}
+    AW_LedgerTidy(&aw_ledger,ref);
+}
 static int32_t object_op(uint32_t ref,int op,int32_t value);
 static int32_t host_object(int instance,int target,int op,int32_t value){
     uint32_t ref=target_reference(instance,target);
@@ -733,26 +787,22 @@ static int32_t object_op(uint32_t ref,int op,int32_t value){
 }
 /* Activation (the original's rule): the player's use of an object whose attached script reads OnActivate goes to
  * the script (OnActivate reads 1 on its next run) and the object does nothing until the script's Activate. Off
- * with the scripts off; a script the engine carries by hand (the census office) is never attached. */
+ * with the scripts off; a script the engine carries by hand (the census office) is never attached.
+ * CAPTAIN-EXIT-DOOR-DEAD-AFTER-REENTRY-66: only while the script holds the use (it read OnActivate since its own
+ * Activate, aw_mwvm.c AW_MwvmUse; OpenMW 0.51 mwworld/refdata.cpp): a script that returns before its OnActivate line
+ * (the census doors' "done" check, after their first opening) leaves the object its own use, every time after. */
 static unsigned long intercepted,activated;
 static int object_intercept(unsigned reference){
-    int k,n;
-    if(!mwscript.value || !resident || !reference)return 0;
-    n=AW_MwvmInstanceCount();
-    for(k=0;k<n;k++){
-        aw_mwvm_instance_t *in=AW_MwvmInstance(k);
-        if(!in || !(in->flags&AWI_USED) || (in->flags&AWI_GLOBAL) || in->reference!=reference)continue;
-        if(!(AW_MwvmScriptFlags(in->script)&AWS_ONACTIVATE))continue;
-        in->flags|=AWI_ACTIVATED;in->flags&=~AWI_QUIET;intercepted++;
-        return 1;
-    }
-    return 0;
+    if(!mwscript.value || !resident || !reference || !AW_MwvmUse(reference))return 0;
+    intercepted++;
+    return 1;
 }
 /* E on an object with no NPC under the crosshair (v0.0.57): the scripted placement that reads OnActivate nearest the
  * view's line, within the activation distance (iMaxActivateDist 192 game units, the original's GMST; OpenMW
  * mwworld/worldimp.cpp getMaxActivationDistance) and inside a narrow cone (cos 0.95 against the view). Activators and
  * other placements the CHIM world keeps without an edict are scripts' instances with their positions; the script's
- * OnActivate reads 1 on its next run. 1 when one took the use. */
+ * OnActivate reads 1 on its next run. 1 when one took the use. Only a script that holds the use now
+ * (CAPTAIN-EXIT-DOOR-DEAD-AFTER-REENTRY-66, AWI_TAKES_USE) is a candidate. */
 static void to_game_units(const vec3_t local,float out[3]);
 int AW_MwscriptUseInView(const float *eye,const float *forward);
 int AW_MwscriptUseInView(const float *eye,const float *forward){
@@ -763,7 +813,7 @@ int AW_MwscriptUseInView(const float *eye,const float *forward){
     for(k=0;k<n;k++){
         aw_mwvm_instance_t *in=AW_MwvmInstance(k);float d[3],g[3],len,c;vec3_t l;
         if(!in || !(in->flags&AWI_USED) || (in->flags&AWI_GLOBAL) || !in->reference)continue;
-        if(!(AW_MwvmScriptFlags(in->script)&AWS_ONACTIVATE))continue;
+        if(!(in->flags&AWI_TAKES_USE))continue;
         VectorCopy(in->origin,l);to_game_units(l,g);
         d[0]=g[0]-e[0];d[1]=g[1]-e[1];d[2]=g[2]-e[2];
         len=(float)sqrt(d[0]*d[0]+d[1]*d[1]+d[2]*d[2]);
@@ -773,8 +823,8 @@ int AW_MwscriptUseInView(const float *eye,const float *forward){
         c=(d[0]*forward[0]+d[1]*forward[1]+d[2]*forward[2])/len;
         if(c>best_cos){best_cos=c;best=k;}
     }
-    if(best<0)return 0;
-    {aw_mwvm_instance_t *in=AW_MwvmInstance(best);in->flags|=AWI_ACTIVATED;in->flags&=~AWI_QUIET;intercepted++;}
+    if(best<0 || !AW_MwvmUse(AW_MwvmInstance(best)->reference))return 0;
+    intercepted++;
     return 1;
 }
 static void object_activate(uint32_t reference){
@@ -1013,7 +1063,7 @@ int AW_MwscriptActors(void){
     return 1;
 }
 static int row_of_edict(edict_t *e){
-    eval_t *v=e?GetEdictFieldValue(e,"aw_source_id"):NULL;
+    eval_t *v=e?field_source(e):NULL;
     if(!v || !v->string || !*(pr_strings+v->string))return AW_ACTOR_NONE;
     return AW_ActorFind(pr_strings+v->string);
 }
@@ -1143,7 +1193,7 @@ void AW_MwscriptPlayerStore(aw_actor_t *a){player_store(a);AW_MwvmStateChanged()
 #define FX_EDICTS 16
 static aw_actor_t *disposition_restore(aw_actor_t *a);
 static uint32_t fx_edict_ref[FX_EDICTS];static int fx_edict_num[FX_EDICTS];
-static uint32_t ref_of_edict(edict_t *e){eval_t *v=e?GetEdictFieldValue(e,"aw_ref"):NULL;return v && v->_float>0?(uint32_t)v->_float:0;}
+static uint32_t ref_of_edict(edict_t *e){eval_t *v=e?field_ref(e):NULL;return v && v->_float>0?(uint32_t)v->_float:0;}
 static void fx_edict_keep(uint32_t ref,edict_t *e){
     int i,k=-1;
     for(i=0;i<FX_EDICTS;i++){if(fx_edict_ref[i]==ref){k=i;break;}if(k<0 && !fx_edict_ref[i])k=i;}
@@ -1322,7 +1372,7 @@ static edict_t *speaker_edict(uint32_t ref){
     if(!ref || !sv.active)return NULL;
     for(i=1;i<sv.num_edicts;i++){
         edict_t *x=EDICT_NUM(i);
-        if(!x->free && (v=GetEdictFieldValue(x,"aw_ref"))!=NULL && v->_float>0 && (uint32_t)v->_float==ref)return x;
+        if(!x->free && (v=field_ref(x))!=NULL && v->_float>0 && (uint32_t)v->_float==ref)return x;
     }
     return NULL;
 }
@@ -1474,7 +1524,7 @@ static void host_combat(int instance,int target,int verb,int other){
     if(!a || !e || e==sv_player){actor_misses++;return;}
     if(verb==0){
         /* StartCombat with the player (the one fight the combat layer has): not when either is dead (OpenMW) */
-        aw_fighter_t sheet;eval_t *v=GetEdictFieldValue(e,"aw_source_id");
+        aw_fighter_t sheet;eval_t *v=field_source(e);
         if((a->flags&AWL_DEAD))return;
         if(other!=AW_MWVM_PLAYER){
             /* COMBAT-ACTOR-VS-ACTOR-62 (v0.0.63): StartCombat on another actor (OpenMW mechanicsmanagerimp.cpp
@@ -1483,7 +1533,7 @@ static void host_combat(int instance,int target,int verb,int other){
             vec3_t at;int n=locate(instance,other,at);edict_t *o=n>0?edict_of(n):NULL;aw_actor_t *b;eval_t *w;
             aw_fighter_t other_sheet;
             if(!o || o==e || o==sv_player || !(b=record_of_edict(o)) || (b->flags&AWL_DEAD)){combat_refused++;return;}
-            w=GetEdictFieldValue(o,"aw_source_id");
+            w=field_source(o);
             if(!v || !v->string || !AW_CombatActorLoad(pr_strings+v->string,&sheet) ||
                !w || !w->string || !AW_CombatActorLoad(pr_strings+w->string,&other_sheet)){combat_refused++;return;}
             to_fighter(a,&sheet);to_fighter(b,&other_sheet);
@@ -1534,7 +1584,7 @@ int AW_MwscriptSpeedAttribute(struct edict_s *e){
     int row;aw_actor_t *a;uint32_t ref;eval_t *v;
     if(!e || !AW_MwscriptActors())return -1;
     if(e==sv_player)return (int)AW_ActorStat(player_record(),AWA_ATTRIBUTE+4);
-    v=GetEdictFieldValue(e,"aw_ref");ref=v && v->_float>0?(uint32_t)v->_float:0;
+    v=field_ref(e);ref=v && v->_float>0?(uint32_t)v->_float:0;
     if((row=row_of_edict(e))==AW_ACTOR_NONE)return -1;
     a=ref?AW_ActorGet(ref,row,0):NULL;
     if(a)return (int)AW_ActorStat(a,AWA_ATTRIBUTE+4);
@@ -1549,13 +1599,19 @@ int AW_MwscriptWeaponType(struct edict_s *e){
 }
 /* Once a frame while anyone fights: the fighters' health and deaths reach their records (the dead count, OnDeath),
  * and the scripts that read actors wake (AW_MwvmStateChanged). */
+static int compare_edicts(const void *a,const void *b){
+    const edict_t *x=*(edict_t *const *)a,*y=*(edict_t *const *)b;return x<y?-1:x>y;
+}
 static void actors_from_fights(void){
-    int i;edict_t *e;const aw_fighter_t *f;
+    int i,n;edict_t *e,*fighting[AW_COMBAT_FIGHTERS_MAX];const aw_fighter_t *f;
     if(!AW_CombatHostiles() || !AW_ActorStateReady())return;
-    for(i=1;i<sv.num_edicts;i++){
+    /* MWSCRIPT-TICK-SHARE-66: the fight slots' edicts (in edict order, as the scan met them), not every edict */
+    n=AW_CombatFighterEdicts(fighting,AW_COMBAT_FIGHTERS_MAX);
+    qsort(fighting,(size_t)n,sizeof(fighting[0]),compare_edicts);
+    for(i=0;i<n;i++){
         eval_t *v;uint32_t ref;int row;aw_actor_t *a;float before;int dead;
-        e=EDICT_NUM(i);if(e->free || !(f=AW_CombatFighter(e)))continue;
-        v=GetEdictFieldValue(e,"aw_ref");ref=v && v->_float>0?(uint32_t)v->_float:0;
+        e=fighting[i];if(e->free || !(f=AW_CombatFighter(e)))continue;
+        v=field_ref(e);ref=v && v->_float>0?(uint32_t)v->_float:0;
         if(!ref || (row=row_of_edict(e))==AW_ACTOR_NONE || !(a=AW_ActorGet(ref,row,1)))continue;
         before=a->dyn_cur[0];dead=(a->flags&AWL_DEAD)!=0;
         from_fighter(a,f);
@@ -1757,7 +1813,7 @@ static int npc_rank_change(aw_actor_t *a,int raise){
 int AW_MwscriptNpcRank(edict_t *e);
 int AW_MwscriptNpcRank(edict_t *e){
     eval_t *v;
-    if(!e || e->free || !aw_ledger_on || !(v=GetEdictFieldValue(e,"aw_ref")) || v->_float<=0)return -1;
+    if(!e || e->free || !aw_ledger_on || !(v=field_ref(e)) || v->_float<=0)return -1;
     return AW_LedgerRank(&aw_ledger,(uint32_t)v->_float);
 }
 /* the dialogue window's Choice and Goodbye (aw_dialwin.c sets it while a result script runs): TEXTS NULL = Goodbye */
@@ -1785,7 +1841,7 @@ static void edict_refs_refresh(void){
     edict_ref_count=0;
     for(i=1;i<sv.num_edicts && edict_ref_count<EDICT_REFS;i++){
         e=EDICT_NUM(i);if(e->free)continue;
-        v=GetEdictFieldValue(e,"aw_ref");if(!v || v->_float<=0)continue;
+        v=field_ref(e);if(!v || v->_float<=0)continue;
         edict_refs[edict_ref_count].ref=(uint32_t)v->_float;edict_refs[edict_ref_count++].entity=i;
     }
     qsort(edict_refs,edict_ref_count,sizeof(edict_refs[0]),compare_refs);
@@ -1847,6 +1903,7 @@ static int census_script(int script){
     return census_scripts[i]!=NULL;
 }
 static int attach_script(uint32_t ref,int script,int flags,int entity,const float origin[3]){
+    if(object_deleted(ref))return -1;   /* MWSCRIPT-SETDELETE-STOPS-66: a deleted reference runs no script (OpenMW) */
     if(script>=0 && census_script(script))AW_MwvmScriptHold(script,AW_CensusLegacy());
     return AW_MwvmAttach(ref,script,flags,entity,origin);
 }
@@ -1913,7 +1970,7 @@ static void leave_now(void){
     for(i=0;i<leaving_count;i++){
         edict_t *e=edict_of(leaving[i].entity);eval_t *v;
         AW_MwvmDetach(leaving[i].ref);
-        if(!e || e->free || !(v=GetEdictFieldValue(e,"aw_ref")) || (uint32_t)v->_float!=leaving[i].ref)continue;
+        if(!e || e->free || !(v=field_ref(e)) || (uint32_t)v->_float!=leaving[i].ref)continue;
         AW_ActorsRemove(e);left++;
     }
     leaving_count=0;
@@ -2030,7 +2087,10 @@ static char *placed_text(const place_row_t *r,uint32_t key,unsigned long *length
  * as a map load runs it (precaching allowed), linked. NULL when the text or its spawn function is missing. */
 static unsigned long placed_objects;
 static int edict_of_ref(uint32_t key){
-    int i;
+    int i=entity_of_reference(key);edict_t *t=edict_of(i);
+    /* MWSCRIPT-TICK-SHARE-66: the map's sorted reference table first (a binary search), checked against the edict;
+     * an edict another module spawned or freed since the table was made: the scan, as before */
+    if(t && !t->free && ref_of_edict(t)==key)return i;
     for(i=1;i<sv.num_edicts;i++){edict_t *x=EDICT_NUM(i);if(!x->free && ref_of_edict(x)==key)return i;}
     return 0;
 }
@@ -2320,7 +2380,7 @@ static edict_t *named_actor(const char *who){
     if(!Q_strcasecmp((char *)who,"player"))return sv_player;
     for(i=1;i<sv.num_edicts;i++){
         edict_t *x=EDICT_NUM(i);eval_t *v;
-        if(x->free || !(v=GetEdictFieldValue(x,"aw_source_id")) || !v->string)continue;
+        if(x->free || !(v=field_source(x)) || !v->string)continue;
         if(!Q_strcasecmp(pr_strings+v->string,(char *)who))return x;
     }
     return NULL;
@@ -2460,7 +2520,7 @@ static int start_find(edict_t *e){
 }
 static void start_keep(edict_t *e){
     eval_t *v;int i;
-    if(e==sv_player || start_find(e)>=0 || !(v=GetEdictFieldValue(e,"aw_ref")) || v->_float<=0)return;
+    if(e==sv_player || start_find(e)>=0 || !(v=field_ref(e)) || v->_float<=0)return;
     i=start_next;start_next=(start_next+1)%STARTS;
     starts[i].ref=(uint32_t)v->_float;starts[i].entity=NUM_FOR_EDICT(e);starts[i].map=attached_map;
     VectorCopy(e->v.origin,starts[i].origin);VectorCopy(e->v.angles,starts[i].angles);
@@ -2577,7 +2637,7 @@ static void detect_thief(edict_t *a,aw_crime_thief_t *t){
     eval_t *r;uint32_t ref;aw_actor_t *x;
     memset(t,0,sizeof(*t));t->fatigue_term=1;
     if(a==sv_player){crime_thief(t);return;}
-    r=GetEdictFieldValue(a,"aw_ref");ref=r && r->_float>0?(uint32_t)r->_float:0;
+    r=field_ref(a);ref=r && r->_float>0?(uint32_t)r->_float:0;
     if(!ref)return;
     t->sneaking=forced_find(ref)>=0;   /* a ForceSneak on the NPC (v0.0.62) */
     if((x=AW_ActorGet(ref,AW_ACTOR_NONE,0))!=NULL){
@@ -2787,11 +2847,16 @@ static int small_call(int instance,int target,int function,const aw_mwcell_t *nu
         else result->i=e && (f=AW_CombatFighter(e))!=NULL && !f->dead;
         return AW_MWVM_CALL_READ;}
     case AWF_SETDELETE:
-        /* SetDelete 1 / 0 (OpenMW miscextensions.cpp OpSetDelete: the reference deleted from the world, or back): here
-         * the object state's Disable and Enable, kept in saved games; any other number does nothing (OpenMW: an
-         * error) */
+        /* SetDelete 1 / 0 (OpenMW miscextensions.cpp OpSetDelete: the reference deleted from the world, or back); any
+         * other number does nothing (OpenMW: an error). With the world change list (the default) it is a delete, not a
+         * Disable: count 0, its script stops (object_set_deleted); without it, the older object state's Disable */
         if(count<1 || (numbers[0].i!=0 && numbers[0].i!=1))return 1;
-        host_object(instance,target,numbers[0].i?AWM_DISABLE:AWM_ENABLE,0);AW_MwvmStateChanged();transforms++;
+        /* MWSCRIPT-SETDELETE-STOPS-66: deleted for good with the world change list (object_set_deleted); the old
+         * object table keeps the earlier Disable / Enable */
+        if(aw_ledger_on){uint32_t ref=target_reference(instance,target);
+            if(ref && ref<=AW_LEDGER_ID)object_set_deleted(ref,numbers[0].i);}
+        else host_object(instance,target,numbers[0].i?AWM_DISABLE:AWM_ENABLE,0);
+        AW_MwvmStateChanged();transforms++;
         return 1;
     }
     return 0;
@@ -2865,17 +2930,44 @@ static int soul_gems(int function,int target,const char *creature,int count){
  * OnPCEquip 1. The item's script then runs while the item is carried (OpenMW runs the scripts of the player's items),
  * as an instance of its own key (CARRIED_KEY and the item id's hash) that follows the player, its values parked on a
  * map change and saved with every object's; it reads OnPCEquip, shows its message box (with its buttons; the choice
- * read by GetButtonPressed) and resets it, as in the original. Not kept: which carried items run (after a load an
- * item's script runs again from its next equipping). */
+ * read by GetButtonPressed) and resets it, as in the original. A save keeps its values by the item (the name hash of
+ * its id, SAVE-ITEM-SCRIPT-LOCALS-66), and a load runs the script again of every carried item whose values it brought.
+ * SAVE-ITEM-SCRIPT-LOCALS-66: the key was 0xFE000000 | hash, which has bit 30, the held items' bit (aw_mwcode.h
+ * AWB_HELD_BIT): the interpreter took it for a held item's and dropped its values at every map change, and the save
+ * skipped them. Now bits 24-29 all set and bit 30 clear: neither a placed reference's key nor a held item's. */
 #define CARRIED_ITEMS 16
-#define CARRIED_KEY 0xFE000000u
+#define CARRIED_KEY 0x3F000000u
+#define CARRIED_REF(r) (((r)&0xFF000000u)==CARRIED_KEY)
 typedef struct {int script,on,skip;} equip_row_t;
 static struct {uint32_t key;char id[64];int script;} carried_items[CARRIED_ITEMS];
 static unsigned long equip_reactions,equip_skipped,carried_refused;
+/* the low 24 bits of the id's name hash (aw_ledger.h AW_LedgerNameHash; tools/mwscript/awms.py refuses two worn items'
+ * ids that share them), never 0 */
 static uint32_t carried_key(const char *id){
-    uint32_t h=2166136261u;
-    for(;*id;id++)h=(h^(uint32_t)(unsigned char)tolower((unsigned char)*id))*16777619u;
-    return CARRIED_KEY|(h&0xFFFFFFu);
+    uint32_t h=AW_LedgerNameHash(id)&0xFFFFFFu;
+    return CARRIED_KEY|(h?h:1u);
+}
+/* SAVE-ITEM-SCRIPT-LOCALS-66: the item behind each carried key met this session (CARRIED_KEY | low bits -> the full
+ * name hash of its id), so a save names the item of values parked after it left the inventory; one entry per worn
+ * item kind with a script (the game: 40), grown from the heap; emptied with the carried items */
+#define CARRIED_NAMES_MAX 256
+AW_RESIDENT_GROWS("worn items' ids met, for the save (SAVE-ITEM-SCRIPT-LOCALS-66)",CARRIED_NAMES_MAX,8);
+static struct carried_name_s {uint32_t key,item;} *carried_names;static int carried_name_count,carried_name_capacity;
+static int carried_name_add(uint32_t key,uint32_t item){
+    int i;
+    for(i=0;i<carried_name_count;i++)if(carried_names[i].key==key){carried_names[i].item=item;return 1;}
+    if(carried_name_count>=CARRIED_NAMES_MAX)return 0;
+    if(carried_name_count==carried_name_capacity){
+        int want=carried_name_capacity?carried_name_capacity*2:16;struct carried_name_s *grown;
+        if(!(grown=(struct carried_name_s *)AW_TryRealloc(carried_names,(unsigned long)want*sizeof(*grown))))return 0;
+        carried_names=grown;carried_name_capacity=want;
+    }
+    carried_names[carried_name_count].key=key;carried_names[carried_name_count].item=item;carried_name_count++;
+    return 1;
+}
+static uint32_t carried_name_of(uint32_t key){
+    int i;for(i=0;i<carried_name_count;i++)if(carried_names[i].key==key)return carried_names[i].item;
+    return 0;
 }
 static int equip_row(const char *id,equip_row_t *out){
     uint32_t off,rows,bytes,i;char name[64];
@@ -2899,6 +2991,7 @@ static int instance_of_reference(uint32_t key){
 }
 static void carried_add(const char *id,int script){
     uint32_t key=carried_key(id);int i,slot=-1;
+    if(!carried_name_add(key,AW_LedgerNameHash(id)))carried_refused++;   /* a save then refuses (locals_put) */
     for(i=0;i<CARRIED_ITEMS;i++){
         if(carried_items[i].key==key)return;
         if(slot<0 && !carried_items[i].key)slot=i;
@@ -2919,7 +3012,7 @@ static void carried_tick(const float player[3]){
         AW_MwvmSetOrigin(k,player);
     }
 }
-static void carried_reset(void){memset(carried_items,0,sizeof(carried_items));}
+static void carried_reset(void){memset(carried_items,0,sizeof(carried_items));carried_name_count=0;}
 /* the inventory window's Equip: PHASE 0 before (1: the script takes it, nothing is worn), 1 after it was worn */
 static int equip_script(const aw_inventory_item_t *it,int phase){
     equip_row_t r;uint32_t key;
@@ -2952,7 +3045,7 @@ static int resurrect(int instance,int target){
     if(target==AW_MWVM_PLAYER || !e || e->free || e==sv_player || !is_actor(e) || !(ref=ref_of_edict(e))){
         resurrect_refused++;return 1;}
     VectorCopy(e->v.origin,origin);yaw=e->v.angles[1];id[0]=0;
-    if((v=GetEdictFieldValue(e,"aw_source_id"))!=NULL && v->string){
+    if((v=field_source(e))!=NULL && v->string){
         strncpy(id,pr_strings+v->string,sizeof(id)-1);id[sizeof(id)-1]=0;}
     ents=sv.worldmodel?sv.worldmodel->entities:NULL;
     if(ents)block=AW_MwvmEntityBlock(ents,(unsigned long)strlen(ents),ref,&len);
@@ -3224,7 +3317,7 @@ static int console_group_call(int instance,int target,int function,const aw_mwce
         k=target==AW_MWVM_PLAYER?-1:object_instance(instance,target,&e);
         if(target==AW_MWVM_PLAYER)e=sv_player;
         if(!e){Con_Printf("OutputRefInfo: no such reference here\n");return 1;}
-        v=GetEdictFieldValue(e,"aw_source_id");scale=GetEdictFieldValue(e,"aw_scale");
+        v=field_source(e);scale=GetEdictFieldValue(e,"aw_scale");
         to_game_units(e->v.origin,game);
         Con_Printf("RefID: %s\nRefNum: %lu\nPosition: %g %g %g\nAngle Z: %g\nScale: %g\nScript: %d\n",
                    e==sv_player?"player":v && v->string?pr_strings+v->string:"(none)",(unsigned long)ref,
@@ -3485,7 +3578,7 @@ static int host_call(int instance,int target,int function,const aw_mwcell_t *num
      * reported), PayFine / PayFineThief / GotoJail (miscextensions.cpp OpPayFine, OpPayFineThief, OpGoToJail),
      * GetPCInJail (OpGetPcInJail) */
     case AWF_ONMURDER:{
-        vec3_t at;int n=locate(instance,target,at);edict_t *e=n>0?edict_of(n):NULL;eval_t *r=e?GetEdictFieldValue(e,"aw_ref"):NULL;
+        vec3_t at;int n=locate(instance,target,at);edict_t *e=n>0?edict_of(n):NULL;eval_t *r=e?field_ref(e):NULL;
         result->i=r && r->_float>0 && AW_CrimeOnMurder((unsigned long)r->_float);
         return AW_MWVM_CALL_READ;}
     case AWF_PAYFINE:case AWF_PAYFINETHIEF:
@@ -3586,7 +3679,7 @@ static int host_call(int instance,int target,int function,const aw_mwcell_t *num
          * for the map's place markers (INGAME-MAP-ORIGINAL-57), which do not exist yet */
         const char *text=call_string(strings,nstrings,0);
         if(!text || !*text)return 0;
-        if(!AW_RevealedAdd(text)){Con_DPrintf("MWScript: ShowMap %s not kept (128 places at most)\n",text);return 0;}
+        if(!AW_RevealedAdd(text)){Con_DPrintf("MWScript: ShowMap %s not kept (the revealed places list is full)\n",text);return 0;}
         AW_MwvmStateChanged();return 1;}
     case AWF_CHOICE:case AWF_GOODBYE:
         /* Choice and Goodbye in a dialogue result script (OpenMW dialogueextensions.cpp OpChoice, OpGoodbye): the
@@ -3635,7 +3728,7 @@ static int host_call(int instance,int target,int function,const aw_mwcell_t *num
         if(!Q_strcasecmp((char *)who,"player"))t=sv_player;
         else for(i=1;i<sv.num_edicts && !t;i++){
             edict_t *x=EDICT_NUM(i);eval_t *v;
-            if(x->free || !(v=GetEdictFieldValue(x,"aw_source_id")) || !v->string)continue;
+            if(x->free || !(v=field_source(x)) || !v->string)continue;
             if(!Q_strcasecmp(pr_strings+v->string,(char *)who))t=x;
         }
         game[0]=numbers[1].f;game[1]=numbers[2].f;game[2]=numbers[3].f;
@@ -3687,7 +3780,7 @@ static int host_call(int instance,int target,int function,const aw_mwcell_t *num
         /* COMBAT-ACTOR-VS-ACTOR-62 (v0.0.63): the actor's target, the player or another actor (by its record id) */
         t=AW_CombatTargetOf(e,&pl);
         if(!Q_strcasecmp((char *)id,"player"))result->i=pl;
-        else if(t){eval_t *w=GetEdictFieldValue(t,"aw_source_id");
+        else if(t){eval_t *w=field_source(t);
                    result->i=w && w->string && !Q_strcasecmp(pr_strings+w->string,(char *)id);}
         return AW_MWVM_CALL_READ;}
     case AWF_ROTATE:{
@@ -3903,14 +3996,14 @@ static int speaker_pair(const aw_glut_cond_t *c,unsigned fn,long *out){
     memset(&p,0,sizeof(p));p.fight_rating=-1;
     if(!aw_character.valid || c->speaker<=0 || c->speaker>=sv.num_edicts || !AW_MwscriptActors())return 0;
     e=EDICT_NUM(c->speaker);
-    if(e->free || !(v=GetEdictFieldValue(e,"aw_source_id")) || !v->string || (row=AW_ActorFind(pr_strings+v->string))<0 ||
+    if(e->free || !(v=field_source(e)) || !v->string || (row=AW_ActorFind(pr_strings+v->string))<0 ||
        !AW_ActorBase(row,&b) || b.kind!=0)return 0;
     p.known=1;p.player_female=aw_character.female!=0;p.speaker_female=(b.flags&AWR_FEMALE)!=0;
     if(aw_character.race>=0 && aw_character.race<aw_race_count)p.player_race=aw_races[aw_character.race].id;
     if(b.race!=AW_ACTOR_NONE && read_string(b.race,race,sizeof(race)))p.speaker_race=race;
     if(fn==AW_DIAL_FN_SHOULD_ATTACK && AW_CombatAiLoaded() && svs.maxclients>0 && (player=svs.clients[0].edict)!=NULL){
         vec3_t d;int fight=b.fight;
-        r=GetEdictFieldValue(e,"aw_ref");
+        r=field_ref(e);
         if(r && (a=AW_ActorGet((uint32_t)r->_float,row,0))!=NULL)fight=(int)AW_ActorStat(a,AWA_FIGHT);
         VectorSubtract(e->v.origin,player->v.origin,d);
         p.fight_rating=AW_CombatFightRating(&aw_combat_ai,fight,c->disposition,(float)Length(d)/AW_MOVE_UNIT_SCALE);
@@ -3923,7 +4016,7 @@ static int live_function(const aw_glut_cond_t *c,unsigned fn,long *out){
     if(fn==5){*out=AW_StandingReputation();return 1;}                      /* PcReputation */
     if(fn==43){*out=AW_StandingCrime();return 1;}                          /* PcCrimeLevel */
     if(fn==49){                                                            /* Alarmed (CRIME-59): the speaker's mark */
-        edict_t *e=c->speaker>0 && c->speaker<sv.num_edicts?EDICT_NUM(c->speaker):NULL;eval_t *r=e?GetEdictFieldValue(e,"aw_ref"):NULL;
+        edict_t *e=c->speaker>0 && c->speaker<sv.num_edicts?EDICT_NUM(c->speaker):NULL;eval_t *r=e?field_ref(e):NULL;
         *out=r && r->_float>0 && AW_CrimeAlarmed((unsigned long)r->_float);return 1;}
     if(fn==39){*out=c->faction?AW_StandingExpelled(c->faction):0;return 1;} /* PcExpelled (the speaker's faction) */
     if(fn==46){*out=c->faction && AW_StandingRank(c->faction)>=0;return 1;} /* SameFaction */
@@ -4169,7 +4262,7 @@ static void attach_objects(void){
     edict_ref_count=0;
     for(i=1;i<sv.num_edicts && edict_ref_count<EDICT_REFS;i++){
         e=EDICT_NUM(i);if(e->free)continue;
-        v=GetEdictFieldValue(e,"aw_ref");if(!v || v->_float<=0)continue;
+        v=field_ref(e);if(!v || v->_float<=0)continue;
         edict_refs[edict_ref_count].ref=(uint32_t)v->_float;edict_refs[edict_ref_count++].entity=i;
     }
     qsort(edict_refs,edict_ref_count,sizeof(edict_refs[0]),compare_refs);
@@ -4188,7 +4281,7 @@ static struct {int entity;uint32_t ref,hash;} levelled_queue[LEVELLED_QUEUE];sta
 static unsigned long levelled_attached,levelled_refused;
 static void levelled_spawned(edict_t *e,unsigned hash){
     eval_t *v;
-    if(!e || e->free || nlevelled>=LEVELLED_QUEUE || !(v=GetEdictFieldValue(e,"aw_ref")) || v->_float<=0)return;
+    if(!e || e->free || nlevelled>=LEVELLED_QUEUE || !(v=field_ref(e)) || v->_float<=0)return;
     levelled_queue[nlevelled].entity=NUM_FOR_EDICT(e);levelled_queue[nlevelled].ref=(uint32_t)v->_float;
     levelled_queue[nlevelled++].hash=hash;
 }
@@ -4196,7 +4289,7 @@ static void levelled_flush(void){
     int i,script,k;
     for(i=0;i<nlevelled;i++){
         edict_t *e=edict_of(levelled_queue[i].entity);eval_t *v;aw_mwvm_instance_t *in;
-        if(!e || e->free || !(v=GetEdictFieldValue(e,"aw_ref")) || (uint32_t)v->_float!=levelled_queue[i].ref ||
+        if(!e || e->free || !(v=field_ref(e)) || (uint32_t)v->_float!=levelled_queue[i].ref ||
            !AW_MwvmLevelledScript(levelled_queue[i].hash,&script))continue;
         /* the list rolled another actor since (a respawn): the old pick's values are parked, the new one attached */
         for(k=0;k<AW_MwvmInstanceCount();k++)
@@ -4348,7 +4441,7 @@ static int ambience_playing(void){
 static float join_clock;static unsigned long joins_allies,joins_guards;
 static int crime_guard(edict_t *e);
 static int fight_sheet(edict_t *e,aw_fighter_t *out){
-    eval_t *v=GetEdictFieldValue(e,"aw_source_id");aw_actor_t *a=record_of_edict(e);
+    eval_t *v=field_source(e);aw_actor_t *a=record_of_edict(e);
     if(!a || (a->flags&AWL_DEAD) || !v || !v->string || !AW_CombatActorLoad(pr_strings+v->string,out))return 0;
     to_fighter(a,out);return 1;
 }
@@ -4426,7 +4519,22 @@ static void chargen_sync(void){
     }else if(script!=story && AW_StateSet(&aw_state,AW_GLOBAL,"CharGenState",script))story=script;
     chargen_synced=story;
 }
-void AW_MwscriptTick(float dt){
+/* MAP-ORIGINAL-POI-66 stage 2: the explored land (aw_mapfog.c) opens around the player as they walk, the way OpenMW's
+ * local map fog clears (localmap.cpp updatePlayer: every frame, 0.17 of a cell around the player); here once the player
+ * has moved 128 source units, a few dozen bit tests. A place square shows once its spot is explored (aw_worldui.c).
+ * Saved with the game (AWFG), cleared by New Game. */
+static void map_visit(void){
+    static int have;static float last_x,last_y;float source[3];
+    if(!AW_WorldToSource(sv.name,sv_player->v.origin,source)){   /* an interior: its own room fog (stage 3) */
+        static float room_x,room_y;   /* once the player has moved 32 units: 256 squares tested */
+        if(sv.worldmodel && (fabsf(sv_player->v.origin[0]-room_x)>=32 || fabsf(sv_player->v.origin[1]-room_y)>=32 || !AW_MapFogRooms()) &&
+           (room_x=sv_player->v.origin[0],room_y=sv_player->v.origin[1],1))AW_MapFogRoomReveal(sv.name,sv_player->v.origin[0],sv_player->v.origin[1],sv.worldmodel->mins,sv.worldmodel->maxs);
+        return;
+    }
+    if(have && fabsf(source[0]-last_x)<128 && fabsf(source[1]-last_y)<128 && AW_MapFogCells())return;
+    have=1;last_x=source[0];last_y=source[1];
+    AW_MapFogReveal(source[0],source[1]);
+}void AW_MwscriptTick(float dt){
     int k,n,i;vec3_t player;
     /* no game running (a load, the main menu): a script's message box goes with it */
     if(!sv.active || cls.signon!=SIGNONS || !sv_player){AW_MsgBoxClear();return;}
@@ -4434,6 +4542,7 @@ void AW_MwscriptTick(float dt){
         map_model=sv.worldmodel;Q_strcpy_bounded(map_name,sv.name,sizeof(map_name));
         attached_map++;attach_objects();script_model=NULL;   /* the count first: what attach hides belongs to this map */
     }
+    map_visit();
     if(!mwscript.value){AW_MsgBoxClear();AW_MusicAmbience(0);return;}
     {   /* ARRIVAL-LONG-FRAME-DEV6-59: the parts of a first tick that take long are named */
         double t0=Sys_FloatTime(),t1,t2;int was=resident!=NULL;
@@ -4496,8 +4605,9 @@ void AW_MwscriptTick(float dt){
     removed_flush();   /* the items the player no longer carries: their carried scripts stop */
     levelled_flush();   /* the actors levelled lists gave since the last frame: their records' scripts */
     {double t0=Sys_FloatTime();
-     AW_MwvmTick(dt,player);
+     script_depth++;AW_MwvmTick(dt,player);script_depth--;   /* SAVE-INSIDE-SCRIPT-STEP-66: a save asked for in here waits */
      if(Sys_FloatTime()-t0>.3)Con_Printf("MWScript tick: %.0f ms (scripts run this frame).\n",(Sys_FloatTime()-t0)*1000);}
+    deleted_flush();   /* MWSCRIPT-SETDELETE-STOPS-66: the objects SetDelete took out: their scripts stop now */
     leave_now();   /* PositionCell: the actors moved to another place leave this map now */
     AW_ActorsPlacedTick(placed_spawn);   /* the actors scripts placed here come back (once a second; MWSCRIPT-PLACE-OBJECTS-62) */
     /* SCRIPTED-EVENT-FALLING-MAGE-61: actors held on an object a script removes fall once it is gone (aw_fall.c) */
@@ -4517,6 +4627,12 @@ static void status_counts(void){
                attach_places,attach_rooms,attach_refused,global,active,looping);
     Con_Printf("frames %lu runs %lu quiet-skips %lu far %lu deferred %lu ops %lu (max %lu a frame) aborted %lu not-yet calls %lu\n",
                s->frames,s->runs,s->skipped_quiet,s->skipped_far,s->deferred,s->ops,s->max_ops_frame,s->aborted,s->notyet_calls);
+    /* MWSCRIPT-TICK-SHARE-66: where the scripts' time goes (whole ms; the share of all frames: chim spikes report) */
+    Con_Printf("time: interpreter with its calls %ld ms, of it host calls %ld ms (%lu calls), %ld us a frame\n",
+               (long)(s->tick_time*1000+.5),(long)(s->host_time*1000+.5),s->host_calls,
+               s->frames?(long)(s->tick_time*1000000/s->frames+.5):0L);
+    Con_Printf("SetDelete: %lu deleted, %lu undeleted, %lu refused (a full world change list)\n",objects_deleted,
+               objects_undeleted,deleted_refused);
     Con_Printf("new games %lu: %d run-once scripts started%s\n",new_games,new_game_started,
                new_game_pending?" (one pending)":"");
     Con_Printf("actors enabled in a loaded area: %lu (an edict of this map shown again, or a kept actor spawned at once)\n",
@@ -4633,11 +4749,11 @@ static void stats_readout(void){
     if(id[0]){
         for(argi=1;argi<sv.num_edicts && !e;argi++){
             edict_t *x=EDICT_NUM(argi);
-            if(!x->free && (v=GetEdictFieldValue(x,"aw_source_id"))!=NULL && v->string && !Q_strcasecmp(pr_strings+v->string,id))e=x;
+            if(!x->free && (v=field_source(x))!=NULL && v->string && !Q_strcasecmp(pr_strings+v->string,id))e=x;
         }
     }else if(sv_player)e=AW_NPCTarget(sv_player,sv_player->v.v_angle);
-    if(e && (v=GetEdictFieldValue(e,"aw_source_id"))!=NULL && v->string){strncpy(id,pr_strings+v->string,sizeof(id)-1);id[sizeof(id)-1]=0;}
-    if(e && (v=GetEdictFieldValue(e,"aw_ref"))!=NULL && v->_float>0)ref=(uint32_t)v->_float;
+    if(e && (v=field_source(e))!=NULL && v->string){strncpy(id,pr_strings+v->string,sizeof(id)-1);id[sizeof(id)-1]=0;}
+    if(e && (v=field_ref(e))!=NULL && v->_float>0)ref=(uint32_t)v->_float;
     if(!id[0]){Con_Printf("dbg mwscript stats ID: no actor of that id here, and none under the crosshair\n");return;}
     if(!AW_AreaActorStats(ref,AW_StatIdHash(id),&b)){
         Con_Printf("dbg mwscript stats %s (ref %lu): not in the loaded areas' stats (the actor table's row is used)\n",
@@ -4734,7 +4850,7 @@ static void status(void){
                 e=NULL;
                 for(argi=1;argi<sv.num_edicts && !e;argi++){
                     edict_t *x=EDICT_NUM(argi);eval_t *v;
-                    if(!x->free && (v=GetEdictFieldValue(x,"aw_source_id"))!=NULL && v->string && !Q_strcasecmp(pr_strings+v->string,id))e=x;
+                    if(!x->free && (v=field_source(x))!=NULL && v->string && !Q_strcasecmp(pr_strings+v->string,id))e=x;
                 }
             }
             Con_Printf("dbg mwscript call aifollow: %s (%s)\n",
@@ -4759,7 +4875,7 @@ static void status(void){
         if(!Q_strcasecmp(f,"raiserank") || !Q_strcasecmp(f,"lowerrank")){
             /* the NPC under the crosshair, as a script's RaiseRank / LowerRank on it (DIALOGUE-COMPLETE-58) */
             edict_t *e=sv_player?AW_NPCTarget(sv_player,sv_player->v.v_angle):NULL;eval_t *v;aw_actor_t *npc=NULL;int row,now;
-            if(e && AW_MwscriptActors() && (v=GetEdictFieldValue(e,"aw_ref"))!=NULL && v->_float>0 &&
+            if(e && AW_MwscriptActors() && (v=field_ref(e))!=NULL && v->_float>0 &&
                (row=row_of_edict(e))!=AW_ACTOR_NONE)npc=AW_ActorGet((uint32_t)v->_float,row,1);
             now=npc_rank_change(npc,!Q_strcasecmp(f,"raiserank"));
             if(now>=0)AW_MwvmStateChanged();
@@ -4776,10 +4892,10 @@ static void status(void){
                 e=NULL;
                 for(argi=1;argi<sv.num_edicts && !e;argi++){
                     edict_t *x=EDICT_NUM(argi);eval_t *s;
-                    if(!x->free && (s=GetEdictFieldValue(x,"aw_source_id"))!=NULL && s->string && !Q_strcasecmp(pr_strings+s->string,id))e=x;
+                    if(!x->free && (s=field_source(x))!=NULL && s->string && !Q_strcasecmp(pr_strings+s->string,id))e=x;
                 }
             }
-            if(e && AW_MwscriptActors() && (v=GetEdictFieldValue(e,"aw_ref"))!=NULL && v->_float>0 &&
+            if(e && AW_MwscriptActors() && (v=field_ref(e))!=NULL && v->_float>0 &&
                (row=row_of_edict(e))!=AW_ACTOR_NONE)npc=disposition_restore(AW_ActorGet((uint32_t)v->_float,row,1));
             if(npc && Cmd_Argc()>3 && Q_strcasecmp(f,"getdisposition")){
                 if(!Q_strcasecmp(f,"setdisposition"))AW_ActorSetStat(npc,AWA_DISPOSITION,(float)atoi(Cmd_Argv(3)));
@@ -4978,17 +5094,21 @@ AW_RESIDENT_GROWS("script name hashes met (CELL-CHANGES-59)",SCRIPT_NAMES,8);
 typedef struct {uint32_t hash;uint16_t script;} script_name_t;
 static script_name_t *script_names;static int script_name_count,script_name_capacity;
 static FILE *script_names_file;static long script_names_base;
+/* the compiled file, open while a save or a load handles the scripts' values (script_names_done closes it) */
+static int names_file(void){
+    if(script_names_file)return 1;
+    if(COM_FOpenFile(FILE_NAME,&script_names_file)<=0 || !script_names_file){
+        if(script_names_file)fclose(script_names_file);
+        script_names_file=NULL;return 0;}
+    script_names_base=ftell(script_names_file);
+    return 1;
+}
 static uint32_t script_hash(int script){
     int lo=0,hi=script_name_count,n;char name[64];uint32_t h;
     if(script<0 || script>=AW_MwvmScriptCount())return 0;
     while(lo<hi){int mid=(lo+hi)/2;if((int)script_names[mid].script<script)lo=mid+1;else hi=mid;}
     if(lo<script_name_count && (int)script_names[lo].script==script)return script_names[lo].hash;
-    if(!script_names_file){
-        if(COM_FOpenFile(FILE_NAME,&script_names_file)<=0 || !script_names_file){
-            if(script_names_file)fclose(script_names_file);
-            script_names_file=NULL;return 0;}
-        script_names_base=ftell(script_names_file);
-    }
+    if(!names_file())return 0;
     n=read_string_from(script_names_file,script_names_base,AW_MwvmScriptName(script),name,sizeof(name));
     if(n<=0)return 0;
     h=AW_LedgerNameHash(name);
@@ -5004,31 +5124,172 @@ static uint32_t script_hash(int script){
     }
     return h;
 }
-static void script_names_done(void){if(script_names_file){fclose(script_names_file);script_names_file=NULL;}}
-/* one instance's values onto the list (only those that differ from 0, the start) */
+/* SAVE-SCRIPT-ROW-HINT-ONLY-65, SAVE-ITEM-SCRIPT-LOCALS-66 (v0.0.66): the compiled file's tables a save and a load
+ * need (tools/mwscript/awms.py), each read whole in one read while the scripts' values are handled and given back
+ * after it (script_names_done), never kept for play:
+ *   LOCN  each script's variables by name (8 bytes a script with variables: u16 script, u8 variables, u8 flags, u32
+ *         its first key; then a u32 key per variable): a local is saved with its variable's key and its script with
+ *         its layout signature, and restored by name when the script's variables changed (aw_ledger.h slice 8);
+ *   HITM  the items placed holders hold (u32 held key, u32 the name hash of the item's id): a held item's values are
+ *         kept by (holder, item), not by its ordinal among the holder's items;
+ *   SCRH  every script row's name hash (u32 a row): a script whose row moved in a rebuilt file is found with one read,
+ *         not a name read per row (8,618 rows with the dialogue's result scripts; SCRIPT_NAMES keeps 2,048).
+ * The game with both expansions: LOCN 16 KB (811 scripts, 2,430 variables), HITM 4 KB (491 rows), SCRH 34 KB.
+ * Without one (an older file): locals by their slot as before; a held item's values cannot be named (refused). */
+typedef struct {unsigned char *data;uint32_t rows,bytes;int state;} save_table_t;   /* 1 read, -1 none, -2 unreadable */
+static save_table_t save_locn,save_hitm,save_scrh;
+static int save_table(save_table_t *t,const char *tag,uint32_t row_bytes){
+    uint32_t off,rows,bytes;
+    if(t->state)return t->state;
+    if(!AW_MwvmSection(tag,&off,&rows,&bytes) || !rows){t->state=-1;return -1;}
+    if(bytes<row_bytes*rows || !names_file() || !(t->data=(unsigned char *)AW_TryMalloc((unsigned long)bytes)) ||
+       fseek(script_names_file,script_names_base+(long)off,SEEK_SET) || fread(t->data,1,bytes,script_names_file)!=bytes){
+        free(t->data);t->data=NULL;t->state=-2;return -2;}
+    t->rows=rows;t->bytes=bytes;t->state=1;
+    return 1;
+}
+static void save_tables_done(void){
+    free(save_locn.data);free(save_hitm.data);free(save_scrh.data);
+    memset(&save_locn,0,sizeof(save_locn));memset(&save_hitm,0,sizeof(save_hitm));memset(&save_scrh,0,sizeof(save_scrh));
+}
+static void script_names_done(void){if(script_names_file){fclose(script_names_file);script_names_file=NULL;}save_tables_done();}
+static uint32_t be32(const unsigned char *p){return ((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|p[3];}
+/* script row S's variable keys from LOCN (*COUNT of them), NULL when the file names none of its variables (no LOCN,
+ * no row, or a row that does not match the script: then by the slot). Off the Amiga task stack. */
+static uint32_t locn_now[256];static int locn_now_script=-1;
+static const uint32_t *locn_keys(int s,int *count){
+    int lo=0,hi,i,n;const unsigned char *r;uint32_t at,first;
+    *count=0;
+    if(save_table(&save_locn,"LOCN",8)!=1)return NULL;
+    if(locn_now_script==s){*count=AW_MwvmLocalCount(s);return locn_now;}
+    hi=(int)save_locn.rows;at=8u*save_locn.rows;
+    while(lo<hi){int mid=(lo+hi)/2;r=save_locn.data+8*mid;if(((r[0]<<8)|r[1])<s)lo=mid+1;else hi=mid;}
+    if(lo>=(int)save_locn.rows)return NULL;
+    r=save_locn.data+8*lo;
+    if(((r[0]<<8)|r[1])!=s)return NULL;
+    n=r[2];first=be32(r+4);
+    if(!n || n!=AW_MwvmLocalCount(s) || at+4u*(first+(uint32_t)n)>save_locn.bytes)return NULL;
+    for(i=0;i<n;i++)locn_now[i]=be32(save_locn.data+at+4u*(first+(uint32_t)i));
+    locn_now_script=s;*count=n;
+    return locn_now;
+}
+/* HITM: the held key of (HOLDER, ITEM), 0 none; the item of held key KEY, 0 none */
+static uint32_t hitm_key(uint32_t holder,uint32_t item){
+    uint32_t i;
+    if(save_table(&save_hitm,"HITM",8)!=1)return 0;
+    for(i=0;i<save_hitm.rows;i++){
+        uint32_t k=be32(save_hitm.data+8*i);
+        if((k&0xFFFFFFu)==holder && be32(save_hitm.data+8*i+4)==item)return k;
+    }
+    return 0;
+}
+static uint32_t hitm_item(uint32_t key){
+    int lo=0,hi;
+    if(save_table(&save_hitm,"HITM",8)!=1)return 0;
+    hi=(int)save_hitm.rows;
+    while(lo<hi){int mid=(lo+hi)/2;if(be32(save_hitm.data+8*mid)<key)lo=mid+1;else hi=mid;}
+    return lo<(int)save_hitm.rows && be32(save_hitm.data+8*lo)==key?be32(save_hitm.data+8*lo+4):0;
+}
+/* the item instance behind an item's script instance REFERENCE: the player's (a carried key: HOLDER 0) or a placed
+ * holder's (a held key); 1 named, 0 not an item's or not known */
+static int item_of(uint32_t reference,uint32_t *holder,uint32_t *item){
+    *holder=0;*item=0;
+    if(CARRIED_REF(reference))*item=carried_name_of(reference);
+    else if(AWB_HELD_KEY(reference)){*holder=AWB_HELD_HOLDER(reference);*item=hitm_item(reference);}
+    return *item!=0;
+}
+static unsigned long locals_unnamed,locals_by_name;
+/* SAVE-ITEM-INSTANCES-ONE-PER-KIND-66: the serial of the player's worn copy of kind ITEM (its id hash) when that copy
+ * is an instance of its own (aw_state.h equipped_serial), else 0: the carried script runs for the worn copy, so its
+ * values are saved under that copy's serial and never pass to another copy of the kind */
+static uint32_t worn_serial(uint32_t item){
+    int k;
+    for(k=0;k<AW_INVENTORY_SLOTS;k++){
+        const char *id=aw_state.inventory.equipped[k];
+        if(id[0] && aw_state.inventory.equipped_serial[k] && AW_LedgerNameHash(id)==item)return aw_state.inventory.equipped_serial[k];
+    }
+    return 0;
+}
+/* a loaded save's value keyed by SERIAL: that copy must still be the player's, an instance under the serial and of kind
+ * ITEM (else it was dropped, merged or given away: the value is left out, counted) */
+static int serial_carried(uint32_t serial,uint32_t item){
+    int j=AW_ItemInstFind(&aw_state,serial);const aw_item_inst_t *x;
+    if(j<0 || !(x=AW_ItemInst(&aw_state,j)) || x->row<0 || x->row>=aw_state.items.count)return 0;
+    return AW_LedgerNameHash(AW_ITEM_ID(&aw_state,x->row))==item;
+}
+/* one instance's values onto the list (only those that differ from 0, the start): an object's by its reference, a
+ * global script's by its name, an item's (the player's worn one, or one a placed holder holds) by the item
+ * (SAVE-ITEM-SCRIPT-LOCALS-66; it was not saved at all: MWSCRIPT-INVENTORY-HITONME-62 left the held ones out); each
+ * value with its variable's key, its script with its layout signature (SAVE-SCRIPT-ROW-HINT-ONLY-65). Anything not
+ * kept is counted, and the save is refused (script_export). */
 static void locals_put(void *user,uint32_t reference,int script,int global,int running,const aw_mwcell_t *cells,int count){
-    aw_ledger_t *l=(aw_ledger_t *)user;int i;uint32_t h=0;
-    if(!global && AWB_HELD_KEY(reference))return;   /* a held item's values are not saved (MWSCRIPT-INVENTORY-HITONME-62) */
+    aw_ledger_t *l=(aw_ledger_t *)user;int i,n=0,first=1,ok,is_item;uint32_t h=0,holder=0,item=0;const uint32_t *keys=NULL;
+    is_item=!global && (AWB_HELD_KEY(reference) || CARRIED_REF(reference));
     if(global && running!=AW_MwvmStartsAtLoad(script)){
         if(!(h=script_hash(script)) || !AW_LedgerScriptSet(l,h,script,running))locals_refused++;
     }
     for(i=0;i<count;i++){
         if(!cells[i].i)continue;
         if(!h && !(h=script_hash(script))){locals_refused++;return;}
-        if(AW_LedgerLocalSet(l,global,global?h:reference,h,script,i,cells[i].i))locals_kept++;else locals_refused++;
+        if(first){
+            first=0;
+            keys=locn_keys(script,&n);
+            /* the file's names cannot be read (memory): the save would not know its variables: refused */
+            if(save_locn.state==-2 || (keys && !AW_LedgerLayoutSet(l,h,AW_LedgerLayoutSignature(keys,n)))){
+                locals_refused++;return;}
+            if(is_item && !item_of(reference,&holder,&item)){locals_unnamed++;locals_refused++;return;}
+        }
+        if(is_item)ok=AW_LedgerItemLocalSet(l,holder,item,holder?0:worn_serial(item),h,script,i,keys && i<n?keys[i]:0,cells[i].i);
+        else ok=AW_LedgerLocalNamed(l,global,global?h:reference,h,script,i,keys && i<n?keys[i]:0,cells[i].i);
+        if(ok)locals_kept++;else locals_refused++;
     }
 }
 static void locals_export(aw_ledger_t *l){
-    locals_kept=locals_refused=0;
+    locals_kept=locals_refused=locals_unnamed=0;locn_now_script=-1;
     AW_LedgerLocalsClear(l);
     AW_MwvmLocalsEach(locals_put,l);
     script_names_done();
 }
-/* the row of a kept script: its hint when that row still has the name, else -1 (a rebuilt file in another order) */
-static int script_row(uint32_t hash,int hint){return script_hash(hint)==hash?hint:-1;}
+/* the row of a kept script: SAVE-SCRIPT-ROW-HINT-ONLY-65: the name hash decides, the row is a hint. The hint row when
+ * it still has the name; else the one row of that name in this file (SCRH, one read; without it every row's name is
+ * looked up), -1 when no row has it or two do (never mixed; tools/mwscript/awms.py refuses such a file) */
+static int script_row(uint32_t hash,int hint){
+    int i,n=AW_MwvmScriptCount(),found=-1;
+    if(!hash)return -1;
+    if(hint>=0 && hint<n && script_hash(hint)==hash)return hint;
+    if(save_table(&save_scrh,"SCRH",4)==1 && save_scrh.rows==(uint32_t)n){
+        for(i=0;i<n;i++)if(be32(save_scrh.data+4*i)==hash){if(found>=0)return -1;found=i;}
+        return found;
+    }
+    for(i=0;i<n;i++)if(i!=hint && script_hash(i)==hash)return i;
+    return -1;
+}
+/* where saved value (SLOT, NAME, VALUE) of the script named SCRIPT goes in row S now (aw_ledger.h AW_LedgerLocalSlot:
+ * by the slot while the script's variables are as saved, else by its name), -1 dropped */
+static int local_slot(const aw_ledger_t *l,uint32_t script,int s,int slot,uint32_t name,int32_t value,int32_t *out){
+    uint32_t layout=0;int n=0,moved=0,at;const uint32_t *keys=locn_keys(s,&n);
+    at=AW_LedgerLocalSlot(slot,name,value,AW_LedgerLayout(l,script,&layout),layout,keys,keys?n:AW_MwvmLocalCount(s),
+                          out,&moved);
+    if(at>=0 && moved)locals_by_name++;
+    return at;
+}
+/* a loaded save's item values: the script instance key of (HOLDER, ITEM) in this build (the player's worn item: its
+ * carried key, kept with its item for the next save; a placed holder's: its HITM row), 0 none; the player's item still
+ * carried runs its script again, as it did when saved */
+static uint32_t item_key(uint32_t holder,uint32_t item,int s){
+    uint32_t key,low=item&0xFFFFFFu;int j;
+    if(holder)return hitm_key(holder,item);
+    key=CARRIED_KEY|(low?low:1u);
+    if(!carried_name_add(key,item))return 0;
+    for(j=0;j<aw_state.items.count;j++){
+        const char *id=AW_ITEM_ID(&aw_state,j);
+        if(AW_ITEM_ROW(&aw_state,j)->value>0 && AW_LedgerNameHash(id)==item){carried_add(id,s);break;}
+    }
+    return key;
+}
 static void locals_import(const aw_ledger_t *l){
-    int i,s;
-    locals_dropped=0;
+    int i,s,slot;int32_t v;uint32_t key;
+    locals_dropped=0;locals_by_name=0;locn_now_script=-1;
     AW_MwvmLocalsReset();      /* a new game's start; then what the list keeps (an older save: nothing) */
     for(i=0;i<l->script_count;i++){
         const aw_ledger_script_t *x=&l->script[i];
@@ -5036,49 +5297,84 @@ static void locals_import(const aw_ledger_t *l){
     }
     for(i=0;i<l->local_count;i++){
         const aw_ledger_local_t *x=&l->local[i];
-        if((s=script_row(x->script,x->hint))<0 ||
-           !(x->global?AW_MwvmGlobalScriptLocal(s,x->slot,(uint32_t)x->value):
-                       AW_MwvmLocalSet(x->key,s,x->slot,(uint32_t)x->value)))locals_dropped++;
+        if((s=script_row(x->script,x->hint))<0 || (slot=local_slot(l,x->script,s,x->slot,x->name,x->value,&v))<0 ||
+           !(x->global?AW_MwvmGlobalScriptLocal(s,slot,(uint32_t)v):AW_MwvmLocalSet(x->key,s,slot,(uint32_t)v)))
+            locals_dropped++;
     }
+    /* the items' values (SAVE-ITEM-SCRIPT-LOCALS-66); one keyed by an instance serial (the worn copy's) is kept only
+     * while that copy is still the player's instance of that kind (serial_carried); a placed holder's items have no
+     * instances, so a serial there is dropped */
+    for(i=0;i<l->item_local_count;i++){
+        const aw_ledger_item_local_t *x=&l->item_local[i];
+        if((x->serial && (x->holder || !serial_carried(x->serial,x->item))) || (s=script_row(x->script,x->hint))<0 ||
+           (slot=local_slot(l,x->script,s,x->slot,x->name,x->value,&v))<0 || !(key=item_key(x->holder,x->item,s)) ||
+           !AW_MwvmLocalSet(key,s,slot,(uint32_t)v))locals_dropped++;
+    }
+    if(save_locn.state==-2)Con_Printf("Saved script values: the variables' names unreadable (memory): restored by their slot.\n");
+    if(locals_dropped || locals_by_name)
+        Con_Printf("Saved script values: %lu restored by their variable's name in a changed script, %lu left out (their "
+                   "script or variable is gone).\n",locals_by_name,locals_dropped);
     script_names_done();
 }
 /* CELL-CHANGES-59 slice 6 (ACTOR-STATE-POOL-LIMITS-54): the changed actor records go into the world change list as
  * its RECORDS part ("AWAR"), held only until the save is written; the actor block keeps the dead counts. */
-static void actor_records_export(aw_ledger_t *l){
-    int need=AW_ActorStateReady()?AW_ActorStateExportRecords(NULL,0):0;unsigned char *b;
+/* SAVE-EXPORT-FAILURE-ACCEPTED-65: 1 kept (or nothing to keep), 0 the save must not be written (a save without them
+ * would bring every changed actor back as the game data has it: the dead alive again) */
+static void *records_alloc(unsigned long bytes){return AW_TryMalloc(bytes);}
+static int actor_records_export(aw_ledger_t *l){
+    unsigned char *b;int need,ok;
     AW_LedgerRecordsSet(l,NULL,0);
-    if(need<=0)return;
-    if(need>AW_LEDGER_RECORDS_MAX || !(b=(unsigned char *)AW_TryMalloc((unsigned long)need)) ){
-        Con_Printf("Saved actor records: %d bytes do not fit; changed actors start from the game data at a load.\n",need);
-        return;}
-    if(AW_ActorStateExportRecords(b,need)!=need || !AW_LedgerRecordsSet(l,b,need))
-        Con_Printf("Saved actor records could not be kept; changed actors start from the game data at a load.\n");
-    free(b);
+    if(!AW_ActorStateReady())return 1;
+    if(!AW_ActorStateRecordsCopy(records_alloc,AW_LEDGER_RECORDS_MAX,&b,&need)){
+        Con_Printf("Saved actor records could not be copied (too large or no memory).\n");return 0;}
+    if(!b)return 1;
+    ok=AW_LedgerRecordsSet(l,b,need);free(b);
+    if(!ok)Con_Printf("Saved actor records could not be kept on the world change list.\n");
+    return ok;
 }
-static void script_export(aw_ledger_t *l){
-    int g,i,n;const uint32_t *h;
-    actor_records_export(l);
-    if(!resident || !AW_MwvmLoaded())return;     /* not loaded: the tables stay as the last load left them */
+/* SAVE-EXPORT-FAILURE-ACCEPTED-65: every part that could not be kept is counted and named (aw_save.h
+ * AW_SaveRefusePart); any = 0, the save is refused and the previous one stays */
+static int script_export(aw_ledger_t *l){
+    int g,i,n;const uint32_t *h;unsigned long globals=0,quests=0,topics=0;
+    if(!actor_records_export(l)){AW_SaveRefusePart("the changed actor records");return 0;}
+    if(!resident || !AW_MwvmLoaded())return 1;     /* not loaded: the tables stay as the last load left them */
     locals_export(l);
+    if(locals_refused){
+        Con_Printf("Saved script values: %lu could not be kept (%lu of them an item's whose item is not known).\n",
+                   locals_refused,locals_unnamed);
+        AW_SaveRefusePart(locals_unnamed?"the items' script values":"the scripts' values");
+        AW_LedgerRecordsSet(l,NULL,0);return 0;}
     AW_LedgerValueClear(l,AW_LEDGER_GLOBALS);AW_LedgerValueClear(l,AW_LEDGER_QUESTS);
     global_names_load();
     for(g=0;g<AW_MwvmGlobalCount();g++){
         uint32_t now=AW_MwvmGlobalBits(g);
         if(now==AW_MwvmGlobalStart(g))continue;
         if(!global_names || !global_offsets || global_offsets[g]<0 ||
-           !AW_LedgerValueSet(l,AW_LEDGER_GLOBALS,AW_LedgerNameHash(global_names+global_offsets[g]),(int32_t)now))script_refused++;
+           !AW_LedgerValueSet(l,AW_LEDGER_GLOBALS,AW_LedgerNameHash(global_names+global_offsets[g]),(int32_t)now))globals++;
     }
     n=AW_MwvmTopicCount();
     for(i=0;topic_values && i<n;i++){
         int32_t v=host_journal_get(i);
         if(v && (!topic_names[topic_offsets[i]] ||
-                 !AW_LedgerValueSet(l,AW_LEDGER_QUESTS,AW_LedgerNameHash(topic_names+topic_offsets[i]),v)))script_refused++;
+                 !AW_LedgerValueSet(l,AW_LEDGER_QUESTS,AW_LedgerNameHash(topic_names+topic_offsets[i]),v)))quests++;
     }
-    if((h=topic_hash_table())!=NULL){      /* the file unreadable: the topics as last loaded stay */
-        AW_LedgerValueClear(l,AW_LEDGER_TOPICS);
-        for(i=0;i<topic_rows;i++)
-            if(AW_MwscriptTopicKnown(i) && !AW_LedgerValueSet(l,AW_LEDGER_TOPICS,h[i],1))script_refused++;
+    /* the known topics by name: with topics known, an unreadable name table refuses the save (the topics as the last
+     * load left them would be written as now: every topic learned since then lost) */
+    if(known_topics && topic_rows>0){
+        if((h=topic_hash_table())==NULL)topics++;
+        else{
+            AW_LedgerValueClear(l,AW_LEDGER_TOPICS);
+            for(i=0;i<topic_rows;i++)
+                if(AW_MwscriptTopicKnown(i) && !AW_LedgerValueSet(l,AW_LEDGER_TOPICS,h[i],1))topics++;
+        }
     }
+    if(globals+quests+topics){
+        script_refused+=globals+quests+topics;
+        Con_Printf("Saved script state could not be kept: %lu globals, %lu quest stages, %lu known topics.\n",
+                   globals,quests,topics);
+        AW_SaveRefusePart(globals?"the scripts' globals":quests?"the quest stages":"the known topics");
+        AW_LedgerRecordsSet(l,NULL,0);return 0;}
+    return 1;
 }
 static void script_import(const aw_ledger_t *l){
     int g,i,n;int32_t v;const uint32_t *h;
@@ -5112,61 +5408,59 @@ static void script_import(const aw_ledger_t *l){
     AW_MwvmStateChanged();
 }
 static void put_u32(unsigned char *p,unsigned long v){p[0]=(unsigned char)(v>>24);p[1]=(unsigned char)(v>>16);p[2]=(unsigned char)(v>>8);p[3]=(unsigned char)v;}
+/* MAP-EXPLORED-SAVE-BLOCK-66: the explored map in a section of its own (aw_save.h feature 4096), as long as it needs,
+ * so it never refuses a save; an export short of room writes what fits and says what it left out */
+static int explored_encode(unsigned char *out,int capacity){
+    int n=AW_MapFogExport(out,capacity),cells,rooms;
+    if(out){
+        AW_MapFogLeftOut(&cells,&rooms);
+        if(cells || rooms)Con_Printf("Explored map: %d cells and %d rooms did not fit the save and were not kept.\n",cells,rooms);
+    }
+    return n;
+}
+static void explored_import(const unsigned char *p,int bytes){
+    if(AW_MapFogImport(p,bytes)<0)Con_Printf("Saved explored map unreadable: the map starts unexplored.\n");
+}
+/* SAVE-EXPORT-FAILURE-ACCEPTED-65 (the save contract's rule 4): a part of the actor block that cannot be written names
+ * itself (aw_save.h AW_SaveRefusePart), so the refused save's one line says which part, never "the actor block"; the
+ * block's writer retries a short block with a bigger one first (aw_save.c), and clears the name when that succeeds */
+#define ACTOR_PART(call,name) do{int part_=(call);if(part_<0){AW_SaveRefusePart(name);return -1;}t+=part_;}while(0)
 static int actors_export(unsigned char *out,int capacity){
     /* slice 6: the dead counts only; the changed records are in the world change list (actor_records_export) */
     int n=AW_ActorStateReady()?AW_ActorStateExportCounts(out,capacity):0,s,t;
-    if(n<0)return n;
-    if((s=AW_StandingExport(out+n,capacity-n))<0)return -1;
+    if(n<0){AW_SaveRefusePart("the dead counts");return n;}
+    if((s=AW_StandingExport(out+n,capacity-n))<0){AW_SaveRefusePart("the factions' standing");return -1;}
     t=6+topic_bytes;
-    if(n+s+t+8>capacity)return -1;
+    if(n+s+t+8>capacity){AW_SaveRefusePart("the known topics");return -1;}
     memcpy(out+n+s,"AWKT",4);out[n+s+4]=(unsigned char)(topic_rows>>8);out[n+s+5]=(unsigned char)topic_rows;
     if(topic_bytes)memcpy(out+n+s+6,known_topics,topic_bytes);
-    {int f=AW_EffectsExport(out+n+s+t,capacity-n-s-t-8);   /* the active spell effects (SPELL-EFFECTS-57) */
-     if(f<0)return -1;
-     t+=f;}
-    {int k=AW_SoldExport(out+n+s+t,capacity-n-s-t-8);   /* things sold to merchants (AWSL, BARTER-SOLD-ITEM-LOST-58) */
-     if(k<0)return -1;
-     t+=k;
-     k=AW_MadeExport(out+n+s+t,capacity-n-s-t-8);           /* made spells and enchanted items (AWMD, AWEN) */
-     if(k<0)return -1;
-     t+=k;
-     k=AW_GemsExport(out+n+s+t,capacity-n-s-t-8);           /* filled soul gems (AWSG) */
-     if(k<0)return -1;
-     t+=k;
-     k=AW_DialReactionsExport(out+n+s+t,capacity-n-s-t-8);  /* the scripts' faction reaction changes (AWFR) */
-     if(k<0)return -1;
-     t+=k;
-     k=AW_RevealedExport(out+n+s+t,capacity-n-s-t-8);       /* places revealed by ShowMap (AWMP) */
-     if(k<0)return -1;
-     t+=k;
-     k=AW_DialHeardExport(out+n+s+t,capacity-n-s-t-8);       /* the journal's topic pages (AWTP) */
-     if(k<0)return -1;
-     t+=k;
-     k=forced_export(out+n+s+t,capacity-n-s-t-8);            /* the forced sneak and the fade (AWFS, v0.0.62) */
-     if(k<0)return -1;
-     t+=k;
-     k=AW_WeatherScriptSave(out+n+s+t,capacity-n-s-t-8);     /* the scripts' region weather (AWWR, v0.0.62) */
-     if(k<0)return -1;
-     t+=k;
-     k=AW_CrimeActorsExport(out+n+s+t,capacity-n-s-t-8);     /* the NPCs' crime marks and pursuers (AWCR, v0.0.62) */
-     if(k<0)return -1;
-     t+=k;
-     k=forced_run_export(out+n+s+t,capacity-n-s-t-8);        /* the forced run (AWRN, v0.0.63) */
-     if(k<0)return -1;
-     t+=k;
-     k=were_export(out+n+s+t,capacity-n-s-t-8);              /* the werewolf state (AWWF, v0.0.63) */
-     if(k<0)return -1;
-     t+=k;
-     k=AW_MoverExport(out+n+s+t,capacity-n-s-t-8);           /* the scripts' moved placements (AWMV, v0.0.63) */
-     if(k<0)return -1;
-     t+=k;}
-    if(aw_mwscript_packages_export){   /* the actors' travel and follow packages (aw_ambient.c, SAVEGAME-COMPLETE-57) */
-        int k=aw_mwscript_packages_export(out+n+s+t,capacity-n-s-t-8);
-        if(k<0)return -1;
-        t+=k;}
+    ACTOR_PART(AW_EffectsExport(out+n+s+t,capacity-n-s-t-8),"the active spell effects");       /* SPELL-EFFECTS-57 */
+    ACTOR_PART(AW_SoldExport(out+n+s+t,capacity-n-s-t-8),"the things sold to merchants");       /* AWSL, BARTER-SOLD-ITEM-LOST-58 */
+    ACTOR_PART(AW_MadeExport(out+n+s+t,capacity-n-s-t-8),"the made spells and items");          /* AWMD, AWEN */
+    ACTOR_PART(AW_GemsExport(out+n+s+t,capacity-n-s-t-8),"the filled soul gems");               /* AWSG */
+    ACTOR_PART(AW_DialReactionsExport(out+n+s+t,capacity-n-s-t-8),"the faction reactions");     /* AWFR, the scripts' changes */
+    ACTOR_PART(AW_RevealedExport(out+n+s+t,capacity-n-s-t-8),"the places revealed on the map"); /* AWMP, ShowMap */
+    /* the explored map (AWFG) is no longer here: a section of its own (MAP-EXPLORED-SAVE-BLOCK-66, explored_encode);
+     * the import below still reads it from the block of a v0.0.66-dev save */
+    ACTOR_PART(AW_DialHeardExport(out+n+s+t,capacity-n-s-t-8),"the journal's topic pages");    /* AWTP */
+    ACTOR_PART(forced_export(out+n+s+t,capacity-n-s-t-8),"the forced sneak");                   /* AWFS, v0.0.62, the fade too */
+    ACTOR_PART(AW_WeatherScriptSave(out+n+s+t,capacity-n-s-t-8),"the scripted weather");        /* AWWR, v0.0.62 */
+    ACTOR_PART(AW_CrimeActorsExport(out+n+s+t,capacity-n-s-t-8),"the crime marks");             /* AWCR, v0.0.62, pursuers too */
+    ACTOR_PART(forced_run_export(out+n+s+t,capacity-n-s-t-8),"the forced run");                 /* AWRN, v0.0.63 */
+    ACTOR_PART(were_export(out+n+s+t,capacity-n-s-t-8),"the werewolf state");                   /* AWWF, v0.0.63 */
+    ACTOR_PART(AW_MoverExport(out+n+s+t,capacity-n-s-t-8),"the moved placements");              /* AWMV, v0.0.63, the scripts' */
+    /* SAVE-MADE-RECORDS-64-CAP-66: the made things and gems past the 255 the first blocks hold (AWM2/AWE2, AWG2), before
+     * the packages, whose reader takes the rest of the block; an older reader stops here and loses the packages alone */
+    ACTOR_PART(AW_MadeExportMore(out+n+s+t,capacity-n-s-t-8),"the made spells and items past 255");
+    ACTOR_PART(AW_GemsExportMore(out+n+s+t,capacity-n-s-t-8),"the filled soul gems past 255");
+    ACTOR_PART(AW_RevealedExportMore(out+n+s+t,capacity-n-s-t-8),"the places revealed on the map past 255");   /* AWP2 */
+    ACTOR_PART(AW_CrimeActorsExportMore(out+n+s+t,capacity-n-s-t-8),"the crime marks past 255");              /* AWC2 */
+    if(aw_mwscript_packages_export)   /* the actors' travel and follow packages (aw_ambient.c, SAVEGAME-COMPLETE-57) */
+        ACTOR_PART(aw_mwscript_packages_export(out+n+s+t,capacity-n-s-t-8),"the actors' travel and follow packages");
     put_u32(out+n+s+t,(unsigned long)(s+t));memcpy(out+n+s+t+4,"AWTR",4);
     return n+s+t+8;
 }
+#undef ACTOR_PART
 static void actors_import(const unsigned char *data,int bytes){
     int actors=bytes;
     forced_reset();V_ScreenFade(0,0);   /* MWSCRIPT-GAP-FUNCTIONS-62: an older save has no AWFS block: none, unfaded */
@@ -5174,7 +5468,7 @@ static void actors_import(const unsigned char *data,int bytes){
     AW_CombatLastHitReset();            /* MWSCRIPT-INVENTORY-HITONME-62: no blow of the last game is remembered */
     AW_WeatherScriptClear();            /* MWSCRIPT-COMPLETE-LANDMARK: no region's weather changed by a script */
     carried_reset();                     /* the carried items' scripts run again from their next equipping */
-    AW_StandingReset();AW_CrimeActorsReset();AW_EffectsReset();AW_SoldReset();AW_MadeReset();AW_GemsReset();AW_DialReactionsReset();AW_RevealedReset();AW_DialHeardReset();
+    AW_StandingReset();AW_CrimeActorsReset();AW_EffectsReset();AW_SoldReset();AW_MadeReset();AW_GemsReset();AW_DialReactionsReset();AW_RevealedReset();AW_MapFogReset();AW_DialHeardReset();
     if(aw_mwscript_packages_import)aw_mwscript_packages_import(NULL,0);   /* none until the save's block says */
     if(topic_bytes)memset(known_topics,0,topic_bytes);
     if(data && bytes>=8 && !memcmp(data+bytes-4,"AWTR",4)){
@@ -5222,6 +5516,10 @@ static void actors_import(const unsigned char *data,int bytes){
                     int k=AW_RevealedImport(p+rest,(int)(tail-rest));
                     if(k<0)Con_Printf("Saved revealed places unreadable: none kept.\n");else rest+=(unsigned long)k;
                 }
+                if(rest+6<=tail && !memcmp(p+rest,"AWFG",4)){   /* the map's explored land (v0.0.66) */
+                    int k=AW_MapFogImport(p+rest,(int)(tail-rest));
+                    if(k<0)Con_Printf("Saved explored map unreadable: the map starts unexplored.\n");else rest+=(unsigned long)k;
+                }
                 if(rest+8<=tail && !memcmp(p+rest,"AWTP",4)){   /* the journal's topic pages (v0.0.58) */
                     int k=AW_DialHeardImport(p+rest,(int)(tail-rest));
                     if(k<0)Con_Printf("Saved journal topic pages unreadable: none kept.\n");else rest+=(unsigned long)k;
@@ -5251,6 +5549,22 @@ static void actors_import(const unsigned char *data,int bytes){
                     int k=AW_MoverImport(p+rest,(int)(tail-rest));
                     if(k<0){AW_MoverReset();Con_Printf("Saved moved objects unreadable: they stand where the game put them.\n");}
                     else rest+=(unsigned long)k;
+                }
+                if(rest+12<=tail && !memcmp(p+rest,"AWM2",4)){   /* made spells and items past 255 (v0.0.66) */
+                    int k=AW_MadeImportMore(p+rest,(int)(tail-rest));
+                    if(k<0)Con_Printf("Saved made spells and enchanted items past the first 255 unreadable: those are not kept.\n");else rest+=(unsigned long)k;
+                }
+                if(rest+6<=tail && !memcmp(p+rest,"AWG2",4)){   /* filled soul gems past 255 (v0.0.66) */
+                    int k=AW_GemsImportMore(p+rest,(int)(tail-rest));
+                    if(k<0)Con_Printf("Saved soul gems past the first 255 unreadable: those are not kept.\n");else rest+=(unsigned long)k;
+                }
+                if(rest+6<=tail && !memcmp(p+rest,"AWP2",4)){   /* revealed places past 255 (v0.0.66) */
+                    int k=AW_RevealedImportMore(p+rest,(int)(tail-rest));
+                    if(k<0)Con_Printf("Saved revealed places past the first 255 unreadable: those are not kept.\n");else rest+=(unsigned long)k;
+                }
+                if(rest+6<=tail && !memcmp(p+rest,"AWC2",4)){   /* crime marks past 255 (v0.0.66) */
+                    int k=AW_CrimeActorsImportMore(p+rest,(int)(tail-rest));
+                    if(k<0)Con_Printf("Saved crime marks past the first 255 unreadable: those are not kept.\n");else rest+=(unsigned long)k;
                 }
                 if(rest+6<=tail && !memcmp(p+rest,"AWPK",4) && aw_mwscript_packages_import &&
                    !aw_mwscript_packages_import(p+rest,(int)(tail-rest)))Con_Printf("Saved actor packages unreadable: none kept.\n");
@@ -5294,12 +5608,31 @@ unsigned long AW_MwscriptDigest(void){
 }
 /* CELL-CHANGES-59 slice 7: the save's hooks for respawn and migration (aw_save.h) */
 static int save_other_ok(void){return AW_PlacedRefs()!=NULL;}
-static void save_ident_refresh(aw_ledger_t *l){AW_PlacedIdentRefresh(l);}
+static int save_ident_refresh(aw_ledger_t *l){return AW_PlacedIdentRefresh(l);}   /* 0: refused (aw_save.c) */
 static long save_migrate(aw_ledger_t *l,void *dropped){return AW_PlacedMigrate(l,dropped);}
 static int save_drop_actor_records(void){return AW_ActorStateReady()?AW_ActorStateDropAll():0;}
 extern uint32_t (*aw_actors_ref_flags)(uint32_t key,aw_ledger_respawn_t *rule);
 extern int (*aw_actors_forget)(uint32_t reference);
 static void save_notice(const char *line){AW_UISubtitle("",line,8);}
+/* ACTOR-DEAD-RESPAWN-INTERIOR-65: the actors' change list asks whether the live record of a placed REFERENCE is dead
+ * (a death a script, a spell or a fall gave it without a fight's slot); never creates a record */
+extern int (*aw_actor_dead_record)(unsigned reference);
+static int actor_dead_record(unsigned reference){
+    aw_actor_t *a=AW_ActorStateReady() && reference?AW_ActorGet((uint32_t)reference,AW_ACTOR_NONE,0):NULL;
+    return a && (a->flags&AWL_DEAD)?1:0;
+}
+/* the save contract, rule 2 (2026-11-14): an actor HEALTH below its live record's base health at its place's unload
+ * earns a change-list row (aw_actors.c AW_ActorsCapture); no record, or at its base: it does not */
+extern int (*aw_actor_hurt_record)(unsigned reference,float health);
+static int actor_hurt_record(unsigned reference,float health){
+    aw_actor_t *a=AW_ActorStateReady() && reference?AW_ActorGet((uint32_t)reference,AW_ACTOR_NONE,0):NULL;
+    return a && health<a->dyn_base[0]-0.5f?1:0;
+}
+/* ESSENTIAL-DEATH-MESSAGE-66: an actor record's death (any cause) of an essential character shows the game's box */
+static void actor_killed(const aw_actor_t *a){
+    if(a && (a->record_flags&AWR_ESSENTIAL) && a->reference!=AW_ACTOR_PLAYER_REF)
+        AW_CombatEssentialKilled((unsigned long)a->reference,NULL);
+}
 static uint32_t actors_ref_flags(uint32_t key,aw_ledger_respawn_t *rule){
     aw_refs_t *r=AW_PlacedRefs();
     if(r && rule)*rule=r->respawn;
@@ -5315,7 +5648,7 @@ static int crime_greet(edict_t *e);
 /* DIALOGUE-AGGRO-62 (quakedef.h aw_ambient_fight_now): the Fight of E's live record (a SetFight or ModFight of a script
  * or an answer lands there), -1 when it has none or is dead; never a search of the actor table on disk */
 static int ambient_fight_now(edict_t *e){
-    eval_t *r=e && e!=sv_player?GetEdictFieldValue(e,"aw_ref"):NULL;aw_actor_t *a;
+    eval_t *r=e && e!=sv_player?field_ref(e):NULL;aw_actor_t *a;
     a=r && r->_float>0?AW_ActorGet((uint32_t)r->_float,AW_ACTOR_NONE,0):NULL;
     return a && !(a->flags&AWL_DEAD)?(int)AW_ActorStat(a,AWA_FIGHT):-1;
 }
@@ -5324,6 +5657,9 @@ void AW_MwscriptInit(void){
     Cvar_RegisterVariable(&mwscript);
     stats_hooks();
     aw_actors_ref_flags=actors_ref_flags;aw_actors_forget=AW_ActorForget;aw_save_notice=save_notice;
+    aw_actor_dead_record=actor_dead_record;
+    aw_actor_hurt_record=actor_hurt_record;   /* the unload row only for a changed actor (the save contract, rule 2) */
+    aw_mwvm_clock=Sys_FloatTime;   /* MWSCRIPT-TICK-SHARE-66 */
     aw_save_other_ok=save_other_ok;aw_save_ident_refresh=save_ident_refresh;aw_save_migrate=save_migrate;
     aw_save_drop_actor_records=save_drop_actor_records;
     aw_save_new_game=new_game_hook;   /* the original's run-once new-game scripts (NPC-STORY-DISABLED-AT-START-42) */
@@ -5332,6 +5668,8 @@ void AW_MwscriptInit(void){
     aw_inventory_equip_script=equip_script;   /* and the console's equip / unequip (MWSCRIPT-UNPLACED-RECORD-SCRIPTS-61) */
     AW_StandingReset();AW_EffectsReset();
     aw_save_actors_export=actors_export;aw_save_actors_import=actors_import;   /* the actor record (feature 16) */
+    aw_save_busy=save_busy;   /* SAVE-INSIDE-SCRIPT-STEP-66: no save inside a script step */
+    aw_save_explored_encode=explored_encode;aw_save_explored_import=explored_import;   /* the explored map (4096) */
     aw_save_objects_export=objects_export;aw_save_objects_import=objects_import;
     aw_save_script_export=script_export;aw_save_script_import=script_import;   /* CELL-CHANGES-59 slice 4 */
     aw_state_fact_get=fact_get;aw_state_fact_set=fact_set;   /* named globals past 32: the list's facts (slice 4) */
@@ -5345,6 +5683,7 @@ void AW_MwscriptInit(void){
     aw_opening_activate=object_intercept;      /* census type amiwind: the clerk starts his talk (OPENING-REGRESSION-64) */
     aw_inventory_intercept=object_intercept;   /* OnActivate takes a placed item's use */   /* OnActivate takes a door's use */
     aw_actor_disabled=AW_ObjectDisabled;   /* the CHIM window spawns no disabled actor */
+    aw_actor_killed=actor_killed;          /* an essential character's death box, whatever killed it (ESSENTIAL-DEATH-MESSAGE-66) */
     aw_actors_visitors=room_visitors;      /* PositionCell: a room spawns the actors moved into it (v0.0.62) */
     aw_scene_followers=followers;          /* the player's followers through a door (v0.0.62) */
     aw_static_flame_gone=AW_ObjectDisabled;   /* a taken candle's flame goes with it (TAKEN-LIGHT-FLAME-STAYS-60) */
@@ -5371,8 +5710,8 @@ void AW_MwscriptInit(void){
 /* the speaker of a conversation attacks when its Fight rating with the conversation's disposition reaches 100 */
 int AW_MwscriptSpeakerAggro(edict_t *e,int disposition){
     eval_t *v,*r;aw_actor_t *a;aw_fighter_t sheet;int got;
-    if(!e || e==sv_player || !(v=GetEdictFieldValue(e,"aw_source_id")) || !v->string)return -1;
-    r=GetEdictFieldValue(e,"aw_ref");
+    if(!e || e==sv_player || !(v=field_source(e)) || !v->string)return -1;
+    r=field_ref(e);
     if(!(a=speaker_actor(pr_strings+v->string,r?(unsigned long)r->_float:0)) || (a->flags&AWL_DEAD))return -1;
     if(AW_CombatFighter(e))return 0;              /* fighting already (an answer's StartCombat) */
     if(!AW_CombatActorLoad(pr_strings+v->string,&sheet))return -1;
@@ -5402,8 +5741,8 @@ static int guard_class(int clas){
 }
 static aw_actor_t *crime_actor(edict_t *e){
     eval_t *v,*r;aw_actor_t *a;
-    if(!e || e==sv_player || !(v=GetEdictFieldValue(e,"aw_source_id")) || !v->string)return NULL;
-    r=GetEdictFieldValue(e,"aw_ref");
+    if(!e || e==sv_player || !(v=field_source(e)) || !v->string)return NULL;
+    r=field_ref(e);
     /* the live record by its reference alone (the area load made it from the area's stat block): no search of the
      * actor table on disk; s12: the first theft's seven searches and class reads took 650 ms. The search only for a
      * record not made yet. */
@@ -5483,8 +5822,8 @@ static int crime_set_global(const char *name,int value){
 }
 static int crime_attack(edict_t *e,int fight){
     eval_t *v,*r;aw_actor_t *a;aw_fighter_t sheet;
-    if(!e || e==sv_player || !sv_player || sv_player->v.health<=0 || !(v=GetEdictFieldValue(e,"aw_source_id")) || !v->string)return 0;
-    r=GetEdictFieldValue(e,"aw_ref");
+    if(!e || e==sv_player || !sv_player || sv_player->v.health<=0 || !(v=field_source(e)) || !v->string)return 0;
+    r=field_ref(e);
     a=r && r->_float>0?AW_ActorGet((uint32_t)r->_float,AW_ACTOR_NONE,0):NULL;   /* as crime_witness */
     if(!a)a=speaker_actor(pr_strings+v->string,r?(unsigned long)r->_float:0);
     if(!a || (a->flags&AWL_DEAD))return 0;
@@ -5757,7 +6096,7 @@ static void console_exec(const char *text){
 /* the console target (dbg mw target: picked in the finder or named): an entity and its id; 0 none (the player) */
 static int console_entity;static char console_id[64];
 static const char *edict_id(edict_t *e){
-    eval_t *v=e?GetEdictFieldValue(e,"aw_source_id"):NULL;
+    eval_t *v=e?field_source(e):NULL;
     return v && v->string?pr_strings+v->string:NULL;
 }
 /* TARGET as a line names it ("" the console target or else the player; "player"; a reference's id: the nearest
@@ -5863,7 +6202,7 @@ static int console_begin(const char *target,int *instance,int *who,edict_t **edi
     }
     if(!e)return 0;
     if(e==sv_player)return 1;
-    if(!(r=GetEdictFieldValue(e,"aw_ref")) || r->_float<=0)return 0;
+    if(!(r=field_ref(e)) || r->_float<=0)return 0;
     if((*instance=AW_MwvmScratch((uint32_t)r->_float,NUM_FOR_EDICT(e)))<0)return 0;
     *who=AW_MWVM_SELF;
     return 1;
@@ -6155,7 +6494,7 @@ static void mw_target(void){
 /* the console prompt's label of the target ("" the player) */
 const char *AW_MwConsoleTarget(void){return console_entity?console_id:"";}
 int AW_MwscriptRunResult(const char *record,unsigned long reference,const char *text,int length){
-    int speaker=-1,k,chosen,row_speaker,broken;
+    int speaker=-1,k,chosen,row_speaker,broken,ran;
     if(!text || length<=0)return 0;
     for(k=0;k<AW_MwvmInstanceCount();k++){   /* the speaker's attached script, when it has one */
         aw_mwvm_instance_t *in=AW_MwvmInstance(k);
@@ -6172,5 +6511,6 @@ int AW_MwscriptRunResult(const char *record,unsigned long reference,const char *
     }
     results_run++;
     /* the locals are those the row was compiled with (its speaker script): never another script's layout */
-    return AW_MwvmRunDialogue(chosen,(uint32_t)reference,row_speaker);
+    script_depth++;ran=AW_MwvmRunDialogue(chosen,(uint32_t)reference,row_speaker);script_depth--;   /* SAVE-INSIDE-SCRIPT-STEP-66 */
+    return ran;
 }

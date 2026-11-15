@@ -63,7 +63,8 @@ int AW_ObjectDisabled(unsigned reference){return disabled && reference==QUILL;}
 int AW_ObjectTake(unsigned reference,int stolen){(void)stolen;take_reference=(int)reference;taken++;disabled=1;return 1;}
 int ChimRoom_Has(unsigned reference){return room_draws && reference==QUILL;}
 void AW_UIPickupNotice(const char *name,double duration){(void)duration;assert(!strcmp(name,"Quill Pen"));notices++;}
-void AW_UISubtitle(const char *speaker,const char *text,double duration){(void)speaker;(void)text;(void)duration;assert(0);}
+static int subtitles;   /* only the locked container's line (DOOR-TRAPS-NOT-SPRUNG-55 check) */
+void AW_UISubtitle(const char *speaker,const char *text,double duration){(void)speaker;(void)duration;assert(!strcmp(text,"Locked"));subtitles++;}
 void AW_CombatEquipmentChanged(void){}
 void ED_Free(edict_t *e){(void)e;assert(0);}   /* a dropped item's edict: none here */
 /* the world change list's drops (CELL-CHANGES-59) are read at every map too: none here, so none is ever shown */
@@ -101,6 +102,12 @@ static void level(int draws){
     world.entities=world2.entities="{\n\"classname\" \"worldspawn\"\n\"_aw_cell_int\" \"763\"\n}\n";
     sv.worldmodel=next;room_draws=draws;taken=take_reference=notices=disabled=0;
 }
+/* DOOR-TRAPS-NOT-SPRUNG-55: stand-ins for the trap (aw_hinged_door.c) and the strip (aw_cstrip.c) */
+extern int (*aw_trap_spring)(unsigned reference);
+extern int (*aw_container_open)(unsigned reference,const char *name,int owned);
+static int trap_armed,springs,opens;
+static int trap_stand_in(unsigned reference){(void)reference;if(!trap_armed)return 0;trap_armed=0;springs++;return 1;}
+static int open_stand_in(unsigned reference,const char *name,int owned){(void)reference;(void)name;(void)owned;opens++;return 1;}
 static int reader_opened;
 static int fake_reader(unsigned reference){reader_opened=(int)reference;return 1;}
 int main(void){
@@ -138,6 +145,60 @@ int main(void){
       memset(row+64,0,32);level(1);
       assert(AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && !strcmp(name,doors[d].head));
      }
+     tables();level(1);
+    }
+    /* SIGNPOST-NAMES-MISSING-65: a named board ('N' row: the board's centre, its box and angles in the id field,
+     * tools/prepare_focus.py) shows its name when the view ray meets its box: a board 76 x 32 game units (map 19 x 8)
+     * face on, 20 map units ahead. Turned 20 degrees (7 units off its centre, past the near-the-origin test) it still
+     * shows; turned 30 degrees (11 units off, past its half width of 9.5) not. It has no prompt and E takes nothing. */
+    {
+     byte *row=focus_file+8+12;float box[7]={4,38,16,1,0,0,0};unsigned long bits;int k;char prompt[48];int steal=-1;
+     (void)AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned);   /* read on this map: the next map reads again */
+     tables();memset(row+20,0,96-20);row[0]='N';row[1]=0;row[2]=0;memcpy(row+28,"Pelagiad (back road)",20);
+     for(k=0;k<7;k++){memcpy(&bits,&box[k],4);put32(row+64+4*k,bits);}
+     level(1);
+     assert(AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && !strcmp(name,"Pelagiad (back road)") &&
+            !weight[0] && !value[0] && !owned);
+     assert(!AW_ItemPrompt(prompt,sizeof(prompt),&steal));
+     assert(!AW_InventoryUse() && !taken);
+     entities[1].v.v_angle[1]=20;assert(AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned));
+     entities[1].v.v_angle[1]=30;assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned));
+     entities[1].v.v_angle[1]=180;assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned));   /* behind */
+     entities[1].v.v_angle[1]=0;
+     /* turned a quarter about z (the builder's quaternion w = z = sqrt(1/2)): seen edge on along the view, its 1-unit
+      * thickness side on */
+     box[3]=box[6]=0.70710678f;for(k=3;k<7;k++){memcpy(&bits,&box[k],4);put32(row+64+4*k,bits);}
+     level(1);entities[1].v.v_angle[1]=20;assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned));
+     entities[1].v.v_angle[1]=0;assert(AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned));
+     tables();level(1);
+    }
+    /* OUTDOOR-CONTAINER-AIM-66: a container whose id field holds its measured box (tools/prepare_focus.py
+     * CONTAINER_BOXES: an exterior one) is aimed at by that box: a sack 76 x 32 game units, 20 map units ahead, seen
+     * 20 degrees off its centre (7 units, past the near-the-origin test's 6) still shows; 30 degrees off not. The same
+     * container with its record id there (a room's, aimed at by the room ray, none here) shows only near its origin. */
+    {
+     byte *row=focus_file+8+12;float box[7]={4,38,16,1,0,0,0};unsigned long bits;int k;
+     (void)AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned);
+     tables();memset(row+20,0,96-20);row[0]='C';row[1]=0;row[2]=1;memcpy(row+28,"Sack",4);
+     for(k=0;k<7;k++){memcpy(&bits,&box[k],4);put32(row+64+4*k,bits);}
+     level(1);
+     assert(AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && !strcmp(name,"Sack"));
+     entities[1].v.v_angle[1]=20;assert(AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned));
+     entities[1].v.v_angle[1]=30;assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned));
+     entities[1].v.v_angle[1]=0;
+     memset(row+64,0,32);memcpy(row+64,"com_sack_01",11);level(1);
+     assert(AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && !strcmp(name,"Sack"));
+     entities[1].v.v_angle[1]=20;assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned));
+     entities[1].v.v_angle[1]=0;
+     /* DOOR-TRAPS-NOT-SPRUNG-55 (TRAPS-WHEN-OPENED-63): E on a trapped container springs the trap (its spell on the
+      * player, aw_hinged_door.c AW_TrapSpring) and does not open it; the trap is used up, so the next E opens it. A
+      * locked one says Locked and springs nothing (the original: the lock first). */
+     aw_trap_spring=trap_stand_in;aw_container_open=open_stand_in;trap_armed=1;springs=opens=0;
+     assert(AW_InventoryUse() && springs==1 && opens==0 && !trap_armed);
+     assert(AW_InventoryUse() && springs==1 && opens==1);
+     trap_armed=1;row[3]=50;level(1);
+     assert(AW_InventoryUse() && springs==1 && opens==1 && trap_armed && subtitles==1);
+     aw_trap_spring=NULL;aw_container_open=NULL;
      tables();level(1);
     }
     /* STEAL-PROMPT-58: the owned quill reads "E: Steal" (drawn red); unowned it reads the GMST's "E: Take" */

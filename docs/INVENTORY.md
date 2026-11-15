@@ -1,6 +1,6 @@
 # Inventory
 
-_Last updated with AmiWind v0.0.65-rc4 (12 November 2026)._
+_Last updated with AmiWind v0.0.66-dev1 (13 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -321,7 +321,10 @@ is free, taking from it is theft). A locked container reads "Locked", its box
 shows "Lock Level: N" as the original's tooltip does, and E does not open it; the
 lock level comes from the placement in the game data, and a script's Lock or
 Unlock on the world change list overrides it. Organic containers (flora) are not
-opened: E picks them as before.
+opened: E picks them as before. A container is aimed at by its box: in a room the
+placement box the room draws; outdoors the container model's measured box, which
+the builder writes into its row (from v0.0.66; before, the containers outdoors
+could not be aimed at). The world-wide numbers are in [CONTAINERS.md](CONTAINERS.md).
 
 E opens the strip: a box along the bottom of the screen, up to the view, with a
 title row (the container's name, red when owned; the Inventory side; Take All;

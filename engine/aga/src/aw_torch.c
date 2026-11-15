@@ -154,11 +154,18 @@ static int hand_state(edict_t *p)
     return v && (v->_float==1 || v->_float==2 || v->_float==3)?(int)v->_float:0;
 }
 static int held_own(void);
+/* READY-MAGIC-SHOWS-WEAPON-65 (v0.0.66): 1 while the carried light is put away: magic is ready (aw_view.c installs it;
+ * NULL in fixtures). As the original (OpenMW 0.51, read not copied: the spell is a two-handed draw, mwworld/store.cpp's
+ * weapon types, and a two-handed draw hides the carried-left item, npcanimation.cpp updateCarriedLeftVisible): no torch
+ * or light in the hand and no light cast while magic is ready; its lit flag is kept, so it is back when the weapon is
+ * readied or the magic lowered. */
+int (*aw_torch_put_away)(void);
 /* the carried light is lit (V or the equip) with the hands raised */
 static int light_lit(void)
 {
     edict_t *p=torch_player();eval_t *v;
     if(!p || hand_state(p)<2)return 0;
+    if(aw_torch_put_away && aw_torch_put_away())return 0;
     v=GetEdictFieldValue(p,"aw_torch");
     /* TORCH-INVENTORY-PICTURE-64: the torch follows the equip state at once: with no light in the left hand nothing is
      * lit (before, the inventory's picture re-rendered on an unequip while the lit flag still waited for the next update,
@@ -187,6 +194,10 @@ static void toggle(void)
     if(!torch_assets){Con_Printf("Original torch assets unavailable; rebuild the image.\n");return;}
     if(!hand_state(p)){
         Con_Printf("Raise hands with F before equipping the torch.\n");return;
+    }
+    if(aw_torch_put_away && aw_torch_put_away()){   /* READY-MAGIC-SHOWS-WEAPON-65: the light stays put away */
+        Con_Printf("The light is put away while magic is ready: ready the weapon or lower the magic to carry it.\n");
+        return;
     }
     v=GetEdictFieldValue(p,"aw_torch");
     if(!v){Con_Printf("Torch requires matching AmiWind game rules.\n");return;}

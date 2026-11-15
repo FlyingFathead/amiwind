@@ -8,15 +8,21 @@
     },
     "dagoth_ur_2": {
       "reason": "Dagoth Ur in Akulakhan's Chamber, the final confrontation, as his whole original model (the maintainer: a full poly count, as in the NPC gallery; the room holds nothing else; CREATURE-DAGOTH-UR-ABSENT-52).",
-      "source": "CREA dagoth_ur_2 (model r/dagothr.nif, the gallery profile dagoth-whole-shared-vertex-v1: all 2,254 triangles on 1,741 vertices); placed once, Akulakhan's Chamber"
+      "source": "CREA dagoth_ur_2 (model r/dagothr.nif, the gallery profile dagoth-whole-shared-vertex-v1: all 2,254 triangles on 1,741 vertices); placed once, Akulakhan's Chamber",
+      "method": "skeletal",
+      "method_reason": "He fights: the 8 baked idle frames have no run, attack or cast, so his blows sounded with no swing (DAGOTH-UR-NO-ANIMATIONS-65). One skeletal model on his own table (his xdagothr.kf groups appended to the humanoid table: 29 bones, 22 groups of his own, run, attack1, spellcast, hit1, death1 in the fight layout). His whole model (2,254 triangles) is past the skeletal reader's 1,024 faces and the 480-row skin (960 faces), so the model is the seam-locked reduction at 948 faces with every open edge of the source kept and none new (tools/creature_tables.py DAGOTH_SEAM_TOTAL); the Halloween scene's 457-face bake is selectable (AMIWIND_DAGOTH_MODEL=halloween). Without this row he is baked as before."
     },
     "dagoth_ur_1": {
       "reason": "Dagoth Ur in the Facility Cavern, the first meeting before the chamber, the same whole model (CREATURE-DAGOTH-UR-ABSENT-52).",
-      "source": "CREA dagoth_ur_1 (model r/dagothr.nif, profile dagoth-whole-shared-vertex-v1); placed once, Dagoth Ur, Facility Cavern"
+      "source": "CREA dagoth_ur_1 (model r/dagothr.nif, profile dagoth-whole-shared-vertex-v1); placed once, Dagoth Ur, Facility Cavern",
+      "method": "skeletal",
+      "method_reason": "The same model and table as dagoth_ur_2 (one mesh, r/dagothr.nif): his own run, attack and cast groups (DAGOTH-UR-NO-ANIMATIONS-65). Without this row he is baked as before."
     },
     "heart_akulakhan": {
-      "reason": "The Heart of Lorkhan in Akulakhan's Chamber, the object of the main quest (the maintainer, TG 2026-10-25: Lorkhan's heart is missing; CREATURE-DAGOTH-UR-ABSENT-52).",
-      "source": "CREA heart_akulakhan (its own model, read from its record); placed once, Akulakhan's Chamber"
+      "reason": "The Heart of Lorkhan in Akulakhan's Chamber, the object of the main quest (the maintainer, 2026-10-25: Lorkhan's heart is missing; CREATURE-DAGOTH-UR-ABSENT-52).",
+      "source": "CREA heart_akulakhan (its own model, read from its record); placed once, Akulakhan's Chamber",
+      "method": "skeletal",
+      "method_reason": "Its script LorkhanHeart plays Idle2 to Idle5 on each strike and Death1 on the fifth (PlayGroup): one skeletal model on its own animation table (210 frames, the Death1 shrink as a scale track) plays every group by name; the 8 baked idle frames cannot (HEART-OF-LORKHAN-LOOK-62)."
     }
   }
 }

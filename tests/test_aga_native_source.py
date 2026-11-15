@@ -552,7 +552,7 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_inventory_fullscreen_events_real_equip_atomic_drop_and_exit(self):
         self.compile_run('aga_inventory_ui_test.c', [Path(SOURCE)/'src'/n for n in
-            ('aw_worldui.c','aw_questbook.c','aw_jhist.c','aw_ledger.c','aw_textdef.c','aw_inventory.c','aw_harvest.c','aw_state.c','aw_save_codec.c','mathlib.c','common.c')],
+            ('aw_worldui.c','aw_mapfog.c','aw_mapmarks.c','aw_listbox_rules.c','aw_msgbox_rules.c','aw_questbook.c','aw_jhist.c','aw_ledger.c','aw_textdef.c','aw_inventory.c','aw_harvest.c','aw_state.c','aw_save_codec.c','mathlib.c','common.c')],
             defines=['AW_INVENTORY_RULES_ONLY','AW_TEXTDEF_HOST_TEST'],
             cflags=['-Wl,--wrap=COM_FOpenFile','-Werror=implicit-function-declaration','-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
 
@@ -562,8 +562,18 @@ class NativeSourceTests(unittest.TestCase):
             cflags=['-Wl,--wrap=AW_SmallStringColor','-Wall','-Werror=implicit-function-declaration',
                     '-fsanitize=address,undefined','-fno-sanitize-recover=all'])
 
+    def test_map_fog_reveal_radius_bounds_and_saved_rows(self):
+        # MAP-ORIGINAL-POI-66 stage 2: the explored land (aw_mapfog.c), its reveal and its saved rows
+        self.compile_run('aga_mapfog_test.c', [Path(SOURCE)/'src/aw_mapfog.c'],
+            cflags=['-Wall','-fsanitize=address,undefined','-fno-sanitize-recover=all'])
+
+    def test_map_markers_list_names_search_hot_and_saved_block(self):
+        # MAP-MULTI-MARKERS-66 / NAV-HOT-MARKER-COMPASS-66: the named markers and the hot marker (aw_mapmarks.c)
+        self.compile_run('aga_mapmarks_test.c', [Path(SOURCE)/'src/aw_mapmarks.c'],
+            cflags=['-Wall','-fsanitize=address,undefined','-fno-sanitize-recover=all'])
+
     def test_world_map_journal_disk_bounds_navigation_and_modal_exit(self):
-        self.compile_run('aga_worldui_test.c', [Path(SOURCE)/'src'/n for n in ('aw_worldui.c','aw_questbook.c','aw_jhist.c','aw_ledger.c','aw_textdef.c','aw_inventory.c','aw_state.c','aw_save_codec.c','mathlib.c')],
+        self.compile_run('aga_worldui_test.c', [Path(SOURCE)/'src'/n for n in ('aw_worldui.c','aw_mapfog.c','aw_mapmarks.c','aw_listbox_rules.c','aw_msgbox_rules.c','aw_questbook.c','aw_jhist.c','aw_ledger.c','aw_textdef.c','aw_inventory.c','aw_state.c','aw_save_codec.c','mathlib.c')],
             defines=['AW_INVENTORY_RULES_ONLY','AW_TEXTDEF_HOST_TEST'], cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
 
     def test_mouse_event_order_accumulation_modal_reset_and_signed_deltas(self):
@@ -573,7 +583,7 @@ class NativeSourceTests(unittest.TestCase):
                                    ('gnu99', ('signed_game', 'filter', 'bounds'))):
             with self.subTest(standard=standard):
                 self.compile_run('aga_mouse_event_test.c', [Path(SOURCE)/'src'/n for n in
-                    ('in_amiga.c', 'cl_input.c', 'aw_worldui.c', 'aw_questbook.c', 'aw_jhist.c', 'aw_ledger.c', 'aw_textdef.c', 'aw_inventory.c', 'aw_state.c', 'aw_save_codec.c', 'mathlib.c')],
+                    ('in_amiga.c', 'cl_input.c', 'aw_worldui.c', 'aw_mapmarks.c', 'aw_listbox_rules.c', 'aw_msgbox_rules.c', 'aw_questbook.c', 'aw_jhist.c', 'aw_ledger.c', 'aw_textdef.c', 'aw_inventory.c', 'aw_state.c', 'aw_save_codec.c', 'mathlib.c')],
                     defines=['AW_INVENTORY_RULES_ONLY', 'AW_TEXTDEF_HOST_TEST'], cflags=['-fsanitize=undefined,float-cast-overflow', '-fno-sanitize-recover=all'],
                     standard=standard, argument_sets=[(case,) for case in selected])
 
@@ -594,7 +604,7 @@ class NativeSourceTests(unittest.TestCase):
                                + branches[0].strip() + '}\n')
             self.compile_run('aga_map_focus_test.c',
                 [*[Path(SOURCE)/'src'/n for n in
-                   ('in_amiga.c', 'cl_input.c', 'keys.c', 'aw_worldui.c', 'aw_questbook.c', 'aw_jhist.c', 'aw_ledger.c', 'aw_textdef.c', 'aw_inventory.c', 'aw_state.c', 'mathlib.c')], adapter],
+                   ('in_amiga.c', 'cl_input.c', 'keys.c', 'aw_worldui.c', 'aw_mapmarks.c', 'aw_listbox_rules.c', 'aw_msgbox_rules.c', 'aw_questbook.c', 'aw_jhist.c', 'aw_ledger.c', 'aw_textdef.c', 'aw_inventory.c', 'aw_state.c', 'mathlib.c')], adapter],
                 defines=['AW_INVENTORY_RULES_ONLY', 'AW_TEXTDEF_HOST_TEST'], cflags=['-fsanitize=undefined,float-cast-overflow', '-fno-sanitize-recover=all'],
                 argument_sets=[(case,) for case in cases])
 

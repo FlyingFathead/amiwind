@@ -97,6 +97,12 @@ int AW_MagicSetCharge(aw_state_t *,const aw_inventory_item_t *,float);
 int AW_MagicRecharge(aw_state_t *,const aw_inventory_item_t *,float seconds,float rate);
 float AW_InventoryCondition(const char *id);
 int AW_InventorySetCondition(const char *id,float condition);
+/* SAVE-ITEM-INSTANCES-ONE-PER-KIND-66 (aw_state.h, the item instances): the condition of the copy SLOT wears (its
+ * instance's, else its kind's plain copies'; 1 when the slot is empty), and that copy's condition set (a blow, a
+ * repair): on its own instance when the kind has more copies, so the others keep theirs; on the kind when it is the one
+ * copy. 1 done, 0 nothing worn or a bad value. Pure (a state pointer, no catalogue read). */
+float AW_InventorySlotCondition(const aw_state_t *,int slot);
+int AW_InventorySlotSetCondition(aw_state_t *,int slot,float condition);
 /* Pure rules (debug torch): the remaining burn time of a carried light after seconds of use
  * (AW_LIGHT_INFINITE stays infinite; else it counts down to 0, as OpenMW's held light); and the
  * one-time grant: 1 = given now, 0 = switched off, given before, or no room (state unchanged). */
@@ -391,7 +397,7 @@ extern int (*aw_container_lock)(unsigned reference,int original);
  * table; a save of other game data migrated (-1: no table, refused; else the changes dropped, by part in OUT); a placed
  * reference's flags (AW_REFS_RESPAWN, AW_REFS_LEVELLED; 0 none or no table). */
 struct aw_ledger_s;
-void AW_PlacedIdentRefresh(struct aw_ledger_s *l);
+int AW_PlacedIdentRefresh(struct aw_ledger_s *l);
 long AW_PlacedMigrate(struct aw_ledger_s *l,void *dropped);
 uint32_t AW_PlacedRefFlags(uint32_t key);
 #endif

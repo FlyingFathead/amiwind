@@ -353,7 +353,7 @@ def prerequisites(args, interactive=False):
             with Progress("Verifying game files, containers and reference hashes"):
                 args.input_report = input_check.inspect(raw, args.stage, args.allow_data_differences,
                                                        notify=print, choose=choose_installation if interactive else None,
-                                                       hasher=input_lock(args))
+                                                       hasher=input_lock(args), expansions=expansion_selection(args))
             input_check.display(args.input_report)
             errors.extend(args.input_report["errors"])
             data = Path(args.input_report["data_files"])
@@ -371,7 +371,10 @@ def prerequisites(args, interactive=False):
     if not getattr(args, 'dry_run', False) and args.stage == 'aga' and not getattr(args, 'miniwind', False):
         import exterior_plan
         from chim.regions import decode_cells
-        cells, master_sha = exterior_plan.source_cells(child_ci(args.data_files, 'Morrowind.esm'))
+        # the selected masters, merged in load order, as the world survey reads them (EXTERIOR-PLAN-MASTER-LAYERS-66):
+        # the base game file alone with --no-dlc, so the base world's checklist is unchanged
+        cells, master_sha = exterior_plan.selected_cells(
+            args.data_files, (getattr(args, 'expansion_layers', None) or {}).get('masters') or ('Morrowind.esm',))
         selected = decode_cells(getattr(args, 'chim_regions_cells', None) or '')
         if selected and (getattr(args, 'chim_region_rows', None) or 'game-data') != 'game-data':
             raise ValueError('Full builds require CHIM rows from game data: no duplicate legacy conversion')
@@ -818,6 +821,18 @@ def chim_sol_test_commands(args, steps, tool, run, tools, jobs):
     return [(name, list(command) + extra if name == 'image' else command) for name, command in steps]
 
 
+def chim_layer_image_commands(args, steps, run):
+    """The image takes ONE CHIM store per selected expansion layer whose CHIM world stage (chim-layer-<layer>, the
+    layer stages) is in the plan (tools/chim/layer_stores.py). No layer selected (--no-dlc) or no such stage: STEPS
+    unchanged, so the image is the one before."""
+    from chim.layer_stores import image_options
+    selected = (getattr(args, 'expansion_layers', None) or {}).get('selected') or []
+    extra = image_options(selected, {name for name, _ in steps}, run)
+    if not extra:
+        return steps
+    return [(name, list(command) + extra if name == 'image' else command) for name, command in steps]
+
+
 def chim_town_commands(args, builder, steps, tool, run, tools, jobs):
     """Replace each CHIM-native town's legacy chain stage by its chim-town stage (tools/chim_town.py,
     after the CHIM world): residents, frame entities, region table and door bank from the game data.
@@ -922,7 +937,11 @@ def room_batch_selection(args):
     if getattr(args, 'miniwind', False) and str(value).strip().casefold() == room_batches.SELECTION_ALL:
         raise ValueError('--room-batches all is every interior of the list: a MiniWind takes batch numbers '
                          '(e.g. --room-batches 1)')
-    chosen = room_batches.parse_selection(value, doc)
+    # an expansion's batches only when its layer is selected (--no-dlc: the base batches alone); from the --dlc /
+    # --no-dlc choice itself, so the answer does not depend on when the input check ran
+    import build_cache
+    masters = build_cache.master_list(expansion_selection(args))
+    chosen = room_batches.parse_selection(value, doc, masters)
     if chosen and getattr(args, 'interior_format', 'chim') != 'chim':
         raise ValueError('--room-batches makes CHIM rooms only: drop --interior-format %s' % args.interior_format)
     if chosen and getattr(args, 'miniwind', False) and getattr(args, 'miniwind_scope', None) in ('exterior', 'interior'):
@@ -1471,6 +1490,7 @@ def commands(args, tools, run):
                                        builder.get('chim_lighting_type') or 'hybrid'] if name == 'image' else command)
                      for name, command in steps]
             steps = chim_sol_test_commands(args, steps, tool, run, tools, jobs)
+            steps = chim_layer_image_commands(args, steps, run)
             steps = chim_town_commands(args, builder, steps, tool, run, tools, jobs)
             if getattr(args, 'interior_format', 'chim') == 'chim':
                 steps = chim_interior_commands(args, steps, tool, run, tools, jobs)
@@ -1721,6 +1741,8 @@ def chim_stage_options(args):
         out += ['--detail-budget', args.chim_detail_budget]
     if getattr(args, 'chim_cut_models_over', None) is not None:
         out += ['--cut-models-over', str(args.chim_cut_models_over)]
+    if getattr(args, 'chim_draw_tiles', None) == 'on':
+        out += ['--draw-tiles', 'on']
     if getattr(args, 'chim_draw_distance', None):
         out += ['--draw-distance', str(args.chim_draw_distance)]
     if getattr(args, 'chim_terrain_shoreline', 'on') != 'on':
@@ -1804,6 +1826,10 @@ def resolve_chim_regions(args, builder=None):
             args.chim_regions_cells = None
             return None
         values, default = ['@' + str(CHIM_CELLS_DEFAULT)], True
+        # each selected layer's exterior as its named set: its finished cells are taken, the rest dropped with their
+        # reason (CHIM-SOL-FLORA-PATH-65); with --no-dlc nothing is added, so the base build is unchanged
+        masters = (getattr(args, 'expansion_layers', None) or {}).get('masters') or []
+        values += [chim_regions.LAYER_SETS[m] for m in masters if m in chim_regions.LAYER_SETS]
     builder = builder or resolve_builder(args)
     if builder['builder'] != 'chim':
         raise ValueError('--chim-regions needs the CHIM builder (--builder chim)')
@@ -1852,6 +1878,8 @@ def debug_settings(args):
         out['detail_budget'] = args.chim_detail_budget
     if getattr(args, 'chim_cut_models_over', None) is not None:
         out['cut_models_over'] = args.chim_cut_models_over
+    if getattr(args, 'chim_draw_tiles', None) == 'on':
+        out['draw_tiles'] = 'on'
     if getattr(args, 'accept_known_stair_findings', None):
         out['accepted_stair_findings'] = list(args.accept_known_stair_findings)
     return out
@@ -1900,10 +1928,20 @@ def execute(steps, run, metadata):
         except (OSError, subprocess.CalledProcessError, KeyboardInterrupt) as exc:
             status = "cancelled" if isinstance(exc, KeyboardInterrupt) else "failed"
             entry.update(status=status, elapsed_seconds=round(time.monotonic() - start, 3))
+            if isinstance(exc, subprocess.CalledProcessError):
+                entry["returncode"] = exc.returncode     # as the parallel scheduler records it (tools/build_failure.py)
             profile.finished(name, entry)
             receipt["status"] = status
             save()
             profile.close(receipt)
+            if status == "failed":
+                # the failure details beside the logs, FAILURE.md and failure.json (BUILD-FAILURE-NO-DETAILS-66;
+                # tools/build_failure.py never raises); the stage's exit is in its row, not in the error
+                try:
+                    import build_failure
+                    build_failure.write(run, None if isinstance(exc, subprocess.CalledProcessError) else exc)
+                except ImportError:
+                    pass
             if isinstance(exc, KeyboardInterrupt):
                 print(f"Build cancelled. Earlier results and logs retained in {run}", flush=True)
                 raise
@@ -1916,14 +1954,15 @@ def execute(steps, run, metadata):
     profile.close(receipt)
 
 
-def resource_plan_document(args, steps, running, got=None):
-    """The resource plan (tools/resource_plan.py) of STEPS of which RUNNING will run, against what the build gets."""
+def resource_plan_document(args, steps, running, got=None, units=None):
+    """The resource plan (tools/resource_plan.py) of STEPS of which RUNNING will run, against what the build gets.
+    UNITS: {stage: [(cache, usable, held)]}, the unit caches' key lookups of the reuse check (NEW-WORK-FIRST-66)."""
     import resource_plan
     got = got or resource_plan.limits(getattr(args, 'resource_memory_gb', None), getattr(args, 'resource_threads', None))
     gathered = resource_plan.gather(args.reuse_from, args.workspace, getattr(args, 'resource_from', None) or (),
                                     'miniwind' if getattr(args, 'miniwind', False) else 'full',
                                     stair_walk_scope(None, getattr(args, 'stair_walk', 'auto')))
-    doc = resource_plan.plan(steps, running, resolve_jobs(args.jobs), got, gathered, args.reuse_from)
+    doc = resource_plan.plan(steps, running, resolve_jobs(args.jobs), got, gathered, args.reuse_from, units=units)
     line, record = resource_plan.state_line(resolve_jobs(args.jobs),
                                             max([r['peak_total_mib'] for r in doc['stages']] or [0]))
     doc['machine'] = record
@@ -1931,6 +1970,85 @@ def resource_plan_document(args, steps, running, got=None):
 
 
 RESOURCE_PLAN_EXIT = 5   # a stage's single unit is larger than the memory the build gets
+UNIT_STOP_EXIT = 6       # --check: the build would stop at its reuse stop (unit caches, whole stages)
+
+
+def focus_box_preflight(args):
+    """EXPANSION-BASE-ONLY-TABLES-66: before any stage, every named activator and container placed in the SELECTED
+    masters (the merged master, build_cache.MASTERS_ENV set) has its measured box in tools/prepare_focus.py; the
+    v0.0.66-dev2 build met a Bloodmoon activator without one only at its focus stage. Returns the error text, or None
+    (also for asset-free dry runs and builds without the focus stage)."""
+    if not focus_status(args)[0] or not getattr(args, 'data_files', None):
+        return None
+    sys.path.insert(0, str(ROOT / 'tools'))
+    import prepare_focus
+    from mwad.masters import master_path
+    try:
+        raw = master_path(resolve_data_files(Path(args.data_files))).read_bytes()
+    except (OSError, ValueError, TypeError) as exc:   # no game data here (a test tree): the stages report it themselves
+        print('Focus box preflight: skipped (%s)' % exc, flush=True)
+        return None
+    missing = prepare_focus.missing_boxes(raw)
+    print('Focus box preflight: %d placed, named activators and containers of the selected masters lack a measured '
+          'box' % len(missing), flush=True)
+    if not missing:
+        return None
+    return ('the focus table has no measured box for %d models of the selected masters (tools/prepare_focus.py '
+            'FOCUS_BOXES / CONTAINER_BOXES): %s' % (len(missing), ', '.join('%s %s (%s)' % row for row in missing[:20])))
+
+
+def unit_stop_check(args, tools, run):
+    """`build.py --check` with --reuse-from or --reuse-all-available: the stage plan and the reuse stop of the build's
+    first minute (build_cache.prepare with the same options: every stage's key, the reuse plan, the reuse preflight,
+    and with --reuse-all-available the unit-cache report and its STOP lines), read only: no run folder, no stage index
+    written (build_cache.CHECK_ONLY). Returns 0, or UNIT_STOP_EXIT when the build would stop there
+    (PLAN-CHECK-UNIT-STOPS-66)."""
+    import build_cache
+    steps = commands(args, tools, run)
+    with Progress("Recording input, tool and source checksums for the reuse check"):
+        metadata = provenance(args, tools)
+    metadata['expansion_layers'] = getattr(args, 'expansion_layers', None)
+    os.environ[build_cache.MASTERS_ENV] = ','.join((metadata['expansion_layers'] or {}).get('masters')
+                                                   or build_cache.master_list([]))
+    problem = focus_box_preflight(args)
+    if problem:
+        print(f'Check FAILED: the build would stop before its first stage: {problem}', flush=True)
+        return UNIT_STOP_EXIT
+    lock = getattr(args, '_input_lock', None)
+    lock_path = lock.save() if lock is not None else None
+    if lock_path:
+        os.environ['AMIWIND_INPUTS_LOCK'] = str(lock_path)
+    metadata['build_argv'] = [str(part) for part in getattr(args, '_argv', None) or []]
+    forced = [name for name in (getattr(args, 'rebuild_stage', '') or '').split(',') if name]
+    print('Reuse check (--check): the stage plan and the reuse stop of this build, before any stage', flush=True)
+    keep = build_cache.CHECK_ONLY
+    build_cache.CHECK_ONLY = True
+    try:
+        build_cache.prepare(steps, run, metadata, args.reuse_from, args.reuse_mode,
+                            scope=getattr(args, 'fingerprint_scope', 'units'), pool=storage_pool_dir(args),
+                            forced=forced, accept_rebuild=getattr(args, 'accept_rebuild', False),
+                            reuse_all=({'workspace': str(Path(args.workspace).resolve()),
+                                        'allowed': getattr(args, 'allow_rebuild_map', {})}
+                                       if getattr(args, 'reuse_all_available', False) else None))
+    except ValueError as exc:
+        print(f'Check FAILED: the build would stop before its first stage: {exc}', flush=True)
+        return UNIT_STOP_EXIT
+    finally:
+        build_cache.CHECK_ONLY = keep
+        # the stage source analysis of this source tree, for aw submit's check and the build that follow
+        # (BUILD-PREFLIGHT-SERIAL-REPEATED-66): valid whether or not the plan stops, it depends on the files only
+        save_preflight_analysis()
+    print('Reuse check (--check): passed (no reuse stop)', flush=True)
+    return 0
+
+
+def save_preflight_analysis():
+    """Keep this process's stage source analyses for the next check or build of the same tree (never fails)."""
+    try:
+        import fingerprint_prefetch
+        fingerprint_prefetch.save_analyses(log=lambda line: print(line, flush=True))
+    except Exception as exc:  # noqa: BLE001 - only an accelerator of the next start
+        print(f'Pre-flight: the stage source analysis was not kept ({type(exc).__name__}: {exc})', flush=True)
 
 
 def resource_plan_main(args, steps):
@@ -1975,8 +2093,9 @@ def resource_preflight(args, steps, metadata):
     import resource_plan
     reused = set((metadata.get('stage_cache') or {}).get('reused') or {})
     running = {name for name, _ in steps if name not in reused}
+    units = ((metadata.get('stage_cache') or {}).get('minute_one') or {}).get('units')
     try:
-        doc, line = resource_plan_document(args, steps, running)
+        doc, line = resource_plan_document(args, steps, running, units=units)
         rendered = resource_plan.text(doc)
     except (OSError, ValueError, KeyError, TypeError) as exc:
         # a plan that cannot be made is reported, never a reason to stop a build (the stages size themselves)
@@ -1990,6 +2109,9 @@ def resource_preflight(args, steps, metadata):
                                  'advisory': (doc['advisory'] or {}).get('text'), 'refusals': doc['refusals']}
     metadata['resource_plan_units'] = {r['stage']: r['worker_mib'] for r in doc['stages'] if r['worker_mib'] >= 64}
     metadata['resource_plan_parents'] = {r['stage']: r['parent_mib'] for r in doc['stages'] if r['worker_mib'] >= 64}
+    # NEW-WORK-FIRST-66: the stages with no history (new content) start first among the ready ones
+    if doc.get('new_work'):
+        metadata['resource_plan_new'] = list(doc['new_work'])
     # BUILD-CHIM-POOL-MEMORY-THROTTLE-59: stages the plan runs alone, and the memory-heavy stages held back beside them
     if doc.get('alone'):
         metadata['resource_plan_alone'] = list(doc['alone'])
@@ -2216,10 +2338,16 @@ def check_known_game_data(args, data):
               'they are used (--game-data-policy warn). See docs/KNOWN_INPUTS.md', flush=True)
     args.known_game_data = report
     # Tribunal and Bloodmoon, plainly: found or not, used now, waiting (tools/expansions_report.py; report only).
-    # --dlc / --no-dlc (DLC-BUILD-LATER) choose the layers; the default is every expansion found.
+    # --dlc / --no-dlc (DLC-BUILD-LATER) choose the layers; the default is both expansions (CHIM-SOL-FLORA-PATH-65).
     selected = expansion_selection(args)   # a contradictory choice stops the build here, before any stage
+    # every selected layer's master and archive present and known, in the first seconds (fail fast)
+    check_selected_layers(report, selected)
+    import build_cache
     args.expansion_layers = {'requested': 'none' if selected == [] else (getattr(args, 'dlc', None) or 'default'),
+                             'selected': list(selected), 'masters': build_cache.master_list(selected),
                              'layers': []}
+    # the stages get it as build_cache.MASTERS_ENV when the build runs (main, beside the AMIWIND_RUN_* names)
+    print('Masters in load order: ' + ','.join(args.expansion_layers['masters']), flush=True)
     try:
         import expansions_report
         args.expansions_record = expansions_report.report(report, no_dlc=selected == [], selected=selected)
@@ -2237,16 +2365,42 @@ def check_known_game_data(args, data):
 DLC_CHOICES = {'tribunal': ['Tribunal'], 'bloodmoon': ['Bloodmoon'], 'both': ['Tribunal', 'Bloodmoon'], 'none': []}
 
 
+DEFAULT_DLC = 'both'   # both expansions are built by default (CHIM-SOL-FLORA-PATH-65); --no-dlc / --dlc none turn them off
+LAYER_FILES = {'Tribunal': ('Tribunal.esm', 'Tribunal.bsa'), 'Bloodmoon': ('Bloodmoon.esm', 'Bloodmoon.bsa')}
+LAYER_FIX = 'put the expansion files in the data folder, or build without them: --no-dlc'
+
+
+def check_selected_layers(report, selected):
+    """Stop the build (ValueError, one plain line per file) when a SELECTED layer's master or archive is missing from
+    the data folder or its SHA-256 is not the known value (config/known-inputs.json, the known-inputs check's verdicts
+    in REPORT). --check-hashes off: an unchecked file is used with a warning. Nothing is checked for []."""
+    records = {str(r.get('name', '')).casefold(): r for r in (report or {}).get('files') or ()}
+    problems = []
+    for layer in selected or ():
+        for name in LAYER_FILES[layer]:
+            record = records.get(name.casefold())
+            if record is None:
+                problems.append('%s is missing from the data folder (expected the known %s file); fix: %s'
+                                % (name, layer, LAYER_FIX))
+            elif record.get('verdict') == 'unchecked':
+                print('[warning] %s not checked (--check-hashes off): used without verification' % name, flush=True)
+            elif record.get('verdict') != 'known':
+                problems.append('%s has SHA-256 %s, expected a known %s file (config/known-inputs.json); fix: %s'
+                                % (name, record.get('sha256') or 'unreadable', layer, LAYER_FIX))
+    if problems:
+        raise ValueError('Expansion files: ' + '\n  - '.join(problems))
+
+
 def expansion_selection(args):
-    """The expansions --dlc / --no-dlc / --no-dlcs ask for: a list of names, [] for none, or None (the default:
-    every expansion found). --no-dlc with --dlc naming an expansion is refused (ValueError)."""
+    """The expansions --dlc / --no-dlc / --no-dlcs ask for: a list of names in load order, [] for none. Unset = both
+    (DEFAULT_DLC). --no-dlc with --dlc naming an expansion is refused (ValueError)."""
     dlc = getattr(args, 'dlc', None)
     if getattr(args, 'dlc_off', False) or getattr(args, 'no_dlc', False):
         if dlc not in (None, 'none'):
             raise ValueError('--no-dlc and --dlc %s contradict each other: give one of them' % dlc)
         return []
     if dlc is None:
-        return None
+        dlc = DEFAULT_DLC
     if dlc not in DLC_CHOICES:
         raise ValueError('--dlc must be one of %s' % ', '.join(DLC_CHOICES))
     return list(DLC_CHOICES[dlc])
@@ -2768,6 +2922,10 @@ def export_converter_environment(args):
     # the standing bevels of hollow collision plates (COLLISION-WORLDWIDE-REDUCTION-64): the option, else the config
     from hollow_bevels_env import export_hollow_bevels
     export_hollow_bevels(getattr(args, "chim_hollow_bevels", None))
+    # the draw tiles of a classic room map's shell (PRISON-SHIP-POLY-COLLISION-65): the option, else the default
+    from room_map_env import export_room_draw_tiles, export_room_small_parts
+    export_room_draw_tiles(getattr(args, "room_draw_tiles", None))
+    export_room_small_parts(getattr(args, "room_small_parts", None))
     from lava import export_lava
     export_lava(args.font_options["lava"])
     from build_font_options import export_world_map
@@ -2833,15 +2991,32 @@ def reuse_plan_environment(old_run, flags=None):
     return source
 
 
+_STARTUP_WATCH = None      # (StartupWatch, final status) of the run main() is in
+
+
 def main(argv=None):
     try:
         return _main(argv)
     finally:
+        # the start-up watch (tools/build_stall.py) ends with this call, also when main() is called in-process
+        # (tests, wrappers): its stdout tee and its thread never outlive the run
+        global _STARTUP_WATCH
+        if _STARTUP_WATCH is not None:
+            watch, final = _STARTUP_WATCH
+            _STARTUP_WATCH = None
+            watch.stop(final)
         # the reuse preflight is shared by the two asks of one --check / --plan run only, never past it
         cache = sys.modules.get('build_cache')
         if cache is not None and getattr(cache, 'PREFLIGHT_ONCE', False):
             cache.PREFLIGHT_ONCE = False
             cache._PREFLIGHT_DONE.clear()
+        # the pre-flight's pool and analysis store belong to this run only (BUILD-PREFLIGHT-SERIAL-REPEATED-66)
+        if cache is not None:
+            cache.PREFLIGHT_WORKERS, cache.ANALYSIS_STORE, cache.ANALYSIS_READ_ONLY = None, None, False
+            cache.ANALYSIS_ORIGIN = {}
+        prefetch = sys.modules.get('fingerprint_prefetch')
+        if prefetch is not None:
+            prefetch.forget()
 
 
 def _main(argv=None):
@@ -2851,6 +3026,15 @@ def _main(argv=None):
         if hasattr(stream, 'reconfigure'):
             stream.reconfigure(line_buffering=True)
     argv = list(sys.argv[1:] if argv is None else argv)
+    # options read from a file written with a byte-order mark (BUILD-FLAGS-MARK-SILENT-REFUSAL-66): the mark in front
+    # of the first option is removed; one anywhere else is refused by the option that holds it
+    if argv and argv[0].startswith('﻿'):
+        argv[0] = argv[0].lstrip('﻿')
+        argv = argv if argv[0] else argv[1:]
+    marked = [part for part in argv if '﻿' in part]
+    if marked:
+        raise SystemExit('Error: option %s holds a byte-order mark (U+FEFF): write the options without it'
+                         % ascii(marked[0]))
     import project_version
     project_version.private_test_options.clear()  # this build's release readiness (tools/release_readiness.py)
     # Read-only commands on run folders (docs/BUILD_PROFILE.md): live progress and the profiler.
@@ -2953,6 +3137,14 @@ def _main(argv=None):
     args.jobs_requested = args.jobs
     if args.jobs is None:
         args.jobs = resolve_jobs(None)
+    # The pre-flight before the first stage on the pool (BUILD-PREFLIGHT-SERIAL-REPEATED-66): the cache walk and the
+    # stage source analysis on --jobs worker processes, capped by the cores this build may use
+    # (tools/fingerprint_prefetch.py preflight_workers; AMIWIND_PREFLIGHT_JOBS=1: this process alone)
+    # (real image builds, checks and plans; an asset-free dry run keeps the earlier serial path)
+    import build_cache as _preflight_cache
+    import fingerprint_prefetch
+    if args.stage == 'aga' and not args.dry_run:
+        _preflight_cache.PREFLIGHT_WORKERS = fingerprint_prefetch.preflight_workers(args.jobs)
     # Output level of the stages (build_profile.log_level; not part of any stage key: build_cache.IGNORED_ENV).
     args.log_level_record = resolve_log_level(args)
     # Every option the stage code reads from the environment, by the function the reuse plan also uses
@@ -3038,13 +3230,25 @@ def _main(argv=None):
             note = require_previous_release(ROOT, VERSION)
             if note:
                 print(note, flush=True)
-            # Seconds-long checks before any stage: cache ownership, game data (build_preflight.py).
+            # Seconds-long checks before any stage: cache ownership, game data (build_preflight.py); the cache's
+            # millions of entries on the pre-flight's workers (BUILD-PREFLIGHT-SERIAL-REPEATED-66)
             import build_preflight
-            problems = build_preflight.run(args.workspace, getattr(args, 'data_files', None), space=False)
+            import build_cache as _preflight_cache
+            began = time.monotonic()
+            problems = build_preflight.run(args.workspace, getattr(args, 'data_files', None), space=False,
+                                           workers=_preflight_cache.PREFLIGHT_WORKERS)
+            print('Build preflight: cache owners, game data and town budgets checked in %.1f s (%d worker processes)'
+                  % (time.monotonic() - began, _preflight_cache.PREFLIGHT_WORKERS or 1), flush=True)
             preflight_builder = resolve_builder(args)
             if preflight_builder['builder'] == 'chim':
                 problems += build_preflight.grounding_problems(getattr(args, 'data_files', None),
                                                                preflight_builder['chim_areas'])
+                # every resident of the room batches' rooms, with the selected expansions (ROOM-BATCH-NPC-GROUNDING-48:
+                # the stage's own check stopped the v0.0.66-dev2 build 14 minutes in)
+                import build_cache as _room_masters
+                problems += build_preflight.room_grounding_problems(
+                    getattr(args, 'data_files', None), room_batch_selection(args),
+                    _room_masters.master_list(expansion_selection(args)))
                 problems += build_preflight.harvest_town_problems(chim_native_towns(args, preflight_builder),
                                                                   args.chim_regions_table, args.miniwind)
             if problems:
@@ -3198,7 +3402,7 @@ def _main(argv=None):
             with Progress("Verifying game files, containers and reference hashes"):
                 report = input_check.inspect(raw, args.stage, args.allow_data_differences,
                                              notify=print, choose=choose_installation if sys.stdin.isatty() else None,
-                                             hasher=input_lock(args))
+                                             hasher=input_lock(args), expansions=expansion_selection(args))
             input_check.display(report)
             args.input_report = report
             check_known_game_data(args, Path(report["data_files"]))
@@ -3232,6 +3436,40 @@ def _main(argv=None):
             raise ValueError("--name must be 1-100 letters, digits, dots, hyphens or underscores")
         args.run_name_record = run_name.record(args.name, VERSION, commit, commit_origin, what, explicit)
         print(f"Run name: {args.name}", flush=True)
+        # The stage source analysis of this source tree, kept for the next check or build of the same tree and taken
+        # from the last one (tools/fingerprint_prefetch.py, BUILD-PREFLIGHT-SERIAL-REPEATED-66): a check makes it, aw
+        # submit's check and the build take it. A plan only reads it.
+        import build_cache as _preflight_cache
+        import fingerprint_prefetch
+        if args.stage == 'aga' and not args.dry_run:
+            _preflight_cache.ANALYSIS_STORE = Path(args.workspace) / 'cache' / fingerprint_prefetch.STORE_FOLDER
+            _preflight_cache.ANALYSIS_READ_ONLY = bool(args.plan)
+            _preflight_cache.ANALYSIS_ORIGIN = {'kind': 'check' if args.check else 'plan' if args.plan else 'build',
+                                                'run': args.name}
+        # the start-up before the first stage is watched too (tools/build_stall.py): build-progress.json with
+        # status "starting", the cores now against the cores planned and the stall block, until the stage tracker
+        # starts (build/.startup/<name>/build-progress.json; the monitor shows it as a starting run)
+        if not args.dry_run:
+            import atexit
+            import build_stall
+            # the progress file beside the runs (the run folder is made later); the status folder (heartbeat.json,
+            # stall.jsonl; docs/BUILD_STATUS.md) inside the run folder from the start, for a check or plan run beside
+            # the runs too (they make no run folder)
+            # a check or plan run creates nothing in the workspace: its [stall] lines go to the log only, and its
+            # files only where AMIWIND_STATUS_DIR names a folder (a caller that wants to watch it)
+            preview = args.check or args.plan
+            named = os.environ.get('AMIWIND_STATUS_DIR', '').strip()
+            where = Path(named) if named else (None if preview else args.workspace / 'build' / '.startup' / args.name)
+            # a build refused in its start-up leaves no run folder: the start-up's status folder sits beside the
+            # runs (build/.startup/<run>/status/) until the stage tracker writes <run>/status/
+            status = where / build_stall.STATUS_DIR if where is not None else None
+            args.startup_watch = build_stall.StartupWatch(
+                where / 'build-progress.json' if where is not None else None, int(args.jobs or os.cpu_count() or 1),
+                status=build_stall.StatusWriter(status, resume='the same build.py command again', make_parents=True)
+                if status is not None else None).start()
+            global _STARTUP_WATCH
+            _STARTUP_WATCH = (args.startup_watch, 'checked' if preview else 'stopped')
+            atexit.register(args.startup_watch.stop, 'checked' if preview else 'stopped')
         # Who wrote a stair-walk record (tools/stair_records.py RUN_ENV; bookkeeping, never part of a stage key)
         os.environ['AMIWIND_RUN_NAME'] = args.name
         os.environ['AMIWIND_RUN_COMMIT'] = str(commit)
@@ -3301,11 +3539,20 @@ def _main(argv=None):
                 recovery = inspect_run(args, ROOT)
         run = ensure_external(args.workspace / "build" / args.name, "build run")
         print(f"Prerequisites passed. Scope: {'asset-free test compile' if args.dry_run else args.stage}; data: {args.data_files}")
+        if args.check and (args.reuse_from or getattr(args, 'reuse_all_available', False)) and args.stage == 'aga':
+            # the build's own first minute, read only: its stage plan and the unit-cache reuse stop
+            # (PLAN-CHECK-UNIT-STOPS-66: the v0.0.66-dev2 check said 0 unexpected stages while the build stopped on
+            # 16 stages of unit-cache STOP lines)
+            code = unit_stop_check(args, tools, run)
+            if code:
+                save_recipe(args, 'planned')
+                return code
         if args.check and not getattr(args, 'resource_plan', False):
             print("Checks completed. No build outputs created. Individual assets are validated during conversion; target performance is not tested here.")
             save_recipe(args, 'planned')
             return 0
-        if run.exists():
+        # the start-up's own status folder (tools/build_stall.py) is the only thing a new run folder may hold
+        if run.exists() and any(p.name != 'status' for p in run.iterdir()):
             raise ValueError(f"Build already exists: {run}; choose a new --name")
         steps = dry_run_commands(args, run) if args.dry_run else commands(args, tools, run)
         if exterior_checklist is not None:
@@ -3356,6 +3603,14 @@ def _main(argv=None):
         summary.expansions = metadata['expansions']
         # The layer set --dlc / --no-dlc chose (DLC-BUILD-LATER): recorded, never a key of a base stage.
         metadata['expansion_layers'] = getattr(args, 'expansion_layers', None)
+        # the selected master list in load order, for the stages that read the layers (build_cache.MASTERS_ENV; keyed
+        # through their game_inputs only)
+        import build_cache as _layer_keys
+        os.environ[_layer_keys.MASTERS_ENV] = ','.join((metadata['expansion_layers'] or {}).get('masters')
+                                                       or _layer_keys.master_list([]))
+        problem = focus_box_preflight(args)   # EXPANSION-BASE-ONLY-TABLES-66: seconds, before any stage
+        if problem:
+            raise SystemExit('Build refused before its first stage: ' + problem)
         lock = getattr(args, '_input_lock', None)
         lock_path = lock.save() if lock is not None else None
         if lock_path:
@@ -3429,13 +3684,16 @@ def _main(argv=None):
             if reuse_mode in ('hardlink', 'pool') and not pool_record['links']:
                 reuse_mode = 'copy'
             metadata['storage_pool']['reuse_mode'] = reuse_mode
-        steps = build_cache.prepare(steps, run, metadata, args.reuse_from, reuse_mode,
-                                    scope=getattr(args, 'fingerprint_scope', 'units'), prerendered=store,
-                                    pool=storage_pool_dir(args), forced=forced,
-                                    accept_rebuild=getattr(args, 'accept_rebuild', False),
-                                    reuse_all=({'workspace': str(Path(args.workspace).resolve()),
-                                                'allowed': getattr(args, 'allow_rebuild_map', {})}
-                                               if getattr(args, 'reuse_all_available', False) else None))
+        try:
+            steps = build_cache.prepare(steps, run, metadata, args.reuse_from, reuse_mode,
+                                        scope=getattr(args, 'fingerprint_scope', 'units'), prerendered=store,
+                                        pool=storage_pool_dir(args), forced=forced,
+                                        accept_rebuild=getattr(args, 'accept_rebuild', False),
+                                        reuse_all=({'workspace': str(Path(args.workspace).resolve()),
+                                                    'allowed': getattr(args, 'allow_rebuild_map', {})}
+                                                   if getattr(args, 'reuse_all_available', False) else None))
+        finally:
+            save_preflight_analysis()   # for the next start of the same tree (BUILD-PREFLIGHT-SERIAL-REPEATED-66)
         if args.reuse_from and args.allow_release_reuse:
             metadata['stage_cache']['release_reuse'] = 'allowed: the from-scratch gate runs separately'
         resource_preflight(args, steps, metadata)
@@ -3465,6 +3723,8 @@ def _main(argv=None):
             if mode:
                 live = live_tracker.LiveTracker(run, mode, len(steps), data_files=args.data_files).start()
         import reuse_all
+        if getattr(args, 'startup_watch', None):
+            args.startup_watch.stop()            # the stage tracker writes build-progress.json from here on
         try:
             execute(steps, run, metadata)
         except BaseException:
@@ -3541,7 +3801,19 @@ def _main(argv=None):
         if summary and not summary.finished:
             summary.finish('failed')
             save_recipe(args, 'failed')
+        if summary:
+            # the failure details (BUILD-FAILURE-NO-DETAILS-66): RUN/FAILURE.md and failure.json, written as the
+            # stage failed or now for an error of the build itself, and printed here too (tools/build_failure.py)
+            import build_failure
+            build_failure.report(summary.run, exc)
         p.exit(1, f"Error: {exc}\n")
+    except Exception as exc:
+        # an unexpected error of the builder itself keeps its traceback as Python prints it; the failure details
+        # are written and printed first
+        if summary:
+            import build_failure
+            build_failure.report(summary.run, exc)
+        raise
 
 
 if __name__ == "__main__":

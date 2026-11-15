@@ -41,6 +41,14 @@ class CrimeNativeTests(unittest.TestCase):
     def test_rules_awareness_bounty_and_the_witness_reaction(self):
         native.NativeSourceTests().compile_run('aga_crime_rules_test.c', [SRC / 'aw_crime_rules.c'], cflags=UBSAN)
 
+    def test_the_crime_layer_per_kind_and_the_guard_kill(self):
+        # CRIME-KILL-BOUNTY-65: aw_crime.c itself on a street of NPCs (the host's hooks a table): theft, trespass, an
+        # owned bed, assault and murder with Morrowind.esm's settings; the guard killed in a street (40 + 1000), alone
+        # (40: the original's rule), after the arrest talk (a second assault, then the murder), a victim without a
+        # placed reference and a table of rows filled by a busy street (both a murder again)
+        native.NativeSourceTests().compile_run('aga_crime_glue_test.c', [SRC / n for n in (
+            'aw_crime.c', 'aw_crime_rules.c', 'aw_pcstanding.c', 'aw_format.c', 'mathlib.c')], cflags=UBSAN)
+
 
 class CrimeBuilderTests(unittest.TestCase):
     def test_the_crime_settings_are_the_engines_names_in_its_order(self):
@@ -230,6 +238,24 @@ class CrimeSourceTests(unittest.TestCase):
         self.assertEqual(dc.path(dc.calls('a->StartCombat "b"')), 'startcombat-actor')
         self.assertEqual(dc.path(dc.calls('StartCombat Player'), runs=False), 'not-run')
         self.assertIsNone(dc.path(dc.calls('Goodbye')))
+
+    def test_the_crime_rows_grow_and_are_saved_past_255(self):
+        # SAVE-CRIME-MARKS-32-ROWS-66: the rows' table from the heap, doubled when full up to the guard (the pure rules
+        # reuse a bystander's row only there); the first 255 saved rows in AWCR, the rest in AWC2 before the packages
+        crime = code('aw_crime.c')
+        self.assertNotIn('actors[AW_CRIME_ACTORS]', crime)
+        self.assertIn('if(AW_CrimeActorsFull(actors,actors_room))rows_room(actors_room*2);', crime)
+        self.assertIn('AW_RESIDENT_GROWS("the NPCs\' crime marks (CRIME-SAVE-PURSUERS-62)",AW_CRIME_ACTORS_MAX,AW_CRIME_ROW_BYTES);',
+                      crime)
+        header = code('aw_crime.h')
+        self.assertIn('#define AW_CRIME_ACTORS_MAX 1024', header)
+        self.assertIn('#define AW_CRIME_SAVE_FIRST 255', header)
+        export = body('aw_mwhost.c', 'static int actors_export(')
+        self.assertIn('ACTOR_PART(AW_CrimeActorsExportMore(out+n+s+t,capacity-n-s-t-8),"the crime marks past 255");', export)
+        self.assertLess(export.index('AW_CrimeActorsExportMore('), export.index('aw_mwscript_packages_export('))
+        imp = body('aw_mwhost.c', 'static void actors_import(')
+        self.assertLess(imp.index('"AWCR"'), imp.index('"AWC2"'))
+        self.assertLess(imp.index('"AWC2"'), imp.index('"AWPK"'))
 
     def test_the_crime_marks_and_pursuers_are_saved(self):
         # CRIME-SAVE-PURSUERS-62: the AWCR block after AWFS in the actors block (pack and unpack tested by number in

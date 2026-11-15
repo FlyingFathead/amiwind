@@ -101,8 +101,9 @@ def add_accept_entity_loss_group(p):
                         "used with a warning), fail (any invalid file stops), require-known. See docs/KNOWN_INPUTS.md")
     p.add_argument("--dlc", choices=("tribunal", "bloodmoon", "both", "none"), default=None,
                    help="Which expansions the build uses (DLC-BUILD-LATER): tribunal, bloodmoon, both or none. Default: "
-                        "every expansion found in Data Files. The base world's stage keys never depend on this choice "
-                        "or on which expansion files are present (BUILD-GAME-INPUT-KEY-BROAD-64)")
+                        "both. Each selected expansion's .esm and .bsa must be in Data Files with a known SHA-256 "
+                        "(config/known-inputs.json), checked before any stage. The base world's stage keys never depend "
+                        "on this choice or on which expansion files are present (BUILD-GAME-INPUT-KEY-BROAD-64)")
     # dest dlc_off, not no_dlc: a player's choice, not a DEBUGGING ONLY opt-out of shipped content
     p.add_argument("--no-dlc", "--no-dlcs", dest="dlc_off", action="store_true",
                    help="Leave both expansions out, the same as --dlc none")
@@ -341,6 +342,19 @@ def add_legacy_area_group(p):
                         'does not choose them (default: config/chim-rooms.json hollow_bevels, 2 = approximate, as '
                         'every solid model; 1 = exact on near-horizontal plates; 0 = exact on every plate, the method '
                         'up to v0.0.64-dev4; COLLISION-WORLDWIDE-REDUCTION-64)')
+    p.add_argument('--chim-draw-tiles', choices=('off', 'on'), default=None,
+                   help='CHIM builder: the Seyda Neen ship and the silt strider stored as draw tiles (the large-model '
+                        'cut\'s tiles at a 128 grain, chim.build.DRAW_TILES_ON), so the parts behind the view are not '
+                        'tested; off by default: it re-keys their model units, for a planned world rebuild '
+                        '(PRISON-SHIP-POLY-COLLISION-65)')
+    p.add_argument('--room-draw-tiles', type=int, default=None, metavar='FACES',
+                   help='classic room maps (the prison ship\'s hold): the shell\'s faces in draw tiles of at most '
+                        'FACES faces, each with its own box for the frustum test (default 512; 0 = the shell as one '
+                        'model, the method before; PRISON-SHIP-POLY-COLLISION-65)')
+    p.add_argument('--room-small-parts', choices=('box', 'off'), default=None,
+                   help='classic room maps (the prison ship\'s hold): the listed props\' small closed parts (the '
+                        'hammocks\' rings and knots of at most 2.5 units) drawn as their boxes (box, default), or every '
+                        'part as authored (off, the method before; PRISON-SHIP-POLY-COLLISION-65)')
     p.add_argument('--chim-fence-twosided-faces', choices=('off', 'mirror'), default=None,
                    help='CHIM builder: two-sided see-through planes (cobwebs, hanging moss and vines; EXPERIMENTAL, '
                         'ROOM-DECAL-ALPHA-62): mirror = a mirrored copy of each see-through face (the converter '

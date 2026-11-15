@@ -343,6 +343,70 @@ int ChimFormat_StorePath (char *out, int size, const char *store, const char *re
 	return 1;
 }
 
+int ChimFormat_WorldspawnStore (const char *entities, long bytes, char *out, int size)
+{
+	static const char key[] = "\"_chim_world\"";
+	const char *end, *at, *p;
+	long n, k = (long)sizeof(key) - 1;
+	int len = 0;
+	if (!out || size <= CHIM_STORE_CHARS)
+		return 0;
+	out[0] = 0;
+	if (!entities || bytes <= 0)
+		return 0;
+	/* the first entity: from its '{' to its '}' within BYTES */
+	for (n=0 ; n<bytes && entities[n] && entities[n] != '{' ; n++)
+		;
+	if (n >= bytes || entities[n] != '{')
+		return 0;
+	at = entities + n;
+	for (end=at ; end<entities+bytes && *end && *end != '}' ; end++)
+		;
+	if (end >= entities+bytes || *end != '}')
+		return 0;
+	for (p=at ; p+k<=end ; p++)
+		if (!memcmp (p, key, k))
+			break;
+	if (p+k > end)
+	{
+		strcpy (out, CHIM_STORE_DEFAULT);
+		return 1;
+	}
+	for (p+=k ; p<end && *p != '"' ; p++)
+		;
+	for (p++ ; p<end && *p != '"' ; p++)
+	{
+		if (len >= CHIM_STORE_CHARS)
+			return (out[0] = 0);
+		out[len++] = *p;
+	}
+	out[len] = 0;
+	if (p >= end || !ChimFormat_StoreNameValid (out))
+		return (out[0] = 0);
+	return 1;
+}
+
+int ChimFormat_StoreInTable (chim_store_table_t *t, const char *store,
+	int (*exists) (const char *path, void *ctx), void *ctx)
+{
+	char path[CHIM_STORE_CHARS+16];
+	int i, present;
+	if (!t || !ChimFormat_StoreNameValid (store))
+		return 0;
+	if (!strcmp (store, CHIM_STORE_DEFAULT))
+		return 1;
+	for (i=0 ; i<t->count ; i++)
+		if (!strcmp (t->name[i], store))
+			return t->present[i];
+	present = exists && ChimFormat_StorePath (path, sizeof(path), store, "world.cwi") && exists (path, ctx) ? 1 : 0;
+	if (t->count < CHIM_STORE_TABLE)
+	{
+		strcpy (t->name[t->count], store);
+		t->present[t->count++] = (char)present;
+	}
+	return present;
+}
+
 /* 1 when a texture of this name and size is drawn turbulent and must be tiled to 64 x 64 first. */
 int ChimFormat_TurbulentTile (const char *name, int width, int height)
 {

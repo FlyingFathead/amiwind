@@ -55,9 +55,10 @@ int main(void) {
     assert(parse("aw_animkit","play","walkforwardhh",&c) && c.group==AW_ANIM_READYWALK);
     assert(parse("aw_animkit","play","runforwardhh",&c) && c.group==AW_ANIM_READYRUN);
     assert(parse("aw_animkit","play","jumphh",&c) && c.group==AW_ANIM_READYJUMP);
-    /* Dodge is an extension; land/readyland are second sections of jump/jumphh. */
+    /* Dodge is an extension; land/readyland are second sections of jump/jumphh; cast is a creature layout's own
+     * group (its .anm), the kit plays spellcast by name (DAGOTH-UR-NO-ANIMATIONS-65). */
     for(i=0;i<aw_animkit_group_count;i++)if(aw_animkit_groups[i].engine>=0)wired++;
-    assert(wired==AW_ANIM_GROUPS-4 && aw_animkit_group_count>70);
+    assert(wired==AW_ANIM_GROUPS-5 && aw_animkit_group_count>70);
     assert(AW_AnimKitFind("WalkForward")>=0 && AW_AnimKitFind("dodgel")<0);
     /* The kit switch: off = idle (the previous method); speed scales the rate. */
     memset(&a,0,sizeof(a));

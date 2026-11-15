@@ -96,6 +96,7 @@ Family: Mesh converter geometry (`converter-geometry`). Converted faces must be 
 - [CONVERT-QHULL-FLAT-32](CONVERT-QHULL-FLAT-32.md): Collision building fails on a flat mesh (chitin shortbow)
 - [CONVERT-TEXCOORD-RANGE-32](CONVERT-TEXCOORD-RANGE-32.md): Converter does not check the 16-bit texture-coordinate range
 - [CREATURE-MESH-HOLES-62](CREATURE-MESH-HOLES-62.md): The Alit model has a hole in its upper torso, and the inspect line shows health 0.0 while it fights
+- EXPANSION-ROOMS-REFUSED-66 (no report page): Seven expansion rooms are not converted: the room stage refuses them
 - [EXTENTS-RULE-OLD-INTERIORS-32](EXTENTS-RULE-OLD-INTERIORS-32.md): The v0.0.32 extent rule breaks the lightmaps of interiors converted before the grid fix
 - GEO-01 (no report page): Giant mushroom cap gaps after material-wise mesh reduction
 - GEO-03 (no report page): Canonical clipping stored reversed-winding fragments
@@ -103,6 +104,7 @@ Family: Mesh converter geometry (`converter-geometry`). Converted faces must be 
 - HELD-BLADE-EDGE-ON-61 (no report page): A held weapon seen edge-on from behind in third person shows only its hilt: the thin blade draws no pixels
 - [INLAND-SHORE-29](INLAND-SHORE-29.md): v0.0.29-dev1: Angular/jagged inland shoreline
 - [INTERIOR-HULL-CHAIN-33](INTERIOR-HULL-CHAIN-33.md): The Arena Pit's main structure collides through one chain of 36,545 clipnodes; every trace in the room walks it
+- LAVA-POOL-NOT-LAVA-NAMED-66 (no report page): The hot-oil pools of two Sotha Sil rooms were refused as lava pools without upward lava faces, so both rooms were not converted
 - [LIGHTMAP-GRID-31](LIGHTMAP-GRID-31.md): Some baked lightmaps sit one sample row or column off
 - [LIGHTMAP-TAIL-31](LIGHTMAP-TAIL-31.md): Interior lightmap: the last face points past the end of the lighting lump
 - [MESH-EBONHEART-DRAGON-PEDESTAL-42](MESH-EBONHEART-DRAGON-PEDESTAL-42.md): Ebonheart: the Imperial dragon statue floats; its converted model starts 236 units above its origin, nothing below
@@ -113,6 +115,7 @@ Family: Mesh converter geometry (`converter-geometry`). Converted faces must be 
 - MESH-REDUCTION-SEAMS-62 (no report page): Reduced actor models lose seams and thin their limbs, and nothing compared them with the original
 - [MESH-VIVEC-CAP-GAP-38](MESH-VIVEC-CAP-GAP-38.md): Vivec giant mushroom cap has a visible opening
 - [NPC-JOINT-GAPS-33](NPC-JOINT-GAPS-33.md): NPC bodies open at the joints: each body part is reduced on its own and pulls back from the part it meets
+- ROOM-EFFECT-MODEL-NO-TRIANGLES-66 (no report page): A summoning effect model without drawn triangles refused the whole Dome of Sotha Sil room
 - [ROUTED-HULL-NODE-ORDER-33](ROUTED-HULL-NODE-ORDER-33.md): A routed standing hull can start above nodes it reaches; the engine stops with "SV_RecursiveHullCheck: bad node number"
 - SEAM-AUDIT-IGNORES-RIM-TEARS-54 (no report page): The seam audit reports meshes with torn rims as ok
 - SKY-GROUND-28 (no report page): Rebuilt LAND faces invisible; clouds scroll too fast

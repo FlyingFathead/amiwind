@@ -1,6 +1,6 @@
 # Installed Morrowind game inputs
 
-_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
+_Last updated with AmiWind v0.0.66-dev2 (13 November 2026)._
 
 Point `--data-files` at the installed game's `Data Files` directory or its
 installation root. The builder locates the named `Morrowind.esm` and
@@ -15,8 +15,8 @@ path is required.
 | --- | --- |
 | `Data Files/Morrowind.esm` | Base-game master; required. |
 | `Data Files/Morrowind.bsa` | Base-game asset archive; required. |
-| `Data Files/Tribunal.esm`, `Data Files/Tribunal.bsa` | Expansion files may be present; the current base-game conversion does not load them. |
-| `Data Files/Bloodmoon.esm`, `Data Files/Bloodmoon.bsa` | Expansion files may be present; the current base-game conversion does not load them. |
+| `Data Files/Tribunal.esm`, `Data Files/Tribunal.bsa` | Read when the expansion is selected: its records are merged into the master in load order, and every stage that reads models, textures or sounds reads its archive after `Morrowind.bsa` (a file both hold comes from the expansion's archive, as in the original game). With `--no-dlc` they are not read. |
+| `Data Files/Bloodmoon.esm`, `Data Files/Bloodmoon.bsa` | Read when the expansion is selected: its records are merged into the master in load order, and every stage that reads models, textures or sounds reads its archive after `Morrowind.bsa` (a file both hold comes from the expansion's archive, as in the original game). With `--no-dlc` they are not read. |
 | `Data Files/BookArt/` | Book artwork and, in the development GOG installation, loose TrueType font extras. |
 | `Data Files/Fonts/` | Original `.fnt` and `.tex` bitmap fonts. |
 | `Data Files/Icons/` | Item icon groups such as `a/`, `c/`, `k/`, `l/`, `m/`, `n/`, `s/`, `w/`. |

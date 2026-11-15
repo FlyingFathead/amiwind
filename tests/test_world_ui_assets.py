@@ -175,6 +175,27 @@ class WorldUIAssetsTests(unittest.TestCase):
         self.assertIn('"AWJ2"',engine);self.assertIn('"AWJ1"',engine)   # both forms read
         labels=quest_labels(raw,{})
         self.assertEqual(labels[72:].rstrip(b'\0'),b'Hello World')
+    def test_expansion_journal_overrides_follow_load_order(self):
+        # JOURNAL-EXPANSION-OVERRIDES-66: Tribunal and Bloodmoon repeat base journal entries under their INFO id, and
+        # put a quest-name row (QSTN) at stage 0 beside a real entry (ic12_dinner_not, ms_bouncer_galms); two name rows
+        # at one stage occur too (ms_warlords)
+        def entry(stage,text,inam,name=False):
+            return record('INFO',sub('INAM',inam)+sub('DATA',struct.pack('<iibbbb',4,stage,-1,-1,-1,0))+
+                          sub('NAME',text)+(sub('QSTN',b'\1') if name else b''))
+        def text_of(raw):
+            index,blob,count=journal_assets(raw)
+            stage,offset,size,flag=struct.unpack_from('<iIII',index,8+64)
+            return blob[offset:offset+size].rstrip(b'\0'),flag,(len(index)-8)//80
+        base=self.master()+entry(1,b'base text\0',b'111\0')
+        self.assertEqual(text_of(base+self.master()+entry(1,b'edited text\0',b'111\0'))[0],b'edited text')
+        named=self.master()+entry(0,b'Quest Title\0',b'222\0',True)+entry(0,b'real entry\0',b'333\0')
+        self.assertEqual(text_of(named),(b'real entry',0,1))
+        later=self.master()+entry(0,b'real entry\0',b'333\0')+entry(0,b'Quest Title\0',b'222\0',True)
+        self.assertEqual(text_of(later),(b'real entry',0,1))
+        names=self.master()+entry(0,b'The Warlords\0',b'444\0',True)+entry(0,b'Warlords\0',b'555\0',True)
+        self.assertEqual(text_of(names)[0],b'The Warlords')
+        with self.assertRaisesRegex(ValueError,'Ambiguous journal stage'):
+            journal_assets(self.master()+entry(2,b'one\0',b'666\0')+entry(2,b'two\0',b'777\0'))
     def test_ambiguous_stages_and_oversized_text_fail_closed(self):
         with self.assertRaises(ValueError):journal_assets(self.master()+journal(1,b'one')+journal(1,b'two'))
         with self.assertRaises(ValueError):journal_assets(self.master()+journal(1,b'x'*8192))

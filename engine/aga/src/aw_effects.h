@@ -95,6 +95,9 @@ unsigned long AW_EffectsGeneration(void);
 /* The I-th active effect (0..AW_EffectsCount()-1), for the HUD and the status line; 1 when there is one. */
 typedef struct {uint32_t owner;int effect,arg,source;float magnitude,left;} aw_effect_info_t;
 int AW_EffectsAt(int i,aw_effect_info_t *out);
+/* HUD-ACTIVE-EFFECTS-ROW-64: OWNER's active effects in one pass of the pool (the HUD's icons each frame), up to MAX;
+ * their count. */
+int AW_EffectsList(uint32_t owner,aw_effect_info_t *out,int max);
 unsigned long AW_EffectsRefused(void);
 /* Saved games: "AWEF" u8 2 u8 count, then per effect u32 owner u8 effect u8 arg u16 source f32 magnitude f32 seconds
  * left (big-endian), 16 bytes. Export: bytes or -1 too small; Import: 1, or 0 for a bad block (then nothing is

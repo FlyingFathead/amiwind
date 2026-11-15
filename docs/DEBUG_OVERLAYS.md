@@ -1,6 +1,6 @@
 # Development overlays
 
-_Last updated with AmiWind v0.0.63-dev5 (9 November 2026)._
+_Last updated with AmiWind v0.0.66-dev2 (13 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -327,10 +327,26 @@ rooms; `andrano` finds Andrano Ancestral Tomb (interior). Choosing a room runs `
 enter at the arrival point of its door, as with `dbg tp <room map>`. A long room name may run past the right edge
 of the box; the search still finds it.
 
-The list is a small table the builder makes from the game data and the rooms in the image (`tp-places.lut`,
-`tools/tp_places_lut.py`; 96 bytes a row, about 140 KB with every room, a disk without rooms reads its older
-table as before). The game reads it from the disk when the box opens and frees it when the box closes;
-nothing of it stays in memory while you play. The same box is meant for the weapon and gear pickers next.
+Since v0.0.66 four buttons sit above the search: All (the default), Exteriors, Interiors and Beings; Left and Right
+or a click choose one, and the search filters within it. Beings are people and creatures together, each by its own
+name in the game (Fargoth, Vivec, Slaughterfish), never a record id. One placed once takes you to it; a name placed
+in a few places is listed once per place (Dagoth Ur, Facility Cavern and Dagoth Ur, Akulakhan's Chamber); a common
+kind placed five times or more (slaughterfish, mudcrabs, generic guards) is listed once and takes you to the nearest
+one, in the room you are in first, else outdoors nearest to you. You arrive on a free spot beside the being, facing
+it: the player's size is tested against the walls, the furniture and the other actors at up to 48 points around
+it, never through a wall. If its area is loaded, that is where it stands now (one that walks about); otherwise its
+placed position. A being whose area this disk does not hold is not listed (the build report names it). A place,
+room or being that an expansion adds carries the expansion's name in this list only, for example Raven Rock
+(Bloodmoon) or Almalexia (Tribunal); a base-game place an expansion only changes keeps its plain name, and typing
+the plain name finds a tagged entry.
+
+The list comes from tables the builder makes from the game data and the rooms in the image (`tools/tp_places_lut.py`):
+`tp-names.lut` holds the names, `tp-places.lut` each entry's arrival (128 bytes a row), and `tpk/` the placements of
+each common kind. While the box is open the game holds only the names list, as one block taken when the box opens and
+given back when it closes (the world waits behind the box, so nothing loads in the meantime); an entry's details are
+read from the disk only when you choose it. When memory is low, the game keeps only one offset per entry and reads
+the names from the disk page by page; the entries, the search and the buttons are the same. Nothing of it stays in
+memory while you play. The same box is meant for the weapon and gear pickers next.
 `debug tp ...` and `amiwind debug tp ...` use the same handler. Teleport uses the
 existing scene state capture and checked arrival path, not a New Game reset.
 Missing map files and unknown destinations are rejected before leaving the scene.

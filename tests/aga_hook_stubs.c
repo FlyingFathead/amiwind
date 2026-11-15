@@ -144,7 +144,7 @@ WEAK void AW_PlacedAimReport(void){}
 /* JOURNAL-BOOK-32-QUESTS-59: the scripts' export to the world change list (aw_save_codec.c holds the pointer; set by
  * aw_mwhost.c) for fixtures that link the book without the save codec */
 struct aw_ledger_s;
-WEAK void (*aw_save_script_export)(struct aw_ledger_s *ledger);
+WEAK int (*aw_save_script_export)(struct aw_ledger_s *ledger);
 WEAK int AW_ViewInventoryParts(model_t **models,int max,float scale[3]){(void)models;(void)max;(void)scale;return -1;}
 WEAK void AW_SkelPose(const aw_skel_table_t *t,float frame,float world[][3][4]){(void)t;(void)frame;(void)world;}
 WEAK int AW_SkelBlockHead(const unsigned char *b,long size,int nv,aw_skel_block_t *out){(void)b;(void)size;(void)nv;(void)out;return 0;}
@@ -166,6 +166,9 @@ WEAK void AW_UISmallEnd(void){}
 /* aw_character.c's class page draws its skill rows with AW_UIText at one fixed line (CLASS-LIST-LAYOUT-62) */
 WEAK void AW_UIText(int x,int y,const char *text,int color){(void)x;(void)y;(void)text;(void)color;}
 WEAK int AW_UIWidth(const char *text){return 6*(int)strlen(text);}
+/* aw_character.c's race box writes the skill bonuses in the console font beside the specials' panel
+ * (CHARGEN-ABILITY-DESCRIPTIONS-65); fixtures without aw_console_glyphs.c draw nothing */
+WEAK void AW_SmallStringColor(int x,int y,int width,const char *text,int color){(void)x;(void)y;(void)width;(void)text;(void)color;}
 WEAK int Q_strcasecmp(char *a,char *b){return strcasecmp(a,b);}
 
 /* Lighting/renderer fixtures which omit real hand runtime have no active block.
@@ -218,3 +221,42 @@ WEAK int AW_MoveNoBurdenOn(void){return 0;}
 WEAK void AW_MoveNoBurdenSet(int on){(void)on;}
 /* superspeed's endless stamina (aw_combat.c, DBG-SUPERSPEED-62): nothing to fill in fixtures without the fight sheet. */
 WEAK void AW_CombatPlayerFatigueFill(void){}
+/* The places known on the map (aw_actorstate.c, ShowMap and the cells entered, MAP-ORIGINAL-POI-66) and the cells'
+ * original names (aw_world.c): fixtures without them know no place and name no cell. */
+WEAK int AW_RevealedCount(void){return 0;}
+WEAK const char *AW_RevealedAt(int i){(void)i;return NULL;}
+WEAK int AW_RevealedAdd(const char *text){(void)text;return 0;}
+WEAK const char *AW_RegionNameAt(const float *position){(void)position;return NULL;}
+WEAK int AW_RegionIndexAt(const float *position){(void)position;return -1;}
+/* The map's explored land (aw_mapfog.c, MAP-ORIGINAL-POI-66 stage 2): nothing explored in fixtures without it. */
+WEAK void AW_MapFogReset(void){}
+WEAK int AW_MapFogReveal(float x,float y){(void)x;(void)y;return 0;}
+WEAK int AW_MapFogSeen(float x,float y){(void)x;(void)y;return 0;}
+WEAK int AW_MapFogCells(void){return 0;}
+WEAK int AW_MapFogRow(int i,int *x,int *y,const unsigned char **bits){(void)i;(void)x;(void)y;(void)bits;return 0;}
+WEAK int AW_MapFogExport(unsigned char *out,int capacity){(void)out;(void)capacity;return 0;}
+WEAK int AW_MapFogImport(const unsigned char *p,int bytes){(void)p;(void)bytes;return -1;}
+WEAK void AW_MapFogLeftOut(int *cells,int *rooms){if(cells)*cells=0;if(rooms)*rooms=0;}
+WEAK const unsigned char *AW_MapFogRoomBits(const char *room){(void)room;return NULL;}
+/* Stage 3: the rooms' fog, the scene's doors and the interior test: no room explored, no door, outdoors. */
+WEAK int AW_MapFogRoomReveal(const char *room,float x,float y,const float *mins,const float *maxs){(void)room;(void)x;(void)y;(void)mins;(void)maxs;return 0;}
+WEAK int AW_MapFogRoomSeen(const char *room,float x,float y,const float *mins,const float *maxs){(void)room;(void)x;(void)y;(void)mins;(void)maxs;return 0;}
+WEAK int AW_MapFogRooms(void){return 0;}
+WEAK int AW_SceneMapDoor(int i,float *point,const char **name){(void)i;(void)point;(void)name;return -1;}
+/* MAP-MULTI-MARKERS-66 (aw_mapmarks.c) in fixtures without it: no marker, no hot marker; no compass strip */
+WEAK const void *AW_MapMark(int i){(void)i;return 0;}
+WEAK int AW_MapHotGet(float *x,float *y){(void)x;(void)y;return 0;}
+WEAK void (*aw_hud_compass_draw)(void);
+/* the map's marker command and the compass (aw_worldui.c) in fixtures without the console or the renderer */
+WEAK refdef_t r_refdef;
+/* the save codec's marker hooks (aw_save_codec.c) in fixtures that link the map without the codec */
+WEAK int (*aw_save_markers_encode)(unsigned char *out,int capacity);
+WEAK int (*aw_save_markers_decode)(const unsigned char *p,int n,int commit);
+WEAK void (*aw_save_markers_loaded)(void);
+WEAK void (*aw_save_markers_reset)(void);
+/* the place's unload hook aw_actors.c binds (aw_save.c AW_SaveLeave, SAVE-ACTOR-ROWS-256-66) in fixtures that link the
+ * actors without the save writer */
+WEAK void (*aw_save_actor_leave)(struct edict_s *e);
+WEAK void AW_SaveCaptureActor(struct edict_s *e){(void)e;}   /* the released actor's saved row (aw_save.c) */
+WEAK char *Cmd_Argv(int arg){(void)arg;return "";}
+WEAK int AW_Interior(void){return 0;}

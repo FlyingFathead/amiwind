@@ -265,6 +265,9 @@ def build(a):
     base, meta = build_system(downloads, spec, cache_dir, work, a.jobs)
     say('=== PHASE 3/5: the AMIWIND drive and the whole image')
     out.mkdir(parents=True, exist_ok=True)
+    # PI-IMAGE-WORK-FOLDER-65: with the system half taken from the cache, build_system() returns before it makes the
+    # work folder, and the whole image is written there
+    work.mkdir(parents=True, exist_ok=True)
     name = 'AmiWind-v%s-Pi4B.img' % a.version
     img = work / name
     readme = (HERE / 'clean' / 'README-FIRST.txt').read_bytes()

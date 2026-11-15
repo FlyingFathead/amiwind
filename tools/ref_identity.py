@@ -38,9 +38,19 @@ def file_index(name):
     raise RefIdentityError(f'{name}: not a content file with a fixed index (tools/ref_identity.py CONTENT_FILES)')
 
 
+MERGED_STRIDE = 1 << 22   # src/mwad/masters.py ADDON_KEY_STRIDE: the merged master's reference key
+
+
 def stable_ref(content_file, number):
-    """The stable id of reference NUMBER (its low 24 bits) of CONTENT_FILE."""
+    """The stable id of reference NUMBER (its low 24 bits) of CONTENT_FILE. A number of the merged master (the base game
+    with its expansions, src/mwad/masters.py _ref_key: game master index * 2**22 + the reference's own number) read
+    through the base game file names its owning master itself, in the same fixed order as CONTENT_FILES."""
     low = int(number) & 0xFFFFFF
+    if low >= MERGED_STRIDE and file_index(content_file) == 0:
+        index, low = divmod(low, MERGED_STRIDE)
+        if index >= len(CONTENT_FILES):
+            raise RefIdentityError(f'{content_file}: merged reference key {int(number)} names master {index}')
+        content_file = CONTENT_FILES[index]
     if not low:
         raise RefIdentityError(f'{content_file}: reference number 0 has no id')
     if low >= NUMBER_LIMIT:

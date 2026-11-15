@@ -365,7 +365,7 @@ class ActorTables:
                    dynamic=(int(health), int(magicka), int(fatigue)), race=race,
                    clas=_text(_first(fields, 'CNAM')), faction=_text(_first(fields, 'ANAM')), gold=gold,
                    carried=self._carried(fields, level), spells=spells, attack=(0,) * 6, soul=0, ctype=0)
-        weapon, armor = self.pc.equipment(self.records, fields, level)
+        weapon, armor = self.pc.equipment(self.records, fields, level, ranged=True)
         row['equipped'] = {weapon[1]} if weapon else set()
         row['equipped'] |= {a for a, _ in armor.values()}
         row['weapon'] = weapon[1] if weapon else None
@@ -389,13 +389,22 @@ class ActorTables:
         aidt = _first(fields, 'AIDT')
         ai = (min(255, struct.unpack_from('<H', aidt)[0]), aidt[2], aidt[3], aidt[4]) if len(aidt) >= 5 else (0, 0, 0, 0)
         carried = self._carried(fields, level)
+        # NPC-CREATURE-COMBAT-STYLE-STATS-66 (CREATURE-COMBAT-WEAPON-54): a creature whose FLAG has "weapon and shield"
+        # (0x4) fights with the weapon and wears the armour its inventory gives, as an NPC does (OpenMW 0.51
+        # mwclass/creature.cpp hit: the weapon's damage when the creature has kWeapon and a weapon equipped;
+        # mwworld/inventorystore.cpp autoEquip for creatures with the flag); the same choice as an NPC's
+        equipped, weapon = set(), None
+        if flag & 4:
+            picked, armor = self.pc.equipment(self.records, fields, level, ranged=True)
+            weapon = picked[1] if picked else None
+            equipped = ({weapon} if weapon else set()) | {a for a, _ in armor.values()}
         return {'kind': 1, 'flags': (ACTOR_ESSENTIAL if flag & 0x80 else 0) | (ACTOR_RESPAWN if flag & 2 else 0) |
                 (ACTOR_WALKS if flag & 0x40 else 0) | (ACTOR_SWIMS if flag & 0x10 else 0) |
                 (ACTOR_FLIES if flag & 0x20 else 0) | (ACTOR_BIPEDAL if flag & 1 else 0),
                 'level': level, 'attributes': attributes, 'skills': skills, 'ai': ai, 'disposition': 0,
                 'reputation': 0, 'rank': -1, 'dynamic': (health, magicka, fatigue), 'race': '', 'clas': '',
                 'faction': '', 'gold': gold, 'carried': carried, 'spells': self._spells(fields), 'attack': attack,
-                'soul': soul, 'ctype': ctype, 'equipped': set(), 'weapon': None}
+                'soul': soul, 'ctype': ctype, 'equipped': equipped, 'weapon': weapon}
 
     def _build(self):
         rec = self.records

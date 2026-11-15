@@ -73,7 +73,7 @@ static int skill_of(const aw_fighter_t *f) {
 int AW_CombatHitChance(const aw_combat_settings_t *s,const aw_fighter_t *a,const aw_fighter_t *v) {
     float defense=0,attack;
     if(v->fatigue>=0){
-        if(!v->knocked && v->aware)
+        if(!v->knocked && !v->paralyzed && v->aware)          /* none while down or paralysed (combat.cpp:331) */
             defense=(v->attributes[AW_AGI]/5.0f+v->attributes[AW_LUC]/10.0f)*AW_CombatFatigueTerm(s,v)+
                     (v->sanctuary<100?v->sanctuary:100);
         defense+=v->unseen;
@@ -150,7 +150,8 @@ int AW_CombatBestAttackPlayer(const aw_fighter_t *f) {
  * under the AmiWind held block), facing the attacker, not down, staggered,
  * swinging or dead (combat.cpp blockMeleeAttack, npcanimation.cpp). */
 int AW_CombatCanBlock(const aw_combat_settings_t *s,const aw_fighter_t *v,float angle) {
-    if(!v->shield || v->block_off || AW_TWO_HANDED(v->weapon) || v->knocked || v->staggered || v->attacking || v->dead)return 0;
+    if(!v->shield || v->block_off || AW_TWO_HANDED(v->weapon) || v->knocked || v->paralyzed || v->staggered || v->attacking ||
+       v->dead)return 0;
     return angle>=s->fCombatBlockLeftAngle && angle<=s->fCombatBlockRightAngle;
 }
 static float ratio(float now,float most) {return most>0?(now>0?now/most:0):1;}
@@ -169,7 +170,8 @@ static int blocks(const aw_combat_settings_t *s,aw_fighter_t *a,aw_fighter_t *v,
     if(x>(int)s->iBlockMaxChance)x=(int)s->iBlockMaxChance;
     out->block_chance=x;out->blocked_roll=AW_CombatRoll100(r);
     if(out->blocked_roll>=x)return 0;
-    v->fatigue-=s->fFatigueBlockBase+(a->weapon?a->weight*strength*s->fWeaponFatigueBlockMult:0);
+    v->fatigue-=s->fFatigueBlockBase+(v->encumbrance<1?v->encumbrance:1)*s->fFatigueBlockMult+
+                (a->weapon?a->weight*strength*s->fWeaponFatigueBlockMult:0);
     if(v->shield_health_max>0){
         v->shield_health-=v->shield_health<(int)damage?v->shield_health:(int)damage;
         if(v->shield_health<=0){v->shield_health=0;v->shield=0;out->shield_broke=1;}  /* unequipped */
@@ -227,8 +229,9 @@ void AW_CombatSwing(const aw_combat_settings_t *s,aw_fighter_t *a,aw_fighter_t *
                     float angle,int still,aw_combat_rng_t *r,aw_swing_t *out) {
     float d,agility;int health;
     memset(out,0,sizeof(*out));out->strength=strength=clampf(strength,0,1);out->blocked_roll=-1;
-    /* applyFatigueLoss: every swing, hit or miss (no encumbrance yet). */
-    a->fatigue-=s->fFatigueAttackBase+(a->weapon?a->weight*strength*s->fWeaponFatigueMult:0);
+    /* applyFatigueLoss: every swing, hit or miss, with the load (ACTOR-MECHANICS-USE-STATS-66; not clamped there) */
+    a->fatigue-=s->fFatigueAttackBase+a->encumbrance*s->fFatigueAttackMult+
+                (a->weapon?a->weight*strength*s->fWeaponFatigueMult:0);
     if(v->dead){out->outcome=AW_HIT_MISS;out->roll=-1;return;}
     out->chance=AW_CombatHitChance(s,a,v);
     out->roll=aw_combat_dice?AW_CombatRoll100(r):-2;      /* dice off: every swing in reach hits */
@@ -256,10 +259,10 @@ void AW_CombatSwing(const aw_combat_settings_t *s,aw_fighter_t *a,aw_fighter_t *
         d=lo+(hi-lo)*strength;
         health=1;
     }else{
-        /* getHandToHandDamage: fatigue damage unless the victim is down
-         * (strength does not count: the original rule, OpenMW's default) */
+        /* getHandToHandDamage: fatigue damage unless the victim is down or paralysed (ACTOR-MECHANICS-USE-STATS-66
+         * row 4; strength does not count: the original rule, OpenMW's default) */
         d=a->skills[AW_SK_H2H]*(s->fMinHandToHandMult+(s->fMaxHandToHandMult-s->fMinHandToHandMult)*strength);
-        health=v->knocked!=0;
+        health=v->knocked!=0 || v->paralyzed;
         if(health)d*=s->fHandtoHandHealthPer;
     }
     out->raw=d;
@@ -309,14 +312,31 @@ static float distance_bias(const aw_combat_ai_t *a,float distance) {
 int AW_CombatFightRating(const aw_combat_ai_t *a,int fight,int disposition,float distance) {
     return fight+(int)(distance_bias(a,distance)+(50.0f-(float)disposition)*a->fFightDispMult);
 }
-/* aicombataction.cpp vanillaRateFlee */
-float AW_CombatFleeRating(const aw_combat_ai_t *a,const aw_fighter_t *f,float distance) {
+/* ACTOR-MECHANICS-USE-STATS-66 row 16 (vanillaRateFlee): the werewolf case: an NPC (not a creature) below
+ * iWereWolfLevelToAttack facing an enemy in werewolf form rates iWereWolfFleeMod; -1 when the case does not apply
+ * (LEVEL_TO_ATTACK 0: the settings are not in the image, they come from the expansions' masters) */
+float AW_CombatWerewolfFleeMod(const aw_fighter_t *f,int enemy_werewolf,float level_to_attack,float flee_mod) {
+    return enemy_werewolf && !f->creature && level_to_attack>0 && f->level<level_to_attack?flee_mod:-1;
+}
+/* aicombataction.cpp vanillaRateFlee; WERE_MOD >= 0 replaces the rating (AW_CombatWerewolfFleeMod) */
+float AW_CombatFleeRatingVs(const aw_combat_ai_t *a,const aw_fighter_t *f,float distance,float were_mod) {
     float ratio,rating;
     if(f->flee>=100)return (float)f->flee;
     ratio=f->health_max!=0?f->health/f->health_max:1;
     rating=(1.0f-ratio)*a->fAIFleeHealthMult+f->flee*a->fAIFleeFleeMult;
+    if(were_mod>=0)rating=were_mod;
     if(rating!=0)rating+=distance_bias(a,distance);
     return rating;
+}
+float AW_CombatFleeRating(const aw_combat_ai_t *a,const aw_fighter_t *f,float distance) {
+    return AW_CombatFleeRatingVs(a,f,distance,-1);
+}
+/* spellpriority.cpp vanillaRateSpell: the anti-flee rating of a spell that is the best action: its success chance x
+ * fAIRangeMagicSpellMult when one effect is on Target (0 against a swimming enemy), else x fAIMagicSpellMult */
+float AW_CombatSpellAntiFlee(float chance,int ranges,float spell_mult,float range_spell_mult,int enemy_swimming) {
+    float mult=spell_mult;
+    if(ranges&(1<<2))mult=enemy_swimming?0:range_spell_mult;
+    return chance*mult;
 }
 /* weaponpriority.cpp vanillaRateWeaponAndAmmo (melee); hand to hand: the empty weapon rates 0 */
 float AW_CombatAntiFleeRating(const aw_combat_ai_t *a,const aw_fighter_t *f) {
@@ -327,10 +347,13 @@ float AW_CombatAntiFleeRating(const aw_combat_ai_t *a,const aw_fighter_t *f) {
     return f->armor*a->fAIMeleeArmorMult+best;
 }
 /* aicombataction.cpp makeFleeDecision */
-int AW_CombatFleeDecision(const aw_combat_ai_t *a,const aw_fighter_t *f,float distance) {
-    float rating=AW_CombatFleeRating(a,f,distance);
+int AW_CombatFleeDecisionVs(const aw_combat_ai_t *a,const aw_fighter_t *f,float distance,float were_mod,float anti) {
+    float rating=AW_CombatFleeRatingVs(a,f,distance,were_mod);
     if(rating<100.0f)rating=0;
-    return rating>AW_CombatAntiFleeRating(a,f);
+    return rating>anti;
+}
+int AW_CombatFleeDecision(const aw_combat_ai_t *a,const aw_fighter_t *f,float distance) {
+    return AW_CombatFleeDecisionVs(a,f,distance,-1,AW_CombatAntiFleeRating(a,f));
 }
 
 /* Actors::calculateRestoration (fatigue only) */
@@ -361,6 +384,22 @@ int AW_CombatCreatureSheet(const aw_actor_base_t *b,const char *id,aw_fighter_t 
     o->armor=0;o->aware=1;
     return 1;
 }
+/* aw_combat.h AW_CombatCreatureWeapon (NPC-CREATURE-COMBAT-STYLE-STATS-66): the melee weapon a creature with the
+ * "weapon and shield" flag holds (its actor row's weapon entry, the builder's choice as for an NPC) on its sheet:
+ * OpenMW 0.51 mwclass/creature.cpp hit takes the weapon's damage for the attack, adjusted as an NPC's (condition,
+ * strength); the skill stays the creature's combat value (getSkill). A bow, crossbow or thrown weapon (types 9-11,
+ * ACTOR-RANGED-COMBAT-MISSING-66) is held for the shot (Marksman); ammunition (12, 13) is never the weapon. */
+int AW_CombatCreatureWeapon(aw_fighter_t *o,const aw_item_t *it) {
+    static const unsigned char skill[12]={AW_SK_SHORT,AW_SK_LONG,AW_SK_LONG,AW_SK_BLUNT,AW_SK_BLUNT,AW_SK_BLUNT,
+                                          AW_SK_SPEAR,AW_SK_AXE,AW_SK_AXE,AW_SK_MARKSMAN,AW_SK_MARKSMAN,AW_SK_MARKSMAN};
+    int i;
+    if(!o || !it || it->kind!=AWK_WEAPON || it->type>11)return 0;
+    o->weapon=(unsigned char)(1+it->type);o->weapon_skill=skill[it->type];
+    for(i=0;i<6;i++)o->damage[i/2][i%2]=it->damage[i];
+    o->reach=it->reach;o->speed=it->speed>0?it->speed:1;o->weight=it->weight;
+    o->weapon_health=o->weapon_health_max=(float)it->health;
+    return 1;
+}
 /* local.lua pickRandomArmor: the band each slot ends at (cuirass, helmet, greaves, boots, left and right pauldron,
  * left and right gauntlet, shield). */
 int AW_CombatArmorHitSlot(int roll100) {
@@ -389,4 +428,41 @@ int AW_CombatSwingSounds(const aw_swing_t *out,const aw_fighter_t *victim,int by
         if(out->critical)sounds[n++]=AW_SND_CRITICAL;
     }
     return n;
+}
+/* ---- the shot (aw_combat.h, ACTOR-RANGED-COMBAT-MISSING-66) ---- */
+int AW_CombatAmmoType(int weapon) {
+    return weapon==10?13:weapon==11?14:weapon==12?0:-1;
+}
+int AW_CombatShootNow(const aw_fighter_t *f,int ammo,float gap,int sight) {
+    return f && AW_COMBAT_RANGED(f->weapon) && ammo>0 && sight && gap<=AW_PROJECTILE_MAX_SPEED;
+}
+float AW_CombatShotSpeed(float strength) {
+    if(strength<0)strength=0;
+    if(strength>1)strength=1;
+    return AW_PROJECTILE_MIN_SPEED+(AW_PROJECTILE_MAX_SPEED-AW_PROJECTILE_MIN_SPEED)*strength;
+}
+void AW_CombatShotAim(const float from[3],const float to[3],float speed,float gravity,float dir[3]) {
+    float d[3],len,flat,t,horizontal=speed,dz;int k,pass;
+    for(k=0;k<3;k++)d[k]=to[k]-from[k];
+    dz=d[2];flat=(float)sqrt(d[0]*d[0]+d[1]*d[1]);
+    /* aim above by the drop over the flight; the flight time by the horizontal speed of the last aim (three passes) */
+    for(pass=0;pass<3;pass++){
+        t=horizontal>0?flat/horizontal:0;
+        d[2]=dz+gravity*t*t*.5f;
+        len=(float)sqrt(flat*flat+d[2]*d[2]);
+        horizontal=len>1e-4f?speed*flat/len:speed;
+    }
+    len=(float)sqrt(d[0]*d[0]+d[1]*d[1]+d[2]*d[2]);
+    if(len<1e-4f){dir[0]=1;dir[1]=dir[2]=0;return;}
+    for(k=0;k<3;k++)dir[k]=d[k]/len;
+}
+void AW_CombatShotStep(const float pos[3],float vel[3],float gravity,float dt,float next[3]) {
+    int k;
+    for(k=0;k<3;k++)next[k]=pos[k]+vel[k]*dt;
+    vel[2]-=gravity*dt;
+}
+void AW_CombatShotSheet(const aw_fighter_t *a,const unsigned char ammo_chop[2],aw_fighter_t *out) {
+    int i,v;
+    *out=*a;
+    for(i=0;i<2;i++){v=a->damage[0][i]+(ammo_chop?ammo_chop[i]:0);out->damage[0][i]=(unsigned char)(v>255?255:v);}
 }

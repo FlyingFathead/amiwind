@@ -41,6 +41,7 @@ static int queued_prison;
 static int hud_debug;
 int AW_DebugTestInputActive(void){return hud_debug;}
 void AW_CharacterReset(void){}
+void AW_OpeningDockStatus(void){}
 void AW_SaveReset(void){}
 void IN_AWClearButtons(void){}
 int AW_MusicStartTrack(int track){assert(track==4);return 1;}

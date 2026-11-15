@@ -1323,9 +1323,10 @@ def image_step(data, id1, out=None, jobs=1):
     from build_scratch import scratch_dir
     from mwad.esm import sha256_file
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     import pass_cache
     import unit_store
-    master = child_ci(Path(data), 'Morrowind.esm')
+    master = master_path(Path(data))
     inputs = {'master_sha256': sha256_file(master)}
     import mwad.dialogue
     # keyed on what the bake runs (build_master and its reach: the voice table's code it calls, mwad.dialogue, the
@@ -1393,7 +1394,8 @@ def main(argv=None):
     p.add_argument('--jobs', type=int, default=1)
     a = p.parse_args(argv)
     from mwad.paths import child_ci
-    raw, report = build_master(child_ci(a.data_files, 'Morrowind.esm'), a.jobs)
+    from mwad.masters import master_path
+    raw, report = build_master(master_path(a.data_files), a.jobs)
     a.out.write_bytes(raw)
     if a.report:
         a.report.write_text(json.dumps(report, indent=1, sort_keys=True) + '\n', encoding='utf-8', newline='\n')

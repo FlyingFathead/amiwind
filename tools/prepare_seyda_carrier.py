@@ -9,6 +9,7 @@ import re
 import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from mwad.paths import copy_tree, ensure_external, resolve_data_files, child_ci
+from mwad.masters import master_path
 from mwad.npc import load_master
 from mwad.interior import read_interior
 from player_hull import lumps
@@ -78,8 +79,8 @@ def prepare(data_files,scene,out,hand_report_path,hand_catalog_report_path,jobs=
     if digest(ui)!=catalog.get('scene_palette_sha256') or digest(final)!=catalog.get('palette_sha256'):
         raise ValueError('Carrier conversion/UI/runtime palette stages differ from the selected catalogue')
     original_inputs={name:file_digest(child_ci(data,name)) for name in ('Morrowind.esm','Morrowind.bsa')}
-    kinds,cells,_=load_master(child_ci(data,'Morrowind.esm'))
-    prison=read_interior(child_ci(data,'Morrowind.esm'),'Imperial Prison Ship')
+    kinds,cells,_=load_master(master_path(data))
+    prison=read_interior(master_path(data),'Imperial Prison Ship')
     copy_tree(scene,out)
     (out/'id1/maps').mkdir(parents=True,exist_ok=True)
     if source_record is not None:

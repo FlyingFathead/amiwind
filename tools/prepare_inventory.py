@@ -12,6 +12,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'src'))
 from mwad.esm import records, subrecords, text, first, is_deleted
 from mwad.paths import resolve_data_files, child_ci
+from mwad.masters import master_path
 
 KINDS={'WEAP':1,'ARMO':2,'CLOT':3,'ALCH':4,'INGR':5,'BOOK':6,'MISC':7,
        'LIGH':7,'APPA':7,'LOCK':7,'PROB':7,'REPA':7}
@@ -111,7 +112,7 @@ def max_charge(enchant,effects,mgef,settings):
 def source_items(data):
     result={};enchantments={};scripts={};settings={};initial=[]
     effects={};mgef={};charges={}
-    for kind,flags,raw in records(child_ci(data,'Morrowind.esm').read_bytes()):
+    for kind,flags,raw in records(master_path(data).read_bytes()):
         if kind not in KINDS and kind not in ('ENCH','SCPT','GMST','NPC_','MGEF'):continue
         fields=list(subrecords(raw))
         if is_deleted(flags,fields):continue
@@ -200,6 +201,23 @@ def source_items(data):
         except (KeyError,ValueError):pass
     return result,enchantments,scripts,settings,initial,charges
 
+EFFECT_MASTERS=('Morrowind.esm','Tribunal.esm','Bloodmoon.esm')
+def effect_records(data):
+    """HUD-ACTIVE-EFFECTS-ROW-64: every magic effect record of the masters present, by its index: the small icon (ITEX)
+    and the description (DESC), a later master's record replacing an earlier one (load order)."""
+    out={}
+    for name in EFFECT_MASTERS:
+        path=child_ci(Path(data),name,required=False)
+        if not path:continue
+        for kind,flags,raw in records(path.read_bytes()):
+            if kind!='MGEF':continue
+            fields=list(subrecords(raw))
+            if is_deleted(flags,fields):continue
+            index=first(fields,'INDX')
+            if len(index)!=4:continue
+            out[struct.unpack('<i',index)[0]]={'icon':text(fields,'ITEX'),'description':text(fields,'DESC')}
+    return out
+
 def enchant_capacity(kind,raw):
     # The record's enchantment points (what an Enchanting service can put on it; OpenMW getEnchantmentPoints): WPDT
     # bytes 20..21, AODT 16..19, CTDT 10..11, BKDT 16..19; 0 for the rest (they cannot be enchanted).
@@ -233,11 +251,11 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
         import numpy as np
         from PIL import Image
         from npc_geometry import Assets
-        from mwad.audit import BSA
+        from mwad.archives import layered_bsa
         from npc_items import item_model
         from prepare_scenery import nif_reader
         nif=nif_reader()
-        assets=Assets(data,BSA(child_ci(data,'Morrowind.bsa')))
+        assets=Assets(data,layered_bsa(data))
     rows=[];inventory_icons={};row_flags={}
     from held_lights import catalogue_flags,held_light,sidecar_path,text as held_text
     # HELD-LIGHT-OWN-MODEL-61: beside each carried light's item model (not the torch's mesh: the torch keeps its own
@@ -422,7 +440,7 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
     # dbg give weapons (DBG-GIVE-WEAPONS-59): one plain item of every weapon type and two shields, chosen from the
     # records by a rule (tools/prepare_weapon_kit.py), every one a row of the catalogue just written.
     from prepare_weapon_kit import write_kit
-    report['weapon_kit']=write_kit(id1,items,settings,row_flags,child_ci(data,'Morrowind.esm').read_bytes())
+    report['weapon_kit']=write_kit(id1,items,settings,row_flags,master_path(data).read_bytes())
     if models:
         # One icon lookup table for the HUD boxes and the inventory (tools/prepare_icons.py):
         # the same referenced closure as the staged inventory resources.
@@ -434,7 +452,8 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
                  for i in sorted(hud_ids) if i in items}
         colours,report['hud_colours']=ini_colours(data)
         import os
-        report['icon_table']=prepare_icons(assets,id1,closure,palette,colours,inventory_icons,jobs or os.cpu_count() or 1)
+        report['icon_table']=prepare_icons(assets,id1,closure,palette,colours,inventory_icons,jobs or os.cpu_count() or 1,
+                                           effects=effect_records(data))
         text_out,report['hud_settings']=hud_settings(settings)
         (id1/'gfx/hud-settings.txt').write_text(text_out,encoding='ascii',newline='\n')
     report['enchanted_items']={i:{'enchantment':items[i]['enchantment'],'kind':enchantments[items[i]['enchantment']][0],

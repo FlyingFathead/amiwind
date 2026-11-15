@@ -506,13 +506,18 @@ def _bake(maps, paths, jobs, token):
     import actor_grounding
     import actor_units
     import pass_cache
+    # the input lock alone, also with expansion layers selected: a fit reads no game data of its own, only its inputs
+    # (the room map's bytes, the store models' collision, the actor's model and layout, the placement:
+    # actor_units.room_actor_inputs, by content), so a room the expansions change re-keys its fits through them
+    # (BUILD-UNIT-KEYS-LAYER-BLIND-66; tests/test_layer_view.py: the fit's reach reads neither merging reader)
     cache = actor_units.open_cache(
         actor_units.ROOM_ACTOR_CACHE,
         ((__file__, '_fit_head'), (__file__, '_fit_search'), (actor_grounding.__file__, 'finish')),
         pass_cache.source_digest((__file__, '_fit_head'), (__file__, '_fit_search'), (actor_grounding.__file__, 'finish')),
         pass_cache.previous_digests((__file__, '_fit_head'), (__file__, '_fit_search'),
                                     (actor_grounding.__file__, 'finish')),
-        pass_cache.covered_lines((__file__, '_fit_head'), (__file__, '_fit_search'), (actor_grounding.__file__, 'finish')))
+        pass_cache.covered_lines((__file__, '_fit_head'), (__file__, '_fit_search'), (actor_grounding.__file__, 'finish')),
+        game=pass_cache.game_data_digest(layers=False))
     flat = iter(actor_units.fit_room_actors(tasks, jobs, cache, maps, _fit_all))
     fitted = {o: [next(flat) for _ in pending[o]] for o in owners}
     results, report = {}, []

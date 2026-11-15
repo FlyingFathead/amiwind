@@ -186,6 +186,10 @@ extern int (*aw_ambient_forced_run)(struct edict_s *e);
 int AW_AmbientAiPackage (struct edict_s *e, int *done);
 /* The row flags (AW_AMBIENT_FLYER, AW_AMBIENT_SWIMMER, ...) of the package E runs, 0 without one (no disk read). */
 int AW_AmbientFlags (struct edict_s *e);
+/* 1 when E's creature record can move by no means (no walk, swim, fly or biped flag: the Heart of Lorkhan, the Kwama
+ * Queens): it never walks, wanders or chases (HEART-OF-LORKHAN-FOLLOWS-DAGOTH-65; aw_actorstate.h
+ * AW_ActorBaseStationary). */
+int AW_ActorStationary (struct edict_s *e);
 /* 1 when P is water for a swimmer: liquid contents, or outdoors below the sea level (z 0). */
 int AW_AmbientInWater (const float p[3]);
 /* AW_ActorStep's failure diagnostics (aw_walk.c), filled only while aw_actor_step_diag is set ("chim actors ambient

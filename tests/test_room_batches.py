@@ -473,5 +473,72 @@ class ShellRoomMap(unittest.TestCase):
         self.assertEqual(world['_chim_room'], R.room_map('Room A'))
 
 
+class LayerBatches(unittest.TestCase):
+    """The expansions' rooms in the room list (CHIM-SOL-FLORA-PATH-65): appended after the island's batches, which stay
+    byte-identical; built only when their layer is selected."""
+    # SHA-256 of the island batches (json.dumps(sort_keys=True)) as they were before the layer batches came in (40
+    # batches, ids 0-1133): a change here moves save IDs
+    ISLAND_SHA256 = '7eef42d6233df284b1c38d26c89f16af4e8b4c4d4981d85c9ebd96ffcadd2b40'
+    MASTERS = {'none': ['Morrowind.esm'], 'tribunal': ['Morrowind.esm', 'Tribunal.esm'],
+               'both': ['Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm']}
+
+    def test_the_island_batches_are_unchanged(self):
+        import hashlib
+        doc = R.load()
+        island = [b for b in doc['batches'] if not b.get('layer')]
+        self.assertEqual(hashlib.sha256(json.dumps(island, sort_keys=True).encode()).hexdigest(), self.ISLAND_SHA256)
+        layers = [b for b in doc['batches'] if b.get('layer')]
+        self.assertTrue(layers, 'the expansions\' batches are in the list')
+        self.assertEqual(doc['batches'], island + layers)          # after the island's, never between
+        top = max(r['id'] for b in island for r in b['rooms'])
+        self.assertTrue(all(r['id'] > top for b in layers for r in b['rooms']))   # ids only appended
+        self.assertEqual({b['layer'] for b in layers}, {'Tribunal.esm', 'Bloodmoon.esm'})
+        names = {r['room'] for b in layers for r in b['rooms']}
+        for room in ('Mournhold, Godsreach', 'Mournhold, Great Bazaar', 'Mournhold, Plaza Brindisi Dorom',
+                     'Mournhold, Royal Palace: Courtyard', 'Mournhold, Temple Courtyard'):
+            self.assertIn(room, names)                             # the five districts are no longer set aside
+
+    def test_a_layer_batch_is_selected_only_with_its_layer(self):
+        doc = R.load()
+        island = [b['batch'] for b in doc['batches'] if not b.get('layer')]
+        tribunal = [b['batch'] for b in doc['batches'] if b.get('layer') == 'Tribunal.esm']
+        self.assertEqual(R.parse_selection('all', doc, self.MASTERS['none']), island)
+        self.assertEqual(R.parse_selection('all', doc, self.MASTERS['tribunal']), island + tribunal)
+        self.assertEqual(R.parse_selection('all', doc, self.MASTERS['both']), R.numbers(doc))
+        with self.assertRaises(ValueError):
+            R.parse_selection(str(tribunal[0]), doc, self.MASTERS['none'])
+
+    def test_the_build_takes_the_layers_from_dlc(self):
+        import argparse
+        import build
+        doc = R.load()
+        island = [b['batch'] for b in doc['batches'] if not b.get('layer')]
+        base = dict(room_batches=None, miniwind=False, interior_format='chim', dlc=None)
+        self.assertEqual(build.room_batch_selection(argparse.Namespace(**base, no_dlc=True)), island)
+        self.assertEqual(build.room_batch_selection(argparse.Namespace(**base, no_dlc=False)), R.numbers(doc))
+
+    def test_append_layers_keeps_the_previous_list(self):
+        previous = doc_of({1: ['A', 'B'], 2: ['C']})
+        graph = {'rooms': [{'name': n, 'entrance_exterior': '1,1', 'entrances': [], 'depth': 1} for n in 'ABCXY']}
+        plan = {'batches': [{'batch': 9, 'kind': 'region', 'groups': ['M'], 'master': 'Tribunal.esm', 'rooms': ['X']},
+                            {'batch': 10, 'kind': 'region', 'groups': ['S'], 'master': 'Bloodmoon.esm',
+                             'rooms': ['Y']}]}
+        doc = R.append_layers(plan, graph, previous)
+        self.assertEqual(doc['batches'][:2], previous['batches'])
+        self.assertEqual([(b['batch'], b['layer'], b['rooms'][0]['id']) for b in doc['batches'][2:]],
+                         [(3, 'Tribunal.esm', 3), (4, 'Bloodmoon.esm', 4)])
+        again = R.append_layers(plan, graph, doc)                  # made again: same ids, same list
+        self.assertEqual(again, doc)
+
+
+class QuasiExteriorSky(unittest.TestCase):
+    def test_a_cell_that_behaves_exterior_gets_the_shared_sky(self):
+        import chim_room_batches as S
+        from exterior_sky_build import SHARED_SKY_PATH
+        self.assertEqual(S.sky_keys({'flags': 0x01}), [])
+        self.assertEqual(S.sky_keys({'flags': 0x81}),
+                         ['"_aw_sky_mode" "exterior"', '"_aw_sky_asset" "%s"' % SHARED_SKY_PATH])
+
+
 if __name__ == '__main__':
     unittest.main()

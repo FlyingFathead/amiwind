@@ -7,8 +7,16 @@ static float identity(float f){return f;}
 float (*LittleFloat)(float)=identity;
 void Con_Printf(char *s,...){}
 eval_t *GetEdictFieldValue(edict_t *e,char *s){return !strcmp(s,"aw_moving")?&moving:&walkstep;}
-qboolean AW_ActorStep(edict_t *e,vec3_t delta,double dt){if(obstruct || (straight_blocked && fabs(delta[1])<1e-4f) || (no_backward && delta[0]<0) || e->v.origin[0]+delta[0]>wall)return false;VectorAdd(e->v.origin,delta,e->v.origin);if(e->v.origin[1]>highest_y)highest_y=e->v.origin[1];return true;}
-trace_t SV_Move(vec3_t a,vec3_t mi,vec3_t ma,vec3_t b,int type,edict_t *e){trace_t t;memset(&t,0,sizeof(t));t.fraction=obstruct || player_blocks?0:1;if(player_blocks)t.ent=svs.clients[0].edict;return t;}
+/* PIER-GUARD-WALKS-INTO-DOOR-65: a round pylon (centre PX PY, radius PR) on the straight line, the walker's half width 4 */
+static int pylon;static float PX=20,PY=0,PR=10;
+static float segment_distance(vec3_t a,vec3_t b){float dx=b[0]-a[0],dy=b[1]-a[1],l=dx*dx+dy*dy,t=l>0?((PX-a[0])*dx+(PY-a[1])*dy)/l:0;
+    if(t<0)t=0;if(t>1)t=1;dx=a[0]+t*dx-PX;dy=a[1]+t*dy-PY;return (float)sqrt(dx*dx+dy*dy);}
+qboolean AW_ActorStep(edict_t *e,vec3_t delta,double dt){
+    if(pylon){vec3_t end;VectorAdd(e->v.origin,delta,end);if(segment_distance(e->v.origin,end)<PR+4)return false;}
+    if(obstruct || (straight_blocked && fabs(delta[1])<1e-4f) || (no_backward && delta[0]<0) || e->v.origin[0]+delta[0]>wall)return false;VectorAdd(e->v.origin,delta,e->v.origin);if(e->v.origin[1]>highest_y)highest_y=e->v.origin[1];return true;}
+trace_t SV_Move(vec3_t a,vec3_t mi,vec3_t ma,vec3_t b,int type,edict_t *e){trace_t t;memset(&t,0,sizeof(t));t.fraction=obstruct || player_blocks?0:1;
+    if(pylon){if(a[2]!=b[2])t.fraction=.5f;   /* the floor under every point */
+        else if(segment_distance(a,b)<PR+4){t.fraction=.5f;VectorAdd(a,b,t.endpos);VectorScale(t.endpos,.5f,t.endpos);}}if(player_blocks)t.ent=svs.clients[0].edict;return t;}
 static void node(byte *p,float x,int degree,int next){float y=0;memcpy(p,&x,4);memcpy(p+4,&y,4);memcpy(p+8,&y,4);p[12]=degree;p[14]=next;}
 int main(void){
     byte grid[54];edict_t actor,player;client_t client;vec3_t goal={40,0,0};int i,result;
@@ -54,5 +62,15 @@ int main(void){
     actor.v.origin[0]=0;actor.v.origin[1]=0;
     player.v.origin[0]=300;assert(AW_NavStart(&actor,goal));assert(AW_NavStep(.1,1)==0 && actor.v.origin[0]==0);
     assert(AW_NavDecode(grid,sizeof(grid)));goal[0]=0;actor.v.origin[0]=40;assert(!AW_NavStart(&actor,goal));
+    /* PIER-GUARD-WALKS-INTO-DOOR-65 (v0.0.66-dev1): a direct walk whose straight line runs into a round pylon goes
+     * round it by a detour point and arrives; before, the side steps slid him round the pylon until the walk failed */
+    {vec3_t far_goal={60,0.5f,0};player.v.origin[0]=1000;
+    memset(&actor,0,sizeof(actor));actor.v.origin[0]=-20;pylon=1;assert(AW_NavStartDirect(&actor,far_goal));
+    for(i=0;i<1000;i++){result=AW_NavStep(.1,0);if(result)break;}
+    assert(result==1 && fabs(actor.v.origin[0]-60)<6 && fabs(actor.v.origin[1]-.5f)<6);
+    /* a clear line takes no detour: the walk keeps the straight line */
+    memset(&actor,0,sizeof(actor));actor.v.origin[0]=-20;actor.v.origin[1]=40;far_goal[1]=40;highest_y=0;
+    assert(AW_NavStartDirect(&actor,far_goal));for(i=0;i<1000;i++){result=AW_NavStep(.1,0);if(result)break;}
+    assert(result==1 && highest_y<40.5f);pylon=0;}
     return 0;
 }

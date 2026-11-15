@@ -1,6 +1,6 @@
 # Third person, vanity camera and the death scene
 
-_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
+_Last updated with AmiWind v0.0.66-dev2 (14 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -307,7 +307,9 @@ take about 0.35 ms a frame from parts and about 0.35 ms baked (15-second samples
 the Pi 4B or a 68040.
 
 The baked arms stay selectable (`aw_hand_parts 0`, saved, or `dbg camera hands off`), and they are still the arms
-while a torch is carried and while the shield is raised to guard (their own baked poses).
+while a torch is carried and while the shield is raised to guard (their own baked poses). While magic is ready the
+torch, a held light and the shield are put away and both paths show the open hands of the spell stance, whatever is
+equipped; the third-person body puts them away too (since v0.0.66-dev2; [MAGIC_EFFECTS.md](MAGIC_EFFECTS.md)).
 
 ## Console
 

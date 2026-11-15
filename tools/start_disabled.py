@@ -294,7 +294,8 @@ _TABLES = {}
 def table_for(data):
     """The table of the Data Files' Morrowind.esm, once per file content in this process."""
     from mwad.paths import child_ci
-    path = child_ci(Path(data), 'Morrowind.esm')
+    from mwad.masters import master_path
+    path = master_path(Path(data))
     stat = path.stat()
     key = (str(path), stat.st_size, stat.st_mtime_ns)
     if key not in _TABLES:

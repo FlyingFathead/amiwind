@@ -105,8 +105,9 @@ class BakeRaises(unittest.TestCase):
 
     def setUp(self):
         groups = [{'name': 'idle', 'base': 0, 'count': 8, 'kind': 'loop', 'step': .1, 'events': []}]
-        self.patches = [patch.object(PA, 'Assets', lambda *a: object()), patch.object(PA, 'BSA', lambda *a: None),
+        self.patches = [patch.object(PA, 'Assets', lambda *a: object()), patch.object(PA, 'layered_bsa', lambda *a: None),
                         patch.object(PA, 'child_ci', lambda *a: Path('/x')),
+                        patch.object(PA, 'master_path', lambda *a: Path('/x')),
                         patch.object(PA, 'Skeleton', lambda *a: object()),
                         patch.object(npc_anim, 'plan', lambda *a, **k: (object(), groups)),
                         patch.object(npc_anim, 'soun_records', lambda *a: {}),

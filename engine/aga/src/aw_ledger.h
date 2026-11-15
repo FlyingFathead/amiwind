@@ -127,17 +127,47 @@ typedef struct {char id[AW_LEDGER_FACT_ID+1];int32_t value;} aw_ledger_fact_t;
  *   LOCALS   one entry per local value that differs from its start (0, as OpenMW's Locals::configure sets it): an
  *            object's (GLOBAL 0, KEY its reference, key rules above, never bit 30) or a global script's (GLOBAL 1, KEY
  *            the script's name hash); SCRIPT the name hash of the script the values belong to, HINT its row in the
- *            compiled scripts when saved (a load takes the values only when that row still has the name: a rebuilt
- *            file in another order drops them, counted), SLOT the local's number, VALUE its 32 bits (a float's bits)
+ *            compiled scripts when saved (tried first; a rebuilt file in another order finds the script by its name,
+ *            SAVE-SCRIPT-ROW-HINT-ONLY-65), SLOT the local's number, VALUE its 32 bits (a float's bits)
  *   SCRIPTS  a global script whose running state differs from a new game's (a start script stopped, any other one
  *            started): its name hash, hint and RUNNING (1/0)
- * Both sorted, LOCALS by (global, key, slot), SCRIPTS by name hash. */
-#define AW_LEDGER_LOCALS_MAX 8192     /* the interpreter keeps at most 4,096 attached and 4,096 parked values */
-#define AW_LEDGER_LOCAL_BYTES 16
+ * Both sorted, LOCALS by (global, key, slot), SCRIPTS by name hash.
+ * Slice 8 (SAVE-SCRIPT-ROW-HINT-ONLY-65, SAVE-ITEM-SCRIPT-LOCALS-66; the rules of OpenMW 0.51 mwscript/locals.cpp
+ * Locals::read and esm3/locals.cpp: a local is saved with its NAME and restored by its name, with its type; a local
+ * no longer declared is dropped; our own code):
+ *   - every local also keeps NAME, its variable's key in the compiled file (aw_mwhost.c, the LOCN section of
+ *     tools/mwscript/awms.py): bits 0-29 the FNV-1a of the folded name (AW_LedgerNameHash), bits 30-31 its type
+ *     (AW_LEDGER_LOCAL_SHORT, _LONG, _FLOAT); 0 no name (an older save, or two names of one script with one hash);
+ *   - LAYOUTS: per script a kept local belongs to (by name hash), the signature of its variables when saved
+ *     (AW_LedgerLayoutSignature: their names and types in slot order). A load restores a local by its slot when
+ *     the script's variables are as they were, else by its name (AW_LedgerLocalSlot);
+ *   - ITEM LOCALS: the values of an ITEM's script (OpenMW 0.51 keeps an item's locals with the item, in the player's
+ *     or a container's or actor's inventory), by the item instance: HOLDER (0 the player, else the placed container,
+ *     NPC or creature holding it: a reference key, key rules above), ITEM (the name hash of the item's record id),
+ *     SERIAL (the item instance's serial; 0 the item kind's one instance, until items are kept one by one), then
+ *     SCRIPT, HINT, SLOT, VALUE and NAME as a local's. Sorted by (holder, item, serial, slot). */
+#define AW_LEDGER_LOCALS_MAX 65536    /* a damaged-file guard (SAVE-LOCALS-BOUND-UNDER-GAME-66): the base game alone
+                                       * declares 7,388 local values in 2,115 scripted objects, the expansions more; was
+                                       * 8,192, under the game; the rows cost 20 bytes each only while kept */
+#define AW_LEDGER_LOCAL_BYTES 20
 #define AW_LEDGER_SCRIPTS_MAX 2048
 #define AW_LEDGER_SCRIPT_BYTES 8
-typedef struct {uint32_t key,script;uint16_t hint;uint8_t slot,global;int32_t value;} aw_ledger_local_t;
+#define AW_LEDGER_LAYOUTS_MAX 4096    /* one per script a kept local belongs to: the game has 811 scripts with variables
+                                       * (both expansions, v0.0.66-dev2): a guard five times above */
+#define AW_LEDGER_LAYOUT_BYTES 8
+/* the game's scripted items: 491 held by placed holders (929 values), 40 the player wears that run a script
+ * (v0.0.66-dev2's compiled scripts, both expansions): a guard well above */
+#define AW_LEDGER_ITEM_LOCALS_MAX 4096
+#define AW_LEDGER_ITEM_LOCAL_BYTES 28
+#define AW_LEDGER_LOCAL_SHORT 0U
+#define AW_LEDGER_LOCAL_LONG 1U
+#define AW_LEDGER_LOCAL_FLOAT 2U
+#define AW_LEDGER_LOCAL_TYPE(name) ((name)>>30)
+#define AW_LEDGER_LOCAL_NAME(name) ((name)&0x3FFFFFFFU)
+typedef struct {uint32_t key,script;uint16_t hint;uint8_t slot,global;int32_t value;uint32_t name;} aw_ledger_local_t;
 typedef struct {uint32_t script;uint16_t hint;uint8_t running,unused;} aw_ledger_script_t;
+typedef struct {uint32_t script,signature;} aw_ledger_layout_t;
+typedef struct {uint32_t holder,item,serial,script;uint16_t hint;uint8_t slot,unused;int32_t value;uint32_t name;} aw_ledger_item_local_t;
 /* Slice 6, the actors (ACTOR-STATE-POOL-LIMITS-54; the rules of OpenMW 0.51 mwworld/livecellref.cpp, esm3/npcstate and
  * creaturestats: a changed actor reference is saved with its death, its place and its stats, an unchanged one is not;
  * our own code). Two parts, both by the actor's reference and only for actors that differ from the game data:
@@ -152,7 +182,9 @@ typedef struct {uint32_t script;uint16_t hint;uint8_t running,unused;} aw_ledger
  *            AW_ActorStateExportRecords), one record per reference, written at a save and read back after a load;
  *            the list keeps the bytes, the actor module checks them.
  * Slice 7 adds DIED (the game hours of the death, for the respawn below). */
-#define AW_LEDGER_ACTORS_MAX 8192     /* actor rows at most (the game places 2,673 NPCs; its actor table has 3,437 bases) */
+#define AW_LEDGER_ACTORS_MAX 32768    /* actor rows at most: a damaged-file guard (SAVE-ACTOR-ROWS-BOUND-UNDER-GAME-66):
+                                       * the game places about 13,800 actor references (2,673 NPCs, 4,798 creatures, 6,352
+                                       * levelled creature spawns; the actor table has 3,437 bases); was 8,192, under them */
 #define AW_LEDGER_ACTOR_BYTES 52
 #define AW_LEDGER_RECORDS_MAX 2097152 /* the actor records' bytes at most (8,192 records of 182 bytes and their changes);
                                        * held only from a save's start to its write and from a load to its spawn */
@@ -163,10 +195,13 @@ typedef struct {uint32_t script;uint16_t hint;uint8_t running,unused;} aw_ledger
 #define AW_LEDGER_ACTOR_PICK 16U
 #define AW_LEDGER_ACTOR_FIELDS 31U
 #define AW_LEDGER_ACTOR_DIED 32U      /* slice 7, the seventh form only: f32 the game hours of the death */
+#define AW_LEDGER_ACTOR_CLEARED 64U   /* ACTOR-RESPAWN-CORPSE-RULES-66, the seventh form: the body was cleared away (no bytes;
+                                       * only with DEAD) */
 typedef struct {
     uint32_t key;
     uint8_t dead,moved,fight,follow;   /* 0/1 each */
-    uint16_t pick,unused;              /* 0 not rolled, 1 nothing, 2 + the actor table base it gave */
+    uint16_t pick;                     /* 0 not rolled, 1 nothing, 2 + the actor table base it gave */
+    uint8_t cleared,unused;            /* cleared: the dead body is gone for good (AW_LedgerActorClears) */
     float origin[3],angles[3],health,hours;
     int32_t room;                      /* a room's stable number (origin room-local), 0 outdoors (origin island) */
     float died;                        /* slice 7: game hours when it was first kept dead (0 unknown: HOURS then) */
@@ -224,6 +259,10 @@ typedef struct aw_ledger_s {
     int local_count,local_capacity;
     aw_ledger_script_t *script;   /* slice 5, sorted by name hash */
     int script_count,script_capacity;
+    aw_ledger_layout_t *layout;   /* slice 8, sorted by script name hash */
+    int layout_count,layout_capacity;
+    aw_ledger_item_local_t *item_local;   /* slice 8, sorted by (holder, item, serial, slot) */
+    int item_local_count,item_local_capacity;
     aw_ledger_actor_t *actor;     /* slice 6, sorted by key */
     int actor_count,actor_capacity;
     unsigned char *records;       /* slice 6, the "AWAR" bytes (NULL: none) */
@@ -276,6 +315,27 @@ int AW_LedgerLocalSet(aw_ledger_t *l,int global,uint32_t key,uint32_t script,int
 int AW_LedgerLocal(const aw_ledger_t *l,int global,uint32_t key,int slot,int32_t *out);
 int AW_LedgerScriptSet(aw_ledger_t *l,uint32_t script,int hint,int running);
 void AW_LedgerLocalsClear(aw_ledger_t *l);
+/* Slice 8: a local set with its variable's NAME key (0 none; AW_LedgerLocalSet keeps 0). A script's layout signature
+ * set (1 kept; 0 a bad script or signature, memory, refused counted) and read (1 kept, *SIGNATURE). The signature of
+ * COUNT variable keys in slot order: FNV-1a over the count and each key's four bytes, never 0 (0 for no variables). */
+int AW_LedgerLocalNamed(aw_ledger_t *l,int global,uint32_t key,uint32_t script,int hint,int slot,uint32_t name,int32_t value);
+int AW_LedgerLayoutSet(aw_ledger_t *l,uint32_t script,uint32_t signature);
+int AW_LedgerLayout(const aw_ledger_t *l,uint32_t script,uint32_t *signature);
+uint32_t AW_LedgerLayoutSignature(const uint32_t *keys,int count);
+/* Slice 8, where a saved local (its SLOT, NAME key and VALUE) goes in its script as compiled now: COUNT its variables
+ * now, NOW their keys (NULL: this build's file names none, an older compiled file). LAYOUT: the saved signature of its
+ * script (HAS_LAYOUT 0: an older save, which keeps no names). The saved slot when the variables are as they were (the
+ * same signature, or no signature to compare: an older save or file, by the slot as before); else the one variable
+ * whose name is its own (the value converted when the type changed, as OpenMW's Locals::read: a float made a whole
+ * number cut toward 0, a whole number made a float, a short kept to 16 bits); -1 when none or two variables have the
+ * name, or it has none (dropped, counted by the caller). *OUT: the value to set. *MOVED: 1 when it went by its name to
+ * another slot. */
+int AW_LedgerLocalSlot(int slot,uint32_t name,int32_t value,int has_layout,uint32_t layout,const uint32_t *now,int count,
+                       int32_t *out,int *moved);
+/* Slice 8, an item's local set (VALUE 0 drops it; 1 kept or dropped, 0 a bad holder, item, script or slot, memory or
+ * AW_LEDGER_ITEM_LOCALS_MAX, refused counted). */
+int AW_LedgerItemLocalSet(aw_ledger_t *l,uint32_t holder,uint32_t item,uint32_t serial,uint32_t script,int hint,int slot,
+                          uint32_t name,int32_t value);
 /* Slice 6: the actor row of KEY (MAKE 1: made, all fields 0, when it is not there); NULL when none, KEY breaks the key
  * rule, or the list cannot grow (refused counted). The pointer holds until the next made row. A row whose fields are
  * all 0 is not saved. The records: set (a copy of BYTES; 0 bytes: none; 1 kept, 0 too large or no memory, refused
@@ -287,6 +347,12 @@ void AW_LedgerActorsClear(aw_ledger_t *l);
  * record is flagged Respawn) or a levelled reference's (PICK set), and its death (DIED, else HOURS) at least
  * min(respawn delay, clear delay) game hours before NOW. Reset: every field but the key back to 0 (as in the data). */
 int AW_LedgerActorRespawns(const aw_ledger_actor_t *a,int respawns,float now,const aw_ledger_respawn_t *r);
+/* ACTOR-RESPAWN-CORPSE-RULES-66, the body clearing (OpenMW 0.51 mwworld/cellstore.cpp clearCorpse, run at the cell's
+ * load before the respawn): the body of dead actor A goes for good (1: set CLEARED now; the actor stays dead) when its
+ * reference's FLAGS (AW_REFS_*) say it neither respawns nor is a levelled list's (those come back instead), its record
+ * is not Persistent (AW_REFS_PERSISTENT: such bodies stay, as quest bodies do), and fCorpseClearDelay game hours have
+ * passed since its death. 0 otherwise (or already cleared). */
+int AW_LedgerActorClears(aw_ledger_actor_t *a,uint32_t flags,float now,const aw_ledger_respawn_t *r);
 void AW_LedgerActorReset(aw_ledger_actor_t *a);
 /* A place (AT, WHERE as the rows' places) is loaded at game hours NOW: 1 when its respawning containers refill (more
  * than 24 x 30 x MONTHS hours after its last refill, the first one after the game's start; the place's time is set to
@@ -369,7 +435,13 @@ unsigned long AW_LedgerResident(const aw_ledger_t *l);
  * u8 files and each: u8 index (0 .. 31, strictly ascending), u8 length and the name (printable), u32 references, 8
  * digest bytes; then u32 idents and each: u32 key (the key rules, never bits 30-31), u32 record hash (never 0),
  * strictly ascending; then u32 stamps and each: u8 at (CELL or ROOM), i32 where, f32 hours, strictly ascending by
- * (at, where). An "AWL7" with none of the four is refused. */
+ * (at, where). An "AWL7" with none of the four is refused.
+ * The eighth form (slice 8), written when a local keeps a name, a script a layout, or an item's local is kept: "AWL8",
+ * the seventh form's parts (any may be 0), then u32 layouts and each: u32 script name hash, u32 signature (never 0),
+ * strictly ascending by hash; then u32 names (the locals' count) and each: u32 the local's name key (0: none), in the
+ * locals' order; then u32 item locals and each: u32 holder (0 or a reference key), u32 item (never 0), u32 serial,
+ * u32 script name hash, u16 hint, u8 slot, i32 value (never 0), u32 name key, strictly ascending by (holder, item,
+ * serial, slot). An "AWL8" with none of them is refused. */
 /* Slice 7, the build's reference identity table: focus.awf's last section (tools/prepare_focus.py), little-endian:
  *   "AWI1" u8 files, each {u8 index, u8 length, the name, u32 references, 8 digest bytes (SHA-256's first)},
  *   u32 iMonthsToRespawn, f32 fCorpseRespawnDelay, f32 fCorpseClearDelay (the master's GMSTs),
@@ -382,6 +454,9 @@ unsigned long AW_LedgerResident(const aw_ledger_t *l);
  * (STEP x 8 bytes) read when a key is looked up. READ: the bytes at AT (0 ok). */
 #define AW_REFS_RESPAWN 0x01000000U
 #define AW_REFS_LEVELLED 0x02000000U
+#define AW_REFS_PERSISTENT 0x04000000U   /* ACTOR-RESPAWN-CORPSE-RULES-66: an NPC or creature record flagged Persistent
+                                          * (record header 0x400): its body is never cleared (a table without the
+                                          * bit: every body clears, as for the 97 % of actors the original clears) */
 #define AW_REFS_STEP_MAX 1024
 #define AW_REFS_BLOCK_BYTES 8192      /* AW_REFS_STEP_MAX rows of 8 bytes */
 #define AW_REFS_BLOCKS_MAX 16384

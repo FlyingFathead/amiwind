@@ -1,10 +1,22 @@
 # Save/load milestone: compact state and a manageable save list
 
-_Last updated with AmiWind v0.0.62-dev1 (2026-11-07)._
+_Last updated with AmiWind v0.0.66 (14 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [The save design in brief](#the-save-design-in-brief)
+  - [1. What a save is](#1-what-a-save-is)
+  - [2. What must be kept](#2-what-must-be-kept)
+  - [3. Item kinds and item instances](#3-item-kinds-and-item-instances)
+  - [4. The journal](#4-the-journal)
+  - [5. Scripts](#5-scripts)
+  - [6. Stable identities](#6-stable-identities)
+  - [7. When and how a save is written](#7-when-and-how-a-save-is-written)
+  - [8. Memory](#8-memory)
+  - [9. The gameplay contract](#9-the-gameplay-contract)
+  - [10. Acceptance tests](#10-acceptance-tests)
+  - [11. Where v0.0.66-dev2 stands](#11-where-v0066-dev2-stands)
 - [First usable save](#first-usable-save)
 - [Avoid clutter in files and in the UI](#avoid-clutter-in-files-and-in-the-ui)
 - [Format and failure recovery](#format-and-failure-recovery)
@@ -13,9 +25,176 @@ _Last updated with AmiWind v0.0.62-dev1 (2026-11-07)._
 - [Actors in rooms and their packages (v0.0.57)](#actors-in-rooms-and-their-packages-v0057)
 - [The world change list (v0.0.59)](#the-world-change-list-v0059)
 - [Magic, items and effects in saved games (v0.0.61)](#magic-items-and-effects-in-saved-games-v0061)
+- [The actor block, the saved actor rows and the explored map (v0.0.66)](#the-actor-block-the-saved-actor-rows-and-the-explored-map-v0066)
+- [Bounds above the game (v0.0.66)](#bounds-above-the-game-v0066)
+- [Item instances: two copies of one kind kept apart (v0.0.66)](#item-instances-two-copies-of-one-kind-kept-apart-v0066)
 - [References inspected](#references-inspected)
 
 <!-- contents end -->
+
+## The save design in brief
+
+### 1. What a save is
+
+**The restored game is the game's content plus the persistent player and world state.** The content (terrain, buildings,
+placements, item and character definitions, dialogue, scripts) comes from the installed game files and is never copied
+into a save. The save records what happened in this playthrough.
+
+**Every save is complete and self-contained.** It holds every persistent change relative to the original game data, not
+only the changes since the previous save: objects in cells visited long ago, script variables, quest progress,
+inventories and timers included. Loading a save never needs an earlier save or a leftover session file. The original
+game and the reference engine, OpenMW (GPL-3.0), work this way, and AmiWind follows them.
+
+Two flags are kept apart:
+
+| Flag | Meaning |
+| --- | --- |
+| Changed from the original | The change stays in every later save. Clearing it would make later saves forget earlier actions: a theft in Seyda Neen must still be known after a second save in Balmora. |
+| Changed since the last save | A working flag only, for caches and snapshots. It may be cleared after a save. |
+
+Something never touched costs nothing in the save. Small systems (the player, the globals) may be written whole where
+that is simpler than a difference; the large population of placed references is written sparsely. For a changed object
+only its latest state is kept: opening and closing a door many times leaves one entry, and a field that returns to its
+original value loses its override. Where the game data still contains an object, its removal is written explicitly,
+otherwise the next load would recreate it.
+
+### 2. What must be kept
+
+The rule: **keep what would change the continuing game; rebuild what is only implementation.** Forgetting which actor
+someone was pursuing, or the fireball about to hit, changes the game; a path search or a particle effect can be built
+again.
+
+| Category | Kept |
+| --- | --- |
+| Player and progression | Name, appearance, race, class, birthsign, attributes, skills, health, magicka, fatigue, level progress, faction standing and ranks, reputation, bounty, place and facing |
+| Inventory and equipment | Items with count, condition, charge and soul-gem contents; what is worn or wielded; the selected enchanted item |
+| World references | Taken, moved, dropped and deleted objects, enabled state, ownership, locks, traps, doors |
+| NPCs and creatures | Changed statistics, death and where the body lies, whether it was cleared, disposition, items, AI packages with their targets and destinations, fights, companions |
+| Quests, journal, dialogue | Quest stages, journal entries, topics known, lines heard |
+| Scripts | Globals, each object's script variables, running global scripts |
+| Magic | Known spells, active effects with their remaining durations and magnitudes, power cooldowns, who cast what |
+| World simulation | Time, weather, respawn clocks, projectiles in flight, the random state |
+| Made things | Spells, potions and enchantments the player made, with the counter that names the next one |
+| Map and controls | The explored map, map markers, quick keys |
+
+### 3. Item kinds and item instances
+
+"Iron longsword" is a kind of item, not one sword. A stack of identical items is saved as a count. When condition,
+charge, ownership or script state differ, the copies are separate entries, and equipment points at the entry it uses.
+Merely saving a count for a kind cannot tell three swords apart.
+
+### 4. The journal
+
+The current stage of a quest does not say which entries the player received, in what order, or on which day. The
+journal is saved as ordered entries. Text that is fixed in the game data is referred to, not copied; text whose
+wording depends on the moment it was written (names and numbers filled in) keeps its value from that moment, so an old
+entry does not change when the character does.
+
+### 5. Scripts
+
+Script state is saved as data, never as an interpreter's stack: the named variables with their values, whether a global
+script is running or stopped, and the identity of the object that owns the variables. A save is made at a defined
+point between script runs, so no script is caught half way. A stopped script stays stopped after a load.
+
+### 6. Stable identities
+
+Every placed reference has an identity made from its content file and its reference number, so a save names the same
+object whatever the order of loading, the map it is drawn in, a rebuilt world or an added expansion. An object moved to
+another place stays the same object, and the move is recorded so that its original placement does not appear again.
+Objects created in play are saved with their ids and with the counter that gives the next id, so a new object never
+takes an id a restored one holds. A save made with other game data is told apart by what changed: a rebuilt asset that
+keeps the identities loads; a reordered table needs mapping; a changed script layout needs migration; removed content
+cannot be restored, and the load says what was left out.
+
+### 7. When and how a save is written
+
+A save is captured all at once at a settled point: the current gameplay step and script run are finished first, so no
+transfer is caught half way (an item removed from a chest and not yet in the pack would be lost, the other order would
+copy it). Capture is checked as complete; a failed export refuses the save. The file is then written to the inactive of
+two generations, closed and read back and checked, and only then reported as saved. The checksum shows the bytes are
+intact; the completeness check shows the state is all there. Both are needed.
+
+Loading restores the whole state first, and only then do scripts and gameplay events run again, so that a load never
+repeats a reward, rolls loot again or fires a pick-up.
+
+### 8. Memory
+
+The peak extra memory while saving and loading is measured first: the live state, the temporary copies, the encoded
+file and the state decoded but not yet applied. If it is a problem, the file is written through a small reusable buffer
+(a few KB), with the lengths known beforehand or patched, an incremental checksum and a streamed check of the result.
+That keeps the file format and the recovery behaviour. Changes of cells that are not loaded could move to disk if a very
+long game ever needs it, copied across at each save; the save still stands on its own.
+
+### 9. The gameplay contract
+
+For every system the question is: what must be true right after loading? Examples:
+
+- A partly burned light keeps its fuel.
+- An effect keeps its remaining duration, and a power its cooldown.
+- A companion still follows or escorts.
+- A dead quest character stays dead.
+- A restored stat is not changed again by an effect that is already in it.
+- A container keeps the contents it had, not a fresh roll.
+
+Authoritative values are saved together with what is needed to rebuild the derived ones.
+
+### 10. Acceptance tests
+
+| Test | Required result |
+| --- | --- |
+| Take an object, leave, save twice, load | It is still gone from its original place |
+| Move or drop an object into another cell | Exactly one copy, in the right place |
+| Change script variables, stop a global script, rebuild with reordered scripts | The same scripts get the same state, or the load says it cannot |
+| Save a carried item that has a script | Its variables and one-time behaviour survive |
+| Carry two copies with different condition or charge | Each keeps its own values and its worn state |
+| Active effects, a cooldown and a companion | Their continuing behaviour survives |
+| Export failure, full disk, truncated file | No incomplete save is reported as made; the previous one still loads |
+| Load and save an unchanged game again and again | Nothing accumulates: no duplicates, rewards or stat changes |
+| Every part at the game's full count (all its NPCs, creatures, quests, topics) | It saves and loads, or the save is refused with a clear message |
+| Save, load, save | The two files are the same bytes |
+
+Every change to the save also has to answer one question: what happens when this part fills?
+
+### 11. Where v0.0.66-dev2 stands
+
+What exists: the sparse world change list (the parts below), tagged and versioned sections that older saves still load
+through, checksums, two generations with a read-back check, and fingerprints of the content a save was made with. The
+engine already refuses a save when the script, change-list, object or actor-block export fails. The saves of the
+original game and of OpenMW store the same kinds of state; AmiWind keeps its own format with packed fields (short
+reference ids, a field mask, positions in steps) instead of their record layout. A full comparison of the reference
+engine's save records with ours follows in a later update.
+
+Known gaps, in the order they are being worked on:
+
+1. An export failure must refuse the save: the engine does so, and tests that inject each failure are being written.
+2. Script variables are matched to their script by position inside the script; a layout signature is missing.
+3. The script variables of carried items are not kept.
+4. Item instances: one condition and one charge are kept per kind in the pack.
+5. The fixed limits (`SAVE-STATE-FIXED-CAPS-66` in the [bug register](BUGS.md)): the saved actor rows stop at 256 and
+   hold NPCs only, so beyond 256 actors, and for creatures such as companions, the state is not saved; the journal, the
+   map markers and the explored map of rooms keep 256 entries each; the explored map shares a 32 KB part with other lists
+   and can make the save be refused when it fills. The limits are being measured against the game's real counts. The
+   save must hold every change the game makes, with no fixed cap that can refuse a save or silently drop state.
+
+Where each kind of state is kept, for the reference engine's records:
+
+| Reference engine record | Where AmiWind keeps it | State |
+| --- | --- | --- |
+| Journal and quest state | The change list, fourth part (every quest's stage by its id) | Done; journal entry limit being lifted |
+| Dialogue state | The change list: topics known, disposition | Done |
+| Cell state: placed objects | The change list, first part (taken, disabled, moved, dropped) | Done |
+| Doors | The change list, second part (open, locked) | Done |
+| Containers | The change list, third part (difference against the contents) | Done |
+| NPC states | The change list, sixth part, and the saved actor rows | Partial (rows stop at 256) |
+| Creature states | The same rows | Partial (companions and scripted creatures may not be kept) |
+| Globals and script locals | The change list, fourth and fifth parts | Partial (carried items' variables missing) |
+| Active spell effects | A block of its own (v0.0.61) | Done |
+| The map's fog and markers | The explored map and the markers | Partial (limits above) |
+| Stolen items | The change list, second part (by item and owner) | Done |
+| Weather, projectiles, random state | Not confirmed in this page | Planned |
+
+The references used are listed at the end of this page, among them the reference engine's save code at
+[commit 57e437a](https://github.com/OpenMW/openmw/tree/57e437a85b312f31fb6c110e28e5a6f3ab9f60bc).
 
 **Status:** the post-RC3 checkpoint adds AWS2 dated journal history, retaining
 AWS1 decoding without invented history. See [journal schema and limits](WORLD_MAP_AND_JOURNAL.md).
@@ -245,9 +424,9 @@ Fifth part (v0.0.59): the scripts' own state, on the same list
 - **Global scripts.** A global script started (StartScript) or stopped (StopScript) is kept with its running state
   when that differs from a new game's (the start scripts running, every other one not), and its locals with it (OpenMW
   0.51's global scripts rule). After a load, a started script runs on and a stopped start script stays stopped.
-- **Script identity.** A script is named by the hash of its id, with its row in the compiled scripts as a hint; a load
-  takes the values only when that row still has the same name (a rebuilt script file in another order drops them, and
-  the drop is counted in `aw_mwscript_status`). The names are read from disk once per script per session.
+- **Script identity.** A script is named by the hash of its id, with its row in the compiled scripts as a hint. In
+  v0.0.59 a load took the values only when that row still had the same name; since v0.0.66 a script whose row moved in
+  a rebuilt file is found by its name (the eighth part below).
 - **A load starts from the beginning.** Before the saved values are set, every script value goes back to 0 and only the
   start scripts run, so nothing of the session before the load is carried into it; an earlier save, which has no
   script state, loads with the scripts as in a new game.
@@ -299,6 +478,28 @@ v0.0.59.
   changed record go). Any other dead actor stays dead. The time of death is the first moment the list keeps the actor
   dead (when it leaves the window, at a save, or when its fight slot is reused). The clock is the game's own clock,
   which resting and waiting move.
+- **Bodies cleared away (v0.0.66).** A dead actor that does not come back (no Respawn flag, not a levelled list's)
+  and whose record is not flagged Persistent loses its body when its cell is next loaded fCorpseClearDelay game hours
+  (72 in Morrowind.esm) after its death: the body and what it carried go, and the actor stays dead for good (its row
+  keeps the death and a "cleared" mark, saved in the seventh form). A Persistent actor's body stays (OpenMW 0.51
+  CellStore::clearCorpse; the builder marks such references in the identity table). As in OpenMW, the respawn and
+  the clearing happen only when a cell is loaded; resting or waiting in a cell moves the clock but does not respawn
+  anything there.
+- **Bodies until then (v0.0.66).** Until its clear time a body lies where the actor fell, and it can be looted, in
+  every kind of place: a room, a town's own map and an outdoor cell that joins the view again. Before v0.0.66 a dead
+  actor of a joining outdoor cell was not spawned at all, so its body was gone at once on a later visit; that older
+  method stays selectable with `chim actors corpses 0` (default 1). A body laid down again from the list is not a new
+  death: an essential character's message is not shown a second time.
+- **The original data, counted (v0.0.66).** Morrowind.esm: 2,675 NPC records, 61 flagged Respawn (438 placed
+  references; the clan lairs' vampires among them), 40 essential, 83 Persistent, none both Respawn and
+  Persistent; 260 creature records, 28 flagged Respawn (87 placed references), 2 essential, 17 Persistent; 890
+  containers, 91 flagged Respawn; 116 levelled creature lists. GMSTs: fCorpseRespawnDelay 72, fCorpseClearDelay 72,
+  iMonthsToRespawn 4. Tribunal.esm: 8 of 159 NPCs and 16 of 97 creatures flagged Respawn. Bloodmoon.esm: 13 of 215
+  NPCs and 3 of 75 creatures. So most of the island's people stay dead once killed; the wild creatures come back
+  through the levelled lists.
+- **Essential characters (v0.0.66).** When an actor whose record is flagged essential dies, by any cause (a fight, a
+  spell, a fall or a script), the game's own sKilledEssential text is shown in a message box, once per death (OpenMW
+  0.51 mwmechanics/actors.cpp). Play goes on; loading a save is the player's choice.
 - **Saves made with other game data.** The save names the content files it was made with, and every reference it
   changed by the game's identity (the content file and the reference number, as in the first part) with a hash of the
   reference's record id. The builder writes a table of every placed reference with its record hash and its respawn flag
@@ -319,9 +520,50 @@ respawn) are back after 2,900 game hours and a trip to the tradehouse; an imperi
 back; Fargoth (not flagged) stays dead. The town's levelled creatures are not spawned on that MiniWind (the outdoor
 actor table is off by default), so the levelled case is checked by the native tests only.
 
-Not yet: corpses are not cleared away after fCorpseClearDelay (a body stays until it respawns or a script removes
-it), and the actor block's other parts (spell effects, soul gems, packages) are taken over as saved. The save import
+Not yet: the actor block's other parts (spell effects, soul gems, packages) are taken over as saved. The save import
 above builds on this list.
+
+Eighth part (v0.0.66): script values by their variable's name, and the items' script values
+([SAVE-SCRIPT-ROW-HINT-ONLY-65](BUGS.md), [SAVE-ITEM-SCRIPT-LOCALS-66](BUGS.md)).
+
+- **Variables by name.** The compiled scripts name every script's variables (a key per variable: a hash of its name
+  folded to lower case and its type). Every saved value carries its variable's key, and every script with saved values
+  a signature of its variables (their names and types in order). While a script's variables are as saved, a value goes
+  back by its slot; when a rebuilt script has a variable inserted, removed, moved or retyped, each value goes to the
+  variable of its name, converted between whole numbers and floats as the original engine's rule does (a float made a
+  whole number is cut toward zero, a short keeps 16 bits). A value whose variable no longer exists is left out; the load
+  says in one line how many went by name and how many were left out (OpenMW 0.51 restores a reference's locals by name
+  the same way).
+- **Script identity.** A saved script is found by the hash of its name, its saved row only tried first; a script whose
+  row moved is found with one read of every row's name hash. Two names that share a hash are never mixed: the builder
+  refuses a script file in which two scripts, two globals, two quests or two worn items' ids share one, and two
+  variables of one script that share one are saved without a name, so they go back only while the script is unchanged.
+- **Items' script values.** The values of an item's script are saved with the item, by its holder (the player, or the
+  container, NPC or creature that holds it), its item id and its instance (one instance per item kind until items are
+  kept one by one): before v0.0.66 they were not saved at all. An item a container or an actor holds keeps its values
+  between visits once its script changed one; an item the player wears keeps its values across map changes (they were
+  dropped at every door) and, after a load, runs its script again if it is still carried, so a one-time message or
+  effect does not repeat.
+- **Saved form.** The list's eighth form is written only when a value keeps a name, a script a signature or an item a
+  value; every earlier save loads, its values by their slot as before.
+
+**The settled capture boundary (v0.0.66, [SAVE-INSIDE-SCRIPT-STEP-66](bugs/SAVE-INSIDE-SCRIPT-STEP-66.md)).** A save is
+taken only between script steps. While the frame's script tick or a dialogue answer's result script runs, a gameplay
+transaction may be half done (an item moving, a reward being given), so a save asked for then (a console command a
+script's message box lets through, the save menu) is queued, not taken: the line says so, and the save is written at the
+first following frame that is outside a script step and has no load waiting, with the usual Saved line. The autosave
+already waited for a settled state; the recorder's starting save and the debug snapshot refuse while a step runs.
+
+**Every part or none (v0.0.66, [SAVE-EXPORT-FAILURE-ACCEPTED-65](BUGS.md)).** A save is written only when every part of
+it was kept: the changed actor records, the scripts' values, globals, quest stages and known topics, the references'
+identities, the actors' and the objects' changes, the actor block, the dated journal. When one cannot be kept (no
+memory, a table at its bound, a name table that cannot be read), or the world change list refuses a row while the save
+is taken, the save is refused with one line naming the part: nothing of it is written, the previous save stays as it
+was, and the game goes on unchanged. A native test runs the save with each part made to fail in turn. The actor
+block's own parts (the spell effects, the things sold, the made spells and items, the soul gems, the faction reactions,
+the revealed places, the topic pages, the forced sneak and run, the scripted weather, the crime marks, the werewolf
+state, the moved placements, the packages) each name themselves, so the line says which of them could not be kept; a
+part that only wanted a bigger block is not a refusal (the block grows first).
 
 ## Magic, items and effects in saved games (v0.0.61)
 
@@ -335,6 +577,93 @@ above builds on this list.
   (feature bit 256) still load. The player's items keep their condition and charge, and recharge over time; an NPC
   weapon's charge is kept for the session only.
 - **Starting spells** are chosen once, when the character is made, and kept with the character.
+
+## The actor block, the saved actor rows and the explored map (v0.0.66)
+
+- **The actor block is a setting.** The block that holds the dead counts, the standing and crime marks, the known
+  topics, the spell effects, the made spells and items, soul gems, sold items, the scripts' weather and movers and the
+  actors' packages is `aw_save_block_kb` in `config/game.cfg`: 64 KB by default (it was a fixed 32 KB), 32 to 256
+  (values outside are clamped, a value that is not a number reads as 64). Its buffer is taken only while a game is
+  saved, and a buffer of the loaded block's own size only while a load waits for its scene; before, two fixed 32 KB
+  buffers were held for the whole game. A save made with any earlier version (its block at most 32 KB) still loads.
+  A block that needs more than the setting refuses the save with a line naming the setting; the previous save stays.
+- **The explored map has a section of its own** (feature bit 4096), as long as it needs. Before, the explored land
+  was written into the actor block, and a well explored map with a full block refused the whole save. A save never
+  cuts the land: every explored cell is written (5 bytes for a fully explored one, 13 for the others); the rooms
+  follow. Saves made by the earlier v0.0.66 builds keep it in the actor block and still load. A well explored game
+  (1,752 cells, 300 rooms) takes 20,268 bytes.
+- **More rooms remembered.** The explored part of 2,048 rooms is kept (it was 256: a room visited after the 256th never
+  cleared on the local map, its doors hidden). That covers every room of the base game and both expansions (about
+  1,750). A room costs 52 bytes in memory (its name, its 16 x 16 squares and its share of the name index); the local
+  map finds a room by its name index once a frame instead of 256 searches of every name.
+- **The saved actor rows** hold, for every NPC and creature of every place, what no other part of the save holds: for
+  an actor of the game data, its greetings (how often it has greeted the player, and whether it has); its place,
+  facing, health and death are in the world change list and the actor records (above). For a role the builder made
+  (the intro's), the row also holds its place and health. An actor with nothing to keep has no row, and a row whose
+  greetings are back at the game data's goes. The rows are taken when a place is left (a door, a crossing, a
+  teleport), when the actor window lets an actor go, and at the save, so a place left long ago is as it was left.
+  There is no fixed number any more (it was 256 rows: the 256th row stopped the capture of the rest of that place and
+  the save went on without them); the rows grow as needed. A capture that memory refuses says so on the console and
+  the save it belongs to is refused.
+- **The rows' saved form** (feature bit 8192): per place its save ID and its rows, each row a 3-byte reference, a
+  byte saying what follows, then only that (the place in whole units, the facing in 1.4 degree steps, the health,
+  the greeting counts). A greeted NPC takes 4 to 6 bytes (5.7 on average with the places counted), a builder's role 11
+  to 15, the most a row can take 25; the earlier form took 48 bytes for every row. 2,720 rows (2,700 greeted NPCs and
+  20 roles) take 15,541 bytes. Saves of the earlier form still load, and a row in an expansion's room no longer refuses
+  the save (the earlier form's place range ended before the expansions' rooms).
+- **Memory.** The two fixed 32 KB buffers and the fixed 256-row tables in the five resident copies of the saved game
+  held 126,936 bytes for the whole game; they are gone. What is held now: the explored map (12 bytes a cell, 52 a
+  room, both in blocks of 64), the saved actor rows (48 bytes a row, in blocks of 64), and while a save is written or a
+  load waits, the actor block, the explored map's section and the rows' copy.
+- **Sizes measured** (the codec's test, synthetic data): a fresh save 852 bytes; with a full 64 KB actor block and the
+  well explored map above, 86,760 bytes.
+
+## Bounds above the game (v0.0.66)
+
+Every fixed count in the save is now a guard above the game's own counts with both expansions, never a cap play can
+reach: the world change list's actor rows 32,768 (the game places about 13,800 actor references; was 8,192;
+[SAVE-ACTOR-ROWS-BOUND-UNDER-GAME-66](bugs/SAVE-ACTOR-ROWS-BOUND-UNDER-GAME-66.md)) and saved script locals 65,536 (the
+base game declares 7,388; was 8,192; [SAVE-LOCALS-BOUND-UNDER-GAME-66](bugs/SAVE-LOCALS-BOUND-UNDER-GAME-66.md)); made
+spells, enchanted items and potions, and filled soul gems 1,024 each (were 64, the 65th refused; the first 255 of each
+stay in the blocks older builds read, the rest ride in blocks of their own;
+[SAVE-MADE-RECORDS-64-CAP-66](bugs/SAVE-MADE-RECORDS-64-CAP-66.md)); the explored land rows 8,192
+(under 1,600 land cells); the map markers' allowance up to 4,096 with 256 the default. The NPCs' crime marks grow from
+32 rows by doubling to 1,024 (was 32 fixed: the 33rd witness took a bystander's row, and a save held at most 32;
+[SAVE-CRIME-MARKS-32-ROWS-66](bugs/SAVE-CRIME-MARKS-32-ROWS-66.md)), the places a script reveals on the map from 128 to
+1,024 (the dialogue results alone call ShowMap 249 times;
+[SAVE-REVEALED-PLACES-128-CAP-66](bugs/SAVE-REVEALED-PLACES-128-CAP-66.md)), both with their first 255 in the blocks
+older builds read and the rest in blocks of their own; the scripts' region weather rows 32 (was 8, under the three
+masters' 16 regions). The actors' travel and follow packages keep their 255 as a guard (128 slots and 64 pending
+packages cannot reach it); a package of an actor without a stable reference cannot be found again after a load and is
+not saved. Each raise is a declared worst case in the resident registry's budget, with its reason; the rows cost memory
+only while kept.
+
+## Item instances: two copies of one kind kept apart (v0.0.66)
+
+The player's items are counted per kind, with one condition and one charge per kind: two iron longswords, one worn down
+in a fight and one new, could not be told apart, a copy picked up with a different condition from the carried ones was
+refused, and a weapon or shield could be equipped only when exactly one was carried
+([SAVE-ITEM-INSTANCES-ONE-PER-KIND-66](bugs/SAVE-ITEM-INSTANCES-ONE-PER-KIND-66.md)). Since v0.0.66 a kind's count stays
+one number and ordinary identical copies stay a stack; a copy whose state differs becomes an **instance** of its own:
+
+- An instance is one copy (or several equal copies) of a kind with its own condition or charge, or simply the copy a slot
+  wears or the magic selection names. It takes its serial from the same allocator as the dropped items, so a copy dropped
+  on the ground is the same thing when picked up again. The sum of a kind's instances never passes its count; a kind that
+  loses its last copy loses its instances; an instance whose state equals the plain copies' and that nothing names
+  merges back into the stack.
+- Equipping a copy of a kind with several copies makes that copy an instance, so a blow lands on the worn copy alone; the
+  slot remembers which copy it wears across a save. Spending a selected enchanted item's charge does the same for the
+  selected copy; the instances recharge with the rest.
+- Dropping takes the plain copies first, then one instance at a time with its condition; picking up a copy whose
+  condition differs from the carried plain ones makes it an instance instead of refusing it.
+- The save writes the instances, the slots' copies and the selection's copy as their own section (feature bit 16384),
+  only when there is one, so a save without instances is byte for byte as before; an older build refuses such a save
+  rather than merging the copies. Kept by the two-swords test (`tests/aga_item_instances_test.c`): two swords through a
+  blow, a save and a load (the loaded game saves again to the same bytes), a drop and a pickup, merged when alike.
+- A scripted copy's own local variables: the carried script runs for the worn copy, so its values are saved under that
+  copy's instance serial (0 for a plain copy, and for an item a placed holder holds). After a load the values go back
+  only while that copy is still the player's instance of that kind; a copy dropped, merged or given away since does not
+  pass its values to another copy. An item's ownership (stolen) stays by kind and owner on the world change list.
 
 ## References inspected
 

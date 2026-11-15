@@ -98,6 +98,25 @@ int main(void){
     AW_JHistMove(&h,&back);assert(h.count==3 && !back.count && !back.entry);
     AW_JHistClear(&h);AW_JHistClear(&back);
     lower_index_test();
+    /* SAVE-STATE-FIXED-CAPS-66: the 32-quest, 256-entry copy of aw_state.h is NOT a cap on play. The scripts' Journal
+     * goes to the dated history first (aw_mwhost.c host_journal_set) and the copy is written only for older readers,
+     * its refusal ignored: here the copy is full after 32 quests of 8 stages, its 257th entry is refused, and the
+     * history takes that entry and 300 more, and its saved form carries them all. */
+    {static aw_state_t full;static aw_jhist_t hist;static unsigned char big[8+600*16];int q,s,kept,r;
+     memset(&full,0,sizeof(full));memset(&hist,0,sizeof(hist));
+     for(q=0;q<32;q++)for(s=1;s<=8;s++){
+         sprintf(id,"cap_quest_%02d",q);
+         assert(AW_JournalAdd(&full,id,s) && AW_JHistJournal(&hist,AW_LedgerNameHash(id),s-1,s,1,q,1000*s)==(AW_JH_RAISE|AW_JH_NOTICE));
+     }
+     assert(full.journal_count==AW_JOURNAL_ENTRIES && hist.count==256);
+     assert(!AW_JournalAdd(&full,"cap_quest_00",9));          /* the copy is full: refused (and ignored by the host) */
+     kept=8;r=AW_JHistJournal(&hist,AW_LedgerNameHash("cap_quest_00"),kept,9,1,40,0);
+     assert((r&AW_JH_RAISE) && hist.count==257);                /* the history keeps the 257th */
+     for(q=32;q<62;q++)for(s=1;s<=10;s++){sprintf(id,"cap_quest_%02d",q);assert(AW_JHistJournal(&hist,AW_LedgerNameHash(id),s-1,s,1,50+q,0)&AW_JH_RAISE);}
+     assert(hist.count==557 && full.journal_count==AW_JOURNAL_ENTRIES);
+     n=AW_JHistEncode(&hist,NULL,0);assert(n==8+557*AW_JHIST_ENTRY_BYTES && AW_JHistEncode(&hist,big,n)==n);
+     assert(AW_JHistDecode(big,n,&back) && back.count==557 && back.entry[256].stage==9 && back.entry[256].days==40);
+     AW_JHistClear(&hist);AW_JHistClear(&back);}
     puts("aga_jhist_test ok");
     return 0;
 }

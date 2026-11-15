@@ -140,7 +140,7 @@ class TableTests(unittest.TestCase):
 
     def test_arrival_order(self):
         self.assertEqual(self.rows['Ald-ruhn'], {'name': 'Ald-ruhn', 'x': -15000, 'y': 53000, 'z': 2400 + T.LIFT,
-                                                 'flags': T.F_HAS_Z | T.F_COC, 'cells': 1, 'map': ''})
+                                                 'flags': T.F_HAS_Z | T.F_COC, 'cells': 1, 'map': '', 'id': ''})
         seyda = self.rows['Seyda Neen']
         self.assertEqual((seyda['x'], seyda['y'], seyda['z'], seyda['flags']),
                          (-17000, -73000, 300 + T.LIFT, T.F_HAS_Z | T.F_DOOR))
@@ -152,7 +152,7 @@ class TableTests(unittest.TestCase):
         self.assertEqual(self.report['arrivals'], {'coc_marker': 1, 'door': 3, 'cell_middle': 1})
 
     def test_file_layout(self):
-        self.assertEqual(self.raw[:8], b'AWTP\x00\x02\x00\x60')
+        self.assertEqual(self.raw[:8], b'AWTP\x00\x03\x00\x80')
         self.assertEqual(len(self.raw), T.HEADER + 5 * T.ROW)
         with self.assertRaises(ValueError):
             T.read_table(self.raw[:-1])
@@ -184,7 +184,7 @@ class RoomRowTests(unittest.TestCase):
         by = {r['name']: r for r in rows}
         self.assertEqual(by["Arrille's Tradehouse (interior)"],
                          {'name': "Arrille's Tradehouse (interior)", 'x': 0, 'y': 0, 'z': 0, 'flags': T.F_ROOM,
-                          'cells': 0, 'map': 'ri0123abcd'})
+                          'cells': 0, 'map': 'ri0123abcd', 'id': ''})
         # a room of an outdoor place's name never clashes with it
         self.assertEqual(by['Seyda Neen (interior)']['map'], 'seyda_cellar')
         self.assertEqual(by['Seyda Neen']['flags'], T.F_HAS_Z | T.F_DOOR)
@@ -207,7 +207,7 @@ class RoomRowTests(unittest.TestCase):
         self.assertEqual([(r['name'], r['map']) for r in rows], [('Balmora', ''), ('Ald-ruhn', '')])
         data, report = T.add_rooms(old, {'andrano ancestral tomb': 'ri8c361151ce'},
                                    {'andrano ancestral tomb': 'Andrano Ancestral Tomb'})
-        self.assertEqual(data[:8], b'AWTP\x00\x02\x00\x60')
+        self.assertEqual(data[:8], b'AWTP\x00\x03\x00\x80')
         self.assertEqual([r['name'] for r in T.read_table(data)],
                          ['Ald-ruhn', 'Andrano Ancestral Tomb (interior)', 'Balmora'])
 
@@ -223,6 +223,13 @@ class RuleTests(unittest.TestCase):
     def test_search_keys_clicks_and_the_table_reader(self):
         import test_aga_native_source as native
         native.NativeSourceTests().compile_run('aga_listbox_test.c', [SRC / 'aw_listbox_rules.c'], cflags=UBSAN)
+
+    def test_names_list_paged_rows_and_the_heap_test(self):
+        """v0.0.66: the names list whole and paged give the same rows; 100 opens and closes (and across an area
+        change) leave the heap's total free and largest free block unchanged to the byte."""
+        import test_aga_native_source as native
+        native.NativeSourceTests().compile_run('aga_tpnames_test.c', [SRC / 'aw_listbox_rules.c'], cflags=UBSAN,
+                                               defines=('AW_TP_ALLOC=test_alloc', 'AW_TP_FREE=test_free'))
 
 
 def code(name):
@@ -240,8 +247,11 @@ class EngineWiringTests(unittest.TestCase):
 
     def test_the_table_is_read_only_while_the_box_is_open(self):
         places = code('aw_tpplaces.c')
-        self.assertIn('static void closed(void *ctx){\n    (void)ctx;free(table);table=NULL;rows=0;\n}', places)
-        self.assertIn('AW_TryMalloc((unsigned long)size)', places)
+        # v0.0.66: only the names list is held while open (one block, freed on close); a row's details on choose
+        self.assertIn('(void)ctx;AW_TpNamesClose(&names);rows=0;', places)
+        self.assertIn('AW_TpNamesOpen(&names,f,base,size,whole)', places)
+        rules = code('aw_listbox_rules.c')
+        self.assertEqual(rules.count('AW_TP_ALLOC(need)'), 1)     # the one allocation, freed by AW_TpNamesClose
         self.assertIn('AW_TpPlacesCommand(&p,command,sizeof(command))', places)
         box = code('aw_listbox.c')
         self.assertIn('free(shown);shown=NULL;active=0;', box)
@@ -266,7 +276,7 @@ class EngineWiringTests(unittest.TestCase):
         make = (ROOT / 'engine' / 'aga' / 'Makefile').read_text(encoding='utf-8')
         self.assertIn('aw_msgbox.c aw_listbox_rules.c aw_listbox.c aw_tpplaces.c', make)
         build = (ROOT / 'tools' / 'build_aga.py').read_text(encoding='utf-8')
-        self.assertIn("tp_places_step(args.data_files, boot/'id1', out, jobs=jobs)", build)
+        self.assertIn("tp_places_step(args.data_files, boot/'id1', out, jobs=jobs, chim_world=", build)
         self.assertEqual(code('aw_tpplaces.c').count('"tp-places.lut"'), 1)
         self.assertEqual(T.NAME, 'tp-places.lut')
 

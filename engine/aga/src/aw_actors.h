@@ -73,6 +73,8 @@ void AW_ActorsPlacedStatus (void);
 int AW_CombatSlotState (edict_t *e, float *health);
 /* aw_combat.c: a test fight with this resident (dead: it dies at once) */
 int AW_CombatTestEngage (edict_t *t, int dead);
+/* aw_combat.c: a saved death laid down again as a corpse (no essential message); 0 when it has no combat slot */
+int AW_CombatLayCorpse (edict_t *t);
 /* aw_combat.c: a fighter's health (a resumed fight); 0 when it has no combat slot */
 int AW_CombatSetHealth (edict_t *e, float health);
 /* aw_combat.c: the resident's combat slot is let go (before its edict is freed) */

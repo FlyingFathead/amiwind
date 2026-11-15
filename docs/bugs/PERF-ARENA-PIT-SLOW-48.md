@@ -4,7 +4,7 @@
 
 ## PERSISTING: reported 2 times; something has to be done
 
-- Reported with v0.0.54-dev1 at 2026-10-27 17:45 +0200: PERSISTING (27 October 2026): the maintainer, on TG 17:31 +0200: the Arena Pit draws a lot of unseen geometry (the upper balconies and far tiers) and tanks the frame rate. Taken by the streaming worker.
+- Reported with v0.0.54-dev1 at 2026-10-27 17:45 +0200: PERSISTING (27 October 2026): the maintainer (17:31 +0200): the Arena Pit draws a lot of unseen geometry (the upper balconies and far tiers) and tanks the frame rate. Taken by the streaming worker.
 - Reported with v0.0.54-dev1 at 2026-10-27 23:25 +0200: Again on v0.0.54-dev1 (27 October 2026): reported by the maintainer at 17:31 +0200; the cause was found at 17:45 +0200 by the streaming worker (an A/B is in progress).
 
 <!-- END GENERATED PERSISTING -->
@@ -167,6 +167,7 @@ Family: Rendering cost and visibility (`render-performance`). Read the visibilit
 - [NPC-TARGET-REDUNDANT-31](NPC-TARGET-REDUNDANT-31.md): NPC targeting runs 2-4 times per frame and checks every NPC
 - [POLYCOUNT-CAMPS-ALDRUHN-57](POLYCOUNT-CAMPS-ALDRUHN-57.md): The Ashlander camps and central Ald'ruhn are the hottest cells of the polycount heatmap: the yurts alone carry about half of a camp's faces
 - [PRISON-SHIP-RENDER-COST-56](PRISON-SHIP-RENDER-COST-56.md): The prison ship's hold draws slower than the Vivec Arena Pit: frame rate dips in the opening room
+- [PRISON-SHIP-SHELL-ONE-MODEL-66](PRISON-SHIP-SHELL-ONE-MODEL-66.md): The prison ship hold's shell is one brush model whose box is the whole room: all its 7,997 faces are tested at every heading, though at most headings a few hundred are on screen
 - [RENDER-BMODEL-FRAGMENTS-32](RENDER-BMODEL-FRAGMENTS-32.md): Brush models spanning many terrain leaves are clipped face by face down the terrain BSP
 - [RENDER-EDGECACHE-SEYDA-32](RENDER-EDGECACHE-SEYDA-32.md): No edges are reused between frames in Seyda Neen views
 - RENDER-SURFACE-CAP-DROPS-FACES-64 (no report page): The renderer posts at most 800 surfaces and 2,400 edges a frame and drops further faces silently, so a dense view such as a Solstheim forest loses most of its faces

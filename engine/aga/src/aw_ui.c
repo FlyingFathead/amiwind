@@ -725,6 +725,10 @@ static void hud_equipment_boxes(int y,int boxes) {
 int (*aw_combat_enemy_bar)(float *fraction,float *alpha);   /* aw_combat.c */
 int (*aw_breath_bar)(float *fraction,int *flashing);        /* aw_breath.c (UNDERWATER-BREATH-62) */
 int (*aw_combat_guard_marker)(void);   /* aw_combat.c: the player guards (hold to block) */
+/* HUD-ACTIVE-EFFECTS-ROW-64 (aw_fxrow.c): the active effects' icons right of the boxes, under the view */
+void (*aw_hud_effects_draw)(void);
+/* NAV-HOT-MARKER-COMPASS-66 (aw_worldui.c, aw_compass): the compass strip at the top of the view */
+void (*aw_hud_compass_draw)(void);
 void AW_UIHud(void) {
     float current[3]={100,100,100},maximum[3]={100,100,100};
     int i,boxes,y=vid.height-26-hud_lift();
@@ -743,6 +747,8 @@ void AW_UIHud(void) {
     if(boxes&AW_HUD_STATS)
         for(i=0;i<3;i++)AW_UIBar(8,y+i*8,75,7,i,maximum[i]>0?current[i]/maximum[i]:0);
     hud_equipment_boxes(y,boxes);
+    if(aw_hud_effects_draw && (boxes&AW_HUD_STATS))aw_hud_effects_draw();
+    if(aw_hud_compass_draw && (boxes&AW_HUD_STATS))aw_hud_compass_draw();
     {float fraction,alpha;if(aw_combat_enemy_bar && aw_combat_enemy_bar(&fraction,&alpha))AW_UIEnemyBar(fraction,alpha);}
     /* UNDERWATER-BREATH-62: the breath bar while the head is under water without Water Breathing (OpenMW 0.51
      * openmw_hud.layout "DrowningFrame": a red bar at the top of the view, in the middle; it flashes once the breath is

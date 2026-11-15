@@ -82,6 +82,19 @@ def shell_map(lo, hi, entities, textures=()):
     return F.brush_image(lumps)[0]
 
 
+BEHAVES_EXTERIOR = 0x80          # cell flag: an interior that behaves like an exterior (Mournhold's districts)
+
+
+def sky_keys(cell):
+    """Worldspawn keys of a room whose cell behaves like an exterior (flag 0x80, Mournhold's five districts): the shared
+    sky every exterior map names (exterior_sky_build), so the engine draws the day and night sky over the open room
+    (R_SetSkyBackground reads _aw_sky_mode) instead of the interior black. Every other room: none (unchanged)."""
+    if not int(cell.get('flags') or 0) & BEHAVES_EXTERIOR:
+        return []
+    from exterior_sky_build import SHARED_SKY_PATH
+    return ['"_aw_sky_mode" "exterior"', '"_aw_sky_asset" "%s"' % SHARED_SKY_PATH]
+
+
 def water_plane(water, low, high):
     """(water height or None, room box top, note or None) of a room whose cell has WATER (Morrowind units) and whose
     box spans LOW..HIGH (Quake units, EDGE outside its placements). Water under everything the room places: nothing
@@ -99,6 +112,35 @@ def water_plane(water, low, high):
     return water, high, None
 
 
+def leave_out_liquids(refs, omitted, pools):
+    """(REFS, OMITTED) with the placements POOLS draw as liquid (lava.room_pools_of rows) moved from REFS to OMITTED:
+    a molten pool is drawn as its liquid only. The lava pools' activators are left out by their names already
+    (mwad.interior.EFFECT_ACTIVATOR, 'in_lava'), so this moves only a pool not named so: Sotha Sil's hot oil
+    (act_hot_oil_512), whose mesh would otherwise lie over its own liquid (LAVA-POOL-NOT-LAVA-NAMED-66)."""
+    liquid = {p['reference'] for p in pools}
+    if not liquid & {r['number'] for r in refs}:
+        return refs, omitted
+    return ([r for r in refs if r['number'] not in liquid],
+            omitted + [{'reference': r['number'], 'id': r['id'], 'reason': 'molten pool drawn as liquid'}
+                       for r in refs if r['number'] in liquid])
+
+
+def effect_models(parts):
+    """The models of a failed scenery export in PARTS whose only error is that the converter finds no drawn static
+    triangles in them (prepare_scenery.model_geometry's refusal; prepare_scenery.export_refs writes
+    conversion-errors.json before it refuses the incomplete room); empty when the export failed for anything else, so
+    that refusal stands. (The refusal's text is written here, not as a module constant: this module's import-time code
+    is in the keys of every room stage that imports shell_map.)"""
+    no_triangles = 'No supported visible static triangles'
+    try:
+        errors = json.loads((Path(parts) / 'conversion-errors.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return set()
+    if not errors or any(e.get('error') != no_triangles for e in errors):
+        return set()
+    return {e['source'] for e in errors}
+
+
 def build_shell(task, jobs=1):
     """One room unit (worker): the room's scenery export, kept placements, plant sprites and shell map into
     ROOT/area-work/<map>/. Returns (report, cell). Raises ValueError naming the room on anything it cannot convert.
@@ -111,6 +153,7 @@ def build_shell(task, jobs=1):
     from mwad.audit import BSA
     from mwad.interior import select_geometry
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     from prepare_area import interior_visual_profile, spawn_entrance
     from prepare_scenery import export_refs
     slug = entry['map']
@@ -120,6 +163,18 @@ def build_shell(task, jobs=1):
     root = Path(scene) / 'area-work' / slug
     root.mkdir(parents=True, exist_ok=False)
     refs, omitted = select_geometry(cell)
+    # Water and lava, as the room converter makes them (prepare_area.build_room): the pools from the game data
+    # (tools/lava.py, --lava quake) with their glow lights, the water plane at the cell's water height. The CHIM
+    # interiors stage makes the room's liquids from the room.map brushes and the shell's own textures
+    # (chim.interior.room_liquids, liquid_world). A pool whose layers are not named lava (Sotha Sil's hot oil) is a
+    # pool by its flowing layers (lava.room_pools_of; LAVA-POOL-NOT-LAVA-NAMED-66)
+    import lava as lava_rules
+    from mwad.paths import child_ci
+    from mwad.masters import master_path
+    lava_mode = lava_rules.lava_mode()
+    pools = (lava_rules.room_pools_of(data, cell['refs'], lava_rules.molten_objects_of(master_path(data)))
+             if lava_mode == 'quake' else [])
+    refs, omitted = leave_out_liquids(refs, omitted, pools)
     if not refs:
         raise ValueError('%s (%s): no placement to convert' % (slug, cell['name']))
     profiles = {}
@@ -134,7 +189,8 @@ def build_shell(task, jobs=1):
         from prepare_scenery import bsa_read, nif_reader
         from prepare_tree_sprites import collision_metadata
         from world_flora import flora_kind
-        bsa = BSA(child_ci(data, 'Morrowind.bsa'))
+        from mwad.archives import layered_bsa      # the selected masters' archives (ASSETS-ARCHIVE-ORDER-32)
+        bsa = layered_bsa(data)
         reader, collisions = nif_reader(), {}
 
         def collision_of(model):
@@ -150,21 +206,35 @@ def build_shell(task, jobs=1):
     groups = {slug: {'references': [r['number'] for r in refs], 'visual_profiles': profiles}}
     refs = [dict(r, scene_groups=[slug]) for r in refs]
     lighting = cell_lighting(cell)
-    # Water and lava, as the room converter makes them (prepare_area.build_room): the pools from the game data
-    # (tools/lava.py, --lava quake) with their glow lights, the water plane at the cell's water height. The CHIM
-    # interiors stage makes the room's liquids from the room.map brushes and the shell's own textures
-    # (chim.interior.room_liquids, liquid_world)
-    import lava as lava_rules
-    from mwad.paths import child_ci
-    lava_mode = lava_rules.lava_mode()
-    pools = (lava_rules.pools_of(data, cell['refs'], lava_rules.molten_objects_of(child_ci(data, 'Morrowind.esm')))
-             if lava_mode == 'quake' else [])
     if pools:
         lighting = {**lighting, 'lights': list(lighting.get('lights', [])) +
                     [light for p in pools for light in lava_rules.glow_lights(p['hull'], p['top'])]}
     parts = root / 'source'
-    export_refs(data, parts, refs, groups, [0, 0, 0], 8192, 128, {'cell': cell['name'], 'lighting': lighting},
-                jobs=max(1, int(jobs)))
+    try:
+        export_refs(data, parts, refs, groups, [0, 0, 0], 8192, 128, {'cell': cell['name'], 'lighting': lighting},
+                    jobs=max(1, int(jobs)))
+    except ValueError:
+        # an effect model the converter finds no drawn static triangles in (Sotha Sil's "Sotha Alma Appear Effect",
+        # meshes/amalexia_summon.nif: a summoning effect a script enables) is no scenery: it is left out of the room's
+        # statics, each one counted in the room's omitted list, instead of refusing the room
+        # (ROOM-EFFECT-MODEL-NO-TRIANGLES-66). Any other export error still refuses the room, named.
+        effects = effect_models(parts)
+        dropped = [r for r in refs if r.get('type') != 'DOOR' and
+                   'meshes/' + r['model'].replace('\\', '/').lower() in effects]     # the export's own model names
+        if not effects or not dropped:
+            raise
+        numbers = {r['number'] for r in dropped}
+        omitted = omitted + [{'reference': r['number'], 'id': r['id'],
+                              'reason': 'effect model without drawn static triangles: ' + r['model']} for r in dropped]
+        refs = [r for r in refs if r['number'] not in numbers]
+        if not refs:
+            raise ValueError('%s (%s): no placement to convert but effect models' % (slug, cell['name']))
+        groups[slug]['references'] = [n for n in groups[slug]['references'] if n not in numbers]
+        _log('%s (%s): %d effect placements without drawn static triangles left out of the statics (%s)' % (
+            slug, cell['name'], len(dropped), ', '.join(sorted(effects))))
+        shutil.rmtree(parts)
+        export_refs(data, parts, refs, groups, [0, 0, 0], 8192, 128, {'cell': cell['name'], 'lighting': lighting},
+                    jobs=max(1, int(jobs)))
     index = json.loads((parts / 'scenery-index.json').read_text())
     if index['errors']:
         raise ValueError('%s (%s): %s' % (slug, cell['name'], index['errors']))
@@ -203,7 +273,8 @@ def build_shell(task, jobs=1):
         if pools:
             from mwad.audit import BSA
             from npc_geometry import Assets
-            assets = Assets(Path(data), BSA(child_ci(data, 'Morrowind.bsa')))
+            from mwad.archives import layered_bsa
+            assets = Assets(Path(data), layered_bsa(data))
             layers = max((p['layers'] for p in pools), key=len)
             liquid_textures += [m for _, _, m in lava_rules.wad_entries(assets.texture, layers, tile)]
     lava_brushes, lava_entities, lava_records = lava_rules.map_parts(pools, [0, 0, 0], 0.25)
@@ -222,7 +293,7 @@ def build_shell(task, jobs=1):
     from prepare_npcs import quote
     label = cell['name'].removeprefix('Seyda Neen, ').removeprefix('Balmora, ')
     world = ['"classname" "worldspawn"', '"message" ' + quote(label), '"%s" "1"' % SHELL_KEY] + \
-        ([timings] if timings else [])
+        sky_keys(cell) + ([timings] if timings else [])
     entities = ['{\n' + '\n'.join(world) + '\n}',
                 entity_text({'classname': 'info_player_start', 'origin': ' '.join(map(str, spawn)), 'angle': yaw})]
     entities += lava_entities
@@ -258,6 +329,7 @@ def build_shell(task, jobs=1):
               'start_rule': start_rule, 'placements': len(placements), 'references': len(index['references']),
               'omitted': omitted, 'water_height': water, **({'water_note': water_note} if water_note else {}),
               'lava': {'mode': lava_mode, 'pools': lava_records},
+              **({'sky': 'exterior'} if sky_keys(cell) else {}),
               'bounds': [list(map(float, lo)), list(map(float, hi))], 'master_sha256': cell['master_sha256'],
               'bytes': (root / 'room.bsp').stat().st_size}
     if plant_report is not None:
@@ -383,12 +455,68 @@ def convert(data, scene, rooms, timings, jobs, refresh=None):
     return results
 
 
+EXTERIOR_LIKE_STATE = 'an exterior-like cell, waiting for the Mournhold exterior work'
+
+
+def exterior_like_rooms(data, rooms, masters=None):
+    """(rooms to convert, [{cell, master, state}]) : the rows of ROOMS whose cell is flagged "behave like exterior"
+    (Tribunal's Mournhold plazas) are left out and listed (INTERIOR-NO-AMBI-66). For the original and the reference
+    engine they are exteriors: sky, the region's weather, the moving sun, no AMBI (OpenMW mwworld/scene.cpp: the
+    interior ambient only for a cell neither exterior nor quasi-exterior; worldimp.cpp updateWeather). Never a room
+    and never lit by a borrowed rule. The base game has none of them, so its rooms are unchanged. MASTERS: the
+    selected masters (default the build's, AMIWIND_MASTERS); the room census and the build preflight pass their own
+    (tools/actor_grounding_census.py room_selection), so they set aside exactly what this stage sets aside."""
+    from mwad.interior import exterior_like_cells
+    from mwad.masters import master_path, selected_masters
+    from mwad.paths import child_ci
+    masters = selected_masters(masters)
+    if len(masters) == 1 or not rooms:
+        return rooms, []
+    flagged = exterior_like_cells(master_path(data, masters).read_bytes())
+    if not flagged:
+        return rooms, []
+    origin = {}
+    for name in masters:
+        for key in exterior_like_cells(child_ci(Path(data), name).read_bytes()):
+            origin.setdefault(key, name)
+    keep, left = [], []
+    for row in rooms:
+        key = row['room'].casefold()
+        if key in flagged:
+            left.append({'cell': row['room'], 'master': origin.get(key, '?'), 'state': EXTERIOR_LIKE_STATE})
+        else:
+            keep.append(row)
+    return keep, left
+
+
+def empty_rooms(entries, cells):
+    """(entries to convert, {room: why}): a room whose cell holds no placement the room converter keeps
+    (mwad.interior.select_geometry: no scenery, only actors, or nothing at all) is no room to make. It is listed by
+    name with what the cell holds and how many doors lead in, never converted and never counted as refused
+    (ROOM-EMPTY-CELL-66: four expansion cells, "Mournhold, Royal Palace" with one NPC and "Sotha Sil,", "Vor Lair,
+    Chambers of Alta Vor" and "Vor Lair, Interior" with no reference at all; no door leads into any of them). CELLS:
+    {map: cell} as read_cells gives them (the doors into a room in 'entrances')."""
+    from mwad.interior import select_geometry
+    keep, empty = [], {}
+    for entry in entries:
+        cell = cells[entry['map']]
+        if select_geometry(cell)[0]:
+            keep.append(entry)
+            continue
+        live = [r for r in cell['refs'] if not r.get('deleted')]
+        held = ', '.join('%s %s' % (r.get('type'), r['id']) for r in live[:6]) + (', ...' if len(live) > 6 else '')
+        empty[entry['cell']] = ('empty in the game data: no placement the room converter keeps (%d references%s); '
+                                '%d doors lead in' % (len(live), ': ' + held if live else '', len(cell['entrances'])))
+    return keep, empty
+
+
 def read_cells(data, todo):
     """{map: cell} of the rooms to convert, read in one pass over the master; a room no exterior door leads into
     takes its arrivals from the interior doors into it (town_interiors.convert's rule), in a second pass."""
     from mwad.interior import read_interiors
     from mwad.paths import child_ci
-    master = child_ci(data, 'Morrowind.esm')
+    from mwad.masters import master_path
+    master = master_path(data)
     names = [e['cell'] for e in todo]
     cells = dict(zip((e['map'] for e in todo), read_interiors(master, names)))
     inner = [e for e in todo if not cells[e['map']]['entrances']]
@@ -423,9 +551,10 @@ def room_banks(data, scene, converted):
     from the door's mesh, target "-" (the image links it, room_batches.link_banks). Returns {map: doors}."""
     from mwad.interior import original_doors
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     from town_interiors import bank_row, bank_text, door_mesh_bounds, SCALE
     by_cell = {}
-    for door in original_doors(child_ci(data, 'Morrowind.esm').read_bytes()):
+    for door in original_doors(master_path(data).read_bytes()):
         if door['source_interior']:
             by_cell.setdefault(door['source_cell'].casefold(), []).append(door)
     wanted = [d for cell in converted.values() for d in by_cell.get(cell['name'].casefold(), [])]
@@ -462,6 +591,10 @@ def prepare(batches, data_files, scene, out, held_by=(), ffmpeg='ffmpeg', jobs=N
         raise ValueError('The repo has no room list (config/%s)' % room_batches.CONFIG)
     chosen = room_batches.parse_selection(batches, doc)
     rooms, held, refused = room_batches.plan(doc, chosen, held_by, root)
+    rooms, exterior_like = exterior_like_rooms(data, rooms)
+    for row in exterior_like:
+        _log('not converted: %s (%s): an exterior-like cell, waiting for the Mournhold exterior work'
+             % (row['cell'], row['master']))
     _log('batches %s: %d rooms to convert, %d left to other stages (%s), %d refused; %d workers' % (
         room_batches.selection_text(chosen), len(rooms), len(held), ', '.join(sorted(set(held.values()))) or 'none',
         len(refused), jobs))
@@ -485,12 +618,16 @@ def prepare(batches, data_files, scene, out, held_by=(), ffmpeg='ffmpeg', jobs=N
     if unclassified:
         ids = sorted({i for v in unclassified.values() for i in v})
         raise ValueError('%d resident NPCs in %d rooms have no grounding class (config/actor_grounding.json or '
-                         'config/actor_grounding_rooms.json; fix: python3 tools/actor_grounding_census.py --rooms '
+                         'config/actor_grounding_rooms.json, the expansions\' config/actor_grounding_rooms_layers.json; '
+                         'fix: python3 tools/actor_grounding_census.py --rooms '
                          '--data-files DATA --write-rooms; ROOM-BATCH-NPC-GROUNDING-48): %s; rooms: %s' % (
                              len(ids), len(unclassified), ', '.join(ids),
                              '; '.join('%s (%d)' % (r, len(v)) for r, v in sorted(unclassified.items()))))
     _log('preflight: every resident NPC of %d rooms has its grounding class (%.1f s)'
          % (len(entries), time.perf_counter() - t0))
+    entries, empty = empty_rooms(entries, cells)
+    for room, why in sorted(empty.items()):
+        _log('not converted: %s: %s' % (room, why))
     t0 = time.perf_counter()
     results = convert(data, work, entries, timings, jobs, refresh=lambda todo: {e['map']: cells[e['map']] for e in todo})
     units_seconds = time.perf_counter() - t0
@@ -544,11 +681,12 @@ def prepare(batches, data_files, scene, out, held_by=(), ffmpeg='ffmpeg', jobs=N
     if converted:
         import room_levelled
         from mwad.paths import child_ci
-        levelled = room_levelled.write(work / 'id1/maps', converted, child_ci(Path(data), 'Morrowind.esm'))
+        from mwad.masters import master_path
+        levelled = room_levelled.write(work / 'id1/maps', converted, master_path(Path(data)))
         if residents and levelled['maps']:
             residents['left_out'] = room_levelled.drop_placed(
                 residents['left_out'], levelled['maps'], converted,
-                room_levelled.list_index(child_ci(Path(data), 'Morrowind.esm')),
+                room_levelled.list_index(master_path(Path(data))),
                 levelled['mode'] == 'table', levelled['placed_mode'] == 'table')
             residents['levelled'] = {k: v for k, v in levelled.items() if k != 'maps'}
             (work / 'room-batches-residents.json').write_text(json.dumps(residents, indent=2) + '\n', encoding='utf-8',
@@ -585,10 +723,15 @@ def prepare(batches, data_files, scene, out, held_by=(), ffmpeg='ffmpeg', jobs=N
                           'total': round(time.perf_counter() - started, 3)},
               'source': 'game data; config/%s (the batches); the room converter\'s selection without its visual '
                         'world (tools/chim_room_batches.py)' % room_batches.CONFIG}
+    if exterior_like:
+        record['exterior_like'] = exterior_like       # only with the expansions: the base game has no such cell
+    if empty:
+        record['empty'] = empty                       # only with the expansions: every base game room holds scenery
     (out / RECORD).write_text(json.dumps(record, indent=1, sort_keys=True) + '\n', encoding='utf-8', newline='\n')
-    _log('%d rooms converted (%d made, %d from the unit cache), %d left to other stages, %d refused or failed; '
+    _log('%d rooms converted (%d made, %d from the unit cache), %d left to other stages, %d refused or failed%s; '
          '%d door banks; %.1f s (units %.1f s, residents %.1f s)' % (
-             len(rows), made, len(rows) - made, len(held), len(record['refused']), len(banks),
+             len(rows), made, len(rows) - made, len(held), len(record['refused']),
+             ', %d empty in the game data' % len(empty) if empty else '', len(banks),
              record['seconds']['total'], units_seconds, residents_seconds))
     if fallback['count']:
         _log('%d residents baked at a smaller animation level (alias byte budget): %s' % (

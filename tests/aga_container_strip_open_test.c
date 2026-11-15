@@ -77,7 +77,12 @@ void AW_CombatEquipmentChanged(void){}
 void IN_AWClearButtons(void){}
 int AW_UIColor(int r,int g,int b){return (r+g+b)&255;}
 void AW_UIBox(int x,int y,int w,int h){(void)x;(void)y;(void)w;(void)h;}
-void AW_UIFill(int x,int y,int w,int h,int c){(void)x;(void)y;(void)w;(void)h;(void)c;}
+/* INVENTORY-BROWSER-ARROWS-66: the fills land in a 320 x 200 picture, so the page arrows are checked by pixels */
+static unsigned char picture[200][320];
+void AW_UIFill(int x,int y,int w,int h,int c){
+    int i,j;
+    for(j=y;j<y+h;j++)for(i=x;i<x+w;i++)if(i>=0 && i<320 && j>=0 && j<200)picture[j][i]=(unsigned char)c;
+}
 void AW_UISmallBegin(void){}
 void AW_UISmallEnd(void){}
 void AW_UIText(int x,int y,const char *s,int c){(void)x;(void)y;(void)s;(void)c;}
@@ -183,6 +188,47 @@ static void run(int by_console){
     /* the contents stay on the world change list: a new map reads the data again with the deltas */
     level();assert(AW_ContainerCount(CHEST,"misc_quill")==0 && AW_ContainerCount(CHEST,"misc_inkwell")==0);
 }
+/* INVENTORY-BROWSER-ARROWS-66: the page arrows are the race page's triangles, read back from the picture. At 320 x 200
+ * the strip's cells start at y 122 (8 in view from x 12), so the 7 x 13 arrow boxes sit at (4,132) and (300,132):
+ * the tip column of a left arrow is x 4, its base x 10; the stub colours are (r+g+b)&255: gold 54, greyed 221 and the
+ * race page's highlight 133, the line above the box. Shown: the inventory side, MANY entries, the last one selected. */
+#define AX_LEFT 4
+#define AX_RIGHT 300
+#define AY 132
+enum {GOLD=(223+199+144)&255,GREYED=(84+76+61)&255,LIT=(54+47+32)&255};
+static int arrow_colour(int x){return picture[AY+6][x+3];}   /* the middle line, half way from tip to base */
+static int arrow_lit(int x){return picture[AY-1][x]==LIT && picture[AY+13][x+6]==LIT;}
+static void draw_picture(void){memset(picture,0,sizeof(picture));aw_cstrip_draw();}
+static void pointer_to(int x,int y){static int at_x=160,at_y=160;aw_cstrip_mouse(x-at_x,y-at_y);at_x=x;at_y=y;}
+static void page_arrows(void){
+    const aw_cstrip_list_t *l=AW_CStripList();int i;
+    /* the last page (the first draw sets the cells in view): right greyed (no more that way, although 'd' was the last
+     * key), left gold and not lit */
+    draw_picture();
+    assert(l->side==AW_CSTRIP_INVENTORY && l->selected[1]==MANY-1 && l->first[1]==MANY-8 && l->columns==8);
+    assert(arrow_colour(AX_RIGHT)==GREYED && arrow_colour(AX_LEFT)==GOLD && !arrow_lit(AX_LEFT) && !arrow_lit(AX_RIGHT));
+    /* the triangle's shape: the left one's tip a single pixel at x 4, its base 13 lines at x 10 */
+    assert(picture[AY+6][AX_LEFT]==GOLD && picture[AY+5][AX_LEFT]!=GOLD && picture[AY+7][AX_LEFT]!=GOLD);
+    for(i=0;i<13;i++)assert(picture[AY+i][AX_LEFT+6]==GOLD);
+    assert(picture[AY+6][AX_RIGHT+6]==GREYED && picture[AY][AX_RIGHT]==GREYED);   /* right: tip at 306, base at 300 */
+    /* the pointer on the left arrow lights it */
+    pointer_to(AX_LEFT+3,AY+6);draw_picture();
+    assert(arrow_lit(AX_LEFT) && arrow_colour(AX_LEFT)==GOLD && arrow_colour(AX_RIGHT)==GREYED);
+    /* a click pages back by the cells in view; both arrows usable then */
+    assert(aw_cstrip_key(K_MOUSE1) && l->selected[1]==MANY-9 && l->first[1]==MANY-9);
+    draw_picture();assert(arrow_colour(AX_LEFT)==GOLD && arrow_colour(AX_RIGHT)==GOLD && arrow_lit(AX_LEFT));
+    /* back to the first page: left greyed, and a click on it does nothing */
+    for(i=0;i<8;i++)assert(aw_cstrip_key(K_PGUP));
+    assert(l->first[1]==0 && l->selected[1]==0);
+    draw_picture();assert(arrow_colour(AX_LEFT)==GREYED && !arrow_lit(AX_LEFT) && arrow_colour(AX_RIGHT)==GOLD);
+    assert(aw_cstrip_key(K_MOUSE1) && l->first[1]==0 && l->selected[1]==0);
+    /* a key that moves right lights the right arrow for a moment (the stub's clock stands still) */
+    pointer_to(160,160);assert(aw_cstrip_key('d') && l->selected[1]==1);
+    draw_picture();assert(arrow_lit(AX_RIGHT) && arrow_colour(AX_RIGHT)==GOLD && !arrow_lit(AX_LEFT));
+    /* the pointer on the right arrow and a click: the next page */
+    pointer_to(AX_RIGHT+3,AY+6);assert(aw_cstrip_key(K_MOUSE1) && l->selected[1]==9 && l->first[1]==2);
+    pointer_to(160,160);
+}
 /* CONTAINER-STRIP-OPEN-MANY-KINDS-61: with MANY kinds carried the strip names its inventory side from one pass over the
  * item file (as the inventory window does), never one search per kind (415 kinds held a body's open 10.3 s on FS-UAE);
  * a take then names both sides from the open list without any read. The kinds keep the item table's order. */
@@ -212,6 +258,7 @@ static void many_kinds(void){
         assert(aw_cstrip_key('d') || i==MANY-1);
     }
     assert(AW_CStripList()->count[AW_CSTRIP_INVENTORY]==MANY);
+    page_arrows();
     /* a take from the basket: both sides named again from the open list, no second pass (the take's own record read
      * and the uncatalogued kind may search) */
     assert(aw_cstrip_key(K_TAB) && aw_cstrip_key('e'));

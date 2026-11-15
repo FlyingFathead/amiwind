@@ -16,6 +16,7 @@ import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from mwad.interior import original_doors
 from mwad.paths import resolve_data_files,child_ci
+from mwad.masters import master_path
 from prepare_harvest_room import world_directory
 from prepare_scenery import export_refs
 from prepare_mesh_bsp import append_meshes,_prepare_model
@@ -81,7 +82,7 @@ def append_geometry(source,output,packet,index,entry,palette,local):
 def prepare(data_files,base_id1,plan,regions_raw,door_rows,output):
     data=resolve_data_files(data_files);base=Path(base_id1);out=Path(output)
     if out.exists():raise ValueError('Fresh exterior door output required')
-    master=child_ci(data,'Morrowind.esm').read_bytes();palette=(base/'gfx/palette.lmp').read_bytes()
+    master=master_path(data).read_bytes();palette=(base/'gfx/palette.lmp').read_bytes()
     if pin(master)['sha256']!=plan['master_sha256'] or pin(regions_raw)['sha256']!=plan['regions_sha256']:
         raise ValueError('Original source/directory identity differs')
     if pin(json.dumps(door_rows,sort_keys=True,separators=(',',':')).encode())['sha256']!=plan['door_rows_sha256']:

@@ -176,6 +176,8 @@ class FileFormatTests(unittest.TestCase):
                                           'maps/bmastius.chim']), [])
         # the shared animation tables of skeletal actors (SKEL-ANIM-STAGE-52: the stage build stopped on them)
         self.assertEqual(unknown_formats(['progs/humanoid.awsk', 'progs/humanoid_f.awsk', 'progs/humanoid_kna.awsk']), [])
+        # the active-effect icon rows, parsed by name (IMAGE-FORMAT-EFFECTS-AWE-66: the v0.0.66-dev1 image step stopped on it)
+        self.assertEqual(unknown_formats(['gfx/effects.awe', 'GFX/Effects.awe']), [])
         with tempfile.TemporaryDirectory() as tmp:
             id1 = Path(tmp)
             (id1 / 'arena').mkdir()
@@ -184,3 +186,23 @@ class FileFormatTests(unittest.TestCase):
             (id1 / 'arena' / 'x.newkind').write_bytes(b'1')
             with self.assertRaisesRegex(ValueError, 'x.newkind'):
                 payload_preflight.check_file_formats(id1)
+
+    def test_every_file_spans_parses_by_name_is_a_known_format(self):
+        """IMAGE-FORMAT-EFFECTS-AWE-66: spans() parsed gfx/effects.awe by its path while the preflight lists did not name
+        it, so an 11 h build stopped in the image step. Every path spans() matches by name must pass unknown_formats."""
+        import ast
+        import sky_palette_overlay
+        from sky_palette_overlay import unknown_formats
+        tree = ast.parse(Path(sky_palette_overlay.__file__).read_text(encoding='utf-8'))
+        fn = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == 'spans')
+        named = set()
+        for node in ast.walk(fn):
+            if not (isinstance(node, ast.Compare) and isinstance(node.left, ast.Call)
+                    and isinstance(node.left.func, ast.Attribute) and node.left.func.attr == 'lower'
+                    and isinstance(node.left.func.value, ast.Name) and node.left.func.value.id == 'rel'):
+                continue
+            for comp in node.comparators:
+                items = comp.elts if isinstance(comp, (ast.Tuple, ast.List, ast.Set)) else [comp]
+                named |= {c.value for c in items if isinstance(c, ast.Constant) and isinstance(c.value, str) and '.' in c.value}
+        self.assertIn('gfx/effects.awe', named)
+        self.assertEqual(unknown_formats(sorted(named)), [])

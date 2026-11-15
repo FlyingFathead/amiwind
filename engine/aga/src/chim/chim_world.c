@@ -923,6 +923,61 @@ static int KeepNothing (void *data, unsigned id)
 	return 0;
 }
 
+/* The stores this image carries (chim_format.h chim_store_table_t): the
+ * island's and one per expansion layer the build selected. */
+static chim_store_table_t store_table;
+
+static int StoreFileOpens (const char *path, void *ctx)
+{
+	FILE *f = NULL;
+	(void)ctx;
+	COM_FOpenFile ((char *)path, &f);
+	if (!f)
+		return 0;
+	fclose (f);
+	return 1;
+}
+
+int Chim_StoreInImage (const char *name)
+{
+	return ChimFormat_StoreInTable (&store_table, name, StoreFileOpens, NULL);
+}
+
+/* aw_chim_map_store_built: the store named by the map file PATH's worldspawn
+ * (BSP29 lump 0, the entities; the first KB holds the worldspawn) is here.
+ * A file this cannot read is left to the loader's own refusal (1). */
+static int MapStoreBuilt (const char *path)
+{
+	FILE *f = NULL;
+	unsigned char head[12];
+	char text[1024], store[CHIM_STORE_CHARS+2];
+	long base, offset, length;
+	int bytes, got;
+	bytes = COM_FOpenFile ((char *)path, &f);
+	if (!f)
+		return 0;
+	base = ftell (f);
+	if (bytes < 12 || fread (head, 1, 12, f) != 12)
+	{
+		fclose (f);
+		return 1;
+	}
+	offset = (long)head[4] | (long)head[5] << 8 | (long)head[6] << 16 | (long)head[7] << 24;
+	length = (long)head[8] | (long)head[9] << 8 | (long)head[10] << 16 | (long)head[11] << 24;
+	if (offset < 12 || length <= 0 || offset + length > bytes || fseek (f, base + offset, SEEK_SET))
+	{
+		fclose (f);
+		return 1;
+	}
+	got = (int)fread (text, 1, length < (long)sizeof(text) ? (size_t)length : sizeof(text), f);
+	fclose (f);
+	if (got <= 0)
+		return 1;
+	if (!ChimFormat_WorldspawnStore (text, got, store, sizeof(store)))
+		return 1;		/* an invalid name: MapBegin refuses it with its reason */
+	return Chim_StoreInImage (store);
+}
+
 int Chim_StoreSelect (const char *name)
 {
 	if (!ChimFormat_StoreNameValid (name))
@@ -1159,6 +1214,14 @@ static void MapBeginWork (const char *entities, double spike_t0)
 	 * packs (Chim_StoreSelect drops what another store left). */
 	if (!WorldspawnKey (entities, "_chim_world", store, sizeof(store)))
 		strcpy (store, CHIM_STORE_DEFAULT);
+	if (ChimFormat_StoreNameValid (store) && !Chim_StoreInImage (store))
+	{
+		if (is_room)
+			RefuseRoom (room_name, "its store is not in this image (an expansion this build did not select)");
+		else
+			Refuse (cx, cy, "its store is not in this image (an expansion this build did not select)");
+		return;
+	}
 	if (!Chim_StoreSelect (store))
 	{
 		if (is_room)
@@ -2228,6 +2291,7 @@ void Chim_Init (void)
 	aw_chim_world = 1;		/* the map path resolver may now pick .chim frame maps */
 	CacheBank ();
 	aw_chim_map_begin = MapBegin;
+	aw_chim_map_store_built = MapStoreBuilt;	/* the unbuilt-target guard of doors and travel */
 	aw_demo_map_begin = DemoMap;
 	aw_chim_map_end = MapEnd;
 	aw_chim_link = Link;

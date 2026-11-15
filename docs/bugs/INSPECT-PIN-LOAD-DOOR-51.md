@@ -58,7 +58,9 @@ Family: Debug commands and remote control (`debug-commands`). dbg commands, tele
 - DBG-PLACED-LOOK-VIEW-NOT-TURNED-61 (no report page): The test commands aw_placed look and aw_view set the view angles but the view does not turn
 - DBG-QUOTED-ID-REFUSED-62 (no report page): A debug command with a quoted record ID holding a space is refused as an unknown debug command (dbg npcs talk "agronian guy")
 - [DBG-TOGGLE-WORDS-31](DBG-TOGGLE-WORDS-31.md): dbg on/off words turned settings off
+- DBG-TP-BEINGS-66 (no report page): Requested: the dbg tp list chooses All, Exteriors, Interiors or Beings and reaches any person or creature by name
 - DBG-TP-DOORLIST-NO-ARRIVAL-LINE-63 (no report page): dbg tp into a room reached through a door list prints no arrival line
+- [DBG-TP-DURING-LOAD-66](DBG-TP-DURING-LOAD-66.md): A dbg tp typed while a load is still running is lost: a town name does nothing, a place says no map holds the point, a room prints its name and stays
 - DBG-TP-NO-FLOOR-FALLBACK-63 (no report page): dbg tp to a spot with no floor under it falls back to the frame centre
 - DBG-TP-SAME-MAP-54 (no report page): dbg tp X Y finds no map for a point on a MiniWind CHIM frame
 - DEBUG-ALIASES-29 (no report page): Discoverable video-player aliases and disk-backed help

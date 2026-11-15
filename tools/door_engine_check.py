@@ -558,7 +558,8 @@ def run(build=None, id1=None, engine_src=None, audit_rows=None, data_files=None,
     if audit_rows is None:
         from mwad.interior import original_doors
         from mwad.paths import child_ci
-        doors = original_doors(child_ci(data_files, 'Morrowind.esm').read_bytes())
+        from mwad.masters import master_path
+        doors = original_doors(master_path(data_files).read_bytes())
         world_rows = json.loads(Path(world_doors or Path(build) / 'image/world-doors.json')
                                 .read_text(encoding='utf-8'))['rows']
         image = door_audit.Image(id1, engine_src, chim_world, jobs)

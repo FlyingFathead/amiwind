@@ -79,11 +79,45 @@ static void stores(void)
     assert(!ChimFormat_StorePath(out,sizeof out,"Chimi","world.cwi"));
 }
 
+/* the image's store table (one store per selected expansion layer) and the store a map names */
+static int asked;
+static int image_has(const char *path, void *ctx)
+{
+    asked++;
+    return strstr((const char *)ctx, path) != NULL;
+}
+
+static void store_table(void)
+{
+    static const char ws[] = "{\n\"classname\" \"worldspawn\"\n\"_chim_world\" \"chimsol\"\n}\n{\n\"_chim_world\" \"chimiti\"\n}";
+    static const char plain[] = "{\n\"classname\" \"worldspawn\"\n}\n{\n\"_chim_world\" \"chimsol\"\n}";
+    chim_store_table_t t;
+    char store[CHIM_STORE_CHARS+2];
+    memset(&t, 0, sizeof t);
+    /* the worldspawn's store; the default when it names none (a later entity's key is not the map's) */
+    assert(ChimFormat_WorldspawnStore(ws, (long)strlen(ws), store, sizeof store) && !strcmp(store, "chimsol"));
+    assert(ChimFormat_WorldspawnStore(plain, (long)strlen(plain), store, sizeof store) && !strcmp(store, "chim"));
+    assert(!ChimFormat_WorldspawnStore("{\"_chim_world\" \"Bad/x\"}", 23, store, sizeof store) && !store[0]);
+    assert(!ChimFormat_WorldspawnStore("{\"_chim_world\" \"abcdefghij\"}", 28, store, sizeof store));
+    assert(!ChimFormat_WorldspawnStore("{\"_chim_world\" \"chimsol\"", 24, store, sizeof store));   /* cut short */
+    assert(!ChimFormat_WorldspawnStore(ws, (long)strlen(ws), store, CHIM_STORE_CHARS));          /* no room */
+    /* the image carries the island and chimsol, not chimiti (Tribunal not selected) */
+    assert(ChimFormat_StoreInTable(&t, "chim", image_has, "chimsol/world.cwi") && asked == 0);
+    assert(ChimFormat_StoreInTable(&t, "chimsol", image_has, "chimsol/world.cwi") && asked == 1);
+    assert(!ChimFormat_StoreInTable(&t, "chimiti", image_has, "chimsol/world.cwi") && asked == 2);
+    /* asked once per name, then kept */
+    assert(ChimFormat_StoreInTable(&t, "chimsol", image_has, "") && !ChimFormat_StoreInTable(&t, "chimiti", image_has,
+        "chimiti/world.cwi") && asked == 2 && t.count == 2);
+    assert(!ChimFormat_StoreInTable(&t, "Chim", image_has, "") && !ChimFormat_StoreInTable(NULL, "chimsol", image_has, ""));
+    assert(!ChimFormat_StoreInTable(&t, "chimx", NULL, NULL));
+}
+
 int main(void)
 {
     int i,offset;
     records();
     stores();
+    store_table();
     plane.normal[2]=1;root.plane=&plane;root.numsurfaces=1;leaf.contents=CONTENTS_EMPTY;
     root.children[0]=root.children[1]=&leaf;world.nodes=&root;world.surfaces=&surface;
     world.numsurfaces=world.nummodelsurfaces=1;world.lightdata=lump;

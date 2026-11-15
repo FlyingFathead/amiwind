@@ -39,7 +39,11 @@ for _p in (ROOT / 'tools', ROOT / 'src'):     # src first: tools/mwad.py is the 
 OUT = ROOT / 'docs' / 'dialogue-choices.json'
 SCHEMA = 'dialogue-choices 1'
 MASTERS = ('Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm')
-TABLE_MASTER = 'Morrowind.esm'      # the dialogue table the engine reads is built from it (tools/dialogue_lut.py)
+TABLE_MASTER = 'Morrowind.esm'      # the base game file: always in the dialogue table
+# the dialogue table the engine reads (tools/dialogue_lut.py) is built from the merged master of the SELECTED masters
+# (mwad.masters.master_path); the default selection is the base game with both expansions, so every master the
+# measure reads is in the table unless a narrower selection is named (EXPANSION-DATA-ALL-TABLES-66)
+DEFAULT_SELECTION = MASTERS
 STATUSES = ('reachable', 'start_value', 'unread', 'plain', 'shadowed', 'none')
 # the SCVR kinds the runner reads (aw_glut.c AW_GlutCond with aw_mwhost.c's live hooks, or decided per speaker when
 # the table is built: mwad.dialogue Context.static)
@@ -167,10 +171,13 @@ def audit(topics, master):
     return {'counts': counts, 'branches': rows}
 
 
-def measure(data):
+def measure(data, selection=DEFAULT_SELECTION):
     import greeting_lut as G
+    from mwad.masters import selected_masters
     from mwad.paths import child_ci
-    doc = {'schema': SCHEMA, 'table_master': TABLE_MASTER, 'masters': {}, 'not_reachable': []}
+    chosen = {m.casefold() for m in selected_masters(selection)}
+    doc = {'schema': SCHEMA, 'table_master': TABLE_MASTER, 'table_masters': [m for m in MASTERS if m.casefold() in chosen],
+           'masters': {}, 'not_reachable': []}
     for n, master in enumerate(MASTERS, 1):
         try:
             path = child_ci(Path(data), master)
@@ -182,7 +189,7 @@ def measure(data):
         print('=== PHASE %d/%d: %s: reading the dialogue ===' % (n, len(MASTERS), master), flush=True)
         _kinds, topics = G.load(path)
         got = audit(topics, master)
-        doc['masters'][master] = dict(got['counts'], in_table=master == TABLE_MASTER)
+        doc['masters'][master] = dict(got['counts'], in_table=master.casefold() in chosen)
         doc['not_reachable'] += [r for r in got['branches'] if r['status'] not in ('reachable', 'plain')]
         c = got['counts']
         print('%s: %d INFOs call Choice (%d calls, %d branches): %s' % (

@@ -134,6 +134,7 @@ def prepare(data_files, scene_palette, out, *, jobs=None, interiors=True):
     HARVEST-INTERIOR-PICK-47); False keeps the earlier exterior-only source (those plants stay baked scenery)."""
     from build_parallel import ordered_map
     from mwad.paths import child_ci, ensure_external, resolve_data_files
+    from mwad.masters import master_path
     from prepare_hand_catalog import runtime_palette
     from prepare_harvest import source_context, prepare_graph
     from prepare_harvest_alias import alias_angles, validate_references
@@ -142,7 +143,7 @@ def prepare(data_files, scene_palette, out, *, jobs=None, interiors=True):
     out = ensure_external(out, 'harvest source')
     if out.exists():
         raise ValueError('Harvest output already exists: ' + str(out))
-    master = child_ci(data, 'Morrowind.esm').read_bytes()
+    master = master_path(data).read_bytes()
     context = source_context(master, max_plants=MAX_PLANTS, intern_root_spans=True)
     refs = exterior_references(context)
     inside, refused = interior_references(context) if interiors else ([], [])
@@ -410,11 +411,12 @@ def load_source(source):
 def source_placements(source, data_files):
     """The source receipt, the master's harvest context and every checked placement."""
     from mwad.paths import child_ci, resolve_data_files
+    from mwad.masters import master_path
     from prepare_harvest import source_context
     from prepare_harvest_alias import validate_references
     source = Path(source)
     receipt = load_source(source)
-    master = child_ci(resolve_data_files(data_files), 'Morrowind.esm').read_bytes()
+    master = master_path(resolve_data_files(data_files)).read_bytes()
     if pin(master) != receipt['master']:
         raise ValueError('Harvest source was made from another master')
     settings = receipt['settings']
@@ -442,9 +444,10 @@ def held_placements(source, data_files):
     tuples and strings, in the same order)."""
     import pickle
     from mwad.paths import child_ci, resolve_data_files
+    from mwad.masters import master_path
     source = Path(source)
     receipt = load_source(source)
-    master = digest(child_ci(resolve_data_files(data_files), 'Morrowind.esm').read_bytes())
+    master = digest(master_path(resolve_data_files(data_files)).read_bytes())
     key = (str(source.resolve()), digest((source / SOURCE_RECEIPT).read_bytes()), master)
     held = _PLACEMENTS.get(key)
     if held is None:

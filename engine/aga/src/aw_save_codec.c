@@ -5,6 +5,11 @@
 #include <math.h>
 #include "aw_save.h"
 #include "aw_maps.h"
+#include "aw_tryalloc.h"	/* a load's rows and sections in buffers of their own sizes (SAVE-ACTOR-ROWS-256-66) */
+int aw_save_rows_form;
+int (*aw_save_explored_encode)(unsigned char *out,int capacity);
+void (*aw_save_explored_import)(const unsigned char *p,int bytes);
+static int short_bytes;   /* AW_SaveDecodeShort */
 int (*aw_save_changes_export)(aw_changes_t *changes);
 void (*aw_save_changes_import)(const aw_changes_t *changes);
 int (*aw_save_objects_export)(aw_changes_t *changes);
@@ -12,18 +17,23 @@ void (*aw_save_objects_import)(const aw_changes_t *changes);
 int (*aw_save_actors_export)(unsigned char *out,int capacity);
 void (*aw_save_actors_import)(const unsigned char *data,int bytes);
 int (*aw_save_ledger_rows)(const struct aw_ledger_s *ledger);
-void (*aw_save_script_export)(struct aw_ledger_s *ledger);
+int (*aw_save_script_export)(struct aw_ledger_s *ledger);
 void (*aw_save_script_import)(const struct aw_ledger_s *ledger);
 int (*aw_save_ledger_encode)(const struct aw_ledger_s *ledger,unsigned char *out,int capacity);
 int (*aw_save_journal_encode)(const struct aw_jhist_s *h,unsigned char *out,int capacity);
 int (*aw_save_journal_decode)(const unsigned char *data,int size,struct aw_jhist_s *into);
 int (*aw_save_ledger_decode)(const unsigned char *data,int size,struct aw_ledger_s *into);
+int (*aw_save_markers_encode)(unsigned char *out,int capacity);
+int (*aw_save_markers_decode)(const unsigned char *p,int n,int commit);
+void (*aw_save_markers_loaded)(void);
+void (*aw_save_markers_reset)(void);
 /* AWS4 feature bit 16: the actor record's block, u32 length then its bytes (checked by aw_actorstate.c's import);
  * read straight into the caller's buffer (its contents count only when the decode succeeds) */
 static int actor_scratch_bytes;
 static unsigned char *writing;
 static const unsigned char *reading;
 static int at,end,error;
+static int row_order(const void *a,const void *b);
 static uint32_t crc32(const unsigned char *p,int n)
 {
     uint32_t crc=0xffffffffU;int i;
@@ -140,18 +150,215 @@ static void fields(aw_save_t *s)
     if(!error && (aw_parts[c->head].race!=c->race || aw_parts[c->hair].race!=c->race ||
        aw_parts[c->head].female!=c->female || aw_parts[c->hair].female!=c->female ||
        aw_parts[c->head].kind!=0 || aw_parts[c->hair].kind!=1))error=1;
-    integer(&s->actor_count,0,AW_SAVE_ACTORS);
+    /* the 48-byte actor rows of the fields (AWS1-4 before v0.0.66, at most 256): a save now writes none here (its rows
+     * are packed, feature 8192) unless aw_save_rows_form is 1; read into the decoded save's own rows, sorted */
+    n=writing?(aw_save_rows_form==1?s->actor_count:0):0;
+    integer(&n,0,AW_SAVE_ACTORS);
     if(error)return;
-    for(i=0;i<s->actor_count;i++){
-        aw_saved_actor_t *a=&s->actors[i];
-        word(&a->reference);integer(&a->scene,0,AW_SCENE_COUNT-1);
+    if(!writing){s->actor_count=0;if(n && !AW_SaveActorsReserve(s,n)){error=1;return;}s->actor_count=n;}
+    for(i=0;i<n;i++){
+        aw_saved_actor_t *a=&s->actors[i];int scene=a->scene;
+        word(&a->reference);integer(&scene,0,AW_SCENE_COUNT-1);
+        if(!writing){a->scene=(unsigned short)scene;a->fields=AW_ROW_ALL;}
         /* The ID range has a gap between interiors and extra towns. */
         if(!a->reference || a->reference>0xffffffU || (!error && !AW_MapName(a->scene)[0]))error=1;
         for(j=0;j<3;j++){floating(&a->position[j],-32767,32767);floating(&a->angles[j],-360,360);}
         floating(&a->health,-10000,100000);
         integer(&a->hello_count,0,10000000);integer(&a->manual_count,0,10000000);integer(&a->hello_done,0,1);
-        for(j=0;j<i;j++)if(a->reference==s->actors[j].reference && a->scene==s->actors[j].scene)error=1;
+        if(writing)for(j=0;j<i;j++)if(a->reference==s->actors[j].reference && a->scene==s->actors[j].scene)error=1;
+        if(error)return;
     }
+    if(!writing && n>1){   /* sorted once, a row twice refused (was a search of every earlier row) */
+        qsort(s->actors,(size_t)n,sizeof(aw_saved_actor_t),row_order);
+        for(i=1;i<n;i++)if(!row_order(&s->actors[i-1],&s->actors[i]))error=1;
+    }
+}
+/* AWS4 feature bit 8192 (SAVE-ACTOR-ROWS-256-66): the saved actor rows, packed. u8 form (1), u16 places; per place
+ * (ascending) u16 scene, u16 rows; per row (ascending) a u24 reference, a u8 of what follows (ROW_*), then only that,
+ * in bit order. Whole units for the place (the rows' range, +-32767), 360/256 degrees for a facing: a greeted NPC is
+ * 4 to 6 bytes, a builder's role 11 to 15, the most any row takes 25 (was 48 for every row). */
+#define ROW_POSITION 1U   /* 3 x s16 position, u8 yaw */
+#define ROW_TILT 2U       /* u8 pitch, u8 roll (with ROW_POSITION only; written when either is not 0) */
+#define ROW_HEALTH16 4U   /* s16 a whole health */
+#define ROW_HEALTH32 8U   /* f32 any other health (never with ROW_HEALTH16) */
+#define ROW_HELLO 16U     /* the hello count, 7 bits a byte from the low end (1..10,000,000) */
+#define ROW_MANUAL 32U    /* the manual greeting count, the same */
+#define ROW_DONE 64U      /* the greeting done (no bytes) */
+#define ROW_KNOWN 127U
+static int row_compare(const aw_saved_actor_t *a,unsigned scene,uint32_t reference)
+{
+    if(a->scene!=scene)return a->scene<scene?-1:1;
+    return a->reference==reference?0:a->reference<reference?-1:1;
+}
+static int row_order(const void *a,const void *b)
+{
+    const aw_saved_actor_t *y=(const aw_saved_actor_t *)b;
+    return row_compare((const aw_saved_actor_t *)a,y->scene,y->reference);
+}
+int AW_SaveActorFind(const aw_save_t *s,uint32_t reference,int scene)
+{
+    int lo=0,hi=s->actor_count-1,mid,c;
+    while(lo<=hi){
+        mid=(lo+hi)/2;c=row_compare(&s->actors[mid],(unsigned)scene,reference);
+        if(!c)return mid;
+        if(c<0)lo=mid+1;else hi=mid-1;
+    }
+    return -1-lo;
+}
+int AW_SaveActorsReserve(aw_save_t *s,int want)
+{
+    aw_saved_actor_t *grown;int capacity;
+    if(want<=s->actor_capacity)return 1;
+    if(want>AW_SAVE_ACTOR_ROWS_MAX)return 0;
+    capacity=(want+AW_SAVE_ACTOR_ROW_BLOCK-1)/AW_SAVE_ACTOR_ROW_BLOCK*AW_SAVE_ACTOR_ROW_BLOCK;
+    grown=(aw_saved_actor_t *)AW_TryRealloc(s->actors,(unsigned long)sizeof(aw_saved_actor_t)*(unsigned long)capacity);
+    if(!grown){short_bytes=(int)sizeof(aw_saved_actor_t)*capacity;return 0;}
+    s->actors=grown;s->actor_capacity=capacity;return 1;
+}
+int AW_SaveActorsCopy(aw_save_t *to,const aw_saved_actor_t *rows,int count)
+{
+    aw_saved_actor_t *copy=NULL;int capacity=0;
+    if(count>0){
+        capacity=(count+AW_SAVE_ACTOR_ROW_BLOCK-1)/AW_SAVE_ACTOR_ROW_BLOCK*AW_SAVE_ACTOR_ROW_BLOCK;
+        copy=(aw_saved_actor_t *)AW_TryMalloc((unsigned long)sizeof(aw_saved_actor_t)*(unsigned long)capacity);
+        if(!copy){short_bytes=(int)sizeof(aw_saved_actor_t)*capacity;return 0;}
+        memcpy(copy,rows,sizeof(aw_saved_actor_t)*(size_t)count);
+    }
+    to->actors=copy;to->actor_count=count;to->actor_capacity=capacity;
+    return 1;
+}
+void AW_SaveActorsFree(aw_save_t *s)
+{
+    if(!s)return;
+    free(s->actors);s->actors=NULL;s->actor_count=s->actor_capacity=0;
+}
+/* a place's save ID a row may name: one this engine names, or one of an expansion's ranges (named or not: an engine
+ * without that expansion's table keeps the row for the save it came from) */
+static int scene_known(int s){return s>=0 && s<AW_LAYER_ROOM_END && (AW_MapName(s)[0] || AW_MapLayer(s));}
+static int angle_byte(float a){return (int)floorf((a-360.0f*floorf(a/360.0f))*256.0f/360.0f+.5f)&255;}
+static int whole16(float h){return h==floorf(h) && h>=-32768.0f && h<=32767.0f;}
+/* what a row writes (ROW_*): 0 when it holds nothing */
+static unsigned row_mask(const aw_saved_actor_t *a)
+{
+    unsigned m=0;
+    if(a->fields&AW_ROW_PLACE){m|=ROW_POSITION;if(angle_byte(a->angles[0]) || angle_byte(a->angles[2]))m|=ROW_TILT;}
+    if(a->fields&AW_ROW_HEALTH)m|=whole16(a->health)?ROW_HEALTH16:ROW_HEALTH32;
+    if(a->fields&AW_ROW_GREET){
+        if(a->hello_count)m|=ROW_HELLO;
+        if(a->manual_count)m|=ROW_MANUAL;
+        if(a->hello_done)m|=ROW_DONE;
+    }
+    return m;
+}
+static int count_bytes(uint32_t v){int n=1;while(v>=128){v>>=7;n++;}return n;}
+static int row_bytes(const aw_saved_actor_t *a,unsigned m)
+{
+    return 4+((m&ROW_POSITION)?7:0)+((m&ROW_TILT)?2:0)+((m&ROW_HEALTH16)?2:0)+((m&ROW_HEALTH32)?4:0)+
+           ((m&ROW_HELLO)?count_bytes((uint32_t)a->hello_count):0)+((m&ROW_MANUAL)?count_bytes((uint32_t)a->manual_count):0);
+}
+int AW_SaveActorRowsBytes(const aw_save_t *s)
+{
+    int i,n=0,places=0,scene=-1;unsigned m;
+    for(i=0;i<s->actor_count;i++){
+        if(!(m=row_mask(&s->actors[i])))continue;
+        if(s->actors[i].scene!=scene){scene=s->actors[i].scene;places++;}
+        n+=row_bytes(&s->actors[i],m);
+    }
+    return n?4+3+4*places+n:0;
+}
+static void put8(unsigned v){unsigned char b=(unsigned char)v;bytes(&b,1);}
+static void put16(unsigned v){unsigned char b[2];b[0]=(unsigned char)v;b[1]=(unsigned char)(v>>8);bytes(b,2);}
+static unsigned get8(void){unsigned char b=0;bytes(&b,1);return b;}
+static unsigned get16(void){unsigned char b[2]={0,0};bytes(b,2);return (unsigned)b[0]|((unsigned)b[1]<<8);}
+static void put_count(uint32_t v){do{put8((v&127U)|(v>=128?128U:0U));v>>=7;}while(v);}
+static uint32_t get_count(void)
+{
+    uint32_t v=0,b;int shift=0;
+    do{b=get8();if(shift>21){error=1;return 0;}v|=(b&127U)<<shift;shift+=7;}while((b&128U) && !error);
+    if(v<1 || v>10000000)error=1;
+    return v;
+}
+static void rows_encode(const aw_save_t *s)
+{
+    int i,j,k,places_at=0,places=0,count_at=0,rows=0,scene=-1;unsigned m;uint32_t length=0;int length_at=at,start;
+    word(&length);start=at;put8(1);places_at=at;put16(0);
+    for(i=0;i<s->actor_count && !error;i++){
+        const aw_saved_actor_t *a=&s->actors[i];
+        if(i && row_order(&s->actors[i-1],a)>=0){error=1;return;}   /* sorted, each once */
+        if(!a->reference || a->reference>0xffffffU || !scene_known(a->scene)){error=1;return;}
+        if(!(m=row_mask(a)))continue;
+        if(a->scene!=scene){
+            if(scene>=0){writing[count_at]=(unsigned char)rows;writing[count_at+1]=(unsigned char)(rows>>8);}
+            if(places==65535){error=1;return;}
+            scene=a->scene;places++;put16((unsigned)scene);count_at=at;put16(0);rows=0;
+        }
+        put8(a->reference&255U);put8((a->reference>>8)&255U);put8((a->reference>>16)&255U);put8(m);
+        if(m&ROW_POSITION){
+            for(j=0;j<3;j++){
+                float p=floorf(a->position[j]+.5f);
+                if(!(p>=-32767 && p<=32767)){error=1;return;}
+                k=(int)p;put16((unsigned)k&0xffffU);
+            }
+            put8((unsigned)angle_byte(a->angles[1]));
+            if(m&ROW_TILT){put8((unsigned)angle_byte(a->angles[0]));put8((unsigned)angle_byte(a->angles[2]));}
+        }
+        if(!(a->health>=-10000 && a->health<=100000) && (m&(ROW_HEALTH16|ROW_HEALTH32))){error=1;return;}
+        if(m&ROW_HEALTH16)put16((unsigned)(int)a->health&0xffffU);
+        if(m&ROW_HEALTH32){float h=a->health;floating(&h,-10000,100000);}
+        if(a->hello_count<0 || a->hello_count>10000000 || a->manual_count<0 || a->manual_count>10000000 ||
+           a->hello_done<0 || a->hello_done>1){error=1;return;}
+        if(m&ROW_HELLO)put_count((uint32_t)a->hello_count);
+        if(m&ROW_MANUAL)put_count((uint32_t)a->manual_count);
+        if(++rows>65535){error=1;return;}
+    }
+    if(error)return;
+    if(scene>=0){writing[count_at]=(unsigned char)rows;writing[count_at+1]=(unsigned char)(rows>>8);}
+    writing[places_at]=(unsigned char)places;writing[places_at+1]=(unsigned char)(places>>8);
+    length=(uint32_t)(at-start);
+    writing[length_at]=(unsigned char)length;writing[length_at+1]=(unsigned char)(length>>8);
+    writing[length_at+2]=(unsigned char)(length>>16);writing[length_at+3]=(unsigned char)(length>>24);
+}
+static void rows_decode(aw_save_t *s)
+{
+    uint32_t length=0,reference;int stop,places,p,rows,r,scene,last_scene=-1,j;unsigned m;
+    word(&length);
+    if(error || length<3 || at>end-(int)length){error=1;return;}
+    stop=at+(int)length;
+    if(get8()!=1){error=1;return;}
+    places=(int)get16();
+    if(error || places<1){error=1;return;}
+    for(p=0;p<places && !error;p++){
+        uint32_t last_reference=0;
+        scene=(int)get16();rows=(int)get16();
+        if(error || scene<=last_scene || !scene_known(scene) || rows<1 || stop-at<4*rows ||
+           !AW_SaveActorsReserve(s,s->actor_count+rows)){error=1;return;}
+        last_scene=scene;
+        for(r=0;r<rows && !error;r++){
+            aw_saved_actor_t *a=&s->actors[s->actor_count];
+            reference=get8();reference|=get8()<<8;reference|=get8()<<16;m=get8();
+            if(error || !reference || reference<=last_reference || !m || (m&~ROW_KNOWN) ||
+               ((m&ROW_TILT) && !(m&ROW_POSITION)) || ((m&ROW_HEALTH16) && (m&ROW_HEALTH32))){error=1;return;}
+            last_reference=reference;
+            memset(a,0,sizeof(*a));a->reference=reference;a->scene=(unsigned short)scene;
+            if(m&ROW_POSITION){
+                for(j=0;j<3;j++)a->position[j]=(float)(int16_t)get16();
+                a->angles[1]=get8()*360.0f/256.0f;
+                if(m&ROW_TILT){a->angles[0]=get8()*360.0f/256.0f;a->angles[2]=get8()*360.0f/256.0f;}
+                a->fields|=AW_ROW_PLACE;
+            }
+            if(m&ROW_HEALTH16){a->health=(float)(int16_t)get16();a->fields|=AW_ROW_HEALTH;if(a->health<-10000)error=1;}
+            if(m&ROW_HEALTH32){floating(&a->health,-10000,100000);a->fields|=AW_ROW_HEALTH;}
+            if(m&(ROW_HELLO|ROW_MANUAL|ROW_DONE)){
+                a->fields|=AW_ROW_GREET;
+                if(m&ROW_HELLO)a->hello_count=(int)get_count();
+                if(m&ROW_MANUAL)a->manual_count=(int)get_count();
+                a->hello_done=(m&ROW_DONE)?1:0;
+            }
+            if(at>stop){error=1;return;}
+            s->actor_count++;
+        }
+    }
+    if(at!=stop)error=1;
 }
 static void journal_fields(aw_state_t *s)
 {
@@ -296,6 +503,50 @@ static void books_fields(aw_character_t *c){
     integer(&n,1,AW_BOOKS_READ_MAX/32);if(error)return;
     for(i=0;i<n && !error;i++){uint32_t w=(uint32_t)c->books_read[i];word(&w);c->books_read[i]=w;}
 }
+/* AWS4 feature bit 16384 (SAVE-ITEM-INSTANCES-ONE-PER-KIND-66): the item instances (aw_state.h: a copy, or equal
+ * copies, of a kind with a condition or charge of its own, or the copy a slot wears), and which copy each slot wears and
+ * the magic selection names: u32 instances, each u32 serial, u32 row, i32 count, u32 flags, f32 condition with the
+ * condition mark, f32 charge with the charge mark; then AW_INVENTORY_SLOTS x u32 the slots' serials (0 a plain copy),
+ * u32 the selected serial. Checked: serials unique and within the drops' allocator, rows of the table, a row's instance
+ * copies never more than its count, a slot's or the selection's serial an instance of the kind it holds. Written only
+ * when there is an instance or a serial, so a save without them is byte for byte as before; older readers refuse the bit
+ * rather than merging the copies. */
+static int instances_used(const aw_state_t *s){
+    int i;
+    if(s->items.inst_count || s->magic.selected_serial)return 1;
+    for(i=0;i<AW_INVENTORY_SLOTS;i++)if(s->inventory.equipped_serial[i])return 1;
+    return 0;
+}
+static void instance_fields(aw_state_t *s){
+    int n=writing?s->items.inst_count:0,i,k;uint32_t u;
+    integer(&n,0,AW_ITEM_INSTANCES_MAX);if(error)return;
+    for(i=0;i<n && !error;i++){
+        aw_item_inst_t x;int c;
+        if(writing)x=s->items.inst[i];else memset(&x,0,sizeof(x));
+        word(&x.serial);u=(uint32_t)x.row;word(&u);x.row=(int32_t)u;
+        c=x.count;integer(&c,1,2147483647);x.count=c;word(&x.flags);
+        if(error)return;
+        if(!x.serial || x.serial>s->inventory.next_serial || (x.flags&~(AW_ITEM_CONDITION|AW_ITEM_CHARGE)) ||
+           x.row<0 || x.row>=s->items.count){error=1;return;}
+        if(x.flags&AW_ITEM_CONDITION)floating(&x.condition,0,1);
+        if(x.flags&AW_ITEM_CHARGE)floating(&x.charge,0,1000000);
+        if(error)return;
+        if(!writing && (AW_ItemInstFind(s,x.serial)>=0 || x.count>AW_ItemPlain(s,x.row) || !AW_ItemInstAppend(s,&x))){error=1;return;}
+    }
+    for(k=0;k<AW_INVENTORY_SLOTS && !error;k++){
+        word(&s->inventory.equipped_serial[k]);
+        if(s->inventory.equipped_serial[k]){
+            int j=AW_ItemInstFind(s,s->inventory.equipped_serial[k]);
+            if(j<0 || !s->inventory.equipped[k][0] || AW_ItemIndex(s,s->inventory.equipped[k])!=AW_ItemInst(s,j)->row)error=1;
+        }
+    }
+    if(error)return;
+    word(&s->magic.selected_serial);
+    if(s->magic.selected_serial){
+        int j=AW_ItemInstFind(s,s->magic.selected_serial);
+        if(j<0 || !s->magic.selected[0] || AW_ItemIndex(s,s->magic.selected)!=AW_ItemInst(s,j)->row)error=1;
+    }
+}
 /* AWS4 feature bit 8: the world-state change list (aw_save.h). Entries strictly ascending by key, each checked
  * field by field; 36 bytes each on disk. The sorted copy and the decoder's scratch live here, off the stack. */
 static aw_changes_t change_scratch;
@@ -342,6 +593,7 @@ int AW_SaveFoldActors(const aw_save_t *state,aw_changes_t *changes)
     int i,j,added=0;uint32_t key;
     for(i=0;i<state->actor_count;i++){
         const aw_saved_actor_t *a=&state->actors[i];
+        if(!(a->fields&AW_ROW_PLACE))continue;   /* a row of greetings only: no place to fold */
         key=AW_SaveChangeKey(a->reference);
         for(j=0;j<changes->count;j++)if(changes->entry[j].key==key)break;
         if(j<changes->count || changes->count>=AW_SAVE_CHANGES)continue;
@@ -364,6 +616,10 @@ int AW_SaveEncodeChanges(unsigned char *out,int capacity,const aw_save_t *state,
     int actors=changes && changes->actors && changes->actor_bytes>0;
     int ledgered=changes && changes->ledger && aw_save_ledger_rows && aw_save_ledger_rows(changes->ledger)>0;
     int dated=changes && changes->journal && aw_save_journal_encode && aw_save_journal_encode(changes->journal,NULL,0)>0;
+    int marked=changes && changes->markers && aw_save_markers_encode && aw_save_markers_encode(NULL,0)>0;
+    int explored=changes && changes->explored && aw_save_explored_encode && aw_save_explored_encode(NULL,0)>0;
+    int packed=!aw_save_rows_form && AW_SaveActorRowsBytes(state)>0;
+    int instanced=instances_used(&state->state);
     if(capacity<12 || capacity>AW_SAVE_MAX_BYTES)return 0;
     writing=out;reading=NULL;at=12;end=capacity;error=0;
     memset(out,0,capacity);fields(&copy);if(!error)journal_fields(&copy.state);
@@ -371,7 +627,9 @@ int AW_SaveEncodeChanges(unsigned char *out,int capacity,const aw_save_t *state,
     {uint32_t features=(copy.state.harvest.slots?1U:0U)|(inventory_used(&copy.state)?2U:0U)|
         (magic_used(&copy.state)?4U:0U)|(listed?8U:0U)|(actors?16U:0U)|(ledgered?32U:0U)|
         (levelling_used(&copy.character)?64U:0U)|(dated?128U:0U)|(copy.state.items.count>32?512U:0U)|
-        (books_words(&copy.character)?1024U:0U);word(&features);}
+        (books_words(&copy.character)?1024U:0U)|(marked?2048U:0U)|(explored?4096U:0U)|(packed?8192U:0U)|
+        (instanced?16384U:0U);
+     word(&features);}
     if(!error && copy.state.harvest.slots)harvest_fields(&copy.state.harvest);
     if(!copy.state.harvest.slots){
         int i;for(i=0;i<32;i++)if(copy.state.harvest.catalogue[i])error=1;
@@ -384,6 +642,8 @@ int AW_SaveEncodeChanges(unsigned char *out,int capacity,const aw_save_t *state,
     if(!error && magic_used(&copy.state))magic_fields(&copy.state);
     if(!error && levelling_used(&copy.character))levelling_fields(&copy.character);
     if(!error && books_words(&copy.character))books_fields(&copy.character);
+    if(!error && instanced)instance_fields(&copy.state);   /* feature 16384: the item instances */
+    if(!error && packed)rows_encode(&copy);   /* feature 8192: the saved actor rows, packed (SAVE-ACTOR-ROWS-256-66) */
     if(!error && listed){
         if(changes->count>AW_SAVE_CHANGES)return 0;
         change_scratch.count=changes->count;
@@ -393,7 +653,7 @@ int AW_SaveEncodeChanges(unsigned char *out,int capacity,const aw_save_t *state,
     }
     if(!error && actors){
         uint32_t n=(uint32_t)changes->actor_bytes;
-        if(n>AW_SAVE_ACTOR_BYTES || changes->actor_bytes>changes->actor_capacity)return 0;
+        if(n>AW_SAVE_ACTOR_MAX_BYTES || changes->actor_bytes>changes->actor_capacity)return 0;
         word(&n);bytes(changes->actors,(int)n);
     }
     /* feature 128 (JOURNAL-ORIGINAL-VIEW-59): u32 length, then the dated journal history's own form (aw_jhist.c) */
@@ -401,6 +661,20 @@ int AW_SaveEncodeChanges(unsigned char *out,int capacity,const aw_save_t *state,
         int need=aw_save_journal_encode(changes->journal,NULL,0);uint32_t n=(uint32_t)need;
         word(&n);
         if(error || at>end-need || aw_save_journal_encode(changes->journal,out+at,need)!=need)return 0;
+        at+=need;
+    }
+    /* feature 2048 (MAP-MULTI-MARKERS-66): u32 length, then the map markers' own block (aw_mapmarks.c AWMK) */
+    if(!error && marked){
+        int need=aw_save_markers_encode(NULL,0);uint32_t n=(uint32_t)need;
+        word(&n);
+        if(error || at>end-need || aw_save_markers_encode(out+at,need)!=need)return 0;
+        at+=need;
+    }
+    /* feature 4096 (MAP-EXPLORED-SAVE-BLOCK-66): u32 length, then the explored map's own form (aw_mapfog.c AWFG) */
+    if(!error && explored){
+        int need=aw_save_explored_encode(NULL,0);uint32_t n=(uint32_t)need;
+        word(&n);
+        if(error || at>end-need || aw_save_explored_encode(out+at,need)!=need)return 0;
         at+=need;
     }
     /* feature 32: u32 length, then the world change list's own form (aw_ledger.c), checked row by row */
@@ -427,16 +701,41 @@ int AW_SaveDecodeChanges(const unsigned char *data,int size,aw_save_t *out,aw_ch
 {
     static aw_save_t candidate;int ok;
     memset(&candidate,0,sizeof(candidate));
+    short_bytes=0;
     ok=decode(data,size,out,changes,&candidate);
-    if(!ok)AW_ItemsFree(&candidate.state);
+    if(!ok){AW_ItemsFree(&candidate.state);AW_SaveActorsFree(&candidate);}
     memset(&candidate,0,sizeof(candidate));
     return ok;
 }
-void AW_SaveRelease(aw_save_t *save){if(save)AW_ItemsFree(&save->state);}
+void AW_SaveRelease(aw_save_t *save){if(save){AW_ItemsFree(&save->state);AW_SaveActorsFree(save);}}
+int AW_SaveBlockBytes(float kb)
+{
+    int k;
+    if(kb!=kb)k=AW_SAVE_BLOCK_KB_DEFAULT;          /* NaN */
+    else if(kb<AW_SAVE_BLOCK_KB_MIN)k=AW_SAVE_BLOCK_KB_MIN;
+    else if(kb>AW_SAVE_BLOCK_KB_MAX)k=AW_SAVE_BLOCK_KB_MAX;
+    else k=(int)kb;
+    return k*1024;
+}
+void AW_SaveChangesFree(aw_changes_t *c)
+{
+    if(!c)return;
+    if(c->take){free(c->actors);c->actors=NULL;c->actor_capacity=c->actor_bytes=0;}
+    free(c->explored_data);c->explored_data=NULL;c->explored_bytes=0;
+}
+int AW_SaveDecodeShort(void){return short_bytes;}
+/* a kept section's copy in a buffer of its own size; NULL when memory says no (counted in short_bytes) */
+static unsigned char *taken(const unsigned char *p,uint32_t n)
+{
+    unsigned char *b=(unsigned char *)AW_TryMalloc((unsigned long)n);
+    if(!b){short_bytes=(int)n;return NULL;}
+    memcpy(b,p,n);return b;
+}
 static int decode(const unsigned char *data,int size,aw_save_t *out,aw_changes_t *changes,aw_save_t *candidate_p)
 {
 #define candidate (*candidate_p)
-    uint32_t length=0,crc=0,features=0,dated_n=0;const unsigned char *dated=NULL;
+    uint32_t length=0,crc=0,features=0,dated_n=0,marks_n=0,explored_n=0;
+    const unsigned char *dated=NULL,*marks=NULL,*explored=NULL,*actor_src=NULL;int actor_kept=0;
     if(size<12 || size>AW_SAVE_MAX_BYTES || (memcmp(data,"AWS1",4) && memcmp(data,"AWS2",4) && memcmp(data,"AWS3",4) && memcmp(data,"AWS4",4)))return 0;
     writing=NULL;reading=data;at=4;end=size;error=0;word(&length);word(&crc);
     if(length!=(uint32_t)size || crc!=crc32(data+12,size-12))return 0;
@@ -444,7 +743,7 @@ static int decode(const unsigned char *data,int size,aw_save_t *out,aw_changes_t
     /* Older saves have quest indices but no chronological evidence. Do not
      * fabricate earlier entries or dates when decoding them. */
     if(!error && data[3]!='1')journal_fields(&candidate.state);
-    if(!error && data[3]=='4'){word(&features);if(features>2047)error=1;}
+    if(!error && data[3]=='4'){word(&features);if(features>0x7fff)error=1;}   /* bits 1..16384 */
     /* more than 32 kinds of item: feature 256 (4 mark words, up to 128 kinds; the v0.0.61 line's 128-kind table) or
      * feature 512 (ceil(kinds / 32) words), never both; 32 or fewer: neither (none before AWS4) */
     if((features&256) && (features&512))error=1;
@@ -461,17 +760,19 @@ static int decode(const unsigned char *data,int size,aw_save_t *out,aw_changes_t
     if(!error && data[3]=='4' && (features&4))magic_fields(&candidate.state);
     if(!error && data[3]=='4' && (features&64))levelling_fields(&candidate.character);
     if(!error && data[3]=='4' && (features&1024))books_fields(&candidate.character);
+    if(!error && data[3]=='4' && (features&16384))instance_fields(&candidate.state);   /* the item instances */
+    /* feature 8192: the packed actor rows, never beside the old form (a writer gives one or the other) */
+    if(!error && data[3]=='4' && (features&8192)){
+        if(candidate.actor_count)error=1;else rows_decode(&candidate);
+    }
     change_scratch.count=0;
     if(!error && data[3]=='4' && (features&8))changes_fields(&change_scratch);
     actor_scratch_bytes=0;
     if(!error && data[3]=='4' && (features&16)){
         uint32_t n=0;word(&n);
-        if(error || n<1 || n>AW_SAVE_ACTOR_BYTES || at>end-(int)n)error=1;
-        else{
-            if(changes && changes->actors && (int)n<=changes->actor_capacity){
-                memcpy(changes->actors,reading+at,n);actor_scratch_bytes=(int)n;}
-            at+=(int)n;
-        }
+        /* MAP-EXPLORED-SAVE-BLOCK-66: up to the largest block the setting gives, so every 32 KB block before it too */
+        if(error || n<1 || n>AW_SAVE_ACTOR_MAX_BYTES || at>end-(int)n)error=1;
+        else{actor_src=reading+at;actor_scratch_bytes=(int)n;at+=(int)n;}
     }
     /* feature 128: checked here, read into the caller's history only when the whole save is good (below) */
     if(!error && data[3]=='4' && (features&128)){
@@ -479,6 +780,19 @@ static int decode(const unsigned char *data,int size,aw_save_t *out,aw_changes_t
         if(error || dated_n<8 || at>end-(int)dated_n || !aw_save_journal_decode ||
            !aw_save_journal_decode(reading+at,(int)dated_n,NULL))error=1;
         else{dated=reading+at;at+=(int)dated_n;}
+    }
+    /* feature 2048: the map markers, checked here, kept as the pending load only when the whole save is good */
+    if(!error && data[3]=='4' && (features&2048)){
+        word(&marks_n);
+        if(error || marks_n<8 || at>end-(int)marks_n || !aw_save_markers_decode ||
+           !aw_save_markers_decode(reading+at,(int)marks_n,0))error=1;
+        else{marks=reading+at;at+=(int)marks_n;}
+    }
+    /* feature 4096: the explored map, framed here (its rows are read at the load's spawn, aw_save_explored_import) */
+    if(!error && data[3]=='4' && (features&4096)){
+        word(&explored_n);
+        if(error || explored_n<6 || at>end-(int)explored_n || memcmp(reading+at,"AWFG",4))error=1;
+        else{explored=reading+at;at+=(int)explored_n;}
     }
     /* feature 32 (CELL-CHANGES-59): the world change list, read into the caller's list only when the whole save is
      * good (it is the last section: nothing after it can still refuse); without a list it is checked, not kept */
@@ -492,16 +806,33 @@ static int decode(const unsigned char *data,int size,aw_save_t *out,aw_changes_t
         }
     }
     if(error || at!=size)return 0;
+    /* the actor block and the explored map: with TAKE (a load) in buffers of their own sizes, taken now that the whole
+     * save is good (MAP-EXPLORED-SAVE-BLOCK-66); else into the caller's buffer when it holds the block */
+    if(changes && changes->take){
+        AW_SaveChangesFree(changes);
+        if(actor_scratch_bytes && !(changes->actors=taken(actor_src,(uint32_t)actor_scratch_bytes)))return 0;
+        changes->actor_capacity=actor_scratch_bytes;actor_kept=1;
+        if(explored && changes->explored){
+            if(!(changes->explored_data=taken(explored,explored_n))){AW_SaveChangesFree(changes);return 0;}
+            changes->explored_bytes=(int)explored_n;
+        }
+    }else if(changes && changes->actors && actor_scratch_bytes<=changes->actor_capacity){
+        if(actor_scratch_bytes)memcpy(changes->actors,actor_src,(size_t)actor_scratch_bytes);
+        actor_kept=1;
+    }
     /* the dated journal history (feature 128; none: emptied, an older save's is taken over on load) */
     if(changes && changes->journal){
-        if(dated){if(!aw_save_journal_decode(dated,(int)dated_n,changes->journal))return 0;}
+        if(dated){if(!aw_save_journal_decode(dated,(int)dated_n,changes->journal)){AW_SaveChangesFree(changes);return 0;}}
         else if(aw_save_journal_decode)aw_save_journal_decode(NULL,0,changes->journal);
     }
+    if(changes && changes->markers && aw_save_markers_decode && !aw_save_markers_decode(marks,(int)marks_n,1)){
+        AW_SaveChangesFree(changes);return 0;}
     *out=candidate;
     if(changes){changes->count=change_scratch.count;
         memcpy(changes->entry,change_scratch.entry,sizeof(aw_change_t)*change_scratch.count);
-        changes->actor_bytes=actor_scratch_bytes;}
+        changes->actor_bytes=actor_kept?actor_scratch_bytes:0;}
     memset(&candidate.state.items,0,sizeof(candidate.state.items));   /* OUT owns the table now */
+    candidate.actors=NULL;candidate.actor_count=candidate.actor_capacity=0;   /* and the actor rows */
     return 1;
 #undef candidate
 }

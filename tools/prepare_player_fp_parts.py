@@ -53,6 +53,9 @@ CHEST = 3
 STANCES = ('hh', '1h', '2c', '2w', 'bow', 'xb', '1t')     # the ranged three since v0.0.61 (FIRST-PERSON-WEAPONS-56)
 # after them the held light (HELD-LIGHT-OWN-MODEL-61): the engine's stance 7 (aw_view.c HAND_PART_LIGHT)
 LIGHT_STANCE = 'light'
+# after the light the spell stance by range (PLAYER-CASTING-59, v0.0.66): the engine's stances 8 self, 9 touch,
+# 10 target (aw_hand_models.h AW_HAND_SPELL_STANCE + range): the open hands and the cast of 'spellcast'
+SPELL_STANCES = ('sps', 'spt', 'sp')
 FRAMES = 28
 # triangles per part by slot: the baked bare arms of a man keep about 700 of the source's (authored topology)
 FP_CAP = {3: 160, 6: 320, 7: 320, 8: 48, 9: 48, 11: 120, 12: 120, 13: 80, 14: 80}
@@ -93,6 +96,12 @@ def stance_times(skeleton):
     """[(stance, its 28 sample times)] in table order (prepare_hands.sample_clips: the baked hands' times)."""
     from prepare_hands import sample_clips
     return [(s, [float(t) for t in sample_clips(skeleton.events, s)[0]]) for s in STANCES]
+
+
+def spell_times(skeleton):
+    """[(spell stance, its 28 sample times)] in table order after the light (SPELL_STANCES)."""
+    from prepare_hands import sample_clips
+    return [(s, [float(t) for t in sample_clips(skeleton.events, s)[0]]) for s in SPELL_STANCES]
 
 
 def camera_at(skeleton, t):
@@ -150,6 +159,12 @@ def fp_table(skeleton):
     arm = left_arm(kept.parents, bones)
     lrot[:, arm], lpos[:, arm] = trot[:, arm], tpos[:, arm]
     rot, pos = np.concatenate((rot, lrot)), np.concatenate((pos, lpos))
+    for stance, t in spell_times(skeleton):
+        groups[stance] = (len(times), len(times) + FRAMES - 1)
+        views.extend([view_matrix(camera_at(skeleton, t[0]))] * FRAMES)
+        times.extend(t)
+        srot, spos = sa.sample_table(kept, bones, t)
+        rot, pos = np.concatenate((rot, srot)), np.concatenate((pos, spos))
     for f, view in enumerate(views):
         for b, parent in enumerate(parents):
             if parent < 0:
@@ -321,7 +336,7 @@ def unit_inputs(task):
     # table's frames are part of the key: the light stance (v0.0.61) made every part again once
     return {'entry': {'name': 'first-person part %d %s' % (part['slot'], part['id'])}, 'skeleton': FP_SKELETON,
             'part': part, 'cap': cap, 'palette_sha256': hashlib.sha256(palette).hexdigest(),
-            'table_frames': FRAMES * (len(STANCES) + 1)}
+            'table_frames': FRAMES * (len(STANCES) + 1 + len(SPELL_STANCES))}
 
 
 def _unit_cache():

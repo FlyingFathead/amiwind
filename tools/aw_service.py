@@ -43,7 +43,7 @@ import time
 import aw
 import build_recipe
 
-NOT_YET = ('chimport-region', 'smoke')
+NOT_YET = ('smoke',)
 # A MiniWind request: the test spot table of the requested commit (tools/miniwind_presets.py) and the options the
 # server sets for it (the preset and MiniWind itself; say them in options.preset / options.description).
 PRESET_TABLE = 'config/miniwind-presets.json'  # builders from before the build recipes
@@ -266,6 +266,27 @@ def recipe_retired_hits(document):
     return hits
 
 
+BYTE_ORDER_MARK = '﻿'
+
+
+def byte_order_marks(flags):
+    """(FLAGS, refusals) for a request's flag list (BUILD-FLAGS-MARK-SILENT-REFUSAL-66): a byte-order mark in front of
+    the first flag, as a flags file written with one hands it over, is removed; a mark anywhere else is refused, by
+    the flag that holds it (the builder would refuse that option without saying why)."""
+    flags = [str(flag) for flag in flags or []]
+    if flags and flags[0].startswith(BYTE_ORDER_MARK):
+        flags[0] = flags[0].lstrip(BYTE_ORDER_MARK)
+        if not flags[0]:
+            flags = flags[1:]                  # the mark alone, before a space
+    return flags, ['flag %s holds a byte-order mark (U+FEFF): write the flags without it' % ascii(flag)
+                   for flag in flags if BYTE_ORDER_MARK in flag]
+
+
+def flag_text(text):
+    """A --flags string as a flag list, with a leading byte-order mark removed (byte_order_marks refuses others)."""
+    return shlex.split((text or '').lstrip(BYTE_ORDER_MARK))
+
+
 def flag_pairs(flags):
     """(flag, value or None) for every --option in FLAGS ('--x=v', '--x v' or '--x')."""
     pairs = []
@@ -476,14 +497,30 @@ class Runner:
         code = first.wait()
         return (code or second.returncode), second.stdout, second.stderr
 
-    def logged(self, command, log_path):
-        return aw.run_logged(command, dict(os.environ), log_path, echo=self.echo)
+    def logged(self, command, log_path, **stall):
+        """Under the stall fallback (tools/stall_guard.py) by default; STALL keeps its name, history and resume."""
+        return aw.run_logged(command, dict(os.environ), log_path, echo=self.echo, **stall)
 
     def feed(self, command, data):
         """COMMAND with DATA (bytes) on its stdin; (exit, stdout, stderr)."""
         result = subprocess.run(command, input=data, capture_output=True)
         return (result.returncode, result.stdout.decode('utf-8', 'replace'),
                 result.stderr.decode('utf-8', 'replace'))
+
+
+def stall_options(config, request, run_name):
+    """The stall fallback of a long step (tools/stall_guard.py): its name, the per-kind stage history (the longest
+    silence of each stage in passing runs) and the resume command printed when it is stopped."""
+    kind = request.get('kind') or 'build'
+    options = request.get('options') or {}
+    try:
+        planned = float(options.get('cpus') or options.get('jobs') or 0) or None
+    except (TypeError, ValueError):
+        planned = None
+    return {'name': f'{kind} {run_name}', 'history_path': aw.state_dir(config) / f'stall-history-{kind}.json',
+            'planned_cores': planned, 'report': {},
+            'resume': f'aw request --kind {kind} --commit {request.get("commit")} with --reuse-from the stopped run '
+                      f'{run_name} (its finished units are kept)'}
 
 
 def git_text(repo, *args):
@@ -577,6 +614,9 @@ def submit(config, request, dry_run=False, runner=None, quiet=False):
     if request['kind'] in NOT_YET:
         return refuse(config, request, [f'kind {request["kind"]} is not implemented yet by the build server '
                                         '(the request form is fixed; use kind build or gate)'])
+    if request['kind'] == 'chimport-region':
+        return submit_chimport(config, request, dry_run or bool((request.get('options') or {}).get('dry_run')),
+                               runner or Runner(echo=not quiet))
     if request['kind'] == 'miniwind':
         try:
             request = miniwind_build_request(config, request)
@@ -840,13 +880,29 @@ CHECK_LINE = re.compile(r'\(f\) reuse preflight: (?P<reused>[0-9]+) of (?P<stage
                         r'(?:, keys too broad: (?P<too_broad>.*))?$')
 
 
+ARGPARSE_ERROR = re.compile(r'^[A-Za-z0-9_.-]{1,60}: error: ')
+CHECK_TAIL_LINES = 40     # lines of a refused check's own output carried in its refusal, notes and log
+
+
+def check_tail(text, lines=CHECK_TAIL_LINES):
+    """The last LINES non-empty lines of a check's output (stdout and stderr), each cut at 400 characters."""
+    rows = [line.rstrip()[:400] for line in (text or '').splitlines() if line.strip()]
+    return rows[-lines:]
+
+
 def parse_check(text):
     """What build.py ... --check printed: the developer-mode verdict, its reuse preflight line (f), its REFUSED
     lines, the first Error line and whether the checks completed."""
     found = {'developer_mode': None, 'preflight': None, 'refusals': [], 'error': None, 'completed': False,
-             'line': None, 'resources': []}
+             'line': None, 'resources': [], 'stops': []}
     for raw in (text or '').splitlines():
         line = raw.strip()
+        # the build's own first-minute reuse stop, as the check now runs it (build.py unit_stop_check,
+        # PLAN-CHECK-UNIT-STOPS-66): every STOP line, and the check's verdict as its error
+        if line.startswith('STOP '):
+            found['stops'].append(line)
+        if line.startswith('Check FAILED:') and found['error'] is None:
+            found['error'] = line[len('Check FAILED:'):].strip()
         if line.startswith(('Resource plan:', 'ADVISORY:', 'WILL THROTTLE', 'WILL NOT FIT', 'Machine at start:')):
             found['resources'].append(line)
         match = re.match(r'Developer mode: (OK|REFUSED)', line)
@@ -866,6 +922,10 @@ def parse_check(text):
             found['refusals'].append(line[len('REFUSED:'):].strip())
         if line.startswith('Error:') and found['error'] is None:
             found['error'] = line[len('Error:'):].strip()
+        # an option the builder's command line refuses ("build.py: error: unrecognized arguments: ..."): its own
+        # words, so a refused check names it (BUILD-FLAGS-MARK-SILENT-REFUSAL-66)
+        if ARGPARSE_ERROR.match(line) and found['error'] is None:
+            found['error'] = line
         if line.startswith('Checks completed.'):
             found['completed'] = True
     return found
@@ -927,14 +987,49 @@ def preflight_check(request, commands, runner, notes, reuse_info):
                      + '; '.join(problems))
         problems = []
     refusals += problems
+    for line in found['stops']:
+        print('aw submit: ' + line, flush=True)
+        notes.append('reuse stop: ' + line[:400])
+    step = {}
     if code != 0 or not found['completed']:
-        refusals += [f'developer mode: {text}' for text in found['refusals']]
+        # the check's own cause first, then what followed from it ("the reuse preflight did not answer"), then the
+        # last lines of the check's own output: a refusal always says why (BUILD-FLAGS-MARK-SILENT-REFUSAL-66)
+        cause = [f'developer mode: {text}' for text in found['refusals']]
         if found['error'] and not any(text in found['error'] for text in found['refusals']):
-            refusals.append(f'build check: {found["error"]}')
+            cause.append(f'build check: {found["error"]}')
         if not found['refusals'] and not found['error']:
-            refusals.append(f'build check exited {code} without "Checks completed"')
+            cause.append(f'build check exited {code} without "Checks completed"')
+        tail = check_tail((out or '') + '\n' + (err or ''))
+        step['output_tail'] = tail
+        for line in tail:
+            print('aw submit: check output | ' + line, flush=True)
+        refusals = cause + refusals + ([f'the build check\'s own output, its last {len(tail)} lines:\n'
+                                        + '\n'.join('  ' + line for line in tail)] if tail else
+                                       ['the build check printed nothing'])
     detail = (found['line'] or '')[4:] or ('checks completed' if found['completed'] else f'exit {code}')
-    return {'exit': code, 'ok': not refusals, 'detail': detail[:200]}, refusals
+    return dict({'exit': code, 'ok': not refusals, 'detail': detail[:200]}, **step), refusals
+
+
+def refused_check_pages(logs_dir, run_name, refusals, tail, facts):
+    """A refused build check, kept beside the build logs: LOGS_DIR/RUN.FAILURE.md (tools/build_failure.py
+    render_refusal: the refusals and the last lines of the check's own output) and, unless the run already has one,
+    LOGS_DIR/RUN.console.log with the same lines. Returns their paths (the result's logs); never raises."""
+    try:
+        import build_failure
+        logs_dir = Path(logs_dir)
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        page = logs_dir / f'{run_name}.FAILURE.md'
+        page.write_text(build_failure.render_refusal(run_name, refusals, tail, facts.get('commit'),
+                                                     facts.get('version')), encoding='utf-8', newline='\n')
+        log = logs_dir / f'{run_name}.console.log'
+        if not log.exists():
+            log.write_text(''.join(f'REFUSED: {text}\n' for text in refusals if '\n' not in text)
+                           + f'The build check\'s own output, its last {len(tail)} lines:\n'
+                           + ''.join(line + '\n' for line in tail), encoding='utf-8', newline='\n')
+        return [str(page), str(log)]
+    except Exception as exc:  # noqa: BLE001 - the page never hides the refusal itself
+        print(f'aw submit: the refused check\'s page was not written ({type(exc).__name__}: {exc})', flush=True)
+        return []
 
 
 def verify_inputs(request, commands, runner):
@@ -1046,7 +1141,13 @@ def submit_build(config, request, dry_run, runner):
         notes += [f'override (build-hold): {request["override"]["reason"]}: {text}' for text in holds]
     else:
         refusals += holds
-    flags = options.get('flags') or []
+    flags, marks = byte_order_marks(options.get('flags') or [])
+    refusals += marks
+    if not marks and flags != list(options.get('flags') or []):
+        notes.append('the byte-order mark in front of the first flag was removed (flags written by an editor or '
+                     'shell that puts one at the start of a file)')
+        options = dict(options, flags=flags)
+        request = dict(request, options=options)
     managed = managed_hits(flags)
     refusals += [f'flag {text}' for text in managed]
     retired = retired_hits(flags)
@@ -1124,10 +1225,11 @@ def submit_build(config, request, dry_run, runner):
         print(f'aw submit: result {path}')
         return aw.EXIT['passed'], path
 
-    def stop(problems):
+    def stop(problems, logs=()):
         free(config, lease, request['requester'])
         return refuse(config, request, problems, run_name=run_name, version=facts['version'], commit=facts['commit'],
-                      leases=[lease['id']], steps=steps, reuse=reuse_info, commands=shown, inputs=inputs)
+                      leases=[lease['id']], steps=steps, reuse=reuse_info, commands=shown, inputs=inputs,
+                      logs=list(logs))
 
     # 1. the source of THAT commit, exported into the build volume (never a working tree)
     code, out, err = runner.pipe(*commands['source'])
@@ -1156,14 +1258,23 @@ def submit_build(config, request, dry_run, runner):
     # 3. the builder's own developer-mode check + reuse preflight (seconds) before the build (hours)
     steps['check'], problems = preflight_check(request, commands, runner, notes, reuse_info)
     if problems:
-        return stop(problems)
+        pages = []
+        if steps['check'].get('output_tail') is not None:
+            # the refused check's page and log beside the build logs (no run folder exists yet): RUN.FAILURE.md and
+            # RUN.console.log, which the Toolkit Monitor's console view reads (BUILD-FLAGS-MARK-SILENT-REFUSAL-66)
+            pages = refused_check_pages(logs_dir, run_name, problems, steps['check']['output_tail'], facts)
+        return stop(problems, pages)
     # 4. the build
     log_path = logs_dir / f'{run_name}.console.log'
     build_started = aw.stamp()
     build_t0 = time.time()
-    code = runner.logged(commands['build'], log_path)
+    stall = stall_options(config, request, run_name)
+    code = runner.logged(commands['build'], log_path, **stall)
     timings = {'build_s': round(time.time() - build_t0, 1)}
     steps['build'] = {'exit': code, 'ok': code == 0, 'detail': f'build.py exit {code}'}
+    notes += [f'stall guard: {text}' for text in stall['report'].get('underused', [])]
+    if stall['report'].get('stalled'):
+        notes.append('stall guard: ' + stall['report']['stalled'])
     # 5. what the run says about itself
     summary = {}
     s_code, s_out, _ = runner.capture(commands['summary'], timeout=300)
@@ -1238,6 +1349,215 @@ def submit_build(config, request, dry_run, runner):
                         **({'over_budget': summary['over_budget']} if summary.get('over_budget') else {}),
                         **({'size_guard': summary['size_guard']} if summary.get('size_guard') else {}),
                         **({'cores': cores_info} if cores_info else {}))
+
+
+# --------------------------------------------------------------------------
+# Kind chimport-region: CHIMport cells measured by tools/chimport.py run (docs/chim/CHIMPORT.md), the island's
+# method for new cells (a layer's exterior included, CHIM-SOL-FLORA-PATH-65)
+
+CELLS_RE = re.compile(r'^-?\d+,-?\d+( -?\d+,-?\d+)*$')
+# src/mwad/esm.py GAME_MASTERS and mwad.masters.MASTERS_ENV (tools/mwad.py shadows the package on the tools path, so
+# the service keeps its own copy; tests/test_aw_service.py checks the two agree)
+GAME_MASTERS = ('Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm')
+MASTERS_ENV = 'AMIWIND_MASTERS'
+
+
+def selected_masters(names):
+    """The masters in load order (default the base game file alone): the base first, each once, known."""
+    names = [str(n).strip() for n in (names or []) if str(n).strip()] or [GAME_MASTERS[0]]
+    known = {m.casefold(): m for m in GAME_MASTERS}
+    if names[0].casefold() != GAME_MASTERS[0].casefold():
+        raise ValueError(f'the first master must be {GAME_MASTERS[0]}, not {names[0]}')
+    if len({n.casefold() for n in names}) != len(names):
+        raise ValueError('a master is named twice: ' + ', '.join(names))
+    unknown = [n for n in names if n.casefold() not in known]
+    if unknown:
+        raise ValueError('unknown master(s) ' + ', '.join(unknown))
+    return tuple(known[n.casefold()] for n in names)
+
+
+def chimport_errors(options):
+    """Problems of a chimport-region request's options (empty = sound)."""
+    errors = []
+    if not options.get('cells'):
+        errors.append('options.cells is required: the cells to measure, "x,y x,y ..." (the easy batch first)')
+    elif not CELLS_RE.match(options['cells'].strip()):
+        errors.append('options.cells must be "x,y x,y ..."')
+    try:
+        selected_masters(options.get('masters'))
+    except ValueError as exc:
+        errors.append(f'options.masters: {exc}')
+    return errors
+
+
+def chimport_commands(config, request, facts, run_name):
+    """The commands of one chimport-region request: the source export (as a build), the check (chimport.py run
+    --dry-run), the run, and the run's tracker result files listed (the feed: RUN/tracker/result-NNNN.json, which
+    tools/cell_progress.py result --file stores)."""
+    build = build_settings(config)
+    chim = build.get('chimport') or {}
+    options = request.get('options') or {}
+    mount = build['mount']
+    commit = facts['commit']
+    source = build['source_dir'].format(mount=mount, series=series(facts['version']), commit=commit)
+    workspace = options.get('workspace') or build['workspace']
+    run_dir = f'{workspace.rstrip("/")}/chimport/{run_name}'
+    prefix = build['container_prefix']
+    selected = selected_masters(options.get('masters'))
+    env = {'PYTHONPATH': f'{source}/src:{source}/tools', 'AMIWIND_AW_REQUEST': request['id'],
+           MASTERS_ENV: ','.join(selected)}
+    volume_rw, volume_ro = f'{build["volume"]}:{mount}:rw', f'{build["volume"]}:{mount}:ro'
+    script = (f'S={shlex.quote(source)}; if [ -f "$S/VERSION" ]; then echo "aw: source exists"; cat > /dev/null; '
+              f'else rm -rf "$S.part" && mkdir -p "$S.part" && tar -xf - -C "$S.part" && mv "$S.part" "$S"; fi; '
+              f'cat "$S/VERSION"')
+    cores = int(options.get('cpus') or options.get('jobs') or build.get('cpus') or 24)
+    cell_jobs = int(options.get('cell_jobs') or chim.get('cell_jobs') or 2)
+    workers = int(options.get('workers') or max(1, cores // cell_jobs))
+    args = [build['python'], 'tools/chimport.py', 'run', '--data-files', build['inputs_mount'],
+            '--palette', chim.get('palette') or f'{build["tools_dir"]}/palette.lmp', '--out', run_dir,
+            '--workers', str(workers), '--jobs', str(cell_jobs), '--cells', options['cells'].strip(),
+            '--storage-pool', 'on', '--workspace', workspace]
+    for key in ('qbsp', 'sdk'):
+        if chim.get(key):
+            args += ['--' + key, chim[key]]
+    if not options.get('world'):
+        args += ['--no-world']      # cells alone, the island's stage check; the growing world is a build's work
+    if options.get('timeout'):
+        args += ['--timeout', str(options['timeout'])]
+    labels = ['--label', f'amiwind.job={request["requester"]}', '--label',
+              f'amiwind.purpose=chimport-region {request["purpose"]}']
+    extra = ['--cpus', str(cores), '--memory', str(options.get('memory') or build.get('memory') or '44g'), *labels]
+    mounts = [f'{build["inputs_volume"]}:{build["inputs_mount"]}:ro', volume_rw]
+    return {
+        'source': (['git', '-C', str(request['repo']), 'archive', '--format=tar', facts['full']],
+                   docker_run(build, f'{prefix}-src-{commit}-{os.getpid()}', ['sh', '-c', script], [volume_rw],
+                              stdin=True)),
+        'check': docker_run(build, f'{prefix}-check-{run_name}', args + ['--dry-run'], mounts,
+                            extra=['--cpus', str(build.get('check_cpus') or 4), *labels], workdir=source, env=env),
+        'build': docker_run(build, f'{prefix}-build-{run_name}', args, mounts, extra=extra, workdir=source, env=env),
+        'feed': docker_run(build, f'{prefix}-feed-{run_name}',
+                           ['sh', '-c', f'ls -1 {shlex.quote(run_dir)}/tracker/result-*.json 2>/dev/null || true'],
+                           [volume_ro], extra=labels),
+        'run_dir': run_dir, 'source_dir': source, 'masters': list(selected), 'workers': workers,
+        'cell_jobs': cell_jobs,
+    }
+
+
+def submit_chimport(config, request, dry_run, runner):
+    """kind chimport-region: the checks of a build (version, entry, published integration head, holds), a run name
+    and a core lease, the source of that commit, chimport.py run --dry-run as the check (seconds), the run, the
+    tracker result files listed, the trial line and the result JSON."""
+    started, t0 = aw.stamp(), time.time()
+    notes, refusals = [], []
+    options = request.get('options') or {}
+    build_settings(config)
+    refusals += chimport_errors(options)
+    try:
+        facts = commit_facts(config, request)
+    except Refused as exc:
+        return refuse(config, request, [str(exc)])
+    if facts['version'] != request['version']:
+        refusals.append(f'the request says {request["version"]} but commit {facts["commit"]} has VERSION '
+                        f'{facts["version"]}')
+    accept = request['override']['reason'] if allowed(request, 'version-mismatch') else None
+    entry_refusals, warnings, entry = aw.entry_findings(config, request['repo'], accept, rev=facts['full'],
+                                                        version=facts['version'])
+    refusals += entry_refusals
+    notes += warnings
+    published = published_integration(config)
+    checked_head = entry.get('integration_head') or ''
+    if published and not (checked_head and (published['head'].startswith(checked_head)
+                                            or checked_head.startswith(published['head']))):
+        if aw.is_ancestor(request['repo'], published['head'], facts['full']) is False:
+            refusals.append(aw.stale_builder_text(request['repo'], facts['commit'], published['head'],
+                                                  'published integration head', config.get('integration_ref')))
+    import aw_broadcast
+    holds = aw_broadcast.hold_refusals(config)
+    if holds and allowed(request, 'build-hold'):
+        notes += [f'override (build-hold): {request["override"]["reason"]}: {text}' for text in holds]
+    else:
+        refusals += holds
+    lease = aw.lease_run_name(config, request['repo'], request['purpose'], request['requester'], request['reason'],
+                              version=facts['version'], commit=facts['commit'], taken=set(),
+                              record=not (dry_run or refusals))
+    run_name = lease['key']
+    if refusals:
+        free(config, lease, request['requester'])
+        return refuse(config, request, refusals, run_name=run_name, version=facts['version'], commit=facts['commit'],
+                      leases=[lease['id']])
+    cores_info = None
+    if not dry_run:
+        try:
+            request, cores_info, cores_lease = take_cores(config, request, run_name, runner, notes)
+        except aw.AwError as exc:
+            free(config, lease, request['requester'])
+            return refuse(config, request, [f'core lease: {exc}'], run_name=run_name, version=facts['version'],
+                          commit=facts['commit'], leases=[lease['id']])
+        if cores_lease:
+            lease['_cores'] = {'lease': cores_lease, 'runner': runner}
+    commands = chimport_commands(config, request, facts, run_name)
+    shown = [show(commands['source'][0]) + ' | ' + show(commands['source'][1])]
+    shown += [show(commands[key]) for key in ('check', 'build', 'feed')]
+    notes.append('masters %s; %d cells at once, %d workers inside each' % (
+        ','.join(commands['masters']), commands['workers'], commands['cell_jobs']))
+    print(f'aw submit: {run_name}: chimport-region of {facts["commit"]} ({facts["version"]}) for '
+          f'{request["requester"]}: {len(options["cells"].split())} cells', flush=True)
+    steps = {'checks': {'exit': 0, 'ok': True, 'detail': 'version, integration head, cells, masters'}}
+    reuse_info = {'applicable': False}
+    if dry_run:
+        for line in shown:
+            print('aw submit: would run: ' + line)
+        notes.append('dry run: nothing ran')
+        free(config, lease, request['requester'])
+        document = result_document(request, run_name, 'passed', started, t0, version=facts['version'],
+                                   commit=facts['commit'], steps=steps, notes=notes, dry_run=True, commands=shown,
+                                   leases=[lease['id']])
+        path = write_result(config, document)
+        print(f'aw submit: result {path}')
+        return aw.EXIT['passed'], path
+
+    def stop(problems):
+        free(config, lease, request['requester'])
+        return refuse(config, request, problems, run_name=run_name, version=facts['version'], commit=facts['commit'],
+                      leases=[lease['id']], steps=steps, commands=shown)
+
+    code, out, err = runner.pipe(*commands['source'])
+    seen = (out.strip().splitlines() or [''])[-1].strip()
+    ok = code == 0 and 'v' + seen.lstrip('v') == facts['version']
+    steps['stage-source'] = {'exit': code, 'ok': ok, 'detail': f'{commands["source_dir"]}: VERSION {seen or "?"}'}
+    if not ok:
+        return stop([f'source export failed (exit {code}, VERSION {seen or "?"}): '
+                     f'{(err.strip().splitlines() or [""])[-1][:200]}'])
+    code, out, err = runner.capture(commands['check'], timeout=900)
+    steps['check'] = {'exit': code, 'ok': code == 0,
+                      'detail': ((out or err).strip().splitlines() or [''])[-1][:300]}
+    if code != 0:
+        return stop([f'chimport.py run --dry-run failed (exit {code}): '
+                     f'{((err or out).strip().splitlines() or [""])[-1][:300]}'])
+    logs_dir = aw.state_dir(config) / 'logs'
+    logs_dir.mkdir(exist_ok=True)
+    log_path = logs_dir / f'{run_name}.console.log'
+    run_started, run_t0 = aw.stamp(), time.time()
+    code = runner.logged(commands['build'], log_path, **stall_options(config, request, run_name))
+    timings = {'build_s': round(time.time() - run_t0, 1)}
+    steps['build'] = {'exit': code, 'ok': code == 0, 'detail': f'chimport.py run exit {code}'}
+    f_code, f_out, _ = runner.capture(commands['feed'], timeout=300)
+    fed = [line.strip() for line in f_out.splitlines() if line.strip().endswith('.json')]
+    steps['feed'] = {'exit': f_code, 'ok': f_code == 0,
+                     'detail': '%d tracker result file(s): store each with tools/cell_progress.py result --file'
+                               % len(fed)}
+    result = 'passed' if steps['build']['ok'] else 'failed'
+    trial = {'time': aw.stamp(), 'run': commands['run_dir'], 'run_name': run_name,
+             'version': facts['version'].lstrip('v'), 'commit': facts['commit'], 'started': run_started,
+             'finished': aw.stamp(), 'result': result, 'failed_stage': None if result == 'passed' else 'chimport',
+             'requester': request['requester'], 'reason': request['reason'], 'request_id': request['id'],
+             'kind': 'chimport-region', 'via': 'aw submit'}
+    trials = append_trial(config, trial)
+    steps['trial-log'] = {'exit': 0, 'ok': True, 'detail': str(trials or 'no build.trials_log configured')}
+    return finish_build(config, request, run_name, lease, started, t0, facts, steps, notes, shown, reuse_info, [],
+                        numbers={'cells': len(options['cells'].split()), 'tracker_results': len(fed)},
+                        timings=timings, failed_stage=trial['failed_stage'], logs=[str(log_path)],
+                        artifacts=[commands['run_dir'], *fed], **({'cores': cores_info} if cores_info else {}))
 
 
 PERF_GUARD_EXIT = 3   # tools/build.py: every stage passed, the perf guard failed the build result
@@ -1358,6 +1678,8 @@ def read_recipe(path):
     import hashlib
     try:
         raw = Path(path).read_bytes()
+        if raw.startswith(BYTE_ORDER_MARK.encode('utf-8')):
+            raw = raw[len(BYTE_ORDER_MARK.encode('utf-8')):]    # a file written with a byte-order mark: without it
         text = raw.decode('utf-8')
         document = json.loads(text)
     except (OSError, ValueError) as exc:
@@ -1379,7 +1701,7 @@ def make_request(args, repo_version=None):
     options = {}
     if args.kind == 'build':
         if args.flags:
-            options['flags'] = shlex.split(args.flags)
+            options['flags'] = flag_text(args.flags)
         for key in ('reuse_from', 'reuse_from_commit', 'workspace', 'cpus', 'memory', 'jobs', 'priority'):
             if getattr(args, key) is not None:
                 options[key] = getattr(args, key)
@@ -1396,7 +1718,7 @@ def make_request(args, repo_version=None):
             options['dry_run'] = True
     elif args.kind == 'miniwind':
         if args.flags:
-            options['flags'] = shlex.split(args.flags)
+            options['flags'] = flag_text(args.flags)
         for key in ('preset', 'description', 'reuse_from', 'reuse_from_commit', 'workspace', 'cpus', 'memory', 'jobs',
                     'priority'):
             if getattr(args, key, None) is not None:
@@ -1405,12 +1727,20 @@ def make_request(args, repo_version=None):
             options['inputs'] = [parse_input(text) for text in args.input]
         if args.dry_run:
             options['dry_run'] = True
+    elif args.kind == 'chimport-region':
+        for key in ('cells', 'workers', 'cell_jobs', 'workspace', 'cpus', 'memory', 'jobs', 'priority'):
+            if getattr(args, key, None) is not None:
+                options[key] = getattr(args, key)
+        if getattr(args, 'masters', None):
+            options['masters'] = [n.strip() for n in args.masters.split(',') if n.strip()]
+        if args.dry_run:
+            options['dry_run'] = True
     elif args.kind == 'gate':
         for key in ('range', 'number'):
             if getattr(args, key) is not None:
                 options[key] = getattr(args, key)
     elif args.flags:
-        options['flags'] = shlex.split(args.flags)
+        options['flags'] = flag_text(args.flags)
     now = datetime.datetime.now().astimezone()
     request = {'schema': 'aw-request-1', 'id': f'req-{now:%Y%m%d-%H%M%S}-{os.getpid()}-{args.kind}',
                'kind': args.kind, 'repo': repo, 'commit': commit, 'purpose': args.purpose, 'version': version,
@@ -1452,6 +1782,12 @@ def add_parsers(sub):
     request_p.add_argument('--preset', help='kind miniwind: the test spot (config/miniwind-presets.json)')
     request_p.add_argument('--description', help='kind miniwind: the Scene: line of the startup screen '
                            '(default: the description of the preset)')
+    request_p.add_argument('--cells', help='kind chimport-region: the cells to measure, "x,y x,y ..."')
+    request_p.add_argument('--masters', help='kind chimport-region: the masters in load order, comma list '
+                           '(default: the base game file alone)')
+    request_p.add_argument('--workers', type=int, help='kind chimport-region: cells converted at once')
+    request_p.add_argument('--cell-jobs', dest='cell_jobs', type=int,
+                           help='kind chimport-region: worker processes inside each cell (default 2)')
     request_p.add_argument('--range')
     request_p.add_argument('--number', type=int)
     request_p.add_argument('--override', metavar='REASON', help='lift the refusals named by --allow, with a reason')
@@ -1473,7 +1809,8 @@ def main(args, config):
                 return 0
         else:
             try:
-                request = json.loads(Path(args.request).read_text(encoding='utf-8'))
+                # utf-8-sig: a request file written with a byte-order mark is read without it
+                request = json.loads(Path(args.request).read_text(encoding='utf-8-sig'))
             except (OSError, ValueError) as exc:
                 raise Refused(f'cannot read the request {args.request}: {exc}')
         code, _ = submit(config, request, dry_run=args.dry_run, quiet=args.quiet)

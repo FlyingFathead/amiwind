@@ -4,8 +4,10 @@
 import argparse, hashlib, json, math, struct, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'src'))
-from mwad.audit import records, subrecords, cell_data, string, BSA
+from mwad.audit import records, subrecords, cell_data, string
+from mwad.archives import layered_bsa
 from mwad.paths import child_ci, ensure_external, resolve_data_files
+from mwad.masters import master_path
 from prepare_scenery import bsa_read, model_geometry, nif_reader, world_bounds
 from prepare_quake import CENTRE
 from area_config import MAP_NAMES, inside
@@ -60,7 +62,7 @@ def door_sources(data_files):
     master file, so a stage can run it beside its own work (build_parallel.Background) and pass
     it to prepare() as sources."""
     from mwad.interior import read_interiors
-    master=child_ci(resolve_data_files(data_files),'Morrowind.esm')
+    master=master_path(resolve_data_files(data_files))
     report=catalogue(master)
     return report,read_interiors(master,destination_names(report))
 
@@ -125,8 +127,8 @@ def name_mapping(report):
 def prepare(data_files, scene, sources=None):
     """sources: door_sources(data_files) already computed (for example beside the stage's work)."""
     data_files=resolve_data_files(data_files);scene=ensure_external(scene,'door conversion')
-    report,cells=sources if sources is not None else (catalogue(child_ci(data_files,'Morrowind.esm')),None)
-    bsa=BSA(child_ci(data_files,'Morrowind.bsa'));N=nif_reader();cache={};links=[]
+    report,cells=sources if sources is not None else (catalogue(master_path(data_files)),None)
+    bsa=layered_bsa(data_files);N=nif_reader();cache={};links=[]
     # A town on CHIM made from the game data has no legacy map but is converted (CHIM-LEGACY-CHAIN-33).
     from chim_town import native_towns
     from town_config import runtime_towns
@@ -172,7 +174,7 @@ def prepare(data_files, scene, sources=None):
     write_bank(scene/'id1/scene-doors.txt',[r for r in links if r['source'] in original])
     (scene/'door-conversion.json').write_text(json.dumps(report,indent=2)+'\n')
     (scene/'asset-name-map.json').write_text(json.dumps(name_mapping(report),indent=2)+'\n')
-    interior_reference(child_ci(data_files,'Morrowind.esm'),report,scene,cells)
+    interior_reference(master_path(data_files),report,scene,cells)
     return {'catalogued':len(report['doors']),'mapped':len(links),
             'available':sum(r['target']!='-' for r in links),'links':links}
 

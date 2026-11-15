@@ -126,7 +126,8 @@ def read_bsa_asset(bsa, name):
     """The bytes of one asset of a mwad.audit.BSA, by (any-case, any-slash) name."""
     from .audit import normpath
     entry = bsa.entries[normpath(name)]
-    with bsa.path.open('rb') as stream:
+    # a layered archive's entry names the archive it comes from (mwad.archives.layered_bsa); a plain one does not
+    with entry.get('path', bsa.path).open('rb') as stream:
         stream.seek(entry['offset'])
         raw = stream.read(entry['bytes'])
     require(len(raw) == entry['bytes'], 'Truncated BSA asset')

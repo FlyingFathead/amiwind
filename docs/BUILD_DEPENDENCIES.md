@@ -1,6 +1,6 @@
 # Dependency checks and reference versions
 
-_Last updated with AmiWind v0.0.46-dev1 (20 October 2026)._
+_Last updated with AmiWind v0.0.66-dev2 (13 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -160,6 +160,15 @@ It locates candidates before inventory or hashing. Multiple candidates require
 an interactive choice or a specific `--data-files` argument. Missing or invalid
 inputs stop before dependency installation. The game prompt includes GOG and
 Steam store links. Ctrl+C cancels without a Python traceback.
+
+The expansions are checked the same way when the build selects them (`--dlc`,
+both by default): `Tribunal.esm`, `Tribunal.bsa`, `Bloodmoon.esm` and
+`Bloodmoon.bsa` of each selected expansion are required, and their sizes and
+SHA-256 are compared with the `expansions` entries of
+`config/input-reference/reference.json`. A missing file stops the check, and so
+does a different one (unless `--allow-data-differences`), naming the file and
+the expected size and SHA-256, before any build stage. An expansion left out
+(`--no-dlc`, `--dlc tribunal`, `--dlc bloodmoon`) is not required.
 
 The terrain stage compares the core master/archive. The AGA stage also compares
 the reference Music and Sound files. Splash remains optional. AGA font conversion

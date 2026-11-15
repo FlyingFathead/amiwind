@@ -41,6 +41,15 @@ class RefIdentityTests(unittest.TestCase):
         # a high byte past the master list counts as the plugin's own (tools/door_graph.py's rule)
         self.assertEqual(R.stable_ref_of_frmr((5 << 24) | 42, 'Tribunal.esm', masters), R.stable_ref('Tribunal.esm', 42))
 
+    def test_a_merged_master_key_names_its_owner(self):
+        # the merged master (src/mwad/masters.py _ref_key: game master index * 2**22 + number), read through the base
+        # game file: the v0.0.66-dev1 build stopped on 4201598 = Tribunal's reference 7294 in its focus stage
+        self.assertEqual(R.stable_ref('Morrowind.esm', (1 << 22) + 7294), R.stable_ref('Tribunal.esm', 7294))
+        self.assertEqual(R.stable_ref('Morrowind.esm', (2 << 22) + 33635), R.stable_ref('Bloodmoon.esm', 33635))
+        self.assertEqual(R.stable_ref('Morrowind.esm', 484481), 484481)
+        with self.assertRaises(R.RefIdentityError):
+            R.stable_ref('Morrowind.esm', 3 << 22)
+
     def test_refusals(self):
         with self.assertRaises(R.RefIdentityError):
             R.stable_ref('Unknown.esp', 1)

@@ -50,6 +50,9 @@ enum {AWV_GET=0,AWV_SET=1,AWV_MOD=2,AWV_MODCURRENT=3,AWV_RATIO=4};
 #define AWR_SWIMS 32
 #define AWR_FLIES 64
 #define AWR_BIPEDAL 128
+/* A creature record (KIND 1) that can move by no means (OpenMW 0.51 creature.cpp canWalk/canSwim/canFly/isBipedal all
+ * false): it stays where it stands (HEART-OF-LORKHAN-FOLLOWS-DAGOTH-65) */
+#define AW_ActorBaseStationary(kind,flags) ((kind)==1 && !((flags)&(AWR_WALKS|AWR_SWIMS|AWR_FLIES|AWR_BIPEDAL)))
 /* Live flags. */
 #define AWL_USED 1
 #define AWL_CHANGED 2              /* differs from its base: kept and saved */
@@ -149,6 +152,9 @@ void AW_ActorModCurrent(aw_actor_t *a,int dynamic,float value);   /* MODCURRENT:
 float AW_ActorRatio(const aw_actor_t *a,int dynamic);             /* current / base (1 when base is 0) */
 int AW_ActorOnDeath(aw_actor_t *a);                               /* 1 once after it died */
 void AW_ActorKill(aw_actor_t *a);                                 /* dead; OnDeath reads 1 once; dead count + 1 */
+/* ESSENTIAL-DEATH-MESSAGE-66: called once per death by AW_ActorKill (NULL: none; aw_mwhost.c binds it: the
+ * essential death box for a record flagged AWR_ESSENTIAL, OpenMW 0.51 actors.cpp sKilledEssential on any death) */
+extern void (*aw_actor_killed)(const aw_actor_t *a);
 int AW_ActorDeadCount(int row);                                   /* GetDeadCount of an actor id */
 /* Inventory: the base list plus the changes; ITEM an AITM row. */
 int AW_ActorItemCount(const aw_actor_t *a,int item);
@@ -160,6 +166,8 @@ int AW_ActorWearsItem(const aw_actor_t *a,int item);
 /* The type of the weapon the record of ROW holds (its weapon entry: the WPDT type, OpenMW's weapon type 0..13), -1
  * none (the animation's stance, aw_animkit.c). */
 int AW_ActorWeaponType(int row);
+/* The weight A carries (its base inventory and changes, count x weight; ACTOR-MECHANICS-USE-STATS-66 row 23). */
+float AW_ActorCarriedWeight(const aw_actor_t *a);
 /* The AENC row of the enchantment on the weapon the record of ROW holds (AW_ACTOR_NONE: none, or no weapon); *ITEM its
  * AITM row (-1 none). v0.0.61, an NPC's Cast When Strikes weapon. */
 int AW_ActorWeaponEnchant(int row,int *item);
@@ -237,6 +245,15 @@ int AW_MadeItemAdd(const aw_made_item_t *m);
 extern const aw_made_item_t *(*aw_inventory_made_item)(int index);
 int AW_MadeExport(unsigned char *out,int capacity);
 int AW_MadeImport(const unsigned char *p,int bytes);
+/* SAVE-MADE-RECORDS-64-CAP-66: the lists grow from the heap to AW_MADE_MAX / AW_GEMS_MAX (guards, were 64 fixed). The
+ * AWMD, AWEN and AWSG blocks keep their one-byte counts and hold the first 255 of each, so every save of up to 255 is
+ * written as before; the rest ride in blocks of their own after them ("AWM2" u16 spells, "AWE2" u16 items, "AWG2" u16
+ * gems, the records as in the first blocks). ExportMore: the bytes written (0 none past 255, -1 no room); ImportMore:
+ * the bytes read (-1 a bad block: what the first blocks gave stays). */
+int AW_MadeExportMore(unsigned char *out,int capacity);
+int AW_MadeImportMore(const unsigned char *p,int bytes);
+int AW_GemsExportMore(unsigned char *out,int capacity);
+int AW_GemsImportMore(const unsigned char *p,int bytes);
 /* Filled soul gems (bounded, saved: AWSG): the gem id and the soul's creature (ACTB row); its soul value. */
 void AW_GemsReset(void);
 int AW_GemCount(void);
@@ -246,14 +263,17 @@ int AW_GemRemove(int i);
 int AW_GemSoul(int i);
 int AW_GemsExport(unsigned char *out,int capacity);
 int AW_GemsImport(const unsigned char *p,int bytes);
-/* Places a script revealed on the map (ShowMap TEXT: the exterior cells whose name holds it; bounded, saved: AWMP),
- * kept for the map's place markers. */
+/* Places a script revealed on the map (ShowMap TEXT: the exterior cells whose name holds it; saved: AWMP the first
+ * 255, "AWP2" u16 the rest, SAVE-REVEALED-PLACES-128-CAP-66), kept for the map's place markers. The list grows from the
+ * heap to a guard of 1,024 (was 128 fixed). ExportMore / ImportMore as the made things' above. */
 void AW_RevealedReset(void);
 int AW_RevealedCount(void);
 const char *AW_RevealedAt(int i);
 int AW_RevealedAdd(const char *text);
 int AW_RevealedExport(unsigned char *out,int capacity);
 int AW_RevealedImport(const unsigned char *p,int bytes);
+int AW_RevealedExportMore(unsigned char *out,int capacity);
+int AW_RevealedImportMore(const unsigned char *p,int bytes);
 void AW_SoldReset(void);
 int AW_SoldCount(void);
 int AW_SoldMax(void);
@@ -273,6 +293,10 @@ int AW_ActorStateImport(const unsigned char *data,int bytes);
 int AW_ActorStateExportCounts(unsigned char *out,int capacity);
 int AW_ActorStateExportRecords(unsigned char *out,int capacity);
 int AW_ActorStateImportRecords(const unsigned char *data,int bytes);
+/* SAVE-EXPORT-FAILURE-ACCEPTED-65: the changed records as one AWAR copy for a save: *OUT a block from ALLOC (the caller
+ * frees it; NULL with *BYTES 0 when nothing changed or the table is not open). 1 good, 0 the save must not be written:
+ * more than MAX bytes, ALLOC said no, or the export did not give the bytes it promised (*OUT NULL then). */
+int AW_ActorStateRecordsCopy(void *(*alloc)(unsigned long),unsigned long max,unsigned char **out,int *bytes);
 /* CELL-CHANGES-59 slice 7: a respawned actor's live record goes (1 when there was one); after a load of another build's
  * save, every changed record and dead count goes (how many). */
 int AW_ActorForget(uint32_t reference);

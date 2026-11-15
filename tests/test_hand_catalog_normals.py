@@ -118,8 +118,9 @@ class CatalogNormalTests(unittest.TestCase):
         parallel = self.bake_tree(4, sizes)
         self.assertEqual(sizes, [4])
         self.assertEqual(parallel, serial)
-        # hands + torch arms + the three armed stances (PLAYER-GEAR-VISUAL-59) for 3 races x 2 sexes
-        self.assertEqual(len([name for name in serial[1] if name.startswith('progs/hands/')]), 30)
+        # hands + torch arms + the three armed stances (PLAYER-GEAR-VISUAL-59) + the spell hands (_sp, PLAYER-CASTING-59)
+        # for 3 races x 2 sexes
+        self.assertEqual(len([name for name in serial[1] if name.startswith('progs/hands/')]), 36)
         self.assertIn('gfx/hand-weapons.aww', serial[1])
 
     def test_source_outputs_and_every_hash_use_surface_normal_bytes(self):

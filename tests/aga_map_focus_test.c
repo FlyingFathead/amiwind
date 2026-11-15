@@ -92,6 +92,7 @@ int COM_FOpenFile(char *name,FILE **out){
         fixed(f,"quest",64);word(f,1);word(f,0);word(f,strlen(body)+1);
         fixed(f,"quest",64);word(f,10);word(f,strlen(body)+1);word(f,sizeof(body)-strlen(body)-1);
     }else if(!strcmp(name,"world/entries.dat"))fwrite(body,1,sizeof(body),f);
+    else if(!strcmp(name,"world/region-names.awn")){}   /* no place catalogue: the map draws no place markers */
     else assert(0);
     size=ftell(f)-base;fseek(f,base,SEEK_SET);return size;
 }

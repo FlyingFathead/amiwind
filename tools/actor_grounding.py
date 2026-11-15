@@ -27,27 +27,37 @@ _ROOMS = {}
 
 
 def room_classes(path=None):
-    """{reference number: (room, id lower case, class)} of the generated room file ({} when it is missing)."""
+    """{reference number: (room, id lower case, class)} of the generated room files ({} when both are missing): PATH
+    (default config/actor_grounding_rooms.json, the base game's references) and, beside it,
+    actor_grounding_rooms_layers.json, the expansions' references (their merged numbers, never a base-game number;
+    tools/actor_grounding_census.py rooms_files, ROOM-BATCH-NPC-GROUNDING-48 v0.0.66). The base game's file does not
+    move when an expansion is added, so a key that names it does not either."""
     path = Path(path or ROOMS)
-    try:
-        stamp = path.stat().st_mtime_ns
-    except OSError:
+    paths = [path, path.parent / 'actor_grounding_rooms_layers.json']
+    stamps = []
+    for each in paths:
+        try:
+            stamps.append((str(each), each.stat().st_mtime_ns))
+        except OSError:
+            pass
+    if not stamps:
         return {}
-    key = (str(path), stamp)
+    key = tuple(stamps)
     if key not in _ROOMS:
-        doc = json.loads(path.read_text(encoding='utf-8'))
-        if doc.get('format') != ROOMS_FORMAT:
-            raise ValueError('Unsupported room grounding file: %s' % path.name)
         index, twice = {}, set()
-        for room, classes in doc['rooms'].items():
-            for name, rows in classes.items():
-                if name not in ROOM_STATES:
-                    raise ValueError('Unknown room grounding class %r (%s)' % (name, room))
-                for row in rows:
-                    number, ident = int(row[0]), str(row[1]).casefold()
-                    if number in index:
-                        twice.add(number)
-                    index[number] = (room, ident, name)
+        for each, _ in stamps:
+            doc = json.loads(Path(each).read_text(encoding='utf-8'))
+            if doc.get('format') != ROOMS_FORMAT:
+                raise ValueError('Unsupported room grounding file: %s' % Path(each).name)
+            for room, classes in doc['rooms'].items():
+                for name, rows in classes.items():
+                    if name not in ROOM_STATES:
+                        raise ValueError('Unknown room grounding class %r (%s)' % (name, room))
+                    for row in rows:
+                        number, ident = int(row[0]), str(row[1]).casefold()
+                        if number in index:
+                            twice.add(number)
+                        index[number] = (room, ident, name)
         for number in twice:          # a reference number two rooms claim names no actor: never used
             index.pop(number)
         _ROOMS.clear()

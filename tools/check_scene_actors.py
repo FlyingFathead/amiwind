@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'src'))
 from actor_grounding import annotate, bake_ground
 from check_actor_ground import require
 from mwad.paths import child_ci, copy_tree, ensure_external
+from mwad.masters import master_path
 from prepare_seyda_regions import convert_builder_scene
 from recorded_stage import check as check_recorded, frozen_maps
 from vis_options import add_vis_option
@@ -51,7 +52,7 @@ def check(scene, data_files, output, allow_known=None, *, ericw_bin, canonical_l
                               recorded=seyda_recorded, terrain_cull=seyda_terrain_cull)
     # Recorded-stage maps (BUILD-SEYDA-REGEN-30) keep their recorded placements.
     frozen = frozen_maps(output/'bounded-seyda')
-    annotate(maps, child_ci(data_files, 'Morrowind.esm'), jobs=jobs, exclude=frozen)
+    annotate(maps, master_path(data_files), jobs=jobs, exclude=frozen)
     (output/'actor-ground-support.json').write_text(
         json.dumps(bake_ground(maps, jobs=jobs, exclude=frozen), indent=2)+'\n')
     check_recorded(id1, output/'bounded-seyda', 'actor-contact actor grounding', jobs=jobs)

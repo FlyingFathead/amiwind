@@ -40,6 +40,7 @@ td.passed{color:#7dffa6}td.failed{color:#ff7070}td.running{color:#8bd5ff}td.perf
 #overall{margin:0 0 10px}#overall .obar{position:relative;height:16px;background:#0d1620;border:1px solid #2c4256;border-radius:4px;overflow:hidden}
 #overall .obar i{position:absolute;top:0;bottom:0;left:0;background:#38a9e8}#overall .obar i.passed{background:#3fbf7a}#overall .obar i.failed{background:#e04848}
 #overall .otext{margin-top:3px;font-size:13px}
+#failbox{margin:0 0 10px;font-size:13px}#failwhat{color:#ff9090;margin-bottom:3px;overflow-wrap:anywhere}#faillink{color:#8bd5ff}
 #machine .mhead{margin:0 0 6px}#machine table td.num{text-align:right;white-space:nowrap}
 .tlchk{display:inline-flex;gap:4px;align-items:center}.tlchk i{display:inline-block;width:14px;height:3px;border-radius:2px}
 .lens{background:none;border:0;cursor:pointer;padding:0 2px;font-size:12px}.runlink{cursor:pointer;text-decoration:underline dotted}tr.picked td{background:#22384d}.right{min-width:0}#timeline{max-width:100%}#acttail{margin:6px 0 4px;max-height:12em;overflow:auto;background:#0b121a;border:1px solid #2c4256;border-radius:6px;padding:6px;font:11px/1.3 ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-all}.silent{color:#ffb070;font-weight:600}.red{color:#ff5050;font-weight:700}#timelinechart{overflow:hidden;touch-action:none;cursor:crosshair}#timelinechart svg{display:block}#tlbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px}#tlbar input{background:#203346;color:#edf3fa;border:1px solid #456;border-radius:4px}#timelinedetail{margin:6px 0 0;white-space:pre-wrap;font:11px/1.35 ui-monospace,Consolas,monospace;color:#ffe9b0}#timelinedetail:empty{display:none}#timeline.maximized{position:fixed;inset:0;z-index:1000;margin:0;border-radius:0;overflow:auto;background:#162433}#timeline:fullscreen{overflow:auto;background:#162433}#timelinechart rect{cursor:pointer}#timelinetip{min-height:1.4em;margin-top:4px}
@@ -50,6 +51,7 @@ td.passed{color:#7dffa6}td.failed{color:#ff7070}td.running{color:#8bd5ff}td.perf
 <script src="panel-fold.js"></script>
 </head>
 <body>
+<div id="stallbanner" role="alert" hidden style="padding:8px 12px;margin:0 0 8px;border-radius:6px;font-weight:bold;background:#7a1f1f;color:#fff"></div>
 <div id="summary">
   <span id="status" class="big">-</span>
   <span id="updated" class="muted"></span>
@@ -65,11 +67,13 @@ td.passed{color:#7dffa6}td.failed{color:#ff7070}td.running{color:#8bd5ff}td.perf
     <label class="chk"><input type="checkbox" id="followlatest" checked autocomplete="off"> follow latest</label>
   </div>
 </div>
+<div id="nowline" class="muted" style="padding:4px 14px"></div>
 <main>
-  <div>
-    <section>
-      <h2>Progress</h2>
+  <div id="leftcol" style="display:flex;flex-direction:column">
+    <section id="progresspanel">
+      <h2 id="progresstitle">Progress</h2>
       <div id="overall" hidden><div class="obar" id="overallbar" role="progressbar" aria-label="Overall progress" aria-valuemin="0" aria-valuemax="100"><i id="overallfill"></i></div><div class="otext" id="overalltext"></div></div>
+      <div id="failbox" hidden><div id="failwhat"></div><a id="faillink" href="#" target="_blank" rel="noopener">See failure details</a></div>
       <div class="kv" id="facts"><b>Run</b><span>-</span></div>
     </section>
     <section style="margin-top:12px">
@@ -197,16 +201,72 @@ function renderOverall(p) {
     ? (p.eta_at ? ' · expected finish ' + fullStamp(p.eta_at) : '') + (Number.isFinite(p.eta_seconds) ? ' · ' + fmtS(p.eta_seconds) + ' left' : '')
     : ' · ' + (p.status || '-'));
 }
+// A failed run (BUILD-FAILURE-NO-DETAILS-66): under the progress line, the failed stage with its exit and its error
+// line, and a "See failure details" link to the run's FAILURE.md, the failure details the builder writes beside the
+// logs (tools/build_failure.py), shown as text in a page of its own. A run of an earlier builder gets the same details
+// derived by the reader from its build-state.json and the failed stage's log.
+const FAIL_LINE = 400;          // characters of the error line shown on the page
+function failureLine(p, f) {
+  const stage = f && f.failed_stages && f.failed_stages.length ? f.failed_stages[0] : null;
+  let what;
+  if (stage) {
+    const bits = [];
+    if (stage.number != null) bits.push('stage ' + stage.number);
+    if (stage.returncode != null) bits.push('exit ' + stage.returncode);
+    what = stage.name + (bits.length ? ' (' + bits.join(', ') + ')' : '');
+  } else if (f && f.error) what = 'the build itself';
+  else what = ((p && p.stages) || []).filter(s => s.status === 'failed').map(s => s.name).join(', ') || 'the build';
+  // a long error line (a refusal listing many names) is cut here; the whole line is in the details
+  const error = f && f.error ? String(f.error) : '';
+  return 'Failed: ' + what + (error ? ': ' + (error.length > FAIL_LINE ? error.slice(0, FAIL_LINE) + ' …' : error) : '');
+}
+function renderFailure(p) {
+  const box = $('failbox');
+  if (!p || p.status !== 'failed' || !S.run) { box.hidden = true; return; }
+  box.hidden = false;
+  const f = S.failure && S.failure.run === S.run ? S.failure.record : null;
+  $('failwhat').textContent = failureLine(p, f);
+  $('faillink').href = '/monitor/run/' + encodeURIComponent(S.run) + '/FAILURE.md';
+  $('faillink').title = 'The failure details of ' + S.run + ' (FAILURE.md: the failed stage, its error lines and ' +
+    'traceback, the last lines of its log, the units it left out, the commit and the command to build again)' +
+    (S.failure && S.failure.source === 'derived' ? '; derived from the run\'s files, its build wrote none' : '');
+}
+// The failure record of the shown run, read once it failed; again every 15 s while it is not the one the build wrote
+// (the builder writes it moments after the run's status turns failed).
+async function loadFailure() {
+  const run = S.run, had = S.failure && S.failure.run === run ? S.failure : null;
+  if (!run || (had && (had.source === 'build' || Date.now() - had.at < 15000))) return false;
+  try {
+    const d = await get('/monitor/run/' + encodeURIComponent(run) + '/failure.json');
+    if (S.run !== run) return false;
+    S.failure = {run, at: Date.now(), record: d.ok ? d.failure : null, source: d.ok ? d.source : null};
+  } catch (e) { S.failure = {run, at: Date.now(), record: null, source: null}; }
+  return true;
+}
+// The stage counts from the same list the stage table shows (build-progress.json stages): "failed" is only a stage
+// whose status is failed; a stage the build stopped or cancelled after it is counted apart (the record's counts.failed
+// lumps both, so a run with one failed stage read "2 failed")
+function stageCounts(p) {
+  const rows = (p && p.stages) || [];
+  const failed = rows.filter(s => s.status === 'failed').length;
+  const stopped = rows.filter(s => s.status && !['passed', 'running', 'pending', 'failed', 'reused', 'skipped'].includes(s.status)).length;
+  return {failed, stopped};
+}
 function renderProgress(p) {
   const status = p ? p.status || '-' : 'no build-progress.json';
   $('status').textContent = status; $('status').className = 'big ' + (p ? p.status : '');
-  if (!p) { kv([['Run', S.run || '-']]); $('stages').replaceChildren(); renderOverall(null); return; }
+  S.lastProgress = p; arrangeLayout();
+  if (!p) { kv([['Run', S.run || '-']]); $('stages').replaceChildren(); renderOverall(null); renderFailure(null); return; }
   renderOverall(p);
+  renderFailure(p);
   const c = p.counts || {}, running = (p.stages || []).filter(s => s.status === 'running').map(s => s.name);
   const ageS = p.updated_epoch ? Date.now() / 1000 - p.updated_epoch : NaN;
   $('updated').textContent = p.updated_at ? 'updated ' + fullStamp(p.updated_at) + (Number.isFinite(ageS) ? ' (' + fmtS(ageS) + ' ago)' : '') : '';
+  const st = stageCounts(p);
   kv([['Run', p.run || S.run], ['Done', (p.percent != null ? p.percent + ' %' : '-') + ' · ' + (c.passed || 0) + ' passed, ' + (c.running || 0) + ' running, ' +
-      (c.pending || 0) + ' pending, ' + (c.failed || 0) + ' failed of ' + (c.total || 0)],
+      (c.pending || 0) + ' pending, ' + st.failed + ' failed' + (st.stopped ? ', ' + st.stopped + ' stopped' : '') + ' of ' + (c.total || 0)],
+    ['Started at', p.started_at ? fullStamp(p.started_at) : '-'],
+    ...(p.status && p.status !== 'running' && p.status !== 'starting' ? [['Ended at', (p.ended_at || p.updated_at) ? fullStamp(p.ended_at || p.updated_at) : '-']] : []),
     ['Running', running.join(', ') || '-'], ['Elapsed', fmtS(p.elapsed_seconds)],
     ['Time left', p.status === 'running' ? fmtS(p.eta_seconds) : '-'],
     ['Finishes at', p.status === 'running' && p.eta_at ? fullStamp(p.eta_at) : '-'],
@@ -630,6 +690,30 @@ function renderMachine(m) {
     table.append(tr);
   }
   $('machinejobs').replaceChildren(m.jobs.length ? table : el('div', 'muted', 'No gate, test or build job is running.'));
+  S.machineNow = m;
+  arrangeLayout();
+}
+// What runs NOW leads the page when no build runs (a busy machine showed nothing near the top of the page:
+// the Machine panel sat under the last, failed build's panels): the one-line summary and the Machine panel first, the
+// last build after them under "Last build: <status>, ended at <time>". While a build runs it stays first and the
+// one-line summary sits under the header. Order by CSS (the left column is a flex column).
+function nowSummary(m) {
+  if (!m || !m.ok) return '';
+  const gates = m.jobs.filter(j => j.kind === 'gate').length, other = m.jobs.length - gates;
+  return 'Running now: ' + gates + ' gate' + (gates === 1 ? '' : 's') + ', ' + other + ' job' + (other === 1 ? '' : 's') + ', ' +
+    m.cores_used.toFixed(1) + (m.machine_cores ? ' of ' + m.machine_cores : '') + ' cores';
+}
+function arrangeLayout() {
+  const p = S.lastProgress, m = S.machineNow;
+  const building = !!(p && (p.status === 'running' || p.status === 'starting'));
+  $('nowline').textContent = nowSummary(m);
+  const machineFirst = !building && m && m.ok;
+  $('machine').style.order = machineFirst ? '-1' : '';
+  $('machine').style.marginTop = machineFirst ? '0' : '12px';
+  $('progresspanel').style.marginTop = machineFirst ? '12px' : '';
+  $('progresstitle').textContent = building || !p ? 'Progress'
+    : 'Last build: ' + (p.status || '-') + ', ended at ' + ((p.ended_at || p.updated_at) ? fullStamp(p.ended_at || p.updated_at) : '-');
+  return {building, machineFirst};
 }
 async function refreshMachine() {
   if (!S.machine) return;
@@ -786,6 +870,7 @@ async function tick() {
       }
       await refreshLists(false);
       renderProgress(S.progress);
+      if (S.progress && S.progress.status === 'failed' && await loadFailure()) renderFailure(S.progress);
       if (S.progress && S.progress.status === 'running') await activity((S.progress.stages || []).filter(s => s.status === 'running').map(s => s.name));
       else $('activity').hidden = !S.trace;
       if (!S.log) {
@@ -828,6 +913,7 @@ function chooseRun(run) {
   S.sections = {}; S.sectionsAt = {}; S.tl = null; S.view = null; S.sel = null; S.red = []; S.liveCores = []; $('timelinedetail').textContent = '';
   S.trace = null; S.tlines = []; S.tool = ''; S.logGrewAt = 0; S.traces = []; $('activity').hidden = false;
   S.state = null; S.stateAt = 0; S.timelineScrolled = false; $('timelinechart').innerHTML = ''; $('log').textContent = '';
+  S.failure = null; $('failbox').hidden = true;
   const u = new URL(location.href); u.searchParams.set('run', run); history.replaceState(null, '', u);
   refreshLists(true).then(tick);
 }
@@ -845,6 +931,7 @@ async function refreshRuns() {
   }
   if (keep && runs.some(x => x.run === keep)) sel.value = keep;
   S.runList = runs;
+  renderStall(runs);
   if (S.resultRows) renderResults(S.resultRows);               // the magnifiers need the run list
   if ($('followlatest').checked && runs.length) {
     for (const x of runs.slice(0, 5)) {
@@ -858,19 +945,54 @@ async function refreshRuns() {
   }
   return runs;
 }
+// The stall alert, on by default: the builder's own stall block (build-progress.json "stall", tools/build_stall.py)
+// of every recent run. A banner names the run, the state, how long and the reason; a new incident also raises one
+// browser notification while the page is open (when the browser allows notifications).
+function stallText(x) {
+  const s = x.stall, mins = Math.max(0, Math.round((Date.now() / 1000 - (x.mtime || 0)) / 60));
+  return x.run + ': ' + s.state + (s.reason ? ' - ' + s.reason : '') + ' (since ' + Math.round(s.since || 0) + ' s into the build'
+    + (mins ? ', last written ' + mins + ' min ago' : '') + ')';
+}
+function renderStall(runs) {
+  const bad = runs.filter(x => x.stall && x.stall.state && x.stall.state !== 'ok');
+  const banner = $('stallbanner');
+  banner.hidden = !bad.length;
+  banner.textContent = bad.length ? 'Build alert: ' + bad.map(stallText).join(' | ') : '';
+  if (!S.stallSeen) S.stallSeen = new Set();
+  for (const x of bad) {
+    const key = x.run + '|' + x.stall.state + '|' + x.stall.since;
+    if (S.stallSeen.has(key)) continue;
+    S.stallSeen.add(key);
+    try {
+      if (typeof Notification === 'undefined') continue;
+      if (Notification.permission === 'granted') new Notification('AmiWind build ' + x.stall.state, {body: stallText(x)});
+      else if (Notification.permission === 'default') Notification.requestPermission().catch(() => {});
+    } catch (_) { /* no notifications here: the banner stays */ }
+  }
+}
 // The two follow choices, kept per browser like the folded blocks (panel-fold.js); every storage access is guarded, so
 // a browser that blocks storage keeps the choice until the page closes.
 const FOLLOW_KEY = 'amiwind-monitor-follow-1';
+// "follow latest" is ON at every page load: picking a run or unticking the box turns it off for this visit only
+// (sessionStorage, never localStorage), so one click never leaves later loads unfollowed. "follow the running stage"
+// stays remembered in this browser.
 function followPrefs() {
+  let stage = true, latest = true;
   try {
     const v = JSON.parse(localStorage.getItem(FOLLOW_KEY) || 'null');
-    if (v && typeof v === 'object') return {latest: v.latest !== false, stage: v.stage !== false};
+    if (v && typeof v === 'object') stage = v.stage !== false;           // a saved "latest" is ignored on purpose
   } catch (_) { /* no storage */ }
-  return {latest: true, stage: true};
+  try {
+    const t = JSON.parse(sessionStorage.getItem(FOLLOW_KEY) || 'null');
+    if (t && typeof t === 'object' && t.latest === false) latest = false; // this visit only
+  } catch (_) { /* no storage */ }
+  return {latest, stage};
 }
 function saveFollowPrefs() {
-  try { localStorage.setItem(FOLLOW_KEY, JSON.stringify({latest: $('followlatest').checked, stage: $('follow').checked})); }
+  try { localStorage.setItem(FOLLOW_KEY, JSON.stringify({stage: $('follow').checked})); }
   catch (_) { /* no storage: the choice lasts until the page closes */ }
+  try { sessionStorage.setItem(FOLLOW_KEY, JSON.stringify({latest: $('followlatest').checked})); }
+  catch (_) { /* no storage */ }
 }
 async function start() {
   try {

@@ -245,8 +245,12 @@ int main(void)
     i-=4+source.state.journal_count*16;legacy_header(raw,i,'1');
     assert(AW_SaveDecode(raw,i,&decoded) && !decoded.state.journal_count);
     assert(AW_StateGet(&decoded.state,AW_JOURNAL,"a1_1_findspymaster")==5);
+    /* the 48-byte rows of the fields and their bounds (SAVE-ACTOR-ROWS-256-66: aw_save_rows_form 1; the packed rows
+     * are tests/aga_save_changes_test.c's); the rows are the save's own block now */
+    aw_save_rows_form=1;assert(AW_SaveActorsReserve(&source,AW_SAVE_ACTORS));
+    memset(source.actors,0,sizeof(aw_saved_actor_t)*AW_SAVE_ACTORS);
     strcpy(source.scene,"addamasartus");source.actor_count=1;
-    source.actors[0].reference=42;source.actors[0].scene=15;
+    source.actors[0].reference=42;source.actors[0].scene=15;source.actors[0].fields=AW_ROW_ALL;
     n=AW_SaveEncode(raw,sizeof(raw),&source);assert(n>0);
     assert(AW_SaveDecode(raw,n,&decoded));assert(!strcmp(decoded.scene,"addamasartus"));
     assert(decoded.actors[0].scene==15 && decoded.actors[0].reference==42);
@@ -273,7 +277,8 @@ int main(void)
     assert(!AW_SaveEncode(raw,sizeof(raw),&source));source.state.journal_count=0;
     source.actors[0].scene=AW_MapId("vf2525");
     n=AW_SaveEncode(raw,sizeof(raw),&source);assert(n>0 && AW_SaveDecode(raw,n,&decoded));
-    assert(decoded.actors[0].scene==AW_MapId("vf2525"));
+    /* a decoded save's rows are sorted by place and reference (found by AW_SaveActorFind) */
+    {int k=AW_SaveActorFind(&decoded,1,AW_MapId("vf2525"));assert(k>=0 && decoded.actors[k].scene==AW_MapId("vf2525"));}
     source.actors[0].scene=AW_SCENE_COUNT;assert(!AW_SaveEncode(raw,sizeof(raw),&source));source.actor_count=0;
     strcpy(source.scene,"../bad");assert(!AW_SaveEncode(raw,sizeof(raw),&source));strcpy(source.scene,"seyda");
     source.character.head=384;assert(!AW_SaveEncode(raw,sizeof(raw),&source));source.character=c;

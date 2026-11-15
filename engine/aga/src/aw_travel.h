@@ -28,6 +28,11 @@ int AW_TravelParse(const char *text,const char *provider,aw_travel_t *out);
 /* The price and hours of ROW: from PLAYER (the player's original coordinates; NULL when unknown) as OpenMW reckons
  * them, else the table's own. */
 void AW_TravelCost(const aw_travel_t *t,int row,const float *player,int *price,int *hours);
+/* The unbuilt-target guard (a layer, an expansion's cell, not in this image): the rows whose map BUILT(map, ctx)
+ * refuses are left out of the menu, kept order, as OpenMW's travel window leaves out a destination of an unknown cell
+ * (apps/openmw/mwgui/travelwindow.cpp: logged, not offered). SKIPPED (may be NULL) gets the first such map. Returns
+ * how many rows were left out. */
+int AW_TravelKeepBuilt(aw_travel_t *t,int (*built)(const char *map,void *ctx),void *ctx,char *skipped,int size);
 /* the dialogue window's Travel (aw_scene.c): this speaker offers travel; the menu opened once the window has closed */
 struct edict_s;
 int AW_SceneTravelOffers(struct edict_s *e);

@@ -2,7 +2,7 @@
 from pathlib import Path
 import hashlib, math, re, struct
 from .audit import cell_data
-from .esm import is_deleted, records, require, string, subrecords
+from .esm import FormatError, is_deleted, records, require, string, subrecords
 from .markers import is_hidden_marker
 
 
@@ -83,7 +83,8 @@ def read_interiors(path, names, *, include_interior_entrances=False, layers=()):
             found_here={key:{'cells':[],'entrances':[]} for key in wanted}
             _interior_records(source,kinds,found_here,objects)
             for key,cells in found_here.items():
-                if cells['cells']:wanted[key]['cells']=cells['cells']
+                if cells['cells'] or cells.get('errors'):
+                    wanted[key]['cells']=cells['cells'];wanted[key]['errors']=cells.get('errors',[])
                 wanted[key]['entrances'].extend(cells['entrances'])
             continue
         _interior_records(source,kinds,wanted,objects)
@@ -111,35 +112,73 @@ def _interior_records(raw,kinds,wanted,objects):
                 continue
             key=string(header.get('NAME',b'')).casefold()
             if key not in wanted:continue
-            cell=cell_data(subs)
-            if not cell['flags']&1:continue
-            cell['water_height']=None
-            if cell['flags']&2:
-                # Original master uses integer INTV; later files may use WHGT.
-                water=0.
-                for tag,data in header.items():
-                    if tag in ('INTV','WHGT'):
-                        require(len(data)==4,'Invalid interior water height')
-                        water=struct.unpack('<i' if tag=='INTV' else '<f',data)[0]
-                require(math.isfinite(water),'Nonfinite interior water height')
-                cell['water_height']=water
-            ambient=header.get('AMBI')
-            require(ambient is not None and len(ambient)==16,'Interior AMBI missing/invalid')
-            cell['lighting']={'ambient':list(ambient[:3]),'sunlight':list(ambient[4:7]),
-                              'fog':list(ambient[8:11]),'fog_density':struct.unpack_from('<f',ambient,12)[0]}
-            wanted[key]['cells'].append(cell)
+            try:
+                _interior_cell(subs,header,wanted[key])
+            except FormatError as error:
+                # every bad room is listed, not only the first (_interior_results raises them together)
+                wanted[key].setdefault('errors',[]).append(str(error))
         elif 'NAME' in s and not is_deleted(flags,s):
             obj={'type':tag,'model':string(s.get('MODL',b'')),'display_name':string(s.get('FNAM',b''))}
             if tag=='LIGH':
-                require(len(s.get('LHDT',b''))==24,'Invalid light record')
+                require(len(s.get('LHDT',b''))==24,'Invalid light record: '+string(s['NAME']))
                 weight,value,duration,radius=struct.unpack_from('<fiiI',s['LHDT'])
                 obj['light']={'radius':radius,'color':list(s['LHDT'][16:19]),'flags':struct.unpack_from('<I',s['LHDT'],20)[0]}
             objects[string(s['NAME']).casefold()]=obj
 
 
+def _interior_cell(subs,header,found):
+    """One wanted interior cell into FOUND['cells']; a refusal names the cell (INTERIOR-NO-AMBI-66)."""
+    cell=cell_data(subs)
+    if not cell['flags']&1:return
+    where=' (cell %s)'%string(header.get('NAME',b''))
+    cell['water_height']=None
+    if cell['flags']&2:
+        # Original master uses integer INTV; later files may use WHGT.
+        water=0.
+        for tag,data in header.items():
+            if tag in ('INTV','WHGT'):
+                require(len(data)==4,'Invalid interior water height'+where)
+                water=struct.unpack('<i' if tag=='INTV' else '<f',data)[0]
+        require(math.isfinite(water),'Nonfinite interior water height'+where)
+        cell['water_height']=water
+    ambient=header.get('AMBI')
+    if ambient is None:
+        # INTERIOR-NO-AMBI-66, the reference engine's rule (OpenMW components/esm3/loadcell.cpp loadCell: mHasAmbi
+        # false, the AMBI values stay 0; mwworld/cell.cpp: the cell's mood is those values; mwrender/
+        # renderingmanager.cpp configureAmbient): ambient, sunlight and fog all black, fog density 0, so the room is
+        # lit by its own lights only. A cell flagged "behave like exterior" is no room: the room stages set it aside
+        # (tools/door_graph.py, tools/chim_room_batches.py exterior_like).
+        cell['lighting']={'ambient':[0,0,0],'sunlight':[0,0,0],'fog':[0,0,0],'fog_density':0.,'no_ambi':True}
+    else:
+        require(len(ambient)==16,'Interior AMBI invalid: %d bytes, 16 expected%s'%(len(ambient),where))
+        cell['lighting']={'ambient':list(ambient[:3]),'sunlight':list(ambient[4:7]),
+                          'fog':list(ambient[8:11]),'fog_density':struct.unpack_from('<f',ambient,12)[0]}
+    found['cells'].append(cell)
+
+
+def exterior_like_cells(raw):
+    """{folded name: name} of the interior cells flagged "behave like exterior" (DATA flag 0x80) in the master bytes
+    RAW: exteriors for the original and the reference engine (sky, region weather, moving sun, no AMBI), not rooms."""
+    out={}
+    for tag,flags,payload in records(raw):
+        if tag!='CELL':continue
+        header={}
+        for t,b in subrecords(payload):
+            if t=='FRMR':break
+            header.setdefault(t,b)
+        if 'DATA' not in header:continue
+        f=struct.unpack_from('<I',header['DATA'])[0]
+        if f&1 and f&0x80:
+            name=string(header.get('NAME',b''));out[name.casefold()]=name
+    return out
+
+
 def _interior_results(names,wanted,objects,doors,digest,include_interior_entrances):
     import copy
     result=[];used=set()
+    # every refused room at once, each naming its cell (INTERIOR-NO-AMBI-66)
+    errors=[e for key in dict.fromkeys(n.casefold() for n in names) for e in wanted[key].get('errors',())]
+    if errors:raise FormatError('%d interior cells refused: %s'%(len(errors),'; '.join(errors)))
     for name in names:
         found=wanted[name.casefold()]
         require(len(found['cells'])==1,'Interior must resolve uniquely: '+name)

@@ -1,6 +1,6 @@
 # MWScript compiled by the builder
 
-_Last updated with AmiWind v0.0.63 (10 November 2026)._
+_Last updated with AmiWind v0.0.66-dev3 (15 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -278,10 +278,15 @@ on disk.
 | STRS | | strings (names for the log, messages, ids of not-yet calls) | 145,333 |
 | TOPC | 2 | the game's dialogue topics, sorted (v0.0.57): name; on disk, AddTopic hands the row | 4,196 |
 | OACT, ACTB, AINV, AITM, ASPT, ASPL | | the actor table (v0.0.54; OACT resident, the rest on disk): [ACTOR_STATE.md](ACTOR_STATE.md) | 536,338 |
+| LOCN | 8 + 4 a variable | the scripts' variables by name (v0.0.66, on disk, read only while a game is saved or loaded): per script with variables that is not a dialogue result script, its row, variable count, flags and first key; then a key per variable (the folded name's hash and its type). Saved values carry their variable's key, so a rebuilt script gets each value back in the variable of its name ([SAVEGAME_PLAN.md](SAVEGAME_PLAN.md), eighth part) | 16,208 (811 scripts, 2,430 variables) |
+| HITM | 8 | the items placed holders hold (v0.0.66, on disk): a held item's reference and the hash of its item id, so a save keeps its script values by holder and item | 3,928 (491 rows) |
+| SCRH | 4 | every script row's name hash (v0.0.66, on disk): a saved script whose row moved is found with one read | 34,472 (8,618 rows) |
 | | | file / resident | 446,316 / 183,212 |
 
 CODE, PCEL and PMOV measured 27 October 2026 (v0.0.54, without the media catalogue: the whole file 1,062,900 bytes
-with the actor table, 168,348 resident); the other rows are from earlier measurements.
+with the actor table, 168,348 resident); LOCN, HITM and SCRH computed 14 November 2026 from the v0.0.66-dev2 file (both
+expansions); the other rows are from earlier measurements. The builder refuses a file in which two scripts, two
+globals, two quests or two worn items share the name hash a save keeps them by.
 
 A pool name is the 8 bytes of a converted file's name in the media catalogue, `sound/pool/a<16 hex>.wav`.
 
@@ -545,7 +550,14 @@ yet ([DOOR-LOAD-LOCKS-MISSING-51](BUGS.md), waiting for a way to open a lock: ke
 Activation (v0.0.51): `OnActivate` and `Activate` run, with the original's rule. A script that reads `OnActivate`
 takes over its object's use: when the player uses the object, it does nothing by itself, and `OnActivate` reads 1
 once on the script's next run; the script's `Activate` then carries out the object's own use (a door opens, locks
-kept). Today the use is taken over for doors (hinged doors and load doors); other objects' own use (items,
+kept). Since v0.0.66 the use is the script's only while the script reads `OnActivate`: reading it takes the
+next use, the object's `Activate` gives it back, and a script that returns before its `OnActivate` line after that
+leaves the object its own use (OpenMW 0.51 keeps the same rule, `mwworld/refdata.cpp`). The census office's two
+scripted doors are built that way: once opened, their script marks itself done and returns before `OnActivate`, so
+the doors open as plain doors every time after, also when the player comes back into the room. Before, a script
+that merely contained `OnActivate` took every use, and those doors opened only once
+([CAPTAIN-EXIT-DOOR-DEAD-AFTER-REENTRY-66](BUGS.md)). Before a script's first run on a newly loaded map the object
+has its own use. Today the use is taken over for doors (hinged doors and load doors); other objects' own use (items,
 containers) is not yet. Since v0.0.57 actors too: E on an actor whose script reads `OnActivate` talks to nobody and
 the script's `OnActivate` reads 1 (`pr_cmds.c`, the same intercept as the doors'); the script's `Activate` on an
 actor does nothing yet (OpenMW would open the talk or the corpse's inventory). Measured 30 October 2026: 258 scripts
@@ -724,7 +736,7 @@ import route (no new opcode, no change of the file's format):
 | `GetPCSneaking` | the player sneaks | controlextensions.cpp OpGetPcSneaking |
 | `GetWeaponDrawn` | the player's hands readied without a torch; an actor while it fights | miscextensions.cpp OpGetWeaponDrawn |
 | `OnKnockout` | 1 in the frame a script first sees the actor knocked down (a blow's or fatigue's) | statsextensions.cpp OpOnKnockout; actors.cpp |
-| `SetDelete` | 1 takes the object out as Disable does, 0 brings it back (kept in saved games); OpenMW also stops the script of a deleted object, here it keeps running as a disabled object's does | miscextensions.cpp OpSetDelete |
+| `SetDelete` | 1 deletes the object for good, as an item the player took: it leaves the world, Enable does not bring it back, its local script stops after the frame and no map binds it again; 0 undeletes it (its script binds at the next map load); kept in saved games | miscextensions.cpp OpSetDelete, worldimp.cpp deleteObject / undeleteObject |
 | `WakeUpPC` | the rest window open for sleeping closes (a wait stays) | miscextensions.cpp OpWakeUpPC; waitdialog.cpp wakeUp |
 
 Angles and moves act on an object with an entity; CHIM scenery without one cannot turn or move yet (counted in
@@ -771,8 +783,9 @@ whole 479 before, 485 after (of 1,207; OnMurder alone held the 5 placed scripts 
 Sarethi, Bolvyn Venim, Alvis Teri and Ondres Nerano); dialogue results that run whole 7,390 before, 7,404 after (the 14
 answers of the guards and the thieves' fixers that pay the fine or go to jail); 324 of 504 functions carried out (319
 before). Cost
-(the budget sheet): resident, 32 NPC rows of 16 bytes and the jail's state (about 700 bytes, its release line); a call
-is a table lookup, PayFine and GotoJail a pass over the stolen pairs and the 32 rows; GotoJail reads the prison markers
+(the budget sheet): resident, the NPC rows (24 bytes each, 32 at first and doubled as the marked NPCs grow, up to
+1,024) and the jail's state (about 700 bytes, its release line); a call
+is a table lookup, PayFine and GotoJail a pass over the stolen pairs and the rows; GotoJail reads the prison markers
 (a file of six lines) once.
 
 A test aid for result scripts: `dbg mwscript result TOPIC NPC [N]` runs the result script of the answer the loaded NPC

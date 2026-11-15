@@ -142,8 +142,14 @@ class EngineSourceTests(unittest.TestCase):
         self.assertIn('dead again: %s', actors)
         # a room lays its bodies down only once the player is in (the scene set-up empties the combat slots before)
         room = actors[actors.index('void AW_ActorsRoomTick (void)'):actors.index('static void Tick (void)')]
-        self.assertIn('!svs.clients[0].spawned', room)
-        self.assertLess(room.index('!svs.clients[0].spawned'), room.index('ApplyLoaded ();'))
+        # ACTOR-DEAD-RESPAWN-INTERIOR-65: the room and the outdoor tick share one wait (ApplyWaits), which reads spawned
+        self.assertIn('if (apply_pending && ApplyWaits ())', room)
+        waits = actors[actors.index('static int ApplyWaits (void)'):actors.index('static void Release (edict_t *e)')]
+        self.assertIn('!svs.clients[0].spawned', waits)
+        tick = actors[actors.index('static void Tick (void)'):actors.index('static edict_t *tried[MAX_EDICTS];')]
+        self.assertIn('if (apply_pending && ApplyWaits ())', tick)
+        self.assertLess(room.index('ApplyWaits ()'), room.index('ApplyLoaded ();'))
+        self.assertLess(tick.index('ApplyWaits ()'), tick.index('ApplyLoaded ();'))
         combat = (self.SRC / 'aw_combat.c').read_text(encoding='utf-8')
         self.assertIn('set_state(s,S_DEAD,G_DEATH);s->e->v.solid=SOLID_NOT;', combat)
         # a death goes onto the change list at once (a room captures its actors only every half minute), from a fight

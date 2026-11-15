@@ -158,8 +158,9 @@ class LevelupSourceContractTests(unittest.TestCase):
         self.assertIn("if(!error && data[3]=='4' && (features&64))levelling_fields(&candidate.character);", codec)
         # bit 128: the dated journal history (JOURNAL-ORIGINAL-VIEW-59), 256: up to 128 kinds of item, 512: any number
         # of kinds (INVENTORY-ORIGINAL-LIMITS-61)
-        # bit 1024: the skill books read (SKILL-BOOKS-MISSING-62)
-        self.assertIn('if(features>2047)error=1;', codec)
+        # bit 1024: the skill books read (SKILL-BOOKS-MISSING-62), 2048: the map markers (MAP-MULTI-MARKERS-66),
+        # 4096: the explored map (MAP-EXPLORED-SAVE-BLOCK-66), 8192: the packed actor rows (SAVE-ACTOR-ROWS-256-66)
+        self.assertIn('if(features>0x7fff)error=1;', codec)   # bits up to 16384 (the item instances)
         self.assertIn('(books_words(&copy.character)?1024U:0U)', codec)
         self.assertIn("if(!error && data[3]=='4' && (features&1024))books_fields(&candidate.character);", codec)
 

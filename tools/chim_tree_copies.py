@@ -139,6 +139,7 @@ def star_name(billboard_name, angle):
 def prepare(data_files, palette_path, out, jobs=None, layer='bloodmoon', config=CONFIG):
     import numpy as np
     from mwad.paths import child_ci, ensure_external, resolve_data_files
+    from mwad.masters import master_path
     from mwad.scene import read_asset
     import prepare_tree_sprites
     angles, patterns, outline_points = load_config(config, layer)
@@ -148,7 +149,7 @@ def prepare(data_files, palette_path, out, jobs=None, layer='bloodmoon', config=
         raise ValueError('Tree copies output exists: ' + str(out))
     budget = resolve_jobs(jobs)
     print('=== PHASE 1/3: the layer\'s tree models ===', flush=True)
-    models = layer_tree_models(child_ci(data, 'Morrowind.esm').read_bytes(), patterns)
+    models = layer_tree_models(master_path(data).read_bytes(), patterns)
     print('tree models:', len(models), flush=True)
     print('=== PHASE 2/3: billboards (shared tree sprite bake) ===', flush=True)
     billboard = prepare_tree_sprites.prepare(data, None, palette_path, out / 'billboard', budget, models)

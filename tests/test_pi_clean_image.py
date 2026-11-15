@@ -109,9 +109,21 @@ def test_package_is_one_img_xz():
     assert 'balenaEtcher' in readme and 'Raspberry' in readme and 'Pi4B.img' in readme
 
 
+def test_work_folder_made_for_a_cached_system_half():
+    # PI-IMAGE-WORK-FOLDER-65: build_system() returns a cached system half before it makes the work folder, so
+    # build() makes it itself between that call and writing the whole image into it
+    src = (ROOT / 'tools/pi_image/build_clean_image.py').read_text(encoding='utf-8')
+    body = src[src.index('def build(a):'):]
+    made = body.index('work.mkdir(parents=True, exist_ok=True)')
+    assert body.index('build_system(') < made < body.index('img = work / name')
+
+
 class PiCleanImage(unittest.TestCase):
     def test_package(self):
         test_package_is_one_img_xz()
+
+    def test_work_folder_cached_system(self):
+        test_work_folder_made_for_a_cached_system_half()
 
     def test_slim(self):
         test_slim_variant()

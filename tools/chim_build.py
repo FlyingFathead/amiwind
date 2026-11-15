@@ -56,6 +56,10 @@ def _cli(argv=None):
                     help='Apply a named per-mesh visual triangle budget (config/chim-detail-budgets.json; default none)')
     ap.add_argument('--cut-models-over', type=float, default=None, metavar='UNITS',
                     help='Cut placements of models wider than UNITS by chunk (chim.cut; default 0: none)')
+    ap.add_argument('--draw-tiles', choices=('off', 'on'), default='off',
+                    help='Draw tiles for the named models of chim.build.DRAW_TILES_ON (the Seyda Neen ship, the silt '
+                         'strider): their faces in the large-model cut\'s tiles at a 128 grain (default off; '
+                         'PRISON-SHIP-POLY-COLLISION-65)')
     ap.add_argument('--terrain-shoreline', choices=('on', 'off'), default='on',
                     help='Town frames: triangulate the shoreline tiles with the sampler of the legacy region maps '
                          '(on, default; CHIM-STITCH-SHORELINE-36) or keep the plain tile grid (off)')
@@ -288,6 +292,9 @@ def _main(ap, a):
         from mwad.paths import child_ci
         try:
             master = child_ci(a.data_files, 'Morrowind.esm', required=False)
+            if master is not None:
+                from mwad.masters import master_path
+                master = master_path(a.data_files)
         except (OSError, ValueError) as exc:
             ap.exit(1, 'Error: the data files cannot be read (%s)\n' % exc)
         if master is None:
@@ -325,12 +332,13 @@ def _main(ap, a):
         from concurrent.futures import ThreadPoolExecutor
         digest_warm = ThreadPoolExecutor(max_workers=1)
         digest_warm_job = digest_warm.submit(warm_validation_key)
-    from chim.build import build_areas
+    from chim.build import DRAW_TILES_ON, build_areas
     from chim.texfx import effect_path
     def build_world():
         try:
             build_areas(areas, a.data_files, a.out, a.palette, a.qbsp, a.jobs, dict({'grain': a.grain}, **({'cut_models_over': a.cut_models_over} if a.cut_models_over is not None else {}),
                      **({'detail_budget': a.detail_budget} if a.detail_budget else {}),
+                     **({'draw_tiles': DRAW_TILES_ON} if a.draw_tiles == 'on' else {}),
                      **({'draw_distance': a.draw_distance} if a.draw_distance is not None else {}),
                      **({'terrain_shoreline': a.terrain_shoreline} if a.terrain_shoreline != 'on' else {}),
                      **({'terrain_resident_detail': a.terrain_resident_detail} if a.terrain_resident_detail != 'on' else {}),

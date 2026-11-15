@@ -1,6 +1,6 @@
 # Shared models for harvestable mushrooms
 
-_Last updated with AmiWind v0.0.47 (21 October 2026)._
+_Last updated with AmiWind v0.0.66-dev2 (13 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -9,6 +9,7 @@ _Last updated with AmiWind v0.0.47 (21 October 2026)._
 - [Inputs and identity](#inputs-and-identity)
 - [Conversion and staging](#conversion-and-staging)
 - [Memory and admission](#memory-and-admission)
+- [Plants on trees](#plants-on-trees)
 - [Current limits](#current-limits)
 
 <!-- contents end -->
@@ -167,6 +168,22 @@ values to tune until admission passes. Failed inherited allowances remain
 failed; an unchanged number of failing maps does not demonstrate acceptance.
 Missing budget evidence is **unknown**, not a pass. Native headroom and model
 admission must still be measured with the exact candidate.
+
+## Plants on trees
+
+The bracket fungi (Hypha Facia, Bungler's Bane) grow from the sides of the Bitter Coast trees. The builder draws
+most of those trees with fewer faces than the original, so the drawn trunk lies a little inside the original one,
+and a few trees near towns as flat sprites. A fungus kept at its original position then hangs in the air.
+
+- `config/flora-support.json` lists, per fungus reference, the measured shift (original units) that puts it on the
+  trunk the build draws, and the trees that are drawn as a mesh because a fungus grows on them.
+- `tools/chim/flora_support_audit.py` measures every bracket fungus against the original support (its nearest
+  placed model by surface distance) and against the CHIM world's drawn triangles. `--write-config` writes the
+  table; the image step runs it as a check and stops on a fungus more than 2 units from its tree that the table
+  does not list under `known_floating` (each with its reason).
+
+Measured on v0.0.66-dev1: 106 of the 634 fungi in built frames floated (104 on reduced trunks, 2 on a sprite tree
+in Seyda Neen); with the shifts none of the 104 float.
 
 ## Current limits
 

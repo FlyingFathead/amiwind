@@ -1,6 +1,6 @@
 # Animation kit
 
-_Last updated with AmiWind v0.0.64 (12 November 2026)._
+_Last updated with AmiWind v0.0.66-dev1 (13 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -180,6 +180,19 @@ The coverage: `python3 tools/anim_coverage.py <build>/.../progs/humanoid.awsk <b
 --markdown coverage.md` lists every group of a build's tables: in which table, hooked by what, and the caller still
 to come; a group nothing plays is reported as never played (`--check` fails on it). The gate test
 (`tests/test_anim_coverage.py`) proves every group reachable through the rules.
+
+The player audit (v0.0.66): `python3 tools/anim_coverage.py --player groups.json [--json out.json] [--check]` takes
+the group lists of the original player files (read from your own game data: base_anim.nif, base_anim_female.nif,
+base_animkna.nif and their first-person files) and lists, per file, any group missing from the engine catalogue
+(`--check` fails on it) and the groups the player body does not play yet, with what is missing for them
+(`PLAYER-ANIM-GROUPS-NOT-PLAYED-66`). Since v0.0.66 the player plays the spell stance and the cast by range
+(`idlespell`, `spellcast`) in third person and on the first-person arms. Also since v0.0.66 the assembled player body
+in third person plays, by OpenMW 0.51's character rules: the sneak idle and gaits while sneaking (the sneak key or a
+script's ForceSneak), turning on the spot while standing and not sneaking (`turnleft`, `turnright`, the stance's own
+and `spellturn*`, held 0.05 s after the last turn), the hit recovery `hit1`..`hit5` at random after a blow that did
+damage and did not knock the player down (`swimhit` in water), `knockdown` held until the player gets up and
+`knockout` looping from its loop key while out, over any stance. Left: the inventory picture's poses, `pickprobe` (no
+lockpicking yet), turning in water. Cost: one group lookup by name when the state changes, as for the stance.
 
 ## Walk or run: the rules and their sources
 

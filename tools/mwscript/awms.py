@@ -53,6 +53,20 @@
         the folded id, u32 the reference (a BIND row's), sorted; on disk, optional. The console's "ID"->Activate finds
         a placement the scripts never name (the Ghostgate switches, the Marks coins: not in OBJS) by a binary search
         here, then its attached instance by the reference.
+  LOCN  the scripts' variables by name (v0.0.66, SAVE-SCRIPT-ROW-HINT-ONLY-65; on disk, optional: an older file keeps
+        locals by their slot only): 8 bytes a script with variables that is not a dialogue result script, ascending by
+        script: u16 script, u8 its variables, u8 flags (1: two of its names share a key, those keys are 0), u32 the
+        index of its first key; then a u32 key per variable in slot order (local_key: the folded name's FNV-1a in bits
+        0-29, the type in bits 30-31, 0 short 1 long 2 float; 0 no name). A save keeps each local with its key and each
+        script's layout signature, so a rebuilt script restores every value into the variable of its name.
+  HITM  the items placed holders hold, by item (v0.0.66, SAVE-ITEM-SCRIPT-LOCALS-66; on disk, optional): 8 bytes a
+        BIND row of a held item, ascending: u32 its reference (compiler.held_key), u32 the name hash of the item's record
+        id (name_hash). A save keeps a held item's locals by (holder, item), not by its ordinal among the holder's items.
+  SCRH  every script row's name hash (v0.0.66, SAVE-SCRIPT-ROW-HINT-ONLY-65; on disk, optional): u32 name_hash a row,
+        so a load finds a saved script whose row moved in a rebuilt file with one read.
+
+The engine keeps scripts, globals, quests and worn items in a save by the name hash of their id (aw_ledger.h,
+name_hash below): write() refuses a file in which two different names share one (their saved values would mix).
 
 A pool name is the 8 bytes of a converted file's name in the media catalogue: sound/pool/a<16 hex>.wav.
 """
@@ -65,7 +79,7 @@ VERSION = 1
 TYPES = {'s': 0, 'l': 1, 'f': 2}
 ORDER = ('CONF', 'GLOB', 'JRNL', 'SNDS', 'VOIC', 'MUSI', 'OBJS', 'SCRP', 'STRT', 'NEWG', 'NGWE', 'HELD', 'OACT', 'PCEL', 'PMOV', 'SPFX', 'VISI', 'PLAC', 'PADD', 'LACT', 'EQUP', 'CODE', 'BIND', 'STRS',
          'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'TOPC', 'ASPC', 'ASPE', 'AEFF', 'AMGE', 'DRSC', 'AENC', 'APCS',
-         'AIDX', 'ASPX') + ('BNAM',)
+         'AIDX', 'ASPX') + ('BNAM',) + ('LOCN', 'HITM', 'SCRH')
 # The actor sections (actors.py, docs/ACTOR_STATE.md): OACT is resident (a script's target -> its actor row); the
 # others stay on disk and are read a row at a time by the engine's actor state (aw_actorstate.c).
 ACTOR_SECTIONS = ('OACT', 'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'ASPC', 'ASPE', 'AEFF', 'AMGE', 'AENC', 'APCS',
@@ -193,6 +207,87 @@ def levelled_actor_rows(program):
     return sorted(set(rows))
 
 
+def name_hash(ident):
+    """The engine's AW_LedgerNameHash (aw_ledger.c): FNV-1a over the id with A-Z folded, 0 becomes 1 (as
+    prepare_focus.name_hash): the key a save keeps a script, a global, a quest, an item and a variable by."""
+    h = 2166136261
+    for c in ident.encode('cp1252', 'replace'):
+        if 65 <= c <= 90:
+            c += 32
+        h = ((h ^ c) * 16777619) & 0xFFFFFFFF
+    return h or 1
+
+
+LOCAL_TYPES = {'s': 0, 'l': 1, 'f': 2}
+LOCN_COLLIDED = 1
+
+
+def local_key(name, letter):
+    """A script variable's key in LOCN and in a save (aw_ledger.h slice 8): the folded name's name_hash in bits 0-29,
+    its type in bits 30-31 (0 short, 1 long, 2 float), never 0."""
+    return ((name_hash(name) & 0x3FFFFFFF) | (LOCAL_TYPES[letter] << 30)) or 1
+
+
+def local_rows(program, compiled):
+    """LOCN (v0.0.66, SAVE-SCRIPT-ROW-HINT-ONLY-65): ([(script index, [key per slot], flags)], report) for every
+    compiled script with variables that is not a dialogue result script (a result script runs on its speaker's
+    variables), ascending by script. Two names of one script whose keys share the name bits (bits 0-29) are written 0
+    and the script flagged LOCN_COLLIDED: the engine restores those two only while the script's variables are as saved,
+    never into another variable. The report: scripts, variables, and the collided names."""
+    from .codegen import SCRIPT_DIALOGUE
+    rows, collided, count = [], [], 0
+    for index, c in enumerate(compiled):
+        if not c.nlocals or c.flags & SCRIPT_DIALOGUE:
+            continue
+        keys, names = [0] * c.nlocals, [None] * c.nlocals
+        for name, (letter, slot) in (program.script_locals.get(c.ident) or {}).items():
+            if 0 <= slot < c.nlocals:
+                keys[slot], names[slot] = local_key(name, letter), name
+        shared = {}
+        for slot, key in enumerate(keys):
+            if key:
+                shared.setdefault(key & 0x3FFFFFFF, []).append(slot)
+        flags = 0
+        for slots in shared.values():
+            if len(slots) > 1:
+                flags |= LOCN_COLLIDED
+                collided.append({'script': c.name, 'names': [names[s] for s in slots]})
+                for s in slots:
+                    keys[s] = 0
+        rows.append((index, keys, flags))
+        count += len(keys)
+    return rows, {'scripts': len(rows), 'variables': count, 'collided': collided}
+
+
+def locn_section(rows):
+    """(bytes, rows) of LOCN: the 8-byte script rows, then the keys."""
+    head, keys = bytearray(), bytearray()
+    for index, row_keys, flags in rows:
+        if not 0 < len(row_keys) <= 255 or index > 0xFFFF:
+            raise ValueError('LOCN: script %d with %d variables' % (index, len(row_keys)))
+        head += struct.pack('>HBBI', index, len(row_keys), flags, len(keys) // 4)
+        keys += b''.join(struct.pack('>I', k) for k in row_keys)
+    return bytes(head + keys), len(rows)
+
+
+def held_item_rows(binds):
+    """HITM (v0.0.66, SAVE-ITEM-SCRIPT-LOCALS-66): [(held key, name_hash of the item's record id)] of every BIND row of
+    an item a placed holder holds (compiler.BIND_HELD), sorted by key."""
+    return sorted((b['reference'], name_hash(b['id'])) for b in binds if b['flags'] & 8 and b.get('id'))
+
+
+def check_name_hashes(label, names, bits=0xFFFFFFFF):
+    """Raise ValueError when two different names (folded) share name_hash (in BITS): a save keeps these by the hash,
+    so their saved values would mix (SAVE-SCRIPT-ROW-HINT-ONLY-65: never mixed; the builder refuses the file)."""
+    seen = {}
+    for name in names:
+        folded = name.casefold()
+        h = name_hash(name) & bits
+        if seen.setdefault(h, folded) != folded:
+            raise ValueError('%s %r and %r share the name hash %08x: their saved values would mix' %
+                             (label, seen[h], folded, h))
+
+
 def bound_name_rows(binds):
     """BNAM (v0.0.64, WORLD-BUTTONS-62 round three): [(FNV-1a of the folded object id, reference)] of every placed
     scripted reference of BIND (an item a holder carries has no place of its own: left out), sorted."""
@@ -204,6 +299,10 @@ def write(program, compiled, binds, conf=None):
     """The file's bytes, and a size table {section: bytes}. CONF: config/mwscript.json's activation and budget."""
     p = program
     check_limits(len(compiled), len(p.globals))
+    # a save keeps these by their name hash: two names of one hash would mix their values (SAVE-SCRIPT-ROW-HINT-ONLY-65)
+    check_name_hashes('scripts', [row['name'] for row in p.scripts.rows])
+    check_name_hashes('globals', [row['name'] for row in p.globals.rows])
+    check_name_hashes('quests', [row['name'] for row in p.journal.rows])
     conf = dict(DEFAULT_CONF, **(conf or {}))
     confb = struct.pack('>IHH', conf['range_units'], conf['ops_per_frame'], conf['ops_per_run'])
     for c in compiled:
@@ -295,6 +394,8 @@ def write(program, compiled, binds, conf=None):
     # u16 0; resident
     equips = p.equip_rows() if hasattr(p, 'equip_rows') else []
     equp = (b''.join(struct.pack('>HHBBH', r[1], r[2], r[3], r[4], 0) for r in equips), len(equips))
+    # the engine runs a worn item's script under the low 24 bits of its id's hash (aw_mwhost.c carried_key)
+    check_name_hashes('worn items', [r[0] for r in equips], 0xFFFFFF)
     # TOPC, 2 bytes a dialogue topic (v0.0.57): u16 name, sorted by folded id (AddTopic hands the row number); on disk
     rows = getattr(p, 'topic_rows', None)
     topics = sorted(rows(), key=rows().get) if rows else []
@@ -335,6 +436,12 @@ def write(program, compiled, binds, conf=None):
     sections['LACT'] = (b''.join(struct.pack('>IHH', h, s, 0) for h, s in lact_rows), len(lact_rows))
     bnam_rows = bound_name_rows(binds)
     sections['BNAM'] = (b''.join(struct.pack('>II', h, r) for h, r in bnam_rows), len(bnam_rows))
+    # LOCN and HITM (v0.0.66): the scripts' variables by name and the held items by item, for the save; on disk
+    locn_rows, p.local_names_report = local_rows(p, compiled)
+    sections['LOCN'] = locn_section(locn_rows)
+    hitm_rows = held_item_rows(binds)
+    sections['HITM'] = (b''.join(struct.pack('>II', k, h) for k, h in hitm_rows), len(hitm_rows))
+    sections['SCRH'] = (b''.join(struct.pack('>I', name_hash(row['name'])) for row in p.scripts.rows), len(p.scripts.rows))
     actors = getattr(p, 'actors', None)
     if actors is not None:
         sections.update(actors.sections(p.objects.rows))

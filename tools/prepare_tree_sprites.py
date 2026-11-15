@@ -16,6 +16,7 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from mwad.paths import child_ci, ensure_external, resolve_data_files
+from mwad.masters import master_path
 from build_jobs import add_jobs, resolve_jobs
 from build_parallel import ordered_map
 from world_flora_policy import load_policy, placement, selection_receipt, stable_sprite_name
@@ -113,14 +114,14 @@ def prepare(data_files, census_path, palette_path, out, jobs=None, models=None, 
     include_small_mushrooms = 'small_mushroom' in policy.get('source_categories', [])
     if census_path is None:
         from world_flora import inventory
-        census = inventory(child_ci(data, 'Morrowind.esm').read_bytes(), policy.get('source_categories', ['tree']))
+        census = inventory(master_path(data).read_bytes(), policy.get('source_categories', ['tree']))
         census_raw = (json.dumps(census, indent=2) + '\n').encode('utf-8')
     else:
         census_raw = Path(census_path).read_bytes()
         census = json.loads(census_raw.decode('utf-8-sig'))
     master_hash, refs = select_census(census, models, include_small_mushrooms)
     unique_reference_numbers(refs)
-    master = child_ci(data, 'Morrowind.esm')
+    master = master_path(data)
     if hashlib.sha256(master.read_bytes()).hexdigest() != master_hash:
         raise ValueError('Flora census and owned base master differ')
     palette = Path(palette_path).read_bytes()
@@ -132,9 +133,9 @@ def prepare(data_files, census_path, palette_path, out, jobs=None, models=None, 
     budget = resolve_jobs(jobs)
     source = out / 'source'
     from prepare_scenery import bsa_read, nif_reader
-    from mwad.audit import BSA
+    from mwad.archives import layered_bsa
     from world_flora import flora_kind
-    bsa = BSA(child_ci(data, 'Morrowind.bsa')); N = nif_reader()
+    bsa = layered_bsa(data); N = nif_reader()
     collision_by_model = {m: collision_metadata(bsa_read(bsa, 'meshes/' + m), N, flora_kind(m))
                           for m in sorted({r['model'] for r in refs})}
     profiles = {'meshes/' + r['model']: {'collision_source': 'root_node_or_visual'} for r in refs}

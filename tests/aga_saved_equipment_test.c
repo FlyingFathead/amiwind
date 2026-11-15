@@ -28,10 +28,13 @@ static aw_save_t original,decoded,unchanged;
 static int bytes(const char *p){FILE *f=fopen(p,"rb");int n;assert(f);n=fread(raw,1,sizeof(raw),f);assert(fgetc(f)==EOF);fclose(f);return n;}
 static void hand(int goal,int state,int torch){memset(field_values,0,sizeof(field_values));field_values[0]._float=goal;field_values[1]._float=state;field_values[2]._float=torch;field_values[3]._float=sv.time-.2;field_values[4]._float=1;player.v.weaponframe=state?2:0;player.v.weaponmodel=state?1:0;}
 /* a load hands the game its own item table (aw_state.h OWNERSHIP: the loader takes the pending save's table) */
-static void restore(const aw_save_t *s){pending=*s;assert(AW_ItemsClone(&pending.state.items,&s->state.items));loading=1;AW_SaveSpawn();assert(!loading);}
+static void restore(const aw_save_t *s){pending=*s;assert(AW_ItemsClone(&pending.state.items,&s->state.items));
+ assert(AW_SaveActorsCopy(&pending,s->actors,s->actor_count));   /* and its own actor rows (aw_save.h OWNERSHIP) */
+ loading=1;AW_SaveSpawn();assert(!loading);}
 #ifndef OLD_CONTROL
 static void header(unsigned char *p,int size){uint32_t crc=0xffffffffU;int i,j;for(i=12;i<size;i++){crc^=p[i];for(j=0;j<8;j++)crc=(crc>>1)^((crc&1)?0xedb88320U:0);}crc^=0xffffffffU;for(i=0;i<4;i++){p[4+i]=(unsigned)size>>(i*8);p[8+i]=crc>>(i*8);}}
-static void bad(const unsigned char *p,int n){AW_SaveRelease(&decoded);memset(&unchanged,0xa5,sizeof(unchanged));decoded=unchanged;assert(!AW_SaveDecode(p,n,&decoded));assert(!memcmp(&decoded,&unchanged,sizeof(decoded)));memset(&decoded.state.items,0,sizeof(decoded.state.items));}
+static void bad(const unsigned char *p,int n){AW_SaveRelease(&decoded);memset(&unchanged,0xa5,sizeof(unchanged));decoded=unchanged;assert(!AW_SaveDecode(p,n,&decoded));assert(!memcmp(&decoded,&unchanged,sizeof(decoded)));memset(&decoded.state.items,0,sizeof(decoded.state.items));
+ decoded.actors=NULL;decoded.actor_count=decoded.actor_capacity=0;}
 static void intent(void){uint32_t flags;int i;static const int goal[]={0,1,1,1,0};static const int state[]={0,1,2,3,4};
  pr_strings=strings_a;sv.time=10;
  for(i=0;i<5;i++){hand(goal[i],state[i],0);flags=0xdeadbeef;assert(AW_SavedEquipmentCapture(&flags,&player,sv.time));assert(flags==(goal[i]?1U:0U));}

@@ -50,6 +50,19 @@ int AW_HandWeaponItemApply(void);
 #define AW_HAND_LIGHT_STANCE 7
 #define AW_HAND_LIGHT_FORWARD 4.0f   /* the torch arms' view offset (tools/prepare_torch.py VIEW_OFFSET) */
 int AW_HandLightItemApply(void);
+/* PLAYER-CASTING-59 (v0.0.66): the spell stance of the arms from parts, one per spell range (the first-person table's
+ * groups 'sps', 'spt', 'sp' after the light: tools/prepare_player_fp_parts.py SPELL_STANCES): AW_HAND_SPELL_STANCE +
+ * aw_magic_cast_range (0 self, 1 touch, 2 target). The baked arms carry one spell stance of their own, the target cast:
+ * <hands model stem>_sp.mdl (tools/prepare_hand_catalog.py SPELL_STANCE). Each holds the original's open hands
+ * (idlespell), raising and lowering (spellcast equip, unequip) and the cast in the attack's 10 frames, the spell's
+ * release on the attack's frame AW_HAND_CAST_RELEASE_FRAME (tools/prepare_hands.py SPELL_RELEASE_FRAME). */
+#define AW_HAND_SPELL_STANCE 8
+#define AW_HAND_CAST_RELEASE_FRAME 6
+#define AW_HAND_CAST_FRAMES 10
+/* aw_cast.c sets it from the selected spell's first effect (AW_PR_SELF, AW_PR_TOUCH, AW_PR_TARGET); 2 when none */
+extern int aw_magic_cast_range;
+/* aw_cast.c, a cast that goes: the hands play the cast (the attack clip) from the ready stance. 1 = started. */
+int AW_HandsCastStart(void);
 extern int (*aw_hand_parts_shield_tag)(float tag[6]);
 /* The first-person hand clips (FIRST-PERSON-HANDS-IN-C-54): the builder writes them to gfx/hand-anims.txt in the image
  * (tools/hand_metadata.py hand_table; read by aw_hands.c), never into a map's worldspawn or the QuakeC, so a change to the hands rebuilds
@@ -63,6 +76,11 @@ typedef struct {int first[AW_HAND_CLIPS],count[AW_HAND_CLIPS];float duration[AW_
 int AW_HandTableParse(const char *text,aw_hand_table_t *out);
 /* The frame of a clip ELAPSED seconds in (the QuakeC contract: first + floor(elapsed x count / duration)). Pure. */
 int AW_HandClipFrame(const aw_hand_table_t *t,int clip,float elapsed);
+/* PLAYER-CASTING-59: the seconds from a cast's start to the spell's release: the attack clip's frame
+ * AW_HAND_CAST_RELEASE_FRAME (the frame AW_HandClipFrame reaches first at that time). Pure. */
+float AW_HandCastRelease(const aw_hand_table_t *t);
+/* The image's table's AW_HandCastRelease, FALLBACK when the image has none. */
+float AW_HandCastReleaseNow(float fallback);
 int AW_HandTableReady(void);
 /* The table is read again at the next use (tests; aw_hands.c). */
 void AW_HandTableReset(void);
@@ -80,6 +98,20 @@ enum {AW_READY_WEAPON_KEY,AW_READY_MAGIC_KEY};
 extern int aw_magic_readied;
 void AW_HandReadyPress(int key,int *goal,int *magic);
 int AW_HandShowsWeapon(int goal,int magic);
+/* READY-MAGIC-SHOWS-WEAPON-65 (v0.0.66; decided for the project, 14 November 2026: readying magic shows the open hands
+ * whatever is equipped): the first-person arms drawn (aw_hand_models.c AW_HandModelsApply), by priority. MAGIC ready:
+ * the spell stance (the original's open palms, idlespell), whatever the weapon, the carried torch, a held light or the
+ * shield; then the lit TORCH's arms, a held LIGHT's stance, and AW_HAND_VIEW_HANDS: the drawn weapon's stance or the bare
+ * hands (the fists of hand to hand). As the original (OpenMW 0.51, read not copied: the spell is a two-handed draw
+ * state, mwworld/store.cpp's weapon types, and a two-handed draw hides the carried-left item, the torch, a light or the
+ * shield, npcanimation.cpp updateCarriedLeftVisible). Before, the lit torch and a held light came first, so with
+ * either in the left hand R showed the right hand's fist (v0.0.66-dev1). Pure. */
+enum {AW_HAND_VIEW_HANDS,AW_HAND_VIEW_SPELL,AW_HAND_VIEW_TORCH,AW_HAND_VIEW_LIGHT};
+int AW_HandView(int magic,int torch,int light);
+/* 1 while the left hand's torch, light or shield is carried visibly: 0 (put away, no light cast) while MAGIC is ready,
+ * back when the weapon is readied or the magic lowered (aw_torch.c aw_torch_put_away, the guard, the third-person
+ * body). Pure. */
+int AW_HandCarriesLeft(int magic);
 /* aw_view.c installs it: 1 while the equipped weapon must not be drawn in first person (the spell stance). */
 extern int (*aw_hand_weapon_hidden)(void);
 int AW_HandModelsDecode(const unsigned char *data,int size);

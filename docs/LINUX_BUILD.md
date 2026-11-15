@@ -1,6 +1,6 @@
 # Build AmiWind on Linux
 
-_Last updated with AmiWind v0.0.62 (8 November 2026)._
+_Last updated with AmiWind v0.0.66-dev2 (14 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -348,6 +348,15 @@ world terrain, character assets, audio, native compilation and HDF assembly.
 Independent stages can overlap within the shared worker budget. It stops at the
 first failed stage and records the command, timing and log path in
 `../amiwind-local/build/first-town/build-state.json`. Stage logs are in `logs/`.
+A failed build also writes `FAILURE.md` (and the same as data in `failure.json`)
+in the run folder and prints it at the end of its output: the failed stage, its
+exit, its error lines, the traceback (a stage's own Python process prints the
+traceback of the error it stops on into its log), the last 60 lines of the
+stage's log, the units it refused or left out, the run's commit and the command
+that builds again from the run with `--reuse-from`. The Toolkit Monitor links it
+under Progress ([Monitor](AMIWIND_TOOLKIT.md#monitor)).
+`python3 tools/build_failure.py RUN --print` writes the page again for a failed
+run, an earlier builder's included.
 Output HDFs are under that run's `image/` directory. Original files are read in
 place. The default output parent is ignored `out/` in the checkout; the explicit
 `--workspace ../amiwind-local` above selects an external parent instead. Neither

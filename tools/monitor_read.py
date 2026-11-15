@@ -15,14 +15,15 @@ and a file that must match a strict name pattern and resolve inside the configur
   monitor_read.py --root builds=DIR runs         list the runs (one JSON document)
 
 A request is a JSON object {"op": "runs"} | {"op": "files", "run": R} | {"op": "progress", "run": R} |
-{"op": "state", "run": R} | {"op": "timeline", "run": R} | {"op": "log", "run": R, "name": N, "offset": O,
-"max": M}; the answer is {"ok": true, ...} or {"ok": false, "error": "..."}.
+{"op": "state", "run": R} | {"op": "timeline", "run": R} | {"op": "failure", "run": R} | {"op": "log", "run": R,
+"name": N, "offset": O, "max": M}; the answer is {"ok": true, ...} or {"ok": false, "error": "..."}.
 """
 import argparse
 import json
 import os
 import re
 import sys
+import time
 from pathlib import Path
 
 NAME = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._+-]{0,199}$')
@@ -40,6 +41,8 @@ NOT_WORK = {'<module>', '_pool_worker_init', 'section', '_clock_ticks', '_profil
 MAX_READ = 256 * 1024          # bytes per log read
 MAX_JSON = 8 * 1024 * 1024     # a JSON file larger than this is refused
 MAX_RUNS = 60
+STARTUP = '.startup'            # build.py's start-up progress (tools/build_stall.py), beside the run folders
+STALL_FRESH_S = 3600            # runs list carries the stall block of progress files written this recently
 TIMELINE_POINTS = 600
 
 
@@ -99,8 +102,45 @@ class Reader:
             if marker is None:
                 continue
             out.append({'run': e.name, 'mtime': marker.stat().st_mtime, 'progress': (d / 'build-progress.json').is_file()})
+        # a build still in its start-up (tools/build_stall.py StartupWatch): build/.startup/<name>/build-progress.json
+        names = {r['run'] for r in out}
+        start = self.root / STARTUP
+        if start.is_dir() and not start.is_symlink():
+            for e in os.scandir(start):
+                p = Path(e.path) / 'build-progress.json'
+                if e.is_dir(follow_symlinks=False) and NAME.match(e.name) and e.name not in names and p.is_file():
+                    out.append({'run': e.name, 'mtime': p.stat().st_mtime, 'progress': True, 'starting': True})
         out.sort(key=lambda r: -r['mtime'])
-        return {'runs': out[:MAX_RUNS]}
+        out = out[:MAX_RUNS]
+        # the builder's stall block of the runs written in the last STALL_FRESH_S (the monitor's stall banner)
+        now = time.time()
+        for r in out:
+            if r['progress'] and now - r['mtime'] <= STALL_FRESH_S:
+                stall = None
+                try:
+                    # the status folder first (docs/BUILD_STATUS.md: the same files any catcher reads)
+                    for parts in ((r['run'], 'status', 'heartbeat.json'), (STARTUP, r['run'], 'status', 'heartbeat.json')):
+                        if (self.root.joinpath(*parts)).is_file():
+                            stall = (self._json(self._inside(*parts)) or {}).get('stall')
+                            break
+                    if stall is None and self._progress_file(r['run']):
+                        stall = (self._json(self._progress_file(r['run'])) or {}).get('stall')
+                except (Refused, ValueError, OSError):
+                    stall = None
+                if stall:
+                    r['stall'] = stall
+        return {'runs': out}
+
+    def _progress_file(self, run):
+        """RUN's build-progress.json, else its start-up file (build/.startup/RUN/), else None."""
+        check_name(run, what='run')
+        d = self.root / run
+        if d.is_dir() and (d / 'build-progress.json').is_file():
+            return self._inside(run, 'build-progress.json')
+        p = self.root / STARTUP / run / 'build-progress.json'
+        if p.is_file():
+            return self._inside(STARTUP, run, 'build-progress.json')
+        return None
 
     def files(self, run):
         d = self._run(run) / 'logs'
@@ -120,7 +160,10 @@ class Reader:
         return {'run': run, 'logs': out, 'traces': traces}
 
     def progress(self, run):
-        return {'run': run, 'progress': self._json(self._run(run) / 'build-progress.json')}
+        path = self._progress_file(run)
+        if path is None:
+            self._run(run)                      # 'no such run' as before
+        return {'run': run, 'progress': self._json(path) if path else None}
 
     def state(self, run):
         """A summary of build-state.json (the full file holds every input hash): status and the steps."""
@@ -162,6 +205,40 @@ class Reader:
                                          'stages': stages, 'cores': series, 'memory': memory,
                                          'memory_limit_gib': round(limit / gib, 2) if limit else None,
                                          'memory_peak': [peak[1], round(peak[0] / gib, 2)] if peak else None}}
+
+    def failure(self, run):
+        """The failure details of a failed run (BUILD-FAILURE-NO-DETAILS-66): its failure.json and FAILURE.md as the
+        builder wrote them (tools/build_failure.py), or, for a failed run without them (an earlier builder), the
+        same details derived from its build-state.json and the failed stage's log, read only and kept for the run's
+        state file as it is. 'failure' is None for a run that did not fail."""
+        d = self._run(run)
+        record = self._json(self._inside(run, 'failure.json'))
+        page = self._inside(run, 'FAILURE.md')
+        text = None
+        if page.is_file():
+            if page.stat().st_size > MAX_JSON:
+                raise Refused('FAILURE.md is too large')
+            text = page.read_bytes().decode('utf-8', 'replace')
+        if isinstance(record, dict) and text is not None:
+            return {'run': run, 'failure': record, 'text': text, 'source': 'build'}
+        module = failure_module()
+        if module is None:
+            return {'run': run, 'failure': record if isinstance(record, dict) else None, 'text': text,
+                    'source': 'build' if text is not None else None}
+        state = self._inside(run, 'build-state.json')
+        stat = state.stat() if state.is_file() else None
+        if stat is None:
+            return {'run': run, 'failure': None, 'text': None, 'source': None}
+        if stat.st_size > MAX_JSON:
+            raise Refused('build-state.json is too large')
+        key = (run, stat.st_size, stat.st_mtime_ns)
+        cache = self.__dict__.setdefault('_failures', {})
+        if key not in cache:
+            if len(cache) > 20:
+                cache.clear()
+            cache[key] = module.derive(d, path=lambda *parts: self._inside(run, *parts))
+        record, text = cache[key]
+        return {'run': run, 'failure': record, 'text': text, 'source': 'derived' if record else None}
 
     def log(self, run, name, offset=-1, max_bytes=MAX_READ, trace=False):
         """Bytes [offset, offset + max) of logs/NAME (or, with TRACE, of the stage's read/write trace
@@ -423,7 +500,7 @@ class Reader:
             op = request.get('op')
             if op == 'runs':
                 out = self.runs()
-            elif op in ('files', 'progress', 'state', 'timeline'):
+            elif op in ('files', 'progress', 'state', 'timeline', 'failure'):
                 out = getattr(self, op)(request.get('run'))
             elif op == 'sections':
                 out = self.sections(request.get('run'), request.get('stage'))
@@ -435,6 +512,26 @@ class Reader:
             return dict(out, ok=True)
         except (Refused, ValueError, TypeError, OSError) as e:
             return {'ok': False, 'error': str(e) if isinstance(e, Refused) else type(e).__name__}
+
+
+def failure_module():
+    """tools/build_failure.py, the code the builder writes the failure details with: imported as usual, or loaded by
+    its path beside this file (the reader container runs this file isolated, -I, with that one file beside it); None
+    without it (the reader then serves only the failure files a build wrote)."""
+    try:
+        import build_failure
+        return build_failure
+    except ImportError:
+        pass
+    path = Path(__file__).resolve().with_name('build_failure.py')
+    if not path.is_file():
+        return None
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('build_failure', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    sys.modules['build_failure'] = module
+    return module
 
 
 LOW_CORES, LOW_SECONDS = 4.0, 60.0

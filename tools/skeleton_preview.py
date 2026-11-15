@@ -142,9 +142,10 @@ def npc_preview(assets, data, npc, palette, groups, out, rate):
     """--npc: the character's skeletal model on its skeleton's shipped table, rendered to npc-preview.gif."""
     from mwad.npc import load_master, outfit
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     from npc_geometry import Skeleton
     import skeletal_actor as S
-    kinds, _, _ = load_master(child_ci(data, 'Morrowind.esm'))
+    kinds, _, _ = load_master(master_path(data))
     app = outfit(kinds, npc.casefold())
     sk = Skeleton(assets, app['skeleton'])
     table_bytes, report = S.stick_table(sk)
@@ -166,12 +167,13 @@ def main(argv=None):
     parser.add_argument('--npc', help='one character by its record id: npc-preview.gif instead of the bones')
     parser.add_argument('--palette', type=Path, help='the game palette (gfx/palette.lmp of a build) for --npc')
     args = parser.parse_args(argv)
-    from mwad.audit import BSA
+    from mwad.archives import layered_bsa
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     from npc_geometry import Assets, Skeleton
     import skeletal_actor as S
     data = Path(args.data_files)
-    assets = Assets(data, BSA(child_ci(data, 'Morrowind.bsa')))
+    assets = Assets(data, layered_bsa(data))
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     if args.npc:

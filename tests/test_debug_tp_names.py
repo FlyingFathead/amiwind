@@ -40,7 +40,7 @@ class DebugTeleportNameTests(unittest.TestCase):
 
     def test_console_page_lists_vivec(self):
         page = (ROOT / 'docs' / 'AMIWIND_CONSOLE_COMMANDS.md').read_text(encoding='utf-8')
-        self.assertIn('vivec (the whole city vivec_city, else the Vivec Arena)', page)
+        self.assertIn('vivec (the city, else the Arena)', page)    # shortened in v0.0.66 (the 384-byte line)
 
 
 if __name__ == '__main__':

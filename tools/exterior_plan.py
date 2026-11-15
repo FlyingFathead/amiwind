@@ -30,6 +30,48 @@ def source_cells(master, layers=()):
     return sorted(cells), hashlib.sha256('\n'.join(digests).encode()).hexdigest()
 
 
+def selected_cells(data_files, masters=None, merged_dir=None):
+    """(cells, digest) of the SELECTED game data, by the world survey's rule (tools/survey_vvardenfell.py run): the
+    merged master of the selected MASTERS (mwad.masters.master_path; the base game file itself when alone), its
+    exterior cells over the base game's exterior grid (base_grid: the cells only an expansion adds, Solstheim, are
+    listed by the survey, not planned), and that merged file's SHA-256, which is the survey's master_sha256.
+
+    The exterior checklist and the terrain survey so hash the same game data and classify_regions compares like with
+    like (EXTERIOR-PLAN-MASTER-LAYERS-66: with Tribunal and Bloodmoon selected the checklist hashed the base game file
+    and the survey the merged master, and the world terrain stage stopped on it). With the base game alone this is
+    source_cells(Morrowind.esm), so the base world's checklist does not move."""
+    from mwad.masters import BASE_MASTER, is_base_only, master_path, selected_masters
+    from mwad.paths import child_ci
+    masters = selected_masters(masters)
+    path = master_path(data_files, masters, merged_dir)
+    if is_base_only(masters):
+        return source_cells(path)
+    cells, digest = _master_cells(path)
+    grid = base_grid(child_ci(Path(data_files), BASE_MASTER))
+    return [c for c in cells if c in grid], digest
+
+
+def base_grid(master):
+    """The exterior grid positions (x, y) of the base game file MASTER: its exterior CELL and LAND records, whatever
+    they hold (the world survey's base_grid in tools/survey_vvardenfell.py, the same rule; the test
+    tests/test_exterior_plan_layers.py holds the two together)."""
+    from mwad.esm import records, subrecords
+    grid = set()
+    for tag, flags, payload in records(Path(master).read_bytes()):
+        if tag not in ('CELL', 'LAND'):
+            continue
+        for key, value in subrecords(payload):
+            if tag == 'CELL' and key == 'DATA':
+                bits, x, y = struct.unpack_from('<Iii', value)
+                if not bits & 1:
+                    grid.add((x, y))
+                break
+            if tag == 'LAND' and key == 'INTV':
+                grid.add(struct.unpack_from('<ii', value))
+                break
+    return grid
+
+
 def _master_cells(master, require=True):
     from mwad.esm import records, subrecords, is_deleted
     raw = Path(master).read_bytes()
@@ -250,6 +292,29 @@ def classify_regions(plan, entries, master_sha256, chim_cells, *, before_ocean_r
         else:
             out[row['name']] = 'bsp'
     return out
+
+
+def planned_cells(terrain):
+    """{(x, y)} of the exterior cells the exterior checklist of the world terrain stage output TERRAIN plans (its
+    world-regions.json), or None without that output or a checklist (then every cell counts as planned)."""
+    path = Path(terrain) / 'world-regions.json' if terrain else None
+    if path is None or not path.is_file():
+        return None
+    plan = json.loads(path.read_bytes()).get('exterior_checklist')
+    return {tuple(r['cell']) for r in plan['cells']} if plan else None
+
+
+def unplanned(references, plan):
+    """The REFERENCES (placements with a 'cell') in exterior cells the exterior checklist PLAN does not plan: the cells
+    only an expansion adds (Solstheim), which the world survey lists in expansion_only_cells and does not plan
+    (selected_cells). No open-world map and no CHIM region of the build holds them, so a stage that checks it covered
+    every source placement of its index leaves these out, and says how many (EXTERIOR-EXPANSION-ONLY-CELLS-66: with
+    Tribunal and Bloodmoon selected the world scenery stage refused 2,960 Solstheim placements as omitted). Without a
+    checklist nothing is left out; with the base game alone every exterior cell is planned, so nothing either."""
+    if not plan:
+        return []
+    planned = {tuple(r['cell']) for r in plan['cells']}
+    return [r for r in references if r.get('cell') is not None and tuple(r['cell']) not in planned]
 
 
 def no_legacy_map(row):

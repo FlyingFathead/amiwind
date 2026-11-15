@@ -62,6 +62,7 @@ The import reports excluded cells.
 Family: Town and interior import (`town-import`). The town importer converts every town and interior within engine limits; doors lead somewhere. See [families](README.md#families).
 
 - AW-20260928-08 (no report page): Census wall/hanging texture quality or mapping
+- CHIM-TOWN-RECEIPT-MERGED-MASTERS-66 (no report page): With the expansions selected, the CHIM stage stopped while listing a town's receipt files
 - [IMPORT-DOORBANK-CITY-36](IMPORT-DOORBANK-CITY-36.md): The whole-city Vivec frame holds 157 load doors, over the engine's 128-row door bank
 - [IMPORT-TOWN-NO-INTERIORS-32](IMPORT-TOWN-NO-INTERIORS-32.md): The town importer converts no interiors; all Vivec Arena doors say "Interior unavailable"
 - [ROOM-DECAL-ALPHA-62](ROOM-DECAL-ALPHA-62.md): A cobweb compiled into a room is drawn as a solid dark sheet instead of see-through

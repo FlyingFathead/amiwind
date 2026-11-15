@@ -456,7 +456,9 @@ def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,me
               % (len(hidden), ', '.join(map(str, hidden[:20]))), flush=True)
         refs = drop_hidden_markers(refs)
     out = ensure_external(out, 'scenery export'); out.mkdir(parents=True, exist_ok=False)
-    bsa = BSA(child_ci(data_files, 'Morrowind.bsa'))
+    # the selected masters' archives, later archive wins (ASSETS-ARCHIVE-ORDER-32); the base game alone: Morrowind.bsa
+    from mwad.archives import layered_bsa
+    bsa = layered_bsa(data_files)
     profiles={name:profile for group in groups.values()
               for name,profile in group.get('visual_profiles',{}).items()}
     names = sorted({normpath('meshes/' + r['model']) for r in refs})
@@ -478,7 +480,7 @@ def export_refs(data_files,out,refs,groups,centre,radius=4096,texture_size=64,me
     from collision_source import export_collision, AVOID_LABEL
     from collision_source_env import collision_source_mode
     rule = collision_source_mode()
-    tasks = [(name, bsa.path, bsa.entries.get(name, {'offset': 0, 'bytes': 0}),
+    tasks = [(name, bsa.entries.get(name, {}).get('path', bsa.path), bsa.entries.get(name, {'offset': 0, 'bytes': 0}),
               export_collision(profiles.get(name, {}).get('collision_source'), rule)) for name in names]
     sources = {}
     workers = min(resolve_jobs(jobs), max(1, len(tasks)))

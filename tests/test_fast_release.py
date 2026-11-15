@@ -121,6 +121,8 @@ class CallSites(unittest.TestCase):
                  'aw_tryalloc.c': 'every checked allocation: per-frame paths too',
                  'aw_fastrelease.c': 'the registry\'s own console line',
                  'aw_census.c': 'dbg memcensus: the free Fast RAM and its largest block in one line (a report only)',
+                 'aw_tpplaces.c': 'dbg tp: the name list is read whole only when the largest Fast block holds it with '
+                                  'the low-memory spare, else it is paged from disk (a debug list; nothing released first)',
                  'chim/chim_world.c': 'the cache banks and a room: released first',
                  'sys_amiga.c': 'the heap at start-up, before anything is held',
                  'zone.c': 'a report'}

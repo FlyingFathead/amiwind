@@ -296,6 +296,87 @@ def pools_of(data_files, refs, molten, source=None):
     return out
 
 
+# ---------------------------------------------------------------- the rooms' pools (LAVA-POOL-NOT-LAVA-NAMED-66)
+
+def _upward_points(vertices, faces, chosen):
+    """Mesh-local vertices of the upward faces of the materials CHOSEN (indices); empty when none (pool_points' rule
+    for any set of layers)."""
+    import numpy as np
+    P = np.asarray(vertices, dtype=float)[:, :3]
+    F = np.asarray(faces, dtype=int)
+    F = F[np.isin(F[:, 3], chosen)] if chosen else F[:0]
+    if not len(F):
+        return P[:0]
+    n = np.cross(P[F[:, 1]] - P[F[:, 0]], P[F[:, 2]] - P[F[:, 0]])
+    length = np.linalg.norm(n, axis=1)
+    up = (length > 0) & (n[:, 2] >= UP_NZ * length)
+    return P[np.unique(F[up][:, :3])] if up.any() else P[:0]
+
+
+def _layer_textures(vertices, faces, materials, chosen):
+    """Texture sources of the layers CHOSEN (material indices), bottom to top by the height of their faces
+    (pool_layers' rule for any set of layers)."""
+    import numpy as np
+    P = np.asarray(vertices, dtype=float)
+    F = np.asarray(faces, dtype=int)
+    rows = []
+    for i in chosen:
+        f = F[F[:, 3] == i]
+        if len(f):
+            rows.append((float(P[f[:, :3].ravel(), 2].mean()), i, materials[i]['texture_source']))
+    return [t for _, _, t in sorted(rows)]
+
+
+def pool_shape(vertices, faces, materials):
+    """(surface points, layers bottom to top) of a molten object's pool mesh. The pool is its upward lava faces
+    (pool_points, pool_layers); a pool none of whose layers is named lava is the pool by its flowing layers: the
+    materials whose texture scrolls (uv_scroll, the shape's NiUVController; prepare_scenery.uv_scroll).
+
+    What is molten is decided by the object's script (molten_objects: an actor standing on it is hurt), never by a
+    texture name. Sotha Sil's hot oil (act_hot_oil_512, Tribunal; script SothaHotOil, 20 per second, loop sound "oil
+    bubbly") is the lava pools' own stack with other textures: two flowing layers of Tx_hot_oil under a flowing crust
+    of Tx_oil_crust, the faces, scroll and glow of in_lava_512. With no upward lava face and no flowing one the
+    points are empty (the caller refuses the pool, named)."""
+    points = pool_points(vertices, faces, materials)
+    if len(points):
+        return points, pool_layers(vertices, faces, materials)
+    flowing = [i for i, m in enumerate(materials) if m.get('uv_scroll')]
+    return _upward_points(vertices, faces, flowing), _layer_textures(vertices, faces, materials, flowing)
+
+
+def room_pools_of(data_files, refs, molten, source=None):
+    """The molten pools of a room's references as pools_of gives them, each pool's surface by pool_shape: a pool whose
+    layers are not named lava (Sotha Sil's hot oil) is a pool by its flowing layers instead of a refusal of the whole
+    room (two Tribunal rooms, Sotha Sil's Central Gearworks and Dome of Udok, were refused with "Lava pool without
+    upward lava faces"; LAVA-POOL-NOT-LAVA-NAMED-66). The same rows as pools_of wherever pools_of gives them (its lava
+    faces are pool_shape's first rule). pools_of stays as it is: its code is in the keys of the CHIM world's lava
+    (exterior_pools) and of the other room stages, whose pools all have lava layers."""
+    from prepare_scenery import model_geometry, nif_reader, reference_rotation
+    from mwad.scene import unpack_geometry
+    shapes, out = {}, []
+    for ref in refs:
+        if ref.get('deleted') or ref.get('id', '').casefold() not in molten:
+            continue
+        if source is None:      # only rooms with a molten object read meshes
+            from world_estimate_data import MeshSource
+            source = MeshSource(data_files)
+        model = ref['model'].replace('\\', '/').casefold()
+        model = model if model.startswith('meshes/') else 'meshes/' + model
+        if model not in shapes:
+            raw, _ = source.read(model)
+            geometry, materials, _, _ = model_geometry(raw, nif_reader(), repair_uv=True)
+            vv, ff, _ = unpack_geometry(geometry)
+            shapes[model] = pool_shape(vv, ff, materials)
+        points, layers = shapes[model]
+        if not len(points):
+            raise ValueError('Lava pool without upward lava or flowing faces: ' + model)
+        hull, top = footprint(points, reference_rotation(ref), ref.get('scale', 1.0), ref['position'])
+        contract = molten[ref['id'].casefold()]
+        out.append({'reference': ref.get('number'), 'id': ref['id'], 'model': model, 'hull': hull, 'top': top,
+                    'layers': layers, 'dps': contract['dps'], 'sound': contract['sound']})
+    return out
+
+
 def wad_entries(assets_texture, layers, palette_image, size=64):
     """[(name, lump type, miptex)] of the warp texture and the bed texture, quantized to the
     game palette. assets_texture(name) -> RGBA array (npc_geometry.Assets.texture)."""
@@ -395,12 +476,13 @@ def convert_sounds(data_files, pools, sound_root, ffmpeg='ffmpeg'):
     from pathlib import Path
     from mwad.audit import BSA
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     from npc_geometry import Assets
     from prepare_intro import ship_hull_convert
     names = sorted({p['sound'] for p in pools if p.get('sound')})
     if not names:
         return {}, []
-    raw = child_ci(Path(data_files), 'Morrowind.esm').read_bytes()
+    raw = master_path(Path(data_files)).read_bytes()
     assets = Assets(Path(data_files), BSA(child_ci(Path(data_files), 'Morrowind.bsa')))
     volumes, receipts = {}, []
     for name in names:
@@ -429,7 +511,8 @@ def exterior_pools(data_files):
     from pathlib import Path
     from mwad.audit import cell_data, records, subrecords
     from mwad.paths import child_ci
-    raw = child_ci(Path(data_files), 'Morrowind.esm').read_bytes()
+    from mwad.masters import master_path
+    raw = master_path(Path(data_files)).read_bytes()
     molten = molten_objects(raw)
     models, refs = {}, []
     for tag, _flags, payload in records(raw):

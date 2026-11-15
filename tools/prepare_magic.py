@@ -31,7 +31,7 @@ SCALE = 0.25                     # Morrowind units to map units (prepare_quake.S
 SPRITE = 32                      # sprite side in pixels (aw_magic.h AW_MAGIC_SPRITE_PIXELS)
 # the bubble's finer copy (progs/awmf_NN.spr beside progs/awmx_NN.spr): for shells seen close, the player's own seen
 # from behind and the first-person veil, where 32 pixels made a coarse dither (the maintainer: "the shield veil looks
-# kinda wild", TG 2026-10-28 08:07 +0200); aw_magic.c finds it by that name and scales it by its own width
+# kinda wild", 2026-10-28); aw_magic.c finds it by that name and scales it by its own width
 FINE_SIDE = 64
 FADES = (1.0, 0.7, 0.45, 0.25)   # the four fade frames' strength
 RAMP = 8
@@ -77,14 +77,14 @@ def zstring(raw):
 
 def read_records(data_files):
     """MGEF rows by index, visual models (STAT, WEAP) and sound files (SOUN) by lower-case id, GMST floats:
-    Morrowind.esm, then Tribunal.esm and Bloodmoon.esm when present (a later master's record wins)."""
+    the SELECTED masters in load order (mwad.masters.selected_masters: the build's layer selection, never which files
+    are present; a later master's record wins; EXPANSION-DATA-ALL-TABLES-66)."""
     from mwad.esm import records, subrecords, is_deleted
+    from mwad.masters import selected_masters
     from mwad.paths import child_ci
     mgef, models, sounds, gmst = {}, {}, {}, {}
-    for name in ('Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm'):
-        path = child_ci(Path(data_files), name, required=name == 'Morrowind.esm')
-        if path is None:
-            continue
+    for name in selected_masters():
+        path = child_ci(Path(data_files), name, required=True)
         for kind, flags, payload in records(path.read_bytes()):
             if kind not in ('MGEF', 'STAT', 'WEAP', 'SOUN', 'GMST'):
                 continue

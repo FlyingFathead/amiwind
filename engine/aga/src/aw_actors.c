@@ -71,6 +71,8 @@ static struct
 {
 	unsigned long	joins, leaves, spawned, skipped_dead, skipped_alive, released, kept, rehomed, frees_by_tick, spawn_ticks;
 	unsigned long	skipped_disabled, skipped_away, away, visitors;
+	unsigned long	cleared;		/* bodies cleared away (ACTOR-RESPAWN-CORPSE-RULES-66) */
+	unsigned long	corpses;		/* dead bodies of a joining cell laid down (OUTDOOR-DEAD-BODY-GONE-66) */
 	double			join_time, leave_time, spawn_time, spawn_worst;
 } st;
 
@@ -104,6 +106,10 @@ static int IsActor (edict_t *e)
  * models, progs/a_*) are not told apart from the room's NPCs yet. */
 static int		creatures_on = 1;
 static unsigned long	creatures_skipped;
+/* OUTDOOR-DEAD-BODY-GONE-66 ("chim actors corpses 0|1", default 1): a joining cell's dead actor whose body is not yet
+ * cleared is spawned and laid down as a body (lootable until fCorpseClearDelay, as the original); 0 = the method before
+ * v0.0.66, a dead actor of a joining cell is not spawned at all (its body gone at once). Not saved. */
+static int		corpses_on = 1;
 
 static int IsCreature (edict_t *e)
 {
@@ -288,11 +294,61 @@ static int Respawned (change_t *c)
 	return 1;
 }
 
+/* ACTOR-RESPAWN-CORPSE-RULES-66, the body clearing (aw_ledger.h AW_LedgerActorClears; OpenMW 0.51 cellstore.cpp
+ * clearCorpse): at the cell's load a dead actor that does not come back (no Respawn flag, no levelled list) and whose
+ * record is not Persistent loses its body fCorpseClearDelay game hours after its death (72 in Morrowind.esm): the body
+ * and what it carried go for good, the actor stays dead (its row keeps DEAD and CLEARED). 1 when the body is gone. */
+static int Cleared (change_t *c)
+{
+	aw_ledger_respawn_t rule = AW_LEDGER_RESPAWN_DEFAULT;
+	uint32_t flags;
+	if (!c || !c->dead)
+		return 0;
+	if (c->cleared)
+		return 1;
+	flags = RefFlags (c->key, &rule);
+	if (!AW_LedgerActorClears (c, flags, GameHours (), &rule))
+		return 0;
+	if (aw_ledger_on)
+		AW_LedgerContentDrop (&aw_ledger, c->key);	/* the body's loot goes with it */
+	st.cleared++;
+	Con_Printf ("Corpse: actor %lu's body is cleared away (dead for good).\n", (unsigned long)c->key);
+	return 1;
+}
+
+/* ACTOR-DEAD-RESPAWN-INTERIOR-65 (ACTOR-STATE-NOT-READ-ON-SPAWN-54): the actor record (aw_actorstate.c) is the other
+ * keeper of a death: a script's SetHealth 0, a spell or a fall kills the record (AW_ActorKill) without a fight's slot,
+ * so the change list may not know it. aw_mwhost.c binds this: 1 when the live record of REFERENCE is dead (NULL in
+ * builds and tests without the scripts). */
+int (*aw_actor_dead_record)(unsigned reference);
+
+/* The change row of REF with the record's death on it: a record that is dead gives its row the death (made when
+ * missing, the time of death now), so the spawn and the map's own actors keep it dead as a fight's death. */
+static change_t *DeadRow (float ref)
+{
+	change_t *c = Change (ref, 0);
+	if ((c && c->dead) || !aw_actor_dead_record || !(ref >= 1 && ref <= 16777215.0f) ||
+		!aw_actor_dead_record ((unsigned)ref))
+		return c;
+	if (!c && !(c = Change (ref, 1)))
+		return NULL;
+	c->died = GameHours () > 0 ? GameHours () : 0;
+	c->dead = 1;
+	return c;
+}
+
+/* A map's change list waits until the player has spawned (the scene's set-up empties the combat slots before that). */
+static int ApplyWaits (void)
+{
+	return svs.maxclients < 1 || !svs.clients || !svs.clients[0].active || !svs.clients[0].spawned;
+}
+
 static void Release (edict_t *e)
 {
 	change_t *c = Change (RefOf (e), 1);
 	if (c)
 		Capture (e, c);
+	AW_SaveCaptureActor (e);	/* its saved row (its greetings) first: unloaded, never lost (SAVE-ACTOR-ROWS-256-66) */
 	AW_CombatForget (e);
 	ED_Free (e);
 	st.released++;
@@ -571,10 +627,13 @@ static int SpawnOne (pending_t *q)
 			v->_float = q->scale;
 	}
 	ref = RefOf (ent);
-	c = Change (ref, 0);
+	c = DeadRow (ref);		/* the record's death too (ACTOR-DEAD-RESPAWN-INTERIOR-65) */
 	Respawned (c);			/* slice 7: a dead one whose time has come is back */
-	if (c && c->dead)
+	Cleared (c);			/* ACTOR-RESPAWN-CORPSE-RULES-66: or its body goes for good */
+	if (c && c->dead && (c->cleared || !corpses_on))
 	{
+		/* its body was cleared away (dead for good), or chim actors corpses 0 (the method before v0.0.66: a dead
+		 * actor of a joining cell is not spawned at all) */
 		ED_Free (ent);
 		st.skipped_dead++;
 		return 0;
@@ -656,8 +715,23 @@ static int SpawnOne (pending_t *q)
 		VectorCopy (c->angles, ent->v.angles);
 		SV_LinkEdict (ent, false);
 		/* a fight it was in goes on, with the health it had (the combat sheet's) */
-		if (c->fight && AW_CombatTestEngage (ent, 0))
+		if (!c->dead && c->fight && AW_CombatTestEngage (ent, 0))
 			AW_CombatSetHealth (ent, c->health);
+	}
+	if (c && c->dead && !ent->free)
+	{
+		/* OUTDOOR-DEAD-BODY-GONE-66: the body lies where it fell, lootable, until its clear delay (OpenMW 0.51
+		 * cellstore.cpp clearCorpse at the cell's load; the same as a room's or the home map's bodies, ApplyLoaded).
+		 * A saved death laid down again: no second essential message. Without a combat slot to hold it, it is not
+		 * left standing: freed as before, a finding in the log. */
+		if (!AW_CombatLayCorpse (ent))
+		{
+			Con_Printf ("actors: ref %.0f dead: no combat slot, its body not laid down\n", ref);
+			ED_Free (ent);
+			st.skipped_dead++;
+			return 0;
+		}
+		st.corpses++;		/* and below: its record's script runs on a body too (OpenMW) */
 	}
 	st.spawned++;
 	spawned_last = ent;
@@ -754,8 +828,47 @@ static int TableLoad (void)
 	return 1;
 }
 
-/* The records of cell CX CY queued for spawning (the frame map is not read). */
+/* The records of cell CX CY queued for spawning (the frame map is not read). CREATURES_ONLY: a town map's own cell
+ * (its residents and dead come with the town frame's resident stage; only the creatures and the levelled points come
+ * from the table, OUTDOOR-CREATURES-MISSING-66). */
+static void TableJoinKinds (int cx, int cy, const float *offset, int creatures_only);
 static void TableJoin (int cx, int cy, const float *offset)
+{
+	TableJoinKinds (cx, cy, offset, 0);
+}
+
+/* OUTDOOR-CREATURES-MISSING-66 (CHIM-EXTERIOR-ACTORS-MISSING-46): the cells inside a town map's core never join the
+ * window (AW_CellMap gives no region map there), and the town frame's resident stage places NPCs only, so the original's
+ * creatures and levelled creature points of those cells (Seyda Neen: 3 placed and 97 levelled in 16 cells; Balmora:
+ * 1 and 15) were never spawned. aw_world.c sets the hook (NULL in tests without the world directory): MAP's origin and
+ * core in its local units, 1 for a town map. */
+int (*aw_town_frame)(const char *map, float *origin, float *core);
+static unsigned long	town_joins;
+static void TownJoin (void)
+{
+	float origin[3], core[4], offset[3];
+	chim_actor_cell_t cell;
+	unsigned i;
+	if (!table_on || !aw_town_frame || !aw_town_frame (sv.name, origin, core) || !TableLoad ())
+		return;
+	for (i=0 ; i<table.head.cells ; i++)
+	{
+		float x, y;
+		ChimActors_Cell (table.cells + i*CHIM_ACTOR_CELL_BYTES, &cell);
+		/* the cell centre in the town map's units (tools/chim/actors.py cell_centre x LOCAL; AW_CellMap's rule) */
+		x = ((float)cell.cx + 0.5f) * 8192.0f * 0.25f - origin[0];
+		y = ((float)cell.cy + 0.5f) * 8192.0f * 0.25f - origin[1];
+		if (x < core[0] || x > core[2] || y < core[1] || y > core[3])
+			continue;
+		offset[0] = x;
+		offset[1] = y;
+		offset[2] = 0;
+		TableJoinKinds (cell.cx, cell.cy, offset, 1);
+		town_joins++;
+	}
+}
+
+static void TableJoinKinds (int cx, int cy, const float *offset, int creatures_only)
 {
 	chim_actor_cell_t cell;
 	chim_actor_record_t r;
@@ -785,6 +898,8 @@ static void TableJoin (int cx, int cy, const float *offset)
 			!ChimActors_Base (table.bases + r.base*CHIM_ACTOR_BASE_BYTES, &table.head, &b))
 			break;
 		table.records++;
+		if (creatures_only && b.kind != CHIM_ACTOR_KIND_LEVELLED && b.kind != CHIM_ACTOR_KIND_CREATURE)
+			continue;			/* a town's residents and dead: its resident stage placed them */
 		if (b.kind == CHIM_ACTOR_KIND_LEVELLED && table.lists)
 		{
 			/* a levelled reference: its kept pick, or one roll at the player's level (kept in the change list) */
@@ -1248,7 +1363,7 @@ void AW_ActorsRoomTick (void)
 		 * the change list to its own residents (a killed one stays dead) */
 		if (room)
 			tick_map[0] = 0;
-		if (room && nchanges)
+		if (room && (nchanges || aw_actor_dead_record))
 			apply_pending = 1;
 	}
 	if (!room)
@@ -1256,7 +1371,7 @@ void AW_ActorsRoomTick (void)
 	/* CORPSE-LOOT-60: not in the map's settle frames: the player's scene set-up (aw_combat.c AW_CombatSceneSpawn) comes
 	 * after them and empties the combat slots, so a body laid down there stood up again with nothing to search; until
 	 * then nothing is captured either (the map's own placement would overwrite where a body lies) */
-	if (apply_pending && (svs.maxclients < 1 || !svs.clients || !svs.clients[0].active || !svs.clients[0].spawned))
+	if (apply_pending && ApplyWaits ())
 		return;
 	if (apply_pending)
 	{
@@ -1300,17 +1415,24 @@ static void Tick (void)
 			while (nwaitq)
 				KeptDrop (nwaitq - 1);	/* another map: its cells join again */
 			MarkHome ();
+			TownJoin ();		/* a town map's own cells: their creatures from the table (OUTDOOR-CREATURES-MISSING-66) */
 			{
 				/* the home frame's own residents came with the map (no join): its cell's recipe table now */
 				int hx, hy, hheld;
 				if (HomeCell (&hx, &hy, &hheld))
 					AW_NpcPartsCell (hx, hy, 1);
 			}
-			if (nchanges)
+			if (nchanges || aw_actor_dead_record)
 				apply_pending = 1;
 		}
 	}
-	if (apply_pending)
+	/* ACTOR-DEAD-RESPAWN-INTERIOR-65: not before the player has spawned. The first window tick of a map runs inside the
+	 * player's scene set-up (aw_scene.c AW_SceneSpawn primes the ring), before that set-up empties the combat slots
+	 * (AW_CombatSceneSpawn): a body laid down there lost its slot at once and stood up alive, so every actor killed
+	 * outdoors was back after a room or a load. The room's tick waits the same way (CORPSE-LOOT-60). */
+	if (apply_pending && ApplyWaits ())
+		;
+	else if (apply_pending)
 		ApplyLoaded ();
 	/* CELL-CHANGES-59 slice 6: an actor killed or in a fight (hurt) is recorded on the list as it stands, every tick
 	 * (only the few with a combat slot), so a level change that frees the town frame's own residents without a release
@@ -1519,17 +1641,24 @@ static void Command (void)
 		Con_Printf ("chim actors: warm %d (first-time model and voice loads on ticks of their own)\n", warm_on);
 		return;
 	}
+	if (Cmd_Argc () == 4 && !strcmp (a, "corpses"))
+	{
+		corpses_on = atoi (Cmd_Argv (3)) != 0;
+		Con_Printf ("chim actors: corpses %d (%s)\n", corpses_on, corpses_on ?
+			"a joining cell's dead lie there until their clear delay" : "a joining cell's dead are not spawned, the older method");
+		return;
+	}
 	if (Cmd_Argc () >= 3 && !strcmp (a, "table"))
 	{
 		if (Cmd_Argc () == 4)
 			table_on = atoi (Cmd_Argv (3)) != 0;
 		Con_Printf ("chim actors table %d (%s): joins %lu, records %lu, queued %lu, without a model %lu, "
 			"not an actor %lu, queue full %lu; levelled %lu (kept picks %lu, nothing %lu, no model %lu; player level %ld, "
-			"seed %lu)\n", table_on, table_on ? "actors join from the actor table" :
+			"seed %lu); town cells joined %lu\n", table_on, table_on ? "actors join from the actor table" :
 			"actors join from the frame maps", table.joins, table.records, table.spawnable, table.no_model,
 			table.not_actor, table.full, table.levelled, table.levelled_kept, table.levelled_none,
 			table.levelled_no_model, (long)(aw_character.valid && aw_character.level > 0 ? aw_character.level : 1),
-			(unsigned long)roll_seed);
+			(unsigned long)roll_seed, town_joins);
 		return;
 	}
 	if (Cmd_Argc () == 4 && !strcmp (a, "seed"))
@@ -1596,7 +1725,8 @@ static void Command (void)
 			VectorSubtract (e->v.origin, p->v.origin, v);
 			Con_Printf ("  actor %.0f %s at %.0f: %s\n", RefOf (e), e->v.netname ? pr_strings + e->v.netname : "?", Length (v),
 				fl & AW_REFS_LEVELLED ? "a levelled creature: respawns" : fl & AW_REFS_RESPAWN ? "flagged Respawn: respawns" :
-				"does not respawn");
+				fl & AW_REFS_PERSISTENT ? "does not respawn; persistent: its body stays" :
+				"does not respawn; its body clears after fCorpseClearDelay");
 			shown++;
 		}
 		return;
@@ -1715,6 +1845,8 @@ static void Command (void)
 		st.spawn_worst*1000, (long)budget_n, (long)npending, st.skipped_dead, st.skipped_alive, st.skipped_disabled,
 		st.skipped_away, st.leaves, st.released, st.kept, st.frees_by_tick, st.leave_time*1000, (long)nchanges, st.away,
 		st.visitors);
+	Con_Printf ("chim actors: bodies cleared away %lu (dead for good; fCorpseClearDelay); bodies laid down on a join %lu "
+		"(corpses %d)\n", st.cleared, st.corpses, corpses_on);
 	Con_Printf ("chim actors: warm %d; warmed %lu models (%.1f ms), %lu voices (%.1f ms), %lu client sounds (%.1f ms), worst warm tick %.1f ms\n",
 		warm_on, wst.models, wst.model_time*1000, wst.voices, wst.voice_time*1000, wst.sounds, wst.sound_time*1000, wst.worst*1000);
 	Con_Printf ("chim actors: %ld disabled actors kept for a script's Enable (of %d; %lu not kept: list full), %lu enabled "
@@ -1861,10 +1993,17 @@ static void ApplyLoaded (void)
 	{
 		edict_t *e = EDICT_NUM(i);
 		change_t *c;
-		if (!IsActor (e) || !(c = Change (RefOf (e), 0)))
+		if (!IsActor (e) || !(c = DeadRow (RefOf (e))))
 			continue;
 		if (Respawned (c))
 			continue;		/* slice 7: the map spawned it as the game data has it */
+		if (Cleared (c))
+		{
+			/* ACTOR-RESPAWN-CORPSE-RULES-66: its body was cleared away: not on the map any more, dead for good */
+			AW_CombatForget (e);
+			ED_Free (e);
+			continue;
+		}
 		if (c->moved && !c->follow && c->room != RoomNumber ())
 		{
 			/* its row puts it in another place (a PositionCell, v0.0.62; OpenMW moves the reference there): it is
@@ -1890,7 +2029,7 @@ static void ApplyLoaded (void)
 		}
 		if (c->dead)
 		{
-			int held = AW_CombatTestEngage (e, 1);
+			int held = AW_CombatLayCorpse (e);	/* a saved death: no second essential message */
 			/* one line per body on the map's first tick (a body that could not be laid down is a finding, CORPSE-LOOT-60) */
 			Con_Printf ("actors: %s (ref %.0f) dead again: %s\n", e->v.netname ? pr_strings + e->v.netname : "?",
 					RefOf (e), held ? "lying" : "no combat slot, not laid down");
@@ -1924,10 +2063,29 @@ int AW_ActorsMoveTo (unsigned reference, long room, const float origin[3], float
 	return 1;
 }
 
+/* The save contract, rule 2 (decided 2026-11-14, SAVE-ACTOR-ROWS-256-66): at a place's unload (aw_save.c AW_SaveLeave)
+ * an actor without a row gets one only when its state differs from the game data: dead, in a fight, following the
+ * player, or hurt below its record's base health (the host answers through aw_actor_hurt_record; NULL: never hurt). A
+ * calm, unhurt actor at its wander keeps no row, so leaving a visited place costs nothing for the actors it did not
+ * change; an actor that has a row keeps it current as before. */
+int (*aw_actor_hurt_record) (unsigned reference, float health);
 void AW_ActorsCapture (edict_t *e)
 {
 	change_t *c;
-	if (e && !e->free && IsActor (e) && (c = Change (RefOf (e), 1)) != NULL)
+	float h;
+	int state;
+	if (!e || e->free || !IsActor (e))
+		return;
+	if (!(c = Change (RefOf (e), 0)))
+	{
+		h = e->v.health;
+		state = AW_CombatSlotState (e, &h);
+		if (state != 1 && state != 2 && !AW_CompanionEdict (e) &&
+		    !(aw_actor_hurt_record && aw_actor_hurt_record ((unsigned)RefOf (e), h)))
+			return;
+		c = Change (RefOf (e), 1);
+	}
+	if (c)
 		Capture (e, c);
 }
 
@@ -2230,6 +2388,7 @@ void AW_ActorsInit (void)
 	aw_combat_actor_died = Died;
 	aw_save_changes_export = SaveExport;
 	aw_save_changes_import = SaveImport;
+	aw_save_actor_leave = AW_ActorsCapture;	/* a place unloaded: every NPC and creature on the list as it stands */
 	chim_actors_join = Join;
 	chim_actors_leave = Leave;
 	chim_actors_tick = Tick;

@@ -21,9 +21,55 @@ REFERENCE_DIR = Path(__file__).resolve().parents[2] / "config/input-reference"
 
 digest = sha256_file  # the one shared SHA-256 file digest (mwad.esm)
 
-# Required core pair (the base game); Tribunal/Bloodmoon are game inputs too but optional.
+# Required core pair (the base game); Tribunal/Bloodmoon are required only when selected (EXPANSION_FILES below).
 REQUIRED_CORE = GAME_CONTAINERS[:2]
 REQUIRED_CORE_NAMES = (GAME_MASTERS[0], "Morrowind.bsa")
+
+# The expansions' master and archive (DLC-INPUT-CHECKSUMS-66): REQUIRED when the build selects that expansion
+# (tools/build.py --dlc / --no-dlc, both by default), checked by size and SHA-256 against reference.json
+# "expansions" like the base pair; not required when it is left out.
+EXPANSION_FILES = {"Tribunal": ("Tribunal.esm", "Tribunal.bsa"), "Bloodmoon": ("Bloodmoon.esm", "Bloodmoon.bsa")}
+EXPANSION_FIX = "put the expansion files in the data folder, or build without them: --no-dlc"
+
+
+def expansion_reference():
+    return json.loads((REFERENCE_DIR / "reference.json").read_text(encoding="utf-8")).get("expansions", {})
+
+
+def check_expansions(loose, selected, allow_differences=False, reference=None, hasher=None):
+    """(errors, warnings, checks) for the SELECTED expansions' files (a list such as ['Tribunal', 'Bloodmoon']).
+    Missing = an error; size or SHA-256 not the reference = an error (a warning with --allow-data-differences, as
+    for the base files); a None hash (--check-hashes off) = a warning, unchecked. Nothing for an empty selection."""
+    errors, warnings, checks = [], [], []
+    if not selected:
+        return errors, warnings, checks
+    reference = expansion_reference() if reference is None else reference
+    sha = hasher.sha256 if hasher is not None else digest
+    for layer in selected:
+        for name in EXPANSION_FILES[layer]:
+            expected = reference.get(name.casefold())
+            if expected is None:
+                errors.append(f"{name}: no reference entry in config/input-reference/reference.json")
+                continue
+            want = f"expected {expected['bytes']:,} bytes, SHA-256 {expected['sha256']}"
+            item = loose.get(name.casefold())
+            if item is None or not item["bytes"]:
+                errors.append(f"Missing or empty required expansion input: {name} ({layer} is selected; {want}); "
+                              f"fix: {EXPANSION_FIX}")
+                continue
+            found = sha(item["path"]) if item["bytes"] == expected["bytes"] else ""
+            if found is None:
+                warnings.append(f"{name} not hashed (--check-hashes off): used without verification")
+            elif found == expected["sha256"]:
+                checks.append(f"{name}: size and SHA-256 match the reference ({layer})")
+            else:
+                message = (f"{name} differs from the reference ({want}; found {item['bytes']:,} bytes"
+                           + (f", SHA-256 {found}" if found else "") + ")")
+                if allow_differences:
+                    warnings.append(message + "; continuing with explicitly allowed unverified data differences")
+                else:
+                    errors.append(message + f". Use --allow-data-differences only if intentional; fix: {EXPANSION_FIX}")
+    return errors, warnings, checks
 
 
 def reference_files():
@@ -168,7 +214,9 @@ def loose_overrides(loose, archive):
             "scope": "loose files whose path is also in Morrowind.bsa"}
 
 
-def inspect(path, stage="aga", allow_differences=False, reference=None, notify=None, choose=None, hasher=None):
+def inspect(path, stage="aga", allow_differences=False, reference=None, notify=None, choose=None, hasher=None,
+            expansions=None, expansion_ref=None):
+    """expansions: the selected expansions (tools/build.py expansion_selection); None or [] = the base check alone."""
     selected = ensure_external(installed_game_path(path), "game installation")
     if not selected.is_dir():
         raise ValueError(f"Game installation is not a directory: {selected}")
@@ -217,6 +265,11 @@ def inspect(path, stage="aga", allow_differences=False, reference=None, notify=N
                 checks.append(f"{name}: {len(archive)} archive entries and byte ranges checked")
         except (OSError, ValueError, UnicodeError, struct.error) as exc:
             errors.append(f"{name}: {exc}")
+    found_errors, found_warnings, found_checks = check_expansions(loose, expansions, allow_differences,
+                                                                  expansion_ref, hasher)
+    errors.extend(found_errors)
+    warnings.extend(found_warnings)
+    checks.extend(found_checks)
     categories = Counter(key.split('/')[0] for key in loose)
     packed = Counter(key.split('/')[0] for key in archive)
     if stage == "aga":

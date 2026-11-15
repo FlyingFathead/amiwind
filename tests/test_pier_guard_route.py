@@ -50,5 +50,37 @@ class PierGuardRoute(unittest.TestCase):
         self.assertRegex(text, r'if\(result>0 && !post_leg\)\{[^}]*post_leg=1', 'the front leg does not hand over to the step aside')
 
 
+class OpeningWalkCheck(unittest.TestCase):
+    """The opening walk's early check (tools/opening_walk_check.py): the dock guard must reach his post (v0.0.66-dev1:
+    he stood against the pier pylon at about 407 -268 and the walk still passed)."""
+
+    def check(self, text):
+        import sys
+        sys.path.insert(0, str(ROOT / 'tools'))
+        import opening_walk_check
+        return opening_walk_check.check(text)
+
+    def test_reached_post_passes(self):
+        log = ('Dock guard at 560 -340 31 / leg 0 / route started 1 failed 0 done 0 / retries 0\n'
+               'Dock guard at 286 -214 31 / leg 1 / route started 0 failed 0 done 1 / retries 0\n')
+        self.assertEqual(self.check(log)[0], 0)
+
+    def test_stuck_on_the_pylon_fails(self):
+        line = 'Dock guard at 407 -268 39 / leg 1 / route started 0 failed 1 done 0 / retries %d\n'
+        self.assertEqual(self.check(''.join(line % i for i in range(16)))[0], 1)
+
+    def test_no_status_line_is_its_own_failure(self):
+        self.assertEqual(self.check('Opening 3 / dock -1\n')[0], 2)
+
+    def test_status_prints_the_guard(self):
+        text = (ROOT / 'engine' / 'aga' / 'src' / 'aw_intro.c').read_text(encoding='utf-8', errors='replace')
+        self.assertIn('AW_OpeningDockStatus();', text[text.index('static void status(void)'):])
+
+    def test_last_leg_sweeps_the_line(self):
+        text = (ROOT / 'engine' / 'aga' / 'src' / 'aw_nav.c').read_text(encoding='utf-8', errors='replace')
+        step = text[text.index('int AW_NavStep('):]
+        self.assertIn('AW_NavPlanDetour()', step, 'the last leg does not plan a detour round an obstacle')
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -11,7 +11,8 @@ module's stage key must not change; tests and the measurement compare its bytes 
 appearance.
 
 What it does not do: no mover model (the moving frames; the standing model's layout names none), no carried items
-(weapons, shields: npc_items), no greeting fields of its own (aw_voice and aw_line empty, hello distance 0: the engine
+on a frame-baked (type 1) model (a skeletal model gets its weapon and shield as the residents do, library_items,
+v0.0.66), no greeting fields of its own (aw_voice and aw_line empty, hello distance 0: the engine
 then takes the NPC's hello distance, voice lines and conversation greeting from the voice table by its aw_source_id,
 tools/greeting_lut.py, NPC-GREETINGS-LIBRARY-MUTE-48), no near/far levels of detail. The support state is the grounding policy's when it names the NPC, else on the ground.
 """
@@ -117,14 +118,15 @@ def bake_standing(task):
 def _bake_standing(task):
     import numpy as np
     import npc_anim
-    from mwad.audit import BSA
+    from mwad.archives import layered_bsa
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     from npc_geometry import Assets, Skeleton, assemble, bake, animated_mdl
     data, palette, appearance, profile_name = task
     data = Path(data)
     key = str(data.resolve())
     if key not in _assets:
-        _assets[key] = Assets(data, BSA(child_ci(data, 'Morrowind.bsa')))
+        _assets[key] = Assets(data, layered_bsa(data))
     assets = _assets[key]
     rig = (key, appearance['skeleton'])
     if rig not in _rigs:
@@ -179,7 +181,7 @@ def _bake_standing(task):
         raw = animated_mdl(frames[standing_index], faces, uv, skin, names=names)
         foot = appearance.get('foot', 'bare')
         if key not in _sounds:
-            _sounds[key] = npc_anim.soun_records(child_ci(data, 'Morrowind.esm'))
+            _sounds[key] = npc_anim.soun_records(master_path(data))
         layout = npc_anim.layout(standing_groups, foot)
         sounds = npc_anim.sound_payload(assets, _sounds[key], npc_anim.needed_sounds(standing_groups, foot))
         nframes = len(standing_index)
@@ -203,6 +205,7 @@ def _skeletal_standing(key, assets, data, palette, appearance, profile_name):
     import npc_anim
     import skeletal_actor
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     from npc_geometry import Skeleton
 
     def rig_of(path):
@@ -215,7 +218,7 @@ def _skeletal_standing(key, assets, data, palette, appearance, profile_name):
     table_bytes, _, _, table_path, _, _ = skeletal_actor.game_table(key, appearance, rig_of)
     foot = appearance.get('foot', 'bare')
     if key not in _sounds:
-        _sounds[key] = npc_anim.soun_records(child_ci(data, 'Morrowind.esm'))
+        _sounds[key] = npc_anim.soun_records(master_path(data))
     layout = npc_anim.layout(groups, foot)
     sounds = npc_anim.sound_payload(assets, _sounds[key], npc_anim.needed_sounds(groups, foot))
     facts = {'bytes': len(raw), 'frames': skel['table_frames'], 'triangles': int(skel['model']['faces']),
@@ -223,6 +226,72 @@ def _skeletal_standing(key, assets, data, palette, appearance, profile_name):
              'sha256': hashlib.sha256(raw).hexdigest(), 'type': 2, 'table': table_path,
              '_table': (table_path, table_bytes)}
     return raw, layout, sounds, facts
+
+
+def library_items(data, palette, appearance):
+    """(AWTS1 tag text, {item model path: bytes}) of a skeletal library model's carried weapon and shield, or
+    (None, {}): the same tag the town residents get (skeletal_actor.skeletal_resident: the table's Weapon Bone and
+    Shield Bone, the actor's scale), made beside the bake, outside the baked unit, so no appearance is baked again
+    (NPC-WEAPON-MESH-33, GUARD-WEAPON-INVISIBLE-65: the library's guards fought with a weapon nobody saw)."""
+    import npc_items
+    import skeletal_actor
+    from mwad.archives import layered_bsa
+    from mwad.paths import child_ci
+    from npc_geometry import Assets, Skeleton
+    if not appearance.get('carried_parts') or appearance.get('initially_dead'):
+        return None, {}
+    data = Path(data)
+    key = str(data.resolve())
+    if key not in _assets:
+        _assets[key] = Assets(data, layered_bsa(data))
+    assets = _assets[key]
+
+    def rig_of(path):
+        rig = (key, path)
+        if rig not in _rigs:
+            _rigs[rig] = Skeleton(assets, path)
+        return _rigs[rig]
+    _, report, table, _, skeleton, _ = skeletal_actor.game_table(key, appearance, rig_of)
+    paths, items = npc_items.carried_models(assets, palette, appearance, skeleton.N)
+    if not paths:
+        return None, {}
+    scale = [appearance['weight'] * .25, appearance['weight'] * .25, appearance['height'] * .25]
+    return skeletal_actor.skeletal_tag(table['frames'], paths, report['bone_names'], scale), items
+
+
+def _items_unit(task):
+    key, data, palette, appearance = task
+    try:
+        return key, library_items(data, palette, appearance), None
+    except Exception as error:  # noqa: BLE001 (a failed item costs that model's items only, reported)
+        return key, (None, {}), '%s: %s' % (type(error).__name__, error)
+
+
+def held_items_all(keys, data, palette, apps, jobs=1):
+    """{key: ((tag, items), error)} of library_items for KEYS (apps: key -> appearance), on JOBS processes: about
+    1.3 s an appearance on one core (the item bakes and the table), so never serial (measured 13 November 2026:
+    288 armed appearances of 423, 367 s on one core)."""
+    import time
+    from concurrent.futures import ProcessPoolExecutor
+    tasks = [(k, data, palette, apps[k]) for k in keys]
+    out, t0, said = {}, time.time(), 0.
+    print('NPC library: carried items of %d appearances on %d jobs' % (len(tasks), max(1, jobs)), flush=True)
+    if jobs <= 1 or len(tasks) < 2:
+        results = map(_items_unit, tasks)
+    else:
+        pool = ProcessPoolExecutor(max_workers=jobs)
+        results = pool.map(_items_unit, tasks, chunksize=4)
+    try:
+        for key, result, error in results:
+            out[key] = (result, error)
+            if time.time() - said > 10:
+                said = time.time()
+                print('NPC library: carried items %d / %d, %.0f s' % (len(out), len(tasks), said - t0), flush=True)
+    finally:
+        if jobs > 1 and len(tasks) >= 2:
+            pool.shutdown()
+    print('NPC library: carried items of %d appearances in %.1f s' % (len(out), time.time() - t0), flush=True)
+    return out
 
 
 def _unit(task):
@@ -236,17 +305,23 @@ def _unit(task):
         return key, None, time.time() - t0, '%s: %s' % (type(error).__name__, error)
 
 
-def build(data, palette, ids, out_id1, jobs=1, kinds=None):
-    """Bake the standing models of the NPC records IDS into OUT_ID1 (progs/n_<key>.mdl + .anm, sound/...); returns
+def build(data, palette, ids, out_id1, jobs=1, kinds=None, held_items=None):
+    """Bake the standing models of the NPC records IDS into OUT_ID1 (progs/n_<key>.mdl + .anm, sound/...; with
+    HELD_ITEMS, default on, AMIWIND_NPC_LIBRARY_ITEMS=0 off: a skeletal model's carried weapon and shield as its .tag
+    and items/*.mdl, library_items); returns
     the manifest {'format', 'profile', 'models': {key: facts + model}, 'npcs': {id: {key, name, dead}},
     'left_out': {id or key: reason}}."""
     import actor_units
     import pass_cache
     from mwad.npc import load_master, text
     from mwad.paths import child_ci
+    from mwad.masters import master_path
+    import os
     data = Path(data)
+    if held_items is None:
+        held_items = os.environ.get('AMIWIND_NPC_LIBRARY_ITEMS', '1') != '0'
     if kinds is None:
-        kinds, _, _ = load_master(child_ci(data, 'Morrowind.esm'))
+        kinds, _, _ = load_master(master_path(data))
     profile = standing_profile()
     apps, left = appearances(kinds, ids)
     groups = {}
@@ -257,16 +332,28 @@ def build(data, palette, ids, out_id1, jobs=1, kinds=None):
         len(apps), len(tasks), profile, jobs), flush=True)
     # every appearance from the unit cache npc-appearance when it was baked before with the same inputs, bake code and
     # settings; the rest baked and each kept the moment it is back (tools/actor_units.py, NPC-LIBRARY-NO-UNIT-CACHE-63)
+    # the game data identity with what the selected expansion layers change in what every appearance's bake reads
+    # beside its appearance (in its inputs): the footstep, wading and swimming sounds (soun_records); the models come
+    # from the base archive (BUILD-UNIT-KEYS-LAYER-BLIND-66, tools/layer_view.py)
+    import layer_view
+    lock = pass_cache.game_data_digest(layers=False)
+    game = layer_view.identity(data, layer_view.footstep_records(), (), base=lock) if lock is not None else None
     cache = actor_units.open_cache(actor_units.NPC_CACHE, ((__file__, 'bake_standing'),),
                                    pass_cache.source_digest((__file__, 'bake_standing')),
                                    pass_cache.previous_digests((__file__, 'bake_standing')),
-                                   pass_cache.covered_lines((__file__, 'bake_standing')))
+                                   pass_cache.covered_lines((__file__, 'bake_standing')), game=game)
     palette_sha256 = actor_units.palette_digest(palette)
     done, errors, cached = actor_units.bake_appearances(
         tasks, {key: idents[0] for key, idents in groups.items()}, jobs, cache,
         lambda task: actor_units.npc_inputs(task[3], task[0], task[4], palette_sha256))
     print('NPC library: %d appearances (%d from the unit cache %s, %d baked)' % (
         len(tasks), cached, actor_units.NPC_CACHE, len(tasks) - cached), flush=True)
+    held = {}
+    if held_items:
+        armed = [task[0] for task in tasks if (done.get(task[0]) or (None,))[0] is not None and
+                 done[task[0]][0][3].get('type') == 2 and apps[groups[task[0]][0]].get('carried_parts') and
+                 not apps[groups[task[0]][0]].get('initially_dead')]
+        held = held_items_all(armed, data, palette, {k: apps[groups[k][0]] for k in armed}, jobs)
     models = {}
     seam = {'passing': 0, 'baselined': 0, 'entry': 0, 'new': 0, 'worse': 0}
     stops = []
@@ -307,6 +394,20 @@ def build(data, palette, ids, out_id1, jobs=1, kinds=None):
             if not s.exists() or s.read_bytes() != sound:
                 s.write_bytes(sound)
         models[key] = dict(facts, model=path, seconds=round(seconds, 2))
+        if key in held:
+            # the carried weapon and shield of a skeletal model, as the residents carry theirs (library_items)
+            (tag, items), error = held[key]
+            if error:
+                models[key]['items_error'] = error
+                print('NPC library: %s: carried items left out: %s' % (groups[key][0], error), flush=True)
+            if tag:
+                target.with_suffix('.tag').write_text(tag, encoding='ascii', newline='\n')
+                for item, body in sorted(items.items()):
+                    i = Path(out_id1) / item
+                    i.parent.mkdir(parents=True, exist_ok=True)
+                    if not i.exists() or i.read_bytes() != body:
+                        i.write_bytes(body)
+                models[key]['items'] = sorted(items)
         print('NPC library: %s -> %s (%d bytes, %d frames, %.1f s)' % (groups[key][0], path, facts['bytes'],
                                                                          facts['frames'], seconds), flush=True)
     print('NPC library: seam check: %(passing)d passing, %(baselined)d baselined, %(entry)d by an override entry, '

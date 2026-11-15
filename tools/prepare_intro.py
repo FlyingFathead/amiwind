@@ -8,6 +8,7 @@ from mwad.audit import BSA,records,subrecords,string
 from mwad.npc import load_master,outfit,text,first
 from mwad.interior import read_interior
 from mwad.paths import copy_tree,ensure_external
+from mwad.masters import master_path
 from npc_geometry import Assets,Skeleton,assemble,bake,animated_mdl,add_root_rule_arg,apply_root_rule
 from npc_faces import ActorSkeleton,actor_samples,envelope
 from player_hull import lumps,pack_lumps
@@ -70,7 +71,7 @@ def ship_ambience_sound(data,out,ffmpeg='ffmpeg'):
     """(emitter entities, receipt) of ship_ambience: the sound conversion, which writes only its own
     sound file, so it can run beside the actor bakes (intro_sounds); add_ship_ambience edits the map."""
     assets=Assets(data,BSA(data/'Morrowind.bsa'));objects={};sounds={};scripts={}
-    for tag,flags,raw in records((data/'Morrowind.esm').read_bytes()):
+    for tag,flags,raw in records((master_path(data)).read_bytes()):
         if tag not in ('CONT','SOUN','SCPT'):continue
         f=dict(subrecords(raw))
         if tag=='CONT':objects[string(f.get('NAME',b'')).casefold()]=string(f.get('SCRI',b'')).casefold()
@@ -80,7 +81,7 @@ def ship_ambience_sound(data,out,ffmpeg='ffmpeg'):
     if not re.search(r'PlayLoopSound3DVP\s+"Boat Hull"\s+0\.4\s*,\s*1\.0',script,re.I):raise ValueError('Unsupported hull sound script')
     sound=sounds['boat hull'];voice='env/boat_hull.wav';target=out/'id1/sound'/voice
     receipt=ship_hull_convert(assets,string(sound['FNAM']),target,ffmpeg)
-    cell=read_interior(data/'Morrowind.esm','Imperial Prison Ship');entities=[]
+    cell=read_interior(master_path(data),'Imperial Prison Ship');entities=[]
     for ref in cell['refs']:
         if objects.get(ref['id'].casefold())!='sound_boat_hull' or ref.get('deleted'):continue
         fields={'classname':'aw_loop','aw_voice':voice,'origin':' '.join(str(v*.25) for v in ref['position']),
@@ -104,7 +105,7 @@ def intro_sounds(data,out,ffmpeg='ffmpeg'):
     the actor bakes (build_parallel.Background); the map edits stay in prepare()."""
     assets=Assets(data,BSA(data/'Morrowind.bsa'));scripts={};speech={}
     # Convert all authored Say lines from the base game's character-generation scripts.
-    lines={};allrecords=list(records((data/'Morrowind.esm').read_bytes()))
+    lines={};allrecords=list(records((master_path(data)).read_bytes()))
     for tag,flags,raw in allrecords:
         if tag!='SCPT':continue
         fields=dict(subrecords(raw));name=string(fields['SCHD'][:32]);script=string(fields.get('SCTX',b''))
@@ -115,7 +116,7 @@ def intro_sounds(data,out,ffmpeg='ffmpeg'):
             if stem in lines and lines[stem]['text']!=subtitle:raise ValueError('Conflicting introductory line '+stem)
             lines[stem]={'voice':source,'text':subtitle,'script':name}
     dest=out/'id1/intro';dest.mkdir(exist_ok=True)
-    nav=navigation(data/'Morrowind.esm','Imperial Prison Ship');(dest/'prison.awn').write_bytes(nav)
+    nav=navigation(master_path(data),'Imperial Prison Ship');(dest/'prison.awn').write_bytes(nav)
     navigation_report={'prison':{'sha256':hashlib.sha256(nav).hexdigest(),'nodes':struct.unpack_from('<H',nav,4)[0]}}
     for i,(stem,line) in enumerate(sorted(lines.items())):
         voice='intro/'+stem+'.wav';receipt=voice_convert(assets,line['voice'],out/'id1/sound'/voice,ffmpeg)
@@ -255,9 +256,9 @@ def prepare(data,scene,out,ffmpeg='ffmpeg',jobs=None,movie=True,cache=None,cache
     copy_tree(scene,out)
     # Speech, path grid and hull sound convert beside the actor bakes (intro_sounds).
     sounds=Background(intro_sounds,data,out,ffmpeg,jobs=jobs)
-    kinds,cells,topics=load_master(data/'Morrowind.esm')
+    kinds,cells,topics=load_master(master_path(data))
     palette=(out/'id1/gfx/palette.lmp').read_bytes();report={'actors':{},'speech':{},'scripts':{}}
-    prison=read_interior(data/'Morrowind.esm','Imperial Prison Ship')
+    prison=read_interior(master_path(data),'Imperial Prison Ship')
     report['actors']=populate_intro_actors(data,out,kinds,cells,prison,palette,jobs)
     report['scripts'],report['navigation'],report['speech'],ambience=sounds.result()
     for identifier in ('fargoth','imperial_guard'):

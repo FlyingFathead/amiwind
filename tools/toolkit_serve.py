@@ -251,12 +251,18 @@ def docker_monitor_command(spec, image=DOCKER_DEFAULT_IMAGE, docker='docker', re
         raise ValueError('--monitor-docker: the reader %s is missing or its path has a comma' % reader)
     if name is not None and not DOCKER_VOLUME.match(name):
         raise ValueError('not a container name')
+    # the failure details code beside the reader, read-only (tools/build_failure.py: the reader derives a failed run's
+    # details with it when the run has no FAILURE.md); a tree without it serves only the files a build wrote
+    helper = reader.with_name('build_failure.py')
+    helpers = (['--mount', 'type=bind,source=%s,target=/amiwind-monitor/build_failure.py,readonly' % helper]
+               if helper.is_file() and ',' not in str(helper) else [])
     return [docker, 'run', '-i', '--rm', '--pull', 'never', '--network', 'none', '--read-only',
             *(['--name', name] if name else []),
             '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--user', '65534:65534',
             '--cpus', '0.5', '--memory', '256m',
             '--mount', 'type=volume,source=%s,target=/vol,readonly' % volume,
             '--mount', 'type=bind,source=%s,target=/amiwind-monitor/monitor_read.py,readonly' % reader,
+            *helpers,
             image, 'python3', '-I', '/amiwind-monitor/monitor_read.py', '--root', 'builds=/vol/' + path, '--serve']
 
 
@@ -637,8 +643,9 @@ class Handler(SimpleHTTPRequestHandler):
 
     def monitor(self, parts, query):
         """The Monitor's read-only endpoints (GET only): /monitor/config.json, runs.json, results.json,
-        run/<run>/{progress,state,timeline,files}.json, run/<run>/log/<name>?offset=&max=, run/<run>/trace/<name>?offset=&max=
-        (a stage's read/write trace), run/<run>/sections/<NN-stage>.json (a stage's sections), console/<run>?offset=&max=."""
+        run/<run>/{progress,state,timeline,files,failure}.json, run/<run>/FAILURE.md (a failed run's failure details as
+        text), run/<run>/log/<name>?offset=&max=, run/<run>/trace/<name>?offset=&max= (a stage's read/write trace),
+        run/<run>/sections/<NN-stage>.json (a stage's sections), console/<run>?offset=&max=."""
         import monitor_read
         try:
             offset = int_param(query, 'offset', -1, -(1 << 62), 1 << 62)
@@ -672,8 +679,12 @@ class Handler(SimpleHTTPRequestHandler):
         request = None
         if parts == ['runs.json']:
             request = {'op': 'runs'}
-        elif len(parts) == 3 and parts[0] == 'run' and parts[2] in ('progress.json', 'state.json', 'timeline.json', 'files.json'):
+        elif len(parts) == 3 and parts[0] == 'run' and parts[2] in ('progress.json', 'state.json', 'timeline.json', 'files.json',
+                                                                    'failure.json'):
             request = {'op': parts[2][:-5], 'run': parts[1]}
+        elif len(parts) == 3 and parts[0] == 'run' and parts[2] == 'FAILURE.md':
+            # a failed run's failure details (tools/build_failure.py), shown as text in a page of its own
+            request = {'op': 'failure', 'run': parts[1], 'as_text': True}
         elif len(parts) == 4 and parts[0] == 'run' and parts[2] == 'sections' and parts[3].endswith('.json'):
             request = {'op': 'sections', 'run': parts[1], 'stage': parts[3][:-5]}
         elif len(parts) == 4 and parts[0] == 'run' and parts[2] in ('log', 'trace'):
@@ -690,6 +701,20 @@ class Handler(SimpleHTTPRequestHandler):
                                             monitor_read.TRACE_NAME if request['op'] == 'trace' else monitor_read.LOG_NAME, k)
         except monitor_read.Refused as e:
             return self.send_json({'ok': False, 'error': str(e)}, 400)
+        if request.pop('as_text', False):
+            answer = self.builds.ask(request)
+            text = answer.get('text') if answer.get('ok') else None
+            if isinstance(text, str) and text:
+                return self.send_bytes(text.encode('utf-8'), 'text/plain; charset=utf-8')
+            body = ('No failure details for %s: %s.\n' % (parts[1], answer.get('error') if not answer.get('ok') else
+                    'the run has not failed, or its build left no build-state.json')).encode('utf-8')
+            self.send_response(404)
+            self.send_header('Content-Type', 'text/plain; charset=utf-8')
+            self.send_header('Content-Length', str(len(body)))
+            self.send_header('Cache-Control', 'no-store')
+            self.end_headers()
+            self.wfile.write(body)
+            return None
         answer = self.builds.ask(request)
         return self.send_json(answer, 200 if answer.get('ok') else 404)
 
@@ -821,6 +846,44 @@ def transient_socket_error(exc):
             or getattr(exc, 'errno', None) in TRANSIENT_SOCKET_ERRNOS)
 
 
+class StallHook:
+    """--on-stall: asks the builds reader for its runs every INTERVAL s and runs COMMAND + [run, state, reason] once per
+    stall incident (a run's stall block leaving "ok"; the same run, state and start is one incident)."""
+    INTERVAL = 30
+
+    def __init__(self, builds, command, runner=None):
+        self.builds, self.command = builds, list(command)
+        self.runner = runner or (lambda argv: subprocess.run(argv, timeout=120, capture_output=True))
+        self.seen = set()
+
+    def check(self):
+        answer = self.builds.ask({'op': 'runs'}) or {}
+        fired = []
+        for run in answer.get('runs') or ():
+            stall = run.get('stall') or {}
+            if stall.get('state') in (None, 'ok'):
+                continue
+            key = (run.get('run'), stall.get('state'), stall.get('since'))
+            if key in self.seen:
+                continue
+            self.seen.add(key)
+            argv = self.command + [str(run.get('run')), str(stall['state']), str(stall.get('reason') or '')]
+            try:
+                self.runner(argv)
+            except (OSError, subprocess.SubprocessError) as exc:
+                print('Stall hook failed: %s' % exc, flush=True)
+            fired.append(argv)
+        return fired
+
+    def loop(self):
+        while True:
+            try:
+                self.check()
+            except Exception as exc:  # noqa: BLE001 - the hook never stops the Toolkit
+                print('Stall hook: check failed: %s' % exc, flush=True)
+            time.sleep(self.INTERVAL)
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('--data', type=Path)
@@ -857,6 +920,10 @@ def main(argv=None):
                         '"working_version"; the Toolkit pages are served from that commit and the pages reload by '
                         'themselves when it moves. Without it the checkout itself is served and the version stamp '
                         'follows its own HEAD (the pages reload when the repository moves)')
+    p.add_argument('--on-stall', metavar='COMMAND',
+                   help='Monitor: run COMMAND once per stall incident of a build (state slow, under-cores or stalled in '
+                        'its build-progress.json), with the run name, the state and the reason as its last three '
+                        'arguments; the page shows its stall banner without it')
     p.add_argument('--port', type=int, default=8031)
     p.add_argument('--open', action='store_true', help='open the toolkit in your browser')
     a = p.parse_args(argv)
@@ -942,6 +1009,12 @@ def main(argv=None):
               (served_build_info(root)['label'] if root else 'none yet', Handler.served_build, url), flush=True)
     for name in sorted(worlds):
         print('  CHIM world %s: %samiwind-toolkit/map-inspector.html?world=/chim-world/%s/' % (name, url, name), flush=True)
+    if a.on_stall:
+        if not Handler.builds:
+            p.error('--on-stall needs the Monitor builds (--builds, --monitor-docker or --builds-command)')
+        watcher = StallHook(Handler.builds, shlex.split(a.on_stall, posix=True))
+        threading.Thread(target=watcher.loop, name='toolkit-on-stall', daemon=True).start()
+        print('  Stall hook: %s (once per stall incident)' % a.on_stall, flush=True)
     if a.open:
         webbrowser.open(url)
     try:

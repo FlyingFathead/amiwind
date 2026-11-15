@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.65 (12 November 2026)._
+_Last updated with AmiWind v0.0.66-dev4 (15 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -25,7 +25,45 @@ Like community projects such as
 
 More in the [gallery](docs/GALLERY.md).
 
-## Where AmiWind stands (12 November 2026)
+## Where AmiWind stands (15 November 2026)
+
+The development line is **v0.0.66**, whose latest snapshot is
+[v0.0.66-dev4](docs/releases/notes/RELEASE-v0.0.66-dev4.md), in development. Its headline: scripted doors that opened
+only once open every time their script allows, as in the original (the census captain's two doors after the opening),
+and the play journey walks the opening on foot as a player plays it, through the census office to the release, stopping
+at the first wrong turn. Its changes are checked by tests, not yet in play. Known: fighting is on before the release
+papers, the crab meat on the census table gives its use to the plate under it, and area loads read their sounds more
+slowly since dev2.
+
+The third snapshot was [v0.0.66-dev3](docs/releases/notes/RELEASE-v0.0.66-dev3.md). Its headline: the save holds the game's
+changes without the fixed limits that could refuse it or drop state (the actors' rows, the explored map, script values,
+made spells and items, crime marks and revealed places grow with the game, a save is written only when every part went
+in, and two copies of one item keep their own state), and the builder checks the selected expansions' files before any
+stage, reads the expansions' data in every table and runs new work first. Its changes are checked by tests, not yet in
+play. Known: Bloodmoon's werewolf form has no player model yet, and the save's round trip in the emulator is still to be
+done.
+
+The second snapshot was [v0.0.66-dev2](docs/releases/notes/RELEASE-v0.0.66-dev2.md). Its headline: the data of Tribunal and
+Bloodmoon is part of the build by default, and the build's cache keys know which expansions are selected, so switching
+them on or off rebuilds only what they change (no finished Mournhold or Solstheim content is in it yet; what the
+expansions are and how they will fit in is on the [expansions page](docs/EXPANSIONS.md)). It also brings
+people and creatures that cast spells, shoot bows and move at their own speeds, the dead staying dead with the original's
+body clearing and essential message, an explored-land map with a local map, named places and your own markers, a lighter
+prison ship hold, outdoor containers that can be pointed at, and a play journey that checks the opening after every
+build, fighters that pick their weapons by their own skills, outdoor bodies that stay until the original clears them, and
+a builder check of every actor against the original. Its changes are checked by tests, not yet in play. Known: the game
+can stop in an ancestral tomb. The measured speed figures of the line, and what is not measured yet, are on the
+[v0.0.66 performance page](docs/performance/V0.0.66-PERFORMANCE.md).
+
+Its first snapshot was
+[v0.0.66-dev1](docs/releases/notes/RELEASE-v0.0.66-dev1.md), built on the v0.0.65 release with all
+of its fixes to the opening: the builder has one reader that merges the
+base game file with the Tribunal and Bloodmoon files and keys its stages by the selected expansion layers (checking the
+expansion files first), the expansions' cells and rooms join the base lists (Solstheim's finished cells, Mournhold's
+rooms) with layer stores in the image, the Heart of Lorkhan is a resident of its room, the effects on the player are shown as a row of
+icons, and the engine has the groundwork for the Heart chamber's collapse. The expansions' cells and rooms are being
+brought in through the same builder and stages as Vvardenfell; no expansion area is built in this snapshot, and the dev1
+build itself has not been made yet. Its changes are checked by tests, not yet in play.
 
 The newest release is **v0.0.65: Reintroducing Vvardenfell**, a fix release made from v0.0.64 ([release notes](docs/releases/notes/RELEASE-v0.0.65.md)). The previous version had a fault in the game's scripting of the start area that kept the opening from working properly (the dock guard, the race choice, the census office, Sellus Gravius' papers). v0.0.65 fixes it, and the opening now follows the original Morrowind more exactly: the original's own scripts run the prison ship, the pier, the census office and Sellus Gravius' conversation, with AmiWind's rules on top (the speech boxes, the hold, nothing taken before the papers, hints that name your own keys). It also mends the torch and the fists, readying magic (no weapon drawn) and the census office's fights. It follows the snapshot [dev1](docs/releases/notes/RELEASE-v0.0.65-dev1.md) and the candidates [rc1](docs/releases/notes/RELEASE-v0.0.65-rc1.md), [rc2](docs/releases/notes/RELEASE-v0.0.65-rc2.md), [v0.0.65-rc3](docs/releases/notes/RELEASE-v0.0.65-rc3.md) (the people of the opening talk in the dialogue window, Sellus Gravius takes the papers and gives the package, the dock guard steps aside at the door) and [v0.0.65-rc4](docs/releases/notes/RELEASE-v0.0.65-rc4.md) (the opening's people fight with their attack animations, the tutorial boxes after the papers come once, and no hidden door by the census office drops the player under its floor), runs on CHIM Engine v0.2.2 and needs 32 MB of Fast RAM. Most of its fixes were regressions that came in when the opening was moved onto the original game's own scripts, while the opening's scenes still kept some of their earlier, separate handling. The opening was played in the emulator on the candidates' images, and by the maintainer on the Raspberry Pi 4B through the census office to Seyda Neen. Known: readied magic shows the fists of hand-to-hand for now (the open spell-casting hands come in v0.0.66), a carried light shows in the hand only when it is equipped while the hands are raised (v0.0.66), a player jailed in Seyda Neen may be placed where the census office has no floor (v0.0.66), the pack guar at Ahemmusa Camp is drawn with its parts apart, shalks on Azura's Coast hang in the air, the battle music can keep playing after a fight, the trip from Seyda Neen to Balmora sometimes stalls on the loading screen in the emulator and the shores still run in saw-tooth steps; every other open entry is in the [bug register](docs/BUGS.md). Mournhold and Solstheim are not in the game: the work on the expansions moves to v0.0.66.
 
@@ -64,7 +102,7 @@ yet:** their worlds, with their scripts, move to the next version.
 - **The Toolkit and the progress pages** follow the newest build: the
   [CHIM progress tracker](docs/chim/PROGRESS_TRACKER.md) is written newest first with one pane for Vvardenfell, Solstheim
   and Mournhold, and the 3D Map Inspector opens CHIM rooms with collision views.
-- **The game's scripts:** 605 of the 1,207 scripts run and 9 more are carried by AmiWind's own code, as in v0.0.63 (27
+- **The game's scripts:** in this release 605 scripts (of the 1,207) ran and 9 more were carried by AmiWind's own code, as in v0.0.63 (27
   wait for a function, 433 belong to Mournhold and Solstheim, 133 are named by nothing); 7 of the 49 systems of the base
   game are done, 39 partial, 3 missing ([game features](docs/GAME_FEATURES.md)).
 
@@ -139,7 +177,7 @@ a new game and the falling mage, and its second ([dev2 notes](docs/releases/note
 delivered. v0.0.61 shipped as its third snapshot with the final version number
 ([release notes](docs/releases/notes/RELEASE-v0.0.61.md)).
 
-What comes next is in the [roadmap](docs/ROADMAP.md). The release after the fix release v0.0.65 (released: [notes](docs/releases/notes/RELEASE-v0.0.65.md)) is v0.0.66, and carries what v0.0.64 did not:
+What comes next is in the [roadmap](docs/ROADMAP.md). The release after the fix release v0.0.65 (released: [notes](docs/releases/notes/RELEASE-v0.0.65.md)) is v0.0.66 (its snapshots [dev1](docs/releases/notes/RELEASE-v0.0.66-dev1.md), [dev2](docs/releases/notes/RELEASE-v0.0.66-dev2.md), [dev3](docs/releases/notes/RELEASE-v0.0.66-dev3.md) and [dev4](docs/releases/notes/RELEASE-v0.0.66-dev4.md) have the merging reader, the layer keys and the expansion data selected by default, but no expansion area yet), and carries what v0.0.64 did not:
 Tribunal (Mournhold) and Bloodmoon (Solstheim) built in by default where you own them (a warning when the files are
 not found, and a builder switch for the base game only), their scripting, and scripted world events such as the
 Ghostgate's doors and the traps of their worlds, with the tree method Solstheim's forests need; the open spell-casting
@@ -167,7 +205,7 @@ yet on its image. Full list: [v0.0.64 release notes](docs/releases/notes/RELEASE
 
 ### What v0.0.63 changed
 
-The base game's scripting: 605 of the 1,074 scripts the original uses run and 9 more are carried by AmiWind's own code, with 460 of the
+The base game's scripting: 611 of the 1,074 scripts the original uses run and 9 more are carried by AmiWind's own code, with 460 of the
 original's 504 script functions carried out (the werewolf, forced run, scale, moon, magic effect, game hour, soul gem and
 console functions among them) and the original game's console commands usable on any reference; Mournhold's and
 Solstheim's scripts wait for those worlds. Creatures that walk, run and attack wherever they are met, stand on the ground
@@ -376,10 +414,10 @@ front page used to carry are kept in [earlier README sections](docs/README_ARCHI
   trapdoor still keeps the use key out of reach ([v0.0.55 release notes](docs/releases/notes/RELEASE-v0.0.55.md#known-in-this-build)).
   [The game feature tracker](docs/GAME_FEATURES.md) lists every system of the base game with its state.
 - **The game's scripts:** the three game files hold 1,207 script records, 1,074 of them used by the original game.
-  Every one of Vvardenfell that the original runs also runs here: 605 run as scripts and 9 more, the opening's and the
+  Every one of Vvardenfell that the original runs also runs here: 611 run as scripts and 9 more, the opening's and the
   game's main script, are carried by the game's own code (in every Vvardenfell region all of them, for example the
-  Ascadian Isles 115 of 115 and the Ashlands 66 of 66). The other 460 of the 1,074 wait: 433 belong to Mournhold or
-  Solstheim and wait for those worlds to be built (one of them is a Morrowind.esm script that Tribunal places), and 27
+  Ascadian Isles 115 of 115 and the Ashlands 66 of 66). The other 454 of the 1,074 wait: 433 belong to Mournhold or
+  Solstheim and wait for those worlds to be built (one of them is a Morrowind.esm script that Tribunal places), and 21
   also call a function not carried out yet, such as placing their own records there. The remaining 133 are not named or
   started by anything in the original game and never ran there either; they stay in the game and are listed apart.
   460 of the original's 504 script functions are carried out
@@ -419,14 +457,25 @@ and, with FS-UAE installed, build and run in one go:
 everything the release ships; the default builder is CHIM. The recorded v0.0.31 Seyda Neen maps
 (`--seyda-recorded DIR`) are optional and NOT RECOMMENDED since v0.0.31: by default Seyda Neen is converted from
 your data ([which Seyda Neen is in my build](docs/LINUX_BUILD.md#which-seyda-neen-is-in-my-build)). For a quick
+`./build.sh --check` (with a reuse source) runs the build's own reuse stop and exits with code 6 when the build would
+stop; the image step's early checks (file formats, flora support, actor spec) are listed in
+[the build profile](docs/BUILD_PROFILE.md#the-checks-a-contributor-meets-at-the-image-step). For a quick
 test image of one spot see [MiniWind: the test ground](docs/MINIWIND.md), the
 [build type reference](docs/MINIWIND_PLAYTESTER.md) and the [CHIM build guide](docs/chim/build_guide/README.md).
 
 Everything else about building, the build speed options, the FPU support library and running the image in FS-UAE or
 WinUAE: [Building and playing](docs/BUILDING_AND_PLAYING.md), the [Linux build guide](docs/LINUX_BUILD.md) and the
 [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md). The newest emulator presets are
+[`AmiWind-v0.0.66-dev4-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.66-dev4-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.66-dev4-WinUAE.uae`](resources/emulators/AmiWind-v0.0.66-dev4-WinUAE.uae) (for the third snapshot:
+[`AmiWind-v0.0.66-dev3-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.66-dev3-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.66-dev3-WinUAE.uae`](resources/emulators/AmiWind-v0.0.66-dev3-WinUAE.uae); for the second snapshot:
+[`AmiWind-v0.0.66-dev2-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.66-dev2-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.66-dev2-WinUAE.uae`](resources/emulators/AmiWind-v0.0.66-dev2-WinUAE.uae); for the first snapshot:
+[`AmiWind-v0.0.66-dev1-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.66-dev1-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.66-dev1-WinUAE.uae`](resources/emulators/AmiWind-v0.0.66-dev1-WinUAE.uae); for the v0.0.65 release:
 [`AmiWind-v0.0.65-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.65-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.65-WinUAE.uae`](resources/emulators/AmiWind-v0.0.65-WinUAE.uae) (for the fourth candidate:
+[`AmiWind-v0.0.65-WinUAE.uae`](resources/emulators/AmiWind-v0.0.65-WinUAE.uae); for the fourth candidate:
 [`AmiWind-v0.0.65-rc4-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.65-rc4-FS-UAE.fs-uae) and
 [`AmiWind-v0.0.65-rc4-WinUAE.uae`](resources/emulators/AmiWind-v0.0.65-rc4-WinUAE.uae); for the third candidate:
 [`AmiWind-v0.0.65-rc3-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.65-rc3-FS-UAE.fs-uae) and

@@ -57,16 +57,23 @@ def destinations(fields):
     return out
 
 
-def read_masters(data_files):
-    """(providers, settings, cells) from the masters present, later masters replacing earlier records (the game's load
-    order). providers: {id casefold: {kind, name, master, destinations}}; settings: the three game settings; cells: the
-    Morrowind.esm cells (mwad.audit.cell_data) for placements and exterior names, and regions {id casefold: name}."""
+def read_masters(data_files, masters=None):
+    """(providers, settings, cells) from the SELECTED masters (mwad.masters.selected_masters: the build's layer
+    selection, never which files are present), later masters replacing earlier records (the game's load order).
+    providers: {id casefold: {kind, name, master, destinations}}; settings: the three game settings; cells: the cells
+    of the merged master of the selection (mwad.audit.cell_data; the base game file alone when only it is selected) for
+    placements and exterior names, and regions {id casefold: name} (EXPANSION-DATA-ALL-TABLES-66)."""
     from mwad.audit import cell_data
     from mwad.esm import is_deleted, records, subrecords, text
+    from mwad.masters import master_bytes, selected_masters
     from mwad.paths import child_ci
+    masters = selected_masters(masters)
     providers, settings, cells, regions = {}, dict(SETTINGS), [], {}
     found = []
-    for name in MASTERS:
+    for tag, flags, raw in records(master_bytes(data_files, masters)):
+        if tag == 'CELL':
+            cells.append(cell_data(list(subrecords(raw))))
+    for name in masters:
         path = child_ci(Path(data_files), name, required=False)
         if path is None or not Path(path).is_file():
             continue
@@ -95,15 +102,13 @@ def read_masters(data_files):
             elif tag == 'REGN':
                 fields = list(subrecords(raw))
                 regions[text(fields, 'NAME').casefold()] = text(fields, 'FNAM')
-            elif tag == 'CELL' and name == 'Morrowind.esm':
-                cells.append(cell_data(list(subrecords(raw))))
     if 'Morrowind.esm' not in found:
         raise ValueError('Travel services: Morrowind.esm not found in ' + str(data_files))
     return providers, settings, cells, regions, found
 
 
 def placements(providers, cells):
-    """{provider id: (position, interior)} of each provider's first placement in Morrowind.esm."""
+    """{provider id: (position, interior)} of each provider's first placement in the selected masters' cells."""
     out = {}
     for cell in cells:
         for ref in cell['refs']:
@@ -168,7 +173,7 @@ def table(providers, settings, cells, regions, rooms, towns, frames, offsets=Non
                 continue
             if place is None:
                 price, hours = (price_hours([0, 0, 0], [0, 0, 0], True, settings) if interior else (1, 0))
-                note = 'provider not placed in Morrowind.esm: price from the game setting only'
+                note = 'provider not placed in the selected masters: price from the game setting only'
             else:
                 price, hours = price_hours(place[0], d['position'], interior, settings)
                 note = None

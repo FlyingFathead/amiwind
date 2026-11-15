@@ -103,6 +103,7 @@ Importer test with a synthetic interior behind a door.
 Family: Town and interior import (`town-import`). The town importer converts every town and interior within engine limits; doors lead somewhere. See [families](README.md#families).
 
 - AW-20260928-08 (no report page): Census wall/hanging texture quality or mapping
+- CHIM-TOWN-RECEIPT-MERGED-MASTERS-66 (no report page): With the expansions selected, the CHIM stage stopped while listing a town's receipt files
 - [IMPORT-DOORBANK-CITY-36](IMPORT-DOORBANK-CITY-36.md): The whole-city Vivec frame holds 157 load doors, over the engine's 128-row door bank
 - [IMPORT-TEST-CELLS-31](IMPORT-TEST-CELLS-31.md): Development test cells would be imported with the world
 - [ROOM-DECAL-ALPHA-62](ROOM-DECAL-ALPHA-62.md): A cobweb compiled into a room is drawn as a solid dark sheet instead of see-through

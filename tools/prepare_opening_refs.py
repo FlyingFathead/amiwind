@@ -10,6 +10,7 @@ import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from mwad.audit import records,subrecords,string,cell_data
 from mwad.paths import ensure_external,resolve_data_files,child_ci,replace_bytes,replace_copy
+from mwad.masters import master_path
 from prepare_quake import CENTRE
 from prepare_scenery import export_refs
 from prepare_mesh_bsp import append_meshes
@@ -20,7 +21,7 @@ def opening_references(data_files):
     """(every exterior reference with its object type and model, the references the opening binds:
     the ship's disable list of ChargenClassNPC and the tutorial barrel, the disable list ids).
     One reading of the master for the legacy scene (prepare) and the CHIM builder (chim.seyda)."""
-    raw=child_ci(data_files,'Morrowind.esm').read_bytes();objects={};cells=[];disabled=None
+    raw=master_path(data_files).read_bytes();objects={};cells=[];disabled=None
     for tag,flags,payload in records(raw):
         if tag not in ('SCPT','CELL','STAT','CONT','ACTI','LIGH','DOOR','NPC_'):continue
         subs=list(subrecords(payload));f=dict(subs)

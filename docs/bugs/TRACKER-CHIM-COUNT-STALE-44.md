@@ -114,6 +114,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - ACTOR-RECEIPT-01 (no report page): Windows actor-audit receipt hash did not match the CRLF-written file
 - AW25-07 (no report page): Python FS-UAE launcher not executable after extraction
 - [BUILD-END-USER-LAUNCHERS-36](BUILD-END-USER-LAUNCHERS-36.md): Requested: the builder's simple mode writes a Python launcher, an FS-UAE config and a WinUAE config for the end user, matching the build
+- BUILD-FAILURE-NO-DETAILS-66 (no report page): Requested: a failed build shows its failure details: the monitor showed only the percentage done and the word failed, and the failed stage's error line came without its traceback
 - [BUILD-MOJIBAKE-32](BUILD-MOJIBAKE-32.md): A builder error message contains mojibake
 - [BUILD-NAME-MOJIBAKE-32](BUILD-NAME-MOJIBAKE-32.md): A builder error message shows mojibake
 - BUILD-PY-AT-TEXT-LIMIT-49 (no report page): tools/build.py stands at 99.6 % of the 256 KiB release text limit: a 1.2 KB builder change failed the gate preflight

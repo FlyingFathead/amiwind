@@ -15,9 +15,10 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
 import numpy as np
-from mwad.audit import BSA
+from mwad.archives import layered_bsa
 from mwad.npc import first, load_master
 from mwad.paths import child_ci
+from mwad.masters import master_path
 from npc_anim import BoneLayer
 from npc_geometry import Assets, Skeleton, animated_mdl
 from npc_items import view_tags
@@ -89,8 +90,8 @@ def prepare(data_files, id1, palette_path, races=()):
     palette = Path(palette_path).read_bytes()
     if len(palette) != 768:
         raise ValueError('Expected installed 256-colour palette')
-    kinds, _, _ = load_master(child_ci(data_files, 'Morrowind.esm'))
-    assets = Assets(data_files, BSA(child_ci(data_files, 'Morrowind.bsa')))
+    kinds, _, _ = load_master(master_path(data_files))
+    assets = Assets(data_files, layered_bsa(data_files))
     base = Skeleton(assets, 'meshes/base_anim.1st.nif')
     skeleton = BlockSkeleton(base)
     times, keys = block_times(base.events)

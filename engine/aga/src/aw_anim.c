@@ -21,7 +21,7 @@ int (*aw_creature_sound)(struct edict_s *e,int moment,char *out,int size);
 void (*aw_player_steps)(void);
 float aw_anim_kit_speed=1;
 const char *const aw_anim_group_names[AW_ANIM_GROUPS]={"idle","walk","run","swim","swimidle","hit","knock","death","attack","block","dodgel","dodger","jump","land",
-    "ready","readywalk","readyrun","readyjump","readyland"};
+    "ready","readywalk","readyrun","readyjump","readyland","cast"};
 static const char *const event_names[AW_ANIM_EVENT_ALL]={"left","right","moan","roar","scream","land"};
 static const char *const voice_topics[AW_VOICE_TOPICS]={"attack","hit","flee","idle"};
 static int hexval(int c) {return c>='0' && c<='9'?c-'0':c>='a' && c<='f'?c-'a'+10:-1;}

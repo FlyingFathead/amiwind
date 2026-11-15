@@ -23,6 +23,10 @@ converted picture:  key -> source path(s) -> picture SHA-256 -> picture file.
   mgef:<index>      a magic effect's ITEX (selected spell; none reachable yet:
                     the engine has no spell list)
 
+The active effects' icons and descriptions (HUD-ACTIVE-EFFECTS-ROW-64) are not table rows:
+gfx/effects.awe holds every effect record's ITEX at 12 x 12 (the HUD) and 16 x 16 (the
+Stats window's list) and its DESC, one row per effect number (write_effects).
+
 Composition and proportions follow the original HUD as OpenMW 0.51 lays it out
 (files/data/mygui/openmw_hud.layout WeapBox/SpellBox: a 36x36 box over a 36x6
 bar beside three 65x12 stat bars; openmw_hud_box.skin.xml HUD_Box = BlackBG +
@@ -262,7 +266,54 @@ def pack_table(rows, offsets):
     return b''.join(out)
 
 
-def prepare(assets, id1, items, palette, colours, inventory=None, jobs=1):
+# HUD-ACTIVE-EFFECTS-ROW-64: the active effects' icons and descriptions, gfx/effects.awe (engine/aga/src/aw_fxrow.h):
+# b'AWE1', u16 count, u8 small size, u8 large size; count rows of u32 small picture, u32 large picture, u32 description
+# (offsets from the file's start, 0 none), u16 description bytes, u16 0; then the pictures (palette indices, no header)
+# and the descriptions (cp1252, no terminator). One row per effect number 0..142, so the engine reads a row by number.
+EFFECTS_FILE = 'gfx/effects.awe'
+EFFECT_COUNT = 143
+EFFECT_SMALL = 12   # the HUD's icon (aw_fxrow.h AW_FX_HUD_ICON)
+EFFECT_LARGE = 16   # the list's icon, the original's own size (AW_FX_LIST_ICON)
+EFFECT_DESCRIPTION_MAX = 1000
+
+
+def effect_pixels(image, palette, size):
+    """An effect's small icon over black at size x size, as palette indices (no AWI1 header)."""
+    return icon_picture(image, palette, None, size)[8:]
+
+
+def write_effects(assets, id1, effects, palette):
+    """effects: {index: {'icon': ITEX, 'description': DESC}} (prepare_inventory.effect_records). Returns the report."""
+    rows = [(0, 0, 0, 0)] * EFFECT_COUNT; blobs = []; at = 8 + EFFECT_COUNT * 16; held = {}; icons = 0
+    def put(raw):
+        nonlocal at
+        offset = at; blobs.append(raw); at += len(raw); return offset
+    for index in range(EFFECT_COUNT):
+        record = effects.get(index)
+        if not record: continue
+        small = large = desc = 0; length = 0
+        if record.get('icon'):
+            try:
+                _, image = read_icon(assets, 'icons/' + record['icon'].replace('\\', '/'))
+                small = put(effect_pixels(image, palette, EFFECT_SMALL)); large = put(effect_pixels(image, palette, EFFECT_LARGE))
+                icons += 1
+            except (ValueError, KeyError, OSError) as error:
+                held['mgef:%d' % index] = str(error)
+        text = ' '.join((record.get('description') or '').split())
+        if text:
+            raw = text.encode('cp1252', 'replace')[:EFFECT_DESCRIPTION_MAX]
+            desc = put(raw); length = len(raw)
+        rows[index] = (small, large, desc, length)
+    out = [b'AWE1', struct.pack('<HBB', EFFECT_COUNT, EFFECT_SMALL, EFFECT_LARGE)]
+    out += [struct.pack('<IIIHH', s, l, d, n, 0) for s, l, d, n in rows]
+    data = b''.join(out + blobs)
+    (Path(id1) / 'gfx').mkdir(parents=True, exist_ok=True)
+    (Path(id1) / EFFECTS_FILE).write_bytes(data)
+    return {'file': EFFECTS_FILE, 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest(), 'records': len(effects),
+            'icons': icons, 'descriptions': sum(1 for r in rows if r[2]), 'held': held}
+
+
+def prepare(assets, id1, items, palette, colours, inventory=None, jobs=1, effects=None):
     """items: {id: {'source_icon': ITEX, 'enchanted': bool}} - the HUD closure (item:<id>, 18 x 18).
     inventory: {id: {'source_icon', 'enchanted', 'equippable'}} - every item the player can own
     (inv:<id>, 16 x 16; inv:<id>:equip on the equipped backdrop for equippable items).
@@ -354,6 +405,11 @@ def prepare(assets, id1, items, palette, colours, inventory=None, jobs=1):
     report['stored_pictures'] = len(pictures); report['table_rows'] = len(rows)
     report['picture_bytes'] = sum(len(v) for v in pictures.values()); report['pack_bytes'] = len(pack)
     report['table_bytes'] = len(table)
+    if effects is not None:
+        report['effects'] = write_effects(assets, id1, effects, palette)
+        print('Effect icons: %d of %d effect records, %d descriptions, %d bytes (%s)' % (
+              report['effects']['icons'], report['effects']['records'], report['effects']['descriptions'],
+              report['effects']['bytes'], EFFECTS_FILE), flush=True)
     print('Icon table: %d rows, %d pictures (%d bytes in the pack), %d held; took %.1f s, %d workers' % (
           len(rows), len(pictures), len(pack), len(report['held']), time.time() - start, workers), flush=True)
     return report

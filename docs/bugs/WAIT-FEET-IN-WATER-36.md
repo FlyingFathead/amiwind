@@ -83,6 +83,7 @@ Every rule of the wait and rest work names its source in the original (OpenMW so
 Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and game state. See [families](README.md#families).
 
 - ACTOR-HELLO-CLAMPED-61 (no report page): An actor's Hello value is cut to 255 although the record holds it in 16 bits (up to 300 in the game data)
+- ACTOR-LOAD-NOT-COUNTED-66 (no report page): The carried load of NPCs and creatures was not counted in their fights
 - ACTOR-STATS-FAR-FALLBACK-61 (no report page): A being outside the loaded areas still reads its stats from the island-wide actor table
 - [ACTOR-STATS-SCATTERED-61](ACTOR-STATS-SCATTERED-61.md): Actor stats are kept in five separate copies, each covering only some beings and some stats
 - ACTORS-TOWN-ROOM-RETURN-59 (no report page): A town resident killed before entering a room is alive again on the way back out
@@ -95,8 +96,11 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [AW-STATE-32-SLOTS-48](AW-STATE-32-SLOTS-48.md): The game state table holds 32 globals, 32 quests and 32 items; the game has 143 globals and 318 journal topics
 - AW25-06 (no report page): Quicksave shown as empty; save ordering confusing
 - BC-TREE-FLOATING-60 (no report page): A Bitter Coast tree near cell -2,-8 floats above the ground
+- CAPTAIN-EXIT-DOOR-DEAD-AFTER-REENTRY-66 (no report page): The census office's two scripted doors of the captain's wing open only once: used a second time, E does nothing (the exit door to Seyda Neen, and the courtyard door into his room)
 - [CARRIED-RECORDS-SEARCH-PER-KIND-61](CARRIED-RECORDS-SEARCH-PER-KIND-61.md): With hundreds of kinds of item carried, a place load takes up to a minute: one catalogue search per kind
 - CAST-ANIM-THIRD-PERSON-62 (no report page): The player's third-person body plays no spellcasting animation when casting
+- CAST-LOOK-AFTER-RELEASE-66 (no report page): A spell's look and cast sound start only when the spell leaves, after the cast animation, and the look is off in a default game
+- CENSUS-CRAB-PLATE-FOCUS-66 (no report page): Census back room: looking at the crab meat on the table, the use key goes to the silver plate under it, so E steals the plate instead of taking the crab meat
 - [CENSUS-DOOR-STUCK-29](CENSUS-DOOR-STUCK-29.md): Player stuck after opening Census Office hall door
 - CENSUS-INTRO-NOT-SCRIPTED-62 (no report page): Opening: the Census and Excise Office and its courtyard run on hand-written story steps, not the game's own character-creation scripts
 - [CENSUS-INTRO-SCRIPTS-62](CENSUS-INTRO-SCRIPTS-62.md): The opening in the Census and Excise Office and its courtyard runs on hand-written rules, not on the game's own character-creation scripts
@@ -114,9 +118,11 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [COLLECT-CAPACITY-REJECTED-60](COLLECT-CAPACITY-REJECTED-60.md): After looting a corpse, picking up items fails with an inventory or state capacity message
 - [COMBAT-BLOCKING-36](COMBAT-BLOCKING-36.md): Requested: blocking in combat - NPCs block by their Block skill with a block animation, the player blocks with the right mouse button
 - [COMBAT-CHASE-CHIM-STUCK-46](COMBAT-CHASE-CHIM-STUCK-46.md): Actors spawned on a CHIM frame without a baked ground point stay in the air: the spawn floor snap runs before the streamed ground under them is collidable (the chase itself works)
+- COMBAT-CHASE-SPEED-FIXED-66 (no report page): Every fighter chased, fled and flew at one fixed speed instead of its own Speed and Athletics
 - [COMBAT-DAEDROTH-NO-HIT-51](COMBAT-DAEDROTH-NO-HIT-51.md): A daedroth outside the Azura s Coast stronghold cannot be punched: the blows pass through it; its runtime health reads 0.0
 - [COMBAT-FATIGUE-HEALTH-DAMAGE-39](COMBAT-FATIGUE-HEALTH-DAMAGE-39.md): Clarify Eldafire bare-fist fatigue damage versus armed guard health damage
 - [COMBAT-FIST-BLOCK-33](COMBAT-FIST-BLOCK-33.md): A fighter with a shield blocks while fighting with fists
+- COMBAT-FLEE-RULE-PARTIAL-66 (no report page): Fleeing by the Flee rating was off by default and left out the werewolf case and a spell as the best action
 - COMBAT-HIT-CHANCE-EFFECTS-62 (no report page): The melee hit chance leaves out Fortify Attack, Blind, Sanctuary, Chameleon and Invisibility, and the player's attributes are counted without their Fortify and Damage
 - COMBAT-HIT-CONTACT-CONE-62 (no report page): The player's melee swing strikes only the actor exactly under the crosshair, not the nearest one in the original's hit cone, so flyers and small creatures are hard to reach
 - [COMBAT-HIT-RECOVERY-33](COMBAT-HIT-RECOVERY-33.md): Fatigue hits did not stagger, and knockdowns lasted half a second too long
@@ -124,6 +130,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [COMBAT-NO-CONDITION-33](COMBAT-NO-CONDITION-33.md): Weapon and shield condition were ignored in combat
 - [COMBAT-NODICE-READOUT-40](COMBAT-NODICE-READOUT-40.md): No-dice combat readout labels living targets already down
 - [COMBAT-NOT-SAVED-33](COMBAT-NOT-SAVED-33.md): Combat state and NPC deaths are not saved
+- COMBAT-PARALYSED-PUNCH-66 (no report page): A paralysed victim of a punch took fatigue damage only and kept its evasion and block
 - [COMBAT-PLAYER-ATTACK-TYPE-33](COMBAT-PLAYER-ATTACK-TYPE-33.md): The player's attack type and swing strength were random
 - [COMBAT-PLAYER-DEATH-FALL-33](COMBAT-PLAYER-DEATH-FALL-33.md): The player does not collapse on death
 - [COMBAT-PLAYER-KNOCKDOWN-33](COMBAT-PLAYER-KNOCKDOWN-33.md): The player's knockdown and knockout exist only in the combat rules
@@ -131,11 +138,15 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - COMBAT-SHIELD-EFFECT-NO-ARMOR-61 (no report page): A Shield effect on the player does not lower the damage of the blows that land on the player
 - COMBAT-STYLE-PRESETS-62 (no report page): Requested: combat style presets for fights, such as the dice and best-attack choices, chosen before a fight
 - COMBAT-THINK-COST-68040-54 (no report page): On the slow 68040 preset one combat decision step (think) costs 34 ms with one fighter and 44 ms with four
+- COMBAT-WEAPON-CHOICE-SKILL-66 (no report page): The weapon a fighter took into a fight ignored its skills: the highest maximum damage won
+- CONSOLE-GETITEMCOUNT-UNNAMED-ITEM-66 (no report page): The console's player->getitemcount answers "no such item id" for an item the player carries when no script and no actor names it (the census iron dagger)
 - [CONTAINER-LEVELLED-CONTENTS-EMPTY-59](CONTAINER-LEVELLED-CONTENTS-EMPTY-59.md): Containers whose contents are levelled lists open empty
 - [CONTAINER-STRIP-OPEN-MANY-KINDS-61](CONTAINER-STRIP-OPEN-MANY-KINDS-61.md): With hundreds of kinds of item carried, opening a body or a container holds the game for about 10 seconds
+- CORPSE-DISPOSE-MISSING-65 (no report page): A corpse's loot window has no way to dispose of the body, so bodies pile up
 - [CORPSE-INVENTORY-NOT-OPENABLE-59](CORPSE-INVENTORY-NOT-OPENABLE-59.md): Bodies of dead NPCs and creatures cannot be opened to take what they carried
 - CREATURE-BIPED-ANIMS-62 (no report page): An actor without walk or attack animations glides and does not fight back (ash slave, corprus stalker, the arena NPC Zennammu)
 - CRIME-FINE-GOLD-NOT-TAKEN-62 (no report page): Paying a guard's fine clears the bounty but takes no gold: the answer's RemoveItem of the bounty's worth of gold leaves the purse as it was
+- CRIME-KILL-BOUNTY-65 (no report page): Killing a guard puts only 80 gold of bounty on the player
 - CRIME-ONLY-THEFT-62 (no report page): Only a theft was a crime: attacking or killing someone in front of witnesses raised no bounty, guards never came to arrest, and the guards' answers to pay the fine or go to jail did nothing
 - CRIME-SAVE-PURSUERS-62 (no report page): The marks a crime leaves on people are lost on loading a save: guards forget a pursuit, the Alarmed mark and the crime's disposition change go, and a murder is no longer known
 - DBG-ARENA-PICKER-62 (no report page): Requested: dbg arena offers a choose-your-opponent list of every NPC and creature
@@ -181,6 +192,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - MWSCRIPT-CELLCHANGED-VOLATILE-54 (no report page): CellChanged made the sound-marker scripts volatile: 85 percent of Vivec's per-frame script work
 - MWSCRIPT-CONSOLE-LOCAL-NAMES-63 (no report page): Show and ShowVars cannot name a script's local variables: Show reads globals only, ShowVars lists the locals by slot number, and ToggleScripts flips the saved scripts switch
 - MWSCRIPT-DATA-UNKNOWN-NAMES-48 (no report page): Four Bloodmoon scripts read names declared nowhere in the game data and do not compile
+- MWSCRIPT-DISABLE-LOST-LEDGER-FULL-66 (no report page): When the world change list is full, a script's Disable or SetDelete is not done
 - MWSCRIPT-INERT-SEEN-62 (no report page): Scripts whose only effect is a message box, a door or item use they take over, or a local the dialogue reads were left out of the build as doing nothing
 - MWSCRIPT-INTERIOR-PLACEMENTS-48 (no report page): Scripted placements in rooms that have no edict are not attached: the engine has no room identity to match them (3,612 of 4,907 bindings are in rooms)
 - MWSCRIPT-LATER-MASTER-SCRIPT-61 (no report page): An object placed in Vvardenfell whose record gets its script from a later master is not attached
@@ -200,17 +212,20 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [NEWGAME-STATE-RESET-62](NEWGAME-STATE-RESET-62.md): A New Game started from the menu after playing leaves the fireplace of the Census and Excise Office unlit
 - [OBJECT-ENABLE-NOT-DRAWN-65](OBJECT-ENABLE-NOT-DRAWN-65.md): Objects switched back on by a script stay invisible: the release papers in the census office can be read but are not drawn on the table
 - OPENING-CAPTAIN-HINT-SUBTITLE-63 (no report page): The hint about talking to the captain shows as a subtitle instead of the original message box with an Ok button
+- OPENING-FIGHTING-ON-BEFORE-PAPERS-66 (no report page): In the opening, fighting is already switched on before the release papers are taken; the original keeps it off from the ship until the papers
 - OPENING-HOLDS-OFF-NEWGAME-64 (no report page): A New Game clears the opening's state right after setting it: the dock guard does not meet the player and no race can be chosen
 - OPENING-SHIP-BLOCKER-NOT-CONVERTED-63 (no report page): The invisible blocker inside the prison ship, one of the opening's 23 blockers, is not converted; the 22 outdoor ones are
 - OPENING-SHIP-GUARD-STEPS-63 (no report page): On the prison ship the guard waits for the cellmate's warning before he speaks, and the movement hint is a box to close with Enter instead of the original message box
 - [OPENING-VANITY-CAMERA-64](OPENING-VANITY-CAMERA-64.md): The idle camera orbit and the view switch run on the prison ship and the pier before the race is chosen
 - OPENING-WEATHER-NOT-CLOUDY-63 (no report page): A new game does not start with the Bitter Coast weather set to cloudy, as the original opening script does
+- OUTDOOR-CONTAINER-AIM-66 (no report page): Containers outdoors (sacks, barrels, crates, chests by the huts and camps) cannot be aimed at, so they never open
 - PERSUASION-BROKEN-62 (no report page): Persuasion in dialogue does nothing: Admire and Intimidate return to the topic list, Taunt shows nothing
 - [PHYSICS-GRAVITY-SCALE-36](PHYSICS-GRAVITY-SCALE-36.md): Gravity is Quake's 800 although the world is scaled 0.25: jumps and falls are several times faster than the original
 - PICKUP-PLACED-E-NO-TAKE-58 (no report page): The activate key on a placed item in reach takes nothing
 - PLACED-ITEMS-OUTDOORS-FIRST-FRAME-59 (no report page): Outdoors no placed items are drawn after a teleport or load: the table is read before the player stands at the arrival
 - PLACED-ITEMS-ROOM-RESET-59 (no report page): Entering a room with placed items drawn resets the machine to the boot screen
-- PLACED-PIT-AXE-NO-FOCUS-61 (no report page): The iron shardaxe in the Seyda Neen pit is drawn but shows no item box and cannot be taken
+- [PLACED-PIT-AXE-NO-FOCUS-61](PLACED-PIT-AXE-NO-FOCUS-61.md): The iron shardaxe in the Seyda Neen pit is drawn but shows no item box and cannot be taken
+- PLAYER-ANIM-GROUPS-NOT-PLAYED-66 (no report page): The player body does not play every animation group of the original player files
 - [PLAYER-DEATH-LIMBO-35](PLAYER-DEATH-LIMBO-35.md): After the player dies there is no way out: the game stays in a limbo with no reload or retry
 - PLAYER-FORTIFY-END-AS-DAMAGE-61 (no report page): When a Fortify Attribute effect on the player ends, the character sheet keeps it as a raised modifier and records the drop as damage
 - PLAYER-HEALTH-OVER-MAX-63 (no report page): The player starts with health above its maximum (100 of 40) and restoring the stats keeps it there
@@ -221,18 +236,32 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [PLAYER-READY-WATER-MOVEMENT-38](PLAYER-READY-WATER-MOVEMENT-38.md): Readied weapon or torch appears to allow walking on water
 - [PLAYER-START-SPELLS-NOT-KNOWN-61](PLAYER-START-SPELLS-NOT-KNOWN-61.md): Character creation never puts the race, birthsign and class spells and abilities on the player record, so they cannot be cast or apply
 - PLAYER-WALK-SPEED-SLOW-51 (no report page): The starting walk speed feels very slow; check it against the original and OpenMW
+- POWER-COOLDOWN-NOT-SAVED-66 (no report page): Power cooldowns are not saved and not reset by a new game: a save and reload makes a used power ready again
+- PRISON-SHIP-ITEMS-TAKEABLE-65 (no report page): On the prison ship the spoons, plates and other dishes can be taken with the activate key
 - [QC-AW-FLAME-SPAWN-32](QC-AW-FLAME-SPAWN-32.md): Every aw_flame entity prints load errors: the game logic has no aw_flame spawn function or aw_flame_size/aw_flame_shape fields
 - RACE-RESIST-NOT-ON-SPELL-DAMAGE-64 (no report page): A race ability that resists an element does not reduce spell damage of that element
-- READY-MAGIC-SHOWS-WEAPON-65 (no report page): Readying magic (R by default) raises the equipped weapon instead of the spell-casting hands
+- [READY-MAGIC-SHOWS-WEAPON-65](READY-MAGIC-SHOWS-WEAPON-65.md): Readying magic (R by default) raises the equipped weapon instead of the spell-casting hands
 - RENDER-METADATA-29 (no report page): Native renderer metadata warns as an unknown QuakeC field
 - RESIST-NORMAL-WEAPONS-61 (no report page): Ghosts and other creatures that resist normal weapons take full damage from ordinary weapons, with no "no effect" message
 - REST-CENSUS-NO-CELL-ID-61 (no report page): The rest window offers Rest in the Census and Excise Office, a cell the game marks as no sleeping
 - REST-OWNED-BED-ALWAYS-REFUSED-62 (no report page): Someone else's bed was always refused; in the original sleeping in it is a crime only when someone sees it
 - SAVE-ACTOR-BLOCK-OVERFLOW-59 (no report page): A full actor record pool (128 actors) can exceed the save's 32 KB actor block, which would refuse the save (calculated, not measured)
+- [SAVE-ACTOR-ROWS-BOUND-UNDER-GAME-66](SAVE-ACTOR-ROWS-BOUND-UNDER-GAME-66.md): The world change list holds at most 8,192 actor rows while the game places about 13,800 actor references
+- SAVE-ACTOR-ROWS-EXPANSION-ROOMS-66 (no report page): A save is refused once an NPC was in a room of an expansion: the saved actor rows took place numbers up to the base game's rooms only, and the expansions' rooms are numbered after them
 - SAVE-CHANGES-FULL-REFUSES-SAVE-59 (no report page): When the world change list is full (2,048 entries for all actors and objects), the whole save is refused and the previous one kept
+- [SAVE-CRIME-MARKS-32-ROWS-66](SAVE-CRIME-MARKS-32-ROWS-66.md): The crime marks table holds 32 NPCs, the 33rd witness takes a bystander's row, and a save keeps at most those 32
 - SAVE-EFFECTS-BLOCK-SIZE-61 (no report page): Loading a save with a spell effect active loses the effects and the made spells, enchanted items, soul gems and other blocks saved after them
 - SAVE-EQUIPMENT-29 (no report page): Quickload returns with hands and torch put away
+- SAVE-EXPORT-FAILURE-ACCEPTED-65 (no report page): A save is written as good although the changed actors or script values failed to go into it
+- [SAVE-INSIDE-SCRIPT-STEP-66](SAVE-INSIDE-SCRIPT-STEP-66.md): A save requested from the console or a menu during a running script step is taken at once instead of at a settled point
+- [SAVE-ITEM-INSTANCES-ONE-PER-KIND-66](SAVE-ITEM-INSTANCES-ONE-PER-KIND-66.md): The player's items are saved per kind with one condition and charge, so two copies of the same item cannot keep different states
+- SAVE-ITEM-SCRIPT-LOCALS-66 (no report page): The script values of items were not saved, and a worn item lost them at every map change
 - [SAVE-LAVA-DEATH-LOOP-38](SAVE-LAVA-DEATH-LOOP-38.md): Lava fall can leave an autosave that reloads into repeated death
+- [SAVE-LOCALS-BOUND-UNDER-GAME-66](SAVE-LOCALS-BOUND-UNDER-GAME-66.md): The saved script locals are bounded at 8,192 values while the base game alone declares 7,388
+- [SAVE-MADE-RECORDS-64-CAP-66](SAVE-MADE-RECORDS-64-CAP-66.md): Made spells, enchanted items, potions and filled soul gems are capped at 64 each in the saved game
+- [SAVE-REVEALED-PLACES-128-CAP-66](SAVE-REVEALED-PLACES-128-CAP-66.md): The places a script reveals on the map stop at 128 while the dialogue results alone call ShowMap 249 times
+- SAVE-SCRIPT-ROW-HINT-ONLY-65 (no report page): A saved script's values are matched to the compiled script only by its row: a rebuild in another order drops them
+- SAVE-STATE-FIXED-CAPS-66 (no report page): The save keeps the changes since a new game in fixed-size parts that are too small for the game, so a save can lose state or be refused
 - SAVE-TAKEN-DISABLED-ONE-FLAG-59 (no report page): A taken object and an object a script disabled share one flag in the save, so one cannot be told from the other
 - [SAVE-TELEPORT-CHECKPOINT-38](SAVE-TELEPORT-CHECKPOINT-38.md): Successful teleport needs a safe destination checkpoint
 - SCRIPT-ENABLED-ACTOR-NOT-DRAWN-62 (no report page): An actor a script enables in a loaded area is not drawn: the falling mage near Seyda Neen falls and dies unseen, his body searchable but invisible
@@ -254,6 +283,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - TALK-PROMPT-NOT-TALKABLE-54 (no report page): The Talk prompt shows for any target with a voice string: hostile, dead, knocked out or without dialogue
 - THIRDPERSON-ANIMS-AUDIT-62 (no report page): Third-person actions are not all mapped to the original's animation groups
 - TORCH-HIDES-HELM-62 (no report page): Holding a torch makes the worn helm disappear from the third-person body and the inventory figure; it returns when the torch is put away
+- [TOWN-OUTDOOR-SCRIPTS-NOT-ATTACHED-66](TOWN-OUTDOOR-SCRIPTS-NOT-ATTACHED-66.md): On a town map, scripted objects without an entity are never attached, so their scripts do not run (the falling mage's journal near Seyda Neen)
 - TRAVEL-SERVICES-CHIM-51 (no report page): Silt strider rides between towns do not work: travel knows only the old Seyda Neen and Balmora town maps, not the CHIM world, and none of the other routes
 - UI-HUD-TOGGLE-KEY-51 (no report page): Requested: a key combination (for example Ctrl+Alt+H) that hides and shows the whole HUD in game, the crosshair with it
 - [UI-INVENTORY-INTEGRATION-40](UI-INVENTORY-INTEGRATION-40.md): Inventory integration and safe world placement remain incomplete
@@ -261,6 +291,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [WAIT-DURING-COMBAT-36](WAIT-DURING-COMBAT-36.md): Waiting is allowed in the middle of a fight
 - [WATER-GAMEPLAY-PARITY-38](WATER-GAMEPLAY-PARITY-38.md): Water gameplay lacks complete original behavior verification
 - WEAPON-STRIKE-ENCHANT-NOT-CAST-61 (no report page): A weapon's Cast When Strikes enchantment is not cast when the weapon hits
+- WEATHER-STATE-NOT-SAVED-66 (no report page): The current weather and its change in progress are not saved: a load rolls the weather again
 - WEREWOLF-BODY-NOT-DRAWN-63 (no report page): A player turned into a werewolf by a script keeps his own body: the werewolf model is not drawn
 - WEREWOLF-RUN-SPEED-63 (no report page): A player in werewolf form runs at his normal run speed: the werewolf run multiplier is not applied
 - WORLD-BUTTONS-62 (no report page): Buttons and levers that should act do nothing, for example the Ghostgate gate buttons on both sides

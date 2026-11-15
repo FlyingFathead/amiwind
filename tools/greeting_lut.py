@@ -178,6 +178,7 @@ def sound_resolver(data):
         return voice_pool_name, None, missing
     from mwad.audit import BSA
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     data = Path(data)
     assets = {}
     for name in M.MASTERS:
@@ -207,6 +208,7 @@ def sound_records(data):
     of an id replaces the earlier; SNDG keep load order)."""
     from mwad.esm import is_deleted, records as esm_records, subrecords as esm_subrecords, string as esm_string
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     sounds, creatures, gens, gmst = {}, {}, {}, {}
     for name in SOUND_MASTERS:
         path = child_ci(Path(data), name, required=False) if data is not None else None
@@ -953,7 +955,8 @@ def image_step(data, id1, out=None, jobs=1, media=None):
     from build_scratch import scratch_dir
     from mwad.esm import sha256_file
     from mwad.paths import child_ci
-    master = child_ci(Path(data), 'Morrowind.esm')
+    from mwad.masters import master_path
+    master = master_path(Path(data))
     resolver = sound_resolver(data)
     inputs = {'master_sha256': sha256_file(master),
               'sound_sources_sha256': hashlib.sha256('\n'.join(sorted(resolver[1] or ())).encode()).hexdigest()}
@@ -1027,7 +1030,8 @@ def main(argv=None):
     p.add_argument('--jobs', type=int, default=1)
     a = p.parse_args(argv)
     from mwad.paths import child_ci
-    raw, report = build_master(child_ci(a.data_files, 'Morrowind.esm'), a.data_files, a.jobs, media=a.media)
+    from mwad.masters import master_path
+    raw, report = build_master(master_path(a.data_files), a.data_files, a.jobs, media=a.media)
     a.out.write_bytes(raw)
     if a.report:
         a.report.write_text(json.dumps(report, indent=1, sort_keys=True) + '\n', encoding='utf-8', newline='\n')

@@ -24,6 +24,50 @@ void (*aw_defaults_migrate)(int level);                                /* aw_fog
 /* aw_items.c (carried weapon/shield entities; its own fixture aga_items_test.c): counted here. */
 #include "aw_items.h"
 static int items_shown,items_hidden;
+/* NPC-NO-SPELLCASTING-65: the fighters' spells (aw_cast.c, aw_magic.c, aw_animkit.c, aw_mwhost.c): no actor record
+ * here, so no fighter knows a spell and every fight below stays with weapons and fists (the rules are linked:
+ * aw_cast_rules.c, aw_effects.c; their own test is aga_spell_ai_test.c) */
+#include "aw_cast.h"
+/* NPC-NO-SPELLCASTING-65, the cheaper version: with spell_actor set the fighter has a record that knows two spells;
+ * every actor table read of its spells is counted (spell_reads), so the test proves the think reads none after the
+ * fight's start */
+static int spell_actor;static unsigned long spell_reads;static aw_actor_t spell_record;
+/* ACTOR-RANGED-COMBAT-MISSING-66: with ranged_actor set the fighter's record carries ARROWS rounds of AITM row 40 (an
+ * arrow, chop 2-6); every round taken off it is counted (removed); the shaft's drawn points are counted; a shot that
+ * crosses the player's front (shot_player) hits the player's edict */
+static int ranged_actor,arrows,removed,shaft_points;static edict_t *shot_player;
+aw_actor_t *AW_MwscriptActorOf(struct edict_s *e,int *row){(void)e;if(row)*row=-1;return spell_actor || ranged_actor?&spell_record:NULL;}
+int AW_ActorItems(const aw_actor_t *a,int *items,int *counts,int *equipped,int max){
+    (void)a;if(!ranged_actor || max<1 || arrows<=0)return 0;items[0]=40;counts[0]=arrows;equipped[0]=0;return 1;
+}
+int AW_ActorRemoveItem(aw_actor_t *a,int item,int count){(void)a;assert(item==40 && count==1 && arrows>0);arrows--;removed++;return 1;}
+int AW_FxParticles(const float at[3],int count,float spread,const float vel[3],float vel_rand,float life,int r,int g,int b,
+                   int gravity){(void)at;(void)spread;(void)vel;(void)vel_rand;(void)life;(void)r;(void)g;(void)b;(void)gravity;
+    shaft_points+=count;return count;}
+int AW_ActorSpells(const aw_actor_t *a,int *out,int max){
+    (void)a;if(!spell_actor || max<2)return 0;spell_reads++;out[0]=5;out[1]=6;return 2;
+}
+int AW_ActorSpellInfo(int spell,int *type,char *name,int capacity,int *cost){
+    (void)spell;if(!spell_actor)return 0;spell_reads++;
+    if(type)*type=AW_SPELL_TYPE_SPELL;if(cost)*cost=10;if(name && capacity>0)name[0]=0;return 1;
+}
+int AW_ActorSpellEffects(int spell,aw_spell_effect_t *out,int max){
+    if(!spell_actor || max<1)return 0;spell_reads++;memset(out,0,sizeof(*out));
+    out->effect=(int16_t)(spell==5?14:16);out->range=AW_RANGE_TARGET;out->magnitude_min=out->magnitude_max=10;out->duration=1;
+    return 1;
+}
+float AW_PlayerEncumbrance(float *capacity){if(capacity)*capacity=250;return 40;}   /* aw_move.c: the player's load */
+int AW_ActorSpellFlags(int spell){(void)spell;if(spell_actor)spell_reads++;return 0;}
+int AW_ActorMagicEffect(int index,aw_mgef_t *out){(void)index;if(!spell_actor)return 0;spell_reads++;memset(out,0,sizeof(*out));out->base_cost=5;return 1;}
+float AW_ActorStat(const aw_actor_t *a,int stat){(void)a;(void)stat;return 0;}
+void AW_ActorModCurrent(aw_actor_t *a,int dynamic,float value){(void)a;(void)dynamic;(void)value;}
+float AW_AnimKitCast(edict_t *e,const char *variant){(void)e;(void)variant;return -1;}
+unsigned long AW_CastActorCasts(void){return 0;}
+int AW_CastActorRelease(edict_t *caster,edict_t *target,int row,float reach){(void)caster;(void)target;(void)row;(void)reach;return -1;}
+int AW_CastReady(void){return 0;}
+float AW_DialwinEffectCostMult(void){return .5f;}
+int AW_MagicCastLookStart(int caster,int mgef,int range,float area){(void)caster;(void)mgef;(void)range;(void)area;return 0;}
+void AW_MagicCastLookRelease(int handle,int ok){(void)handle;(void)ok;}
 int AW_CompanionPickAim(void){return 0;}      /* aw_companion.c: the right button in pick mode */
 /* aw_hand_models.c: the image's hand clip table (FIRST-PERSON-HANDS-IN-C-54): a 0.9 s punch, as the old stamp gave */
 float AW_HandDuration(int clip,float fallback){(void)fallback;return clip==3?.9f:fallback;}
@@ -49,13 +93,20 @@ eval_t *GetEdictFieldValue(edict_t *e,char *name){
 }
 void SV_LinkEdict(edict_t *e,qboolean touch){(void)e;(void)touch;}
 trace_t SV_Move(vec3_t a,vec3_t mi,vec3_t ma,vec3_t b,int type,edict_t *e){
-    trace_t t;(void)mi;(void)ma;(void)type;(void)e;aw_sv_move_calls++;
+    trace_t t;(void)ma;(void)e;aw_sv_move_calls++;
     memset(&t,0,sizeof(t));t.fraction=1;VectorCopy(b,t.endpos);
     if(walled){t.startsolid=1;t.fraction=0;return t;}       /* nowhere to go: no path */
+    /* a shot (a point trace that hits bodies) crossing the player's front, from the +x side */
+    if(shot_player && type==MOVE_NORMAL && mi==vec3_origin && a[0]>shot_player->v.origin[0]+7 &&
+       b[0]<=shot_player->v.origin[0]+7){t.fraction=.5f;t.ent=shot_player;return t;}
     if(b[2]<0 && a[2]>=0){t.fraction=a[2]/(a[2]-b[2]);t.endpos[2]=0;t.plane.normal[2]=1;}
     return t;
 }
 int AW_AmbientFlags(struct edict_s *e){(void)e;return 0;}
+static int stationary;   /* HEART-OF-LORKHAN-FOLLOWS-DAGOTH-65: the fighter's record moves by no means */
+int AW_ActorStationary(struct edict_s *e){(void)e;return stationary;}
+int aw_move_werewolf;   /* the player's werewolf form (aw_move.c): never here */
+float AW_ActorCarriedWeight(const aw_actor_t *a){(void)a;return 0;}   /* the fighters here carry nothing */
 int AW_AmbientInWater(const float p[3]){(void)p;return 0;}   /* the swimmer chase's water test (never reached here) */   /* every fighter here walks (the flyer chase: test_ambient_lut.py) */
 qboolean AW_ActorStep(edict_t *e,vec3_t move,double dt){(void)dt;if(walled)return false;e->v.origin[0]+=move[0];e->v.origin[1]+=move[1];aw_sv_move_calls+=3;steps++;return true;}
 edict_t *AW_NPCTargetReach(edict_t *p,vec3_t angles,float reach){(void)p;(void)angles;assert(reach>32 && reach<64);return target;}
@@ -69,8 +120,11 @@ void AW_MusicCombat(int on){if(on)music_on++;else music_off++;}
 void AW_MusicDeath(void){music_death++;}
 double Sys_FloatTime(void){return clock_now+=.0001;}
 /* aw_anim.c engine glue: test models have no layout file (previous frames). */
+static const aw_anim_t *anim_layout;   /* DAGOTH-UR-NO-ANIMATIONS-65: a skeletal fighter's own .anm layout */
 const aw_anim_t *AW_AnimOf(edict_t *e){
-    static aw_anim_t a;int i=(int)e->v.modelindex;AW_AnimDefault(&a,i>0 && i<MAX_MODELS && sv.models[i]?sv.models[i]->numframes:1);return &a;
+    static aw_anim_t a;int i=(int)e->v.modelindex;
+    if(anim_layout)return anim_layout;
+    AW_AnimDefault(&a,i>0 && i<MAX_MODELS && sv.models[i]?sv.models[i]->numframes:1);return &a;
 }
 int aw_test_mover_on,aw_test_mover_off;static edict_t *aw_test_worn;
 int AW_AnimMover(edict_t *e,int on){if(on){if(aw_test_worn)return 0;aw_test_worn=e;aw_test_mover_on++;return 1;}if(aw_test_worn!=e)return 0;aw_test_worn=NULL;aw_test_mover_off++;return 1;}
@@ -105,6 +159,12 @@ int AW_ActorBase(int row,aw_actor_base_t *out){
     for(i=0;i<27;i++)out->skills[i]=70;              /* the combat value in every combat skill (getSkill) */
     out->fight=90;out->attack[0]=15;out->attack[1]=35;out->attack[2]=15;out->attack[3]=35;out->attack[4]=15;out->attack[5]=35;
     return 1;
+}
+/* NPC-CREATURE-COMBAT-STYLE-STATS-66: the daedroth's row equips no weapon (its own attacks stay) */
+int AW_ActorWeaponEnchant(int row,int *item){(void)row;if(item)*item=-1;return AW_ACTOR_NONE;}
+int AW_ActorItem(int item,aw_item_t *out){
+    if(item!=40)return 0;
+    memset(out,0,sizeof(*out));out->kind=AWK_WEAPON;out->type=12;out->damage[0]=2;out->damage[1]=6;return 1;
 }
 static struct {char *name;xcommand_t f;} commands[8];static int command_count;
 static cvar_t *cvars[16];static int cvar_count;
@@ -330,9 +390,11 @@ int main(void){
         for(i=0;i<3000 && !AW_CombatStats()->npc_flees;i++)tick(1);
         assert(AW_CombatStats()->npc_flees>=1 && voices[AW_VOICE_FLEE]>=1);
         walled=0;x0=npc->v.origin[0];gap0=p->v.origin[0]-x0;
-        tick(25);assert(p->v.origin[0]-npc->v.origin[0]>gap0+50);           /* runs away, no warp */
+        /* runs away at its own run (ACTOR-MECHANICS-USE-STATS-66: Speed 10, Athletics 5: 110 x 1.80 = 198 original units,
+         * 49.5 game units a second: about 22.8 in these 25 ticks; the old fixed 200 went about 92), no warp */
+        tick(25);assert(p->v.origin[0]-npc->v.origin[0]>gap0+18 && p->v.origin[0]-npc->v.origin[0]<gap0+28);
         tick(25);x0=npc->v.origin[0];tick(50);assert(npc->v.origin[0]==x0);   /* stands and watches */
-        tick(100);assert(p->v.origin[0]-npc->v.origin[0]<gap0);              /* re-decided after 3 s: back in */
+        tick(200);assert(p->v.origin[0]-npc->v.origin[0]<gap0);              /* re-decided after 3 s: back in (at its own run) */
     }
     /* the player dies: result lost, the death track, no battle music switching while dead */
     {
@@ -466,6 +528,16 @@ int main(void){
      AW_CombatClear();guard_flags=2;                                /* essential */
      assert(AW_CombatTestEngage(resident,1));
      assert(boxes==shown_before+1 && !strcmp(box_text,"Test essential words one line."));
+     /* ESSENTIAL-DEATH-MESSAGE-66: a death of the actor record alone (a script, a spell, a fall) shows it too, once per
+      * death: the record's report of the same reference right after is not a second box; another reference's is */
+     AW_CombatEssentialKilled(4242,"Caius");assert(boxes==shown_before+2 && !strcmp(box_text,"Test essential words one line."));
+     AW_CombatEssentialKilled(4242,"Caius");assert(boxes==shown_before+2);
+     AW_CombatEssentialKilled(4243,NULL);assert(boxes==shown_before+3);
+     /* OUTDOOR-DEAD-BODY-GONE-66: a saved death laid down again (a room's, the home map's or a joining cell's body) is
+      * the same corpse but no new death: no box, even long after the last one */
+     AW_CombatClear();guard_flags=2;realtime+=100;
+     assert(AW_CombatLayCorpse(resident));
+     assert(boxes==shown_before+3 && AW_CombatSlotState(resident,NULL)==2);
      {int essential=0;assert(AW_CombatEssentialRecord("a guard",&essential) && essential);
       guard_flags=0;assert(AW_CombatEssentialRecord("a guard",&essential) && !essential);
       assert(!AW_CombatEssentialRecord("nobody",&essential) && !essential);}
@@ -494,6 +566,34 @@ int main(void){
      for(i=0;i<400;i++){tick(1);seen++;if(npc->v.frame>top)top=(int)npc->v.frame;assert(npc->v.frame>=0 && npc->v.frame<16);}
      assert(seen==400 && top>=0);
      npc->v.modelindex=1;sv.models[2]=NULL;AW_CombatClear();}
+    /* HEART-OF-LORKHAN-FOLLOWS-DAGOTH-65: a fighter whose creature record can move by no means (the Heart of Lorkhan)
+     * stays where it stands 200 units off for 10 s; the same fighter able to walk closes in */
+    {float x0;
+     AW_CombatClear();p->v.health=60;p->v.button0=0;stationary=1;
+     npc->v.solid=SOLID_BBOX;npc->v.origin[0]=p->v.origin[0]-200;npc->v.origin[1]=p->v.origin[1];x0=npc->v.origin[0];
+     assert(AW_CombatActorLoad("mevil molor",&f) && AW_CombatEngage(npc,&f,NULL));
+     tick(500);assert(npc->v.origin[0]==x0 && npc->v.origin[1]==p->v.origin[1]);
+     AW_CombatClear();stationary=0;
+     assert(AW_CombatEngage(npc,&f,NULL));tick(100);assert(npc->v.origin[0]>x0+50);
+     AW_CombatClear();printf("stationary fighter ok: stayed at %.0f, the walker moved\n",(double)x0);}
+    /* DAGOTH-UR-NO-ANIMATIONS-65: a skeletal fighter (Dagoth Ur's table layout from tools/creature_tables.py, with
+     * its spellcast group) plays its own run, attack and cast frames, not the idle's; without a cast group the cast
+     * stands on the idle */
+    {static aw_anim_t a;int base=-1,count=-1;
+     static const char dagoth[]="idle:30:8:0.1250 walk:116:9:0.1289:46.59 run:133:8:0.1289:75.75 "
+         "attack:96:8:0.1250:0.400 hit:249:5:0.1467 death:320:11:0.1333 cast:141:12:0.1250 @attack:2:roar";
+     assert(AW_AnimParse(&a,dagoth,400) && a.from_layout && a.g[AW_ANIM_CAST].present);
+     anim_layout=&a;AW_CombatClear();p->v.health=60;p->v.button0=0;
+     assert(AW_CombatActorLoad("mevil molor",&f) && AW_CombatEngage(npc,&f,NULL));
+     assert(AW_CombatGroupFrames(npc,"run",&base,&count) && base==133 && count==8);
+     assert(AW_CombatGroupFrames(npc,"attack",&base,&count) && base==96 && count==8);
+     assert(AW_CombatGroupFrames(npc,"cast",&base,&count) && base==141 && count==12);
+     assert(AW_CombatGroupFrames(npc,"idle",&base,&count) && base==30 && count==8);
+     assert(!AW_CombatGroupFrames(npc,"swim",&base,&count) && !AW_CombatGroupFrames(resident,"run",&base,&count));
+     AW_CombatClear();
+     assert(AW_AnimParse(&a,"idle:30:8:0.1250 run:133:8:0.1289:75.75 attack:96:8:0.1250:0.400",400));
+     assert(AW_CombatEngage(npc,&f,NULL) && AW_CombatGroupFrames(npc,"cast",&base,&count) && base==30 && count==8);
+     AW_CombatClear();anim_layout=NULL;printf("skeletal fighter groups ok: run, attack and cast found\n");}
     /* commands and cost */
     run("aw_combat_cmd");run("aw_combat_cmd readout off");run("aw_combat_cmd calm");run("aw_combat_cmd off");
     assert(!AW_CombatEngage(npc,&f,NULL));
@@ -525,6 +625,48 @@ int main(void){
      assert(music_on==0);
      AW_CombatClear();
      printf("actor vs actor ok: %ld ticks\n",(long)k);}
+    /* NPC-NO-SPELLCASTING-65, the cheaper version: a fighter that knows two spells reads them (list, row, effects,
+     * flags, MGEF: 1 + 4 x 2 reads) once, at its first choice; the next choices (one a second) read nothing */
+    {aw_fighter_t a;unsigned long at_start,stats_reads;int k;
+     AW_CombatClear();p->v.health=60;p->v.button0=0;npc->v.solid=SOLID_BBOX;npc->v.health=0;
+     npc->v.origin[0]=1000;npc->v.origin[1]=0;p->v.origin[0]=300;
+     assert(AW_CombatActorLoad("mevil molor",&a));
+     spell_actor=1;spell_reads=0;stats_reads=AW_CombatStats()->npc_spell_reads;
+     assert(AW_CombatEngage(npc,&a,NULL));
+     assert(spell_reads==0);                                   /* nothing read before its first think */
+     for(k=0;k<100 && spell_reads==0;k++)tick(1);
+     at_start=spell_reads;
+     assert(at_start==9 && AW_CombatStats()->npc_spell_reads-stats_reads==9);
+     for(k=0;k<600;k++)tick(1);                                /* several more choices */
+     assert(spell_reads==at_start && AW_CombatStats()->npc_spell_reads-stats_reads==9);
+     AW_CombatClear();
+     /* a new fight reads them again (the slot is new) */
+     assert(AW_CombatEngage(npc,&a,NULL));
+     for(k=0;k<100 && spell_reads==at_start;k++)tick(1);
+     assert(spell_reads==2*at_start);
+     AW_CombatClear();spell_actor=0;
+     printf("spell cache ok: %lu reads at the fight's start, none in the next %ld ticks\n",at_start,(long)600);}
+    /* ACTOR-RANGED-COMBAT-MISSING-66: an archer (a bow on its sheet, 3 arrows on its record) 200 units away keeps its
+     * place and shoots: each shot takes one arrow off the record, flies (drawn as a shaft) and hits the player (a sure
+     * Marksman); a shot that crosses nobody misses; out of arrows it closes in by hand */
+    {aw_fighter_t a;int k;float x0,h0;
+     AW_CombatClear();p->v.health=1000;p->v.button0=0;npc->v.solid=SOLID_BBOX;npc->v.health=0;
+     npc->v.origin[0]=500;npc->v.origin[1]=0;p->v.origin[0]=300;x0=npc->v.origin[0];h0=p->v.health;
+     assert(AW_CombatActorLoad("mevil molor",&a));
+     a.weapon=10;a.weapon_skill=AW_SK_MARKSMAN;a.skills[AW_SK_MARKSMAN]=200;a.shield=0;
+     a.damage[0][0]=5;a.damage[0][1]=20;a.reach=1;a.speed=1;
+     ranged_actor=1;arrows=3;removed=0;shaft_points=0;shot_player=p;
+     assert(AW_CombatEngage(npc,&a,NULL));
+     for(k=0;k<3000 && removed<3;k++)tick(1);
+     assert(removed==3 && arrows==0 && npc->v.origin[0]==x0);     /* three shots from where it stood */
+     tick(300);                                                   /* the last one lands */
+     assert(shaft_points>0 && p->v.health<h0);
+     shot_player=NULL;
+     for(k=0;k<600 && npc->v.origin[0]==x0;k++)tick(1);
+     assert(npc->v.origin[0]<x0);                                 /* out of arrows: it closes in */
+     printf("ranged ok: 3 arrows shot from %.0f, health %.0f -> %.0f, shaft points %ld\n",(double)x0,(double)h0,
+            (double)p->v.health,(long)shaft_points);
+     AW_CombatClear();ranged_actor=0;p->v.health=60;}
     printf("combat ok: %ld steps, %ld sounds\n",(long)steps,(long)sounds);
     AW_CombatClear();assert(items_hidden>=items_shown);   /* every release hides them */
     return 0;

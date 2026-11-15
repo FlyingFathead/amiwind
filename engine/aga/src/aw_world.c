@@ -124,6 +124,7 @@ static void row_name(int i,char *out){AW_TerrainName(row_terrain(i),out);}
 static int load_directory(void){
     FILE *f=NULL,*g=NULL;byte header[8],row[52];int size,gsize,n=0,m=0,i,k,t;terrain_region_t slots[2];
     if(attempted)return count>0;
+    memset(slots,0,sizeof(slots));   /* a town row has no cover: zero, never the stack's (TOWN-OUTDOOR-SCRIPTS-NOT-ATTACHED-66) */
     attempted=1;size=COM_FOpenFile("world/regions.awr",&f);
     gsize=COM_FOpenFile("world/regions-sl.awr",&g);
     if(!f && !g)return 0;
@@ -166,6 +167,15 @@ bad:
 static int world_town(const char *name){
     int t=AW_TownFind(name);const aw_town_t *row=AW_Town(t);
     return row && (row->world_slot>=0 || row->handoff)?t:-1;
+}
+/* OUTDOOR-CREATURES-MISSING-66: the open-world frame of town T (its map's origin and core, the same rows AW_CellMap
+ * reads), 1 when ready. The actor table's creatures of the cells inside the core join with the town map. */
+int AW_TownFrame(const char *map,float *origin,float *core){
+    int k,t=AW_TownFind(map);
+    if(t<0 || t>=AW_TOWN_COUNT || !load_directory() || !town_ready[t])return 0;
+    for(k=0;k<3;k++)origin[k]=towns[t].origin[k];
+    for(k=0;k<4;k++)core[k]=towns[t].core[k];
+    return 1;
 }
 static terrain_region_t *source(const char *name){
     int i=AW_TerrainId(name),t=world_town(name);
@@ -232,11 +242,17 @@ int AW_WorldRegionCentres(float *xy,int max){
     }
     return count;
 }
-/* Inside the map's terrain: a region row's cover, else the loaded CHIM frame's chunk grid (the same 24-unit margin). */
+/* Inside the map's terrain: a region row's cover, else the loaded CHIM frame's chunk grid (the same 24-unit margin).
+ * TOWN-OUTDOOR-SCRIPTS-NOT-ATTACHED-66: a town's row (a directory slot or a table frame) carries an origin and a core
+ * but no cover, so the cover test said no for every point of a town map and the script host (aw_mwhost.c attach_map)
+ * attached no placement without an edict outdoors there: the journal that runs the falling mage's script near Seyda
+ * Neen, and every such scripted object of a town. A town map: the loaded CHIM frame's grid when the town is on CHIM,
+ * else the town's core. */
 int AW_WorldContains(const char *name,const float *local){
     terrain_region_t *r=source(name);
-    if(r)return inside(local,r->cover,-24);
-    return aw_world_chim_contains && aw_world_chim_contains(name,local);
+    if(r && r->cover[0]<r->cover[2])return inside(local,r->cover,-24);
+    if(aw_world_chim_contains && aw_world_chim_contains(name,local))return 1;
+    return r?inside(local,r->core,0):0;
 }
 int AW_WorldDestination(const char *name,const float *local,char *target,float *arrival){
     terrain_region_t *from,*to=NULL;float global[3],point[3];int i,k,id;

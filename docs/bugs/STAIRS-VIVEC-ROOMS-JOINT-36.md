@@ -6,7 +6,7 @@
 
 - Reported with v0.0.36-dev4 at 2026-10-11 08:37 +0300: found: whole-city Vivec with rooms try2 3734cf5, 6 flight steps in vdi012, voi025, vri000
 - Reported with v0.0.36-dev5 at 2026-10-11 09:41 +0300: PERSISTING: whole-city Vivec with rooms f6e08fe (dev5), accepted by ID for the dev MiniWind: same 6 flight steps
-- Reported with v0.0.36-dev5 at 2026-10-11 09:56 +0300: maintainer order (TG): fix for rc1
+- Reported with v0.0.36-dev5 at 2026-10-11 09:56 +0300: maintainer order: fix for rc1
 
 <!-- END GENERATED PERSISTING -->
 

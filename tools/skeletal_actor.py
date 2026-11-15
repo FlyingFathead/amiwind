@@ -1301,6 +1301,22 @@ def weld_shared(frames, faces, uv, skin):
     return frames[:, keep], rank[inverse][np.asarray(faces)], uv[keep], skin
 
 
+def fit_skin_rows(skin, uv, rows=480):
+    """SKIN cut to the rows its texture coordinates use (a multiple of 16), when the bake's skin is taller than the
+    renderer takes (ROWS: its skin height limit, engine/aga/src/d_iface.h MAX_LBM_HEIGHT, as npc_lod.SKIN_ROWS) but
+    every face tile lies within ROWS. npc_geometry._bake sizes a skin past 512 faces for its face_limit (1,024 faces
+    = 512 rows), though 32 tiles a row put 960 faces within 480 rows; uncut, every budget over 512 faces was refused
+    as 'Unsupported alias skin' (Dagoth Ur's ladder fell from 1000 to 480, DAGOTH-UR-NO-ANIMATIONS-65). A skin within
+    ROWS, or one whose tiles reach past it, is returned unchanged. The limit is a default, not a module constant: a
+    module-level line is import-time code of every unit key that reaches this module (BUILD-UNIT-KEYS-REACH-64)."""
+    if skin.height <= rows or not len(uv):
+        return skin
+    used = (int(np.asarray(uv)[:, 1].max()) // 16 + 1) * 16
+    if used > rows:
+        return skin
+    return skin.crop((0, 0, skin.width, used))
+
+
 def skeletal_from_shapes(shapes, materials, textures, palette, sources, rest_world, actor_scale, table_bytes,
                          bone_names, table_path=SKEL_TABLE_PATH, budgets=RESIDENT_BUDGETS, every=BOX_EVERY,
                          vertex_limit=SKEL_VERTEX_LIMIT, parents=None, topology='reduced', **bake_args):
@@ -1310,13 +1326,17 @@ def skeletal_from_shapes(shapes, materials, textures, palette, sources, rest_wor
     input to learn each baked vertex's shape: frame 0 moved by (shape + 1) x SHAPE_TAG along x. bake carries a
     reduced vertex into every frame by the best-fit motion of its nearest original triangle, which is exact for a
     pure translation, so the added frame minus frame 0 names the shape; reference_frames keeps the face quotas of
-    the frames without it. The box: the model's vertices posed at box_frames of the table and scaled by the actor.
+    the frames without it. fit_skin=True (in BAKE_ARGS, default off): cut a skin taller than the renderer takes to the
+    rows its tiles use (fit_skin_rows; the room-resident Dagoth Ur, creature_tables); a keyword in BAKE_ARGS, not in
+    the signature, whose defaults are import-time code of every unit key reaching this module
+    (BUILD-UNIT-KEYS-REACH-64). The box: the model's vertices posed at box_frames of the table and scaled by the actor.
     parents: the skeleton's {node: parent}; given, a shape on nodes the table lacks rides their nearest kept
     ancestors (onto_kept: the stick figure). topology 'source' (the first-person arm parts, FP-ARMS-PARTS-COST-59):
     no reduction and no face tiles; the authored vertices and texture coordinates in a repeated-texture atlas
     (hand_geometry.bake_source_hands, as the baked arms), then welded (weld_shared), so a vertex is posed once
     however many triangles use it. Returns (MDL bytes, report)."""
     from npc_geometry import bake
+    fit_skin = bake_args.pop('fit_skin', False)
     if topology not in ('reduced', 'source'):
         raise ValueError('Unknown skeletal topology %r' % (topology,))
     if len(sources) != len(shapes):
@@ -1366,6 +1386,8 @@ def skeletal_from_shapes(shapes, materials, textures, palette, sources, rest_wor
     if len(rest_model) > vertex_limit:
         raise ValueError('A skeletal model takes at most %d vertices (the alias stream reader): %d'
                          % (vertex_limit, len(rest_model)))
+    if fit_skin:
+        skin_image = fit_skin_rows(skin_image, uv)
     tag = frames[-1] - rest_model
     shape_of = np.rint(tag[:, 0] / SHAPE_TAG).astype(int) - 1
     if np.any(np.abs(tag[:, 0] - (shape_of + 1) * SHAPE_TAG) > 1e-3) or np.any(np.abs(tag[:, 1:]) > 1e-3) or \

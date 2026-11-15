@@ -1,0 +1,21 @@
+{
+ "records": 3437,
+ "placed references": 4798,
+ "reference styles": {
+  "bow": 119,
+  "creature attack": 343,
+  "crossbow": 20,
+  "hand to hand": 1062,
+  "melee": 1839,
+  "thrown": 54
+ },
+ "casting fighters": 632,
+ "match": {
+  "same": 3437
+ },
+ "match (references)": {
+  "same": 4798
+ },
+ "mismatches by styles": {},
+ "label": "this tree"
+}

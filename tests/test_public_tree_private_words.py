@@ -8,6 +8,7 @@ public file list (tools/release-files.json) and every file git tracks is checked
 binary, any case) for the names of the private working folder and of tools the public text never names, and by its
 file name for assistant instruction files. The words and names are kept in pieces here so this file holds none whole."""
 import json
+import re
 import subprocess
 import sys
 import unittest
@@ -21,6 +22,11 @@ WORDS = tuple(w.encode() for w in bug_register.PRIVATE_WORDS)     # one list, ke
 INSTRUCTION_FILES = frozenset(n.lower() for n in ('AGE' + 'NTS.md', 'GEM' + 'INI.md', '.cursor' + 'rules',
                                                   '.windsurf' + 'rules', '.cline' + 'rules',
                                                   'co' + 'pilot-instructions.md', 'cla' + 'ude.md'))
+
+
+# the private channels, kept in pieces so this file names none whole
+CHANNEL_FORMS = re.compile('(?i:tele' + 'gram|gate' + 'way-to-' + 'harry|t' + 'g[ -](?:client|gate' + 'way|bridge))|'
+                           '(?<![A-Za-z0-9_])T' + 'G(?![A-Za-z0-9_])')
 
 
 def public_files():
@@ -53,6 +59,31 @@ class PublicTreeWords(unittest.TestCase):
             if found:
                 bad.append('%s: holds %s' % (name, ', '.join(found)))
         self.assertEqual(bad, [], 'private words in the public tree:\n' + '\n'.join(bad))
+
+    def test_no_private_channel_is_named(self):
+        """Who raised something is a role and a date, never the private channel (PUBLIC-NO-PRIVATE-COMMS-66). The word
+        forms match in any case; the two capital letters only as a whole word, so the console alias in lower case and
+        an identifier never hit."""
+        forms = CHANNEL_FORMS
+        bad = []
+        for name in public_files():
+            path = ROOT / name
+            if not path.is_file():
+                continue
+            data = path.read_bytes()
+            if b'\0' in data:
+                continue
+            for number, line in enumerate(data.decode('utf-8', 'replace').splitlines(), 1):
+                if forms.search(line):
+                    bad.append('%s:%d' % (name, number))
+        self.assertEqual(bad, [], 'a private channel is named in the public tree:\n' + '\n'.join(bad[:40]))
+
+    def test_the_channel_check_finds_each_form(self):
+        forms = CHANNEL_FORMS
+        for text in ('on T' + 'G (25 October)', 'Tele' + 'gram', 't' + 'g client', 'T' + 'G 17:27'):
+            self.assertTrue(forms.search(text), text)
+        for text in ('| togglegrid | t' + 'g | Console |', 'THGT.encode', 'a T' + 'GA file'):
+            self.assertFalse(forms.search(text), text)
 
     def test_no_assistant_instruction_file(self):
         bad = [name for name in public_files() if Path(name).name.lower() in INSTRUCTION_FILES]

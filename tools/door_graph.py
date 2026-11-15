@@ -79,7 +79,7 @@ TELVANNI_KIT = re.compile(r'(^|/)in_t_')
 # What sets a room aside (v0.0.48, the maintainer's decisions of 23 October 2026: water, lava and Levitate-only rooms
 # are converted like any room and keep a note; the size limit is the zone of the 32 MiB minimum machine)
 HARD_REASONS = ('unreachable', 'teleport_only', 'behaves_exterior', 'lava_under_water', 'over_limit')
-NOTES = ('levitate_only', 'water', 'lava', 'zone_over_16mb')
+NOTES = ('levitate_only', 'water', 'lava', 'zone_over_16mb', 'behaves_exterior')
 ROOM_STATES = ('on_chim_rooms', 'room_map', 'converted', 'not_started', 'hard_case', 'test_cell', 'teleport_only',
                'no_entrance')
 TOWN_MIN_ROOMS = 4                 # a named exterior cell with fewer rooms behind its doors is not a town (batch plan)
@@ -95,10 +95,10 @@ TEST_CELLS = frozenset(n.casefold() for n in (
     "Mark's Script Testing Cell", "Mark's Vampire Test Cell", 'Redoran interior', 'Redoran interior2', 'ToddTest'))
 # The expansions' rooms wait for their land: one later batch per master, with the reason it waits.
 LATER = collections.OrderedDict((
-    ('Tribunal.esm', ('Mournhold', "Mournhold is reached only by script (Tribunal's teleport): its rooms wait for the "
-                                   'scripts step (roadmap step 6)')),
-    ('Bloodmoon.esm', ('Solstheim', "Solstheim's exterior (Bloodmoon) is not on CHIM yet: its rooms come in with the "
-                                    'island (roadmap step 7)'))))
+    ('Tribunal.esm', ('Mournhold', "Mournhold is reached by script (Tribunal's teleport): its rooms are batched with "
+                                   'plan --layers (the Tribunal layer, CHIM-SOL-FLORA-PATH-65)')),
+    ('Bloodmoon.esm', ('Solstheim', "Solstheim's rooms (Bloodmoon) are batched with plan --layers (the Bloodmoon "
+                                    'layer, beside its exterior cells, CHIM-SOL-FLORA-PATH-65)'))))
 
 
 # ------------------------------------------------------------------ small helpers
@@ -800,7 +800,13 @@ def build_graph(data_files, jobs=None, mesh_cache=None, warn=print, engine_sourc
         if inf['access'] == 'door' and k not in on_foot:
             notes.append('levitate_only')
         if room['behaves_exterior']:
+            # INTERIOR-NO-AMBI-66: a cell flagged "behave like exterior" (Tribunal's Mournhold plazas) is an exterior
+            # for the original and the reference engine: no AMBI, lit by the region's weather and the moving sun
+            # (OpenMW scene.cpp configureAmbient only for !quasi-exterior; worldimp.cpp updateWeather). It is not a
+            # room: the room stages leave it out and list it, waiting for the Mournhold exterior work. No cell of the
+            # base game carries the flag, so the base plan is unchanged.
             hard.append('behaves_exterior')
+            notes.append('behaves_exterior')
         if water:
             notes.append('water')
         if ct['lava']:
@@ -875,6 +881,8 @@ def our_rooms(config_dir):
 def parity_state(room):
     """The state of a room no door reaches (test_cell, teleport_only, no_entrance), else None."""
     hard = room.get('hard') or ()
+    if 'behaves_exterior' in hard:
+        return None        # an exterior-like cell is no room at all (INTERIOR-NO-AMBI-66): set aside, never parity
     if not any(h in hard for h in PARITY_REASONS):
         return None
     if room['name'].casefold() in TEST_CELLS:
@@ -907,13 +915,43 @@ def parity_rows(rooms):
             for r in sorted(rooms, key=parity_order)]
 
 
-def plan(graph, config_dir=None, batch_rooms=40, chim_rooms=()):
-    """Vvardenfell rooms to convert now, in batches in a player's order, with the store growth of each batch."""
+def plan(graph, config_dir=None, batch_rooms=40, chim_rooms=(), layers=()):
+    """Vvardenfell rooms to convert now, in batches in a player's order, with the store growth of each batch.
+    LAYERS: expansion masters (Tribunal.esm, Bloodmoon.esm) whose rooms join the plan as their own batches after the
+    island's, by the same order and parity rule (CHIM-SOL-FLORA-PATH-65); without them the plan is as before."""
+    layers = tuple(m for m in LATER if m in set(layers))
+    if layers:
+        base = plan(graph, config_dir, batch_rooms, chim_rooms)
+        for master in layers:
+            sub = {'rooms': [r for r in graph['rooms'] if not in_vvardenfell_plan(r) and later_master(r) == master],
+                   'masters': graph['masters'], '_layer': True}
+            for key in ('meshes', 'textures', 'mesh_textures'):
+                if key in graph:
+                    sub[key] = graph[key]
+            part = plan(sub, config_dir, batch_rooms, chim_rooms)
+            for b in part['batches']:
+                b['batch'] = len(base['batches']) + 1
+                b['master'] = master
+                b['store_growth_bytes'] = b['store_after_bytes'] = None   # a layer's store is its own (per layer)
+                base['batches'].append(b)
+            base['later'] = [b for b in base['later'] if b['master'] != master]
+            base['summary']['later'].pop(LATER[master][0], None)
+            base['summary']['batches'] = len(base['batches'])
+            # the layer's rooms left out (exterior-like cells and the other hard cases), listed with their master
+            for row in part['aside']:
+                base['aside'].append(dict(row, master=master))
+                if 'behaves_exterior' in row['reasons']:
+                    base.setdefault('exterior_like', []).append(
+                        {'cell': row['room'], 'master': master,
+                         'state': 'an exterior-like cell, waiting for the Mournhold exterior work'})
+            base['summary'].setdefault('layers', {})[LATER[master][0]] = part['summary']['rooms']
+        base['layers'] = list(layers)
+        return base
     in_game = our_rooms(config_dir) if config_dir else {}
     chim_rooms = {n.casefold() for n in chim_rooms}
     # Vvardenfell: the rooms whose door chain starts there, and the base game's rooms with no island (reached by
     # script or not at all: they can only be hard cases).
-    rooms = [r for r in graph['rooms'] if in_vvardenfell_plan(r)]
+    rooms = [r for r in graph['rooms'] if in_vvardenfell_plan(r) or graph.get('_layer')]
     ready = [r for r in rooms if not r['hard']]
     parity = [r for r in rooms if parity_state(r)]
     aside = [r for r in rooms if r['hard'] and not parity_state(r)]
@@ -1073,12 +1111,16 @@ def main(argv=None):
     p.add_argument('--config-dir', type=Path, default=ROOT / 'config', help='scene lists: the rooms in the game')
     p.add_argument('--chim-rooms', type=Path, help='a chim-rooms-receipt.json: the rooms already on CHIM rooms')
     p.add_argument('--batch-rooms', type=int, default=40)
+    p.add_argument('--layers', default='', help='comma list of expansion masters (Tribunal.esm, Bloodmoon.esm) whose '
+                   'rooms join the plan as their own batches after the island (default: none, the island alone)')
     p.add_argument('--stamp', default='')
     r = sub.add_parser('room-batches', help='the public room list of a batch plan (config/room-batches.json)')
     r.add_argument('--plan', type=Path, required=True)
     r.add_argument('--graph', type=Path, required=True)
     r.add_argument('--out', type=Path, required=True)
     r.add_argument('--previous', type=Path, help='the list it replaces: its rooms keep their ids (save IDs)')
+    r.add_argument('--append-layers', action='store_true', help='keep the previous list\'s island batches exactly and '
+                   'append (or make again) the expansion batches of a plan --layers plan')
     a = ap.parse_args(argv)
     if a.cmd == 'room-batches':
         import room_batches
@@ -1087,7 +1129,12 @@ def main(argv=None):
         if plan_doc.get('format') != PLAN_FORMAT or graph.get('format') != FORMAT:
             raise SystemExit('room-batches needs an %s plan and an %s graph' % (PLAN_FORMAT, FORMAT))
         previous = json.loads(a.previous.read_text(encoding='utf-8')) if a.previous and a.previous.is_file() else None
-        doc = room_batches.from_plan(plan_doc, graph, previous)
+        if a.append_layers:
+            if previous is None:
+                raise SystemExit('room-batches --append-layers needs --previous (the list whose island batches stay)')
+            doc = room_batches.append_layers(plan_doc, graph, previous)
+        else:
+            doc = room_batches.from_plan(plan_doc, graph, previous)
         a.out.write_text(room_batches.dumps(doc), encoding='utf-8', newline='\n')
         print('room list: %d batches, %d rooms, next id %d' % (len(doc['batches']),
                                                                 sum(len(b['rooms']) for b in doc['batches']),
@@ -1111,7 +1158,8 @@ def main(argv=None):
     chim = []
     if a.chim_rooms:
         chim = [r.get('cell') or r.get('room') for r in json.loads(a.chim_rooms.read_text())['rooms']]
-    doc = plan(graph, a.config_dir, a.batch_rooms, [c for c in chim if c])
+    layers = [n.strip() for n in (getattr(a, 'layers', None) or '').split(',') if n.strip()]
+    doc = plan(graph, a.config_dir, a.batch_rooms, [c for c in chim if c], layers)
     write_json(a.out, doc)
     if a.md:
         a.md.write_text(plan_markdown(doc, a.stamp), encoding='utf-8', newline='\n')

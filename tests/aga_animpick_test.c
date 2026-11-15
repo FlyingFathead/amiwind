@@ -113,6 +113,51 @@ int main(void) {
     assert(AW_PickPlayerState(1,2,1,AW_PM_FORWARD,0,0,1,0,&s) && !strcmp(pick(s,&o),"jump1h") && !strcmp(o.loop_start,"loop start"));
     assert(AW_PickPlayerState(10,2,1,AW_PM_NONE,0,0,0,0,&s) && !strcmp(pick(s,&o),"idlecrossbow"));
     assert(AW_PickPlayerState(9,3,1,AW_PM_NONE,0,0,0,0,&s) && !strcmp(pick(s,&o),"bowandarrow") && !strcmp(o.start,"shoot start"));
+    /* PLAYER-CASTING-59: the player's spell stance (magic ready): the open hands, raising, the cast by range */
+    assert(AW_PickPlayerState(AW_PW_SPELL,2,1,AW_PM_NONE,0,0,0,0,&s) && !strcmp(pick(s,&o),"idlespell"));
+    assert(AW_PickPlayerState(AW_PW_SPELL,1,1,AW_PM_NONE,0,0,0,0,&s) && !strcmp(pick(s,&o),"spellcast") && !strcmp(o.start,"equip start"));
+    assert(AW_PickPlayerState(AW_PW_SPELL,4,0,AW_PM_NONE,0,0,0,0,&s) && !strcmp(pick(s,&o),"spellcast") && !strcmp(o.start,"unequip start"));
+    assert(AW_PickPlayerState(AW_PW_SPELL,3,1,AW_PM_NONE,0,0,0,0,&s));
+    s.range=AW_PR_TARGET;assert(!strcmp(pick(s,&o),"spellcast") && !strcmp(o.start,"target start") && !strcmp(o.stop,"target stop"));
+    s.range=AW_PR_SELF;assert(!strcmp(pick(s,&o),"spellcast") && !strcmp(o.start,"self start"));
+    assert(!AW_PickPlayerState(AW_PW_SPELL,2,1,AW_PM_NONE,0,0,0,1,&s));             /* swimming: no stance */
+    {   /* PLAYER-ANIM-GROUPS-NOT-PLAYED-66: the player body's sneak, turn on the spot, hit, knockdown and knockout, each
+         * action and the group it selects (OpenMW character.cpp refreshMovementAnims / refreshHitRecoilAnims) */
+        aw_pick_player_t in;int k;
+        memset(&in,0,sizeof(in));in.weapon=AW_PW_NONE;
+        assert(!AW_PickPlayerBody(&in,&s));                                          /* nothing: the body's own layout */
+        in.sneak=1;assert(AW_PickPlayerBody(&in,&s) && !strcmp(pick(s,&o),"idlesneak") && o.loop);   /* sneak idle */
+        in.move=AW_PM_FORWARD;assert(AW_PickPlayerBody(&in,&s) && !strcmp(pick(s,&o),"sneakforward"));
+        in.move=AW_PM_BACK;assert(AW_PickPlayerBody(&in,&s) && !strcmp(pick(s,&o),"sneakback"));
+        in.move=AW_PM_LEFT;assert(AW_PickPlayerBody(&in,&s) && !strcmp(pick(s,&o),"sneakleft"));
+        in.move=AW_PM_RIGHT;in.run=1;assert(AW_PickPlayerBody(&in,&s) && !strcmp(pick(s,&o),"sneakright"));   /* no run sneaking */
+        in.move=AW_PM_NONE;in.run=0;in.turn=AW_PM_TURNLEFT;
+        assert(AW_PickPlayerBody(&in,&s) && !strcmp(pick(s,&o),"idlesneak"));       /* no turning while sneaking */
+        in.sneak=0;assert(AW_PickPlayerBody(&in,&s) && !strcmp(pick(s,&o),"turnleft"));    /* turn on the spot */
+        in.turn=AW_PM_TURNRIGHT;assert(AW_PickPlayerBody(&in,&s) && !strcmp(pick(s,&o),"turnright"));
+        in.move=AW_PM_FORWARD;assert(!AW_PickPlayerBody(&in,&s));                   /* walking: no turn (the body's walk) */
+        in.move=AW_PM_NONE;in.swim=1;assert(!AW_PickPlayerBody(&in,&s));in.swim=0;   /* in water: the body's own swim */
+        in.hand=3;in.goal=1;assert(!AW_PickPlayerBody(&in,&s));in.hand=0;in.goal=0;  /* the punch layer stays */
+        /* the drawn stance: its own turn and the sneak gaits */
+        in.weapon=1;in.hand=2;in.goal=1;in.turn=AW_PM_TURNLEFT;
+        assert(AW_PickPlayerBody(&in,&s) && !strncmp(pick(s,&o),"turnleft",8));
+        in.turn=0;in.sneak=1;in.move=AW_PM_FORWARD;
+        assert(AW_PickPlayerBody(&in,&s) && !strncmp(pick(s,&o),"sneakforward",12));
+        in.move=AW_PM_NONE;assert(AW_PickPlayerBody(&in,&s) && !strcmp(pick(s,&o),"idlesneak"));
+        in.sneak=0;in.weapon=AW_PW_SPELL;in.turn=AW_PM_TURNRIGHT;
+        assert(AW_PickPlayerBody(&in,&s) && !strcmp(pick(s,&o),"spellturnright"));  /* the spell stance turning */
+        in.turn=0;
+        /* the hit recovery: hit1..hitN by the roll, over any stance */
+        in.react=AW_PE_HIT;
+        for(k=0;k<5;k++){char want[8];in.roll=k;assert(AW_PickPlayerBody(&in,&s) && s.event==AW_PE_HIT);
+            pick(s,&o);snprintf(want,sizeof(want),"hit%d",k%5+1);assert(!strncmp(o.group,"hit",3));
+            if(has(NULL,want))assert(!strcmp(o.group,want));}
+        in.weapon=AW_PW_NONE;in.hand=0;in.goal=0;assert(AW_PickPlayerBody(&in,&s) && !strncmp(pick(s,&o),"hit",3));
+        in.react=AW_PE_KNOCKDOWN;assert(AW_PickPlayerBody(&in,&s) && !strcmp(pick(s,&o),"knockdown"));
+        in.react=AW_PE_KNOCKOUT;assert(AW_PickPlayerBody(&in,&s) && !strcmp(pick(s,&o),"knockout") && !strcmp(o.loop_start,"loop start"));
+        in.weapon=7;in.hand=3;in.goal=1;assert(AW_PickPlayerBody(&in,&s) && !strcmp(pick(s,&o),"knockout"));   /* over a swing */
+        in.react=AW_PE_KNOCKDOWN;in.swim=1;assert(AW_PickPlayerBody(&in,&s) && s.swim && !strcmp(pick(s,&o),"swimknockdown"));
+    }
     {   /* aiwander.cpp getRandomIdle: the dancers' chances; one roll per idle, the highest under its chance wins */
         static const unsigned char dancer[8]={20,20,20,10,0,0,0,80},r1[8]={50,50,50,50,50,50,50,60},r2[8]={15,90,90,90,90,90,90,90};
         assert(AW_PickWanderIdle(dancer,100,40,r1)==9);

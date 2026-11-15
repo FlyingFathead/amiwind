@@ -52,10 +52,14 @@ int main(void){
     assert(AW_SaveDecode(bytes,size,&decoded));assert(same_state(&save.state,&decoded.state));
     assert(decoded.state.inventory.dropped[index].condition_known);
     assert(decoded.state.inventory.dropped[index].condition==.375f);
-    AW_ITEM_ROW(&decoded.state,AW_ItemIndex(&decoded.state,ring.id))->condition=.5f;prior=decoded;
-    assert(!AW_InventoryPickup(&decoded.state,index));assert(!memcmp(&prior,&decoded,sizeof(prior)));
-    AW_ITEM_ROW(&decoded.state,AW_ItemIndex(&decoded.state,ring.id))->condition=.375f;
+    AW_ITEM_ROW(&decoded.state,AW_ItemIndex(&decoded.state,ring.id))->condition=.5f;
+    /* SAVE-ITEM-INSTANCES-ONE-PER-KIND-66: the two copies picked up differ from the carried one (.5): they come back as
+     * an instance of their own at .375 (the pickup refused them before), beside the worn copy's instance */
     assert(AW_InventoryPickup(&decoded.state,index));assert(AW_StateGet(&decoded.state,AW_ITEM,ring.id)==3);
+    {int k,picked=-1;
+     for(k=0;k<AW_ItemInstCount(&decoded.state);k++)if(AW_ItemInst(&decoded.state,k)->flags&AW_ITEM_CONDITION)picked=k;
+     assert(picked>=0 && AW_ItemInst(&decoded.state,picked)->count==2 && AW_ItemInst(&decoded.state,picked)->condition==.375f);
+     assert(AW_ITEM_ROW(&decoded.state,AW_ItemIndex(&decoded.state,ring.id))->condition==.5f);}
     assert(AW_InventoryEquipped(&decoded.state,ring.id)==1);
     AW_SaveRelease(&decoded);
     /* Feature bit 4: the selected magic item and a recorded charge round-trip;
@@ -92,8 +96,9 @@ int main(void){
         assert(AW_ITEM_ROW(&back.state,399)->condition==.25f && AW_ITEM_ROW(&back.state,270)->charge==3.5f);
         assert(!strcmp(AW_ITEM_ID(&back.state,399),"kind_399") && AW_StateGet(&back.state,AW_ITEM,"kind_200")==2);
         AW_SaveRelease(&back);
-        /* the features word sits after the journal; find it by its value (512 | 2 | 4 here) and break it */
-        for(at=12;at+4<=wsize;at++){f=wbytes[at]|(wbytes[at+1]<<8)|(wbytes[at+2]<<16)|((uint32_t)wbytes[at+3]<<24);if(f==(512U|2U|4U))break;}
+        /* the features word sits after the journal; find it by its value (512 | 2 | 4 here, with 16384 for the worn
+         * ring's instance, SAVE-ITEM-INSTANCES-ONE-PER-KIND-66) and break it */
+        for(at=12;at+4<=wsize;at++){f=wbytes[at]|(wbytes[at+1]<<8)|(wbytes[at+2]<<16)|((uint32_t)wbytes[at+3]<<24);if(f==(512U|2U|4U) || f==(512U|2U|4U|16384U))break;}
         assert(at+4<=wsize);
         wbytes[at+1]^=3;   /* 512 -> 256: a 128-kind feature with 400 kinds, refused (the CRC is fixed below) */
         {   /* recompute the CRC so only the features word is wrong */
@@ -105,6 +110,9 @@ int main(void){
         /* a 128-kind save of the v0.0.61 line: feature 256 and 4 mark words */
         {
             static aw_save_t old;copy_save(&old,&save);
+            /* a save of that line knows no item instances: the worn ring's goes (SAVE-ITEM-INSTANCES-ONE-PER-KIND-66) */
+            while(AW_ItemInstCount(&old.state))AW_ItemInstRemove(&old.state,0);
+            assert(AW_ItemInstCount(&old.state)==0 && !old.state.inventory.equipped_serial[AW_SLOT_RRING]);
             for(i=AW_ItemCount(&old.state);i<128;i++){sprintf(id,"kind_%d",i);assert(AW_ItemAdd(&old.state,id,1));}
             AW_ItemMark(&old.state,127,AW_ITEM_CONDITION,.5f);
             wsize=AW_SaveEncode(wbytes,sizeof(wbytes),&old);assert(wsize>0);   /* feature 512, 4 words for 128 kinds */

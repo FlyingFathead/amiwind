@@ -148,6 +148,16 @@ int AW_EffectsEnd(aw_actor_t *a,uint32_t owner,int number){
     return n;
 }
 unsigned long AW_EffectsGeneration(void){return generation;}
+int AW_EffectsList(uint32_t owner,aw_effect_info_t *out,int max){
+    int k,n=0;
+    for(k=0;k<AW_EFFECTS_MAX && n<max;k++){
+        if(!fx[k].used || fx[k].owner!=owner)continue;
+        out[n].owner=owner;out[n].effect=fx[k].effect;out[n].arg=fx[k].arg==AW_EFFECT_NO_ARG?-1:fx[k].arg;
+        out[n].source=fx[k].source==AW_EFFECT_NO_SOURCE?-1:fx[k].source;out[n].magnitude=fx[k].magnitude;
+        out[n].left=fx[k].left;n++;
+    }
+    return n;
+}
 int AW_EffectsAt(int i,aw_effect_info_t *out){
     int k;
     for(k=0;k<AW_EFFECTS_MAX;k++){

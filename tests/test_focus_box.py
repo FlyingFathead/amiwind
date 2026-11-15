@@ -233,7 +233,7 @@ class FocusTableTests(unittest.TestCase):
                 ref(40, 'chest_a', (1, 1, 1), sub('ANAM', z('clerk'))), ref(41, 'chest_a', (2, 2, 2)))])
         objects = focus.objects_of(master)
         self.assertEqual(objects['chest_a'][0], 'C')
-        self.assertEqual(objects['chest_a'][5:], ([('test_cup', 2), ('test_dagger', 3)], 3))
+        self.assertEqual(objects['chest_a'][5:7], ([('test_cup', 2), ('test_dagger', 3)], 3))
         rows = {r[2]: r for r in focus.placements(master, objects, {'store': 9})[9]}
         self.assertEqual((rows[40][0], rows[40][1], rows[40][11]), ('C', 1, ('clerk', 0)))
         self.assertEqual(rows[41][1], 0)
@@ -277,6 +277,43 @@ class FocusTableTests(unittest.TestCase):
         self.assertIn('free(strip)', strip)                          # and freed on close
         self.assertIn('AW_ContainerTake(strip->reference', strip)     # the deltas, never a copy
         self.assertIn('AW_ContainerPut(strip->reference', strip)
+
+    def test_exterior_container_carries_its_measured_box(self):
+        """OUTDOOR-CONTAINER-AIM-66: an exterior container of a measured model (CONTAINER_BOXES) sits at its box's
+        centre with the box and rotation in its id field, as a named board; a room's carries it too, the room ray first (the room
+        ray), and so does an exterior one of an unmeasured model. The engine reads the box for 'C' rows."""
+        import prepare_focus as focus
+        model = 'o\\contain_com_sack_01.nif'
+        self.assertIn(model, focus.CONTAINER_BOXES)
+        master = self.MASTER + b''.join([
+            rec('CONT', sub('NAME', z('sack_a')), sub('FNAM', z('Sack')), sub('MODL', z('o/Contain_Com_Sack_01.nif')),
+                sub('FLAG', struct.pack('<I', 8))),
+            rec('CONT', sub('NAME', z('odd_a')), sub('FNAM', z('Odd')), sub('MODL', z('o\\not_measured.nif')),
+                sub('FLAG', struct.pack('<I', 8))),
+            rec('CELL', sub('NAME', z('Store')), sub('DATA', struct.pack('<Iii', 1, 0, 0)), ref(60, 'sack_a', (1, 1, 1))),
+            rec('CELL', sub('NAME', z('')), sub('DATA', struct.pack('<Iii', 0, 3, 3)),
+                ref(61, 'sack_a', (24600, 24600, 100)), ref(62, 'odd_a', (24600, 24600, 100)))])
+        objects = focus.objects_of(master)
+        self.assertEqual(objects['sack_a'][7], model)
+        rooms = focus.placements(master, objects, {'store': 9})
+        inside = {r[2]: r for r in rooms[9]}
+        outside = {r[2]: r for r in rooms[focus.exterior_key(3, 3)]}
+        self.assertIsInstance(inside[60][9], bytes)      # a room's container too (a room map without a CHIM room)
+        self.assertEqual(outside[62][9], 'odd_a')
+        packed = outside[61][9]
+        self.assertIsInstance(packed, bytes)
+        self.assertEqual(len(focus.pack_name_and_id('C', 'Sack', packed)), focus.NAME + focus.IDENT)
+        halves = struct.unpack_from('<3f', packed)
+        quat = struct.unpack_from('<4f', packed, 12)
+        lo, hi = focus.CONTAINER_BOXES[model]
+        self.assertEqual([round(h, 2) for h in halves], [round((b - a) / 2, 2) for a, b in zip(lo, hi)])
+        self.assertAlmostEqual(sum(q * q for q in quat), 1.0, places=5)
+        centre = [24600 + (a + b) / 2 for a, b in zip(lo[:2], hi[:2])]
+        self.assertAlmostEqual(outside[61][3], centre[0], places=3)
+        self.assertAlmostEqual(outside[61][4], centre[1], places=3)
+        inventory = (SRC / 'aw_inventory.c').read_text(encoding='utf-8')
+        self.assertIn("r->box=(short)(r->kind=='C'?focus_board_add(row+FOCUS_ROW):-1);", inventory)
+        self.assertIn("focus_board_ray(focus_board_axis[row->box],at,eye,f)", body(inventory, 'static int placed_target(void){'))
 
     def test_row_layout(self):
         import prepare_focus as focus
@@ -336,7 +373,7 @@ class PickupTests(unittest.TestCase):
         self.assertLess(tick.index('if(!mwscript.value)'), tick.index('if(!load())return;'))
         self.assertLess(tick.index('if(!load())return;'), tick.index('attach_map();'))
         objects = body(self.host, 'static void attach_objects(void)')
-        self.assertIn('"aw_ref"', objects)
+        self.assertIn('field_ref(e)', objects)     # aw_ref, found once per game code (MWSCRIPT-TICK-SHARE-66)
         self.assertIn('object_hide(&objects[i])', objects)
         attach = body(self.host, 'static void attach_map(void)')
         self.assertNotIn('object_hide(', attach)               # hidden once per map, never twice

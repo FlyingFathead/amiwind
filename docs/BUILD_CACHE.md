@@ -1,6 +1,6 @@
 # Build cache: resuming and reusing work safely
 
-_Last updated with AmiWind v0.0.64-dev3 (10 November 2026)._
+_Last updated with AmiWind v0.0.66-dev3 (15 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -13,10 +13,13 @@ _Last updated with AmiWind v0.0.64-dev3 (10 November 2026)._
   - [The table units and the actor ground fit (v0.0.63-dev4)](#the-table-units-and-the-actor-ground-fit-v0063-dev4)
   - [Expansion rows in the measured tables (v0.0.64-dev3)](#expansion-rows-in-the-measured-tables-v0064-dev3)
   - [World flora and world scenery regions (v0.0.64-dev4)](#world-flora-and-world-scenery-regions-v0064-dev4)
+  - [The merging reader and the expansion layers (v0.0.66-dev1)](#the-merging-reader-and-the-expansion-layers-v0066-dev1)
   - [Collision defaults of v0.0.48-dev2: what rebuilds once](#collision-defaults-of-v0048-dev2-what-rebuilds-once)
 - [Narrowed reuse: what a stage really used](#narrowed-reuse-what-a-stage-really-used)
+  - [Edits proven to change no output (v0.0.66-dev3)](#edits-proven-to-change-no-output-v0066-dev3)
 - [Reuse preflight](#reuse-preflight)
 - [Reuse every earlier run](#reuse-every-earlier-run)
+- [The pre-flight on every core, once per source tree](#the-pre-flight-on-every-core-once-per-source-tree)
 - [Run names](#run-names)
 - [Entry check](#entry-check)
 - [Developer mode](#developer-mode)
@@ -302,6 +305,48 @@ region runs keeps every region key, an edit to code a region runs changes it. Th
 that `tools/map_engine_limits.py` reads whole. Every region is a CHIM cell today, so neither stage makes a region and the
 one rebuild for the new key form takes seconds. Tests: `tests/test_flora_unit_key.py`.
 
+### The merging reader and the expansion layers (v0.0.66-dev1)
+
+The merging reader (`src/mwad/masters.py`: the base game file plus the selected expansion masters, merged as the game
+merges them) and the layered archive reader (`src/mwad/archives.py`) are read by nearly every stage and unit cache, so
+their code was in every key that reaches them: about 20 unit caches, the CHIM mesh units and most stages. The
+v0.0.66-dev1 build, for the base game alone, baked all 1,769 room residents again (about 7 h) for a reader change,
+although the reader hands the base game file itself to every unit when only the base game is selected.
+
+Both readers are now **content-keyed** (`build_cache.CONTENT_KEYED_READERS`): they stay in the reach (the settings they
+read, the coverage and trace checks), but in every stage key, unit cache key and CHIM unit code key they count as a
+fixed text naming their output form, never as their code. What they hand out is keyed as content instead: the game
+input files and the load order in the stage keys, and in the unit keys the game data identity
+(`pass_cache.game_data_digest`). A reader edit with the same output re-keys nothing; a change of what they hand out for
+the same inputs needs a new form text (as the merged master's `FORMAT`). Keys made before (the readers as code) are
+looked up as an older form, so the change itself bakes nothing again: the unit caches through
+`pass_cache.previous_digests`, the CHIM units through `UnitKey.reader_code`, the stage reuse through
+`build_cache.content_keyed_as_recorded`. Tests: `tests/test_content_keyed_readers.py`.
+
+The game data identity was the input lock alone, which lists the expansion files whether or not the build selects them,
+so a build with the expansions on would have taken every unit baked for the base game (BUILD-UNIT-KEYS-LAYER-BLIND-66).
+With expansion layers selected the identity now holds the selected masters and the readers' form; with the base game
+alone it is the lock digest as before, so base-game keys do not move.
+
+A unit cache whose inputs hold the records the stage resolved for the unit keys the rest of what it reads as a **layer
+view** (`tools/layer_view.py`): the records the layers add, replace or delete that it names, and the archive files the
+layers replace with other bytes that its assets name (the file itself, or a texture whose name is in a model's bytes).
+An empty view keeps the base-game key, so a unit the expansions do not touch is reused. The room residents
+(`resident-bake`) are keyed this way: their appearance (parts, items, foot, voices) and greeting were already in the
+key; the view adds their NPC record, the lights they carry, the original torch and the footstep sounds
+(`prepare_area.resident_reads`; their models and textures come from the base archive and the loose files whichever
+layers are selected). A bake that reads a layer's archive file its view leaves out is not stored
+(`layer_view.gaps`): a gap costs reuse, never a stale resident. `tests/test_layer_view.py` lists every master read of
+the resident bake, so a new one fails the gate until its records are named. The NPC library's appearances
+(`npc-appearance`) key the footstep sounds the same way (their appearance is in their inputs), and the player view keys
+its body as the layers resolve it (`prepare_player_view.layer_body`). Other unit caches keep the selection in their key
+until they name what they read.
+
+Measured against the v0.0.66-dev1 build's units (base game): with both expansions selected 55 of the 1,769 room
+residents change (53 wear armour the expansions change, 3 have a changed record), 4 of the 80 player view units (one
+body), and about 3 % of the NPC library's appearances; the 935 batched rooms bake again (they read 47 textures the
+expansion archives replace).
+
 ### Collision defaults of v0.0.48-dev2: what rebuilds once
 
 The collision-source rule (`--collision-source`, `tools/collision_source.py`) and stair
@@ -386,6 +431,28 @@ files not in the page cache: world terrain (5,875 files, 1.7 GB) 9.9 s -> 2.4 s,
 (3,413 files, 1.8 GB) 12.1 s -> 4.5 s; with the files cached both take about 2 s. These stages
 are applied one after another at the start of every reuse build.
 
+### Edits proven to change no output (v0.0.66-dev3)
+
+Narrowed reuse cannot take a stage that ran the edited code, even when the edit changes nothing it makes. The
+v0.0.66-dev3 line had three: the CHIM world stage (about 31 min) keyed a module imported under another local name in
+`tools/chim/world.py` and new fields of the item state structures in `engine/aga/src/aw_state.h`, which it reaches only
+through the target size probe of `tools/check_world_map_heap.py` (the probe names that structure behind a pointer); the
+world scenery and world flora stages keyed two new rows of `unit_store.LEGACY_SOURCES` for other unit caches. For such
+an edit the stage-key twin of `LEGACY_SOURCES` is `build_cache.PROVEN_EQUAL_SOURCES`: per stage, per file, the pairs
+(recorded value, this checkout's value) of edits compared with what the stage makes of the file and shown to change
+none of its outputs, with the proof written beside the entry (for the CHIM stage: the probe compiled for the target in
+both trees gives the same 68 sizes, and the one value it reads of the header is the same). A stage whose key differs
+only in its sources, and there only by such pairs, is reused; the plan says `its key changed only by edits proven to
+change none of its outputs (PROVEN_EQUAL_SOURCES): FILES` (`proven` in the build state), and `--reuse-plan` says the
+same. A pair holds only while both values are exactly these, so any further edit of the file keys the stage as before,
+and the table counts in no key, so an entry re-keys nothing. A pair is added only with its proof, never to get past a
+rebuild whose output may change. Tests: `tests/test_build_cache.py` `ProvenEqualSourcesTests`.
+
+The same round found the creature models keyed on the whole interior creature list (`config/interior_creatures.json`):
+a reworded reason text of one row re-keyed all 97 models, though a bake reads a row only for its method and for whether
+it gives a reason and a source. The models stored before the edit are found again through `unit_store.LEGACY_SOURCES`
+(`tests/test_creature_residents.py`).
+
 ## Reuse preflight
 
 With `--reuse-from`, the builder checks the reuse plan before any stage runs:
@@ -463,6 +530,18 @@ run (BUILD-UNIT-PREFLIGHT-63).
   the NPC standing models, the creature library and the arena fighters (moving onto the
   gallery and parts caches), and the actors' ground heights. `tests/test_reuse_all.py`
   fails on any new one.
+- **A stage with no cache stops as a whole.** A stage that has no unit cache, whose key changed and whose earlier run
+  took 10 minutes or more (`WHOLE_STAGE_LIMIT_SECONDS`, from the run's `build-profile.json`) would redo stored work, so
+  the build stops. A stage whose unit caches give back at least 95 % of the units they hold (all but `REBAKE_LIMIT`,
+  5 %) does not stop as a whole: its stored minutes were its unit bakes, which the caches deliver now. The 5 % rule on
+  each unit cache still applies to it.
+- **The check sees it too.** `tools/build.py --check` with `--reuse-from` or `--reuse-all-available` plans the stages
+  as the build does in its first minute (every stage key, the reuse plan, the reuse preflight and, with
+  `--reuse-all-available`, the unit-cache report) and fails with the same `STOP` lines when the build would stop
+  there (`build.py unit_stop_check`, exit code 6; it prints `Check FAILED: the build would stop before its first
+  stage` and, when it passes, `Reuse check (--check): passed (no reuse stop)`). It writes no run folder and no stage index. Before v0.0.66-dev2 the
+  check only predicted the stages of the reuse run's own command, so it said "0 unexpected" while the build stopped
+  on 16 stages of unit-cache stops. Tests: `tests/test_check_unit_stops.py`.
 
 `python3 tools/reuse_all.py predict RUN --workspace WORKSPACE` is the read-only dry run:
 RUN's stages keyed with this checkout and looked up in the index (an upper bound, no outputs
@@ -472,6 +551,40 @@ run, the newest); `--reuse-from` the v0.0.62 release run alone holds 24 of them.
 
 The build server's development and release chains build with `--reuse-all-available`; the
 `--reuse-from` run the request names is looked at first (docs/AW.md).
+
+## The pre-flight on every core, once per source tree
+
+Before its first stage a build checks the workspace cache (every entry owned by the build's
+user) and works out every stage key. Most of a key's cost is the stage source analysis: for
+each stage script, the code it can reach, the data files that code names, the engine C files
+by their use, the same in the older key forms, and the `AMIWIND_*` names the code reads. Both
+ran on one core, and every build start ran them three times: the check before the request,
+the build server's own check of the request, and the build itself
+(BUILD-PREFLIGHT-SERIAL-REPEATED-66).
+
+- **Every core.** The cache walk (`tools/build_preflight.py` `cache_problems`) hands each
+  folder's own entries and each subtree three folders down to a process pool and joins the
+  results in the walk's own order: the same counts and the same first entries as the serial
+  walk. The stage source analysis (`tools/fingerprint_prefetch.py` `prepare_index`) first
+  reads every Python module of the checkout once, spread over the pool, then works out each
+  stage script in forked workers that inherit those modules, so no worker reads a shared
+  module again. The pool has `--jobs` workers, capped by the cores the build may use;
+  `AMIWIND_PREFLIGHT_JOBS=1` runs both in the build's own process (the serial method, kept).
+- **Once per source tree.** The analysis is kept in `WORKSPACE/cache/preflight-analysis-v1/`,
+  one file per source tree, and the next check or build of the same tree takes it. Its key is
+  the SHA-256 of every file the analysis covers, the checkout folder, the key form, the
+  analysing code and the Python version; any difference, and it is worked out again. Build
+  options and environment switches are no part of it: they count in each stage key itself,
+  which is always computed. The log says which it did:
+  `Pre-flight: stage source analysis computed: ...` or
+  `Pre-flight: stage source analysis taken from the check of <time> (<run>): ...`. A check
+  writes this store; a `--plan` only reads it. The analysis of an earlier run's checkout (to
+  compare a reuse source keyed by an earlier method) is kept the same way. The store keeps
+  the 24 most recently used source trees and removes the rest itself; a damaged file is
+  worked out again, and a store problem never stops a build.
+- **The same keys.** The pool, the serial path and a stored analysis give the same answers,
+  and an environment switch still changes the keys of the stages that read it
+  (`tests/test_build_cache_prefetch.py`, `tests/test_build_preflight.py`).
 
 ## Run names
 

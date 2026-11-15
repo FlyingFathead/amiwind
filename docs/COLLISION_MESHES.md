@@ -1,6 +1,6 @@
 # Morrowind collision meshes: where they are and how AmiWind uses them
 
-_Last updated with AmiWind v0.0.64-dev5 (11 November 2026)._
+_Last updated with AmiWind v0.0.66-dev1 (13 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -194,6 +194,7 @@ whole-game view, the Toolkit the view of one place.
 | Standing bevels, type 1 | Tiles, exact bevels | room type 1 | needs 15,242 KiB, does not load |
 | Standing bevels, type 2 | Approximate standing bevels | room type 2; `--chim-hollow-bevels 0/1/2`; `hollow_bevels` in `config/chim-rooms.json` | default for hollow models in every room from v0.0.64-dev5; needs 13,796 KiB for the Heart Chamber, loads |
 | Room type 3 | A room built to the drawn mesh's budget (type 2 plus a reduced detail budget) | room type 3 | the Vivec Arena Pit; the Heart Chamber's default from v0.0.64-dev5 |
+| Room map shell bevels | The rooms' bevel rule for the shell of a classic room map (the prison ship's hold): exact on the walkable plates, approximate on the walls | `--chim-hollow-bevels` (the hold's own value 1) | default from v0.0.66-dev1: the hold's clipnodes 29,182 to 18,054 ([ship interior](SHIP_INTERIOR.md#the-weight-of-the-hold)) |
 | Stair collision method 1 | One stairway collision mesh per flight, proven by a geometric check | stair collision method | default since v0.0.48-dev2; 11 meshes keep method 0 ([CHIM-STAIR-METHOD1-UNFIXED-48](bugs/CHIM-STAIR-METHOD1-UNFIXED-48.md)) |
 | Routed hulls | Balanced tree of the same solid set instead of a chain | `--model-hull` (`auto`, `chain`, `routed`, `balanced`) | default `auto` from v0.0.64-dev5 (was `chain`) |
 | Collision from the reduced drawn mesh | Collision of `visual` models from the reduced drawing, the original walkable faces kept | `AMIWIND_COLLISION_MESH` (`original`, `reduced`, `reduced-all`) | off; measured to save nothing on the samples, aimed at models with a reduced drawing |

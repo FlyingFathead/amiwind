@@ -151,6 +151,16 @@ class WholeStageStopTests(unittest.TestCase):
         self.assertEqual(RA.strict_problems(self.STEPS, {'a'}, {}, {}, set(), {'a': 'why'}, costs={'a': 13000.0},
                                             reasons={'a': 'changed: sources (x)'}), [])
 
+    def test_stage_whose_unit_caches_deliver_does_not_stop_whole(self):
+        # its stored minutes were unit bakes the caches give back now (PLAN-CHECK-UNIT-STOPS-66)
+        rows = {'a': [('resident-bake', 2147, 2147), ('interior-room-chim', 1000, 1010)]}
+        self.assertEqual(RA.strict_problems(self.STEPS, {'a'}, rows, {}, set(), {}, costs={'a': 25000.0},
+                                            reasons={'a': 'changed: sources (x)'}), [])
+        rows = {'a': [('resident-bake', 0, 2147)]}
+        stops = RA.strict_problems(self.STEPS, {'a'}, rows, {}, set(), {}, costs={'a': 25000.0},
+                                   reasons={'a': 'changed: sources (x)'})
+        self.assertEqual(len(stops), 2)                     # the whole stage and its unit cache
+
     def test_new_stage_does_not_stop(self):
         self.assertEqual(RA.strict_problems(self.STEPS, {'a'}, {}, {}, set(), {}, costs={'a': 13000.0},
                                             reasons={'a': 'no earlier run holds it'}), [])

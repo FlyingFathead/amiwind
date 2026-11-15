@@ -41,6 +41,8 @@ int AW_OpeningStoryHidden(void);
 int AW_FpsTenths(void);
 /* aw_scene.c */
 int AW_SceneMapMarker(float *source);
+/* the I-th door row of the loaded scene for the map's door markers (aw_scene.c): 1 door, 0 not this scene's, -1 end */
+int AW_SceneMapDoor(int i,float *point,const char **name);
 /* aw_scenery.c */
 int AW_SceneryCount(void);
 /* aw_walk.c */

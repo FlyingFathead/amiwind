@@ -3,6 +3,7 @@
  */
 #include "quakedef.h"
 #include "aw_actors.h"
+#include "aw_listbox.h"
 #include "aw_placed.h"
 #include "aw_links.h"
 #include "aw_bounds.h"
@@ -26,6 +27,8 @@
 #include "aw_inspect.h"
 #include "aw_inventory.h"
 #include "aw_statswin.h"
+#include "aw_fxrow.h"
+#include "aw_spelllist.h"
 #include "aw_textdef.h"
 #include "aw_alchemy.h"
 #include "aw_glut.h"
@@ -351,9 +354,11 @@ void AW_DebugInit(void) {
     {extern void (*aw_walkto_move)(usercmd_t *);aw_walkto_move=walkto_move;}
     Cvar_RegisterVariable(&aw_logs_live);Cmd_AddCommand("aw_logs_live_set",logs_live_command);Cmd_AddCommand("aw_savelogs",savelogs_command);Cmd_AddCommand("aw_godmode",godmode_command);
     AW_ResetRegister("god mode across maps",godmode_reset,godmode_digest);
-    AW_GalleryInit();AW_SweepInit();AW_WorldUIInit();AW_PlacedInit();AW_StatsWindowInit();AW_TextDefineInit();AW_AlchemyInit();AW_DebugTorchInit();    AW_StreamInit();AW_PhotoInit();AW_SpikeInit();Chim_Init();
+    AW_GalleryInit();AW_SweepInit();AW_WorldUIInit();AW_PlacedInit();AW_StatsWindowInit();AW_FxRowInit();AW_SpellListInit();AW_TextDefineInit();AW_AlchemyInit();AW_DebugTorchInit();    AW_StreamInit();AW_PhotoInit();AW_SpikeInit();Chim_Init();
     /* CHIM's window (type 1 crossings) names a cell's region map through the world directory. */
     {extern int (*chim_cell_map)(int,int,char *,int);chim_cell_map=AW_CellMap;}
+    /* OUTDOOR-CREATURES-MISSING-66: a town map's own cells take their creatures from the actor table. */
+    {extern int (*aw_town_frame)(const char *,float *,float *);aw_town_frame=AW_TownFrame;}
     {extern int (*aw_chim_window_slot)(int,int *,int *,float *);extern int (*aw_chim_map_frame)(const char *,int *,int *);
      extern char *(*aw_frame_map_entities)(int,int);   /* FIREPIT-FLAMES-62: every frame's flames (aw_guard_torch.c) */
      aw_chim_window_slot=Chim_WindowSlot;aw_chim_map_frame=Chim_MapFrame;aw_frame_map_entities=frame_map_entities;}
@@ -365,7 +370,7 @@ void AW_DebugInit(void) {
     Cmd_AddCommand("aw_census_legacy",AW_CensusLegacyCommand);       /* the older alias (OPENING-REGRESSION-64) */
     aw_census_take_refused=AW_OpeningTakeRefused;                    /* nothing taken during the registration */
     AW_NpcPartsInit();     /* aw_npc_tables_areas (NPC-RECIPES-PER-AREA-59) */
-    AW_CamInit();AW_InputDebugInit();AW_BoundsInit();AW_DoorAudioInit();AW_HingedDoorInit();aw_hinged_story=AW_OpeningHingedStory;AW_TalkInit();AW_MwscriptInit();AW_CompanionInit();AW_CombatInit();AW_AmbientInit();AW_MoveInit();AW_ActorsInit();AW_ViewInit();AW_LavaInit();AW_BreathInit();AW_MagicInit();AW_AnimInit();AW_GlutInit();AW_DialWindowInit();AW_AnimKitInit();AW_HalloweenInit();AW_DemoWindInit();AW_WaitInit();AW_LevelupInit();AW_ConsoleInit();AW_SceneInit();AW_LoadFailInit();AW_CensusInit();AW_UIInit();AW_IconsInit();AW_IntroInit();AW_SaveInit();AW_RecorderInit();
+    AW_CamInit();AW_InputDebugInit();AW_BoundsInit();AW_DoorAudioInit();AW_HingedDoorInit();aw_hinged_story=AW_OpeningHingedStory;AW_TalkInit();AW_MwscriptInit();AW_CompanionInit();AW_CombatInit();AW_AmbientInit();AW_MoveInit();AW_ActorsInit();AW_ViewInit();AW_LavaInit();AW_BreathInit();AW_MagicInit();AW_AnimInit();AW_GlutInit();AW_DialWindowInit();AW_AnimKitInit();AW_HalloweenInit();AW_DemoWindInit();AW_WaitInit();AW_LevelupInit();AW_ConsoleInit();AW_SceneInit();AW_TpPlacesInit();AW_LoadFailInit();AW_CensusInit();AW_UIInit();AW_IconsInit();AW_IntroInit();AW_SaveInit();AW_RecorderInit();
     aw_save_entry_refuse=AW_SceneSaveEntryRefuse;   /* a save in a 32 MB place on less Fast RAM (CHIM-32MB-SAVE-ENTRY-48) */
     /* a bad sprite (r_sprite.c) names the CHIM streamed static it belongs to (SPRITE-BAD-TYPE-THREADED-56) */
     {extern const char *(*aw_sprite_describe)(const entity_t *,char *,int);

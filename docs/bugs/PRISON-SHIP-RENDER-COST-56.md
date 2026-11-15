@@ -1,5 +1,14 @@
 # PRISON-SHIP-RENDER-COST-56: the prison ship's hold draws slower than the Vivec Arena Pit
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.58-dev2 at 2026-10-31 20:10 +0000: Still slow in Seyda Neen on the Pi 4B stick (2.0 GHz, 32 MB Fast): about 4-5 fps with the Halloween bench scene, while the DoomAttack timedemo on the same stick runs at about 57-60 fps. Leads from the maintainer: check that Seyda Neen loads fully as CHIM (no legacy map in the path), and give the building exteriors simpler forms where beams and trim carry far more faces than they show. Work item RENDER-COST-SEYDA-59.
+- Reported with v0.0.65 at 2026-11-13 03:45 +0200: measured on the v0.0.65 release map: 26,628 drawn faces, the worst view from the start 23,386 tested (shell 7,997, hammocks 7,504, barrels 3,458); the hammocks' small closed rings and knots drawn as boxes (--room-small-parts) and the shell in draw tiles (--room-draw-tiles) bring the worst view to 21,356 and the mean to 10,749
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -24,6 +33,7 @@ _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 <!-- contents start -->
 ## Contents
 
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
 - [Status: 29 October 2026](#status-29-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -214,6 +224,7 @@ Family: Rendering cost and visibility (`render-performance`). Read the visibilit
 - [NPC-TARGET-REDUNDANT-31](NPC-TARGET-REDUNDANT-31.md): NPC targeting runs 2-4 times per frame and checks every NPC
 - [PERF-ARENA-PIT-SLOW-48](PERF-ARENA-PIT-SLOW-48.md): The Vivec Arena Pit runs slowly: a large interior with heavy drawn and collision geometry
 - [POLYCOUNT-CAMPS-ALDRUHN-57](POLYCOUNT-CAMPS-ALDRUHN-57.md): The Ashlander camps and central Ald'ruhn are the hottest cells of the polycount heatmap: the yurts alone carry about half of a camp's faces
+- [PRISON-SHIP-SHELL-ONE-MODEL-66](PRISON-SHIP-SHELL-ONE-MODEL-66.md): The prison ship hold's shell is one brush model whose box is the whole room: all its 7,997 faces are tested at every heading, though at most headings a few hundred are on screen
 - [RENDER-BMODEL-FRAGMENTS-32](RENDER-BMODEL-FRAGMENTS-32.md): Brush models spanning many terrain leaves are clipped face by face down the terrain BSP
 - [RENDER-EDGECACHE-SEYDA-32](RENDER-EDGECACHE-SEYDA-32.md): No edges are reused between frames in Seyda Neen views
 - RENDER-SURFACE-CAP-DROPS-FACES-64 (no report page): The renderer posts at most 800 surfaces and 2,400 edges a frame and drops further faces silently, so a dense view such as a Solstheim forest loses most of its faces

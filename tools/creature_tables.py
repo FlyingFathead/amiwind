@@ -46,13 +46,20 @@ MAX_BONES = 64                          # engine/aga/src/aw_skel.h AW_SKEL_MAX_B
 LAYOUT_MAX = 64                         # tools/npc_anim.py table_groups: a layout group takes at most 64 frames
 # The engine's groups a creature plays (engine/aga/src/aw_anim.h, creature_pose.MOVER's order); a group the creature
 # lacks stands on the idle (OpenMW falls back to idle, mwmechanics/character.cpp).
-KIT = ('idle', 'walk', 'run', 'attack', 'hit', 'death')
+KIT = ('idle', 'walk', 'run', 'attack', 'hit', 'death', 'cast')
+# Groups written only when the creature has them (no idle stand-in line: the engine's fight layer stands a missing
+# cast on the idle, aw_combat.c layout_parse), so a creature without a spellcast keeps its layout byte for byte
+OPTIONAL = ('cast',)
 # The model's reduction ladder (creature_residents.BUDGETS; npc_geometry.bake takes at most 480 without face quotas);
 # a gallery profile's budget comes first when the mesh has one (config/gallery_model_quality.json).
 BUDGETS = (480, 384, 320, 256, 192)
 # Meshes whose model keeps more than the ladder allows, with the bake rules of the model the Halloween scene already
 # ships for them (tools/halloween_cast.py: Dagoth Ur's mask and crest at up to 1,000 triangles).
 LARGE = {'r/dagothr.nif': 'dagoth'}
+# Dagoth Ur's room-resident model, the default (AMIWIND_DAGOTH_MODEL=halloween: the Halloween bake, 457 faces): the seam-locked bake at the most faces a 480-row skin holds (32 tiles a row x 30
+# rows = 960; his source 2,254 faces exceed the 1,024-face reader, so his whole model cannot ship); measured
+# 2026-11-13: 948 faces, 2,844 vertices, 41 open edges as the source, none new (DAGOTH-UR-NO-ANIMATIONS-65)
+DAGOTH_SEAM_TOTAL = 960
 
 
 def table_path(mesh):
@@ -519,8 +526,11 @@ def kit(rig, data, times, base=None):
         pairs, kind, _moves = creature_pose.GROUPS[name]
         span = next((f for pair in pairs for f in [frames_of(*pair)] if f), None)
         entry = {'name': name, 'kind': kind}
+        if name in OPTIONAL and span is not None and span[2]:
+            continue            # an optional group only from the creature's own file, never the base table's
         if span is None:
-            out.append(dict(entry, base=idle[0], count=1, step=step0, source='idle'))
+            if name not in OPTIONAL:
+                out.append(dict(entry, base=idle[0], count=1, step=step0, source='idle'))
             continue
         a, b, based = span
         count = b - a + 1 if kind == 'hold' else max(1, b - a)
@@ -555,9 +565,10 @@ def layout(groups):
 
 # ---------------------------------------------------------------- the model
 
-def model(N, assets, palette, rig, data, report, budgets=None, **bake_args):
+def model(N, assets, palette, rig, data, report, budgets=None, seam_total=None, **bake_args):
     """(MDL bytes, facts) of the creature as one skeletal model on its table, reduced from its idle's poses (8 samples
-    of the source that plays the idle)."""
+    of the source that plays the idle). seam_total: the faces of a seam-locked bake (seam_model) tried first; the
+    budget ladder when it does not fit."""
     import numpy as np
     import halloween_cast
     from halloween_cast import RigSkeleton
@@ -566,10 +577,122 @@ def model(N, assets, palette, rig, data, report, budgets=None, **bake_args):
         raise ValueError('%s: no idle group' % rig.model)
     source, a, b = idle
     times = np.linspace(a, b, 8, endpoint=False)
-    raw, facts = halloween_cast.creature_model(N, rig.raw, RigSkeleton(rig, source).pose, times, assets, palette,
-                                               data, report['bone_names'], table_path(rig.mesh),
-                                               budgets or BUDGETS, **bake_args)
-    return raw, halloween_cast._facts(facts)
+    effects = effect_shapes(N, rig.raw)
+    if seam_total and not effects:
+        found = seam_model(N, rig, RigSkeleton(rig, source).pose, times, assets, palette, data, report, seam_total)
+        if found is not None:
+            return found
+    if not effects:
+        raw, facts = halloween_cast.creature_model(N, rig.raw, RigSkeleton(rig, source).pose, times, assets, palette,
+                                                   data, report['bone_names'], table_path(rig.mesh),
+                                                   budgets or BUDGETS, **bake_args)
+        return raw, halloween_cast._facts(facts)
+    raw, facts = _model_without(N, rig, RigSkeleton(rig, source).pose, times, assets, palette, data, report,
+                                budgets or BUDGETS, effects, **bake_args)
+    return raw, dict(halloween_cast._facts(facts), effects_left_out=effects)
+
+
+def seam_model(N, rig, motion, times, assets, palette, data, report, total):
+    """(MDL bytes, facts) of the creature reduced to TOTAL faces with every shape's seams locked (npc_seams.seam_quotas
+    and the locked reducer, as creature_library's seam-locked bake), the skin cut to the rows it uses; kept only when
+    its open edges, counted in the bake's own pose (mesh_seam_check.new_openings), are no more than the source's: no
+    new opening. None when the locks do not fit TOTAL, the bake is refused or an opening is new (the caller then takes
+    the budget ladder). facts carries open_edges_source, open_edges and new_openings (DAGOTH-UR-NO-ANIMATIONS-65)."""
+    import numpy as np
+    import halloween_cast
+    import mesh_seam_check
+    from npc_seams import seam_quotas
+    from skeletal_actor import skeletal_from_shapes, SKEL_FACE_LIMIT
+    shapes, materials, textures, sources, parents, rest_world = halloween_cast.creature_shapes(
+        N, rig.raw, motion, times, assets)
+    quotas = seam_quotas(shapes, total)
+    if quotas is None:
+        print('Creature tables: %s: the seam locks do not fit %d faces' % (rig.mesh, total), flush=True)
+        return None
+    face_shapes = []
+    try:
+        raw, facts = skeletal_from_shapes(shapes, materials, textures, palette, sources, rest_world, [.25, .25, .25],
+                                          data, report['bone_names'], table_path=table_path(rig.mesh),
+                                          budgets=(None,), parents=parents, fit_skin=True,
+                                          face_limit=SKEL_FACE_LIMIT, quotas=quotas, seams=True,
+                                          face_shapes=face_shapes)
+    except ValueError as error:
+        print('Creature tables: %s: the seam-locked bake was refused (%s)' % (rig.mesh, error), flush=True)
+        return None
+    faces = np.array([[3 * i, 3 * i + 2, 3 * i + 1] for i in range(facts['faces'])])
+    offsets = np.cumsum([0] + [len(s['positions'][0]) for s in shapes])
+    source_open = len(mesh_seam_check.open_edges(
+        np.concatenate([s['positions'][0] for s in shapes]),
+        np.concatenate([np.asarray(s['faces'])[:, :3] + offsets[i] for i, s in enumerate(shapes)])))
+    reduced_open = len(mesh_seam_check.open_edges(facts['rest_model'], faces))
+    new = mesh_seam_check.new_openings(shapes, facts['rest_model'], faces, face_shapes)
+    print('Creature tables: %s: seams locked at %d faces (source %d): open edges %d (source %d), new %d' % (
+        rig.mesh, facts['faces'], sum(len(s['faces']) for s in shapes), reduced_open, source_open, len(new)),
+        flush=True)
+    if new:
+        return None
+    out = halloween_cast._facts(facts)
+    out.update(budget='seams-%d' % total, open_edges_source=source_open, open_edges=reduced_open,
+               new_openings=len(new), source_faces=sum(len(s['faces']) for s in shapes))
+    return raw, out
+
+
+def effect_shapes(N, raw):
+    """[{shape, triangles, reason}] of the model's shapes an opaque skin cannot draw (creature_residents.effect_shape:
+    material alpha 0, or a translucent shell whose texture scrolls), the rule the baked creature residents follow
+    (HEART-EFFECT-SHELLS-OPAQUE-64): measured 2026-11-10 over every creature mesh, only the Heart of Lorkhan's."""
+    import io
+    import creature_residents
+    from prepare_scenery import uv_scroll
+    d = N.Data()
+    d.read(io.BytesIO(raw))
+    out = []
+
+    def walk(node):
+        if not isinstance(node, N.NiAVObject):
+            return
+        if isinstance(node, N.NiTriShape):
+            material = {}
+            for prop in node.properties:
+                if isinstance(prop, N.NiMaterialProperty):
+                    material['alpha'] = float(prop.alpha)
+            scroll = uv_scroll(node)
+            if scroll:
+                material['uv_scroll'] = scroll
+            why = creature_residents.effect_shape(material)
+            if why:
+                out.append({'shape': node.name.decode('cp1252'),
+                            'triangles': int(node.data.num_triangles) if node.data else 0, 'reason': why})
+            return
+        for child in getattr(node, 'children', []) or []:
+            if child:
+                walk(child)
+    for root in d.roots:
+        walk(root)
+    return out
+
+
+def _model_without(N, rig, motion, times, assets, palette, data, report, budgets, effects, **bake_args):
+    """halloween_cast.creature_model with the EFFECTS shapes left out (the same ladder and the same skeletal bake)."""
+    import halloween_cast
+    from skeletal_actor import skeletal_from_shapes
+    shapes, materials, textures, sources, parents, rest_world = halloween_cast.creature_shapes(
+        N, rig.raw, motion, times, assets)
+    names = {e['shape'] for e in effects}
+    keep = [i for i, s in enumerate(shapes) if s['name'] not in names]
+    if not keep:
+        raise ValueError('%s: no visible geometry once the effect shapes are left out' % rig.model)
+    shapes = [shapes[i] for i in keep]
+    sources = [sources[i] for i in keep]
+    for budget in budgets:
+        try:
+            return skeletal_from_shapes(shapes, materials, textures, palette, sources, rest_world, [.25, .25, .25],
+                                        data, report['bone_names'], table_path=table_path(rig.mesh),
+                                        budgets=(budget,), parents=parents, **bake_args)
+        except ValueError as error:
+            if not (str(error).startswith('A skeletal model takes at most') or
+                    str(error) == 'Unsupported alias skin') or budget == budgets[-1]:
+                raise
 
 
 def humanoid_rig(rig):
@@ -679,6 +802,11 @@ def unit(task):
             if LARGE.get(normpath(mesh)) == 'dagoth':
                 import halloween_cast
                 budgets, bake_args = halloween_cast.DAGOTH_BUDGETS, dict(halloween_cast.DAGOTH_BAKE)
+                # the default: the seam-locked 948-face model (every closed edge kept, by count);
+                # AMIWIND_DAGOTH_MODEL=halloween: exactly the Halloween scene's bake (DAGOTH-UR-NO-ANIMATIONS-65)
+                import os
+                if os.environ.get('AMIWIND_DAGOTH_MODEL', '').strip() != 'halloween':
+                    bake_args.update(fit_skin=True, seam_total=DAGOTH_SEAM_TOTAL)
             elif profile:
                 top = min(int(profile['budget']), BUDGETS[0])
                 budgets = (top,) + tuple(b for b in BUDGETS if b < top)
@@ -691,6 +819,11 @@ def unit(task):
             out['model'] = raw
             rep.update(model=model_path(mesh), model_bytes=len(raw), model_sha256=hashlib.sha256(raw).hexdigest(),
                        vertices=facts.get('vertices'), faces=facts.get('faces'), budget=facts.get('budget'))
+            for k in ('open_edges_source', 'open_edges', 'new_openings', 'source_faces'):
+                if k in facts:
+                    rep[k] = facts[k]
+            if facts.get('effects_left_out'):
+                rep['effects_left_out'] = facts['effects_left_out']
         rep['seconds'] = round(time.time() - t0, 2)
         return mesh, out, None
     except Exception as error:  # noqa: BLE001 (each mesh left out with its reason; the census lists it)
@@ -752,10 +885,12 @@ def census(recs, done, failed, per_master):
 
 
 def read_masters(data):
-    """[(name, bytes)] of the masters the data folder has, in load order."""
+    """[(name, bytes)] of the selected masters (mwad.masters.selected_masters: AMIWIND_MASTERS, set by the builder;
+    --no-dlc = the base game file alone) that the data folder has, in load order."""
+    from mwad.masters import selected_masters
     from mwad.paths import child_ci
     out = []
-    for name in MASTERS:
+    for name in selected_masters():
         try:
             out.append((name, child_ci(Path(data), name).read_bytes()))
         except (FileNotFoundError, OSError):

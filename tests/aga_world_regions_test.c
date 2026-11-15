@@ -78,10 +78,23 @@ static void frame_maps(void){
         assert(s0==AW_RegionWorldToSource(region[i],l,r) && (!s0 || !memcmp(r,w0,sizeof r)));
         aw_world_chim_source=frame_source;aw_world_chim_local=frame_local;aw_world_chim_contains=frame_contains;
         frame_name=region[i];frame_calls=0;  /* even when the loaded frame map has that name: the region row wins */
-        s1=AW_WorldToSource(region[i],l,w);t1=AW_SourceToWorld(region[i],w,back);c1=AW_WorldContains(region[i],l);
-        assert(s0 && s1 && t0 && t1 && c0==c1 && !memcmp(w,w0,sizeof w) && !memcmp(back,l0,sizeof back) && !frame_calls);
+        s1=AW_WorldToSource(region[i],l,w);t1=AW_SourceToWorld(region[i],w,back);
+        assert(s0 && s1 && t0 && t1 && !memcmp(w,w0,sizeof w) && !memcmp(back,l0,sizeof back) && !frame_calls);
+        c1=AW_WorldContains(region[i],l);
+        if(i<2)assert(c0 && c1 && !frame_calls);   /* a region row: its cover, the frame never asked */
+        else if(i<4)assert(c0 && c1);              /* TOWN-OUTDOOR-SCRIPTS-NOT-ATTACHED-66: a town row has no cover */
         aw_world_chim_source=NULL;aw_world_chim_local=NULL;aw_world_chim_contains=NULL;
     }
+    /* TOWN-OUTDOOR-SCRIPTS-NOT-ATTACHED-66: a town map holds its placements: without a loaded frame its core (the
+     * test's towns: -200..200), with its CHIM frame loaded the frame's grid (the stand-in: |x|,|y| < 488) */
+    {float in_core[3]={150,-150,0},past_core[3]={300,0,0},past_frame[3]={600,0,0};
+     assert(AW_WorldContains("seyda",in_core) && !AW_WorldContains("seyda",past_core) && !AW_WorldContains("seyda",past_frame));
+     aw_world_chim_source=frame_source;aw_world_chim_local=frame_local;aw_world_chim_contains=frame_contains;
+     frame_name="seyda";
+     assert(AW_WorldContains("seyda",in_core) && AW_WorldContains("seyda",past_core) && !AW_WorldContains("seyda",past_frame));
+     assert(!AW_WorldContains("balmora",past_core));   /* another town than the loaded frame: its core alone */
+     assert(AW_WorldContains("vf0000",past_frame));    /* a region row: its own cover, never the frame */
+     aw_world_chim_source=NULL;aw_world_chim_local=NULL;aw_world_chim_contains=NULL;}
     frame_name="seyda_chim";
     /* no frame hooks (a legacy disk): a frame map is not known, a room stays a room */
     assert(!AW_WorldToSource("seyda_chim",l,w) && !AW_SourceToWorld("seyda_chim",zero,at) && !AW_WorldContains("seyda_chim",l));

@@ -89,7 +89,8 @@ def prepare(town, data_files, scene, chim_world, out, qbsp, vis, light, ffmpeg='
     # entity per levelled reference and per placed creature reference, after the residents
     import room_levelled
     from mwad.paths import child_ci
-    levelled = room_levelled.write(work_scene / 'id1/maps', rooms['rooms'], child_ci(data, 'Morrowind.esm'))
+    from mwad.masters import master_path
+    levelled = room_levelled.write(work_scene / 'id1/maps', rooms['rooms'], master_path(data))
     # The town's exterior door bank with its doors into the converted rooms (the CHIM world's own source stage).
     work = chim_world / 'work' / town
     if not (work / 'audit/placements.json').is_file():

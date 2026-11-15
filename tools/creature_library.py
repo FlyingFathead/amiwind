@@ -90,10 +90,15 @@ def ground_mode(ident, flags):
 
 
 # 'skeletal' (CREATURE-TABLES, v0.0.54): the creature's own animation table (tools/creature_tables.py: every group of
-# its own files, OpenMW's source order) and one skeletal model on it; selectable, not the default until the
-# in-game A/B against 'kf' is recorded (a new method is added beside the old, never in place of it).
+# its own files, OpenMW's source order) and one skeletal model on it. The default since v0.0.66
+# (NPC-ATTACK-ANIMS-MISSING-65): 'kf' bakes six groups (idle, walk, run, attack1, hit1, death1), so a creature never
+# played its second and third attack, its knockdown, its spell cast or swim; on its table the engine picks each of
+# them by state, as for the rooms' creatures and Dagoth Ur. A mesh the skeletal bake refuses (a shape on a bone with
+# no kept ancestor, more bones than the table takes) is baked with 'kf' instead and listed (KF_FALLBACK). 'kf' stays
+# selectable (--creature-method kf), never deleted.
 METHODS = ('kf', 'resident', 'skeletal')
-DEFAULT_METHOD = 'kf'
+DEFAULT_METHOD = 'skeletal'
+KF_FALLBACK = 'kf_fallback'
 
 
 def variant_key(mesh, scale=1.0):
@@ -180,6 +185,16 @@ def bake(data, palette, meshes, out_id1, jobs=1, method=DEFAULT_METHOD, bipedal=
         from npc_geometry import BakeStop
         raise BakeStop('Creature library: %d meshes stopped by the seam check (new or worse than '
                        'config/mesh-seam-baseline.json):\n  %s' % (len(stops), '\n  '.join(stops)))
+    if method == 'skeletal':
+        # a mesh the skeletal bake refuses keeps the baked method (six groups) rather than being left out
+        retry = {m: ids for m, ids in meshes.items() if variant_key(m) in failed}
+        if retry:
+            more, still = bake(data, palette, retry, out_id1, jobs, 'kf', bipedal, scales)
+            for key, record in more.items():
+                why = failed.pop(key, None)
+                done[key] = dict(record, **{KF_FALLBACK: why})
+                print('Creature library: %s baked with kf instead (skeletal refused: %s)' % (key, why), flush=True)
+            failed.update(still)
     return done, failed
 
 
@@ -213,11 +228,28 @@ def _unit(task):
 _assets = {}
 
 
+def layered_assets(data):
+    """The assets the library's creature bakes read: loose files over the selected masters' archives
+    (mwad.archives.layered_bsa; Morrowind.bsa alone for the base game). The expansions' creatures live in Tribunal.bsa
+    and Bloodmoon.bsa: read from the base archive alone, all 37 of their meshes were missing and left out of the actor
+    library (ACTOR-LIBRARY-BASE-ARCHIVE-66). The skeletal method's reader (creature_tables._open) takes them from its
+    own cache, filled here first; its code is unchanged, so the room stages' resident creatures (base game creatures
+    only, config/interior_creatures.json) keep their keys."""
+    import creature_tables
+    from mwad.archives import layered_bsa
+    from npc_geometry import Assets
+    key = str(Path(data).resolve())
+    if key not in creature_tables._assets:
+        creature_tables._assets[key] = Assets(Path(data), layered_bsa(Path(data)))
+    return creature_tables._assets[key]
+
+
 def bake_skeletal(data, palette, app, bipedal):
     """{'files': [(role, bytes, path)], 'record': {...}} of one mesh with the 'skeletal' method: its own table, one
     skeletal model on it and that model's layout (every engine group on the table's frames; tools/creature_tables.py).
     One model plays every group, so there is no separate mover (the layout names none)."""
     import creature_tables
+    layered_assets(data)
     mesh, out, error = creature_tables.unit((app['mesh'], data, palette, bipedal, False))
     if out is None:
         raise ValueError(error)
@@ -232,6 +264,8 @@ def bake_skeletal(data, palette, app, bipedal):
               'vertices': rep['vertices'], 'step': idle_step, 'idle': 'idle', 'kit': rep['kit'],
               'scaled_bones': rep['scaled_bones'], 'repeated_node_names': rep['repeated_node_names'],
               'sha256': rep['model_sha256'], 'table_sha256': rep['table_sha256']}
+    if rep.get('effects_left_out'):
+        record['effects_left_out'] = rep['effects_left_out']
     return {'files': files, 'record': record}
 
 
@@ -392,6 +426,7 @@ def bake_kf(data, palette, app, bipedal, scale=1.0, profile=None, corpse=False):
     import numpy as np
     from mwad.audit import BSA, normpath
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     from mwad.scene import unpack_geometry
     from npc_geometry import Assets, bake as bake_model, animated_mdl
     from prepare_scenery import model_geometry, nif_reader
@@ -400,7 +435,10 @@ def bake_kf(data, palette, app, bipedal, scale=1.0, profile=None, corpse=False):
     import creature_residents
     root = str(Path(data).resolve())
     if root not in _assets:
-        _assets[root] = Assets(Path(data), BSA(child_ci(Path(data), 'Morrowind.bsa')))
+        # loose files over the selected masters' archives, as the skeletal method reads them (creature_tables._open;
+        # the expansions' creatures live in Tribunal.bsa and Bloodmoon.bsa, ACTOR-LIBRARY-BASE-ARCHIVE-66)
+        from mwad.archives import layered_bsa
+        _assets[root] = Assets(Path(data), layered_bsa(Path(data)))
     assets = _assets[root]
     reader = nif_reader()
     rig = creature_pose.CreatureRig(reader, assets.read, app['mesh'], bipedal)
@@ -554,7 +592,8 @@ def main(argv=None):
     p.add_argument('--method', choices=METHODS, default=DEFAULT_METHOD)
     a = p.parse_args(argv)
     from mwad.paths import child_ci
-    planned = plan(child_ci(a.data_files, 'Morrowind.esm').read_bytes())
+    from mwad.masters import master_path
+    planned = plan(master_path(a.data_files).read_bytes())
     meshes, corpses = planned['meshes'], planned['corpses']
     if a.only:
         want = {i.strip().casefold() for i in a.only.split(',')}

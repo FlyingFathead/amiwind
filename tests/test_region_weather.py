@@ -75,7 +75,12 @@ class WeatherWiringTests(unittest.TestCase):
         host = code('aw_mwhost.c')
         self.assertIn('AW_WeatherChangeByScript(numbers[0].i,numbers[1].i)', host)
         self.assertIn('AW_WeatherModRegionByScript(numbers[0].i,chances,n<0?0:n)', host)
-        self.assertIn('k=AW_WeatherScriptSave(out+n+s+t,capacity-n-s-t-8);', host)
+        self.assertIn('ACTOR_PART(AW_WeatherScriptSave(out+n+s+t,capacity-n-s-t-8),"the scripted weather");', host)
+        # SAVE-STATE-FIXED-CAPS-66: the rows are a guard above the three masters' 16 regions (was 8, under them), and the
+        # export writes every row (the table refuses a row past the bound when it is set; the old clamp was dead code)
+        self.assertIn('#define AW_WEATHER_SCRIPT_ROWS 32', code('aw_weather.h'))
+        self.assertNotIn('if(n>AW_WEATHER_SCRIPT_ROWS)n=AW_WEATHER_SCRIPT_ROWS;', code('aw_weather_rules.c'))
+        self.assertIn('if(s->count>=AW_WEATHER_SCRIPT_ROWS)return -1;', code('aw_weather_rules.c'))
         self.assertIn('!memcmp(p+rest,"AWWR",4)', host)
         imp = host[host.index('static void actors_import('):]
         self.assertIn('AW_WeatherScriptClear();', imp[:imp.index('\n}\n')])

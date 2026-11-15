@@ -157,16 +157,18 @@ class NeighboringFacadeSupport:
 
     def _load(self):
         import hashlib
-        from mwad.audit import load_esm, BSA, normpath
+        from mwad.audit import load_esm, normpath
+        from mwad.archives import layered_bsa
         from mwad.paths import child_ci
+        from mwad.masters import master_path
         from mwad.scene import unpack_geometry
         from prepare_scenery import bsa_read, model_geometry, nif_reader, reference_rotation
         radius = int(self.settings['source_radius']) + 1
         if not 1 <= radius <= 9:
             raise ValueError('Window support source radius outside bounds')
         cx, cy = self.settings['source_cell']
-        esm = load_esm(child_ci(self.data, 'Morrowind.esm'))
-        bsa = BSA(child_ci(self.data, 'Morrowind.bsa'))
+        esm = load_esm(master_path(self.data))
+        bsa = layered_bsa(self.data)
         reader = nif_reader()
         geometry = {}
         self.walls = []

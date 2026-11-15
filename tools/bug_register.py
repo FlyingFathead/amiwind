@@ -125,7 +125,13 @@ FIELDS = {'id': str, 'title': str, 'state': str, 'fixed_in': (str, type(None)),
 # Facts every bug found from v0.0.30 on must carry (project requirement, 9 October 2026).
 FACTS = ('reported_by', 'found_date', 'found_in', 'where', 'reproduction', 'duplicate_of', 'persists_in',
          'severity', 'severity_reason', 'family', 'related')
-OPTIONAL = ('tags', 'chim', 'build', 'reports', 'platform', 'platform_reason', 'waiting_on', 'deferred', 'regressions')
+OPTIONAL = ('tags', 'chim', 'build', 'reports', 'platform', 'platform_reason', 'waiting_on', 'deferred', 'regressions',
+            'fix_commit', 'fixed_date', 'todo')
+# How a fix is recorded (TRACKER-DONE-VIEW-66, 13 November 2026): the commit that fixed the bug, the local date of the fix
+# and the planning item that carried the work. Optional, only on a fixed bug; filled by `set --fix-commit --fixed-date --todo`.
+FIX_COMMIT_RE = re.compile(r'^[0-9a-f]{7,40}$')
+FIXED_DATE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
+TODO_ID_RE = re.compile(r'^[A-Z0-9][A-Z0-9-]*[A-Z0-9]$')
 # Why an open bug is not fixed yet (the maintainer, 24 October 2026: "lacks dependency"): waiting_on is "Lacks dependency:
 # <system>" (MWScript function, object state, inventory, journal, combat, jail system, renderer ...), deferred the
 # maintainer's written deferral "YYYY-MM-DD: reason". A bug open in LONG_PERSISTING releases or more needs one of them
@@ -308,6 +314,13 @@ def _line_ok(text, limit):
     return isinstance(text, str) and text.strip() and '|' not in text and '\n' not in text and len(text) <= limit
 
 
+# The one-line text fields (where, the severity reason, the platform and its reason, the waiting and deferred notes,
+# the build notes) are table cells or fact rows: one line and no "|" (both break a table), and only a generous cap that
+# catches a page pasted by mistake. The writer keeps them short by judgement; the tables shorten what they show
+# (the maintainer, 2026-11-12: no tight character limits; earlier caps of 100 to 200 characters refused real entries).
+LINE_MAX = 2000
+
+
 # Names the public text never holds, any case (the maintainer, 24 and 29 October 2026): kept in pieces so no file of the
 # tree spells them. tests/test_public_tree_private_words.py takes this tuple for its whole-tree check, and the gate's
 # first step (the maintainer's private list, a longer one) checks every commit.
@@ -347,8 +360,8 @@ def validate_facts(b, ids, families, where):
     if 'found_in' in b and not (g('found_in') == 'unknown' or isinstance(g('found_in'), str)
                                 and VERSION_RE.match(g('found_in'))):
         errors.append('%s: found_in must be a version like v0.0.32-dev3, or unknown' % where)
-    if 'where' in b and not _line_ok(g('where'), 100):
-        errors.append('%s: where must be one line of at most 100 characters without | (it is a table cell: the long text goes into the status or a report note or the bug\'s report page, never into another entry)' % where)
+    if 'where' in b and not _line_ok(g('where'), LINE_MAX):
+        errors.append('%s: where must be one line without | (it is a table cell: the long text goes into the status or a report note or the bug\'s report page, never into another entry)' % where)
     if 'reproduction' in b and g('reproduction') not in REPRODUCTION:
         errors.append('%s: reproduction must be one of %s' % (where, REPRODUCTION))
     if 'duplicate_of' in b:
@@ -368,8 +381,8 @@ def validate_facts(b, ids, families, where):
                           'or unknown' % where)
     if 'severity' in b and g('severity') not in SEVERITIES:
         errors.append('%s: severity must be one of %s' % (where, SEVERITIES))
-    if 'severity_reason' in b and not _line_ok(g('severity_reason'), 160):
-        errors.append('%s: severity_reason must be one line of at most 160 characters without |' % where)
+    if 'severity_reason' in b and not _line_ok(g('severity_reason'), LINE_MAX):
+        errors.append('%s: severity_reason must be one line without |' % where)
     if 'family' in b and g('family') not in families:
         errors.append('%s: family %r is not in docs/bugs/families.json' % (where, g('family')))
     if 'related' in b:
@@ -429,13 +442,13 @@ def validate_build(b, where):
         errors.append('%s: a CHIM bug names the CHIM version and world format of its build (or unknown with '
                       'a reason)' % where)
     unknown = [k for k in BUILD_KEYS[:6] if m.get(k) == 'unknown']
-    if unknown and not _line_ok(m.get('unknown_reason'), 200):
-        errors.append('%s: build has unknown %s: say why in build.unknown_reason (one line, at most 200 '
-                      'characters, no |)' % (where, ', '.join(unknown)))
+    if unknown and not _line_ok(m.get('unknown_reason'), LINE_MAX):
+        errors.append('%s: build has unknown %s: say why in build.unknown_reason (one line, no |)'
+                      % (where, ', '.join(unknown)))
     if not unknown and 'unknown_reason' in m:
         errors.append('%s: build.unknown_reason without an unknown value' % where)
-    if 'note' in m and not _line_ok(m['note'], 200):
-        errors.append('%s: build.note must be one line of at most 200 characters without |' % where)
+    if 'note' in m and not _line_ok(m['note'], LINE_MAX):
+        errors.append('%s: build.note must be one line without |' % where)
     return errors
 
 
@@ -456,11 +469,11 @@ def validate_platform(b, where):
             errors.append('%s: missing platform (the platform or emulator the maintainer saw it on, e.g. "FS-UAE 3.1.66, '
                           'JIT"; "unknown" or "not in game" with platform_reason)' % where)
         return errors
-    if not _line_ok(v, 120):
-        errors.append('%s: platform must be one line of at most 120 characters' % where)
+    if not _line_ok(v, LINE_MAX):
+        errors.append('%s: platform must be one line without |' % where)
     elif v in PLATFORM_UNKNOWN:
-        if not _line_ok(b.get('platform_reason'), 200):
-            errors.append('%s: platform "%s" needs platform_reason (one line, at most 200 characters)' % (where, v))
+        if not _line_ok(b.get('platform_reason'), LINE_MAX):
+            errors.append('%s: platform "%s" needs platform_reason (one line, without |)' % (where, v))
     elif 'platform_reason' in b:
         errors.append('%s: platform_reason is only for "unknown" or "not in game"' % where)
     return errors
@@ -654,6 +667,14 @@ def validate(bugs, families=None):
                               'with "fixed in source" in status until a numbered build ships it' % (where, k, b[k]))
         if b['owner_accepted'] and b['state'] != 'fixed':
             errors.append('%s: owner_accepted needs a fixed bug' % where)
+        for k, rx, what in (('fix_commit', FIX_COMMIT_RE, 'a git commit id of 7 to 40 lowercase hex characters'),
+                            ('fixed_date', FIXED_DATE_RE, 'a date YYYY-MM-DD'),
+                            ('todo', TODO_ID_RE, 'a planning item id (capitals, digits and dashes)')):
+            if k in b:
+                if b['state'] != 'fixed':
+                    errors.append('%s: only a fixed bug has %s' % (where, k))
+                elif not isinstance(b[k], str) or not rx.match(b[k]):
+                    errors.append('%s: %s must be %s' % (where, k, what))
         if b['report'] and b['report'] != 'bugs/%s.md' % b['id']:
             errors.append('%s: report must be bugs/%s.md' % (where, b['id']))
         if b['report'] and not (REGISTER.parent / b['report']).is_file():
@@ -687,11 +708,11 @@ def validate_waiting(b, where):
     errors = []
     waiting, deferred = b.get('waiting_on'), b.get('deferred')
     if 'waiting_on' in b and not (isinstance(waiting, str) and waiting.startswith(WAITING_PREFIX)
-                                  and len(waiting) > len(WAITING_PREFIX) and _line_ok(waiting, 120)):
-        errors.append('%s: waiting_on must be one line "%s<system>" of at most 120 characters' % (where, WAITING_PREFIX))
-    if 'deferred' in b and not (isinstance(deferred, str) and DEFERRED_RE.match(deferred) and _line_ok(deferred, 200)):
-        errors.append('%s: deferred must be one line "YYYY-MM-DD: reason" of at most 200 characters (the maintainer\'s '
-                      'deferral; this one has %d)' % (where, len(deferred) if isinstance(deferred, str) else 0))
+                                  and len(waiting) > len(WAITING_PREFIX) and _line_ok(waiting, LINE_MAX)):
+        errors.append('%s: waiting_on must be one line "%s<system>" without |' % (where, WAITING_PREFIX))
+    if 'deferred' in b and not (isinstance(deferred, str) and DEFERRED_RE.match(deferred) and _line_ok(deferred, LINE_MAX)):
+        errors.append('%s: deferred must be one line "YYYY-MM-DD: reason" without | (the maintainer\'s deferral)'
+                      % where)
     if (waiting or deferred) and b.get('state') != 'open':
         errors.append('%s: waiting_on and deferred belong to open bugs; clear them when it is fixed or closed' % where)
     return errors
@@ -813,6 +834,8 @@ def reopen(b, version, at, by=None, note=None):
     b['status'] = 'REGRESSED in %s (%s before)%s. Before: %s' % (version, before, ': ' + note if note else '',
                                                                  b['status'])
     b['state'], b['fixed_in'], b['owner_accepted'] = 'open', None, None
+    for k in ('fix_commit', 'fixed_date', 'todo'):
+        b.pop(k, None)                      # the fix record belongs to the fix that did not hold
     if b.get('severity') in SEVERITIES:
         raised = SEVERITIES[max(SEVERITIES.index(b['severity']) - 1, 0)]
         if raised != b['severity']:
@@ -912,6 +935,12 @@ def facts_table(b, by_id, families):
             ('Persists in', persists_text(b)),
             ('Severity', '%s: %s' % (b['severity'], b['severity_reason']) if b.get('severity') else 'unknown'),
             ('Family', '%s (`%s`)' % (fam['title'], fam['key']) if fam else 'unknown')]
+    if b.get('fix_commit'):
+        rows.append(('Fix commit', '`%s`' % b['fix_commit']))
+    if b.get('fixed_date'):
+        rows.append(('Fixed on', b['fixed_date']))
+    if b.get('todo'):
+        rows.append(('Planning item', '`%s`' % b['todo']))
     if b.get('waiting_on'):
         rows.append(('Waiting on', b['waiting_on']))
     if b.get('deferred'):
@@ -1573,6 +1602,9 @@ def main(argv=None):
     pp.add_argument('--fail', action='store_true', help='exit 1 when one has no reason of record')
     s = sub.add_parser('set'); s.add_argument('id'); s.add_argument('--state', choices=STATES)
     s.add_argument('--fixed-in'); s.add_argument('--status'); s.add_argument('--owner-accepted')
+    s.add_argument('--fix-commit', help='git commit id of the fix (fixed bugs only)')
+    s.add_argument('--fixed-date', help='local date of the fix, YYYY-MM-DD (fixed bugs only)')
+    s.add_argument('--todo', help='the planning item that carried the fix (fixed bugs only)')
     s.add_argument('--tag', action='append', choices=TAGS, default=[])
     s.add_argument('--found-in'); s.add_argument('--duplicate-of'); s.add_argument('--persists-in', nargs='+')
     facts_args(s, False)
@@ -1701,11 +1733,16 @@ def main(argv=None):
             b['state'] = args.state
             if args.state != 'fixed':
                 b['fixed_in'] = None
+                for k in ('fix_commit', 'fixed_date', 'todo'):
+                    b.pop(k, None)
             if args.state != 'open':
                 b.pop('waiting_on', None)
                 b.pop('deferred', None)
         if args.fixed_in:
             b['fixed_in'] = args.fixed_in
+        for k, v in (('fix_commit', args.fix_commit), ('fixed_date', args.fixed_date), ('todo', args.todo)):
+            if v:
+                b[k] = v
         if args.status:
             b['status'] = args.status
         if args.owner_accepted:

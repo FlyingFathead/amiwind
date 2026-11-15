@@ -116,6 +116,7 @@ Family: First-person hands and torch (`torch-hands`). First-person hands, punche
 - HAND-PUNCH-TRANSITION-29 (no report page): Hands briefly disappear when changing into the punch animation
 - [HELD-LIGHT-ALWAYS-TORCH-61](HELD-LIGHT-ALWAYS-TORCH-61.md): Any carried light held in the hand is drawn and lit as a torch
 - HELD-LIGHT-NOT-IN-HAND-65 (no report page): An equipped candlestick is not held in the hand; readying shows only the fists
+- PLAYER-3P-HELD-ITEM-STALE-65 (no report page): After a new weapon is given and readied, the third-person body still holds the light that was equipped before
 - PLAYER-EQUIPMENT-NOT-WORN-54 (no report page): The player body shows no chosen head or hair, no worn clothing or armour and no weapon: it is baked per race and sex with fixed new-game looks
 - [PLAYER-MOVEMENT-FRAME-SKIP-39](PLAYER-MOVEMENT-FRAME-SKIP-39.md): Third-person Nord and Khajiit fast movement loses smooth foot animation
 - PLAYER-PARTS-BAKE-REFUSED-59 (no report page): Two body part meshes are refused by the assembled player body's parts library

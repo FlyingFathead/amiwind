@@ -261,7 +261,10 @@ class DoorGraphTests(unittest.TestCase):
         self.assertEqual(rooms['Cellar']['access'], 'unreachable')
         self.assertEqual(rooms['City Gate']['island'], 'Mournhold')
         self.assertEqual(rooms['City Gate']['access'], 'teleport_only')
+        # a cell that behaves like an exterior is no room (INTERIOR-NO-AMBI-66): set aside, waiting for the Mournhold
+        # exterior work, and still noted
         self.assertEqual(rooms['City Gate']['hard'], ['teleport_only', 'behaves_exterior'])
+        self.assertIn('behaves_exterior', rooms['City Gate']['notes'])
         self.assertEqual(rooms['Palace']['access'], 'teleport')
         self.assertEqual(rooms['Palace']['island'], 'Mournhold')
         self.assertEqual(rooms['Palace']['hard'], [])
@@ -328,11 +331,31 @@ class DoorGraphTests(unittest.TestCase):
         later = plan['later'][0]
         self.assertEqual((later['batch'], later['master'], later['rooms']),
                          ('later: Mournhold', 'Tribunal.esm', ['City Gate', 'Palace']))
-        self.assertIn('scripts step', later['waits_for'])
-        self.assertEqual([(p['room'], p['state']) for p in later['parity']], [('City Gate', 'teleport_only')])
+        self.assertIn('plan --layers', later['waits_for'])    # the hold lifted: the layer batches (v0.0.65)
+        # an exterior-like cell is set aside, never parity (INTERIOR-NO-AMBI-66)
+        self.assertEqual(later['parity'], [])
+        self.assertEqual(later['aside_reasons'], {'behaves_exterior': 1, 'teleport_only': 1})
         # the Cellar lost its door to the expansion: no door reaches it, so it joins the Vvardenfell parity batch
         self.assertIn('Cellar', plan['batches'][-1]['rooms'])
         self.assertIn('## Later batches (expansions)', G.plan_markdown(plan))
+
+    def test_plan_with_a_layer_batches_its_rooms_after_the_island(self):
+        # CHIM-SOL-FLORA-PATH-65: a selected layer's rooms join the plan as its own batches; the island's are unchanged
+        (self.data / 'Tribunal.esm').write_bytes(expansion())
+        doc, _, _ = self.graph()
+        alone = G.plan(doc, None, batch_rooms=40)
+        both = G.plan(doc, None, batch_rooms=40, layers=['Tribunal.esm'])
+        n = len(alone['batches'])
+        self.assertEqual(both['batches'][:n], alone['batches'])
+        layer = both['batches'][n:]
+        self.assertTrue(layer and all(b['master'] == 'Tribunal.esm' for b in layer))
+        self.assertEqual(sorted(r for b in layer for r in b['rooms']), ['Palace'])
+        # the exterior-like cell is listed with its master, not converted (INTERIOR-NO-AMBI-66)
+        self.assertEqual(both['exterior_like'], [{'cell': 'City Gate', 'master': 'Tribunal.esm',
+                                                  'state': 'an exterior-like cell, waiting for the Mournhold exterior work'}])
+        self.assertEqual(both['summary']['later'], {})
+        self.assertEqual(both['later'], [])
+        self.assertEqual(G.plan(doc, None, batch_rooms=40, layers=()), alone)
 
     def test_parity_states(self):
         self.assertEqual(G.parity_state({'name': 'ToddTest', 'hard': ['unreachable']}), 'test_cell')

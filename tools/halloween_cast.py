@@ -457,6 +457,7 @@ def dancer_model(identifier):
 def _assets(data):
     from mwad.audit import BSA
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     from npc_geometry import Assets
     return Assets(Path(data), BSA(child_ci(Path(data), 'Morrowind.bsa')))
 
@@ -490,9 +491,10 @@ def member(item):
             return kind, (identifier, raw, record), None
         if kind == 'sounds':
             from mwad.paths import child_ci
+            from mwad.masters import master_path
             from prepare_combat import load as load_sounds
             _, data, stage = item
-            return kind, cast_sounds(load_sounds(child_ci(Path(data), 'Morrowind.esm')), _assets(data), stage), None
+            return kind, cast_sounds(load_sounds(master_path(Path(data))), _assets(data), stage), None
     except Exception as error:  # noqa: BLE001 (left out with its reason: the skeletons-only version still plays)
         return kind, (item[1][2]['id'] if kind == 'dancer' else None), _error(error)
     raise ValueError('Unknown Halloween cast member ' + kind)
@@ -559,6 +561,7 @@ def stage_cast(data_files, id1, stage, jobs=1, soundtrack_bpm=None):
     from build_parallel import in_order_map
     from mwad.npc import load_master, outfit, greeting_fixture
     from mwad.paths import child_ci, replace_bytes as replace
+    from mwad.masters import master_path
 
     def replace_bytes(path, raw):
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -571,7 +574,7 @@ def stage_cast(data_files, id1, stage, jobs=1, soundtrack_bpm=None):
     palette = (id1 / 'gfx/palette.lmp').read_bytes()
     stage = Path(stage)
     rows, report = [], {'left_out': []}
-    kinds, _cells, topics = load_master(child_ci(data, 'Morrowind.esm'))
+    kinds, _cells, topics = load_master(master_path(data))
     items = [('skeleton', data, palette), ('dagoth', data, palette)]
     for identifier in DANCERS:
         if identifier not in kinds['NPC_']:

@@ -2,6 +2,20 @@
 
 _Last updated with AmiWind v0.0.64-dev5 (11 November 2026)._
 
+<!-- contents start -->
+## Contents
+
+- [How many small effect icons there are (11 November 2026)](#how-many-small-effect-icons-there-are-11-november-2026)
+- [In the game (v0.0.64)](#in-the-game-v0064)
+- [How many effects can be active?](#how-many-effects-can-be-active)
+- [Instances, effect types and icons](#instances-effect-types-and-icons)
+- [Planned AGA layout and overflow](#planned-aga-layout-and-overflow)
+- [Original icons and build preparation](#original-icons-and-build-preparation)
+- [Condition, charge, spell chance and Endurance](#condition-charge-spell-chance-and-endurance)
+- [Bounded display diagnostic and acceptance](#bounded-display-diagnostic-and-acceptance)
+
+<!-- contents end -->
+
 ## How many small effect icons there are (11 November 2026)
 
 The small coloured icons the HUD shows while something is on the player (a disease, a shrine blessing, a race or
@@ -36,6 +50,55 @@ box you scroll up and down: every active effect with its icon, name, description
 disease, blessing, ability, item) and the time left for timed ones. So a few always show on the HUD, and the whole list
 is one key away in the stats view. How many icons fit in a row follows from the HUD width at the screen mode in use. The icons are converted from the player's own game data by the build (about 256 bytes each at 16 × 16
 in 8 bits, about 36 KB for all of them); the repository holds the converter, never the pixels.
+
+## In the game (v0.0.64)
+
+**Under the view.** The icons stand right of the weapon and magic boxes and the sneak indicator, in the strip under the
+view, one 12 × 12 icon per active effect type, in effect-number order as OpenMW orders them. The first row is the lowest
+one; when it is full the icons go on in a second and a third row above it. When even three rows are full, the last
+place shows "+N" for the effect types that do not fit. How many fit follows the screen width: 12 a row at 320 pixels
+(36 in three rows), 37 a row at 640 (the picture cache caps the HUD at 48 places). With the debug HUD on (`dbg hud`)
+the strip has no free rows beside the bars, so the icons get rows of their own under the name line and the view is
+that much shorter while effects are active.
+
+**The Stats window.** The same icons stand under the birthsign (one row, nine places, "+N" past them). V in the Stats
+window opens the list of every active effect over the window: each effect's 16 × 16 icon and name, its description from
+the game data, and one line per source: the attribute or skill it acts on, the magnitude in points (none for an effect
+without a magnitude), the source's name (the spell, the worn item), what kind of source it is (spell, potion or item,
+worn item, ability, disease, blight disease, curse) and the time left, or "permanent". Up and Down, the wheel, Page Up
+and Page Down and the scroll bar move it; V or Escape go back to the Stats window; P closes both. The game is paused
+while the window is open, as with every window. V outside the Stats window stays the torch.
+
+**What counts as active.** Every effect in the player's active effect list (spells cast on the player, potions and
+ingredients, used and striking items, the constant effects of worn items) and the effects of the spells in the
+player's list that act always: race and birthsign abilities, diseases, blights and curses (OpenMW keeps those active
+with no end). A script's resistance change (SetResistFire and the like) changes a magnitude but shows no icon.
+
+**The switch.** `aw_hud_effects 1` (the default, in the game's default settings) shows the icons; `dbg hudeffects off`
+hides them under the view and on the Stats window, and V still lists everything. The setting is saved. `dbg effects`
+prints what is active, the pictures held and read, and the strip lines the debug HUD gives the icons.
+
+**The pictures.** The build converts each magic effect record's small icon (its ITEX) from the player's own game data
+into `gfx/effects.awe`, at 12 × 12 for the HUD and 16 × 16 for the list, together with the effect's description; one
+row per effect number, so the game reads an effect's row directly. An effect whose icon the data does not have gets an
+empty framed place, never drawn stand-in art. The repository holds the converter only.
+
+### Cost
+
+Measured numbers come from the in-game check (pending); the sizes below are the program's own.
+
+| What | Bytes or work | When |
+| --- | --- | --- |
+| Effect file directory | 2,288 bytes resident | read on the first effect shown, kept |
+| HUD picture cache | 48 icons, 7,296 bytes | allocated on the first effect shown, kept |
+| Active list, icons, always-active entries | 4,096 bytes resident | static |
+| The list behind V | about 52 KB | while it is open, freed on closing |
+| Per frame | one pass over the 64-entry effect pool, a sort of at most 96 entries, 144 bytes copied per icon | while the HUD shows |
+| Disk in play | one open of `gfx/effects.awe` for the icons new in that frame (144 bytes each); the always-active spells' effects read again only when the player's spell list changes | when an effect first shows |
+| Disk on V | one open, the 16 × 16 icons (256 bytes each) and the descriptions of the effects listed | when the list opens |
+| Image | `gfx/effects.awe`, about 80 KB (143 rows, two pictures and a description per effect) | build |
+
+Nothing is drawn in the 3D view: no triangles, models or lights are added.
 
 14 October 2026. Source findings and planned follow-up for v0.0.40. This document does not implement the effect grid, original icon conversion, selected-magic gameplay or the display diagnostic. The current HUD's interim artwork does not establish original visual parity. See the [HUD roadmap](ROADMAP_HISTORY.md#world-map-inventory-and-journal-todo-maintainer-request-1-october-2026) and [HUD-STATS-29](bugs/HUD-STATS-29.md).
 

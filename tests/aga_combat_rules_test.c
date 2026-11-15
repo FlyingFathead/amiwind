@@ -140,6 +140,13 @@ int main(void) {
     r=seeded_for(0);
     AW_CombatSwing(&s,&y,&m,AW_ATTACK_CHOP,.5f,180,1,&r,&out);
     assert(out.outcome==AW_HIT_MISS && near(y.fatigue,198) && near(m.health,94) && near(m.fatigue,208));
+    /* ACTOR-MECHANICS-USE-STATS-66 (OpenMW 0.51 combat.cpp applyFatigueLoss): the load counts with fFatigueAttackMult
+     * (0 in the original masters, so 2 as above; a mod's 3 at a load of 1.5 over capacity: 2 + 4.5, not clamped) */
+    m=mevil();y=player();y.encumbrance=1.5f;s.fFatigueAttackMult=3;r=seeded_for(0);
+    AW_CombatSwing(&s,&y,&m,AW_ATTACK_CHOP,.5f,180,1,&r,&out);
+    assert(out.outcome==AW_HIT_MISS && near(y.fatigue,200-2-4.5f));
+    s.fFatigueAttackMult=0;y.encumbrance=0;
+    m=mevil();y=player();
 
     /* the punch: fatigue damage 30 x (0.1 + 0.4 x 0.5) = 9; to health only while down */
     r=seeded_for(1);y.skills[AW_SK_H2H]=200;
@@ -149,6 +156,14 @@ int main(void) {
     AW_CombatSwing(&s,&y,&m,AW_ATTACK_CHOP,.5f,180,1,&r,&out);
     /* 60 x 0.1 = 6, x 1.5 (down) = 9, armour 8.814: 9 x 9/17.814 = 4.547 */
     assert(out.outcome==AW_HIT_HEALTH && near(out.damage,4.547f) && near(m.health,94-4.547f));
+    /* ACTOR-MECHANICS-USE-STATS-66 row 4 (OpenMW 0.51 combat.cpp getHandToHandDamage): a paralysed victim takes the punch
+     * to health too, without the knockdown's x 1.5: 60 x 0.1 = 6, armour 8.814: 6 x 6/14.814 = 2.430 */
+    m=mevil();m.paralyzed=1;r=seeded_for(1);
+    AW_CombatSwing(&s,&y,&m,AW_ATTACK_CHOP,.5f,180,1,&r,&out);
+    assert(out.outcome==AW_HIT_HEALTH && near(out.damage,2.430f) && near(m.health,94-2.430f) && !m.knocked);
+    /* no evasion while paralysed (getHitChance) and no block (blockMeleeAttack) */
+    m=mevil();y=player();y.paralyzed=1;assert(AW_CombatHitChance(&s,&m,&y)==61);
+    y=player();m.paralyzed=1;assert(!AW_CombatCanBlock(&s,&m,0));m.paralyzed=0;assert(AW_CombatCanBlock(&s,&m,0) || !m.shield);
     m=mevil();y=player();
 
     /* critical strike on an unaware victim: x4 (here then reduced by armour) */
@@ -321,6 +336,13 @@ int main(void) {
     AW_CombatSwing(&s,&y,&m,AW_ATTACK_CHOP,1,0,1,&r,&out);
     assert(out.outcome==AW_HIT_BLOCKED && out.shield_broke && !m.shield && near(m.shield_health,0));
     assert(near(m.fatigue,208-4-20*1*1));                                 /* fFatigueBlockBase + weight x swing x mult */
+    /* ACTOR-MECHANICS-USE-STATS-66 (blockMeleeAttack): the blocker's load x fFatigueBlockMult, the load at most 1 */
+    m=mevil();y=player();m.skills[AW_SK_BLOCK]=100;m.encumbrance=1.5f;s.fFatigueBlockMult=2;
+    y.weapon=2;y.weapon_skill=AW_SK_LONG;y.skills[AW_SK_LONG]=60;y.damage[0][0]=20;y.damage[0][1]=20;y.weight=20;
+    r=seeded_for(1);
+    AW_CombatSwing(&s,&y,&m,AW_ATTACK_CHOP,1,0,1,&r,&out);
+    assert(out.outcome==AW_HIT_BLOCKED && near(m.fatigue,208-4-2-20));
+    s.fFatigueBlockMult=0;
     /* a miss is classified for the AmiWind style: block-like with a usable shield, else dodge */
     m=mevil();y=player();r=seeded_for(0);
     AW_CombatSwing(&s,&y,&m,AW_ATTACK_CHOP,.5f,0,1,&r,&out);
@@ -365,6 +387,21 @@ int main(void) {
         m.flee=100;assert(AW_CombatFleeRating(&a,&m,400)==100 && AW_CombatFleeDecision(&a,&m,400));
         m.weapon=0;m.armor=0;m.flee=30;m.health=1;                 /* hand to hand rates 0, a low rating counts as 0 */
         assert(AW_CombatAntiFleeRating(&a,&m)==0 && !AW_CombatFleeDecision(&a,&m,400));
+        /* ACTOR-MECHANICS-USE-STATS-66 row 16 (vanillaRateFlee): an NPC below iWereWolfLevelToAttack 20 facing a werewolf
+         * rates iWereWolfFleeMod 100, + the distance term 18 at 400 = 118, over Mevil's weapon 17.77: he runs */
+        m=mevil();m.level=5;m.flee=30;
+        assert(AW_CombatWerewolfFleeMod(&m,1,20,100)==100);
+        assert(AW_CombatWerewolfFleeMod(&m,0,20,100)<0 && AW_CombatWerewolfFleeMod(&m,1,0,100)<0);   /* no werewolf; no setting */
+        m.level=20;assert(AW_CombatWerewolfFleeMod(&m,1,20,100)<0);m.level=5;                     /* at the level: fights */
+        m.creature=1;assert(AW_CombatWerewolfFleeMod(&m,1,20,100)<0);m.creature=0;                /* a creature: fights */
+        assert(near(AW_CombatFleeRatingVs(&a,&m,400,100),118) && near(AW_CombatFleeRatingVs(&a,&m,400,-1),9+18));
+        assert(AW_CombatFleeDecisionVs(&a,&m,400,100,AW_CombatAntiFleeRating(&a,&m)));
+        assert(!AW_CombatFleeDecisionVs(&a,&m,400,-1,AW_CombatAntiFleeRating(&a,&m)));
+        /* a spell as the best action (prepareNextAction, vanillaRateSpell): chance 60 x 5 with a Target effect, 0 against
+         * a swimmer, x 3 without one; the decision uses it in place of the weapon's */
+        assert(near(AW_CombatSpellAntiFlee(60,1<<2,3,5,0),300) && near(AW_CombatSpellAntiFlee(60,(1<<2)|1,3,5,1),0) &&
+               near(AW_CombatSpellAntiFlee(60,1,3,5,0),180));
+        assert(!AW_CombatFleeDecisionVs(&a,&m,400,100,AW_CombatSpellAntiFlee(60,1<<2,3,5,0)));   /* 118 < 300: casts */
         m=mevil();
     }
 
@@ -411,6 +448,20 @@ int main(void) {
         AW_CombatSwing(&s,&c,&m,AW_ATTACK_CHOP,.5f,0,1,&r,&o);
         assert(o.outcome==AW_HIT_FATIGUE);                                            /* bipedal: hand to hand */
         m=mevil();
+        /* NPC-CREATURE-COMBAT-STYLE-STATS-66: an armed skeleton (weapon flag) fights with its axe's damage, health
+         * damage like an NPC's weapon blow; since v0.0.66 a bow is held for the shot (ACTOR-RANGED-COMBAT-MISSING-66),
+         * an arrow and a non-weapon item never */
+        {aw_item_t it;memset(&it,0,sizeof(it));it.kind=AWK_WEAPON;it.type=7;it.health=300;it.reach=1;it.speed=1;
+         it.weight=10;it.damage[0]=2;it.damage[1]=10;
+         assert(AW_CombatCreatureWeapon(&c,&it) && c.weapon==8 && c.weapon_skill==AW_SK_AXE && c.damage[0][1]==10);
+         AW_CombatSwing(&s,&c,&m,AW_ATTACK_CHOP,.5f,0,1,&r,&o);
+         assert(o.outcome==AW_HIT_HEALTH);                                            /* a weapon blow, not fists */
+         m=mevil();
+         it.type=12;assert(!AW_CombatCreatureWeapon(&c,&it) && c.weapon==8);          /* an arrow: unchanged */
+         it.type=9;assert(AW_CombatCreatureWeapon(&c,&it) && c.weapon==10 && c.weapon_skill==AW_SK_MARKSMAN);
+         assert(AW_CombatCreatureWeapon(&c,&(aw_item_t){.kind=AWK_WEAPON,.type=7,.speed=1}) && c.weapon==8);
+         it.kind=AWK_ARMOR;it.type=1;assert(!AW_CombatCreatureWeapon(&c,&it));
+         assert(!AW_CombatCreatureWeapon(&c,NULL));}
         /* the creature as the victim: no armour, so the whole blow lands */
         b.flags=0;AW_CombatCreatureSheet(&b,"daedroth",&c);
         AW_CombatSwing(&s,&m,&c,AW_ATTACK_CHOP,1,0,1,&r,&o);
@@ -418,8 +469,47 @@ int main(void) {
         aw_combat_dice=1;m=mevil();
     }
 
+    /* ACTOR-RANGED-COMBAT-MISSING-66: the shot's rules */
+    {aw_fighter_t a,o;aw_item_t bow,arrow;unsigned char chop[2]={2,6};float from[3]={0,0,20},to[3]={300,0,20},dir[3],
+     pos[3],vel[3],next[3],g=17.15f,speed;int k,steps=0;
+     memset(&a,0,sizeof(a));
+     /* which weapon needs which round: a bow arrows (13), a crossbow bolts (14), a thrown weapon itself (0) */
+     assert(AW_CombatAmmoType(10)==13 && AW_CombatAmmoType(11)==14 && AW_CombatAmmoType(12)==0);
+     assert(AW_CombatAmmoType(0)==-1 && AW_CombatAmmoType(4)==-1);
+     /* the choice: a ranged weapon, a round left, in range (fProjectileMaxSpeed) and in sight */
+     a.weapon=10;
+     assert(AW_CombatShootNow(&a,5,1000,1) && AW_CombatShootNow(&a,1,AW_PROJECTILE_MAX_SPEED,1));
+     assert(!AW_CombatShootNow(&a,0,1000,1) && !AW_CombatShootNow(&a,5,AW_PROJECTILE_MAX_SPEED+1,1));
+     assert(!AW_CombatShootNow(&a,5,1000,0) && !AW_CombatShootNow(NULL,5,1000,1));
+     a.weapon=4;assert(!AW_CombatShootNow(&a,5,100,1));          /* a melee weapon never shoots */
+     /* the draw: min + (max - min) x strength, clamped */
+     assert(near(AW_CombatShotSpeed(0),400) && near(AW_CombatShotSpeed(1),3000) && near(AW_CombatShotSpeed(.5f),1700));
+     assert(near(AW_CombatShotSpeed(-1),400) && near(AW_CombatShotSpeed(2),3000));
+     /* the flight: aimed above by the drop, it falls back to the target's height at the target's distance */
+     speed=AW_CombatShotSpeed(0)*.25f;
+     AW_CombatShotAim(from,to,speed,g,dir);
+     assert(dir[2]>0 && near(dir[0]*dir[0]+dir[1]*dir[1]+dir[2]*dir[2],1));
+     for(k=0;k<3;k++){pos[k]=from[k];vel[k]=dir[k]*speed;}
+     while(pos[0]<to[0] && steps<10000){AW_CombatShotStep(pos,vel,g,.02f,next);for(k=0;k<3;k++)pos[k]=next[k];steps++;}
+     assert(steps<10000 && fabsf(pos[2]-to[2])<4);              /* within a body's height step (the hull is 56) */
+     /* the damage: the weapon's chop plus the round's, capped */
+     a.weapon=10;a.damage[0][0]=1;a.damage[0][1]=25;a.damage[1][1]=9;
+     AW_CombatShotSheet(&a,chop,&o);
+     assert(o.damage[0][0]==3 && o.damage[0][1]==31 && o.damage[1][1]==9 && o.weapon==10);
+     a.damage[0][1]=250;AW_CombatShotSheet(&a,chop,&o);assert(o.damage[0][1]==255);
+     /* a creature holds its bow for the shot (Marksman); a round is never its weapon */
+     memset(&bow,0,sizeof(bow));bow.kind=AWK_WEAPON;bow.type=9;bow.damage[0]=1;bow.damage[1]=25;bow.speed=1;
+     arrow=bow;arrow.type=12;
+     memset(&o,0,sizeof(o));
+     assert(AW_CombatCreatureWeapon(&o,&bow) && o.weapon==10 && o.weapon_skill==AW_SK_MARKSMAN && o.damage[0][1]==25);
+     memset(&o,0,sizeof(o));assert(!AW_CombatCreatureWeapon(&o,&arrow) && o.weapon==0);
+     printf("shot rules ok: the flight lands within %.2f units after %d steps\n",(double)fabsf(pos[2]-to[2]),steps);
+    }
+
     /* a fighter sheet stays small (bytes per actor) */
-    assert(sizeof(aw_fighter_t)<=184);   /* +4 since v0.0.63: the hit chance's effect terms (HIT-CHANCE-CHECK-62) */
+    assert(sizeof(aw_fighter_t)<=192);   /* +4 since v0.0.63: the hit chance's effect terms (HIT-CHANCE-CHECK-62); +4 since
+                                            v0.0.66: the load of the fatigue costs (ACTOR-MECHANICS-USE-STATS-66); +4
+                                            since v0.0.66: the paralysed flag (row 4, with its padding) */
     printf("combat rules ok: fighter %lu bytes, settings %lu bytes\n",(unsigned long)sizeof(aw_fighter_t),(unsigned long)sizeof(s));
     return 0;
 }

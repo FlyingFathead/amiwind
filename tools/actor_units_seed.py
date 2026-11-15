@@ -58,13 +58,14 @@ _TABLE_STATE = {}
 def skeletal_table(data_files, appearance):
     """(table bytes, game path) of an appearance's shared animation table, as npc_library._skeletal_standing gets it."""
     import skeletal_actor
-    from mwad.audit import BSA
+    from mwad.archives import layered_bsa
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     from npc_geometry import Assets, Skeleton
     data = Path(data_files)
     key = str(data.resolve())
     if key not in _TABLE_STATE:
-        _TABLE_STATE[key] = (Assets(data, BSA(child_ci(data, 'Morrowind.bsa'))), {})
+        _TABLE_STATE[key] = (Assets(data, layered_bsa(data)), {})
     assets, rigs = _TABLE_STATE[key]
 
     def rig_of(path):
@@ -87,6 +88,7 @@ def seed(run, data_files, lookup_only=False, log=print):
     import npc_library as NL
     from mwad.npc import load_master
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     run = Path(run)
     library = run / STAGE
     reach = pass_cache.source_digest((NL.__file__, 'bake_standing'))
@@ -112,7 +114,7 @@ def seed(run, data_files, lookup_only=False, log=print):
     for ident, row in manifest['npcs'].items():
         groups.setdefault(row['key'], []).append(ident)
     firsts = {key: sorted(idents)[0] for key, idents in groups.items()}
-    kinds, _, _ = load_master(child_ci(Path(data_files), 'Morrowind.esm'))
+    kinds, _, _ = load_master(master_path(Path(data_files)))
     apps, _ = NL.appearances(kinds, sorted(firsts.values()))
     counts = {'appearances': len(manifest['models']), 'imported': 0, 'found': 0, 'skipped': {}}
 

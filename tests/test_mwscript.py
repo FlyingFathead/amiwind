@@ -579,6 +579,10 @@ class HeldItemBindingTests(unittest.TestCase):
         f = awms.read(awms.write(prog, compiled, binds)[0])
         self.assertEqual(f['BIND_rows'], len(binds))
         self.assertEqual(struct.unpack_from('>I', f['BIND'], 24 * (len(binds) - 1))[0], held_key(301, 1))
+        # SAVE-ITEM-SCRIPT-LOCALS-66: HITM names each held row's item, so a save keeps its values by (holder, item)
+        self.assertGreater(awms.ORDER.index('HITM'), awms.ORDER.index('BIND'))   # on disk, not resident
+        self.assertEqual([struct.unpack_from('>II', f['HITM'], 8 * i) for i in range(f['HITM_rows'])],
+                         [(held_key(301, 0), awms.name_hash('held_misc')), (held_key(301, 1), awms.name_hash('held_two'))])
         with self.assertRaises(ValueError):
             held_key(0x1000000, 0)
 
@@ -595,10 +599,13 @@ class HeldItemBindingTests(unittest.TestCase):
         self.assertEqual(attach.count('held_attach('), 3)            # an edict holder, outdoors, a room's spot
         self.assertIn('if(held_attached_now>=HELD_MAX){held_over++;return -1;}', host)
         self.assertIn('held_recheck(script);', host[host.index('static void pcadd_flush(void){'):])
-        self.assertIn('if(!global && AWB_HELD_KEY(reference))return;', host)
+        # SAVE-ITEM-SCRIPT-LOCALS-66: a held item's values are saved by (holder, item) (HITM), no longer left out, and
+        # parked like an object's once they hold a value (the behaviour: tests/test_save_item_locals.py)
+        self.assertNotIn('if(!global && AWB_HELD_KEY(reference))return;', host)
+        self.assertIn('else if(AWB_HELD_KEY(reference)){*holder=AWB_HELD_HOLDER(reference);*item=hitm_item(reference);}', host)
         vm = (src / 'aw_mwvm.c').read_text(encoding='utf-8')
-        self.assertIn('if(AWB_HELD_KEY(in->reference)){in->flags=0;continue;}', vm)
-        self.assertIn('if(!AWB_HELD_KEY(reference) && (p=park_slot(', vm)
+        self.assertNotIn('if(AWB_HELD_KEY(in->reference)){in->flags=0;continue;}', vm)
+        self.assertIn('park_instance(in);', vm)
 
 
 class ResultKeyTests(unittest.TestCase):
@@ -1543,12 +1550,23 @@ int main(int argc,char **argv){
         return 0;
     }
     for(tick=1;tick<=ticks;tick++){
-        if(used && tick==3)
-            for(i=0;i<AW_MwvmInstanceCount();i++){
-                aw_mwvm_instance_t *in=AW_MwvmInstance(i);
-                if(in && (in->flags&AWI_USED) && in->reference==used &&
-                   (AW_MwvmScriptFlags(in->script)&AWS_ONACTIVATE)){in->flags|=AWI_ACTIVATED;printf("%d used %d\n",tick,i);}
+        /* the player's use as the engine gives it (aw_mwhost.c object_intercept): the script takes it, or not */
+        if(used && tick==3 && AW_MwvmUse(used))printf("%d used %u\n",tick,used);
+        /* CAPTAIN-EXIT-DOOR-DEAD-AFTER-REENTRY-66: USES "tick:reference,...": the player's uses, each answered (1 the
+         * script takes it, 0 the object's own use); REMAP a tick where the player leaves and comes back (the map's
+         * objects parked, then attached again with their values) */
+        if(getenv("REMAP") && tick==atoi(getenv("REMAP"))){AW_MwvmBeginMap();attach_all();printf("%d remap\n",tick);}
+        if(getenv("USES")){
+            const char *u=getenv("USES");
+            while(*u){
+                int t=atoi(u);const char *colon=strchr(u,':'),*comma;unsigned ref;
+                if(!colon)break;
+                ref=(unsigned)atoi(colon+1);
+                if(t==tick)printf("%d use %u taken %d\n",tick,ref,AW_MwvmUse(ref));
+                if(!(comma=strchr(colon,',')))break;
+                u=comma+1;
             }
+        }
         AW_MwvmTick(dt,player);
     }
     {const aw_mwvm_stats_t *s=AW_MwvmStats();
@@ -1894,6 +1912,91 @@ class InterpreterTests(unittest.TestCase):
         unlocks = [l.split()[0] for l in out if l.split()[1:2] == ['object'] and l.split()[3] == chime
                    and l.split()[4] == str(OPCODES['UNLOCK'][0])]
         self.assertEqual(unlocks, ['5'], out)
+
+
+# CAPTAIN-EXIT-DOOR-DEAD-AFTER-REENTRY-66: two doors in Test Room. DoneDoor is built like the census office's
+# CharGenDoorExitCaptain and CharGenDoorEnterCaptain: refused once (a message), opened once (done 1, Activate), and
+# from then on it returns before its OnActivate line. BlockedDoor reads OnActivate and never hands the use back.
+USE_SCRIPTS = dict(SCRIPTS,
+                   DoneDoor='Begin DoneDoor\nshort done\nshort tries\nif ( done == 1 )\n    return\nendif\n'
+                            'if ( OnActivate == 1 )\n    if ( tries == 0 )\n        set tries to 1\n'
+                            '        MessageBox "Not yet."\n    else\n        set done to 1\n        Activate\n'
+                            '    endif\nendif\nEnd DoneDoor\n',
+                   BlockedDoor='Begin BlockedDoor\nif ( OnActivate == 1 )\n    MessageBox "This door is blocked."\n'
+                               'endif\nEnd BlockedDoor\n')
+
+
+@unittest.skipIf(os.name == 'nt', 'native fixtures run in the Linux Docker gate')
+@unittest.skipUnless(shutil.which('cc'), 'a Linux C compiler is required')
+class ScriptedUseTests(unittest.TestCase):
+    """CAPTAIN-EXIT-DOOR-DEAD-AFTER-REENTRY-66: the player's use of an object goes to its script only while the script
+    reads OnActivate (since its own Activate), the original's rule as OpenMW 0.51 keeps it (mwworld/refdata.cpp
+    onActivate, activateByScript, activate). The census office's two scripted doors set their local done, call
+    Activate and from then on return before OnActivate: their doors open as plain doors every time after, also after
+    the player left the room and came back (the values parked and attached again). Before: a script that merely
+    contained OnActivate took every use, and these doors opened only once."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = Path(tempfile.mkdtemp(prefix='aw-mwvm-use-'))
+        data_dir = cls.tmp / 'data'
+        data_dir.mkdir()
+        records = [record('DOOR', sub('NAME', 'done_door'), sub('SCRI', 'DoneDoor')),
+                   record('DOOR', sub('NAME', 'blocked_door'), sub('SCRI', 'BlockedDoor'))]
+        (data_dir / 'Morrowind.esm').write_bytes(master_bytes(USE_SCRIPTS, records, room_refs=[
+            (501, 'done_door', (0, 0, 0)), (502, 'blocked_door', (0, 0, 0))]))
+        data = GameData().load(data_dir)
+        prog, compiled = compile_program(data, MediaMap(data, catalogue(), SOUNDTRACK), handwritten=('chargen*',),
+                                         rooms=ROOMS)
+        cls.prog = prog
+        raw, _ = awms.write(prog, compiled, bindings(prog, compiled), {'ops_per_run': 500})
+        (cls.tmp / 'use.awm').write_bytes(raw)
+        (cls.tmp / 'h.c').write_text(HARNESS, encoding='utf-8')
+        src = ROOT / 'engine/aga/src'
+        built = subprocess.run(['cc', '-std=gnu89', '-Wall', '-Werror', '-Wno-unused-parameter', '-Wshadow',
+                                '-fsanitize=undefined,address', '-fno-sanitize-recover=all', '-I' + str(src),
+                                str(cls.tmp / 'h.c'), str(src / 'aw_mwvm.c'), str(src / 'aw_ledger.c'),
+                                '-o', str(cls.tmp / 'h')],
+                               capture_output=True, text=True)
+        assert built.returncode == 0, built.stdout + built.stderr
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def run_uses(self, ticks, uses, remap=None):
+        env = dict(os.environ, USES=','.join('%d:%d' % u for u in uses))
+        if remap:
+            env['REMAP'] = str(remap)
+        r = subprocess.run([str(self.tmp / 'h'), str(self.tmp / 'use.awm'), str(ticks), '0.25'],
+                           capture_output=True, text=True, env=env)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        out = r.stdout.splitlines()
+        taken = {(int(l.split()[0]), int(l.split()[2])): int(l.split()[4]) for l in out if l.split()[1:2] == ['use']}
+        activates = [int(l.split()[0]) for l in out
+                     if l.split()[1:2] == ['object'] and l.split()[4] == str(OPCODES['ACTIVATE'][0])]
+        strings = self.prog.strings.index
+        messages = [(int(l.split()[0]), int(l.split()[3])) for l in out if l.split()[1:2] == ['message']]
+        return out, taken, activates, {t for t, s in messages if s == strings['Not yet.']}, \
+            {t for t, s in messages if s == strings['This door is blocked.']}
+
+    def test_a_door_whose_script_is_done_opens_by_itself_every_time_after(self):
+        out, taken, activates, refused, blocked = self.run_uses(12, [(1, 501), (3, 501), (5, 501), (7, 501),
+                                                                      (10, 501)], remap=8)
+        self.assertIn('8 remap', out)
+        self.assertEqual(taken[(1, 501)], 0, out)    # before its script's first run: the door's own use
+        self.assertEqual(taken[(3, 501)], 1, out)    # refused by the script: "Not yet."
+        self.assertEqual(refused, {3}, out)
+        self.assertEqual(taken[(5, 501)], 1, out)    # opened by the script: done 1, Activate, on that run only
+        self.assertEqual(activates, [5], out)
+        # done: the script returns before OnActivate, the door opens as a plain door, also back in the room
+        self.assertEqual((taken[(7, 501)], taken[(10, 501)]), (0, 0), out)
+
+    def test_a_script_that_keeps_reading_onactivate_keeps_the_use(self):
+        out, taken, activates, refused, blocked = self.run_uses(12, [(3, 502), (5, 502), (10, 502)], remap=8)
+        self.assertEqual([taken[(t, 502)] for t in (3, 5, 10)], [1, 1, 1], out)
+        self.assertEqual(blocked, {3, 5, 10}, out)
+        self.assertEqual(activates, [], out)
 
 
 @unittest.skipIf(os.name == 'nt', 'native fixtures run in the Linux Docker gate')

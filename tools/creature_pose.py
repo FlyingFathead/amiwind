@@ -46,6 +46,10 @@ GROUPS = {
                'once', False),
     'hit': ([('hit1: start', 'hit1: stop')], 'once', False),
     'death': ([('death1: start', 'death1: stop')], 'hold', False),
+    # the cast at a target, else at touch or self (the engine's range order; DAGOTH-UR-NO-ANIMATIONS-65): only in a
+    # skeletal creature's layout (creature_tables KIT), and only when its own file has the group
+    'cast': ([('spellcast: target start', 'spellcast: target stop'), ('spellcast: touch start', 'spellcast: touch stop'),
+              ('spellcast: self start', 'spellcast: self stop')], 'once', False),
 }
 ATTACK_HITS = ('attack1: hit', 'handtohand: chop hit')
 STANDING = (('idle', 8), ('hit', 3), ('death', 5))                      # as the NPC 'react' profile

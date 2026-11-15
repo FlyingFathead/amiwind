@@ -15,7 +15,7 @@
  * data is refused as before, nothing is migrated) */
 int aw_save_migrating;
 int (*aw_save_other_ok)(void);
-void (*aw_save_ident_refresh)(struct aw_ledger_s *ledger);
+int (*aw_save_ident_refresh)(struct aw_ledger_s *ledger);
 long (*aw_save_migrate)(struct aw_ledger_s *ledger,void *dropped);
 int (*aw_save_drop_actor_records)(void);
 void (*aw_save_notice)(const char *line);
@@ -36,12 +36,22 @@ static aw_changes_t save_changes,pending_changes;
 /* a loaded save's world change list (feature 32, CELL-CHANGES-59), handed to the session's list at the load */
 static aw_ledger_t pending_ledger;
 static aw_jhist_t pending_jhist;
-/* the actor record's block (feature 16), one buffer for a save and one for a loaded save */
-static unsigned char save_actor_block[AW_SAVE_ACTOR_BYTES],pending_actor_block[AW_SAVE_ACTOR_BYTES];
+/* the actor record's block (feature 16): MAP-EXPLORED-SAVE-BLOCK-66, a buffer of aw_save_block_kb taken only while a
+ * save is written (encode_world) and one of the loaded block's own size while a load waits for its spawn (the decoder
+ * takes it, AW_SaveSpawn gives it back); before, two fixed 32 KB buffers lived for the whole game */
 static int loading,scheduled,content_ready;
 static double last_auto,settle;
 static byte content_id[32];
 static cvar_t autosaves={"aw_autosaves","5",true};
+static cvar_t save_block={"aw_save_block_kb","64",true};
+/* SAVE-ACTOR-ROWS-256-66: the saved actor rows grow with the game (aw_save.h); what a capture could not keep */
+AW_RESIDENT_GROWS("saved actor rows (SAVE-ACTOR-ROWS-256-66)",AW_SAVE_ACTOR_ROWS_MAX,AW_SAVE_ACTOR_ROW_BYTES);
+static int rows_refused;
+/* SAVE-INSIDE-SCRIPT-STEP-66 (aw_save.h): inside a script step a save is queued, not taken */
+int (*aw_save_busy)(void);
+static int queued_slot=-1;
+static int busy(void){return aw_save_busy && aw_save_busy();}
+int AW_SaveQueued(void){return queued_slot;}
 static const char *actor_fields[]={"aw_hello_count","aw_manual_count","aw_hello_done"};
 static int make_directory(const char *directory)
 {
@@ -156,47 +166,136 @@ static void migrate_report(void)
 }
 int (*aw_companion_home)(edict_t *,vec3_t,vec3_t);   /* aw_companion.c */
 int (*aw_save_entry_refuse)(const char *scene,const float *position);   /* aw_scene.c, bound in aw_debug.c */
-void AW_SaveCapture(void)
-{
-    int i,j,k,scene;uint32_t ref;edict_t *e;eval_t *v;aw_saved_actor_t *a;
-    if(!sv.active || (scene=scene_id())<0)return;
-    AW_CombatEquipmentStore();
-    for(i=1;i<sv.num_edicts;i++){
-        e=EDICT_NUM(i);
-        if(e->free || strcmp(pr_strings+e->v.classname,"aw_npc"))continue;
-        ref=actor_id(e);if(!ref)continue;
-        for(j=0;j<world.actor_count;j++)if(world.actors[j].reference==ref && world.actors[j].scene==scene)break;
-        if(j==world.actor_count){if(j==AW_SAVE_ACTORS){Con_Printf("Save actor limit reached.\n");return;}world.actor_count++;}
-        a=&world.actors[j];a->reference=ref;a->scene=scene;
+/* SAVE-ACTOR-ROWS-256-66: the actors the rows are for, NPCs and creatures alike (aw_actors.c IsActor) */
+static int row_actor(edict_t *e){
+    const char *c=pr_strings+e->v.classname;
+    return !strcmp(c,"aw_npc") || !strcmp(c,"aw_creature");
+}
+/* E's row as it is now into A (REFERENCE and SCENE set); A->FIELDS 0: nothing a row must hold. An actor of the game
+ * data (aw_ref) has its place, facing, health and death in the change list and the actor records (aw_actors.c
+ * SaveExport and Release, aw_actorstate.c): its row holds its greetings, only when one is set (they start at 0 in the
+ * game data). A role the builder made (aw_intro_role, no game reference) has its place, health and greetings here. */
+static void row_of(edict_t *e,aw_saved_actor_t *a){
+    eval_t *v=GetEdictFieldValue(e,"aw_ref");int k,builder=!(v && v->_float>0);
+    for(k=0;k<3;k++){
+        eval_t *f=GetEdictFieldValue(e,(char *)actor_fields[k]);
+        int n=f && f->_float>0 && f->_float<=10000000.0f?(int)f->_float:0;
+        if(k==0)a->hello_count=n;else if(k==1)a->manual_count=n;else a->hello_done=n?1:0;
+    }
+    a->fields=a->hello_count || a->manual_count || a->hello_done?AW_ROW_GREET:0;
+    if(builder){
         VectorCopy(e->v.origin,a->position);VectorCopy(e->v.angles,a->angles);
         if(aw_companion_home)aw_companion_home(e,a->position,a->angles);  /* a picked companion saves at home */
         a->angles[1]=anglemod(a->angles[1]);a->health=e->v.health;
-        for(k=0;k<3;k++){
-            v=GetEdictFieldValue(e,(char *)actor_fields[k]);
-            if(k==0)a->hello_count=v?(int)v->_float:0;
-            else if(k==1)a->manual_count=v?(int)v->_float:0;
-            else a->hello_done=v?(int)v->_float:0;
-        }
+        a->fields=AW_ROW_ALL;
     }
+}
+static int reference_order(const void *a,const void *b){
+    uint32_t x=((const aw_saved_actor_t *)a)->reference,y=((const aw_saved_actor_t *)b)->reference;
+    return x<y?-1:x>y;
+}
+/* The loaded place's actors into the rows (a save, a snapshot, and every time the place is left: aw_scene.c
+ * load_scene, so a place unloaded long ago keeps its actors as left). Each actor keeps one row, its latest; a row that
+ * holds nothing any more goes; the rows of the place's actors not loaded now stay as they were. The place's rows are
+ * made in a list taken for the capture only and put back in one move (no search of every row per actor). */
+int AW_SaveCapture(void)
+{
+    int i,k,scene,lo,hi,live=0,fresh_n=0,kept=0,want;uint32_t ref;edict_t *e;aw_saved_actor_t *fresh;
+    if(!sv.active || (scene=scene_id())<0)return 1;
+    AW_CombatEquipmentStore();
+    lo=-1-AW_SaveActorFind(&world,0,scene);      /* reference 0 is never a row: the place's first row */
+    hi=-1-AW_SaveActorFind(&world,0,scene+1);
+    for(i=1;i<sv.num_edicts;i++){e=EDICT_NUM(i);if(!e->free && row_actor(e) && actor_id(e))live++;}
+    if(!live && lo==hi)return 1;
+    fresh=(aw_saved_actor_t *)AW_TryMalloc((unsigned long)sizeof(aw_saved_actor_t)*(unsigned long)(live+(hi-lo)));
+    if(!fresh){
+        rows_refused++;
+        Con_Printf("Saved actor rows: not enough free memory to keep the %d actors of %s now; their earlier rows stay.\n",
+                   live,sv.name);
+        return 0;
+    }
+    for(i=1;i<sv.num_edicts;i++){
+        e=EDICT_NUM(i);
+        if(e->free || !row_actor(e) || !(ref=actor_id(e)))continue;
+        for(k=0;k<fresh_n && fresh[k].reference!=ref;k++){}
+        if(k==fresh_n)fresh_n++;                     /* a second edict of a reference: the last one's state */
+        memset(&fresh[k],0,sizeof(fresh[k]));fresh[k].reference=ref;fresh[k].scene=(unsigned short)scene;
+        row_of(e,&fresh[k]);
+    }
+    qsort(fresh,(size_t)fresh_n,sizeof(*fresh),reference_order);
+    live=fresh_n;
+    for(i=lo;i<hi;i++)   /* the place's rows of actors not loaded now: as they were */
+        if(!bsearch(&world.actors[i],fresh,(size_t)live,sizeof(*fresh),reference_order))fresh[fresh_n++]=world.actors[i];
+    for(i=0;i<fresh_n;i++)if(fresh[i].fields)fresh[kept++]=fresh[i];
+    qsort(fresh,(size_t)kept,sizeof(*fresh),reference_order);
+    want=world.actor_count-(hi-lo)+kept;
+    if(!AW_SaveActorsReserve(&world,want)){
+        free(fresh);rows_refused++;
+        Con_Printf("Saved actor rows: %d rows are more than free memory or a save holds (%d at most): the actors of %s keep "
+                   "their earlier rows.\n",want,AW_SAVE_ACTOR_ROWS_MAX,sv.name);
+        return 0;
+    }
+    if(world.actor_count>hi)memmove(&world.actors[lo+kept],&world.actors[hi],sizeof(aw_saved_actor_t)*(size_t)(world.actor_count-hi));
+    if(kept)memcpy(&world.actors[lo],fresh,sizeof(aw_saved_actor_t)*(size_t)kept);
+    world.actor_count=want;
+    free(fresh);
+    if(!world.actor_count)AW_SaveActorsFree(&world);   /* no row: no block held */
+    return 1;
+}
+void (*aw_save_actor_leave)(edict_t *e);   /* aw_actors.c AW_ActorsCapture */
+int AW_SaveLeave(void)
+{
+    int i,ok=AW_SaveCapture();edict_t *e;
+    if(sv.active && aw_save_actor_leave)
+        for(i=1;i<sv.num_edicts;i++){e=EDICT_NUM(i);if(!e->free && row_actor(e))aw_save_actor_leave(e);}
+    return ok;
+}
+/* aw_actors.c Release: an actor the actor window lets go keeps its row first, as leaving the place does */
+void AW_SaveCaptureActor(edict_t *e)
+{
+    aw_saved_actor_t now;int scene,i;uint32_t ref;
+    if(!e || e->free || !sv.active || !row_actor(e) || (scene=scene_id())<0 || !(ref=actor_id(e)))return;
+    memset(&now,0,sizeof(now));now.reference=ref;now.scene=(unsigned short)scene;row_of(e,&now);
+    if((i=AW_SaveActorFind(&world,ref,scene))>=0){
+        if(now.fields)world.actors[i]=now;
+        else{
+            memmove(&world.actors[i],&world.actors[i+1],sizeof(aw_saved_actor_t)*(size_t)(world.actor_count-i-1));
+            if(!--world.actor_count)AW_SaveActorsFree(&world);
+        }
+        return;
+    }
+    if(!now.fields)return;
+    i=-1-i;
+    if(!AW_SaveActorsReserve(&world,world.actor_count+1)){
+        rows_refused++;
+        Con_Printf("Saved actor rows: no room to keep %s's row (not enough free memory or %d rows).\n",
+                   e->v.netname?pr_strings+e->v.netname:"an actor",AW_SAVE_ACTOR_ROWS_MAX);
+        return;
+    }
+    if(world.actor_count>i)memmove(&world.actors[i+1],&world.actors[i],sizeof(aw_saved_actor_t)*(size_t)(world.actor_count-i));
+    world.actors[i]=now;world.actor_count++;
 }
 /* Temporary debug excursions use the same persistent state as normal saves,
  * without touching a profile, manual slot or autosave generation. */
 int AW_SaveSnapshot(aw_save_t *snapshot)
 {
     edict_t *p;uint32_t equipment;
-    if(!snapshot || !sv.active || scene_id()<0 || loading || svs.maxclients!=1 ||
+    if(!snapshot || !sv.active || scene_id()<0 || loading || busy() || svs.maxclients!=1 ||
        !svs.clients || !(p=svs.clients[0].edict))return 0;
-    if(!AW_SavedEquipmentCapture(&equipment,p,sv.time))return 0;
-    AW_SaveCapture();*snapshot=world;snapshot->equipment=equipment;
+    if(!AW_SavedEquipmentCapture(&equipment,p,sv.time) || !AW_SaveCapture())return 0;
+    *snapshot=world;snapshot->equipment=equipment;
     snapshot->story=aw_story;snapshot->state=aw_state;snapshot->character=aw_character;
-    /* the snapshot's own copy of the item table (aw_state.h OWNERSHIP); the caller gives it back (AW_SaveRelease) */
+    /* the snapshot's own copies of the item table (aw_state.h OWNERSHIP) and of the actor rows (aw_save.h OWNERSHIP);
+     * the caller gives them back (AW_SaveRelease) */
+    snapshot->actors=NULL;snapshot->actor_count=snapshot->actor_capacity=0;
     if(!AW_ItemsClone(&snapshot->state.items,&aw_state.items))return 0;
+    if(!AW_SaveActorsCopy(snapshot,world.actors,world.actor_count)){AW_ItemsFree(&snapshot->state);return 0;}
     VectorCopy(p->v.origin,snapshot->position);VectorCopy(cl.viewangles,snapshot->angles);
     strcpy(snapshot->scene,sv.name);return 1;
 }
 void AW_SaveSnapshotRestore(const aw_save_t *snapshot)
 {
-    aw_items_t items;
+    aw_items_t items;aw_saved_actor_t *rows=world.actors;int count=world.actor_count,capacity=world.actor_capacity;
     if(!snapshot)return;
     /* the snapshot keeps its table (it may be restored again); the game takes a copy, or keeps its own when memory
      * says no (said so) */
@@ -204,19 +303,28 @@ void AW_SaveSnapshotRestore(const aw_save_t *snapshot)
         Con_Printf("Snapshot restore: not enough memory for the item table; the items stay as they are.\n");
         items=aw_state.items;
     }else AW_ItemsFree(&aw_state);
-    world=*snapshot;aw_story=world.story;aw_state=world.state;aw_character=world.character;
+    world=*snapshot;
+    /* and its actor rows the same way (SAVE-ACTOR-ROWS-256-66) */
+    if(!AW_SaveActorsCopy(&world,snapshot->actors,snapshot->actor_count)){
+        world.actors=rows;world.actor_count=count;world.actor_capacity=capacity;
+        Con_Printf("Snapshot restore: not enough memory for the saved actor rows; they stay as they are.\n");
+    }else free(rows);
+    aw_story=world.story;aw_state=world.state;aw_character=world.character;
     aw_state.items=items;memset(&world.state.items,0,sizeof(world.state.items));
     loading=scheduled=0;last_auto=realtime;
 }
 void AW_SaveSpawn(void)
 {
-    int i,j,k,scene=scene_id();edict_t *e;eval_t *v;uint32_t ref;aw_saved_actor_t *a;
+    int i,j,k,scene=scene_id(),npc;edict_t *e;eval_t *v;uint32_t ref;aw_saved_actor_t *a;
     if(loading){
-        if(strcmp(sv.name,pending.scene)){loading=0;Con_Printf("Saved scene could not be loaded.\n");return;}
+        if(strcmp(sv.name,pending.scene)){loading=0;AW_SaveChangesFree(&pending_changes);Con_Printf("Saved scene could not be loaded.\n");return;}
         /* the loaded save's item table becomes the game's (the old one given back; aw_state.h OWNERSHIP) */
         if(pending.state.items.block!=aw_state.items.block)AW_ItemsFree(&aw_state);
+        /* and its actor rows (aw_save.h OWNERSHIP): every place's, so a place left long ago is as it was left */
+        if(world.actors!=pending.actors)AW_SaveActorsFree(&world);
         world=pending;aw_story=world.story;aw_character=world.character;aw_state=world.state;
         memset(&pending.state.items,0,sizeof(pending.state.items));memset(&world.state.items,0,sizeof(world.state.items));
+        pending.actors=NULL;pending.actor_count=pending.actor_capacity=0;
         /* its rows weighed now, at the load (aw_inventory.c: one pass over the item file for many kinds;
          * ENCUMBRANCE-INCOMPLETE-61): the place's area load may already have run for this map */
         if(aw_save_items_loaded)aw_save_items_loaded();
@@ -233,12 +341,18 @@ void AW_SaveSpawn(void)
         aw_save_migrating=pending_other;
         if(pending_other)migrate_loaded();
         if(aw_save_actors_import)aw_save_actors_import(pending_changes.actors,pending_changes.actor_bytes);
+        /* MAP-EXPLORED-SAVE-BLOCK-66: the explored map's own section (a v0.0.66-dev save has it in the actor block
+         * instead, read just now); then the load's section buffers go */
+        if(pending_changes.explored_data && aw_save_explored_import)
+            aw_save_explored_import(pending_changes.explored_data,pending_changes.explored_bytes);
+        AW_SaveChangesFree(&pending_changes);
         /* slice 4: the scripts' globals, quest stages and known topics as saved (an older save: the data's start,
          * its 32-slot journal folded in), after the actor block's topic bits */
         if(aw_save_script_import)aw_save_script_import(&aw_ledger);
         /* the dated journal history as saved; an older save's 32-slot history taken over (JOURNAL-ORIGINAL-VIEW-59) */
         AW_JHistMove(&aw_jhist,&pending_jhist);
         if(!aw_jhist.count)AW_JHistTakeOver(&aw_jhist,&aw_state);
+        if(aw_save_markers_loaded)aw_save_markers_loaded();   /* the map markers as saved (MAP-MULTI-MARKERS-66) */
         if(pending_other){
             /* the actor records and dead counts name another build's actor table rows: they go, counted */
             aw_ledger_events.records=aw_save_drop_actor_records?(unsigned long)aw_save_drop_actor_records():0;
@@ -247,21 +361,25 @@ void AW_SaveSpawn(void)
         aw_save_migrating=pending_other=0;
         AW_BarrierLoad();AW_OpeningSpawn();
     }
+    /* SAVE-ACTOR-ROWS-256-66: every NPC and creature of the place takes what its row holds (found by its scene and
+     * reference, sorted rows: no search of every row) */
     for(i=1;i<sv.num_edicts;i++){
-        e=EDICT_NUM(i);if(e->free || strcmp(pr_strings+e->v.classname,"aw_npc"))continue;
+        e=EDICT_NUM(i);if(e->free || !row_actor(e))continue;
+        npc=!strcmp(pr_strings+e->v.classname,"aw_npc");
         ref=actor_id(e);if(!ref)continue;
-        for(j=0;j<world.actor_count;j++){
-            a=&world.actors[j];if(a->reference!=ref || a->scene!=scene)continue;
-            VectorCopy(a->position,e->v.origin);VectorCopy(a->angles,e->v.angles);e->v.health=a->health;
-            for(k=0;k<3;k++){
+        if(scene>=0 && (j=AW_SaveActorFind(&world,ref,scene))>=0){
+            a=&world.actors[j];
+            if(a->fields&AW_ROW_PLACE){VectorCopy(a->position,e->v.origin);VectorCopy(a->angles,e->v.angles);}
+            if(a->fields&AW_ROW_HEALTH)e->v.health=a->health;
+            if(a->fields&AW_ROW_GREET)for(k=0;k<3;k++){
                 v=GetEdictFieldValue(e,(char *)actor_fields[k]);
                 if(v)v->_float=k==0?a->hello_count:k==1?a->manual_count:a->hello_done;
             }
             /* Restore identity/state, then revalidate feet in the current
              * sub-cell. Persisted source-height errors must not undo settling. */
-            AW_NPCFloor(e);SV_LinkEdict(e,false);break;
+            if(a->fields&AW_ROW_PLACE){AW_NPCFloor(e);SV_LinkEdict(e,false);}
         }
-        if(!AW_RegionContains(e->v.origin))ED_Free(e);
+        if(npc && !AW_RegionContains(e->v.origin))ED_Free(e);
     }
     if(loading){
         e=svs.clients[0].edict;
@@ -274,7 +392,11 @@ void AW_SaveSpawn(void)
     }else AW_SaveSchedule();
 }
 /* A new game: no saved state, and the world as in the game data (the world change list emptied, CELL-CHANGES-59). */
-void AW_SaveReset(void){memset(&world,0,sizeof(world));loading=scheduled=0;last_auto=realtime;AW_LedgerClear(&aw_ledger);AW_JHistClear(&aw_jhist);
+void AW_SaveReset(void){
+    /* the rows and a waiting load's sections given back first (SAVE-ACTOR-ROWS-256-66, MAP-EXPLORED-SAVE-BLOCK-66) */
+    AW_SaveActorsFree(&world);AW_SaveActorsFree(&pending);AW_SaveChangesFree(&pending_changes);
+    memset(&world,0,sizeof(world));loading=scheduled=0;last_auto=realtime;AW_LedgerClear(&aw_ledger);AW_JHistClear(&aw_jhist);
+    if(aw_save_markers_reset)aw_save_markers_reset();   /* MAP-MULTI-MARKERS-66: no marker in a new game */
     if(aw_save_new_game)aw_save_new_game();}
 int AW_SaveAllowed(void)
 {
@@ -323,57 +445,133 @@ static int make_profile(void)
     if(f){fwrite(aw_story.name,1,strlen(aw_story.name),f);fclose(f);}
     return 1;
 }
+/* SAVE-EXPORT-FAILURE-ACCEPTED-65 (the save contract's rule 4, all or nothing): the part an export named when it could
+ * not keep it (aw_save.h AW_SaveRefusePart); cleared when a save begins */
+static const char *refused_part;
+void AW_SaveRefusePart(const char *part){if(part && part[0])refused_part=part;}
+/* a save refused or skipped: nothing is written and the previous generations stay; the game goes on as it was: the
+ * generation number back when BUMPED, the item table no longer shared with the save's copy, the actor records' copy
+ * given back, the actor block's buffer too */
+static void save_undo(int bumped)
+{
+    if(bumped)world.sequence--;
+    memset(&world.state.items,0,sizeof(world.state.items));   /* the game's table stays the game's (aw_state.h) */
+    AW_LedgerRecordsSet(&aw_ledger,NULL,0);
+    free(save_changes.actors);save_changes.actors=NULL;save_changes.actor_capacity=save_changes.actor_bytes=0;
+}
+/* the line of a refused save: the part an export named, else PART */
+static byte *refused(int bumped,const char *part)
+{
+    save_undo(bumped);
+    Con_Printf("Save refused: %s could not be kept; previous saves retained.\n",refused_part?refused_part:part);
+    refused_part=NULL;
+    return NULL;
+}
 /* The game as it is now, encoded (AW_SaveWrite's and the recorder's part, GAME-RECORDER-61): the bytes (the caller
  * frees them) and their count in *SIZE; NULL when it cannot be (said why). BUMP: the next generation (a save file);
- * 0 keeps the sequence (the recorder's starting save is no generation of the character's). */
+ * 0 keeps the sequence (the recorder's starting save is no generation of the character's).
+ * SAVE-EXPORT-FAILURE-ACCEPTED-65: every export's failure, and every row the world change list refused while they ran,
+ * refuses the save with one line naming the part (refused); nothing of it is written. */
 static byte *encode_world(const char *label,int bump,int *size)
 {
-    byte *raw;int n,capacity;edict_t *p;uint32_t equipment;
+    byte *raw;int n,capacity,block,jneed=0;edict_t *p;uint32_t equipment;unsigned long ledger_refused=aw_ledger.refused;
+    refused_part=NULL;
     p=svs.clients[0].edict;
     if(!AW_SavedEquipmentCapture(&equipment,p,sv.time)){
         Con_Printf("Save equipment validation failed; previous saves retained.\n");return NULL;
     }
-    AW_SaveCapture();world.equipment=equipment;
+    /* SAVE-ACTOR-ROWS-256-66: the place's actors into the rows; a row that cannot be kept refuses the save, never a
+     * row left out unsaid (was: a full 256-row table skipped the rest of the place's actors) */
+    if(!AW_SaveCapture()){
+        Con_Printf("Save refused: the actors' saved rows could not be kept (not enough free memory); previous saves retained.\n");
+        return NULL;
+    }
+    world.equipment=equipment;
     world.story=aw_story;world.state=aw_state;world.character=aw_character;world.character.current[0]=p->v.health;
     VectorCopy(p->v.origin,world.position);VectorCopy(cl.viewangles,world.angles);world.angles[1]=anglemod(world.angles[1]);strcpy(world.scene,sv.name);
     memcpy(world.content,content_id,32);
     if(bump){
-        if(world.sequence==0xffffffffU)return NULL;
+        if(world.sequence==0xffffffffU)return refused(0,"the generation number (all are used)");
         world.sequence++;
     }
     memset(world.label,0,sizeof(world.label));strcpy(world.label,label);
     /* Keep larger serialized storage off the fixed Amiga task stack. The world change list (CELL-CHANGES-59) adds
      * its own bytes to the buffer: a save is never refused because the list is long. */
     capacity=AW_SAVE_BYTES;
+    save_changes.count=0;save_changes.ledger=&aw_ledger;save_changes.journal=&aw_jhist;save_changes.markers=1;
+    save_changes.explored=1;save_changes.take=0;save_changes.actors=NULL;save_changes.actor_bytes=save_changes.actor_capacity=0;
     /* slice 4: the scripts' globals, quest stages and known topics join the list as they are now (aw_mwhost.c) */
-    if(aw_save_script_export)aw_save_script_export(&aw_ledger);
+    /* SAVE-EXPORT-FAILURE-ACCEPTED-65: a part that could not be kept refuses this generation; the previous save and
+     * the game as it is stay */
+    if(aw_save_script_export && !aw_save_script_export(&aw_ledger))return refused(bump,"the scripts' state");
     /* slice 7: the record hash of every reference the list names and the content files, so a later build of other
      * game data can tell what still names the same thing (only when there is a list to save) */
-    if(AW_LedgerRows(&aw_ledger)>0 && aw_save_ident_refresh)aw_save_ident_refresh(&aw_ledger);
+    if(AW_LedgerRows(&aw_ledger)>0 && aw_save_ident_refresh && !aw_save_ident_refresh(&aw_ledger))
+        return refused(bump,"the references' identities");
+    if(aw_ledger.refused!=ledger_refused)return refused(bump,"a row of the world change list");
     if(AW_LedgerRows(&aw_ledger)>0){      /* its rows, or its stolen pairs alone (slice 2) */
         int need=AW_LedgerEncode(&aw_ledger,NULL,0);
-        if(need<=0 || need>AW_SAVE_MAX_BYTES-AW_SAVE_BYTES-8){
-            Con_Printf("Save world change list invalid (%d rows); previous saves retained.\n",aw_ledger.count);return NULL;}
+        if(need<=0 || need>AW_SAVE_MAX_BYTES-AW_SAVE_BYTES-8)return refused(bump,"the world change list");
         capacity+=need+8;
     }
-    if(aw_jhist.count)capacity+=AW_JHistEncode(&aw_jhist,NULL,0)+8;   /* the dated journal history (feature 128) */
-    raw=(byte *)AW_TryMalloc((unsigned long)capacity);
-    if(!raw){AW_LedgerRecordsSet(&aw_ledger,NULL,0);
-        Con_Printf("Save skipped: not enough free memory for its buffer; previous saves retained.\n");return NULL;}
-    save_changes.count=0;save_changes.ledger=&aw_ledger;save_changes.journal=&aw_jhist;
-    if((aw_save_changes_export && aw_save_changes_export(&save_changes)<0) ||
-       (aw_save_objects_export && aw_save_objects_export(&save_changes)<0)){
-        free(raw);Con_Printf("Save change list incomplete; previous saves retained.\n");return NULL;
+    /* the dated journal history (feature 128): entries that do not encode are refused, never left out */
+    if(aw_jhist.count && (jneed=AW_JHistEncode(&aw_jhist,NULL,0))<=0)return refused(bump,"the dated journal");
+    if(jneed)capacity+=jneed+8;
+    if(aw_save_markers_encode)capacity+=aw_save_markers_encode(NULL,0)+8;   /* the map markers (feature 2048) */
+    if(aw_save_changes_export && aw_save_changes_export(&save_changes)<0)return refused(bump,"the actors' changes");
+    if(aw_save_objects_export && aw_save_objects_export(&save_changes)<0)return refused(bump,"the objects' changes");
+    /* MAP-EXPLORED-SAVE-BLOCK-66: the actor block in a buffer of the setting's size (aw_save_block_kb, 64 KB by
+     * default), taken for this write only; the buffer below holds the block's bytes past the 32 KB it always held,
+     * the explored map's own section and the packed actor rows */
+    block=AW_SaveBlockBytes(save_block.value);
+    if(aw_save_actors_export){
+        if(!(save_changes.actors=(byte *)AW_TryMalloc((unsigned long)block))){
+            save_undo(bump);
+            Con_Printf("Save skipped: not enough free memory for its %d KB actor block; previous saves retained.\n",block/1024);
+            return NULL;
+        }
+        save_changes.actor_capacity=block;
+        /* the save contract, rule 3 (2026-11-14): the setting is the block's starting size, never a cap that refuses a
+         * save the game could write: a block too small is doubled, up to the most a load reads
+         * (AW_SAVE_ACTOR_MAX_BYTES), before the save is refused */
+        while((save_changes.actor_bytes=aw_save_actors_export(save_changes.actors,block))<0){
+            int grown=block<AW_SAVE_ACTOR_MAX_BYTES?(block*2>AW_SAVE_ACTOR_MAX_BYTES?AW_SAVE_ACTOR_MAX_BYTES:block*2):0;
+            byte *bigger=grown?(byte *)AW_TryMalloc((unsigned long)grown):NULL;
+            free(save_changes.actors);save_changes.actors=bigger;save_changes.actor_capacity=bigger?grown:0;
+            if(!bigger){
+                save_changes.actor_bytes=0;
+                if(grown){
+                    save_undo(bump);
+                    Con_Printf("Save skipped: not enough free memory for a %d KB actor block; previous saves retained.\n",grown/1024);
+                    return NULL;
+                }
+                Con_Printf("The actor block needs more than %d KB, the most a save holds.\n",block/1024);
+                return refused(bump,"the actor block");
+            }
+            Con_Printf("Save: the actor block grew from %d to %d KB (aw_save_block_kb %d KB was too small).\n",block/1024,grown/1024,(int)save_block.value);
+            block=grown;
+        }
+        refused_part=NULL;   /* a part that only wanted the bigger block named itself on the short try: not refused */
     }
-    save_changes.actors=save_actor_block;save_changes.actor_capacity=AW_SAVE_ACTOR_BYTES;save_changes.actor_bytes=0;
-    if(aw_save_actors_export && (save_changes.actor_bytes=aw_save_actors_export(save_actor_block,AW_SAVE_ACTOR_BYTES))<0){
-        free(raw);Con_Printf("Save actor records too large; previous saves retained.\n");return NULL;
+    if(save_changes.actor_bytes>AW_SAVE_ACTOR_BYTES)capacity+=save_changes.actor_bytes-AW_SAVE_ACTOR_BYTES;
+    if(aw_save_explored_encode)capacity+=aw_save_explored_encode(NULL,0)+8;   /* the explored map (feature 4096) */
+    capacity+=AW_SaveActorRowsBytes(&world);                                   /* the actor rows (feature 8192) */
+    if(aw_ledger.refused!=ledger_refused)return refused(bump,"a row of the world change list");
+    raw=capacity<=AW_SAVE_MAX_BYTES?(byte *)AW_TryMalloc((unsigned long)capacity):NULL;
+    if(!raw){
+        if(capacity>AW_SAVE_MAX_BYTES){
+            Con_Printf("%d bytes are more than a save holds (%d).\n",capacity,AW_SAVE_MAX_BYTES);
+            return refused(bump,"the whole save (too large)");
+        }
+        save_undo(bump);
+        Con_Printf("Save skipped: not enough free memory for its buffer; previous saves retained.\n");
+        return NULL;
     }
     n=AW_SaveEncodeChanges(raw,capacity,&world,&save_changes);
-    /* world shared the game's item table for the write only (aw_state.h OWNERSHIP) */
-    memset(&world.state.items,0,sizeof(world.state.items));
-    AW_LedgerRecordsSet(&aw_ledger,NULL,0);   /* slice 6: the actor records' copy is only for this write */
-    if(!n){free(raw);Con_Printf("Save state validation failed; previous saves retained.\n");return NULL;}
+    /* world shared the game's item table for the write only (aw_state.h OWNERSHIP); the actor records' copy and the
+     * block's buffer were for this write only (slice 6) */
+    save_undo(0);
+    if(!n){free(raw);return refused(bump,"the game state (a value out of its range)");}
     *size=n;return raw;
 }
 int AW_SaveWrite(int slot)
@@ -384,6 +582,11 @@ int AW_SaveWrite(int slot)
         Con_Printf("Save unavailable: complete registration and release first, and check the writable save folder.\n");return 0;
     }
     sprintf(label,slot>=5?"Autosave %ld":slot?"Manual %ld":"Quicksave",(long)(slot>=5?slot-4:slot));
+    /* SAVE-INSIDE-SCRIPT-STEP-66: asked for inside a script step, the save waits for the settled frame (AW_SaveTick) */
+    if(busy()){
+        queued_slot=slot;
+        Con_Printf("Save queued: %s is written when the running script step ends.\n",label);return 2;
+    }
     if(!(raw=encode_world(label,1,&n)))return 0;
     side=newest_info(world.profile,slot,&check);side=side==0?1:0;
     if(!path(filename,sizeof(filename),world.profile,slot,side)){free(raw);return 0;}
@@ -403,28 +606,54 @@ int AW_SaveWrite(int slot)
         if(path(filename,sizeof(filename),world.profile,i,1))remove(filename);
     }
     Con_Printf("Saved %s (%ld bytes, generation %lu).\n",label,(long)n,(unsigned long)world.sequence);
+    if(rows_refused){   /* said when it happened; said again with the save it concerns */
+        Con_Printf("Saved actor rows: %d captures since the last save could not keep their actors' rows (not enough free memory).\n",
+                   rows_refused);
+        rows_refused=0;
+    }
     return 1;
 }
 /* a load's decode targets: the actor block, the world change list and the journal history of the pending load */
 static void pending_targets(void)
 {
-    pending_changes.actors=pending_actor_block;pending_changes.actor_capacity=AW_SAVE_ACTOR_BYTES;
-    pending_changes.actor_bytes=0;
+    /* MAP-EXPLORED-SAVE-BLOCK-66: the decoder takes the actor block and the explored map in buffers of their own sizes
+     * (a load still waiting gives its own back first); the spawn gives them back */
+    AW_SaveChangesFree(&pending_changes);
+    pending_changes.take=1;pending_changes.explored=1;
+    pending_changes.actors=NULL;pending_changes.actor_capacity=pending_changes.actor_bytes=0;
     AW_LedgerClear(&pending_ledger);pending_changes.ledger=&pending_ledger;
-    AW_JHistClear(&pending_jhist);pending_changes.journal=&pending_jhist;
+    AW_JHistClear(&pending_jhist);pending_changes.journal=&pending_jhist;pending_changes.markers=1;
+}
+/* a load refused after its decode: the sections it took go back now (MAP-EXPLORED-SAVE-BLOCK-66) */
+static void pending_drop(void){AW_SaveChangesFree(&pending_changes);AW_LedgerClear(&pending_ledger);AW_JHistClear(&pending_jhist);}
+/* why a decode of a slot that read before did not: memory (the bytes it needed) or the save itself */
+static void decode_refused(void)
+{
+    if(AW_SaveDecodeShort())Con_Printf("Load refused: not enough free memory for the save's %d bytes of actors and map; "
+                                      "current game retained.\n",AW_SaveDecodeShort());
+    else Con_Printf("No valid compatible save generation; current game retained.\n");
 }
 /* the end of a load (AW_SaveRead, AW_SaveLoadBytes): the decoded CANDIDATE (its item table owned; given back on a
  * refusal) becomes the pending load and its scene's map is queued. 1 queued, 2 refused with the refusal screen up, 0
  * refused. */
+static int load_queue(aw_save_t *candidate);
 static int load_decoded(aw_save_t *candidate)
+{
+    /* a refused load gives back the sections its decode took at once (MAP-EXPLORED-SAVE-BLOCK-66) */
+    int queued=load_queue(candidate);
+    if(queued!=1)pending_drop();
+    return queued;
+}
+static int load_queue(aw_save_t *candidate)
 {
     char map[40];
     /* A save in a room or frame marked for more Fast RAM than this start has: nothing is left or loaded, the
      * refusal screen is up and ENTER goes to the main menu (CHIM-32MB-SAVE-ENTRY-48). 2: refused, handled. */
     if(aw_save_entry_refuse && aw_save_entry_refuse(candidate->scene,candidate->position)){AW_SaveRelease(candidate);return 2;}
     if(!AW_RegionSelect(candidate->scene,candidate->position,0)){AW_SaveRelease(candidate);return 0;}
-    /* a load still pending (its spawn never came) gives its table back first */
+    /* a load still pending (its spawn never came) gives its table and its actor rows back first */
     if(pending.state.items.block!=aw_state.items.block)AW_SaveRelease(&pending);
+    if(pending.actors!=world.actors)AW_SaveActorsFree(&pending);
     pending=*candidate;loading=1;scheduled=0;
     pending_other=memcmp(candidate->content,content_id,32)!=0;    /* slice 7: migrated at the spawn */
     IN_AWClearButtons();key_dest=key_game;
@@ -440,6 +669,7 @@ unsigned char *AW_SaveEncodeNow(int *size,uint32_t *profile,uint32_t *sequence)
     if(!AW_SaveAllowed() || !content()){
         Con_Printf("Recorder: the game cannot be saved here (registration and release first, alive, walking).\n");return NULL;
     }
+    if(busy()){Con_Printf("Recorder: the game is inside a script step; start the recording from a settled frame.\n");return NULL;}
     *profile=keep_profile;*sequence=keep_sequence;
     if(!world.profile)world.profile=1;
     if(!world.sequence)world.sequence=1;
@@ -454,13 +684,15 @@ int AW_SaveLoadBytes(const unsigned char *raw,int size,uint32_t profile,uint32_t
     static aw_save_t candidate;char map[40];
     pending_targets();
     if(!AW_CharacterLoad() || !content() || !AW_SaveDecodeChanges(raw,size,&candidate,&pending_changes)){
-        Con_Printf("Recorder: the recording's save does not decode; current game retained.\n");return 0;
+        pending_drop();Con_Printf("Recorder: the recording's save does not decode; current game retained.\n");return 0;
     }
     if(!other_content_ok(&candidate)){
-        AW_SaveRelease(&candidate);Con_Printf("Recorder: the recording's save is of other game data; current game retained.\n");return 0;
+        AW_SaveRelease(&candidate);pending_drop();
+        Con_Printf("Recorder: the recording's save is of other game data; current game retained.\n");return 0;
     }
     if(AW_SceneMapSize(candidate.scene,map,sizeof(map))<124){
-        AW_SaveRelease(&candidate);Con_Printf("Recorder: the recording's scene is not in this build; current game retained.\n");return 0;
+        AW_SaveRelease(&candidate);pending_drop();
+        Con_Printf("Recorder: the recording's scene is not in this build; current game retained.\n");return 0;
     }
     candidate.profile=profile;candidate.sequence=sequence;
     return load_decoded(&candidate);
@@ -476,12 +708,10 @@ int AW_SaveRead(uint32_t profile,int slot)
         Con_Printf("No valid compatible save generation; current game retained.\n");return 0;
     }
     AW_SaveRelease(&candidate);
-    if(!read_file_changes(profile,slot,generation,&candidate,&pending_changes)){
-        Con_Printf("No valid compatible save generation; current game retained.\n");return 0;
-    }
+    if(!read_file_changes(profile,slot,generation,&candidate,&pending_changes)){pending_drop();decode_refused();return 0;}
     /* The scene's own map, or its CHIM frame map in a pure-CHIM image. */
     n=AW_SceneMapSize(candidate.scene,map,sizeof(map));
-    if(n<124){AW_SaveRelease(&candidate);Con_Printf("Saved scene unavailable; current game retained.\n");return 0;}
+    if(n<124){AW_SaveRelease(&candidate);pending_drop();Con_Printf("Saved scene unavailable; current game retained.\n");return 0;}
     /* Loading an older manual save must still produce newer generations than
      * every existing autosave of this character. */
     for(i=0;i<=20;i++)if(newest_info(profile,i,&other)>=0 && other.sequence>candidate.sequence)
@@ -507,9 +737,16 @@ static int autosave_safe(void)
 void AW_SaveTick(void)
 {
     int n,slot;aw_save_t info;uint32_t oldest=0xffffffffU;
-    /* GAME-RECORDER-61: no autosave while the recorder records or plays back: a save changes the change list's
+    /* GAME-RECORDER-61: no save while the recorder records or plays back: a save changes the change list's
      * tables (the scripts' export) and would happen in one run and not the other; and no disk write during play */
-    if(!AW_AutosaveCount() || AW_RecorderActive())return;
+    if(AW_RecorderActive())return;
+    /* SAVE-INSIDE-SCRIPT-STEP-66: a save asked for inside a script step is written now, the step over and no load
+     * waiting; it is the player's own save, so the autosave's ground rules below do not hold it */
+    if(queued_slot>=0 && !busy() && !loading){
+        slot=queued_slot;queued_slot=-1;
+        if(AW_SaveWrite(slot)!=1)AW_UISubtitle("","Queued save failed. Previous saves retained.",6);
+    }
+    if(!AW_AutosaveCount())return;
     if(!scheduled && realtime-last_auto<300)return;
     if(!autosave_safe()){
         /* Loading/menu time and time spent falling into danger do not count
@@ -625,6 +862,7 @@ static void quickload(void){
 void AW_SaveInit(void)
 {
     Cvar_RegisterVariable(&autosaves);Cmd_AddCommand("aw_quicksave",quicksave);Cmd_AddCommand("aw_quickload",quickload);
+    Cvar_RegisterVariable(&save_block);   /* the actor block's KB (MAP-EXPLORED-SAVE-BLOCK-66) */
     aw_save_ledger_rows=AW_LedgerRows;aw_save_ledger_encode=AW_LedgerEncode;aw_save_ledger_decode=AW_LedgerDecode;
     aw_save_journal_encode=AW_JHistEncode;aw_save_journal_decode=AW_JHistDecode;
 }

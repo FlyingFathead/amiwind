@@ -36,8 +36,11 @@ static void encoding(void)
     source.story.stage=AW_STAGE_RELEASED;source.story.ship_disabled=1;source.story.captain=-1;
     source.character.level=1;source.character.hair=1;source.state=state;
     assert(AW_ItemsClone(&source.state.items,&state.items));   /* its own rows: the items below are the save's only */
+    /* the 48-byte rows of the fields (aw_save_rows_form 1, SAVE-ACTOR-ROWS-256-66): the layout the AWS3 check below cuts */
+    aw_save_rows_form=1;assert(AW_SaveActorsReserve(&source,AW_SAVE_ACTORS));
+    memset(source.actors,0,sizeof(aw_saved_actor_t)*AW_SAVE_ACTORS);
     source.actor_count=AW_SAVE_ACTORS;
-    for(i=0;i<AW_SAVE_ACTORS;i++){source.actors[i].reference=i+1;source.actors[i].scene=0;}
+    for(i=0;i<AW_SAVE_ACTORS;i++){source.actors[i].reference=i+1;source.actors[i].scene=0;source.actors[i].fields=AW_ROW_ALL;}
     assert(AW_StateSet(&source.state,AW_JOURNAL,"quest",256));
     for(i=1;i<AW_STATE_VALUES;i++){
         sprintf(id,"quest%d",i);assert(AW_StateSet(&source.state,AW_JOURNAL,id,i));

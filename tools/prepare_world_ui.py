@@ -14,6 +14,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from PIL import Image
 from mwad.audit import records, subrecords, string
 from mwad.paths import ensure_external, child_ci
+from mwad.masters import master_path
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 # tools/text_defines.py is imported in journal_assets, its only reader (not under mwad: an older mwad may already be
 # loaded in tests). Not at import: the CHIM world and rooms stages reach this module's validate() alone, and a stage key
@@ -379,7 +380,7 @@ JOURNAL_FINISHED,JOURNAL_RESTART,JOURNAL_NAME=1,2,4
 
 def journal_assets(raw):
     import text_defines   # the engine's define codes (BOOK-TEXT-MACROS-58); here, not at import (see the imports)
-    kind=None;quest=None;entries={};flags_of={}
+    kind=None;quest=None;entries={};flags_of={};info_of={}
     for tag,flags,payload in records(raw):
         if tag not in ('DIAL','INFO'):continue
         f=dict(subrecords(payload))
@@ -392,9 +393,18 @@ def journal_assets(raw):
             text,_=text_defines.encode(text)   # the engine's define codes (BOOK-TEXT-MACROS-58, aw_textdef.c)
             body=text.encode('cp1252')+b'\0'
             if len(body)>8192 or b'\0' in body[:-1]:raise ValueError('Journal entry exceeds runtime text bounds')
-            key=(quest,stage)
-            if key in entries:raise ValueError('Ambiguous journal stage: '+str(key))
-            entries[key]=body
+            key=(quest,stage);info=string(f.get('INAM',b''));name='QSTN' in f
+            if key in entries:
+                # The selected masters in load order (JOURNAL-EXPANSION-OVERRIDES-66): Tribunal and Bloodmoon repeat
+                # 1,833 base journal entries under their own INFO id, and a later master's INFO with the same id
+                # replaces the earlier one in place. At one stage a journal entry wins over a quest-name row (QSTN,
+                # the title: the book's titles come from quest_labels), and of two name rows the first stays
+                # (OpenMW Quest::getName); two different entries at one stage stay ambiguous.
+                old_info,old_name=info_of[key]
+                if not (info and info==old_info) and not (old_name and not name):
+                    if name:continue
+                    raise ValueError('Ambiguous journal stage: '+str(key))
+            entries[key]=body;info_of[key]=(info,name)
             flags_of[key]=((JOURNAL_FINISHED if 'QSTF' in f else 0)|(JOURNAL_RESTART if 'QSTR' in f else 0)|
                            (JOURNAL_NAME if 'QSTN' in f else 0))
     index=bytearray(b'AWJ2'+struct.pack('<I',len(entries)));blob=bytearray()
@@ -556,6 +566,71 @@ def lava_section_colour(raw):
     return struct.unpack_from('<I', raw, lava_section_offset(raw) + 12)[0]
 
 
+# MAP-ORIGINAL-POI-66 (a): the land colours of OpenMW's world map (apps/openmw/mwrender/globalmap.cpp: per cell the 9 x 9
+# WNAM heights of its LAND record, index = WNAM + 128 into a 256-entry colour table; below 128 is water). The table is
+# OpenMW's files/data/textures/omw_map_color_palette.dds (OpenMW, GPLv3), written here as its piecewise-linear stops
+# (index, RGB): the water ramp 0..127, the shore band 128..141, then the land darkening to the peaks. Builder only:
+# the engine never carries these values. Behind a switch (AMIWIND_MAP_COLOURS=openmw); the default stays the terrain
+# overview until a picture comparison is saved (docs/WORLD_MAP_AND_JOURNAL.md).
+MAP_COLOURS = ('terrain', 'openmw')
+DEFAULT_MAP_COLOURS = 'terrain'
+MAP_COLOURS_VARIABLE = 'AMIWIND_MAP_COLOURS'
+OPENMW_MAP_STOPS = ((0, (24, 36, 33)), (127, (37, 55, 50)), (128, (66, 48, 33)), (141, (40, 29, 20)), (255, (5, 5, 5)))
+WNAM_SIDE = 9                 # WNAM texels per cell side (ESM::Land::LAND_GLOBAL_MAP_LOD_SIZE_SQRT)
+
+
+def map_colours(value=None):
+    """The world map's land colours: the argument, else AMIWIND_MAP_COLOURS, else the shipped default (terrain)."""
+    value = value or os.environ.get(MAP_COLOURS_VARIABLE) or DEFAULT_MAP_COLOURS
+    if value not in MAP_COLOURS:
+        raise ValueError('map_colours must be terrain or openmw')
+    return value
+
+
+def openmw_map_colour(index):
+    """RGB of a WNAM + 128 index (0..255) on OpenMW's map colour table."""
+    if not 0 <= index <= 255:
+        raise ValueError('map colour index out of range')
+    for (i0, c0), (i1, c1) in zip(OPENMW_MAP_STOPS, OPENMW_MAP_STOPS[1:]):
+        if i0 <= index <= i1:
+            f = 0.0 if i1 == i0 else (index - i0) / (i1 - i0)
+            return tuple(int(round(a + (b - a) * f)) for a, b in zip(c0, c1))
+    raise AssertionError('stops cover 0..255')
+
+
+def wnam_heights(master):
+    """{(x, y): 81 signed WNAM bytes} of the master's exterior LAND records (rows south to north, as globalmap.cpp)."""
+    out = {}
+    for tag, flags, payload in records(master):
+        if tag != 'LAND':
+            continue
+        fields = dict(subrecords(payload))
+        if 'DELE' in fields or len(fields.get('INTV', b'')) != 8 or len(fields.get('WNAM', b'')) != WNAM_SIDE * WNAM_SIDE:
+            continue
+        out[struct.unpack('<ii', fields['INTV'])] = struct.unpack('<81b', fields['WNAM'])
+    return out
+
+
+def wnam_picture(heights, bounds):
+    """The OpenMW-coloured world map over BOUNDS (cells: x0, y0, x1, y1, exclusive ends), 9 pixels per cell, north up;
+    cells without WNAM are water at index 0."""
+    x0, y0, x1, y1 = bounds
+    w, h = (x1 - x0) * WNAM_SIDE, (y1 - y0) * WNAM_SIDE
+    if w < 1 or h < 1:
+        raise ValueError('empty map bounds')
+    table = [openmw_map_colour(i) for i in range(256)]
+    out = Image.new('RGB', (w, h), table[0])
+    px = out.load()
+    for (cx, cy), wnam in heights.items():
+        if not (x0 <= cx < x1 and y0 <= cy < y1):
+            continue
+        for vy in range(WNAM_SIDE):
+            row = (y1 - 1 - cy) * WNAM_SIDE + (WNAM_SIDE - 1 - vy)   # image y grows southward
+            for vx in range(WNAM_SIDE):
+                px[(cx - x0) * WNAM_SIDE + vx, row] = table[wnam[vy * WNAM_SIDE + vx] + 128]
+    return out
+
+
 def map_asset(report, image, palette, version='v1', lava_rows=None):
     """map.awm: v1 = AWM1; v2 = the same bytes under AWM2 followed by the LAVA section of lava_rows."""
     if version not in WORLD_MAPS:raise ValueError('world_map must be v1 or v2')
@@ -579,23 +654,24 @@ def map_asset(report, image, palette, version='v1', lava_rows=None):
     return bytes(raw)
 
 
-def prepare(data_files,survey,scene,world_map=None,lava_pools=None):
+def prepare(data_files,survey,scene,world_map=None,lava_pools=None,colours=None):
     scene=ensure_external(scene,'private world UI');dest=scene/'id1/world';dest.mkdir(parents=True,exist_ok=True)
-    master=child_ci(data_files,'Morrowind.esm').read_bytes()
+    master=master_path(data_files).read_bytes()
     if survey is None:
         # Normal image builds need only the terrain overview, not the much
         # broader scenery-density survey. Use the same source terrain routine.
-        from mwad.audit import load_esm, BSA
+        from mwad.audit import load_esm
+        from mwad.archives import layered_bsa
         from npc_geometry import Assets
         from survey_vvardenfell import terrain_arrays
         from world_survey import area_catalogue
         with scratch_dir('amiwind-world-map-') as directory:
-            temp=Path(directory);source=load_esm(child_ci(data_files,'Morrowind.esm'))
-            bounds,stats,terrain=terrain_arrays(source,temp,Assets(data_files,BSA(child_ci(data_files,'Morrowind.bsa'))))
+            temp=Path(directory);source=load_esm(master_path(data_files))
+            bounds,stats,terrain=terrain_arrays(source,temp,Assets(data_files,layered_bsa(data_files)))
             report={'master_sha256':source['sha256'],'terrain_bounds':bounds,
                     'areas':area_catalogue(Path(__file__).resolve().parents[1])}
             (temp/'world-survey.json').write_text(json.dumps(report))
-            return prepare(data_files,temp,scene,world_map,lava_pools)
+            return prepare(data_files,temp,scene,world_map,lava_pools,colours)
     report=json.loads((survey/'world-survey.json').read_text())
     if hashlib.sha256(master).hexdigest()!=report['master_sha256']:raise ValueError('Survey/master mismatch')
     palette=(scene/'id1/gfx/palette.lmp').read_bytes()
@@ -609,7 +685,9 @@ def prepare(data_files,survey,scene,world_map=None,lava_pools=None):
         import lava_map
         land=lava_map.land_heights(master)      # the visible lava only: land above a pool buries it (WORLDMAP-LAVA-MISMATCH-36)
         rows=lava_layer(lava_pools,land);lava_report=check_lava_layer(rows,lava_pools,land)
-    worldmap=map_asset(report,Image.open(survey/'terrain.png'),palette,version,rows)
+    colours=map_colours(colours)
+    picture=wnam_picture(wnam_heights(master),report['terrain_bounds']) if colours=='openmw' else Image.open(survey/'terrain.png')
+    worldmap=map_asset(report,picture,palette,version,rows)
     looks,hours,weather_info=weather_settings(data_files)
     # MESH-PARTICLE-EMITTERS: the exterior smoke and steam emitters of the placed meshes (tools/particle_emitters.py)
     from particle_emitters import smoke_table
@@ -633,6 +711,7 @@ def prepare(data_files,survey,scene,world_map=None,lava_pools=None):
     if version=='v2':
         # v1 keeps its receipt byte for byte; v2 records the format and the lava coverage check.
         receipt['map_format']='AWM2';receipt['lava_layer']=dict(lava_report,colour=lava_section_colour(worldmap))
+    if colours!=DEFAULT_MAP_COLOURS:receipt['map_colours']=colours   # the default keeps its receipt byte for byte
     (dest/'conversion.json').write_text(json.dumps(receipt,indent=2)+'\n')
     return receipt
 
@@ -662,5 +741,6 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--data-files',type=Path,required=True);p.add_argument('--survey',type=Path,help='Reuse a complete survey; absent builds only the overview');p.add_argument('--scene',type=Path,required=True)
     p.add_argument('--world-map',choices=WORLD_MAPS,default=None,help='Map file format: v2 (default: with the lava pools) or v1 (terrain and settlements only)')
-    a=p.parse_args();prepare(a.data_files,a.survey,a.scene,a.world_map)
+    p.add_argument('--map-colours',choices=MAP_COLOURS,default=None,help='World map land colours: terrain (default: the terrain overview) or openmw (OpenMW''s colours from the cells'' WNAM heights)')
+    a=p.parse_args();prepare(a.data_files,a.survey,a.scene,a.world_map,colours=a.map_colours)
     print(json.dumps(validate(a.scene/'id1'),indent=2))

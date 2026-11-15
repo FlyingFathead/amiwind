@@ -56,6 +56,7 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from mwad.paths import ensure_external, child_ci
+from mwad.masters import master_path
 from build_jobs import add_jobs, resolve_jobs
 from mwad.audit import normpath
 from vis_options import light_args
@@ -445,7 +446,7 @@ def prepare(data, palette_path, out, qbsp, vis, light, jobs, cache=None, seed_ru
     receipt = {'format': FORMAT, 'records': count, 'models': len(results), 'npc_models': npc_models,
                'scope': ({'reference_closure': closure.get('cells', []), 'records': len(entries)}
                          if only is not None else 'every NPC and creature'),
-               'master_sha256': input_sha256(child_ci(data, 'Morrowind.esm')),
+               'master_sha256': input_sha256(master_path(data)),
                'palette_sha256': hashlib.sha256(palette).hexdigest(),
                'files': {name: {'bytes': (out/name).stat().st_size, 'sha256': sha(out/name)} for name in sorted(files)}}
     report = validate_payload(out, receipt)

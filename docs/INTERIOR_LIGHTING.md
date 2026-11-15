@@ -1,6 +1,16 @@
 # Interior and exterior brightness
 
-_Last updated with AmiWind v0.0.51 (25 October 2026)._
+_Last updated with AmiWind v0.0.66-dev2 (13 November 2026)._
+
+## Interiors without a cell light record: 13 November 2026 (v0.0.66-dev2)
+
+An interior cell normally carries its ambient, sunlight and fog (the AMBI record). One without it is lit as the
+reference engine lights it: ambient, sunlight and fog black, so only its own lights light it. None of the game files
+has such a room today. Tribunal's five Mournhold plazas (Godsreach, the Great Bazaar, Plaza Brindisi Dorom, the Royal
+Palace courtyard and the Temple courtyard) also have no AMBI, because they are flagged "behave like exterior": the game
+lights them with the sky, the region's weather and the moving sun. They are not rooms, so the room stages leave them out
+and list them until the Mournhold exterior work. Mournhold's shops, palace and temple rooms have their own light and
+convert as rooms ([INTERIOR-NO-AMBI-66](bugs/INTERIOR-NO-AMBI-66.md)).
 
 ## Interior sunlight and the 1.0 default: 25 October 2026 (v0.0.51)
 

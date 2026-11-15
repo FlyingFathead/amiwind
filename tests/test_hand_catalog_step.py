@@ -150,8 +150,11 @@ class RuntimePalette(unittest.TestCase):
                  patch.object(catalog, 'runtime_palette', return_value=final):
                 source.return_value.kinds = {'RACE': {'nord': object()}}
                 result = catalog.prepare(root / 'owned', root / 'palette.lmp', root / 'out', runtime=True, jobs=1)
-        # 2 appearances x (bare hands + 3 armed stances) + 2 torch arms + the block view, all on the final palette
-        self.assertEqual(used, [final] * 11)
+        # 2 appearances x (bare hands + 3 armed stances + the spell stance) + 2 torch arms + the block view, all on the
+        # final palette
+        self.assertEqual(used, [final] * 13)
+        self.assertEqual([e['spell']['model'] for e in result['entries']],
+                         ['progs/hands/nord_m_sp.mdl', 'progs/hands/nord_f_sp.mdl'])
         block_bake.assert_called_once()
         self.assertEqual(len(result['block_view']['appearances']), 2)
         self.assertEqual(result['block_view']['palette_sha256'], sha(final))
@@ -198,6 +201,26 @@ class Install(unittest.TestCase):
             del report['entries'][0]['stances']['1h']
             (out / 'hand-catalog-report.json').write_text(json.dumps(report), encoding='utf-8')
             with self.assertRaisesRegex(ValueError, 'armed arms'):
+                catalog.install(out, stage(root / 'second', scene_palette()))
+
+    def test_installs_the_spell_arms_all_or_none(self):
+        # PLAYER-CASTING-59: every appearance's <stem>_sp.mdl, or none (an older catalogue installs as before)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            out = make_catalog(root, scene_palette())
+            report = json.loads((out / 'hand-catalog-report.json').read_text(encoding='utf-8'))
+            for entry in report['entries']:
+                path = catalog.stance_path(entry['race'], entry['female'], catalog.SPELL_STANCE)
+                raw = ('spell-' + path).encode()
+                (out / path).write_bytes(raw)
+                entry['spell'] = {'model': path, 'sha256': sha(raw), 'bytes': len(raw)}
+            (out / 'hand-catalog-report.json').write_text(json.dumps(report), encoding='utf-8')
+            id1 = stage(root, scene_palette())
+            self.assertEqual(catalog.install(out, id1)['files'], 15 + 4)
+            self.assertEqual((id1 / 'progs/hands/orc_f_sp.mdl').read_bytes(), b'spell-progs/hands/orc_f_sp.mdl')
+            del report['entries'][0]['spell']
+            (out / 'hand-catalog-report.json').write_text(json.dumps(report), encoding='utf-8')
+            with self.assertRaisesRegex(ValueError, 'spell arms'):
                 catalog.install(out, stage(root / 'second', scene_palette()))
 
     def test_other_palette_installs_nothing(self):

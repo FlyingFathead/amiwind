@@ -629,10 +629,10 @@ def stage_ambient(id1, out, data_files, places):
         return None
     print('=== areas: the Wander packages per area ===', flush=True)
     import prepare_focus  # noqa: F401  (puts src/ on the path for mwad)
-    from cell_numbers import load_table
+    from cell_numbers import load_table, room_numbers
     from mwad.paths import resolve_data_files
     table, _ = load_table(resolve_data_files(Path(data_files)))
-    numbers = {row['cell'].casefold(): row['number'] for row in table if row['master'] == 'Morrowind.esm'}
+    numbers = room_numbers(table)   # EXPANSION-BASE-ONLY-TABLES-66: every selected master's rooms
     payload, report = build_ambient(area_keys(places, numbers), (id1 / 'npc-ambient.lut').read_bytes())
     (id1 / 'npc-ambient.awa').write_bytes(payload)
     report['file'] = 'id1/npc-ambient.awa'

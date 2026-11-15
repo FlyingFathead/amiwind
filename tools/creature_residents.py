@@ -66,6 +66,71 @@ def listed():
     return rows
 
 
+# How a listed creature's model is made (its row's "method" in config/interior_creatures.json; DON'T DELETE ANY METHOD):
+#   baked     (default) 8 frames of its idle loop (bake_task, the method since v0.0.42)
+#   skeletal  one skeletal model on the creature's own animation table (tools/creature_tables.py unit): every group of its text keys plays by name, so MWScript's PlayGroup reaches it (the Heart
+#             of Lorkhan's Idle2 to Idle5 and Death1, HEART-OF-LORKHAN-LOOK-62); the idle loops the table's idle span
+CREATURE_METHODS = ('baked', 'skeletal')
+
+
+def method_of(identifier, rows=None):
+    """The model method of a listed creature (CREATURE_METHODS); an unlisted one is baked."""
+    row = (rows if rows is not None else listed()).get(identifier.casefold()) or {}
+    value = row.get('method', 'baked')
+    if value not in CREATURE_METHODS:
+        raise ValueError('Interior creature %s: method %r, not one of %s' % (identifier, value, ', '.join(CREATURE_METHODS)))
+    return value
+
+
+def biped(fields):
+    """CREA FLAG bit 0x01: two-legged (rule from OpenMW file components/esm3/loadcrea.hpp)."""
+    from mwad.npc import first
+    raw = first(fields, 'FLAG')
+    return len(raw) >= 4 and bool(struct.unpack_from('<i', raw, 0)[0] & 0x01)
+
+
+def idle_layout(layout):
+    """(base, count, step) of the 'idle' entry of a kit layout (NAME:BASE:COUNT:STEP[:X] words, npc_anim.layout)."""
+    for word in layout.split():
+        parts = word.split(':')
+        if parts[0] == 'idle' and len(parts) >= 4:
+            return int(parts[1]), int(parts[2]), float(parts[3])
+    raise ValueError('the layout has no idle group')
+
+
+def skeletal_task(task):
+    """Worker: (identifier, raw skeletal model, record) of one creature resident on its own animation table. The
+    record carries '_files' [(game path, bytes)]: the table and the model's layout, written beside the model."""
+    import creature_tables
+    data, palette, app = task
+    _mesh, out, error = creature_tables.unit((app['mesh'], data, palette, bool(app.get('biped')), False))
+    if out is None:
+        raise ValueError(error)
+    rep = out['report']
+    model, raw = rep['model'], out['model']
+    layout_bytes = (out['layout'] + '\n').encode('ascii')
+    files = {'table': (out['table'], rep['table']), 'standing_layout': (layout_bytes, model[:-4] + '.anm')}
+    rec = {'triangles': rep.get('faces'), 'table_frames': rep['frames'], 'table': rep['table'],
+           'table_bytes': rep['table_bytes'], 'table_groups': len(rep['groups']), 'scaled_bones': rep['scaled_bones'],
+           'sha256': rep['model_sha256'], 'table_sha256': rep['table_sha256'],
+           'effects_left_out': rep.get('effects_left_out')}
+    base, count, step = idle_layout(out['layout'])
+    record = {'appearance': {'id': app['id'], 'name': app['name'], 'kind': 'CREA', 'mesh': app['mesh']},
+              'greeting': {'text': '', 'voice': ''}, 'method': 'skeletal', 'model': model,
+              'step': float(step), 'triangles': int(rec['triangles'] or 0), 'frames': int(rec['table_frames']),
+              'idle': {'group': 'idle', 'base': base, 'count': count, 'profile': 'table'},
+              # the idle think loops the table's idle span (npc_anim.own_idle_fields: aw_idle_base / count / step)
+              'anim': {'skeletal': {'own_idle': {'base': base, 'count': count, 'step': float(step)}}},
+              'table': {'path': rec['table'], 'bytes': rec['table_bytes'], 'frames': rec['table_frames'],
+                        'groups': rec['table_groups'], 'scaled_bones': rec['scaled_bones'],
+                        'sha256': rec['table_sha256']},
+              'sha256': rec['sha256'], 'voice_seconds': 0.,
+              '_files': [(rec['table'], files['table'][0]), (model[:-4] + '.anm', files['standing_layout'][0])]}
+    if rec.get('effects_left_out'):
+        record['effects_left_out'] = rec['effects_left_out']
+    return app['id'], raw, record
+
+
 def initially_dead(fields):
     """CREA NPDT (96 bytes): type, level, 8 attributes, then health (int32 at byte 40)."""
     from mwad.npc import first
@@ -121,8 +186,12 @@ def appearance(kinds, identifier):
     from mwad.npc import text
     from mwad.audit import normpath
     fields = kinds['CREA'][identifier]
-    return {'id': identifier, 'kind': 'CREA', 'name': text(fields, 'FNAM') or identifier,
-            'mesh': normpath(text(fields, 'MODL'))}
+    out = {'id': identifier, 'kind': 'CREA', 'name': text(fields, 'FNAM') or identifier,
+           'mesh': normpath(text(fields, 'MODL'))}
+    if method_of(identifier) == 'skeletal':
+        # only for the skeletal method, so every baked creature's task (and key) stays as before
+        out.update(method='skeletal', biped=biped(fields))
+    return out
 
 
 def idle_range(skeleton, profile):
@@ -243,6 +312,8 @@ def safe_bake(task):
     """Worker: bake_task; with --interior-creatures all a model that fails returns (id, None, error) so
     its references are left out with the error. A listed creature that fails stops the stage."""
     try:
+        if task[2].get('method') == 'skeletal':
+            return skeletal_task(task)
         return bake_task(task)
     except Exception as error:
         if mode() != 'all':

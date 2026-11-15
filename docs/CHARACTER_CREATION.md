@@ -1,6 +1,6 @@
 # Next milestone: dock and Census Office character creation
 
-_Last updated with AmiWind v0.0.62-dev2 (2026-11-08)._
+_Last updated with AmiWind v0.0.66-dev2 (13 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -14,6 +14,7 @@ _Last updated with AmiWind v0.0.62-dev2 (2026-11-08)._
 - [Deliverable sequence](#deliverable-sequence)
 - [Character record and OpenMW comparison](#character-record-and-openmw-comparison)
   - [View Stats on the race page (v0.0.57)](#view-stats-on-the-race-page-v0057)
+  - [What the abilities do (v0.0.66)](#what-the-abilities-do-v0066)
 - [Acceptance before the next playable](#acceptance-before-the-next-playable)
 - [References inspected](#references-inspected)
 - [Class mechanics reference checklist](#class-mechanics-reference-checklist)
@@ -251,6 +252,47 @@ loaded. The original's race menu lists the skill bonuses and specials (the
 rule as OpenMW 0.51 shows it: `apps/openmw/mwgui/race.cpp`, updateSkills and
 updateSpellPowers); the base attributes are the record's own, shown beside
 them. Enter, Escape, V or a click closes the box.
+
+### What the abilities do (v0.0.66)
+
+The birthsign window and the race's View Stats box say what each special does.
+Until v0.0.66-dev1 the birthsign window showed only a kind and a name ("Ability",
+"Akaviri Danger-sense") at the top of the page, and the race box showed the
+spells' record IDs.
+
+Now both list the spells the way the original does (the rules as OpenMW 0.51
+words them, written independently: `apps/openmw/mwgui/birth.cpp` updateSpells,
+`apps/openmw/mwgui/widgets.cpp` MWSpellEffect::updateWidgets,
+`apps/openmw/mwmechanics/magiceffects.cpp` getMagicEffectString,
+`components/esm3/loadmgef.cpp` getMagnitudeDisplayType):
+
+- the groups **Abilities**, **Powers** and **Spells**, in that order, each only
+  when the race or sign has one;
+- each spell by name, and under it every effect on a line of its own: the
+  effect's icon, its name with the attribute or skill it names ("Fortify
+  Personality"), the magnitude ("10 pts", "50%", "0.5x INT", "5 to 20 pts");
+- for a power or a spell also the duration, the area and the range ("Shield 50
+  pts for 60 secs on Self"); an ability's effects are always on, so they have
+  none.
+
+The text is in the console font, so a long line wraps instead of crowding the
+window. The birthsign list sits in a panel between the list of signs and the
+sign's picture; the race's specials sit under its skill bonuses in the View
+Stats box. A long list scrolls with the mouse wheel, Page Up and Page Down, or
+its scroll bar.
+
+The spells are the ones the player is given (the same race and birthsign rows
+of the shared stats record). Their names, effects and magic-effect names come
+from the actor table, and the icons from the active-effect row's file
+(`gfx/effects.awe`). A window without those tables (an old build) shows the
+names as before.
+
+Cost, measured on the code: about 11 KB resident (the list and up to 32 icons of
+12 x 12, static). Showing another race or sign reads its spell rows from the
+actor table and opens the effect file once for all its icons. Drawing reads
+nothing. Checked by `tests/aga_spelllist_test.c` (the lines and groups) and
+`tests/aga_spelllist_windows_test.c`, which draws both windows and checks that
+every pixel the list adds lies inside its panel.
 
 Race-based height is also original data. The complete male/female multiplier
 table and its source are recorded in

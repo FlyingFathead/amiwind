@@ -125,6 +125,44 @@ class Tool(unittest.TestCase):
         with self.assertRaises(ValueError):
             anim_coverage.table_groups(b'XXXX' + data[4:])
 
+    def test_player_body_plays_sneak_turn_and_reactions(self):
+        # PLAYER-ANIM-GROUPS-NOT-PLAYED-66: the body's pick takes the sneak, the turn on the spot and the last blow
+        # (the groups per action: aga_animpick_test.c)
+        src = ROOT / 'engine/aga/src'
+        view = (src / 'aw_view.c').read_text(encoding='utf-8')
+        self.assertIn('if(!AW_PickPlayerBody(&in,&s)){stance.picked=0;return -1;}', view)
+        self.assertIn('in.sneak=AW_MoveSneaking() || aw_move_force_sneak;in.turn=body_turn(move,dt);', view)
+        self.assertIn('react=AW_CombatPlayerReaction(&age,&roll);', view)
+        self.assertIn('if(s.event==AW_PE_HIT && f>(float)stance.to){in.react=0;goto again;}', view)
+        combat = (src / 'aw_combat.c').read_text(encoding='utf-8')
+        self.assertIn('you_hit_at=(float)sv.time;', combat)
+        self.assertIn('you_hit_at=-1;you_down_seen=0;', combat)   # cleared with the fight (New Game, a load)
+
+    def test_player_audit_fails_when_a_player_group_goes_missing(self):
+        # PLAYER-CASTING-59: the original's player files' groups (names read from base_anim.nif and
+        # base_anim.1st.nif, v0.0.66 audit) are all catalogued; the player plays the spell stance now
+        player = {'meshes/base_anim.1st.nif': ['idlespell', 'spellcast', 'spellturnleft', 'idlehh', 'handtohand',
+                                               'idle1h', 'weapononehand', 'torch', 'shield', 'jumphh', 'sneakforwardhh'],
+                  'meshes/base_anim.nif': ['idle', 'idlespell', 'spellcast', 'hit1', 'knockdown', 'deathknockdown',
+                                           'inventoryhandtohand', 'pickprobe', 'swimknockdown', 'idle3', '', 'sound']}
+        rep = anim_coverage.player_report(player)
+        self.assertEqual(rep['missing_from_catalogue'], [])
+        for name in ('idlespell', 'spellcast', 'idlehh', 'handtohand', 'jumphh', 'idle', 'deathknockdown', 'torch',
+                     'spellturnleft', 'sneakforwardhh', 'hit1', 'knockdown', 'swimknockdown'):   # v0.0.66 AW_PickPlayerBody
+            self.assertEqual(anim_coverage.player_not_yet(name), '', name)
+        for name in ('inventoryhandtohand', 'pickprobe', 'idle3'):
+            self.assertIn(name, rep['not_yet'])
+        self.assertEqual(rep['files']['meshes/base_anim.nif']['groups'], 10)
+        player['meshes/base_anim.nif'].append('moonwalk')
+        self.assertEqual(anim_coverage.player_report(player)['missing_from_catalogue'], ['moonwalk'])
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'p.json'
+            path.write_text(__import__('json').dumps({k: {g: [] for g in v} for k, v in player.items()}), encoding='utf-8')
+            self.assertEqual(anim_coverage.main(['--player', str(path), '--check']), 1)
+            player['meshes/base_anim.nif'].remove('moonwalk')
+            path.write_text(__import__('json').dumps(player), encoding='utf-8')
+            self.assertEqual(anim_coverage.main(['--player', str(path), '--check']), 0)
+
     def test_tool_ships_and_is_documented(self):
         import json
         files = json.loads((ROOT / 'tools/release-files.json').read_text(encoding='utf-8'))

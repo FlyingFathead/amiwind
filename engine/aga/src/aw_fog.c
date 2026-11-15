@@ -65,14 +65,17 @@ int AW_SkyHazeNow(void) {
  * a save from before the land-outline default (v0.0.31, dev builds) still holds
  * aw_skyline_fill 1. Later explicit choices stay effective.
  * aw_horizon_defaults is the saved configuration's defaults level: 1 the land outline (v0.0.31), 2 (v0.0.63,
- * BEST-ATTACK-OPTION-62) "Always use best attack" on (aw_defaults_migrate, aw_combat.c). Each level runs once. */
-#define DEFAULTS_LEVEL 2
+ * BEST-ATTACK-OPTION-62) "Always use best attack" on (aw_defaults_migrate, aw_combat.c), 3 (v0.0.66, CAST-EGG-SYNC-62)
+ * the cast look on: a configuration saved while the look was off by default holds aw_magic_fx 0, which no menu set.
+ * Each level runs once. */
+#define DEFAULTS_LEVEL 3
 static cvar_t aw_horizon_defaults={"aw_horizon_defaults","0",true};
 void (*aw_defaults_migrate)(int level);
 static void horizon_migrate(void) {
     int level=(int)aw_horizon_defaults.value;
     if(level>=DEFAULTS_LEVEL)return;
     if(level<1)Cvar_SetValue("aw_skyline_fill",0);
+    if(level<3)Cvar_SetValue("aw_magic_fx",1);
     if(aw_defaults_migrate)aw_defaults_migrate(level);
     Cvar_SetValue("aw_horizon_defaults",DEFAULTS_LEVEL);
 }

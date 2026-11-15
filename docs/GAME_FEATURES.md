@@ -1,6 +1,6 @@
 # Game features
 
-_Last updated with AmiWind v0.0.65 (12 November 2026)._
+_Last updated with AmiWind v0.0.66-dev4 (12 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -55,7 +55,7 @@ Each has its own source file and its own check.
 | Tracker | Headline |
 | --- | --- |
 | [Dialogue features](DIALOGUE_FEATURES.md) | 5 of 29 done, 19 partial, 5 missing |
-| [MWScript features](MWSCRIPT_FEATURES.md) | 605 of 1207 scripts run, 27 use a function the interpreter lacks |
+| [MWScript features](MWSCRIPT_FEATURES.md) | 611 of 1207 scripts run, 21 use a function the interpreter lacks |
 | [Voices and sounds](VOICE_FEATURES.md) | per kind of line, with its proof |
 | [CHIM features](chim/FEATURES.md) | engine features with measured gains |
 | [World, cell by cell](chim/CELL_TRACKER.md) | every cell converted and audited |

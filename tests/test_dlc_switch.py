@@ -1,5 +1,5 @@
 """The expansion switch (DLC-BUILD-LATER): --dlc tribunal|bloodmoon|both|none, --no-dlc / --no-dlcs; the default is
-every expansion found, and the chosen layer set is recorded in the expansions record."""
+both expansions (CHIM-SOL-FLORA-PATH-65), and the chosen layer set is recorded in the expansions record."""
 import sys
 import unittest
 from pathlib import Path
@@ -35,7 +35,7 @@ class SwitchTests(unittest.TestCase):
 
     def test_selection(self):
         sel = build.expansion_selection
-        self.assertIsNone(sel(SimpleNamespace(dlc=None, no_dlc=False)))
+        self.assertEqual(sel(SimpleNamespace(dlc=None, no_dlc=False)), ['Tribunal', 'Bloodmoon'])   # default: both
         self.assertEqual(sel(SimpleNamespace(dlc=None, no_dlc=True)), [])
         self.assertEqual(sel(SimpleNamespace(dlc='none', no_dlc=True)), [])
         self.assertEqual(sel(SimpleNamespace(dlc='tribunal', no_dlc=False)), ['Tribunal'])

@@ -10,16 +10,21 @@
  */
 #ifndef AW_LISTBOX_H
 #define AW_LISTBOX_H
+#include <stdio.h>
 
 #define AW_LISTBOX_SEARCH 24
 
 /* abstract keys (aw_listbox.c maps the engine's) */
 enum {AW_LBKEY_UP=1,AW_LBKEY_DOWN,AW_LBKEY_PAGEUP,AW_LBKEY_PAGEDOWN,AW_LBKEY_HOME,AW_LBKEY_END,
-      AW_LBKEY_BACKSPACE,AW_LBKEY_CHOOSE,AW_LBKEY_CLOSE};
+      AW_LBKEY_BACKSPACE,AW_LBKEY_CHOOSE,AW_LBKEY_CLOSE,AW_LBKEY_LEFT,AW_LBKEY_RIGHT};
 /* what a key did */
 enum {AW_LB_NONE=0,AW_LB_CHOSEN=1,AW_LB_CLOSED=2};
 
 typedef const char *(*aw_listbox_label_t)(void *ctx,int row);
+
+/* TP-MENU-CATEGORY-FILTER-66: a row's category (1..categories-1; category 0 is "All", every row) */
+typedef int (*aw_listbox_category_t)(void *ctx,int row);
+#define AW_LISTBOX_CATEGORIES 6
 
 typedef struct {
     int count;                      /* the caller's rows */
@@ -28,9 +33,15 @@ typedef struct {
     int *shown,shown_count;         /* the rows the search keeps, in the caller's order (caller's buffer, count ints) */
     int selection,top,visible;      /* selection and top index into shown; visible rows on screen */
     char search[AW_LISTBOX_SEARCH+1];
+    aw_listbox_category_t category; /* NULL: no category row */
+    int categories,chosen;          /* buttons (All included) and the chosen one (0 = All) */
 } aw_listbox_t;
 
 void AW_ListBoxReset(aw_listbox_t *b,int count,aw_listbox_label_t label,void *ctx,int *shown,int visible);
+/* The category buttons (TP-MENU-CATEGORY-FILTER-66): COUNT buttons (All first), CATEGORY gives each row's; the
+ * search filters within the chosen one. AW_ListBoxChoose picks button N (0 = All) and filters again. */
+void AW_ListBoxCategories(aw_listbox_t *b,aw_listbox_category_t category,int count);
+void AW_ListBoxChoose(aw_listbox_t *b,int n);
 /* 1 when LABEL holds SEARCH, letters and digits only, case ignored ("aldruhn" finds "Ald-ruhn"); "" holds all. */
 int AW_ListBoxMatches(const char *label,const char *search);
 void AW_ListBoxFilter(aw_listbox_t *b);
@@ -54,6 +65,10 @@ typedef struct {
     void *ctx;
     void (*chosen)(void *ctx,int row);
     void (*closed)(void *ctx);
+    /* optional category buttons (zero: none): their labels, All first, and each row's category */
+    const char *const *category_names;
+    int categories;
+    aw_listbox_category_t category;
 } aw_listbox_spec_t;
 int AW_ListBoxOpen(const aw_listbox_spec_t *spec);
 int AW_ListBoxActive(void);
@@ -73,8 +88,45 @@ int AW_ListBoxActive(void);
 #define AW_TP_DOOR 2         /* the arrival of a door into the place (on the street) */
 #define AW_TP_COC 4          /* the game's own CocMarkerHeading */
 #define AW_TP_ROOM 8         /* a converted room: map is its room map, entered through dbg tp <map> */
-typedef struct {char name[AW_TP_NAME];char map[AW_TP_MAP];long x,y,z;int flags,cells;} aw_tp_place_t;
-/* rows of a table of SIZE bytes (header checked, size exact); -1 when it is no AWTP1/AWTP2 table */
+/* Version 3 (DBG-TP-TO-NPC-66), rows x 128: the version 2 row, then id[32] (a being's record id). */
+#define AW_TP_ROW3 128
+#define AW_TP_ID 32
+#define AW_TP_BEING 16       /* a person or creature: id is its record; map its room map ("" outdoors: x y z global) */
+#define AW_TP_NEAREST 32     /* a common kind: map names its placements file tpk/<map>.tpk; the nearest one */
+/* the list's categories (the buttons All / Exteriors / Interiors / Beings) */
+enum {AW_TP_CAT_ALL=0,AW_TP_CAT_EXTERIOR,AW_TP_CAT_INTERIOR,AW_TP_CAT_BEING,AW_TP_CATS};
+int AW_TpPlacesCategory(int flags);
+typedef struct {char name[AW_TP_NAME];char map[AW_TP_MAP];char id[AW_TP_ID];long x,y,z;int flags,cells;} aw_tp_place_t;
+/* A common kind's placements file (tools/tp_places_lut.py, id1/tpk/<name>.tpk), big-endian: "AWTK", u16 1, u16 64,
+ * u32 rows, u32 0; rows x 64: id[32], map[16] (a room map, "" outdoors), i32 x, y, z, u32 0. */
+#define AW_TPK_HEADER 16
+#define AW_TPK_ROW 64
+/* The names list (tools/tp_places_lut.py, id1/tp-names.lut): what the box holds while open, row for row the same as
+ * tp-places.lut. Big-endian: "AWTN", u16 1, u16 0, u32 rows, u32 name bytes; then per row u8 category (AW_TP_CAT_*),
+ * u8 length (at most 63), the label (Latin-1, no NUL). Held as ONE block allocated at open and freed at close: the
+ * labels and a u32 offset per row, or (low memory, WHOLE 0) only the offsets, the labels read from FILE in 4 KB
+ * chunks into the struct's own buffer. A row's details (position, map, id) are read from tp-places.lut on choose. */
+#define AW_TPN_HEADER 16
+#define AW_TPN_CHUNK 4096
+typedef struct {
+    unsigned char *block;          /* the one allocation */
+    const unsigned char *names;    /* the labels, whole; NULL when paged */
+    unsigned long *at;             /* offset of each row from the first row, rows entries */
+    long rows,bytes,base;
+    FILE *file;                    /* paged: the open names file (the caller's; never closed here) */
+    unsigned char chunk[AW_TPN_CHUNK];
+    long chunk_at,chunk_len;
+} aw_tp_names_t;
+/* Rows, or -1 (a bad file, no memory); BASE is the file position of the header in F (read from there). */
+long AW_TpNamesOpen(aw_tp_names_t *n,FILE *f,long base,long size,int whole);
+/* Row I's label into LABEL (NUL-ended) and its category; 0 when it cannot be read. */
+int AW_TpNamesGet(aw_tp_names_t *n,long i,char *label,int size,int *category);
+void AW_TpNamesClose(aw_tp_names_t *n);
+/* The bytes the open list holds (the block). */
+long AW_TpNamesHeld(const aw_tp_names_t *n);
+long AW_TpKindRows(const unsigned char *data,long size);
+void AW_TpKindRow(const unsigned char *data,long i,aw_tp_place_t *p);
+/* rows of a table of SIZE bytes (header checked, size exact); -1 when it is no AWTP1/AWTP2/AWTP3 table */
 long AW_TpPlacesRows(const unsigned char *data,long size);
 /* row I of a checked table into P (the name and the map always end in a NUL) */
 void AW_TpPlacesRow(const unsigned char *data,long i,aw_tp_place_t *p);
@@ -85,5 +137,21 @@ int AW_TpPlacesCommand(const aw_tp_place_t *p,char *out,int size);
 /* dbg tp with no argument (aw_tpplaces.c): the settlements box from id1/tp-places.lut, read when it opens and
  * freed when it closes; 0 when the table is not on this disk (the caller then opens the scene picker, as before). */
 int AW_TpPlacesOpen(void);
+
+/* A free spot beside a being (aw_listbox_rules.c, host-tested): candidate I (0..AW_TP_SPOTS-1) around CENTRE at
+ * rings of RADIUS, RADIUS+24, RADIUS+48, 16 directions, the direction from FROM first; OUT gets the point. */
+#define AW_TP_SPOTS 48
+void AW_TpSpotCandidate(const float *centre,const float *from,float radius,int i,float *out);
+/* The first candidate FREE_AT accepts (it tests the player's hull there and gives the standing point in OUT):
+ * its number + 1, or 0 when none is free. */
+int AW_TpPickSpot(const float *centre,const float *from,float radius,
+                  int (*free_at)(void *ctx,const float *point,float *out),void *ctx,float *out);
+/* The yaw (degrees, 0..360) from FROM looking at TO */
+float AW_TpFacingYaw(const float *from,const float *to);
+/* dbg tp's being arrival (aw_tpplaces.c): a chosen Beings row; on arrival in its scene the player is put on a free
+ * spot beside the being, facing it (called from aw_scene.c AW_SceneSpawn and by aw_tp_being_arrive). */
+void AW_TpBeingGo(const aw_tp_place_t *p);
+void AW_TpBeingArrive(void);
+void AW_TpPlacesInit(void);
 
 #endif

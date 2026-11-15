@@ -60,7 +60,13 @@ typedef struct {
     float bolt_start,land;      /* cl.time the bolt left / the spell landed */
     vec3_t eye,right,forward,up,bolt,dir,where,hit;
     float trail_debt;
+    int begun,fail_done;        /* the start phases / the failure sound played (AW_MagicStartDue's once-flags) */
+    int f_anim,f_start,f_sound,f_shell,f_release;   /* CAST-EGG-SYNC-62: host frames of the cast animation's start, the
+                                               * look's first frame, the cast sound, the first
+                                               * shell or cast sprite and the release (dbg cast shows the last cast's) */
 } cast_t;
+static cast_t last_sync;        /* the last released or failed held cast's frame record */
+static unsigned long look_starts,look_releases,look_fails;   /* held looks (AW_MagicCastLookStart) */
 static aw_magic_table_t *table;
 static int table_state;         /* 0 not tried, 1 loaded, -1 refused */
 static char table_why[64];
@@ -394,10 +400,15 @@ static void update_cast(cast_t *c,int slot,float t0,float t1) {
     const aw_magic_effect_t *fx=&table->fx[c->fx];const aw_magic_phase_t *ph;vec3_t lh,rh,mid,at;float age,size,end=0;int k,f;
     hands(c,lh,rh);
     for(k=0;k<3;k++)mid[k]=(lh[k]+rh[k])*.5f;
+    /* a held look whose spell never left (the cast was dropped: death, a load) ends by itself */
+    if(c->release>=AW_MAGIC_HELD_RELEASE && t1>AW_MAGIC_HELD_MAX){c->used=0;return;}
     /* a failed cast (OpenMW spellcasting.cpp: the roll fails before any effect plays): the school's failure sound
      * at the caster and nothing seen */
     if(c->mode==MODE_FAIL){
-        if(t0<=0)sound_at(c->fx,AW_MAGIC_FAIL,c->eye);
+        if(AW_MagicStartDue(c->fail_done,t1)){
+            c->fail_done=1;sound_at(c->fx,AW_MAGIC_FAIL,c->eye);
+            if(c->f_start){c->f_release=host_framecount;last_sync=*c;}
+        }
         if(t1>FAIL_LENGTH){
             if(c->repeat){c->start=cl.time;}else c->used=0;
         }
@@ -432,7 +443,17 @@ static void update_cast(cast_t *c,int slot,float t0,float t1) {
         }
         if(end<ph->length)end=ph->length;
     }
-    if(t0<=0)sound_at(c->fx,AW_MAGIC_CAST,c->eye);
+    /* the cast sound, the hand glow and the cast sprites (and the orb or egg around a caster seen from outside) all
+     * start on the look's first frame, the frame the cast animation starts (CAST-EGG-SYNC-62; OpenMW character.cpp
+     * plays the casting effects and their sound as the spellcast group starts) */
+    if(AW_MagicStartDue(c->begun,t1)){
+        c->begun=1;sound_at(c->fx,AW_MAGIC_CAST,c->eye);
+        c->f_start=c->f_sound=c->f_shell=host_framecount;
+    }
+    if(!c->f_release && !c->landed && !c->bolt_alive && t1>=c->release && c->f_start){
+        c->f_release=host_framecount;
+        last_sync=*c;
+    }
     /* the bolt (target), the reach (touch) or the caster (self), on the spellcast group's release key */
     if(c->mode==MODE_TARGET){
         if(!c->bolt_alive && !c->landed && t1>=c->release){
@@ -511,7 +532,7 @@ static void update_cast(cast_t *c,int slot,float t0,float t1) {
                 for(k=0;k<3;k++)eye[k]+=VIEW_VEIL*fw[k];
                 /* about as wide as the view at that distance (90 degrees: 2 x VIEW_VEIL), so the shell's strong rim
                  * frames the screen and its see-through middle leaves the view clear; always the faintest frame
-                 * and the finer copy (the maintainer, TG 2026-10-28 08:07 +0200: "the shield veil looks kinda
+                 * and the finer copy (the maintainer, 2026-10-28: "the shield veil looks kinda
                  * wild") */
                 {model_t *fine=shell_model(c->fx,c->shape>=0?c->shape:shell_default(),1);
                  if(fine){if(AW_FxSprite(fine,eye,VIEW_VEIL*2.2f,AW_MAGIC_FADE_FRAMES-1))frame_sprites++;else dropped_sprites++;}
@@ -607,6 +628,11 @@ static void status(void) {
     Con_Printf("Last frame: %lu particles started, %lu sprites; %lu frames: %lu particles, %lu sprites, dropped %lu sprites, %lu particles\n",
                frame_particles,frame_sprites,frames,total_particles,total_sprites,dropped_sprites,dropped_particles);
     if(update_frames)Con_Printf("Update cost: %.3f ms a frame on average (spawning only; drawing is in the frame)\n",update_seconds*1000/update_frames);
+    Con_Printf("Shell: %s (orb type %d); casts with the animation: %lu started, %lu released, %lu failed\n",
+               shell_default()==AW_MAGIC_SHAPE_EGG?"egg (the default)":"sphere",orb_type,look_starts,look_releases,look_fails);
+    if(last_sync.f_start)Con_Printf("Last cast frames: animation %d, look %d, cast sound %d, shell %d, release %d (%s)\n",
+                                   last_sync.f_anim,last_sync.f_start,last_sync.f_sound,last_sync.f_shell,last_sync.f_release,
+                                   AW_MagicInSync(last_sync.f_anim,last_sync.f_sound,last_sync.f_shell)?"in sync":"NOT in sync");
 }
 static void command(void) {
     static char shapes[AW_MAGIC_SHAPES][8]={"egg","sphere"};   /* not const: Q_strcasecmp takes char * */
@@ -680,7 +706,11 @@ static void command(void) {
 /* PLAYER-CASTING-59 (aw_cast.c): the look of the player's real cast of effect MGEF on RANGE (0 self, 1 touch, 2
  * target; FAIL: the failure's sound only), as dbg cast plays it; an effect the table has no look for takes the first
  * of its school's. The bolt seen here is the look only: the spell's own bolt is aw_cast.c's. 0 when nothing plays. */
-int AW_MagicCastLook(int mgef,int range,int fail,float area) {
+/* CAST-EGG-SYNC-62: one look of CASTER (0 the player, else an actor's edict at the player). HELD: the look starts with
+ * the cast animation (the hand glow, the cast sound, the orb or egg around the caster, all on this frame) and waits for
+ * AW_MagicCastLookRelease, called on the frame the spell itself leaves; else it times its own release (the old one-call
+ * look of items and dbg cast). Returns the cast's handle (slot + 1), 0 when nothing plays. */
+static int look_begin(int caster,int mgef,int range,int fail,float area,int held) {
     int i,fx=-1,slot=-1;aw_mgef_t m;
     if(!aw_magic_fx.value || mgef<0 || !sv.active || svs.maxclients!=1 || !sv_player || !load_table())return 0;
     for(i=0;i<table->effects;i++)if(table->fx[i].mgef==mgef){fx=i;break;}
@@ -690,12 +720,26 @@ int AW_MagicCastLook(int mgef,int range,int fail,float area) {
     if(slot<0)return 0;
     memset(&casts[slot],0,sizeof(cast_t));
     casts[slot].used=1;casts[slot].fx=fx;casts[slot].area=area;casts[slot].start=cl.time;casts[slot].shape=-1;
+    casts[slot].caster=caster;
     casts[slot].mode=fail?MODE_FAIL:range==0?MODE_SELF:range==1?MODE_TOUCH:MODE_TARGET;
     casts[slot].duration=(table->fx[fx].flags&AW_MAGIC_CONTINUOUS_VFX)?HOLD_DEFAULT:0;
     if(!aim(&casts[slot])){casts[slot].used=0;return 0;}
-    animate(&casts[slot]);
+    animate(&casts[slot]);casts[slot].f_anim=host_framecount;
+    if(held)casts[slot].release=AW_MAGIC_HELD_RELEASE;   /* the caller releases it (AW_MagicCastRelease's rule) */
     if(last_world!=cl.worldmodel){last_world=cl.worldmodel;last_time=cl.time;}
-    return 1;
+    look_starts+=held!=0;
+    return slot+1;
+}
+int AW_MagicCastLook(int mgef,int range,int fail,float area) {return look_begin(0,mgef,range,fail,area,0)!=0;}
+int AW_MagicCastLookStart(int caster,int mgef,int range,float area) {return look_begin(caster,mgef,range,0,area,1);}
+/* OK 1: the spell left on this frame: the bolt, the touch or the self hit from now; 0: the cast failed: the school's
+ * failure sound now and the look ends; -1: the cast was dropped, the look ends */
+void AW_MagicCastLookRelease(int handle,int ok) {
+    cast_t *c;
+    if(handle<1 || handle>CASTS || !(c=&casts[handle-1])->used || c->release<AW_MAGIC_HELD_RELEASE)return;
+    if(ok>0){c->release=AW_MagicCastRelease((float)(cl.time-c->start));look_releases++;return;}
+    if(ok<0){c->used=0;return;}   /* the cast was dropped: the look ends quietly */
+    c->mode=MODE_FAIL;c->start=cl.time;c->release=0;c->repeat=0;c->fail_done=0;look_fails++;
 }
 void AW_MagicInit(void) {
     Cvar_RegisterVariable(&aw_magic_fx);

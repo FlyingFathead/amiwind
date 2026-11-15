@@ -90,9 +90,11 @@ def merged_region_names(base_raw, layer_raw):
             + b''.join(struct.pack('<iiII', x, y, *cells[x, y]) for x, y in sorted(cells)))
 
 
-def install(world_dir, id1, hand_fields, alternatives=()):
-    """Copy the layer's store into ID1/chimsol and write one frame map per frame of WORLD_DIR's ownership table.
-    Returns the record: {'store', 'files', 'bytes', 'maps': [{'map', 'frame', 'cell', 'bytes', 'sha256', ...}]}."""
+def install(world_dir, id1, hand_fields, alternatives=(), store=STORE):
+    """Copy the layer's store into ID1/<STORE> (chimsol) and write one frame map per frame of WORLD_DIR's ownership
+    table. Also the image's layer stores (tools/chim/layer_stores.py, Bloodmoon). Returns the record:
+    {'store', 'files', 'bytes', 'maps': [{'map', 'frame', 'cell', 'bytes', 'sha256', ...}]}."""
+    STORE = store  # noqa: N806 (the module default, or the layer plan's store name)
     from chim import frame_map as FM
     from chim.regions import TABLE_FILE, read_table
     world_dir, id1 = Path(world_dir), Path(id1)

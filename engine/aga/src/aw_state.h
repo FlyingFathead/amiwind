@@ -29,12 +29,29 @@ typedef struct {
 #define AW_ITEM_FLAGS(row) ((row)->name>>24)
 #define AW_ITEM_SET_FLAG(row,f) ((row)->name|=(uint32_t)(f)<<24)
 #define AW_ITEM_CLEAR_FLAG(row,f) ((row)->name&=~((uint32_t)(f)<<24))
+/* SAVE-ITEM-INSTANCES-ONE-PER-KIND-66 (the save contract 5b; OpenMW keeps one reference per inventory item and merges
+ * equal ones into a stack, components/esm3/inventorystate.cpp, read not copied): a kind's row holds the count of ALL
+ * its copies and the state of the PLAIN ones; an INSTANCE is one copy, or COUNT equal copies, of ROW whose state
+ * differs from the plain copies: its own condition and charge marks (the row's flag bits), or simply the copy a slot
+ * wears or the magic selection names (FLAGS 0 then: which copy is worn is state). SERIAL comes from the drops'
+ * allocator (aw_inventory_state_t next_serial: one identity space, so a dropped instance is the drop with that serial
+ * and comes back as the same instance). The sum of a row's instance counts never passes the row's value; a row that
+ * falls to 0 copies loses its instances; an instance whose state equals the plain copies' and that nothing names
+ * merges back (goes). Instances live in the item table (OWNERSHIP as the rows: cloned and freed with them). */
+#define AW_ITEM_INSTANCES_MAX 65536   /* a damaged-file guard; a game holds tens */
+typedef struct {
+    uint32_t serial;int32_t row,count;
+    uint32_t flags;            /* AW_ITEM_CONDITION, AW_ITEM_CHARGE: the marks this copy carries of its own */
+    float condition,charge;
+} aw_item_inst_t;
 typedef struct {
     int count,blocks;          /* rows in use (rows at 0 included); blocks allocated */
     aw_item_row_t **block;     /* the blocks (heap); NULL with no rows */
     char *names;               /* the name pool: every row's id, 0-terminated (heap) */
     uint32_t names_used,names_size;
     float burden;              /* sum of count x weight over the weighed rows */
+    aw_item_inst_t *inst;      /* the instances (heap, grows by doubling); NULL with none */
+    int inst_count,inst_capacity;
 } aw_items_t;
 #define AW_ITEM_ROW(state,i) (&(state)->items.block[(i)/AW_ITEM_BLOCK][(i)%AW_ITEM_BLOCK])
 #define AW_ITEM_ID(state,i) ((const char *)(state)->items.names+(AW_ITEM_ROW(state,i)->name&0xffffffU))
@@ -64,12 +81,15 @@ typedef struct {
     char equipped[AW_INVENTORY_SLOTS][64];
     uint32_t next_serial,initialized;
     aw_dropped_item_t dropped[AW_INVENTORY_DROPS];
+    /* SAVE-ITEM-INSTANCES-ONE-PER-KIND-66: the instance a slot wears (its serial; 0: a plain copy of EQUIPPED's kind) */
+    uint32_t equipped_serial[AW_INVENTORY_SLOTS];
 } aw_inventory_state_t;
 /* The selected magic item (the original magic menu's item selection; OpenMW
  * InventoryStore::mSelectedEnchantItem). The current enchantment charge of an owned item is in its item row
  * (AW_ITEM_CHARGE); no mark means full charge (OpenMW CellRef charge -1). */
 typedef struct {
     char selected[64];
+    uint32_t selected_serial;   /* the instance selected (0: a plain copy of SELECTED's kind), SAVE-ITEM-INSTANCES-ONE-PER-KIND-66 */
 } aw_magic_state_t;
 enum aw_value_kind { AW_GLOBAL, AW_JOURNAL, AW_ITEM };
 enum aw_compare { AW_EQ, AW_NE, AW_GT, AW_GE, AW_LT, AW_LE };
@@ -112,6 +132,26 @@ void AW_ItemsFree(aw_state_t *state);
 void AW_ItemMark(aw_state_t *state,int i,unsigned flag,float value);
 void AW_ItemUnmark(aw_state_t *state,int i,unsigned flag);
 int AW_ItemsClone(aw_items_t *out,const aw_items_t *in);
+/* The item instances (SAVE-ITEM-INSTANCES-ONE-PER-KIND-66, above). Count and instance I (NULL past the end); Find: the
+ * index of SERIAL (-1 none); Copies: how many copies of ROW are instances; Plain: ROW's copies that are not (its value
+ * less the instances). Make: an instance of ROW with COUNT copies and the marks FLAGS (its condition and charge), under
+ * SERIAL (0: the next serial of the drops' allocator): its index, -1 when ROW or COUNT is bad (more than the plain
+ * copies), the serial is taken, or memory says no. Set: mark FLAG on instance I with VALUE; Unmark: clear it; both
+ * merge the instance away when no mark is left and nothing (a slot, the selection) names its serial: 1 kept, 2 merged
+ * away, 0 bad. Remove: instance I goes (its copies are plain again; the slots and the selection that named it are
+ * cleared). Append: a raw instance (the save decoder; 0 refused). Named: 1 when a slot or the selection names SERIAL. */
+int AW_ItemInstCount(const aw_state_t *state);
+const aw_item_inst_t *AW_ItemInst(const aw_state_t *state,int i);
+int AW_ItemInstFind(const aw_state_t *state,uint32_t serial);
+int32_t AW_ItemInstCopies(const aw_state_t *state,int row);
+int32_t AW_ItemPlain(const aw_state_t *state,int row);
+int AW_ItemInstMake(aw_state_t *state,int row,int32_t count,unsigned flags,float condition,float charge,uint32_t serial);
+int AW_ItemInstSet(aw_state_t *state,int i,unsigned flag,float value);
+int AW_ItemInstUnmark(aw_state_t *state,int i,unsigned flag);
+void AW_ItemInstRemove(aw_state_t *state,int i);
+int AW_ItemInstAppend(aw_state_t *state,const aw_item_inst_t *inst);
+int AW_ItemInstNamed(const aw_state_t *state,uint32_t serial);
+void AW_ItemInstSweep(aw_state_t *state);   /* every instance that is a plain copy again (and unnamed) goes */
 /* The carried weight (ENCUMBRANCE-INCOMPLETE-61): the running total of count x weight over the weighed rows,
  * changed by every count change (no per-frame sum). aw_item_weight (aw_inventory.c sets it: the item's record, read
  * from memory where it already is; NULL in the native tests: rows stay unweighed) gives a new row its weight;

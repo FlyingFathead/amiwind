@@ -12,7 +12,8 @@
  *   per frame: nothing while no guard pursues, the bounty is under iCrimeThreshold and no jail waits; else at most
  *   one edict walk every 0.25 s for the pursuers (a distance and one trace each) and one every second for the guards
  *   on sight (a distance, and one trace and the awareness roll for a guard within the alarm radius).
- *   resident: the settings (29 floats), the crime-reported line, 32 NPC rows of 16 bytes, the last crime's report
+ *   resident: the settings (29 floats), the crime-reported line, the NPC rows (24 bytes each, 32 at first, doubled when
+ *   full up to 1,024: the marked NPCs of a whole game, SAVE-CRIME-MARKS-32-ROWS-66), the last crime's report
  *   (about 1 KB), the jail's state; the prison markers (a 6-line file) and the jail's lines are read only at the jail.
  */
 #include "quakedef.h"
@@ -35,6 +36,7 @@
 #include "aw_statswin.h"
 #include "aw_mwvm.h"
 #include "aw_actors.h"   /* AW_CombatTestEngage: aw_placed crime kill */
+#include "aw_tryalloc.h" /* the rows' table from the heap */
 int AW_SceneStarting(void);   /* aw_scene.c: a map load is pending */
 
 int (*aw_crime_witness)(edict_t *e,aw_crime_witness_t *out);
@@ -60,8 +62,25 @@ static struct {
     int count;
 } last;
 static unsigned long crimes_tried,crimes,rolls_state=0x2545f491UL,arrests,calmed,jailed,fines;
-static aw_crime_actor_t actors[AW_CRIME_ACTORS];
+/* SAVE-CRIME-MARKS-32-ROWS-66 (aw_crime.h): the rows' table from the heap, AW_CRIME_ACTORS rows at first, doubled when
+ * it is full (no free and no calm row) up to AW_CRIME_ACTORS_MAX, where the pure rules reuse a bystander's row as before */
+#define AW_CRIME_ROW_BYTES 24
+AW_RESIDENT_GROWS("the NPCs' crime marks (CRIME-SAVE-PURSUERS-62)",AW_CRIME_ACTORS_MAX,AW_CRIME_ROW_BYTES);
+typedef char aw_crime_row_fits[sizeof(aw_crime_actor_t)<=AW_CRIME_ROW_BYTES?1:-1];
+static aw_crime_actor_t *actors;static int actors_room;
 static int actors_ready;
+/* the table with room for WANT rows (doubled, at most the guard); 0 no memory (the table as it was) */
+static int rows_room(int want){
+    int room=actors_room?actors_room:AW_CRIME_ACTORS,i;aw_crime_actor_t *grown;
+    while(room<want && room<AW_CRIME_ACTORS_MAX)room*=2;
+    if(room>AW_CRIME_ACTORS_MAX)room=AW_CRIME_ACTORS_MAX;
+    if(actors && room<=actors_room)return 1;
+    if(!(grown=(aw_crime_actor_t *)AW_TryRealloc(actors,sizeof(*grown)*(unsigned long)room)))return 0;
+    for(i=actors_room;i<room;i++){memset(&grown[i],0,sizeof(grown[i]));grown[i].crime_id=-1;}
+    actors=grown;actors_room=room;return 1;
+}
+static int rows_used(void){int i,n=0;for(i=0;i<actors_room;i++)if(actors[i].ref)n++;return n;}
+int AW_CrimeActorsRoom(void){return actors_room;}
 
 static int roll100(void){
     unsigned long x=rolls_state;
@@ -96,24 +115,48 @@ static int full(void){return load() && loaded==2;}
 float AW_CrimeAlarmRadius(void){return full()?settings.fAlarmRadius*SCALE:0;}   /* aw_crime.h (COMBAT-ACTOR-VS-ACTOR-62) */
 static edict_t *player(void){return sv.active && svs.maxclients>=1 && svs.clients?svs.clients[0].edict:NULL;}
 static const char *source_id(edict_t *e){eval_t *v=GetEdictFieldValue(e,"aw_source_id");return v && v->string?pr_strings+v->string:"";}
-static unsigned long ref_of(edict_t *e){eval_t *v=GetEdictFieldValue(e,"aw_ref");return v && v->_float>0?(unsigned long)v->_float:0;}
-static int is_npc(edict_t *e){return !e->free && !strcmp(pr_strings+e->v.classname,"aw_npc");}
-static aw_crime_actor_t *row_of(edict_t *e,int make){
-    unsigned long r=e?ref_of(e):0;
-    if(!actors_ready){int i;memset(actors,0,sizeof(actors));for(i=0;i<AW_CRIME_ACTORS;i++)actors[i].crime_id=-1;actors_ready=1;}
-    return make?AW_CrimeActorMake(actors,AW_CRIME_ACTORS,r):AW_CrimeActorFind(actors,AW_CRIME_ACTORS,r);
+/* CRIME-KILL-BOUNTY-65 (c): an NPC without a placed reference (a story actor) is kept by its edict instead, a key no
+ * placed reference uses (the top byte 0xFE), so its crime number is remembered and its death after the assault is a
+ * murder as for anyone else; such a row lives as long as the map (a saved game cannot find it again) */
+#define REFLESS_KEY AW_CRIME_REFLESS_KEY
+static unsigned long ref_of(edict_t *e){
+    eval_t *v=GetEdictFieldValue(e,"aw_ref");
+    if(v && v->_float>0)return (unsigned long)v->_float;
+    return e && !strcmp(pr_strings+e->v.classname,"aw_npc")?REFLESS_KEY|(unsigned long)NUM_FOR_EDICT(e):0;
 }
-/* CRIME-SAVE-PURSUERS-62 (aw_crime.h): the rows to and from a saved game */
+static int is_npc(edict_t *e){return !e->free && !strcmp(pr_strings+e->v.classname,"aw_npc");}
+static void table_ready(void){if(!actors)rows_room(AW_CRIME_ACTORS);actors_ready=1;}
+static aw_crime_actor_t *row_of(edict_t *e,int make){
+    unsigned long r=e?ref_of(e):0;aw_crime_actor_t *row;
+    if(!actors_ready || !actors)table_ready();
+    if(!actors)return NULL;   /* no memory for the table: no crime marks until one is made */
+    row=AW_CrimeActorFind(actors,actors_room,r);
+    if(row || !make || !r)return row;
+    /* a full table grows before a bystander's row would be reused (only at the guard it is) */
+    if(AW_CrimeActorsFull(actors,actors_room))rows_room(actors_room*2);
+    return AW_CrimeActorMake(actors,actors_room,r);
+}
+/* CRIME-SAVE-PURSUERS-62 (aw_crime.h): the rows to and from a saved game; SAVE-CRIME-MARKS-32-ROWS-66: the first 255 in
+ * AWCR, the rest in AWC2; the table grows to hold what a save brings */
 int AW_CrimeActorsExport(unsigned char *out,int capacity){
     row_of(NULL,0);   /* the table made */
-    return AW_CrimeActorsPack(actors,AW_CRIME_ACTORS,out,capacity);
+    return AW_CrimeActorsPack(actors,actors_room,out,capacity);
+}
+int AW_CrimeActorsExportMore(unsigned char *out,int capacity){
+    row_of(NULL,0);
+    return AW_CrimeActorsPackMore(actors,actors_room,out,capacity);
 }
 int AW_CrimeActorsImport(const unsigned char *data,int bytes){
-    int k=AW_CrimeActorsUnpack(actors,AW_CRIME_ACTORS,data,bytes);
-    actors_ready=1;   /* emptied, then filled (or left empty when unreadable) */
-    return k;
+    table_ready();
+    if(data && bytes>=6)rows_room(data[5]);
+    return AW_CrimeActorsUnpack(actors,actors_room,data,bytes);   /* emptied, then filled (or left empty when unreadable) */
 }
-void AW_CrimeActorsReset(void){AW_CrimeActorsUnpack(actors,AW_CRIME_ACTORS,NULL,0);actors_ready=1;}
+int AW_CrimeActorsImportMore(const unsigned char *data,int bytes){
+    table_ready();
+    if(data && bytes>=6)rows_room(rows_used()+((((int)data[4])<<8)|data[5]));
+    return AW_CrimeActorsUnpackMore(actors,actors_room,data,bytes);
+}
+void AW_CrimeActorsReset(void){table_ready();AW_CrimeActorsUnpack(actors,actors_room,NULL,0);}
 static edict_t *edict_of_ref(unsigned long ref){
     int i;
     if(!ref)return NULL;
@@ -326,16 +369,16 @@ int AW_CrimeKilled(edict_t *victim,int can_commit){
     return 1;
 }
 int AW_CrimeOnMurder(unsigned long ref){
-    aw_crime_actor_t *row=actors_ready?AW_CrimeActorFind(actors,AW_CRIME_ACTORS,ref):NULL;
+    aw_crime_actor_t *row=actors_ready?AW_CrimeActorFind(actors,actors_room,ref):NULL;
     if(!row || !row->murdered)return 0;
     row->murdered=0;return 1;
 }
 int AW_CrimeAlarmed(unsigned long ref){
-    aw_crime_actor_t *row=actors_ready?AW_CrimeActorFind(actors,AW_CRIME_ACTORS,ref):NULL;
+    aw_crime_actor_t *row=actors_ready?AW_CrimeActorFind(actors,actors_room,ref):NULL;
     return row && row->alarmed;
 }
 int AW_CrimeDispositionOf(unsigned long ref){
-    aw_crime_actor_t *row=actors_ready?AW_CrimeActorFind(actors,AW_CRIME_ACTORS,ref):NULL;
+    aw_crime_actor_t *row=actors_ready?AW_CrimeActorFind(actors,actors_room,ref):NULL;
     return row?row->disposition:0;
 }
 
@@ -346,7 +389,7 @@ static void calm_all(void){
     int paid,i,n=0;
     AW_StandingCrimePaid();paid=AW_StandingCrimeLast();
     if(!actors_ready)return;
-    for(i=0;i<AW_CRIME_ACTORS;i++){
+    for(i=0;i<actors_room;i++){
         aw_crime_actor_t *r=&actors[i];edict_t *e;
         if(!r->ref || r->crime_id==-1 || r->crime_id>paid)continue;
         if(sv.active && (e=edict_of_ref(r->ref))!=NULL){
@@ -355,7 +398,7 @@ static void calm_all(void){
         }
         n++;
     }
-    AW_CrimeActorsCalm(actors,AW_CRIME_ACTORS,paid);
+    AW_CrimeActorsCalm(actors,actors_room,paid);
     calmed+=n;
 }
 /* the prison markers of the image (prison-markers.txt, tools/build_aga.py write_prison_markers): "AWPM1", then per
@@ -535,10 +578,10 @@ static int pursue_last,pursue_last_dz;   /* the last pursuer's distance and heig
 /* an alarmed guard runs to the player; near and in sight it talks (the arrest); a bounty paid ends the pursuit */
 static void pursuers(void){
     int i,any=0;edict_t *p=player();
-    for(i=0;i<AW_CRIME_ACTORS;i++)if(actors[i].ref && actors[i].pursue)any=1;
+    for(i=0;i<actors_room;i++)if(actors[i].ref && actors[i].pursue)any=1;
     if(!any || realtime-pursue_at<.25)return;
     pursue_at=realtime;pursue_walks++;
-    for(i=0;i<AW_CRIME_ACTORS;i++){
+    for(i=0;i<actors_room;i++){
         aw_crime_actor_t *r=&actors[i];edict_t *e;vec3_t d;float reach;
         if(!r->ref || !r->pursue)continue;
         /* not here, or dead (an NPC's edict health is not its health: the fight's sheet says it; s6: every check
@@ -643,7 +686,7 @@ static void status(void){
                            "iCrimeThreshold %g, iDaysinPrisonMod %g, message \"%s\"\n",
                            settings.fAlarmRadius,settings.fCrimeStealing,settings.iCrimeAttack,settings.iCrimeKilling,
                            settings.iCrimeTresspass,settings.iCrimeThreshold,settings.iDaysinPrisonMod,crime_text);
-    if(actors_ready)for(i=0;i<AW_CRIME_ACTORS;i++)if(actors[i].ref && !(actors[i].crime_id==-1 && !actors[i].alarmed &&
+    if(actors_ready)for(i=0;i<actors_room;i++)if(actors[i].ref && !(actors[i].crime_id==-1 && !actors[i].alarmed &&
                                                      !actors[i].murdered && !actors[i].pursue))
         Con_Printf("  NPC ref %lu: crime %d, disposition %+d%s%s%s\n",actors[i].ref,actors[i].crime_id,actors[i].disposition,
                    actors[i].alarmed?", alarmed":"",actors[i].pursue?", pursues":"",actors[i].murdered?", murdered":"");

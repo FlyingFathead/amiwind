@@ -16,9 +16,10 @@ import struct
 import sys
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
-from mwad.audit import BSA
+from mwad.archives import layered_bsa
 from mwad.interior import original_doors, read_interior, select_geometry
 from mwad.paths import resolve_data_files, child_ci, ensure_external
+from mwad.masters import master_path
 from prepare_harvest import source_context, placement_source_key, identity_key, prepare_graph
 from prepare_harvest_alias import pin, alias_angles, convert_plan
 
@@ -94,7 +95,7 @@ def route_banks(raw, room_name, registry, directory, data_files):
     for name,slug in MAP_NAMES.items():
         if name in maps and maps[name]!=slug:raise ValueError('Registry overlaps an existing interior')
         maps[name]=slug
-    bsa=BSA(child_ci(data_files,'Morrowind.bsa'));reader=nif_reader();cache={};links=[];blocked=[]
+    bsa=layered_bsa(data_files);reader=nif_reader();cache={};links=[];blocked=[]
     doors=[d for d in original_doors(raw) if
            (d['source_interior'] and d['source_cell'].casefold()==room_name.casefold()) or
            d['destination_cell'].casefold()==room_name.casefold()]
@@ -158,7 +159,7 @@ def finish_room(data_files, scene, room_name, registry, regions_raw, *, media_pa
     import numpy as np
     from prepare_scenery import export_refs
     data=resolve_data_files(data_files);scene=Path(scene)
-    raw=child_ci(data,'Morrowind.esm').read_bytes()
+    raw=master_path(data).read_bytes()
     registry=append_registry([],pin(raw)['sha256'],registry)
     rows=[r for r in registry['entries'] if r['cell']==room_name]
     if len(rows)!=1:raise ValueError('Room must have one exact appended registry entry')
@@ -208,7 +209,7 @@ def finish_room(data_files, scene, room_name, registry, regions_raw, *, media_pa
 def convert_room(data_files, scene, cell_name, registry, palette, regions_raw, tools, *, media_payload=None):
     from prepare_area import build_room
     data=resolve_data_files(data_files);scene=ensure_external(scene,'new harvest interior')
-    raw=child_ci(data,'Morrowind.esm').read_bytes();context=source_context(raw,max_plants=256,intern_root_spans=True)
+    raw=master_path(data).read_bytes();context=source_context(raw,max_plants=256,intern_root_spans=True)
     registry=append_registry([],pin(raw)['sha256'],registry)
     rows=[r for r in registry['entries'] if r['cell']==cell_name]
     if registry['master_sha256']!=pin(raw)['sha256'] or len(rows)!=1:raise ValueError('Room/source registry mismatch')
@@ -217,7 +218,7 @@ def convert_room(data_files, scene, cell_name, registry, palette, regions_raw, t
     if not refs:raise ValueError('Room has no original numeric harvestable mushrooms')
     prepare_graph(context,refs,lambda r:({'model':'@0','representation':'external_alias','scale':r['scale']},
                                         [v*.25 for v in r['position']],alias_angles(r)))
-    cell=read_interior(child_ci(data,'Morrowind.esm'),cell_name,include_interior_entrances=True)
+    cell=read_interior(master_path(data),cell_name,include_interior_entrances=True)
     select_geometry(cell,harvest_references=refs,harvest_master_sha256=context['full']['master_sha256'])
     if len(palette)!=768:raise ValueError('Expected RGB palette')
     scene.mkdir(parents=True,exist_ok=False);(scene/'id1/gfx').mkdir(parents=True)

@@ -7,6 +7,7 @@ import numpy as np
 from PIL import Image
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 from mwad.paths import copy_tree,ensure_external,resolve_data_files,child_ci
+from mwad.masters import master_path
 from mwad.interior import read_interior,select_geometry
 from prepare_scenery import export_refs
 from prepare_mesh_bsp import add_dressing_option, append_meshes, apply_dressing_option, interior_dressing
@@ -25,7 +26,7 @@ def prepare(data_files,scene,out,qbsp,vis,light,jobs=None,vis_mode='fast'):
     from build_parallel import Background
     from prepare_doors import door_sources
     doors=Background(door_sources,data_files,jobs=jobs)
-    cell=read_interior(child_ci(data_files,'Morrowind.esm'),'Imperial Prison Ship')
+    cell=read_interior(master_path(data_files),'Imperial Prison Ship')
     refs,omitted=select_geometry(cell)
     shell=next(r for r in refs if r['id'].casefold()=='in_prison_ship')
     door=next(r for r in refs if r['type']=='DOOR' and r.get('destination'))
@@ -70,10 +71,31 @@ def prepare(data_files,scene,out,qbsp,vis,light,jobs=None,vis_mode='fast'):
     for exe,args in [(qbsp,['-nopercent','prison.map']),(vis,['-fast','prison.bsp'] if vis_mode=='fast' else ['prison.bsp']),(light,light_args('-minlight','24','prison.bsp'))]:
         subprocess.run([str(Path(exe).resolve()),*(['-threads',str(resolve_jobs(jobs))] if exe==vis else []),*args],cwd=out,check=True)
     base=out/'prison-base.bsp';(out/'prison.bsp').rename(base);rebuild_world_hull(base,out/'prison.map',qbsp)
+    # The shell's collision plates under the rooms' rule: exact standing bevels on the walkable plates, approximate
+    # on the walls (room_map_collision, PRISON-SHIP-POLY-COLLISION-65; --chim-hollow-bevels 0: exact on every plate,
+    # the method before). The models are prepared here and handed to the converter as they are.
+    from room_map_collision import prepare_room_models, room_map_hollow_bevels
+    prepared,shell_bevels=prepare_room_models(parts,'meshes/i/in_prison_ship.nif',room_map_hollow_bevels(1),jobs)
+    # The hammocks' small closed parts (rings and knots of at most 2.5 units) drawn as their boxes (room_map_parts;
+    # --room-small-parts off: every part as authored).
+    from room_map_parts import apply_room_small_parts
+    small_parts=apply_room_small_parts(prepared,index)
     report=append_meshes(base,out/'prison.bsp',parts,out/'id1/gfx/palette.lmp',centre=(0,0),lighting=lighting,jobs=jobs,
-                         retain_dressing=interior_dressing())
+                         retain_dressing=interior_dressing(),prepared_models=prepared)
+    report['shell_bevels']=shell_bevels;report['small_parts']=small_parts
     from collision_index import index_model_collision
     report['collision_index'] = index_model_collision(out/'prison.bsp', shell['number'])
+    # The shell's faces in draw tiles with their own boxes, so the engine's per-model frustum test leaves out the
+    # parts behind the view (bsp_model_tiles, PRISON-SHIP-POLY-COLLISION-65; --room-draw-tiles 0: one model, as before)
+    from bsp_model_tiles import tile_model, model_by_ref
+    from room_map_env import room_draw_tiles
+    tile_faces=room_draw_tiles()
+    if tile_faces:
+        raw=(out/'prison.bsp').read_bytes()
+        tiled,report['draw_tiles']=tile_model(raw,model_by_ref(raw,shell['number']),tile_faces)
+        (out/'prison.bsp').write_bytes(tiled)
+    else:
+        report['draw_tiles']={'tiles':0,'note':'off (--room-draw-tiles 0)'}
     indexed = lumps((out/'prison.bsp').read_bytes())
     report.update(nodes=len(indexed[5])//24, clipnodes=len(indexed[9])//8, bytes=(out/'prison.bsp').stat().st_size)
     shutil.copyfile(out/'prison.bsp',out/'id1/maps/prison.bsp')

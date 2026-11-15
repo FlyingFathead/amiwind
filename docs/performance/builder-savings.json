@@ -30,6 +30,9 @@
      "source": "hudcell-mw1: 4,862 of 4,875 sounds converted; rc1c with a warm pool: 14 s"},
     {"label": "Expected loss to failures per full build", "before": 5200, "before_kind": "estimated",
      "after": 300, "after_kind": "estimated", "fixes": "preflight, resume, faster image step",
-     "source": "6 of 9 image attempts failed, mean 3,339 s to the error (ledger)"}
+     "source": "6 of 9 image attempts failed, mean 3,339 s to the error (ledger)"},
+    {"label": "Resume after the image step's stop (v0.0.66-dev1)", "before": 40725, "before_kind": "measured",
+     "after": 3761, "after_kind": "measured", "fixes": "unit caches and stage reuse (46 of 48 stages reused)",
+     "source": "v0.0.66-dev1 first build 40,725 s, 41 of 48 stages rebuilt, stopped in the image step; resumed build 3,761 s, 2 rebuilt"}
   ]
 }

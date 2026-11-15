@@ -1517,6 +1517,7 @@ class DiagnosticOutputTests(unittest.TestCase):
             'tools/fsuae_headless_probe.py': 'emulator probe logs', 'tools/engine_smoke.py': 'the engine smoke (not a builder stage) reads the game console of its own emulator run', 'tools/package_opening.py': 'opening package',
             'tools/profile_demo.py': 'demo profiler', 'tools/capture_opening.py': 'opening capture',
             'tools/crossing_route.py': 'the crossing route (not a builder stage) reads the game console of its own emulator run',
+            'tools/journey_smoke.py': 'the gameplay journey judge (not a builder stage) reads the step and console logs of its own emulator sessions',
             'tools/run_tests.py': 'test runner log', 'tools/world_estimate_sample.py': 'estimate sample tool logs',
             'tools/chimport.py': 'the island conversion tool (not a builder stage) quotes a failed cell process log',
             'tools/aw.py': 'the master builder command line (not a builder stage) names its own gate console log',
@@ -2061,6 +2062,96 @@ class NarrowedReuseTests(unittest.TestCase):
         record = build_cache.used_record(['tools/narrow.py', '@tools/narrow.py\tfast'], index)
         self.assertFalse(record['complete'])
         self.assertIn('trace form 1', record['why'][0])
+
+
+# the slow stage's code edited so that it writes the same output (a local name for the text it reads)
+SLOW_BEFORE = "    return 'slow:' + (ROOT / 'config' / 'slow.json').read_text()\n"
+SLOW_AFTER = "    text = (ROOT / 'config' / 'slow.json').read_text()\n    return 'slow:' + text\n"
+
+
+@unittest.skipUnless(MANIFESTS, 'stage wrapper, trace and manifests are exercised on POSIX')
+class ProvenEqualSourcesTests(unittest.TestCase):
+    """BUILD-STAGE-KEY-EQUAL-EDITS-66: a stage whose sources differ only by edits build_cache.PROVEN_EQUAL_SOURCES
+    lists for it, each from exactly the recorded value to exactly this checkout's, is reused (the stage-key twin of
+    unit_store.LEGACY_SOURCES); any other value, file or key part rebuilds it as before. The v0.0.66-dev3 line: the
+    chim stage's key moved for a renamed local import and for engine structure fields no size it reads depends on."""
+    MODES = NarrowedReuseTests.MODES
+    setUp = NarrowedReuseTests.setUp
+    tearDown = NarrowedReuseTests.tearDown
+    steps = NarrowedReuseTests.steps
+    build = NarrowedReuseTests.build
+    reused = NarrowedReuseTests.reused
+    outputs = NarrowedReuseTests.outputs
+    edit = NarrowedReuseTests.edit
+
+    def recorded(self, run, stage, path='tools/narrow.py'):
+        details = json.loads((run / 'profile' / 'fingerprints.json').read_text())
+        return details[stage]['sources']['by_file'][path]
+
+    def test_a_proven_edit_reuses_the_stage_with_the_outputs_of_a_fresh_build(self):
+        first, _, _ = self.build('first')
+        self.edit('tools/narrow.py', SLOW_BEFORE, SLOW_AFTER)
+        # without an entry the slow stage ran the edited code: it runs again (narrowing cannot take it)
+        second, state, _ = self.build('second', reuse_from=first)
+        self.assertEqual(self.reused(state), ['fast', 'list'])
+        self.assertIn('sources (tools/narrow.py)', state['stage_cache']['not_reused']['slow'])
+        old, new = self.recorded(first, 'slow'), self.recorded(second, 'slow')
+        self.assertNotEqual(old, new)
+        table = {'slow': {'tools/narrow.py': ((old, new),)}}
+        with patch.dict(build_cache.PROVEN_EQUAL_SOURCES, table):
+            third, state, printed = self.build('third', reuse_from=first)
+            predicted = build_cache.predict(first, root=self.repository)
+        self.assertEqual(self.reused(state), ['fast', 'list', 'slow'])
+        self.assertEqual(state['stage_cache']['proven'], {'slow': ['tools/narrow.py']})
+        self.assertIn('proven to change none of its outputs (PROVEN_EQUAL_SOURCES): tools/narrow.py', printed)
+        self.assertIsNone(predicted['slow'])
+        self.assertIn('child', state['stage_cache']['not_reused'])     # no entry: compared as before
+        fresh, _, _ = self.build('fresh')
+        self.assertEqual(self.outputs(third), self.outputs(fresh))
+        self.assertEqual(self.outputs(third), self.outputs(first))
+
+    def test_any_other_value_file_or_stage_rebuilds(self):
+        first, _, _ = self.build('first')
+        old = self.recorded(first, 'slow')
+        self.edit('tools/narrow.py', SLOW_BEFORE, SLOW_AFTER)
+        other = 'units4:' + '0' * 64
+        for table in ({'slow': {'tools/narrow.py': ((old, other),)}},             # another new value
+                      {'slow': {'tools/narrow.py': ((other, old),)}},             # another recorded value
+                      {'slow': {'tools/stage_n.py': ((old, other),)}},            # another file
+                      {'fast-and-slow': {'tools/narrow.py': ((old, other),)}}):   # another stage
+            with patch.dict(build_cache.PROVEN_EQUAL_SOURCES, table):
+                _, state, _ = self.build('try-%d' % len(list((self.root / 'workspace').iterdir())), reuse_from=first)
+            self.assertNotIn('slow', self.reused(state), table)
+            self.assertNotIn('proven', state['stage_cache'], table)
+
+    def test_only_listed_source_pairs_count(self):
+        def parts(by_file, **other):
+            return dict({'sources': {'by_file': by_file}, 'stage': 's'}, **other)
+        table = {'s': {'a.py': (('a1', 'a2'),), 'b.h': (('b1', 'b2'),)}}
+        files = build_cache.proven_equal_files
+        self.assertEqual(files('s', parts({'a.py': 'a1', 'c': 'c'}), parts({'a.py': 'a2', 'c': 'c'}), table), ['a.py'])
+        self.assertEqual(files('s', parts({'a.py': 'a1', 'b.h': 'b1'}), parts({'a.py': 'a2', 'b.h': 'b2'}), table),
+                         ['a.py', 'b.h'])
+        # a changed file the table does not list, a reversed pair, an unchanged key, another key part
+        self.assertIsNone(files('s', parts({'a.py': 'a1', 'c': 'c'}), parts({'a.py': 'a2', 'c': 'd'}), table))
+        self.assertIsNone(files('s', parts({'a.py': 'a2'}), parts({'a.py': 'a1'}), table))
+        self.assertIsNone(files('s', parts({'a.py': 'a1'}), parts({'a.py': 'a1'}), table))
+        self.assertIsNone(files('s', parts({'a.py': 'a1'}, environment={'X': '1'}),
+                                parts({'a.py': 'a2'}, environment={'X': '2'}), table))
+        self.assertIsNone(files('t', parts({'a.py': 'a1'}), parts({'a.py': 'a2'}), table))
+        # a file that appears or goes is no pair either
+        self.assertIsNone(files('s', parts({}), parts({'a.py': 'a2'}), table))
+
+    def test_the_table_names_files_of_the_repository_in_pairs(self):
+        for stage, files in build_cache.PROVEN_EQUAL_SOURCES.items():
+            self.assertTrue(stage and files, stage)
+            for path, pairs in files.items():
+                self.assertTrue((ROOT / path).is_file(), path)
+                self.assertTrue(pairs, path)
+                for pair in pairs:
+                    self.assertEqual(len(pair), 2, path)
+                    self.assertTrue(all(isinstance(value, str) and value for value in pair), path)
+                    self.assertNotEqual(pair[0], pair[1], path)
 
 
 TABLED = '''HOST = {'raiserank', 'showmap'}

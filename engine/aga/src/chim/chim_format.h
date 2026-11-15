@@ -170,6 +170,25 @@ int ChimFormat_RecordTint (int minor, int flags);
 int ChimFormat_StoreNameValid (const char *name);
 /* "<store>/<relative>" into out (size bytes); 0 when the name is invalid or it does not fit. */
 int ChimFormat_StorePath (char *out, int size, const char *store, const char *relative);
+/* The store a map names in its worldspawn ("_chim_world", the first entity of
+ * ENTITIES, BYTES long or NUL-ended): into out, the default store when the key
+ * is absent. 0 when the named store is not a valid name (out then empty). */
+int ChimFormat_WorldspawnStore (const char *entities, long bytes, char *out, int size);
+/* The stores this image carries (tools/chim/layer_stores.py: one per selected
+ * expansion layer beside the island's): a store is there when its world.cwi
+ * opens, asked once per name and kept. The default store is the island's and
+ * always listed. */
+#define CHIM_STORE_TABLE	8
+typedef struct
+{
+	int		count;
+	char	name[CHIM_STORE_TABLE][CHIM_STORE_CHARS+1];
+	char	present[CHIM_STORE_TABLE];
+} chim_store_table_t;
+/* 1 when STORE is in the image (EXISTS("<store>/world.cwi", ctx) opens it), 0
+ * when not or the name is invalid; a full table answers by asking again. */
+int ChimFormat_StoreInTable (chim_store_table_t *t, const char *store,
+	int (*exists) (const char *path, void *ctx), void *ctx);
 
 /* A room record (<store>/rooms/<room>.crm, docs/chim/INTERIOR_STORE.md): the
  * common header (kind ROOM, count = placements, directory = the model list at

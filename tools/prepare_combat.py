@@ -27,8 +27,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
 import numpy as np
-from mwad.audit import BSA, records, subrecords, string
+from mwad.audit import records, subrecords, string
+from mwad.archives import layered_bsa
 from mwad.paths import child_ci, resolve_data_files
+from mwad.masters import master_path
 
 SETTINGS = ('fFatigueBase', 'fFatigueMult', 'fCombatDistance', 'fHandToHandReach',
             'fMinHandToHandMult', 'fMaxHandToHandMult', 'fHandtoHandHealthPer',
@@ -55,9 +57,15 @@ MOVE_SETTINGS = ('fMinWalkSpeed', 'fMaxWalkSpeed', 'fEncumberedMoveEffect', 'fBa
                  # fall damage (v0.0.62, SCRIPTED-EVENT-FALLING-MAGE-61; aw_move.h AW_MoveFallDamage)
                  'fFallDamageDistanceMin', 'fFallDistanceBase', 'fFallDistanceMult', 'fFallAcroBase', 'fFallAcroMult',
                  # the werewolf's run (v0.0.63, WEREWOLF-RUN-SPEED-63; aw_move.h AW_MoveRunSpeed): Bloodmoon's
-                 'fWerewolfRunMult')
+                 'fWerewolfRunMult',
+                 # a creature's walk (v0.0.66, ACTOR-MECHANICS-USE-STATS-66; aw_move.h AW_MoveActorSpeed)
+                 'fMinWalkSpeedCreature', 'fMaxWalkSpeedCreature')
 # Settings only an add-on master defines: name -> the master (prepare_combat.addon_settings)
-ADDON_SETTINGS = {'fWerewolfRunMult': 'Bloodmoon.esm'}
+ADDON_SETTINGS = {'fWerewolfRunMult': 'Bloodmoon.esm', 'iWereWolfLevelToAttack': 'Bloodmoon.esm',
+                  'iWereWolfFleeMod': 'Bloodmoon.esm'}
+# ACTOR-MECHANICS-USE-STATS-66 row 16 (OpenMW 0.51 aicombataction.cpp vanillaRateFlee): an NPC below the level flees a
+# werewolf by the mod; in the expansions' masters only, written as optional "werewolf NAME VALUE" lines (aw_combat.c)
+WEREWOLF_SETTINGS = ('iWereWolfLevelToAttack', 'iWereWolfFleeMod')
 # The aggro and flee ratings (engine/aga/src/aw_combat.h aw_combat_ai_t, the same order; docs/COMBAT.md "Combat
 # playground"): written as "ai NAME VALUE" lines, which the melee settings' loader skips.
 AI_SETTINGS = ('iFightDistanceBase', 'fFightDistanceMultiplier', 'fFightDispMult',
@@ -98,6 +106,13 @@ SNDG_TYPES = ('left', 'right', 'swimleft', 'swimright', 'moan', 'roar', 'scream'
 # Original weapon types 0..8 are melee; skill each uses; two-handed (no shield).
 WEAPON_SKILL = {0: 22, 1: 5, 2: 5, 3: 4, 4: 4, 5: 4, 6: 7, 7: 6, 8: 6}
 TWO_HANDED = {2, 4, 5, 6, 8}
+# ACTOR-RANGED-COMBAT-MISSING-66: 9 bow, 10 crossbow, 11 thrown use Marksman (23); a bow shoots arrows (12), a
+# crossbow bolts (13), a thrown weapon is its own ammunition (OpenMW 0.51 weapontype.cpp).
+RANGED_SKILL = {9: 23, 10: 23, 11: 23}
+RANGED_AMMO = {9: 12, 10: 13, 11: None}
+# fAIRangeMeleeWeaponMult / fAIMeleeWeaponMult (the masters' game settings 5 and 2): the original rates a ranged
+# weapon with the first while its enemy is out of reach, as every fight starts (weaponpriority.cpp rateWeapon).
+RANGED_OPENING_MULT = 5.0 / 2.0
 # Animation group suffix per weapon type for the fighters' frames.
 STANCE = {None: 'handtohand', 0: 'weapononehand', 1: 'weapononehand', 3: 'weapononehand', 7: 'weapononehand',
           2: 'weapontwohand', 8: 'weapontwohand', 4: 'weapontwowide', 5: 'weapontwowide', 6: 'weapontwowide'}
@@ -145,15 +160,17 @@ def addon_settings(data, kinds):
     """The settings an add-on master defines (ADDON_SETTINGS: the name and its master): Morrowind.esm's value when it
     has one, else the add-on's, read only for these names; a setting neither has is left out (the engine keeps the
     original's value, aw_move_rules.c)."""
-    out = {}
+    out, loaded = {}, {}
     for name, master in ADDON_SETTINGS.items():
         if kinds['GMST'].get(name.casefold()) is not None:
             out[name] = gmst(kinds, name)
             continue
-        try:
-            extra = load(child_ci(data, master))
-        except (OSError, FileNotFoundError, KeyError, ValueError):
-            continue
+        if master not in loaded:         # each add-on master read once, whatever number of its settings
+            try:
+                loaded[master] = load(child_ci(data, master))
+            except (OSError, FileNotFoundError, KeyError, ValueError):
+                loaded[master] = {}
+        extra = loaded[master]
         if extra.get('GMST', {}).get(name.casefold()) is not None:
             out[name] = gmst(extra, name)
     return out
@@ -271,29 +288,182 @@ def resolve(kinds, identifier, level, depth=0):
     return resolve(kinds, max(entries)[1], level, depth + 1)
 
 
-def equipment(kinds, npc, level):
+def weapon_rating(w):
+    """OpenMW 0.51 weaponpriority.cpp rateWeapon without the enemy (no resistances, hit chance or enchantment): a
+    melee weapon (slash^2 + thrust^2 + chop^2) / (slash + thrust + chop) of the mean damages, a thrown weapon twice its
+    mean chop, a bow or crossbow its mean chop (the ammunition's is added by the caller), ammunition its mean chop;
+    times the weapon's speed (not for ammunition)."""
+    typ = struct.unpack_from('<h', w, 8)[0]
+    speed = struct.unpack_from('<f', w, 12)[0]
+    chop, slash, thrust = ((w[22 + 2 * i] + w[23 + 2 * i]) / 2. for i in range(3))
+    if typ in AMMO_TYPES:
+        return chop
+    if typ == 11:
+        rating = chop * 2
+    elif typ in RANGED_SKILL:
+        rating = chop
+    else:
+        rating = (slash * slash + thrust * thrust + chop * chop) / (slash + thrust + chop) if slash + thrust + chop else 0.
+    return rating * speed
+
+
+AMMO_TYPES = {12, 13}
+
+
+def ranged_choice(kinds, items):
+    """(rating, item, type, WPDT, ammo item or None) of the best ranged weapon ITEMS can shoot (a bow with arrows, a
+    crossbow with bolts, a thrown weapon), None when none can: OpenMW rates a bow or crossbow 0 without its ammunition
+    and adds the best ammunition's rating (rateAmmo)."""
+    ammo = {}
+    for item in items:
+        if item in kinds['WEAP']:
+            w = first(kinds['WEAP'][item], 'WPDT')
+            typ = struct.unpack_from('<h', w, 8)[0]
+            if typ in AMMO_TYPES:
+                r = weapon_rating(w)
+                if typ not in ammo or r > ammo[typ][0]:
+                    ammo[typ] = (r, item)
+    best = None
+    for item in items:
+        if item not in kinds['WEAP']:
+            continue
+        w = first(kinds['WEAP'][item], 'WPDT')
+        typ = struct.unpack_from('<h', w, 8)[0]
+        if typ not in RANGED_SKILL:
+            continue
+        need = RANGED_AMMO[typ]
+        if need is not None and need not in ammo:
+            continue
+        rating = weapon_rating(w) + (ammo[need][0] if need is not None else 0.)
+        if best is None or rating > best[0]:
+            best = (rating, item, typ, w, ammo[need][1] if need is not None else None)
+    return best
+
+
+def fighter_stats(kinds, actor, level):
+    """(skills[27], agility, luck, combat) of an NPC_ or CREA record as the weapon choice reads them, or None when the
+    record does not give them (the choice then counts every skill as 50, OpenMW rateWeapon's value without a skill).
+    An NPC: its stored skills or the auto-calculated ones, combat None. A creature: each skill is its Combat, Magic or
+    Stealth value by the skill's specialization (OpenMW 0.51 mwclass/creature.cpp getSkill), combat its Combat value
+    (rateWeapon's hit chance of a creature)."""
+    try:
+        npdt = first(actor, 'NPDT')
+        if len(npdt) == 96:
+            v = struct.unpack('<24i', npdt)
+            combat, magic, stealth = v[14:17]
+            skills = []
+            for index in range(27):
+                sk = first(kinds['SKIL'].get(index, []), 'SKDT')
+                spec = struct.unpack_from('<i', sk, 4)[0] if len(sk) >= 8 else 0
+                skills.append((combat, magic, stealth)[spec] if 0 <= spec <= 2 else combat)
+            return skills, v[2 + 3], v[2 + 7], combat
+        if len(npdt) == 52:
+            return list(npdt[10:37]), npdt[2 + 3], npdt[2 + 7], None
+        if len(npdt) == 12:
+            attributes, skills, _ = autocalc(kinds, actor, level)
+            return list(skills), attributes[3], attributes[7], None
+    except (KeyError, IndexError, struct.error, ValueError, TypeError):
+        pass
+    return None
+
+
+def _setting(kinds, name, default):
+    try:
+        return gmst(kinds, name)
+    except (KeyError, ValueError, struct.error, TypeError):
+        return default
+
+
+def combat_rating(kinds, w, stats, mult, ammo_rating=0.):
+    """OpenMW 0.51 weaponpriority.cpp rateWeapon of a weapon record's WPDT W for a fighter of STATS (fighter_stats)
+    at the start of a fight, without the enemy: the damage term (weapon_rating's, before the speed), a bow's or
+    crossbow's best round added (AMMO_RATING, already rated; 0 without one = the weapon rates 0), then 0 when the
+    fighter's skill of that weapon is 0 (it prefers its fists), times the hit chance (the skill, or a creature's Combat,
+    + Agility / 5 + Luck / 10, times the fresh fatigue term fFatigueBase, as a share clamped to 0.01..1; the enemy's
+    evasion is not known when the builder chooses, so it is left out), times the weapon's speed (not for a round),
+    times MULT (fAIMeleeWeaponMult, or fAIRangeMeleeWeaponMult for a ranged weapon out of the enemy's reach)."""
+    typ = struct.unpack_from('<h', w, 8)[0]
+    speed = struct.unpack_from('<f', w, 12)[0]
+    chop, slash, thrust = ((w[22 + 2 * i] + w[23 + 2 * i]) / 2. for i in range(3))
+    if typ in AMMO_TYPES:
+        rating = chop
+    elif typ == 11:
+        rating = chop * 2
+    elif typ in RANGED_SKILL:
+        if ammo_rating <= 0:
+            return 0.
+        rating = chop + ammo_rating
+    else:
+        rating = (slash * slash + thrust * thrust + chop * chop) / (slash + thrust + chop) if slash + thrust + chop else 0.
+    skill = {**WEAPON_SKILL, **RANGED_SKILL, 12: 23, 13: 23}.get(typ)
+    value, hit_value, agility, luck = 50, 50, 0, 0
+    if stats is not None:
+        skills, agility, luck, combat = stats
+        value = skills[skill] if skill is not None else 50
+        hit_value = value if combat is None else combat
+    if value <= 0:
+        return 0.
+    hit = round((hit_value + agility / 5. + luck / 10.) * _setting(kinds, 'fFatigueBase', 1.25))
+    rating *= min(max(hit / 100., .01), 1.)
+    if typ not in AMMO_TYPES:
+        rating *= speed
+    return rating * mult
+
+
+def best_weapon(kinds, items, stats, ranged):
+    """(rating, item, type, WPDT) of the weapon a fighter of STATS takes into a fight from ITEMS by combat_rating, or
+    None (its fists, a creature its own attacks): the melee weapons at fAIMeleeWeaponMult; with RANGED a bow or
+    crossbow with its best round, or a thrown weapon, at fAIRangeMeleeWeaponMult (every fight starts with the enemy
+    out of reach). A rating of 0 never wins."""
+    melee_mult = _setting(kinds, 'fAIMeleeWeaponMult', 2.)
+    range_mult = _setting(kinds, 'fAIRangeMeleeWeaponMult', 5.)
+    weapons = [(item, first(kinds['WEAP'][item], 'WPDT')) for item in items if item in kinds['WEAP']]
+    ammo = {}
+    if ranged:
+        for item, w in weapons:
+            typ = struct.unpack_from('<h', w, 8)[0]
+            if typ in AMMO_TYPES:
+                r = combat_rating(kinds, w, stats, range_mult)
+                ammo[typ] = max(ammo.get(typ, 0.), r)
+    best = None
+    for item, w in weapons:
+        typ = struct.unpack_from('<h', w, 8)[0]
+        if typ in WEAPON_SKILL:
+            r = combat_rating(kinds, w, stats, melee_mult)
+        elif ranged and typ in RANGED_SKILL:
+            need = RANGED_AMMO[typ]
+            r = combat_rating(kinds, w, stats, range_mult, ammo.get(need, 0.) if need is not None else 0.)
+        else:
+            continue
+        if r > 0 and (best is None or r > best[0]):
+            best = (r, item, typ, w)
+    return best
+
+
+def equipment(kinds, npc, level, ranged=False):
+    """(weapon, armour): weapon (best, item, type, WPDT) the weapon the actor takes into a fight
+    (NPC-CREATURE-COMBAT-STYLE-STATS-66: OpenMW 0.51 weaponpriority.cpp rateWeapon with the actor's own skills, see
+    best_weapon: a weapon whose skill is 0 is never taken, a low skill lowers its rating by the hit chance); without
+    RANGED only the melee weapons are weighed (the held models of the arena fighters); with RANGED
+    (ACTOR-RANGED-COMBAT-MISSING-66, the actor table and the combat sheets) a bow, crossbow or thrown weapon the
+    inventory can shoot is weighed too, at the opening of a fight (fAIRangeMeleeWeaponMult against
+    fAIMeleeWeaponMult). BEST is the weapon's highest maximum damage, as before."""
     items = []
     for tag, data in npc:
         if tag == 'NPCO' and len(data) == 36 and struct.unpack_from('<i', data)[0] != 0:
             item = resolve(kinds, string(data[4:]), level)
             if item:
                 items.append(item)
-    weapon = None
-    for item in items:
-        if item in kinds['WEAP']:
-            w = first(kinds['WEAP'][item], 'WPDT')
-            typ = struct.unpack_from('<h', w, 8)[0]
-            if typ not in WEAPON_SKILL:
-                continue
-            best = max(w[23], w[25], w[27])
-            if weapon is None or best > weapon[0]:
-                weapon = (best, item, typ, w)
+    weapon = best_weapon(kinds, items, fighter_stats(kinds, npc, level), ranged)
+    if weapon:
+        w = weapon[3]
+        weapon = (max(w[23], w[25], w[27]), weapon[1], weapon[2], w)
     armor = {}
     for item in items:
         if item in kinds['ARMO']:
             typ = struct.unpack_from('<i', first(kinds['ARMO'][item], 'AODT'))[0]
             armor.setdefault(ARMOR_SLOT.get(typ), (item, typ))
-    if weapon and weapon[2] in TWO_HANDED:
+    if weapon and (weapon[2] in TWO_HANDED or weapon[2] in (9, 10)):    # bows and crossbows are two-handed
         armor.pop('shield', None)
     armor.pop(None, None)
     return weapon, armor
@@ -341,12 +511,13 @@ def sheet(kinds, identifier, settings):
         raise ValueError('Malformed NPC NPDT ' + identifier)
     aidt = first(npc, 'AIDT')
     fight, flee = (aidt[2], aidt[3]) if len(aidt) == 12 else (30, 30)
-    weapon, armor = equipment(kinds, npc, level)
+    weapon, armor = equipment(kinds, npc, level, ranged=True)
     if weapon:
         _, item, typ, w = weapon
         weight, speed, reach = struct.unpack_from('<f', w, 0)[0], struct.unpack_from('<f', w, 12)[0], \
             struct.unpack_from('<f', w, 16)[0]
-        wfield = [1 + typ, WEAPON_SKILL[typ], *w[22:28], round(reach, 4), round(speed, 4), round(weight, 4)]
+        wfield = [1 + typ, {**WEAPON_SKILL, **RANGED_SKILL}[typ], *w[22:28], round(reach, 4), round(speed, 4),
+                  round(weight, 4)]
     else:
         item, typ = '', None
         wfield = [0, 26, 0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -571,7 +742,7 @@ def bake_fighter(task):
     weapon, armor = equipment(kinds, npc, struct.unpack_from('<h', first(npc, 'NPDT'))[0])
     carried = {'weapon': weapon[1] if weapon else None, 'shield': armor.get('shield', (None,))[0]}
     appearance = outfit(kinds, identifier, carried=carried)
-    assets = Assets(data, BSA(child_ci(data, 'Morrowind.bsa')))
+    assets = Assets(data, layered_bsa(data))
     skeleton = Skeleton(assets, appearance['skeleton'])
     groups, hit_fraction = frame_times(skeleton, stance)
     # Run frames in place (the root's forward motion removed, as the original does; npc_anim.py).
@@ -607,7 +778,7 @@ def _master(data):
     key = str(Path(data).resolve())
     if key not in _masters:
         from mwad.npc import load_master
-        _masters[key] = load_master(child_ci(data, 'Morrowind.esm'))
+        _masters[key] = load_master(master_path(data))
     return _masters[key]
 
 
@@ -707,18 +878,19 @@ def casts_file(kinds, casts):
 def prepare(data_files, id1, jobs=None, fighters=None):
     data = resolve_data_files(Path(data_files))
     id1 = Path(id1)
-    kinds = load(child_ci(data, 'Morrowind.esm'))
+    kinds = load(master_path(data))
     settings = {name: gmst(kinds, name) for name in SETTINGS + BUILD_SETTINGS + MOVE_SETTINGS + AI_SETTINGS +
                 CRIME_SETTINGS + BREATH_SETTINGS if name not in ADDON_SETTINGS}
     settings.update(addon_settings(data, kinds))
     (id1 / 'combat').mkdir(parents=True, exist_ok=True)
     (id1 / 'sound/combat').mkdir(parents=True, exist_ok=True)
     from npc_geometry import Assets
-    assets = Assets(data, BSA(child_ci(data, 'Morrowind.bsa')))
+    assets = Assets(data, layered_bsa(data))
     lines = ['AWCS1']
     lines += [f'{name} {settings[name]:.6g}' for name in SETTINGS]
     lines += movement_lines(kinds, settings)
     lines += [f'ai {name} {settings[name]:.6g}' for name in AI_SETTINGS]
+    lines += [f'werewolf {name} {settings[name]:.6g}' for name in WEREWOLF_SETTINGS if name in settings]
     lines += [f'crime {name} {settings[name]:.6g}' for name in CRIME_SETTINGS]
     lines += [f'breath {name} {settings[name]:.6g}' for name in BREATH_SETTINGS]
     sounds = {}

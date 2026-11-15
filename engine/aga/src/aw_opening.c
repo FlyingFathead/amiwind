@@ -117,6 +117,16 @@ static int dock_route(int second)
     }
     return route_started;
 }
+/* aw_intro_status: where the dock guard stands and how his walk goes, so a scripted opening walk can assert that he
+ * reaches his post (PIER-GUARD-WALKS-INTO-DOOR-65, the early check of tests/test_pier_guard_route.py) */
+void AW_OpeningDockStatus(void)
+{
+    edict_t *g=sv.active && !strcmp(sv.name,"seyda")?AW_IntroRole(5):NULL;
+    if(!g){Con_Printf("Dock guard none\n");return;}
+    Con_Printf("Dock guard at %ld %ld %ld / leg %ld / route started %ld failed %ld done %ld / retries %ld\n",
+        (long)g->v.origin[0],(long)g->v.origin[1],(long)g->v.origin[2],(long)post_leg,(long)route_started,
+        (long)route_failed,(long)route_done,(long)post_retries);
+}
 static void hide(edict_t *e)
 {
     e->v.modelindex=0;e->v.solid=SOLID_NOT;SV_LinkEdict(e,false);

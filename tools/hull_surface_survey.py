@@ -59,7 +59,8 @@ def exterior_placements(data):
     deleted references left out."""
     from mwad.audit import load_esm
     from mwad.paths import child_ci
-    esm = load_esm(child_ci(data, 'Morrowind.esm'))
+    from mwad.masters import master_path
+    esm = load_esm(master_path(data))
     out = []
     for (cx, cy), cell in sorted(esm['cells'].items()):
         for ref in cell['refs']:

@@ -293,8 +293,16 @@ int COM_FOpenFile(char *name,FILE **f){
  *f=tmpfile();assert(*f);fputs(s,*f);rewind(*f);return strlen(s);
 }
 static int door_arrival_lines;   /* DBG-TP-DOORLIST-NO-ARRIVAL-LINE-63: "ROOM: at its door's arrival X Y Z." */
+/* DBG-TP-DURING-LOAD-66: a dbg tp typed during a load: held, replaced, refused, run on arrival, dropped */
+static int held_lines,held_replaced,held_refused,held_runs,held_dropped;
 void Con_Printf(char *fmt,...){if(!strcmp(fmt,"%ld: %s [%s]\n"))picker_list_rows++;
- if(!strcmp(fmt,"%s: at its door's arrival %ld %ld %ld.\n"))door_arrival_lines++;}
+ if(!strcmp(fmt,"%s: at its door's arrival %ld %ld %ld.\n"))door_arrival_lines++;
+ if(!strcmp(fmt,"dbg tp: a load is in progress (%s); %s runs when it has arrived.\n"))held_lines++;
+ if(!strcmp(fmt,"dbg tp: %s replaces the held %s.\n"))held_replaced++;
+ if(!strcmp(fmt,"dbg tp: a load is in progress; try again when it has arrived.\n"))held_refused++;
+ if(!strcmp(fmt,"dbg tp: the load has arrived; %s runs now.\n"))held_runs++;
+ if(!strcmp(fmt,"dbg tp: the held %s is dropped: %s.\n") ||
+    !strcmp(fmt,"dbg tp: the held %s is dropped: no game is running.\n"))held_dropped++;}
 void Sys_Error(char *fmt,...){abort();}
 void Cbuf_AddText(char *s){strcpy(queued,s);}
 void Cbuf_InsertText(char *s){strcpy(queued,s);}
@@ -1139,6 +1147,49 @@ int main(void){
   assert(p.v.origin[0]==24 && p.v.origin[1]==-40 && p.v.angles[1]==180);
   AW_SceneCancelTransition();roulette_fixture=0;command_argc=1;
  }
+ /* DBG-TP-DURING-LOAD-66 (the v0.0.66-dev2 smoke hops): a dbg tp typed while a load still runs was lost (Balmora typed
+  * during Seyda Neen's load did nothing; Ald'ruhn during Vivec's said no map holds the point; the Arena Pit printed its
+  * name and stayed). It is held and runs once that load has arrived and the player is in play: one held, a newer one
+  * replaces it, a refused argument is never held, dbg scene the same, New Game and a game that is gone drop it. The
+  * console's open (key_console) keeps the scene tick's crossing checks out of the way. */
+ {
+  int lines,runs,dropped;
+  assert(teleport && scene);occluded=target_trace=travel_trace=0;door_duration=0;ship_available=1;roulette_fixture=0;
+  AW_SceneCancelTransition();CL_ClearState();strcpy(sv.name,"seyda");sv.active=true;AW_SceneSpawn(&p);finish_signon(&p);
+  p.v.movetype=MOVETYPE_WALK;p.v.health=73;cls.state=ca_connected;key_dest=key_console;
+  /* in play: it runs at once, as before */
+  command_args[0]="aw_teleport";command_args[1]="prisonship";command_argc=2;queued[0]=0;lines=held_lines;teleport();
+  assert(!strcmp(queued,"map prison\n") && held_lines==lines);
+  /* typed during that load: held, nothing loads yet */
+  queued[0]=0;command_args[1]="seydaneen";teleport();assert(!queued[0] && held_lines==lines+1);
+  /* an argument that could end the line is refused, not held: the held one stays */
+  command_args[1]="balmora;quit";teleport();assert(!queued[0] && held_refused==1 && held_replaced==0);
+  runs=held_runs;AW_SceneTick();assert(!queued[0] && held_runs==runs);          /* the load has not arrived */
+  CL_ClearState();cls.signon=0;strcpy(sv.name,"prison");AW_SceneSpawn(&p);
+  AW_SceneTick();assert(!queued[0] && held_runs==runs);                        /* arrived; the client not in play */
+  finish_signon(&p);AW_SceneTick();assert(!strcmp(queued,"aw_teleport \"seydaneen\"\n") && held_runs==runs+1);
+  queued[0]=0;AW_SceneTick();assert(!queued[0] && held_runs==runs+1);          /* once */
+  /* the run itself goes the normal way: in play now, it loads */
+  command_args[1]="seydaneen";teleport();assert(!strcmp(queued,"map seyda\n"));
+  /* a newer one replaces the held one; dbg scene (aw_scene) is held the same way */
+  queued[0]=0;command_args[1]="prisonship";teleport();assert(!queued[0] && held_lines==lines+2);
+  command_args[0]="aw_scene";command_args[1]="census";scene();assert(!queued[0] && held_replaced==1);
+  CL_ClearState();cls.signon=0;strcpy(sv.name,"seyda");AW_SceneSpawn(&p);finish_signon(&p);
+  AW_SceneTick();assert(!strcmp(queued,"aw_scene \"census\"\n") && held_runs==runs+2);
+  /* coordinates keep their words; New Game drops the held one */
+  command_args[0]="aw_teleport";command_args[1]="prisonship";command_argc=2;queued[0]=0;teleport();
+  assert(!strcmp(queued,"map prison\n"));
+  command_argc=3;command_args[1]="-11264";command_args[2]="-71680";queued[0]=0;teleport();
+  assert(!queued[0] && held_lines==lines+3);
+  {int voice_cancels=scene_voice_cancels;dropped=held_dropped;AW_SceneLoadReset();scene_voice_cancels=voice_cancels;}
+  assert(held_dropped==dropped+1);AW_SceneTick();assert(!queued[0] && held_runs==runs+2);
+  /* a held one whose game is gone is dropped, not run */
+  CL_ClearState();strcpy(sv.name,"seyda");sv.active=true;AW_SceneSpawn(&p);finish_signon(&p);p.v.health=73;
+  command_argc=2;command_args[1]="prisonship";queued[0]=0;teleport();assert(!strcmp(queued,"map prison\n"));
+  queued[0]=0;command_args[1]="seydaneen";teleport();assert(!queued[0] && held_lines==lines+4);
+  sv.active=false;AW_SceneTick();assert(!queued[0] && held_dropped==dropped+2 && held_runs==runs+2);sv.active=true;
+  AW_SceneCancelTransition();key_dest=key_game;command_argc=1;
+ }
  puts("scene, real client reset/signon, exact streaming view, drift policy, reverse/world crossings and explicit arrivals passed");
  return 0;
 }
@@ -1146,7 +1197,8 @@ int main(void){
 void AW_IntroSpawn(void){}
 
 void AW_OpeningSpawn(void){}
-void AW_SaveCapture(void){}
+int AW_SaveCapture(void){return 1;}
+int AW_SaveLeave(void){return 1;}
 void AW_SaveSpawn(void){}
 void AW_SaveReset(void){}
 

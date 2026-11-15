@@ -32,11 +32,13 @@ static void hand(int goal,int state,int torch){memset(field_values,0,sizeof(fiel
 /* ENCUMBRANCE-INCOMPLETE-61: a load weighs the loaded rows itself (the place's area load may have run already) */
 static int weighed;static void weigh(void){weighed++;}
 static void restore(const aw_save_t *s){int was=weighed;pending=*s;assert(AW_ItemsClone(&pending.state.items,&s->state.items));
+ assert(AW_SaveActorsCopy(&pending,s->actors,s->actor_count));   /* and its own rows (aw_save.h OWNERSHIP) */
  aw_save_items_loaded=weigh;loading=1;AW_SaveSpawn();assert(!loading && weighed==was+1);}
 static void live(const aw_state_t *s){aw_state=*s;assert(AW_ItemsClone(&aw_state.items,&s->items));}
 #ifndef OLD_CONTROL
 static void header(unsigned char *p,int size){uint32_t crc=0xffffffffU;int i,j;for(i=12;i<size;i++){crc^=p[i];for(j=0;j<8;j++)crc=(crc>>1)^((crc&1)?0xedb88320U:0);}crc^=0xffffffffU;for(i=0;i<4;i++){p[4+i]=(unsigned)size>>(i*8);p[8+i]=crc>>(i*8);}}
-static void bad(const unsigned char *p,int n){AW_SaveRelease(&decoded);memset(&unchanged,0xa5,sizeof(unchanged));decoded=unchanged;assert(!AW_SaveDecode(p,n,&decoded));assert(!memcmp(&decoded,&unchanged,sizeof(decoded)));memset(&decoded.state.items,0,sizeof(decoded.state.items));}
+static void bad(const unsigned char *p,int n){AW_SaveRelease(&decoded);memset(&unchanged,0xa5,sizeof(unchanged));decoded=unchanged;assert(!AW_SaveDecode(p,n,&decoded));assert(!memcmp(&decoded,&unchanged,sizeof(decoded)));memset(&decoded.state.items,0,sizeof(decoded.state.items));
+ decoded.actors=NULL;decoded.actor_count=decoded.actor_capacity=0;}
 static void intent(void){uint32_t flags;int i;static const int goal[]={0,1,1,1,0};static const int state[]={0,1,2,3,4};
  pr_strings=strings_a;sv.time=10;
  for(i=0;i<5;i++){hand(goal[i],state[i],0);flags=0xdeadbeef;assert(AW_SavedEquipmentCapture(&flags,&player,sv.time));assert(flags==(goal[i]?1U:0U));}
@@ -96,7 +98,9 @@ int main(int argc,char **argv){int n;char filename[512];assert(argc==2);
  sv.num_edicts=3;strcpy(sv.name,"mi5b8154939f7aa");world=original;
  world.actor_count=0;equipment_stores=0;AW_SaveCapture();assert(equipment_stores==1);assert(world.actor_count==1 && world.actors[0].scene==8252);
  strcpy(sv.name,"mi5b8154939f7ab");npc.v.health=1;npc_hello._float=0;
- loading=0;AW_SaveSpawn();assert(npc.v.health==43 && npc_hello._float==7);
+ /* SAVE-ACTOR-ROWS-256-66: an actor of the game data keeps its greetings in its row; its health and place are the
+  * change list's and the actor records' (aw_actors.c, aw_actorstate.c), so the row leaves the edict's health alone */
+ loading=0;AW_SaveSpawn();assert(npc.v.health==1 && npc_hello._float==7);
  npc_hello._float=8;AW_SaveCapture();assert(world.actor_count==1 && world.actors[0].hello_count==8);
  aw_story=original.story;aw_character=original.character;AW_ItemsFree(&aw_state);live(&original.state);
  hand(1,2,1);assert(AW_SaveWrite(1));assert(path(filename,sizeof(filename),world.profile,1,0));

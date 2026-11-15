@@ -1,6 +1,38 @@
 # Town containers and inventory plan
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.66-dev1 (13 November 2026)._
+
+## Status: 13 November 2026
+
+Containers open into the container strip ([INVENTORY.md](INVENTORY.md), "The container strip") with their original
+contents (items and levelled lists), owners (taking is theft), lock levels and keys; taken items stay taken on the
+world change list. The world-wide table below is counted from the base master and the v0.0.65 release build with
+`tools/container_census.py --data-files DIR --run RUN` (add `--boxes` to count this tree's exterior boxes).
+
+| | Interior | Exterior |
+| --- | --- | --- |
+| Placed containers | 17,180 | 22,225 |
+| Organic (flora, harvested, never opened) | 3,725 | 21,238 |
+| To open | 13,455 in 982 cells | 987 in 213 cells |
+| Name a levelled list | 9,132 | 494 |
+| Locked / trapped / keyed | 1,029 / 277 / 128 | 12 / 5 / 2 |
+| Owned | 8,243 | 315 |
+| Openable in the v0.0.65 build | 13,397 | 0 |
+
+Indoors a container is aimed at by its drawn placement box in the room record. Outdoors there is no room record, and
+the near-the-reference-point test missed nearly every container standing on the ground (OUTDOOR-CONTAINER-AIM-66).
+From v0.0.66 the builder carries each exterior container's measured model box in its focus row (56 container models,
+measured once from the original data), as the named signposts do, and the view ray is tested against it: all 987
+exterior containers have a box; the most boxes in one 3 x 3 cell window is 154, in one room 99. Room containers carry
+the box too: in a CHIM room the room record's placement box is asked first, and the two room maps of the opening that
+are not CHIM rooms (the Imperial Prison Ship, 46 containers, and the Census and Excise Office, 12) use the box.
+
+A trapped container or door casts its trap spell on the player when used and does not open; the trap is then used up
+(saved), and the key that opens its lock disarms it (since v0.0.64). Levelled entries are rolled once, on the first
+open, at the player's level then, by the list's flags (chance none, every level or the highest at or below, a roll
+for each or one for the count), and kept on the world change list.
+
+## The original plan
 
 Planning status, 27 September 2026, after checkpoint-014. Native containers and
 player inventory are not implemented. The current scenery pass selects STAT and

@@ -112,6 +112,24 @@ const char *AW_InventoryBeastRefusal(const aw_inventory_item_t *it,int beast){
     if(it->flags&AW_INV_BEAST_FEET)return it->category==AW_INV_ARMOUR?"sNotifyMessage14":"sNotifyMessage15";
     return NULL;
 }
+/* SAVE-ITEM-INSTANCES-ONE-PER-KIND-66: the copy a slot takes of kind ID: the one copy itself (serial 0) when the kind has
+ * one; else a plain copy made its own instance (so a blow lands on it, not on the kind), or, with no plain copy left,
+ * the first instance no slot wears (0 when memory says no: the kind's marks then, as before the instances) */
+static uint32_t slot_wear(aw_state_t *s,const char *id){
+    int index=AW_ItemIndex(s,id),k;
+    if(index<0 || AW_ITEM_ROW(s,index)->value<=1)return 0;
+    if(AW_ItemPlain(s,index)>0){k=AW_ItemInstMake(s,index,1,0,0,0,0);return k>=0?AW_ItemInst(s,k)->serial:0;}
+    for(k=0;k<AW_ItemInstCount(s);k++){
+        const aw_item_inst_t *x=AW_ItemInst(s,k);
+        if(x->row==index && !AW_ItemInstNamed(s,x->serial))return x->serial;
+    }
+    return 0;
+}
+/* a slot emptied: its instance, a plain copy again when nothing else tells it apart, goes */
+static void slot_clear(aw_state_t *s,int slot){
+    memset(s->inventory.equipped[slot],0,64);s->inventory.equipped_serial[slot]=0;
+    AW_ItemInstSweep(s);
+}
 int AW_InventoryEquipSlot(aw_state_t *s,const aw_inventory_item_t *item,int slot){
     int i,used=0;
     if(!s || !item || !inv_id(item->id,64) || slot<0 || slot>=AW_INVENTORY_SLOTS ||
@@ -120,7 +138,9 @@ int AW_InventoryEquipSlot(aw_state_t *s,const aw_inventory_item_t *item,int slot
     if(!strcmp(s->inventory.equipped[slot],item->id))return 1;
     for(i=0;i<AW_INVENTORY_SLOTS;i++)if(i!=slot && !strcmp(s->inventory.equipped[i],item->id))used++;
     if(used>=AW_StateGet(s,AW_ITEM,item->id))return 0;
-    strcpy(s->inventory.equipped[slot],item->id);s->inventory.initialized=1;return 1;
+    if(s->inventory.equipped[slot][0])slot_clear(s,slot);
+    strcpy(s->inventory.equipped[slot],item->id);s->inventory.equipped_serial[slot]=slot_wear(s,item->id);
+    s->inventory.initialized=1;return 1;
 }
 int (*aw_inventory_hand_item)(int slot,aw_inventory_item_t *out);
 static int equip_into(aw_state_t *s,const aw_inventory_item_t *item);
@@ -133,7 +153,7 @@ int AW_InventoryEquip(aw_state_t *s,const aw_inventory_item_t *item){
                                         aw_inventory_hand_item(AW_SLOT_LEFT,&left)?&left:NULL);
     if(!equip_into(s,item))return 0;
     /* actionequip.cpp: the new item is worn, then the hand it conflicts with is emptied (back to the pack) */
-    if(clear>=0 && strcmp(s->inventory.equipped[clear],item->id))memset(s->inventory.equipped[clear],0,64);
+    if(clear>=0 && strcmp(s->inventory.equipped[clear],item->id))slot_clear(s,clear);
     return 1;
 }
 static int equip_into(aw_state_t *s,const aw_inventory_item_t *item){
@@ -148,8 +168,11 @@ static int equip_into(aw_state_t *s,const aw_inventory_item_t *item){
         strcpy(right,s->inventory.equipped[AW_SLOT_RRING]);
         if((item->flags&(AW_INV_EQUIP|AW_INV_EQUIP_SUPPORTED))!=(AW_INV_EQUIP|AW_INV_EQUIP_SUPPORTED) ||
            AW_StateGet(s,AW_ITEM,item->id)<1 || !inv_id(item->id,64))return 0;
+        if(s->inventory.equipped[AW_SLOT_LRING][0])slot_clear(s,AW_SLOT_LRING);
         strcpy(s->inventory.equipped[AW_SLOT_LRING],right);
+        s->inventory.equipped_serial[AW_SLOT_LRING]=s->inventory.equipped_serial[AW_SLOT_RRING];   /* the worn copy moves with its ring */
         strcpy(s->inventory.equipped[AW_SLOT_RRING],item->id);
+        s->inventory.equipped_serial[AW_SLOT_RRING]=slot_wear(s,item->id);
         s->inventory.initialized=1;return 1;
     }
     return first>=0?AW_InventoryEquipSlot(s,item,first):0;
@@ -157,13 +180,38 @@ static int equip_into(aw_state_t *s,const aw_inventory_item_t *item){
 int AW_InventoryUnequip(aw_state_t *s,const char *id){
     int i,n=0;if(!s || !inv_id(id,64))return 0;
     for(i=0;i<AW_INVENTORY_SLOTS;i++)if(!strcmp(s->inventory.equipped[i],id)){
-        memset(s->inventory.equipped[i],0,64);n++;
+        slot_clear(s,i);n++;
     }
     return n;
 }
 #define inv_item_index AW_ItemIndex
 #define COND(s,i) (AW_ITEM_ROW(s,i)->condition)
 #define CHARGE(s,i) (AW_ITEM_ROW(s,i)->charge)
+/* SAVE-ITEM-INSTANCES-ONE-PER-KIND-66 (aw_inventory.h): the worn copy's condition, read and set */
+float AW_InventorySlotCondition(const aw_state_t *s,int slot){
+    int k,index;
+    if(!s || slot<0 || slot>=AW_INVENTORY_SLOTS || !s->inventory.equipped[slot][0])return 1;
+    k=AW_ItemInstFind(s,s->inventory.equipped_serial[slot]);
+    if(k>=0 && (AW_ItemInst(s,k)->flags&AW_ITEM_CONDITION))return AW_ItemInst(s,k)->condition;
+    index=inv_item_index(s,s->inventory.equipped[slot]);
+    return AW_ITEM_HAS(s,index,AW_ITEM_CONDITION)?COND(s,index):1;
+}
+int AW_InventorySlotSetCondition(aw_state_t *s,int slot,float value){
+    int k,index;
+    if(!s || slot<0 || slot>=AW_INVENTORY_SLOTS || !s->inventory.equipped[slot][0] || !(value>=0 && value<=1))return 0;
+    index=inv_item_index(s,s->inventory.equipped[slot]);if(index<0)return 0;
+    k=AW_ItemInstFind(s,s->inventory.equipped_serial[slot]);
+    if(k<0 && AW_ITEM_ROW(s,index)->value>1 && AW_ItemPlain(s,index)>0){
+        /* the worn copy becomes its own instance, so the kind's other copies keep their state */
+        if((k=AW_ItemInstMake(s,index,1,0,0,0,0))>=0)s->inventory.equipped_serial[slot]=AW_ItemInst(s,k)->serial;
+    }
+    if(k>=0){
+        if(AW_ItemInstSet(s,k,AW_ITEM_CONDITION,value)==2)return 1;   /* merged: it is a plain copy again */
+        return 1;
+    }
+    if(value>=1)AW_ItemUnmark(s,index,AW_ITEM_CONDITION);else AW_ItemMark(s,index,AW_ITEM_CONDITION,value);
+    return 1;
+}
 int AW_InventoryDrop(aw_state_t *s,const aw_inventory_item_t *item,int32_t count,
                      const char *scene,const float position[3],float yaw){
     aw_dropped_item_t drop;int i,j,item_index;int32_t old;
@@ -201,21 +249,37 @@ int AW_MagicSelectable(const aw_inventory_item_t *item){
 }
 int AW_MagicSelect(aw_state_t *s,const aw_inventory_item_t *item){
     if(!s || !AW_MagicSelectable(item) || !inv_id(item->id,64) || AW_StateGet(s,AW_ITEM,item->id)<1)return 0;
+    if(strcmp(s->magic.selected,item->id)){s->magic.selected_serial=0;AW_ItemInstSweep(s);}   /* a plain copy of the new kind */
     memset(s->magic.selected,0,64);strcpy(s->magic.selected,item->id);return 1;
 }
-void AW_MagicClear(aw_state_t *s){if(s)memset(s->magic.selected,0,64);}
+void AW_MagicClear(aw_state_t *s){if(s){memset(s->magic.selected,0,64);s->magic.selected_serial=0;AW_ItemInstSweep(s);}}
+/* SAVE-ITEM-INSTANCES-ONE-PER-KIND-66: the selected copy's charge is its instance's when the selection names one */
+static int magic_selected_inst(const aw_state_t *s,const aw_inventory_item_t *item){
+    return strcmp(s->magic.selected,item->id)?-1:AW_ItemInstFind(s,s->magic.selected_serial);
+}
 float AW_MagicCharge(const aw_state_t *s,const aw_inventory_item_t *item){
-    int index;
+    int index,k;
     if(!s || !item || item->enchant_kind==AW_ENCH_NONE || !(item->charge_max>0))return 0;
+    if((k=magic_selected_inst(s,item))>=0 && (AW_ItemInst(s,k)->flags&AW_ITEM_CHARGE))return AW_ItemInst(s,k)->charge;
     index=inv_item_index(s,item->id);
     if(AW_ITEM_HAS(s,index,AW_ITEM_CHARGE))return CHARGE(s,index);
     return item->charge_max;
 }
 int AW_MagicSetCharge(aw_state_t *s,const aw_inventory_item_t *item,float value){
-    int index;
+    int index,k;
     if(!s || !item || item->enchant_kind==AW_ENCH_NONE || !(item->charge_max>0) ||
        !(value>=0) || AW_StateGet(s,AW_ITEM,item->id)<1)return 0;
     index=inv_item_index(s,item->id);if(index<0)return 0;
+    /* the selected copy of a kind with more copies spends its own charge: its own instance */
+    k=magic_selected_inst(s,item);
+    if(k<0 && !strcmp(s->magic.selected,item->id) && AW_ITEM_ROW(s,index)->value>1 && AW_ItemPlain(s,index)>0){
+        if((k=AW_ItemInstMake(s,index,1,0,0,0,0))>=0)s->magic.selected_serial=AW_ItemInst(s,k)->serial;
+    }
+    if(k>=0){
+        if(value>=item->charge_max)AW_ItemInstUnmark(s,k,AW_ITEM_CHARGE);
+        else AW_ItemInstSet(s,k,AW_ITEM_CHARGE,value);
+        return 1;
+    }
     if(value>=item->charge_max)AW_ItemUnmark(s,index,AW_ITEM_CHARGE);
     else AW_ItemMark(s,index,AW_ITEM_CHARGE,value);
     return 1;
@@ -237,10 +301,15 @@ int AW_InventoryPickup(aw_state_t *s,int index){
     item_index=inv_item_index(s,d->id);old=AW_StateGet(s,AW_ITEM,d->id);
     current=AW_ITEM_HAS(s,item_index,AW_ITEM_CONDITION)?COND(s,item_index):1;
     incoming=d->condition_known?d->condition:1;
-    if(!(incoming>=0 && incoming<=1) || (old>0 && current!=incoming))return 0;
+    if(!(incoming>=0 && incoming<=1))return 0;
     if(!AW_ItemAdd(s,d->id,d->count))return 0;
     item_index=inv_item_index(s,d->id);
-    if(d->condition_known)AW_ItemMark(s,item_index,AW_ITEM_CONDITION,incoming);
+    /* SAVE-ITEM-INSTANCES-ONE-PER-KIND-66: a copy whose condition differs from the carried plain ones is its own
+     * instance (under the drop's serial: the same thing it was); the one copy of a kind marks the kind, as before */
+    if(old>0 && current!=incoming){
+        if(AW_ItemInstMake(s,item_index,d->count,AW_ITEM_CONDITION,incoming,0,d->serial)<0)
+            AW_ItemInstMake(s,item_index,d->count,AW_ITEM_CONDITION,incoming,0,0);
+    }else if(d->condition_known)AW_ItemMark(s,item_index,AW_ITEM_CONDITION,incoming);
     s->inventory.initialized=1;memset(d,0,sizeof(*d));return 1;
 }
 /* dbg give weapons (DBG-GIVE-WEAPONS-59): the builder's weapon kit table (aw_inventory.h). Text the builder wrote,
@@ -848,9 +917,11 @@ int AW_InventoryCanEquip(const aw_inventory_item_t *item){
     if((equip_refusal=AW_InventoryBeastRefusal(item,aw_inventory_player_beast && aw_inventory_player_beast())))return 0;
     if(item->category==AW_INV_WEAPON || (item->category==AW_INV_ARMOUR && item->subtype==8)){
         int index=inv_item_index(&aw_state,item->id),count=AW_StateGet(&aw_state,AW_ITEM,item->id);
-        /* one of it, except thrown weapons, which are held as their stack (OpenMW: the stack is the equipped item) */
-        if((count!=1 && !(item->category==AW_INV_WEAPON && item->weapon==12 && count>1)) || item->health<=0 ||
-           (index>=0 && AW_ITEM_HAS(&aw_state,index,AW_ITEM_CONDITION) && COND(&aw_state,index)<=0))return 0;
+        /* one copy of the kind is worn (SAVE-ITEM-INSTANCES-ONE-PER-KIND-66: it becomes its own instance when the kind
+         * has more, so a blow lands on it alone; before, a weapon or shield could be equipped only when exactly one
+         * was carried); thrown weapons are held as their stack (OpenMW: the stack is the equipped item) */
+        if(count<1 || item->health<=0 ||
+           (index>=0 && AW_ITEM_HAS(&aw_state,index,AW_ITEM_CONDITION) && COND(&aw_state,index)<=0 && AW_ItemPlain(&aw_state,index)>0))return 0;
         return AW_ViewEquipmentReady();
     }
     return 1;
@@ -921,8 +992,9 @@ float AW_MagicRechargeRate(void){
 #define MAGIC_CACHE 8
 void AW_MagicFrame(float seconds){
     static char ids[MAGIC_CACHE][64];static aw_inventory_item_t rows[MAGIC_CACHE];static int ok[MAGIC_CACHE],next;
-    int i,c,any=0;float rate;
+    int i,c,k,any=0;float rate;
     for(i=0;i<aw_state.items.count && !any;i++)any=AW_ITEM_HAS(&aw_state,i,AW_ITEM_CHARGE)!=0;
+    for(k=0;k<AW_ItemInstCount(&aw_state) && !any;k++)any=(AW_ItemInst(&aw_state,k)->flags&AW_ITEM_CHARGE)!=0;
     if(!any || !(seconds>0) || (rate=AW_MagicRechargeRate())<=0)return;
     for(i=0;i<aw_state.items.count;i++){
         if(!AW_ITEM_HAS(&aw_state,i,AW_ITEM_CHARGE))continue;
@@ -932,6 +1004,19 @@ void AW_MagicFrame(float seconds){
             strcpy(ids[c],AW_ITEM_ID(&aw_state,i));ok[c]=AW_InventoryRead(ids[c],&rows[c]);
         }
         if(ok[c])AW_MagicRecharge(&aw_state,&rows[c],seconds,rate);
+    }
+    /* the instances with a charge of their own (SAVE-ITEM-INSTANCES-ONE-PER-KIND-66), the last first: a full one merges away */
+    for(k=AW_ItemInstCount(&aw_state)-1;k>=0;k--){
+        const aw_item_inst_t *x=AW_ItemInst(&aw_state,k);float value;
+        if(!(x->flags&AW_ITEM_CHARGE))continue;
+        for(c=0;c<MAGIC_CACHE && strcmp(ids[c],AW_ITEM_ID(&aw_state,x->row));c++);
+        if(c==MAGIC_CACHE){
+            c=next;next=(next+1)%MAGIC_CACHE;
+            strcpy(ids[c],AW_ITEM_ID(&aw_state,x->row));ok[c]=AW_InventoryRead(ids[c],&rows[c]);
+        }
+        if(!ok[c] || (rows[c].enchant_kind!=AW_ENCH_USED && rows[c].enchant_kind!=AW_ENCH_STRIKES) || !(rows[c].charge_max>0))continue;
+        value=x->charge+rate*seconds;
+        if(value>=rows[c].charge_max)AW_ItemInstUnmark(&aw_state,k,AW_ITEM_CHARGE);else AW_ItemInstSet(&aw_state,k,AW_ITEM_CHARGE,value);
     }
 }
 static void inv_store(const aw_fighter_t *sheet){
@@ -946,7 +1031,7 @@ static void inv_store(const aw_fighter_t *sheet){
         maximum=kind?sheet->shield_health_max:sheet->weapon_health_max;
         if(!(maximum>0 && current>=0))continue;
         value=current/maximum;if(value>1)value=1;
-        AW_ItemMark(&aw_state,index,AW_ITEM_CONDITION,value);
+        AW_InventorySlotSetCondition(&aw_state,slot,value);   /* the worn copy's own condition (SAVE-ITEM-INSTANCES-ONE-PER-KIND-66) */
     }
 }
 static void inv_combat(aw_fighter_t *sheet){
@@ -964,7 +1049,7 @@ static void inv_combat(aw_fighter_t *sheet){
         sheet->weapon=(unsigned char)item.weapon;sheet->weapon_skill=(unsigned char)item.weapon_skill;
         for(i=0;i<6;i++)sheet->damage[i/2][i%2]=(unsigned char)item.damage[i];
         sheet->reach=item.reach;sheet->speed=item.speed;sheet->weight=item.weight;
-        sheet->weapon_health_max=item.health;sheet->weapon_health=item.health*inv_condition(item.id);
+        sheet->weapon_health_max=item.health;sheet->weapon_health=item.health*AW_InventorySlotCondition(&aw_state,AW_SLOT_RIGHT);
     }
     /* Every worn armour piece (OpenMW mwclass/npc.cpp getArmorRating): cuirass 0.3; shield, helmet, greaves, boots and
      * each pauldron 0.1; each gauntlet or bracer 0.05; an empty slot the unarmoured rating. A piece rates its armour x
@@ -982,13 +1067,13 @@ static void inv_combat(aw_fighter_t *sheet){
                AW_InventoryArmourSlot(item.subtype)!=worn[k].slot || item.shield_class<0 || item.shield_class>2 ||
                item.armor_skill_base<=0)continue;
             rating=item.weight>0?item.armor*sheet->skills[skills[item.shield_class]]/item.armor_skill_base:item.armor;
-            rating*=inv_condition(item.id);
+            rating*=AW_InventorySlotCondition(&aw_state,worn[k].slot);   /* the worn copy's own condition */
             sheet->armor+=worn[k].weight*(rating-base);
             hit=AW_InventoryHitSlot(worn[k].slot);
             if(hit>=0)sheet->hit_classes|=(unsigned int)(item.shield_class+1)<<(2*hit);
             if(worn[k].slot==AW_SLOT_LEFT){
                 sheet->shield=1;sheet->shield_class=(unsigned char)item.shield_class;
-                sheet->shield_health_max=item.health;sheet->shield_health=item.health*inv_condition(item.id);
+                sheet->shield_health_max=item.health;sheet->shield_health=item.health*AW_InventorySlotCondition(&aw_state,AW_SLOT_LEFT);
             }
         }
     }
@@ -1662,7 +1747,12 @@ int AW_InventoryFocus(const char **name,char *weight_line,char *value_line,int l
  * Positions are game units; the room map is a quarter scale plus its shift (aw_mwhost.c AW_MwscriptRoomShift, the
  * same shift the scripts' placements use). Rows whose reference has an edict here (aw_ref: actors, doors) are left
  * to that edict's own targeting; an object a script disabled shows no box. */
-#define FOCUS_ROWS 1024
+/* FOCUS-ROWS-WINDOW-OVERFLOW-66: the rows of the busiest 3 x 3 cells outdoors fit: the most in the original data is
+ * 1192 (with the named activators; 10 areas were over 1024, the rows past it never read); 1536 leaves 29 % room.
+ * Budget: 100 bytes a row (focus_row_t), 153.6 KB allocated at the first place read (51 KB more than at 1024), against
+ * the 32 MB Fast requirement. aw_placed.c PLACED_MAX (the items of these rows it draws) stays 1024: the most items
+ * are 601 in a room and 100 in a 3 x 3 outdoor window (tools/prepare_focus.py checks both at build time). */
+#define FOCUS_ROWS 1536
 #define FOCUS_ROW 64
 #define FOCUS_ROW2 96          /* AWF2 (PICKUP-PLACED-58): the AWF1 row, then the item's record id (32 bytes) */
 #define FOCUS_ID 32
@@ -1678,10 +1768,59 @@ static int focus_stride=FOCUS_ROW;
  * from the row's id field, which a door does not use (INFO-BOX-TEXT-CUT-62): up to 35 + 31 characters */
 #define FOCUS_NAME_FIELD 36
 #define FOCUS_NAME_LONG (FOCUS_NAME_FIELD-1+FOCUS_ID-1)
-typedef struct {vec3_t at;float weight;int value;unsigned reference;char kind,owned,edict,live,action,name[FOCUS_NAME_LONG+1];short drawn;unsigned char lock;} focus_row_t;
+/* box: OUTDOOR-CONTAINER-AIM-66, an exterior container's box (tools/prepare_focus.py CONTAINER_BOXES, packed in its id
+ * field as a board's): its index in focus_board_axis, -1 none (a room's container: the room ray; no measured model) */
+typedef struct {vec3_t at;float weight;int value;unsigned reference;char kind,owned,edict,live,action,name[FOCUS_NAME_LONG+1];short drawn,box;unsigned char lock;} focus_row_t;
 static focus_row_t *focus_rows;
 static int focus_count;
 static model_t *focus_world;
+/* SIGNPOST-NAMES-MISSING-65: a named board ('N' row, tools/prepare_focus.py SIGN_BOARD_BOXES): its row sits at the
+ * board's centre and its id field holds the box's half extents and the reference's rotation (a unit quaternion). The box's three
+ * half axes (map units, turned as drawn) are kept here, the row's value is its index; the view ray is tested against
+ * that box. NAMED-ACTIVATOR-FOCUS-66: every named activator (beds, shrines, banners ...) the same way; the most in one
+ * place of the original data: 18 in a room, 78 in a 3 x 3 exterior window (measured on the built table, 13 November 2026). */
+/* OUTDOOR-CONTAINER-AIM-66: the exterior containers' boxes share the table (the most in a 3 x 3 window of the original
+ * data: tools/container_census.py window_boxes); 256 x 36 bytes */
+#define FOCUS_BOARDS 256
+static float focus_board_axis[FOCUS_BOARDS][3][3];
+static int focus_boards;
+static float focus_f32(const byte *p){
+    uint32_t bits=(uint32_t)p[0]|((uint32_t)p[1]<<8)|((uint32_t)p[2]<<16)|((uint32_t)p[3]<<24);float v;
+    memcpy(&v,&bits,4);return v;
+}
+/* The half axes of a board's box in game units: column k of the reference's rotation (the builder's quaternion of
+ * tools/prepare_focus.py reference_rotation) times half extent k. */
+static int focus_board_add(const byte *box){
+    float h[3],q[4],m[3][3],n;int i,k;
+    if(focus_boards>=FOCUS_BOARDS)return -1;
+    for(i=0;i<3;i++){h[i]=focus_f32(box+4*i);if(!(h[i]>=0 && h[i]<100000))return -1;}
+    for(i=0;i<4;i++){q[i]=focus_f32(box+12+4*i);if(!(q[i]>=-1.01f && q[i]<=1.01f))return -1;}
+    n=q[0]*q[0]+q[1]*q[1]+q[2]*q[2]+q[3]*q[3];
+    if(n<.98f || n>1.02f)return -1;          /* not a unit quaternion (an empty or older field): no box */
+    /* the rotation from the builder's unit quaternion (w, x, y, z): multiplications only, no sine or cosine
+     * (those reach 68040-unimplemented instructions); tools/prepare_focus.py quaternion_matrix */
+    m[0][0]=1-2*(q[2]*q[2]+q[3]*q[3]);m[0][1]=2*(q[1]*q[2]-q[0]*q[3]);m[0][2]=2*(q[1]*q[3]+q[0]*q[2]);
+    m[1][0]=2*(q[1]*q[2]+q[0]*q[3]);m[1][1]=1-2*(q[1]*q[1]+q[3]*q[3]);m[1][2]=2*(q[2]*q[3]-q[0]*q[1]);
+    m[2][0]=2*(q[1]*q[3]-q[0]*q[2]);m[2][1]=2*(q[2]*q[3]+q[0]*q[1]);m[2][2]=1-2*(q[1]*q[1]+q[2]*q[2]);
+    for(k=0;k<3;k++)for(i=0;i<3;i++)focus_board_axis[focus_boards][k][i]=m[i][k]*h[k];
+    return focus_boards++;
+}
+/* Where the ray EYE + t*DIR (t >= 0) enters the box CENTRE +- the half axes AXIS, -1 when it misses (the slab test). */
+static float focus_board_ray(const float axis[3][3],const vec3_t centre,const vec3_t eye,const vec3_t dir){
+    float lo=0,hi=1e9f,len,e,f,t0,t1,tmp;int k;vec3_t d;
+    VectorSubtract(eye,centre,d);
+    for(k=0;k<3;k++){
+        len=DotProduct(axis[k],axis[k]);if(len<1e-6f)return -1;
+        e=DotProduct(d,axis[k])/len;f=DotProduct(dir,axis[k])/len;   /* the box's own coordinate along k: e + t f */
+        if(fabs(f)<1e-9f){if(e<-1 || e>1)return -1;continue;}
+        t0=(-1-e)/f;t1=(1-e)/f;
+        if(t0>t1){tmp=t0;t0=t1;t1=tmp;}
+        if(t0>lo)lo=t0;
+        if(t1<hi)hi=t1;
+        if(lo>hi)return -1;
+    }
+    return lo;
+}
 static unsigned long focus_u32(const byte *p){return (unsigned long)p[0]|((unsigned long)p[1]<<8)|((unsigned long)p[2]<<16)|((unsigned long)p[3]<<24);}
 static long focus_room(void){
     const char *p=sv.worldmodel?sv.worldmodel->entities:NULL,*key,*end;long n=0;
@@ -1707,7 +1846,8 @@ static unsigned long focus_exterior_key(int gx,int gy){
 static void focus_add_row(const byte *row){
     focus_row_t *r;unsigned long bits;int j;
     if(focus_count>=FOCUS_ROWS)return;
-    if(row[0]!='I' && row[0]!='A' && row[0]!='D' && row[0]!='C')return;   /* 'C' a container (slice 3) */
+    /* 'C' a container (slice 3); 'N' a named board (SIGNPOST-NAMES-MISSING-65, its box in the id field) */
+    if(row[0]!='I' && row[0]!='A' && row[0]!='D' && row[0]!='C' && row[0]!='N')return;
     r=&focus_rows[focus_count];
     r->kind=(char)row[0];r->owned=row[1]?1:0;r->edict=0;r->reference=(unsigned)focus_u32(row+4);
     /* STEAL-PROMPT-58: the builder's action code (prepare_focus.py); an older file has 0: an item is taken */
@@ -1724,6 +1864,10 @@ static void focus_add_row(const byte *row){
     }
     for(j=0;r->name[j];j++)if((unsigned char)r->name[j]<32)r->name[j]=' ';
     if(!r->name[0] || !(r->weight>=0 && r->weight<1000000))return;
+    if(r->kind=='N' && (r->value=focus_board_add(row+FOCUS_ROW))<0)return;   /* the board's box (game units) */
+    /* OUTDOOR-CONTAINER-AIM-66: a container's id field holds its box when the builder measured one (a record id, which
+     * a room's container keeps, is no unit quaternion: no box) */
+    r->box=(short)(r->kind=='C'?focus_board_add(row+FOCUS_ROW):-1);
     focus_count++;
 }
 /* Append one key's rows (game units) to the table; 0 on a bad file. With WANT set nothing is appended: the record
@@ -2895,11 +3039,14 @@ static int item_known(void *context,const char *id){
     return id && id[0] && (id[0]=='*' || AW_InventoryRead(id,&item));   /* '*': LEVELLED_MARK */
 }
 /* A save is written: the record hash of every reference the list names, and the content files (aw_save.c). */
-void AW_PlacedIdentRefresh(aw_ledger_t *l){
+/* SAVE-EXPORT-FAILURE-ACCEPTED-65: 1 done (or no table: nothing to name), 0 memory refused the idents (the save is
+ * refused: a migrated load could not check what the changes name) */
+int AW_PlacedIdentRefresh(aw_ledger_t *l){
     aw_refs_t *r=AW_PlacedRefs();
-    if(!r)return;
-    AW_LedgerIdentRefresh(l,refs_lookup,r);
+    if(!r)return 1;
+    if(!AW_LedgerIdentRefresh(l,refs_lookup,r))return 0;
     AW_LedgerFilesSet(l,r->file,r->file_count);
+    return 1;
 }
 /* A save of other game data is loaded (aw_save.c): its list migrated (aw_ledger.h AW_LedgerMigrate); -1 no table here
  * (the save is refused), else the changes dropped. */
@@ -3081,8 +3228,8 @@ int AW_AreaPlaceKeys(unsigned long *keys,int max,unsigned long *generation){
 static void focus_load(void){
     FILE *f=NULL;long base,room=0;int i,j,dx,dy,ok=1;
     unsigned long rooms;edict_t *e;eval_t *v;vec3_t game,local;
-    focus_world=sv.worldmodel;focus_count=0;focus_outdoor=0;
-    AW_ContainerRelease();     /* CONTAINER-STRIP-TAKE-STALL-59: a held container belongs to the place it was read in */
+    focus_world=sv.worldmodel;focus_count=0;focus_outdoor=0;focus_boards=0;
+    AW_ContainerRelease();    /* CONTAINER-STRIP-TAKE-STALL-59: a held container belongs to the place it was read in */
     if(aw_placed_begin)aw_placed_begin();      /* a new map or cell: nothing drawn until the list is read again */
     if(svs.clients && svs.clients[0].edict && focus_to_source(svs.clients[0].edict->v.origin,game)){
         focus_outdoor=1;focus_gx=(int)floor(game[0]/FOCUS_CELL);focus_gy=(int)floor(game[1]/FOCUS_CELL);
@@ -3154,9 +3301,21 @@ static void focus_load(void){
     if(!ok){focus_count=0;return;}
     /* to this map's units: outdoors the map's own origin, a room a quarter scale (its shift is added when aimed) */
     for(j=0;j<focus_count;j++){
-        if(!focus_outdoor)VectorScale(focus_rows[j].at,.25f,focus_rows[j].at);
-        else if(focus_to_local(focus_rows[j].at,local)){VectorCopy(local,focus_rows[j].at);}
-        else focus_rows[j].edict=1;
+        focus_row_t *row=&focus_rows[j];
+        /* SIGNPOST-NAMES-MISSING-65: a board's half axes into map units the same way (outdoors each axis end mapped
+         * and the centre taken off, so the map's own transform turns the box with it) */
+        if((row->kind=='N' && row->value>=0 && row->value<focus_boards) ||
+           (row->kind=='C' && row->box>=0 && row->box<focus_boards)){       /* OUTDOOR-CONTAINER-AIM-66 too */
+            float (*axis)[3]=focus_board_axis[row->kind=='N'?row->value:row->box];int k;vec3_t end,there;
+            if(!focus_outdoor)for(k=0;k<3;k++)VectorScale(axis[k],.25f,axis[k]);
+            else if(focus_to_local(row->at,local))for(k=0;k<3;k++){
+                VectorAdd(row->at,axis[k],end);
+                if(focus_to_local(end,there)){VectorSubtract(there,local,axis[k]);}else{axis[k][0]=axis[k][1]=axis[k][2]=0;}
+            }
+        }
+        if(!focus_outdoor)VectorScale(row->at,.25f,row->at);
+        else if(focus_to_local(row->at,local)){VectorCopy(local,row->at);}
+        else row->edict=1;
     }
     /* the actors and doors that have an edict of their own (an item's edict, a compiled room's placed static, has no
      * targeting of its own: its row stays) */
@@ -3165,7 +3324,9 @@ static void focus_load(void){
         e=EDICT_NUM(i);if(e->free)continue;
         v=GetEdictFieldValue(e,"aw_ref");if(!v || v->_float<=0)continue;
         for(j=0;j<focus_count;j++)if(focus_rows[j].reference==(unsigned)v->_float){
-            if(focus_rows[j].kind!='I')focus_rows[j].edict=1;else focus_rows[j].live=1;
+            /* SIGNPOST-NAMES-MISSING-65: a board drawn as an edict (a scenery brush with its reference) has no
+             * targeting of its own: its row stays */
+            if(focus_rows[j].kind=='I')focus_rows[j].live=1;else if(focus_rows[j].kind!='N')focus_rows[j].edict=1;
         }
     }
     /* In a room an item row counts only when the room draws the item: an edict that carries its reference or a
@@ -3219,6 +3380,17 @@ static int placed_target(void){
             if(tr.fraction<1 && (1-tr.fraction)*hit>6)continue;        /* something in front of the item */
             nearest=hit;best=i;continue;
         }
+        /* SIGNPOST-NAMES-MISSING-65: a named board is aimed at where the view ray meets its box (as the original and
+         * OpenMW test the ray against the object), within the reach, with a clear line to that point; never by the
+         * near-the-origin test */
+        if(row->kind=='N'){
+            if(row->value<0 || row->value>=focus_boards || length>(reach+256)*(reach+256) ||
+               (hit=focus_board_ray(focus_board_axis[row->value],at,eye,f))<0 || hit>nearest)continue;
+            VectorMA(eye,hit,f,delta);
+            tr=SV_Move(eye,vec3_origin,vec3_origin,delta,MOVE_NOMONSTERS,p);
+            if(tr.fraction<1 && (1-tr.fraction)*hit>6)continue;        /* a wall in front of the board */
+            nearest=hit;best=i;continue;
+        }
         /* ROOM-OBJECTS-MISSING-62: a room's container is aimed at where the view ray meets its drawn placement box
          * (the 6-unit test at its reference point missed most urns and sacks), with the same clear line to that point */
         if(row->kind=='C' && !focus_outdoor && aw_room_ray && length<=(reach+64)*(reach+64) &&
@@ -3226,6 +3398,16 @@ static int placed_target(void){
             if(hit>nearest)continue;
             VectorMA(eye,hit,f,at);
             tr=SV_Move(eye,vec3_origin,vec3_origin,at,MOVE_NOMONSTERS,p);
+            if(tr.fraction<1 && (1-tr.fraction)*hit>6)continue;        /* a wall in front of the container */
+            nearest=hit;best=i;continue;
+        }
+        /* OUTDOOR-CONTAINER-AIM-66: an exterior container (no room record) is aimed at where the view ray meets its
+         * measured box, as a named board is; the near-the-origin test missed nearly every sack, barrel and chest */
+        if(row->kind=='C' && row->box>=0 && row->box<focus_boards){
+            if(length>(reach+256)*(reach+256) || (hit=focus_board_ray(focus_board_axis[row->box],at,eye,f))<0 ||
+               hit>nearest)continue;
+            VectorMA(eye,hit,f,delta);
+            tr=SV_Move(eye,vec3_origin,vec3_origin,delta,MOVE_NOMONSTERS,p);
             if(tr.fraction<1 && (1-tr.fraction)*hit>6)continue;        /* a wall in front of the container */
             nearest=hit;best=i;continue;
         }

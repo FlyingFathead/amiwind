@@ -15,6 +15,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from mwad.audit import cell_data, normpath, records, string, subrecords
 from mwad.paths import child_ci, ensure_external, resolve_data_files
+from mwad.masters import master_path
 
 
 def scenery_kind(object_id, obj):
@@ -109,7 +110,7 @@ def main():
     data = resolve_data_files(args.data_files)
     out = ensure_external(args.out, 'private world scenery census')
     out.mkdir(parents=True, exist_ok=False)
-    result = inventory(child_ci(data, 'Morrowind.esm').read_bytes())
+    result = inventory(master_path(data).read_bytes())
     (out / 'source-census.json').write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')
     print(json.dumps(result['counts'], indent=2), flush=True)
     if args.export_meshes:

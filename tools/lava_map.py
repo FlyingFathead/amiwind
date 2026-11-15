@@ -238,11 +238,12 @@ def main(argv=None):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))      # src first: tools/mwad.py is a script
     from lava import exterior_pools
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     ap = argparse.ArgumentParser(description=main.__doc__)
     ap.add_argument('--data-files', required=True)
     ap.add_argument('--json', help='write the full per-pool report here')
     args = ap.parse_args(argv)
-    land = land_heights(child_ci(Path(args.data_files), 'Morrowind.esm').read_bytes())
+    land = land_heights(master_path(Path(args.data_files)).read_bytes())
     pools = exterior_pools(args.data_files)
     rows, step = rows_for(pools, land)
     report = audit(rows, pools, land)

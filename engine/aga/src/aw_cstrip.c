@@ -10,6 +10,7 @@
 #include "aw_icons.h"
 #include "aw_tryalloc.h"
 #include "aw_cstrip.h"
+#include "aw_ui_arrow.h"
 /* LOOT-WINDOW-LAYOUT-60: the rows and their room (aw_cstrip_rules.c AW_CStripLayout, native-tested) */
 #define STRIP_CELL AW_CSTRIP_CELL
 #define STRIP_COLUMNS AW_CSTRIP_COLUMNS
@@ -166,6 +167,25 @@ static void layout(aw_cstrip_layout_t *o){
     AW_CStripLayout((int)vid.width,(int)vid.height,r_refdef.vrect.y+r_refdef.vrect.height,AW_ConsoleCharWidth(),
                     AW_ConsoleCharHeight(),o);
 }
+/* INVENTORY-BROWSER-ARROWS-66: the page arrows are the race page's triangles (aw_ui_arrow.h), always drawn, left in
+ * the frame's margin and right after the last cell, centred on the cells; greyed when the side shown has no more that
+ * way, lit under the pointer and for a moment after a key moved that way; a click pages by the cells in view. */
+#define ARROW_SLACK 2
+#define ARROW_KEY_LIT .25
+static int arrow_key_dir=-1;static double arrow_key_until;
+static void arrow_place(const aw_cstrip_layout_t *o,int dir,int *x,int *y){
+    *x=dir==AW_UI_ARROW_LEFT?AW_CSTRIP_FRAME:o->left+o->columns*STRIP_CELL;
+    *y=o->cells_y+(STRIP_CELL-2-AW_UI_ARROW_SPAN)/2;
+}
+static int arrow_can(const aw_cstrip_list_t *l,int dir){
+    return dir==AW_UI_ARROW_LEFT?l->first[l->side]>0:l->first[l->side]+l->columns<l->count[l->side];
+}
+static int arrow_under_pointer(const aw_cstrip_layout_t *o,int dir){
+    int x,y;
+    arrow_place(o,dir,&x,&y);
+    return AW_UIArrowHit(x,y,dir,ARROW_SLACK,mouse_x,mouse_y);
+}
+static void arrow_key(int dir){arrow_key_dir=dir;arrow_key_until=Sys_FloatTime()+ARROW_KEY_LIT;}
 /* LOOT-WINDOW-LAYOUT-60: a line in the console font (the key help, the name and the properties), clipped at RIGHT;
  * RED (a palette index) for an owned container's entries, -1 the console's own colour */
 static void ctext(int x,int y,const char *s,int right,int red){
@@ -237,6 +257,9 @@ static int click(void){
         if(mouse_x>=right-2*STRIP_BUTTON_W-4)return 't';
         return mouse_x<o.left+120?'1':'2';
     }
+    /* INVENTORY-BROWSER-ARROWS-66: an arrow pages (a greyed one does nothing) */
+    if(arrow_under_pointer(&o,AW_UI_ARROW_LEFT)){if(arrow_can(l,AW_UI_ARROW_LEFT))return K_PGUP;return 0;}
+    if(arrow_under_pointer(&o,AW_UI_ARROW_RIGHT)){if(arrow_can(l,AW_UI_ARROW_RIGHT))return K_PGDN;return 0;}
     i=AW_CStripCell(l,mouse_x,mouse_y,o.left,o.cells_y,STRIP_CELL,STRIP_CELL);
     if(i<0)return 0;
     if(i==l->selected[l->side])return 'e';
@@ -252,10 +275,10 @@ int AW_CStripKey(int key){
     if(key==K_MOUSE1 && !(key=click()))return 1;
     switch(key){
     case K_ESCAPE:strip_close();return 1;
-    case K_LEFTARROW:case 'a':case 'A':AW_CStripMove(l,-1);return 1;
-    case K_RIGHTARROW:case 'd':case 'D':AW_CStripMove(l,1);return 1;
-    case K_PGUP:AW_CStripMove(l,-l->columns);return 1;
-    case K_PGDN:AW_CStripMove(l,l->columns);return 1;
+    case K_LEFTARROW:case 'a':case 'A':AW_CStripMove(l,-1);arrow_key(AW_UI_ARROW_LEFT);return 1;
+    case K_RIGHTARROW:case 'd':case 'D':AW_CStripMove(l,1);arrow_key(AW_UI_ARROW_RIGHT);return 1;
+    case K_PGUP:AW_CStripMove(l,-l->columns);arrow_key(AW_UI_ARROW_LEFT);return 1;
+    case K_PGDN:AW_CStripMove(l,l->columns);arrow_key(AW_UI_ARROW_RIGHT);return 1;
     case K_TAB:case K_UPARROW:case K_DOWNARROW:case 'w':case 'W':case 's':case 'S':AW_CStripSide(l,-1);return 1;
     case '1':AW_CStripSide(l,AW_CSTRIP_CONTAINER);return 1;
     case '2':AW_CStripSide(l,AW_CSTRIP_INVENTORY);return 1;
@@ -302,9 +325,15 @@ void AW_CStripDraw(void){
      if(strip_pictures_pending && loaded)
         Con_DPrintf("Container strip: %d pictures in %d ms.\n",loaded,(int)((Sys_FloatTime()-t0)*1000));
      strip_pictures_pending=0;}
-    if(l->first[l->side]>0)ctext(left-o.char_w-2,y+(STRIP_CELL-o.char_h)/2,"<",left,-1);
-    if(l->first[l->side]+columns<l->count[l->side])
-        ctext(left+columns*STRIP_CELL,y+(STRIP_CELL-o.char_h)/2,">",(int)vid.width-AW_CSTRIP_FRAME,-1);
+    /* INVENTORY-BROWSER-ARROWS-66: the page arrows (were "<" and ">" in the console font, shown only with more) */
+    {int dir,ax,ay,lit_key=arrow_key_dir>=0 && Sys_FloatTime()<arrow_key_until;
+     if(arrow_key_dir>=0 && !lit_key){arrow_key_dir=-1;strip_dirty=STRIP_DIRTY_FRAMES;}   /* the key's light goes out */
+     for(dir=AW_UI_ARROW_LEFT;dir<=AW_UI_ARROW_RIGHT;dir++){
+        int can=arrow_can(l,dir);
+        arrow_place(&o,dir,&ax,&ay);
+        AW_UIPageArrow(ax,ay,dir,!can?AW_UI_ARROW_GREYED:
+                       (arrow_under_pointer(&o,dir) || (lit_key && arrow_key_dir==dir))?AW_UI_ARROW_LIT:AW_UI_ARROW_ON);
+     }}
     for(c=0;c<columns;c++){
         int i=l->first[l->side]+c,x=left+c*STRIP_CELL;
         AW_UIFill(x,y,STRIP_CELL-2,STRIP_CELL-2,AW_UIColor(0,0,0));   /* the item slots are black (ITEM-ICONS-MISSING-62) */

@@ -28,6 +28,9 @@ const context = vm.createContext({console, JSON, Math, Date, Number, String, Arr
   history: {replaceState() {}},
   document: {hidden: false, getElementById: element, createElement: node, addEventListener() {}},
   window: {}, setTimeout() { return 0; }, clearTimeout() {},
+  // an earlier visit saved "follow latest" off: the page must start following anyway
+  localStorage: {getItem: () => '{"latest":false,"stage":true}', setItem() {}},
+  sessionStorage: {getItem: () => null, setItem() {}},
   fetch: async path => {
     requested.push(path);
     const key = path.split('?')[0], offset = Number((/[?&]offset=(-?\d+)/.exec(path) || [])[1]);
@@ -39,6 +42,7 @@ const context = vm.createContext({console, JSON, Math, Date, Number, String, Arr
 const html = fs.readFileSync(htmlFile, 'utf8');
 vm.runInContext(html.split(/<script>\s*/)[1].split('</script>')[0], context);
 setTimeout(async () => {
+  const followLatestAtLoad = element('followlatest').checked;
   const facts = element('facts').children.map(c => c.textContent).join(' | ');
   const out = {status: element('status').textContent, facts, stages: element('stages').children.length,
     log: vm.runInContext('S.log', context), text: element('log').textContent,
@@ -53,6 +57,16 @@ setTimeout(async () => {
   out.overallDone = {width: element('overallfill').style.width, cls: element('overallfill').className, text: element('overalltext').textContent};
   vm.runInContext('renderOverall(null)', context);
   out.overallNone = element('overall').hidden;
+  // a failed run: the failed stage, its exit and its error line under the progress line, with the link to FAILURE.md;
+  // hidden while the run is not failed; without the failure record the failed stages of the progress file are named
+  out.failureRunning = element('failbox').hidden;
+  vm.runInContext('S.failure = {run: S.run, source: "build", record: {stage: "chim", error: "ValueError: x is not in the subpath of /owned",' +
+    ' failed_stages: [{name: "chim", number: 27, returncode: 1}]}}; renderFailure({status: "failed", stages: []})', context);
+  out.failure = {hidden: element('failbox').hidden, what: element('failwhat').textContent, href: element('faillink').href};
+  vm.runInContext('S.failure = null; renderFailure({status: "failed", stages: [{name: "rooms", status: "failed"}]})', context);
+  out.failureBare = element('failwhat').textContent;
+  vm.runInContext('renderFailure({status: "passed", stages: []})', context);
+  out.failurePassed = element('failbox').hidden;
   // a result row of a build whose stages passed and whose perf guard failed: its own amber state, sections on hover
   out.perfCell = JSON.parse(vm.runInContext('JSON.stringify((c => ({text: c.textContent, cls: c.className, title: c.title}))(resultStatusCell({outcome:"passed-perf-guard-failed",status:"failed",perf_failing:["fog 12 %","draw 9 %"]})))', context));
   out.failedCell = JSON.parse(vm.runInContext('JSON.stringify((c => ({text: c.textContent, cls: c.className}))(resultStatusCell({status:"failed"})))', context));
@@ -81,10 +95,28 @@ setTimeout(async () => {
   out.full2 = vm.runInContext('toggleFullscreen()', context);
   out.fullClassAfter = element('timeline').className;
   out.hover = vm.runInContext('S.tlGeom ? hoverAt(4 + (S.tlGeom.W - 8) * 30 / 200) : ""', context);
+  // a finished run: Started at and Ended at rows; "failed" counted from its stage list (one failed, one cancelled)
+  vm.runInContext('renderProgress({run:"r",status:"failed",started_at:"2026-11-13T20:00:00+02:00",ended_at:"2026-11-13T20:00:56+02:00",' +
+    'elapsed_seconds:56,counts:{passed:1,running:0,pending:0,failed:2,total:3},stages:[{name:"a",status:"passed"},' +
+    '{name:"world-survey",status:"failed"},{name:"b",status:"cancelled"}]})', context);
+  out.finished = element('facts').children.map(c => c.textContent).join(' | ');
+  // no build running: what runs now leads (summary line, Machine panel first, "Last build: ..." header)
+  vm.runInContext('renderMachine({ok:true,jobs:[{name:"amiwind-gate-smoke-10690",kind:"gate",cpu_pct:120,cores:1.2,mem:"1GiB"},' +
+    '{name:"aw-a",kind:"test",cpu_pct:50,cores:0.5},{name:"aw-b",kind:"test",cpu_pct:50,cores:0.5}],cores_used:2.2,machine_cores:24})', context);
+  out.idleLayout = {now: element('nowline').textContent, order: element('machine').style.order, title: element('progresstitle').textContent};
+  // a build running: the build stays first
+  vm.runInContext('renderProgress({run:"r",status:"running",started_at:"2026-11-13T20:00:00+02:00",elapsed_seconds:5,counts:{total:1},stages:[{name:"a",status:"running"}]})', context);
+  out.busyLayout = {now: element('nowline').textContent, order: element('machine').style.order, title: element('progresstitle').textContent};
+  // the stall banner (on by default)
+  vm.runInContext('renderStall([{run:"r1",mtime:Date.now()/1000,stall:{state:"stalled",since:600,reason:"chim: no progress"}},{run:"r2",stall:{state:"ok"}}])', context);
+  out.banner = {hidden: element('stallbanner').hidden, text: element('stallbanner').textContent};
+  vm.runInContext('renderStall([])', context);
+  out.bannerOff = element('stallbanner').hidden;
   // the run list read again: a new run is marked, the selection stays
   answers['/monitor/runs.json'] = {ok: true, runs: [{run: '2026_10_11_v0.0.36-dev3_miniwind-vivec-stage-a_abc1234', mtime: 9e9, progress: false},
     ...(answers['/monitor/runs.json'].runs || [])]};
   await vm.runInContext('refreshRuns()', context);
+  out.followLatestAtLoad = followLatestAtLoad;
   out.runOptions = element('run').options.map(o => o.textContent);
   out.runValue = element('run').value;
   process.stdout.write(JSON.stringify(out) + '\n');

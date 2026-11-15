@@ -104,6 +104,8 @@ def build(data_files, media, music, out, config=CONFIG):
               'sections': sizes, 'scripts': len(compiled),
               'not_compiled': [c.name for c in compiled if c.error],
               'bindings': len(binds), 'globals': len(program.globals), 'journal_topics': len(program.journal),
+              # SAVE-SCRIPT-ROW-HINT-ONLY-65: the scripts' variables by name (LOCN) and any names that share a key
+              'local_names': getattr(program, 'local_names_report', None),
               'player_moves': moves,
               'new_game': {'scripts': new_game['scripts'], 'counts': new_game['counts'],
                            'actors': sorted(d['id'] for d in new_game['disabled'] if d['type'] in newgame.ACTOR_TYPES)},

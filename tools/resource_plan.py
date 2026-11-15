@@ -501,7 +501,30 @@ def _waits_for(steps):
     return found
 
 
-def plan(steps, running, jobs, got, gathered, reuse_from=None, stair_walk=None, alone=True):
+def unit_forecast(rows, stored_s=None):
+    """{'reused', 'to_bake', 'held', 'new'} of one rebuilt stage from its unit caches' key lookups ROWS
+    [(cache, usable, held)] (tools/reuse_all.py unit_report: USABLE units stored under this build's key, HELD the units
+    the cache holds for one key), or None without a unit cache. 'to_bake' counts the held units this build's key does
+    not find (a None usable = the key could not be read: all held). 'new' is None: units the cache never held (new
+    content) are known only to the stage itself, and the plan says so instead of guessing (NEW-WORK-FIRST-66)."""
+    rows = [(cache, usable, held) for cache, usable, held in rows or () if held]
+    if not rows:
+        return None
+    held = sum(h for _, _, h in rows)
+    reused = sum(u or 0 for _, u, _ in rows)
+    return {'reused': reused, 'to_bake': held - reused, 'held': held, 'new': None,
+            'caches': sorted({c for c, _, _ in rows})}
+
+
+def _unit_wall(wall, units):
+    """The stage's wall from its units: its full-rebuild WALL (stage history) scaled by the share of its stored units
+    this build bakes again; None when the history has no time (the units without one are named, never guessed)."""
+    if wall is None or not units or not units['held']:
+        return wall
+    return round(float(wall) * units['to_bake'] / float(units['held']), 1)
+
+
+def plan(steps, running, jobs, got, gathered, reuse_from=None, stair_walk=None, alone=True, units=None):
     """The resource plan document (schema resource-plan-1) of STEPS [(name, command)] of which RUNNING (names) will
     actually run, at --jobs JOBS, against GOT (limits()); the build's scope is GATHERED's (gather(scope=)), STAIR_WALK
     its stair walk scope ('off', 'flights', 'all'; None: GATHERED's, else not known and the stair model counts).
@@ -584,6 +607,15 @@ def plan(steps, running, jobs, got, gathered, reuse_from=None, stair_walk=None, 
                'beside_mib': round(beside, 1), 'lease_gb_full_speed': lease_gb}
         if status != 'OK':
             reasons.append('a lease of %d GB runs it at its %d planned workers' % (lease_gb, planned))
+        # THE PLAN COUNTS UNITS (NEW-WORK-FIRST-66, BUILD-REBUILD-FORECAST-65): a stage with a unit pool takes the
+        # wall of the units it bakes, not its full-rebuild history (the dev2 plan added the full times up to about 16 h)
+        forecast = unit_forecast((units or {}).get(name))
+        if forecast is not None:
+            row['units'] = forecast
+            row['wall_s'] = _unit_wall(row['wall_s'], forecast)
+            row['full_speed_wall_s'] = _unit_wall(row['full_speed_wall_s'], forecast)
+        if not model['runs']:
+            row['new_work'] = True    # no history: new content; the scheduler starts it first
         if runs_alone:
             row['alone'] = True
         if model.get('stair'):
@@ -606,6 +638,9 @@ def plan(steps, running, jobs, got, gathered, reuse_from=None, stair_walk=None, 
            'refusals': refusals, 'advisory': advisory(rows, got, threads, jobs, models)}
     if scope in SCOPES:
         doc['scope'] = scope
+    new_rows = [r['stage'] for r in rows if r.get('new_work')]
+    if new_rows:
+        doc['new_work'] = new_rows
     alone_rows = [r['stage'] for r in rows if r.get('alone')]
     if alone_rows:
         doc['alone'] = alone_rows
@@ -724,6 +759,15 @@ def checklist(doc):
                      % (r['status'], r['stage'], detail, r['worker_mib'], r['parent_mib'], r['peak_total_mib'],
                         'wall about %s' % _seconds(r['wall_s']) if r['wall_s'] is not None else 'wall unknown',
                         (': ' + '; '.join(r['reasons'])) if r['reasons'] else '', r['model']))
+        if r.get('units') or r.get('new_work'):
+            u = r.get('units')
+            lines.append('  %-13s %-24s units: %s%s' % (
+                '', '', ('%d reused, %d to bake (of %d stored; wall from the units to bake); units new to the cache: '
+                         'counted by the stage' % (u['reused'], u['to_bake'], u['held'])) if u else 'no unit cache',
+                '; NEW WORK, no history: starts first' if r.get('new_work') else ''))
+    if doc.get('new_work'):
+        lines.append('Resource plan: new work first (no history, started before the known stages): %s'
+                     % ', '.join(doc['new_work']))
     if doc['advisory']:
         lines.append('ADVISORY: ' + doc['advisory']['text'])
     # stages with no measured time are not in the sum: named, so a short total is never read as the build's time
@@ -945,6 +989,46 @@ SCHEMA_DOCUMENT = json.loads(r"""
      "alone": {
       "type": "boolean"
      },
+     "new_work": {
+      "type": "boolean"
+     },
+     "units": {
+      "type": "object",
+      "required": [
+       "reused",
+       "to_bake",
+       "held",
+       "new",
+       "caches"
+      ],
+      "additionalProperties": false,
+      "properties": {
+       "reused": {
+        "type": "integer",
+        "minimum": 0
+       },
+       "to_bake": {
+        "type": "integer",
+        "minimum": 0
+       },
+       "held": {
+        "type": "integer",
+        "minimum": 0
+       },
+       "new": {
+        "type": [
+         "integer",
+         "null"
+        ]
+       },
+       "caches": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       }
+      }
+     },
      "measured_in": {
       "type": "array",
       "items": {
@@ -1091,6 +1175,12 @@ SCHEMA_DOCUMENT = json.loads(r"""
    "minLength": 1
   },
   "alone": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  },
+  "new_work": {
    "type": "array",
    "items": {
     "type": "string"

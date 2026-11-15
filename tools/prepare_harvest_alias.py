@@ -165,8 +165,12 @@ def reject_existing_geometry(bsp, refs, origin):
 
 
 def catalogue(context, refs, origin, model_indices, registry):
+    from flora_support import seat
+
     def binding(ref):
-        pose = (np.array(ref['position']) * .25 - origin).tolist()
+        # a bracket fungus whose tree is drawn with a reduced trunk sits on that trunk (tools/flora_support.py)
+        shift = seat(ref['number']) or (0., 0., 0.)
+        pose = ((np.array(ref['position']) + np.array(shift)) * .25 - origin).tolist()
         angles = alias_angles(ref)
         entity = dict(model='@' + str(model_indices[ref['model_index']]),
                       representation='external_alias', scale=ref['scale'])

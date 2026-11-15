@@ -193,7 +193,7 @@
     9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,11,11,11,11,11\
 }
 /* Batch rooms (config/room-batches.json) by id: "" for an id held by a town or scene list. */
-#define AW_ROOM_BATCH_COUNT 1134
+#define AW_ROOM_BATCH_COUNT 1328
 #define AW_ROOM_BATCH_NAMES {\
     "","","","","","","","",\
     "","","","","","","","",\
@@ -336,7 +336,31 @@
     "ri660f4c2c83","rif151d5be74","ri5b3528a419","ri98458e9ea8","ri3857685cf0","ri5669edf33a","riab82fef20a","ri24808f9c56",\
     "ri68d85aff91","ri961749212c","rif822e0ad71","riebb6d4996f","ri45caee0ac1","ri461eea6587","ri9c52038c39","ri70146a59f2",\
     "rie258def6fe","ri8825e76530","ri84000a3f51","ridebf62b23e","ri6f2e598a63","ri81f33b87cb","ri5b317562f4","ri2b11f8c8c0",\
-    "ri4f387fd912","rid7202423b4","ria3ca870a92","ri695b1f4224","ri1d28f47749","ri01010cd4a0"\
+    "ri4f387fd912","rid7202423b4","ria3ca870a92","ri695b1f4224","ri1d28f47749","ri01010cd4a0","ri896f24c5df","ri547dd8c80e",\
+    "ri1122b892ad","riec92d6ab2b","ri6681d74a1e","ri84b184bb8d","ri5275e9c123","ri5603c2f8d1","ri06d00a6352","rid3587e40b7",\
+    "ribf949d5b71","ria425e8ab52","ri1ea1c94706","ri5a529c88ab","ri953d1ef238","ri22735271d9","rifcccfc05ae","ri2fc7e42bc8",\
+    "ri3cda81f81a","ri60b45e81e3","ri12a6bc0b0d","ri146d852d39","ri0597da2001","ri737d11784f","ri060fead0ad","ri605b60f181",\
+    "ri90f4f2c02c","ria81e2581a6","rie0d11f5959","rie222d11124","ricdcfe1014f","ri8e2666f5cb","ri683ffd9fe8","ri53c6526d53",\
+    "ri626fc8ddb3","rifc0774a4d2","rid91c99e78f","ri277e866907","ri88110ab62c","rib51904acde","rifd9cb8672f","rifca83be30d",\
+    "riee63a7a381","riae288adbee","rie43ed9f1f8","ri1b6c02d188","ri2eb8679f5b","ri93e7465c5d","ri5b35755469","ri0c4df11665",\
+    "ri9cf47c0442","ri7c6a5af22e","ri62c6ddb9be","riaf634d6c2a","ri6be9ae0492","ri9ecfbd5fa4","rid1db50c618","ri5cb661c397",\
+    "ricacf0e27d2","ri7f27a3485e","ri4dd2560bad","ri9e26aea7bc","ri2edb70aea3","ri07c0fe89c2","ri6f0f575272","rib1144ff31e",\
+    "ria5680afcba","ri4b6c30119d","ri91b702bba0","ri1c21be67b5","rid487626c11","ri5653544249","ri4f62782f0b","rie2b2d725e9",\
+    "riffb8df4ae1","rid9955a3ed9","ri19404a68a2","ri32c90aee0e","ric3627a7bf0","rie73f821ea7","rid519ad92a1","ribb34499728",\
+    "ri9e17133cee","ri773e9834eb","ri2a537166ed","ri8a59acf25e","ri17776f0d7b","rie12f4fa74a","ri752f0df4c9","ri6b1b32a74e",\
+    "ri9f3abf19ae","ri0f405296e7","ri46d06425af","ri2f19217530","ri173e59443c","ri1071c4517b","ri3f1865b457","ri63b024718b",\
+    "ric278afa717","ri43c91d1d00","ri060a88496d","ri3956c960ba","ri6b7e3259f7","ri7231881839","ri60f2810401","ri20d1c43652",\
+    "rie0cf56f793","ricc8c5e3807","ric4bf923d3c","rifcfc9f86a1","rib695ef48c1","riea770748f6","ri67a0b8230c","ri81fa119f00",\
+    "ri7ac3cf5168","ri0add1ce27a","ri453d76f2d8","ri5064dd85f8","ri1f46af8f68","ri62f73e08bc","ricba09f8dcf","rif3dafb9cfb",\
+    "ri297c3d1574","ri478eaf3286","ri1428a4a2ab","ri2742749abd","riaa2c84b0dc","ri07519b1dd1","ric7c0f9221a","ri85054e1e80",\
+    "ri73d4ec755c","ri7a610715f8","rie0ff2d211f","ri40caab021d","ri6062cc3eab","ri4b83052bf5","ric9e23e5afd","ri4dbc87205f",\
+    "ri6b445600dd","rid4163e277f","rif8c3ba382f","ridace97dcf5","ri4009169c0e","ri09ea02ad25","ria24ea10994","rica4e4e8c4f",\
+    "riace85de9de","ri45292b79ee","ri2e30191c90","ri210148ee23","ri008fb40031","ri601b48ef1f","ri0991e6f258","rif61f4dc044",\
+    "ri92ab3a2789","ri31fad5dd89","ri207b130ea6","ri684f3cf131","ri2622e407e2","ri53bc170a8e","ri04dfdaef95","ri7983529099",\
+    "ri4d9f832863","ri89822bff5b","riadace54c61","ri6d8b3a5e8a","ric07cf8d86a","riff2b96275d","ri563c83263c","rieb92362f44",\
+    "ria0c6462831","ri16f8756368","ri61b78ed4c8","rif5870d1c47","rid8e6c276f4","rid128773614","ric80596f163","rid0a82b9fca",\
+    "ri11b03fdeda","ri3095321444","ri0f4d322df2","rif3c1d7e636","ri1fd2b3d11f","ri5eff5309c3","ri2f3aa0d0b5","ri12218fbc53",\
+    "rid7af67aedf","ri47f9bedf0f","ri1c8d15bb65","ric1f509606b","ri4b02fb1df9","ri5eee35f719","rie449086196","ri0f95c04785"\
 }
 #define AW_ROOM_BATCH_TITLES {\
     "",\
@@ -1472,7 +1496,201 @@
     "Unmarked Shipwreck, Lower Level",\
     "Indoranyon",\
     "Forgotten Vaults of Anudnabia, Forge of Hilbongard",\
-    "Subdun"\
+    "Subdun",\
+    "Mournhold, Godsreach",\
+    "Mournhold, Great Bazaar",\
+    "Mournhold, Plaza Brindisi Dorom",\
+    "Mournhold, Temple Courtyard",\
+    "Mournhold, Royal Palace: Courtyard",\
+    "Mournhold Temple: High Chapel",\
+    "Mournhold, Geon Auline's House",\
+    "Mournhold, Royal Palace Throne Room",\
+    "Mournhold, Royal Palace: Jail",\
+    "Mournhold, Royal Palace: Reception Area",\
+    "Mournhold, Sadri Manor",\
+    "Mournhold, The Winged Guar",\
+    "Mournhold, Trader",\
+    "Mournhold, Vacant Manor",\
+    "Old Mournhold: Abandoned Crypt",\
+    "Old Mournhold: Residential Sewers",\
+    "Old Mournhold: Temple Gardens",\
+    "Sotha Sil, Dome of Serlyn",\
+    "Sotha Sil, Dome of Sotha Sil",\
+    "Sotha Sil, Outer Flooded Halls",\
+    "Bamz-Amschend, Hearthfire Hall",\
+    "Mournhold Temple: Hall of Ministry",\
+    "Mournhold Temple: Infirmary",\
+    "Mournhold Temple: Office of the Lord Archcanon",\
+    "Mournhold Temple: Reception Area",\
+    "Mournhold, Andoren Manor",\
+    "Mournhold, Armory",\
+    "Mournhold, Bookseller",\
+    "Mournhold, Clothier",\
+    "Mournhold, Craftsmen's Hall",\
+    "Mournhold, Ignatius Flaccus' House",\
+    "Mournhold, Llethan Manor",\
+    "Mournhold, Magic Shop",\
+    "Mournhold, Museum of Artifacts",\
+    "Mournhold, Pawnbroker",\
+    "Mournhold, Royal Palace: Basement",\
+    "Mournhold, Royal Palace: Guards' Quarters",\
+    "Mournhold, Royal Palace: Helseth's Chambers",\
+    "Mournhold, Royal Palace: Imperial Cult Services",\
+    "Mournhold, Royal Palace: Legion Depot",\
+    "Mournhold, Thendas Manor",\
+    "Mournhold, Velas Manor",\
+    "Old Mournhold: Bazaar Sewers",\
+    "Old Mournhold: Forgotten Sewer",\
+    "Old Mournhold: Gedna Relvel's Tomb",\
+    "Old Mournhold: Palace Sewers",\
+    "Old Mournhold: Temple Sewers",\
+    "Old Mournhold: Temple Sewers East",\
+    "Old Mournhold: Temple Shrine",\
+    "Old Mournhold: West Sewers",\
+    "Sotha Sil, Dome of Kasia",\
+    "Sotha Sil, Dome of the Imperfect",\
+    "Sotha Sil, Hall of Sallaemu",\
+    "Sotha Sil, Inner Flooded Halls",\
+    "Bamz-Amschend, Hall of Winds",\
+    "Bamz-Amschend, Passage of Whispers",\
+    "Mournhold Temple: Basement",\
+    "Mournhold, Royal Palace: Barenziah's Chambers",\
+    "Mournhold, Secret Office",\
+    "Old Mournhold: Battlefield",\
+    "Old Mournhold: Manor District",\
+    "Old Mournhold: Temple Catacombs",\
+    "Old Mournhold: Temple Crypt",\
+    "Old Mournhold: Temple Sewers West",\
+    "Sotha Sil, Dome of Udok",\
+    "Sotha Sil, Hall of Delirium",\
+    "Sotha Sil, Hall of Mileitho",\
+    "Sotha Sil, Hall of Theuda",\
+    "Bamz-Amschend, Hall of Wails",\
+    "Bamz-Amschend, Radac's Forge",\
+    "Old Mournhold: Abandoned Passageway",\
+    "Old Mournhold: City Gate",\
+    "Old Mournhold: Moril Manor, East Building",\
+    "Old Mournhold: Moril Manor, North Building",\
+    "Sotha Sil, Central Gearworks",\
+    "Bamz-Amschend, Passage of the Walker",\
+    "Old Mournhold: Armory Ruins",\
+    "Old Mournhold: Moril Manor, Courtyard",\
+    "Old Mournhold: Residential Ruins",\
+    "Old Mournhold: Teran Hall",\
+    "Sotha Sil, Chamber of Sohleh",\
+    "Bamz-Amschend, King's Walk",\
+    "Norenen-dur",\
+    "Old Mournhold: Tears of Amun-Shae",\
+    "Old Mournhold: Teran Hall, East Bldg",\
+    "Bamz-Amschend, Skybreak Gallery",\
+    "Norenen-dur, The Grand Stair",\
+    "Norenen-dur, The Teeth that Gnash",\
+    "Norenen-dur, Citadel of Myn Dhrur",\
+    "Norenen-dur, Basilica of Divine Whispers",\
+    "Norenen-dur, The Wailingdelve",\
+    "Mournhold",\
+    "Sotha Sil,",\
+    "Mournhold Temple",\
+    "Mournhold, Royal Palace",\
+    "Pelagiad, Ignatius Flaccus' House",\
+    "Raven Rock, Afer Flaccus' House",\
+    "Raven Rock, Bar",\
+    "Raven Rock, Factor's Estate",\
+    "Raven Rock, Garnas Uvalen's House",\
+    "Raven Rock, Gidar Verothan's House",\
+    "Raven Rock, Gratian Caerellius' House",\
+    "Raven Rock, Mine Entrance",\
+    "Raven Rock, North Storehouse",\
+    "Raven Rock, Sabinus Oranius' House",\
+    "Raven Rock, Sados Relothan's House",\
+    "Raven Rock, Seler Favelnim's House",\
+    "Raven Rock, Smith",\
+    "Raven Rock, South Storehouse",\
+    "Raven Rock, SouthEast Storehouse",\
+    "Raven Rock, Trader",\
+    "Raven Rock, Uryn Maren's House",\
+    "Raven Rock, Vacant House",\
+    "Raven Rock, Mine",\
+    "Raven Rock, Abandoned Mine Shaft",\
+    "Skaal Village, Bronrod the Roarer's House",\
+    "Skaal Village, Erna the Quiet's House",\
+    "Skaal Village, Ice-Mane's Hut",\
+    "Skaal Village, Ingmar's House",\
+    "Skaal Village, Lassnr's House",\
+    "Skaal Village, Rigmor's Hut",\
+    "Skaal Village, Shaman's Hut",\
+    "Skaal village, Snedbrir the Smith",\
+    "Skaal Village, The Blodskaal's House",\
+    "Skaal Village, The Greathall",\
+    "Fort Frostmoth, Armory",\
+    "Fort Frostmoth, Curtain Wall",\
+    "Fort Frostmoth, General Quarters",\
+    "Fort Frostmoth, Imperial Cult Shrine",\
+    "Fort Frostmoth, Prison",\
+    "Fort Frostmoth, Carius' Chambers",\
+    "Fort Frostmoth, General Quarters, Upper Level",\
+    "Fort Frostmoth, Supply Room",\
+    "Solstheim, Castle Karstaag, Throne Room",\
+    "Solstheim, Castle Karstaag, Tower",\
+    "Solstheim, Castle Karstaag, Banquet Hall",\
+    "Solstheim, Castle Karstaag, Karstaag's Chambers",\
+    "Solstheim, Caves of Fjalding",\
+    "Solstheim, Lair of the Udyrfrykte",\
+    "Solstheim, Aesliip's Lair",\
+    "Solstheim, Aesliip's Lair, Caverns",\
+    "Solstheim, Ulfgar the Unending's Dwelling",\
+    "Solstheim, Frossel",\
+    "Solstheim, Glenschul's Tomb",\
+    "Solstheim, Graring's House",\
+    "Solstheim, Gyldenhul Barrow",\
+    "Solstheim, Rimhull",\
+    "Solstheim, Sjobal",\
+    "Solstheim, Skygge",\
+    "Solstheim, Tombs of Skaalara",\
+    "Solstheim, Bloodskal Barrow",\
+    "Solstheim, Frosselmane Barrow",\
+    "Solstheim, Gandrung Caverns",\
+    "Solstheim, Halls of Penumbra",\
+    "Solstheim, Himmelhost Barrow",\
+    "Solstheim, Kelsedolk Barrow",\
+    "Solstheim, Kolbjorn Barrow",\
+    "Solstheim, Stormpfund Barrow",\
+    "Raven Rock, Supply Ship",\
+    "Solstheim, Bjorn",\
+    "Solstheim, Cave of Hidden Music",\
+    "Solstheim, Connorflenge Barrow",\
+    "Solstheim, Eddard Barrow",\
+    "Solstheim, Fjell",\
+    "Solstheim, Geilir the Mumbling's Dwelling",\
+    "Solstheim, Gloomy Cave",\
+    "Solstheim, Gronn",\
+    "Solstheim, Jolgeirr Barrow",\
+    "Solstheim, Kjolver's Dwelling",\
+    "Solstheim, Kolfinna's Dwelling",\
+    "Solstheim, Lukesturm Barrow",\
+    "Solstheim, Skogsdrake Barrow",\
+    "Solstheim, Solvjord",\
+    "Solstheim, Uncle Sweetshare's Workshop",\
+    "Solstheim, Valbrandr Barrow",\
+    "Solstheim, Chamber of Song",\
+    "Solstheim, Benkongerike",\
+    "Solstheim, Castle Karstaag, Caverns of Karstaag",\
+    "Solstheim, Domme",\
+    "Solstheim, Frykte",\
+    "Solstheim, Hrothmund's Barrow",\
+    "Solstheim, Legge",\
+    "Solstheim, Stahlman's Gorge",\
+    "Solstheim, Varstaad Caves",\
+    "Solstheim, Thirsk",\
+    "Solstheim, Mortrag Glacier: Huntsman's Hall",\
+    "Solstheim, Mortrag Glacier: Inner Ring",\
+    "Solstheim, Mortrag Glacier: Outer Ring",\
+    "Draugr Test",\
+    "Mark's Script Testing Cell",\
+    "Solstheim, Mortrag Glacier: Entry",\
+    "Solstheim",\
+    "Vor Lair, Chambers of Alta Vor",\
+    "Vor Lair, Interior"\
 }
 /* name,title,prefix,regions,travel_npc,travel_target,region_cap,draw_distance,
    world_slot,flags,travel_return,handoff,origin[3],core[4] */

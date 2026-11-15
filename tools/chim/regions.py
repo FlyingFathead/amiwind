@@ -43,7 +43,9 @@ SEABED = ('empty_sea',)
 LAND_DONE = ('complete', 'terrain_complete', 'complete_unlit', 'terrain_complete_unlit', 'approved',
              'playtested', 'audits_passed')
 OCEAN = ('ocean',)
-NAMED = ('seabed', 'coast', 'sea-ring', 'coast2')
+NAMED = ('seabed', 'coast', 'sea-ring', 'coast2', 'solstheim')
+# The named set of a layer's exterior, added by tools/build.py when its master is selected (CHIM-SOL-FLORA-PATH-65)
+LAYER_SETS = {'Bloodmoon.esm': 'solstheim'}
 # The v0.0.36 coastline (project decision 2026-10-11: "the entire coastline, all 1's, all possible 2's ... as CHIM"):
 # every cell of rings 1 and 2 from the sea; a cell that cannot go on CHIM is dropped with its reason, not refused.
 COAST2_RINGS = (1, 2)
@@ -176,6 +178,10 @@ def named_cells(name, statuses):
         return sorted(set(named_cells('seabed', statuses)) | set(named_cells('coast', statuses)))
     if name == 'coast2':
         return sorted(c for c, v in main.items() if v['ring'] in COAST2_RINGS)
+    if name == 'solstheim':
+        # EVERY cell of Solstheim, whatever its status: the preflight drops the unfinished ones with their reason,
+        # so the layer grows as CHIMport finishes its cells (the island's method; open sea only by explicit cell)
+        return sorted(c for c, v in statuses.items() if v['set'] == 'bloodmoon')
     raise ValueError('Unknown named set: ' + name)
 
 
@@ -597,8 +603,9 @@ def ocean_map_split(kinds, data_files):
     if not ocean or not data_files:
         return [], [], []
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     from exterior_plan import ocean_routing, source_cells
-    mapped = set(source_cells(child_ci(Path(data_files), 'Morrowind.esm'))[0])
+    mapped = set(source_cells(master_path(Path(data_files)))[0])
     routing, problems = ocean_routing(kinds, ocean, mapped)
     replaced = sorted(set(ocean) & mapped)
     return replaced, routing, ['world terrain would refuse the selection: %s' % p for p in problems]

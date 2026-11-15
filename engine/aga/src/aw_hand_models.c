@@ -133,6 +133,14 @@ int AW_HandWeaponsDecode(aw_hand_weapons_t *out,const unsigned char *raw,int siz
     }
     *out=t;return 1;
 }
+/* READY-MAGIC-SHOWS-WEAPON-65 (v0.0.66): readied magic first, whatever is equipped (aw_hand_models.h AW_HandView);
+ * the left hand's torch, light or shield put away while it is ready (AW_HandCarriesLeft). Pure. */
+int AW_HandView(int magic,int torch,int light) {
+    if(magic)return AW_HAND_VIEW_SPELL;
+    if(torch)return AW_HAND_VIEW_TORCH;
+    return light?AW_HAND_VIEW_LIGHT:AW_HAND_VIEW_HANDS;
+}
+int AW_HandCarriesLeft(int magic) {return !magic;}
 int AW_HandItemPath(const char *s) {
     int i,n=0,prefix;
     if(!s)return 0;
@@ -193,6 +201,11 @@ int AW_HandBlockApply(void) {
     char id[64]={0},path[64]={0};const char *race="nord";int female=0,i,index=-1,mark;
     int guarding=AW_CombatGuarding();float left=AW_CombatBlockShown(),dt=(float)host_frametime;byte *raw;
     block_visible=0;
+    /* READY-MAGIC-SHOWS-WEAPON-65 (v0.0.66): the shield is put away while magic is ready (AW_HandCarriesLeft): the
+     * open hands of the spell stance, never the guard's arms (aw_hand_weapon_hidden: magic ready, aw_view.c) */
+    if(aw_hand_weapon_hidden && !AW_HandCarriesLeft(aw_hand_weapon_hidden())){
+        memset(&block_clock,0,sizeof(block_clock));return 0;
+    }
     if(AW_TorchEquipped() || !aw_hand_block_item || !cl.viewent.model ||
        !aw_hand_block_item(id,path) || !id[0] || !memchr(id,0,sizeof(id)) || !block_equipment_path(path)){
         memset(&block_clock,0,sizeof(block_clock));return 0;
@@ -447,10 +460,38 @@ static int hand_held_light(float origin[3],float angles[3]) {
     if(!light_visible || light_pose_frame!=r_framecount)return 0;
     memcpy(origin,light_pose,3*sizeof(float));memcpy(angles,light_pose+3,3*sizeof(float));return 1;
 }
+/* ---- PLAYER-CASTING-59 (v0.0.66): the spell stance in first person ---- */
+static int spell_shown(void) {return aw_hand_weapon_hidden && aw_hand_weapon_hidden();}   /* magic ready (aw_view.c) */
+static int spell_range(void) {return aw_magic_cast_range>=0 && aw_magic_cast_range<=2?aw_magic_cast_range:2;}
+static model_t *spell_model;
+static char spell_path[64];
+static int spell_state=-1;   /* the baked spell arms of the selected appearance: -1 not probed, 0 missing, 1 there */
+static void spell_release(void) {
+    if(spell_model && spell_path[0])release_owned(spell_model,spell_path);
+    spell_model=NULL;spell_path[0]=0;spell_state=-1;
+}
+static int spell_arms(int index) {
+    int n=(int)strlen(appearances[index].hand);char path[64];
+    if(n<5 || n-4+7>=(int)sizeof(path))return 0;
+    memcpy(path,appearances[index].hand,n-4);strcpy(path+n-4,"_sp.mdl");
+    if(strcmp(path,spell_path)){spell_release();strcpy(spell_path,path);}
+    if(spell_state<0){
+        spell_state=probe_frames(path,AW_HAND_WEAPON_FRAMES);
+        if(!spell_state)Con_Printf("First-person spell arms not in this image; magic ready shows the bare hands.\n");
+    }
+    if(!spell_state)return 0;
+    if(!spell_model){
+        if(!Mod_CanFindName(path)){spell_state=0;return 0;}
+        spell_model=Mod_ForName(path,false);
+    }
+    if(!spell_model || spell_model->type!=mod_alias || spell_model->numframes!=AW_HAND_WEAPON_FRAMES ||
+       strcmp(spell_model->name,path)){spell_model=NULL;spell_state=0;return 0;}
+    return 1;
+}
 int AW_HandModelsApply(void)
 {
 #if !AMIWIND_SPRITE_HANDS
-    const char *race="nord",*path;int female=0,index=-1,i,equipped,frames;
+    const char *race="nord",*path;int female=0,index=-1,i,equipped,frames,view;
     model_t **wanted,*base=cl.viewent.model;
     aw_hand_held_light=hand_held_light;light_visible=0;
     weapon_visible=0;weapon_base=NULL;weapon_frame_base=0;
@@ -470,6 +511,7 @@ int AW_HandModelsApply(void)
             release_owned(torch_model,appearances[selected].torch);
         }
         if(stance_model && stance_path[0])release_owned(stance_model,stance_path);
+        spell_release();
         weapon_stance=-1;stance_model=weapon_model=NULL;stance_path[0]=weapon_path[0]=0;weapon_bad=0;
         selected=index;hand_model=torch_model=NULL;pair_valid=0;
         if(index>=0){
@@ -480,9 +522,13 @@ int AW_HandModelsApply(void)
         }
     }
     if(!pair_valid || index<0)return 0;
-    equipped=AW_TorchEquipped();frames=equipped?8:28;
+    /* READY-MAGIC-SHOWS-WEAPON-65 (v0.0.66): readied magic first, whatever is equipped (AW_HandView); before, the lit
+     * torch and a held light came first and R showed the right hand's fist beside them (v0.0.66-dev1). The torch and
+     * the light are put away while magic is ready (aw_torch.c aw_torch_put_away), so they are not lit either. */
+    view=AW_HandView(spell_shown(),AW_TorchEquipped(),AW_HeldLight()!=NULL);
+    equipped=view==AW_HAND_VIEW_TORCH;frames=equipped?8:28;
     light_visible=0;
-    if(!equipped && AW_HeldLight()){
+    if(view==AW_HAND_VIEW_LIGHT){
         /* a held light of its own (HELD-LIGHT-OWN-MODEL-61): the arms from parts at the light stance, the bare hands'
          * frame (the right hand keeps its fist and punch); the light rides their shield bone (AW_HandLightItemApply) */
         if(aw_hand_parts_apply && aw_hand_parts_apply(race,female,AW_HAND_LIGHT_STANCE,cl.viewent.frame)){
@@ -501,12 +547,24 @@ int AW_HandModelsApply(void)
      * the previous method. The carried torch keeps its baked arms. */
     if(!equipped && aw_hand_parts_apply){
         int armed=hand_weapon(index,0),stance=armed?weapon_stance+1:0,frame=cl.viewent.frame;
+        /* PLAYER-CASTING-59: magic ready: the spell stance of the selected spell's range (the open hands, the cast);
+         * an older table without it: the bare hands */
+        if(view==AW_HAND_VIEW_SPELL && aw_hand_parts_apply(race,female,AW_HAND_SPELL_STANCE+spell_range(),frame)){
+            AW_TorchUseHandAssets(1);release_owned(base,"progs/v_nord.mdl");AW_TorchReleaseLegacyCache();
+            return 1;
+        }
         if(aw_hand_parts_apply(race,female,stance,frame)){
             if(armed){weapon_base=cl.viewent.model;weapon_frame_base=stance*AW_HAND_WEAPON_FRAMES;}
             AW_TorchUseHandAssets(1);release_owned(base,"progs/v_nord.mdl");AW_TorchReleaseLegacyCache();
             return 1;
         }
         weapon_visible=0;
+    }
+    /* the baked arms' spell stance (<hands stem>_sp.mdl: the target cast for every range); an older image: the bare hands */
+    if(view==AW_HAND_VIEW_SPELL && spell_arms(index)){
+        cl.viewent.model=spell_model;AW_TorchUseHandAssets(1);
+        release_owned(base,"progs/v_nord.mdl");AW_TorchReleaseLegacyCache();
+        return 1;
     }
     if(!equipped && hand_weapon(index,1)){
         cl.viewent.model=stance_model;weapon_base=stance_model;AW_TorchUseHandAssets(1);

@@ -72,8 +72,10 @@ class SharedConversionContract(unittest.TestCase):
         self.assertLess(to_world.index('AW_RegionSourceToWorld(name,world,local)'),
                         to_world.index('aw_world_chim_local && aw_world_chim_local(name,world,local)'))
         contains = body(world, 'int AW_WorldContains(')
-        self.assertLess(contains.index('if(r)return inside(local,r->cover,-24);'),
+        self.assertLess(contains.index('if(r && r->cover[0]<r->cover[2])return inside(local,r->cover,-24);'),
                         contains.index('aw_world_chim_contains'))
+        # TOWN-OUTDOOR-SCRIPTS-NOT-ATTACHED-66: a town row has no cover: the frame's grid, else the town's core
+        self.assertIn('return r?inside(local,r->core,0):0;', contains)
         # the frame answers for the frame map that is loaded, finite numbers only
         chim = (SRC / 'chim/chim_world.c').read_text(encoding='utf-8')
         frame = body(chim, 'static int FrameMap (')

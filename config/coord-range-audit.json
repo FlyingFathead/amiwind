@@ -3,6 +3,12 @@
  "about": "Every 4000 / 4096 / 4095 in the engine and the builder's frame checks, classified against the coordinate range (CHIM-FRAME-COORD-RANGE-33, engine/aga/src/aw_coord.h): bound = follows the coordinate bound (AW_COORD_BOUND; tools/coord_range.py in the builder: wide by default since v0.0.36, narrow with --coord-range narrow); kept = about positions or distances but deliberately unchanged (why in note); unrelated = not a position. tests/test_coord_range_audit.py fails on any new occurrence that is not listed.",
  "entries": [
   {
+   "file": "engine/aga/src/aw_listbox.h",
+   "contains": "#define AW_TPN_CHUNK 4096",
+   "class": "unrelated",
+   "note": "the bytes of the dbg tp names list read at a time on the low-memory path (TP-MENU-CATEGORY-FILTER-66), a buffer size, not a position"
+  },
+  {
    "file": "engine/aga/src/aw_maps.h",
    "contains": "#define AW_SOLSTHEIM_TERRAIN_BASE 4096",
    "class": "unrelated",
@@ -49,6 +55,24 @@
    "contains": "#define AW_LEDGER_EXTRAS 4096",
    "class": "unrelated",
    "note": "the most rows of the world change list with a position block (CELL-CHANGES-59): a count, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_ledger.h",
+   "contains": "#define AW_LEDGER_LAYOUTS_MAX 4096",
+   "class": "unrelated",
+   "note": "the most scripts with a saved variable layout signature (SAVE-SCRIPT-ROW-HINT-ONLY-65): a count, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_ledger.h",
+   "contains": "#define AW_LEDGER_ITEM_LOCALS_MAX 4096",
+   "class": "unrelated",
+   "note": "the most saved script values of items (SAVE-ITEM-SCRIPT-LOCALS-66): a count, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_mapmarks.h",
+   "contains": "#define AW_MAPMARKS_MAX 4096",
+   "class": "unrelated",
+   "note": "the most named map markers the setting allows and a save may hold (SAVE-STATE-FIXED-CAPS-66, a guard above the default 256): a count, not a position"
   },
   {
    "file": "engine/aga/src/aw_excluded.c",
@@ -523,6 +547,60 @@
    "contains": "AW_MWVM_CELLS 4096",
    "class": "unrelated",
    "note": "the compiled-script machine's value cells (locals of attached objects and global scripts), a count, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_mapfog.h",
+   "contains": "the save writes it in a section of its own (aw_save.h feature 4096)",
+   "class": "unrelated",
+   "note": "the saved game's feature bit of the explored map's own section (MAP-EXPLORED-SAVE-BLOCK-66), a bit, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_mwhost.c",
+   "contains": "the explored map in a section of its own (aw_save.h feature 4096)",
+   "class": "unrelated",
+   "note": "the saved game's feature bit of the explored map's own section (MAP-EXPLORED-SAVE-BLOCK-66), a bit, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_mwhost.c",
+   "contains": "aw_save_explored_encode=explored_encode;aw_save_explored_import=explored_import;   /* the explored map (4096) */",
+   "class": "unrelated",
+   "note": "the saved game's feature bit of the explored map's own section (MAP-EXPLORED-SAVE-BLOCK-66), a bit, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_save.c",
+   "contains": "/* the explored map (feature 4096) */",
+   "class": "unrelated",
+   "note": "the saved game's feature bit of the explored map's own section (MAP-EXPLORED-SAVE-BLOCK-66), a bit, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_save.h",
+   "contains": "AWS4 feature bit 4096 (MAP-EXPLORED-SAVE-BLOCK-66)",
+   "class": "unrelated",
+   "note": "the saved game's feature bit of the explored map's own section (MAP-EXPLORED-SAVE-BLOCK-66), a bit, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_save_codec.c",
+   "contains": "(explored?4096U:0U)|(packed?8192U:0U)",
+   "class": "unrelated",
+   "note": "the saved game's feature bits of the explored map (4096) and the packed actor rows (8192), bits, not positions"
+  },
+  {
+   "file": "engine/aga/src/aw_save_codec.c",
+   "contains": "/* feature 4096 (MAP-EXPLORED-SAVE-BLOCK-66): u32 length",
+   "class": "unrelated",
+   "note": "the saved game's feature bit of the explored map's own section (MAP-EXPLORED-SAVE-BLOCK-66), a bit, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_save_codec.c",
+   "contains": "/* feature 4096: the explored map, framed here",
+   "class": "unrelated",
+   "note": "the saved game's feature bit of the explored map's own section (MAP-EXPLORED-SAVE-BLOCK-66), a bit, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_save_codec.c",
+   "contains": "(features&4096)",
+   "class": "unrelated",
+   "note": "the saved game's feature bit of the explored map's own section (MAP-EXPLORED-SAVE-BLOCK-66), a bit, not a position"
   }
  ]
 }

@@ -191,3 +191,9 @@ float AW_MagicGrow(float size,float grow,float age,float length) {
     if(!(length>0))return size;
     return size*(1+(grow-1)*clamp01(age/length));
 }
+int AW_MagicDue(float t0,float t1,float at) {return t0<at && at<=t1;}
+int AW_MagicStartDue(int started,float t1) {return !started && t1>=0;}
+float AW_MagicCastRelease(float age) {return age>0?age:0;}
+int AW_MagicInSync(int anim_frame,int sound_frame,int shell_frame) {
+    return anim_frame && anim_frame==sound_frame && sound_frame==shell_frame;
+}

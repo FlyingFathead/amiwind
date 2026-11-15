@@ -3,6 +3,86 @@
   {
    "built_at": "2026-11-11T12:08:29+00:00",
    "cells": 1409,
+   "commit": "51221ddb",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.65-rc4 (51221ddb)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-11T12:08:29+00:00",
+   "cells": 1409,
+   "commit": "6f00103b",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.65-rc2 (6f00103b)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-11T12:08:29+00:00",
+   "cells": 1409,
+   "commit": "9bd80ee1",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.65 (9bd80ee1)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-11T12:08:29+00:00",
+   "cells": 1409,
+   "commit": "20c6b9c6",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.65 (20c6b9c6)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-11T12:08:29+00:00",
+   "cells": 1409,
    "commit": "b3dc0a2b",
    "islands": [
     {
@@ -1441,9 +1521,9 @@
    "sea": 0
   }
  ],
- "eligible_release": "v0.0.65",
+ "eligible_release": "v0.0.66",
  "format": "aw-progress-state-1",
- "generated": "2026-11-11T14:21:29+00:00",
+ "generated": "2026-11-12T16:26:37+00:00",
  "groups": {
   "accounted_for": 2158,
   "cells": 2311,
@@ -1451,7 +1531,7 @@
   "not_in_game": 153,
   "settled": 749
  },
- "in_game_label": "v0.0.64 (b3dc0a2b)",
+ "in_game_label": "v0.0.65-rc4 (51221ddb)",
  "interiors": {
   "classic_rooms": [
    {
@@ -1694,7 +1774,7 @@
   "terrain_complete_unlit": 804
  },
  "version_stamp": {
-  "release": "v0.0.65",
+  "release": "v0.0.66",
   "source": "the version file"
  }
 }

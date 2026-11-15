@@ -109,10 +109,12 @@ Expansions:
 Which expansions a build uses: `--dlc tribunal|bloodmoon|both|none`, or `--no-dlc`
 (the same as `--dlc none`). The default is every expansion found. The chosen set is
 printed as `Expansion layers: ...` and kept as `expansion_layers` in
-`build-state.json` and the master builder's result (DLC-BUILD-LATER). The base world's
-stage keys depend on neither the choice nor which expansion files are present: each
-stage is keyed only by the game files it reads, `Morrowind.esm`, `Morrowind.bsa` and
-the loose files for every stage today (BUILD-GAME-INPUT-KEY-BROAD-64).
+`build-state.json` and the master builder's result (DLC-BUILD-LATER). Since v0.0.66-dev2
+the stage keys, unit keys and CHIM unit keys follow the selected expansions: each unit
+is keyed by what it reads, and a unit that reads records or archive files an expansion
+changes is keyed by that change, so switching the expansions on rebuilds only what they
+change, and a build for the base game alone keeps the keys it had. See
+[EXPANSIONS.md](EXPANSIONS.md).
 
 The counts come only from what the build already has at hand, so the block costs
 milliseconds: the record count in the master's header and the archive's file count

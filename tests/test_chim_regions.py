@@ -106,6 +106,18 @@ class Selection(unittest.TestCase):
         self.assertEqual(kept, [(0, 0)])
         self.assertIn('9,8: the tracker lists 2 legacy maps', problems[0])
 
+    def test_solstheim_set_takes_the_finished_layer_cells_and_drops_the_rest(self):
+        # CHIM-SOL-FLORA-PATH-65: the layer's named set; unfinished cells are dropped with their reason, never refused
+        statuses = dict(self.statuses)
+        statuses[(-20, 23)] = dict(statuses[(1, 1)], set='bloodmoon')
+        statuses[(-21, 23)] = dict(statuses[(1, 1)], set='bloodmoon', status='not_started')
+        cells = R.named_cells('solstheim', statuses)
+        self.assertEqual(cells, [(-21, 23), (-20, 23)])
+        kept, problems, dropped = R.preflight(cells, set(), statuses, {})
+        self.assertEqual((kept, problems), ([(-20, 23)], []))
+        self.assertEqual([tuple(d['cell']) for d in dropped], [(-21, 23)])
+        self.assertEqual(R.LAYER_SETS, {'Bloodmoon.esm': 'solstheim'})
+
     def test_coast2_takes_rings_1_and_2_and_names_every_cell_left_out(self):
         # maintainer 2026-10-11: the entire coastline, all of ring 1 and every possible cell of ring 2, as CHIM
         statuses = dict(self.statuses)

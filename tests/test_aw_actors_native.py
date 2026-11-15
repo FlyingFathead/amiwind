@@ -100,6 +100,23 @@ class ActorsNativeTests(unittest.TestCase):
         # one stands where it was left
         self.assertIn('save round trip passed', self.run_check('save'))
 
+    def test_the_dead_stay_dead_across_a_room_and_a_save(self):
+        # ACTOR-DEAD-RESPAWN-INTERIOR-65: killed outdoors (a fight, and a script on the actor record), a room entered and
+        # left twice, then a save and a load: the town's map spawns them again inside the player's scene set-up, which
+        # empties the combat slots; the change list is applied after it, so both bodies lie dead and the third lives
+        self.assertIn('dead stay dead passed', self.run_check('deadstay'))
+
+    def test_respawn_and_corpse_clearing_follow_the_original_over_time(self):
+        # ACTOR-RESPAWN-CORPSE-RULES-66 (OpenMW 0.51 CellStore::respawn / clearCorpse; Morrowind.esm fCorpseRespawnDelay
+        # 72, fCorpseClearDelay 72): with the game clock moved forward, an ordinary NPC's body is cleared after 72 h and
+        # it stays dead for good, a Respawn-flagged one comes back, a Persistent one's body stays; through a save too
+        self.assertIn('corpse rules passed', self.run_check('corpse'))
+
+    def test_an_outdoor_body_lies_there_until_its_clear_delay(self):
+        # OUTDOOR-DEAD-BODY-GONE-66: a joining outdoor cell's dead actor is spawned as its body (laid down, lootable)
+        # until fCorpseClearDelay, then cleared for good; "chim actors corpses 0" keeps the older method (not spawned)
+        self.assertIn('outdoor corpse passed', self.run_check('outdoorcorpse'))
+
     def test_home_frame_keeps_its_own_actors(self):
         # CHIM-ACTORS-TOWN-RETURN-EMPTY-47: a town frame's residents beside its own cell stay while the frame is held
         self.assertIn('home frame actors passed', self.run_check('home'))

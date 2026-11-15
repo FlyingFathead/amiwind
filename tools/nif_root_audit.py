@@ -20,8 +20,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 import numpy as np
-from mwad.audit import BSA, normpath, records, string, subrecords
+from mwad.audit import normpath, records, string, subrecords
+from mwad.archives import layered_bsa
 from mwad.paths import child_ci
+from mwad.masters import master_path
 from nif_common import first_record, root_local, scenery_root_local
 
 PLACEABLE = ('ACTI', 'ALCH', 'APPA', 'ARMO', 'BOOK', 'CLOT', 'CONT', 'DOOR', 'INGR', 'LIGH', 'LOCK', 'MISC', 'PROB',
@@ -83,8 +85,8 @@ def audit(data_files):
     from prepare_scenery import bsa_read, nif_reader
     N = nif_reader()
     data_files = Path(data_files)
-    bsa = BSA(child_ci(data_files, 'Morrowind.bsa'))
-    counts = placements(child_ci(data_files, 'Morrowind.esm').read_bytes())
+    bsa = layered_bsa(data_files)
+    counts = placements(master_path(data_files).read_bytes())
     rows, unreadable = [], []
     for model in sorted(counts):
         try:

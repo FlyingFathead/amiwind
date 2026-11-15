@@ -1,6 +1,6 @@
 # Door graph: every load door and every interior
 
-_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
+_Last updated with AmiWind v0.0.66 (14 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -115,8 +115,8 @@ A room's `hard` reasons (the batch plan sets it aside, or, for the first two, pu
 
 - `unreachable`: no door chain and no script reaches it.
 - `teleport_only`: no load door leads into it; a script or dialogue moves the player there.
-- `behaves_exterior`: the cell's "behaves like an exterior" flag (sky and weather inside a cell, as Mournhold's
-  districts).
+- `behaves_exterior` (a hard case until v0.0.65, a note since): the cell's "behaves like an exterior" flag (sky and
+  weather inside a cell, as Mournhold's districts); the room gets the shared exterior sky.
 - `over_limit`: it passes one of the CHIM room limits (names in `over_limit`).
 
 A room's `notes` (v0.0.48, the maintainer's decisions of 23 October 2026: these rooms are converted like any room):
@@ -208,7 +208,7 @@ a state in the batch's `parity` list (room, state, label, reasons), never an exc
 | `teleport_only` | teleport only | a script sends the player there; no door leads in |
 | `no_entrance` | no entrance, no script | no door leads in and no script or dialogue names it |
 
-The other hard cases (lava at or under the water, size, behaves like an exterior) stay in `aside` with their reasons.
+The other hard cases (lava at or under the water, size) stay in `aside` with their reasons.
 Each batch and the summary count the notes of their rooms (`notes`, `ready_notes`).
 
 **The expansions wait for their land.** `later` has one batch per expansion, named `later: <island>`: every room
@@ -216,12 +216,19 @@ outside the Vvardenfell plan, by the island its door chain starts on, else by it
 exterior that the base game adds goes with Solstheim). Each lists its rooms, how many are ready and set aside, its own
 parity rooms with their states, and the reason it waits:
 
-- `later: Mournhold` (Tribunal.esm): Mournhold is reached only by script (Tribunal's teleport), so its rooms wait for
-  the scripts step (roadmap step 6).
-- `later: Solstheim` (Bloodmoon.esm): Solstheim's exterior is not on CHIM yet; its rooms come in with the island
-  (roadmap step 7).
+- `later: Mournhold` (Tribunal.esm): Mournhold is reached by script (Tribunal's teleport).
+- `later: Solstheim` (Bloodmoon.esm): Solstheim's rooms.
 
 The summary checks the parity: `every_room` (the Vvardenfell plan plus every later batch) equals `graph_rooms`.
+
+**The expansions as layers (v0.0.65).** `plan --layers Tribunal.esm,Bloodmoon.esm` batches each expansion's rooms by
+the island's own order and parity rule, as batches of their own after the island's (each names its `master`), and
+drops their `later` entry. `room-batches --append-layers --previous config/room-batches.json` writes them into the room
+list: the island's batches stay exactly as they are (their rooms keep their save ids), and each expansion batch gets a
+`layer` (its master) and ids from the list's `next_id` on. The builder takes a layer's batches only when that
+expansion is selected (`--dlc`; with `--no-dlc` the island's batches alone). The five Mournhold districts whose cell
+behaves like an exterior are converted like any room since v0.0.65: the room converter gives them the shared exterior
+sky (`_aw_sky_mode exterior`, `chim_room_batches.sky_keys`), and `behaves_exterior` is a note, no longer a hard case.
 
 ## Rooms by batch in the builder
 
@@ -291,8 +298,19 @@ is converted twice. Those stages are `interior` (Seyda Neen), `balmora-interiors
 The builder works out the held stages after the MiniWind and exclusion filters. A stage the plan dropped holds
 nothing.
 
-A room the stage cannot convert is listed with its reason under `refused`, never dropped. Examples: a sectioned room,
-water outside the room's bounds, or no placement.
+A room the stage cannot convert is listed with its reason under `refused`, never dropped. Examples: a sectioned room
+or water outside the room's bounds.
+
+A room whose cell holds nothing the room converter keeps (no scenery: only an actor, or no reference at all) is no
+room to make. It is listed by name under `empty`, with what the cell holds and how many doors lead in, and is neither
+converted nor refused (ROOM-EMPTY-CELL-66). With both expansions there are four: "Mournhold, Royal Palace" (one NPC),
+"Sotha Sil,", "Vor Lair, Chambers of Alta Vor" and "Vor Lair, Interior" (no reference at all). No door leads into any
+of them, and no script moves the player there.
+
+An effect model in which the converter finds no drawn static triangles (a particle effect, such as the summoning
+effect in Sotha Sil's dome that a script switches on) is not scenery. It is left out of the room's statics and counted
+in the room's `omitted` list with that reason; it no longer refuses the whole room (ROOM-EFFECT-MODEL-NO-TRIANGLES-66).
+Any other export error still refuses the room, and a door is never left out this way.
 
 **Doors, both ways** (the image step, `room_batches.link_banks`, after the frame maps are written). In every door bank
 of the image, a row whose target is `-` gets its target and arrival in these cases:
@@ -492,8 +510,17 @@ unchanged. Done in the builder on 22 October 2026; the first CHIM rooms left wat
 first comparison simple. A pool whose bed reaches under the water level is carved into the water too (lava inside its
 prism, water around it; 23 October 2026, three rooms, above).
 
+**Pools not named lava.** What is molten is decided by the object's script, never by a texture name. Sotha Sil's hot
+oil (Tribunal) is the lava pools' own stack of layers with oil textures: two flowing layers under a flowing crust, and
+a script that hurts a standing actor (20 per second, a bubbling loop). The batch rooms take such a pool's surface from
+its flowing layers (the ones whose texture scrolls) when none of its layers is named lava (`tools/lava.py`
+`room_pools_of`), and its activator leaves the statics, so the oil is drawn as its liquid only. Before this the two
+hot-oil rooms, the Central Gearworks and the Dome of Udok, were refused (LAVA-POOL-NOT-LAVA-NAMED-66). Every
+lava-named pool gives exactly what it gave before (compared in all 59 interior cells of the three masters that hold a
+molten object). The other room stages keep the earlier rule; none of their rooms has such a pool.
+
 **To check in the game (open):** standing in lava (damage) and on its bed, and the lava drawn against the store's
-floors.
+floors; the hot oil of Sotha Sil's Central Gearworks and Dome of Udok (damage, drawing, the bubbling loop).
 
 ### Over the size limit (27)
 

@@ -261,6 +261,12 @@ int AW_SceneMapSize(const char *name,char *path,int size)
     if(path && size>0){strncpy(path,found,size-1);path[size-1]=0;}
     return n;
 }
+int AW_SceneTargetBuilt(const char *name)
+{
+    char path[MAX_QPATH+24];
+    if(AW_SceneMapSize(name,path,sizeof(path))<0)return 0;
+    return !aw_chim_map_store_built || aw_chim_map_store_built(path);
+}
 /* dbg tp's named destinations this disk has (the scene's map or the town's
  * CHIM frame map, AW_SceneMapSize), "/"-separated, for its help and error
  * lines: on a pure-CHIM disk only the towns that are there are offered.

@@ -1,6 +1,6 @@
 # Keyboard and command reference
 
-_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
+_Last updated with AmiWind v0.0.64-dev5 (11 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -189,6 +189,7 @@ all remappable through gameplay bindings.
 | Journal | J, Escape | Close journal |
 | Stats window | P (or its bound key), Escape | Close the window |
 | Stats window | Up / Down, wheel, Page Up / Down, Home / End, scrollbar | Scroll the skill list |
+| Stats window | V | Open the list of every active effect (icon, name, description, magnitude, sources, time left; [active effects](HUD_ACTIVE_EFFECTS.md#in-the-game-v0064)); Up / Down, wheel, Page Up / Down, Home / End and its scrollbar scroll it, V or Escape go back to the Stats window |
 | Magic window | O (or its bound key), Escape | Close the window |
 | Gallery | Wheel / middle mouse | Navigate model view / return to browser |
 | Menus | Arrows, Enter, Escape | Select, activate, back |

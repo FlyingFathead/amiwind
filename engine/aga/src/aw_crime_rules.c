@@ -189,25 +189,40 @@ aw_crime_actor_t *AW_CrimeActorFind(aw_crime_actor_t *table,int count,unsigned l
     return NULL;
 }
 static int row_quiet(const aw_crime_actor_t *r){return r->crime_id==-1 && !r->alarmed && !r->murdered && !r->pursue;}
+/* CRIME-KILL-BOUNTY-65 (c): a row kept by an edict (aw_crime.c, an NPC without a placed reference) is never saved */
+static int row_saved(const aw_crime_actor_t *r){return r->ref && !row_quiet(r) && (r->ref&0xFF000000UL)!=AW_CRIME_REFLESS_KEY;}
 aw_crime_actor_t *AW_CrimeActorMake(aw_crime_actor_t *table,int count,unsigned long ref){
     aw_crime_actor_t *r=AW_CrimeActorFind(table,count,ref);int i;
     if(r || !ref)return r;
     for(i=0;i<count && !r;i++)if(!table[i].ref)r=&table[i];                     /* a free row */
     for(i=0;i<count && !r;i++)if(row_quiet(&table[i]))r=&table[i];              /* else a calm one */
+    /* CRIME-KILL-BOUNTY-65 (d): else a bystander's row, the oldest crime first: first one with only a crime's
+     * disposition change and number, then an alarmed one (its alarmed greeting is all it loses); never a pursuing
+     * guard's or a murdered NPC's. A busy street's witnesses filled the table and a guard the player then attacked
+     * kept no crime number, so his death was no murder. */
+    {int pass;
+     for(pass=0;pass<2 && !r;pass++)for(i=0;i<count;i++){
+         aw_crime_actor_t *t=&table[i];
+         if(t->pursue || t->murdered || (pass==0 && t->alarmed))continue;
+         if(!r || t->crime_id<r->crime_id)r=t;
+     }}
     if(!r)return NULL;
     memset(r,0,sizeof(*r));r->ref=ref;r->crime_id=-1;
     return r;
 }
-int AW_CrimeActorsPack(const aw_crime_actor_t *table,int count,unsigned char *out,int capacity){
-    int i,n=0,at=6;
-    for(i=0;i<count;i++)if(table[i].ref && !row_quiet(&table[i]))n++;
-    if(n>255)n=255;
-    if(!out || capacity<6+n*AW_CRIME_SAVE_ROW)return -1;
-    memcpy(out,"AWCR",4);out[4]=1;out[5]=(unsigned char)n;
-    for(i=0;i<count && at<6+n*AW_CRIME_SAVE_ROW;i++){
+int AW_CrimeActorsFull(const aw_crime_actor_t *table,int count){
+    int i;
+    for(i=0;i<count;i++)if(!table[i].ref || row_quiet(&table[i]))return 0;
+    return 1;
+}
+static int saved_rows(const aw_crime_actor_t *table,int count){int i,n=0;for(i=0;i<count;i++)if(row_saved(&table[i]))n++;return n;}
+/* TAKE saved rows after the first SKIP saved ones, 12 bytes each; the bytes written */
+static int put_rows(const aw_crime_actor_t *table,int count,int skip,int take,unsigned char *out){
+    int i,seen=0,at=0;
+    for(i=0;i<count && at<take*AW_CRIME_SAVE_ROW;i++){
         const aw_crime_actor_t *r=&table[i];unsigned long id=(unsigned long)(long)r->crime_id;
         unsigned d=(unsigned)(unsigned short)r->disposition;
-        if(!r->ref || row_quiet(r))continue;
+        if(!row_saved(r) || seen++<skip)continue;
         out[at]=(unsigned char)(r->ref>>24);out[at+1]=(unsigned char)(r->ref>>16);
         out[at+2]=(unsigned char)(r->ref>>8);out[at+3]=(unsigned char)r->ref;
         out[at+4]=(unsigned char)(id>>24);out[at+5]=(unsigned char)(id>>16);
@@ -219,25 +234,51 @@ int AW_CrimeActorsPack(const aw_crime_actor_t *table,int count,unsigned char *ou
     }
     return at;
 }
-int AW_CrimeActorsUnpack(aw_crime_actor_t *table,int count,const unsigned char *in,int bytes){
-    int i,n,at=6;
-    memset(table,0,sizeof(*table)*(size_t)count);
-    for(i=0;i<count;i++)table[i].crime_id=-1;
-    if(!in || bytes<6 || memcmp(in,"AWCR",4) || in[4]!=1)return -1;
-    n=in[5];
-    if(bytes<6+n*AW_CRIME_SAVE_ROW)return -1;
+/* N rows from IN into the table (a row the table cannot take is left); the bytes read */
+static int get_rows(aw_crime_actor_t *table,int count,const unsigned char *in,int n){
+    int i,at=0;
     for(i=0;i<n;i++,at+=AW_CRIME_SAVE_ROW){
         const unsigned char *p=in+at;aw_crime_actor_t *r;
         unsigned long ref=((unsigned long)p[0]<<24)|((unsigned long)p[1]<<16)|((unsigned long)p[2]<<8)|p[3];
         unsigned long id=((unsigned long)p[4]<<24)|((unsigned long)p[5]<<16)|((unsigned long)p[6]<<8)|p[7];
         unsigned d=((unsigned)p[8]<<8)|p[9];
-        if(i>=count || !ref || !(r=AW_CrimeActorMake(table,count,ref)))continue;   /* more than the table: the rest left */
+        if(!ref || !(r=AW_CrimeActorMake(table,count,ref)))continue;
         r->crime_id=id>0x7FFFFFFFUL?-(int)((0xFFFFFFFFUL-id)+1):(int)id;
         r->disposition=(short)(d>0x7FFF?(int)d-0x10000:(int)d);
         r->alarmed=(unsigned char)(p[10]&1);r->murdered=(unsigned char)((p[10]>>1)&1);
         r->pursue=(unsigned char)((p[10]>>2)&1);r->attacked=(unsigned char)((p[10]>>3)&1);
     }
     return at;
+}
+int AW_CrimeActorsPack(const aw_crime_actor_t *table,int count,unsigned char *out,int capacity){
+    int n=saved_rows(table,count);
+    if(n>AW_CRIME_SAVE_FIRST)n=AW_CRIME_SAVE_FIRST;   /* the rest ride in AWC2 (AW_CrimeActorsPackMore) */
+    if(!out || capacity<6+n*AW_CRIME_SAVE_ROW)return -1;
+    memcpy(out,"AWCR",4);out[4]=1;out[5]=(unsigned char)n;
+    return 6+put_rows(table,count,0,n,out+6);
+}
+int AW_CrimeActorsPackMore(const aw_crime_actor_t *table,int count,unsigned char *out,int capacity){
+    int n=saved_rows(table,count)-AW_CRIME_SAVE_FIRST;
+    if(n<=0)return 0;
+    if(!out || capacity<6+n*AW_CRIME_SAVE_ROW)return -1;
+    memcpy(out,"AWC2",4);out[4]=(unsigned char)(n>>8);out[5]=(unsigned char)n;
+    return 6+put_rows(table,count,AW_CRIME_SAVE_FIRST,n,out+6);
+}
+int AW_CrimeActorsUnpack(aw_crime_actor_t *table,int count,const unsigned char *in,int bytes){
+    int i,n;
+    if(count>0)memset(table,0,sizeof(*table)*(size_t)count);
+    for(i=0;i<count;i++)table[i].crime_id=-1;
+    if(!in || bytes<6 || memcmp(in,"AWCR",4) || in[4]!=1)return -1;
+    n=in[5];
+    if(bytes<6+n*AW_CRIME_SAVE_ROW)return -1;
+    return 6+get_rows(table,count,in+6,n);
+}
+int AW_CrimeActorsUnpackMore(aw_crime_actor_t *table,int count,const unsigned char *in,int bytes){
+    int n;
+    if(!in || bytes<6 || memcmp(in,"AWC2",4))return -1;
+    n=((int)in[4]<<8)|in[5];
+    if(bytes<6+n*AW_CRIME_SAVE_ROW)return -1;
+    return 6+get_rows(table,count,in+6,n);
 }
 int AW_CrimeActorsCalm(aw_crime_actor_t *table,int count,int paid){
     int i,n=0;

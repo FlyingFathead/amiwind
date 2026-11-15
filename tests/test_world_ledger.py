@@ -61,6 +61,14 @@ class LedgerNativeTests(unittest.TestCase):
         self.assertTrue(any(line.startswith('script locals 8188 values 604 scripts') for line in lines), lines)
         # slice 6: actor rows at the game's counts (3,437 actor bases, past the old 2,048 entries) and to the ceiling
         self.assertTrue(any(line.startswith('actors 3437 rows') for line in lines), lines)
+        # slice 8 (SAVE-SCRIPT-ROW-HINT-ONLY-65, SAVE-ITEM-SCRIPT-LOCALS-66): locals with their names, the layouts and
+        # the items' locals round trip; a rebuilt script's values each land in their own variable
+        self.assertIn('script locals by name: inserted, removed, reversed, retyped ok; 3 item locals', lines)
+        # the variable keys the compiler writes (tools/mwscript/awms.py local_key) are the engine's
+        from mwscript import awms
+        keys = next(line for line in lines if line.startswith('variable keys '))
+        self.assertEqual(keys, 'variable keys %08x %08x %08x' % (awms.local_key('done', 's'), awms.local_key('count', 'l'),
+                                                                 awms.local_key('timer', 'f')))
 
 
 class ActorStateWiringTests(unittest.TestCase):
@@ -89,9 +97,13 @@ class ActorStateWiringTests(unittest.TestCase):
         save = code('aw_save.c')
         # the session list is the save's after a load: the actor rows the import put in come with it
         self.assertLess(save.index('aw_save_changes_import(&pending_changes);'), save.index('AW_LedgerMove(&aw_ledger,&pending_ledger);'))
-        self.assertIn('AW_LedgerRecordsSet(&aw_ledger,NULL,0);   /* slice 6', save)
+        # the actor records' copy is for the write only: given back by save_undo after the encode (and on every refusal)
+        self.assertIn('AW_LedgerRecordsSet(&aw_ledger,NULL,0);\n    free(save_changes.actors);', body(save, 'static void save_undo(int bumped)'))
+        self.assertIn('n=AW_SaveEncodeChanges(raw,capacity,&world,&save_changes);\n    /* world shared', save)
+        self.assertIn('save_undo(0);\n    if(!n){free(raw);return refused(bump,', save)
         host = code('aw_mwhost.c')
-        self.assertIn('actor_records_export(l);', body(host, 'static void script_export(aw_ledger_t *l)'))
+        self.assertIn('if(!actor_records_export(l)){AW_SaveRefusePart("the changed actor records");return 0;}',
+                      body(host, 'static int script_export(aw_ledger_t *l)'))
         self.assertIn('AW_ActorStateImportRecords(l->records,l->records_bytes)', body(host, 'static void script_import(const aw_ledger_t *l){'))
         self.assertIn('AW_ActorStateExportCounts(out,capacity)', body(host, 'static int actors_export(unsigned char *out,int capacity)'))
         # an older save's actor block with records (AWAS1) still loads: migrated into the pool
@@ -108,8 +120,12 @@ class ActorStateWiringTests(unittest.TestCase):
         self.assertIn('aw_actors_ref_flags=actors_ref_flags;aw_actors_forget=AW_ActorForget;', code('aw_mwhost.c'))
         self.assertIn('AW_LedgerActorReset (c);', respawned)
         spawn = body(actors, 'static int SpawnOne (pending_t *q)')
-        self.assertLess(spawn.index('Respawned (c);'), spawn.index('if (c && c->dead)'))
-        join = body(actors, 'static void TableJoin (int cx, int cy, const float *offset)')
+        self.assertLess(spawn.index('Respawned (c);'), spawn.index('if (c && c->dead'))
+        # OUTDOOR-DEAD-BODY-GONE-66: a dead one not yet cleared is spawned and laid down as its body
+        self.assertLess(spawn.index('Cleared (c);'), spawn.index('if (c && c->dead && (c->cleared || !corpses_on))'))
+        self.assertIn('AW_CombatLayCorpse (ent)', spawn)
+        # the table join's body (TableJoin and a town map's cells, OUTDOOR-CREATURES-MISSING-66, call it)
+        join = body(actors, 'static void TableJoinKinds (int cx, int cy, const float *offset, int creatures_only)\n{')
         self.assertLess(join.index('Respawned (c);'), join.index('if (c && c->pick)'))
         self.assertIn('Respawned (c);', body(actors, 'static void LevelledEntity (edict_t *ent)'))
         self.assertIn('if (Respawned (c))', body(actors, 'static void ApplyLoaded (void)\n{'))
@@ -143,7 +159,7 @@ class ScriptLocalsWiringTests(unittest.TestCase):
 
     def test_export_and_import(self):
         host = code('aw_mwhost.c')
-        self.assertIn('locals_export(l);', body(host, 'static void script_export(aw_ledger_t *l)'))
+        self.assertIn('locals_export(l);', body(host, 'static int script_export(aw_ledger_t *l)'))
         self.assertIn('locals_import(l);', body(host, 'static void script_import(const aw_ledger_t *l){'))
         put = body(host, 'static void locals_put(')
         self.assertIn('if(!cells[i].i)continue;', put)                        # only what differs from the start
@@ -152,7 +168,7 @@ class ScriptLocalsWiringTests(unittest.TestCase):
         self.assertLess(imp.index('AW_MwvmLocalsReset();'), imp.index('AW_MwvmLocalSet('))
         self.assertIn('AW_MwvmGlobalScriptSet(s,x->running)', imp)
         # a script by its name hash, its row only a hint checked against the name
-        self.assertIn('return script_hash(hint)==hash?hint:-1;', host)
+        self.assertIn('if(hint>=0 && hint<n && script_hash(hint)==hash)return hint;', host)
         self.assertIn('AW_RESIDENT_GROWS("script name hashes met (CELL-CHANGES-59)",SCRIPT_NAMES,8);', host)
 
     def test_the_fifth_form_only_when_needed(self):
@@ -169,6 +185,9 @@ class ScriptLocalsWiringTests(unittest.TestCase):
         cells = int(re.search(r'#define AW_MWVM_PARK_CELLS (\d+)', header).group(1))
         self.assertGreaterEqual(parked, 2115)
         self.assertGreaterEqual(cells, 7388)
+        # SAVE-ITEM-SCRIPT-LOCALS-66: and the items placed holders hold (491 rows, 929 values with both expansions)
+        self.assertGreaterEqual(parked, 2115 + 491)
+        self.assertGreaterEqual(cells, 7388 + 929)
         self.assertLessEqual(cells, 0xFFFF)                                  # parked_t.at is 16 bits
 
 
@@ -178,7 +197,12 @@ class ScriptStateWiringTests(unittest.TestCase):
 
     def test_save_and_load_carry_the_script_tables(self):
         save = code('aw_save.c')
-        self.assertLess(save.index('aw_save_script_export(&aw_ledger);'), save.index('AW_LedgerEncode(&aw_ledger,NULL,0)'))
+        # SAVE-EXPORT-FAILURE-ACCEPTED-65: a part the scripts or the actors could not keep refuses the generation: the
+        # generation number back, nothing written, one line naming the part (the behaviour: tests/aga_save_refusal_test.c)
+        self.assertIn('if(aw_save_script_export && !aw_save_script_export(&aw_ledger))return refused(bump,', save)
+        self.assertIn('if(bumped)world.sequence--;', body(save, 'static void save_undo(int bumped)'))
+        self.assertIn('previous saves retained', body(save, 'static byte *refused(int bumped,const char *part)'))
+        self.assertLess(save.index('!aw_save_script_export(&aw_ledger)'), save.index('AW_LedgerEncode(&aw_ledger,NULL,0)'))
         self.assertLess(save.index('aw_save_actors_import(pending_changes.actors'),
                         save.index('aw_save_script_import(&aw_ledger);'))
         host = code('aw_mwhost.c')
@@ -188,7 +212,23 @@ class ScriptStateWiringTests(unittest.TestCase):
 
     def test_journal_globals_topics(self):
         host = code('aw_mwhost.c')
-        export = body(host, 'static void script_export(aw_ledger_t *l)')
+        # SAVE-SCRIPT-ROW-HINT-ONLY-65: the name hash decides the row (a rebuilt file in another order keeps the values),
+        # the hint is tried first; a slot outside the found script's locals is not restored
+        row = body(host, 'static int script_row(uint32_t hash,int hint){')
+        self.assertIn('if(hint>=0 && hint<n && script_hash(hint)==hash)return hint;', row)
+        self.assertIn('for(i=0;i<n;i++)if(i!=hint && script_hash(i)==hash)return i;', row)
+        # with the file's row name hashes (SCRH): one read, and two rows of one hash are never taken
+        self.assertIn('if(be32(save_scrh.data+4*i)==hash){if(found>=0)return -1;found=i;}', row)
+        # a local by its variable's name when its script's variables changed (aw_ledger.c AW_LedgerLocalSlot; the
+        # behaviour: tests/aga_world_ledger_test.c "script locals by name"), the slot only while they are as saved
+        imp = body(host, 'static void locals_import(const aw_ledger_t *l){')
+        self.assertIn('(slot=local_slot(l,x->script,s,x->slot,x->name,x->value,&v))<0', imp)
+        self.assertIn('AW_LedgerLocalSlot(slot,name,value,AW_LedgerLayout(l,script,&layout),layout,keys,',
+                      body(host, 'static int local_slot('))
+        put = body(host, 'static void locals_put(')
+        self.assertIn('AW_LedgerLayoutSet(l,h,AW_LedgerLayoutSignature(keys,n))', put)
+        self.assertIn('AW_LedgerLocalNamed(l,global,global?h:reference,h,script,i,keys && i<n?keys[i]:0,cells[i].i)', put)
+        export = body(host, 'static int script_export(aw_ledger_t *l)')
         # every quest's stage (GetJournalIndex = host_journal_get, after Journal / SetJournalIndex), no 32 ceiling
         self.assertIn('host_journal_get(i)', export)
         self.assertIn('AW_LEDGER_QUESTS', export)
@@ -246,8 +286,9 @@ class LedgerWiringTests(unittest.TestCase):
         self.assertIn('(ledgered?32U:0U)', codec)
         # bit 64: the levelling (LEVEL-UP-58), 128: the dated journal, 256: up to 128 kinds of item (COLLECT-CAPACITY-
         # REJECTED-60), 512: any number of kinds (INVENTORY-ORIGINAL-LIMITS-61), 1024: the skill books read
-        # (SKILL-BOOKS-MISSING-62)
-        self.assertIn('if(features>2047)error=1;', codec)
+        # (SKILL-BOOKS-MISSING-62), 2048: the map markers (MAP-MULTI-MARKERS-66), 4096: the explored map
+        # (MAP-EXPLORED-SAVE-BLOCK-66), 8192: the packed actor rows (SAVE-ACTOR-ROWS-256-66)
+        self.assertIn('if(features>0x7fff)error=1;', codec)   # bits up to 16384 (the item instances)
 
     def test_objects_take_and_hide_through_the_list(self):
         host = code('aw_mwhost.c')
@@ -404,6 +445,22 @@ class RespawnAndMigrationTests(unittest.TestCase):
     """CELL-CHANGES-59 slice 7: the builder's reference identity table (focus.awf AWI1: every placed reference's record
     hash and respawn flags, the master's respawn GMSTs) and the engine's respawn and migration wiring; with the table of
     a changed content list, a save made with the old one loads with exactly the changed references' changes dropped."""
+
+    def test_identity_table_marks_persistent_actors(self):
+        # ACTOR-RESPAWN-CORPSE-RULES-66: an NPC or creature record whose header carries Persistent (0x400) is marked
+        # REFS_PERSISTENT (its body is never cleared, OpenMW 0.51 isPersistent); a container's header flag is not
+        import struct
+        import prepare_focus as focus
+        def rec(tag, flags, *subs):
+            body_ = b''.join(subs)
+            return tag.encode() + struct.pack('<III', len(body_), 0, flags) + body_
+        flag = lambda v: _sub('FLAG', struct.pack('<I', v))  # noqa: E731
+        raw = b''.join([rec('NPC_', 0x400, _sub('NAME', _z('caius')), flag(2)),
+                        rec('CREA', 0x400, _sub('NAME', _z('ghost_r')), flag(2)),
+                        rec('CONT', 0x400, _sub('NAME', _z('chest_p')), flag(0)),
+                        rec('NPC_', 0, _sub('NAME', _z('guard')), flag(0))])
+        self.assertEqual(focus.reference_flags(raw), {'caius': focus.REFS_PERSISTENT,
+                                                      'ghost_r': focus.REFS_PERSISTENT | focus.REFS_RESPAWN})
 
     def test_identity_table_flags_and_settings(self):
         import struct

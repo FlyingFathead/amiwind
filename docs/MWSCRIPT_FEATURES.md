@@ -1,6 +1,6 @@
 # MWScript features
 
-_Last updated with AmiWind v0.0.65 (12 November 2026)._
+_Last updated with AmiWind v0.0.66-dev4 (15 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -33,13 +33,13 @@ _Last updated with AmiWind v0.0.65 (12 November 2026)._
 
 One row per script record of the game: what names it, where it stands, which functions it calls and what its conditions test, and what state AmiWind has it in. The data is measured from the game's masters with the builder's own compiler; the page lists record ids, counts and states only. When the work list runs dry, the scripting work is taken from here row by row, toward the next landmark: every game script running as in the original. On Vvardenfell the scripts left are the character creation ones; the rest belong to Mournhold and Solstheim.
 
-Of the 1,074 scripts the original game uses, **605 run** as scripts and **9 are carried by AmiWind's own code**; of the rest, 27 use a function the interpreter lacks, 0 are attached but not run, 0 are compiled but not attached, 433 belong to an add-on world not in the image yet, 0 are not converted. The 133 scripts that nothing in the original game ever names (test and example scripts, replaced versions, cut content) are listed apart under Not used in the original game.
+Of the 1,074 scripts the original game uses, **611 run** as scripts and **9 are carried by AmiWind's own code**; of the rest, 21 use a function the interpreter lacks, 0 are attached but not run, 0 are compiled but not attached, 433 belong to an add-on world not in the image yet, 0 are not converted. The 133 scripts that nothing in the original game ever names (test and example scripts, replaced versions, cut content) are listed apart under Not used in the original game.
 
 | State | Scripts | What it means |
 | --- | ---: | --- |
-| runs | 605 | compiles whole, and the build attaches it to its objects or starts it (a record that is never placed: while the player carries its item, on the actor a levelled list gives, or on the object a script places; a script with no function, whose own locals the dialogue keeps on the speaker without it, counts as running) |
+| runs | 611 | compiles whole, and the build attaches it to its objects or starts it (a record that is never placed: while the player carries its item, on the actor a levelled list gives, or on the object a script places; a script with no function, whose own locals the dialogue keeps on the speaker without it, counts as running) |
 | carried by AmiWind's own code | 9 | not run as a script because AmiWind's own code does what it does (the section Carried by AmiWind's own code names the code and compares it step by step) |
-| uses a function the interpreter lacks | 27 | compiles, but calls at least one function the interpreter does not carry out yet (those calls do nothing and read 0) |
+| uses a function the interpreter lacks | 21 | compiles, but calls at least one function the interpreter does not carry out yet (those calls do nothing and read 0) |
 | attached, not run | 0 | the game attaches it, but the build does not run it: a hand-written rule carries it, or nothing it does is seen yet |
 | compiled, not attached | 0 | compiles whole, but nothing in the build attaches or starts it: its records are never placed, and nothing makes them at run time yet |
 | only in an add-on world | 433 | compiles whole, but its records are placed (or made by scripts) only in Mournhold or Solstheim, which are not in the image yet |
@@ -51,8 +51,8 @@ Of the 1,074 scripts the original game uses, **605 run** as scripts and **9 are 
 | Game file | All | Used in the original | Runs | AmiWind code | Function missing | Attached, not run | Not attached | Add-on world | Not converted | Not used |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | Morrowind.esm | 616 | 528 | 518 | 9 | 0 | 0 | 0 | 1 | 0 | 88 |
-| Tribunal.esm | 255 | 236 | 42 | 0 | 7 | 0 | 0 | 187 | 0 | 19 |
-| Bloodmoon.esm | 336 | 310 | 45 | 0 | 20 | 0 | 0 | 245 | 0 | 26 |
+| Tribunal.esm | 255 | 236 | 45 | 0 | 4 | 0 | 0 | 187 | 0 | 19 |
+| Bloodmoon.esm | 336 | 310 | 48 | 0 | 17 | 0 | 0 | 245 | 0 | 26 |
 
 Dialogue result scripts (the lines a topic answer runs) are compiled as scripts of their own: 7,411 results, 7,411 run whole, 0 use a function the interpreter lacks, 0 are not converted.
 
@@ -66,7 +66,7 @@ Dialogue answers that start or change a fight (StartCombat, SetFight, ModFight):
 | the speaker attacks (StartCombat): found by the answer's reference | 124 |
 | a fight between two actors: both are set against each other (since v0.0.63) | 5 |
 
-Measured on 12 November 2026 from the three masters (Morrowind, Tribunal, Bloodmoon) with the builder's own compiler (tools/mwscript), 11,171 placed scripted references, 9,095 bindings in the compiled file, 4 start scripts. The states are worked out again from the interpreter's function table (tools/mwscript/functions.py) whenever the page is rendered, so a function carried out later moves its scripts without a new measurement.
+Measured on 15 November 2026 from the three masters (Morrowind, Tribunal, Bloodmoon) with the builder's own compiler (tools/mwscript), 11,171 placed scripted references, 9,095 bindings in the compiled file, 4 start scripts. The states are worked out again from the interpreter's function table (tools/mwscript/functions.py) whenever the page is rendered, so a function carried out later moves its scripts without a new measurement.
 
 ## Why the others do not run
 
@@ -76,7 +76,7 @@ Each script that does not run, by its reason, and where its area is: Vvardenfell
 | --- | --- | ---: | ---: | ---: |
 | only in an add-on world | placed only in an add-on world, not in the image yet | 1 | 429 | 430 |
 | named by nothing | nothing names it: it never runs in the original either | 122 | 0 | 122 |
-| uses a function the interpreter lacks | calls a function the interpreter does not carry out yet | 9 | 18 | 27 |
+| uses a function the interpreter lacks | calls a function the interpreter does not carry out yet | 3 | 18 | 21 |
 | named by nothing | its records are never placed and nothing makes them: it never runs in the original either | 11 | 0 | 11 |
 | only in an add-on world | made only by a script of an add-on world, not in the image yet | 3 | 0 | 3 |
 
@@ -220,16 +220,16 @@ The area of a script is where most of its placed references stand: the region fo
 | named by nothing | 123 | 0 | 1 | 0 | 0 | 0 | 0 | 122 | 0 |
 | ascadian isles region | 115 | 115 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | hirstaang forest region | 103 | 0 | 0 | 4 | 0 | 0 | 99 | 0 | 0 |
-| dialogue only | 82 | 79 | 0 | 3 | 0 | 0 | 0 | 0 | 0 |
+| dialogue only | 82 | 82 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | azura's coast region | 73 | 73 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| records not placed | 69 | 51 | 0 | 4 | 0 | 0 | 3 | 11 | 0 |
+| records not placed | 69 | 52 | 0 | 3 | 0 | 0 | 3 | 11 | 0 |
 | ashlands region | 66 | 66 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | west gash region | 65 | 65 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | isinfier plains region | 48 | 0 | 0 | 1 | 0 | 0 | 47 | 0 | 0 |
 | felsaad coast region | 45 | 0 | 0 | 1 | 0 | 0 | 44 | 0 | 0 |
 | bitter coast region | 41 | 34 | 7 | 0 | 0 | 0 | 0 | 0 | 0 |
 | molag mar region | 37 | 37 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| global scripts | 33 | 30 | 1 | 2 | 0 | 0 | 0 | 0 | 0 |
+| global scripts | 33 | 32 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | red mountain region | 22 | 21 | 0 | 0 | 0 | 0 | 1 | 0 | 0 |
 | thirsk region | 20 | 0 | 0 | 0 | 0 | 0 | 20 | 0 | 0 |
 | moesring mountains region | 17 | 0 | 0 | 0 | 0 | 0 | 17 | 0 | 0 |
@@ -238,7 +238,7 @@ The area of a script is where most of its placed references stand: the region fo
 | sheogorad | 13 | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | brodir grove region | 7 | 0 | 0 | 0 | 0 | 0 | 7 | 0 | 0 |
 | interior with no way out | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| **All** | **1207** | **605** | **9** | **27** | **0** | **0** | **433** | **133** | **0** |
+| **All** | **1207** | **611** | **9** | **21** | **0** | **0** | **433** | **133** | **0** |
 
 ## By function
 
@@ -247,7 +247,6 @@ Every function the game's scripts call. Scripts: the script records that call it
 | Function | Group | Carried out | Scripts | Uses | In conditions | Missing in | Only gap | Dialogue | Dialogue missing |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | placeitem | position | host, in part | 24 | 37 | 0 | 19 | 19 | 0 | 0 |
-| positioncell | position | host, in part | 57 | 96 | 0 | 7 | 7 | 14 | 0 |
 | setwaterlevel | world | no | 3 | 3 | 0 | 3 | 2 | 0 | 0 |
 | cast | spells | host, in part | 53 | 126 | 0 | 1 | 1 | 5 | 0 |
 | modwaterlevel | world | no | 1 | 1 | 0 | 1 | 0 | 0 | 0 |
@@ -277,6 +276,7 @@ Every function the game's scripts call. Scripts: the script records that call it
 | setfight | ai | yes | 73 | 234 | 0 | 0 | 0 | 173 | 0 |
 | gethealth | stats | yes | 69 | 94 | 63 | 0 | 0 | 0 | 0 |
 | playsound | audio | yes | 62 | 108 | 0 | 0 | 0 | 3 | 0 |
+| positioncell | position | host | 57 | 96 | 0 | 0 | 0 | 14 | 0 |
 | addspell | spells | yes | 52 | 175 | 0 | 0 | 0 | 50 | 0 |
 | getbuttonpressed | ui | yes | 48 | 76 | 1 | 0 | 0 | 0 | 0 |
 | getcurrentaipackage | ai | yes | 48 | 51 | 48 | 0 | 0 | 0 | 0 |
@@ -1066,10 +1066,10 @@ Referenced by: the records that carry the script and their placed references per
 | IlnoriCellCheck | dialogue only | runs | started by 1 dialogue results | - | cellchanged, getjournalindex, stopscript | 3: cellchanged, getjournalindex, other script | - | - |
 | JournalistCombat | dialogue only | runs | started by 2 dialogue results | - | startcombat, stopscript | - | - | - |
 | MatchMakerTimer | dialogue only | runs | started by 3 dialogue results | - | getjournalindex, getpccell, journal, positioncell, startscript, stopscript | 10: getjournalindex, getpccell, global, local | - | - |
-| MHTransportScript | dialogue only | uses a function the interpreter lacks | started by 2 dialogue results | - | menumode, playsound, positioncell, stopscript | 1: menumode | - | 1 not carried out: positioncell |
+| MHTransportScript | dialogue only | runs | started by 2 dialogue results | - | menumode, playsound, positioncell, stopscript | 1: menumode | - | - |
 | SadriThief | dialogue only | runs | started by 1 dialogue results | - | disable, lock, positioncell, removeitem, sethealth, stopscript | - | - | - |
 | ScrollSales | dialogue only | runs | started by 1 dialogue results | - | activate, enable, forcegreeting, getdisabled, getjournalindex, journal, menumode, onactivate, ondeath, stopscript | 9: getdisabled, getjournalindex, local, menumode, onactivate, ondeath | - | - |
-| SothaSilTeleport | dialogue only | uses a function the interpreter lacks | started by 1 dialogue results | - | menumode, playsound, positioncell, stopscript | 1: menumode | - | 1 not carried out: positioncell |
+| SothaSilTeleport | dialogue only | runs | started by 1 dialogue results | - | menumode, playsound, positioncell, stopscript | 1: menumode | - | - |
 | TherdonCellCheck | dialogue only | runs | started by 1 dialogue results | - | cellchanged, stopscript | 1: cellchanged | - | - |
 | VelasCellCheck | dialogue only | runs | started by 1 dialogue results | - | cellchanged, stopscript | 1: cellchanged | - | - |
 | VVTransportScript | dialogue only | runs | started by 1 dialogue results | - | menumode, playsound, positioncell, stopscript | 1: menumode | - | - |
@@ -1278,7 +1278,7 @@ Referenced by: the records that carry the script and their placed references per
 | dbcontractScript | records not placed | runs | 1 book | bk_dbcontract | getitemcount, journal | 2: getitemcount, local | - | runs while the player carries one of its items |
 | DrothDagger | records not placed | runs | 1 WEAP | silver dagger_droth_unique | getitemcount, journal | 2: getitemcount, global | - | runs while the player carries one of its items |
 | karrodguardScript | records not placed | runs | 1 NPC; placed by scripts (1 records) | royal guard_karrod | cellchanged, disable, forcegreeting, getsecondspassed, menumode | 7: cellchanged, global, local, menumode | - | runs on the object a script places |
-| mazedbandEnd_Script | records not placed | uses a function the interpreter lacks | 1 clothing | mazed_band_end | getbuttonpressed, getjournalindex, messagebox, playsound, positioncell | 17: getjournalindex, local | - | 1 not carried out: positioncell |
+| mazedbandEnd_Script | records not placed | runs | 1 clothing | mazed_band_end | getbuttonpressed, getjournalindex, messagebox, playsound, positioncell | 17: getjournalindex, local | - | runs while the player carries one of its items |
 | mazedbandScript | records not placed | runs | 1 clothing | mazed_band | getitemcount, journal, menumode | 4: getitemcount, local, menumode | - | runs while the player carries one of its items |
 | MuseumStendarHammer | records not placed | runs | 1 WEAP | stendar_hammer_unique_x | activate, additem, disable, enable, onactivate, removeitem | 3: onactivate, other script | - | runs while the player carries one of its items |
 | packrat | records not placed | runs | 1 creature; placed by scripts (1 records); speaker of 3 dialogue results | rat_pack_rerlas | getjournalindex | 1: getjournalindex | - | runs on the object a script places |
@@ -1312,7 +1312,7 @@ Referenced by: the records that carry the script and their placed references per
 | ColonyServTimer | dialogue only | runs | started by 3 dialogue results | - | journal, stopscript | 15: global, local | - | - |
 | ColonyTimer | dialogue only | runs | started by 3 dialogue results | - | aiwander, getdeadcount, getjournalindex, getpccell, getpcrank, journal, position, positioncell | 55: getdeadcount, getjournalindex, getpccell, getpcrank, global, local | - | - |
 | CorprusBeastSafe | dialogue only | runs | started by 1 dialogue results | - | getdeadcount, getjournalindex, setdisposition, setfight, stopcombat, stopscript | 8: getdeadcount, getjournalindex | - | - |
-| GlenmorilCaveTeleport | dialogue only | uses a function the interpreter lacks | started by 1 dialogue results | - | menumode, playsound, positioncell, stopscript | 1: menumode | - | 1 not carried out: positioncell |
+| GlenmorilCaveTeleport | dialogue only | runs | started by 1 dialogue results | - | menumode, playsound, positioncell, stopscript | 1: menumode | - | - |
 | IngmarTeleport | dialogue only | runs | started by 2 dialogue results | - | aiwander, getpccell, positioncell, stopscript | 1: getpccell | - | - |
 | JeleenScript | dialogue only | runs | started by 1 dialogue results | - | additem, cellchanged, getjournalindex, sethealth, stopscript | 2: cellchanged, getjournalindex | - | - |
 | RitualTransform | dialogue only | runs | started by 1 dialogue results | - | becomewerewolf, getdeadcount, getpos, getsecondspassed, journal, menumode, modfatigue, modhealth, placeitem, resurrect, startcombat | 7: getdeadcount, global, local, menumode | - | - |
@@ -1370,10 +1370,10 @@ Referenced by: the records that carry the script and their placed references per
 | MirisaTeleport | global scripts | runs | started by UdyrfrykteDead | - | aiwander, gethealth, getjournalindex, positioncell, stopscript | 2: gethealth, getjournalindex | - | - |
 | plant2Script | global scripts | runs | started by plantScript | - | disable, enable, getdistance | 9: getdistance, global, local | - | - |
 | VampireCheck | global scripts | runs | started by Main, VampTest, VampTest1, VampTest2, VampTest3, testPlayerStats | - | getpcsleep, getspell, messagebox, startscript, stopscript, wakeuppc | 19: getpcsleep, getspell, global, local | - | - |
-| WereChangeScript | global scripts | uses a function the interpreter lacks | started by WereCheckScript | - | addspell, becomewerewolf, disable, disableplayercontrols, enable, enableplayercontrols, fadein, fadeout, getjournalindex, getpcinjail, getpctraveling, getsecondspassed, getwerewolfkills, iswerewolf, journal, menumode, messagebox, playbink, positioncell, removespell, setwerewolfacrobatics, startscript, stopscript, undowerewolf, wakeuppc | 52: getjournalindex, getpcinjail, getpctraveling, getwerewolfkills, global, iswerewolf, local, menumode | - | 1 not carried out: positioncell |
+| WereChangeScript | global scripts | runs | started by WereCheckScript | - | addspell, becomewerewolf, disable, disableplayercontrols, enable, enableplayercontrols, fadein, fadeout, getjournalindex, getpcinjail, getpctraveling, getsecondspassed, getwerewolfkills, iswerewolf, journal, menumode, messagebox, playbink, positioncell, removespell, setwerewolfacrobatics, startscript, stopscript, undowerewolf, wakeuppc | 52: getjournalindex, getpcinjail, getpctraveling, getwerewolfkills, global, iswerewolf, local, menumode | - | - |
 | WereCheckScript | global scripts | runs | started by BMStartUpScript | - | getspell, startscript, stopscript | 10: getspell, global, local | - | - |
 | werehungerScript | global scripts | runs | started by WereChange2Script, WereChangeScript | - | gethealth, iswerewolf, messagebox, modcurrenthealth | 7: global, iswerewolf, local | - | - |
-| wildhuntStartScript | global scripts | uses a function the interpreter lacks | started by WereChange2Script, WereChangeScript; started by 1 dialogue results | - | disableplayercontrols, fadein, fadeout, getjournalindex, getpcsleep, getsecondspassed, iswerewolf, journal, placeatpc, positioncell, stopscript, wakeuppc | 18: getjournalindex, getpcsleep, iswerewolf, local | - | 1 not carried out: positioncell |
+| wildhuntStartScript | global scripts | runs | started by WereChange2Script, WereChangeScript; started by 1 dialogue results | - | disableplayercontrols, fadein, fadeout, getjournalindex, getpcsleep, getsecondspassed, iswerewolf, journal, placeatpc, positioncell, stopscript, wakeuppc | 18: getjournalindex, getpcsleep, iswerewolf, local | - | - |
 | artoriaScript | hirstaang forest region | only in an add-on world | 1 NPC; placed 1 (Bloodmoon 1); speaker of 14 dialogue results | gaea artoria | forcegreeting, getdistance, getjournalindex, ondeath, setfight, startcombat | 8: getdistance, getjournalindex, global, local, ondeath | - | placed only in an add-on world, not in the image yet |
 | bm_bloodskal_creatures | hirstaang forest region | only in an add-on world | 4 creature; placed 5 (Bloodmoon 5); levelled lists 3 | bm skeleton champion gr, bm_draugr_bloodskal, bm_sk_champ_bloodskal01, bm_sk_champ_bloodskal02 | disable, enable, getjournalindex | 3: getjournalindex, local | - | placed only in an add-on world, not in the image yet |
 | bm_bloodskal_sword | hirstaang forest region | only in an add-on world | 1 WEAP; placed 1 (Bloodmoon 1) | bm_nordic_silver_lgswd_bloodska | journal | 2: local | - | placed only in an add-on world, not in the image yet |

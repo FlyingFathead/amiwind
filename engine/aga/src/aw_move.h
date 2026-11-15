@@ -35,8 +35,10 @@ typedef struct {
     float fFallDamageDistanceMin,fFallDistanceBase,fFallDistanceMult,fFallAcroBase,fFallAcroMult;
     /* the werewolf's run (v0.0.63, WEREWOLF-RUN-SPEED-63; OpenMW 0.51 mwclass/npc.cpp getMaxSpeed) */
     float fWerewolfRunMult;
+    /* a creature's walk (v0.0.66, ACTOR-MECHANICS-USE-STATS-66; OpenMW 0.51 mwclass/creature.cpp getWalkSpeed) */
+    float fMinWalkSpeedCreature,fMaxWalkSpeedCreature;
 } aw_move_settings_t;
-#define AW_MOVE_SETTING_COUNT 36
+#define AW_MOVE_SETTING_COUNT 38
 
 /* Everything the speed depends on, gathered in one place so later effects plug
  * in without rewriting the rules. Stats are the MODIFIED values (base +
@@ -79,6 +81,18 @@ float AW_MoveWalkSpeed(const aw_move_settings_t *s,const aw_move_inputs_t *in);
 float AW_MoveRunSpeed(const aw_move_settings_t *s,const aw_move_inputs_t *in);
 float AW_MoveSwimSpeed(const aw_move_settings_t *s,const aw_move_inputs_t *in);
 float AW_MoveMaxSpeed(const aw_move_settings_t *s,const aw_move_inputs_t *in);
+/* ACTOR-MECHANICS-USE-STATS-66: an NPC's or a creature's own top speed on foot or in the air, original units/s, from
+ * its Speed and Athletics (OpenMW 0.51 mwclass/npc.cpp getMaxSpeed / getWalkSpeed / getRunSpeed for an NPC with
+ * nothing carried; mwclass/creature.cpp getMaxSpeed / getWalkSpeed / getRunSpeed for a creature: fMinWalkSpeedCreature
+ * + Speed / 100 x (fMaxWalkSpeedCreature - fMinWalkSpeedCreature), its run the same as its walk; a flyer by
+ * fMinFlySpeed..fMaxFlySpeed on its Speed; a swimmer that speed on foot x (fSwimRunBase + Athletics / 100 x
+ * fSwimRunAthleticsMult), mwclass/actor.hpp getSwimSpeedImpl). RUNNING picks an NPC's run; MEDIUM is AW_MEDIUM_*. Pure. */
+enum {AW_MEDIUM_GROUND,AW_MEDIUM_AIR,AW_MEDIUM_WATER};
+float AW_MoveActorSpeed(const aw_move_settings_t *s,int creature,int medium,float speed,float athletics,int running);
+/* ACTOR-MECHANICS-USE-STATS-66 row 23 (OpenMW 0.51 npc.cpp / creature.cpp getMaxSpeed): BASE (AW_MoveActorSpeed) with
+ * the actor's normalized LOAD (carried / capacity): 0 over 1; an NPC's speed, and a creature's flight, x (1 -
+ * fEncumberedMoveEffect x LOAD); a creature's walk is not slowed below the limit. */
+float AW_MoveActorLoaded(const aw_move_settings_t *s,int creature,int medium,float base,float load);
 /* getCurrentSpeed x actor scale: factor = input 0..1, strafing (sideways) x 0.75. */
 float AW_MoveCurrentSpeed(const aw_move_settings_t *s,const aw_move_inputs_t *in,float factor,int strafing);
 /* Strafing in first person (character.cpp): |side| > |forward| * 2. */

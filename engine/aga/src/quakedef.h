@@ -670,6 +670,7 @@ void AW_UIOuterFrame(void);
 int AW_UIFrameEnabled(void);
 void AW_UIFrameToggle(void);
 void AW_UIText(int,int,const char *,int);
+extern void (*aw_hud_compass_draw)(void);   /* aw_ui.c; set by aw_worldui.c (NAV-HOT-MARKER-COMPASS-66) */
 void AW_UITextBox(int,int,int,int,const char *,int);
 void AW_UITextCentred(int,int,int,int,const char *,int);   /* centred by painted bounds */
 extern int (*aw_title_bar)(int x,int y,int w,const char *title);   /* aw_icons.c: the original title bar */
@@ -913,6 +914,7 @@ void AW_BirthArt(int index,int x,int y);
 int AW_IntroSpeak(int role,const char *stem);
 edict_t *AW_IntroRole(int role);
 int AW_OpeningTick(void);
+void AW_OpeningDockStatus(void);   /* aw_opening.c: the dock guard's place and walk for aw_intro_status (PIER-GUARD-WALKS-INTO-DOOR-65) */
 int AW_OpeningLocked(void);
 void AW_OpeningSpawn(void);
 int AW_OpeningUse(void);

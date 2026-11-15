@@ -13,6 +13,7 @@ int AW_WorldMapTarget(const float *,char *,float *);
 int AW_WorldHasDirectory(void);
 int AW_WorldLoadedTarget(const char *,const float *,char *,float *);
 int AW_CellMap(int,int,char *,int);
+int AW_TownFrame(const char *,float *,float *);
 const char *AW_SceneName(void);
 const char *AW_SceneWalkModel(void);
 int AW_MapTeleport(const float *);

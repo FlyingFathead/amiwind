@@ -164,7 +164,9 @@ def tag_frames(text, skeletal=False):
 
 
 def _map_actors(path):
-    """(model, intro, classname) of every actor entity (aw_npc, aw_corpse) in a staged BSP's entity lump."""
+    """(model, intro, classname, own idle) of every actor entity (aw_npc, aw_corpse) in a staged BSP's entity lump.
+    own idle: (aw_idle_base, aw_idle_count) of an actor that loops its own idle span (world.qc aw_npc_idle;
+    npc_anim.own_idle_fields), (0, 0) for the default 8 idle frames."""
     import re
     with open(path, 'rb') as stream:
         header = stream.read(12)
@@ -183,7 +185,11 @@ def _map_actors(path):
                 intro = bool(float(ent.get('aw_intro_role', 0) or 0))
             except ValueError:
                 intro = False
-            out.append((ent['model'], intro, ent['classname']))
+            try:
+                own = (int(float(ent.get('aw_idle_base', 0) or 0)), int(float(ent.get('aw_idle_count', 0) or 0)))
+            except ValueError:
+                own = (-1, -1)   # unreadable own idle keys: the check below names them
+            out.append((ent['model'], intro, ent['classname'], own))
     return out
 
 
@@ -226,17 +232,24 @@ def audit_payload(id1, removed_maps=()):
         if actors is None:
             other += 1
             continue
-        for model, intro, classname in actors:
-            models.setdefault(model, set()).add((intro, classname == 'aw_npc', classname == 'aw_corpse'))
+        for model, intro, classname, own in actors:
+            models.setdefault(model, set()).add((intro, classname == 'aw_npc', classname == 'aw_corpse', own))
     for model, intros in sorted(models.items()):
         p = Path(model)
         if p.is_absolute() or '..' in p.parts or not (id1 / p).is_file():
             errors.append('%s: placed actor model missing or unsafe' % model)
             continue
-        for intro, idles, dead in sorted(intros):
+        for intro, idles, dead, own in sorted(intros):
             try:
                 layout = of_model(frames(model), layout_text(id1 / p), intro, dead, skeletal(model))
-                if idles and skeletal(model):
+                if idles and skeletal(model) and own != (0, 0):
+                    # its own idle span (world.qc aw_npc_idle loops aw_idle_base .. + aw_idle_count; Dagoth Ur's idle
+                    # at 30:8 of his table, DAGOTH-IDLE-BASE-CHECK-66): it must lie inside the model's table frames
+                    base, count = own
+                    if base < 0 or count < 1 or base + count > frames(model):
+                        raise ValueError('a skeletal aw_npc\'s own idle loop %d:%d (aw_idle_base:aw_idle_count) is not '
+                                         'inside its %d table frames' % (base, count, frames(model)))
+                elif idles and skeletal(model):
                     # the QuakeC idle cycle steps a skeletal actor through table frames 0..7: inside its idle group
                     if layout.idle[0] != 0 or layout.idle[1] < IDLE_FRAMES:
                         raise ValueError('a skeletal aw_npc needs its idle group to start at table frame 0 with at '

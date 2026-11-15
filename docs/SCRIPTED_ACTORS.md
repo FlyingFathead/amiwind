@@ -1,6 +1,6 @@
 # Scripted actors: Dagoth Ur, the Heart of Lorkhan and Vivec
 
-_Last updated with AmiWind v0.0.52-dev (26 October 2026)._
+_Last updated with AmiWind v0.0.66-dev1 (13 November 2026)._
 
 A handful of the base game's actors are not ordinary residents: they are creature records with their own scripts,
 and the end of the main quest depends on what those scripts do. This page says, in our own words, what the original
@@ -69,4 +69,23 @@ group), which the builder keeps as his initial state (levitating, no floor snap)
 - **Not yet**: their scripts. Today they play their idle loop only: no greeting, no combat, no strike counting. The
   Heart needs its Idle2 to Idle5 and Death1 groups, Dagoth Ur his combat groups; both come with his own skeleton
   table and the MWScript work of v0.0.53, as do the voice lines, the doors, the collapse and the weather.
+- **The Heart stays in place** (v0.0.66): its creature record can move by no means (no walk, swim, fly or biped
+  flag), and such a creature no longer walks, wanders, chases, flees or dodges; in a fight it only strikes what
+  comes within its reach. Before, a struck Heart left its spot and followed the player beside Dagoth Ur
+  ([HEART-OF-LORKHAN-FOLLOWS-DAGOTH-65](BUGS.md)). The same holds for the Kwama Queens, the only other creatures
+  of the base game with no way to move. The Heart's script itself was checked: its two calls on Dagoth Ur (move him
+  to his spot, start his fight) are compiled with Dagoth Ur's own reference and act on him.
+- **Dagoth Ur fights with his own animations** (v0.0.66): both of his records are one skeletal model on his own
+  animation table (his own keyframe file over the shared humanoid one: 29 bones, 22 groups of his own), so he runs,
+  swings, casts, flinches and dies with his own groups instead of looping 8 idle frames while his blows sounded
+  ([DAGOTH-UR-NO-ANIMATIONS-65](BUGS.md)). His whole model (2,254 triangles) is more than the skeletal reader takes
+  (1,024 faces, a 480-row skin that holds 960), so he is reduced to 948 faces with every seam locked: exactly the 41
+  open edges of the original, none new. The Halloween bench scene's smaller model (457 faces) can be selected for
+  the build with `AMIWIND_DAGOTH_MODEL=halloween`. Removing his `method` row in
+  `config/interior_creatures.json` brings back the baked whole model.
+- **The strike sequence is tested** (v0.0.66) as a scripted scene through the script compiler and interpreter
+  (`tests/test_heart_strike_scene.py`, two scripts of the same rules written for the test): Keening before Sunder
+  counts nothing; after Sunder the five Keening strikes play Idle2 to Idle5 and Death1, once each and in order;
+  HeartDestroyed is set on the fifth; Dagoth Ur's health is set back to 1,000 after every blow until then and he can
+  die only after it. Not yet seen in the game itself.
 - **Vivec** keeps a reduced model for now; his whole model is to be checked against the 1,999-vertex limit.

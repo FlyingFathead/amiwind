@@ -3,6 +3,7 @@
 #include "aw_story.h"
 #include "aw_character.h"
 #include "aw_tryalloc.h"
+#include "aw_ui_arrow.h"
 
 aw_character_t aw_character;
 aw_race_t aw_races[16];
@@ -165,12 +166,9 @@ static void custom_start(void)
 #define LIST_ARROW_H 7
 #define LIST_ARROW_UP_Y (CLASS_Y-LIST_ARROW_H-2)
 #define LIST_ARROW_DOWN_Y (CLASS_Y+CLASS_ROWS*CLASS_H+2)
+/* the shared triangle (aw_ui_arrow.c, INVENTORY-BROWSER-ARROWS-66), the same pixels as before */
 static void list_arrow(int cx,int y,int up,int color) {
-    int j,half;
-    for(j=0;j<LIST_ARROW_H;j++){
-        half=up?j:LIST_ARROW_H-1-j;
-        AW_UIFill(cx-half,y+j,half*2+1,1,color);
-    }
+    AW_UIArrow(cx-(AW_UI_ARROW_SPAN/2),y,up?AW_UI_ARROW_UP:AW_UI_ARROW_DOWN,color);
 }
 #define QWAY_Y 132
 #define QWAY_H 18
@@ -204,6 +202,44 @@ static void sign_spells(int birth)
         fclose(f);
     }
     sign_spell_count=n;sign_loaded=birth;
+}
+/* CHARGEN-ABILITY-DESCRIPTIONS-65 (aw_spelllist.c sets them; NULL in fixtures without it, which keep the names above):
+ * the race's or the sign's spells listed under Abilities, Powers and Spells, each with its effects' icons and lines,
+ * in a panel that scrolls (the mouse wheel, Page Up/Down, the bar) */
+int (*aw_chargen_spells_open)(int race,int birth,int w,int h);
+void (*aw_chargen_spells_draw)(int x,int y,int w,int h);
+void (*aw_chargen_spells_scroll)(int delta,int h);
+int (*aw_chargen_spells_click)(int mx,int my,int x,int y,int w,int h);
+void (*aw_chargen_spells_forget)(void);
+/* the birthsign window's panel: right of the list, left of the sign's picture (212..308), above the hint row */
+#define SIGN_LIST_X 124
+#define SIGN_LIST_Y 32
+#define SIGN_LIST_W 86
+#define SIGN_LIST_H 130
+/* the race's View Stats box: the specials under the skill bonuses in the right column */
+#define RACE_LIST_X 158
+#define RACE_LIST_Y 126
+#define RACE_LIST_W 148
+#define RACE_LIST_H 66
+/* the panel of the window open now (1), its place; 0 none */
+static int spell_panel(int *x,int *y,int *w,int *h)
+{
+    int race=-1,birth=-1;
+    if(!aw_chargen_spells_open || !aw_chargen_spells_draw)return 0;
+    if(menu==3 && !confirming){*x=SIGN_LIST_X;*y=SIGN_LIST_Y;*w=SIGN_LIST_W;*h=SIGN_LIST_H;birth=choice.birth;}
+    else if(menu==1 && stats_open){*x=RACE_LIST_X;*y=RACE_LIST_Y;*w=RACE_LIST_W;*h=RACE_LIST_H;race=choice.race;}
+    else return 0;
+    return aw_chargen_spells_open(race,birth,*w,*h)>0;
+}
+/* the wheel and Page Up/Down scroll the panel; a click on its bar moves it: 1 when KEY was taken */
+static int spell_panel_key(int key)
+{
+    int x,y,w,h;
+    if(key!=K_MWHEELUP && key!=K_MWHEELDOWN && key!=K_PGUP && key!=K_PGDN && key!=K_MOUSE1)return 0;
+    if(!spell_panel(&x,&y,&w,&h))return 0;
+    if(key==K_MOUSE1)return aw_chargen_spells_click && aw_chargen_spells_click(mouse_x,mouse_y,x,y,w,h);
+    if(aw_chargen_spells_scroll)aw_chargen_spells_scroll(key==K_MWHEELUP?-1:key==K_MWHEELDOWN?1:key==K_PGUP?-4:4,h);
+    return 1;
 }
 static const char *specializations[]={"Combat","Magic","Stealth"};
 static const char *attributes[]={"Strength","Intelligence","Willpower","Agility","Speed","Endurance","Personality","Luck"};
@@ -537,6 +573,7 @@ int AW_CharacterOpenQuick(int kind,int confirm)
     IN_AWClearButtons();
     if(kind==1 && !AW_HeadLoad(choice.head,choice.hair)){menu=0;return 0;}
     if(kind==3)sign_spells(choice.birth);
+    if(aw_chargen_spells_forget)aw_chargen_spells_forget();   /* read again: a New Game or a load may change the tables */
     class_way=0;quiz_free();
     if(kind==2 && quiz_available<0){quiz_load();quiz_free();}  /* whether the build has the questions */
     custom_slot();
@@ -594,7 +631,9 @@ int AW_CharacterKey(int key)
         return 1;
     }
     if(stats_open){
-        /* the race's stats box: Enter, Escape, V or a click closes it (back on the button) */
+        /* the race's stats box: Enter, Escape, V or a click closes it (back on the button); the wheel, Page Up/Down and
+         * its bar scroll the specials */
+        if(spell_panel_key(key))return 1;
         if(key==K_ENTER || key==K_ESCAPE || key==K_MOUSE1 || key=='v' || key=='V'){stats_open=0;row=STATS_ROW;}
         return 1;
     }
@@ -653,6 +692,7 @@ int AW_CharacterKey(int key)
         return 1;
     }
     if(key==K_ESCAPE)return 0; /* Pause menu, retaining the unfinished choice. */
+    if(menu==3 && spell_panel_key(key))return 1;   /* the sign's spells scroll (CHARGEN-ABILITY-DESCRIPTIONS-65) */
     if(key=='a' || key=='A')key=K_LEFTARROW;
     if(key=='d' || key=='D')key=K_RIGHTARROW;
     if(key=='w' || key=='W')key=K_UPARROW;
@@ -735,10 +775,9 @@ void AW_CharacterDraw(void)
             }
             y=38+i*22;
             if(row==i)AW_UIFill(9,y,186,21,AW_UIColor(54,47,32));
-            for(j=0;j<=6;j++){
-                AW_UIFill(16+j,y+10-j,1,j*2+1,gold);
-                AW_UIFill(188-j,y+10-j,1,j*2+1,gold);
-            }
+            /* the row's triangles, tips at x 16 and 188, centred on line y+10 (shared: aw_ui_arrow.c) */
+            AW_UIArrow(16,y+10-(AW_UI_ARROW_SPAN/2),AW_UI_ARROW_LEFT,gold);
+            AW_UIArrow(188-(AW_UI_ARROW_DEPTH-1),y+10-(AW_UI_ARROW_SPAN/2),AW_UI_ARROW_RIGHT,gold);
             AW_UITextBox(34,y,136,21,line,gold);
         }
         AW_UIBox(STATS_X,STATS_Y,STATS_W,STATS_H);
@@ -796,14 +835,20 @@ void AW_CharacterDraw(void)
         }
         if(menu==3){
             static const char *kinds[]={"Spell","Ability","Power"};
+            int px,py,pw,ph;
             sign_spells(choice.birth); /* already loaded when the page opened or changed: no file read here */
             AW_BirthArt(choice.birth,212,34);
-            for(i=0;i<sign_spell_count;i++){
-                int kind=sign_kind[i]==0?0:sign_kind[i]==1?1:sign_kind[i]==5?2:-1;
-                if(kind>=0)AW_UITextBox(126,34+i*22,84,10,kinds[kind],muted);
-                AW_UITextBox(126,44+i*22,84,11,sign_spell[i],gold);
+            /* CHARGEN-ABILITY-DESCRIPTIONS-65: each ability, power and spell with what it does, under its group, in the
+             * panel beside the picture (read once per sign shown, aw_spelllist.c); the names alone without it */
+            if(spell_panel(&px,&py,&pw,&ph))aw_chargen_spells_draw(px,py,pw,ph);
+            else{
+                for(i=0;i<sign_spell_count;i++){
+                    int kind=sign_kind[i]==0?0:sign_kind[i]==1?1:sign_kind[i]==5?2:-1;
+                    if(kind>=0)AW_UITextBox(126,34+i*22,84,10,kinds[kind],muted);
+                    AW_UITextBox(126,44+i*22,84,11,sign_spell[i],gold);
+                }
+                if(!sign_spell_count)AW_UITextBox(126,34,84,11,"none",gold);
             }
-            if(!sign_spell_count)AW_UITextBox(126,34,84,11,"none",gold);
             AW_UISmallEnd();
         }else{
         sprintf(line,"Specialization: %s",specializations[k->special]);
@@ -884,7 +929,7 @@ void AW_CharacterDraw(void)
     }
     if(stats_open && menu==1){
         /* RACE-STATS-57: base attributes (the chosen sex), skill bonuses and specials of the race */
-        const aw_race_t *r=&aw_races[choice.race];int n=0;
+        const aw_race_t *r=&aw_races[choice.race];int n=0,px,py,pw,ph;
         AW_UIBox(8,26,304,170);
         sprintf(line,"%s - %s",r->name,choice.female?"Female":"Male");
         AW_UITextBox(14,30,292,18,line,gold);
@@ -895,6 +940,17 @@ void AW_CharacterDraw(void)
             AW_UITextBox(16,61+i*11,136,11,line,gold);
         }
         AW_UITextBox(160,49,144,11,"Skill bonus",muted);
+        if(spell_panel(&px,&py,&pw,&ph)){
+            /* CHARGEN-ABILITY-DESCRIPTIONS-65: the bonuses in the console font, then the specials with what each one
+             * does, in a panel that scrolls (aw_spelllist.c) */
+            for(i=0;i<27 && n<7;i++)if(r->skills[i]){
+                sprintf(line,"%s +%ld",skills[i],(long)r->skills[i]);
+                AW_SmallStringColor(162,63+n*7,142,line,gold);n++;
+            }
+            if(!n)AW_SmallStringColor(162,63,142,"none",gold);
+            AW_UITextBox(160,113,144,11,"Specials",muted);
+            aw_chargen_spells_draw(px,py,pw,ph);
+        }else{
         for(i=0;i<27 && n<7;i++)if(r->skills[i]){
             sprintf(line,"%s +%ld",skills[i],(long)r->skills[i]);
             AW_UITextBox(160,61+n*11,144,11,line,gold);n++;
@@ -910,6 +966,7 @@ void AW_CharacterDraw(void)
             AW_UITextBox(160,72+7*11+i*11,144,11,line,gold);
         }
         if(!r->power_count)AW_UITextBox(160,72+7*11,144,11,"none",gold);
+        }
         AW_UISmallEnd();
     }
     if(confirming){

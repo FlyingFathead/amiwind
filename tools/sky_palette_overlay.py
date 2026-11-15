@@ -31,7 +31,9 @@ OPAQUE={'.cfg','.dat','.json','.lip','.rc','.tsv','.txt','.wav','.awc','.awj','.
 # MAP_EXTS (tools/map_files.py): a map file, a Quake BSP (version 29) under either name; a CHIM room map
 # (tools/chim/interior.py room_map) is one under the frame-map extension and is read as one.
 PARSED={*MAP_EXTS,'.mdl','.spr','.wad','.lmp','.awb','.awv','.awf','.mws','.awh','.awi','.awu','.awm','.aws','.awp','.awk'}
-NAMED={'save-content.bin'}
+# gfx/effects.awe: the active-effect icon rows (HUD-ACTIVE-EFFECTS-ROW-64), parsed by name in spans(); the preflight
+# list did not name it, so the v0.0.66-dev1 image step stopped on it (IMAGE-FORMAT-EFFECTS-AWE-66)
+NAMED={'save-content.bin','gfx/effects.awe'}
 
 
 def unknown_formats(paths):
@@ -159,6 +161,15 @@ def spans(raw,rel):
             tag,w,h=get('<4sHH',at);need(tag==b'AWI1' and 0<w<=320 and 0<h<=32,'Invalid icon pack picture')
             add(at+8,w*h);at+=8+w*h
         need(at==n,'Icon pack length mismatch')
+    elif rel.lower()=='gfx/effects.awe':
+        # HUD-ACTIVE-EFFECTS-ROW-64 (tools/prepare_icons.py write_effects): AWE1, count, the two icon sizes, 16-byte rows
+        # (small picture, large picture, description, its length); the pictures are palette indices, the texts are not.
+        magic,count,small,large=get('<4sHBB',0)
+        need(magic==b'AWE1' and 0<count<=256 and 0<small<=32 and 0<large<=32 and n>=8+16*count,'Invalid effect icon file')
+        for i in range(count):
+            s,l,d,length,pad=get('<IIIHH',8+16*i);need(pad==0 and (d or not length) and d+length<=n,'Invalid effect row')
+            if s:add(s,small*small)
+            if l:add(l,large*large)
     elif rel.lower() in ('inventory/items.awi','inventory/initial.awi'):
         # Inventory records contain identities, paths and numbers, never pixels.
         # Match the AWI2/AWST framing consumed by aw_inventory.c.

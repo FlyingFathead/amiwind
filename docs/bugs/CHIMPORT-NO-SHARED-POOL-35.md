@@ -115,6 +115,7 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - BUILD-CACHE-PROVENANCE-GROWTH-54 (no report page): chim-units/.provenance is one append-only 8.8 GB file; its growth per build is not measured
 - BUILD-CELL-PROGRESS-ENGINE-KEY-48 (no report page): The tracker data stage (cell-progress) counted every engine source in its key: an engine-only edit rebuilt it
 - [BUILD-CELL-PROGRESS-KEY-BUGS-35](BUILD-CELL-PROGRESS-KEY-BUGS-35.md): Every bug registration stopped builds at the reuse preflight: the cell-progress key held all of docs/
+- BUILD-CHECK-UNIT-STOPS-MISSING-66 (no report page): The build check passes while the build itself stops at its first-minute unit-cache reuse stop
 - BUILD-CHIM-HEAP-KEY-LOADER-63 (no report page): An engine model loader edit re-keys the whole CHIM world and its interiors
 - BUILD-CHIM-KEY-ENGINE-FILE-WHOLE-54 (no report page): chim_world.c is keyed whole into the CHIM world, so a diagnostic print re-keys the world
 - BUILD-CHIM-KEY-ENGINE-SOURCES-49 (no report page): An engine source edit rebuilds the whole CHIM world: the CHIM stage imports project_version, whose engine check names engine/aga/src files
@@ -123,6 +124,7 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - [BUILD-CHIM-LABEL-IN-KEYS-48](BUILD-CHIM-LABEL-IN-KEYS-48.md): The CHIM version label was in the stage keys: the x.x.1 release step rebuilt about 25 stages, the CHIM world among them
 - BUILD-CHIM-RECORD-COMPILER-INCOMPLETE-51 (no report page): The chim stage's read record is always incomplete: it starts compilers with checkout paths, so it can never be reused when only its key's sources changed
 - BUILD-CHIM-VIS-RECOMPUTED-48 (no report page): The CHIM stage recomputed every region frame's visibility (1 h 20 min on 24 cores)
+- [BUILD-CREATURE-KEY-REASON-TEXT-66](BUILD-CREATURE-KEY-REASON-TEXT-66.md): The creature models' unit key counts the whole interior creature list, so a reworded reason text of one row re-keyed all 97 stored models
 - [BUILD-CUTOFF-WHOLE-ANCESTOR-51](BUILD-CUTOFF-WHOLE-ANCESTOR-51.md): An interior light change reran exterior stages: the reuse cutoff refuses a stage when any earlier stage's whole output differs, not the files it reads
 - BUILD-DEV-GALLERY-SKIP-RC-REBUILD-48 (no report page): Development builds leave out the NPC gallery, so every release candidate builds all 3,551 faces fresh
 - [BUILD-DIAGNOSTIC-INPUT-REFUSED-36](BUILD-DIAGNOSTIC-INPUT-REFUSED-36.md): The cell-progress stage was never reusable: it reads the CHIM stage's statistics report, which counted as a forbidden diagnostic read
@@ -167,7 +169,7 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - [BUILD-REUSE-REDUCED-RECORD-36](BUILD-REUSE-REDUCED-RECORD-36.md): A stage reused from a run that had itself reused it came back without the files a later stage replaced there, so that later stage failed when it ran again
 - [BUILD-REUSE-SCHEDULER-TOP-45](BUILD-REUSE-SCHEDULER-TOP-45.md): A scheduler-only edit rekeys every stage, NPC gallery face and stair walk that reaches tools/build_parallel.py
 - [BUILD-REUSE-SCRATCH-UNDECLARED-33](BUILD-REUSE-SCRATCH-UNDECLARED-33.md): A rerun with --reuse-from reused 1 of 33 stages: the builder's scratch folder made the first stages non-reusable
-- BUILD-REUSE-STOP-COUNTS-STORED-GROUP-64 (no report page): The reuse report counts a stage's whole stored unit group as rebuilt even when the stage makes no units (world-flora: 1931 of 1931 while it converted 0 regions)
+- [BUILD-REUSE-STOP-COUNTS-STORED-GROUP-64](BUILD-REUSE-STOP-COUNTS-STORED-GROUP-64.md): The reuse report counts a stage's whole stored unit group as rebuilt even when the stage makes no units (world-flora: 1931 of 1931 while it converted 0 regions)
 - BUILD-REUSE-STOPPED-SOURCE-52 (no report page): Reusing a build that stopped early reruns every stage it never reached, though the build it reused holds them
 - [BUILD-REUSE-TMP-RECORDED-DELETED-48](BUILD-REUSE-TMP-RECORDED-DELETED-48.md): A reused stage removed another stage's reuse copies mid-copy: its record listed them as deleted (balmora-interiors stopped at os.replace)
 - BUILD-ROOM-BATCHES-KEY-UNDERDECLARED-48 (no report page): The room stage's reuse record is refused: it reads 17 repository files its fingerprint leaves out
@@ -178,6 +180,7 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - [BUILD-SHARED-WRITES-UNATTRIBUTED-52](BUILD-SHARED-WRITES-UNATTRIBUTED-52.md): Stages running side by side write the same files, so their records are refused and they rebuild every time: the town carried-item models, the room door audio
 - [BUILD-SPRITE-KEY-HASHLIB-47](BUILD-SPRITE-KEY-HASHLIB-47.md): The CHIM stage failed 45 minutes into a build: the sprite recipe key used hashlib without importing it
 - BUILD-STAGE-KEY-CLIENT-H-58 (no report page): An engine declaration added to client.h re-converts the CHIM world and its interiors
+- [BUILD-STAGE-KEY-EQUAL-EDITS-66](BUILD-STAGE-KEY-EQUAL-EDITS-66.md): A stage whose key moved only by edits that change none of its outputs ran again in full, about 31 minutes of CHIM world
 - BUILD-STAGE-KEY-TEXT-DEFINES-59 (no report page): The CHIM world and CHIM rooms stages rebuild when tools/text_defines.py changes, although the world does not use the text macros
 - BUILD-STAGE-KEY-UNIT-STORE-63 (no report page): Five stage keys count the unit store code as a whole file, so one reuse table row rebuilds them
 - BUILD-STAGE-KEY-WHOLE-CLASS-48 (no report page): A one-method edit in tools/actor_grounding.py rekeyed the CHIM stages: a class was import-time code of its module, so every stage importing the module hashed every method
@@ -188,10 +191,12 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - [BUILD-SURVEY-KEY-CONFIG-35](BUILD-SURVEY-KEY-CONFIG-35.md): World survey, world terrain, world UI and CHIM stage keys counted every file under config/: a path built from a loop name read as the whole folder
 - [BUILD-SURVEY-NOT-REPRODUCIBLE-33](BUILD-SURVEY-NOT-REPRODUCIBLE-33.md): The world-survey stage writes its wall time into its outputs, so a rerun never has the same outputs
 - [BUILD-TABLE-UNITS-REBAKE-63](BUILD-TABLE-UNITS-REBAKE-63.md): Every build bakes the dialogue and voice tables and the actor ground check again
+- BUILD-UNIT-KEYS-LAYER-BLIND-66 (no report page): Unit cache keys do not change with the selected expansion layers: an expansions-on build would reuse base-game units
 - [BUILD-VERSION-GETATTR-TRACE-49](BUILD-VERSION-GETATTR-TRACE-49.md): The v0.0.49 final rebuilt the CHIM world: the lazy VERSION (a module __getattr__ in project_version) ran in the CHIM stage, its read trace recorded it and the key could not
 - [CACHE-NO-PROVENANCE-36](CACHE-NO-PROVENANCE-36.md): Cache and pool entries were keyed by SHA-256 but did not record when, by which run, from which version and commit they were made, and some recorded no output hash
 - CHIM-COLLISION-UNION-FAIL-NOT-CACHED-48 (no report page): A collision union that fails is compiled again for every room that uses the same mesh packet
 - [CHIM-INTERIORS-REUSE-MISS-48](CHIM-INTERIORS-REUSE-MISS-48.md): The CHIM rooms stage (chim-interiors) is never reused: it hashed the shared CHIM unit cache, which is past the 512 MiB folder limit
+- CHIMPORT-CELL-KEY-LAYERS-65 (no report page): Selecting the expansion layers re-keys every CHIMport cell of the island
 - [CHIMPORT-POOL-CROSS-MOUNT-36](CHIMPORT-POOL-CROSS-MOUNT-36.md): CHIMport run folder and the storage pool on two mounts of one volume: hard links fail across the mounts, so pooled units were copied, not linked
 - [CHIMPORT-RETRY-AUDIT-FAILED-36](CHIMPORT-RETRY-AUDIT-FAILED-36.md): CHIMport --retry-failed never reran cells that converted but failed an audit (memory fit, doors, hull chains): the runner marks them done
 - DOOR-CHECK-KNOWN-UNKEYED-54 (no report page): config/door-check-known.json is in no stage key: an edit to the known list never re-runs a passed image's door check

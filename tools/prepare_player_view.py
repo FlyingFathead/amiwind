@@ -238,8 +238,9 @@ def _sources(data):
         from mwad.audit import BSA
         from mwad.npc import load_master
         from mwad.paths import child_ci
+        from mwad.masters import master_path
         from npc_geometry import Assets
-        kinds, _, _ = load_master(child_ci(Path(data), 'Morrowind.esm'))
+        kinds, _, _ = load_master(master_path(Path(data)))
         _cache[key] = (kinds, Assets(Path(data), BSA(child_ci(Path(data), 'Morrowind.bsa'))), {})
     return _cache[key]
 
@@ -492,6 +493,7 @@ def bake_torch_body(task):
     from prepare_guard_torches import _equipment, _source_records
     from mwad.npc import text
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     kinds, assets, rigs = _sources(data)
     appearance = body_appearance(kinds, race, female)
     if appearance['skeleton'] not in rigs:
@@ -542,7 +544,7 @@ def bake_torch_body(task):
     held_body = animated_mdl(frames[index], faces, uv, skin, names=names)
     if len(held_body) > npc_anim.ALIAS_BYTE_BUDGET:
         raise ValueError('Player torch body exceeded alias byte budget')
-    lights = _source_records(child_ci(Path(data), 'Morrowind.esm'))
+    lights = _source_records(master_path(Path(data)))
     mesh = text(lights['torch'], 'MODL')
     # The guard converter preserves the original 238 visible torch triangles,
     # the Shield Bone rigid attachment and the flame emitter geometry.
@@ -692,7 +694,37 @@ def unit_inputs(unit):
         inputs['base'] = {'model': task[4]['model'], 'groups': task[4]['groups']}
     elif kind == 'swim':
         inputs['base'] = {'model': task[4]['model']}
+    layers = layer_body(task[0], race, female)
+    if layers is not None:
+        inputs['layers'] = layers
     return inputs
+
+
+_LAYER_BODIES = {}
+
+
+def layer_body(data, race, female):
+    """What the selected expansion layers change in what a player view unit reads from the game data
+    (BUILD-UNIT-KEYS-LAYER-BLIND-66): every unit reads the master only through body_appearance (the player record's
+    clothes over the race's head, hair and skin parts) and its models from the base archive. None with the base game
+    alone or when the layers resolve this race and sex's body as the base game does (the unit keeps its base-game
+    key); else the SHA-256 of the body as the layers resolve it."""
+    from mwad.masters import selected_masters
+    masters = selected_masters()
+    if len(masters) == 1:
+        return None
+    key = (str(Path(data).resolve()), masters)
+    if key not in _LAYER_BODIES:
+        from mwad.masters import master_path
+        from mwad.npc import load_master
+        _LAYER_BODIES[key] = (load_master(master_path(Path(data), masters))[0],
+                              load_master(master_path(Path(data), masters[:1]))[0])
+    layered, base = _LAYER_BODIES[key]
+
+    def digest(value):
+        return hashlib.sha256(json.dumps(value, sort_keys=True, default=repr).encode()).hexdigest()
+    seen = digest(body_appearance(layered, race, female))
+    return None if seen == digest(body_appearance(base, race, female)) else seen
 
 
 def pack_result(result):
@@ -720,7 +752,9 @@ def _unit_cache():
     """The player view's share of the image unit cache (tools/pass_cache.py UnitCache, WORKSPACE/cache/image-passes),
     or None: cache off, or no input lock naming the game data by SHA-256 (the inputs are then not known exactly)."""
     import pass_cache
-    game = pass_cache.game_data_digest()
+    # the input lock alone: each unit adds what the selected expansion layers change in its body (unit_inputs,
+    # layer_body; BUILD-UNIT-KEYS-LAYER-BLIND-66)
+    game = pass_cache.game_data_digest(layers=False)
     if game is None:
         return None
     import player_inventory_pose

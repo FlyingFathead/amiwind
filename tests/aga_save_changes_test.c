@@ -9,9 +9,14 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <math.h>
 #include "aw_story.h"
 #include "aw_save.h"
 #include "aw_maps.h"
+#ifndef PIN_ONLY
+#include "aw_mapfog.h"   /* the explored map's own section (MAP-EXPLORED-SAVE-BLOCK-66) */
+#endif
 aw_race_t aw_races[16];aw_class_t aw_classes[32];aw_birth_t aw_births[16];aw_part_t aw_parts[384];
 int aw_race_count=1,aw_class_count=1,aw_birth_count=1,aw_part_count=2;
 static aw_save_t save,decoded;
@@ -58,6 +63,11 @@ static void base(void)
 }
 static void rows(void)
 {
+#ifndef PIN_ONLY
+    /* the 48-byte rows of saves before v0.0.66, as the dev line's codec wrote them (SAVE-ACTOR-ROWS-256-66) */
+    aw_save_rows_form=1;assert(AW_SaveActorsReserve(&save,2));memset(save.actors,0,2*sizeof(aw_saved_actor_t));
+    save.actors[0].fields=save.actors[1].fields=AW_ROW_ALL;
+#endif
     save.actor_count=2;
     save.actors[0].reference=1234;save.actors[0].scene=AW_MapLogicalId("seyda");
     save.actors[0].position[0]=100;save.actors[0].angles[1]=90;save.actors[0].health=40;
@@ -83,6 +93,207 @@ static aw_change_t entry(unsigned int key,unsigned int flags,unsigned int pick,i
     aw_change_t e;memset(&e,0,sizeof(e));e.key=key;e.flags=flags;e.pick=pick;
     e.where=(int)(((unsigned int)(cx&0xffff)<<16)|(unsigned int)(cy&0xffff));
     e.position[0]=x;e.position[1]=-x;e.position[2]=8;e.yaw=45;e.health=health;e.hours=12.5f;return e;
+}
+/* MAP-EXPLORED-SAVE-BLOCK-66 and SAVE-ACTOR-ROWS-256-66 (below): every allocation counted to the byte (linked with
+ * --wrap for malloc, calloc, realloc and free) */
+static long live;
+void *__real_malloc(size_t n);void *__real_realloc(void *p,size_t n);void __real_free(void *p);
+void *__wrap_malloc(size_t n){size_t *p=(size_t *)__real_malloc(n+16);if(!p)return NULL;p[0]=n;live+=(long)n;return (char *)p+16;}
+void __wrap_free(void *q){size_t *p;if(!q)return;p=(size_t *)(void *)((char *)q-16);live-=(long)p[0];__real_free(p);}
+void *__wrap_realloc(void *q,size_t n){
+    size_t *p,was;
+    if(!q)return __wrap_malloc(n);
+    p=(size_t *)(void *)((char *)q-16);was=p[0];p=(size_t *)__real_realloc(p,n+16);
+    if(!p)return NULL;
+    p[0]=n;live+=(long)n-(long)was;return (char *)p+16;
+}
+void *__wrap_calloc(size_t c,size_t s){void *q=__wrap_malloc(c*s);if(q)memset(q,0,c*s);return q;}
+static unsigned char big[AW_SAVE_ACTOR_MAX_BYTES+AW_SAVE_BYTES];
+static void block_setting(void)
+{
+    /* aw_save_block_kb: 64 by default, 32 to 256, whole KB, NaN the default */
+    assert(AW_SaveBlockBytes(64)==65536 && AW_SaveBlockBytes(AW_SAVE_BLOCK_KB_DEFAULT)==65536);
+    assert(AW_SaveBlockBytes(0)==32768 && AW_SaveBlockBytes(31.9f)==32768 && AW_SaveBlockBytes(-5)==32768);
+    assert(AW_SaveBlockBytes(32)==32768 && AW_SaveBlockBytes(100.7f)==102400 && AW_SaveBlockBytes(256)==262144);
+    assert(AW_SaveBlockBytes(257)==262144 && AW_SaveBlockBytes(1e9f)==262144);
+    assert(AW_SaveBlockBytes(NAN)==65536 && AW_SaveBlockBytes(-INFINITY)==32768 && AW_SaveBlockBytes(INFINITY)==262144);
+    fprintf(o,"block setting ok\n");
+}
+/* a block of BYTES_N through a save and a load that takes it in a buffer of its own size */
+static void block_round_trip(int bytes_n)
+{
+    static unsigned char block[AW_SAVE_ACTOR_MAX_BYTES];int i,n;
+    for(i=0;i<bytes_n;i++)block[i]=(unsigned char)(i*7+3);
+    list.count=0;list.actors=block;list.actor_bytes=list.actor_capacity=bytes_n;list.explored=0;
+    n=AW_SaveEncodeChanges(big,sizeof(big),&save,&list);assert(n>bytes_n);
+    memset(&back,0,sizeof(back));back.take=1;
+    assert(AW_SaveDecodeChanges(big,n,&decoded,&back) && back.actor_bytes==bytes_n && back.actor_capacity==bytes_n);
+    assert(!memcmp(back.actors,block,(size_t)bytes_n));
+    AW_SaveChangesFree(&back);assert(!back.actors && !back.actor_bytes);
+    AW_SaveRelease(&decoded);
+    list.actors=NULL;list.actor_bytes=list.actor_capacity=0;
+}
+static void block_sizes(void)
+{
+    /* the 32 KB block of a save before v0.0.66 (its largest), the default 64 KB, the largest setting */
+    block_round_trip(AW_SAVE_ACTOR_BYTES);block_round_trip(65536);block_round_trip(AW_SAVE_ACTOR_MAX_BYTES);
+    fprintf(o,"blocks ok %d %d %d\n",AW_SAVE_ACTOR_BYTES,65536,AW_SAVE_ACTOR_MAX_BYTES);
+}
+/* a well explored game: 1,440 land cells walked all over, the 152 around them seen from their edges, 160 crossed once
+ * (1,752 cells; the island and Solstheim hold under 1,600 land cells), 300 rooms (half walked through, half seen at
+ * one spot) */
+static void explore(void)
+{
+    int cx,cy,gx,gy,i;char name[16];static const float mins[2]={0,0},maxs[2]={1600,1600};
+    AW_MapFogReset();
+    for(cy=-18;cy<18;cy++)for(cx=-20;cx<20;cx++)for(gy=0;gy<8;gy++)for(gx=0;gx<8;gx++)
+        AW_MapFogReveal(cx*8192.0f+gx*1024+512,cy*8192.0f+gy*1024+512);
+    for(i=0;i<160;i++)AW_MapFogReveal((30+i%20)*8192.0f+4096,(-10+i/20*3)*8192.0f+4096);
+    for(i=0;i<300;i++){
+        sprintf(name,"ri%010d",i);
+        if(i&1){for(gy=0;gy<16;gy++)for(gx=0;gx<16;gx++)AW_MapFogRoomReveal(name,gx*100+50,gy*100+50,mins,maxs);}
+        else AW_MapFogRoomReveal(name,800,800,mins,maxs);
+    }
+}
+static void explored_section(void)
+{
+    static unsigned char block[65536];unsigned char *map;int need,n,i,cells,rooms,left_cells,left_rooms,at;
+    aw_save_explored_encode=AW_MapFogExport;
+    explore();cells=AW_MapFogCells();rooms=AW_MapFogRooms();
+    assert(cells==1752 && rooms==300);
+    need=AW_MapFogExport(NULL,0);assert(need==6+1440*5+312*13+6+150*(2+12)+150*(2+12+32));
+    /* a full 64 KB actor block (the default) and the explored map beside it: the save is written (before, the map
+     * was inside the 32 KB block and a full block refused the whole save) */
+    for(i=0;i<65536;i++)block[i]=(unsigned char)(i*13+1);
+    list.count=0;list.actors=block;list.actor_bytes=list.actor_capacity=65536;list.explored=1;
+    n=AW_SaveEncodeChanges(big,sizeof(big),&save,&list);assert(n>65536+need);
+    memset(&back,0,sizeof(back));back.take=1;back.explored=1;
+    assert(AW_SaveDecodeChanges(big,n,&decoded,&back) && back.actor_bytes==65536 && back.explored_bytes==need);
+    assert((map=(unsigned char *)malloc((size_t)need)) && AW_MapFogExport(map,need)==need && !memcmp(map,back.explored_data,(size_t)need));
+    AW_MapFogReset();assert(AW_MapFogImport(back.explored_data,back.explored_bytes)==need);
+    assert(AW_MapFogCells()==cells && AW_MapFogRooms()==rooms && AW_MapFogSeen(-20*8192.0f+100,-18*8192.0f+100));
+    fprintf(o,"explored %d cells %d rooms: section %d bytes, %lu bytes held; save with a full 64 KB block %d bytes\n",
+            cells,rooms,need,AW_MapFogBytes(),n);
+    AW_SaveChangesFree(&back);AW_SaveRelease(&decoded);
+    /* a reader that does not keep it: checked, not kept */
+    memset(&back,0,sizeof(back));back.take=1;
+    assert(AW_SaveDecodeChanges(big,n,&decoded,&back) && !back.explored_data && back.actor_bytes==65536);
+    AW_SaveChangesFree(&back);AW_SaveRelease(&decoded);
+    /* a broken section (its head) refuses the save as any other broken part */
+    for(at=12;at<n-4 && memcmp(big+at,"AWFG",4);at++){}
+    assert(at<n-4);big[at+3]='X';put(big+8,crc32(big+12,n-12));
+    memset(&back,0,sizeof(back));back.take=1;back.explored=1;
+    assert(!AW_SaveDecodeChanges(big,n,&decoded,&back) && !back.explored_data && !back.actors);
+    /* short of room (never in a save: the section is sized to the need) the land is never cut, only rooms left out
+     * and counted (the save contract) */
+    i=AW_MapFogExport(map,6+5*1000);AW_MapFogLeftOut(&left_cells,&left_rooms);
+    assert(i==0 && left_cells==cells && left_rooms==rooms);
+    i=AW_MapFogExport(map,need-46);AW_MapFogLeftOut(&left_cells,&left_rooms);
+    assert(i==need-46 && !left_cells && left_rooms==1);
+    assert(AW_MapFogExport(map,5)==0);
+    i=AW_MapFogExport(map,need);AW_MapFogLeftOut(&left_cells,&left_rooms);assert(i==need && !left_cells && !left_rooms);
+    free(map);
+    list.actors=NULL;list.actor_bytes=list.actor_capacity=0;list.explored=0;
+    fprintf(o,"explored section ok\n");
+}
+static int scene_ref_order(const void *a,const void *b)
+{
+    const aw_saved_actor_t *x=(const aw_saved_actor_t *)a,*y=(const aw_saved_actor_t *)b;
+    if(x->scene!=y->scene)return x->scene<y->scene?-1:1;
+    return x->reference==y->reference?0:x->reference<y->reference?-1:1;
+}
+/* a long game's rows: NPCS greeted NPCs over 300 places (2,675 NPC records in the base game), ROLES builder roles;
+ * creatures have none (their place, health and death are in the change list and the actor records) */
+static void long_game(aw_save_t *s,int npcs,int roles)
+{
+    int i;aw_saved_actor_t *a;
+    memcpy(s,&save,sizeof(*s));memset(&s->state.items,0,sizeof(s->state.items));
+    s->actors=NULL;s->actor_count=s->actor_capacity=0;
+    assert(AW_SaveActorsReserve(s,npcs+roles));memset(s->actors,0,sizeof(aw_saved_actor_t)*(size_t)(npcs+roles));
+    for(i=0;i<npcs;i++){
+        a=&s->actors[s->actor_count++];a->reference=1000+(uint32_t)i;a->scene=(unsigned short)(AW_MAP_COUNT+i%300);
+        a->fields=AW_ROW_GREET;a->hello_count=1+i%3;a->hello_done=i&1;a->manual_count=i%5?0:2;
+    }
+    for(i=0;i<roles;i++){
+        a=&s->actors[s->actor_count++];a->reference=0x800000U+(uint32_t)i+1;a->scene=(unsigned short)AW_MapLogicalId("seyda");
+        a->fields=AW_ROW_ALL;a->position[0]=100.4f+i;a->position[1]=-50;a->position[2]=8;a->angles[1]=90;
+        a->health=i&1?37.5f:40;a->hello_count=i%2;
+    }
+    qsort(s->actors,(size_t)s->actor_count,sizeof(aw_saved_actor_t),scene_ref_order);
+}
+static void packed_rows(void)
+{
+    static aw_save_t s,back_rows,again;int n,n_base,n2,i,j,greeted=0;aw_saved_actor_t *a,*b;
+    aw_save_rows_form=0;
+    long_game(&s,2700,20);
+    {aw_save_t none=s;none.actor_count=0;n_base=AW_SaveEncode(big,sizeof(big),&none);assert(n_base>0);}
+    n=AW_SaveEncode(big,sizeof(big),&s);assert(n>n_base && n-n_base==AW_SaveActorRowsBytes(&s));
+    assert(AW_SaveDecode(big,n,&back_rows) && back_rows.actor_count==2720);
+    for(i=0;i<2720;i++){
+        a=&s.actors[i];b=&back_rows.actors[i];
+        assert(a->reference==b->reference && a->scene==b->scene && a->hello_count==b->hello_count &&
+               a->manual_count==b->manual_count && a->hello_done==b->hello_done);
+        if(a->fields==AW_ROW_ALL){
+            /* greetings all 0 write nothing (the game data's own), so such a row comes back with its place and health */
+            assert((b->fields&(AW_ROW_PLACE|AW_ROW_HEALTH))==(AW_ROW_PLACE|AW_ROW_HEALTH) &&
+                   !(b->fields&AW_ROW_GREET)==!(a->hello_count || a->manual_count || a->hello_done) &&
+                   b->position[0]==floorf(a->position[0]+.5f) && b->position[1]==-50 &&
+                   b->position[2]==8 && b->angles[1]==90 && b->health==a->health);
+        }else{assert(b->fields==AW_ROW_GREET);greeted++;}
+    }
+    /* save, load, save: the same bytes */
+    memcpy(other,big,(size_t)n);n2=AW_SaveEncode(big,sizeof(big),&back_rows);assert(n2==n && !memcmp(big,other,(size_t)n));
+    /* the old form holds 256 at most: refused, never cut */
+    aw_save_rows_form=1;assert(!AW_SaveEncode(big,sizeof(big),&s));
+    {aw_save_t first=s;first.actor_count=AW_SAVE_ACTORS;n2=AW_SaveEncode(big,sizeof(big),&first);assert(n2>0);
+     assert(AW_SaveDecode(big,n2,&again) && again.actor_count==AW_SAVE_ACTORS && again.actors[255].reference==s.actors[255].reference);
+     AW_SaveRelease(&again);}
+    /* SAVE-ACTOR-ROWS-EXPANSION-ROOMS-66: an expansion room's row (its save ID past the base rooms' range) refused
+     * the old form, so the whole save; the packed form keeps it */
+    {aw_save_t one=s;aw_saved_actor_t r=s.actors[0];one.actors=&r;one.actor_count=1;r.scene=AW_TRIBUNAL_ROOM_BASE+5;
+     assert(!AW_SaveEncode(big,sizeof(big),&one));
+     aw_save_rows_form=0;n2=AW_SaveEncode(big,sizeof(big),&one);assert(n2>0);
+     assert(AW_SaveDecode(big,n2,&again) && again.actor_count==1 && again.actors[0].scene==AW_TRIBUNAL_ROOM_BASE+5);
+     AW_SaveRelease(&again);
+     r.scene=AW_SCENE_COUNT;assert(!AW_SaveEncode(big,sizeof(big),&one));   /* an ID no place has: refused */
+     r.scene=AW_LAYER_ROOM_END;assert(!AW_SaveEncode(big,sizeof(big),&one));}
+    /* rows out of order or twice are refused (a capture keeps them sorted) */
+    {aw_saved_actor_t t=s.actors[0];s.actors[0]=s.actors[1];s.actors[1]=t;assert(!AW_SaveEncode(big,sizeof(big),&s));
+     s.actors[1]=s.actors[0];assert(!AW_SaveEncode(big,sizeof(big),&s));s.actors[0]=t;
+     qsort(s.actors,(size_t)s.actor_count,sizeof(aw_saved_actor_t),scene_ref_order);}
+    /* the most one row takes: a place, a tilt, a health that is not whole, both counts at their largest, done */
+    {aw_save_t one=s;aw_saved_actor_t r;memset(&r,0,sizeof(r));r.reference=0xffffff;r.scene=1;r.fields=AW_ROW_ALL;
+     r.position[0]=-32767;r.angles[0]=10;r.health=0.25f;r.hello_count=r.manual_count=10000000;r.hello_done=1;
+     one.actors=&r;one.actor_count=1;j=AW_SaveActorRowsBytes(&one)-4-3-4;assert(j==25);
+     n2=AW_SaveEncode(big,sizeof(big),&one);assert(n2>0 && AW_SaveDecode(big,n2,&again));
+     assert(again.actors[0].hello_count==10000000 && again.actors[0].health==0.25f && again.actors[0].position[0]==-32767);
+     AW_SaveRelease(&again);}
+    fprintf(o,"packed rows %d (%d greeted NPCs, 20 builder roles): %d bytes, %.2f a row; the old form %d bytes "
+            "(and at most %d rows); worst row 25 bytes\n",s.actor_count,greeted,n-n_base,(double)(n-n_base)/s.actor_count,
+            s.actor_count*48,AW_SAVE_ACTORS);
+    fprintf(o,"fresh save %d bytes\n",n_base);
+    AW_SaveRelease(&back_rows);AW_SaveActorsFree(&s);
+}
+/* save, load, save, load: the bytes held stay the same to the byte (rows, the explored map, the load's buffers) */
+static void heap_cycles(void)
+{
+    static aw_save_t s,d;static unsigned char block[65536];long held=0;int c,n;
+    aw_save_rows_form=0;aw_save_explored_encode=AW_MapFogExport;
+    explore();long_game(&s,2700,20);
+    for(c=0;c<6;c++){
+        list.count=0;list.actors=block;list.actor_bytes=list.actor_capacity=40000;list.explored=1;
+        n=AW_SaveEncodeChanges(big,sizeof(big),&s,&list);assert(n>0);
+        memset(&back,0,sizeof(back));back.take=1;back.explored=1;
+        assert(AW_SaveDecodeChanges(big,n,&d,&back) && d.actor_count==2720 && back.actor_bytes==40000);
+        assert(AW_MapFogImport(back.explored_data,back.explored_bytes)==back.explored_bytes);
+        AW_SaveChangesFree(&back);
+        AW_SaveRelease(&s);s=d;memset(&d,0,sizeof(d));   /* the loaded save becomes the game's */
+        if(c==1)held=live;
+        else if(c>1)assert(live==held);
+    }
+    fprintf(o,"heap %ld bytes held after each of 5 save and load cycles\n",held);
+    AW_SaveRelease(&s);AW_MapFogReset();
+    list.actors=NULL;list.actor_bytes=list.actor_capacity=0;list.explored=0;aw_save_explored_encode=NULL;
 }
 #endif
 int main(int argc,char **argv)
@@ -181,10 +392,18 @@ int main(int argc,char **argv)
      assert(AW_SaveDecodeChanges(other,k2,&decoded,&back) && back.actor_bytes==10 && !memcmp(got,block,10) && back.count==0);
      back.actors=NULL;back.actor_capacity=0;
      assert(AW_SaveDecodeChanges(other,k2,&decoded,&back) && back.actor_bytes==0);
-     list.actor_bytes=AW_SAVE_ACTOR_BYTES+1;list.actor_capacity=AW_SAVE_ACTOR_BYTES+1;
-     assert(!AW_SaveEncodeChanges(other,sizeof(other),&save,&list));
+     /* MAP-EXPLORED-SAVE-BLOCK-66: past the largest block the setting gives (256 KB) it is refused */
+     {static unsigned char huge[AW_SAVE_ACTOR_MAX_BYTES+1];
+      list.actors=huge;list.actor_bytes=AW_SAVE_ACTOR_MAX_BYTES+1;list.actor_capacity=AW_SAVE_ACTOR_MAX_BYTES+1;
+      assert(!AW_SaveEncodeChanges(big,sizeof(big),&save,&list));}
      list.actors=NULL;list.actor_bytes=list.actor_capacity=0;}
     fprintf(o,"refusals ok\n");
+    AW_SaveRelease(&decoded);
+    block_setting();
+    block_sizes();
+    explored_section();
+    packed_rows();
+    heap_cycles();
 #endif
     if(o!=stdout)fclose(o);
     return 0;

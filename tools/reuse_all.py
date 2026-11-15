@@ -590,14 +590,19 @@ def strict_problems(steps, rebuilt, unit_rows, closures, uncached, allowed, limi
     {stage: {module: reached functions}}; an uncached bake counts for a stage that reaches it (or, without the
     stage's unit reach, has its module in the closure). COSTS {stage: stored wall seconds} and REASONS {stage: why it
     rebuilds}: a stage without a unit cache whose key changed ('changed: ...') and whose stored run took STAGE_LIMIT
-    seconds or more stops too, with its estimated minutes."""
+    seconds or more stops too, with its estimated minutes. A stage whose unit caches give back all but LIMIT of their
+    units does not: its stored minutes were its unit bakes, which the caches deliver now (the v0.0.66-dev2 check
+    stopped chim-room-batches as "about 419 min" with every resident and room from the cache; PLAN-CHECK-UNIT-STOPS-66)."""
     problems = []
     for name, _ in steps:
         if name not in rebuilt or name in allowed:
             continue
         seconds = (costs or {}).get(name)
         why = str((reasons or {}).get(name) or '')
-        if seconds is not None and seconds >= stage_limit and why.startswith('changed: '):
+        held_rows = [(usable, held) for _, usable, held in unit_rows.get(name, ()) if held]
+        delivered = bool(held_rows) and all(usable is not None and (held - usable) <= limit * held
+                                            for usable, held in held_rows)
+        if seconds is not None and seconds >= stage_limit and why.startswith('changed: ') and not delivered:
             cached = '; '.join(f'{cache}: {usable} of {held} units from the cache' for cache, usable, held
                                in unit_rows.get(name, ()) if held) or 'no unit cache'
             problems.append((name, f'would run the whole stage again, about {seconds / 60.0:.0f} min where it last ran '

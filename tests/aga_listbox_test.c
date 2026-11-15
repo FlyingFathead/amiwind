@@ -13,6 +13,15 @@ static const char *const places[]={"Ald-ruhn","Balmora","Caldera","Gnisis","Khuu
 #define PLACES ((int)(sizeof(places)/sizeof(places[0])))
 static int label_calls;
 static const char *label(void *ctx,int row){(void)ctx;label_calls++;return row>=0 && row<PLACES?places[row]:"";}
+/* categories of the test rows: Balmora and Tel Branora are 3, the Vivec rows 2, the rest 1 */
+static int category(void *ctx,int row){(void)ctx;return row==1 || row==8?3:row>=10?2:1;}
+static int blocked_wall_table(void *ctx,const float *p,float *out){
+    (void)ctx;
+    if(p[0]>20)return 0;                                              /* the wall */
+    if(p[0]>-25 && p[0]<25 && p[1]>15 && p[1]<65)return 0;            /* the table */
+    out[0]=p[0];out[1]=p[1];out[2]=p[2];return 1;
+}
+static int blocked_all(void *ctx,const float *p,float *out){(void)ctx;(void)p;(void)out;return 0;}
 static void type(aw_listbox_t *b,const char *s){for(;*s;s++)assert(AW_ListBoxType(b,(unsigned char)*s));}
 
 static void put32(unsigned char *p,long v){unsigned long u=(unsigned long)v;p[0]=(unsigned char)(u>>24);p[1]=(unsigned char)(u>>16);p[2]=(unsigned char)(u>>8);p[3]=(unsigned char)u;}
@@ -77,6 +86,37 @@ int main(void){
     /* labels are asked for only when filtering (and drawing, in the game) */
     label_calls=0;AW_ListBoxKey(&b,AW_LBKEY_UP);assert(!label_calls);
 
+    /* the category buttons (TP-MENU-CATEGORY-FILTER-66): All by default, the search filters within the chosen one */
+    AW_ListBoxReset(&b,PLACES,label,NULL,shown,5);
+    AW_ListBoxCategories(&b,category,4);
+    assert(b.categories==4 && b.chosen==0 && b.shown_count==PLACES);
+    AW_ListBoxChoose(&b,3);assert(b.shown_count==2 && b.shown[0]==1 && b.shown[1]==8);   /* Balmora, Tel Branora */
+    type(&b,"tel");assert(b.shown_count==1 && AW_ListBoxSelected(&b)==8);
+    AW_ListBoxKey(&b,AW_LBKEY_RIGHT);assert(b.chosen==0 && b.shown_count==3);           /* back to All: 3 Tel */
+    AW_ListBoxKey(&b,AW_LBKEY_LEFT);assert(b.chosen==3);
+    AW_ListBoxKey(&b,AW_LBKEY_LEFT);assert(b.chosen==2);
+    AW_ListBoxChoose(&b,9);assert(b.chosen==2);                                          /* no such button */
+    AW_ListBoxReset(&b,PLACES,label,NULL,shown,5);
+    assert(!b.categories && AW_ListBoxKey(&b,AW_LBKEY_LEFT)==AW_LB_NONE && b.shown_count==PLACES);   /* no buttons */
+
+    /* the free spot beside a being: the side towards the player first, then either way round, then wider rings */
+    {
+        float c[3]={0,0,0},from[3]={100,0,0},o[3],got[3];int n;
+        AW_TpSpotCandidate(c,from,40,0,o);assert(o[0]>39.9f && o[0]<40.1f && o[1]==0);
+        AW_TpSpotCandidate(c,from,40,1,o);assert(o[0]>36 && o[1]>15);
+        AW_TpSpotCandidate(c,from,40,2,o);assert(o[0]>36 && o[1]<-15);
+        AW_TpSpotCandidate(c,from,40,16,o);assert(o[0]>63.9f && o[0]<64.1f);
+        AW_TpSpotCandidate(c,from,40,32,o);assert(o[0]>87.9f && o[0]<88.1f);
+        /* a wall on the player's side (x > 20) and a table at (0, 40): the first free one is behind the being */
+        n=AW_TpPickSpot(c,from,40,blocked_wall_table,NULL,got);
+        assert(n>0 && got[0]<20 && !(got[0]>-25 && got[0]<25 && got[1]>15 && got[1]<65));
+        assert(!AW_TpPickSpot(c,from,40,blocked_all,NULL,got));
+        assert(AW_TpFacingYaw(got,c)>=0 && AW_TpFacingYaw(got,c)<360);
+        {float a[3]={0,0,0},e[3]={0,10,0},w[3]={-10,0,0};
+         assert(AW_TpFacingYaw(a,e)>89.9f && AW_TpFacingYaw(a,e)<90.1f);
+         assert(AW_TpFacingYaw(a,w)>179.9f && AW_TpFacingYaw(a,w)<180.1f);}
+    }
+
     /* the settlements table */
     memset(table,0,sizeof(table));
     memcpy(table,"AWTP",4);table[5]=1;table[7]=AW_TP_ROW;put32(table+8,2);
@@ -120,6 +160,33 @@ int main(void){
     AW_TpPlacesRow(table2,1,&p);
     assert(!strcmp(p.name,"Balmora") && !p.map[0] && AW_TpPlacesCommand(&p,line,sizeof(line))>0
         && !strcmp(line,"aw_teleport -20536 -13960\n"));
+
+    /* version 3 (DBG-TP-TO-NPC-66): a being row with its record id; a v2 row never reads as a being */
+    {
+        unsigned char t3[AW_TP_HEADER+AW_TP_ROW3];
+        memset(t3,0,sizeof(t3));memcpy(t3,"AWTP",4);t3[5]=3;t3[7]=AW_TP_ROW3;put32(t3+8,1);
+        memcpy(t3+AW_TP_HEADER,"Fargoth",7);put32(t3+AW_TP_HEADER+64,-11000);put32(t3+AW_TP_HEADER+68,-71000);
+        t3[AW_TP_HEADER+76]=AW_TP_BEING|AW_TP_HAS_Z;memcpy(t3+AW_TP_HEADER+96,"fargoth",7);
+        assert(AW_TpPlacesRows(t3,sizeof(t3))==1);
+        AW_TpPlacesRow(t3,0,&p);
+        assert(!strcmp(p.name,"Fargoth") && !strcmp(p.id,"fargoth") && (p.flags&AW_TP_BEING) && p.x==-11000);
+        assert(AW_TpPlacesCategory(p.flags)==AW_TP_CAT_BEING);
+        table2[AW_TP_HEADER+64+12]=AW_TP_ROOM|AW_TP_BEING;AW_TpPlacesRow(table2,0,&p);
+        assert(!(p.flags&AW_TP_BEING) && !p.id[0] && AW_TpPlacesCategory(p.flags)==AW_TP_CAT_INTERIOR);
+        assert(AW_TpPlacesCategory(0)==AW_TP_CAT_EXTERIOR && AW_TpPlacesCategory(AW_TP_HAS_Z|AW_TP_DOOR)==AW_TP_CAT_EXTERIOR);
+    }
+    /* a common kind's placements file */
+    {
+        unsigned char k[AW_TPK_HEADER+2*AW_TPK_ROW];
+        memset(k,0,sizeof(k));memcpy(k,"AWTK",4);k[5]=1;k[7]=AW_TPK_ROW;put32(k+8,2);
+        memcpy(k+AW_TPK_HEADER,"slaughterfish",13);put32(k+AW_TPK_HEADER+48,100);
+        memcpy(k+AW_TPK_HEADER+AW_TPK_ROW,"slaughterfish_small",19);memcpy(k+AW_TPK_HEADER+AW_TPK_ROW+32,"rroom1",6);
+        put32(k+AW_TPK_HEADER+AW_TPK_ROW+56,-8);
+        assert(AW_TpKindRows(k,sizeof(k))==2 && AW_TpKindRows(k,sizeof(k)-1)==-1);
+        AW_TpKindRow(k,0,&p);assert(!strcmp(p.id,"slaughterfish") && !p.map[0] && p.x==100 && !(p.flags&AW_TP_ROOM));
+        AW_TpKindRow(k,1,&p);assert(!strcmp(p.map,"rroom1") && p.z==-8 && (p.flags&AW_TP_ROOM));
+        k[0]='X';assert(AW_TpKindRows(k,sizeof(k))==-1);
+    }
     puts("listbox rules ok");
     return 0;
 }

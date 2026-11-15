@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
-"""Survey owned base-master terrain and geometry; emit private map and planning data."""
+"""Survey owned terrain and geometry of the selected masters (the base game, plus the expansions when they are on);
+emit private map and planning data."""
 import argparse
 from collections import Counter, defaultdict
 import hashlib
@@ -16,6 +17,8 @@ import numpy as np
 from PIL import Image
 from mwad.audit import BSA, load_esm, normpath, records, subrecords
 from mwad.paths import child_ci, ensure_external
+from mwad.masters import BASE_MASTER, is_base_only, master_path, selected_masters
+from mwad.archives import archive_names, layered_bsa
 from mwad.scene import unpack_geometry
 from npc_geometry import Assets
 from prepare_scenery import nif_reader, model_geometry, world_bounds
@@ -41,7 +44,9 @@ def mesh_scan(task):
     global _assets
     data, cache, name = task
     if _assets is None:
-        _assets = Assets(Path(data), BSA(child_ci(Path(data), 'Morrowind.bsa')))
+        # the selected masters' archives (mwad.archives): Morrowind.bsa alone for the base game, the expansion
+        # archives over it when the expansions are on (WORLD-SURVEY-EXPANSIONS-66)
+        _assets = Assets(Path(data), layered_bsa(Path(data)))
     key = hashlib.sha256(name.encode()).hexdigest()[:24]
     folder = Path(cache)
     receipt = folder / (key + '.json')
@@ -67,6 +72,24 @@ def mesh_scan(task):
     return r
 
 
+def base_grid(path):
+    """The exterior grid positions (x, y) of the base game file at PATH: its exterior CELL and LAND records."""
+    grid = set()
+    for tag, flags, payload in records(Path(path).read_bytes()):
+        if tag not in ('CELL', 'LAND'):
+            continue
+        for k, v in subrecords(payload):
+            if tag == 'CELL' and k == 'DATA':
+                bits, x, y = struct.unpack_from('<Iii', v)
+                if not bits & 1:
+                    grid.add((x, y))
+                break
+            if tag == 'LAND' and k == 'INTV':
+                grid.add(struct.unpack_from('<ii', v))
+                break
+    return grid
+
+
 def terrain_arrays(master, out, assets):
     keys = sorted(master['lands'])
     if not keys:
@@ -84,7 +107,7 @@ def terrain_arrays(master, out, assets):
             materials[n] = [255, 0, 255]
             missing.append(dict(material=n, texture=record['texture'], error=str(e)))
     seas = {}
-    for tag, flags, payload in records(child_ci(assets.bsa.path.parent, 'Morrowind.esm').read_bytes()):
+    for tag, flags, payload in records(master_path(assets.bsa.path.parent).read_bytes()):
         if tag != 'CELL':
             continue
         fields = {}
@@ -156,8 +179,28 @@ def run(a):
     cache = ensure_external(a.cache or out/'mesh-cache', 'world mesh cache'); cache.mkdir(parents=True, exist_ok=True)
     data = a.data_files.resolve(); start = time.monotonic()
     print('Reading base-master terrain and exterior references.', flush=True)
-    master = load_esm(child_ci(data, 'Morrowind.esm'))
-    areas = area_catalogue(ROOT); assets = Assets(data, BSA(child_ci(data,'Morrowind.bsa')))
+    master = load_esm(master_path(data))
+    masters = selected_masters()
+    if not is_base_only(masters):
+        print('Expansions on: the survey reads ' + ', '.join(masters) + ' (merged in load order) and '
+              + ', '.join(archive_names(masters)) + '.', flush=True)
+    expansion_only = []
+    if not is_base_only(masters):
+        # The plan covers the base game's exterior grid (Vvardenfell), read with the expansions' edits to it and
+        # their archives. Exterior cells that only an expansion adds (Solstheim) are listed, not planned: that
+        # exterior is not converted yet (docs/chim/PROGRESS_TRACKER.md), and planning it here would renumber every
+        # vf map after it and the recorded refinements (config/world-region-refinements.json).
+        grid = base_grid(child_ci(data, BASE_MASTER))
+        extra = sorted(k for k in set(master['cells']) | set(master['lands']) if k not in grid)
+        expansion_only = [dict(cell=list(k), name=master['cells'].get(k, {}).get('name', ''),
+                               region=master['cells'].get(k, {}).get('region', ''),
+                               references=len(master['cells'].get(k, {}).get('refs', ())),
+                               has_terrain=k in master['lands']) for k in extra]
+        master = dict(master, cells={k: v for k, v in master['cells'].items() if k in grid},
+                      lands={k: v for k, v in master['lands'].items() if k in grid})
+        print(f'{len(expansion_only)} exterior cells only an expansion adds are listed, not planned '
+              f'({sum(c["references"] for c in expansion_only)} placements).', flush=True)
+    areas = area_catalogue(ROOT); assets = Assets(data, layered_bsa(data))
     bounds, terrain, terrain_report = terrain_arrays(master, out, assets)
     grouped = defaultdict(list); issues = []; types = Counter(); excluded = Counter(); per_cell = defaultdict(Counter)
     from editor_markers import EditorMarkers
@@ -221,6 +264,9 @@ def run(a):
     if limit <= 0:
         raise ValueError('No reference geometry for screening limit')
     print('Screening 1, 4, 16, 64 region options; source geometry ceiling',limit,flush=True)
+    reasons = defaultdict(Counter)
+    for i in issues:
+        reasons[tuple(i['cell'])][(i.get('model') + ': ' if i.get('model') else '') + str(i['reason'])] += 1
     cells = []
     for cell in sorted(set(master['cells']) | set(terrain)):
         item = dict(cell=list(cell),name=master['cells'].get(cell,{}).get('name',''),
@@ -230,6 +276,10 @@ def run(a):
                     **terrain.get(cell,{}))
         item['spatial_source_triangles'] = sum(bins[(cell[0]*SUBTILES+x,cell[1]*SUBTILES+y)] for y in range(SUBTILES) for x in range(SUBTILES))
         item['subtiles'] = [bins[(cell[0]*SUBTILES+x,cell[1]*SUBTILES+y)] for y in range(SUBTILES) for x in range(SUBTILES)]
+        if unresolved_cells[cell]:
+            # why each placement of the cell is unresolved (only on such a cell, so a clean survey's bytes stay
+            # as they were): the atlas names them when it refuses the cell
+            item['unresolved_reasons'] = [dict(reason=k, placements=n) for k, n in sorted(reasons[cell].items())]
         item['screen'] = evaluate_cell(cell,index,limit,a.overlap)
         if issues:
             # A failed mesh has unknown extent, so even neighbouring coverage
@@ -245,11 +295,20 @@ def run(a):
             measured_placements=len(rows),unique_meshes=len(scans),unresolved_meshes=sum(r['status']!='measured' for r in scans.values()),
             unresolved_placements=len(issues),placed_source_triangles=expected,excluded=dict(excluded),types=dict(types),
             candidate_counts=dict(Counter(str(r['screen']['candidate']) for r in cells))),
-        boundaries=['Base master only; no expansions or plugin merging.','Actors/leveled lists are counted, not meshed.',
+        boundaries=[('Base master only; no expansions or plugin merging.' if is_base_only(masters) else
+                     'Base master and the selected expansion masters (' + ', '.join(masters[1:]) + ') merged in load '
+                     'order, read with their archives, over the base exterior grid; exterior cells only an expansion '
+                     'adds are listed in expansion_only_cells, not planned; no plugin merging.'),
+                    'Actors/leveled lists are counted, not meshed.',
                     'Centroid bins conserve source triangles; complete transformed object bounds determine residency.',
                     'Source triangle counts are not converted BSP faces, frame cost or RAM.',
                     'Subdivision candidates require converted collision/texture/heap and native transition checks.',
                     'Terrain image is averaged source texture colour, not full original texture reproduction.'])
+    if not is_base_only(masters):
+        # the layers this survey read (absent for the base game alone, so its output bytes do not move)
+        report['masters'] = list(masters)
+        report['archive_sha256'] = {n: sha_file(child_ci(data, n)) for n in archive_names(masters)}
+        report['expansion_only_cells'] = expansion_only
     write_json(out/'world-survey.json',report)
     write_json(out/'mesh-survey.json',list(scans.values()))
     write_json(out/'placement-issues.json',issues)

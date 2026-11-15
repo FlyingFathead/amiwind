@@ -9,8 +9,10 @@ import struct
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
-from mwad.audit import BSA, records, subrecords, string, cell_data
+from mwad.audit import records, subrecords, string, cell_data
+from mwad.archives import layered_bsa
 from mwad.paths import ensure_external, resolve_data_files, child_ci
+from mwad.masters import master_path
 from prepare_quake import CENTRE
 
 
@@ -250,7 +252,7 @@ def _head(task):
     data_files, part, palette = task
     from npc_geometry import Assets, Skeleton
     if _preview_context is None or _preview_context[0] != data_files:
-        assets = Assets(data_files, BSA(child_ci(data_files, 'Morrowind.bsa')))
+        assets = Assets(data_files, layered_bsa(data_files))
         _preview_context = (data_files, assets, Skeleton(assets))
     return head_preview(_preview_context[1], _preview_context[2], part, palette)
 
@@ -286,9 +288,9 @@ def prepare(data_files, scene, previews=True, jobs=None):
     data_files = resolve_data_files(data_files); scene = ensure_external(scene, 'character conversion')
     from mwad.paths import unshare_tree
     unshare_tree(scene)  # in place: BUILD-POOL-READONLY-SCENE-WRITE-35
-    master = child_ci(data_files, 'Morrowind.esm')
+    master = master_path(data_files)
     dest = scene/'id1/character'; dest.mkdir(exist_ok=True)
-    assets = Assets(data_files, BSA(child_ci(data_files, 'Morrowind.bsa')))
+    assets = Assets(data_files, layered_bsa(data_files))
     first_person = Skeleton(assets, 'meshes/base_anim.1st.nif')
     # Ordinary standing idle, independent of the Nord hand-to-hand fixture.
     eye_base = float(first_person.pose(first_person.events['idle: start'])('Camera')[3, 2]) * .25

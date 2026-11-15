@@ -1,6 +1,6 @@
 # Magic effects
 
-_Last updated with AmiWind v0.0.64-dev5 (11 November 2026)._
+_Last updated with AmiWind v0.0.66-dev2 (14 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -15,15 +15,28 @@ _Last updated with AmiWind v0.0.64-dev5 (11 November 2026)._
 Morrowind draws its spells with a set of small effect meshes and textures of its own: a glow on the casting hands,
 a burst at the caster, a bolt per school in flight, a burst where it hits and an orb where an area spell lands.
 AmiWind shows them with Quake's own machinery, following the plan in the
-[roadmap](ROADMAP.md#near-term-magic-effects-as-sprites-and-bitmap-planes-25-october-2026). It is an experimental
-prototype, off by default. This page covers the look of spells (`dbg magicfx`) and, from v0.0.61, how the player casts
+[roadmap](ROADMAP.md#near-term-magic-effects-as-sprites-and-bitmap-planes-25-october-2026). From v0.0.66 the game
+turns it on by default (`aw_magic_fx 1` in the game's default settings; `dbg magicfx 0` turns it off; a settings file saved by an earlier version with the look off is switched on once at
+the first start, and a later `dbg magicfx 0` stays). This page covers the look of spells (`dbg magicfx`) and, from v0.0.61, how the player casts
 them, what the effects do and how enchanted items work, which are on by default and do not need the look.
 
 ## What it shows
 
 - **The caster's animation**: a character with a shared animation table plays its own spellcast group (the
   target, touch or self variant), and the spell leaves its hands on the group's release key, as in OpenMW; a
-  failed cast plays the animation too. Not yet: the first-person hands' cast animation.
+  failed cast plays the animation too. From v0.0.66 the player does the same: readying magic (R) raises the open
+  hands of the original's spell stance in first person (`idlespell`; the fists of hand-to-hand stay with F), and the
+  attack button plays the cast of the selected spell's first range (`spellcast` self, touch or target) with the spell
+  leaving on its release key; a failed cast plays it too. The arms from parts show what is worn (a robe's sleeves,
+  gloves, bracers) in the stance and the cast, with all three ranges; the baked arms (`dbg camera hands off`) carry
+  the target cast for every range. In third person the parts body plays the same groups. Readying magic shows the
+  open hands whatever is equipped (decided for the project, 14 November 2026): a drawn weapon is put away, and a
+  carried torch, a held candle or lantern and a shield are put away too while magic is ready (no light from them),
+  as in the original, where the spell is a two-handed stance that hides what the left hand carries (OpenMW 0.51, its
+  weapon types and `updateCarriedLeftVisible`). Readying the weapon or lowering the magic brings them back. Before,
+  with a lit torch or a held light the readied-magic hands showed the fist of hand-to-hand beside it. Every image
+  checks this on the data it ships (`tools/ready_hands.py`, run by the image step): the spell stances' open hands
+  against the fists, on both first-person paths, and the image stops if the two do not differ.
 - **The orb**: the translucent sphere in the spell's colour that wraps the caster while casting and the character
   a spell lands on, made from the effect's own shell texture with the effect's own hit model (a shield's body-shaped
   shell, levitation's rings) drawn into it from the front. On the character a spell lands on it follows them and,
@@ -91,13 +104,25 @@ The engine (`aw_magic.c`) shows them with:
 - Quake's dynamic lights, only with `dbg magicfx 2`: the bolt's light and a short flash where it lands. A software
   dynamic light rebuilds every surface it touches, so it has its own setting.
 
-With the setting off (the default) nothing is loaded, spawned or drawn.
+With the setting off nothing is loaded, spawned or drawn. The setting's own value is 0; the game's default settings
+set it to 1 (v0.0.66). A saved setting from an earlier version keeps its value.
+
+### In step with the cast (v0.0.66)
+
+A cast's look starts on the frame its cast animation starts: the hand glow, the cast sprites, the cast sound and the
+orb or egg-shaped shell around the caster (seen from outside) begin together, for every kind of spell (self, touch,
+target, summon), as OpenMW plays the casting effects when the spellcast group starts. The look then waits for the
+spell itself: the bolt, the touch or the hit on the caster starts on the frame the spell leaves (the release key), and
+a failed roll ends the look there with the school's failure sound. Casts without the hands' animation (an item used,
+`dbg cast`) play their whole look at once, as before. `dbg cast` shows the shell shape (the egg is the default), the
+count of such casts and the frame numbers of the last one: the animation, the look, the cast sound, the shell and the
+release.
 
 ## Console
 
 | Command | What it does |
 |---|---|
-| `dbg magicfx 0` / `1` / `2` | magic effects off (default, saved) / sprites and particles / also their light |
+| `dbg magicfx 0` / `1` / `2` | magic effects off / sprites and particles (the game's default, saved) / also their light |
 | `dbg cast NAME` | cast NAME's look: hand glow, cast, a bolt along the view, its hit and area burst |
 | `dbg cast NAME touch` / `self` | the hit within reach / on yourself instead of a bolt |
 | `dbg cast NAME fail` | a failed cast: the school's failure sound only |
@@ -116,8 +141,9 @@ With the setting off (the default) nothing is loaded, spawned or drawn.
 The player casts the spells and powers he knows and the spells he made at a spellmaker. The rules follow OpenMW
 0.51 (its spell utility, world and spell casting code), written independently.
 
-- **Ready magic** (`R`, `dbg cast ready`): the hands come up; with magic ready the attack button casts the selected
-  spell instead of striking, once per press.
+- **Ready magic** (`R`, `dbg cast ready`): the hands come up open, whatever is equipped (the weapon, a torch or
+  another light and a shield are put away while magic is ready); with magic ready the attack button casts the
+  selected spell instead of striking, once per press.
 - **The selected spell**: `dbg cast spell list` shows the known spells and powers (with their number, cost and the
   selection), `dbg cast spell N` selects spell N, `dbg cast spell mN` the made spell N, `dbg cast spell none` clears
   it.
@@ -144,15 +170,48 @@ The player casts the spells and powers he knows and the spells he made at a spel
   of non-player actors run while they are loaded and their damage feeds the fight. Creatures ignore skill effects.
   Light lights the player; Resist Normal Weapons and Weakness to Normal Weapons are read by the combat code; Burden
   and Feather feed the carry weight (docs/INVENTORY.md).
-- **The look** is this page's (with `dbg magicfx 1` or `2`): the cast, the bolt and the hit of the spell's first
+- **The look** is this page's (with `dbg magicfx 1`, the default, or `2`): the cast, the bolt and the hit of the spell's first
   effect of that range (an effect without its own look takes the first of its school). The look's bolt is drawn
   apart from the spell's own; the failure sound plays only with the look on.
+
+### Characters cast too (v0.0.66)
+
+A character or creature that knows spells weighs them in a fight against its weapon about once a second, by OpenMW
+0.51's combat rules (written independently): each spell's effects are rated by what they would do now (a harmful
+effect on the player by its cost and the player's resistance, a summon when none stands by, a healing spell when it is
+hurt, a bound weapon by its skill, Blind only on a player with a weapon ready, Silence and Sound only on one with magic
+ready), times the game settings for spells (3, or 5 for Target effects) and the spell's chance to succeed. A melee
+weapon is rated by its damage, the wielder's strength, its condition, the hit chance and its speed; fists and a
+creature's own attacks rate nothing, so a creature or an unarmed caster casts whenever a spell is of use. The best
+action wins. A spell is cast from its range (Touch within a blow's reach, the rest from up to 256 map units) with the
+player in sight: the magicka is paid, the character's spellcast group plays (self, touch or target by the first
+effect), the look starts with it as for the player, and on the release key the roll decides and the spell leaves as
+the player's do: its Self effects on the caster, Touch on the player in reach, Target as a bolt from the caster's eye
+that lands on the player. `dbg combat spells off` keeps fighters to their weapons (the earlier rule); `dbg combat`
+shows the choices and casts. Also rated as OpenMW rates them: Burden on a player its magnitude would overburden (by
+the player's load), Feather on an overburdened caster (only the Burden and Feather on it count as its load: a
+character's carried weight is not summed in a fight), Dispel by the harmful spell effects it would lift from the
+caster or the helpful ones it would strip from the player, Cure Poison and Cure Paralyzation by each such effect on the
+caster (above everything else), Restore Magicka and Absorb Magicka by the caster's need (a spell it knows costs more
+than its magicka now), the bound weapons one at a time by the caster's skill in that weapon; the bound longbow only
+with arrows, which no fighter carries yet, so it is never cast. The disease cures are never cast, as in OpenMW. Fights
+between two characters use their weapons only.
+
+Cost: a fighter's spells are read from the actor table once, at its first choice in the fight (the list, then for each
+spell its row, its effects, its flags and each effect's record: 1 + 3n + e reads for n spells with e effects); every later choice, once a second, reads nothing from disk and only rates
+the kept spells. Each of the 4 fight slots keeps up to 32 spells and 48 effects, about 1.6 KB a slot, 6.4 KB in all,
+part of the combat slots for the whole session (no allocation); a new fight reads its fighter again. `dbg combat` shows
+the count ("spell reads"). Not measured on the Pi yet: the think's rating cost per choice.
 
 The Magic window (O) selects the spell too: Up and Down move, Enter or a click selects (docs/INVENTORY.md).
 
 A spell flagged as always succeeding in the game data always succeeds.
 
-Not yet: the casting gesture of the first-person hands and of the parts body, resistances from abilities, reflection,
+The cast plays on the player's hands in first person and on the parts body in third person (v0.0.66): the magicka is
+paid, the roll made and the spell sent on the cast's release key, not at the press; the refusals (no spell, too
+little magicka, a power used today) come at the press, with no gesture.
+
+Not yet: resistances from abilities, reflection,
 and the effects that need other systems to read their magnitude: Levitate and the other movement effects move nothing,
 and a Shield effect on the player does not soften the blows that land on it (the inventory window adds it to the armour
 rating; `COMBAT-SHIELD-EFFECT-NO-ARMOR-61`). When a Fortify Attribute effect on the player ends, the stat sheet keeps

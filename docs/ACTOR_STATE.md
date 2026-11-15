@@ -1,6 +1,6 @@
 # The actor record
 
-_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
+_Last updated with AmiWind v0.0.66-dev2 (14 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -199,7 +199,8 @@ tables, so the engine reads no names while scripts run. The engine side (`aw_mwh
 
 The changed live records and the dead counts are saved as one block (AWAS1: the record's fixed 182 bytes plus 4
 bytes per inventory or spell change; 4 bytes a dead count), kept by each actor's reference, in the save file as its
-feature 16 (at most 32,768 bytes; a save over that is refused with a message and the earlier saves kept). A record
+feature 16 (at most the setting `aw_save_block_kb`, 64 KB by default, 32 to 256, since v0.0.66; 32,768 bytes before;
+a save over that is refused with a message and the earlier saves kept). A record
 not changed by play is not saved; the player's stats are saved with the character. A save without changed actors
 is the same bytes as before; an older engine refuses a save that has the block.
 

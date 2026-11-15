@@ -1291,9 +1291,10 @@ def empty_miniwind_actor_evidence(args, maps):
         return None
     from mwad.audit import load_esm
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     from town_config import load_settings
     from import_town import in_frame
-    master = child_ci(args.data_files, 'Morrowind.esm')
+    master = master_path(args.data_files)
     original = load_esm(master)
     settings = load_settings(town)
     deferred_spawns = []
@@ -1943,6 +1944,22 @@ def startup_lines(mini, font_path, chim=False):
                                      measure=measure, width=TEXT_WIDTH, debug=mini.get('debug', False)))
 
 
+def flora_support_check(args):
+    """Every bracket fungus of the CHIM world touches the tree it grows on (tools/chim/flora_support_audit.py,
+    FLORA-FLOATING-DEV1-66): read only, on the finished CHIM stage, before the image's slow work. Fails on a floating
+    plant that config/flora-support.json does not list under known_floating (each listed with its reason)."""
+    if not getattr(args, 'chim_world', None) or not getattr(args, 'data_files', None):
+        return
+    import build_profile
+    from chim.flora_support_audit import main as flora_audit
+    with build_profile.phase('Image: flora support check'):
+        rc = flora_audit([str(args.chim_world), '--data-files', str(args.data_files), '--jobs', str(image_jobs(args)),
+                          '--json', str(Path(args.chim_world).parent / 'flora-support.json'), '--known-from-config'])
+    if rc:
+        raise ValueError('Flora support check: bracket fungi float away from their trees '
+                         '(flora-support.json of this run; FLORA-FLOATING-DEV1-66)')
+
+
 def image(args):
     """Package the NPC gallery by default; fail if any required payload is absent.
 
@@ -1983,6 +2000,7 @@ def image(args):
     heap_loader_source_sha256=verify_heap_loader_source_receipt(engine_record)
     build_mode=engine_record.get('hands','3d')
     if build_mode!=args.hands:raise ValueError('Image hands choice must match engine build')
+    flora_support_check(args)
     excluded=excluded_groups(args)
     if 'music' not in excluded and not getattr(args,'music',None):
         raise ValueError('--music is required unless the quick test build leaves the music out (--exclude music)')
@@ -2275,7 +2293,7 @@ def image(args):
         repair_balmora_maps(boot/'id1/maps', cache=args.balmora_cache,
                            palette=boot/'id1/gfx/palette.lmp', ericw_bin=args.qbsp.parent,
                            work_dir=out/'bounded-balmora', threads=jobs, vis_mode=getattr(args,'vis_mode','fast'),
-                           night_lamps=(__import__('mwad.paths',fromlist=['child_ci']).child_ci(args.data_files,'Morrowind.esm')
+                           night_lamps=(__import__('mwad.masters',fromlist=['master_path']).master_path(args.data_files)
                                         if getattr(args,'night_lamp_lightmaps',False) else None))
     if flora:
         from install_town_flora import install as install_town_flora
@@ -2326,7 +2344,8 @@ def image(args):
     if args.data_files:
         from actor_grounding import annotate, bake_ground
         from mwad.paths import child_ci
-        grounding=annotate(boot/'id1/maps',child_ci(args.data_files,'Morrowind.esm'),jobs=jobs,exclude=frozen)
+        from mwad.masters import master_path
+        grounding=annotate(boot/'id1/maps',master_path(args.data_files),jobs=jobs,exclude=frozen)
         (out/'actor-grounding.json').write_text(json.dumps(grounding,indent=2)+'\n', newline='\n')
         (out/'actor-ground-support.json').write_text(json.dumps(bake_ground(boot/'id1/maps',jobs=jobs,exclude=frozen),indent=2)+'\n', newline='\n')
     recorded_stage.check(boot/'id1',out/'bounded-seyda','image map passes (flora, harvest removal, actor grounding)',jobs=jobs)
@@ -2441,7 +2460,8 @@ def write_prison_markers(args, id1, out):
     coordinates and refuses a marker whose map the image does not hold. Returns the markers (also OUT/prison-markers.json)."""
     import world_doors
     from mwad.paths import child_ci
-    markers = world_doors.prison_markers(child_ci(args.data_files, 'Morrowind.esm').read_bytes())
+    from mwad.masters import master_path
+    markers = world_doors.prison_markers(master_path(args.data_files).read_bytes())
     (Path(id1)/world_doors.PRISON_MARKERS).write_text(world_doors.prison_markers_text(markers), encoding='cp1252',
                                                       newline='\n')
     (Path(out)/'prison-markers.json').write_text(json.dumps(markers, indent=1, sort_keys=True)+'\n', encoding='utf-8',
@@ -2462,6 +2482,7 @@ def write_world_doors(args, id1, out, chim_frames):
     from map_files import map_file
     from mwad.interior import original_doors
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     from town_config import load_registry
     from town_interiors import door_mesh_bounds, room_offsets
     id1 = Path(id1)
@@ -2470,16 +2491,23 @@ def write_world_doors(args, id1, out, chim_frames):
     towns = world_doors.town_holders([a for a in chim_frames['areas'] if a in registered])
     regions = room_batches.region_frames(chim_region_table(args.chim_world), (chim_frames or {}).get('region_maps'))
     rooms = {cell: name for cell, name in room_batches.listed_maps().items() if name and map_file(maps, name).is_file()}
+    held_back = {}
     if getattr(args, 'chim_room_batches', None):
         record = json.loads((Path(args.chim_room_batches) / room_batches.RECORD).read_text(encoding='utf-8'))
         rooms.update({r['room'].casefold(): r['map'] for r in record['rooms'] if map_file(maps, r['map']).is_file()})
-    master_raw = child_ci(args.data_files, 'Morrowind.esm').read_bytes()
+        # the rooms the batch stage records as not made: their doors are held back, named, not unresolved
+        held_back = {cell: why for cell, why in world_doors.held_back_places(record).items() if cell not in rooms}
+    master_raw = master_path(args.data_files).read_bytes()
     doors = original_doors(master_raw)
     # dbg tp's list box: one "(interior)" row for every room this image holds (tools/tp_places_lut.py,
     # TP-MENU-INTERIORS-63); it opens the room through dbg tp <map>, at its door's arrival
     from tp_places_lut import image_rooms as tp_places_rooms
     tp_places_rooms(id1, rooms, master_raw, out)
-    rows = world_doors.table(doors, rooms, towns, regions, room_offsets())
+    # the exterior cells the build plans (exterior_plan.planned_cells): a door in a cell only an expansion adds is
+    # held back, named (EXPANSION-DOORS-HELD-BACK-66)
+    from exterior_plan import planned_cells
+    planned = planned_cells(getattr(args, 'exterior_terrain', None))
+    rows = world_doors.table(doors, rooms, towns, regions, room_offsets(), planned, held_back)
     wanted = {row['reference'] for row in rows if row['kind'] == 'door' and 'source' in row and 'target' in row}
     bounds = door_mesh_bounds(args.data_files, [d for d in doors if d['number'] in wanted])
     applied = world_doors.apply(id1, rows, bounds)
@@ -2493,10 +2521,19 @@ def write_world_doors(args, id1, out, chim_frames):
                'rooms': len(rooms), 'summary': world_doors.summary(rows), 'added': applied['added'],
                'filled': applied['filled'], 'banks_changed': applied['banks_changed'], 'unresolved': problems,
                'rows': rows}
+    held = [row for row in rows if 'held_back' in row]
+    if held:
+        # only with held-back places (the expansions), so a base game receipt does not move
+        receipt['held_back'] = len(held)
     (Path(out)/'world-doors.json').write_text(json.dumps(receipt, indent=1, sort_keys=True)+'\n', encoding='utf-8',
                                               newline='\n')
     print('World doors: %d doors and markers, %d rows added to the door banks, %d filled, %d unresolved '
           '(world-doors.json)' % (len(rows), applied['added'], applied['filled'], len(problems)), flush=True)
+    if held:
+        outdoors = sum('does not plan' in row['held_back'] for row in held)
+        print('World doors: %d doors and markers held back (world-doors.json held_back rows): %d in exterior cells '
+              'this build does not plan, %d at rooms the room batch stage did not make' % (
+                  len(held), outdoors, len(held) - outdoors), flush=True)
     # the travel services by the same holder rule (TRAVEL-SERVICES-CHIM-51, tools/prepare_travel.py): id1/travel.txt
     import prepare_travel
     travel = prepare_travel.write(id1, args.data_files, rooms, towns, regions, room_offsets())
@@ -2523,11 +2560,18 @@ def write_door_check(args, id1, out):
     import door_engine_check
     from mwad.interior import original_doors
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     jobs = resolve_jobs(getattr(args, 'jobs', None))
     id1, out = Path(id1), Path(out)
     engine_src = ROOT/'engine'/'aga'/'src'
-    doors = original_doors(child_ci(args.data_files, 'Morrowind.esm').read_bytes())
+    doors = original_doors(master_path(args.data_files).read_bytes())
     world_rows = json.loads((out/'world-doors.json').read_text(encoding='utf-8'))['rows']
+    # the doors the world door table holds back (places this build does not hold: write_world_doors,
+    # EXPANSION-DOORS-HELD-BACK-66) are not entrances of this image
+    held_back = {row['reference'] for row in world_rows if 'held_back' in row}
+    if held_back:
+        doors = [d for d in doors if d['number'] not in held_back]
+        print('Door check: %d held-back doors and markers left out (world-doors.json)' % len(held_back), flush=True)
     stores = [p for p in (getattr(args, 'chim_interiors', None),) if p]
     image = door_audit.Image(id1, engine_src, args.chim_world, jobs, stores)
     audit = door_audit.audit(doors, world_rows, image, door_audit.regions_by_cell(args.data_files, jobs))
@@ -2555,6 +2599,7 @@ def write_room_batch_links(args, id1, out, chim_frames):
     from map_files import map_file, town_map_present
     from mwad.interior import original_doors
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     from town_interiors import frame_towns, room_offsets
     id1 = Path(id1)
     maps = id1 / 'maps'
@@ -2566,7 +2611,7 @@ def write_room_batch_links(args, id1, out, chim_frames):
     towns = [t for t in frame_towns(prefer=chim_native_towns(args)) if town_map_present(maps, t[0])]
     regions = room_batches.region_frames(chim_region_table(args.chim_world), (chim_frames or {}).get('region_maps'))
     listed = {r['room'].casefold() for r in room_batches.rows(room_batches.load())}
-    receipt = room_batches.link_banks(id1, batch, present, original_doors(child_ci(args.data_files, 'Morrowind.esm')
+    receipt = room_batches.link_banks(id1, batch, present, original_doors(master_path(args.data_files)
                                                                           .read_bytes()),
                                       {'towns': towns, 'regions': regions}, room_offsets(), listed)
     receipt.update(rooms=len(batch), town_frames=[t[0] for t in towns], region_frames=len(regions))
@@ -2693,7 +2738,8 @@ def write_actor_table(args, out, boot, library, actor_tables):
     NPC and creature reference in one table beside the frame maps, for the type 1 window; its report in OUT."""
     from chim.actors import FILE_NAME, write_table
     from mwad.paths import child_ci
-    actor_table = write_table(boot/'id1/maps'/FILE_NAME, child_ci(args.data_files,'Morrowind.esm'), boot/'id1/maps',
+    from mwad.masters import master_path
+    actor_table = write_table(boot/'id1/maps'/FILE_NAME, master_path(args.data_files), boot/'id1/maps',
                               Path(args.chim_world)/'chim' if getattr(args, 'chim_world', None) else None, library,
                               tables=actor_tables.result())
     (out/'chim-actor-table.json').write_text(json.dumps(actor_table, indent=1, sort_keys=True)+'\n', encoding='utf-8',
@@ -2894,7 +2940,8 @@ def finalize_image(args):
         from build_parallel import Background
         from chim.actors import master_tables
         from mwad.paths import child_ci
-        actor_tables=Background(master_tables, child_ci(args.data_files,'Morrowind.esm'), jobs=jobs)
+        from mwad.masters import master_path
+        actor_tables=Background(master_tables, master_path(args.data_files), jobs=jobs)
     # The region frames' actor census (EXPERIMENTAL --chim-region-actors on: chim.region_actors.census_file, the
     # master only) beside the same checks
     region_census=None
@@ -2902,7 +2949,8 @@ def finalize_image(args):
         from build_parallel import Background
         from chim.region_actors import census_file
         from mwad.paths import child_ci
-        region_census=Background(census_file, child_ci(args.data_files,'Morrowind.esm'), jobs=jobs)
+        from mwad.masters import master_path
+        region_census=Background(census_file, master_path(args.data_files), jobs=jobs)
     # Every read-only payload check first, all errors together, before any write (tools/payload_preflight.py).
     payload_preflight(args, out, excluded, jobs)
     gallery_report=json.loads((out/'npc-gallery-staging.json').read_text())
@@ -2953,6 +3001,12 @@ def finalize_image(args):
         if args.hands!='3d':raise ValueError('The per-race hand catalogue applies to 3D hands only')
         hand_catalog=install_hand_catalog(args.hand_catalog,boot/'id1')
         (out/'hand-catalog-staging.json').write_text(json.dumps(hand_catalog,indent=2)+'\n',encoding='utf-8',newline='\n')
+    # READY-MAGIC-SHOWS-WEAPON-65 (v0.0.66): readied magic shows the open hands and the bare hands the fists on both
+    # first-person paths (tools/ready_hands.py): the table of the arms from parts and the baked arms installed above are
+    # measured here, and a failure stops the image before it is packed
+    from ready_hands import image_check as ready_hands_check
+    (out/'ready-hands.json').write_text(json.dumps(ready_hands_check(args.data_files,boot/'id1'),indent=2)+'\n',
+                                        encoding='utf-8',newline='\n')
     # Apply explicit sky policy after every mesh/overlay, before all final gates.
     from exterior_sky_build import configure_staged_maps
     exterior_sky_path = out / 'exterior-sky' / 'exterior-sky.json'
@@ -3013,8 +3067,9 @@ def finalize_image(args):
     # kept their game-data height; AMIWIND_ROOM_ACTOR_BAKE=off is the method before)
     from room_actor_bake import bake_room_ground, require_fitted
     from mwad.paths import child_ci as _child_ci
+    from mwad.masters import master_path
     room_actor_bake=bake_room_ground(boot/'id1/maps',jobs=jobs,
-                                     master=_child_ci(args.data_files,'Morrowind.esm') if args.data_files else None)
+                                     master=master_path(args.data_files) if args.data_files else None)
     (out/'room-actor-ground-support.json').write_text(json.dumps(room_actor_bake,indent=2)+'\n',encoding='utf-8',newline='\n')
     if room_actor_bake['mode']!='off' and args.data_files:   # the map bake runs with the game data (image step above)
         # every ground resident of every scene map went through a ground bake (a skipped scene kind stops here,
@@ -3045,11 +3100,12 @@ def finalize_image(args):
     # loss against the previous build stops here, before any disk is made.
     from entity_tracker import build_gate as entity_gate
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     from prepare_mesh_bsp import DRESSING_EXCLUDED
     # the CHIM world is read once here and held for the frame maps and their heap gate below
     chim_world_held = {}
     chim_world_data = chim_world_once(getattr(args, 'chim_world', None), chim_world_held)
-    entity_tracker = entity_gate(out, boot/'id1/maps', child_ci(args.data_files,'Morrowind.esm'),
+    entity_tracker = entity_gate(out, boot/'id1/maps', master_path(args.data_files),
         getattr(args,'entity_baseline',None), getattr(args,'accept_entity_loss',None), jobs=jobs,
         dressing_terms=DRESSING_EXCLUDED, extra_maps={**chim_town_placements(args, boot/'id1', world=chim_world_data),
                                                      **chim_region_placements(args, boot/'id1', world=chim_world_data)})
@@ -3071,7 +3127,7 @@ def finalize_image(args):
     # The settlements table (tools/tp_places_lut.py, TP-PICKER-57): every named place of the island and its arrival
     # on the street (id1/tp-places.lut), read by `dbg tp` with no argument only while its list box is open.
     from tp_places_lut import image_step as tp_places_step
-    tp_places_step(args.data_files, boot/'id1', out, jobs=jobs)
+    tp_places_step(args.data_files, boot/'id1', out, jobs=jobs, chim_world=getattr(args, 'chim_world', None))
     # EXPERIMENTAL actor table (--chim-actor-table on, tools/chim/actors.py, CHIM-EXTERIOR-ACTORS-MISSING-46): every
     # exterior NPC and creature reference in one table beside the frame maps, for the type 1 window; off by default
     actor_library_texts = None
@@ -3099,7 +3155,7 @@ def finalize_image(args):
         world_progress = {'status': 'not_built', 'reason': '--miniwind: no open-world region directory'}
     else:
         world_progress = world_progress_step(out, boot/'id1/world/regions.awr', out/'entity-tracker.json',
-            child_ci(args.data_files,'Morrowind.esm'), Path(__file__).resolve().parents[1]/'docs/trackers/checked.json')
+            master_path(args.data_files), Path(__file__).resolve().parents[1]/'docs/trackers/checked.json')
     # Audit the final prepared payload after subdivision and actor annotation;
     # an earlier audit cannot authorize maps subsequently regenerated here.
     world_heap_path=out/'world-map-heap.json'
@@ -3116,7 +3172,7 @@ def finalize_image(args):
     # Night lamp, glowing glass and location fog tables from the final maps (read only; before a pure CHIM image
     # removes the CHIM towns' legacy maps below).
     from night_lighting import stage as stage_night_lighting, image_sources
-    night_lighting = stage_night_lighting(boot/'id1', master=child_ci(args.data_files,'Morrowind.esm'),
+    night_lighting = stage_night_lighting(boot/'id1', master=master_path(args.data_files),
         maps=staged_exterior_map_names(boot/'id1', getattr(args, 'chim_world', None), getattr(args, 'exterior_terrain', None)), sources=image_sources(args),
         palette=boot/'id1/gfx/palette.lmp', data_files=args.data_files, work_dir=out/'night-lighting',
         lighting_type=getattr(args, 'chim_lighting_type', None))
@@ -3232,6 +3288,15 @@ def finalize_image(args):
             sol = install_chim_sol(args.chim_sol_world, boot/'id1', hand_metadata['worldspawn_fields'], alternatives)
             (out/'chim-sol-image.json').write_text(json.dumps(sol, indent=1, sort_keys=True)+'\n', encoding='utf-8',
                                                    newline='\n')
+        if getattr(args, 'chim_layer_world', None):
+            # the selected expansion layers' stores, one per layer (tools/chim/layer_stores.py); none = no change
+            from chim.layer_stores import install as install_layer_stores
+            if getattr(args, 'chim_sol_world', None) and any(str(v).startswith('chimsol=')
+                                                             for v in args.chim_layer_world):
+                raise SystemExit('--chim-sol-world and --chim-layer-world chimsol=... both name the store chimsol')
+            layer_stores = install_layer_stores(args.chim_layer_world, boot/'id1', hand_metadata['worldspawn_fields'])
+            (out/'chim-layer-stores.json').write_text(json.dumps(layer_stores, indent=1, sort_keys=True)+'\n',
+                                                      encoding='utf-8', newline='\n')
         # frame maps the gate marked 32 MB itself (over the 16 MB budget by this exact check, not by the CHIM stage's
         # estimate; BUILD-CHIM-HEAP-GATE-LATE-36): their records follow the marked file
         late = set(frame_heap.get('marked_32mb_late') or [])
@@ -3265,12 +3330,20 @@ def finalize_image(args):
     if gallery_report.get('status')=='room staged':
         # NPC Gallery v2.0: every actor the finished maps and the actor table hold, one catalogue row each (seconds)
         from gallery_v2 import catalogue_step
-        gallery_report=catalogue_step(boot/'id1',child_ci(args.data_files,'Morrowind.esm'),out,gallery_report,jobs=jobs)
+        gallery_report=catalogue_step(boot/'id1',master_path(args.data_files),out,gallery_report,jobs=jobs)
     # FAUNA-COVERAGE-62: every creature record of the masters is built, or not built for a reason that
     # config/creature-census.json names (tools/creature_census.py); an unnamed one stops a full build (seconds)
     from creature_census import stage as creature_census_stage, partial_reason as creature_census_partial
     creature_census_stage(boot/'id1', args.data_files, out, library=installed_actor_library(args),
                           partial=creature_census_partial(args), jobs=jobs)
+    # BUILD-ACTOR-SPEC-CHECK-66: the people and creatures per area kind (interiors, region and town exteriors, water)
+    # against the original's references, and every actor record against the original's fields (level, stats,
+    # behaviour values, the carried weapon class...): a drop or a field gap beyond the tracked allowlists stops the build (~35 s)
+    if creature_census_partial(args) is None:
+        from actor_spec_check import stage as actor_spec_stage
+        actor_spec_stage(out.parent, args.data_files, out)
+    else:
+        print('Actor spec check skipped: %s.' % creature_census_partial(args), flush=True)
     # Original NPC heads take world, combat and guard models past 2,000 vertices:
     # each gets its byte-matching model-budgets.txt line (NPC-HEAD-DECIMATION-33).
     from audit_gallery_budgets import world_allowances
@@ -3685,6 +3758,10 @@ def main():
                    help='TEST BUILDS ONLY (tools/build.py --chim-sol-test): the Bloodmoon layer\'s CHIM world '
                         '(run/chim-sol) into the image as the store chimsol, one frame map sol<cell> per '
                         'frame (tools/chim/sol_test.py); off by default')
+    i.add_argument('--chim-layer-world', action='append', default=None, metavar='STORE=WORLD',
+                   help='A selected expansion layer\'s CHIM world (run/chim-layer-<layer>) into the image as its own '
+                        'store (chimsol: Bloodmoon, chimiti: Tribunal; tools/chim/layer_stores.py); given by '
+                        'tools/build.py for each selected layer the plan builds, none with --no-dlc')
     i.add_argument('--chim-sol-alt', action='append', default=None, metavar='METHOD=WORLD',
                    help='TEST BUILDS ONLY, with --chim-sol-world: another build of the same Solstheim frames whose models '
                         'go into the store as the alternative models of aw_tree_crowns METHOD (tools/chim/alt_models.py)')

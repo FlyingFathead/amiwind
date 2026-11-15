@@ -93,7 +93,7 @@ class Wiring(unittest.TestCase):
         self.assertIn('aw_hand_parts_apply(race,female,AW_HAND_LIGHT_STANCE,cl.viewent.frame)', hands)
         self.assertIn('AW_BlockCompose(origin,angles,l->offset,light_pose,light_pose+3);', hands)
         self.assertIn('if(AW_HandLightItemApply()){', r_main)
-        self.assertIn('#define HAND_PART_STANCES 8', view)
+        self.assertIn('#define HAND_PART_STANCES 11', view)      # the light (7), then the spell stances (8-10)
         self.assertIn('AW_BlockCompose(origin,angles,light->offset,out->origin,out->angles);', view)
         self.assertIn('aw_items_player_layer=player_light_layer;', view)
         self.assertIn('AW_HeldLightDraw ();', code('view.c'))

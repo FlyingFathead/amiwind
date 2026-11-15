@@ -28,6 +28,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
 from mwad.esm import records, subrecords, string, first
 from mwad.paths import resolve_data_files, child_ci
+from mwad.masters import master_path
 sys.path.insert(0, str(ROOT / 'tools'))
 import text_defines   # tools/text_defines.py
 
@@ -136,7 +137,7 @@ def encode(books, words=None):
 
 def build(data_files):
     data = resolve_data_files(Path(data_files))
-    master = child_ci(data, 'Morrowind.esm').read_bytes()
+    master = master_path(data).read_bytes()
     books, scrolls = books_of(master)
     words = labels_of(master)
     payload, left = encode(books, words)

@@ -5,6 +5,8 @@ static int active,load_mode,profile_count,profile_at,row,confirm;
 static uint32_t profiles[32];
 static char names[32][32],descriptions[21][96],notice[80];
 static unsigned char slot_states[21];
+/* SAVE-INSIDE-SCRIPT-STEP-66: AW_SaveWrite returned 2, the save waits for the settled frame (aw_save.h aw_save_busy) */
+#define QUEUED "Save queued: written when the script step ends."
 static void refresh(void)
 {
     int i;
@@ -47,7 +49,8 @@ int AW_SaveMenuKey(int key)
         if(key=='y' || key==K_ENTER){
             ok=load_mode?AW_SaveRead(profiles[profile_at],row):AW_SaveWrite(row);
             confirm=0;
-            if(ok){if(load_mode)active=0;else{strcpy(notice,"Saved.");AW_SaveMenuOpen(0);strcpy(notice,"Saved.");}}
+            if(!load_mode && ok==2){strcpy(notice,QUEUED);active=0;}   /* SAVE-INSIDE-SCRIPT-STEP-66: written at the settled frame */
+            else if(ok){if(load_mode)active=0;else{strcpy(notice,"Saved.");AW_SaveMenuOpen(0);strcpy(notice,"Saved.");}}
             else strcpy(notice,"Unable to complete. Previous saves retained.");
         }else if(key=='n')confirm=0;
         return 1;
@@ -62,8 +65,12 @@ int AW_SaveMenuKey(int key)
                                slot_states[row]==AW_SLOT_OTHER_DATA?"This save belongs to other game data or another build.":
                                "No save in this slot.");}
         else if(profile_count && descriptions[row][0])confirm=1;
-        else if(AW_SaveWrite(row)){AW_SaveMenuOpen(0);strcpy(notice,"Saved.");}
-        else strcpy(notice,"Save failed. Previous saves retained.");
+        else{
+            ok=AW_SaveWrite(row);
+            if(ok==2){strcpy(notice,QUEUED);active=0;}
+            else if(ok){AW_SaveMenuOpen(0);strcpy(notice,"Saved.");}
+            else strcpy(notice,"Save failed. Previous saves retained.");
+        }
     }
     return 1;
 }

@@ -101,18 +101,29 @@ class Table(unittest.TestCase):
         import skeletal_actor as sa
         sk = FakeSkeleton()
         stances = [(s, [i * 4.0 + k * 0.1 for k in range(fp.FRAMES)]) for i, s in enumerate(fp.STANCES)]
-        saved = fp.stance_times
+        spells = [(s, [30.0 + i * 4.0 + k * 0.1 for k in range(fp.FRAMES)]) for i, s in enumerate(fp.SPELL_STANCES)]
+        saved, saved_spell = fp.stance_times, fp.spell_times
         fp.stance_times = lambda skeleton: stances
+        fp.spell_times = lambda skeleton: spells
         try:
             data, bones, view0, times = fp.fp_table(sk)
         finally:
-            fp.stance_times = saved
+            fp.stance_times, fp.spell_times = saved, saved_spell
         table = sa.read_table(data)
-        # the weapon stances, then the held light's (HELD-LIGHT-OWN-MODEL-61, the engine's stance 7)
-        self.assertEqual(table['frames'], fp.FRAMES * (len(fp.STANCES) + 1))
-        self.assertEqual([table['groups'][s] for s in fp.STANCES + (fp.LIGHT_STANCE,)],
-                         [(i * fp.FRAMES, i * fp.FRAMES + fp.FRAMES - 1) for i in range(len(fp.STANCES) + 1)])
+        # the weapon stances, then the held light's (HELD-LIGHT-OWN-MODEL-61, the engine's stance 7), then the spell
+        # stance by range (PLAYER-CASTING-59: the engine's 8 self, 9 touch, 10 target)
+        order = fp.STANCES + (fp.LIGHT_STANCE,) + fp.SPELL_STANCES
+        self.assertEqual(table['frames'], fp.FRAMES * len(order))
+        self.assertEqual([table['groups'][s] for s in order],
+                         [(i * fp.FRAMES, i * fp.FRAMES + fp.FRAMES - 1) for i in range(len(order))])
         self.assertEqual(len(fp.STANCES), 7)
+        self.assertEqual(fp.SPELL_STANCES, ('sps', 'spt', 'sp'))
+        for i, (_, ts) in enumerate(spells):
+            view = fp.view_matrix(sk.pose(ts[0])('camera')[3, :3])
+            for k in (0, 18, fp.FRAMES - 1):
+                world = sa.table_world(table, (8 + i) * fp.FRAMES + k)
+                want = np.asarray(sk.pose(ts[k])('bip01 r hand')) @ view
+                self.assertTrue(np.allclose(world[bones.index('bip01 r hand')], want, atol=2e-2), (i, k))
         self.assertTrue(np.allclose(view0, fp.view_matrix(sk.pose(stances[0][1][0])('camera')[3, :3])))
         for i, (_, ts) in enumerate(stances):
             view = fp.view_matrix(sk.pose(ts[0])('camera')[3, :3])

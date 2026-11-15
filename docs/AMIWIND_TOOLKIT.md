@@ -1,6 +1,6 @@
 # AmiWind Toolkit
 
-_Last updated with AmiWind v0.0.64-dev5 (11 November 2026)._
+_Last updated with AmiWind v0.0.66-dev2 (14 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -674,9 +674,33 @@ the build-side ingest and the live tracker's prompt, files and server lifecycle,
 
 The **Monitor** tab (`amiwind-toolkit/monitor.html`) follows a build as it runs, in any browser, phones included:
 
+- **Stall alert (on by default):** a red banner at the top names every recent build whose own stall block
+  (`build-progress.json` `stall`, written by the builder) is not `ok`: `slow` (a stage past three times its recorded
+  time), `under-cores` (under half of the planned cores for five minutes) or `stalled` (no progress for 20 minutes and
+  almost no CPU), with how long and the reason. A new incident also raises one browser notification while the page is
+  open (the browser asks once). A build still in its start-up (before its first stage) is listed as a starting run.
+  `toolkit_serve.py --on-stall COMMAND` runs COMMAND once per incident with the run, the state and the reason as its
+  last three arguments, for your own alert (a chat message, a sound); without it the banner and the notification are
+  the alert.
+- **Started at / Ended at:** the Progress panel names when the run started and, once it has ended (passed, failed or
+  stopped), when it ended, in local time with the date and the offset, from the run's own `build-progress.json`; the
+  failed count is the number of failed stages in its stage list (stopped or cancelled stages are counted apart).
+- **What runs now first:** with the Machine view on (`--machine-jobs`) and no build running, the page leads with a
+  one-line summary ("Running now: 1 gate, 2 jobs, 2.2 of 24 cores") and the Machine panel; the last build follows
+  under "Last build: <status>, ended at <time>". While a build runs, it stays first and the summary line sits under
+  the header.
+- **Follow latest** is on at every page load; picking a run or unticking it turns it off for that visit only. "Follow
+  the running stage" is remembered in the browser.
+
 - **Overall progress bar:** at the top of Progress, one bar for the whole build with the percentage and, while it
   runs, the expected finish time (local time with its offset and in UTC) and the time left; green when the build
   passed, red when it failed;
+- **Failure details** (v0.0.66): when the run failed, under the bar the failed stage with its number and exit and its
+  error line, and a **See failure details** link that opens the run's `FAILURE.md` as text in a page of its own: the
+  failed stage, its error lines, the traceback, the last 60 lines of its log, the units it refused or left out, the
+  run's commit and the command that builds again from the run (written by the builder when a stage or the build
+  fails, see [Linux build](LINUX_BUILD.md#3-check-then-build)). For a failed run of an earlier builder the reader
+  makes the same page from the run's `build-state.json` and the failed stage's log, without writing anything;
 - **Progress:** status, percent done, stages passed, running, pending and failed, elapsed time, the time left and the
   finish time in rows of their own (the finish time in local time with its offset and in UTC, both dated), the ETA's
   basis (critical path or history) and the cores in use now, from the run's `build-progress.json`. Under "Cores now" a
@@ -760,7 +784,8 @@ Read-only by construction:
   server runs two fixed, read-only calls, `docker stats --no-stream` and `docker info`, that no page request can change);
 - every request names a run and a log (or a stage trace) by a strict name pattern, checked by the server and again by the reader, and
   must resolve inside the builds folder (no `..`, no path separators, no symbolic links); logs are read in capped byte
-  ranges; `build-state.json` is summarised (stage names, status, times), never sent whole;
+  ranges; `build-state.json` is summarised (stage names, status, times), never sent whole; a failed run's
+  `FAILURE.md` and `failure.json` are read as they are (`/monitor/run/RUN/FAILURE.md` and `failure.json`);
 - with `--monitor-docker` or `--builds-command` the command is fixed when the server starts; a page's request
   reaches it only as a JSON document on its input (`tools/monitor_read.py` refuses any request it does not know),
   never as part of a command;

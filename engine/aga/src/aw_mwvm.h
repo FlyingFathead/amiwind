@@ -14,9 +14,11 @@
 #define AW_MWVM_CELLS 4096         /* local values of the attached objects and the global scripts */
 /* objects whose values are kept while their map is not loaded, and their values: the game places 2,115 references
  * whose script has locals, 7,388 values in all (counted in v0.0.59-dev5's compiled scripts; CELL-CHANGES-59 slice 5
- * raised these from 512 and 4,096 so a whole game's objects keep theirs: 37 KB more in the interpreter's one block) */
-#define AW_MWVM_PARKED 2304
-#define AW_MWVM_PARK_CELLS 8192
+ * raised these from 512 and 4,096 so a whole game's objects keep theirs: 37 KB more in the interpreter's one block).
+ * SAVE-ITEM-SCRIPT-LOCALS-66 (v0.0.66): the items placed holders hold are parked too once their script changed a value:
+ * 491 held rows, 929 values with both expansions (v0.0.66-dev2's compiled scripts): +512 and +1,024, about 10 KB more */
+#define AW_MWVM_PARKED 2816
+#define AW_MWVM_PARK_CELLS 9216
 #define AW_MWVM_STACK 32
 #define AW_MWVM_STRINGS 8192       /* NOTYET names logged once each */
 #define AW_MWVM_SELF (-2)
@@ -100,11 +102,21 @@ typedef struct {
 #define AWI_INTERIOR 32    /* in a room: active while the room is loaded */
 #define AWI_ACTIVE 64      /* within the activation range this frame */
 #define AWI_ACTIVATED 128  /* the player used its object and the script took the use: OnActivate reads 1 once */
+/* CAPTAIN-EXIT-DOOR-DEAD-AFTER-REENTRY-66: the script read OnActivate since its own Activate (OpenMW 0.51
+ * mwworld/refdata.cpp Flag_SuppressActivate: OnActivate sets it, the script's Activate clears it): only then is the
+ * player's use the script's. A script that returns before its OnActivate line (the census doors' "done" check) gives
+ * the object its own use back. */
+#define AWI_TAKES_USE 256
 
 typedef struct {
     unsigned long frames,runs,skipped_quiet,skipped_far,deferred,ops,max_ops_frame,aborted,notyet_calls,host_calls;
     unsigned long dialogue_runs;    /* dialogue result scripts run (AW_MwvmRunDialogue) */
+    /* MWSCRIPT-TICK-SHARE-66: seconds in AW_MwvmTick (the interpreter with its calls) and in the host's function
+     * calls (the import route); 0 without a clock */
+    double tick_time,host_time;
 } aw_mwvm_stats_t;
+/* the clock the two times use (seconds; the host sets it, NULL: not timed) */
+extern double (*aw_mwvm_clock)(void);
 /* The import route's counters: NOTYET calls run per function number (AWM_FUNCTIONS of them), and the string index
  * of each function's name (-1: no script calls it). */
 unsigned long AW_MwvmFunctionCalls(int function);
@@ -171,6 +183,10 @@ int AW_MwvmDetach(uint32_t reference);
 const char *AW_MwvmEntityBlock(const char *text,unsigned long length,uint32_t ref,unsigned long *block);
 aw_mwvm_instance_t *AW_MwvmInstance(int instance);
 int AW_MwvmInstanceCount(void);
+/* The player uses the object REFERENCE (CAPTAIN-EXIT-DOOR-DEAD-AFTER-REENTRY-66, the original's rule as OpenMW 0.51
+ * keeps it, mwworld/refdata.cpp activate): 1 when its attached script takes the use (it read OnActivate since its
+ * own Activate): OnActivate reads 1 on its next run and the object does nothing by itself; 0: the object's own use. */
+int AW_MwvmUse(uint32_t reference);
 /* Start scripts and StartScript. */
 void AW_MwvmStartScript(int script);
 /* a dialogue result script (_dlg_N) once on the speaker (its reference and script; -1 none); 1 ran */

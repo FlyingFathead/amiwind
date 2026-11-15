@@ -40,8 +40,10 @@ import re
 import struct
 import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
-from mwad.audit import BSA,records,subrecords,string,cell_data
+from mwad.audit import records, subrecords, string, cell_data
+from mwad.archives import layered_bsa
 from mwad.paths import resolve_data_files,child_ci,ensure_external
+from mwad.masters import master_path
 from npc_geometry import Assets
 from prepare_intro import voice_convert
 
@@ -344,10 +346,10 @@ def prepare(data,scene,ffmpeg='ffmpeg'):
     from mwad.paths import unshare_tree
     unshare_tree(scene)  # in place: BUILD-POOL-READONLY-SCENE-WRITE-35
     wanted={172860}|scene_links(scene)   # the Census hall door (a story door, no destination) and the scene's links
-    raw=child_ci(data,'Morrowind.esm').read_bytes()
+    raw=master_path(data).read_bytes()
     rows=catalogue(raw,wanted)
     if len(rows)>MAX_REFERENCES:raise ValueError(f'Door sound catalogue exceeds the runtime bound ({len(rows)} > {MAX_REFERENCES})')
-    assets=Assets(data,BSA(child_ci(data,'Morrowind.bsa')));converted={}
+    assets=Assets(data,layered_bsa(data));converted={}
     def sample(original):
         """Convert one SOUN file once (both tables share the converted samples); -> (path, seconds)."""
         source=original.replace('\\','/').casefold();name=sample_name(original)

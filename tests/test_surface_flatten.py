@@ -92,7 +92,7 @@ class NeighboringFacadeTests(unittest.TestCase):
         v,f=self.wall();packet=pack_geometry([list(point)+[0.,0.,255,255,255,255] for point in v],f.tolist(),1)
         support=NeighboringFacadeSupport('/owned',settings,[10])
         with patch('mwad.paths.child_ci',side_effect=lambda root,name:root/name), \
-             patch('mwad.audit.load_esm',return_value=master),patch('mwad.audit.BSA'), \
+             patch('mwad.audit.load_esm',return_value=master),patch('mwad.archives.layered_bsa'), \
              patch('prepare_scenery.nif_reader'), \
              patch('prepare_scenery.bsa_read',return_value=b'owned-source') as read, \
              patch('prepare_scenery.model_geometry',return_value=(packet,[],[],[])) as geometry:

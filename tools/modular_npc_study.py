@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from mwad.audit import BSA, normpath
 from mwad.npc import load_master, outfit
 from mwad.paths import child_ci
+from mwad.masters import master_path
 from build_parallel import ordered_map
 from npc_geometry import Assets, Skeleton, assemble, bake, bake_quotas, animated_mdl
 
@@ -43,7 +44,7 @@ def part_key(appearance, part):
 
 
 def appearances(data):
-    kinds, cells, _ = load_master(child_ci(data, 'Morrowind.esm'))
+    kinds, cells, _ = load_master(master_path(data))
     specs = {}; records = 0; errors = 0; record_uses = 0
     for identifier in sorted(kinds['NPC_']):
         records += 1
@@ -228,7 +229,7 @@ def preview(frames, faces, uv, skin, size=200):
 
 def compose_main(args):
     from PIL import Image, ImageDraw
-    kinds, cells, _ = load_master(child_ci(args.data_files, 'Morrowind.esm'))
+    kinds, cells, _ = load_master(master_path(args.data_files))
     _ctx['palette'] = args.palette.read_bytes()
     ids = sorted({r['id'].casefold() for c in cells if c['name'].startswith(args.cell_prefix)
                   for r in c['refs'] if not r.get('deleted') and r['id'].casefold() in kinds['NPC_']})

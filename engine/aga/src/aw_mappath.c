@@ -9,6 +9,7 @@
 #include "aw_mappath.h"
 
 int aw_chim_world;
+int (*aw_chim_map_store_built) (const char *path);	/* set by Chim_Init (aw_mappath.h) */
 
 /* The answer for the last few names (the region and section look-ahead ask
  * every frame); files do not change while the engine runs. */

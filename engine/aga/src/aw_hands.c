@@ -54,7 +54,12 @@ int AW_HandClipFrame(const aw_hand_table_t *t,int clip,float elapsed) {
     if(f>=t->count[clip])f=t->count[clip]-1;
     return t->first[clip]+f;
 }
-
+float AW_HandCastRelease(const aw_hand_table_t *t) {
+    int n=t->count[AW_HAND_PUNCH];
+    if(n<=AW_HAND_CAST_RELEASE_FRAME)return t->duration[AW_HAND_PUNCH];
+    return t->duration[AW_HAND_PUNCH]*(float)AW_HAND_CAST_RELEASE_FRAME/(float)n;
+}
+int aw_magic_cast_range=2;
 /* ---- READY-MAGIC-SHOWS-WEAPON-65: weapon ready (F) and magic ready (R), exclusive, pure ----
  * As in the original (OpenMW 0.51 mwinput actionmanager.cpp toggleWeapon / toggleSpell and the draw state of
  * mechanics/drawstate.hpp, read not copied): the player's draw state is one of nothing, weapon or spell. Readying the
@@ -100,6 +105,7 @@ int AW_HandTableReady(void) {hand_table_load();return hand_table_state>0;}
 float AW_HandDuration(int clip,float fallback) {
     return AW_HandTableReady() && clip>=0 && clip<AW_HAND_CLIPS?hand_table.duration[clip]:fallback;
 }
+float AW_HandCastReleaseNow(float fallback) {return AW_HandTableReady()?AW_HandCastRelease(&hand_table):fallback;}
 static float hand_get(edict_t *p,const char *name) {eval_t *v=GetEdictFieldValue(p,(char *)name);return v?v->_float:0;}
 static void hand_set(edict_t *p,const char *name,float value) {eval_t *v=GetEdictFieldValue(p,(char *)name);if(v)v->_float=value;}
 static void hand_begin(edict_t *p,int state) {hand_set(p,"aw_hand_state",(float)state);hand_set(p,"aw_hand_started",(float)sv.time);}
@@ -109,6 +115,14 @@ static void hand_show(edict_t *p,int on) {
     if(!on)return;
     for(i=1;i<MAX_MODELS && sv.model_precache[i];i++)
         if(!strcmp(sv.model_precache[i],"progs/v_nord.mdl")){p->v.weaponmodel=sv.model_precache[i]-pr_strings;return;}
+}
+/* PLAYER-CASTING-59: magic ready takes the attack button before the hands (aw_cast.c); a cast that goes plays the
+ * attack clip here, the spell stance's cast (the arms show it at the spell stance, aw_hand_models.c) */
+int AW_HandsCastStart(void) {
+    edict_t *p;
+    if(!sv.active || svs.maxclients<1 || !svs.clients || !(p=svs.clients[0].edict) || p->free ||
+       !GetEdictFieldValue(p,"aw_hand_state") || (int)hand_get(p,"aw_hand_state")!=2)return 0;
+    hand_begin(p,3);return 1;
 }
 void AW_HandsTick(void) {
     edict_t *p;int state,goal,clip;float elapsed;

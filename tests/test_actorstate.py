@@ -263,6 +263,8 @@ HARNESS = r'''
 static unsigned char *file;static long size;
 static int rd(void *c,uint32_t off,void *out,uint32_t n){(void)c;if(off+n>(uint32_t)size)return 1;memcpy(out,file+off,n);return 0;}
 #define P(...) printf(__VA_ARGS__)
+static void *no_alloc(unsigned long bytes){return NULL;}    /* SAVE-EXPORT-FAILURE-ACCEPTED-65: memory refused */
+static void *host_alloc(unsigned long bytes){return malloc(bytes);}
 int main(int argc,char **argv){
     FILE *f=fopen(argv[1],"rb");aw_actorstate_io_t io={rd,NULL};aw_actor_t *a,*r;int row,i;unsigned char save[8192];int n;
     int sword=atoi(argv[2]),ring=atoi(argv[3]),spell=atoi(argv[4]),other=atoi(argv[5]),auto_spell=atoi(argv[6]);
@@ -354,18 +356,42 @@ int main(int argc,char **argv){
        AW_MadeSpellAt(0)->effects,(unsigned)AW_MadeSpellAt(0)->effect[1].duration,AW_MadeItemAt(0)->base,AW_MadeItemAt(0)->name,
        AW_MadeItemAt(0)->charge);
      for(k=0;k<70;k++)if(AW_MadeSpellAdd(&s)<0)full++;
-     blob[4]=200;k=AW_MadeImport(blob,len);P(" full %d bad %d %d\n",full,k,AW_MadeSpellCount());AW_MadeReset();}
+     blob[4]=200;k=AW_MadeImport(blob,len);P(" full %d bad %d %d",full,k,AW_MadeSpellCount());AW_MadeReset();
+     /* SAVE-MADE-RECORDS-64-CAP-66: 300 of each: the first blocks hold 255, the rest ride in AWM2/AWE2 and come back;
+      * a cut AWM2 block leaves the first 255 */
+     {static unsigned char big[65536];int more,k2,cut;
+      for(k=0;k<300;k++){if(AW_MadeSpellAdd(&s)<0 || AW_MadeItemAdd(&m)<0)break;}
+      len=AW_MadeExport(big,sizeof(big));more=AW_MadeExportMore(big+len,sizeof(big)-len);AW_MadeReset();
+      k=AW_MadeImport(big,len);k2=AW_MadeImportMore(big+len,more);
+      P(" many %d old %d more %d back %d %d spells %d items %d",k==len,len,more,k,k2,AW_MadeSpellCount(),AW_MadeItemCount());
+      AW_MadeReset();k=AW_MadeImport(big,len);cut=AW_MadeImportMore(big+len,more-20);
+      P(" cut %d spells %d items %d\n",cut,AW_MadeSpellCount(),AW_MadeItemCount());AW_MadeReset();}}
     /* filled soul gems: the soul from the creature record, through a save */
     {unsigned char blob[512];int k,len,creature;char gem[40];
      k=AW_GemAdd("misc_soulgem_petty",AW_ActorFind("test_rat"));len=AW_GemsExport(blob,sizeof(blob));AW_GemsReset();
      P("gem %d export %d",k,len);k=AW_GemsImport(blob,len);AW_GemAt(0,gem,sizeof(gem),&creature);
-     P(" import %d %s soul %d",k,gem,AW_GemSoul(0));k=AW_GemRemove(0);P(" removed %d left %d\n",k,AW_GemCount());AW_GemsReset();}
+     P(" import %d %s soul %d",k,gem,AW_GemSoul(0));k=AW_GemRemove(0);P(" removed %d left %d",k,AW_GemCount());AW_GemsReset();
+     /* SAVE-MADE-RECORDS-64-CAP-66: 300 gems: 255 in AWSG, the rest in AWG2, all back */
+     {static unsigned char big[16384];int more,k2;
+      for(k=0;k<300;k++)if(AW_GemAdd("misc_soulgem_petty",AW_ActorFind("test_rat"))<0)break;
+      len=AW_GemsExport(big,sizeof(big));more=AW_GemsExportMore(big+len,sizeof(big)-len);AW_GemsReset();
+      k=AW_GemsImport(big,len);k2=AW_GemsImportMore(big+len,more);
+      P(" many %d %d %d gems %d\n",len,more,k==len && k2==more,AW_GemCount());AW_GemsReset();}}
     /* places revealed by ShowMap: once each (any case), through a save */
     {unsigned char blob[512];int k,len;
      k=AW_RevealedAdd("Tel Fyr");k+=AW_RevealedAdd("TEL FYR");k+=AW_RevealedAdd("Gnaar Mok");
      len=AW_RevealedExport(blob,sizeof(blob));AW_RevealedReset();
-     P("revealed %d count",k);k=AW_RevealedImport(blob,len);P(" %d export %d import %d %s %s\n",AW_RevealedCount(),len,k,
+     P("revealed %d count",k);k=AW_RevealedImport(blob,len);P(" %d export %d import %d %s %s",AW_RevealedCount(),len,k,
        AW_RevealedAt(0),AW_RevealedAt(1));AW_RevealedReset();}
+    /* SAVE-REVEALED-PLACES-128-CAP-66: 300 places (was 128 at most): AWMP holds the first 255, AWP2 the rest, all back;
+     * a cut AWP2 block adds nothing and leaves the first 255 */
+    {static unsigned char big[16384];int k,len,more,k2,n2;char name[32];
+     for(n2=0;n2<300;n2++){sprintf(name,"Place %d",n2);if(!AW_RevealedAdd(name))break;}
+     len=AW_RevealedExport(big,sizeof(big));more=AW_RevealedExportMore(big+len,(int)sizeof(big)-len);AW_RevealedReset();
+     k=AW_RevealedImport(big,len);k2=AW_RevealedImportMore(big+len,more);
+     P(" many %d %d %d %d places %d %s",n2,len,more,k==len && k2==more,AW_RevealedCount(),AW_RevealedAt(299));
+     AW_RevealedReset();k=AW_RevealedImport(big,len);k2=AW_RevealedImportMore(big+len,more-1);
+     P(" cut %d places %d\n",k2,AW_RevealedCount());AW_RevealedReset();}
     /* slice 6 (CELL-CHANGES-59, ACTOR-STATE-POOL-LIMITS-54): every record changed up to AW_ACTOR_POOL_MAX (the game:
      * 3,437 actor bases, 2,673 NPCs placed), half killed, half hurt, a third hostile, each with an item change; the
      * next one refused; the records as "AWAR" and the dead counts alone as AWAS1, read back after an emptied pool;
@@ -431,6 +457,16 @@ int main(int argc,char **argv){
      P("player ability %d",AW_ActorHasSpell(p,imm));
      n=AW_ActorStateExport(save,sizeof(save));AW_ActorStateImport(save,n>0?n:0);p=AW_ActorPlayer();
      P(" after load %d epoch moved %d\n",AW_ActorHasSpell(p,imm),AW_ActorStateEpoch()!=e0);}
+    /* SAVE-EXPORT-FAILURE-ACCEPTED-65: the save's copy of the changed records: none changed (good, nothing), a killed
+     * actor with the allocation refused, with too small a limit (both refuse the save, nothing handed out), then kept */
+    {unsigned char *b=(unsigned char *)1;int bytes=-1,k0,k1,k2,k3;
+     AW_ActorStateImport(NULL,0);
+     k0=AW_ActorStateRecordsCopy(host_alloc,1000000,&b,&bytes);P("recordscopy empty %d %d %d",k0,b==NULL,bytes);
+     AW_ActorKill(AW_ActorGet(4242,AW_ActorFind("test_rat"),1));
+     k1=AW_ActorStateRecordsCopy(no_alloc,1000000,&b,&bytes);P(" noalloc %d %d %d",k1,b==NULL,bytes);
+     k2=AW_ActorStateRecordsCopy(host_alloc,8,&b,&bytes);P(" small %d %d",k2,b==NULL);
+     k3=AW_ActorStateRecordsCopy(host_alloc,1000000,&b,&bytes);
+     P(" kept %d %d %d\n",k3,bytes==AW_ActorStateExportRecords(NULL,0),b && !memcmp(b,"AWAR",4));free(b);}
     AW_ActorStateClose();free(file);return 0;
 }
 '''
@@ -461,6 +497,12 @@ class EngineTests(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def test_save_copy_of_the_records_fails_loudly(self):
+        # SAVE-EXPORT-FAILURE-ACCEPTED-65: nothing changed is a good copy of nothing; a refused allocation and a block
+        # over the limit return 0 (the save is refused) and hand out nothing; then the AWAR block is kept whole
+        line = next(l for l in self.out if l.startswith('recordscopy '))
+        self.assertEqual(line, 'recordscopy empty 1 1 0 noalloc 0 1 0 small 0 1 kept 1 1 1')
 
     def test_lookup_and_base(self):
         self.assertEqual(self.out[0], 'open 1 count 4')
@@ -519,17 +561,23 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(self.out[38], 'cap 1024 ok 1 count 1024 first thing_1')
 
     def test_made_things_survive_a_save_and_are_bounded(self):
-        # 5 + 33 + 2 x 14 + 5 + 82 + 14 = 167 bytes; 64 spells at most (63 more fit, 7 of 70 refused); a bad count refused
+        # 5 + 33 + 2 x 14 + 5 + 82 + 14 = 167 bytes; the lists grow (70 more spells all fit; SAVE-MADE-RECORDS-64-CAP-66,
+        # was 64 at most); a bad count refused; 300 of each: the first blocks hold 255 (40,045 bytes), AWM2/AWE2 the rest
+        # (7,077), all 300 back; a cut AWM2 block leaves the first 255
         self.assertEqual(self.out[39], 'made 0 export 167 import 167 spells 1 items 1 My Fire 2 30 steel_longsword Biter 40 '
-                                       'full 7 bad -1 0')
+                                       'full 0 bad -1 0 many 1 old 40045 more 7077 back 40045 7077 spells 300 items 300 '
+                                       'cut -1 spells 255 items 255')
 
     def test_soul_gems(self):
         # the rat's soul (its record's soul, 10) read through the creature row; 5 + 1 + 18 + 2 = 26 bytes
-        self.assertEqual(self.out[40], 'gem 0 export 26 import 26 misc_soulgem_petty soul 10 removed 1 left 0')
+        # 300 gems: AWSG holds 255 (5,360 bytes), AWG2 the rest (951), all back (SAVE-MADE-RECORDS-64-CAP-66)
+        self.assertEqual(self.out[40], 'gem 0 export 26 import 26 misc_soulgem_petty soul 10 removed 1 left 0 many 5360 951 1 gems 300')
 
     def test_revealed_places(self):
-        # ShowMap's places: kept once (any case), 5 + 8 + 10 = 23 bytes saved
-        self.assertEqual(self.out[41], 'revealed 3 count 2 export 23 import 23 Tel Fyr Gnaar Mok')
+        # ShowMap's places: kept once (any case), 5 + 8 + 10 = 23 bytes saved; 300 places (SAVE-REVEALED-PLACES-128-CAP-66):
+        # AWMP holds 255 (5 + 2,440 bytes), AWP2 the other 45 (6 + 450), all 300 back; a cut AWP2 leaves the first 255
+        self.assertEqual(self.out[41], 'revealed 3 count 2 export 23 import 23 Tel Fyr Gnaar Mok '
+                                       'many 300 2445 456 1 places 300 Place 299 cut -1 places 255')
 
     def test_pool(self):
         self.assertEqual(self.out[33], 'pool %d evicted 10' % (128 + 10))

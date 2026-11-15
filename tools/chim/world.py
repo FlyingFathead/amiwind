@@ -777,8 +777,8 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
         if generate_on:
             # EXPERIMENTAL world format 0.11 (chim.thgt): a regular-path record as heights and facts the engine
             # generates the same bytes from; every other record compact as above
-            from chim import thgt as TG
-            version = TG.FORMAT_VERSION
+            from chim import thgt as THGT
+            version = THGT.FORMAT_VERSION
     terc_count, terc_saved, thgt_count, thgt_saved = 0, 0, 0, 0
     generate_on = False if not terc_on else generate_on
     terrain_content, terrain_records, terrain_at = {}, [], {}
@@ -1015,7 +1015,7 @@ def build_frames(out, frames, settings=None, terrain_light=12, jobs=1, cache=Non
                             terrain_content[digest] = len(terrain_records)
                             # format 0.11 record version 2: the converter's own triangles of this chunk,
                             # when the frame's ground is irregular (the regular path needs none)
-                            made = TG.encode(image, TG.chunk_triangles(spec.get('visibility'), shift)) \
+                            made = THGT.encode(image, THGT.chunk_triangles(spec.get('visibility'), shift)) \
                                 if terc_on and generate_on else None
                             compact = TC.encode(image) if terc_on and made is None else None
                             if made is not None:

@@ -24,6 +24,11 @@ int AW_ItemIndex(const aw_state_t *s,const char *id){(void)s;(void)id;return -1;
 int AW_ItemAppend(aw_state_t *s,const char *id,int32_t value){(void)s;(void)id;(void)value;return 0;}
 void AW_ItemsFree(aw_state_t *s){memset(&s->items,0,sizeof(s->items));}
 int AW_ItemsClone(aw_items_t *out,const aw_items_t *in){(void)in;memset(out,0,sizeof(*out));return 1;}
+/* the item instances (SAVE-ITEM-INSTANCES-ONE-PER-KIND-66): none here either; the codec writes an empty instance list */
+int AW_ItemInstFind(const aw_state_t *s,uint32_t serial){(void)s;(void)serial;return -1;}
+int AW_ItemPlain(const aw_state_t *s,int row){(void)s;(void)row;return 0;}
+int AW_ItemInstAppend(aw_state_t *s,const aw_item_inst_t *x){(void)s;(void)x;return 0;}
+const aw_item_inst_t *AW_ItemInst(const aw_state_t *s,int i){(void)s;(void)i;return NULL;}
 void (*aw_save_items_loaded)(void);
 int AW_CharacterLoad(void)
 {

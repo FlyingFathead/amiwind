@@ -3,27 +3,32 @@
  "note": "Ratchet: tests/test_resident_registry.py fails above these numbers and asks for them to be lowered when the engine needs less. Raise only with a dated, maintainer-approved reason. A group under \"caps\" may grow up to its cap without a raise (its totals still record what the engine uses).",
  "caps": {
   "commands": {
-   "count": 1000,
-   "hunk_bytes": 32000
+   "count": 1024,
+   "hunk_bytes": 32768
+  },
+  "cvars": {
+   "count": 1024,
+   "static_bytes": 24576,
+   "zone_bytes": 40960
   }
  },
  "totals": {
   "commands": {
-   "count": 304,
-   "hunk_bytes": 9728
+   "count": 306,
+   "hunk_bytes": 9792
   },
   "cvars": {
-   "count": 374,
-   "static_bytes": 8976,
-   "zone_bytes": 12200
+   "count": 377,
+   "static_bytes": 9048,
+   "zone_bytes": 12296
   },
   "tables": {
    "count": 1,
    "bytes": 1557
   },
   "growing": {
-   "count": 33,
-   "worst_bytes": 10090336
+   "count": 41,
+   "worst_bytes": 14122080
   }
  },
  "reasons": [
@@ -39,8 +44,8 @@
   "2026-10-17: HUD-STATS-29, maintainer-ordered original HUD boxes (job of 2026-10-17, maintainer: magic box charge bar required): aw_magic, one command record (32 hunk bytes) for selecting a magic item until the magic menu exists, the diagnostic charge and the HUD icon counters; aw_hud_icons, one saved cvar for the old placeholder method (DON'T DELETE ANY METHOD). The icon table is read from disk; no static table.",
   "2026-10-17: UI-INVENTORY-PREVIEW-GAP-41, maintainer-reported missing inventory character preview: aw_inventory_preview_reserve, one saved cvar keeping the old fixed 2 MiB admission selectable (DON'T DELETE ANY METHOD) beside the new admission by the pose model's real need.",
   "2026-10-17: UI-INVENTORY-PREVIEW-STILL-42, maintainer-ordered still inventory picture (rendered once per equipment change): aw_inventory_preview_live, one saved cvar keeping the old live, turnable preview selectable, default off (DON'T DELETE ANY METHOD).",
-  "2026-10-17: SKY-STAR-TWINKLE-LATE-42, maintainer-requested star twinkle switch (TG 2026-10-17 12:51: config flag on/off, default on, minimal strength): aw_star_twinkle, one saved cvar (24 structure bytes, 32 zone bytes); dbg startwinkle reuses the on-disk catalogue. 0 keeps the stars steady, 1 is the unchanged default pulse.",
-  "2026-10-17: the maintainer-requested debug torch (test only) while AmiWind is a preview (TG 12:42): aw_debug_torch, one cvar set by the builder's game config (1 until the final game, not saved), decides whether the player leaves the census office with the never-burning torch; the grant, the catalogue row and the lit torch need no command or static table.",
+  "2026-10-17: SKY-STAR-TWINKLE-LATE-42, maintainer-requested star twinkle switch (2026-10-17: config flag on/off, default on, minimal strength): aw_star_twinkle, one saved cvar (24 structure bytes, 32 zone bytes); dbg startwinkle reuses the on-disk catalogue. 0 keeps the stars steady, 1 is the unchanged default pulse.",
+  "2026-10-17: the maintainer-requested debug torch (test only) while AmiWind is a preview: aw_debug_torch, one cvar set by the builder's game config (1 until the final game, not saved), decides whether the player leaves the census office with the never-burning torch; the grant, the catalogue row and the lit torch need no command or static table.",
   "2026-10-17: maintainer-ordered automatic use of extra Fast RAM (v0.0.42-rc1, docs/ROADMAP.md cache plan: \"the benefits come automatically\", with an Options setting to turn it off for good): aw_autoram, one saved cvar (24 structure bytes, 32 zone bytes) behind Options > Extra RAM; no command (the startup notice's key and the chim command's memory line need none).",
   "2026-10-20: SKY-REDMOUNTAIN-BLUE-44 (v0.0.45 known list, fix job on branch v0.0.46-sky-pedestal): region weather needs aw_weather, one saved cvar (default 1 = the region weather; 0 = the old clear sky everywhere, the earlier method kept selectable) and aw_weather_set, one command record (dbg weather: force a weather for in-game checks, status with the region chances). Raised on the worker branch; the maintainer approves it at merge.",
   "2026-10-21: GHOSTFENCE-NO-ANIMATION-46, maintainer request (desktop chat 2026-10-21: the turbulent Ghostfence on by default with a dbg option for on/off): aw_ghostfence, one cvar (24 structure bytes, 32 zone bytes; default 1, not saved); dbg ghostfence reuses the on-disk catalogue, no command. The still table it selects is 512 bytes (CYCLE ints), under the 1 KiB static-table line.",
@@ -54,24 +59,24 @@
   "2026-10-23: aw_step_rules, the OpenMW step and slope rules prototype the maintainer asked for (approved in the desktop chat, 23 October 2026: yeah it's ok); STEP-MOVEMENT-OPENMW-RULES-48",
   "2026-10-26: the custom OST player the maintainer asked for (desktop chat, about 23:00 +0200: a custom OST audio player routine): one command record, aw_music_custom (aw music custom play/stop; 32 hunk bytes) (CUSTOM-OST-SLOT-53)",
   "2026-10-26: the maintainer's evening requests (via the coordinator): aw bench halloween, the standard benchmark command for testers, with the alias aw halloweenbench (one command record aw_bench, and the aw prefix as one more dbg dispatcher record: 64 hunk bytes), and a config flag that hides photo mode's own notice box and hints (the cvar aw_photomode_ui: 24 structure bytes, 32 zone bytes) (HALLOWEEN-SCENE-53)",
-  "2026-10-26: dbg halloween and its alias dbg halloweentest, the Halloween scene the maintainer asked for (TG 2026-10-26 10:21-10:22 +0200: the command and the alias by name; later the same day: the FPS counter off in the show, on in the test alias): two command records, aw_halloween and aw_halloweentest (64 hunk bytes); no cvars, the cast is read from disk on the command only (HALLOWEEN-SCENE-53)",
+  "2026-10-26: dbg halloween and its alias dbg halloweentest, the Halloween scene the maintainer asked for (2026-10-26: the command and the alias by name; later the same day: the FPS counter off in the show, on in the test alias): two command records, aw_halloween and aw_halloweentest (64 hunk bytes); no cvars, the cast is read from disk on the command only (HALLOWEEN-SCENE-53)",
   "2026-10-23: dbg door, for testing the hinged doors the maintainer asked for (approved in the desktop chat, 23 October 2026); AW-20260928-12",
   "2026-10-23: merge of v0.0.48-merge-dev-doors (sensitivity, step rules, hinged doors) into the interiors line (voice table, MWScript, player speed, Stats and Magic windows, campfires): both sides' approved raises recorded separately above; the totals are their union (no new setting)",
   "2026-10-27: WEATHER-RAIN and MESH-PARTICLE-EMITTERS, the maintainer's v0.0.54 items (desktop chat 2026-10-27 14:44 +0200: rain perhaps done with sprites, chimney smoke as a very simple sprite effect; the TODO item asks for a default-off setting first): aw_atmos, one saved cvar (24 structure bytes, 32 zone bytes; bit 1 the falling weather, default off until measured; bit 2 the mesh smoke, default on); dbg atmos reuses the on-disk catalogue, no command. The weather's land light (aw_weather 2) and the interior fog (aw_fog 2) reuse existing cvars.",
   "2026-10-27: maintainer-requested magic effects prototype (desktop chat 2026-10-27, TODO MAGICKA GRAPHICS, worker v054-magic): aw_magic_fx, one saved setting (default 0 = off, nothing loaded), and aw_magicfx, one command record for dbg cast (the effect table, sprites and sounds are read from disk on the first cast only); 32 hunk bytes, 24 structure bytes, 32 zone bytes.",
-  "2026-10-28: the magic shell shapes, the maintainer (TG via the coordinator, 2026-10-28: the dotted sphere shell is kept as a selectable version rather than deleted, and the shield defaults to the original's egg): aw_magic_orb, one saved setting carrying both the orb type (ones, 0-3) and the shell shape of the effect set (tens: 0 egg, 1 sphere); no command (dbg cast orb / shell route through aw_magicfx); 24 structure bytes, 32 zone bytes.",
+  "2026-10-28: the magic shell shapes, the maintainer (2026-10-28: the dotted sphere shell is kept as a selectable version rather than deleted, and the shield defaults to the original's egg): aw_magic_orb, one saved setting carrying both the orb type (ones, 0-3) and the shell shape of the effect set (tens: 0 egg, 1 sphere); no command (dbg cast orb / shell route through aw_magicfx); 24 structure bytes, 32 zone bytes.",
   "2026-10-27: merge of v0.0.54-magic (aw_magic_fx, aw_magicfx) into v0.0.54-atmos (aw_atmos): both raises recorded separately above; the cvar totals are their union (344).",
   "2026-10-27: aw_sweep (dbg sweep, ENTITY-SWEEP-AB), the console command the maintainer asked for on 2026-10-27 15:33 +0200 / 2026-10-27 13:33 UTC: a dbg command that checks the existence of all such entities across the map; one command, 32 hunk bytes",
   "2026-10-28: aw_vivec_arena_pit_type, the maintainer's call of 2026-10-28 ~01:2x +0200 (relayed by the coordinator: the Arena Pit methods go behind one saved setting; 0 the bowl whole, 1 tiles, 2 tiles + the room detail budget, 3 the backdrop panels later; the image stores the room once per type and the setting picks which one the door loads, PERF-ARENA-PIT-SLOW-48): one saved cvar (24 structure bytes, 32 zone bytes; default -1 = the type the room map names as its default); no command",
   "2026-10-28: v0.0.55 merge round 1 of v0.0.54-streaming (aw_vivec_arena_pit_type) and v0.0.54-magic (aw_magic_orb): both approved raises recorded separately above; the cvar totals are their union (346), no new setting",
   "2026-10-28: DemoWind, the effects test kit the maintainer asked for (desktop chat 2026-10-28 12:36 +0200: a fullscreen AGA set of cheap effects, no world, browsed one after another; v0.0.55 seed \"DemoWind\"): aw_demowind, one command record (32 hunk bytes; dbg demowind routes to it through the on-disk catalogue); no cvars; its 81,920 bytes of tiles are allocated on dbg demowind on and freed on off",
-  "2026-10-29: the Red Mountain sky, DemoWind's effect 2 in the game, asked for by the maintainer (TG 2026-10-29 07:48 +0200 / 2026-10-29 05:48 UTC: the Red Mountain sky step goes into the next release; REDMOUNTAIN-SKY-55, RED-MOUNTAIN-MENACE-54): aw_redmountain, one saved console variable (24 structure bytes, 32 zone bytes; default 1, 0 keeps the region weather alone); no command (dbg weather shows the pull), no table",
+  "2026-10-29: the Red Mountain sky, DemoWind's effect 2 in the game, asked for by the maintainer (2026-10-29: the Red Mountain sky step goes into the next release; REDMOUNTAIN-SKY-55, RED-MOUNTAIN-MENACE-54): aw_redmountain, one saved console variable (24 structure bytes, 32 zone bytes; default 1, 0 keeps the region weather alone); no command (dbg weather shows the pull), no table",
   "2026-10-29: _aw_debug_fps_hud, the maintainer asked for it: the FPS counter on by default in the dbg hud on view, but also switchable separately (one cvar, 24 static bytes)",
   "2026-10-30: aw_sky_haze, the switch for the sky haze the maintainer chose with the 300 fog distance (FOG-SKY-UNFOGGED-57; DON'T DELETE ANY METHOD keeps the unhazed sky selectable): one cvar, 24 structure bytes and 32 zone bytes; the haze itself lives in the sky's existing colour tables, no new table.",
   "2026-10-31: the growing group starts: the barter sold-things list (BARTER-SOLD-ITEM-LOST-58), nothing until a sale, at most 1024 kinds x 48 bytes = 49152 bytes; decided by the coordinator for the dialogue line (in memory, not a disk write per sale)",
   "2026-10-31: made spells (64 x 152 bytes) and enchanted items (64 x 200 bytes), nothing until the first is made, worst 22,528 bytes; decided by the coordinator for a feature-complete dialogue (the maintainer asked for it), sized to the data",
   "2026-10-31: filled soul gems (64 x 44 bytes = 2,816), nothing until the first is filled; part of the coordinator-approved made-things design (Enchanting)",
-  "2026-10-31: the maintainer (TG): 'by default the player's own footstep sounds could be turned on (or off) from sound options menu or dbg console' (PLAYER-FOOTSTEPS-NONE-58: dbg footsteps, aw_player_footsteps, its stride and volume)",
+  "2026-10-31: the maintainer: 'by default the player's own footstep sounds could be turned on (or off) from sound options menu or dbg console' (PLAYER-FOOTSTEPS-NONE-58: dbg footsteps, aw_player_footsteps, its stride and volume)",
   "2026-10-31: places revealed by ShowMap (128 x 32 bytes = 4,096), nothing until the first ShowMap; the coordinator asked for the data to be kept for the map place markers (INGAME-MAP-ORIGINAL-57)",
   "2026-10-31: the journal topic pages, sized from the data (16,796 Topic answers in the three masters, each heard once): at most 12,000 entries x 6 bytes and 1,024 speaker names x 32 bytes, worst 104,768 bytes, a few KB in a long game, growing from 256; the coordinator approved the plan",
   "2026-11-01: the model table raised from 256 to 512 by the maintainer's decision (ENGINE-MODEL-TABLE-58): the first 256 loaded-model slots stay static as before; slots 257-512 come in 4 pages of 64 x 400 bytes (25,600 each), allocated only when a map loads more than 256 models, worst 102,400 bytes",
@@ -103,8 +108,8 @@
   "2026-11-07: merge of v0.0.62-census (aw_census_legacy) and integration 583c0feb (aw_name_labels, aw_name_labels_set): both approved raises recorded separately above; the totals are their union (no new setting)",
   "2026-11-07: maintainer-ordered recovery from a failed load and the clean game reset (HEART-CHAMBER-LOAD-HANG-62, DBG-RESTARTGAME-62, DBG-VERSION-62, critical): four commands (128 hunk bytes): aw_restart_game (dbg restartgame), aw_load_fail (dbg loadfail, the test aid that forces a failed load), aw_version_info (dbg ver / dbg version), aw_memcensus (dbg memcensus, the free Fast RAM in one line); one cvar aw_load_fail_test (24 structure bytes, 32 zone bytes), the count dbg loadfail sets and the map command reads.",
   "2026-11-08: +1 command aw_topic_colours (32 hunk bytes) and +1 console variable aw_dialogue_topic_colours (24 structure bytes, 32 zone bytes) for the dialogue topic colours switch (DIALOGUE-LINKS-62, the maintainer's dialogue link reports of 2026-11-07); added on the worker branch v0.0.62-dlglinks while its base still had room, recorded at the catch-up with the v0.0.62-dev2 line; the maintainer approves it at merge.",
-  "2026-11-08: +1 command aw_breath (32 hunk bytes; dbg breath) for the breath under water and drowning the maintainer asked for (UNDERWATER-BREATH-62, TG 2026-11-07): the breath left, Water Breathing, the drowning damage and what god mode held back, by number, for the in-game checks; no console variable (the rule has no switch, its settings come from the game data). Added on the worker branch v0.0.63-envhazard; the maintainer approves it at merge.",
-  "2026-11-09: +2 commands aw_mw_help (dbg help mw / dbg mw help, the original game's console commands paged from a file on disk, one offset and a 256-byte line buffer kept) and aw_mw_target (dbg mw target, the finder for a console line's target: 256 rows of 82 bytes only while its list is open), 64 hunk bytes, no cvar: the original console commands the maintainer asked for (MW-CONSOLE-COMMANDS-62, TG 2026-11-07, and the finder menu like dbg tp's, the same day). The entry list also gains five commands whose raises were approved and recorded above but whose names were never added: aw_restart_game, aw_load_fail, aw_version_info, aw_memcensus (2026-11-07) and aw_topic_colours (2026-11-08).",
+  "2026-11-08: +1 command aw_breath (32 hunk bytes; dbg breath) for the breath under water and drowning the maintainer asked for (UNDERWATER-BREATH-62, 2026-11-07): the breath left, Water Breathing, the drowning damage and what god mode held back, by number, for the in-game checks; no console variable (the rule has no switch, its settings come from the game data). Added on the worker branch v0.0.63-envhazard; the maintainer approves it at merge.",
+  "2026-11-09: +2 commands aw_mw_help (dbg help mw / dbg mw help, the original game's console commands paged from a file on disk, one offset and a 256-byte line buffer kept) and aw_mw_target (dbg mw target, the finder for a console line's target: 256 rows of 82 bytes only while its list is open), 64 hunk bytes, no cvar: the original console commands the maintainer asked for (MW-CONSOLE-COMMANDS-62, 2026-11-07, and the finder menu like dbg tp's, the same day). The entry list also gains five commands whose raises were approved and recorded above but whose names were never added: aw_restart_game, aw_load_fail, aw_version_info, aw_memcensus (2026-11-07) and aw_topic_colours (2026-11-08).",
   "2026-11-09: the command cap raised to 512 commands (512 x 32 = 16,384 hunk bytes; 300 in use, 9,600 bytes) by the maintainer's decision the same day (app chat, while dev2 was gated), so new console commands asked for do not each need a raise; the ratchet still refuses growth past 512 and the cvar, table and growing budgets are unchanged.",
   "2026-11-09: the command cap raised from 512 to 1,000 commands (1,000 x 32 = 32,000 hunk bytes; 300 in use, 9,600 bytes) by the maintainer's decision the same day (app chat), so the original game's console commands and AmiWind's own can grow without a raise each; the ratchet still refuses growth past 1,000 and the cvar, table and growing budgets are unchanged.",
   "2026-11-09: +1 console variable aw_text_box_type, the saved text box type (1 rising strip / 2 box only, the default) the maintainer asked for, with its Options entry and dbg ui textbox; the command aw_text_box sits under the commands cap (SUBTITLE-BOX-HIDES-STATS-63)",
@@ -114,9 +119,18 @@
   "2026-11-10: LARGE-ROOM-FOG-SETTING-64, the maintainer's request for its own setting for the large-room fog: aw_fog_large_rooms, one saved console variable (0 off, 1 on, the default) with an Options > Video row; no command, no static name table.",
   "2026-11-10: LARGE-ROOM-FOG-SETTING-64, the maintainer's request for an indoor fog distance of its own: aw_fog_distance_interior, one saved console variable (100..4096 local units, default 300 as the shared value before) with an Options > Video row; the outdoor aw_drawdistance unchanged; no command, no static name table.",
   "2026-11-10: aw_tree_crowns, the Tree crowns player setting the maintainer asked for (saved with the other settings, Options > Video > Tree crowns; TREES-DEPTH-56): one console variable",
+  "2026-11-11: HUD-ACTIVE-EFFECTS-ROW-64, the active-effect icons the maintainer decided on (app chat 2026-11-11: a row under the view growing to at most three rows with +N, the same icons on the Stats window and V for the full list): aw_hud_effects, one saved cvar (24 structure bytes, 32 zone bytes; default 1, config/game.cfg) to turn the icons off (methods as switches); dbg hudeffects reuses the on-disk catalogue. The status command aw_effects_status (dbg effects) stays within the command cap. The pictures and descriptions are read from gfx/effects.awe on demand, not a registry.",
   "2026-11-12: OPENING-TUTORIAL-KEYS-65, the maintainer (via the coordinator, 2026-11-12): the tutorial boxes must name the keys the player has bound, and the inventory window's own keys must be bindable too. aw_key_inv_use and aw_key_inv_drop, two saved cvars (48 structure bytes, 72 zone bytes) holding the inventory's use/equip (E ENTER) and drop (D) key lists; the tutorial table (rows, 1.5 KiB of static row text and hashes, config/tutorial-texts.json rendered into aw_tutorial_table.inc) read by every message box. No command added.",
   "2026-11-12: OPENING-TUTORIAL-KEYS-65, the tutorial table grew with the rows the maintainer added the same day (the magic menu with its ready key, the inventory with its equip key): 1,725 bytes of static row text and hashes.",
-  "2026-11-12: the maintainer asked for dbg dbgtorch and dbg debugtorch as names of the debug torch once the census exit stopped giving it (two catalogue rows routed to the inventory command, no resident command of their own); the tutorial table is 168 bytes smaller (two hint rows hidden, TUTORIAL-BOX-SHOWN-TWICE-65)"
+  "2026-11-12: the maintainer asked for dbg dbgtorch and dbg debugtorch as names of the debug torch once the census exit stopped giving it (two catalogue rows routed to the inventory command, no resident command of their own); the tutorial table is 168 bytes smaller (two hint rows hidden, TUTORIAL-BOX-SHOWN-TWICE-65)",
+  "2026-11-12: the v0.0.65 release merged into the v0.0.66 line: the union of the two lines' approved console variables, no new one: aw_hud_effects (HUD-ACTIVE-EFFECTS-ROW-64, the active-effect icons the maintainer decided on 2026-11-11, raised on the expansion line) on top of the release's 374 (with aw_key_inv_use and aw_key_inv_drop, OPENING-TUTORIAL-KEYS-65); one cvar, 24 structure bytes, 32 zone bytes.",
+  "2026-11-12: the maintainer set the console variables' cap to 1,024 (24,576 structure bytes, 40,960 zone bytes) and the commands' cap to 1,024 (32,768 hunk bytes): both groups grow up to their caps without a raise, so a merge of two lines or a new switch no longer stops a gate; the totals still record what the engine uses and this list why each came. The other groups stay an exact ratchet.",
+  "2026-11-14: MAP-EXPLORED-SAVE-BLOCK-66, MAP-EXPLORED-ROOMS-CAP-66 and SAVE-ACTOR-ROWS-256-66, the maintainer's decisions of 14 November 2026 (the explored map never refuses a save and remembers more than 256 rooms; the saved actor rows lose their fixed 256): four growing allocations declared, worst cases only: the explored map's land rows (2,048 x 12 bytes, held before but not declared), its rooms (2,048 x 48 bytes, was 256 x 48 not declared) and their name index (2,048 x 4 bytes), and the saved actor rows (16,384 x 48 bytes, was a fixed 256 x 48 inside every saved-game copy). A long game holds a few hundred rows and rooms; the fixed tables they replace freed 126,936 resident bytes (the two 32 KB actor blocks, and 12,280 bytes in each of the five resident saved-game copies).",
+  "2026-11-14: the explored land rows bound raised from 2,048 to 8,192 as a damaged-file guard (the save contract: no fixed bound under the game; 72 KB declared, nothing resident until used)",
+  "2026-11-14: the maintainer asked (outside review of the save, 2026-11-14) that script values be saved by their variable's name with a layout check, and that items' script values be saved: three growing tables, declared worst cases only (realistic: a few KB): every kept local's name key (+4 bytes a local, 8,192 at most), a layout signature per script with kept locals (4,096 at most, 811 scripts have variables), the items' locals by (holder, item, serial) (4,096 at most; 491 held items and 40 worn ones have scripts), and the worn items' ids met (256 at most); SAVE-SCRIPT-ROW-HINT-ONLY-65, SAVE-ITEM-SCRIPT-LOCALS-66",
+  "2026-11-14: the world change list bounds raised to damaged-file guards above the game with both expansions (the save contract): saved script locals 8,192 -> 65,536 (the base game declares 7,388; SAVE-LOCALS-BOUND-UNDER-GAME-66) and actor rows 8,192 -> 32,768 (about 13,800 placed actor references; SAVE-ACTOR-ROWS-BOUND-UNDER-GAME-66); declared worst cases only, the rows cost memory only while kept",
+  "2026-11-14: made spells, enchanted items and potions, and filled soul gems grow from the heap to guards of 1,024 each (were 64 fixed, the 65th refused: SAVE-MADE-RECORDS-64-CAP-66, the save contract); declared worst cases only, the lists grow by doubling from 8",
+  "2026-11-14: the NPCs crime marks table grows from the heap to a guard of 1,024 rows of 24 bytes (was 32 fixed, the 33rd witness reused a bystander row; SAVE-CRIME-MARKS-32-ROWS-66) and the places a script reveals on the map to 1,024 of 32 bytes (was 128; the dialogue results alone call ShowMap 249 times; SAVE-REVEALED-PLACES-128-CAP-66); declared worst cases only, both lists grow by doubling as used (the save contract)"
  ],
  "entries": {
   "commands": [
@@ -213,6 +227,7 @@
    "aw_dialogue_method",
    "aw_dimensions",
    "aw_door_status",
+   "aw_effects_status",
    "aw_exteriorluma_set",
    "aw_eyeheight",
    "aw_fog_distance",
@@ -363,6 +378,7 @@
    "listen",
    "load",
    "map",
+   "marker",
    "maxplayers",
    "mcache",
    "menu_main",
@@ -520,6 +536,7 @@
    "aw_headlamp",
    "aw_horizon_defaults",
    "aw_horizon_veil",
+   "aw_hud_effects",
    "aw_hud_icons",
    "aw_input_trace",
    "aw_interaction_label_style",
@@ -549,6 +566,7 @@
    "aw_map_debug_available",
    "aw_map_format",
    "aw_map_lava",
+   "aw_map_markers_max",
    "aw_map_mode",
    "aw_modal_black",
    "aw_modal_freeze",
@@ -594,6 +612,7 @@
    "aw_region_loading_delay",
    "aw_remote",
    "aw_remote_dir",
+   "aw_save_block_kb",
    "aw_seethrough_material",
    "aw_show_speaker_name_during_voiceovers",
    "aw_showdisk",
@@ -816,8 +835,12 @@
    "drops shown on the loaded map (CELL-CHANGES-59)",
    "enchanted items (Enchanting)",
    "engine named facts past 32 (CELL-CHANGES-59)",
+   "explored map: land cells (MAP-EXPLORED-SAVE-BLOCK-66)",
+   "explored map: rooms (MAP-EXPLORED-ROOMS-CAP-66)",
+   "explored map: the rooms' name index (MAP-EXPLORED-ROOMS-CAP-66)",
    "filled soul gems (Enchanting)",
    "hidden edicts of the loaded map (CELL-CHANGES-59)",
+   "item scripts' locals by item instance (SAVE-ITEM-SCRIPT-LOCALS-66)",
    "journal topic entries",
    "journal topic speakers",
    "loaded models past 256 (ENGINE-MODEL-TABLE-58)",
@@ -831,13 +854,17 @@
    "reference identity table's block index (CELL-CHANGES-59 slice 7)",
    "reference identity table's one block of rows (CELL-CHANGES-59 slice 7)",
    "running global scripts (CELL-CHANGES-59)",
+   "saved actor rows (SAVE-ACTOR-ROWS-256-66)",
    "script globals, quest stages, known topics, dispositions (CELL-CHANGES-59)",
    "script locals (CELL-CHANGES-59)",
    "script name hashes met (CELL-CHANGES-59)",
+   "script variable layouts of the kept locals (SAVE-SCRIPT-ROW-HINT-ONLY-65)",
    "stolen items by owner (CELL-CHANGES-59)",
+   "the NPCs' crime marks (CRIME-SAVE-PURSUERS-62)",
    "the item table: kinds carried (INVENTORY-ORIGINAL-LIMITS-61)",
    "world change list positions and drops (CELL-CHANGES-59)",
-   "world change list rows (CELL-CHANGES-59)"
+   "world change list rows (CELL-CHANGES-59)",
+   "worn items' ids met, for the save (SAVE-ITEM-SCRIPT-LOCALS-66)"
   ]
  }
 }

@@ -218,6 +218,23 @@ class PayloadAuditTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, '^2 actor frame'):
             audit_payload(self.id1, removed_maps={'maps/a.bsp'})
 
+    def test_skeletal_own_idle_span_from_the_entity(self):
+        # DAGOTH-IDLE-BASE-CHECK-66: a skeletal aw_npc whose idle group is not at table frame 0 loops its own idle
+        # span (world.qc aw_npc_idle: aw_idle_base .. + aw_idle_count; Dagoth Ur's idle at 30:8 of his table)
+        from unittest import mock
+        self.put('progs/dagoth.mdl', 1, 'hit:0:3:0.3 death:3:27:0.3 idle:30:8:0.3')
+        own = ('{\n"classname" "aw_npc"\n"model" "progs/dagoth.mdl"\n"aw_idle_base" "%s"\n"aw_idle_count" "8"\n'
+               '"aw_idle_step" "0.1250000"\n}\n')
+        with mock.patch.object(actor_frames, 'skeletal_frames', lambda raw: 64):
+            (self.id1 / 'maps/a.bsp').write_bytes(bsp(own % '30'))
+            self.assertEqual(audit_payload(self.id1)['actor_models'], 1)
+            (self.id1 / 'maps/a.bsp').write_bytes(bsp(npc('progs/dagoth.mdl')))
+            with self.assertRaisesRegex(ValueError, 'start at table frame 0'):
+                audit_payload(self.id1)
+            (self.id1 / 'maps/a.bsp').write_bytes(bsp(own % '60'))
+            with self.assertRaisesRegex(ValueError, r'own idle loop 60:8 .* not inside its 64 table frames'):
+                audit_payload(self.id1)
+
     def test_preflight_runs_it(self):
         source = (ROOT / 'tools/payload_preflight.py').read_text(encoding='utf-8')
         # (in a process of its own beside the other checks since v0.0.48, else on a thread: BUILD-IMAGE-UNDERUSED-32)

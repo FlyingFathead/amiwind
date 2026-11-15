@@ -62,6 +62,7 @@ static float lock_until;
  * are not solid to a plain trace), its distance, and how far the bolt has flown */
 typedef struct {
     int used,source,target,n;vec3_t at,vel;float until,target_dist,flown;
+    int caster;   /* NPC-NO-SPELLCASTING-65: the edict number of an actor that cast it (0: the player's bolt) */
     aw_spell_effect_t e[AW_MADE_EFFECTS];uint32_t flags[AW_MADE_EFFECTS];   /* its own spell: a later selection does not change it */
 } bolt_t;
 static bolt_t bolts[BOLTS];
@@ -91,6 +92,8 @@ static int load_spell(void){
     }
     for(i=0;i<spell.n;i++)if(!AW_ActorMagicEffect(spell.e[i].effect,&spell.m[i]))memset(&spell.m[i],0,sizeof(spell.m[i]));
     spell.valid=spell.n>0;
+    /* the hands' cast by the first effect's range (OpenMW CharacterController: the spell's first effect) */
+    if(spell.valid && (int)spell.e[0].range<=AW_RANGE_TARGET)aw_magic_cast_range=(int)spell.e[0].range;
     return spell.valid;
 }
 void AW_CastSelect(int kind,int index){
@@ -164,7 +167,7 @@ static void bolt_land(const bolt_t *b,edict_t *t,int source){
     aw_mgef_t m[AW_MADE_EFFECTS];int k;
     memset(m,0,sizeof(m));
     for(k=0;k<b->n;k++)m[k].flags=b->flags[k];
-    if(AW_MwscriptLand(t,b->e,m,b->n,AW_RANGE_TARGET,source)>0)landed++;
+    if(AW_MwscriptLand(t==sv_player?NULL:t,b->e,m,b->n,AW_RANGE_TARGET,source)>0)landed++;   /* NULL: the player */
 }
 /* every actor within the bolt's largest target area of AT (one pass over the edicts, at the explosion only) */
 static void area_land(const bolt_t *b,const vec3_t at,edict_t *struck){
@@ -172,9 +175,14 @@ static void area_land(const bolt_t *b,const vec3_t at,edict_t *struck){
     for(i=0;i<b->n;i++)if(b->e[i].range==AW_RANGE_TARGET && b->e[i].area>area)area=b->e[i].area;
     if(!area)return;
     radius=(float)area*UNITS_PER_FOOT*SCALE;
+    /* an actor's bolt reaches the player too; never its own caster */
+    if(b->caster>0 && sv_player && !sv_player->free && struck!=sv_player){
+        vec3_t d;VectorSubtract(sv_player->v.origin,at,d);
+        if(Length(d)<=radius)bolt_land(b,sv_player,-1);
+    }
     for(i=1,e=NEXT_EDICT(sv.edicts);i<sv.num_edicts;i++,e=NEXT_EDICT(e)){
         vec3_t d;
-        if(e->free || e==struck || e==sv_player || !GetEdictFieldValue(e,"aw_ref"))continue;
+        if(e->free || e==struck || e==sv_player || i==b->caster || !GetEdictFieldValue(e,"aw_ref"))continue;
         VectorSubtract(e->v.origin,at,d);
         if(Length(d)>radius)continue;
         bolt_land(b,e,-1);
@@ -232,6 +240,45 @@ int AW_CastOn(edict_t *caster,edict_t *target,int row){
     landed+=(unsigned long)hits;
     return hits;
 }
+/* NPC-NO-SPELLCASTING-65 (aw_cast.h): an actor's cast at the release, delivered as the player's: Self on itself, Touch
+ * on the target within REACH, Target as a bolt from its eye to the target's chest (the bolts above) */
+static unsigned long actor_casts;
+int AW_CastActorRelease(edict_t *caster,edict_t *target,int row,float reach){
+    aw_spell_effect_t e[AW_MADE_EFFECTS];aw_mgef_t m[AW_MADE_EFFECTS];int i,n,hits=0,ranges;edict_t *t;
+    n=row>=0?AW_ActorSpellEffects(row,e,AW_MADE_EFFECTS):0;
+    if(n<=0 || !caster || caster->free || !sv_player)return -1;
+    t=target?target:sv_player;
+    for(i=0;i<n;i++)if(!AW_ActorMagicEffect(e[i].effect,&m[i]))memset(&m[i],0,sizeof(m[i]));
+    ranges=AW_CastRanges(e,n);actor_casts++;
+    if(ranges&(1<<AW_RANGE_SELF)){
+        if(AW_MwscriptLand(caster,e,m,n,AW_RANGE_SELF,row)>0)landed++;
+        hits++;
+    }
+    if((ranges&(1<<AW_RANGE_TOUCH)) && !t->free){
+        vec3_t d;float gap;
+        VectorSubtract(t->v.origin,caster->v.origin,d);d[2]=0;
+        gap=(float)Length(d)-caster->v.maxs[0]-t->v.maxs[0];
+        if(gap<=reach && AW_MwscriptLand(t==sv_player?NULL:t,e,m,n,AW_RANGE_TOUCH,row)>0)landed++;
+        hits++;
+    }
+    if(ranges&(1<<AW_RANGE_TARGET)){
+        bolt_t *b;vec3_t to,d;float len;
+        for(i=0;i<BOLTS && bolts[i].used;i++);
+        if(i==BOLTS)i=0;
+        b=&bolts[i];memset(b,0,sizeof(*b));
+        VectorCopy(caster->v.origin,b->at);b->at[2]+=caster->v.mins[2]+(caster->v.maxs[2]-caster->v.mins[2])*.75f;
+        VectorCopy(t->v.origin,to);to[2]+=(t->v.mins[2]+t->v.maxs[2])*.5f;
+        VectorSubtract(to,b->at,d);len=(float)VectorNormalize(d);
+        VectorScale(d,BOLT_SPEED_DEFAULT*SCALE,b->vel);
+        b->used=1;b->until=(float)sv.time+BOLT_SECONDS;b->source=row;b->caster=NUM_FOR_EDICT(caster);
+        b->target=NUM_FOR_EDICT(t);b->target_dist=len;
+        b->n=n;
+        for(i=0;i<n;i++){b->e[i]=e[i];b->flags[i]=m[i].flags;}
+        hits++;
+    }
+    return hits;
+}
+unsigned long AW_CastActorCasts(void){return actor_casts;}
 static void bolts_frame(float dt){
     int i;
     for(i=0;i<BOLTS;i++){
@@ -240,7 +287,10 @@ static void bolts_frame(float dt){
         /* gone at its time, or when a map load started the clock again (a bolt never flies into another map) */
         if(sv.time>=b->until || b->until>(float)sv.time+BOLT_SECONDS){b->used=0;continue;}
         VectorMA(b->at,dt,b->vel,end);
-        tr=SV_Move(b->at,vec3_origin,vec3_origin,end,MOVE_MISSILE,sv_player);
+        {   /* the trace passes through its own caster (the player, or the actor that cast it) */
+            edict_t *from=b->caster>0 && b->caster<sv.num_edicts?EDICT_NUM(b->caster):sv_player;
+            tr=SV_Move(b->at,vec3_origin,vec3_origin,end,MOVE_MISSILE,from);
+        }
         if(b->target>0 && b->target<sv.num_edicts){
             /* the aimed actor is reached before the world stops the bolt: it lands there */
             edict_t *t=EDICT_NUM(b->target);float step=(float)Length(b->vel)*dt*(tr.fraction<1?tr.fraction:1);
@@ -257,6 +307,7 @@ static void bolts_frame(float dt){
         Con_DPrintf("Bolt: struck %s after %.1f s\n",tr.ent && tr.ent!=sv.edicts?
                     (tr.ent->v.netname?pr_strings+tr.ent->v.netname:"an object"):"the world",BOLT_SECONDS-(b->until-(float)sv.time));
         if(tr.ent && tr.ent!=sv.edicts && tr.ent!=sv_player && GetEdictFieldValue(tr.ent,"aw_ref"))bolt_land(b,tr.ent,b->source);
+        else if(b->caster>0 && tr.ent==sv_player){bolt_land(b,sv_player,b->source);area_land(b,tr.endpos,sv_player);b->used=0;continue;}
         area_land(b,tr.endpos,tr.ent);
         b->used=0;
     }
@@ -403,13 +454,31 @@ static void worn_frame(void){
     worn_generation=AW_EffectsGeneration();
     if(p)AW_MwscriptPlayerStore(p);
 }
+/* PLAYER-CASTING-59 (v0.0.66): a cast goes in two steps, as the original's spellcast group: at the press the refusals
+ * (no spell, the magicka, a used power; OpenMW World::startSpellCast), then the hands' cast starts (aw_hands.c), and
+ * at its release key (AW_HandCastReleaseNow: the attack clip's release frame) the magicka is paid, the roll made and
+ * the spell leaves (CastSpell::cast at the "release" text key). pending: a cast between its start and its release. */
+static int pending;static float release_at;
+static int looks[3];   /* CAST-EGG-SYNC-62: the pending cast's held looks per range (AW_MagicCastLookStart), 0 none */
+/* the refusals of a cast before it starts; 1 = it may start. P: the player's record. */
+static int cast_allowed(aw_actor_t *p,int god){
+    /* OpenMW World::startSpellCast: the magicka first; a used power refuses as well */
+    if(!god && spell.cost>0 && p->dyn_cur[1]<(float)spell.cost){
+        refused++;say("You do not have enough Magicka to cast the spell.");return 0;   /* sMagicInsufficientSP */
+    }
+    if(spell.type==AW_SPELL_TYPE_POWER && sel_kind==0 && !power_ready(sel_index)){
+        refused++;say("You can only use this power once a day.");return 0;          /* sPowerAlreadyUsed */
+    }
+    return 1;
+}
+static void cast_release(void);
 static void cast_now(void){
-    float chance;int roll,ranges,god;aw_actor_t *p;
+    aw_actor_t *p;float delay;
     if(!cast_on || !sv.active || !sv_player || sv_player->v.health<=0)return;
     /* a map load starts the server clock again: a lock from the last map never holds past one cast's length (seen
      * in game 6 November 2026: after a teleport across maps no cast went off for minutes) */
     if(lock_until>(float)sv.time+CAST_SECONDS)lock_until=0;
-    if(sv.time<lock_until)return;
+    if(sv.time<lock_until || pending)return;
     if(sel_index<0 || !spell.valid){
         aw_inventory_item_t it;
         if(AW_MagicSelectedItem(&it)){use_item(&it);return;}   /* Cast When Used / Cast Once (v0.0.61) */
@@ -417,16 +486,34 @@ static void cast_now(void){
     }
     if(!(p=AW_MwscriptPlayerRecord())){Con_Printf("Casting: no player record in this build.\n");return;}
     lock_until=(float)sv.time+CAST_SECONDS;
+    if(!cast_allowed(p,((int)sv_player->v.flags&FL_GODMODE)!=0))return;
+    /* the hands' cast; the spell leaves at its release (at once when the image has no hand table or the hands are
+     * not up: the cast never waits on the look) */
+    delay=AW_HandsCastStart()?AW_HandCastReleaseNow(0):0;
+    if(delay>0 && delay<CAST_SECONDS){
+        /* CAST-EGG-SYNC-62: the look (hand glow, cast sound, the shell) starts now, with the cast animation; it waits
+         * for the release below */
+        int r,ranges=AW_CastRanges(spell.e,spell.n);
+        for(r=0;r<3;r++)looks[r]=ranges&(1<<r)?AW_MagicCastLookStart(0,first_mgef(r),r,0):0;
+        pending=1;release_at=(float)sv.time+delay;return;
+    }
+    cast_release();
+}
+/* the held looks of the pending cast end (AW_MagicCastLookRelease): OK 1 the spell left, each range's look goes on;
+ * 0 the roll failed, one failure sound; -1 the cast was dropped, the looks end quietly */
+static void looks_release(int ok){
+    int r,first=1;
+    for(r=0;r<3;r++)if(looks[r]){AW_MagicCastLookRelease(looks[r],ok==0 && !first?-1:ok);first=0;looks[r]=0;}
+}
+static void cast_release(void){
+    float chance;int roll,ranges,god,look_held=looks[0] || looks[1] || looks[2];aw_actor_t *p;
+    pending=0;
+    if(!cast_on || !sv.active || !sv_player || sv_player->v.health<=0 || sel_index<0 || !spell.valid ||
+       !(p=AW_MwscriptPlayerRecord())){looks_release(-1);return;}
     /* god mode (Quake's, dbg god on): no magicka paid and the cast always succeeds (OpenMW startSpellCast and
      * getSpellSuccessChance: godmode) */
     god=((int)sv_player->v.flags&FL_GODMODE)!=0;
-    /* OpenMW World::startSpellCast: the magicka first; a used power refuses as well */
-    if(!god && spell.cost>0 && p->dyn_cur[1]<(float)spell.cost){
-        refused++;say("You do not have enough Magicka to cast the spell.");return;   /* sMagicInsufficientSP */
-    }
-    if(spell.type==AW_SPELL_TYPE_POWER && sel_kind==0 && !power_ready(sel_index)){
-        refused++;say("You can only use this power once a day.");return;          /* sPowerAlreadyUsed */
-    }
+    if(!cast_allowed(p,god)){looks_release(-1);return;}   /* the magicka spent since the start (another cast, a drain) */
     chance=god?100.0f:AW_CastChanceNow();
     if(spell.type==AW_SPELL_TYPE_SPELL && !god){p->dyn_cur[1]-=(float)spell.cost;AW_MwscriptPlayerStore(p);}
     roll=rand()%100;
@@ -434,7 +521,7 @@ static void cast_now(void){
         /* sMagicSkillFail; the school's failure sound comes with the look (aw_magic_fx), not yet without it */
         fails++;say("You failed casting the spell.");
         Con_DPrintf("Cast %s failed: roll %d, chance %.0f %%, magicka %.0f left\n",spell.name,roll,chance,p->dyn_cur[1]);
-        AW_MagicCastLook(spell.e[0].effect,spell.e[0].range,1,0);
+        if(look_held)looks_release(0);else AW_MagicCastLook(spell.e[0].effect,spell.e[0].range,1,0);
         return;
     }
     casts++;
@@ -444,12 +531,15 @@ static void cast_now(void){
     if(spell.type==AW_SPELL_TYPE_POWER && sel_kind==0)power_used(sel_index);
     if(spell.type==AW_SPELL_TYPE_SPELL)AW_LevelupUse(AW_CastSchoolSkill(spell.school),0,1);   /* Spellcast_Success */
     ranges=AW_CastRanges(spell.e,spell.n);
+    /* the looks: a held cast's (started with the animation) leave now; a cast without the hands' animation plays
+     * its whole look from here, as before */
+    if(look_held)looks_release(1);
     if(ranges&(1<<AW_RANGE_SELF)){
         if(AW_MwscriptLand(NULL,spell.e,spell.m,spell.n,AW_RANGE_SELF,sel_kind==0?sel_index:-1)>0)landed++;
-        AW_MagicCastLook(first_mgef(AW_RANGE_SELF),AW_RANGE_SELF,0,0);
+        if(!look_held)AW_MagicCastLook(first_mgef(AW_RANGE_SELF),AW_RANGE_SELF,0,0);
     }
-    if(ranges&(1<<AW_RANGE_TOUCH)){touch();AW_MagicCastLook(first_mgef(AW_RANGE_TOUCH),AW_RANGE_TOUCH,0,0);}
-    if(ranges&(1<<AW_RANGE_TARGET)){launch();AW_MagicCastLook(first_mgef(AW_RANGE_TARGET),AW_RANGE_TARGET,0,0);}
+    if(ranges&(1<<AW_RANGE_TOUCH)){touch();if(!look_held)AW_MagicCastLook(first_mgef(AW_RANGE_TOUCH),AW_RANGE_TOUCH,0,0);}
+    if(ranges&(1<<AW_RANGE_TARGET)){launch();if(!look_held)AW_MagicCastLook(first_mgef(AW_RANGE_TARGET),AW_RANGE_TARGET,0,0);}
 }
 
 /* one carried item of AW_InventoryCarried: a Magic Items row when it can be cast (AW_MagicSelectable) */
@@ -507,7 +597,7 @@ static int window_status(char *out,int size){
     Q_snprintf(out,size,"%s: cost %d, chance %.0f %%",spell.name,spell.cost,AW_CastChanceNow());
     return 1;
 }
-static void ready_reset(int new_game){(void)new_game;ready=0;held=0;}
+static void ready_reset(int new_game){(void)new_game;ready=0;held=0;pending=0;release_at=0;memset(looks,0,sizeof(looks));aw_magic_cast_range=AW_RANGE_TARGET;}
 void AW_CastFrame(void){
     edict_t *p=sv_player;
     aw_magic_castables=window_castables;aw_magic_select=window_select;aw_magic_status=window_status;
@@ -536,6 +626,9 @@ void AW_CastFrame(void){
 #endif
         }
     }
+    /* a cast between its start and its release (a map load restarts the clock: one never waits past a cast's length) */
+    if(pending && (release_at>(float)sv.time+CAST_SECONDS || p->v.health<=0)){pending=0;looks_release(-1);}
+    if(pending && sv.time>=release_at)cast_release();
     if(!ready || !cast_on)return;
     if(p->v.health<=0){ready=0;return;}
     /* with magic ready the attack button is the cast: taken before the fight and the hands see it */

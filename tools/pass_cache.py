@@ -77,28 +77,35 @@ PASS_KEY_NEUTRAL = frozenset({'tools/pass_cache.py', 'tools/mesh_tables.py',
                               'config/collision-standing-room.json', 'config/collision-hull-surface.json'})
 
 
-def source_digest(*scripts, form=PASS_KEY_FORM):
+def source_digest(*scripts, form=PASS_KEY_FORM, content_keyed=True):
     """SHA-256 of the repository sources the given pass modules read, transitively
     (computed once per process: the repository index hashes every source file). A script given as
     (path, function) counts only the code that function reaches: the pass's per-map worker.
-    FORM: the key form (PASS_KEY_FORM; 1 = the keys written before BUILD-PASS-KEY-OVERBROAD-36)."""
-    key = (form,) + tuple((str(Path(script[0]).resolve()), script[1]) if isinstance(script, tuple)
-                          else str(Path(script).resolve()) for script in scripts)
+    FORM: the key form (PASS_KEY_FORM; 1 = the keys written before BUILD-PASS-KEY-OVERBROAD-36).
+    CONTENT_KEYED: the content-keyed readers (build_cache.CONTENT_KEYED_READERS) count as their fixed text; False:
+    as their code, the keys written before BUILD-UNIT-KEYS-REACH-64."""
+    key = (form, bool(content_keyed)) + tuple((str(Path(script[0]).resolve()), script[1]) if isinstance(script, tuple)
+                                              else str(Path(script).resolve()) for script in scripts)
     if key not in _DIGESTS:
-        _DIGESTS[key] = _source_digest(scripts, form)
+        _DIGESTS[key] = _source_digest(scripts, form, content_keyed)
     return _DIGESTS[key]
 
 
 def previous_digests(*scripts):
-    """The source digests the same scripts had in older key forms (empty when they equal the current one)."""
+    """The source digests the same scripts had in older key forms (empty when they equal the current one): form 1,
+    then the readers keyed by their code (BUILD-UNIT-KEYS-REACH-64: units stored before the content-keyed readers are
+    found while the readers' code is what it was, and stored again under the current key)."""
     current = source_digest(*scripts)
-    older = source_digest(*scripts, form=1)
-    return () if older == current else (older,)
+    older = []
+    for value in (source_digest(*scripts, form=1), source_digest(*scripts, content_keyed=False)):
+        if value != current and value not in older:
+            older.append(value)
+    return tuple(older)
 
 
-def _source_digest(scripts, form=PASS_KEY_FORM):
+def _source_digest(scripts, form=PASS_KEY_FORM, content_keyed=True):
     from build_cache import SourceIndex
-    index = SourceIndex(ROOT, top_format=form)
+    index = SourceIndex(ROOT, top_format=form, content_keyed=content_keyed)
     exclude = PASS_KEY_NEUTRAL if form >= 2 else ()
     parts = []
     for script in scripts:
@@ -111,7 +118,7 @@ def _source_digest(scripts, form=PASS_KEY_FORM):
             continue
         value, _, uncertain = index.digest(Path(script).resolve(), exclude)
         parts.append([str(Path(script).name), value, uncertain])
-    if form == PASS_KEY_FORM:
+    if form == PASS_KEY_FORM and content_keyed:
         from build_cache import STAGE_TOP_FORMAT
         stage = SourceIndex(ROOT, top_format=STAGE_TOP_FORMAT)
         stage._files = index.files            # the same checkout: its file hashes once
@@ -163,7 +170,7 @@ def _covered_lines(index, scripts, exclude=()):
 def covered_lines(*scripts):
     """The trace lines of what the cache of these scripts keys (computed with its digest)."""
     if tuple(scripts) not in _COVERED:
-        _DIGESTS.pop((PASS_KEY_FORM,) + tuple((str(Path(s[0]).resolve()), s[1]) if isinstance(s, tuple)
+        _DIGESTS.pop((PASS_KEY_FORM, True) + tuple((str(Path(s[0]).resolve()), s[1]) if isinstance(s, tuple)
                                               else str(Path(s).resolve()) for s in scripts), None)
         source_digest(*scripts)
     return _COVERED.get(tuple(scripts), [])
@@ -479,10 +486,29 @@ class UnitCache(PassCache):
         return row
 
 
-def game_data_digest():
+def game_data_digest(layers=True):
     """The game data identity of this build: SHA-256 over the (file, SHA-256) pairs of the build's input lock
     (AMIWIND_INPUTS_LOCK, every game input file), or None without a lock (then units read from game data are
-    not cached: their inputs would be unknown)."""
+    not cached: their inputs would be unknown).
+
+    The lock lists the expansion files whether or not the build selects them, so the identity alone does not change
+    with the selection (BUILD-UNIT-KEYS-LAYER-BLIND-66). With expansion layers selected, the selected masters in load
+    order and the form of the content-keyed readers (build_cache.CONTENT_KEYED_READERS: what the merged master and the
+    layered archives are for those files) are part of it too; with the base game alone it is the lock digest as it
+    always was, so base-game keys do not move. LAYERS False: the lock digest alone, for a unit cache whose inputs
+    hold their own view of what the layers change (tools/layer_view.py identity)."""
+    base = _lock_digest()
+    if base is None or not layers:
+        return base
+    from mwad.masters import selected_masters
+    masters = selected_masters()
+    if len(masters) == 1:
+        return base
+    from build_cache import CONTENT_KEYED_READERS
+    return input_digest([base, {'masters': list(masters), 'readers': sorted(CONTENT_KEYED_READERS.values())}])
+
+
+def _lock_digest():
     from known_inputs import LOCK_ENV, LOCK_SCHEMA
     path = os.environ.get(LOCK_ENV)
     if not path:

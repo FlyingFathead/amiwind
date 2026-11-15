@@ -139,8 +139,13 @@ int AW_CrimeRollFind(const aw_crime_roll_t *table,int count,int key,double now);
 void AW_CrimeRollKeep(aw_crime_roll_t *table,int count,int key,int roll,double now);   /* an expired or the oldest slot */
 
 /* What the crime rules keep of an NPC (OpenMW NpcStats crime id, crime disposition modifier, CreatureStats alarmed,
- * murdered; the pursuit package), by its placed reference; a fixed table, the oldest calmed row reused. Pure. */
+ * murdered; the pursuit package), by its placed reference; a table of rows, a calm row reused. Pure.
+ * SAVE-CRIME-MARKS-32-ROWS-66: the table starts at AW_CRIME_ACTORS rows and doubles when full (aw_crime.c) up to
+ * AW_CRIME_ACTORS_MAX, a guard above any game (about 2,700 NPCs placed, few of them ever marked); only at the guard is
+ * a bystander's row reused (was: 32 rows fixed, the 33rd witness took the oldest bystander's row, and a save held at
+ * most those 32). */
 #define AW_CRIME_ACTORS 32
+#define AW_CRIME_ACTORS_MAX 1024
 typedef struct {
     unsigned long ref;                  /* 0: a free row */
     int crime_id;                       /* -1: none */
@@ -152,8 +157,19 @@ typedef struct {
  * alarmed and murdered flags and the AiPursue package): "AWCR", version 1, the row count, then 12 bytes a row (u32
  * reference, s32 crime id, s16 disposition, flags 1 alarmed 2 murdered 4 pursues 8 attacked, 0), big-endian; only
  * rows that hold something. Pack: the bytes written, -1 when CAPACITY is short. Unpack: the table emptied, then
- * filled; the bytes read, -1 when the block is not one (the table left empty). */
+ * filled; the bytes read, -1 when the block is not one (the table left empty).
+ * SAVE-CRIME-MARKS-32-ROWS-66: AWCR holds the first AW_CRIME_SAVE_FIRST saved rows (its count is one byte; every save
+ * of up to 255 marked NPCs is written as before); the rest ride in "AWC2" u16 count, the same rows (PackMore: the bytes
+ * written, 0 none past the first, -1 short; UnpackMore: added to the table, the bytes read, -1 a bad block, nothing
+ * added). Full: no free and no calm row (the host grows the table before a row would be reused). */
 #define AW_CRIME_SAVE_ROW 12
+#define AW_CRIME_SAVE_FIRST 255
+int AW_CrimeActorsFull(const aw_crime_actor_t *table,int count);
+int AW_CrimeActorsPackMore(const aw_crime_actor_t *table,int count,unsigned char *out,int capacity);
+int AW_CrimeActorsUnpackMore(aw_crime_actor_t *table,int count,const unsigned char *in,int bytes);
+/* CRIME-KILL-BOUNTY-65 (c): the key of a row kept by an edict (an NPC without a placed reference): top byte 0xFE, the
+ * edict's number below; never saved */
+#define AW_CRIME_REFLESS_KEY 0xFE000000UL
 int AW_CrimeActorsPack(const aw_crime_actor_t *table,int count,unsigned char *out,int capacity);
 int AW_CrimeActorsUnpack(aw_crime_actor_t *table,int count,const unsigned char *in,int bytes);
 aw_crime_actor_t *AW_CrimeActorFind(aw_crime_actor_t *table,int count,unsigned long ref);
@@ -222,6 +238,9 @@ void AW_CrimeTick(float dt);
  * (a save without the block). A pursuer loaded walks again when its edict is here (pursuers()). */
 int AW_CrimeActorsExport(unsigned char *out,int capacity);
 int AW_CrimeActorsImport(const unsigned char *data,int bytes);
+int AW_CrimeActorsExportMore(unsigned char *out,int capacity);   /* the rows past the first 255 (AWC2); 0 none */
+int AW_CrimeActorsImportMore(const unsigned char *data,int bytes);
+int AW_CrimeActorsRoom(void);                                     /* the table's rows now (grows from 32) */
 void AW_CrimeActorsReset(void);
 /* Counters and the last crime for `dbg crime` (the console). */
 void AW_CrimeInit(void);

@@ -7,13 +7,33 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 
+def refusal(cell):
+    """One line naming a cell the atlas refuses and why."""
+    name = cell.get('name') or cell.get('region') or 'unnamed'
+    why = []
+    n = cell['screen']['candidate']
+    if n not in (1, 2, 4, 8):
+        why.append('subdivision candidate %s is not 1, 2, 4 or 8 (no option fits the ceiling)' % (n,))
+    if cell['unresolved_placements']:
+        detail = '; '.join('%s x%d' % (r['reason'], r['placements']) for r in cell.get('unresolved_reasons', ())[:5])
+        more = len(cell.get('unresolved_reasons', ())) - 5
+        why.append('%d unresolved placement(s)%s%s' % (cell['unresolved_placements'], ': ' + detail if detail else '',
+                                                      ' (+%d more reasons)' % more if more > 0 else ''))
+    return 'cell (%d, %d) %s: %s' % (cell['cell'][0], cell['cell'][1], name, '; '.join(why))
+
+
 def terrain_regions(report):
     """Match prepare_world_regions.plan naming; bounds are source game units."""
     result = []
-    for cell in sorted(report['cells'], key=lambda c: tuple(c['cell'])):
+    cells = sorted(report['cells'], key=lambda c: tuple(c['cell']))
+    refused = [refusal(c) for c in cells
+               if c['screen']['candidate'] not in (1, 2, 4, 8) or c['unresolved_placements']]
+    if refused:
+        # every refused cell with its reason, never only the count (WORLD-SURVEY-EXPANSIONS-66)
+        raise ValueError('Unresolved terrain subdivision in atlas: %d cell(s) refused:\n  ' % len(refused)
+                         + '\n  '.join(refused))
+    for cell in cells:
         n = cell['screen']['candidate']
-        if n not in (1, 2, 4, 8) or cell['unresolved_placements']:
-            raise ValueError('Unresolved terrain subdivision in atlas')
         step = report['cell_size'] / n
         for y in range(n):
             for x in range(n):

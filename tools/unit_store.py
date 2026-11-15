@@ -69,6 +69,35 @@ LEGACY_SOURCES = {
     # whose residents are stored under the key below.
     ('resident-bake', '965a70be8255f95d2ebb3b44676934cce9faa6163c6592ac17a697a07d4f6c8b'):
         ('4318d4be491911a8a2867bb8873f23a052a1616df08f4151d7344705a13ec576',),
+    # BUILD-UNIT-KEYS-REACH-64, the v0.0.66 line at a7f0598c (v0.0.66-dev2) against the v0.0.66-dev1 build's units
+    # (7130bd0, keyed with the readers as code: b9ab12d8 / be5ec199), compared unit by unit: the residents and the
+    # NPC appearances differ only in code that cannot change them. skeletal_actor.skeletal_from_shapes takes
+    # fit_skin in bake_args (default off; only creature_tables passes it, for Dagoth Ur's creature models, outside
+    # these reaches) and fit_skin_rows that only that branch runs (209a12cf); npc_library's module text (its
+    # docstring, for library_items, which runs beside the bake and outside the unit). The 2,147 residents and 423 NPC
+    # appearances of the dev1 run are taken while the bake code is exactly this (the current digests below).
+    ('resident-bake', '3e4dcd521a1106a53c95a5c8619cab4e94c60114dfd5212f0e48aeeb22fa8817'):
+        ('b9ab12d8ca64b9696a4e3f0cb3dd2195d904dd4534b6a1036d4a58e8051d78a2',),
+    ('npc-appearance', '19a1c39459d33af79040cf468b30b58f12c981d7daf1fba7d15738ad488474d7'):
+        ('be5ec1996a1ce564bc728f7f6b0280d3494b15b69a0beda164cea535758928ca',),
+    # interior-room-chim (build_shell) on the v0.0.66 line after the rooms the v0.0.66-dev2 room batches refused
+    # (LAVA-POOL-NOT-LAVA-NAMED-66, ROOM-EFFECT-MODEL-NO-TRIANGLES-66): the new code differs from 796d8043's only where
+    # that code refused the room, so no unit stored under the old key can differ. The pools come from
+    # lava.room_pools_of, equal to pools_of wherever pools_of gives its pools (compared in all 59 interior cells of the
+    # three masters that hold a molten object; it refused only the two hot-oil rooms); a molten pool's activator
+    # leaves the statics, and select_geometry keeps no molten activator but the 20 hot-oil ones of those two rooms; an
+    # effect model is left out only after the export refused the room. The 1,117 rooms of the dev2 run (stored under
+    # the old key) are taken while the room code is exactly this.
+    ('interior-room-chim', 'ba92267dd851229b02fac55fb0c394999fd48dc511f9920c463e07ba62750576'):
+        ('b839f4c67012130a27a869342bfee3c5da56323876bbdd3d370618ca0341335e',),
+    # creature-model (creature_library._unit) on the v0.0.66 line after 7585dc23, which reworded the reason text of
+    # one row of the interior creature list (the Heart of Lorkhan's: who asked for it, no value a bake uses). The list
+    # counts whole in the key; the bakes read a row only for its method and for whether it gives a reason and a source
+    # (creature_residents.listed, method_of), never the text. Compared file by file, the key differs from 3988c6e4's
+    # (v0.0.66-dev2) in that one file alone (BUILD-CREATURE-KEY-REASON-TEXT-66), so the 97 creature models of the dev2
+    # run (stored under the old key) are taken while the bake code is exactly this.
+    ('creature-model', '07fe655ad9b18d4bcf86b7c3d602e2b03fb6fad91c112f8b654796c317d2d6f3'):
+        ('5826271f9a056d57c890c835c8281408b3933f05249c6f0892c3eae20cfe03fd',),
 }
 
 # AMIWIND_* settings that say where a stage does its work, never what a unit is made of: left out of a unit key
@@ -349,7 +378,7 @@ def run_each(costs, function, items, names, jobs, keep, fallback=None, label=Non
     from the unit cache). Returns ['name: error'] of the units that failed (empty when all passed).
     A KEEP that returns False (its store was not found again, stored()) gets a loud line at once; when the map has
     ended, the count ('K stores FAILED') is printed and the stage fails (UNIT-CACHE-STORE-ERRORS-SILENT-63)."""
-    from build_costs import estimator, record
+    from build_costs import estimator, load, record
     from build_parallel import completed_map
     names = [str(n) for n in names]
     if len(names) != len(items):
@@ -359,7 +388,16 @@ def run_each(costs, function, items, names, jobs, keep, fallback=None, label=Non
         log('%s [%d/%d] cached, %d to make' % (label, already, total, len(items)), flush=True)
     by_index = {index: name for (index, _), name in zip(items, names)}
     estimate = estimator(costs, names, fallback)
-    cost = None if estimate is None else (lambda work: estimate(by_index[work[0]]))
+    # NEW WORK FIRST (NEW-WORK-FIRST-66): ITEMS are the units with no cache hit; those with no recorded time (new
+    # content) go out before the ones with one, each group longest first, so a failure in new work shows in minutes
+    # and the stage still collects every unit's failure. Order only: every unit runs FUNCTION(task) once.
+    timed_before = set(load(costs))
+    new_first = 0.0 if estimate is None else 1e12
+    cost = None if estimate is None else (
+        lambda work: estimate(by_index[work[0]]) + (0.0 if by_index[work[0]] in timed_before else new_first))
+    if label and estimate is not None:
+        log('%s: %d new units without a recorded time go first' % (
+            label, sum(1 for name in names if name not in timed_before)), flush=True)
     seconds, failed, lost = {}, [], []
     try:
         for index, took, result in completed_map(timed, [(index, function, task) for index, task in items], jobs,

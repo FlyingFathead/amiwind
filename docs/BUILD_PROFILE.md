@@ -1,6 +1,6 @@
 # Build profile and stage reuse
 
-_Last updated with AmiWind v0.0.63-dev3 (9 November 2026)._
+_Last updated with AmiWind v0.0.66-dev2 (13 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -28,6 +28,7 @@ _Last updated with AmiWind v0.0.63-dev3 (9 November 2026)._
 - [Build speed in CHIM](#build-speed-in-chim)
   - [CHIM world conversion (v0.0.42)](#chim-world-conversion-v0042)
 - [Payload preflight](#payload-preflight)
+  - [The checks a contributor meets at the image step](#the-checks-a-contributor-meets-at-the-image-step)
 - [Recipe collision preflight](#recipe-collision-preflight)
 - [Measured release builds (v0.0.33 -> v0.0.34)](#measured-release-builds-v0033---v0034)
 
@@ -293,6 +294,18 @@ One line per stage that runs:
 | `WILL THROTTLE` | fewer workers: the number, and why (the memory holds N at the stage's size per worker, or the CPU quota) |
 | `WILL NOT FIT` | one unit alone (named, with its estimated MiB) is larger than the memory the build plans with (80 % of the limit): the build is refused before any stage runs (`--resource-check warn` builds anyway, `off` skips the plan) |
 
+The plan counts units (BUILD-PLAN-PESSIMISTIC-48): with `--reuse-all-available`
+the reuse check looks up every unit cache's keys before any stage, and a
+rebuilt stage with a unit cache gets a second line, `units: R reused, B to bake
+(of S stored; wall from the units to bake)`. Its wall is the stage's last full
+time scaled by the share of stored units it bakes again, not the full-rebuild
+time (the plan of the first expansions build added full times up to about 16
+hours). Units the cache never held (new content) are counted by the stage when
+it runs; the plan says so instead of guessing. A stage with no history at all is
+marked `NEW WORK, no history: starts first`, and a summary line names every such
+stage (RESOURCE-PLAN.json: `units` per stage, `new_work` per stage and for the
+build).
+
 The `ADVISORY` line appears only when more memory or threads would make the
 build at least 2 % faster; it never asks for more than the machine has (it
 says so when full speed would need more).
@@ -462,6 +475,24 @@ step bakes the player view as before. Among the stages ready at the same moment
 the scheduler starts the risky ones first (`build_parallel.RISK_FIRST`: the
 player view, the actor library); a gate test fails when a risky stage that needs
 no world stage is placed after a world stage (`tests/test_risky_stages_first.py`).
+
+New work first (BUILD-NEW-WORK-NOT-FIRST-66): a fixed list of risky stages did
+not cover the content that is new in a build (for example the first build with
+the expansions on), so a failure in it could show hours in. Now, by default:
+
+- among the stages ready at the same moment, the scheduler starts first the
+  stages the resource plan finds with no history (new content), then the
+  `RISK_FIRST` stages, then the rest in plan order;
+- inside a unit stage (`unit_store.run_each`: the actor library, the player
+  view and parts), the units with no cache hit and no recorded time go out
+  first, then the known ones, each group longest first; the stage still runs
+  every unit and lists every failed unit at its end;
+- the order changes no output: unit keys and stage outputs are the same
+  (`tests/test_new_work_first.py`). The stages that call `run_each` take a new
+  stage key once with this change; their units come from the unit cache.
+
+The CHIM region and room maps (`costed_map`) keep their longest-first order for
+now: changing that code would give the whole CHIM world a new stage key.
 
 The build summary's digest (`tools/build_digest.py`) is written into
 `RUN/build-summary.json` (schema `amiwind-build-summary-v2`, key `digest`) and
@@ -865,6 +896,28 @@ reported in the profile, never silently dropped.
 No part of a build runs silently. A stage marks its long steps with
 `build_profile.phase`; the builder process watches every running stage for
 silence.
+
+The heartbeat only reports. A build run through `aw` is also under the stall
+fallback ([aw: Stall fallback](AW.md#stall-fallback)): when a stage shows only
+heartbeat lines, no log growth and almost no CPU for the limit (20 minutes, or
+three times that stage's longest silence in earlier passing runs), the build is
+stopped with the reason and the resume command instead of sitting idle.
+
+The builder also keeps its own stall alert (`tools/build_stall.py`, on by
+default) in `build-progress.json`: `seconds_since_progress` and a `stall` block
+`{"state": "ok|slow|under-cores|stalled", "since": seconds into the build,
+"reason": ...}`. `slow` = a running stage past three times its recorded time;
+`under-cores` = under half of the planned cores (`budget`) for five minutes;
+`stalled` = no progress for 20 minutes with almost no CPU. Each change of state
+prints one `[stall]` line in the build log. The start-up before the first
+stage (entry check, reuse preflight, resource plan) writes the same file with
+status `starting` under `build/.startup/<run>/` (a `--check` or `--plan` run
+writes no files there, only its log lines; its last line as the phase,
+the process's cores against the cores planned) until the stage tracker takes
+over. The Toolkit monitor shows the alert as a banner. The same numbers are kept
+as a file interface for any program in the run's status folder
+(`status/heartbeat.json`, `status/stall.jsonl`), with the small catcher
+`tools/stall_watch.py`: [Build status folder](BUILD_STATUS.md).
 
 ```python
 import build_profile
@@ -1617,6 +1670,29 @@ Payload preflight: 7 checks, 0 errors, 4.1 s
 `tools/build.py --check-payload RUN` runs it alone on a run folder's staged
 payload, with the image command recorded in its `build-state.json`. The later
 checks still run on what the image step writes.
+
+### The checks a contributor meets at the image step
+
+Each of these stops the build in seconds or minutes, before the image's slow work, and names what to fix:
+
+- **File formats.** Every file staged under `id1` must have a format the palette overlay knows
+  (`tools/sky_palette_overlay.py`, `unknown_formats`: its opaque and parsed extensions and the files it reads by name). A
+  new file type fails with "N staged files have a format the image step does not know (first: ...)"; declare the format
+  in `tools/sky_palette_overlay.py`. This is the `file-formats` check of the preflight above.
+- **Flora support.** At the start of the image step (`Image: flora support check`) every bracket fungus of the CHIM
+  world is measured against the tree it grows on (`tools/chim/flora_support_audit.py`, the table
+  `config/flora-support.json`). A fungus more than 2 units from its tree that the table does not list under
+  `known_floating` (each entry with its reason) stops the build; the run's `flora-support.json` has the measurements.
+  See [plants on trees](EXTERNAL_HARVEST_MODELS.md#plants-on-trees).
+- **Actor spec.** After the creature census (`tools/actor_spec_check.py`, about 35 seconds) the people and creatures
+  placed per area kind and every actor's record are compared with the original; a shortfall beyond
+  `config/actor_census_allowlist.json`, or more missing records than `config/actor-record-gaps.json` lists, stops a full
+  build. Each listed gap names its register entry. Skipped for a partial build, with the reason printed. See
+  [the build's actor spec check](ACTOR_RECORDS.md#the-builds-actor-spec-check).
+
+Before any stage, `tools/build.py --check` with `--reuse-from` or `--reuse-all-available` runs the build's own
+first-minute reuse stop and fails with the same `STOP` lines (exit code 6; see
+[reuse every earlier run](BUILD_CACHE.md#reuse-every-earlier-run)).
 
 ## Recipe collision preflight
 

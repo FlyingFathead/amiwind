@@ -26,15 +26,33 @@ apps/openmw/mwworld/worldimp.cpp findExteriorPosition):
 The height of 1 and 2 is the marker's own plus 32 units, so "the floor at or below it" (dbg tp X Y Z) is that
 street.
 
+The expansions (TP-LIST-EXPANSIONS-66): the places and the room names are read through the merging reader of exactly
+the build's selected layers (mwad.masters, AMIWIND_MASTERS); with the base game alone that is Morrowind.esm itself
+and the table is unchanged. An outdoor place that only an expansion adds (Solstheim) is listed only when the image
+holds a CHIM frame of one of its cells; the others are named in the report (places_not_built).
+
 Rooms (TP-MENU-INTERIORS-63): the image step adds one row for every converted room the image holds
 (add_rooms, called where the image knows its room maps), labelled "<the room's cell name> (interior)" on every room
 row, so a room never clashes with an outdoor place of the same name and typing "interior" filters to the rooms.
 A room row has flag 8 and its room map name; choosing it runs `dbg tp <map>`, which enters at the door's arrival.
 
-File (big-endian): header 16 bytes: "AWTP", u16 version 2, u16 row bytes 96, u32 rows, u32 0. Rows x 96, sorted by
+Beings and categories (v0.0.66, TP-MENU-CATEGORY-FILTER-66, DBG-TP-TO-NPC-66): one Beings row per person or creature
+(NPC_ and CREA records alike) placed in a cell the image holds, by its own display name (FNAM), never its record id.
+A name placed once: "Name"; placed 2 to 4 times in different places: "Name, <place>" each; placed COMMON_AT times or
+more (slaughterfish, mudcrabs, generic guards): one row "Name" with flag 32 whose placements file id1/tpk/<map>.tpk
+lists them all, so the engine takes you to the nearest one. A being row has flag 16, its record id, and a room map
+with the being's point in that room's units (world_doors.local_point), or no map and the global point outdoors. A
+being whose cell the image does not hold is left out and named in the report (beings_not_built).
+Expansion tags: a place, room or being that a later layer first defines (not one it only edits) carries " (Tribunal)"
+or " (Bloodmoon)" after its name in this list only.
+The names list id1/tp-names.lut (AWTN, aw_listbox.h) is what the box holds while open: per row the category
+(1 exteriors, 2 interiors, 3 beings), the label length and the label, row for row as this table.
+
+File (big-endian): header 16 bytes: "AWTP", u16 version 3, u16 row bytes 128, u32 rows, u32 0. Rows x 128, sorted by
 name (case ignored): name[64] (Latin-1, NUL-padded, at most 63 bytes), i32 x, i32 y, i32 z (original global
 units), u8 flags (1 z given, 2 door arrival, 4 CocMarkerHeading, 8 a room), u8 the place's cells (at most 255),
-u16 0, map[16] (a room row's map name, NUL-padded; else zero). Version 1 (row 48: name[32], then the same 16 bytes,
+u16 0, map[16] (a room row's map name, NUL-padded; else zero), id[32] (a being's record id). Version 2 (row 96, no id)
+and version 1 (row 48: name[32], then the same 16 bytes,
 no map) is the earlier table; the engine and read_table read both, so an older disk keeps its settlements list.
 
   python3 tools/tp_places_lut.py --data-files DIR --out tp-places.lut [--report report.json]
@@ -56,10 +74,17 @@ for _p in (ROOT / 'tools', ROOT / 'src'):
 from mwad.audit import cell_data, records, subrecords  # noqa: E402  (the package, before tools/mwad.py)
 
 MAGIC = b'AWTP'
-VERSION = 2
+VERSION = 3
 NAME = 'tp-places.lut'
+NAMES = 'tp-names.lut'
+KIND_DIR = 'tpk'
 HEADER = 16
-ROW = 96
+ROW = 128
+ROW_V2 = 96
+ID_BYTES = 32
+F_BEING, F_NEAREST = 16, 32
+COMMON_AT = 5                   # placements of one name from which it is a common kind (the nearest one)
+CAT_EXTERIOR, CAT_INTERIOR, CAT_BEING = 1, 2, 3
 NAME_BYTES = 64
 MAP_BYTES = 16
 ROW_V1, NAME_BYTES_V1 = 48, 32   # the earlier table (no rooms), still read
@@ -194,12 +219,256 @@ def encode_name(name):
     return raw[:NAME_BYTES - 1]
 
 
-def build_master(master):
-    """(table bytes, report) of a master (path or bytes)."""
+def exterior_cells(raw):
+    """{(x, y)} of every exterior cell of a master (path or bytes)."""
+    raw = raw if isinstance(raw, (bytes, bytearray)) else Path(raw).read_bytes()
+    out = set()
+    for tag, flags, payload in records(raw):
+        if tag != 'CELL' or flags & 0x20:
+            continue
+        data = next((d for t, d in subrecords(payload) if t == 'DATA'), b'')
+        if len(data) >= 12:
+            bits, x, y = struct.unpack_from('<Iii', data)
+            if not bits & 1:
+                out.add((x, y))
+    return out
+
+
+# ---------------------------------------------------------------- beings and expansion tags (v0.0.66)
+
+BEING_TAGS = ('NPC_', 'CREA')
+
+
+def being_records(raw):
+    """{record id casefolded: (record id, display name)} of every NPC_ and CREA record with a display name (FNAM)."""
+    out = {}
+    for tag, flags, payload in records(raw):
+        if tag not in BEING_TAGS or flags & 0x20:
+            continue
+        f = {}
+        for sub_tag, sub_data in subrecords(payload):
+            f.setdefault(sub_tag, sub_data)
+        ident = f.get('NAME', b'').split(b'\0')[0].decode('latin-1').strip()
+        name = f.get('FNAM', b'').split(b'\0')[0].decode('latin-1').strip()
+        if ident and name and 'DELE' not in f:
+            out[ident.casefold()] = (ident, name)
+    return out
+
+
+def layer_keys(raw):
+    """(record ids, exterior cells, interior cell names), casefolded, that a master defines or edits."""
+    ids, cells, rooms = set(), set(), set()
+    for tag, flags, payload in records(raw):
+        if tag in BEING_TAGS:
+            name = next((d for t, d in subrecords(payload) if t == 'NAME'), b'')
+            ids.add(name.split(b'\0')[0].decode('latin-1').strip().casefold())
+        elif tag == 'CELL':
+            f = {}
+            for sub_tag, sub_data in subrecords(payload):
+                f.setdefault(sub_tag, sub_data)
+            if len(f.get('DATA', b'')) < 12:
+                continue
+            bits, x, y = struct.unpack_from('<Iii', f['DATA'])
+            if bits & 1:
+                rooms.add(f.get('NAME', b'').split(b'\0')[0].decode('latin-1').strip().casefold())
+            else:
+                cells.add((x, y))
+    return ids, cells, rooms
+
+
+def layer_tags(layers):
+    """{'records': {id: tag}, 'cells': {(x, y): tag}, 'rooms': {name: tag}} from LAYERS [(master name, bytes)] in load
+    order: a key first defined by a later layer is tagged with that layer's name ("Tribunal"); keys the base game
+    defines are never tagged, though a layer edits them."""
+    out = {'records': {}, 'cells': {}, 'rooms': {}}
+    seen = [set(), set(), set()]
+    for index, (master, raw) in enumerate(layers):
+        tag = Path(master).stem
+        for k, (key, keys) in enumerate(zip(('records', 'cells', 'rooms'), layer_keys(raw))):
+            for item in keys - seen[k]:
+                if index:
+                    out[key][item] = tag
+            seen[k] |= keys
+    return out
+
+
+def tagged(name, tag):
+    """NAME with ' (TAG)' after it (cut so the tag always fits the name field)."""
+    if not tag:
+        return name
+    suffix = ' (%s)' % tag
+    keep = NAME_BYTES - 1 - len(suffix)
+    return name.encode('latin-1', 'replace')[:keep].decode('latin-1').rstrip() + suffix
+
+
+def untagged(label):
+    """The label without its expansion tag and the room suffix (what the search is meant to find)."""
+    for tag in ('Tribunal', 'Bloodmoon'):
+        label = label.replace(' (%s)' % tag, '')
+    return label[:-len(ROOM_SUFFIX)] if label.endswith(ROOM_SUFFIX) else label
+
+
+def placements(raw, beings, rooms=None, cell_ok=None, offsets=None):
+    """([placement], [left out]) of every being reference of RAW: {'id', 'name', 'place', 'map', 'x', 'y', 'z'}.
+    Interior ones only in ROOMS {cell casefold: map} (point in the room's units, world_doors.local_point with the room's
+    recentring OFFSETS), exterior ones only where CELL_OK((x, y)) holds (global point). ROOMS None: no interiors;
+    CELL_OK None: no exteriors."""
+    from world_doors import local_point
+    out, left = [], []
+    for tag, flags, payload in records(raw):
+        if tag != 'CELL' or flags & 0x20:
+            continue
+        c = cell_data(list(subrecords(payload)))
+        interior = bool(c['flags'] & 1)
+        for r in c['refs']:
+            got = beings.get(r.get('id', '').casefold())
+            if not got or r.get('deleted') or 'position' not in r:
+                continue
+            ident, name = got
+            if interior:
+                if rooms is None:
+                    continue
+                m = rooms.get(c['name'].strip().casefold())
+                if not m:
+                    left.append('%s (%s)' % (name, c['name'].strip()))
+                    continue
+                p = local_point(r['position'], 'room', (offsets or {}).get(c['name'].strip().casefold()))
+                out.append({'id': ident, 'name': name, 'place': c['name'].strip(), 'map': m,
+                            'x': round(p[0]), 'y': round(p[1]), 'z': round(p[2])})
+            else:
+                if cell_ok is None:
+                    continue
+                if not cell_ok((c['x'], c['y'])):
+                    left.append('%s (%d, %d)' % (name, c['x'], c['y']))
+                    continue
+                place = c['name'].strip() or c.get('region', '').strip() or '%d, %d' % (c['x'], c['y'])
+                p = r['position']
+                out.append({'id': ident, 'name': name, 'place': place, 'map': '',
+                            'x': round(p[0]), 'y': round(p[1]), 'z': round(p[2])})
+    return out, left
+
+
+def kind_file_name(label):
+    """The placements file of a common kind: 'k' + the CRC-32 of its label (casefolded), 9 characters."""
+    import zlib
+    return 'k%08x' % (zlib.crc32(label.casefold().encode('latin-1', 'replace')) & 0xFFFFFFFF)
+
+
+def encode_kind(rows):
+    """The AWTK bytes (aw_listbox.h) of placement ROWS."""
+    out = bytearray(b'AWTK' + struct.pack('>HHII', 1, 64, len(rows), 0))
+    for r in rows:
+        out += r['id'].encode('latin-1', 'replace')[:ID_BYTES - 1].ljust(ID_BYTES, b'\0')
+        out += r['map'].encode('ascii')[:MAP_BYTES - 1].ljust(MAP_BYTES, b'\0')
+        out += struct.pack('>iiiI', r['x'], r['y'], r['z'], 0)
+    return bytes(out)
+
+
+def being_rows(found, record_tags=None):
+    """(table rows, {kind file name: AWTK bytes}) of the placements FOUND (the module text's rule)."""
+    record_tags = record_tags or {}
+    groups = {}
+    for p in found:
+        label = tagged(p['name'], record_tags.get(p['id'].casefold()))
+        groups.setdefault(label.casefold(), (label, []))[1].append(p)
+    rows, kinds = [], {}
+    for key in sorted(groups):
+        label, group = groups[key]
+        group.sort(key=lambda p: (p['map'], p['place'], p['id'], p['x'], p['y'], p['z']))
+        places = {p['place'].casefold() for p in group}
+        if len(group) >= COMMON_AT or (len(group) > 1 and len(places) < len(group)):
+            name = kind_file_name(label)
+            kinds[name] = encode_kind(group)
+            rows.append({'name': label, 'x': 0, 'y': 0, 'z': 0, 'flags': F_BEING | F_NEAREST | F_HAS_Z,
+                         'cells': 0, 'map': name, 'id': ''})
+            continue
+        for p in group:
+            text = label
+            if len(group) > 1:   # "Dagoth Ur, Facility Cavern": a place already named after the being stays as it is
+                text = p['place'] if p['place'].casefold().startswith(p['name'].casefold() + ',') \
+                    and label == p['name'] else label + ', ' + p['place']
+            raw = text.encode('latin-1', 'replace')[:NAME_BYTES - 1].decode('latin-1')
+            rows.append({'name': raw, 'x': p['x'], 'y': p['y'], 'z': p['z'],
+                         'flags': F_BEING | F_HAS_Z | (F_ROOM if p['map'] else 0), 'cells': 0,
+                         'map': p['map'], 'id': p['id']})
+    return rows, kinds
+
+
+def category(flags):
+    if flags & F_BEING:
+        return CAT_BEING
+    return CAT_INTERIOR if flags & F_ROOM else CAT_EXTERIOR
+
+
+def encode_names(table):
+    """The AWTN bytes of a table: row for row, the category, the label length and the label."""
+    rows = read_table(table)
+    body = bytearray()
+    for r in rows:
+        label = r['name'].encode('latin-1', 'replace')[:NAME_BYTES - 1]
+        body += bytes((category(r['flags']), len(label))) + label
+    return b'AWTN' + struct.pack('>HHII', 1, 0, len(rows), len(body)) + bytes(body)
+
+
+def read_names(data):
+    """[(category, label)] of an AWTN list."""
+    if data[:4] != b'AWTN':
+        raise ValueError('not AWTN')
+    _, _, count, size = struct.unpack_from('>HHII', data, 4)
+    if len(data) != HEADER + size:
+        raise ValueError('AWTN size mismatch')
+    out, at = [], HEADER
+    for _ in range(count):
+        cat, n = data[at], data[at + 1]
+        out.append((cat, data[at + 2:at + 2 + n].decode('latin-1')))
+        at += 2 + n
+    if at != len(data):
+        raise ValueError('AWTN rows do not fill it')
+    return out
+
+
+def write_list(id1, table, kinds=None):
+    """id1/tp-places.lut, id1/tp-names.lut and (KINDS given) id1/tpk/*.tpk, the earlier kind files replaced; the
+    names list's bytes (what the box holds while open: the labels plus 4 bytes a row)."""
+    id1 = Path(id1)
+    (id1 / NAME).write_bytes(table)
+    names = encode_names(table)
+    (id1 / NAMES).write_bytes(names)
+    if kinds is not None:
+        folder = id1 / KIND_DIR
+        if folder.is_dir():
+            for old in sorted(folder.glob('k*.tpk')):
+                old.unlink()
+        if kinds:
+            folder.mkdir(parents=True, exist_ok=True)
+        for name in sorted(kinds):
+            (folder / (name + '.tpk')).write_bytes(kinds[name])
+    rows = struct.unpack_from('>I', names, 8)[0]
+    return len(names) - HEADER + 4 * rows
+
+
+def build_master(master, base_cells=None, frames=None, tags=None):
+    """(table bytes, report) of a master (path or bytes). With BASE_CELLS (the base game's exterior cells, given when
+    expansion layers are merged in) an outdoor place none of whose cells is a base cell is listed only when one of its
+    cells is in FRAMES (the exterior cells the image holds frames for); the rest are named in the report
+    ('places_not_built'). TAGS (layer_tags) tag the places a later layer first defines. The report also holds the
+    outdoor beings of the cells the table lists ('beings_exterior'; the room step adds them, image_rooms)."""
     t0 = time.time()
     raw = master if isinstance(master, (bytes, bytearray)) else Path(master).read_bytes()
     lands = {}
     places, doors = collect(raw, lands)
+    cell_tags = (tags or {}).get('cells', {})
+    for place in places.values():
+        first = sorted(place['cells'])
+        if first and all(c in cell_tags for c in first):
+            place['name'] = tagged(place['name'], cell_tags[first[0]])
+    not_built = []
+    if base_cells is not None:
+        frames = set(frames or ())
+        for key in sorted(places):
+            cells = places[key]['cells']
+            if not cells & base_cells and not cells & frames:
+                not_built.append(places.pop(key)['name'])
     doors_by_cell = {}
     for p in doors:
         doors_by_cell.setdefault(_cell_of(p[0], p[1]), []).append(p)
@@ -222,19 +491,29 @@ def build_master(master):
         'resident_bytes': 0, 'open_bytes': len(data),
         'seconds': round(time.time() - t0, 3),
     }
+    if base_cells is not None:
+        report['places_not_built'] = not_built
+    frames_set = set(frames or ())
+    found, left = placements(raw, being_records(raw), rooms=None,
+                             cell_ok=lambda c: base_cells is None or c in base_cells or c in frames_set)
+    report['beings_exterior'] = found
+    report['beings_not_built'] = left
+    report['record_tags'] = dict(sorted((tags or {}).get('records', {}).items()))
+    report['room_tags'] = dict(sorted((tags or {}).get('rooms', {}).items()))
     return data, report
 
 
 def encode_table(rows):
-    """The AWTP2 bytes of ROWS ({'name', 'x', 'y', 'z', 'flags', 'cells'[, 'map']}), sorted by name (case ignored)."""
+    """The AWTP3 bytes of ROWS ({'name', 'x', 'y', 'z', 'flags', 'cells'[, 'map']}), sorted by name (case ignored)."""
     if len(rows) > 65535:
-        raise ValueError('Settlements table: %d places, at most 65535' % len(rows))
+        raise ValueError('Settlements table: %d rows, at most 65535' % len(rows))
     rows = sorted(rows, key=lambda r: (r['name'].casefold(), r['name'], r.get('map', '')))
     out = bytearray(MAGIC + struct.pack('>HHII', VERSION, ROW, len(rows), 0))
     for r in rows:
         out += encode_name(r['name']).ljust(NAME_BYTES, b'\0')
         out += struct.pack('>iiiBBH', r['x'], r['y'], r['z'], r['flags'], min(255, r['cells']), 0)
         out += r.get('map', '').encode('ascii')[:MAP_BYTES].ljust(MAP_BYTES, b'\0')
+        out += r.get('id', '').encode('latin-1', 'replace')[:ID_BYTES - 1].ljust(ID_BYTES, b'\0')
     return bytes(out)
 
 
@@ -261,19 +540,21 @@ def interior_names(raw):
     return out
 
 
-def add_rooms(table, rooms, names=None):
+def add_rooms(table, rooms, names=None, room_tags=None):
     """(AWTP2 bytes, report) of TABLE (v1 or v2) with one row per room of ROOMS {cell casefold: map name}: the label
     room_label of the cell's own name (NAMES {casefold: name}, else the key), flag F_ROOM, the map; earlier room rows
     are replaced. A room whose map name does not fit, or is not lower-case letters, digits and _, is left out (listed)."""
     names = names or {}
-    rows = [r for r in read_table(table) if not r['flags'] & F_ROOM]
+    room_tags = room_tags or {}
+    rows = [r for r in read_table(table) if not r['flags'] & (F_ROOM | F_BEING)]
     added, left_out = 0, []
     for key in sorted(rooms):
         m = rooms[key]
         if not m or len(m) >= MAP_BYTES or not all(c.isdigit() or c == '_' or 'a' <= c <= 'z' for c in m):
             left_out.append(key)
             continue
-        rows.append({'name': room_label(names.get(key, key)), 'x': 0, 'y': 0, 'z': 0, 'flags': F_ROOM, 'cells': 0,
+        rows.append({'name': room_label(tagged(names.get(key, key), room_tags.get(key))), 'x': 0, 'y': 0, 'z': 0,
+                     'flags': F_ROOM, 'cells': 0,
                      'map': m})
         added += 1
     data = encode_table(rows)
@@ -288,15 +569,48 @@ def image_rooms(id1, rooms, master, out=None):
     if not target.is_file():
         return None
     t0 = time.time()
-    data, report = add_rooms(target.read_bytes(), rooms, interior_names(master))
-    target.write_bytes(data)
+    places = {}
+    if out is not None and (Path(out) / 'tp-places-table.json').is_file():
+        places = json.loads((Path(out) / 'tp-places-table.json').read_text(encoding='utf-8'))
+    data, report = add_rooms(target.read_bytes(), rooms, interior_names(master), places.get('room_tags'))
+    data, beings = add_beings(data, master, rooms, places.get('beings_exterior', []), places.get('record_tags'))
+    kinds = beings.pop('kind_files_data')        # bytes: written as files, never into the JSON report
+    report.update(beings)
+    report['names_bytes_open'] = write_list(id1, data, kinds)
+    report['bytes'] = len(data)
+    report['sha256'] = hashlib.sha256(data).hexdigest()
+    report['beings_not_built'] = sorted(set(places.get('beings_not_built', [])) | set(report['beings_not_built']))
     if out is not None:
         (Path(out) / 'tp-places-rooms.json').write_text(json.dumps(report, indent=1, sort_keys=True) + '\n',
                                                          encoding='utf-8', newline='\n')
-    print('Settlements table: %d rooms added, %d rows, %d bytes while the box is open (%d left out; took %.1f s, '
-          '1 core; 0 bytes resident)' % (report['rooms'], report['rows'], report['bytes'],
-                                          len(report['rooms_left_out']), time.time() - t0), flush=True)
+    print('Settlements table: %d rooms and %d being rows (%d common kinds) added, %d rows, %d bytes on disk, %d bytes '
+          'held while the box is open (%d rooms and %d beings left out; took %.1f s, 1 core; 0 bytes resident)' % (
+              report['rooms'], report['being_rows'], report['kinds'], report['rows'], report['bytes'],
+              report['names_bytes_open'], len(report['rooms_left_out']), len(report['beings_not_built']),
+              time.time() - t0), flush=True)
     return report
+
+
+def add_beings(table, master, rooms, exterior, record_tags=None, offsets=None):
+    """(AWTP3 bytes, report) of TABLE with its being rows replaced: the room placements of MASTER in ROOMS plus the
+    outdoor ones EXTERIOR (the table step's report), grouped by being_rows. The report holds 'kind_files_data'
+    {name: AWTK bytes} for write_list."""
+    raw = master if isinstance(master, (bytes, bytearray)) else Path(master).read_bytes()
+    if offsets is None:
+        try:
+            from town_interiors import room_offsets
+            offsets = room_offsets()
+        except (OSError, ValueError, KeyError):
+            offsets = {}
+    inside, left = placements(raw, being_records(raw), rooms=rooms, cell_ok=None, offsets=offsets)
+    found = inside + list(exterior)
+    brows, kinds = being_rows(found, record_tags)
+    rows = [r for r in read_table(table) if not r['flags'] & F_BEING] + brows
+    data = encode_table(rows)
+    return data, {'being_rows': len(brows), 'beings_placed': len(found), 'kinds': len(kinds),
+                  'kind_files_bytes': sum(len(v) for v in kinds.values()),
+                  'kind_file_largest': max((len(v) for v in kinds.values()), default=0),
+                  'beings_not_built': left, 'rows': len(rows), 'kind_files_data': kinds}
 
 
 def read_table(data):
@@ -305,7 +619,7 @@ def read_table(data):
     if data[:4] != MAGIC:
         raise ValueError('not AWTP')
     version, row, count, _ = struct.unpack_from('>HHII', data, 4)
-    sizes = {1: (ROW_V1, NAME_BYTES_V1), 2: (ROW, NAME_BYTES)}
+    sizes = {1: (ROW_V1, NAME_BYTES_V1), 2: (ROW_V2, NAME_BYTES), 3: (ROW, NAME_BYTES)}
     if version not in sizes or row != sizes[version][0] or len(data) != HEADER + count * row:
         raise ValueError('AWTP header or size mismatch')
     name_bytes = sizes[version][1]
@@ -314,23 +628,50 @@ def read_table(data):
         at = HEADER + i * row
         name = data[at:at + name_bytes].split(b'\0')[0].decode('latin-1')
         x, y, z, flags, cells, _ = struct.unpack_from('>iiiBBH', data, at + name_bytes)
-        m = data[at + name_bytes + 16:at + row].split(b'\0')[0].decode('ascii') if version == 2 else ''
-        rows.append({'name': name, 'x': x, 'y': y, 'z': z, 'flags': flags, 'cells': cells, 'map': m})
+        m = data[at + name_bytes + 16:at + name_bytes + 16 + MAP_BYTES].split(b'\0')[0].decode('ascii') \
+            if version >= 2 else ''
+        ident = data[at + name_bytes + 32:at + row].split(b'\0')[0].decode('latin-1') if version == 3 else ''
+        rows.append({'name': name, 'x': x, 'y': y, 'z': z, 'flags': flags, 'cells': cells, 'map': m, 'id': ident})
     return rows
 
 
 # ---------------------------------------------------------------- the image step
 
-def image_step(data, id1, out=None, jobs=1):
-    """The image step: id1/tp-places.lut from DATA's Morrowind.esm through the unit cache (keyed by the master's
-    SHA-256 and this module's source); the report beside it in OUT (tp-places-table.json). One unit: the island
-    compiles in about a second on one core (the report's seconds), so it is not split."""
+def layer_inputs(data, chim_world=None, masters=None):
+    """(masters, base exterior cells, frame cells) for the selected layers (mwad.masters.selected_masters: the
+    build's AMIWIND_MASTERS, the same selection every layer-reading stage uses); (masters, None, None) with the base
+    game alone. Frame cells: the exterior cells the CHIM world CHIM_WORLD holds frames for (chim/frames/.../frame.ccf)."""
+    from mwad.masters import selected_masters
+    from mwad.paths import child_ci
+    masters = selected_masters(masters)
+    if len(masters) == 1:
+        return masters, None, None
+    base = exterior_cells(child_ci(Path(data), masters[0]))
+    frames = set()
+    if chim_world:
+        from chim.heap import frame_cells
+        root = Path(chim_world) / 'chim' / 'frames'
+        if root.is_dir():
+            frames = frame_cells(p.relative_to(Path(chim_world) / 'chim') for p in root.rglob('frame.ccf'))
+    return masters, base, frames
+
+
+def image_step(data, id1, out=None, jobs=1, chim_world=None):
+    """The image step: id1/tp-places.lut from DATA's selected layers (the merging reader, mwad.masters; the base
+    game alone = Morrowind.esm itself) through the unit cache (keyed by the merged master's SHA-256 and this module's
+    source; with expansion layers also by the layer list and the layer-only exterior cells the image has frames for);
+    the report beside it in OUT (tp-places-table.json). One unit: the island compiles in about a second on one core
+    (the report's seconds), so it is not split."""
     from build_scratch import scratch_dir
     from mwad.esm import sha256_file
-    from mwad.paths import child_ci
+    from mwad.masters import master_path
     from pass_cache import UnitCache
-    master = child_ci(Path(data), 'Morrowind.esm')
+    masters, base_cells, frames = layer_inputs(data, chim_world)
+    master = master_path(Path(data), masters)
     inputs = {'master_sha256': sha256_file(master)}
+    if base_cells is not None:
+        inputs['masters'] = list(masters)
+        inputs['layer_frames'] = sorted(list(c) for c in frames - base_cells)
     cache = UnitCache.open('tp-places-table', {'format': 'AWTP%d' % VERSION}, __file__)
     target = Path(id1) / NAME
     t0 = time.time()
@@ -344,7 +685,11 @@ def image_step(data, id1, out=None, jobs=1):
             raw = (folder / NAME).read_bytes()
             report['reused'] = True
         else:
-            raw, report = build_master(master)
+            tags = None
+            if base_cells is not None:
+                from mwad.paths import child_ci
+                tags = layer_tags([(m, child_ci(Path(data), m).read_bytes()) for m in masters])
+            raw, report = build_master(master, base_cells, frames, tags)
             folder.mkdir(parents=True)
             (folder / NAME).write_bytes(raw)
             (folder / 'report.json').write_text(json.dumps(report, indent=1, sort_keys=True) + '\n',
@@ -355,7 +700,7 @@ def image_step(data, id1, out=None, jobs=1):
     if hashlib.sha256(raw).hexdigest() != report['sha256']:
         raise ValueError('Settlements table: SHA-256 differs from its report')
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_bytes(raw)
+    report['names_bytes_open'] = write_list(target.parent, raw)
     if out is not None:
         Path(out).mkdir(parents=True, exist_ok=True)
         (Path(out) / 'tp-places-table.json').write_text(json.dumps(report, indent=1, sort_keys=True) + '\n',
@@ -365,6 +710,10 @@ def image_step(data, id1, out=None, jobs=1):
               'reused' if report['reused'] else 'built', NAME, len(raw), report['rows'],
               report['arrivals']['coc_marker'], report['arrivals']['door'], report['arrivals']['cell_middle'],
               time.time() - t0), flush=True)
+    if 'places_not_built' in report:
+        print('Settlements table: layers %s; %d expansion outdoor places not listed (no frame in this image): %s' % (
+            ', '.join(masters), len(report['places_not_built']), ', '.join(report['places_not_built']) or 'none'),
+            flush=True)
     return report
 
 
@@ -375,7 +724,8 @@ def main(argv=None):
     p.add_argument('--report', type=Path)
     a = p.parse_args(argv)
     from mwad.paths import child_ci
-    raw, report = build_master(child_ci(a.data_files, 'Morrowind.esm'))
+    from mwad.masters import master_path
+    raw, report = build_master(master_path(a.data_files))
     a.out.write_bytes(raw)
     if a.report:
         a.report.write_text(json.dumps(report, indent=1, sort_keys=True) + '\n', encoding='utf-8', newline='\n')

@@ -23,6 +23,7 @@ int AW_ReaderActive(void){return 0;}
 void AW_ReaderMouse(int x,int y){}
 static int opening_locked,character_modal;
 int AW_OpeningLocked(void){return opening_locked;}
+void AW_OpeningDockStatus(void){}
 int AW_CharacterActive(void){return character_modal;}
 void AW_CharacterMouse(int x,int y){}
 static void (*command)(void),(*combat_command)(void),(*torch_command)(void);static int argc=1,bad,captures,region_selected;static char *args[4];

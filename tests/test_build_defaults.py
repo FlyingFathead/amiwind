@@ -226,6 +226,13 @@ OPTIONS = {
     # COLLISION-WORLDWIDE-REDUCTION-64: unset = config/chim-rooms.json hollow_bevels (2), what the release ships;
     # 0 and 1 are the earlier methods for an A/B
     'chim_hollow_bevels': 'opt-in, not shipped',
+    # PRISON-SHIP-POLY-COLLISION-65: unset = the hold's shell in draw tiles of 512 faces and the hammocks' small
+    # parts as boxes, what the release ships; 0 / off are the earlier methods for an A/B
+    'room_draw_tiles': 'opt-in, not shipped',
+    # the Seyda Neen ship and the silt strider as draw tiles: off by default (re-keys their tile units; for a
+    # planned world rebuild)
+    'chim_draw_tiles': 'opt-in, not shipped',
+    'room_small_parts': 'opt-in, not shipped',
     # world format 0.8: one model per mesh + scale, the full rotation in the record (CHIM-TILT-VARIANTS-SPLIT-33):
     # EXPERIMENTAL, 0.7 by default
     'chim_placement_format': 'opt-in, not shipped',

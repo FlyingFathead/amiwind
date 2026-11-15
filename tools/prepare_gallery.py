@@ -17,9 +17,11 @@ from functools import lru_cache
 import numpy as np
 from PIL import Image
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
-from mwad.audit import BSA, normpath
+from mwad.audit import normpath
+from mwad.archives import layered_bsa
 from mwad.npc import load_master, outfit, text
 from mwad.paths import child_ci, ensure_external
+from mwad.masters import master_path
 from mwad.scene import unpack_geometry
 import npc_geometry
 from npc_geometry import Assets, Skeleton, assemble, bake, animated_mdl, add_root_rule_arg, apply_root_rule, get_root_rule, shared_vertex_mdl
@@ -112,7 +114,7 @@ def convert_model(task):
     try:
         source_repairs=[]
         if _assets is None:
-            data = Path(data); _assets = Assets(data, BSA(child_ci(data, 'Morrowind.bsa')))
+            data = Path(data); _assets = Assets(data, layered_bsa(data))
         if spec['kind'] == 'NPC_':
             appearance = spec['appearance']; source = appearance['skeleton']
             if source not in _skeletons: _skeletons[source] = Skeleton(_assets, source)
@@ -179,7 +181,7 @@ def footprint(dimensions, palette):
 def catalogue(data, only=None):
     """(entries, specs) of every NPC and creature; only: a set of casefolded record IDs
     (an area build's reference closure, --exclude-unreferenced npcs) keeps just those."""
-    kinds, _, _ = load_master(child_ci(data, 'Morrowind.esm'))
+    kinds, _, _ = load_master(master_path(data))
     entries = []; specs = {}
     for kind in ('CREA', 'NPC_'):
         for identifier, fields in sorted(kinds[kind].items()):

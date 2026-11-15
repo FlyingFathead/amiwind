@@ -62,8 +62,19 @@ class DbgKillTests(unittest.TestCase):
     def test_essential_death_is_read_from_the_game_settings(self):
         combat = (SRC / 'aw_combat.c').read_text(encoding='utf-8')
         text = code('aw_combat.c')
-        fn = body(text, 'static void essential_death')
+        fn = body(text, 'static void essential_message')
+        self.assertIn('essential_message(', body(text, 'static void essential_death'))
         self.assertIn('AWR_ESSENTIAL', body(text, 'int AW_CombatEssentialRecord'))
+        # ESSENTIAL-DEATH-MESSAGE-66: a death of the actor record (a script, a spell, a fall: AW_ActorKill) shows it
+        # too (OpenMW 0.51 actors.cpp: any death of an essential actor), once per death
+        self.assertIn('ref==last_ref && realtime-last_time<10', fn)
+        self.assertIn('essential_message(ref,name)', body(text, 'void AW_CombatEssentialKilled'))
+        state = code('aw_actorstate.c')
+        self.assertIn('if(aw_actor_killed)aw_actor_killed(a);', body(state, 'void AW_ActorKill'))
+        host = code('aw_mwhost.c')
+        self.assertIn('AW_CombatEssentialKilled(', body(host, 'static void actor_killed'))
+        self.assertIn('(a->record_flags&AWR_ESSENTIAL)', body(host, 'static void actor_killed'))
+        self.assertIn('aw_actor_killed=actor_killed;', host)
         self.assertIn('"sKilledEssential "', combat)         # the key; the words are the game's, never typed here
         self.assertIn('view/settings.txt', fn)
         self.assertIn('AW_MsgBoxShow', fn)

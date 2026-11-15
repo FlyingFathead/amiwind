@@ -772,7 +772,8 @@ def main(argv=None):
                                      else ROOT / 'engine/aga/src')
     from mwad.interior import original_doors
     from mwad.paths import child_ci
-    doors = original_doors(child_ci(args.data_files, 'Morrowind.esm').read_bytes())
+    from mwad.masters import master_path
+    doors = original_doors(master_path(args.data_files).read_bytes())
     world_rows = json.loads(Path(world_doors_path).read_text(encoding='utf-8'))['rows']
     stores = args.room_store or ([b / 'chim-interiors'] if b and (b / 'chim-interiors').is_dir() else [])
     image = Image(id1, engine_src, chim_world, args.jobs, stores)

@@ -134,6 +134,9 @@ def export_fire_light(mode, data_files=None):
     if mode == 'on' and data_files is not None and Path(data_files).is_dir():
         from mwad.paths import child_ci
         master = child_ci(Path(data_files), 'Morrowind.esm', required=False)
+        if master is not None:
+            from mwad.masters import master_path
+            master = master_path(data_files)
         if master is None:
             raise ValueError('chim_fire_light on needs Morrowind.esm in the data files')
         os.environ[PL.MASTER_VARIABLE] = str(master)

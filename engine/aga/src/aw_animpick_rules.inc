@@ -198,7 +198,9 @@ int AW_AnimPick(const aw_pick_state_t *s,aw_pick_has_t h,void *c,aw_pick_t *o) {
 
 int AW_PickPlayerState(int weapon,int hand,int goal,int move,int run,int attack,int air,int swim,aw_pick_state_t *out) {
     memset(out,0,sizeof(*out));out->weapon=AW_PW_NONE;
-    if(!real(weapon) || swim)return 0;
+    /* PLAYER-CASTING-59: the spell stance (magic ready) is a stance as a drawn weapon: idlespell, spellcast equip /
+     * unequip, and the attack is the cast (AW_PE_ATTACK -> AW_PE_CAST by out->range, set by the caller) */
+    if(!(real(weapon) || weapon==AW_PW_SPELL) || swim)return 0;
     out->weapon=(signed char)weapon;
     if(hand==1)out->event=AW_PE_EQUIP;
     else if(hand==4)out->event=AW_PE_UNEQUIP;
@@ -208,6 +210,33 @@ int AW_PickPlayerState(int weapon,int hand,int goal,int move,int run,int attack,
         out->follow=AW_PF_LARGE;
     }else if(air)out->event=AW_PE_JUMP;
     else{out->move=(unsigned char)(move>=AW_PM_NONE && move<AW_PM_COUNT?move:AW_PM_NONE);out->run=(unsigned char)(run!=0);}
+    return 1;
+}
+
+int AW_PickPlayerBody(const aw_pick_player_t *in,aw_pick_state_t *out) {
+    int drawn=in->goal==1 && (in->hand==2 || in->hand==3),turning=in->turn==AW_PM_TURNLEFT || in->turn==AW_PM_TURNRIGHT;
+    if(in->react==AW_PE_HIT || in->react==AW_PE_KNOCKDOWN || in->react==AW_PE_KNOCKOUT){
+        /* a hit, a knockdown or a knockout plays over every stance (the upper body's is cancelled) */
+        memset(out,0,sizeof(*out));
+        out->weapon=(signed char)((real(in->weapon) || in->weapon==AW_PW_SPELL) && drawn?in->weapon:AW_PW_NONE);
+        out->event=(unsigned char)in->react;out->swim=(unsigned char)(in->swim!=0);out->roll=(unsigned char)in->roll;
+        return 1;
+    }
+    if(AW_PickPlayerState(in->weapon,in->hand,in->goal,in->move,in->run,in->attack,in->air,in->swim,out)){
+        if(out->event==AW_PE_NONE){
+            out->sneak=(unsigned char)(in->sneak!=0);
+            if(out->sneak)out->run=0;
+            if(out->move==AW_PM_NONE && turning && !out->sneak)out->move=(unsigned char)in->turn;
+        }
+        return 1;
+    }
+    /* nothing drawn (or fists ready): the sneak and the turn on the spot, never over the hand layer or in water */
+    if(in->swim || in->air || in->hand==1 || in->hand==3 || in->hand==4)return 0;
+    if(!in->sneak && !(turning && in->move==AW_PM_NONE))return 0;
+    memset(out,0,sizeof(*out));
+    out->weapon=(signed char)(drawn?AW_PW_HANDTOHAND:AW_PW_NONE);
+    out->sneak=(unsigned char)(in->sneak!=0);
+    out->move=(unsigned char)(in->move>AW_PM_NONE && in->move<=AW_PM_RIGHT?in->move:in->sneak?AW_PM_NONE:in->turn);
     return 1;
 }
 

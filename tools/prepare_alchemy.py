@@ -172,18 +172,20 @@ def bottle_tiers(items):
 def prepare(data, id1, items):
     """Write alchemy/settings.txt and the four sounds; DATA the resolved data folder, ITEMS prepare_inventory.source_items'
     catalogue."""
-    from mwad.audit import BSA, string
+    from mwad.audit import string
+    from mwad.archives import layered_bsa
     from mwad.paths import child_ci
+    from mwad.masters import master_path
     from prepare_levelup import load
     data = Path(data)
     id1 = Path(id1)
-    kinds = load(child_ci(data, 'Morrowind.esm'))
+    kinds = load(master_path(data))
     report = {'held': {}, 'sounds': {}}
     sounds = {}
     try:
         from npc_geometry import Assets
         from prepare_combat import convert_wav
-        assets = Assets(data, BSA(child_ci(data, 'Morrowind.bsa')))
+        assets = Assets(data, layered_bsa(data))
     except (ImportError, OSError, KeyError, ValueError) as error:
         assets, report['held']['sounds'] = None, str(error)
     for name, record_id in SOUNDS:

@@ -1090,8 +1090,20 @@ def gate_command(config, number):
     return [str(part).replace('{number}', str(number)) for part in template]
 
 
-def run_logged(command, env, log_path, echo=True):
-    """Runs COMMAND, copies its output to LOG_PATH (and stdout); returns the exit code."""
+def run_logged(command, env, log_path, echo=True, stall=True, name=None, history_path=None, resume='',
+               containers=None, extra_logs=(), planned_cores=None, report=None):
+    """Runs COMMAND, copies its output to LOG_PATH (and stdout); returns the exit code. Under the stall fallback by
+    default (tools/stall_guard.py, BUILD-NO-STALL-ALERT-66): a step with no progress is stopped with the reason
+    and the resume command (exit stall_guard.STALL_EXIT); stall=False only for a caller that watches on its own."""
+    if stall:
+        tools = str(Path(__file__).resolve().parent)
+        if tools not in sys.path:
+            sys.path.append(tools)
+        import stall_guard
+        return stall_guard.run_watched(command, env=env, log_path=log_path, echo=echo,
+                                       name=name or Path(str(log_path)).name, containers=containers,
+                                       history_path=history_path, resume=resume, extra_logs=extra_logs,
+                                       planned_cores=planned_cores, report=report)
     with open(log_path, 'w', encoding='utf-8', newline='\n') as log:
         process = subprocess.Popen(command, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                    text=True, encoding='utf-8', errors='replace')
@@ -1242,8 +1254,16 @@ def cmd_gate(args, config):
     env['REPO'] = str(repo).replace('\\', '/')
     log_path = logs / f'{run_name}.console.log'
     script_exit = None
+    gate_out = config.get('gate', {}).get('out_dir')
     try:
-        script_exit = run_logged(gate_command(config, number), env, log_path, echo=not args.quiet)
+        # the gate's own containers carry its number (amiwind-gate-*-N, aw-gate-*-N); the gate queue's wait lines
+        # hold the stall clock (stall_guard.WAIT_RE)
+        script_exit = run_logged(gate_command(config, number), env, log_path, echo=not args.quiet,
+                                 name=f'gate {number}', containers=[f'-{number}'],
+                                 extra_logs=[str(Path(gate_out) / f'par-{number}-{part}.out') for part in
+                                             ('repo', 'preflight', 'suite', 'engine', 'smoke')] if gate_out else (),
+                                 history_path=state_dir(config) / 'stall-history-gate.json',
+                                 resume=f'aw gate --repo {repo} --commit {head} (a new number; the stalled one is spent)')
     finally:
         out_dir = config.get('gate', {}).get('out_dir')
         parsed = parse_gate(out_dir, number, head) if out_dir else {

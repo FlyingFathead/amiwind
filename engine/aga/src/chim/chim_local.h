@@ -229,6 +229,9 @@ const char *Chim_Store (void);
 /* the model id a placement draws with under aw_tree_crowns (the store's alt-models.bin; BASE when none) */
 unsigned Chim_AltModel (unsigned base);
 int Chim_StoreSelect (const char *name);
+/* 1 when the store NAME is carried by this image (its world.cwi opens; the
+ * island's always): the expansions' stores, tools/chim/layer_stores.py. */
+int Chim_StoreInImage (const char *name);
 void Chim_PackClose (chim_pack_t *pack);
 int Chim_PackRead (chim_pack_t *pack, long offset, void *out, long bytes);
 int Chim_PackReadRaw (chim_pack_t *pack, long offset, void *out, long bytes);

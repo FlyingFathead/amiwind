@@ -1,6 +1,6 @@
 # What every being can have: the actor records
 
-_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
+_Last updated with AmiWind v0.0.66 (15 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -25,6 +25,12 @@ _Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
   - [Resistances and weaknesses](#resistances-and-weaknesses)
   - [What a missing value reads as](#what-a-missing-value-reads-as)
 - [Part two: everything a being holds while the game runs](#part-two-everything-a-being-holds-while-the-game-runs)
+- [Is it all there: the audit](#is-it-all-there-the-audit)
+  - [Ranged fighters](#ranged-fighters)
+  - [Held weapons](#held-weapons)
+  - [Combat styles](#combat-styles)
+  - [The animations](#the-animations)
+- [The build's actor spec check](#the-builds-actor-spec-check)
 - [Sources and method](#sources-and-method)
 
 <!-- contents end -->
@@ -463,6 +469,211 @@ OpenMW save file keeps the value.
 | Mark and Recall position | position, cell | P | yes | Not yet |
 | Previous items (for bound item spells) | map of ids | P | yes | Not yet |
 | Last known exterior position, current cell | position, id | P | yes | The save's own position block |
+
+## Is it all there: the audit
+
+A world-wide table checks, field by field, every NPC and creature record of the three masters against what a build's
+actor data holds: the actor table, the stats vocabulary every area's stats are cut from, the compiled Wander packages
+and the script table. Each field of each record is **carried** (the build holds the record's value), **missing** (the
+record has it, the build holds nothing), **different** (the build holds another value) or **absent** (the record has
+no such value). Counts are given in records and in placed references, with the references of Morrowind.esm's cells
+apart (the expansions' cells are not in the build yet).
+
+- The tool: `tools/actor_record_audit.py --data-files DIR --build RUN --out DIR [--public FILE]
+  [--fresh-actor-table]` (the last flag compares the actor table the current source would write, before any build).
+- The counts: [actor-record-audit.json](actor-record-audit.json). The known gaps, each with its tracked ID:
+  `config/actor-record-gaps.json`. The gate test `tests/test_actor_record_audit.py` fails on any gap that is not
+  listed there, or that grew.
+
+Headline, 13 November 2026 (the v0.0.65 release build's outputs, the actor table of v0.0.66): 3,041 people and 396
+creature records, 4,798 placed references (3,906 in Morrowind.esm).
+
+| Field | Missing or different (records) | Placed references (Morrowind.esm) | Tracked as |
+| --- | ---: | ---: | --- |
+| Level, attributes, skills, health, magicka, fatigue, behaviour ratings, disposition, reputation, rank, gold, race, class, faction, creature type, attacks, soul, flags, blood, spells, fixed inventory, script | 0 | 0 | all carried |
+| Levelled inventory: chosen once at build time, not per actor | 1,276 | 1,820 | ACTOR-LEVELLED-INVENTORY-ONE-PICK-66 |
+| Wander package (actors placed only in the expansions) | 520 | 6 | ACTOR-PACKAGES-NOT-HELD-66 |
+| Ranged weapon: a bow or crossbow without its ammunition (7); a melee weapon rated higher at the opening (43) | 50 | 50 | ACTOR-RANGED-COMBAT-MISSING-66 |
+| Follow, travel, escort packages | 158 | 123 | ACTOR-PACKAGES-NOT-HELD-66 |
+| Creature scale (expansions only) | 42 | 0 | CREATURE-SCALE-NOT-HELD-66 |
+| Armour worn | 23 | 44 | ACTOR-LEVELLED-INVENTORY-ONE-PICK-66 |
+| Melee weapon equipped | 2 | 2 | ACTOR-LEVELLED-INVENTORY-ONE-PICK-66 |
+| Script local count | 1 | 0 | NPC-CREATURE-COMBAT-STYLE-STATS-66 |
+
+Fixed by the audit's first round (v0.0.66): a creature with the "weapon and shield" flag now equips the weapon and
+armour its inventory gives and fights with the weapon's damage, as in the original (CREATURE-COMBAT-WEAPON-54). Before:
+54 such records (164 placed references, among them every skeleton, lich, goblin and dremora with a weapon) struck with
+their own claw attacks; after: 2, both a levelled pick. A creature without the flag keeps its items as loot only.
+
+### Ranged fighters
+
+The skeleton archers of Andrano Ancestral Tomb carry a long bow and nothing else to fight with, so they come at the
+player with their fists. Two parts are missing, for every archer of the game (252 records):
+
+1. The builder's equipment choice takes melee weapons only (weapon types 0 to 8); a bow, crossbow or thrown weapon is
+   never the equipped weapon.
+2. The engine has no shot: the player's own bow says so, and no actor can shoot.
+
+The plan, as the original does it (OpenMW 0.51 aicombat.cpp, weapontype.cpp, projectilemanager.cpp, for the rules
+only): an actor whose best weapon is ranged keeps its distance and shoots; the arrow or bolt is a projectile that flies
+at a speed between the game settings fProjectileMinSpeed and fProjectileMaxSpeed by how far the bow was drawn, falls with gravity, and hits the first body
+or wall on its path; the damage is the weapon's chop range plus the ammunition's, and one round of ammunition is used
+per shot. Budget sheet for the first version (to be measured on the slow machine before it ships):
+
+- RAM: one projectile pool of 16 entries (about 64 bytes each, 1 KiB), one shared arrow and bolt model each.
+- CPU: one ray test against the world and the actors per projectile per frame (16 at most); a shot is an event, not a
+  per-frame cost. The draw and release play the bow groups the animation tables already hold.
+- DISK: no new file per area; the ammunition models are shared item models.
+- DRAW: one small model per arrow in flight (about 20 triangles).
+
+What v0.0.66 does (in the source, not yet checked in a running game):
+
+- The builder (`tools/prepare_combat.py` `equipment(..., ranged=True)`, used by the actor table and the fight sheets)
+  holds a bow, crossbow or thrown weapon when the inventory can shoot it (a bow with arrows, a crossbow with bolts) and
+  it rates higher than the best melee weapon at the opening of a fight, by the original's weapon rating
+  (weaponpriority.cpp: the mean chop plus the best round's, times the speed, and the ranged multiplier while the enemy
+  is out of reach), or when it is the only weapon. The arrows stay in the inventory. Bows and crossbows are two-handed:
+  no shield beside them. The arena fighters and the held models keep the melee choice. On the game data (the audit with
+  this source's actor table, 13 November 2026): 202 of the 252 records hold their ranged weapon; 43 hold a melee weapon
+  that rates higher at the opening; 7 carry a bow without arrows (the original rates such a bow 0).
+- The fight layer (`engine/aga/src/aw_combat.c`, rules in `aw_combat_rules.c`): while the player is within the
+  weapon's combat range (fProjectileMaxSpeed, 3,000 units) and in sight, the actor keeps its place and plays its attack
+  group; at the release one round leaves its inventory (the live record, so a saved game keeps the count) and the
+  shot flies at fProjectileMinSpeed to fProjectileMaxSpeed by the draw (an actor's draw in the original, 0.1 plus a roll),
+  aimed above the target by the drop and falling with the original's projectile gravity. Each frame it moves once and
+  traces once; it hits the first body or wall on its path. On the player it is the hit roll and damage of a blow, with
+  the weapon's and the round's chop and the player's armour, never blocked. Out of rounds the actor fights hand to hand.
+  `dbg combat` shows the shots fired, landed and missed and the pool.
+- Not yet: switching between bow and melee weapon during a fight (the original rates both again at every action), the
+  arrow model (the shot is drawn as a short shaft of four particles), shots at other actors, and the slow-machine
+  measurement of the sheet above.
+
+Budget as built: RAM 16 shots of about 40 bytes (640 bytes on the Amiga) and 12 bytes per fighter slot; CPU one trace per shot in flight
+per frame (16 at most) and one sight trace per archer think (0.1 s); DISK none (the rounds are read from the actor
+record already in memory); DRAW four particles per shot in flight.
+
+### Held weapons
+
+People and creatures draw the weapon and shield they fight with through the item models that follow the Weapon Bone
+and Shield Bone of their skeleton (a `.tag` file beside the actor's model; `tools/npc_items.py`,
+`engine/aga/src/aw_items.c`). The town residents had them; the models of the NPC library (the people of the rest of the
+island, among them most guards) did not: in the v0.0.65 release build none of the 423 library models had a tag, so a
+guard fought with a spear nobody saw (NPC-WEAPON-MESH-33, seen again in v0.0.65). From v0.0.66 the library writes the
+same tag for every skeletal model whose person carries a weapon or shield, beside the bake, so no model is baked
+again; the setting `AMIWIND_NPC_LIBRARY_ITEMS=0` turns it off. Measured on the game data (13 November 2026): 288 of
+the 423 library models get a tag (28,680 bytes in all, about 100 bytes each), naming 69 item models of about 145 KB
+each, shared with the residents' (the image already holds 111 item models, the guard's spear among them); the work is
+about 1.3 seconds an appearance on one core and runs on all the stage's jobs. In play it adds one small item model
+per armed person drawn. Not yet checked in a running game.
+
+### Combat styles
+
+Which weapon a person or creature takes into a fight, and so its style of combat (a melee weapon, a bow, a crossbow, a
+thrown weapon, its fists, or a creature's own attacks), is chosen by the builder for its fight sheet and the actor
+table (`tools/prepare_combat.py` `equipment`). From v0.0.66 the choice follows the original's weapon rating with the
+fighter's own skills (OpenMW 0.51 weaponpriority.cpp rateWeapon, for the rules only): each weapon's damage term, a bow
+or crossbow with its best round and no rating without one, is multiplied by the hit chance of the fighter with that
+weapon (its skill, or a creature's Combat value, plus Agility / 5 and Luck / 10, times the fresh fatigue factor; the
+enemy's side is not known before the fight and is left out), by the weapon's speed, and by fAIMeleeWeaponMult, or
+fAIRangeMeleeWeaponMult for a ranged weapon, since every fight opens with the enemy out of reach. A weapon whose skill
+is 0 is never taken. A creature's skill is its Combat, Magic or Stealth value by the skill's specialization, so a
+creature with no Stealth leaves its dagger and bow and uses its own attacks; a creature without the "weapon and
+shield" flag always does. Before, the melee weapon was the one with the highest maximum damage whatever the skill.
+
+The table (`tools/combat_style_audit.py`, run in a container on the three masters; counts in
+[combat-style-audit.json](combat-style-audit.json)) checks every record's choice against the rule written out on its
+own. On the game data (13 November 2026), of 3,437 records: 1,839 fight with a melee weapon, 119 with a bow, 20 with a
+crossbow, 54 with a thrown weapon, 1,062 with their fists and 343 creatures with their own attacks; 632 of them also
+have spells to cast (weighed against the weapon in the fight itself). The choice of the v0.0.66 source before this
+change differed for 35 records: 11 took another style (8 a thrown weapon and 2 a bow where their skills give a melee
+weapon, 1 the other way round) and 24 another melee weapon. Now none differs. The skeleton archers hold their bows in
+both.
+
+### The animations
+
+The same table also holds, per record, every kind of animation the original's files give its skeleton, against what
+the build's model of that actor can play. The original side: a person's groups come from `xbase_anim.kf` (the beast
+races from `xbase_animkna.kf`) plus its own file when its record names one; a creature's from its own `x<model>.kf`,
+plus `xbase_anim.kf` when it walks on two legs (the text keys of each file, read without parsing the model). The
+build side: the method each actor gets (a town or room resident, the NPC library, the opening's standing model with
+the full kit it wears in a fight, the creature library's `kf` bake of six groups or its `skeletal` model on the
+creature's whole table, an authored corpse with its one death pose) and the groups that method plays. The kinds:
+idle, walk, run, attack (a creature's attack1 to attack3), the seven weapon attacks of a person (hand-to-hand,
+one-handed, two-handed, two-wide, bow, crossbow, thrown), hit, knockdown, death, spell cast, block, sneak and swim.
+A corpse counts only its death pose. Each row also names its method, and the opening's people are listed by name.
+
+Headline (the v0.0.65 release build, Morrowind.esm references):
+
+| Kind | Missing (references) | Why | After v0.0.66 (projected) |
+| --- | ---: | --- | ---: |
+| Knockdown | 791 | the creature library bakes six groups (168 creature records) | 16 |
+| Spell cast | 129 | the same (38 creature records) | 16 |
+| Weapon attacks, block, sneak, swim of two-legged creatures | 81 | the same (22 records: skeletons, dremora) | 4 |
+| Idle, walk, run, hit, death | 6 to 7 | Fargoth and the opening's Imperial guard (no layout), Vivec, Dagoth Ur | 6 to 7 |
+
+Every person of the towns, the rooms and the NPC library (about 2,550 records) carries every kind: they are skeletal
+and play their table by state. The census office's people (Socucius Ergalla, Sellus Gravius, the hall guard) and the
+prison ship's carry every kind through their full kit (fixed in v0.0.65, CENSUS-NPC-NO-ATTACK-ANIM-65). The gap was
+the creatures (NPC-ATTACK-ANIMS-MISSING-65): from v0.0.66 the creature library bakes every creature with the
+`skeletal` method, its whole table (the second and third attack, knockdown, spell cast and swim included, picked by
+state as for the rooms' creatures and Dagoth Ur); a mesh the skeletal bake refuses keeps the six baked groups and is
+named in the build log (in the game data: the storm atronach). `--creature-method kf` brings back the old bake.
+Budget, measured by baking the 39 creature meshes alone on the game data (13 November 2026, about 5 minutes on 16
+cores): 38 take the skeletal method; their models and tables are 10.1 MB on disk (2.97 MB of tables, 7.08 MB of
+models) against 24.6 MB for the same meshes baked with `kf` (a standing and a mover model each), so the image is
+about 14.5 MB smaller. In memory a placed creature holds one rest frame instead of two models of 16 and 38 frames; its
+table (12 to 56 KB, or the shared humanoid table for the two-legged ones) is held once per kind. Posing a skeletal
+model costs CPU per drawn frame, as every person already does; not yet measured in a running game. Fargoth's and the
+guard's missing layout is FARGOTH-STANDING-NO-LAYOUT-66.
+
+## The build's actor spec check
+
+Since v0.0.66 the image step stops a full build whose people and creatures fall short of the original or are out of
+spec (`tools/actor_spec_check.py`, run right after the creature census, about 35 seconds on stored outputs; by hand:
+`python3 tools/actor_spec_check.py RUN --data-files DIR`). It has two parts:
+
+- Placement, per area kind: the NPC, creature and levelled creature references (deleted ones left out) of the cells
+  of the selected masters, merged as the game merges them, counted for interiors, the region exteriors, the town
+  exteriors and the water (swim-only creatures and lists that give only them), against what the build places: in the
+  rooms, the references the image's maps carry, each under its own record's kind (a levelled point of an expansion
+  room counts like one of the base game's); outdoors, the actor table under the town and region rules. A kind short by
+  more than `config/actor_census_allowlist.json` allows fails; each allowed shortfall names its register entry.
+  With the expansions selected, the places the build sets aside on purpose leave both sides and are listed by name
+  with their register entry (the same file's `set_aside`): Mournhold's districts, which behave like an exterior and
+  wait for the Mournhold exterior work (INTERIOR-NO-AMBI-66), the expansion rooms the room stage refused
+  (EXPANSION-ROOMS-REFUSED-66), the cells the game data leaves empty, which the room stage lists as empty and makes no
+  room of (no scenery to convert, at most an actor, and no door leads in; ROOM-EMPTY-CELL-66), and Solstheim's
+  exterior cells, which no map holds yet (EXTERIOR-EXPANSION-ONLY-CELLS-66). Each list of rooms the room stage does not
+  make is read as its own group, by the name the stage records it under. Only an expansion's references are set aside;
+  a base game reference in such a place still counts as missing. With the base game alone nothing is set aside.
+- Records: the audit above over the build's actor data; a field (level, attributes, skills, health, magicka,
+  fatigue, behaviour values, flags, spells, inventory, the carried weapon and ranged weapon, packages, animations)
+  with more missing or different records than `config/actor-record-gaps.json` lists fails.
+
+On the v0.0.66-dev1 build it fails: the town maps place 0 of 4 creatures and 0 of 112 levelled creature points of
+their cells (46 of them water lists), and the creature weapons and ranged weapons are not held (both fixed on the line
+after that build; this tree's actor table passes the record part).
+
+The first build with Tribunal and Bloodmoon selected (v0.0.66-dev2) stopped in it (BUILD-ACTOR-SPEC-EXPANSIONS-66):
+the rooms' original counted the three masters' references while the placed levelled points were the base game's
+alone (1,266 of 1,532: the 262 points the image places in the expansions' rooms were counted as missing), and the 50
+NPCs and 13 creatures of the Tribunal places the room stage sets aside counted as missing too. Counted like for like
+on the same build, every kind is within its tracked gap: in the rooms 2,738 of 2,740 NPCs, 888 of 891 creatures and
+1,528 of 1,532 levelled points (the 2, 3 and 4 of the allowlist), with 50 NPCs and 13 creatures set aside; outdoors
+everything planned is placed, and Solstheim's 82 NPCs, 120 creatures and 860 levelled points are set aside (before,
+they counted as placed because the actor table holds them, though no map does). Its record part counted 52 actors
+holding a melee weapon where their record also gives a ranged one, against 43 listed: the same two gaps (the opening
+rating, ACTOR-RANGED-COMBAT-MISSING-66, and the one levelled pick, ACTOR-LEVELLED-INVENTORY-ONE-PICK-66) over nine
+Bloodmoon actors the earlier count left out; the list now says 52.
+
+The v0.0.66-dev3 build stopped in it once more (BUILD-ACTOR-SPEC-EMPTY-ROOMS-66): interior NPCs 2,738 of 2,741 placed,
+3 missing against 2 allowed. Since that build the room stage lists the four cells the game data leaves empty under a
+list of their own instead of among the refused rooms (Mournhold, Royal Palace, whose one Tribunal NPC stands in a cell
+with no scenery and no door leading in, and three cells with no reference at all), and the check read only the two
+older lists, so that NPC counted as missing. The check now reads the empty list as its own group; on the same build's
+outputs it passes in about 20 seconds: in the rooms 2,738 of 2,740 NPCs, 893 of 896 creatures (the three Sotha Sil
+rooms the dev2 build refused convert in this one, their 5 creatures placed) and 1,528 of 1,532 levelled points, with
+50 NPCs and 8 creatures set aside.
 
 ## Sources and method
 

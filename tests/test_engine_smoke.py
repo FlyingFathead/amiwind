@@ -755,3 +755,182 @@ class LoadHangExperimentTests(unittest.TestCase):
             run = subprocess.run([sys.executable, str(Path(tmp, 'judge.py')), 'live', str(Path(tmp, 'frames.txt')),
                                   '150'], capture_output=True, text=True)
         self.assertTrue(run.stdout.startswith('STOP the same picture from 50 s to 290 s'), run.stdout)
+
+
+class WalkerStepTests(unittest.TestCase):
+    """JOURNEY-WALK-DIALOGUE-DESYNC-66: the script steps that wait for the game and stop at the first wrong turn
+    (walkto, waitfor, boxes, mark / saw, topic, face, aimed), run in a POSIX shell against a fake game: a console log
+    and a state file that change as the fake clock (sleep) moves."""
+
+    STUBS = ('K=1\nN=0\nlog(){ echo "log $*"; }\nalive(){ return 0; }\nshot(){ echo "shot $1"; }\n'
+             'finish(){ echo "finish $1"; exit 0; }\nkey(){ echo "key $1"; [ "$1" = Return ] && : > $R/nobox; }\n'
+             'xdo(){ echo "xdo $1"; }\nrc(){ echo "rc $1"; }\n'
+             'st(){ case "$1" in screen) if [ -e $R/box ] && [ ! -e $R/nobox ]; then echo messagebox; else cat $R/screen 2>/dev/null || echo game; fi;; '
+             'local) echo "10 20 30";; map) echo maps/census.bsp;; *) echo 1;; esac; }\n')
+
+    def walker(self):
+        text = engine_smoke.PROBE
+        return text[text.index('# WALKER-STEPS-BEGIN'):text.index('# WALKER-STEPS-END')]
+
+    def run_sh(self, tmp, body, sleep='sleep(){ N=$((N+1)); }\n', console=''):
+        Path(tmp, 'awctl').mkdir(exist_ok=True)
+        Path(tmp, 'awctl', 'console.log').write_text(console, encoding='utf-8', newline='\n')
+        script = 'R=%s\n%s%s%s\n%s\necho done\n' % (Path(tmp).as_posix(), self.STUBS, sleep, self.walker(), body)
+        done = subprocess.run(['sh', '-c', script], capture_output=True, text=True, timeout=60)
+        return done.stdout.splitlines()
+
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_walkto_waits_for_the_engine_and_answers_a_box_on_the_way(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, 'box').write_text('')
+            sleep = ('sleep(){ N=$((N+1)); [ $N = 3 ] && echo "Walk to: reached." >> $R/awctl/console.log; :; }\n')
+            lines = self.run_sh(tmp, 'walk_to 47 100 20', sleep, console='Walk to: reached.\n')
+        # an older "reached" line before the step does not count; the box is answered; the new line ends the step
+        self.assertIn('rc aw_view walk 47 100', lines)
+        self.assertIn('key Return', lines)
+        self.assertIn('log walkto 47 100: a message box on the way, Enter', lines)
+        self.assertIn('log walkto 47 100: reached after 3 s at local 10 20 30', lines)
+        self.assertEqual(lines[-1], 'done')
+
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_walkto_not_reached_stops_the_run_with_the_position(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            lines = self.run_sh(tmp, 'walk_to 47 100 5')
+        self.assertIn('rc aw_view walk off', lines)
+        self.assertIn('shot walkto-stuck-47_100', lines)
+        self.assertEqual(lines[-1], 'finish FAIL walkto 47 100: not reached in 5 s; the player stands at local 10 20 30 '
+                                    '(screen game, map maps/census.bsp)')
+
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_waitfor_reads_the_state_until_it_holds_the_text(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, 'screen').write_text('game\n')
+            sleep = 'sleep(){ N=$((N+1)); [ $N = 2 ] && echo dialogue > $R/screen; :; }\n'
+            lines = self.run_sh(tmp, 'wait_for screen 10 dialogue', sleep)
+            self.assertEqual(lines[-2:], ['log waitfor screen dialogue: after 2 s', 'done'])
+            Path(tmp, 'screen').write_text('persuasion\n')
+            lines = self.run_sh(tmp, 'wait_for screen 3 dialogue')
+        self.assertEqual(lines[-1], "finish FAIL waitfor screen dialogue: read 'persuasion' after 3 s (map maps/census.bsp, "
+                                    'screen persuasion, local 10 20 30)')
+
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_saw_looks_only_after_the_mark(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            body = 'M0=$(clines)\nsaw 3 source ref: 172859'
+            lines = self.run_sh(tmp, body, console='source ref: 172859\n')
+            self.assertTrue(lines[-1].startswith("finish FAIL saw: no console line 'source ref: 172859' within 3 s"),
+                            lines)
+            sleep = 'sleep(){ N=$((N+1)); echo "source ref: 172859" >> $R/awctl/console.log; }\n'
+            lines = self.run_sh(tmp, body, sleep, console='source ref: 1\n')
+        self.assertEqual(lines[-2:], ["log saw 'source ref: 172859' after 1 s", 'done'])
+
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_aimed_takes_the_crosshair_pick_or_the_use_keys_focus(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            sleep = 'sleep(){ N=$((N+1)); echo "source ref: 113889 / cell -2,-9" >> $R/awctl/console.log; }\n'
+            lines = self.run_sh(tmp, 'aimed 113889', sleep)
+            self.assertEqual(lines[:2], ['rc aw_placed aim', 'rc aw_inspect'])
+            self.assertEqual(lines[-2:], ["log aimed 113889: the crosshair's pick (aw_inspect; the focus row none not in "
+                                          "the report), try 1", 'done'])
+            # the v0.0.66-dev2 papers: the pick hit the desk under the flat scroll, the game's focus is on the scroll
+            focus = ('aw_placed aim: reach 48, 30 rows (room), eye 20 -30 79, aimed row 5\n'
+                     '  4 B 406345 sc_paper plain: at 52 -44 65, edict 0 drawn 3 disabled 0, dist 35.0\n'
+                     '  5 B 172859 chargen statssheet: at 37 -46 65, edict 40 drawn 0 disabled 0, dist 23.0\n'
+                     'source ref: 119515\n')
+            sleep = "sleep(){ N=$((N+1)); [ $N = 2 ] && printf '%s' \"$FOCUS\" >> $R/awctl/console.log; :; }\n"
+            lines = self.run_sh(tmp, 'FOCUS=\'%s\'\naimed 172859' % focus, sleep)
+            self.assertEqual(lines[-2:], ["log aimed 172859: the use key's focus row 5 (aw_placed aim), try 1", 'done'])
+            # the pick lands on the papers only after a nudge of the aim (the third try: 1.5 degrees less pitch)
+            sleep = ('sleep(){ N=$((N+1)); [ -n "$(grep -c "aw_aim" $R/turns 2>/dev/null)" ] && '
+                     '[ "$(grep -c aw_aim $R/turns)" -ge 2 ] && echo "source ref: 172859" >> $R/awctl/console.log; :; }\n'
+                     'rc(){ echo "rc $1"; echo "$1" >> $R/turns; }\n')
+            lines = self.run_sh(tmp, 'st(){ case "$1" in angles) echo "28.7 317.8";; local) echo "20 -30 79";; *) echo 1;; esac; }\n'
+                                     'aimed 172859', sleep)
+            self.assertIn('rc aw_aim 317.8 30.2', lines)
+            self.assertIn('rc aw_aim 317.8 27.2', lines)
+            self.assertEqual(lines[-2:], ["log aimed 172859: the crosshair's pick (aw_inspect; the focus row none not in "
+                                          "the report), try 3", 'done'])
+            # the v0.0.66-dev2 crab meat: the pick names it, but the focus row the report prints is the plate under it,
+            # and the use key takes the focus: never accepted
+            plate = ("sleep(){ N=$((N+1)); printf 'aw_placed aim: reach 48, 154 rows (room), eye 141 192 79, aimed row 43\\n"
+                     "  43 I 119580 Silverware Plate: at 145 176 63, edict 0 drawn 0 disabled 0, dist 23.6\\n"
+                     "source ref: 454283\\n' >> $R/awctl/console.log; }\n")
+            lines = self.run_sh(tmp, 'aimed 454283 2', plate)
+            self.assertFalse([l for l in lines if l.startswith('log aimed')], lines)
+            self.assertEqual(lines[-1], "finish FAIL aimed 454283: neither the use key's focus (aw_placed aim, aimed row 43) "
+                                        "nor the crosshair's pick (aw_inspect: 454283) is on it in 13 tries around pitch 1 "
+                                        "yaw 0 (local 10 20 30)")
+            # aimed at the desk itself: neither names the reference in any of the thirteen tries
+            sleep = ("sleep(){ N=$((N+1)); printf 'aw_placed aim: reach 48, 154 rows (room), eye 20 -30 79, aimed row 92\\n"
+                     "source ref: 119515\\n' >> $R/awctl/console.log; }\n")
+            lines = self.run_sh(tmp, 'aimed 172860 2', sleep)
+        self.assertEqual(lines[-2], 'shot aimed-missing-172860')
+        self.assertEqual(lines[-1], "finish FAIL aimed 172860: neither the use key's focus (aw_placed aim, aimed row 92) "
+                                    "nor the crosshair's pick (aw_inspect: 119515) is on it in 13 tries around pitch 1 yaw 0 "
+                                    "(local 10 20 30)")
+
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_lookat_turns_to_the_nearest_placed_items_until_one_is_the_reference(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            # aw_placed.c look_command: the plate first (nearest), then the crab meat on it
+            sleep = ('rc(){ echo "rc $1"; case "$1" in "aw_placed look 0") r=119580;; "aw_placed look 1") r=454283;; '
+                     '*) r=;; esac; [ -n "$r" ] && echo "aw_placed look: reference $r at 37 units." >> $R/awctl/console.log; :; }\n'
+                     'sleep(){ N=$((N+1)); }\n')
+            lines = self.run_sh(tmp, 'look_at 454283', sleep)
+            self.assertEqual([l for l in lines if l.startswith('rc ')], ['rc aw_placed look 0', 'rc aw_placed look 1'])
+            self.assertEqual(lines[-2:], ['log lookat 454283: the nearest drawn placed item number 1', 'done'])
+            # the list runs out: the game says how many there are, and the step stops naming what it saw
+            sleep = ('rc(){ echo "rc $1"; case "$1" in "aw_placed look 0") echo "aw_placed look: reference 119580 at 37 units." '
+                     '>> $R/awctl/console.log;; *) echo "aw_placed look: 1 drawn placed items near here." >> $R/awctl/console.log;; '
+                     'esac; }\nsleep(){ N=$((N+1)); }\n')
+            lines = self.run_sh(tmp, 'look_at 454283', sleep)
+        self.assertEqual(lines[-2], 'shot lookat-missing-454283')
+        self.assertEqual(lines[-1], 'finish FAIL lookat 454283: not among the nearest drawn placed items (saw: 119580; '
+                                    'local 10 20 30)')
+
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_boxes_answers_every_box_showing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, 'box').write_text('')
+            lines = self.run_sh(tmp, 'boxes')
+        self.assertEqual([l for l in lines if l.startswith(('key', 'log'))], ['key Return', 'log boxes: Enter on message box 1'])
+
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_topic_types_the_name_into_the_open_window(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            lines = self.run_sh(tmp, 'topic duties')
+            self.assertEqual(lines[0], 'shot topic-no-window')
+            self.assertTrue(lines[-1].startswith('finish FAIL topic duties: the dialogue window is not open (screen game'))
+            Path(tmp, 'screen').write_text('dialogue\n')
+            lines = self.run_sh(tmp, 'topic Caius Cosades')
+        # the Find box ignores spaces (aw_listbox_rules.c fold): the name is typed without them, then Enter
+        self.assertEqual(lines[:3], ['xdo type --delay 60 CaiusCosades', 'key Return', 'log topic Caius Cosades (typed CaiusCosades, Enter)'])
+        # then the search box is cleared, one BackSpace per typed letter (a name not offered stays in the box)
+        self.assertEqual(lines[3:-1], ['key BackSpace'] * len('CaiusCosades'))
+
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_face_turns_the_view_to_a_point_from_the_eye(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            lines = self.run_sh(tmp, 'face 20 30 20\nface 0 20 30\nface 10 20 90')
+        aims = [l for l in lines if l.startswith('rc ')]
+        # from the eye at 10 20 30: up and to the right, down 35.3 degrees; due west (yaw 180), level; straight up (clamped)
+        self.assertEqual(aims, ['rc aw_aim 45.0 35.3', 'rc aw_aim 180.0 0.0', 'rc aw_aim 0.0 -70.0'])
+
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_the_script_loop_dispatches_the_walker_steps(self):
+        text = engine_smoke.PROBE
+        start = text.index('if [ -s $R/script.txt ]; then')
+        block = text[start:text.index('\nfi\n', start) + 4]
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, 'script.txt').write_text('walkto 1 2 3\nwaitfor screen 5 dialogue box\nboxes\nmark\nsaw 4 a b\n'
+                                              'topic my trade\nface 1 2 3\naimed 42 7\n', encoding='utf-8', newline='\n')
+            stubs = ('R=%s\nlog(){ :; }\nrc(){ :; }\nalive(){ return 0; }\nclines(){ echo 7; }\n'
+                     'walk_to(){ echo "walk_to $*"; }\nwait_for(){ echo "wait_for $*"; }\nboxes(){ echo boxes; }\n'
+                     'saw(){ echo "saw $* after $M0"; }\ntopic(){ echo "topic $*"; }\nface(){ echo "face $*"; }\n'
+                     'aimed(){ echo "aimed $*"; }\n'
+                     'st(){ case "$1" in screen) echo game;; signon) echo 4;; *) echo 1;; esac; }\n'
+                     'finish(){ echo "finish $1"; exit 0; }\nt0=0\n' % Path(tmp).as_posix())
+            done = subprocess.run(['sh', '-c', stubs + block], capture_output=True, text=True, timeout=30, input='')
+        self.assertEqual(done.stdout.splitlines()[:7],
+                         ['walk_to 1 2 3', 'wait_for screen 5 dialogue box', 'boxes', 'saw 4 a b after 7',
+                          'topic my trade', 'face 1 2 3', 'aimed 42 7'], done.stderr)

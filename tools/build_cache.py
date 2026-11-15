@@ -117,10 +117,14 @@ POOL_CONTENT = 'not hashed (content-addressed storage pool)'
 # Worker counts (outputs do not depend on them), bookkeeping, and interpreter locations
 # (the Python version and packages are fingerprinted themselves).
 IGNORED_ENV = {'AMIWIND_BUILD_JOBS', 'AMIWIND_FINGERPRINT_JOBS','AMIWIND_INPUTS_LOCK', 'AMIWIND_PROFILE_SECTIONS', 'AMIWIND_COST_HISTORY', 'AMIWIND_PASS_CACHE',
+               # the pre-flight's worker processes (tools/fingerprint_prefetch.py): the same keys either way
+               'AMIWIND_PREFLIGHT_JOBS',
                'AMIWIND_BUILD_PROFILE', 'AMIWIND_PROFILE_INTERVAL', 'AMIWIND_BUILD_JOBS_FILE',
                'AMIWIND_BUILD_BUDGET', 'AMIWIND_ACTIVE_ENV', 'AMIWIND_PYTHON', 'AMIWIND_STAGE_TRACE',
                'AMIWIND_REBUILD_UNITS', 'AMIWIND_CACHE_FALLBACK', 'AMIWIND_SOURCE_COMMIT', 'AMIWIND_STORAGE_POOL',
                'AMIWIND_BUILD_RECIPE',
+               # the selected master list (MASTERS_ENV): keyed through game_inputs for the stages that read it
+               'AMIWIND_MASTERS',
                # how many small units go out in one pool task (build_parallel completed_map, BUILD-POOL-TINY-UNITS-48):
                # every unit's result is the same either way
                'AMIWIND_POOL_CHUNKS',
@@ -193,6 +197,83 @@ OUTPUT_NEUTRAL = INSTRUMENTATION_MODULES
 #   that can reach the preflight keyed tools/release-files.json and the other files there, and a release file list
 #   edit rebuilt the chim stage (BUILD-REUSE-KEYS-TOO-BROAD-35, v0.0.44-dev1 build try 2).
 OUTPUT_NEUTRAL_UNITS = frozenset({('tools/chim/regions.py', 'converter_note')})
+# Content-keyed readers (BUILD-UNIT-KEYS-REACH-64): modules whose output is keyed by its content, never by their code.
+# The merging reader (src/mwad/masters.py) hands every reader the base game file itself when only the base game is
+# selected (byte for byte, tests/test_mwad_masters.py) and the merged master of the selected layers otherwise; the
+# layered archive reader (src/mwad/archives.py) hands out the base archive alone, or the layers' files over it. What
+# they hand out is keyed as content: the game input files and the selection in the stage keys (game_inputs, the
+# load order) and in the unit keys (pass_cache.game_data_digest: the input lock, and with layers the selection, the
+# merged master's SHA-256 and the archive files the layers replace). Their code was in every key that reaches them:
+# about 20 unit caches, the CHIM mesh units and most stages, so a reader edit with the same output rebaked every unit
+# (the v0.0.66-dev1 build: 1,769 room residents again, about 7 h). They stay in the reach (the AMIWIND_* names they
+# read, the coverage and trace checks); each counts in a key as the fixed text below, never as its code. A change of
+# what such a module hands out for the same inputs needs the text below changed (a new form), as masters.FORMAT says.
+# Explicit list, tested (tests/test_content_keyed_readers.py); add a module only when its output is keyed this way.
+CONTENT_KEYED_READERS = {
+    'src/mwad/masters.py': 'content-keyed reader: the merged master of the selected masters (aw-merged-master-1)',
+    'src/mwad/archives.py': 'content-keyed reader: the archives of the selected masters (layered-archives-1)',
+}
+
+
+def content_keyed_value(path, enabled=True):
+    """The fixed key text of a content-keyed reader PATH (CONTENT_KEYED_READERS), or None (hash its code)."""
+    return CONTENT_KEYED_READERS.get(path) if enabled else None
+
+
+# Stage key edits proven to change no output (BUILD-STAGE-KEY-EQUAL-EDITS-66), the stage-key twin of
+# tools/unit_store.py LEGACY_SOURCES: {stage: {repository path: ((recorded value, this checkout's value), ...)}}. A stage
+# whose recorded key differs from this checkout's only in its sources (its dependencies may differ too, as in narrowed
+# reuse), and there only in files listed here for it, each from exactly a recorded value to exactly this checkout's
+# value, is reused (plan_reuse, predict). Each pair is one edit, compared with what the stage makes of the file and
+# shown to change none of its outputs; the proof is written beside the entry. A pair holds only while both values are
+# exactly these: any further edit of the file keys the stage as before. This module counts in no key
+# (INSTRUMENTATION_MODULES), so an entry re-keys nothing. Explicit list, tested (tests/test_build_cache.py
+# ProvenEqualSourcesTests); a pair is added only with its proof, never to get past a rebuild.
+PROVEN_EQUAL_SOURCES = {
+    # v0.0.66-dev3 (the dev3 line after 392721a7) against the v0.0.66-dev2 run of 3988c6e4, compared file by file:
+    # - tools/chim/world.py, build_frames: the format 0.11 terrain module imported under another local name (7585dc23,
+    #   three lines, the same calls); no other unit of the file changed;
+    # - engine/aga/src/aw_state.h: the item instances (397d51e2) add a structure and fields to the item, inventory and
+    #   magic state structures. The stage counts them as C facts only because the target size probe of
+    #   tools/check_world_map_heap.py includes aw_harvest.h, which includes aw_state.h, and names aw_state_t behind a
+    #   pointer. The probe compiled for the target in both trees gives the same 68 sizes; the one value the stage
+    #   reads of the file (AW_INVENTORY_DROPS, tools/map_engine_limits.py) is 32 in both; no CHIM C file uses those
+    #   structures.
+    'chim': {
+        'tools/chim/world.py': (('units4:caf246a1dff6d2f5a277c7e321e95912f8ae051890ffd4fceece228c99c0b823',
+                                 'units4:aa4376f48a57f6f0de04ccc1c7cc8dac1c57df0a1842207e302ddb2c192d00ee'),),
+        'engine/aga/src/aw_state.h': (('cfacts5:e02371ae2a61e46a9f6b0e9ca563f8497f408a06a149b52f0e14bc7745afbffc',
+                                       'cfacts5:c487d1c84470a6a41b4c1075e0c3b70dc40d03a82a38db2a9314d66062d01067'),),
+    },
+    # - tools/unit_store.py in the world scenery and world flora stages: of the eight units of the file their keys
+    #   reach, only the LEGACY_SOURCES table changed, by two rows for other unit caches (interior-room-chim, 872924c1;
+    #   creature-model, BUILD-CREATURE-KEY-REASON-TEXT-66). The stages look the table up for their own region caches
+    #   only, whose rows are unchanged, and no build of this line converts a region (every region is a CHIM cell).
+    'world-scenery': {
+        'tools/unit_store.py': (('units4:ce06698122d4567894f4170f8e71dfadf60be760a621941fdeb62e16afa9f7b7',
+                                 'units4:976fb8dc7acb1645f06122a56520758c639e284d2988547759678bcf323f3a7f'),),
+    },
+    'world-flora': {
+        'tools/unit_store.py': (('units4:ce06698122d4567894f4170f8e71dfadf60be760a621941fdeb62e16afa9f7b7',
+                                 'units4:976fb8dc7acb1645f06122a56520758c639e284d2988547759678bcf323f3a7f'),),
+    },
+}
+
+
+def proven_equal_files(name, old_components, new_components, table=None):
+    """The changed source files of stage NAME when every one is a pair of PROVEN_EQUAL_SOURCES (TABLE) for it and
+    nothing but its sources (and dependencies) changed; None otherwise."""
+    pairs = (PROVEN_EQUAL_SOURCES if table is None else table).get(name)
+    if not pairs or not only_sources_changed(old_components, new_components):
+        return None
+    old = ((old_components or {}).get('sources') or {}).get('by_file')
+    new = ((new_components or {}).get('sources') or {}).get('by_file')
+    if not isinstance(old, dict) or not isinstance(new, dict):
+        return None
+    changed = sorted(path for path in set(old) | set(new) if old.get(path) != new.get(path))
+    if not changed or any((old.get(path), new.get(path)) not in tuple(pairs.get(path) or ()) for path in changed):
+        return None
+    return changed
 # The engine's C folders in the stage keys (BUILD-ENGINE-SOURCE-KEY-BROAD-36): the modules of C_HEADER_READERS name
 # an engine folder only to read the engine files they name (engine_limits.define('client.h', ...)), to compile the
 # files they name (zone_sim: chim/chim_zone.c) or to give the compiler include folders (check_world_map_heap's target
@@ -669,7 +750,7 @@ class SourceIndex:
     """
 
     def __init__(self, root=ROOT, scope=DEFAULT_SCOPE, top_format=1, chim_label_keys=False, narrow_headers=None,
-                 engine_facts=None):
+                 engine_facts=None, content_keyed=True):
         if scope not in SCOPES:
             raise ValueError(f'fingerprint scope must be one of {", ".join(SCOPES)}')
         if top_format not in TOP_FORMATS:
@@ -703,7 +784,16 @@ class SourceIndex:
         self.narrow_headers = self.stage_form if narrow_headers is None else narrow_headers
         # ... and each engine C file by its use: C facts, or left out (tools/engine_facts.py); False: whole files
         self.engine_facts = self.narrow_headers if engine_facts is None else engine_facts
+        # True: a content-keyed reader (CONTENT_KEYED_READERS) counts as its fixed text; False: the earlier form, its
+        # code (pass_cache.previous_digests and comparable() look units and stages up under it)
+        self.content_keyed = content_keyed
         self._includes = {}
+        # {(script, top format): (selection, uncertain)}, or None: each stage selection worked out once per index (a
+        # pure function of the checkout; refresh forgets it), as the stage key, its older forms and the reach checks ask
+        # for it again (BUILD-PREFLIGHT-SERIAL-REPEATED-66). Off (None) unless the build's pre-flight turns it on
+        # (tools/fingerprint_prefetch.py use_memo, which fills it on the pool and keeps it per source tree): a test that
+        # shows one index an edited file (index.files[path] = ..., a patched reader) gets a new selection, as before.
+        self._selections = None
 
     def switch_neutral(self):
         """True when this index leaves the default-off switches' code out (DEFAULT_OFF_SWITCHES): stage keys (form 3
@@ -1036,15 +1126,18 @@ class SourceIndex:
             self._exact[key] = found
         return self._exact[key]
 
+    def symbol_key(self, relative, raw):
+        """The _SYMBOL_MEMO key of RELATIVE's text RAW in this index's form."""
+        return (raw, self.scope == 'units', self.split) + ((relative, 'switches') if self.switch_neutral() else ())
+
     def _module_symbols(self, relative):
         if relative not in self._symbols:
             raw = (self.root / relative).read_text(encoding='utf-8', errors='replace')
-            switches = self.switch_neutral()
-            key = (raw, self.scope == 'units', self.split) + ((relative, 'switches') if switches else ())
+            key = self.symbol_key(relative, raw)
             known = _SYMBOL_MEMO.get(key)
             if known is None:
                 text = strip_provenance(raw)
-                if switches:
+                if len(key) > 3:
                     text = strip_switches(relative, text)
                 try:
                     tree = ast.parse(text)
@@ -1066,6 +1159,8 @@ class SourceIndex:
         self._reached.clear()
         self._keyed.clear()
         self._json_values.clear()
+        if self._selections is not None:
+            self._selections.clear()
         self._companion = None
         self.__dict__.pop('_prefetched', None)
 
@@ -1499,6 +1594,16 @@ class SourceIndex:
         if done is not None:
             # computed by prefetch_selections in a worker process (BUILD-REUSE-CHECK-ONE-CORE-59)
             return dict(done[0]), done[1]
+        if self._selections is None:
+            return self._selection(script, top_format)
+        key = (str(Path(script).resolve()), top_format or self.top_format)
+        done = self._selections.get(key)
+        if done is None:
+            done = self._selections[key] = self._selection(script, top_format)
+        return dict(done[0]), done[1]
+
+    def _selection(self, script, top_format=None):
+        """selection() worked out (no memo)."""
         python, data, uncertain = self.closure(script)
         files = self.files
         if uncertain:
@@ -1507,6 +1612,10 @@ class SourceIndex:
         selected = {}
         for path in python | data:
             if path not in files:
+                continue
+            fixed = content_keyed_value(path, self.content_keyed)
+            if fixed is not None:
+                selected[path] = fixed          # keyed by what it hands out (CONTENT_KEYED_READERS)
                 continue
             # a module whose bytes the code reads as data (FOLDER.glob('*.py')) counts whole, also when reached
             if units is not None and path in units and path.endswith('.py') and path not in data:
@@ -1542,8 +1651,10 @@ class SourceIndex:
         if self._companion is None:
             self._companion = SourceIndex(self.root, scope=self.scope, top_format=2,
                                           chim_label_keys=self.chim_label_keys, narrow_headers=self.narrow_headers,
-                                          engine_facts=self.engine_facts)
+                                          engine_facts=self.engine_facts, content_keyed=self.content_keyed)
             self._companion._files = self.files       # the same checkout: its file hashes once
+            if self._selections is not None:
+                self._companion._selections = {}      # the pre-flight's memo for both forms
         return self._companion
 
     def digest(self, script, exclude=()):
@@ -1587,6 +1698,10 @@ class SourceIndex:
         selected = {}
         for path in python | data:
             if path not in files or path in exclude:
+                continue
+            fixed = content_keyed_value(path, self.content_keyed)
+            if fixed is not None:
+                selected[path] = fixed          # keyed by what it hands out (CONTENT_KEYED_READERS)
                 continue
             if units is not None and path in units and path.endswith('.py') and path not in data:
                 selected[path] = self.unit_digest(path, units[path])
@@ -2586,10 +2701,59 @@ STAGE_GAME_INPUTS = {
 # it (comparable); kept out of the fingerprint itself. Set by stage_components.
 PREVIOUS_GAME_INPUTS = {}
 
+# The SELECTED layers (tools/build.py --dlc / --no-dlc, CHIM-SOL-FLORA-PATH-65) reach a stage as its master list in
+# load order, in the environment variable MASTERS_ENV ("Morrowind.esm,Tribunal.esm,Bloodmoon.esm"; the merging reader
+# reads it). A stage READS THE LAYERS when its code names MASTERS_ENV (found by the source index, as for every
+# AMIWIND_* name) or it is listed in LAYER_READING_STAGES; only such a stage adds the selected layers' masters and
+# archives to its game-input key, with the master list. Every other stage keeps the base key, so selecting the layers
+# (the default) re-keys no base stage; keys follow the selection, never which files are present. The variable itself
+# is in IGNORED_ENV: it is keyed here, through game_inputs, and never re-keys a stage that builds names at run time.
+MASTERS_ENV = 'AMIWIND_MASTERS'
+BASE_MASTER = 'Morrowind.esm'
+LAYER_ORDER = (('tribunal', 'Tribunal.esm'), ('bloodmoon', 'Bloodmoon.esm'))
+LAYER_READING_STAGES = set()
 
-def declared_game_inputs(name, inputs):
-    """{relative path: sha256} of the game inputs stage NAME reads (STAGE_GAME_INPUTS, default BASE_GAME_INPUTS)."""
-    allowed = STAGE_GAME_INPUTS.get(name, BASE_GAME_INPUTS)
+
+def master_list(layers):
+    """The master names in load order for the selected LAYERS (names, any case): Morrowind.esm, Tribunal.esm,
+    Bloodmoon.esm."""
+    chosen = {str(layer).casefold() for layer in layers or ()}
+    return [BASE_MASTER] + [master for layer, master in LAYER_ORDER if layer in chosen]
+
+
+def selected_layers(metadata):
+    """The layers the build selected ([] when none, or when the metadata does not say), lower case, in load order."""
+    record = (metadata or {}).get('expansion_layers') or {}
+    chosen = {str(layer).casefold() for layer in record.get('selected') or ()}
+    return [layer for layer, _ in LAYER_ORDER if layer in chosen]
+
+
+def stage_reads_layers(name, script, index):
+    """True when stage NAME reads the selected layers (LAYER_READING_STAGES, or its code names MASTERS_ENV)."""
+    if name in LAYER_READING_STAGES:
+        return True
+    if script is None or not Path(script).is_file() or index is None:
+        return False
+    try:
+        return MASTERS_ENV in index.environment_names(script)
+    except (OSError, ValueError):
+        return False
+
+
+def stage_game_masters(name, layers=(), reads_layers=False):
+    """The game inputs (lower case) stage NAME's key covers: STAGE_GAME_INPUTS (default BASE_GAME_INPUTS), plus the
+    selected LAYERS' masters and archives when the stage reads the layers."""
+    allowed = tuple(STAGE_GAME_INPUTS.get(name, BASE_GAME_INPUTS))
+    if reads_layers:
+        for layer in layers:
+            allowed += tuple(f for f in LAYER_GAME_INPUTS.get(layer, ()) if f not in allowed)
+    return allowed
+
+
+def declared_game_inputs(name, inputs, allowed=None):
+    """{relative path: sha256} of the game inputs stage NAME reads (ALLOWED, default STAGE_GAME_INPUTS or
+    BASE_GAME_INPUTS)."""
+    allowed = STAGE_GAME_INPUTS.get(name, BASE_GAME_INPUTS) if allowed is None else allowed
     return {path: value for path, value in sorted((inputs or {}).items())
             if len(Path(str(path).replace('\\', '/')).parts) > 1 or str(path).casefold() in allowed}
 
@@ -2689,9 +2853,14 @@ def stage_components(name, command, run, metadata, index, dependencies, fingerpr
                            if str(path) in joined or str(Path(path).parent) in command}
     if '--data-files' in command:
         inputs = metadata.get('input_sha256') or {}
-        declared = declared_game_inputs(name, inputs)
-        components['game_inputs'] = {'form': 2, 'masters': sorted(STAGE_GAME_INPUTS.get(name, BASE_GAME_INPUTS)),
-                                     'digest': digest_json(declared)}
+        reads_layers = stage_reads_layers(name, script, index)
+        layers = selected_layers(metadata) if reads_layers else []
+        allowed = stage_game_masters(name, layers, reads_layers)
+        declared = declared_game_inputs(name, inputs, allowed)
+        components['game_inputs'] = {'form': 2, 'masters': sorted(allowed), 'digest': digest_json(declared)}
+        if reads_layers:
+            # the master list the stage reads (MASTERS_ENV); only for a layer-reading stage, so base keys stay as they were
+            components['game_inputs']['load_order'] = master_list(layers)
         PREVIOUS_GAME_INPUTS[(str(run), name)] = digest_json(inputs)
     external, external_problems = external_inputs(name, command, run, metadata, skip_hashing=name in NON_REUSABLE,
                                                   index=index)
@@ -2714,13 +2883,18 @@ def stage_components(name, command, run, metadata, index, dependencies, fingerpr
 def fingerprint_steps(steps, run, metadata, index=None, dependencies=None):
     """({stage: fingerprint}, {stage: components}, {stage: [problems]}) for every stage."""
     index = index or SourceIndex(top_format=STAGE_TOP_FORMAT)
-    if os.environ.get('AMIWIND_FINGERPRINT_JOBS'):
-        # opt-in worker processes for the source selections (tools/fingerprint_prefetch.py); log on stderr, never
-        # mixed into a command's JSON on stdout
+    scripts = [s for s in (stage_script([str(p) for p in c]) for _, c in steps) if s is not None and s.is_file()]
+    if PREFLIGHT_WORKERS is not None or ANALYSIS_STORE is not None:
+        # the build's pre-flight (tools/build.py sets both): the stage source analysis on the pool, taken from the
+        # analysis of the same source tree when a check or build made it (BUILD-PREFLIGHT-SERIAL-REPEATED-66); log on
+        # stderr, never mixed into a command's JSON on stdout
+        from fingerprint_prefetch import prepare_index
+        prepare_index(index, scripts, log=lambda line: print(line, file=sys.stderr, flush=True))
+    elif os.environ.get('AMIWIND_FINGERPRINT_JOBS'):
+        # opt-in worker processes for the source selections (tools/fingerprint_prefetch.py, the earlier method); log
+        # on stderr, never mixed into a command's JSON on stdout
         from fingerprint_prefetch import prefetch_selections
-        prefetch_selections(index, [s for s in (stage_script([str(p) for p in c]) for _, c in steps)
-                                    if s is not None and s.is_file()],
-                            log=lambda line: print(line, file=sys.stderr, flush=True))
+        prefetch_selections(index, scripts, log=lambda line: print(line, file=sys.stderr, flush=True))
     if dependencies is None:
         try:
             from build_parallel import plan_skipped, stage_dependencies
@@ -2776,7 +2950,27 @@ def comparable(old_components, new_components, run, name):
     while a real edit still shows (BUILD-KEY-FUNCTION-DEFAULTS-TOP-36). Unchanged when the forms agree.
     A reuse source whose game-input key is the older blanket digest of every game input (a plain string) is compared
     with this run's blanket digest, so the narrowing alone rebuilds nothing on the same data
-    (BUILD-GAME-INPUT-KEY-BROAD-64)."""
+    (BUILD-GAME-INPUT-KEY-BROAD-64). A reuse source keyed before the content-keyed readers (CONTENT_KEYED_READERS)
+    holds their code digests: they are compared as that source holds them (content_keyed_as_recorded), so the change
+    of form alone rebuilds nothing (BUILD-UNIT-KEYS-REACH-64)."""
+    return content_keyed_as_recorded(old_components, _comparable_forms(old_components, new_components, run, name))
+
+
+def content_keyed_as_recorded(old_components, new_components):
+    """NEW_COMPONENTS with each content-keyed reader's fixed text replaced by the value OLD_COMPONENTS records for that
+    file, when the old record keyed its code (a fingerprint made before CONTENT_KEYED_READERS). Only a file both reach:
+    a reach that gained or lost a reader still differs. What the readers hand out is keyed in game_inputs either way."""
+    old = (((old_components or {}).get('sources') or {}).get('by_file') or {})
+    new = (((new_components or {}).get('sources') or {}).get('by_file') or {})
+    swap = {path: old[path] for path, text in CONTENT_KEYED_READERS.items()
+            if new.get(path) == text and path in old and old[path] != text}
+    if not swap:
+        return new_components
+    by_file = dict(new, **swap)
+    return dict(new_components, sources=dict(new_components['sources'], by_file=by_file, digest=digest_json(by_file)))
+
+
+def _comparable_forms(old_components, new_components, run, name):
     new_components = _comparable_game_inputs(old_components, new_components, run, name)
     old_form, new_form = source_format(old_components), source_format(new_components)
     if old_form is None or new_form is None or old_form >= new_form:
@@ -3232,7 +3426,41 @@ def _install():
         pass
 
 
+def _install_exit_traceback():
+    # The traceback of a stage's error (BUILD-FAILURE-NO-DETAILS-66, tools/build_failure.py): the stage's own process
+    # (the stage wrapper's child) that ends with an error while it handles an exception, as the stage tools'
+    # "Error: ..." exits do (argparse's exit calls sys.exit), prints that exception's traceback under the error line,
+    # so the stage log and the build's FAILURE.md say where it came from. Its workers and the tools it starts are left
+    # alone, and how the process ends never changes.
+    owner = os.environ.get('AMIWIND_STAGE_WRAPPER_PID', '')
+    try:
+        if not owner or os.getppid() != int(owner):
+            return
+    except (ValueError, OSError):
+        return
+    me = os.getpid()
+    original = sys.exit
+
+    def exit(status=None):
+        try:
+            error = sys.exc_info()[1]
+            if os.getpid() == me and status not in (None, 0) and isinstance(error, Exception) \\
+                    and not getattr(exit, 'printed', False):
+                exit.printed = True
+                import traceback
+                sys.stdout.flush()
+                sys.stderr.write('[stage] the traceback of the error above:\\n')
+                traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
+                sys.stderr.flush()
+        except Exception:  # noqa: BLE001 - the traceback never changes how the stage ends
+            pass
+        return original(status)
+
+    sys.exit = exit
+
+
 _install()
+_install_exit_traceback()
 # Keep the interpreter's own sitecustomize (if any) working.
 _here = os.path.dirname(os.path.abspath(__file__))
 _path = list(sys.path)
@@ -4144,10 +4372,12 @@ def requalify(manifest):
 
 
 def plan_reuse(steps, fingerprints, dependencies, components, problems, old_run, forced=(), index=None,
-               narrowed=None, skip_verify=(), for_combine=False):
+               narrowed=None, skip_verify=(), for_combine=False, proven=None):
     """({stage: plan}, {stage: reason not reused}) against a completed earlier run. INDEX (this checkout's
     SourceIndex): a stage whose key differs only in its sources is reused when what it used is unchanged
-    (narrowed_unchanged); NARROWED (a dict) gets {stage: the changed key files it never used}. SKIP_VERIFY: stages a
+    (narrowed_unchanged); NARROWED (a dict) gets {stage: the changed key files it never used}. A stage whose sources
+    differ only by edits PROVEN_EQUAL_SOURCES lists for it is reused too; PROVEN (a dict) gets {stage: those files}
+    (BUILD-STAGE-KEY-EQUAL-EDITS-66). SKIP_VERIFY: stages a
     newer run already delivers (--reuse-all-available): their files are not hashed here and their plans are marked
     'unverified' (never applied); they still count as reused for the stages around them."""
     old_run = Path(old_run)
@@ -4183,6 +4413,14 @@ def plan_reuse(steps, fingerprints, dependencies, components, problems, old_run,
                     new_files = ((components[name].get('sources') or {}).get('by_file') or {})
                     narrowed[name] = sorted(p for p in set(old_files) | set(new_files)
                                             if old_files.get(p) != new_files.get(p))
+        if (not own_same and name in old_details and name not in NON_REUSABLE and name not in forced
+                and old_status.get(name) == 'passed'):
+            # only edits proven to change none of its outputs (PROVEN_EQUAL_SOURCES, BUILD-STAGE-KEY-EQUAL-EDITS-66)
+            files = proven_equal_files(name, old_details[name], components[name])
+            if files is not None:
+                own_same = True
+                if proven is not None:
+                    proven[name] = files
         if name in NON_REUSABLE:
             reasons[name] = NON_REUSABLE[name]
         elif name in forced:
@@ -4440,6 +4678,17 @@ def predict_preflight(old_run, scope=DEFAULT_SCOPE, root=ROOT):
 
 _PREFLIGHT_DONE = {}
 PREFLIGHT_ONCE = False   # set by build.py for a --check or --plan run
+# The build's pre-flight (BUILD-PREFLIGHT-SERIAL-REPEATED-66), both set by tools/build.py before its first stage key:
+# PREFLIGHT_WORKERS, the processes for the stage source analysis (tools/fingerprint_prefetch.py; from --jobs, capped by
+# the cores the build may use); ANALYSIS_STORE, the folder where the analysis of a source tree is kept for the next
+# check or build of the same tree (WORKSPACE/cache/preflight-analysis-v1). None: this process alone, nothing kept (every
+# other caller: tests, the reuse plan, the stages' own unit keys).
+PREFLIGHT_WORKERS = None
+ANALYSIS_STORE = None
+ANALYSIS_READ_ONLY = False   # --plan: the store is read, never written
+ANALYSIS_ORIGIN = {}          # {'kind': 'check' | 'build' | ..., 'run': run name}: who made an analysis kept there
+# build.py --check's reuse stop (unit_stop_check): prepare plans as a build does but writes no stage index
+CHECK_ONLY = False
 
 
 def advisory_stages(steps, dependencies):
@@ -4456,10 +4705,10 @@ def plan_all(steps, run, fingerprints, components, dependencies, problems, index
     (the reuse preflight compares against it)."""
     import reuse_all as RA
     workspace = Path(reuse_all['workspace'])
-    stage_index = RA.update_index(workspace)
+    stage_index = RA.update_index(workspace, write=not CHECK_ONLY)
     sources = RA.candidate_runs(stage_index, fingerprints, exclude={Path(run).name},
                                 preferred=Path(preferred).name if preferred else None)
-    options, planned, delivered, narrowed_by = {}, {}, set(), {}
+    options, planned, delivered, narrowed_by, proven_by = {}, {}, set(), {}, {}
     for source in sources:
         old = (workspace / 'build' / source).resolve()
         try:
@@ -4467,15 +4716,17 @@ def plan_all(steps, run, fingerprints, components, dependencies, problems, index
         except (OSError, ValueError):
             old_details = {}
         compared = comparable_all(components, old_details, run, old)
-        narrowed = {}
+        narrowed, proven = {}, {}
         try:
             plans, reasons = plan_reuse(steps, fingerprints, dependencies, compared, problems, old, forced=set(forced),
-                                        index=index, narrowed=narrowed, skip_verify=set(delivered), for_combine=True)
+                                        index=index, narrowed=narrowed, skip_verify=set(delivered), for_combine=True,
+                                        proven=proven)
         except ValueError as exc:
             print(f'Reuse: {source} left out ({exc}).', flush=True)
             continue
         planned[source] = (old, compared, reasons)
         narrowed_by[source] = narrowed
+        proven_by[source] = proven
         for name, plan in plans.items():
             if not plan.get('unverified'):
                 options.setdefault(name, []).append((str(old), plan))
@@ -4504,6 +4755,11 @@ def plan_all(steps, run, fingerprints, components, dependencies, problems, index
         reasons[name] = why
     summary = {'workspace': str(workspace), 'candidates': sources, 'sources': counts,
                'primary': primary, 'passed_over': {name: notes[:3] for name, notes in passed_over.items()}}
+    # the stages taken through edits proven to change no output, from the run each was taken from
+    proven = {name: files for source, found in proven_by.items() for name, files in found.items()
+              if name in plans and Path(plans[name]['from']).name == source}
+    if proven:
+        summary['proven'] = proven
     return plans, reasons, compared, (planned[primary][0] if primary else None), narrowed, summary
 
 
@@ -4577,9 +4833,11 @@ def prepare(steps, run, metadata, reuse_from=None, mode='copy', index=None, scop
         reuse_from = Path(reuse_from).resolve()
         if reuse_from == Path(run).resolve():
             raise ValueError('--reuse-from must name an earlier run, not this one')
+    proven = {}
     if reuse_all is not None:
         plans, reasons, compared, reuse_from, narrowed, cache['reuse_all'] = plan_all(
             steps, run, fingerprints, components, dependencies, problems, index, reuse_all, reuse_from, forced)
+        proven = cache['reuse_all'].get('proven') or {}
     if reuse_from is not None:
         if reuse_all is None:
             # Compared in the reuse source's own fingerprint form (comparable); recorded in this run's form.
@@ -4590,9 +4848,12 @@ def prepare(steps, run, metadata, reuse_from=None, mode='copy', index=None, scop
             compared = comparable_all(components, old_details, run, reuse_from)
             narrowed = {}
             plans, reasons = plan_reuse(steps, fingerprints, dependencies, compared, problems, reuse_from,
-                                        forced=set(forced), index=index, narrowed=narrowed)
+                                        forced=set(forced), index=index, narrowed=narrowed, proven=proven)
         if narrowed:
             cache['narrowed'] = {name: files[:20] for name, files in narrowed.items() if name in plans}
+        proven = {name: files for name, files in proven.items() if name in plans}
+        if proven:
+            cache['proven'] = proven
         if forced:
             cache['forced'] = sorted(forced)
         cache.update(reuse_from=str(reuse_from), not_reused=reasons, reuse_mode=mode)
@@ -4629,6 +4890,9 @@ def prepare(steps, run, metadata, reuse_from=None, mode='copy', index=None, scop
                     more = f' (+{len(files) - 4} more)' if len(files) > 4 else ''
                     print(f"           its key changed only in code and files it never ran or read: "
                           f"{', '.join(files[:4])}{more}", flush=True)
+                if name in proven:
+                    print(f"           its key changed only by edits proven to change none of its outputs "
+                          f"(PROVEN_EQUAL_SOURCES): {', '.join(proven[name])}", flush=True)
         # Reuse preflight (BUILD-REUSE-KEYS-TOO-BROAD-35): every rebuild with its reason and the changed files
         # that touch it, before any stage runs; a rebuild the source diff and the inputs do not explain stops here.
         import reuse_report
@@ -5070,6 +5334,8 @@ def predict(old_run, scope=DEFAULT_SCOPE, root=ROOT, dependencies=None, index=No
             elif (name in old_details and only_sources_changed(old_details[name], components[name])
                   and narrowed_unchanged(old_run, name, index, stage_script(dict(steps)[name]))[0]):
                 result[name] = None   # narrowed reuse: what it used is unchanged (B7)
+            elif name in old_details and proven_equal_files(name, old_details[name], components[name]) is not None:
+                result[name] = None   # only edits proven to change no output (PROVEN_EQUAL_SOURCES)
             else:
                 result[name] = 'changed: ' + ', '.join(changed)
         else:

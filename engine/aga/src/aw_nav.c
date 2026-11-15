@@ -13,6 +13,52 @@ static vec3_t destination;
 static double blocked,animation,stalled;
 static int player_wait;
 static float best_distance;
+/* PIER-GUARD-WALKS-INTO-DOOR-65 (seen again in v0.0.66-dev1): the last leg of every walk steers straight at its
+ * destination; a round obstacle on that line (the pier pylon at about 407 -268 on the dock guard's walk to the office
+ * door) let the +-30..90 degree side steps slide him round it on the spot until the stall timer ended the walk, and the
+ * opening retried it into the same pylon. Before the walker steers at the destination, and again whenever he makes no
+ * progress for a second and a half, the straight line is swept with his hull; when it is blocked, one detour point
+ * beside the obstacle (clear from him, clear to the destination, with floor under it) is walked first. For every
+ * scripted walker of this file, not only the dock guard. */
+static vec3_t detour;
+static int detour_on,detour_plans;
+static const int detour_side[8]={32,-32,48,-48,64,-64,96,-96};
+static int line_clear(vec3_t from,vec3_t to) {
+    trace_t tr=SV_Move(from,walker->v.mins,walker->v.maxs,to,MOVE_NOMONSTERS,walker);
+    return !tr.startsolid && !tr.allsolid && tr.fraction==1;
+}
+static int floor_under(vec3_t at) {
+    vec3_t down;trace_t tr;
+    VectorCopy(at,down);down[2]-=40;
+    tr=SV_Move(at,walker->v.mins,walker->v.maxs,down,MOVE_NOMONSTERS,walker);
+    return !tr.startsolid && !tr.allsolid && tr.fraction<1;
+}
+/* 1 when a detour point was set: the straight line to the destination is blocked and a point beside the obstacle is clear */
+static int AW_NavPlanDetour(void) {
+    vec3_t goal,dir,perp,candidate;trace_t tr;float length,hit,ahead;int i,j;
+    if(!walker || detour_plans>=6)return 0;
+    VectorCopy(destination,goal);goal[2]=walker->v.origin[2];
+    VectorSubtract(goal,walker->v.origin,dir);dir[2]=0;length=(float)sqrt(dir[0]*dir[0]+dir[1]*dir[1]);
+    if(length<8)return 0;
+    tr=SV_Move(walker->v.origin,walker->v.mins,walker->v.maxs,goal,MOVE_NOMONSTERS,walker);
+    if(!tr.startsolid && !tr.allsolid && tr.fraction==1)return 0;
+    detour_plans++;
+    dir[0]/=length;dir[1]/=length;perp[0]=-dir[1];perp[1]=dir[0];perp[2]=0;
+    hit=tr.fraction*length;
+    for(j=0;j<2;j++)for(i=0;i<8;i++){
+        ahead=hit+(j?24:0);if(ahead>length)ahead=length;
+        candidate[0]=walker->v.origin[0]+dir[0]*ahead+perp[0]*detour_side[i];
+        candidate[1]=walker->v.origin[1]+dir[1]*ahead+perp[1]*detour_side[i];
+        candidate[2]=walker->v.origin[2];
+        if(line_clear(walker->v.origin,candidate) && line_clear(candidate,goal) && floor_under(candidate)){
+            VectorCopy(candidate,detour);detour_on=1;best_distance=1e30f;stalled=0;
+            Con_Printf("Route detour: line to %ld %ld blocked at %ld %ld; via %ld %ld\n",(long)goal[0],(long)goal[1],
+                (long)tr.endpos[0],(long)tr.endpos[1],(long)candidate[0],(long)candidate[1]);
+            return 1;
+        }
+    }
+    return 0;
+}
 static unsigned u16(const byte *p){return p[0]+(p[1]<<8);}
 static float f32(const byte *p){float f;memcpy(&f,p,4);return LittleFloat(f);}
 int AW_NavDecode(const byte *data,int size) {
@@ -64,14 +110,16 @@ int AW_NavStart(edict_t *actor,vec3_t goal) {
         trace=SV_Move(actor->v.origin,actor->v.mins,actor->v.maxs,entry,MOVE_NORMAL,actor);
         if(!trace.startsolid && !trace.allsolid && trace.fraction==1)route_at=1;
     }
-    VectorCopy(goal,destination);walker=actor;blocked=animation=stalled=0;player_wait=0;best_distance=1e30f;return 1;
+    VectorCopy(goal,destination);walker=actor;blocked=animation=stalled=0;player_wait=0;best_distance=1e30f;
+    detour_on=detour_plans=0;return 1;
 }
 /* PIER-GUARD-WALKS-INTO-DOOR-65: a walk straight to GOAL with no path grid (route_count 0: AW_NavStep steers to the
  * destination itself), for a short measured leg whose straight line is known clear; the grid's nearest point there can
  * lie where the walker must not go (the census door's corner) */
 int AW_NavStartDirect(edict_t *actor,vec3_t goal) {
     walker=NULL;route_count=route_at=0;if(!actor)return 0;
-    VectorCopy(goal,destination);walker=actor;blocked=animation=stalled=0;player_wait=0;best_distance=1e30f;return 1;
+    VectorCopy(goal,destination);walker=actor;blocked=animation=stalled=0;player_wait=0;best_distance=1e30f;
+    detour_on=detour_plans=0;return 1;
 }
 int AW_NavStep(double dt,int wait_for_player) {
     vec3_t delta,move,target,side;float length,step,angle;eval_t *field;int i,moved;
@@ -99,9 +147,13 @@ int AW_NavStep(double dt,int wait_for_player) {
             }
         }
     }
+    /* the last leg: sweep the straight line first (PIER-GUARD-WALKS-INTO-DOOR-65 detour, above) */
+    if(route_at>=route_count && !detour_on && (best_distance>=1e29f || stalled>1.5))AW_NavPlanDetour();
     if(route_at<route_count){VectorCopy(nodes[route[route_at]].point,target);}
+    else if(detour_on){VectorCopy(detour,target);}
     else {VectorCopy(destination,target);}
     VectorSubtract(target,walker->v.origin,delta);length=(float)sqrt(delta[0]*delta[0]+delta[1]*delta[1]);
+    if(detour_on && route_at>=route_count && length<6){detour_on=0;best_distance=1e30f;stalled=0;return 0;}
     if(length<5 && fabs(delta[2])<20){
         if(route_at<route_count){route_at++;best_distance=1e30f;stalled=0;return 0;}
         walker->v.frame=0;field=GetEdictFieldValue(walker,"aw_moving");if(field)field->_float=0;walker=NULL;return 1;
