@@ -136,7 +136,12 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [GATE-SUITE-WRITABLE-32](GATE-SUITE-WRITABLE-32.md): The test suite needs a writable source copy and an executable /tmp; the documented command does not say so
 - HARNESS-NEWGAME-BOX-STALL-54 (no report page): An FS-UAE session stalled at the Start a new game box before any map load: the probe sent its key on a fixed delay
 - HORS-AFTER-HALLOWEEN-STAYS-ARENA-58 (no report page): dbg aw hors after the Halloween scene no longer crashes on the v0.0.58-dev5 image but leaves the player in the Arena Pit instead of Seyda Neen
+- JOURNEY-AIM-RETRY-YAW-66 (no report page): The gameplay journey aimed at a door from an eye position that had changed: its thirteen retries ran round the wrong direction
+- JOURNEY-DOOR-USE-GOES-TO-ACTOR-66 (no report page): The opening journey's use key at the census street door went to the body of the guard killed a step before, or to a message box still showing, and the step then waited for a load it had never asked for
 - JOURNEY-PART-B-SAVE-NOT-CARRIED-66 (no report page): The gameplay journey's second part never loaded the first part's save: the save was written where the session does not carry it
+- JOURNEY-STEP6-VICTIM-NEAREST-66 (no report page): The opening journey's step 6 killed the nearest resident, which could be the guard by the census office's street door, whose body then took the use key instead of the door
+- JOURNEY-STEP7-FIGHT-UNREACHABLE-66 (no report page): The gameplay journey fight in step 7 took no health: the nearest resident was inside the census office, could not reach the player and fled
+- JOURNEY-STEP7-FIGHTER-NEAREST-66 (no report page): The opening journey's step 7 fights the nearest resident, which can be Fargoth, who fights unarmed, so the health may stay as it was
 - JOURNEY-WALK-DIALOGUE-DESYNC-66 (no report page): The gameplay journey lost its way in the census office: its key presses talked to the clerk and chose Persuasion instead of taking the papers, and every later step ran in that window
 - KIT-CI-JOBS-SPLIT-53 (no report page): The release kit did not know the split CI workflow: its job check refused it and its publisher waited for the old job names
 - LINUX-VALID-02 (no report page): Linux test fixtures failed to link (missing stubs)
@@ -168,6 +173,8 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - SMOKE-SEYDA-AGAIN-NOT-IN-PLAY-58 (no report page): The boot smoke failed once with 'seyda again (before load 3 of 3) is not in play'; the rerun on the same commit passed
 - [SMOKE-STALL-LABEL-INFERRED-60](SMOKE-STALL-LABEL-INFERRED-60.md): The boot smoke names a stop an emulator disk stall without checking the pending disk request
 - [SMOKE-TALK-BOX-BLOCKS-REMOTE-57](SMOKE-TALK-BOX-BLOCKS-REMOTE-57.md): The boot smoke failed with a talk box (Yes?) open in Seyda Neen right after the load: the remote commands went unanswered and the music check read nothing
+- STALL-PROBE-PROMPT-LOG-LINE-66 (no report page): The stall examination missed the debugger's prompt when an emulator log line followed it on the same line, never resumed the emulator, and the paused session read as a stop of the game
+- STALL-PROBE-RUNNING-GAME-66 (no report page): The stall examination read a running game as a missing task or as waiting on a file reply: it walked only the ready and waiting task lists and took the wait mask of a task that was not waiting
 - TEST-ACTOR-LIBRARY-OFF-PLAN-48 (no report page): test_actor_library StageTests.test_on_by_default_off_selectable fails on the interiors line: the actor-library stage stays in the plan with --chim-actor-table off
 - [TEST-CENSUS-CONTRACTS-40](TEST-CENSUS-CONTRACTS-40.md): Three quick-character expected failures lack reconciled contracts
 - [TEST-CHIM-BIG-FRAME-TIMEOUT-33](TEST-CHIM-BIG-FRAME-TIMEOUT-33.md): The Balmora-sized CHIM world test times out on a loaded machine

@@ -54,5 +54,28 @@ int main(void)
         AW_StoryReset(0);debug=1;assert(AW_ControlSet(AW_CONTROL_PLAYER,0) && AW_IntroButtons(3)==3);   /* the test input wins */
         debug=0;
     }
+    {   /* OPENING-FIGHTING-ON-BEFORE-PAPERS-66: the carried CharGen's switches (the compiler's NGCS row) at the new game's
+         * start, and only then; the opening's own rule stays beside them */
+        const int chargen=AW_CONTROL_PLAYER|AW_CONTROL_FIGHTING|AW_CONTROL_JUMPING|AW_CONTROL_MAGIC|
+                          AW_CONTROL_VIEWSWITCH|AW_CONTROL_VANITY;
+        AW_StoryReset(1);assert(AW_StoryNewGameControls(chargen,0) && AW_ControlsDisabled()==chargen);
+        assert(!AW_ControlAllowed(AW_CONTROL_FIGHTING) && !AW_IntroButtons(3) && !AW_IntroImpulse(202));
+        /* the papers' own script (OnPCAdd) switches fighting and magic on again; the rest stays off */
+        assert(AW_ControlSet(AW_CONTROL_FIGHTING,1) && AW_ControlSet(AW_CONTROL_MAGIC,1));
+        assert(AW_ControlsDisabled()==(chargen&~(AW_CONTROL_FIGHTING|AW_CONTROL_MAGIC)));
+        /* a quick start or a demo (no opening): none */
+        AW_StoryReset(0);assert(!AW_StoryNewGameControls(chargen,0) && !AW_ControlsDisabled());
+        /* an opening past the ship (a debug scene that begins on the pier): none */
+        AW_StoryReset(1);assert(AW_StoryTransition(AW_STAGE_DOCK));
+        assert(!AW_StoryNewGameControls(chargen,0) && !AW_ControlsDisabled());
+        /* CharGenState -1 (released, or OpenMW's new game that skips the character generation): none */
+        AW_StoryReset(1);assert(AW_StateSet(&aw_state,AW_GLOBAL,"CharGenState",-1));
+        assert(!AW_StoryNewGameControls(chargen,0) && !AW_ControlsDisabled());
+        /* the row's second mask switches on */
+        AW_StoryReset(1);assert(AW_ControlSet(AW_CONTROL_LEVITATION,0));
+        assert(AW_StoryNewGameControls(AW_CONTROL_FIGHTING,AW_CONTROL_LEVITATION) && AW_ControlsDisabled()==AW_CONTROL_FIGHTING);
+        /* New Game clears them again, as at a fresh boot */
+        AW_StoryReset(1);assert(!AW_ControlsDisabled());
+    }
     return 0;
 }

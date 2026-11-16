@@ -1,0 +1,87 @@
+# Load repeat (CHIM-SEYDA-BALMORA-LOAD-HANG-43): the teleport that stopped once in the v0.0.66-dev7 delivery's area
+# hops, Vivec -> the arena pit (maps/vai000.chim), and back, ten times in one session: twenty loads, so a stop that
+# comes once in ten to thirty loads has its chances in one run. Run as a scripted session of the boot smoke
+# (tools/engine_smoke.py --script this file, the default preset, 32 MB Fast); each wait is judged by the game clock, and
+# a stop is examined in place (stall.py: the running task, the handlers' waits, the load trace ring named below).
+# The load trace is on so that a stop names the last file calls and the one not finished (aw_loadtrace.c; the ring is
+# read from memory by the examination whenever the console names it).
+# The A/B twin of this script, load_repeat_hops_nolog.txt, adds "aw_remote_log 0" (no console log on the remote folder):
+# N sessions of each, stops per load, decide whether that append is the trigger.
+wait 8
+cmd aw_crosshair off
+cmd dbg hud on
+cmd dbg headlamp off
+cmd dbg time 1200
+cmd aw_loadtrace 1
+cmd dbg tp vivec
+wait 45
+state map
+shot repeat-00-vivec
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-01-arenapit
+cmd dbg tp vivec
+wait 45
+state map
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-02-arenapit
+cmd dbg tp vivec
+wait 45
+state map
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-03-arenapit
+cmd dbg tp vivec
+wait 45
+state map
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-04-arenapit
+cmd dbg tp vivec
+wait 45
+state map
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-05-arenapit
+cmd dbg tp vivec
+wait 45
+state map
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-06-arenapit
+cmd dbg tp vivec
+wait 45
+state map
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-07-arenapit
+cmd dbg tp vivec
+wait 45
+state map
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-08-arenapit
+cmd dbg tp vivec
+wait 45
+state map
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-09-arenapit
+cmd dbg tp vivec
+wait 45
+state map
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-10-arenapit
+state frame_ms

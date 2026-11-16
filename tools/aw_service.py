@@ -950,11 +950,29 @@ def source_diff(request, facts, notes):
     return info
 
 
-def preflight_check(request, commands, runner, notes, reuse_info):
+def keep_check_output(path, text, notes):
+    """The whole output of a build check in PATH (every stage's plan line, passed or refused), noted in NOTES: the
+    refusal and the result carry only its last CHECK_TAIL_LINES lines, which lost the plan line of a stopped stage
+    (BUILD-REUSE-STOP-COUNTS-STORED-GROUP-64). Never raises."""
+    if path is None:
+        return None
+    try:
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text or '', encoding='utf-8', newline='\n')
+        notes.append(f'the check\'s whole output: {path}')
+        return str(path)
+    except OSError as exc:
+        print(f'aw submit: the check\'s whole output was not kept ({type(exc).__name__}: {exc})', flush=True)
+        return None
+
+
+def preflight_check(request, commands, runner, notes, reuse_info, full_log=None):
     """The builder's own developer-mode check of this exact build (the build command + --check: same flags, same
     environment, so the same reuse preflight the build prints as "(f)"). Returns (step, refusals) and fills
-    REUSE_INFO with the reuse preflight numbers."""
+    REUSE_INFO with the reuse preflight numbers. FULL_LOG: where the check's whole output is kept (RUN.check.log)."""
     code, out, err = runner.capture(commands['check'], timeout=1800)
+    kept = keep_check_output(full_log, (out or '') + ('\n' + err if err else ''), notes)
     found = parse_check((out or '') + '\n' + (err or ''))
     refusals, problems = [], []
     # the resource plan (tools/resource_plan.py): its checklist into the result; WILL NOT FIT refuses here
@@ -1007,6 +1025,8 @@ def preflight_check(request, commands, runner, notes, reuse_info):
                                         + '\n'.join('  ' + line for line in tail)] if tail else
                                        ['the build check printed nothing'])
     detail = (found['line'] or '')[4:] or ('checks completed' if found['completed'] else f'exit {code}')
+    if kept:
+        step['full_output'] = kept
     return dict({'exit': code, 'ok': not refusals, 'detail': detail[:200]}, **step), refusals
 
 
@@ -1256,13 +1276,14 @@ def submit_build(config, request, dry_run, runner):
     if problems:
         return stop(problems)
     # 3. the builder's own developer-mode check + reuse preflight (seconds) before the build (hours)
-    steps['check'], problems = preflight_check(request, commands, runner, notes, reuse_info)
+    steps['check'], problems = preflight_check(request, commands, runner, notes, reuse_info,
+                                               full_log=logs_dir / f'{run_name}.check.log')
     if problems:
-        pages = []
+        pages = [steps['check']['full_output']] if steps['check'].get('full_output') else []
         if steps['check'].get('output_tail') is not None:
             # the refused check's page and log beside the build logs (no run folder exists yet): RUN.FAILURE.md and
             # RUN.console.log, which the Toolkit Monitor's console view reads (BUILD-FLAGS-MARK-SILENT-REFUSAL-66)
-            pages = refused_check_pages(logs_dir, run_name, problems, steps['check']['output_tail'], facts)
+            pages += refused_check_pages(logs_dir, run_name, problems, steps['check']['output_tail'], facts)
         return stop(problems, pages)
     # 4. the build
     log_path = logs_dir / f'{run_name}.console.log'

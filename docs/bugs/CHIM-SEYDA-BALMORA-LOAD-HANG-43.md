@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 35 times; something has to be done
+## PERSISTING: reported 42 times; something has to be done
 
 - Reported with v0.0.46 at 2026-10-20 20:09 +0300: Listed under Known in this build in the v0.0.46 release notes (still open at the release).
 - Reported with v0.0.53-dev2 at 2026-10-26 (time not recorded): 19:14 UTC door sample: the Yassu Mine room load (ri9f4c8ccd45) stopped after its BSP while a gate ran its emulator; the next try loaded in 7.6 s
@@ -39,6 +39,13 @@
 - Reported with v0.0.61 at 2026-11-07 03:39 +0200: Release image: a coordinate teleport from Seyda Neen to Ebonheart about 60 s after arrival stopped the game: the clock stood still, the processor idle and the game waiting on a file request no handler held. The emulator was not under load at the time. The same teleport worked in the session before and in the rerun.
 - Reported with v0.0.61 at 2026-11-07 05:21 +0200: The v0.0.61 release image on the emulator (32 MB Fast, JIT, busy host): the second load of Seyda Neen at the start of a scripted session stopped at the second sign-on step and stayed on the Loading screen; the same script prefix loaded normally in the session before.
 - Reported with v0.0.63 at 2026-11-09 22:07 +0200: Seen again in a gate boot smoke on the v0.0.63 dbg tp room menu branch (a84fbd8a, gate 9950): "the second load (balmora) is not in play: screen game, signon 2, world leaves 12"; all 7,248 tests passed and the branch does not touch map loading (the dbg tp list box only); the same smoke passed on the release line one gate earlier (9981).
+- Reported with v0.0.66-dev6 at 2026-11-15 (time not recorded): Seen once in the opening journey on foot on the v0.0.66-dev6 image (FS-UAE at 32 MB Fast, JIT) (part A, step 6): the Seyda Neen street door of the census office (113833) was aimed and used, and no load came within 45 s; the stall probe read "busy ... game not in a file call; pending: game task not found". The same door as both sightings of v0.0.66-dev4; the journey of the v0.0.66-dev5 image did not show it.
+- Reported with v0.0.66-dev7 at 2026-11-15 (time not recorded): Seen in the delivery's area hops on the v0.0.66-dev7 image (FS-UAE at 32 MB Fast, JIT): after the Seyda Neen, Balmora and Vivec hops loaded, the teleport from Vivec to the Vivec arena pit (maps/vai000.chim) never loaded; the stall probe read "exec idle; game waits on SIGF_DOS; no request of the game queued on any handler port". The same game loaded all six hops in the v0.0.66-dev6 delivery. The opening journey on the same image used the census street door (113833) three times without a stall.
+- Reported with v0.0.66-dev4 at 2026-11-15 10:33 +0200: Seen twice in the opening journey on foot on the v0.0.66-dev4 image (2026_11_15_v0.0.66-dev4_full-v0.0.66-dev4_010ce4a, FS-UAE at 32 MB Fast, JIT). Part A: right after the actor kill of step 6, E on the street door into the census office (113833) started no load within 45 s, the game staying in Seyda Neen; the examination at the stop read the processor busy in 5 of 5 samples and the game waiting on SIGF_DOS with no request of the game queued on any handler port (a stack scan pointed at DH0). Part B: Load game on the session's save (part A's autosave, since part A never reached its quicksave) stayed in the Load game window for 60 s; the examination read the processor busy and the game in no file call (its task not found). A second run of the same journey on the same image went through both parts with no stop.
+- Reported with v0.0.66-dev8 at 2026-11-15 20:16 +0200: Correction to the three reports of 15 November from the v0.0.66-dev4 and dev6 opening journeys (the census street door twice, the Load game window once): not this stall. In each, every sample of the examination was in game code (none in the idle loop), the game was the running task (read as a missing task, or as waiting from a stale wait mask), and the state file kept being written (the clock moving, the player's position changing). No load had been asked for: on dev6 the use key went to the body of the guard killed a step before, lying in front of the door (the container strip opened); on dev4 a message box still showing took the key; the Load game window stayed open with the game running. The examination now reads the running task, the state file's age and each handler's wait (STALL-PROBE-RUNNING-GAME-66), and the journey's aim check refuses a door whose use goes to an actor and answers a box first (JOURNEY-DOOR-USE-GOES-TO-ACTOR-66). The arena pit stop of the dev7 area hops stands as reported: every sample idle, the game waiting on its file reply, no request queued on any handler port; its emulator log was not kept (the passing rerun wrote over it). The 1,938 packet overflow lines before it come every frame in Vivec on passing runs too (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66) and are not part of the stop. A repeat script for that teleport is tests/sessions/load_repeat_hops.txt.
+- Reported with v0.0.66-dev7 at 2026-11-15 21:39 +0200: Reproduced on demand with the repeat script (tests/sessions/load_repeat_hops.txt) on the v0.0.66-dev7 image (FS-UAE at 32 MB Fast, JIT, the disks on the emulated IDE port, the remote-console folder mounted): the first session ran its twenty loads; the second stopped after nineteen, in play in Vivec about 23 seconds after arriving, during the wait before the twentieth teleport (the state file and the console log last written in the same second, twelve seconds before the next command was put down and never taken). The examination: four of five samples in the idle loop, the game waiting on its file reply, no request queued on any handler port, every file-system handler process waiting on its port, the library loader process waiting on a signal of its own, and the load trace ring with no unfinished call, so the stuck call is one the wrappers do not see. The engine's last printed frame had spent 2,570 ms in its remote-console stage with 23 ms of wrapped disk time: the console log append (a file descriptor's open, seek, write and close on the remote folder, the first call of every poll). The remote folder is served by the emulator's virtual unit DH2, whose handler waits for its port and for the host side's completion alike, so idle on its port does not clear it. Reading: the stop is in a write to the remote-console folder, below the game, in the emulator's host-side directory-drive path (the second hypothesis), as SESSION-STALL-AFTER-LONG-FRAME-62 saw stops right after long remote-folder frames. Next: the append is traced (op write), the examination reads the game's packet off its stack, every handler's whole wait mask, the unit names and signalled-but-asleep tasks, and the repeat script examines the running game once as a baseline.
+- Reported with v0.0.66-dev7 at 2026-11-15 22:15 +0200: Not this stall: the third repeat session stopped at its first Vivec arrival because the baseline examination paused the emulator in its debugger and never resumed it (STALL-PROBE-PROMPT-LOG-LINE-66); the game had been running at the sample before. The examination's state-file age measure is withdrawn (the file time lags through the container's bind mount; the earlier 96 s reading agreed with the host clock by coincidence) and replaced by the state file's own realtime and ticks read before and after the examination.
+- Reported with v0.0.66-dev7 at 2026-11-15 22:50 +0200: Not this stall: the fourth repeat session stopped at its first Vivec arrival as the third did, the baseline examination failing after its break-in and leaving the emulator paused (STALL-PROBE-PROMPT-LOG-LINE-66, seen again on another path). The examination is now crash-proof and the step is out of the repeat script. For the comparison planned next, the engine gained the console setting aw_remote_log (0 = no console log on the remote folder, the candidate trigger; the command and state files as before) and the repeat script a twin that sets it (tests/sessions/load_repeat_hops_nolog.txt): sessions with and without the append, stops per load on each side.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -51,7 +58,7 @@
 | Where | file request to the boot partition (DH0) never answered, under host load; seen on map changes |
 | Reproduction | sometimes |
 | Duplicate of | no |
-| Persists in | v0.0.43-dev1 (last seen) |
+| Persists in | v0.0.43-dev1, v0.0.66-dev7 (last seen) |
 | Severity | high: the game can stop on a Loading screen; seen on the v0.0.41-dev5 image (gate 2928) and on v0.0.43-dev1 (first smoke), each passing on a rerun |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Engine streaming and memory ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -62,12 +69,12 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
+_Last updated with AmiWind v0.0.66-dev10 (15 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 35 times; something has to be done](#persisting-reported-35-times-something-has-to-be-done)
+- [PERSISTING: reported 42 times; something has to be done](#persisting-reported-42-times-something-has-to-be-done)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -245,6 +252,31 @@ Tracked as SMOKE-STALL-LABEL-INFERRED-60.
 5. The same route on the Raspberry Pi 4B (Amiberry, a quiet machine). A stall only on the busy build machine is host
    load; a stall on the Pi as well is a bug in the game or the disk image.
 
+**15 November 2026, evening: seen once more in a repeat session, and where the stop reads (the cause not proven).** The repeat script
+(`tests/sessions/load_repeat_hops.txt`, twenty Vivec and arena pit loads in one session, load trace on) ran twice on
+the v0.0.66-dev7 image (FS-UAE at 32 MB Fast, JIT, disks on the emulated IDE port, the remote-console folder
+mounted): the first session passed its twenty loads; the second stopped after nineteen, in play in Vivec about 23
+seconds after arriving, during the wait before the twentieth teleport (the state file and the console log were last
+written in the same second, twelve seconds before the next command was put down and never taken). The examination
+read four of five samples in the idle loop, the game waiting on its file reply, no request queued on any handler
+port, every file-system handler process waiting on its port, the library loader process waiting on a signal of its
+own, and the load trace ring with no unfinished call. So the stuck call is one the wrappers do not see, and the
+engine's last printed frame says which: it had spent 2,570 ms in its remote-console stage with 23 ms of wrapped disk
+time, that is inside the console log append (a file descriptor's open, seek, write and close on the remote folder,
+the first call of every poll). The remote folder is served by the emulator's virtual unit DH2 (its log: "mounted
+virtual unit DH2"), whose handler waits for its port and for the host side's completion alike, so "idle on its port"
+does not clear it. This is the second hypothesis with the stop placed: a write to the remote-console folder, below
+the game, in the emulator's host-side directory-drive path; SESSION-STALL-AFTER-LONG-FRAME-62 saw stops right after
+long remote-folder frames too. Next: the append is traced (op `write`), the examination reads the game's packet off
+its stack (action, arguments, results), every handler's whole wait mask, the unit names, and any task signalled but
+asleep; the repeat script examines the running game once as a baseline. A stop whose packet is a WRITE or an open of
+the console log on DH2 settles it; a packet on a world or boot partition reopens the first hypothesis. The third
+repeat session was not a sighting: its baseline examination missed the debugger's prompt (an emulator log line had
+followed it on the same line) and left the emulator paused in the debugger, so the session read as a stop; the
+examination now reads such a prompt, resumes an emulator it could not read, and judges a running game by the state
+file's own clock instead of the file's modification time, which lags through the container's bind mount
+(STALL-PROBE-PROMPT-LOG-LINE-66).
+
 **For players.** The shipped presets are unchanged and keep the hard-file device until this is verified. If the lost disk-done signal is confirmed,
 the decision is to provide or name a corrected emulator build, document the affected emulator versions, and decide
 whether an IDE profile stays useful for those who run unpatched builds. Results on the Pi (Amiberry) are kept apart,
@@ -265,6 +297,19 @@ The boot smoke (`tools/engine_smoke.py`) now:
   stall described above is reported as "emulator disk stall (CHIM-SEYDA-BALMORA-LOAD-HANG-43)" and the run is
   retried once on a fresh play copy; a second stall fails the smoke. Any other stall fails at once with what the
   monitor saw.
+
+15 November 2026: the examination tells a running game from a stopped one. It reads the task that was running at
+the break (a game in neither of the operating system's lists is the running task, not a missing one), reports a wait
+only for a task in the waiting list (the wait mask alone is stale on a running task), gives the age of the game's
+state file, names what each file-system handler waits on (its own packet port, or something else, in which case it
+holds a request and the layer below it has not answered), and reads the load trace ring whenever the console names
+one. Three stops of that day (two at the census office's street door in the opening journey, one in the Load game
+window) had been counted on this entry although every sample was in game code and the game kept writing its state:
+the use key had gone to a body lying in front of the door, or to a message box still showing, and no load had been
+asked for. The journey's aim check now refuses such a door and answers the box first
+(JOURNEY-DOOR-USE-GOES-TO-ACTOR-66, STALL-PROBE-RUNNING-GAME-66). The repeat script for the teleport that did stop
+that day (Vivec to the arena pit, twenty loads in one session with the load trace on) is
+`tests/sessions/load_repeat_hops.txt`, run with the session tool.
 
 Checked in the emulator, 18 October 2026, on the v0.0.43-dev1 image: the smoke passed with its map change run three
 times (105 s); a smoke asked to load a map that does not exist stopped with "STALL unknown: pc 0 of 5 samples in exec
@@ -414,8 +459,11 @@ Related bugs in other categories:
 - [HEART-CHAMBER-LOAD-HANG-62](HEART-CHAMBER-LOAD-HANG-62.md): The game stops on the Loading screen when teleporting to the heart chamber, with the music still playing
 - IMAGE-IDE-CYLINDER-TAIL-59 (no report page): On the emulated A1200 IDE port the last 144 sectors of the world partition AW_WORLD0 were unreadable, so loading Khuul stopped the game
 - [IMAGE-LOADS-SLOWER-66](IMAGE-LOADS-SLOWER-66.md): Area loads on the v0.0.66-dev2 image take 1.3 to 2.2 times as long as on v0.0.66-dev1 with the same file work (Vivec 13.6 s against 29.9 s)
+- JOURNEY-DOOR-USE-GOES-TO-ACTOR-66 (no report page): The opening journey's use key at the census street door went to the body of the guard killed a step before, or to a message box still showing, and the step then waited for a load it had never asked for
 - [SESSION-STALL-AFTER-LONG-FRAME-62](SESSION-STALL-AFTER-LONG-FRAME-62.md): The game stops with its clock frozen right after a frame of several seconds spent on console output or file reads, in three of ten scripted Seyda Neen sessions
 - [SEYDA-LOAD-HANG-30](SEYDA-LOAD-HANG-30.md): Rare freeze during a Seyda Neen region load
 - [SMOKE-DELIVERY-OLD-COPY-58](SMOKE-DELIVERY-OLD-COPY-58.md): The playtest delivery ran an old copy of the boot smoke: the v0.0.58 release smoke failed four times on a working image
+- STALL-PROBE-PROMPT-LOG-LINE-66 (no report page): The stall examination missed the debugger's prompt when an emulator log line followed it on the same line, never resumed the emulator, and the paused session read as a stop of the game
+- STALL-PROBE-RUNNING-GAME-66 (no report page): The stall examination read a running game as a missing task or as waiting on a file reply: it walked only the ready and waiting task lists and took the wait mask of a task that was not waiting
 
 <!-- END GENERATED CATEGORY -->

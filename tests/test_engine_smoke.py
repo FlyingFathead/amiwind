@@ -223,6 +223,163 @@ class EngineSmokeTests(unittest.TestCase):
         self.assertIn('no request of the game queued', details)
         self.assertIn('ports not read', classify(idle, tasks, [])[1])
 
+    def test_a_running_game_is_not_read_as_waiting(self):
+        """STALL-PROBE-RUNNING-GAME-66: the v0.0.66-dev4 and dev6 journey stops: every sample in game code, the game
+        the running task (in neither exec list), its stale wait mask still holding SIGF_DOS; the probe said "game
+        waits on SIGF_DOS" or "game task not found". Now: the running task is read from ExecBase, a wait is reported
+        only for a task in the Wait list, the state file's age is given, and every handler's wait is named."""
+        classify = self.stall_classify()
+        busy = [0x401FEA88, 0x401FEA88, 0x401B71EE, 0x40200C0A, 0x40200C58]
+        dh0 = 0x40010618
+        handlers = [('DH0', dh0, 0x40000100, True, 'wait', 8), ('AWCTL', 0x40020000, 0x40000100, True, 'wait', 8)]
+        game = ('Initial CLI', 0x4000F8A8, 0x100, True, 'running', 8)
+        kind, details = classify(busy, [game] + handlers, [], {}, 'Initial CLI', 0.4)
+        self.assertEqual(kind, 'busy')
+        self.assertIn('game is the running task, not in a file call', details)
+        self.assertNotIn('waits on SIGF_DOS', details)
+        self.assertIn('state file written 0 s before the examination', details)
+        self.assertIn('handlers: DH0 idle on its port (waits $40000100), AWCTL idle on its port (waits $40000100)', details)
+        # between two frames the game sits in the Ready list: running too, whatever its last wait mask was
+        kind, details = classify(busy, [('Initial CLI', 0x4000F8A8, 0x100, True, 'ready', 8)] + handlers, [], {},
+                                 'input.device', 1.0)
+        self.assertEqual(kind, 'busy')
+        self.assertIn('game is ready to run, not in a file call', details)
+        # the lists walked without the game and ThisTask names it: the running task, not a missing one
+        kind, details = classify(busy, handlers, [], {}, 'Initial CLI', None)
+        self.assertEqual(kind, 'busy')
+        self.assertIn('game is the running task, not in a file call; pending: the game runs; no request pending', details)
+        self.assertNotIn('state file written', details)
+        # a wait on another signal than SIGF_DOS is said with its mask
+        kind, details = classify(busy, [('Initial CLI', 0x4000F8A8, 0x1010, True, 'wait', 8)] + handlers, [], {})
+        self.assertIn('game waits on $00001010, not in a file call', details)
+        # the stall proper: every sample idle, the game in the Wait list on SIGF_DOS, and DH0 waiting on something
+        # that is not its packet port: it holds the request and the layer below it has not answered
+        idle = [0xF81476, 0xF81478, 0xF81478]
+        waiting = ('Initial CLI', 0x4000F8A8, 0x100, True, 'wait', 8)
+        kind, details = classify(idle, [waiting, ('DH0', dh0, 0x00001000, True, 'wait', 8), handlers[1]], [], {})
+        self.assertEqual(kind, 'emulator-disk')
+        self.assertIn('game waits on SIGF_DOS', details)
+        self.assertIn('handlers: DH0 busy (waits $00001000, not its port bit 8), AWCTL idle on its port (waits $40000100)',
+                      details)
+        # every handler idle on its port and nothing else named: unknown, as before
+        self.assertEqual(classify(idle, [waiting] + handlers, [], {})[0], 'unknown')
+        # a handler whose mask is exactly its port bit: idle on its port, no mask repeated
+        self.assertIn('handlers: DH0 idle on its port,', classify(idle, [waiting, ('DH0', dh0, 0x100, True, 'wait', 8),
+                                                                           handlers[1]], [], {})[1])
+        # the examination reads ThisTask and the port signal bits, and the load trace ring whenever the console names it
+        self.assertIn('be32(base, 0x114)', engine_smoke.STALL_PY)
+        self.assertIn("port[0x0F] if len(port) > 0x0F else None", engine_smoke.STALL_PY)
+        self.assertNotIn("os.environ.get('LOADTRACE') != '1'", engine_smoke.STALL_PY)
+        self.assertIn('state file written', engine_smoke.STALL_PY)
+
+    def test_the_packet_the_handler_masks_and_the_units_are_named(self):
+        """CHIM-SEYDA-BALMORA-LOAD-HANG-43, the repeat2 stop of 15 November 2026: every traced call had finished, the
+        remote folder's unit (DH2) read "idle on its port" although the emulator's directory-drive handler waits for
+        its port and the host side alike, and the game's packet was not read. Now: the packet off the game's stack,
+        every handler's whole mask, the unit that serves the remote folder named, a signalled task that sleeps said."""
+        space = {'__name__': 'stall'}
+        exec(compile(engine_smoke.STALL_PY, 'stall.py', 'exec'), space)
+        stack_packet, packet_text, unit_labels, classify = (space[k] for k in
+                                                            ('stack_packet', 'packet_text', 'unit_labels', 'classify'))
+        base, reply = 0x4000E000, 0x4000F8A8 + 0x5C
+        # a StandardPacket at stack offset 0x100: sp_Msg (ln_Name -> sp_Pkt), then sp_Pkt (dp_Link -> sp_Msg, dp_Port)
+        s = bytearray(3072)
+        msg, pkt = 0x100, 0x114
+        s[msg + 10:msg + 14] = (base + pkt).to_bytes(4, 'big')
+        s[pkt:pkt + 4] = (base + msg).to_bytes(4, 'big')
+        s[pkt + 4:pkt + 8] = reply.to_bytes(4, 'big')
+        for k, v in ((8, 87), (12, 0), (16, 0), (20, 0x40031000), (24, 0x40040000), (28, 8192)):
+            s[pkt + k:pkt + k + 4] = v.to_bytes(4, 'big')
+        pk = stack_packet(bytes(s), base, reply)
+        self.assertEqual(pk, (87, 0, 0, 0x40031000, 0x40040000, 8192))
+        self.assertEqual(packet_text(pk), "the game's packet on its stack: WRITE (arg1 $40031000, arg2 $40040000, "
+                                          "arg3 8192; res1 0, res2 0)")
+        self.assertIn("FINDOUTPUT of 'AWCTL:console.log'", packet_text((1006, 0, 0, 1, 2, 3), 'AWCTL:console.log'))
+        self.assertIn('res1 -1, res2 205', packet_text((82, 0xFFFFFFFF, 205, 1, 2, 3)))
+        self.assertIsNone(stack_packet(bytes(s), base, reply + 4))      # another task's reply port: not the game's
+        self.assertIsNone(packet_text(None))
+        labels = unit_labels('FS: mounted virtual unit DH2 (/out/awctl)\nFS: AWCTL (flags=00000002) starting..\n')
+        self.assertEqual(labels, {'DH2': 'the remote-console folder /out/awctl'})
+        idle = [0xF81476, 0xF81478, 0xF81478]
+        game = ('Initial CLI', 0x4000F8A8, 0x100, True, 'wait', 8, 0)
+        dh2 = ('DH2', 0x40020000, 0x80000100, True, 'wait', 8, 0)
+        ramlib = ('ramlib', 0x40021000, 0x10, True, 'wait', 8, 0)
+        kind, details = classify(idle, [game, dh2, ramlib], [], {}, None, 96.0, labels, packet_text(pk))
+        self.assertIn("the game's packet on its stack: WRITE", details)
+        self.assertIn('handlers: DH2 (the remote-console folder /out/awctl) idle on its port (waits $80000100), '
+                      'ramlib busy (waits $00000010, not its port bit 8)', details)
+        # a task that holds the very signal it waits on was never woken by the scheduler: said on the task and the game
+        kind, details = classify(idle, [('Initial CLI', 0x4000F8A8, 0x100, True, 'wait', 8, 0x100),
+                                        ('DH2', 0x40020000, 0x80000100, True, 'wait', 8, 0x80000000)], [], {})
+        self.assertIn('game waits on SIGF_DOS SIGNALLED BUT ASLEEP ($00000100 received)', details)
+        self.assertIn('DH2 idle on its port (waits $80000100) SIGNALLED BUT ASLEEP ($80000000 received)', details)
+        # STALL-PROBE-PROMPT-LOG-LINE-66 (repeat3): a prompt with an emulator log line after it on the same line is a
+        # prompt; the echo of the command just sent is not; a debugger that activated without a readable prompt is resumed
+        prompts, state_note = space['prompts'], space['state_note']
+        self.assertEqual(len(prompts('WARNING: Activated debugger\n>need_metadata_file 6 WF_ALWAYS WF_EXISTS\n')), 1)
+        self.assertEqual(len(prompts('>d\n00F81478 2080 MOVE.L D0,(A0)\n>', sent='d')), 1)
+        self.assertEqual(prompts('>d\n00F81478 2080 MOVE.L D0,(A0)\n', sent='d'), [])
+        self.assertEqual(len(prompts('>m $00000004 !1\n00000004 4000 0924\n>', sent='m $00000004 !1')), 1)
+        self.assertEqual(prompts('some other output\n', sent=None), [])
+        self.assertIn("if 'Activated debugger' in tail_from(pos):\n        paused = True\n        resume()", engine_smoke.STALL_PY)
+        # the state file's content, not its modification time, says whether the game runs
+        self.assertIn('the game runs', state_note(('100.00', '10'), ('100.52', '41')))
+        self.assertIn('unchanged: the game is stopped', state_note(('100.00', '10'), ('100.00', '10')))
+        self.assertIn('no end line', state_note(None, None))
+        self.assertNotIn('os.path.getmtime', engine_smoke.STALL_PY)
+        kind, details = classify(idle, [game, dh2], [], {}, None, state_note(None, None))
+        self.assertIn('state file unreadable (no end line', details)
+        # the write op of the load trace ring decodes, and the examine script step logs a baseline without failing
+        self.assertEqual(space['LT_OPS'][5], 'write')
+        # stall.py's stderr is kept, never dropped
+        self.assertNotIn("stall check could not run') 2>/dev/null", engine_smoke.PROBE)
+        self.assertEqual(engine_smoke.PROBE.count("2>>$R/logs/stall-errors.txt"), 3)
+
+    def test_a_failed_examination_resumes_the_emulator_and_says_why(self):
+        """STALL-PROBE-PROMPT-LOG-LINE-66 (repeat4, 15 November 2026): the examination failed after its break-in, its
+        error went to /dev/null and the emulator stayed paused in the debugger. Now: whatever fails after a break-in,
+        the emulator is resumed in the end, the STALL line names the exception, and the traceback goes to stderr."""
+        import contextlib
+        import io
+        import types
+        from unittest import mock
+        space = {'__name__': 'stall'}
+        exec(compile(engine_smoke.STALL_PY, 'stall.py', 'exec'), space)
+        calls = []
+        space['subprocess'] = types.SimpleNamespace(run=lambda *a, **k: types.SimpleNamespace(stdout='1234'))
+        space['size'] = lambda: 0
+        space['tail_from'] = lambda pos: ''
+        space['wait_prompt'] = lambda pos, timeout=20, sent=None: '>'       # the break-in answers
+        space['state_values'] = lambda: None
+
+        def cmd(text, timeout=20):
+            raise RuntimeError('boom')
+
+        def resume():
+            calls.append('g')
+            space['paused'] = False
+        space['cmd'], space['resume'] = cmd, resume
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err), mock.patch.object(sys, 'argv', ['stall.py', '1']):
+            space['main']()
+        self.assertEqual(calls, ['g'])
+        self.assertFalse(space['paused'])
+        self.assertTrue(out.getvalue().startswith('STALL unknown: the examination failed after a break-in: RuntimeError: boom'),
+                        out.getvalue())
+        self.assertIn('RuntimeError: boom', err.getvalue())
+        # no break-in at all (no emulator window): nothing to resume, the line says so
+        calls.clear()
+        space['subprocess'] = types.SimpleNamespace(run=lambda *a, **k: types.SimpleNamespace(stdout=''))
+        space['state_values'] = lambda: (_ for _ in ()).throw(ValueError('bad state'))
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()), mock.patch.object(sys, 'argv', ['stall.py', '1']):
+            space['main']()
+        self.assertEqual(calls, [])
+        self.assertIn('failed after no break-in: ValueError: bad state', out.getvalue())
+        self.assertIn('examine\\ *) S=$(', engine_smoke.PROBE)
+        self.assertIn('log "examine ${line#examine }: $S"', engine_smoke.PROBE)
+        self.assertIn('unit_labels(f.read(4 << 20)', engine_smoke.STALL_PY)
+
     def test_ide_trace_is_left_out_unless_asked(self):
         """SMOKE-IDE-TRACE-LOG-63: the IDE transfer lines (compiled into the emulator package) leave the kept logs by
         default; --ide-trace keeps them."""
@@ -870,6 +1027,89 @@ class WalkerStepTests(unittest.TestCase):
                                     "(local 10 20 30)")
 
     @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_aimed_refuses_a_door_whose_use_goes_to_an_actor(self):
+        # JOURNEY-DOOR-USE-GOES-TO-ACTOR-66 (the v0.0.66-dev6 journey): the focus row is the census street door, the
+        # Guard killed a step before lies in front of it, and the game says the use key goes to the actor: E would
+        # search the body, not open the door. The focus row is not accepted; the step fails naming the actor.
+        with tempfile.TemporaryDirectory() as tmp:
+            corpse = ("sleep(){ N=$((N+1)); printf 'aw_placed aim: reach 48, 381 rows (outdoors), eye 266 36 70, aimed row 164\\n"
+                      "  164 D 113833 Seyda Neen, Census and Excise Office: at 247 11 65, edict 0 drawn 0 disabled 0, dist 32.1\\n"
+                      "aw_placed aim: use goes to the actor; actor Guard box 0.0..45.0, item -1.0, plant -1.0\\n"
+                      "source ref: unavailable\\n' >> $R/awctl/console.log; }\n")
+            lines = self.run_sh(tmp, 'aimed 113833 2', corpse)
+        self.assertIn('log aimed 113833: the focus row 164 is on it, but the use key goes to the actor Guard standing in '
+                      'front of it, try 1', lines)
+        self.assertFalse([l for l in lines if l.startswith("log aimed 113833: the use key's focus row")], lines)
+        self.assertEqual(lines[-2], 'shot aimed-missing-113833')
+        self.assertEqual(lines[-1], 'finish FAIL aimed 113833: the use key goes to the actor Guard standing in front of it '
+                                    '(the focus row 164 is on it) in 13 tries around pitch 1 yaw 0 (local 10 20 30); the '
+                                    'use key would search or talk, not use it')
+
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_aimed_accepts_the_focus_row_when_the_use_goes_to_no_actor(self):
+        # the same door with nobody in front of it (the v0.0.66-dev4 journey's line): accepted at the first try
+        with tempfile.TemporaryDirectory() as tmp:
+            clear = ("sleep(){ N=$((N+1)); printf 'aw_placed aim: reach 48, 381 rows (outdoors), eye 266 36 70, aimed row 164\\n"
+                     "  164 D 113833 Seyda Neen, Census and Excise Office: at 247 11 65, edict 0 drawn 0 disabled 0, dist 32.1\\n"
+                     "aw_placed aim: use goes to no actor; actor none box -1.0..-1.0, item -1.0, plant -1.0\\n' >> $R/awctl/console.log; }\n")
+            lines = self.run_sh(tmp, 'aimed 113833 2', clear)
+        self.assertEqual(lines[-2:], ["log aimed 113833: the use key's focus row 164 (aw_placed aim), try 1", 'done'])
+
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_aimed_answers_a_message_box_first(self):
+        # the v0.0.66-dev4 journey: the release's "Press J" notice was still up when E was pressed at the door; the box
+        # took the key as its button and the journey waited 45 s for a load it never asked for
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, 'box').write_text('')
+            sleep = 'sleep(){ N=$((N+1)); echo "source ref: 113833" >> $R/awctl/console.log; }\n'
+            lines = self.run_sh(tmp, 'aimed 113833', sleep)
+        self.assertEqual(lines[:2], ['key Return', 'log aimed 113833: a message box was up, Enter'])
+        self.assertEqual(lines[-2:], ["log aimed 113833: the crosshair's pick (aw_inspect; the focus row none not in the "
+                                      "report), try 1", 'done'])
+
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_aim_is_computed_from_the_eye_as_it_is_now(self):
+        # JOURNEY-AIM-RETRY-YAW-66, the v0.0.66-dev5 journey: the turn to door 113833 (242.6 10.3 61) was made from local
+        # 247 8 70 (aw_aim 152.4 61.1), the eye then read 266 36 70 and the thirteen tries ran round yaw 45.0 while the
+        # door lies at yaw 227.7 from there (the v0.0.66-dev4 journey's "face ... from local 266 36 70: aw_aim 227.7 14.5")
+        with tempfile.TemporaryDirectory() as tmp:
+            sleep = ('sleep(){ N=$((N+1)); grep -q "aw_aim 227.7" $R/turns 2>/dev/null && '
+                     'echo "source ref: 113833 / cell -2,-9" >> $R/awctl/console.log; :; }\n'
+                     'rc(){ echo "rc $1"; echo "$1" >> $R/turns; }\n')
+            body = ('st(){ case "$1" in local) cat $R/loc;; angles) echo "0.0 45.0";; *) echo 1;; esac; }\n'
+                    'printf "247 8 70" > $R/loc\nface 242.6 10.3 61\nprintf "266 36 70" > $R/loc\naimed 113833')
+            lines = self.run_sh(tmp, body, sleep)
+        aims = [l for l in lines if l.startswith('rc aw_aim')]
+        self.assertEqual(aims, ['rc aw_aim 152.4 61.1', 'rc aw_aim 227.7 14.5'], lines)
+        self.assertIn('log aimed 113833: the eye moved from 247 8 70 to 266 36 70 since the turn, aiming again: '
+                      'aw_aim 227.7 14.5', lines)
+        self.assertEqual(lines[-2:], ["log aimed 113833: the crosshair's pick (aw_inspect; the focus row none not in the "
+                                      "report), try 1", 'done'])
+
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_the_tries_are_centred_on_the_aim_from_the_current_eye(self):
+        # the door is only found 1.5 degrees to one side of the exact aim: every try is a turn round 227.7 14.5 (from the
+        # eye read at that moment), never round the view the player happened to have (yaw 45.0)
+        with tempfile.TemporaryDirectory() as tmp:
+            sleep = ('sleep(){ N=$((N+1)); grep -q "aw_aim 227.7 16.0" $R/turns 2>/dev/null && '
+                     'echo "source ref: 113833" >> $R/awctl/console.log; :; }\n'
+                     'rc(){ echo "rc $1"; echo "$1" >> $R/turns; }\n')
+            body = ('st(){ case "$1" in local) echo "266 36 70";; angles) echo "0.0 45.0";; *) echo 1;; esac; }\n'
+                    'face 242.6 10.3 61\naimed 113833')
+            lines = self.run_sh(tmp, body, sleep)
+        aims = [l for l in lines if l.startswith('rc aw_aim')]
+        self.assertEqual(aims, ['rc aw_aim 227.7 14.5', 'rc aw_aim 227.7 16.0'], lines)
+        self.assertEqual(lines[-1], 'done')
+
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_a_face_is_forgotten_after_its_aimed_step(self):
+        # a later aimed without a face of its own takes the view as it is, as before
+        with tempfile.TemporaryDirectory() as tmp:
+            sleep = 'sleep(){ N=$((N+1)); echo "source ref: 7" >> $R/awctl/console.log; }\n'
+            lines = self.run_sh(tmp, 'face 20 30 20\naimed 7\naimed 7', sleep)
+        self.assertEqual([l for l in lines if l.startswith('rc aw_aim')], ['rc aw_aim 45.0 35.3'])
+
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
     def test_lookat_turns_to_the_nearest_placed_items_until_one_is_the_reference(self):
         with tempfile.TemporaryDirectory() as tmp:
             # aw_placed.c look_command: the plate first (nearest), then the crab meat on it
@@ -911,10 +1151,26 @@ class WalkerStepTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
     def test_face_turns_the_view_to_a_point_from_the_eye(self):
         with tempfile.TemporaryDirectory() as tmp:
-            lines = self.run_sh(tmp, 'face 20 30 20\nface 0 20 30\nface 10 20 90')
+            lines = self.run_sh(tmp, 'face 20 30 20\nface 0 20 30')
         aims = [l for l in lines if l.startswith('rc ')]
-        # from the eye at 10 20 30: up and to the right, down 35.3 degrees; due west (yaw 180), level; straight up (clamped)
-        self.assertEqual(aims, ['rc aw_aim 45.0 35.3', 'rc aw_aim 180.0 0.0', 'rc aw_aim 0.0 -70.0'])
+        # from the eye at 10 20 30: up and to the right, down 35.3 degrees; due west (yaw 180), level
+        self.assertEqual(aims, ['rc aw_aim 45.0 35.3', 'rc aw_aim 180.0 0.0'])
+
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_face_steps_back_from_a_point_too_close_or_too_steep(self):
+        # JOURNEY-AIM-RETRY-YAW-66: a target straight above the eye cannot be aimed at (pitch is clamped to 70 up): the
+        # player first steps back 12 units on the floor plane (here straight along -x, the eye being right under it),
+        # the engine says it arrived, and the turn is computed from where the eye stands then
+        with tempfile.TemporaryDirectory() as tmp:
+            sleep = 'sleep(){ N=$((N+1)); [ $N = 1 ] && echo "Walk to: reached." >> $R/awctl/console.log; :; }\n'
+            lines = self.run_sh(tmp, 'face 10 20 90', sleep)
+        self.assertIn('rc aw_view walk -2.0 20.0', lines)
+        self.assertEqual([l for l in lines if l.startswith('rc aw_aim')], ['rc aw_aim 0.0 -70.0'])
+        self.assertTrue(any('stepping back to -2.0 20.0' in l for l in lines), lines)
+        # a target 1 unit away on the floor plane and 4 below the eye is too close as well
+        with tempfile.TemporaryDirectory() as tmp:
+            lines = self.run_sh(tmp, 'face 11 20 26', sleep)
+        self.assertIn('rc aw_view walk -2.0 20.0', lines)
 
     @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
     def test_the_script_loop_dispatches_the_walker_steps(self):

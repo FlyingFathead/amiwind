@@ -293,9 +293,12 @@ int COM_FOpenFile(char *name,FILE **f){
  *f=tmpfile();assert(*f);fputs(s,*f);rewind(*f);return strlen(s);
 }
 static int door_arrival_lines;   /* DBG-TP-DOORLIST-NO-ARRIVAL-LINE-63: "ROOM: at its door's arrival X Y Z." */
+static int arrival_steps,arrival_no_room;   /* DOOR-ARRIVAL-INSIDE-ACTOR-66: the arrival's step off an actor */
 /* DBG-TP-DURING-LOAD-66: a dbg tp typed during a load: held, replaced, refused, run on arrival, dropped */
 static int held_lines,held_replaced,held_refused,held_runs,held_dropped;
 void Con_Printf(char *fmt,...){if(!strcmp(fmt,"%ld: %s [%s]\n"))picker_list_rows++;
+ if(!strncmp(fmt,"Arrival: %s (ref %ld) stood on the arrival point",48))arrival_steps++;
+ if(!strncmp(fmt,"Arrival: %s (ref %ld) stands on the arrival point",49))arrival_no_room++;
  if(!strcmp(fmt,"%s: at its door's arrival %ld %ld %ld.\n"))door_arrival_lines++;
  if(!strcmp(fmt,"dbg tp: a load is in progress (%s); %s runs when it has arrived.\n"))held_lines++;
  if(!strcmp(fmt,"dbg tp: %s replaces the held %s.\n"))held_replaced++;
@@ -348,8 +351,19 @@ static float door_wall;
 static int stream_crossings;
 static int stream_cross_hook(const float *origin,int *cx,int *cy){(void)origin;*cx=-2;*cy=-9;stream_crossings++;return 1;}
 int SV_PointContents(vec3_t p){return water_feet?CONTENTS_WATER:CONTENTS_EMPTY;}
+/* DOOR-ARRIVAL-INSIDE-ACTOR-66: one actor's box (its origin at its feet) that the position tests see, and world.c's
+ * overlap query for it; the console lines of the arrival's step */
+static int body_on;static edict_t body;
+static int body_overlaps(const vec3_t o,const vec3_t mins,const vec3_t maxs){
+ int k;
+ for(k=0;k<3;k++)if(o[k]+mins[k]>=body.v.origin[k]+body.v.maxs[k] || o[k]+maxs[k]<=body.v.origin[k]+body.v.mins[k])return 0;
+ return 1;
+}
+edict_t *AW_BodyOverlapping(edict_t *e){return body_on && e!=&body && body_overlaps(e->v.origin,e->v.mins,e->v.maxs)?&body:NULL;}
 trace_t SV_Move(vec3_t a,vec3_t mins,vec3_t maxs,vec3_t b,int type,edict_t *p){
  trace_t t;memset(&t,0,sizeof(t));t.fraction=1;VectorCopy(b,t.endpos);
+ /* a position test meets the actor's box (bodies count in MOVE_NORMAL, never in MOVE_NOBODIES) */
+ if(body_on && type==MOVE_NORMAL && VectorCompare(a,b) && body_overlaps(a,mins,maxs)){t.startsolid=t.allsolid=true;t.fraction=0;return t;}
  if(all_solid==1 || (all_solid==2 && fabs(a[0])<100 && fabs(a[1])<100)){t.startsolid=t.allsolid=true;t.fraction=0;return t;}
  if(travel_trace){t.fraction=.5;t.ent=occluded?NULL:&target;return t;}
  /* FOCUS-NPC-OVERRIDES-ITEM-62: the use key's choice also asks the plant aim, whose point test (a zero-length move)
@@ -396,6 +410,41 @@ int main(void){
  finish_signon(&p);assert(cl.viewangles[0]==0 && cl.viewangles[1]==90);
  assert(!cl.nodrift); /* A door keeps the authored arrival policy. */
  assert(AW_InteriorPlace(&p,arrival));assert(p.v.origin[2]>50 && p.v.origin[2]<51);
+ /* DOOR-ARRIVAL-INSIDE-ACTOR-66: an actor that joins onto the door's arrival point after the arrival's check (the
+  * Seyda Neen guard 128967 stood 8 units from it) steps the player once to the clear spot beside it, away from the
+  * actor; nothing moves while nobody overlaps, with aw_arrival_clear 0, or once the player has walked on (walking out
+  * is then the body rule's, world.c AW_BodyOverlap). */
+ {
+  extern cvar_t aw_arrival_clear;
+  static vec3_t pmins={-7.32f,-7.12f,-16.625f},pmaxs={7.32f,7.12f,16.625f};
+  vec3_t at;int k,steps,buttons=clear_buttons;
+  memset(&body,0,sizeof(body));body.v.solid=SOLID_SLIDEBOX;
+  body.v.mins[0]=-7.32f;body.v.mins[1]=-7.12f;body.v.maxs[0]=7.32f;body.v.maxs[1]=7.12f;body.v.maxs[2]=33.25f;
+  VectorCopy(pmins,p.v.mins);VectorCopy(pmaxs,p.v.maxs);
+  for(k=0;k<3;k++){
+   strcpy(sv.name,"prison");p.v.origin[0]=p.v.origin[1]=p.v.origin[2]=0;p.v.movetype=MOVETYPE_WALK;p.v.health=100;
+   cl.viewangles[1]=90;queued[0]=0;assert(AW_SceneUse());if(!queued[0])AW_SceneTick();
+   assert(!strcmp(queued,"map seyda\n"));
+   strcpy(sv.name,"seyda");AW_SceneSpawn(&p);VectorCopy(p.v.origin,at);assert(at[2]>50 && at[2]<51);
+   body.v.origin[0]=at[0]+2;body.v.origin[1]=at[1]+8;body.v.origin[2]=at[2]-16.875f+.03125f;
+   steps=arrival_steps;
+   AW_SceneTick();assert(VectorCompare(p.v.origin,at) && arrival_steps==steps);   /* nobody there yet: actors join later */
+   if(k==1)aw_arrival_clear.value=0;
+   if(k==2)p.v.origin[0]+=5;   /* the player walked on first */
+   body_on=1;AW_SceneTick();
+   if(k==0){
+    assert(arrival_steps==steps+1 && !arrival_no_room);
+    assert(p.v.origin[0]==at[0] && p.v.origin[1]==at[1]-16 && fabs(p.v.origin[2]-at[2])<.01f);
+    assert(!AW_BodyOverlapping(&p));
+    VectorCopy(p.v.origin,at);AW_SceneTick();assert(arrival_steps==steps+1 && VectorCompare(p.v.origin,at));   /* once */
+   }else{
+    assert(arrival_steps==steps && !arrival_no_room && AW_BodyOverlapping(&p));
+    if(k==1)assert(VectorCompare(p.v.origin,at));
+   }
+   body_on=0;aw_arrival_clear.value=1;
+  }
+  VectorCopy(vec3_origin,p.v.mins);VectorCopy(vec3_origin,p.v.maxs);clear_buttons=buttons;
+ }
  /* CHIM recovery reuses dry standing clearance; failure preserves the player
   * and re-primes the old ring. The legacy exterior path remains unchanged. */
  {

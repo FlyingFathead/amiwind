@@ -26,6 +26,11 @@ int AW_GuardTorchNight(void);
 #define REMOTE_PERIOD .5
 static cvar_t aw_remote={"aw_remote","0"};
 static cvar_t aw_remote_dir={"aw_remote_dir","AWCTL:"};
+/* CHIM-SEYDA-BALMORA-LOAD-HANG-43: the candidate trigger of the test sessions' stops is the console log's append on the
+ * remote folder (a directory drive the emulator serves from a host thread; the repeat2 stop of 15 November 2026 fell
+ * inside it). aw_remote_log 0 keeps the console log off that folder entirely (the lines stay on the in-game console;
+ * the command and state files are untouched), so sessions with and without it can be compared. Default 1: as before. */
+static cvar_t aw_remote_log={"aw_remote_log","1"};
 static double next_poll,next_busy;
 static long command_files;
 /* LOAD-STALL-SESSIONS-59: "ticks" advances on every host frame and on every long-work heartbeat
@@ -72,26 +77,36 @@ const char *AW_RemoteConsoleLog(void)
 #define REMOTE_LOG_MAX 8192
 static char log_buf[REMOTE_LOG_MAX];
 static int log_len,log_exit_hook;
+/* CHIM-SEYDA-BALMORA-LOAD-HANG-43 (the repeat2 stop of 15 November 2026): the append is the one remote-folder call the
+ * disk wrappers in aw_spike.h do not see (a file descriptor, not a FILE), and that stop fell inside it: the last frame
+ * printed had spent 2.5 s in the remote stage with 23 ms of wrapped disk time, and the load trace ring held no unfinished
+ * call. Its four calls are traced by name here (op 5 = write; the numbers are aw_spike.h's AW_LT_OP_ enum), so the ring
+ * names the one that never ends. */
+extern int aw_loadtrace_on;
+unsigned long AW_LoadTraceBegin(int op,const void *file,const char *name,long bytes);
+void AW_LoadTraceEnd(unsigned long seq,long result,const void *file);
+#define LOG_TRACE(op,bytes) (aw_loadtrace_on?AW_LoadTraceBegin((op),0,path,(bytes)):0)
 static void log_append(const char *data,int len)
 {
-    int fd=open(AW_RemoteConsoleLog(),O_WRONLY|O_CREAT|O_APPEND,0666);
+    const char *path=AW_RemoteConsoleLog();unsigned long lt;int fd;long r;
+    lt=LOG_TRACE(1,0);fd=open(path,O_WRONLY|O_CREAT|O_APPEND,0666);if(lt)AW_LoadTraceEnd(lt,fd<0?-1:0,0);
     if(fd<0)return;
     /* the Amiga C library does not honour O_APPEND (REMOTE-CONSOLE-APPEND-31) */
-    lseek(fd,0,SEEK_END);
-    if(write(fd,data,len)!=len){}   /* a short write loses log text only; nothing to retry here */
-    close(fd);
+    lt=LOG_TRACE(3,0);r=lseek(fd,0,SEEK_END);if(lt)AW_LoadTraceEnd(lt,r,0);
+    lt=LOG_TRACE(5,len);r=write(fd,data,len);if(lt)AW_LoadTraceEnd(lt,r,0);   /* a short write loses log text only; nothing to retry here */
+    lt=LOG_TRACE(4,0);r=close(fd);if(lt)AW_LoadTraceEnd(lt,r,0);
 }
 void AW_RemoteLogFlush(void)
 {
     int n=log_len;
-    if(n<=0)return;
     log_len=0;
+    if(n<=0 || aw_remote_log.value<=0)return;   /* aw_remote_log 0: what was collected is dropped, no file call */
     log_append(log_buf,n);
 }
 void AW_RemoteLog(const char *msg)
 {
     int n=msg?(int)strlen(msg):0;
-    if(n<=0)return;
+    if(n<=0 || aw_remote_log.value<=0)return;
     if(!log_exit_hook){log_exit_hook=1;atexit(AW_RemoteLogFlush);}
     if(log_len+n>REMOTE_LOG_MAX)AW_RemoteLogFlush();
     if(n>REMOTE_LOG_MAX){log_append(msg,n);return;}
@@ -172,5 +187,5 @@ void AW_RemoteBusy(double now)
 }
 void AW_RemoteInit(void)
 {
-    Cvar_RegisterVariable(&aw_remote);Cvar_RegisterVariable(&aw_remote_dir);
+    Cvar_RegisterVariable(&aw_remote);Cvar_RegisterVariable(&aw_remote_dir);Cvar_RegisterVariable(&aw_remote_log);
 }

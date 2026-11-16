@@ -1,0 +1,86 @@
+# Load repeat, the A/B twin of load_repeat_hops.txt (CHIM-SEYDA-BALMORA-LOAD-HANG-43): the same twenty Vivec and arena
+# pit loads with the console log kept OFF the remote folder (aw_remote_log 0: the engine's console lines stay on the
+# in-game console; the command and state files are written as before). The candidate trigger of the sessions' stops is
+# that log's append (a directory drive the emulator serves from a host thread). Run N sessions of this script and N of
+# load_repeat_hops.txt on the same image; count stops per load on each side. Needs an engine with aw_remote_log
+# (v0.0.66-dev9 line or later); on an older engine the first command prints "Unknown command" on the console and the
+# session is not an A/B.
+wait 8
+cmd aw_remote_log 0
+cmd aw_crosshair off
+cmd dbg hud on
+cmd dbg headlamp off
+cmd dbg time 1200
+cmd aw_loadtrace 1
+cmd dbg tp vivec
+wait 45
+state map
+shot repeat-00-vivec
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-01-arenapit
+cmd dbg tp vivec
+wait 45
+state map
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-02-arenapit
+cmd dbg tp vivec
+wait 45
+state map
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-03-arenapit
+cmd dbg tp vivec
+wait 45
+state map
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-04-arenapit
+cmd dbg tp vivec
+wait 45
+state map
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-05-arenapit
+cmd dbg tp vivec
+wait 45
+state map
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-06-arenapit
+cmd dbg tp vivec
+wait 45
+state map
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-07-arenapit
+cmd dbg tp vivec
+wait 45
+state map
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-08-arenapit
+cmd dbg tp vivec
+wait 45
+state map
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-09-arenapit
+cmd dbg tp vivec
+wait 45
+state map
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-10-arenapit
+state frame_ms

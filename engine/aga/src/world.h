@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -40,6 +40,17 @@ typedef struct
 #define	MOVE_NORMAL		0
 #define	MOVE_NOMONSTERS	1
 #define	MOVE_MISSILE	2
+/* DOOR-ARRIVAL-INSIDE-ACTOR-66: as MOVE_NORMAL, but bodies (SOLID_SLIDEBOX: the player, residents, creatures) are
+ * left out; SOLID_BBOX objects still count, unlike MOVE_NOMONSTERS. */
+#define	MOVE_NOBODIES	3
+
+/* DOOR-ARRIVAL-INSIDE-ACTOR-66 (world.c): two bodies that already overlap collide as the original's actors do
+ * (aw_body_overlap 1, the default; 0 = Quake's box clip, the method before v0.0.66). */
+extern cvar_t aw_body_overlap;
+int AW_BodyOverlap (const edict_t *mover, const edict_t *touch, const float *start, const float *mins,
+	const float *maxs, const float *end, trace_t *trace);
+edict_t *AW_BodyOverlapping (edict_t *ent);
+edict_t *SV_TestWorldPosition (edict_t *ent);
 
 
 void SV_ClearWorld (void);

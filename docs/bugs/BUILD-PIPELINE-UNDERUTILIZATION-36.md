@@ -124,6 +124,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-CACHE-OVERBROAD-33](BUILD-CACHE-OVERBROAD-33.md): CHIM builds rerun the scene chain after merges that cannot change its outputs
 - [BUILD-CACHE-PER-WORKSPACE-33](BUILD-CACHE-PER-WORKSPACE-33.md): Per-file caches live in each build workspace, so a build on a new volume with --reuse-from converts everything again (MiniWind media 1,195 s instead of seconds)
 - [BUILD-CACHE-TRACE-PYTHONPATH-33](BUILD-CACHE-TRACE-PYTHONPATH-33.md): The stage read trace refused reuse of a reused run when another checkout was on PYTHONPATH
+- BUILD-CHECK-ONE-CORE-66 (no report page): The build's reuse check runs about six minutes on one core, and every snapshot runs it twice before its build starts
 - [BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46](BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46.md): A change in the shared collision converter rebuilds every CHIM frame and everything after it, even where the output is identical
 - [BUILD-CHIM-FRAME-SWAP-LATE-36](BUILD-CHIM-FRAME-SWAP-LATE-36.md): The image step builds 335 legacy maps of cells already on CHIM, then removes them before packing
 - BUILD-CHIM-KEY-SKY-OVERLAY-TABLE-59 (no report page): The CHIM world stage and its ocean units are keyed by the whole sky palette overlay module, so a new image file extension rebuilds the CHIM world
@@ -162,6 +163,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-IMAGE-FRAME-MAP-HEAP-SERIAL-36](BUILD-IMAGE-FRAME-MAP-HEAP-SERIAL-36.md): The image step's CHIM frame-map heap check runs on one core: 66 s to 4.5 min per build while 23 cores idle
 - [BUILD-IMAGE-HASH-UNDERUSED-36](BUILD-IMAGE-HASH-UNDERUSED-36.md): The image step hashes 34,592 payload files on 3 of 24 cores (one file per pool task)
 - [BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36](BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36.md): The image step's world map heap audit estimates 170 maps on 5.3 of 24 cores
+- BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66 (no report page): The image step of the v0.0.66-dev9 build wrote its partitions in 107 seconds where the earlier build took 67
 - [BUILD-IMAGE-NOT-INCREMENTAL-33](BUILD-IMAGE-NOT-INCREMENTAL-33.md): The image step redoes every per-map pass and the whole pack on every build
 - [BUILD-IMAGE-NPC-CHECKS-LATE-44](BUILD-IMAGE-NPC-CHECKS-LATE-44.md): The image step's player body and guard torch bakes fail only at the end of a full build instead of before the expensive stages
 - [BUILD-IMAGE-REGION-MAPS-SERIAL-43](BUILD-IMAGE-REGION-MAPS-SERIAL-43.md): The image step's CHIM frame-map phases run on one core: the world read six times, ground traces on whole frames
@@ -270,6 +272,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - IMAGE-GUARD-TORCHES-SLOW-66 (no report page): The image step's torch guards bake took 3.4 times as long, and the step ran on under half its cores
 - IMAGE-ROOM-ACTOR-BAKE-REFIT-66 (no report page): The image step's CHIM room actor bake fitted all 2,594 room residents again in the v0.0.66-dev3 build, where the v0.0.66-dev2 run had every one of them cached
 - IMAGE-ROOM-HEAP-ONE-CORE-66 (no report page): The image step's room heap check measures every room on one core
+- IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66 (no report page): The image step's CHIM room actor bake takes about two minutes on one core when every room resident is already cached
 - [MINIWIND-NO-INTERIOR-SCOPE-42](MINIWIND-NO-INTERIOR-SCOPE-42.md): A MiniWind of one room built the whole town: no scope converted only the start room
 - [MINIWIND-NOT-MINUTES-33](MINIWIND-NOT-MINUTES-33.md): A reused MiniWind build took about two hours instead of minutes
 - MINIWIND-NPCS-ONE-WORKER-64 (no report page): The npcs stage of a MiniWind sandbox build runs alone on 1 of its 8 workers

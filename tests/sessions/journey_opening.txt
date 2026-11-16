@@ -2,7 +2,8 @@
 # A FULL image, FS-UAE at 32 MB Fast, started with --map seyda. Every check reads the game's state (console answers,
 # the state file), never a picture. Part A is New Game through the opening as a player plays it: the ship, the pier,
 # the clerk's registration, the papers off the table, the hall guard and his door, the back room (a take), out to the
-# courtyard and back in (the take stays taken), Keley's ring, Sellus Gravius (his duties topic chosen by its name),
+# courtyard and back in (the take stays taken), Fargoth's ring (the Engraved Ring of Healing, `ring_keley`), Sellus
+# Gravius (his duties topic chosen by its name),
 # the release through the exit door, a kill, a room and back, a spell and a fight, then the game's own quicksave;
 # part B is a fresh engine that loads that save through the Load game window and goes on through a door.
 # JOURNEY-WALK-DIALOGUE-DESYNC-66: the walk waits for the game and stops at the first wrong turn (tools/engine_smoke.py
@@ -47,6 +48,13 @@ wait 10
 cmd dbg all on
 boxes
 cmd noclip
+# OPENING-FIGHTING-ON-BEFORE-PAPERS-66: round the courtyard barrel (172851, at 121 -46 in this map), whose script
+# switches fighting, magic and jumping on once the player comes within 400 original units (100 here). The console map
+# change sets the player down at the town's start point (16 44) beside the courtyard, and the straight walk to the
+# pier passed about 10 units from the barrel (its map box came up on the pier, and fight_before would read 0 with the
+# switches set); this leg keeps 114 units or more from it. A player who comes off the ship's deck is far from it until
+# the courtyard.
+walkto 0 -170 30
 cmd aw_view walk 470 -290
 wait 6
 boxes
@@ -203,8 +211,8 @@ walkto 120 212 25
 walkto 145 205 20
 boxes
 # the iron dagger on the back-room table (chargen dagger, reference 119577; the clerk's tutorial box asks for it):
-# from the table's edge, looking down at it. Not the crab meat: on the dev2 image the use key's focus at the crab
-# meat is the silver plate under it (CENSUS-CRAB-PLATE-FOCUS-66), and the plate is owned.
+# from the table's edge, looking down at it. The crab meat has its own check after it, since the fix in source d7dd7443
+# (on the dev2 image the use key's focus at the crab meat was the silver plate under it, and the plate is owned).
 # The take is read from the game's aim report (the dagger's row switched off): the console's getitemcount does not
 # know "chargen dagger", which no script names (CONSOLE-GETITEMCOUNT-UNNAMED-ITEM-66).
 walkto 130 181 20
@@ -218,6 +226,25 @@ probe dagger_taken aw_placed aim
 expect has dagger_before 119577 Iron Dagger: at 130 177 67, edict 0 drawn 0 disabled 0
 expect has dagger_taken 119577 Iron Dagger: at 130 177 67, edict 0 drawn 0 disabled 1
 shot a4-dagger-taken
+# CENSUS-CRAB-PLATE-FOCUS-66 (fixed in source d7dd7443: the use key takes what the view ray meets first): the crab meat
+# (`ingred_crab_meat_01`, reference 454283) lies on the Silverware Plate (`misc_imp_silverware_plate_01`, reference
+# 119580, owned). From the table's edge, looking at the crab meat: the game's own focus row must name the crab meat (not
+# the plate under it), E takes it, the crab meat is then in the inventory (getitemcount, as step 4 reads the ring) and
+# the plate is not: the theft ledger names no plate. The dev2 image's use key went to the plate here.
+walkto 145 181 20
+boxes
+probe crab_before player->getitemcount ingred_crab_meat_01
+expect crab_before == 0
+face 145.2 177.5 64.2
+aimed 454283
+key e
+wait 3
+boxes
+probe crab_after player->getitemcount ingred_crab_meat_01
+probe plate_ledger aw_placed ledger
+expect crab_after == 1
+expect lacks plate_ledger misc_imp_silverware_plate_01
+shot a4b-crab-taken
 
 step 3 out to the courtyard and back in: the taken item stays taken
 walkto 185 218 30
@@ -251,7 +278,7 @@ waitfor map 45 sncourt
 wait 6
 boxes
 
-step 4 Keley's ring and Sellus Gravius: papers taken, the package given, the journal on, the reward once
+step 4 Fargoth's ring (the Engraved Ring of Healing, `ring_keley`) and Sellus Gravius: papers taken, the package given, the journal on, the reward once
 walkto 106 -60 40
 boxes
 face 120.7 -45.8 46.3
@@ -333,7 +360,15 @@ shot a6-released
 
 step 6 kill an actor, enter an interior, come back: the dead stay dead, and the captain's room lets the player out by either door
 cmd dbg god on
-probe victim chim actors kill
+# the victim is fixed, by reference: Erene Llenim (128960), who stands by his shack at -862 20 on the west of the town
+# in every journey so far, more than 1,100 units from the census office's street door. A plain "chim actors kill"
+# takes the nearest resident, which in the v0.0.66-dev6 and dev8 journeys was the guard (128967) standing by that
+# door: his body lay in front of it, E opened his container strip instead of the door and the step stopped.
+probe victim chim actors kill 128960
+# god mode off again at once: it blocks every kind of damage, scripts included, so with it left on step 7's hurt, heal
+# and fight all read the same health (920 against 920 in the v0.0.66-dev4 journey retry). The console kill is not
+# counted as the player's crime (aw_actors.c; only "dbg kill crime" is), so nobody turns on the player here.
+cmd dbg god off
 wait 4
 probe list_killed chim actors list
 expect dead victim in list_killed
@@ -393,6 +428,13 @@ expect health_healed > health_hurt
 expect cast_list >= 1
 cmd dbg god off
 cmd dbg combat seed 7
+# JOURNEY-STEP7-FIGHT-UNREACHABLE-66: "chim actors fight" sets the NEAREST resident on the player, and from the release
+# point that was the census hall guard (reference 172852) inside the office at 353 -179: the v0.0.66-dev5 console reads
+# "Combat: Guard cannot reach you and flees" twice and no hit landed (health 910 before and after). A copy of the
+# nearest resident is put at the player's feet first (chim actors summon, aw_actors.c: the test copy the pursuit
+# checks use), so the fighter is the one that stands beside the player and the path search has its goal
+cmd chim actors summon
+wait 2
 probe fighter chim actors fight
 wait 20
 probe list_fight chim actors list

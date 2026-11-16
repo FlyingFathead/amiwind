@@ -157,7 +157,7 @@ idetrim(){ [ "${IDETRACE:-0}" = 1 ] && return 0; for f in "$@"; do [ -f "$f" ] |
     log "ide trace: ${n:-0} lines left out of $(basename $f) (--ide-trace keeps them)"; done; }
 finish(){ [ -e $R/finished ] && exit 0; : > $R/finished
   case "$1" in FAIL*) [ -e $R/examined ] || ! alive || { : > $R/examined
-      log "examined at the stop: $( (python3 $R/stall.py 5 || echo 'STALL unknown: stall check could not run') 2>/dev/null | tail -n 1)"; };; esac
+      log "examined at the stop: $( (python3 $R/stall.py 5 || echo 'STALL unknown: stall check could not run') 2>>$R/logs/stall-errors.txt | tail -n 1)"; };; esac
   [ "${REMOTE:-1}" = 0 ] || case "$1" in PASS*) b=$(st efrags_bad); [ -n "$b" ] && [ "$b" != 0 ] && set -- "FAIL efrag safety net used $b times (console: Efrag safety net)"
     z=$(zonefull); [ "${z:-0}" -gt 0 ] && [ "$FASTMB" -ge 32 ] && [ "${ZONEFULL:-fail}" != allow ] && case "$1" in PASS*)
       if grep -q 'CHIM cache off (skipped for this start)' $R/awctl/console.log 2>/dev/null; then
@@ -211,7 +211,9 @@ inplay(){ s=0; while [ $s -lt $((30*K)) ]; do alive || finish "FAIL emulator exi
 # stall: a load that does not finish is examined with the FS-UAE monitor (stall.py): an emulator disk stall (the
 # processor idle, the game's file request taken by a handler and never answered, CHIM-SEYDA-BALMORA-LOAD-HANG-43)
 # is named as such; the launcher retries such a run once on a fresh play copy.
-stall(){ : > $R/examined; S=$( (python3 $R/stall.py 5 || echo 'STALL unknown: stall check could not run') 2>/dev/null | tail -n 1); log "$S"
+# stall.py's stderr (a traceback when the examination fails) is kept in logs/stall-errors.txt, never dropped: the repeat4
+# examination of 15 November 2026 failed after its break-in and nothing said why (STALL-PROBE-PROMPT-LOG-LINE-66)
+stall(){ : > $R/examined; S=$( (python3 $R/stall.py 5 || echo 'STALL unknown: stall check could not run') 2>>$R/logs/stall-errors.txt | tail -n 1); log "$S"
   case "$S" in "STALL emulator-disk"*) finish "FAIL emulator disk stall (CHIM-SEYDA-BALMORA-LOAD-HANG-43) $1: ${S#STALL emulator-disk: }";;
     "STALL busy"*) finish "FAIL long frame (busy) $1: ${S#STALL busy: }";; esac
   finish "FAIL $1 ($S)"; }
@@ -307,7 +309,10 @@ fi
 #                       the crab meat on its plate, which neither the pick nor the printed focus rows name)
 #   aimed REF [SECS]    the use key would go to the placed reference REF: the game's own focus row (aw_placed aim) or
 #                       the crosshair's pick (aw_inspect) names it, else FAIL (a flat scroll on a desk: the pick hits
-#                       the desk while the focus is on the scroll)
+#                       the desk while the focus is on the scroll). A focus row on REF counts only while the game's
+#                       own "use goes to" line does not name an actor: with a body or a person in front of a door
+#                       the use key searches or talks instead (JOURNEY-DOOR-USE-GOES-TO-ACTOR-66), and a message
+#                       box still showing is answered first, so the use key is not taken as its button
 clines(){ n=$(wc -l < $R/awctl/console.log 2>/dev/null); echo "${n:-0}" | tr -d ' '; }
 since(){ tail -n +$((${1:-0}+1)) $R/awctl/console.log 2>/dev/null; }
 walk_to(){ n0=$(clines); rc "aw_view walk $1 $2"; s=0
@@ -334,14 +339,39 @@ topic(){ [ "$(st screen)" = dialogue ] || { shot topic-no-window; finish "FAIL t
   # a name the list does not hold leaves it in the search box ("(no topics)"); an asked topic empties it: either way
   # the box is cleared so the next topic starts from an empty search (BackSpace on an empty search does nothing)
   i=0; while [ $i -lt ${#t} ]; do key BackSpace; i=$((i+1)); done; }
-face(){ e=$(st local); a=$(echo "$1 $2 $3 $e" | awk '{dx=$1-$4; dy=$2-$5; d=sqrt(dx*dx+dy*dy); y=atan2(dy,dx)*57.29578
-    if(y<0)y+=360; if(y>=359.95)y=0; p=atan2($6-$3,d)*57.29578; if(p>80)p=80; if(p<-70)p=-70; printf "%.1f %.1f", y, p}')
-  rc "aw_aim $a"; log "face $1 $2 $3 from local $e: aw_aim $a"; sleep 1; }
-aimed(){ ref=$1; secs=${2:-3}; set -- $(st angles); bp=${1:-0}; by=${2:-0}; n=0; lrow=; lpick=
+# JOURNEY-AIM-RETRY-YAW-66: every aim is computed from the eye as it is NOW (read back with st local), never from a
+# remembered one: the v0.0.66-dev5 journey turned to the door from local 247 9 70, the player then stood at 266 36 70
+# (the restored game had moved it), and the thirteen retries ran round the old turn (yaw 45) while the door lay at 227.7.
+# aim_calc TX TY TZ EX EY EZ prints "yaw pitch" (pitch clamped as the engine allows) and "raw" pitch before the clamp.
+aim_calc(){ echo "$1 $2 $3 $4 $5 $6" | awk '{dx=$1-$4; dy=$2-$5; d=sqrt(dx*dx+dy*dy); y=atan2(dy,dx)*57.29578
+    if(y<0)y+=360; if(y>=359.95)y=0; p=atan2($6-$3,d)*57.29578; if(p>80)p=80; if(p<-70)p=-70; printf "%.1f %.1f", y, p}'; }
+# aim_reach TX TY TZ EX EY EZ: "close" when the target is nearer than AIM_MIN_DIST units on the floor plane (default 2) or
+# needs a pitch the view cannot take (more than 80 down or 70 up): the player first steps back from it
+aim_reach(){ echo "$1 $2 $3 $4 $5 $6 ${AIM_MIN_DIST:-2}" | awk '{dx=$1-$4; dy=$2-$5; d=sqrt(dx*dx+dy*dy); p=atan2($6-$3,d)*57.29578
+    if(d<$7 || p>80 || p<-70) print "close"; else print "ok"}'; }
+face(){ AIMX=$1; AIMY=$2; AIMZ=$3; e=$(st local)
+  if [ "$(aim_reach $1 $2 $3 $e)" = close ]; then
+    # a point 12 units away from the target on the floor plane (straight back along -x when the eye is right under it)
+    w=$(echo "$1 $2 $e ${AIM_STEP_BACK:-12}" | awk '{dx=$3-$1; dy=$4-$2; d=sqrt(dx*dx+dy*dy); if(d<0.01){dx=-1; dy=0; d=1}
+      printf "%.1f %.1f", $3+dx/d*$6, $4+dy/d*$6}')
+    log "face $1 $2 $3: too close or too steep from local $e, stepping back to $w"; walk_to $w 15; e=$(st local); fi
+  a=$(aim_calc $1 $2 $3 $e); rc "aw_aim $a"; FACE_EYE=$e; log "face $1 $2 $3 from local $e: aw_aim $a"; sleep 1; }
+aimed(){ aimed_run "$@"; AIMX=; }
+aimed_run(){ ref=$1; secs=${2:-3}; set -- $(st angles); bp=${1:-0}; by=${2:-0}; n=0; lrow=; lpick=; lwho=
+  # JOURNEY-DOOR-USE-GOES-TO-ACTOR-66 (the v0.0.66-dev4 journey): a message box still up (the release's "Press J"
+  # notice) takes the use key as its button, and the step then waits for a load it never asked for
+  [ "$(st screen)" = messagebox ] && { key Return; log "aimed $ref: a message box was up, Enter"; sleep $((2*K)); }
   # as a player nudges the mouse until the prompt shows: the aim as it is, then small turns around it (degrees of
-  # pitch and yaw); the v0.0.66-dev2 papers answered at 319.6 29.4 and not at 317.8 28.7 from almost the same spot
+  # pitch and yaw); the v0.0.66-dev2 papers answered at 319.6 29.4 and not at 317.8 28.7 from almost the same spot.
+  # After a face the aim is the one to the faced point from the CURRENT eye, re-read before every try, and the turns are
+  # centred on that; without a face it is the view as it is.
   for d in "0 0" "1.5 0" "-1.5 0" "0 1.5" "0 -1.5" "3 0" "-3 0" "0 3" "0 -3" "1.5 1.5" "1.5 -1.5" "-1.5 1.5" "-1.5 -1.5"; do
     set -- $d; n=$((n+1))
+    if [ -n "${AIMX:-}" ]; then
+      e=$(st local); set -- $(aim_calc $AIMX $AIMY $AIMZ $e) $d; by=$1; bp=$2; shift 2
+      if [ "$e" != "${FACE_EYE:-}" ]; then
+        log "aimed $ref: the eye moved from ${FACE_EYE:-?} to $e since the turn, aiming again: aw_aim $by $bp"; rc "aw_aim $by $bp"; FACE_EYE=$e; sleep 1; fi
+    fi
     if [ "$1" != 0 ] || [ "$2" != 0 ]; then
       a=$(echo "$bp $by $1 $2" | awk '{p=$1+$3; y=$2+$4; if(y<0)y+=360; if(y>=360)y-=360; if(p>80)p=80; if(p<-70)p=-70
         printf "%.1f %.1f", y, p}'); rc "aw_aim $a"; sleep 1; fi
@@ -351,10 +381,17 @@ aimed(){ ref=$1; secs=${2:-3}; set -- $(st angles); bp=${1:-0}; by=${2:-0}; n=0;
       row=$(echo "$out" | sed -n 's/.*aimed row \([0-9][0-9]*\).*/\1/p' | tail -n 1); [ -n "$row" ] && lrow=$row
       pick=$(echo "$out" | sed -n 's/^source ref: //p' | tail -n 1); [ -n "$pick" ] && lpick=$pick
       rowline=; [ -n "$row" ] && rowline=$(echo "$out" | grep "^ *$row [A-Za-z] " | head -n 1)
+      # JOURNEY-DOOR-USE-GOES-TO-ACTOR-66: the game's own verdict on the use key (FOCUS-NPC-OVERRIDES-ITEM-62): when it
+      # goes to an actor, the focus row is not what E takes (the v0.0.66-dev6 journey: the Guard killed a step before
+      # lay in front of the census door, the focus row was the door, and E searched the body; the journey then waited
+      # 45 s for a load and the stop was counted as the load hang)
+      who=$(echo "$out" | sed -n 's/^aw_placed aim: use goes to the actor; actor \(.*\) box .*/\1/p' | tail -n 1)
       # the focus row, when the report prints it, is what the use key takes: it decides (the v0.0.66-dev2 journey's
       # pick named the crab meat while the focus, and E, took the silver plate under it)
       if [ -n "$rowline" ]; then
-        case "$rowline" in *" $ref "*) log "aimed $ref: the use key's focus row $row (aw_placed aim), try $n"; return 0;; esac
+        case "$rowline" in *" $ref "*)
+          if [ -n "$who" ]; then lwho=$who; log "aimed $ref: the focus row $row is on it, but the use key goes to the actor $who standing in front of it, try $n"; break; fi
+          log "aimed $ref: the use key's focus row $row (aw_placed aim), try $n"; return 0;; esac
         [ -n "$pick" ] && break
       elif echo "$out" | grep -E -q "source ref: $ref( /|$)"; then
         log "aimed $ref: the crosshair's pick (aw_inspect; the focus row ${row:-none} not in the report), try $n"; return 0
@@ -363,6 +400,7 @@ aimed(){ ref=$1; secs=${2:-3}; set -- $(st angles); bp=${1:-0}; by=${2:-0}; n=0;
     done
   done
   shot "aimed-missing-$ref"
+  [ -n "$lwho" ] && finish "FAIL aimed $ref: the use key goes to the actor $lwho standing in front of it (the focus row ${lrow:--} is on it) in $n tries around pitch $bp yaw $by (local $(st local)); the use key would search or talk, not use it"
   finish "FAIL aimed $ref: neither the use key's focus (aw_placed aim, aimed row ${lrow:--}) nor the crosshair's pick (aw_inspect: ${lpick:--}) is on it in $n tries around pitch $bp yaw $by (local $(st local))"; }
 look_at(){ k=0; seen=
   while [ $k -lt 10 ]; do alive || finish "FAIL emulator exited turning to $1"
@@ -378,7 +416,8 @@ look_at(){ k=0; seen=
 # SCRIPT: a scripted session instead of the music and second-load steps (evidence shots, replays). One step per line:
 # "cmd TEXT" console command, "key NAME" key press, "xdo ARGS" raw xdotool steps (mouse, held keys), "wait S" S seconds of game time (the game must keep running),
 # "shot NAME" screenshot shots/NAME.png, "rec NAME" starts the clip shots/NAME.mp4, "recstop" ends it,
-# "state KEY" logs that state value; other lines are comments. Ends PASS
+# "state KEY" logs that state value, "examine NAME" logs the stall examination of the running game (a baseline);
+# other lines are comments. Ends PASS
 # when the game survives the whole script.
 if [ -s $R/script.txt ]; then
   while IFS= read -r line <&3 || [ -n "$line" ]; do  # fd 3: ffmpeg (shot) reads stdin
@@ -391,6 +430,9 @@ if [ -s $R/script.txt ]; then
     rec\ *) rec "${line#rec }";;
     recstop) recstop;;
     state\ *) log "state ${line#state }: $(st ${line#state })";;
+    # examine NAME: the stall examination on a game that runs (stall.py breaks in a few times, the game goes on): a
+    # baseline of the tasks' waits and the handlers for a later stop to be read against (CHIM-SEYDA-BALMORA-LOAD-HANG-43)
+    examine\ *) S=$( (python3 $R/stall.py 5 || echo 'STALL unknown: stall check could not run') 2>>$R/logs/stall-errors.txt | tail -n 1); log "examine ${line#examine }: $S";;
     walkto\ *) set -- ${line#walkto }; walk_to "$1" "$2" "$3";;
     waitfor\ *) set -- ${line#waitfor }; wait_for "$@";;
     boxes) boxes;;
@@ -463,7 +505,7 @@ R = '/out'
 LOG = R + '/logs/fsuae.log'
 FIFO = R + '/dbg.in'
 IDLE = (0xF81460, 0xF81480)     # Kickstart 3.1 exec idle loop (STOP)
-PROMPT = re.compile(r'(?:^|\r?\n)>[ \t]*$')
+PROMPT = re.compile(r'(?:^|\r?\n)>(.*)')
 
 
 def tail_from(pos):
@@ -479,11 +521,19 @@ def size():
         return 0
 
 
-def wait_prompt(pos, timeout=20):
+def prompts(text, sent=None):
+    """STALL-PROBE-PROMPT-LOG-LINE-66 (repeat3, 15 November 2026): the debugger's prompts in text, every line that
+    starts with '>'. The emulator's own log lines can follow a prompt on the same line (">need_metadata_file 6
+    WF_ALWAYS WF_EXISTS" did), so the prompt is not required to end the text; the echo of the command just sent
+    (">d") is not a prompt."""
+    return [m for m in PROMPT.finditer(text) if sent is None or m.group(1).strip() != sent.strip()]
+
+
+def wait_prompt(pos, timeout=20, sent=None):
     end = time.time() + timeout
     while time.time() < end:
         text = tail_from(pos)
-        if PROMPT.search(text.rstrip(' \t')):
+        if prompts(text, sent):
             return text
         time.sleep(0.15)
     return None
@@ -493,22 +543,62 @@ def cmd(text, timeout=20):
     pos = size()
     with open(FIFO, 'w') as f:
         f.write(text + '\n')
-    return wait_prompt(pos, timeout) or ''
+    return wait_prompt(pos, timeout, sent=text) or ''
+
+
+paused = False      # the emulator is stopped in its debugger (a break-in answered); main() resumes it whatever happens
 
 
 def break_in():
+    """Alt+D into the emulator's debugger; True when its prompt answered. When the debugger did activate (its log
+    line is there) and no prompt could be read, the emulator is resumed before giving up: the repeat3 examination
+    left it paused in the debugger for the rest of the session, which then read as a stop of the game."""
+    global paused
     w = subprocess.run(['xdotool', 'search', '--name', 'FS-UAE'], capture_output=True, text=True).stdout.split()
     if not w:
         return False
     pos = size()
     for a in (['windowfocus', '--sync', w[0]], ['keydown', 'Alt_L'], ['key', '--delay', '150', 'd'], ['keyup', 'Alt_L']):
         subprocess.run(['xdotool'] + a, capture_output=True)
-    return wait_prompt(pos) is not None
+    if wait_prompt(pos) is not None:
+        paused = True
+        return True
+    if 'Activated debugger' in tail_from(pos):
+        paused = True
+        resume()
+    return False
+
+
+def state_values():
+    """realtime and ticks from the game's state file, or None when it has no end line (a write in progress, or one
+    that never finished). The file's content is the measure of a running game; its modification time is not: through
+    the emulator container's bind mount the time lagged by minutes in repeat3 (STALL-PROBE-PROMPT-LOG-LINE-66)."""
+    try:
+        lines = open(R + '/awctl/state.txt', encoding='latin-1').read().splitlines()
+    except OSError:
+        return None
+    if not lines or lines[-1].strip() != 'end':
+        return None
+    v = dict(l.split(None, 1) for l in lines if ' ' in l)
+    return v.get('realtime', '?'), v.get('ticks', '?')
+
+
+def state_note(before, after):
+    """One phrase on the state file over the examination: moving = the game runs."""
+    if before is None and after is None:
+        return 'state file unreadable (no end line: a write in progress or never finished)'
+    if before is None or after is None:
+        return 'state file %s during the examination' % ('appeared' if before is None else 'went unreadable')
+    moved = before != after
+    return 'state file realtime %s -> %s, ticks %s -> %s over the examination (%s)' % (
+        before[0], after[0], before[1], after[1], 'the game runs' if moved else 'unchanged: the game is stopped')
 
 
 def resume():
+    global paused
     with open(FIFO, 'w') as f:
         f.write('g\n')
+    paused = False
 
 
 def mread(addr, n):
@@ -553,18 +643,114 @@ def pending(game, queues):
     return None, 'no request of the game queued on any handler port (taken by a handler, or the call is not a file call)'
 
 
-def classify(pcs, tasks, stack, queues=None):
-    """pcs: sampled program counters; tasks: [(name, node, sigwait, is_process)]; stack: the game's stack words;
-    queues: the message ports read (see pending), None when they could not be read. Returns (class, details)."""
+def task_state(t):
+    """'wait', 'ready' or 'running' for a task tuple: its 5th element (STALL-PROBE-RUNNING-GAME-66); a 4-tuple came
+    from the Wait list, as every task did before the running task was read."""
+    return t[4] if len(t) > 4 else 'wait'
+
+
+def handler_states(tasks, labels=None):
+    """STALL-PROBE-RUNNING-GAME-66: what every other process waits on, from its wait mask against its packet port's
+    signal bit (the 6th tuple element, None when not read): 'idle on its port' = it waits for new packets, so it holds
+    none of the game's; 'busy (waits $MASK, not its port bit N)' = it has taken a request and waits for something else
+    (its device, or the emulator's host-side worker behind a directory drive); 'running' or 'ready' = it works. The
+    whole mask is printed when more than the port bit is in it (the emulator's directory-drive handler waits for its
+    port AND the host side's completion signal, so "on its port" alone cannot tell packets from a host reply: the
+    repeat2 stop of 15 November 2026). labels: {unit name: what it serves} from the emulator's log. A waiting task
+    whose received signals (the 7th element) include a waited one was signalled and not woken: said so."""
+    out = []
+    for t in tasks:
+        if not t[3] or t[0] == 'Initial CLI' or len(t) < 6 or t[5] is None:
+            continue
+        name = t[0] + (' (%s)' % labels[t[0]] if labels and t[0] in labels else '')
+        state = task_state(t)
+        if state != 'wait':
+            out.append('%s %s' % (name, state))
+            continue
+        bit = 1 << t[5]
+        if t[2] == bit:
+            s = '%s idle on its port' % name
+        elif t[2] & bit:
+            s = '%s idle on its port (waits $%08X)' % (name, t[2])
+        else:
+            s = '%s busy (waits $%08X, not its port bit %d)' % (name, t[2], t[5])
+        recvd = t[6] if len(t) > 6 else 0
+        if recvd & t[2]:
+            s += ' SIGNALLED BUT ASLEEP ($%08X received)' % (recvd & t[2])
+        out.append(s)
+    return out[:10]
+
+
+def stack_packet(s, base, reply):
+    """CHIM-SEYDA-BALMORA-LOAD-HANG-43 (the repeat2 stop of 15 November 2026: every traced call finished, so the stuck
+    call was one the wrappers do not see): the game's DOS packet read off its own stack bytes s (read from address
+    base). dos.library builds a StandardPacket there: sp_Msg (20 bytes) then sp_Pkt, with sp_Msg.ln_Name = &sp_Pkt,
+    dp_Link = &sp_Msg and dp_Port = the caller's reply port. Returns (type, res1, res2, arg1, arg2, arg3) or None."""
+    for o in range(20, len(s) - 32, 2):
+        if be32(s, o) == base + o - 20 and be32(s, o - 20 + 10) == base + o and be32(s, o + 4) == reply:
+            return tuple(be32(s, o + k) for k in (8, 12, 16, 20, 24, 28))
+    return None
+
+
+def packet_text(pk, name=None):
+    """One phrase for the packet stack_packet found; name: the BSTR an open, lock or delete names (read separately)."""
+    if not pk:
+        return None
+    signed = lambda v: v - (1 << 32) if v & 0x80000000 else v
+    return "the game's packet on its stack: %s%s (arg1 $%08X, arg2 $%08X, arg3 %d; res1 %d, res2 %d)" % (
+        ACTIONS.get(pk[0], 'type %d' % pk[0]), " of '%s'" % name if name else '', pk[3], pk[4], signed(pk[5]),
+        signed(pk[1]), signed(pk[2]))
+
+
+def unit_labels(text):
+    """{unit: what it serves} from the emulator's start-up log: FS-UAE mounts a host folder as a virtual unit named
+    DHn ("FS: mounted virtual unit DH2 (/out/awctl)"), so the remote-console folder's handler is DHn, not AWCTL."""
+    return {m.group(1): 'the remote-console folder %s' % m.group(2)
+            for m in re.finditer(r'FS: mounted virtual unit (\w+) \((/\S*awctl\S*)\)', text)}
+
+
+def classify(pcs, tasks, stack, queues=None, running=None, state_age=None, labels=None, packet=None):
+    """pcs: sampled program counters; tasks: [(name, node, sigwait, is_process[, list, port signal bit, received])];
+    stack: the game's stack words; queues: the message ports read (see pending), None when they could not be read;
+    running: the name of ExecBase's ThisTask at the examination (None when not read); state_age: seconds since the
+    game last wrote its state file (None when unknown); labels: unit_labels(); packet: packet_text() of the game's
+    packet found on its stack. Returns (class, details)."""
     idle = [p for p in pcs if IDLE[0] <= p < IDLE[1]]
     game = next((t for t in tasks if t[0] == 'Initial CLI'), None)
     lists = {t[1] + 0x5C + 0x14: t[0] for t in tasks if t[3] and t[0] != 'Initial CLI'}
     holder = next((lists[w] for w in stack if w in lists), None)
     named, text = pending(game, queues) if queues is not None else (None, 'ports not read')
-    details = 'pc %d of %d samples in exec idle; game %s; pending: %s; stack scan (inferred): request held by %s' % (
-        len(idle), len(pcs), 'waits on SIGF_DOS' if game and game[2] & 0x100 else 'not in a file call', text,
-        holder or 'none found')
-    if pcs and len(idle) == len(pcs) and game and game[2] & 0x100 and (holder or named):
+    # STALL-PROBE-RUNNING-GAME-66: a task waits only while it sits in exec's Wait list. The running task is in no list
+    # (ExecBase's ThisTask names it) and a ready one is between two frames; on both, tc_SigWait is the mask of its LAST
+    # wait, so "waits on SIGF_DOS" read from it alone was false (the v0.0.66-dev4 and dev6 journey stops: the processor
+    # in game code in every sample, the state file moving, and the game read as waiting or as a missing task).
+    waiting = False
+    if game and task_state(game) == 'wait':
+        waiting = bool(game[2] & 0x100)
+        what = 'waits on SIGF_DOS' if waiting else 'waits on $%08X, not in a file call' % game[2]
+        if len(game) > 6 and game[6] & game[2]:
+            what += ' SIGNALLED BUT ASLEEP ($%08X received)' % (game[6] & game[2])
+    elif game:
+        what = ('is the running task' if task_state(game) == 'running' else 'is ready to run') + ', not in a file call'
+    elif running == 'Initial CLI':
+        what, text = 'is the running task, not in a file call', 'the game runs; no request pending'
+    else:
+        what = "task not found in exec's lists"
+    parts = ['pc %d of %d samples in exec idle' % (len(idle), len(pcs)), 'game %s' % what, 'pending: %s' % text,
+             'stack scan (inferred): request held by %s' % (holder or 'none found')]
+    if packet:
+        parts.append(packet)
+    if isinstance(state_age, str):
+        parts.append(state_age)
+    elif state_age is not None:
+        parts.append('state file written %.0f s before the examination' % state_age)
+    handlers = handler_states(tasks, labels)
+    if handlers:
+        parts.append('handlers: ' + ', '.join(handlers))
+    details = '; '.join(parts)
+    # the stall proper: nothing computes, the game sleeps in a file call, and someone holds its request: the stack's
+    # word, a port's queue, or a handler that waits on something other than its own packet port (the device below it)
+    if pcs and len(idle) == len(pcs) and waiting and (holder or named or any(' busy ' in h for h in handlers)):
         return 'emulator-disk', details
     # ARRIVAL-LONG-FRAME-DEV6-59: three samples or more and none in exec idle: the processor is working (a long run of
     # file and game work inside one frame), not a request nobody answers
@@ -573,7 +759,7 @@ def classify(pcs, tasks, stack, queues=None):
     return 'unknown', details
 
 
-LT_OPS = {1: 'open', 2: 'read', 3: 'seek', 4: 'close'}
+LT_OPS = {1: 'open', 2: 'read', 3: 'seek', 4: 'close', 5: 'write'}
 LT_HEADER, LT_ENTRY = 24, 64
 
 
@@ -608,16 +794,16 @@ def ring_lines(raw):
 
 def load_trace():
     """The ring named by the console's last "Load trace on: ring at $ADDR" line, read with the monitor (the game is
-    stopped); its lines go to logs/loadtrace-at-stop.txt. Returns the summary for the STALL line ('' when off)."""
-    if os.environ.get('LOADTRACE') != '1':
-        return ''
+    stopped); its lines go to logs/loadtrace-at-stop.txt. Returns the summary for the STALL line ('' when off).
+    Read whenever the console names a ring (a session script's "aw_loadtrace 1" turns it on as well as --load-trace,
+    which also sets LOADTRACE=1; STALL-PROBE-RUNNING-GAME-66)."""
     try:
         text = open(R + '/awctl/console.log', encoding='latin-1').read()
     except OSError:
         text = ''
     found = re.findall(r'Load trace on: ring at \$([0-9A-Fa-f]{8})', text)
     if not found:
-        return '; load trace: no ring address on the console'
+        return '; load trace: no ring address on the console' if os.environ.get('LOADTRACE') == '1' else ''
     raw = mread(int(found[-1], 16), LT_HEADER + 128 * LT_ENTRY)
     lines, open_ = ring_lines(raw)
     with open(R + '/logs/loadtrace-at-stop.txt', 'w') as f:
@@ -629,7 +815,28 @@ def load_trace():
 
 
 def main():
+    """The examination, crash-proof (the repeat4 session of 15 November 2026: it failed after a break-in, its error
+    went to /dev/null, and the emulator stayed paused in the debugger): whatever fails, a paused emulator is resumed in
+    the end, the failure is one STALL line that names the exception, and the traceback goes to stderr, which the probe
+    keeps in logs/stall-errors.txt (STALL-PROBE-PROMPT-LOG-LINE-66)."""
+    try:
+        examine()
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print('STALL unknown: the examination failed after %s: %s: %s (logs/stall-errors.txt has the traceback)'
+              % ('a break-in' if paused else 'no break-in', type(e).__name__, e))
+    finally:
+        if paused:
+            try:
+                resume()
+            except Exception:
+                pass
+
+
+def examine():
     pcs = []
+    state_before = state_values()
     for _ in range(int(sys.argv[1]) if len(sys.argv) > 1 else 5):
         if not break_in():
             continue
@@ -637,26 +844,58 @@ def main():
         if m:
             pcs.append(int(m.group(1), 16))
         resume(); time.sleep(1)
-    tasks, stack = [], []
+    tasks, stack, running, labels, packet = [], [], None, {}, None
+    time.sleep(1)   # the game writes its state file twice a second: its content moving tells a running game from a stopped one
+    state_age = state_note(state_before, state_values())
+    try:   # the emulator's mount lines come at start-up: the first part of its log is enough
+        with open(LOG, 'rb') as f:
+            labels = unit_labels(f.read(4 << 20).decode('latin-1', 'replace'))
+    except OSError:
+        pass
     if break_in():
         eb = be32(mread(4, 4), 0)
         base = mread(eb, 0x1B0)
-        for off in (0x196, 0x1A4):
+
+        def task_tuple(node, state):
+            t = mread(node, 0x60)
+            if not be32(t, 0):
+                return None, t
+            np = be32(t, 10)
+            name = mread(np, 32).split(b'\x00')[0].decode('latin-1', 'replace') if np else ''
+            proc = len(t) > 8 and t[8] == 13
+            port = mread(node + 0x5C, 0x18) if proc else b''       # pr_MsgPort: mp_SigBit at +0x0F
+            # tc_SigWait at +22, tc_SigRecvd at +26: a received signal that is also waited on was never woken
+            return (name, node, be32(t, 22), proc, state, port[0x0F] if len(port) > 0x0F else None, be32(t, 26)), t
+        # STALL-PROBE-RUNNING-GAME-66: the task running at the break (ExecBase ThisTask, in neither list) comes first;
+        # its stack pointer is live, not saved, so no stack scan of a running game
+        this = be32(base, 0x114)
+        if this:
+            tup, _t = task_tuple(this, 'running')
+            if tup:
+                running = tup[0]
+                tasks.append(tup)
+        for off, state in ((0x196, 'ready'), (0x1A4, 'wait')):
             node, k = be32(base, off), 0
             while node and k < 40:
-                t = mread(node, 0x60)
-                if not be32(t, 0):
+                tup, t = task_tuple(node, state)
+                if not tup:
                     break
-                np = be32(t, 10)
-                name = mread(np, 32).split(b'\x00')[0].decode('latin-1', 'replace') if np else ''
-                tasks.append((name, node, be32(t, 22), len(t) > 8 and t[8] == 13))
-                if name == 'Initial CLI':
-                    s = mread(be32(t, 54) & ~1, 3072)
+                tasks.append(tup)
+                if tup[0] == 'Initial CLI':
+                    sbase = be32(t, 54) & ~1
+                    s = mread(sbase, 3072)
                     stack = [be32(s, i) for i in range(0, len(s) - 3, 2)]
+                    pk = stack_packet(s, sbase, node + 0x5C)
+                    pname = None
+                    if pk and pk[0] in (8, 16, 1004, 1005, 1006):     # LOCATE / DELETE name arg2; FIND* name arg3
+                        b = mread(pk[4] if pk[0] in (8, 16) else pk[5], 64)
+                        pname = b[1:1 + b[0]].decode('latin-1', 'replace') if b else None
+                    packet = packet_text(pk, pname)
                 node, k = be32(t, 0), k + 1
         # every process's message port (pr_MsgPort at +0x5C, its list at +0x14): the packets queued there
         queues = {}
-        for name, node, _sig, proc in tasks:
+        for tup in tasks:
+            name, node, proc = tup[0], tup[1], tup[3]
             if not proc:
                 continue
             lst = node + 0x5C + 0x14
@@ -674,7 +913,7 @@ def main():
         resume()
     else:
         queues, trace = None, ''
-    kind, details = classify(pcs, tasks, stack, queues)
+    kind, details = classify(pcs, tasks, stack, queues, running, state_age, labels, packet)
     print('STALL %s: %s; pc %s%s' % (kind, details, ' '.join('%08X' % p for p in pcs[:5]), trace))
 
 

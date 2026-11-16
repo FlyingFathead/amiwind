@@ -264,6 +264,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - SWEEP-SEYDA-EIGHT-FAIL-59 (no report page): dbg sweep reports 8 failing entities in Seyda Neen on a v0.0.59-dev3 MiniWind with the placed world items; the Census Office map reported 3 in v0.0.58 sessions
 - SWIM-BAKED-CLOTHES-60 (no report page): Swimming in third-person view shows default clothes instead of the player's own
 - TOMB-NO-CREATURES-60 (no report page): Samarys Ancestral Tomb has no ghosts, skeletons or other creatures
+- WANDER-DOOR-RULE-66 (no report page): A wandering resident can stop at a destination right by a door and stand there; the original sends an idle wanderer near a door walking
 
 Related bugs in other categories:
 

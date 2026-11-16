@@ -4773,7 +4773,7 @@ def minute_one(steps, run, metadata, cache, reasons, index, reuse_all):
     closures = (CLOSURES.get(str(run)) or {}).get('stages') or {}
     units = (CLOSURES.get(str(run)) or {}).get('units') or {}
     unit_rows = RA.unit_report(steps, closures, units, pass_cache.folder(), reuse_all['workspace'], rebuilt,
-                               root=index.root)
+                               root=index.root, limits=RA.region_limits(steps, plans, rebuilt))
     print('Stage plan (--reuse-all-available), before any stage runs:', flush=True)
     for line in RA.minute_one_lines(steps, plans, reasons, unit_rows):
         print(line, flush=True)

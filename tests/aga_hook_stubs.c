@@ -211,6 +211,8 @@ WEAK int AW_TpPlacesOpen(void){return 0;}
 /* The scripts' control switches (aw_story.c, MWSCRIPT-PLAYER-CONTROL-62): every switch on in fixtures without it. */
 WEAK int AW_ControlAllowed(int controls){(void)controls;return 1;}
 WEAK int AW_ControlsDisabled(void){return 0;}
+/* the opening's carried scripts switch them (aw_intro.c, aw_opening.c; OPENING-FIGHTING-ON-BEFORE-PAPERS-66): kept */
+WEAK int AW_ControlSet(int controls,int enable){(void)controls;(void)enable;return 1;}
 /* dbg weapon / dbg gear's box (aw_gearbox.c, WEAPONS-57): no box in fixtures. */
 WEAK int AW_GearBoxOpen(int kind){(void)kind;return 0;}
 /* dbg give's item picker and count box (aw_gearbox.c, DBG-GIVE-MONEY-62): no box in fixtures. */
@@ -260,3 +262,10 @@ WEAK void (*aw_save_actor_leave)(struct edict_s *e);
 WEAK void AW_SaveCaptureActor(struct edict_s *e){(void)e;}   /* the released actor's saved row (aw_save.c) */
 WEAK char *Cmd_Argv(int arg){(void)arg;return "";}
 WEAK int AW_Interior(void){return 0;}
+/* DOOR-ARRIVAL-INSIDE-ACTOR-66 (world.c) in fixtures without it: the body rule's switch (sv_main.c registers it), the
+ * stuck search's position test (sv_phys.c SV_CheckStuck; a fixture's own SV_TestEntityPosition answers, as before)
+ * and the arrival's overlap check (aw_scene.c: nobody overlaps). */
+WEAK cvar_t aw_body_overlap={"aw_body_overlap","1",false,false,1,NULL};
+extern edict_t *SV_TestEntityPosition(edict_t *e) WEAK;
+WEAK edict_t *SV_TestWorldPosition(edict_t *e){return SV_TestEntityPosition?SV_TestEntityPosition(e):NULL;}
+WEAK edict_t *AW_BodyOverlapping(edict_t *e){(void)e;return NULL;}

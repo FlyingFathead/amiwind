@@ -65,6 +65,17 @@ class LoadTraceSourceContracts(unittest.TestCase):
         self.assertIn('AW_HeapAuditPhase(sv.name,"scene-ready")', code('aw_scene.c'))
         self.assertIn('AW_HeapAuditPhase(sv.modelname,"after-actors")', code('sv_main.c'))
 
+    def test_the_remote_console_append_is_traced(self):
+        # CHIM-SEYDA-BALMORA-LOAD-HANG-43 (the repeat2 stop of 15 November 2026): the console.log append is a file
+        # descriptor's open, lseek, write and close, outside the FILE wrappers, and the stop fell inside it with the ring
+        # showing nothing unfinished; its four calls are traced by name, op 5 = write
+        remote = code('aw_remote.c')
+        for call in ('LOG_TRACE(1,0);fd=open(', 'LOG_TRACE(3,0);r=lseek(', 'LOG_TRACE(5,len);r=write(',
+                     'LOG_TRACE(4,0);r=close('):
+            self.assertIn(call, remote)
+        self.assertIn('AW_LT_OP_WRITE', code('aw_spike.h'))
+        self.assertIn('"close", "write"', code('aw_loadtrace.c'))
+
     def test_registered_and_in_the_debug_help(self):
         self.assertIn('aw_loadtrace.c', (ROOT / 'engine' / 'aga' / 'Makefile').read_text(encoding='utf-8'))
         self.assertIn('AW_LoadTraceInit();', code('aw_debug.c'))

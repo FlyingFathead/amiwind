@@ -1,6 +1,6 @@
 # AmiWind v0.0.66-dev4 (in development)
 
-_Last updated with AmiWind v0.0.66-dev4 (15 November 2026)._
+_Last updated with AmiWind v0.0.66-dev5 (15 November 2026)._
 
 Development snapshot, 15 November 2026, in development. Running on CHIM Engine v0.2.2. Previous snapshot:
 [v0.0.66-dev3](RELEASE-v0.0.66-dev3.md); previous release: [v0.0.65: Reintroducing Vvardenfell](RELEASE-v0.0.65.md).
@@ -35,7 +35,8 @@ there is in the register (see "Known in this build").
 
 - **The play journey walks the opening as a player plays it** ([gameplay journeys](../../GAME_RECORDER.md#gameplay-journeys)):
   the ship, the pier walked up to the census office door, the papers taken off the table, the hall guard's door, the
-  iron dagger from the back room, the courtyard and Keley's ring, Sellus Gravius' topics chosen by name, the release,
+  iron dagger from the back room, the courtyard and Fargoth's ring (the Engraved Ring of Healing, `ring_keley`),
+  Sellus Gravius' topics chosen by name, the release,
   and after it the captain's room left by both its doors. Each step waits for the game (a point reached, a window open,
   a map running) and turns the view to what it uses until the game's own use focus names it; the first wrong turn stops
   the part, names where the player stands, and every check after it is reported as not reached.
@@ -79,8 +80,9 @@ The game needs 32 MB of Fast RAM. At 16 MB parts run and over-limit interiors sh
 
 - After the release, go back into Sellus Gravius' room by the street door, leave by the courtyard door, come in again
   from the courtyard and leave by the exit door: every door opens, every time.
-- A New Game through the census office on foot: the papers, the hall guard's door, the dagger in the back room, Keley's
-  ring in the courtyard barrel, Sellus Gravius' topics and the release.
+- A New Game through the census office on foot: the papers, the hall guard's door, the dagger in the back room,
+  Fargoth's ring (the Engraved Ring of Healing, `ring_keley`) in the courtyard barrel, Sellus Gravius' topics and the
+  release.
 - `dbg tp` to a town typed while an area is still loading: the teleport happens once the area has arrived.
 - Everything on dev3's checklist that has not been played yet (the save after a long walk, two weapons of one kind,
   a save during a speech, `dbg tp` by category).

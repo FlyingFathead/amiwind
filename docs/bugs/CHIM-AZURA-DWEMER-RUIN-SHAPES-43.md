@@ -95,6 +95,7 @@ Family: Object placement and in-game geometry (`placement-geometry`). Placed obj
 - [CONVERTER-ROOT-ROTATION-30](CONVERTER-ROOT-ROTATION-30.md): Converter applied NIF root-node rotation to placed meshes
 - COURTYARD-ARRIVAL-STUCK-66 (no report page): Arriving in the census courtyard from the back room, the player was once stuck in solid: twenty "player is stuck" lines and two moves out
 - CREATURE-FLOATING-62 (no report page): A scrib in the wilderness floats above the terrain
+- [DOOR-ARRIVAL-INSIDE-ACTOR-66](DOOR-ARRIVAL-INSIDE-ACTOR-66.md): Coming back out of the census office onto the Seyda Neen street after a kill, the player arrives inside the guard who has walked to the door and stays stuck
 - ROCK-FLORA-SURFACE-29 (no report page): Angular rock-like surfaces newly appearing in Bitter Coast
 - ROOM-GROUND-STEEP-ICE-66 (no report page): With Bloodmoon selected, the image stage stopped on one Hound of Hircine in the Mortrag Glacier Inner Ring: its feet stand on a steep part of the converted ice floor
 - SHACK-VISIBILITY-29 (no report page): Indrele Rathryon shack front walls missing

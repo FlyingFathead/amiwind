@@ -203,6 +203,9 @@ int AW_OpeningTick(void)
             if(near_actor(5)<27){
                 /* Source AIWander 0 stops travel as soon as the player arrives. */
                 AW_NavLoad("seyda");route_started=0;aw_story.dock=20;
+                /* CharGenRaceNPC's DisablePlayerControls at his greeting (states 20-30), beside the pier's own hold
+                 * (AW_OpeningLocked); his state 50 switches them on again below (OPENING-FIGHTING-ON-BEFORE-PAPERS-66) */
+                AW_ControlSet(AW_CONTROL_PLAYER,0);
             }else if(!route_failed){
                 if(!route_started)dock_route(0);
                 if(route_started){result=AW_NavStep(dt,0);
@@ -217,6 +220,8 @@ int AW_OpeningTick(void)
             if(aw_story.stage==AW_STAGE_OFFICE)aw_story.dock_timer+=dt;
             if(aw_story.dock_timer>=1.5 && AW_IntroSpeak(5,"chargendock2")){aw_story.dock=50;aw_story.dock_timer=0;}
         }else if(aw_story.dock==50 && AW_SpeechRemaining()<=0){
+            /* CharGenRaceNPC's state 50: EnablePlayerControls, then his walk to the door */
+            AW_ControlSet(AW_CONTROL_PLAYER,1);
             aw_story.dock=-1;route_started=route_failed=route_done=0;post_leg=0;dock_route(1);IN_AWClearButtons();
         }else if(aw_story.dock==-1){
             /* OPENING-REGRESSION-64: a walk to his post held up (the player standing in his way after the race

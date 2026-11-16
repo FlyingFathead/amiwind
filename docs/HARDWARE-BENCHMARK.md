@@ -1,6 +1,6 @@
 # Hardware benchmark for owners of accelerated Amigas
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.66-dev8 (15 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -113,6 +113,10 @@ tester medium=<fill in: internal IDE hard disk / CF card and adapter / other; ca
 tester filesystem=<fill in if known: FFS, PFS3, SFS and version; AddBuffers you use>
 AWBENCH-REPORT end
 ```
+
+For a PiStorm, name the board, the Raspberry Pi model and the Emu68 version on the `tester card` line, and say whether
+the screen was AGA or RTG; what such a run would answer is listed in the
+[PiStorm study](PISTORM_RTG_STUDY.md#the-measurement-plan).
 
 - `system cpu/fpu/attn`: the processor and FPU as the system reports them (exec
   `AttnFlags`; a 68060 is only reported as such once 68060.library has run, and then

@@ -1,6 +1,6 @@
 # Census Office silver plate: a game-script smoke test
 
-_Last updated with AmiWind v0.0.59-dev5 (2 November 2026)._
+_Last updated with AmiWind v0.0.66-dev5 (15 November 2026)._
 
 A repeatable check of the game's own rules on a classic first theft: in the Census and Excise Office the player
 takes the silver plate from the dining table, drops it on the floor and saves. The session script is
@@ -14,7 +14,7 @@ takes the silver plate from the dining table, drops it on the floor and saves. T
 - No script names the plate or any other silverware. The Census Office scripts that react to the player's items
   are `CharGenStuffRoom` (a tutorial message for the bread, the crab meat, the candle, the lockpick, the whiskey
   and the note, only while character creation runs), `CharGenDagger` (the dagger), `CharGenStatsSheet` (the
-  papers), `CharGenDoorGuardTalker` (the papers open the hall door), `CharGenDoorEnterCaptain` (Keley's ring) and
+  papers), `CharGenDoorGuardTalker` (the papers open the hall door), `CharGenDoorEnterCaptain` (Fargoth's ring, the Engraved Ring of Healing, `ring_keley`) and
   `CharGenDoorExitCaptain` (Caius's package).
 - So the reaction to taking the plate is the engine's crime rule, not a script. As OpenMW 0.51 applies it
   (mwmechanics/mechanicsmanagerimp.cpp): the taken item is marked stolen from its owner; if an NPC within

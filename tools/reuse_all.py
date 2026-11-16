@@ -533,8 +533,45 @@ def parse_allowed(values):
     return allowed
 
 
-def unit_report(steps, closures, units, cache_root, workspace, rebuilt, root=ROOT, openers=None):
-    """{stage: [(cache name, N, T) or (cache name, None, None)]} of the rebuilt stages that bake into unit caches."""
+# Stages whose unit cache holds one unit per region the stage converts, and the stage whose receipt lists the regions:
+# a region that is a CHIM region cell or a routing-only row gets no map from them (tools/prepare_world_scenery.py
+# prepare, tools/prepare_world_flora.py: `entries = regions not no_legacy_map`). The cache keeps every region of
+# every earlier key form (2,064 world-scenery regions, 1,931 world-flora regions from builds before the cells moved
+# to CHIM), so a stage that converts none of them would still be counted as baking all of them
+# (BUILD-REUSE-STOP-COUNTS-STORED-GROUP-64).
+REGION_STAGES = {'world-scenery': 'world-terrain', 'world-flora': 'world-terrain'}
+
+
+def regions_to_make(terrain_run, stage='world-terrain'):
+    """How many regions of the terrain stage's receipt in TERRAIN_RUN a region stage converts (those that are neither
+    a CHIM region cell nor routing only); None when the receipt cannot be read."""
+    try:
+        receipt = json.loads((Path(terrain_run) / stage / 'world-regions.json').read_text(encoding='utf-8'))
+        regions = receipt['regions']
+        return sum(1 for row in regions if not (row.get('chim_region') or row.get('routing_only')))
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return None
+
+
+def region_limits(steps, plans, rebuilt):
+    """{stage: most units it can look up} for the REBUILT region stages whose terrain stage is taken from an earlier
+    run by the plan (its receipt is read there); a stage whose terrain stage runs again, or whose receipt is unreadable,
+    has no limit (all its stored units count, as before)."""
+    limits = {}
+    for name, _ in steps:
+        terrain = REGION_STAGES.get(name)
+        if name not in rebuilt or terrain is None or terrain not in plans:
+            continue
+        count = regions_to_make(plans[terrain].get('from'), terrain)
+        if count is not None:
+            limits[name] = count
+    return limits
+
+
+def unit_report(steps, closures, units, cache_root, workspace, rebuilt, root=ROOT, openers=None, limits=None):
+    """{stage: [(cache name, N, T) or (cache name, None, None)]} of the rebuilt stages that bake into unit caches.
+    LIMITS {stage: units}: the most units a stage can look up (region_limits); the stored group and the units found
+    are counted up to it only."""
     if cache_root is None:
         return {}
     openers = unit_cache_openers(root) if openers is None else openers
@@ -555,6 +592,9 @@ def unit_report(steps, closures, units, cache_root, workspace, rebuilt, root=ROO
                 row = (cache, None, max((len(u) for u in groups[cache].values()), default=0))
             else:
                 row = (cache, *unit_counts(groups[cache], digests[key][1]))
+            limit = (limits or {}).get(name)
+            if limit is not None:
+                row = (row[0], None if row[1] is None else min(row[1], limit), min(row[2], limit))
             if row not in report.setdefault(name, []):
                 report[name].append(row)
     return report

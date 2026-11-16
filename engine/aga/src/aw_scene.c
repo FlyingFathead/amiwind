@@ -1135,26 +1135,82 @@ static void door_status(void) {
 /* The standing-spot search shared by arrivals and dbg unstuck; the same rule as
  * tools/arrival_spot.py, which checks every town arrival at build time. A spot
  * needs a walkable floor, a clear standing hull and dry feet (never water). */
+/* One spot of that rule: the floor under PREFERRED moved by DX DY, searched from 8 above to 24 below it lowered by
+ * DROP; 1 with POINT filled when that floor is walkable, the standing hull clear (of bodies too) and the feet dry. */
+static int standing_try(edict_t *p,const vec3_t preferred,float dx,float dy,int drop,vec3_t point) {
+    vec3_t top,bottom,feet;trace_t tr;
+    VectorCopy(preferred,top);top[0]+=dx;top[1]+=dy;top[2]+=8-drop;
+    VectorCopy(top,bottom);bottom[2]-=32;
+    tr=SV_Move(top,p->v.mins,p->v.maxs,bottom,MOVE_NORMAL,p);
+    if(tr.startsolid || tr.allsolid || tr.fraction==1 || tr.plane.normal[2]<AW_WALKABLE_Z)return 0;
+    VectorCopy(tr.endpos,point);point[2]+=.25f;
+    tr=SV_Move(point,p->v.mins,p->v.maxs,point,MOVE_NORMAL,p);
+    if(tr.startsolid || tr.allsolid)return 0;
+    VectorCopy(point,feet);feet[2]+=p->v.mins[2]+1;
+    return SV_PointContents(feet)==CONTENTS_EMPTY;
+}
 static int standing_spot(edict_t *p,const vec3_t preferred,vec3_t point) {
-    vec3_t top,bottom,feet;trace_t tr;int i,drop;
+    int i,drop;
     static int offsets[9][2]={{0,0},{16,0},{-16,0},{0,16},{0,-16},{16,16},{-16,16},{16,-16},{-16,-16}};
-    for(drop=0;drop<=64;drop+=8)for(i=0;i<9;i++) {
-        VectorCopy(preferred,top);top[0]+=offsets[i][0];top[1]+=offsets[i][1];top[2]+=8-drop;
-        VectorCopy(top,bottom);bottom[2]-=32;
-        tr=SV_Move(top,p->v.mins,p->v.maxs,bottom,MOVE_NORMAL,p);
-        if(tr.startsolid || tr.allsolid || tr.fraction==1 || tr.plane.normal[2]<AW_WALKABLE_Z)continue;
-        VectorCopy(tr.endpos,point);point[2]+=.25f;
-        tr=SV_Move(point,p->v.mins,p->v.maxs,point,MOVE_NORMAL,p);
-        if(tr.startsolid || tr.allsolid)continue;
-        VectorCopy(point,feet);feet[2]+=p->v.mins[2]+1;
-        if(SV_PointContents(feet)!=CONTENTS_EMPTY)continue;
-        return 1;
-    }
+    for(drop=0;drop<=64;drop+=8)for(i=0;i<9;i++)
+        if(standing_try(p,preferred,(float)offsets[i][0],(float)offsets[i][1],drop,point))return 1;
     return 0;
 }
 static void install_spot(edict_t *p,const vec3_t point) {
     VectorCopy(point,p->v.origin);VectorCopy(point,p->v.oldorigin);VectorCopy(vec3_origin,p->v.velocity);
     p->v.flags=(int)p->v.flags&~FL_ONGROUND;SV_LinkEdict(p,false);
+}
+/* DOOR-ARRIVAL-INSIDE-ACTOR-66: an arrival never leaves the player inside an actor. The arrival's own check above
+ * keeps clear of the bodies that stand there at that moment, but outdoors (CHIM) the scene's actors join after it:
+ * queued with the arrival ring, spawned over the next ticks, then each moved to where the save's changes left it
+ * (aw_actors.c SpawnOne, ApplyLoaded). So a wandering guard left by the census office's street door in Seyda Neen
+ * (reference 128967, 8 units from its arrival point 266 36 55) came back onto the player. For a few seconds after a
+ * door, a teleport or a crossing, while the player still stands where it arrived, each frame asks whether a body
+ * overlaps the player's box; the first one found steps the player once to the nearest clear standing spot beside the
+ * point: the standing-spot rule above, 16 then 32 units out, the directions away from the body first, on the same
+ * side of every wall (a straight sweep of the standing box from the point, bodies left out, meets nothing). The
+ * original and OpenMW 0.51 put the player on the marker and leave the overlap to the physics, which the body rule
+ * (world.c AW_BodyOverlap) follows too, so the player could walk out anyway; this step is AmiWind's, so the view
+ * never starts inside the actor. aw_arrival_clear 0: no step (the overlap stays, walkable out). Not saved. */
+cvar_t aw_arrival_clear={"aw_arrival_clear","1",false,false,1};
+#define ARRIVAL_WATCH_SECONDS 3
+static struct {int on;vec3_t at;double until;} arrival_watch;
+static int arrival_step_off(edict_t *p,const edict_t *body,vec3_t point) {
+    static const float dirs[8][2]={{1,0},{-1,0},{0,1},{0,-1},{.7071f,.7071f},{-.7071f,.7071f},{.7071f,-.7071f},
+                                   {-.7071f,-.7071f}};
+    vec3_t from;float away[2],score[8];int order[8],i,j,k,r,drop;trace_t tr;
+    VectorCopy(p->v.origin,from);
+    away[0]=from[0]-body->v.origin[0];away[1]=from[1]-body->v.origin[1];
+    for(i=0;i<8;i++){score[i]=dirs[i][0]*away[0]+dirs[i][1]*away[1];order[i]=i;}
+    for(i=1;i<8;i++)for(j=i;j>0 && score[order[j]]>score[order[j-1]];j--){k=order[j];order[j]=order[j-1];order[j-1]=k;}
+    for(r=16;r<=32;r+=16)for(drop=0;drop<=16;drop+=8)for(i=0;i<8;i++){
+        k=order[i];
+        if(!standing_try(p,from,dirs[k][0]*r,dirs[k][1]*r,drop,point))continue;
+        tr=SV_Move(from,p->v.mins,p->v.maxs,point,MOVE_NOBODIES,p);
+        if(tr.startsolid || tr.allsolid || tr.fraction<1)continue;
+        return 1;
+    }
+    return 0;
+}
+/* every frame (AW_SceneTick): nothing unless an arrival is being watched, then one pass over the edicts' boxes */
+static void arrival_clear_tick(void) {
+    edict_t *p,*body;vec3_t point;eval_t *ref;
+    if(!arrival_watch.on)return;
+    if(pending || !sv.active || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict) || p->free ||
+       !aw_arrival_clear.value || p->v.movetype!=MOVETYPE_WALK || p->v.health<=0 || sv.time>arrival_watch.until ||
+       fabs(p->v.origin[0]-arrival_watch.at[0])>4 || fabs(p->v.origin[1]-arrival_watch.at[1])>4){
+        arrival_watch.on=0;return;   /* moved on: walking out is the body rule's */
+    }
+    if(!(body=AW_BodyOverlapping(p)))return;
+    arrival_watch.on=0;
+    ref=GetEdictFieldValue(body,"aw_ref");
+    if(arrival_step_off(p,body,point)){
+        install_spot(p,point);
+        Con_Printf("Arrival: %s (ref %ld) stood on the arrival point; the player stands beside it at %ld %ld %ld.\n",
+            body->v.netname?pr_strings+body->v.netname:"a body",ref?(long)ref->_float:0L,
+            (long)point[0],(long)point[1],(long)point[2]);
+    }else Con_Printf("Arrival: %s (ref %ld) stands on the arrival point and no clear spot is beside it; the player can "
+        "walk out.\n",body->v.netname?pr_strings+body->v.netname:"a body",ref?(long)ref->_float:0L);
 }
 int AW_InteriorPlace(edict_t *p,vec3_t preferred) {
     vec3_t point;
@@ -1209,7 +1265,7 @@ static int arrival_place(edict_t *p,const vec3_t arrival,int jump) {
 /* An explicit debug scene restart owns no old door/cell arrival or voice tail. */
 void AW_SceneCancelTransition(void) {
     pending=region_crossing=map_jump=crossing_view_ready=shroompicker_view=0;
-    door_ready=0;door_close=0;S_CancelSceneVoice();
+    door_ready=0;door_close=0;S_CancelSceneVoice();arrival_watch.on=0;
     memset(&hand_snapshot,0,sizeof(hand_snapshot));hand_clock_ready=0;
     AW_TorchResetAnimation();
 }
@@ -1312,6 +1368,7 @@ int aw_godmode_kept;
 void (*aw_tp_being_arrive)(void);   /* aw_tpplaces.c AW_TpBeingArrive (bound by AW_TpPlacesInit) */
 void AW_SceneSpawn(edict_t *p) {
     int placed=0;float eye;
+    arrival_watch.on=0;
     if(aw_godmode_kept)p->v.flags=(float)((int)p->v.flags|FL_GODMODE);
     area_last_ok=0;frame_last_ok=0;frame_refused[0]=frame_mark_map[0]=0;
     logical_map[0]=0;VectorCopy(vec3_origin,logical_offset);logical_used=0;
@@ -1373,6 +1430,7 @@ void AW_SceneSpawn(edict_t *p) {
         {extern void AW_LoadTraceSceneReady(const char *);AW_HeapAuditPhase(sv.name,"scene-ready");AW_LoadTraceSceneReady("scene ready");}
 #endif
         AW_MusicSceneEvent("scene-enter");pending=0;AW_StreamTransitionReady();
+        arrival_watch.on=placed;    /* DOOR-ARRIVAL-INSIDE-ACTOR-66: the point is taken at the end of the spawn */
         load_recovered(p);load_from.valid=0;
         if(aw_scene_followers)aw_scene_followers(p,0);    /* the followers that came along arrive beside the player */
         if(aw_tp_being_arrive)aw_tp_being_arrive();       /* dbg tp to a being: beside it, facing it (DBG-TP-TO-NPC-66) */
@@ -1403,6 +1461,7 @@ void AW_SceneSpawn(edict_t *p) {
         quick_notice=0;AW_UISubtitle(AW_Miniwind()->title,AW_Miniwind()->features,15);
         miniwind_boot();
     }
+    if(arrival_watch.on){VectorCopy(p->v.origin,arrival_watch.at);arrival_watch.until=sv.time+ARRIVAL_WATCH_SECONDS;}
     AW_HeapAuditReport(sv.worldmodel?sv.worldmodel->name:sv.name);
 }
 void AW_SceneTick(void) {
@@ -1413,6 +1472,7 @@ void AW_SceneTick(void) {
     aw_scene_link_t r;edict_t *p;
     if(aw_loadfail_tick)aw_loadfail_tick();
     tp_held_tick();     /* DBG-TP-DURING-LOAD-66: a dbg tp typed during the load runs now that it has arrived */
+    arrival_clear_tick();   /* DOOR-ARRIVAL-INSIDE-ACTOR-66: an actor that joined onto the arrival point */
     AW_NPCFloorRetry();
     if(!pending && aw_hinged_tick)aw_hinged_tick(host_frametime);   /* nothing unless a door turns */
     if(!pending && sv.active && cls.state==ca_connected && cls.signon==SIGNONS &&
@@ -1994,6 +2054,7 @@ void AW_SceneInit(void) {
     AW_HarvestInit();
     Cmd_AddCommand("aw_debug_hors",hors_command);
     Cvar_RegisterVariable(&intro_docks_variant);
+    Cvar_RegisterVariable(&aw_arrival_clear);   /* DOOR-ARRIVAL-INSIDE-ACTOR-66 (default 1) */
     Cvar_RegisterVariable(&target_style);Cmd_AddCommand("aw_target_place",target_style_command);
     Cvar_RegisterVariable(&label_style);Cmd_AddCommand("aw_label_style",label_style_command);
     Cvar_RegisterVariable(&target_names);Cmd_AddCommand("aw_target_names_set",target_names_command);

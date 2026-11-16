@@ -1,6 +1,6 @@
 # FS-UAE development access
 
-_Last updated with AmiWind v0.0.64-dev1 (10 November 2026)._
+_Last updated with AmiWind v0.0.66-dev10 (15 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -62,8 +62,18 @@ shots and replays. It takes one step per line:
 - `wait S`: S seconds of game time; the game clock must keep moving.
 - `shot NAME`: a screenshot, saved as `shots/NAME.png`.
 - `state KEY`: logs that value of the game's state file.
+- `examine NAME`: logs the stall examination of the running game (the processor samples, what every task and
+  file-system handler waits on, the game's pending file request, the load trace ring) without failing the run: a
+  baseline that a later stop's line is read against.
 
-Any other line is a comment. The run passes if the game survives the whole script.
+Any other line is a comment. The run passes if the game survives the whole script. When the examination of a stop
+fails, its error is kept in `logs/stall-errors.txt` and the emulator is resumed all the same.
+
+The console setting `aw_remote_log 0` keeps the remote console's copy of the console output off the remote folder
+(the lines stay on the in-game console; the command and state files are written as before). It exists for comparing
+test sessions with and without that append, the candidate trigger of the load stall
+([CHIM-SEYDA-BALMORA-LOAD-HANG-43](bugs/CHIM-SEYDA-BALMORA-LOAD-HANG-43.md)): `tests/sessions/load_repeat_hops.txt` against its twin
+`tests/sessions/load_repeat_hops_nolog.txt`.
 
 Every engine gate runs it on the engine it has just built. It would have stopped the v0.0.36-dev3 playtest, whose
 engine corrupted memory on every music read and made the emulator exit a few seconds after a map load

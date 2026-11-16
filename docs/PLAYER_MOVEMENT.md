@@ -1,6 +1,6 @@
 # Player scale, collision and camera motion
 
-_Last updated with AmiWind v0.0.62 (2026-11-08)._
+_Last updated with AmiWind v0.0.66-dev9 (15 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -12,6 +12,7 @@ _Last updated with AmiWind v0.0.62 (2026-11-08)._
 - [Original race-based heights](#original-race-based-heights)
 - [Matching the baked map](#matching-the-baked-map)
 - [Ground support and feel](#ground-support-and-feel)
+- [Bodies that overlap, and arriving next to an actor](#bodies-that-overlap-and-arriving-next-to-an-actor)
 - [Checkpoint-013 architectural ghost volumes](#checkpoint-013-architectural-ghost-volumes)
 - [Eye-height audit, checkpoint-016 development](#eye-height-audit-checkpoint-016-development)
 - [Dev1 regression comparison, 28 September 2026](#dev1-regression-comparison-28-september-2026)
@@ -268,6 +269,43 @@ in [Stair ramp walkability](STAIR_RAMP_WALKABILITY.md). Keep movement, support
 and placement tests consistent when changing the threshold.
 
 See checkpoint-012 validation for native evidence and remaining limitations.
+
+## Bodies that overlap, and arriving next to an actor
+
+From v0.0.66 two bodies whose boxes already overlap (the player, residents and creatures, Quake's
+`SOLID_SLIDEBOX`) collide as the original game's actors do, by the rule OpenMW 0.51 states in
+`apps/openmw/mwphysics/actorconvexcallback.cpp`: overlapping actors collide as cylinders whose diameter is the
+distance between them. Only a move that heads horizontally toward the other body's centre is stopped, at once,
+on the upright plane facing away from that centre; a move away, along the other body, up or down passes it, so
+the two can always walk apart. Quake clips the sum of the two boxes instead: a sweep that starts inside that
+sum is solid until a single frame's move leaves it whole, so neither body could move. Bodies that do not overlap
+still block each other exactly as before, and a position test (a box at one point) still counts every body, so
+the placement searches keep bodies apart. The code is `engine/aga/src/world.c` `AW_BodyOverlap`, called for
+each body a sweep meets.
+
+Quake's stuck search (`sv_phys.c` `SV_CheckStuck`, run before every walking step of the player and of each
+walking resident) is for the world's clipping hull. It now leaves other bodies out of its position tests
+(`SV_TestWorldPosition`, OpenMW's `movementsolver.cpp` unstuck leaves actor-on-actor contacts out too): with an
+actor on the player's spot it used to fail every frame, for the player and for the actor's own steps, with up to
+164 position tests and the developer message "player is stuck." each time.
+
+A door, a teleport or a crossing places the player on the destination's standing spot, and that check keeps
+clear of the bodies that stand there at that moment. Outdoors the scene's actors join after it: they are queued
+with the arrival's ring, spawned over the next ticks and then moved to where the saved changes left them. So a
+wandering guard who had stopped by the Seyda Neen census office's street door, 8 units from its arrival point,
+came back onto the player. For three seconds after an arrival, while the player still stands where it arrived,
+each frame asks whether a body overlaps the player's box; the first one found steps the player once to the
+nearest clear standing spot beside the point: the same standing-spot rule, 16 and then 32 units out, the
+directions away from the actor first, and only to a spot that a straight sweep from the point reaches past every
+wall. The console says `Arrival: NAME (ref N) stood on the arrival point; the player stands beside it at X Y Z.`
+The original and OpenMW put the player on the marker and leave the overlap to the physics; with the rule above
+the player could walk out anyway (shown by the native tests; to be confirmed by the opening journey), and this step keeps
+the view from starting inside the actor.
+
+Both are switches, on by default and written into `id1/default-game.cfg`: `aw_body_overlap 0` gives Quake's box
+clip and stuck search back, `aw_arrival_clear 0` leaves the arrival where it is. The native tests are
+`tests/aga_body_overlap_test.c` (the engine's own collision, stuck search and walk, with the boxes and positions
+of that arrival) and the arrival case in `tests/aga_scene_test.c`.
 
 ## Checkpoint-013 architectural ghost volumes
 

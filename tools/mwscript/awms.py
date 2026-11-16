@@ -31,6 +31,10 @@
   NGWE  4 bytes a region's weather a new game sets for a new-game script AmiWind's own code carries (v0.0.63,
         OPENING-WEATHER-NOT-CLOUDY-63; CharGen's ChangeWeather): u16 the region's catalogue index (sorted Morrowind.esm
         region ids, as ChangeWeather's), u8 weather, u8 0; resident, optional (an older file: none)
+  NGCS  4 bytes the control switches a new-game script AmiWind's own code carries sets on its first run (v0.0.66,
+        OPENING-FIGHTING-ON-BEFORE-PAPERS-66; CharGen's DisablePlayerControls, -Jumping, -ViewSwitch, VanityMode,
+        -Fighting, -Magic): u16 the switches it leaves off, u16 those it leaves on (gamedata.CONTROL_BITS, the
+        engine's aw_story.h AW_CONTROL_* bits); resident, optional (an older file: none)
   HELD  20 bytes an actor standing on an object a script disables (events.py; v0.0.62, SCRIPTED-EVENT-FALLING-MAGE-61),
         sorted by actor: u32 the actor's reference u32 the object's reference f32 x y z (the actor's placed position,
         game units); resident, optional (an older file: none)
@@ -77,7 +81,7 @@ from .opcodes import NAME, LAYOUT
 MAGIC = b'AWMS'
 VERSION = 1
 TYPES = {'s': 0, 'l': 1, 'f': 2}
-ORDER = ('CONF', 'GLOB', 'JRNL', 'SNDS', 'VOIC', 'MUSI', 'OBJS', 'SCRP', 'STRT', 'NEWG', 'NGWE', 'HELD', 'OACT', 'PCEL', 'PMOV', 'SPFX', 'VISI', 'PLAC', 'PADD', 'LACT', 'EQUP', 'CODE', 'BIND', 'STRS',
+ORDER = ('CONF', 'GLOB', 'JRNL', 'SNDS', 'VOIC', 'MUSI', 'OBJS', 'SCRP', 'STRT', 'NEWG', 'NGWE', 'NGCS', 'HELD', 'OACT', 'PCEL', 'PMOV', 'SPFX', 'VISI', 'PLAC', 'PADD', 'LACT', 'EQUP', 'CODE', 'BIND', 'STRS',
          'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'TOPC', 'ASPC', 'ASPE', 'AEFF', 'AMGE', 'DRSC', 'AENC', 'APCS',
          'AIDX', 'ASPX') + ('BNAM',) + ('LOCN', 'HITM', 'SCRH')
 # The actor sections (actors.py, docs/ACTOR_STATE.md): OACT is resident (a script's target -> its actor row); the
@@ -172,6 +176,26 @@ def new_game_weather_rows(program, compiled):
         for region, weather in new_game_weather(getattr(s, 'text', '') if s else ''):
             if region in regions and 0 <= weather < 10:
                 out.append((regions.index(region), weather))
+    return out
+
+
+def new_game_control_rows(program, compiled):
+    """The NGCS rows (v0.0.66, OPENING-FIGHTING-ON-BEFORE-PAPERS-66): [(off, on)] of the control switches each new-game
+    script (Main's CharGenState block) the build does not run, because AmiWind's own code carries it (compiled
+    hand-written: CharGen), sets on its first run; one row a script that sets any. A script that runs sets its own."""
+    from .codegen import SCRIPT_HANDWRITTEN
+    from .gamedata import new_game_controls
+    p = program
+    scripts = getattr(p.data, 'scripts', {})
+    out = []
+    for name in getattr(p.data, 'new_game', []):
+        k = p.scripts.index.get(name)
+        if k is None or not (compiled[k].flags & SCRIPT_HANDWRITTEN):
+            continue
+        s = scripts.get(name)
+        off, on = new_game_controls(getattr(s, 'text', '') if s else '')
+        if off or on:
+            out.append((off, on))
     return out
 
 
@@ -354,6 +378,7 @@ def write(program, compiled, binds, conf=None):
     newg = b''.join(struct.pack('>H', p.scripts.index[s]) for s in getattr(p.data, 'new_game', [])
                     if s in p.scripts.index)
     ngwe_rows = new_game_weather_rows(p, compiled)
+    ngcs_rows = new_game_control_rows(p, compiled)
     held_rows = getattr(p, 'held', None) or []
     held = b''.join(struct.pack('>IIfff', r['actor'], r['support'], *r['position'])
                     for r in sorted(held_rows, key=lambda r: r['actor']))
@@ -424,7 +449,8 @@ def write(program, compiled, binds, conf=None):
                 'CODE': (bytes(code), len(compiled)), 'BIND': (bytes(bind), len(binds)),
                 'STRT': (strt, len(strt) // 2), 'NEWG': (newg, len(newg) // 2), 'HELD': (held, len(held_rows)), 'PCEL': pcel, 'PMOV': pmov, 'TOPC': topc, 'SPFX': spfx,
                 'VISI': visi, 'PLAC': plac, 'EQUP': equp, 'DRSC': drsc,
-                'NGWE': (b''.join(struct.pack('>HBB', r, w, 0) for r, w in ngwe_rows), len(ngwe_rows))}
+                'NGWE': (b''.join(struct.pack('>HBB', r, w, 0) for r, w in ngwe_rows), len(ngwe_rows)),
+                'NGCS': (b''.join(struct.pack('>HH', off, on) for off, on in ngcs_rows), len(ngcs_rows))}
     # PADD (v0.0.62, CENSUS-INTRO-SCRIPTS-62, MWSCRIPT-UNPLACED-ATTACH-62): 8 bytes a carryable item record that names
     # a script, sorted by the FNV-1a of its folded id: u32 hash, u16 script, u8 the OnPCAdd local's slot (0xFF: none),
     # u8 0; resident

@@ -108,6 +108,7 @@ def build(data_files, media, music, out, config=CONFIG):
               'local_names': getattr(program, 'local_names_report', None),
               'player_moves': moves,
               'new_game': {'scripts': new_game['scripts'], 'counts': new_game['counts'],
+                           'controls': new_game['controls'],
                            'actors': sorted(d['id'] for d in new_game['disabled'] if d['type'] in newgame.ACTOR_TYPES)},
               'held_actors': {'rows': [dict(r, cell=str(r['cell']), position=[round(v, 1) for v in r['position']])
                                        for r in held['rows']],
@@ -179,6 +180,11 @@ def main(argv=None):
               'once and bound, %d placed more than once, %d not placed in the world' % (
                   c['scripts'], ', '.join(s['name'] for s in ng['scripts']), c['disabled'], c['actors'],
                   c['resolved'], c['placed_more_than_once'], c['not_placed']), flush=True)
+        k = ng.get('controls') or {}
+        if k.get('enabled_by'):   # OPENING-FIGHTING-ON-BEFORE-PAPERS-66: the carried CharGen's switches (NGCS)
+            print('[mwscript] new game: the carried scripts switch off %s; switched on again by %s' % (
+                ', '.join(k['enabled_by']), '; '.join('%s: %s' % (n, ', '.join(s[:4]) + (' ...' if len(s) > 4 else ''))
+                                                     for n, s in k['enabled_by'].items())), flush=True)
     held = report.get('held_actors')
     if held:
         print('[mwscript] held actors: %d stand on an object a script disables (%s); %d others near such an object '

@@ -1,6 +1,6 @@
 # Running AmiWind on real Amiga hardware
 
-_Last updated with AmiWind v0.0.62-dev1 (6 November 2026)._
+_Last updated with AmiWind v0.0.66-dev8 (15 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -66,7 +66,7 @@ which settings use more memory. Measurements from real machines are very welcome
 
 The 68k Amiga lives on in new accelerators and machines: FPGA cores (the Vampire's Apollo 68080), a Raspberry Pi
 in the CPU socket running a 68k JIT ([PiStorm](#pistorm)), and complete new machines built around an emulator,
-such as the THEA1200 (an A1200 replica running Amiberry). These are where AmiWind is meant to be played, and the
+such as the THEA1200 (an A1200 replica; press coverage says it runs Amiberry, which its makers' pages do not state; see the [THEA1200 study](THEA1200_STUDY.md)). These are where AmiWind is meant to be played, and the
 development emulators already run 68k code at that kind of speed. They also run on original Amigas fitted with a
 modern accelerator, and most of them offer an RTG screen as the normal display.
 
@@ -322,7 +322,7 @@ Planned ([roadmap](ROADMAP.md), the cache plan above):
 
 ## Raspberry Pi with Amiberry
 
-A Raspberry Pi running Amiberry, the emulator the THEA1200 is built on, is the cheapest way to an Amiga-like box for
+A Raspberry Pi running Amiberry, the emulator the THEA1200 is reported to be built on, is the cheapest way to an Amiga-like box for
 AmiWind. Linux runs underneath, but the box can start straight into the emulator with no desktop.
 
 **What we have measured** (a Raspberry Pi 4B Rev 1.1, Amiberry 8.5.0, v0.0.56-dev1, 29 October 2026): the game is
@@ -415,8 +415,10 @@ that makes it, never the Kickstart, AmigaOS or anything from Morrowind. The firs
 
 [PiStorm](https://pistorm.github.io/) is an open-source accelerator: a Raspberry Pi takes the place of the Amiga's
 680x0 CPU, and Emu68, a bare-metal just-in-time translator, turns the 68k instruction stream into native ARM
-(AArch64) code as it runs. The Amiga's own chipset stays in place, so the picture still comes from AGA, as
-AmiWind expects. The hardware and software are published under open-source licences (BSD-like to MPLv2), and the
+(AArch64) code as it runs. The Amiga's own chipset stays in place, so on an A1200 (PiStorm32 Lite) the picture
+still comes from AGA, as AmiWind expects. An A500, A600 or A2000 has no AGA chipset: there the game would need an RTG
+screen or the unofficial AGA emulation AGA-STORM, and today's start-up check stops on such a machine; both routes are
+looked at in the [PiStorm study](PISTORM_RTG_STUDY.md). The hardware and software are published under open-source licences (BSD-like to MPLv2), and the
 JIT's speed can be adjusted while the machine runs, from timing-friendly settings up to full speed. Project page
 and documentation: [pistorm.github.io](https://pistorm.github.io/) (read 17 October 2026); Emu68's releases:
 [github.com/michalsc/Emu68/releases](https://github.com/michalsc/Emu68/releases).
@@ -490,7 +492,8 @@ How we read it:
   general AGA ceiling: AmiWind draws its screen differently, so its own limit on a PiStorm may be higher or lower. That
   the CPU side is ample is likewise a hypothesis until AmiWind's own workload runs there. What it suggests is where to
   look: how much of an AmiWind frame goes to drawing on the AGA screen, and the RTG screen as the way past it (the
-  engine's RTG path is still slow: ENGINE-RTG-SLOW-PATH-52 in the [bug register](BUGS.md)).
+  engine's RTG path is still slow: ENGINE-RTG-SLOW-PATH-52 in the [bug register](BUGS.md); the
+  [PiStorm study](PISTORM_RTG_STUDY.md) traces that path in the code and sketches an RTG backend beside AGA).
 
 ### What the published PiStorm numbers mean
 

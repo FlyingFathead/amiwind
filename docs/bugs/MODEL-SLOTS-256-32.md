@@ -97,6 +97,7 @@ Family: Engine table limits (`engine-limits`). Fixed engine tables (models, enti
 - [MODEL-MARKSURF-SIGNED-31](MODEL-MARKSURF-SIGNED-31.md): Face indices above 32,767 in leaf face lists become bad pointers
 - MWVM-INSTANCES-256-66 (no report page): At most 256 scripted objects run per loaded map: a map with more leaves the rest without their scripts
 - MWVM-PARKING-STORE-SMALL-66 (no report page): The store that keeps script values of unloaded maps holds 2,304 objects and 8,192 values: with the expansions the game has about 3,278 scripted objects with about 11,000 values
+- NET-VIVEC-ENTITY-PACKET-OVERFLOW-66 (no report page): In Vivec the server's entity update overflows the client datagram every frame: packet overflow printed 1,938 times during one 45-second stay
 - [RENDER-SURFACE-OVERFLOW-SILENT-36](RENDER-SURFACE-OVERFLOW-SILENT-36.md): Faces past r_maxsurfs (12,288) or edges past r_maxedges (24,576) are dropped without a warning: Vivec views send up to 37,112 placement faces
 - [RENDER-VISEDICTS-OVERFLOW-32](RENDER-VISEDICTS-OVERFLOW-32.md): Entities beyond MAX_VISEDICTS (1,112) are dropped silently
 - SAVE-ACTOR-ROWS-256-66 (no report page): The save keeps at most 256 saved actor rows: at the 256th row the capture stops and the rest of that place's NPCs (their greetings, place and health) are left out of the save without a word; only NPCs were looked at

@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.66-dev4 (15 November 2026)._
+_Last updated with AmiWind v0.0.66-dev10 (15 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -28,12 +28,61 @@ More in the [gallery](docs/GALLERY.md).
 ## Where AmiWind stands (15 November 2026)
 
 The development line is **v0.0.66**, whose latest snapshot is
-[v0.0.66-dev4](docs/releases/notes/RELEASE-v0.0.66-dev4.md), in development. Its headline: scripted doors that opened
-only once open every time their script allows, as in the original (the census captain's two doors after the opening),
-and the play journey walks the opening on foot as a player plays it, through the census office to the release, stopping
-at the first wrong turn. Its changes are checked by tests, not yet in play. Known: fighting is on before the release
-papers, the crab meat on the census table gives its use to the plate under it, and area loads read their sounds more
-slowly since dev2.
+[v0.0.66-dev10](docs/releases/notes/RELEASE-v0.0.66-dev10.md), in development. The game is the same as in dev9 apart
+from the version, plus one test-only setting, `aw_remote_log` (the remote console's log of the test sessions, on by
+default; players have no remote console). What is new is in the testing tools: the stall examination reads the game's own
+disk request, every handler's wait and the game's own clock, and can no longer leave the emulator paused; the remote
+console's log is traced and can be switched off; and a repeat test session of the load stall stopped once, after 19 good
+loads, in play and not in a map load, reading as inside the remote console's log write on its folder (the cause is not
+proven; being measured with the log on and off). On the dev9 image the opening journey passed 41 of 42 checks: step 6
+killed its fixed victim and no player was left stuck, and step 7's fighter, chosen as the nearest resident, was Fargoth
+(`fargoth`), who fights unarmed, so the health stayed as
+it was. Known: the load stall in test sessions; the door arrival, which that journey did not exercise and which is still to
+be confirmed in play; in Vivec the server's entity update overflows the client's packet every frame; wanderers do not keep
+away from doors as in the original game; the builder's reuse check runs on one core; and the image's partitions were
+written slower once.
+
+The ninth snapshot was [v0.0.66-dev9](docs/releases/notes/RELEASE-v0.0.66-dev9.md). The game changed for the first time
+since dev5: the player no longer ends inside an actor at a door's or a teleport's arrival point (two overlapping bodies
+may move apart, the stuck search leaves bodies out, and an actor that joins on the arrival point steps the player once to
+a clear spot beside it), fixed in source and covered by tests. The testing tools changed too: the stall examination reads
+the running game correctly, and the journey's door aim refuses a door whose use goes to an actor. The notes corrected the
+earlier ones: the opening journey's stops at the census street door on the dev4 (twice), dev6 and dev8 images were not
+the load hang, because the game was running.
+
+The eighth snapshot was [v0.0.66-dev8](docs/releases/notes/RELEASE-v0.0.66-dev8.md). The game is the same as in dev7
+apart from the version. Its headline: the builder's reuse check plans the same commands as the build, the check's whole
+output is kept beside its result, and two study pages are added:
+[AmiWind on a PiStorm-equipped Amiga 500](docs/PISTORM_RTG_STUDY.md) (an RTG display backend or AGA-STORM, traced in the
+code, nothing run on that hardware yet) and [the THEA1200 as a target](docs/THEA1200_STUDY.md) (the announced machine's
+open questions and a test plan). On the dev7 image the opening journey passed all nine steps (42 of 42 checks).
+
+The seventh snapshot was [v0.0.66-dev7](docs/releases/notes/RELEASE-v0.0.66-dev7.md). The game is the same as in dev6
+and dev5 apart from the version. Its headline: what was seen in play and measured on the dev6 build. In the opening journey the
+use key takes the crab meat from the census back room's silver plate, not the plate; the sound stage of a map load took
+59 ms at Seyda Neen, 118 and 147 ms at Balmora and 147 and 165 ms at Vivec, below the dev1 figures at Seyda Neen and Vivec, at Balmora one load below and one just above its dev1 figure, and the disk buffers
+that did it cost 72 to 73 KiB of Fast RAM. Known: a load can stop in the emulator (seen on the dev4 opening journey on
+foot twice and on the dev6 journey once; corrected in dev9: those stops were not the load hang), and the build's reuse
+check still stops the world scenery and flora stages (fixed in dev8).
+
+The sixth snapshot was [v0.0.66-dev6](docs/releases/notes/RELEASE-v0.0.66-dev6.md). The game is the same as in dev5
+apart from the version. Its headline: the build's reuse check counts the regions a world scenery or flora stage converts
+(its own check still stopped both, an open fault); the play journey aims from where the player stands, checks the crab
+meat on the census office's silver plate, and brings the fighter of its fight step to the player; and the roadmap names
+automated playthroughs (later, not scheduled). Seen in play on the dev5 image: the opening holds fighting and magic until
+the release papers.
+
+The fifth snapshot was [v0.0.66-dev5](docs/releases/notes/RELEASE-v0.0.66-dev5.md). Its headline: the opening's scripts
+keep fighting and magic switched off from the prison ship until the release papers, as in the original; of two items
+lying one on the other, the use key goes to the one the view meets first (the crab meat on the census back room's plate,
+not the owned plate under it); and area loads read their sounds quickly again, since the image step lays out the disk's
+folders so that a sound's name lookup fits the disk buffers. Its changes are checked by tests; the opening's control
+switches have been seen in play on its image.
+
+The fourth snapshot was [v0.0.66-dev4](docs/releases/notes/RELEASE-v0.0.66-dev4.md). Its headline: scripted doors that
+opened only once open every time their script allows, as in the original (the census captain's two doors after the
+opening, since seen in play on its image), and the play journey walks the opening on foot as a player plays it, through
+the census office to the release, stopping at the first wrong turn.
 
 The third snapshot was [v0.0.66-dev3](docs/releases/notes/RELEASE-v0.0.66-dev3.md). Its headline: the save holds the game's
 changes without the fixed limits that could refuse it or drop state (the actors' rows, the explored map, script values,
@@ -177,7 +226,7 @@ a new game and the falling mage, and its second ([dev2 notes](docs/releases/note
 delivered. v0.0.61 shipped as its third snapshot with the final version number
 ([release notes](docs/releases/notes/RELEASE-v0.0.61.md)).
 
-What comes next is in the [roadmap](docs/ROADMAP.md). The release after the fix release v0.0.65 (released: [notes](docs/releases/notes/RELEASE-v0.0.65.md)) is v0.0.66 (its snapshots [dev1](docs/releases/notes/RELEASE-v0.0.66-dev1.md), [dev2](docs/releases/notes/RELEASE-v0.0.66-dev2.md), [dev3](docs/releases/notes/RELEASE-v0.0.66-dev3.md) and [dev4](docs/releases/notes/RELEASE-v0.0.66-dev4.md) have the merging reader, the layer keys and the expansion data selected by default, but no expansion area yet), and carries what v0.0.64 did not:
+What comes next is in the [roadmap](docs/ROADMAP.md). The release after the fix release v0.0.65 (released: [notes](docs/releases/notes/RELEASE-v0.0.65.md)) is v0.0.66 (its snapshots [dev1](docs/releases/notes/RELEASE-v0.0.66-dev1.md), [dev2](docs/releases/notes/RELEASE-v0.0.66-dev2.md), [dev3](docs/releases/notes/RELEASE-v0.0.66-dev3.md), [dev4](docs/releases/notes/RELEASE-v0.0.66-dev4.md), [dev5](docs/releases/notes/RELEASE-v0.0.66-dev5.md), [dev6](docs/releases/notes/RELEASE-v0.0.66-dev6.md), [dev7](docs/releases/notes/RELEASE-v0.0.66-dev7.md), [dev8](docs/releases/notes/RELEASE-v0.0.66-dev8.md), [dev9](docs/releases/notes/RELEASE-v0.0.66-dev9.md) and [dev10](docs/releases/notes/RELEASE-v0.0.66-dev10.md) have the merging reader, the layer keys and the expansion data selected by default, but no expansion area yet), and carries what v0.0.64 did not:
 Tribunal (Mournhold) and Bloodmoon (Solstheim) built in by default where you own them (a warning when the files are
 not found, and a builder switch for the base game only), their scripting, and scripted world events such as the
 Ghostgate's doors and the traps of their worlds, with the tree method Solstheim's forests need; the open spell-casting
@@ -466,8 +515,20 @@ test image of one spot see [MiniWind: the test ground](docs/MINIWIND.md), the
 Everything else about building, the build speed options, the FPU support library and running the image in FS-UAE or
 WinUAE: [Building and playing](docs/BUILDING_AND_PLAYING.md), the [Linux build guide](docs/LINUX_BUILD.md) and the
 [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md). The newest emulator presets are
+[`AmiWind-v0.0.66-dev10-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.66-dev10-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.66-dev10-WinUAE.uae`](resources/emulators/AmiWind-v0.0.66-dev10-WinUAE.uae) (for the ninth snapshot:
+[`AmiWind-v0.0.66-dev9-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.66-dev9-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.66-dev9-WinUAE.uae`](resources/emulators/AmiWind-v0.0.66-dev9-WinUAE.uae); for the eighth snapshot:
+[`AmiWind-v0.0.66-dev8-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.66-dev8-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.66-dev8-WinUAE.uae`](resources/emulators/AmiWind-v0.0.66-dev8-WinUAE.uae); for the seventh snapshot:
+[`AmiWind-v0.0.66-dev7-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.66-dev7-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.66-dev7-WinUAE.uae`](resources/emulators/AmiWind-v0.0.66-dev7-WinUAE.uae); for the sixth snapshot:
+[`AmiWind-v0.0.66-dev6-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.66-dev6-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.66-dev6-WinUAE.uae`](resources/emulators/AmiWind-v0.0.66-dev6-WinUAE.uae); for the fifth snapshot:
+[`AmiWind-v0.0.66-dev5-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.66-dev5-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.66-dev5-WinUAE.uae`](resources/emulators/AmiWind-v0.0.66-dev5-WinUAE.uae); for the fourth snapshot:
 [`AmiWind-v0.0.66-dev4-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.66-dev4-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.66-dev4-WinUAE.uae`](resources/emulators/AmiWind-v0.0.66-dev4-WinUAE.uae) (for the third snapshot:
+[`AmiWind-v0.0.66-dev4-WinUAE.uae`](resources/emulators/AmiWind-v0.0.66-dev4-WinUAE.uae); for the third snapshot:
 [`AmiWind-v0.0.66-dev3-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.66-dev3-FS-UAE.fs-uae) and
 [`AmiWind-v0.0.66-dev3-WinUAE.uae`](resources/emulators/AmiWind-v0.0.66-dev3-WinUAE.uae); for the second snapshot:
 [`AmiWind-v0.0.66-dev2-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.66-dev2-FS-UAE.fs-uae) and

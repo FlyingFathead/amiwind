@@ -3538,6 +3538,22 @@ static void new_game_weather(void){
         if(AW_WeatherChangeByScript((r[0]<<8)|r[1],r[2]))weather_calls++;else weather_refused++;
     }
 }
+/* OPENING-FIGHTING-ON-BEFORE-PAPERS-66: the NGCS rows (awms.py: u16 the switches turned off, u16 those turned on;
+ * aw_story.h AW_CONTROL_* bits), the control switches a carried new-game script sets on its first run (CharGen:
+ * DisablePlayerControls, -Jumping, -ViewSwitch, VanityMode, -Fighting, -Magic), set as its calls would
+ * (AW_StoryNewGameControls: only at the opening's start). Not on the census type legacy path: its hand-written
+ * registration holds the scripts that switch them on again (census_scripts). */
+static unsigned long new_game_switches,new_game_switches_skipped;
+static void new_game_controls(void){
+    uint32_t off,rows,bytes,i;
+    if(!resident || !AW_MwvmSection("NGCS",&off,&rows,&bytes) || off+bytes>resident_bytes || 4ul*rows>bytes)return;
+    for(i=0;i<rows;i++){
+        const unsigned char *r=resident+off+4*i;
+        if(!AW_CensusLegacy() && AW_StoryNewGameControls((r[0]<<8)|r[1],(r[2]<<8)|r[3]))new_game_switches++;
+        else new_game_switches_skipped++;
+    }
+    if(rows)AW_MwvmStateChanged();
+}
 static int land_spfx(int row){
     uint32_t off,rows,bytes;int e;aw_actor_t *p=player_record();
     if(!p || !AW_MwvmSection("SPFX",&off,&rows,&bytes) || row<0 || (uint32_t)row>=rows ||
@@ -4555,6 +4571,7 @@ static void map_visit(void){
             if(was)script_import(&aw_ledger);
             new_game_started=AW_MwvmNewGame();new_games++;
             new_game_weather();   /* CharGen's ChangeWeather, carried by AmiWind's own opening (v0.0.63) */
+            new_game_controls();  /* and its control switches (OPENING-FIGHTING-ON-BEFORE-PAPERS-66) */
         }
         t1=Sys_FloatTime();
         chargen_sync();   /* OPENING-REGRESSION-64: before any script runs this tick */
@@ -4717,7 +4734,9 @@ static void status_counts(void){
         for(b=1;b<=AW_CONTROL_LEVITATION;b<<=1)if(!AW_ControlAllowed(b)){
             if(off[0])strncat(off,", ",sizeof(off)-strlen(off)-1);
             strncat(off,AW_ControlName(b),sizeof(off)-strlen(off)-1);}
-        Con_Printf("Control switches: %lu calls (%lu not kept); off now: %s\n",control_calls,control_refused,off[0]?off:"none");
+        Con_Printf("Control switches: %lu calls (%lu not kept); off now: %s; a new game's carried switches set %lu "
+                   "times (%lu not: no opening at its start)\n",control_calls,control_refused,off[0]?off:"none",
+                   new_game_switches,new_game_switches_skipped);
     }
 }
 /* "aw_mwscript_status [on|off|about]" (dbg mwscript [on|off], dbg mwscript status; DBG-MWSCRIPT-SILENT-56): the

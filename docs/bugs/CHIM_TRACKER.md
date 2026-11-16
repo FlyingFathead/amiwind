@@ -1,18 +1,18 @@
 # CHIM Engine tracker
 
-_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.66-dev4._
+_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.66-dev10._
 
 <!-- Generated whole by tools/bug_register.py render from docs/bugs/bugs.json and docs/BUG_JOURNAL.md; do not edit by hand. -->
 
 Every bug of the CHIM engine: its streaming and memory, world format, builder, stairs and collision on CHIM worlds, rendering and performance. Generated together with the [bug register](../BUGS.md) from [`bugs.json`](bugs.json); a test fails when this page is stale or a CHIM bug is missing. Which bugs appear here and how to add one: [CHIM bugs](README.md#chim-bugs). Design: [world streamer](../WORLD_STREAMER.md).
 
-CHIM version: 0.2.2. 399 CHIM bugs: 200 open, 180 fixed, 19 closed.
+CHIM version: 0.2.2. 400 CHIM bugs: 201 open, 180 fixed, 19 closed.
 
 | Part | Open | Fixed | Closed |
 | --- | --- | --- | --- |
 | [Engine streaming and memory](#engine-streaming-and-memory) | 30 | 27 | 2 |
 | [World format](#world-format) | 3 | 4 | 0 |
-| [Builder](#builder) | 112 | 123 | 12 |
+| [Builder](#builder) | 113 | 123 | 12 |
 | [Stairs and collision on CHIM worlds](#stairs-and-collision-on-chim-worlds) | 19 | 11 | 2 |
 | [Rendering and visibility](#rendering-and-visibility) | 16 | 4 | 2 |
 | [Performance](#performance) | 20 | 11 | 1 |
@@ -21,7 +21,7 @@ CHIM version: 0.2.2. 399 CHIM bugs: 200 open, 180 fixed, 19 closed.
 
 Bugs reported two or more times. Most reports first. Each has its report lines on its page.
 
-- [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): Travelling from Seyda Neen to Balmora sometimes hangs on the Loading screen (boot smoke, 2 of about 5 runs) (reported 35 times, open)
+- [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): Travelling from Seyda Neen to Balmora sometimes hangs on the Loading screen (boot smoke, 2 of about 5 runs) (reported 42 times, open)
 - [BUILD-CHIM-STAGE-SERIAL-TAIL-36](BUILD-CHIM-STAGE-SERIAL-TAIL-36.md): After the parallel world build the chim stage ran its validation, heap gate and zone walk on one core (about 10 minutes of the 270-frame coast build) (reported 17 times, open)
 - [BUILD-CHIM-CELLS-PRIVATE-LIST-47](BUILD-CHIM-CELLS-PRIVATE-LIST-47.md): The releases' CHIM cell list was not in the source tree; public builds had no CHIM exterior cells (reported 11 times, fixed)
 - [CHIM-AZURA-FLOATING-FLORA-43](CHIM-AZURA-FLOATING-FLORA-43.md): Plant or tree pieces hang in the air at Azura's Coast (cell 16,7) (reported 7 times, open)
@@ -263,6 +263,7 @@ Newest first: the last 10 [journal](../BUG_JOURNAL.md) entries that name a CHIM 
 | [IMAGE-ROOM-MAPS-LATE-PASSES-48](IMAGE-ROOM-MAPS-LATE-PASSES-48.md) | Image checks after the CHIM rooms install skip CHIM rooms: entity tracker 47 cells against 52, dressing 81 pieces against 99, actor contact 0 placements against 93 | open | high | 22 October 2026, in v0.0.48-dev2 | - | 2026_10_22_v0.0.48-dev2_miniwind-balmora-rooms-chim_f577f015: CHIM 0.2.1, format 0.12, engine f577f01, source f577f01, world f577f01 | Repaired on the v0.0.48 room-passes branch (22 October 2026), not in a build yet: every check after the CHIM rooms install reads CHIM rooms (tracker and dressing count the room record placements, actor contact stands room actors on the store models, a zone gate per room, direct start, harvest listing); on B's own disk 52 cells, 99 dressing pieces in 19 maps and all 90 ground actors on the same floor as A; tests added. |
 | IMAGE-ROOM-MAPS-OPTIMIZER-RECEIPT-48 | A CHIM rooms build stops at the map optimizer check: the room maps are staged but not in the optimizer receipt | open | high | 22 October 2026, in v0.0.48-dev2 | - | 2026_10_22_v0.0.48-dev2_miniwind-balmora-rooms-chim_cec7f9d1: CHIM 0.2.1, format 0.12, engine cec7f9d, source cec7f9d, world cec7f9d | Repaired on the v0.0.48 interiors branch (22 October 2026): CHIM room maps join the optimizer receipt unchanged (input = output), so the later gates bind to them; test added. |
 | IMAGE-ROOM-MAPS-SKIP-PASSES-48 | CHIM rooms were installed before the image passes that write a room worldspawn, so CHIM room maps would miss interior sky, hand metadata and cell numbers | open | high | 22 October 2026, in v0.0.48-dev2 | - | 2026_10_22_v0.0.48-dev2_miniwind-balmora-rooms-chim_1ca025a1: CHIM 0.2.1, format 0.12, engine 1ca025a, source 1ca025a, world 1ca025a | Repaired on the v0.0.48 interiors branch (22 October 2026): the CHIM rooms install runs after the interior sky, hand metadata and cell number passes and before the optimizer; the room map keeps the stamped worldspawn. |
+| IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66 | The image step's CHIM room actor bake takes about two minutes on one core when every room resident is already cached | open | low | 15 November 2026, in v0.0.66-dev4 | - | 2026_11_15_v0.0.66-dev5_full-v0.0.66-dev5_18eb63f: CHIM 0.2.2, format 0.11, source 18eb63f, engine, world not recorded | Open. In the v0.0.66-dev4 and v0.0.66-dev5 builds' image steps the CHIM room actor bake reads "[2594/2594] cached, 0 to fit" and "done - took 2m01s, 1.2 cores" (dev4: about 2m00s at 1.25 of 24 cores), with its heartbeats at 1.0 cores and no output for 90 s, although every room resident came from the unit cache and none was fitted; the v0.0.66-dev2 run of the same all-cached step took 1 min 51 s, so the step has taken about two minutes since then. (full text: the register) |
 | INTERIOR-ACTIVATORS-LEFT-OUT-52 | Interiors leave out every activator but the beds: the heart of Lorkhan is missing from Akulakhan s Chamber, and bar counters, shrines and Dwemer machinery from hundreds of rooms | open | high | 25 October 2026, in v0.0.51 | - | 2026_10_25_v0.0.51_final_d74cc652: CHIM 0.2.2, format 0.12, engine 3c0c6c8, source 3c0c6c8, world 3c0c6c8 | Checked 10 November 2026: the Heart of Lorkhan is a creature record, not an activator; it is placed by the room creature list (CREATURE-DAGOTH-UR-ABSENT-52). The activators fix of 25 October covers the other activators. |
 | [INTERIOR-CREATURES-MISSING-41](INTERIOR-CREATURES-MISSING-41.md) | No creature is placed in any interior: the resident stage takes NPC records only, so the demigod Vivec is missing from his palace | open | high | 16 October 2026, in v0.0.41-dev4 | - | 2026_10_16_v0.0.41-dev4_full-rings01234-r3_87f6534: CHIM 0.2.0, format 0.7, engine 87f6534, source 87f6534, world 87f6534 | Open, fixed in source on branch v0.0.62-roomcreatures (gate 7901), proven on a full v0.0.62-dev1 build, not in a numbered build yet. Every creature placed in a converted room gets a list of one in the actor table (after the real lists, so their indices and bases stay as before), a model in the actor library (a mesh only the rooms reach with the skeletal method; an authored-dead creature its mesh's corpse) and an aw_levelled entity in its room map, which the engine spawns from the creature's tabl (full text: the register) |
 | [LIGHT-ENTITIES-UNWIRED-33](LIGHT-ENTITIES-UNWIRED-33.md) | Morrowind lights are never turned into Quake light entities, so the light compiler bakes nothing | open | high | 9 October 2026, in v0.0.33-dev | - | source: CHIM 0.1.0, engine b828d64, source b828d64, format, world not recorded | Open. Design and measurements done 9 October 2026 (docs/chim/LIGHTING.md: one shared light-entity path for CHIM and the legacy maps, sources in styles 32 and up); repair waits for the project decision. |

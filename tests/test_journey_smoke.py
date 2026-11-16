@@ -16,13 +16,13 @@ sys.path.insert(0, str(ROOT / 'tools'))
 import journey_smoke as js  # noqa: E402
 
 JOURNEY = ROOT / 'tests' / 'sessions' / 'journey_opening.txt'
-VICTIM = 172001
+VICTIM = 128960   # step 6's fixed victim, Erene Llenim (DOOR-ARRIVAL-INSIDE-ACTOR-66)
 
 # what a good run's game answers (the engine's own console forms: aw_mwhost.c, aw_mwconsole.c, aw_actors.c)
 GOOD = {
     'fight_ship': 1, 'papers_before': 0, 'fight_before': 1, 'papers_after': 1, 'fight_after': 0, 'magic_after': 0,
     'dagger_before': 'BACK', 'dagger_taken': 'GONE', 'away_map': 'maps/sncourt-chim.chim', 'back_map': 'maps/census.bsp',
-    'table_back': 'GONE', 'ring_taken': 1,
+    'table_back': 'GONE', 'crab_before': 0, 'crab_after': 1, 'plate_ledger': 'CLEAN', 'ring_taken': 1,
     'gold_before': 0, 'talk_screen': 'dialogue', 'papers_sellus': 0, 'package_sellus': 1, 'directions_sellus': 1,
     'gold_sellus': 87, 'journal_sellus': 1, 'package_again': 1, 'gold_again': 87, 'journal_again': 1,
     'release_map': 'maps/seyda-chim.chim', 'state_released': -1,
@@ -48,18 +48,23 @@ def answer(name, command, v):
         return ['dbg mwscript call getglobal: CharGenState = %d (data start changed)' % v]
     if command == 'player->gethealth':
         return ['gethealth -> %d' % v]
-    if command == 'chim actors kill':
-        return ['chim actors kill: Seyda Neen guard (ref %d, edict 61)' % v]
+    if command == 'chim actors kill %d' % VICTIM:
+        # aw_actors.c's answer to a kill by reference
+        return ['chim actors kill: Erene Llenim (ref %d) at 9.0 game hours' % v]
     if command == 'chim actors fight':
         return ['chim actors fight: Fargoth (ref %d, edict 70)' % v]
     if command == 'chim actors list':
         state = '' if v == 'ALIVE' else ' ' + v
-        rows = [] if v == 'GONE' else ['  61 Seyda Neen guard ref %d cell -2 -9 at 100 200 30%s' % (VICTIM, state)]
+        rows = [] if v == 'GONE' else ['  4 Erene Llenim ref %d cell 0 0 (outside) at -862 20 4%s' % (VICTIM, state)]
         return rows + [
                 '  70 Fargoth ref 172002 cell -2 -9 at 140 210 30%s' % (' FIGHTING' if name == 'list_fight' else ''),
                 'chim actors: 2 actors alive, 90 edicts; joins 1']
     if command == 'dbg cast spell list':
         return [' m0 Test spell (made) *', 'Selected: Test spell, cost 9, chance 100 %%; %d cast, 0 failed, 0 refused, %d landed' % (v, v)]
+    if command == 'aw_placed ledger':
+        # the theft ledger (aw_placed.c): the plate named when it was stolen instead of the crab meat taken
+        return (['aw_placed ledger: 1 stolen, 0 drops', '  stolen misc_imp_silverware_plate_01 from a shady smuggler: 1']
+                if v == 'PLATE' else ['aw_placed ledger: 0 stolen, 0 drops'])
     if command == 'aw_placed aim':
         # aw_inventory.c AW_PlacedAimReport: the dagger's focus row switched off once taken, on again if it came back
         return ['aw_placed aim: reach 48, 154 rows (room), eye 130 191 79, aimed row 41',
@@ -119,7 +124,7 @@ class JourneySmoke(unittest.TestCase):
             a = (Path(d) / 'part-A.txt').read_text(encoding='utf-8').splitlines()
             b = (Path(d) / 'part-B.txt').read_text(encoding='utf-8').splitlines()
         self.assertIn('cmd echo JOURNEY PROBE victim', a)
-        self.assertIn('cmd chim actors kill', a)
+        self.assertIn('cmd chim actors kill %d' % VICTIM, a)
         # the game's own quicksave in part A, its Load game window in part B (JOURNEY-PART-B-SAVE-NOT-CARRIED-66)
         self.assertIn('cmd aw_quicksave', a)
         self.assertFalse([l for l in a + b if l.startswith(('cmd save ', 'cmd load '))])
@@ -133,10 +138,85 @@ class JourneySmoke(unittest.TestCase):
                 self.assertTrue(word in js.SESSION_WORDS or word in js.WALKER_WORDS, line)
         self.assertTrue(any(l == 'cmd dbg all on' for l in a) and any(l == 'cmd dbg all on' for l in b))
 
+    def test_god_mode_is_on_for_the_kill_only_and_off_before_the_hurt_and_heal(self):
+        # the v0.0.66-dev4 journey retry: god mode, on from the kill, held step 7's hurt, heal and fight at one health
+        # (920 against 920); it blocks every kind of damage, the console's modcurrenthealth included
+        with tempfile.TemporaryDirectory() as d:
+            js.write_scripts(JOURNEY, d)
+            a = (Path(d) / 'part-A.txt').read_text(encoding='utf-8').splitlines()
+        kill = a.index('cmd chim actors kill %d' % VICTIM)
+        hurt = a.index('cmd player->modcurrenthealth -60')
+        god = [(i, l) for i, l in enumerate(a) if l.startswith('cmd dbg god ')]
+        before = [l for i, l in god if i < kill]
+        between = [l for i, l in god if kill < i < hurt]
+        self.assertEqual(before[-1:], ['cmd dbg god on'], god)
+        self.assertEqual(between, ['cmd dbg god off'], god)
+        # right after the kill: the next line past the probe's own wait
+        self.assertEqual(next(l for l in a[kill + 1:] if not l.startswith('wait ')), 'cmd dbg god off',
+                         a[kill - 2:kill + 4])
+
+    def test_step_6_kills_a_fixed_resident_away_from_the_door_then_walks_through_it_and_back(self):
+        # DOOR-ARRIVAL-INSIDE-ACTOR-66: a plain "chim actors kill" takes the nearest resident; in the v0.0.66-dev6 and
+        # dev8 journeys that was the guard (128967) by the census office's street door, whose body then took the use
+        # key in front of it. The victim is now named by reference: Erene Llenim, who stays by his shack in the west.
+        with tempfile.TemporaryDirectory() as d:
+            js.write_scripts(JOURNEY, d)
+            a = (Path(d) / 'part-A.txt').read_text(encoding='utf-8').splitlines()
+            b = (Path(d) / 'part-B.txt').read_text(encoding='utf-8').splitlines()
+        kills = [l for l in a + b if l.startswith('cmd chim actors kill')]
+        self.assertEqual(kills, ['cmd chim actors kill 128960'])
+        kill = a.index(kills[0])
+        # after it, unchanged: into the captain's room by the street door, and out again by the exit door
+        door = a.index('aimed 113833', kill)
+        self.assertEqual(a[door - 1:door + 3], ['face 242.6 10.3 61', 'aimed 113833', 'key e', 'waitfor map 45 census'])
+        out = a.index('aimed 119659', door)
+        self.assertEqual(a[out - 1:out + 3], ['face 292.7 -186 71', 'aimed 119659', 'key e', 'waitfor server 45 seyda'])
+        # a kill that finds nobody fails step 6 and says why
+        runs = self.runs()
+        steps, con = runs[0]
+        con = con.replace('chim actors kill: Erene Llenim (ref %d) at 9.0 game hours' % VICTIM,
+                          'chim actors kill: no living actor of reference %d here' % VICTIM)
+        ok, lines = js.judge(self.j, [(steps, con), runs[1]])
+        self.assertFalse(ok)
+        self.assertTrue(any(l.startswith('FAIL step 6') and 'no living actor' in l for l in lines), lines)
+
+    def test_the_fighter_is_put_at_the_players_feet_before_the_fight(self):
+        # JOURNEY-STEP7-FIGHT-UNREACHABLE-66 (the v0.0.66-dev5 journey): the nearest resident was the hall guard inside the
+        # census office ("Combat: Guard cannot reach you and flees"), so no hit landed; the copy at the player's feet is
+        # made after the seed and before the fight command
+        with tempfile.TemporaryDirectory() as d:
+            js.write_scripts(JOURNEY, d)
+            a = (Path(d) / 'part-A.txt').read_text(encoding='utf-8').splitlines()
+        seed = a.index('cmd dbg combat seed 7')
+        summon = a.index('cmd chim actors summon')
+        fight = a.index('cmd chim actors fight')
+        self.assertLess(seed, summon)
+        self.assertLess(summon, fight)
+
     def test_a_good_run_passes_every_check(self):
         ok, lines = js.judge(self.j, self.runs())
         self.assertTrue(ok, '\n'.join(l for l in lines if l.startswith('FAIL')))
         self.assertRegex(lines[-1], r'^JOURNEY RESULT PASS (\d+)/\1 checks, 9 steps$')
+
+    def test_the_crab_meat_step_checks_the_crab_meat_taken_and_the_plate_left(self):
+        # CENSUS-CRAB-PLATE-FOCUS-66: aimed at the crab meat, the use key takes it, never the plate under it
+        with tempfile.TemporaryDirectory() as d:
+            js.write_scripts(JOURNEY, d)
+            a = (Path(d) / 'part-A.txt').read_text(encoding='utf-8').splitlines()
+        self.assertIn('aimed 454283', a)
+        self.assertLess(a.index('aimed 454283'), a.index('cmd echo JOURNEY PROBE crab_after'))
+        self.assertIn('cmd player->getitemcount ingred_crab_meat_01', a)
+        ok, lines = js.judge(self.j, self.runs(crab_after=0))
+        bad = [l for l in lines if l.startswith('FAIL')]
+        self.assertFalse(ok)
+        self.assertEqual(len(bad), 1, lines)
+        self.assertIn('step 2', bad[0])
+        ok, lines = js.judge(self.j, self.runs(plate_ledger='PLATE'))
+        bad = [l for l in lines if l.startswith('FAIL')]
+        self.assertFalse(ok)
+        self.assertEqual(len(bad), 1, lines)
+        self.assertIn('step 2', bad[0])
+        self.assertIn('plate_ledger', bad[0])
 
     def test_the_dead_coming_back_after_a_room_fails_step_6(self):
         ok, lines = js.judge(self.j, self.runs(list_back='ALIVE'))

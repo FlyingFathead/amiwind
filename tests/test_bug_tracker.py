@@ -297,6 +297,12 @@ class BugTrackerTest(unittest.TestCase):
             build = b.get('build') or {}
             expected = ['Fact', 'Reported by', 'First noticed', 'Where', 'Reproduction', 'Duplicate of', 'Persists in',
                         'Severity', 'Family']
+            # the fix rows the register writes right after Family (bug_register fact_rows: fix commit, fixed date, the
+            # planning item); the first fixed entry with a report page to carry them was BUILD-HDF-BUFFERS-32 in
+            # v0.0.66-dev7, and this test did not know them
+            expected += ['Fix commit'] if b.get('fix_commit') else []
+            expected += ['Fixed on'] if b.get('fixed_date') else []
+            expected += ['Planning item'] if b.get('todo') else []
             # the optional rows the register writes after Family (bug_register fact_rows; TEST-FACT-ROWS-WAITING-51)
             expected += ['Waiting on'] if b.get('waiting_on') else []
             expected += ['Deferred by the maintainer'] if b.get('deferred') else []

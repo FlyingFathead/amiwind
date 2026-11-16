@@ -1819,7 +1819,11 @@ ACTOR_LOGIC_LINES = (b'// Compiled game logic (default on since v0.0.57): the ga
                      b'aw_player_stances 1\naw_fp_sway 1\naw_fp_view 1\nchim actors ambient settle on\n'
                      b'// Walking creatures without a baked ground point drop onto what is under them (OpenMW\'s\n'
                      b'// placement rule, CREATURE-FLOATING-62); off = the 32-unit snap of every actor.\n'
-                     b'chim actors ambient drop on\n')
+                     b'chim actors ambient drop on\n'
+                     b'// Bodies that already overlap collide as the original\'s actors: only a move toward the other\'s\n'
+                     b'// centre stops, so they walk apart; an arrival steps the player off an actor on the point\n'
+                     b'// (DOOR-ARRIVAL-INSIDE-ACTOR-66). 0 = Quake\'s box clip / no step, the methods before v0.0.66.\n'
+                     b'aw_body_overlap 1\naw_arrival_clear 1\n')
 
 
 CHIM_CROSSING_LINES = (b'// Cell crossings (builder option --chim-crossing 0|1, default 1 since v0.0.47): type 1, the\n'
@@ -3559,9 +3563,12 @@ def finalize_image(args):
     # into build.json.
     layout,drive_receipts,disk_layout=assemble_drives(args.rdbtool,drive_plans,out,part,boot_files,jobs=jobs,run=run,
                                                       images=images)
+    # buffers and lookup_blocks: each partition's buffers and its name lookups in header blocks (BUILD-HDF-BUFFERS-32,
+    # IMAGE-LOADS-SLOWER-66; world_volumes.assemble_drives)
     layout_record['partitions']=[dict(partition=r['partition'],volume=r.get('volume'),bytes=r['bytes'],
                                       payload_bytes=r['payload_bytes'],free_bytes=r['free_bytes'],
-                                      free_share=round(r['free_bytes']/r['bytes'],4),files=r['files'])
+                                      free_share=round(r['free_bytes']/r['bytes'],4),files=r['files'],
+                                      buffers=r.get('buffers'),lookup_blocks=r.get('lookup_blocks'))
                                  for r in layout]
     import layout_plan
     if layout_settings['mode']=='compact':

@@ -3354,9 +3354,30 @@ static void focus_refresh(const edict_t *p){
  * the model's box turned and scaled as drawn), at the distance of that point, as the original and OpenMW 0.51 test
  * the activation ray against the object itself; the near-the-origin test (4 map units off the crosshair line) only
  * reached a long item such as an axe near its origin. Rows the map draws itself keep that test, and so does a drawn
- * row the ray misses (a small item, aimed just beside it). */
+ * row the ray misses (a small item, aimed just beside it).
+ * CENSUS-CRAB-PLATE-FOCUS-66: an item lying on another (the census office's crab meat on its silver plate, their
+ * centres a hair apart) went to whichever origin lay nearer the crosshair line, here the plate under it, so E stole
+ * the owned plate. The original and OpenMW 0.51 give the use to the object the activation ray meets first, so every
+ * row the map draws with a shape the ray can meet is aimed at where it meets it: an item drawn as an edict of its own
+ * (a compiled room's brush item) by the view trace's first hit (view_reference), an item a CHIM room draws by where
+ * the ray enters its placement box (ChimRoom_RayRef, as a room's container), a placed-list item by its model (above).
+ * Cost: one point trace along the reach a call; a room ray only for the few rows that already pass the origin test. */
+/* CENSUS-CRAB-PLATE-FOCUS-66: the reference of the edict the view ray from EYE along F meets first within REACH (its
+ * aw_ref; 0 for the world, nothing, or an edict without one) and in *HIT the distance to that point (map units) */
+static unsigned view_reference(edict_t *p,vec3_t eye,vec3_t f,float reach,float *hit){
+    vec3_t end;trace_t tr;eval_t *v;
+    *hit=-1;
+    VectorMA(eye,reach,f,end);
+    tr=SV_Move(eye,vec3_origin,vec3_origin,end,MOVE_NOMONSTERS,p);
+    if(tr.startsolid || !(tr.fraction<1) || !tr.ent || tr.ent==sv.edicts || tr.ent==p)return 0;
+    v=GetEdictFieldValue(tr.ent,"aw_ref");
+    if(!v || !(v->_float>0) || !(v->_float<16777216.0f))return 0;
+    *hit=tr.fraction*reach;
+    return (unsigned)v->_float;
+}
 static int placed_target(void){
-    int i,best=-1;float reach=AW_ActivateDistance(),nearest,along,side,length,shift[3],hit;edict_t *p;vec3_t f,r,u,eye,delta,at;
+    int i,best=-1;float reach=AW_ActivateDistance(),nearest,along,side,length,shift[3],hit,rank,view_hit;edict_t *p;
+    vec3_t f,r,u,eye,delta,at;unsigned view_ref;
     trace_t tr;
     if(!sv.active || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict))return -1;
     focus_refresh(p);
@@ -3364,6 +3385,7 @@ static int placed_target(void){
     VectorCopy(p->v.origin,eye);eye[2]+=p->v.view_ofs[2];AngleVectors(p->v.v_angle,f,r,u);
     if(focus_outdoor)shift[0]=shift[1]=shift[2]=0;else AW_MwscriptRoomShift(shift);
     nearest=reach;placed_aim=-1;
+    view_ref=view_reference(p,eye,f,reach,&view_hit);
     for(i=0;i<focus_count;i++){
         focus_row_t *row=&focus_rows[i];
         if(row->edict || AW_ObjectDisabled(row->reference))continue;
@@ -3371,6 +3393,12 @@ static int placed_target(void){
          * actor himself is aimed at by aw_scene.c), so his feet near the crosshair line no longer hide an item */
         if(row->kind=='A')continue;
         VectorAdd(row->at,shift,at);VectorSubtract(at,eye,delta);length=DotProduct(delta,delta);
+        /* CENSUS-CRAB-PLATE-FOCUS-66: an item drawn as an edict of its own that the view ray meets first is aimed at
+         * that point, wherever on it the ray lands (as a drawn row by its model); nothing lies in front of it */
+        if(row->kind=='I' && row->live && view_ref && row->reference==view_ref){
+            if(view_hit>nearest)continue;
+            nearest=view_hit;best=i;continue;
+        }
         /* the ray asked only of drawn rows whose origin is within the reach and 64 units (the longest item) */
         if(row->kind=='I' && row->drawn>0 && aw_placed_ray && length<=(reach+64)*(reach+64) &&
            (hit=aw_placed_ray(row->drawn,eye,f))>=0){
@@ -3412,12 +3440,18 @@ static int placed_target(void){
             nearest=hit;best=i;continue;
         }
         VectorAdd(row->at,shift,at);along=DotProduct(delta,f);
-        if(along<=0 || along>nearest || length>reach*reach)continue;
+        if(along<=0 || length>reach*reach)continue;
         side=length-along*along;
         if(side>(row->kind=='I'?16.0f:36.0f))continue;     /* close to the crosshair line (map units squared) */
+        /* CENSUS-CRAB-PLATE-FOCUS-66: an item a CHIM room draws is ranked by where the view ray enters its placement
+         * box, so of two items with nearly one centre the one on top (met first) wins; the origin's distance else */
+        rank=along;
+        if(row->kind=='I' && !row->live && row->drawn<=0 && !focus_outdoor && aw_room_ray &&
+           (hit=aw_room_ray(row->reference,eye,f))>=0 && hit<along)rank=hit;
+        if(rank>nearest)continue;
         tr=SV_Move(eye,vec3_origin,vec3_origin,at,MOVE_NOMONSTERS,p);
         if(tr.fraction<1 && (1-tr.fraction)*sqrt(length)>6)continue;      /* a wall between: not in view */
-        nearest=along;best=i;
+        nearest=rank;best=i;
     }
     /* what the use key takes or opens (placed_use): an item or a container */
     if(best>=0 && (focus_rows[best].kind=='I' || focus_rows[best].kind=='C'))placed_aim=nearest;
@@ -3434,10 +3468,16 @@ void AW_PlacedAimReport(void){
     if(focus_outdoor)shift[0]=shift[1]=shift[2]=0;else AW_MwscriptRoomShift(shift);
     Con_Printf("aw_placed aim: reach %.0f, %d rows (%s), eye %.0f %.0f %.0f, aimed row %d\n",reach,focus_count,
                focus_outdoor?"outdoors":"room",eye[0],eye[1],eye[2],best);
-    for(i=0;i<focus_count && shown<12;i++){
+    /* CENSUS-CRAB-PLATE-FOCUS-66: what the view ray meets first (an edict the map draws with its reference) */
+    {float view_hit;unsigned view_ref=view_reference(p,eye,f,reach,&view_hit);
+     if(view_ref)Con_Printf("aw_placed aim: the view ray meets reference %u first, at %.1f\n",view_ref,view_hit);
+     else Con_Printf("aw_placed aim: the view ray meets no edict with a reference within the reach\n");}
+    /* the aimed row is always listed, also past the first twelve rows near the eye (the crab meat's was not) */
+    for(i=0;i<focus_count;i++){
         focus_row_t *row=&focus_rows[i];
+        if(shown>=12 && i!=best)continue;
         VectorAdd(row->at,shift,at);VectorSubtract(at,eye,delta);along=DotProduct(delta,f);length=DotProduct(delta,delta);
-        if(length>4*reach*reach)continue;
+        if(length>4*reach*reach && i!=best)continue;
         side=length-along*along;
         tr=SV_Move(eye,vec3_origin,vec3_origin,at,MOVE_NOMONSTERS,p);
         Con_Printf("  %d %c %u %s: at %.0f %.0f %.0f, edict %d drawn %d disabled %d, dist %.1f along %.1f off %.1f, "

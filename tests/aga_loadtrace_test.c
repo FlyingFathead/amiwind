@@ -60,5 +60,11 @@ int main(void){
     AW_LoadTraceStage("outgoing",1);AW_LoadTraceSceneReady("scene ready");assert(used);
     /* off again through the cvar */
     AW_LoadTraceStage("after-unload",0);assert(!aw_loadtrace_on && AW_LoadTraceBegin(1,0,"y",0)==0);
+    /* the write op (5): the remote console's append, traced by name (aw_remote.c, CHIM-SEYDA-BALMORA-LOAD-HANG-43) */
+    AW_LoadTraceStage("before-bsp",1);
+    s=AW_LoadTraceBegin(5,0,"AWCTL:console.log",2048);AW_LoadTraceEnd(s,2048,0);
+    assert(s==1 && AW_LoadTraceFormat(s,line,sizeof(line)) && strstr(line,"before-bsp write AWCTL:console.log 2048 bytes -> 2048"));
+    s=AW_LoadTraceBegin(9,0,"odd",0);AW_LoadTraceFormat(s,line,sizeof(line));assert(strstr(line," ? odd 0 bytes"));
+    AW_LoadTraceStage("after-unload",0);
     (void)b;puts("load trace ok");return 0;
 }

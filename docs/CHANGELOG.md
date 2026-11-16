@@ -1,10 +1,16 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.66-dev4 (15 November 2026)._
+_Last updated with AmiWind v0.0.66-dev10 (15 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.66-dev10: tenth snapshot of v0.0.66, 15 November 2026](#v0066-dev10-tenth-snapshot-of-v0066-15-november-2026)
+- [v0.0.66-dev9: ninth snapshot of v0.0.66, 15 November 2026](#v0066-dev9-ninth-snapshot-of-v0066-15-november-2026)
+- [v0.0.66-dev8: eighth snapshot of v0.0.66, 15 November 2026](#v0066-dev8-eighth-snapshot-of-v0066-15-november-2026)
+- [v0.0.66-dev7: seventh snapshot of v0.0.66, 15 November 2026](#v0066-dev7-seventh-snapshot-of-v0066-15-november-2026)
+- [v0.0.66-dev6: sixth snapshot of v0.0.66, 15 November 2026](#v0066-dev6-sixth-snapshot-of-v0066-15-november-2026)
+- [v0.0.66-dev5: fifth snapshot of v0.0.66, 15 November 2026](#v0066-dev5-fifth-snapshot-of-v0066-15-november-2026)
 - [v0.0.66-dev4: fourth snapshot of v0.0.66, 15 November 2026](#v0066-dev4-fourth-snapshot-of-v0066-15-november-2026)
 - [v0.0.66-dev3: third snapshot of v0.0.66, 14 November 2026](#v0066-dev3-third-snapshot-of-v0066-14-november-2026)
 - [v0.0.66-dev2: second snapshot of v0.0.66, 13 November 2026](#v0066-dev2-second-snapshot-of-v0066-13-november-2026)
@@ -194,6 +200,112 @@ _Last updated with AmiWind v0.0.66-dev4 (15 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.66-dev10: tenth snapshot of v0.0.66, 15 November 2026
+
+The tenth development snapshot of v0.0.66, in development ([release notes](releases/notes/RELEASE-v0.0.66-dev10.md)). It
+carries dev9 and needs 32 MB of Fast RAM. The game is the same as in dev9 apart from the version, plus one test-only
+setting, `aw_remote_log` (the remote console's log of the test sessions, on by default; players have no remote console).
+No finished Mournhold or Solstheim content is in this snapshot.
+
+- Testing tools: the stall examination reads the game's own disk request, every handler's wait and the game's own clock,
+  and can no longer leave the emulator paused. The remote console's log is traced and can be switched off.
+- The load stall investigation: a repeat test session stopped once, after 19 good loads, in play and not in a map load;
+  the stop reads as inside the remote console's log write on its folder. The cause is not proven; it is being measured
+  with the log on and off, and the entry stays open.
+- Seen on the dev9 image: the opening journey passed 41 of 42 checks. Step 6 killed its fixed victim and no player was
+  left stuck (`JOURNEY-STEP6-VICTIM-NEAREST-66`, seen fixed). Step 7's fighter, the nearest resident, was Fargoth
+  (`fargoth`), who fights unarmed, so the health stayed as it was (`JOURNEY-STEP7-FIGHTER-NEAREST-66`, new). The door arrival case was not
+  exercised (`DOOR-ARRIVAL-INSIDE-ACTOR-66` stays open).
+- Register: the reuse check was seen again on one core (`BUILD-CHECK-ONE-CORE-66`), and the image's partitions were
+  written in 107 s against 67 s in the earlier build (`BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66`, new, to be measured again).
+
+## v0.0.66-dev9: ninth snapshot of v0.0.66, 15 November 2026
+
+The ninth development snapshot of v0.0.66, in development ([release notes](releases/notes/RELEASE-v0.0.66-dev9.md)). It
+carries dev8 and needs 32 MB of Fast RAM. The game changes for the first time since dev5. No finished Mournhold or
+Solstheim content is in this snapshot.
+
+- The player no longer ends inside an actor at a door's or a teleport's arrival point (`DOOR-ARRIVAL-INSIDE-ACTOR-66`):
+  two overlapping bodies may move apart, the stuck search leaves bodies out, and an actor that joins on the arrival point
+  steps the player once to a clear spot beside it. Fixed in source and covered by tests, to be confirmed by this
+  snapshot's opening journey; the entry stays open until then.
+- Testing tools: the stall examination reads the running game correctly (`STALL-PROBE-RUNNING-GAME-66`), the journey's
+  door aim refuses a door whose use goes to an actor and answers a message box first
+  (`JOURNEY-DOOR-USE-GOES-TO-ACTOR-66`), the journey's step 6 kills a resident who stands away from the door
+  (`JOURNEY-STEP6-VICTIM-NEAREST-66`, to be confirmed), and a repeat session for one area load was added.
+- Correction: the opening journey's stops at the census street door on the dev4 (twice), dev6 and dev8 images were not
+  the load hang ([CHIM-SEYDA-BALMORA-LOAD-HANG-43](bugs/CHIM-SEYDA-BALMORA-LOAD-HANG-43.md)); the game was running, and
+  the killed guard's body lay in front of the door or a message box took the key. Only the stop in the dev7 delivery's
+  area hops matches the load hang. The notes of dev6, dev7 and dev8 said otherwise.
+- The builder's reuse check on the world scenery and flora stages is fixed since dev8
+  ([BUILD-REUSE-STOP-COUNTS-STORED-GROUP-64](bugs/BUILD-REUSE-STOP-COUNTS-STORED-GROUP-64.md)); new register entries
+  record that the check runs about six minutes on one core (`BUILD-CHECK-ONE-CORE-66`) and that in Vivec the server's
+  entity update overflows the client's packet every frame (`NET-VIVEC-ENTITY-PACKET-OVERFLOW-66`).
+
+## v0.0.66-dev8: eighth snapshot of v0.0.66, 15 November 2026
+
+The eighth development snapshot of v0.0.66, in development ([release notes](releases/notes/RELEASE-v0.0.66-dev8.md)). It
+carries dev7 and needs 32 MB of Fast RAM. The game itself is the same as dev7 apart from the version. No finished
+Mournhold or Solstheim content is in this snapshot.
+
+- The builder's reuse check plans the same commands as the build: it binds the exterior plan's steps to the world terrain,
+  scenery, flora and image commands as the build does. Fixed in source, to be confirmed by this snapshot's own unit check,
+  which runs without the allowances for the world scenery and flora stages; the register entry stays open until then.
+- The check's whole output is kept beside its result (`RUN.check.log`), not only its last lines.
+- Seen on the v0.0.66-dev7 image: the opening journey passed all nine steps (42 of 42 checks); its four earlier harness
+  faults are fixed. New in the register: the player can arrive inside the guard waiting at the census office's street
+  door and stay stuck (`DOOR-ARRIVAL-INSIDE-ACTOR-66`; no crime is involved, see v0.0.66-dev9).
+- Two study pages: [AmiWind on a PiStorm-equipped Amiga 500](PISTORM_RTG_STUDY.md) (traces the display path in the code,
+  sketches a selectable RTG backend and lists the likely blockers under AGA-STORM; nothing has been run on that hardware)
+  and [the THEA1200 as a target](THEA1200_STUDY.md) (what the announced machine says it offers, the open questions and a
+  test plan).
+
+## v0.0.66-dev7: seventh snapshot of v0.0.66, 15 November 2026
+
+The seventh development snapshot of v0.0.66, in development ([release notes](releases/notes/RELEASE-v0.0.66-dev7.md)). It
+carries dev6 and needs 32 MB of Fast RAM. The game itself is the same as dev6 and dev5 apart from the version. No
+finished Mournhold or Solstheim content is in this snapshot.
+
+- Seen in play on the dev6 image: in the opening journey the use key takes the crab meat from the census back room's
+  silver plate, not the plate.
+- Measured on the dev6 image (the disk layout of dev5): the sound stage of a map load took 59 ms at Seyda Neen, 118 and
+  147 ms at Balmora and 147 and 165 ms at Vivec: below the dev1 figure at Seyda Neen (139 ms) and Vivec (306 ms), at
+  Balmora one load below (118 ms) and one just above (147 ms) its 139 ms, all three far below the dev2 figures; the disk
+  buffers cost 72 to 73 KiB of Fast RAM.
+- The bug register and the known list are brought up to date. Still open: the reuse check's stop on the world scenery
+  and flora stages, and a load that can stop in the emulator (seen once more on the dev6 journey).
+
+## v0.0.66-dev6: sixth snapshot of v0.0.66, 15 November 2026
+
+The sixth development snapshot of v0.0.66, in development ([release notes](releases/notes/RELEASE-v0.0.66-dev6.md)). It
+carries dev5 and needs 32 MB of Fast RAM. The game itself is the same as dev5 apart from the version. No finished
+Mournhold or Solstheim content is in this snapshot.
+
+- The build's reuse check counts the regions a world scenery or flora stage converts, not the units stored under earlier
+  keys (checked by tests). This snapshot's own check still stopped both stages: a second cause in the check's stage plan
+  is open.
+- The play journey aims from where the player stands, checks the crab meat on the census office's silver plate, and its
+  fight step brings the fighter to the player.
+- Seen in play on the dev5 image: the opening holds fighting and magic until the release papers are taken.
+- The roadmap names automated playthroughs in the emulator's fast mode (later, not scheduled).
+
+## v0.0.66-dev5: fifth snapshot of v0.0.66, 15 November 2026
+
+The fifth development snapshot of v0.0.66, in development ([release notes](releases/notes/RELEASE-v0.0.66-dev5.md)). It
+carries dev4 and needs 32 MB of Fast RAM. Its changes are checked by tests, not yet in play. No finished Mournhold or
+Solstheim content is in this snapshot.
+
+- The opening's scripts keep fighting and magic switched off from the prison ship until the release papers, as in the
+  original, and the ready-magic key follows them.
+- Of two items lying one on the other, the use key goes to the one the view meets first: the crab meat on the census
+  back room's plate is taken, not the owned plate under it.
+- Area loads read their sounds quickly again: the image step orders the disk's folder chains busiest first and gives
+  each partition the disk buffers its name lookups need.
+- The opening journey keeps god mode for its kill only and walks to the pier clear of the courtyard barrel; the
+  opening's ring is named Fargoth's ring (the Engraved Ring of Healing, `ring_keley`), as in the game.
+- Seen in play on the dev4 image: the census captain's two doors open every time.
+- Known: a load can stop in the emulator (twice in the dev4 journey on foot; a second run went through).
 
 ## v0.0.66-dev4: fourth snapshot of v0.0.66, 15 November 2026
 

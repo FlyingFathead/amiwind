@@ -14,9 +14,37 @@ state, which is kept in saved games; a disabled reference's own script keeps run
 it when the main quest reaches its stage (OpenMW World::disable keeps the local script).
 
 check() is the build check: the new game's scripts are in the file and runnable, and every reference their
-unconditional Disable lines name resolves to its placed reference, so the engine can disable it."""
+unconditional Disable lines name resolves to its placed reference, so the engine can disable it.
+
+OPENING-FIGHTING-ON-BEFORE-PAPERS-66 (v0.0.66): CharGen, which AmiWind's own opening carries, switches six of the
+player's controls off on its first run; the engine sets them from the NGCS rows (awms.py) and the scripts of the
+later steps switch them on again (the census clerk, the papers, the hall guard, the courtyard barrel, the exit door).
+check() also refuses a file in which a switch the new game turns off is turned on by no script the build runs: that
+control would stay off for the whole game."""
 from .codegen import SCRIPT_BROKEN, SCRIPT_HANDWRITTEN, SCRIPT_INERT
-from .gamedata import MAIN_SCRIPT, unconditional_disables
+from .gamedata import CONTROL_BITS, MAIN_SCRIPT, control_switch_calls, unconditional_disables
+
+
+def controls(program, compiled):
+    """{'off': mask, 'on': mask, 'enabled_by': {switch: [scripts]}, 'stuck': [switches]}: the switches the new game's
+    carried scripts set (the NGCS rows) and, for each one left off, the scripts the build runs that switch it on."""
+    from .awms import new_game_control_rows
+    off = on = 0
+    for o, n in new_game_control_rows(program, compiled):
+        off, on = off | o, on | n
+    names = {bit: name for name, bit in CONTROL_BITS.items()}
+    enablers = {bit: [] for bit in names if off & bit}
+    for name, script in sorted(getattr(program.data, 'scripts', {}).items() if enablers else ()):
+        text = getattr(script, 'text', '') or ''
+        k = program.scripts.index.get(name)
+        if k is None or compiled[k].flags & (SCRIPT_BROKEN | SCRIPT_HANDWRITTEN | SCRIPT_INERT) or \
+                'enable' not in text.casefold():
+            continue
+        for bit, enable, _ in control_switch_calls(text):
+            if enable and bit in enablers and name not in enablers[bit]:
+                enablers[bit].append(name)
+    return {'off': off, 'on': on, 'enabled_by': {names[b]: v for b, v in sorted(enablers.items())},
+            'stuck': [names[b] for b, v in sorted(enablers.items()) if not v]}
 
 ACTOR_TYPES = ('NPC_', 'CREA')
 
@@ -45,6 +73,7 @@ def report(program, compiled):
                              'resolved': bool(row) and len(refs) == 1 and row['reference'] == refs[0]})
     actors = [d for d in disabled if d['type'] in ACTOR_TYPES]
     return {'main': MAIN_SCRIPT in data.scripts, 'scripts': scripts, 'disabled': disabled,
+            'controls': controls(program, compiled),
             'counts': {'scripts': len(scripts), 'runnable': sum(s['runnable'] for s in scripts),
                        'disabled': len(disabled), 'actors': len(actors),
                        'placed_once': sum(d['placed'] == 1 for d in disabled),
@@ -68,6 +97,9 @@ def check(program, compiled):
     if lost:
         problems.append('%d references placed once are not bound for their Disable: %s' % (
             len(lost), ', '.join(d['id'] for d in lost[:12])))
+    if r['controls']['stuck']:
+        problems.append('the new game switches off %s, which no script the build runs switches on again '
+                        '(OPENING-FIGHTING-ON-BEFORE-PAPERS-66)' % ', '.join(r['controls']['stuck']))
     if problems:
         raise ValueError('New game check (NPC-STORY-DISABLED-AT-START-42): ' + ' | '.join(problems))
     return r

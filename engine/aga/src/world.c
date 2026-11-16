@@ -559,6 +559,105 @@ edict_t	*SV_TestEntityPosition (edict_t *ent)
 	return NULL;
 }
 
+/*
+===============================================================================
+
+BODIES THAT OVERLAP (DOOR-ARRIVAL-INSIDE-ACTOR-66)
+
+===============================================================================
+*/
+
+/* aw_body_overlap 1 (the default, also written into id1/default-game.cfg): two bodies whose boxes already overlap
+ * collide as the original's actors do; 0: Quake's box clip for every pair, the method before v0.0.66. Not saved. */
+cvar_t aw_body_overlap = {"aw_body_overlap", "1", false, false, 1};
+
+/* Two bodies (SOLID_SLIDEBOX: the player, residents, creatures) whose boxes already overlap when a box sweep starts:
+ * an actor left standing on a door's arrival point, one placed where the player stands. The rule is the original's as
+ * OpenMW 0.51 states it (apps/openmw/mwphysics/actorconvexcallback.cpp: overlapping actors collide as cylinders with
+ * the distance between them as diameter; its motion vector is from minus to, trace.cpp): only a move that heads
+ * horizontally toward the other's centre is stopped, at once, on the upright plane facing away from that centre;
+ * every other move (away, along, up or down, or with both centres in one place) passes the other body, so the two can
+ * always walk apart. Quake clips the sum of the two boxes instead: a sweep that starts inside it is allsolid until
+ * one frame's move leaves it whole, SV_FlyMove then zeroes the velocity, and neither body could step out (at the
+ * Seyda Neen census door the two boxes overlapped by 6.2 units across and 12.6 along). A position test
+ * (START == END) is unchanged, so the placement searches still keep bodies apart.
+ * Returns 0: not such a pair, Quake's clip applies; 1: the move passes TOUCH; 2: stopped, TRACE holds the stop. */
+int AW_BodyOverlap (const edict_t *mover, const edict_t *touch, const float *start, const float *mins,
+	const float *maxs, const float *end, trace_t *trace)
+{
+	float	n[2], len;
+	int		i;
+
+	if (!aw_body_overlap.value || !mover || mover->v.solid != SOLID_SLIDEBOX || touch->v.solid != SOLID_SLIDEBOX)
+		return 0;
+	if (maxs[0] <= mins[0] || maxs[1] <= mins[1])
+		return 0;		/* a point trace (a sight line, a use ray): not a body's move */
+	if (start[0] == end[0] && start[1] == end[1] && start[2] == end[2])
+		return 0;		/* a position test */
+	for (i=0 ; i<3 ; i++)
+		if (start[i] + mins[i] >= touch->v.origin[i] + touch->v.maxs[i] ||
+			start[i] + maxs[i] <= touch->v.origin[i] + touch->v.mins[i])
+			return 0;	/* apart (or only touching) at the start: Quake's clip */
+	n[0] = start[0] - touch->v.origin[0];
+	n[1] = start[1] - touch->v.origin[1];
+	len = sqrt (n[0]*n[0] + n[1]*n[1]);
+	if (len <= 0)
+		return 1;
+	n[0] /= len;
+	n[1] /= len;
+	/* toward means more than 1/1024 unit nearer the centre (OpenMW's test has no margin): a slide along the circle
+	 * (SV_FlyMove's clipped velocity, which float rounding can leave a hair inward) passes */
+	if (n[0]*(end[0] - start[0]) + n[1]*(end[1] - start[1]) > -1.0f/1024)
+		return 1;
+	memset (trace, 0, sizeof(*trace));
+	trace->fraction = 0;
+	VectorCopy (start, trace->endpos);
+	trace->plane.normal[0] = n[0];
+	trace->plane.normal[1] = n[1];
+	trace->plane.dist = trace->plane.normal[0]*start[0] + trace->plane.normal[1]*start[1];
+	trace->ent = (edict_t *)touch;
+	return 2;
+}
+
+/* The first other body (SOLID_SLIDEBOX) whose box overlaps ENT's at its origin, or NULL: one pass over the edicts,
+ * box tests only. The arrival's check asks it for a few seconds after a door or a teleport (aw_scene.c). */
+edict_t *AW_BodyOverlapping (edict_t *ent)
+{
+	int		i, k;
+	edict_t	*e;
+
+	for (i=1 ; i<sv.num_edicts ; i++)
+	{
+		e = EDICT_NUM(i);
+		if (e == ent || e->free || e->v.solid != SOLID_SLIDEBOX)
+			continue;
+		for (k=0 ; k<3 ; k++)
+			if (ent->v.origin[k] + ent->v.mins[k] >= e->v.origin[k] + e->v.maxs[k] ||
+				ent->v.origin[k] + ent->v.maxs[k] <= e->v.origin[k] + e->v.mins[k])
+				break;
+		if (k == 3)
+			return e;
+	}
+	return NULL;
+}
+
+/* SV_TestEntityPosition for Quake's stuck search (sv_phys.c SV_CheckStuck): a body counts as stuck only in the world
+ * and its objects, never because other bodies overlap it (OpenMW 0.51 movementsolver.cpp unstuck leaves actor-on-actor
+ * contacts out); the walk moves such bodies apart (AW_BodyOverlap). With Quake's test an actor on the player's spot
+ * failed the search every frame, for the player and for the actor's own steps: "player is stuck." each time, after
+ * up to 164 position tests. aw_body_overlap 0: Quake's test. */
+edict_t *SV_TestWorldPosition (edict_t *ent)
+{
+	trace_t	trace;
+
+	if (!aw_body_overlap.value || ent->v.solid != SOLID_SLIDEBOX)
+		return SV_TestEntityPosition (ent);
+	trace = SV_Move (ent->v.origin, ent->v.mins, ent->v.maxs, ent->v.origin, MOVE_NOBODIES, ent);
+	if (trace.startsolid)
+		return sv.edicts;
+	return NULL;
+}
+
 
 /*
 ===============================================================================
@@ -845,6 +944,8 @@ void SV_ClipToLinks ( areanode_t *node, moveclip_t *clip )
 
 		if (clip->type == MOVE_NOMONSTERS && touch->v.solid != SOLID_BSP)
 			continue;
+		if (clip->type == MOVE_NOBODIES && touch->v.solid == SOLID_SLIDEBOX)
+			continue;
 
 		if (clip->boxmins[0] > touch->v.absmax[0]
 		|| clip->boxmins[1] > touch->v.absmax[1]
@@ -866,6 +967,16 @@ void SV_ClipToLinks ( areanode_t *node, moveclip_t *clip )
 				continue;	// don't clip against own missiles
 			if (PROG_TO_EDICT(clip->passedict->v.owner) == touch)
 				continue;	// don't clip against owner
+		}
+
+		/* DOOR-ARRIVAL-INSIDE-ACTOR-66: a body the mover already overlaps (AW_BodyOverlap) */
+		switch (AW_BodyOverlap (clip->passedict, touch, clip->start, clip->mins, clip->maxs, clip->end, &trace))
+		{
+		case 1:
+			continue;
+		case 2:
+			AW_MergeCollisionTrace (&clip->trace, &trace, touch);
+			continue;
 		}
 
 		if ((int)touch->v.flags & FL_MONSTER)

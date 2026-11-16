@@ -1115,6 +1115,30 @@ class NativeSourceTests(unittest.TestCase):
         self.compile_run('aga_step_rules_test.c', [ROOT/'engine/aga/src/aw_walk.c', ROOT/'engine/aga/src/sv_phys.c',
                                                    Path(SOURCE)/'src/mathlib.c'])
 
+    def test_overlapping_bodies_walk_apart(self):
+        # DOOR-ARRIVAL-INSIDE-ACTOR-66: the player arrived inside the Seyda Neen guard and could not move. world.c's
+        # body rule (AW_BodyOverlap, aw_body_overlap 1; OpenMW 0.51 actorconvexcallback.cpp) lets two overlapping
+        # bodies walk apart and stops a move toward the other's centre; the stuck search leaves them alone
+        # (SV_TestWorldPosition). The arrival's step off an actor is tests/aga_scene_test.c's. Both defaults are
+        # written into id1/default-game.cfg.
+        self.compile_run('aga_body_overlap_test.c', [Path(SOURCE)/'src/world.c', ROOT/'engine/aga/src/sv_phys.c',
+                                                     ROOT/'engine/aga/src/aw_walk.c', Path(SOURCE)/'src/mathlib.c'])
+        import build_aga
+        self.assertIn(b'\naw_body_overlap 1\naw_arrival_clear 1\n', build_aga.ACTOR_LOGIC_LINES)
+        world = (ROOT/'engine/aga/src/world.c').read_text(encoding='utf-8')
+        self.assertIn('switch (AW_BodyOverlap (clip->passedict, touch, clip->start, clip->mins, clip->maxs, '
+                      'clip->end, &trace))', world)
+        physics = (ROOT/'engine/aga/src/sv_phys.c').read_text(encoding='utf-8')
+        start = physics.index('void SV_CheckStuck (edict_t *ent)')
+        check = physics[start:physics.index('SV_CheckWater', start)]
+        self.assertEqual(check.count('SV_TestWorldPosition(ent)'), 3)
+        self.assertNotIn('SV_TestEntityPosition', check)
+        scene = (ROOT/'engine/aga/src/aw_scene.c').read_text(encoding='utf-8')
+        self.assertIn('arrival_clear_tick();', scene)
+        self.assertIn('Cvar_RegisterVariable(&aw_arrival_clear);', scene)
+        self.assertIn('Cvar_RegisterVariable (&aw_body_overlap);',
+                      (ROOT/'engine/aga/src/sv_main.c').read_text(encoding='utf-8'))
+
     def test_failed_step_inside_solid_settles_once(self):
         # AMBIENT-UNSTUCK-FLOOD-61: a resident put back inside solid by a failed step searched for a clear spot at
         # every step (ten a walk); aw_walk.c AW_ActorSettle runs the search once and keeps the spot (aw_ambient.c,

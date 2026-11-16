@@ -1,12 +1,13 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.66-dev4 (15 November 2026)._
+_Last updated with AmiWind v0.0.66-dev10 (15 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [v0.0.65: Reintroducing Vvardenfell](#v0065-reintroducing-vvardenfell)
 - [Next version: the two expansion worlds](#next-version-the-two-expansion-worlds)
+- [Later: automated playthroughs, 15 November 2026](#later-automated-playthroughs-15-november-2026)
 - [v0.0.64: Gone Beyond The Gate, released 11 November 2026](#v0064-gone-beyond-the-gate-released-11-november-2026)
 - [v0.0.63: Every Script Of Vvardenfell, released 9 November 2026](#v0063-every-script-of-vvardenfell-released-9-november-2026)
 - [v0.0.62: released 8 November 2026](#v0062-released-8-november-2026)
@@ -171,6 +172,67 @@ chains from person to place):
 Alongside, every item the game places in the world (weapons, armor, books, ingredients, keys and the rest, loose in the
 wild and in rooms) is counted from the game files and checked in the build.
 
+**Tenth snapshot, 15 November 2026:** [v0.0.66-dev10](releases/notes/RELEASE-v0.0.66-dev10.md) is in development and
+carries dev9; the game is the same as dev9 apart from the version and one test-only setting (`aw_remote_log`, the remote
+console's log of the test sessions). **Testing tools:** the stall examination reads the game's own disk request, every
+handler's wait and the game's own clock and can no longer leave the emulator paused; a repeat test session of the load
+stall stopped once, after 19 good loads, in play and not in a map load, reading as inside the remote console's log write
+on its folder (the cause is not proven; being measured with the log on and off). **Seen on the dev9 image:** the opening
+journey passed 41 of 42 checks; step 7's fighter was chosen as the nearest resident, Fargoth (`fargoth`), who fights
+unarmed (`JOURNEY-STEP7-FIGHTER-NEAREST-66`). **Still
+open in dev10:** the load stall in test sessions, the door arrival until it is seen in play
+(`DOOR-ARRIVAL-INSIDE-ACTOR-66`), the packet overflow in Vivec (`NET-VIVEC-ENTITY-PACKET-OVERFLOW-66`), wanderers that do
+not keep away from doors (`WANDER-DOOR-RULE-66`), the reuse check on one core (`BUILD-CHECK-ONE-CORE-66`) and the image
+partitions written slower once (`BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66`).
+
+**Ninth snapshot, 15 November 2026:** [v0.0.66-dev9](releases/notes/RELEASE-v0.0.66-dev9.md) is in development and
+carries dev8. **The game changes:** the player no longer ends inside an actor at a door's or a teleport's arrival point
+(`DOOR-ARRIVAL-INSIDE-ACTOR-66`), fixed in source and covered by tests, to be confirmed by this snapshot's opening
+journey. **Testing tools:** the stall examination reads the running game correctly, and the journey's door aim refuses a
+door whose use goes to an actor. **Corrected:** the journey's stops at the census street door on the dev4, dev6 and dev8
+images were not the load hang; only the stop in the dev7 delivery's area hops matches it. **Still open in dev9:** the
+load hang (one real sighting, cause not found), the door arrival until the journey shows it, wanderers that do not keep
+away from doors (`WANDER-DOOR-RULE-66`), the packet overflow in Vivec (`NET-VIVEC-ENTITY-PACKET-OVERFLOW-66`) and the
+reuse check on one core (`BUILD-CHECK-ONE-CORE-66`).
+
+**Eighth snapshot, 15 November 2026:** [v0.0.66-dev8](releases/notes/RELEASE-v0.0.66-dev8.md) is in development and
+carries dev7; the game is the same as dev7 apart from the version. **Fixed in source, to be confirmed:** the builder's
+reuse check plans the same commands as the build (`BUILD-REUSE-STOP-COUNTS-STORED-GROUP-64` stays open until this
+snapshot's own check runs without the world scenery and flora allowances; seen fixed in the dev8 unit check), and the
+check's whole output is kept beside
+its result. **Added:** the studies of [a PiStorm Amiga 500](PISTORM_RTG_STUDY.md) and of
+[the THEA1200](THEA1200_STUDY.md), feasibility notes with nothing run on that hardware. **Seen on the dev7 image:** the
+opening journey passed all nine steps (42 of 42 checks). **Still open in dev8:** the reuse check's stop until that check
+has run, a load that can stop in the emulator, and the player arriving inside the guard at the census office's street
+door (`DOOR-ARRIVAL-INSIDE-ACTOR-66`; no crime is involved, see the ninth snapshot).
+
+**Seventh snapshot, 15 November 2026:** [v0.0.66-dev7](releases/notes/RELEASE-v0.0.66-dev7.md) is in development and
+carries dev6; the game is the same as dev6 and dev5 apart from the version. **Seen in play on the dev6 image:** the use
+key takes the crab meat from the census office's silver plate, not the plate. **Measured on the dev6 image:** the sound
+stage of a map load, 59 ms at Seyda Neen, 118 and 147 ms at Balmora and 147 and 165 ms at Vivec, below the dev1 figures at Seyda Neen and Vivec, at Balmora one load below and one just above
+its dev1 figure, all three far below dev2's,
+and the 72 to 73 KiB of Fast RAM the disk buffers cost. **Still open in dev7:** the reuse check's stop on the world
+scenery and flora stages (BUILD-REUSE-STOP-COUNTS-STORED-GROUP-64), a load that can stop in the emulator, and the later
+steps of the test journey of the opening, which did not run past that stop.
+
+**Sixth snapshot, 15 November 2026:** [v0.0.66-dev6](releases/notes/RELEASE-v0.0.66-dev6.md) is in development and
+carries dev5; the game is the same as dev5 apart from the version. **Done in dev6** (checked by tests): the build's reuse
+check counts the regions a world scenery or flora stage converts; the play journey aims from where the player stands,
+checks the crab meat on the census office's silver plate, and brings the fighter of its fight step to the player.
+**Seen in play on the dev5 image:** the opening holds fighting and magic until the release papers.
+**Still open in dev6:** the reuse check's own stop on the world scenery and flora stages (this snapshot's check still
+stopped both; BUILD-REUSE-STOP-COUNTS-STORED-GROUP-64), the load times on the new disk buffers are not measured yet,
+the crab meat's check has not run in play, and a load that can stop in the emulator.
+
+**Fifth snapshot, 15 November 2026:** [v0.0.66-dev5](releases/notes/RELEASE-v0.0.66-dev5.md) is in development and
+carries dev4. **Done in dev5** (checked by tests, not yet in play): the opening's scripts keep fighting and magic switched
+off from the prison ship until the release papers, as in the original, and the ready-magic key follows them; of two items
+lying one on the other, the use key goes to the one the view meets first, so the crab meat on the census back room's
+plate is taken and not the plate under it; and the image step lays out the disk's folder chains and buffers so that area
+loads read their sounds quickly again. **Seen in play on the dev4 image:** the census captain's two doors open every
+time. **Still open in dev5:** a load that can stop in the emulator (twice in the dev4 journey on foot), a stuck arrival
+in the census courtyard seen once, and the console's count of an item no script names.
+
 **Fourth snapshot, 15 November 2026:** [v0.0.66-dev4](releases/notes/RELEASE-v0.0.66-dev4.md) is in development and
 carries dev3. **Done in dev4** (checked by tests, not yet in play): a scripted object takes the player's use only while
 its script reads it, as in the original, so the census captain's two doors, which opened only once, open every time; the
@@ -240,6 +302,21 @@ snapshot, and the dev1 build itself has not been made yet.
 - **The shorelines:** the saw-tooth steps at shores and pond edges need a world rebuild.
 - **The builder and the image:** a build that measures the lighter room collision on an image, every stage on all cores,
   and a smaller image.
+
+## Later: automated playthroughs, 15 November 2026
+
+Test sessions that play quest lines by themselves in the emulator, run faster than real time in the emulator's fast
+mode. The game runs on the emulated Amiga's own clock, so a fast run is the same game, only sooner. What it would take:
+
+- **Session steps that wait for what happens in the game** (an area loaded, a quest stage reached), with a time limit,
+  instead of fixed waits. This also makes the existing test journeys quicker and less brittle.
+- **Console commands that give a test what it needs,** each answering in one line: a quest's journal stage, talking to a
+  character on a topic, walking on foot to a marker, waiting game hours. They come on top of the commands that exist
+  (the teleport, journal, item and position commands).
+- **Quest sessions,** starting with the opening and the first main quest steps, with their results kept as a list of
+  quests known to be completable.
+- **The fast mode is for playing through only:** frame rate, timing, sound and music are still checked at real speed.
+- **The speed-up is measured on one journey first,** before anything is promised. Not scheduled.
 
 ## v0.0.64: Gone Beyond The Gate, released 11 November 2026
 
@@ -1433,7 +1510,8 @@ Amiberry is an open-source Amiga emulator, and it is the emulator inside the upc
 with CPU JIT and FPU JIT options and adjustable RAM (one visitor's report saw 32 MB of Fast RAM). A reviewer reports that
 it loads WHDLoad installs and floppy, hard drive and CD images from a USB stick, offers RTG and switchable chipsets
 (OCS, ECS, AGA), and launches on 4 December 2026 (an earlier report said June; the launch was delayed). Games that
-run well in it will be what many people try first, so AmiWind should be checked there.
+run well in it will be what many people try first, so AmiWind should be checked there. The open questions and the
+test order are in the [THEA1200 study](THEA1200_STUDY.md) (13 November 2026).
 
 - [ ] Build Amiberry from its source in a Docker image (a new image, so the maintainer's go comes first).
 - [ ] Boot the AmiWind hard disk image directly, with no Workbench needed.
@@ -3141,6 +3219,11 @@ engine already carries an inherited, untested CyberGraphX path. The emulators' v
 makes it testable without hardware. Possible scope: choose an RTG screen at startup when one is present (AGA
 otherwise), the palette and double buffering, the HUD, menus and video, and a measured comparison with AGA. A
 future path to look into, not a planned release item ([FAQ](FAQ.md#why-not-use-pistorm32-rtg-and-minigl)).
+
+A study of the question, 13 November 2026 (a study, not a commitment):
+[AmiWind on a PiStorm-equipped Amiga 500, RTG backend or AGA-STORM](PISTORM_RTG_STUDY.md). It traces today's display
+path in the code, sketches a selectable RTG backend beside AGA, lists the likely blockers for the current build under
+AGA-STORM, and names the counters for a like-for-like comparison.
 
 Notes from Amiga developers, 26 October 2026:
 

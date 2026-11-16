@@ -281,7 +281,9 @@ def plan_drives(boot, worlds, name=lambda index: 'drive-%02d.hdf' % index, group
 
 
 def write_boot_partition(xdftool, part, boot, mib, volume='AMIWIND'):
-    """Write the bootable DH0 partition image: every folder and file under BOOT, boot block installed.
+    """Write the bootable DH0 partition image: every folder and file under BOOT, boot block installed, then every
+    directory hash chain relinked busiest first (tools/ffs_chains.py, IMAGE-LOADS-SLOWER-66: xdftool puts each new
+    entry at the head of its chain, so the folders made before their parent's files ended at the tail; no block moves).
     Bounded xdftool batches on every host (one command with every boot file exceeds ARG_MAX)."""
     boot = Path(boot)
     command = [xdftool, part, 'create', f'size={mib}Mi', '+', 'format', volume, 'ffs', '+', 'boot', 'install']
@@ -291,6 +293,8 @@ def write_boot_partition(xdftool, part, boot, mib, volume='AMIWIND'):
         command += ['+', 'write', path, path.relative_to(boot).as_posix()]
     from build_windows_xdftool import run_any as run_xdftool
     run_xdftool(command)
+    from ffs_chains import describe, order_partition
+    print(describe(order_partition(part), 'DH0'), flush=True)
     return check_image(part, normalize=True)
 
 
@@ -346,8 +350,11 @@ def assemble_drives(rdbtool, plans, out, boot_part, boot_files, jobs=1, images=N
     its hashed BOOT_FILES; out/<file> for a world partition, IMAGES by partition name when the plan
     holds planned partitions), read it back (verify_combined) and gate it as written (require_mountable,
     require_disk_layout). A written partition whose size differs from its plan stops the build.
+    Every partition gets the buffers its longest name lookup needs, in the partition table (tools/ffs_chains.py
+    buffer_plan, BUILD-HDF-BUFFERS-32: rdbtool's default was 30 for every partition); the readback checks them.
     Returns (partition receipts, drive receipts, disk_layout)."""
     import subprocess
+    from ffs_chains import buffer_plan
     run = run or (lambda command: subprocess.run(list(map(str, command)), check=True))
     out = Path(out)
     layout, drive_receipts, disk_layout = [], [], []
@@ -356,25 +363,38 @@ def assemble_drives(rdbtool, plans, out, boot_part, boot_files, jobs=1, images=N
         if ide_cylinder_bytes(plan['mib'] * MIB + RDB_BYTES) >= DRIVE_SIZE_LIMIT:
             raise ValueError('Legacy hardfile must remain below 4 GiB')
         command = [rdbtool, drive, 'create', 'chs=%d,1,64' % (plan['mib'] * 32 + 1), '+', 'init']
-        partitions = []
+        partitions, buffers = [], {}
         for member in plan['members']:
             if member['partition'] == 'DH0':
                 source = Path(boot_part)
                 written = dict(partition='DH0', volume=member.get('volume'), files=boot_files)
-                command += ['+', 'addimg', source, 'name=DH0', 'bootable=1', 'pri=0']
+                options = ['name=DH0', 'bootable=1', 'pri=0']
             else:
                 written = (images or {}).get(member['partition'], member)
                 source = out / written['file']
-                command += ['+', 'addimg', source, 'name=' + member['partition'], 'bootable=0']
+                options = ['name=' + member['partition'], 'bootable=0']
             if source.stat().st_size != member['bytes']:
                 raise ValueError('Partition %s is %d bytes, planned %d'
                                  % (member['partition'], source.stat().st_size, member['bytes']))
+            lookups = buffers[member['partition']] = buffer_plan(source)
+            print('Image: partition %s buffers %d (set by %s; BUILD-HDF-BUFFERS-32): its longest name lookup reads %d '
+                  'header blocks (%s), median %d, 95 %% %d; %d of %d files fit'
+                  % (member['partition'], lookups['buffers'], lookups['sized'], lookups['longest'],
+                     lookups['longest_file'], lookups['median'], lookups['p95'], lookups['fit'], lookups['files']),
+                  flush=True)
+            command += ['+', 'addimg', source] + options + ['num_buffer=%d' % lookups['buffers']]
             partitions.append(written)
         run(command)
         pad_to_ide_cylinders(drive)
         checked = verify_combined(drive, partitions, jobs=jobs)
         for receipt in checked:
             receipt['hdf_file'] = drive.name
+            lookups = buffers[receipt['partition']]
+            if receipt.get('buffers') != lookups['buffers']:
+                raise ValueError('Partition %s of %s has %s buffers in its partition table, planned %d'
+                                 % (receipt['partition'], drive.name, receipt.get('buffers'), lookups['buffers']))
+            receipt['lookup_blocks'] = {key: lookups[key] for key in ('median', 'p95', 'longest', 'longest_file', 'fit',
+                                                                      'sized')}
         # Kickstart 3.1 does not mount a partition starting at or beyond 2 GiB of its drive.
         require_mountable(checked)
         # Every drive passes the image layout gate as written too, ONE check with every rule: partition start and
@@ -426,6 +446,9 @@ def _pack_batch(task):
         files.append(dict(path=name,bytes=path.stat().st_size,sha256=digest(path)))
     from build_windows_xdftool import run_any as run_xdftool
     run_xdftool(command)
+    # every hash chain busiest first, as on DH0 (tools/ffs_chains.py, IMAGE-LOADS-SLOWER-66)
+    from ffs_chains import describe, order_partition
+    print(describe(order_partition(part),f'DW{index}'),flush=True)
     check_image(part,normalize=True)
     from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
     from amitools.fs.ADFSVolume import ADFSVolume
@@ -665,8 +688,10 @@ def _verify_task(task):
     try:
         volume=ADFSVolume(device);volume.open()
         if files is None:
+            # the buffers in the partition table (BUILD-HDF-BUFFERS-32; assemble_drives sets them per partition)
             return dict(offset_bytes=device.blk_off*device.block_bytes,bytes=device.num_blocks*device.block_bytes,
-                        free_bytes=volume.bitmap.get_num_free()*device.block_bytes)
+                        free_bytes=volume.bitmap.get_num_free()*device.block_bytes,
+                        buffers=device.part_blk.dos_env.num_buffer)
         highest=0;highest_file=None
         for entry in files:
             data=volume.read_file(FSString(entry['path']))
@@ -699,5 +724,6 @@ def verify_combined(hdf, partitions, jobs=1):
         receipts.append(dict(partition=partition['partition'],volume=partition.get('volume'),
             offset_bytes=geometry['offset_bytes'],bytes=geometry['bytes'],
             payload_bytes=sum(e['bytes'] for e in partition['files']),files=len(partition['files']),
-            free_bytes=geometry['free_bytes'],highest_used_end_offset=highest,highest_file=highest_file,readback='passed'))
+            free_bytes=geometry['free_bytes'],highest_used_end_offset=highest,highest_file=highest_file,
+            buffers=geometry['buffers'],readback='passed'))
     return receipts

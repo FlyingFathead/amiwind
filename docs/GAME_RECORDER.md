@@ -1,6 +1,6 @@
 # Gameplay recorder
 
-_Last updated with AmiWind v0.0.66-dev3 (15 November 2026)._
+_Last updated with AmiWind v0.0.66-dev9 (15 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -146,17 +146,27 @@ by name (Morrowind, whose answer names his duties, then duties). Its nine steps:
 1. The opening to the papers taken at the census office: fighting is switched off from the ship until the papers;
    after them the papers are carried and fighting and magic are on.
 2. The hall guard's door and the back room: the door opens once the papers are carried, and the iron dagger on the
-   back-room table (the one the clerk's tutorial box asks for) is taken.
+   back-room table (the one the clerk's tutorial box asks for) is taken. Then the crab meat (`ingred_crab_meat_01`) on
+   the Silverware Plate (`misc_imp_silverware_plate_01`): the view is aimed at the crab meat, the game's focus row must
+   name it and not the plate, the use key takes it, the crab meat is counted in the inventory and the plate is not
+   (the theft ledger names none).
 3. Out to the courtyard and back in through the other door: the dagger is not on the table again (the game's aim
    report lists its row switched off; the console cannot count an item no script names).
-4. Keley's ring from the courtyard barrel, then Sellus Gravius: the papers are gone, the package and the directions
+4. Fargoth's ring (the Engraved Ring of Healing, `ring_keley`) from the courtyard barrel, then Sellus Gravius: the papers are gone, the package and the directions
    are carried, 87 gold more, the journal of `A1_1_FindSpymaster` is at 1; asking again gives nothing a second time.
 5. The release: the exit door lets the player out with the package, and the opening's state is over (`CharGenState`
    -1).
 6. An actor killed, an interior entered (the captain's room by the street door), out by its courtyard door, in
    again and out by the exit door to the street: the actor is still listed dead, and both doors let the player out.
+   The victim is named by reference (`chim actors kill 128960`, Erene Llenim, who stays by his shack on the west of
+   the town): the nearest resident, which a plain `chim actors kill` takes, can be the guard standing by the street
+   door, and his body there then takes the use key instead of the door (changed in v0.0.66-dev9; to be confirmed by a
+   journey).
+   God mode is on for the kill only and off again right after it, since it blocks every kind of damage and would
+   leave step 7's health readings all the same.
 7. A spell cast (a Restore Health made for the test) and a fight: the health rises, the cast is counted as landed,
-   and the fight takes health.
+   and the fight takes health. The fighter is a copy of the nearest resident put at the player's feet first
+   (`chim actors summon`): the nearest resident by itself can stand behind a wall, cannot reach the player and flees.
 8. The game's own quicksave, then a new start of the engine and the load through the Load game window: the package,
    the gold, the ring, the journal, the dead actor and a script global are as they were saved.
 9. Through a door with E: the next area loads and the game goes on with the loaded inventory.
@@ -179,7 +189,12 @@ turn, naming where the player stands:
 - `boxes`: answer the message boxes that are showing;
 - `face X Y Z` and `aimed REF`: turn the view to a point and check that the use key would go to that placed
   reference (the game's own focus or the crosshair's pick), nudging the aim a little around the point as a player
-  does;
+  does. Every aim is worked out from the eye as it is when it is made: `aimed` reads the eye again before each try and
+  turns again when it has moved since `face`, and the nudges are centred on the aim from that eye. A point nearer than
+  2 units on the floor plane, or needing more than 80 degrees down or 70 up, first has the player step back 12 units.
+  A focus row on the reference counts only while the game's own use-key verdict names no actor: with a body or a
+  person in front of a door the use key would search or talk instead, and the step fails naming them. A message box
+  still showing is answered before the aim is checked, so the use key is never taken as its button;
 - `lookat REF`: turn the view to a small placed item that the map does not draw itself (the town's items, not a
   room's own) with the game's own test aim at the nearest placed items;
 - `topic NAME`: in the open dialogue window, type the topic's name into its search box and choose it;
@@ -192,7 +207,7 @@ so. `tools/journey_smoke.py`:
 - `scripts JOURNEY OUTDIR`: the session script of each part (`part-A.txt`, `part-B.txt`);
 - `judge JOURNEY RUN-A RUN-B`: reads each session's `logs/steps.log` and `logs/console.log`, prints one line per
   check, `PASS` or `FAIL` with the value read and the value wanted, and a last line
-  `JOURNEY RESULT PASS 39/39 checks, 9 steps` or `JOURNEY RESULT FAIL ... (steps 6)`;
+  `JOURNEY RESULT PASS 42/42 checks, 9 steps` or `JOURNEY RESULT FAIL ... (steps 6)` (the counts are an example);
 - `walkthrough JOURNEY`: the same journey as a checklist to play by hand.
 
 ### Playing a journey by hand

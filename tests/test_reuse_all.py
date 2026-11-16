@@ -152,6 +152,79 @@ class MinuteOneAndStrict(unittest.TestCase):
             self.assertEqual(RA.census(cache, 'resident-bake', tmp), groups)
 
 
+class StoredGroupOfRegionStages(unittest.TestCase):
+    """BUILD-REUSE-STOP-COUNTS-STORED-GROUP-64: the unit stop counted a region stage's whole stored group (2,064
+    world-scenery and 1,931 world-flora regions of earlier key forms) as baking again, although every region is a CHIM
+    region cell and the stage converts none. A stage taken from an earlier build is never counted; a stage that runs
+    still is, for the regions it converts."""
+    STEPS = [('world-terrain', []), ('world-scenery', []), ('world-flora', [])]
+    CASES = (('world-scenery', 'world-scenery-region', 2064), ('world-flora', 'world-flora-region', 1931))
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        root = Path(self.tmp.name)
+        self.cache = root / 'image-passes'
+        for _, cache, count in self.CASES:         # every stored unit sits under an older key form
+            for number in range(count):
+                key = f'{number:05d}'
+                folder = self.cache / cache / key[:2]
+                folder.mkdir(parents=True, exist_ok=True)
+                (folder / f'{key}.json').write_text(json.dumps({'provenance': {
+                    'fields': {'sources_sha256': 'OLD'}, 'input_manifest': {'unit': f'region-{number}'}}}))
+        self.openers = [{'module': f'tools/prepare_{stage.replace("-", "_")}.py', 'function': 'unit_cache',
+                         'name': cache, 'scripts': ['x']} for stage, cache, _ in self.CASES]
+        self.closures = {stage: {opener['module']} for (stage, _, _), opener in zip(self.CASES, self.openers)}
+        self.terrain = root / 'build' / 'EARLIER'
+        self.plans = {'world-terrain': {'from': str(self.terrain)}}
+        self.keep = RA.current_digests
+        RA.current_digests = lambda opener, root=ROOT: ('NEW', ('NEW',))
+        self.addCleanup(setattr, RA, 'current_digests', self.keep)
+
+    def receipt(self, regions):
+        folder = self.terrain / 'world-terrain'
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / 'world-regions.json').write_text(json.dumps({'regions': regions}))
+
+    def stops(self, rebuilt, plans=None):
+        plans = self.plans if plans is None else plans
+        rows = RA.unit_report(self.STEPS, self.closures, {}, self.cache, self.tmp.name, rebuilt, openers=self.openers,
+                              limits=RA.region_limits(self.STEPS, plans, rebuilt))
+        return RA.strict_problems(self.STEPS, rebuilt, rows, self.closures, set(), {}), rows
+
+    def test_regions_to_make_skips_chim_cells_and_routing_rows(self):
+        self.receipt([{'name': 'a'}, {'name': 'b', 'chim_region': True}, {'name': 'c', 'routing_only': True}])
+        self.assertEqual(RA.regions_to_make(self.terrain), 1)
+        self.assertIsNone(RA.regions_to_make(Path(self.tmp.name) / 'nowhere'))
+
+    def test_all_regions_are_chim_cells_nothing_to_bake(self):
+        """The dev5 case: the stage runs, its terrain stage is reused, every region is a CHIM cell."""
+        self.receipt([{'name': f'r{n}', 'chim_region': True} for n in range(2594)])
+        problems, rows = self.stops({'world-scenery', 'world-flora'})
+        self.assertEqual(problems, [])
+        self.assertEqual(rows['world-scenery'], [('world-scenery-region', 0, 0)])
+        self.assertEqual(rows['world-flora'], [('world-flora-region', 0, 0)])
+
+    def test_stage_taken_from_an_earlier_build_is_not_counted(self):
+        self.receipt([{'name': 'r0'}])
+        problems, rows = self.stops(set())
+        self.assertEqual((problems, rows), ([], {}))
+
+    def test_a_stage_that_makes_regions_still_stops(self):
+        self.receipt([{'name': f'r{n}'} for n in range(2064)])
+        problems, _ = self.stops({'world-scenery'})
+        self.assertEqual([stage for stage, _ in problems], ['world-scenery'])
+        self.assertIn('would bake again 2064 of the 2064 units', problems[0][1])
+        self.receipt([{'name': f'r{n}'} for n in range(100)] + [{'name': 'c', 'chim_region': True}])
+        problems, rows = self.stops({'world-scenery'})                    # 100 regions, none found under the new key
+        self.assertIn('would bake again 100 of the 100 units', problems[0][1])
+
+    def test_terrain_that_runs_again_or_an_unreadable_receipt_keeps_the_full_count(self):
+        for plans in ({}, {'world-terrain': {'from': str(Path(self.tmp.name) / 'nowhere')}}):
+            problems, _ = self.stops({'world-scenery'}, plans)
+            self.assertIn('would bake again 2064 of the 2064 units', problems[0][1])
+
+
 class UnitCacheOpeners(unittest.TestCase):
     def test_openers_name_their_key_code(self):
         found = {(row['module'], row['name']): row for row in RA.unit_cache_openers(ROOT)}

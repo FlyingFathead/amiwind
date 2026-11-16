@@ -1,6 +1,6 @@
 # MWScript features
 
-_Last updated with AmiWind v0.0.66-dev4 (15 November 2026)._
+_Last updated with AmiWind v0.0.66-dev10 (15 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -86,7 +86,7 @@ The game scripts AmiWind carries with its own code instead of running them, each
 
 | Script | What it does | AmiWind counterpart | Parity | In game | Register |
 | --- | --- | --- | --- | --- | --- |
-| CharGen | the new game's start: the player's controls off, the player placed on the prison ship, the Bitter Coast weather set to cloudy, CharGenState 10 | engine/aga/src/aw_story.c AW_StoryReset (with aw_intro.c AW_IntroBegin) | same | not yet | OPENING-WEATHER-NOT-CLOUDY-63, CHARGENSTATE-START-VALUE-63 |
+| CharGen | the new game's start: the player's controls off, the player placed on the prison ship, the Bitter Coast weather set to cloudy, CharGenState 10 | engine/aga/src/aw_story.c AW_StoryReset (with aw_intro.c AW_IntroBegin) | same | not yet | OPENING-WEATHER-NOT-CLOUDY-63, CHARGENSTATE-START-VALUE-63, OPENING-FIGHTING-ON-BEFORE-PAPERS-66 |
 | CharGenBoatNPC | the guard on deck: sends the player down to the dock, repeats | engine/aga/src/aw_intro.c AW_IntroTick, the deck_state steps | same | not yet | - |
 | CharGenBoatWomen | the woman on the upper deck: hurries the player, repeats | engine/aga/src/aw_intro.c AW_IntroTick, the upper_state steps | same | not yet | - |
 | CharGenDialogueMessage | the hint about talking to the captain when the player comes near him | engine/aga/src/aw_opening.c AW_OpeningTick, captain_hint | same | not yet | OPENING-CAPTAIN-HINT-SUBTITLE-63 |
@@ -137,7 +137,7 @@ The original game's console commands (docs/CONSOLE_COMMANDS_MORROWIND.md): 392 i
 
 | Step | Original | AmiWind | Same? |
 | --- | --- | --- | --- |
-| controls | DisablePlayerControls, -Jumping, -ViewSwitch, VanityMode, -Fighting, -Magic | the opening's own restriction (AW_StoryRestricted, AW_IntroUse) holds the same controls | same |
+| controls | DisablePlayerControls, -Jumping, -ViewSwitch, VanityMode, -Fighting, -Magic | the same six switches off at the new game's start, from the script's own calls (the compiler's NGCS row, aw_mwhost.c new_game_controls; v0.0.66; before it every switch read on from the start), beside the opening's own restriction (AW_StoryRestricted, AW_IntroUse); the later scripts switch them on as in the original (the clerk, the papers, the hall guard, the courtyard barrel, the exit door) | same |
 | the ship | PositionCell into Imperial Prison Ship at 61, -135, 24, facing 340 | the new game starts on the ship map at its arrival | same |
 | weather | ChangeWeather Bitter Coast Region 1 (cloudy) | set cloudy at a new game from the script's own call (the compiler's NGWE row, aw_mwhost.c new_game_weather; v0.0.63) | same |
 | CharGenState | set to 10 | set to 10 (fixed in v0.0.63; every reader of the game tests -1, not -1 or 0 and over) | same |
@@ -183,9 +183,9 @@ The original game's console commands (docs/CONSOLE_COMMANDS_MORROWIND.md): 392 i
 | Step | Original | AmiWind | Same? |
 | --- | --- | --- | --- |
 | 0-10 | AITravel to the plank; the player within 108 | the route to the plank; the player within 27 map units (108 original) | same |
-| 20-30 | controls off, CharGenDock1; line done: EnableRaceMenu | the player held, chargendock1; line done: the race window | same |
+| 20-30 | controls off, CharGenDock1; line done: EnableRaceMenu | the player held (and the controls switch off, v0.0.66), chargendock1; line done: the race window | same |
 | 40 | 1.5 s after the window: CharGenDock2 | 1.5 s after the race is accepted: chargendock2 | same |
-| 50 | line done: controls on, AITravel next to the door (-9944, -72481) | line done: the player free, the route to the script's own point next to the door, standing as the walk leaves him (v0.0.63). Measured in the dock map's units against the shipped door table: his box x 322.68..337.32, y -207.37..-193.13; the office door's box x 308.86..332.61, y -173.38..-149.62; no overlap, 19.75 units between them, wider than the player's box (14.64), so the player can pass between him and the door (INTRO-DOCK-GUARD-BLOCKS-DOOR-62 not brought back) | same |
+| 50 | line done: controls on, AITravel next to the door (-9944, -72481) | line done: the player free (the switch on, v0.0.66), the route to the script's own point next to the door, standing as the walk leaves him (v0.0.63). Measured in the dock map's units against the shipped door table: his box x 322.68..337.32, y -207.37..-193.13; the office door's box x 308.86..332.61, y -173.38..-149.62; no overlap, 19.75 units between them, wider than the player's box (14.64), so the player can pass between him and the door (INTRO-DOCK-GUARD-BLOCKS-DOOR-62 not brought back) | same |
 | -1 | every 6 s near: CharGenDock3 | every 6 s near: chargendock3 | same |
 
 ### CharGenWalkNPC
@@ -195,7 +195,7 @@ The original game's console commands (docs/CONSOLE_COMMANDS_MORROWIND.md): 392 i
 | 0-10 | after 8 s: AITravel 90, -90, -88 | after 8 s: the route to 90, -90, -88 | same |
 | 20 | arrived: CharGenWalk1 | arrived: chargenwalk1 (the wait for Jiub's warning removed in v0.0.63) | same |
 | 30 | line done: a message box with the movement keys and Ok | line done: the script's text with AmiWind's keys, closed with Enter (Ok) (v0.0.63) | same |
-| 40-57 | EnablePlayerControls, AIEscort to 195, 100, 170, then AITravel 185, 174, 170 | the controls free, the route to 195, 100, 170, then to 185, 174, 170 | same |
+| 40-57 | EnablePlayerControls, AIEscort to 195, 100, 170, then AITravel 185, 174, 170 | the controls free (the switch on, v0.0.66), the route to 195, 100, 170, then to 185, 174, 170 | same |
 | 60 | the player within 200: CharGenWalk2 | within 50 map units (200 original): chargenwalk2 | same |
 | -1 | every 6 s the player stays within 150: CharGenWalk3 | the same; its timer advances only while the player is near (fixed in v0.0.63) | same |
 

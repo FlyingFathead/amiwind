@@ -2005,6 +2005,13 @@ def unit_stop_check(args, tools, run):
     (PLAN-CHECK-UNIT-STOPS-66)."""
     import build_cache
     steps = commands(args, tools, run)
+    # the same steps the build prepares: its world-terrain, world-scenery and world-flora commands carry the exterior
+    # checklist (--exterior-plan) and its image the terrain folder (--exterior-terrain); without them their keys differ
+    # from every earlier build's, the plan runs the three stages and the unit stop counts their stored units
+    # (BUILD-REUSE-STOP-COUNTS-STORED-GROUP-64, second cause)
+    if getattr(args, 'exterior_checklist', None) is not None:
+        import exterior_plan
+        steps = exterior_plan.bind_steps(steps, run / 'exterior-checklist.json')
     with Progress("Recording input, tool and source checksums for the reuse check"):
         metadata = provenance(args, tools)
     metadata['expansion_layers'] = getattr(args, 'expansion_layers', None)

@@ -134,7 +134,7 @@ extern void (*aw_chim_spike_counts)(unsigned long *out, int count);
 extern int aw_loadtrace_on;
 unsigned long AW_LoadTraceBegin(int op,const void *file,const char *name,long bytes);
 void AW_LoadTraceEnd(unsigned long seq,long result,const void *file);
-enum {AW_LT_OP_OPEN = 1, AW_LT_OP_READ, AW_LT_OP_SEEK, AW_LT_OP_CLOSE};
+enum {AW_LT_OP_OPEN = 1, AW_LT_OP_READ, AW_LT_OP_SEEK, AW_LT_OP_CLOSE, AW_LT_OP_WRITE};   /* write: the remote console's append (aw_remote.c) */
 static inline FILE *AW_DiskFopen(const char *path,const char *mode)
 {
     double t0; FILE *f; unsigned long lt=0;

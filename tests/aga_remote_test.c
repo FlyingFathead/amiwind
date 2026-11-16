@@ -41,12 +41,18 @@ int AW_LevelupBoxActive(void){return 0;}int AW_MsgBoxActive(void){return 0;}int 
 int AW_QuickCharActive(void){return 0;}int AW_CharacterActive(void){return 0;}int AW_SaveMenuActive(void){return 0;}
 int AW_ReaderActive(void){return 0;}
 static int exists(const char *p){FILE *f=fopen(p,"rb");if(f)fclose(f);return f!=NULL;}
+/* aw_loadtrace.c stand-in (CHIM-SEYDA-BALMORA-LOAD-HANG-43): the console log append's four calls are traced by name,
+ * op 1 open, 3 seek, 5 write, 4 close; recorded here */
+int aw_loadtrace_on;static int lt_ops[16],lt_n,lt_ended;static char lt_name[64];static long lt_bytes;
+unsigned long AW_LoadTraceBegin(int op,const void *f,const char *n,long b){(void)f;if(lt_n<16)lt_ops[lt_n]=op;lt_n++;
+    if(n)strncpy(lt_name,n,sizeof lt_name-1);if(op==5)lt_bytes=b;return (unsigned long)lt_n;}
+void AW_LoadTraceEnd(unsigned long s,long r,const void *f){(void)s;(void)r;(void)f;lt_ended++;}
 int main(void){
     char dir[256],cmd[300],state[300],text[2048];FILE *f;size_t n;
     snprintf(dir,sizeof dir,"/tmp/aw-remote-%ld/",(long)getpid());
     snprintf(text,sizeof text,"mkdir -p %s",dir);assert(!system(text));
     snprintf(cmd,sizeof cmd,"%scmd.txt",dir);snprintf(state,sizeof state,"%sstate.txt",dir);
-    AW_RemoteInit();assert(nvars==2 && !AW_RemoteLogging());
+    AW_RemoteInit();assert(nvars==3 && !AW_RemoteLogging());
     Cvar_Set("aw_remote_dir",dir);
     f=fopen(cmd,"w");fputs("dbg time 0119",f);fclose(f);
     realtime=1;AW_RemotePoll();assert(!buffer[0] && exists(cmd) && !exists(state)); /* off by default */
@@ -102,9 +108,11 @@ int main(void){
         AW_RemoteLog("end of listing\n");AW_RemoteLog("");AW_RemoteLog(NULL);
         assert(!exists(logp));                           /* 302 prints, no file call yet */
         realtime=t0+.2;AW_RemotePoll();assert(!exists(logp));   /* within the period: still collected */
-        realtime=t0+.6;AW_RemotePoll();
+        aw_loadtrace_on=1;realtime=t0+.6;AW_RemotePoll();aw_loadtrace_on=0;
         f=fopen(logp,"r");n=fread(text,1,sizeof text-1,f);fclose(f);text[n]=0;
         assert(n==315 && text[0]=='x' && text[1]==' ' && !strcmp(text+300,"end of listing\n"));
+        /* the append's open, seek, write and close were traced by the log's name, the write with its byte count */
+        assert(lt_n==4 && lt_ended==4 && lt_ops[0]==1 && lt_ops[1]==3 && lt_ops[2]==5 && lt_ops[3]==4 && lt_bytes==315 && strstr(lt_name,"console.log"));
         AW_RemoteLog("busy line\n");AW_RemoteBusy(103.0);   /* the long-work heartbeat sends it too, appended */
         f=fopen(logp,"r");n=fread(text,1,sizeof text-1,f);fclose(f);text[n]=0;
         assert(n==325 && !strcmp(text+300,"end of listing\nbusy line\n"));
@@ -117,6 +125,14 @@ int main(void){
         assert(size==17824 && fgetc(f)=='b');fseek(f,8825,SEEK_SET);assert(fgetc(f)=='c');fclose(f);
         AW_RemoteLog("last\n");AW_RemoteLogFlush();AW_RemoteLogFlush();   /* exit's flush; a second one is nothing */
         f=fopen(logp,"rb");fseek(f,0,SEEK_END);size=ftell(f);fclose(f);assert(size==17829);
+        remove(logp);
+        /* aw_remote_log 0 (the A/B switch of CHIM-SEYDA-BALMORA-LOAD-HANG-43): nothing collected, nothing appended, no
+         * file call on the remote folder; the command and state files go on as before; 1 again: appends resume */
+        Cvar_Set("aw_remote_log","0");lt_n=0;
+        AW_RemoteLog("dropped\n");realtime=t0+1.2;AW_RemotePoll();AW_RemoteLogFlush();
+        assert(!exists(logp) && lt_n==0 && exists(state));
+        Cvar_Set("aw_remote_log","1");AW_RemoteLog("kept\n");realtime=t0+1.8;AW_RemotePoll();
+        f=fopen(logp,"r");n=fread(text,1,sizeof text-1,f);fclose(f);text[n]=0;assert(!strcmp(text,"kept\n"));
         remove(logp);
         puts("remote console log: collected, one append a poll, heartbeat, full buffer and exit");
     }

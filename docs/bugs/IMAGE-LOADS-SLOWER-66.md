@@ -1,5 +1,15 @@
 # IMAGE-LOADS-SLOWER-66: Area loads on the v0.0.66-dev2 image take 1.3 to 2.2 times as long as on v0.0.66-dev1 with the same file work (Vivec 13.6 s against 29.9 s)
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 3 times; something has to be done
+
+- Reported with v0.0.66-dev5 at 2026-11-15 (time not recorded): The v0.0.66-dev5 build's image step relinked the hard disk name lookups busiest-first: 86 of 4,559 chains on the program partition (DH0), median lookup 73 -> 25 header blocks, longest 169 -> 140, files within 30 buffers 3,613 -> 16,306 of 29,385; the buffers are 150 on DH0 and 40 on the world partition (DW0). The area load times on the v0.0.66-dev5 image are not measured yet, so the entry stays open.
+- Reported with v0.0.66-dev7 at 2026-11-15 (time not recorded): Measured on the v0.0.66-dev6 image, which has the disk layout of v0.0.66-dev5 (see the status): the sound stage of a map load is far below the v0.0.66-dev2 figures at Seyda Neen, Balmora and Vivec, and below the v0.0.66-dev1 figures except one of the two Balmora loads (147 ms against 139 ms). This replaces the v0.0.66-dev5 report's "not measured yet".
+- Reported with v0.0.66-dev4 at 2026-11-15 09:40 +0200: the v0.0.66-dev4 image has the same layout: id1/sound is entry 28 of 28 of its chain on the boot partition, and 370 lookups of sounds outside the pool read 34 header blocks (median), none within the 30 buffers (measured on the image, no session)
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -9,9 +19,12 @@
 | Where | the v0.0.66-dev2 boot partition: the order in which the image step creates the folders and files of id1 (sound is entry 28 of its hash chain), and the partition's 30 buffers |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.66-dev2 (last seen) |
+| Persists in | fixed in v0.0.66-dev5 |
 | Severity | medium: every sound the game loads reads its whole name lookup from disk: 0.3 to 0.8 s more per area load at 32 MB Fast, and a longer pause when a sound is first played |
 | Family | Loading and disk reads (`disk-loading`) |
+| Fix commit | `3dfd5095` |
+| Fixed on | 2026-11-15 |
+| Planning item | `IMAGE-LOAD-SOUND-CHAIN-66` |
 | Playtest version | v0.0.66-dev2 |
 | From commit | source unknown, engine unknown, CHIM world unknown |
 | CHIM engine version | CHIM 0.2.2, engine unknown, world format 0.11 |
@@ -20,11 +33,12 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.66-dev2 (15 November 2026)._
+_Last updated with AmiWind v0.0.66-dev4 (15 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
 - [Status: 15 November 2026](#status-15-november-2026)
 - [Symptom](#symptom)
 - [The sessions side by side](#the-sessions-side-by-side)
@@ -39,12 +53,13 @@ _Last updated with AmiWind v0.0.66-dev2 (15 November 2026)._
 
 ## Status: 15 November 2026
 
-Open; the cause is found (below). The fix belongs to the image step only.
+Fixed in source (3dfd5095), not built yet: the image step only, no world stage and no engine change (Repair, below).
+The verification is the sound loading of the next build's area loads.
 
 In short: on the v0.0.66-dev2 boot partition no sound file lookup fits the file system's 30 buffers any more, so every
 sound the game loads reads its whole lookup from disk. The sound loading of an area load takes 3.5 to 5.6 times as long
 for the same sounds. Most of the gap in the total load times below came from the load beside the sessions, not from the
-image.
+image. The v0.0.66-dev4 image has the same layout (measured on the image).
 
 ## Symptom
 
@@ -129,19 +144,40 @@ partition's 30 buffers (BUILD-HDF-BUFFERS-32).
 
 ## Repair
 
-Not yet; the image step only (no world stage, no engine change):
+Fixed in source (3dfd5095), in the image step only:
 
-1. Make the folders the game reads most head their chains: create the loose files of a folder before its subfolders,
-   so each subfolder is added last and sits at the head of its chain. That alone takes 19 to 27 block reads off every
-   lookup under `sound` and `progs`.
-2. Set the boot partition's buffers explicitly (BUILD-HDF-BUFFERS-32), sized to the longest lookup the game repeats,
-   with its Fast RAM cost measured at 32 MB.
-3. A test that counts the header blocks of every lookup under the game's folders and fails when one that fitted the
-   buffers stops fitting (FFS-DIRECTORY-HASH-32 counts entries, not chain positions).
+1. Once a partition is written, every directory hash chain on it is relinked busiest first: an entry with more files
+   under it comes first (a file counts as one), and entries with as many keep the order they were written in. Only the
+   chain links and their checksums change, no block moves, and the partition is read back after
+   (`tools/ffs_chains.py`, called by the boot, world and CHIM partition writers). The rule names no folder.
+2. Every partition gets the buffers its longest name lookup needs, in the partition table: that lookup plus 10, in
+   steps of 10, at least 30 and at most 500 (BUILD-HDF-BUFFERS-32). The drive readback checks them, and `build.json`
+   records them with the lookup figures of each partition.
+3. `tests/test_ffs_chains.py`: on a small image the writer makes, a lookup of a file in the sound folder, which shares
+   its chain with 40 loose files of `id1`, fits 30 buffers; the same check fails on the old order. The relink moves no
+   block and changes no file.
+
+Measured on the v0.0.66-dev4 boot partition through that code, without a build (header blocks per lookup, the root
+block counted; median and longest):
+
+| Lookup | As written | Busiest first |
+| --- | --- | --- |
+| A sound outside the pool (370 files) | 34, 42; none within 30 buffers | 6, 14; all within 30 |
+| A pooled sound (7,086) | 81, 159 | 54, 132 |
+| A model or other file under `progs` (13,322) | 113, 169 | 20, 140 |
+| Every file (29,385) | 73, 169 | 25, 140 |
+
+`id1/sound`, `id1/progs` and `id1/maps` now head their chains, where they were the last of 28, 21 and 29 entries. The
+boot partition gets 150 buffers, so the repeated lookup of every file fits them; the CHIM world partition gets 40. On a
+copy of the boot partition the relink rewrote 232 header blocks and nothing else, and every file read back the same.
+
+For an A/B build, `AMIWIND_CHAIN_ORDER=as-written` and `AMIWIND_PARTITION_BUFFERS=30` in the image step's environment
+keep the methods before. See [storage](../STORAGE.md#directory-hash-chains-and-disk-buffers).
 
 ## Verification
 
-Pending: the sound loading of the same three loads back at the v0.0.66-dev1 figures.
+Pending: the sound loading of the same three loads of the next build against the v0.0.66-dev1 figures (139, 139 and
+306 ms), the buffers in its build record, and the Fast RAM they take at 32 MB.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

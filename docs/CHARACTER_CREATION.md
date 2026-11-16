@@ -1,6 +1,6 @@
 # Next milestone: dock and Census Office character creation
 
-_Last updated with AmiWind v0.0.66-dev2 (13 November 2026)._
+_Last updated with AmiWind v0.0.66-dev5 (15 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -154,7 +154,7 @@ Model this using the original independent facts and reference identities:
 | Dock guard local state and speech completion | Stop the player for race selection, then permit following the guard to the office. This does not complete registration. |
 | Class NPC local state | Hide the specifically listed ship assembly and actors during registration; this is separate from releasing the invisible barriers. |
 | Papers, ring and duties conditions | Gate the hall/captain/release interactions using their source item counts and journal/global conditions, not merely the current map or proximity to a door. |
-| Original input-control scripts | Jumping starts disabled; `CharGenFatigueBarrel` enables it when approached in the courtyard. Keep this distinct from barrier removal. Fighting is enabled by the hall guard accepting papers; drawing and punching use that permission. The current adapter still keeps jumping disabled until release; original courtyard proximity enablement remains to implement. |
+| Original input-control scripts | `CharGen` switches the controls, jumping, fighting, magic, the view switch and vanity off at the new game's start; since v0.0.66 the engine sets these switches from the script's own calls when the opening starts on the ship. The ship guard (`CharGenWalkNPC`) switches the controls on after the movement box, the dock guard (`CharGenRaceNPC`) off at his greeting and on after the race window, and the clerk (`CharGenClassNPC`) on after the stat review, with the view switch and vanity after his instruction about the papers. Fighting and magic come on when the papers are taken (`CharGenStatsSheet`), when the hall guard opens his door (`CharGenDoorGuardTalker`), near the courtyard barrel (`CharGenFatigueBarrel`, which also switches jumping on) and at the exit door. Keep this distinct from barrier removal. The opening's own rule stays beside the switches: no drawing or punching before the papers, no jumping until the release. |
 
 The UI stage coordinates implemented menus; it is not a replacement for globals,
 journal indices, actor script locals, inventory or reference enable state.
@@ -361,7 +361,15 @@ attack and jump, while readers and character menus temporarily consume controls.
 Future status effects add independent restrictions; clearing a tutorial gate must
 not cancel Paralyze or treat Silence as a ban on physical attacks.
 
-The courtyard barrel has a fixed Engraved Ring of Healing (`ring_keley`). Its
+From v0.0.66-dev5 the new game starts with the switches the carried `CharGen`
+script sets in its first calls: player controls, fighting, jumping, magic, the
+view switch and vanity are off. The ship's guard and the dock guard switch the
+controls as their scripts do, and the opening's later scripts switch each one on
+again as in the original. The key that readies magic honours a script's
+`DisablePlayerMagic`, and the build refuses a switch that no script turns on again.
+
+The courtyard barrel holds Fargoth's ring (the Engraved Ring of Healing,
+`ring_keley`). Its
 contents are independent of UI stage and the player's present item count.
 The namespaced runtime fact `amiwind:ref:172851:ring_taken` records depletion;
 atomic pickup changes that fact and inventory together. Returning, dropping or

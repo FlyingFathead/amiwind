@@ -54,6 +54,11 @@ int AW_ControlsDisabled(void);              /* the mask of switches a script tur
 int AW_ControlAllowed(int controls);        /* 1 when none of CONTROLS is off */
 int AW_ControlSet(int controls,int enable); /* 1 when kept (0: the named facts are full; nothing changed) */
 const char *AW_ControlName(int control);    /* "playercontrols" ... for one bit, "" else */
+/* OPENING-FIGHTING-ON-BEFORE-PAPERS-66: the switches a carried new-game script sets on its first run (CharGen:
+ * DisablePlayerControls, -Jumping, -ViewSwitch, VanityMode, -Fighting, -Magic; the compiler's NGCS rows, aw_mwhost.c
+ * new_game_controls): OFF turned off, then ON turned on, only while the new game's opening is at its start (the ship,
+ * CharGenState not -1). 1 when set; 0 for a quick start, a demo, a debug scene or an opening already past the ship. */
+int AW_StoryNewGameControls(int off,int on);
 /* The menus a script turns on (CENSUS-INTRO-SCRIPTS-62: EnableStatsMenu, -InventoryMenu, -MagicMenu, -MapMenu of the
  * census office's scripts; OpenMW guiextensions.cpp OpEnableWindow): one bit mask in the saved named facts
  * ("amiwind:menus", no new save field; New Game clears it with the facts). They add to the opening's own rule above

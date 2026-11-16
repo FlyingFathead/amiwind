@@ -73,7 +73,8 @@ static struct {const void *file; char name[36];} files[LT_FILES];
 static int file_next, busy, dumped;
 static double started;
 static char stage[11] = "boot";
-static const char *const op_names[] = {"?", "open", "read", "seek", "close"};
+static const char *const op_names[] = {"?", "open", "read", "seek", "close", "write"};
+#define LT_OP_NAMES		6
 
 static void copy_tail (char *out, int size, const char *in)
 {
@@ -179,10 +180,10 @@ int AW_LoadTraceFormat (unsigned long seq, char *out, int size)
 	e = &ring.e[(seq - 1) % LT_ENTRIES];
 	if (e->t1 == LT_OPEN)
 		snprintf (out, size, "LT %lu %s %s %s %ld bytes, at %lu ms, NOT FINISHED", seq, e->stage,
-			op_names[e->op < 5 ? e->op : 0], e->name, e->bytes, e->t0);
+			op_names[e->op < LT_OP_NAMES ? e->op : 0], e->name, e->bytes, e->t0);
 	else
 		snprintf (out, size, "LT %lu %s %s %s %ld bytes -> %ld, at %lu ms, %lu ms", seq, e->stage,
-			op_names[e->op < 5 ? e->op : 0], e->name, e->bytes, e->result, e->t0, e->t1 - e->t0);
+			op_names[e->op < LT_OP_NAMES ? e->op : 0], e->name, e->bytes, e->result, e->t0, e->t1 - e->t0);
 	return 1;
 }
 

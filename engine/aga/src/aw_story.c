@@ -117,6 +117,21 @@ int AW_ControlSet(int controls,int enable)
     if(next==now)return 1;               /* no row is taken for a switch that does not change */
     return AW_StateSet(&aw_state,AW_GLOBAL,AW_CONTROL_FACT,next);
 }
+/* OPENING-FIGHTING-ON-BEFORE-PAPERS-66: AW_StoryReset clears the switches (every one on, OpenMW's InputManager::clear);
+ * the original's CharGen then turns six of them off on its first run, at the new game's start (OpenMW worldimp.cpp
+ * startNewGame runs the global scripts at once). AmiWind carries CharGen with its own opening, which had kept only
+ * its own restriction (AW_StoryFighting and the rest above), so on the ship every switch read on and a script's
+ * GetPlayerFightingDisabled read 0. The carried script's own calls (aw_mwhost.c reads them from the compiled file) go
+ * in here, once, while the opening is at its start: not for a quick start or a demo (CharGenState -1 or no opening:
+ * OpenMW's bypass sets -1 and never starts CharGen), a debug scene that begins on the pier, or an opening already
+ * past the ship (the script's moment is gone; the scripts of the later steps switched what they switch). The scripts
+ * that run switch them on again: the clerk (controls, the view switch, vanity), the papers, the hall guard, the
+ * courtyard barrel (fighting, magic; the barrel jumping) and the exit door (fighting, magic). */
+int AW_StoryNewGameControls(int off,int on)
+{
+    if(!AW_StoryRestricted() || aw_story.stage!=AW_STAGE_SHIP)return 0;
+    return AW_ControlSet(off&AW_CONTROL_ALL,0) && AW_ControlSet(on&AW_CONTROL_ALL,1);
+}
 int AW_MoonRed(void)
 {
     return AW_StateGet(&aw_state,AW_GLOBAL,AW_MOON_FACT)!=0;

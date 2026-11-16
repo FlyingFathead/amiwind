@@ -2,10 +2,12 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 4 times; something has to be done
 
 - Reported with v0.0.66-dev3 at 2026-11-15 01:54 +0200: Seen again on the v0.0.66-dev3 line: the unit check stopped world-scenery (2064 of 2064) and world-flora (1931 of 1931) as baking again, while neither converts a region (every region is a CHIM cell). Their stage keys moved only by the table of earlier unit keys; they are taken through PROVEN_EQUAL_SOURCES (BUILD-STAGE-KEY-EQUAL-EDITS-66), so the stop does not come up, but the count itself is unchanged.
 - Reported with v0.0.66-dev3 at 2026-11-15 06:12 +0200: Seen again on the v0.0.66-dev3 line: the unit check of c0ab8f11 against the stopped v0.0.66-dev3 try2 run planned 46 of 48 stages for reuse, world-scenery and world-flora among them, yet stopped both for the 2,064 and 1,931 stored units of their caches: a stage that does not run is counted as baking again.
+- Reported with v0.0.66-dev5 at 2026-11-15 12:29 +0200: Seen again on the v0.0.66-dev5 line: the unit check of 18eb63f1 stopped world-scenery (2,064 of 2,064) and world-flora (1,931 of 1,931) as baking again, while neither stage converts a region; the stored group of older key forms was counted. Each snapshot needed an allowance with a proof.
+- Reported with v0.0.66-dev6 at 2026-11-15 14:23 +0200: Seen again on the v0.0.66-dev6 line: the unit check of 00dfab13 stopped world-scenery (2,064 of 2,064) and world-flora (1,931 of 1,931) although the first repair was in it. Cause found: the check planned the world terrain, scenery and flora commands without the exterior checklist the build binds to them, so the three stages read as changed and were counted as rebuilt; the build reused them.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -18,9 +20,12 @@
 | Where | the builder's reuse report (stage unit counts), world-flora stage |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.64-dev3, v0.0.66-dev3 (last seen) |
+| Persists in | fixed in v0.0.66-dev8 |
 | Severity | medium: a wrong count hides which stages really rebuilt and sends the reuse review after work that never ran; the build output itself is not wrong |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
+| Fix commit | `56901b8d` |
+| Fixed on | 2026-11-15 |
+| Planning item | `BUILD-REUSE-STOP-STORED-GROUP-FIX-66` |
 | Playtest version | 2026_11_10_v0.0.64-dev3_full-v0.0.64-dev3_bf2743f |
 | From commit | source bf2743f, engine bf2743f, CHIM world bf2743f |
 | CHIM engine version | CHIM unknown, engine bf2743f, world format unknown |
@@ -30,12 +35,12 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.66-dev4 (15 November 2026)._
+_Last updated with AmiWind v0.0.66-dev8 (15 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
 - [Status: 15 November 2026](#status-15-november-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -48,7 +53,10 @@ _Last updated with AmiWind v0.0.66-dev4 (15 November 2026)._
 
 ## Status: 15 November 2026
 
-Open; the cause is not looked at yet. Seen in v0.0.64-dev3 and twice on the v0.0.66-dev3 line (the reports above).
+Open. Both causes are fixed in source (the first on the v0.0.66-dev6 line, the second on the v0.0.66-dev8 line); fixed in
+source, to be confirmed by the v0.0.66-dev8 unit check, which runs without the per-stage allowances for the world scenery
+and world flora stages. The entry stays open until that check has run. Seen in v0.0.64-dev3, twice on the v0.0.66-dev3
+line and again on the v0.0.66-dev5 and v0.0.66-dev6 lines (the reports above).
 
 ## Symptom
 
@@ -71,18 +79,50 @@ The builder's reuse report and unit check (stage unit counts), the world-scenery
 
 ## Cause
 
-Not looked at yet. What is known: the count comes from the stage's stored unit group, not from the units the stage
-makes. On the v0.0.66-dev3 line the two stages' keys moved only by the table of earlier unit keys, and they are taken
-through the proven-equal sources (BUILD-STAGE-KEY-EQUAL-EDITS-66), so the stop does not come up there; the count itself
-is unchanged.
+The unit stop (tools/reuse_all.py strict_problems) compares the units a stage's unit cache holds with the units found
+under this build's key, for every stage the plan runs. For the world scenery and world flora stages the cache holds one
+unit per region of every earlier key form (2,064 and 1,931 regions, stored while the regions were still converted),
+but a region that is a CHIM region cell or a routing-only row gets no map from these stages
+(`prepare_world_scenery.prepare`, `prepare_world_flora`: the regions to convert are those without a CHIM cell or routing
+mark in the terrain stage's receipt). Every region is a CHIM cell on this line, so the stages convert none, and the stop
+still counted the whole stored group as baking again. A stage that the plan takes from an earlier build is never in the
+stop's list; the unit check of a snapshot nevertheless listed these two as running, so the count mattered every time.
+
+Second cause (found 15 November 2026 on the v0.0.66-dev6 line): the check plans different commands from the build. The
+build binds the exterior checklist to its world terrain, world scenery and world flora commands (`--exterior-plan`) and
+the terrain folder to the image command (`--exterior-terrain`) before it prepares the stages (tools/exterior_plan.py
+`bind_steps`); the check (tools/build.py `unit_stop_check`) built the same commands without that step. Against every
+earlier build the three stages therefore read "changed: command", the check's plan ran them, and the unit stop counted
+the units stored in the two region caches. The build itself bound the commands, matched the earlier keys and reused all
+three. The first repair below also cut nothing in that check: its region count is read from the terrain stage's
+receipt when the plan takes that stage from an earlier build, and in the check the terrain stage was itself planned to
+run again, so the full stored count stayed. The reuse preflight line the check prints beside it ("46 of 48 stages
+reusable") comes from a separate prediction made from the earlier build's own recorded commands, which is why it
+disagreed with the plan.
 
 ## Repair
 
-Not yet: count only the units a stage would make, and never count a stage that is planned for reuse as baking.
+The unit report counts, for the world scenery and world flora stages, at most the regions the stage converts: when the
+plan takes the terrain stage from an earlier build, its receipt is read there and the held and found counts are cut to
+the regions without a CHIM cell or routing mark (`reuse_all.region_limits`, `unit_report(limits=...)`). With every
+region a CHIM cell the stage has 0 units to bake and no stop; a stage that does convert regions, a terrain stage that
+runs again or an unreadable receipt keeps the full count and the 5 % limit. Tested in tests/test_reuse_all.py
+(StoredGroupOfRegionStages: the 2,064 and 1,931 unit case, a stage taken from an earlier build, a stage that makes
+regions, a terrain stage that runs again).
+
+Second repair: the check binds the exterior checklist to the same commands before it plans them, exactly as the build
+does (`unit_stop_check` calls `exterior_plan.bind_steps` when the build has an exterior checklist), so its plan matches
+the build's and the three stages read as reused. The whole output of the build check is also kept in a file beside the
+result (`RUN.check.log`); the refusal and the result carry only its last 40 lines, which
+had lost the plan line of a stopped stage. Tested in tests/test_check_unit_stops.py (the check plans the bound commands,
+a check without a checklist plans them as they are, the whole output is kept).
 
 ## Verification
 
-Pending: a unit check of a commit that changes neither stage shows 0 units to bake for both.
+Replayed read only against the v0.0.66-dev5 build with the v0.0.66-dev6 source: before the second repair the check plans
+43 of 48 stages for reuse (world terrain, world scenery and world flora rebuilt) and stops the two region stages; with
+the bound commands it plans 46 of 48 (engine and image only) and passes with no allowance for either stage. Pending: the
+unit check of v0.0.66-dev8 passes with no allowance, and its plan lines read "reused" for the three stages.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

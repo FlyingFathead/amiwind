@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'src'), str(ROOT / 'tests')]
 
 from mwscript.gamedata import GameData, new_game_scripts, unconditional_disables  # noqa: E402
+from mwscript.gamedata import CONTROL_BITS, control_switch_calls, new_game_controls  # noqa: E402
 from mwscript.compiler import compile_program, bindings  # noqa: E402
 from mwscript.codegen import SCRIPT_HANDWRITTEN, SCRIPT_NOTYET  # noqa: E402
 from mwscript.opcodes import OPCODES  # noqa: E402
@@ -119,6 +120,91 @@ class NewGameWeatherTests(unittest.TestCase):
         host = (ROOT / 'engine/aga/src/aw_mwhost.c').read_text(encoding='utf-8')
         self.assertIn('AW_MwvmSection("NGWE"', host)
         self.assertIn('new_game_weather();', host)
+
+
+class NewGameControlsTests(unittest.TestCase):
+    # v0.0.66 (OPENING-FIGHTING-ON-BEFORE-PAPERS-66): CharGen, carried by AmiWind's own opening, switches six of the
+    # player's controls off on its first run (on the ship a script's GetPlayerFightingDisabled read 0 until now); its
+    # calls become an NGCS row the engine sets at the new game's start, and the build refuses a switch that no script
+    # it runs switches on again
+    CHARGEN = ('begin CharGen\n;short CharGenState is a global\nDisablePlayerControls\nDisablePlayerJumping\n'
+               'DisablePlayerViewSwitch\nDisableVanityMode\nDisablePlayerFighting\nDisablePlayerMagic\n'
+               'Player->PositionCell 61,-135, 24, 340, "Imperial Prison Ship"\nset CharGenState to 10\n'
+               'stopscript CharGen\nend CharGen')
+    LATER = {
+        # the clerk's last step, the papers taken and the courtyard barrel, as the original's scripts switch them
+        'Clerk': 'begin Clerk\nshort state\nif ( state == 30 )\nEnablePlayerViewSwitch\nEnableVanityMode\n'
+                 'EnablePlayerControls\nset state to -1\nendif\nend',
+        'Papers': 'begin Papers\nshort state\nif ( state == 0 )\nenableplayerfighting\nenableplayermagic\n'
+                  'set state to 10\nendif\nend',
+        'Barrel': 'begin Barrel\nshort done\nif ( done == 0 )\nEnablePlayerJumping\nset done to 1\nendif\nend'}
+
+    def test_the_bits_are_the_engines(self):
+        header = (ROOT / 'engine/aga/src/aw_story.h').read_text(encoding='utf-8')
+        engine = {'playercontrols': 'PLAYER', 'playerfighting': 'FIGHTING', 'playerjumping': 'JUMPING',
+                  'playerlooking': 'LOOKING', 'playermagic': 'MAGIC', 'playerviewswitch': 'VIEWSWITCH',
+                  'vanitymode': 'VANITY', 'teleporting': 'TELEPORTING', 'levitation': 'LEVITATION'}
+        self.assertEqual(set(engine), set(CONTROL_BITS))
+        for name, bit in CONTROL_BITS.items():
+            self.assertRegex(header, r'AW_CONTROL_%s=%d\b' % (engine[name], bit))
+
+    def test_the_first_run_switches(self):
+        self.assertEqual(new_game_controls(self.CHARGEN), (1 | 2 | 4 | 16 | 32 | 64, 0))
+        # inside an if block: not a first-run switch; a later call of the same switch wins; a reference changes nothing
+        self.assertEqual(new_game_controls('begin X\nif ( a == 1 )\nDisablePlayerMagic\nendif\n'
+                                           'DisablePlayerFighting\nEnablePlayerFighting\n'
+                                           'player->DisablePlayerJumping ; a comment\nEnableLevitation\nend'),
+                         (4, 2 | 256))
+        self.assertEqual(control_switch_calls('begin X\nif ( a )\nEnablePlayerControls\nendif\n'
+                                              '"player"->DisableTeleporting\nGetPlayerControlsDisabled\nend'),
+                         [(1, True, 1), (128, False, 0)])
+
+    def test_carried_chargen_switches_are_a_row_and_the_check(self):
+        scripts = dict(SCRIPTS, CharGen=self.CHARGEN, **self.LATER)
+        prog, compiled, data = compiled_program(scripts)
+        self.assertEqual(awms.new_game_control_rows(prog, compiled), [(1 | 2 | 4 | 16 | 32 | 64, 0)])
+        prog2, compiled2 = compile_program(data, None, handwritten=(), rooms={})
+        self.assertEqual(awms.new_game_control_rows(prog2, compiled2), [])        # CharGen runs: its own calls
+        f = awms.read(awms.write(prog, compiled, bindings(prog))[0])
+        self.assertEqual(f['NGCS_rows'], 1)
+        self.assertEqual(struct.unpack_from('>HH', f['NGCS'], 0), (119, 0))
+        self.assertIn('NGCS', awms.RESIDENT)
+        r = newgame.check(prog, compiled)
+        self.assertEqual(r['controls']['stuck'], [])
+        self.assertEqual(r['controls']['off'], 119)
+        self.assertEqual(r['controls']['enabled_by']['playerjumping'], ['barrel'])
+        self.assertEqual(r['controls']['enabled_by']['playerfighting'], ['papers'])
+        # nothing that runs switches jumping on again (the barrel's script gone): the build refuses the file
+        del scripts['Barrel']
+        prog3, compiled3, _ = compiled_program(scripts)
+        with self.assertRaises(ValueError) as caught:
+            newgame.check(prog3, compiled3)
+        self.assertIn('playerjumping', str(caught.exception))
+        # the engine reads the rows at the new game's first tick and sets them only at the opening's start
+        host = (ROOT / 'engine/aga/src/aw_mwhost.c').read_text(encoding='utf-8')
+        self.assertIn('AW_MwvmSection("NGCS"', host)
+        self.assertIn('new_game_controls();', host)
+        self.assertIn('!AW_CensusLegacy() && AW_StoryNewGameControls((r[0]<<8)|r[1],(r[2]<<8)|r[3])', host)
+        story = (ROOT / 'engine/aga/src/aw_story.c').read_text(encoding='utf-8')
+        self.assertIn('if(!AW_StoryRestricted() || aw_story.stage!=AW_STAGE_SHIP)return 0;', story)
+
+    def test_the_carried_scripts_switch_the_controls_where_the_originals_do(self):
+        # CharGenWalkNPC's step 40 (after the movement box) and CharGenRaceNPC's states 20 and 50, carried by hand
+        intro = (ROOT / 'engine/aga/src/aw_intro.c').read_text(encoding='utf-8')
+        self.assertIn('prompt=0;unlocked=1;AW_ControlSet(AW_CONTROL_PLAYER,1);', intro)
+        failure = intro[intro.index('static void failure('):intro.index('int AW_IntroSpeak(')]
+        self.assertIn('AW_ControlSet(AW_CONTROL_PLAYER,1);', failure)
+        self.assertIn('if(!unlocked)AW_ControlSet(AW_CONTROL_PLAYER,1);', intro)
+        opening = (ROOT / 'engine/aga/src/aw_opening.c').read_text(encoding='utf-8')
+        greet = opening[opening.index('aw_story.dock=20;'):opening.index('if(aw_story.dock==20 &&')]
+        self.assertIn('AW_ControlSet(AW_CONTROL_PLAYER,0);', greet)
+        done = opening[opening.index('}else if(aw_story.dock==50 && AW_SpeechRemaining()<=0){'):]
+        self.assertIn('AW_ControlSet(AW_CONTROL_PLAYER,1);', done[:done.index('dock_route(1);')])
+        # a script's DisablePlayerMagic: the ready-magic key does not ready the magic (lowering stays)
+        cast = (ROOT / 'engine/aga/src/aw_cast.c').read_text(encoding='utf-8')
+        ready = cast[cast.index('static void ready_command(void){'):cast.index('/* the words after "spell"')]
+        self.assertIn('if(!ready && !AW_ControlAllowed(AW_CONTROL_PLAYER|AW_CONTROL_MAGIC)){', ready)
+        self.assertLess(ready.index('AW_CONTROL_MAGIC'), ready.index('AW_HandReadyPress('))
 
 
 class LaterMasterScriptTests(unittest.TestCase):

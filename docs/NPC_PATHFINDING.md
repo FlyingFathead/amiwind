@@ -1,6 +1,6 @@
 # NPC pathfinding: how NPCs find their way
 
-_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
+_Last updated with AmiWind v0.0.66-dev9 (15 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -451,8 +451,16 @@ puts the resident of a `list` slot at a point (map units) and, with a goal, walk
 checked on purpose. In a forced test on the Seyda Neen residents, 106 searches and 1,758 position tests fell to 9 and
 336 (minus 81 percent); the cause was a resident's standing box at the foot of a steep face, and the face itself is
 unchanged. The measurements are in [docs/performance/FRAME-WAITS.md](performance/FRAME-WAITS.md).
+Since v0.0.66 the search leaves other bodies out, and two bodies that overlap walk apart as the original's actors
+do: a resident standing inside the player (or the player inside it) is not stuck and its steps away are taken
+([PLAYER_MOVEMENT.md, bodies that overlap](PLAYER_MOVEMENT.md#bodies-that-overlap-and-arriving-next-to-an-actor)).
 
-Not done yet (said so, not invented): doors in the way and occupied destinations (flyers and swimmers move since v0.0.57, below); the
+Not done yet (said so, not invented): doors in the way and occupied destinations (flyers and swimmers move since v0.0.57, below). For
+doors, OpenMW 0.51 (`aiwander.cpp`, `obstacle.cpp` `proximityToDoor`) checks an idle wanderer every 1.5 seconds and
+sends it walking when it faces a door within 1.6 times the activation distance, and a walker that has to evade
+next to a door drops that destination for another; here a wanderer can stop at a destination by a door, as the
+Seyda Neen guard (`128967`) did by the census office's street door (`WANDER-DOOR-RULE-66`; the player arriving inside
+him there is `DOOR-ARRIVAL-INSIDE-ACTOR-66`); the
 time of day is kept but unused (OpenMW reads it nowhere either); a package set by a script keeps the spawn position
 as its start; the walk speed is the actor record's Speed attribute (50 only for an actor without a record); baked models
 without an Idle2..Idle9 group only walk; packages other than Wander; the package is not saved.

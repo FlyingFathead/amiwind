@@ -1,6 +1,6 @@
 # AmiWind FAQ
 
-_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
+_Last updated with AmiWind v0.0.66-dev8 (2026-11-15)._
 
 <!-- contents start -->
 ## Contents
@@ -238,7 +238,10 @@ is therefore not a supported configuration for this build. The earlier A500
 experiment remains in the repository, alongside the current accelerated AGA
 track. See the [engine build settings](../engine/aga/Makefile),
 [startup checker](../engine/aga/boot/bootcheck.asm) and
-[project overview](ABOUT.md).
+[project overview](ABOUT.md). An Amiga 500 with a PiStorm accelerator (an RTG
+screen, or AGA emulation through AGA-STORM) and the announced THEA1200 are looked
+at in two studies: [PiStorm on an Amiga 500](PISTORM_RTG_STUDY.md) and
+[the THEA1200](THEA1200_STUDY.md).
 
 Bringing the experience down to lower specifications is planned work. A
 particular physical accelerator, memory configuration or minimum frame rate
@@ -408,7 +411,9 @@ a deliberate part of the project's identity, out of the maintainer's love of
 the Amiga's own OCS and AGA graphics modes and their palettes. RTG is a
 possible future path to look into, beside AGA rather than instead of it, for
 the faster machines where the screen starts to matter (PiStorm, Vampire,
-graphics-card Amigas); see the [roadmap](ROADMAP.md#long-term-possibility-an-rtg-display-path). For how another PC role-playing game port fares on
+graphics-card Amigas); see the [roadmap](ROADMAP.md#long-term-possibility-an-rtg-display-path) and the study of
+[an RTG backend and AGA-STORM on a PiStorm Amiga 500](PISTORM_RTG_STUDY.md), which traces the display path in the code
+and collects the measured share of the conversion in a frame today. For how another PC role-playing game port fares on
 PiStorm, Vampire and 68060 hardware, see [Comparisons](COMPARISONS.md).
 
 ## Can a MiSTer run AmiWind?

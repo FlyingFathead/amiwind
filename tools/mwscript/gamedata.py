@@ -84,6 +84,49 @@ def new_game_weather(text):
     return out
 
 
+# The player's control switches the scripts set (OpenMW 0.51 mwscript/controlextensions.cpp OpSetControl,
+# miscextensions.cpp OpEnableTeleporting and OpEnableLevitation): each switch's bit, the engine's own
+# (engine/aga/src/aw_story.h enum aw_control; tests/test_mwscript_new_game.py keeps the two equal).
+CONTROL_BITS = {'playercontrols': 1, 'playerfighting': 2, 'playerjumping': 4, 'playerlooking': 8, 'playermagic': 16,
+                'playerviewswitch': 32, 'vanitymode': 64, 'teleporting': 128, 'levitation': 256}
+_CONTROL = re.compile(r'^(?:' + _TARGET + r'\s*->\s*)?(enable|disable)(' + '|'.join(CONTROL_BITS) + r')$', re.I)
+
+
+def control_switch_calls(text):
+    """[(bit, on, depth)] of a script's control switch calls in order (Enable/DisablePlayerControls, -Fighting,
+    -Jumping, -Looking, -Magic, -ViewSwitch, Enable/DisableVanityMode, -Teleporting, -Levitation), with the depth of
+    if blocks each stands in (0: outside every if). A reference before the call (player->DisablePlayerControls)
+    changes nothing: the switches are the player's."""
+    out, depth = [], 0
+    for line in _statements(text):
+        low = line.casefold()
+        if re.match(r'^if\b', low):
+            depth += 1
+            continue
+        if re.match(r'^endif\b', low):
+            depth = max(0, depth - 1)
+            continue
+        m = _CONTROL.match(line)
+        if m:
+            out.append((CONTROL_BITS[m.group(4).casefold()], m.group(3).casefold() == 'enable', depth))
+    return out
+
+
+def new_game_controls(text):
+    """(off, on): the bit masks of the control switches a run-once script's lines outside every if block leave off
+    and on, the last call of each switch counting (v0.0.66, OPENING-FIGHTING-ON-BEFORE-PAPERS-66: CharGen's
+    DisablePlayerControls, -Jumping, -ViewSwitch, VanityMode, -Fighting, -Magic, which AmiWind's own opening carries)."""
+    off = on = 0
+    for bit, enable, depth in control_switch_calls(text):
+        if depth:
+            continue
+        if enable:
+            on, off = on | bit, off & ~bit
+        else:
+            off, on = off | bit, on & ~bit
+    return off, on
+
+
 def unconditional_disables(text):
     """The folded ids of a script's `ID->Disable` lines outside every if block, in order (what a run-once script such
     as Startup always disables)."""

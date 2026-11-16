@@ -1,16 +1,19 @@
 # Storage profiles and disk-backed preprocessing
 
-_Last updated with AmiWind v0.0.59 (3 November 2026)._
+_Last updated with AmiWind v0.0.66-dev5 (15 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [Compatibility profiles](#compatibility-profiles)
 - [Current AGA image layout](#current-aga-image-layout)
+  - [The boot volume seen from Workbench](#the-boot-volume-seen-from-workbench)
 - [Drive size and IDE cylinders](#drive-size-and-ide-cylinders)
 - [The image layout gate](#the-image-layout-gate)
+- [Directory hash chains and disk buffers](#directory-hash-chains-and-disk-buffers)
 - [Historical v0.0.25 single-HDF layout](#historical-v0025-single-hdf-layout)
 - [Preferred future content placement](#preferred-future-content-placement)
+  - [CPU, memory and loading costs](#cpu-memory-and-loading-costs)
 - [Historical A500 image layout](#historical-a500-image-layout)
 - [Capacity budget](#capacity-budget)
 - [Proposed raw asset archive](#proposed-raw-asset-archive)
@@ -125,6 +128,54 @@ builder's build result has an `ide-cylinders` step (`tools/ide_cylinders.py`), t
 gate's boot smoke refuses a smoke image whose drive is not whole cylinders before
 it boots, the Raspberry Pi image script and stick update refuse such a drive, and
 the release guard checks the drives of the release image.
+
+## Directory hash chains and disk buffers
+
+The Fast File System finds a file by its name, one folder of the path at a time. Each folder block holds 72 hash
+chains; a name belongs to one of them, and the file system reads the header block of every entry ahead of it in that
+chain. The header blocks of one lookup add up over the path: for `id1/sound/fx/door.wav` they are the root block, then
+the entries up to `id1`, `sound`, `fx` and `door.wav` in their chains.
+
+The image writer adds every new entry at the head of its chain, so a chain lists its entries newest first. The image
+step made every folder before any file, so a folder ended at the tail of its chain, behind the loose files of its
+parent. On the v0.0.66-dev2 boot partition `id1/sound` was the 28th entry of 28 in its chain (the 20th of 20 in
+v0.0.66-dev1), and no lookup of a sound outside the sound pool fitted the partition's buffers any more
+(IMAGE-LOADS-SLOWER-66).
+
+Each partition keeps a number of block buffers. The engine opens a file twice in a row (once to check that it exists,
+then to read it), so each open looks the same name up twice. When the first lookup reads no more blocks than there are
+buffers, the second one is served from memory, and the next file of the same folder finds the folder's own blocks
+there too; when it reads more, every walk pushes out the blocks the next one starts with, and every block is read from
+the disk again.
+
+The image step now:
+
+- relinks every chain of every partition it writes, busiest first: an entry with more files under it comes first (a
+  file counts as one), and entries with as many keep the order they were written in. Only the chain links and their
+  checksums change: no block moves and every file keeps its data (`tools/ffs_chains.py`, called by each partition
+  writer, then read back);
+- gives every partition the buffers its longest name lookup needs: that lookup plus 10, in steps of 10, at least 30
+  (what every partition had before, the partition table's default) and at most 500. The value is written in the
+  partition table, read back with the drive and recorded in `build.json` (`disk_layout_plan`, each partition's
+  `buffers` and `lookup_blocks`). A buffer holds one 512-byte block, so 150 buffers take about 75 KiB of Fast RAM.
+
+Measured on the v0.0.66-dev4 boot partition (29,385 files), header blocks per lookup:
+
+| Files | As written: median, longest | Busiest first: median, longest |
+| --- | --- | --- |
+| `id1/sound` outside the pool (370) | 34, 42 | 6, 14 |
+| `id1/sound/pool` (7,086) | 81, 159 | 54, 132 |
+| `id1/progs` (13,322) | 113, 169 | 20, 140 |
+| `id1/maps` (3,865) | 58, 105 | 30, 77 |
+| Every file | 73, 169 | 25, 140 |
+
+As written, 3,613 of the 29,385 lookups fit 30 buffers; busiest first, 16,306 do, and all of them fit the 150 buffers
+the partition gets. The relink changed 86 of the 4,559 chains (232 header blocks). The CHIM world partition (37,006
+files) was already short, its longest lookup 30 header blocks, and gets 40 buffers.
+
+For an A/B build, the image step's environment selects the methods before: `AMIWIND_CHAIN_ORDER=as-written` keeps the
+writer's chain order, `AMIWIND_PARTITION_BUFFERS=30` gives every partition 30 buffers. `tools/ffs_chains.py IMAGE
+--partition DH0` prints the lookup figures of a partition of a drive (read only).
 
 ## Historical v0.0.25 single-HDF layout
 

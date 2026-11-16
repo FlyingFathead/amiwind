@@ -81,6 +81,7 @@ static int say(int role,const char *stem) {
 }
 static void failure(const char *reason) {
     failed=1;unlocked=1;prompt=0;
+    AW_ControlSet(AW_CONTROL_PLAYER,1);   /* the scripts' Controls switch too (OPENING-FIGHTING-ON-BEFORE-PAPERS-66) */
     Con_Printf("Intro stopped: %s. Movement unlocked for inspection.\n",reason);
     AW_UISubtitle("Intro checkpoint",reason,12);
 }
@@ -192,7 +193,13 @@ void AW_IntroSpawn(void) {
     if(!pending){
         active=aw_story.stage==AW_STAGE_SHIP && !strcmp(sv.name,"prison");prompt=0;
         AW_NavLoad(sv.name);
-        if(!strcmp(sv.name,"seyda") && aw_story.stage==AW_STAGE_SHIP)AW_StoryTransition(AW_STAGE_DOCK);
+        if(!strcmp(sv.name,"seyda") && aw_story.stage==AW_STAGE_SHIP){
+            AW_StoryTransition(AW_STAGE_DOCK);
+            /* OPENING-FIGHTING-ON-BEFORE-PAPERS-66: the ship left before the guard's movement box (only a console map
+             * change can: the hatch is behind it): the ship's scripts end there, so the controls their walk would
+             * have switched on are on, and the pier's own hold takes over */
+            if(!unlocked)AW_ControlSet(AW_CONTROL_PLAYER,1);
+        }
         return;
     }
     pending=0;active=1;jiub_state=guard_state=upper_state=prompt=unlocked=failed=0;elapsed=jiub_timer=guard_timer=upper_timer=0;
@@ -349,7 +356,10 @@ int AW_IntroKey(int key) {
             if(!name_scripted){jiub_state=20;jiub_timer=0;}   /* the script's own wait goes on (CharGenNameNPC) */
             name_scripted=0;
         }
-    }else if(prompt==2 && key==K_ENTER){prompt=0;unlocked=1;if(travel(195,100,170))guard_state=50;}
+    }else if(prompt==2 && key==K_ENTER){
+        /* CharGenWalkNPC's step 40: EnablePlayerControls after the movement box, then the escort; the switch CharGen
+         * turned off at the new game's start goes on with it (OPENING-FIGHTING-ON-BEFORE-PAPERS-66) */
+        prompt=0;unlocked=1;AW_ControlSet(AW_CONTROL_PLAYER,1);if(travel(195,100,170))guard_state=50;}
     return 1;
 }
 void AW_IntroDraw(void) {

@@ -813,7 +813,8 @@ class ServiceTests(unittest.TestCase):
         self.assertIn(tail[0], result['notes'])
         self.assertEqual(len(result['steps']['check']['output_tail']), 40)
         # beside the build logs: the refused check's page and its console log, named by the result
-        page, log = (Path(path) for path in result['logs'])
+        whole, page, log = (Path(path) for path in result['logs'])
+        self.assertEqual(whole.name, result['run_name'] + '.check.log')   # the check's whole output (BUILD-REUSE-STOP-...-64)
         self.assertEqual(page.name, result['run_name'] + '.FAILURE.md')
         text = page.read_text(encoding='utf-8')
         for part in ('# Build refused: ' + result['run_name'], '- **Refused at:** the build check, before any stage',

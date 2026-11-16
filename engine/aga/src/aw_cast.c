@@ -38,6 +38,7 @@
 #include "aw_inventory.h"
 #include "aw_hand_models.h"
 #include "aw_reset.h"
+#include "aw_story.h"
 
 static int cast_on=1;              /* dbg cast casting on|off */
 #define SCALE .25f                 /* original units -> map units (tools/prepare_quake.py SCALE) */
@@ -641,6 +642,11 @@ static void ready_command(void){
     eval_t *goal;int g;
     if(!cast_on)return;
     if(!sv.active || !sv_player){Con_Printf("Ready magic: no game.\n");return;}
+    /* OPENING-FIGHTING-ON-BEFORE-PAPERS-66: a script's DisablePlayerMagic (CharGen's, from the ship until the papers)
+     * or DisablePlayerControls: the magic is not readied; lowering it stays allowed (OpenMW 0.51 playercontrols.lua
+     * ToggleSpell: the spell stance only with the Magic switch on, the stance left at any time) */
+    if(!ready && !AW_ControlAllowed(AW_CONTROL_PLAYER|AW_CONTROL_MAGIC)){
+        Con_DPrintf("Ready magic: switched off by a script.\n");return;}
     /* READY-MAGIC-SHOWS-WEAPON-65: the spell stance: the empty hands come up (the weapon is put away), and go down
      * with the magic; from the weapon stance the hands stay up and only the weapon goes */
     goal=GetEdictFieldValue(sv_player,"aw_hand_goal");g=goal && goal->_float!=0;

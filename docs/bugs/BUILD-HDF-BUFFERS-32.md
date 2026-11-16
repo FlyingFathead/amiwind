@@ -1,5 +1,15 @@
 # BUILD-HDF-BUFFERS-32: Hard disk buffer and MaxTransfer defaults depend on the disk type
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 3 times; something has to be done
+
+- Reported with v0.0.66-dev5 at 2026-11-15 (time not recorded): Seen in the v0.0.66-dev5 build's image step: the buffers are set by the longest name lookup, DH0 150 (longest lookup 140 header blocks, median 25) and DW0 40 (longest 30, median 7); all 29,385 and 37,006 files fit. The load times in play are not measured yet.
+- Reported with v0.0.66-dev7 at 2026-11-15 (time not recorded): The load times in play are measured on the v0.0.66-dev6 image, which has the disk layout of v0.0.66-dev5: see IMAGE-LOADS-SLOWER-66. This replaces the v0.0.66-dev5 report's "not measured yet".
+- Reported with v0.0.66-dev2 at 2026-11-15 03:25 +0200: the 30 default buffers of the boot partition were too few for its name lookups once id1/sound moved to the tail of its chain: every sound lookup read all its blocks from the disk again (IMAGE-LOADS-SLOWER-66)
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -9,17 +19,23 @@
 | Where | disk images written by the builder (partition buffers, MaxTransfer) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.32-dev (last seen) |
+| Persists in | fixed in v0.0.66-dev5 |
 | Severity | medium: Players and benchmarks silently get different disk defaults depending on the disk type. |
 | Family | Disk images, partitions and launchers (`disk-image-layout`) |
+| Fix commit | `3dfd5095` |
+| Fixed on | 2026-11-15 |
+| Planning item | `IMAGE-LOAD-SOUND-CHAIN-66` |
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+_Last updated with AmiWind v0.0.66-dev4 (15 November 2026)._
 
-## Status: 8 October 2026
+## Status: 15 November 2026
 
-Open. Found by the CHIM world-format follow-up (FFS sweep, branch v0.0.33-chim-format).
+Fixed in source (3dfd5095), not built yet. Seen again in v0.0.66-dev2: the boot partition's 30 default buffers were
+too few for its name lookups once `id1/sound` had moved to the tail of its hash chain, so every sound lookup read all
+its blocks from the disk again (IMAGE-LOADS-SLOWER-66). First found on 8 October 2026 by the CHIM world-format
+follow-up (FFS sweep, branch v0.0.33-chim-format).
 
 ## Symptom
 
@@ -49,17 +65,29 @@ its own default.
 
 ## Repair
 
-Not yet: the builder sets buffers (and MaxTransfer) explicitly on every partition it writes and
-records them in the build receipt. In the FFS sweep, 30, 50 and 100 buffers stayed within the drift
-of the control run for seeks, so the value is a consistency question first.
+Fixed in source (3dfd5095): the image step sets the buffers of every partition it writes in the
+partition table, sized to that partition's longest name lookup: the lookup plus 10, in steps of 10,
+at least 30 (the value every partition had) and at most 500 (`tools/ffs_chains.py`). The drive is
+read back with them and `build.json` records each partition's buffers with its lookup figures.
+Measured on the v0.0.66-dev4 layout: the boot partition gets 150 (its longest lookup reads 140 header
+blocks once its chains are relinked, IMAGE-LOADS-SLOWER-66), the CHIM world partition 40. A buffer
+holds one 512-byte block, so the boot partition's take about 75 KiB of Fast RAM. MaxTransfer stays at
+0xFFFFFF, the value every partition of the image already had; the plain partition hard file is not a
+form the image ships in. `AMIWIND_PARTITION_BUFFERS=N` gives every partition N for an A/B build.
+
+In the FFS sweep (8 October 2026), 30, 50 and 100 buffers stayed within the drift of the control run
+for seeks; the sizing is for name lookups, which that sweep did not measure.
 
 ## Verification
 
-Pending.
+Pending: the buffers in the next build's record and in `awbench disk` on its image, and the Fast RAM
+they take at 32 MB.
 
 ## Prevention
 
-A builder test that every partition carries the configured buffer count and MaxTransfer.
+The drive readback reads every partition's buffers back from the partition table, and the image step
+stops when they differ from the planned value; `tests/test_ffs_chains.py` checks that they reach the
+partition table.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

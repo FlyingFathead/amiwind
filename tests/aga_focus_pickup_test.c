@@ -24,13 +24,23 @@ void Con_Printf(char *format,...){(void)format;}
 void CDAudio_Update(void){}
 void S_ExtraUpdate(void){}
 edict_t *EDICT_NUM(int i){assert(i>=0 && i<8);return &entities[i];}
-eval_t *GetEdictFieldValue(edict_t *e,char *field){(void)e;(void)field;return NULL;}
+/* CENSUS-CRAB-PLATE-FOCUS-66: edicts 2 and 3 carry the references in refs[] (the census office's brush items, each an
+ * edict of its own with its aw_ref) while ref_edicts is set; every other field lookup finds nothing */
+static eval_t refs[8];static int ref_edicts;
+eval_t *GetEdictFieldValue(edict_t *e,char *field){
+    int n=(int)(e-entities);
+    if(ref_edicts && !strcmp(field,"aw_ref") && n>=2 && n<2+ref_edicts)return &refs[n];
+    return NULL;
+}
 void *AW_TryMalloc(int size){return calloc(1,size);}
 static int serve(const void *data,int size,FILE **file){
     *file=tmpfile();assert(*file);assert(fwrite(data,1,size,*file)==(size_t)size);rewind(*file);return size;
 }
+/* CENSUS-CRAB-PLATE-FOCUS-66: a focus table of two item rows (the silver plate and the crab meat on it) */
+static byte stacked_file[8+12+2*96];static int stacked;
 int COM_FOpenFile(char *name,FILE **file){
     *file=NULL;
+    if(!strcmp(name,"focus.awf") && stacked)return serve(stacked_file,sizeof(stacked_file),file);
     if(!strcmp(name,"focus.awf"))return serve(focus_file,focus_size,file);
     if(!strcmp(name,"inventory/items.awi"))return serve(item_file,sizeof(item_file),file);
     if(!strcmp(name,"gfx/hud-settings.txt"))return serve(hud_text,sizeof(hud_text)-1,file);
@@ -74,9 +84,15 @@ void SV_LinkEdict(edict_t *e,qboolean triggers){(void)e;(void)triggers;assert(0)
 model_t *Mod_ForName(char *name,qboolean crash){(void)name;(void)crash;assert(0);return NULL;}
 void *Cache_Check(cache_user_t *c){(void)c;assert(0);return NULL;}
 int SV_PointContents(vec3_t p){(void)p;assert(0);return 0;}
+/* CENSUS-CRAB-PLATE-FOCUS-66: the view trace (the whole reach, 48 map units from the eye) meets edict view_entity at
+ * view_fraction when it is set; a sight test to a row's origin (about 20 units) and everything else are clear */
+static int view_entity;static float view_fraction;
 trace_t SV_Move(vec3_t start,vec3_t mins,vec3_t maxs,vec3_t end,int type,edict_t *pass){
-    trace_t tr;(void)start;(void)mins;(void)maxs;(void)type;(void)pass;
-    memset(&tr,0,sizeof(tr));tr.fraction=1;VectorCopy(end,tr.endpos);return tr;
+    trace_t tr;vec3_t d;(void)mins;(void)maxs;(void)type;(void)pass;
+    memset(&tr,0,sizeof(tr));tr.fraction=1;VectorCopy(end,tr.endpos);
+    VectorSubtract(end,start,d);
+    if(view_entity && DotProduct(d,d)>40*40){tr.fraction=view_fraction;tr.ent=&entities[view_entity];}
+    return tr;
 }
 static void put32(byte *p,unsigned long v){p[0]=(byte)v;p[1]=(byte)(v>>8);p[2]=(byte)(v>>16);p[3]=(byte)(v>>24);}
 /* One room (cell 763), one item row: the Quill Pen at game units (80,0,116), map (20,0,29): 20 units ahead of the
@@ -91,6 +107,26 @@ static void tables(void){
     memcpy(item_file,"AWI2",4);put32(item_file+4,1);
     memcpy(item_file+8,"misc_quill",10);memcpy(item_file+8+64,"Quill Pen",9);put32(item_file+8+160,AW_INV_MISC);
     put32(item_file+8+168,1);put32(item_file+8+172,bits);
+}
+/* CENSUS-CRAB-PLATE-FOCUS-66: the census office's back-room table as the table holds it: the owned Silverware Plate
+ * (reference PLATE, row 0) and the crab meat lying on it (CRAB, row 1), their centres half a game unit apart (the
+ * original data: 580.2 and 580.7); here 20 and 20.5 map units ahead of the eye, one unit under the crosshair line, so
+ * the plate's origin is the nearer one. Both rows read "Quill Pen" with the quill's record, so the take path is the
+ * quill's own; the reference taken tells them apart. */
+#define PLATE 119580u
+#define CRAB 454283u
+static void stacked_tables(void){
+    static const unsigned long refs_of[2]={PLATE,CRAB},x_of[2]={80,82};
+    float weight=.1f;unsigned long bits;int k;
+    memset(stacked_file,0,sizeof(stacked_file));
+    memcpy(stacked_file,"AWF2",4);put32(stacked_file+4,1);
+    put32(stacked_file+8,763);put32(stacked_file+12,0);put32(stacked_file+16,2);
+    memcpy(&bits,&weight,4);
+    for(k=0;k<2;k++){
+        byte *row=stacked_file+8+12+96*k;
+        row[0]='I';row[1]=1;put32(row+4,refs_of[k]);put32(row+8,x_of[k]);put32(row+12,0);put32(row+16,112);
+        put32(row+20,bits);put32(row+24,1);memcpy(row+28,"Quill Pen",9);memcpy(row+64,"misc_quill",10);
+    }
 }
 static void level(int draws){
     static model_t *next;
@@ -291,6 +327,32 @@ int main(void){
      put32(t+8,QUILL+1);AW_LedgerClear(&aw_ledger);level(1);
      assert(AW_InventoryUse() && taken==1 && !aw_ledger.stolen_count);
      AW_LedgerClear(&aw_ledger);focus_size=8+12+96;}
+    /* CENSUS-CRAB-PLATE-FOCUS-66: the crab meat on the silver plate, both drawn by the room as edicts of their own.
+     * The use goes to what the view ray meets first, as in the original; the origin nearer the crosshair line only
+     * when the ray meets neither. */
+    stacked_tables();stacked=1;ref_edicts=2;refs[2]._float=(float)PLATE;refs[3]._float=(float)CRAB;
+    /* the ray meets no edict with a reference: the plate's origin, a hair nearer, as before */
+    level(0);sv.num_edicts=4;view_entity=0;
+    assert(AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned));
+    assert(AW_InventoryUse() && take_reference==(int)PLATE);
+    /* the ray meets the crab meat lying on top first (19.5 units out): E takes the crab meat, not the owned plate */
+    level(0);sv.num_edicts=4;view_entity=3;view_fraction=19.5f/48;
+    assert(AW_InventoryUse() && take_reference==(int)CRAB);
+    /* looking at the plate's rim beside it: the ray meets the plate first, the plate */
+    level(0);sv.num_edicts=4;view_entity=2;view_fraction=19.0f/48;
+    assert(AW_InventoryUse() && take_reference==(int)PLATE);
+    /* the view turned 20 degrees, both origins past the origin test (6.8 units off the line): where the ray meets the
+     * crab meat it is still the crab meat (as a drawn item by its model) */
+    level(0);sv.num_edicts=4;view_entity=3;view_fraction=21.0f/48;entities[1].v.v_angle[1]=20;
+    assert(AW_InventoryUse() && take_reference==(int)CRAB);
+    /* turned the same 20 degrees with the ray meeting neither (it passes beside them): no item */
+    level(0);sv.num_edicts=4;view_entity=0;entities[1].v.v_angle[1]=20;
+    assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned));
+    entities[1].v.v_angle[1]=0;
+    /* an edict whose reference no row has (the crab meat's row then has no edict: not drawn): the plate */
+    refs[3]._float=(float)(CRAB+1);level(0);sv.num_edicts=4;view_entity=3;view_fraction=19.5f/48;
+    assert(AW_InventoryUse() && take_reference==(int)PLATE);
+    stacked=0;ref_edicts=0;view_entity=0;
     puts("Placed pickup through the use key's path: box, take, no second take, no box for an item the room leaves out; "
          "the placed list draws the left-out item by reference and it is taken the same way.");
     return 0;

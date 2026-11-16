@@ -195,6 +195,10 @@ def pack_partition(chim_root, part, volume='AW_CHIM', mib=None, xdftool='xdftool
     payload = sum((chim_root / rel).stat().st_size for rel in order) + sum(s.stat().st_size for s, _ in extra)
     mib = mib or partition_mib(payload)
     run_any(partition_command(xdftool, part, chim_root, volume, mib, base, extra))
+    # every hash chain busiest first, as on the boot partition (tools/ffs_chains.py, IMAGE-LOADS-SLOWER-66): only
+    # links change, so the pack order the layout gate checks below stays as written
+    from ffs_chains import describe, order_partition
+    print(describe(order_partition(part), volume), flush=True)
     check_image(part, normalize=True)
     from amitools.fs.ADFSVolume import ADFSVolume
     from amitools.fs.FSString import FSString

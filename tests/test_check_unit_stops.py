@@ -76,6 +76,71 @@ class CheckRunsTheUnitStop(unittest.TestCase):
         self.assertIn('the build would stop', found['error'])
         self.assertFalse(found['completed'])
 
+    def test_the_check_plans_the_same_commands_as_the_build(self):
+        # the second cause of BUILD-REUSE-STOP-COUNTS-STORED-GROUP-64: the build binds the exterior checklist to
+        # world-terrain, world-scenery and world-flora (--exterior-plan) and to the image (--exterior-terrain) before
+        # it prepares the steps; the check planned the unbound commands, so those three stages read "changed:
+        # command" against every earlier build, were counted as rebuilt, and the unit stop counted their stored units
+        # (2064 world-scenery regions, 1931 world-flora regions) while the build reused all three
+        self.steps = [('world-terrain', ['python3', 'tools/prepare_world_regions.py']),
+                      ('world-scenery', ['python3', 'tools/prepare_world_scenery.py']),
+                      ('world-flora', ['python3', 'tools/prepare_world_flora.py']),
+                      ('image', ['python3', 'tools/build_aga.py', 'image']),
+                      ('music', ['python3', 'tools/prepare_music.py'])]
+        self.args.exterior_checklist = {'summary': {'chim-region': 1348}}
+        seen = {}
+
+        def prepare(steps, run, *a, **kw):
+            seen['steps'] = [(name, list(command)) for name, command in steps]
+            seen['run'] = run
+            return list(steps)
+        run = Path(self.tmp.name) / 'build' / 'run'
+        code, _ = self.run_check(prepare)
+        self.assertEqual(code, 0)
+        import exterior_plan
+        self.assertEqual(seen['steps'], [(name, list(command)) for name, command in
+                                         exterior_plan.bind_steps(self.steps, run / 'exterior-checklist.json')])
+        by_name = dict(seen['steps'])
+        for name in ('world-terrain', 'world-scenery', 'world-flora'):
+            self.assertEqual(by_name[name][-2:], ['--exterior-plan', str(run / 'exterior-checklist.json')])
+        self.assertEqual(by_name['image'][-2:], ['--exterior-terrain', str(run / 'world-terrain')])
+        self.assertEqual(by_name['music'], ['python3', 'tools/prepare_music.py'])   # every other stage as it was
+
+    def test_a_check_without_a_checklist_plans_the_commands_as_they_are(self):
+        self.args.exterior_checklist = None
+        seen = {}
+
+        def prepare(steps, *a, **kw):
+            seen['steps'] = list(steps)
+            return list(steps)
+        code, _ = self.run_check(prepare)
+        self.assertEqual(code, 0)
+        self.assertEqual(seen['steps'], self.steps)
+
+    def test_the_whole_check_output_is_kept_beside_the_result(self):
+        # the refusal carries the check's last 40 lines; the plan line of a stopped stage ("rebuild: why") comes
+        # earlier, so aw keeps the whole output in RUN.check.log, refused or passed
+        import aw_service
+        lines = [f'   stage-{n}: reused from run' for n in range(200)] + ['STOP world-scenery: would bake again 2064',
+                                                                         'Check FAILED: the build would stop']
+
+        class Runner:
+            def capture(self, command, timeout=None):
+                return 1, '\n'.join(lines) + '\n', ''
+        log = Path(self.tmp.name) / 'logs' / 'run.check.log'
+        notes = []
+        with contextlib.redirect_stdout(io.StringIO()):
+            step, refusals = aw_service.preflight_check({'options': {}}, {'check': ['x']}, Runner(), notes, {},
+                                                        full_log=log)
+        self.assertEqual(log.read_text(encoding='utf-8').splitlines(), lines)
+        self.assertEqual(step['full_output'], str(log))
+        self.assertEqual(len(step['output_tail']), aw_service.CHECK_TAIL_LINES)      # the refusal still shows 40
+        self.assertTrue(any(str(log) in note for note in notes))
+        self.assertTrue(refusals)
+        with contextlib.redirect_stdout(io.StringIO()):
+            step, _ = aw_service.preflight_check({'options': {}}, {'check': ['x']}, Runner(), [], {})   # no path
+        self.assertNotIn('full_output', step)
+
     def test_the_check_branch_calls_it_before_completing(self):
         text = (ROOT / 'tools/build.py').read_text(encoding='utf-8')
         call = text.index('code = unit_stop_check(args, tools, run)')
