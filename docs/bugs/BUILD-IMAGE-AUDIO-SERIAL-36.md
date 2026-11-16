@@ -119,7 +119,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-CACHE-OVERBROAD-33](BUILD-CACHE-OVERBROAD-33.md): CHIM builds rerun the scene chain after merges that cannot change its outputs
 - [BUILD-CACHE-PER-WORKSPACE-33](BUILD-CACHE-PER-WORKSPACE-33.md): Per-file caches live in each build workspace, so a build on a new volume with --reuse-from converts everything again (MiniWind media 1,195 s instead of seconds)
 - [BUILD-CACHE-TRACE-PYTHONPATH-33](BUILD-CACHE-TRACE-PYTHONPATH-33.md): The stage read trace refused reuse of a reused run when another checkout was on PYTHONPATH
-- BUILD-CHECK-ONE-CORE-66 (no report page): The build's reuse check runs about six minutes on one core, and every snapshot runs it twice before its build starts
+- [BUILD-CHECK-ONE-CORE-66](BUILD-CHECK-ONE-CORE-66.md): The build's reuse check runs about six minutes on one core, and every snapshot runs it twice before its build starts
 - [BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46](BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46.md): A change in the shared collision converter rebuilds every CHIM frame and everything after it, even where the output is identical
 - [BUILD-CHIM-FRAME-SWAP-LATE-36](BUILD-CHIM-FRAME-SWAP-LATE-36.md): The image step builds 335 legacy maps of cells already on CHIM, then removes them before packing
 - BUILD-CHIM-KEY-SKY-OVERLAY-TABLE-59 (no report page): The CHIM world stage and its ocean units are keyed by the whole sky palette overlay module, so a new image file extension rebuilds the CHIM world

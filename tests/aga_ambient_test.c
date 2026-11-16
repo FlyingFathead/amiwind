@@ -1,8 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
  * The ambient table reader (engine/aga/src/aw_ambient.c pure part, AW_AMBIENT_HOST_TEST) on a real AWAM1 file the
  * builder made (tests/test_ambient_lut.py): aga_ambient_test TABLE EXPECTATIONS (tab-separated lines: row, point,
- * hop, profile, idle, hash, missing). Also the decisions: allowed destinations, picks, the idle roll's table. */
+ * hop, profile, idle, hash, missing). Also the decisions: allowed destinations, picks, the idle roll's table, and the
+ * door rule (WANDER-DOOR-RULE-66: a door ahead, the idle check, a stuck walker's dropped destinations). */
 #include <assert.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,6 +19,9 @@ static unsigned char *slurp(const char *path,long *size) {
 }
 static aw_ambient_table_t t;
 static unsigned char *data;
+/* WANDER-DOOR-RULE-66: the facing of a Quake yaw (degrees) as the engine gets it, its sine and cosine (Q_SinCosDeg
+ * there, the C library here) into AW_AmbientForward */
+static void facing(double yaw,float f[2]) {double a=yaw*3.14159265358979323846/180.0;AW_AmbientForward((float)sin(a),(float)cos(a),f);}
 static void pkg_of(long row,aw_ambient_pkg_t *p) {
     aw_ambient_row_t r;long pa,pb,ha,hb;unsigned char *blob;
     AW_AmbientRow(&t,row,&r);AW_AmbientBlobAt(&t,&r,&pa,&pb,&ha,&hb);
@@ -118,6 +123,51 @@ int main(int argc,char **argv) {
             /* the maximum range: 7168 original units = 1792 engine units */
             assert(AW_AmbientTravelInRange(1792,0,0) && !AW_AmbientTravelInRange(1793,0,0));
         }
+        {   /* WANDER-DOOR-RULE-66 on the wanderer's routes: at 700 the four grid destinations lie on one line, cur (x -2)
+             * at one end; FAR is the other end, FIRST the hop from cur toward it, MID the one between */
+            int far=-1,first,mid,xyz[3],j,best=-1000,n,cur_was,seen3[AW_AMBIENT_MAX_DEST];
+            static const float door_east[2]={30,0};
+            float at[2],forward[2];
+#define ALLOWED(p,i) (((p).allowed[(i)>>3]>>((i)&7))&1)
+            AW_AmbientAllow(&pk,700);
+            for(j=0;j<pk.destinations;j++)if(ALLOWED(pk,j)){AW_AmbientPoint(&pk,j,xyz,NULL);if(xyz[0]>best){best=xyz[0];far=j;}}
+            first=AW_AmbientHop(&pk,pk.cur,far);mid=AW_AmbientHop(&pk,first,far);
+            assert(far>=0 && first>=0 && mid>=0 && first!=far && mid!=far && ALLOWED(pk,first) && ALLOWED(pk,mid));
+            assert(AW_AmbientHop(&pk,mid,far)==far);
+            /* an idle wanderer at a destination, facing a door within 1.6 x the activation distance (76.8), walks on:
+             * the idle check applies, the door is ahead, and it gets a destination other than where it stands */
+            AW_AmbientPoint(&pk,pk.cur,xyz,NULL);at[0]=(float)xyz[0];at[1]=(float)xyz[1];
+            facing(-90,forward);                                              /* facing +x, toward FIRST and the door */
+            {float door[2];door[0]=at[0]+door_east[0];door[1]=at[1]+door_east[1];
+             assert(AW_AmbientIdleCheck(&pk) && AW_AmbientDoorAhead(at,forward,door,76.8f));
+             assert((n=AW_AmbientPickDestination(&pk,12345u))>=0 && n!=pk.cur);
+             /* facing away from it, or the door farther than the distance: it stays in its idle */
+             facing(90,forward);assert(!AW_AmbientDoorAhead(at,forward,door,76.8f));
+             facing(-90,forward);door[0]=at[0]+80;assert(!AW_AmbientDoorAhead(at,forward,door,76.8f));}
+            /* a stationary one (wander distance 0) and one that only wanders near its start never take the check */
+            {aw_ambient_pkg_t still=pk;AW_AmbientAllow(&still,0);assert(!AW_AmbientIdleCheck(&still));
+             still.distance=700;still.manual=1;assert(!AW_AmbientIdleCheck(&still));}
+            /* a walker stuck by a door while walking to FIRST, bound for FAR, drops MID (its route after FIRST); FAR
+             * stays while only two others would (OpenMW puts the destination back), and it never picks MID again */
+            assert(AW_AmbientTrimRoute(&pk,first,far)==1);
+            assert(!ALLOWED(pk,mid) && ALLOWED(pk,far) && ALLOWED(pk,first) && pk.count==3 && !pk.manual);
+            for(k=0;k<300;k++){goal=AW_AmbientPickDestination(&pk,(unsigned)k*7919u);assert(goal>=0 && goal!=mid && goal!=pk.cur);}
+            /* bound for FIRST (cur = its goal, as a walk sets it) with three others allowed: FIRST itself is dropped,
+             * and every other destination can come up next, the start's included */
+            AW_AmbientAllow(&pk,700);cur_was=pk.cur;pk.cur=(unsigned char)first;
+            assert(AW_AmbientTrimRoute(&pk,cur_was,first)==1 && !ALLOWED(pk,first) && pk.count==3 && !pk.manual);
+            memset(seen3,0,sizeof(seen3));
+            for(k=0;k<300;k++){goal=AW_AmbientPickDestination(&pk,(unsigned)k*7919u);assert(goal>=0 && goal!=first);seen3[goal]++;}
+            assert(seen3[cur_was] && seen3[mid] && seen3[far]);
+            /* the routes behind a door take every other destination: one left, so the package wanders near its start */
+            AW_AmbientAllow(&pk,700);pk.allowed[cur_was>>3]&=(unsigned char)~(1u<<(cur_was&7));pk.count=3;
+            pk.cur=(unsigned char)far;
+            assert(AW_AmbientTrimRoute(&pk,cur_was,far)==2 && pk.count==1 && pk.manual && ALLOWED(pk,far));
+            assert(AW_AmbientPickDestination(&pk,0)==-1);
+            assert(AW_AmbientTrimRoute(&pk,-1,far)==0 && AW_AmbientTrimRoute(&pk,cur_was,pk.destinations)==0);
+#undef ALLOWED
+            checks+=17;
+        }
         free((void *)pk.blob);
     }
     assert(AW_AmbientWithin(0,0,0,0) && AW_AmbientWithin(25,0,0,100) && !AW_AmbientWithin(26,0,0,100));
@@ -143,6 +193,26 @@ int main(int argc,char **argv) {
         assert(AW_AmbientEscortStep(-1,9,0,0,16,&max)==AW_ESCORT_WAIT);           /* outdoors only */
         assert(AW_AmbientEscortStep(-1,0,0,0,16,&max)==AW_ESCORT_DONE);
         checks+=14;
+    }
+    {   /* WANDER-DOOR-RULE-66 (OpenMW obstacle.cpp getNearbyDoor): ahead = within the distance and at most 60 degrees off
+         * the facing; a converted character of yaw 0 faces +y, of yaw -90 +x; heights play no part */
+        float at[2]={100,200},f[2],d[2];
+        facing(0,f);assert(fabs(f[0])<1e-6 && fabs(f[1]-1)<1e-6);
+        facing(-90,f);assert(fabs(f[0]-1)<1e-6 && fabs(f[1])<1e-6);
+        facing(90,f);assert(fabs(f[0]+1)<1e-6 && fabs(f[1])<1e-6);
+        facing(0,f);
+        d[0]=100;d[1]=250;assert(AW_AmbientDoorAhead(at,f,d,76.8f));                     /* 50 straight ahead */
+        d[0]=100;d[1]=276.8f;assert(AW_AmbientDoorAhead(at,f,d,76.8f));                  /* at the distance itself */
+        d[0]=100;d[1]=277.5f;assert(!AW_AmbientDoorAhead(at,f,d,76.8f));                 /* past it */
+        d[0]=100;d[1]=150;assert(!AW_AmbientDoorAhead(at,f,d,76.8f));                    /* behind */
+        d[0]=100+50*(float)sin(55*3.14159265/180);d[1]=200+50*(float)cos(55*3.14159265/180);
+        assert(AW_AmbientDoorAhead(at,f,d,76.8f));                                       /* 55 degrees off */
+        d[0]=100+50*(float)sin(65*3.14159265/180);d[1]=200+50*(float)cos(65*3.14159265/180);
+        assert(!AW_AmbientDoorAhead(at,f,d,76.8f));                                      /* 65 degrees off */
+        d[0]=100;d[1]=200;assert(!AW_AmbientDoorAhead(at,f,d,76.8f));                    /* on its own spot */
+        /* a walker's check uses the activation distance itself (48): a door 50 ahead is not by it */
+        d[0]=100;d[1]=250;assert(!AW_AmbientDoorAhead(at,f,d,48.0f));
+        checks+=12;
     }
     printf("aga_ambient_test: %d checks passed\n",checks);
     free(data);

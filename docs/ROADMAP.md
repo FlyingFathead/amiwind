@@ -1,6 +1,6 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.66-dev10 (15 November 2026)._
+_Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -171,6 +171,22 @@ chains from person to place):
 
 Alongside, every item the game places in the world (weapons, armor, books, ingredients, keys and the rest, loose in the
 wild and in rooms) is counted from the game files and checked in the build.
+
+**Eleventh snapshot, 16 November 2026:** [v0.0.66-dev11](releases/notes/RELEASE-v0.0.66-dev11.md) is in development
+and carries dev10. **The game changes:** residents that wander keep off doors as in the original
+(`WANDER-DOOR-RULE-66`), and a script's read or write of another object's local variable and a script's `SetHealth 0`
+work as in the original (`MWSCRIPT-MEMBER-READS-ID-AS-SCRIPT-66`, `MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66`), fixed in source
+and covered by tests, to be confirmed in play. **The builder** runs its reuse check once per snapshot
+(`BUILD-CHECK-ONE-CORE-66`), fixed in source, to be confirmed by this snapshot's build. **Testing tools:** `chim actors summon` by reference for the opening
+journey's step 7, the stall examination naming the stuck request's file, emulator options in session scripts, and a
+test session for the end of the main quest, whose first run loaded the Heart Chamber in play at 32 MB and whose second
+destroyed the Heart of Lorkhan with Sunder and Keening and ran the end script from the entrance. **The load stall
+in test sessions** has its cause found in the emulator's source and shown in a test session (an interrupt request lost
+in the drive that serves the remote-console folder; players have no such drive), and the way out, an emulator option, is
+being measured. **Still open in dev11:** that measurement, the chamber's collapse (`ENDGAME-CHAMBER-COLLAPSE-63`), the
+packet overflow in Vivec (`NET-VIVEC-ENTITY-PACKET-OVERFLOW-66`), the door arrival and the wander rule until they are
+seen in play (`DOOR-ARRIVAL-INSIDE-ACTOR-66`, `WANDER-DOOR-RULE-66`) and the image partitions written slower since dev2
+(`BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66`).
 
 **Tenth snapshot, 15 November 2026:** [v0.0.66-dev10](releases/notes/RELEASE-v0.0.66-dev10.md) is in development and
 carries dev9; the game is the same as dev9 apart from the version and one test-only setting (`aw_remote_log`, the remote

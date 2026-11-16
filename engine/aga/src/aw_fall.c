@@ -108,7 +108,7 @@ static void landed(edict_t *e,fall_t *f,int water){
     if(AW_CombatSlotState(e,&health)==1)a->dyn_cur[0]=health;    /* a fight's health is the live one */
     a->dyn_cur[0]-=loss;health=a->dyn_cur[0];
     play(e,AW_SND_HEALTH,1);
-    if(health<=0){
+    if(AW_ACTOR_HEALTH_DEAD(health)){     /* under 1 is death (MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66) */
         a->dyn_cur[0]=0;
         /* dies as by a blow: laid down, on the change list, its body searchable (aw_combat.c) */
         if(!AW_CombatSpellHit(e,0,0))AW_CombatTestEngage(e,1);

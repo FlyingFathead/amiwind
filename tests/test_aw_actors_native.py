@@ -117,6 +117,13 @@ class ActorsNativeTests(unittest.TestCase):
         # until fCorpseClearDelay, then cleared for good; "chim actors corpses 0" keeps the older method (not spawned)
         self.assertIn('outdoor corpse passed', self.run_check('outdoorcorpse'))
 
+    def test_summon_takes_an_optional_reference(self):
+        # JOURNEY-STEP7-FIGHTER-NEAREST-66: "chim actors summon REF" copies the living resident of that reference, the
+        # bare form still the nearest; an unknown or dead reference copies nobody and says so
+        out = self.run_check('summonref')
+        self.assertIn('summon by reference passed', out)
+        self.assertIn('chim actors summon: no living actor of reference 999 here', out)
+
     def test_home_frame_keeps_its_own_actors(self):
         # CHIM-ACTORS-TOWN-RETURN-EMPTY-47: a town frame's residents beside its own cell stay while the frame is held
         self.assertIn('home frame actors passed', self.run_check('home'))

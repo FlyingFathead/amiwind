@@ -225,6 +225,73 @@ class StoredGroupOfRegionStages(unittest.TestCase):
             self.assertIn('would bake again 2064 of the 2064 units', problems[0][1])
 
 
+def _fake_digests(opener, root=ROOT):
+    """A pure stand-in for current_digests (module level: the forked workers call it by name)."""
+    import hashlib
+    text = json.dumps([opener['name'], opener['scripts'], str(root)], sort_keys=True).encode()
+    digest = hashlib.sha256(text).hexdigest()
+    return digest, (digest, digest[::-1])
+
+
+def _worker_pid(opener, root=ROOT):
+    import os
+    return os.getpid(), ()
+
+
+class UnitDigestsOnThePool(unittest.TestCase):
+    """The unit-cache report's keys on worker processes (BUILD-CHECK-ONE-CORE-66): the same answers as one after
+    another, and the pool really runs them elsewhere."""
+
+    def setUp(self):
+        self.keep = RA.current_digests
+        self.addCleanup(setattr, RA, 'current_digests', self.keep)
+        self.wanted = {(f'cache-{n}', json.dumps([f'tools/t{n}.py'])): {
+            'module': f'tools/t{n}.py', 'function': 'f', 'name': f'cache-{n}', 'scripts': [f'tools/t{n}.py']}
+            for n in range(9)}
+
+    def test_parallel_equals_serial(self):
+        RA.current_digests = _fake_digests
+        serial = RA.unit_digests(self.wanted, ROOT, workers=1)
+        parallel = RA.unit_digests(self.wanted, ROOT, workers=4)
+        self.assertEqual(parallel, serial)
+        self.assertEqual(list(parallel), list(self.wanted))        # the order of the keys asked for
+        self.assertEqual(serial[('cache-3', json.dumps(['tools/t3.py']))],
+                         _fake_digests(self.wanted[('cache-3', json.dumps(['tools/t3.py']))], ROOT))
+
+    def test_the_pool_runs_them_in_other_processes(self):
+        import os
+        RA.current_digests = _worker_pid
+        pids = {pid for pid, _ in RA.unit_digests(self.wanted, ROOT, workers=3).values()}
+        self.assertNotIn(os.getpid(), pids)
+        self.assertEqual({pid for pid, _ in RA.unit_digests(self.wanted, ROOT, workers=1).values()}, {os.getpid()})
+        one = dict(list(self.wanted.items())[:1])                  # a single key: no pool for it
+        self.assertEqual({pid for pid, _ in RA.unit_digests(one, ROOT, workers=8).values()}, {os.getpid()})
+
+    def test_the_workers_follow_the_build_preflight(self):
+        import build_cache
+        keep = build_cache.PREFLIGHT_WORKERS
+        self.addCleanup(setattr, build_cache, 'PREFLIGHT_WORKERS', keep)
+        build_cache.PREFLIGHT_WORKERS = None
+        self.assertEqual(RA.digest_workers(), 1)                   # tests, plans and every other caller: one process
+        build_cache.PREFLIGHT_WORKERS = 6
+        self.assertEqual(RA.digest_workers(), 6)
+
+    def test_the_real_keys_of_two_caches_on_the_pool(self):
+        """Two real caches of this checkout: their key digests on two workers equal the serial ones."""
+        openers = [o for o in RA.unit_cache_openers(ROOT) if o['scripts'] and o['name']]
+        wanted = {}
+        for opener in openers:
+            if opener['name'] in ('npc-voice-table', 'dialogue-table'):
+                wanted.setdefault((opener['name'], json.dumps(opener['scripts'])), opener)
+        self.assertEqual(len(wanted), 2, sorted(o['name'] for o in openers))
+        import pass_cache
+        serial = RA.unit_digests(wanted, ROOT, workers=1)
+        pass_cache._DIGESTS.clear()                                 # worked out again, not taken from this process
+        parallel = RA.unit_digests(wanted, ROOT, workers=2)
+        self.assertEqual(parallel, serial)
+        self.assertTrue(all(value is not None for value in serial.values()))
+
+
 class UnitCacheOpeners(unittest.TestCase):
     def test_openers_name_their_key_code(self):
         found = {(row['module'], row['name']): row for row in RA.unit_cache_openers(ROOT)}

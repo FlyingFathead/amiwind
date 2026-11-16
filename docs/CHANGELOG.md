@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.66-dev10 (15 November 2026)._
+_Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.66-dev11: eleventh snapshot of v0.0.66, 16 November 2026](#v0066-dev11-eleventh-snapshot-of-v0066-16-november-2026)
 - [v0.0.66-dev10: tenth snapshot of v0.0.66, 15 November 2026](#v0066-dev10-tenth-snapshot-of-v0066-15-november-2026)
 - [v0.0.66-dev9: ninth snapshot of v0.0.66, 15 November 2026](#v0066-dev9-ninth-snapshot-of-v0066-15-november-2026)
 - [v0.0.66-dev8: eighth snapshot of v0.0.66, 15 November 2026](#v0066-dev8-eighth-snapshot-of-v0066-15-november-2026)
@@ -200,6 +201,43 @@ _Last updated with AmiWind v0.0.66-dev10 (15 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.66-dev11: eleventh snapshot of v0.0.66, 16 November 2026
+
+The eleventh development snapshot of v0.0.66, in development ([release notes](releases/notes/RELEASE-v0.0.66-dev11.md)).
+It carries dev10 and needs 32 MB of Fast RAM. No finished Mournhold or Solstheim content is in this snapshot.
+
+- The game: residents that wander keep off doors as in the original. An idle wanderer facing a door within reach walks
+  on, and a walker stuck by a door drops that destination (`WANDER-DOOR-RULE-66`; fixed in source and covered by tests,
+  to be confirmed in play).
+- The script engine: a script's read or write of another object's local variable read the wrong field, so every such
+  read gave 0 and every write was lost (464 operations in 186 of the game's scripts;
+  `MWSCRIPT-MEMBER-READS-ID-AS-SCRIPT-66`), and a script's `SetHealth 0` did not kill
+  (`MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66`). Both fixed in source and covered by tests, to be confirmed by the end of the
+  main quest session on the dev11 image.
+- The builder: a build takes the passed reuse check of an identical earlier request instead of running it again, and
+  the check's file comparison and unit-cache report run on more cores (`BUILD-CHECK-ONE-CORE-66`; to be confirmed by
+  this snapshot's build).
+- Testing tools: `chim actors summon` takes a reference, and the opening journey's step 7 fights the armed Seyda Neen
+  guard (`JOURNEY-STEP7-FIGHTER-NEAREST-66`); the stall examination names the file of a stuck open, lock or delete and
+  prints the stuck request's state word (`STALL-PROBE-NAME-BPTR-66`, seen fixed); session scripts and journeys can set
+  emulator options; and a test session plays the end of the main quest (`ENDGAME-HEART-SESSION-66`).
+- The end of the main quest session's first run, on the dev10 image: the Heart Chamber loads in play at 32 MB with the
+  Heart of Lorkhan and Dagoth Ur in it. The console does not count Keening, its equip skips an item's equip script and
+  its position read of an actor is wrong (`CONSOLE-EQUIP-SKIPS-ONPCEQUIP-66` and `CONSOLE-GETPOS-SCRATCH-ORIGIN-66`,
+  new). Its second run (deterministic, no stall) passed 55 of 66 checks: the Heart's script took Sunder's strike, five
+  Keening strikes destroyed the Heart of Lorkhan, Dagoth Ur's health was capped at 200, and the end script ran from the
+  entrance (the quest at its stage 20, the blight ended, Red Mountain's weather changed, teleporting allowed again,
+  reputation +10); it found the two script engine faults above. Its Facility Cavern step failed on the session's own
+  order of visits (the cavern first entered at stage 20, where Azura's spirit shows itself again only if it was hidden),
+  now fixed in the session; no run has reached the ending video yet. Known: the chamber's collapse is not animated
+  (`ENDGAME-CHAMBER-COLLAPSE-63`), and the console's ShowVars on a reference (`CONSOLE-SHOWVARS-SCRATCH-INSTANCE-66`).
+- The load stall in test sessions: its cause is found in the emulator's source and shown in a test session, an
+  interrupt request lost in the drive that serves the test sessions' remote-console folder (players have no such
+  drive). The way out, the emulator's deterministic mode, is being measured, and the entry stays open.
+- Register: the image's partitions are written slower on every build since v0.0.66-dev2, with the larger boot
+  partition (`BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66`), and file reads in the development container can fail with "Cannot
+  allocate memory" ([CONTAINER-READ-ENOMEM-66](bugs/CONTAINER-READ-ENOMEM-66.md), new).
 
 ## v0.0.66-dev10: tenth snapshot of v0.0.66, 15 November 2026
 

@@ -108,8 +108,29 @@ void AW_AmbientPoint (const aw_ambient_pkg_t *p, int index, int xyz[3], int *kin
  * one, also the starting position and (only at the record's own distance) the part-way points; with none, the
  * package wanders manually (distance > 0) or stands. cur = the allowed destination closest to the start. */
 void AW_AmbientAllow (aw_ambient_pkg_t *p, unsigned distance);
-/* A destination other than cur, picked uniformly by ROLL (setPathToAnAllowedPosition), or -1 with fewer than 2. */
+/* An allowed destination other than cur, picked uniformly by ROLL (setPathToAnAllowedPosition), or -1 when there is none
+ * (cur itself may have been dropped by AW_AmbientTrimRoute: then every allowed destination can come up). */
 int AW_AmbientPickDestination (const aw_ambient_pkg_t *p, unsigned roll);
+/* WANDER-DOOR-RULE-66, the doors (rules from OpenMW 0.51 apps/openmw/mwmechanics/obstacle.cpp getNearbyDoor and
+ * aiwander.cpp; our own code):
+ *   AW_AmbientForward   the unit direction (x y) an actor faces from the sine and cosine of its Quake yaw (the engine
+ *                       takes them from Q_SinCosDeg): a converted character faces its local +Y, yaw + 90 degrees
+ *                       (OpenMW: the attitude times (0, 1, 0)).
+ *   AW_AmbientDoorAhead 1 when a door at DOOR (x y) lies within DISTANCE (inclusive) of an actor at AT facing FORWARD
+ *                       and no more than 60 degrees off it; heights left out (the original flattens both points), a
+ *                       door on the actor's own spot is not ahead. Engine units in and out.
+ *   AW_AmbientIdleCheck 1 when the idle check (every 1.5 s of an idle, onIdleStatePerFrameActions: a door ahead within
+ *                       1.6 x the activation distance, or no allowed destination near) can send the actor on: it has a
+ *                       wander distance (OpenMW isStationary) and routes (a package that wanders near its start only
+ *                       goes back to its roll in OpenMW).
+ *   AW_AmbientTrimRoute a walker stuck by a door (evadeObstacles, trimAllowedPositions, mTrimCurrentPosition): the
+ *                       allowed destinations its route passes after the waypoint AT (a local point) and before GOAL
+ *                       are dropped, then GOAL too while at least three others stay; with fewer than two left the
+ *                       package wanders near its start (manual). The number dropped. */
+void AW_AmbientForward (float sin_yaw, float cos_yaw, float forward[2]);
+int AW_AmbientDoorAhead (const float at[2], const float forward[2], const float door[2], float distance);
+int AW_AmbientIdleCheck (const aw_ambient_pkg_t *p);
+int AW_AmbientTrimRoute (aw_ambient_pkg_t *p, int at, int goal);
 /* The next local point from local point FROM toward destination GOAL, or -1 (no route). */
 int AW_AmbientHop (const aw_ambient_pkg_t *p, int from, int goal);
 /* AITravel (v0.0.57; OpenMW aitravel.cpp): 1 when an offset (engine units) is within the travel's maximum range

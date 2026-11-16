@@ -1774,6 +1774,12 @@ typedef struct {vec3_t at;float weight;int value;unsigned reference;char kind,ow
 static focus_row_t *focus_rows;
 static int focus_count;
 static model_t *focus_world;
+/* WANDER-DOOR-RULE-66 (AW_PlacedDoors): the load door rows ('D') whose position is in this map's units, by index, made
+ * with the rows; 512 bytes. The most load doors in one place of the original data: see docs/NPC_PATHFINDING.md (doors). */
+#define FOCUS_DOORS 256
+static short focus_doors[FOCUS_DOORS];
+static int focus_door_count;
+static unsigned long focus_doors_over;     /* doors past the list at a load (none expected; said once a load) */
 /* SIGNPOST-NAMES-MISSING-65: a named board ('N' row, tools/prepare_focus.py SIGN_BOARD_BOXES): its row sits at the
  * board's centre and its id field holds the box's half extents and the reference's rotation (a unit quaternion). The box's three
  * half axes (map units, turned as drawn) are kept here, the row's value is its index; the view ray is tested against
@@ -3228,7 +3234,7 @@ int AW_AreaPlaceKeys(unsigned long *keys,int max,unsigned long *generation){
 static void focus_load(void){
     FILE *f=NULL;long base,room=0;int i,j,dx,dy,ok=1;
     unsigned long rooms;edict_t *e;eval_t *v;vec3_t game,local;
-    focus_world=sv.worldmodel;focus_count=0;focus_outdoor=0;focus_boards=0;
+    focus_world=sv.worldmodel;focus_count=0;focus_outdoor=0;focus_boards=0;focus_door_count=0;
     AW_ContainerRelease();    /* CONTAINER-STRIP-TAKE-STALL-59: a held container belongs to the place it was read in */
     if(aw_placed_begin)aw_placed_begin();      /* a new map or cell: nothing drawn until the list is read again */
     if(svs.clients && svs.clients[0].edict && focus_to_source(svs.clients[0].edict->v.origin,game)){
@@ -3315,8 +3321,12 @@ static void focus_load(void){
         }
         if(!focus_outdoor)VectorScale(row->at,.25f,row->at);
         else if(focus_to_local(row->at,local)){VectorCopy(local,row->at);}
-        else row->edict=1;
+        else {row->edict=1;continue;}
+        /* WANDER-DOOR-RULE-66: a load door at a position of this map joins the door list */
+        if(row->kind=='D'){if(focus_door_count<FOCUS_DOORS)focus_doors[focus_door_count++]=(short)j;else focus_doors_over++;}
     }
+    if(focus_doors_over){Con_Printf("Placed doors: %lu load doors past the %d the residents' door rule keeps\n",
+                                    focus_doors_over,FOCUS_DOORS);focus_doors_over=0;}
     /* the actors and doors that have an edict of their own (an item's edict, a compiled room's placed static, has no
      * targeting of its own: its row stays) */
     for(j=0;j<focus_count;j++)focus_rows[j].live=0;
@@ -3495,6 +3505,18 @@ void AW_PlacedAimReport(void){
                    seen && seen->v.netname?pr_strings+seen->v.netname:"none",aw_activate_last.actor_near,
                    aw_activate_last.actor_far,aw_activate_last.item,aw_activate_last.plant);
     }
+}
+/* WANDER-DOOR-RULE-66 (aw_inventory.h): the place's load doors for the residents' door rule; no file read, no search */
+int AW_PlacedDoors(float shift[3]){
+    if(focus_outdoor)shift[0]=shift[1]=shift[2]=0;else AW_MwscriptRoomShift(shift);
+    return focus_rows && sv.active && focus_world==sv.worldmodel?focus_door_count:0;
+}
+const float *AW_PlacedDoorAt(int i,unsigned *reference){
+    const focus_row_t *row;
+    if(!focus_rows || i<0 || i>=focus_door_count)return NULL;
+    row=&focus_rows[focus_doors[i]];
+    *reference=row->reference;
+    return row->at;
 }
 int AW_PlacedFocus(const char **name,char *weight_line,char *value_line,int line_size,int *owned){
     static char label_weight[32],label_value[32];static int labels;

@@ -143,6 +143,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [CI-SUITE-TWICE-33](CI-SUITE-TWICE-33.md): Hosted CI runs the full test suite twice per revision
 - CI-TAG-RUN-DUPLICATE-54 (no report page): The release tag push ran the whole CI test suite again on a commit main had already passed
 - [CI-TEST-SHARD-ONE-SLOW-53](CI-TEST-SHARD-ONE-SLOW-53.md): The first test shard of the v0.0.53 GitHub run took six times as long as the others
+- [CONTAINER-READ-ENOMEM-66](CONTAINER-READ-ENOMEM-66.md): In the development container, reads of the repository files sometimes fail with "Cannot allocate memory"; a retry works, so a check that hits it can report an unrelated failure
 - DOCS-PUBLIC-CHAT-QUOTES-56 (no report page): Public bug pages and code comments carried the maintainer's chat words and swearing
 - DOCS-PUBLIC-PRIVATE-CHANNEL-66 (no report page): Public register text, code comments and test data named the private channel a report came through
 - DOOR-ENTRANCE-AUDIT-51 (no report page): Requested: an entrance check in every build: each exterior entrance of the original must have a door that leads into its interior, found from the map, missing ones listed
@@ -203,6 +204,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - SMOKE-SEYDA-AGAIN-NOT-IN-PLAY-58 (no report page): The boot smoke failed once with 'seyda again (before load 3 of 3) is not in play'; the rerun on the same commit passed
 - [SMOKE-STALL-LABEL-INFERRED-60](SMOKE-STALL-LABEL-INFERRED-60.md): The boot smoke names a stop an emulator disk stall without checking the pending disk request
 - [SMOKE-TALK-BOX-BLOCKS-REMOTE-57](SMOKE-TALK-BOX-BLOCKS-REMOTE-57.md): The boot smoke failed with a talk box (Yes?) open in Seyda Neen right after the load: the remote commands went unanswered and the music check read nothing
+- STALL-PROBE-NAME-BPTR-66 (no report page): The stall examination showed no file name for a stuck open, lock or delete: it read the name at the raw BCPL pointer instead of the pointer times 4
 - STALL-PROBE-PROMPT-LOG-LINE-66 (no report page): The stall examination missed the debugger's prompt when an emulator log line followed it on the same line, never resumed the emulator, and the paused session read as a stop of the game
 - STALL-PROBE-RUNNING-GAME-66 (no report page): The stall examination read a running game as a missing task or as waiting on a file reply: it walked only the ready and waiting task lists and took the wait mask of a task that was not waiting
 - TEST-ACTOR-LIBRARY-OFF-PLAN-48 (no report page): test_actor_library StageTests.test_on_by_default_off_selectable fails on the interiors line: the actor-library stage stays in the plan with --chim-actor-table off

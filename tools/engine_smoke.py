@@ -32,6 +32,15 @@ XDF = '/opt/amiwind-tools/venv/bin/xdftool'
 IDE_CYLINDER_BYTES = 16 * 63 * 512      # an IDE port reads whole cylinders (IMAGE-IDE-CYLINDER-TAIL-59)
 # The maintainer, 2026-10-27 17:24 +0200 / 2026-10-27 15:24 UTC:"WE RUN AT 32MB FAST BY DEFAULT FROM NOW ON" (the game's minimum)
 DEFAULT_FAST_MB = 32
+# Keys the smoke sets itself: an --emu-option (or a script's "emu KEY=VALUE" line) may not change the machine under test
+# (memory, disks, ROM, CPU, the JIT profile, the monitor the stall check needs, the screenshot paths). One pattern for
+# the Python side (EMU_MANAGED) and the probe's grep (@EMU_MANAGED@ in PROBE).
+EMU_MANAGED_PATTERN = (r'amiga_model|cpu|fpu|uae_cpu_24bit_addressing|chip_memory|slow_memory|fast_memory|'
+                       r'zorro_iii_memory|kickstart_file|hard_drive_.*|floppy_.*|joystick_port_.*|fullscreen|'
+                       r'window_.*|console_debugger|screenshots_output_dir|base_dir|jit_compiler|uae_cpu_speed')
+# What FS-UAE 3.1.66 logs when it took deterministic=1 (od-fs/libamiga.cpp amiga_set_deterministic_mode): the proof
+# judge.py emucheck and the probe's own check look for (@EMU_PROOF_DETERMINISTIC@ in JUDGE_PY and PROBE)
+EMU_PROOF_LINE = 'libamiga enabling net play mode'
 
 # The emulator side, written to OUT/probe.sh and run with sh inside the FS-UAE container.
 PROBE = r'''#!/bin/sh
@@ -89,6 +98,17 @@ if [ "$PROF" = interp ]; then printf 'jit_compiler = 0\nuae_cpu_speed = max\n' >
 else printf 'jit_compiler = 1\nuae_cpu_speed = max\n' >> $R/smoke.fs-uae; fi
 # ILLEGAL=1: FS-UAE logs the 68k PC of every access to unmapped memory (use with PROF interp; JOB_PREAMBLE 53)
 [ "${ILLEGAL:-0}" = 1 ] && printf 'uae_log_illegal_mem = 1\n' >> $R/smoke.fs-uae
+# "emu KEY=VALUE" lines of a session script (SCRIPT below) are extra emulator lines too, as --emu-option, so a scripted
+# session asks for them itself and the tool that runs it need not know them (the load stall's way out: deterministic=1
+# runs the directory drives on the emulator thread, CHIM-SEYDA-BALMORA-LOAD-HANG-43). Taken only when the run brought no
+# emu-options.txt; checked in the start-up log like the others (emucheck). A malformed line, or a key the smoke sets
+# itself (the machine under test), ends the run before the emulator starts.
+if [ ! -s $R/emu-options.txt ] && [ -s $R/script.txt ] && grep -q '^emu ' $R/script.txt; then
+  sed -n 's/^emu  *//p' $R/script.txt | sed 's/ *= */=/' > $R/emu-script.txt
+  bad=$(grep -v -E '^[a-z][a-z0-9_]*=[A-Za-z0-9_.:/+-]+$' $R/emu-script.txt; cut -d= -f1 $R/emu-script.txt | grep -E '^(@EMU_MANAGED@)$')
+  if [ -n "$bad" ]; then : > $R/finished; echo "$(date -u +%T) smoke RESULT FAIL the script's emu line is malformed or names a key the smoke sets itself: $(echo $bad)" | tee -a $R/logs/steps.log; exit 0; fi
+  sed 's/=/ = /' $R/emu-script.txt > $R/emu-options.txt
+fi
 # --emu-option KEY=VALUE (experiment E3: e.g. deterministic=1): extra emulator lines, checked in the start-up log
 [ -s $R/emu-options.txt ] && cat $R/emu-options.txt >> $R/smoke.fs-uae
 export HOME=$R/home DISPLAY=:$N LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe SDL_AUDIODRIVER=dummy
@@ -172,8 +192,17 @@ finish(){ [ -e $R/finished ] && exit 0; : > $R/finished
 # emucheck: every --emu-option line must show in the emulator's start-up log (judge.py emucheck), else the run fails:
 # a count with an option the emulator never took would prove nothing
 emucheck(){ [ -s $R/emu-options.txt ] || return 0
-  v=$(python3 $R/judge.py emucheck $R/emu-options.txt $R/home/Cache/Logs/fs-uae.log.txt $R/logs/fsuae.log 2>&1 | tail -n 1); log "$v"
+  if [ -f $R/judge.py ]; then v=$(python3 $R/judge.py emucheck $R/emu-options.txt $R/home/Cache/Logs/fs-uae.log.txt $R/logs/fsuae.log 2>&1 | tail -n 1)
+  else v=$(emucheck_sh); fi; log "$v"
   case "$v" in "EMUOPT ok"*) ;; *) finish "FAIL the emulator did not take its extra options: ${v#EMUOPT }";; esac; }
+# the same check without judge.py (a session tool that writes probe.sh and stall.py alone, and takes its emulator lines
+# from the script's emu lines); the proof line of deterministic=1 is the one judge.py knows
+emucheck_sh(){ m=; while IFS= read -r l; do k=${l%% = *}; v=${l#* = }
+    if [ "$k" = deterministic ] && [ "$v" = 1 ]; then p='@EMU_PROOF_DETERMINISTIC@'; else p="^$k *= *$v *\$"; fi
+    grep -q -E -- "$p" $R/home/Cache/Logs/fs-uae.log.txt $R/logs/fsuae.log 2>/dev/null || m="$m $k=$v"
+  done < $R/emu-options.txt
+  if [ -n "$m" ]; then echo "EMUOPT missing$m (not in the emulator log)"
+  else echo "EMUOPT ok $(sed 's/ = /=/' $R/emu-options.txt | tr '\n' ' ')taken (emulator log)"; fi; }
 # play S: S seconds of game time; the emulator must stay up and the game clock must move. A window open (screen not
 # "game": inventory, journal, rest, dialogue, ...) whose realtime stood still while the engine's ticks moved is long
 # work inside one frame, not a stall (LOAD-STALL-SESSIONS-59); with neither moving it is a stall as before.
@@ -692,14 +721,62 @@ def stack_packet(s, base, reply):
     return None
 
 
-def packet_text(pk, name=None):
-    """One phrase for the packet stack_packet found; name: the BSTR an open, lock or delete names (read separately)."""
+def stack_message_status(s, base, reply):
+    """The second word of the game's StandardPacket message (sp_Msg + 4, found as stack_packet finds the packet), or
+    None. The emulator's directory-drive handler keeps a command's state there while the command is on its own queue
+    (FS-UAE filesys.asm, FSML_Enqueue): 0 = handed to the host side, 1 = queued unstarted, -1 = the host side finished
+    it (filesys.cpp filesys_iteration) and it waits for the handler's reply pass, which a dummy message from the
+    interrupt starts. CHIM-SEYDA-BALMORA-LOAD-HANG-43: a stop with the results filled in and -1 here is the host side's
+    completion whose interrupt request was lost (the word uae_int_requested, written without atomic operations by the
+    host thread and the emulator thread in FS-UAE 3.1.66)."""
+    for o in range(20, len(s) - 32, 2):
+        if be32(s, o) == base + o - 20 and be32(s, o - 20 + 10) == base + o and be32(s, o + 4) == reply:
+            v = be32(s, o - 20 + 4)
+            return v - (1 << 32) if v & 0x80000000 else v
+    return None
+
+
+def status_text(status):
+    """One phrase for stack_message_status; '' for None."""
+    if status is None:
+        return ''
+    if status == -1:
+        return ("; the handler's word for it is -1: the emulator's host side finished the request and the handler was "
+                "never told (the directory drive's lost interrupt request, CHIM-SEYDA-BALMORA-LOAD-HANG-43)")
+    if status == 0:
+        return "; the handler's word for it is 0: handed to the emulator's host side, not finished"
+    if status == 1:
+        return "; the handler's word for it is 1: queued by the handler, not started"
+    return "; the handler's word for it is $%08X (not a directory-drive queue word)" % (status & 0xFFFFFFFF)
+
+
+def name_addr(pk):
+    """The address of the name an open, lock or delete packet carries (pk from stack_packet), or None for other
+    packets: LOCATE_OBJECT and DELETE_OBJECT name it in arg2, the FIND* opens in arg3. Both are BCPL pointers (the byte
+    address divided by 4), so the address is the value times 4. CHIM-SEYDA-BALMORA-LOAD-HANG-43: until 16 November
+    2026 the raw value was read as the address, so the stop of the A/B (FINDINPUT, arg3 $106D9863) printed no name."""
+    if not pk or pk[0] not in (8, 16, 1004, 1005, 1006):
+        return None
+    return ((pk[4] if pk[0] in (8, 16) else pk[5]) << 2) & 0xFFFFFFFF
+
+
+def bstr(b):
+    """The text of a BCPL string read as bytes b (a length byte, then the characters); None when empty, or when the
+    length runs past the bytes read (not a string)."""
+    if not b or not b[0] or 1 + b[0] > len(b):
+        return None
+    return b[1:1 + b[0]].decode('latin-1', 'replace')
+
+
+def packet_text(pk, name=None, status=None):
+    """One phrase for the packet stack_packet found; name: the BSTR an open, lock or delete names (read separately);
+    status: stack_message_status (the handler's word for the command, None when not read)."""
     if not pk:
         return None
     signed = lambda v: v - (1 << 32) if v & 0x80000000 else v
-    return "the game's packet on its stack: %s%s (arg1 $%08X, arg2 $%08X, arg3 %d; res1 %d, res2 %d)" % (
+    return "the game's packet on its stack: %s%s (arg1 $%08X, arg2 $%08X, arg3 %d; res1 %d, res2 %d)%s" % (
         ACTIONS.get(pk[0], 'type %d' % pk[0]), " of '%s'" % name if name else '', pk[3], pk[4], signed(pk[5]),
-        signed(pk[1]), signed(pk[2]))
+        signed(pk[1]), signed(pk[2]), status_text(status))
 
 
 def unit_labels(text):
@@ -886,11 +963,10 @@ def examine():
                     s = mread(sbase, 3072)
                     stack = [be32(s, i) for i in range(0, len(s) - 3, 2)]
                     pk = stack_packet(s, sbase, node + 0x5C)
-                    pname = None
-                    if pk and pk[0] in (8, 16, 1004, 1005, 1006):     # LOCATE / DELETE name arg2; FIND* name arg3
-                        b = mread(pk[4] if pk[0] in (8, 16) else pk[5], 64)
-                        pname = b[1:1 + b[0]].decode('latin-1', 'replace') if b else None
-                    packet = packet_text(pk, pname)
+                    a = name_addr(pk)       # LOCATE / DELETE name arg2, FIND* name arg3: BCPL pointers, times 4
+                    pname = bstr(mread(a, 256)) if a else None
+                    # the handler's word for the command (-1 = finished by the host side, the reply pass never came)
+                    packet = packet_text(pk, pname, stack_message_status(s, sbase, node + 0x5C))
                 node, k = be32(t, 0), k + 1
         # every process's message port (pr_MsgPort at +0x5C, its list at +0x14): the packets queued there
         queues = {}
@@ -935,7 +1011,7 @@ import re, sys
 
 # what the emulator writes when it took an option (FS-UAE 3.1.66 source: od-fs/libamiga.cpp
 # amiga_set_deterministic_mode); any other key must appear as "key = value" in a log
-EMU_PROOF = {'deterministic': ('1', 'libamiga enabling net play mode')}
+EMU_PROOF = {'deterministic': ('1', '@EMU_PROOF_DETERMINISTIC@')}
 
 
 def judge_frames(frames, frozen, final=False, min_distinct=3):
@@ -1012,17 +1088,14 @@ def main(argv):
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))
-'''
+'''.replace('@EMU_PROOF_DETERMINISTIC@', EMU_PROOF_LINE)
 _JUDGE = {'__name__': 'judge'}
 exec(compile(JUDGE_PY, 'judge.py', 'exec'), _JUDGE)
 judge_frames = _JUDGE['judge_frames']
 emu_check = _JUDGE['emu_check']
 
-# Keys the smoke sets itself: an --emu-option may not change the machine under test (memory, disks, ROM, CPU,
-# the JIT profile, the monitor the stall check needs, the screenshot paths)
-EMU_MANAGED = re.compile(r'^(amiga_model|cpu|fpu|uae_cpu_24bit_addressing|chip_memory|slow_memory|fast_memory|'
-                         r'zorro_iii_memory|kickstart_file|hard_drive_.*|floppy_.*|joystick_port_.*|fullscreen|'
-                         r'window_.*|console_debugger|screenshots_output_dir|base_dir|jit_compiler|uae_cpu_speed)$')
+EMU_MANAGED = re.compile('^(%s)$' % EMU_MANAGED_PATTERN)
+PROBE = PROBE.replace('@EMU_MANAGED@', EMU_MANAGED_PATTERN).replace('@EMU_PROOF_DETERMINISTIC@', EMU_PROOF_LINE)
 
 
 def parse_emu_options(items):
@@ -1044,6 +1117,14 @@ def parse_emu_options(items):
 def emu_config_lines(options):
     """The lines appended to the emulator config (OUT/emu-options.txt)."""
     return ''.join('%s = %s\n' % kv for kv in options)
+
+
+def script_emu_options(text):
+    """The KEY=VALUE items of a session script's "emu KEY=VALUE" lines: extra emulator lines a scripted session asks
+    for itself, as --emu-option does (parse_emu_options checks them). The probe derives the same lines when a run brings
+    no emu-options.txt, so a session tool that only copies the script need not know them (CHIM-SEYDA-BALMORA-LOAD-HANG-43:
+    tests/sessions/load_repeat_hops_det.txt asks for deterministic=1)."""
+    return [re.sub(r'\s*=\s*', '=', line[4:].strip()) for line in text.splitlines() if line.startswith('emu ')]
 
 
 ROUTE_WAIT_CHUNK = 50
@@ -1235,6 +1316,8 @@ def main(argv=None):
         raw = args.emu_option if args.emu_option is not None else \
             [x for x in os.environ.get('AW_SMOKE_EMU_OPTION', '').split(';') if x.strip()]
         emu_options = parse_emu_options(raw)
+        if args.script:   # the script's own "emu KEY=VALUE" lines, checked like the options
+            emu_options += parse_emu_options(script_emu_options(args.script.read_text(encoding='utf-8')))
         autoexec = None
         if args.remote == 'off':
             if args.script or args.start != 'map':

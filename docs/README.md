@@ -1,6 +1,6 @@
 # AmiWind documentation
 
-_Generated from `docs/README.topics.json` with AmiWind v0.0.66-dev10._
+_Generated from `docs/README.topics.json` with AmiWind v0.0.66-dev11._
 
 Every document of the project, by topic, with the version and date of its last update. A document marked "needs a refresh" predates the current state of its subject and is due for a review; its facts may be out of date. Release notes and whitespace baselines are listed in [releases](releases/README.md); one-off records and replaced documents in [history](history/README.md).
 
@@ -31,9 +31,9 @@ Every document of the project, by topic, with the version and date of its last u
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [AW.md](AW.md) | aw: the master builder command line | v0.0.66-dev2 (14 November 2026) |
+| [AW.md](AW.md) | aw: the master builder command line | v0.0.66-dev11 (16 November 2026) |
 | [AGA_BUILD.md](AGA_BUILD.md) | AGA checkpoint build and controls | v0.0.57 (30 October 2026) |
-| [BUILD_CACHE.md](BUILD_CACHE.md) | Build cache: resuming and reusing work safely | v0.0.66-dev3 (15 November 2026) |
+| [BUILD_CACHE.md](BUILD_CACHE.md) | Build cache: resuming and reusing work safely | v0.0.66-dev11 (16 November 2026) |
 | [BUILD_DEPENDENCIES.md](BUILD_DEPENDENCIES.md) | Dependency checks and reference versions | v0.0.66-dev2 (13 November 2026) |
 | [BUILD_MANIFEST.md](BUILD_MANIFEST.md) | World map manifest (design) | v0.0.54 (27 October 2026) |
 | [EXPANSION_TABLES.md](EXPANSION_TABLES.md) | The expansions in every table | v0.0.66-dev2 (13 November 2026) |
@@ -51,9 +51,9 @@ Every document of the project, by topic, with the version and date of its last u
 | [LINUX_BUILD.md](LINUX_BUILD.md) | Build AmiWind on Linux | v0.0.66-dev2 (14 November 2026) |
 | [WINDOWS_BUILD.md](WINDOWS_BUILD.md) | Windows build entry points and WSL notes | v0.0.53 (27 October 2026) |
 | [WINDOWS_BUILD_ROADMAP.md](WINDOWS_BUILD_ROADMAP.md) | Windows build roadmap | v0.0.28 (4 October 2026), needs a refresh |
-| [FS-UAE-DEVELOPMENT.md](FS-UAE-DEVELOPMENT.md) | FS-UAE development access | v0.0.66-dev10 (15 November 2026), needs a refresh |
+| [FS-UAE-DEVELOPMENT.md](FS-UAE-DEVELOPMENT.md) | FS-UAE development access | v0.0.66-dev11 (16 November 2026), needs a refresh |
 | [FS-UAE-LAUNCHER.md](FS-UAE-LAUNCHER.md) | Portable FS-UAE launcher | v0.0.49-dev1 (24 October 2026) |
-| [FS-UAE-PLAYTESTING.md](FS-UAE-PLAYTESTING.md) | AmiWind playtesting with FS-UAE | v0.0.49-dev1 (24 October 2026) |
+| [FS-UAE-PLAYTESTING.md](FS-UAE-PLAYTESTING.md) | AmiWind playtesting with FS-UAE | v0.0.66-dev11 (16 November 2026) |
 | [CENSUS_TRAY_SMOKE.md](CENSUS_TRAY_SMOKE.md) | Census Office silver plate: a game-script smoke test | v0.0.66-dev5 (15 November 2026) |
 | [WINUAE.md](WINUAE.md) | WinUAE setup | v0.0.59 (3 November 2026) |
 | [IMAGE_RECOVERY.md](IMAGE_RECOVERY.md) | Recover an rc3 image-stage failure | v0.0.48-rc1 (23 October 2026) |
@@ -77,8 +77,8 @@ Every document of the project, by topic, with the version and date of its last u
 | [EXPERIMENTAL_FLAGS.md](EXPERIMENTAL_FLAGS.md) | Experimental flags | v0.0.66-dev1 (13 November 2026) |
 | [CRASH_REPORTING.md](CRASH_REPORTING.md) | Fatal error reports | v0.0.28 (4 October 2026), needs a refresh |
 | [DEBUG_OVERLAYS.md](DEBUG_OVERLAYS.md) | Development overlays | v0.0.66-dev2 (13 November 2026) |
-| [GAME_RECORDER.md](GAME_RECORDER.md) | Gameplay recorder | v0.0.66-dev9 (15 November 2026) |
-| [AMIWIND_CONSOLE_COMMANDS.md](AMIWIND_CONSOLE_COMMANDS.md) | AmiWind console commands | generated (v0.0.66-dev10) |
+| [GAME_RECORDER.md](GAME_RECORDER.md) | Gameplay recorder | v0.0.66-dev11 (16 November 2026) |
+| [AMIWIND_CONSOLE_COMMANDS.md](AMIWIND_CONSOLE_COMMANDS.md) | AmiWind console commands | generated (v0.0.66-dev11) |
 | [CONSOLE_COMMANDS_MORROWIND.md](CONSOLE_COMMANDS_MORROWIND.md) | The original game's console commands in AmiWind | v0.0.64-dev4 (11 November 2026) |
 | [GAME_STATE_RESET.md](GAME_STATE_RESET.md) | Game state reset and failed loads | v0.0.62-dev2 (8 November 2026) |
 | [MEMORY_ALLOCATION.md](MEMORY_ALLOCATION.md) | Memory allocation and heap clearance | v0.0.42-dev1 (17 October 2026), needs a refresh |
@@ -89,7 +89,7 @@ Every document of the project, by topic, with the version and date of its last u
 | [STAIR_RULES.md](STAIR_RULES.md) | Stairs: Morrowind's own rules, and a gate that proves them | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [STAIR_RAMP_WALKABILITY.md](STAIR_RAMP_WALKABILITY.md) | Recurring stair failure: authored ramps below the walkable-floor cutoff | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [TRANSLATION_LAYER.md](TRANSLATION_LAYER.md) | AmiWind: host conversion and native runtime | v0.0.42-dev1 (17 October 2026), needs a refresh |
-| [MWSCRIPT_BYTECODE.md](MWSCRIPT_BYTECODE.md) | MWScript compiled by the builder | v0.0.66-dev3 (15 November 2026) |
+| [MWSCRIPT_BYTECODE.md](MWSCRIPT_BYTECODE.md) | MWScript compiled by the builder | v0.0.66-dev10 (16 November 2026) |
 | [SAVEGAME_PLAN.md](SAVEGAME_PLAN.md) | Save/load milestone: compact state and a manageable save list | v0.0.66 (14 November 2026), needs a refresh |
 | [PERSISTENCE_AND_STREAMING.md](PERSISTENCE_AND_STREAMING.md) | Proposed approach: persistent world state and disk loading | v0.0.59-dev6 (3 November 2026), needs a refresh |
 | [DATA_STREAMING.md](DATA_STREAMING.md) | Data streaming: how AmiWind loads the world today | v0.0.32-dev1 (8 October 2026), needs a refresh |
@@ -124,9 +124,9 @@ Every document of the project, by topic, with the version and date of its last u
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [GAME_FEATURES.md](GAME_FEATURES.md) | Game features | v0.0.66-dev10 (12 November 2026) |
+| [GAME_FEATURES.md](GAME_FEATURES.md) | Game features | v0.0.66-dev11 (12 November 2026) |
 | [game-features.json](game-features.json) | game-features.json | data file |
-| [MWSCRIPT_FEATURES.md](MWSCRIPT_FEATURES.md) | MWScript features | v0.0.66-dev10 (15 November 2026) |
+| [MWSCRIPT_FEATURES.md](MWSCRIPT_FEATURES.md) | MWScript features | v0.0.66-dev11 (16 November 2026) |
 | [WORLD_MECHANISMS.md](WORLD_MECHANISMS.md) | World mechanisms | v0.0.64-dev1 (10 November 2026) |
 | [OPENING_SEQUENCE.md](OPENING_SEQUENCE.md) | The opening, step by step | v0.0.65 (12 November 2026) |
 | [mwscript-features.json](mwscript-features.json) | mwscript-features.json | data file |
@@ -166,20 +166,20 @@ Every document of the project, by topic, with the version and date of its last u
 | --- | --- | --- |
 | [ANIMATION.md](ANIMATION.md) | Character animation | v0.0.63-dev2 (2026-11-09) |
 | [ANIMKIT.md](ANIMKIT.md) | Animation kit | v0.0.66-dev1 (13 November 2026) |
-| [ACTOR_STATE.md](ACTOR_STATE.md) | The actor record | v0.0.66-dev2 (14 November 2026) |
+| [ACTOR_STATE.md](ACTOR_STATE.md) | The actor record | v0.0.66-dev10 (16 November 2026) |
 | [ACTOR_STATS.md](ACTOR_STATS.md) | Every being's stats | v0.0.61-dev3 (2026-11-06) |
 | [CHARACTER_CREATION.md](CHARACTER_CREATION.md) | Next milestone: dock and Census Office character creation | v0.0.66-dev5 (15 November 2026), needs a refresh |
 | [CHARACTER_EQUIPMENT_ROADMAP.md](CHARACTER_EQUIPMENT_ROADMAP.md) | Mutable character equipment and shared assets | v0.0.40 (15 October 2026), needs a refresh |
 | [CHARACTER_MODEL_GALLERY.md](CHARACTER_MODEL_GALLERY.md) | Character Model Gallery | v0.0.56 (30 October 2026) |
 | [CHARACTER_STATES.md](CHARACTER_STATES.md) | Character presence, progression and placement | v0.0.48-rc1 (23 October 2026) |
 | [MODULAR_NPCS.md](MODULAR_NPCS.md) | Modular NPCs: every body part stored once, assembled per actor | v0.0.62-dev1 (7 November 2026) |
-| [SCRIPTED_ACTORS.md](SCRIPTED_ACTORS.md) | Scripted actors: Dagoth Ur, the Heart of Lorkhan and Vivec | v0.0.66-dev1 (13 November 2026) |
+| [SCRIPTED_ACTORS.md](SCRIPTED_ACTORS.md) | Scripted actors: Dagoth Ur, the Heart of Lorkhan and Vivec | v0.0.66-dev11 (16 November 2026) |
 | [NPC_CELL_TRAVERSAL.md](NPC_CELL_TRAVERSAL.md) | NPC traversal across world boundaries | v0.0.41-dev5 (16 October 2026), needs a refresh |
 | [NPC_DEFAULTS.md](NPC_DEFAULTS.md) | The default NPC: stats, behaviour, sounds and movement as data | v0.0.54-dev1 (27 October 2026) |
 | [NPC_GROUND_CONTACT.md](NPC_GROUND_CONTACT.md) | Initial NPC placement and ground-contact workflow | v0.0.66-dev2 (14 November 2026) |
 | [NPC_MODEL_CACHE.md](NPC_MODEL_CACHE.md) | Persistent NPC model conversion cache | v0.0.62-dev1 (7 November 2026) |
 | [MODEL_REDUCTION.md](MODEL_REDUCTION.md) | How AmiWind reduces a model, and how to check it | v0.0.62-dev1 (7 November 2026) |
-| [NPC_PATHFINDING.md](NPC_PATHFINDING.md) | NPC pathfinding: how NPCs find their way | v0.0.66-dev9 (15 November 2026) |
+| [NPC_PATHFINDING.md](NPC_PATHFINDING.md) | NPC pathfinding: how NPCs find their way | v0.0.66-dev11 (16 November 2026) |
 | [FIRST_PERSON_HANDS.md](FIRST_PERSON_HANDS.md) | First-person geometry and sprite experiment | v0.0.61-dev3 (2026-11-06), needs a refresh |
 | [THIRD_PERSON.md](THIRD_PERSON.md) | Third person, vanity camera and the death scene | v0.0.66-dev2 (14 November 2026) |
 | [PLAYER_MOVEMENT.md](PLAYER_MOVEMENT.md) | Player scale, collision and camera motion | v0.0.66-dev9 (15 November 2026) |
@@ -208,7 +208,7 @@ Every document of the project, by topic, with the version and date of its last u
 | [VOICED_DIALOGUE.md](VOICED_DIALOGUE.md) | Voiced dialogue: event lookup and runtime plan | v0.0.48-dev2 (23 October 2026) |
 | [DIALOGUE_AND_WAIT.md](DIALOGUE_AND_WAIT.md) | Dialogue, character confirmation and waiting — v0.0.23-dev4 | v0.0.63-dev5 (9 November 2026), needs a refresh |
 | [DIALOGUE_DESIGN.md](DIALOGUE_DESIGN.md) | Dialogue: design (topics, conditions, choices, disposition, journal) | v0.0.62-dev2 (2026-11-08) |
-| [DIALOGUE_FEATURES.md](DIALOGUE_FEATURES.md) | Dialogue features | v0.0.66-dev10 (10 November 2026) |
+| [DIALOGUE_FEATURES.md](DIALOGUE_FEATURES.md) | Dialogue features | v0.0.66-dev11 (10 November 2026) |
 | [dialogue-features.json](dialogue-features.json) | dialogue-features.json | data file |
 | [dialogue-choices.json](dialogue-choices.json) | dialogue-choices.json | data file |
 | [VOICE_FEATURES.md](VOICE_FEATURES.md) | Voices and sounds | v0.0.59-dev4 (2 November 2026) |
@@ -260,15 +260,15 @@ Every document of the project, by topic, with the version and date of its last u
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [BUGS.md](BUGS.md) | Bug register | generated (v0.0.66-dev10) |
+| [BUGS.md](BUGS.md) | Bug register | generated (v0.0.66-dev11) |
 | [BUG_JOURNAL.md](BUG_JOURNAL.md) | Bug journal | v0.0.62-dev1 (7 November 2026) |
 
 ## Releases
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [CHANGELOG.md](CHANGELOG.md) | Changelog | v0.0.66-dev10 (15 November 2026) |
-| [ROADMAP.md](ROADMAP.md) | Roadmap and implementation options | v0.0.66-dev10 (15 November 2026) |
+| [CHANGELOG.md](CHANGELOG.md) | Changelog | v0.0.66-dev11 (16 November 2026) |
+| [ROADMAP.md](ROADMAP.md) | Roadmap and implementation options | v0.0.66-dev11 (16 November 2026) |
 | [RELEASE_WORKFLOW.md](RELEASE_WORKFLOW.md) | AmiWind release workflow | v0.0.64-dev4 (10 November 2026) |
 | [CI.md](CI.md) | Build audit and the local pipeline | v0.0.54 (27 October 2026) |
 | [CI_DRY_RUN.md](CI_DRY_RUN.md) | Asset-free compilation and boot image | v0.0.54 (27 October 2026) |

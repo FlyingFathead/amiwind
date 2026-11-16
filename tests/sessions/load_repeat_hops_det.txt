@@ -1,0 +1,88 @@
+# Load repeat, the twin of load_repeat_hops.txt with the emulator's directory drives run on the emulator thread
+# (CHIM-SEYDA-BALMORA-LOAD-HANG-43): the same twenty Vivec and arena pit loads, the console log on as in the plain
+# script. The "emu" line below puts "deterministic = 1" into the emulator's configuration (the probe takes it from the
+# script; the run fails if the emulator's start-up log does not show it taken). In FS-UAE 3.1.66 that setting starts no
+# host thread for a host folder mounted as a drive: the folder's file requests are completed on the emulator thread,
+# so the interrupt request that announces a completion is never written from two threads at once, which is where the
+# stops of the test sessions came from (the request finished, its results filled in, the handler never told). Run N
+# sessions of this script and N of load_repeat_hops.txt on the same image; count stops per load on each side. Players
+# have no such folder; this concerns the test sessions only.
+emu deterministic=1
+wait 8
+cmd aw_crosshair off
+cmd dbg hud on
+cmd dbg headlamp off
+cmd dbg time 1200
+cmd aw_loadtrace 1
+cmd dbg tp vivec
+wait 45
+state map
+shot repeat-00-vivec
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-01-arenapit
+cmd dbg tp vivec
+wait 45
+state map
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-02-arenapit
+cmd dbg tp vivec
+wait 45
+state map
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-03-arenapit
+cmd dbg tp vivec
+wait 45
+state map
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-04-arenapit
+cmd dbg tp vivec
+wait 45
+state map
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-05-arenapit
+cmd dbg tp vivec
+wait 45
+state map
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-06-arenapit
+cmd dbg tp vivec
+wait 45
+state map
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-07-arenapit
+cmd dbg tp vivec
+wait 45
+state map
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-08-arenapit
+cmd dbg tp vivec
+wait 45
+state map
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-09-arenapit
+cmd dbg tp vivec
+wait 45
+state map
+cmd dbg tp arenapit
+wait 45
+state map
+shot repeat-10-arenapit
+state frame_ms

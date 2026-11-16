@@ -1,0 +1,404 @@
+# The end of the main quest with a test character (ENDGAME-HEART-SESSION-66; docs/GAME_RECORDER.md "Gameplay journeys",
+# docs/SCRIPTED_ACTORS.md). A FULL image, FS-UAE at 32 MB Fast, started with --map seyda; one part, one session. Every check
+# reads the game's state (console answers, the state file, the script status counts), never a picture.
+#
+# What the original asks (the scripts in the game data, read by the builder; OpenMW 0.51 for how they run):
+# - Sunder (`sunder`, script ouch_sunder) and Keening (`keening`, ouch_keening) hurt the player every second while
+#   equipped unless the global wraithguardEquipped is 1; Wraithguard (`wraithguard`, wraithguardScript) sets it while
+#   worn. Carrying them advances C0_Act_C (Keening 10, Sunder 15).
+# - The Heart of Lorkhan (`heart_akulakhan`, reference 197602, script LorkhanHeart; locals in slot order sunderHit,
+#   keeningHit, countHits, countSays, doOnce) cannot die (its health set to 5000 every frame). When the player first comes
+#   within 500 game units it moves Dagoth Ur (`dagoth_ur_2`, 262014) to -40 2590 -180 of the chamber and starts his fight.
+#   It counts nothing until struck with Sunder (HitOnMe Sunder); then each Keening blow (HitOnMe Keening) adds one to
+#   countHits and plays Idle2, Idle3, Idle4, Idle5; the fifth plays Death1 and sets the global HeartDestroyed.
+# - Dagoth Ur (DagothUrCreature2) turns teleporting off, sets his health back to 1000 whenever it falls under it, and
+#   changes his shield ability with the Heart's countHits (dagoth_ur_shield_01 at 0 .. none at 4); once HeartDestroyed is
+#   1 his health is capped at 200 and his magicka emptied, so he can die.
+# - The dreamer workers (dreamerWorkerScript) set their health to 0 when HeartDestroyed is 1.
+# - Two invisible activators (`dagoth destroy detector`, 262016 by the entrance and 262017 off the bridge, script
+#   DagothDoorDetector) start the global script EndGame once HeartDestroyed is 1, DestroyBlight is 0 and the player is
+#   within 1200 game units: EndGame sets C3_DestroyDagoth to 20, plays Death1 on Akulakhan (`in_akulakhan00`) and the
+#   bridge (`in_dagoth_bridge00`): the collapse, disables the blight cloud, changes the Red Mountain weather (ModRegion,
+#   ChangeWeather), sets Dagoth Ur's and the ash vampires' health to 0, turns teleporting back on, sets DestroyBlight to
+#   -1 and gives the player 10 reputation.
+# - The quest ends in Dagoth Ur, Facility Cavern: Azura's spirit (`azura spirit`, 425529, script AzuraEnd) appears at
+#   C3_DestroyDagoth 20, within 250 game units takes the controls, plays the ending video, then sets C3_DestroyDagoth and
+#   A1_SleepersAwake to 50, enables the Ring of Azura (`ring of azura`, 481184) and gives the controls back.
+#
+# How this session gets there: a test character (dbg aw hors: Hors after the census) with every attribute and skill at 100
+# (dbg maxstats), the three tools given and equipped, the quest set to 10 (Dagoth Ur defeated in the Facility Cavern, the
+# stage before the chamber), then dbg tp heartchamber. Dagoth Ur is FOUGHT IN GOD MODE, not killed by reference: his own
+# script keeps him alive while the Heart lives (that is part of what is checked) and the original lets him be killed only
+# after it. Map-local points are the room's own (game units / 4): the Heart at -2.9 967.6 -67.4, its model's middle at
+# 0.7 967.5 -46 (the model's box), the platform in front of it with a standing origin at about -46 (the room's
+# collision, tools/chim/room_scene.py, traced with the standing hull), the entrance at -24 320 473
+# (config/teleport-names.txt), 72 units from the detector 262016. The player stands at 0 946.
+# The Heart is set on the player first (chim actors fight), as the first blow would do, so the swing finds it by the
+# original's hit cone over the fighters even when the crosshair's ray does not meet it.
+# The ending's collapse is a known gap today: ENDGAME-CHAMBER-COLLAPSE-63 (Akulakhan and the bridge are part of the room's
+# fixed geometry, so their Death1 finds nothing to play).
+part A
+# The remote-console folder served on the emulator thread: run1 stopped in step 5 on the emulator's lost wake for a
+# request to that folder (CHIM-SEYDA-BALMORA-LOAD-HANG-43), not on anything of the Heart's.
+emu deterministic=1
+wait 8
+cmd developer 1
+cmd dbg all on
+cmd dbg headlamp off
+mark
+cmd dbg aw hors
+saw 30 Created Hors
+wait 20
+waitfor screen 60 game
+boxes
+cmd dbg god on
+wait 2
+
+step 1 the test character: Hors after the census, fighting allowed, every attribute and skill at 100
+probe fight_on aw_mwscript_status call getplayerfightingdisabled
+cmd dbg maxstats
+wait 3
+probe strength player->getstrength
+probe blunt player->getbluntweapon
+probe shortblade player->getshortblade
+expect fight_on == 0
+expect strength == 100
+expect blunt == 100
+expect shortblade == 100
+shot e1-test-character
+
+step 2 Kagrenac's tools: Sunder, Keening and Wraithguard carried, Wraithguard worn, Sunder in hand and harmless
+# each grant answers with the count the inventory holds then ("Now 1 carried (keening)")
+probe sunder_given dbg give sunder
+boxes
+probe keening_given dbg give keening
+boxes
+probe wraith_given dbg give wraithguard
+boxes
+expect has sunder_given Now 1 carried (sunder)
+expect has keening_given Now 1 carried (keening)
+expect has wraith_given Now 1 carried (wraithguard)
+probe sunder_count player->getitemcount sunder
+probe keening_count player->getitemcount keening
+probe wraith_count player->getitemcount wraithguard
+expect sunder_count == 1
+expect wraith_count == 1
+# the console counts only the items of the actor table's item list; Keening is not in it (no actor carries it, and the
+# player's GetItemCount of its script counts by name): run1 on the v0.0.66-dev10 image, "no such item id: keening"
+expect known CONSOLE-GETITEMCOUNT-UNNAMED-ITEM-66 keening_count == 1
+# the original's console Equip: in OpenMW the player's Equip goes through the inventory window's use, so the item's
+# OnPCEquip is set and wraithguardScript sets the global (run1: it read 0)
+cmd player->equip wraithguard
+wait 3
+probe wraith_console aw_mwscript_status call getglobal wraithguardEquipped
+expect known CONSOLE-EQUIP-SKIPS-ONPCEQUIP-66 wraith_console == 1
+# then off and on again with the inventory window's own route (aw_inventory equip: PCSkipEquip, then OnPCEquip)
+cmd aw_inventory unequip wraithguard
+wait 2
+cmd aw_inventory equip wraithguard
+wait 3
+probe wraith_worn aw_mwscript_status call getglobal wraithguardEquipped
+expect wraith_worn == 1
+cmd aw_inventory equip sunder
+wait 3
+boxes
+probe worn aw_inventory worn
+expect has worn right hand: sunder
+expect has worn wraithguard
+# carrying the tools: ouch_keening and ouch_sunder advance C0_Act_C (10 and 15; a lower index is not taken)
+probe tools_journal getjournalindex C0_Act_C
+expect tools_journal >= 10
+# Wraithguard keeps Sunder's harm off: four seconds without god mode, Sunder in hand
+probe health_armed player->gethealth
+cmd dbg god off
+wait 4
+probe health_wraith player->gethealth
+cmd dbg god on
+boxes
+expect health_wraith == health_armed
+shot e2-tools
+
+step 3 the quest at the stage before the Heart: the Facility Cavern with Dagoth Ur's first form defeated and Azura's spirit hidden, then the Heart Chamber, which loads at 32 MB with the Heart and Dagoth Ur
+probe quest_set aw_mwscript_status call journal C3_DestroyDagoth 10
+probe heart_gone_before aw_mwscript_status call getglobal HeartDestroyed
+probe blight_before aw_mwscript_status call getglobal DestroyBlight
+probe standing_before aw_mwscript_status call getpccrimelevel
+pick rep_before standing_before after reputation
+expect quest_set == 10
+expect heart_gone_before == 0
+expect blight_before == 0
+# Dagoth Ur, Facility Cavern before the chamber, as the quest goes (run2 came here first at stage 20, so Azura's spirit had
+# never been hidden and AzuraEnd, which enables it only when it is hidden, waited at its first state): below stage 20
+# AzuraEnd hides the spirit and the Ring of Azura hides itself on arrival (ringAzuraScript, CellChanged). Dagoth Ur's
+# first form is defeated at stage 10: killed by reference, as the story has it by then.
+cmd dbg tp ri71c3339d8b
+waitfor map 150 ri71c3339d8b
+waitfor screen 60 game
+wait 8
+boxes
+probe dagoth_first chim actors kill 258093
+wait 4
+probe list_cavern chim actors list
+probe spirit_hidden "azura spirit"->getdisabled
+probe ring_hidden "ring of azura"->getdisabled
+expect dead dagoth_first in list_cavern
+expect spirit_hidden == 1
+expect ring_hidden == 1
+shot e3a-cavern-before
+cmd dbg tp heartchamber
+waitfor map 150 rifa4ef181ed
+waitfor screen 60 game
+wait 8
+boxes
+probe chamber_map state map
+probe chamber_memory dbg memcensus
+probe list_arrival chim actors list
+probe status_arrival aw_mwscript_status
+pick moved_arrival status_arrival after PositionCell:
+expect has chamber_map rifa4ef181ed
+expect alive 197602 in list_arrival
+expect alive 262014 in list_arrival
+shot e3-chamber-arrival
+
+step 4 in front of the Heart: its script moves Dagoth Ur to his place and sets him on the player; his script holds his health and his first shield
+# the platform in front of the Heart: a standing origin at about -46 here (the room's collision, the standing hull's
+# trace), so the view is put 8 units over it and the arrival search (dbg unstuck: ground within 32 units of the point)
+# finds the platform itself. run1 put the view at -12: the search found no ground under it within reach and took the
+# next spot, 16 units on, on top of the solid round the Heart (local 0 964 -17)
+cmd noclip
+cmd aw_view 0 946 -38 90 30
+wait 1
+probe stand dbg unstuck
+wait 2
+probe heart_distance heart_akulakhan->getdistance player
+probe heart_fight chim actors fight
+wait 4
+probe list_near chim actors list
+probe dagoth_y dagoth_ur_2->getpos y
+expect has stand Unstuck: 0 946
+expect heart_distance < 500
+expect has heart_fight ref 197602
+expect fighting 262014 in list_near
+# Dagoth Ur fights from the arrival on (his record's fight is 100), so his place is read from the script host's own
+# count of a PositionCell carried out on this map (the Heart's call), not from where he stands seconds later; the
+# console's GetPos on him reads the console's own instance today (run1: -0.43 while he stood at y 3700)
+expect known CONSOLE-GETPOS-SCRATCH-ORIGIN-66 dagoth_y > 1000
+# a blow on Dagoth Ur from the console: his script sets his health back while the Heart lives
+cmd dagoth_ur_2->modcurrenthealth -400
+wait 3
+probe dagoth_held dagoth_ur_2->gethealth
+probe shield_first dagoth_ur_2->getspell dagoth_ur_shield_01
+probe status_near aw_mwscript_status
+pick plays_near status_near after ; PlayGroup
+pick misses_near status_near before with no skeletal actor or group
+pick matched_near status_near before matched
+pick moved_near status_near after PositionCell:
+expect moved_near == moved_arrival+1
+expect dagoth_held >= 1000
+expect shield_first == 1
+expect has status_near off now: teleporting
+face 0.7 967.5 -46
+shot e4-at-the-heart
+
+step 5 the first strike, with Sunder: the Heart's script takes it (sunderHit, its local 0, is 1) and plays nothing yet
+# The strikes are counted from the Heart's own script: its HitOnMe calls that took a blow (aw_mwscript_status "HitOnMe:
+# ... matched"), the PlayGroup each counted Keening blow plays on it ("; PlayGroup N"), its local 0 (call getlocal), and
+# Dagoth Ur's shield, which his script changes with the Heart's countHits. The console's ShowVars on a reference is
+# checked once against the same script (a line "heart_akulakhan->sv" runs on the console's own instance, aw_mwhost.c
+# console_begin and console_group_call).
+probe heart_before aw_mwscript_status call getlocal 197602
+cmd dbg combat readout on
+rec e-strikes
+cmd impulse 202
+wait 3
+face 0.7 967.5 -46
+probe aim_sunder aw_inspect
+cmd +attack
+wait 1
+cmd -attack
+wait 3
+probe heart_sunder aw_mwscript_status call getlocal 197602
+probe heart_vars heart_akulakhan->sv
+pick vars_row heart_vars after ShowVars: script
+pick heart_row heart_sunder after (row
+expect has heart_before local 0 = 0 (
+expect has aim_sunder source ref: 197602
+expect has heart_sunder local 0 = 1 (
+# run2: "ShowVars: script 0, 0 locals", the console's own instance
+expect known CONSOLE-SHOWVARS-SCRATCH-INSTANCE-66 vars_row == heart_row
+
+step 6 five strikes with Keening: each one taken by the Heart's script and played on it, Dagoth Ur's shield following the count, the fifth destroys the Heart
+cmd impulse 202
+wait 2
+cmd aw_inventory equip keening
+wait 2
+cmd impulse 202
+wait 3
+face 0.7 967.5 -46
+cmd +attack
+wait 1
+cmd -attack
+wait 3
+probe status_k1 aw_mwscript_status
+pick matched_k1 status_k1 before matched
+pick plays_k1 status_k1 after ; PlayGroup
+probe shield_k1 dagoth_ur_2->getspell dagoth_ur_shield_02
+probe shield_one_k1 dagoth_ur_2->getspell dagoth_ur_shield_01
+expect matched_k1 == matched_near+2
+expect plays_k1 == plays_near+1
+# Dagoth Ur's script reads the Heart's countHits ("heart_akulakhan".countHits); run2: his shield stayed at the count-0
+# one, the engine reads another object's local through the object row's id as its script (aw_mwvm.c member)
+expect known MWSCRIPT-MEMBER-READS-ID-AS-SCRIPT-66 shield_k1 == 1
+expect known MWSCRIPT-MEMBER-READS-ID-AS-SCRIPT-66 shield_one_k1 == 0
+face 0.7 967.5 -46
+cmd +attack
+wait 1
+cmd -attack
+wait 3
+probe status_k2 aw_mwscript_status
+pick matched_k2 status_k2 before matched
+pick plays_k2 status_k2 after ; PlayGroup
+probe shield_k2 dagoth_ur_2->getspell dagoth_ur_shield_03
+expect matched_k2 == matched_near+3
+expect plays_k2 == plays_near+2
+expect known MWSCRIPT-MEMBER-READS-ID-AS-SCRIPT-66 shield_k2 == 1
+face 0.7 967.5 -46
+cmd +attack
+wait 1
+cmd -attack
+wait 3
+probe status_k3 aw_mwscript_status
+pick matched_k3 status_k3 before matched
+pick plays_k3 status_k3 after ; PlayGroup
+probe shield_k3 dagoth_ur_2->getspell dagoth_ur_shield_04
+expect matched_k3 == matched_near+4
+expect plays_k3 == plays_near+3
+expect known MWSCRIPT-MEMBER-READS-ID-AS-SCRIPT-66 shield_k3 == 1
+face 0.7 967.5 -46
+cmd +attack
+wait 1
+cmd -attack
+wait 3
+probe status_k4 aw_mwscript_status
+pick matched_k4 status_k4 before matched
+pick plays_k4 status_k4 after ; PlayGroup
+probe shield_k4 dagoth_ur_2->getspell dagoth_ur_shield_04
+expect matched_k4 == matched_near+5
+expect plays_k4 == plays_near+4
+expect shield_k4 == 0
+probe heart_gone_k4 aw_mwscript_status call getglobal HeartDestroyed
+expect heart_gone_k4 == 0
+face 0.7 967.5 -46
+cmd +attack
+wait 1
+cmd -attack
+wait 4
+probe heart_gone aw_mwscript_status call getglobal HeartDestroyed
+probe status_k5 aw_mwscript_status
+pick matched_k5 status_k5 before matched
+pick plays_k5 status_k5 after ; PlayGroup
+pick misses_k5 status_k5 before with no skeletal actor or group
+expect heart_gone == 1
+expect matched_k5 == matched_near+6
+expect plays_k5 == plays_near+5
+# every one of its five groups (Idle2 to Idle5, Death1) found on the Heart's own animation table
+expect misses_k5 == misses_near
+recstop
+shot e5-heart-struck
+
+step 7 the Heart destroyed: Dagoth Ur can die now (his health capped at 200), the dreamer workers die
+wait 3
+probe dagoth_capped dagoth_ur_2->gethealth
+probe worker_health "dreamer worker"->gethealth
+probe list_destroyed chim actors list
+probe status_struck aw_mwscript_status
+pick plays_struck status_struck after ; PlayGroup
+pick misses_struck status_struck before with no skeletal actor or group
+pick weather_struck status_struck after region weather by scripts:
+expect dagoth_capped == 200
+expect alive 262014 in list_destroyed
+# the workers' script sets their health to 0 (the nearest worker's record read); run2: all three still alive in the
+# list, since a health set to 0 by a script never kills (the death needs a base above 0, aw_mwhost.c host_actor)
+expect worker_health <= 0
+expect known MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66 dead 234367 in list_destroyed
+expect known MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66 dead 234368 in list_destroyed
+expect known MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66 dead 234371 in list_destroyed
+# the end of the quest is checked even when a strike did not register: the global set by the console AFTER the checks
+# above (when the fifth strike set it, this changes nothing)
+cmd aw_mwscript_status call setglobal HeartDestroyed 1
+wait 2
+
+step 8 back by the entrance, within reach of the detector: EndGame advances the quest, kills Dagoth Ur, ends the blight, allows teleporting, rewards the player; the collapse
+cmd noclip
+cmd aw_view -24 320 480 270 0
+wait 1
+cmd dbg unstuck
+wait 6
+boxes
+probe blight_end aw_mwscript_status call getglobal DestroyBlight
+probe quest_end getjournalindex C3_DestroyDagoth
+probe dagoth_end dagoth_ur_2->gethealth
+probe list_end chim actors list
+probe standing_end aw_mwscript_status call getpccrimelevel
+pick rep_end standing_end after reputation
+probe status_end aw_mwscript_status
+pick plays_end status_end after ; PlayGroup
+pick misses_end status_end before with no skeletal actor or group
+pick weather_end status_end after region weather by scripts:
+expect blight_end == -1
+expect quest_end == 20
+expect dagoth_end <= 0
+# run2: his health 0, still listed fighting ("cannot reach you and flees"): the same health set to 0 by a script
+expect known MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66 dead 262014 in list_end
+expect rep_end == rep_before+10
+expect weather_end == weather_struck+2
+expect lacks status_end off now: teleporting
+# the collapse: EndGame's Death1 on Akulakhan and the bridge; today they are the room's fixed geometry, so both calls find
+# no skeletal actor to play (ENDGAME-CHAMBER-COLLAPSE-63)
+expect known ENDGAME-CHAMBER-COLLAPSE-63 misses_end == misses_struck
+expect known ENDGAME-CHAMBER-COLLAPSE-63 plays_end == plays_struck+2
+shot e6-after-the-end-script
+
+step 9 Dagoth Ur, Facility Cavern: Azura's spirit appears, takes the controls, plays the ending video, then ends the quest with the Ring of Azura
+# AzuraEnd at stage 20: the hidden spirit is enabled, appears within 800 game units (PlayGroup Idle2), takes the controls
+# within 250, plays mw_end.bik after 3 s, then sets C3_DestroyDagoth and A1_SleepersAwake to 50, enables the ring, gives
+# the controls back and hides the spirit 9 s later. The video plays over the scene and the script goes on at once
+# (aw_movie.c AW_MovieScript); OpenMW plays it to its end first (WindowManager::playVideo), then the script goes on.
+probe status_before_end aw_mwscript_status
+pick binks_before status_before_end after PlayBink
+cmd dbg tp ri71c3339d8b
+waitfor map 150 ri71c3339d8b
+waitfor screen 60 game
+wait 6
+boxes
+probe spirit_shown "azura spirit"->getdisabled
+expect spirit_shown == 0
+# to Azura's spirit (425529 at 1009 1325.5 3552): within 250 game units of it
+cmd noclip
+cmd aw_view 1009 1290 3575 90 0
+wait 1
+cmd dbg unstuck
+wait 1
+# read inside the 3 s between the controls taken and the video
+probe controls_taken aw_mwscript_status call getplayercontrolsdisabled
+expect controls_taken == 1
+rec e-azura
+wait 20
+boxes
+wait 10
+boxes
+recstop
+probe quest_final getjournalindex C3_DestroyDagoth
+probe sleepers_final getjournalindex A1_SleepersAwake
+probe ring_final "ring of azura"->getdisabled
+probe controls_final aw_mwscript_status call getplayercontrolsdisabled
+probe spirit_gone "azura spirit"->getdisabled
+probe status_final aw_mwscript_status
+pick binks_final status_final after PlayBink
+expect quest_final == 50
+expect sleepers_final == 50
+expect ring_final == 0
+expect controls_final == 0
+expect spirit_gone == 1
+expect binks_final == binks_before+1
+shot e7-azura

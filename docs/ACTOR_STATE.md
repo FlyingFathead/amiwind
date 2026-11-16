@@ -1,6 +1,6 @@
 # The actor record
 
-_Last updated with AmiWind v0.0.66-dev2 (14 November 2026)._
+_Last updated with AmiWind v0.0.66-dev10 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -158,7 +158,13 @@ containerextensions.cpp; apps/openmw/mwmechanics/stat.cpp), written independentl
   the base stays within 0 to 100 (OpenMW's modStat). Mod of a dynamic stat changes the base (not below 0, except
   fatigue) and the current value by the amount.
 - ModCurrent of a dynamic stat changes the current value only, never above the base; fatigue may go below 0 (a
-  knockdown). Health at 0 or below kills the actor.
+  knockdown).
+- A current health under 1 is death, whatever the base (OpenMW's setDynamic), from a blow, a spell, a fall or a
+  script alike: SetHealth 0 sets the base to 0 too and still kills. A script's health call that takes a living NPC or
+  creature under 1 kills it as a blow would: the record's death once (OnDeath, the dead count, an essential
+  character's box) and, when its place is loaded, the fight's death or the body a fight leaves. An actor that was
+  already under 1 or dead dies no second time. Up to v0.0.66-dev10 a death needed the health at 0 or below and a
+  script's kill also a base above 0, so a script's SetHealth 0 never killed.
 - The ratio is current over base (1 when the base is 0).
 - OnDeath reads 1 once after the actor died. The dead count of an actor id counts every death of it.
 - Item counts are the row's entries plus play's changes; AddItem and RemoveItem with a negative count read it as

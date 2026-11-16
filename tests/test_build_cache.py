@@ -709,6 +709,43 @@ class ReuseTests(unittest.TestCase):
         self.assertFalse(list(second.rglob('*' + build_cache.TEMPORARY_SUFFIX)))
 
     @unittest.skipUnless(MANIFESTS, 'stage wrapper and manifests are exercised on POSIX')
+    def test_the_plan_is_the_same_on_any_number_of_threads(self):
+        """BUILD-CHECK-ONE-CORE-66: the SHA-256 check of the earlier run's files runs on the cores the build may use
+        (verify_threads); the plan, a damaged file included, is the one a single thread makes."""
+        first, _, _ = self.build('first')
+        (first / 'delta' / 'd.txt').write_text('tampered')
+        run = self.root / 'workspace' / 'threads'
+        (run / 'profile').mkdir(parents=True)
+        index = build_cache.SourceIndex(self.repository)
+        steps = steps_for(self.repository, run, self.data)
+        fingerprints, components, problems, dependencies = build_cache.fingerprint_steps(steps, run, metadata(), index)
+        answers = {}
+        for threads in ('1', '3', '16'):
+            with patch.dict(os.environ, {build_cache.VERIFY_THREADS_ENV: threads}):
+                self.assertEqual(build_cache.verify_threads(), int(threads))
+                answers[threads] = build_cache.plan_reuse(steps, fingerprints, dependencies, components, problems,
+                                                          first)
+        self.assertEqual(answers['3'], answers['1'])
+        self.assertEqual(answers['16'], answers['1'])
+        plans, reasons = answers['1']
+        self.assertEqual(sorted(plans), ['alpha', 'beta', 'gamma'])
+        self.assertIn('old output delta/d.txt changed or missing', reasons['delta'])
+
+    def test_verify_threads_follow_the_cores_this_process_may_use(self):
+        import fingerprint_prefetch
+        with patch.dict(os.environ, {build_cache.VERIFY_THREADS_ENV: ''}), \
+                patch.object(fingerprint_prefetch, 'usable_cores', return_value=4):
+            self.assertEqual(build_cache.verify_threads(), 8)          # a 4-core check container keeps its 8
+        with patch.dict(os.environ, {build_cache.VERIFY_THREADS_ENV: ''}), \
+                patch.object(fingerprint_prefetch, 'usable_cores', return_value=24):
+            self.assertEqual(build_cache.verify_threads(), 24)         # the 24-core build: 24, not 8
+        with patch.dict(os.environ, {build_cache.VERIFY_THREADS_ENV: ''}), \
+                patch.object(fingerprint_prefetch, 'usable_cores', return_value=96):
+            self.assertEqual(build_cache.verify_threads(), build_cache.VERIFY_THREADS_MAX)
+        with patch.dict(os.environ, {build_cache.VERIFY_THREADS_ENV: '8'}):
+            self.assertEqual(build_cache.verify_threads(), 8)           # the method before, by name
+
+    @unittest.skipUnless(MANIFESTS, 'stage wrapper and manifests are exercised on POSIX')
     def test_damage_found_while_copying_rebuilds_or_stops(self):
         first, _, _ = self.build('first')
         run = self.root / 'workspace' / 'manual'

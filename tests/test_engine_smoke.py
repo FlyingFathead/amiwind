@@ -298,6 +298,32 @@ class EngineSmokeTests(unittest.TestCase):
         self.assertIn('res1 -1, res2 205', packet_text((82, 0xFFFFFFFF, 205, 1, 2, 3)))
         self.assertIsNone(stack_packet(bytes(s), base, reply + 4))      # another task's reply port: not the game's
         self.assertIsNone(packet_text(None))
+        # the name of an open, lock or delete is a BCPL pointer: the address is the value times 4 (the A/B's stop of 16
+        # November 2026, FINDINPUT with arg3 $106D9863, printed no name while the raw value was read as the address)
+        name_addr, bstr = space['name_addr'], space['bstr']
+        self.assertEqual(name_addr((1005, 0, 205, 0x106D978F, 0, 0x106D9863)), 0x41B6618C)
+        self.assertEqual(name_addr((8, 0, 0, 0x1000, 0x2000, 0)), 0x8000)          # LOCATE_OBJECT names arg2
+        self.assertIsNone(name_addr((87, 0, 0, 1, 2, 3)))                          # a WRITE names no file
+        self.assertIsNone(name_addr(None))
+        self.assertEqual(bstr(b'\x0dAWCTL:cmd.txt' + bytes(20)), 'AWCTL:cmd.txt')
+        self.assertIsNone(bstr(b'\x00abc'))
+        self.assertIsNone(bstr(b'\x40short'))                                      # the length runs past the bytes
+        self.assertIsNone(bstr(b''))
+        # the handler's word for the command (sp_Msg + 4, the directory-drive handler's queue state; 16 November 2026):
+        # -1 = the host side finished it and the reply pass never came, the lost interrupt request of the two stops
+        stack_message_status, status_text = space['stack_message_status'], space['status_text']
+        self.assertEqual(stack_message_status(bytes(s), base, reply), 0)
+        s[msg + 4:msg + 8] = (0xFFFFFFFF).to_bytes(4, 'big')
+        self.assertEqual(stack_message_status(bytes(s), base, reply), -1)
+        self.assertIsNone(stack_message_status(bytes(s), base, reply + 4))
+        self.assertIn("the handler's word for it is -1: the emulator's host side finished the request and the handler "
+                      "was never told", packet_text(pk, None, -1))
+        self.assertTrue(packet_text(pk, None, 0).endswith("handed to the emulator's host side, not finished"))
+        self.assertIn('is 1: queued by the handler, not started', status_text(1))
+        self.assertIn('$40031000 (not a directory-drive queue word)', status_text(0x40031000))
+        self.assertEqual(status_text(None), '')
+        self.assertEqual(packet_text(pk), packet_text(pk, None, None))
+        self.assertIn('packet_text(pk, pname, stack_message_status(s, sbase, node + 0x5C))', engine_smoke.STALL_PY)
         labels = unit_labels('FS: mounted virtual unit DH2 (/out/awctl)\nFS: AWCTL (flags=00000002) starting..\n')
         self.assertEqual(labels, {'DH2': 'the remote-console folder /out/awctl'})
         idle = [0xF81476, 0xF81478, 0xF81478]
@@ -773,6 +799,88 @@ class LoadHangExperimentTests(unittest.TestCase):
         self.assertIn('[ -s $R/emu-options.txt ] && cat $R/emu-options.txt >> $R/smoke.fs-uae', probe)
         self.assertIn('shot menu; emucheck', probe)              # remote on: checked once the game answers
         self.assertIn('[ $i = 1 ] && emucheck', probe)           # remote off: at the first screenshot
+
+    def test_a_session_script_asks_for_its_emulator_lines(self):
+        """CHIM-SEYDA-BALMORA-LOAD-HANG-43 (16 November 2026): a session script's "emu KEY=VALUE" lines are extra emulator
+        lines like --emu-option, derived by the probe itself when the run brings no emu-options.txt (the session tool
+        copies the script and writes probe.sh and stall.py alone), checked in the start-up log without judge.py, and
+        refused for a key the smoke sets itself. tests/sessions/load_repeat_hops_det.txt asks for deterministic=1."""
+        self.assertEqual(engine_smoke.script_emu_options('# a comment\nemu deterministic=1\ncmd dbg hud on\nemu x = y\n'),
+                         ['deterministic=1', 'x=y'])
+        self.assertEqual(engine_smoke.script_emu_options('wait 8\n'), [])
+        det = Path(engine_smoke.HERE.parent, 'tests', 'sessions', 'load_repeat_hops_det.txt').read_text(encoding='utf-8')
+        self.assertEqual(engine_smoke.parse_emu_options(engine_smoke.script_emu_options(det)), [('deterministic', '1')])
+        plain = Path(engine_smoke.HERE.parent, 'tests', 'sessions', 'load_repeat_hops.txt').read_text(encoding='utf-8')
+        self.assertEqual([l for l in det.splitlines() if not l.startswith('#') and l != 'emu deterministic=1'],
+                         [l for l in plain.splitlines() if not l.startswith('#')])      # the same session otherwise
+        probe = engine_smoke.PROBE
+        self.assertNotIn('@EMU_MANAGED@', probe)
+        self.assertNotIn('@EMU_PROOF', probe + engine_smoke.JUDGE_PY)
+        self.assertIn(engine_smoke.EMU_PROOF_LINE, engine_smoke.JUDGE_PY)
+        self.assertIn('else v=$(emucheck_sh); fi', probe)
+        with tempfile.TemporaryDirectory() as tmp:
+            engine, roms = self.setup_dirs(tmp)
+            script = Path(tmp, 's.txt')
+            script.write_text('emu jit_compiler=0\nwait 8\n', encoding='utf-8', newline='\n')
+            common = ['--engine', str(engine), '--volume', 'v', '--image-dir', 'i', '--scratch', 's', '--roms',
+                      str(roms), '--out', str(Path(tmp, 'o')), '--script', str(script)]
+            with unittest.mock.patch.object(engine_smoke, 'docker') as docker:
+                code, text = self.run_main(*common)
+            self.assertEqual(code, 2)
+            self.assertIn('the smoke sets jit_compiler itself', text)
+            docker.assert_not_called()
+        if not shutil.which('sh'):
+            self.skipTest('a POSIX shell is required')
+        start = probe.index('if [ ! -s $R/emu-options.txt ] && [ -s $R/script.txt ]')
+        block = probe[start:probe.index('\nfi\n', start) + 4]
+        fn = probe[probe.index('emucheck_sh(){'):]
+        fn = fn[:fn.index('; fi; }\n') + 8]
+        for lines, want_options, want_result in (
+                ('# twin\nemu deterministic=1\nwait 8\n', 'deterministic = 1\n', None),
+                ('emu deterministic = 1\nemu cpu_idle=0\n', 'deterministic = 1\ncpu_idle = 0\n', None),
+                ('emu jit_compiler=0\nwait 8\n', None, 'names a key the smoke sets itself: jit_compiler'),
+                ('emu Bad Line\n', None, 'malformed'),
+                ('wait 8\n', None, None)):
+            with tempfile.TemporaryDirectory() as tmp:
+                r = Path(tmp)
+                (r / 'logs').mkdir()
+                (r / 'script.txt').write_text(lines, encoding='utf-8', newline='\n')
+                done = subprocess.run(['sh', '-c', 'R=%s\n%s' % (r.as_posix(), block)], capture_output=True, text=True,
+                                      timeout=30)
+                self.assertEqual(done.returncode, 0, done.stderr)
+                if want_options is None:
+                    self.assertFalse((r / 'emu-options.txt').exists(), lines)
+                else:
+                    self.assertEqual((r / 'emu-options.txt').read_text(encoding='utf-8'), want_options)
+                steps = (r / 'logs' / 'steps.log').read_text(encoding='utf-8') if (r / 'logs' / 'steps.log').exists() else ''
+                if want_result:
+                    self.assertIn('smoke RESULT FAIL', steps)
+                    self.assertIn(want_result, steps)
+                    self.assertTrue((r / 'finished').exists())
+                else:
+                    self.assertEqual(steps, '')
+            # a run that brought its own emu-options.txt keeps it: the script's lines are not added twice
+            with tempfile.TemporaryDirectory() as tmp:
+                r = Path(tmp)
+                (r / 'logs').mkdir()
+                (r / 'script.txt').write_text('emu deterministic=1\n', encoding='utf-8', newline='\n')
+                (r / 'emu-options.txt').write_text('cpu_idle = 0\n', encoding='utf-8', newline='\n')
+                subprocess.run(['sh', '-c', 'R=%s\n%s' % (r.as_posix(), block)], capture_output=True, text=True, timeout=30)
+                self.assertEqual((r / 'emu-options.txt').read_text(encoding='utf-8'), 'cpu_idle = 0\n')
+        # the probe's own check of the taken options, for a run without judge.py
+        for options, log, want in (
+                ('deterministic = 1\n', 'x\n%s\n' % engine_smoke.EMU_PROOF_LINE, 'EMUOPT ok deterministic=1 taken (emulator log)'),
+                ('deterministic = 1\n', 'nothing\n', 'EMUOPT missing deterministic=1 (not in the emulator log)'),
+                ('cpu_idle = 0\n', 'cpu_idle = 0\n', 'EMUOPT ok cpu_idle=0 taken (emulator log)'),
+                ('cpu_idle = 0\ndeterministic = 1\n', 'cpu_idle = 1\n', 'EMUOPT missing cpu_idle=0 deterministic=1 (not in the emulator log)')):
+            with tempfile.TemporaryDirectory() as tmp:
+                r = Path(tmp)
+                (r / 'logs').mkdir()
+                (r / 'emu-options.txt').write_text(options, encoding='utf-8', newline='\n')
+                (r / 'logs' / 'fsuae.log').write_text(log, encoding='utf-8', newline='\n')
+                done = subprocess.run(['sh', '-c', 'R=%s\n%s\nemucheck_sh' % (r.as_posix(), fn)], capture_output=True,
+                                      text=True, timeout=30)
+                self.assertEqual(done.stdout.strip(), want, done.stderr)
 
     def test_frozen_clock_from_a_list_of_frames(self):
         judge = engine_smoke.judge_frames

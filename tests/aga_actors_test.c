@@ -1042,6 +1042,54 @@ static void outdoor_corpse (void)
 	puts ("outdoor corpse passed");
 }
 
+/* JOURNEY-STEP7-FIGHTER-NEAREST-66: "chim actors summon" copies the nearest resident; "chim actors summon REF" copies the
+ * living resident of that reference (the journey's step 7 names the Seyda Neen guard), and says so when nobody of that
+ * reference lives here (a dead one counts as nobody). The copy stands at the player's feet with its own reference. */
+static edict_t *copy_of (float ref)
+{
+	int i;
+	for (i=2 ; i<sv.num_edicts ; i++)
+	{
+		eval_t *v = GetEdictFieldValue (&ents[i], "aw_ref");
+		if (!ents[i].free && v && v->_float == ref)
+			return &ents[i];
+	}
+	return NULL;
+}
+static void summon_by_reference (void)
+{
+	edict_t *c, *far_one, *mid;
+	programs.entityfields = sizeof(entvars_t) / 4;		/* the copy takes the source's fields as the engine's progs say */
+	reset_level ();
+	nlaid = 0;
+	dead_ref = 0;
+	command ("clear", NULL);
+	town_residents ();
+	chim_actors_tick ();
+	assert (on_map (701) && on_map (702) && on_map (703));
+	far_one = copy_of (703);
+	mid = copy_of (702);
+	ents[1].v.origin[0] = 0;
+	/* without a reference: the nearest resident (701, at 100 east) */
+	command ("summon", NULL);
+	assert ((c = copy_of (900500)) != NULL && c->v.model == copy_of (701)->v.model);
+	/* with one: that resident, though it is the farthest (703, at 300 east) */
+	command ("summon", "703");
+	assert ((c = copy_of (900501)) != NULL && c->v.model == far_one->v.model && c->v.model != mid->v.model);
+	assert (c->v.origin[0] == ents[1].v.origin[0] && c->v.origin[1] == ents[1].v.origin[1]);
+	/* the reference of nobody here: no copy, the count of copies stays */
+	command ("summon", "999");
+	assert (!copy_of (900502));
+	/* a dead resident is nobody */
+	dead_ref = 702;
+	command ("summon", "702");
+	assert (!copy_of (900502));
+	dead_ref = 0;
+	command ("summon", "702");
+	assert ((c = copy_of (900502)) != NULL && c->v.model == mid->v.model);
+	puts ("summon by reference passed");
+}
+
 /* COMBAT-PLAYGROUND-CREATURE-HUMANOID-61: a creature record ID's world model from its table base (any case); a
  * creature with no model in this build, an unknown id and a buffer too small for the path give none */
 static void base_model (void)
@@ -1107,6 +1155,8 @@ int main (int argc, char **argv)
 		corpse_rules ();
 	else if (!strcmp (argv[1], "outdoorcorpse"))
 		outdoor_corpse ();
+	else if (!strcmp (argv[1], "summonref"))
+		summon_by_reference ();
 	else
 		return 2;
 	return 0;

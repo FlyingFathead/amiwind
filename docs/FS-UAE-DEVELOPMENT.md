@@ -1,6 +1,6 @@
 # FS-UAE development access
 
-_Last updated with AmiWind v0.0.66-dev10 (15 November 2026)._
+_Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -65,15 +65,48 @@ shots and replays. It takes one step per line:
 - `examine NAME`: logs the stall examination of the running game (the processor samples, what every task and
   file-system handler waits on, the game's pending file request, the load trace ring) without failing the run: a
   baseline that a later stop's line is read against.
+- `emu KEY=VALUE`: an extra line for the emulator's configuration, as `--emu-option` gives one (below), so that a
+  session script asks for the emulator setting it needs itself. It is read before the emulator starts, checked in
+  the emulator's start-up log, and refused for a key the smoke sets itself.
 
 Any other line is a comment. The run passes if the game survives the whole script. When the examination of a stop
 fails, its error is kept in `logs/stall-errors.txt` and the emulator is resumed all the same.
 
 The console setting `aw_remote_log 0` keeps the remote console's copy of the console output off the remote folder
-(the lines stay on the in-game console; the command and state files are written as before). It exists for comparing
-test sessions with and without that append, the candidate trigger of the load stall
+(the lines stay on the in-game console; the command and state files are written as before). It was made for
+comparing test sessions with and without that append, once the candidate trigger of the load stall
 ([CHIM-SEYDA-BALMORA-LOAD-HANG-43](bugs/CHIM-SEYDA-BALMORA-LOAD-HANG-43.md)): `tests/sessions/load_repeat_hops.txt` against its twin
-`tests/sessions/load_repeat_hops_nolog.txt`.
+`tests/sessions/load_repeat_hops_nolog.txt`. The comparison of 15 and 16 November 2026 showed the stall with the
+append off as well, so the append was not the trigger; the cause is below.
+
+**The load stall of the test sessions and `deterministic = 1`.** The remote-console folder is a host folder that
+FS-UAE mounts as a drive. In FS-UAE 3.1.66 such a drive is served by a host thread, and the completion of each file
+request is announced to the emulated machine through one shared interrupt-request word that is written without
+atomic operations: the host thread sets its bit with a plain read-modify-write, and the emulator thread clears another
+device's bit in the same word with a plain read-modify-write on every change of the interrupt requests, whether or
+not that device is configured. When the two overlap and the emulator thread's write lands last, the announcement is
+lost: the request is finished and its results are in the packet, but the handler process is never told to reply, so
+the game waits for ever. That is the stop the sessions saw about once in a hundred loads, and it needs the host
+folder: a player's game has no such drive (the hard files complete on the emulator thread). The setting
+`deterministic = 1` makes FS-UAE 3.1.66 start no host thread for host folders and complete their requests on the
+emulator thread, so the word is never written from two threads at once; the stall examination also reports the
+handler's word for the stuck command (`-1` = finished by the host side, the handler never told), which names a stop
+of this kind directly. `tests/sessions/load_repeat_hops_det.txt` is `load_repeat_hops.txt` with the line
+`emu deterministic=1`; N sessions of each on the same image, stops per load, show whether the stall is gone. The
+setting also fixes the emulated machine's clock at a constant date and completes a host folder's slow file calls on
+the emulator thread, so it is for test sessions that drive the game through the remote console, not for timing
+measurements.
+
+**A note for anyone who mounts a host folder as a drive in FS-UAE.** FS-UAE 3.1.66 and the newest stable release,
+3.2.35, serve a host folder mounted as a drive on a second thread. When that thread finishes a request it sets its flag
+in the shared interrupt word, and the emulator thread updates the same word for its own devices; neither update is
+atomic, so when the two meet the completion can be lost, and a program waiting on that drive then waits for ever.
+FS-UAE's development line has the fix (the interrupt status made atomic in 2016), but no release carries it yet. In
+AmiWind's test sessions, which use such a folder for the remote console, it was seen about once in 100 area loads
+([CHIM-SEYDA-BALMORA-LOAD-HANG-43](bugs/CHIM-SEYDA-BALMORA-LOAD-HANG-43.md)); the game itself runs from hard file
+images, which are not affected. The way out: the FS-UAE option `deterministic = 1`, which serves host-folder requests on
+the emulator thread (side effects: the Amiga clock starts at a fixed date and folder access makes short pauses, so it is
+not for speed measurements), or no host-folder drives.
 
 Every engine gate runs it on the engine it has just built. It would have stopped the v0.0.36-dev3 playtest, whose
 engine corrupted memory on every music read and made the emulator exit a few seconds after a map load

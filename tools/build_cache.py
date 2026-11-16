@@ -4371,6 +4371,31 @@ def requalify(manifest):
     return manifest
 
 
+# The SHA-256 check of every file a build takes from an earlier run (plan_reuse) on every core the build may use
+# (BUILD-CHECK-ONE-CORE-66): 116,024 files, 14.6 GiB for a v0.0.66 snapshot, read and hashed on at most 8 threads
+# (min(8, os.cpu_count())), so the 24-core build hashed on 8. hashlib lets go of the interpreter lock while it hashes,
+# so the threads run side by side; each file's digest is the same on any number of threads. The work waits on the
+# disk as much as on the cores (the same check took 93 s on 4 cores and 73 s on 24, 2026-11-16), so a container with
+# fewer cores keeps the 8 threads it had (more reads in flight). AMIWIND_VERIFY_THREADS=N: N threads.
+VERIFY_THREADS_ENV = 'AMIWIND_VERIFY_THREADS'
+VERIFY_THREADS_MIN = 8    # the method before: the floor, never fewer
+VERIFY_THREADS_MAX = 32
+
+
+def verify_threads():
+    """Threads for plan_reuse's SHA-256 check: AMIWIND_VERIFY_THREADS when set, else the cores this process may use
+    (its CPU affinity capped by a cgroup CPU quota, docker --cpus), at least VERIFY_THREADS_MIN and at most
+    VERIFY_THREADS_MAX."""
+    value = os.environ.get(VERIFY_THREADS_ENV, '').strip()
+    if value:
+        try:
+            return max(1, int(value))
+        except ValueError:
+            pass
+    from fingerprint_prefetch import usable_cores
+    return max(VERIFY_THREADS_MIN, min(VERIFY_THREADS_MAX, usable_cores()))
+
+
 def plan_reuse(steps, fingerprints, dependencies, components, problems, old_run, forced=(), index=None,
                narrowed=None, skip_verify=(), for_combine=False, proven=None):
     """({stage: plan}, {stage: reason not reused}) against a completed earlier run. INDEX (this checkout's
@@ -4543,7 +4568,7 @@ def plan_reuse(steps, fingerprints, dependencies, components, problems, old_run,
                 return sha256_file(old_run / path)
             except OSError:
                 return None
-        with ThreadPoolExecutor(max_workers=min(8, os.cpu_count() or 1)) as pool:
+        with ThreadPoolExecutor(max_workers=verify_threads()) as pool:
             verified.update(zip(pending, pool.map(check, pending)))
         damaged = False
         for name in sorted(candidates):

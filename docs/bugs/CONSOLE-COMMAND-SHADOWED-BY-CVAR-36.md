@@ -72,6 +72,9 @@ Family: Debug commands and remote control (`debug-commands`). dbg commands, tele
 
 - AW-20260928-14 (no report page): Master debug toggle omits coordinates
 - [COMPANION-PICK-RMB-33](COMPANION-PICK-RMB-33.md): The right mouse button does not pick a companion: "MOUSE3 is unbound"
+- CONSOLE-EQUIP-SKIPS-ONPCEQUIP-66 (no report page): The original's console Equip on the player wears the item without its script's OnPCEquip: Wraithguard equipped with player->equip leaves wraithguardEquipped at 0
+- CONSOLE-GETPOS-SCRATCH-ORIGIN-66 (no report page): The console's GetPos on an actor answers a point near 0 instead of where the actor stands (dagoth_ur_2->getpos y read -0.43 while he stood at y 3700)
+- CONSOLE-SHOWVARS-SCRATCH-INSTANCE-66 (no report page): The console's ShowVars on a reference prints the console's own empty instance, not the reference's script (heart_akulakhan->sv: script 0, 0 locals)
 - CONSOLE-TP-ROOM-NAME-63 (no report page): The console teleport to a room map name stays in the current town instead of entering the room
 - DBG-CONTAINER-AIM-NO-SPOT-59 (no report page): aw_placed container aim finds no standing spot the room collision accepts in Arrille's Tradehouse
 - DBG-DOOR-GO-AIM-CHIM-59 (no report page): aw_hinged_door go does not bring the door under the crosshair in a CHIM room

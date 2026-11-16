@@ -2,11 +2,12 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 3 times; something has to be done
+## PERSISTING: reported 4 times; something has to be done
 
 - Reported with v0.0.50 at 2026-10-24 19:03 +0300
 - Reported with v0.0.52-dev3 at 2026-10-26 14:10 +0200: Confirmed in the dev3 image: from Balmora at 32 MB the skeletal tables gave back 1589 KiB, the room loaded whole on try 3; the refuse-at-the-door part stays open
 - Reported with v0.0.61 at 2026-11-07 (time not recorded): Seen again on the v0.0.61 release image in FS-UAE on Linux: the debug teleport to heartchamber stops on the Loading screen with the music playing; the console says the room record or models cannot be loaded; afterwards the teleport command says no game is running and the scene command says a scene is still loading, and nothing recovers the session (HEART-CHAMBER-LOAD-HANG-62).
+- Reported with v0.0.66-dev10 at 2026-11-16 09:47 +0200: the endgame session ENDGAME-HEART-SESSION-66, run1 on the v0.0.66-dev10 image, FS-UAE JIT, 32 MB Fast, IDE: dbg tp heartchamber from Seyda Neen loaded the room in play after 41 s (one frame of 41,930 ms, 40,917 ms of it disk); the Heart (197602) and Dagoth Ur (262014) listed; inside, 1,943 KiB of Fast RAM free, largest block 1,402 KiB. The room models needed about 12,976 KiB against 12,597 KiB of zone and banks before growing (579 KiB of session memory given back first).
 
 <!-- END GENERATED PERSISTING -->
 
@@ -35,7 +36,7 @@ _Last updated with AmiWind v0.0.50 (24 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
 - [Status: 24 October 2026](#status-24-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)

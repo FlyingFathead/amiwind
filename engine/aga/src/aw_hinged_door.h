@@ -90,6 +90,11 @@ int AW_HingedDoorActivate(unsigned reference);
  * reference is a hinged door; *yaw gets its current pose. */
 int AW_HingedDoorPlacement(unsigned pid,unsigned reference,const float *origin,float radius,float *yaw);
 void AW_HingedDoorRecentre(const float *d);
+/* WANDER-DOOR-RULE-66 (the residents' door rule, aw_ambient.c): the current map's hinged doors. AW_HingedDoorCount:
+ * how many; AW_HingedDoorShut: 1 with door I's origin (the placement's, map units, its hinge) and reference when it
+ * stands shut and still (OpenMW 0.51 obstacle.cpp leaves out a door that moves or is not at its placed rotation). */
+int AW_HingedDoorCount(void);
+int AW_HingedDoorShut(int i,float origin[3],unsigned *reference);
 
 /* Scripted movers (WORLD-BUTTONS-62): the table's M rows, the references a script moves (Move, MoveWorld, SetPos,
  * SetAtStart) that the CHIM world draws as placements without an entity, the Ghostgate portcullises first.

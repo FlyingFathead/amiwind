@@ -162,7 +162,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - COMBAT-STYLE-PRESETS-62 (no report page): Requested: combat style presets for fights, such as the dice and best-attack choices, chosen before a fight
 - COMBAT-THINK-COST-68040-54 (no report page): On the slow 68040 preset one combat decision step (think) costs 34 ms with one fighter and 44 ms with four
 - COMBAT-WEAPON-CHOICE-SKILL-66 (no report page): The weapon a fighter took into a fight ignored its skills: the highest maximum damage won
-- CONSOLE-GETITEMCOUNT-UNNAMED-ITEM-66 (no report page): The console's player->getitemcount answers "no such item id" for an item the player carries when no script and no actor names it (the census iron dagger)
+- [CONSOLE-GETITEMCOUNT-UNNAMED-ITEM-66](CONSOLE-GETITEMCOUNT-UNNAMED-ITEM-66.md): The console's player->getitemcount answers "no such item id" for an item the player carries when no script and no actor names it (the census iron dagger)
 - [CONTAINER-LEVELLED-CONTENTS-EMPTY-59](CONTAINER-LEVELLED-CONTENTS-EMPTY-59.md): Containers whose contents are levelled lists open empty
 - [CONTAINER-STRIP-OPEN-MANY-KINDS-61](CONTAINER-STRIP-OPEN-MANY-KINDS-61.md): With hundreds of kinds of item carried, opening a body or a container holds the game for about 10 seconds
 - CORPSE-DISPOSE-MISSING-65 (no report page): A corpse's loot window has no way to dispose of the body, so bodies pile up
@@ -218,6 +218,8 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - MWSCRIPT-INERT-SEEN-62 (no report page): Scripts whose only effect is a message box, a door or item use they take over, or a local the dialogue reads were left out of the build as doing nothing
 - MWSCRIPT-INTERIOR-PLACEMENTS-48 (no report page): Scripted placements in rooms that have no edict are not attached: the engine has no room identity to match them (3,612 of 4,907 bindings are in rooms)
 - MWSCRIPT-LATER-MASTER-SCRIPT-61 (no report page): An object placed in Vvardenfell whose record gets its script from a later master is not attached
+- MWSCRIPT-MEMBER-QUIET-READER-66 (no report page): A script that reads another object's variable can sleep through a change that object's own script makes to it: such a change does not wake quiet scripts
+- MWSCRIPT-MEMBER-READS-ID-AS-SCRIPT-66 (no report page): A script's read or write of another object's local variable finds nothing: the engine takes the object row's id as its script, so the read gives 0 and the write is dropped (Dagoth Ur's shield never follows the Heart's count)
 - MWSCRIPT-MISSING-FUNCTIONS-63 (no report page): Game scripts call MWScript functions the interpreter does not carry out yet: those calls do nothing and read 0 (69 scripts after the first v0.0.63 batch, most of them in Mournhold and Solstheim)
 - MWSCRIPT-OLD-CONFIG-OFF-57 (no report page): An install whose saved config holds aw_mwscript 0 keeps compiled scripts off after the default turned on
 - [MWSCRIPT-PLACE-NO-MODEL-62](MWSCRIPT-PLACE-NO-MODEL-62.md): A script cannot place an NPC or a creature whose record has no placed reference in Vvardenfell
@@ -226,6 +228,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [MWSCRIPT-POSITIONCELL-OUTDOOR-62](MWSCRIPT-POSITIONCELL-OUTDOOR-62.md): An NPC or a creature a script sends outdoors appears there only while its home area is loaded
 - MWSCRIPT-REFUSED-SCRIPT-COUNT-58 (no report page): The compiled game scripts are refused at load since the dialogue result scripts joined the file: no script runs
 - MWSCRIPT-ROTATE-NO-ENTITY-59 (no report page): A script's Rotate on a streamed outdoor object without an entity is not carried out: the object does not turn
+- MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66 (no report page): A script's SetHealth 0 leaves the actor alive: its health reads 0 but it stays standing and fighting (Dagoth Ur after the end script, the dreamer workers after the Heart)
 - MWSCRIPT-STANDING-NOT-SAVED-57 (no report page): The players standing the scripts change (crime level, reputation, faction ranks, expelled marks, faction reputation) is not in saved games
 - [MWSCRIPT-STATE-NOT-SAVED-48](MWSCRIPT-STATE-NOT-SAVED-48.md): The compiled scripts' values (globals, object and script locals, journal indexes) are not in saved games
 - MWSCRIPT-STOPCOMBAT-UNWIRED-62 (no report page): A script's StopCombat never ended a fight: the combat layer's end of one actor's fight was never connected to it

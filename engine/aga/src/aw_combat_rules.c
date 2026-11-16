@@ -286,7 +286,8 @@ void AW_CombatSwing(const aw_combat_settings_t *s,aw_fighter_t *a,aw_fighter_t *
             out->knockdown=1;
         }
     }
-    if(v->health<=0){v->health=0;v->dead=1;v->knocked=0;}
+    /* under 1 health is death (OpenMW 0.51 creaturestats.cpp setDynamic; MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66) */
+    if(AW_ACTOR_HEALTH_DEAD(v->health)){v->health=0;v->dead=1;v->knocked=0;}
     else if(v->fatigue<0)v->knocked=2;
 }
 /* ---- the aggro and flee ratings (aw_combat.h) ---- */

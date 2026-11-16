@@ -17,6 +17,7 @@ import journey_smoke as js  # noqa: E402
 
 JOURNEY = ROOT / 'tests' / 'sessions' / 'journey_opening.txt'
 VICTIM = 128960   # step 6's fixed victim, Erene Llenim (DOOR-ARRIVAL-INSIDE-ACTOR-66)
+FIGHTER_SOURCE = 128967   # step 7's fixed armed fighter, the Seyda Neen guard (JOURNEY-STEP7-FIGHTER-NEAREST-66)
 
 # what a good run's game answers (the engine's own console forms: aw_mwhost.c, aw_mwconsole.c, aw_actors.c)
 GOOD = {
@@ -118,6 +119,14 @@ class JourneySmoke(unittest.TestCase):
         self.assertEqual(self.j['probes']['package_loaded']['part'], 'B')
         self.assertEqual(js.main(['check', str(JOURNEY)]), 0)
 
+    def test_an_emu_line_goes_into_the_parts_script(self):
+        # an emulator option for a part's session (CHIM-SEYDA-BALMORA-LOAD-HANG-43: emu deterministic=1), passed as it
+        # stands for tools/engine_smoke.py to take; an unknown word is still refused
+        j = js.parse('part A\nemu deterministic=1\nstep 1 one\nprobe x cmd getpos x\nexpect x == 1\n')
+        self.assertIn('emu deterministic=1', j['parts'][0]['lines'])
+        with self.assertRaises(js.JourneyError):
+            js.parse('part A\nemux deterministic=1\nstep 1 one\nprobe x cmd getpos x\nexpect x == 1\n')
+
     def test_the_scripts_carry_the_markers_and_the_session_and_walker_words_only(self):
         with tempfile.TemporaryDirectory() as d:
             self.assertEqual(js.write_scripts(JOURNEY, d), ['A', 'B'])
@@ -188,10 +197,29 @@ class JourneySmoke(unittest.TestCase):
             js.write_scripts(JOURNEY, d)
             a = (Path(d) / 'part-A.txt').read_text(encoding='utf-8').splitlines()
         seed = a.index('cmd dbg combat seed 7')
-        summon = a.index('cmd chim actors summon')
+        summon = a.index('cmd chim actors summon %d' % FIGHTER_SOURCE)
         fight = a.index('cmd chim actors fight')
         self.assertLess(seed, summon)
         self.assertLess(summon, fight)
+
+    def test_step_7_summons_a_fixed_armed_resident_by_reference(self):
+        # JOURNEY-STEP7-FIGHTER-NEAREST-66: a plain "chim actors summon" copies the nearest resident, which was Fargoth
+        # (unarmed: misses and fatigue damage only) on the v0.0.66-dev9 and dev10 images, so the health check failed by
+        # chance; step 7 names the Seyda Neen guard (128967, armed) by reference, as step 6 names its victim
+        with tempfile.TemporaryDirectory() as d:
+            js.write_scripts(JOURNEY, d)
+            a = (Path(d) / 'part-A.txt').read_text(encoding='utf-8').splitlines()
+            b = (Path(d) / 'part-B.txt').read_text(encoding='utf-8').splitlines()
+        summons = [l for l in a + b if l.startswith('cmd chim actors summon')]
+        self.assertEqual(summons, ['cmd chim actors summon 128967'])
+        self.assertEqual(FIGHTER_SOURCE, 128967)
+        # the rest of step 7 is as it was: the hurt, the heal, then the summon, the fight and the health check
+        self.assertLess(a.index('cmd dbg cast now'), a.index(summons[0]))
+        self.assertLess(a.index('cmd chim actors fight'), a.index('cmd echo JOURNEY PROBE health_fought'))
+        # a run whose fight lands no hit still fails step 7
+        ok, lines = js.judge(self.j, self.runs(health_fought=90))
+        self.assertFalse(ok)
+        self.assertTrue(any(l.startswith('FAIL step 7') for l in lines), lines)
 
     def test_a_good_run_passes_every_check(self):
         ok, lines = js.judge(self.j, self.runs())
@@ -322,8 +350,63 @@ class JourneySmoke(unittest.TestCase):
         self.assertLess(text.index('load its quicksave'), text.index('Step 9: '))
         self.assertGreater(text.index('load its quicksave'), text.index('Step 8: '))
 
+    def test_pick_reads_a_number_after_or_before_a_text_of_an_earlier_answer(self):
+        # ENDGAME-HEART-SESSION-66: the counts of a long status answer; the not-yet list names the same words with other
+        # numbers, so the text is matched as given (case and the "; " before PlayGroup)
+        text = ('step 1 counts\nprobe s aw_mwscript_status\npick plays s after ; PlayGroup\npick seen s before matched\n'
+                'pick none s after no such words\nexpect plays == 5\nexpect seen == 6\nexpect none == 1\n')
+        j = js.parse(text)
+        self.assertEqual(j['probes']['plays']['kind'], 'pick')
+        self.assertEqual(j['parts'][0]['lines'], ['cmd echo JOURNEY STEP 1', 'cmd echo JOURNEY PROBE s',
+                                                  'cmd aw_mwscript_status', 'wait %d' % js.PROBE_WAIT])
+        con = ('JOURNEY STEP 1\nJOURNEY PROBE s\nnot yet, most called: HitOnMe 900 PlayGroup 7\n'
+               'HitOnMe: 6 weapon blows kept, 0 by NPCs not kept; 1800 reads, 6 matched\n'
+               'player standing: crime level 0, reputation 0; calls 4 (0 not carried out); PlayGroup 5 (2 with no '
+               'skeletal actor or group)\n')
+        ok, lines = js.judge(j, [('08:00:00 cmd echo JOURNEY STEP 1\n08:00:09 smoke RESULT PASS script\n', con)])
+        self.assertTrue(lines[0].startswith('PASS') and lines[1].startswith('PASS'), lines)
+        self.assertTrue(lines[2].startswith('FAIL') and 'no number' in lines[2], lines)
+        self.assertEqual(js.pick_number(['a 12 matched'], 'before', 'matched'), 12.0)
+        self.assertEqual(js.pick_number(['ShowVars: script 811, 5 locals'], 'after', 'ShowVars: script'), 811.0)
+        self.assertIsNone(js.pick_number(['nothing'], 'after', 'x'))
+
+    def test_alive_fighting_and_dead_take_a_reference_number(self):
+        text = ('step 1 actors\nprobe l chim actors list\nexpect alive 197602 in l\nexpect fighting 262014 in l\n'
+                'expect dead 234367 in l\nexpect alive 5 in l\n')
+        con = ('JOURNEY STEP 1\nJOURNEY PROBE l\n  10 Heart of Lorkhan ref 197602 cell 0 0 (outside) at 0 0 0\n'
+               '  11 Dagoth Ur ref 262014 cell 0 0 (outside) at 0 0 0 FIGHTING\n'
+               '  12 Dreamer ref 234367 cell 0 0 (outside) at 0 0 0 DEAD\n')
+        ok, lines = js.judge(js.parse(text), [('08:00:09 smoke RESULT PASS script\n', con)])
+        self.assertEqual([l.split()[0] for l in lines[:4]], ['PASS', 'PASS', 'PASS', 'FAIL'], lines)
+        self.assertIn('reference 5 is not in the actor list', lines[3])
+        con2 = con.replace(' FIGHTING', '').replace(' DEAD\n', '\n')
+        ok, lines = js.judge(js.parse(text), [('08:00:09 smoke RESULT PASS script\n', con2)])
+        self.assertIn('reference 262014 is alive, not fighting', lines[1])
+        self.assertIn('reference 234367 is alive, not dead', lines[2])
+
+    def test_a_known_gap_is_reported_and_not_counted(self):
+        text = 'step 1 the end\nprobe a x\nprobe b y\nexpect a == 1\nexpect known ENDGAME-CHAMBER-COLLAPSE-63 b == 2\n'
+        j = js.parse(text)
+        self.assertEqual(j['expects'][1]['known'], 'ENDGAME-CHAMBER-COLLAPSE-63')
+        run = lambda b: [('08:00:09 smoke RESULT PASS script\n',
+                          'JOURNEY STEP 1\nJOURNEY PROBE a\nx -> 1\nJOURNEY PROBE b\ny -> %d\n' % b)]
+        ok, lines = js.judge(j, run(0))
+        self.assertTrue(ok, lines)
+        self.assertTrue(lines[1].startswith('KNOWN step 1') and lines[1].endswith('[known gap ENDGAME-CHAMBER-COLLAPSE-63]'),
+                        lines)
+        self.assertEqual(lines[-1], 'JOURNEY RESULT PASS 1/1 checks, 1 steps; known gaps: 1 of 1 checks still failing '
+                                    '(ENDGAME-CHAMBER-COLLAPSE-63)')
+        ok, lines = js.judge(j, run(2))
+        self.assertIn('passes now, check the register', lines[1])
+        self.assertTrue(lines[-1].endswith('closed now: ENDGAME-CHAMBER-COLLAPSE-63'), lines[-1])
+
     def test_bad_journeys_are_refused(self):
-        for text, why in (('step 1 x\nexpect nope == 1\n', 'before it is defined'),
+        for text, why in (('pick a b after x\nprobe c x\nexpect c == 1\n', 'before it is defined'),
+                          ('probe a x\npick a a after y\nexpect a == 1\n', 'twice'),
+                          ('probe a x\npick b a near y\nexpect a == 1\n', 'pick NAME PROBE after|before TEXT'),
+                          ('probe a x\nexpect known a == 1\n', 'expect known REGISTER-ID'),
+                          ('probe a x\nexpect alive 12 in nolist\n', 'before it is defined'),
+                          ('step 1 x\nexpect nope == 1\n', 'before it is defined'),
                           ('probe a cmd\nprobe a cmd\nexpect a == 1\n', 'twice'),
                           ('frobnicate\nprobe a x\nexpect a == 1\n', 'unknown word'),
                           ('cmd echo JOURNEY STEP 1\nprobe a x\nexpect a == 1\n', 'marker'),

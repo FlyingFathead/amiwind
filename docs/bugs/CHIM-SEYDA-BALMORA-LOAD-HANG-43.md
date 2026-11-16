@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 42 times; something has to be done
+## PERSISTING: reported 44 times; something has to be done
 
 - Reported with v0.0.46 at 2026-10-20 20:09 +0300: Listed under Known in this build in the v0.0.46 release notes (still open at the release).
 - Reported with v0.0.53-dev2 at 2026-10-26 (time not recorded): 19:14 UTC door sample: the Yassu Mine room load (ri9f4c8ccd45) stopped after its BSP while a gate ran its emulator; the next try loaded in 7.6 s
@@ -46,6 +46,8 @@
 - Reported with v0.0.66-dev7 at 2026-11-15 21:39 +0200: Reproduced on demand with the repeat script (tests/sessions/load_repeat_hops.txt) on the v0.0.66-dev7 image (FS-UAE at 32 MB Fast, JIT, the disks on the emulated IDE port, the remote-console folder mounted): the first session ran its twenty loads; the second stopped after nineteen, in play in Vivec about 23 seconds after arriving, during the wait before the twentieth teleport (the state file and the console log last written in the same second, twelve seconds before the next command was put down and never taken). The examination: four of five samples in the idle loop, the game waiting on its file reply, no request queued on any handler port, every file-system handler process waiting on its port, the library loader process waiting on a signal of its own, and the load trace ring with no unfinished call, so the stuck call is one the wrappers do not see. The engine's last printed frame had spent 2,570 ms in its remote-console stage with 23 ms of wrapped disk time: the console log append (a file descriptor's open, seek, write and close on the remote folder, the first call of every poll). The remote folder is served by the emulator's virtual unit DH2, whose handler waits for its port and for the host side's completion alike, so idle on its port does not clear it. Reading: the stop is in a write to the remote-console folder, below the game, in the emulator's host-side directory-drive path (the second hypothesis), as SESSION-STALL-AFTER-LONG-FRAME-62 saw stops right after long remote-folder frames. Next: the append is traced (op write), the examination reads the game's packet off its stack, every handler's whole wait mask, the unit names and signalled-but-asleep tasks, and the repeat script examines the running game once as a baseline.
 - Reported with v0.0.66-dev7 at 2026-11-15 22:15 +0200: Not this stall: the third repeat session stopped at its first Vivec arrival because the baseline examination paused the emulator in its debugger and never resumed it (STALL-PROBE-PROMPT-LOG-LINE-66); the game had been running at the sample before. The examination's state-file age measure is withdrawn (the file time lags through the container's bind mount; the earlier 96 s reading agreed with the host clock by coincidence) and replaced by the state file's own realtime and ticks read before and after the examination.
 - Reported with v0.0.66-dev7 at 2026-11-15 22:50 +0200: Not this stall: the fourth repeat session stopped at its first Vivec arrival as the third did, the baseline examination failing after its break-in and leaving the emulator paused (STALL-PROBE-PROMPT-LOG-LINE-66, seen again on another path). The examination is now crash-proof and the step is out of the repeat script. For the comparison planned next, the engine gained the console setting aw_remote_log (0 = no console log on the remote folder, the candidate trigger; the command and state files as before) and the repeat script a twin that sets it (tests/sessions/load_repeat_hops_nolog.txt): sessions with and without the append, stops per load on each side.
+- Reported with v0.0.66-dev10 at 2026-11-16 (time not recorded)
+- Reported with v0.0.66-dev10 at 2026-11-16 10:46 +0200: The mechanism captured in a plain repeat session on the v0.0.66-dev10 image (FS-UAE at 32 MB Fast, JIT, the remote-console folder served by the emulator's host thread): it stopped after nine arena pit loads with the game's packet a FINDINPUT of AWCTL:cmd.txt, the remote console's poll of its missing command file, its result already set (res1 0, res2 205), and the handler's state word for it -1: the emulator's host side finished the request and the handler was never told. The deterministic twin (emu deterministic=1) is being measured against it.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -58,7 +60,7 @@
 | Where | file request to the boot partition (DH0) never answered, under host load; seen on map changes |
 | Reproduction | sometimes |
 | Duplicate of | no |
-| Persists in | v0.0.43-dev1, v0.0.66-dev7 (last seen) |
+| Persists in | v0.0.43-dev1, v0.0.66-dev7, v0.0.66-dev10 (last seen) |
 | Severity | high: the game can stop on a Loading screen; seen on the v0.0.41-dev5 image (gate 2928) and on v0.0.43-dev1 (first smoke), each passing on a rerun |
 | Family | CHIM world streamer (`chim-streamer`) |
 | CHIM | Engine streaming and memory ([CHIM Engine tracker](CHIM_TRACKER.md)) |
@@ -69,12 +71,12 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.66-dev10 (15 November 2026)._
+_Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 42 times; something has to be done](#persisting-reported-42-times-something-has-to-be-done)
+- [PERSISTING: reported 44 times; something has to be done](#persisting-reported-44-times-something-has-to-be-done)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -215,7 +217,9 @@ slower.
 - It was seen once with the JIT off, so it is not tied to the JIT.
 - Hard-file device 3 stalls in 12 sessions against emulated IDE 0 in 16 (the table above); the IDE runs were also
   about 30 % slower, so that comparison changed both the completion path and the timing.
-- The test sessions have used IDE since 3 November, and no stall has been seen in the deliveries since.
+- The test sessions have used IDE since 3 November, and no stall has been seen in the deliveries since. (Superseded:
+  with IDE the stall was seen again in the v0.0.66-dev7 delivery's area hops and in the repeat sessions of 15 and
+  16 November 2026; the cause found on 16 November is in the remote-console folder's drive, below.)
 
 **A lost disk-done signal in the emulator (candidate, unconfirmed).** FS-UAE 3.1.66 appears to update one shared
 interrupt-request word with plain read-modify-write operations, from the hard-file worker thread (which sets the bit
@@ -277,15 +281,83 @@ examination now reads such a prompt, resumes an emulator it could not read, and 
 file's own clock instead of the file's modification time, which lags through the container's bind mount
 (STALL-PROBE-PROMPT-LOG-LINE-66).
 
-**For players.** The shipped presets are unchanged and keep the hard-file device until this is verified. If the lost disk-done signal is confirmed,
-the decision is to provide or name a corrected emulator build, document the affected emulator versions, and decide
-whether an IDE profile stays useful for those who run unpatched builds. Results on the Pi (Amiberry) are kept apart,
-since it is a different emulator.
+**16 November 2026: two stops named, and the cause read from the emulator's source.** Two more stops of the repeat
+sessions on the v0.0.66-dev10 image (about 1 in 100 arena pit loads, with the remote console's log on or off: the log's
+append was not the trigger) were examined with the packet read off the game's stack. In the first the packet was an open
+for reading with the result "object not found" already set; in the second a write of 320 bytes with the result 320 already
+set, and the remote-console folder's state file was exactly 320 bytes, written at the moment the game's clock froze. In
+both the processor sat in the idle loop, the game slept on its file reply, every handler process waited on its port
+(the remote folder's handler on its port and signal bit 13), and no message was queued on any port. So both were
+requests to the remote-console folder, the host folder the emulator serves as a drive, done on the host, their results
+written into the packet, and the handler never told to reply.
+
+The source of FS-UAE 3.1.66 shows where that is lost (reasoned from the source, consistent with both stops; not yet
+seen in a capture). A host folder is served by a host thread (`filesys.cpp` `filesys_thread`). When it has finished a
+request it counts it (`cmds_sent`) and announces it by setting bit 0 of the shared word `uae_int_requested` with a plain
+read-modify-write (`include/native2amiga.h` 57-60, called from `filesys.cpp` 6797). The word is a `volatile int`
+(`autoconf.cpp` 276), not an atomic one. The emulator thread polls that word (`newcpu.cpp` 3522-3528, `custom.cpp`
+8356-8359) and raises the interrupt while bit 0 is set; the interrupt's helper (`filesys.cpp` `exter_int_helper`) clears
+bit 0 first and then scans every pending indicator (case 0 and case 2, 6522-6635), which is safe. But the same emulator
+thread also runs `rethink_a2065` (`a2065.cpp` 566-569) on every change of the interrupt requests (`custom.cpp` 5017-5020
+`rethink_intreq`, `devices.cpp` 192-196), and that function clears bit 2 of the same word with a plain read-modify-write
+before it checks whether an A2065 network card is configured at all. When the host thread's set of bit 0 and the emulator
+thread's clear of bit 2 overlap and the emulator thread's write lands last, bit 0 is lost. Then no interrupt is requested,
+the helper's scan (case 2, 6619-6635) never sends the dummy message that tells the handler a queued command finished
+(`filesys.asm`, the handler loop: the dummy message calls the helper's case 1 and the queue is scanned for finished
+commands), the finished packet stays on the handler's private queue with its results and its state word -1 (`filesys.cpp`
+6789-6791), the handler sleeps on its port and bit 13 (the measured wait mask), and the game sleeps on its reply for ever.
+Nothing re-sends: the interrupt is re-requested only while bit 0 is set, and the pending counter is read only inside an
+interrupt that some other event must raise; in a stopped session nothing else talks to that drive. Upstream fixed exactly
+this spot with atomic operations on 28 December 2016 (FS-UAE 4eefeebd, "Interrupt status atomic operations", after
+WinUAE 0cc79925: `atomic_and` in `rethink_a2065` and the other devices), and that change is not an ancestor of the 3.1.66
+tag the sessions run. The order of magnitude fits (an estimate, not a measurement): the emulator thread rewrites the
+word thousands of times a second (every interrupt request and acknowledge), the remote console sends about ten to
+thirty requests a second, and an overlap window of a few nanoseconds per pair gives about one lost announcement in a
+few thousand requests, that is one in a hundred loads of fifteen seconds. A player's game has no host folder: the hard
+files complete on the emulator thread and never write the word from a second thread, which is why no player has
+reported this.
+
+The way out for the test sessions, by the source: FS-UAE's `deterministic = 1` (`doc/options/deterministic`) starts no
+host thread for host folders (`filesys.cpp` 3106) and completes their requests on the emulator thread
+(`filesys_hsync`, 8473-8500, one request every other scan line), so the word is never written from two threads at
+once and the stall cannot occur. The repeat script `tests/sessions/load_repeat_hops_det.txt` asks for it with the
+session-script line `emu deterministic=1` (the boot smoke's probe takes such lines itself and checks the setting in the
+emulator's start-up log); the stall examination now prints the handler's state word for the stuck command, so the next
+stop of this kind says "-1: the emulator's host side finished the request and the handler was never told" instead of
+leaving it to be inferred. Fewer requests from the remote console would only lower the odds; a second emulated task
+sending the drive a request would wake the handler and release the lost reply, but it is not needed once the host
+thread is gone. The remaining doubt is a capture: the state word -1 at a stop would show the mechanism measured, and
+the repeats with the setting show whether the stall is gone.
+
+A third stop the same morning, in a scripted session on the same image, was the first whose stuck request printed
+its name: an open for output of the remote-console state file, with a handle already returned (result -1, no error),
+every handler idle, the remote folder's handler waiting on its port and bit 13, the game asleep on its file reply,
+and the state file left empty in the folder (opened for output and truncated by the host side, never written by the
+game, which never woke). The session ran beside other work. So all three named stops are requests to the remote-console folder, each finished on the
+host side with the game's wake lost: an open that failed, a write that completed, an open that completed.
+
+**16 November 2026, later the same day: the mechanism captured.** A plain repeat session on the same image
+(`tests/sessions/load_repeat_hops.txt`, the remote-console folder served by the emulator's host thread) stopped after
+nine arena pit loads. The game's packet was a FINDINPUT of `AWCTL:cmd.txt`, the remote console's poll of its command
+file, which was not there, with its result already set (res1 0, res2 205: object not found), and the stall examination
+read the handler's state word for it: -1, the emulator's host side had finished the request and the handler was never
+told. So the mechanism read from the source above is shown in a test session, not only reasoned. Whether the
+deterministic mode ends the stall is measured by the same comparison: its sessions against the plain ones, stops per
+load.
+
+**For players.** The shipped presets are unchanged and keep the hard-file device until this is verified. The cause
+found on 16 November 2026 needs the test sessions' host folder, which a player's game does not have; the emulator
+versions it concerns (FS-UAE 3.1.x without the 2016 atomic-operations change) still matter for anyone who mounts a
+host folder as a drive, and the release notes will say so once the repeats confirm it. Results on the Pi (Amiberry)
+are kept apart, since it is a different emulator.
 
 ## Verification
 
-Pending: needs the repair. A repair is verified by the repeat loop with the same I/O bursts: many loads with no
-hang, where the unrepaired setup hangs.
+Pending: the deterministic side. The repair is verified by the repeat loop with the same loads: N sessions of
+`tests/sessions/load_repeat_hops_det.txt` (`deterministic = 1`) against N of `tests/sessions/load_repeat_hops.txt` on
+the same image, stops per load on each side; about 200 loads a side at the measured rate of 1 in 100. The mechanism is
+captured: a stop on the plain side printed the handler's state word -1 (16 November 2026, above). No stop on the
+deterministic side over the same exposure is the repair shown.
 
 ## Prevention
 
@@ -463,6 +535,7 @@ Related bugs in other categories:
 - [SESSION-STALL-AFTER-LONG-FRAME-62](SESSION-STALL-AFTER-LONG-FRAME-62.md): The game stops with its clock frozen right after a frame of several seconds spent on console output or file reads, in three of ten scripted Seyda Neen sessions
 - [SEYDA-LOAD-HANG-30](SEYDA-LOAD-HANG-30.md): Rare freeze during a Seyda Neen region load
 - [SMOKE-DELIVERY-OLD-COPY-58](SMOKE-DELIVERY-OLD-COPY-58.md): The playtest delivery ran an old copy of the boot smoke: the v0.0.58 release smoke failed four times on a working image
+- STALL-PROBE-NAME-BPTR-66 (no report page): The stall examination showed no file name for a stuck open, lock or delete: it read the name at the raw BCPL pointer instead of the pointer times 4
 - STALL-PROBE-PROMPT-LOG-LINE-66 (no report page): The stall examination missed the debugger's prompt when an emulator log line followed it on the same line, never resumed the emulator, and the paused session read as a stop of the game
 - STALL-PROBE-RUNNING-GAME-66 (no report page): The stall examination read a running game as a missing task or as waiting on a file reply: it walked only the ready and waiting task lists and took the wait mask of a task that was not waiting
 

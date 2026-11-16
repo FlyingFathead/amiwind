@@ -1,6 +1,6 @@
 # Build cache: resuming and reusing work safely
 
-_Last updated with AmiWind v0.0.66-dev3 (15 November 2026)._
+_Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -585,6 +585,17 @@ the build server's own check of the request, and the build itself
 - **The same keys.** The pool, the serial path and a stored analysis give the same answers,
   and an environment switch still changes the keys of the stages that read it
   (`tests/test_build_cache_prefetch.py`, `tests/test_build_preflight.py`).
+- **The reuse plan's own work on every core** (BUILD-CHECK-ONE-CORE-66). The SHA-256 check of
+  every file a build takes from an earlier run (116,024 files, 14.6 GiB for a v0.0.66 snapshot)
+  runs on as many threads as the cores the build may use (its CPU affinity, capped by a
+  container's CPU quota; at least 8, the method before, and at most 32), no longer on at most 8;
+  the check waits on the disk as much as on the cores, so a container with fewer cores keeps its
+  8 reads in flight. `AMIWIND_VERIFY_THREADS=N` sets the number. The unit-cache report's
+  key digests (one per unit cache a rebuilt stage reaches, each the code that cache's key
+  hashes in this and the older key forms) are worked out on the pre-flight's worker processes,
+  one cache key per task, no longer one after another; `AMIWIND_PREFLIGHT_JOBS=1` keeps them
+  in the build's own process. Either way the answers are the serial ones
+  (`tests/test_build_cache.py`, `tests/test_reuse_all.py`).
 
 ## Run names
 

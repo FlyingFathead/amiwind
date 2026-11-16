@@ -829,6 +829,121 @@ class ServiceTests(unittest.TestCase):
         self.assertIn('build check exited 2 without "Checks completed"', result['refusals'])
         self.assertIn('the build check printed nothing', result['refusals'])
 
+    # ---- one check per build (BUILD-CHECK-ONE-CORE-66): the starter's check and the build request's own check ran the
+    # same command on the same commit, earlier build and flags, about six minutes each
+
+    def same_name_submit(self, request, runner):
+        # the starter's check is a check-only request, which spends no run name (the launcher leases with
+        # record=False), so the build request after it gets the same name
+        original = aw.lease_run_name
+        with mock.patch.object(aw, 'lease_run_name', lambda *a, **k: original(*a, **dict(k, record=False))):
+            return self.submit(request, runner)
+
+    def check_record(self, result):
+        return aw.state_dir(self.config) / 'logs' / (result['run_name'] + '.check.json')
+
+    def test_a_passed_check_is_taken_by_the_next_request_of_the_same_build(self):
+        code, first, runner = self.same_name_submit(self.request(), FakeRunner())
+        self.assertEqual(code, 0, first['notes'])
+        self.assertTrue(any('-check-' in name for name in runner.ran))
+        record = json.loads(self.check_record(first).read_text(encoding='utf-8'))
+        self.assertEqual(record['schema'], aw_service.CHECK_RECORD_SCHEMA)
+        self.assertEqual(record['request'], 'req-1')
+        self.assertEqual(record['key'], first['steps']['check']['check_key'])
+        self.assertEqual(record['stdout'], CHECK_OK)
+        # the build request: the same commit, earlier build and flags; its check is taken, never run
+        code, second, runner = self.same_name_submit(self.request(id='req-2'),
+                                                     FakeRunner(check='must not run', check_exit=9))
+        self.assertEqual(code, 0, second['refusals'] if 'refusals' in second else second['notes'])
+        self.assertEqual(second['run_name'], first['run_name'])
+        self.assertFalse(any('-check-' in name for name in runner.ran), runner.ran)
+        self.assertTrue(any('-build-' in name for name in runner.ran))
+        step = second['steps']['check']
+        self.assertTrue(step['ok'])
+        self.assertEqual(step['taken_from']['request'], 'req-1')
+        self.assertTrue(step['detail'].startswith('taken from the check of req-1: reuse preflight: 34 of 36'))
+        self.assertTrue(any('not run again' in note for note in second['notes']))
+        self.assertEqual(second['reuse']['planned_reuse'], 34)       # its numbers, as if it had run
+        self.assertEqual(aw.validate(second, aw.schema('aw-result-1')), [])
+        # the taken check's whole output is still beside the result
+        self.assertEqual(Path(step['full_output']).read_text(encoding='utf-8'), CHECK_OK)
+
+    def test_anything_different_runs_the_check_again(self):
+        self.same_name_submit(self.request(), FakeRunner())
+        changed = [
+            ('flags', self.request(id='req-2', options={
+                'flags': ['--no-npc-gallery', '--exclude-video'],
+                'reuse_from': '/vol/ws8/build/2026_10_10_v0.0.36-dev2_full_642c1ea'})),
+            ('reuse_from', self.request(id='req-3', options={
+                'flags': ['--no-npc-gallery'], 'reuse_from': '/vol/ws8/build/2026_10_10_v0.0.36-dev2_full-try2_642c1ea'})),
+        ]
+        for part, request in changed:
+            code, result, runner = self.same_name_submit(request, FakeRunner())
+            self.assertEqual(code, 0, part)
+            self.assertTrue(any('-check-' in name for name in runner.ran), part)
+            self.assertNotIn('taken_from', result['steps']['check'], part)
+            self.assertTrue(any(note.startswith('the check runs again: the kept check was for another')
+                                and part in note for note in result['notes']), (part, result['notes']))
+        # another earlier build finished in the workspace since (the runs --reuse-all-available plans from)
+        self.same_name_submit(self.request(id='req-4'), FakeRunner())
+        code, result, runner = self.same_name_submit(
+            self.request(id='req-5'), FakeRunner(existing=('2026_10_10_v0.0.36-dev3_full-other_abc1234',)))
+        self.assertTrue(any('-check-' in name for name in runner.ran))
+        self.assertTrue(any('another runs' in note for note in result['notes']), result['notes'])
+
+    def test_an_old_or_failed_check_is_never_taken(self):
+        _, first, _ = self.same_name_submit(self.request(), FakeRunner())
+        path = self.check_record(first)
+        record = json.loads(path.read_text(encoding='utf-8'))
+        record['saved_epoch'] -= (aw_service.CHECK_REUSE_MINUTES + 1) * 60
+        path.write_text(json.dumps(record), encoding='utf-8')
+        _, result, runner = self.same_name_submit(self.request(id='req-2'), FakeRunner())
+        self.assertTrue(any('-check-' in name for name in runner.ran))
+        self.assertTrue(any('min old (at most 30 min)' in note for note in result['notes']), result['notes'])
+        # a refused check is never kept: the next request runs it again
+        path.unlink()
+        refused = CHECK_OK.replace('0 unexpected', '3 unexpected')
+        self.same_name_submit(self.request(id='req-3'), FakeRunner(check=refused))
+        self.assertFalse(path.exists())
+        self.same_name_submit(self.request(id='req-4'), FakeRunner(check=CHECK_OK.replace('Checks completed.', ''),
+                                                                   check_exit=0))
+        self.assertFalse(path.exists())                                # exit 0 without "Checks completed"
+        _, _, runner = self.same_name_submit(self.request(id='req-5'), FakeRunner())
+        self.assertTrue(any('-check-' in name for name in runner.ran))
+        self.assertTrue(path.exists())
+
+    def test_check_reuse_off_in_the_config(self):
+        self.config['build']['check_reuse_minutes'] = 0
+        self.same_name_submit(self.request(), FakeRunner())
+        _, _, runner = self.same_name_submit(self.request(id='req-2'), FakeRunner())
+        self.assertTrue(any('-check-' in name for name in runner.ran))
+
+    def test_the_check_key_leaves_out_who_asked_and_the_cores(self):
+        def commands(request_id, cpus, flag):
+            check = ['docker', 'run', '--name', 'aw-check-r', '--cpus', str(cpus), '-v', 'pool-vol:/vol:rw',
+                     '-e', 'PYTHONPATH=/vol/src/x/src', '-e', f'AMIWIND_AW_REQUEST={request_id}', 'builder:test',
+                     'python3', 'tools/build.py', '--name', 'r', '--jobs', '24', flag, '--check']
+            return {'check': check, 'flags': [flag]}
+        request = self.request()
+        key, parts = aw_service.check_key(request, commands('req-1', 4, '--live-logs'), FULL, ['a', 'b'])
+        self.assertEqual(aw_service.check_key(request, commands('req-9', 24, '--live-logs'), FULL, ['b', 'a'])[0], key)
+        self.assertIn('AMIWIND_AW_REQUEST=*', parts['check'])
+        self.assertIn('PYTHONPATH=/vol/src/x/src', parts['check'])
+        self.assertNotEqual(aw_service.check_key(request, commands('req-1', 4, '--no-npc-gallery'), FULL,
+                                                 ['a', 'b'])[0], key)
+        self.assertNotEqual(aw_service.check_key(request, commands('req-1', 4, '--live-logs'), 'f' * 40,
+                                                 ['a', 'b'])[0], key)
+        self.assertNotEqual(aw_service.check_key(request, commands('req-1', 4, '--live-logs'), FULL, ['a'])[0], key)
+        self.assertEqual(aw_service.check_record_path(Path('/s/logs/r.check.log')), Path('/s/logs/r.check.json'))
+        # a builder setting in aw's own environment is part of the key; aw's own settings are not
+        with mock.patch.dict(os.environ, {'AMIWIND_MESH_SEAM_STOP': 'warn'}):
+            warn, parts = aw_service.check_key(request, commands('req-1', 4, '--live-logs'), FULL, ['a', 'b'])
+        self.assertNotEqual(warn, key)
+        self.assertEqual(parts['environment'].get('AMIWIND_MESH_SEAM_STOP'), 'warn')
+        with mock.patch.dict(os.environ, {'AMIWIND_AW_CONFIG': '/elsewhere/aw-config.json'}):
+            self.assertEqual(aw_service.check_key(request, commands('req-1', 4, '--live-logs'), FULL, ['a', 'b'])[0],
+                             key)
+
     def test_a_leading_byte_order_mark_is_removed_and_any_other_refused(self):
         self.assertEqual(aw_service.byte_order_marks(['﻿--no-npc-gallery', '--jobs', '4']),
                          (['--no-npc-gallery', '--jobs', '4'], []))

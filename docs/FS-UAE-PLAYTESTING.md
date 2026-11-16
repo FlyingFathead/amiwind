@@ -1,6 +1,6 @@
 # AmiWind playtesting with FS-UAE
 
-_Last updated with AmiWind v0.0.49-dev1 (24 October 2026)._
+_Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -308,6 +308,11 @@ This is an accelerated AmiWind playtesting configuration. It is intended to prov
 It is not intended to represent the performance of a stock Amiga 1200 or Amiga 500. The configuration deliberately uses a 68040, JIT, Zorro III Fast RAM, and fastest-possible CPU speed.
 
 For compatibility or minimum-spec testing, use a separate emulator configuration matching the intended target hardware.
+
+AmiWind runs from its hard file images and needs no host folder mounted as a drive. If you add one for your own use, note
+that FS-UAE 3.1.66 and 3.2.35 can lose the completion of such a drive's request, so a program waiting on it waits for
+ever; the note on host folders under
+[Engine boot and map-load smoke](FS-UAE-DEVELOPMENT.md#engine-boot-and-map-load-smoke) has the details and the way out.
 
 ## Slow accelerator preset
 

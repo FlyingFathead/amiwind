@@ -327,15 +327,15 @@ family links to its list in the register.
 | [Disk images, partitions and launchers](../BUGS.md#disk-images-partitions-and-launchers-disk-image-layout) | `disk-image-layout` | 8 of 20 | Classic FFS limits: partitions under 2 GiB, few files per directory; launchers list every disk. |
 | [Morrowind editions, archives and inputs](../BUGS.md#morrowind-editions-archives-and-inputs-game-data-editions) | `game-data-editions` | 5 of 10 | The builder reads the user's data the way Morrowind does (archive order, loose files) and checks inputs against known versions. |
 | [Object placement and in-game geometry](../BUGS.md#object-placement-and-in-game-geometry-placement-geometry) | `placement-geometry` | 15 of 21 | Placed objects match the original (OpenMW A/B at the same pose). |
-| [Actors and NPCs](../BUGS.md#actors-and-npcs-actors-npc) | `actors-npc` | 82 of 131 | Actor placement, models and behaviour; the actor placement gate. |
+| [Actors and NPCs](../BUGS.md#actors-and-npcs-actors-npc) | `actors-npc` | 83 of 132 | Actor placement, models and behaviour; the actor placement gate. |
 | [Harvestable plants](../BUGS.md#harvestable-plants-harvest) | `harvest` | 12 of 20 | Harvest catalogues are built by the builder for the shipped maps and counted by the entity tracker. |
 | [Town and interior import](../BUGS.md#town-and-interior-import-town-import) | `town-import` | 5 of 11 | The town importer converts every town and interior within engine limits; doors lead somewhere. |
 | [Scene changes, arrivals and handoffs](../BUGS.md#scene-changes-arrivals-and-handoffs-transitions-arrivals) | `transitions-arrivals` | 8 of 23 | Cell, region and scene changes keep the player, view, equipment and sound intact. |
 | [Menus, HUD, map screen and text](../BUGS.md#menus-hud-map-screen-and-text-ui-text) | `ui-text` | 54 of 99 | Menus, HUD, map screen, fonts and messages. |
-| [Debug commands and remote control](../BUGS.md#debug-commands-and-remote-control-debug-commands) | `debug-commands` | 27 of 49 | dbg commands, teleports, debug map loads and the remote console. |
+| [Debug commands and remote control](../BUGS.md#debug-commands-and-remote-control-debug-commands) | `debug-commands` | 30 of 52 | dbg commands, teleports, debug map loads and the remote console. |
 | [Boot and engine start-up](../BUGS.md#boot-and-engine-start-up-boot-startup) | `boot-startup` | 5 of 14 | The boot check and engine start-up report problems clearly and never stop the game silently. |
-| [Game logic (QuakeC) and saves](../BUGS.md#game-logic-quakec-and-saves-game-logic) | `game-logic` | 142 of 215 | QuakeC entities, saves and game state. |
-| [Gates, CI and tests](../BUGS.md#gates-ci-and-tests-tests-ci) | `tests-ci` | 52 of 133 | A check that is skipped, tests the wrong tree or depends on the host is not a check; skips fail loudly. |
+| [Game logic (QuakeC) and saves](../BUGS.md#game-logic-quakec-and-saves-game-logic) | `game-logic` | 145 of 218 | QuakeC entities, saves and game state. |
+| [Gates, CI and tests](../BUGS.md#gates-ci-and-tests-tests-ci) | `tests-ci` | 54 of 135 | A check that is skipped, tests the wrong tree or depends on the host is not a check; skips fail loudly. |
 | [Development tooling, receipts and packaging](../BUGS.md#development-tooling-receipts-and-packaging-tracker-tooling) | `tracker-tooling` | 39 of 98 | Receipts, packaging, development tools and the tracker itself. |
 
 <!-- END GENERATED FAMILIES -->

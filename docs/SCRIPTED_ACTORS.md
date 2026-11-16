@@ -1,6 +1,6 @@
 # Scripted actors: Dagoth Ur, the Heart of Lorkhan and Vivec
 
-_Last updated with AmiWind v0.0.66-dev1 (13 November 2026)._
+_Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
 
 A handful of the base game's actors are not ordinary residents: they are creature records with their own scripts,
 and the end of the main quest depends on what those scripts do. This page says, in our own words, what the original
@@ -56,6 +56,27 @@ Akulakhan and the bridge (their Death1 groups), removes the blight cloud over Re
 kills Dagoth Ur and his remaining Ash Vampires, allows teleporting again and rewards the player's reputation. The
 dreamer workers in the chamber die too.
 
+`EndGame` does not start at the last strike. Two invisible markers in the chamber (`dagoth destroy detector`, script
+`DagothDoorDetector`), one by the entrance and one off the bridge, start it once the Heart is destroyed and the player
+comes within 1,200 units of either, so the collapse begins as the player leaves the Heart. Its journal stage is 20 of
+`C3_DestroyDagoth`. From the Heart's destruction on, Dagoth Ur's script holds his health at 200 at most, until
+`EndGame` sets it to 0.
+
+The quest itself ends in Dagoth Ur, Facility Cavern. Azura's spirit there (`azura spirit`, script `AzuraEnd`) is
+hidden by its own script on the player's first visit, below stage 20. At stage 20 it enables itself again, but only if
+it is hidden, so a player who first enters the cavern at stage 20 never sees it. Once enabled, it appears when the
+player comes within 800 units. Within 250 it takes the controls and plays the ending video. Then it sets
+`C3_DestroyDagoth` and `A1_SleepersAwake` to 50, enables the Ring of Azura beside it and gives the controls back. Nine
+seconds later it is gone. The ring hides itself whenever the player arrives, and spins until it is taken.
+
+In the original the ending video stops the game until it ends, and the script goes on after it. No session has reached
+the ending video in AmiWind yet. Read from the engine's code only (not seen), the video would play over the scene while
+the script goes on, so the last stage, the ring and the controls would come while it plays.
+
+Sunder and Keening hurt the player every second while they are held unless Wraithguard is worn: their scripts
+(`ouch_sunder`, `ouch_keening`) read the global `wraithguardEquipped`, which Wraithguard's script (`wraithguardScript`)
+sets while it is worn. Picking up each tool also writes its journal entry (`C0_Act_C`).
+
 ## Vivec
 
 Vivec has no script of his own: he floats above the floor of his palace in his crossed-leg idle (the `idle2`
@@ -88,4 +109,17 @@ group), which the builder keeps as his initial state (levitating, no floor snap)
   counts nothing; after Sunder the five Keening strikes play Idle2 to Idle5 and Death1, once each and in order;
   HeartDestroyed is set on the fifth; Dagoth Ur's health is set back to 1,000 after every blow until then and he can
   die only after it. Not yet seen in the game itself.
+- **A test session plays the end** (v0.0.66, `tests/sessions/endgame_heart.txt`, [the gameplay journeys](GAME_RECORDER.md#gameplay-journeys)):
+  a test character with the three tools, from the chamber's arrival to Azura in the Facility Cavern. Each strike, Dagoth
+  Ur's part, the end script and the quest's last stages are checked from the game's own state. Its second run, on the
+  v0.0.66-dev10 image, saw the Heart's script take one Sunder strike and five Keening strikes and play Idle2 to Idle5
+  and Death1. It also saw HeartDestroyed set, and Dagoth Ur's script set his health back to 1,000 after a blow, then
+  cap it at 200. The end script ran from the detector by the entrance: the quest at 20, the blight ended, 10
+  reputation, the weather changed, teleporting back on.
+- **Not yet**, all measured by that run:
+  - Dagoth Ur's shield does not follow the Heart's count: a script's read of another object's local gives 0
+    ([MWSCRIPT-MEMBER-READS-ID-AS-SCRIPT-66](BUGS.md)).
+  - Dagoth Ur and the dreamer workers do not die when the scripts set their health to 0
+    ([MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66](BUGS.md)).
+  - The collapse is not animated ([ENDGAME-CHAMBER-COLLAPSE-63](BUGS.md)).
 - **Vivec** keeps a reduced model for now; his whole model is to be checked against the 1,999-vertex limit.

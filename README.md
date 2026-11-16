@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.66-dev10 (15 November 2026)._
+_Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -25,22 +25,30 @@ Like community projects such as
 
 More in the [gallery](docs/GALLERY.md).
 
-## Where AmiWind stands (15 November 2026)
+## Where AmiWind stands (16 November 2026)
 
 The development line is **v0.0.66**, whose latest snapshot is
-[v0.0.66-dev10](docs/releases/notes/RELEASE-v0.0.66-dev10.md), in development. The game is the same as in dev9 apart
-from the version, plus one test-only setting, `aw_remote_log` (the remote console's log of the test sessions, on by
-default; players have no remote console). What is new is in the testing tools: the stall examination reads the game's own
-disk request, every handler's wait and the game's own clock, and can no longer leave the emulator paused; the remote
-console's log is traced and can be switched off; and a repeat test session of the load stall stopped once, after 19 good
-loads, in play and not in a map load, reading as inside the remote console's log write on its folder (the cause is not
-proven; being measured with the log on and off). On the dev9 image the opening journey passed 41 of 42 checks: step 6
-killed its fixed victim and no player was left stuck, and step 7's fighter, chosen as the nearest resident, was Fargoth
-(`fargoth`), who fights unarmed, so the health stayed as
-it was. Known: the load stall in test sessions; the door arrival, which that journey did not exercise and which is still to
-be confirmed in play; in Vivec the server's entity update overflows the client's packet every frame; wanderers do not keep
-away from doors as in the original game; the builder's reuse check runs on one core; and the image's partitions were
-written slower once.
+[v0.0.66-dev11](docs/releases/notes/RELEASE-v0.0.66-dev11.md), in development. The game changes in three places:
+residents that wander keep off doors as in the original (an idle wanderer facing a door within reach walks on), and two
+faults of the script engine are fixed (a script's read or write of another object's local variable, and a script's
+`SetHealth 0`), all fixed in source and covered by tests, to be confirmed in play. The builder runs its reuse check once
+per snapshot, fixed in source, to be confirmed by this snapshot's build. The testing tools grew: `chim actors summon`
+takes a reference (the opening journey's step 7 now fights the armed Seyda Neen guard), the stall examination names the
+file a stuck request asks for, session scripts can set emulator options, and a test session plays the end of the main
+quest; its first run loaded the Heart Chamber in play at 32 MB with the Heart of Lorkhan and Dagoth Ur in it, and its
+second destroyed the Heart with Sunder and Keening and ran the end script from the entrance. The load stall of the test
+sessions has its cause found in the emulator's source and shown in a test session: an interrupt request lost in the
+drive that serves the test sessions' remote-console folder, which a player's game does not have; the way out, an
+emulator option, is being measured. Known: the load stall in test sessions until that measurement is in; the Heart
+Chamber's collapse, not animated, so the end of the main quest cannot play yet; in Vivec the server's entity update
+overflows the client's packet every frame; the door arrival and the wander rule, still to be confirmed in play; and the
+image's partitions, written slower since v0.0.66-dev2.
+
+The tenth snapshot was [v0.0.66-dev10](docs/releases/notes/RELEASE-v0.0.66-dev10.md). The game was the same as in dev9
+apart from the version, plus one test-only setting, `aw_remote_log` (the remote console's log of the test sessions). The
+stall examination reads the game's own disk request, every handler's wait and the game's own clock, and can no longer
+leave the emulator paused; the remote console's log is traced and can be switched off. On the dev9 image the opening
+journey passed 41 of 42 checks.
 
 The ninth snapshot was [v0.0.66-dev9](docs/releases/notes/RELEASE-v0.0.66-dev9.md). The game changed for the first time
 since dev5: the player no longer ends inside an actor at a door's or a teleport's arrival point (two overlapping bodies
@@ -226,7 +234,7 @@ a new game and the falling mage, and its second ([dev2 notes](docs/releases/note
 delivered. v0.0.61 shipped as its third snapshot with the final version number
 ([release notes](docs/releases/notes/RELEASE-v0.0.61.md)).
 
-What comes next is in the [roadmap](docs/ROADMAP.md). The release after the fix release v0.0.65 (released: [notes](docs/releases/notes/RELEASE-v0.0.65.md)) is v0.0.66 (its snapshots [dev1](docs/releases/notes/RELEASE-v0.0.66-dev1.md), [dev2](docs/releases/notes/RELEASE-v0.0.66-dev2.md), [dev3](docs/releases/notes/RELEASE-v0.0.66-dev3.md), [dev4](docs/releases/notes/RELEASE-v0.0.66-dev4.md), [dev5](docs/releases/notes/RELEASE-v0.0.66-dev5.md), [dev6](docs/releases/notes/RELEASE-v0.0.66-dev6.md), [dev7](docs/releases/notes/RELEASE-v0.0.66-dev7.md), [dev8](docs/releases/notes/RELEASE-v0.0.66-dev8.md), [dev9](docs/releases/notes/RELEASE-v0.0.66-dev9.md) and [dev10](docs/releases/notes/RELEASE-v0.0.66-dev10.md) have the merging reader, the layer keys and the expansion data selected by default, but no expansion area yet), and carries what v0.0.64 did not:
+What comes next is in the [roadmap](docs/ROADMAP.md). The release after the fix release v0.0.65 (released: [notes](docs/releases/notes/RELEASE-v0.0.65.md)) is v0.0.66 (its snapshots [dev1](docs/releases/notes/RELEASE-v0.0.66-dev1.md), [dev2](docs/releases/notes/RELEASE-v0.0.66-dev2.md), [dev3](docs/releases/notes/RELEASE-v0.0.66-dev3.md), [dev4](docs/releases/notes/RELEASE-v0.0.66-dev4.md), [dev5](docs/releases/notes/RELEASE-v0.0.66-dev5.md), [dev6](docs/releases/notes/RELEASE-v0.0.66-dev6.md), [dev7](docs/releases/notes/RELEASE-v0.0.66-dev7.md), [dev8](docs/releases/notes/RELEASE-v0.0.66-dev8.md), [dev9](docs/releases/notes/RELEASE-v0.0.66-dev9.md), [dev10](docs/releases/notes/RELEASE-v0.0.66-dev10.md) and [dev11](docs/releases/notes/RELEASE-v0.0.66-dev11.md) have the merging reader, the layer keys and the expansion data selected by default, but no expansion area yet), and carries what v0.0.64 did not:
 Tribunal (Mournhold) and Bloodmoon (Solstheim) built in by default where you own them (a warning when the files are
 not found, and a builder switch for the base game only), their scripting, and scripted world events such as the
 Ghostgate's doors and the traps of their worlds, with the tree method Solstheim's forests need; the open spell-casting
@@ -515,8 +523,10 @@ test image of one spot see [MiniWind: the test ground](docs/MINIWIND.md), the
 Everything else about building, the build speed options, the FPU support library and running the image in FS-UAE or
 WinUAE: [Building and playing](docs/BUILDING_AND_PLAYING.md), the [Linux build guide](docs/LINUX_BUILD.md) and the
 [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md). The newest emulator presets are
+[`AmiWind-v0.0.66-dev11-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.66-dev11-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.66-dev11-WinUAE.uae`](resources/emulators/AmiWind-v0.0.66-dev11-WinUAE.uae) (for the tenth snapshot:
 [`AmiWind-v0.0.66-dev10-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.66-dev10-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.66-dev10-WinUAE.uae`](resources/emulators/AmiWind-v0.0.66-dev10-WinUAE.uae) (for the ninth snapshot:
+[`AmiWind-v0.0.66-dev10-WinUAE.uae`](resources/emulators/AmiWind-v0.0.66-dev10-WinUAE.uae); for the ninth snapshot:
 [`AmiWind-v0.0.66-dev9-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.66-dev9-FS-UAE.fs-uae) and
 [`AmiWind-v0.0.66-dev9-WinUAE.uae`](resources/emulators/AmiWind-v0.0.66-dev9-WinUAE.uae); for the eighth snapshot:
 [`AmiWind-v0.0.66-dev8-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.66-dev8-FS-UAE.fs-uae) and

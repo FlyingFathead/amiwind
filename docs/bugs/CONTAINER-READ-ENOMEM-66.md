@@ -1,0 +1,245 @@
+# CONTAINER-READ-ENOMEM-66: In the development container, reads of the repository files sometimes fail with "Cannot allocate memory"; a retry works, so a check that hits it can report an unrelated failure
+
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.54 at 2026-10-27 18:21 +0200: Seen first in v0.0.54 (not registered then): the tests of gates 4250 and 4252 failed with "Cannot allocate memory" in the gate's compiler wrapper while several gates, builds and an emulator session ran.
+- Reported with v0.0.66-dev10 at 2026-11-16 (time not recorded): Seen again under load: a pregate run failed every check with "Cannot allocate memory" while a long build check ran.
+
+<!-- END GENERATED PERSISTING -->
+
+<!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+| Fact | Value |
+| --- | --- |
+| Reported by | developer |
+| First noticed | 16 November 2026, in v0.0.66-dev10 |
+| Where | the development container: file reads of the register tool, the pregate and the native tests |
+| Reproduction | sometimes |
+| Duplicate of | no |
+| Persists in | v0.0.54, v0.0.66-dev10 (last seen) |
+| Severity | medium: a gate or pregate run can fail on a check the change does not touch, and the failure moves from run to run |
+| Family | Gates, CI and tests (`tests-ci`) |
+| Playtest version | 2026_11_16_v0.0.66-dev10_full-v0.0.66-dev10_f446092 |
+| From commit | source f446092, engine f446092, CHIM world f446092 |
+| CHIM engine version | CHIM unknown, engine f446092, world format unknown |
+| Unknown because | a development tooling fault; no game build is involved |
+| Platform or emulator | the development container (Linux) reading the repository over its bind mount |
+
+<!-- END GENERATED FACTS -->
+
+_Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Status: 16 November 2026](#status-16-november-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
+## Status: 16 November 2026
+
+Open. Seen in v0.0.54 and in v0.0.66-dev10. The cause is not looked at yet; the fix to try is a memory lease for the
+containers of gates and pregates, as builds and emulator sessions already take one.
+
+## Symptom
+
+A read of a repository file in the development container fails with OSError ENOMEM ("Cannot allocate memory"), and the
+same read works when it is tried again. A check that hits it fails although the change under test does not touch it, and
+the failing check moves from run to run:
+
+- In the night of 15 to 16 November 2026 and twice on 16 November, with no build running: two pregate runs of one branch
+  each failed one different check the branch does not touch ("C warnings new" in files it did not change, then "contents
+  lists stale"), and both checks passed when run directly.
+- On 27 October 2026 (v0.0.54), the tests of gates 4250 and 4252 failed with "Cannot allocate memory" in the gate's
+  compiler wrapper while several gates, builds and an emulator session ran. It was not registered then.
+- On 16 November 2026, under load: a pregate run failed every one of its checks with "Cannot allocate memory" while a
+  long build check ran.
+
+## Where
+
+The development container that runs the register tool, the pregate and the gates' tests, reading the repository over
+its bind mount. A fault of the development tools: no game build is involved.
+
+## How it happened
+
+Not known yet. It is not the shortage of concurrent builds (`AW-CONCURRENT-BUILDS-OVERSUBSCRIBE-36`, fixed by the master
+builder's leases): the first sightings came with no build running. It comes both with nothing else running and under
+load.
+
+## Why it was not caught
+
+A failed read surfaces as the failure of whatever check made it, so each sighting looked like a fault of that check;
+the v0.0.54 sighting was noted as a gate failure under load and not registered.
+
+## Reproduction
+
+Not on demand. Seen in pregate and gate runs; a check that fails on a part of the tree the change does not touch is run
+again once before the failure is believed.
+
+## Repair
+
+None yet. To try: a memory lease for the gates' and pregates' containers, so that they wait for memory as builds and
+emulator sessions do; then a look at the container's and the mount's memory when it happens.
+
+## Verification
+
+Pending. The repair is verified by pregate and gate runs beside builds and emulator sessions with no read failing.
+
+## Prevention
+
+Pending with the repair.
+
+<!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
+
+## Bugs in the same category
+
+Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wrong tree or depends on the host is not a check; skips fail loudly. See [families](README.md#families).
+
+- ARRIVAL-CHECK-EMPTY-65 (no report page): The image's arrival check passes while it checks no door arrival
+- [AW-RESULT-RECIPE-SAVED-36](AW-RESULT-RECIPE-SAVED-36.md): The master builder's result of a failed build from a requested recipe does not validate (recipe.saved left in)
+- [AW-RUN-NAME-LONG-REASON-36](AW-RUN-NAME-LONG-REASON-36.md): aw gate refuses a long --reason after leasing the gate number: the run name, used as the request id, passes 128 characters
+- BUILD-ACTOR-SPEC-EXPANSIONS-66 (no report page): With the expansions selected, the image stage stopped on the actor spec check: its room counts were not like for like, and the places the build sets aside counted as missing
+- [BUILD-CHECKLIST-JSON-CELLS-39](BUILD-CHECKLIST-JSON-CELLS-39.md): Exterior checklist rejects JSON cell coordinates before scenery conversion
+- [BUILD-DEV1-EMULATOR-PRESETS-39](BUILD-DEV1-EMULATOR-PRESETS-39.md): Version bump omitted the matching dev1 emulator presets
+- [BUILD-EMPTY-ACTOR-GATE-38](BUILD-EMPTY-ACTOR-GATE-38.md): Actor contact gate rejects a MiniWind exterior without residents
+- [BUILD-EMPTY-RESIDENT-POOL-38](BUILD-EMPTY-RESIDENT-POOL-38.md): Town conversion starts a zero-worker pool when no residents are present
+- [BUILD-EXECUTABLES-LIST-UNGATED-36](BUILD-EXECUTABLES-LIST-UNGATED-36.md): A file committed executable but missing from tools/release.py EXECUTABLES (tools/engine_smoke.py) broke the source ZIP only at kit time
+- [BUILD-FACE-KEY-FORM-TEST-48](BUILD-FACE-KEY-FORM-TEST-48.md): The face key test tied the gallery face keys to the stage key form; stage keys in form 3 failed it (the faces rightly keep form 2)
+- [BUILD-LAVA-CORE-BOUNDS-38](BUILD-LAVA-CORE-BOUNDS-38.md): Lava sandbox bounds are not divisible by its core size
+- [BUILD-LAVA-PRESET-FIXTURE-38](BUILD-LAVA-PRESET-FIXTURE-38.md): Lava sandbox addition omitted the preset inventory fixture
+- [BUILD-SEYDA-CARRIER-VOICE-DIR-40](BUILD-SEYDA-CARRIER-VOICE-DIR-40.md): Fresh Seyda carrier cannot publish a resident voice without an inherited sound directory
+- [BUILD-SHADOWED-WORLD-MAPS-38](BUILD-SHADOWED-WORLD-MAPS-38.md): Full image retains BSP maps shadowed by higher-priority world routes
+- [BUILD-TOOLKIT-VERSION-40](BUILD-TOOLKIT-VERSION-40.md): Development source retains the prior Toolkit release label
+- [BUILD-VERSION-EMULATOR-PRESETS-38](BUILD-VERSION-EMULATOR-PRESETS-38.md): Version bump omitted matching emulator presets
+- [BUILD-WORLD-FINGERPRINT-RETIRED-38](BUILD-WORLD-FINGERPRINT-RETIRED-38.md): Content fingerprint requires an explicitly retired exterior BSP
+- [BUILD-WORLD-PACK-RETIRED-38](BUILD-WORLD-PACK-RETIRED-38.md): World disk packer requires explicitly omitted exterior BSP maps
+- [CHIM-SEYDA-RECEIPT-TEXT-40](CHIM-SEYDA-RECEIPT-TEXT-40.md): New Seyda metadata and carrier writers omit explicit UTF-8 and LF
+- CI-01 (no report page): Windows short aliases mismatch resolved discovery paths in tests
+- CI-ACTIONS-CACHE-NODE20-54 (no report page): The GitHub workflow pinned actions/cache v4.2.3, which runs on Node 20, a runtime GitHub retires
+- [CI-BOOTSTRAP-NUMPY-32](CI-BOOTSTRAP-NUMPY-32.md): The public CI tool bootstrap fails: tools/build.py imports numpy before the tools exist
+- [CI-ERICW-SKIP-31](CI-ERICW-SKIP-31.md): Torch test room test never runs in hosted CI or the builder image
+- [CI-HOSTDEPS-30](CI-HOSTDEPS-30.md): Host CI job fails: scenery export needs the NIF reader for non-NIF test data
+- CI-JOBS-UNNAMED-53 (no report page): The six test jobs of the v0.0.53 CI split shipped with no names, and the maintainer was not told the new job list
+- [CI-NEW-BUILDER-RULES-35](CI-NEW-BUILDER-RULES-35.md): Hosted CI failed on v0.0.35: the previous-release check refused the one-commit checkout and the run-name rule refused the Docker check's run name
+- CI-SHARD-TOOLS-SETUP-HANG-61 (no report page): A CI test shard hung in its tools setup step until the 30-minute job timeout cancelled it
+- [CI-SKIPS-UNGUARDED-31](CI-SKIPS-UNGUARDED-31.md): Hosted CI does not fail on skipped tests; JavaScript test coverage unpinned
+- [CI-SOURCE-JOB-TIMEOUT-52](CI-SOURCE-JOB-TIMEOUT-52.md): The GitHub source check of v0.0.52 was cancelled at its 25-minute limit: the source-and-dry-run job outgrew it
+- [CI-SUITE-TWICE-33](CI-SUITE-TWICE-33.md): Hosted CI runs the full test suite twice per revision
+- CI-TAG-RUN-DUPLICATE-54 (no report page): The release tag push ran the whole CI test suite again on a commit main had already passed
+- [CI-TEST-SHARD-ONE-SLOW-53](CI-TEST-SHARD-ONE-SLOW-53.md): The first test shard of the v0.0.53 GitHub run took six times as long as the others
+- DOCS-PUBLIC-CHAT-QUOTES-56 (no report page): Public bug pages and code comments carried the maintainer's chat words and swearing
+- DOCS-PUBLIC-PRIVATE-CHANNEL-66 (no report page): Public register text, code comments and test data named the private channel a report came through
+- DOOR-ENTRANCE-AUDIT-51 (no report page): Requested: an entrance check in every build: each exterior entrance of the original must have a door that leads into its interior, found from the map, missing ones listed
+- EMULATOR-SESSION-BESIDE-SMOKE-53 (no report page): A scripted FS-UAE evidence session ran beside a gate boot smoke (one emulator at a time)
+- [ENGINE-O2-STRNCPY-WARNINGS-36](ENGINE-O2-STRNCPY-WARNINGS-36.md): At -O2 the engine build printed four -Wstringop-truncation warnings for bounded strncpy copies
+- ENGINE-SMOKE-PREP-KILLED-52 (no report page): The engine smoke's play-copy step is killed on and off: copying the 4 GiB boot disk through the page cache fills its 2 GiB container
+- [ENGINE-STRICT-WARNINGS-36](ENGINE-STRICT-WARNINGS-36.md): The engine builds warning-free only under -Wall -Wno-unused; stricter flags show 482 warnings
+- ENGINE-WARNING-ROOM-PREGROW-54 (no report page): RoomPreGrow in chim_room.c compares signed with unsigned and broke the warning-free engine build
+- ENTITY-TRACKER-CELL-CHECK-LAYERS-66 (no report page): With the expansions selected, the entity tracker's per-cell loss check is skipped without a word
+- [GATE-EMBERS-31](GATE-EMBERS-31.md): Ember commit broke native torch tests and a header format check
+- [GATE-HOSTPARITY-TEMP-RACE-33](GATE-HOSTPARITY-TEMP-RACE-33.md): Two gates running at once share the host-parity step's log file, so one gate can report the other's error
+- [GATE-NODE-MISSING-31](GATE-NODE-MISSING-31.md): The local gate never runs the inspector JavaScript tests (no Node.js in the Docker images)
+- [GATE-NUMPY-PATH-SCRATCH-33](GATE-NUMPY-PATH-SCRATCH-33.md): The gate's NumPy and Pillow import folder lived in a temporary per-session folder, so gates broke once it was removed
+- GATE-PRIVACY-NAMES-SWEARING-57 (no report page): The gate checked assistant names only in changed lines, never in file or folder names or the whole tree, and swearing in public text not at all
+- [GATE-PRIVACY-SCAN-33](GATE-PRIVACY-SCAN-33.md): The source preflight does not scan file contents for tool or model names and private path prefixes
+- [GATE-SHARED-SOURCE-32](GATE-SHARED-SOURCE-32.md): The local gate always tested the main checkout, in one shared folder
+- GATE-SMOKE-IMAGE-REMOVED-54 (no report page): Every gate failed its smoke part: the image it boots lived in an old build run that the automatic Docker cleanup retired
+- [GATE-SMOKE-NO-REMOTE-CONTROL-60](GATE-SMOKE-NO-REMOTE-CONTROL-60.md): Gate boot smokes sometimes fail with no remote control after boot
+- [GATE-SOURCE-RACE-33](GATE-SOURCE-RACE-33.md): The local gate copies the working tree after its clean check, so edits during the copy reach the tested source
+- GATE-STAGES-DIRTY-WORKTREE-54 (no report page): A gate copies the worktree as it is when it starts, not the commit it was launched for
+- [GATE-SUITE-WRITABLE-32](GATE-SUITE-WRITABLE-32.md): The test suite needs a writable source copy and an executable /tmp; the documented command does not say so
+- HARNESS-NEWGAME-BOX-STALL-54 (no report page): An FS-UAE session stalled at the Start a new game box before any map load: the probe sent its key on a fixed delay
+- HORS-AFTER-HALLOWEEN-STAYS-ARENA-58 (no report page): dbg aw hors after the Halloween scene no longer crashes on the v0.0.58-dev5 image but leaves the player in the Arena Pit instead of Seyda Neen
+- JOURNEY-AIM-RETRY-YAW-66 (no report page): The gameplay journey aimed at a door from an eye position that had changed: its thirteen retries ran round the wrong direction
+- JOURNEY-DOOR-USE-GOES-TO-ACTOR-66 (no report page): The opening journey's use key at the census street door went to the body of the guard killed a step before, or to a message box still showing, and the step then waited for a load it had never asked for
+- JOURNEY-PART-B-SAVE-NOT-CARRIED-66 (no report page): The gameplay journey's second part never loaded the first part's save: the save was written where the session does not carry it
+- JOURNEY-STEP6-VICTIM-NEAREST-66 (no report page): The opening journey's step 6 killed the nearest resident, which could be the guard by the census office's street door, whose body then took the use key instead of the door
+- JOURNEY-STEP7-FIGHT-UNREACHABLE-66 (no report page): The gameplay journey fight in step 7 took no health: the nearest resident was inside the census office, could not reach the player and fled
+- JOURNEY-STEP7-FIGHTER-NEAREST-66 (no report page): The opening journey's step 7 fights the nearest resident, which can be Fargoth, who fights unarmed, so the health may stay as it was
+- JOURNEY-WALK-DIALOGUE-DESYNC-66 (no report page): The gameplay journey lost its way in the census office: its key presses talked to the clerk and chose Persuasion instead of taking the papers, and every later step ran in that window
+- KIT-CI-JOBS-SPLIT-53 (no report page): The release kit did not know the split CI workflow: its job check refused it and its publisher waited for the old job names
+- LINUX-VALID-02 (no report page): Linux test fixtures failed to link (missing stubs)
+- [MWAD-TEXT-WRITER-LF-35](MWAD-TEXT-WRITER-LF-35.md): Some JSON and text writers do not pin LF and UTF-8
+- [OPS-GATE-UNLISTED-TESTS-36](OPS-GATE-UNLISTED-TESTS-36.md): The gate runs only the tests listed in the public file list, and nothing checked that every test file is listed
+- [PLAYTEST-SHIPPED-WITHOUT-SMOKE-36](PLAYTEST-SHIPPED-WITHOUT-SMOKE-36.md): The v0.0.36-dev3 private playtest package was published with an engine that dies on every map load: no ship step or gate booted it
+- PREGATE-GLOBAL-SHADOW-58 (no report page): Pregate C check misses global shadowing; the engine build fails on it
+- PREGATE-SYNTAX-SKIP-SILENT-57 (no report page): The pre-gate C syntax check skipped itself without failing on worktrees in the per-version folder layout
+- RELEASE-CONNECT-STEP-SKIPPED-53 (no report page): After v0.0.52 and v0.0.53 were published the release's connect-it-fully step was skipped: the pinned previous release and the size baseline stayed at v0.0.51
+- [RELEASE-INCLUSION-CHECK-LATE-48](RELEASE-INCLUSION-CHECK-LATE-48.md): The release guard does not check the CHIM inclusion ledger: the v0.0.48 kit stopped in its source step after the guard and the full suite had passed
+- [RELEASE-KIT-NO-REPAIR-MODE-35](RELEASE-KIT-NO-REPAIR-MODE-35.md): The release kit has no repair mode for a commit already pushed
+- [RELEASE-KIT-PUSH-BEFORE-CI-45](RELEASE-KIT-PUSH-BEFORE-CI-45.md): The release kit pushes to main before CI has passed
+- [RELEASE-KIT-RETRY-REUSES-CI-45](RELEASE-KIT-RETRY-REUSES-CI-45.md): A kit retry after a CI failure reads the same failed run again
+- [RELEASE-LAVA-IMAGE-ALLOWLIST-38](RELEASE-LAVA-IMAGE-ALLOWLIST-38.md): Lava documentation images were listed without image-type approval
+- [RELEASE-PATCH-SIZE-33](RELEASE-PATCH-SIZE-33.md): The release preflight refuses the whitespace baseline of v0.0.33-dev1 as oversized text
+- [RELEASE-PATCH-TARGET-VERSION-39](RELEASE-PATCH-TARGET-VERSION-39.md): RC1 publication baseline lacks its target version
+- [ROOM-TRACE-VISIT-GUARD-48](ROOM-TRACE-VISIT-GUARD-48.md): Long downward traces on the Hall of Processing's collision raise the trace visit guard (Cyclic or excessive collision tree)
+- SESSION-PASS-DEAD-ENGINE-57 (no report page): The scripted test session reported PASS while the engine had crashed
+- SESSION-STALL-CENSUS-QUICKSTART-58 (no report page): On the v0.0.58-dev6 image a session that quick-starts into the Census and Excise Office at 135 172 64 stalls before its first still: the runner reports game stalled with the game clock frozen at 23.23 s
+- [SMOKE-DELIVERY-OLD-COPY-58](SMOKE-DELIVERY-OLD-COPY-58.md): The playtest delivery ran an old copy of the boot smoke: the v0.0.58 release smoke failed four times on a working image
+- SMOKE-END-CONSOLE-TOGGLE-OUTSIDE-PLAY-64 (no report page): A scripted session whose last step closes the console is judged as ended outside play while the game is in play
+- SMOKE-IDE-TRACE-LOG-63 (no report page): The gate smoke runs the emulator with its IDE trace log on, about 41 MB per two-minute run
+- SMOKE-INPLAY-UNSAMPLED-63 (no report page): The boot smoke never examines a stop where the game does not get into play after a load
+- SMOKE-KEY-DURING-LOGO-52 (no report page): The engine smoke can type its console command while the logo is still up: the m of map is the logo s not-now key for the extra Fast RAM, so the start runs without the CHIM cache and the 32 MB zone check fails falsely
+- SMOKE-M-KEY-SKIPS-CHIM-CACHE-57 (no report page): The gate's boot smoke sometimes fails with the CHIM zone full: an M typed while the startup memory notice shows turns the CHIM cache off for that start
+- [SMOKE-MUSIC-REREAD-FLAKY-57](SMOKE-MUSIC-REREAD-FLAKY-57.md): The boot smoke's music check fails now and then: music is not read again after dbg music on (reads 35 -> 35), a rerun passes
+- [SMOKE-PASSES-WITHOUT-MAP-36](SMOKE-PASSES-WITHOUT-MAP-36.md): The engine boot smoke passed while its first map ran under the title menu: a loaded server was taken for a played map
+- SMOKE-PROBE-ARRIVAL-LOAD-NOT-STARTED-64 (no report page): The session probe reports a MiniWind as never started while the preset's own arrival step is loading a room, and runs none of the session script
+- SMOKE-SEYDA-AGAIN-NOT-IN-PLAY-58 (no report page): The boot smoke failed once with 'seyda again (before load 3 of 3) is not in play'; the rerun on the same commit passed
+- [SMOKE-STALL-LABEL-INFERRED-60](SMOKE-STALL-LABEL-INFERRED-60.md): The boot smoke names a stop an emulator disk stall without checking the pending disk request
+- [SMOKE-TALK-BOX-BLOCKS-REMOTE-57](SMOKE-TALK-BOX-BLOCKS-REMOTE-57.md): The boot smoke failed with a talk box (Yes?) open in Seyda Neen right after the load: the remote commands went unanswered and the music check read nothing
+- STALL-PROBE-NAME-BPTR-66 (no report page): The stall examination showed no file name for a stuck open, lock or delete: it read the name at the raw BCPL pointer instead of the pointer times 4
+- STALL-PROBE-PROMPT-LOG-LINE-66 (no report page): The stall examination missed the debugger's prompt when an emulator log line followed it on the same line, never resumed the emulator, and the paused session read as a stop of the game
+- STALL-PROBE-RUNNING-GAME-66 (no report page): The stall examination read a running game as a missing task or as waiting on a file reply: it walked only the ready and waiting task lists and took the wait mask of a task that was not waiting
+- TEST-ACTOR-LIBRARY-OFF-PLAN-48 (no report page): test_actor_library StageTests.test_on_by_default_off_selectable fails on the interiors line: the actor-library stage stays in the plan with --chim-actor-table off
+- [TEST-CENSUS-CONTRACTS-40](TEST-CENSUS-CONTRACTS-40.md): Three quick-character expected failures lack reconciled contracts
+- [TEST-CHIM-BIG-FRAME-TIMEOUT-33](TEST-CHIM-BIG-FRAME-TIMEOUT-33.md): The Balmora-sized CHIM world test times out on a loaded machine
+- TEST-CHIMPORT-POOL-COPY-REUSE-48 (no report page): test_chimport_pool test_copy_mode_reuses_by_verified_copy fails on the interiors branch head
+- [TEST-COST-ORDER-LOAD-33](TEST-COST-ORDER-LOAD-33.md): The scheduler cost-order test fails on a fully loaded machine (start times compared within a fraction of a second)
+- [TEST-ENV-LEAK-HULL-33](TEST-ENV-LEAK-HULL-33.md): A sequential run of the suite fails the CHIM unit fingerprint test: an earlier in-process test leaves AMIWIND_MODEL_HULL set
+- TEST-FACT-ROWS-WAITING-51 (no report page): The register's page test did not know the optional Waiting on and Deferred fact rows: the first bug page with a waiting reason failed the gate
+- [TEST-GODMODE-UNLISTED-36](TEST-GODMODE-UNLISTED-36.md): The dbg godmode test was never run by the gate (missing from the public file list) and its escape check failed
+- TEST-HEAP-WATCHER-UNDER-LOAD-66 (no report page): The heap watcher native test failed in a full gate run and passed when run alone
+- TEST-MWAD-MODULE-SHADOW-48 (no report page): test_room_late_passes fails to import when test_optimize_world_maps runs before it in the same process: tools/mwad.py hides the mwad package
+- [TEST-NATIVE-STALE-IMPORT-33](TEST-NATIVE-STALE-IMPORT-33.md): Native engine tests run alone generate their version headers with the builder image's old tools copy
+- [TEST-NATIVE-TMPDIR-32](TEST-NATIVE-TMPDIR-32.md): A native test overflows a 64-byte name buffer when the temp path is long
+- [TEST-PARALLEL-ORDER-FLAKY-36](TEST-PARALLEL-ORDER-FLAKY-36.md): test_processes_keep_order_and_limit_nested_threads is timing-sensitive and fails now and then
+- [TEST-PARALLEL-ORDER-LOAD-33](TEST-PARALLEL-ORDER-LOAD-33.md): The process-pool order test fails on a fully loaded machine (one worker process takes every item)
+- [TEST-PARALLEL-SHARE-TIMING-36](TEST-PARALLEL-SHARE-TIMING-36.md): The fair-share scheduler test watched the freed budget for a fixed 4 s and failed on a loaded machine
+- TEST-POOL-LIVE-GROWTH-FLAKY-64 (no report page): The pool live growth test fails once in a full suite run while the machine is busy and passes when run alone
+- TEST-POOL-LONGEST-FIRST-LOAD-66 (no report page): The pool test of longest-first ordering failed once in a gate run while two other gates shared the machine, and passes when run alone
+- TEST-POOL-QUEUE-REFILL-TIMING-64 (no report page): The pool queue refill test (test_longest_first) failed once in a gate on a busy machine and passed on the rerun of the same commit
+- TEST-POOL-RESUME-SHELL-CONTAINER-58 (no report page): A stage-key test fails when run on its own in the shell container: a pool-mode resume reuses the scene-chain stage it should rerun
+- TEST-POOL-SCENE-RESUME-ENV-64 (no report page): A stage-key test fails when run directly in the shell container but passes in the gate
+- TEST-PORT-01 (no report page): Focused tests depended on repo root and Windows UTF-8 mode
+- TEST-PORTABILITY-01 (no report page): Pre-release test fixtures assumed host features and links
+- [TEST-PROFILE-OVERHEAD-SAMPLES-36](TEST-PROFILE-OVERHEAD-SAMPLES-36.md): The profiler overhead test sampled for a fixed 2 s and got too few samples on a loaded machine
+- [TEST-PROFILE-SECTION-CPU-32](TEST-PROFILE-SECTION-CPU-32.md): The build profile section test fails on a loaded machine (CPU time read in clock ticks)
+- [TEST-PROFILE-STAGE-WALL-32](TEST-PROFILE-STAGE-WALL-32.md): The build profile stage test needs an idle machine (wall time compared with CPU time)
+- [TEST-PROFILE-TIMELINE-BOUND-33](TEST-PROFILE-TIMELINE-BOUND-33.md): A profiler test bounds the sampled CPU too tightly and fails on a loaded machine
+- [TEST-PROFILE-TIMELINE-SUM-33](TEST-PROFILE-TIMELINE-SUM-33.md): The build profile test's sampled-timeline check fails on a loaded machine (timeline CPU above the stage's own CPU)
+- [TEST-RC1-INTEGRATION-CONTRACTS-39](TEST-RC1-INTEGRATION-CONTRACTS-39.md): RC1 regression tests assume the old fingerprint location and a separate class cache unit
+- TEST-SAVED-EQUIPMENT-NATIVE-FLAKY-64 (no report page): The saved equipment native test errors once in a full suite run while the machine is busy and passes when run alone
+- TEST-SKEL-NATIVE-FLAKY-UNDER-LOAD-60 (no report page): Native test test_skel_native (left_arm_takes_the_layer_frame) fails once under host load
+- [TEST-SPAWN-SCAN-DOCSTRING-KEY-48](TEST-SPAWN-SCAN-DOCSTRING-KEY-48.md): The spawn contract scan read a docstring example in hand_metadata.py as a map key named key
+- [TEST-TOWN-BOUNDS-40](TEST-TOWN-BOUNDS-40.md): Town expansion left recovery fixtures and coordinate audit stale
+- TEST-TRACKER-SLOW-48 (no report page): Bug register render, contents check and tracker tests take 5 to 6 minutes on one core
+- [TEST-WORKER-SYSPATH-32](TEST-WORKER-SYSPATH-32.md): Pool workers started from tests import tools/mwad.py instead of the mwad package
+- [TESTS-HEAD-REDUCER-BYTES-CI-45](TESTS-HEAD-REDUCER-BYTES-CI-45.md): A byte-exact head reducer test fails on some GitHub runners
+- [TESTS-SUPERVISOR-START-CLOCK-46](TESTS-SUPERVISOR-START-CLOCK-46.md): A scheduler test sorted units by the clock each worker read, and failed when the host delayed a thread
+- [TOOLKIT-TEST-POINTERLOCK-31](TOOLKIT-TEST-POINTERLOCK-31.md): Inspector test left pointer lock set, breaking later drag checks
+- TOOLS-UNPINNED-WRITER-ATMOS-54 (no report page): tools/particle_emitters.py wrote JSON without pinned line endings
+- TRACKER-BUGS-PAGE-SIZE-58 (no report page): docs/BUGS.md lists every bug with its whole status, archived ones too, so the archive rotation cannot keep it under its size limit: it reached 95.06 % of 1 MiB
+
+<!-- END GENERATED CATEGORY -->

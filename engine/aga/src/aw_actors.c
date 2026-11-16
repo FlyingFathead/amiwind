@@ -25,7 +25,8 @@
  * chim actors list, chim actors trace 0/1, chim actors resetstats, chim actors budget N, chim actors warm 0/1
  * (spawns per tick, 0 = all at once; default 1), chim actors fight (the nearest resident
  * attacks the player), chim actors kill (the nearest resident dies), chim actors summon
- * (TEST: a copy of the nearest resident at the player's feet), chim actors hash LABEL,
+ * (TEST: a copy of the nearest resident at the player's feet; chim actors summon REF copies the living resident of
+ * that reference instead), chim actors hash LABEL,
  * chim actors clear (forget the change list), chim actors seed N (the levelled lists' session seed).
  *
  * Levelled creature lists (actor table version 2, tools/chim/actors.py): a levelled reference of a joining cell is
@@ -1776,14 +1777,37 @@ static void Command (void)
 			RefOf (e), (long)NUM_FOR_EDICT(e));
 		return;
 	}
-	if (Cmd_Argc () == 3 && !strcmp (a, "summon"))
+	if ((Cmd_Argc () == 3 || Cmd_Argc () == 4) && !strcmp (a, "summon"))
 	{
 		/* TEST: a copy of the nearest resident standing exactly where the player stands (the player's feet: ground
 		 * the player's own hull rests on, so the copy's support test and path search find it), with its own
-		 * reference id; then "chim actors fight" makes it the pursuer. Same command, same place in both methods. */
+		 * reference id; then "chim actors fight" makes it the pursuer. Same command, same place in both methods.
+		 * "chim actors summon REF" copies the living resident of that reference instead of the nearest one
+		 * (JOURNEY-STEP7-FIGHTER-NEAREST-66: a fixed, armed fighter for the journey's step 7). */
 		static int summoned;
-		edict_t *src = Nearest (), *p = Player (), *copy;
+		edict_t *src = NULL, *p = Player (), *copy;
 		eval_t *v;
+		if (Cmd_Argc () == 4)
+		{
+			float want = (float)Q_atof (Cmd_Argv (3));
+			int k;
+			for (k=1 ; k<sv.num_edicts ; k++)
+			{
+				e = EDICT_NUM(k);
+				if (IsActor (e) && RefOf (e) == want && AW_CombatSlotState (e, NULL) != 2)
+				{
+					src = e;
+					break;
+				}
+			}
+			if (!src)
+			{
+				Con_Printf ("chim actors summon: no living actor of reference %s here\n", Cmd_Argv (3));
+				return;
+			}
+		}
+		else
+			src = Nearest ();
 		if (!src || !p)
 		{
 			Con_Printf ("chim actors summon: no resident to copy\n");

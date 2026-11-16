@@ -2211,10 +2211,10 @@ int AW_CombatLayCorpse(edict_t *t) {
 }
 /* PLAYER-CASTING-59 (aw_mwhost.c AW_MwscriptLand): a spell's effects changed an actor's health to HEALTH. A harmful
  * spell is an attack: an actor not yet fighting joins the fight with the player (OpenMW spellcasting.cpp inflict,
- * the player's harmful spell on a living actor shows its health bar and counts as an attack). At 0 it dies as by a
- * blow. 1 when the actor has a fight slot. */
+ * the player's harmful spell on a living actor shows its health bar and counts as an attack). Under 1 it dies as by a
+ * blow (AW_ACTOR_HEALTH_DEAD, MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66). 1 when the actor has a fight slot. */
 int AW_CombatSpellHit(edict_t *e,float health,int harmful) {
-    slot_t *s;
+    slot_t *s;int dead=AW_ACTOR_HEALTH_DEAD(health);
     if(!e || e->free)return 0;
     s=slot_of(e);
     if(!s){
@@ -2227,8 +2227,8 @@ int AW_CombatSpellHit(edict_t *e,float health,int harmful) {
     }
     if(s->f.dead)return 1;
     if(harmful){enemy=e;enemy_until=(float)sv.time+aw_combat_settings.fNPCHealthBarTime;}
-    s->f.health=health>0?health:0;
-    if(health<=0){
+    s->f.health=!dead && health>0?health:0;
+    if(dead){
         s->f.dead=1;
         set_state(s,S_DEAD,G_DEATH);s->e->v.solid=SOLID_NOT;SV_LinkEdict(s->e,false);sound(SND_FALL);
         if(s->rolled){s->e->v.angles[2]=90;s->e->v.origin[2]+=2;}           /* stand-in: lie down */

@@ -432,8 +432,11 @@ cmd dbg combat seed 7
 # point that was the census hall guard (reference 172852) inside the office at 353 -179: the v0.0.66-dev5 console reads
 # "Combat: Guard cannot reach you and flees" twice and no hit landed (health 910 before and after). A copy of the
 # nearest resident is put at the player's feet first (chim actors summon, aw_actors.c: the test copy the pursuit
-# checks use), so the fighter is the one that stands beside the player and the path search has its goal
-cmd chim actors summon
+# checks use), so the fighter is the one that stands beside the player and the path search has its goal.
+# JOURNEY-STEP7-FIGHTER-NEAREST-66: the nearest resident was Fargoth on the dev9 and dev10 images, who fights unarmed
+# (misses and fatigue damage only), so the copy is of a fixed armed resident by reference: the Seyda Neen guard
+# (128967), who carries a weapon
+cmd chim actors summon 128967
 wait 2
 probe fighter chim actors fight
 wait 20

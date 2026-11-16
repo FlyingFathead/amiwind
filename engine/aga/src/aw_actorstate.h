@@ -152,6 +152,13 @@ void AW_ActorModCurrent(aw_actor_t *a,int dynamic,float value);   /* MODCURRENT:
 float AW_ActorRatio(const aw_actor_t *a,int dynamic);             /* current / base (1 when base is 0) */
 int AW_ActorOnDeath(aw_actor_t *a);                               /* 1 once after it died */
 void AW_ActorKill(aw_actor_t *a);                                 /* dead; OnDeath reads 1 once; dead count + 1 */
+/* MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66, the death rule of every path (a blow, a spell, a fall, a script): a current
+ * health under 1 is death, whatever the base (OpenMW 0.51 creaturestats.cpp CreatureStats::setDynamic). FELL: a
+ * change of the current health from BEFORE to NOW that crosses it; an actor already under 1 died no second time. */
+#define AW_ACTOR_HEALTH_DEAD(health) ((health)<1.0f)
+#define AW_ACTOR_HEALTH_FELL(before,now) (!AW_ACTOR_HEALTH_DEAD(before) && AW_ACTOR_HEALTH_DEAD(now))
+/* the record's death of a change of its health from BEFORE (WAS_DEAD: dead before it): 1 when this change killed it */
+int AW_ActorHealthDeath(aw_actor_t *a,int was_dead,float before);
 /* ESSENTIAL-DEATH-MESSAGE-66: called once per death by AW_ActorKill (NULL: none; aw_mwhost.c binds it: the
  * essential death box for a record flagged AWR_ESSENTIAL, OpenMW 0.51 actors.cpp sKilledEssential on any death) */
 extern void (*aw_actor_killed)(const aw_actor_t *a);

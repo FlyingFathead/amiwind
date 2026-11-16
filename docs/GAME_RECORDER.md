@@ -1,6 +1,6 @@
 # Gameplay recorder
 
-_Last updated with AmiWind v0.0.66-dev9 (15 November 2026)._
+_Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -13,6 +13,8 @@ _Last updated with AmiWind v0.0.66-dev9 (15 November 2026)._
 - [Not yet covered](#not-yet-covered)
 - [Recordings as benchmarks](#recordings-as-benchmarks)
 - [Gameplay journeys](#gameplay-journeys)
+  - [Playing a journey by hand](#playing-a-journey-by-hand)
+  - [What it costs](#what-it-costs)
 - [Gameplay smoke tests](#gameplay-smoke-tests)
 - [Workflow](#workflow)
 
@@ -160,13 +162,17 @@ by name (Morrowind, whose answer names his duties, then duties). Its nine steps:
    again and out by the exit door to the street: the actor is still listed dead, and both doors let the player out.
    The victim is named by reference (`chim actors kill 128960`, Erene Llenim, who stays by his shack on the west of
    the town): the nearest resident, which a plain `chim actors kill` takes, can be the guard standing by the street
-   door, and his body there then takes the use key instead of the door (changed in v0.0.66-dev9; to be confirmed by a
-   journey).
+   door, and his body there then takes the use key instead of the door (changed in v0.0.66-dev9; seen working in the
+   v0.0.66-dev9 and v0.0.66-dev10 journeys).
    God mode is on for the kill only and off again right after it, since it blocks every kind of damage and would
    leave step 7's health readings all the same.
 7. A spell cast (a Restore Health made for the test) and a fight: the health rises, the cast is counted as landed,
-   and the fight takes health. The fighter is a copy of the nearest resident put at the player's feet first
-   (`chim actors summon`): the nearest resident by itself can stand behind a wall, cannot reach the player and flees.
+   and the fight takes health. The fighter is a copy of a resident put at the player's feet first: the nearest resident
+   by itself can stand behind a wall, cannot reach the player and flees, and can be one who fights unarmed (Fargoth,
+   `fargoth`: misses and fatigue damage only). The copy is of the Seyda Neen guard, who carries a weapon, named by
+   reference (`chim actors summon 128967`; without a reference the command copies the nearest resident, and a
+   reference of nobody living there copies nobody and says so; changed after v0.0.66-dev10, to be confirmed by a
+   journey).
 8. The game's own quicksave, then a new start of the engine and the load through the Load game window: the package,
    the gold, the ring, the journal, the dead actor and a script global are as they were saved.
 9. Through a door with E: the next area loads and the game goes on with the loaded inventory.
@@ -175,10 +181,82 @@ A second journey, `tests/sessions/journey_tarhiel.txt`, checks the falling mage 
 Outside the trigger it checks that the mage is still held on his platform and that nothing has landed. After a walk
 to within 2000 units of his journal it checks from `aw_mwscript_status` that he fell, landed and died.
 
+A third, `tests/sessions/endgame_heart.txt`, plays the end of the main quest without the quest before it. A test
+character (`dbg aw hors`, then `dbg maxstats`) is given Sunder (`sunder`), Keening (`keening`) and Wraithguard
+(`wraithguard`), the quest `C3_DestroyDagoth` is set to 10 (Dagoth Ur defeated in the Facility Cavern) and
+`dbg tp heartchamber` takes the character to Akulakhan's Chamber. Its nine steps:
+
+1. The character: fighting allowed, every attribute and skill at 100.
+2. The tools: all three carried. Wraithguard is worn, both by the original's console `Equip` and by the inventory's
+   own route, and its global `wraithguardEquipped` is read after each. Sunder is in hand and does no harm for four
+   seconds without god mode.
+3. Dagoth Ur, Facility Cavern first, as the quest goes: Dagoth Ur's first form is defeated (by reference, as at stage
+   10), and below stage 20 Azura's spirit and the Ring of Azura are hidden by their scripts. Then the chamber loads at
+   32 MB Fast with the Heart of Lorkhan (`heart_akulakhan`) and Dagoth Ur (`dagoth_ur_2`) in it.
+4. In front of the Heart: the Heart's script moves Dagoth Ur to his place and sets him on the player. His own script
+   gives back the health a console blow takes and holds his first shield.
+5. One strike with Sunder: the Heart's script takes it (its first local is 1, its `HitOnMe` matched once) and plays
+   nothing yet.
+6. Five strikes with Keening. After each one the Heart's script has taken one more blow and played one more
+   animation (Idle2 to Idle5, then Death1), and Dagoth Ur's shield follows the count. The fifth sets `HeartDestroyed`.
+7. The Heart destroyed: Dagoth Ur's health is capped at 200 (he can die now) and the three dreamer workers die.
+8. Back at the entrance, within reach of the detector: the end script `EndGame` sets the quest to 20, ends the
+   blight (`DestroyBlight` -1, two weather calls), kills Dagoth Ur, turns teleporting back on and gives 10
+   reputation. The collapse of Akulakhan and the bridge is checked as a known gap
+   ([ENDGAME-CHAMBER-COLLAPSE-63](BUGS.md)).
+9. In Dagoth Ur, Facility Cavern, near Azura's spirit: the spirit is shown, takes the controls and plays the ending
+   video, then the quest ends (`C3_DestroyDagoth` and `A1_SleepersAwake` at 50), the Ring of Azura is enabled, the
+   controls are given back and the spirit goes.
+
+Dagoth Ur is fought in god mode, not killed by reference: his script keeps him alive while the Heart lives, and that
+is part of what is checked. The Heart is set on the player first (`chim actors fight`), as the first blow would do,
+so a swing finds it by the original's hit cone over the fighters. The strikes are counted from the game's own state,
+never from a picture: the Heart's `HitOnMe` calls that took a blow and its `PlayGroup` calls (`aw_mwscript_status`),
+its first local (`aw_mwscript_status call getlocal 197602`) and Dagoth Ur's shields (`getspell`). After step 7's checks
+the session sets `HeartDestroyed` from the console, which changes nothing when the fifth strike set it, so steps 8
+and 9 are checked even when a strike did not register.
+
+Some checks cannot pass today and are checked as known gaps, each with its register entry:
+
+- Four console reads:
+  - `player->getitemcount keening`: the console counts only the items of the actor table's list
+    ([CONSOLE-GETITEMCOUNT-UNNAMED-ITEM-66](BUGS.md));
+  - the original's `player->equip`: it wears the item without its script's OnPCEquip
+    ([CONSOLE-EQUIP-SKIPS-ONPCEQUIP-66](BUGS.md));
+  - `dagoth_ur_2->getpos` reads the console's own instance ([CONSOLE-GETPOS-SCRATCH-ORIGIN-66](BUGS.md));
+  - `heart_akulakhan->sv` shows the console's own instance ([CONSOLE-SHOWVARS-SCRATCH-INSTANCE-66](BUGS.md)).
+- Dagoth Ur's shield, which his script changes with the Heart's count: a read of another object's local gives 0
+  today ([MWSCRIPT-MEMBER-READS-ID-AS-SCRIPT-66](BUGS.md)).
+- The deaths of the dreamer workers and of Dagoth Ur: a script's `SetHealth 0` leaves an actor alive
+  ([MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66](BUGS.md)). The workers' health set to 0 is a counted check.
+- The collapse ([ENDGAME-CHAMBER-COLLAPSE-63](BUGS.md)).
+
+Keening is checked from the grant's own answer, and Dagoth Ur's move from the script host's count of a
+`PositionCell` carried out in the chamber.
+
+Both runs so far used the v0.0.66-dev10 image.
+
+- **The first run** stopped before the first strike, on an emulator disk stall in the test console's own state file
+  ([CHIM-SEYDA-BALMORA-LOAD-HANG-43](BUGS.md)). Before that, it passed steps 1 and 3: the chamber loaded at 32 MB Fast
+  from Seyda Neen in 41 seconds.
+- **The second run** played the whole session with the emulator option meant to keep the test console's folder from
+  stalling (the comparison is still being measured).
+  - Sunder registered, the five Keening strikes were taken and played on the Heart, and the Heart was destroyed.
+  - Dagoth Ur's health was capped at 200.
+  - The end script ended the blight, set the quest to 20, gave 10 reputation, changed the weather and turned
+    teleporting back on.
+  - It failed on the known gaps above, and in the Facility Cavern: that run came there first at stage 20. Azura's
+    spirit had never been hidden, and its script shows it only when it was hidden, so the quest's end never started.
+    The session now visits the cavern before the chamber.
+
 Each part of a journey (`part A`, `part B`) runs as its own game: part B starts the engine again and loads the save
-part A wrote. The journey file is the session-script language of `tools/engine_smoke.py` with three more words:
-`step` (a numbered stage), `probe NAME COMMAND` (read one value) and `expect` (a check on it, for example
-`expect gold_again == gold_sellus`, `expect dead victim in list_back`, or `expect lacks table_back reference 454283`).
+part A wrote. The journey file is the session-script language of `tools/engine_smoke.py` with four more words:
+`step` (a numbered stage), `probe NAME COMMAND` (read one value), `pick NAME PROBE after|before TEXT` (the number
+right after or before TEXT in an earlier probe's answer, such as one count of the long `aw_mwscript_status` answer)
+and `expect` (a check on it, for example `expect gold_again == gold_sellus`, `expect dead victim in list_back`,
+`expect fighting 262014 in list_near` with a reference number, or `expect lacks table_back reference 454283`).
+`expect known REGISTER-ID CHECK` is a check for a step that cannot pass today: it is printed as `KNOWN` with its
+register entry and is not counted in the result, and when it passes the result line says the gap closed.
 
 The walk itself never counts key presses blindly. Its steps wait for the game and stop the session at the first wrong
 turn, naming where the player stands:

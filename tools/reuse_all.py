@@ -568,14 +568,71 @@ def region_limits(steps, plans, rebuilt):
     return limits
 
 
-def unit_report(steps, closures, units, cache_root, workspace, rebuilt, root=ROOT, openers=None, limits=None):
+# The unit-cache report's keys on every core (BUILD-CHECK-ONE-CORE-66): each cache's key digest (current_digests:
+# the code its key hashes, in this form and the older forms still looked up) is a pure function of the checkout,
+# worked out for one cache after another on one core (a fresh source index per key form each time). They are worked
+# out on forked worker processes, one cache key per task; the answers are the serial ones (tests/test_reuse_all.py).
+DIGEST_TIMEOUT_S = 900    # no answer for this long: the pool is stopped and this process works them out alone
+
+
+def digest_workers():
+    """Processes for the unit-cache report's keys: the build's pre-flight workers (build_cache.PREFLIGHT_WORKERS: --jobs
+    capped by the cores the build may use; AMIWIND_PREFLIGHT_JOBS=1 = this process alone), else this process alone."""
+    cache = sys.modules.get('build_cache')
+    workers = getattr(cache, 'PREFLIGHT_WORKERS', None) if cache is not None else None
+    return int(workers) if workers else 1
+
+
+def _digest_task(item):
+    opener, root = item
+    return current_digests(opener, root)
+
+
+def unit_digests(wanted, root=ROOT, workers=None):
+    """{(cache, scripts json): current_digests(opener)} for WANTED {(cache, scripts json): opener}, on WORKERS forked
+    processes (default digest_workers()); one key alone, one worker, or a pool that fails: in this process, one after
+    another (the earlier method)."""
+    items = list(wanted.items())
+    workers = digest_workers() if workers is None else workers
+    if workers > 1 and len(items) > 1:
+        import gc
+        import multiprocessing
+        gc.collect()
+        gc.freeze()   # the inherited objects stay out of the workers' collections (no copy of every page)
+        try:
+            with multiprocessing.get_context('fork').Pool(min(workers, len(items))) as pool:
+                pending = pool.map_async(_digest_task, [(opener, root) for _, opener in items], chunksize=1)
+                found = pending.get(timeout=DIGEST_TIMEOUT_S)
+            return {key: value for (key, _), value in zip(items, found)}
+        except Exception as exc:  # noqa: BLE001 - a pool that stops: the same keys in this process
+            print(f'Unit-cache keys: the worker pool stopped ({type(exc).__name__}: {exc}); working them out here',
+                  flush=True)
+        finally:
+            gc.unfreeze()
+    return {key: current_digests(opener, root) for key, opener in items}
+
+
+def unit_report(steps, closures, units, cache_root, workspace, rebuilt, root=ROOT, openers=None, limits=None,
+                workers=None):
     """{stage: [(cache name, N, T) or (cache name, None, None)]} of the rebuilt stages that bake into unit caches.
     LIMITS {stage: units}: the most units a stage can look up (region_limits); the stored group and the units found
-    are counted up to it only."""
+    are counted up to it only. WORKERS: processes for the caches' key digests (unit_digests)."""
     if cache_root is None:
         return {}
     openers = unit_cache_openers(root) if openers is None else openers
-    report, groups, digests = {}, {}, {}
+    report, groups = {}, {}
+    wanted = {}   # every cache key the rebuilt stages reach, each once
+    for name, _ in steps:
+        if name in rebuilt:
+            for opener in stage_unit_caches(openers, (closures or {}).get(name), (units or {}).get(name)):
+                if opener['name']:
+                    wanted.setdefault((opener['name'], json.dumps(opener['scripts'])), opener)
+    began = time.monotonic()
+    digests = unit_digests(wanted, root, workers)
+    if wanted:
+        used = workers if workers is not None else digest_workers()
+        print(f'Unit-cache keys: {len(wanted)} cache key(s) worked out in {time.monotonic() - began:.1f} s '
+              f'({min(used, len(wanted)) if used > 1 and len(wanted) > 1 else 1} worker process(es))', flush=True)
     for name, _ in steps:
         if name not in rebuilt:
             continue
@@ -584,8 +641,6 @@ def unit_report(steps, closures, units, cache_root, workspace, rebuilt, root=ROO
             if not cache:
                 continue
             key = (cache, json.dumps(opener['scripts']))
-            if key not in digests:
-                digests[key] = current_digests(opener, root)
             if cache not in groups:
                 groups[cache] = census(cache_root, cache, workspace)
             if digests[key] is None:

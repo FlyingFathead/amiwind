@@ -1280,7 +1280,7 @@ int AW_MwscriptLand(edict_t *target,const aw_spell_effect_t *e,const aw_mgef_t *
     else{
         fx_edict_keep(a->reference,target);
         if(harmful || a->dyn_cur[0]!=health)AW_CombatSpellHit(target,a->dyn_cur[0],harmful);
-        if(a->dyn_cur[0]<=0){AW_EffectsForget(a->reference);if(!(a->flags&AWL_DEAD))AW_ActorKill(a);}
+        if(AW_ACTOR_HEALTH_DEAD(a->dyn_cur[0])){AW_EffectsForget(a->reference);if(!(a->flags&AWL_DEAD))AW_ActorKill(a);}
     }
     AW_MwvmStateChanged();
     return k;
@@ -1328,7 +1328,7 @@ static void npc_effects_tick(float dt){
         before=a->dyn_cur[0];
         if(!AW_EffectsTick(a,dt))continue;
         if(a->dyn_cur[0]!=before)AW_CombatSpellHit(e,a->dyn_cur[0],0);
-        if(a->dyn_cur[0]<=0){AW_EffectsForget(owners[i]);if(!(a->flags&AWL_DEAD))AW_ActorKill(a);}
+        if(AW_ACTOR_HEALTH_DEAD(a->dyn_cur[0])){AW_EffectsForget(owners[i]);if(!(a->flags&AWL_DEAD))AW_ActorKill(a);}
         AW_MwvmStateChanged();
     }
 }
@@ -1413,9 +1413,21 @@ static void to_fighter(const aw_actor_t *a,aw_fighter_t *f){
     f->health=a->dyn_cur[0];f->health_max=a->dyn_base[0];f->fatigue=a->dyn_cur[2];f->fatigue_max=a->dyn_base[2];
     f->magicka=a->dyn_cur[1];
 }
+static int is_actor(const edict_t *e);
+/* MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66: a script's SetHealth, ModHealth or ModCurrentHealth that takes a living NPC or
+ * creature under 1 health kills it as a blow would (OpenMW 0.51 creaturestats.cpp setDynamic: under 1 is death,
+ * whatever the base; SetHealth 0 sets the base to 0 too): the record's death once (AW_ActorHealthDeath: OnDeath, the
+ * dead count, an essential character's box), and on its loaded edict the fight's death, or the body a fight leaves
+ * when it is not fighting (aw_fall.c landed does the same). WAS_DEAD and BEFORE: the record before the call. */
+static unsigned long script_deaths;
+static void script_death(aw_actor_t *a,edict_t *e,int was_dead,float before){
+    if(!AW_ActorHealthDeath(a,was_dead,before))return;
+    if(is_actor(e) && !AW_CombatSpellHit(e,0,0))AW_CombatTestEngage(e,1);
+    script_deaths++;
+}
 static aw_mwcell_t host_actor(int instance,int target,int verb,int stat,aw_mwcell_t value){
     aw_mwcell_t out;edict_t *e;aw_actor_t *a=actor_of(instance,target,&e);aw_fighter_t *f;
-    int whole=stat>=AWA_LEVEL && verb!=AWV_RATIO;float v;
+    int whole=stat>=AWA_LEVEL && verb!=AWV_RATIO,was_dead;float v,before;
     out.i=0;actor_calls++;
     if(!a){actor_misses++;return out;}
     f=fighter_of(e);from_fighter(a,f);
@@ -1431,11 +1443,12 @@ static aw_mwcell_t host_actor(int instance,int target,int verb,int stat,aw_mwcel
     if(dagoth_ur_1==-2)dagoth_ur_1=AW_ActorFind("dagoth_ur_1");
     if(target>=0 && !e && a->base==(uint16_t)dagoth_ur_1)return out;
     v=whole?(float)value.i:value.f;
+    was_dead=(a->flags&AWL_DEAD)!=0;before=a->dyn_cur[0];
     if(verb==AWV_SET)AW_ActorSetStat(a,stat,v);
     else if(verb==AWV_MOD)AW_ActorModStat(a,stat,v);
     else AW_ActorModCurrent(a,stat,v);
     if(stat==AWA_DISPOSITION)disposition_keep(a);   /* slice 4: on the world change list */
-    if(a->dyn_cur[0]<=0 && a->dyn_base[0]>0 && !(a->flags&AWL_DEAD) && a->reference!=AW_ACTOR_PLAYER_REF)AW_ActorKill(a);
+    if(stat==AWA_HEALTH && a->reference!=AW_ACTOR_PLAYER_REF)script_death(a,e,was_dead,before);
     if(a->reference==AW_ACTOR_PLAYER_REF)player_store(a);
     to_fighter(a,f);
     return out;
@@ -4695,9 +4708,10 @@ static void status_counts(void){
     AW_MwscriptLedgerStatus();
     {const aw_actorstate_stats_t *a=AW_ActorStateStats();
      Con_Printf("actor record: %d actors, %lu bytes kept; calls %lu (%lu with no actor), records made %lu, changed %lu, "
-                "dropped %lu, full %lu, disk reads %lu; combat started %lu stopped %lu; wanders %lu\n",AW_ActorCount(),
+                "dropped %lu, full %lu, disk reads %lu; combat started %lu stopped %lu; wanders %lu; killed by a script's "
+                "health %lu\n",AW_ActorCount(),
                 AW_ActorStateResident(),actor_calls,actor_misses,a->created,a->changed,a->evicted,a->full,a->reads,
-                combat_starts,combat_stops,wanders);}
+                combat_starts,combat_stops,wanders,script_deaths);}
     Con_Printf("player standing: crime level %d, reputation %d; calls %lu (%lu not carried out)%s; PlayGroup %lu "
                "(%lu with no skeletal actor or group); topics added %lu (of %d, %d bytes kept); cures cast %lu; spell effects "
                "landed %lu, active %d, refused %lu; ForceGreeting %lu (%lu not possible); Rotate %lu (%lu with no entity); AITravel %lu (%lu not possible); AIFollow %lu (%lu not possible); Position %lu (%lu not possible)\n",

@@ -242,11 +242,19 @@ int AW_MwvmVoice(int k,unsigned char hash[8],int *centis){
     return r[0]|r[1]|r[2]|r[3]|r[4]|r[5]|r[6]|r[7]?1:0;
 }
 int AW_MwvmMusic(int k){return ON && k>=0 && k<vm.nmusi && (vm.musi[4*k+1]&1)?vm.musi[4*k]:-1;}
-uint32_t AW_MwvmObjectReference(int k){return ON && k>=0 && k<vm.nobjs?u32(vm.objs+12*k):0;}
+/* The OBJS row, 12 bytes (tools/mwscript/awms.py): u32 reference (0: not placed once), u16 id (a string index), u16
+ * script (AWM_NONE none), u16 placed, u16 flags (1: the id names a script, its global instance). Every reader of the
+ * row goes through these four (MWSCRIPT-MEMBER-READS-ID-AS-SCRIPT-66: member() read the script at the id's offset). */
+#define OBJ_ROW(k) (vm.objs+12*(k))
+static uint32_t obj_reference(int k){return u32(OBJ_ROW(k));}
+static int obj_id(int k){return (int)U16(OBJ_ROW(k)+4);}
+static int obj_script(int k){return (int)U16(OBJ_ROW(k)+6);}
+static int obj_flags(int k){return (int)U16(OBJ_ROW(k)+10);}
+uint32_t AW_MwvmObjectReference(int k){return ON && k>=0 && k<vm.nobjs?obj_reference(k):0;}
 /* WORLD-BUTTONS-62 round two: the OBJS row's id (a string index) and the object's own script (AWM_NONE none) */
 int AW_MwvmObjectCount(void){return ON?vm.nobjs:0;}
-int AW_MwvmObjectId(int k){return ON && k>=0 && k<vm.nobjs?(int)U16(vm.objs+12*k+4):-1;}
-int AW_MwvmObjectScript(int k){return ON && k>=0 && k<vm.nobjs?(int)U16(vm.objs+12*k+6):AWM_NONE;}
+int AW_MwvmObjectId(int k){return ON && k>=0 && k<vm.nobjs?obj_id(k):-1;}
+int AW_MwvmObjectScript(int k){return ON && k>=0 && k<vm.nobjs?obj_script(k):AWM_NONE;}
 int AW_MwvmTopicName(int k){return ON && k>=0 && k<vm.njrnl?(int)U16(vm.jrnl+2*k):-1;}
 int AW_MwvmTopicCount(void){return ON?vm.njrnl:0;}
 int AW_MwvmObjectActor(int k){return ON && vm.oact && k>=0 && k<vm.noact?(int)U16(vm.oact+2*k):AWM_NONE;}
@@ -627,11 +635,12 @@ int AW_MwvmGlobalScriptLocal(int script,int slot,uint32_t bits){
     vm.cells[vm.inst[k].locals+slot].i=(int32_t)bits;
     return 1;
 }
-/* The cells of object OBJECT's locals (an attached object, a parked one, or a script's global instance). */
+/* The cells of object OBJECT's locals (an attached object, a parked one, or a script's global instance). OBJECT is
+ * an OBJS row the load check passed (check_code: GETM, SETM and SETMS name rows below the count). */
 static aw_mwcell_t *member(int object,int slot,int create){
-    const unsigned char *r=vm.objs+12*object;uint32_t ref=u32(r);int script=(int)U16(r+4),k;parked_t *p;
+    uint32_t ref=obj_reference(object);int script=obj_script(object),k;parked_t *p;
     if(script==AWM_NONE || script>=vm.nscrp || slot>=nlocals(script))return NULL;
-    if(U16(r+10)&1){
+    if(obj_flags(object)&1){
         k=global_instance(script,create);
         return k>=0?&vm.cells[vm.inst[k].locals+slot]:NULL;
     }

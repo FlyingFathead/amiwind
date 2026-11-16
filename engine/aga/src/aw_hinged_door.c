@@ -669,6 +669,16 @@ void AW_HingedDoorRecentre(const float *d){
     int i,k;
     for(i=0;i<placed_count;i++)if(!placed[i].edict)for(k=0;k<2;k++)placed[i].origin[k]-=d[k];
 }
+/* WANDER-DOOR-RULE-66 (aw_hinged_door.h): the doors a resident may stand in front of; no search */
+int AW_HingedDoorCount(void){return sv.active?placed_count:0;}
+int AW_HingedDoorShut(int i,float origin[3],unsigned *reference){
+    const hd_door_t *d;
+    if(i<0 || i>=placed_count)return 0;
+    d=&placed[i];
+    if(d->dir || d->amount>0 || (d->edict && EDICT_NUM(d->edict)->free))return 0;
+    VectorCopy(d->origin,origin);*reference=d->ref;
+    return 1;
+}
 /* aw_hinged_door go [N] (test sessions, CELL-CHANGES-59 slice 2): the player 40 units in front of door N of the list
  * (on the side they stand), the eye 8 units above its origin, aimed at its middle; the side of the hinge the door's
  * leaf lies on is tried both ways (and the other face last); when none of them aims at it, the first spot is kept (for

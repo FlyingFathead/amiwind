@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.64-dev2 at 2026-11-10 11:48 +0200: MiniWind akulakhan-chamber (2026_11_10_v0.0.64-dev2_miniwind-akulakhan-chamber-try3_8b67157), FS-UAE 32 MB Fast: dbg tp heartchamber from Balmora fails: the room's models need about 18,130 KiB, the zone and banks give 14,787 KiB after growing, a store model cannot be loaded, the load returns to Balmora (twice). The heart and Dagoth Ur are therefore not seen.
 - Reported with v0.0.64-dev2 at 2026-11-10 12:13 +0200: Byte measurement of the room's 148 store models (18,579,456 bytes): planes 42.4 %, visibility 17.9 %, clipnodes 13.8 %, surfaces 9.3 %, texinfo 7.4 %, vertices and edges 3.2 %; textures 210,688 bytes. Cutting triangles moves little; the shortfall in the sandbox is the town cache held across the map change (ROOM-LOAD-KEEPS-EXTERIOR-CACHE-64).
+- Reported with v0.0.66-dev10 at 2026-11-16 09:47 +0200: Checked in play (the endgame session ENDGAME-HEART-SESSION-66, run1 on the v0.0.66-dev10 image): the default room type loads at 32 MB Fast from Seyda Neen, 41 s, 1,943 KiB free inside (largest block 1,402 KiB).
 
 <!-- END GENERATED PERSISTING -->
 

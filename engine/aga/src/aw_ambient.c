@@ -14,8 +14,11 @@
  * reference's compiled routes (find_actor). Creatures this module moves also check aggro on sight (aggro below).
  * Memory: only the first key of every 32 rows and the idle profiles stay resident; a lookup reads one block of rows.
  * Flyers (v0.0.57) fly straight to their destinations off the ground (fly below).
- * Not done (said in docs/NPC_PATHFINDING.md): door proximity, occupied destinations, swimmers (stand), the
- * package is not saved (an actor starts again from its spawn), packages other than Wander.
+ * Doors (v0.0.66, WANDER-DOOR-RULE-66; door_ahead below): every 1.5 s of an idle, a wanderer on its routes that faces a
+ * door within 1.6 x the activation distance walks on; a walker stuck with a door ahead within the activation distance
+ * drops its destination and those its route passes, and walks to another.
+ * Not done (said in docs/NPC_PATHFINDING.md): occupied destinations, the package is not saved (an actor starts again
+ * from its spawn), packages other than Wander.
  */
 #include <string.h>
 #include "aw_ambient.h"
@@ -160,11 +163,40 @@ void AW_AmbientAllow(aw_ambient_pkg_t *p,unsigned distance) {
     p->manual=(unsigned char)(distance>0 && p->count<2);
 }
 int AW_AmbientPickDestination(const aw_ambient_pkg_t *p,unsigned roll) {
-    int i,k;
-    if(p->count<2)return -1;
-    k=(int)(roll%(unsigned)(p->count-1));
+    /* the allowed destinations other than cur (WANDER-DOOR-RULE-66: cur itself may have been dropped) */
+    int i,k,n=p->count-(p->count && p->cur<p->destinations && allowed(p,p->cur));
+    if(n<1)return -1;
+    k=(int)(roll%(unsigned)n);
     for(i=0;i<p->destinations;i++)if(allowed(p,i) && i!=p->cur && k--==0)return i;
     return -1;
+}
+/* ---- WANDER-DOOR-RULE-66: the doors (rules from OpenMW 0.51 apps/openmw/mwmechanics/obstacle.cpp getNearbyDoor and
+ * aiwander.cpp onIdleStatePerFrameActions, evadeObstacles, trimAllowedPositions, setPathToAnAllowedPosition; our own
+ * code) ---- */
+void AW_AmbientForward(float sin_yaw,float cos_yaw,float forward[2]) {
+    forward[0]=-sin_yaw;forward[1]=cos_yaw;     /* a converted character faces its local +Y: yaw + 90 degrees */
+}
+int AW_AmbientDoorAhead(const float at[2],const float forward[2],const float door[2],float distance) {
+    float dx=door[0]-at[0],dy=door[1]-at[1],d2=dx*dx+dy*dy,along=dx*forward[0]+dy*forward[1];
+    if(!(d2>0) || d2>distance*distance)return 0;   /* on the actor's own spot (OpenMW: no direction), or too far */
+    return along>0 && 4*along*along>=d2;          /* no more than 60 degrees off: the cosine at least 0.5 */
+}
+int AW_AmbientIdleCheck(const aw_ambient_pkg_t *p) {return p->distance && !p->manual;}
+int AW_AmbientTrimRoute(aw_ambient_pkg_t *p,int at,int goal) {
+    int i,n=0,step,others=0;
+    if(at<0 || at>=p->points || goal<0 || goal>=p->destinations)return 0;
+    /* the allowed destinations the route passes after AT and before GOAL (OpenMW keeps the remaining path's first
+     * point, the waypoint walked to) */
+    for(i=at,step=0;i!=goal && step<p->points;step++){
+        if((i=AW_AmbientHop(p,i,goal))<0)break;
+        if(i!=goal && i<p->destinations && allowed(p,i)){p->allowed[i>>3]&=(unsigned char)~(1u<<(i&7));n++;}
+    }
+    /* the goal itself while at least three others stay (OpenMW puts it back after the next pick otherwise) */
+    for(i=0;i<p->destinations;i++)if(i!=goal && allowed(p,i))others++;
+    if(others>=3 && allowed(p,goal)){p->allowed[goal>>3]&=(unsigned char)~(1u<<(goal&7));n++;}
+    p->count=(unsigned char)(others+allowed(p,goal));
+    p->manual=(unsigned char)(p->distance>0 && p->count<2);   /* fewer than two left: near its start, as OpenMW */
+    return n;
 }
 int AW_AmbientHop(const aw_ambient_pkg_t *p,int from,int goal) {
     int h;
@@ -238,6 +270,8 @@ int AW_AmbientEscortStep(long place,long room,float target2,float dest2,float hu
 #include "aw_spike.h"
 #include "aw_crime.h"
 #include "aw_actorstate.h"
+#include "aw_inventory.h"   /* AW_ActivateDistance, AW_PlacedDoors (WANDER-DOOR-RULE-66) */
+#include "aw_hinged_door.h" /* AW_HingedDoorShut (WANDER-DOOR-RULE-66) */
 int AW_AreaPlaceKeys(unsigned long *keys,int max,unsigned long *generation);   /* aw_inventory.c */
 
 #define SLOTS 128
@@ -337,7 +371,8 @@ static unsigned long rng=1;
 static float scan_at;
 static struct {unsigned long thinks,steps,traces,walks,idles,bad_idles,registered,unknown,no_walk,blob_bytes,manual,stuck,
                levelled,aggro_checks,aggro_engaged,aggro_full,flights,dry,travels,travels_done,follows,follows_done,
-               unsticks,unstick_tests,settles,settled,escorts,crossed,standing;double seconds,worst,elapsed;} st;
+               unsticks,unstick_tests,settles,settled,escorts,crossed,standing,
+               door_checks,door_tests,door_found,door_idles,door_stuck,door_dropped;double seconds,worst,elapsed;} st;
 /* sv_phys.c SV_CheckStuck: every search for a clear spot (a box that starts in solid), its position tests, and the
  * searches that found none (AMBIENT-UNSTUCK-FLOOD-61) */
 extern unsigned long aw_stuck_searches,aw_stuck_tests,aw_stuck_failed;
@@ -877,6 +912,52 @@ static void rejoin(slot_t *s) {
     if(near<0 || goal<0 || !s->can_walk)return;
     s->goal=(unsigned char)goal;s->at=(short)near;s->pkg.cur=(unsigned char)goal;begin_walk(s);
 }
+/* ---- WANDER-DOOR-RULE-66: doors (rules from OpenMW 0.51 apps/openmw/mwmechanics/obstacle.cpp proximityToDoor /
+ * getNearbyDoor and aiwander.cpp, our own code; the pure decisions are AW_AmbientDoorAhead, AW_AmbientIdleCheck and
+ * AW_AmbientTrimRoute above) ----
+ * The doors a resident can stand in front of: the place's load doors at their references' positions (aw_inventory.c
+ * AW_PlacedDoors: the focus table's door rows of the room, or of the 3 x 3 exterior cells around the player, which hold
+ * every actor this module runs) and the map's hinged doors that stand shut and still (aw_hinged_door.c
+ * AW_HingedDoorShut); a disabled door never counts (OpenMW: not enabled or deleted). One pass over them a check, the
+ * first door ahead ends it (as OpenMW's visitor). OpenMW asks the doors of the actor's own cell only; outdoors this
+ * asks the 3 x 3 cells, so a door just across a cell border counts too.
+ * "chim actors ambient doors on|off" (default on, id1/default-game.cfg; no cvar of its own: the resident registry
+ * budget; not saved): off = no door rule, the behaviour before v0.0.66. */
+#define DOOR_IDLE_SCALE 1.6f    /* aiwander.cpp: an idle wanderer, 1.6 x getMaxActivationDistance (iMaxActivateDist) */
+static int doors_on=1;
+static int door_ahead(slot_t *s,float distance) {
+    float at[2],forward[2],door[2],shift[3],origin[3],sy,cy;const float *p;unsigned ref;int i,n;
+    if(!doors_on)return 0;
+    st.door_checks++;
+    Q_SinCosDeg(s->e->v.angles[1],&sy,&cy);      /* the table sine, never the C library's (ENGINE-FPU-UNIMPL-31) */
+    AW_AmbientForward(sy,cy,forward);
+    at[0]=s->e->v.origin[0];at[1]=s->e->v.origin[1];
+    n=AW_PlacedDoors(shift);
+    for(i=0;i<n;i++){
+        if(!(p=AW_PlacedDoorAt(i,&ref)))continue;
+        door[0]=p[0]+shift[0];door[1]=p[1]+shift[1];st.door_tests++;
+        if(AW_AmbientDoorAhead(at,forward,door,distance) && !AW_ObjectDisabled(ref)){st.door_found++;return 1;}
+    }
+    n=AW_HingedDoorCount();
+    for(i=0;i<n;i++){
+        if(!AW_HingedDoorShut(i,origin,&ref))continue;
+        door[0]=origin[0];door[1]=origin[1];st.door_tests++;
+        if(AW_AmbientDoorAhead(at,forward,door,distance) && !AW_ObjectDisabled(ref)){st.door_found++;return 1;}
+    }
+    return 0;
+}
+/* aiwander.cpp evadeObstacles: a Wander walker on its routes that is stuck (OpenMW: it has to evade) with a door ahead
+ * within the activation distance drops its destination and the allowed ones its route passes after the waypoint it
+ * walks to (AW_AmbientTrimRoute; never given back while the package runs, as in OpenMW) and walks to another at once.
+ * A travel, a follow or an escort, or a walk to a spot near the start, ends as before. 1 when it took this way. */
+static int stuck_by_door(slot_t *s) {
+    int at=s->at,goal=s->goal;
+    if(s->travel || s->manual_walk || at<0 || !door_ahead(s,AW_ActivateDistance()))return 0;
+    stop_walk(s);s->state=S_CHOOSE;
+    st.door_dropped+=(unsigned long)AW_AmbientTrimRoute(&s->pkg,at,goal);st.door_stuck++;
+    if(!s->pkg.manual)rejoin(s);
+    return 1;
+}
 /* "chim actors ambient steplog on": one console line per failed step, for the collision owner: where the actor
  * stood, where it stepped, and what the standing hull's sweep met (the brush model or entity, the plane normal) or,
  * when the sweep was free, that the floor or step height refused it (aw_walk.c support / step_height_ok). */
@@ -957,7 +1038,8 @@ static void walk(slot_t *s,float dt) {
         s->e->v.angles[1]=heading*360.0f/AW_PATH_FAN-90;s->e->v.angles[0]=s->e->v.angles[2]=0;
         t3[0]=target[0];t3[1]=target[1];t3[2]=tz;
         if(fly(s,t3,speed*dt)){s->stuck=0;st.steps++;st.flights++;walk_frames(s,speed,dt);}
-        else{st.stuck++;if(s->travel==1){travel_end(s);return;}stop_walk(s);s->state=S_CHOOSE;}   /* getCountBeforeReset: 1 for a flyer */
+        else{st.stuck++;if(s->travel==1){travel_end(s);return;}
+            if(!stuck_by_door(s)){stop_walk(s);s->state=S_CHOOSE;}}   /* getCountBeforeReset: 1 for a flyer */
         return;
     }
     dx=target[0]-s->e->v.origin[0];dy=target[1]-s->e->v.origin[1];len=(float)AW_PathLength((int)dx,(int)dy);
@@ -995,7 +1077,8 @@ static void walk(slot_t *s,float dt) {
     }
     else{
         if(steplog)log_failed_step(s,move);
-        if(++s->stuck>=STUCK_STEPS){st.stuck++;if(s->travel==1){travel_end(s);}else{stop_walk(s);s->state=S_CHOOSE;}}   /* countBeforeReset */
+        /* countBeforeReset; a Wander walker with a door ahead takes another destination (WANDER-DOOR-RULE-66) */
+        if(++s->stuck>=STUCK_STEPS){st.stuck++;if(s->travel==1){travel_end(s);}else if(!stuck_by_door(s)){stop_walk(s);s->state=S_CHOOSE;}}
         else walk_frames(s,0,dt);
     }
     st.traces+=aw_sv_move_calls-before;
@@ -1043,8 +1126,15 @@ static void think(slot_t *s,float dt) {
         e->v.frame=(float)(s->skel_first+(int)(s->t*s->skel_rate));
         if((int)(s->t*s->skel_rate)>=s->skel_count){e->v.frame=(float)s->skel_first;set_field(e,"aw_moving",0);s->state=S_CHOOSE;}
         else if(sv.time>=s->check_at){
+            /* aiwander.cpp onIdleStatePerFrameActions: a wanderer on its routes that faces a door within 1.6 x the
+             * activation distance (WANDER-DOOR-RULE-66), or is far from every allowed destination, walks on */
+            int door=0;
             s->check_at=(float)sv.time+IDLE_CHECK;
-            if(s->pkg.distance && !s->pkg.manual && !near_allowed(s)){set_field(e,"aw_moving",0);rejoin(s);}
+            if(AW_AmbientIdleCheck(&s->pkg) &&
+               ((door=door_ahead(s,DOOR_IDLE_SCALE*AW_ActivateDistance())) || !near_allowed(s))){
+                if(door)st.door_idles++;
+                set_field(e,"aw_moving",0);rejoin(s);
+            }
         }
         break;
     case S_WALK:AW_SPIKE_STAGE(AW_SP_AMBWALK,walk(s,dt));break;
@@ -1456,6 +1546,11 @@ static void status(void) {
                 "settled %lu of %lu (settle %s), %lu position tests; every body %lu (%lu tests, %lu found no "
                 "clear spot)\n",secs,st.unsticks,st.unsticks/secs,st.settled,st.settles,settle_on?"on":"off",
                 st.unstick_tests,aw_stuck_searches-stuck_base,aw_stuck_tests-stuck_tests_base,aw_stuck_failed-stuck_failed_base);}
+    {float shift[3];
+     Con_Printf("  doors (%s, WANDER-DOOR-RULE-66): %d load doors and %d hinged doors here; %lu checks over %lu doors, %lu "
+                "with a door ahead; %lu idle residents sent on, %lu stuck walkers to another destination (%lu "
+                "destinations dropped)\n",doors_on?"on":"off",AW_PlacedDoors(shift),AW_HingedDoorCount(),st.door_checks,
+                st.door_tests,st.door_found,st.door_idles,st.door_stuck,st.door_dropped);}
     Con_Printf("  script packages: travels %lu (%lu done), follows %lu, escorts %lu (%lu follows and escorts done); "
                "followers through a door with the player %lu\n",st.travels,st.travels_done,st.follows,st.escorts,
                st.follows_done,st.crossed);
@@ -1496,6 +1591,13 @@ void AW_AmbientCommand(void) {
         Con_Printf("Ambient: drop %s (default on, not saved): %s\n",drop_on?"ON":"OFF",drop_on?
                    "a walking creature without a baked ground point is put on what is under it (up to a cell, OpenMW)":
                    "the old way: every actor snaps at most 32 units down onto the ground");
+    }
+    else if(!strcmp(a,"doors") && Cmd_Argc()>4){
+        doors_on=!strcmp(Cmd_Argv(4),"on");
+        Con_Printf("Ambient: doors %s (default on, not saved): %s\n",doors_on?"ON":"OFF",doors_on?
+                   "an idle wanderer facing a door within 1.6 x the activation distance walks on, and a walker stuck "
+                   "by a door takes another destination (OpenMW's door rule)":
+                   "the old way: no door rule, a wanderer can stand in front of a door");
     }
     else if(!strcmp(a,"settle") && Cmd_Argc()>4){
         settle_on=!strcmp(Cmd_Argv(4),"on");

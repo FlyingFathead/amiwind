@@ -1,6 +1,6 @@
 # MWScript compiled by the builder
 
-_Last updated with AmiWind v0.0.66-dev3 (15 November 2026)._
+_Last updated with AmiWind v0.0.66-dev10 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -262,7 +262,7 @@ on disk.
 | SNDS | 18 | pool name (8 bytes), length, volume, mapped, near and far hearing distance, name | 1,476 |
 | VOIC | 12 | pool name, length, path | 1,584 |
 | MUSI | 4 | soundtrack track number, mapped, path | 4 |
-| OBJS | 12 | reference (if placed once), id, script, placed count, kind | 1,992 |
+| OBJS | 12 | u32 reference (if placed once), u16 id, u16 script, u16 placed count, u16 kind (1: the id names a script, its global instance); the engine reads the row through one set of readers, and a script's read or write of another object's variable finds that object's script there (up to v0.0.66-dev10 it took the id for the script, so every such read gave 0 and every write was lost) | 1,992 |
 | SCRP | 16 | name, locals, stack, flags, code offset and length | 19,312 |
 | STRT | 2 | start scripts | 8 |
 | NEWG | 2 | the scripts a new game starts once (v0.0.62): Main's new-game block, [below](#which-objects-run-scripts) | 6 |
@@ -477,7 +477,7 @@ thing is built as a general mechanism, by a rule on the data, not by name:
   gravity (8.96 m/s squared, 627 game units/s squared) in steps of 1/60 s, every drop counted as the fall height, until
   its hull meets the ground or water. The fall starts only when something collidable is under it (the streamed ground
   may not be ready yet). The landing costs the fall damage of the next section, taken from the actor record's health
-  with the game's Health Damage sound; at 0 it dies as by a blow, so `OnDeath` reads 1 (the journal's script stops) and
+  with the game's Health Damage sound; under 1 health it dies as by a blow, so `OnDeath` reads 1 (the journal's script stops) and
   the body lies where it landed and can be searched. `aw_mwscript_status` shows the rows, the actors tracked and their
   state (held, waiting for ground, falling, landed), the falls and the last fall's height and loss.
 

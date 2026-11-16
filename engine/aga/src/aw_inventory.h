@@ -322,6 +322,13 @@ int AW_PlacedBook(unsigned reference,char *id,int *owned);
 int AW_PlacedTake(unsigned reference);
 /* aw_placed aim (PLACED-PIT-AXE-NO-FOCUS-61): the focus rows near the eye and what the aim test makes of each. */
 void AW_PlacedAimReport(void);
+/* WANDER-DOOR-RULE-66 (the residents' door rule, aw_ambient.c): the load doors of the place the focus table holds (the
+ * room, or the 3 x 3 exterior cells around the player), at their references' positions as the original places them.
+ * AW_PlacedDoors: how many (0 while the table is not this map's) and in SHIFT what to add to each position (a room's
+ * shift; 0 outdoors); AW_PlacedDoorAt: door I's position (this map's units, before SHIFT) and its reference, NULL when
+ * I is out of range. A list of indices kept with the rows, so a check passes over the doors alone. */
+int AW_PlacedDoors(float shift[3]);
+const float *AW_PlacedDoorAt(int i,unsigned *reference);
 /* WORLD-OBJECT-PLACEMENT-59: the placed item list (progs/items/placed.awp) is read with the focus rows; each row the
  * map does not draw itself is offered to aw_placed_admit (aw_placed.c: returns its drawn index + 1, 0 when it is not
  * drawn); aw_placed_begin forgets the drawn set and returns 0 when nothing is to be drawn. NULL: nothing is. */

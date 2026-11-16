@@ -117,9 +117,11 @@ class Census(unittest.TestCase):
         special = host[host.index('static int console_special('):host.index('static int console_table(')]
         self.assertIn('if(in && object_intercept(in->reference)){', special)
         vm = (SRC / 'aw_mwvm.c').read_text(encoding='utf-8')
-        self.assertIn('int AW_MwvmObjectId(int k){return ON && k>=0 && k<vm.nobjs?(int)U16(vm.objs+12*k+4):-1;}', vm)
-        self.assertIn('int AW_MwvmObjectScript(int k){return ON && k>=0 && k<vm.nobjs?(int)U16(vm.objs+12*k+6):AWM_NONE;}',
-                      vm)
+        # the one set of OBJS row readers (MWSCRIPT-MEMBER-READS-ID-AS-SCRIPT-66): the id at byte 4, the script at 6
+        self.assertIn('static int obj_id(int k){return (int)U16(OBJ_ROW(k)+4);}', vm)
+        self.assertIn('static int obj_script(int k){return (int)U16(OBJ_ROW(k)+6);}', vm)
+        self.assertIn('int AW_MwvmObjectId(int k){return ON && k>=0 && k<vm.nobjs?obj_id(k):-1;}', vm)
+        self.assertIn('int AW_MwvmObjectScript(int k){return ON && k>=0 && k<vm.nobjs?obj_script(k):AWM_NONE;}', vm)
         # the OBJS row the builder writes: reference, id string, own script (tools/mwscript/awms.py)
         self.assertIn("struct.pack('>IHHHH', r['reference'], r['id_string'],",
                       (ROOT / 'tools/mwscript/awms.py').read_text(encoding='utf-8'))

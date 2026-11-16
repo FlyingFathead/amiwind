@@ -1,6 +1,6 @@
 # NPC pathfinding: how NPCs find their way
 
-_Last updated with AmiWind v0.0.66-dev9 (15 November 2026)._
+_Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -455,12 +455,44 @@ Since v0.0.66 the search leaves other bodies out, and two bodies that overlap wa
 do: a resident standing inside the player (or the player inside it) is not stuck and its steps away are taken
 ([PLAYER_MOVEMENT.md, bodies that overlap](PLAYER_MOVEMENT.md#bodies-that-overlap-and-arriving-next-to-an-actor)).
 
-Not done yet (said so, not invented): doors in the way and occupied destinations (flyers and swimmers move since v0.0.57, below). For
-doors, OpenMW 0.51 (`aiwander.cpp`, `obstacle.cpp` `proximityToDoor`) checks an idle wanderer every 1.5 seconds and
-sends it walking when it faces a door within 1.6 times the activation distance, and a walker that has to evade
-next to a door drops that destination for another; here a wanderer can stop at a destination by a door, as the
-Seyda Neen guard (`128967`) did by the census office's street door (`WANDER-DOOR-RULE-66`; the player arriving inside
-him there is `DOOR-ARRIVAL-INSIDE-ACTOR-66`); the
+**Doors (v0.0.66, `WANDER-DOOR-RULE-66`).** Wanderers keep off doors as the original's do. The rules are
+OpenMW 0.51's (`apps/openmw/mwmechanics/aiwander.cpp` `onIdleStatePerFrameActions` and `evadeObstacles`,
+`obstacle.cpp` `proximityToDoor` / `getNearbyDoor`), our own code in `engine/aga/src/aw_ambient.c`:
+
+- **A door ahead** is a door within the given distance of the actor and no more than 60 degrees off the way it faces;
+  heights are left out, as the original flattens both points. A door that is opening, closing or standing open does not
+  count, nor does a disabled one. The doors are the place's load doors at their references' positions (the focus
+  table's door rows of the room, or of the 3 x 3 exterior cells around the player) and the map's ordinary hinged
+  doors. OpenMW asks only the doors of the actor's own cell; outdoors this asks the 3 x 3 cells, so a door just across
+  a cell border counts too.
+- **An idle wanderer** on its routes is checked every 1.5 seconds while it plays an idle (as before, the first check of
+  an idle comes at its first think when the last check is older). With a door ahead within 1.6 times the activation
+  distance (`iMaxActivateDist` 192, so 307 original units, 77 map units), or far from every allowed destination as
+  before, it walks on to another destination at once. A resident with wander distance 0 stands as before, and one
+  that only walks now and then to a spot near its start goes back to its roll, as in OpenMW.
+- **A walker on its routes that gets stuck** (ten failed steps; one for a flyer) with a door ahead within the activation
+  distance (192 original units, 48 map units) drops its destination and the allowed destinations its route still
+  passes after the waypoint it walks to, and walks to another destination at once. The destination itself stays while
+  fewer than three others would be left, and with fewer than two left the package wanders near its start, as in
+  OpenMW. Dropped destinations stay dropped while the package runs (OpenMW does not give them back either). Travel,
+  follow and escort packages end a stuck walk as before.
+- **The switch:** `chim actors ambient doors on` is the default (written into `id1/default-game.cfg`); `chim actors
+  ambient doors off` gives the old behaviour back (no door rule). No console variable of its own. `chim actors
+  ambient` prints the doors of the place, the checks and doors tested, and how many idle residents were sent on and
+  stuck walkers rerouted.
+- **Cost:** one pass over the place's doors per check, no file read, no search. Counted from the v0.0.66-dev10 build's
+  tables (not measured in game): outdoors the largest 3 x 3 window holds 100 load doors (around Vivec), Seyda Neen's
+  23, the median window 5; a room at most 19 load doors, the median one; outdoors at most 4 hinged doors in one cell.
+  Memory: a list of the place's load door rows (512 bytes) and six counters; no bytes per resident.
+
+Seen before the rule: the Seyda Neen guard (`128967`) stopped by the street door of the Census and Excise Office
+(`113833`), and the player arriving through that door came out inside him (`DOOR-ARRIVAL-INSIDE-ACTOR-66`); in the
+v0.0.66-dev10 opening journey Fargoth (`fargoth`, reference 128964) stood by the same door, 55 map units from its
+reference, and 12 of the journey's 13 aims at the door went to him. Fixed in source, to be confirmed in play. Kept by
+`tests/aga_ambient_test.c` (a door ahead, the idle check, a stuck walker's dropped destinations) and
+`tests/test_ambient_lut.py`.
+
+Not done yet (said so, not invented): occupied destinations (flyers and swimmers move since v0.0.57, below); the
 time of day is kept but unused (OpenMW reads it nowhere either); a package set by a script keeps the spawn position
 as its start; the walk speed is the actor record's Speed attribute (50 only for an actor without a record); baked models
 without an Idle2..Idle9 group only walk; packages other than Wander; the package is not saved.

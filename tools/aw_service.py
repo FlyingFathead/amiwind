@@ -31,6 +31,7 @@ no paths of its own.
 """
 import argparse
 import datetime
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -967,13 +968,125 @@ def keep_check_output(path, text, notes):
         return None
 
 
-def preflight_check(request, commands, runner, notes, reuse_info, full_log=None):
+# --------------------------------------------------------------------------
+# One check per build (BUILD-CHECK-ONE-CORE-66): the starter's check of a build (a check-only request) and the build
+# request's own check minutes later ran the same command on the same commit, earlier build and flags, about six minutes
+# each. A check that passed is kept beside its whole output (RUN.check.json beside RUN.check.log) under a key of exactly
+# what it checks; the next request with the same key takes it instead of running it again. Anything different runs
+# the check again. The build itself still plans every stage at its start (build.py), so a change in between (a unit
+# baked by another build) stops the build in its first minute, never later.
+
+CHECK_RECORD_SCHEMA = 'aw-check-1'
+CHECK_REUSE_MINUTES = 30   # config build.check_reuse_minutes: how old a kept check may be (0 = every request runs it)
+# the environment values of the check command that never change what the check finds: who asked (the request id the
+# stair-walk records carry); check_key also leaves out the check container's cores (its pools give the same answer on
+# any number of cores)
+CHECK_KEY_FREE_ENV = ('AMIWIND_AW_REQUEST',)
+
+
+def check_key(request, commands, commit, runs=()):
+    """(digest, parts) of a build check: the commit, the earlier build (reuse_from), the build flags, the check command
+    itself (image, mounts, source, every builder option; the request id and the container's cores left out) and the
+    runs in the workspace (the earlier builds --reuse-all-available plans from)."""
+    command = [str(part) for part in commands['check']]
+    cores = True
+    for at in range(1, len(command)):
+        if command[at - 1] == '-e' and command[at].split('=', 1)[0] in CHECK_KEY_FREE_ENV:
+            command[at] = command[at].split('=', 1)[0] + '=*'
+        elif command[at - 1] == '--cpus' and cores:
+            command[at], cores = '*', False   # docker's own --cpus, before the image (the builder has no --cpus)
+    parts = {'commit': str(commit), 'reuse_from': (request.get('options') or {}).get('reuse_from'),
+             'flags': [str(flag) for flag in commands.get('flags') or []], 'check': command,
+             'runs': json_sha256(sorted(str(run) for run in runs)),
+             # the builder settings of this process's environment (aw run where its caller sets them): a launcher
+             # that adds settings to the check and build containers itself must hand them to aw too, or they are
+             # no part of the key (the build's own first minute still plans with them)
+             'environment': {name: value for name, value in sorted(os.environ.items())
+                             if name.startswith('AMIWIND_') and not name.startswith('AMIWIND_AW_')}}
+    return json_sha256(parts), parts
+
+
+def json_sha256(value):
+    return hashlib.sha256(json.dumps(value, sort_keys=True).encode('utf-8')).hexdigest()
+
+
+def check_record_path(full_log):
+    """RUN.check.json beside RUN.check.log (None without a log path)."""
+    if full_log is None:
+        return None
+    full_log = Path(full_log)
+    stem = full_log.name[:-len('.log')] if full_log.name.endswith('.log') else full_log.name
+    return full_log.with_name(stem + '.json')
+
+
+def taken_check(path, key, parts, minutes, now=None):
+    """(record, why not): the kept check at PATH when its key is KEY, it passed and it is at most MINUTES old; else
+    (None, the reason it runs again, or None when nothing was kept)."""
+    if path is None or not minutes:
+        return None, None
+    try:
+        record = json.loads(Path(path).read_text(encoding='utf-8'))
+    except FileNotFoundError:
+        return None, None
+    except (OSError, ValueError) as exc:
+        return None, f'the kept check {path} is unreadable ({type(exc).__name__})'
+    if not isinstance(record, dict) or record.get('schema') != CHECK_RECORD_SCHEMA:
+        return None, f'the kept check {path} is not an {CHECK_RECORD_SCHEMA} record'
+    if record.get('key') != key:
+        old = record.get('parts') or {}
+        differ = [name for name in parts if old.get(name) != parts[name]] or ['the key']
+        return None, 'the kept check was for another ' + ', '.join(differ)
+    age = (time.time() if now is None else now) - float(record.get('saved_epoch') or 0)
+    if age < 0 or age > minutes * 60:
+        return None, f'the kept check is {age / 60:.0f} min old (at most {minutes} min)'
+    if record.get('exit') != 0 or not record.get('completed'):
+        return None, 'the kept check did not pass'
+    return dict(record, age_s=round(age, 1)), None
+
+
+def keep_check_record(path, key, parts, request, code, out, err, completed):
+    """The check's verdict and whole output under its key, for the next request (written only when it passed); never
+    raises."""
+    if path is None or code != 0 or not completed:
+        return None
+    record = {'schema': CHECK_RECORD_SCHEMA, 'key': key, 'parts': parts, 'request': request.get('id'),
+              'requester': request.get('requester'), 'saved': aw.stamp(), 'saved_epoch': time.time(), 'exit': code,
+              'completed': bool(completed), 'stdout': out or '', 'stderr': err or ''}
+    try:
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        partial = path.with_name(f'{path.name}.{os.getpid()}.part')
+        partial.write_text(json.dumps(record, sort_keys=True), encoding='utf-8', newline='\n')
+        os.replace(partial, path)
+        return str(path)
+    except OSError as exc:
+        print(f'aw submit: the check was not kept for the next request ({type(exc).__name__}: {exc})', flush=True)
+        return None
+
+
+def preflight_check(request, commands, runner, notes, reuse_info, full_log=None, reuse=None):
     """The builder's own developer-mode check of this exact build (the build command + --check: same flags, same
     environment, so the same reuse preflight the build prints as "(f)"). Returns (step, refusals) and fills
-    REUSE_INFO with the reuse preflight numbers. FULL_LOG: where the check's whole output is kept (RUN.check.log)."""
-    code, out, err = runner.capture(commands['check'], timeout=1800)
+    REUSE_INFO with the reuse preflight numbers. FULL_LOG: where the check's whole output is kept (RUN.check.log).
+    REUSE {'key', 'parts', 'minutes'} (check_key): a passed check of the same key at most MINUTES old, kept beside
+    FULL_LOG (RUN.check.json), is taken instead of running it again, and a check that passes here is kept there."""
+    record_path = check_record_path(full_log) if reuse else None
+    taken, why = (taken_check(record_path, reuse['key'], reuse['parts'], reuse.get('minutes'))
+                  if reuse else (None, None))
+    if taken is not None:
+        code, out, err = taken['exit'], taken.get('stdout') or '', taken.get('stderr') or ''
+        text = (f'the check of request {taken.get("request")} ({taken.get("saved")}, {taken["age_s"]:.0f} s ago) '
+                'taken: the same commit, earlier build, flags, check command and runs in the workspace; not run again')
+        print('aw submit: ' + text, flush=True)
+        notes.append(text)
+    else:
+        if why:
+            print(f'aw submit: the check runs again: {why}', flush=True)
+            notes.append(f'the check runs again: {why}')
+        code, out, err = runner.capture(commands['check'], timeout=1800)
     kept = keep_check_output(full_log, (out or '') + ('\n' + err if err else ''), notes)
     found = parse_check((out or '') + '\n' + (err or ''))
+    raw_code = code
     refusals, problems = [], []
     # the resource plan (tools/resource_plan.py): its checklist into the result; WILL NOT FIT refuses here
     for line in found['resources']:
@@ -1027,6 +1140,16 @@ def preflight_check(request, commands, runner, notes, reuse_info, full_log=None)
     detail = (found['line'] or '')[4:] or ('checks completed' if found['completed'] else f'exit {code}')
     if kept:
         step['full_output'] = kept
+    if reuse:
+        step['check_key'] = reuse['key']
+    if reuse and taken is None and not refusals:
+        # only a check that passed is kept (a refused one runs again: the reuse source may be repaired in between)
+        keep_check_record(record_path, reuse['key'], reuse['parts'], request, raw_code, out, err, found['completed'])
+    if taken is not None:
+        # BUILD-CHECK-ONE-CORE-66: the result says which earlier check it stands on
+        step['taken_from'] = {'request': taken.get('request'), 'saved': taken.get('saved'), 'age_s': taken['age_s'],
+                              'record': str(record_path)}
+        detail = f'taken from the check of {taken.get("request")}: {detail}'
     return dict({'exit': code, 'ok': not refusals, 'detail': detail[:200]}, **step), refusals
 
 
@@ -1275,9 +1398,15 @@ def submit_build(config, request, dry_run, runner):
         steps['inputs'] = step
     if problems:
         return stop(problems)
-    # 3. the builder's own developer-mode check + reuse preflight (seconds) before the build (hours)
+    # 3. the builder's own developer-mode check + reuse preflight (seconds) before the build (hours); a passed check of
+    # the same commit, earlier build, flags, command and workspace runs is taken, not run again (BUILD-CHECK-ONE-CORE-66)
+    minutes = build_settings(config).get('check_reuse_minutes', CHECK_REUSE_MINUTES)
+    key, parts = check_key(request, commands, facts['full'], taken)
+    check_t0 = time.time()
     steps['check'], problems = preflight_check(request, commands, runner, notes, reuse_info,
-                                               full_log=logs_dir / f'{run_name}.check.log')
+                                               full_log=logs_dir / f'{run_name}.check.log',
+                                               reuse={'key': key, 'parts': parts, 'minutes': minutes})
+    steps['check']['seconds'] = round(time.time() - check_t0, 1)
     if problems:
         pages = [steps['check']['full_output']] if steps['check'].get('full_output') else []
         if steps['check'].get('output_tail') is not None:

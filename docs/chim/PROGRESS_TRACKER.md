@@ -1,6 +1,6 @@
 # CHIM Progress Tracker
 
-_Last updated with AmiWind v0.0.66-dev10 (15 November 2026)._
+_Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -43,7 +43,7 @@ _Last updated with AmiWind v0.0.66-dev10 (15 November 2026)._
 
 <!-- BEGIN GENERATED CURRENT STATE: from docs/chim/progress-state.json and docs/mwscript-features.json; run python3 tools/cell_progress_state.py render -->
 
-_Counted from the tracker data generated 2026-11-12: newest ingested build **v0.0.65-rc4 (51221ddb)**, built 2026-11-11; the version in development, 0.0.66-dev10, has no ingested build yet, so these are the figures of the newest ingested one. Every number below is read from that data and from the MWScript tracker when this block is rendered; none is typed by hand._
+_Counted from the tracker data generated 2026-11-12: newest ingested build **v0.0.65-rc4 (51221ddb)**, built 2026-11-11; the version in development, 0.0.66-dev11, has no ingested build yet, so these are the figures of the newest ingested one. Every number below is read from that data and from the MWScript tracker when this block is rendered; none is typed by hand._
 
 ### Exterior cells, per land
 
@@ -77,7 +77,7 @@ Rooms that are in the game as room maps of our own, not as CHIM rooms: Imperial 
 
 ### Scripting
 
-Counted from the MWScript tracker ([MWScript features](../MWSCRIPT_FEATURES.md)), measured 15 November 2026 for AmiWind v0.0.66-dev10 with the builder's own compiler: 620 of the 1,074 scripts the original game uses run as scripts or are carried by AmiWind's own code (611 run, 9 carried); 9,095 script records are bound to placed objects.
+Counted from the MWScript tracker ([MWScript features](../MWSCRIPT_FEATURES.md)), measured 16 November 2026 for AmiWind v0.0.66-dev11 with the builder's own compiler: 620 of the 1,074 scripts the original game uses run as scripts or are carried by AmiWind's own code (611 run, 9 carried); 9,095 script records are bound to placed objects.
 
 | State | Scripts |
 | :-- | --: |

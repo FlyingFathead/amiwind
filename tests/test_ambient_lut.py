@@ -435,6 +435,39 @@ class AmbientSourceContractTests(unittest.TestCase):
         self.assertIn('aw_combat_actor_died = Died;', a)
         self.assertIn('c->dead = 1;', a.split('static void Died (edict_t *e)')[1][:200])
 
+    def test_wanderers_keep_off_doors(self):
+        # WANDER-DOOR-RULE-66 (OpenMW 0.51 aiwander.cpp onIdleStatePerFrameActions and evadeObstacles, obstacle.cpp
+        # proximityToDoor): every 1.5 s of an idle a wanderer on its routes facing a door within 1.6 x the activation
+        # distance walks on; a stuck Wander walker with a door ahead within the activation distance drops its
+        # destination and those its route passes and walks to another. The doors: the place's load doors (the focus
+        # table's door rows) and the map's shut hinged doors, a disabled one never. On by default, off = the old way.
+        c = self.code('aw_ambient.c')
+        self.assertIn('static int doors_on=1;', c)
+        self.assertIn('#define DOOR_IDLE_SCALE 1.6f', c)
+        idle = c[c.index('case S_IDLE:'):c.index('case S_WALK:')]
+        self.assertIn('if(AW_AmbientIdleCheck(&s->pkg) &&', idle)
+        self.assertIn('((door=door_ahead(s,DOOR_IDLE_SCALE*AW_ActivateDistance())) || !near_allowed(s))', idle)
+        self.assertIn('rejoin(s);', idle)
+        walk = c[c.index('static void walk(slot_t *s,float dt)'):c.index('static void think(slot_t *s,float dt)')]
+        self.assertEqual(walk.count('if(!stuck_by_door(s)){stop_walk(s);s->state=S_CHOOSE;}'), 2)   # flyers and walkers
+        stuck = c[c.index('static int stuck_by_door(slot_t *s)'):c.index('static int steplog;')]
+        self.assertIn('if(s->travel || s->manual_walk || at<0 || !door_ahead(s,AW_ActivateDistance()))return 0;', stuck)
+        self.assertIn('AW_AmbientTrimRoute(&s->pkg,at,goal)', stuck)
+        ahead = c[c.index('static int door_ahead(slot_t *s,float distance)'):c.index('static int stuck_by_door(')]
+        self.assertIn('if(!doors_on)return 0;', ahead)
+        self.assertIn('n=AW_PlacedDoors(shift);', ahead)
+        self.assertIn('if(!AW_HingedDoorShut(i,origin,&ref))continue;', ahead)
+        self.assertEqual(ahead.count('if(AW_AmbientDoorAhead(at,forward,door,distance) && !AW_ObjectDisabled(ref))'), 2)
+        self.assertIn('!strcmp(a,"doors")', c)
+        import build_aga
+        self.assertIn(b'\nchim actors ambient doors on\n', build_aga.ACTOR_LOGIC_LINES)
+        inv = self.code('aw_inventory.c')
+        self.assertIn('focus_count=0;focus_outdoor=0;focus_boards=0;focus_door_count=0;', inv)
+        self.assertIn("if(row->kind=='D'){if(focus_door_count<FOCUS_DOORS)focus_doors[focus_door_count++]=(short)j;", inv)
+        self.assertIn('return focus_rows && sv.active && focus_world==sv.worldmodel?focus_door_count:0;', inv)
+        hinged = self.code('aw_hinged_door.c')
+        self.assertIn('if(d->dir || d->amount>0 || (d->edict && EDICT_NUM(d->edict)->free))return 0;', hinged)
+
     def test_no_search_at_run_time(self):
         c = self.code('aw_ambient.c')
         for word in ('aStar', 'dijkstra', 'heap', 'queue'):

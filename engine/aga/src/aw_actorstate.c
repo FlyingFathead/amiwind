@@ -442,13 +442,24 @@ void AW_ActorModStat(aw_actor_t *a,int stat,float value){
     changed(a);
 }
 void AW_ActorModCurrent(aw_actor_t *a,int stat,float value){
-    int d=dynamic(stat);
+    int d=dynamic(stat);float before;
     if(!a || d<0)return;
     /* ModCurrentHealth etc.: current only, never above the base; fatigue may go below 0 (a knockdown, which the
      * combat layer applies: OpenMW OpModCurrentDynamic) */
-    set_current(a,d,a->dyn_cur[d]+value,d==2,0);
-    if(d==0 && a->dyn_cur[0]<=0 && !(a->flags&AWL_DEAD) && a->dyn_base[0]>0)AW_ActorKill(a);
+    before=a->dyn_cur[d];
+    set_current(a,d,before+value,d==2,0);
+    if(d==0)AW_ActorHealthDeath(a,(a->flags&AWL_DEAD)!=0,before);   /* under 1: death (MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66) */
     changed(a);
+}
+/* MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66 (OpenMW 0.51 creaturestats.cpp setDynamic: a current health under 1 is death,
+ * whatever the base): a change of A's health from BEFORE that takes a living record (WAS_DEAD: dead before the change)
+ * under 1 is its death, once (AW_ActorKill does nothing for a record already dead). A record already under 1 before
+ * the change (a body the data places with no health) died no second time. 1: this change killed it, so the caller
+ * gives the death a blow's would give (a script's change: aw_mwhost.c host_actor). */
+int AW_ActorHealthDeath(aw_actor_t *a,int was_dead,float before){
+    if(!a || was_dead || !AW_ACTOR_HEALTH_FELL(before,a->dyn_cur[0]))return 0;
+    AW_ActorKill(a);
+    return 1;
 }
 float AW_ActorRatio(const aw_actor_t *a,int stat){
     int d=dynamic(stat);

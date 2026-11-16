@@ -1,6 +1,6 @@
 # aw: the master builder command line
 
-_Last updated with AmiWind v0.0.66-dev2 (14 November 2026)._
+_Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -58,7 +58,7 @@ relative to the config file.
                "inputs_volume": "game-data-volume", "inputs_mount": "/owned",
                "workspace": "/vol/ws", "source_dir": "{mount}/src/{series}-{commit}",
                "tools_dir": "/opt/amiwind-tools", "cpus": 24, "memory": "44g", "jobs": 24,
-               "check_cpus": 4, "container_prefix": "aw",
+               "check_cpus": 4, "check_reuse_minutes": 30, "container_prefix": "aw",
                "recipes_dir": "{mount}/src/recipes", "save_recipe": true,
                "default_flags": [["--chim-native-towns", "on"], ["--live-logs"]],
                "trials_log": "trials/TRIALS.jsonl",
@@ -283,6 +283,23 @@ A build request is checked first, in this order; any failure refuses it before t
    build logs that the result's `logs` names: `RUN.FAILURE.md` (the refused check's page,
    in the form of a failed build's `FAILURE.md`) and `RUN.console.log`, which the Toolkit
    Monitor's console view reads.
+   **One check per build:** a check that passed is kept beside its whole output as
+   `RUN.check.json`, under a key of exactly what it checks: the full commit, the earlier build
+   (`reuse_from`), the build flags, the check command itself (image, mounts, source and every
+   builder option; the request id and the check container's cores are left out, they change
+   nothing it finds), the runs in the workspace's build folder (the earlier builds
+   `--reuse-all-available` plans from) and the builder settings of aw's own environment (the
+   `AMIWIND_*` variables set where aw runs, such as the mesh seam stop or the NPC body check,
+   which plan other stage keys; aw's own `AMIWIND_AW_*` settings are left out). The next request with the same key, at most
+   `build.check_reuse_minutes` minutes later (default 30; 0 runs every check), takes it instead
+   of running it again: the starter's check of a build (a check-only request) and the build
+   request after it no longer both run the same check (BUILD-CHECK-ONE-CORE-66). The result's `check` step
+   then names the request whose check it took (`taken_from`) and its notes say so; anything
+   different (another flag, earlier build, commit, or a run finished in the workspace since)
+   runs the check again and the notes say which part differed. A refused check is never kept.
+   The build itself still plans every stage at its start, so a change in between (a unit
+   another build baked) shows in its first minute, never later. Every `check` step records its
+   `seconds` and its `check_key`.
 
 Then the build runs in the configured image with `--pull never`, no network, the build
 user, `PYTHONPATH` from the exported source, `--developer-mode`, `--storage-pool on` and,
