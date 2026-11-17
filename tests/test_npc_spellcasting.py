@@ -53,7 +53,9 @@ class NpcSpellcasting(unittest.TestCase):
         for read in ('AW_ActorSpellEffects(', 'AW_ActorSpellFlags(', 'AW_ActorMagicEffect(', 'AW_ActorSpells('):
             self.assertNotIn(read, choose)
         # the cast: magicka at the start, the spellcast group, the look held to the release, the roll and the delivery
-        self.assertIn('AW_ActorModCurrent(a,1,-(float)mcost);', combat)
+        # NPC-CAST-MAGICKA-NOT-PAID-66: the stat is magicka (stat 1 is Intelligence, which ModCurrent ignores)
+        self.assertIn('AW_ActorModCurrent(a,AWA_MAGICKA,-(float)mcost);', combat)
+        self.assertNotIn('AW_ActorModCurrent(a,1,', combat)
         self.assertIn('r=AW_AnimKitCast(s->e,variant[range]);', combat)
         self.assertIn('s->cast_look=AW_MagicCastLookStart(NUM_FOR_EDICT(s->e),e[0].effect,range,0);', combat)
         self.assertIn('AW_CastActorRelease(s->e,NULL,s->spell,', combat)

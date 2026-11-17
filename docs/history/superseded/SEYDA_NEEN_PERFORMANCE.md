@@ -176,7 +176,7 @@ The shipped sub-cells replace the town's own ground with the denser canonical
 world terrain (about 7,700 terrain faces in sn019 against about 4,000), so the
 town meets the surrounding world without seams. That step was done outside
 the public build and cannot be regenerated with it yet
-([BUILD-SEYDA-REGEN-30](../../BUG_JOURNAL.md)). A seam-free ground with fewer faces
+([BUILD-SEYDA-REGEN-30](../../bugs/BUILD-SEYDA-REGEN-30.md)). A seam-free ground with fewer faces
 (error-bounded simplification of flat ground, shoreline and edges kept exact)
 is the next large saving after the meshes.
 

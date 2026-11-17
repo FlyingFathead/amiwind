@@ -18,6 +18,18 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.32-dev1
+- 2026-10-08: CONSOLE-HISTORY-ARROWS-32: the maintainer trace shows the arrows arriving: The maintainer's `aw_input_trace 1` on dev1: Up and Down reach the game as raw 76 and 77 with qualifier 32768 (mouse grabbed).
+- 2026-10-08: CONSOLE-HISTORY-EMPTY-32: Up past the oldest command sticks on an empty line
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 ## Status: 8 October 2026

@@ -19,6 +19,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-16: reported in v0.0.41
+- 2026-10-17: ENGINE-060-MUL64-41: ENGINE-060-MUL64-41: the 68040 engine holds 151 64-bit `MULS.L`/`MULU.L` in 68 engine functions (GCC's division by constants), which the 68060 traps; the first 68060 scan missed them.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.41 (17 October 2026)._
 
 ## Symptom

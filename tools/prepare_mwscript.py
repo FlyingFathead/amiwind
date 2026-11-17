@@ -86,6 +86,11 @@ def build(data_files, media, music, out, config=CONFIG):
     conf = {'range_units': int(config_data['activation']['range_units']),
             'ops_per_frame': int(config_data['budget']['ops_per_frame']),
             'ops_per_run': int(config_data['budget']['ops_per_run'])}
+    # EXPANSION-SCRIPT-LIMITS-66: the script engine's table sizes counted from the whole game (every master's
+    # placements, whether or not this image binds the add-on worlds): the engine allocates exactly these at load
+    from mwscript.plan import plan as table_plan
+    sizes_plan = table_plan(program, compiled, bindings(program, compiled, addons=tuple(MASTERS[1:])), data)
+    conf.update({k: sizes_plan[k] for k in ('instances', 'cells', 'parked', 'park_cells')})
     raw, sizes = awms.write(program, compiled, binds, conf)
     awms.read(raw)   # the output schema: the file reads back
     for row in awms.scripts(awms.read(raw)):
@@ -104,6 +109,9 @@ def build(data_files, media, music, out, config=CONFIG):
               'sections': sizes, 'scripts': len(compiled),
               'not_compiled': [c.name for c in compiled if c.error],
               'bindings': len(binds), 'globals': len(program.globals), 'journal_topics': len(program.journal),
+              # EXPANSION-SCRIPT-LIMITS-66: the script engine's tables as the file plans them, and how they were counted
+              'tables': {k: sizes_plan[k] for k in ('instances', 'cells', 'parked', 'park_cells')},
+              'tables_counted': sizes_plan['report'],
               # SAVE-SCRIPT-ROW-HINT-ONLY-65: the scripts' variables by name (LOCN) and any names that share a key
               'local_names': getattr(program, 'local_names_report', None),
               'player_moves': moves,
@@ -173,6 +181,15 @@ def main(argv=None):
               report['scripts'], len(report['not_compiled']), report['bytes'], report['sha256'][:12],
               report['bindings'], m['sounds']['mapped'], m['sounds']['names'], m['voices']['mapped'],
               m['voices']['names'], m['music']['mapped'], m['music']['names'], result), flush=True)
+    t = report.get('tables')
+    if t:   # EXPANSION-SCRIPT-LIMITS-66: what the engine allocates for the scripts, counted from every master
+        c = report.get('tables_counted') or {}
+        print('[mwscript] script engine tables planned from the game: %d attached instances, %d local values, %d parked '
+              'objects, %d parked values (busiest map %s: %d placed, %d held; %d global scripts; %d bound objects with '
+              'values)' % (t['instances'], t['cells'], t['parked'], t['park_cells'],
+                           (c.get('busiest_map') or {}).get('map'), (c.get('busiest_map') or {}).get('placed', 0),
+                           (c.get('busiest_map') or {}).get('held', 0), (c.get('global_scripts') or {}).get('distinct', 0),
+                           (c.get('bound') or {}).get('with_values', 0)), flush=True)
     ng = report.get('new_game')
     if ng:
         c = ng['counts']

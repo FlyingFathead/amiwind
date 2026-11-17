@@ -18,11 +18,26 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.32-dev1
+- 2026-10-08: Vivec Arena arrival and the maintainer dev1 reports: VIVEC-ARENA-TP-ARRIVAL-32: cause found and fixed in source (branch v0.0.32-vivec-arrival).
+- 2026-10-08: Vivec dev1 the maintainer evidence and CHIM terrain edges: The maintainer evidence from real play of dev1: a Vivec canton sewer outflow floats without its canton (the frame-by-origin bug, fixed in source by the footprint rule ...
+- 2026-10-08: Vivec Arena residents: VIVEC-ARENA-ACTORS-32: cause found and fixed in source (branch v0.0.32-arena-actors).
+- 2026-10-08: v0.0.32-dev1: v0.0.32-dev1 playtest findings: The dev1 playtest payload lacks the hands and harvest of v0.0.31 (built from a snapshot before those builder steps; no packaging coverage gate), the first Arena teleport of a session can fail its arrival ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Status: 8 October 2026](#status-8-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -164,6 +179,7 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [SEYDA-BLOCK-31](SEYDA-BLOCK-31.md): Invisible obstacle blocks the path on a Seyda Neen slope
 - [STAIR-DETECT-POSITION-41](STAIR-DETECT-POSITION-41.md): Stair step detection depends on where a frame puts the placement: a few borderline steps are found in one frame's copy and not in another's
 - [STAIR-FLIGHT-CORE-SPLIT-41](STAIR-FLIGHT-CORE-SPLIT-41.md): The stair gate marks flights per 1024-unit core: a flight that crosses a core line loses its flight mark, so its failures do not stop a build
+- [STAIR-ORIGIN-IN-TERRAIN-24](STAIR-ORIGIN-IN-TERRAIN-24.md): stairs10: the reported stuck position at -685,+619,141 lies inside the terrain
 - [STAIRS-ADDAMASARTUS-32](STAIRS-ADDAMASARTUS-32.md): A low step in the Addamasartus cave is blocked
 - [STAIRS-BALMORA-B01-32](STAIRS-BALMORA-B01-32.md): A Balmora Hlaalu house staircase cannot be approached from below
 - [STAIRS-BALMORA-WESTSOUTH-32](STAIRS-BALMORA-WESTSOUTH-32.md): A Hlaalu hall staircase in a Balmora interior has no clear foot

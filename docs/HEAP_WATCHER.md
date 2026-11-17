@@ -1,6 +1,6 @@
 # Heap watcher: build estimates and complete scene lifecycles
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -196,7 +196,7 @@ hunk capacity.
 Compare equal-content, equal-config target runs across both directions of region
 crossings, fast noclip, dense town views, restart/teleport, save restoration and
 both HDFs. Exercise cold and warm caches. Preserve raw reports and regressions in
-[the bug journal](BUG_JOURNAL.md), including affected/introducing/repair and
+[the bug tracker](BUGS.md), including affected/introducing/repair and
 verified-fixed versions. Do not replace a failure history with a later green run.
 
 ## Residency is not the same as per-frame visibility

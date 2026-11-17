@@ -38,4 +38,4 @@ journal image is docs/images/amiwind-v0.0.25-dev1-journal.png.
 
 Input preflight and build receipts now ignore personal transfer/backup archives,
 including case-colliding Morrowind_Video.zip/Morrowind_video.zip. Actual loose
-Video/mw_intro.bik and ESM/BSA validation remain unchanged. See BUG_JOURNAL.md.
+Video/mw_intro.bik and ESM/BSA validation remain unchanged. See INPUT-TRANSFER-ZIPS-25 in the bug tracker (docs/BUGS.md).

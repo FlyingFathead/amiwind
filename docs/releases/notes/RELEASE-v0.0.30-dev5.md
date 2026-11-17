@@ -38,7 +38,7 @@ the old loader. See [Seyda Neen performance](../../history/superseded/SEYDA_NEEN
   buffer off the stack.
 - `build_aga.py image --canonical-land-source` passes the world-survey terrain
   to the Seyda Neen partition; regenerating Seyda Neen with public tools
-  is still open ([BUILD-SEYDA-REGEN-30](../../BUG_JOURNAL.md)).
+  is still open ([BUILD-SEYDA-REGEN-30](../../bugs/BUILD-SEYDA-REGEN-30.md)).
 - New tool: [points-of-interest checklist](../../POI_CHECKLIST.md).
 
 ## Still open

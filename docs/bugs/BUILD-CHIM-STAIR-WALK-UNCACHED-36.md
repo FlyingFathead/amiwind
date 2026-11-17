@@ -30,12 +30,39 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| shipped | a development build | v0.0.36-dev5 | 2026-10-11 | the bug journal entry of 2026-10-11: BUILD-CHIM-STAIR-WALK-UNCACHED-36 fixed | BUILD-CHIM-STAIR-WALK-UNCACHED-36 is fixed in v0.0.36-dev5 (3d2499e). |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-10: reported in v0.0.36-dev3
+- 2026-10-10: BUILD-CHIM-STAIR-WALK-UNCACHED-36: only stair walks checked by a passed master build are reused: BUILD-CHIM-STAIR-WALK-UNCACHED-36: a stored stair walk is now a record with its provenance (version, commit, run, master builder request, host ...
+- 2026-10-10: CHIM-TOWN-HEAP-ROUTED-HULL-36; BUILD-CHIM-HEAP-GATE-LATE-36 and BUILD-CHIM-STAIR-WALK-UNCACHED-36 repaired in source: CHIM-TOWN-HEAP-ROUTED-HULL-36: the dev3 run's rings over the zone come from `--chim-terrain-hull routed` replacing the ...
+- 2026-10-10: BUILD-CHIM-HEAP-GATE-LATE-36 and BUILD-CHIM-STAIR-WALK-UNCACHED-36: BUILD-CHIM-HEAP-GATE-LATE-36: the v0.0.36-dev3 run with 270 CHIM region cells and the routed terrain hull failed its chim stage after 1 h 48 min: the heap gate, which ...
+- 2026-10-11: BUILD-CHIM-STAIR-WALK-UNCACHED-36 fixed: The CHIM stair gate now keys each frame by the SHA-256 of exactly what the walk reads, so a texture table or model numbering change no longer re-walks every frame, and its walk units run on every ...
+- 2026-10-11: shipped: a development build, v0.0.36-dev5; the bug journal entry of 2026-10-11: BUILD-CHIM-STAIR-WALK-UNCACHED-36 fixed: BUILD-CHIM-STAIR-WALK-UNCACHED-36 is fixed in v0.0.36-dev5 (3d2499e).
+- 2026-10-11 06:52 +0300: seen again in v0.0.36-dev4: dev4 full (d050b6f): 0 of 274 frames reused, 274 walked (3 min 57 s, 11.2 cores)
+- 2026-10-11 09:48 +0300: seen again in v0.0.36-dev5: coast divided-cells test (1eb3172): 15 of 275 reused, 260 walked (5 min 50 s, 6.5 cores)
+- 2026-10-11 11:17 +0300: seen again in v0.0.36-dev5: coast2 whole coastline (eaef12e): 0 of 330 reused, 330 walked (13 min 18 s, 3.6 of 24 cores)
+- 2026-10-16: BUILD-STAIR-PASS-NOT-KEPT-41: BUILD-STAIR-PASS-NOT-KEPT-41: dev5 reused none of its 726 frame walks, and its rerun will not reuse the 724 that passed: a stored walk only counts after a whole build passes, and the walker's key changed with ...
+- 2026-10-16 13:17 +0300: seen again in v0.0.41-dev5: 0 of 726 frame walks reused: 604 walker code changed, 122 new frames
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Status: 11 October 2026 (persisting)](#status-11-october-2026-persisting)
 - [Status: 10 October 2026](#status-10-october-2026)
 - [Symptom](#symptom)
@@ -284,6 +311,7 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - CHIM-STORE-ONE-AT-A-TIME-64 (no report page): The engine streams one CHIM store at a time, so frames of a second store cannot sit beside the first in the open world
 - [CHIM-TERRAIN-GRAFT-33](CHIM-TERRAIN-GRAFT-33.md): CHIM chunk terrain is a brush entity, not part of the world tree, so it does not occlude
 - [CHIM-TERRAIN-HULL-BEVELS-33](CHIM-TERRAIN-HULL-BEVELS-33.md): A standing box rests above the ground at convex CHIM terrain edges
+- [CHIM-TERRAIN-RECORDS-SIZE-46](CHIM-TERRAIN-RECORDS-SIZE-46.md): CHIM terrain records were stored whole: 489.4 MB of the v0.0.46 world's frame segments
 - [CHIM-TEXTURE-SPECKS-33](CHIM-TEXTURE-SPECKS-33.md): CHIM-drawn surfaces show bright single-texel specks that legacy frames do not
 - [CHIM-TILT-VARIANTS-SPLIT-33](CHIM-TILT-VARIANTS-SPLIT-33.md): Tilted placements each get their own model variant: 39,103 extra model variants on the base island, breaking store-once
 - [CHIM-TOWN-HEAP-ROUTED-HULL-36](CHIM-TOWN-HEAP-ROUTED-HULL-36.md): With the routed terrain hull for every chunk, Balmora and Seyda Neen rings no longer fit the CHIM zone

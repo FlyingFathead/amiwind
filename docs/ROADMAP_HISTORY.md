@@ -1,6 +1,6 @@
 # Roadmap history: v0.0.29 and earlier
 
-_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -513,7 +513,7 @@ a full native Windows suite or actual emulator gameplay.
   do not prove emulator playability.
 
 The missing-template regression and repair are recorded in the
-[bug journal](BUG_JOURNAL.md). The complete Linux Docker suite and asset-free
+[bug tracker](BUGS.md). The complete Linux Docker suite and asset-free
 compile passed for v0.0.27; actual multi-drive gameplay remains pending.
 
 ## v0.0.26 released - validated Windows and Docker builds

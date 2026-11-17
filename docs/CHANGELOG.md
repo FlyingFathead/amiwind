@@ -1,10 +1,12 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
+_Last updated with AmiWind v0.0.66 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.66: Forward It Is, 16 November 2026](#v0066-forward-it-is-16-november-2026)
+- [v0.0.66-dev12: twelfth snapshot of v0.0.66, 16 November 2026](#v0066-dev12-twelfth-snapshot-of-v0066-16-november-2026)
 - [v0.0.66-dev11: eleventh snapshot of v0.0.66, 16 November 2026](#v0066-dev11-eleventh-snapshot-of-v0066-16-november-2026)
 - [v0.0.66-dev10: tenth snapshot of v0.0.66, 15 November 2026](#v0066-dev10-tenth-snapshot-of-v0066-15-november-2026)
 - [v0.0.66-dev9: ninth snapshot of v0.0.66, 15 November 2026](#v0066-dev9-ninth-snapshot-of-v0066-15-november-2026)
@@ -201,6 +203,133 @@ _Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.66: Forward It Is, 16 November 2026
+
+v0.0.66 is made from the twelfth development snapshot and the changes after it
+([release notes](releases/notes/RELEASE-v0.0.66.md)). It carries every snapshot of the line, each with its own notes:
+[dev1](releases/notes/RELEASE-v0.0.66-dev1.md), [dev2](releases/notes/RELEASE-v0.0.66-dev2.md),
+[dev3](releases/notes/RELEASE-v0.0.66-dev3.md), [dev4](releases/notes/RELEASE-v0.0.66-dev4.md),
+[dev5](releases/notes/RELEASE-v0.0.66-dev5.md), [dev6](releases/notes/RELEASE-v0.0.66-dev6.md),
+[dev7](releases/notes/RELEASE-v0.0.66-dev7.md), [dev8](releases/notes/RELEASE-v0.0.66-dev8.md),
+[dev9](releases/notes/RELEASE-v0.0.66-dev9.md), [dev10](releases/notes/RELEASE-v0.0.66-dev10.md),
+[dev11](releases/notes/RELEASE-v0.0.66-dev11.md) and [dev12](releases/notes/RELEASE-v0.0.66-dev12.md). It runs on CHIM
+Engine v0.2.2 and needs 32 MB of Fast RAM. The builder reads Tribunal and Bloodmoon by default and the rooms of
+Mournhold and Solstheim are in the image, but the expansions are not playable yet: their finished content and the rest
+of the open plan move to v0.0.67 and later. Several fixes of the last snapshots are made in source and covered by
+tests and are still to be confirmed in play; the [bug tracker](BUGS.md) keeps them open until then.
+
+**New**
+
+- Tribunal and Bloodmoon in the build: one reader merges the base game with the selected expansions in load order, and
+  every stage reads their archives over the base archive (dev1, dev2); stage keys, unit caches and CHIM cell keys follow
+  the selected layers, each unit keyed by what it reads, so an expansion switched on rebuilds only what it changes (dev1,
+  dev2); the expansions' masters and archives are checked by size and SHA-256 before any stage (dev3); every table the
+  build makes reads them, with a table of tables in the docs index (dev3); the expansions' 630 room residents are
+  classified and checked first, their 86 large rooms fade into fog, the seven rooms the room stage refused are built or
+  listed, and the journal reads their entries in load order (dev2 to dev4); what is held back (Mournhold's five outdoor
+  districts, Solstheim's exterior, the 273 doors there) is named in the build report (dev2); `dbg tp` lists the
+  expansion rooms the image holds (dev2).
+- The script engine sized for the whole game with both expansions (791 attached instances, 1,475 local values, 5,478
+  parked objects, 12,811 parked values, about 83 KB more resident memory): a map with more than 256 scripted objects
+  runs every one; `dbg mwscript status` prints the tables (dev12; in source, to be confirmed in a session).
+- The save without the fixed limits that could refuse it or drop state: actor rows on the world change list, the
+  explored map in its own section, every other part a guard above the game's counts, all-or-nothing saves that name the
+  failed part, script values by name, two copies of one item kept apart, a save inside a script step queued (dev2, dev3).
+- The map: explored land, a local map, a room plan with fog, named places, up to 256 named markers with a Markers menu,
+  the hot marker and its compass, a land-colours switch; signposts and named objects say their names (dev2).
+- Magic and fights: characters cast spells with their cast animation and pay the magicka; the cast look starts with the
+  animation and is on by default; readied magic shows the open spell-casting hands; fighters move at their own speeds,
+  carry their load in fatigue and speed, shoot bows and crossbows, pick weapons by their own skills, flee by their Flee
+  rating; a paralysed victim takes punch damage; the player body sneaks, turns on the spot and reacts to blows (dev2,
+  dev3).
+- Death and respawn as in the original: the dead stay dead, bodies are cleared after the original's delay (outdoors too),
+  the essential message once per death, the murder bounty (dev2, dev3).
+- Dagoth Ur's own animations on a seam-locked 948-face model; the Heart of Lorkhan a resident of its room that stays in
+  place; every actor's record audited, creatures on the skeletal method, creatures with their weapons (dev1, dev2).
+- The active effects as a row of icons under the view and on the Stats window (dev1); the birthsign and race windows
+  describe each ability (dev2); `dbg tp` by All, Exteriors, Interiors or Beings, to a person or creature by name, and a
+  teleport typed during a load run on arrival (dev3, dev4).
+
+**Fixed**
+
+- The opening's controls stay off until the release papers, from the original scripts' own calls (dev5); the census
+  captain's two doors open every time (dev4); the use key takes the crab meat, not the plate under it (dev5); the dock
+  guard walks round the pier pylon (dev2).
+- The towns' scripted objects run again, and Tarhiel falls near his journal (dev2); wanderers keep off doors (dev11,
+  reopened on the dev12 journey); the player no longer ends inside an actor at an arrival point (dev9, in source).
+- The script engine: reads and writes of another object's local variables (dev11, confirmed), `SetHealth 0` kills (dev11;
+  one dreamer worker still open), `SetDelete` stops the object's script (dev2), a fighter's spell costs its magicka (dev12,
+  in source).
+- The world: bracket fungi on their trees, outdoor containers aimable, the town cells' mudcrabs and slaughterfish placed
+  again, the container window's page arrows (dev2); area loads read their sounds quickly again (dev5).
+
+**Performance**
+
+- The sound stage of an area load: 59 ms at Seyda Neen, 118 and 147 ms at Balmora, 147 and 165 ms at Vivec (dev1: 139,
+  139, 306 ms; dev2: 480, 777, 1,078 ms), for 72 to 73 KiB of Fast RAM in disk buffers (dev7).
+- The prison ship's hold: faces tested per view 14,128 to 10,749 on average, collision clipnodes 29,182 to 18,054 (dev2).
+- A synthetic long game saves to about 985 KB in 45 ms and loads in 120 ms on the host (dev3); the Heart Chamber loads in
+  play at 32 MB in one frame of about 42 seconds (dev11); scripts' timers share their work and fights read nothing from
+  disk (dev2).
+- The image's partitions in one pass: the boot partition 16.8 s instead of 115.5 s on the dev11 inputs, and an unchanged
+  partition copied from a cache (dev12, to be confirmed on the release build). The frame rate on the Raspberry Pi 4B is
+  still to be measured on a v0.0.66 build.
+
+**Builder and tools**
+
+- Early failures: new work first, the plan check with the build's own reuse stop, the reuse check planning the build's
+  own commands and run once per snapshot, the image step's format and actor checks (dev2 to dev11).
+- Stalls and failures: a live stall alert, steps under half their planned cores flagged, a failure page in the build
+  monitor, a build options file with a byte-order mark read or refused by name (dev3); after dev12, one report file
+  `logs/BUILD-REPORT-<run>.txt` per failed build, and the release build's NPC bake settings as the builder's defaults.
+- The Toolkit's build monitor: the stall alert first, started and ended times, failed stages counted, the failure
+  details linked (dev3).
+- Testing: the opening journey on foot (42 checks), the end of the main quest session, the stall examination of the
+  running game and of the file a stuck request asks for, emulator options in sessions, `chim actors summon` by reference,
+  `aw_remote_log` (dev4 to dev11).
+- The bug tracker records each fix's commit, date and planning item (dev2); public texts name who raised an issue by role
+  and date (dev3); the study pages for a PiStorm-equipped Amiga 500 and the THEA1200 (dev8); the performance page, the
+  saved game budget and the expansions page; the release file list, the docs index and the test fixtures follow every
+  change ([release notes](releases/notes/RELEASE-v0.0.66.md), "Smaller changes").
+
+**Scripts and progress:** 611 of the 1,074 scripts the original uses run and 9 more are carried by AmiWind's own code; 433
+wait for Mournhold and Solstheim ([MWScript tracker](MWSCRIPT_FEATURES.md)). Vvardenfell's 1,409 exterior cells and
+1,121 of its 1,123 rooms are on CHIM ([CHIM progress tracker](chim/PROGRESS_TRACKER.md)).
+
+Known: Mournhold and Solstheim are not playable yet; the Heart Chamber's collapse is not animated, so the end of the main
+quest cannot play; one dreamer worker survives `SetHealth 0`; a resident can still stand in front of a door; the load
+stall of the test sessions (players have no such drive); the save's round trip in the emulator is still to be done; the
+console's item count, equip, position and ShowVars reads; Bloodmoon's werewolves have no model; the packet overflow in
+Vivec; the shores' saw-tooth steps (deferred to v0.0.67). The full list is in the release notes.
+
+## v0.0.66-dev12: twelfth snapshot of v0.0.66, 16 November 2026
+
+The twelfth development snapshot of v0.0.66, in development ([release notes](releases/notes/RELEASE-v0.0.66-dev12.md)).
+It carries dev11 and needs 32 MB of Fast RAM. No finished Mournhold or Solstheim content is in this snapshot.
+
+- The script engine: sized for the whole game with both expansions, from the counts in the three game files (791
+  attached instances, 1,475 local values, 5,478 parked objects and 12,811 parked values, about 83 KB more resident
+  memory in Fast RAM); a map with more than 256 scripted objects runs every one; a script reading another object's
+  variable does it in one step; the save file does not change (`EXPANSION-SCRIPT-LIMITS-66`; fixed in source and
+  covered by tests, to be confirmed in a session). The first step of bringing Tribunal and Bloodmoon in.
+- The game: a fighter's spell costs its magicka again (`NPC-CAST-MAGICKA-NOT-PAID-66`; fixed in source and covered by
+  tests, to be confirmed in a game).
+- The builder: every image partition is written in one pass and an unchanged partition is taken from a cache
+  (`BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66`; the boot partition 16.8 s instead of 115.5 s and the world volume 22.1 s
+  instead of 41.8 s on the dev11 inputs, to be confirmed on this snapshot's build).
+- Confirmed in play on dev11: residents keep off doors and the opening journey passed 42 of 42 checks
+  (`WANDER-DOOR-RULE-66`, `JOURNEY-STEP7-FIGHTER-NEAREST-66`), the build took the starter's passed check instead of
+  running it again (`BUILD-CHECK-ONE-CORE-66`), and Dagoth Ur's shield followed the Heart's strike count
+  (`MWSCRIPT-MEMBER-READS-ID-AS-SCRIPT-66`); EndGame's `SetHealth 0` killed Dagoth Ur and two of the three dreamer
+  workers (`MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66`, open).
+- The load stall in test sessions: as sessions run today 8 valid runs, 76 loads, 2 stops; with the emulator's
+  deterministic option 8 valid runs, 80 loads, 0 stops; the comparison continues.
+- Known: the load stall in test sessions until the comparison ends, the chamber's collapse
+  (`ENDGAME-CHAMBER-COLLAPSE-63`), the packet overflow in Vivec (`NET-VIVEC-ENTITY-PACKET-OVERFLOW-66`), the guard's
+  partition-write basis (`PERF-GUARD-BASIS-BY-COUNT-66`, new), and one script engine limit (`MWVM-PLACE-COPIES-FOUR-66`): 4 live copies per scripted
+  Place row in one map. Also known: `tools/mwad.py` still has the name of the `src/mwad` package
+  (`MWAD-NAME-CLASH-66`): a repair was held back because it would build ten stages again with the same outputs.
 
 ## v0.0.66-dev11: eleventh snapshot of v0.0.66, 16 November 2026
 
@@ -2995,7 +3124,7 @@ Details of the v0.0.32 development line:
 
 - Fixed dev5's misplaced Census and Excise Office objects (upright rug, hole
   seen in the ceiling, tapestry in a bookshelf): the map's object list now
-  matches its geometry ([CENSUS-ENTITIES-30](BUG_JOURNAL.md)).
+  matches its geometry ([CENSUS-ENTITIES-30](bugs/CENSUS-ENTITIES-30.md)).
 
 - Release of the dev3-dev5 work: Balmora Temple, Tharys Ancestral Tomb and
   five fireplace interiors rebuilt with the root-rotation converter fix;
@@ -3004,8 +3133,8 @@ Details of the v0.0.32 development line:
   single-pass actor loading; warning-free engine build.
 - A playtest reports much less WinUAE music crackle; some map changes still
   crackle.
-- Bug journal entries before 7 October 2026 moved to
-  [journals/BUG_JOURNAL-v0.0.29.md](journals/BUG_JOURNAL-v0.0.29.md).
+- Bug journal entries before 7 October 2026 moved to a frozen journal (since 16
+  November 2026 their facts are on the entries of the [bug tracker](BUGS.md)).
 - Details: [release notes](releases/notes/RELEASE-v0.0.30-rc1.md).
 
 ## v0.0.30-dev5: The Temple
@@ -3024,7 +3153,7 @@ Details of the v0.0.32 development line:
   path formatting; moved a 15 KB sprite buffer off the stack.
 - Build: `build_aga.py image --canonical-land-source` passes the world-survey
   terrain to the Seyda Neen partition
-  ([BUILD-SEYDA-REGEN-30](BUG_JOURNAL.md)).
+  ([BUILD-SEYDA-REGEN-30](bugs/BUILD-SEYDA-REGEN-30.md)).
 - Converter: the recovered root scale is rounded, restoring exact vertex
   sharing; the rebuilt Temple matches v0.0.30-dev4 byte for byte.
 - Rebuilt maps: Balmora Temple (lantern glow), Census and Excise Office

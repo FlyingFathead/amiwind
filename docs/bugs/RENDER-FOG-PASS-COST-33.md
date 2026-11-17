@@ -15,6 +15,18 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-09: reported in v0.0.33-dev
+- 2026-10-09: CHIM-SLOWCPU-FRAMETIME-33: Balmora on CHIM at about 1 frame per second on a slow 68040: CHIM-SLOWCPU-FRAMETIME-33: the maintainer play report of the private CHIM preview (engine 0d8bf4f, world format 0.4, v0.0.32 disks) on the slow ...
+- 2026-10-30 18:55 +0200: seen again in v0.0.57-dev3: Raspberry Pi 4B, Amiberry JIT, 32 MB Fast, HUD fps, 4 headings per spot: fog off vs fog on at distance 300: Balmora +3 %, Ald-ruhn +4 %, Suran +8 % (the fog pass about 3 to 8 % of the frame), Vivec -8 % (fog on faster there); 300 vs 540 ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 ## Status: 9 October 2026
@@ -81,6 +93,7 @@ Family: Distance drawing (horizon, fog, sky, far edges) (`distance-drawing`). Fa
 - [LAND-HORIZON-GAPS-29](LAND-HORIZON-GAPS-29.md): Sky visible through gaps in distant resident ground
 - [SEYDA-WALL-SHAPE-31](SEYDA-WALL-SHAPE-31.md): Dark shape pokes out of a stone wall by the Seyda Neen shore
 - [SHELL-TEXTURE-VOTE-32](SHELL-TEXTURE-VOTE-32.md): Distant shells: door and grille textures win over large sealed areas
+- [SKY-FOG-OFF-BACKGROUND-25](SKY-FOG-OFF-BACKGROUND-25.md): With fog off, far pixels outdoors that no surface covered showed a pale solid background instead of the sky
 - SKY-NIGHT-COVER-29 (no report page): Dense night clouds rarely reveal moons/stars
 - SKY-STARS-28 (no report page): Enlarged stars cover original night artwork
 - SKY-VISUAL-01 (no report page): Sky-only day/night remap clashed with gray distance fog

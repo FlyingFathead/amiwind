@@ -70,7 +70,7 @@ class RepositoryReuseTests(unittest.TestCase):
 
     def test_docs_and_tracker_edits_reuse_every_stage(self):
         """(a) docs/tracker-only change."""
-        edited = [self.edit('docs/bugs/bugs.json', new=' '), self.edit('docs/BUGS.md'), self.edit('docs/BUG_JOURNAL.md'),
+        edited = [self.edit('docs/bugs/bugs.json', new=' '), self.edit('docs/BUGS.md'),
                   self.edit('docs/bugs/BUILD-CACHE-OVERBROAD-33.md'), self.edit('docs/BUILD_PROFILE.md')]
         self.assertEqual(self.changed(*edited), set())
         for stage, script in MINIWIND_STAGES.items():

@@ -31,12 +31,32 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-13: reported in v0.0.39-rc1
+- 2026-10-13: seen again in v0.0.39-rc1: Maintainer identifies v0.0.38 as last known good fast gait.
+- 2026-10-13: seen again in v0.0.39-rc1: Source candidate: two male bodies retain full8/6 gait plus punch within512 KiB;83 affected tests pass.
+- 2026-10-13: seen again in v0.0.39-rc2: All 20 body pairs pass binary checks; prior bake failure retained.
+- 2026-10-13: DOCS-CHANGELOG-STALE-39 and DOCS-RC1-PREFLIGHT-39: PLAYER-MOVEMENT-FRAME-SKIP-39 (2026-10-13, RC2 follow-up): Open RC1 repeat and RC2 blocker: fast movement appears to use only a couple of poses rather than the earlier rapid foot ...
+- 2026-10-14: seen again in v0.0.39-rc2: Maintainer repeats poor third-person running and asks whether frames were removed.
+- 2026-10-14: PLAYER-MOVEMENT-FRAME-SKIP-39: original reference and measurement labels: Original Nord male/Barbarian/Steed physical lowered/ready gait controls are recorded with matching displayed attributes and original clothes.
+- 2026-10-14: Development audit: PLAYER-MOVEMENT-FRAME-SKIP-39: sealedRC2 actual vertices/declarations show8walk/ 6run poses in all20normal bodies and matching ready gait.
+- 2026-10-15: 15 October 2026 - complete carrier and expanded contact findings: PLAYER-MOVEMENT-FRAME-SKIP-39: All 243 current-source player resources pass independent serialized readback.
+- 2026-10-15: NPC-ANIMATION-OFFSET-40: rotating simplification offsets: v0.0.40-dev2 source correction: simplified actor vertices now carry their rest-pose offsets with the source triangle's rotation and scale.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Current-source asset readback: 15 October 2026](#current-source-asset-readback-15-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -208,6 +228,7 @@ Family: First-person hands and torch (`torch-hands`). First-person hands, punche
 - [PLAYER-PUNCH-THIRDPERSON-39](PLAYER-PUNCH-THIRDPERSON-39.md): Third-person punches have no visible player-body attack animation
 - [PLAYER-READY-THIRDPERSON-38](PLAYER-READY-THIRDPERSON-38.md): Third-person player lacks fists-up and weapon-draw animation
 - [PLAYER-TORCH-THIRDPERSON-38](PLAYER-TORCH-THIRDPERSON-38.md): Player torch and holding pose disappear in third person while light remains
+- [TORCH-ACTIVATE-CRASH-25](TORCH-ACTIVATE-CRASH-25.md): Raising the fists and pressing V crashed the game: a dynamic light was marked through a negative collision root
 - TORCH-FLAME-VISIBILITY-29 (no report page): Torch flame not visible after changing styles
 - TORCH-FUEL-29 (no report page): Torch never burns out; no unlit or fuel state
 - TORCH-HAND-NORD-29 (no report page): Detached-looking left grip fragment in dev4

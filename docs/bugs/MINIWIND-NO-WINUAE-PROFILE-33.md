@@ -19,6 +19,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-09: reported in v0.0.33-dev
+- 2026-10-09: MINIWIND-NO-WINUAE-PROFILE-33: MINIWIND-NO-WINUAE-PROFILE-33: MiniWind playtest packages had an FS-UAE profile only, no WinUAE profile and no launcher, unlike the v0.0.32 playtests.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 ## Status: 9 October 2026
@@ -83,6 +94,7 @@ Family: Boot and engine start-up (`boot-startup`). The boot check and engine sta
 - HORS-AFTER-HALLOWEEN-CRASH-58 (no report page): dbg aw hors 0 after the Halloween benchmark crashes the game: NUM_FOR_EDICT: bad pointer
 - [LAUNCHER-GL-CONTEXT-FALLBACK-36](LAUNCHER-GL-CONTEXT-FALLBACK-36.md): When FS-UAE cannot create an OpenGL context, the Linux launcher ends in a raw X error instead of explaining it and offering software rendering
 - [NET-UDP-INIT-CRASH-32](NET-UDP-INIT-CRASH-32.md): UDP network start-up can stop the game at boot when bsdsocket.library is present
+- [STARTUP-THEME-TIMING-23](STARTUP-THEME-TIMING-23.md): The startup logo faded too quickly and the theme started late
 - VIDEO-NTSC-NO-PAL-MODE-58 (no report page): On an NTSC machine the game stops at start: it asks for a PAL screen mode by name
 
 <!-- END GENERATED CATEGORY -->

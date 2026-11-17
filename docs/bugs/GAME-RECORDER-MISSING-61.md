@@ -20,6 +20,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-06: reported in v0.0.61-dev2
+- 2026-11-06: GAME-RECORDER-MISSING-61: a gameplay recorder, first slice: GAME-RECORDER-MISSING-61: the maintainer asked for a recorder that records a play session and plays it back in another game instance, to repeat a problem exactly and to test and ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.61-dev2 (6 November 2026)._
 
 ## Status: 6 November 2026

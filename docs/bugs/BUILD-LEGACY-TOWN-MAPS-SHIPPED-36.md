@@ -29,12 +29,29 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-09: seen again in v0.0.33-dev: CHIM-LEGACY-CHAIN-33: CHIM builds still run the legacy exterior chain
+- 2026-10-10: seen again in v0.0.36-dev1: BUILD-IMAGE-CHIM-NATIVE-TOWN-36 and BUILD-LEGACY-CHAIN-DEFAULT-36: legacy maps read or built for CHIM towns
+- 2026-10-11: reported in v0.0.36-dev3
+- 2026-10-11: Pipeline entries, correction, the eight build rules and the persisting set: Correction, checked on the finished dev3 run: dev3 ships no legacy Seyda map.
+- 2026-10-11: BUILD-LEGACY-TOWN-MAPS-SHIPPED-36: BUILD-LEGACY-TOWN-MAPS-SHIPPED-36: the CHIM-native towns still ship their legacy region maps (about 300 MB).
+- 2026-10-11 00:43 +0300: seen again in v0.0.36-dev3: legacy maps of CHIM areas built and removed again (BUILD-CHIM-FRAME-SWAP-LATE-36)
+- 2026-10-15: 15 October 2026 - source-only carrier and expanded stairs: BUILD-LEGACY-TOWN-MAPS-SHIPPED-36: Optional canonical source-only carrier added; 47 isolated tests pass.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [BUILD-LEGACY-TOWN-MAPS-SHIPPED-36: CHIM-native Seyda Neen is still built through the legacy chain: 65 sn maps are built and removed before packing (build time, not payload)](#build-legacy-town-maps-shipped-36-chim-native-seyda-neen-is-still-built-through-the-legacy-chain-65-sn-maps-are-built-and-removed-before-packing-build-time-not-payload)
 - [Status: 11 October 2026](#status-11-october-2026)
 - [Symptom](#symptom)
@@ -172,6 +189,7 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [BUILD-MINIWIND-BALMORA-ASSUMED-36](BUILD-MINIWIND-BALMORA-ASSUMED-36.md): A MiniWind image of another town fails its content fingerprint: the Balmora region table was always required
 - [BUILD-MINIWIND-DIRECT-START-TOWN-36](BUILD-MINIWIND-DIRECT-START-TOWN-36.md): A MiniWind build of another town refuses its own direct start: the start check assumed Balmora
 - [BUILD-NIGHT-TABLES-31](BUILD-NIGHT-TABLES-31.md): Repository image builds have no night lamp, glowing glass or location fog tables
+- [BUILD-NPC-GALLERY-MISSING-25](BUILD-NPC-GALLERY-MISSING-25.md): Normal images had no NPC gallery: the builder never ran the gallery stage (Gallery catalogue missing)
 - [BUILD-RUN-FOLDER-PRECREATED-36](BUILD-RUN-FOLDER-PRECREATED-36.md): Every real CHIM build is refused at its start: the plan writes the world map manifest into the run folder before the run makes it
 - [BUILD-STANDALONE-STAGES-32](BUILD-STANDALONE-STAGES-32.md): Door overlay and interior section tools are outside the builder; their use in v0.0.31 is unverified
 - [CHIM-CELL-FEATURE-LIST-INCOMPLETE-38](CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md): Cell feature list incomplete: original placements and gameplay support are not reconciled with packaged coverage

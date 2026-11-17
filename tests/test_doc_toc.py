@@ -224,7 +224,7 @@ class AnchorLinkTests(unittest.TestCase):
 
 class ScopeTests(unittest.TestCase):
     def test_readme_frozen_generated_and_licences_are_excluded(self):
-        for rel in ('README.md', 'docs/journals/BUG_JOURNAL-v0.0.29.md', 'docs/releases/notes/RELEASE-v0.0.31.md',
+        for rel in ('README.md', 'docs/releases/notes/RELEASE-v0.0.31.md',
                     'docs/history/checkpoints/BUGS-v0.0.29-RC1.md', 'docs/history/checkpoints/RC2_ISSUE_CHECKPOINT.md', 'docs/releases/patches/PATCH-v0.0.20.md',
                     'docs/BUGS.md', 'docs/AMIWIND_CONSOLE_COMMANDS.md', 'LICENSE.md', 'engine/COPYING.md'):
             self.assertTrue(doc_toc.excluded(rel), rel)

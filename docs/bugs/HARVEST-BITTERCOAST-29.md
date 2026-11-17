@@ -15,6 +15,18 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-06: reported in v0.0.29-rc2
+- 2026-10-06: HARVEST-BITTERCOAST-29: one of three nearby mushrooms usable: Open RC2 playtest report in Bitter Coast: only one of three nearby mushrooms could be eaten.
+- 2026-10-10: seen again in v0.0.33: HARVEST-BITTERCOAST-29 and HARVEST-PLANTS-IN-COLLISION-33: HARVEST-BITTERCOAST-29: seen again in v0.0.33 at the same Bitter Coast cluster.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 ## Status: 10 October 2026

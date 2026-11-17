@@ -19,6 +19,18 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-07: reported in v0.0.31-dev2
+- 2026-10-07: MUSIC-STARTUP-TRACK-31: random track under the startup logo: The maintainer, dev3 in WinUAE: a random soundtrack piece plays during the logo.
+- 2026-10-07: AUDIO-03 and AUDIO-LOGO-31: music started under disk-heavy moments: The maintainer, WinUAE: the music still crackles right after the intro video, and also while the startup logo plays.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 ## Status: 7 October 2026

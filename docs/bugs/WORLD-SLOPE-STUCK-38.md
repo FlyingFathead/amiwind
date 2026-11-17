@@ -29,12 +29,28 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-12: reported in v0.0.38-dev2
+- 2026-10-12: BUILD-LAVA-CORE-BOUNDS-38: WORLD-SLOPE-STUCK-38 (2026-10-12): Maintainer reports being stuck beside a steep terrain face; slope involvement is suggested, not established.
+- 2026-10-13: STAIRS-MOLAG-ACCESS-38: WORLD-SLOPE-STUCK-38: 13 October 2026: reconciled 4 maintainer screenshot(s) with evidence IDs and original hashes.
+- 2026-10-14: Renewed RC2 gameplay reports: 12 October 2026 — WORLD-SLOPE-STUCK-38: maintainer reports jumping cannot pass the Vivec Arena boat-path obstruction; other docks remain untested.
+- 2026-10-19 15:12 +0300: seen again in v0.0.44-dev1: maintainer: cannot move forward up Red Mountain, cell 2,7 (global 20773 60884 11506), terrain likely too steep for the walk limit
+- 2026-10-19 15:13 +0300: seen again in v0.0.44-dev1: maintainer: second spot nearby, cell 2,7 (global 21067 60839 11315), facing north up a slope the original lets you walk; no target within 2048 units, so terrain itself
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -153,6 +169,7 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [SEYDA-BLOCK-31](SEYDA-BLOCK-31.md): Invisible obstacle blocks the path on a Seyda Neen slope
 - [STAIR-DETECT-POSITION-41](STAIR-DETECT-POSITION-41.md): Stair step detection depends on where a frame puts the placement: a few borderline steps are found in one frame's copy and not in another's
 - [STAIR-FLIGHT-CORE-SPLIT-41](STAIR-FLIGHT-CORE-SPLIT-41.md): The stair gate marks flights per 1024-unit core: a flight that crosses a core line loses its flight mark, so its failures do not stop a build
+- [STAIR-ORIGIN-IN-TERRAIN-24](STAIR-ORIGIN-IN-TERRAIN-24.md): stairs10: the reported stuck position at -685,+619,141 lies inside the terrain
 - [STAIRS-ADDAMASARTUS-32](STAIRS-ADDAMASARTUS-32.md): A low step in the Addamasartus cave is blocked
 - [STAIRS-BALMORA-B01-32](STAIRS-BALMORA-B01-32.md): A Balmora Hlaalu house staircase cannot be approached from below
 - [STAIRS-BALMORA-WESTSOUTH-32](STAIRS-BALMORA-WESTSOUTH-32.md): A Hlaalu hall staircase in a Balmora interior has no clear foot

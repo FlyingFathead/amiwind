@@ -32,10 +32,38 @@
 | Persists in | v0.0.62-dev1 (last seen) |
 | Severity | high: Regressed in v0.0.62-dev1 (was medium): Several image passes run serially or leave most CPUs idle, slowing builds. |
 | Family | Build speed (`build-speed`) |
-| Deferred by the maintainer | 2026-11-12: deferred by the maintainer to v0.0.66 (the v0.0.65 release fixes the opening only and ships early); its "came back" mark is checked against its evidence first |
+| Deferred by the maintainer | 2026-11-16: deferred to v0.0.67 by the maintainer (2026-11-16); the v0.0.66 release ships without it, and what would confirm a fix is in the status |
 | Came back (regression) | in v0.0.62-dev1 (fixed in v0.0.48 before) |
 
 <!-- END GENERATED FACTS -->
+
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.32-dev
+- 2026-10-08: seen again in v0.0.32-dev: BUILD-IMAGE-UNDERUSED-32: parts of the image step still serial
+- 2026-10-08: Image-parallel follow-ups merged: Fixed in source on the v0.0.32 development line, not yet shipped (state stays open): BUILD-LIGHT-THREADS-32 (one light thread for every map through one helper; maps lit with several threads before now ...
+- 2026-10-11 00:43 +0300: seen again in v0.0.36-dev3: audio payload and CHIM maps serial, stats on one core
+- 2026-10-20 02:30 +0300: seen again in v0.0.45: v0.0.45 perf guard FAILED: image bake_body 14.17/24 cores +50 percent, four image sections at about one core
+- 2026-10-20 14:48 +0300: seen again in v0.0.46-dev1: dev1 try 2: image 15m38s at 8.9 of 24; finalize 10m at 7.1; boot partition 50 s and CHIM volume 45 s at 1 core (xdftool one by one); a 281 s stall, 62 queued, 0 running
+- 2026-10-20 20:02 +0300: seen again in v0.0.46: v0.0.46 release image: CHIM world volume 43.4 s then boot partition 42.0 s, each on 1 core, one after the other; written at once on branch v0.0.46-span-what-we-need
+- 2026-10-21: v0.0.47-dev2: BUILD-IMAGE-WORLD-READ-FRAMES-47: the v0.0.47-dev2 build's frame-read pool on 3 of 24 cores: BUILD-IMAGE-WORLD-READ-FRAMES-47 (new): the image step's CHIM world read failed the perf guard of the v0.0.47-dev2 build (try 3) ...
+- 2026-10-21: v0.0.47-dev1: v0.0.47-dev1 build: the CHIM and image sections under half their cores: The build summary of the v0.0.47-dev1 build (try 2, 41 minutes) listed `underused:chim` six times, `underused:image` four times and the perf guard failure of the body ...
+- 2026-10-21 14:44 +0300: seen again in v0.0.47-dev1: dev1 try 2: image 8m00s at 8.4 of 24, 4 windows (3m16s); finalize 3m19s at 2.95; preflight 16.0 s and 18.5 s at 1.1; partitions 36.9 s at 1.67 of 2
+- 2026-10-21 17:30 +0300: seen again in v0.0.47-dev2: dev2 try 3, FIX-NOW: frame-read pool 102 s on 2.96 of 24 cores, 91 units; see BUILD-IMAGE-WORLD-READ-FRAMES-47
+- 2026-10-23: seen again in v0.0.48-dev2: dev2 try8 payload preflight 47 s on 1.6 of 24 cores; try5 bake_unit map 66 s on 0.0 of 24 (waits); image failed both runs
+- 2026-11-07: seen again in v0.0.62-dev1: Seen again in the v0.0.62-dev1 build: the image stage ran on 6.3 of 24 cores for 81 s with 4 units queued and none running, so the scheduler left work waiting (tracker BUILD-IMAGE-QUEUE-STALL-62).
+- 2026-11-07: came back in v0.0.62-dev1 (fixed in v0.0.48 before): Seen again in the v0.0.62-dev1 build: the image stage ran on 6.3 of 24 cores for 81 s with 4 units queued and none running, so the scheduler left work waiting (tracker BUILD-IMAGE-QUEUE-STALL-62).
+- 2026-11-09 13:44 +0200: seen again in v0.0.63-dev2: v0.0.63-dev2 full build: image step 1,638 s.
+- 2026-11-09 15:10 +0200: seen again in v0.0.63-dev3: Seen in the v0.0.63-dev3 build (run 2026_11_09_v0.0.63-dev3_full-v0.0.63-dev3-try2_6e68096): the CHIM room actor bake took all 2,342 placements from its unit cache room-actor (0 fitted), yet the step took 1m22s on 1.3 of 24 cores: the ...
+- 2026-11-10 02:34 +0200: seen again in v0.0.63: Seen again in the v0.0.63 release build: the image step links its 7,181 media files one by one at about 2 of 24 cores.
+- 2026-11-11 01:51 +0200: seen again in v0.0.64-dev4: v0.0.64-dev4 full build: the image step wrote its disk layout in 122 s against 66 s before, two units on about 1.3 cores.
+- 2026-11-16: deferred by the maintainer: deferred to v0.0.67 by the maintainer (2026-11-16); the v0.0.66 release ships without it, and what would confirm a fix is in the status
+
+<!-- END GENERATED TIMELINE -->
 
 _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
@@ -43,6 +71,7 @@ _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 ## Contents
 
 - [PERSISTING: reported 13 times; something has to be done](#persisting-reported-13-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Seen again: 7 November 2026 (v0.0.62-dev1)](#seen-again-7-november-2026-v0062-dev1)
 - [Status: 23 October 2026 (v0.0.48)](#status-23-october-2026-v0048)
 - [Status: 8 October 2026](#status-8-october-2026)
@@ -239,7 +268,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-IMAGE-FRAME-MAP-HEAP-SERIAL-36](BUILD-IMAGE-FRAME-MAP-HEAP-SERIAL-36.md): The image step's CHIM frame-map heap check runs on one core: 66 s to 4.5 min per build while 23 cores idle
 - [BUILD-IMAGE-HASH-UNDERUSED-36](BUILD-IMAGE-HASH-UNDERUSED-36.md): The image step hashes 34,592 payload files on 3 of 24 cores (one file per pool task)
 - [BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36](BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36.md): The image step's world map heap audit estimates 170 maps on 5.3 of 24 cores
-- BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66 (no report page): The image step of the v0.0.66-dev9 build wrote its partitions in 107 seconds where the earlier build took 67
+- [BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66](BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66.md): The image step of the v0.0.66-dev9 build wrote its partitions in 107 seconds where the earlier build took 67
 - [BUILD-IMAGE-NOT-INCREMENTAL-33](BUILD-IMAGE-NOT-INCREMENTAL-33.md): The image step redoes every per-map pass and the whole pack on every build
 - [BUILD-IMAGE-NPC-CHECKS-LATE-44](BUILD-IMAGE-NPC-CHECKS-LATE-44.md): The image step's player body and guard torch bakes fail only at the end of a full build instead of before the expensive stages
 - [BUILD-IMAGE-REGION-MAPS-SERIAL-43](BUILD-IMAGE-REGION-MAPS-SERIAL-43.md): The image step's CHIM frame-map phases run on one core: the world read six times, ground traces on whole frames
@@ -356,6 +385,8 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - NPC-BAKE-STAGES-OVERRUN-62 (no report page): The new seam and floor character bake made every stage that bakes characters run far past its history: room batches about 2 h 40 min, actor library about 40 min, player bodies 35+ min
 - [NPC-BAKED-WHOLE-DUPLICATION-33](NPC-BAKED-WHOLE-DUPLICATION-33.md): Every NPC appearance is baked whole: shared body parts are converted again for each actor, and equipment cannot change
 - [NPC-LIBRARY-NO-UNIT-CACHE-63](NPC-LIBRARY-NO-UNIT-CACHE-63.md): The NPC appearance bakes of the actor library stage had no unit cache, so every rebuild of the stage baked all 418 appearances again (about 45 minutes)
+- PARTITION-CACHE-FIXED-WORKERS-66 (no report page): The new partition cache hashed its files on a fixed eight threads instead of the stage's own allowance
+- PERF-GUARD-BASIS-BY-COUNT-66 (no report page): The performance guard judges the image step's partition write by the number of partitions and not by their size, so a slowdown back to the old time would pass
 - [PERF-GUARD-RESIDENT-BUSY-HOST-57](PERF-GUARD-RESIDENT-BUSY-HOST-57.md): The dev5 full build's perf guard failed chim-town-balmora and chim-town-vivec_city build_resident as slower (129 s, was 52 s; 147 s, was 62 s) while two other builds ran beside it: contention, not code
 - PLAYER-VIEW-SKIN-ROWS-STOP-62 (no report page): The image step's player view stopped the v0.0.62 final build after 1 h 13 min: an Alias skin rows overflow ended it instead of trying the next smaller body
 - RELEASE-GUARD-SLOW-CLONE-51 (no report page): The release guard, the fail-fast first step of a release, took 6 minutes on about 0.14 of a core: its release check clones the whole repository through the Windows-mounted drive

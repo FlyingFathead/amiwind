@@ -15,6 +15,18 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.33-dev
+- 2026-10-08: v0.0.33-dev1: BUILD-ENV-FINGERPRINT-GLOBAL-33, merges for v0.0.33-dev1: BUILD-ENV-FINGERPRINT-GLOBAL-33: the v0.0.33-dev1 build reused 0 of 34 stages from the v0.0.32 release run, because the stair rule setting is an environment variable that goes into ...
+- 2026-10-08: Seyda Neen on CHIM: first world, stair gate and findings: The CHIM builder regenerates Seyda Neen's exterior (format 0.5) and validates it, but the stair gate fails: the rule does not clear the exterior lighthouse ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 ## Status: 8 October 2026

@@ -2,6 +2,7 @@
   "_about": "Where every file of the docs/ root went in the v0.0.55 reorganisation (old path -> new path). Nothing was deleted: every row is a git rename. \"superseded\": the topic docs moved to docs/history/superseded/ and the docs that replace them. Old tag trees keep the old paths; this file maps them.",
   "moves": {
     "docs/ASSET_PROGRESS.md": "docs/history/superseded/ASSET_PROGRESS.md",
+    "docs/BUG_JOURNAL.md": "docs/BUGS.md",
     "docs/BALMORA-v0.0.24-dev1.md": "docs/history/other/BALMORA-v0.0.24-dev1.md",
     "docs/BUGS-v0.0.29-RC1.md": "docs/history/checkpoints/BUGS-v0.0.29-RC1.md",
     "docs/BUILD_RECOVERY_STORAGE.md": "docs/history/superseded/BUILD_RECOVERY_STORAGE.md",

@@ -15,6 +15,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.32-dev
+- 2026-10-08: Independent review of the open-world plan: All performance figures were taken with the emulator at host speed; flat directories are slow on real FFS; brush models may fragment down the terrain BSP; the loader stages lumps before decoding.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.43 (19 October 2026)._
 
 ## Status: 8 October 2026
@@ -91,6 +102,7 @@ Family: Map heap and memory budget (`heap-memory`). The heap model must match wh
 - HOLLOW-COLLISION-PLATE-PER-TRIANGLE-64 (no report page): A hollow model gets one exact-bevel collision plate per authored collision triangle, and a visual recipe ratio reduces only the drawn mesh
 - HUNK-RESERVE-SN012-29 (no report page): Dev4 first-presented sn012 reserve below 2 MiB target
 - [MAP-UNUSED-HULL2-32](MAP-UNUSED-HULL2-32.md): Shipped maps carry about 1.1 MB of collision data for a hull the engine never uses
+- [MEM-EXTRA-HDF-27](MEM-EXTRA-HDF-27.md): Map loads bypassed the engine's file search paths: a map on an extra world disk image fell back to a whole-file read
 - MEM-GEOMETRY-01 (no report page): Light-range sharing could copy a too-short byte span
 - MEM-TOWN-02 (no report page): Bounded Balmora maps exceeded the modeled map heap limit
 - MEMCENSUS-OWNERS-START-STALL-64 (no report page): An engine with the first per-asker block count stalled at the start: every free searched the whole count table once its removal markers filled it

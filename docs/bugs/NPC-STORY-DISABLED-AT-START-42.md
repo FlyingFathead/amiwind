@@ -19,15 +19,38 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.62-dev1 (b998cb2d) | 2026-11-07 | gate 7722 passed on 4aee681c, which holds it | a new game runs the run-once start scripts, so Startup disables its 102 story references |
+| shipped | a numbered build | v0.0.62-dev1 build 2026_11_07_v0.0.62-dev1_full-v0.0.62-dev1_089421b | 2026-11-07 | the delivered build | the build holds b998cb2d |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-17: reported in v0.0.42-dev1
+- 2026-10-17: NPC-STORY-DISABLED-AT-START-42: NPC-STORY-DISABLED-AT-START-42: registered: the original's Startup script disables 58 NPCs (the twelve town Dreamers and the Dreamer Prophet among them) and 20 creatures at a new game, and the Dreamers ...
+- 2026-11-07: fixed in source: a gated commit, v0.0.62-dev1 (b998cb2d); gate 7722 passed on 4aee681c, which holds it: a new game runs the run-once start scripts, so Startup disables its 102 story references
+- 2026-11-07: shipped: a numbered build, v0.0.62-dev1 build 2026_11_07_v0.0.62-dev1_full-v0.0.62-dev1_089421b; the delivered build: the build holds b998cb2d
+- 2026-11-07 02:34 +0200: seen again in v0.0.61: Dreamers stand on the roads from the start of a new game (the maintainer's play); cause: the global script Main never ran, so its run-once Startup never disabled them
+
+<!-- END GENERATED TIMELINE -->
+
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
 - [Why it was not caught](#why-it-was-not-caught)
 - [Reproduction](#reproduction)
 - [Repair](#repair)
+  - [The runtime route (v0.0.62)](#the-runtime-route-v0062)
 - [Verification](#verification)
 - [Prevention](#prevention)
 - [Bugs in the same category](#bugs-in-the-same-category)
@@ -248,6 +271,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - NPC-BAKE-FALLBACK-62 (no report page): Characters the new seam and floor bake cannot fit in the alias budget are baked a second time with the v0.0.62-dev1 body rules
 - [NPC-BAKE-VERTEX-32](NPC-BAKE-VERTEX-32.md): NPC resident baking can exceed the alias vertex budget
 - NPC-CAST-MAGICKA-NOT-PAID-66 (no report page): A fighter's spell costs it no magicka: the cast's payment names the wrong stat
+- [NPC-CONVERSATION-FACING-23](NPC-CONVERSATION-FACING-23.md): NPCs do not turn to face the player in conversation
 - [NPC-DAGOTH-BODY-DECIMATION-33](NPC-DAGOTH-BODY-DECIMATION-33.md): Dagoth Ur's body is decimated; his whole model exceeds the alias ceiling
 - [NPC-FEMALE-SKELETON-33](NPC-FEMALE-SKELETON-33.md): Female humans are posed on the male skeleton file (base_anim.nif), the original uses base_anim_female.nif
 - [NPC-FOLLOW-FLOORS-33](NPC-FOLLOW-FLOORS-33.md): The test companion cannot find stairs to another floor of an interior; it is placed beside the player after 6 seconds
@@ -291,7 +315,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - SWEEP-SEYDA-EIGHT-FAIL-59 (no report page): dbg sweep reports 8 failing entities in Seyda Neen on a v0.0.59-dev3 MiniWind with the placed world items; the Census Office map reported 3 in v0.0.58 sessions
 - SWIM-BAKED-CLOTHES-60 (no report page): Swimming in third-person view shows default clothes instead of the player's own
 - TOMB-NO-CREATURES-60 (no report page): Samarys Ancestral Tomb has no ghosts, skeletons or other creatures
-- WANDER-DOOR-RULE-66 (no report page): A wandering resident can stop at a destination right by a door and stand there; the original sends an idle wanderer near a door walking
+- [WANDER-DOOR-RULE-66](WANDER-DOOR-RULE-66.md): A wandering resident can stop at a destination right by a door and stand there; the original sends an idle wanderer near a door walking
 
 Related bugs in other categories:
 

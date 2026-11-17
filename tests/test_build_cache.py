@@ -1292,7 +1292,7 @@ class StageKeyCoverageTests(unittest.TestCase):
                 continue  # engine (never reused: BUILD-ENGINE-KEY-SDK-33) and image (always assembled)
             _, data, _ = index.closure(ROOT / 'tools' / script)
             tracker = sorted(path for path in data if path == 'tools/release-files.json' or path.startswith('docs/bugs/')
-                             or path in ('docs/BUGS.md', 'docs/BUG_JOURNAL.md'))
+                             or path == 'docs/BUGS.md')
             self.assertEqual(tracker, [], script)
 
 

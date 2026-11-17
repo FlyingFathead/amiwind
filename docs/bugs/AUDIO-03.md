@@ -17,13 +17,28 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-03: AUDIO-03: WinUAE video-to-Jiub loading spike: The maintainer reports repeatable audio glitches during the heaviest scene-loading spike immediately after the intro movie, when entering the Jiub opening scene.
+- 2026-10-07: AUDIO-03 and AUDIO-LOGO-31: music started under disk-heavy moments: The maintainer, WinUAE: the music still crackles right after the intro video, and also while the startup logo plays.
+- 2026-10-07: v0.0.30-rc1: v0.0.30-rc1 the maintainer playtest summary: WinUAE playtest by the maintainer: Census office interiors work (CENSUS-ENTITIES-30 accepted), mushroom picking on the road to Balmora works, Balmora works and torches work.
+- 2026-10-07: AUDIO-NEWGAME-30: rc1 playtest audio reports: v0.0.30-rc1 WinUAE playtest by the maintainer: music crackles when confirming New Game (new, report (AUDIO-NEWGAME-30)); crackles as the game fades in after the intro (AUDIO-03); a split-second ...
+- 2026-10-29: deferred by the maintainer: to v0.0.57, the maintainer (desktop chat 2026-10-29, on the six expired v0.0.56 deferrals): approved, the six bugs are deferred to v0.0.57.
+- 2026-10-31: seen again in v0.0.57-dev5: Supporting reading only (FS-UAE, not the WinUAE judgement): v0.0.57-dev5 full image, 32 MB Fast, audio on, aw_new_game: the load from the intro movie into the prison ship read longest mixer gap 63 ms with the mix 1486 ms ahead, 0 late ...
+
+<!-- END GENERATED TIMELINE -->
+
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 ## Status: 7 October 2026
 
 Open. Reported in v0.29-era builds, still present in v0.0.30-rc1 and
 v0.0.31-dev2 (maintainer, WinUAE). Cause found in source; repair in source, not yet
-packaged or heard. Earlier history: [journal](../journals/BUG_JOURNAL-v0.0.29.md#audio-03-winuae-video-to-jiub-loading-spike).
+packaged or heard. Earlier history: the entry's dated history in the timeline below.
 
 ## Symptom
 

@@ -19,6 +19,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-07: reported in v0.0.31
+- 2026-10-08: WORLD-REGION-DUPLICATION-31: exterior objects stored about ten times: Overlapping self-contained region maps store each exterior object about 9.8 times; most of the 4.8 GB of game files and the ~20 GB whole-island estimate is repeated ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.41-dev1 (15 October 2026)._
 
 ## Status: 8 October 2026

@@ -15,6 +15,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-09: reported in v0.0.33-dev
+- 2026-10-09: DEBUG-TP-CHIM-33: dbg tp on a pure-CHIM disk: DEBUG-TP-CHIM-33: on a disk with only the CHIM frame maps of the towns, `dbg tp X Y` into a CHIM town said the teleport was unavailable (the target check looked for the town's legacy map) and ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42-dev2 (17 October 2026)._
 
 ## Status: 9 October 2026

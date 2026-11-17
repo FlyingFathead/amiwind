@@ -38,7 +38,7 @@ The build reports target-ABI estimates and the remaining growth margin in its
 `build.json` receipt; target runtime measurements remain pending. More HDF capacity
 does not increase engine heap. See the [memory allocation policy](../../MEMORY_ALLOCATION.md),
 [heap watcher receipts and lifecycle requirements](../../HEAP_WATCHER.md), and the
-[bug journal](../../BUG_JOURNAL.md). The original crash remains open until the exact
+[bug tracker](../../BUGS.md). The original crash remains open until the exact
 packaged route passes owner target lifecycle playtesting. The host-side candidate repair and static build gates passed; the original crash is not yet target-verified.
 
 Rc4 also adds versioned FS-UAE and WinUAE configuration generation from the
@@ -76,7 +76,7 @@ Existing playback and mixer routines are unchanged. Target playback verification
 remains open.
 Conversion and runtime integration of the complete 17-video catalogue remain
 later work; the existing opening logo and intro clips remain supported. See the
-[bug journal](../../BUG_JOURNAL.md) for the two corrected retry-helper incidents and
+[bug tracker](../../BUGS.md) for the two corrected retry-helper incidents and
 their preserved safety behavior.
 ## Known limitations and deferred work
 

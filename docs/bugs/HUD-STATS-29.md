@@ -29,12 +29,32 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-05: HUD-STATS-29: healthy character appears partly depleted (OPEN) (part 1 of 2): Source-candidate update: The source candidate now uses independent stat current/max values, with live single-player health authoritative where applicable and ...
+- 2026-10-05: HUD-STATS-29: healthy character appears partly depleted (OPEN) (part 2 of 2): Cause: `AW_UIHud` divides live health by fixed 100 rather than the character's maximum.
+- 2026-10-14: seen again in v0.0.40-dev1: Original HUD reference requires actual weapon/fists and selected spell/enchantment boxes with applicable condition/charge indicators; no off-hand guess.
+- 2026-10-14: seen again in v0.0.40-dev1: Opening HUD timing queried.
+- 2026-10-14: seen again in v0.0.40-dev2: Dev2 source restores staged HUD channels and paper-pickup fighting.
+- 2026-10-14: seen again in v0.0.40-dev2: Original and candidate show paper pickup enabling fists before the hall guard; reading alone does not.
+- 2026-10-14: UI-INVENTORY-INTEGRATION-40: scoped native equipment: UI-INVENTORY-INTEGRATION-40/INVENTORY-CATALOG-LOOKUP-40: actual names/icons, equip, modal pause and Russula persistence scoped; missing resources separate.
+- 2026-10-17: HUD-STATS-29: original weapon and magic boxes: HUD-STATS-29, persisting (reported a fifth time by the maintainer: the boxes were placeholders).
+- 2026-10-17 01:58 +0300: seen again in v0.0.42-dev1: owner: the weapon and magic boxes at the bottom of the HUD are still placeholders (fist, dash) and look bad
+- 2026-11-07 03:39 +0200: seen again in v0.0.61: Release image: in a game started from the map menu the player's sheet reads health 100 of a maximum of 55 (aw_magicfx spell list and the combat report "You: health 100/55"), in three sessions.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 6 times; something has to be done](#persisting-reported-6-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -364,6 +384,7 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - [DIALOGUE-LINKS-62](DIALOGUE-LINKS-62.md): The blue topic words in dialogue text cannot be clicked, a word is highlighted inside a longer word, and asking about a dead person gives "Who?"
 - DIALOGUE-MSGBOX-BEHIND-60 (no report page): Message boxes raised during a conversation open behind the dialogue window
 - DIALOGUE-OPEN-STALL-58 (no report page): Opening a conversation hangs the game for many seconds
+- [DIALOGUE-PADDING-UNEVEN-23](DIALOGUE-PADDING-UNEVEN-23.md): Two dialogue rows had uneven vertical spacing
 - EXTRAS-MENU-54 (no report page): Requested: an Extras choice on the main menu that opens what the game holds: the arena, the dance scenes, the in-game videos, later a library of every book
 - FOCUS-BOX-TWO-AT-ONCE-59 (no report page): Two item boxes at once: the box of the item aimed at before stays while the next item's box is drawn below the view
 - FOCUS-BOX-UNDRAWN-ITEMS-58 (no report page): The focus box showed for room items that the room does not draw, and the activate key then took nothing
@@ -400,6 +421,7 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - NAMED-ACTIVATOR-FOCUS-66 (no report page): Named objects such as beds and shrines show no name when looked at
 - [NOCLIP-BOB-DEFAULT-42](NOCLIP-BOB-DEFAULT-42.md): Head bob still on in noclip mode by default, although the noclip bob was set to off by default
 - [NPC-DREAMER-GREETING-DEFAULT-42](NPC-DREAMER-GREETING-DEFAULT-42.md): Dreamers (Sixth House sleepers) give a default greeting instead of their own Sixth House greeting
+- [OPENING-QUOTE-OVERLAY-23](OPENING-QUOTE-OVERLAY-23.md): The first prophecy quote of the intro showed unreadable burned-in lettering again
 - OPENING-SPEECH-LEADING-DOTS-65 (no report page): A speech line in the opening starts with a long row of dots before its text
 - [OPENING-TUTORIAL-KEYS-65](OPENING-TUTORIAL-KEYS-65.md): The opening's tutorial boxes name the original game's controls (right click for the menus) instead of AmiWind's keys
 - OPTIONS-CROSSHAIR-STYLE-48 (no report page): Requested: crosshair colour and shape in Options, and Options in framed categories, full screen
@@ -432,6 +454,7 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - UI-MAP-PLAYER-ARROW-51 (no report page): Requested: the map shows the player as the original s arrow that turns with the player, not a crosshair
 - [UI-MENU-LOGO-32](UI-MENU-LOGO-32.md): The menu logo has a line above the name and reddish-pink letters instead of gold
 - UI-OPTIONS-WRAP-29 (no report page): Setup selection wraps despite a bounded scrollbar
+- [UI-ORNAMENT-GLYPHS-23](UI-ORNAMENT-GLYPHS-23.md): The name-entry caret drew as a ball and the rotation hints as a skull and a tree (ornamental font glyphs)
 - UI-PALETTE-NO-WHITE-48 (no report page): The game palette has no white: a White crosshair draws as the console ink cream (238,221,170)
 - [UI-STATS-WINDOW-48](UI-STATS-WINDOW-48.md): No Stats window (attributes, skills, health/magicka/fatigue) and no Magic window: the original's P and O windows
 - [UI-TEXT-BOX-CLEARANCE-64](UI-TEXT-BOX-CLEARANCE-64.md): Text boxes leave too little room above and below their text (the opening hint: the last line touches the bottom edge)

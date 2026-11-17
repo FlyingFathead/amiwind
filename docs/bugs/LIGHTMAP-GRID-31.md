@@ -15,7 +15,36 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-07: reported in v0.0.31-dev
+- 2026-10-07: LIGHT-FALLOFF-31 correction; LIGHTMAP-GRID-31: My measuring script read placed objects in model-local coordinates, so the claim that the opening lantern bakes no light was wrong: the map is lit around it.
+- 2026-10-08: Vivec limits repaired in source; ERICW-TEXINFO-SIGNED-31, EXTENTS-FPU-RULE-31, VIVEC-HEAP-31 found: VIVEC-TEXINFO-31 and MODEL-MARKSURF-SIGNED-31: the engine reads face texinfo indices, marksurface entries and leaf mark ranges unsigned ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [Timeline](#timeline)
+- [Status: 7 October 2026](#status-7-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Status: 7 October 2026
 

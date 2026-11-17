@@ -76,11 +76,11 @@ Every bug remains **Fixed: N** until its own acceptance is supported.
 | P1 HORIZON-POP-29 | Distant terrain/features abruptly appear or become a mesh mess when turning. | Authored opaque terrain_rock_rm_18 is rejected by far culling. Exact diagnostic geometry visually restores one sample, but the latest lossless OFF baselines drift by 36.11%; controlled pose/view-angle replay is required before acceptance. |
 | P2 MAP-SPOTS-28 | In-game map is covered with unintended white/yellow dots. | AWM1 palette-index data missed the sky remap; candidate corrects pixels/ocean without changing area metadata. Wide and closer native samples show clean terrain with labels/player marker retained; wheel zoom works. Explicit mode selection does not establish mouse-tab acceptance; exact owner view and broader coverage remain open. |
 | P2 HUD-STATS-29 | Healthy character's red bar appears partly empty; all three bars need independent current/max values. | Independent current/max source and pixel fixtures pass. Native health fills match 55/55, 25/55 and controlled 5/55; quickload restores the 25-health frame exactly. Magicka/fatigue stayed full, so their independent depletion remains untested natively. Sampled heading/time is correct; broader state/damage/healing checks remain open. |
-| P1 TORCH-LIGHT-29 | Guards carry torches but do not visibly illuminate nearby night surfaces. | Signed interpolation repair passes synthetic fixtures ([evidence](../../TORCH.md#light-gradient-29-unsigned-surface-light-interpolation-overflow)). One Balmora Hlaalu guard visibly lights pavement: 841/1,680 selected pixels brighten, restore exactly off and match automatic night. Earlier guard view still has identical off/on frames and no recognizable guard; diagnose it separately. General surface, actor and cost acceptance stays open ([incident](../../journals/BUG_JOURNAL-v0.0.29.md#torch-light-29-guard-torches-do-not-illuminate-nearby-night-surfaces-open)). |
+| P1 TORCH-LIGHT-29 | Guards carry torches but do not visibly illuminate nearby night surfaces. | Signed interpolation repair passes synthetic fixtures ([evidence](../../TORCH.md#light-gradient-29-unsigned-surface-light-interpolation-overflow)). One Balmora Hlaalu guard visibly lights pavement: 841/1,680 selected pixels brighten, restore exactly off and match automatic night. Earlier guard view still has identical off/on frames and no recognizable guard; diagnose it separately. General surface, actor and cost acceptance stays open ([incident](../../BUGS.md)). |
 | P2 INTERIOR-LIGHT-29 | Interiors look bleak, with no convincing local light sources. | One Hlaalu Council player-torch replay shows visible wall/floor response; lossless comparison finds 24,728 changed stable viewport pixels, 16,624 above the lower hand/torch band. This is not a depth-classified surface count. One ordinary door roundtrip preserves equipment; F/V restores the sampled light after quickload. Authored static lights, other rooms/save states and budgets remain open. |
 | P2 SKY-NIGHT-COVER-29 | Night can look good in some regions, but near-constant dense cloud cover hides moons, stars and space. | Optional cloud-control V2 provides clear/partial/overcast deep nights and independent midday coverage. Legacy remains default; protected twilight and depth-order fixtures pass. Lossless indexed native frames at one frozen 23:00 dry-exterior pose show optional V2 coverage/night-layer changes confined to sky pixels with exact restores. Broader regions/Balmora, appearance/frame cost and original regional weather remain pending. Playtester accepted the night-sky appearance on 5 October; preserve that baseline. Exact active configuration and wider weather/region coverage remain open. |
 
-Detailed incident records and evidence limits are in [BUG_JOURNAL.md](../../BUG_JOURNAL.md)
+Detailed incident records and evidence limits are in the [bug tracker](../../BUGS.md)
 and the maintained [fix index](../../BUGS.md#fix-index). Passing a console handler or
 showing a flame does not establish working hands, surface lighting or target FPS.
 
@@ -131,7 +131,7 @@ does not establish complete horizon acceptance or resolve streaming. Record
 exact active and previous regions before attributing either issue to cell size.
 Any reduction in sub-cell count must retain source geometry/collision/placement
 coverage and meet existing resident/transition heap limits without reserve
-relaxation. See the new open entries in [the journal](../../BUG_JOURNAL.md).
+relaxation. See the new open entries in [the bug tracker](../../BUGS.md).
 
 Add the angular inland shoreline to the topology checklist: compare source LAND
 and water intersection against conversion at the reported pose, keeping water
@@ -244,7 +244,7 @@ The controlled camera at global **51855 39125 3502**, local **-348 565 107**,
 raw **DEG 265 / P 0**, exposes a taller peak formed by the authored opaque
 `terrain_rock_rm_18` static. Its whole-model bounds fail the far-distance gate;
 LAND-only fill cannot reproduce the missing rock silhouette. Other reported
-angles still need their own attribution. See [HORIZON-POP-29](../../journals/BUG_JOURNAL-v0.0.29.md#horizon-pop-29-distant-scenery-pops-or-breaks-up-while-turning-open).
+angles still need their own attribution. See [HORIZON-POP-29](../../BUGS.md).
 
 A bounded LAND/rock heightfield remesh is rejected: 44 of 48 sampled views fail
 coverage, false-occlusion or conservative-depth checks, with a worst sampled
@@ -355,7 +355,7 @@ correction when reproducing the view; it is not a changed player position.
   followed by a pass of the corrected radius assertion in the real-QC fixture. Current current development playtest and native
   acceptance remain pending. See TORCH.md.
 - Cross-check current shack persistence and the separate angular rock-like
-  ground-form report in BUG_JOURNAL.md. Object identity and both root causes
+  ground-form report (ROCK-FLORA-SURFACE-29 in the bug tracker). Object identity and both root causes
   remain open.
 
 

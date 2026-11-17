@@ -28,6 +28,19 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-07: reported in v0.0.31-dev2
+- 2026-10-07: SEYDA-WALL-SHAPE-31: likely a tree card drawn through a wall: Ray-cast of the reported pose: the dark shape matches the trunk base of a camera-facing tree card standing 230 units behind the wall, depth-tested at the tree's centre.
+- 2026-10-25 14:21 +0200: seen again in v0.0.51: Seen again on the v0.0.51 final (trees as CHIM models): dbg tp -10474 -73437, aw_aim 58 10: the dark triangle at the wall end by the shore, so not the old tree billboard
+- 2026-10-27 16:58 +0200: seen again in v0.0.53: PERSISTING on the v0.0.53 final with the CHIM trees (27 October 2026, FS-UAE 16 MB, Seyda Neen arrival): the drystone wall x/ex_drystonewall_c_01s1 (CHIM placement 74143, reference 113892, cell -2,-9) shows the wrong shape; stills kept ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 ## Status: 7 October 2026
@@ -110,6 +123,7 @@ Family: Distance drawing (horizon, fog, sky, far edges) (`distance-drawing`). Fa
 - [LAND-HORIZON-GAPS-29](LAND-HORIZON-GAPS-29.md): Sky visible through gaps in distant resident ground
 - [RENDER-FOG-PASS-COST-33](RENDER-FOG-PASS-COST-33.md): The per-pixel fog and day-night sky pass costs 150-210 ms per frame on a slow 68040
 - [SHELL-TEXTURE-VOTE-32](SHELL-TEXTURE-VOTE-32.md): Distant shells: door and grille textures win over large sealed areas
+- [SKY-FOG-OFF-BACKGROUND-25](SKY-FOG-OFF-BACKGROUND-25.md): With fog off, far pixels outdoors that no surface covered showed a pale solid background instead of the sky
 - SKY-NIGHT-COVER-29 (no report page): Dense night clouds rarely reveal moons/stars
 - SKY-STARS-28 (no report page): Enlarged stars cover original night artwork
 - SKY-VISUAL-01 (no report page): Sky-only day/night remap clashed with gray distance fog

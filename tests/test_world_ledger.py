@@ -179,16 +179,21 @@ class ScriptLocalsWiringTests(unittest.TestCase):
         self.assertNotRegex(ledger, r'static\s+aw_ledger_local_t\s+\w+\s*\[')
 
     def test_the_parking_store_holds_a_whole_game(self):
-        # the game places 2,115 references whose script has locals, 7,388 values (v0.0.59-dev5's compiled scripts)
+        # EXPANSION-SCRIPT-LIMITS-66 (MWVM-PARKING-STORE-SMALL-66): the store is no longer a constant; the builder counts
+        # it from the game (tools/mwscript/plan.py) and the engine allocates the file's plan at load. The engine's hard
+        # maxima hold the whole game with both expansions (counted 16 November 2026 from the three masters: 3,496 bound
+        # objects with values and 10,499 values, 136 carried items' scripts with 214 values, 1,777 levelled-list
+        # placements that can give a scripted actor with 1,814 values, 124 planned script-made copies with 284 values).
         header = code('aw_mwvm.h')
-        parked = int(re.search(r'#define AW_MWVM_PARKED (\d+)', header).group(1))
-        cells = int(re.search(r'#define AW_MWVM_PARK_CELLS (\d+)', header).group(1))
-        self.assertGreaterEqual(parked, 2115)
-        self.assertGreaterEqual(cells, 7388)
-        # SAVE-ITEM-SCRIPT-LOCALS-66: and the items placed holders hold (491 rows, 929 values with both expansions)
-        self.assertGreaterEqual(parked, 2115 + 491)
-        self.assertGreaterEqual(cells, 7388 + 929)
-        self.assertLessEqual(cells, 0xFFFF)                                  # parked_t.at is 16 bits
+        parked_max = int(re.search(r'#define AW_MWVM_PARKED_MAX (\d+)', header).group(1))
+        cells_max = int(re.search(r'#define AW_MWVM_PARK_CELLS_MAX (\d+)', header).group(1))
+        self.assertGreaterEqual(parked_max, 3496 + 136 + 1777 + 124)
+        self.assertGreaterEqual(cells_max, 10499 + 214 + 1814 + 284)
+        self.assertLessEqual(cells_max, 0xFFFF)                              # parked_t.at is 16 bits
+        self.assertLessEqual(parked_max, 0xFFFE)                             # the hash holds an index + 1 below 0xFFFF
+        # the earlier constants are what an older file (an 8-byte CONF) still gets
+        self.assertEqual(int(re.search(r'#define AW_MWVM_PARKED_DEFAULT (\d+)', header).group(1)), 2816)
+        self.assertEqual(int(re.search(r'#define AW_MWVM_PARK_CELLS_DEFAULT (\d+)', header).group(1)), 9216)
 
 
 class ScriptStateWiringTests(unittest.TestCase):

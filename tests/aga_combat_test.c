@@ -31,7 +31,7 @@ static int items_shown,items_hidden;
 /* NPC-NO-SPELLCASTING-65, the cheaper version: with spell_actor set the fighter has a record that knows two spells;
  * every actor table read of its spells is counted (spell_reads), so the test proves the think reads none after the
  * fight's start */
-static int spell_actor;static unsigned long spell_reads;static aw_actor_t spell_record;
+static int spell_actor,cast_paid;static unsigned long spell_reads;static aw_actor_t spell_record;
 /* ACTOR-RANGED-COMBAT-MISSING-66: with ranged_actor set the fighter's record carries ARROWS rounds of AITM row 40 (an
  * arrow, chop 2-6); every round taken off it is counted (removed); the shaft's drawn points are counted; a shot that
  * crosses the player's front (shot_player) hits the player's edict */
@@ -57,10 +57,16 @@ int AW_ActorSpellEffects(int spell,aw_spell_effect_t *out,int max){
     return 1;
 }
 float AW_PlayerEncumbrance(float *capacity){if(capacity)*capacity=250;return 40;}   /* aw_move.c: the player's load */
-int AW_ActorSpellFlags(int spell){(void)spell;if(spell_actor)spell_reads++;return 0;}
+int AW_ActorSpellFlags(int spell){(void)spell;if(spell_actor)spell_reads++;return cast_paid?AW_SPELL_ALWAYS:0;}
 int AW_ActorMagicEffect(int index,aw_mgef_t *out){(void)index;if(!spell_actor)return 0;spell_reads++;memset(out,0,sizeof(*out));out->base_cost=5;return 1;}
-float AW_ActorStat(const aw_actor_t *a,int stat){(void)a;(void)stat;return 0;}
-void AW_ActorModCurrent(aw_actor_t *a,int dynamic,float value){(void)a;(void)dynamic;(void)value;}
+/* NPC-CAST-MAGICKA-NOT-PAID-66: with cast_paid set the fighter's record has MAGICKA points of magicka and good attributes;
+ * a change of its magicka (AWA_MAGICKA only: any other stat is ignored, as AW_ActorModCurrent ignores it) is counted */
+static int magicka_changes;static float magicka,magicka_last;
+float AW_ActorStat(const aw_actor_t *a,int stat){(void)a;
+    if(!cast_paid)return 0;
+    return stat==AWA_MAGICKA?magicka:stat>=AWA_ATTRIBUTE && stat<AWA_ATTRIBUTE+8?50:0;}
+void AW_ActorModCurrent(aw_actor_t *a,int dynamic,float value){(void)a;
+    if(cast_paid && dynamic==AWA_MAGICKA){magicka+=value;if(magicka<0)magicka=0;magicka_last=value;magicka_changes++;}}
 float AW_AnimKitCast(edict_t *e,const char *variant){(void)e;(void)variant;return -1;}
 unsigned long AW_CastActorCasts(void){return 0;}
 int AW_CastActorRelease(edict_t *caster,edict_t *target,int row,float reach){(void)caster;(void)target;(void)row;(void)reach;return -1;}
@@ -646,6 +652,21 @@ int main(void){
      assert(spell_reads==2*at_start);
      AW_CombatClear();spell_actor=0;
      printf("spell cache ok: %lu reads at the fight's start, none in the next %ld ticks\n",at_start,(long)600);}
+    /* NPC-CAST-MAGICKA-NOT-PAID-66: a fighter with magicka for two casts of a 10-point spell casts twice, the magicka
+     * falling by the cost each time (20, 10, 0), and then cannot cast (OpenMW 0.51 worldimp.cpp startSpellCast pays at
+     * the start) */
+    {aw_fighter_t a;int k;
+     AW_CombatClear();p->v.health=1000;p->v.button0=0;npc->v.solid=SOLID_BBOX;npc->v.health=0;
+     npc->v.origin[0]=500;npc->v.origin[1]=0;p->v.origin[0]=300;
+     assert(AW_CombatActorLoad("mevil molor",&a));
+     spell_actor=1;cast_paid=1;magicka=20;magicka_changes=0;
+     assert(AW_CombatEngage(npc,&a,NULL));
+     for(k=0;k<3000 && magicka_changes<2;k++)tick(1);
+     assert(magicka_changes==2 && magicka==0 && magicka_last==-10);   /* two casts, each paid in magicka */
+     tick(2000);
+     assert(magicka_changes==2 && magicka==0);                        /* none left: no third cast */
+     AW_CombatClear();spell_actor=0;cast_paid=0;
+     printf("cast pays magicka ok: two casts of 10, none after\n");}
     /* ACTOR-RANGED-COMBAT-MISSING-66: an archer (a bow on its sheet, 3 arrows on its record) 200 units away keeps its
      * place and shoots: each shot takes one arrow off the record, flies (drawn as a shaft) and hits the player (a sure
      * Marksman); a shot that crosses nobody misses; out of arrows it closes in by hand */

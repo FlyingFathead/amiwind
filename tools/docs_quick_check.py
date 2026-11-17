@@ -22,7 +22,7 @@ Checks, each only when a file it covers changed:
   console-page   tests/test_console_commands_doc.py: the generated console command page is current
                  (when config/debug-commands.txt or the page changed)
   register       tools/bug_register.py check: the bug register and its generated parts are in sync
-                 (when docs/bugs/, docs/BUGS.md or docs/BUG_JOURNAL.md changed)
+                 (when docs/bugs/ or docs/BUGS.md changed)
 
 The checks read the files on disk. Exit 0 when every check that ran passed (or none applied), 1 when one failed,
 2 on a usage error. It never replaces the gate: the full suite still runs there.
@@ -103,8 +103,7 @@ def plan(paths):
                                   'tools/console_commands_doc.py'))
     if page:
         out.append(('console-page', 'the command catalogue or its page'))
-    reg = any_of(lambda p: p.startswith('docs/bugs/') or p in ('docs/BUGS.md', 'docs/BUG_JOURNAL.md',
-                                                                 'tools/bug_register.py'))
+    reg = any_of(lambda p: p.startswith('docs/bugs/') or p in ('docs/BUGS.md', 'tools/bug_register.py'))
     if reg:
         out.append(('register', '%d register file(s)' % len(reg)))
     return out

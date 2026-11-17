@@ -28,12 +28,26 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-09: reported in v0.0.32
+- 2026-11-07: seen again in v0.0.61: Seen again on the v0.0.61 release image: the head stands apart from the torso on Jiub, the prison ship guards and Sellus Gravius; the bodies look in pieces.
+- 2026-11-07 12:13 +0200: seen again in v0.0.62-dev1: Seen again on the prison ship: two guards show a gap between the head and the torso, and Sellus Gravius in the Census and Excise Office looks broken into pieces.
+- 2026-11-07 16:22 +0200: seen again in v0.0.62-dev1: In v0.0.62-dev1 the intro guard's head is detached from the body, and the body and proportions of Jiub are still wrong (stick limbs).
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Status: 9 October 2026](#status-9-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)

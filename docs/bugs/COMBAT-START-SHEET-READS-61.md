@@ -20,6 +20,18 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-06: reported in v0.0.61-dev2
+- 2026-11-06: STEAL-WITNESSED-NO-CRIME-60 in the works: theft seen by witnesses: STEAL-WITNESSED-NO-CRIME-60 (the register's entry): the theft rules of OpenMW 0.51 (commitCrime, reportCrime, awarenessCheck) are being added: witnesses within the alarm ...
+- 2026-11-07 03:39 +0200: seen again in v0.0.61: Release image: the seen theft in Arrille's Tradehouse with four residents starting to fight cost 1,135 ms in the crime step and held a 2,003 ms frame (550 ms in two other sessions).
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.61-dev2 (6 November 2026)._
 
 ## Status: 6 November 2026
@@ -104,5 +116,6 @@ Family: Rendering cost and visibility (`render-performance`). Read the visibilit
 - SKEL-RUNTIME-COST-52 (no report page): The skeletal prototype poses every vertex twice a drawn frame, with three divisions and three float-to-integer conversions each: it must cost what a baked frame costs
 - [SPRITE-BAD-TYPE-THREADED-56](SPRITE-BAD-TYPE-THREADED-56.md): R_DrawSprite: Bad sprite type ends a load (dbg aw hors 0) on Amiberry with the threaded CPU: the game stays on Loading
 - [TOWN-VIS-OCCLUSION-31](TOWN-VIS-OCCLUSION-31.md): Converted buildings, rooms and rocks do not block Quake visibility (func_wall)
+- [TREE-SPRITE-DEPTH-23](TREE-SPRITE-DEPTH-23.md): A tree sprite was cut off against the background: a signed depth compared as unsigned
 
 <!-- END GENERATED CATEGORY -->

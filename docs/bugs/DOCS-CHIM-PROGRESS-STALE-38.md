@@ -20,11 +20,28 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-13: reported in v0.0.38
+- 2026-10-13: DOCS-CHIM-PROGRESS-STALE-38: DOCS-CHIM-PROGRESS-STALE-38: Maintainer reports the main README map is stale.
+- 2026-10-13: UI-DEATH-DAMAGE-TINT-38, candidate: DOCS-CHIM-PROGRESS-STALE-38 (2026-10-13): prepared a current reference-derived README map and coherent coverage guide; corrected historical plan/lava/lighting figures.
+- 2026-10-14: DOCS-CHIM-PROGRESS-STALE-38: final shipment wording recurrence: DOCS-CHIM-PROGRESS-STALE-38/DOCS-RELEASE-EVIDENCE-SCOPE-39: reconcile README/map guide with final039 delivery07:15:35UTC; earlier Nord views are historical.
+- 2026-10-14: Renewed RC2 gameplay reports: DOCS-CHIM-PROGRESS-STALE-38: 13 October 2026, v0.0.39 final preparation: the maintainer approved RC1 as the final-release basis.
+- 2026-10-14: DOCS-RELEASE-EVIDENCE-SCOPE-39 - final source reconciliation: DOCS-CHIM-PROGRESS-STALE-38: final source retains the exact RC2 coverage and remaining tracker display limitation.
+- 2026-10-15: 15 October 2026 - ring plan and public image selection: DOCS-CHIM-PROGRESS-STALE-38: Refreshed the reference and progress map from the canonical 06:48 UTC snapshot.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -260,6 +277,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [TRACKER-INTERIORS-NOT-SHOWN-48](TRACKER-INTERIORS-NOT-SHOWN-48.md): The CHIM Progress Tracker does not show the interiors: no room list, no counts per island and state, and 16 rooms with no entrance area left out of every batch
 - [TRACKER-MAP-BLANK-31](TRACKER-MAP-BLANK-31.md): World progress map vanished when the mouse moved over it
 - [TRACKER-OCEAN-COUNTED-DONE-36](TRACKER-OCEAN-COUNTED-DONE-36.md): The tracker counts the 867 open-ocean cells as done, although the engine does not place the ocean chunk yet
+- [TRACKER-OPEN-ENTRIES-STALE-41](TRACKER-OPEN-ENTRIES-STALE-41.md): Register entries stayed open after their fixes shipped: 738 of 842 entries open before the audit of 16 October 2026
 - [TRACKER-REGISTER-LINK-MERGE-33](TRACKER-REGISTER-LINK-MERGE-33.md): An integration merge dropped the CHIM Engine tracker link from the bug register
 - [TRACKER-REGISTER-SIZE-33](TRACKER-REGISTER-SIZE-33.md): The bug register outgrew the release text-file size limit
 - [TRACKER-REGISTER-SIZE-36](TRACKER-REGISTER-SIZE-36.md): The live register bugs.json reached 75 % of its 1 MiB release text limit; the size warning was raised to 85 % until a second archive rotation

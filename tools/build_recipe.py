@@ -63,7 +63,9 @@ NOT_IN_RECIPE = frozenset({
     'recipe_inputs', 'perf_guard', 'perf_guard_baselines', 'size_guard', 'size_baseline', 'size_growth_margin',
     'size_growth_reason', 'clean', 'public_defaults',
     # the free space this machine must have (tools/disk_need.py)
-    'min_free_gib', 'disk_margin_percent'})
+    'min_free_gib', 'disk_margin_percent',
+    # the one-file build report of a passed build too (tools/build_report.py): what this run writes, not what it builds
+    'report'})
 # Repeatable options whose command-line values add to the recipe's instead of replacing them
 # (exclusions add up, as they did with the MiniWind preset table).
 ADDITIVE = frozenset({'exclude'})

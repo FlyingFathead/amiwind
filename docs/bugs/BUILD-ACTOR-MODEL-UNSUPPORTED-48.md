@@ -20,11 +20,24 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-23: reported in v0.0.48-dev2
+- 2026-10-23: CHIM-32MB-SAVE-ENTRY-48 fixed; BUILD-ACTOR-MODEL-UNSUPPORTED-48 closed, ACTOR-MODEL-ERROR-UNNAMED-48 registered: CHIM-32MB-SAVE-ENTRY-48: on 16 MB of Fast RAM (or Extra RAM off) a save, a start or a console jump into a room or frame marked ...
+- 2026-10-28 01:48 +0200: came back in v0.0.54-dev1 (closed before): tools/check_actor_ground.py model_frames refused actor models over 1,999 vertices once whole-hair skeletal residents went up to 3,072.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.48 (23 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Status: 23 October 2026](#status-23-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -123,6 +136,7 @@ Family: Builder breaks and reproducibility (`builder-from-scratch`). The reposit
 - [BUILD-LAVA-TERRAIN-BUDGET-38](BUILD-LAVA-TERRAIN-BUDGET-38.md): Detailed lava terrain exceeds region storage budget
 - BUILD-LAYER-DATA-MWAD-SHADOWED-64 (no report page): The Bloodmoon layer data stage stops with mwad is not a package in a MiniWind build
 - [BUILD-LIGHT-THREADS-32](BUILD-LIGHT-THREADS-32.md): ericw light is not byte-reproducible with more than one thread
+- BUILD-MERGED-MASTER-IN-CHECKOUT-66 (no report page): The merged master of the selected game files is written into the source checkout's out folder also when --workspace names another folder; with a read-only checkout the build stops at its room grounding check before the first stage
 - [BUILD-MINIWIND-SEYDA-COMPILE-42](BUILD-MINIWIND-SEYDA-COMPILE-42.md): A CHIM MiniWind of another town stops at its bsp stage: it compiles the whole Seyda Neen town, which exceeds the BSP29 node limit
 - BUILD-MINIWIND-SEYDA-KELP-INDEX-54 (no report page): A Seyda Neen MiniWind can never pass: the chim-town-seyda stage stops because the kelp additions need the original scenery index, which a MiniWind plan does not build
 - [BUILD-NO-OVERLAY-32](BUILD-NO-OVERLAY-32.md): The builder has no engine-overlay command; dev measurements used a private script

@@ -1,24 +1,35 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
  * The interpreter of the compiled game scripts (docs/MWSCRIPT_BYTECODE.md, tools/mwscript/).
  *
- * Pure C: no engine headers; one allocation, its tables, at the first load, none while running. Everything it
+ * Pure C: no engine headers; one allocation, its tables, at the load, none while running. Everything it
  * needs from the game goes through the host table
- * (aw_mwhost.c in the engine, stubs in the native tests). Fixed tables: instances (the placed objects and the
+ * (aw_mwhost.c in the engine, stubs in the native tests). Four tables: instances (the placed objects and the
  * global scripts that run), their local values, a parking store that keeps an object's values while its map is
- * not loaded. */
+ * not loaded, and the parked values. */
 #ifndef AW_MWVM_H
 #define AW_MWVM_H
 #include <stdint.h>
 
-#define AW_MWVM_INSTANCES 256      /* placed objects attached to the loaded map, plus running global scripts */
-#define AW_MWVM_CELLS 4096         /* local values of the attached objects and the global scripts */
-/* objects whose values are kept while their map is not loaded, and their values: the game places 2,115 references
- * whose script has locals, 7,388 values in all (counted in v0.0.59-dev5's compiled scripts; CELL-CHANGES-59 slice 5
- * raised these from 512 and 4,096 so a whole game's objects keep theirs: 37 KB more in the interpreter's one block).
- * SAVE-ITEM-SCRIPT-LOCALS-66 (v0.0.66): the items placed holders hold are parked too once their script changed a value:
- * 491 held rows, 929 values with both expansions (v0.0.66-dev2's compiled scripts): +512 and +1,024, about 10 KB more */
-#define AW_MWVM_PARKED 2816
-#define AW_MWVM_PARK_CELLS 9216
+/* THE TABLES ARE SIZED BY THE BUILD (EXPANSION-SCRIPT-LIMITS-66; MWVM-INSTANCES-256-66, MWVM-PARKING-STORE-SMALL-66):
+ * the file's CONF carries the counts the builder made from the whole game (tools/mwscript/plan.py: the busiest map's
+ * scripted placements with the global scripts for the instances, every object whose script has values for the parking
+ * store, both expansions included), and AW_MwvmLoad allocates exactly that. OpenMW keeps a reference's locals with the
+ * reference and its local scripts in a list with no bound (apps/openmw/mwworld/refdata.hpp:48, localscripts.cpp:96-132);
+ * here a count past the plan is reported to the host (full) and counted (stats), never a silent drop.
+ * History: 256 instances, 4,096 values, 512 then 2,816 parked objects (CELL-CHANGES-59 slice 5: the base game's 2,115
+ * references with locals and 7,388 values; SAVE-ITEM-SCRIPT-LOCALS-66: +512 held items), 9,216 parked values; the
+ * Uvirith's Grave frame has 276 scripted placements and Raven Rock 350, so a map lost scripts past 256, and the whole
+ * game's 3,496 objects with 10,499 values did not fit the store. An older file without the counts gets these: */
+#define AW_MWVM_INSTANCES_DEFAULT 256
+#define AW_MWVM_CELLS_DEFAULT 4096
+#define AW_MWVM_PARKED_DEFAULT 2816
+#define AW_MWVM_PARK_CELLS_DEFAULT 9216
+/* the most a file may plan (the builder refuses more, tools/mwscript/plan.py ENGINE_MAX_*; the parked store's
+ * offsets and the hash's indexes are 16 bits, an instance's memo on an object row is 16 bits) */
+#define AW_MWVM_INSTANCES_MAX 4096
+#define AW_MWVM_CELLS_MAX 65535
+#define AW_MWVM_PARKED_MAX 32768
+#define AW_MWVM_PARK_CELLS_MAX 65535
 #define AW_MWVM_STACK 32
 #define AW_MWVM_STRINGS 8192       /* NOTYET names logged once each */
 #define AW_MWVM_SELF (-2)
@@ -81,6 +92,10 @@ typedef struct {
     /* GetCurrentAIPackage (VERB 0: OpenMW's package numbers, -1 none) and GetAIPackageDone (VERB 1: 1 or 0) of the
      * target actor */
     int32_t (*ai_package)(int instance,int target,int verb);
+    /* EXPANSION-SCRIPT-LIMITS-66: a table the build planned is full (TABLE its name; PLANNED its size, USED what it
+     * holds): the engine stops with a clear message at a map change (the plan was wrong) or refuses a console's start;
+     * NULL (the tests): warn() once per table, the stats count every refusal. May be NULL. */
+    void (*full)(const char *table,int planned,int used);
 } aw_mwvm_host_t;
 
 typedef struct {
@@ -92,6 +107,7 @@ typedef struct {
     uint32_t generation;            /* the state generation of its last run */
     float last_run;                 /* the interpreter clock of its last run (GetSecondsPassed) */
     float say_until;                /* (host use) */
+    int actor_row;uint32_t actor_row_ref;   /* (host use: the actor record row of its object, found once by reference) */
 } aw_mwvm_instance_t;
 
 #define AWI_USED 1
@@ -114,6 +130,8 @@ typedef struct {
     /* MWSCRIPT-TICK-SHARE-66: seconds in AW_MwvmTick (the interpreter with its calls) and in the host's function
      * calls (the import route); 0 without a clock */
     double tick_time,host_time;
+    /* EXPANSION-SCRIPT-LIMITS-66: refusals of each table the build planned (every one is also told to the host) */
+    unsigned long full_instances,full_cells,full_parked,full_park_cells;
 } aw_mwvm_stats_t;
 /* the clock the two times use (seconds; the host sets it, NULL: not timed) */
 extern double (*aw_mwvm_clock)(void);
@@ -253,4 +271,13 @@ int AW_MwvmLocalCount(int script);
 int AW_MwvmScriptRunning(int script);
 /* REFERENCE's local SLOT now (attached, else parked): 1 found, *SCRIPT its script, *OUT the value */
 int AW_MwvmLocalGet(uint32_t reference,int slot,int *script,aw_mwcell_t *out);
+/* EXPANSION-SCRIPT-LIMITS-66: the tables as the file planned them (CONF; an older file: the defaults), their use now
+ * (instances and parked objects in use, local values of attached instances, parked values taken), the one block's
+ * bytes, and a forgotten reference: a script-made copy whose key is free again (aw_actors.c AW_ActorsPlacedForget):
+ * its instance ends without parking and its parked row is given back, so a new copy under the key starts clean
+ * (1 when anything was held). */
+void AW_MwvmPlan(int *instances,int *cells,int *parked,int *park_cells);
+void AW_MwvmUsage(int *instances,int *cells,int *parked,int *park_cells);
+unsigned long AW_MwvmTableBytes(void);
+int AW_MwvmForget(uint32_t reference);
 #endif

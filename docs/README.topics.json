@@ -256,8 +256,7 @@
     {
       "name": "Bugs",
       "docs": [
-        "BUGS.md",
-        "BUG_JOURNAL.md"
+        "BUGS.md"
       ]
     },
     {
@@ -295,7 +294,7 @@
     },
     {
       "path": "journals",
-      "about": "frozen bug journals of earlier lines and the maintainer's journals"
+      "about": "the maintainer's journals (the bug journals that were here were merged into the bug tracker on 16 November 2026)"
     },
     {
       "path": "bugs",

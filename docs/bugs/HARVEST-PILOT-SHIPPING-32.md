@@ -19,6 +19,19 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.31
+- 2026-10-08: Builder harvest step findings: Found while moving harvest into the builder (0331f76).
+- 2026-10-08: BUILD-HARVEST-NOT-BUILT-32: harvest built by default: The maintainer decision: a default builder step for every map family, Seyda Neen regenerated too.
+- 2026-10-08: Harvest data audit and builder message: The v0.0.31 harvest files were never rebuilt with their maps: stale Seyda catalogues, a pilot catalogue still shipping, the geometry gate not re-run.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.41 (16 October 2026)._
 
 ## Status: 8 October 2026

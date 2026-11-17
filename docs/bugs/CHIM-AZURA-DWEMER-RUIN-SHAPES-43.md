@@ -20,6 +20,19 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-18: reported in v0.0.43-dev2
+- 2026-10-18: CHIM-AZURA-FLOATING-FLORA-43 cause found and CHIM-AZURA-DWEMER-RUIN-SHAPES-43 measured: CHIM-AZURA-DWEMER-RUIN-SHAPES-43: Daedric ruin pillars at cell 19,4 looked like twisted shapes in the air.
+- 2026-10-18: CHIM-AZURA-DWEMER-RUIN-SHAPES-43: The maintainer's v0.0.43-dev2 playtest: a Dwemer ruin on Azura's Coast (cell 19,4) is drawn as twisted shapes that do not match the original.
+- 2026-10-18 18:18 +0300: seen again in v0.0.43-dev2: maintainer pinned it: Daedric pillar x/ex_dae_pillar_01@s1 (model 102), placement 394489, ref 77482, placement local 849 -376 552, yaw -43; floating in the air
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 ## Status: 18 October 2026
@@ -96,9 +109,12 @@ Family: Object placement and in-game geometry (`placement-geometry`). Placed obj
 - COURTYARD-ARRIVAL-STUCK-66 (no report page): Arriving in the census courtyard from the back room, the player was once stuck in solid: twenty "player is stuck" lines and two moves out
 - CREATURE-FLOATING-62 (no report page): A scrib in the wilderness floats above the terrain
 - [DOOR-ARRIVAL-INSIDE-ACTOR-66](DOOR-ARRIVAL-INSIDE-ACTOR-66.md): Coming back out of the census office onto the Seyda Neen street after a kill, the player arrives inside the guard who has walked to the door and stays stuck
+- [PORT-ROCK-ROTATION-23](PORT-ROCK-ROTATION-23.md): A rock by the Seyda Neen port was converted with the wrong rotation
 - ROCK-FLORA-SURFACE-29 (no report page): Angular rock-like surfaces newly appearing in Bitter Coast
 - ROOM-GROUND-STEEP-ICE-66 (no report page): With Bloodmoon selected, the image stage stopped on one Hound of Hircine in the Mortrag Glacier Inner Ring: its feet stand on a steep part of the converted ice floor
 - SHACK-VISIBILITY-29 (no report page): Indrele Rathryon shack front walls missing
+- [VODUNIUS-HOUSE-HOLES-23](VODUNIUS-HOUSE-HOLES-23.md): Visibility holes in Vodunius Nuccius' house in Seyda Neen
+- [WEDGE-TRAP-24](WEDGE-TRAP-24.md): wedge1: the player is trapped at -225,348,131
 - [WORLD-SHORE-OPEN-GEOMETRY-38](WORLD-SHORE-OPEN-GEOMETRY-38.md): Shoreline objects show large open sections and thin disconnected edges
 
 Related bugs in other categories:

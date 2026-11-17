@@ -34,6 +34,6 @@ stay exact).
   reaches them; they are beyond view there and present in the neighbouring
   sub-cell. The lists are rebuilt before v0.0.31.
 - The Seyda Neen build steps used for these maps are not yet in the public
-  tools ([BUILD-SEYDA-REGEN-30](../../BUG_JOURNAL.md)).
+  tools ([BUILD-SEYDA-REGEN-30](../../bugs/BUILD-SEYDA-REGEN-30.md)).
 - Everything listed in the [v0.0.30 notes](RELEASE-v0.0.30.md) and the
   [bug register](../../BUGS.md).

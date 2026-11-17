@@ -18,6 +18,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-10: reported in v0.0.36-dev
+- 2026-10-10: HANG-IDLE-DUSK-35 game side repaired in source, ENGINE-SYNC-IO-MAIN-LOOP-36: HANG-IDLE-DUSK-35: the music stream reads through asynchronous DOS packets (`aw_aread.c`); a read that is late or never answered is logged once, the music goes ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 ## Status: 10 October 2026

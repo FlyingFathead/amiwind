@@ -18,7 +18,37 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.32-dev3
+- 2026-10-08: QC-AW-FLAME-SPAWN-32 and CENSUS-LOAD-SLOW-32: repaired in source, A/B/C/D: QC-AW-FLAME-SPAWN-32: the game logic now declares `aw_flame_size`, `aw_flame_shape` and the worldspawn `wad` key and spawns `aw_flame` by removing it, as id's ...
+- 2026-10-08: CENSUS-LOAD-SLOW-32 cause; REMOTE-CONSOLE-LOG-COST-32 and DEBUG-TP-SHIP-FREEZE-32: CENSUS-LOAD-SLOW-32: cause confirmed in one FS-UAE container (loaded machine, relative numbers): dev3 Census 8.8-20.9 s with the remote console on ...
+- 2026-10-08: v0.0.32-dev3: v0.0.32-dev3 smoke test findings: One FS-UAE session of the dev3 image (built from source 91a7eeb).
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.45 (19 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [Timeline](#timeline)
+- [Status: 8 October 2026](#status-8-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Status: 8 October 2026
 

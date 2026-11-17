@@ -79,6 +79,7 @@ Family: Boot and engine start-up (`boot-startup`). The boot check and engine sta
 - HORS-AFTER-HALLOWEEN-CRASH-58 (no report page): dbg aw hors 0 after the Halloween benchmark crashes the game: NUM_FOR_EDICT: bad pointer
 - [MINIWIND-NO-WINUAE-PROFILE-33](MINIWIND-NO-WINUAE-PROFILE-33.md): MiniWind playtest packages ship only an FS-UAE profile: no WinUAE profile and no launcher
 - [NET-UDP-INIT-CRASH-32](NET-UDP-INIT-CRASH-32.md): UDP network start-up can stop the game at boot when bsdsocket.library is present
+- [STARTUP-THEME-TIMING-23](STARTUP-THEME-TIMING-23.md): The startup logo faded too quickly and the theme started late
 - VIDEO-NTSC-NO-PAL-MODE-58 (no report page): On an NTSC machine the game stops at start: it asks for a PAL screen mode by name
 
 <!-- END GENERATED CATEGORY -->

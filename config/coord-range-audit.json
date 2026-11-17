@@ -544,9 +544,15 @@
   },
   {
    "file": "engine/aga/src/aw_mwvm.h",
-   "contains": "AW_MWVM_CELLS 4096",
+   "contains": "AW_MWVM_CELLS_DEFAULT 4096",
    "class": "unrelated",
-   "note": "the compiled-script machine's value cells (locals of attached objects and global scripts), a count, not a position"
+   "note": "the compiled-script machine's value cells an older file without a plan gets (locals of attached objects and global scripts; EXPANSION-SCRIPT-LIMITS-66), a count, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_mwvm.h",
+   "contains": "AW_MWVM_INSTANCES_MAX 4096",
+   "class": "unrelated",
+   "note": "the most attached script instances a compiled script file may plan (EXPANSION-SCRIPT-LIMITS-66), a count, not a position"
   },
   {
    "file": "engine/aga/src/aw_mapfog.h",

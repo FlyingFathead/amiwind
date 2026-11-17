@@ -20,11 +20,31 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.66-dev3 (c139d3f8) | 2026-11-14 | gate 10818 passed on c0ab8f11, which holds it | a dbg tp or dbg scene typed during a load is held and runs once the load has arrived |
+| shipped | a numbered build | v0.0.66-dev3 build 2026_11_15_v0.0.66-dev3_full-v0.0.66-dev3_c0ab8f1 | 2026-11-15 | the delivered build | the first build that holds c139d3f8 |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-14: fixed in source: a gated commit, v0.0.66-dev3 (c139d3f8); gate 10818 passed on c0ab8f11, which holds it: a dbg tp or dbg scene typed during a load is held and runs once the load has arrived
+- 2026-11-15: reported in v0.0.66-dev2
+- 2026-11-15: shipped: a numbered build, v0.0.66-dev3 build 2026_11_15_v0.0.66-dev3_full-v0.0.66-dev3_c0ab8f1; the delivered build: the first build that holds c139d3f8
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.66-dev2 (15 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Status: 15 November 2026](#status-15-november-2026)
 - [Symptom](#symptom)
 - [Where](#where)

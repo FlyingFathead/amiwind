@@ -12,6 +12,9 @@
 | Persists in | fixed in v0.0.66-dev2 |
 | Severity | high: the build with the expansions stops in the room stage |
 | Family | Content silently missing from a build (`build-content-missing`) |
+| Fix commit | `0be241df` |
+| Fixed on | 2026-11-13 |
+| Planning item | `INTERIOR-NO-AMBI-66` |
 | Playtest version | 2026_11_13_v0.0.66-dev2_full-v0.0.66-dev2_b59f971 |
 | From commit | source and engine b59f971 |
 | CHIM engine version | none: legacy engine |
@@ -19,7 +22,41 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.66-dev2 (0be241df) | 2026-11-13 | gate 10700 passed on c9d30f8e, which holds it | the Mournhold plazas are set aside by the room stages, an interior without AMBI takes the reference default, every refusal names its cell |
+| shipped | a numbered build | v0.0.66-dev2 build 2026_11_14_v0.0.66-dev2_full-v0.0.66-dev2_3988c6e | 2026-11-14 | the delivered build | the build holds 0be241df |
+| confirmed by a build | a numbered build | v0.0.66-dev2 build 2026_11_14_v0.0.66-dev2_full-v0.0.66-dev2_3988c6e | 2026-11-14 | the dev2 build log | with Tribunal selected the room stages passed with the Mournhold plazas set aside; a builder fix, no play check applies |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-13: reported in v0.0.66-dev2
+- 2026-11-13: fixed in source: a gated commit, v0.0.66-dev2 (0be241df); gate 10700 passed on c9d30f8e, which holds it: the Mournhold plazas are set aside by the room stages, an interior without AMBI takes the reference default, every refusal names its cell
+- 2026-11-14: shipped: a numbered build, v0.0.66-dev2 build 2026_11_14_v0.0.66-dev2_full-v0.0.66-dev2_3988c6e; the delivered build: the build holds 0be241df
+- 2026-11-14: confirmed by a build: a numbered build, v0.0.66-dev2 build 2026_11_14_v0.0.66-dev2_full-v0.0.66-dev2_3988c6e; the dev2 build log: with Tribunal selected the room stages passed with the Mournhold plazas set aside; a builder fix, no play check applies
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.66-dev2 (13 November 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [Timeline](#timeline)
+- [Status: 13 November 2026](#status-13-november-2026)
+- [Symptom](#symptom)
+- [How it happened](#how-it-happened)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Status: 13 November 2026
 
@@ -87,6 +124,7 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [BUILD-MINIWIND-BALMORA-ASSUMED-36](BUILD-MINIWIND-BALMORA-ASSUMED-36.md): A MiniWind image of another town fails its content fingerprint: the Balmora region table was always required
 - [BUILD-MINIWIND-DIRECT-START-TOWN-36](BUILD-MINIWIND-DIRECT-START-TOWN-36.md): A MiniWind build of another town refuses its own direct start: the start check assumed Balmora
 - [BUILD-NIGHT-TABLES-31](BUILD-NIGHT-TABLES-31.md): Repository image builds have no night lamp, glowing glass or location fog tables
+- [BUILD-NPC-GALLERY-MISSING-25](BUILD-NPC-GALLERY-MISSING-25.md): Normal images had no NPC gallery: the builder never ran the gallery stage (Gallery catalogue missing)
 - [BUILD-RUN-FOLDER-PRECREATED-36](BUILD-RUN-FOLDER-PRECREATED-36.md): Every real CHIM build is refused at its start: the plan writes the world map manifest into the run folder before the run makes it
 - [BUILD-STANDALONE-STAGES-32](BUILD-STANDALONE-STAGES-32.md): Door overlay and interior section tools are outside the builder; their use in v0.0.31 is unverified
 - [CHIM-CELL-FEATURE-LIST-INCOMPLETE-38](CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md): Cell feature list incomplete: original placements and gameplay support are not reconciled with packaged coverage

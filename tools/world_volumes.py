@@ -281,21 +281,23 @@ def plan_drives(boot, worlds, name=lambda index: 'drive-%02d.hdf' % index, group
 
 
 def write_boot_partition(xdftool, part, boot, mib, volume='AMIWIND'):
-    """Write the bootable DH0 partition image: every folder and file under BOOT, boot block installed, then every
-    directory hash chain relinked busiest first (tools/ffs_chains.py, IMAGE-LOADS-SLOWER-66: xdftool puts each new
-    entry at the head of its chain, so the folders made before their parent's files ended at the tail; no block moves).
-    Bounded xdftool batches on every host (one command with every boot file exceeds ARG_MAX)."""
-    boot = Path(boot)
-    command = [xdftool, part, 'create', f'size={mib}Mi', '+', 'format', volume, 'ffs', '+', 'boot', 'install']
-    for path in sorted((p for p in boot.rglob('*') if p.is_dir()), key=lambda p: len(p.parts)):
-        command += ['+', 'makedir', path.relative_to(boot).as_posix()]
-    for path in sorted(p for p in boot.rglob('*') if p.is_file()):
-        command += ['+', 'write', path, path.relative_to(boot).as_posix()]
-    from build_windows_xdftool import run_any as run_xdftool
-    run_xdftool(command)
-    from ffs_chains import describe, order_partition
-    print(describe(order_partition(part), 'DH0'), flush=True)
-    return check_image(part, normalize=True)
+    """Write the bootable DH0 partition image: every folder under BOOT (shallowest first), then every file in sorted
+    order, boot block installed (tools/ffs_write.py: written directly by default, BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66;
+    AMIWIND_PARTITION_WRITER=xdftool, the bounded xdftool batches before), then every directory hash chain relinked
+    busiest first (tools/ffs_chains.py, IMAGE-LOADS-SLOWER-66: xdftool puts each new entry at the head of its chain, so
+    the folders made before their parent's files ended at the tail; no block moves). A partition with the same inputs
+    as one an earlier build wrote is taken from the partition cache instead (tools/partition_cache.py)."""
+    import ffs_write
+    import partition_cache
+    ops = ffs_write.tree_ops(boot)
+
+    def write():
+        receipt = ffs_write.write_volume(xdftool, part, mib, volume, ops, boot=True)
+        print(ffs_write.describe(receipt, 'DH0'), flush=True)
+        from ffs_chains import describe, order_partition
+        print(describe(order_partition(part), 'DH0'), flush=True)
+        return check_image(part, normalize=True)
+    return partition_cache.reuse_or_write('DH0', part, write, xdftool, mib, volume, ops, boot=True)
 
 
 # KHUUL-HOP-STALL-59: on the emulated A1200 IDE port (and a real IDE drive given a raw image) the drive's size is
@@ -431,38 +433,43 @@ def _pack_batch(task):
     # the compact layout passes its planned size (tools/layout_plan.py); the legacy layout sizes it here
     mib=task[4] if len(task)>4 else partition_mib(payload)
     if mib>=2048:raise ValueError('World partition must remain below 2 GiB')
-    command=[str(xdftool),str(part),'create',f'size={mib}Mi','+','format',volume,'ffs',
-             '+','makedir','id1','+','makedir','id1/maps']
+    # id1, id1/maps, then the folders of the moved boot units, then every file (tools/ffs_write.py: written directly
+    # by default, BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66; AMIWIND_PARTITION_WRITER=xdftool, the bounded xdftool batches)
+    ops=[('dir','id1'),('dir','id1/maps')]
     made={'id1','id1/maps'}
     for _,name in batch:
         parts=name.split('/')[:-1]
         for k in range(1,len(parts)+1):
             folder='/'.join(parts[:k])
             if folder not in made:
-                made.add(folder);command+=['+','makedir',folder]
-    files=[]
+                made.add(folder);ops.append(('dir',folder))
     for path,name in batch:
-        command+=['+','write',str(path),name]
-        files.append(dict(path=name,bytes=path.stat().st_size,sha256=digest(path)))
-    from build_windows_xdftool import run_any as run_xdftool
-    run_xdftool(command)
-    # every hash chain busiest first, as on DH0 (tools/ffs_chains.py, IMAGE-LOADS-SLOWER-66)
-    from ffs_chains import describe, order_partition
-    print(describe(order_partition(part),f'DW{index}'),flush=True)
-    check_image(part,normalize=True)
-    from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
-    from amitools.fs.ADFSVolume import ADFSVolume
-    from amitools.fs.FSString import FSString
-    device=BlkDevFactory().open(str(part),read_only=True)
-    try:
-        mounted=ADFSVolume(device);mounted.open()
-        for entry in files:
-            data=mounted.read_file(FSString(entry['path']))
-            if len(data)!=entry['bytes'] or hashlib.sha256(data).hexdigest()!=entry['sha256']:
-                raise ValueError('World disk readback mismatch: '+entry['path'])
-    finally:device.close()
-    return dict(file=part.name,volume=volume,partition=f'DW{index}',bytes=part.stat().st_size,
-                sha256=digest(part),files=files,readback='passed')
+        ops.append(('file',path,name))
+    import ffs_write
+    import partition_cache
+
+    def write():
+        files=[dict(path=name,bytes=path.stat().st_size,sha256=digest(path)) for path,name in batch]
+        print(ffs_write.describe(ffs_write.write_volume(xdftool,part,mib,volume,ops),f'DW{index}'),flush=True)
+        # every hash chain busiest first, as on DH0 (tools/ffs_chains.py, IMAGE-LOADS-SLOWER-66)
+        from ffs_chains import describe, order_partition
+        print(describe(order_partition(part),f'DW{index}'),flush=True)
+        check_image(part,normalize=True)
+        from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
+        from amitools.fs.ADFSVolume import ADFSVolume
+        from amitools.fs.FSString import FSString
+        device=BlkDevFactory().open(str(part),read_only=True)
+        try:
+            mounted=ADFSVolume(device);mounted.open()
+            for entry in files:
+                data=mounted.read_file(FSString(entry['path']))
+                if len(data)!=entry['bytes'] or hashlib.sha256(data).hexdigest()!=entry['sha256']:
+                    raise ValueError('World disk readback mismatch: '+entry['path'])
+        finally:device.close()
+        return dict(file=part.name,volume=volume,partition=f'DW{index}',bytes=part.stat().st_size,
+                    sha256=digest(part),files=files,readback='passed')
+    # the same partition from an earlier build when its inputs are the same (tools/partition_cache.py)
+    return partition_cache.reuse_or_write(f'DW{index}',part,write,xdftool,mib,volume,ops)
 
 
 def plan_partitions(batches):

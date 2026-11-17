@@ -27,12 +27,29 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.32-dev
+- 2026-10-08: Morrowind collision census: Where Morrowind keeps its collision and how the converter uses it: COLLISION_MESHES.md (docs/COLLISION_MESHES.md).
+- 2026-10-18 18:42 +0300: seen again in v0.0.43-dev2: maintainer: four red editormarker meshes drawn under a bridge in the West Gash (cells -9,14 and -10,13; refs 481808, 481815; placements 263124, 256282)
+- 2026-10-18 18:45 +0300: seen again in v0.0.43-dev2: maintainer: editor markers in Khuul too; decided: ignored by default wherever placed, filtered out before any rendering
+- 2026-10-18 19:20 +0300: seen again in v0.0.43-dev2: Recorded 18 October 2026: the maintainer saw red editor-marker shapes under the West Gash bridges (cells -9,14, -10,13, -10,14) and in a Khuul longboat.
+- 2026-10-18 20:27 +0300: seen again in v0.0.43-dev2: maintainer: another red editor marker in Vivec Hlaalu canton by the dock (cell 2,-11, local -2255 1067 141); the pick hits the dock ex_v_dock_01
+- 2026-10-18 20:51 +0300: seen again in v0.0.43-dev2: maintainer: another editormarker under a pier/bridge, cell 2,-9 (CHIM placement 25089, ref 474259); fixed in the line (ee7be41), hidden from the next build
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 5 times; something has to be done](#persisting-reported-5-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Status: 22 October 2026](#status-22-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -246,6 +263,7 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [SEYDA-BLOCK-31](SEYDA-BLOCK-31.md): Invisible obstacle blocks the path on a Seyda Neen slope
 - [STAIR-DETECT-POSITION-41](STAIR-DETECT-POSITION-41.md): Stair step detection depends on where a frame puts the placement: a few borderline steps are found in one frame's copy and not in another's
 - [STAIR-FLIGHT-CORE-SPLIT-41](STAIR-FLIGHT-CORE-SPLIT-41.md): The stair gate marks flights per 1024-unit core: a flight that crosses a core line loses its flight mark, so its failures do not stop a build
+- [STAIR-ORIGIN-IN-TERRAIN-24](STAIR-ORIGIN-IN-TERRAIN-24.md): stairs10: the reported stuck position at -685,+619,141 lies inside the terrain
 - [STAIRS-ADDAMASARTUS-32](STAIRS-ADDAMASARTUS-32.md): A low step in the Addamasartus cave is blocked
 - [STAIRS-BALMORA-B01-32](STAIRS-BALMORA-B01-32.md): A Balmora Hlaalu house staircase cannot be approached from below
 - [STAIRS-BALMORA-WESTSOUTH-32](STAIRS-BALMORA-WESTSOUTH-32.md): A Hlaalu hall staircase in a Balmora interior has no clear foot

@@ -18,6 +18,18 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-11: reported in v0.0.36-dev3
+- 2026-10-11: ENGINE-MUSIC-NO-OFF-SWITCH-36 and ENGINE-STRICT-WARNINGS-36: ENGINE-MUSIC-NO-OFF-SWITCH-36: while isolating CHIM-DEV3-MAPLOAD-CRASH-36 the soundtrack could only be turned off by deleting music/playlist.txt; there is no cvar, option or ...
+- 2026-10-11 02:26 +0300: seen again in v0.0.36-dev3: dev3 crash isolation: music could only be turned off by deleting the playlist on a play copy
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.39 (14 October 2026)._
 
 ## Status: 11 October 2026

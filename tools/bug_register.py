@@ -114,7 +114,7 @@ REPORT_VERSION_RE = re.compile(r'^v\d+\.\d+\.\d+(?:-[a-z]+\d*)?$')
 REPORT_AT_RE = re.compile(r'^\d{4}-\d{2}-\d{2}(?: \d{2}:\d{2} [+-]\d{4})?$')
 PERSISTING_MIN = 2
 CHIM_TRACKER = ROOT / 'docs' / 'bugs' / 'CHIM_TRACKER.md'
-JOURNAL = ROOT / 'docs' / 'BUG_JOURNAL.md'
+# docs/BUG_JOURNAL.md (the hand-written journal) was merged into the entries and removed on 16 November 2026
 CHIM_VERSION_FILE = ROOT / 'CHIM_VERSION'
 # Generated pages inside docs/bugs that are not report pages.
 GENERATED_PAGES = ('README.md', 'CHIM_TRACKER.md')
@@ -126,7 +126,31 @@ FIELDS = {'id': str, 'title': str, 'state': str, 'fixed_in': (str, type(None)),
 FACTS = ('reported_by', 'found_date', 'found_in', 'where', 'reproduction', 'duplicate_of', 'persists_in',
          'severity', 'severity_reason', 'family', 'related')
 OPTIONAL = ('tags', 'chim', 'build', 'reports', 'platform', 'platform_reason', 'waiting_on', 'deferred', 'regressions',
-            'fix_commit', 'fixed_date', 'todo')
+            'fix_commit', 'fixed_date', 'todo', 'closure', 'history')
+# HOW A BUG IS CLOSED (the closure schema, decided for the project, 16 November 2026, docs/bugs/README.md "Closure"):
+# "closure" is the list of its closure steps, each {stage, who, where, when, how, why}, in time order:
+#   stage  fixed in source | shipped | confirmed in play | confirmed by the maintainer | confirmed by a tester |
+#          confirmed by a build | confirmed by a test
+#   who    a role, never a name (a gated commit, the opening journey, an end-of-quest session, a release build, the
+#          maintainer, a tester, a test module)
+#   where  the version and the commit or build ("v0.0.66-dev2 (505a6332)", "v0.0.66-dev5 build 2026_11_15_...")
+#   when   the date (YYYY-MM-DD, or with the time and offset as a report's "at")
+#   how    the check: a test module, a journey step, a session file, a build log, a report
+#   why    what the check shows
+# A fix is closed internally when it has a "fixed in source" step and a "shipped" step (a numbered build holds it),
+# and altogether when a "confirmed ..." step follows; state fixed means altogether. RATCHET: a bug fixed in v0.0.66 or
+# later (fixed_in) is refused as fixed without a shipped step naming fixed_in and a confirmed step; a builder- or
+# tooling-only fix is confirmed by a build or a test, whose "why" says why no play check applies. Entries fixed before
+# the rule keep their state; the sweep of 16 November 2026 filled the steps where the evidence was there.
+# "history" holds the dated facts that are neither a sighting (reports) nor a closure step: {at, version?, note}
+# (a cause found, a design decided, a deferral); the journal page is generated from reports, history and closure.
+STAGES = ('fixed in source', 'shipped', 'confirmed in play', 'confirmed by the maintainer', 'confirmed by a tester',
+          'confirmed by a build', 'confirmed by a test')
+CONFIRMED_STAGES = tuple(s for s in STAGES if s.startswith('confirmed'))
+STEP_KEYS = ('stage', 'who', 'where', 'when', 'how', 'why')
+HISTORY_KEYS = {'at', 'version', 'note'}
+CLOSURE_RATCHET_SERIES = 66
+STEP_WHERE_RE = re.compile(r'^v\d+\.\d+\.\d+(?:-[a-z]+\d*)?(?:\s|$|[(,:])')
 # How a fix is recorded (TRACKER-DONE-VIEW-66, 13 November 2026): the commit that fixed the bug, the local date of the fix
 # and the planning item that carried the work. Optional, only on a fixed bug; filled by `set --fix-commit --fixed-date --todo`.
 FIX_COMMIT_RE = re.compile(r'^[0-9a-f]{7,40}$')
@@ -689,6 +713,8 @@ def validate(bugs, families=None):
         errors += validate_platform(b, where)
         errors += validate_waiting(b, where)
         errors += validate_regressions(b, where)
+        errors += validate_closure(b, where)
+        errors += validate_history(b, where)
     for b in by_id.values():
         for r in b.get('related') or []:
             other = by_id.get(r)
@@ -820,6 +846,138 @@ def validate_regressions(b, where):
     return []
 
 
+def fixed_series(b):
+    """The release series of fixed_in (66 for v0.0.66-dev2), or None."""
+    m = re.match(r'^v0\.0\.(\d+)', str(b.get('fixed_in') or ''))
+    return int(m.group(1)) if m else None
+
+
+def needs_closure(b):
+    """The ratchet: a bug fixed in CLOSURE_RATCHET_SERIES or later needs its shipped and confirmed steps."""
+    s = fixed_series(b)
+    return b.get('state') == 'fixed' and s is not None and s >= CLOSURE_RATCHET_SERIES
+
+
+def steps_of(b, stage=None):
+    steps = b.get('closure') or []
+    return [s for s in steps if isinstance(s, dict) and (stage is None or s.get('stage') == stage)]
+
+
+def closure_stage(b):
+    """The furthest closure stage a bug reached (its last step's stage), or None."""
+    steps = steps_of(b)
+    return steps[-1].get('stage') if steps else None
+
+
+def closed_internally(b):
+    """Fixed in source and shipped in a numbered build (whatever its state says)."""
+    return bool(steps_of(b, 'shipped'))
+
+
+def confirmed(b):
+    return any(s.get('stage') in CONFIRMED_STAGES for s in steps_of(b))
+
+
+def validate_closure(b, where):
+    """closure: time-ordered steps {stage, who, where, when, how, why}; the ratchet on new fixed bugs."""
+    errors = []
+    steps = b.get('closure')
+    if steps is not None:
+        if not isinstance(steps, list) or not steps:
+            return ['%s: closure must be a non-empty list of steps' % where]
+        for s in steps:
+            if not isinstance(s, dict) or set(s) != set(STEP_KEYS):
+                return ['%s: each closure step has exactly %s' % (where, ', '.join(STEP_KEYS))]
+            if s['stage'] not in STAGES:
+                errors.append('%s: closure stage must be one of %s' % (where, ', '.join(STAGES)))
+            if not (_line_ok(s['where'], LINE_MAX) and STEP_WHERE_RE.match(s['where'])):
+                errors.append('%s: closure where names the version first, then the commit or build, e.g. '
+                              '"v0.0.66-dev2 (505a6332)"' % where)
+            if not REPORT_AT_RE.match(str(s['when'])):
+                errors.append('%s: closure when is YYYY-MM-DD (or with HH:MM +ZZZZ)' % where)
+            for k in ('who', 'how', 'why'):
+                if not _line_ok(s[k], LINE_MAX):
+                    errors.append('%s: closure %s must be one line without |' % (where, k))
+            if errors:
+                return errors
+        whens = [str(s['when']) for s in steps]
+        if whens != sorted(whens):
+            errors.append('%s: closure steps must be in time order' % where)
+        shipped = steps_of(b, 'shipped')
+        if shipped and b.get('state') == 'fixed' and b.get('fixed_in') \
+                and not shipped[0]['where'].startswith(b['fixed_in']):
+            errors.append('%s: the first shipped step (%s) must name fixed_in %s' % (where, shipped[0]['where'],
+                                                                                      b['fixed_in']))
+    if needs_closure(b):
+        if not closed_internally(b):
+            errors.append('%s: fixed in %s without a "shipped" closure step: add it (bug_register.py step %s --stage '
+                          'shipped ...) or keep the bug open with its "fixed in source" step' % (where, b['fixed_in'],
+                                                                                                  b['id']))
+        if not confirmed(b):
+            errors.append('%s: fixed in %s without a "confirmed ..." closure step: a journey, a session, a playtest, the '
+                          'maintainer or a tester confirms a game fix; a build or a test confirms a builder or tooling '
+                          'fix (its why says why no play check applies)' % (where, b['fixed_in']))
+        elif b.get('reproduction') in INTERMITTENT and not confirmed_repeatedly(b):
+            errors.append('%s: reproduction "%s": one passing run does not confirm it (WANDER-DOOR-RULE-66 was set fixed on '
+                          'one journey and failed the next): two or more "confirmed ..." steps, or one whose how names the '
+                          'runs ("3 journeys", "10 sessions"), or the maintainer\'s or a tester\'s confirmation'
+                          % (where, b['reproduction']))
+    return errors
+
+
+# A bug that does not show every time (reproduction sometimes or once: where actors walk, a timing, a load order) is
+# confirmed by repeated runs, never by one passing journey: WANDER-DOOR-RULE-66 was set fixed in v0.0.66-dev11 on one
+# passing journey and the v0.0.66-dev12 journey failed the same step again (16 November 2026).
+INTERMITTENT = ('sometimes', 'once')
+RUNS_RE = re.compile(r'\b(\d+)\s+(?:of\s+\d+\s+)?(?:runs?|sessions?|journeys?|passes|gates?|builds?|playtests?|times)\b', re.I)
+
+
+def confirmed_repeatedly(b):
+    """Two or more confirmed steps, one confirmed step naming two or more runs, or the maintainer's or a tester's word."""
+    steps = [s for s in steps_of(b) if s.get('stage') in CONFIRMED_STAGES]
+    if len(steps) >= 2 or any(s['stage'] in ('confirmed by the maintainer', 'confirmed by a tester') for s in steps):
+        return True
+    return any(int(m.group(1)) >= 2 for s in steps for m in RUNS_RE.finditer('%s %s' % (s['how'], s['why'])))
+
+
+def validate_history(b, where):
+    """history: time-ordered dated facts {at, version (optional), note}."""
+    hist = b.get('history')
+    if hist is None:
+        return []
+    if not isinstance(hist, list) or not hist:
+        return ['%s: history must be a non-empty list' % where]
+    for h in hist:
+        if not isinstance(h, dict) or not {'at', 'note'} <= set(h) or set(h) - HISTORY_KEYS \
+                or not REPORT_AT_RE.match(str(h.get('at'))) or not _line_ok(h.get('note'), 200000) \
+                or ('version' in h and not REPORT_VERSION_RE.match(str(h.get('version')))):
+            return ['%s: each history line needs at (YYYY-MM-DD, or with HH:MM +ZZZZ) and a one-line note, optional '
+                    'version (vX.Y.Z[-devN])' % where]
+    ats = [str(h['at']) for h in hist]
+    if ats != sorted(ats):
+        return ['%s: history must be in time order' % where]
+    return []
+
+
+def add_step(b, stage, who, where, when, how, why):
+    """One closure step, kept in time order (a step equal to an existing one is refused)."""
+    step = {'stage': stage, 'who': who, 'where': where, 'when': when, 'how': how, 'why': why}
+    if step in (b.get('closure') or []):
+        raise ValueError('closure step already recorded')
+    b['closure'] = sorted((b.get('closure') or []) + [step], key=lambda s: str(s['when']))
+    return step
+
+
+def add_history(b, at, note, version=None):
+    line = {'at': at, 'note': note}
+    if version:
+        line['version'] = version
+    if line in (b.get('history') or []):
+        raise ValueError('history line already recorded')
+    b['history'] = sorted((b.get('history') or []) + [line], key=lambda h: str(h['at']))
+    return line
+
+
 def reopen(b, version, at, by=None, note=None):
     """Reopen a fixed or closed bug as a regression: one entry in regressions, state open, one severity step up."""
     if b['state'] not in ('fixed', 'closed'):
@@ -836,6 +994,12 @@ def reopen(b, version, at, by=None, note=None):
     b['state'], b['fixed_in'], b['owner_accepted'] = 'open', None, None
     for k in ('fix_commit', 'fixed_date', 'todo'):
         b.pop(k, None)                      # the fix record belongs to the fix that did not hold
+    # the closure steps of the fix that did not hold stay as history (closed is never gone: the timeline keeps them)
+    for s in b.pop('closure', None) or []:
+        line = {'at': s['when'], 'note': 'Before the regression: %s, %s (%s; %s: %s)' % (
+            s['stage'], s['where'], s['who'], s['how'], s['why'])}
+        if line not in (b.get('history') or []):
+            b['history'] = sorted((b.get('history') or []) + [line], key=lambda h: str(h['at']))
     if b.get('severity') in SEVERITIES:
         raised = SEVERITIES[max(SEVERITIES.index(b['severity']) - 1, 0)]
         if raised != b['severity']:
@@ -956,6 +1120,115 @@ def facts_table(b, by_id, families):
     out = [FACTS_BEGIN, '', '| Fact | Value |', '| --- | --- |']
     out += ['| %s | %s |' % (k, v) for k, v in rows]
     return '\n'.join(out + ['', FACTS_END])
+
+
+TIMELINE_BEGIN = ('<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run '
+                  'tools/bug_register.py render -->')
+TIMELINE_END = '<!-- END GENERATED TIMELINE -->'
+
+
+def first_sentence(text, limit=240):
+    """The first sentence of a note (for one-line listings), cut at a word past LIMIT characters."""
+    text = ' '.join(str(text or '').split())
+    m = re.search(r'\.(\s|$)', text)
+    if m and m.start() + 1 >= 20:
+        text = text[:m.start() + 1]
+    if len(text) > limit:
+        text = text[:limit].rsplit(' ', 1)[0].rstrip(' ,;:(') + ' ...'
+    return text
+
+
+def events(b):
+    """The dated events of one bug from its own data, oldest first: [(at, kind, text)]. Kinds: reported, seen again,
+    history, came back, deferred, fixed and the closure stages. The timeline is never written by hand
+    (docs/bugs/README.md "Closure"; the journal page is generated from these)."""
+    out = []
+    d = b.get('found_date')
+    if d and d != 'unknown':
+        v = b.get('found_in')
+        out.append((d, 'reported', 'reported%s' % ('' if not v or v == 'unknown' else ' in %s' % v)))
+    for r in b.get('reports') or []:
+        note = first_sentence(r.get('note'))
+        out.append((r['at'], 'seen again', 'seen again in %s%s' % (r['version'], ': ' + note if note else '')))
+    for h in b.get('history') or []:
+        out.append((h['at'], 'history', ('%s: ' % h['version'] if h.get('version') else '') + first_sentence(h['note'])))
+    for r in b.get('regressions') or []:
+        before = 'fixed in %s' % r['fixed_in'] if r.get('fixed_in') else r['was']
+        out.append((r['at'], 'came back', 'came back in %s (%s before)%s' % (
+            r['version'], before, ': ' + first_sentence(r['note']) if r.get('note') else '')))
+    for s in steps_of(b):
+        out.append((str(s['when']), s['stage'], '%s: %s, %s; %s: %s' % (s['stage'], s['who'], s['where'], s['how'],
+                                                                      first_sentence(s['why']))))
+    m = DEFERRED_RE.match(str(b.get('deferred') or ''))
+    if m:
+        out.append((b['deferred'][:10], 'deferred', 'deferred by the maintainer: ' + first_sentence(b['deferred'][12:])))
+    if b.get('state') == 'fixed' and b.get('fixed_date') and not closed_internally(b):
+        out.append((b['fixed_date'], 'fixed', 'fixed in %s%s' % (b['fixed_in'], ' (%s)' % short(b['fix_commit'])
+                                                                  if b.get('fix_commit') else '')))
+    return sorted(out, key=lambda e: e[0])
+
+
+def timeline_block(b):
+    """The page's generated timeline: the closure steps as a table, then every dated event as one line."""
+    out = [TIMELINE_BEGIN, '', '## Timeline', '']
+    steps = steps_of(b)
+    if steps:
+        out += ['Closure steps (how this bug was closed, [the schema](README.md#closure)):', '',
+                '| Stage | Who | Where | When | How | Why |', '| --- | --- | --- | --- | --- | --- |']
+        out += ['| %s |' % ' | '.join(str(s[k]) for k in STEP_KEYS) for s in steps]
+        out.append('')
+    evs = events(b)
+    if evs:
+        out += ['Dated events, oldest first, from the entry\'s own data (first noticed, reports, history, closure steps, '
+                'returns, the fix, a deferral):', '']
+        out += ['- %s: %s' % (at, text) for at, kind, text in evs]
+    else:
+        out.append('No dated event recorded.')
+    return '\n'.join(out + ['', TIMELINE_END])
+
+
+def state_cell(b):
+    """The register's State cell: the state, and the closure stage reached when steps are recorded."""
+    stage = closure_stage(b)
+    if not stage:
+        return b['state']
+    if b['state'] == 'open' and closed_internally(b) and not confirmed(b):
+        return 'open (shipped, awaiting confirmation)'
+    return '%s (%s)' % (b['state'], stage)
+
+
+def register_events(bugs):
+    """Every dated event of the register, newest first: [(at, bug, kind, text)]."""
+    out = [(at, b, kind, text) for b in bugs for at, kind, text in events(b)]
+    return sorted(out, key=lambda e: (e[0][:10], e[0], e[1]['id']), reverse=True)
+
+
+def events_section(bugs):
+    """The tracker's "Dated events" list: every dated event of every entry but the first notice (the tables' Found in
+    column), newest first, grouped by day, each line linking the entry's page. Since 16 November 2026 this is where the
+    bug journal's entries live: the facts are on the entries (history, reports, closure steps), and the render lists
+    them here."""
+    evs = [e for e in register_events(bugs) if e[2] != 'reported']
+    out = ['#### Dated events', '',
+           'Every dated event of every bug, newest first, from the entries\' own data (reports, history lines, closure '
+           'steps, returns, fixes, deferrals; the first notice is the Found in column above). Nothing here is written '
+           'by hand: an event goes onto its entry (`tools/bug_register.py report`, `note`, `step`, `set`) and the render '
+           'lists it. The hand-written bug journal ended with v0.0.62-dev1 (7 November 2026): its entries were merged '
+           'into their bugs\' entries on 16 November 2026 and appear here.', '']
+    day = None
+    for at, b, kind, text in evs:
+        if at[:10] != day:
+            day = at[:10]
+            out += ['', '##### %s' % human_date(day), '']
+        out.append('- %s: %s' % (link(b), text))
+    return out + ['']
+
+
+def chim_changes(bugs, limit=10):
+    """The newest LIMIT dated events of CHIM bugs: [(at, bug, kind, text)] (the CHIM tracker's "Latest changes";
+    before 16 November 2026 these came from the hand-written journal's headings, journal_changes, and the journal is
+    a pointer to the bug tracker since)."""
+    return register_events([b for b in bugs if is_chim(b)])[:limit]
 
 
 def short(commit):
@@ -1081,8 +1354,7 @@ def chim_tracker(bugs, journal_text, version, pages=None):
     chim = [b for b in bugs if is_chim(b)]
     counts = {s: sum(1 for b in chim if b['state'] == s) for s in STATES}
     out = ['# CHIM Engine tracker', '', doc_toc.generated_line('docs/bugs/bugs.json'), '',
-           '<!-- Generated whole by tools/bug_register.py render from docs/bugs/bugs.json and docs/BUG_JOURNAL.md; '
-           'do not edit by hand. -->', '',
+           '<!-- Generated whole by tools/bug_register.py render from docs/bugs/bugs.json; do not edit by hand. -->', '',
            'Every bug of the CHIM engine: its streaming and memory, world format, builder, stairs and collision '
            'on CHIM worlds, rendering and performance. Generated together with the [bug register](../BUGS.md) '
            'from [`bugs.json`](bugs.json); a test fails when this page is stale or a CHIM bug is missing. Which '
@@ -1099,10 +1371,10 @@ def chim_tracker(bugs, journal_text, version, pages=None):
     if pers:
         out += [''] + pers[:-1]
     out += ['', '## Latest changes', '',
-            'Newest first: the last 10 [journal](../BUG_JOURNAL.md) entries that name a CHIM bug.', '']
-    changes = journal_changes(bugs, journal_text)
-    out += ['- [%s](../BUG_JOURNAL.md#%s): %s' % (raw.replace('[', '(').replace(']', ')'), anchor, ', '.join(ids))
-            for raw, anchor, ids in changes] or ['No journal entry names a CHIM bug yet.']
+            'Newest first: the last 10 dated events of CHIM bugs, from their entries (reports, history, closure steps).', '']
+    changes = chim_changes(bugs)
+    out += ['- %s %s: %s' % (at[:10], '[%s](%s.md)' % (b['id'], b['id']) if b['report'] else '`%s`' % b['id'], text)
+            for at, b, kind, text in changes] or ['No CHIM bug has a dated event yet.']
     for key, title in CHIM_PARTS:
         part = sorted((b for b in chim if b['chim'] == key), key=lambda b: (ORDER[b['state']], b['id']))
         out += ['', '## %s' % title, '']
@@ -1207,6 +1479,7 @@ def rendered_page(text, b, bugs, by_id, families):
     lines, _ = _strip_block(lines, FACTS_BEGIN, FACTS_END)
     lines, _ = _strip_block(lines, CAT_BEGIN, CAT_END)
     lines, _ = _strip_block(lines, PERS_BEGIN, PERS_END)
+    lines, _ = _strip_block(lines, TIMELINE_BEGIN, TIMELINE_END)
     hand = _hand_fact_table(lines)
     if hand:
         lines = lines[:hand[0]] + lines[hand[1]:]
@@ -1220,6 +1493,9 @@ def rendered_page(text, b, bugs, by_id, families):
         out += ['', persisting_block(b)]
     if has_facts(b):
         out += ['', facts_table(b, by_id, families)]
+    # the timeline (closure steps and dated events) sits under the facts, before the hand-written report (16 November 2026)
+    if steps_of(b) or b.get('history') or b.get('reports') or b.get('regressions'):
+        out += ['', timeline_block(b)]
     out += [''] + body if body else []
     if b.get('family') in families:
         out += ['', category_section(b, bugs, by_id, families)]
@@ -1241,17 +1517,48 @@ def status_cell(b):
     return cut + (' ... (more on its page)' if b.get('report') else ' ... (more in the register data)')
 
 
+def _version_key(v):
+    """Sort key of a version string: release numbers, then final > rc > dev, then the number ("" sorts first)."""
+    m = re.match(r'^v?(\d+)\.(\d+)\.(\d+)(?:-([a-z]+)(\d*))?$', str(v or ''))
+    if not m:
+        return (-1,)
+    kind = {'dev': 0, 'rc': 1}.get(m.group(4), 2) if m.group(4) else 2
+    return (int(m.group(1)), int(m.group(2)), int(m.group(3)), kind, int(m.group(5) or 0))
+
+
+def _found_key(b):
+    d = b.get('found_date')
+    return (d if d and d != 'unknown' else '', _version_key(b.get('found_in')))
+
+
+SECTIONS = (('open', 'Open', 'Open bugs, most recently noticed first.',
+             lambda b: (_found_key(b), b['id']), True),
+            ('fixed', 'Fixed', 'Fixed bugs by the version that fixed them, newest first (fixed = shipped in that numbered '
+                                'build and confirmed; the State column shows the closure stage reached when the steps are '
+                                'recorded).',
+             lambda b: (_version_key(b.get('fixed_in')), b['id']), True),
+            ('closed', 'Closed', 'Closed without a fix: not a bug, a duplicate or superseded; the status says which.',
+             lambda b: b['id'], False))
+
+
 def table(bugs):
+    """The tracker's tables: Open (most recent first), Fixed (by fixed_in, newest first), Closed (16 November 2026;
+    before that one mixed list of every bug)."""
     out = persisting_section(bugs)
-    if out:
-        out += ['### All bugs', '']
-    out += ['| ID | Issue | Severity | Found in | State | Fixed in | Maintainer accepted | Waiting on | Status |',
-           '| --- | --- | --- | --- | --- | --- | --- | --- | --- |']
-    for b in sorted(bugs, key=lambda b: (ORDER[b['state']], b['id'])):
-        waiting = b.get('waiting_on', '')[len(WAITING_PREFIX):] or ('deferred' if b.get('deferred') else '-')
-        out.append('| %s | %s | %s | %s | %s | %s | %s | %s | %s |' % (
-            link(b), b['title'], b.get('severity', '-'), found_in_cell(b), b['state'], b['fixed_in'] or '-',
-            b['owner_accepted'] or '-', waiting, status_cell(b)))
+    out += ['### All bugs', '', 'Three tables: the open bugs, the fixed ones and the closed ones. Each row links the bug\'s '
+            'report page.', '']
+    head = ['| ID | Issue | Severity | Found in | State | Fixed in | Maintainer accepted | Waiting on | Status |',
+            '| --- | --- | --- | --- | --- | --- | --- | --- | --- |']
+    for state, title, lead, key, newest_first in SECTIONS:
+        rows = sorted((b for b in bugs if b['state'] == state), key=key, reverse=newest_first)
+        out += ['#### %s (%d)' % (title, len(rows)), '', lead, ''] + head
+        for b in rows:
+            waiting = b.get('waiting_on', '')[len(WAITING_PREFIX):] or ('deferred' if b.get('deferred') else '-')
+            out.append('| %s | %s | %s | %s | %s | %s | %s | %s | %s |' % (
+                link(b), b['title'], b.get('severity', '-'), found_in_cell(b), state_cell(b), b['fixed_in'] or '-',
+                b['owner_accepted'] or '-', waiting, status_cell(b)))
+        out.append('')
+    out += events_section(bugs)
     for tag in TAGS:
         tagged = [b for b in sorted(bugs, key=lambda b: (ORDER[b['state']], b['id'])) if tag in b.get('tags', [])]
         if tagged:
@@ -1345,7 +1652,7 @@ def outputs(bugs, families):
         if b['report']:
             path = REGISTER.parent / b['report']
             out[path] = rendered_page(path.read_text(encoding='utf-8'), b, bugs, by_id, fam)
-    out[CHIM_TRACKER] = chim_tracker(bugs, JOURNAL.read_text(encoding='utf-8'), chim_version())
+    out[CHIM_TRACKER] = chim_tracker(bugs, '', chim_version())
     return out
 
 
@@ -1556,6 +1863,19 @@ def main(argv=None):
     rp.add_argument('id'); rp.add_argument('--version', required=True)
     rp.add_argument('--at', required=True, help='YYYY-MM-DD HH:MM +ZZZZ (host clock), or a date alone')
     rp.add_argument('--note')
+    st = sub.add_parser('step', help='add a closure step: how the bug was fixed, shipped or confirmed (docs/bugs/README.md '
+                                     '"Closure")')
+    st.add_argument('id'); st.add_argument('--stage', required=True, choices=STAGES)
+    st.add_argument('--who', required=True, help='a role, never a name: a gated commit, the opening journey, an end-of-'
+                                                 'quest session, a release build, the maintainer, a tester, a test module')
+    st.add_argument('--where', required=True, help='the version first, then the commit or build: "v0.0.66-dev2 (505a6332)"')
+    st.add_argument('--when', required=True, help='YYYY-MM-DD (or with HH:MM +ZZZZ)')
+    st.add_argument('--how', required=True, help='the check: a test module, a journey step, a session file, a build log')
+    st.add_argument('--why', required=True, help='what the check shows')
+    nt = sub.add_parser('note', help='add a dated history line (a cause found, a decision, a fact that is neither a '
+                                     'sighting nor a closure step)')
+    nt.add_argument('id'); nt.add_argument('--at', required=True, help='YYYY-MM-DD (or with HH:MM +ZZZZ)')
+    nt.add_argument('--note', required=True); nt.add_argument('--version')
     bf = sub.add_parser('backfill'); bf.add_argument('file'); bf.add_argument('--overwrite', action='store_true')
     bf.add_argument('--pages', action='store_true', help='also read hand-written fact tables on report pages')
 
@@ -1766,6 +2086,21 @@ def main(argv=None):
         if entry in (b.get('reports') or []):
             raise SystemExit('report already recorded')
         b['reports'] = sorted((b.get('reports') or []) + [entry], key=lambda r: r['at'])
+    elif args.cmd in ('step', 'note'):
+        b = by_id.get(args.id)
+        if b is None:
+            raise SystemExit('unknown ID: ' + args.id)
+        try:
+            if args.cmd == 'step':
+                add_step(b, args.stage, args.who, args.where, args.when, args.how, args.why)
+                print('%s: %s step recorded; closure stage now %s%s' % (
+                    b['id'], args.stage, closure_stage(b),
+                    '' if b['state'] == 'fixed' or not (closed_internally(b) and confirmed(b)) else
+                    ' (shipped and confirmed: set it fixed with set %s --state fixed --fixed-in V)' % b['id']))
+            else:
+                add_history(b, args.at, args.note, args.version)
+        except ValueError as exc:
+            raise SystemExit(str(exc))
     elif args.cmd == 'reopen':
         b = by_id.get(args.id)
         if b is None:
@@ -1811,7 +2146,7 @@ def main(argv=None):
         print('bug register ok: %d bugs (%d live, %d archived), %d with report pages' % (
             len(bugs), len(live), len(old), sum(1 for b in bugs if b['report'])))
         return 0
-    if args.cmd in ('add', 'set', 'backfill', 'report', 'reopen', 'render'):
+    if args.cmd in ('add', 'set', 'backfill', 'report', 'reopen', 'render', 'step', 'note'):
         save(bugs)
     changed = 0
     for path, text in new.items():

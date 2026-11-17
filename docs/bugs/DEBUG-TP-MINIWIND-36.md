@@ -27,7 +27,38 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-11: reported in v0.0.36-dev4
+- 2026-10-30 07:07 +0200: seen again in v0.0.57-dev1: Balmora exterior MiniWind 2a3284a: every dbg tp X Y unavailable, also beside the player; the new settlement list (dbg tp, TP-PICKER-57) therefore takes you nowhere on a MiniWind; full dev1 image works
+- 2026-11-07 06:16 +0200: seen again in v0.0.62-dev1: Seyda Neen CHIM MiniWind b3bf27ea: dbg tp X Y refused (no map on this disk holds that point); scripted checks moved with noclip + aw_view
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Timeline](#timeline)
+- [Status: 7 November 2026](#status-7-november-2026)
+- [Status: 11 October 2026](#status-11-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Status: 7 November 2026
 

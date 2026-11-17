@@ -36,12 +36,35 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-12: reported in v0.0.38-dev2
+- 2026-10-13: seen again in v0.0.39-rc1: Maintainer repeat: F unsheathes fists successfully; V after F produces world light but no third-person carried torch pose or animation.
+- 2026-10-13: seen again in v0.0.39-rc2: Original human/beast and common first-person torch groups confirmed.
+- 2026-10-13: seen again in v0.0.39-rc2: Maintainer now requires third-person torch holding in RC2.
+- 2026-10-13: seen again in v0.0.39-rc2: RC2 torch source candidate implemented.
+- 2026-10-13: STAIRS-MOLAG-ACCESS-38: PLAYER-TORCH-THIRDPERSON-38: 13 October 2026: reconciled 1 maintainer screenshot(s) with evidence IDs and original hashes.
+- 2026-10-13: UI-DEATH-DAMAGE-TINT-38, candidate: PLAYER-TORCH-THIRDPERSON-38 (2026-10-13): Source diagnosis confirms third-person flame suppression and missing player equipment/pose.
+- 2026-10-13: DOCS-CHANGELOG-STALE-39 and DOCS-RC1-PREFLIGHT-39: PLAYER-TORCH-THIRDPERSON-38 (2026-10-13, RC2 follow-up): Still present in RC1: F draws the fists in third person, but V after F lights the world without a visible third-person torch ...
+- 2026-10-14: seen again in v0.0.39-rc2: Scoped native Nord F-then-V hold/movement/off and first-person control observed; original game/audio clip retained.
+- 2026-10-18 16:41 +0300: seen again in v0.0.43-dev2: maintainer: the inventory character display does not show the equipped torch either; it should hold it
+- 2026-10-19 15:56 +0300: seen again in v0.0.44-dev1: maintainer, vanity camera: the player shows the raised-arm torch pose but no torch in the hand
+- 2026-10-19 15:57 +0300: seen again in v0.0.44-dev1: maintainer: every third-person camera, not only the vanity camera; the raised-arm pose shows, the torch model is missing
+- 2026-10-20 02:22 +0300: seen again in v0.0.45: source diagnosis: held torch alias never reloaded after a cache eviction (aw_view.c view_held) and never drawn in the inventory picture; fix in code with regression tests, needs gate and in-game check
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.45 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 9 times; something has to be done](#persisting-reported-9-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -261,6 +284,7 @@ Family: First-person hands and torch (`torch-hands`). First-person hands, punche
 - PLAYER-PARTS-BAKE-REFUSED-59 (no report page): Two body part meshes are refused by the assembled player body's parts library
 - [PLAYER-PUNCH-THIRDPERSON-39](PLAYER-PUNCH-THIRDPERSON-39.md): Third-person punches have no visible player-body attack animation
 - [PLAYER-READY-THIRDPERSON-38](PLAYER-READY-THIRDPERSON-38.md): Third-person player lacks fists-up and weapon-draw animation
+- [TORCH-ACTIVATE-CRASH-25](TORCH-ACTIVATE-CRASH-25.md): Raising the fists and pressing V crashed the game: a dynamic light was marked through a negative collision root
 - TORCH-FLAME-VISIBILITY-29 (no report page): Torch flame not visible after changing styles
 - TORCH-FUEL-29 (no report page): Torch never burns out; no unlit or fuel state
 - TORCH-HAND-NORD-29 (no report page): Detached-looking left grip fragment in dev4

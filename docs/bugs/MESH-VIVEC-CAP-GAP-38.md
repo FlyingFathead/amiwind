@@ -24,12 +24,27 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-12: reported
+- 2026-10-13: seen again in v0.0.39-rc1: RC1: three inspected views in cell 2,-10 show torn mushroom cap seams.
+- 2026-10-13: STAIRS-MOLAG-ACCESS-38: MESH-VIVEC-CAP-GAP-38: 13 October 2026: reconciled 2 maintainer screenshot(s) with evidence IDs and original hashes.
+- 2026-10-14: Renewed RC2 gameplay reports: MESH-VIVEC-CAP-GAP-38: 13 October 2026, RC1 maintainer report and private evidence reviewed.
+- 2026-10-17 11:49 +0300: seen again in v0.0.42-dev1: maintainer with a frame at cell 1,-10: the mushrooms at Vivec are still open
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)

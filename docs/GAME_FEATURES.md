@@ -1,6 +1,6 @@
 # Game features
 
-_Last updated with AmiWind v0.0.66-dev11 (12 November 2026)._
+_Last updated with AmiWind v0.0.66 (12 November 2026)._
 
 <!-- contents start -->
 ## Contents

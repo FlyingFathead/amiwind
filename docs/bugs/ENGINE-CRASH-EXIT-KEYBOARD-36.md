@@ -33,12 +33,30 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-01: reported in v0.0.25
+- 2026-10-01: seen again in v0.0.25: earlier entry AW25-05 (v0.0.25): console typed only capitals and shifted digits; stuck Shift suspected, never reproduced natively
+- 2026-10-05 12:07 +0300: seen again in v0.0.29-dev1: earlier entry CONSOLE-CAPS-29 (v0.0.29-dev1, FS-UAE): Caps Lock appears stuck in the F10 console
+- 2026-10-11: CHIM-FRAME-EDGE-EFRAG-CRASH-36 (persisting) and ENGINE-CRASH-EXIT-KEYBOARD-36: CHIM-FRAME-EDGE-EFRAG-CRASH-36 is PERSISTING: after the README screenshot session, the maintainer hit "R_StoreEfrags: Bad entity type 270440" in normal play of ...
+- 2026-10-11 13:12 +0300: seen again in v0.0.36-dev5: maintainer, dev5 playtest build, FS-UAE JIT: after the efrag crash the shell typed amiwind as AIWDID (capitals, M and N missing)
+- 2026-10-11 13:35 +0300: seen again in v0.0.36-dev5: maintainer, after the Balmora crash: AMIWIND arrives (M and N too) but all in capitals, no Shift or Caps Lock pressed
+- 2026-10-11 13:36 +0300: seen again in v0.0.36-dev5: maintainer, AmiWind restarted without a reboot: in the main menu the cursor keys move the mouse pointer (a latched Amiga qualifier)
+- 2026-10-11 13:38 +0300: seen again in v0.0.36-dev5: maintainer, same restarted run: console typed 1234567890 as !@#$%^&*() (a latched Shift inside the new run)
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 6 times; something has to be done](#persisting-reported-6-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Status: 11 October 2026](#status-11-october-2026)
 - [Symptom](#symptom)
 - [Evidence](#evidence)
@@ -174,6 +192,7 @@ Family: Boot and engine start-up (`boot-startup`). The boot check and engine sta
 - [LAUNCHER-GL-CONTEXT-FALLBACK-36](LAUNCHER-GL-CONTEXT-FALLBACK-36.md): When FS-UAE cannot create an OpenGL context, the Linux launcher ends in a raw X error instead of explaining it and offering software rendering
 - [MINIWIND-NO-WINUAE-PROFILE-33](MINIWIND-NO-WINUAE-PROFILE-33.md): MiniWind playtest packages ship only an FS-UAE profile: no WinUAE profile and no launcher
 - [NET-UDP-INIT-CRASH-32](NET-UDP-INIT-CRASH-32.md): UDP network start-up can stop the game at boot when bsdsocket.library is present
+- [STARTUP-THEME-TIMING-23](STARTUP-THEME-TIMING-23.md): The startup logo faded too quickly and the theme started late
 - VIDEO-NTSC-NO-PAL-MODE-58 (no report page): On an NTSC machine the game stops at start: it asks for a PAL screen mode by name
 
 Related bugs in other categories:

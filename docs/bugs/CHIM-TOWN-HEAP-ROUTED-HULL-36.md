@@ -19,11 +19,24 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-10: reported in v0.0.36-dev3
+- 2026-10-10: CHIM-COMPILED-HULL-SHORT-36: model hull patch on by default; A/B/C/D of the town rings: CHIM-COMPILED-HULL-SHORT-36: the town frames built with the v0.0.36-dev3 inputs at four commits: Balmora / Seyda Neen 6,230,992 / 5,679,168 (642c1ea ...
+- 2026-10-10: CHIM-TOWN-HEAP-ROUTED-HULL-36; BUILD-CHIM-HEAP-GATE-LATE-36 and BUILD-CHIM-STAIR-WALK-UNCACHED-36 repaired in source: CHIM-TOWN-HEAP-ROUTED-HULL-36: the dev3 run's rings over the zone come from `--chim-terrain-hull routed` replacing the ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Status: 10 October 2026](#status-10-october-2026)
 - [Symptom](#symptom)
 - [Evidence](#evidence)
@@ -207,6 +220,7 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - CHIM-STORE-ONE-AT-A-TIME-64 (no report page): The engine streams one CHIM store at a time, so frames of a second store cannot sit beside the first in the open world
 - [CHIM-TERRAIN-GRAFT-33](CHIM-TERRAIN-GRAFT-33.md): CHIM chunk terrain is a brush entity, not part of the world tree, so it does not occlude
 - [CHIM-TERRAIN-HULL-BEVELS-33](CHIM-TERRAIN-HULL-BEVELS-33.md): A standing box rests above the ground at convex CHIM terrain edges
+- [CHIM-TERRAIN-RECORDS-SIZE-46](CHIM-TERRAIN-RECORDS-SIZE-46.md): CHIM terrain records were stored whole: 489.4 MB of the v0.0.46 world's frame segments
 - [CHIM-TEXTURE-SPECKS-33](CHIM-TEXTURE-SPECKS-33.md): CHIM-drawn surfaces show bright single-texel specks that legacy frames do not
 - [CHIM-TILT-VARIANTS-SPLIT-33](CHIM-TILT-VARIANTS-SPLIT-33.md): Tilted placements each get their own model variant: 39,103 extra model variants on the base island, breaking store-once
 - [CHIM-UNIT-CACHE-RACE-33](CHIM-UNIT-CACHE-RACE-33.md): Two processes storing the same CHIM unit at once: the second rename fails

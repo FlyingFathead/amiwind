@@ -21,11 +21,23 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-20: reported in v0.0.46-dev1
+- 2026-10-28 12:38 +0200: seen again in v0.0.54: The maintainer: the Ghostfence is animated now, but with the same Quake texture animation, not the original's own; the target is the original's animation.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.46 (21 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Status: 21 October 2026](#status-21-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)

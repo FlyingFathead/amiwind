@@ -30,12 +30,25 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-23: reported in v0.0.47
+- 2026-11-07: seen again in v0.0.62-dev1: Fire pits (l/furn_de_firepit_f) at Ghostgate draw no fire.
+- 2026-11-07 19:50 +0200: seen again in v0.0.62-dev1: Seen again in v0.0.62-dev1: the firepit light models (l/furn_de_firepit*) show no fire, while the fireplace of the Census and Excise Office does.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Status: 23 October 2026](#status-23-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -139,6 +152,7 @@ Family: Lighting, lamps and night (`lighting-night`). Morrowind lights become Qu
 - [CENSUS-OFFICE-BRIGHT-32](CENSUS-OFFICE-BRIGHT-32.md): The Census and Excise Office walls are about twice as bright as the original
 - [CHIM-MESHLESS-LIGHTS-33](CHIM-MESHLESS-LIGHTS-33.md): Exterior lights without a mesh have no CHIM light path: 2,284 placed lights give no light in a CHIM frame
 - CHIM-ROOM-LIGHT-FLAT-48 (no report page): CHIM rooms light each placement at one level: Temple arch trims and Rithleen walls look flat and brighter than the room maps baked light
+- [DLIGHT-MODEL-TRANSFORM-25](DLIGHT-MODEL-TRANSFORM-25.md): Dynamic lights on translated or rotated models (caves) were placed in world coordinates where the surfaces need model-local ones
 - [DLIGHT-WALLS-31](DLIGHT-WALLS-31.md): Torches barely light town walls at night
 - [EMISSIVE-UNSHIPPED-31](EMISSIVE-UNSHIPPED-31.md): Glowing lantern glass never reached the shipped maps (only the Temple has it)
 - ENGINE-FLAME-LIGHT-KEY-WARNING-51 (no report page): Every Seyda Neen load prints "aw_flame_light is not a field" ten times: the fire rows key no QuakeC field

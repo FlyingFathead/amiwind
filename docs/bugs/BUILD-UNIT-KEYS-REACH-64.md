@@ -23,11 +23,27 @@
 | Persists in | v0.0.64-dev5, v0.0.66-dev1, v0.0.65 (last seen) |
 | Severity | high: The v0.0.64-dev5 build stopped at its reuse check: about 3 hours of bakes would have run again; no effect on the game. |
 | Family | Build speed (`build-speed`) |
+| Deferred by the maintainer | 2026-11-16: deferred to v0.0.67 by the maintainer (2026-11-16); the v0.0.66 release ships without it, and what would confirm a fix is in the status |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
 | From commit | source and engine 8a36dfa |
 | CHIM engine version | none: legacy engine |
 
 <!-- END GENERATED FACTS -->
+
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-11: reported in v0.0.64-dev5
+- 2026-11-11 14:34 +0200: seen again in v0.0.64: The release build: the Vivec room stage bakes its 269 room residents again after the world step (about 20 s a unit against 0.32 s reused, about 85 min at 24 cores), the same wide resident key as the room batches earlier in the same release.
+- 2026-11-13 01:41 +0200: seen again in v0.0.66-dev1: the v0.0.66-dev1 build (base game only) baked all 1,769 room residents again (about 7 h) because the merging reader of the expansions is in every unit key, though its output for the base game alone is the base game file itself
+- 2026-11-13 13:50 +0200: seen again in v0.0.66-dev1: on the v0.0.66 line after the dev1 build: a default-off parameter added to the shared skeletal bake (only the creature models pass it) and a module text edit in the NPC library re-keyed all 2,147 room residents, 2,342 room actor fits and ...
+- 2026-11-13 16:20 +0200: seen again in v0.0.66-dev2: the v0.0.66-dev2 build stopped at its reuse stop on 16 stages (resident-bake 0 of 2147, interior-room 0 of 198, interior-room-chim 0 of 1059, player-parts 0 of 2158 and more): module-level lines and signature defaults count as import-time ...
+- 2026-11-16: deferred by the maintainer: deferred to v0.0.67 by the maintainer (2026-11-16); the v0.0.66 release ships without it, and what would confirm a fix is in the status
+
+<!-- END GENERATED TIMELINE -->
 
 _Last updated with AmiWind v0.0.66-dev1 (13 November 2026)._
 
@@ -35,6 +51,7 @@ _Last updated with AmiWind v0.0.66-dev1 (13 November 2026)._
 ## Contents
 
 - [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [What happens](#what-happens)
 - [Cause](#cause)
 - [Fix](#fix)
@@ -132,7 +149,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-IMAGE-FRAME-MAP-HEAP-SERIAL-36](BUILD-IMAGE-FRAME-MAP-HEAP-SERIAL-36.md): The image step's CHIM frame-map heap check runs on one core: 66 s to 4.5 min per build while 23 cores idle
 - [BUILD-IMAGE-HASH-UNDERUSED-36](BUILD-IMAGE-HASH-UNDERUSED-36.md): The image step hashes 34,592 payload files on 3 of 24 cores (one file per pool task)
 - [BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36](BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36.md): The image step's world map heap audit estimates 170 maps on 5.3 of 24 cores
-- BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66 (no report page): The image step of the v0.0.66-dev9 build wrote its partitions in 107 seconds where the earlier build took 67
+- [BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66](BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66.md): The image step of the v0.0.66-dev9 build wrote its partitions in 107 seconds where the earlier build took 67
 - [BUILD-IMAGE-NOT-INCREMENTAL-33](BUILD-IMAGE-NOT-INCREMENTAL-33.md): The image step redoes every per-map pass and the whole pack on every build
 - [BUILD-IMAGE-NPC-CHECKS-LATE-44](BUILD-IMAGE-NPC-CHECKS-LATE-44.md): The image step's player body and guard torch bakes fail only at the end of a full build instead of before the expensive stages
 - [BUILD-IMAGE-REGION-MAPS-SERIAL-43](BUILD-IMAGE-REGION-MAPS-SERIAL-43.md): The image step's CHIM frame-map phases run on one core: the world read six times, ground traces on whole frames
@@ -249,6 +266,8 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - NPC-BAKE-STAGES-OVERRUN-62 (no report page): The new seam and floor character bake made every stage that bakes characters run far past its history: room batches about 2 h 40 min, actor library about 40 min, player bodies 35+ min
 - [NPC-BAKED-WHOLE-DUPLICATION-33](NPC-BAKED-WHOLE-DUPLICATION-33.md): Every NPC appearance is baked whole: shared body parts are converted again for each actor, and equipment cannot change
 - [NPC-LIBRARY-NO-UNIT-CACHE-63](NPC-LIBRARY-NO-UNIT-CACHE-63.md): The NPC appearance bakes of the actor library stage had no unit cache, so every rebuild of the stage baked all 418 appearances again (about 45 minutes)
+- PARTITION-CACHE-FIXED-WORKERS-66 (no report page): The new partition cache hashed its files on a fixed eight threads instead of the stage's own allowance
+- PERF-GUARD-BASIS-BY-COUNT-66 (no report page): The performance guard judges the image step's partition write by the number of partitions and not by their size, so a slowdown back to the old time would pass
 - [PERF-GUARD-RESIDENT-BUSY-HOST-57](PERF-GUARD-RESIDENT-BUSY-HOST-57.md): The dev5 full build's perf guard failed chim-town-balmora and chim-town-vivec_city build_resident as slower (129 s, was 52 s; 147 s, was 62 s) while two other builds ran beside it: contention, not code
 - PLAYER-VIEW-SKIN-ROWS-STOP-62 (no report page): The image step's player view stopped the v0.0.62 final build after 1 h 13 min: an Alias skin rows overflow ended it instead of trying the next smaller body
 - RELEASE-GUARD-SLOW-CLONE-51 (no report page): The release guard, the fail-fast first step of a release, took 6 minutes on about 0.14 of a core: its release check clones the whole repository through the Windows-mounted drive

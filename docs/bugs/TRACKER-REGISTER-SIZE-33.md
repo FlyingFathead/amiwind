@@ -29,12 +29,33 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.45 (20 October 2026)._
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.33-dev
+- 2026-10-09: seen again in v0.0.33: first: the register outgrew the 256 KiB release text limit (gate preflight)
+- 2026-10-11: Register rotation: `docs/bugs/bugs.json` reached its release size limit (786,357 of 786,432 bytes).
+- 2026-10-11 14:55 +0300: seen again in v0.0.36-dev5: bugs.json 789,008 of 1 MiB passed the 75 % warning again; follow-up TRACKER-REGISTER-SIZE-36 (second archive)
+- 2026-10-13: seen again in v0.0.39-rc2: Moved from TRACKER-REGISTER-SIZE-36 (duplicate): RC2 suite caught the 896,776 B size warning; lossless canonical JSON plus 56 focused checks; fresh pin required.
+- 2026-10-14: seen again in v0.0.40-dev2: Journal reached196510B,98B below its warning.
+- 2026-10-18: TRACKER-REGISTER-SIZE-33: journal rotation: The current journal was 196,648 bytes, 40 bytes past its 196,608-byte warning (75 % of the release text limit), so the tracker test failed.
+- 2026-10-18 15:28 +0300: seen again in v0.0.43-dev2: Journal reached 196,648 B, 40 B past its warning.
+- 2026-10-20: TRACKER-REGISTER-SIZE-33 and TRACKER-REGISTER-SIZE-36: the archive split by version range: TRACKER-REGISTER-SIZE-33 (PERSISTING, reported a fifth time): the register audit of 20 October 2026 took the single bug archive to 232,832 bytes, 89 ...
+- 2026-10-20 09:12 +0300: seen again in v0.0.46-dev: The 2026-10-20 audit took the one archive to 232,832 B, 89 % of 256 KiB.
+- 2026-10-25 07:19 +0200: seen again in v0.0.51-dev2: gate 3893: CHIM_TRACKER.md 196,861 of 262,144 bytes (over the 75 % warning); a status moved to its page, 195,727 now, 881 bytes under
+
+<!-- END GENERATED TIMELINE -->
+
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 7 times; something has to be done](#persisting-reported-7-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Status: 8 October 2026](#status-8-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -114,7 +135,8 @@ the existing 75% warning of 196,608 bytes. Continued short entries alone
 would soon fail the tracker gate. The hard text limit and warning are unchanged.
 
 Move 133 selected entries dated 9-11 October into the
-[v0.0.35-v0.0.36 archive](../journals/BUG_JOURNAL-v0.0.35-v0.0.36.md).
+v0.0.35-v0.0.36 journal archive (its entries were merged into the bug tracker's entries and the file removed on
+16 November 2026).
 Preserve every entry body and its order, changing only relative links for
 the new directory. Keep newer entries and the latest ten CHIM summary
 entries in the current journal. Existing frozen files remain unchanged.
@@ -140,7 +162,8 @@ validate this later source. Shipment remains separate.
 The v0.0.43-dev2 source journal reached 196,648 bytes, 40 bytes past the
 75 % warning of 196,608 bytes, and the tracker test failed. The 130 entries
 dated 11-16 October 2026 (the v0.0.37 to v0.0.41 releases) moved into the
-[v0.0.37-v0.0.41 archive](../journals/BUG_JOURNAL-v0.0.37-v0.0.41.md), as in
+v0.0.37-v0.0.41 journal archive (merged into the bug tracker's entries and removed on 16
+November 2026), as in
 the rotation of 14 October: entry bodies and order unchanged, only relative
 links rewritten for the new directory, and links between the current journal
 and the archive repointed to where each entry now lives. The current journal
@@ -281,6 +304,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [TRACKER-INTERIORS-NOT-SHOWN-48](TRACKER-INTERIORS-NOT-SHOWN-48.md): The CHIM Progress Tracker does not show the interiors: no room list, no counts per island and state, and 16 rooms with no entrance area left out of every batch
 - [TRACKER-MAP-BLANK-31](TRACKER-MAP-BLANK-31.md): World progress map vanished when the mouse moved over it
 - [TRACKER-OCEAN-COUNTED-DONE-36](TRACKER-OCEAN-COUNTED-DONE-36.md): The tracker counts the 867 open-ocean cells as done, although the engine does not place the ocean chunk yet
+- [TRACKER-OPEN-ENTRIES-STALE-41](TRACKER-OPEN-ENTRIES-STALE-41.md): Register entries stayed open after their fixes shipped: 738 of 842 entries open before the audit of 16 October 2026
 - [TRACKER-REGISTER-LINK-MERGE-33](TRACKER-REGISTER-LINK-MERGE-33.md): An integration merge dropped the CHIM Engine tracker link from the bug register
 - [TRACKER-REGISTER-SIZE-36](TRACKER-REGISTER-SIZE-36.md): The live register bugs.json reached 75 % of its 1 MiB release text limit; the size warning was raised to 85 % until a second archive rotation
 - [TRACKER-RELEASE-HEADROOM-MISSING-42](TRACKER-RELEASE-HEADROOM-MISSING-42.md): The CHIM tracker keeps no memory headroom per cell from a full build, and older CHIMport results replace a newer full build's audits: every headroom figure dates from the v0.0.36-v0.0.40 builders

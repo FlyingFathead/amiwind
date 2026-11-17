@@ -1,10 +1,11 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
+_Last updated with AmiWind v0.0.66 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.66: Forward It Is, released 16 November 2026](#v0066-forward-it-is-released-16-november-2026)
 - [v0.0.65: Reintroducing Vvardenfell](#v0065-reintroducing-vvardenfell)
 - [Next version: the two expansion worlds](#next-version-the-two-expansion-worlds)
 - [Later: automated playthroughs, 15 November 2026](#later-automated-playthroughs-15-november-2026)
@@ -116,6 +117,26 @@ _Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
+## v0.0.66: Forward It Is, released 16 November 2026
+
+v0.0.66, "Forward It Is", is made from the twelfth development snapshot and the changes after it
+([release notes](releases/notes/RELEASE-v0.0.66.md); every change with links to the twelve snapshots' notes: the
+[changelog](CHANGELOG.md#v0066-forward-it-is-16-november-2026)). What it did of the plan below: the builder reads
+Tribunal and Bloodmoon with the base game by default, with the expansions' files checked before any stage, every table
+reading their data and every key following the selected layers (steps 1 and the table census); the rooms of Mournhold
+and Solstheim are converted and in the image; the script engine is sized from the game's counts with both expansions
+(step 5, in source, to be confirmed in a session); and the save holds every change without fixed limits (step 6's
+groundwork). In play it brings characters that cast spells, shoot bows and move at their own speeds, the dead that stay
+dead with the original's body clearing, the explored map with a local map and markers, and an opening that holds its
+controls and doors as the original does.
+
+**Moved to v0.0.67 and later:** the expansions' finished content (Solstheim built like the island, Mournhold's five
+districts as one exterior, the way there and back, their scripts, dialogue and journal in play, the Toolkit's views of
+both and the playtests: steps 2 to 8 below), the Heart Chamber's collapse and the end of the main quest, the open
+spell-casting stance's remaining checks in play, the shores' saw-tooth steps, and the builder entries the maintainer
+deferred to v0.0.67 (the under-used image and room batch stages, the unit keys that re-key on settings they never
+read, the memory leases, the gate smoke's remote control). Their entries are in the [bug tracker](BUGS.md).
+
 ## v0.0.65: Reintroducing Vvardenfell
 
 v0.0.65, "Reintroducing Vvardenfell" (titled "Reintroduction" in dev1 and rc1), is a fix release made from v0.0.64,
@@ -134,16 +155,16 @@ v0.0.66, and in it the census office becomes a room built like every other inter
 
 ## Next version: the two expansion worlds
 
-The version after v0.0.65 (v0.0.66) takes up what v0.0.64 moved on; no dates are promised. The measured speed figures of
-the line (the prison ship's hold, the builder's build records) and what is still to be measured, among it the frame rate
-on the Raspberry Pi 4B, are on the [v0.0.66 performance page](performance/V0.0.66-PERFORMANCE.md).
+The version after v0.0.66 (v0.0.67) brings the expansions' finished content, Tribunal's Mournhold and Bloodmoon's
+Solstheim, and takes up what v0.0.66 moved on; no dates are promised. The plan below was begun in v0.0.66, whose
+snapshots are kept under it as they were written. The measured speed figures of the v0.0.66 line and what is still to
+be measured, among it the frame rate on the Raspberry Pi 4B, are on the
+[v0.0.66 performance page](performance/V0.0.66-PERFORMANCE.md).
 
-**Planned, in progress: every table reads the expansions.** With Tribunal and/or Bloodmoon selected (both are selected by
-default), every table the builder makes from the game data reads the expansions' data too: the people and creatures with
-their stats and variables, the scripts (checked against the reference engine), the places and points of interest, the
-items, the dialogue and the rest. With the base game alone the tables stay as they are. Done so far: the focus boxes of
-named objects and the teleport place list. Next: a table-by-table census with a check that no table reads the base game
-alone while an expansion is selected.
+**Every table reads the expansions (done in v0.0.66).** With Tribunal and/or Bloodmoon selected (both are selected by
+default), every table the builder makes from the game data reads the expansions' data too, and a check lists any table
+that still reads the base game alone ([expansion tables](EXPANSION_TABLES.md)). With the base game alone the tables stay
+as they are.
 
 **The plan for Bloodmoon and Tribunal, in order** (the [expansions page](EXPANSIONS.md) has the detail and the
 chains from person to place):
@@ -163,7 +184,8 @@ chains from person to place):
    joined by their doors; set aside in dev2. Its rooms are ordinary interiors. A playtest of the trip there and back
    follows.
 5. **The expansions' scripts and dialogue,** the journal and the topics. The limit of 256 script instances and the store
-   of script variables have to be widened first, or the expansions' scripts do not run.
+   of script variables are widened in source in v0.0.66-dev12, sized from the game's counts, to be confirmed in a
+   session (`EXPANSION-SCRIPT-LIMITS-66`).
 6. **The save with the expansions' counts** (about 13,800 placed actors and about 3,300 scripted references with
    variables).
 7. **The Toolkit's Solstheim and Mournhold views,** with the completion map and the heatmap.
@@ -171,6 +193,23 @@ chains from person to place):
 
 Alongside, every item the game places in the world (weapons, armor, books, ingredients, keys and the rest, loose in the
 wild and in rooms) is counted from the game files and checked in the build.
+
+**Twelfth snapshot, 16 November 2026:** [v0.0.66-dev12](releases/notes/RELEASE-v0.0.66-dev12.md), the snapshot the
+v0.0.66 release is made from, carries dev11. **The game changes:** the script engine is sized for the whole game with both expansions, from the
+counts in the three game files (791 attached instances, 1,475 local values, 5,478 parked objects and 12,811 parked
+values, about 83 KB more resident memory), so a map with more than 256 scripted objects runs every one
+(`EXPANSION-SCRIPT-LIMITS-66`; the first step of bringing Tribunal and Bloodmoon in, fixed in source and covered by
+tests, to be confirmed in a session), and a fighter's spell costs its magicka again (`NPC-CAST-MAGICKA-NOT-PAID-66`).
+**The builder** writes every image partition in one pass and takes an unchanged partition from a cache
+(`BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66`; the boot partition 16.8 s instead of 115.5 s on the dev11 inputs, to be
+confirmed on this snapshot's build). **Confirmed in play on dev11:** residents keep off doors and the opening journey
+passed 42 of 42 checks (`WANDER-DOOR-RULE-66`), and Dagoth Ur's shield followed the Heart's strike count
+(`MWSCRIPT-MEMBER-READS-ID-AS-SCRIPT-66`). **The load stall in test sessions:** 8 valid runs with 2 stops as sessions
+run today against 8 runs with none with the emulator's deterministic option; the comparison continues. **Still open in
+dev12:** that comparison, the chamber's collapse (`ENDGAME-CHAMBER-COLLAPSE-63`), one of three scripted deaths missing
+(`MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66`), the packet overflow in Vivec (`NET-VIVEC-ENTITY-PACKET-OVERFLOW-66`), the
+performance guard's partition-write basis (`PERF-GUARD-BASIS-BY-COUNT-66`) and one script engine limit (`MWVM-PLACE-COPIES-FOUR-66`), 4 live copies per
+scripted Place row in one map.
 
 **Eleventh snapshot, 16 November 2026:** [v0.0.66-dev11](releases/notes/RELEASE-v0.0.66-dev11.md) is in development
 and carries dev10. **The game changes:** residents that wander keep off doors as in the original

@@ -18,7 +18,36 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-09: reported in v0.0.33
+- 2026-10-09: RELEASE-PREVIOUS-FIXES-MISSING-33 and three gate findings: RELEASE-PREVIOUS-FIXES-MISSING-33: the next release line (v0.0.35) lacked the last v0.0.33 fixes (barrel use, intro teleport, Seyda Neen repack and terrain floor).
+- 2026-10-10: BUILD-CACHE-OWNER-FAILS-STAGE-34 and the published-release check: BUILD-CACHE-OWNER-FAILS-STAGE-34: unit cache entries owned by another user stopped the v0.0.34 release build four minutes in.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [Timeline](#timeline)
+- [Status: 9 October 2026](#status-9-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Status: 9 October 2026
 
@@ -99,6 +128,7 @@ Family: Builder breaks and reproducibility (`builder-from-scratch`). The reposit
 - [BUILD-LAVA-TERRAIN-BUDGET-38](BUILD-LAVA-TERRAIN-BUDGET-38.md): Detailed lava terrain exceeds region storage budget
 - BUILD-LAYER-DATA-MWAD-SHADOWED-64 (no report page): The Bloodmoon layer data stage stops with mwad is not a package in a MiniWind build
 - [BUILD-LIGHT-THREADS-32](BUILD-LIGHT-THREADS-32.md): ericw light is not byte-reproducible with more than one thread
+- BUILD-MERGED-MASTER-IN-CHECKOUT-66 (no report page): The merged master of the selected game files is written into the source checkout's out folder also when --workspace names another folder; with a read-only checkout the build stops at its room grounding check before the first stage
 - [BUILD-MINIWIND-SEYDA-COMPILE-42](BUILD-MINIWIND-SEYDA-COMPILE-42.md): A CHIM MiniWind of another town stops at its bsp stage: it compiles the whole Seyda Neen town, which exceeds the BSP29 node limit
 - BUILD-MINIWIND-SEYDA-KELP-INDEX-54 (no report page): A Seyda Neen MiniWind can never pass: the chim-town-seyda stage stops because the kelp additions need the original scenery index, which a MiniWind plan does not build
 - [BUILD-NO-OVERLAY-32](BUILD-NO-OVERLAY-32.md): The builder has no engine-overlay command; dev measurements used a private script

@@ -1,6 +1,6 @@
 # Earlier README sections
 
-_Last updated with AmiWind v0.0.64-dev1 (10 November 2026)._
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -899,7 +899,7 @@ See the [memory notes](MEMORY_ALLOCATION.md),
 [cell-changing checklist](CELL_CHANGING.md),
 [sky and background rendering](DAY_NIGHT_AND_SKY.md#shared-exterior-background-sky-implementation-candidate),
 [terrain-culling status](TERRAIN_VISUAL_CULL.md),
-[bug journal](BUG_JOURNAL.md) and [roadmap](ROADMAP.md) for the details.
+[bug tracker](BUGS.md) and [roadmap](ROADMAP.md) for the details.
 Original-game assets, converted proprietary content and ROMs are not distributed
 with AmiWind; you provide your own legally obtained files. Playable builds and
 playtest packages containing those assets stay private.
@@ -947,7 +947,7 @@ source coordinates and keeps its zoom on reopen. See
 with an animated grip and flame attached to its source emitter. The debug header
 shows the region from the game's own records. The earlier torch-crash correction
 is included; its target retest and the brief fist-visibility blink remain tracked
-in the [bug journal](BUG_JOURNAL.md).
+in the [bug tracker](BUGS.md).
 
 `dbg gallery` opens the inspection plane for **2,935 original NPC/creature
 records and all 3,551 converted model assets**. Search by friendly name or source
@@ -1017,7 +1017,7 @@ The reference target is **A1200 / AGA / PAL, 68040 + FPU + JIT, 2 MiB Chip and
 16 MiB Z3 RAM**. Stock A1200 and physical-hardware performance are unproven.
 Linux remains the established build foundation. Native Windows is experimental,
 with intermittent worker and cancellation failures recorded in the
-[Windows guide](WINDOWS_BUILD.md) and [bug journal](BUG_JOURNAL.md).
+[Windows guide](WINDOWS_BUILD.md) and [bug tracker](BUGS.md).
 
 The [Docker build helper](DOCKER_BUILD.md) takes your own Morrowind
 installation as private runtime input. Images contain source and tools; game

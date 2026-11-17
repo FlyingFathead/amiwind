@@ -403,6 +403,17 @@ static void host_warn(const char *what,int script){
     if(script>=0)read_string(script,where,sizeof(where));else strcpy(where,"-");
     Con_Printf("MWScript: %s (%s).\n",what,where);
 }
+/* EXPANSION-SCRIPT-LIMITS-66: a table the build planned from the game (tools/mwscript/plan.py, the file's CONF) is
+ * full. While the map's objects are attached (attach_map) the plan itself was wrong: a clear stop with the numbers,
+ * never a map whose scripts silently do not run (MWVM-INSTANCES-256-66). Outside it (a console's StartScript, a
+ * script-made copy past the allowance) the one action is refused with the numbers in the console. */
+static int attaching;
+static void host_full(const char *table,int planned,int used){
+    if(attaching)
+        Sys_Error("MWScript: the build planned %d %s and this map needs more (%d in use): the compiled scripts' plan is "
+                  "wrong; rebuild the scripts (tools/mwscript/plan.py)",planned,table,used);
+    Con_Printf("MWScript: refused: the build planned %d %s, %d in use.\n",planned,table,used);
+}
 /* --- object state (v0.0.51): Disable/Enable and Lock/Unlock by the placement's reference, kept in saved games
  * (aw_save.h AW_CHANGE_DISABLED, AW_CHANGE_LOCK). A disabled placement with an edict is hidden (no model) and not
  * solid until Enable; at every map change the new map's edicts are hidden again. Not yet: an actor the CHIM window
@@ -713,9 +724,15 @@ static int door_open(unsigned reference,int set){
 #define DELETED_PENDING 32
 static uint32_t deleted_pending[DELETED_PENDING];static int deleted_count;
 static unsigned long objects_deleted,objects_undeleted,deleted_refused;
+/* a deleted reference's script stops: a game-file placement's values are parked (SetDelete 0 may undelete it); a
+ * script-made copy's (AW_ACTORS_PLACED: a projectile a trap fired, a summoned creature) are forgotten with it, so the
+ * parking store the build planned does not fill with gone copies (EXPANSION-SCRIPT-LIMITS-66) */
+static void deleted_script(uint32_t ref){
+    if(ref>=AW_ACTORS_PLACED && ref<=(AW_ACTORS_PLACED|0xFFFFF))AW_MwvmForget(ref);else AW_MwvmDetach(ref);
+}
 static void deleted_flush(void){
     int i;
-    for(i=0;i<deleted_count;i++)AW_MwvmDetach(deleted_pending[i]);
+    for(i=0;i<deleted_count;i++)deleted_script(deleted_pending[i]);
     deleted_count=0;
 }
 static int object_deleted(uint32_t ref){
@@ -728,7 +745,7 @@ static void object_set_deleted(uint32_t ref,int deleted){
         if(r && (r->fields&AW_LEDGER_TAKEN))return;
         if(!(r=AW_LedgerPut(&aw_ledger,ref))){deleted_refused++;return;}
         r->fields|=AW_LEDGER_TAKEN;ledger_place(r);ledger_hide(ref);objects_deleted++;
-        if(deleted_count<DELETED_PENDING)deleted_pending[deleted_count++]=ref;else AW_MwvmDetach(ref);
+        if(deleted_count<DELETED_PENDING)deleted_pending[deleted_count++]=ref;else deleted_script(ref);
         return;
     }
     if(!r || !(r->fields&AW_LEDGER_TAKEN))return;
@@ -1067,8 +1084,8 @@ static int row_of_edict(edict_t *e){
     if(!v || !v->string || !*(pr_strings+v->string))return AW_ACTOR_NONE;
     return AW_ActorFind(pr_strings+v->string);
 }
-/* each instance's own actor row, found once by its edict's record id */
-static int instance_row[AW_MWVM_INSTANCES];static uint32_t instance_row_ref[AW_MWVM_INSTANCES];
+/* each instance's own actor row, found once by its edict's record id: kept on the instance (aw_mwvm_instance_t
+ * actor_row, actor_row_ref: the instance table is sized by the build since EXPANSION-SCRIPT-LIMITS-66) */
 /* ACTOR-STATS-ALL-61: the player's spells from character creation (OpenMW 0.51 mechanicsmanagerimp.cpp: the chosen
  * race's powers and abilities, the birthsign's spells; the class gives none of its own). Applied when the race or the
  * birthsign is (re)chosen: what the previous choice gave goes, and the abilities and powers of the default player
@@ -1384,11 +1401,11 @@ static aw_actor_t *actor_of(int instance,int target,edict_t **edict){
     if(!AW_MwscriptActors())return NULL;
     if(target==AW_MWVM_PLAYER){*edict=sv_player;return player_record();}
     if(target==AW_MWVM_SELF){
-        if(!in || !in->reference || instance<0 || instance>=AW_MWVM_INSTANCES)return NULL;
+        if(!in || !in->reference || instance<0)return NULL;
         ref=in->reference;e=in->entity>0?edict_of(in->entity):NULL;
         if(!e)e=speaker_edict(ref);   /* a dialogue result's run has no entity of its own: the speaker by its reference */
-        if(instance_row_ref[instance]!=ref){instance_row_ref[instance]=ref;instance_row[instance]=row_of_edict(e);}
-        row=instance_row[instance];
+        if(in->actor_row_ref!=ref){in->actor_row_ref=ref;in->actor_row=row_of_edict(e);}
+        row=in->actor_row;
     }else{
         /* an id placed more than once (no one reference): not yet (OpenMW changes the record of every copy) */
         ref=AW_MwvmObjectReference(target);row=AW_MwvmObjectActor(target);
@@ -2259,6 +2276,7 @@ static void summon_end(summon_t *s,int flash){
     edict_t *e=summon_edict(s);
     if(e){if(flash)summon_flash(e->v.origin);AW_ActorsRemove(e);edict_refs_refresh();}
     AW_ActorsPlacedForget(s->key);
+    AW_MwvmForget(s->key);   /* its script's values go with it: the slot's next summon starts clean (EXPANSION-SCRIPT-LIMITS-66) */
     s->used=0;s->entity=0;
 }
 static void summons_tick(void){
@@ -2303,7 +2321,7 @@ static int place_here(int row,const place_row_t *r,const vec3_t local,float yaw)
     }
     {uint32_t key=placed_key(row);
      if(!key || !AW_ActorsPlaceRow(key,local,yaw))return 0;
-     if(!placed_spawn(key)){AW_ActorsPlacedForget(key);return 0;}
+     if(!placed_spawn(key)){AW_ActorsPlacedForget(key);AW_MwvmForget(key);return 0;}
      return 1;}
 }
 static int place_call(int instance,int target,int function,const aw_mwcell_t *numbers,int count){
@@ -2995,8 +3013,8 @@ static int equip_row(const char *id,equip_row_t *out){
     return 0;
 }
 static int instance_of_reference(uint32_t key){
-    int i;
-    for(i=0;i<AW_MWVM_INSTANCES;i++){
+    int i,n=AW_MwvmInstanceCount();
+    for(i=0;i<n;i++){
         aw_mwvm_instance_t *in=AW_MwvmInstance(i);
         if(in && (in->flags&AWI_USED) && in->reference==key)return i;
     }
@@ -3068,7 +3086,7 @@ static int resurrect(int instance,int target){
             memcpy(text,own,len-1);memcpy(text+len-1,tail,(size_t)t+1);len=len-1+(unsigned long)t;block=text;}
     }
     if(!block){free(own);resurrect_refused++;return 1;}
-    for(i=0;i<AW_MWVM_INSTANCES;i++){
+    for(i=0;i<AW_MwvmInstanceCount();i++){
         aw_mwvm_instance_t *in=AW_MwvmInstance(i);
         if(in && in->reference==ref){script=in->script;break;}
     }
@@ -4000,7 +4018,7 @@ static int host_call(int instance,int target,int function,const aw_mwcell_t *num
 static const aw_mwvm_host_t host={host_sound,host_sound_playing,host_say,host_say_done,host_music,host_distance,
     host_menu_mode,host_query,host_journal_get,host_journal_set,host_notyet,host_warn,host_object,host_message,
     host_button,host_actor,host_item,host_spell,host_combat,host_dead_count,host_wander,host_call,host_player_cell,
-    host_position,host_player_move,host_ai_package};
+    host_position,host_player_move,host_ai_package,host_full};
 
 /* The dialogue conditions' live state (aw_glut.h aw_glut_live, DIALOGUE-57): what the scripts keep, read by name.
  * RankRequirement reads the factions' rank requirements from the dialogue table (aw_dialwin.c, FACTION-RANK-58). */
@@ -4379,6 +4397,7 @@ static void held_recheck(int script){
 static void attach_map(void){
     FILE *f=NULL;int length,i,k,nroom=0,anchored=0;long base,room;uint32_t offset,rows,bytes,r;unsigned char row[24];
     vec3_t local,shift;float source[3];edict_t *e;int outdoors;
+    attaching=1;   /* a table the build planned running out here is a clear stop (host_full); the caller clears it */
     AW_MwvmBeginMap();held_attached_now=0;
     /* Room or outdoors: outdoors when the shared conversion (aw_world.c) knows this map, a region map or, since
      * CHIM-FRAME-SOURCE-CONVERSION-59, the loaded CHIM frame map (a streamed town counts as outdoors, its placements
@@ -4588,7 +4607,7 @@ static void map_visit(void){
         }
         t1=Sys_FloatTime();
         chargen_sync();   /* OPENING-REGRESSION-64: before any script runs this tick */
-        if(script_model!=map_model){script_model=map_model;attach_map();carried_sync();}
+        if(script_model!=map_model){script_model=map_model;attach_map();attaching=0;carried_sync();}
         t2=Sys_FloatTime();
         if(t2-t0>.3)Con_Printf("MWScript first tick: file %s %.0f ms, map attach %.0f ms.\n",was?"kept":"loaded",
                                (t1-t0)*1000,(t2-t1)*1000);
@@ -4657,6 +4676,12 @@ static void status_counts(void){
                attach_places,attach_rooms,attach_refused,global,active,looping);
     Con_Printf("frames %lu runs %lu quiet-skips %lu far %lu deferred %lu ops %lu (max %lu a frame) aborted %lu not-yet calls %lu\n",
                s->frames,s->runs,s->skipped_quiet,s->skipped_far,s->deferred,s->ops,s->max_ops_frame,s->aborted,s->notyet_calls);
+    /* EXPANSION-SCRIPT-LIMITS-66: the tables the build planned from the game against their use (the session's peaks) */
+    {int pi,pc,pp,ppc,ui,uc,up,upc;
+     AW_MwvmPlan(&pi,&pc,&pp,&ppc);AW_MwvmUsage(&ui,&uc,&up,&upc);
+     Con_Printf("tables (planned by the build, %lu bytes): instances %d of %d, values %d of %d, parked objects %d of %d, "
+                "parked values %d of %d; refused %lu/%lu/%lu/%lu\n",AW_MwvmTableBytes(),ui,pi,uc,pc,up,pp,upc,ppc,
+                s->full_instances,s->full_cells,s->full_parked,s->full_park_cells);}
     /* MWSCRIPT-TICK-SHARE-66: where the scripts' time goes (whole ms; the share of all frames: chim spikes report) */
     Con_Printf("time: interpreter with its calls %ld ms, of it host calls %ld ms (%lu calls), %ld us a frame\n",
                (long)(s->tick_time*1000+.5),(long)(s->host_time*1000+.5),s->host_calls,

@@ -18,6 +18,18 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-09: reported in v0.0.33-dev
+- 2026-10-09: BUILD-ROUTED-FLORA-RESERVE-33: BUILD-ROUTED-FLORA-RESERVE-33: with routed standing hulls the full build stopped in world-flora: region vf0779's flora packing needed 33,533 clipnodes against its 32,767 reserve (32,614 with chains).
+- 2026-10-11 14:29 +0300: seen again in v0.0.36-dev5: PERSISTING: vf0779 again, aggregate flora packing 33,172 clipnodes after the stair plate rule (e532b0e)
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 
 ## Status: 9 October 2026
@@ -104,6 +116,7 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [SEYDA-BLOCK-31](SEYDA-BLOCK-31.md): Invisible obstacle blocks the path on a Seyda Neen slope
 - [STAIR-DETECT-POSITION-41](STAIR-DETECT-POSITION-41.md): Stair step detection depends on where a frame puts the placement: a few borderline steps are found in one frame's copy and not in another's
 - [STAIR-FLIGHT-CORE-SPLIT-41](STAIR-FLIGHT-CORE-SPLIT-41.md): The stair gate marks flights per 1024-unit core: a flight that crosses a core line loses its flight mark, so its failures do not stop a build
+- [STAIR-ORIGIN-IN-TERRAIN-24](STAIR-ORIGIN-IN-TERRAIN-24.md): stairs10: the reported stuck position at -685,+619,141 lies inside the terrain
 - [STAIRS-ADDAMASARTUS-32](STAIRS-ADDAMASARTUS-32.md): A low step in the Addamasartus cave is blocked
 - [STAIRS-BALMORA-B01-32](STAIRS-BALMORA-B01-32.md): A Balmora Hlaalu house staircase cannot be approached from below
 - [STAIRS-BALMORA-WESTSOUTH-32](STAIRS-BALMORA-WESTSOUTH-32.md): A Hlaalu hall staircase in a Balmora interior has no clear foot

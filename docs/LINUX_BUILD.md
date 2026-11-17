@@ -1,6 +1,6 @@
 # Build AmiWind on Linux
 
-_Last updated with AmiWind v0.0.66-dev2 (14 November 2026)._
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -10,6 +10,7 @@ _Last updated with AmiWind v0.0.66-dev2 (14 November 2026)._
 - [Manual or partial setup](#manual-or-partial-setup)
 - [2. External native tools](#2-external-native-tools)
 - [3. Check, then build](#3-check-then-build)
+  - [When a build fails](#when-a-build-fails)
 - [4. Boot your private image](#4-boot-your-private-image)
 - [Rebuilding only the first NPC slice](#rebuilding-only-the-first-npc-slice)
 - [Repeatable conversion choices](#repeatable-conversion-choices)
@@ -383,6 +384,31 @@ For a smaller host-only terrain test with no native toolchain:
 ```
 
 This produces verified terrain packets, not an Amiga executable or HDF.
+
+### When a build fails
+
+A failed build writes one report, `logs/BUILD-REPORT-<run>.txt` in the build workspace (beside `build/`, so
+`out/logs/` by default), and prints where it is. It is the one file to send when you ask for help:
+
+1. what failed: the stage, its exit and time, its error and the unit or map it names, the units it refused, the
+   stage's command, the traceback and the last 200 lines of the stage's own log (or the builder's own error when it
+   stopped before a stage);
+2. every build option with its value and where it came from (the command line, a recipe, set by the builder, or the
+   default), every `AMIWIND_` setting with where it came from (set before the build started, the builder's defaults,
+   or set by the builder from the options), and the settings the failed stage reads;
+3. the versions: `VERSION`, `CHIM_VERSION`, the source commit and any local changes, Python, its packages and every
+   tool against the recorded reference, and whether the build ran in a container;
+4. the game data: each master and archive with its size, SHA-256 and the known copy it matches, so two copies of the
+   game are told apart;
+5. the machine: operating system, cores, memory and free space;
+6. the stage plan with each stage's state, time and workers;
+7. the reuse state: the reuse source, the stages reused, the stages not reused and why, the reuse stops.
+
+The report stays on your computer; nothing is sent anywhere. It holds no environment value other than the `AMIWIND_`
+settings and the build options; paths in the workspace are written relative to it, paths in the source checkout start
+with `<source>` and your home folder is `~`. `--report` writes one for a passed or cancelled build too, and for a
+`--check` or `--plan` that stops on an error (without it those write nothing). `FAILURE.md` in the run folder stays the
+short form the Toolkit Monitor shows.
 
 ## 4. Boot your private image
 

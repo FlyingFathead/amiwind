@@ -312,6 +312,8 @@ OPTIONS = {
     'developer_mode': 'tooling', 'working_version': 'tooling', 'accept_version_mismatch': 'tooling',
     # Build recipes (tools/build_recipe.py, docs/BUILD_RECIPES.md): where the options come from and where they go.
     'recipe': 'tooling', 'save_recipe': 'tooling', 'recipe_inputs': 'tooling',
+    # The one-file build report (tools/build_report.py, BUILD-FAILURE-REPORT-66): what the run writes, never what it builds.
+    'report': 'tooling',
     'rebuild_unit': 'tooling',
     'allow_release_reuse': 'check',
     'fingerprint_scope': 'tooling', 'no_unit_cache': 'debug opt-out', 'no_media_cache': 'debug opt-out',

@@ -20,6 +20,18 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-21: reported in v0.0.46
+- 2026-10-21: HARVEST-INTERIOR-PICK-47 found and fixed on a branch; INTERIOR-PLACED-ITEMS-47 and HARVEST-ORGANIC-PLANTS-47 registered: HARVEST-INTERIOR-PICK-47: in the v0.0.46 image a mushroom inside an interior is drawn but cannot be picked (checked in ...
+- 2026-11-07 02:35 +0200: seen again in v0.0.61: flora census of the masters: 17,620 other plant and 4,883 egg sack, kollop and spore placements are still scenery; the bracket fungi on the tree trunks are now a harvest kind (HARVEST-TREE-FUNGUS-62)
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.61 (7 November 2026)._
 
 ## Status: 7 November 2026

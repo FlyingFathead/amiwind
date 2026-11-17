@@ -28,6 +28,31 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.66-dev5 (3dfd5095) | 2026-11-15 | gate 10881 passed on 18eb63f1, which holds it | the image step sets every partition's buffers from its longest name lookup and reads them back |
+| shipped | a numbered build | v0.0.66-dev5 build 2026_11_15_v0.0.66-dev5_full-v0.0.66-dev5_18eb63f | 2026-11-15 | the delivered build | the build holds 3dfd5095 |
+| confirmed by a build | a numbered build | v0.0.66-dev5 build 2026_11_15_v0.0.66-dev5_full-v0.0.66-dev5_18eb63f | 2026-11-15 | the build log's image step | it set 150 buffers on the boot partition and 40 on the world partition from their longest name lookups (140 and 30 header blocks); a fix of the disk image the builder writes, no play check applies |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.32-dev
+- 2026-10-08: CHIM world-format follow-up findings: FFS sweep, walk replay and per-placement visibility (branch v0.0.33-chim-format).
+- 2026-11-15: seen again in v0.0.66-dev5: Seen in the v0.0.66-dev5 build's image step: the buffers are set by the longest name lookup, DH0 150 (longest lookup 140 header blocks, median 25) and DW0 40 (longest 30, median 7); all 29,385 and 37,006 files fit.
+- 2026-11-15: seen again in v0.0.66-dev7: The load times in play are measured on the v0.0.66-dev6 image, which has the disk layout of v0.0.66-dev5: see IMAGE-LOADS-SLOWER-66.
+- 2026-11-15: fixed in source: a gated commit, v0.0.66-dev5 (3dfd5095); gate 10881 passed on 18eb63f1, which holds it: the image step sets every partition's buffers from its longest name lookup and reads them back
+- 2026-11-15: shipped: a numbered build, v0.0.66-dev5 build 2026_11_15_v0.0.66-dev5_full-v0.0.66-dev5_18eb63f; the delivered build: the build holds 3dfd5095
+- 2026-11-15: confirmed by a build: a numbered build, v0.0.66-dev5 build 2026_11_15_v0.0.66-dev5_full-v0.0.66-dev5_18eb63f; the build log's image step: it set 150 buffers on the boot partition and 40 on the world partition from their longest name lookups (140 and 30 header blocks); a fix of the disk image the builder writes, no play check applies
+- 2026-11-15 03:25 +0200: seen again in v0.0.66-dev2: the 30 default buffers of the boot partition were too few for its name lookups once id1/sound moved to the tail of its chain: every sound lookup read all its blocks from the disk again (IMAGE-LOADS-SLOWER-66)
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.66-dev4 (15 November 2026)._
 
 ## Status: 15 November 2026

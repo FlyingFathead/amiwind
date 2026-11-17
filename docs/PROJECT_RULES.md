@@ -1,6 +1,6 @@
 # Project development rules
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 These requirements apply to changes in the public project.
 
@@ -26,8 +26,9 @@ a claim that every path has already passed both platforms.
 ## Mandatory bug and incident documentation
 
 Project requirement, reaffirmed 3 October 2026: ALWAYS record every bug, issue,
-regression and failed build/validation incident in public docs/BUG_JOURNAL.md
-and the relevant subsystem documentation, with supporting private production
+regression and failed build/validation incident in the public bug tracker
+(docs/bugs/bugs.json through tools/bug_register.py: its entry, sightings, dated history and closure steps, and its
+report page; shown in docs/BUGS.md) and the relevant subsystem documentation, with supporting private production
 notes. Record it when discovered; do not wait for a fix or a maintainer reminder.
 
 - State the affected/first-observed version, location, environment, symptoms and
@@ -60,7 +61,7 @@ Every incident entry must state:
 
 These records include incidents encountered while developing, converting,
 compiling, validating and packaging AmiWind, as well as gameplay bugs. Update
-public docs/BUG_JOURNAL.md and subsystem docs alongside private production notes.
+the public bug tracker (docs/bugs/) and subsystem docs alongside private production notes.
 
 ### Imperative: keep bug, issue and regression tracking updated at all times
 

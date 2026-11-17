@@ -30,12 +30,29 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-13: reported in v0.0.39-rc1
+- 2026-10-13: seen again in v0.0.39-rc2: Roadmap maxstats is explicitly proposed, not an available command.
+- 2026-10-13: DOCS-CHANGELOG-STALE-39 and DOCS-RC1-PREFLIGHT-39: PLAYER-MOVEMENT-STATS-PARITY-39 (2026-10-13, scoped repeat/documentation correction): Suite catalogue coverage rejects roadmap wording that resembles an implemented maxstats command.
+- 2026-10-14: seen again in v0.0.40-dev1: Maintainer renewed turbo-traversal report.
+- 2026-10-14: PLAYER-MOVEMENT-STATS-PARITY-39: movement speed source study: Maintainer renewed the fast-traversal report.
+- 2026-10-23: PLAYER-MOVEMENT-STATS-PARITY-39 persisting, repaired in source; PLAYER-JUMP-ORIGINAL-RULES-48 registered
+- 2026-10-23 02:54 +0300: seen again in v0.0.48-dev2: Maintainer: crossing the island as with boots of blinding speed; original speeds by default, old ones as dbg superspeed.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -244,6 +261,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - MWSCRIPT-INERT-SEEN-62 (no report page): Scripts whose only effect is a message box, a door or item use they take over, or a local the dialogue reads were left out of the build as doing nothing
 - MWSCRIPT-INTERIOR-PLACEMENTS-48 (no report page): Scripted placements in rooms that have no edict are not attached: the engine has no room identity to match them (3,612 of 4,907 bindings are in rooms)
 - MWSCRIPT-LATER-MASTER-SCRIPT-61 (no report page): An object placed in Vvardenfell whose record gets its script from a later master is not attached
+- MWSCRIPT-MEMBER-LOOKUP-COST-66 (no report page): A script reading or writing another object's variable walks the instance table and the parking store for the object: with the tables sized for the whole game the walk grows to hundreds of instances and thousands of parked objects, in 307 every-frame operations
 - MWSCRIPT-MEMBER-QUIET-READER-66 (no report page): A script that reads another object's variable can sleep through a change that object's own script makes to it: such a change does not wake quiet scripts
 - MWSCRIPT-MEMBER-READS-ID-AS-SCRIPT-66 (no report page): A script's read or write of another object's local variable finds nothing: the engine takes the object row's id as its script, so the read gives 0 and the write is dropped (Dagoth Ur's shield never follows the Heart's count)
 - MWSCRIPT-MISSING-FUNCTIONS-63 (no report page): Game scripts call MWScript functions the interpreter does not carry out yet: those calls do nothing and read 0 (69 scripts after the first v0.0.63 batch, most of them in Mournhold and Solstheim)
@@ -254,7 +272,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [MWSCRIPT-POSITIONCELL-OUTDOOR-62](MWSCRIPT-POSITIONCELL-OUTDOOR-62.md): An NPC or a creature a script sends outdoors appears there only while its home area is loaded
 - MWSCRIPT-REFUSED-SCRIPT-COUNT-58 (no report page): The compiled game scripts are refused at load since the dialogue result scripts joined the file: no script runs
 - MWSCRIPT-ROTATE-NO-ENTITY-59 (no report page): A script's Rotate on a streamed outdoor object without an entity is not carried out: the object does not turn
-- MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66 (no report page): A script's SetHealth 0 leaves the actor alive: its health reads 0 but it stays standing and fighting (Dagoth Ur after the end script, the dreamer workers after the Heart)
+- [MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66](MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66.md): A script's SetHealth 0 leaves the actor alive: its health reads 0 but it stays standing and fighting (Dagoth Ur after the end script, the dreamer workers after the Heart)
 - MWSCRIPT-STANDING-NOT-SAVED-57 (no report page): The players standing the scripts change (crime level, reputation, faction ranks, expelled marks, faction reputation) is not in saved games
 - [MWSCRIPT-STATE-NOT-SAVED-48](MWSCRIPT-STATE-NOT-SAVED-48.md): The compiled scripts' values (globals, object and script locals, journal indexes) are not in saved games
 - MWSCRIPT-STOPCOMBAT-UNWIRED-62 (no report page): A script's StopCombat never ended a fight: the combat layer's end of one actor's fight was never connected to it

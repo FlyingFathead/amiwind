@@ -21,11 +21,24 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-15: reported in v0.0.40-dev2
+- 2026-10-15: v0.0.40: v0.0.40 - retain authored boundary collision: CHIM-FRAME-STATIC-SEAM-40: Compiled apron repair reduces mismatches477to69; remaining rock disagreement comes from an authored collision shape omitted by the Seyda carrier.
+- 2026-10-16: Register audit: open means open: 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Opening-barrel original-cell binding, 15 October 2026](#opening-barrel-original-cell-binding-15-october-2026)
 - [Checked image parity for apron supplements, 15 October 2026](#checked-image-parity-for-apron-supplements-15-october-2026)
 - [Missing Seyda apron dependencies: source repair, 15 October 2026](#missing-seyda-apron-dependencies-source-repair-15-october-2026)

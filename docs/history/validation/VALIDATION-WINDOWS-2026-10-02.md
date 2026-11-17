@@ -100,7 +100,7 @@ contain the maintainer's converted game assets and host paths.
 
 WIN-01's intermittent worker-handle failure remains unresolved. WIN-02's cancelled
 worker-descendant cleanup candidate needs integration. WIN-03's corrected packing
-passed this full image; retain its regression tests. See [the bug journal](../../BUG_JOURNAL.md).
+passed this full image; retain its regression tests. See [the bug tracker](../../BUGS.md).
 The planned v0.0.26 release also includes the [Docker builder](../../DOCKER_BUILD_ROADMAP.md),
 its input helpers and container validation. Those are still pending. The Windows
 port and fixes are packaged as **v0.0.26-rc1**; the historical full image and

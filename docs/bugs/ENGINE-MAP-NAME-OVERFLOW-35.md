@@ -18,6 +18,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-10: reported in v0.0.34
+- 2026-10-10: Engine crash paths and engine table limits (BUILD-BUDGET-ENGINE-LIMITS-35 and fifteen more): ENGINE-MAP-NAME-OVERFLOW-35, ENGINE-FRAME-TIME-FLOAT-35, ENGINE-LOADGAME-SYSERROR-35: registered; fixed in source.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 ## Status: 10 October 2026

@@ -29,6 +29,18 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-11: reported in v0.0.36-dev5
+- 2026-10-11 14:31 +0300: seen again in v0.0.36-dev5: maintainer: clicking in the map (M) drags AmigaDOS into view
+- 2026-10-11 14:33 +0300: seen again in v0.0.36-dev5: maintainer: right+left click combos reach the AmigaDOS screen behind the game
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 ## Status: 11 October 2026

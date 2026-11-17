@@ -15,6 +15,18 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.32-dev
+- 2026-10-08: Independent review of the open-world plan: All performance figures were taken with the emulator at host speed; flat directories are slow on real FFS; brush models may fragment down the terrain BSP; the loader stages lumps before decoding.
+- 2026-10-08: World streamer measurement findings: Model variants per mesh, textures copied into every map, shared node subtrees, placements stored differently per region, and a heap estimate that ignores sharing inside a map.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.41-dev1 (15 October 2026)._
 
 ## Status: 8 October 2026

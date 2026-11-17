@@ -20,6 +20,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-10: reported in v0.0.36-dev1
+- 2026-10-27 15:33 +0200: came back in v0.0.54-dev1 (fixed in v0.0.41 before): Found by the combat playground MiniWind of v0.0.54-dev1: harvest_build.plan_rows uses runtime_towns()[:2] and the engine's AW_HarvestFollow follows only those, so a CHIM town made from the game data (Vivec and every other) has no pickable ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.41-dev5 (16 October 2026)._
 
 ## Status: 27 October 2026

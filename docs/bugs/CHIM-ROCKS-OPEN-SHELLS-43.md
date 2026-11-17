@@ -30,12 +30,28 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-18: reported in v0.0.43-dev2
+- 2026-10-19: CHIM-ROCKS-OPEN-SHELLS-43: island-wide rock sweep finds no converter cause
+- 2026-10-19: CHIM-ROCKS-OPEN-SHELLS-43 and CHIM-CROSSING-SLUGGISH-43 registered
+- 2026-10-19 19:11 +0300: seen again in v0.0.44: sweep: 168 CHIM rock meshes, no converter cause (faces, winding, rotation match the original); rims buried as in the original; in-game and OpenMW look pending
+- 2026-10-20 20:09 +0300: seen again in v0.0.46: Listed under Known in this build in the v0.0.46 release notes (still open at the release).
+- 2026-10-27 16:58 +0200: seen again in v0.0.54-dev1: PERSISTING, one class cause with MESH-LOD-TORN-MESHES-33 (27 October 2026): 651 of 666 reduced mesh spaces are reduced without lock_boundaries, 136 with half or more of their rim torn (26,198 placements); the seam audit reports them as ok ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Status: 19 October 2026](#status-19-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)

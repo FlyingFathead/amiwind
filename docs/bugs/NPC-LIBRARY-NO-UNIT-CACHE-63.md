@@ -22,7 +22,7 @@
 | Persists in | v0.0.64-dev2 (last seen) |
 | Severity | critical: Regressed in v0.0.64-dev2 (was high): each refused reuse of the stage costs 2,600 to 2,750 s re-baking 418 appearances and 57 creature models whose own input... |
 | Family | Build speed (`build-speed`) |
-| Deferred by the maintainer | 2026-11-12: deferred by the maintainer to v0.0.66 (the v0.0.65 release fixes the opening only and ships early); its "came back" mark is checked against its evidence first |
+| Deferred by the maintainer | 2026-11-16: deferred by the maintainer's release decision to v0.0.67 (v0.0.66 is made from its twelfth snapshot; the rest of the roadmap goes to later versions) |
 | Came back (regression) | in v0.0.64-dev2 (fixed in v0.0.63 before) |
 | Playtest version | 2026_11_09_v0.0.63-dev1_full-v0.0.63-dev1_dc356e3 |
 | From commit | source dc356e3, engine dc356e3, CHIM world dc356e3 |
@@ -32,12 +32,29 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-09: reported in v0.0.63-dev1
+- 2026-11-09 09:07 +0200: seen again in v0.0.63-dev1: Also: neither the actor library nor the arena fighters of the image step used the existing NPC gallery and parts caches, and the image step baked its 10 arena fighters again in every build at low core use.
+- 2026-11-09 09:21 +0200: seen again in v0.0.63-dev1: Also in the image step: the CHIM room actor bake fitted all 2,342 room residents again (11 min 3 s on 22.5 cores) and the guard torches tried 6 guards again at every level, all 6 skipped (5 min 20 s on 4.7 cores): neither kept its results.
+- 2026-11-10 07:40 +0200: came back in v0.0.64-dev2 (fixed in v0.0.63 before): The v0.0.64-dev2 build (d031c7b5, reusing the dev1 run) took 0 of 418 NPC appearances and 0 of 48 creature models from their unit caches and baked them all, about 20 minutes; the dev1 build had taken 418 of 418 from the cache.
+- 2026-11-10 12:11 +0200: seen again in v0.0.64-dev2: Creature half: two MiniWind runs of the same source tree (akulakhan-chamber try2 and try3, 10 November) each baked all 48 creature models of the actor library again while the NPC appearances came from their unit cache (450 of 451).
+- 2026-11-16: v0.0.66-dev11: The v0.0.66-dev11 chain build took the actor library from its unit caches (the stage took 2.0 s on 4 cores); the rebakes after a change outside the actors' own inputs are BUILD-UNIT-KEYS-REACH-64.
+- 2026-11-16: deferred by the maintainer: deferred by the maintainer's release decision to v0.0.67 (v0.0.66 is made from its twelfth snapshot; the rest of the roadmap goes to later versions)
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.63-dev1 (9 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Status: 9 November 2026](#status-9-november-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -148,7 +165,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-IMAGE-FRAME-MAP-HEAP-SERIAL-36](BUILD-IMAGE-FRAME-MAP-HEAP-SERIAL-36.md): The image step's CHIM frame-map heap check runs on one core: 66 s to 4.5 min per build while 23 cores idle
 - [BUILD-IMAGE-HASH-UNDERUSED-36](BUILD-IMAGE-HASH-UNDERUSED-36.md): The image step hashes 34,592 payload files on 3 of 24 cores (one file per pool task)
 - [BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36](BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36.md): The image step's world map heap audit estimates 170 maps on 5.3 of 24 cores
-- BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66 (no report page): The image step of the v0.0.66-dev9 build wrote its partitions in 107 seconds where the earlier build took 67
+- [BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66](BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66.md): The image step of the v0.0.66-dev9 build wrote its partitions in 107 seconds where the earlier build took 67
 - [BUILD-IMAGE-NOT-INCREMENTAL-33](BUILD-IMAGE-NOT-INCREMENTAL-33.md): The image step redoes every per-map pass and the whole pack on every build
 - [BUILD-IMAGE-NPC-CHECKS-LATE-44](BUILD-IMAGE-NPC-CHECKS-LATE-44.md): The image step's player body and guard torch bakes fail only at the end of a full build instead of before the expensive stages
 - [BUILD-IMAGE-REGION-MAPS-SERIAL-43](BUILD-IMAGE-REGION-MAPS-SERIAL-43.md): The image step's CHIM frame-map phases run on one core: the world read six times, ground traces on whole frames
@@ -265,6 +282,8 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [MINIWIND-SCENE-CHAIN-WEIGHT-42](MINIWIND-SCENE-CHAIN-WEIGHT-42.md): Every MiniWind bakes all playable races and the opening rooms, and walks its whole frame stairs
 - NPC-BAKE-STAGES-OVERRUN-62 (no report page): The new seam and floor character bake made every stage that bakes characters run far past its history: room batches about 2 h 40 min, actor library about 40 min, player bodies 35+ min
 - [NPC-BAKED-WHOLE-DUPLICATION-33](NPC-BAKED-WHOLE-DUPLICATION-33.md): Every NPC appearance is baked whole: shared body parts are converted again for each actor, and equipment cannot change
+- PARTITION-CACHE-FIXED-WORKERS-66 (no report page): The new partition cache hashed its files on a fixed eight threads instead of the stage's own allowance
+- PERF-GUARD-BASIS-BY-COUNT-66 (no report page): The performance guard judges the image step's partition write by the number of partitions and not by their size, so a slowdown back to the old time would pass
 - [PERF-GUARD-RESIDENT-BUSY-HOST-57](PERF-GUARD-RESIDENT-BUSY-HOST-57.md): The dev5 full build's perf guard failed chim-town-balmora and chim-town-vivec_city build_resident as slower (129 s, was 52 s; 147 s, was 62 s) while two other builds ran beside it: contention, not code
 - PLAYER-VIEW-SKIN-ROWS-STOP-62 (no report page): The image step's player view stopped the v0.0.62 final build after 1 h 13 min: an Alias skin rows overflow ended it instead of trying the next smaller body
 - RELEASE-GUARD-SLOW-CLONE-51 (no report page): The release guard, the fail-fast first step of a release, took 6 minutes on about 0.14 of a core: its release check clones the whole repository through the Windows-mounted drive

@@ -28,6 +28,18 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-15: reported in v0.0.66-dev5
+- 2026-11-15: seen again in v0.0.66-dev7: Seen on the v0.0.66-dev7 image (FS-UAE at 32 MB Fast, JIT): the guard (128967) at 268 44 39 by the arrival point 266 36 55 after the return; "player is stuck." 3,498 times until part A ended.
+- 2026-11-15: seen again in v0.0.66-dev9: Looked for on the v0.0.66-dev9 image (FS-UAE at 32 MB Fast, JIT): no "player is stuck." line in either part of the opening journey and no "Arrival:" line after step 6, because no actor stood on the street door's arrival point; the case was ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.66-dev10 (15 November 2026)._
 
 ## Status: 15 November 2026
@@ -88,9 +100,12 @@ Family: Object placement and in-game geometry (`placement-geometry`). Placed obj
 - [CONVERTER-ROOT-ROTATION-30](CONVERTER-ROOT-ROTATION-30.md): Converter applied NIF root-node rotation to placed meshes
 - COURTYARD-ARRIVAL-STUCK-66 (no report page): Arriving in the census courtyard from the back room, the player was once stuck in solid: twenty "player is stuck" lines and two moves out
 - CREATURE-FLOATING-62 (no report page): A scrib in the wilderness floats above the terrain
+- [PORT-ROCK-ROTATION-23](PORT-ROCK-ROTATION-23.md): A rock by the Seyda Neen port was converted with the wrong rotation
 - ROCK-FLORA-SURFACE-29 (no report page): Angular rock-like surfaces newly appearing in Bitter Coast
 - ROOM-GROUND-STEEP-ICE-66 (no report page): With Bloodmoon selected, the image stage stopped on one Hound of Hircine in the Mortrag Glacier Inner Ring: its feet stand on a steep part of the converted ice floor
 - SHACK-VISIBILITY-29 (no report page): Indrele Rathryon shack front walls missing
+- [VODUNIUS-HOUSE-HOLES-23](VODUNIUS-HOUSE-HOLES-23.md): Visibility holes in Vodunius Nuccius' house in Seyda Neen
+- [WEDGE-TRAP-24](WEDGE-TRAP-24.md): wedge1: the player is trapped at -225,348,131
 - [WORLD-SHORE-OPEN-GEOMETRY-38](WORLD-SHORE-OPEN-GEOMETRY-38.md): Shoreline objects show large open sections and thin disconnected edges
 
 Related bugs in other categories:
@@ -98,6 +113,6 @@ Related bugs in other categories:
 - [AMBIENT-UNSTUCK-FLOOD-61](AMBIENT-UNSTUCK-FLOOD-61.md): Walking residents in Seyda Neen keep falling back to the stuck-movement retry
 - JOURNEY-DOOR-USE-GOES-TO-ACTOR-66 (no report page): The opening journey's use key at the census street door went to the body of the guard killed a step before, or to a message box still showing, and the step then waited for a load it had never asked for
 - JOURNEY-STEP6-VICTIM-NEAREST-66 (no report page): The opening journey's step 6 killed the nearest resident, which could be the guard by the census office's street door, whose body then took the use key instead of the door
-- WANDER-DOOR-RULE-66 (no report page): A wandering resident can stop at a destination right by a door and stand there; the original sends an idle wanderer near a door walking
+- [WANDER-DOOR-RULE-66](WANDER-DOOR-RULE-66.md): A wandering resident can stop at a destination right by a door and stand there; the original sends an idle wanderer near a door walking
 
 <!-- END GENERATED CATEGORY -->

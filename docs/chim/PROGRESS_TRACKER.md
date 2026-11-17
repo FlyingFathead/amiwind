@@ -1,6 +1,6 @@
 # CHIM Progress Tracker
 
-_Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
+_Last updated with AmiWind v0.0.66 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -43,7 +43,7 @@ _Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
 
 <!-- BEGIN GENERATED CURRENT STATE: from docs/chim/progress-state.json and docs/mwscript-features.json; run python3 tools/cell_progress_state.py render -->
 
-_Counted from the tracker data generated 2026-11-12: newest ingested build **v0.0.65-rc4 (51221ddb)**, built 2026-11-11; the version in development, 0.0.66-dev11, has no ingested build yet, so these are the figures of the newest ingested one. Every number below is read from that data and from the MWScript tracker when this block is rendered; none is typed by hand._
+_Counted from the tracker data generated 2026-11-16: newest ingested build **v0.0.66-dev9 (803f83cd)**, built 2026-11-14; the version in development, 0.0.66, has no ingested build yet, so these are the figures of the newest ingested one. Every number below is read from that data and from the MWScript tracker when this block is rendered; none is typed by hand._
 
 ### Exterior cells, per land
 
@@ -64,20 +64,20 @@ None of Solstheim's land cells is on CHIM in this build.
 | Land | Rooms | In the game on CHIM rooms | In the game as a room map | Converted, not in the game yet | Not started | Set aside, with a reason |
 | :-- | --: | --: | --: | --: | --: | --: |
 | Vvardenfell | 1,123 | 1,121 | 2 | 0 | 0 | 0 |
-| Solstheim | 96 | 3 | 0 | 0 | 92 | 1 |
-| Mournhold | 93 | 0 | 0 | 0 | 86 | 7 |
-| No entrance area | 16 | 8 | 0 | 0 | 0 | 8 |
-| All | 1,328 | 1,132 | 2 | 0 | 178 | 16 |
+| Solstheim | 96 | 96 | 0 | 0 | 0 | 0 |
+| Mournhold | 93 | 87 | 0 | 0 | 5 | 1 |
+| No entrance area | 16 | 13 | 0 | 0 | 0 | 3 |
+| All | 1,328 | 1,317 | 2 | 0 | 5 | 4 |
 
-Set aside: hard case 5, teleport only 3, no entrance, no script 6, test cell 2. Reasons (a room can have two): behaves exterior 5, teleport only 3, unreachable 8.
+Set aside: teleport only 1, no entrance, no script 3. Reasons (a room can have two): teleport only 1, unreachable 3.
 Rooms that are in the game as room maps of our own, not as CHIM rooms: Imperial Prison Ship; Seyda Neen, Census and Excise Office. The builder converts them from the original cells into regular Quake maps with the opening sequence's own markers, and counts them as in the game; they stay room maps until CHIM rooms keep object state.
 
-- later: Mournhold (Tribunal.esm): Mournhold is reached only by script (Tribunal's teleport): its rooms wait for the scripts step (roadmap step 6).
-- later: Solstheim (Bloodmoon.esm): Solstheim's exterior (Bloodmoon) is not on CHIM yet: its rooms come in with the island (roadmap step 7).
+- later: Mournhold (Tribunal.esm): Mournhold is reached by script (Tribunal's teleport): its rooms are batched with plan --layers (the Tribunal layer, CHIM-SOL-FLORA-PATH-65).
+- later: Solstheim (Bloodmoon.esm): Solstheim's rooms (Bloodmoon) are batched with plan --layers (the Bloodmoon layer, beside its exterior cells, CHIM-SOL-FLORA-PATH-65).
 
 ### Scripting
 
-Counted from the MWScript tracker ([MWScript features](../MWSCRIPT_FEATURES.md)), measured 16 November 2026 for AmiWind v0.0.66-dev11 with the builder's own compiler: 620 of the 1,074 scripts the original game uses run as scripts or are carried by AmiWind's own code (611 run, 9 carried); 9,095 script records are bound to placed objects.
+Counted from the MWScript tracker ([MWScript features](../MWSCRIPT_FEATURES.md)), measured 16 November 2026 for AmiWind v0.0.66 with the builder's own compiler: 620 of the 1,074 scripts the original game uses run as scripts or are carried by AmiWind's own code (611 run, 9 carried); 9,095 script records are bound to placed objects.
 
 | State | Scripts |
 | :-- | --: |
@@ -94,6 +94,18 @@ Cells on CHIM (land + sea) in each ingested build since v0.0.49, from the tracke
 
 | Build | Built | Vvardenfell | Solstheim | All cells on CHIM |
 | :-- | --: | --: | --: | --: |
+| v0.0.66-dev9 (803f83cd) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 1,409 |
+| v0.0.66-dev8 (3a64d00e) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 1,409 |
+| v0.0.66-dev7 (a33bba98) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 1,409 |
+| v0.0.66-dev6 (629a2dbd) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 1,409 |
+| v0.0.66-dev5 (1427e0da) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 1,409 |
+| v0.0.66-dev4 (010ce4a9) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 1,409 |
+| v0.0.66-dev3 (c0ab8f11) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 1,409 |
+| v0.0.66-dev2 (3988c6e4) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 1,409 |
+| v0.0.66-dev12 (ac37e80b) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 1,409 |
+| v0.0.66-dev11 (26ed570f) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 1,409 |
+| v0.0.66-dev10 (f446092e) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 1,409 |
+| v0.0.66-dev1 (662ffae6) | 2026-11-13 | 1,292 + 116 | 0 + 1 | 1,409 |
 | v0.0.65-rc4 (51221ddb) | 2026-11-11 | 1,292 + 116 | 0 + 1 | 1,409 |
 | v0.0.65-rc2 (6f00103b) | 2026-11-11 | 1,292 + 116 | 0 + 1 | 1,409 |
 | v0.0.65 (9bd80ee1) | 2026-11-11 | 1,292 + 116 | 0 + 1 | 1,409 |

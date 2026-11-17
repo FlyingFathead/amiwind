@@ -20,6 +20,18 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-11: reported in v0.0.36-dev3
+- 2026-10-11: CHIM-ARENA-HUNK-GAP-36 and EMU-JIT-FAULT-ADDRESS-36; version 0.0.36-dev4: The Vivec stage A MiniWind passed its boot smoke (Arena loaded, 10 s in the scene).
+- 2026-10-11 07:47 +0300: seen again in v0.0.36-dev4: PERSISTING: whole-city frame gap 1,917,312; stated hunk rest 1,613,920 vs measured 1,701,072, high 108,384 not in the rule
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.43 (19 October 2026)._
 
 ## Status: 11 October 2026
@@ -98,6 +110,7 @@ Family: Map heap and memory budget (`heap-memory`). The heap model must match wh
 - HUNK-RESERVE-SN012-29 (no report page): Dev4 first-presented sn012 reserve below 2 MiB target
 - [LOADER-STAGING-PEAK-32](LOADER-STAGING-PEAK-32.md): Map loading stages most lumps in temporary memory before decoding, raising the heap peak
 - [MAP-UNUSED-HULL2-32](MAP-UNUSED-HULL2-32.md): Shipped maps carry about 1.1 MB of collision data for a hull the engine never uses
+- [MEM-EXTRA-HDF-27](MEM-EXTRA-HDF-27.md): Map loads bypassed the engine's file search paths: a map on an extra world disk image fell back to a whole-file read
 - MEM-GEOMETRY-01 (no report page): Light-range sharing could copy a too-short byte span
 - MEM-TOWN-02 (no report page): Bounded Balmora maps exceeded the modeled map heap limit
 - MEMCENSUS-OWNERS-START-STALL-64 (no report page): An engine with the first per-asker block count stalled at the start: every free searched the whole count table once its removal markers filled it

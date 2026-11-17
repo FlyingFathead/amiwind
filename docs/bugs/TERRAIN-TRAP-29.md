@@ -25,6 +25,20 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-05: reported in v0.0.29-dev1
+- 2026-10-05: TERRAIN-TRAP-29: player reported stuck on rocks beside structures (OPEN): Affected/first observed: v0.0.29-dev1, 5 October 2026; the maintainer playtest report.
+- 2026-10-18 17:03 +0300: seen again in v0.0.43-dev2: maintainer: stuck on a rock, CHIM placement 89952, terrain_rocks_wg_01 (scaled), source ref 475844, cell -1,2, global -7617 17684 1259
+- 2026-10-18 17:05 +0300: seen again in v0.0.43-dev2: maintainer: a second stuck-on-a-rock spot in the same playtest
+- 2026-10-19 15:01 +0300: seen again in v0.0.44-dev1: maintainer: stuck on a rock again, West Gash cell -2,-1 (global -11842 -3885 614), CHIM placement 85930, mesh f/terrain_rocks_wg_01 tilted copy (model 8849), source ref 362864
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 _Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
@@ -111,6 +125,7 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [SEYDA-BLOCK-31](SEYDA-BLOCK-31.md): Invisible obstacle blocks the path on a Seyda Neen slope
 - [STAIR-DETECT-POSITION-41](STAIR-DETECT-POSITION-41.md): Stair step detection depends on where a frame puts the placement: a few borderline steps are found in one frame's copy and not in another's
 - [STAIR-FLIGHT-CORE-SPLIT-41](STAIR-FLIGHT-CORE-SPLIT-41.md): The stair gate marks flights per 1024-unit core: a flight that crosses a core line loses its flight mark, so its failures do not stop a build
+- [STAIR-ORIGIN-IN-TERRAIN-24](STAIR-ORIGIN-IN-TERRAIN-24.md): stairs10: the reported stuck position at -685,+619,141 lies inside the terrain
 - [STAIRS-ADDAMASARTUS-32](STAIRS-ADDAMASARTUS-32.md): A low step in the Addamasartus cave is blocked
 - [STAIRS-BALMORA-B01-32](STAIRS-BALMORA-B01-32.md): A Balmora Hlaalu house staircase cannot be approached from below
 - [STAIRS-BALMORA-WESTSOUTH-32](STAIRS-BALMORA-WESTSOUTH-32.md): A Hlaalu hall staircase in a Balmora interior has no clear foot

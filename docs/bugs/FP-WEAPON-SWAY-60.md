@@ -29,6 +29,26 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| shipped | a development build | v0.0.61-dev2 | 2026-11-06 | the bug journal entry of 2026-11-06: The v0.0.61-dev2 image checked in game; CONTAINER-STRIP-OPEN-MANY-KINDS-61 and CREATURE-COMBAT-FRAMES-MISSING-61 registered | Set fixed in v0.0.61-dev2: CHARGEN-INVENTORY-LOCKED-60, CHARGEN-NO-STARTING-CLOTHES-60, SERVICE-REFUSAL-UNCLOTHED-60, FP-WEAPON-SWAY-60, HELD-BLADE-EDGE-ON-61, CARRIED-RECORDS-SEARCH-PER-KIND-61, INVENTORY-OPEN-COST-MANY-KINDS-61, TAKEN-LIGHT-OUTDOORS-NOT-TAKEN-61, MUSIC-DEATH-TRACK-RANDOM-60, BLANK-PAPER-READ-60, COLLECT-CAPACITY-REJECTED-60 and TOMB-MUSIC-OVER-AMBIENT-60. |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-05: reported in v0.0.61-dev1
+- 2026-11-05 21:32 +0200: seen again in v0.0.61-dev1: Decision of the maintainer after playing v0.0.61-dev1: the held weapon's sway in first person is kept as it is; with a melee weapon it reads as a deliberately lively, slightly cartoonish style rather than a fault.
+- 2026-11-05 22:37 +0200: seen again in v0.0.61-dev1: Decided: the held weapon's sway becomes a setting with two styles, chosen in the Options menu, the debug menu and the console and kept with the settings.
+- 2026-11-06: v0.0.61-dev2: The v0.0.61-dev2 image checked in game; CONTAINER-STRIP-OPEN-MANY-KINDS-61 and CREATURE-COMBAT-FRAMES-MISSING-61 registered: The points the v0.0.61-dev2 release notes list as not yet seen in game were played on that image at 32 MB Fast in ...
+- 2026-11-06: shipped: a development build, v0.0.61-dev2; the bug journal entry of 2026-11-06: The v0.0.61-dev2 image checked in game; CONTAINER-STRIP-OPEN-MANY-KINDS-61 and CREATURE-COMBAT-FRAMES-MISSING-61 registered: Set fixed in v0.0.61-dev2: CHARGEN-INVENTORY-LOCKED-60, CHARGEN-NO-STARTING-CLOTHES-60, SERVICE-REFUSAL-UNCLOTHED-60, FP-WEAPON-SWAY-60, HELD-BLADE-EDGE-ON-61, CARRIED-RECORDS-SEARCH-PER-KIND-61, INVENTORY-OPEN-COST-MANY-KINDS-61 ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 ## Status: 5 November 2026
@@ -106,6 +126,7 @@ Family: First-person hands and torch (`torch-hands`). First-person hands, punche
 - [PLAYER-PUNCH-THIRDPERSON-39](PLAYER-PUNCH-THIRDPERSON-39.md): Third-person punches have no visible player-body attack animation
 - [PLAYER-READY-THIRDPERSON-38](PLAYER-READY-THIRDPERSON-38.md): Third-person player lacks fists-up and weapon-draw animation
 - [PLAYER-TORCH-THIRDPERSON-38](PLAYER-TORCH-THIRDPERSON-38.md): Player torch and holding pose disappear in third person while light remains
+- [TORCH-ACTIVATE-CRASH-25](TORCH-ACTIVATE-CRASH-25.md): Raising the fists and pressing V crashed the game: a dynamic light was marked through a negative collision root
 - TORCH-FLAME-VISIBILITY-29 (no report page): Torch flame not visible after changing styles
 - TORCH-FUEL-29 (no report page): Torch never burns out; no unlit or fuel state
 - TORCH-HAND-NORD-29 (no report page): Detached-looking left grip fragment in dev4

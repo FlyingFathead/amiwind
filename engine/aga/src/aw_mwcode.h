@@ -438,6 +438,9 @@
 #define AWS_HANDWRITTEN 32     /* the engine carries this behaviour by hand today (config/mwscript.json) */
 #define AWS_INERT 64           /* nothing it can do today is seen outside its own values: not attached */
 #define AWS_ONACTIVATE 128     /* reads OnActivate: the player's use of its object goes to the script */
+/* MWSCRIPT-MEMBER-QUIET-READER-66: another script reads this script's variables ("object".var): a change of its own
+ * variable moves the state generation, so a quiet reader runs again and sees it (compiler.py read_by_others) */
+#define AWS_SHARED 1024
 
 /* Binding flags (BIND rows). */
 #define AWB_INTERIOR 1

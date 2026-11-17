@@ -1,6 +1,6 @@
 # Trees and Grass, Day and Night
 
-_Last updated with AmiWind v0.0.56 (30 October 2026)._
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -223,7 +223,7 @@ status: source-tested repair candidate, target acceptance pending.**
   for one dry exterior pose; broader visual/performance acceptance remains
   open. Keep clouds, sky switches and moon/star/world occlusion in the
   comparison. See
-  [SKY-NIGHT-COVER-29](journals/BUG_JOURNAL-v0.0.29.md#sky-night-cover-29-frequent-dense-night-clouds-hide-celestial-views-open).
+  [SKY-NIGHT-COVER-29](BUGS.md).
 - **Optional veil cloud type:** preserve existing cloud/sky types and defaults;
   add a separate sparse, rasterized/ordered-transparent variant. Keep cloud
   speed, clock, sun, interiors and toggles intact, with bounded rendering cost.
@@ -483,7 +483,7 @@ the ceiling-start arrival correction, the latest cloud-speed change and
 guard voices are unchanged. The current WinUAE listening report still notes
 intermittent artifacts, mostly at load-ins and in heavy scenes. The audio issue
 remains open; publication proceeds with this known limitation, with further
-audio investigation deferred until after publication. See [WIN-05](journals/BUG_JOURNAL-v0.0.29.md#win-05-intermittent-winuae-background-music-snapping---investigation-open).
+audio investigation deferred until after publication. See [WIN-05](BUGS.md).
 The compiler retains 86 warnings; these are successful builds, not warning-free
 builds. The earlier 816-test/739,156-byte result is
 superseded for this source. Compilation and host fixtures do not establish
@@ -803,7 +803,7 @@ the full host gates above. The later bounded native route supports the capacity
 and map-reset correction, but image005 itself was rejected for a separate
 filesystem defect. Image006 subsequently passed the bounded route and
 write/exit/reboot checks below.
-See [EFRAG-01](journals/BUG_JOURNAL-v0.0.29.md#efrag-01-static-foliage-leaf-links-exhausted-in-image004).
+See [EFRAG-01](BUGS.md).
 
 ### Bounded native result and remaining visual defects — 4 October 2026
 
@@ -839,7 +839,7 @@ separate from the public engine correction and the sky/fog appearance gap.
 Image005 remains rejected. Fresh image006, rebuilt from the intact image004
 baseline with volume flush, passed all-owned-block and native write/exit/reboot
 validation at 07:30 EEST on 4 October 2026. See
-[HDF-WRITER-01](journals/BUG_JOURNAL-v0.0.29.md#hdf-writer-01-private-image005-refresh-left-owned-blocks-free).
+[HDF-WRITER-01](BUGS.md).
 
 The image006 test copy loaded `sn045` → `vf0538` → ship/prison → `sn045`, exited
 cleanly to AmigaDOS, and was closed. The same test HDF was restarted, loaded

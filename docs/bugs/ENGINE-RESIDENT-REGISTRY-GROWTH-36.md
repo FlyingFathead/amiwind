@@ -19,11 +19,24 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-10: reported in v0.0.36-dev3
+- 2026-10-14: seen again in v0.0.40-dev1: Reopened after historical fixedv0.0.36 budget guard catches aw_set_playerrace270>269 and8640>8608B.
+- 2026-10-14: UI-INVENTORY-INTEGRATION-40: scoped native equipment: PLAYER-READY-MOVEMENT-39: race shortcut preserves stats/identity/equipment; 14priorfunctional checks pass, revised routing/target/native pending.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Status: 10 October 2026](#status-10-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -159,6 +172,7 @@ Family: Engine table limits (`engine-limits`). Fixed engine tables (models, enti
 - [MODEL-SLOTS-256-32](MODEL-SLOTS-256-32.md): Some Vivec interiors exceed the engine's 256 model slots; the heap check does not catch it
 - MWVM-INSTANCES-256-66 (no report page): At most 256 scripted objects run per loaded map: a map with more leaves the rest without their scripts
 - MWVM-PARKING-STORE-SMALL-66 (no report page): The store that keeps script values of unloaded maps holds 2,304 objects and 8,192 values: with the expansions the game has about 3,278 scripted objects with about 11,000 values
+- MWVM-PLACE-COPIES-FOUR-66 (no report page): The script engine plans 4 live copies per scripted Place row in one map, and a fifth copy is refused
 - NET-VIVEC-ENTITY-PACKET-OVERFLOW-66 (no report page): In Vivec the server's entity update overflows the client datagram every frame: packet overflow printed 1,938 times during one 45-second stay
 - [RENDER-SURFACE-OVERFLOW-SILENT-36](RENDER-SURFACE-OVERFLOW-SILENT-36.md): Faces past r_maxsurfs (12,288) or edges past r_maxedges (24,576) are dropped without a warning: Vivec views send up to 37,112 placement faces
 - [RENDER-VISEDICTS-OVERFLOW-32](RENDER-VISEDICTS-OVERFLOW-32.md): Entities beyond MAX_VISEDICTS (1,112) are dropped silently

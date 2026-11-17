@@ -1,6 +1,6 @@
 # Memory allocation and heap clearance
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -102,7 +102,7 @@ or raise emulator memory to turn a failed reference-target build into a pass.
 
 This guide applies to each town subdivision, world region and interior.
 Update it when allocation behavior, runtime structures or the target changes.
-Every incident belongs in [the bug journal](BUG_JOURNAL.md), with affected and
+Every incident belongs in [the bug tracker](BUGS.md), with affected and
 introducing versions, cause, repair candidate, verified fixed version and proof.
 Unknown/pending fields must remain explicit. Documentation freshness is part
 of completing a repair, not an optional follow-up.
@@ -576,7 +576,7 @@ experiment was stopped on 3 October with its inputs, logs and saved state
 preserved privately. It is deferred optional research; resumption is unverified
 and no comparative FPS or memory result is available.
 
-See [the corresponding bug-journal record](journals/BUG_JOURNAL-v0.0.29.md#mem-geometry-01-transactional-geometrylight-sharing-candidates)
+See [the bug tracker entry MEM-GEOMETRY-01](BUGS.md)
 for the version/cause/fix/status distinction. The rc3 duplicate-visibility-copy
 incident remains open until the repaired trip and lifecycle pass on target.
 

@@ -1,6 +1,6 @@
 # Build completion output
 
-_Last updated with AmiWind v0.0.59 (4 November 2026)._
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -314,7 +314,11 @@ A caught build failure or cancellation gets its own title and timing, with
 and is not assigned a final checksum. Existing error messages and exit statuses
 remain. Failures before the build starts keep their existing prerequisite/setup
 messages. An uncatchable process termination or machine failure cannot print a
-footer.
+footer. Every caught failure, also one before the first stage, writes the build
+report `logs/BUILD-REPORT-<run>.txt` in the workspace (with `--report` a passed
+or cancelled build too): what failed, the settings, the versions, the game data,
+the machine, the stage plan and the reuse state in one file to send
+([when a build fails](LINUX_BUILD.md#when-a-build-fails)).
 
 `--dry-run` is explicitly labelled an asset-free, non-playable build; it compiles
 the engine/preflight and packages a test HDF. It does not validate game conversion.

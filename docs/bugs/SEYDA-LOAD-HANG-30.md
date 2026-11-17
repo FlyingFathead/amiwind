@@ -30,7 +30,44 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-07: reported in v0.0.30-dev4
+- 2026-10-07: SEYDA-LOAD-HANG-30: rare freeze during a Seyda Neen region load: Evidence: every CPU sample was the idle loop.
+- 2026-10-10: HANG-IDLE-DUSK-35: cause found: HANG-IDLE-DUSK-35: the idle freeze is a music stream read that never returns while the main loop waits for it, the same call chain as SEYDA-LOAD-HANG-30 (v0.0.30).
+- 2026-10-18: CHIM-HULL-ROUTE-NO-CUT-43 and CHIM-STAIR-STEPS-SOLID-43: CHIM-SEYDA-BALMORA-LOAD-HANG-43: 18 October 2026, v0.0.43-dev1: reproduced with a repeat loop under host load (5 hangs; none in 100 loads on a quiet machine, at 16 and at 128 MiB ...
+- 2026-11-02: seen again in v0.0.59-dev4: Gate boot smoke 5665 at 2026-11-02 12:57 +0200 / 2026-11-02 10:57 UTC (worker branch v0.0.59-cellchanges2, FS-UAE, 32 MB Fast): the second Seyda Neen load after Balmora stopped after the title line and the smoke timed out; the same commit ...
+- 2026-11-02: seen again in v0.0.59-dev5: Gate 5863 (v0.0.59-preview 28cea448) boot smoke: the third seyda load stopped at signon 3; the suite passed and gate 5864 on the same commit passed unchanged.
+- 2026-11-02: seen again in v0.0.59-dev5
+- 2026-11-02 15:23 +0200: seen again in v0.0.59-dev4: Gate 5735 boot smoke on integ 80a1aed8 (a register-only commit): seyda was not in play (screen game, signon 0, world leaves 0, map none); the other five gate parts passed; rerun as gate 5736.
+- 2026-11-07: Register and work list synchronised: three entries fixed, the rest linked to open work: An audit of the register against the work list found entries that disagreed with it.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.45 (19 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
+- [Timeline](#timeline)
+- [Status: 7 October 2026](#status-7-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [What the debugger shows](#what-the-debugger-shows)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Related](#related)
+- [Related freezes](#related-freezes)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Status: 7 October 2026
 

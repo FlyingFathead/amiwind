@@ -1,6 +1,6 @@
 # Current project state
 
-_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -136,7 +136,7 @@ Open, in priority order:
    is built and mapped. Seyda Neen sub-cells are up to about
    5 MB and fill the 11 MiB heap, so each crossing drops cached models and
    pauses for about 1.0-1.5 s in the emulator. Plan: make the Seyda Neen build
-   reproducible from the public tools ([BUILD-SEYDA-REGEN-30](BUG_JOURNAL.md)),
+   reproducible from the public tools ([BUILD-SEYDA-REGEN-30](bugs/BUILD-SEYDA-REGEN-30.md)),
    then rebuild the maps lighter (ground simplification, merged flat faces,
    simpler collision for clutter) with placements and mechanics unchanged.
    See [Seyda Neen performance](history/superseded/SEYDA_NEEN_PERFORMANCE.md).
@@ -174,7 +174,7 @@ the ceiling-start arrival correction, the latest cloud-speed change and
 guard voices are unchanged. The current WinUAE listening report still notes
 intermittent artifacts, mostly at load-ins and in heavy scenes. The audio issue
 remains open; publication proceeds with this known limitation, with further
-audio investigation deferred until after publication. See [WIN-05](journals/BUG_JOURNAL-v0.0.29.md#win-05-intermittent-winuae-background-music-snapping---investigation-open).
+audio investigation deferred until after publication. See [WIN-05](BUGS.md).
 The compiler retains 86 warnings; these are successful builds, not warning-free
 builds. The earlier 816-test/739,156-byte result is
 superseded for this source. Compilation and host fixtures do not establish
@@ -278,7 +278,7 @@ research with no completed comparison or verified resumption. Vivec remains
 inactive, and the static asset gallery remains planned.
 
 See [memory policy](MEMORY_ALLOCATION.md), [cell changes](CELL_CHANGING.md),
-[bug journal](BUG_JOURNAL.md), [roadmap](ROADMAP.md), and
+[bug tracker](BUGS.md), [roadmap](ROADMAP.md), and
 [release notes](releases/notes/RELEASE-v0.0.27.md). Original and converted proprietary assets,
 ROMs and playable/playtest packages remain private; the public release is source
 and documentation only.
@@ -303,7 +303,7 @@ The two generated emulator configurations mount both HDFs simultaneously.
 Corrected-image maintainer playtest, texture/boundary acceptance, fresh Linux/Docker
 pipeline validation and hosted CI remain pending. The published baseline is
 v0.0.26. See [rc2 notes](releases/notes/RELEASE-v0.0.27-rc2.md),
-[What are rocks?](WHAT_ARE_ROCKS.md) and [known issues](BUG_JOURNAL.md).
+[What are rocks?](WHAT_ARE_ROCKS.md) and [known issues](BUGS.md).
 
 ### Published v0.0.26 baseline — historical
 

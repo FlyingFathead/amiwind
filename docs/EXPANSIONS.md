@@ -1,6 +1,6 @@
 # The expansions: Tribunal and Bloodmoon
 
-_Last updated with AmiWind v0.0.66-dev2 (14 November 2026)._
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -192,7 +192,9 @@ the expansions make to the base game is being made; the chains below are what is
 4. **Mournhold.** The five districts become one exterior of their own, joined by their doors; the rooms are ordinary
    interiors. The trip there and back gets its own playtest.
 5. **Scripts and dialogue.** Both expansions' scripts are compiled and attached, with the journal and the topics. The
-   game's limit of 256 script instances (Raven Rock alone needs 353) and the store of script variables are widened first.
+   game's limit of 256 script instances (Raven Rock's frame alone has 353 scripted placements; up to 350 in one 3 by 3
+   block) and the store of script variables are widened in source in v0.0.66-dev12, sized from the game's counts, to be
+   confirmed in a session (`EXPANSION-SCRIPT-LIMITS-66`).
 6. **The save.** The save holds the expansions' counts: about 13,800 placed actors and about 3,300 scripted references
    with variables.
 7. **The Toolkit.** A Solstheim view and a Mournhold screen with the completion map and the heatmap.

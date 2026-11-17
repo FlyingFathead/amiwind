@@ -12,13 +12,27 @@
 | Persists in | v0.0.64-dev3 (last seen) |
 | Severity | high: Regressed in v0.0.64-dev3 (was medium): a frozen game in play, or a session that cannot finish its check |
 | Family | Loading and disk reads (`disk-loading`) |
-| Deferred by the maintainer | 2026-11-12: deferred by the maintainer to v0.0.66 (the v0.0.65 release fixes the opening only and ships early); its "came back" mark is checked against its evidence first |
+| Deferred by the maintainer | 2026-11-16: deferred by the maintainer's release decision to v0.0.67 (v0.0.66 is made from its twelfth snapshot; the rest of the roadmap goes to later versions) |
 | Came back (regression) | in v0.0.64-dev3 (fixed in v0.0.62-dev1 before) |
 | Playtest version | MiniWind v0.0.62-dev1 seyda-enabledraw2 7bb679e |
 | From commit | source 7bb679e, engine 7bb679e, CHIM world 7bb679e |
 | CHIM engine version | CHIM 0.2.2, engine 7bb679e, world format 0.11 |
 
 <!-- END GENERATED FACTS -->
+
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-07: reported in v0.0.62-dev1
+- 2026-11-07: The falling mage is drawn after his Enable; SCRIPTED-EVENT-PAST-DRAW-DISTANCE-62 registered: SCRIPT-ENABLED-ACTOR-NOT-DRAWN-62 is closed: it was no fault of the Enable.
+- 2026-11-10: came back in v0.0.64-dev3 (fixed in v0.0.62-dev1 before): Seen again once in a scripted Akulakhan Chamber MiniWind session (commit 86c595a5, FS-UAE JIT, 32 MB Fast): after the room load failed and the console teleport back to Balmora, a 1,448 ms frame, then the game stopped at the console picture ...
+- 2026-11-16: v0.0.66-dev11: Seen once since the regression (a v0.0.64-dev3 session).
+- 2026-11-16: deferred by the maintainer: deferred by the maintainer's release decision to v0.0.67 (v0.0.66 is made from its twelfth snapshot; the rest of the roadmap goes to later versions)
+
+<!-- END GENERATED TIMELINE -->
 
 _Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
 

@@ -29,12 +29,26 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-17: reported in v0.0.42-dev1
+- 2026-10-17 12:02 +0300: seen again in v0.0.42-dev1: maintainer: statue floating in the air, no pedestal drawn
+- 2026-10-18 07:50 +0300: seen again in v0.0.43-dev1: maintainer: the after image (test engine with the popping fix) still has the statue floating in the air
+- 2026-10-20 02:50 +0300: seen again in v0.0.45: same converter rule in v0.0.45; cause: the root NiNode translation (z 327.1) kept, the game drops it; fixed on branch v0.0.46-sky-pedestal, needs a world build
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Status: 20 October 2026](#status-20-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)

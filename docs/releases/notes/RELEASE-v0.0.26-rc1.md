@@ -66,7 +66,7 @@ See [the source validation receipt](../../validation/v0.0.26-rc1-source.json).
 - Docker image and input helpers remain to be implemented and validated for
   final v0.0.26. They must ship only source/tools and use owned game-data mounts.
 
-See [Windows setup](../../WINDOWS_BUILD.md), [known bugs](../../BUG_JOURNAL.md),
+See [Windows setup](../../WINDOWS_BUILD.md), [known bugs](../../BUGS.md),
 [Linux builds](../../LINUX_BUILD.md) and [Docker roadmap](../../DOCKER_BUILD_ROADMAP.md).
 The release archive contains public source and existing selected documentation
 media only; no original game data, converted payload, HDF, ROM or private notes.

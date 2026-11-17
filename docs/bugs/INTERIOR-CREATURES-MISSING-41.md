@@ -19,9 +19,12 @@
 | Where | tools/prepare_area.py populate (cast filter NPC_ only); every converted interior |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.41-dev4 (last seen) |
+| Persists in | fixed in v0.0.62-dev1 |
 | Severity | high: every interior creature is missing, Vivec in his palace among them; dropped silently without a log line |
 | Family | Actors and NPCs (`actors-npc`) |
+| Fix commit | `3ca3d610` |
+| Fixed on | 2026-11-07 |
+| Planning item | `TOMB-NO-CREATURES-61` |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
 | Playtest version | 2026_10_16_v0.0.41-dev4_full-rings01234-r3_87f6534 |
 | From commit | source 87f6534, engine 87f6534, CHIM world 87f6534 |
@@ -30,12 +33,39 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.62-dev1 (3ca3d610) | 2026-11-07 | gate 8240 passed on 3ca3d610 | every creature placed in a converted room gets its table row, its library model and an aw_levelled entity in its room map |
+| shipped | a numbered build | v0.0.62-dev1 build 2026_11_07_v0.0.62-dev1_full-v0.0.62-dev1_089421b | 2026-11-07 | the delivered build | the build holds 3ca3d610 and 92231a6d |
+| confirmed in play | an end-of-quest session | v0.0.66-dev11 build 2026_11_16_v0.0.66-dev11_full-v0.0.66-dev11_26ed570 | 2026-11-16 | the end of the main quest session, run 3, steps 3 and 4 | Dagoth Ur, a creature placed in a converted interior, is there in his chamber and his script and the Heart's act on him (the steps' checks passed) |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-16: reported in v0.0.41-dev4
+- 2026-10-16: INTERIOR-CREATURES-MISSING-41: INTERIOR-CREATURES-MISSING-41: the demigod Vivec is not in his palace.
+- 2026-10-20 20:09 +0300: seen again in v0.0.46: Listed under Known in this build in the v0.0.46 release notes (still open at the release).
+- 2026-10-27 15:58 +0200: seen again in v0.0.54-dev1: PERSISTING (partly fixed): rooms carry only the creatures their cell lists name; nothing levelled is placed, 1,270 levelled creature references in 293 rooms.
+- 2026-11-05: TOMB-NO-CREATURES-60: cause found, the rooms' creatures stop at the room stage: TOMB-NO-CREATURES-60: Samarys Ancestral Tomb has no creature in v0.0.61-dev1.
+- 2026-11-07: fixed in source: a gated commit, v0.0.62-dev1 (3ca3d610); gate 8240 passed on 3ca3d610: every creature placed in a converted room gets its table row, its library model and an aw_levelled entity in its room map
+- 2026-11-07: shipped: a numbered build, v0.0.62-dev1 build 2026_11_07_v0.0.62-dev1_full-v0.0.62-dev1_089421b; the delivered build: the build holds 3ca3d610 and 92231a6d
+- 2026-11-07 03:54 +0200: seen again in v0.0.61: PERSISTING: the creature census of the v0.0.61 image places 4 of the 533 creatures that the base master places in rooms; 128 creature records are placed only in rooms (the kwama queens, the Sixth House's Dagoth brothers and corprus ...
+- 2026-11-16: confirmed in play: an end-of-quest session, v0.0.66-dev11 build 2026_11_16_v0.0.66-dev11_full-v0.0.66-dev11_26ed570; the end of the main quest session, run 3, steps 3 and 4: Dagoth Ur, a creature placed in a converted interior, is there in his chamber and his script and the Heart's act on him (the steps' checks passed)
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.46 (21 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Status: 21 October 2026](#status-21-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -198,6 +228,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - NPC-BAKE-FALLBACK-62 (no report page): Characters the new seam and floor bake cannot fit in the alias budget are baked a second time with the v0.0.62-dev1 body rules
 - [NPC-BAKE-VERTEX-32](NPC-BAKE-VERTEX-32.md): NPC resident baking can exceed the alias vertex budget
 - NPC-CAST-MAGICKA-NOT-PAID-66 (no report page): A fighter's spell costs it no magicka: the cast's payment names the wrong stat
+- [NPC-CONVERSATION-FACING-23](NPC-CONVERSATION-FACING-23.md): NPCs do not turn to face the player in conversation
 - [NPC-DAGOTH-BODY-DECIMATION-33](NPC-DAGOTH-BODY-DECIMATION-33.md): Dagoth Ur's body is decimated; his whole model exceeds the alias ceiling
 - [NPC-FEMALE-SKELETON-33](NPC-FEMALE-SKELETON-33.md): Female humans are posed on the male skeleton file (base_anim.nif), the original uses base_anim_female.nif
 - [NPC-FOLLOW-FLOORS-33](NPC-FOLLOW-FLOORS-33.md): The test companion cannot find stairs to another floor of an interior; it is placed beside the player after 6 seconds
@@ -242,7 +273,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - SWEEP-SEYDA-EIGHT-FAIL-59 (no report page): dbg sweep reports 8 failing entities in Seyda Neen on a v0.0.59-dev3 MiniWind with the placed world items; the Census Office map reported 3 in v0.0.58 sessions
 - SWIM-BAKED-CLOTHES-60 (no report page): Swimming in third-person view shows default clothes instead of the player's own
 - TOMB-NO-CREATURES-60 (no report page): Samarys Ancestral Tomb has no ghosts, skeletons or other creatures
-- WANDER-DOOR-RULE-66 (no report page): A wandering resident can stop at a destination right by a door and stand there; the original sends an idle wanderer near a door walking
+- [WANDER-DOOR-RULE-66](WANDER-DOOR-RULE-66.md): A wandering resident can stop at a destination right by a door and stand there; the original sends an idle wanderer near a door walking
 
 Related bugs in other categories:
 

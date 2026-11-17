@@ -15,6 +15,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.32-dev
+- 2026-10-08: TOWN-FRAME-CEILING-32: high ground leaks town frames: Frames are sealed at 2,048 units; 320 regions have higher ground and leak.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.36 (11 October 2026)._
 
 ## Status: 8 October 2026

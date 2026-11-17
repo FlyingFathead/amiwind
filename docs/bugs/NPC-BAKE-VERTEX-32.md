@@ -15,11 +15,25 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.32-dev
+- 2026-10-08: Vivec cantons import and loader rework findings: Four cantons convert within all limits; the Temple, St.
+- 2026-10-09: NPC-BAKE-VERTEX-32: one more record, Godros: NPC-BAKE-VERTEX-32: the NPC level-of-detail survey (`tools/npc_lod.py survey`, 149 of the 2,675 NPC records) could not bake Godros at any budget of the resident ladder either, so about one ...
+- 2026-10-15: 15 October 2026 - carrier original-data failure and text output: NPC-BAKE-VERTEX-32: v0.0.40-dev2 carrier stops at Tarhiel after resident fitting.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.41-dev5 (16 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Overflow repair candidate - 15 October 2026](#overflow-repair-candidate---15-october-2026)
 - [Original carrier failure: 15 October 2026](#original-carrier-failure-15-october-2026)
 - [Source carrier completion: 15 October 2026](#source-carrier-completion-15-october-2026)
@@ -221,6 +235,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - NPC-ATTACK-ANIMS-MISSING-65 (no report page): Most creatures play only six baked animation groups: no knockdown, spell cast, second or third attack
 - NPC-BAKE-FALLBACK-62 (no report page): Characters the new seam and floor bake cannot fit in the alias budget are baked a second time with the v0.0.62-dev1 body rules
 - NPC-CAST-MAGICKA-NOT-PAID-66 (no report page): A fighter's spell costs it no magicka: the cast's payment names the wrong stat
+- [NPC-CONVERSATION-FACING-23](NPC-CONVERSATION-FACING-23.md): NPCs do not turn to face the player in conversation
 - [NPC-DAGOTH-BODY-DECIMATION-33](NPC-DAGOTH-BODY-DECIMATION-33.md): Dagoth Ur's body is decimated; his whole model exceeds the alias ceiling
 - [NPC-FEMALE-SKELETON-33](NPC-FEMALE-SKELETON-33.md): Female humans are posed on the male skeleton file (base_anim.nif), the original uses base_anim_female.nif
 - [NPC-FOLLOW-FLOORS-33](NPC-FOLLOW-FLOORS-33.md): The test companion cannot find stairs to another floor of an interior; it is placed beside the player after 6 seconds
@@ -265,7 +280,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - SWEEP-SEYDA-EIGHT-FAIL-59 (no report page): dbg sweep reports 8 failing entities in Seyda Neen on a v0.0.59-dev3 MiniWind with the placed world items; the Census Office map reported 3 in v0.0.58 sessions
 - SWIM-BAKED-CLOTHES-60 (no report page): Swimming in third-person view shows default clothes instead of the player's own
 - TOMB-NO-CREATURES-60 (no report page): Samarys Ancestral Tomb has no ghosts, skeletons or other creatures
-- WANDER-DOOR-RULE-66 (no report page): A wandering resident can stop at a destination right by a door and stand there; the original sends an idle wanderer near a door walking
+- [WANDER-DOOR-RULE-66](WANDER-DOOR-RULE-66.md): A wandering resident can stop at a destination right by a door and stand there; the original sends an idle wanderer near a door walking
 
 Related bugs in other categories:
 

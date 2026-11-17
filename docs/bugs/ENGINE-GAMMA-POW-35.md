@@ -18,6 +18,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-10: reported in v0.0.34
+- 2026-10-10: Engine review fixes (ENGINE-PAK-HEADER-TRUST-35 and thirteen more): A source review of the engine found fifteen problems; fourteen are fixed in source on the v0.0.35 line, each with a regression check.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.41 (17 October 2026)._
 
 ## Status: 10 October 2026

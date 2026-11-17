@@ -28,12 +28,25 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-24: reported in v0.0.50
+- 2026-10-24 19:03 +0300: seen again in v0.0.50
+- 2026-11-09 21:13 +0200: seen again in v0.0.63-dev5: Seen again: dbg tp ri8c361151ce (Andrano Ancestral Tomb, its door in a cell without a frame) printed No converted entrance; same cause as CONSOLE-TP-ROOM-NAME-63.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.50 (24 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Status: 24 October 2026](#status-24-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -179,6 +192,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [TRACKER-INTERIORS-NOT-SHOWN-48](TRACKER-INTERIORS-NOT-SHOWN-48.md): The CHIM Progress Tracker does not show the interiors: no room list, no counts per island and state, and 16 rooms with no entrance area left out of every batch
 - [TRACKER-MAP-BLANK-31](TRACKER-MAP-BLANK-31.md): World progress map vanished when the mouse moved over it
 - [TRACKER-OCEAN-COUNTED-DONE-36](TRACKER-OCEAN-COUNTED-DONE-36.md): The tracker counts the 867 open-ocean cells as done, although the engine does not place the ocean chunk yet
+- [TRACKER-OPEN-ENTRIES-STALE-41](TRACKER-OPEN-ENTRIES-STALE-41.md): Register entries stayed open after their fixes shipped: 738 of 842 entries open before the audit of 16 October 2026
 - [TRACKER-REGISTER-LINK-MERGE-33](TRACKER-REGISTER-LINK-MERGE-33.md): An integration merge dropped the CHIM Engine tracker link from the bug register
 - [TRACKER-REGISTER-SIZE-33](TRACKER-REGISTER-SIZE-33.md): The bug register outgrew the release text-file size limit
 - [TRACKER-REGISTER-SIZE-36](TRACKER-REGISTER-SIZE-36.md): The live register bugs.json reached 75 % of its 1 MiB release text limit; the size warning was raised to 85 % until a second archive rotation

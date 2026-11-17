@@ -18,6 +18,19 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.32-dev1
+- 2026-10-08: First from-scratch build with the repository builder: The public builder has not built the game from scratch since v0.0.28 (Seyda Neen full-town hull 2 over the clipnode limit) and its actor stage fails since v0.0.27; five Vivec Arena ...
+- 2026-10-09: IMPORT-TOWN-NO-INTERIORS-32: the Arena Pit converts; INTERIOR-HULL-CHAIN-33 and TOWN-INTERIOR-SAVEID-ORDER-33: IMPORT-TOWN-NO-INTERIORS-32: the Arena config listed no rooms, so the importer's interior step (added with the cantons) had ...
+- 2026-10-11: BUILD-MINIWIND-ARENA-PIT-REFUSED-36: BUILD-MINIWIND-ARENA-PIT-REFUSED-36: the Vivec Arena Pit preset was refused as "not converted" (IMPORT-TOWN-NO-INTERIORS-32) although the Pit (vai000) shipped in v0.0.35.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42-dev2 (17 October 2026)._
 
 ## Status: 11 October 2026

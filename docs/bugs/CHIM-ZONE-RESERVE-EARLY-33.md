@@ -20,11 +20,25 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-09: reported in v0.0.33-dev
+- 2026-10-09: CHIM-ZONE-RESERVE-EARLY-33: reloads of frame maps without a stated figure: CHIM-ZONE-RESERVE-EARLY-33: the MiniWind build mw2-033c (from c4e14ab) ends 6.8 KB under the 2 MiB Hunk gap after a reload or `dbg tp` into CHIM Balmora (2,090,368 ...
+- 2026-10-09: CHIM-SEYDA-HUNK-GAP-33 and CHIM-ZONE-RESERVE-EARLY-33: CHIM-SEYDA-HUNK-GAP-33: Seyda Neen's CHIM map ends its load with a Hunk gap of 1,099,456 bytes at the default zone (6,864 KiB), under the engine's 2 MiB safety: its frame map carries ...
+- 2026-10-14: Renewed RC2 gameplay reports: CHIM-SEYDA-HUNK-GAP-33 and CHIM-ZONE-RESERVE-EARLY-33: 13 October 2026: exact RC1 native logs retain sub-2-MiB gaps, Seyda 2,091,392 bytes and Balmora 2,063,344.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.43 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Status: 9 October 2026](#status-9-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -146,6 +160,7 @@ Family: Map heap and memory budget (`heap-memory`). The heap model must match wh
 - HUNK-RESERVE-SN012-29 (no report page): Dev4 first-presented sn012 reserve below 2 MiB target
 - [LOADER-STAGING-PEAK-32](LOADER-STAGING-PEAK-32.md): Map loading stages most lumps in temporary memory before decoding, raising the heap peak
 - [MAP-UNUSED-HULL2-32](MAP-UNUSED-HULL2-32.md): Shipped maps carry about 1.1 MB of collision data for a hull the engine never uses
+- [MEM-EXTRA-HDF-27](MEM-EXTRA-HDF-27.md): Map loads bypassed the engine's file search paths: a map on an extra world disk image fell back to a whole-file read
 - MEM-GEOMETRY-01 (no report page): Light-range sharing could copy a too-short byte span
 - MEM-TOWN-02 (no report page): Bounded Balmora maps exceeded the modeled map heap limit
 - MEMCENSUS-OWNERS-START-STALL-64 (no report page): An engine with the first per-asker block count stalled at the start: every free searched the whole count table once its removal markers filled it

@@ -19,6 +19,18 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-07: reported in v0.0.31-dev3
+- 2026-10-07: DLIGHT-WALLS-31: cause is the night remap: Walls do receive torch light (native run on the shipped map); the outdoor night remap darkened it with everything else.
+- 2026-10-07: DLIGHT-WALLS-31: torches light the ground but not town walls: The maintainer report; the headlamp barely changes Balmora wall views (0.1-1.9 luma) while it lights the ship.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 ## Status: 7 October 2026
@@ -90,6 +102,7 @@ Family: Lighting, lamps and night (`lighting-night`). Morrowind lights become Qu
 - [CHIM-EXTERIOR-FLAMES-MISSING-48](CHIM-EXTERIOR-FLAMES-MISSING-48.md): CHIM exteriors draw no fire: campfires, braziers, fire pits and flame lamps outdoors have no flame animation
 - [CHIM-MESHLESS-LIGHTS-33](CHIM-MESHLESS-LIGHTS-33.md): Exterior lights without a mesh have no CHIM light path: 2,284 placed lights give no light in a CHIM frame
 - CHIM-ROOM-LIGHT-FLAT-48 (no report page): CHIM rooms light each placement at one level: Temple arch trims and Rithleen walls look flat and brighter than the room maps baked light
+- [DLIGHT-MODEL-TRANSFORM-25](DLIGHT-MODEL-TRANSFORM-25.md): Dynamic lights on translated or rotated models (caves) were placed in world coordinates where the surfaces need model-local ones
 - [EMISSIVE-UNSHIPPED-31](EMISSIVE-UNSHIPPED-31.md): Glowing lantern glass never reached the shipped maps (only the Temple has it)
 - ENGINE-FLAME-LIGHT-KEY-WARNING-51 (no report page): Every Seyda Neen load prints "aw_flame_light is not a field" ten times: the fire rows key no QuakeC field
 - [FLAME-RANGE-NEAREST-32](FLAME-RANGE-NEAREST-32.md): A hearth fire shows only up close when many candles are nearer

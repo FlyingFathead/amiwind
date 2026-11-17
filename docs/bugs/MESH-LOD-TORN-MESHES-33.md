@@ -34,12 +34,32 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-09: reported in v0.0.32
+- 2026-10-09: seen again in v0.0.33: found by the island-wide seam audit: 49 reduced meshes tear their seams
+- 2026-10-11 03:36 +0300: seen again in v0.0.36-dev3: measured as visible holes: 39 of 150 open-world rocks at 64 triangles show the sky through on more than 5 of 100 pixels, worst 48 (terrain_ashland_rock_01)
+- 2026-10-18 19:03 +0300: seen again in v0.0.43-dev2: maintainer: Ashlands rocks still open underneath (cell -4,12, func_wall model *52, source ref 283924); the same rocks he mentioned earlier, which should not be open
+- 2026-10-18 19:04 +0300: seen again in v0.0.43-dev2: maintainer: another open rock, cell -4,13 (func_wall model *44, ref 245627); fixed in some map spots but not in others
+- 2026-10-18 19:06 +0300: seen again in v0.0.43-dev2: open rocks at -4,12/-4,13 are on classic region maps in dev2 (not CHIM); one step into CHIM cell -5,13 the same rocks are closed; dev3 has all three on CHIM
+- 2026-10-18 19:20 +0300: seen again in v0.0.43-dev2: maintainer: two long spikes hang from a rock/terrain face in Balmora (cell -3,-3, global -20051 -19320 80, local 107 -1758 20); Balmora is a CHIM town frame
+- 2026-10-18 19:21 +0300: seen again in v0.0.43-dev2: maintainer: the Balmora spikes may be the overpass poking through the rocks; wants its ends hidden inside the rocks
+- 2026-10-20 02:30 +0300: seen again in v0.0.45: v0.0.45 seam audit: 42 reduced meshes above 2 percent seam tear (worst flora_bc_tree_01 80.8 percent)
+- 2026-10-27 16:58 +0200: seen again in v0.0.54-dev1: PERSISTING, one class cause with CHIM-ROCKS-OPEN-SHELLS-43 (27 October 2026): 651 of 666 reduced mesh spaces are reduced without lock_boundaries; 136 have half or more of their rim torn (26,198 placements).
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 9 times; something has to be done](#persisting-reported-9-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Status: 9 October 2026](#status-9-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)

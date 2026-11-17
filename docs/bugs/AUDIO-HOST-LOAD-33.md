@@ -19,7 +19,18 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-09: reported in v0.0.33-dev
+- 2026-10-09: AUDIO-HOST-LOAD-33: crackle on a saturated host: AUDIO-HOST-LOAD-33: the maintainer heard music and sound crackle and snap throughout CHIM Preview 1 played on a PC whose CPU was at 100 % with build jobs; the same build was clean on a ...
+
+<!-- END GENERATED TIMELINE -->
+
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 ## Status: 9 October 2026
 
@@ -49,7 +60,7 @@ With JIT and unlimited CPU speed (the playtest profile, see
 [BENCH-JIT-PROFILE-32](BENCH-JIT-PROFILE-32.md)) the emulator itself asks for a whole host core, so it
 is the first to suffer when the host is saturated.
 
-This differs from [AUDIO-LOAD-29](AUDIO-LOAD-29.md) and [WIN-05](../journals/BUG_JOURNAL-v0.0.29.md#win-05-intermittent-winuae-background-music-snapping---investigation-open):
+This differs from [AUDIO-LOAD-29](AUDIO-LOAD-29.md) and [WIN-05](../BUGS.md):
 those crackles happen inside the emulated machine (the game's mixer starves during blocking disk
 loads) and are heard on an idle machine; this one is continuous and disappears on an idle machine.
 

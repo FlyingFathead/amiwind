@@ -15,6 +15,18 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.32-dev
+- 2026-10-08: Builder breaks fixed; next stop in Seyda Neen culling: BUILD-SEYDA-HULL2-32 and BUILD-ACTOR-CONTACT-CALL-32 fixed in source; the from-scratch build now stops in Seyda Neen terrain culling (covered by the recorded exception); shipped maps ...
+- 2026-10-10: BUILD-SEYDA-REGEN-30 fixed in source: no recorded Seyda Neen input: BUILD-SEYDA-REGEN-30: the builder no longer needs the recorded v0.0.31 Seyda Neen maps.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.35 (10 October 2026)._
 
 ## Status: 9 October 2026

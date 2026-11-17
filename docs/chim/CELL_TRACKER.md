@@ -2,7 +2,7 @@
 
 # CHIM Cell Tracker
 
-_Generated from `cell-progress.json` with AmiWind v0.0.66-dev11._
+_Generated from `cell-progress.json` with AmiWind v0.0.66-dev12._
 
 Live status of the open world on CHIM, Vvardenfell (island 1). Generated page: do not edit by hand. Per-cell detail is in the Toolkit and its CSV export. What each number counts: [what we count](#what-we-count).
 
@@ -38,7 +38,7 @@ Lighting: lit 0, partial 137, unlit 1,056, not measured 99 (cells; lit is requir
 
 Original light sources placed in these cells (numbers of lights, not of cells): lamp / lantern 545 (0 without a mesh), candle 6 (0 without a mesh), torch 69 (0 without a mesh), fire 74 (4 without a mesh), glowing plant 332 (332 without a mesh), darkener (negative light) 12 (12 without a mesh), plain light 1,936 (1,936 without a mesh). In converted cells: 0 lights baked, 694 night lamps only, 2,280 not represented.
 
-Generated 2026-11-16 14:16 +0200. Tracker data generated 2026-11-16T12:14:42+00:00.
+Generated 2026-11-16 20:09 +0200. Tracker data generated 2026-11-16T18:06:25+00:00.
 
 ## What we count
 

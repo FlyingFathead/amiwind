@@ -30,12 +30,26 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-26: reported in v0.0.52-dev1
+- 2026-11-09 10:21 +0200: seen again in v0.0.63-dev2: Seen again in the reuse plan of v0.0.63-dev2 against 2026_11_09_v0.0.63-dev1_full-v0.0.63-dev1_dc356e3: chim-town-seyda and chim-town-vivec_city both refused, because both changed intro-scene/id1/sound/env/lava_layer.wav and 10 more shared ...
+- 2026-11-09 11:28 +0200: seen again in v0.0.63-dev2: Cause found in the v0.0.63-dev1 records: the two towns did not write the 11 files.
+- 2026-11-09 11:43 +0200: seen again in v0.0.63-dev1: The reuse plan of the next build against the v0.0.63-dev1 run refuses the records of chim-town-seyda and chim-town-vivec_city: both changed intro-scene/id1/sound/env/lava_layer.wav and ten more files while running side by side, so both ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.63-dev2 (9 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [What happens](#what-happens)
 - [Seen](#seen)
 - [Status: 9 November 2026](#status-9-november-2026)
@@ -181,6 +195,7 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - BUILD-REUSE-FOREIGN-DIRS-52 (no report page): A reused stage recreates, as empty folders, the folders another stage filled beside it: the area stage then stops on its own room folder
 - [BUILD-REUSE-INTRO-CENSUS-REPLACED-48](BUILD-REUSE-INTRO-CENSUS-REPLACED-48.md): A reused MiniWind rooms build rebuilt the intro and census stages (replaced outputs) and its Balmora interiors (4 s to 1m21s)
 - BUILD-REUSE-KEY-WALK-LISTED-51 (no report page): The read records of the CHIM world stages list almost every folder of the checkout, so a new bug page refuses their narrowed reuse
+- BUILD-REUSE-NEVER-READ-STOPS-66 (no report page): The reuse check stops stages whose key changed only in code they never ran or read, and redoes their stored units
 - BUILD-REUSE-OUTPUTS-DIFFER-48 (no report page): Eight stages were rebuilt because their earlier outputs differed from their records (character, reading, world-ui, actor-contact, world-terrain and others)
 - [BUILD-REUSE-PLAN-ENV-36](BUILD-REUSE-PLAN-ENV-36.md): The standalone reuse plan reports environment changes the real build does not have
 - BUILD-REUSE-RC1-RECORDS-REFUSED-48 (no report page): Every stage that ran the idle-worker watcher or read the CHIM label module was marked not reusable: rc1-try2 had 24 unexpected rebuilds

@@ -24,7 +24,44 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-06: reported in v0.0.29-rc1
+- 2026-10-06: Latest scoped RC2 playtest confirmations: WinUAE guard-follow, race-selection and heavy-load music continuity remain open, including the reopened appearance-entry report below.
+- 2026-10-06: v0.0.29-rc2: Latest v0.0.29-rc2 playtest report: AUDIO-ENTER-29 / AUDIO-LOAD-29 remain open: the current WinUAE playtest still reports music crackle and pauses, including Enter to follow the guard.
+- 2026-10-06: v0.0.29-rc2: v0.0.29-rc2: Let There Be (Just a Bit More) Light: Recorded 2026-10-06T21:23:03+03:00.
+- 2026-10-06: Current RC1 regression checkpoint: Delivered playtest remains v0.0.29-rc1.
+- 2026-10-06: Loading-audio candidate evidence: The next candidate limits loading-only asset reads to 4 KiB and services audio between reads.
+- 2026-10-06: RC1 the maintainer playtest follow-up: Recorded 2026-10-06T13:09:20+00:00.
+- 2026-10-06: Current RC1 regression checkpoint: Consolidated RC1 reports, coordinates and scoped positive observations: RC1 playtest ledger (docs/history/feedback/RC1_PLAYTEST_LEDGER.md).
+- 2026-10-07: v0.0.30-rc1: v0.0.30-rc1 the maintainer playtest summary: WinUAE playtest by the maintainer: Census office interiors work (CENSUS-ENTITIES-30 accepted), mushroom picking on the road to Balmora works, Balmora works and torches work.
+- 2026-10-07: v0.0.30-rc1: CENSUS-ENTITIES-30: maintainer-accepted in v0.0.30-rc1: The maintainer WinUAE playtest of v0.0.30-rc1: the Census and Excise Office interiors work.
+- 2026-10-07: AUDIO-NEWGAME-30: rc1 playtest audio reports: v0.0.30-rc1 WinUAE playtest by the maintainer: music crackles when confirming New Game (new, report (AUDIO-NEWGAME-30)); crackles as the game fades in after the intro (AUDIO-03); a split-second ...
+- 2026-10-09: AUDIO-HOST-LOAD-33: crackle on a saturated host: AUDIO-HOST-LOAD-33: the maintainer heard music and sound crackle and snap throughout CHIM Preview 1 played on a PC whose CPU was at 100 % with build jobs; the same build was clean on a ...
+- 2026-10-25 01:16 +0300: seen again in v0.0.51-dev1: v0.0.51-dev1 image, FS-UAE 32 MB, same five loads: longest gaps 44-121 ms after the first load (319 ms), 0 late in every load; the first load printed 'music ran dry 1 times'.
+- 2026-10-25 03:53 +0200: seen again in v0.0.51-dev2: dev2, FS-UAE 32 MB: first load of a session 310 ms, music ran dry 3 times (311 ms, 2 on the chamber run; dev1 319 ms, 1); later loads 39-129 ms, 0 late
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.51 (25 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Timeline](#timeline)
+- [Status: 25 October 2026](#status-25-october-2026)
+- [Symptom](#symptom)
+- [Measured](#measured)
+- [Where](#where)
+- [Next](#next)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Status: 25 October 2026
 

@@ -20,6 +20,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-12: reported in v0.0.38-dev2
+- 2026-10-14: Renewed RC2 gameplay reports: COMBAT-AMBIENT-SPEECH-GATING-38: 13 October 2026: traced ungated greeting/manual/idle paths and separate audio/subtitle lifetimes.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 ## Symptom

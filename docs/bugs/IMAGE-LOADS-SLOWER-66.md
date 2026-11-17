@@ -33,12 +33,37 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.66-dev5 (3dfd5095) | 2026-11-15 | gate 10881 passed on 18eb63f1, which holds it | the image step relinks every directory hash chain busiest first and sizes every partition's buffers to its longest name lookup |
+| shipped | a numbered build | v0.0.66-dev5 build 2026_11_15_v0.0.66-dev5_full-v0.0.66-dev5_18eb63f | 2026-11-15 | the delivered build | the build holds 3dfd5095 |
+| confirmed in play | the delivery's town hops | v0.0.66-dev6 build 2026_11_15_v0.0.66-dev6_full-v0.0.66-dev6_629a2db | 2026-11-15 | the hops' console: the sound stage of each map load (the disk layout of v0.0.66-dev5) | Seyda Neen 59 ms (v0.0.66-dev1 139, dev2 480) and Vivec 147 and 165 ms (dev1 306, dev2 1,078): the slower sound loading is gone |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-15: reported in v0.0.66-dev2
+- 2026-11-15: seen again in v0.0.66-dev5: The v0.0.66-dev5 build's image step relinked the hard disk name lookups busiest-first: 86 of 4,559 chains on the program partition (DH0), median lookup 73 -> 25 header blocks, longest 169 -> 140, files within 30 buffers 3,613 -> 16,306 of ...
+- 2026-11-15: seen again in v0.0.66-dev7: Measured on the v0.0.66-dev6 image, which has the disk layout of v0.0.66-dev5 (see the status): the sound stage of a map load is far below the v0.0.66-dev2 figures at Seyda Neen, Balmora and Vivec, and below the v0.0.66-dev1 figures except ...
+- 2026-11-15: fixed in source: a gated commit, v0.0.66-dev5 (3dfd5095); gate 10881 passed on 18eb63f1, which holds it: the image step relinks every directory hash chain busiest first and sizes every partition's buffers to its longest name lookup
+- 2026-11-15: shipped: a numbered build, v0.0.66-dev5 build 2026_11_15_v0.0.66-dev5_full-v0.0.66-dev5_18eb63f; the delivered build: the build holds 3dfd5095
+- 2026-11-15: confirmed in play: the delivery's town hops, v0.0.66-dev6 build 2026_11_15_v0.0.66-dev6_full-v0.0.66-dev6_629a2db; the hops' console: the sound stage of each map load (the disk layout of v0.0.66-dev5): Seyda Neen 59 ms (v0.0.66-dev1 139, dev2 480) and Vivec 147 and 165 ms (dev1 306, dev2 1,078): the slower sound loading is gone
+- 2026-11-15 09:40 +0200: seen again in v0.0.66-dev4: the v0.0.66-dev4 image has the same layout: id1/sound is entry 28 of 28 of its chain on the boot partition, and 370 lookups of sounds outside the pool read 34 header blocks (median), none within the 30 buffers (measured on the image, no ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.66-dev4 (15 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Status: 15 November 2026](#status-15-november-2026)
 - [Symptom](#symptom)
 - [The sessions side by side](#the-sessions-side-by-side)

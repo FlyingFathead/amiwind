@@ -15,11 +15,22 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.35 (10 October 2026)._
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.31-dev
+- 2026-10-08: BUILD-SEYDA-PRIVATE-STAGES-31: duplicate of BUILD-SEYDA-REGEN-30: Recorded again while preparing v0.0.31 and closed as a duplicate of BUILD-SEYDA-REGEN-30; its detail (the three private Seyda stages, the image path not run end to end since ...
+
+<!-- END GENERATED TIMELINE -->
+
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 ## Status: 8 October 2026
 
-Closed: duplicate of [BUILD-SEYDA-REGEN-30](../journals/BUG_JOURNAL-v0.0.31.md#build-seyda-regen-30-public-build-cannot-regenerate-seyda-neen-7-october-2026),
+Closed: duplicate of [BUILD-SEYDA-REGEN-30](BUILD-SEYDA-REGEN-30.md),
 recorded again while preparing v0.0.31. Current status lives there. Note: the image
 build has had `--canonical-land-source` since v0.0.30-dev5; the remaining gap is
 the three private stages below.

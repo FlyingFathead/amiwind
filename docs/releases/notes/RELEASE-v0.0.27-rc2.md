@@ -13,7 +13,7 @@ The rc1 playtest confirmed visible rocks and giant mushrooms but revealed cap
 gaps after independent material-wise simplification. Rc2 preserves shared-seam
 material sections and source UVs on all five giant-mushroom models. Rock LOD
 is unchanged. This is a conservative geometry correction; further reduction
-must preserve joins. See GEO-01 in the [bug journal](../../BUG_JOURNAL.md).
+must preserve joins. See GEO-01 in the [bug tracker](../../BUGS.md).
 
 Image assembly splits large payloads into additional HDFs automatically, with
 each HDF below 4 GiB and each filesystem partition below 2 GiB. Both WinUAE and

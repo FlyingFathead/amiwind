@@ -9,9 +9,12 @@
 | Where | src/mwad/input_check.py (only Morrowind.esm and Morrowind.bsa are required) and config/input-reference (no expansion entries) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | fixed in v0.0.66-dev2 |
+| Persists in | fixed in v0.0.66-dev3 |
 | Severity | high: The expansions are on by default: a missing expansion file is skipped without a message and a different one only warns, so a build can run on wrong or missing game data. |
 | Family | Morrowind editions, archives and inputs (`game-data-editions`) |
+| Fix commit | `c3f89b5d` |
+| Fixed on | 2026-11-13 |
+| Planning item | `DLC-INPUT-CHECKSUMS-66` |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
 | Playtest version | v0.0.66-dev2 |
 | From commit | source 1d5d76a, engine 1d5d76a, CHIM world 1d5d76a |
@@ -20,6 +23,27 @@
 | Platform or emulator | not in game (build time) |
 
 <!-- END GENERATED FACTS -->
+
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.66-dev3 (c3f89b5d) | 2026-11-13 | gate 10660 passed on c3f89b5d | the selected expansions are required and checked by size and SHA-256 in the input check, like the base files |
+| shipped | a numbered build | v0.0.66-dev3 build 2026_11_15_v0.0.66-dev3_full-v0.0.66-dev3_c0ab8f1 | 2026-11-15 | the delivered build | the first build that holds c3f89b5d (the dev2 build does not) |
+| confirmed by a build | a numbered build | v0.0.66-dev3 build 2026_11_15_v0.0.66-dev3_full-v0.0.66-dev3_c0ab8f1 | 2026-11-15 | the build log's input check | Tribunal.esm and Bloodmoon.esm: size and SHA-256 match the reference; a builder fix, no play check applies |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-13: reported in v0.0.66-dev2
+- 2026-11-13: fixed in source: a gated commit, v0.0.66-dev3 (c3f89b5d); gate 10660 passed on c3f89b5d: the selected expansions are required and checked by size and SHA-256 in the input check, like the base files
+- 2026-11-15: shipped: a numbered build, v0.0.66-dev3 build 2026_11_15_v0.0.66-dev3_full-v0.0.66-dev3_c0ab8f1; the delivered build: the first build that holds c3f89b5d (the dev2 build does not)
+- 2026-11-15: confirmed by a build: a numbered build, v0.0.66-dev3 build 2026_11_15_v0.0.66-dev3_full-v0.0.66-dev3_c0ab8f1; the build log's input check: Tribunal.esm and Bloodmoon.esm: size and SHA-256 match the reference; a builder fix, no play check applies
+
+<!-- END GENERATED TIMELINE -->
 
 _Last updated with AmiWind v0.0.66-dev2 (13 November 2026)._
 
@@ -62,6 +86,7 @@ Family: Morrowind editions, archives and inputs (`game-data-editions`). The buil
 - [BUILD-EXPANSIONS-31](BUILD-EXPANSIONS-31.md): Tribunal and Bloodmoon cannot be converted with today's tools
 - [BUILD-INPUTS-UNVERIFIED-32](BUILD-INPUTS-UNVERIFIED-32.md): The builder does not check user inputs (Morrowind data, Amiga libraries) against known versions
 - [BUILD-PLUGIN-SOUNDS-32](BUILD-PLUGIN-SOUNDS-32.md): A GOG image includes 8 converted sounds that only an official plugin uses
+- [INPUT-TRANSFER-ZIPS-25](INPUT-TRANSFER-ZIPS-25.md): The input preflight refused a game folder with two differently cased transfer ZIPs beside its Video folder
 - [MWAD-DELETED-RECORD-35](MWAD-DELETED-RECORD-35.md): Readers disagree on what a deleted record is
 - [MWAD-READER-CHECKS-35](MWAD-READER-CHECKS-35.md): Data readers: missing length checks, duplicate FRMR, diverging master lists, lock key
 - [MWAD-STRING-DECODE-35](MWAD-STRING-DECODE-35.md): Data readers decode record strings four different ways

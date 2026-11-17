@@ -117,6 +117,11 @@ def parser():
     p.add_argument('--no-live-tracker', dest='tracker_declined', action='store_true', help='Do not offer or start the live build tracker')
     p.add_argument('--keep-tracker', action='store_true',
                    help='Keep the live tracker server running after the build until you press Enter (never left running unattended)')
+    p.add_argument('--report', action='store_true',
+                   help='Also write the build report logs/BUILD-REPORT-<run>.txt in the workspace when the build passes '
+                        'or is cancelled, or when a --check or --plan stops on an error. A failed build always writes '
+                        'it: what failed, every setting, the versions, the game data, the stage plan and the stage log '
+                        'in one file that stays on this computer (tools/build_report.py)')
     add_no_harvest_group(p)  # --no-harvest .. --map-budget-policy
     from vis_options import VIS_MODES, DEFAULT_VIS_MODE
     p.add_argument('--vis', '--vis-mode', dest='vis_mode', choices=VIS_MODES, default=DEFAULT_VIS_MODE,
@@ -2774,6 +2779,9 @@ def export_option_environment(args, announce=True):
     standalone reuse plan (plan_stage_environment, build.py --reuse-plan) both call it, so the plan keys every stage
     as the build does (BUILD-REUSE-PLAN-ENV-36). ANNOUNCE: print the option lines (not in a host plan, which prints
     JSON only, nor in the reuse plan)."""
+    # The shipped NPC bake settings, unless set (BUILD-INTRO-SEAM-STOP-CHARGEN-CLASS-64): here, so the build and the
+    # reuse plan set them alike and the read-only commands (status, profile, --layout-selftest ...) leave them alone.
+    apply_shipped_bake_defaults()
     log_level = getattr(args, 'log_level_record', None) or resolve_log_level(args)
     os.environ['AMIWIND_LOG_LEVEL'] = log_level['level']
     # NPC root-node rule: stage code names AMIWIND_NPC_ROOT_RULE, so it is part of every NPC stage's key.
@@ -3026,9 +3034,42 @@ def main(argv=None):
             prefetch.forget()
 
 
+SHIPPED_BAKE_DEFAULTS = (('AMIWIND_MESH_SEAM_STOP', 'warn'), ('AMIWIND_NPC_BODY_CHECK', 'warn'),
+                         ('AMIWIND_NPC_BAKE_FALLBACK', 'dev1'))
+
+
+def apply_shipped_bake_defaults(environ=None):
+    """BUILD-INTRO-SEAM-STOP-CHARGEN-CLASS-64: the public builder builds what is shipped. Every release since v0.0.62 was
+    built with these three NPC bake settings; a build started without them stopped in the intro stage on the character
+    creation class NPC (a seam check against a baseline written from one copy of the game data). They are the builder's
+    defaults, set here for the build and every stage it starts; a value set in the environment is kept."""
+    environ = os.environ if environ is None else environ
+    for name, value in SHIPPED_BAKE_DEFAULTS:
+        if not str(environ.get(name, '')).strip():
+            environ[name] = value
+    return environ
+
+
+def write_build_report(args, status, error=None, metadata=None, steps=None, result=None, code=None):
+    """The one-file build report (tools/build_report.py, BUILD-FAILURE-REPORT-66): logs/BUILD-REPORT-<run>.txt in the
+    workspace when the build fails, with --report also when it passes or is cancelled. Never raises."""
+    try:
+        import build_report
+        if build_report.wanted(args, status):
+            return build_report.write(args, status, error, metadata, steps, factory=parser, root=ROOT, version=VERSION,
+                                      result=result, code=code)
+    except Exception as exc:  # noqa: BLE001 - the report never hides the build's own result
+        print('[report] the build report was not written: %s: %s' % (type(exc).__name__, exc), flush=True)
+    return None
+
+
 def _main(argv=None):
     # Also cover direct Python invocations and subsequent environment re-exec.
     os.environ['PYTHONUNBUFFERED'] = '1'
+    # the AMIWIND_ settings as the build was started, before the builder sets any (the build report says which
+    # setting came from where; tools/build_report.py); read only: the read-only commands leave the environment alone
+    import build_report
+    build_report.note_start()
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, 'reconfigure'):
             stream.reconfigure(line_buffering=True)
@@ -3184,6 +3225,7 @@ def _main(argv=None):
         if town in shipped_extra_towns():
             print(f"Note: --extra-town {town} has no effect; {town} is shipped and built by default.", flush=True)
     summary = None
+    metadata = steps = None      # as far as the build got, for the build report of a failure (write_build_report)
     try:
         if args.prerendered and args.prerendered[0] in PRERENDERED_ACTIONS:
             return prerendered_action(args.prerendered)
@@ -3794,15 +3836,19 @@ def _main(argv=None):
                       flush=True)
         except Exception as exc:
             print('[summary] digest not updated: %s' % exc, flush=True)
+        # --report: the one-file build report of a passed build too (tools/build_report.py)
+        write_build_report(args, 'passed', None, metadata, steps, result=result,
+                           code=code or (SIZE_GUARD_EXIT if size_verdict == 'failed' else 0))
         if size_verdict == 'failed':
             print('SIZE GUARD FAILED: a payload folder grew past the margin without a named reason (%s); the '
                   'stages passed and their outputs stay valid and reusable' % (run / 'size-ledger.json'), flush=True)
             return code or SIZE_GUARD_EXIT
         return code
-    except (KeyboardInterrupt, EOFError):
+    except (KeyboardInterrupt, EOFError) as exc:
         if summary and not summary.finished:
             summary.finish('cancelled')
             save_recipe(args, 'cancelled')
+        write_build_report(args, 'cancelled', exc, metadata, steps)      # --report only
         p.exit(130, "\nCancelled.\n")
     except (OSError, ValueError, RuntimeError) as exc:
         if summary and not summary.finished:
@@ -3813,13 +3859,21 @@ def _main(argv=None):
             # stage failed or now for an error of the build itself, and printed here too (tools/build_failure.py)
             import build_failure
             build_failure.report(summary.run, exc)
+        # the one file with everything (BUILD-FAILURE-REPORT-66): logs/BUILD-REPORT-<run>.txt in the workspace
+        write_build_report(args, 'failed', exc, metadata, steps)
         p.exit(1, f"Error: {exc}\n")
+    except SystemExit as exc:
+        # a refusal inside the build's start-up (the focus box preflight, a tool's own exit): the report, the same exit
+        if exc.code not in (None, 0):
+            write_build_report(args, 'failed', exc, metadata, steps)
+        raise
     except Exception as exc:
         # an unexpected error of the builder itself keeps its traceback as Python prints it; the failure details
         # are written and printed first
         if summary:
             import build_failure
             build_failure.report(summary.run, exc)
+        write_build_report(args, 'failed', exc, metadata, steps)
         raise
 
 

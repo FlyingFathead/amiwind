@@ -34,12 +34,31 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-18: reported in v0.0.43-dev2
+- 2026-10-18 18:10 +0300: seen again in v0.0.43-dev2: maintainer: second spot, cell 16,9 (global 136878 75700 373, frame map vf2303): leaf cards and twig lines in a tree-crown pattern, no trunk drawn
+- 2026-10-18 18:12 +0300: seen again in v0.0.43-dev2: maintainer pinned it: CHIM placement 379487, mesh f/flora_tree_ac_01@s1.85 (model 12410), source ref 137320, cell 16,9; a repeating pattern
+- 2026-10-18 18:14 +0300: seen again in v0.0.43-dev2: maintainer: third spot, cell 18,5, leaf cards under a giant mushroom (pick: f/flora_emp_parasol_02@s1.84, ref 133286); the leaves themselves are not pickable
+- 2026-10-18 18:15 +0300: seen again in v0.0.43-dev2: maintainer: fourth spot, cell 19,4 under a parasol (f/flora_emp_parasol_02@s1.58); it is the same plant repeating, not the mushroom
+- 2026-10-18 18:22 +0300: seen again in v0.0.43-dev2: maintainer found a WORKING copy of the same tree: cell 18,5, f/flora_tree_ac_01@s1.54 (model 12430), ref 133288; compare with the broken @s1.85 (model 12410)
+- 2026-10-18 19:46 +0300: seen again in v0.0.43-dev2: maintainer: a broken rock on CHIM, Bitter Coast cell -4,-6: f/terrain_rocks_ai_02@s1 (model 1750, ref 476548), a rock that takes the flora reducer profile
+- 2026-10-18 20:25 +0300: seen again in v0.0.43-dev2: correction: terrain_rocks_ai_02 (Bitter Coast -4,-6) is not on the flora path and not reduced (393 of 396 faces); its open edges match the one-sided NIF: OpenMW A/B needed
+- 2026-10-19: CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43: two Bitter Coast frames over the heap zone: CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43: the v0.0.43-dev4 build stopped at the CHIM heap gate: frames x-07/y-04 and x-08/y-04 were 113 and 110 KiB (1.9 %) over ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 7 times; something has to be done](#persisting-reported-7-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Status: 18 October 2026](#status-18-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -206,9 +225,12 @@ Family: Object placement and in-game geometry (`placement-geometry`). Placed obj
 - COURTYARD-ARRIVAL-STUCK-66 (no report page): Arriving in the census courtyard from the back room, the player was once stuck in solid: twenty "player is stuck" lines and two moves out
 - CREATURE-FLOATING-62 (no report page): A scrib in the wilderness floats above the terrain
 - [DOOR-ARRIVAL-INSIDE-ACTOR-66](DOOR-ARRIVAL-INSIDE-ACTOR-66.md): Coming back out of the census office onto the Seyda Neen street after a kill, the player arrives inside the guard who has walked to the door and stays stuck
+- [PORT-ROCK-ROTATION-23](PORT-ROCK-ROTATION-23.md): A rock by the Seyda Neen port was converted with the wrong rotation
 - ROCK-FLORA-SURFACE-29 (no report page): Angular rock-like surfaces newly appearing in Bitter Coast
 - ROOM-GROUND-STEEP-ICE-66 (no report page): With Bloodmoon selected, the image stage stopped on one Hound of Hircine in the Mortrag Glacier Inner Ring: its feet stand on a steep part of the converted ice floor
 - SHACK-VISIBILITY-29 (no report page): Indrele Rathryon shack front walls missing
+- [VODUNIUS-HOUSE-HOLES-23](VODUNIUS-HOUSE-HOLES-23.md): Visibility holes in Vodunius Nuccius' house in Seyda Neen
+- [WEDGE-TRAP-24](WEDGE-TRAP-24.md): wedge1: the player is trapped at -225,348,131
 - [WORLD-SHORE-OPEN-GEOMETRY-38](WORLD-SHORE-OPEN-GEOMETRY-38.md): Shoreline objects show large open sections and thin disconnected edges
 
 Related bugs in other categories:

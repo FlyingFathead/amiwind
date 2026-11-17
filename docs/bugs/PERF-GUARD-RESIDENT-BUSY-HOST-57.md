@@ -36,10 +36,30 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-31: reported in v0.0.57-dev5
+- 2026-10-31 03:46 +0200: seen again in v0.0.57: v0.0.57 release image run 2026_10_31_v0.0.57_full-v0.0.57-release_7ff625e: every stage passed, the perf guard failed the same two: chim-town-balmora build_resident 86 s, was 52 s (+65 %); chim-town-vivec_city 98 s, was 62 s (+57 %), same ...
+- 2026-10-31 16:50 +0200: seen again in v0.0.58-dev1: v0.0.58-dev1 build 2026_10_31_v0.0.58-dev1_full-v0.0.58-dev1_3d610fa: every stage passed, the perf guard failed the same two: chim-town-balmora build_resident 101 s, was 52 s (+93 %); chim-town-vivec_city 118 s, was 62 s (+89 %), same ...
+- 2026-11-01: seen again in v0.0.59-dev1: Seen again on the v0.0.59-dev1 full build: the same two resident sections failed the performance check (chim-town-balmora wall time 107 s against 52 s with the same 15 units; chim-town-vivec_city CPU per unit 35.3 s against 7.1 s with the ...
+- 2026-11-01 04:34 +0200: seen again in v0.0.58-dev3: Seen again in the v0.0.58 test image build of 6679573 (2026-11-01): the perf guard failed chim-town-vivec_city parallel map build_resident at 32.9 s CPU per unit against a 7.1 s baseline with the same 39 units, while a gate ran beside the ...
+- 2026-11-02: seen again in v0.0.59-dev5: PERSISTING on a quiet machine: v0.0.59-dev5 (f08583e0) chim-town-vivec_city build_resident 26.3 s CPU per unit against the baseline 7.1 s (+268 %, the same 39 units); dev4 26.6 s, so dev4 to dev5 unchanged.
+- 2026-11-02: seen again in v0.0.59-dev5: Cause found (quiet machine): since skeletal actors became the default, every worker process builds the shared animation table again, about 18 s of CPU per table (the beast table too); a Vivec resident bake itself is 3 to 6 s.
+- 2026-11-06: seen again in v0.0.61-dev2: Seen again in the v0.0.61-dev2 full build: chim-town-vivec_city, parallel map build_resident, 11.9 s of CPU per unit against 7.1 s (+66 %) with the same 39 units, at 7.34 cores against the baseline 5.90; the only perf guard failure of the ...
+- 2026-11-10 16:37 +0200: seen again in v0.0.64-dev3: Seen again on the v0.0.64-dev3 full build 2026_11_10_v0.0.64-dev3_full-v0.0.64-dev3_bf2743f (commit bf2743fa): every stage passed, the perf guard failed the same two build_resident sections.
+- 2026-11-11 01:51 +0200: seen again in v0.0.64-dev4: v0.0.64-dev4 full build: chim-town-vivec_city build_resident took 146.1 s against 7.1 s before with the same 39 units, compared by CPU time per unit, so not a busy machine.
+
+<!-- END GENERATED TIMELINE -->
+
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 9 times; something has to be done](#persisting-reported-9-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -165,7 +185,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-IMAGE-FRAME-MAP-HEAP-SERIAL-36](BUILD-IMAGE-FRAME-MAP-HEAP-SERIAL-36.md): The image step's CHIM frame-map heap check runs on one core: 66 s to 4.5 min per build while 23 cores idle
 - [BUILD-IMAGE-HASH-UNDERUSED-36](BUILD-IMAGE-HASH-UNDERUSED-36.md): The image step hashes 34,592 payload files on 3 of 24 cores (one file per pool task)
 - [BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36](BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36.md): The image step's world map heap audit estimates 170 maps on 5.3 of 24 cores
-- BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66 (no report page): The image step of the v0.0.66-dev9 build wrote its partitions in 107 seconds where the earlier build took 67
+- [BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66](BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66.md): The image step of the v0.0.66-dev9 build wrote its partitions in 107 seconds where the earlier build took 67
 - [BUILD-IMAGE-NOT-INCREMENTAL-33](BUILD-IMAGE-NOT-INCREMENTAL-33.md): The image step redoes every per-map pass and the whole pack on every build
 - [BUILD-IMAGE-NPC-CHECKS-LATE-44](BUILD-IMAGE-NPC-CHECKS-LATE-44.md): The image step's player body and guard torch bakes fail only at the end of a full build instead of before the expensive stages
 - [BUILD-IMAGE-REGION-MAPS-SERIAL-43](BUILD-IMAGE-REGION-MAPS-SERIAL-43.md): The image step's CHIM frame-map phases run on one core: the world read six times, ground traces on whole frames
@@ -283,6 +303,8 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - NPC-BAKE-STAGES-OVERRUN-62 (no report page): The new seam and floor character bake made every stage that bakes characters run far past its history: room batches about 2 h 40 min, actor library about 40 min, player bodies 35+ min
 - [NPC-BAKED-WHOLE-DUPLICATION-33](NPC-BAKED-WHOLE-DUPLICATION-33.md): Every NPC appearance is baked whole: shared body parts are converted again for each actor, and equipment cannot change
 - [NPC-LIBRARY-NO-UNIT-CACHE-63](NPC-LIBRARY-NO-UNIT-CACHE-63.md): The NPC appearance bakes of the actor library stage had no unit cache, so every rebuild of the stage baked all 418 appearances again (about 45 minutes)
+- PARTITION-CACHE-FIXED-WORKERS-66 (no report page): The new partition cache hashed its files on a fixed eight threads instead of the stage's own allowance
+- PERF-GUARD-BASIS-BY-COUNT-66 (no report page): The performance guard judges the image step's partition write by the number of partitions and not by their size, so a slowdown back to the old time would pass
 - PLAYER-VIEW-SKIN-ROWS-STOP-62 (no report page): The image step's player view stopped the v0.0.62 final build after 1 h 13 min: an Alias skin rows overflow ended it instead of trying the next smaller body
 - RELEASE-GUARD-SLOW-CLONE-51 (no report page): The release guard, the fail-fast first step of a release, took 6 minutes on about 0.14 of a core: its release check clones the whole repository through the Windows-mounted drive
 - RELEASE-SUITE-RECORD-SERIAL-51 (no report page): The release's suite record runs the whole test suite again on one core for about 22 minutes, right after the gate ran the same tests in about 2 minutes

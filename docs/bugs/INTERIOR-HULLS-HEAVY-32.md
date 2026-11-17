@@ -15,6 +15,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.32-dev
+- 2026-10-08: Asset census findings: Interior hulls outweigh interior geometry; open-world maps spend a fifth of their bytes on visibility; terrain and some interior bakes are nearly uniform; a flat mesh breaks collision building; tilt drives model ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.41-dev1 (15 October 2026)._
 
 ## Status: 8 October 2026

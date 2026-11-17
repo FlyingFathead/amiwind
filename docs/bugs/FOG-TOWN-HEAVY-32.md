@@ -18,6 +18,18 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.32-dev1
+- 2026-10-08: HORIZON-FLORA-SPRITES-32: horizon silhouetting, not yet perfect: The maintainer report on dev1: the horizon is meant to follow the highest topography, and the sprite trees break it (partly the maintainer's own call; not a v0.0.32 blocker).
+- 2026-10-08: v0.0.32-dev1: v0.0.32-dev1 delivery and smoke test findings: The recorded Seyda Neen maps are rewritten by later image passes (high priority for v0.0.32 final), the Arena and Balmora are heavily fogged, the world disk image is just over 2 GiB and the ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 ## Status: 8 October 2026
@@ -120,6 +132,7 @@ Family: Distance drawing (horizon, fog, sky, far edges) (`distance-drawing`). Fa
 - [RENDER-FOG-PASS-COST-33](RENDER-FOG-PASS-COST-33.md): The per-pixel fog and day-night sky pass costs 150-210 ms per frame on a slow 68040
 - [SEYDA-WALL-SHAPE-31](SEYDA-WALL-SHAPE-31.md): Dark shape pokes out of a stone wall by the Seyda Neen shore
 - [SHELL-TEXTURE-VOTE-32](SHELL-TEXTURE-VOTE-32.md): Distant shells: door and grille textures win over large sealed areas
+- [SKY-FOG-OFF-BACKGROUND-25](SKY-FOG-OFF-BACKGROUND-25.md): With fog off, far pixels outdoors that no surface covered showed a pale solid background instead of the sky
 - SKY-NIGHT-COVER-29 (no report page): Dense night clouds rarely reveal moons/stars
 - SKY-STARS-28 (no report page): Enlarged stars cover original night artwork
 - SKY-VISUAL-01 (no report page): Sky-only day/night remap clashed with gray distance fog

@@ -1,6 +1,6 @@
 # Build cache: resuming and reusing work safely
 
-_Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -697,9 +697,21 @@ which stage and which segments first differ. Measured on the v0.0.33 rc1 records
 world terrain (12,664 files, 5,067 units, 54 segments) builds its tree in 0.04 s and
 compares in 0.1 ms.
 
-The image step's packing is not split by segment: the world partitions are written in
-parallel in about 28 s and the whole disk assembly takes about 4 minutes, under the unit
-ceiling, while caching packed partitions would store gigabytes per build.
+The image step's packing is not split by segment. Each partition is one unit of the partition cache
+(`tools/partition_cache.py`, BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66): its key is every folder and file it holds in write order (each
+file's size and SHA-256), its size, volume name and boot block, the writer's code and the settings it reads; a
+partition with the key of a stored one is copied from it with its SHA-256 checked, and its check, readback and layout
+gate receipts are the stored ones. The CHIM world volume is the one this serves: its files were the same in the
+v0.0.66-dev9, dev10 and dev11 builds, while the boot partition holds the engine and the version-named icon, which
+change with every build. Measured on the v0.0.66-dev11 inputs: the CHIM world volume 29.6 s written and stored, 4.5 s
+taken from the cache; the boot partition 13.9 s written and stored, 6.8 s taken (not yet measured on a build of
+v0.0.66-dev12). A partition is up to 2 GiB, so the
+cache keeps the two most recently used entries of each partition name (about 7 GB for the boot partition and the CHIM
+world volume) and removes older ones when it stores a new one. It is in the image pass cache folder and follows its
+rule: development builds, and release builds only with `--allow-release-reuse`. There is no update of a stored
+partition in place: the boot partition is written in sorted order, its first files are the engine binaries, and a
+file whose size changes moves every block after it, so an update in place would be the whole write again (see
+[Storage](STORAGE.md#how-the-partitions-are-written)).
 
 ## Selective rebuilds
 

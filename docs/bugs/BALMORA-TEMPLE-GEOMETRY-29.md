@@ -15,11 +15,33 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-06: reported in v0.0.29-rc1
+- 2026-10-06: Latest scoped RC2 playtest confirmations: WinUAE guard-follow, race-selection and heavy-load music continuity remain open, including the reopened appearance-entry report below.
+- 2026-10-06: Current RC2 issue status: Implemented repairs, demonstrated cases and still-open issues (docs/history/checkpoints/RC2_ISSUE_CHECKPOINT.md).
+- 2026-10-06: v0.0.29-rc2: v0.0.29-rc2: Let There Be (Just a Bit More) Light: Recorded 2026-10-06T21:23:03+03:00.
+- 2026-10-06: Follow-up evidence and open reports: Delivered v0.0.29-rc1 remains unchanged.
+- 2026-10-06: RC1 follow-up evidence: Combined repair candidate: 1,047 tests, zero failures/errors, four documented skips; Amiga build passed.
+- 2026-10-06: Current RC1 regression checkpoint: Delivered playtest remains v0.0.29-rc1.
+- 2026-10-06: Post-RC1 combined gate: The next candidate passes 1,046 Linux Docker checks, zero failures/errors, and four documented skips: three Windows-only checks and the JavaScript inspector check requiring Node.js.
+- 2026-10-06: Balmora Temple geometry/collision report: BALMORA-TEMPLE-GEOMETRY-29: open, major, final-release blocker.
+- 2026-10-06: Follow-up validation checkpoint: The post-RC1 repair candidate passes the full 1,047-test suite with zero failures or errors and four documented skips, plus the Amiga build.
+- 2026-10-06: Current RC1 regression checkpoint: Consolidated RC1 reports, coordinates and scoped positive observations: RC1 playtest ledger (docs/history/feedback/RC1_PLAYTEST_LEDGER.md).
+- 2026-10-07: BALMORA-TEMPLE-GEOMETRY-29: cause found: Entries before 7 October 2026 are in the v0.0.29 bug journal.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.45 (20 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Status: 7 October 2026](#status-7-october-2026)
 - [Cause found, candidate repair: 7 October 2026](#cause-found-candidate-repair-7-october-2026)
 - [RC2 entrance-level traversal report: 6 October 2026](#rc2-entrance-level-traversal-report-6-october-2026)

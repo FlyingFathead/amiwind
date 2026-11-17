@@ -28,6 +28,20 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: seen again in v0.0.32-dev1: WORLD-THIRD-PARTITION-32: the world image needs more partitions
+- 2026-10-11: reported in v0.0.36-dev3
+- 2026-10-11: Pipeline entries, correction, the eight build rules and the persisting set: Correction, checked on the finished dev3 run: dev3 ships no legacy Seyda map.
+- 2026-10-11: IMAGE-ONE-HDF-TARGET-36, BUILD-CHIM-FRAME-SWAP-LATE-36, BUILD-IMAGE-AUDIO-SERIAL-36 and BUILD-PIPELINE-UNDERUTILIZATION-36: Four new entries from the v0.0.36-dev3 build, all open.
+- 2026-10-11 00:43 +0300: seen again in v0.0.36-dev3: two disks and three world partitions; the target is one HDF
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 
 ## Status: 11 October 2026

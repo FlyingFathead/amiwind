@@ -27,6 +27,18 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-10: reported in v0.0.63
+- 2026-11-16 09:47 +0200: seen again in v0.0.66-dev10: Seen again (the endgame session ENDGAME-HEART-SESSION-66, run1 on the v0.0.66-dev10 image): loading Akulakhan's Chamber took one frame of 41,930 ms (disk 40,917 ms; 86 files, the store chunks chimi/p00 to p07 among them), FS-UAE 32 MB ...
+- 2026-11-16 10:34 +0200: seen again in v0.0.66-dev10: the endgame session ENDGAME-HEART-SESSION-66, run2 on the v0.0.66-dev10 image: Akulakhan's Chamber again in one frame of 41,212 ms (disk 39,001 ms), and Dagoth Ur, Facility Cavern after it in one frame of 19,284 ms (disk 18,637 ms).
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.66-dev10 (16 November 2026)._
 
 ## Status: 16 November 2026

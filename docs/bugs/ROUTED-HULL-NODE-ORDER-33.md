@@ -19,7 +19,36 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-09: reported in v0.0.33-dev1
+- 2026-10-09: ROUTED-HULL-NODE-ORDER-33 in the integration line: ROUTED-HULL-NODE-ORDER-33: the Arena Pit crashed the engine on load ("SV_RecursiveHullCheck: bad node number") because a routed hull's root sat above nodes it reaches.
+- 2026-10-09: ROUTED-HULL-NODE-ORDER-33; INTERIOR-HULL-CHAIN-33 repaired in source: ROUTED-HULL-NODE-ORDER-33: the first routed legacy map loaded in the engine (the Arena Pit) crashed with "SV_RecursiveHullCheck: bad node number": a part's root was its ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [Timeline](#timeline)
+- [Status: 9 October 2026](#status-9-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Status: 9 October 2026
 

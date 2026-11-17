@@ -39,8 +39,14 @@ class SetDeleteTests(unittest.TestCase):
         self.assertIn('if(!(r->fields&AW_LEDGER_TAKEN))ledger_show(ref);', enable[:600])
 
     def test_the_script_stops_and_is_not_bound_again(self):
-        self.assertIn('for(i=0;i<deleted_count;i++)AW_MwvmDetach(deleted_pending[i]);',
+        self.assertIn('for(i=0;i<deleted_count;i++)deleted_script(deleted_pending[i]);',
                       body(self.host, 'static void deleted_flush(void){'))
+        # EXPANSION-SCRIPT-LIMITS-66: a script-made copy is forgotten (its instance ended and its values dropped,
+        # AW_MwvmForget), any other reference detached; both stop the script
+        gone = body(self.host, 'static void deleted_script(uint32_t ref){')
+        self.assertIn('AW_MwvmForget(ref);else AW_MwvmDetach(ref);', gone)
+        vm = (SOURCE / 'aw_mwvm.c').read_text(encoding='utf-8', errors='replace')
+        self.assertIn('if(k>=0){end_instance(&vm.inst[k]);any=1;}', body(vm, 'int AW_MwvmForget(uint32_t reference){'))
         tick = self.host[self.host.index('AW_MwvmTick(dt,player);'):]
         self.assertLess(tick.index('deleted_flush();'), tick.index('leave_now();'))
         attach = body(self.host, 'static int attach_script(uint32_t ref,int script,int flags,int entity,const float origin[3]){')

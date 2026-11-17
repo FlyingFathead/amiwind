@@ -18,6 +18,18 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.32-dev1
+- 2026-10-08: Vivec Arena residents: VIVEC-ARENA-ACTORS-32: cause found and fixed in source (branch v0.0.32-arena-actors).
+- 2026-10-08: First CHIM world-format build of Balmora: Balmora in CHIM format 0.1: 17.4 MB instead of 162 MB, crossings read 277 KB instead of 4.4 MB, but in many separate runs; visibility culls little; model faces still dominate.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 
 ## Status: 8 October 2026

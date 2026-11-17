@@ -15,11 +15,25 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.32-dev
+- 2026-10-08: Vivec limits repaired in source; ERICW-TEXINFO-SIGNED-31, EXTENTS-FPU-RULE-31, VIVEC-HEAP-31 found: VIVEC-TEXINFO-31 and MODEL-MARKSURF-SIGNED-31: the engine reads face texinfo indices, marksurface entries and leaf mark ranges unsigned ...
+- 2026-10-08: Whole-world measurement findings: Estimating every map of the world with every object placed found silent drops (night lamps in Vivec, static flames), the 220-object interior ceiling, out-of-range interior coordinates, unsupported ...
+- 2026-10-08: MESH-EXTENT-GRID-31 and LIGHTMAP-TAIL-31: Vivec dry run: A sewer corridor face sitting exactly on the texture grid passes the converter's extent check but exceeds 256 texels with the 68040's rounding, stopping 13 Vivec maps; a 1/16-texel ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Status: 8 October 2026](#status-8-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)

@@ -29,6 +29,20 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-11: reported in v0.0.36-dev3
+- 2026-10-11: CHIM-ARENA-HUNK-GAP-36 and EMU-JIT-FAULT-ADDRESS-36; version 0.0.36-dev4: The Vivec stage A MiniWind passed its boot smoke (Arena loaded, 10 s in the scene).
+- 2026-10-11 07:48 +0300: seen again in v0.0.36-dev4: PERSISTING: whole-city Vivec, JIT only: game clock stops after a noclip move to x 0, y beyond 3600; interpreter runs, no engine unmapped access
+- 2026-10-27 17:33 +0200: seen again in v0.0.54-dev1: PERSISTING (27 October 2026): the lines JIT: Fault address is 0x80f10000 at two program counters were seen again at 128 MiB Fast in Akulakhan's Chamber (v0.0.53 final) and in the combat playground (155a523, 17:17 +0200, group of four).
+- 2026-10-27 23:25 +0200: seen again in v0.0.54-dev1: JIT only (27 October 2026): the game clock stopped once at 128 MB after a mode chain in the combat playground (155a523), JIT on, none with the JIT off.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.36 (11 October 2026)._
 
 ## Status: 11 October 2026

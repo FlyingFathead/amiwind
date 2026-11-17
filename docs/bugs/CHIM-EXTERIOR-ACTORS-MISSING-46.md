@@ -24,6 +24,7 @@
 | Persists in | v0.0.46, v0.0.48-dev2, v0.0.65 (last seen) |
 | Severity | high: the open world is empty of people and creatures; gameplay outdoors is missing |
 | Family | CHIM world streamer (`chim-streamer`) |
+| Deferred by the maintainer | 2026-11-16: deferred by the maintainer's release decision to v0.0.67 (v0.0.66 is made from its twelfth snapshot; the rest of the roadmap goes to later versions) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
 | Playtest version | v0.0.46 release |
 | From commit | source a3fb9b7, engine a3fb9b7, CHIM world a3fb9b7 |
@@ -33,12 +34,39 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.66-dev2 (d3dc2493) | 2026-11-13 | a town map joins its own cells' creatures and levelled points from the actor table; tools/chim/actor_census_check.py stops a build whose placed counts per area fall short of the original | the 116 creature points of the Seyda Neen and Balmora cells are placed; a shortfall fails the build |
+| shipped | the v0.0.66-dev2 release build | v0.0.66-dev2 (3988c6e4, build 2026_11_14_v0.0.66-dev2_full) | 2026-11-15 | the delivered dev2 build holds the commit | a numbered build carries the fix |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-20: reported in v0.0.46
+- 2026-10-21: CHIM-EXTERIOR-ACTORS-MISSING-46: the actor table, off by default: CHIM-EXTERIOR-ACTORS-MISSING-46: the actor table is in the source behind `--chim-actor-table on` (experimental, off): every exterior NPC and creature reference of the game ...
+- 2026-10-22: seen again in v0.0.48-dev2: the maintainer: outdoors NPCs only in Seyda Neen, Balmora and Vivec
+- 2026-10-27 15:58 +0200: seen again in v0.0.54-dev1: Still no outdoor creature in the v0.0.54-dev1 MiniWinds.
+- 2026-10-27 16:30 +0200: seen again in v0.0.54-dev1: Cause found 27 October 2026 by the creatures worker: the actor table setting was dropped silently at game start (CHIM-ACTOR-TABLE-OFF-IN-GAME-47), so only 317 direct creature rows appeared outdoors and the 5,082 levelled references were ...
+- 2026-11-07: seen again in v0.0.61: Seen again on the v0.0.61 release image: no worms, wild guars or mudcrabs are seen in the wilderness.
+- 2026-11-13: fixed in source: a gated commit, v0.0.66-dev2 (d3dc2493); a town map joins its own cells' creatures and levelled points from the actor table; tools/chim/actor_census_check.py stops a build whose placed counts per area fall short of the original: the 116 creature points of the Seyda Neen and Balmora cells are placed; a shortfall fails the build
+- 2026-11-13 10:28 +0200: seen again in v0.0.65: Seen again with v0.0.65: no mudcrabs or slaughterfish around Seyda Neen.
+- 2026-11-15: shipped: the v0.0.66-dev2 release build, v0.0.66-dev2 (3988c6e4, build 2026_11_14_v0.0.66-dev2_full); the delivered dev2 build holds the commit: a numbered build carries the fix
+- 2026-11-16: deferred by the maintainer: deferred by the maintainer's release decision to v0.0.67 (v0.0.66 is made from its twelfth snapshot; the rest of the roadmap goes to later versions)
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 5 times; something has to be done](#persisting-reported-5-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Status: 22 October 2026](#status-22-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -277,6 +305,7 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - CHIM-STORE-ONE-AT-A-TIME-64 (no report page): The engine streams one CHIM store at a time, so frames of a second store cannot sit beside the first in the open world
 - [CHIM-TERRAIN-GRAFT-33](CHIM-TERRAIN-GRAFT-33.md): CHIM chunk terrain is a brush entity, not part of the world tree, so it does not occlude
 - [CHIM-TERRAIN-HULL-BEVELS-33](CHIM-TERRAIN-HULL-BEVELS-33.md): A standing box rests above the ground at convex CHIM terrain edges
+- [CHIM-TERRAIN-RECORDS-SIZE-46](CHIM-TERRAIN-RECORDS-SIZE-46.md): CHIM terrain records were stored whole: 489.4 MB of the v0.0.46 world's frame segments
 - [CHIM-TEXTURE-SPECKS-33](CHIM-TEXTURE-SPECKS-33.md): CHIM-drawn surfaces show bright single-texel specks that legacy frames do not
 - [CHIM-TILT-VARIANTS-SPLIT-33](CHIM-TILT-VARIANTS-SPLIT-33.md): Tilted placements each get their own model variant: 39,103 extra model variants on the base island, breaking store-once
 - [CHIM-TOWN-HEAP-ROUTED-HULL-36](CHIM-TOWN-HEAP-ROUTED-HULL-36.md): With the routed terrain hull for every chunk, Balmora and Seyda Neen rings no longer fit the CHIM zone

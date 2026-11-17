@@ -19,11 +19,25 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-07: reported in v0.0.31-dev1
+- 2026-10-07: SEYDA-READ-SLOW-31: the maintainer playtest of dev2: The maintainer, playing v0.0.31-dev2: Seyda Neen is fast now.
+- 2026-10-07: SEYDA-READ-SLOW-31: 16 KiB file buffer repairs and beats it
+- 2026-10-08: CHIM world-format follow-up findings: FFS sweep, walk replay and per-placement visibility (branch v0.0.33-chim-format).
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Status: 7 October 2026](#status-7-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)

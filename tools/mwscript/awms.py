@@ -3,7 +3,10 @@
 
   header   "AWMS" u16 version (1) u16 sections u32 file bytes u32 resident bytes
   directory, one row per section: tag[4] u32 offset u32 rows u32 bytes
-  CONF  8 bytes: u32 activation range (game units) u16 opcodes per frame u16 opcodes per script run
+  CONF  20 bytes: u32 activation range (game units) u16 opcodes per frame u16 opcodes per script run, then the
+        script engine's table sizes counted from the game (v0.0.66, EXPANSION-SCRIPT-LIMITS-66; plan.py): u16 attached
+        instances, u16 their local values, u16 parked objects, u32 parked values, u16 0. An older file's 8-byte CONF
+        gives the engine its earlier constants (256, 4,096, 2,816, 9,216).
   The sections up to CODE are what the engine keeps in memory (the "resident bytes" from the start of the file);
   BIND and STRS stay on disk: the bindings are read at each map change, a string only when one is logged.
   GLOB  8 bytes a global:   u8 type (0 short, 1 long, 2 float) u8 0 u16 name u32 initial value (raw cell)
@@ -88,8 +91,28 @@ ORDER = ('CONF', 'GLOB', 'JRNL', 'SNDS', 'VOIC', 'MUSI', 'OBJS', 'SCRP', 'STRT',
 # others stay on disk and are read a row at a time by the engine's actor state (aw_actorstate.c).
 ACTOR_SECTIONS = ('OACT', 'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'ASPC', 'ASPE', 'AEFF', 'AMGE', 'AENC', 'APCS',
                   'AIDX', 'ASPX')
-DEFAULT_CONF = {'range_units': 12288, 'ops_per_frame': 4000, 'ops_per_run': 2000}
+DEFAULT_CONF = {'range_units': 12288, 'ops_per_frame': 4000, 'ops_per_run': 2000,
+                # the engine's earlier constants (aw_mwvm.h AW_MWVM_*_DEFAULT): a build writes the counted plan instead
+                'instances': 256, 'cells': 4096, 'parked': 2816, 'park_cells': 9216}
+CONF_BYTES = 20
 RESIDENT = ORDER[:ORDER.index('BIND')]
+
+
+def conf_bytes(conf):
+    """The CONF section of CONF (DEFAULT_CONF's keys): 20 bytes."""
+    from .plan import check_plan
+    check_plan(conf)
+    return struct.pack('>IHHHHHIH', conf['range_units'], conf['ops_per_frame'], conf['ops_per_run'],
+                       conf['instances'], conf['cells'], conf['parked'], conf['park_cells'], 0)
+
+
+def conf_read(raw):
+    """DEFAULT_CONF's keys from a CONF section's bytes (8-byte: the earlier constants)."""
+    out = dict(DEFAULT_CONF)
+    out['range_units'], out['ops_per_frame'], out['ops_per_run'] = struct.unpack_from('>IHH', raw, 0)
+    if len(raw) >= CONF_BYTES:
+        out['instances'], out['cells'], out['parked'], out['park_cells'] = struct.unpack_from('>HHHI', raw, 8)
+    return out
 # The engine's limits (the interpreter's MAX_SCRIPTS and MAX_GLOBALS; tests/test_mwscript.py keeps them equal): a file over them is refused there and every
 # script stays off (MWSCRIPT-REFUSED-SCRIPT-COUNT-58), so the builder refuses it here first.
 ENGINE_MAX_SCRIPTS = 16384
@@ -328,7 +351,7 @@ def write(program, compiled, binds, conf=None):
     check_name_hashes('globals', [row['name'] for row in p.globals.rows])
     check_name_hashes('quests', [row['name'] for row in p.journal.rows])
     conf = dict(DEFAULT_CONF, **(conf or {}))
-    confb = struct.pack('>IHH', conf['range_units'], conf['ops_per_frame'], conf['ops_per_run'])
+    confb = conf_bytes(conf)
     for c in compiled:
         p.string(c.name)
     sections = {}

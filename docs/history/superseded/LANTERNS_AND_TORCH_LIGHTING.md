@@ -29,9 +29,9 @@ gaps: F/V can fail to produce a visible player torch, carried guard torches do
 not convincingly illuminate nearby night surfaces, and interiors look bleak.
 A visible flame and a working local light are different results. Fixing input
 does not prove surface illumination, and making a flame brighter does not light
-a wall. Keep [TORCH-INPUT-29](../../journals/BUG_JOURNAL-v0.0.29.md#torch-input-29-f-cannot-raise-hands-and-v-only-reports-torch-state-open),
-[TORCH-LIGHT-29](../../journals/BUG_JOURNAL-v0.0.29.md#torch-light-29-guard-torches-do-not-illuminate-nearby-night-surfaces-open)
-and [INTERIOR-LIGHT-29](../../journals/BUG_JOURNAL-v0.0.29.md#interior-light-29-interiors-lack-convincing-local-light-open)
+a wall. Keep [TORCH-INPUT-29](../../BUGS.md),
+[TORCH-LIGHT-29](../../BUGS.md)
+and [INTERIOR-LIGHT-29](../../bugs/INTERIOR-LIGHT-29.md)
 separate until each has its own evidence.
 
 This document is a study and acceptance plan. The existing converted torch and
@@ -148,7 +148,7 @@ The real guard-to-world/rotated-brush surface-cache fixture found and reproduced
 an unsigned-gradient interpolation overflow. The narrow renderer repair passes
 sanitizers and verifies brighter final pixels plus complete light-off restoration
 at representative ambient/static levels across all four mip resolutions. See
-[LIGHT-GRADIENT-29](../../journals/BUG_JOURNAL-v0.0.29.md#light-gradient-29-unsigned-surface-light-interpolation-overflow).
+[LIGHT-GRADIENT-29](../../BUGS.md).
 
 This rejects a universal failure to create or rasterize guard lights under those
 conditions. It does not close the observed in-game report. Next, bind the exact
@@ -190,7 +190,7 @@ tests; never infer lava from red terrain or guessed map dots. Reference:
 ## NPC illumination remains a separate acceptance gate
 
 The dev4 playtest reports torch-lit walls/floors but dark nearby NPCs.
-Track [TORCH-NPC-LIGHT-29](../../journals/BUG_JOURNAL-v0.0.29.md#torch-npc-light-29-nearby-npcs-do-not-respond-to-torchlight-open)
+Track [TORCH-NPC-LIGHT-29](../../BUGS.md)
 independently of surface coverage, emitter visibility and light radius. An
 emitter or illuminated floor does not establish actor lighting. Verify the
 actor's rendering branch, base light, dynamic-light clamp and final night

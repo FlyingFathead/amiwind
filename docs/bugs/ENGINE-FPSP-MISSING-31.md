@@ -19,7 +19,37 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.31
+- 2026-10-08: ENGINE-FPU-UNIMPL-31, NPC-TARGET-REDUNDANT-31, ENGINE-BUILD-REPRO-31, ENGINE-FPSP-MISSING-31, REMOTE-STATE-WIDTH-31: FPU fixes measured: Per-frame counters (`dbg fpucount`) on the v0.0.31 image: 3,547 `cexp` calls per frame at Balmora ...
+- 2026-10-08: Independent review of the open-world plan: All performance figures were taken with the emulator at host speed; flat directories are slow on real FFS; brush models may fragment down the terrain BSP; the loader stages lumps before decoding.
+- 2026-10-08: ENGINE-FPU-UNIMPL-31, ENGINE-FPSP-MISSING-31, NPC-TARGET-REDUNDANT-31, CI-ERICW-SKIP-31, CI-SKIPS-UNGUARDED-31: FPU audit and gate skips: The engine's sin+cos pairs become `cexp` calls that execute 68040-unimplemented instructions every ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.41 (17 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [Timeline](#timeline)
+- [Status: 8 October 2026](#status-8-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Status: 8 October 2026
 

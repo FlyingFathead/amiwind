@@ -18,9 +18,12 @@
 | Where | the build's reuse check (--check) before a snapshot build, run by the check route and again by the build itself |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.66-dev7, v0.0.66-dev8, v0.0.66-dev9, v0.0.66-dev10 (last seen) |
+| Persists in | fixed in v0.0.66-dev11 |
 | Severity | medium: about 13 minutes of every snapshot on one core; the output is right |
 | Family | Build speed (`build-speed`) |
+| Fix commit | `7e502993` |
+| Fixed on | 2026-11-16 |
+| Planning item | `BUILD-CHECK-ONE-CORE-66` |
 | Playtest version | 2026_11_15_v0.0.66-dev7_full-v0.0.66-dev7_a33bba9 |
 | From commit | source and engine a33bba9 |
 | CHIM engine version | none: legacy engine |
@@ -28,12 +31,36 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.66-dev11 (7e502993) | 2026-11-16 | gate 10941 passed on 26ed570f, which holds it | a build request takes the passed check of an identical earlier request instead of running it again |
+| shipped | a numbered build | v0.0.66-dev11 build 2026_11_16_v0.0.66-dev11_full-v0.0.66-dev11_26ed570 | 2026-11-16 | the delivered build | the build holds 7e502993 |
+| confirmed by a build | a numbered build | v0.0.66-dev11 build 2026_11_16_v0.0.66-dev11_full-v0.0.66-dev11_26ed570 | 2026-11-16 | the build log's first lines | the build took the passed check of the identical starter request, 58 seconds old, and did not run it again; a builder fix, no play check applies |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-15: reported in v0.0.66-dev7
+- 2026-11-15: seen again in v0.0.66-dev9: Seen again on the v0.0.66-dev9 snapshot (15 November 2026): the starter's reuse check ran 22:25 to 22:30 and the build's own check of the same commit 22:30 to 22:38:13, on one core each.
+- 2026-11-16: seen again in v0.0.66-dev10: Seen again on the v0.0.66-dev10 snapshot (16 November 2026): the starter's reuse check ran 00:46:46 to 00:52:43 and the build's own check of the same commit 00:53:24 to 00:57:51, both in a 4-core check container.
+- 2026-11-16: fixed in source: a gated commit, v0.0.66-dev11 (7e502993); gate 10941 passed on 26ed570f, which holds it: a build request takes the passed check of an identical earlier request instead of running it again
+- 2026-11-16: shipped: a numbered build, v0.0.66-dev11 build 2026_11_16_v0.0.66-dev11_full-v0.0.66-dev11_26ed570; the delivered build: the build holds 7e502993
+- 2026-11-16: confirmed by a build: a numbered build, v0.0.66-dev11 build 2026_11_16_v0.0.66-dev11_full-v0.0.66-dev11_26ed570; the build log's first lines: the build took the passed check of the identical starter request, 58 seconds old, and did not run it again; a builder fix, no play check applies
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Status: 16 November 2026](#status-16-november-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -183,7 +210,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-IMAGE-FRAME-MAP-HEAP-SERIAL-36](BUILD-IMAGE-FRAME-MAP-HEAP-SERIAL-36.md): The image step's CHIM frame-map heap check runs on one core: 66 s to 4.5 min per build while 23 cores idle
 - [BUILD-IMAGE-HASH-UNDERUSED-36](BUILD-IMAGE-HASH-UNDERUSED-36.md): The image step hashes 34,592 payload files on 3 of 24 cores (one file per pool task)
 - [BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36](BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36.md): The image step's world map heap audit estimates 170 maps on 5.3 of 24 cores
-- BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66 (no report page): The image step of the v0.0.66-dev9 build wrote its partitions in 107 seconds where the earlier build took 67
+- [BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66](BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66.md): The image step of the v0.0.66-dev9 build wrote its partitions in 107 seconds where the earlier build took 67
 - [BUILD-IMAGE-NOT-INCREMENTAL-33](BUILD-IMAGE-NOT-INCREMENTAL-33.md): The image step redoes every per-map pass and the whole pack on every build
 - [BUILD-IMAGE-NPC-CHECKS-LATE-44](BUILD-IMAGE-NPC-CHECKS-LATE-44.md): The image step's player body and guard torch bakes fail only at the end of a full build instead of before the expensive stages
 - [BUILD-IMAGE-REGION-MAPS-SERIAL-43](BUILD-IMAGE-REGION-MAPS-SERIAL-43.md): The image step's CHIM frame-map phases run on one core: the world read six times, ground traces on whole frames
@@ -301,6 +328,8 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - NPC-BAKE-STAGES-OVERRUN-62 (no report page): The new seam and floor character bake made every stage that bakes characters run far past its history: room batches about 2 h 40 min, actor library about 40 min, player bodies 35+ min
 - [NPC-BAKED-WHOLE-DUPLICATION-33](NPC-BAKED-WHOLE-DUPLICATION-33.md): Every NPC appearance is baked whole: shared body parts are converted again for each actor, and equipment cannot change
 - [NPC-LIBRARY-NO-UNIT-CACHE-63](NPC-LIBRARY-NO-UNIT-CACHE-63.md): The NPC appearance bakes of the actor library stage had no unit cache, so every rebuild of the stage baked all 418 appearances again (about 45 minutes)
+- PARTITION-CACHE-FIXED-WORKERS-66 (no report page): The new partition cache hashed its files on a fixed eight threads instead of the stage's own allowance
+- PERF-GUARD-BASIS-BY-COUNT-66 (no report page): The performance guard judges the image step's partition write by the number of partitions and not by their size, so a slowdown back to the old time would pass
 - [PERF-GUARD-RESIDENT-BUSY-HOST-57](PERF-GUARD-RESIDENT-BUSY-HOST-57.md): The dev5 full build's perf guard failed chim-town-balmora and chim-town-vivec_city build_resident as slower (129 s, was 52 s; 147 s, was 62 s) while two other builds ran beside it: contention, not code
 - PLAYER-VIEW-SKIN-ROWS-STOP-62 (no report page): The image step's player view stopped the v0.0.62 final build after 1 h 13 min: an Alias skin rows overflow ended it instead of trying the next smaller body
 - RELEASE-GUARD-SLOW-CLONE-51 (no report page): The release guard, the fail-fast first step of a release, took 6 minutes on about 0.14 of a core: its release check clones the whole repository through the Windows-mounted drive

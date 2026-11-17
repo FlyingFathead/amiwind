@@ -19,7 +19,38 @@
 
 <!-- END GENERATED FACTS -->
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-07: reported in v0.0.29
+- 2026-10-07: BUILD-SEYDA-REGEN-30: public build cannot regenerate Seyda Neen: Reproduced 7 October 2026: running the partition on the original v0.0.29 inputs stops with the message below.
+- 2026-10-08: v0.0.32-dev1: v0.0.32-dev1 delivery and smoke test findings: The recorded Seyda Neen maps are rewritten by later image passes (high priority for v0.0.32 final), the Arena and Balmora are heavily fogged, the world disk image is just over 2 GiB and the ...
+- 2026-10-08: BUILD-SEYDA-PRIVATE-STAGES-31: duplicate of BUILD-SEYDA-REGEN-30: Recorded again while preparing v0.0.31 and closed as a duplicate of BUILD-SEYDA-REGEN-30; its detail (the three private Seyda stages, the image path not run end to end since ...
+
+<!-- END GENERATED TIMELINE -->
+
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [Timeline](#timeline)
+- [Status: 9 October 2026](#status-9-october-2026)
+- [Status: 8 October 2026](#status-8-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Status: 9 October 2026
 
@@ -36,7 +67,7 @@ See [Which Seyda Neen is in my build?](../LINUX_BUILD.md#which-seyda-neen-is-in-
 Open; recorded exception for v0.0.31 and again for v0.0.32 (project decision, 8 October 2026). The
 shipped Seyda Neen stages are used as a recorded input; Seyda Neen is rebuilt by the world streamer
 (v0.0.33), so the legacy builder is not fixed. Report page written 8 October 2026 from the
-[journal entry](../journals/BUG_JOURNAL-v0.0.31.md#build-seyda-regen-30-public-build-cannot-regenerate-seyda-neen-7-october-2026)
+journal entry of 7 October 2026 (now in the entry's dated history, the timeline below)
 and the closed duplicate [BUILD-SEYDA-PRIVATE-STAGES-31](BUILD-SEYDA-PRIVATE-STAGES-31.md).
 
 ## Symptom

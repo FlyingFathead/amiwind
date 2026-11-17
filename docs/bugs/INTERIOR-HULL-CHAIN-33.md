@@ -19,11 +19,25 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-09: reported in v0.0.33-dev1
+- 2026-10-09: ROUTED-HULL-NODE-ORDER-33; INTERIOR-HULL-CHAIN-33 repaired in source: ROUTED-HULL-NODE-ORDER-33: the first routed legacy map loaded in the engine (the Arena Pit) crashed with "SV_RecursiveHullCheck: bad node number": a part's root was its ...
+- 2026-10-09: IMPORT-TOWN-NO-INTERIORS-32: the Arena Pit converts; INTERIOR-HULL-CHAIN-33 and TOWN-INTERIOR-SAVEID-ORDER-33: IMPORT-TOWN-NO-INTERIORS-32: the Arena config listed no rooms, so the importer's interior step (added with the cantons) had ...
+- 2026-10-14: Renewed RC2 gameplay reports: 12 October 2026 — INTERIOR-HULL-CHAIN-33: maintainer reports severe Arena Pit interior slowdown; retain as a performance observation pending measured cause.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Status: 9 October 2026](#status-9-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)

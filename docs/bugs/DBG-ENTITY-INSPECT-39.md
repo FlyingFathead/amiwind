@@ -31,12 +31,27 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-13: reported in v0.0.39-rc1
+- 2026-10-13: seen again in v0.0.39-rc2: First target compile rejects missing AW_CharacterActive declaration.
+- 2026-10-13: seen again in v0.0.39-rc2: Corrected target compile passes; native HUD pins background Ord201385 through the foreground actor because whole-model bounds include other poses.
+- 2026-10-13: seen again in v0.0.39-rc2: Current rendered frame-bounds source candidate passes one real C UBSan regression incl.
+- 2026-10-13: seen again in v0.0.39-rc2: Latest source explicitly labels server runtime/position separate from rendered client selection.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42-dev2 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)

@@ -31,12 +31,28 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-21: reported in v0.0.46
+- 2026-10-21: HARVEST-INTERIOR-PICK-47 found and fixed on a branch; INTERIOR-PLACED-ITEMS-47 and HARVEST-ORGANIC-PLANTS-47 registered: HARVEST-INTERIOR-PICK-47: in the v0.0.46 image a mushroom inside an interior is drawn but cannot be picked (checked in ...
+- 2026-10-27 17:17 +0200: seen again in v0.0.54-dev1: PERSISTING (27 October 2026, the NPC docs audit): 6 of 2,031 placed items in interiors are takeable.
+- 2026-11-01 05:16 +0000: seen again in v0.0.58-dev4: The office's 124 takeable items now share one inline model per equal item (57 models instead of 124), the shared bake taken from the first equal item, so the office stays under the engine's model table.
+- 2026-11-01 05:33 +0200: seen again in v0.0.58-dev3: PERSISTING (v0.0.58-dev3 test image): the opening's Census and Excise Office is a compiled room map (tools/prepare_census.py) that leaves all 124 small items out (Iron Dagger 119577, Quill Pen 406347, the meal on the back-room table and ...
+- 2026-11-07: seen again in v0.0.61: Seen again on the v0.0.61 release image: in the Andrano Ancestral Tomb no container or placed item can be used (ROOM-OBJECTS-MISSING-62).
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Status: 21 October 2026](#status-21-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -168,6 +184,7 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [BUILD-MINIWIND-BALMORA-ASSUMED-36](BUILD-MINIWIND-BALMORA-ASSUMED-36.md): A MiniWind image of another town fails its content fingerprint: the Balmora region table was always required
 - [BUILD-MINIWIND-DIRECT-START-TOWN-36](BUILD-MINIWIND-DIRECT-START-TOWN-36.md): A MiniWind build of another town refuses its own direct start: the start check assumed Balmora
 - [BUILD-NIGHT-TABLES-31](BUILD-NIGHT-TABLES-31.md): Repository image builds have no night lamp, glowing glass or location fog tables
+- [BUILD-NPC-GALLERY-MISSING-25](BUILD-NPC-GALLERY-MISSING-25.md): Normal images had no NPC gallery: the builder never ran the gallery stage (Gallery catalogue missing)
 - [BUILD-RUN-FOLDER-PRECREATED-36](BUILD-RUN-FOLDER-PRECREATED-36.md): Every real CHIM build is refused at its start: the plan writes the world map manifest into the run folder before the run makes it
 - [BUILD-STANDALONE-STAGES-32](BUILD-STANDALONE-STAGES-32.md): Door overlay and interior section tools are outside the builder; their use in v0.0.31 is unverified
 - [CHIM-CELL-FEATURE-LIST-INCOMPLETE-38](CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md): Cell feature list incomplete: original placements and gameplay support are not reconciled with packaged coverage

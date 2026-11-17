@@ -30,12 +30,31 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-18: reported in v0.0.43-dev2
+- 2026-10-18: NPC-HEAD-DECIMATION-33 locked head reducer and INTERIOR-MORAG-TONG-FPS-43 decided: Decided for the project, 18 October 2026 (the maintainer): plants and trees in interiors are sprites by default (INTERIOR-MORAG-TONG-FPS-43; the page ranks ...
+- 2026-10-18: INTERIOR-MORAG-TONG-FPS-43 and NPC-HEAD-DECIMATION-33 persisting: INTERIOR-MORAG-TONG-FPS-43: the maintainer found the Balmora Morag Tong Guild very slow in v0.0.43-dev2.
+- 2026-10-18: INTERIOR-MORAG-TONG-FPS-43: The maintainer's v0.0.43-dev2 playtest: the Morag Tong Guild interior runs at a very low frame rate; suspects pinned in game are the planter tree with its roots and grass, and a table.
+- 2026-10-18 17:56 +0300: seen again in v0.0.43-dev2: maintainer pinned the suspect: the big planter tree in the middle, entity 93, func_wall, source ref 378691, model *90 (local 130 -5 18)
+- 2026-10-18 17:57 +0300: seen again in v0.0.43-dev2: maintainer pinned a second suspect: a wooden table, entity 6, func_wall, source ref 65016, model *4 (local 7 125 20): feels extremely heavy in polygons
+- 2026-10-18 20:12 +0300: seen again in v0.0.43-dev2: maintainer: Vivec Redoran Plaza is a frame-rate killer too; the planter plants (func_wall model *79, ref 466735) should probably be sprites
+- 2026-10-19: INTERIOR-MORAG-TONG-FPS-43: every room installer copies its plant sprites: INTERIOR-MORAG-TONG-FPS-43: since v0.0.43-dev4 the plants and trees of every converted interior are sprites, written next to each room's own map.
+- 2026-10-19 13:28 +0300: seen again in v0.0.44-dev1: image step stopped: the Balmora Mages Guild plant sprite was placed but not installed (only Vivec's room installer copied sprites); fixed for every installer
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Status: 18 October 2026](#status-18-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -247,5 +266,6 @@ Family: Rendering cost and visibility (`render-performance`). Read the visibilit
 - SKEL-RUNTIME-COST-52 (no report page): The skeletal prototype poses every vertex twice a drawn frame, with three divisions and three float-to-integer conversions each: it must cost what a baked frame costs
 - [SPRITE-BAD-TYPE-THREADED-56](SPRITE-BAD-TYPE-THREADED-56.md): R_DrawSprite: Bad sprite type ends a load (dbg aw hors 0) on Amiberry with the threaded CPU: the game stays on Loading
 - [TOWN-VIS-OCCLUSION-31](TOWN-VIS-OCCLUSION-31.md): Converted buildings, rooms and rocks do not block Quake visibility (func_wall)
+- [TREE-SPRITE-DEPTH-23](TREE-SPRITE-DEPTH-23.md): A tree sprite was cut off against the background: a signed depth compared as unsigned
 
 <!-- END GENERATED CATEGORY -->

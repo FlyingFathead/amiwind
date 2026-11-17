@@ -1,6 +1,6 @@
 # What are rocks? — terrain coverage and conversion workflow
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -141,7 +141,7 @@ sections and their original UVs; rock reduction is unchanged. This conservative
 exception increases mushroom triangles while retaining the source silhouette.
 Final BSP budgets passed; corrected-image visual and frame-cost acceptance is
 still required. Boundary-constrained reduction is a future optimization, not a
-reason to ship open caps. See GEO-01 in the [bug journal](BUG_JOURNAL.md).
+reason to ship open caps. See GEO-01 in the [bug tracker](BUGS.md).
 
 ## v0.0.38 investigation: repeated shoreline rock gaps
 

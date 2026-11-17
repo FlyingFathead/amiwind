@@ -1,6 +1,6 @@
 # MWScript compiled by the builder
 
-_Last updated with AmiWind v0.0.66-dev10 (16 November 2026)._
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -256,7 +256,7 @@ on disk.
 
 | Section | Row | Holds | Bytes (the game) |
 | --- | --- | --- | ---: |
-| CONF | 8 | activation range, opcodes per frame, opcodes per run (from `config/mwscript.json`) | 8 |
+| CONF | 20 | activation range, opcodes per frame, opcodes per run (from `config/mwscript.json`); then the script engine's table sizes counted from the whole game (v0.0.66-dev12, `tools/mwscript/plan.py`): attached instances, their local values, parked objects, parked values. The engine allocates exactly these at load; an older file's 8-byte CONF gives it the earlier constants (256, 4,096, 2,816, 9,216). The three masters: 791 instances, 1,475 values, 5,478 parked objects, 12,811 parked values | 20 |
 | GLOB | 8 | type (short, long, float), name, initial value | 1,144 |
 | JRNL | 2 | journal topic name | 636 |
 | SNDS | 18 | pool name (8 bytes), length, volume, mapped, near and far hearing distance, name | 1,476 |
@@ -412,13 +412,42 @@ Balmora MiniWind run found 0 problems in 54 scenery indexes. Register:
 
 `engine/aga/src/aw_mwvm.c`: a switch on opcodes, no engine headers, everything from the game through a host table
 (`aw_mwhost.c` in the engine, stubs in the native tests). Every script's code is checked once at load (opcodes,
-operands, table indexes, jump targets), so the loop does no bounds checks. Its tables (65,716 bytes) are taken once
-when the scripts are switched on; nothing is allocated while scripts run.
+operands, table indexes, jump targets), so the loop does no bounds checks. Its tables are taken once when the
+scripts are switched on, in one block; nothing is allocated while scripts run.
+
+**The tables are sized by the build** (v0.0.66-dev12: fixed in source and covered by tests, not yet seen in a session,
+`EXPANSION-SCRIPT-LIMITS-66`; one limit stays: 4 live copies per scripted Place row in one map, a fifth is refused with a
+console line and counted, `MWVM-PLACE-COPIES-FOUR-66`; up to dev11 they were constants: 256 attached instances, 4,096
+local values, 2,816 parked objects, 9,216 parked values, so a map with more scripted placements left the rest without
+their scripts, and a long game lost values once the store was full). The builder counts the whole game, both expansions
+included, whether or not the image binds their worlds (`tools/mwscript/plan.py`): the busiest loaded map (a 3 by 3
+block of exterior cells or one interior: Raven Rock's block has 350 scripted placements, Mournhold's Temple Courtyard
+213) with its held items and the levelled-list placements that can give a scripted actor, every global script that can
+have an instance at once (the start scripts, every script a StartScript names, the new game's run-once scripts, the
+carried items' scripts: 251), the copies the scripts' Place calls can make and the two scratch instances; for the
+parking store every object whose script has a local value (3,496 of the 11,423 bound, with 10,499 values), the carried
+items' scripts, the levelled placements and the copies. The counts go into the file's CONF and the engine allocates
+exactly that (about 180 KB of tables for the three masters, 97 KB with the old constants); a table running out is told
+to the engine every time and counted (`dbg mwscript status` shows the plan against the session's peaks): at a map change
+that is a clear stop with the numbers (the plan was wrong), elsewhere (a console's StartScript) the one action is
+refused in the console. An object whose script has no local value is not parked: there is nothing to keep. OpenMW keeps
+a reference's locals with the reference (`apps/openmw/mwworld/refdata.hpp`, `setLocals`) and its local scripts in a list
+with no bound (`mwworld/localscripts.cpp` `add`, `addCell`); the counted plan is this engine's way to the same result
+without a heap that grows in play. A script-made copy (a trap's projectile, a summoned creature) that is deleted or whose
+key is given back is forgotten: its values go with it, so the store does not fill with gone copies.
+
+**A member operation is one step** (`"object".variable`, v0.0.66-dev12): each object row remembers its attached
+instance, and the parked store is hashed by reference, so a read or write of another object's variable never walks the
+instance table or the store (the 99 every-frame object scripts of the masters hold 307 such operations; up to dev11 each
+walked up to 256 instances and 2,816 parked objects).
 
 - A script runs only while its object is **active**: within the activation range of the player (12,288 game
   units, one and a half exterior cells; the original runs the 3 by 3 cells around the player), or in the loaded room.
 - A script that is not VOLATILE and whose last run changed nothing and called nothing runs again only after the state
-  it can read has changed (a global, a journal index, another object's variable, a script started or stopped).
+  it can read has changed (a global, a journal index, another object's variable, a script started or stopped). A
+  script whose variables another script reads is SHARED (the compiler's whole-program pass): its own change of such a
+  variable moves the state too, so the reader wakes and sees it on the next frame instead of sleeping through it
+  (v0.0.66-dev12; 44 scripts of the masters are read by others, 9 of their readers had been quiet).
 - An opcode budget per frame (4,000) is shared round robin; a script left over waits at the head of the next frame.
   One run stops after 2,000 opcodes (an endless loop), logged once.
 - NOTYET calls are logged once per function name, never a crash.
@@ -431,9 +460,11 @@ inside the map (sound markers and other activators the CHIM frames keep without 
 in the game data), and in a room every scripted placement of that room (the room map's stable interior number,
 worldspawn `_aw_cell_int`, matches the binding's; room maps are the game positions at a quarter scale, and a
 recentred room's shift is taken from one of its edicts). The bindings are read from disk at the map change and not
-kept. Not attached: the hand-written list, inert scripts, and more than 256 edict-less placements in one room. An
-object's values are kept while its map is not loaded (512 objects, 4,096 values). Room placements are not
-checked in game yet ([MWSCRIPT-INTERIOR-PLACEMENTS-48](BUGS.md)).
+kept. Not attached: the hand-written list, inert scripts, and placements past the build's planned instance count (refused
+and counted; see [the interpreter](#the-interpreter)). An
+object's values are kept while its map is not loaded, in the parking store the build sized for every object of the
+game whose script has values ([above](#the-interpreter)). Room placements are not checked in game yet
+([MWSCRIPT-INTERIOR-PLACEMENTS-48](BUGS.md)).
 
 Global scripts: the game data's start script records (Tribunal's and Bloodmoon's) start when the file loads and again
 at every load of a save. The original also always runs its global script Main (OpenMW 0.51 globalscripts.cpp adds it
@@ -1064,7 +1095,7 @@ spelleffects.cpp for what each effect does, spellcasting.cpp for casting), writt
 | `id1/mwscript.awm` | 446,316 bytes (183,212 resident while on) |
 | Interpreter code (68040, -O1) | 9,720 bytes |
 | Engine side code / data | 5,876 / 10,960 bytes |
-| Interpreter tables (taken when switched on) | 65,716 bytes, plus 3,840 for the import route's counters (v0.0.54) |
+| Interpreter tables (taken when switched on) | sized by the build since v0.0.66-dev12 (fixed in source and covered by tests, not yet seen in a session, `EXPANSION-SCRIPT-LIMITS-66`; 4 live copies per scripted Place row in one map stay the limit, `MWVM-PLACE-COPIES-FOUR-66`): for the three masters 791 instances (38 KB), 1,475 values (6 KB), 5,478 parked objects (66 KB), 12,811 parked values (51 KB), a 16 KB hash and 3 KB of row tables, about 180 KB; 60 KB fixed beside them (the runnable and global-instance tables, the globals, the code marks, the import route's counters). The old constants took 97 KB |
 | Journal names (taken when switched on) | 318 topics, 22,896 bytes |
 | Compile time, the whole game | 2.5 s, one unit, reused from the pool when unchanged |
 

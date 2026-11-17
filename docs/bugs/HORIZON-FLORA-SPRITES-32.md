@@ -18,11 +18,27 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.32-dev1
+- 2026-10-08: HORIZON-FLORA-SPRITES-32 default accepted; HORIZON-HOLES-31 not re-checked
+- 2026-10-08: v0.0.31: FOG-TOWN-HEAVY-32: fog settings identical to v0.0.31: `fog-locations.txt`, the game configs, palette, fog and sky lookups and the 540 town fog distance equal v0.0.31; location fog is off by default.
+- 2026-10-08: HORIZON-FLORA-SPRITES-32: horizon silhouetting, not yet perfect: The maintainer report on dev1: the horizon is meant to follow the highest topography, and the sprite trees break it (partly the maintainer's own call; not a v0.0.32 blocker).
+- 2026-10-09: BUILD-PROFILE-JOBS-START-ONLY-33: idle cores measured against the start allowance (part 1 of 2): BUILD-PROFILE-JOBS-START-ONLY-33: the build profile compared each stage's cores with the workers it started with, but the scheduler rebalances ...
+- 2026-10-09: BUILD-PROFILE-JOBS-START-ONLY-33: idle cores measured against the start allowance (part 2 of 2): Fixed in source on v0.0.33-ws-baseline, not shipped at the time of writing: the list is `docs/WHITESPACE-BASELINE.json`, written from the ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Status: 8 October 2026](#status-8-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -168,6 +184,7 @@ Family: Distance drawing (horizon, fog, sky, far edges) (`distance-drawing`). Fa
 - [RENDER-FOG-PASS-COST-33](RENDER-FOG-PASS-COST-33.md): The per-pixel fog and day-night sky pass costs 150-210 ms per frame on a slow 68040
 - [SEYDA-WALL-SHAPE-31](SEYDA-WALL-SHAPE-31.md): Dark shape pokes out of a stone wall by the Seyda Neen shore
 - [SHELL-TEXTURE-VOTE-32](SHELL-TEXTURE-VOTE-32.md): Distant shells: door and grille textures win over large sealed areas
+- [SKY-FOG-OFF-BACKGROUND-25](SKY-FOG-OFF-BACKGROUND-25.md): With fog off, far pixels outdoors that no surface covered showed a pale solid background instead of the sky
 - SKY-NIGHT-COVER-29 (no report page): Dense night clouds rarely reveal moons/stars
 - SKY-STARS-28 (no report page): Enlarged stars cover original night artwork
 - SKY-VISUAL-01 (no report page): Sky-only day/night remap clashed with gray distance fog

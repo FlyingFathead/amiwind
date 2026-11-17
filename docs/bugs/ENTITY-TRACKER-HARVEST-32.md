@@ -15,6 +15,18 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.32-dev
+- 2026-10-08: ENTITY-TRACKER-HARVEST-32: register state corrected: Set back to open: it had been marked fixed in "v0.0.32-dev", a development line, not a shipped build.
+- 2026-10-08: Builder harvest step findings: Found while moving harvest into the builder (0331f76).
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.41 (16 October 2026)._
 
 ## Status: 8 October 2026

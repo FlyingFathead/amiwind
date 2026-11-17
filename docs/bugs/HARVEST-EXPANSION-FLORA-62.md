@@ -20,6 +20,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-07: reported in v0.0.61
+- 2026-11-13: seen again in v0.0.66-dev2: Persisting with both expansions selected by default: the harvest source reads the merged master, but the harvest kinds are chosen by model name (Bitter Coast mushrooms and tree fungi), so no Tribunal or Bloodmoon plant is harvestable ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.61 (7 November 2026)._
 
 ## Status: 7 November 2026

@@ -30,6 +30,22 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.33-dev
+- 2026-10-08: CHIM world-format follow-up findings: FFS sweep, walk replay and per-placement visibility (branch v0.0.33-chim-format).
+- 2026-10-08: First CHIM world-format build of Balmora: Balmora in CHIM format 0.1: 17.4 MB instead of 162 MB, crossings read 277 KB instead of 4.4 MB, but in many separate runs; visibility culls little; model faces still dominate.
+- 2026-10-18: CHIM-CROSSING-SYNC-LOAD-43 and ENGINE-HEAP-FIXED-SIZE-43: the open-world pauses measured: CHIM-CROSSING-SYNC-LOAD-43: the open-world "yoinks" in v0.0.43-dev2 are the cell crossings.
+- 2026-10-18 16:46 +0300: seen again in v0.0.43-dev2: maintainer, 128 MB: small load pauses ('yoinks') when crossing the world now that most cells are CHIM
+- 2026-10-18 16:48 +0300: seen again in v0.0.43-dev2: maintainer: the same route was smoother in v0.0.42, so the crossing pauses got worse (regression); prefetch into spare RAM proposed
+- 2026-10-18 16:59 +0300: seen again in v0.0.43-dev2: maintainer: the pause matches 'maps/vf0866.chim first-presented' (frame map load) at cell -2,1, also entering Caldera
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 ## Status: 8 October 2026

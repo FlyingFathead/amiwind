@@ -1,6 +1,6 @@
 # Windows build roadmap
 
-_Last updated with AmiWind v0.0.28 (4 October 2026)._
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 ## Current baseline — published v0.0.27
 
@@ -41,7 +41,7 @@ reference versions; version drift warns and actual checks decide compatibility.
   file formats, full-content defaults and normal gates. Portable BSA identifiers
   use forward slashes; generated Amiga text uses LF on both hosts.
 
-Use the [bug journal](BUG_JOURNAL.md) for symptoms, reproduction, evidence and
+Use the [bug tracker](BUGS.md) for symptoms, reproduction, evidence and
 fix-versus-mitigation status. Fresh run names can reuse validated model caches;
 there is no generic resume of every finished stage and no measured retry rate.
 

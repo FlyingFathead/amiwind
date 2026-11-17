@@ -19,11 +19,26 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.31
+- 2026-10-08: ENGINE-FPU-UNIMPL-31, ENGINE-FPSP-MISSING-31, NPC-TARGET-REDUNDANT-31, CI-ERICW-SKIP-31, CI-SKIPS-UNGUARDED-31: FPU audit and gate skips: The engine's sin+cos pairs become `cexp` calls that execute 68040-unimplemented instructions every ...
+- 2026-10-14: seen again in v0.0.40-dev1: Target FPU gate recurrence in block orientation; safe-math repair and focused pose checks pass, linked target/native gates pending.
+- 2026-10-14: ENGINE-FPU-UNIMPL-31: target pass and native inventory limits: ENGINE-FPU-UNIMPL-31: subsequent dev1 Amiga target and linked68040 gate pass without allowlist expansion.
+- 2026-10-14: ENGINE-FPU-UNIMPL-31: blocking recurrence: ENGINE-FPU-UNIMPL-31/COMBAT-BLOCKING-36: initial dev1 linked target fails68040 reachability via block library trig.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Historical source note, 8 October 2026](#historical-source-note-8-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)

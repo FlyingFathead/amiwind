@@ -71,11 +71,15 @@ class WindowsXdfToolTests(unittest.TestCase):
             text = (root / name).read_text(encoding='utf-8')
             self.assertNotIn('import run as run_xdftool', text, name)
         # The image step writes its boot partition with world_volumes.write_boot_partition (and its world
-        # partitions with world_volumes.write_partitions); both use the bounded runner.
+        # partitions with world_volumes.write_partitions); both write through tools/ffs_write.py, whose xdftool
+        # commands (the format, and the whole queue of the method before) use the bounded runner
+        # (BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66).
         volumes = (root / 'world_volumes.py').read_text(encoding='utf-8')
-        self.assertIn('run_any as run_xdftool', volumes)
         boot = volumes[volumes.index('def write_boot_partition('):]
-        self.assertIn('run_xdftool(command)', boot[:boot.index('\ndef ')])
+        self.assertIn('ffs_write.write_volume(', boot[:boot.index('\ndef ')])
+        writer = (root / 'ffs_write.py').read_text(encoding='utf-8')
+        self.assertIn('from build_windows_xdftool import run_any as run', writer)
+        self.assertNotIn('import run as', writer)
         self.assertIn('root_check=write_boot_partition(args.xdftool,part,boot,partition_mib)',
                       (root / 'build_aga.py').read_text(encoding='utf-8'))
 

@@ -15,6 +15,22 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-06: reported in v0.0.29-dev
+- 2026-10-06: RC1 follow-up evidence: Combined repair candidate: 1,047 tests, zero failures/errors, four documented skips; Amiga build passed.
+- 2026-10-06: Current RC1 regression checkpoint: Delivered playtest remains v0.0.29-rc1.
+- 2026-10-06: Post-RC1 combined gate: The next candidate passes 1,046 Linux Docker checks, zero failures/errors, and four documented skips: three Windows-only checks and the JavaScript inspector check requiring Node.js.
+- 2026-10-06: RC1 follow-up: building brightness and isolated inspection scenes: Recorded 2026-10-06T14:29:39+00:00; next candidate after v0.0.29-rc1, not in the published RC1.
+- 2026-10-06: Follow-up validation checkpoint: The post-RC1 repair candidate passes the full 1,047-test suite with zero failures or errors and four documented skips, plus the Amiga build.
+- 2026-10-06: Current RC1 regression checkpoint: Consolidated RC1 reports, coordinates and scoped positive observations: RC1 playtest ledger (docs/history/feedback/RC1_PLAYTEST_LEDGER.md).
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.39 (14 October 2026)._
 
 ## Explicit test-room input restriction, 2026-10-06T18:59:52+03:00
@@ -100,6 +116,7 @@ Family: First-person hands and torch (`torch-hands`). First-person hands, punche
 - [PLAYER-PUNCH-THIRDPERSON-39](PLAYER-PUNCH-THIRDPERSON-39.md): Third-person punches have no visible player-body attack animation
 - [PLAYER-READY-THIRDPERSON-38](PLAYER-READY-THIRDPERSON-38.md): Third-person player lacks fists-up and weapon-draw animation
 - [PLAYER-TORCH-THIRDPERSON-38](PLAYER-TORCH-THIRDPERSON-38.md): Player torch and holding pose disappear in third person while light remains
+- [TORCH-ACTIVATE-CRASH-25](TORCH-ACTIVATE-CRASH-25.md): Raising the fists and pressing V crashed the game: a dynamic light was marked through a negative collision root
 - TORCH-FLAME-VISIBILITY-29 (no report page): Torch flame not visible after changing styles
 - TORCH-FUEL-29 (no report page): Torch never burns out; no unlit or fuel state
 - TORCH-HAND-NORD-29 (no report page): Detached-looking left grip fragment in dev4

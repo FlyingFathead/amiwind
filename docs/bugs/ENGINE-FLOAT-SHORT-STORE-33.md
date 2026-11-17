@@ -15,6 +15,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-09: reported in v0.0.33-dev
+- 2026-10-09: NPC-VOICE-BARKS-33, ENGINE-FLOAT-SHORT-STORE-33, NPC-GREETING-PICK-33: mover models and voices: NPC-VOICE-BARKS-33: only greetings were voiced; the original voice topics now play at their moments with OpenMW's odds (repair in source).
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.41 (17 October 2026)._
 
 ## Status: 9 October 2026

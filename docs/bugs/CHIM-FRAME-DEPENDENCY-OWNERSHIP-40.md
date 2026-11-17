@@ -21,11 +21,24 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-15: reported in v0.0.40-dev2
+- 2026-10-15: 15 October 2026 - boundary ownership repair: CHIM-FRAME-DEPENDENCY-OWNERSHIP-40: Source repair adds original ownership and exact compiled-piece bindings without changing the runtime format.
+- 2026-10-15: 15 October 2026 - combined-world boundary ownership: CHIM-FRAME-DEPENDENCY-OWNERSHIP-40: The 369-frame world fails six ownership checks.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Combined-world readback, 15 October 2026](#combined-world-readback-15-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)

@@ -23,10 +23,25 @@
 #define MAX_GLOBALS 512
 #define MAX_CODE 8192           /* longest single script the load check accepts */
 
-typedef struct {uint32_t reference;uint16_t script,count,at;} parked_t;
+/* A parked object: its values at AT in the park (COUNT cells reserved: the most its script has had), its script's
+ * values nlocals(script) of them. FLAGS: PARKED_ATTACHED while its object is attached (the row is then a stale copy:
+ * the save skips it), PARKED_FREE on the free list (a forgotten script-made copy's row; REFERENCE then links the next
+ * free row, index + 1, 0 the end), given to the next object that needs as many cells. */
+typedef struct {uint32_t reference;uint16_t script,count,at,flags;} parked_t;
+#define PARKED_ATTACHED 1
+#define PARKED_FREE 2
+#define HASH_EMPTY 0
+#define HASH_GONE 0xFFFF         /* a tombstone: a forgotten row's slot, passed over by a search, reused by an insert */
 
-/* The interpreter's tables (about 160 KB) exist only once the scripts are switched on and loaded: one block taken
- * at load (AW_MwvmLoad), kept for the session; a game that never switches them on spends nothing. */
+/* The interpreter's tables exist only once the scripts are switched on and loaded: ONE block taken at load
+ * (AW_MwvmLoad), the fixed part below followed by the four tables the file's plan sizes (EXPANSION-SCRIPT-LIMITS-66;
+ * instances, their cells, the parked objects and the parked values), the parked store's hash by reference (one probe
+ * finds a parked object: MWSCRIPT-MEMBER-LOOKUP-COST-66), and two tables over the OBJS rows (the rows sorted by
+ * reference, and each row's attached instance: a member operation is one step); kept for the session; a game that
+ * never switches the scripts on spends nothing. Counted from the three masters on 16 November 2026 (tools/mwscript/
+ * plan.py): 791 instances (38 KB), 1,475 cells (6 KB), 5,478 parked objects (66 KB), 12,811 parked values (51 KB), a
+ * 16 KB hash and 3 KB of row tables: about 180 KB of tables, 240 KB with the fixed part below (the old constants:
+ * 97 KB and 157 KB). */
 typedef struct {
     const unsigned char *base;unsigned long bytes;const aw_mwvm_host_t *host;
     const unsigned char *glob,*jrnl,*snds,*voic,*musi,*objs,*scrp,*strt,*code,*oact,*pcel,*pmov,*newg,*held;
@@ -40,10 +55,14 @@ typedef struct {
     const unsigned char *lact;int nlact;      /* the levelled lists' scripted actors (LACT; older file: none) */
     int16_t global_instance[MAX_SCRIPTS];
     aw_mwcell_t globals[MAX_GLOBALS];
-    aw_mwvm_instance_t inst[AW_MWVM_INSTANCES];int ninst,cursor;
-    aw_mwcell_t cells[AW_MWVM_CELLS];int low,high;        /* objects from below, global scripts from above */
-    parked_t parked[AW_MWVM_PARKED];int nparked;
-    aw_mwcell_t park[AW_MWVM_PARK_CELLS];int park_used;
+    aw_mwvm_instance_t *inst;int ninst,cursor;                /* size_inst of them */
+    aw_mwcell_t *cells;int low,high;                          /* size_cells; objects from below, global scripts from above */
+    parked_t *parked;int nparked,free_parked;                 /* size_parked; the free list's head, index + 1 (0 none) */
+    aw_mwcell_t *park;int park_used;                          /* size_park */
+    uint16_t *park_hash;int tombstones;                       /* size_hash slots: a parked index + 1, HASH_EMPTY, HASH_GONE */
+    uint16_t *obj_order;int nobj_order;                       /* the OBJS rows placed once, sorted by reference */
+    int16_t *obj_inst;                                        /* each OBJS row's attached instance, -1 none */
+    int peak_inst,peak_cells;                                 /* the most in use this session (the status line) */
     unsigned char logged[AW_MWVM_STRINGS/8];
     uint32_t generation;float now,dt;uint32_t rng;
     int loaded;aw_mwvm_stats_t stats;
@@ -53,6 +72,27 @@ typedef struct {
 static vm_t *vmp;
 #define vm (*vmp)
 #define marks (vm.marks)
+/* the tables' sizes (the plan of the loaded file) and the block they share with the fixed part */
+static int size_inst,size_cells,size_parked,size_park,size_hash,size_objs;
+static unsigned long block_bytes;
+static unsigned long round4(unsigned long n){return (n+3ul)&~3ul;}
+static unsigned long tables_bytes(int ni,int nc,int np,int npc,int hash,int nobjs){
+    return round4(sizeof(vm_t))+round4((unsigned long)ni*sizeof(aw_mwvm_instance_t))+round4((unsigned long)nc*sizeof(aw_mwcell_t))
+          +round4((unsigned long)np*sizeof(parked_t))+round4((unsigned long)npc*sizeof(aw_mwcell_t))
+          +round4((unsigned long)hash*sizeof(uint16_t))+round4((unsigned long)nobjs*sizeof(uint16_t))
+          +round4((unsigned long)nobjs*sizeof(int16_t));
+}
+/* the tables' places in the block (after a memset of the whole block too) */
+static void layout(void){
+    unsigned char *p=(unsigned char *)vmp+round4(sizeof(vm_t));
+    vm.inst=(aw_mwvm_instance_t *)p;p+=round4((unsigned long)size_inst*sizeof(aw_mwvm_instance_t));
+    vm.cells=(aw_mwcell_t *)p;p+=round4((unsigned long)size_cells*sizeof(aw_mwcell_t));
+    vm.parked=(parked_t *)p;p+=round4((unsigned long)size_parked*sizeof(parked_t));
+    vm.park=(aw_mwcell_t *)p;p+=round4((unsigned long)size_park*sizeof(aw_mwcell_t));
+    vm.park_hash=(uint16_t *)p;p+=round4((unsigned long)size_hash*sizeof(uint16_t));
+    vm.obj_order=(uint16_t *)p;p+=round4((unsigned long)size_objs*sizeof(uint16_t));
+    vm.obj_inst=(int16_t *)p;
+}
 
 #define U16(p) ((unsigned)(((p)[0]<<8)|(p)[1]))
 #define S16(p) ((int)(int16_t)U16(p))
@@ -61,19 +101,23 @@ static float f32(const unsigned char *p){uint32_t u=u32(p);float f;memcpy(&f,&u,
 static int32_t short16(int32_t v){return (int32_t)(int16_t)(uint16_t)(v&0xFFFF);}
 
 /* --- loading --- */
-static const unsigned char *section(const char *tag,int *rows,unsigned long *bytes){
-    unsigned n=U16(vm.base+6),i;
+static const unsigned char *dir_section(const unsigned char *base,unsigned long bytes,const char *tag,int *rows,
+                                        unsigned long *len){
+    unsigned n=U16(base+6),i;
     for(i=0;i<n;i++){
-        const unsigned char *d=vm.base+16+16*i;
+        const unsigned char *d=base+16+16*i;
         if(!memcmp(d,tag,4)){
-            uint32_t off=u32(d+4),len=u32(d+12);
-            if(off+len>vm.bytes || off+len<off)return NULL;
+            uint32_t off=u32(d+4),length=u32(d+12);
+            if(off+length>bytes || off+length<off)return NULL;
             if(rows)*rows=(int)u32(d+8);
-            if(bytes)*bytes=len;
-            return vm.base+off;
+            if(len)*len=length;
+            return base+off;
         }
     }
     return NULL;
+}
+static const unsigned char *section(const char *tag,int *rows,unsigned long *bytes){
+    return dir_section(vm.base,vm.bytes,tag,rows,bytes);
 }
 int AW_MwvmSection(const char tag[4],uint32_t *offset,uint32_t *rows,uint32_t *bytes){
     unsigned n,i;
@@ -161,16 +205,45 @@ static int check_code(const unsigned char *code,unsigned long n,int nlocals){
     return 1;
 }
 static aw_drsc_index_t drsc_index;static int drsc_index_state;   /* the DRSC index: 0 not tried, 1 built, -1 failed */
-void AW_MwvmReset(void){if(vmp)memset(vmp,0,sizeof(*vmp));drsc_index_state=0;drsc_index.count=0;}
+void AW_MwvmReset(void){
+    if(vmp){memset(vmp,0,block_bytes);layout();if(size_objs)memset(vm.obj_inst,0xFF,(size_t)size_objs*sizeof(int16_t));}
+    drsc_index_state=0;drsc_index.count=0;
+}
 int AW_MwvmLoaded(void){return vmp && vm.loaded;}
 /* GAME-RECORDER-FIGHT-SEED-61: Random's generator set from the gameplay recorder's seed at its frame 0 */
 void AW_MwvmSeed(unsigned long seed){if(vmp)vm.rng=seed?(uint32_t)seed:0x2545F491u;}
+/* the OBJS rows placed once, sorted by reference (an insertion sort of a few hundred rows, once at load), so an
+ * attach or a detach finds its row with a binary search and notes the instance there (MWSCRIPT-MEMBER-LOOKUP-COST-66) */
+static void sort_objects(void){
+    int i,j;
+    vm.nobj_order=0;
+    for(i=0;i<vm.nobjs;i++){
+        uint32_t r=u32(vm.objs+12*i);uint16_t row=(uint16_t)i;
+        if(!r || (U16(vm.objs+12*i+10)&1))continue;
+        for(j=vm.nobj_order;j>0 && u32(vm.objs+12*vm.obj_order[j-1])>r;j--)vm.obj_order[j]=vm.obj_order[j-1];
+        vm.obj_order[j]=row;vm.nobj_order++;
+    }
+}
 int AW_MwvmLoad(const unsigned char *data,unsigned long bytes,const aw_mwvm_host_t *host){
-    const unsigned char *conf;int rows,i;unsigned long len;
-    if(!vmp && !(vmp=(vm_t *)AW_TryMalloc(sizeof(vm_t))))return 0;   /* once, at load; never while running */
+    const unsigned char *conf,*objs;int rows,i,nobjs=0,ni,nc,np;unsigned long len,npc,need,hash;
+    if(!data || bytes<16 || memcmp(data,"AWMS",4) || U16(data+4)!=1){AW_MwvmReset();if(vmp)vm.loaded=0;return 0;}
+    if(u32(data+12)>bytes || bytes<16+16*(unsigned long)U16(data+6)){AW_MwvmReset();if(vmp)vm.loaded=0;return 0;}
+    /* EXPANSION-SCRIPT-LIMITS-66: the tables' sizes from the file's plan (CONF 20 bytes; an 8-byte CONF, an older
+     * file: the earlier constants), checked against what the tables can address; then the one block for exactly that */
+    conf=dir_section(data,bytes,"CONF",&rows,&len);
+    if(!conf || len<8){AW_MwvmReset();if(vmp)vm.loaded=0;return 0;}
+    ni=AW_MWVM_INSTANCES_DEFAULT;nc=AW_MWVM_CELLS_DEFAULT;np=AW_MWVM_PARKED_DEFAULT;npc=AW_MWVM_PARK_CELLS_DEFAULT;
+    if(len>=20){ni=(int)U16(conf+8);nc=(int)U16(conf+10);np=(int)U16(conf+12);npc=u32(conf+14);}
+    if(ni>AW_MWVM_INSTANCES_MAX || nc>AW_MWVM_CELLS_MAX || np>AW_MWVM_PARKED_MAX || npc>AW_MWVM_PARK_CELLS_MAX){
+        AW_MwvmReset();if(vmp)vm.loaded=0;return 0;}
+    objs=dir_section(data,bytes,"OBJS",&nobjs,&len);
+    if(!objs || nobjs<0 || 12ul*(unsigned long)nobjs>len || nobjs>0xFFFE){AW_MwvmReset();if(vmp)vm.loaded=0;return 0;}
+    for(hash=8;hash<(unsigned long)np+(unsigned long)np/4;hash*=2);   /* at most four fifths full: short probes */
+    need=tables_bytes(ni,nc,np,(int)npc,(int)hash,nobjs);
+    if(vmp && block_bytes!=need){free(vmp);vmp=NULL;}
+    if(!vmp && !(vmp=(vm_t *)AW_TryMalloc(need)))return 0;   /* once, at load; never while running */
+    block_bytes=need;size_inst=ni;size_cells=nc;size_parked=np;size_park=(int)npc;size_hash=(int)hash;size_objs=nobjs;
     AW_MwvmReset();
-    if(!data || bytes<16 || memcmp(data,"AWMS",4) || U16(data+4)!=1)return 0;
-    if(u32(data+12)>bytes || bytes<16+16*(unsigned long)U16(data+6))return 0;
     vm.base=data;vm.bytes=bytes;vm.host=host;
     conf=section("CONF",&rows,&len);
     vm.glob=section("GLOB",&vm.nglob,&len);vm.jrnl=section("JRNL",&vm.njrnl,&len);
@@ -218,7 +291,8 @@ int AW_MwvmLoad(const unsigned char *data,unsigned long bytes,const aw_mwvm_host
         if(off+n>vm.ncode || s[3]>AW_MWVM_STACK || (flags&(AWS_BROKEN|AWS_HANDWRITTEN|AWS_INERT)))continue;
         vm.runnable[i]=(unsigned char)check_code(vm.code+off,n,s[2]);
     }
-    vm.low=0;vm.high=AW_MWVM_CELLS;vm.rng=0x2545F491u;vm.loaded=1;
+    sort_objects();
+    vm.low=0;vm.high=size_cells;vm.rng=0x2545F491u;vm.loaded=1;
     for(i=0;i<vm.nstrt;i++)AW_MwvmStartScript((int)U16(vm.strt+2*i));
     return 1;
 }
@@ -288,44 +362,131 @@ aw_mwcell_t AW_MwvmLocal(int k,int slot){
 }
 
 /* --- instances, parking --- */
+/* EXPANSION-SCRIPT-LIMITS-66: a table the build planned is full: told to the host every time (full(); the engine stops
+ * at a map change, refuses a console's start), else warned once; always counted */
+static void table_full(const char *table,const char *message,int planned,int used,unsigned long *count,
+                       unsigned char *warned){
+    (*count)++;
+    if(vm.host && vm.host->full)vm.host->full(table,planned,used);
+    else if(!*warned && vm.host && vm.host->warn){*warned=1;vm.host->warn(message,-1);}
+}
 static int new_instance(void){
     int k;
     for(k=0;k<vm.ninst;k++)if(!(vm.inst[k].flags&AWI_USED))break;
-    if(k==AW_MWVM_INSTANCES){
-        if(!vm.warned_inst && vm.host && vm.host->warn){vm.warned_inst=1;vm.host->warn("instance table full",-1);}
+    if(k==size_inst){
+        table_full("attached instances","instance table full",size_inst,vm.ninst,&vm.stats.full_instances,&vm.warned_inst);
         return -1;
     }
     if(k==vm.ninst)vm.ninst++;
+    if(vm.ninst>vm.peak_inst)vm.peak_inst=vm.ninst;
     memset(&vm.inst[k],0,sizeof(vm.inst[k]));vm.inst[k].entity=-1;
     return k;
 }
+/* The OBJS row placed as REF (a binary search of the rows sorted by reference), -1 none. The row remembers its attached
+ * instance (obj_inst): a member operation on it is one step, never a walk of the tables
+ * (MWSCRIPT-MEMBER-LOOKUP-COST-66: 307 such operations in the 99 every-frame object scripts of the masters). */
+static int object_of(uint32_t ref){
+    int lo=0,hi=vm.nobj_order-1;
+    while(lo<=hi){
+        int mid=(lo+hi)/2;uint32_t r=u32(vm.objs+12*vm.obj_order[mid]);
+        if(r<ref)lo=mid+1;else if(r>ref)hi=mid-1;else return vm.obj_order[mid];
+    }
+    return -1;
+}
+static void memo_instance(uint32_t ref,int k){int o=object_of(ref);if(o>=0)vm.obj_inst[o]=(int16_t)k;}
+/* The parked store's hash by reference (open addressing, at most four fifths full): a slot holds a parked index + 1,
+ * HASH_EMPTY, or HASH_GONE where a forgotten row was (passed over by a search, reused by an insert; the table is
+ * rebuilt when tombstones take a quarter of it). */
+static unsigned hash_slot(uint32_t ref){uint32_t h=ref*2654435761u;h^=h>>15;return (unsigned)(h&(uint32_t)(size_hash-1));}
 static parked_t *find_parked(uint32_t ref){
-    int i;for(i=0;i<vm.nparked;i++)if(vm.parked[i].reference==ref)return &vm.parked[i];
+    unsigned i,n;
+    if(!ref || !size_hash)return NULL;
+    for(n=0,i=hash_slot(ref);n<(unsigned)size_hash;n++,i=(i+1)&(unsigned)(size_hash-1)){
+        uint16_t e=vm.park_hash[i];
+        if(e==HASH_EMPTY)return NULL;
+        if(e!=HASH_GONE && vm.parked[e-1].reference==ref && !(vm.parked[e-1].flags&PARKED_FREE))return &vm.parked[e-1];
+    }
     return NULL;
 }
-static parked_t *park_slot(uint32_t ref,int script){
-    parked_t *p=find_parked(ref);int n=nlocals(script);
-    if(p)return p->script==script?p:NULL;
-    if(vm.nparked>=AW_MWVM_PARKED || vm.park_used+n>AW_MWVM_PARK_CELLS){
-        if(!vm.warned_park && vm.host && vm.host->warn){vm.warned_park=1;vm.host->warn("parking store full",-1);}
-        return NULL;
+static void hash_put(uint32_t ref,int index){
+    unsigned i,n;
+    for(n=0,i=hash_slot(ref);n<(unsigned)size_hash;n++,i=(i+1)&(unsigned)(size_hash-1)){
+        uint16_t e=vm.park_hash[i];
+        if(e==HASH_GONE)vm.tombstones--;
+        if(e==HASH_EMPTY || e==HASH_GONE){vm.park_hash[i]=(uint16_t)(index+1);return;}
     }
-    p=&vm.parked[vm.nparked++];p->reference=ref;p->script=(uint16_t)script;p->count=(uint16_t)n;
-    p->at=(uint16_t)vm.park_used;vm.park_used+=n;
-    memset(&vm.park[p->at],0,n*sizeof(aw_mwcell_t));
+}
+static void hash_rebuild(void){
+    int k;
+    memset(vm.park_hash,0,(size_t)size_hash*sizeof(uint16_t));vm.tombstones=0;
+    for(k=0;k<vm.nparked;k++)if(!(vm.parked[k].flags&PARKED_FREE))hash_put(vm.parked[k].reference,k);
+}
+static void hash_del(uint32_t ref,int index){
+    unsigned i,n;
+    for(n=0,i=hash_slot(ref);n<(unsigned)size_hash;n++,i=(i+1)&(unsigned)(size_hash-1)){
+        uint16_t e=vm.park_hash[i];
+        if(e==HASH_EMPTY)return;
+        if(e==(uint16_t)(index+1)){vm.park_hash[i]=HASH_GONE;vm.tombstones++;break;}
+    }
+    if(vm.tombstones>size_hash/4)hash_rebuild();
+}
+/* a parked row given back (a forgotten script-made copy): on the free list, its cells kept for the next object that
+ * needs as many */
+static void park_free(parked_t *p){
+    hash_del(p->reference,(int)(p-vm.parked));
+    p->flags=PARKED_FREE;p->reference=(uint32_t)vm.free_parked;vm.free_parked=(int)(p-vm.parked)+1;
+}
+/* REF's parked row for SCRIPT: the one it has (re-keyed to SCRIPT when its script changed and the cells suffice: a
+ * levelled list's placement gives another actor; the old values mean nothing to the new script), a free row with
+ * room, else a new one; NULL when the store the build planned is full (told to the host, counted) */
+static parked_t *park_slot(uint32_t ref,int script){
+    parked_t *p=find_parked(ref),*prev=NULL,*q;int n=nlocals(script),i;
+    if(p){
+        if(p->script==script)return p;
+        if(n<=p->count){p->script=(uint16_t)script;memset(&vm.park[p->at],0,(size_t)n*sizeof(aw_mwcell_t));return p;}
+        park_free(p);p=NULL;
+    }
+    for(i=vm.free_parked;i;i=(int)vm.parked[i-1].reference){
+        q=&vm.parked[i-1];
+        if(q->count>=n){
+            if(prev)prev->reference=q->reference;else vm.free_parked=(int)q->reference;
+            p=q;break;
+        }
+        prev=q;
+    }
+    if(!p){
+        if(vm.nparked>=size_parked){
+            table_full("parked objects","parking store full",size_parked,vm.nparked,&vm.stats.full_parked,&vm.warned_park);
+            return NULL;}
+        if(vm.park_used+n>size_park){
+            table_full("parked values","parking store full",size_park,vm.park_used,&vm.stats.full_park_cells,&vm.warned_park);
+            return NULL;}
+        p=&vm.parked[vm.nparked++];p->count=(uint16_t)n;p->at=(uint16_t)vm.park_used;vm.park_used+=n;
+    }
+    p->reference=ref;p->script=(uint16_t)script;p->flags=0;
+    memset(&vm.park[p->at],0,(size_t)n*sizeof(aw_mwcell_t));
+    hash_put(ref,(int)(p-vm.parked));
     return p;
 }
 /* an attached instance leaves (a map change, a detach): its values parked. SAVE-ITEM-SCRIPT-LOCALS-66: a held item's
  * (AWB_HELD_KEY, MWSCRIPT-INVENTORY-HITONME-62: they were never parked, so each visit started them again and a save had
  * none) only when it holds a value or was parked before: the 491 held items need no room in the store until their
- * script changes something (OpenMW 0.51 keeps an item's locals with the item in its holder's inventory). */
+ * script changes something (OpenMW 0.51 keeps an item's locals with the item in its holder's inventory). A script
+ * without values parks nothing: there is nothing to keep (OpenMW's RefData::setLocals leaves them empty too). */
 static void park_instance(const aw_mwvm_instance_t *in){
     parked_t *p;int i,n=nlocals(in->script),any=0;
+    if(!n)return;
     if(AWB_HELD_KEY(in->reference) && !find_parked(in->reference)){
         for(i=0;i<n && !any;i++)any=vm.cells[in->locals+i].i!=0;
         if(!any)return;
     }
-    if((p=park_slot(in->reference,in->script))!=NULL)memcpy(&vm.park[p->at],&vm.cells[in->locals],p->count*sizeof(aw_mwcell_t));
+    if((p=park_slot(in->reference,in->script))!=NULL){
+        memcpy(&vm.park[p->at],&vm.cells[in->locals],(size_t)n*sizeof(aw_mwcell_t));p->flags&=~PARKED_ATTACHED;}
+}
+/* an object's instance ends (a map change, a detach, a forget): its row forgets it */
+static void end_instance(aw_mwvm_instance_t *in){
+    memo_instance(in->reference,-1);
+    in->flags=0;in->entity=-1;
 }
 void AW_MwvmBeginMap(void){
     int k;
@@ -335,7 +496,7 @@ void AW_MwvmBeginMap(void){
         if(!(in->flags&AWI_USED))continue;
         if(in->flags&AWI_GLOBAL){in->flags|=AWI_CELLCHANGED;in->flags&=~AWI_QUIET;continue;}
         park_instance(in);   /* a held item's too, when it holds a value (SAVE-ITEM-SCRIPT-LOCALS-66) */
-        in->flags=0;
+        end_instance(in);
     }
     while(vm.ninst>0 && !(vm.inst[vm.ninst-1].flags&AWI_USED))vm.ninst--;
     vm.low=0;vm.cursor=0;
@@ -361,39 +522,53 @@ int AW_MwvmScriptHold(int script,int hold){
     if(i<vm.nheld_scripts)vm.story_held[i]=vm.story_held[--vm.nheld_scripts];
     return 1;
 }
+/* the attached instance of REF (an object's, never a global script's), -1 none: its OBJS row remembers it; a reference
+ * no script names (most placements) is looked for among the instances */
+static int attached_instance(uint32_t ref){
+    int k,o=ref?object_of(ref):-1;
+    if(o>=0)return vm.obj_inst[o];
+    for(k=0;k<vm.ninst;k++)if((vm.inst[k].flags&(AWI_USED|AWI_GLOBAL))==AWI_USED && vm.inst[k].reference==ref)return k;
+    return -1;
+}
+static void note_cells(void){int used=vm.low+(size_cells-vm.high);if(used>vm.peak_cells)vm.peak_cells=used;}
 int AW_MwvmAttach(uint32_t reference,int script,int bind_flags,int entity,const float origin[3]){
     int k,n;parked_t *p;aw_mwvm_instance_t *in;
     if(!ON || script<0 || script>=vm.nscrp || !vm.runnable[script] || AW_MwvmScriptHeld(script))return -1;
-    for(k=0;k<vm.ninst;k++)if((vm.inst[k].flags&AWI_USED) && !(vm.inst[k].flags&AWI_GLOBAL) &&
-                               vm.inst[k].reference==reference)return k;   /* attached once */
+    if((k=attached_instance(reference))>=0)return k;   /* attached once */
     n=nlocals(script);
     if(vm.low+n>vm.high){
-        if(!vm.warned_cells && vm.host && vm.host->warn){vm.warned_cells=1;vm.host->warn("local value pool full",-1);}
+        table_full("local values","local value pool full",size_cells,vm.low+(size_cells-vm.high),&vm.stats.full_cells,
+                   &vm.warned_cells);
         return -1;
     }
     k=new_instance();if(k<0)return -1;
     in=&vm.inst[k];in->script=(uint16_t)script;in->reference=reference;in->entity=entity;
     in->flags=AWI_USED|AWI_CELLCHANGED|((bind_flags&AWB_INTERIOR)?AWI_INTERIOR:0);
     if(origin){in->origin[0]=origin[0];in->origin[1]=origin[1];in->origin[2]=origin[2];}
-    in->locals=vm.low;vm.low+=n;in->last_run=vm.now;
+    in->locals=vm.low;vm.low+=n;in->last_run=vm.now;note_cells();
     p=find_parked(reference);
-    if(p && p->script==script)memcpy(&vm.cells[in->locals],&vm.park[p->at],n*sizeof(aw_mwcell_t));
-    else memset(&vm.cells[in->locals],0,n*sizeof(aw_mwcell_t));
+    if(p && p->script==script)memcpy(&vm.cells[in->locals],&vm.park[p->at],(size_t)n*sizeof(aw_mwcell_t));
+    else memset(&vm.cells[in->locals],0,(size_t)n*sizeof(aw_mwcell_t));
+    if(p)p->flags|=PARKED_ATTACHED;   /* the row is a stale copy while the object is attached: the save skips it */
+    memo_instance(reference,k);
     return k;
 }
 /* An attached object left the loaded map (PositionCell to another place, v0.0.62): its values are parked as a map
  * change parks them, and it no longer runs here; attached again where it arrives. 1 when one was attached. */
 int AW_MwvmDetach(uint32_t reference){
-    int k;
-    if(!ON || !reference)return 0;
-    for(k=0;k<vm.ninst;k++){
-        aw_mwvm_instance_t *in=&vm.inst[k];
-        if(!(in->flags&AWI_USED) || (in->flags&AWI_GLOBAL) || in->reference!=reference)continue;
-        park_instance(in);   /* a held item's too, when it holds a value (SAVE-ITEM-SCRIPT-LOCALS-66) */
-        in->flags=0;in->entity=-1;
-        return 1;
-    }
-    return 0;
+    int k=ON && reference?attached_instance(reference):-1;
+    if(k<0)return 0;
+    park_instance(&vm.inst[k]);   /* a held item's too, when it holds a value (SAVE-ITEM-SCRIPT-LOCALS-66) */
+    end_instance(&vm.inst[k]);
+    return 1;
+}
+/* EXPANSION-SCRIPT-LIMITS-66: REFERENCE is forgotten (aw_mwvm.h): a script-made copy's key is free again, so its
+ * instance ends without parking and its parked row goes to the free list; nothing of it is saved or restored. */
+int AW_MwvmForget(uint32_t reference){
+    int k=ON && reference?attached_instance(reference):-1,any=0;parked_t *p;
+    if(k>=0){end_instance(&vm.inst[k]);any=1;}
+    if(ON && (p=find_parked(reference))!=NULL){park_free(p);any=1;}
+    return any;
 }
 /* The entity block of reference REF in a map's entity text (its "aw_ref" key): a pointer at its '{' and *LENGTH the
  * bytes up to and with its '}', or NULL. Pure text: the host's PositionCell reads it from the loaded map or from the
@@ -431,11 +606,12 @@ static int global_instance(int script,int create){
     if(k>=0 || !create)return k;
     n=nlocals(script);
     if(vm.high-n<vm.low){
-        if(!vm.warned_cells && vm.host && vm.host->warn){vm.warned_cells=1;vm.host->warn("local value pool full",-1);}
+        table_full("local values","local value pool full",size_cells,vm.low+(size_cells-vm.high),&vm.stats.full_cells,
+                   &vm.warned_cells);
         return -1;
     }
     k=new_instance();if(k<0)return -1;
-    vm.high-=n;
+    vm.high-=n;note_cells();
     vm.inst[k].script=(uint16_t)script;vm.inst[k].flags=AWI_USED|AWI_GLOBAL|AWI_CELLCHANGED;
     vm.inst[k].locals=vm.high;vm.inst[k].last_run=vm.now;
     memset(&vm.cells[vm.high],0,n*sizeof(aw_mwcell_t));
@@ -480,11 +656,6 @@ int AW_MwvmHeldFind(uint32_t actor){
     return -1;
 }
 /* --- the scripts' own state for a save (CELL-CHANGES-59 slice 5, aw_mwvm.h) --- */
-static int attached_instance(uint32_t ref){
-    int k;
-    for(k=0;k<vm.ninst;k++)if((vm.inst[k].flags&(AWI_USED|AWI_GLOBAL))==AWI_USED && vm.inst[k].reference==ref)return k;
-    return -1;
-}
 /* CAPTAIN-EXIT-DOOR-DEAD-AFTER-REENTRY-66: the player's use of REFERENCE (aw_mwvm.h). Its script takes it only while
  * it holds AWI_TAKES_USE (it read OnActivate since its own Activate), as OpenMW 0.51 mwworld/refdata.cpp activate()
  * suppresses the object's own use only after onActivate(); a script that has returned before its OnActivate line
@@ -515,9 +686,9 @@ void AW_MwvmLocalsEach(void (*fn)(void *user,uint32_t reference,int script,int g
         if((in->flags&(AWI_USED|AWI_GLOBAL))==AWI_USED && in->reference)
             fn(user,in->reference,in->script,0,0,&vm.cells[in->locals],nlocals(in->script));
     }
-    for(k=0;k<vm.nparked;k++){
+    for(k=0;k<vm.nparked;k++){   /* a row whose object is attached now is a stale copy; a free row is nobody's */
         const parked_t *p=&vm.parked[k];
-        if(attached_instance(p->reference)<0)fn(user,p->reference,p->script,0,0,&vm.park[p->at],p->count);
+        if(!(p->flags&(PARKED_ATTACHED|PARKED_FREE)))fn(user,p->reference,p->script,0,0,&vm.park[p->at],nlocals(p->script));
     }
     for(s=0;s<vm.nscrp;s++)
         if((k=vm.global_instance[s])>=0)
@@ -526,7 +697,8 @@ void AW_MwvmLocalsEach(void (*fn)(void *user,uint32_t reference,int script,int g
 void AW_MwvmLocalsReset(void){
     int k;
     if(!ON)return;
-    vm.nparked=0;vm.park_used=0;vm.warned_park=0;
+    vm.nparked=0;vm.park_used=0;vm.free_parked=0;vm.tombstones=0;vm.warned_park=0;
+    if(size_hash)memset(vm.park_hash,0,(size_t)size_hash*sizeof(uint16_t));
     for(k=0;k<vm.ninst;k++){
         aw_mwvm_instance_t *in=&vm.inst[k];
         if(!(in->flags&AWI_USED))continue;
@@ -556,7 +728,7 @@ int AW_MwvmLocalGet(uint32_t reference,int slot,int *script,aw_mwcell_t *out){
         if(slot<0 || slot>=nlocals(vm.inst[k].script))return 0;
         *script=vm.inst[k].script;*out=vm.cells[vm.inst[k].locals+slot];return 1;
     }
-    if(!ON || !(p=find_parked(reference)) || slot<0 || slot>=p->count)return 0;
+    if(!ON || !(p=find_parked(reference)) || slot<0 || slot>=nlocals(p->script))return 0;
     *script=p->script;*out=vm.park[p->at+slot];
     return 1;
 }
@@ -645,9 +817,9 @@ static aw_mwcell_t *member(int object,int slot,int create){
         return k>=0?&vm.cells[vm.inst[k].locals+slot]:NULL;
     }
     if(!ref)return NULL;
-    for(k=0;k<vm.ninst;k++)
-        if((vm.inst[k].flags&(AWI_USED|AWI_GLOBAL))==AWI_USED && vm.inst[k].reference==ref)
-            return vm.inst[k].script==script?&vm.cells[vm.inst[k].locals+slot]:NULL;
+    /* MWSCRIPT-MEMBER-LOOKUP-COST-66: one step, never a walk of the tables: the row remembers its attached instance,
+     * else the parked store's hash finds the object with one probe */
+    if((k=vm.obj_inst[object])>=0)return vm.inst[k].script==script?&vm.cells[vm.inst[k].locals+slot]:NULL;
     p=create?park_slot(ref,script):find_parked(ref);
     return p && p->script==script?&vm.park[p->at+slot]:NULL;
 }
@@ -895,6 +1067,9 @@ static int run(int k){
 done:
     in=&vm.inst[k];
     in->last_run=vm.now;
+    /* MWSCRIPT-MEMBER-QUIET-READER-66: another script reads this one's variables (AWS_SHARED, the compiler's
+     * whole-program pass): its own change moves the state generation, so a quiet reader runs again and sees it */
+    if(changed && (U16(s+4)&AWS_SHARED))vm.generation++;
     if(changed || acted || cell_changed)in->flags&=~AWI_QUIET;else in->flags|=AWI_QUIET;
     in->flags&=~AWI_CELLCHANGED;
     in->generation=vm.generation;
@@ -956,10 +1131,10 @@ int AW_MwvmRunDialogue(int script,uint32_t reference,int speaker){
     if(vm.high-n<vm.low || (k=new_instance())<0)return 0;
     vm.high-=n;in=&vm.inst[k];
     in->script=(uint16_t)script;in->flags=AWI_USED|AWI_GLOBAL;in->reference=reference;in->locals=vm.high;in->last_run=vm.now;
-    if(p && p->count>=n)memcpy(&vm.cells[vm.high],&vm.park[p->at],n*sizeof(aw_mwcell_t));
-    else memset(&vm.cells[vm.high],0,n*sizeof(aw_mwcell_t));
+    if(p && nlocals(p->script)>=n)memcpy(&vm.cells[vm.high],&vm.park[p->at],(size_t)n*sizeof(aw_mwcell_t));
+    else memset(&vm.cells[vm.high],0,(size_t)n*sizeof(aw_mwcell_t));
     run(k);
-    if(p && p->count>=n)memcpy(&vm.park[p->at],&vm.cells[vm.high],n*sizeof(aw_mwcell_t));
+    if(p && nlocals(p->script)>=n)memcpy(&vm.park[p->at],&vm.cells[vm.high],(size_t)n*sizeof(aw_mwcell_t));
     vm.high+=n;in->flags=0;
     while(vm.ninst>0 && !(vm.inst[vm.ninst-1].flags&AWI_USED))vm.ninst--;
     vm.stats.dialogue_runs++;
@@ -1051,3 +1226,11 @@ int AW_MwvmFindDialogueRows(int (*read)(void *user,uint32_t offset,void *out,uin
     }
     return chosen;
 }
+/* EXPANSION-SCRIPT-LIMITS-66 (aw_mwvm.h): the plan the tables were made from, their use, the block's bytes */
+void AW_MwvmPlan(int *instances,int *cells,int *parked,int *park_cells){
+    *instances=vmp?size_inst:0;*cells=vmp?size_cells:0;*parked=vmp?size_parked:0;*park_cells=vmp?size_park:0;
+}
+void AW_MwvmUsage(int *instances,int *cells,int *parked,int *park_cells){
+    *instances=ON?vm.peak_inst:0;*cells=ON?vm.peak_cells:0;*parked=ON?vm.nparked:0;*park_cells=ON?vm.park_used:0;
+}
+unsigned long AW_MwvmTableBytes(void){return vmp?block_bytes:0;}

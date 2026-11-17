@@ -127,6 +127,10 @@ class Table:
 
 
 SCRIPT_DIALOGUE = 512   # a dialogue result script (_dlg_N): run when its answer is shown, never attached or started
+# MWSCRIPT-MEMBER-QUIET-READER-66: another script reads this script's variables ("object".var, GETM): a change of its
+# own variable moves the engine's state generation, so a quiet reader runs again and sees it (compiler.py; the engine's
+# AWS_SHARED). Cheaper than making the readers VOLATILE: they wake only when the value changes, not every frame.
+SCRIPT_SHARED = 1024
 
 
 def fnv1a(raw):

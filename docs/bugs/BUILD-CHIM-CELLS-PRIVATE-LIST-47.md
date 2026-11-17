@@ -38,12 +38,35 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-11: reported in v0.0.36
+- 2026-10-11: seen again in v0.0.36: Built with the coastline selection of the v0.0.36-dev5 tracker file, kept outside the source tree
+- 2026-10-13: seen again in v0.0.38: Built with the full selection of 310 cells (CSV), kept outside the source tree
+- 2026-10-14: seen again in v0.0.39-rc1: Built with the same 310-cell CSV, kept outside the source tree
+- 2026-10-16: seen again in v0.0.41: Built with the dev5 regional cell list, kept outside the source tree
+- 2026-10-17: seen again in v0.0.42: Built with the release cell list without 98 seabed cells, kept outside the source tree
+- 2026-10-19: seen again in v0.0.43: Built with CHIMport batch 5 (1,394 cells), kept outside the source tree
+- 2026-10-19: seen again in v0.0.44: Built with CHIMport batch 5 (1,394 cells), kept outside the source tree
+- 2026-10-20: seen again in v0.0.45: Built with CHIMport batch 5 (1,394 cells), kept outside the source tree
+- 2026-10-20: seen again in v0.0.46: Built with CHIMport batch 5 (1,394 cells), kept outside the source tree
+- 2026-10-21: seen again in v0.0.47-dev2: Built with CHIMport batch 5 (1,394 cells), kept outside the source tree; found while checking the dev2 build options
+- 2026-10-21: BUILD-CHIM-CELLS-PRIVATE-LIST-47 and CHIM-ACTOR-TABLE-OFF-IN-GAME-47 registered: BUILD-CHIM-CELLS-PRIVATE-LIST-47, persisting since v0.0.36: every release image was built with a CHIM cell list kept outside the source tree, and ...
+- 2026-10-24 05:05 +0300: seen again in v0.0.48-rc1: PERSISTING: the rc1 image was built with the private batch5 cell list (same 1348 CHIM cells as the in-tree default); the release guard refuses it
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.47-dev2 (21 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 11 times; something has to be done](#persisting-reported-11-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -146,6 +169,7 @@ Family: Builder breaks and reproducibility (`builder-from-scratch`). The reposit
 - [BUILD-LAVA-TERRAIN-BUDGET-38](BUILD-LAVA-TERRAIN-BUDGET-38.md): Detailed lava terrain exceeds region storage budget
 - BUILD-LAYER-DATA-MWAD-SHADOWED-64 (no report page): The Bloodmoon layer data stage stops with mwad is not a package in a MiniWind build
 - [BUILD-LIGHT-THREADS-32](BUILD-LIGHT-THREADS-32.md): ericw light is not byte-reproducible with more than one thread
+- BUILD-MERGED-MASTER-IN-CHECKOUT-66 (no report page): The merged master of the selected game files is written into the source checkout's out folder also when --workspace names another folder; with a read-only checkout the build stops at its room grounding check before the first stage
 - [BUILD-MINIWIND-SEYDA-COMPILE-42](BUILD-MINIWIND-SEYDA-COMPILE-42.md): A CHIM MiniWind of another town stops at its bsp stage: it compiles the whole Seyda Neen town, which exceeds the BSP29 node limit
 - BUILD-MINIWIND-SEYDA-KELP-INDEX-54 (no report page): A Seyda Neen MiniWind can never pass: the chim-town-seyda stage stops because the kelp additions need the original scenery index, which a MiniWind plan does not build
 - [BUILD-NO-OVERLAY-32](BUILD-NO-OVERLAY-32.md): The builder has no engine-overlay command; dev measurements used a private script

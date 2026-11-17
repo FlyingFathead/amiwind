@@ -15,6 +15,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.32-dev
+- 2026-10-08: ENGINE-SUBMODEL-LIMIT-32, TOOL-SIMPLIFY-MANIFOLD-32, SHELL-TEXTURE-VOTE-32: distant shell prototype: Map loading does not check the submodel count; mesh reduction can open closed meshes; the shell texture vote picks door textures for walls.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 
 ## Status: 8 October 2026

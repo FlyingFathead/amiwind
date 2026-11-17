@@ -19,11 +19,23 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-22: reported in v0.0.48-dev2
+- 2026-11-11 00:59 +0200: seen again in v0.0.64-dev4: PERSISTING: the v0.0.64-dev4 full build (run 2026_11_10_v0.0.64-dev4_full-v0.0.64-dev4-try2_dbe3869) again reported 2 unexpected rebuilds: intro (replaced outputs) and census (refused with identical outputs).
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Status: 22 October 2026](#status-22-october-2026)
 - [Symptom](#symptom)
 - [The refusal reasons (B's build-state.json, stage_cache.not_reused and each step's reuse_refused)](#the-refusal-reasons-bs-build-statejson-stage_cachenot_reused-and-each-steps-reuse_refused)
@@ -165,6 +177,7 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - [BUILD-REUSE-CUTOFF-MODE-36](BUILD-REUSE-CUTOFF-MODE-36.md): Early cutoff compared file modes with their write bits: a stage reused by hard link (read-only) never matched the same bytes written fresh, so 10 stages after dev3's bsp rerun were refused
 - BUILD-REUSE-FOREIGN-DIRS-52 (no report page): A reused stage recreates, as empty folders, the folders another stage filled beside it: the area stage then stops on its own room folder
 - BUILD-REUSE-KEY-WALK-LISTED-51 (no report page): The read records of the CHIM world stages list almost every folder of the checkout, so a new bug page refuses their narrowed reuse
+- BUILD-REUSE-NEVER-READ-STOPS-66 (no report page): The reuse check stops stages whose key changed only in code they never ran or read, and redoes their stored units
 - BUILD-REUSE-OUTPUTS-DIFFER-48 (no report page): Eight stages were rebuilt because their earlier outputs differed from their records (character, reading, world-ui, actor-contact, world-terrain and others)
 - [BUILD-REUSE-PLAN-ENV-36](BUILD-REUSE-PLAN-ENV-36.md): The standalone reuse plan reports environment changes the real build does not have
 - BUILD-REUSE-RC1-RECORDS-REFUSED-48 (no report page): Every stage that ran the idle-worker watcher or read the CHIM label module was marked not reusable: rc1-try2 had 24 unexpected rebuilds

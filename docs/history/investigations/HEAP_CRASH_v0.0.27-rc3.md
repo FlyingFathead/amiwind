@@ -94,8 +94,8 @@ Replacement private image: assembled with both HDF filesystem readbacks passed.
 Verified target-fixed version: **pending**. No cold/warm lifecycle trace or
 exact-route target acceptance is recorded.
 
-A separate extra-HDF streaming lookup issue is documented as MEM-EXTRA-HDF in
-[the bug journal](../../BUG_JOURNAL.md); do not conflate its potential full-file
+A separate extra-HDF streaming lookup issue is documented as MEM-EXTRA-HDF (in the bug tracker
+[MEM-EXTRA-HDF-27](../../bugs/MEM-EXTRA-HDF-27.md)); do not conflate its potential full-file
 fallback peak with the recovered sn012 duplicate-copy crash.
 
 ## Producer's note: mitigation is NOT a fix

@@ -20,7 +20,7 @@ music crackles at some transitions remain (see Known issues).
   black hole in the ceiling below) and a tapestry inside a bookshelf. rc1 uses
   the correct object list with the same flames; owner-accepted in the rc1
   playtest.
-  ([CENSUS-ENTITIES-30](../../BUG_JOURNAL.md#census-entities-30-misplaced-objects-in-the-census-and-excise-office-7-october-2026))
+  ([CENSUS-ENTITIES-30](../../bugs/CENSUS-ENTITIES-30.md))
 - **The Balmora Temple is whole again.** The scene converter applied the
   rotation stored on some meshes' NIF root node; Morrowind ignores it and keeps
   only the root's position and scale. The lower-level Velothi walls were turned
@@ -78,9 +78,9 @@ compared in place or turned off if something looks wrong.
 - **Load freeze (SEYDA-LOAD-HANG-30):** in about 5 of 70 automated FS-UAE runs
   of a Seyda Neen route, the game stopped during a region load. The game was
   waiting for a disk read that never completed; the cause is open. See the
-  [journal](../../BUG_JOURNAL.md).
+  [bug tracker](../../BUGS.md).
 - **Seyda Neen maps cannot yet be regenerated** from the public tools
-  ([BUILD-SEYDA-REGEN-30](../../BUG_JOURNAL.md)).
+  ([BUILD-SEYDA-REGEN-30](../../bugs/BUILD-SEYDA-REGEN-30.md)).
 - **Glow and flames** reach other maps only as they are rebuilt; the prison
   ship's cabin lantern is still unlit. The flame look is still being tuned.
 - One Balmora exterior placement (`furn_pathspear_03`) still has the root

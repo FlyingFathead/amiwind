@@ -1,6 +1,6 @@
 # Voiced dialogue: event lookup and runtime plan
 
-_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -179,7 +179,7 @@ map-owned cache/entity/lip references. At most four detached tails share128KiB,
 including PCM headers; refusal paths are explicit. Existing gain and background
 music buffering are unchanged. Source mixer tests pass, but audible target
 continuity and worst-case memory acceptance remain open. See
-[TRANSITION-VOICE-29](journals/BUG_JOURNAL-v0.0.29.md#transition-voice-29-active-speech-stops-during-automatic-cell-handoff-open).
+[TRANSITION-VOICE-29](BUGS.md).
 
 Modal background freeze/blackout is independent of audio. Character selection,
 journals and other blocking overlays keep the soundtrack serviced continuously;

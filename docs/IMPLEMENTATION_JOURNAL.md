@@ -1,6 +1,6 @@
 # Implementation journal: mappings, failures and decisions
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -1135,4 +1135,5 @@ of this source handoff.
 Positive selection of the base ESM/BSA and known asset folders replaces scanning
 unrelated root files as inputs. Remote-work transfer ZIPs are not installation
 assets in GOG/Steam. Preserve original files and the maintainer's archives unchanged.
-See RELEASE-v0.0.25-rc2.md and BUG_JOURNAL.md for reproduction and validation.
+See RELEASE-v0.0.25-rc2.md and INPUT-TRANSFER-ZIPS-25 in the bug tracker (BUGS.md) for reproduction and
+validation.

@@ -22,7 +22,7 @@ playable, native rc2 binary or complete rc2 image is delivered with this source.
   v0.0.24 and v0.0.24-rc4 journal pictures, links and packaging entries.
 
 The reconciliation and source choices are recorded in RECONCILE-v0.0.25-rc1.md;
-new builder regression details are in BUG_JOURNAL.md. Host checks and archive
+new builder regression details are in the bug tracker (docs/BUGS.md). Host checks and archive
 identity are recorded in validation/rc2-source.json. Earlier native screenshots
 and walking/input/HDF evidence remain evidence for their original executable,
 not a claim that rc2 has been run natively. The owner compiles and validates rc2.

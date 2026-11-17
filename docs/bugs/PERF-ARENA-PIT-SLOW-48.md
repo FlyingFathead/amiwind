@@ -29,12 +29,25 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-23: reported in v0.0.48-dev2
+- 2026-10-27 17:45 +0200: seen again in v0.0.54-dev1: PERSISTING (27 October 2026): the maintainer (17:31 +0200): the Arena Pit draws a lot of unseen geometry (the upper balconies and far tiers) and tanks the frame rate.
+- 2026-10-27 23:25 +0200: seen again in v0.0.54-dev1: Again on v0.0.54-dev1 (27 October 2026): reported by the maintainer at 17:31 +0200; the cause was found at 17:45 +0200 by the streaming worker (an A/B is in progress).
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.54-dev1 (28 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Status: 27 October 2026](#status-27-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -176,5 +189,6 @@ Family: Rendering cost and visibility (`render-performance`). Read the visibilit
 - SKEL-RUNTIME-COST-52 (no report page): The skeletal prototype poses every vertex twice a drawn frame, with three divisions and three float-to-integer conversions each: it must cost what a baked frame costs
 - [SPRITE-BAD-TYPE-THREADED-56](SPRITE-BAD-TYPE-THREADED-56.md): R_DrawSprite: Bad sprite type ends a load (dbg aw hors 0) on Amiberry with the threaded CPU: the game stays on Loading
 - [TOWN-VIS-OCCLUSION-31](TOWN-VIS-OCCLUSION-31.md): Converted buildings, rooms and rocks do not block Quake visibility (func_wall)
+- [TREE-SPRITE-DEPTH-23](TREE-SPRITE-DEPTH-23.md): A tree sprite was cut off against the background: a signed depth compared as unsigned
 
 <!-- END GENERATED CATEGORY -->

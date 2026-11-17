@@ -1,6 +1,6 @@
 # Storage profiles and disk-backed preprocessing
 
-_Last updated with AmiWind v0.0.66-dev5 (15 November 2026)._
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -11,6 +11,7 @@ _Last updated with AmiWind v0.0.66-dev5 (15 November 2026)._
 - [Drive size and IDE cylinders](#drive-size-and-ide-cylinders)
 - [The image layout gate](#the-image-layout-gate)
 - [Directory hash chains and disk buffers](#directory-hash-chains-and-disk-buffers)
+- [How the partitions are written](#how-the-partitions-are-written)
 - [Historical v0.0.25 single-HDF layout](#historical-v0025-single-hdf-layout)
 - [Preferred future content placement](#preferred-future-content-placement)
   - [CPU, memory and loading costs](#cpu-memory-and-loading-costs)
@@ -176,6 +177,52 @@ files) was already short, its longest lookup 30 header blocks, and gets 40 buffe
 For an A/B build, the image step's environment selects the methods before: `AMIWIND_CHAIN_ORDER=as-written` keeps the
 writer's chain order, `AMIWIND_PARTITION_BUFFERS=30` gives every partition 30 buffers. `tools/ffs_chains.py IMAGE
 --partition DH0` prints the lookup figures of a partition of a drive (read only).
+
+## How the partitions are written
+
+The image step writes its partitions at the same time, one worker each: the boot partition (DH0), the CHIM world
+volume and any volume of open-world maps (`tools/world_volumes.py` `write_layout`). Each partition is written by
+`tools/ffs_write.py`.
+
+Until v0.0.66-dev11 every partition was one xdftool command queue (create, format, every folder, every file), cut into
+batches of about 1,700 files to stay below the system's argument limit. xdftool finds the folder of each file it writes
+by comparing the path with the entries of every folder on the way, one at a time, and each batch opens the image
+again, so a folder's entries come back in the order of its hash table. Every file paid a scan of its folder and of the
+folders above it, and that cost grows with the square of a folder's entries. On the v0.0.66-dev11 boot partition
+(29,385 files; 7,757 entries directly in `id1/progs`, 7,086 in `id1/sound/pool`, 3,865 in `id1/maps`) the queue made
+223 million name comparisons, 26 % more than on the v0.0.66-dev1 one (176.9 million, 26,532 files): a profile put 91 %
+of the write in those scans. The boot partition took 86 to 109 s to write in every build from v0.0.66-dev2 on
+(66 to 82 s before), and the dev11 build failed its performance guard on it (BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66).
+
+Now xdftool still creates and formats each partition (and installs the boot block), and the builder makes every
+folder and file in the same order through the same file system code, in one pass, each in the folder object it goes
+into, so nothing is looked up by name. The same code allocates the same blocks in the same order: the partition is
+the one the queue wrote. Written both ways with the clock held still (every write dates its blocks with the moment it
+runs), the v0.0.66-dev11 boot partition had the same SHA-256 (`tests/test_ffs_write.py` checks the same on small trees,
+with many batches, a partition whose allocation wraps past its end, and files that need extension blocks). A file's
+data is written after its blocks are allocated, one write per run of consecutive blocks.
+
+Measured on the v0.0.66-dev11 payload (16 November 2026), one partition at a time:
+
+| Partition | The queue | Written directly |
+| --- | --- | --- |
+| DH0, 29,385 files, 2,019 MiB, with the chain relink and the check | 115.5 s (file writes 114.4 s) | 16.8 s (format 0.4 s, folders and files 9.8 s on one core, file data 4.9 s) |
+| The CHIM world volume, 35,658 files, 1,408 MiB (without the 1,348 frame maps the image step adds), with the relink, the readback of every file and the layout gate | 41.8 s (write 27.8 s) | 22.1 s (write 8.0 s) |
+
+The file data is written on one thread: on four threads it took 8.2 s and on eight 13.0 s, against 4.9 s on one,
+since every write goes into the same image file. The allocation itself is one pass in write order, because the order
+decides where every block goes.
+
+For an A/B build, `AMIWIND_PARTITION_WRITER=xdftool` in the image step's environment writes every partition with the
+queue, the method before.
+
+A partition whose contents, size, volume name and writer are those of a partition an earlier build wrote is not
+written again: it is copied from the partition cache with its SHA-256 checked (`tools/partition_cache.py`; see
+[Build cache](BUILD_CACHE.md#hierarchical-output-hashes)). Between the v0.0.66-dev9, dev10 and dev11 builds the CHIM
+world volume's 35,658 files were the same; of the boot partition's 29,385 files, 3 and then 4 changed (the engine
+binaries, then also the game settings) and the two version-named icon files took the new version's name. Measured on the v0.0.66-dev11 inputs, a CHIM world volume
+taken from the cache took 4.5 s against 29.6 s written and stored, and a boot partition 6.8 s against 13.9 s. Not yet
+measured on a build of v0.0.66-dev12.
 
 ## Historical v0.0.25 single-HDF layout
 

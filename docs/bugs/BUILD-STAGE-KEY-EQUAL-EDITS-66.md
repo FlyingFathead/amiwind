@@ -9,9 +9,12 @@
 | Where | tools/build_cache.py plan_reuse; the chim, world-scenery and world-flora stage keys (engine/aga/src/aw_state.h, tools/chim/world.py, tools/unit_store.py) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.66-dev3 (last seen) |
+| Persists in | fixed in v0.0.66-dev3 |
 | Severity | medium: the CHIM world stage (about 31 min) runs again for an edit with no effect on it; the stages after it are kept when it writes the same files |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
+| Fix commit | `5818ef07` |
+| Fixed on | 2026-11-15 |
+| Planning item | `DEV3-REUSE-PROOFS-66` |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
 | Playtest version | v0.0.66-dev3 unit check (392721a7) |
 | From commit | source 392721a, engine 392721a, CHIM world 392721a |
@@ -21,11 +24,33 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.66-dev3 (5818ef07) | 2026-11-15 | gate 10818 passed on c0ab8f11, which holds it | a stage whose key differs only by edits proven to change none of its outputs is taken from the earlier run |
+| shipped | a numbered build | v0.0.66-dev3 build 2026_11_15_v0.0.66-dev3_full-v0.0.66-dev3_c0ab8f1 | 2026-11-15 | the delivered build | the build holds 5818ef07 |
+| confirmed by a build | a numbered build | v0.0.66-dev3 build 2026_11_15_v0.0.66-dev3_full-v0.0.66-dev3_c0ab8f1 | 2026-11-15 | the dev3 build log's reuse plan | the CHIM world and the world stages, whose keys moved only by edits proven to change none of their outputs, were taken from the dev2 build (46 of 48 stages reused); a builder fix, no play check applies |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-15: reported in v0.0.66-dev3
+- 2026-11-15: fixed in source: a gated commit, v0.0.66-dev3 (5818ef07); gate 10818 passed on c0ab8f11, which holds it: a stage whose key differs only by edits proven to change none of its outputs is taken from the earlier run
+- 2026-11-15: shipped: a numbered build, v0.0.66-dev3 build 2026_11_15_v0.0.66-dev3_full-v0.0.66-dev3_c0ab8f1; the delivered build: the build holds 5818ef07
+- 2026-11-15: confirmed by a build: a numbered build, v0.0.66-dev3 build 2026_11_15_v0.0.66-dev3_full-v0.0.66-dev3_c0ab8f1; the dev3 build log's reuse plan: the CHIM world and the world stages, whose keys moved only by edits proven to change none of their outputs, were taken from the dev2 build (46 of 48 stages reused); a builder fix, no play check applies
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.66-dev3 (15 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Status: 15 November 2026](#status-15-november-2026)
 - [Symptom](#symptom)
 - [Cause](#cause)
@@ -131,6 +156,7 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - BUILD-REUSE-FOREIGN-DIRS-52 (no report page): A reused stage recreates, as empty folders, the folders another stage filled beside it: the area stage then stops on its own room folder
 - [BUILD-REUSE-INTRO-CENSUS-REPLACED-48](BUILD-REUSE-INTRO-CENSUS-REPLACED-48.md): A reused MiniWind rooms build rebuilt the intro and census stages (replaced outputs) and its Balmora interiors (4 s to 1m21s)
 - BUILD-REUSE-KEY-WALK-LISTED-51 (no report page): The read records of the CHIM world stages list almost every folder of the checkout, so a new bug page refuses their narrowed reuse
+- BUILD-REUSE-NEVER-READ-STOPS-66 (no report page): The reuse check stops stages whose key changed only in code they never ran or read, and redoes their stored units
 - BUILD-REUSE-OUTPUTS-DIFFER-48 (no report page): Eight stages were rebuilt because their earlier outputs differed from their records (character, reading, world-ui, actor-contact, world-terrain and others)
 - [BUILD-REUSE-PLAN-ENV-36](BUILD-REUSE-PLAN-ENV-36.md): The standalone reuse plan reports environment changes the real build does not have
 - BUILD-REUSE-RC1-RECORDS-REFUSED-48 (no report page): Every stage that ran the idle-worker watcher or read the CHIM label module was marked not reusable: rc1-try2 had 24 unexpected rebuilds

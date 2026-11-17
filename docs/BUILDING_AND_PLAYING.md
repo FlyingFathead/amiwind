@@ -1,6 +1,6 @@
 # Building and playing
 
-_Last updated with AmiWind v0.0.66-dev2 (13 November 2026)._
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 How to build AmiWind from your own Morrowind copy and run it in an emulator. The short version is in the [README](../README.md#build-it-from-your-own-morrowind).
 
@@ -74,6 +74,11 @@ With `--reuse-from` or `--reuse-all-available`, `--check` also runs the build's 
 code 6 and its `STOP` lines when the build would stop there. A full build's image step stops early, with a named
 cause, on a staged file of an unknown format, a bracket fungus floating away from its tree and an actor shortfall
 against the original: [the checks at the image step](BUILD_PROFILE.md#the-checks-a-contributor-meets-at-the-image-step).
+
+**When a build fails:** send the file `logs/BUILD-REPORT-<run>.txt` from the build workspace (`out/logs/` by default;
+the build prints where it is). It holds what failed with the stage's own log, every setting, the versions, which copy of
+the game data and the stage plan in one file, and it stays on your computer until you send it
+([when a build fails](LINUX_BUILD.md#when-a-build-fails)).
 
 **Build speed:** `--jobs N` sets the exact worker count. While a build runs,
 `./build.sh status out/build/NAME` shows its progress, the cores in use and an

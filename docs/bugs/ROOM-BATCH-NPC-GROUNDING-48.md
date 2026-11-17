@@ -9,9 +9,12 @@
 | Where | config/actor_grounding.json; tools/actor_grounding_census.py (exterior only) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.66-dev2 (last seen) |
+| Persists in | fixed in v0.0.66-dev2 |
 | Severity | critical: Regressed in v0.0.66-dev2 (was high): every batch past the rooms the towns list is refused until its residents are classified |
 | Family | Content silently missing from a build (`build-content-missing`) |
+| Fix commit | `85255fdf` |
+| Fixed on | 2026-11-14 |
+| Planning item | `REGISTER-STALE-SWEEP-66` |
 | Came back (regression) | in v0.0.66-dev2 (fixed in v0.0.48-dev2 before) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
 | From commit | source f2b9693, engine f2b9693, CHIM world f2b9693 |
@@ -20,11 +23,34 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.66-dev2 (85255fdf) | 2026-11-14 | tools/actor_grounding_census.py measures the rooms the build converts; the expansions' classes in a file beside the base game's; the build preflight checks every room resident before any stage | every resident of the selected masters' rooms has a grounding class, so the room batches stage no longer stops on an unclassified resident |
+| shipped | the v0.0.66-dev2 release build | v0.0.66-dev2 (3988c6e4, build 2026_11_14_v0.0.66-dev2_full) | 2026-11-15 | the delivered dev2 build holds the commit (its source commit is a descendant of the fix) | a numbered build carries the fix |
+| confirmed by a build | the v0.0.66-dev2 and later chain builds | v0.0.66-dev2 (3988c6e4, build 2026_11_14_v0.0.66-dev2_full) | 2026-11-15 | the chim-room-batches stage ran in full (1,059 room units, 2,147 resident bakes) and the build was delivered; every later dev build reused or ran the stage without a refusal | a builder-only fix: the stage that was refused runs to its end, nothing changes in play |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-23: reported in v0.0.48-dev2
+- 2026-11-14: fixed in source: a gated commit, v0.0.66-dev2 (85255fdf); tools/actor_grounding_census.py measures the rooms the build converts; the expansions' classes in a file beside the base game's; the build preflight checks every room resident before any stage: every resident of the selected masters' rooms has a grounding class, so the room batches stage no longer stops on an unclassified resident
+- 2026-11-14 02:06 +0200: came back in v0.0.66-dev2 (fixed in v0.0.48-dev2 before): Seen again with both expansions on: the room batches stage stopped on 179 NPCs in 78 Tribunal and Bloodmoon rooms without a class; the list had gained their rooms, not their classes
+- 2026-11-15: shipped: the v0.0.66-dev2 release build, v0.0.66-dev2 (3988c6e4, build 2026_11_14_v0.0.66-dev2_full); the delivered dev2 build holds the commit (its source commit is a descendant of the fix): a numbered build carries the fix
+- 2026-11-15: confirmed by a build: the v0.0.66-dev2 and later chain builds, v0.0.66-dev2 (3988c6e4, build 2026_11_14_v0.0.66-dev2_full); the chim-room-batches stage ran in full (1,059 room units, 2,147 resident bakes) and the build was delivered; every later dev build reused or ran the stage without a refusal: a builder-only fix: the stage that was refused runs to its end, nothing changes in play
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.66-dev2 (14 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Status: 14 November 2026 (came back in v0.0.66-dev2)](#status-14-november-2026-came-back-in-v0066-dev2)
 - [Status: 23 October 2026](#status-23-october-2026)
 - [Symptom](#symptom)
@@ -151,6 +177,7 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [BUILD-MINIWIND-BALMORA-ASSUMED-36](BUILD-MINIWIND-BALMORA-ASSUMED-36.md): A MiniWind image of another town fails its content fingerprint: the Balmora region table was always required
 - [BUILD-MINIWIND-DIRECT-START-TOWN-36](BUILD-MINIWIND-DIRECT-START-TOWN-36.md): A MiniWind build of another town refuses its own direct start: the start check assumed Balmora
 - [BUILD-NIGHT-TABLES-31](BUILD-NIGHT-TABLES-31.md): Repository image builds have no night lamp, glowing glass or location fog tables
+- [BUILD-NPC-GALLERY-MISSING-25](BUILD-NPC-GALLERY-MISSING-25.md): Normal images had no NPC gallery: the builder never ran the gallery stage (Gallery catalogue missing)
 - [BUILD-RUN-FOLDER-PRECREATED-36](BUILD-RUN-FOLDER-PRECREATED-36.md): Every real CHIM build is refused at its start: the plan writes the world map manifest into the run folder before the run makes it
 - [BUILD-STANDALONE-STAGES-32](BUILD-STANDALONE-STAGES-32.md): Door overlay and interior section tools are outside the builder; their use in v0.0.31 is unverified
 - [CHIM-CELL-FEATURE-LIST-INCOMPLETE-38](CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md): Cell feature list incomplete: original placements and gameplay support are not reconciled with packaged coverage

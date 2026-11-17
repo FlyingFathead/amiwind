@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""One bug-tracking system: register, report pages and journal must agree.
+"""One bug tracker: the data, the generated pages and the report pages must agree.
 
 See docs/bugs/README.md. docs/bugs/bugs.json lists every bug exactly once and
-docs/BUGS.md is generated from it; every report page and every current journal entry
-has a register row; register links resolve, including heading anchors.
+docs/BUGS.md is generated from it; every report page has a tracker row; links resolve,
+including heading anchors. The hand-written bug journal was merged into the entries on
+16 November 2026 (their reports, history and closure steps) and the journal files removed.
 """
 import json
 from pathlib import Path
@@ -17,11 +18,9 @@ sys.path.insert(0, str(ROOT / 'tools'))
 import bug_register  # noqa: E402
 DOCS = ROOT / 'docs'
 REGISTER = DOCS / 'BUGS.md'
-JOURNAL = DOCS / 'BUG_JOURNAL.md'
-FROZEN = [DOCS / 'journals' / 'BUG_JOURNAL-v0.0.29.md', DOCS / 'journals' / 'BUG_JOURNAL-v0.0.31.md',
-          DOCS / 'journals' / 'BUG_JOURNAL-v0.0.34.md', DOCS / 'journals' / 'BUG_JOURNAL-v0.0.35-v0.0.36.md',
-          DOCS / 'journals' / 'BUG_JOURNAL-v0.0.37-v0.0.41.md', DOCS / 'journals' / 'BUGS-NOTES-v0.0.29.md',
-          DOCS / 'history' / 'checkpoints' / 'BUGS-v0.0.29-RC1.md', DOCS / 'history' / 'checkpoints' / 'RC2_ISSUE_CHECKPOINT.md']
+# the hand-written bug journals (docs/BUG_JOURNAL.md, docs/journals/BUG_JOURNAL-*.md, BUGS-NOTES-v0.0.29.md) were merged
+# into the entries and removed on 16 November 2026; the two checkpoints stay as frozen history
+FROZEN = [DOCS / 'history' / 'checkpoints' / 'BUGS-v0.0.29-RC1.md', DOCS / 'history' / 'checkpoints' / 'RC2_ISSUE_CHECKPOINT.md']
 FROZEN_BANNER = 'Frozen history:'
 LINK = re.compile(r'\]\(([^)\s]+)\)')
 
@@ -53,15 +52,6 @@ def register_rows():
     bugs = bug_register.load()
     return [[b['id'], b['title'], b['state'], b['fixed_in'] or '-', b['status'] +
              (' [Report](%s)' % b['report'] if b['report'] else '')] for b in bugs]
-
-
-def journal_ids():
-    ids = []
-    for line in JOURNAL.read_text(encoding='utf-8').splitlines():
-        m = re.match(r'## ([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+):', line)
-        if m:
-            ids.append(m.group(1))
-    return ids
 
 
 FACTS = dict(reported_by='owner', found_date='2026-10-08', found_in='v0.0.32-dev3', where='Vivec Arena preview',
@@ -138,9 +128,46 @@ class BugTrackerTest(unittest.TestCase):
         pages = sorted(p.stem for p in (DOCS / 'bugs').glob('*.md') if p.name not in bug_register.GENERATED_PAGES)
         self.assertEqual([p for p in pages if p not in ids], [], 'report pages without a register row')
 
-    def test_every_journal_entry_is_registered(self):
-        ids = {r[0] for r in register_rows()}
-        self.assertEqual([j for j in journal_ids() if j not in ids], [], 'journal IDs without a register row')
+    def test_closure_steps_are_checked(self):
+        # the closure schema (16 November 2026): steps {stage, who, where, when, how, why} in time order; a bug fixed in
+        # v0.0.66 or later needs a shipped step naming fixed_in and a confirmed step; older fixed bugs keep their state
+        step = dict(stage='fixed in source', who='a gated commit', where='v0.0.66-dev2 (505a6332)', when='2026-11-13',
+                    how='tests.test_x', why='the check passes')
+        shipped = dict(step, stage='shipped', where='v0.0.66-dev2 (3988c6e4)', when='2026-11-15')
+        seen = dict(step, stage='confirmed in play', where='v0.0.66-dev5 (abc1234)', when='2026-11-15', how='journey step 3')
+        old = bug(id='TEST-OLD-32', state='fixed', fixed_in='v0.0.40', persists_in='fixed in v0.0.40')
+        self.assertEqual(bug_register.validate([old]), [])
+        new = bug(id='TEST-NEW-66', state='fixed', fixed_in='v0.0.66-dev2', persists_in='fixed in v0.0.66-dev2')
+        self.assertTrue(any('"shipped" closure step' in e for e in bug_register.validate([new])))
+        self.assertTrue(any('"confirmed ..." closure step' in e for e in bug_register.validate([dict(new, closure=[step, shipped])])))
+        self.assertEqual(bug_register.validate([dict(new, closure=[step, shipped, seen])]), [])
+        wrong = dict(shipped, where='v0.0.66-dev3 (c0ab8f11)')
+        self.assertTrue(any('must name fixed_in' in e for e in bug_register.validate([dict(new, closure=[step, wrong, seen])])))
+        for bad in ([dict(step, stage='done')], [dict(step, where='commit 505a6332')], [dict(step, when='13 Nov')],
+                    [seen, step], [{k: v for k, v in step.items() if k != 'why'}]):
+            self.assertTrue(bug_register.validate([dict(bug(), closure=bad)]), 'bad closure passed: %r' % bad)
+        open_shipped = dict(bug(), closure=[step, shipped])
+        self.assertEqual(bug_register.validate([open_shipped]), [])
+        self.assertEqual(bug_register.state_cell(open_shipped), 'open (shipped, awaiting confirmation)')
+        self.assertEqual(bug_register.state_cell(dict(new, closure=[step, shipped, seen])), 'fixed (confirmed in play)')
+        b = bug()
+        bug_register.add_step(b, **seen)
+        bug_register.add_step(b, **step)
+        self.assertEqual([s['stage'] for s in b['closure']], ['fixed in source', 'confirmed in play'])
+        with self.assertRaises(ValueError):
+            bug_register.add_step(b, **step)
+        bug_register.add_history(b, '2026-11-14', 'The cause: a stale table.', 'v0.0.66-dev2')
+        self.assertEqual(bug_register.validate([b]), [])
+        self.assertTrue(any('history' in e for e in bug_register.validate([dict(bug(), history=[{'at': 'yesterday', 'note': 'x'}])])))
+        kinds = [k for _, k, _ in bug_register.events(b)]
+        self.assertEqual(kinds, ['reported', 'fixed in source', 'history', 'confirmed in play'])
+        self.assertIn('## Timeline', bug_register.timeline_block(b))
+        self.assertIn('| fixed in source | a gated commit |', bug_register.timeline_block(b))
+        # a regression keeps the steps of the fix that did not hold as history
+        fixed = dict(new, closure=[step, shipped, seen])
+        bug_register.reopen(fixed, 'v0.0.66-dev9', '2026-11-16')
+        self.assertNotIn('closure', fixed)
+        self.assertEqual(len(fixed['history']), 3)
 
     def test_register_links_resolve(self):
         problems = []
@@ -398,7 +425,7 @@ class BugTrackerTest(unittest.TestCase):
         import release
         self.assertEqual(release.TEXT_LIMIT, 1048576)       # raised from 256 KiB on 2026-11-05
         self.assertEqual(release.LARGE_TEXT_LIMIT, 16777216)
-        files = [REGISTER, JOURNAL, *sorted(p for p in (DOCS / 'bugs').iterdir() if p.is_file()),
+        files = [REGISTER, *sorted(p for p in (DOCS / 'bugs').iterdir() if p.is_file()),
                  *sorted((DOCS / 'bugs' / 'archive').glob('*.json'))]
         files += sorted((DOCS / 'releases' / 'patches').glob('PATCH-v*.json'))  # whitespace baselines (RELEASE-PATCH-SIZE-33)
         # 2026-10-11 coordinator: bugs.json warned at 85 % until the second archive rotation
@@ -563,7 +590,7 @@ class BugTrackerTest(unittest.TestCase):
 
     def test_tracker_files_ship_in_release(self):
         shipped = set(json.loads((ROOT / 'tools' / 'release-files.json').read_text(encoding='utf-8')))
-        files = [REGISTER, JOURNAL, *FROZEN, *sorted((DOCS / 'bugs').iterdir())]
+        files = [REGISTER, *FROZEN, *sorted((DOCS / 'bugs').iterdir())]
         missing = [p.relative_to(ROOT).as_posix() for p in files
                    if p.is_file() and p.relative_to(ROOT).as_posix() not in shipped]
         self.assertEqual(missing, [], 'tracker files missing from tools/release-files.json')
@@ -575,7 +602,7 @@ class BugTrackerTest(unittest.TestCase):
         page = DOCS / 'bugs' / 'CHIM_TRACKER.md'
         self.assertTrue(page.is_file(), 'docs/bugs/CHIM_TRACKER.md missing: run tools/bug_register.py render')
         text = page.read_text(encoding='utf-8')
-        want = bug_register.chim_tracker(bugs, JOURNAL.read_text(encoding='utf-8'), bug_register.chim_version())
+        want = bug_register.chim_tracker(bugs, '', bug_register.chim_version())
         self.assertEqual(text, want, 'docs/bugs/CHIM_TRACKER.md is stale: run tools/bug_register.py render')
         chim = [b for b in bugs if 'chim' in b]
         self.assertTrue(chim)
@@ -665,7 +692,8 @@ class BugTrackerTest(unittest.TestCase):
         self.assertIn('[CHIM-ZONE-FULL-33](CHIM-ZONE-FULL-33.md)', part)
         self.assertIn('source: CHIM 0.1.0, format 0.5, engine f95cf75', part)
         self.assertIn('CHIM-STAIRGATE-SLOW-33', page.split('\n## Performance\n', 1)[1])
-        self.assertIn('(../BUG_JOURNAL.md#chim-zone-full-33-found-9-october-2026): CHIM-ZONE-FULL-33', page)
+        latest = page.split('## Latest changes', 1)[1].split('\n## ', 1)[0]
+        self.assertIn('[CHIM-ZONE-FULL-33](CHIM-ZONE-FULL-33.md): reported in v0.0.33-dev', latest)
         self.assertIn('2 CHIM bugs: 2 open, 0 fixed, 0 closed.', page)
         self.assertNotIn('TEST-BUG-32', page)
 
@@ -794,15 +822,20 @@ class BugTrackerTest(unittest.TestCase):
                                              pages=pages)
             self.assertIn('[TEST-BUG-32](TEST-BUG-32.md) ([1 frame](../images/%s))' % good, page)
 
-    def test_journal_changes_are_newest_first_and_capped(self):
-        bugs = [bug(id='CHIM-A-33', chim='format'), bug(id='TEST-B-32')]
-        journal = '# Bug journal\n\n<!-- contents start -->\n## Contents\n\n- CHIM-A-33\n\n<!-- contents end -->\n\n'
-        journal += ''.join('## Entry %d, 9 October 2026\n\n%s\n\n' % (i, 'CHIM-A-33' if i % 2 else 'TEST-B-32')
-                           for i in range(30))
-        got = bug_register.journal_changes(bugs, journal)
+    def test_chim_changes_are_newest_first_and_capped(self):
+        # since 16 November 2026 the CHIM tracker's latest changes are the CHIM bugs' own dated events (the hand-written
+        # journal's headings before: journal_changes, kept for the frozen journals)
+        chim = bug(id='CHIM-A-33', chim='format', history=[{'at': '2026-10-%02d' % d, 'note': 'fact %d' % d}
+                                                             for d in range(9, 30)])
+        bugs = [chim, bug(id='TEST-B-32', history=[{'at': '2026-10-31', 'note': 'not a CHIM bug'}])]
+        got = bug_register.chim_changes(bugs)
         self.assertEqual(len(got), 10)
-        self.assertEqual([g[0] for g in got[:2]], ['Entry 1, 9 October 2026', 'Entry 3, 9 October 2026'])
-        self.assertEqual(got[0][1:], ('entry-1-9-october-2026', ['CHIM-A-33']))
+        self.assertEqual([g[0] for g in got[:2]], ['2026-10-29', '2026-10-28'])
+        self.assertTrue(all(g[1]['id'] == 'CHIM-A-33' for g in got))
+        self.assertEqual(got[0][2:], ('history', 'fact 29'))
+        journal = '# Bug journal\n\n' + ''.join('## Entry %d, 9 October 2026\n\n%s\n\n' % (i, 'CHIM-A-33' if i % 2 else 'TEST-B-32')
+                                               for i in range(30))
+        self.assertEqual(len(bug_register.journal_changes(bugs, journal)), 10)
 
     def test_a_deferral_to_a_version_expires_with_it(self):
         # REGISTER-DEFERRAL-EXPIRES-53: "deferred ... to v0.0.52" is no reason inside v0.0.52 or later

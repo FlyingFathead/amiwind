@@ -30,12 +30,31 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: seen again in v0.0.32-dev1: BUILD-IMAGE-SERIAL-32: image step on one core
+- 2026-10-08: seen again in v0.0.32-dev: BUILD-IMAGE-UNDERUSED-32: parts of the image step still serial
+- 2026-10-11: reported in v0.0.36-dev3
+- 2026-10-11: IMAGE-ONE-HDF-TARGET-36, BUILD-CHIM-FRAME-SWAP-LATE-36, BUILD-IMAGE-AUDIO-SERIAL-36 and BUILD-PIPELINE-UNDERUTILIZATION-36: Four new entries from the v0.0.36-dev3 build, all open.
+- 2026-10-11: BUILD-IMAGE-CHIM-MAPS-SERIAL-36: BUILD-IMAGE-CHIM-MAPS-SERIAL-36: the image step writes the 270 CHIM region-cell maps one by one on half a core, silently.
+- 2026-10-11 00:43 +0300: seen again in v0.0.36-dev3: audio payload and CHIM maps serial, stats on one core
+- 2026-10-13: STAIRS-MOLAG-ACCESS-38: BUILD-IMAGE-CHIM-MAPS-SERIAL-36 (13 October 2026): Full v0.0.38 at c2c2050 completed image assembly but failed the regional-frame CPU guard: 360 frames,267 seconds,1.01/16 cores.
+- 2026-10-18: BUILD-IMAGE-REGION-MAPS-SERIAL-43 and BUILD-PASS-KEY-TOP-BROAD-43: BUILD-IMAGE-REGION-MAPS-SERIAL-43: the v0.0.43-dev2 full build failed its perf guard on "Image: CHIM region frame maps" (1,295 frames, 61 s on 1.13 of 20 cores).
+- 2026-10-18 11:21 +0300: seen again in v0.0.43-dev2: persisting: region frame maps phase on 1.13 of 20 cores again (61 s, perf guard FIX-NOW); task preparation and world reads serial: BUILD-IMAGE-REGION-MAPS-SERIAL-43
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Status: 11 October 2026](#status-11-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -178,7 +197,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-IMAGE-FRAME-MAP-HEAP-SERIAL-36](BUILD-IMAGE-FRAME-MAP-HEAP-SERIAL-36.md): The image step's CHIM frame-map heap check runs on one core: 66 s to 4.5 min per build while 23 cores idle
 - [BUILD-IMAGE-HASH-UNDERUSED-36](BUILD-IMAGE-HASH-UNDERUSED-36.md): The image step hashes 34,592 payload files on 3 of 24 cores (one file per pool task)
 - [BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36](BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36.md): The image step's world map heap audit estimates 170 maps on 5.3 of 24 cores
-- BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66 (no report page): The image step of the v0.0.66-dev9 build wrote its partitions in 107 seconds where the earlier build took 67
+- [BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66](BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66.md): The image step of the v0.0.66-dev9 build wrote its partitions in 107 seconds where the earlier build took 67
 - [BUILD-IMAGE-NOT-INCREMENTAL-33](BUILD-IMAGE-NOT-INCREMENTAL-33.md): The image step redoes every per-map pass and the whole pack on every build
 - [BUILD-IMAGE-NPC-CHECKS-LATE-44](BUILD-IMAGE-NPC-CHECKS-LATE-44.md): The image step's player body and guard torch bakes fail only at the end of a full build instead of before the expensive stages
 - [BUILD-IMAGE-REGION-MAPS-SERIAL-43](BUILD-IMAGE-REGION-MAPS-SERIAL-43.md): The image step's CHIM frame-map phases run on one core: the world read six times, ground traces on whole frames
@@ -296,6 +315,8 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - NPC-BAKE-STAGES-OVERRUN-62 (no report page): The new seam and floor character bake made every stage that bakes characters run far past its history: room batches about 2 h 40 min, actor library about 40 min, player bodies 35+ min
 - [NPC-BAKED-WHOLE-DUPLICATION-33](NPC-BAKED-WHOLE-DUPLICATION-33.md): Every NPC appearance is baked whole: shared body parts are converted again for each actor, and equipment cannot change
 - [NPC-LIBRARY-NO-UNIT-CACHE-63](NPC-LIBRARY-NO-UNIT-CACHE-63.md): The NPC appearance bakes of the actor library stage had no unit cache, so every rebuild of the stage baked all 418 appearances again (about 45 minutes)
+- PARTITION-CACHE-FIXED-WORKERS-66 (no report page): The new partition cache hashed its files on a fixed eight threads instead of the stage's own allowance
+- PERF-GUARD-BASIS-BY-COUNT-66 (no report page): The performance guard judges the image step's partition write by the number of partitions and not by their size, so a slowdown back to the old time would pass
 - [PERF-GUARD-RESIDENT-BUSY-HOST-57](PERF-GUARD-RESIDENT-BUSY-HOST-57.md): The dev5 full build's perf guard failed chim-town-balmora and chim-town-vivec_city build_resident as slower (129 s, was 52 s; 147 s, was 62 s) while two other builds ran beside it: contention, not code
 - PLAYER-VIEW-SKIN-ROWS-STOP-62 (no report page): The image step's player view stopped the v0.0.62 final build after 1 h 13 min: an Alias skin rows overflow ended it instead of trying the next smaller body
 - RELEASE-GUARD-SLOW-CLONE-51 (no report page): The release guard, the fail-fast first step of a release, took 6 minutes on about 0.14 of a core: its release check clones the whole repository through the Windows-mounted drive

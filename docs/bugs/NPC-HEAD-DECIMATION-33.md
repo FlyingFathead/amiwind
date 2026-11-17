@@ -25,12 +25,31 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-09: reported in v0.0.33-dev
+- 2026-10-09: NPC-HEAD-DECIMATION-33 and NPC-DAGOTH-BODY-DECIMATION-33: original heads: NPC-HEAD-DECIMATION-33: the maintainer saw Fargoth's face mangled.
+- 2026-10-14: UI-INVENTORY-INTEGRATION-40: scoped native equipment: UI-INVENTORY-INTEGRATION-40/INVENTORY-CATALOG-LOOKUP-40: actual names/icons, equip, modal pause and Russula persistence scoped; missing resources separate.
+- 2026-10-18: NPC-HEAD-DECIMATION-33 locked head reducer and INTERIOR-MORAG-TONG-FPS-43 decided: Decided for the project, 18 October 2026 (the maintainer): plants and trees in interiors are sprites by default (INTERIOR-MORAG-TONG-FPS-43; the page ranks ...
+- 2026-10-18: INTERIOR-MORAG-TONG-FPS-43 and NPC-HEAD-DECIMATION-33 persisting: NPC-HEAD-DECIMATION-33 persisting: Angahran (a gash in her head) and Shannat Pansamsi (a crude, flat face) in the same room.
+- 2026-10-18 17:55 +0300: seen again in v0.0.43-dev2: maintainer: Angahran (Morag Tong Guild) has a dark gash/hole in the head mesh at close range; check head triangles against the original NIF
+- 2026-10-18 17:58 +0300: seen again in v0.0.43-dev2: maintainer: Shannat Pansamsi (Morag Tong Guild, ref 67641, a_76b87bee3530.mdl) has a crude, flattened face
+- 2026-10-19: NPC-HEAD-DECIMATION-33: the player body falls back to the previous head reducer: NPC-HEAD-DECIMATION-33: the v0.0.44-dev1 build stopped in its image step on the Argonian female player body.
+- 2026-10-19 11:30 +0300: seen again in v0.0.44-dev1: image step stopped on the Argonian female player body with the locked head reducer, fixed by the same fallback as the NPC bake
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Status: 9 October 2026](#status-9-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -271,6 +290,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - NPC-BAKE-FALLBACK-62 (no report page): Characters the new seam and floor bake cannot fit in the alias budget are baked a second time with the v0.0.62-dev1 body rules
 - [NPC-BAKE-VERTEX-32](NPC-BAKE-VERTEX-32.md): NPC resident baking can exceed the alias vertex budget
 - NPC-CAST-MAGICKA-NOT-PAID-66 (no report page): A fighter's spell costs it no magicka: the cast's payment names the wrong stat
+- [NPC-CONVERSATION-FACING-23](NPC-CONVERSATION-FACING-23.md): NPCs do not turn to face the player in conversation
 - [NPC-DAGOTH-BODY-DECIMATION-33](NPC-DAGOTH-BODY-DECIMATION-33.md): Dagoth Ur's body is decimated; his whole model exceeds the alias ceiling
 - [NPC-FEMALE-SKELETON-33](NPC-FEMALE-SKELETON-33.md): Female humans are posed on the male skeleton file (base_anim.nif), the original uses base_anim_female.nif
 - [NPC-FOLLOW-FLOORS-33](NPC-FOLLOW-FLOORS-33.md): The test companion cannot find stairs to another floor of an interior; it is placed beside the player after 6 seconds
@@ -314,6 +334,6 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - SWEEP-SEYDA-EIGHT-FAIL-59 (no report page): dbg sweep reports 8 failing entities in Seyda Neen on a v0.0.59-dev3 MiniWind with the placed world items; the Census Office map reported 3 in v0.0.58 sessions
 - SWIM-BAKED-CLOTHES-60 (no report page): Swimming in third-person view shows default clothes instead of the player's own
 - TOMB-NO-CREATURES-60 (no report page): Samarys Ancestral Tomb has no ghosts, skeletons or other creatures
-- WANDER-DOOR-RULE-66 (no report page): A wandering resident can stop at a destination right by a door and stand there; the original sends an idle wanderer near a door walking
+- [WANDER-DOOR-RULE-66](WANDER-DOOR-RULE-66.md): A wandering resident can stop at a destination right by a door and stand there; the original sends an idle wanderer near a door walking
 
 <!-- END GENERATED CATEGORY -->

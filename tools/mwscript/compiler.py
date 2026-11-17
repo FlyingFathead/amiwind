@@ -3,7 +3,7 @@
 from collections import Counter
 
 from .codegen import (Program, ScriptCompiler, CompileError, SCRIPT_BROKEN, SCRIPT_START, SCRIPT_GLOBAL,
-                      SCRIPT_HANDWRITTEN, SCRIPT_INERT, SCRIPT_DIALOGUE, EFFECT_OPS, effect_op)  # noqa: F401 (EFFECT_OPS: callers)
+                      SCRIPT_HANDWRITTEN, SCRIPT_INERT, SCRIPT_DIALOGUE, SCRIPT_SHARED, EFFECT_OPS, effect_op)  # noqa: F401 (EFFECT_OPS: callers)
 from .awms import CARRIED
 from .functions import lookup
 from .lexer import LexError
@@ -117,6 +117,12 @@ def compile_program(data, media=None, scripts=None, handwritten=None, rooms=None
                 if obj['script'] is not None:
                     read_by_others.add(obj['script'])
     dialogue_read = dialogue_read_slots(data, program)
+    # MWSCRIPT-MEMBER-QUIET-READER-66: a script whose variables another script reads is SHARED: its own change of a
+    # variable moves the engine's state generation, so a quiet reader wakes and sees it (the alternative, marking the
+    # readers VOLATILE, would run them every frame; 9 object scripts of the masters read such a variable)
+    for index in read_by_others:
+        if out[index].error is None:
+            out[index].flags |= SCRIPT_SHARED
     for index, c in enumerate(out):
         if c.error is None and index not in read_by_others and \
                 not any(effect_op(name, args) or (name in ('SETL', 'SETLS') and args[0] in dialogue_read.get(c.ident, ()))

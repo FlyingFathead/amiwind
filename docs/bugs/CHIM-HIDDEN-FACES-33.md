@@ -20,11 +20,25 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.33-dev
+- 2026-10-08: v0.0.33-dev1: BUILD-ENV-FINGERPRINT-GLOBAL-33, merges for v0.0.33-dev1: BUILD-ENV-FINGERPRINT-GLOBAL-33: the v0.0.33-dev1 build reused 0 of 34 stages from the v0.0.32 release run, because the stair rule setting is an environment variable that goes into ...
+- 2026-10-08: Seyda Neen on CHIM: first world, stair gate and findings: The CHIM builder regenerates Seyda Neen's exterior (format 0.5) and validates it, but the stair gate fails: the rule does not clear the exterior lighthouse ...
+- 2026-10-14: Renewed RC2 gameplay reports: 12 October 2026 — CHIM-HIDDEN-FACES-33 / CHIM-MOLAG-MEMORY-38: opt-in Molag Mar (10,1) terrain cut after optimizer removes 1,510 placed and 1,244 stored faces and lowers the modelled peak by 149,408 B.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Status: 8 October 2026](#status-8-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -193,6 +207,7 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - CHIM-STORE-ONE-AT-A-TIME-64 (no report page): The engine streams one CHIM store at a time, so frames of a second store cannot sit beside the first in the open world
 - [CHIM-TERRAIN-GRAFT-33](CHIM-TERRAIN-GRAFT-33.md): CHIM chunk terrain is a brush entity, not part of the world tree, so it does not occlude
 - [CHIM-TERRAIN-HULL-BEVELS-33](CHIM-TERRAIN-HULL-BEVELS-33.md): A standing box rests above the ground at convex CHIM terrain edges
+- [CHIM-TERRAIN-RECORDS-SIZE-46](CHIM-TERRAIN-RECORDS-SIZE-46.md): CHIM terrain records were stored whole: 489.4 MB of the v0.0.46 world's frame segments
 - [CHIM-TEXTURE-SPECKS-33](CHIM-TEXTURE-SPECKS-33.md): CHIM-drawn surfaces show bright single-texel specks that legacy frames do not
 - [CHIM-TILT-VARIANTS-SPLIT-33](CHIM-TILT-VARIANTS-SPLIT-33.md): Tilted placements each get their own model variant: 39,103 extra model variants on the base island, breaking store-once
 - [CHIM-TOWN-HEAP-ROUTED-HULL-36](CHIM-TOWN-HEAP-ROUTED-HULL-36.md): With the routed terrain hull for every chunk, Balmora and Seyda Neen rings no longer fit the CHIM zone

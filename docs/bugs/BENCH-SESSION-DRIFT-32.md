@@ -15,6 +15,18 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.33-dev
+- 2026-10-08: Image-parallel follow-ups merged: Fixed in source on the v0.0.32 development line, not yet shipped (state stays open): BUILD-LIGHT-THREADS-32 (one light thread for every map through one helper; maps lit with several threads before now ...
+- 2026-10-08: CHIM world-format follow-up findings: FFS sweep, walk replay and per-placement visibility (branch v0.0.33-chim-format).
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 ## Status: 8 October 2026

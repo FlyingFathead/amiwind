@@ -1,6 +1,6 @@
 # Asset coverage
 
-_Last updated with AmiWind v0.0.56 (30 October 2026)._
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -207,7 +207,7 @@ or worldwide coverage. None of the six plants resolved empty in this run.
 Native empty-state behavior, walked boundaries, mixed world/town representation,
 audible pickup/music quality and intro_docks memory headroom remain untested.
 Quickload also returned hands and torch to put-away state; see the open
-SAVE-EQUIPMENT-29 observation in [the bug journal](BUG_JOURNAL.md).
+SAVE-EQUIPMENT-29 observation in [the bug tracker](BUGS.md).
 
 The Docker asset-progress reconciliation counted 20,943 unique source paths and
 17,992 packaged artifacts. Exact outputs from the supplied media batch matched
@@ -564,7 +564,7 @@ Dev4 playtesting reports visible torch response on walls/floors but not nearby
 NPC bodies. This is an **open runtime-lighting issue**, not evidence of missing
 NPC model assets. The affected actor denominator is unknown; conversion and
 packaged-asset counts remain unchanged. See
-[TORCH-NPC-LIGHT-29](journals/BUG_JOURNAL-v0.0.29.md#torch-npc-light-29-nearby-npcs-do-not-respond-to-torchlight-open).
+[TORCH-NPC-LIGHT-29](BUGS.md).
 A no-lightdata saturation correction now passes source/raster/night-palette checks; actual NPC playtest acceptance remains pending. Packaged counts are unchanged.
 
 

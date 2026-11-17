@@ -15,6 +15,19 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.32-dev
+- 2026-10-08: HEAP-SEYDA-OVERLAP-32: temporary pre-CHIM heap bypass for three Seyda Neen maps: The from-scratch build dev3-r2 stopped at the strict heap gate on the recorded maps sn019, sn026 and sn035 (modelled reserve allowance only, worst -238,180 ...
+- 2026-10-08: Builder harvest step findings: Found while moving harvest into the builder (0331f76).
+- 2026-10-08: Vivec cantons import and loader rework findings: Four cantons convert within all limits; the Temple, St.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 ## Status: 8 October 2026

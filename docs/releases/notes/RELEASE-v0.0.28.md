@@ -47,7 +47,7 @@ the ceiling-start arrival correction, the latest cloud-speed change and
 guard voices are unchanged. The current WinUAE listening report still notes
 intermittent artifacts, mostly at load-ins and in heavy scenes. The audio issue
 remains open; publication proceeds with this known limitation, with further
-audio investigation deferred until after publication. See [WIN-05](../../journals/BUG_JOURNAL-v0.0.29.md#win-05-intermittent-winuae-background-music-snapping---investigation-open).
+audio investigation deferred until after publication. See [WIN-05](../../BUGS.md).
 The compiler retains 86 warnings; these are successful builds, not warning-free
 builds. The earlier 816-test/739,156-byte result is
 superseded for this source. Compilation and host fixtures do not establish
@@ -94,7 +94,7 @@ ordered opposite to the renderer's convention. The 051 repair changes only the
 signed surfedge ordering, retaining collision, materials and other BSP lumps.
 A matched-camera diagnostic and the initial combined-engine town replay both
 show restored textured ground. These bounded views do not certify every map or
-route. See [the bug journal](../../BUG_JOURNAL.md).
+route. See [the bug tracker](../../BUGS.md).
 
 The 050 correction re-clips actual float32 serialized coordinates in seven maps:
 13 replacement faces add 1,776 bytes while collision, PVS and actor bindings remain

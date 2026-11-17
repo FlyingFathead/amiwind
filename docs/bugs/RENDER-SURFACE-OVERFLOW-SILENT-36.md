@@ -18,6 +18,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-10: reported in v0.0.36-dev3
+- 2026-10-10: CHIM-PREDICT-VIVEC-LOW-36 and CHIM-DETAIL-BUDGET-SEAM-UNAUDITED-36; CHIM-FRAME-COORD-RANGE-33 measured: Found by the Vivec on CHIM preflight (milestone M3, phase 1: read-only, no build).
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.41 (16 October 2026)._
 
 ## Status: 10 October 2026
@@ -113,6 +124,7 @@ Family: Engine table limits (`engine-limits`). Fixed engine tables (models, enti
 - [MODEL-SLOTS-256-32](MODEL-SLOTS-256-32.md): Some Vivec interiors exceed the engine's 256 model slots; the heap check does not catch it
 - MWVM-INSTANCES-256-66 (no report page): At most 256 scripted objects run per loaded map: a map with more leaves the rest without their scripts
 - MWVM-PARKING-STORE-SMALL-66 (no report page): The store that keeps script values of unloaded maps holds 2,304 objects and 8,192 values: with the expansions the game has about 3,278 scripted objects with about 11,000 values
+- MWVM-PLACE-COPIES-FOUR-66 (no report page): The script engine plans 4 live copies per scripted Place row in one map, and a fifth copy is refused
 - NET-VIVEC-ENTITY-PACKET-OVERFLOW-66 (no report page): In Vivec the server's entity update overflows the client datagram every frame: packet overflow printed 1,938 times during one 45-second stay
 - [RENDER-VISEDICTS-OVERFLOW-32](RENDER-VISEDICTS-OVERFLOW-32.md): Entities beyond MAX_VISEDICTS (1,112) are dropped silently
 - SAVE-ACTOR-ROWS-256-66 (no report page): The save keeps at most 256 saved actor rows: at the 256th row the capture stops and the rest of that place's NPCs (their greetings, place and health) are left out of the save without a word; only NPCs were looked at

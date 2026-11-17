@@ -29,12 +29,32 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-07: reported in v0.0.31-dev2
+- 2026-10-08: v0.0.31: FOG-TOWN-HEAVY-32: fog settings identical to v0.0.31: `fog-locations.txt`, the game configs, palette, fog and sky lookups and the 540 town fog distance equal v0.0.31; location fog is off by default.
+- 2026-10-08: v0.0.32-dev1: v0.0.32-dev1 delivery and smoke test findings: The recorded Seyda Neen maps are rewritten by later image passes (high priority for v0.0.32 final), the Arena and Balmora are heavily fogged, the world disk image is just over 2 GiB and the ...
+- 2026-10-09: BUILD-PROFILE-JOBS-START-ONLY-33: idle cores measured against the start allowance (part 1 of 2): BUILD-PROFILE-JOBS-START-ONLY-33: the build profile compared each stage's cores with the workers it started with, but the scheduler rebalances ...
+- 2026-10-09: BUILD-PROFILE-JOBS-START-ONLY-33: idle cores measured against the start allowance (part 2 of 2): Fixed in source on v0.0.33-ws-baseline, not shipped at the time of writing: the list is `docs/WHITESPACE-BASELINE.json`, written from the ...
+- 2026-10-13: STAIRS-MOLAG-ACCESS-38: HORIZON-HOLES-31: 13 October 2026: reconciled 10 maintainer screenshot(s) with evidence IDs and original hashes.
+- 2026-10-14: Renewed RC2 gameplay reports: 12 October 2026 — WORLD-SLOPE-STUCK-38: maintainer reports jumping cannot pass the Vivec Arena boat-path obstruction; other docks remain untested.
+- 2026-10-19 18:28 +0300: seen again in v0.0.44: maintainer: distant topology still breaks up (counted as a bug); idea: a very low-poly depth/silhouette model of the world for the distance, with the far-terrain and mold-shell layers; later to-do
+- 2026-10-20 20:09 +0300: seen again in v0.0.46: Listed under Known in this build in the v0.0.46 release notes (still open at the release).
+- 2026-10-30: seen again in v0.0.57-dev3: Seen again in a new form: at the 300 fog distance whole buildings at the end of the Seyda Neen start street turn solid fog colour and the sky shows between them (FOG-SKY-UNFOGGED-57).
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Status: 7 October 2026](#status-7-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -222,6 +242,7 @@ Family: Distance drawing (horizon, fog, sky, far edges) (`distance-drawing`). Fa
 - [RENDER-FOG-PASS-COST-33](RENDER-FOG-PASS-COST-33.md): The per-pixel fog and day-night sky pass costs 150-210 ms per frame on a slow 68040
 - [SEYDA-WALL-SHAPE-31](SEYDA-WALL-SHAPE-31.md): Dark shape pokes out of a stone wall by the Seyda Neen shore
 - [SHELL-TEXTURE-VOTE-32](SHELL-TEXTURE-VOTE-32.md): Distant shells: door and grille textures win over large sealed areas
+- [SKY-FOG-OFF-BACKGROUND-25](SKY-FOG-OFF-BACKGROUND-25.md): With fog off, far pixels outdoors that no surface covered showed a pale solid background instead of the sky
 - SKY-NIGHT-COVER-29 (no report page): Dense night clouds rarely reveal moons/stars
 - SKY-STARS-28 (no report page): Enlarged stars cover original night artwork
 - SKY-VISUAL-01 (no report page): Sky-only day/night remap clashed with gray distance fog

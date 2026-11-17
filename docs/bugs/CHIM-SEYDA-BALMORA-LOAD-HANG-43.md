@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 44 times; something has to be done
+## PERSISTING: reported 46 times; something has to be done
 
 - Reported with v0.0.46 at 2026-10-20 20:09 +0300: Listed under Known in this build in the v0.0.46 release notes (still open at the release).
 - Reported with v0.0.53-dev2 at 2026-10-26 (time not recorded): 19:14 UTC door sample: the Yassu Mine room load (ri9f4c8ccd45) stopped after its BSP while a gate ran its emulator; the next try loaded in 7.6 s
@@ -47,6 +47,8 @@
 - Reported with v0.0.66-dev7 at 2026-11-15 22:15 +0200: Not this stall: the third repeat session stopped at its first Vivec arrival because the baseline examination paused the emulator in its debugger and never resumed it (STALL-PROBE-PROMPT-LOG-LINE-66); the game had been running at the sample before. The examination's state-file age measure is withdrawn (the file time lags through the container's bind mount; the earlier 96 s reading agreed with the host clock by coincidence) and replaced by the state file's own realtime and ticks read before and after the examination.
 - Reported with v0.0.66-dev7 at 2026-11-15 22:50 +0200: Not this stall: the fourth repeat session stopped at its first Vivec arrival as the third did, the baseline examination failing after its break-in and leaving the emulator paused (STALL-PROBE-PROMPT-LOG-LINE-66, seen again on another path). The examination is now crash-proof and the step is out of the repeat script. For the comparison planned next, the engine gained the console setting aw_remote_log (0 = no console log on the remote folder, the candidate trigger; the command and state files as before) and the repeat script a twin that sets it (tests/sessions/load_repeat_hops_nolog.txt): sessions with and without the append, stops per load on each side.
 - Reported with v0.0.66-dev10 at 2026-11-16 (time not recorded)
+- Reported with v0.0.66-dev11 at 2026-11-16 (time not recorded): The deterministic-mode comparison so far, test sessions only (the tally is DET-TALLY.txt of the comparison, repeat sessions of the Arena Pit loads on the v0.0.66-dev10 image at 32 MB Fast): as sessions run today, 8 valid runs, 76 Arena Pit loads, 2 stops; with the emulator's deterministic option, 7 valid runs, 70 loads, 0 stops. The second stop's packet was again a request of the remote console's folder, an open for writing of its state file whose host side had finished while the game was never told. The comparison continues; no conclusion beyond these numbers.
+- Reported with v0.0.66-dev12 at 2026-11-16 (time not recorded): The deterministic-mode comparison, updated (test sessions only; the tally is DET-TALLY.txt of the comparison, repeat sessions of the Arena Pit loads on the v0.0.66-dev10 image at 32 MB Fast): as sessions run today, 8 valid runs, 76 Arena Pit loads, 2 stops; with the emulator's deterministic option, 8 valid runs, 80 loads, 0 stops. The comparison continues; no conclusion beyond these numbers. This line replaces the earlier tally of the same day (7 valid runs, 70 loads, 0 stops).
 - Reported with v0.0.66-dev10 at 2026-11-16 10:46 +0200: The mechanism captured in a plain repeat session on the v0.0.66-dev10 image (FS-UAE at 32 MB Fast, JIT, the remote-console folder served by the emulator's host thread): it stopped after nine arena pit loads with the game's packet a FINDINPUT of AWCTL:cmd.txt, the remote console's poll of its missing command file, its result already set (res1 0, res2 205), and the handler's state word for it -1: the emulator's host side finished the request and the handler was never told. The deterministic twin (emu deterministic=1) is being measured against it.
 
 <!-- END GENERATED PERSISTING -->
@@ -71,12 +73,71 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-18: reported in v0.0.43-dev1
+- 2026-10-20 20:09 +0300: seen again in v0.0.46: Listed under Known in this build in the v0.0.46 release notes (still open at the release).
+- 2026-10-26: seen again in v0.0.53-dev2: 19:14 UTC door sample: the Yassu Mine room load (ri9f4c8ccd45) stopped after its BSP while a gate ran its emulator; the next try loaded in 7.6 s
+- 2026-10-26 15:58 +0200: seen again in v0.0.52: PERSISTING: v0.0.52 final delivery, 16 MB smoke: dbg tp to Balmora did not load; game waits on SIGF_DOS, the request held by DH0 (emulator disk stall); passed in the run before
+- 2026-10-30 12:19 +0200: seen again in v0.0.57-dev1: Gate 4784 boot smoke (commit a1c00e4a, the shared gate-smoke v0.0.54 image, 32 MB Fast): the second load (balmora, load 1 of 3) was not in play, signon 1; the same image and a one-line later commit passed gate 4785.
+- 2026-10-31 23:42 +0000: seen again in v0.0.58-dev3: Also seen in play, not only on a load: in gates 4698, 4845, 4897 and 4954 the game stopped a few seconds after arriving in Seyda Neen (game clock still, the same frame on screen, no command taken), and gate 4932 examined such a stop ...
+- 2026-11-01: seen again in v0.0.58: Seen again twice on v0.0.58 images: the boot smoke of the release build stopped with Seyda Neen not loaded, the game waiting on the emulator's disk request (held by DH0, the CPU idle); an in-game check session on the dev6 image stopped the ...
+- 2026-11-01: seen again in v0.0.58: And again on the release smoke's rerun: Seyda Neen loaded twice and Balmora twice, then the third Seyda Neen load from Balmora did not finish within the limit; the game kept running server frames on the Loading screen (no disk wait this ...
+- 2026-11-01: seen again in v0.0.59-dev1: Seen again on the v0.0.59-dev1 delivery: the release hops session froze on its first map (Balmora) about 17 s in, before the first hop, after waiting for a gate's emulator run; the 32 MB boot smoke of the same image had passed.
+- 2026-11-01 03:04 +0200: seen again in v0.0.58: Seen again in gate 5233 (source b1d45efd, a character menu change): the boot smoke got no answer to aw_music_status after the second load; all five samples showed the game waiting on a DH0 file request in exec idle.
+- 2026-11-01 07:49 +0000: seen again in v0.0.58-dev4: Seen again in a gate boot smoke on the model-table branch (2bf629a1): after the Seyda Neen load the game stopped taking console commands for 60 seconds (the emulator disk stall pattern); the suite and the engine build passed.
+- 2026-11-02: seen again in v0.0.59-dev4: MiniWind proof session proof2 of CELL-CHANGES-59 at 2026-11-02 13:28 +0200 / 2026-11-02 11:28 UTC (FS-UAE, 32 MB Fast, the host busy with a gate suite and a reuse audit): after a quickload in Arrille's Tradehouse, dbg tp seydaneen loaded ...
+- 2026-11-02: seen again in v0.0.59-dev5
+- 2026-11-02 12:44 +0200: seen again in v0.0.59-dev4: FS-UAE sessions at 32 MB Fast on the seyda MiniWind (slice 1 image cc5b049 and the first-person arms image f983e6b alike) stopped on the emulator disk stall (game waits on SIGF_DOS, request held by DH0) in 6 of 9 runs between 11:57 and ...
+- 2026-11-02 14:06 +0000: seen again in v0.0.59-dev4: Seen twice on the Seyda Neen MiniWind at 32 MB Fast (da6c335, CELL-CHANGES-59 slice 4 checks): the game stopped taking commands about a minute after a save in Seyda Neen (the request held by DH0); a shorter session got through.
+- 2026-11-02 14:49 +0200: seen again in v0.0.59-dev4: Emulator disk stall during a first-person cost session in the Seyda Neen MiniWind (FS-UAE, 32 MB Fast, JIT); the same script ran through on the next try.
+- 2026-11-02 22:46 +0200: seen again in v0.0.59-dev5: Seen in 5 of 9 short Seyda Neen MiniWind sessions in one evening on a loaded machine (4 with JIT, 1 before the map loaded with JIT off); the same scripts passed on a retry.
+- 2026-11-02 23:25 +0200: seen again in v0.0.59-dev5: Seyda Neen MiniWind sessions, FS-UAE JIT 32 MB: disk stall on load (2 of 4 tries), host 32-56 % CPU.
+- 2026-11-03: seen again in v0.0.59-dev5: JIT A/B for CELL-CHANGES-59 slice 6 (2abc9fc0 vs 0128e0c0, 4 runs each, alternating): 3 of 4 passed on each side; one disk stall (with slice 6) and one start failure (without); heap readings identical.
+- 2026-11-03: seen again in v0.0.59-dev5: four strip sessions froze at the first take after a console-opened strip; IDE had completed its last command; one of four waited on DH0, three were in no file call; an aimed-open session on the same image did not freeze: follows the script ...
+- 2026-11-03 00:19 +0200: seen again in v0.0.59-dev5: Seen again on the v0.0.59-dev5 full image (FS-UAE, JIT, 32 MB Fast, 2026-11-02): five short verification sessions in a row stalled with the game waiting on DH0 (pc 00F81478), during a teleport to the Census Office, Seyda Neen or at the ...
+- 2026-11-03 01:50 +0200: seen again in v0.0.59-dev5: A/B under the normal host load, same script: hard-file device 3 disk stalls in 12 sessions, emulated IDE port 0 in 16 (slower loads).
+- 2026-11-03 02:18 +0200: seen again in v0.0.59-dev5: One of three short Seyda Neen MiniWind sessions stalled on an idle machine (disk request held by DH0); a retry passed.
+- 2026-11-03 04:09 +0200: seen again in v0.0.59-dev5: Gate boot smoke on a branch with the IDE disk controller (6c750516) and no engine change: the client stayed at signon 3 for the 30 s in-play wait before load 3 of 3; the unchanged rerun passed.
+- 2026-11-03 04:39 +0200: seen again in v0.0.59-dev5: Still seen with the IDE disks under host load: four container-strip sessions (strip11-14, Seyda Neen MiniWind 420cb1a and 3e51c30) froze 171-183 s into play, one sample showing the game waiting on SIGF_DOS with the request held by DH0 ...
+- 2026-11-03 04:59 +0200: seen again in v0.0.59-dev5: Correction to the earlier report of 2026-11-03: the container-strip sessions strip13 and strip14 stopped right after a take in the container strip (CONTAINER-STRIP-TAKE-STALL-59), and strip11 stopped with a conversation window open after E ...
+- 2026-11-03 05:07 +0200: seen again in v0.0.59-dev5: Seen again with the disks on IDE: the v0.0.59-dev5 full image run with the integration engine 5a41c209 (FS-UAE, JIT, 32 MB Fast) stalled while loading Seyda Neen, before play; pc 00F811BC/00F828A2, no file call pending.
+- 2026-11-03 11:28 +0200: seen again in v0.0.59-dev6: Not this stall: the v0.0.59-dev6 smoke stop follows the dev6 engine.
+- 2026-11-03 12:50 +0200: seen again in v0.0.59-dev6: The v0.0.59-dev6 test session stops in Seyda Neen were not this disk stall: the processor was busy in one 13 to 15 s frame (the player's assembled body loaded at arrival), ARRIVAL-LONG-FRAME-DEV6-59.
+- 2026-11-03 15:44 +0000: seen again in v0.0.59-dev6: v0.0.59-dev6 image 95a5bdb (FS-UAE, JIT, 32 MB Fast): the delivery hops stop on the hop from Ald'ruhn to Khuul 3 times of 3, twice on a quiet machine; the load stops right after vf0271's bsp, the game waits on SIGF_DOS with the request ...
+- 2026-11-03 18:36 +0200: seen again in v0.0.59-dev6: Not this stall: the dev6 Khuul hop stop (3 of 3 on IDE) was Kickstart's read error requester on AW_WORLD0 block 2480045.
+- 2026-11-05: v0.0.61-dev1: SMOKE-STALL-LABEL-INFERRED-60 seen again in v0.0.61-dev1: the smoke's stall label is a guess: SMOKE-STALL-LABEL-INFERRED-60: the boot smoke names a stop an "emulator disk stall" when the processor sits in the system's idle loop, the game ...
+- 2026-11-05 05:49 +0200: seen again in v0.0.60: Candidate cause under investigation, not confirmed: FS-UAE 3.1.66 updates a shared interrupt-request word without atomic operations, so a finished hard-file request can lose its signal under host load.
+- 2026-11-05 23:16 +0200: seen again in v0.0.61-dev1: Delivered image (run 2026_11_05_v0.0.61-dev1_full-v0.0.61-dev1_374d59b), FS-UAE 3.1.66 at 32 MB Fast, JIT, disks on IDE, a busy host: dbg scene seyda after a quickload in Arrilles Tradehouse stopped with the game clock frozen; the stall ...
+- 2026-11-07: Register and work list synchronised: three entries fixed, the rest linked to open work: An audit of the register against the work list found entries that disagreed with it.
+- 2026-11-07 03:39 +0200: seen again in v0.0.61: Release image: a coordinate teleport from Seyda Neen to Ebonheart about 60 s after arrival stopped the game: the clock stood still, the processor idle and the game waiting on a file request no handler held.
+- 2026-11-07 05:21 +0200: seen again in v0.0.61: The v0.0.61 release image on the emulator (32 MB Fast, JIT, busy host): the second load of Seyda Neen at the start of a scripted session stopped at the second sign-on step and stayed on the Loading screen; the same script prefix loaded ...
+- 2026-11-09 22:07 +0200: seen again in v0.0.63: Seen again in a gate boot smoke on the v0.0.63 dbg tp room menu branch (a84fbd8a, gate 9950): "the second load (balmora) is not in play: screen game, signon 2, world leaves 12"; all 7,248 tests passed and the branch does not touch map ...
+- 2026-11-15: seen again in v0.0.66-dev6: Seen once in the opening journey on foot on the v0.0.66-dev6 image (FS-UAE at 32 MB Fast, JIT) (part A, step 6): the Seyda Neen street door of the census office (113833) was aimed and used, and no load came within 45 s; the stall probe ...
+- 2026-11-15: seen again in v0.0.66-dev7: Seen in the delivery's area hops on the v0.0.66-dev7 image (FS-UAE at 32 MB Fast, JIT): after the Seyda Neen, Balmora and Vivec hops loaded, the teleport from Vivec to the Vivec arena pit (maps/vai000.chim) never loaded; the stall probe ...
+- 2026-11-15 10:33 +0200: seen again in v0.0.66-dev4: Seen twice in the opening journey on foot on the v0.0.66-dev4 image (2026_11_15_v0.0.66-dev4_full-v0.0.66-dev4_010ce4a, FS-UAE at 32 MB Fast, JIT).
+- 2026-11-15 20:16 +0200: seen again in v0.0.66-dev8: Correction to the three reports of 15 November from the v0.0.66-dev4 and dev6 opening journeys (the census street door twice, the Load game window once): not this stall.
+- 2026-11-15 21:39 +0200: seen again in v0.0.66-dev7: Reproduced on demand with the repeat script (tests/sessions/load_repeat_hops.txt) on the v0.0.66-dev7 image (FS-UAE at 32 MB Fast, JIT, the disks on the emulated IDE port, the remote-console folder mounted): the first session ran its ...
+- 2026-11-15 22:15 +0200: seen again in v0.0.66-dev7: Not this stall: the third repeat session stopped at its first Vivec arrival because the baseline examination paused the emulator in its debugger and never resumed it (STALL-PROBE-PROMPT-LOG-LINE-66); the game had been running at the sample ...
+- 2026-11-15 22:50 +0200: seen again in v0.0.66-dev7: Not this stall: the fourth repeat session stopped at its first Vivec arrival as the third did, the baseline examination failing after its break-in and leaving the emulator paused (STALL-PROBE-PROMPT-LOG-LINE-66, seen again on another path).
+- 2026-11-16: seen again in v0.0.66-dev10
+- 2026-11-16: seen again in v0.0.66-dev11: The deterministic-mode comparison so far, test sessions only (the tally is DET-TALLY.txt of the comparison, repeat sessions of the Arena Pit loads on the v0.0.66-dev10 image at 32 MB Fast): as sessions run today, 8 valid runs, 76 Arena Pit ...
+- 2026-11-16: seen again in v0.0.66-dev12: The deterministic-mode comparison, updated (test sessions only; the tally is DET-TALLY.txt of the comparison, repeat sessions of the Arena Pit loads on the v0.0.66-dev10 image at 32 MB Fast): as sessions run today, 8 valid runs, 76 Arena ...
+- 2026-11-16 10:46 +0200: seen again in v0.0.66-dev10: The mechanism captured in a plain repeat session on the v0.0.66-dev10 image (FS-UAE at 32 MB Fast, JIT, the remote-console folder served by the emulator's host thread): it stopped after nine arena pit loads with the game's packet a ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 44 times; something has to be done](#persisting-reported-44-times-something-has-to-be-done)
+- [PERSISTING: reported 46 times; something has to be done](#persisting-reported-46-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -197,11 +258,11 @@ other:
   possible sign of a stall on IDE so far.
 - Gate smokes failing on "CHIM zone full" were not this bug either: the boot loop typed a command while the
   start-up logo was up and turned the CHIM cache off for that start (SMOKE-M-KEY-SKIPS-CHIM-CACHE-57, fixed).
-- To keep the host load down, at most two emulator sessions now run at once on the build machine (the session tool
+- To keep the host load down, at most two emulator sessions now run at once (the session tool
   and the gate smoke wait for a free slot).
 
 Decision (the maintainer, 3 November 2026): the shipped FS-UAE and WinUAE presets and the Raspberry Pi 4 image keep
-the hard-file device for now. The Pi 4 image (Amiberry), the project's measuring machine, is the next test: the
+the hard-file device for now. The Pi 4 image (Amiberry), the Raspberry Pi 4B used for measurements, is the next test: the
 presets move to the IDE port only if a stall shows up there or in play, since IDE makes every load about 30 %
 slower.
 
@@ -492,6 +553,7 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - CHIM-STORE-ONE-AT-A-TIME-64 (no report page): The engine streams one CHIM store at a time, so frames of a second store cannot sit beside the first in the open world
 - [CHIM-TERRAIN-GRAFT-33](CHIM-TERRAIN-GRAFT-33.md): CHIM chunk terrain is a brush entity, not part of the world tree, so it does not occlude
 - [CHIM-TERRAIN-HULL-BEVELS-33](CHIM-TERRAIN-HULL-BEVELS-33.md): A standing box rests above the ground at convex CHIM terrain edges
+- [CHIM-TERRAIN-RECORDS-SIZE-46](CHIM-TERRAIN-RECORDS-SIZE-46.md): CHIM terrain records were stored whole: 489.4 MB of the v0.0.46 world's frame segments
 - [CHIM-TEXTURE-SPECKS-33](CHIM-TEXTURE-SPECKS-33.md): CHIM-drawn surfaces show bright single-texel specks that legacy frames do not
 - [CHIM-TILT-VARIANTS-SPLIT-33](CHIM-TILT-VARIANTS-SPLIT-33.md): Tilted placements each get their own model variant: 39,103 extra model variants on the base island, breaking store-once
 - [CHIM-TOWN-HEAP-ROUTED-HULL-36](CHIM-TOWN-HEAP-ROUTED-HULL-36.md): With the routed terrain hull for every chunk, Balmora and Seyda Neen rings no longer fit the CHIM zone

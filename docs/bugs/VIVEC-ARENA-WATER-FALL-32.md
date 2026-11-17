@@ -18,6 +18,18 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.32-dev3
+- 2026-10-08: v0.0.32-dev3: v0.0.32-dev3 the maintainer play reports: VIVEC-ARENA-WATER-FALL-32: east of the Arena canton the sea ends at the canton edge; sky is drawn below the horizon (LOCAL 1076 -150 65) and the player falls out of the area through the water ...
+- 2026-10-18 20:26 +0300: seen again in v0.0.43-dev2: maintainer: from the St.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 
 ## Status: 18 October 2026

@@ -19,7 +19,37 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-07: reported in v0.0.31-dev5
+- 2026-10-07: TOWN-VIS-OCCLUSION-31: buildings do not block visibility: Measured from the dev5 maps: 94 % of Balmora's faces are in `func_wall` building models, which Quake's `vis` ignores, so 84-89 % of a Balmora map is potentially visible from an ...
+- 2026-10-08: MODEL-MARKSURF-SIGNED-31 and TOWN-VIS-OCCLUSION-31: visibility prototype: Occluders and building faces in the world model were measured not to help open towns.
+- 2026-10-18 19:52 +0300: seen again in v0.0.43-dev2: measured: 183 of 197 interiors are one vis leaf (14 have two): every room model is drawn every frame (Morag Tong 34,801 faces, 122 models)
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [Timeline](#timeline)
+- [Status: 8 October 2026](#status-8-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Status: 8 October 2026
 
@@ -128,6 +158,7 @@ Family: Rendering cost and visibility (`render-performance`). Read the visibilit
 - SKEL-16MB-TRAP-52 (no report page): With skeletal actors the game stops loading Balmora at 16 MB of Fast RAM with a software failure (error 80000027); the baked build loads
 - SKEL-RUNTIME-COST-52 (no report page): The skeletal prototype poses every vertex twice a drawn frame, with three divisions and three float-to-integer conversions each: it must cost what a baked frame costs
 - [SPRITE-BAD-TYPE-THREADED-56](SPRITE-BAD-TYPE-THREADED-56.md): R_DrawSprite: Bad sprite type ends a load (dbg aw hors 0) on Amiberry with the threaded CPU: the game stays on Loading
+- [TREE-SPRITE-DEPTH-23](TREE-SPRITE-DEPTH-23.md): A tree sprite was cut off against the background: a signed depth compared as unsigned
 
 Related bugs in other categories:
 

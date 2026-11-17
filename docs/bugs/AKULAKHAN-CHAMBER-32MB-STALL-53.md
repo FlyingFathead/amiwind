@@ -29,7 +29,38 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-27: reported in v0.0.53
+- 2026-11-10 11:48 +0200: seen again in v0.0.64-dev2: MiniWind akulakhan-chamber (2026_11_10_v0.0.64-dev2_miniwind-akulakhan-chamber-try3_8b67157), FS-UAE 32 MB Fast: dbg tp heartchamber from Balmora fails: the room's models need about 18,130 KiB, the zone and banks give 14,787 KiB after ...
+- 2026-11-10 12:13 +0200: seen again in v0.0.64-dev2: Byte measurement of the room's 148 store models (18,579,456 bytes): planes 42.4 %, visibility 17.9 %, clipnodes 13.8 %, surfaces 9.3 %, texinfo 7.4 %, vertices and edges 3.2 %; textures 210,688 bytes.
+- 2026-11-16 09:47 +0200: seen again in v0.0.66-dev10: Checked in play (the endgame session ENDGAME-HEART-SESSION-66, run1 on the v0.0.66-dev10 image): the default room type loads at 32 MB Fast from Seyda Neen, 41 s, 1,943 KiB free inside (largest block 1,402 KiB).
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.64-dev2 (10 November 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [Timeline](#timeline)
+- [Status: 10 November 2026](#status-10-november-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Status: 10 November 2026
 
@@ -115,6 +146,7 @@ Family: Map heap and memory budget (`heap-memory`). The heap model must match wh
 - HUNK-RESERVE-SN012-29 (no report page): Dev4 first-presented sn012 reserve below 2 MiB target
 - [LOADER-STAGING-PEAK-32](LOADER-STAGING-PEAK-32.md): Map loading stages most lumps in temporary memory before decoding, raising the heap peak
 - [MAP-UNUSED-HULL2-32](MAP-UNUSED-HULL2-32.md): Shipped maps carry about 1.1 MB of collision data for a hull the engine never uses
+- [MEM-EXTRA-HDF-27](MEM-EXTRA-HDF-27.md): Map loads bypassed the engine's file search paths: a map on an extra world disk image fell back to a whole-file read
 - MEM-GEOMETRY-01 (no report page): Light-range sharing could copy a too-short byte span
 - MEM-TOWN-02 (no report page): Bounded Balmora maps exceeded the modeled map heap limit
 - MEMCENSUS-OWNERS-START-STALL-64 (no report page): An engine with the first per-asker block count stalled at the start: every free searched the whole count table once its removal markers filled it

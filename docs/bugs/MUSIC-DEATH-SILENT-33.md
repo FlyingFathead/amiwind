@@ -20,6 +20,18 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-09: reported in v0.0.33-rc1
+- 2026-10-09: ARENA-PIT-NO-INTERIOR-33, COMBAT-SETUP-DICE-BLOCK-33, COMBAT-VOICES-SILENT-33, MUSIC-DEATH-SILENT-33, COMBAT-PLAYER-DEATH-FALL-33: The maintainer playtest findings for a later release: ARENA-PIT-NO-INTERIOR-33 the Vivec Arena minigame ...
+- 2026-10-10: PLAYER-DEATH-LIMBO-35 and COMBAT-PLAYER-DEATH-FALL-33 repaired in source: PLAYER-DEATH-LIMBO-35: a dead player can no longer talk, activate, attack, wait or move; after the death animation the original question appears (load the most ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 ## Status: 9 October 2026

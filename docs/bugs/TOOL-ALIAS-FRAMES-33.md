@@ -15,6 +15,18 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-09: reported in v0.0.33-dev
+- 2026-10-09: NPC-ANIM-IDLE-ONLY-33 and the animation kit: NPC-ANIM-IDLE-ONLY-33: NPCs had only an 8-frame idle, so the companion slid in its idle pose.
+- 2026-10-09: NPC-WEAPON-MESH-33, COMBAT-NOT-SAVED-33, TOOL-ALIAS-FRAMES-33, COMBAT-PLAYER-KNOCKDOWN-33: combat: Found while building melee combat and the Vivec Arena minigame (combat (docs/COMBAT.md)): NPC-WEAPON-MESH-33 NPCs carry no visible weapons ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 
 ## Status: 9 October 2026

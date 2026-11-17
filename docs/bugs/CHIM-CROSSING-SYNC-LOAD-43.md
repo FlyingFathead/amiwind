@@ -19,11 +19,23 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-18: reported in v0.0.43-dev2
+- 2026-10-18: CHIM-CROSSING-SYNC-LOAD-43 and ENGINE-HEAP-FIXED-SIZE-43: the open-world pauses measured: CHIM-CROSSING-SYNC-LOAD-43: the open-world "yoinks" in v0.0.43-dev2 are the cell crossings.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)

@@ -21,11 +21,37 @@
 | Persists in | fixed in v0.0.66-dev2 |
 | Severity | high: stops every build with the expansions selected before its world stages |
 | Family | Builder breaks and reproducibility (`builder-from-scratch`) |
+| Fix commit | `d6abf612` |
+| Fixed on | 2026-11-13 |
+| Planning item | `EXPANSION-BASE-ONLY-TABLES-66` |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
 | From commit | source and engine ef8b970 |
 | CHIM engine version | none: legacy engine |
 
 <!-- END GENERATED FACTS -->
+
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.66-dev2 (c7cf1fae, d6abf612) | 2026-11-13 | gate 10611 passed on d6abf612 | the expansions' activator and container boxes are measured, every selected master's rooms are in the room-keyed tables, and a focus box preflight runs before any stage |
+| shipped | a numbered build | v0.0.66-dev2 build 2026_11_14_v0.0.66-dev2_full-v0.0.66-dev2_3988c6e | 2026-11-14 | the delivered build | the build holds d6abf612 |
+| confirmed by a build | a numbered build | v0.0.66-dev2 build 2026_11_14_v0.0.66-dev2_full-v0.0.66-dev2_3988c6e | 2026-11-14 | the dev2 build log | with the expansions selected the focus stage passed, where the run of ef8b9700 had stopped on a Bloodmoon activator without a box; a builder fix, no play check applies |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-13: reported in v0.0.66-dev2
+- 2026-11-13: fixed in source: a gated commit, v0.0.66-dev2 (c7cf1fae, d6abf612); gate 10611 passed on d6abf612: the expansions' activator and container boxes are measured, every selected master's rooms are in the room-keyed tables, and a focus box preflight runs before any stage
+- 2026-11-13 20:08 +0000: seen again in v0.0.66-dev2: PERSISTING: 24 tools read the merged master (with the expansions) but open only Morrowind.bsa, so a model or texture only an expansion archive holds is missing: actor_grounding_census, actor_units_seed, import_town, nif_root_audit ...
+- 2026-11-14: shipped: a numbered build, v0.0.66-dev2 build 2026_11_14_v0.0.66-dev2_full-v0.0.66-dev2_3988c6e; the delivered build: the build holds d6abf612
+- 2026-11-14: confirmed by a build: a numbered build, v0.0.66-dev2 build 2026_11_14_v0.0.66-dev2_full-v0.0.66-dev2_3988c6e; the dev2 build log: with the expansions selected the focus stage passed, where the run of ef8b9700 had stopped on a Bloodmoon activator without a box; a builder fix, no play check applies
+- 2026-11-14 00:11 +0000: seen again in v0.0.66-dev1: Seen in v0.0.66-dev1: the dialogue table holds the base game only (2,675 NPC rows against 3,041 in the merged game files; the Mournhold transport topic is absent) and so does the entity tracker.
+
+<!-- END GENERATED TIMELINE -->
 
 _Last updated with AmiWind v0.0.66-dev2 (14 November 2026)._
 
@@ -33,6 +59,7 @@ _Last updated with AmiWind v0.0.66-dev2 (14 November 2026)._
 ## Contents
 
 - [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Status: 14 November 2026](#status-14-november-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -115,6 +142,7 @@ Family: Builder breaks and reproducibility (`builder-from-scratch`). The reposit
 - [BUILD-LAVA-TERRAIN-BUDGET-38](BUILD-LAVA-TERRAIN-BUDGET-38.md): Detailed lava terrain exceeds region storage budget
 - BUILD-LAYER-DATA-MWAD-SHADOWED-64 (no report page): The Bloodmoon layer data stage stops with mwad is not a package in a MiniWind build
 - [BUILD-LIGHT-THREADS-32](BUILD-LIGHT-THREADS-32.md): ericw light is not byte-reproducible with more than one thread
+- BUILD-MERGED-MASTER-IN-CHECKOUT-66 (no report page): The merged master of the selected game files is written into the source checkout's out folder also when --workspace names another folder; with a read-only checkout the build stops at its room grounding check before the first stage
 - [BUILD-MINIWIND-SEYDA-COMPILE-42](BUILD-MINIWIND-SEYDA-COMPILE-42.md): A CHIM MiniWind of another town stops at its bsp stage: it compiles the whole Seyda Neen town, which exceeds the BSP29 node limit
 - BUILD-MINIWIND-SEYDA-KELP-INDEX-54 (no report page): A Seyda Neen MiniWind can never pass: the chim-town-seyda stage stops because the kelp additions need the original scenery index, which a MiniWind plan does not build
 - [BUILD-NO-OVERLAY-32](BUILD-NO-OVERLAY-32.md): The builder has no engine-overlay command; dev measurements used a private script

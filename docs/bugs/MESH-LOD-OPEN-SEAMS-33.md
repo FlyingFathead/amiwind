@@ -18,11 +18,23 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-09: reported in v0.0.32
+- 2026-10-09: v0.0.33: MESH-LOD-OPEN-SEAMS-33 and CHIM-STRIDER-RING-33 in v0.0.33: MESH-LOD-OPEN-SEAMS-33 and CHIM-STRIDER-RING-33: the closed-hull strider fix stays on its branch for v0.0.33 by the maintainer decision (on CHIM it puts Balmora's active ring ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Status: 10 October 2026](#status-10-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)

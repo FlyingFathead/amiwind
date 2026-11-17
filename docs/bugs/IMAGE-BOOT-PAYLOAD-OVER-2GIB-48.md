@@ -20,6 +20,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-23: reported in v0.0.48-dev2
+- 2026-10-23 08:10 +0300: seen again in v0.0.48-dev2: dev2 build try8 stopped in the image step payload preflight: boot payload 2751137598 bytes needs a 2778 MiB partition
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
 
 ## Status: 23 October 2026

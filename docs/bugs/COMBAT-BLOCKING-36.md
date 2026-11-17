@@ -29,12 +29,32 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-11: reported in v0.0.36-dev5
+- 2026-10-11: CAMERA-THIRDPERSON-COMBAT-NPC-HIDDEN-36, COMBAT-BLOCKING-36 and the platform field: From the maintainer's dev5 playtest on FS-UAE with JIT.
+- 2026-10-14: seen again in v0.0.39-rc2: Maintainer repeats missing block presentation in both views.
+- 2026-10-14: seen again in v0.0.40-dev1: Target FPU gate recurrence in block orientation; safe-math repair and focused pose checks pass, linked target/native gates pending.
+- 2026-10-14: UI-INVENTORY-INTEGRATION-40: scoped native equipment: UI-INVENTORY-INTEGRATION-40/INVENTORY-CATALOG-LOOKUP-40: actual names/icons, equip, modal pause and Russula persistence scoped; missing resources separate.
+- 2026-10-14: ENGINE-FPU-UNIMPL-31: target pass and native inventory limits: ENGINE-FPU-UNIMPL-31: subsequent dev1 Amiga target and linked68040 gate pass without allowlist expansion.
+- 2026-10-14: UI-INVENTORY-INTEGRATION-40: integration and placement boundaries: UI-INVENTORY-INTEGRATION-40: fixed-hull, edict quarantine and reserve findings yield bounded point/hull0 placement and pre-transfer guards:32 carried IDs/32 drops/16 new ...
+- 2026-10-14: COMBAT-BLOCKING-36: first-person source candidate: COMBAT-BLOCKING-36: dev1 alias renderer integrates original left-arm block plus actual shield;2Nord appearances/15 checks pass.
+- 2026-10-14: Development audit: COMBAT-BLOCKING-36: earlier Orc test-sheet physical RMB guards, body25/104, GuardHUD but no first/third shield.
+- 2026-10-14: PLAYER-READY-MOVEMENT-39: disabled-combat lock: COMBAT-BLOCKING-36 (14 October 2026, v0.0.40-dev1): Inventory-backed actual shield identity now feeds the first-person block bridge and per-frame third-person alias attachments.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Historical source plan: 11 October 2026](#historical-source-plan-11-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -484,6 +504,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - MWSCRIPT-INERT-SEEN-62 (no report page): Scripts whose only effect is a message box, a door or item use they take over, or a local the dialogue reads were left out of the build as doing nothing
 - MWSCRIPT-INTERIOR-PLACEMENTS-48 (no report page): Scripted placements in rooms that have no edict are not attached: the engine has no room identity to match them (3,612 of 4,907 bindings are in rooms)
 - MWSCRIPT-LATER-MASTER-SCRIPT-61 (no report page): An object placed in Vvardenfell whose record gets its script from a later master is not attached
+- MWSCRIPT-MEMBER-LOOKUP-COST-66 (no report page): A script reading or writing another object's variable walks the instance table and the parking store for the object: with the tables sized for the whole game the walk grows to hundreds of instances and thousands of parked objects, in 307 every-frame operations
 - MWSCRIPT-MEMBER-QUIET-READER-66 (no report page): A script that reads another object's variable can sleep through a change that object's own script makes to it: such a change does not wake quiet scripts
 - MWSCRIPT-MEMBER-READS-ID-AS-SCRIPT-66 (no report page): A script's read or write of another object's local variable finds nothing: the engine takes the object row's id as its script, so the read gives 0 and the write is dropped (Dagoth Ur's shield never follows the Heart's count)
 - MWSCRIPT-MISSING-FUNCTIONS-63 (no report page): Game scripts call MWScript functions the interpreter does not carry out yet: those calls do nothing and read 0 (69 scripts after the first v0.0.63 batch, most of them in Mournhold and Solstheim)
@@ -494,7 +515,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [MWSCRIPT-POSITIONCELL-OUTDOOR-62](MWSCRIPT-POSITIONCELL-OUTDOOR-62.md): An NPC or a creature a script sends outdoors appears there only while its home area is loaded
 - MWSCRIPT-REFUSED-SCRIPT-COUNT-58 (no report page): The compiled game scripts are refused at load since the dialogue result scripts joined the file: no script runs
 - MWSCRIPT-ROTATE-NO-ENTITY-59 (no report page): A script's Rotate on a streamed outdoor object without an entity is not carried out: the object does not turn
-- MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66 (no report page): A script's SetHealth 0 leaves the actor alive: its health reads 0 but it stays standing and fighting (Dagoth Ur after the end script, the dreamer workers after the Heart)
+- [MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66](MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66.md): A script's SetHealth 0 leaves the actor alive: its health reads 0 but it stays standing and fighting (Dagoth Ur after the end script, the dreamer workers after the Heart)
 - MWSCRIPT-STANDING-NOT-SAVED-57 (no report page): The players standing the scripts change (crime level, reputation, faction ranks, expelled marks, faction reputation) is not in saved games
 - [MWSCRIPT-STATE-NOT-SAVED-48](MWSCRIPT-STATE-NOT-SAVED-48.md): The compiled scripts' values (globals, object and script locals, journal indexes) are not in saved games
 - MWSCRIPT-STOPCOMBAT-UNWIRED-62 (no report page): A script's StopCombat never ended a fight: the combat layer's end of one actor's fight was never connected to it

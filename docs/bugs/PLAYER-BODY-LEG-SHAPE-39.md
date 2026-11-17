@@ -31,7 +31,43 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-13: reported in v0.0.39-rc1
+- 2026-10-13: seen again in v0.0.39-rc1: Source candidate: two male bodies retain full8/6 gait plus punch within512 KiB;83 affected tests pass.
+- 2026-10-13: seen again in v0.0.39-rc2: All 20 bodies pass binary checks.
+- 2026-10-15: NPC-ANIMATION-OFFSET-40: rotating simplification offsets: v0.0.40-dev2 source correction: simplified actor vertices now carry their rest-pose offsets with the source triangle's rotation and scale.
+- 2026-11-07: seen again in v0.0.61: Seen again on the v0.0.61 release image: the legs of Jiub are stick-thin, like pegs, and the same body shape is on other characters (tracker NPC-BODY-REGRESSION-62).
+- 2026-11-07 12:13 +0200: seen again in v0.0.62-dev1: Seen again on an NPC: Jiub on the prison ship has stick-thin legs.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
+- [Timeline](#timeline)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Earlier all-appearance failure, 13 October 2026](#earlier-all-appearance-failure-13-october-2026)
+- [Corrected RC2 all-body result and seam limits, 13 October 2026](#corrected-rc2-all-body-result-and-seam-limits-13-october-2026)
+- [Post-pin RC2 package observation, 14 October 2026](#post-pin-rc2-package-observation-14-october-2026)
+- [Animation transfer defect, 15 October 2026](#animation-transfer-defect-15-october-2026)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Symptom
 
@@ -123,6 +159,7 @@ Family: First-person hands and torch (`torch-hands`). First-person hands, punche
 - [PLAYER-PUNCH-THIRDPERSON-39](PLAYER-PUNCH-THIRDPERSON-39.md): Third-person punches have no visible player-body attack animation
 - [PLAYER-READY-THIRDPERSON-38](PLAYER-READY-THIRDPERSON-38.md): Third-person player lacks fists-up and weapon-draw animation
 - [PLAYER-TORCH-THIRDPERSON-38](PLAYER-TORCH-THIRDPERSON-38.md): Player torch and holding pose disappear in third person while light remains
+- [TORCH-ACTIVATE-CRASH-25](TORCH-ACTIVATE-CRASH-25.md): Raising the fists and pressing V crashed the game: a dynamic light was marked through a negative collision root
 - TORCH-FLAME-VISIBILITY-29 (no report page): Torch flame not visible after changing styles
 - TORCH-FUEL-29 (no report page): Torch never burns out; no unlit or fuel state
 - TORCH-HAND-NORD-29 (no report page): Detached-looking left grip fragment in dev4

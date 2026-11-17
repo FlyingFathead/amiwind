@@ -20,6 +20,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-07: reported in v0.0.61
+- 2026-11-07 17:50 +0200: seen again in v0.0.62-dev1: Seen again in v0.0.62-dev1: the cobweb in the Andrano Ancestral Tomb is still drawn as an opaque plane with no transparency.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
 
 ## Status: 7 November 2026

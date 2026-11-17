@@ -19,6 +19,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-29: reported in v0.0.56-dev1
+- 2026-10-30 14:58 +0200: seen again in v0.0.57-dev2: FS-UAE JIT, 32 MB Fast, dev2 image d725e23: crash R_DrawSprite: Bad sprite type 1073750932 just after the Gnisis region load (first-presented), in a settlement sweep; the same teleport passed in the dev2 sweep an hour earlier, so not every ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.57-dev3 (30 October 2026)._
 
 ## Status: 29 October 2026
@@ -132,5 +143,6 @@ Family: Rendering cost and visibility (`render-performance`). Read the visibilit
 - SKEL-16MB-TRAP-52 (no report page): With skeletal actors the game stops loading Balmora at 16 MB of Fast RAM with a software failure (error 80000027); the baked build loads
 - SKEL-RUNTIME-COST-52 (no report page): The skeletal prototype poses every vertex twice a drawn frame, with three divisions and three float-to-integer conversions each: it must cost what a baked frame costs
 - [TOWN-VIS-OCCLUSION-31](TOWN-VIS-OCCLUSION-31.md): Converted buildings, rooms and rocks do not block Quake visibility (func_wall)
+- [TREE-SPRITE-DEPTH-23](TREE-SPRITE-DEPTH-23.md): A tree sprite was cut off against the background: a signed depth compared as unsigned
 
 <!-- END GENERATED CATEGORY -->

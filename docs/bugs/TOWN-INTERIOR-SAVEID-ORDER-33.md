@@ -19,6 +19,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-09: reported in v0.0.33-dev1
+- 2026-10-09: IMPORT-TOWN-NO-INTERIORS-32: the Arena Pit converts; INTERIOR-HULL-CHAIN-33 and TOWN-INTERIOR-SAVEID-ORDER-33: IMPORT-TOWN-NO-INTERIORS-32: the Arena config listed no rooms, so the importer's interior step (added with the cantons) had ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.36 (11 October 2026)._
 
 ## Status: 9 October 2026

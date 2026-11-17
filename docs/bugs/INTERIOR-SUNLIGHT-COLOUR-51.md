@@ -77,6 +77,7 @@ Family: Lighting, lamps and night (`lighting-night`). Morrowind lights become Qu
 - [CHIM-EXTERIOR-FLAMES-MISSING-48](CHIM-EXTERIOR-FLAMES-MISSING-48.md): CHIM exteriors draw no fire: campfires, braziers, fire pits and flame lamps outdoors have no flame animation
 - [CHIM-MESHLESS-LIGHTS-33](CHIM-MESHLESS-LIGHTS-33.md): Exterior lights without a mesh have no CHIM light path: 2,284 placed lights give no light in a CHIM frame
 - CHIM-ROOM-LIGHT-FLAT-48 (no report page): CHIM rooms light each placement at one level: Temple arch trims and Rithleen walls look flat and brighter than the room maps baked light
+- [DLIGHT-MODEL-TRANSFORM-25](DLIGHT-MODEL-TRANSFORM-25.md): Dynamic lights on translated or rotated models (caves) were placed in world coordinates where the surfaces need model-local ones
 - [DLIGHT-WALLS-31](DLIGHT-WALLS-31.md): Torches barely light town walls at night
 - [EMISSIVE-UNSHIPPED-31](EMISSIVE-UNSHIPPED-31.md): Glowing lantern glass never reached the shipped maps (only the Temple has it)
 - ENGINE-FLAME-LIGHT-KEY-WARNING-51 (no report page): Every Seyda Neen load prints "aw_flame_light is not a field" ten times: the fire rows key no QuakeC field

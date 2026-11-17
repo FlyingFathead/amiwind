@@ -44,12 +44,44 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-11: reported in v0.0.36-dev3
+- 2026-10-11: BUILD-CHIM-STAGE-SERIAL-TAIL-36 and CHIM-STAIR-GATE-WORLD-RELOAD-36 repaired in source: BUILD-CHIM-STAGE-SERIAL-TAIL-36: after the parallel world build the chim stage validated, heap-gated and zone-walked its 273 frames on one core (about ...
+- 2026-10-11: BUILD-IMAGE-STAIR-WALK-SERIAL-36, BUILD-IMAGE-FRAME-MAP-HEAP-SERIAL-36, BUILD-IMAGE-HASH-UNDERUSED-36 and BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36: the perf guard: BUILD-PROFILER-NO-WASTE-ALARM-36 PERSISTING: the image stair walk ran on 1.7 of ...
+- 2026-10-11 01:43 +0300: seen again in v0.0.36-dev3: maintainer via the Monitor: chim 19.0-29.1 min on about 1 core in the 270-frame coast build; validation 8 min, heap gate and zone walk 1 min each (file times)
+- 2026-10-11 10:20 +0300: seen again in v0.0.36-dev4: perf guard seed: CHIM heap gate 295 s on 0.94 of 12 cores in the dev4 whole-city Vivec MiniWind (e7a8e82); the chim-speed repair has not reached the line
+- 2026-10-16: seen again in v0.0.41-dev5: dev5, 726 frames: validation on 1 core for over half of its 6 min, heap gate 2.9 cores, zone walk 1 core between frames (fixlist B1-B4)
+- 2026-10-16: Register audit: open means open: Two proposed closures were not applied because the bug was reported again after the audit: BUILD-CHIM-STAGE-SERIAL-TAIL-36 and BUILD-PROGRESS-ETA-BASIS-36 (both again in v0.0.41-dev5).
+- 2026-10-20 14:48 +0300: seen again in v0.0.46-dev1: dev1 try 2: validation 8m at 13.6 cores; zone walk 1.0-5.3 of 24 cores for 60-125 s with up to 1351 units queued (many 1-3 s units: batch per worker); stats 1m41s at 1.2 cores
+- 2026-10-23: seen again in v0.0.48-dev2: dev2 try8: CHIM validation 468 s on 2.1 of 13.8 cores; cause: the world read decoded each chunk's terrain record again in the parent
+- 2026-10-24 11:40 +0300: seen again in v0.0.49-dev1: PERSISTING: CHIM validation on 5.45 of 23 cores for 1 min 50 s (perf guard FIX-NOW), and the CHIM world pack on 1 core for 1 min 41 s
+- 2026-10-25: seen again in v0.0.51-dev1: dev1 perf guard FIX-NOW: CHIM validation 121 s on 4.99 of 22 usable cores with independent frames (the only failed section; the stages passed)
+- 2026-10-25 09:25 +0200: seen again in v0.0.51-dev3: dev3 build summary: chim ran under half its cores with units queued (1 time); the CHIM world was rebuilt for the interior sunlight
+- 2026-10-26 14:00 +0200: seen again in v0.0.52-dev3: PERSISTING: dev3 perf guard FIX-NOW: CHIM validation 107s on 5.60 of 23 cores (independent frames); the waiver expired 2026-10-14
+- 2026-10-27 17:10 +0200: seen again in v0.0.54-dev1: PERSISTING (27 October 2026): the CHIM zone walk gate ran 100 s on 0.83 of 7 usable cores in the combat playground MiniWind (run 155a523); its waiver expired on 14 October 2026.
+- 2026-10-27 17:51 +0200: seen again in v0.0.53-dev3: PERSISTING (27 October 2026, the persisting worker): the v0.0.53-dev3 validation took 2 min 15 s on 4.86 of 13 cores, and the world pack took 2 min 58 s on 0.99 of a core.
+- 2026-10-28 01:48 +0200: seen again in v0.0.54-dev1: PERSISTING (27 October 2026 evening): the CHIM zone walk gate ran 77 s on 0.96 of 7 cores; its waiver had expired on 14 October 2026, so the perf guard failed a MiniWind.
+- 2026-10-28 04:51 +0200: seen again in v0.0.54-dev2: The builder's detector: chim ran on 7.4 of 24 cores for 150 s with 1351 units queued and 0 running, between the far-terrain and cut-group phases; chim's end 166 s on one core.
+- 2026-11-02 02:43 +0200: seen again in v0.0.59-dev3: Seen again in 2026_11_02_v0.0.59-dev3_full-v0.0.59-dev3_0ce2752: the chim stage ran 17m38s at 15.1 of 23.5 cores, under half its cores with units queued twice, longest 3m31s.
+- 2026-11-03: deferred by the maintainer: accepted for v0.0.59 as an exception: about 2.5 min of one-core CHIM work per full build (96 s terrain records), builder speed only; terrain records onto the pool in v0.0.60
+- 2026-11-07: seen again in v0.0.62-dev1: Seen again in the v0.0.62-dev1 build: the CHIM validation ran 298 s on 3.49 of 24 cores; its waiver expired on 2026-11-03.
+- 2026-11-09 15:12 +0200: seen again in v0.0.63-dev3: Seen again in the v0.0.63-dev3 build (run 2026_11_09_v0.0.63-dev3_full-v0.0.63-dev3-try2_6e68096), the first full CHIM world rebuild since the waiver expired on 3 November: the perf guard stopped the build's perf check on "CHIM validation ...
+- 2026-11-11 01:51 +0200: seen again in v0.0.64-dev4: v0.0.64-dev4 full build: the CHIM validation ran 269 s on about 3 cores while the units around it ran wide; the waiver for this entry ended on 2026-11-03, so the perf guard counted it.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 17 times; something has to be done](#persisting-reported-17-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Status: 3 November 2026 (v0.0.59)](#status-3-november-2026-v0059)
 - [Status: 23 October 2026 (v0.0.48)](#status-23-october-2026-v0048)
 - [Status: 16 October 2026](#status-16-october-2026)
@@ -311,7 +343,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-IMAGE-FRAME-MAP-HEAP-SERIAL-36](BUILD-IMAGE-FRAME-MAP-HEAP-SERIAL-36.md): The image step's CHIM frame-map heap check runs on one core: 66 s to 4.5 min per build while 23 cores idle
 - [BUILD-IMAGE-HASH-UNDERUSED-36](BUILD-IMAGE-HASH-UNDERUSED-36.md): The image step hashes 34,592 payload files on 3 of 24 cores (one file per pool task)
 - [BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36](BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36.md): The image step's world map heap audit estimates 170 maps on 5.3 of 24 cores
-- BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66 (no report page): The image step of the v0.0.66-dev9 build wrote its partitions in 107 seconds where the earlier build took 67
+- [BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66](BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66.md): The image step of the v0.0.66-dev9 build wrote its partitions in 107 seconds where the earlier build took 67
 - [BUILD-IMAGE-NOT-INCREMENTAL-33](BUILD-IMAGE-NOT-INCREMENTAL-33.md): The image step redoes every per-map pass and the whole pack on every build
 - [BUILD-IMAGE-NPC-CHECKS-LATE-44](BUILD-IMAGE-NPC-CHECKS-LATE-44.md): The image step's player body and guard torch bakes fail only at the end of a full build instead of before the expensive stages
 - [BUILD-IMAGE-REGION-MAPS-SERIAL-43](BUILD-IMAGE-REGION-MAPS-SERIAL-43.md): The image step's CHIM frame-map phases run on one core: the world read six times, ground traces on whole frames
@@ -429,6 +461,8 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - NPC-BAKE-STAGES-OVERRUN-62 (no report page): The new seam and floor character bake made every stage that bakes characters run far past its history: room batches about 2 h 40 min, actor library about 40 min, player bodies 35+ min
 - [NPC-BAKED-WHOLE-DUPLICATION-33](NPC-BAKED-WHOLE-DUPLICATION-33.md): Every NPC appearance is baked whole: shared body parts are converted again for each actor, and equipment cannot change
 - [NPC-LIBRARY-NO-UNIT-CACHE-63](NPC-LIBRARY-NO-UNIT-CACHE-63.md): The NPC appearance bakes of the actor library stage had no unit cache, so every rebuild of the stage baked all 418 appearances again (about 45 minutes)
+- PARTITION-CACHE-FIXED-WORKERS-66 (no report page): The new partition cache hashed its files on a fixed eight threads instead of the stage's own allowance
+- PERF-GUARD-BASIS-BY-COUNT-66 (no report page): The performance guard judges the image step's partition write by the number of partitions and not by their size, so a slowdown back to the old time would pass
 - [PERF-GUARD-RESIDENT-BUSY-HOST-57](PERF-GUARD-RESIDENT-BUSY-HOST-57.md): The dev5 full build's perf guard failed chim-town-balmora and chim-town-vivec_city build_resident as slower (129 s, was 52 s; 147 s, was 62 s) while two other builds ran beside it: contention, not code
 - PLAYER-VIEW-SKIN-ROWS-STOP-62 (no report page): The image step's player view stopped the v0.0.62 final build after 1 h 13 min: an Alias skin rows overflow ended it instead of trying the next smaller body
 - RELEASE-GUARD-SLOW-CLONE-51 (no report page): The release guard, the fail-fast first step of a release, took 6 minutes on about 0.14 of a core: its release check clones the whole repository through the Windows-mounted drive

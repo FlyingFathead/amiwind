@@ -20,11 +20,24 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-21: reported in v0.0.46
+- 2026-10-21: HARVEST-INTERIOR-PICK-47 found and fixed on a branch; INTERIOR-PLACED-ITEMS-47 and HARVEST-ORGANIC-PLANTS-47 registered: HARVEST-INTERIOR-PICK-47: in the v0.0.46 image a mushroom inside an interior is drawn but cannot be picked (checked in ...
+- 2026-10-25 16:33 +0200: seen again in v0.0.51: Maintainer: the mushrooms in Vivec, St.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Status: 21 October 2026](#status-21-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)

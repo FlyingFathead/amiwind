@@ -1,6 +1,6 @@
 # Cell-change continuity checklist - a growing list
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -99,7 +99,7 @@ boundary. The old ground ended only 64 units beyond the eastern exit against
 sampling are being rebuilt and require a separate owner boundary playtest.
 
 The maintainer accepted the rc2 giant-mushroom cap correction. That acceptance does
-not cover these transition defects. See [bug journal](BUG_JOURNAL.md).
+not cover these transition defects. See [bug tracker](BUGS.md).
 
 ## Visible overlap and terrain handoff policy
 
@@ -189,7 +189,7 @@ enlarged the central subdivision visibility table from 473407 to 2767103 bytes.
 The loader held a temporary input table and allocated a second resident copy
 inside the 11-MiB heap. A Hors restart from Jiub name entry exhausted the heap
 loading sn012. Held-input/state preservation does not add BSP data and is not
-the cause indicated by this failure. See CRASH-01 in [the bug journal](BUG_JOURNAL.md).
+the cause indicated by this failure. See CRASH-01 in [the bug tracker](BUGS.md).
 
 Byte-only sections now load into their final allocation. The host regression
 and Amiga compile pass; total clearance and target playtesting remain separate

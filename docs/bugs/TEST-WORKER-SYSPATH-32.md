@@ -9,18 +9,47 @@
 | Where | pool workers and test import path (tools/mwad.py vs src/mwad) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.66-dev11 (last seen) |
+| Persists in | fixed in v0.0.66-dev11 |
 | Severity | high: Regressed in v0.0.66-dev11 (was medium): A test worker can import different code from the parent, which could hide regressions. |
 | Family | Gates, CI and tests (`tests-ci`) |
+| Fix commit | `b9b121f1` |
+| Fixed on | 2026-11-16 |
+| Planning item | `REGISTER-STALE-SWEEP-66` |
 | Came back (regression) | in v0.0.66-dev11 (fixed in v0.0.35 before) |
 
 <!-- END GENERATED FACTS -->
+
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.66-dev11 (b9b121f1) | 2026-11-16 | the two new native test modules put src before tools on sys.path; tests.test_run_tests.DiscoveryTests compares the parallel and serial discoveries | the suite's discovery imports the mwad package for every module again; both discoveries list the same 8,029 tests |
+| shipped | the v0.0.66-dev11 release build | v0.0.66-dev11 (26ed570f, build 2026_11_16_v0.0.66-dev11_full) | 2026-11-16 | the delivered dev11 build holds the commit | a numbered build carries the fix |
+| confirmed by a test | the gate's test suite | v0.0.66-dev11 (gate 10943 on d6489f49) | 2026-11-16 | tests.test_run_tests.DiscoveryTests passed in gate 10943 (8,031 tests, 0 failures) and in every gate since | a test-only fix: the discoveries agree, no play check applies; the shadowing itself remains possible while a module in tools has the package's name (a new module puts src first, the preamble says so) |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.32-dev
+- 2026-10-08: CHIM parity and terrain hull fixes; test import path: Fixed in source on the CHIM branch, not merged: CHIM-PAYLOAD-PARITY-33 (Balmora 1,473 statics, two-way frame-map gate passes; two open requirements: frame origin and harvest ...
+- 2026-10-08: Image-parallel follow-up findings: Found while making the image step parallel.
+- 2026-10-10: TEST-WORKER-SYSPATH-32: TEST-WORKER-SYSPATH-32: fixed.
+- 2026-11-16: fixed in source: a gated commit, v0.0.66-dev11 (b9b121f1); the two new native test modules put src before tools on sys.path; tests.test_run_tests.DiscoveryTests compares the parallel and serial discoveries: the suite's discovery imports the mwad package for every module again; both discoveries list the same 8,029 tests
+- 2026-11-16: shipped: the v0.0.66-dev11 release build, v0.0.66-dev11 (26ed570f, build 2026_11_16_v0.0.66-dev11_full); the delivered dev11 build holds the commit: a numbered build carries the fix
+- 2026-11-16: confirmed by a test: the gate's test suite, v0.0.66-dev11 (gate 10943 on d6489f49); tests.test_run_tests.DiscoveryTests passed in gate 10943 (8,031 tests, 0 failures) and in every gate since: a test-only fix: the discoveries agree, no play check applies; the shadowing itself remains possible while a module in tools has the package's name (a new module puts src first, the preamble says so)
+- 2026-11-16 10:32 +0000: came back in v0.0.66-dev11 (fixed in v0.0.35 before): Seen again by gate 10940 on the v0.0.66-dev11 line: the suite's parallel discovery could not import test_actor_ground ("No module named mwad.cli; mwad is not a package"), so 27 tests were missing against the serial loader and ...
+
+<!-- END GENERATED TIMELINE -->
 
 _Last updated with AmiWind v0.0.40 (15 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Status: 10 October 2026](#status-10-october-2026)
 - [Earlier status: 8 October 2026](#earlier-status-8-october-2026)
 - [Symptom](#symptom)
@@ -107,6 +136,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [BUILD-EMPTY-RESIDENT-POOL-38](BUILD-EMPTY-RESIDENT-POOL-38.md): Town conversion starts a zero-worker pool when no residents are present
 - [BUILD-EXECUTABLES-LIST-UNGATED-36](BUILD-EXECUTABLES-LIST-UNGATED-36.md): A file committed executable but missing from tools/release.py EXECUTABLES (tools/engine_smoke.py) broke the source ZIP only at kit time
 - [BUILD-FACE-KEY-FORM-TEST-48](BUILD-FACE-KEY-FORM-TEST-48.md): The face key test tied the gallery face keys to the stage key form; stage keys in form 3 failed it (the faces rightly keep form 2)
+- BUILD-FAILURE-REPORT-66 (no report page): Requested: a failed build writes one report file with everything needed to find its cause; the intro stage failure of a build of v0.0.64 and v0.0.65 outside the project came with its traceback, but without the build settings, the versions, which copy of the game data or the stage plan
 - [BUILD-LAVA-CORE-BOUNDS-38](BUILD-LAVA-CORE-BOUNDS-38.md): Lava sandbox bounds are not divisible by its core size
 - [BUILD-LAVA-PRESET-FIXTURE-38](BUILD-LAVA-PRESET-FIXTURE-38.md): Lava sandbox addition omitted the preset inventory fixture
 - [BUILD-SEYDA-CARRIER-VOICE-DIR-40](BUILD-SEYDA-CARRIER-VOICE-DIR-40.md): Fresh Seyda carrier cannot publish a resident voice without an inherited sound directory
@@ -130,6 +160,8 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - CI-TAG-RUN-DUPLICATE-54 (no report page): The release tag push ran the whole CI test suite again on a commit main had already passed
 - [CI-TEST-SHARD-ONE-SLOW-53](CI-TEST-SHARD-ONE-SLOW-53.md): The first test shard of the v0.0.53 GitHub run took six times as long as the others
 - [CONTAINER-READ-ENOMEM-66](CONTAINER-READ-ENOMEM-66.md): In the development container, reads of the repository files sometimes fail with "Cannot allocate memory"; a retry works, so a check that hits it can report an unrelated failure
+- DELIVERY-LEAVES-LINE-UNCLEAN-66 (no report page): A snapshot delivery wrote the cell tracker page into the release line's working copy, so the line's next gate was not clean and could not be published
+- DELIVERY-RERUN-STOPS-ON-OWN-OUTPUT-66 (no report page): A second delivery of a snapshot stopped on what the first one left: its source package folder, then its Pi image, reported as a failed upload although the upload had gone through
 - DOCS-PUBLIC-CHAT-QUOTES-56 (no report page): Public bug pages and code comments carried the maintainer's chat words and swearing
 - DOCS-PUBLIC-PRIVATE-CHANNEL-66 (no report page): Public register text, code comments and test data named the private channel a report came through
 - DOOR-ENTRANCE-AUDIT-51 (no report page): Requested: an entrance check in every build: each exterior entrance of the original must have a door that leads into its interior, found from the map, missing ones listed
@@ -162,11 +194,13 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - JOURNEY-WALK-DIALOGUE-DESYNC-66 (no report page): The gameplay journey lost its way in the census office: its key presses talked to the clerk and chose Persuasion instead of taking the papers, and every later step ran in that window
 - KIT-CI-JOBS-SPLIT-53 (no report page): The release kit did not know the split CI workflow: its job check refused it and its publisher waited for the old job names
 - LINUX-VALID-02 (no report page): Linux test fixtures failed to link (missing stubs)
+- MWAD-NAME-CLASH-66 (no report page): tools/mwad.py has the name of the src/mwad package and hides it for any process with tools before src
 - [MWAD-TEXT-WRITER-LF-35](MWAD-TEXT-WRITER-LF-35.md): Some JSON and text writers do not pin LF and UTF-8
 - [OPS-GATE-UNLISTED-TESTS-36](OPS-GATE-UNLISTED-TESTS-36.md): The gate runs only the tests listed in the public file list, and nothing checked that every test file is listed
 - [PLAYTEST-SHIPPED-WITHOUT-SMOKE-36](PLAYTEST-SHIPPED-WITHOUT-SMOKE-36.md): The v0.0.36-dev3 private playtest package was published with an engine that dies on every map load: no ship step or gate booted it
 - PREGATE-GLOBAL-SHADOW-58 (no report page): Pregate C check misses global shadowing; the engine build fails on it
 - PREGATE-SYNTAX-SKIP-SILENT-57 (no report page): The pre-gate C syntax check skipped itself without failing on worktrees in the per-version folder layout
+- RELEASE-CHECK-NOTES-LATE-66 (no report page): The release check of the notes' core-use claims ran only when the snapshot package was made, after the build and its play tests, and read a sentence about allowed workers as a claim
 - RELEASE-CONNECT-STEP-SKIPPED-53 (no report page): After v0.0.52 and v0.0.53 were published the release's connect-it-fully step was skipped: the pinned previous release and the size baseline stayed at v0.0.51
 - [RELEASE-INCLUSION-CHECK-LATE-48](RELEASE-INCLUSION-CHECK-LATE-48.md): The release guard does not check the CHIM inclusion ledger: the v0.0.48 kit stopped in its source step after the guard and the full suite had passed
 - [RELEASE-KIT-NO-REPAIR-MODE-35](RELEASE-KIT-NO-REPAIR-MODE-35.md): The release kit has no repair mode for a commit already pushed

@@ -19,11 +19,26 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.32-dev1
+- 2026-10-08: CONSOLE-HISTORY-ARROWS-32: the maintainer trace shows the arrows arriving: The maintainer's `aw_input_trace 1` on dev1: Up and Down reach the game as raw 76 and 77 with qualifier 32768 (mouse grabbed).
+- 2026-10-08: CONSOLE-HISTORY-EMPTY-32: Up past the oldest command sticks on an empty line: Found during CONSOLE-HISTORY-ARROWS-32, inherited from Quake's `Key_Console`: Up past the oldest command jumped to an empty slot and stayed there until Down, and ...
+- 2026-10-19 15:30 +0300: seen again in v0.0.44-dev1: maintainer: still no Up/Down console history; wants at least 10 previous commands like bash, least memory possible
+- 2026-11-07: came back in v0.0.61 (fixed in v0.0.53 before): Seen again on the v0.0.61 release image in FS-UAE: the arrow keys only move the mouse pointer, in every menu, the main menu included; they used to browse the menus (INVENTORY-ARROWS-SCROLL-62).
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Status: 8 October 2026](#status-8-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)

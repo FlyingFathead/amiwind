@@ -18,6 +18,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.32-dev1
+- 2026-10-08: v0.0.32-dev1: v0.0.32-dev1 delivery and smoke test findings: The recorded Seyda Neen maps are rewritten by later image passes (high priority for v0.0.32 final), the Arena and Balmora are heavily fogged, the world disk image is just over 2 GiB and the ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 
 ## Status: 8 October 2026

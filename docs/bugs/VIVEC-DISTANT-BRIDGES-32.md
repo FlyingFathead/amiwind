@@ -18,6 +18,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-08: reported in v0.0.32-dev3
+- 2026-10-19 18:28 +0300: seen again in v0.0.44: maintainer: distant views still break up, Vivec bridges cut in the middle; idea: a very low-poly world proxy drawn in the distance; later to-do
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.45 (20 October 2026)._
 
 ## Status: 8 October 2026

@@ -63,17 +63,14 @@ def directories(order, base='chim'):
     return dirs
 
 
-def partition_command(xdftool, part, chim_root, volume, mib, base='chim', extra=()):
-    """The xdftool command: create, format, directories, then every file in pack order. EXTRA: further
-    (source file, volume path) pairs written after the CHIM world (the compact layout puts the open-world
-    frame maps on the CHIM volume, tools/layout_plan.py), so the world stays packed in order."""
+def partition_ops(chim_root, base='chim', extra=()):
+    """The partition's ops in order (tools/ffs_write.py write_volume): directories, then every file in pack order.
+    EXTRA: further (source file, volume path) pairs written after the CHIM world (the compact layout puts the
+    open-world frame maps on the CHIM volume, tools/layout_plan.py), so the world stays packed in order."""
     order = pack_order(chim_root)
-    command = [str(xdftool), str(part), 'create', 'size=%dMi' % mib, '+', 'format', volume, 'ffs']
     made = directories(order, base)
-    for d in made:
-        command += ['+', 'makedir', d]
-    for rel in order:
-        command += ['+', 'write', str(Path(chim_root) / rel), base + '/' + rel]
+    ops = [('dir', d) for d in made]
+    ops += [('file', str(Path(chim_root) / rel), base + '/' + rel) for rel in order]
     extra = list(extra)
     for path in extra:
         parts = path[1].split('/')[:-1]
@@ -81,10 +78,16 @@ def partition_command(xdftool, part, chim_root, volume, mib, base='chim', extra=
             d = '/'.join(parts[:k])
             if d not in made:
                 made.append(d)
-                command += ['+', 'makedir', d]
-    for source, path in extra:
-        command += ['+', 'write', str(source), path]
-    return command
+                ops.append(('dir', d))
+    ops += [('file', str(source), path) for source, path in extra]
+    return ops
+
+
+def partition_command(xdftool, part, chim_root, volume, mib, base='chim', extra=()):
+    """The xdftool command: create, format, directories, then every file in pack order (partition_ops; the queue
+    the method before ran, AMIWIND_PARTITION_WRITER=xdftool)."""
+    from ffs_write import xdftool_command
+    return xdftool_command(xdftool, part, mib, volume, partition_ops(chim_root, base, extra))
 
 
 def name_rules(paths):
@@ -182,7 +185,7 @@ def pack_partition(chim_root, part, volume='AW_CHIM', mib=None, xdftool='xdftool
     pack-order and name rules cover the CHIM world, the extra files keep their own folder (the image's
     disk-layout gate measures every directory)."""
     from amiga_fs import check_image
-    from build_windows_xdftool import run_any
+    import ffs_write
     chim_root, part = Path(chim_root), Path(part)
     if part.exists():
         raise ValueError('CHIM partitions are written once: ' + str(part))
@@ -194,34 +197,43 @@ def pack_partition(chim_root, part, volume='AW_CHIM', mib=None, xdftool='xdftool
     extra = [(Path(source), str(path)) for source, path in extra]
     payload = sum((chim_root / rel).stat().st_size for rel in order) + sum(s.stat().st_size for s, _ in extra)
     mib = mib or partition_mib(payload)
-    run_any(partition_command(xdftool, part, chim_root, volume, mib, base, extra))
-    # every hash chain busiest first, as on the boot partition (tools/ffs_chains.py, IMAGE-LOADS-SLOWER-66): only
-    # links change, so the pack order the layout gate checks below stays as written
-    from ffs_chains import describe, order_partition
-    print(describe(order_partition(part), volume), flush=True)
-    check_image(part, normalize=True)
-    from amitools.fs.ADFSVolume import ADFSVolume
-    from amitools.fs.FSString import FSString
-    from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
-    files = []
-    device = BlkDevFactory().open(str(part), read_only=True)
-    try:
-        mounted = ADFSVolume(device)
-        mounted.open()
-        for source, path in [(chim_root / rel, path) for rel, path in zip(order, paths)] + extra:
-            data = source.read_bytes()
-            if mounted.read_file(FSString(path)) != data:
-                raise ValueError('CHIM partition readback mismatch: ' + path)
-            files.append({'path': path, 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()})
-    finally:
-        device.close()
-    layout = layout_gate(part, paths)
-    if not layout['ok']:
-        raise ValueError('CHIM disk layout: ' + '; '.join(layout['failures'][:5]))
-    with part.open('rb') as stream:
-        digest = hashlib.file_digest(stream, 'sha256').hexdigest()
-    return {'file': part.name, 'volume': volume, 'mib': mib, 'bytes': part.stat().st_size, 'sha256': digest,
-            'files': files, 'readback': 'passed', 'layout': layout}
+    ops = partition_ops(chim_root, base, extra)
+
+    def write():
+        # written directly by default (tools/ffs_write.py, BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66): the same blocks as the
+        # xdftool queue (AMIWIND_PARTITION_WRITER=xdftool, the method before), so the pack order holds as before
+        print(ffs_write.describe(ffs_write.write_volume(xdftool, part, mib, volume, ops), volume), flush=True)
+        # every hash chain busiest first, as on the boot partition (tools/ffs_chains.py, IMAGE-LOADS-SLOWER-66): only
+        # links change, so the pack order the layout gate checks below stays as written
+        from ffs_chains import describe, order_partition
+        print(describe(order_partition(part), volume), flush=True)
+        check_image(part, normalize=True)
+        from amitools.fs.ADFSVolume import ADFSVolume
+        from amitools.fs.FSString import FSString
+        from amitools.fs.blkdev.BlkDevFactory import BlkDevFactory
+        files = []
+        device = BlkDevFactory().open(str(part), read_only=True)
+        try:
+            mounted = ADFSVolume(device)
+            mounted.open()
+            for source, path in [(chim_root / rel, path) for rel, path in zip(order, paths)] + extra:
+                data = source.read_bytes()
+                if mounted.read_file(FSString(path)) != data:
+                    raise ValueError('CHIM partition readback mismatch: ' + path)
+                files.append({'path': path, 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()})
+        finally:
+            device.close()
+        layout = layout_gate(part, paths)
+        if not layout['ok']:
+            raise ValueError('CHIM disk layout: ' + '; '.join(layout['failures'][:5]))
+        with part.open('rb') as stream:
+            digest = hashlib.file_digest(stream, 'sha256').hexdigest()
+        return {'file': part.name, 'volume': volume, 'mib': mib, 'bytes': part.stat().st_size, 'sha256': digest,
+                'files': files, 'readback': 'passed', 'layout': layout}
+    # the same partition from an earlier build when its inputs are the same (tools/partition_cache.py): the CHIM
+    # world and the maps on it are often unchanged from one snapshot to the next
+    import partition_cache
+    return partition_cache.reuse_or_write(volume, part, write, xdftool, mib, volume, ops)
 
 
 def main(argv=None):

@@ -20,6 +20,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-23: reported in v0.0.48-dev2
+- 2026-10-23: CHIM-32MB-SAVE-ENTRY-48 fixed; BUILD-ACTOR-MODEL-UNSUPPORTED-48 closed, ACTOR-MODEL-ERROR-UNNAMED-48 registered: CHIM-32MB-SAVE-ENTRY-48: on 16 MB of Fast RAM (or Extra RAM off) a save, a start or a console jump into a room or frame marked ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.48 (23 October 2026)._
 
 ## Status: 23 October 2026

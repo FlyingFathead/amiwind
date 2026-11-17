@@ -19,6 +19,18 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-06: Current RC1 regression checkpoint: Delivered playtest remains v0.0.29-rc1.
+- 2026-10-07: reported in v0.0.30-dev3
+- 2026-10-07: INTRO-ROLES-30: crash on a region change: `NUM_FOR_EDICT: bad pointer` on a Seyda Neen sub-cell load.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 ## Status: 7 October 2026

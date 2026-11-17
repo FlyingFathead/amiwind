@@ -19,9 +19,12 @@
 | Where | tools/resource_plan.py plan(): beside memory |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.48-rc1 (last seen) |
+| Persists in | fixed in v0.0.66-dev3 |
 | Severity | medium: A plan that says 15 hours for a build of 90 minutes wakes the session for nothing. |
 | Family | Build speed (`build-speed`) |
+| Fix commit | `48bedc7c` |
+| Fixed on | 2026-11-13 |
+| Planning item | `NEW-WORK-FIRST-66` |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
 | Playtest version | 2026_10_24_v0.0.48-rc1_rc1-try3_5138d022 |
 | From commit | source 5138d02, engine 5138d02, CHIM world 5138d02 |
@@ -30,12 +33,37 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.66-dev3 (48bedc7c) | 2026-11-13 | gate 10670 passed on 03a0b17d, which holds it | the resource plan counts the units to bake instead of full-rebuild history |
+| shipped | a numbered build | v0.0.66-dev3 build 2026_11_15_v0.0.66-dev3_full-v0.0.66-dev3_c0ab8f1 | 2026-11-15 | the delivered build | the first build that holds 48bedc7c |
+| confirmed by a build | a numbered build | v0.0.66-dev3 build 2026_11_15_v0.0.66-dev3_full-v0.0.66-dev3_c0ab8f1 | 2026-11-15 | the build log's resource plan and the build's own time | the plan said about 22 minutes (stages added up) for a build that took 26, where the v0.0.66-dev2 plan had said about 15 hours 55 minutes; a builder fix, no play check applies |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-24: reported in v0.0.48-rc1
+- 2026-10-26 13:21 +0200: seen again in v0.0.52-dev3: PERSISTING: the dev3 plan said about 12h06m (chim 5h47m, room batches 5h39m on 1 worker); dev2 with the same plan shape (11h29m) really took 1h12m (chim 40m52s, room batches 35m54s).
+- 2026-10-28 01:48 +0200: seen again in v0.0.54-dev2: PERSISTING (28 October 2026): the plan check of the v0.0.54-dev2 full build said expected wall about 15h33m, every stage at 1 of 22 workers (chim 5h57m, room batches 5h39m), because two other builds held memory at check time (12 of 47 GiB ...
+- 2026-11-13: fixed in source: a gated commit, v0.0.66-dev3 (48bedc7c); gate 10670 passed on 03a0b17d, which holds it: the resource plan counts the units to bake instead of full-rebuild history
+- 2026-11-13 20:08 +0000: seen again in v0.0.66-dev2: PERSISTING: the v0.0.66-dev2 plan said about 15h55m (each stage's history in full rebuilds added up; room batches 7.0 h, player view 2.6 h, chim 2.0 h, actor library 1.5 h) while the unit forecast against the dev1 run is about 1 h plus the ...
+- 2026-11-15: shipped: a numbered build, v0.0.66-dev3 build 2026_11_15_v0.0.66-dev3_full-v0.0.66-dev3_c0ab8f1; the delivered build: the first build that holds 48bedc7c
+- 2026-11-15: confirmed by a build: a numbered build, v0.0.66-dev3 build 2026_11_15_v0.0.66-dev3_full-v0.0.66-dev3_c0ab8f1; the build log's resource plan and the build's own time: the plan said about 22 minutes (stages added up) for a build that took 26, where the v0.0.66-dev2 plan had said about 15 hours 55 minutes; a builder fix, no play check applies
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.54 (28 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Status: 28 October 2026](#status-28-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -154,7 +182,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-IMAGE-FRAME-MAP-HEAP-SERIAL-36](BUILD-IMAGE-FRAME-MAP-HEAP-SERIAL-36.md): The image step's CHIM frame-map heap check runs on one core: 66 s to 4.5 min per build while 23 cores idle
 - [BUILD-IMAGE-HASH-UNDERUSED-36](BUILD-IMAGE-HASH-UNDERUSED-36.md): The image step hashes 34,592 payload files on 3 of 24 cores (one file per pool task)
 - [BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36](BUILD-IMAGE-HEAP-AUDIT-UNDERUSED-36.md): The image step's world map heap audit estimates 170 maps on 5.3 of 24 cores
-- BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66 (no report page): The image step of the v0.0.66-dev9 build wrote its partitions in 107 seconds where the earlier build took 67
+- [BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66](BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66.md): The image step of the v0.0.66-dev9 build wrote its partitions in 107 seconds where the earlier build took 67
 - [BUILD-IMAGE-NOT-INCREMENTAL-33](BUILD-IMAGE-NOT-INCREMENTAL-33.md): The image step redoes every per-map pass and the whole pack on every build
 - [BUILD-IMAGE-NPC-CHECKS-LATE-44](BUILD-IMAGE-NPC-CHECKS-LATE-44.md): The image step's player body and guard torch bakes fail only at the end of a full build instead of before the expensive stages
 - [BUILD-IMAGE-REGION-MAPS-SERIAL-43](BUILD-IMAGE-REGION-MAPS-SERIAL-43.md): The image step's CHIM frame-map phases run on one core: the world read six times, ground traces on whole frames
@@ -271,6 +299,8 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - NPC-BAKE-STAGES-OVERRUN-62 (no report page): The new seam and floor character bake made every stage that bakes characters run far past its history: room batches about 2 h 40 min, actor library about 40 min, player bodies 35+ min
 - [NPC-BAKED-WHOLE-DUPLICATION-33](NPC-BAKED-WHOLE-DUPLICATION-33.md): Every NPC appearance is baked whole: shared body parts are converted again for each actor, and equipment cannot change
 - [NPC-LIBRARY-NO-UNIT-CACHE-63](NPC-LIBRARY-NO-UNIT-CACHE-63.md): The NPC appearance bakes of the actor library stage had no unit cache, so every rebuild of the stage baked all 418 appearances again (about 45 minutes)
+- PARTITION-CACHE-FIXED-WORKERS-66 (no report page): The new partition cache hashed its files on a fixed eight threads instead of the stage's own allowance
+- PERF-GUARD-BASIS-BY-COUNT-66 (no report page): The performance guard judges the image step's partition write by the number of partitions and not by their size, so a slowdown back to the old time would pass
 - [PERF-GUARD-RESIDENT-BUSY-HOST-57](PERF-GUARD-RESIDENT-BUSY-HOST-57.md): The dev5 full build's perf guard failed chim-town-balmora and chim-town-vivec_city build_resident as slower (129 s, was 52 s; 147 s, was 62 s) while two other builds ran beside it: contention, not code
 - PLAYER-VIEW-SKIN-ROWS-STOP-62 (no report page): The image step's player view stopped the v0.0.62 final build after 1 h 13 min: an Alias skin rows overflow ended it instead of trying the next smaller body
 - RELEASE-GUARD-SLOW-CLONE-51 (no report page): The release guard, the fail-fast first step of a release, took 6 minutes on about 0.14 of a core: its release check clones the whole repository through the Windows-mounted drive

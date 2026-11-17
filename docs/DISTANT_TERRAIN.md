@@ -1,6 +1,6 @@
 # Distant terrain and sky gaps
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 The v0.0.29-dev3 source candidate adds a separate, optional resident LAND
 background pass. In the console:
@@ -78,7 +78,7 @@ nearby crossings, coastline and water, looking down, changed FOV and nighttime.
 Measure actual target frame cost and counters, verify that genuine gaps remain
 open, and retain the old-mode switch.
 
-See [the bug journal](journals/BUG_JOURNAL-v0.0.29.md#land-horizon-gaps-29-sky-visible-through-distant-resident-ground-open)
+See [LAND-HORIZON-GAPS-29](bugs/LAND-HORIZON-GAPS-29.md)
 and [the separate horizon study](history/plans/PLAN-v0.0.29.md#distant-terrain-topology-and-occlusion-study).
 
 ## Horizon draw methods (v0.0.32)

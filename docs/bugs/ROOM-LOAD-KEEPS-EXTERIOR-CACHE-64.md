@@ -28,6 +28,18 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-10: reported in v0.0.64-dev2
+- 2026-11-10 17:17 +0200: seen again in v0.0.64-dev3: Fast RAM outside the Hunk, measured (session console.log of MiniWind v0.0.64-dev3 akulakhan-chamber census6 (73e5aeb6), FS-UAE 32 MB Fast): about 6 MiB free after the boot's 6 MiB CHIM bank; Balmora after its actors 4,346,264 (about 1.7 MB ...
+- 2026-11-10 19:13 +0200: seen again in v0.0.64-dev3: Census (MiniWind akulakhan-chamber census7): nothing among the engine's checked allocations of 4 KiB or more is kept per area: the same 24 blocks (4,520 KiB) in Balmora, after the failed chamber load, inside a small room and back.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.64-dev3 (10 November 2026)._
 
 ## Status: 10 November 2026
@@ -113,6 +125,7 @@ Family: Map heap and memory budget (`heap-memory`). The heap model must match wh
 - HUNK-RESERVE-SN012-29 (no report page): Dev4 first-presented sn012 reserve below 2 MiB target
 - [LOADER-STAGING-PEAK-32](LOADER-STAGING-PEAK-32.md): Map loading stages most lumps in temporary memory before decoding, raising the heap peak
 - [MAP-UNUSED-HULL2-32](MAP-UNUSED-HULL2-32.md): Shipped maps carry about 1.1 MB of collision data for a hull the engine never uses
+- [MEM-EXTRA-HDF-27](MEM-EXTRA-HDF-27.md): Map loads bypassed the engine's file search paths: a map on an extra world disk image fell back to a whole-file read
 - MEM-GEOMETRY-01 (no report page): Light-range sharing could copy a too-short byte span
 - MEM-TOWN-02 (no report page): Bounded Balmora maps exceeded the modeled map heap limit
 - MEMCENSUS-OWNERS-START-STALL-64 (no report page): An engine with the first per-asker block count stalled at the start: every free searched the whole count table once its removal markers filled it

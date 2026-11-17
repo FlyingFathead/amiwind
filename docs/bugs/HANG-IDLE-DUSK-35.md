@@ -18,11 +18,25 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-10: reported in v0.0.35
+- 2026-10-10: HANG-IDLE-DUSK-35: cause found: HANG-IDLE-DUSK-35: the idle freeze is a music stream read that never returns while the main loop waits for it, the same call chain as SEYDA-LOAD-HANG-30 (v0.0.30).
+- 2026-10-10: HANG-IDLE-DUSK-35 game side repaired in source, ENGINE-SYNC-IO-MAIN-LOOP-36: HANG-IDLE-DUSK-35: the music stream reads through asynchronous DOS packets (`aw_aread.c`); a read that is late or never answered is logged once, the music goes ...
+- 2026-10-11: CHIM-DEV3-MAPLOAD-CRASH-36 cause and CHIM-WORLD-INDEX-FILE-LIMIT-36: CHIM-DEV3-MAPLOAD-CRASH-36: cause found by an A/B sweep and a build bisect (c8bf614 dies, its parent loads): the asynchronous music reader used the pointer from ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.45 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Status: 10 October 2026](#status-10-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)

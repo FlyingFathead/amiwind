@@ -1,6 +1,6 @@
 # AmiWind release workflow
 
-_Last updated with AmiWind v0.0.64-dev4 (10 November 2026)._
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -156,8 +156,8 @@ One commit carries everything that must agree before the build:
 
 The records change in the same step as the work, not later.
 
-- **The bug register** (`docs/bugs/bugs.json`, rendered into [BUGS.md](BUGS.md) and the report pages, with the
-  [journal](BUG_JOURNAL.md)) is always current: every finding is registered the same day; an issue seen again is
+- **The bug register** (`docs/bugs/bugs.json`, rendered into [BUGS.md](BUGS.md) and the report pages, with every
+  dated sighting, history line and closure step on its entry) is always current: every finding is registered the same day; an issue seen again is
   reported on its entry as persisting, never filed again; a fix is marked fixed only when it shipped in a numbered
   release build and was verified, with the version it was fixed in. See [the register's readme](bugs/README.md).
 - **The roadmap** ([ROADMAP.md](ROADMAP.md)) lists the open work of each version and says what a release moved on.
@@ -189,8 +189,8 @@ until its affected records agree with the code and actual verification.
    regression or confirmed finding, under the current version and date. State
    the player-visible result or build effect and link the issue ID. Keep
    implemented changes separate from findings and unfinished work.
-2. Update [bugs.json](bugs/bugs.json), the issue report and [BUG_JOURNAL.md](BUG_JOURNAL.md)
-   together; render the generated register and related pages. The register
+2. Update [bugs.json](bugs/bugs.json) (the entry, its reports, dated history and closure steps through
+   `tools/bug_register.py`) and the issue report together; render the generated [register](BUGS.md) and related pages. The register
    alone owns current status. Record regressions immediately. Source-only
    work does not set shipped/fixed or maintainer-accepted status.
 3. Update the [CHIM cell tracker](chim/PROGRESS_TRACKER.md) whenever conversion,

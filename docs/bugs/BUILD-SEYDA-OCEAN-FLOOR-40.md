@@ -20,6 +20,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-15: reported in v0.0.40-dev2
+- 2026-10-15: BUILD-SEYDA-OCEAN-FLOOR-40: expanded ocean floor: v0.0.40-dev2: actual town compilation exposed zero-thickness prisms where original seabed meets the old seal.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 
 ## Symptom and reproduction

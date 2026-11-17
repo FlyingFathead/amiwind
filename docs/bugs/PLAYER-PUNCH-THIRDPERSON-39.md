@@ -31,12 +31,32 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-13: reported in v0.0.39-rc1
+- 2026-10-13: seen again in v0.0.39-rc1: Source candidate: two male bodies retain full8/6 gait plus punch within512 KiB;83 affected tests pass.
+- 2026-10-13: seen again in v0.0.39-rc2: All 20 body pairs pass binary checks with gait/punch declarations; 33 guard checks pass, earlier 83 retained.
+- 2026-10-13: seen again in v0.0.39-rc2: Scoped Nord male/Orc female candidate footage shows torso/arm punch motion and ready movement.
+- 2026-10-14: seen again in v0.0.39-rc2: Maintainer repeats no third-person punch from physical LMB in RC2.
+- 2026-10-14: PLAYER-PUNCH-THIRDPERSON-39: Khajiit movement and punch control: An unreleased diagnostic adds Khajiit female physical W/A/S/D movement with fists drawn, F lower/redraw, and stationary/strafe LMB attack observations.
+- 2026-10-14: PLAYER-PUNCH-THIRDPERSON-39: selected ordinary-view observation: Unchanged delivered dev1, dry stationary male Argonian: physical LMB in ordinary third person records attack state3/body102-103 and visible arm motion.
+- 2026-10-14: UI-INVENTORY-INTEGRATION-40: scoped native equipment: UI-INVENTORY-INTEGRATION-40/INVENTORY-CATALOG-LOOKUP-40: actual names/icons, equip, modal pause and Russula persistence scoped; missing resources separate.
+- 2026-10-14: PLAYER-PUNCH-THIRDPERSON-39: held attack during raising: PLAYER-PUNCH-THIRDPERSON-39: compiledQC old control fails heldLMB during raise; source defers latch until ready.
+- 2026-10-14: Renewed RC2 gameplay reports: PLAYER-PUNCH-THIRDPERSON-39: maintainer repeats no physicalLMB third-person punch.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -273,6 +293,7 @@ Family: First-person hands and torch (`torch-hands`). First-person hands, punche
 - PLAYER-PARTS-BAKE-REFUSED-59 (no report page): Two body part meshes are refused by the assembled player body's parts library
 - [PLAYER-READY-THIRDPERSON-38](PLAYER-READY-THIRDPERSON-38.md): Third-person player lacks fists-up and weapon-draw animation
 - [PLAYER-TORCH-THIRDPERSON-38](PLAYER-TORCH-THIRDPERSON-38.md): Player torch and holding pose disappear in third person while light remains
+- [TORCH-ACTIVATE-CRASH-25](TORCH-ACTIVATE-CRASH-25.md): Raising the fists and pressing V crashed the game: a dynamic light was marked through a negative collision root
 - TORCH-FLAME-VISIBILITY-29 (no report page): Torch flame not visible after changing styles
 - TORCH-FUEL-29 (no report page): Torch never burns out; no unlit or fuel state
 - TORCH-HAND-NORD-29 (no report page): Detached-looking left grip fragment in dev4

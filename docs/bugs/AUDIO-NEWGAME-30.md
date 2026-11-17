@@ -19,6 +19,18 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-07: reported in v0.0.30-rc1
+- 2026-10-07: v0.0.30-rc1: v0.0.30-rc1 the maintainer playtest summary: WinUAE playtest by the maintainer: Census office interiors work (CENSUS-ENTITIES-30 accepted), mushroom picking on the road to Balmora works, Balmora works and torches work.
+- 2026-10-07: AUDIO-NEWGAME-30: rc1 playtest audio reports: v0.0.30-rc1 WinUAE playtest by the maintainer: music crackles when confirming New Game (new, report (AUDIO-NEWGAME-30)); crackles as the game fades in after the intro (AUDIO-03); a split-second ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 ## Status: 7 October 2026

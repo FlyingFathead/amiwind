@@ -4,7 +4,7 @@
 Hors restart from Jiub name entry. Direct visibility/lighting/entity loading
 avoids the duplicate input buffer; its host regression and Amiga compile pass.
 The heap-headroom gate and repaired target playtest remain required. See
-[CRASH-01](../../BUG_JOURNAL.md) and [heap allowance policy](../../CELL_CHANGING.md).
+[CRASH-01](../../BUGS.md) and [heap allowance policy](../../CELL_CHANGING.md).
 
 Rc3 carries the rc2 mushroom seam correction, accepted by the owner in WinUAE,
 and adds the Seyda Neen terrain handoff and held-input corrections.
@@ -36,7 +36,7 @@ publication remain pending. Native Windows remains experimental. Further
 size/runtime optimization follows the measured baseline; see the [roadmap](../../ROADMAP.md).
 
 See [rc2 screenshots and scope](RELEASE-v0.0.27-rc2.md), the
-[bug journal](../../BUG_JOURNAL.md) and [What are rocks?](../../WHAT_ARE_ROCKS.md).
+[bug tracker](../../BUGS.md) and [What are rocks?](../../WHAT_ARE_ROCKS.md).
 Distribution remains source/tools plus explicitly selected documentation media;
 users supply game data and ROMs. No playable HDFs or proprietary runtime assets
 are public release inputs.

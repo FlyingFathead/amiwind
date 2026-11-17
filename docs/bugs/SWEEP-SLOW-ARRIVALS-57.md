@@ -28,6 +28,18 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-30: reported in v0.0.57-dev1
+- 2026-10-30 14:14 +0200: seen again in v0.0.57-dev2: dev2 sweep: 7 places over 50 ms (Ashurnibibi 51, Holamayan 64, Mzuleft Ruin 67, Nchuleft Ruin 52, Odrosal 50, Tureynulal 72); median 19 ms (dev1 22)
+- 2026-10-30 20:37 +0200: seen again in v0.0.57-dev4: dev4 sweep: 4 places over 50 ms (Ashurnibibi 60, Holamayan 51, Odrosal 58, Tureynulal 82); median of all 82 is 17 ms (dev2 19, dev1 22)
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.57-dev4 (30 October 2026)._
 
 ## Status: 30 October 2026

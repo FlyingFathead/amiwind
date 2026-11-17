@@ -67,7 +67,7 @@ geometry checks but introduces mismatches at three neighboring joins and require
 coherent NPC fitting across owner cores and their overlap copies. It is not accepted,
 and candidate035 remains pending. Rejected terrain trials and the current
 regional blockers are retained with their costs and causes in the
-[terrain record](../../CANONICAL_TERRAIN_CULLING.md) and [bug journal](../../BUG_JOURNAL.md).
+[terrain record](../../CANONICAL_TERRAIN_CULLING.md) and [bug tracker](../../BUGS.md).
 No complete world-wide buried-geometry removal is claimed.
 
 ## Public and private outputs
@@ -79,4 +79,4 @@ final package gates. The private reference profile is A1200/AGA/PAL, 68040/FPU/J
 2 MiB Chip and 16 MiB Z3 Fast RAM; physical-hardware performance is unverified.
 
 See [day/night controls](../../DAY_NIGHT_AND_SKY.md), [gameplay media](../../GAMEPLAY_MEDIA.md),
-[project state](../../PROJECT_STATE.md) and [known issues](../../BUG_JOURNAL.md).
+[project state](../../PROJECT_STATE.md) and [known issues](../../BUGS.md).

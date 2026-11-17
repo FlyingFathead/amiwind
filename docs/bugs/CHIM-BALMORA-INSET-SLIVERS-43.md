@@ -30,12 +30,28 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-18: reported in v0.0.43
+- 2026-10-18: CHIM-BALMORA-INSET-SLIVERS-43 and CHIM-OCEAN-CELL-RECORD-CLASSIC-43: The v0.0.43-dev2 build keeps 61 exterior cells classic: 39 wait for the stair repair, and 22 more were missing from the count.
+- 2026-10-18 16:57 +0300: seen again in v0.0.43-dev2: maintainer: a terrain band hangs across the sky at cell -2,-1 (West Gash, Balmora border), global -10263 -851 735, 19:00
+- 2026-10-18 18:04 +0300: seen again in v0.0.43-dev2: maintainer: the Balmora exit is still rough at cell -2,-1 (West Gash, local 2534 2933 199): ground wedges and a slab across the sky; dev2 predates the fix, dev3 carries it
+- 2026-10-18 19:44 +0300: seen again in v0.0.43-dev2: maintainer: rough terrain seam again at cell -2,-1 (global -8617 -4100); heap line shows the classic strip map vf0864.bsp; dev3 carries the fix
+- 2026-10-18 19:53 +0300: seen again in v0.0.43-dev2: maintainer: same seam on the east side, cell -2,-3 (global -8650 -19436): classic strip map vf0859.bsp; a different border cell of the same Balmora ring
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -201,6 +217,7 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - CHIM-STORE-ONE-AT-A-TIME-64 (no report page): The engine streams one CHIM store at a time, so frames of a second store cannot sit beside the first in the open world
 - [CHIM-TERRAIN-GRAFT-33](CHIM-TERRAIN-GRAFT-33.md): CHIM chunk terrain is a brush entity, not part of the world tree, so it does not occlude
 - [CHIM-TERRAIN-HULL-BEVELS-33](CHIM-TERRAIN-HULL-BEVELS-33.md): A standing box rests above the ground at convex CHIM terrain edges
+- [CHIM-TERRAIN-RECORDS-SIZE-46](CHIM-TERRAIN-RECORDS-SIZE-46.md): CHIM terrain records were stored whole: 489.4 MB of the v0.0.46 world's frame segments
 - [CHIM-TEXTURE-SPECKS-33](CHIM-TEXTURE-SPECKS-33.md): CHIM-drawn surfaces show bright single-texel specks that legacy frames do not
 - [CHIM-TILT-VARIANTS-SPLIT-33](CHIM-TILT-VARIANTS-SPLIT-33.md): Tilted placements each get their own model variant: 39,103 extra model variants on the base island, breaking store-once
 - [CHIM-TOWN-HEAP-ROUTED-HULL-36](CHIM-TOWN-HEAP-ROUTED-HULL-36.md): With the routed terrain hull for every chunk, Balmora and Seyda Neen rings no longer fit the CHIM zone

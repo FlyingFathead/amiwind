@@ -35,12 +35,38 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.66-dev8 (56901b8d) | 2026-11-15 | gate 10910 passed on 3a64d00e, which holds it | the build check plans the same commands as the build, so the unit stop counts only the regions a stage converts |
+| shipped | a numbered build | v0.0.66-dev8 build 2026_11_15_v0.0.66-dev8_full-v0.0.66-dev8_3a64d00 | 2026-11-15 | the delivered build | the build holds 56901b8d |
+| confirmed by a build | a numbered build | v0.0.66-dev8 build 2026_11_15_v0.0.66-dev8_full-v0.0.66-dev8_3a64d00 | 2026-11-15 | the build's reuse check of 3a64d00e | world terrain, scenery and flora were planned as reused from the v0.0.66-dev7 build with no allowance and the check passed with no reuse stop; a builder fix, no play check applies |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-10: reported in v0.0.64-dev3
+- 2026-11-15: fixed in source: a gated commit, v0.0.66-dev8 (56901b8d); gate 10910 passed on 3a64d00e, which holds it: the build check plans the same commands as the build, so the unit stop counts only the regions a stage converts
+- 2026-11-15: shipped: a numbered build, v0.0.66-dev8 build 2026_11_15_v0.0.66-dev8_full-v0.0.66-dev8_3a64d00; the delivered build: the build holds 56901b8d
+- 2026-11-15: confirmed by a build: a numbered build, v0.0.66-dev8 build 2026_11_15_v0.0.66-dev8_full-v0.0.66-dev8_3a64d00; the build's reuse check of 3a64d00e: world terrain, scenery and flora were planned as reused from the v0.0.66-dev7 build with no allowance and the check passed with no reuse stop; a builder fix, no play check applies
+- 2026-11-15 01:54 +0200: seen again in v0.0.66-dev3: Seen again on the v0.0.66-dev3 line: the unit check stopped world-scenery (2064 of 2064) and world-flora (1931 of 1931) as baking again, while neither converts a region (every region is a CHIM cell).
+- 2026-11-15 06:12 +0200: seen again in v0.0.66-dev3: Seen again on the v0.0.66-dev3 line: the unit check of c0ab8f11 against the stopped v0.0.66-dev3 try2 run planned 46 of 48 stages for reuse, world-scenery and world-flora among them, yet stopped both for the 2,064 and 1,931 stored units of ...
+- 2026-11-15 12:29 +0200: seen again in v0.0.66-dev5: Seen again on the v0.0.66-dev5 line: the unit check of 18eb63f1 stopped world-scenery (2,064 of 2,064) and world-flora (1,931 of 1,931) as baking again, while neither stage converts a region; the stored group of older key forms was counted.
+- 2026-11-15 14:23 +0200: seen again in v0.0.66-dev6: Seen again on the v0.0.66-dev6 line: the unit check of 00dfab13 stopped world-scenery (2,064 of 2,064) and world-flora (1,931 of 1,931) although the first repair was in it.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.66-dev8 (15 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Status: 15 November 2026](#status-15-november-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -183,6 +209,7 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - BUILD-REUSE-FOREIGN-DIRS-52 (no report page): A reused stage recreates, as empty folders, the folders another stage filled beside it: the area stage then stops on its own room folder
 - [BUILD-REUSE-INTRO-CENSUS-REPLACED-48](BUILD-REUSE-INTRO-CENSUS-REPLACED-48.md): A reused MiniWind rooms build rebuilt the intro and census stages (replaced outputs) and its Balmora interiors (4 s to 1m21s)
 - BUILD-REUSE-KEY-WALK-LISTED-51 (no report page): The read records of the CHIM world stages list almost every folder of the checkout, so a new bug page refuses their narrowed reuse
+- BUILD-REUSE-NEVER-READ-STOPS-66 (no report page): The reuse check stops stages whose key changed only in code they never ran or read, and redoes their stored units
 - BUILD-REUSE-OUTPUTS-DIFFER-48 (no report page): Eight stages were rebuilt because their earlier outputs differed from their records (character, reading, world-ui, actor-contact, world-terrain and others)
 - [BUILD-REUSE-PLAN-ENV-36](BUILD-REUSE-PLAN-ENV-36.md): The standalone reuse plan reports environment changes the real build does not have
 - BUILD-REUSE-RC1-RECORDS-REFUSED-48 (no report page): Every stage that ran the idle-worker watcher or read the CHIM label module was marked not reusable: rc1-try2 had 24 unexpected rebuilds

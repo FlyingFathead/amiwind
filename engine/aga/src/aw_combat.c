@@ -1527,7 +1527,7 @@ static int start_cast(slot_t *s,edict_t *p) {
     if(!a || s->spell<0 || ci<0 || cached_effects(s,ci,e,m)<=0)return 0;
     mcost=s->sp[ci].cost;
     if(AW_ActorStat(a,AWA_MAGICKA)<(float)mcost)return 0;
-    AW_ActorModCurrent(a,1,-(float)mcost);
+    AW_ActorModCurrent(a,AWA_MAGICKA,-(float)mcost);   /* NPC-CAST-MAGICKA-NOT-PAID-66: stat 1 was Intelligence, which ModCurrent ignores */
     range=e[0].range<=AW_RANGE_TARGET?(int)e[0].range:AW_RANGE_TARGET;
     r=AW_AnimKitCast(s->e,variant[range]);
     s->cast_release=r>=0 && r<3?r:CAST_FALLBACK;s->cast_end=s->cast_release+CAST_TAIL;s->cast_left=0;

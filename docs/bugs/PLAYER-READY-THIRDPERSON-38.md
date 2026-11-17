@@ -20,11 +20,26 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-12: reported in v0.0.38-dev2
+- 2026-10-12: BUILD-LAVA-CORE-BOUNDS-38: PLAYER-READY-THIRDPERSON-38 (2026-10-12): Maintainer reports no fists-up pose or weapon unsheathing animation on the third-person player body.
+- 2026-10-13: seen again in v0.0.39-rc1: Maintainer confirms RC1 fight-ready posture is good and must be preserved.
+- 2026-10-13: UI-DEATH-DAMAGE-TINT-38, candidate: PLAYER-READY-THIRDPERSON-38 (2026-10-13): Source diagnosis confirms the body ignores QuakeC ready state and omits the original ready/equip/unequip groups.
+- 2026-10-14: Renewed RC2 gameplay reports: INTRO-CAMERA-GATING-38, PLAYER-JUMP-THIRDPERSON-38, PLAYER-READY-THIRDPERSON-38 and UI-KEY-HELP-STALE-38: 13 October 2026: reconciled completed RC1 source suite/Amiga compilation with pending ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -184,6 +199,7 @@ Family: First-person hands and torch (`torch-hands`). First-person hands, punche
 - PLAYER-PARTS-BAKE-REFUSED-59 (no report page): Two body part meshes are refused by the assembled player body's parts library
 - [PLAYER-PUNCH-THIRDPERSON-39](PLAYER-PUNCH-THIRDPERSON-39.md): Third-person punches have no visible player-body attack animation
 - [PLAYER-TORCH-THIRDPERSON-38](PLAYER-TORCH-THIRDPERSON-38.md): Player torch and holding pose disappear in third person while light remains
+- [TORCH-ACTIVATE-CRASH-25](TORCH-ACTIVATE-CRASH-25.md): Raising the fists and pressing V crashed the game: a dynamic light was marked through a negative collision root
 - TORCH-FLAME-VISIBILITY-29 (no report page): Torch flame not visible after changing styles
 - TORCH-FUEL-29 (no report page): Torch never burns out; no unlit or fuel state
 - TORCH-HAND-NORD-29 (no report page): Detached-looking left grip fragment in dev4

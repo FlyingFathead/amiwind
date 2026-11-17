@@ -1,6 +1,6 @@
 # Streamed music and speech
 
-_Last updated with AmiWind v0.0.61-dev3 (2026-11-06)._
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -242,7 +242,7 @@ limitation; further audio investigation is deferred until after publication. Add
 read-ahead is a functionally tested mitigation, not a verified cure or a proven
 hardware/backend diagnosis. The complete attempts, corrected test oracle,
 memory accounting and listening chronology are in
-[WIN-05](journals/BUG_JOURNAL-v0.0.29.md#win-05-intermittent-winuae-background-music-snapping---investigation-open).
+[WIN-05](BUGS.md).
 
 ## Earlier audio design and implementation records
 

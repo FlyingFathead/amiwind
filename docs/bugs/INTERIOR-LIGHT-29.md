@@ -15,7 +15,40 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-04: reported in v0.0.28
+- 2026-10-04: INTERIOR-LIGHT-29: interiors lack convincing local light (OPEN): Priority/type: P2 fidelity/visual issue.
+- 2026-10-04: LIGHT-GRADIENT-29: unsigned surface-light interpolation overflow: This establishes the arithmetic repair and a working synthetic surface-light path.
+- 2026-10-06: Latest scoped RC2 playtest confirmations: The RC2 playtest was released on 6 October.
+- 2026-10-06: v0.0.29-rc2: Latest v0.0.29-rc2 playtest report: These reports supersede conflicting current-status claims below while retaining their dated history.
+- 2026-10-06: INTERIOR-LIGHT-29: RC2 measured checkpoint: Native menu changes and saved settings passed.
+- 2026-10-06: v0.0.29-rc2: v0.0.29-rc2: Let There Be (Just a Bit More) Light: Recorded 2026-10-06T21:23:03+03:00.
+- 2026-10-06: Live-console comparison completed: A single `--debug-luma` executable was used for all four values: 1.0, 1.1, 1.2 and 1.3.
+- 2026-10-06: Debug-only luminosity checkpoint: The latest setting supersedes the earlier 1.2 default: normal builds omit the preview feature; `--debug-luma` builds include all gameplay-interior previews, starting at 1.0.
+- 2026-10-06: Current RC1 regression checkpoint: Delivered playtest remains v0.0.29-rc1.
+- 2026-10-06: Post-RC1 combined gate: The next candidate passes 1,046 Linux Docker checks, zero failures/errors, and four documented skips: three Windows-only checks and the JavaScript inspector check requiring Node.js.
+- 2026-10-06: RC1 follow-up: building brightness and isolated inspection scenes: `dbg interiorluma [factor]`: archived `aw_interiorluma`, default 1.2, bounded 0..4.
+- 2026-10-06: Current RC1 regression checkpoint: Consolidated RC1 reports, coordinates and scoped positive observations: RC1 playtest ledger (docs/history/feedback/RC1_PLAYTEST_LEDGER.md).
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.45 (19 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [Timeline](#timeline)
+- [Latest visual feedback: 6 October 2026](#latest-visual-feedback-6-october-2026)
+- [Measurement identity and method](#measurement-identity-and-method)
+- [Remaining acceptance](#remaining-acceptance)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 Status: controls and bounded native checks pass in v0.0.29-rc2; broader
 performance acceptance remains open. This measurement does not close other
@@ -94,6 +127,7 @@ Family: Lighting, lamps and night (`lighting-night`). Morrowind lights become Qu
 - [CHIM-EXTERIOR-FLAMES-MISSING-48](CHIM-EXTERIOR-FLAMES-MISSING-48.md): CHIM exteriors draw no fire: campfires, braziers, fire pits and flame lamps outdoors have no flame animation
 - [CHIM-MESHLESS-LIGHTS-33](CHIM-MESHLESS-LIGHTS-33.md): Exterior lights without a mesh have no CHIM light path: 2,284 placed lights give no light in a CHIM frame
 - CHIM-ROOM-LIGHT-FLAT-48 (no report page): CHIM rooms light each placement at one level: Temple arch trims and Rithleen walls look flat and brighter than the room maps baked light
+- [DLIGHT-MODEL-TRANSFORM-25](DLIGHT-MODEL-TRANSFORM-25.md): Dynamic lights on translated or rotated models (caves) were placed in world coordinates where the surfaces need model-local ones
 - [DLIGHT-WALLS-31](DLIGHT-WALLS-31.md): Torches barely light town walls at night
 - [EMISSIVE-UNSHIPPED-31](EMISSIVE-UNSHIPPED-31.md): Glowing lantern glass never reached the shipped maps (only the Temple has it)
 - ENGINE-FLAME-LIGHT-KEY-WARNING-51 (no report page): Every Seyda Neen load prints "aw_flame_light is not a field" ten times: the fire rows key no QuakeC field

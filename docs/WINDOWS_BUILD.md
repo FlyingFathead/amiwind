@@ -1,6 +1,6 @@
 # Windows build entry points and WSL notes
 
-_Last updated with AmiWind v0.0.53 (27 October 2026)._
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -49,7 +49,7 @@ test have now passed. The open issues and exact recovery scope remain below.
 
 ### Intermittent Python worker failure (unresolved, 2 October 2026)
 
-Canonical record: [WIN-01 in the bug journal](journals/BUG_JOURNAL-v0.0.29.md#win-01-intermittent-geometry-worker-queue-failure--open-2-october-2026).
+Canonical record: [WIN-01 in the bug tracker](BUGS.md).
 
 Native Windows full-conversion attempts have intermittently failed in Python's
 `ProcessPoolExecutor`, while preparing interior, Balmora or Census BSP geometry:
@@ -90,7 +90,7 @@ hashes invalidate older model-cache entries and require their regeneration.
 
 The confirmed failure point is the Python worker's local queue semaphore, not
 the Amiga compiler. Worker startup, handle duplication/closure and possible
-native-library interactions remain hypotheses. The [bug journal](BUG_JOURNAL.md)
+native-library interactions remain hypotheses. The [bug tracker](BUGS.md)
 records the evidence and exact fix status for WIN-01 and the separate WIN-02
 process-tree cleanup defect. Do not publish private diagnostic logs containing
 local paths, usernames, machine identities or owned asset details.
@@ -453,6 +453,6 @@ packing with WinError 206: the xdftool command exceeded the Windows process
 argument limit. The Windows-only batching correction passed focused file-readback
 and regression checks, then passed full HDF validation and WinUAE game entry.
 See [the exact successful checkpoint](history/validation/VALIDATION-WINDOWS-2026-10-02.md).
-See [WIN-03](journals/BUG_JOURNAL-v0.0.29.md#win-03-windows-image-packing-command-exceeds-process-limit--fixed-in-working-tree-2-october-2026).
+See [WIN-03](BUGS.md).
 The original failed receipt remains failed; an image-only retry records its own
 result. WIN-01 was not observed in this run and remains unresolved.

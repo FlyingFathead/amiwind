@@ -21,11 +21,25 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-15: reported in v0.0.40-dev2
+- 2026-10-15: 15 October 2026 - combined-world boundary ownership: CHIM-TERRAIN-DIAGONAL-40: Generation completes; ownership validation holds compiled seam acceptance.
+- 2026-10-15: 15 October 2026 - original ground reference distinction: CHIM-TERRAIN-DIAGONAL-40: Complete source suite passes with explicit skips and expected failures.
+- 2026-10-15: 15 October 2026 - complete carrier and expanded contact findings: CHIM-TERRAIN-DIAGONAL-40: Exact OpenMW 0.48 source uses alternating diamond terrain triangles while the converter uses fixed AC splits.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.44-dev1 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Combined-world readback, 15 October 2026](#combined-world-readback-15-october-2026)
 - [Symptom](#symptom)
 - [Where](#where)

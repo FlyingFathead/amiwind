@@ -1,6 +1,6 @@
 # World map and progression journal
 
-_Last updated with AmiWind v0.0.66-dev2 (14 November 2026)._
+_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -38,9 +38,9 @@ explicit map/story availability and map area metadata. Twenty-three focused
 interpreted checks pass on Windows and Linux, with two actual C world-UI/console
 fixtures passing on Linux. Fresh target map/click/teleport acceptance remains
 pending; the published image has not changed. See
-[MAP-TELEPORT-28](journals/BUG_JOURNAL-v0.0.29.md#map-teleport-28-map-teleport-commands-fail-from-f10-open)
-and [MAP-SPOTS-28](journals/BUG_JOURNAL-v0.0.29.md#map-spots-28-whiteyellow-spots-on-the-default-map-open),
-plus [MAP-VIEW-SWITCH-28](journals/BUG_JOURNAL-v0.0.29.md#map-view-switch-28-mouse-cannot-switch-map-views-open).
+[MAP-TELEPORT-28](BUGS.md)
+and [MAP-SPOTS-28](BUGS.md),
+plus [MAP-VIEW-SWITCH-28](BUGS.md).
 
 The post-RC3 development checkpoint adds two on-demand screens. They use the
 normal single-player menu pause, leave music servicing active, capture mouse
@@ -397,7 +397,7 @@ earlier rc4 HDF was not changed by the failed helper retries. This In-Game view
 remains a terrain overview prototype, not the complete original-game world/local
 map. Verify both button labels and selected states, retained markers in both
 modes, player marker and heading, map scales and interaction. See the tracked
-[selector regression](journals/BUG_JOURNAL-v0.0.29.md#map-reg-01-rc4-in-game-selector-hides-retained-settlement-markers-bug--regression).
+selector regression (MAP-REG-01 in the [bug tracker](BUGS.md)).
 
 Stable v0.0.27 also includes the archived aw_region_loading_delay setting from rc5:
 two seconds by default, zero for immediate loading-screen presentation. It
@@ -417,7 +417,7 @@ passes all eleven candidate checks, including ordinary release, close/reopen,
 selection preservation and discarded pending gameplay motion. Native focus and
 capture transitions remain unverified. This is distinct from map-tab pointer
 delivery and does not establish a fix for that report. See
-[MAP-FOCUS-DRAG-29](journals/BUG_JOURNAL-v0.0.29.md#map-focus-drag-29-map-or-journal-keeps-dragging-after-focus-returns-open).
+[MAP-FOCUS-DRAG-29](BUGS.md).
 
 ## v0.0.29 lava and weather map study
 
