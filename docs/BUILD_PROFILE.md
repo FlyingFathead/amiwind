@@ -1,6 +1,6 @@
 # Build profile and stage reuse
 
-_Last updated with AmiWind v0.0.66-dev2 (13 November 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -470,8 +470,14 @@ the image step at its end. It first checks every player model already in the
 unit cache against the engine's model limits (bytes, frames, vertices,
 triangles) and names every one over a limit before anything is baked; then it
 bakes the missing units into the unit cache, and the image step takes all of
-them from there. With the unit cache off the stage bakes nothing and the image
-step bakes the player view as before. Among the stages ready at the same moment
+them from there. Since v0.0.67 the stage also bakes the parts the body is
+assembled from by what is worn and the first-person arm parts (each part stored
+the moment it is baked) and runs their coverage check, so a part that does not
+bake stops the build right after the census instead of in the image step (the
+v0.0.66-dev2 build met the werewolf robe's part there, a bake that fails; a
+check of the game data alone cannot see it). With the unit cache off the stage
+bakes nothing and the image step bakes the player view as before; a parts cache
+that is off leaves those parts to the image step. Among the stages ready at the same moment
 the scheduler starts the risky ones first (`build_parallel.RISK_FIRST`: the
 player view, the actor library); a gate test fails when a risky stage that needs
 no world stage is placed after a world stage (`tests/test_risky_stages_first.py`).

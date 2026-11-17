@@ -1,6 +1,6 @@
 # CHIM Progress Tracker
 
-_Last updated with AmiWind v0.0.66 (16 November 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -43,11 +43,11 @@ _Last updated with AmiWind v0.0.66 (16 November 2026)._
 
 <!-- BEGIN GENERATED CURRENT STATE: from docs/chim/progress-state.json and docs/mwscript-features.json; run python3 tools/cell_progress_state.py render -->
 
-_Counted from the tracker data generated 2026-11-16: newest ingested build **v0.0.66-dev9 (803f83cd)**, built 2026-11-14; the version in development, 0.0.66, has no ingested build yet, so these are the figures of the newest ingested one. Every number below is read from that data and from the MWScript tracker when this block is rendered; none is typed by hand._
+_Counted from the tracker data generated 2026-11-17: newest ingested build **v0.0.66 (ad5e9a0a)**, built 2026-11-14; the version in development, 0.0.67-dev1, has no ingested build yet, so these are the figures of the newest ingested one. Every number below is read from that data and from the MWScript tracker when this block is rendered; none is typed by hand._
 
 ### Exterior cells, per land
 
-The tracker draws the open world as one square per cell. "On CHIM" counts what a frame of the newest build's CHIM world owns; the audit columns count cells by their measured status ("done" is complete, awaiting lighting, passed or empty sea; every figure and definition: [what we count](CELL_TRACKER.md#what-we-count)). Eligible for v0.0.66: 1,390 of 1,390 cells.
+The tracker draws the open world as one square per cell. "On CHIM" counts what a frame of the newest build's CHIM world owns; the audit columns count cells by their measured status ("done" is complete, awaiting lighting, passed or empty sea; every figure and definition: [what we count](CELL_TRACKER.md#what-we-count)). Eligible for v0.0.67: 1,390 of 1,390 cells.
 
 | Land | On CHIM in the newest build | Done (audited) | Fully approved cells | Fully approved terrain | Awaiting lighting | Passed, something deferred | Not started |
 | :-- | --: | --: | --: | --: | --: | --: | --: |
@@ -77,7 +77,7 @@ Rooms that are in the game as room maps of our own, not as CHIM rooms: Imperial 
 
 ### Scripting
 
-Counted from the MWScript tracker ([MWScript features](../MWSCRIPT_FEATURES.md)), measured 16 November 2026 for AmiWind v0.0.66 with the builder's own compiler: 620 of the 1,074 scripts the original game uses run as scripts or are carried by AmiWind's own code (611 run, 9 carried); 9,095 script records are bound to placed objects.
+Counted from the MWScript tracker ([MWScript features](../MWSCRIPT_FEATURES.md)), measured 17 November 2026 for AmiWind v0.0.67-dev1 with the builder's own compiler: 620 of the 1,074 scripts the original game uses run as scripts or are carried by AmiWind's own code (611 run, 9 carried); 9,095 script records are bound to placed objects.
 
 | State | Scripts |
 | :-- | --: |
@@ -94,6 +94,7 @@ Cells on CHIM (land + sea) in each ingested build since v0.0.49, from the tracke
 
 | Build | Built | Vvardenfell | Solstheim | All cells on CHIM |
 | :-- | --: | --: | --: | --: |
+| v0.0.66 (ad5e9a0a) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 1,409 |
 | v0.0.66-dev9 (803f83cd) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 1,409 |
 | v0.0.66-dev8 (3a64d00e) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 1,409 |
 | v0.0.66-dev7 (a33bba98) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 1,409 |

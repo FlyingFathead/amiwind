@@ -1,6 +1,6 @@
 # CHIM Engine tracker
 
-_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.66._
+_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.67-dev1._
 
 <!-- Generated whole by tools/bug_register.py render from docs/bugs/bugs.json; do not edit by hand. -->
 
@@ -21,7 +21,7 @@ CHIM version: 0.2.2. 401 CHIM bugs: 198 open, 184 fixed, 19 closed.
 
 Bugs reported two or more times. Most reports first. Each has its report lines on its page.
 
-- [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): Travelling from Seyda Neen to Balmora sometimes hangs on the Loading screen (boot smoke, 2 of about 5 runs) (reported 46 times, open)
+- [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): Travelling from Seyda Neen to Balmora sometimes hangs on the Loading screen (boot smoke, 2 of about 5 runs) (reported 47 times, open)
 - [BUILD-CHIM-STAGE-SERIAL-TAIL-36](BUILD-CHIM-STAGE-SERIAL-TAIL-36.md): After the parallel world build the chim stage ran its validation, heap gate and zone walk on one core (about 10 minutes of the 270-frame coast build) (reported 17 times, open)
 - [BUILD-CHIM-CELLS-PRIVATE-LIST-47](BUILD-CHIM-CELLS-PRIVATE-LIST-47.md): The releases' CHIM cell list was not in the source tree; public builds had no CHIM exterior cells (reported 11 times, fixed)
 - [CHIM-AZURA-FLOATING-FLORA-43](CHIM-AZURA-FLOATING-FLORA-43.md): Plant or tree pieces hang in the air at Azura's Coast (cell 16,7) (reported 7 times, open)
@@ -77,6 +77,8 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 
 Newest first: the last 10 dated events of CHIM bugs, from their entries (reports, history, closure steps).
 
+- 2026-11-17 [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): seen again in v0.0.66: Seen again on 17 November 2026 on the v0.0.66 release image, with the emulator in warp mode (warp_mode = 1): the opening journey stopped at its very first map load (map seyda).
+- 2026-11-17 `BUILD-NO-STALL-ALERT-66`: fixed in source: a gated commit, v0.0.67-dev1 (1725098e); gate 11073 passed on 586fd07f, which holds 1725098e; tests/test_build_report.py StartupWatchTests and tests/test_build_stall.py: the build writes its live numbers (phase, cores now against planned, seconds since the last line, the stall block) from its first second, before the minute-long build preflight, and the monitor's runs list carries them for every build
 - 2026-11-16 [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): seen again in v0.0.66-dev10: The mechanism captured in a plain repeat session on the v0.0.66-dev10 image (FS-UAE at 32 MB Fast, JIT, the remote-console folder served by the emulator's host thread): it stopped after nine arena pit loads with the game's packet a ...
 - 2026-11-16 [CREATURE-DAGOTH-UR-ABSENT-52](CREATURE-DAGOTH-UR-ABSENT-52.md): seen again in v0.0.66-dev10: In game (the endgame session ENDGAME-HEART-SESSION-66, run1 on the v0.0.66-dev10 image): both are in Akulakhan's Chamber, the Heart of Lorkhan (197602) at -3 968 -67 and Dagoth Ur (262014), fighting the player from the arrival on; his ...
 - 2026-11-16 [CHIM-ROOM-HEART-CHAMBER-LOAD-50](CHIM-ROOM-HEART-CHAMBER-LOAD-50.md): seen again in v0.0.66-dev10: the endgame session ENDGAME-HEART-SESSION-66, run1 on the v0.0.66-dev10 image, FS-UAE JIT, 32 MB Fast, IDE: dbg tp heartchamber from Seyda Neen loaded the room in play after 41 s (one frame of 41,930 ms, 40,917 ms of it disk); the Heart ...
@@ -84,9 +86,7 @@ Newest first: the last 10 dated events of CHIM bugs, from their entries (reports
 - 2026-11-16 [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): seen again in v0.0.66-dev10
 - 2026-11-16 [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): seen again in v0.0.66-dev11: The deterministic-mode comparison so far, test sessions only (the tally is DET-TALLY.txt of the comparison, repeat sessions of the Arena Pit loads on the v0.0.66-dev10 image at 32 MB Fast): as sessions run today, 8 valid runs, 76 Arena Pit ...
 - 2026-11-16 [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): seen again in v0.0.66-dev12: The deterministic-mode comparison, updated (test sessions only; the tally is DET-TALLY.txt of the comparison, repeat sessions of the Arena Pit loads on the v0.0.66-dev10 image at 32 MB Fast): as sessions run today, 8 valid runs, 76 Arena ...
-- 2026-11-16 [CHIM-EXTERIOR-ACTORS-MISSING-46](CHIM-EXTERIOR-ACTORS-MISSING-46.md): deferred by the maintainer: deferred by the maintainer's release decision to v0.0.67 (v0.0.66 is made from its twelfth snapshot; the rest of the roadmap goes to later versions)
-- 2026-11-16 [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): deferred by the maintainer: deferred to v0.0.67 by the maintainer (2026-11-16); the v0.0.66 release ships without it, and what would confirm a fix is in the status
-- 2026-11-15 [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): seen again in v0.0.66-dev7: Not this stall: the fourth repeat session stopped at its first Vivec arrival as the third did, the baseline examination failing after its break-in and leaving the emulator paused (STALL-PROBE-PROMPT-LOG-LINE-66, seen again on another path).
+- 2026-11-16 [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): v0.0.66-dev12: Pi 4B A/B: the same repeat loads with the test console served from a host folder drive in Amiberry 8.5.0, 32 MB Fast, the v0.0.66-dev12 image: 10 valid sessions, 200 loads (100 into the Arena Pit), 0 stops, 0 failures.
 
 ## Engine streaming and memory
 

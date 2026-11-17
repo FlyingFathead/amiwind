@@ -278,12 +278,31 @@ def session_stop(steps_text, start=0):
             continue
         m = re.search(r'smoke RESULT (FAIL.*)$', line)
         if m:
-            return step, m.group(1).strip()
+            return step, m.group(1).replace(WARP_MARK, '').strip()
     return None
 
 
+# What a session's result line ends with when it ran in the emulator's warp mode (tools/engine_smoke.py WARP_MARK; the
+# decision of 17 November 2026: warp is off for every performance and bench test). The journey's checks read the game's
+# state and hold in warp; its times never do, and its own result line then says so.
+WARP_MARK = ' [warp run: no timing verdict]'
+
+
+def warp_run(steps_text):
+    """True when a session's own result line says it ran in warp."""
+    return any('smoke RESULT' in line and line.rstrip().endswith(WARP_MARK) for line in steps_text.splitlines())
+
+
 def judge(journey, runs):
-    """runs: [(steps.log text, console.log text)] in part order. Returns (passed, lines)."""
+    """runs: [(steps.log text, console.log text)] in part order. Returns (passed, lines); the result line of a run whose
+    sessions ran in warp ends with WARP_MARK."""
+    passed, out = judge_checks(journey, runs)
+    if any(run is not None and warp_run(run[0]) for run in runs) and out and out[-1].startswith('JOURNEY RESULT'):
+        out[-1] += WARP_MARK
+    return passed, out
+
+
+def judge_checks(journey, runs):
     raw, values, missing_parts, stops = {}, {}, [], {}
     for part, run in zip(journey['parts'], runs):
         if run is None:

@@ -1,6 +1,6 @@
 # Docker builder
 
-_Last updated with AmiWind v0.0.53 (27 October 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -134,6 +134,16 @@ it. Each run is a folder `/work/build/<run>/` in that volume, named
 successful run to the requested new results directory.
 Failures retain logs, receipts, volume and container for diagnosis. A completed
 HDF still requires host-side emulator testing using your own Kickstart ROM.
+
+When the build fails, the helper copies its report, `logs/BUILD-REPORT-<run>.txt`
+in the volume, into the results directory and prints where it is: the one file
+to send when you ask for help ([when a build fails](LINUX_BUILD.md#when-a-build-fails)).
+Its environment summary names the image the build ran in: the builder image
+carries the mark `AW_RUNTIME=docker-builder` with its tag in `AW_RUNTIME_IMAGE`
+(set after the tool install layer, so that layer stays cached), and the helper
+passes the same two settings to the build, so an image built before the mark is
+named too. The mark has no `AMIWIND_` name because those settings are part of
+the stage keys.
 ## Watch a build in the Monitor
 
 The AmiWind Toolkit's **Monitor** tab follows a Docker build while it runs: the live log of the running

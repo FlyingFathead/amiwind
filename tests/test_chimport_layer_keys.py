@@ -103,5 +103,21 @@ class LayerKeys(unittest.TestCase):
         self.assertIsNone(chimport.layer_touch((0, 0), self.data, ['Morrowind.esm', 'Bloodmoon.esm']))
 
 
+class SearchPathTests(unittest.TestCase):
+    """CHIMPORT-CLI-MWAD-SHADOW-66: after an import that puts tools/ first, the package src/mwad still wins over
+    the command tools/mwad.py (the chimport-region route runs the command line on a fresh run folder)."""
+
+    def test_src_before_tools_again(self):
+        saved = list(sys.path)
+        try:
+            sys.path.insert(0, str(ROOT / 'tools'))
+            chimport._own_search_path()
+            self.assertEqual(sys.path[0], str(ROOT / 'src'))
+            self.assertEqual(sys.path[1], str(ROOT / 'tools'))
+            self.assertEqual(sys.path.count(str(ROOT / 'tools')), 1)
+        finally:
+            sys.path[:] = saved
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -84,6 +84,7 @@ Family: Emulator measurement method (`benchmark-method`). Emulator numbers are r
 - [BENCH-NO-STANDARD-DEMO-48](BENCH-NO-STANDARD-DEMO-48.md): Testers on real hardware have no standard benchmark: no shipped timedemo, and the hardware page did not say how to show the frame rate
 - [BENCH-SESSION-DRIFT-32](BENCH-SESSION-DRIFT-32.md): Emulated disk time drifts about 1.6x between FS-UAE sessions
 - [EMU-JIT-FAULT-ADDRESS-36](EMU-JIT-FAULT-ADDRESS-36.md): FS-UAE JIT reports fault addresses during the Vivec stage A boot smoke
+- [EMU-WARP-STARVES-GAME-CPU-67](EMU-WARP-STARVES-GAME-CPU-67.md): In the emulator's warp mode the game gets far less processor time per second of its own clock, so its frames take seconds of game time
 
 Related bugs in other categories:
 

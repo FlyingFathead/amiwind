@@ -154,6 +154,7 @@ Family: Builder breaks and reproducibility (`builder-from-scratch`). The reposit
 - [ENGINE-FRAME-REFUSE-PROTOTYPE-48](ENGINE-FRAME-REFUSE-PROTOTYPE-48.md): The engine build stops on a missing prototype: AW_SceneFrameRefuse has no declaration
 - EXPANSION-ARCHIVE-READERS-66 (no report page): With the expansions selected, 24 builder stages that read the merged game data opened the base game archive alone, so a model or texture only an expansion archive holds was missing
 - [EXPANSION-BASE-ONLY-TABLES-66](EXPANSION-BASE-ONLY-TABLES-66.md): With the expansions selected the build stopped at the focus table: activators and containers of Tribunal and Bloodmoon had no measured box, and their rooms had no rows
+- [FRAME-HEAP-PEAK-MODELS-NUMBERING-67](FRAME-HEAP-PEAK-MODELS-NUMBERING-67.md): The frame memory report numbers its peak model lists differently in a build from scratch than in a build that reuses earlier work
 - MINIWIND-EXTERIOR-DIRECT-START-CELL-57 (no report page): An exterior MiniWind direct start at cell 0,-7 (the Ascadian Isles creatures recipe) fails in the image step: no map of the build holds the point
 - PREFLIGHT-GUARD-UNSTAMPED-NPCS-48 (no report page): The payload preflight guard count refused census.bsp: its three NPCs get their source identity later in the image step
 - [RELEASE-FINAL-LINE-STALE-RC-48](RELEASE-FINAL-LINE-STALE-RC-48.md): The v0.0.48 final line was cut from an older rc1 head than the image: it lacked the two layout fixes the shipped image was built with

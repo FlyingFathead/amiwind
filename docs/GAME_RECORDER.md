@@ -1,6 +1,6 @@
 # Gameplay recorder
 
-_Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -287,6 +287,11 @@ so. `tools/journey_smoke.py`:
   check, `PASS` or `FAIL` with the value read and the value wanted, and a last line
   `JOURNEY RESULT PASS 42/42 checks, 9 steps` or `JOURNEY RESULT FAIL ... (steps 6)` (the counts are an example);
 - `walkthrough JOURNEY`: the same journey as a checklist to play by hand.
+
+A journey's checks read the game's state, so they also hold when its sessions run in the emulator's warp mode. Its
+times never do: warp runs the emulated machine without frame pacing or sound, and every performance check and
+benchmark runs without it (decided for the project, 17 November 2026; [FS-UAE-DEVELOPMENT.md](FS-UAE-DEVELOPMENT.md#engine-boot-and-map-load-smoke)).
+The result line of a warp run ends with `[warp run: no timing verdict]`.
 
 ### Playing a journey by hand
 

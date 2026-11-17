@@ -152,6 +152,59 @@ class MinuteOneAndStrict(unittest.TestCase):
             self.assertEqual(RA.census(cache, 'resident-bake', tmp), groups)
 
 
+class HeldUnitsPerBuild(unittest.TestCase):
+    """REUSE-STOP-OLD-GROUPS-67: the v0.0.66 release build's strict reuse check stopped the engine and image stages
+    with "would bake again 6 of the 7 units its unit cache npc-voice-table holds": the voice table is looked up once per
+    build, and its largest group was seven earlier builds' tables (one input set each); the one this build needs was
+    stored. The units one build looks up are bounded by the most units one build stored under one key."""
+
+    def cache(self, tmp, name, rows):
+        """ROWS: (entry, sources digest, unit, the build that stored it or None)."""
+        root = Path(tmp) / 'image-passes'
+        for key, sources, unit, build in rows:
+            folder = root / name / key[:2]
+            folder.mkdir(parents=True, exist_ok=True)
+            provenance = {'fields': {'sources_sha256': sources}, 'input_manifest': {'unit': unit}}
+            if build:
+                provenance['request'] = build
+            (folder / f'{key}.json').write_text(json.dumps({'provenance': provenance}))
+        return root
+
+    def test_a_one_lookup_table_holding_older_groups_is_not_a_stop(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            rows = [('o%d' % i, 'OLD', 'inputs-%d' % i, 'req-%d' % i) for i in range(7)]   # seven builds, one each
+            rows.append(('c0', 'CUR', 'inputs-6', 'req-7'))                               # this key's one table
+            groups = RA.census(self.cache(tmp, 'npc-voice-table', rows), 'npc-voice-table')
+            self.assertEqual((groups.batch, RA.held_units(groups)), (1, 1))
+            self.assertEqual(RA.unit_counts(groups, ('CUR',)), (1, 1))
+            steps = [('image', [])]
+            found = {'image': [('npc-voice-table', *RA.unit_counts(groups, ('CUR',)))]}
+            self.assertEqual(RA.strict_problems(steps, {'image'}, found, {'image': []}, set(), {}), [])
+            # a key the cache never saw: the one table bakes again, and that is a stop as before
+            missing = {'image': [('npc-voice-table', *RA.unit_counts(groups, ('NEW',)))]}
+            self.assertEqual(RA.unit_counts(groups, ('NEW',)), (0, 1))
+            self.assertEqual([stage for stage, _ in RA.strict_problems(steps, {'image'}, missing, {'image': []},
+                                                                       set(), {})], ['image'])
+
+    def test_a_cache_baked_item_by_item_keeps_its_whole_set(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            rows = [('p%03d' % i, 'OLD', 'part-%d' % i, 'req-a') for i in range(579)]       # one build: all 579
+            rows += [('q%03d' % i, 'CUR', 'part-%d' % i, 'req-b') for i in range(200)]       # a failed try: 200
+            groups = RA.census(self.cache(tmp, 'player-fp-parts', rows), 'player-fp-parts')
+            self.assertEqual(RA.unit_counts(groups, ('CUR',)), (200, 579))           # 379 to bake: still a stop
+
+    def test_entries_that_name_no_build_count_as_before(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            rows = [('o%d' % i, 'OLD', 'inputs-%d' % i, None) for i in range(7)] + [('c0', 'CUR', 'inputs-6', None)]
+            groups = RA.census(self.cache(tmp, 'npc-voice-table', rows), 'npc-voice-table')
+            self.assertIsNone(groups.batch)
+            self.assertEqual(RA.unit_counts(groups, ('CUR',)), (1, 7))
+            # one entry without its build is enough to keep the whole largest group
+            rows[0] = ('o0', 'OLD', 'inputs-0', 'req-0')
+            groups = RA.census(self.cache(Path(tmp) / 'second', 'npc-voice-table', rows), 'npc-voice-table')
+            self.assertIsNone(groups.batch)
+
+
 class StoredGroupOfRegionStages(unittest.TestCase):
     """BUILD-REUSE-STOP-COUNTS-STORED-GROUP-64: the unit stop counted a region stage's whole stored group (2,064
     world-scenery and 1,931 world-flora regions of earlier key forms) as baking again, although every region is a CHIM

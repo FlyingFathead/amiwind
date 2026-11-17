@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 13 times; something has to be done
+## PERSISTING: reported 14 times; something has to be done
 
 - Reported with v0.0.32-dev at 2026-10-08 (time not recorded): BUILD-IMAGE-UNDERUSED-32: parts of the image step still serial
 - Reported with v0.0.36-dev3 at 2026-10-11 00:43 +0300: audio payload and CHIM maps serial, stats on one core
@@ -17,6 +17,7 @@
 - Reported with v0.0.63-dev3 at 2026-11-09 15:10 +0200: Seen in the v0.0.63-dev3 build (run 2026_11_09_v0.0.63-dev3_full-v0.0.63-dev3-try2_6e68096): the CHIM room actor bake took all 2,342 placements from its unit cache room-actor (0 fitted), yet the step took 1m22s on 1.3 of 24 cores: the cached units are read one after another. The image stage itself went from 1,638 s (dev2, which filled the cache) to 544 s.
 - Reported with v0.0.63 at 2026-11-10 02:34 +0200: Seen again in the v0.0.63 release build: the image step links its 7,181 media files one by one at about 2 of 24 cores.
 - Reported with v0.0.64-dev4 at 2026-11-11 01:51 +0200: v0.0.64-dev4 full build: the image step wrote its disk layout in 122 s against 66 s before, two units on about 1.3 cores.
+- Reported with v0.0.66 at 2026-11-17 (time not recorded): Seen again in the v0.0.66 from-scratch check (commit ac37e80b, 20 cores): the image step 50 min 17 s at 9.76 of 20 cores; its finalize 42 min 12 s at 8.98; the guard torches 17 min 16 s at 4.36, six models one after another, all skipped (GUARD-TORCH-SCRATCH-SERIAL-67); an underuse warning at 1.9 of 20 cores for 1,177 s with 7,181 units queued and none running (the media payload); the partitions step at 2.0 cores. The performance guard failed the run on one image section.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -62,6 +63,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-10 02:34 +0200: seen again in v0.0.63: Seen again in the v0.0.63 release build: the image step links its 7,181 media files one by one at about 2 of 24 cores.
 - 2026-11-11 01:51 +0200: seen again in v0.0.64-dev4: v0.0.64-dev4 full build: the image step wrote its disk layout in 122 s against 66 s before, two units on about 1.3 cores.
 - 2026-11-16: deferred by the maintainer: deferred to v0.0.67 by the maintainer (2026-11-16); the v0.0.66 release ships without it, and what would confirm a fix is in the status
+- 2026-11-17: seen again in v0.0.66: Seen again in the v0.0.66 from-scratch check (commit ac37e80b, 20 cores): the image step 50 min 17 s at 9.76 of 20 cores; its finalize 42 min 12 s at 8.98; the guard torches 17 min 16 s at 4.36, six models one after another, all skipped ...
 
 <!-- END GENERATED TIMELINE -->
 
@@ -70,7 +72,7 @@ _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 13 times; something has to be done](#persisting-reported-13-times-something-has-to-be-done)
+- [PERSISTING: reported 14 times; something has to be done](#persisting-reported-14-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Seen again: 7 November 2026 (v0.0.62-dev1)](#seen-again-7-november-2026-v0062-dev1)
 - [Status: 23 October 2026 (v0.0.48)](#status-23-october-2026-v0048)
@@ -371,6 +373,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - EXPANSION-READER-ONE-MASTER-64 (no report page): Most builder readers load only the base game file; the roadmap calls the readers master-list readers
 - GATE-IMAGE-REMOVED-52 (no report page): A cleanup removed the image the gate s Linux host-parity step runs: the in-use check looked at containers only
 - GATE-PRIVACY-NOT-IN-PREGATE-52 (no report page): The privacy word check runs only in the full gate: the quick pre-gate checks passed text the gate then refused
+- [GUARD-TORCH-SCRATCH-SERIAL-67](GUARD-TORCH-SCRATCH-SERIAL-67.md): From scratch, the guard torch step bakes the six boat guard models one after another only to skip every one of them
 - [HARVEST-CHIM-COVERAGE-ONE-AREA-48](HARVEST-CHIM-COVERAGE-ONE-AREA-48.md): The image step harvest coverage check failed on every CHIM world of one area (every MiniWind sandbox of one town)
 - IMAGE-BIGGER-THAN-ORIGINAL-62 (no report page): The game image (3,022 MB in v0.0.62) is bigger than the original game data it is made from (1.93 GB)
 - IMAGE-FORMAT-EFFECTS-AWE-66 (no report page): The image step's format check did not know the active-effect icon file, and stopped the build at its end
@@ -386,6 +389,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [NPC-BAKED-WHOLE-DUPLICATION-33](NPC-BAKED-WHOLE-DUPLICATION-33.md): Every NPC appearance is baked whole: shared body parts are converted again for each actor, and equipment cannot change
 - [NPC-LIBRARY-NO-UNIT-CACHE-63](NPC-LIBRARY-NO-UNIT-CACHE-63.md): The NPC appearance bakes of the actor library stage had no unit cache, so every rebuild of the stage baked all 418 appearances again (about 45 minutes)
 - PARTITION-CACHE-FIXED-WORKERS-66 (no report page): The new partition cache hashed its files on a fixed eight threads instead of the stage's own allowance
+- [PERF-DB-FOLDER-CONFLICT-67](PERF-DB-FOLDER-CONFLICT-67.md): A folder ingest of the performance database stops at the first changed file
 - PERF-GUARD-BASIS-BY-COUNT-66 (no report page): The performance guard judges the image step's partition write by the number of partitions and not by their size, so a slowdown back to the old time would pass
 - [PERF-GUARD-RESIDENT-BUSY-HOST-57](PERF-GUARD-RESIDENT-BUSY-HOST-57.md): The dev5 full build's perf guard failed chim-town-balmora and chim-town-vivec_city build_resident as slower (129 s, was 52 s; 147 s, was 62 s) while two other builds ran beside it: contention, not code
 - PLAYER-VIEW-SKIN-ROWS-STOP-62 (no report page): The image step's player view stopped the v0.0.62 final build after 1 h 13 min: an Alias skin rows overflow ended it instead of trying the next smaller body

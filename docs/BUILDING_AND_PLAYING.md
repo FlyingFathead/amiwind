@@ -1,6 +1,6 @@
 # Building and playing
 
-_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 How to build AmiWind from your own Morrowind copy and run it in an emulator. The short version is in the [README](../README.md#build-it-from-your-own-morrowind).
 
@@ -76,9 +76,11 @@ cause, on a staged file of an unknown format, a bracket fungus floating away fro
 against the original: [the checks at the image step](BUILD_PROFILE.md#the-checks-a-contributor-meets-at-the-image-step).
 
 **When a build fails:** send the file `logs/BUILD-REPORT-<run>.txt` from the build workspace (`out/logs/` by default;
-the build prints where it is). It holds what failed with the stage's own log, every setting, the versions, which copy of
-the game data and the stage plan in one file, and it stays on your computer until you send it
-([when a build fails](LINUX_BUILD.md#when-a-build-fails)).
+the build prints where it is). It starts with a summary of the environment (operating system, container, Python against
+the reference, cores, memory, free space; on Linux, macOS and Windows alike) and holds what failed with the stage's own
+log, every setting, the versions, which copy of the game data and the stage plan in one file, and it stays on your
+computer until you send it ([when a build fails](LINUX_BUILD.md#when-a-build-fails)). A Docker build's helper copies
+it into its results folder.
 
 **Build speed:** `--jobs N` sets the exact worker count. While a build runs,
 `./build.sh status out/build/NAME` shows its progress, the cores in use and an

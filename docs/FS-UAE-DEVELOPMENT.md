@@ -1,6 +1,6 @@
 # FS-UAE development access
 
-_Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -67,10 +67,26 @@ shots and replays. It takes one step per line:
   baseline that a later stop's line is read against.
 - `emu KEY=VALUE`: an extra line for the emulator's configuration, as `--emu-option` gives one (below), so that a
   session script asks for the emulator setting it needs itself. It is read before the emulator starts, checked in
-  the emulator's start-up log, and refused for a key the smoke sets itself.
+  the emulator's start-up log, and refused for a key the smoke sets itself (warp among them, below).
 
 Any other line is a comment. The run passes if the game survives the whole script. When the examination of a stop
 fails, its error is kept in `logs/stall-errors.txt` and the emulator is resumed all the same.
+
+**Warp mode is never a measurement** (decided for the project, 17 November 2026). FS-UAE's warp mode runs the
+emulated machine without frame pacing and without sound. Checks that read the game's state (the inventory, the
+journal, who is alive) hold in a warp run; its times do not. Frame times, load times, durations, frame rates, audio and
+music from a warp run say nothing about the game, so every performance check and benchmark runs without warp:
+
+- No `--emu-option` and no `emu` line can switch warp on: `warp_mode` and FS-UAE's own warp keys (`uae_warp...`)
+  are keys the smoke sets itself.
+- A session runner asks for warp with the environment variable `WARP=1`. The probe then writes `warp_mode = 1` as the
+  configuration's last line, so no other line can take it back.
+- The run's result line then ends with `[warp run: no timing verdict]`, so a reader of the line sees it was a warp
+  run.
+
+Warp does not make the test sessions faster either: it shortens only the time the emulated machine is idle, and takes
+host time from the processor wherever the game works (measured on 17 November 2026 with the opening journey:
+[performance/EMULATOR-WARP.md](performance/EMULATOR-WARP.md)).
 
 The console setting `aw_remote_log 0` keeps the remote console's copy of the console output off the remote folder
 (the lines stay on the in-game console; the command and state files are written as before). It was made for

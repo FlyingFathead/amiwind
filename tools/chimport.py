@@ -60,10 +60,18 @@ import traceback
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-for _p in (ROOT / 'tools', ROOT / 'src'):
-    while str(_p) in sys.path:
-        sys.path.remove(str(_p))
-    sys.path.insert(0, str(_p))
+
+
+def _own_search_path():
+    """src before tools at the front of sys.path: the package src/mwad must win over the command tools/mwad.py.
+    Called again after imports that put tools/ first (stair_walk.py; CHIMPORT-CLI-MWAD-SHADOW-66)."""
+    for _p in (ROOT / 'tools', ROOT / 'src'):
+        while str(_p) in sys.path:
+            sys.path.remove(str(_p))
+        sys.path.insert(0, str(_p))
+
+
+_own_search_path()
 
 PLAN_FORMAT = 'aw-chimport-plan-1'
 STATE_FORMAT = 'aw-chimport-state-1'
@@ -866,7 +874,14 @@ CELL_KEY_IGNORED_ENV = {'AMIWIND_INPUTS_LOCK', 'AMIWIND_STORAGE_POOL', 'AMIWIND_
                         'AMIWIND_BUILD_JOBS_FILE', 'AMIWIND_PROFILE_SECTIONS', 'AMIWIND_BUILD_PROFILE',
                         'AMIWIND_PROFILE_INTERVAL', 'AMIWIND_STAGE_TRACE', 'AMIWIND_BUILD_BUDGET',
                         # the selected layers: keyed per cell by what they change there (layer_touch), never whole
-                        'AMIWIND_MASTERS'}
+                        'AMIWIND_MASTERS',
+                        # who runs the cell, never what its bytes are: the master builder's request id, each request
+                        # its own (CHIMPORT-CELL-KEY-REQUEST-ID-67: no cell of one request was linked by the next), and
+                        # the builder's other run facts (RUN_ENV of the cache provenance records), as the build's stage
+                        # keys leave them out (tools/build_cache.py IGNORED_ENV)
+                        'AMIWIND_AW_REQUEST', 'AMIWIND_RUN_NAME', 'AMIWIND_RUN_COMMIT', 'AMIWIND_RUN_VERSION',
+                        'AMIWIND_RUN_JOB', 'AMIWIND_RUN_TOOLS_SHA256', 'AMIWIND_RUN_CHIM_VERSION',
+                        'AMIWIND_RUN_WORLD_FORMAT', 'AMIWIND_RUN_KIND'}
 # The expansion layers' game files: never in a cell key as whole files; a cell keys what they change in it
 # (layer_touch: its own and its neighbours' merged CELL and LAND records, the records of the objects placed there
 # and the layer archives' copies of those objects' models). CHIMPORT-CELL-KEY-LAYERS-65.
@@ -2190,6 +2205,7 @@ def main(argv=None):
     """The command line, with the stair walk off by default (BUILD-STAIR-WALK-OFF-46; an explicit
     AMIWIND_STAIR_WALK wins); the default is restored when it returns."""
     import stair_walk
+    _own_search_path()      # stair_walk puts tools/ first, which would load tools/mwad.py as the package mwad
     before = stair_walk.DEFAULT_OFF
     stair_walk.DEFAULT_OFF = True
     try:

@@ -1205,6 +1205,22 @@ WORLD_STAGES = ('world-terrain', 'world-scenery', 'world-flora', 'chim', 'cell-p
 WORLD_PREFIXES = ('chim-town-', 'chim-rooms-')
 
 
+def after_stage_checks(name, run, metadata=None):
+    """The checks registered to run the moment stage NAME has passed in this build (tools/build_preflight.py
+    EARLY_CHECKS, phase after:NAME; BUILD-IMAGE-CHECKS-EARLY-66), on its output, before the stages after it. A stage
+    this build took from an earlier run is not checked here: its stored output was checked before the first stage
+    (phase stored). Raises RuntimeError naming every problem; the stage stays passed, so a build again after the fix
+    takes its output and checks it before its first stage."""
+    reused = ((metadata or {}).get('stage_cache') or {}).get('reused') or {}
+    if name in reused:
+        return
+    import build_preflight
+    problems = build_preflight.after_stage_problems(name, run, log=lambda line: print(line, flush=True))
+    if problems:
+        raise RuntimeError('%s passed, but the checks after it found %d problem(s):\n  %s'
+                           % (name, len(problems), '\n  '.join(problems)))
+
+
 def risk_first(ready, new=()):
     """READY [(position, (name, command))] in start order: NEW WORK FIRST (NEW-WORK-FIRST-66: NEW, the stages the
     resource plan found with no history, the new content of a build, whose failure would otherwise show hours in),
@@ -1569,6 +1585,7 @@ def execute_parallel(steps, run, metadata, root):
                     raise RuntimeError(f"{name} failed. Earlier results are retained. Read {state['entry']['log']}; use a new --name after fixing the problem.")
                 passed.add(name)
                 print(f"Completed {name}: {state['entry']['elapsed_seconds']:.1f}s", flush=True)
+                after_stage_checks(name, run, metadata)
             if not active and pending and not any(set(dependencies[n]) <= passed for _, (n, _) in pending):
                 raise ValueError('Build dependency cycle')
             if time.monotonic() - heartbeat >= 15:

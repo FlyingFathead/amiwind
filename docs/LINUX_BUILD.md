@@ -1,6 +1,6 @@
 # Build AmiWind on Linux
 
-_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -10,6 +10,7 @@ _Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 - [Manual or partial setup](#manual-or-partial-setup)
 - [2. External native tools](#2-external-native-tools)
 - [3. Check, then build](#3-check-then-build)
+  - [Early checks](#early-checks)
   - [When a build fails](#when-a-build-fails)
 - [4. Boot your private image](#4-boot-your-private-image)
 - [Rebuilding only the first NPC slice](#rebuilding-only-the-first-npc-slice)
@@ -350,14 +351,21 @@ Independent stages can overlap within the shared worker budget. It stops at the
 first failed stage and records the command, timing and log path in
 `../amiwind-local/build/first-town/build-state.json`. Stage logs are in `logs/`.
 A failed build also writes `FAILURE.md` (and the same as data in `failure.json`)
-in the run folder and prints it at the end of its output: the failed stage, its
-exit, its error lines, the traceback (a stage's own Python process prints the
-traceback of the error it stops on into its log), the last 60 lines of the
-stage's log, the units it refused or left out, the run's commit and the command
-that builds again from the run with `--reuse-from`. The Toolkit Monitor links it
-under Progress ([Monitor](AMIWIND_TOOLKIT.md#monitor)).
+in the run folder, the one failure page, and prints it at the end of its output:
+first the failure's kind when it ran out of memory or disk ([below](#when-a-build-fails)),
+then the failed stage, its exit, its error lines, the traceback (a stage's own Python
+process prints the traceback of the error it stops on into its log), the last 60
+lines of the stage's log, what was not completed (the stages not started or
+cancelled with it, the units it refused or left out), the settings the build ran
+with (its options as given, `build-recipe.json` with every option's value, the
+builder and its masters, the data folder, the `AMIWIND_` settings the failed
+stage read), the run's commit, the name of the full build report (below) and the
+command that builds again from the run with `--reuse-from`. The build's last
+line names the page (`Failure details: .../FAILURE.md`). The Toolkit Monitor
+links it under Progress ([Monitor](AMIWIND_TOOLKIT.md#monitor)).
 `python3 tools/build_failure.py RUN --print` writes the page again for a failed
-run, an earlier builder's included.
+run, an earlier builder's included; `--out DIR` writes it into another folder and
+only reads the run (a run on a read-only volume).
 Output HDFs are under that run's `image/` directory. Original files are read in
 place. The default output parent is ignored `out/` in the checkout; the explicit
 `--workspace ../amiwind-local` above selects an external parent instead. Neither
@@ -385,6 +393,21 @@ For a smaller host-only terrain test with no native toolchain:
 
 This produces verified terrain packets, not an Amiga executable or HDF.
 
+### Early checks
+
+Checks of seconds run before the first stage, so a stop a stage or the image step would meet hours into the build
+shows in its first minutes: the build preflight (cache owners, game data, town budgets, the grounding classes of the
+towns' and rooms' residents) and the builder's registered early checks (`EARLY_CHECKS` in `tools/build_preflight.py`).
+Those run in two phases: `inputs` with the preflight (the game data, the selected masters, the options) and `stored`
+after the reuse plan, on the stored outputs the build reuses; `--check` runs both. Every check of a phase runs, each
+prints one line (`Early check NAME (PHASE): ok` or its problems and its time), and the build stops once with every
+problem listed. A third phase, `after:STAGE`, runs a check the moment that stage has passed in the build, on its
+output, and stops the build before the stages after it (the stage stays passed, so a build again takes its output).
+The image step's actor frames check runs this way on the room batches' own output (`tools/image_early_checks.py`):
+before the first stage when the room batches are taken from an earlier build, right after them when the build makes
+them, so a room actor whose frames the image would refuse stops the build in its first minutes, not at its end. A new check is a module of its own whose function takes the build's context and returns its problems
+(it never exits), plus one line in `EARLY_CHECKS`.
+
 ### When a build fails
 
 A failed build writes one report, `logs/BUILD-REPORT-<run>.txt` in the build workspace (beside `build/`, so
@@ -400,15 +423,39 @@ A failed build writes one report, `logs/BUILD-REPORT-<run>.txt` in the build wor
    tool against the recorded reference, and whether the build ran in a container;
 4. the game data: each master and archive with its size, SHA-256 and the known copy it matches, so two copies of the
    game are told apart;
-5. the machine: operating system, cores, memory and free space;
+5. the machine: operating system, cores, memory and the free space of the workspace and the temp folder;
 6. the stage plan with each stage's state, time and workers;
 7. the reuse state: the reuse source, the stages reused, the stages not reused and why, the reuse stops.
 
+Under its result line, a short **environment summary** comes first: the operating system and its release, whether the
+build ran in a container, Python against the recorded reference version, the cores, the memory and the free space.
+Memory is read on Linux (`/proc/meminfo`), macOS (`sysctl hw.memsize` and `vm_stat`) and Windows (the system's memory
+status); the report says `Not available` only where nothing answers. The container line says what was checked and what
+each check found. Our builder image carries its own mark, `AW_RUNTIME` with the image tag in `AW_RUNTIME_IMAGE` (set by
+the image, by `tools/run_docker.py` and by the master builder), so a build there reads `yes (our builder image TAG)`.
+Otherwise the line names the signals container engines leave (`/.dockerenv`, `/run/.containerenv`, the `container`
+variable, the first process's control groups, an overlay root folder). With none of them it lists what it checked,
+because finding no signal does not prove there is no container. The mark has no `AMIWIND_` name on purpose: every
+`AMIWIND_` setting a stage can read is part of that stage's key, so such a mark would key a build in the image apart
+from the same build outside it.
+
+When the failure carries the marks of running out of memory or disk, the report (right under its result line) and
+`FAILURE.md` (as its first lines) name its **kind**: `OUT OF MEMORY` (a stage or worker ended by signal 9, exit -9 or
+137, a process pool whose worker was ended, `MemoryError`, errno 12) or `OUT OF DISK` (errno 28 "No space left on
+device", errno 122 "Disk quota exceeded"), as `proven` or `likely, not proven`, with what was found and what to do.
+`MemoryError` and the two disk errors prove their kind; inside a container, so does the memory controller's kill
+counter (`oom_kill` in the control group's `memory.events`) when it rose between the build's start and the failure, and
+when it did not rise an out-of-memory hint is reported as `not proven`. An out-of-disk failure shows the free space of
+the workspace and the temp folder at the start and at the failure. Out of memory: build again from the run with fewer
+workers (`--jobs`) or more memory for the build. Out of disk: free space (`python3 tools/build_gc.py plan out` lists
+what can go) or use another workspace, or point `TMPDIR` elsewhere when the temp folder is the full one.
+
 The report stays on your computer; nothing is sent anywhere. It holds no environment value other than the `AMIWIND_`
-settings and the build options; paths in the workspace are written relative to it, paths in the source checkout start
-with `<source>` and your home folder is `~`. `--report` writes one for a passed or cancelled build too, and for a
-`--check` or `--plan` that stops on an error (without it those write nothing). `FAILURE.md` in the run folder stays the
-short form the Toolkit Monitor shows.
+settings, the build options, the builder image's mark and the `container` variable; paths in the workspace are written
+relative to it, paths in the source checkout start with `<source>` and your home folder is `~`. `--report` writes one for a passed or cancelled build too, and for a
+`--check` or `--plan` that stops on an error (without it those write nothing). `FAILURE.md` in the run folder is the
+failure page the Toolkit Monitor shows and names this report; a build that stopped before it made its run folder has
+only the report, and its last line names it.
 
 ## 4. Boot your private image
 

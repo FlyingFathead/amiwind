@@ -128,5 +128,75 @@ class PreFlight(unittest.TestCase):
                          (0, 4, []))
 
 
+class PartsEarly(unittest.TestCase):
+    """BUILD-IMAGE-CHECKS-EARLY-66: the player-view stage bakes the player parts and the first-person parts too, after
+    the bodies, so a part that does not bake stops the build right after the census (PLAYER-WEREWOLF-ROBE-NOT-BAKED-66
+    stopped the v0.0.66-dev2 image step), and the image step takes every part from the unit cache."""
+
+    def run_stage(self, tmp, parts_prepare, cache_on=True):
+        import io
+        import contextlib
+        import player_view_stage
+        palette = Path(tmp) / 'palette.lmp'
+        palette.write_bytes(b'\1' * 768)
+        calls = []
+
+        def body_prepare(data, id1, jobs=None):
+            calls.append('bodies')
+            return {'bodies': 1}
+
+        def fp_prepare(data, id1, palette_bytes, jobs=None):
+            calls.append('fp_parts')
+            return {'models': 2}
+
+        def parts(data, id1, palette_bytes, jobs=None):
+            calls.append('parts')
+            self.assertEqual(palette_bytes, palette.read_bytes())         # the census palette, as the bodies use
+            return parts_prepare()
+        cache = object() if cache_on else None
+        with patch('prepare_player_view._sources', return_value=({}, None, {})), \
+                patch('prepare_player_view.playable_races', return_value=['nord']), \
+                patch('prepare_player_view._unit_cache', return_value=object()), \
+                patch('player_view_stage.preflight', return_value=(4, 0, [])), \
+                patch('prepare_player_view.prepare', side_effect=body_prepare), \
+                patch('prepare_player_parts.prepare', side_effect=parts), \
+                patch('prepare_player_parts._unit_cache', return_value=cache), \
+                patch('prepare_player_fp_parts.prepare', side_effect=fp_prepare), \
+                patch('prepare_player_fp_parts._unit_cache', return_value=cache), \
+                patch('mwad.paths.resolve_data_files', side_effect=lambda p: Path(p)), \
+                contextlib.redirect_stdout(io.StringIO()) as out:
+            code = player_view_stage.main(['--data-files', str(tmp), '--palette', str(palette),
+                                           '--out', str(Path(tmp) / 'out'), '--jobs', '2'])
+        return code, calls, out.getvalue()
+
+    def test_the_parts_are_baked_in_the_early_stage_after_the_bodies(self):
+        import json
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            code, calls, out = self.run_stage(tmp, lambda: {'models': 3, 'coverage': {}})
+            self.assertEqual((code, calls), (0, ['bodies', 'parts', 'fp_parts']))
+            self.assertIn('=== PHASE 3/3: the player parts and first-person parts', out)
+            report = json.loads((Path(tmp) / 'out' / 'player-view.json').read_text(encoding='utf-8'))
+            self.assertEqual((report['parts']['models'], report['fp_parts']['models']), (3, 2))
+
+    def test_a_part_that_does_not_bake_stops_the_stage_with_its_error_line(self):
+        import tempfile
+
+        def stop():
+            raise ValueError('ROBE-PART-NOT-BAKED-62: 1 drawn parts have no model (first: werewolfskin)')
+        with tempfile.TemporaryDirectory() as tmp:
+            code, calls, out = self.run_stage(tmp, stop)
+            self.assertEqual((code, calls), (1, ['bodies', 'parts']))
+            self.assertIn('Error: ROBE-PART-NOT-BAKED-62: 1 drawn parts have no model (first: werewolfskin)', out)
+            self.assertTrue((Path(tmp) / 'out' / 'player-view.json').is_file())
+
+    def test_parts_caches_that_are_off_are_left_to_the_image_step(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            code, calls, out = self.run_stage(tmp, lambda: {}, cache_on=False)
+            self.assertEqual((code, calls), (0, ['bodies']))
+            self.assertIn('the unit cache is off; the image step bakes them', out)
+
+
 if __name__ == '__main__':
     unittest.main()

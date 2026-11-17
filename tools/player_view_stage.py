@@ -10,6 +10,12 @@ from the unit cache (the units, their keys and their bytes are the image's own: 
 First, in seconds, the pre-flight: every unit already in the unit cache is checked against the engine's model limits
 (bytes, frames, vertices, triangles), all of them, and the step stops with the whole list when any is over
 (collect-then-fail), before anything is baked.
+
+Then the parts the body is assembled from by what is worn (tools/prepare_player_parts.py) and the first-person arm
+parts (tools/prepare_player_fp_parts.py), baked here too (BUILD-IMAGE-CHECKS-EARLY-66): every part the unit cache lacks
+is baked in the build's first stages and stored at once, and the parts coverage check (ROBE-PART-NOT-BAKED-62) stops
+the build here, not in its image step, which takes the parts from the unit cache. The v0.0.66-dev2 build met the
+werewolf robe's part there, a bake that fails (PLAYER-WEREWOLF-ROBE-NOT-BAKED-66).
 """
 import argparse
 import json
@@ -79,7 +85,7 @@ def main(argv=None):
     import prepare_player_view as view
     from mwad.paths import resolve_data_files
     started = time.monotonic()
-    print('=== PHASE 1/2: player view pre-flight (the stored models against the limits) ===', flush=True)
+    print('=== PHASE 1/3: player view pre-flight (the stored models against the limits) ===', flush=True)
     data = resolve_data_files(a.data_files)
     kinds, _, _ = view._sources(data)
     palette = a.palette.read_bytes()
@@ -100,7 +106,7 @@ def main(argv=None):
         print('Player view pre-flight FAILED: %d stored models over a limit (listed above); nothing baked'
               % len(problems), flush=True)
         return 1
-    print('=== PHASE 2/2: player view units (%d to bake; the image step takes them from the unit cache) ==='
+    print('=== PHASE 2/3: player view units (%d to bake; the image step takes them from the unit cache) ==='
           % missing, flush=True)
     if a.out.exists():
         shutil.rmtree(a.out)
@@ -110,9 +116,32 @@ def main(argv=None):
     report = view.prepare(data, id1, jobs=a.jobs)
     report['preflight'] = {'checked': checked, 'to_bake': missing, 'over_limits': problems,
                            'limits': LIMITS, 'cache': 'off' if cache is None else view.UNIT_CACHE}
+    print('=== PHASE 3/3: the player parts and first-person parts (the image step takes them from the unit cache) ===',
+          flush=True)
+    try:
+        report.update(bake_parts(data, id1, palette, a.jobs))
+    except ValueError as exc:            # the parts coverage stop (ROBE-PART-NOT-BAKED-62), as the image step meets it
+        (a.out / 'player-view.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8', newline='\n')
+        print('Error: %s' % exc, flush=True)
+        return 1
     (a.out / 'player-view.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8', newline='\n')
     print('Player view stage: done in %.1f s' % (time.monotonic() - started), flush=True)
     return 0
+
+
+def bake_parts(data, id1, palette, jobs=None):
+    """The player parts and the first-person parts into ID1 and their unit caches (each part stored the moment it is
+    baked; tools/unit_store.py run_each), with the parts coverage check. A parts cache that is off is left to the image
+    step: what is baked here would not reach it. Returns {'parts': report, 'fp_parts': report} of those baked here."""
+    import prepare_player_fp_parts as fp
+    import prepare_player_parts as parts
+    out = {}
+    for key, module in (('parts', parts), ('fp_parts', fp)):
+        if module._unit_cache() is None:
+            print('%s: the unit cache is off; the image step bakes them' % module.__name__, flush=True)
+            continue
+        out[key] = module.prepare(data, id1, palette, jobs=jobs)
+    return out
 
 
 if __name__ == '__main__':

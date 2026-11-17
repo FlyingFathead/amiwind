@@ -22,6 +22,12 @@ IMAGE = 'amiwind-builder:local'
 # suite runs once per revision in the CI tests jobs (one suite shard each), or here with --full-suite.
 SMOKE_TESTS = ('test_build_docker', 'test_build_host', 'test_build', 'test_release',
                'test_collision_bsp', 'test_engine_hulls')
+# The builder image's own mark (tools/build_report.py container): the build report then names the image a build ran in
+# ("container: yes (our builder image TAG)"), where the files a container engine leaves only hint at a container.
+# Set after the install layer, so the layers before it stay cached; tools/run_docker.py passes it to the build too, for
+# an image built before the mark. No AMIWIND_ name: those are part of the stage keys.
+RUNTIME_ENV, RUNTIME_IMAGE_ENV, RUNTIME = 'AW_RUNTIME', 'AW_RUNTIME_IMAGE', 'docker-builder'
+IMAGE_ARG = 'BUILDER_IMAGE'
 DOCKERFILE = f'''FROM {BASE_IMAGE}
 ENV DEBIAN_FRONTEND=noninteractive PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-venv python3-pip ca-certificates build-essential ffmpeg unzip xz-utils fonts-dejavu-core libgmp10 libmpfr6 libmpc3 && rm -rf /var/lib/apt/lists/*
@@ -29,6 +35,8 @@ COPY source/ /opt/amiwind/
 WORKDIR /opt/amiwind
 RUN chmod +x build.sh && python3 tools/build.py --autoinstall --install-dependencies --yes --tools-dir /opt/amiwind-tools && rm -rf /var/lib/apt/lists/* /root/.cache/pip
 ENV PATH="/opt/amiwind-tools/venv/bin:${{PATH}}" PYTHONPATH="/opt/amiwind/src:/opt/amiwind/tools" QCC_PATH="/opt/amiwind-tools/Quake-Tools/qcc-host" AMIWIND_TEST_QBSP="/opt/amiwind-tools/ericw/bin/qbsp"
+ARG {IMAGE_ARG}={IMAGE}
+ENV {RUNTIME_ENV}={RUNTIME} {RUNTIME_IMAGE_ENV}="${{{IMAGE_ARG}}}"
 CMD ["python", "tools/build.py", "--help"]
 '''
 
@@ -154,7 +162,8 @@ def main(argv=None):
                        f'the build volume before the game data copy', flush=True)
             if problems:
                 raise ValueError(problems[0])
-            logged(docker + ['build', '--progress=plain', '-t', args.image, str(context)],
+            logged(docker + ['build', '--progress=plain', '-t', args.image,
+                             '--build-arg', f'{IMAGE_ARG}={args.image}', str(context)],
                    output / 'image-build.log')
             if args.action == 'check':
                 run = 'docker-ci-' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')

@@ -882,6 +882,61 @@ class LoadHangExperimentTests(unittest.TestCase):
                                       text=True, timeout=30)
                 self.assertEqual(done.stdout.strip(), want, done.stderr)
 
+    def test_warp_is_never_an_option_and_marks_its_result(self):
+        """The maintainer's rule (17 November 2026): warp is off for every performance and bench test. No extra option
+        and no script line can switch FS-UAE's warp on, so a smoke is never a warp run by accident; a session runner
+        asks for it with WARP=1, which writes the config's last line, and the run's result line then says that its
+        times are no verdict."""
+        for bad in ('warp_mode=1', 'uae_warp=true', 'uae_warp_limit=500'):
+            with self.assertRaises(ValueError, msg=bad):
+                engine_smoke.parse_emu_options([bad])
+        probe = engine_smoke.PROBE
+        self.assertNotIn('@WARP_MARK@', probe)
+        self.assertIn('log "smoke RESULT $1${WM:-}"', probe)
+        if not shutil.which('sh'):
+            self.skipTest('a POSIX shell is required')
+        # a script's own emu line naming warp is refused before the emulator starts
+        start = probe.index('if [ ! -s $R/emu-options.txt ] && [ -s $R/script.txt ]')
+        block = probe[start:probe.index('\nfi\n', start) + 4]
+        with tempfile.TemporaryDirectory() as tmp:
+            r = Path(tmp)
+            (r / 'logs').mkdir()
+            (r / 'script.txt').write_text('emu warp_mode=1\nwait 8\n', encoding='utf-8', newline='\n')
+            done = subprocess.run(['sh', '-c', 'R=%s\n%s' % (r.as_posix(), block)], capture_output=True, text=True,
+                                  timeout=30)
+            self.assertEqual(done.returncode, 0, done.stderr)
+            steps = (r / 'logs' / 'steps.log').read_text(encoding='utf-8')
+            self.assertIn('smoke RESULT FAIL', steps)
+            self.assertIn('names a key the smoke sets itself: warp_mode', steps)
+            self.assertFalse((r / 'emu-options.txt').exists())
+        # WARP=1: the warp line comes after the extra options and the mark is set; without it, neither
+        line = next(l for l in probe.splitlines() if l.startswith('WM=; if [ "${WARP:-0}" = 1 ]'))
+        # WARPLIMIT=N (digits) adds FS-UAE's warp limit after the warp line, only with WARP=1 (EMU-WARP-STARVES-GAME-CPU-67)
+        for warp, limit, want_mark, want_lines in (
+                ('1', None, engine_smoke.WARP_MARK, 'warp_mode = 1\n'),
+                ('1', '100', engine_smoke.WARP_MARK, 'warp_mode = 1\nuae_warp_limit = 100\n'),
+                ('1', '10x', engine_smoke.WARP_MARK, 'warp_mode = 1\n'),
+                ('1', '', engine_smoke.WARP_MARK, 'warp_mode = 1\n'),
+                ('0', '100', '', ''), (None, '100', '', ''), (None, None, '', '')):
+            with tempfile.TemporaryDirectory() as tmp:
+                r = Path(tmp)
+                (r / 'smoke.fs-uae').write_text('jit_compiler = 1\n', encoding='utf-8', newline='\n')
+                (r / 'emu-options.txt').write_text('cpu_idle = 0\n', encoding='utf-8', newline='\n')
+                env = {'PATH': '/usr/bin:/bin'}
+                if warp is not None:
+                    env['WARP'] = warp
+                if limit is not None:
+                    env['WARPLIMIT'] = limit
+                done = subprocess.run(['sh', '-c', 'R=%s\n[ -s $R/emu-options.txt ] && cat $R/emu-options.txt >> '
+                                       '$R/smoke.fs-uae\n%s\nprintf "%%s" "$WM"' % (r.as_posix(), line)],
+                                      capture_output=True, text=True, timeout=30, env=env)
+                self.assertEqual(done.returncode, 0, done.stderr)
+                self.assertEqual(done.stdout, want_mark, (warp, limit))
+                self.assertEqual((r / 'smoke.fs-uae').read_text(encoding='utf-8'),
+                                 'jit_compiler = 1\ncpu_idle = 0\n' + want_lines, (warp, limit))
+        # the readers of the result line still see PASS and FAIL with the mark at its end
+        self.assertTrue(engine_smoke.WARP_MARK.startswith(' [warp run'))
+
     def test_frozen_clock_from_a_list_of_frames(self):
         judge = engine_smoke.judge_frames
         moving = [(t, 'd%d' % t) for t in range(0, 300, 10)]

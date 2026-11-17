@@ -32,7 +32,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 INDEX_NAME = 'stage-index-v1.json'
 INDEX_SCHEMA = 'amiwind-stage-index-1'
-CENSUS_FOLDER = 'unit-census-v1'
+CENSUS_FOLDER = 'unit-census-v2'   # v2: each entry also names the build that stored it (REUSE-STOP-OLD-GROUPS-67)
 # At most this many earlier runs are planned in one build (each plan checks every output's SHA-256).
 MAX_SOURCES = 8
 # Runs planned although no stage fingerprint equals: a stage whose key changed only in code it never ran or read
@@ -411,9 +411,21 @@ def _sources_of(meta):
     return None
 
 
+class Groups(dict):
+    """{sources digest: set of unit names} of a unit cache (census). BATCH: the most units one build stored under one
+    key, when every entry names the build that stored it (its request, job or commit), else None."""
+    batch = None
+
+
+def _builder_of(meta):
+    provenance = meta.get('provenance') or {}
+    return provenance.get('request') or provenance.get('job') or provenance.get('commit') or None
+
+
 def census(cache_root, name, workspace=None):
-    """{sources digest: set of unit names} stored in unit cache NAME (each entry read once: the census is kept beside
-    the cache, WORKSPACE/cache/unit-census-v1/NAME.json, and only new entries are read)."""
+    """Groups ({sources digest: set of unit names}) stored in unit cache NAME, with the most units one build stored
+    under one key (Groups.batch). Each entry is read once: the census is kept beside the cache,
+    WORKSPACE/cache/unit-census-v2/NAME.json, and only new entries are read."""
     folder = Path(cache_root) / name
     keep = (Path(workspace) / 'cache' / CENSUS_FOLDER / f'{name}.json') if workspace else None
     known = {}
@@ -432,7 +444,7 @@ def census(cache_root, name, workspace=None):
         except (OSError, ValueError):
             continue
         unit = ((data.get('provenance') or {}).get('input_manifest') or {}).get('unit') or data.get('input_sha256')
-        entries[meta.name] = [_sources_of(data), unit]
+        entries[meta.name] = [_sources_of(data), unit, _builder_of(data)]
     if keep is not None and entries != known:
         try:
             keep.parent.mkdir(parents=True, exist_ok=True)
@@ -441,16 +453,34 @@ def census(cache_root, name, workspace=None):
             os.replace(partial, keep)
         except OSError:
             pass
-    groups = {}
-    for sources, unit in entries.values():
+    groups, batches, every_named = Groups(), {}, True
+    for entry in entries.values():
+        sources, unit = entry[0], entry[1]
+        builder = entry[2] if len(entry) > 2 else None
         groups.setdefault(sources, set()).add(unit)
+        if builder:
+            batches.setdefault((sources, builder), set()).add(unit)
+        else:
+            every_named = False
+    groups.batch = max(len(units) for units in batches.values()) if batches and every_named else None
     return groups
+
+
+def held_units(groups):
+    """The units one build of a cache looks up, as its stored entries show: its largest group (one key's full set of
+    units), bounded by the most units one build stored under one key (Groups.batch) when every entry names its build.
+    REUSE-STOP-OLD-GROUPS-67: a table a build looks up once (npc-voice-table) keeps one unit per input set its key saw,
+    each stored by another build; its largest group of 7 was 7 builds' tables, not 7 units this build would bake
+    again. A cache a build bakes item by item has a build that stored the whole set (player-fp-parts: 579 by one)."""
+    held = max((len(units) for units in groups.values()), default=0)
+    batch = getattr(groups, 'batch', None)
+    return min(held, batch) if batch else held
 
 
 def unit_counts(groups, digests):
     """(N, T): units stored under one of DIGESTS (this build's key and the older forms it still looks up), and the
-    units the cache holds (its largest group: one key's full set of units)."""
-    held = max((len(units) for units in groups.values()), default=0)
+    units one build looks up (held_units)."""
+    held = held_units(groups)
     usable = max((len(groups.get(digest, ())) for digest in digests), default=0)
     return min(usable, held), held
 
@@ -644,7 +674,7 @@ def unit_report(steps, closures, units, cache_root, workspace, rebuilt, root=ROO
             if cache not in groups:
                 groups[cache] = census(cache_root, cache, workspace)
             if digests[key] is None:
-                row = (cache, None, max((len(u) for u in groups[cache].values()), default=0))
+                row = (cache, None, held_units(groups[cache]))
             else:
                 row = (cache, *unit_counts(groups[cache], digests[key][1]))
             limit = (limits or {}).get(name)

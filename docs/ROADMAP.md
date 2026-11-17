@@ -1,10 +1,11 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.66 (16 November 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.67: in development, from 17 November 2026](#v0067-in-development-from-17-november-2026)
 - [v0.0.66: Forward It Is, released 16 November 2026](#v0066-forward-it-is-released-16-november-2026)
 - [v0.0.65: Reintroducing Vvardenfell](#v0065-reintroducing-vvardenfell)
 - [Next version: the two expansion worlds](#next-version-the-two-expansion-worlds)
@@ -117,6 +118,31 @@ _Last updated with AmiWind v0.0.66 (16 November 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
+## v0.0.67: in development, from 17 November 2026
+
+The first snapshot, [v0.0.67-dev1](releases/notes/RELEASE-v0.0.67-dev1.md), is the v0.0.66 release with the new line's
+label; nothing is new in the game yet. The line holds, in order:
+
+1. **Tribunal and Bloodmoon in the game**, by the plan under "Next version" below: the files checked; every change the
+   expansions make to Vvardenfell working end to end (the boat at Khuul, Louis Beauchamp in Ald'ruhn, Asciene Rane in
+   Ebonheart, the Dark Brotherhood); Solstheim built like the island; Mournhold's districts as one exterior of their own;
+   their scripts and dialogue; the save; the Toolkit's views; and playtests.
+2. **A builder that fails fast and says why.** Its own live numbers from the first second (phase, cores in use against the
+   planned ones, time since the last progress, stage time against its history), the image stage's own checks at the start
+   of a build, and a strict reuse check that does not count a bake's older cached units as work to redo.
+3. **The build times recorded again.** Every build records its stage times in the performance database, and build
+   estimates come from it.
+4. **The bug register's sweep.** The findings and closing steps of the v0.0.66 release are recorded, and the seven
+   long-open entries deferred to this version are taken up (the under-used player view and the actor library's missing
+   unit cache in the builder, the journey's door aim, the stall after a long frame in test sessions, the residents that
+   stand at doors, the buttons and levers, and the missing outdoor actors).
+
+**Acceptance of each expansion, in four steps, each on a measured run (a journey, a memory record) and the next not
+started before it:** reach (the player can get there: the way, the load, no crash, the memory fits at 32 MB), play (one
+quest is played from start to end, with its journal, rewards and world changes right), continue (a save, a restart and a
+load in the middle of it, and carry on), and broaden (the rest of the expansion's quests and places, one at a time, each
+through the same journey).
+
 ## v0.0.66: Forward It Is, released 16 November 2026
 
 v0.0.66, "Forward It Is", is made from the twelfth development snapshot and the changes after it
@@ -155,7 +181,7 @@ v0.0.66, and in it the census office becomes a room built like every other inter
 
 ## Next version: the two expansion worlds
 
-The version after v0.0.66 (v0.0.67) brings the expansions' finished content, Tribunal's Mournhold and Bloodmoon's
+The line in development, v0.0.67, brings the expansions' finished content, Tribunal's Mournhold and Bloodmoon's
 Solstheim, and takes up what v0.0.66 moved on; no dates are promised. The plan below was begun in v0.0.66, whose
 snapshots are kept under it as they were written. The measured speed figures of the v0.0.66 line and what is still to
 be measured, among it the frame rate on the Raspberry Pi 4B, are on the

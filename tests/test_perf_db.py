@@ -207,6 +207,26 @@ class PerfDbTests(unittest.TestCase):
         self.assertEqual(perf_db.canonical_sha(db.db), before)
         db.close()
 
+    def test_a_folder_ingest_goes_on_after_a_conflict(self):
+        """PERF-DB-FOLDER-CONFLICT: one changed file is refused and reported; the rest of the folder is still read."""
+        run_a = make_run(self.runs, RUN_A)
+        db = self.open()
+        db.ingest_path(self.runs)
+        write_json(run_a / 'chim-world' / 'chim-heap.json', {'frames': [heap_frame(BALMORA, 1)]})
+        make_run(self.runs, RUN_B, started='2026-10-10T18:00:00+00:00')      # a later run in the same folder
+        before = self.count(db, 'runs')
+        results = db.ingest_path(self.runs)
+        outcomes = {logical: o for logical, o in results}
+        self.assertEqual(outcomes[f'runs/{RUN_A}/chim-world/chim-heap.json'], 'conflict')
+        self.assertTrue(any(o == 'new' and logical.startswith(f'runs/{RUN_B}/') for logical, o in results))
+        self.assertGreater(self.count(db, 'runs'), before)
+        self.assertTrue(any(m.startswith('CONFLICT:') for m in db.messages))
+        db.close()
+        # the command line: exit 1, the conflict on stderr, the other run read
+        code, _, err = quiet(perf_db.main, ['--db', str(self.db_path), 'ingest', str(self.runs)])
+        self.assertEqual(code, 1)
+        self.assertIn('CONFLICT', err)
+
     def test_ledgers_are_read_in_appended_segments_and_rewrites_are_refused(self):
         ledger = self.root / 'samples.jsonl'
         lines = [json.dumps({'t': f'2026-10-10T22:3{i}:00', 'name': 'HOST', 'cpu_pct': 50.0 + i}) for i in range(3)]

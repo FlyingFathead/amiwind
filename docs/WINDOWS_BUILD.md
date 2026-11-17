@@ -1,6 +1,6 @@
 # Windows build entry points and WSL notes
 
-_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -37,6 +37,13 @@ and the next attempt uses a fresh run name. Compatible model-cache entries can
 be reused, but resuming every completed stage is not implemented. How often a
 retry succeeds is not known, and a retry that works is not a fix. Changes made
 for Windows keep the Linux build path and its validation gates working.
+
+When a build fails, send the one file `out\logs\BUILD-REPORT-<run>.txt` (the
+build prints where it is). It starts with a summary of the environment
+(Windows version, container, Python against the reference, cores, memory read
+through Windows itself, free space) and holds what failed, every setting and
+the versions. It stays on your computer until you send it; see
+[when a build fails](LINUX_BUILD.md#when-a-build-fails).
 
 `setup-windows.cmd` / `setup-windows.ps1` provision a native Windows environment.
 `build.cmd` / `build.ps1` use the same `tools/build.py` pipeline as Linux.

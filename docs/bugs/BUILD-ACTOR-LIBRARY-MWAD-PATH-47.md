@@ -178,10 +178,12 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - CHIM-COLLISION-UNION-FAIL-NOT-CACHED-48 (no report page): A collision union that fails is compiled again for every room that uses the same mesh packet
 - [CHIM-INTERIORS-REUSE-MISS-48](CHIM-INTERIORS-REUSE-MISS-48.md): The CHIM rooms stage (chim-interiors) is never reused: it hashed the shared CHIM unit cache, which is past the 512 MiB folder limit
 - CHIMPORT-CELL-KEY-LAYERS-65 (no report page): Selecting the expansion layers re-keys every CHIMport cell of the island
+- CHIMPORT-CELL-KEY-REQUEST-ID-67 (no report page): The CHIM import keys every cell by the master builder request that runs it
 - [CHIMPORT-NO-SHARED-POOL-35](CHIMPORT-NO-SHARED-POOL-35.md): The CHIMporter kept its own unit store beside the shared hashed storage pool: no pool flag, every run folder a private copy
 - [CHIMPORT-POOL-CROSS-MOUNT-36](CHIMPORT-POOL-CROSS-MOUNT-36.md): CHIMport run folder and the storage pool on two mounts of one volume: hard links fail across the mounts, so pooled units were copied, not linked
 - [CHIMPORT-RETRY-AUDIT-FAILED-36](CHIMPORT-RETRY-AUDIT-FAILED-36.md): CHIMport --retry-failed never reran cells that converted but failed an audit (memory fit, doors, hull chains): the runner marks them done
 - DOOR-CHECK-KNOWN-UNKEYED-54 (no report page): config/door-check-known.json is in no stage key: an edit to the known list never re-runs a passed image's door check
 - [MWAD-WALK-ORDER-35](MWAD-WALK-ORDER-35.md): Input check results depend on directory listing order
+- [REUSE-STOP-OLD-GROUPS-67](REUSE-STOP-OLD-GROUPS-67.md): The strict reuse check counts the units an older version of a bake left in its cache as work the build would redo, so a one-unit table with history stops a build that would reuse it
 
 <!-- END GENERATED CATEGORY -->

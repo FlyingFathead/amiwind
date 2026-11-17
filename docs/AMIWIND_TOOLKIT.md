@@ -1,6 +1,6 @@
 # AmiWind Toolkit
 
-_Last updated with AmiWind v0.0.66-dev2 (14 November 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -697,7 +697,8 @@ The **Monitor** tab (`amiwind-toolkit/monitor.html`) follows a build as it runs,
   passed, red when it failed;
 - **Failure details** (v0.0.66): when the run failed, under the bar the failed stage with its number and exit and its
   error line, and a **See failure details** link that opens the run's `FAILURE.md` as text in a page of its own: the
-  failed stage, its error lines, the traceback, the last 60 lines of its log, the units it refused or left out, the
+  failed stage, its error lines, the traceback, the last 60 lines of its log, what was not completed (the stages not
+  started or cancelled, the units it refused or left out), the settings the build ran with (since v0.0.67), the
   run's commit and the command that builds again from the run (written by the builder when a stage or the build
   fails, see [Linux build](LINUX_BUILD.md#3-check-then-build)). For a failed run of an earlier builder the reader
   makes the same page from the run's `build-state.json` and the failed stage's log, without writing anything;

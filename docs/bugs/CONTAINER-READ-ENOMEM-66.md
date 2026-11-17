@@ -2,11 +2,13 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 3 times; something has to be done
+## PERSISTING: reported 5 times; something has to be done
 
 - Reported with v0.0.54 at 2026-10-27 18:21 +0200: Seen first in v0.0.54 (not registered then): the tests of gates 4250 and 4252 failed with "Cannot allocate memory" in the gate's compiler wrapper while several gates, builds and an emulator session ran.
 - Reported with v0.0.66-dev10 at 2026-11-16 (time not recorded): Seen again under load: a pregate run failed every check with "Cannot allocate memory" while a long build check ran.
+- Reported with v0.0.66-dev12 at 2026-11-16 (time not recorded): Seen again during the v0.0.66-dev12 delivery with the build from scratch running beside it: the package step stopped on a write error ("Cannot allocate memory") while writing the playtest ZIP, with memory available; the delivery was resumed from that step (DELIVER-RESUME-OWN-OUTPUT-66).
 - Reported with v0.0.66-dev12 at 2026-11-16 18:58 +0200: Seen again on the v0.0.66-dev12 line: a run of about 230 test modules from a worktree, eight at a time in a development container, had 14 modules fail on Cannot allocate memory reads of the repository while a build check ran beside it; run again two at a time beside the full build, every read of the bind mount failed the same way; the same modules from a copy of the committed tree inside the container read nothing over the mount.
+- Reported with v0.0.67-dev1 at 2026-11-17 (time not recorded): Seen again on 17 November 2026 under load: a pregate run read the release file list with grep, the read ended with "Cannot allocate memory", and the check then counted a listed test file as missing and refused the gate; the same branch passed the same pregate by itself minutes before, and the next gate of the same commit ran. A read error in that check is reported as a missing file.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -39,7 +41,10 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-10-27 18:21 +0200: seen again in v0.0.54: Seen first in v0.0.54 (not registered then): the tests of gates 4250 and 4252 failed with "Cannot allocate memory" in the gate's compiler wrapper while several gates, builds and an emulator session ran.
 - 2026-11-16: reported in v0.0.66-dev10
 - 2026-11-16: seen again in v0.0.66-dev10: Seen again under load: a pregate run failed every check with "Cannot allocate memory" while a long build check ran.
+- 2026-11-16: seen again in v0.0.66-dev12: Seen again during the v0.0.66-dev12 delivery with the build from scratch running beside it: the package step stopped on a write error ("Cannot allocate memory") while writing the playtest ZIP, with memory available; the delivery was ...
 - 2026-11-16 18:58 +0200: seen again in v0.0.66-dev12: Seen again on the v0.0.66-dev12 line: a run of about 230 test modules from a worktree, eight at a time in a development container, had 14 modules fail on Cannot allocate memory reads of the repository while a build check ran beside it; run ...
+- 2026-11-17: seen again in v0.0.67-dev1: Seen again on 17 November 2026 under load: a pregate run read the release file list with grep, the read ended with "Cannot allocate memory", and the check then counted a listed test file as missing and refused the gate; the same branch ...
+- 2026-11-17: v0.0.67-dev1: Seen a second time the same day: in another pregate run every check of its main container failed at once, one of them with "OSError: [Errno 12] Cannot allocate memory" on listing the tools folder; the checks print nothing else, so each was ...
 
 <!-- END GENERATED TIMELINE -->
 
@@ -48,7 +53,7 @@ _Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [PERSISTING: reported 5 times; something has to be done](#persisting-reported-5-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Status: 16 November 2026](#status-16-november-2026)
 - [Symptom](#symptom)
@@ -180,7 +185,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [GATE-SUITE-WRITABLE-32](GATE-SUITE-WRITABLE-32.md): The test suite needs a writable source copy and an executable /tmp; the documented command does not say so
 - HARNESS-NEWGAME-BOX-STALL-54 (no report page): An FS-UAE session stalled at the Start a new game box before any map load: the probe sent its key on a fixed delay
 - HORS-AFTER-HALLOWEEN-STAYS-ARENA-58 (no report page): dbg aw hors after the Halloween scene no longer crashes on the v0.0.58-dev5 image but leaves the player in the Arena Pit instead of Seyda Neen
-- JOURNEY-AIM-RETRY-YAW-66 (no report page): The gameplay journey aimed at a door from an eye position that had changed: its thirteen retries ran round the wrong direction
+- [JOURNEY-AIM-RETRY-YAW-66](JOURNEY-AIM-RETRY-YAW-66.md): The gameplay journey aimed at a door from an eye position that had changed: its thirteen retries ran round the wrong direction
 - JOURNEY-DOOR-USE-GOES-TO-ACTOR-66 (no report page): The opening journey's use key at the census street door went to the body of the guard killed a step before, or to a message box still showing, and the step then waited for a load it had never asked for
 - JOURNEY-PART-B-SAVE-NOT-CARRIED-66 (no report page): The gameplay journey's second part never loaded the first part's save: the save was written where the session does not carry it
 - JOURNEY-STEP6-VICTIM-NEAREST-66 (no report page): The opening journey's step 6 killed the nearest resident, which could be the guard by the census office's street door, whose body then took the use key instead of the door
@@ -261,5 +266,9 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [TOOLKIT-TEST-POINTERLOCK-31](TOOLKIT-TEST-POINTERLOCK-31.md): Inspector test left pointer lock set, breaking later drag checks
 - TOOLS-UNPINNED-WRITER-ATMOS-54 (no report page): tools/particle_emitters.py wrote JSON without pinned line endings
 - TRACKER-BUGS-PAGE-SIZE-58 (no report page): docs/BUGS.md lists every bug with its whole status, archived ones too, so the archive rotation cannot keep it under its size limit: it reached 95.06 % of 1 MiB
+
+Related bugs in other categories:
+
+- [DELIVER-RESUME-OWN-OUTPUT-66](DELIVER-RESUME-OWN-OUTPUT-66.md): A resumed delivery stopped on the package outputs of its own failed try
 
 <!-- END GENERATED CATEGORY -->

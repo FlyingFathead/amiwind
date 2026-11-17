@@ -121,6 +121,9 @@ DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.42-dev1-{name}.png" for n
 DOCUMENTATION_IMAGES.add("docs/images/amiwind-v0.0.43-dev2-ghostgate.png")
 # The v0.0.56-dev1 gallery: Ald'ruhn, sixteen frames from Amiberry on the Raspberry Pi 4B boot stick (docs/GALLERY.md).
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.56-dev1-aldruhn-{n}.png" for n in range(1, 17))
+# The v0.0.66 gallery: a first look at Mournhold, two frames from Amiberry on the Raspberry Pi 4B, enlarged four times
+# with nearest neighbour (docs/GALLERY.md).
+DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.66-mournhold-reception-area-{name}.png" for name in ("royal-guard", "effe-tei"))
 # Toolkit screenshots (amiwind-toolkit/README.md): World with the CHIM progress tracker, the 3D Inspector on a .chim map
 # and on a CHIM world with the memory overlay.
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.36-toolkit-{name}.png" for name in ("world-chim-tracker", "inspector-chim-map", "inspector-chim-world-memory", "monitor"))

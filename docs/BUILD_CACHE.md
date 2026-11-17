@@ -1,6 +1,6 @@
 # Build cache: resuming and reusing work safely
 
-_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -521,7 +521,10 @@ run (BUILD-UNIT-PREFLIGHT-63).
 - **Minute one.** Before any stage runs, one line per stage: `reused from RUN`, or
   `rebuild: WHY`, and for a stage that bakes into a unit cache
   `CACHE: N of T units from the cache` (N: units stored under this build's key for that
-  cache or an older key form it still looks up; T: the units the cache holds under one key).
+  cache or an older key form it still looks up; T: the units one build looks up there, as the cache's entries show:
+  its largest group of units under one key, bounded by the most units one build stored under one key, since every
+  entry names the build that stored it. A table a build looks up once, such as the voice table, keeps one unit for each
+  set of game files its key saw, each stored by another build; those are not units this build would bake again).
 - **The stop.** The build stops in its first minute when a stage it rebuilds would bake
   again more than 5 % of the units its unit caches hold, or reaches a per-item bake with no
   cache (every item made again). `--allow-rebuild STAGE:REASON` (repeatable) lets that

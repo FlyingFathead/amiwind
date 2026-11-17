@@ -16,15 +16,30 @@ when a --check or --plan stops on an error (without --report those create no fil
    every tool against the recorded reference, and whether the build ran in a container.
 4. The game data: the data folder, the edition, and each master and archive with its size and SHA-256 and the known
    copy it matches, so two copies of the game are told apart.
-5. The machine: the operating system, the cores, the memory, the free space of the workspace.
+5. The machine: the operating system, the cores, the memory, the free space of the workspace and the temp folder.
 6. The stage plan: every stage with its state, its time, its workers and the start of its key.
 7. The reuse state: the reuse source and mode, the stages reused and from where, the stages not reused and why, the
    reuse preflight and the reuse stops.
 
+Right under the result line, when its marks are there, the failure's kind: OUT OF MEMORY or OUT OF DISK, proven or
+likely, with what was found (the memory controller's kill counter, the free space at the start and now) and what to do
+(tools/build_failure.py kinds, the same judgement FAILURE.md shows first).
+
+Above the parts, under the result, a short environment summary (BUILD-REPORT-MACHINE-ALL-OS-67): the operating system and
+its release, the container line, Python against the recorded reference, the cores, the memory and the free space.
+Memory is read on Linux (/proc/meminfo), macOS (sysctl hw.memsize, vm_stat) and Windows (GlobalMemoryStatusEx);
+"Not available" only where nothing answers. The container line says what was checked and what each check found, never
+"not in a container" from finding nothing: our own mark first (AW_RUNTIME and AW_RUNTIME_IMAGE, set by the builder
+image, tools/run_docker.py and the master builder), then the signals container engines leave (/.dockerenv,
+/run/.containerenv, the container variable, /proc/1/cgroup, an overlay root in /proc/self/mountinfo). The mark is no
+AMIWIND_ name on purpose: every AMIWIND_ setting a stage can read is part of its key (tools/build_cache.py, the CHIM
+import's cell key), so a mark there would key a build in the image apart from the same build outside it.
+
 The report stays on this computer: nothing is sent anywhere. It holds no environment value other than the AMIWIND_
-settings and the build options, and no host or user name: a path in the workspace is written relative to it, one in
-the source checkout as <source>/..., the home folder as ~. FAILURE.md in the run folder (tools/build_failure.py) stays
-the short form the Toolkit Monitor shows; this report is the one file to send when asking for help.
+settings, the build options, the builder image's mark and the container variable, and no host or user name: a path in
+the workspace is written relative to it, one in the source checkout as <source>/..., the home folder as ~. FAILURE.md
+in the run folder (tools/build_failure.py) stays the short form the Toolkit Monitor shows; this report is the one file
+to send when asking for help.
 
 Writing it never raises into the build: a part that cannot be read says so in its place. The builder calls note_start
 first thing and write at its end (tools/build.py); no stage imports this module.
@@ -32,10 +47,12 @@ first thing and write at its end (tools/build.py); no stage imports this module.
 import json
 import os
 import platform
+import re
 import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 import traceback
 from datetime import datetime, timezone
 from pathlib import Path
@@ -57,15 +74,41 @@ SHIPPED_SETTINGS = ('AMIWIND_MESH_SEAM_STOP', 'AMIWIND_NPC_BODY_CHECK', 'AMIWIND
 # What the builder gives each stage beside its own environment (tools/build_parallel.py, tools/build_scratch.py)
 PER_STAGE = ('AMIWIND_BUILD_JOBS: the stage\'s worker count; AMIWIND_SCRATCH: the run\'s scratch folder unless set; '
              'AMIWIND_BUILD_JOBS_FILE and AMIWIND_BUILD_BUDGET: a pooled stage\'s live share and the build\'s budget')
+# Our own container mark: which of our routes started the build in our builder image, and the image's tag
+# (tools/build_docker.py DOCKERFILE, tools/run_docker.py, tools/aw_service.py). Not AMIWIND_ names: see the docstring.
+RUNTIME_ENV, RUNTIME_IMAGE_ENV = 'AW_RUNTIME', 'AW_RUNTIME_IMAGE'
+RUNTIMES = {'docker-builder': 'our builder image%s',
+            'master-builder': 'our builder image%s, started by the master builder'}
+CGROUP_WORDS = ('docker', 'kubepods', 'containerd', 'libpod', 'lxc')
+CONTAINER_CHECKS = ('our builder image mark (%s)' % RUNTIME_ENV, '/.dockerenv', '/run/.containerenv',
+                    'the container variable', '/proc/1/cgroup (it names nothing under cgroup v2)',
+                    'an overlay root in /proc/self/mountinfo')
+OVERLAY_TYPES = ('overlay', 'fuse-overlayfs')
+MEMORY_SECONDS = 5                # sysctl and vm_stat on macOS: at most this long each
 
 _START = {'environment': None}
 
 
 def note_start(environ=None):
-    """The AMIWIND_ settings of the environment the builder started in, before it sets any (tools/build.py _main)."""
+    """The AMIWIND_ settings of the environment the builder started in, before it sets any (tools/build.py _main), and
+    the memory controller's kill counter and the free space a failure's kind is judged against (tools/build_failure.py)."""
     environ = os.environ if environ is None else environ
     _START['environment'] = {key: value for key, value in environ.items() if key.startswith(ENV_PREFIX)}
+    try:
+        import build_failure
+        build_failure.note_start()
+    except Exception:  # noqa: BLE001 - the start notes never stop the build
+        pass
     return dict(_START['environment'])
+
+
+def note_workspace(workspace):
+    """The workspace's free space at the build's start, once the options name it (tools/build.py)."""
+    try:
+        import build_failure
+        build_failure.note_workspace(workspace)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def wanted(args, status):
@@ -231,9 +274,38 @@ class Context:
         self.steps = [(str(name), [str(part) for part in command]) for name, command in steps or ()]
         self.paths = Paths(self.workspace, self.root)
         self.stage_cache = self.metadata.get('stage_cache') or self.state.get('stage_cache') or {}
+        self._scans, self._kinds = {}, None
 
     def path(self, value):
         return self.paths.text(value)
+
+    def scan(self, step):
+        """(the stage log, what it says or None) of a failed stage, read once (tools/build_failure.py scan_log)."""
+        import build_failure
+        name = str(step.get('name') or '?')
+        if name not in self._scans:
+            log_name = Path(str(step.get('log') or '')).name
+            log = self.run / 'logs' / log_name if self.run is not None and log_name else None
+            self._scans[name] = (log, build_failure.scan_log(log, tail_lines=TAIL_LINES)
+                                 if log is not None and log.is_file() else None)
+        return self._scans[name]
+
+    def kinds(self):
+        """The failure's kinds (out of memory, out of disk) when their marks are there, judged in the failing build."""
+        if self._kinds is None:
+            self._kinds = []
+            if self.status == 'failed':
+                import build_failure
+                rows = []
+                for step in self.failed_stages():
+                    row = dict(self.scan(step)[1] or {})
+                    row.update(name=str(step.get('name')), returncode=step.get('returncode'))
+                    rows.append(row)
+                rec = {'failed_stages': rows}
+                if self.error is not None and not rows:
+                    rec['builder_error'] = {'type': type(self.error).__name__, 'message': str(self.error)[:4000]}
+                self._kinds = build_failure.kinds(rec, self.error, live=True, workspace=self.workspace)
+        return self._kinds
 
     def failed_stages(self):
         return [step for step in self.state.get('steps') or [] if isinstance(step, dict) and step.get('status') == 'failed']
@@ -260,8 +332,13 @@ def header(ctx):
         result += ', exit code %s (a guard after the stages: see the build output)' % ctx.code
     lines = [SCHEMA_LINE, '=' * len(SCHEMA_LINE), '',
              'Run: %s' % (ctx.name or 'not named yet (the build stopped before it chose its run name)'),
-             'Result: %s' % result,
-             'Written: %s' % _stamp()]
+             'Result: %s' % result]
+    try:                                         # out of memory, out of disk: named right under the result
+        import build_failure
+        lines += [ctx.path(line) for line in build_failure.kind_lines(ctx.kinds())]
+    except Exception as exc:  # noqa: BLE001 - the kind never hides the report
+        lines.append('Kind: not judged (%s)' % type(exc).__name__)
+    lines.append('Written: %s' % _stamp())
     started = ctx.metadata.get('build_started_at') or ctx.state.get('build_started_at')
     if started:
         lines.append('Build started: %s' % started)
@@ -271,11 +348,29 @@ def header(ctx):
                                            ' (not made: the build stopped before its first stage)'))
         if (ctx.run / 'FAILURE.md').is_file() and not ctx.foreign:
             lines.append('Short form: %s (the failure page the Toolkit Monitor shows)' % ctx.path(ctx.run / 'FAILURE.md'))
+    lines += [''] + environment(ctx)
     lines += ['',
               'This file stays on this computer: nothing is sent anywhere. Send it when you ask for help with this '
-              'build. It holds no environment value other than the AMIWIND_ settings and the build options. Paths in '
-              'the build workspace are relative to it, paths in the source checkout start with <source>, the home '
-              'folder is ~.', '']
+              'build. It holds no environment value other than the AMIWIND_ settings, the build options, the builder '
+              'image\'s mark and the container variable. Paths in the build workspace are relative to it, paths in the '
+              'source checkout start with <source>, the home folder is ~.', '']
+    return lines
+
+
+def environment(ctx):
+    """The short environment summary under the result (BUILD-REPORT-MACHINE-ALL-OS-67); a line that cannot be read
+    says so in its place."""
+    rows = (('Operating system', system_text), ('Container', container), ('Python', python_text),
+            ('Cores', lambda: cores_text(ctx)), ('Memory', memory_text),
+            ('Free space', lambda: '%s in the workspace, %s in the temp folder' % (free_text(ctx.workspace),
+                                                                                  free_text(temp_folder()))))
+    lines = ['Environment (parts 3 and 5 have the details):']
+    for title, read in rows:
+        try:
+            value = read()
+        except Exception as exc:  # noqa: BLE001 - one line that cannot be read never hides the others
+            value = 'not read (%s)' % type(exc).__name__
+        lines.append('  %s: %s' % (title, ctx.path(value)))
     return lines
 
 
@@ -301,9 +396,7 @@ def what_failed(ctx):
         lines.append('Stage: %s (stage %s of %d, exit %s, after %s, %s worker%s)' % (
             name, number or '?', len(plan), step.get('returncode', 'not recorded'), _seconds(step.get('elapsed_seconds')),
             step.get('jobs', '?'), '' if step.get('jobs') == 1 else 's'))
-        log_name = Path(str(step.get('log') or '')).name
-        log = ctx.run / 'logs' / log_name if ctx.run is not None and log_name else None
-        scan = build_failure.scan_log(log, tail_lines=TAIL_LINES) if log is not None and log.is_file() else None
+        log, scan = ctx.scan(step)
         if scan is None:
             lines.append('Error: the stage log %s was not found' % (ctx.path(log) if log else '(none recorded)'))
         else:
@@ -495,27 +588,61 @@ def _git_changes(root):
     return '%d changed, %d untracked files' % (len(rows) - untracked, untracked)
 
 
-def container():
-    """How the build ran: in a container or not, and the image's own builder copy when it has one."""
-    found = []
-    if Path('/.dockerenv').exists():
-        found.append('Docker (/.dockerenv)')
-    if Path('/run/.containerenv').exists():
-        found.append('Podman (/run/.containerenv)')
+def _read(path):
     try:
-        groups = Path('/proc/1/cgroup').read_text(encoding='utf-8', errors='replace')
-        if not found and any(word in groups for word in ('docker', 'kubepods', 'containerd', 'libpod')):
-            found.append('a container (/proc/1/cgroup)')
+        return Path(path).read_text(encoding='utf-8', errors='replace')
     except OSError:
-        pass
-    if not found:
-        return 'no container found'
-    text = 'yes, ' + ', '.join(found) + '; the image name is not visible inside a container'
-    try:
-        image = (Path('/opt/amiwind') / 'VERSION').read_text(encoding='utf-8').strip()
-        text += '; the image\'s own builder copy (/opt/amiwind) is v' + image
-    except OSError:
-        pass
+        return None
+
+
+def _overlay_root(mountinfo):
+    """Whether the root folder is an overlay mount (the last mount on / in /proc/self/mountinfo)."""
+    kind = None
+    for row in (mountinfo or '').splitlines():
+        left, separator, right = row.partition(' - ')
+        fields = left.split()
+        if separator and len(fields) >= 5 and fields[4] == '/':
+            kind = (right.split() or [''])[0]
+    return kind in OVERLAY_TYPES
+
+
+def container(environ=None, exists=None, read=None):
+    """Whether the build ran in a container, as what was checked and what each check found: our own mark first (the
+    route and the image tag), then the signals container engines leave. Finding none is no proof of none, so the line
+    then lists the checks, never "not in a container". EXISTS(path) and READ(path) stand in for the files in tests."""
+    environ = os.environ if environ is None else environ
+    exists = exists or (lambda path: Path(path).exists())
+    read = read or _read
+    signals = []
+    if exists('/.dockerenv'):
+        signals.append('/.dockerenv (Docker)')
+    if exists('/run/.containerenv'):
+        signals.append('/run/.containerenv (Podman)')
+    kind = str(environ.get('container') or '').strip()
+    if kind:
+        signals.append('container=%s (the container variable)' % _short(kind, 60))
+    groups = read('/proc/1/cgroup') or ''
+    words = [word for word in CGROUP_WORDS if word in groups]
+    if words:
+        signals.append('/proc/1/cgroup names %s' % ', '.join(words))
+    if _overlay_root(read('/proc/self/mountinfo')):
+        signals.append('an overlay root (/proc/self/mountinfo)')
+    runtime = str(environ.get(RUNTIME_ENV) or '').strip()
+    image = str(environ.get(RUNTIME_IMAGE_ENV) or '').strip()
+    if runtime:
+        named = ' ' + _short(image, 160) if image else ''
+        what = RUNTIMES.get(runtime)
+        text = 'yes (%s)' % (what % named if what else 'marked %s=%s%s' % (RUNTIME_ENV, _short(runtime, 60), named))
+        if signals:
+            text += '; signals: ' + ', '.join(signals)
+    elif signals:
+        text = 'yes (signals: %s)' % ', '.join(signals)
+    else:
+        return 'no container signal found (checked: %s); finding none does not prove there is none' % ', '.join(
+            CONTAINER_CHECKS)
+    copy = (read('/opt/amiwind/VERSION') or '').strip()
+    if copy:
+        text += '; the image\'s own builder copy (/opt/amiwind) is v' + _short(copy, 60)
     return text
 
 
@@ -647,53 +774,155 @@ def _cgroup(*names):
     return None
 
 
-def machine(ctx):
-    lines = []
-    system = '%s %s (%s)' % (platform.system(), platform.release(), platform.machine())
-    try:
-        for row in Path('/etc/os-release').read_text(encoding='utf-8').splitlines():
+def system_text(system=None):
+    """The operating system, its release and the processor type (no machine or user name)."""
+    system = system or platform.system() or 'not known'
+    text = '%s %s (%s)' % (system, platform.release(), platform.machine())
+    if system == 'Linux':
+        for row in (_read('/etc/os-release') or '').splitlines():
             if row.startswith('PRETTY_NAME='):
-                system += ', ' + row.split('=', 1)[1].strip().strip('"')
-    except OSError:
-        pass
-    if 'microsoft' in platform.release().lower():
-        system += ', under WSL'
-    lines.append('Operating system: ' + system)
+                text += ', ' + row.split('=', 1)[1].strip().strip('"')
+        if 'microsoft' in platform.release().lower():
+            text += ', under WSL'
+    elif system == 'Darwin':
+        release = platform.mac_ver()[0]
+        if release:
+            text += ', macOS ' + release
+    elif system == 'Windows':
+        text += ', version ' + platform.version()
+        edition = platform.win32_edition() if hasattr(platform, 'win32_edition') else None
+        if edition:
+            text += ' (%s)' % edition
+    return text
+
+
+def python_text():
+    """This Python against the version the builder records as its reference (tools/build-reference.json)."""
+    found = platform.python_version()
+    text = '%s (%s)' % (found, platform.python_implementation())
+    try:
+        import build_versions
+        reference = json.loads(build_versions.REFERENCE.read_text(encoding='utf-8')).get('python')
+        verdict = build_versions.compare(found, reference) if reference else None
+    except Exception:  # noqa: BLE001 - the summary never stops on its reference
+        reference = verdict = None
+    return text + (', the recorded reference %s: %s' % (reference, verdict) if reference else
+                   ', the recorded reference was not read')
+
+
+def cores_text(ctx):
     count = os.cpu_count()
     usable = len(os.sched_getaffinity(0)) if hasattr(os, 'sched_getaffinity') else count
+    text = '%s usable of %s' % (usable, count)
     quota = _cgroup('/sys/fs/cgroup/cpu.max')
-    cores = 'Cores: %s usable of %s' % (usable, count)
     if quota and not quota.startswith('max'):
         try:
             limit, period = quota.split()[:2]
-            cores += ', container limit %.1f' % (int(limit) / int(period))
+            text += ', container limit %.1f' % (int(limit) / int(period))
         except ValueError:
             pass
     asked = getattr(ctx.args, 'jobs_requested', getattr(ctx.args, 'jobs', None))
-    cores += '; build workers %s (--jobs %s)' % (getattr(ctx.args, 'jobs', None) or '?', asked if asked else 'auto')
-    lines.append(cores)
-    memory = {}
-    try:
-        for row in Path('/proc/meminfo').read_text(encoding='utf-8').splitlines():
+    return text + '; build workers %s (--jobs %s)' % (getattr(ctx.args, 'jobs', None) or '?', asked if asked else 'auto')
+
+
+def memory(system=None, read=None, run=None, kernel32=None):
+    """(total, available, how) in bytes of the machine's memory: Linux /proc/meminfo, macOS sysctl hw.memsize and
+    vm_stat, Windows GlobalMemoryStatusEx; (None, None, why) where nothing answers. READ, RUN and KERNEL32 stand in for
+    the file reader, subprocess.run and the Windows kernel in tests."""
+    system = system or platform.system()
+    if system == 'Linux':
+        found = {}
+        for row in ((read or _read)('/proc/meminfo') or '').splitlines():
             key, _, value = row.partition(':')
             if key in ('MemTotal', 'MemAvailable'):
-                memory[key] = int(value.split()[0]) * 1024
-    except (OSError, ValueError, IndexError):
-        pass
-    if memory:
-        text = 'Memory: %s total, %s available' % (_size(memory.get('MemTotal')), _size(memory.get('MemAvailable')))
-        limit = _cgroup('/sys/fs/cgroup/memory.max', '/sys/fs/cgroup/memory/memory.limit_in_bytes')
-        if limit and limit.isdigit() and int(limit) < memory.get('MemTotal', 1 << 62):
-            text += ', container limit %s' % _size(int(limit))
-        lines.append(text)
-    else:
-        lines.append('Memory: not read on this operating system')
+                try:
+                    found[key] = int(value.split()[0]) * 1024
+                except (ValueError, IndexError):
+                    pass
+        if found.get('MemTotal'):
+            return found['MemTotal'], found.get('MemAvailable'), '/proc/meminfo'
+        return None, None, '/proc/meminfo did not answer'
+    if system == 'Darwin':
+        return _mac_memory(run or subprocess.run)
+    if system == 'Windows':
+        return _windows_memory(kernel32)
+    return None, None, 'no memory reader for %s' % system
+
+
+def _mac_memory(run):
+    def ask(command):
+        try:
+            done = run(command, capture_output=True, text=True, errors='replace', timeout=MEMORY_SECONDS,
+                       stdin=subprocess.DEVNULL)
+        except (OSError, subprocess.SubprocessError):
+            return ''
+        return done.stdout if done.returncode == 0 else ''
+    total = ask(['sysctl', '-n', 'hw.memsize']).strip()
+    if not total.isdigit():
+        return None, None, 'sysctl hw.memsize did not answer'
+    stat = ask(['vm_stat'])
+    size = re.search(r'page size of (\d+) bytes', stat)
+    pages = [re.search(r'^Pages %s:\s+(\d+)\.?\s*$' % name, stat, re.M) for name in ('free', 'inactive', 'speculative')]
+    if size and pages[0]:
+        available = sum(int(found.group(1)) for found in pages if found) * int(size.group(1))
+        return int(total), available, 'sysctl hw.memsize; vm_stat free, inactive and speculative pages'
+    return int(total), None, 'sysctl hw.memsize; vm_stat did not answer'
+
+
+def _windows_memory(kernel32=None):
+    import ctypes
+
+    class Status(ctypes.Structure):          # MEMORYSTATUSEX
+        _fields_ = [('dwLength', ctypes.c_uint32), ('dwMemoryLoad', ctypes.c_uint32)] + [
+            (name, ctypes.c_uint64) for name in ('ullTotalPhys', 'ullAvailPhys', 'ullTotalPageFile', 'ullAvailPageFile',
+                                                 'ullTotalVirtual', 'ullAvailVirtual', 'ullAvailExtendedVirtual')]
+    status = Status()
+    status.dwLength = ctypes.sizeof(Status)
     try:
-        usage = shutil.disk_usage(ctx.workspace if ctx.workspace.exists() else ctx.workspace.parent)
-        lines.append('Free space in the workspace: %s of %s' % (_size(usage.free), _size(usage.total)))
+        kernel32 = kernel32 or ctypes.windll.kernel32
+        if not kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+            return None, None, 'GlobalMemoryStatusEx did not answer'
+    except (AttributeError, OSError) as exc:
+        return None, None, 'GlobalMemoryStatusEx not reached (%s)' % type(exc).__name__
+    return int(status.ullTotalPhys), int(status.ullAvailPhys), 'GlobalMemoryStatusEx'
+
+
+def memory_text(system=None, **readers):
+    system = system or platform.system()
+    total, available, how = memory(system, **readers)
+    if not total:
+        return 'Not available (%s)' % how
+    text = '%s total, %s' % (_size(total), '%s available' % _size(available) if available is not None else
+                             'available not read')
+    if system == 'Linux':
+        limit = _cgroup('/sys/fs/cgroup/memory.max', '/sys/fs/cgroup/memory/memory.limit_in_bytes')
+        if limit and limit.isdigit() and int(limit) < total:
+            text += ', container limit %s' % _size(int(limit))
+    return text + ' (%s)' % how
+
+
+def free_text(folder):
+    """The free space of the disk FOLDER is on (its nearest existing parent when it is not made yet)."""
+    try:
+        folder = Path(folder)
+        while not folder.exists() and folder.parent != folder:
+            folder = folder.parent
+        usage = shutil.disk_usage(folder)
     except OSError:
-        lines.append('Free space in the workspace: not read')
-    return lines
+        return 'not read'
+    return '%s of %s' % (_size(usage.free), _size(usage.total))
+
+
+def temp_folder():
+    """The temp folder, only to say how much room it has (the report writes nothing there)."""
+    return tempfile.gettempdir()
+
+
+def machine(ctx):
+    temp = temp_folder()
+    return ['Operating system: ' + system_text(), 'Cores: ' + cores_text(ctx), 'Memory: ' + memory_text(),
+            'Free space in the workspace: ' + free_text(ctx.workspace),
+            'Free space in the temp folder (%s): %s' % (ctx.path(temp), free_text(temp))]
 
 
 def stage_plan(ctx):

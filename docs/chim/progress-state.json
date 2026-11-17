@@ -3,6 +3,26 @@
   {
    "built_at": "2026-11-14T09:49:03+00:00",
    "cells": 1409,
+   "commit": "ad5e9a0a",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    }
+   ],
+   "label": "v0.0.66 (ad5e9a0a)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-14T09:49:03+00:00",
+   "cells": 1409,
    "commit": "803f83cd",
    "islands": [
     {
@@ -1761,9 +1781,9 @@
    "sea": 0
   }
  ],
- "eligible_release": "v0.0.66",
+ "eligible_release": "v0.0.67",
  "format": "aw-progress-state-1",
- "generated": "2026-11-16T18:06:25+00:00",
+ "generated": "2026-11-17T05:32:18+00:00",
  "groups": {
   "accounted_for": 2158,
   "cells": 2311,
@@ -1771,7 +1791,7 @@
   "not_in_game": 153,
   "settled": 749
  },
- "in_game_label": "v0.0.66-dev9 (803f83cd)",
+ "in_game_label": "v0.0.66 (ad5e9a0a)",
  "interiors": {
   "classic_rooms": [
    {
@@ -2011,7 +2031,7 @@
   "terrain_complete_unlit": 804
  },
  "version_stamp": {
-  "release": "v0.0.66",
+  "release": "v0.0.67",
   "source": "the version file"
  }
 }

@@ -318,7 +318,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - WEATHER-STATE-NOT-SAVED-66 (no report page): The current weather and its change in progress are not saved: a load rolls the weather again
 - WEREWOLF-BODY-NOT-DRAWN-63 (no report page): A player turned into a werewolf by a script keeps his own body: the werewolf model is not drawn
 - WEREWOLF-RUN-SPEED-63 (no report page): A player in werewolf form runs at his normal run speed: the werewolf run multiplier is not applied
-- WORLD-BUTTONS-62 (no report page): Buttons and levers that should act do nothing, for example the Ghostgate gate buttons on both sides
+- [WORLD-BUTTONS-62](WORLD-BUTTONS-62.md): Buttons and levers that should act do nothing, for example the Ghostgate gate buttons on both sides
 - WORLD-OBJECT-STATE-NOT-SAVED-59 (no report page): World objects taken or moved are not remembered: they come back when the cell or room reloads, and saves do not keep them
 
 <!-- END GENERATED CATEGORY -->

@@ -518,13 +518,18 @@ class PerfDb:
             if is_run_dir(p):
                 return self.ingest_run_dir(p, ingested_at)
             out = []
+            # a changed file is a conflict of that file: the rest of the folder is still read (PERF-DB-FOLDER-CONFLICT)
             for child in sorted(p.iterdir(), key=lambda c: c.name):
                 if child.is_dir() and is_run_dir(child):
-                    out += self.ingest_run_dir(child, ingested_at)
+                    out += self.ingest_run_dir(child, ingested_at, keep_going=True)
                 elif child.is_file() and input_kind(child.name):
                     if input_kind(child.name) == 'aw-result' and not is_aw_result(child):
                         continue
-                    out += self.ingest_path(child, ingested_at)
+                    try:
+                        out += self.ingest_path(child, ingested_at)
+                    except Conflict as error:
+                        self.say(f'CONFLICT: {error}')
+                        out.append((child.name, 'conflict'))
             if not out:
                 self.say(f'{path}: nothing to read (no run files, archives, results or ledgers)')
             return out
@@ -544,7 +549,9 @@ class PerfDb:
         logical = f'aw-results/{p.name}'
         return [(logical, self.ingest_blob(logical, 'aw-result', data, run=p.name[:-5], ingested_at=ingested_at))]
 
-    def ingest_run_dir(self, folder, ingested_at=None):
+    def ingest_run_dir(self, folder, ingested_at=None, keep_going=False):
+        """One run folder. keep_going: a file that changed since it was read is reported as a 'conflict' outcome and
+        the run's other files are still read (a folder ingest); without it the Conflict is raised."""
         folder = Path(folder)
         name = folder.name
         state = read_json_quiet(folder / 'build-state.json')
@@ -569,8 +576,14 @@ class PerfDb:
                 self.say(f'not read: runs/{name}/{rel} ({size} bytes, over the {SIZE_CAP} byte cap)')
                 continue
             logical = f'runs/{name}/{rel}'
-            out.append((logical, self.ingest_blob(logical, RUN_FILES[rel], p.read_bytes(), run=name,
-                                                  ingested_at=ingested_at)))
+            try:
+                out.append((logical, self.ingest_blob(logical, RUN_FILES[rel], p.read_bytes(), run=name,
+                                                      ingested_at=ingested_at)))
+            except Conflict as error:
+                if not keep_going:
+                    raise
+                self.say(f'CONFLICT: {error}')
+                out.append((logical, 'conflict'))
         if not out:
             self.say(f'{name}: no run files found')
         return out
@@ -1371,6 +1384,8 @@ def cmd_ingest(args):
                     totals[outcome] = totals.get(outcome, 0) + 1
                     if args.verbose or outcome not in ('same',):
                         print(f'{outcome:8} {logical}')
+                    if outcome == 'conflict':
+                        problems += 1
                 if args.strict and (not results or any(o == 'running' for _, o in results)):
                     problems += 1
                     print(f'STRICT: {path}: ' + ('still running' if results else 'nothing was read'), file=sys.stderr)

@@ -26,6 +26,8 @@ TEMP_CALLS = {'gettempdir', 'TemporaryDirectory', 'mkdtemp', 'mkstemp', 'NamedTe
 # file -> (allowed count, reason). A new use must go through build_scratch, or be argued for here.
 SMALL_TRANSIENT = {
     'tools/build_aga.py': (1, 'QuakeC compile check: copies three source files, the compiler is run from its own path'),
+    'tools/build_failure.py': (1, 'the temp folder\'s free space for an out-of-disk failure: read only, nothing is written'),
+    'tools/build_report.py': (1, 'the temp folder\'s free space in the report\'s summary: read only, nothing is written'),
     'tools/build_versions.py': (1, 'cwd for a tool version probe (--version output only)'),
     'tools/check_world_map_heap.py': (1, 'target ABI probe: one C file compiled to assembly (-S), nothing is run'),
     'tools/collision_bsp.py': (1, 'one tiny .map compiled by qbsp (the compiler is run from its own path)'),

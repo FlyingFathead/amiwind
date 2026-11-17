@@ -1,6 +1,6 @@
 # aw: the master builder command line
 
-_Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -272,7 +272,9 @@ A build request is checked first, in this order; any failure refuses it before t
    entry block (version, imports, run name) and its reuse preflight, computed in the
    build's own environment, plus the build preflight (cache ownership, game data), with
    no stage run. With a reuse source the check also runs the build's own first-minute reuse stop and fails with its
-   `STOP` lines (exit code 6; [reuse every earlier run](BUILD_CACHE.md#reuse-every-earlier-run)). A reuse preflight with rebuilds the source diff does not explain ("keys
+   `STOP` lines (exit code 6; [reuse every earlier run](BUILD_CACHE.md#reuse-every-earlier-run)), and then the
+   builder's early checks of the stored outputs the build reuses (`EARLY_CHECKS` in `tools/build_preflight.py`, phase
+   `stored`; the same exit with every problem they list). A reuse preflight with rebuilds the source diff does not explain ("keys
    too broad") or with unexpected rebuilds is refused unless `override.allow` names
    `unexplained-rebuilds` (the builder then gets `--accept-rebuild`). The source diff
    against the reuse source's commit (the hash at the end of its run name, or

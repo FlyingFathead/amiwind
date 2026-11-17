@@ -35,9 +35,15 @@ DEFAULT_FAST_MB = 32
 # Keys the smoke sets itself: an --emu-option (or a script's "emu KEY=VALUE" line) may not change the machine under test
 # (memory, disks, ROM, CPU, the JIT profile, the monitor the stall check needs, the screenshot paths). One pattern for
 # the Python side (EMU_MANAGED) and the probe's grep (@EMU_MANAGED@ in PROBE).
+# Warp is one of them (17 November 2026, the maintainer's rule: warp is off for every performance and bench test): an
+# extra option or a script line can never switch it on, so no smoke and no session is a warp run by accident; a session
+# runner asks for it with WARP=1 (PROBE), and the run's result line then says so (WARP_MARK).
 EMU_MANAGED_PATTERN = (r'amiga_model|cpu|fpu|uae_cpu_24bit_addressing|chip_memory|slow_memory|fast_memory|'
                        r'zorro_iii_memory|kickstart_file|hard_drive_.*|floppy_.*|joystick_port_.*|fullscreen|'
-                       r'window_.*|console_debugger|screenshots_output_dir|base_dir|jit_compiler|uae_cpu_speed')
+                       r'window_.*|console_debugger|screenshots_output_dir|base_dir|jit_compiler|uae_cpu_speed|'
+                       r'warp_mode|uae_warp.*')
+# What a warp run's result line ends with: its checks of the game's state hold, its times never do
+WARP_MARK = ' [warp run: no timing verdict]'
 # What FS-UAE 3.1.66 logs when it took deterministic=1 (od-fs/libamiga.cpp amiga_set_deterministic_mode): the proof
 # judge.py emucheck and the probe's own check look for (@EMU_PROOF_DETERMINISTIC@ in JUDGE_PY and PROBE)
 EMU_PROOF_LINE = 'libamiga enabling net play mode'
@@ -111,6 +117,13 @@ if [ ! -s $R/emu-options.txt ] && [ -s $R/script.txt ] && grep -q '^emu ' $R/scr
 fi
 # --emu-option KEY=VALUE (experiment E3: e.g. deterministic=1): extra emulator lines, checked in the start-up log
 [ -s $R/emu-options.txt ] && cat $R/emu-options.txt >> $R/smoke.fs-uae
+# WARP=1 (a session runner's warp switch, 17 November 2026): FS-UAE warp mode, the config's last line (no option can
+# take it back). Warp runs the emulated machine without frame pacing or sound: the run's checks of the game's state
+# hold, its times, frame rates, audio and music never do, and its result line says so (@WARP_MARK@). WARPLIMIT=N (with
+# WARP=1, digits only): at most N emulated frames a second (FS-UAE's warp limit; 50 is a PAL machine's own pace), so each
+# emulated frame keeps 1/N s of the host for the processor; without it warp leaves the processor almost no time per
+# frame and the game's frames take seconds of its own clock (EMU-WARP-STARVES-GAME-CPU-67).
+WM=; if [ "${WARP:-0}" = 1 ]; then printf 'warp_mode = 1\n' >> $R/smoke.fs-uae; WM='@WARP_MARK@'; case "${WARPLIMIT:-}" in ''|*[!0-9]*) ;; *) printf 'uae_warp_limit = %s\n' "$WARPLIMIT" >> $R/smoke.fs-uae;; esac; fi
 export HOME=$R/home DISPLAY=:$N LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe SDL_AUDIODRIVER=dummy
 Xvfb :$N -screen 0 1024x768x24 -nolisten tcp > $R/logs/xvfb.log 2>&1 &
 XP=$!; sleep 2
@@ -188,7 +201,7 @@ finish(){ [ -e $R/finished ] && exit 0; : > $R/finished
   grep -E "Caught illegal|Fault address|Suspicious" $R/logs/fs-uae.log.txt 2>/dev/null | tail -12 > $R/logs/emulator-faults.txt
   cp $R/awctl/console.log $R/logs/console.log 2>/dev/null; alive && shot final
   kill $FP 2>/dev/null; sleep 2; kill $XP 2>/dev/null; idetrim $R/logs/fs-uae.log.txt $R/logs/fsuae.log
-  rm -f $R/home/Cache/Logs/fs-uae.log.txt; log "smoke RESULT $1"; exit 0; }
+  rm -f $R/home/Cache/Logs/fs-uae.log.txt; log "smoke RESULT $1${WM:-}"; exit 0; }
 # emucheck: every --emu-option line must show in the emulator's start-up log (judge.py emucheck), else the run fails:
 # a count with an option the emulator never took would prove nothing
 emucheck(){ [ -s $R/emu-options.txt ] || return 0
@@ -1095,7 +1108,8 @@ judge_frames = _JUDGE['judge_frames']
 emu_check = _JUDGE['emu_check']
 
 EMU_MANAGED = re.compile('^(%s)$' % EMU_MANAGED_PATTERN)
-PROBE = PROBE.replace('@EMU_MANAGED@', EMU_MANAGED_PATTERN).replace('@EMU_PROOF_DETERMINISTIC@', EMU_PROOF_LINE)
+PROBE = PROBE.replace('@EMU_MANAGED@', EMU_MANAGED_PATTERN).replace('@EMU_PROOF_DETERMINISTIC@', EMU_PROOF_LINE) \
+    .replace('@WARP_MARK@', WARP_MARK)
 
 
 def parse_emu_options(items):

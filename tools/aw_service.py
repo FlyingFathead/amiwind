@@ -387,7 +387,10 @@ def build_commands(config, request, facts, run_name):
     workspace = options.get('workspace') or build['workspace']
     run_dir = f'{workspace.rstrip("/")}/build/{run_name}'
     prefix = build['container_prefix']
-    env = {'PYTHONPATH': f'{source}/src:{source}/tools', 'AMIWIND_AW_REQUEST': request['id']}
+    # the builder image's mark (tools/build_report.py container: the build report names the image the build ran in;
+    # no AMIWIND_ name, so it keys no stage)
+    env = {'PYTHONPATH': f'{source}/src:{source}/tools', 'AMIWIND_AW_REQUEST': request['id'],
+           'AW_RUNTIME': 'master-builder', 'AW_RUNTIME_IMAGE': build['image']}
     volume_rw, volume_ro = f'{build["volume"]}:{mount}:rw', f'{build["volume"]}:{mount}:ro'
     script = (f'S={shlex.quote(source)}; if [ -f "$S/VERSION" ]; then echo "aw: source exists"; cat > /dev/null; '
               f'else rm -rf "$S.part" && mkdir -p "$S.part" && tar -xf - -C "$S.part" && mv "$S.part" "$S"; fi; '

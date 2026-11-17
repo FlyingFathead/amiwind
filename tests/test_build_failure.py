@@ -207,8 +207,72 @@ class RecordTests(unittest.TestCase):
             self.assertIn('--reuse-from /work/build/%s' % RUN, rec['resume']['command'])
             self.assertNotIn('older', rec['resume']['command'])
             page = (Path(tmp) / RUN / 'FAILURE.md').read_text()
-            self.assertIn('- **Other stages:** cancelled with it: rooms; 1 not started: image', page)
+            self.assertIn('- **Not completed:** 1 stage not started: image; cancelled with it: rooms', page)
             self.assertIn('after 41 min 3 s, 12 workers', page)
+
+    def test_the_page_carries_the_settings_from_the_run_s_own_files(self):
+        # the one page (BUILD-FAILURE-NO-DETAILS-66 with BUILD-FAILURE-REPORT-66): the options as given, the file with
+        # every option's value, the builder, its masters, the data folder, the AMIWIND_ settings the failed stage read
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp) / 'ws'
+            run = failed_run(workspace / 'build')
+            state = json.loads((run / 'build-state.json').read_text())
+            state.update({'builder_options': {'builder': 'chim', 'chim_areas': ['balmora', 'seyda']},
+                          'expansion_layers': {'masters': ['Morrowind.esm', 'Tribunal.esm']}, 'data_files': '/owned'})
+            (run / 'build-state.json').write_text(json.dumps(state))
+            (run / 'build-recipe.json').write_text('{"options": {}}')
+            (run / 'profile').mkdir()
+            (run / 'profile' / 'fingerprints.json').write_text(json.dumps({
+                'chim': {'environment': {'AMIWIND_LAVA': 'quake', 'AMIWIND_HEAP_MB': None,
+                                         'AMIWIND_MESH_SEAM_STOP': 'warn'}},
+                'census': {'environment': {'AMIWIND_NOT_THIS_STAGE': '1'}}}))
+            rec = build_failure.write(run)
+            found = rec['settings']
+            self.assertEqual(found['command_line'], META['build_argv'])
+            self.assertEqual((found['recipe'], found['builder'], found['masters'], found['data_files']),
+                             ('build-recipe.json', 'chim (CHIM areas: balmora, seyda)', ['Morrowind.esm', 'Tribunal.esm'],
+                              '/owned'))
+            self.assertEqual(found['stages'], {'chim': {'AMIWIND_LAVA': 'quake', 'AMIWIND_MESH_SEAM_STOP': 'warn'}})
+            self.assertNotIn('report', rec)                                   # no build report written yet
+            page = (run / 'FAILURE.md').read_text()
+            for part in ('## Build settings', 'tools/build.py --stage aga --name %s --jobs 4' % RUN,
+                         '- **Every option with its value:** build-recipe.json in the run folder',
+                         '- **Builder:** chim (CHIM areas: balmora, seyda)',
+                         '- **Masters, in load order:** Morrowind.esm, Tribunal.esm', '- **Game data:** /owned',
+                         'The AMIWIND_ settings the stage chim read', 'AMIWIND_LAVA=quake\nAMIWIND_MESH_SEAM_STOP=warn'):
+                self.assertIn(part, page)
+            self.assertNotIn('AMIWIND_HEAP_MB', page)                         # not set: left out
+            self.assertNotIn('AMIWIND_NOT_THIS_STAGE', page)                  # another stage's settings
+            self.assertLess(page.index('## Build settings'), page.index('## Build again from this run'))
+            # the build report written next is named in the page, which the build then prints
+            report = workspace / 'logs' / ('BUILD-REPORT-%s.txt' % RUN)
+            report.parent.mkdir()
+            report.write_text('the full report')
+            out = io.StringIO()
+            build_failure.report(run, None, out)
+            self.assertIn('- **Full report:** %s (every option' % report, out.getvalue())
+            self.assertEqual(json.loads((run / 'failure.json').read_text())['report'], str(report))
+            self.assertEqual(build_failure.last_line(run).split(' (')[0], 'Failure details: %s' % (run / 'FAILURE.md'))
+
+    def test_the_page_of_a_run_on_a_read_only_volume_goes_elsewhere(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run = failed_run(Path(tmp) / 'build')
+            before = sorted(p.name for p in run.iterdir())
+            out_dir = Path(tmp) / 'pages'
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                self.assertEqual(build_failure.main([str(run), '--out', str(out_dir)]), 0)
+            self.assertEqual(sorted(p.name for p in run.iterdir()), before)  # the run is only read
+            self.assertIn('Failure details: %s' % (out_dir / 'FAILURE.md'), out.getvalue())
+            self.assertEqual(json.loads((out_dir / 'failure.json').read_text())['source'], 'command')
+            self.assertIn('## Build settings', (out_dir / 'FAILURE.md').read_text())
+
+    def test_what_was_not_completed_when_the_build_stopped_before_its_stages(self):
+        self.assertEqual(build_failure.not_completed({'failed_stages': [], 'stages_recorded': 0}),
+                         'the whole build: it stopped before its stages ran')
+        self.assertEqual(build_failure.not_completed({'failed_stages': [{'left_out_count': 2}], 'stages_recorded': 3}),
+                         '2 units refused or left out (listed below)')
+        self.assertEqual(build_failure.not_completed({'failed_stages': [{}], 'stages_recorded': 3}),
+                         'no other stage was stopped or left to run')
 
     def test_the_command_to_build_again_leaves_the_options_of_the_failed_run_out(self):
         command = build_failure.resume_command(
@@ -243,6 +307,128 @@ class RecordTests(unittest.TestCase):
             self.assertEqual([w for w in bug_register.PRIVATE_WORDS if w in lowered], [])
             for word in ('tele' + 'gram', 'the ' + 'owner', ' cha' + 't ', 'chann' + 'el'):
                 self.assertNotIn(word, lowered)
+
+
+TRACE = ['Traceback (most recent call last):', '  File "/opt/amiwind/tools/chim_room_batches.py", line 310, in bake',
+         '    result = convert(room)']
+# Recorded tracebacks of each kind (BUILD-REPORT-MACHINE-ALL-OS-67): a pool worker ended by the system, a numpy array
+# Python could not allocate, a write on a full disk, a write past a quota, a read of a shared folder failing with errno 12
+BROKEN_POOL = TRACE + [
+    '  File "/usr/lib/python3.12/concurrent/futures/_base.py", line 449, in result',
+    '    return self.__get_result()',
+    'concurrent.futures.process.BrokenProcessPool: A process in the process pool was terminated abruptly while the '
+    'future was running or pending.']
+ARRAY_MEMORY = TRACE + ['numpy.core._exceptions._ArrayMemoryError: Unable to allocate 64.0 GiB for an array with shape '
+                        '(2048, 2048, 2048) and data type float64']
+NO_SPACE = TRACE + ["OSError: [Errno 28] No space left on device: '/work/build/r/chim-room-batches/id1/maps/x.bsp'"]
+QUOTA = TRACE + ["OSError: [Errno 122] Disk quota exceeded: '/work/cache/asset-pool-v1/ab/cd'"]
+SHARED_READ = TRACE + ["OSError: [Errno 12] Cannot allocate memory: '/src/tools/release-files.json'"]
+
+
+def stage_row(traceback=(), returncode=1, tail=(), error_lines=()):
+    return {'name': 'chim-room-batches', 'returncode': returncode, 'traceback': list(traceback), 'tail': list(tail),
+            'error_lines': list(error_lines)}
+
+
+class KindTests(unittest.TestCase):
+    """The failure's kind at the top of FAILURE.md and of the build report: out of memory and out of disk by their
+    marks, proven or likely, with what was found and what to do (BUILD-REPORT-MACHINE-ALL-OS-67)."""
+
+    def kind(self, *rows, error=None, **options):
+        return build_failure.kinds({'failed_stages': list(rows)}, error, **options)
+
+    def test_each_kind_by_its_recorded_traceback(self):
+        for name, rows, kind, proof, said in (
+                ('pool worker ended', [stage_row(BROKEN_POOL)], build_failure.MEMORY, 'likely, not proven',
+                 'a worker process of a pool was ended'),
+                ('numpy array', [stage_row(ARRAY_MEMORY)], build_failure.MEMORY, 'proven', 'MemoryError'),
+                ('full disk', [stage_row(NO_SPACE)], build_failure.DISK, 'proven', 'errno 28 (ENOSPC)'),
+                ('quota', [stage_row(QUOTA)], build_failure.DISK, 'proven', 'errno 122 (EDQUOT)'),
+                ('shared read', [stage_row(SHARED_READ)], build_failure.MEMORY, 'likely, not proven',
+                 'a read from a shared folder can also end so'),
+                ('signal 9', [stage_row(returncode=-9)], build_failure.MEMORY, 'likely, not proven',
+                 'was ended by signal 9 (exit -9)'),
+                ('shell exit 137', [stage_row(returncode=137)], build_failure.MEMORY, 'likely, not proven',
+                 'was ended by signal 9 (exit 137)'),
+                ('Killed line', [stage_row(error_lines=['bash: line 1:  4242 Killed    python3 tools/x.py'])],
+                 build_failure.MEMORY, 'likely, not proven', 'ended by signal 9 (SIGKILL)')):
+            with self.subTest(name):
+                found = self.kind(*rows)
+                self.assertEqual([(row['kind'], row['proof']) for row in found], [(kind, proof)])
+                self.assertIn(said, '; '.join(found[0]['marks']))
+                self.assertEqual(found[0]['advice'], build_failure.KIND_ADVICE[kind])
+        # no mark: no kind; a mark only in the last log lines is a hint, never a proof
+        self.assertEqual(self.kind(stage_row(TRACE + ['ValueError: a seam stop'])), [])
+        hint = self.kind(stage_row(TRACE + ['ValueError: a seam stop'], tail=['MemoryError while caching, retried']))
+        self.assertEqual((hint[0]['proof'], hint[0]['marks']),
+                         ('likely, not proven', ['MemoryError: Python could not get the memory it asked for (in the last '
+                                                 'log lines)']))
+
+    def test_the_builder_s_own_error_and_what_it_was_raised_from(self):
+        try:
+            try:
+                raise OSError(28, 'No space left on device')
+            except OSError as exc:
+                raise RuntimeError('the image step failed') from exc
+        except RuntimeError as exc:
+            error = exc
+        self.assertEqual([(row['kind'], row['proof']) for row in self.kind(error=error)],
+                         [(build_failure.DISK, 'proven')])
+        self.assertEqual(self.kind(error=MemoryError())[0]['proof'], 'proven')
+        self.assertEqual(self.kind(error=ValueError('a seam stop')), [])
+        record = build_failure.kinds({'builder_error': {'type': 'OSError', 'message': '[Errno 122] Disk quota exceeded'}})
+        self.assertEqual(record[0]['kind'], build_failure.DISK)
+
+    def test_in_the_failing_build_the_kill_counter_proves_it_and_the_free_space_is_shown(self):
+        files = {'/proc/self/cgroup': '0::/docker/abc\n', '/sys/fs/cgroup/docker/abc/memory.events':
+                 'low 0\nhigh 0\nmax 4\noom 2\noom_kill 1\noom_group_kill 0\n'}
+        self.assertEqual(build_failure.oom_kills(files.get), 1)
+        # cgroup v1: memory.oom_control; no counter anywhere: None
+        self.assertEqual(build_failure.oom_kills({'/sys/fs/cgroup/memory/memory.oom_control':
+                                                  'oom_kill_disable 0\nunder_oom 0\noom_kill 3\n'}.get), 3)
+        self.assertIsNone(build_failure.oom_kills({}.get))
+        saved = dict(build_failure._START)
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                build_failure.note_start(tmp, read=files.get)
+                files['/sys/fs/cgroup/docker/abc/memory.events'] = 'oom 4\noom_kill 3\n'
+                found = self.kind(stage_row(BROKEN_POOL), live=True, read=files.get)
+                self.assertEqual(found[0]['proof'], 'proven')
+                self.assertEqual(found[0]['found'], ['the memory controller ended 2 processes for memory during the build '
+                                                     '(cgroup oom_kill 1 -> 3)'])
+                build_failure.note_start(tmp, read=files.get)       # the counter did not rise this time
+                found = self.kind(stage_row(BROKEN_POOL), live=True, read=files.get)
+                self.assertEqual(found[0]['proof'], 'not proven')
+                self.assertIn('stayed at 3', found[0]['found'][0])
+                self.assertEqual(self.kind(stage_row(BROKEN_POOL), live=True, read={}.get)[0]['proof'],
+                                 'likely, not proven')
+                disk = self.kind(stage_row(NO_SPACE), live=True, workspace=tmp)
+                self.assertRegex(disk[0]['found'][0], r'^free space at the start and now: workspace \S+ \S+, now \S+ \S+; '
+                                                      r'temp folder \S+ \S+, now \S+ \S+$')
+        finally:
+            build_failure._START.clear()
+            build_failure._START.update(saved)
+
+    def test_failure_md_names_the_kind_first(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run = failed_run(tmp)
+            (run / 'logs' / '27-chim.log').write_text('\n'.join(['CHIM frame 1'] + NO_SPACE) + '\n')
+            rec = build_failure.write(run)
+            page = (run / 'FAILURE.md').read_text(encoding='utf-8')
+            bullets = [line for line in page.splitlines() if line.startswith('- **')]
+            self.assertTrue(bullets[0].startswith('- **Kind:** OUT OF DISK (proven): errno 28 (ENOSPC)'), bullets[0])
+            self.assertTrue(bullets[1].startswith('- **Found:** free space at the start and now: '), bullets[1])
+            self.assertTrue(bullets[2].startswith('- **What to do:** free space in the workspace'), bullets[2])
+            self.assertTrue(bullets[3].startswith('- **Failed stage:** chim'), bullets[3])
+            self.assertEqual(json.loads((run / 'failure.json').read_text())['kinds'][0]['kind'], 'OUT OF DISK')
+            self.assertEqual(rec['kinds'][0]['proof'], 'proven')
+            # the Monitor's reader, later: the marks alone, without the free space of another moment
+            derived, text = build_failure.derive(run)
+            self.assertEqual(derived['kinds'][0]['found'], [])
+            self.assertIn('- **Kind:** OUT OF DISK (proven)', text)
+            # a failure without the marks names no kind
+            plain = failed_run(Path(tmp) / 'plain', with_files=True)
+            self.assertNotIn('**Kind:**', (plain / 'FAILURE.md').read_text(encoding='utf-8'))
 
 
 class OptionMarkTests(unittest.TestCase):

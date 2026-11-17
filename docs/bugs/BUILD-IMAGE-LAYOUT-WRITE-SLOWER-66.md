@@ -18,9 +18,11 @@
 | Where | the build's image step (the partitions written at once) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.66-dev9, v0.0.66-dev10, v0.0.66-dev11 (last seen) |
+| Persists in | fixed in v0.0.66-dev12 |
 | Severity | medium: about 90 seconds of every build's image step on one core, and the v0.0.66-dev11 build failed its performance guard on it; the output is right |
 | Family | Build speed (`build-speed`) |
+| Fixed on | 2026-11-16 |
+| Planning item | `BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66` |
 | Playtest version | 2026_11_15_v0.0.66-dev9_full-v0.0.66-dev9_803f83c |
 | From commit | source and engine 803f83c |
 | CHIM engine version | none: legacy engine |
@@ -32,10 +34,19 @@
 
 ## Timeline
 
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| shipped | the v0.0.66-dev12 snapshot build | v0.0.66-dev12 (ac37e80b, build 2026_11_16_v0.0.66-dev12_full-v0.0.66-dev12_ac37e80) | 2026-11-16 | the delivered build holds the commit; its build log names the entry on the line that writes the world partition directly | the faster image layout write (the partitions written at once, the world partition written directly) is part of the snapshot |
+| confirmed by a build | a development build | v0.0.66-dev12 (ac37e80b, build 2026_11_16_v0.0.66-dev12_full-v0.0.66-dev12_ac37e80) | 2026-11-16 | the image step of the build log: Image: partitions (all at once) took 25.4 s (boot partition 20.9 s, world partition 24.5 s) at 1.7 cores | against 110 s on the v0.0.66-dev11 build and the guard baseline of 67 s, inside the expected 25 to 31 s; a builder timing, so no play check applies |
+
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-15: reported in v0.0.66-dev9
 - 2026-11-16: seen again in v0.0.66-dev11: Seen again on the v0.0.66-dev11 build (26ed570, 16 November 2026), beside two emulator sessions: the boot partition (2,019 MiB, 29,385 files) took 109.1 s and the world partition 46.5 s, the step 1 min 50 s at 1.4 cores; the performance ...
+- 2026-11-16: shipped: the v0.0.66-dev12 snapshot build, v0.0.66-dev12 (ac37e80b, build 2026_11_16_v0.0.66-dev12_full-v0.0.66-dev12_ac37e80); the delivered build holds the commit; its build log names the entry on the line that writes the world partition directly: the faster image layout write (the partitions written at once, the world partition written directly) is part of the snapshot
+- 2026-11-16: confirmed by a build: a development build, v0.0.66-dev12 (ac37e80b, build 2026_11_16_v0.0.66-dev12_full-v0.0.66-dev12_ac37e80); the image step of the build log: Image: partitions (all at once) took 25.4 s (boot partition 20.9 s, world partition 24.5 s) at 1.7 cores: against 110 s on the v0.0.66-dev11 build and the guard baseline of 67 s, inside the expected 25 to 31 s; a builder timing, so no play check applies
 - 2026-11-16 01:22 +0200: seen again in v0.0.66-dev10: Measured again on the v0.0.66-dev10 build (f446092) with no emulator session beside it: the partitions took 1 min 37 s at 1.44 of 2 cores (the boot partition 95.7 s, the world partition 46.6 s) against the guard's baseline of 67 s; the ...
 
 <!-- END GENERATED TIMELINE -->
@@ -321,6 +332,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - EXPANSION-READER-ONE-MASTER-64 (no report page): Most builder readers load only the base game file; the roadmap calls the readers master-list readers
 - GATE-IMAGE-REMOVED-52 (no report page): A cleanup removed the image the gate s Linux host-parity step runs: the in-use check looked at containers only
 - GATE-PRIVACY-NOT-IN-PREGATE-52 (no report page): The privacy word check runs only in the full gate: the quick pre-gate checks passed text the gate then refused
+- [GUARD-TORCH-SCRATCH-SERIAL-67](GUARD-TORCH-SCRATCH-SERIAL-67.md): From scratch, the guard torch step bakes the six boat guard models one after another only to skip every one of them
 - [HARVEST-CHIM-COVERAGE-ONE-AREA-48](HARVEST-CHIM-COVERAGE-ONE-AREA-48.md): The image step harvest coverage check failed on every CHIM world of one area (every MiniWind sandbox of one town)
 - IMAGE-BIGGER-THAN-ORIGINAL-62 (no report page): The game image (3,022 MB in v0.0.62) is bigger than the original game data it is made from (1.93 GB)
 - IMAGE-FORMAT-EFFECTS-AWE-66 (no report page): The image step's format check did not know the active-effect icon file, and stopped the build at its end
@@ -336,6 +348,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [NPC-BAKED-WHOLE-DUPLICATION-33](NPC-BAKED-WHOLE-DUPLICATION-33.md): Every NPC appearance is baked whole: shared body parts are converted again for each actor, and equipment cannot change
 - [NPC-LIBRARY-NO-UNIT-CACHE-63](NPC-LIBRARY-NO-UNIT-CACHE-63.md): The NPC appearance bakes of the actor library stage had no unit cache, so every rebuild of the stage baked all 418 appearances again (about 45 minutes)
 - PARTITION-CACHE-FIXED-WORKERS-66 (no report page): The new partition cache hashed its files on a fixed eight threads instead of the stage's own allowance
+- [PERF-DB-FOLDER-CONFLICT-67](PERF-DB-FOLDER-CONFLICT-67.md): A folder ingest of the performance database stops at the first changed file
 - PERF-GUARD-BASIS-BY-COUNT-66 (no report page): The performance guard judges the image step's partition write by the number of partitions and not by their size, so a slowdown back to the old time would pass
 - [PERF-GUARD-RESIDENT-BUSY-HOST-57](PERF-GUARD-RESIDENT-BUSY-HOST-57.md): The dev5 full build's perf guard failed chim-town-balmora and chim-town-vivec_city build_resident as slower (129 s, was 52 s; 147 s, was 62 s) while two other builds ran beside it: contention, not code
 - PLAYER-VIEW-SKIN-ROWS-STOP-62 (no report page): The image step's player view stopped the v0.0.62 final build after 1 h 13 min: an Alias skin rows overflow ended it instead of trying the next smaller body

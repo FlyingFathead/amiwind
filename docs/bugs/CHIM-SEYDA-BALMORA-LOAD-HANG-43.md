@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 46 times; something has to be done
+## PERSISTING: reported 47 times; something has to be done
 
 - Reported with v0.0.46 at 2026-10-20 20:09 +0300: Listed under Known in this build in the v0.0.46 release notes (still open at the release).
 - Reported with v0.0.53-dev2 at 2026-10-26 (time not recorded): 19:14 UTC door sample: the Yassu Mine room load (ri9f4c8ccd45) stopped after its BSP while a gate ran its emulator; the next try loaded in 7.6 s
@@ -50,6 +50,7 @@
 - Reported with v0.0.66-dev11 at 2026-11-16 (time not recorded): The deterministic-mode comparison so far, test sessions only (the tally is DET-TALLY.txt of the comparison, repeat sessions of the Arena Pit loads on the v0.0.66-dev10 image at 32 MB Fast): as sessions run today, 8 valid runs, 76 Arena Pit loads, 2 stops; with the emulator's deterministic option, 7 valid runs, 70 loads, 0 stops. The second stop's packet was again a request of the remote console's folder, an open for writing of its state file whose host side had finished while the game was never told. The comparison continues; no conclusion beyond these numbers.
 - Reported with v0.0.66-dev12 at 2026-11-16 (time not recorded): The deterministic-mode comparison, updated (test sessions only; the tally is DET-TALLY.txt of the comparison, repeat sessions of the Arena Pit loads on the v0.0.66-dev10 image at 32 MB Fast): as sessions run today, 8 valid runs, 76 Arena Pit loads, 2 stops; with the emulator's deterministic option, 8 valid runs, 80 loads, 0 stops. The comparison continues; no conclusion beyond these numbers. This line replaces the earlier tally of the same day (7 valid runs, 70 loads, 0 stops).
 - Reported with v0.0.66-dev10 at 2026-11-16 10:46 +0200: The mechanism captured in a plain repeat session on the v0.0.66-dev10 image (FS-UAE at 32 MB Fast, JIT, the remote-console folder served by the emulator's host thread): it stopped after nine arena pit loads with the game's packet a FINDINPUT of AWCTL:cmd.txt, the remote console's poll of its missing command file, its result already set (res1 0, res2 205), and the handler's state word for it -1: the emulator's host side finished the request and the handler was never told. The deterministic twin (emu deterministic=1) is being measured against it.
+- Reported with v0.0.66 at 2026-11-17 (time not recorded): Seen again on 17 November 2026 on the v0.0.66 release image, with the emulator in warp mode (warp_mode = 1): the opening journey stopped at its very first map load (map seyda). The stall examination found the game waiting on FINDOUTPUT of AWCTL:state.txt with the handler's word -1 (the request finished by the host side, the handler never told) and the state file left empty. Without warp this stop comes about once in 100 loads; warp emulates thousands of frames per second (about 23,000 in the first 15 s), and every frame updates the shared interrupt word that the folder's host thread also writes, so the race comes at once. A warp session needs the deterministic option (EMU-WARP-STARVES-GAME-CPU-67).
 
 <!-- END GENERATED PERSISTING -->
 
@@ -127,7 +128,9 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-16: seen again in v0.0.66-dev10
 - 2026-11-16: seen again in v0.0.66-dev11: The deterministic-mode comparison so far, test sessions only (the tally is DET-TALLY.txt of the comparison, repeat sessions of the Arena Pit loads on the v0.0.66-dev10 image at 32 MB Fast): as sessions run today, 8 valid runs, 76 Arena Pit ...
 - 2026-11-16: seen again in v0.0.66-dev12: The deterministic-mode comparison, updated (test sessions only; the tally is DET-TALLY.txt of the comparison, repeat sessions of the Arena Pit loads on the v0.0.66-dev10 image at 32 MB Fast): as sessions run today, 8 valid runs, 76 Arena ...
+- 2026-11-16: v0.0.66-dev12: Pi 4B A/B: the same repeat loads with the test console served from a host folder drive in Amiberry 8.5.0, 32 MB Fast, the v0.0.66-dev12 image: 10 valid sessions, 200 loads (100 into the Arena Pit), 0 stops, 0 failures.
 - 2026-11-16 10:46 +0200: seen again in v0.0.66-dev10: The mechanism captured in a plain repeat session on the v0.0.66-dev10 image (FS-UAE at 32 MB Fast, JIT, the remote-console folder served by the emulator's host thread): it stopped after nine arena pit loads with the game's packet a ...
+- 2026-11-17: seen again in v0.0.66: Seen again on 17 November 2026 on the v0.0.66 release image, with the emulator in warp mode (warp_mode = 1): the opening journey stopped at its very first map load (map seyda).
 
 <!-- END GENERATED TIMELINE -->
 
@@ -136,7 +139,7 @@ _Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 46 times; something has to be done](#persisting-reported-46-times-something-has-to-be-done)
+- [PERSISTING: reported 47 times; something has to be done](#persisting-reported-47-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -589,6 +592,7 @@ Related bugs in other categories:
 - ARRIVAL-LONG-FRAME-DEV6-59 (no report page): Arriving in Seyda Neen, the first frame of play lasts about 13 to 15 seconds; v0.0.59-dev6 test sessions stopped on it as a stall
 - [CONTAINER-STRIP-TAKE-STALL-59](CONTAINER-STRIP-TAKE-STALL-59.md): A take or put in the container strip can hold the game for seconds
 - [DBG-TP-DURING-LOAD-66](DBG-TP-DURING-LOAD-66.md): A dbg tp typed while a load is still running is lost: a town name does nothing, a place says no map holds the point, a room prints its name and stays
+- [EMU-WARP-STARVES-GAME-CPU-67](EMU-WARP-STARVES-GAME-CPU-67.md): In the emulator's warp mode the game gets far less processor time per second of its own clock, so its frames take seconds of game time
 - [HANG-IDLE-DUSK-35](HANG-IDLE-DUSK-35.md): The game freezes with the music looping after the player is left idle for a few minutes outdoors, seen around sundown
 - [HEART-CHAMBER-LOAD-HANG-62](HEART-CHAMBER-LOAD-HANG-62.md): The game stops on the Loading screen when teleporting to the heart chamber, with the music still playing
 - IMAGE-IDE-CYLINDER-TAIL-59 (no report page): On the emulated A1200 IDE port the last 144 sectors of the world partition AW_WORLD0 were unreadable, so loading Khuul stopped the game

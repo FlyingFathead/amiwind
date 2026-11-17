@@ -1954,6 +1954,18 @@ def execute(steps, run, metadata):
         entry.update(status="passed", elapsed_seconds=round(time.monotonic() - start, 3))
         profile.finished(name, entry)
         save()
+        try:
+            # the checks registered for right after this stage, on its output (BUILD-IMAGE-CHECKS-EARLY-66)
+            from build_parallel import after_stage_checks
+            after_stage_checks(name, run, metadata)
+        except RuntimeError as exc:
+            receipt["status"] = "failed"
+            receipt["not_started"] = [later for later, _ in steps[number:]]
+            save()
+            profile.close(receipt)
+            import build_failure
+            build_failure.write(run, exc)
+            raise
     receipt["status"] = "passed"
     save()
     profile.close(receipt)
@@ -2051,7 +2063,34 @@ def unit_stop_check(args, tools, run):
         # (BUILD-PREFLIGHT-SERIAL-REPEATED-66): valid whether or not the plan stops, it depends on the files only
         save_preflight_analysis()
     print('Reuse check (--check): passed (no reuse stop)', flush=True)
+    problems = stored_early_problems(args, metadata, steps, run)
+    if problems:
+        print('Check FAILED: the build would stop before its first stage: early checks: %d problem%s:\n  %s' % (
+            len(problems), '' if len(problems) == 1 else 's', '\n  '.join(problems)), flush=True)
+        return UNIT_STOP_EXIT
     return 0
+
+
+def early_masters(args):
+    """The selected masters in load order, for the early checks (tools/build_preflight.py EarlyContext)."""
+    try:
+        import build_cache
+        return build_cache.master_list(expansion_selection(args))
+    except Exception:  # noqa: BLE001 - a check that needs them says so itself
+        return []
+
+
+def stored_early_problems(args, metadata, steps, run):
+    """The registered early checks of the stored outputs this build reuses (tools/build_preflight.py EARLY_CHECKS,
+    phase 'stored'; BUILD-IMAGE-CHECKS-EARLY-66): after the reuse plan, before the first stage; the build and its
+    --check run them alike. Returns [problem]; each check prints one line."""
+    import build_preflight
+    reused = {name: row.get('from') for name, row in ((metadata.get('stage_cache') or {}).get('reused') or {}).items()
+              if isinstance(row, dict) and row.get('from') and not str(row['from']).startswith('prerendered ')}
+    return build_preflight.early_problems(build_preflight.EarlyContext(
+                'stored', args, masters=early_masters(args), run=run, reused=reused,
+                steps=[name for name, _ in steps], log=lambda line: print(line, flush=True),
+                keys=(metadata.get('stage_cache') or {}).get('fingerprints')))
 
 
 def save_preflight_analysis():
@@ -3010,8 +3049,14 @@ _STARTUP_WATCH = None      # (StartupWatch, final status) of the run main() is i
 
 
 def main(argv=None):
+    outcome = 'failed'    # the start-up watch's last status when the build stops in its start-up
     try:
-        return _main(argv)
+        result = _main(argv)
+        outcome = None
+        return result
+    except SystemExit as exc:
+        outcome = None if exc.code in (None, 0) else 'stopped' if exc.code == 130 else 'failed'
+        raise
     finally:
         # the start-up watch (tools/build_stall.py) ends with this call, also when main() is called in-process
         # (tests, wrappers): its stdout tee and its thread never outlive the run
@@ -3019,7 +3064,7 @@ def main(argv=None):
         if _STARTUP_WATCH is not None:
             watch, final = _STARTUP_WATCH
             _STARTUP_WATCH = None
-            watch.stop(final)
+            watch.stop(outcome or final)
         # the reuse preflight is shared by the two asks of one --check / --plan run only, never past it
         cache = sys.modules.get('build_cache')
         if cache is not None and getattr(cache, 'PREFLIGHT_ONCE', False):
@@ -3032,6 +3077,49 @@ def main(argv=None):
         prefetch = sys.modules.get('fingerprint_prefetch')
         if prefetch is not None:
             prefetch.forget()
+
+
+# modes that build nothing and end before a run name: no start-up watch (tools/build_stall.py)
+STARTUP_WATCH_SKIP = ('host_plan', 'versions', 'check_inputs', 'install_dependencies', 'install_sdk', 'estimate_world',
+                      'layout_selftest')
+
+
+def begin_startup_watch(args):
+    """The start-up watch (tools/build_stall.py, BUILDER-STALL-METRICS-66): build-progress.json with status "starting",
+    the phase (the last line the builder printed), the cores now against the cores planned, the seconds since that line
+    and the stall block, in build/.startup/<run>/ beside the runs with its status folder (heartbeat.json, stall.jsonl;
+    docs/BUILD_STATUS.md), until the stage tracker takes over at the first stage; the Toolkit monitor lists it as a
+    starting run. Called at the build's first second, once its options are read: a build started with --name has its
+    files from then on; called again once the run name is chosen, it places the files of a build without --name and
+    takes the resolved cores. A --check or --plan creates nothing in the workspace: its [stall] lines go to the log,
+    its files only where AMIWIND_STATUS_DIR names a folder. Returns the watch, or None (a mode that builds nothing)."""
+    if args.dry_run or any(getattr(args, mode, None) for mode in STARTUP_WATCH_SKIP) or (
+            getattr(args, 'prerendered', None) and args.prerendered[0] in PRERENDERED_ACTIONS):
+        return None
+    import atexit
+    import build_stall
+    import run_name
+    preview = args.check or args.plan
+    named = os.environ.get('AMIWIND_STATUS_DIR', '').strip()
+    name = args.name if args.name and run_name.NAME.fullmatch(str(args.name)) else None
+    # a build refused in its start-up leaves no run folder: the start-up's files sit beside the runs
+    # (build/.startup/<run>/) until the stage tracker writes <run>/build-progress.json and <run>/status/
+    where = Path(named) if named else None if preview or not name else Path(args.workspace) / 'build' / '.startup' / name
+    status = (build_stall.StatusWriter(where / build_stall.STATUS_DIR, resume='the same build.py command again',
+                                       make_parents=True) if where is not None else None)
+    planned = int(args.jobs or os.cpu_count() or 1)
+    watch = getattr(args, 'startup_watch', None)
+    if watch is None:
+        global _STARTUP_WATCH
+        watch = args.startup_watch = build_stall.StartupWatch(
+            where / 'build-progress.json' if where is not None else None, planned, status=status).start()
+        _STARTUP_WATCH = (watch, 'checked' if preview else 'stopped')
+        atexit.register(watch.stop, 'checked' if preview else 'stopped')
+    elif watch.path is None and where is not None:
+        watch.place(where / 'build-progress.json', status, planned=planned)
+    else:
+        watch.place(planned=planned)
+    return watch
 
 
 SHIPPED_BAKE_DEFAULTS = (('AMIWIND_MESH_SEAM_STOP', 'warn'), ('AMIWIND_NPC_BODY_CHECK', 'warn'),
@@ -3061,6 +3149,33 @@ def write_build_report(args, status, error=None, metadata=None, steps=None, resu
     except Exception as exc:  # noqa: BLE001 - the report never hides the build's own result
         print('[report] the build report was not written: %s: %s' % (type(exc).__name__, exc), flush=True)
     return None
+
+
+FAILURE_LINE = None     # the line that names a failed build's failure page (failure_details), for the build's last line
+
+
+def failure_details(args, summary, error, metadata=None, steps=None):
+    """The one failure page of a failed build and the line that names it (BUILD-FAILURE-NO-DETAILS-66,
+    BUILD-FAILURE-REPORT-66): RUN/FAILURE.md and failure.json (written as the stage failed, or now for an error of the
+    build itself; tools/build_failure.py), then the build report logs/BUILD-REPORT-<run>.txt in the workspace
+    (tools/build_report.py), then the page printed with the report named in it. The returned line is the build's last
+    line; without a run folder (a stop before the first stage) it names the build report. Never raises."""
+    global FAILURE_LINE
+    line = None
+    try:
+        import build_failure
+        run = summary.run if summary is not None else None
+        if run is not None:
+            build_failure.ensure(run, error)
+        report = write_build_report(args, 'failed', error, metadata, steps)
+        if run is not None and build_failure.report(run, error) is not None:
+            line = build_failure.last_line(run)
+        elif report is not None:
+            line = 'Failure details: %s (the build stopped before it made its run folder)' % report
+    except Exception as exc:  # noqa: BLE001 - the failure page never hides the build's own failure
+        print('[failure] the failure details were not written: %s: %s' % (type(exc).__name__, exc), flush=True)
+    FAILURE_LINE = line
+    return line
 
 
 def _main(argv=None):
@@ -3137,6 +3252,11 @@ def _main(argv=None):
     except ValueError as exc:
         p.exit(1, f'Error: {exc}\n')
     halloween_cast.check(args, p)
+    # the build's live numbers from its first second (BUILDER-STALL-METRICS-66): phase, cores now against planned,
+    # seconds since the last line and the stall block, where the Toolkit monitor and any stall catcher read them
+    begin_startup_watch(args)
+    # the workspace's free space at the start, for an out-of-disk failure's kind (tools/build_failure.py kinds)
+    build_report.note_workspace(getattr(args, 'workspace', None) or ROOT / 'out')
     # Free space first: an image build stops here when short (tools/disk_need.py, BUILD-DISK-NEED-UNKNOWN-52)
     __import__('disk_need').entry(args, p, storage_pool_dir)
     # Retired flags (tools/retired_flags.py, BUILD-LEGACY-CHAIN-DEFAULT-36): before any stage, refused in
@@ -3284,6 +3404,9 @@ def _main(argv=None):
             import build_preflight
             import build_cache as _preflight_cache
             began = time.monotonic()
+            # the phase the start-up watch shows while it runs (a minute on a large workspace)
+            print('Build preflight: checking cache owners, game data and town budgets (%d worker processes) ...'
+                  % (_preflight_cache.PREFLIGHT_WORKERS or 1), flush=True)
             problems = build_preflight.run(args.workspace, getattr(args, 'data_files', None), space=False,
                                            workers=_preflight_cache.PREFLIGHT_WORKERS)
             print('Build preflight: cache owners, game data and town budgets checked in %.1f s (%d worker processes)'
@@ -3300,6 +3423,10 @@ def _main(argv=None):
                     _room_masters.master_list(expansion_selection(args)))
                 problems += build_preflight.harvest_town_problems(chim_native_towns(args, preflight_builder),
                                                                   args.chim_regions_table, args.miniwind)
+            # the registered early checks of the inputs (tools/build_preflight.py EARLY_CHECKS, phase 'inputs';
+            # BUILD-IMAGE-CHECKS-EARLY-66): their problems join the preflight's, one stop before any stage
+            problems += build_preflight.early_problems(build_preflight.EarlyContext(
+                'inputs', args, masters=early_masters(args), log=lambda line: print(line, flush=True)))
             if problems:
                 raise ValueError('Build preflight failed before any stage:\n  ' + '\n  '.join(problems))
             fill = build_preflight.fill_warning(args.workspace)
@@ -3495,30 +3622,9 @@ def _main(argv=None):
             _preflight_cache.ANALYSIS_READ_ONLY = bool(args.plan)
             _preflight_cache.ANALYSIS_ORIGIN = {'kind': 'check' if args.check else 'plan' if args.plan else 'build',
                                                 'run': args.name}
-        # the start-up before the first stage is watched too (tools/build_stall.py): build-progress.json with
-        # status "starting", the cores now against the cores planned and the stall block, until the stage tracker
-        # starts (build/.startup/<name>/build-progress.json; the monitor shows it as a starting run)
-        if not args.dry_run:
-            import atexit
-            import build_stall
-            # the progress file beside the runs (the run folder is made later); the status folder (heartbeat.json,
-            # stall.jsonl; docs/BUILD_STATUS.md) inside the run folder from the start, for a check or plan run beside
-            # the runs too (they make no run folder)
-            # a check or plan run creates nothing in the workspace: its [stall] lines go to the log only, and its
-            # files only where AMIWIND_STATUS_DIR names a folder (a caller that wants to watch it)
-            preview = args.check or args.plan
-            named = os.environ.get('AMIWIND_STATUS_DIR', '').strip()
-            where = Path(named) if named else (None if preview else args.workspace / 'build' / '.startup' / args.name)
-            # a build refused in its start-up leaves no run folder: the start-up's status folder sits beside the
-            # runs (build/.startup/<run>/status/) until the stage tracker writes <run>/status/
-            status = where / build_stall.STATUS_DIR if where is not None else None
-            args.startup_watch = build_stall.StartupWatch(
-                where / 'build-progress.json' if where is not None else None, int(args.jobs or os.cpu_count() or 1),
-                status=build_stall.StatusWriter(status, resume='the same build.py command again', make_parents=True)
-                if status is not None else None).start()
-            global _STARTUP_WATCH
-            _STARTUP_WATCH = (args.startup_watch, 'checked' if preview else 'stopped')
-            atexit.register(args.startup_watch.stop, 'checked' if preview else 'stopped')
+        # the start-up watch began at the build's first second (begin_startup_watch); with the run name chosen its
+        # files are in place now and its planned cores are the build's
+        begin_startup_watch(args)
         # Who wrote a stair-walk record (tools/stair_records.py RUN_ENV; bookkeeping, never part of a stage key)
         os.environ['AMIWIND_RUN_NAME'] = args.name
         os.environ['AMIWIND_RUN_COMMIT'] = str(commit)
@@ -3745,6 +3851,12 @@ def _main(argv=None):
             save_preflight_analysis()   # for the next start of the same tree (BUILD-PREFLIGHT-SERIAL-REPEATED-66)
         if args.reuse_from and args.allow_release_reuse:
             metadata['stage_cache']['release_reuse'] = 'allowed: the from-scratch gate runs separately'
+        if args.stage == 'aga' and not args.dry_run:
+            # the registered early checks of the stored outputs this build reuses, before the first stage
+            problems = stored_early_problems(args, metadata, steps, run)
+            if problems:
+                raise ValueError('Early checks failed before the first stage (%d problem%s):\n  %s' % (
+                    len(problems), '' if len(problems) == 1 else 's', '\n  '.join(problems)))
         resource_preflight(args, steps, metadata)
         if not args.dry_run:
             # every unit and pass cache folder writable by this build's user, in the first minute: a store never
@@ -3854,28 +3966,36 @@ def _main(argv=None):
         if summary and not summary.finished:
             summary.finish('failed')
             save_recipe(args, 'failed')
-        if summary:
-            # the failure details (BUILD-FAILURE-NO-DETAILS-66): RUN/FAILURE.md and failure.json, written as the
-            # stage failed or now for an error of the build itself, and printed here too (tools/build_failure.py)
-            import build_failure
-            build_failure.report(summary.run, exc)
-        # the one file with everything (BUILD-FAILURE-REPORT-66): logs/BUILD-REPORT-<run>.txt in the workspace
-        write_build_report(args, 'failed', exc, metadata, steps)
-        p.exit(1, f"Error: {exc}\n")
+        # the one failure page (RUN/FAILURE.md, printed here too) and the full build report, then the error and, as
+        # the build's last line, the page's name (failure_details)
+        line = failure_details(args, summary, exc, metadata, steps)
+        p.exit(1, f"Error: {exc}\n" + (line + '\n' if line else ''))
     except SystemExit as exc:
-        # a refusal inside the build's start-up (the focus box preflight, a tool's own exit): the report, the same exit
+        # a refusal inside the build's start-up (the focus box preflight, a tool's own exit): the report, the same
+        # exit, the report's name as the last line
         if exc.code not in (None, 0):
-            write_build_report(args, 'failed', exc, metadata, steps)
+            line = failure_details(args, summary, exc, metadata, steps)
+            if line and isinstance(exc.code, str):
+                exc.code = exc.code.rstrip('\n') + '\n' + line
+            elif line:
+                print(line, file=sys.stderr, flush=True)
         raise
     except Exception as exc:
         # an unexpected error of the builder itself keeps its traceback as Python prints it; the failure details
-        # are written and printed first
-        if summary:
-            import build_failure
-            build_failure.report(summary.run, exc)
-        write_build_report(args, 'failed', exc, metadata, steps)
+        # are written and printed first, and the page's name follows the traceback (the __main__ block)
+        failure_details(args, summary, exc, metadata, steps)
         raise
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        status = main()
+    except Exception:
+        # an unexpected error of the builder itself: its traceback as Python prints it, then the line that names
+        # the failure page, so the build's last line says where the details are (BUILD-FAILURE-NO-DETAILS-66)
+        import traceback
+        traceback.print_exc()
+        if FAILURE_LINE:
+            print(FAILURE_LINE, file=sys.stderr, flush=True)
+        status = 1
+    raise SystemExit(status)

@@ -8,8 +8,10 @@ States, the same rules as the master builder's stall fallback (tools/stall_guard
   ok           none of these.
 Block: {"state", "since" (seconds into the build the state began), "reason"}.
 
-The start-up before the first stage (the entry check, the reuse preflight, the resource plan) is watched too:
-StartupWatch writes the same file with status "starting" until the stage tracker takes it over.
+The start-up before the first stage (the free-space check, the build preflight, the entry check, the reuse preflight,
+the resource plan) is watched too: StartupWatch writes the same file with status "starting" from the build's first
+second (tools/build.py begin_startup_watch, BUILDER-STALL-METRICS-66) until the stage tracker takes it over; a build
+without --name gets its files once it has chosen its run name (place).
 """
 import json
 import os
@@ -208,6 +210,19 @@ class StartupWatch:
                 'updated_epoch': round(time.time(), 3), 'elapsed_seconds': round(elapsed, 1),
                 'cores_now': None if cores is None else round(cores, 2), 'budget': self.planned,
                 'seconds_since_progress': round(silent, 1), 'stages': [], 'stall': stall}
+
+    def place(self, path=None, status=None, planned=None):
+        """From now on the files at PATH (build-progress.json) and STATUS (a StatusWriter): a watch started before the
+        build chose its run name (no --name) writes them once it has one. PLANNED: the cores planned, once the build
+        resolved them. Written at once."""
+        if planned:
+            self.planned = planned
+        if path is not None:
+            self.path = Path(path)
+        if status is not None:
+            self.status = status
+            self.assessor.on_incident = status.incident
+        self.write()
 
     def write(self):
         try:

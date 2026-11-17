@@ -25,6 +25,17 @@ tools/build.py runs it for every real image build, right after the previous-rele
 
 Every problem is listed at once, each with the command that fixes it. Run it alone with
 `python3 tools/build_preflight.py --workspace DIR [--data-files DIR]`.
+
+THE EARLY CHECKS (EARLY_CHECKS, BUILD-IMAGE-CHECKS-EARLY-66): one list for every further check of seconds that a stage
+or the image step would otherwise meet hours into a build. Each entry is (name, phase, 'module:function'); the function
+takes an EarlyContext and returns a list of problems (text naming the unit, its input and the check; empty when all is
+well). It never exits; an error of its own is reported as a problem of that check. tools/build.py runs every check of
+a phase, prints one line per check and stops once, before any stage, with every problem of the phase in its error and
+its failure page. Phase 'inputs' runs with the checks above (the game data, the selected masters, the options);
+phase 'stored' runs after the reuse plan, before the first stage, with the stored outputs the build reuses
+(EarlyContext.reused); phase 'after:STAGE' runs the moment STAGE has passed in this build, on its output, before the
+stages after it (after_stage_problems, called by the stage scheduler: the stage stays passed, the build stops). A new
+check is one line in EARLY_CHECKS and a module of its own.
 A cache entry that still cannot be read or written later never fails a stage: the unit is built locally and
 the build reports "cache write refused".
 """
@@ -334,6 +345,81 @@ def harvest_town_problems(native, regions, miniwind=False, boxes=None):
                             f'plants would be placed nowhere and the image step would stop; fix: build CHIM region cells '
                             f'around it (the default --chim-regions list), or leave the town out of the CHIM areas')
     return problems
+
+
+# ---------------------------------------------------------------- the early checks (BUILD-IMAGE-CHECKS-EARLY-66)
+
+PHASES = ('inputs', 'stored')
+AFTER = 'after:'    # phase after:STAGE: right after STAGE has passed in this build, on its output (after_stage_problems)
+# (name, phase, 'module:function'), in the order they run; a pre-flight of its own adds one line here
+EARLY_CHECKS = [
+    # the image step's actor frames check on the room batches' own output: stored when the stage is taken from an
+    # earlier run, right after it when this build makes it (tools/image_early_checks.py)
+    ('room-actor-frames', 'stored', 'image_early_checks:room_actor_frames'),
+    ('room-actor-frames', AFTER + 'chim-room-batches', 'image_early_checks:room_actor_frames_after'),
+]
+
+
+def known_phase(phase):
+    return phase in PHASES or (str(phase).startswith(AFTER) and len(str(phase)) > len(AFTER))
+
+
+class EarlyContext:
+    """What an early check gets. PHASE: 'inputs' or 'stored'; ARGS: the build's options; MASTERS: the selected masters
+    in load order; WORKSPACE: the build workspace; RUN: this build's run folder (not made yet); REUSED: {stage: the
+    run folder its stored outputs come from} (phase 'stored'; empty in phase 'inputs'); STEPS: the stage names of the
+    plan; KEYS: {stage: this build's stage key} (phase 'stored'); LOG: where a check prints its progress lines."""
+
+    def __init__(self, phase, args=None, masters=(), workspace=None, run=None, reused=None, steps=(), log=print,
+                 keys=None):
+        if not known_phase(phase):
+            raise ValueError('early check phase %r: one of %s or %sSTAGE' % (phase, ', '.join(PHASES), AFTER))
+        self.phase, self.args, self.log = phase, args, log
+        self.data_files = getattr(args, 'data_files', None)
+        self.masters = list(masters or ())
+        self.workspace = Path(workspace) if workspace is not None else (
+            Path(args.workspace) if getattr(args, 'workspace', None) else None)
+        self.run = Path(run) if run is not None else None
+        self.reused = {str(stage): Path(folder) for stage, folder in (reused or {}).items()}
+        self.steps = [str(name) for name in steps or ()]
+        self.keys = {str(stage): str(key) for stage, key in (keys or {}).items()}
+
+
+def early_problems(context, checks=None):
+    """Every early check of CONTEXT.phase (EARLY_CHECKS, or CHECKS): [problem], each starting with its check's name.
+    Prints one line per check (its problems or ok, and its time). Never raises and never exits for a check."""
+    import importlib
+    import time
+    problems = []
+    for name, phase, target in (EARLY_CHECKS if checks is None else checks):
+        if not known_phase(phase):
+            problems.append('%s: early check of an unknown phase %r (one of %s or %sSTAGE)'
+                            % (name, phase, ', '.join(PHASES), AFTER))
+            continue
+        if phase != context.phase:
+            continue
+        began = time.monotonic()
+        module, _, function = str(target).partition(':')
+        try:
+            found = getattr(importlib.import_module(module), function)(context)
+            found = [str(problem) for problem in found or ()]
+        except (Exception, SystemExit) as exc:   # noqa: BLE001 - a check never stops the build by itself
+            found = ['the check itself failed (%s: %s); fix the check (%s), the build does not start without it'
+                     % (type(exc).__name__, str(exc).strip()[:500] or '-', target)]
+        context.log('Early check %s (%s): %s, %.1f s' % (
+            name, phase, '%d problem%s' % (len(found), '' if len(found) == 1 else 's') if found else 'ok',
+            time.monotonic() - began))
+        problems += ['%s: %s' % (name, problem) for problem in found]
+    return problems
+
+
+def after_stage_problems(stage, run, log=print, checks=None):
+    """The checks registered for right after STAGE (phase after:STAGE), on its output in the run folder RUN: called by
+    the stage scheduler the moment STAGE has passed in this build. [problem]; nothing registered for it: []."""
+    entries = EARLY_CHECKS if checks is None else checks
+    if not any(phase == AFTER + stage for _, phase, _ in entries):
+        return []
+    return early_problems(EarlyContext(AFTER + stage, run=run, steps=[stage], log=log), entries)
 
 
 def run(workspace, data_files=None, uid=None, minimum_gib=None, space=True, workers=None):

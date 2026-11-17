@@ -7,6 +7,7 @@ What changed in each version: [changelog](CHANGELOG.md).
 <!-- contents start -->
 ## Contents
 
+- [v0.0.66: A first look at Mournhold (Tribunal)](#v0066-a-first-look-at-mournhold-tribunal)
 - [v0.0.56-dev1: Ald'ruhn on a Raspberry Pi](#v0056-dev1-aldruhn-on-a-raspberry-pi)
 - [v0.0.44: By Azura's Trees!](#v0044-by-azuras-trees)
 - [v0.0.43: Let There Be CHIM: Vvardenfell's Outdoors, All of It](#v0043-let-there-be-chim-vvardenfells-outdoors-all-of-it)
@@ -24,7 +25,19 @@ What changed in each version: [changelog](CHANGELOG.md).
 
 <!-- contents end -->
 
-_Last updated with AmiWind v0.0.56-dev1 (29 October 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
+
+## v0.0.66: A first look at Mournhold (Tribunal)
+
+The first pictures from Mournhold, the city of the Tribunal expansion: the Reception Area of the Royal Palace, reached
+the original way, by Asciene Rane's transport from Ebonheart, in the released v0.0.66 game in Amiberry on the
+Raspberry Pi 4B. Enlarged four times without smoothing. Mournhold's rooms are in the game; its five outdoor districts
+are still to come.
+
+| | |
+| --- | --- |
+| ![A Royal Guard in the Reception Area of the Royal Palace in Mournhold, Amiberry on the Raspberry Pi 4B, v0.0.66](images/amiwind-v0.0.66-mournhold-reception-area-royal-guard.png) | ![Effe-Tei in the Reception Area of the Royal Palace in Mournhold, Amiberry on the Raspberry Pi 4B, v0.0.66](images/amiwind-v0.0.66-mournhold-reception-area-effe-tei.png) |
+| **A Royal Guard** at the palace's reception. | **Effe-Tei**, who takes travellers back to Vvardenfell. |
 
 ## v0.0.56-dev1: Ald'ruhn on a Raspberry Pi
 

@@ -1,6 +1,6 @@
 # Dialogue features
 
-_Last updated with AmiWind v0.0.66 (10 November 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 <!-- Generated whole by tools/dialogue_features.py render from docs/dialogue-features.json; do not edit by hand. -->
 
@@ -94,7 +94,7 @@ Start value: Attacked 5, Detected 7, PcBlightDisease 19, PcClothingModifier 24, 
 | Part | State | What | Proof | Missing | Register |
 | --- | --- | --- | --- | --- | --- |
 | Creature speakers | missing | Creatures with dialogue (the talking ones of the data) have rows and topics. | - | - | - |
-| Tribunal and Bloodmoon dialogue | missing | The add-ons' topics, answers and changes to Morrowind's. | - | - | - |
+| Tribunal and Bloodmoon dialogue | missing | The add-ons' topics, answers and changes to Morrowind's. Since v0.0.66 the builder's dialogue choice table and journal read Tribunal and Bloodmoon with the base game (a later master's journal entry replaces the earlier one); the expansions' speakers and places are not in the game yet, so none of it can be played. | - | - | - |
 
 ### Voice
 

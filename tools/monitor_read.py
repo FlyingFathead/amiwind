@@ -50,6 +50,22 @@ class Refused(ValueError):
     pass
 
 
+# The live numbers of a run in the runs list (docs/BUILD_STATUS.md heartbeat.json): what it does now, its cores now
+# against the cores it was given, the seconds since its last progress line, its time and when they were written
+LIVE_FIELDS = ('status', 'phase', 'elapsed_seconds', 'cores_now', 'cores_planned', 'seconds_since_progress',
+               'written_epoch')
+
+
+def live_of(progress):
+    """The live numbers of a build-progress.json (a run without a status folder: an earlier builder's)."""
+    running = [row.get('name') for row in progress.get('stages') or () if isinstance(row, dict)
+               and row.get('status') == 'running']
+    return {'status': progress.get('status'), 'phase': progress.get('phase') or (', '.join(map(str, running)) or None),
+            'elapsed_seconds': progress.get('elapsed_seconds'), 'cores_now': progress.get('cores_now'),
+            'cores_planned': progress.get('budget'), 'seconds_since_progress': progress.get('seconds_since_progress'),
+            'written_epoch': progress.get('updated_epoch'), 'stall': progress.get('stall')}
+
+
 def check_name(value, pattern=NAME, what='name'):
     if not isinstance(value, str) or not pattern.match(value) or value in ('.', '..') or '..' in value:
         raise Refused('invalid %s' % what)
@@ -112,23 +128,30 @@ class Reader:
                     out.append({'run': e.name, 'mtime': p.stat().st_mtime, 'progress': True, 'starting': True})
         out.sort(key=lambda r: -r['mtime'])
         out = out[:MAX_RUNS]
-        # the builder's stall block of the runs written in the last STALL_FRESH_S (the monitor's stall banner)
+        # the builder's stall block and live numbers of the runs written in the last STALL_FRESH_S (the monitor's stall
+        # banner; a stall catcher reads them all from this one list: BUILDER-STALL-METRICS-66)
         now = time.time()
         for r in out:
             if r['progress'] and now - r['mtime'] <= STALL_FRESH_S:
-                stall = None
+                beat = None
                 try:
                     # the status folder first (docs/BUILD_STATUS.md: the same files any catcher reads)
                     for parts in ((r['run'], 'status', 'heartbeat.json'), (STARTUP, r['run'], 'status', 'heartbeat.json')):
                         if (self.root.joinpath(*parts)).is_file():
-                            stall = (self._json(self._inside(*parts)) or {}).get('stall')
+                            beat = self._json(self._inside(*parts)) or {}
                             break
-                    if stall is None and self._progress_file(r['run']):
-                        stall = (self._json(self._progress_file(r['run'])) or {}).get('stall')
+                    if (beat is None or not beat.get('stall')) and self._progress_file(r['run']):
+                        progress = self._json(self._progress_file(r['run'])) or {}
+                        beat = dict(beat or {}, **{key: value for key, value in live_of(progress).items()
+                                                   if (beat or {}).get(key) is None})
                 except (Refused, ValueError, OSError):
-                    stall = None
-                if stall:
-                    r['stall'] = stall
+                    beat = None
+                if beat:
+                    if beat.get('stall'):
+                        r['stall'] = beat['stall']
+                    live = {key: beat.get(key) for key in LIVE_FIELDS if beat.get(key) is not None}
+                    if live:
+                        r['live'] = live
         return {'runs': out}
 
     def _progress_file(self, run):

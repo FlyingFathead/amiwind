@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.66 (16 November 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -25,7 +25,12 @@ Like community projects such as
 
 More in the [gallery](docs/GALLERY.md).
 
-## Where AmiWind stands (16 November 2026)
+## Where AmiWind stands (17 November 2026)
+
+The development line is **v0.0.67**, whose first snapshot is
+[v0.0.67-dev1](docs/releases/notes/RELEASE-v0.0.67-dev1.md), in development. It is the v0.0.66 release with the new
+line's label: nothing is new in the game yet. The line works on Tribunal and Bloodmoon in the game, on a builder that
+fails fast and says why, and on recording the build times again.
 
 The newest release is **v0.0.66: Forward It Is**. It takes the game forward on the road to the expansions and brings
 more of the original's rules to the people of Vvardenfell. It runs on CHIM Engine v0.2.2 and needs 32 MB of Fast RAM.
@@ -77,8 +82,8 @@ snapshots. Known problems: the notes' "Known in this build" and [the bug tracker
 
 ## What comes next
 
-**v0.0.67** brings the expansions' finished content: Tribunal's Mournhold and Bloodmoon's Solstheim, with their scripts;
-then the rest of the open plan. The order of record is the [roadmap](docs/ROADMAP.md); no dates are promised.
+**v0.0.67**, the line in development, brings the expansions' finished content: Tribunal's Mournhold and Bloodmoon's
+Solstheim, with their scripts; then the rest of the open plan. The order of record is the [roadmap](docs/ROADMAP.md); no dates are promised.
 
 ## Build it from your own Morrowind
 
@@ -110,10 +115,10 @@ spot: [MiniWind: the test ground](docs/MINIWIND.md) and the [build type referenc
 build prints where it is): one file with what failed and every setting, kept on your computer until you send it
 ([when a build fails](docs/LINUX_BUILD.md#when-a-build-fails)).
 
-The emulator presets of this release are
-[`AmiWind-v0.0.66-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.66-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.66-WinUAE.uae`](resources/emulators/AmiWind-v0.0.66-WinUAE.uae); both start with 32 MB of Fast RAM, the
-requirement. The presets of earlier versions are beside them in [resources/emulators](resources/emulators/). Everything
+The emulator presets of this version are
+[`AmiWind-v0.0.67-dev1-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.67-dev1-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.67-dev1-WinUAE.uae`](resources/emulators/AmiWind-v0.0.67-dev1-WinUAE.uae); both start with 32 MB of Fast
+RAM, the requirement. The presets of earlier versions are beside them in [resources/emulators](resources/emulators/). Everything
 else about building and playing: [Building and playing](docs/BUILDING_AND_PLAYING.md), the
 [Linux build guide](docs/LINUX_BUILD.md) and the [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md).
 

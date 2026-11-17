@@ -93,6 +93,8 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 
 - [ACTOR-MODEL-ERROR-UNNAMED-48](ACTOR-MODEL-ERROR-UNNAMED-48.md): The actor model decoder's stops name neither the model nor the refused field
 - ACTOR-RECEIPT-01 (no report page): Windows actor-audit receipt hash did not match the CRLF-written file
+- AW-CHIMPORT-REGION-NO-PALETTE-66 (no report page): aw chimport-region passes a palette, qbsp and SDK the builder image does not hold: every cell fails in seconds
+- AW-CHIMPORT-REGION-PASSED-ALL-FAILED-66 (no report page): aw chimport-region reports passed when every cell of the run failed
 - AW25-07 (no report page): Python FS-UAE launcher not executable after extraction
 - BUILD-FAILURE-NO-DETAILS-66 (no report page): Requested: a failed build shows its failure details: the monitor showed only the percentage done and the word failed, and the failed stage's error line came without its traceback
 - [BUILD-MOJIBAKE-32](BUILD-MOJIBAKE-32.md): A builder error message contains mojibake
@@ -104,10 +106,12 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [BUILD-SCRATCH-DISK-GROWTH-32](BUILD-SCRATCH-DISK-GROWTH-32.md): Build scratch volumes grow the container disk image on the system drive
 - BUILD-STALE-BSP-CONFIG-48 (no report page): Docs and config still described things that ship as .chim as .bsp maps
 - BUILD-SUMMARY-INTERIOR-COUNTS-48 (no report page): The build summary and the inclusion ledger do not say how many interiors a build includes
+- CHIMPORT-CLI-MWAD-SHADOW-66 (no report page): chimport.py run stops on a fresh run folder: stair_walk puts tools/ first, so tools/mwad.py loads in place of the package mwad
 - [CHIMPORT-DOOR-MARKER-AUDIT-36](CHIMPORT-DOOR-MARKER-AUDIT-36.md): The CHIMport door audit counted marker DOOR records (PrisonMarker) as missing door links: 6 cells failed door_links, Seyda Neen among them
 - [CHIMPORT-STATUS-STALE-41](CHIMPORT-STATUS-STALE-41.md): The CHIM regions preflight refuses cells on old CHIMport audits without saying how old they are or how to measure them again
 - [DEBUG-TP-ROOM-ENTRANCE-50](DEBUG-TP-ROOM-ENTRANCE-50.md): dbg tp <room map> finds a batch room s entrance only in Balmora s door list: rooms entered from Seyda Neen, Vivec or a region frame say No converted entrance
 - DELIVER-OUTPUT-NAMES-LATE-59 (no report page): deliver_dev.py checks that its output names are free only after the smoke and hops
+- [DELIVER-RESUME-OWN-OUTPUT-66](DELIVER-RESUME-OWN-OUTPUT-66.md): A resumed delivery stopped on the package outputs of its own failed try
 - DOC-STATE-01 (no report page): Published release documentation retained stale candidate/current-version claims
 - DOCS-BUGS-FOLDER-OVER-1000-64 (no report page): The bug report folder holds more than 1,000 files, so the GitHub folder view leaves some out
 - [DOCS-CELL-COUNTS-44](DOCS-CELL-COUNTS-44.md): Cell counts in the docs and tracker are stated without saying what they count

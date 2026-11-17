@@ -162,5 +162,95 @@ class HarvestTownPlanTests(unittest.TestCase):
         self.assertIn('build_preflight.harvest_town_problems(chim_native_towns(args, preflight_builder),', text)
 
 
+class EarlyCheckTests(unittest.TestCase):
+    """The early checks (BUILD-IMAGE-CHECKS-EARLY-66): one list, every check of a phase runs, its problems are
+    collected with its name, and nothing a check does stops the build by itself."""
+    MODULE = 'aw_test_early_checks_module'
+
+    def setUp(self):
+        import types
+        module = types.ModuleType(self.MODULE)
+        module.seen = []
+
+        def clean(context):
+            module.seen.append(('clean', context.phase))
+            return []
+
+        def two(context):
+            module.seen.append(('two', context.phase))
+            return ['room A: no grounding class', 'room B: no grounding class']
+
+        def broken(context):
+            raise KeyError('census')
+
+        def exits(context):
+            sys.exit('stop')
+        module.clean, module.two, module.broken, module.exits = clean, two, broken, exits
+        sys.modules[self.MODULE] = module
+        self.addCleanup(sys.modules.pop, self.MODULE, None)
+        self.module = module
+
+    def run_phase(self, phase, checks, **extra):
+        lines = []
+        context = build_preflight.EarlyContext(phase, log=lines.append, **extra)
+        return build_preflight.early_problems(context, checks), lines
+
+    def test_every_check_of_the_phase_runs_and_its_problems_carry_its_name(self):
+        m = self.MODULE
+        checks = [('two', 'inputs', m + ':two'), ('clean', 'inputs', m + ':clean'), ('later', 'stored', m + ':two')]
+        problems, lines = self.run_phase('inputs', checks)
+        self.assertEqual(problems, ['two: room A: no grounding class', 'two: room B: no grounding class'])
+        self.assertEqual(self.module.seen, [('two', 'inputs'), ('clean', 'inputs')])   # the stored one waits
+        self.assertEqual(len(lines), 2)
+        self.assertTrue(lines[0].startswith('Early check two (inputs): 2 problems, '), lines)
+        self.assertTrue(lines[1].startswith('Early check clean (inputs): ok, '), lines)
+        problems, _ = self.run_phase('stored', checks, reused={'image': '/work/build/older'})
+        self.assertEqual(len(problems), 2)
+        self.assertEqual(self.module.seen[-1], ('two', 'stored'))
+
+    def test_a_check_that_raises_or_exits_is_a_problem_never_a_stop(self):
+        m = self.MODULE
+        problems, _ = self.run_phase('inputs', [('broken', 'inputs', m + ':broken'), ('exits', 'inputs', m + ':exits'),
+                                                ('missing', 'inputs', 'aw_no_such_module_here:problems'),
+                                                ('clean', 'inputs', m + ':clean')])
+        self.assertEqual(len(problems), 3)
+        self.assertTrue(problems[0].startswith("broken: the check itself failed (KeyError: 'census')"), problems)
+        self.assertTrue(problems[1].startswith('exits: the check itself failed (SystemExit: stop)'), problems)
+        self.assertTrue(problems[2].startswith('missing: the check itself failed (ModuleNotFoundError'), problems)
+        self.assertIn(('clean', 'inputs'), self.module.seen)                   # the checks after them still ran
+
+    def test_phases_are_named(self):
+        with self.assertRaises(ValueError):
+            build_preflight.EarlyContext('later')
+        problems, _ = self.run_phase('inputs', [('odd', 'later', self.MODULE + ':clean')])
+        self.assertEqual(problems, ["odd: early check of an unknown phase 'later' (one of inputs, stored or "
+                                    "after:STAGE)"])
+        self.assertTrue(build_preflight.known_phase('after:chim-room-batches'))
+        self.assertFalse(build_preflight.known_phase('after:'))
+        context = build_preflight.EarlyContext('stored', reused={'image': '/work/build/older'}, steps=['image'])
+        self.assertEqual((context.reused, context.steps), ({'image': Path('/work/build/older')}, ['image']))
+
+    def test_every_registered_check_names_a_function_and_a_phase(self):
+        import importlib
+        for name, phase, target in build_preflight.EARLY_CHECKS:
+            module, _, function = target.partition(':')
+            self.assertTrue(build_preflight.known_phase(phase), (name, phase))
+            self.assertTrue(callable(getattr(importlib.import_module(module), function)), name)
+
+    def test_the_builder_runs_both_phases_before_its_first_stage_and_in_its_check(self):
+        text = (ROOT / 'tools' / 'build.py').read_text(encoding='utf-8')
+        start = text.index('def _main(')
+        inputs = text.index("build_preflight.early_problems(build_preflight.EarlyContext(\n                'inputs'", start)
+        preflight_stop = text.index("raise ValueError('Build preflight failed before any stage:", start)
+        self.assertLess(inputs, preflight_stop)                                # one stop with the preflight's own
+        helper = text[text.index('def stored_early_problems('):]
+        self.assertIn("build_preflight.early_problems(build_preflight.EarlyContext(\n                'stored'",
+                      helper[:helper.index('\ndef ')])
+        stored = text.index('problems = stored_early_problems(args, metadata, steps, run)', start)
+        self.assertLess(stored, text.index('execute(steps, run, metadata)', start))
+        check = text[text.index('def unit_stop_check('):text.index('def early_masters(')]
+        self.assertIn('stored_early_problems(args, metadata, steps, run)', check)   # the --check stops on them too
+
+
 if __name__ == '__main__':
     unittest.main()

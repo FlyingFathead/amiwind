@@ -4,24 +4,24 @@
   "npc_gallery": true,
   "partial_area": null
  },
- "drive_bytes": 3105349632,
+ "drive_bytes": 3387138048,
  "drives": [
   {
-   "bytes": 3105349632,
-   "file": "AmiWind-v0.0.65.hdf"
+   "bytes": 3387138048,
+   "file": "AmiWind-v0.0.66.hdf"
   }
  ],
  "groups": {
   "actors": {
-   "bytes": 458027500,
-   "files": 5629
+   "bytes": 489190095,
+   "files": 6028
   },
   "chim-world": {
-   "bytes": 1149626870,
-   "files": 39496
+   "bytes": 1151439206,
+   "files": 39681
   },
   "classic-maps": {
-   "bytes": 8722024,
+   "bytes": 8451461,
    "files": 1190
   },
   "music": {
@@ -29,20 +29,20 @@
    "files": 21
   },
   "npc-gallery": {
-   "bytes": 1498638,
+   "bytes": 1672664,
    "files": 1
   },
   "other": {
-   "bytes": 488369027,
-   "files": 4081
+   "bytes": 684284417,
+   "files": 4675
   },
   "progs": {
-   "bytes": 309045503,
-   "files": 5676
+   "bytes": 355386685,
+   "files": 7294
   },
   "sound": {
-   "bytes": 203194900,
-   "files": 7376
+   "bytes": 204287196,
+   "files": 7456
   },
   "video": {
    "bytes": 137136540,
@@ -51,9 +51,9 @@
  },
  "labels": [],
  "note": "",
- "payload_bytes": 2811893806,
- "run": "2026_11_12_v0.0.65_full-v0.0.65-release_20c6b9c",
+ "payload_bytes": 3088121068,
+ "run": "2026_11_17_v0.0.66_full-v0.0.66-release-try2_ad5e9a0",
  "schema": "amiwind-size-ledger-v1",
  "status": "complete",
- "version": "0.0.65"
+ "version": "0.0.66"
 }

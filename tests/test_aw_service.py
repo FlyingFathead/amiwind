@@ -308,6 +308,9 @@ class ServiceTests(unittest.TestCase):
                      'PYTHONPATH=/vol/src/v036-abc1234/src:/vol/src/v036-abc1234/tools', '--cpus 24'):
             self.assertIn(part, build)
         self.assertIn('AMIWIND_AW_REQUEST=req-1', build)
+        # the builder image's mark, read by the build report (tools/build_report.py container)
+        self.assertIn('AW_RUNTIME=master-builder', build)
+        self.assertIn('AW_RUNTIME_IMAGE=', build)
         self.assertEqual(aw.validate(result, aw.schema('aw-result-1')), [])
         trials = (self.base / 'trials' / 'TRIALS.jsonl').read_text(encoding='utf-8').splitlines()
         self.assertEqual(len(trials), 1)

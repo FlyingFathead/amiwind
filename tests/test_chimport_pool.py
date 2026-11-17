@@ -152,6 +152,23 @@ class CellKey(Temp):
         with patch.dict(os.environ, {storage_pool.ENV: str(self.root / 'elsewhere')}):
             self.assertEqual(self.key(), base)                       # where the pool is: not an input
 
+    def test_who_runs_the_cell_is_not_an_input(self):
+        # CHIMPORT-CELL-KEY-REQUEST-ID-67: the master builder gives every request its own id (AMIWIND_AW_REQUEST); two
+        # requests with the same inputs take one cell key, so the second links the cell whole from the pool
+        base = self.key()
+        for name in ('AMIWIND_AW_REQUEST', 'AMIWIND_RUN_NAME', 'AMIWIND_RUN_COMMIT', 'AMIWIND_RUN_JOB'):
+            with patch.dict(os.environ, {name: 'request-1'}):
+                first = self.key()
+            with patch.dict(os.environ, {name: 'request-2'}):
+                self.assertEqual(self.key(), first, name)
+            self.assertEqual(first, base, name)
+        # every run fact the builder writes into its caches' provenance is out of the cell key, as out of the stage keys
+        import build_cache
+        import cache_provenance
+        for name in cache_provenance.RUN_ENV.values():
+            self.assertIn(name, C.CELL_KEY_IGNORED_ENV, name)
+            self.assertIn(name, build_cache.IGNORED_ENV, name)
+
     def test_no_lock_means_no_cell_key(self):
         from known_inputs import LOCK_ENV
         del os.environ[LOCK_ENV]

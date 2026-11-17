@@ -270,7 +270,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - NPC-ATTACK-ANIMS-MISSING-65 (no report page): Most creatures play only six baked animation groups: no knockdown, spell cast, second or third attack
 - NPC-BAKE-FALLBACK-62 (no report page): Characters the new seam and floor bake cannot fit in the alias budget are baked a second time with the v0.0.62-dev1 body rules
 - [NPC-BAKE-VERTEX-32](NPC-BAKE-VERTEX-32.md): NPC resident baking can exceed the alias vertex budget
-- NPC-CAST-MAGICKA-NOT-PAID-66 (no report page): A fighter's spell costs it no magicka: the cast's payment names the wrong stat
+- [NPC-CAST-MAGICKA-NOT-PAID-66](NPC-CAST-MAGICKA-NOT-PAID-66.md): A fighter's spell costs it no magicka: the cast's payment names the wrong stat
 - [NPC-CONVERSATION-FACING-23](NPC-CONVERSATION-FACING-23.md): NPCs do not turn to face the player in conversation
 - [NPC-DAGOTH-BODY-DECIMATION-33](NPC-DAGOTH-BODY-DECIMATION-33.md): Dagoth Ur's body is decimated; his whole model exceeds the alias ceiling
 - [NPC-FEMALE-SKELETON-33](NPC-FEMALE-SKELETON-33.md): Female humans are posed on the male skeleton file (base_anim.nif), the original uses base_anim_female.nif

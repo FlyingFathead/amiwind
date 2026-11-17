@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.59-dev5 at 2026-11-02 (time not recorded): v0.0.59-dev5 full build at 2026-11-02 16:02 +0200 / 2026-11-02 14:02 UTC (f08583e0, reuse dev4, lease 44 GiB): the resource plan throttles chim-room-batches to 8 of 24 workers (about 894 MiB a worker beside 26.9 GiB the other stages held), wall about 2 min; chim-rooms-vivec_city 10 of 24.
 - Reported with v0.0.62 at 2026-11-08 (time not recorded): Seen again in the v0.0.62 release build: the Vivec rooms stage ran at about 4 of 24 cores for a while.
+- Reported with v0.0.66 at 2026-11-17 (time not recorded): Seen again in the v0.0.66 from-scratch check (commit ac37e80b, 20 cores, 628 minutes): five underuse warnings for chim-room-batches: 2.2 of 5 cores for 142 s with 3 units queued and none running; 1.0 of 7 cores for 61 s with 1,701 queued and 1 running (slowest unit 796 s); 2.5 of 10 cores for 60 s with 1,156 queued and 2 running (598 s); 1.0 of 7 cores for 60 s with 549 queued and 1 running (458 s); 2.1 of 7 cores for 136 s with 549 queued and none running.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -39,6 +40,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-02: seen again in v0.0.59-dev5: v0.0.59-dev5 full build at 2026-11-02 16:02 +0200 / 2026-11-02 14:02 UTC (f08583e0, reuse dev4, lease 44 GiB): the resource plan throttles chim-room-batches to 8 of 24 workers (about 894 MiB a worker beside 26.9 GiB the other stages held) ...
 - 2026-11-08: seen again in v0.0.62: Seen again in the v0.0.62 release build: the Vivec rooms stage ran at about 4 of 24 cores for a while.
 - 2026-11-16: deferred by the maintainer: deferred to v0.0.67 by the maintainer (2026-11-16); the v0.0.66 release ships without it, and what would confirm a fix is in the status
+- 2026-11-17: seen again in v0.0.66: Seen again in the v0.0.66 from-scratch check (commit ac37e80b, 20 cores, 628 minutes): five underuse warnings for chim-room-batches: 2.2 of 5 cores for 142 s with 3 units queued and none running; 1.0 of 7 cores for 61 s with 1,701 queued ...
 
 <!-- END GENERATED TIMELINE -->
 
@@ -47,7 +49,7 @@ _Last updated with AmiWind v0.0.62 (8 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Status: 8 November 2026](#status-8-november-2026)
 - [Symptom](#symptom)
@@ -263,6 +265,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - EXPANSION-READER-ONE-MASTER-64 (no report page): Most builder readers load only the base game file; the roadmap calls the readers master-list readers
 - GATE-IMAGE-REMOVED-52 (no report page): A cleanup removed the image the gate s Linux host-parity step runs: the in-use check looked at containers only
 - GATE-PRIVACY-NOT-IN-PREGATE-52 (no report page): The privacy word check runs only in the full gate: the quick pre-gate checks passed text the gate then refused
+- [GUARD-TORCH-SCRATCH-SERIAL-67](GUARD-TORCH-SCRATCH-SERIAL-67.md): From scratch, the guard torch step bakes the six boat guard models one after another only to skip every one of them
 - [HARVEST-CHIM-COVERAGE-ONE-AREA-48](HARVEST-CHIM-COVERAGE-ONE-AREA-48.md): The image step harvest coverage check failed on every CHIM world of one area (every MiniWind sandbox of one town)
 - IMAGE-BIGGER-THAN-ORIGINAL-62 (no report page): The game image (3,022 MB in v0.0.62) is bigger than the original game data it is made from (1.93 GB)
 - IMAGE-FORMAT-EFFECTS-AWE-66 (no report page): The image step's format check did not know the active-effect icon file, and stopped the build at its end
@@ -278,6 +281,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [NPC-BAKED-WHOLE-DUPLICATION-33](NPC-BAKED-WHOLE-DUPLICATION-33.md): Every NPC appearance is baked whole: shared body parts are converted again for each actor, and equipment cannot change
 - [NPC-LIBRARY-NO-UNIT-CACHE-63](NPC-LIBRARY-NO-UNIT-CACHE-63.md): The NPC appearance bakes of the actor library stage had no unit cache, so every rebuild of the stage baked all 418 appearances again (about 45 minutes)
 - PARTITION-CACHE-FIXED-WORKERS-66 (no report page): The new partition cache hashed its files on a fixed eight threads instead of the stage's own allowance
+- [PERF-DB-FOLDER-CONFLICT-67](PERF-DB-FOLDER-CONFLICT-67.md): A folder ingest of the performance database stops at the first changed file
 - PERF-GUARD-BASIS-BY-COUNT-66 (no report page): The performance guard judges the image step's partition write by the number of partitions and not by their size, so a slowdown back to the old time would pass
 - [PERF-GUARD-RESIDENT-BUSY-HOST-57](PERF-GUARD-RESIDENT-BUSY-HOST-57.md): The dev5 full build's perf guard failed chim-town-balmora and chim-town-vivec_city build_resident as slower (129 s, was 52 s; 147 s, was 62 s) while two other builds ran beside it: contention, not code
 - PLAYER-VIEW-SKIN-ROWS-STOP-62 (no report page): The image step's player view stopped the v0.0.62 final build after 1 h 13 min: an Alias skin rows overflow ended it instead of trying the next smaller body

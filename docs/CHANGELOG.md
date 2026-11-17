@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.66 (16 November 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.67-dev1: first snapshot of v0.0.67, 17 November 2026](#v0067-dev1-first-snapshot-of-v0067-17-november-2026)
 - [v0.0.66: Forward It Is, 16 November 2026](#v0066-forward-it-is-16-november-2026)
 - [v0.0.66-dev12: twelfth snapshot of v0.0.66, 16 November 2026](#v0066-dev12-twelfth-snapshot-of-v0066-16-november-2026)
 - [v0.0.66-dev11: eleventh snapshot of v0.0.66, 16 November 2026](#v0066-dev11-eleventh-snapshot-of-v0066-16-november-2026)
@@ -203,6 +204,52 @@ _Last updated with AmiWind v0.0.66 (16 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.67-dev1: first snapshot of v0.0.67, 17 November 2026
+
+The first development snapshot of v0.0.67, in development ([release notes](releases/notes/RELEASE-v0.0.67-dev1.md)). It
+is the [v0.0.66](releases/notes/RELEASE-v0.0.66.md) release with the version label of the new line and its emulator
+presets (`AmiWind-v0.0.67-dev1-FS-UAE.fs-uae`, `AmiWind-v0.0.67-dev1-WinUAE.uae`, both with 32 MB of Fast RAM), and the
+first changes of the builder and its tools; the game is the same. The line works on Tribunal and Bloodmoon in the game, a
+builder that fails fast and says why, the build times recorded again and the bug register's sweep; the later snapshots
+add the rest.
+
+**Builder and tools**
+
+- A failed build writes one failure page, `FAILURE.md`, with the failed stage, its error and traceback, what was not
+  completed, the settings the build ran with and the command that builds again; the build's last line names it, or the
+  build report when no run folder was made. `tools/build_failure.py RUN --out DIR` writes it for a run elsewhere.
+- The builder has one list of early checks of seconds (`EARLY_CHECKS`), run before the first stage on the inputs and on
+  the stored outputs the build reuses, and by `--check`; every check of a phase runs and the build stops once with every
+  problem. Its first entry is the room actors' frame check, before the first stage or right after the room batches; the
+  player view stage bakes the player's parts right after the census and stores each at once.
+- The build report opens with an environment summary (operating system, container or not and how that was found, Python
+  against the reference, cores, memory on Linux, macOS and Windows, free space), and a failure is classed as out of memory
+  or out of disk when the build shows it, with what to do.
+- A CHIMport cell's key no longer takes in the request id, so the unit pool links a cell made once
+  (`CHIMPORT-CELL-KEY-REQUEST-ID-67`); CHIMport finds its own reader when run from the tools folder.
+- Test sessions refuse timing in a warped emulator; measured, warp does not make them faster
+  ([EMULATOR-WARP.md](performance/EMULATOR-WARP.md)).
+- The line is connected to the v0.0.66 release: the previous-release pin, the size baseline and the Toolkit's header.
+- The gallery has its first Mournhold pictures, from the released v0.0.66 game.
+- The build writes its live numbers (phase, cores in use against planned, time since the last progress) from its first
+  second, and the Toolkit Monitor's runs list carries them for every build of the last hour.
+- The strict reuse stop counts the units one build looks up (the most units one build stored under one key), not the
+  tables older builds left under their keys: the voice table's 1 of 7 is 1 of 1
+  ([REUSE-STOP-OLD-GROUPS-67](bugs/REUSE-STOP-OLD-GROUPS-67.md)).
+- The performance database's folder ingest goes on past a changed file and reports it as a conflict
+  (`PERF-DB-FOLDER-CONFLICT-67`).
+- The bug register records the v0.0.66 release's findings and closing steps, with new entries for the reuse stop, the
+  guard torch step ([GUARD-TORCH-SCRATCH-SERIAL-67](bugs/GUARD-TORCH-SCRATCH-SERIAL-67.md)), the frame memory report
+  ([FRAME-HEAP-PEAK-MODELS-NUMBERING-67](bugs/FRAME-HEAP-PEAK-MODELS-NUMBERING-67.md)), a resumed delivery
+  ([DELIVER-RESUME-OWN-OUTPUT-66](bugs/DELIVER-RESUME-OWN-OUTPUT-66.md)) and two faults of `aw chimport-region`.
+- The version label and the two emulator presets of v0.0.67-dev1 are made from the v0.0.66 ones, which differ in the label
+  only, and both are on the release file list.
+- The MWScript tracker and the CHIM progress tracker are measured for this version: 611 of the original game's 1,074
+  scripts run and 9 more are carried by AmiWind's own code (433 wait for Mournhold and Solstheim); the progress page's
+  newest ingested build is v0.0.66.
+
+Nothing is new in the game yet.
 
 ## v0.0.66: Forward It Is, 16 November 2026
 

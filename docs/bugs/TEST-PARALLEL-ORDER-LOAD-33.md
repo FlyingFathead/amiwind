@@ -169,7 +169,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [GATE-SUITE-WRITABLE-32](GATE-SUITE-WRITABLE-32.md): The test suite needs a writable source copy and an executable /tmp; the documented command does not say so
 - HARNESS-NEWGAME-BOX-STALL-54 (no report page): An FS-UAE session stalled at the Start a new game box before any map load: the probe sent its key on a fixed delay
 - HORS-AFTER-HALLOWEEN-STAYS-ARENA-58 (no report page): dbg aw hors after the Halloween scene no longer crashes on the v0.0.58-dev5 image but leaves the player in the Arena Pit instead of Seyda Neen
-- JOURNEY-AIM-RETRY-YAW-66 (no report page): The gameplay journey aimed at a door from an eye position that had changed: its thirteen retries ran round the wrong direction
+- [JOURNEY-AIM-RETRY-YAW-66](JOURNEY-AIM-RETRY-YAW-66.md): The gameplay journey aimed at a door from an eye position that had changed: its thirteen retries ran round the wrong direction
 - JOURNEY-DOOR-USE-GOES-TO-ACTOR-66 (no report page): The opening journey's use key at the census street door went to the body of the guard killed a step before, or to a message box still showing, and the step then waited for a load it had never asked for
 - JOURNEY-PART-B-SAVE-NOT-CARRIED-66 (no report page): The gameplay journey's second part never loaded the first part's save: the save was written where the session does not carry it
 - JOURNEY-STEP6-VICTIM-NEAREST-66 (no report page): The opening journey's step 6 killed the nearest resident, which could be the guard by the census office's street door, whose body then took the use key instead of the door

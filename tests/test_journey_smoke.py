@@ -335,6 +335,32 @@ class JourneySmoke(unittest.TestCase):
         self.assertEqual(code, 0, out.getvalue())
         self.assertRegex(out.getvalue().splitlines()[-1], r'^JOURNEY RESULT PASS (\d+)/\1 checks, 9 steps$')
 
+    def test_a_warp_run_says_so_on_its_result_line(self):
+        """Decided 17 November 2026: warp is off for every performance and bench test. A journey whose sessions ran in
+        the emulator's warp mode (the session's own result line ends with the mark) still checks the game's state, and
+        its result line ends with the same mark, PASS or FAIL alike; a stop reason is read without it."""
+        import engine_smoke
+        self.assertEqual(js.WARP_MARK, engine_smoke.WARP_MARK)
+        runs = self.runs()
+        ok, lines = js.judge(self.j, runs)
+        self.assertTrue(ok)
+        self.assertFalse(lines[-1].endswith(js.WARP_MARK))
+        warp = [(s.replace('smoke RESULT PASS script', 'smoke RESULT PASS script' + js.WARP_MARK), c) for s, c in runs]
+        ok, lines = js.judge(self.j, warp)
+        self.assertTrue(ok)
+        self.assertRegex(lines[-1], r'^JOURNEY RESULT PASS (\d+)/\1 checks, 9 steps \[warp run: no timing verdict\]$')
+        # a stopped warp part: FAIL, the mark once at the end, and the stop's reason without it
+        v = dict(GOOD)
+        stopped = [fake_run(self.j, 'A', v, stop_in=3), fake_run(self.j, 'B', v)]
+        stopped = [(s.replace('25 s; the player stands at local 20 -30 79',
+                              '25 s; the player stands at local 20 -30 79' + js.WARP_MARK), c) for s, c in stopped]
+        ok, lines = js.judge(self.j, stopped)
+        self.assertFalse(ok)
+        self.assertTrue(lines[-1].startswith('JOURNEY RESULT FAIL') and lines[-1].endswith(js.WARP_MARK))
+        self.assertEqual(lines[-1].count(js.WARP_MARK), 1)
+        stop = [l for l in lines if l.startswith('STOP part A')]
+        self.assertTrue(stop and js.WARP_MARK not in stop[0], stop)
+
     def test_part_b_not_run_fails(self):
         ok, lines = js.judge(self.j, [self.runs()[0], None])
         self.assertFalse(ok)

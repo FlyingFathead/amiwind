@@ -1,6 +1,6 @@
 # AmiWind documentation
 
-_Generated from `docs/README.topics.json` with AmiWind v0.0.66._
+_Generated from `docs/README.topics.json` with AmiWind v0.0.67-dev1._
 
 Every document of the project, by topic, with the version and date of its last update. A document marked "needs a refresh" predates the current state of its subject and is due for a review; its facts may be out of date. Release notes and whitespace baselines are listed in [releases](releases/README.md); one-off records and replaced documents in [history](history/README.md).
 
@@ -10,7 +10,7 @@ Every document of the project, by topic, with the version and date of its last u
 | --- | --- | --- |
 | [ABOUT.md](ABOUT.md) | About AmiWind, licences and credits | v0.0.46 (20 October 2026), needs a refresh |
 | [FAQ.md](FAQ.md) | AmiWind FAQ | v0.0.66-dev8 (2026-11-15) |
-| [BUILDING_AND_PLAYING.md](BUILDING_AND_PLAYING.md) | Building and playing | v0.0.66-dev12 (16 November 2026) |
+| [BUILDING_AND_PLAYING.md](BUILDING_AND_PLAYING.md) | Building and playing | v0.0.67-dev1 (17 November 2026) |
 | [REAL_HARDWARE.md](REAL_HARDWARE.md) | Running AmiWind on real Amiga hardware | v0.0.66-dev8 (15 November 2026) |
 | [PISTORM_RTG_STUDY.md](PISTORM_RTG_STUDY.md) | Study: AmiWind on a PiStorm-equipped Amiga 500 (RTG backend or AGA-STORM) | v0.0.66-dev8 (15 November 2026) |
 | [THEA1200_STUDY.md](THEA1200_STUDY.md) | Study: the THEA1200 as an AmiWind target | v0.0.66-dev8 (15 November 2026) |
@@ -18,7 +18,7 @@ Every document of the project, by topic, with the version and date of its last u
 | [68060.md](68060.md) | AmiWind on the 68060 | v0.0.54-dev1 (27 October 2026) |
 | [MORROWIND_EDITIONS.md](MORROWIND_EDITIONS.md) | Morrowind editions: what the builder reads | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [GAME_INPUT_LAYOUT.md](GAME_INPUT_LAYOUT.md) | Installed Morrowind game inputs | v0.0.66-dev2 (13 November 2026), needs a refresh |
-| [GALLERY.md](GALLERY.md) | AmiWind gallery | v0.0.56-dev1 (29 October 2026), needs a refresh |
+| [GALLERY.md](GALLERY.md) | AmiWind gallery | v0.0.67-dev1 (17 November 2026), needs a refresh |
 | [GAMEPLAY_MEDIA.md](GAMEPLAY_MEDIA.md) | Gameplay media | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [LICENSING_AND_CREDITS.md](LICENSING_AND_CREDITS.md) | Licensing, provenance and credits | v0.0.48-dev2 (23 October 2026) |
 | [CONTENT_POLICY.md](CONTENT_POLICY.md) | Original game content stays outside this repository | v0.0.42-dev1 (17 October 2026), needs a refresh |
@@ -31,27 +31,27 @@ Every document of the project, by topic, with the version and date of its last u
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [AW.md](AW.md) | aw: the master builder command line | v0.0.66-dev11 (16 November 2026) |
+| [AW.md](AW.md) | aw: the master builder command line | v0.0.67-dev1 (17 November 2026) |
 | [AGA_BUILD.md](AGA_BUILD.md) | AGA checkpoint build and controls | v0.0.57 (30 October 2026) |
-| [BUILD_CACHE.md](BUILD_CACHE.md) | Build cache: resuming and reusing work safely | v0.0.66-dev12 (16 November 2026) |
+| [BUILD_CACHE.md](BUILD_CACHE.md) | Build cache: resuming and reusing work safely | v0.0.67-dev1 (17 November 2026) |
 | [BUILD_DEPENDENCIES.md](BUILD_DEPENDENCIES.md) | Dependency checks and reference versions | v0.0.66-dev2 (13 November 2026) |
 | [BUILD_MANIFEST.md](BUILD_MANIFEST.md) | World map manifest (design) | v0.0.54 (27 October 2026) |
 | [EXPANSION_TABLES.md](EXPANSION_TABLES.md) | The expansions in every table | v0.0.66-dev2 (13 November 2026) |
 | [BUILD_OUTPUT.md](BUILD_OUTPUT.md) | Build completion output | v0.0.66-dev12 (16 November 2026) |
-| [BUILD_PROFILE.md](BUILD_PROFILE.md) | Build profile and stage reuse | v0.0.66-dev2 (13 November 2026) |
+| [BUILD_PROFILE.md](BUILD_PROFILE.md) | Build profile and stage reuse | v0.0.67-dev1 (17 November 2026) |
 | [BUILD_RECIPES.md](BUILD_RECIPES.md) | Build recipes | v0.0.36 (11 October 2026), needs a refresh |
-| [BUILD_STATUS.md](BUILD_STATUS.md) | Build status folder: a file interface for stall alerts | v0.0.66-dev2 (13 November 2026) |
+| [BUILD_STATUS.md](BUILD_STATUS.md) | Build status folder: a file interface for stall alerts | v0.0.67-dev1 (17 November 2026) |
 | [KNOWN_INPUTS.md](KNOWN_INPUTS.md) | Known inputs: which files did the builder get? | v0.0.63 (2026-11-10), needs a refresh |
 | [CONTAINERS.md](CONTAINERS.md) | Town containers and inventory plan | v0.0.66-dev1 (13 November 2026), needs a refresh |
 | [COMPILER_TROUBLESHOOTING.md](COMPILER_TROUBLESHOOTING.md) | Compiler troubleshooting options and evidence | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [CONVERSION_RECIPES.md](CONVERSION_RECIPES.md) | Reusable conversion recipes | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Development and source packaging | v0.0.53 (27 October 2026) |
-| [DOCKER_BUILD.md](DOCKER_BUILD.md) | Docker builder | v0.0.53 (27 October 2026) |
+| [DOCKER_BUILD.md](DOCKER_BUILD.md) | Docker builder | v0.0.67-dev1 (17 November 2026) |
 | [DOCKER_BUILD_ROADMAP.md](DOCKER_BUILD_ROADMAP.md) | Docker builder roadmap | v0.0.53 (27 October 2026) |
-| [LINUX_BUILD.md](LINUX_BUILD.md) | Build AmiWind on Linux | v0.0.66-dev12 (16 November 2026) |
-| [WINDOWS_BUILD.md](WINDOWS_BUILD.md) | Windows build entry points and WSL notes | v0.0.66-dev12 (16 November 2026) |
+| [LINUX_BUILD.md](LINUX_BUILD.md) | Build AmiWind on Linux | v0.0.67-dev1 (17 November 2026) |
+| [WINDOWS_BUILD.md](WINDOWS_BUILD.md) | Windows build entry points and WSL notes | v0.0.67-dev1 (17 November 2026) |
 | [WINDOWS_BUILD_ROADMAP.md](WINDOWS_BUILD_ROADMAP.md) | Windows build roadmap | v0.0.66-dev12 (16 November 2026), needs a refresh |
-| [FS-UAE-DEVELOPMENT.md](FS-UAE-DEVELOPMENT.md) | FS-UAE development access | v0.0.66-dev11 (16 November 2026), needs a refresh |
+| [FS-UAE-DEVELOPMENT.md](FS-UAE-DEVELOPMENT.md) | FS-UAE development access | v0.0.67-dev1 (17 November 2026), needs a refresh |
 | [FS-UAE-LAUNCHER.md](FS-UAE-LAUNCHER.md) | Portable FS-UAE launcher | v0.0.49-dev1 (24 October 2026) |
 | [FS-UAE-PLAYTESTING.md](FS-UAE-PLAYTESTING.md) | AmiWind playtesting with FS-UAE | v0.0.66-dev11 (16 November 2026) |
 | [CENSUS_TRAY_SMOKE.md](CENSUS_TRAY_SMOKE.md) | Census Office silver plate: a game-script smoke test | v0.0.66-dev5 (15 November 2026) |
@@ -77,8 +77,8 @@ Every document of the project, by topic, with the version and date of its last u
 | [EXPERIMENTAL_FLAGS.md](EXPERIMENTAL_FLAGS.md) | Experimental flags | v0.0.66-dev1 (13 November 2026) |
 | [CRASH_REPORTING.md](CRASH_REPORTING.md) | Fatal error reports | v0.0.28 (4 October 2026), needs a refresh |
 | [DEBUG_OVERLAYS.md](DEBUG_OVERLAYS.md) | Development overlays | v0.0.66-dev12 (16 November 2026) |
-| [GAME_RECORDER.md](GAME_RECORDER.md) | Gameplay recorder | v0.0.66-dev11 (16 November 2026) |
-| [AMIWIND_CONSOLE_COMMANDS.md](AMIWIND_CONSOLE_COMMANDS.md) | AmiWind console commands | generated (v0.0.66) |
+| [GAME_RECORDER.md](GAME_RECORDER.md) | Gameplay recorder | v0.0.67-dev1 (17 November 2026) |
+| [AMIWIND_CONSOLE_COMMANDS.md](AMIWIND_CONSOLE_COMMANDS.md) | AmiWind console commands | generated (v0.0.67-dev1) |
 | [CONSOLE_COMMANDS_MORROWIND.md](CONSOLE_COMMANDS_MORROWIND.md) | The original game's console commands in AmiWind | v0.0.64-dev4 (11 November 2026) |
 | [GAME_STATE_RESET.md](GAME_STATE_RESET.md) | Game state reset and failed loads | v0.0.62-dev2 (8 November 2026) |
 | [MEMORY_ALLOCATION.md](MEMORY_ALLOCATION.md) | Memory allocation and heap clearance | v0.0.66-dev12 (16 November 2026), needs a refresh |
@@ -124,9 +124,9 @@ Every document of the project, by topic, with the version and date of its last u
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [GAME_FEATURES.md](GAME_FEATURES.md) | Game features | v0.0.66 (12 November 2026) |
+| [GAME_FEATURES.md](GAME_FEATURES.md) | Game features | v0.0.67-dev1 (17 November 2026) |
 | [game-features.json](game-features.json) | game-features.json | data file |
-| [MWSCRIPT_FEATURES.md](MWSCRIPT_FEATURES.md) | MWScript features | v0.0.66 (16 November 2026) |
+| [MWSCRIPT_FEATURES.md](MWSCRIPT_FEATURES.md) | MWScript features | v0.0.67-dev1 (17 November 2026) |
 | [WORLD_MECHANISMS.md](WORLD_MECHANISMS.md) | World mechanisms | v0.0.64-dev1 (10 November 2026) |
 | [OPENING_SEQUENCE.md](OPENING_SEQUENCE.md) | The opening, step by step | v0.0.65 (12 November 2026) |
 | [mwscript-features.json](mwscript-features.json) | mwscript-features.json | data file |
@@ -208,7 +208,7 @@ Every document of the project, by topic, with the version and date of its last u
 | [VOICED_DIALOGUE.md](VOICED_DIALOGUE.md) | Voiced dialogue: event lookup and runtime plan | v0.0.66-dev12 (16 November 2026) |
 | [DIALOGUE_AND_WAIT.md](DIALOGUE_AND_WAIT.md) | Dialogue, character confirmation and waiting — v0.0.23-dev4 | v0.0.63-dev5 (9 November 2026), needs a refresh |
 | [DIALOGUE_DESIGN.md](DIALOGUE_DESIGN.md) | Dialogue: design (topics, conditions, choices, disposition, journal) | v0.0.62-dev2 (2026-11-08) |
-| [DIALOGUE_FEATURES.md](DIALOGUE_FEATURES.md) | Dialogue features | v0.0.66 (10 November 2026) |
+| [DIALOGUE_FEATURES.md](DIALOGUE_FEATURES.md) | Dialogue features | v0.0.67-dev1 (17 November 2026) |
 | [dialogue-features.json](dialogue-features.json) | dialogue-features.json | data file |
 | [dialogue-choices.json](dialogue-choices.json) | dialogue-choices.json | data file |
 | [VOICE_FEATURES.md](VOICE_FEATURES.md) | Voices and sounds | v0.0.59-dev4 (2 November 2026) |
@@ -233,7 +233,7 @@ Every document of the project, by topic, with the version and date of its last u
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [AMIWIND_TOOLKIT.md](AMIWIND_TOOLKIT.md) | AmiWind Toolkit | v0.0.66-dev2 (14 November 2026) |
+| [AMIWIND_TOOLKIT.md](AMIWIND_TOOLKIT.md) | AmiWind Toolkit | v0.0.67-dev1 (17 November 2026) |
 | [AMIWIND_MAP_OPTIMIZATION_TOOLKIT.md](AMIWIND_MAP_OPTIMIZATION_TOOLKIT.md) | AmiWind Map Optimization Toolkit | v0.0.41-dev4 (16 October 2026), needs a refresh |
 | [POLYCOUNT_INSPECTOR.md](POLYCOUNT_INSPECTOR.md) | AmiWind 3D Map Inspector | v0.0.64-dev4 (10 November 2026), needs a refresh |
 | [POLYGON_HEATMAP.md](POLYGON_HEATMAP.md) | Polygon density, cells and town subcells | v0.0.32-dev1 (8 October 2026), needs a refresh |
@@ -260,14 +260,14 @@ Every document of the project, by topic, with the version and date of its last u
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [BUGS.md](BUGS.md) | Bug tracker | generated (v0.0.66) |
+| [BUGS.md](BUGS.md) | Bug tracker | generated (v0.0.67-dev1) |
 
 ## Releases
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [CHANGELOG.md](CHANGELOG.md) | Changelog | v0.0.66 (16 November 2026) |
-| [ROADMAP.md](ROADMAP.md) | Roadmap and implementation options | v0.0.66 (16 November 2026) |
+| [CHANGELOG.md](CHANGELOG.md) | Changelog | v0.0.67-dev1 (17 November 2026) |
+| [ROADMAP.md](ROADMAP.md) | Roadmap and implementation options | v0.0.67-dev1 (17 November 2026) |
 | [RELEASE_WORKFLOW.md](RELEASE_WORKFLOW.md) | AmiWind release workflow | v0.0.66-dev12 (16 November 2026) |
 | [CI.md](CI.md) | Build audit and the local pipeline | v0.0.54 (27 October 2026) |
 | [CI_DRY_RUN.md](CI_DRY_RUN.md) | Asset-free compilation and boot image | v0.0.54 (27 October 2026) |
@@ -295,7 +295,7 @@ Every document of the project, by topic, with the version and date of its last u
 | [bugs/](bugs/) | the bug register: one report page per bug (generated sections from bugs.json), the register data and its archive | [bugs/README.md](bugs/README.md) |
 | [chim/](chim/) | the CHIM engine and world format: design, trackers, features, build guide | [chim/README.md](chim/README.md) |
 | [trackers/](trackers/) | world progress, points of interest and entity trackers | [trackers/README.md](trackers/README.md) |
-| [performance/](performance/) | measured performance records and baselines | [BUILDER_PROFILE.md](performance/BUILDER_PROFILE.md), [CELL-TRANSITION-INVESTIGATION-v0.0.29-dev4.md](performance/CELL-TRANSITION-INVESTIGATION-v0.0.29-dev4.md), [CROSSING_BASELINE.md](performance/CROSSING_BASELINE.md), [EXPANSIONS-CENSUS-v0.0.64.md](performance/EXPANSIONS-CENSUS-v0.0.64.md), [FAR-TEST.md](performance/FAR-TEST.md), [FRAME-WAITS.md](performance/FRAME-WAITS.md), [LESSONS_LEARNED.md](performance/LESSONS_LEARNED.md), [NPC-RECIPE-TABLES.md](performance/NPC-RECIPE-TABLES.md), [RENDERER-COUNTERS.md](performance/RENDERER-COUNTERS.md), [SAVE-BUDGET.md](performance/SAVE-BUDGET.md), [SINGLE-CORE-THROUGHPUT.md](performance/SINGLE-CORE-THROUGHPUT.md), [SLOW-FRAME-BREAKDOWN.md](performance/SLOW-FRAME-BREAKDOWN.md), [SOLSTHEIM-FIRST-FRAME-v0.0.64.md](performance/SOLSTHEIM-FIRST-FRAME-v0.0.64.md), [TOWN-VISIBILITY.md](performance/TOWN-VISIBILITY.md), [V0.0.66-PERFORMANCE.md](performance/V0.0.66-PERFORMANCE.md) |
+| [performance/](performance/) | measured performance records and baselines | [BUILDER_PROFILE.md](performance/BUILDER_PROFILE.md), [CELL-TRANSITION-INVESTIGATION-v0.0.29-dev4.md](performance/CELL-TRANSITION-INVESTIGATION-v0.0.29-dev4.md), [CROSSING_BASELINE.md](performance/CROSSING_BASELINE.md), [EMULATOR-WARP.md](performance/EMULATOR-WARP.md), [EXPANSIONS-CENSUS-v0.0.64.md](performance/EXPANSIONS-CENSUS-v0.0.64.md), [FAR-TEST.md](performance/FAR-TEST.md), [FRAME-WAITS.md](performance/FRAME-WAITS.md), [LESSONS_LEARNED.md](performance/LESSONS_LEARNED.md), [NPC-RECIPE-TABLES.md](performance/NPC-RECIPE-TABLES.md), [RENDERER-COUNTERS.md](performance/RENDERER-COUNTERS.md), [SAVE-BUDGET.md](performance/SAVE-BUDGET.md), [SINGLE-CORE-THROUGHPUT.md](performance/SINGLE-CORE-THROUGHPUT.md), [SLOW-FRAME-BREAKDOWN.md](performance/SLOW-FRAME-BREAKDOWN.md), [SOLSTHEIM-FIRST-FRAME-v0.0.64.md](performance/SOLSTHEIM-FIRST-FRAME-v0.0.64.md), [TOWN-VISIBILITY.md](performance/TOWN-VISIBILITY.md), [V0.0.66-PERFORMANCE.md](performance/V0.0.66-PERFORMANCE.md) |
 | [benchmarks/](benchmarks/) | benchmark data files | data files only |
 | [asset-coverage/](asset-coverage/) | asset coverage history data | data files only |
 | [validation/](validation/) | machine records of early release-candidate source checks (data) | data files only |

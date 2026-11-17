@@ -11,8 +11,32 @@ import subprocess
 import sys
 import time
 
-from build_docker import IMAGE, docker_command, logged
+from build_docker import IMAGE, RUNTIME, RUNTIME_ENV, RUNTIME_IMAGE_ENV, docker_command, logged
 from mwad.paths import ensure_external, inside, resolve_data_files
+
+
+def create_command(docker, container, mount, volume, image, name, jobs, commit):
+    """The build container: offline, the game data read-only, the build volume as its workspace, and the builder image's
+    mark with its tag (the build report names the image it ran in, also for an image built before the mark)."""
+    return docker + ['create', '--name', container, '--network', 'none',
+                     '--mount', mount, '--mount', f'type=volume,source={volume},target=/work',
+                     '-e', f'{RUNTIME_ENV}={RUNTIME}', '-e', f'{RUNTIME_IMAGE_ENV}={image}', image,
+                     'python', 'tools/build.py', '--data-files', '/input',
+                     '--tools-dir', '/opt/amiwind-tools', '--workspace', '/work',
+                     '--name', name, '--jobs', str(jobs),
+                     *(['--source-commit', commit] if commit != 'nogit' else [])]
+
+
+def copy_report(docker, container, name, output):
+    """A failed build's report (logs/BUILD-REPORT-<run>.txt in the build volume, tools/build_report.py) copied into
+    OUTPUT: the one file to send when asking for help. Its path there, or None when the build wrote none."""
+    target = Path(output) / f'BUILD-REPORT-{name}.txt'
+    try:
+        done = subprocess.run(docker + ['cp', f'{container}:/work/logs/BUILD-REPORT-{name}.txt', str(target)],
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+    except OSError:
+        return None
+    return target if done.returncode == 0 and target.is_file() else None
 
 
 def stage_inputs(docker, data, volume, image, log):
@@ -132,13 +156,7 @@ def main(argv=None):
             mount = f'type=bind,source={data},target=/input,readonly'
         if not staging:
             check_space()
-        command = docker + ['create', '--name', container, '--network', 'none',
-                   '--mount', mount, '--mount',
-                   f'type=volume,source={args.volume},target=/work', args.image,
-                   'python', 'tools/build.py', '--data-files', '/input',
-                   '--tools-dir', '/opt/amiwind-tools', '--workspace', '/work',
-                   '--name', args.name, '--jobs', str(args.jobs),
-                   *(['--source-commit', commit] if commit != 'nogit' else [])]
+        command = create_command(docker, container, mount, args.volume, args.image, args.name, args.jobs, commit)
         subprocess.run(command, check=True)
         created = True
         logged(docker + ['start', '--attach', container], output / 'full-build.log')
@@ -166,6 +184,10 @@ def main(argv=None):
         receipt['error'] = str(exc)
         print(f'Error: {exc}', file=sys.stderr)
         status = 1
+        report = copy_report(docker, container, args.name, output) if created else None
+        if report is not None:
+            receipt['build_report'] = str(report)
+            print(f'Build report: {report} (send this one file when you ask for help)', file=sys.stderr)
     finally:
         # Retain input/output volumes and failed containers for diagnosis.
         if created and receipt['status'] == 'passed':

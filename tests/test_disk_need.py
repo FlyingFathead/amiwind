@@ -310,7 +310,9 @@ class FirstStepTests(unittest.TestCase):
         text = (ROOT / 'tools' / 'run_docker.py').read_text(encoding='utf-8')
         self.assertIn('disk_need.docker_volume_check(', text)
         self.assertLess(text.index('check_space(disk_need.tree_bytes([data]))'), text.index('stage_inputs(\n'))
-        self.assertLess(text.index('            check_space()\n'), text.index("['create', '--name'"))
+        # the build container is made by create_command (BUILD-REPORT-MACHINE-ALL-OS-67): its call comes after the check
+        self.assertLess(text.index('            check_space()\n'), text.index('command = create_command('))
+        self.assertIn("['create', '--name'", text)
 
     def test_entry_stops_a_short_build_and_skips_setup_modes(self):
         import argparse

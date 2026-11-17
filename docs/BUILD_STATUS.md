@@ -1,6 +1,6 @@
 # Build status folder: a file interface for stall alerts
 
-_Last updated with AmiWind v0.0.66-dev2 (13 November 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 Every build `tools/build.py` runs keeps a small status folder that any program can read to follow it and to catch a
 stall, with no server and no library: `<workspace>/build/<run>/status/`. Before the first stage, while the run
@@ -8,9 +8,10 @@ folder does not exist yet (a build refused in its start-up leaves none), the sam
 `<workspace>/build/.startup/<run>/status/`. A `--check` or `--plan` run creates nothing
 in the workspace: it prints its `[stall]` lines in the log only, and writes the folder only into the folder the
 environment variable `AMIWIND_STATUS_DIR` names (`$AMIWIND_STATUS_DIR/status/`). The folder is written from the
-start of `build.py` (before the first stage: the entry check, the reuse preflight and the resource plan count too)
-until the build ends. The format is a stable interface: fields are only added, and a change that breaks a reader
-gets a new `format` value.
+first second of `build.py`, as soon as its options are read (before the first stage: the free-space check, the build
+preflight, the entry check, the reuse preflight and the resource plan count too), until the build ends; a build
+started without `--name` writes it once it has chosen its run name. The format is a stable interface: fields are only
+added, and a change that breaks a reader gets a new `format` value.
 
 ## heartbeat.json
 
@@ -33,7 +34,7 @@ it.
 ```
 
 - `status`: `starting` (before the first stage), `running`, then `passed`, `failed`, `stopped` or `checked` (a check
-  or plan run that ended).
+  or plan run that ended); a build that stops in its start-up says `failed` (`stopped` when cancelled).
 - `phase`: the running stage or stages, or during the start-up the last line the builder printed.
 - `cores_now` against `cores_planned`: the cores the build uses now and the cores it was given.
 - `seconds_since_progress`: seconds since the last output of the running stages (the start-up: since its last line).
@@ -61,4 +62,8 @@ It prints each incident once, runs COMMAND once per incident with the state and 
 and treats a heartbeat older than `--max-age` (default 120 s) as an incident of its own (`no-heartbeat`).
 `--exit-on-stall` exits with code 3 at the first incident, so a loop or a CI job can wake on it; `--once` checks
 what is there now and exits. The Toolkit monitor (its stall banner and `toolkit_serve.py --on-stall`) reads the same
-files. Tests: `tests/test_build_stall.py`.
+files. Its runs list (`/monitor/runs.json`) carries, for every build written in the last hour, the `stall` block and
+a `live` block with the heartbeat's `status`, `phase`, `elapsed_seconds`, `cores_now`, `cores_planned`,
+`seconds_since_progress` and `written_epoch` (an earlier builder's run without a status folder: what its
+`build-progress.json` holds), so one read of that list follows every build. Tests: `tests/test_build_stall.py`,
+`tests/test_build_report.py` (the first second).

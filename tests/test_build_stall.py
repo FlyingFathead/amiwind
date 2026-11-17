@@ -82,6 +82,51 @@ class StartupAndReaderTests(unittest.TestCase):
             runs = monitor_read.Reader(d).runs()['runs']
             self.assertEqual(runs[0]['stall']['state'], 'stalled')
 
+    def test_runs_carry_the_live_numbers_for_a_stall_catcher(self):
+        # BUILDER-STALL-METRICS-66: one read of the runs list gives a catcher (the Toolkit's --on-stall, a watcher of
+        # its own) every build's phase, cores now against planned and seconds since its last progress line
+        with tempfile.TemporaryDirectory() as d:
+            status = Path(d) / '.startup' / 'run-s' / 'status'
+            status.mkdir(parents=True)
+            (status.parent / 'build-progress.json').write_text('{"status": "starting"}', encoding='utf-8')
+            (status / 'heartbeat.json').write_text(json.dumps({
+                'format': build_stall.STATUS_FORMAT, 'run': None, 'status': 'starting',
+                'phase': 'Build preflight: checking cache owners', 'elapsed_seconds': 41.5, 'cores_now': 0.9,
+                'cores_planned': 24, 'seconds_since_progress': 38.0, 'stall': {'state': 'ok', 'since': 0, 'reason': ''},
+                'written_epoch': 1.0}), encoding='utf-8')
+            old = Path(d) / 'run-o'
+            old.mkdir()
+            (old / 'build-progress.json').write_text(json.dumps({
+                'status': 'running', 'elapsed_seconds': 90.0, 'cores_now': 3.0, 'budget': 22,
+                'stages': [{'name': 'chim', 'status': 'running'}]}), encoding='utf-8')
+            runs = {r['run']: r for r in monitor_read.Reader(d).runs()['runs']}
+            self.assertEqual(runs['run-s']['live'], {
+                'status': 'starting', 'phase': 'Build preflight: checking cache owners', 'elapsed_seconds': 41.5,
+                'cores_now': 0.9, 'cores_planned': 24, 'seconds_since_progress': 38.0, 'written_epoch': 1.0})
+            self.assertEqual(runs['run-s']['stall']['state'], 'ok')
+            # an earlier builder's run without a status folder: the numbers its progress file holds
+            self.assertEqual(runs['run-o']['live'], {'status': 'running', 'phase': 'chim', 'elapsed_seconds': 90.0,
+                                                     'cores_now': 3.0, 'cores_planned': 22})
+            self.assertNotIn('stall', runs['run-o'])
+
+    def test_a_watch_started_before_the_run_name_writes_once_it_has_one(self):
+        with tempfile.TemporaryDirectory() as d:
+            w = build_stall.StartupWatch(None, 4, interval=0.05).start()
+            try:
+                print('Free space: 100 GiB free')
+                time.sleep(0.15)
+                self.assertEqual(list(Path(d).iterdir()), [])             # no name yet: the log only
+                path = Path(d) / '.startup' / 'run-n' / 'build-progress.json'
+                w.place(path, build_stall.StatusWriter(path.parent / 'status', make_parents=True), planned=24)
+                print('Run name: run-n')
+                time.sleep(0.2)
+            finally:
+                w.stop('failed')
+            data = json.loads(path.read_text(encoding='utf-8'))
+            self.assertEqual((data['budget'], data['phase']), (24, 'Run name: run-n'))
+            beat = json.loads((path.parent / 'status' / 'heartbeat.json').read_text(encoding='utf-8'))
+            self.assertEqual((beat['status'], beat['cores_planned']), ('failed', 24))
+
 
 class StatusFolderTests(unittest.TestCase):
     def test_writer_and_catcher(self):
