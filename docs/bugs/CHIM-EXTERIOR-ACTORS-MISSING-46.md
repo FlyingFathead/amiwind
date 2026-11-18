@@ -339,6 +339,7 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 Related bugs in other categories:
 
 - [CREATURE-BAKE-NIF-UNSUPPORTED-47](CREATURE-BAKE-NIF-UNSUPPORTED-47.md): The creature bake refuses 14 of the 39 creature meshes the outdoor world can show, the cliff racer, the rat, the guar and the nix-hound among them
+- OUTDOOR-CREATURES-HOME-CELL-67 (no report page): The cell the player arrives in has none of its levelled creatures: the window's home frame never joins the actor table
 - [OUTDOOR-CREATURES-REGRESSION-66](OUTDOOR-CREATURES-REGRESSION-66.md): Regression: no outdoor creatures spawn, no mudcrabs or slaughterfish, though earlier versions had them
 
 <!-- END GENERATED CATEGORY -->

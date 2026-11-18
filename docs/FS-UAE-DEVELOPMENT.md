@@ -1,6 +1,6 @@
 # FS-UAE development access
 
-_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
+_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -53,6 +53,28 @@ mounted read-only), the game boots to the console, loads a map with the music pl
 must keep reading, `dbg music off` must stop the reads while the game goes on, a second map loads (`dbg tp` into
 Balmora), and `dbg music on` must start the reads again. If the emulator exits, the game clock stops or a step is
 missing, the smoke fails (exit 1). The emulator side is the shell script `PROBE` in the same tool.
+
+On that plain route (the first map Seyda Neen, the gate's and the delivery's smoke) the creatures of Seyda Neen must
+be alive once its first load has joined them. The count (`chim actors creatures`, with `chim actors table` and
+`dbg sweep actors` logged beside it) is asked again every 5 s for up to 60 s, since an arrival's actors join a few at a
+time. Then the smoke plays as a released test character, so that the game may save (`dbg aw hors 0`: the opening is
+over for it). Then:
+
+- every map change of the route must write the game's autosave (a `Saved Autosave` line) within 30 s of the map
+  being in play;
+- the creatures must be alive at one wild stop on the Bitter Coast too, and in Seyda Neen again after the preset's
+  reload of it: since v0.0.67-dev2 the engine joins a map spawned again under its own name, so that count fails the
+  smoke as the others do ([ACTOR-TABLE-SAME-MAP-RELOAD-67](BUGS.md), before the fix counted as a known gap);
+- each stop takes a `dbg netstat` reading;
+- at the end `dbg save status` must say that nothing holds the autosave back.
+
+A scripted session, a one-area image or another route leaves these steps out.
+
+Anywhere in a run's console, the engine's known failure lines fail a run that would pass: an entity update that
+overflowed the message (`packet overflow`, `Message overflow`, `SZ_GetSpace`), a frame update dropped or unreadable (`Frame update
+dropped`, `Illegible server message`) and any `Host_Error`. So does a `dbg netstat` reading whose fullest frame since
+the map started wanted more than the game's own connection carries, or that counts a frame update not sent.
+`--allow-engine-errors` only counts them, for a run that shows one on purpose.
 
 `--script FILE` replaces the music and second-load steps with a scripted session after the first map, for evidence
 shots and replays. It takes one step per line:

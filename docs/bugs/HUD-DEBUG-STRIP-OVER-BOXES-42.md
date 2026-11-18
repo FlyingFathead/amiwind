@@ -101,7 +101,7 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - BLANK-PAPER-READ-60 (no report page): A blank sheet of paper offers Read although it has no text
 - BOOK-TEXT-MACROS-58 (no report page): A book read where it lies shows the text defines as written (Name: %PCName Race: %PCRace Class: %PCClass)
 - CHAR-CONFIRM-BORDER-29 (no report page): Character Go back / Choose actions lack OK-style frames
-- CHARGEN-ABILITY-DESCRIPTIONS-65 (no report page): The birthsign and race menus do not show what an ability or a special power does
+- [CHARGEN-ABILITY-DESCRIPTIONS-65](CHARGEN-ABILITY-DESCRIPTIONS-65.md): The birthsign and race menus do not show what an ability or a special power does
 - [CHIM-REGION-DOORS-NO-PROMPT-42](CHIM-REGION-DOORS-NO-PROMPT-42.md): Doors in CHIM region cells show no entrance at all (no prompt, not even Interior unavailable), e.g. every door in Khuul
 - [CLASS-LIST-LAYOUT-62](CLASS-LIST-LAYOUT-62.md): The class choice window runs its lists together without separating lines
 - CONTAINER-STRIP-REDRAW-COST-59 (no report page): The container strip redraws the whole screen every frame: about 17 fps while it is open
@@ -132,6 +132,7 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - HUD-INTERIOR-CLOCK-CUT-54 (no report page): The dbg hud line GLOBAL XYZ: unavailable (interior) is so long that the clock is cut off
 - [HUD-NOTIFY-OVERLAP-31](HUD-NOTIFY-OVERLAP-31.md): Console messages print over the location title
 - [HUD-STATS-29](HUD-STATS-29.md): Health uses fixed 100; other bars hardcoded full
+- HUD-TEXTS-OVERLAP-67 (no report page): Two texts are drawn on top of each other in the HUD: the name of the aimed character and the place name
 - HUD-WEAPON-BOX-EMPTY-59 (no report page): HUD weapon box stays empty after equipping a weapon from the console
 - [INFO-BOX-TEXT-CUT-62](INFO-BOX-TEXT-CUT-62.md): The name of an aimed door or object is drawn in a box over the view that cuts its text; before, the name was shown only below the view
 - [INVENTORY-ARROWS-SCROLL-62](INVENTORY-ARROWS-SCROLL-62.md): The arrow keys do not move through any list window: dialogue topics, bartering, the inventory, containers and spells
@@ -151,6 +152,7 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - MAP-REG-01 (no report page): In-Game map mode hid settlement markers (regression)
 - MAP-RIGHT-DRAG-29 (no report page): Advertised right-drag does not pan teleport map
 - MAP-SPOTS-28 (no report page): In-game map screen has white/yellow spots
+- MAP-WORLD-TAB-BLANK-67 (no report page): The World tab of the in-game map draws no land: only the player arrow and the place markers show on a blank background
 - [MSGBOX-NO-CURSOR-62](MSGBOX-NO-CURSOR-62.md): The death message box shows no mouse cursor
 - NAMED-ACTIVATOR-FOCUS-66 (no report page): Named objects such as beds and shrines show no name when looked at
 - [NOCLIP-BOB-DEFAULT-42](NOCLIP-BOB-DEFAULT-42.md): Head bob still on in noclip mode by default, although the noclip bob was set to off by default
@@ -163,6 +165,7 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - PHOTO-CROSSHAIR-51 (no report page): In photo mode the crosshair stays: crosshair off and dbg crosshair off do nothing, and photo mode does not hide it by itself
 - [PHOTO-DEBUG-STRIP-33](PHOTO-DEBUG-STRIP-33.md): Photo mode with Ctrl+H: the coordinate strip blacks out only from x=88, leaving the bottom-left corner of the view
 - [PHOTO-GALLERY-TEXT-33](PHOTO-GALLERY-TEXT-33.md): Photo mode leaves test-room and gallery instruction text over the view
+- PICKUP-NAME-ONLY-BOX-67 (no report page): Picking up an item shows only the item name in a box
 - [PLACE-NAMES-INTERIOR-31](PLACE-NAMES-INTERIOR-31.md): Location label has no place name inside interiors
 - QUICKSAVE-NO-PROFILE-SILENT-57 (no report page): Quicksave says nothing when no character profile is chosen (a game started from the console with map), while quickload says why
 - [RACE-MENU-OK-HIGHLIGHT-65](RACE-MENU-OK-HIGHLIGHT-65.md): The OK box of the character windows shows no highlight when the keys reach it
@@ -176,6 +179,7 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - [TRADEHOUSE-LONG-FRAME-59](TRADEHOUSE-LONG-FRAME-59.md): In Arrille's Tradehouse one frame can last about 10 seconds, with or without the container strip open
 - TUTORIAL-BOX-SHOWN-TWICE-65 (no report page): After the papers the same tutorial box is shown twice in a row
 - UI-ACCEPT-29 (no report page): Character selection lacks a visible OK button
+- UI-CHARGEN-CLASS-FONT-67 (no report page): Requested: the Make your own class window uses the console font for the attribute and skill rows (as the race stats screen does), keeps the heading in the game font, and gives its hint row and Cancel and OK buttons the regular frame
 - [UI-DEATH-DAMAGE-TINT-38](UI-DEATH-DAMAGE-TINT-38.md): Lava damage tint also colours the death menu and selection
 - [UI-ICONS-INVENTORY-42](UI-ICONS-INVENTORY-42.md): Inventory rows show icons only for the few staged items, squeezed 32 to 14 pixels; no magic or equipped backdrops
 - [UI-INVENTORY-FONT-TABS-42](UI-INVENTORY-FONT-TABS-42.md): Inventory categories use the console font as plain text instead of the original Morrowind font on button tabs
@@ -184,12 +188,16 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - [UI-INVENTORY-ORIGINAL-LAYOUT-42](UI-INVENTORY-ORIGINAL-LAYOUT-42.md): The inventory lacks the original encumbrance bar, armour rating and item icon grid
 - [UI-INVENTORY-PREVIEW-GAP-41](UI-INVENTORY-PREVIEW-GAP-41.md): Inventory shows 'Character preview unavailable': a fixed 2 MiB memory guard refuses the 128 KB pose model in Seyda Neen
 - [UI-INVENTORY-PREVIEW-STILL-42](UI-INVENTORY-PREVIEW-STILL-42.md): The inventory character is drawn live and turns instead of being a still picture
+- UI-JOURNAL-HINT-EMPTY-BOX-67 (no report page): An empty box flashes after the first journal hint has gone: the frame stays on screen for a moment without its text
 - [UI-KEY-HELP-STALE-38](UI-KEY-HELP-STALE-38.md): Key help exposes raw actions and uses a sparse outdated layout
 - UI-MAP-PLAYER-ARROW-51 (no report page): Requested: the map shows the player as the original s arrow that turns with the player, not a crosshair
 - [UI-MENU-LOGO-32](UI-MENU-LOGO-32.md): The menu logo has a line above the name and reddish-pink letters instead of gold
+- UI-NO-SHARED-LAYOUT-67 (no report page): Menus place their boxes and buttons at fixed pixel positions of their own, so margins differ from screen to screen and buttons sit against the bottom edge of the box
+- UI-OK-BUTTON-THIN-FRAME-67 (no report page): The OK button in the menus has a thin outline instead of the regular button frame that View Stats has
 - UI-OPTIONS-WRAP-29 (no report page): Setup selection wraps despite a bounded scrollbar
 - [UI-ORNAMENT-GLYPHS-23](UI-ORNAMENT-GLYPHS-23.md): The name-entry caret drew as a ball and the rotation hints as a skull and a tree (ornamental font glyphs)
 - UI-PALETTE-NO-WHITE-48 (no report page): The game palette has no white: a White crosshair draws as the console ink cream (238,221,170)
+- UI-RACE-STATS-RETURN-SPACING-67 (no report page): Requested: the race stats screen gets a Return button under the attributes and space under the Attributes heading
 - [UI-STATS-WINDOW-48](UI-STATS-WINDOW-48.md): No Stats window (attributes, skills, health/magicka/fatigue) and no Magic window: the original's P and O windows
 - [UI-TEXT-BOX-CLEARANCE-64](UI-TEXT-BOX-CLEARANCE-64.md): Text boxes leave too little room above and below their text (the opening hint: the last line touches the bottom edge)
 - [UI-WINDOW-TITLE-BAR-42](UI-WINDOW-TITLE-BAR-42.md): Menu windows lack the original title bar (tiled frame with the window name on a dark plaque)

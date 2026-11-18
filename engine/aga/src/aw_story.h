@@ -28,6 +28,9 @@ int AW_StoryHudChannels(void);
 int AW_StoryPapersRead(void);
 /* The inventory window during the registration: from the papers' activation on (CHARGEN-INVENTORY-LOCKED-60). */
 int AW_StoryInventoryAllowed(void);
+/* PRISON-SHIP-ITEMS-TAKEABLE-65: placed objects (items, containers, named furniture) show a name and an action line:
+ * not before the papers (the prison ship's every deck, the dock, the registration), from the papers on. */
+int AW_StoryObjectLabels(void);
 int AW_StoryViewAllowed(void);
 int AW_StoryDoor(unsigned reference);
 void AW_ExpandPlayerName(char *out, unsigned capacity, const char *text);

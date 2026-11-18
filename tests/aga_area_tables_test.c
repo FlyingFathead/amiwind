@@ -65,6 +65,9 @@ typedef struct {int room;unsigned ref;char id[40];} placed_t;
 static placed_t placed[MAXC];static int nplaced;
 typedef struct {char id[40];int w,h,first;} icon_t;
 static icon_t icons[MAXC];static int nicons;
+/* LOCKED-CONTAINERS-NEVER-OPEN-67: "L room ref key" (key "-": none), a container's key from its area record */
+typedef struct {int room;unsigned ref;char key[40];} area_key_t;
+static area_key_t keys[MAXC];static int nkeys;
 static void expectations(void){
     char path[512],kind[4];FILE *f;int i;
     snprintf(path,sizeof(path),"%s/expect.txt",folder);
@@ -79,6 +82,8 @@ static void expectations(void){
             assert(fscanf(f,"%d %u %39s",&p->room,&p->ref,p->id)==3);
         }else if(!strcmp(kind,"K")){icon_t *k=&icons[nicons++];
             assert(fscanf(f,"%39s %d %d %d",k->id,&k->w,&k->h,&k->first)==4);
+        }else if(!strcmp(kind,"L")){area_key_t *k=&keys[nkeys++];
+            assert(fscanf(f,"%d %u %39s",&k->room,&k->ref,k->key)==3);
         }else assert(0);
     }
     fclose(f);
@@ -128,6 +133,13 @@ static void ask(int room){
             char id[64];int owned;
             if(placed[i].room!=room)continue;
             assert(AW_PlacedBook(placed[i].ref,id,&owned) && !Q_strcasecmp(id,placed[i].id));
+        }
+        /* a container's key, from its area record: the key's record id, none when it names none */
+        for(i=0;i<nkeys;i++){
+            char id[64];
+            if(keys[i].room!=room)continue;
+            if(strcmp(keys[i].key,"-"))assert(AW_AreaContainerKey(keys[i].ref,id,sizeof(id)) && !Q_strcasecmp(id,keys[i].key));
+            else assert(!AW_AreaContainerKey(keys[i].ref,id,sizeof(id)));
         }
         for(i=0;i<nicons;i++){
             char key[64];int w,h;byte pixels[32*32];

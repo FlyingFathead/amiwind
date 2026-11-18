@@ -829,13 +829,18 @@ static int TableLoad (void)
 	return 1;
 }
 
-/* The records of cell CX CY queued for spawning (the frame map is not read). CREATURES_ONLY: a town map's own cell
- * (its residents and dead come with the town frame's resident stage; only the creatures and the levelled points come
- * from the table, OUTDOOR-CREATURES-MISSING-66). */
-static void TableJoinKinds (int cx, int cy, const float *offset, int creatures_only);
+/* The records of cell CX CY queued for spawning (the frame map is not read). WHICH: JOIN_ALL a joining frame's cell
+ * (every kind); JOIN_CREATURES a town map's own cell (its residents and dead come with the town frame's resident
+ * stage; only the creatures and the levelled points come from the table, OUTDOOR-CREATURES-MISSING-66); JOIN_LEVELLED
+ * the window's home cell (its people and placed creatures come with the region frame map's own entity text, which holds
+ * no levelled point: tools/chim/region_actors.py defers every one to the table, HomeJoin below). */
+#define JOIN_ALL		0
+#define JOIN_CREATURES	1
+#define JOIN_LEVELLED	2
+static void TableJoinKinds (int cx, int cy, const float *offset, int which);
 static void TableJoin (int cx, int cy, const float *offset)
 {
-	TableJoinKinds (cx, cy, offset, 0);
+	TableJoinKinds (cx, cy, offset, JOIN_ALL);
 }
 
 /* OUTDOOR-CREATURES-MISSING-66 (CHIM-EXTERIOR-ACTORS-MISSING-46): the cells inside a town map's core never join the
@@ -864,12 +869,32 @@ static void TownJoin (void)
 		offset[0] = x;
 		offset[1] = y;
 		offset[2] = 0;
-		TableJoinKinds (cell.cx, cell.cy, offset, 1);
+		TableJoinKinds (cell.cx, cell.cy, offset, JOIN_CREATURES);
 		town_joins++;
 	}
 }
 
-static void TableJoinKinds (int cx, int cy, const float *offset, int creatures_only)
+/* OUTDOOR-CREATURES-HOME-CELL-67 (OUTDOOR-CREATURES-REGRESSION-66): the window's home frame (the region frame map the
+ * session loaded: after a teleport, a load, a door out of a room or a town, a level change) never joins the window
+ * (chim_chunks.c SlotJoin joins the actors of every slot but the first one's, whose actors come with the map's own
+ * entity text), and a region frame map holds its cell's people and placed creatures but none of its levelled creature
+ * points (tools/chim/region_actors.py defers them all: the table rolls them when the cell joins). So the cell the
+ * player arrived in had none of its levelled creatures, about nine in ten of the wild's creatures, until its frame
+ * left the window and joined again. When such a map starts, its home cell's levelled points join from the table as a
+ * joining cell's do (rolled at the player's level, the picks kept in the change list, spawned at the per-tick budget).
+ * A town map has no window (its cells: TownJoin). */
+static unsigned long	home_joins;
+static void HomeJoin (void)
+{
+	static const float none[3] = {0, 0, 0};		/* the session's origin is the home cell's centre */
+	int hx, hy, held;
+	if (!table_on || !HomeCell (&hx, &hy, &held) || !held || !TableLoad ())
+		return;
+	TableJoinKinds (hx, hy, none, JOIN_LEVELLED);
+	home_joins++;
+}
+
+static void TableJoinKinds (int cx, int cy, const float *offset, int which)
 {
 	chim_actor_cell_t cell;
 	chim_actor_record_t r;
@@ -899,8 +924,10 @@ static void TableJoinKinds (int cx, int cy, const float *offset, int creatures_o
 			!ChimActors_Base (table.bases + r.base*CHIM_ACTOR_BASE_BYTES, &table.head, &b))
 			break;
 		table.records++;
-		if (creatures_only && b.kind != CHIM_ACTOR_KIND_LEVELLED && b.kind != CHIM_ACTOR_KIND_CREATURE)
+		if (which == JOIN_CREATURES && b.kind != CHIM_ACTOR_KIND_LEVELLED && b.kind != CHIM_ACTOR_KIND_CREATURE)
 			continue;			/* a town's residents and dead: its resident stage placed them */
+		if (which == JOIN_LEVELLED && b.kind != CHIM_ACTOR_KIND_LEVELLED)
+			continue;			/* the home frame map's own people, creatures and dead came with it */
 		if (b.kind == CHIM_ACTOR_KIND_LEVELLED && table.lists)
 		{
 			/* a levelled reference: its kept pick, or one roll at the player's level (kept in the change list) */
@@ -1347,16 +1374,30 @@ static void Leave (int cx, int cy)
  * entries (SAVEGAME-COMPLETE-57: an actor moved in a room is where it was left after a save and a reload, and after
  * leaving and coming back); when the room is left, its actors' state goes into the change list (Capture). */
 static char tick_map[64];		/* the map of the last window tick (Tick) */
+static char room_map[64];		/* the map of the last room tick (AW_ActorsRoomTick) */
+
+/* ACTOR-TABLE-SAME-MAP-RELOAD-67: every server spawn starts a new map for the actors, the same map's name included
+ * (sv_main.c SV_SpawnServer calls this). The ticks told a new map by its name alone, so a reload of the map the player
+ * stood in (a save made there loaded, dbg aw hors 0, "map" of the same name) joined none of its cells from the actor
+ * table: the town join and the home join never ran again and the creatures stayed missing until the next map change
+ * (Seyda Neen: 16 cells and 53 creatures at the first spawn, 0 after the reload). Declared by its callers (sv_main.c,
+ * the native test), not in aw_actors.h: the CHIM world stage keys that header, so a change there re-keys the world. */
+void AW_ActorsServerReset (void);
+void AW_ActorsServerReset (void)
+{
+	tick_map[0] = 0;
+	room_map[0] = 0;
+}
+
 void AW_ActorsRoomTick (void)
 {
-	static char map[64];
 	static long room;
 	int i;
 	if (!sv.active)
 		return;
-	if (strncmp (map, sv.name, sizeof(map) - 1))
+	if (strncmp (room_map, sv.name, sizeof(room_map) - 1))
 	{
-		Q_strncpy (map, sv.name, sizeof(map) - 1);
+		Q_strncpy (room_map, sv.name, sizeof(room_map) - 1);
 		room = RoomNumber ();
 		if (room)
 			AW_NpcPartsRoom (sv.name);	/* the room's residents' recipe table (aw_npc_parts.c); goes with the map */
@@ -1415,8 +1456,20 @@ static void Tick (void)
 			Q_strncpy (tick_map, sv.name, sizeof(tick_map) - 1);
 			while (nwaitq)
 				KeptDrop (nwaitq - 1);	/* another map: its cells join again */
+			/* ACTOR-QUEUE-OTHER-MAP-67: the queue of the map before goes too. Its places are that map's (the
+			 * v0.0.66 delivery smoke: 16 of Seyda Neen's 53 queued creatures still waiting when Balmora started,
+			 * to be spawned there at Seyda Neen's coordinates); the cells of this map join on their own, after this
+			 * (WindowUpdate runs the actors' tick before the window's joins) */
+			if (npending)
+			{
+				Con_Printf ("actors: %ld queued actors of the map before dropped (their cells join again)\n",
+					(long)npending);
+				while (npending)
+					PendingDrop (npending - 1);
+			}
 			MarkHome ();
 			TownJoin ();		/* a town map's own cells: their creatures from the table (OUTDOOR-CREATURES-MISSING-66) */
+			HomeJoin ();		/* a region frame map's own cell: its levelled points (OUTDOOR-CREATURES-HOME-CELL-67) */
 			{
 				/* the home frame's own residents came with the map (no join): its cell's recipe table now */
 				int hx, hy, hheld;
@@ -1655,11 +1708,12 @@ static void Command (void)
 			table_on = atoi (Cmd_Argv (3)) != 0;
 		Con_Printf ("chim actors table %d (%s): joins %lu, records %lu, queued %lu, without a model %lu, "
 			"not an actor %lu, queue full %lu; levelled %lu (kept picks %lu, nothing %lu, no model %lu; player level %ld, "
-			"seed %lu); town cells joined %lu\n", table_on, table_on ? "actors join from the actor table" :
-			"actors join from the frame maps", table.joins, table.records, table.spawnable, table.no_model,
-			table.not_actor, table.full, table.levelled, table.levelled_kept, table.levelled_none,
-			table.levelled_no_model, (long)(aw_character.valid && aw_character.level > 0 ? aw_character.level : 1),
-			(unsigned long)roll_seed, town_joins);
+			"seed %lu); town cells joined %lu, home cells joined %lu\n", table_on, table_on ?
+			"actors join from the actor table" : "actors join from the frame maps", table.joins, table.records,
+			table.spawnable, table.no_model, table.not_actor, table.full, table.levelled, table.levelled_kept,
+			table.levelled_none, table.levelled_no_model,
+			(long)(aw_character.valid && aw_character.level > 0 ? aw_character.level : 1), (unsigned long)roll_seed,
+			town_joins, home_joins);
 		return;
 	}
 	if (Cmd_Argc () == 4 && !strcmp (a, "seed"))

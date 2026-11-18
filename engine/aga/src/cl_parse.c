@@ -74,6 +74,38 @@ char *svc_strings[] =
 
 //=============================================================================
 
+/* NET-VIVEC-ENTITY-PACKET-OVERFLOW-66: a frame's update (an unreliable message, NET_GetMessage 2) that does not read
+ * (cut short, or overflowed on the way) never ends the game: the rest of that message is dropped, one console line
+ * says so (at most one every 10 s, with the count), and the next frame's update carries on. The entities it did not
+ * reach keep their last state for that frame. A reliable message (the sign-on, prints, stats) that does not read
+ * still ends the session as before (Host_Error: during a load the way back and the box, aw_scene.c). cl_main.c
+ * CL_ReadFromServer says which kind each message is (cl_message_unreliable, kept there). */
+extern int cl_message_unreliable;
+static jmp_buf cl_parse_drop;
+static qboolean cl_parse_catching;
+static int cl_parse_dropped;
+static double cl_parse_said = -1000;
+void CL_ParseFault (char *fmt, ...) __attribute__((format(printf, 1, 2)));
+void CL_ParseFault (char *fmt, ...)
+{
+	va_list	argptr;
+	char	text[256];
+
+	va_start (argptr, fmt);
+	vsnprintf (text, sizeof(text), fmt, argptr);
+	va_end (argptr);
+	if (!cl_parse_catching)
+		Host_Error ("%s", text);
+	cl_parse_catching = false;
+	cl_parse_dropped++;
+	if (realtime - cl_parse_said >= 10 || realtime < cl_parse_said)
+	{
+		cl_parse_said = realtime;
+		Con_Printf ("Frame update dropped (%ld so far): %s\n", (long)cl_parse_dropped, text);
+	}
+	longjmp (cl_parse_drop, 1);
+}
+
 /*
 ===============
 CL_EntityNum
@@ -86,7 +118,7 @@ entity_t	*CL_EntityNum (int num)
 	if (num >= cl.num_entities)
 	{
 		if (num >= MAX_EDICTS)
-			Host_Error ("CL_EntityNum: %i is an invalid number",num);
+			CL_ParseFault ("CL_EntityNum: %i is an invalid number",num);
 		while (cl.num_entities<=num)
 		{
 			cl_entities[cl.num_entities].colormap = vid.colormap;
@@ -132,7 +164,7 @@ void CL_ParseStartSoundPacket(void)
 	channel &= 7;
 
 	if (ent > MAX_EDICTS)
-		Host_Error ("CL_ParseStartSoundPacket: ent = %i", ent);
+		CL_ParseFault ("CL_ParseStartSoundPacket: ent = %i", ent);
 
 	for (i=0 ; i<3 ; i++)
 		pos[i] = MSG_ReadCoord ();
@@ -224,20 +256,16 @@ void CL_ParseServerInfo (void)
 	CL_ClearState ();
 
 // parse protocol version number
+	/* SCENE-LOAD-FAIL-FALLBACK-67: each of these ended the server info half read, the client stuck on the loading
+	 * screen; now the load ends with the error (Host_Error) and the way back runs */
 	i = MSG_ReadLong ();
 	if (i != PROTOCOL_VERSION)
-	{
-		Con_Printf ("Server returned version %i, not %i", i, PROTOCOL_VERSION);
-		return;
-	}
+		Host_Error ("Server returned version %i, not %i", i, PROTOCOL_VERSION);
 
 // parse maxclients
 	cl.maxclients = MSG_ReadByte ();
 	if (cl.maxclients < 1 || cl.maxclients > MAX_SCOREBOARD)
-	{
-		Con_Printf("Bad maxclients (%u) from server\n", cl.maxclients);
-		return;
-	}
+		Host_Error ("Bad maxclients (%u) from server", cl.maxclients);
 	cl.scores = (scoreboard_t *)Hunk_AllocName (cl.maxclients*sizeof(*cl.scores), "scores");
 
 // parse gametype
@@ -266,10 +294,7 @@ void CL_ParseServerInfo (void)
 		if (!str[0])
 			break;
 		if (nummodels==MAX_MODELS)
-		{
-			Con_Printf ("Server sent too many model precaches\n");
-			return;
-		}
+			Host_Error ("Server sent too many model precaches");
 		/* a demo or server message is data: names longer than MAX_QPATH end
 		   the session (ENGINE-ENTITY-TEXT-UNBOUNDED-35) */
 		if (strlen (str) >= MAX_QPATH)
@@ -285,10 +310,7 @@ void CL_ParseServerInfo (void)
 		if (!str[0])
 			break;
 		if (numsounds==MAX_SOUNDS)
-		{
-			Con_Printf ("Server sent too many sound precaches\n");
-			return;
-		}
+			Host_Error ("Server sent too many sound precaches");
 		if (strlen (str) >= MAX_QPATH)
 			Host_Error ("Server sent a sound name longer than %d characters", MAX_QPATH - 1);
 		strcpy (sound_precache[numsounds], str);
@@ -311,9 +333,10 @@ void CL_ParseServerInfo (void)
 		cl.model_precache[i] = AW_AnimLazy (name) ? Mod_FindName (name) : Mod_ForName (name, false);
 		if (cl.model_precache[i] == NULL)
 		{
-			Con_Printf("Model %s not found\n", name);
+			/* SCENE-LOAD-FAIL-FALLBACK-67: the load ends here (Host_Error: the way back and the box naming the file),
+			 * never a client left half connected with no world, which hung on the loading screen */
 			msg_readcount = after_lists;
-			return;
+			Host_Error ("Model %s not found", name);
 		}
 		CL_KeepaliveMessage ();
 	}
@@ -385,6 +408,8 @@ void CL_ParseUpdate (int bits)
 		num = MSG_ReadShort ();
 	else
 		num = MSG_ReadByte ();
+	if (msg_badread || num < 0)	/* a cut message: never an entity number below 0 */
+		CL_ParseFault ("CL_ParseUpdate: the update is cut short");
 
 	ent = CL_EntityNum (num);
 
@@ -403,7 +428,7 @@ void CL_ParseUpdate (int bits)
 	{
 		modnum = MSG_ReadModel ();
 		if (modnum >= MAX_MODELS)
-			Host_Error ("CL_ParseModel: bad modnum");
+			CL_ParseFault ("CL_ParseModel: bad modnum");
 	}
 	else
 		modnum = ent->baseline.modelindex;
@@ -443,7 +468,7 @@ void CL_ParseUpdate (int bits)
 	else
 	{
 		if (i > cl.maxclients)
-			Sys_Error ("i >= cl.maxclients");
+			CL_ParseFault ("CL_ParseUpdate: colormap %d past the scoreboard", i);
 		ent->colormap = cl.scores[i-1].translations;
 	}
 
@@ -512,22 +537,24 @@ void CL_ParseUpdate (int bits)
 	{
 		int aw = MSG_ReadByte ();
 		if (aw & ~(AWU_SCALE | AWU_FRAME2))
-			Host_Error ("CL_ParseUpdate: unknown AmiWind fields %d", aw);
+			CL_ParseFault ("CL_ParseUpdate: unknown AmiWind fields %d", aw);
 		if (aw & AWU_SCALE)
 		{
 			float s = MSG_ReadFloat ();
 			if (!isfinite (s) || s <= 0.01f || s >= 64.0f)
-				Host_Error ("CL_ParseUpdate: invalid entity scale");
+				CL_ParseFault ("CL_ParseUpdate: invalid entity scale");
 			ent->aw_sprite_scale = s;
 			ent->effects |= AW_EF_ALIAS_SCALE;
 		}
 		if (aw & AWU_FRAME2)
 		{
 			if (!(bits & U_FRAME))
-				Host_Error ("CL_ParseUpdate: a frame's high byte without its frame");
+				CL_ParseFault ("CL_ParseUpdate: a frame's high byte without its frame");
 			ent->frame |= MSG_ReadByte () << 8;
 		}
 	}
+	if (msg_badread)
+		CL_ParseFault ("CL_ParseUpdate: the update is cut short");
 
 	if ( forcelink )
 	{	// didn't have an update last message
@@ -630,7 +657,7 @@ void CL_ParseClientdata (int bits)
 	{
 		i = MSG_ReadModel ();
 		if (i >= MAX_MODELS)
-			Host_Error ("CL_ParseClientdata: bad weapon modnum");
+			CL_ParseFault ("CL_ParseClientdata: bad weapon modnum");
 	}
 	else
 		i = 0;
@@ -805,7 +832,24 @@ void CL_ParseStaticSound (void)
 CL_ParseServerMessage
 =====================
 */
+static void CL_ParseMessage (void);
 void CL_ParseServerMessage (void)
+{
+	/* a frame's update that does not read is dropped, never the game (CL_ParseFault) */
+	if (!cl_message_unreliable || cls.demoplayback)
+	{
+		cl_parse_catching = false;	/* also after a frame's update that left through Host_EndGame */
+		CL_ParseMessage ();
+		return;
+	}
+	if (setjmp (cl_parse_drop))
+		return;		/* CL_ParseFault said why */
+	cl_parse_catching = true;
+	CL_ParseMessage ();
+	cl_parse_catching = false;
+}
+
+static void CL_ParseMessage (void)
 {
 	int			cmd;
 	int			i;
@@ -827,7 +871,7 @@ void CL_ParseServerMessage (void)
 	while (1)
 	{
 		if (msg_badread)
-			Host_Error ("CL_ParseServerMessage: Bad server message");
+			CL_ParseFault ("CL_ParseServerMessage: Bad server message");
 
 		cmd = MSG_ReadByte ();
 
@@ -851,7 +895,7 @@ void CL_ParseServerMessage (void)
 		switch (cmd)
 		{
 		default:
-			Host_Error ("CL_ParseServerMessage: Illegible server message\n");
+			CL_ParseFault ("CL_ParseServerMessage: Illegible server message (command %d)", cmd);
 			break;
 
 		case svc_nop:

@@ -188,5 +188,6 @@ Family: Map heap and memory budget (`heap-memory`). The heap model must match wh
 Related bugs in other categories:
 
 - [CHIM-ROOM-CLIPNODE-BUDGET-48](CHIM-ROOM-CLIPNODE-BUDGET-48.md): Akulakhan's Chamber cannot be made as a CHIM room: a model's collision exceeds the clipnode budget
+- LOAD-FATAL-ERRORS-67 (no report page): Memory that runs out or a damaged map file while a place loads ends the game instead of going back where the player was
 
 <!-- END GENERATED CATEGORY -->

@@ -130,15 +130,33 @@
       '<span class="chimdetail">awaiting lighting: ' + n((isl.complete_unlit || 0) + (isl.terrain_complete_unlit || 0)) + '</span>' +
       (isl.eligible != null ? '<span class="chimdetail"><b>eligible for ' + esc(release || 'the next release') + ': ' + n(isl.eligible) + '</b></span>' : ''), title: LEGEND};
   }
+  // An expansion's row from the same figures as its card and the completion line (expansion-views.js completion(): rooms and
+  // cells done / partial / missing): the rooms in the game are counted, never "not started" while its rooms are in the game
+  // (TOOLKIT-DLC-VIEWS-64). exp: completion()'s row of the expansion; isl: its island row of the headline (cells), or none.
+  function expansionRow(label, exp) {
+    const r = exp.rooms || {}, c = exp.cells || {}, n = v => (v || 0).toLocaleString(), pct = (a, b) => b ? (Math.round(1000 * a / b) / 10).toFixed(1) + ' %' : '';
+    const roomsPart = r.total ? 'rooms ' + n(r.done) + ' of ' + n(r.total) + ' in the game (' + pct(r.done, r.total) + ')' : 'no rooms in the tracker';
+    const cellsPart = c.total ? 'cells ' + n(c.done) + ' of ' + n(c.total) + ' in the game' : 'no exterior cells in the tracker';
+    return {html: esc(label) + ': <b>' + roomsPart + '</b>' +
+      '<span class="chimdetail">' + cellsPart + ' · rooms and cells together ' + n(exp.done) + ' of ' + n(exp.total) + ' (' + (+exp.rate).toFixed(1) + ' %)' +
+      (r.partial ? ' · rooms partial ' + n(r.partial) : '') + (r.set_aside ? ' · rooms set aside ' + n(r.set_aside) : '') + '</span>',
+      title: 'The same numbers as the view switch and the completion line above the map: rooms and cells in the game, partial and missing.'};
+  }
   function buildRow(h) {
     if (!(h.groups && h.states)) return null;
     const label = h.in_game_label || h.in_game_build || 'none';
     return {html: '<b>In the game: ' + fmt(h.groups.in_game) + ' cells</b> · newest ingested build ' + esc(label) + ' · accounted for ' + fmt(h.groups.accounted_for) + ' of ' + fmt(h.groups.cells),
       title: 'Build run: ' + (h.in_game_build || 'none')};
   }
-  function headRows(h) {
+  // expansions: expansion-views.js completion(doc) (the World Map page sends it with the headline), or nothing (older pages):
+  // then the expansion rows are made from the headline's cells alone, as before.
+  const EXPANSION_OF = {2: 'bloodmoon', 3: 'tribunal'};
+  function headRows(h, expansions) {
     const isl = h.islands || [];
-    const rows = LANDS.map(([id, label]) => landRow(label, isl.find(i => i.island === id), h.eligible_release));
+    const rows = LANDS.map(([id, label]) => {
+      const exp = expansions && EXPANSION_OF[id] ? expansions.find(e => e.id === EXPANSION_OF[id] && e.present) : null;
+      return exp && exp.rooms && exp.rooms.total ? expansionRow(label, exp) : landRow(label, isl.find(i => i.island === id), h.eligible_release);
+    });
     const b = buildRow(h);
     return b ? rows.concat([b]) : rows;
   }
@@ -146,8 +164,8 @@
   // into one line ("1 390Solstheim"). Real block elements, one <div class="chimrow"> per land and one for the build, inside one
   // full-width <div class="chimrows chimtitle"> (chimtitle keeps the group at the top of the World Map's page header); the layout
   // CSS is injected with the script, so every page that draws the headline gets it.
-  function rowsHtml(h) {
-    return '<div class="chimrows chimtitle">' + headRows(h).map(r => '<div class="chimrow"' + (r.title ? ' title="' + esc(r.title) + '"' : '') + '>' + r.html + '</div>').join('') + '<div class="chimrule"></div></div>';
+  function rowsHtml(h, expansions) {
+    return '<div class="chimrows chimtitle">' + headRows(h, expansions).map(r => '<div class="chimrow"' + (r.title ? ' title="' + esc(r.title) + '"' : '') + '>' + r.html + '</div>').join('') + '<div class="chimrule"></div></div>';
   }
   const FULL_CELLS = 'Fully approved cells:', FULL_TERRAIN = 'Fully approved terrain:';
   // The fold state of the summary block, kept per browser in localStorage (every access guarded; without storage it lasts until reload).
@@ -184,7 +202,7 @@
     // The summary under the rows (chips, accounted for, lighting, unmeasured, history) folds as one block; the choice is kept per
     // browser. A page with its own fold for it (the World Map's legend block) passes opts.noFold and gets the plain pieces.
     const fold = !(opts && opts.noFold), folded = summaryFolded();
-    el.innerHTML = rowsHtml(h) + (fold ? '<div class="chimsumbar"><button type="button" class="chimsumbtn" aria-expanded="' + !folded + '" title="Fold or unfold the tracker summary">' +
+    el.innerHTML = rowsHtml(h, opts && opts.expansions) + (fold ? '<div class="chimsumbar"><button type="button" class="chimsumbtn" aria-expanded="' + !folded + '" title="Fold or unfold the tracker summary">' +
       (folded ? CLOSED : OPEN) + ' Tracker summary</button></div><div class="chimsummary"' + (folded ? ' hidden' : '') + '>' + rest + '</div>' : rest);
     const sumBtn = el.querySelector('.chimsumbtn');
     if (sumBtn) sumBtn.onclick = () => setSummary(el, sumBtn.getAttribute('aria-expanded') === 'true');
@@ -198,7 +216,7 @@
       more.nextElementSibling.hidden = !open;
     };
   }
-  const api = {render, setSummary, summaryFolded, SUM_KEY, rowsHtml, headRows, CSS, PARTS, STATE_PARTS, GROUPS, SETTLED_TEXT, SETTLED_GREY, layout, groupsHtml, MORE_KEY};
+  const api = {render, setSummary, summaryFolded, SUM_KEY, rowsHtml, headRows, expansionRow, CSS, PARTS, STATE_PARTS, GROUPS, SETTLED_TEXT, SETTLED_GREY, layout, groupsHtml, MORE_KEY};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.ChimHead = api;
 })(typeof window !== 'undefined' ? window : this);

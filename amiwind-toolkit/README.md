@@ -1,6 +1,6 @@
 # AmiWind Toolkit
 
-_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 The AmiWind Toolkit is a set of web pages for looking at AmiWind's world: where the conversion stands on the
 island map, any converted map in 3D, and its polygon and memory figures. Everything runs in your own browser.
@@ -85,8 +85,8 @@ conversion, native or packaged coverage.
 | --- | --- |
 | `index.html` | The start page: the World, Local, 3D Inspector and Monitor tabs |
 | **World** (`world-map.html`) | The whole island: conversion status per cell, the CHIM progress tracker, the map metrics heatmap |
-| **Local** | One area's maps around a cell, ready to open in 3D |
-| **3D Inspector** (`map-inspector.html`) | Fly through a map's real polygons: Quake `.bsp` maps, CHIM maps (`.chim`) and whole CHIM worlds, with polygon counts, textures and the CHIM memory overlay |
+| **Local** | One cell up close; **Show in 3D** opens the CHIM frame that holds it (a town cell its town's frame) or its maps in the 3D Inspector, and says why when there is nothing to open |
+| **3D Inspector** (`map-inspector.html`) | Fly through a map's real polygons: Quake `.bsp` maps, CHIM maps (`.chim`) and whole CHIM worlds of every world format the builder writes (0.5 to 0.12), with polygon counts, textures and the CHIM memory overlay; `?world=URL&cell=X,Y` opens the frame that holds a cell |
 | **Monitor** (`monitor.html`) | A build as it runs, read-only: its live log, stage progress, ETA, cores in use, a live stage timeline and recent builds and gates |
 | **Seam Check** (`seam-check.html`) | A reduced actor model's seam receipt: new openings, thickness at 25 / 50 / 75 % of each limb, the join map ([details](../docs/AMIWIND_TOOLKIT.md#seam-check)) |
 

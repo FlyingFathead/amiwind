@@ -23,7 +23,9 @@ the Amiga file system). Little-endian:
     owners     x 32 bytes   the owning NPC and faction ids the area uses (folded, NUL-padded)
     owned      x 8 bytes    { u32 reference, u8 owner index, u8 1 a faction, u16 0 }   ascending reference
     containers x 12 bytes   { u32 reference, u16 first content, u16 contents, u8 flags (focus.awf AWC1's bits 0-2,
-                            8 trapped, 16 its record respawns), u8 lock (0..100), u16 0 }   ascending reference
+                            8 trapped, 16 its record respawns), u8 lock (0..100), u16 its key: the key's index in
+                            the area's items + 1, 0 none (LOCKED-CONTAINERS-NEVER-OPEN-67; 0 in older files) }
+                            ascending reference
     contents   x 8 bytes    { u16 item index, u16 0, i32 count }
     items      x 512 bytes  the items.awi rows of every item the area's containers hold, its placed items are, and
                             its doors' and containers' keys (ascending, as items.awi)
@@ -266,7 +268,10 @@ def area(rows, owners, containers, refs, extras, items, icons, levelled=None, ex
             flags |= CONT_RESPAWN
         kept = [(index[i.lower()], 0, n) if i.lower() in index else (list_at[i.lower()], CONTENT_LEVELLED, n)
                 for i, n in entries if i.lower() in index or i.lower() in list_at]
-        cont_rows.append(struct.pack('<IHHBBH', ref, len(content_rows), len(kept), flags, min(lock_of.get(ref, 0), 100), 0))
+        # LOCKED-CONTAINERS-NEVER-OPEN-67: the key that opens it (its item record here, index + 1; 0 none)
+        key = extras.get(str(ref), (0, ''))[1]
+        cont_rows.append(struct.pack('<IHHBBH', ref, len(content_rows), len(kept), flags, min(lock_of.get(ref, 0), 100),
+                                     index[key] + 1 if key and key in index else 0))
         content_rows.extend(struct.pack('<HHi', k, f, n) for k, f, n in kept)
     head = b'AWB1' + struct.pack('<HHHHHH', len(rows), len(owner_ids), len(owned), len(cont_rows), len(content_rows),
                                  len(order))

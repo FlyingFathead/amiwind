@@ -793,7 +793,9 @@ void *SZ_GetSpace (sizebuf_t *buf, int length)
 			Sys_Error ("SZ_GetSpace: %i is > full buffer size", length);
 
 		buf->overflowed = true;
-		Con_Printf ("SZ_GetSpace: overflow");
+		/* the buffer's owner catches the mark and says it once (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66: the frame's
+		 * message is dropped whole, never sent from its middle); here only with developer 1 */
+		Con_DPrintf ("SZ_GetSpace: overflow\n");
 		SZ_Clear (buf);
 	}
 

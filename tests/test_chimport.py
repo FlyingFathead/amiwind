@@ -144,6 +144,9 @@ class CellSettings(unittest.TestCase):
         self.assertEqual(h['status'], 'failed')
         self.assertEqual(h['numbers']['over_limit'], 1)
         self.assertEqual(h['numbers']['kept_as_chain_for_memory'], ['rock_wg_12'])
+        # the audit names the model it fails on (a failed cell said only "1 models", so a second run was needed)
+        self.assertEqual(h['numbers']['over_limit_models'], [{'name': 'x/ex_house@s1', 'depth': 280, 'clipnodes': 900}])
+        self.assertIn('x/ex_house@s1 (depth 280, 900 clipnodes)', h['detail'])
         a = C.audits_of(None, None, None, hulls[:1] + hulls[2:], None, rec,
                         {'hull_fallback': {'kept_chain': ['meshes/x/rock_wg_12.nif']}})
         self.assertEqual(a['hull_bevels']['status'], 'passed')
@@ -177,6 +180,18 @@ class CellSettings(unittest.TestCase):
         rec['by_type']['DOOR'].update(converted=19)
         self.assertEqual(C.audits_of(None, None, None, None, None, rec, None)['door_links']['status'], 'failed')
         rec['by_type']['DOOR'].update(converted=20, deferred={'other reason': 1})
+        self.assertEqual(C.audits_of(None, None, None, None, None, rec, None)['door_links']['status'], 'failed')
+
+    def test_door_audit_leaves_out_editor_marker_doors(self):
+        # the status text of tools/editor_markers.py: Mournhold's Royal Palace courtyard has 9 DOOR records, one a
+        # hidden marker; 8 of 8 walkable doors converted is a pass
+        from editor_markers import marker_status
+        rec = {'by_type': {'DOOR': {'placed': 9, 'converted': 8, 'deferred': {marker_status('hidden marker'): 1},
+                                    'failed': 0, 'skipped': {}}}, 'totals': {}}
+        d = C.audits_of(None, None, None, None, None, rec, None)['door_links']
+        self.assertEqual((d['status'], d['numbers']['markers']), ('passed', 1))
+        self.assertIn('8 of 8 doors converted', d['detail'])
+        rec['by_type']['DOOR'].update(converted=7)
         self.assertEqual(C.audits_of(None, None, None, None, None, rec, None)['door_links']['status'], 'failed')
 
     def test_hull_rule_uses_the_shared_check_when_the_builder_has_it(self):

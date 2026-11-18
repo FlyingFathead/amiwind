@@ -19,6 +19,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-10: reported in v0.0.36-dev1
+- 2026-11-17: seen again in v0.0.67-dev1: Seen in Mournhold's Temple courtyard presented as an exterior cell (cell 4,-30): the standing hull of the model `r/azura` stays one chain 484 clipnodes deep, the only model of the eleven district cells over the hull-chain limit; the cell ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
 
 ## Status: 10 October 2026
@@ -94,6 +105,7 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [COLLISION-CONVEX-LOSS-32](COLLISION-CONVEX-LOSS-32.md): Convex collision proxies lose and invent authored surfaces
 - [COLLISION-DISPARITY-WORLDWIDE-64](COLLISION-DISPARITY-WORLDWIDE-64.md): Collision data is far larger and deeper than the drawn meshes across the game
 - [COLLISION-HULL-CHAINS-33](COLLISION-HULL-CHAINS-33.md): 183 brush models across the island collide through standing-hull chains 512 to 31,659 clipnodes deep
+- COLLISION-ICEBERG-CLIPNODE-BUDGET-67 (no report page): The two icebergs of the Mortrag Glacier cannot be converted: their collision is over the clipnode budget
 - [COLLISION-NC-FLAGS-32](COLLISION-NC-FLAGS-32.md): Morrowind no-collision and editor-marker flags (NC, NCC, MRK, AvoidNode) are ignored by the mesh converters
 - [COLLISION-RCN-SCOPE-32](COLLISION-RCN-SCOPE-32.md): Authored collision meshes (RootCollisionNode) are used by some converters only
 - [COLLISION-SEYDA-PREVIEW-BYPASS-32](COLLISION-SEYDA-PREVIEW-BYPASS-32.md): The legacy Seyda Neen preview builds its own convex collision

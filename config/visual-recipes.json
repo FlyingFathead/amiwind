@@ -2,6 +2,10 @@
   "format": 1,
   "everywhere": "everywhere-v1",
   "recipes": {
+    "mournhold-v1": {
+      "status": "No visual reduction. The recipe names the cells of Mournhold's five outdoor districts as the outdoor converter reads them (tools/presented_exterior.py, config/presented-exteriors.json), so that a measured table can hold rows that apply there and nowhere else: config/collision-hull-surface.json recipe_meshes lists the three base game models whose collision needs the surface rule in their Mournhold placements only.",
+      "models": {}
+    },
     "tel-uvirith-v1": {
       "status": "Measured diagnostic reductions; full-world native acceptance pending. Requires explicit area visual_recipe selection. Collision remains original.",
       "models": {
@@ -403,6 +407,39 @@
     }
   },
   "cell_settings": {
+    "-12,-30": {
+      "visual_recipe": "mournhold-v1"
+    },
+    "-12,-29": {
+      "visual_recipe": "mournhold-v1"
+    },
+    "-8,-30": {
+      "visual_recipe": "mournhold-v1"
+    },
+    "-7,-30": {
+      "visual_recipe": "mournhold-v1"
+    },
+    "-4,-30": {
+      "visual_recipe": "mournhold-v1"
+    },
+    "-3,-30": {
+      "visual_recipe": "mournhold-v1"
+    },
+    "0,-30": {
+      "visual_recipe": "mournhold-v1"
+    },
+    "4,-30": {
+      "visual_recipe": "mournhold-v1"
+    },
+    "5,-30": {
+      "visual_recipe": "mournhold-v1"
+    },
+    "4,-29": {
+      "visual_recipe": "mournhold-v1"
+    },
+    "5,-29": {
+      "visual_recipe": "mournhold-v1"
+    },
     "10,1": {
       "visual_recipe": "tel-uvirith-v1",
       "fixed_visibility_state": {

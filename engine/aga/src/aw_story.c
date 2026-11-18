@@ -90,6 +90,15 @@ int AW_StoryInventoryAllowed(void)
         (AW_StoryMenus()&AW_MENU_INVENTORY);   /* a script's EnableInventoryMenu (CENSUS-INTRO-SCRIPTS-62) */
 }
 
+int AW_StoryObjectLabels(void)
+{
+    /* PRISON-SHIP-ITEMS-TAKEABLE-65 (the maintainer's rule, 17 November 2026): before the papers no placed object shows
+     * a text overlay, neither its name nor an action line: on every deck of the prison ship, on the dock and during
+     * the registration, where nothing can be taken or opened either. From the papers on (the papers themselves first)
+     * they show, as the person and door labels do throughout. */
+    return !AW_StoryRestricted() || aw_story.stage>=AW_STAGE_PAPERS || AW_StoryInventoryAllowed();
+}
+
 int AW_StoryViewAllowed(void)
 {
     /* CharGen disables both view switching and vanity. CharGenClassNPC

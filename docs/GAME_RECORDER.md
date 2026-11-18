@@ -157,7 +157,10 @@ by name (Morrowind, whose answer names his duties, then duties). Its nine steps:
 4. Fargoth's ring (the Engraved Ring of Healing, `ring_keley`) from the courtyard barrel, then Sellus Gravius: the papers are gone, the package and the directions
    are carried, 87 gold more, the journal of `A1_1_FindSpymaster` is at 1; asking again gives nothing a second time.
 5. The release: the exit door lets the player out with the package, and the opening's state is over (`CharGenState`
-   -1).
+   -1). The release's map change is the first after which the game may save, so the game's own autosave must be on
+   disk a few seconds later: `dbg save status` (`aw_save_status`) answers `autosaves -> N` and must read at least 1;
+   on a miss its answer says what held the autosave back and how the last save ended. Seyda Neen is outdoors, so its
+   creatures are counted too: `chim actors creatures on` (the switch is on by default) must count at least one alive.
 6. An actor killed, an interior entered (the captain's room by the street door), out by its courtyard door, in
    again and out by the exit door to the street: the actor is still listed dead, and both doors let the player out.
    The victim is named by reference (`chim actors kill 128960`, Erene Llenim, who stays by his shack on the west of
@@ -175,7 +178,10 @@ by name (Morrowind, whose answer names his duties, then duties). Its nine steps:
    journey).
 8. The game's own quicksave, then a new start of the engine and the load through the Load game window: the package,
    the gold, the ring, the journal, the dead actor and a script global are as they were saved.
-9. Through a door with E: the next area loads and the game goes on with the loaded inventory.
+9. Through a door with E: the next area loads and the game goes on with the loaded inventory. At the end, every map
+   change since the release has written its autosave (the release's, the captain's room, the courtyard and back, and
+   this door; the load of the quicksave is not a map change), and `dbg save status` says nothing holds the next one
+   back.
 
 A second journey, `tests/sessions/journey_tarhiel.txt`, checks the falling mage on the Bitter Coast near Seyda Neen.
 Outside the trigger it checks that the mage is still held on his platform and that nothing has landed. After a walk
@@ -257,6 +263,16 @@ and `expect` (a check on it, for example `expect gold_again == gold_sellus`, `ex
 `expect fighting 262014 in list_near` with a reference number, or `expect lacks table_back reference 454283`).
 `expect known REGISTER-ID CHECK` is a check for a step that cannot pass today: it is printed as `KNOWN` with its
 register entry and is not counted in the result, and when it passes the result line says the gap closed.
+`expect autosaves from step N` checks the game's autosave over the run's console: from step N on, every map load (a
+streamed crossing and the load of a save are none) must be followed by a `Saved Autosave` line before the next map
+load or the end of the part, and a failure names each map change without one. In a later part the count starts at
+its `Game restored` line, since the start of a fresh engine is not a map change of the game.
+
+Every session of a journey, like every smoke run, also fails on the engine's known failure lines anywhere in its
+console (an entity update that overflowed the message, a frame update dropped or unreadable, any `Host_Error`) and
+on a `dbg netstat` reading whose fullest frame wanted more than the game's own connection carries, or that counts a
+frame update not sent (`tools/engine_smoke.py`; `--allow-engine-errors` only counts them, for a run that shows one on
+purpose).
 
 The walk itself never counts key presses blindly. Its steps wait for the game and stop the session at the first wrong
 turn, naming where the player stands:

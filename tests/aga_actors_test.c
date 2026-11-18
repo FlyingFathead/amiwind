@@ -5,8 +5,10 @@
  * scale on the entity) and the levelled roll (the same pick for the same seed, kept for a later join).
  *
  * usage: check MODE TABLE FRAME SEED FRAME2
- *   MODE queue | warm | lazy | table | roll | save | home   (roll prints its picks; the Python side compares two
- *   runs; save: the change list through a save's export and a load's import; home: the home map's own actors)
+ *   MODE queue | warm | lazy | table | roll | save | home | homejoin | samemap   (roll prints its picks; the Python
+ *   side compares two runs; save: the change list through a save's export and a load's import; home: the home map's
+ *   own actors; homejoin: a new map's home cell joins its levelled points, the old map's queue dropped; samemap: the
+ *   same map spawned again, by a reload and by a save's load, joins again)
  * The engine pieces it stands in for: the edicts and their QuakeC fields (GetEdictFieldValue), ED_ParseEdict (the
  * "key" "value" pairs this module reads), the spawn function (PR_ExecuteProgram: precaches the model, the voice, a
  * footstep sound of the animation layout and, for models named "*_mover.mdl", a mover model by name only, as
@@ -807,6 +809,7 @@ static void room_levelled (void)
 static client_t *test_client;
 extern int (*aw_actor_dead_record)(unsigned reference);
 void AW_ActorsRoomTick (void);
+void AW_ActorsServerReset (void);	/* aw_actors.c; sv_main.c SV_SpawnServer calls it (ACTOR-TABLE-SAME-MAP-RELOAD-67) */
 static int record_dead_stub (unsigned reference) {return reference == 702;}
 static void town_residents (void)
 {
@@ -1105,6 +1108,137 @@ static void base_model (void)
 	puts ("base model passed");
 }
 
+/* OUTDOOR-CREATURES-HOME-CELL-67: a region frame map's own cell never joins the window (its people and placed
+ * creatures come with the map's entity text, which holds no levelled point), so its levelled creatures were never
+ * rolled. A new map's first window tick joins the home cell's levelled points from the table, and only those (the
+ * crab 14 and the villager 13 of cell 0 0 came with the map); prints "homejoin ref R MODEL" for the Python side to
+ * compare with the builder's roll for SEED. Then the queue of the map before: cell 0 0 joins again with budget 1 and
+ * the map changes before its first spawn: the queued actors are dropped (their places are the old map's), so the
+ * crab is not spawned in the new map, and the new map's home cell gives its levelled points again (the kept picks). */
+static void home_join (unsigned seed)
+{
+	static const float none[2] = {0, 0};
+	char s[16];
+	int i, spawned = 0;
+	eval_t *v;
+	reset_level ();
+	command ("clear", NULL);
+	command ("table", "1");
+	command ("budget", "0");
+	snprintf (s, sizeof(s), "%u", seed);
+	command ("seed", s);
+	leaving_cx = leaving_cy = 0;			/* the window's home cell, held */
+	strcpy (sv.name, "region");			/* a new map: its first window tick */
+	chim_actors_tick ();
+	for (i=2 ; i<sv.num_edicts ; i++)
+		if (!ents[i].free && (v = GetEdictFieldValue (&ents[i], "aw_ref")) != NULL)
+		{
+			assert (v->_float == 11 || v->_float == 12);	/* the home cell's levelled points, nothing else */
+			printf ("homejoin ref %.0f %s\n", v->_float, pr_strings + ents[i].v.model);
+			spawned++;
+		}
+	assert (!on_map (14) && !on_map (13));
+	command ("table", NULL);			/* the status line: home cells joined 1 */
+	/* the cell joins (every kind) with budget 1; the map changes before the first spawn: the queue is dropped */
+	reset_level ();
+	command ("budget", "1");
+	chim_actors_join (0, 0, "frame", none);
+	strcpy (sv.name, "region2");
+	reset_level ();					/* the old map's edicts went with it */
+	command ("budget", "0");
+	chim_actors_tick ();
+	assert (!on_map (14));				/* the crab queued in the map before is not spawned here */
+	for (i=2 ; i<sv.num_edicts ; i++)
+		if (!ents[i].free && (v = GetEdictFieldValue (&ents[i], "aw_ref")) != NULL)
+			assert (v->_float == 11 || v->_float == 12);
+	command ("table", NULL);			/* home cells joined 2 */
+	sv.name[0] = 0;
+	command ("budget", "1");
+	printf ("homejoin spawned %d\n", spawned);
+	puts ("home join passed");
+}
+
+/* ACTOR-TABLE-SAME-MAP-RELOAD-67: the map the player stands in spawned again under the same name (a save made there
+ * loaded, dbg aw hors 0, "map" of the same name). The ticks told a new map by its name alone, so the second spawn
+ * joined none of its cells and its table creatures stayed missing. Every server spawn now calls AW_ActorsServerReset
+ * (sv_main.c SV_SpawnServer). Prints "samemap PASS ref R MODEL" per pass for the Python side (the builder's roll for SEED,
+ * the same picks every time: kept in the change list, and through the save). */
+static int levelled_alive (const char *pass)
+{
+	int i, n = 0;
+	eval_t *v;
+	for (i=2 ; i<sv.num_edicts ; i++)
+		if (!ents[i].free && (v = GetEdictFieldValue (&ents[i], "aw_ref")) != NULL)
+		{
+			assert (v->_float == 11 || v->_float == 12);
+			printf ("samemap %s ref %.0f %s\n", pass, v->_float, pr_strings + ents[i].v.model);
+			n++;
+		}
+	return n;
+}
+static void same_map (unsigned seed)
+{
+	static model_t room;
+	static aw_ledger_t loaded;
+	static unsigned char bytes[65536];
+	static aw_changes_t saved;
+	char s[16];
+	int first, k, rooms;
+	reset_level ();
+	command ("clear", NULL);
+	command ("table", "1");
+	command ("budget", "0");
+	snprintf (s, sizeof(s), "%u", seed);
+	command ("seed", s);
+	leaving_cx = leaving_cy = 0;
+	strcpy (sv.name, "region");
+	AW_ActorsServerReset ();				/* the first spawn of the map */
+	chim_actors_tick ();
+	first = levelled_alive ("first");
+	assert (first > 0);
+	/* the same map spawned again: the spawn frees every edict; without the reset the name alone said "the same map" and
+	 * nothing joined (the v0.0.67-dev1 engine: 0 creatures after dbg aw hors 0) */
+	reset_level ();
+	chim_actors_tick ();
+	assert (actors_alive () == 0);
+	reset_level ();
+	AW_ActorsServerReset ();
+	chim_actors_tick ();
+	assert (levelled_alive ("reload") == first);
+	/* a save made here and loaded here: the change list through the save's encoding, the map spawned by the load */
+	k = AW_LedgerEncode (&aw_ledger, bytes, sizeof(bytes));
+	AW_LedgerClear (&loaded);
+	assert (k > 0 && AW_LedgerDecode (bytes, k, &loaded));
+	saved.count = 0;
+	saved.ledger = &loaded;
+	command ("clear", NULL);
+	aw_save_changes_import (&saved);
+	AW_LedgerMove (&aw_ledger, &loaded);
+	saved.ledger = NULL;
+	reset_level ();
+	AW_ActorsServerReset ();
+	chim_actors_tick ();
+	assert (levelled_alive ("load") == first);	/* the same picks, kept through the save */
+	command ("table", NULL);				/* home cells joined 3 */
+	/* a room loaded again under its own name takes its room set-up again (its recipe table, its change rows) */
+	reset_level ();
+	strcpy (sv.name, "room");
+	room.entities = "{\n\"classname\" \"worldspawn\"\n\"_aw_cell_int\" \"77\"\n}\n";
+	sv.worldmodel = &room;
+	AW_ActorsServerReset ();
+	AW_ActorsRoomTick ();
+	rooms = parts_rooms;
+	AW_ActorsRoomTick ();
+	assert (parts_rooms == rooms);			/* the same spawn: once */
+	AW_ActorsServerReset ();
+	AW_ActorsRoomTick ();
+	assert (parts_rooms == rooms + 1);		/* spawned again: again */
+	sv.worldmodel = NULL;
+	sv.name[0] = 0;
+	command ("budget", "1");
+	puts ("same map passed");
+}
+
 int main (int argc, char **argv)
 {
 	static client_t client;
@@ -1157,6 +1291,10 @@ int main (int argc, char **argv)
 		outdoor_corpse ();
 	else if (!strcmp (argv[1], "summonref"))
 		summon_by_reference ();
+	else if (!strcmp (argv[1], "homejoin"))
+		home_join ((unsigned)atoi (argv[4]));
+	else if (!strcmp (argv[1], "samemap"))
+		same_map ((unsigned)atoi (argv[4]));
 	else
 		return 2;
 	return 0;

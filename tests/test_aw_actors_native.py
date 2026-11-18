@@ -163,6 +163,65 @@ class ActorsNativeTests(unittest.TestCase):
         self.assertIn('base model progs/c_crab.mdl', out)
         self.assertIn('base model passed', out)
 
+    def test_home_cell_joins_its_levelled_points(self):
+        """OUTDOOR-CREATURES-HOME-CELL-67: the region frame map the session loads brings its cell's people and placed
+        creatures but no levelled point (tools/chim/region_actors.py defers them), and the window's home frame never
+        joins, so the arrival cell had none of its levelled creatures. A new map's first window tick joins the home
+        cell's levelled points from the table: exactly the builder's roll for them at the player's level (the crab and
+        the villager of the cell are not joined twice). A map change drops the queue of the map before (its places are
+        that map's)."""
+        import re
+        for seed in (7, 8):
+            out = self.run_check('homejoin', seed)
+            self.assertIn('home join passed', out)
+            self.assertIn('home cells joined 1', out)
+            self.assertIn('home cells joined 2', out)
+            self.assertIn('queued actors of the map before dropped', out)
+            got = {int(l.split()[2]): l.split()[3] for l in out.splitlines() if l.startswith('homejoin ref ')}
+            want = {}
+            for r in self.records:
+                b = self.bases[r['base']]
+                if r['key'] not in (11, 12) or 'list' not in b:
+                    continue
+                pick, _ = self.A.levelled_pick(self.lists, b['list'], 1, self.A.rng_seed(r['key'], seed))
+                m = re.search(r'"model" "([^"]+)"', self.bases[pick]['text']) if pick >= 0 else None
+                if m:
+                    want[r['key']] = m.group(1)
+            self.assertEqual(got, want, seed)
+
+    def test_same_map_reload_and_save_load_join_again(self):
+        """ACTOR-TABLE-SAME-MAP-RELOAD-67: the map the player stands in spawned again under the same name (a save made
+        there loaded, dbg aw hors 0) joined none of its cells, because the ticks told a new map by its name alone. Every
+        server spawn now resets that (AW_ActorsServerReset, called by sv_main.c SV_SpawnServer): the reload and the
+        save's load give the same creatures as the first spawn (the builder's roll, the picks kept), and a room spawned
+        again takes its set-up again."""
+        import re
+        src = (SRC / 'sv_main.c').read_text(encoding='latin-1')
+        spawn = src.split('void SV_SpawnServer', 1)[1]
+        self.assertLess(spawn.index('memset (&sv, 0, sizeof(sv));'), spawn.index('AW_ActorsServerReset();'))
+        for seed in (7, 8):
+            out = self.run_check('samemap', seed)
+            self.assertIn('same map passed', out)
+            self.assertIn('home cells joined 3', out)
+            passes = {}
+            for line in out.splitlines():
+                if line.startswith('samemap ') and ' ref ' in line:
+                    w = line.split()
+                    passes.setdefault(w[1], {})[int(w[3])] = w[4]
+            self.assertEqual(set(passes), {'first', 'reload', 'load'})
+            self.assertEqual(passes['first'], passes['reload'])
+            self.assertEqual(passes['first'], passes['load'])
+            want = {}
+            for r in self.records:
+                b = self.bases[r['base']]
+                if r['key'] not in (11, 12) or 'list' not in b:
+                    continue
+                pick, _ = self.A.levelled_pick(self.lists, b['list'], 1, self.A.rng_seed(r['key'], seed))
+                m = re.search(r'"model" "([^"]+)"', self.bases[pick]['text']) if pick >= 0 else None
+                if m:
+                    want[r['key']] = m.group(1)
+            self.assertEqual(passes['first'], want, seed)
+
     def test_levelled_roll_is_deterministic_and_kept(self):
         def picks(seed):
             out = [l.split() for l in self.run_check('roll', seed).splitlines() if l.startswith('pick pass ')]

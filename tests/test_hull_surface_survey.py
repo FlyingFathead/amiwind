@@ -81,8 +81,40 @@ class Survey(unittest.TestCase):
             self.assertEqual(doc.get('layers'), previous.get('layers'))
             self.assertEqual(hull_surface_table(path), {'meshes/x/deck.nif'} | layer)
             self.assertEqual(hull_surface_known(path), {'meshes/x/still.nif'})
-            self.assertEqual(hull_surface_recipe_table(path), {'telvanni-v1': {'meshes/x/ship.nif'}})
+            # and so do the recipe blocks a layer owns (layer_recipes: the rows of Mournhold's districts)
+            owned = {r: set(previous['recipe_meshes'][r])
+                     for rs in (previous.get('layer_recipes') or {}).values() for r in rs}
+            self.assertEqual(doc.get('layer_recipes'), previous.get('layer_recipes'))
+            self.assertEqual(hull_surface_recipe_table(path), {'telvanni-v1': {'meshes/x/ship.nif'}, **owned})
             self.assertEqual(doc['counts']['meshes'], 1)
+
+
+class AppendLayerRows(unittest.TestCase):
+    def test_rows_go_into_the_table_and_to_the_end_of_the_layers_list(self):
+        from hull_surface_survey import append_layer_rows, main
+        doc = {'schema': 'aw-collision-hull-surface-1', 'meshes': ['meshes/a.nif', 'meshes/m.nif', 'meshes/z.nif'],
+               'layers': {'bloodmoon': ['meshes/z.nif', 'meshes/m.nif']}}
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / 'table.json'
+            path.write_text(json.dumps(doc, indent=1) + '\n', encoding='utf-8')
+            new = append_layer_rows(path, 'bloodmoon', ['Meshes\\B.nif', 'meshes/m.nif', 'meshes/y.nif'])
+            self.assertEqual(new, ['meshes/b.nif', 'meshes/y.nif'])
+            out = json.loads(path.read_text(encoding='utf-8'))
+            self.assertEqual(out['meshes'], ['meshes/a.nif', 'meshes/b.nif', 'meshes/m.nif', 'meshes/y.nif',
+                                             'meshes/z.nif'])
+            # the layer's earlier rows keep their places; the new ones follow in the order given
+            self.assertEqual(out['layers']['bloodmoon'], ['meshes/z.nif', 'meshes/m.nif', 'meshes/b.nif',
+                                                          'meshes/y.nif'])
+            before = path.read_bytes()
+            self.assertEqual(append_layer_rows(path, 'bloodmoon', ['meshes/b.nif']), [])
+            self.assertEqual(path.read_bytes(), before)
+            with self.assertRaises(ValueError):
+                append_layer_rows(path, 'bloodmoon', ['textures/x.dds'])
+            rows = Path(d) / 'rows.json'
+            rows.write_text(json.dumps({'tribunal': ['meshes/t.nif']}), encoding='utf-8')
+            self.assertEqual(main(['append-layer', '--table', str(path), '--layer', 'tribunal', '--rows', str(rows),
+                                   '--key', 'tribunal']), 0)
+            self.assertEqual(json.loads(path.read_text(encoding='utf-8'))['layers']['tribunal'], ['meshes/t.nif'])
 
 
 class ShippedTable(unittest.TestCase):

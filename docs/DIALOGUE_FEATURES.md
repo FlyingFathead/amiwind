@@ -1,6 +1,6 @@
 # Dialogue features
 
-_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
+_Last updated with AmiWind v0.0.67-dev2 (17 November 2026)._
 
 <!-- Generated whole by tools/dialogue_features.py render from docs/dialogue-features.json; do not edit by hand. -->
 

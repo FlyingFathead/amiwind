@@ -114,28 +114,48 @@ def tracked(values, path):
     return TrackedSet(values, name(path))
 
 
-def _base_text(table, text):
-    """TEXT of a layer-row table (build_cache.LAYER_ROW_TABLES) without the rows of every expansion layer it names:
-    the table as it was before those rows (NPC-LIBRARY-NO-UNIT-CACHE-63); TEXT itself for any other table."""
+def _layer_names(table, text):
+    """The expansion layers a layer-row table (build_cache.LAYER_ROW_TABLES) names, sorted; () for any other table."""
+    from build_cache import LAYER_ROW_TABLES
+    if LAYER_ROW_TABLES.get(name(_path(table))) is None:
+        return ()
+    try:
+        layers = json.loads(text).get('layers')
+    except ValueError:
+        return ()
+    return tuple(sorted(layers)) if isinstance(layers, dict) else ()
+
+
+def _base_text(table, text, drop=None):
+    """TEXT of a layer-row table (build_cache.LAYER_ROW_TABLES) without the rows of the expansion layers DROP (default:
+    every layer it names): the table as it was before those rows (NPC-LIBRARY-NO-UNIT-CACHE-63); TEXT itself for any
+    other table."""
     from build_cache import LAYER_ROW_TABLES, layer_table_view
     spec = LAYER_ROW_TABLES.get(name(_path(table)))
     if spec is None:
         return text
-    try:
-        layers = json.loads(text).get('layers')
-    except ValueError:
+    layers = _layer_names(table, text)
+    if not layers:
         return text
-    if not isinstance(layers, dict) or not layers:
-        return text
-    return layer_table_view(text, set(layers), *spec)
+    return layer_table_view(text, set(layers) if drop is None else set(drop) & set(layers), *spec)
+
+
+def _layer_subsets(table):
+    """Every non-empty set of the table's expansion layers, the whole set first: the tables an entry may have been
+    recorded on before some of today's layer rows were added (MESH-TABLE-SECOND-LAYER-REKEY-67: an entry recorded with
+    the Bloodmoon rows read no Tribunal row added later)."""
+    import itertools
+    layers = _layer_names(table, _path(table).read_text(encoding='utf-8'))
+    return [frozenset(c) for n in range(len(layers), 0, -1) for c in itertools.combinations(layers, n)]
 
 
 def _views(table, base=False):
-    """(format text, {mesh: decision}) of a table as it is on disk now (cached by its bytes' SHA-256); BASE: without
-    its expansion layers' rows (_base_text)."""
+    """(format text, {mesh: decision}) of a table as it is on disk now (cached by its bytes' SHA-256); BASE: True for
+    the table without its expansion layers' rows (_base_text), or a set of layer names for the table without the
+    rows of those layers only."""
     raw = _path(table).read_bytes()
     if base:
-        raw = _base_text(table, raw.decode('utf-8')).encode('utf-8')
+        raw = _base_text(table, raw.decode('utf-8'), None if base is True else base).encode('utf-8')
     digest = hashlib.sha256(raw).hexdigest()
     known = _VIEWS.get((table, base))
     if known is not None and known[0] == digest:
@@ -168,6 +188,74 @@ def _decision(table, mesh, base=False):
     return hashlib.sha256(json.dumps(value).encode()).hexdigest()
 
 
+def _recipe_rows_only(table, mesh, drop):
+    """True when MESH's decision in the table without the layers DROP differs from today's by recipe rows only: the
+    mesh is no row of those layers itself, the layers only list it for their own visual recipes (the table's
+    "layer_recipes"). A unit in a cell of another recipe never read those rows; a cell of the layer's own recipe has
+    that recipe in its key."""
+    now = json.loads(_views(table)[1].get(mesh) or '{}')
+    then = json.loads(_views(table, drop)[1].get(mesh) or '{}')
+    now.pop('recipes', None)
+    then.pop('recipes', None)
+    return now == then
+
+
+_SHORTER = {}
+
+
+def _shorter_layer_decisions(table):
+    """The whole-table decisions of the table as it was when its expansion layers were SHORTER: for each layer, only
+    the first k rows of its list (k = 0: the layer and the recipe blocks it owns not there at all), in every
+    combination over the layers. A layer's list is append-only, in the order the rows were added
+    (MESH-TABLE-LAYER-GROWS-67), so one of these is the table an entry was recorded on before the rows added since;
+    it read none of them. Cached by the table's bytes."""
+    import itertools
+    raw = _path(table).read_bytes()
+    stamp = hashlib.sha256(raw).hexdigest()
+    known = _SHORTER.get(table)
+    if known is not None and known[0] == stamp:
+        return known[1]
+    data = json.loads(raw.decode('utf-8'))
+    head, views = _views(table)
+    layers = data.get('layers') if isinstance(data.get('layers'), dict) else {}
+    owned = data.get('layer_recipes') if isinstance(data.get('layer_recipes'), dict) else {}
+    parsed = {mesh: json.loads(view) for mesh, view in views.items()}
+    found = set()
+    names = sorted(layers)
+    for lengths in itertools.product(*[range(len(layers[name]) + 1) for name in names]):
+        if all(k == len(layers[name]) for k, name in zip(lengths, names)):
+            continue                                    # the table as it is
+        gone = {norm(mesh) for k, name in zip(lengths, names) for mesh in list(layers[name])[k:]}
+        recipes = {str(r) for k, name in zip(lengths, names) if k == 0 for r in owned.get(name, ())}
+        items = []
+        for mesh, view in parsed.items():
+            if mesh in gone or (recipes and 'recipes' in view):
+                view = dict(view)
+                if mesh in gone:
+                    view.pop('listed', None)
+                if recipes and 'recipes' in view:
+                    kept = [r for r in view['recipes'] if r not in recipes]
+                    if kept:
+                        view['recipes'] = kept
+                    else:
+                        del view['recipes']
+                if not view:
+                    continue
+                items.append((mesh, json.dumps(view, sort_keys=True)))
+            else:
+                items.append((mesh, views[mesh]))
+        found.add(hashlib.sha256(json.dumps([head, sorted(items)]).encode()).hexdigest())
+    _SHORTER[table] = (stamp, found)
+    return found
+
+
+def _shorter_layers_match(table, digest):
+    """True when the whole-table DIGEST is the table's with shorter expansion layers (a layer-row table only)."""
+    if not _layer_names(table, _path(table).read_text(encoding='utf-8')):
+        return False
+    return digest in _shorter_layer_decisions(table)
+
+
 def rows(used):
     """{table: {mesh: decision SHA-256}} of the (table, mesh) pairs USED (a table read whole: its one row '*')."""
     out = {}
@@ -192,7 +280,15 @@ def matches(record):
     matches the table without its expansion layers' rows (build_cache.LAYER_ROW_TABLES): an entry recorded before a
     layer's rows were added read only the base rows, and those are unchanged (NPC-LIBRARY-NO-UNIT-CACHE-63: the
     Bloodmoon rows of the hull-surface table missed all 418 NPC appearances and the creature models, whose bakes
-    never read them). A base row changed still misses; a mesh row is compared as it is."""
+    never read them). The same holds layer by layer: an entry recorded with one layer's rows matches the table
+    without the rows of the layers added since (any set of the table's layers left out,
+    MESH-TABLE-SECOND-LAYER-REKEY-67), and row by row within a layer: a layer's list is append-only, and an entry
+    recorded when the layer was shorter matches the table without the rows appended since
+    (_shorter_layer_decisions, MESH-TABLE-LAYER-GROWS-67: Solstheim's 71 rows under the Bloodmoon layer would have
+    missed every NPC appearance and creature model recorded with its first 25). A base row changed still misses,
+    and so does a layer row changed, removed or put anywhere but the end; a mesh row is compared as it is, except for the rows a layer lists for its own visual recipes
+    only (_recipe_rows_only: a base game mesh that needs the rule in Mournhold's districts keeps every entry of the
+    cells that place it elsewhere)."""
     if not record:
         return True
     try:
@@ -200,7 +296,13 @@ def matches(record):
             for mesh, digest in meshes.items():
                 if digest is None:
                     return False
-                if _decision(table, mesh) != digest and (mesh != WHOLE or _decision(table, mesh, True) != digest):
+                if _decision(table, mesh) == digest:
+                    continue
+                if any(_decision(table, mesh, drop) == digest
+                       and (mesh == WHOLE or _recipe_rows_only(table, mesh, drop))
+                       for drop in _layer_subsets(table)):
+                    continue
+                if mesh != WHOLE or not _shorter_layers_match(table, digest):
                     return False
     except (OSError, ValueError, AttributeError, TypeError):
         return False

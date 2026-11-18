@@ -1,6 +1,6 @@
 # What every being can have: the actor records
 
-_Last updated with AmiWind v0.0.66 (15 November 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -674,6 +674,21 @@ older lists, so that NPC counted as missing. The check now reads the empty list 
 outputs it passes in about 20 seconds: in the rooms 2,738 of 2,740 NPCs, 893 of 896 creatures (the three Sotha Sil
 rooms the dev2 build refused convert in this one, their 5 creatures placed) and 1,528 of 1,532 levelled points, with
 50 NPCs and 8 creatures set aside.
+
+Since v0.0.67 the outdoor rows count only what the engine can spawn (OUTDOOR-CREATURES-REGRESSION-66): a person or
+creature whose base has a model in the build, a levelled point whose list can give such a creature at some level, with
+the actor table and the creatures switched on by the image's own `default-game.cfg` (`chim actors table 1`; no
+`chim actors creatures 0`). Before, every row of the table counted as placed, so a build whose creatures had lost their
+models, or whose settings left the table off, would have passed while no creature appeared outdoors. On the v0.0.66
+release build the count is the same as before (every outdoor creature and levelled point has a model; the table and
+the creatures are on), and the check prints the settings it read.
+
+The same models are checked early, in seconds, on the actor library stage's own output (`tools/actor_early_checks.py`,
+the builder's early check `outdoor-creature-models`): when the stage is taken from an earlier run, before the first
+stage; when the build makes it, the moment it has passed. Every creature the base game places outdoors and every
+outdoor levelled list must give a creature with a model in the library, or the build stops before the world stages
+and names the records (the v0.0.66 release library: 333 placed creatures and 5,082 levelled points, all with a model,
+about 2 seconds).
 
 ## Sources and method
 

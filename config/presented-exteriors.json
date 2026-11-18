@@ -1,0 +1,7 @@
+{
+ "format": "aw-presented-exterior-1",
+ "note": "Where the interior cells that behave like an exterior (Tribunal's five Mournhold districts) are presented to the outdoor converter as exterior cell blocks of their own (tools/presented_exterior.py). The blocks lie in one row south of every island of the three game files, one per cell in the order of the cells' names; a block and the ring of one cell around it must be free of the games' own exterior cells, and the tool stops when it is not.",
+ "first_block": [-12, -30],
+ "spacing": 4,
+ "max_block": 2
+}

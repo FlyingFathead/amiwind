@@ -1,6 +1,6 @@
 # Original door mapping
 
-_Last updated with AmiWind v0.0.54-dev1 (27 October 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -129,8 +129,11 @@ locked door, load or hinged, follows the original's rule as OpenMW's `apps/openm
 - a script's Lock and Unlock (the object state) count, and `GetLocked` on a load door reads its level;
 - a story rule (the census hall door) is not a lock: it holds in god mode too.
 
-Lockpicks and the Open spell do not exist yet, so `dbg doorlocks off` switches every lock off until they do
-(default on, not saved; `dbg doorlocks` prints it).
+A locked container follows the same rule (v0.0.67): its key, named in its area record, opens it for good and
+disarms its trap; god mode opens it with "God mode used to open a locked container"; otherwise it says Locked.
+
+Lockpicks and the Open spell do not exist yet, so `dbg doorlocks off` switches every lock off, a door's and a
+container's, until they do (default on, not saved; `dbg doorlocks` prints it).
 
 ### The worked example: the census hall door
 

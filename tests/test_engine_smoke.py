@@ -638,6 +638,202 @@ class EngineSmokeTests(unittest.TestCase):
         self.assertEqual(verdict(32, 3, allow='allow'), 'smoke RESULT PASS boot')
         self.assertEqual(verdict(32, 3, result='FAIL music not reading'), 'smoke RESULT FAIL music not reading')
 
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_engine_error_lines_fail_a_pass(self):
+        """ENGINE-REGRESSION-GUARDS-67: a packet overflow, a Message overflow, a dropped or unreadable frame update and any
+        Host_Error in the console fail the run (the maintainer's game of 17 November 2026 ended on such lines); a clean
+        console passes; --allow-engine-errors (ENGERR=allow) only counts them; an earlier FAIL stays the result."""
+        text = engine_smoke.PROBE
+        start = text.index('zonefull(){')
+        body = text[start:text.index('exit 0; }', start) + len('exit 0; }')]
+
+        def verdict(lines, allow='fail', result='PASS boot'):
+            with tempfile.TemporaryDirectory() as tmp:
+                awctl = Path(tmp, 'awctl')
+                awctl.mkdir()
+                (awctl / 'console.log').write_text('Scene ready: seyda, 1089 ms\nSaved Autosave 1 (13037 bytes, '
+                                                   'generation 7).\n' + ''.join(l + '\n' for l in lines),
+                                                   encoding='utf-8', newline='\n')
+                stubs = ('st(){ case "$1" in efrags_bad) echo 0;; screen) echo game;; esac; }\n'
+                         'alive(){ return 1; }\nsleep(){ :; }\nlog(){ echo "$*"; }\nFP=999999\nXP=999999\n')
+                script = Path(tmp, 'finish.sh')
+                script.write_text('R=%s\nFASTMB=32\nENGERR=%s\n%s%s\nfinish "%s"\n'
+                                  % (Path(tmp).as_posix(), allow, stubs, body, result), encoding='utf-8', newline='\n')
+                done = subprocess.run(['sh', str(script)], capture_output=True, text=True, timeout=60)
+                return done.stdout.strip().splitlines()[-1]
+        self.assertEqual(verdict([]), 'smoke RESULT PASS boot')
+        for bad in ('packet overflow', 'SZ_GetSpace: overflowHost_Error: CL_ParseServerMessage: Illegible server message',
+                    'Message overflow caught (3 so far): the entity updates, 1490 bytes; not sent',
+                    'Frame update dropped (1 so far): an entity update past the end of the message',
+                    'Host_Error: ED_ParseEntity: unclosed render metadata', 'SZ_GetSpace: overflow'):
+            got = verdict([bad, bad])
+            self.assertTrue(got.startswith('smoke RESULT FAIL 2 engine error lines in the console '
+                                           '(ENGINE-REGRESSION-GUARDS-67), the first: '), got)
+            self.assertIn(bad[:40], got)
+        self.assertEqual(verdict(['packet overflow'] * 5, allow='allow'), 'smoke RESULT PASS boot')
+        self.assertEqual(verdict(['packet overflow'], result='FAIL music not reading'),
+                         'smoke RESULT FAIL music not reading')
+        # an ordinary line that only mentions an overflow in other words is not one of them
+        self.assertEqual(verdict(['Explored map: 0 cells and 0 rooms did not fit the save']), 'smoke RESULT PASS boot')
+        self.assertIn("'--allow-engine-errors'", Path(engine_smoke.__file__).read_text(encoding='utf-8'))
+
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_a_netstat_reading_over_the_ceiling_or_with_updates_not_sent_fails_a_pass(self):
+        """ENGINE-REGRESSION-GUARDS-67 (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66): a dbg netstat reading in the console whose
+        fullest frame since the map started wanted more than the game's own connection carries, or that counts a frame
+        update not sent, fails the run; clean readings pass; ENGERR=allow only logs it; an earlier FAIL stays."""
+        text = engine_smoke.PROBE
+        start = text.index('zonefull(){')
+        body = text[start:text.index('exit 0; }', start) + len('exit 0; }')]
+
+        def reading(where, fullest, dropped):
+            return ("Frame update on %s: 212 entities in sight want 6120 bytes, room 8000 (a network packet 1024, the "
+                    "game's own connection up to 8192, its buffer 16388); 212 sent in 6120 bytes, 0 wait for the next "
+                    "frames\nSince the map started: 812 frames, 4 with updates waiting, 300 over 1024 bytes; the fullest "
+                    "wanted %d bytes for 260 entities (room 8000, 9 waited); %d frame updates not sent\n"
+                    "  4410 bytes: 120 x vivec/static_0012.mdl\n" % (where, fullest, dropped))
+
+        def verdict(console, allow='fail', result='PASS boot'):
+            with tempfile.TemporaryDirectory() as tmp:
+                awctl = Path(tmp, 'awctl')
+                awctl.mkdir()
+                (awctl / 'console.log').write_text('Scene ready: seyda, 1089 ms\n' + console, encoding='utf-8',
+                                                   newline='\n')
+                stubs = ('st(){ case "$1" in efrags_bad) echo 0;; screen) echo game;; esac; }\n'
+                         'alive(){ return 1; }\nsleep(){ :; }\nlog(){ echo "$*"; }\nFP=999999\nXP=999999\n')
+                script = Path(tmp, 'finish.sh')
+                script.write_text('R=%s\nFASTMB=32\nENGERR=%s\n%s%s\nfinish "%s"\n'
+                                  % (Path(tmp).as_posix(), allow, stubs, body, result), encoding='utf-8', newline='\n')
+                done = subprocess.run(['sh', str(script)], capture_output=True, text=True, timeout=60)
+                return done.stdout.strip().splitlines()[-1]
+        self.assertEqual(verdict(''), 'smoke RESULT PASS boot')
+        self.assertEqual(verdict(reading('seyda', 3120, 0) + reading('vivec', 8192, 0)), 'smoke RESULT PASS boot')
+        self.assertEqual(verdict(reading('seyda', 3120, 0) + reading('vivec', 9420, 0)),
+                         'smoke RESULT FAIL dbg netstat in vivec: the fullest frame wanted 9420 bytes against the '
+                         'ceiling 8192, 0 frame updates not sent (ENGINE-REGRESSION-GUARDS-67)')
+        self.assertEqual(verdict(reading('vivec', 7410, 3)),
+                         'smoke RESULT FAIL dbg netstat in vivec: the fullest frame wanted 7410 bytes against the '
+                         'ceiling 8192, 3 frame updates not sent (ENGINE-REGRESSION-GUARDS-67)')
+        self.assertEqual(verdict(reading('vivec', 9420, 3), allow='allow'), 'smoke RESULT PASS boot')
+        self.assertEqual(verdict(reading('vivec', 9420, 3), result='FAIL music not reading'),
+                         'smoke RESULT FAIL music not reading')
+        # each stop of the plain route takes its reading
+        for where in ('netstat_at "Seyda Neen"', 'netstat_at "$(st server)"', 'netstat_at "the wild stop"'):
+            self.assertIn(where, text)
+
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_guards_an_autosave_on_every_map_change_and_creatures_outdoors(self):
+        """ENGINE-REGRESSION-GUARDS-67: on the plain route (the gate's smoke) every map change must write its autosave
+        within AUTOSAVE_WAIT s, the outdoor stops must have creatures alive, and the save status must hold nothing at
+        the end; each failure names itself. The game's answers are written into a fake console by a fake rc."""
+        text = engine_smoke.PROBE
+        helpers = ''.join(line + '\n' for line in text.splitlines()
+                          if line.startswith(('clines(){', 'since(){')))
+        start = text.index('# GUARDS-BEGIN')
+        guards = text[start:text.index('\nif [ "$SAVES" = check ]; then\n', start) + 1]
+        self.assertIn('autosaved(){', guards)
+        self.assertIn('creatures(){', guards)
+        self.assertIn('M=$(clines); rc "dbg tp $TP"', text)                     # every load of the route is marked
+        self.assertIn('autosaved "$M" "the load of $(st server) ($r of $REPEAT)"', text)
+        self.assertIn('autosaved "$M" "$MAP1 again (before load $r of $REPEAT)"', text)
+        self.assertIn('creatures "the wild stop ($(st server))"', text)
+        self.assertIn('[ "$h" = nothing ] || finish "FAIL the save status at the end', text)
+
+        def run(console, call, answers='', extra=''):
+            with tempfile.TemporaryDirectory() as tmp:
+                awctl = Path(tmp, 'awctl')
+                awctl.mkdir()
+                (awctl / 'console.log').write_text(console, encoding='utf-8', newline='\n')
+                Path(tmp, 'answers.txt').write_text(answers, encoding='utf-8', newline='\n')
+                stubs = ('K=1\nMAP1=seyda\nTP="-21800 -12300"\nalive(){ return 0; }\nsleep(){ :; }\n'
+                         'log(){ echo "LOG $*"; }\nfinish(){ echo "RESULT $1"; exit 0; }\n'
+                         'st(){ case "$1" in server) echo vf0877;; esac; }\n'
+                         # the fake game: every answer at the first command, or with ROWS=1 one line per command
+                         'rc(){ echo "RC $1"; [ -s $R/answers.txt ] || return 0\n'
+                         '  if [ "${ROWS:-0}" = 1 ]; then head -n 1 $R/answers.txt >> $R/awctl/console.log\n'
+                         '    tail -n +2 $R/answers.txt > $R/answers.next; mv $R/answers.next $R/answers.txt\n'
+                         '  else cat $R/answers.txt >> $R/awctl/console.log; : > $R/answers.txt; fi; }\n')
+                script = Path(tmp, 'guards.sh')
+                script.write_text('R=%s\n%s%s%s%s\n%s\necho RESULT returned\n'
+                                  % (Path(tmp).as_posix(), extra, stubs, helpers, guards, call),
+                                  encoding='utf-8', newline='\n')
+                done = subprocess.run(['sh', str(script)], capture_output=True, text=True, timeout=60)
+                return [l for l in done.stdout.splitlines() if l.startswith(('RESULT', 'LOG', 'RC '))]
+        loads = 'Scene ready: seyda, 1089 ms\n'
+        # an autosave after the mark: the step goes on and says which
+        out = run(loads + 'Scene ready: balmora, 900 ms\nSaved Autosave 2 (13037 bytes, generation 8).\n',
+                  'autosaved 1 "the load of balmora"', extra='AUTOSAVE_WAIT=2\n')
+        self.assertEqual(out[-1], 'RESULT returned', out)
+        self.assertIn('LOG autosave after the load of balmora: Saved Autosave 2 (13037 bytes, generation 8).', out)
+        # an autosave only before the mark does not count; the failure names the last save line after it
+        out = run('Saved Autosave 1 (12000 bytes, generation 7).\n' + loads +
+                  'Save queued: Autosave 2 is written when the running script step ends.\n',
+                  'autosaved 2 "the load of balmora"', extra='AUTOSAVE_WAIT=2\n')
+        self.assertEqual(out[-1], 'RESULT FAIL no autosave within 2 s after the load of balmora '
+                                  '(ENGINE-REGRESSION-GUARDS-67); the last save line: Save queued: Autosave 2 is written '
+                                  'when the running script step ends.', out)
+        # SAVES=off (a MiniWind, a script, another route): nothing is asked
+        out = run(loads, 'autosaved 1 "a load"', extra='SAVES=off\n')
+        self.assertEqual(out[-1], 'RESULT returned', out)
+        table = ('chim actors table 1 (actors join from the actor table): joins 9, records 120, queued 40, without a model '
+                 '0, not an actor 0, queue full 0; levelled 12 (kept picks 3, nothing 0, no model 0; player level 1, seed 7); '
+                 'town cells joined 4, home cells joined 2\n')
+        alive = 'Creatures on: 4 alive, 0 released now, 0 spawns skipped while off (outdoor creatures; not saved)\n'
+        none = 'Creatures on: 0 alive, 0 released now, 0 spawns skipped while off (outdoor creatures; not saved)\n'
+        sweep = ('Sweep of vf0877 (the loaded area; containers have no runtime class yet):\n'
+                 ' actors: map 3, live 3; corpses: map 0, live 0; 0 without a model, 0 without animation; hidden on '
+                 'purpose: 0 disabled by a script, 0 by the opening\nSWEEP RESULT ok failures=0 ms=12 map=vf0877\n')
+        out = run(loads, 'creatures "the wild stop"', answers=alive + table + sweep)
+        self.assertEqual(out[-1], 'RESULT returned', out)
+        self.assertIn('LOG creatures at the wild stop: 4 alive after 1 s; the actor table: 12 levelled, 0 rolled nothing, '
+                      '40 actors queued; dbg sweep actors: map 3, live 3 (ok failures=0)', out)
+        # an engine without the sweep's answer: the count still stands
+        out = run(loads, 'creatures "the wild stop"', answers=alive + table)
+        self.assertEqual(out[-1], 'RESULT returned', out)
+        self.assertIn('LOG creatures at the wild stop: 4 alive after 1 s; the actor table: 12 levelled, 0 rolled nothing, '
+                      '40 actors queued; dbg sweep actors: no answer ()', out)
+        out = run(loads, 'creatures "the wild stop"', answers=none + table)
+        self.assertEqual(out[-1], 'RESULT FAIL no outdoor creature alive at the wild stop within 60 s '
+                                  '(ENGINE-REGRESSION-GUARDS-67, OUTDOOR-CREATURES-MISSING-66); the actor table: 12 '
+                                  'levelled, 0 rolled nothing, 40 actors queued', out)
+        # gate 11306: none alive at the first count, the queued actors join later: the count is asked again
+        # (the fake rc answers each call with the next line of the file)
+        out = run(loads, 'creatures "Seyda Neen"',
+                  answers=table + 'SWEEP RESULT ok failures=0 ms=4 map=seyda\n' + none + none + alive, extra='ROWS=1\n')
+        self.assertEqual(out[-1], 'RESULT returned', out)
+        self.assertIn('LOG creatures at Seyda Neen: 4 alive after 11 s; the actor table: 12 levelled, 0 rolled nothing, '
+                      '40 actors queued; dbg sweep actors: no answer (ok failures=0)', out)
+        self.assertEqual(sum(1 for l in out if l == 'RC chim actors creatures on'), 3, out)
+        # a known gap (the form ACTOR-TABLE-SAME-MAP-RELOAD-67 had until its fix: no cell joined again when the preset
+        # reloaded the map in play): asked for 10 s, logged, never failing; a count above none says the gap passes now
+        out = run(loads, 'creatures "Seyda Neen after the reload" GAP-ONE-67', answers=none + table)
+        self.assertEqual(out[-1], 'RESULT returned', out)
+        self.assertIn('LOG known gap GAP-ONE-67 at Seyda Neen after the reload: still no creature alive', out)
+        self.assertEqual(sum(1 for l in out if l == 'RC chim actors creatures on'), 2, out)
+        out = run(loads, 'creatures "Seyda Neen after the reload" GAP-ONE-67', answers=alive + table)
+        self.assertIn('LOG known gap GAP-ONE-67 passes now at Seyda Neen after the reload: check the register', out)
+        # Seyda Neen's hard count is the map's first load, before the preset reloads it; the count after the reload is a
+        # hard check too since the engine joins a map spawned again under its own name (ACTOR-TABLE-SAME-MAP-RELOAD-67):
+        # no known gap left on it
+        self.assertLess(text.index('  creatures "Seyda Neen"\n'), text.index('rc "aw_debug_hors 0"'))
+        self.assertIn('  creatures "Seyda Neen after the preset\'s reload"\n', text)
+        self.assertNotIn('ACTOR-TABLE-SAME-MAP-RELOAD-67\n', text)
+        out = run(loads, 'creatures "Seyda Neen after the preset\'s reload"', answers=none + table)
+        self.assertTrue(out[-1].startswith('RESULT FAIL no outdoor creature alive at Seyda Neen after the preset\'s '
+                                           'reload within 60 s'), out)
+        out = run(loads, 'creatures "the wild stop"', answers=none + table, extra='CREATURES=known-gap\n')
+        self.assertEqual(out[-1], 'RESULT returned', out)
+        # a stop's dbg netstat reading is logged (finish judges it, netover)
+        out = run(loads, 'netstat_at "the wild stop"',
+                  answers='Since the map started: 90 frames, 0 with updates waiting, 0 over 1024 bytes; the fullest '
+                          'wanted 812 bytes for 30 entities (room 8000, 0 waited); 0 frame updates not sent\n')
+        self.assertEqual(out[-1], 'RESULT returned', out)
+        self.assertIn('LOG netstat at the wild stop: Since the map started: 90 frames, 0 with updates waiting, 0 over '
+                      '1024 bytes; the fullest wanted 812 bytes for 30 entities (room 8000, 0 waited); 0 frame updates '
+                      'not sent', out)
+        self.assertIn("'ENGERR=%s' % ('allow' if args.allow_engine_errors else 'fail')",
+                      Path(engine_smoke.__file__).read_text(encoding='utf-8'))
+
 if __name__ == '__main__':
     unittest.main()
 

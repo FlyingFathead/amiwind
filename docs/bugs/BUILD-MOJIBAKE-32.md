@@ -96,6 +96,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - ACTOR-RECEIPT-01 (no report page): Windows actor-audit receipt hash did not match the CRLF-written file
 - AW-CHIMPORT-REGION-NO-PALETTE-66 (no report page): aw chimport-region passes a palette, qbsp and SDK the builder image does not hold: every cell fails in seconds
 - AW-CHIMPORT-REGION-PASSED-ALL-FAILED-66 (no report page): aw chimport-region reports passed when every cell of the run failed
+- AW-CHIMPORT-REGION-POOL-COPY-67 (no report page): aw chimport-region copies the units it reuses from the shared pool instead of linking them
 - AW25-07 (no report page): Python FS-UAE launcher not executable after extraction
 - [BUILD-END-USER-LAUNCHERS-36](BUILD-END-USER-LAUNCHERS-36.md): Requested: the builder's simple mode writes a Python launcher, an FS-UAE config and a WinUAE config for the end user, matching the build
 - BUILD-FAILURE-NO-DETAILS-66 (no report page): Requested: a failed build shows its failure details: the monitor showed only the percentage done and the word failed, and the failed stage's error line came without its traceback
@@ -109,6 +110,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - BUILD-SUMMARY-INTERIOR-COUNTS-48 (no report page): The build summary and the inclusion ledger do not say how many interiors a build includes
 - CHIMPORT-CLI-MWAD-SHADOW-66 (no report page): chimport.py run stops on a fresh run folder: stair_walk puts tools/ first, so tools/mwad.py loads in place of the package mwad
 - [CHIMPORT-DOOR-MARKER-AUDIT-36](CHIMPORT-DOOR-MARKER-AUDIT-36.md): The CHIMport door audit counted marker DOOR records (PrisonMarker) as missing door links: 6 cells failed door_links, Seyda Neen among them
+- CHIMPORT-LAYER-CELL-EMPTY-67 (no report page): CHIM import counts a cell only an expansion holds as empty: it is built as flat ground with nothing placed
 - [CHIMPORT-STATUS-STALE-41](CHIMPORT-STATUS-STALE-41.md): The CHIM regions preflight refuses cells on old CHIMport audits without saying how old they are or how to measure them again
 - [DEBUG-TP-ROOM-ENTRANCE-50](DEBUG-TP-ROOM-ENTRANCE-50.md): dbg tp <room map> finds a batch room s entrance only in Balmora s door list: rooms entered from Seyda Neen, Vivec or a region frame say No converted entrance
 - DELIVER-OUTPUT-NAMES-LATE-59 (no report page): deliver_dev.py checks that its output names are free only after the smoke and hops
@@ -118,6 +120,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [DOCS-CELL-COUNTS-44](DOCS-CELL-COUNTS-44.md): Cell counts in the docs and tracker are stated without saying what they count
 - [DOCS-CHANGELOG-STALE-39](DOCS-CHANGELOG-STALE-39.md): Maintained changelog stops at v0.0.35 while current development reaches v0.0.39-rc1
 - [DOCS-CHIM-PROGRESS-STALE-38](DOCS-CHIM-PROGRESS-STALE-38.md): Main README CHIM progress map still shows the v0.0.36 snapshot
+- [DOCS-CHIMPORT-EXPANSIONS-67](DOCS-CHIMPORT-EXPANSIONS-67.md): The CHIMport page described the base game only: how the expansions' cells are read, checked and crossed was missing
 - [DOCS-DEAD-ANCHORS-32](DOCS-DEAD-ANCHORS-32.md): Seven documentation links point at headings that no longer exist
 - DOCS-PROGRESS-TRACKER-STALE-64 (no report page): The CHIM Progress Tracker page carried the newest version in its last-updated line while its current state stopped at v0.0.48 and listed its builds oldest first
 - [DOCS-RC1-PREFLIGHT-39](DOCS-RC1-PREFLIGHT-39.md): RC1 documentation changes omit export and generated-document requirements
@@ -131,6 +134,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - GATE-NUMBER-RACE-53 (no report page): Two workers started gate 4074 at the same moment: the gate scripts number-is-free check is not atomic
 - HANDOFF-WRAPPER-01 (no report page): Source handoff wrapper reused an existing extraction directory
 - IMAGE-HDF-COPY-SPARSE-JDRIVE-59 (no report page): Copying a padded HDF from the build volume onto a mounted folder fails with Permission denied
+- [MESH-EXPORT-FULL-67](MESH-EXPORT-FULL-67.md): tools/mesh_export.py writes no texture names in its material file and no texture coordinates
 - MONITOR-WARNINGS-ROW-54 (no report page): Requested: the Toolkit build monitor gathers every warning of a build in one yellow row, Warnings: N with a view of the lines
 - MWSCRIPT-TRACKER-MAIN-INERT-63 (no report page): The script tracker called Main named by nothing, although the game always starts it and AmiWind carries its work
 - PACKAGE-PORTABILITY-28 (no report page): Rebundled ZIPs lost exec modes; Windows path aliases accepted
@@ -154,11 +158,13 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - TOOLKIT-COPY-ONE-CELL-57 (no report page): The world map's copy-cells button is disabled when only one cell is clicked
 - [TOOLKIT-CULL-DIAGNOSTICS-38](TOOLKIT-CULL-DIAGNOSTICS-38.md): Collision-only diagnostics disable terrain culling preview
 - TOOLKIT-ELIGIBLE-RELEASE-STALE-64 (no report page): The CHIM Progress Tracker headline says eligible for a release six versions old
+- TOOLKIT-HEADLINE-EXPANSIONS-NOT-STARTED-67 (no report page): The Toolkit headline calls Mournhold and Solstheim not started while the view switch above the map shows 89 of 96 Mournhold rooms and 99 of 101 Solstheim rooms in the game
 - TOOLKIT-HEADLINE-ROWS-INLINE-64 (no report page): The CHIM Progress Tracker headline shows its rows for each land and the build as one run-on line in Firefox
 - TOOLKIT-HEADLINE-ROWS-OVERFLOW-64 (no report page): The CHIM Progress Tracker headline rows run off the right edge and its summary cannot be folded
 - TOOLKIT-HELP-BUTTON-INERT-64 (no report page): The round question mark in the Toolkit header does nothing when clicked
 - TOOLKIT-INSPECTOR-EXPORT-VERSION-64 (no report page): The Polycount inspector JSON copy names program version 0.0.38 on every later release
 - [TOOLKIT-LEGEND-STATES-UNCLEAR-48](TOOLKIT-LEGEND-STATES-UNCLEAR-48.md): The CHIM Progress Tracker legend is confusing: 15 status buttons, half of them always 0, and open ocean labelled not in the game for cells that are
+- [TOOLKIT-LOCAL-CHIM-CELL-NO-MAP-67](TOOLKIT-LOCAL-CHIM-CELL-NO-MAP-67.md): On a CHIM cell in the game, the Toolkit offers no map: the World tab says the Local view is 2D only, the Local tab asks for its terrain file (island-cells.json) by hand, its map list is empty and its Show in 3D button does nothing
 - [TOOLKIT-MAP-SCALING-36](TOOLKIT-MAP-SCALING-36.md): The CHIM Progress Tracker map scales badly: a small box in the middle with inner scrollbars, controls far away, the island cropped
 - [TOOLKIT-MONITOR-BLIND-PHASES-36](TOOLKIT-MONITOR-BLIND-PHASES-36.md): The Toolkit Monitor shows nothing during silent build phases: no activity, no phases, no time since the last log line
 - TOOLKIT-MONITOR-FOLLOW-NOT-DEFAULT-49 (no report page): The Toolkit Monitor did not follow the newest running build on a load or a reload: follow latest started off and the page link pinned the old run

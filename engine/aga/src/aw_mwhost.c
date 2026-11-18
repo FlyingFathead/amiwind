@@ -122,6 +122,9 @@ unsigned long AW_MwscriptStringReads(void){return string_reads;}
  * menu) is queued and written by AW_SaveTick at the next settled frame */
 static int script_depth;
 static int save_busy(void){return script_depth>0;}
+/* SAVE-AUTOSAVE-REGRESSED-67 (aw_save.h aw_save_busy_clear): a depth an error left behind set back to 0; the save tick
+ * asks for it, since it runs at the frame level where no script step can be running */
+static void save_busy_clear(void){script_depth=0;}
 /* ARRIVAL-LONG-FRAME-DEV6-59: the file is opened once and kept open while it is loaded (one handle), never once per
  * string read (five opens, about 1 s, in the arrival frame); closed when the scripts load again */
 static FILE *str_file;static long str_base;
@@ -5727,6 +5730,7 @@ void AW_MwscriptInit(void){
     AW_StandingReset();AW_EffectsReset();
     aw_save_actors_export=actors_export;aw_save_actors_import=actors_import;   /* the actor record (feature 16) */
     aw_save_busy=save_busy;   /* SAVE-INSIDE-SCRIPT-STEP-66: no save inside a script step */
+    aw_save_busy_clear=save_busy_clear;   /* SAVE-AUTOSAVE-REGRESSED-67: a step an error ended does not hold saves */
     aw_save_explored_encode=explored_encode;aw_save_explored_import=explored_import;   /* the explored map (4096) */
     aw_save_objects_export=objects_export;aw_save_objects_import=objects_import;
     aw_save_script_export=script_export;aw_save_script_import=script_import;   /* CELL-CHANGES-59 slice 4 */

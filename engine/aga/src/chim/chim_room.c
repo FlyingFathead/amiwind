@@ -588,6 +588,23 @@ void ChimRoom_Clip (vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, trace_t 
  * (HIDE 0: an Enable). The record stays; the next map loads it whole again and
  * the object state hides it again (aw_mwhost.c). Returns the placements changed. */
 #define ROOM_SOURCE_MASK	0xFFFFFFu
+/* REF-IDENTITY-MERGED-MASTER-66, the engine side: placement I is of
+ * REFERENCE when its source number (the record's reference less the piece
+ * bits) is REFERENCE, or when REFERENCE is that number's stable reference id.
+ * The room record carries the merged master's number (master index x 2^22 +
+ * the reference's own number, tools/chim/cut.py source_ref); the use table,
+ * the object state and the saved games name a reference by its stable id
+ * (master index x 2^20 + number, tools/ref_identity.py stable_ref); the
+ * scripts by the merged number. The base game's numbers (below 2^20) are both
+ * forms at once; an expansion's merged number (from 2^22) and stable id
+ * (2^20 up to 3 x 2^20) never meet a base number or each other, so either form
+ * finds the placement (the expansions' rooms: their items, taking, hiding and
+ * the containers' aim). */
+static int RoomRefIs (int i, unsigned reference)
+{
+	unsigned n = ChimFormat_U32 (room.records + (long)i*CHIM_RECORD_BYTES_PLACED + 4) & ROOM_SOURCE_MASK;
+	return n == reference || (n >= (1u << 22) && (((n >> 22) << 20) | (n & 0x3FFFFFu)) == reference);
+}
 /* The loaded room's drawn placements of REFERENCE (0: the room does not draw
  * it). Read once per map by the focus table (aw_inventory.c focus_load). */
 int ChimRoom_Has (unsigned reference)
@@ -596,8 +613,7 @@ int ChimRoom_Has (unsigned reference)
 	if (!room.on || !reference)
 		return 0;
 	for (i=0 ; i<room.count ; i++)
-		if (room.places[i].linked &&
-			(ChimFormat_U32 (room.records + (long)i*CHIM_RECORD_BYTES_PLACED + 4) & ROOM_SOURCE_MASK) == reference)
+		if (room.places[i].linked && RoomRefIs (i, reference))
 			found++;
 	return found;
 }
@@ -615,8 +631,7 @@ float ChimRoom_RayRef (unsigned reference, const float *eye, const float *dir)
 	for (i=0 ; i<room.count ; i++)
 	{
 		chim_place_t *p = &room.places[i];
-		if (!p->linked ||
-			(ChimFormat_U32 (room.records + (long)i*CHIM_RECORD_BYTES_PLACED + 4) & ROOM_SOURCE_MASK) != reference)
+		if (!p->linked || !RoomRefIs (i, reference))
 			continue;
 		if (AW_RayBox (eye, dir, p->mins, p->maxs, &lo, &hi) && (best < 0 || lo < best))
 			best = lo;
@@ -631,8 +646,7 @@ int ChimRoom_Hide (unsigned reference, int hide)
 	for (i=0 ; i<room.count ; i++)
 	{
 		chim_place_t *p = &room.places[i];
-		if ((ChimFormat_U32 (room.records + (long)i*CHIM_RECORD_BYTES_PLACED + 4) & ROOM_SOURCE_MASK) != reference ||
-			p->linked == !hide)
+		if (!RoomRefIs (i, reference) || p->linked == !hide)
 			continue;
 		if (hide)
 		{

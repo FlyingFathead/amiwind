@@ -117,6 +117,7 @@ WEAK int AW_InventoryDropHere(const aw_inventory_item_t *item,int32_t count){(vo
 WEAK int AW_InventoryUse(void){return 0;}
 WEAK const char *AW_InventoryHint(void){return NULL;}
 WEAK float AW_InventoryAimDistance(void){return -1;}   /* FOCUS-NPC-OVERRIDES-ITEM-62: no item aimed at */
+WEAK int (*aw_inventory_allowed)(void);   /* PRISON-SHIP-ITEMS-TAKEABLE-65: NULL, allowed (aw_inventory.c defines it) */
 WEAK int AW_InventoryFocus(const char **name,char *weight_line,char *value_line,int line_size,int *owned){(void)name;(void)weight_line;(void)value_line;(void)line_size;(void)owned;return 0;}
 WEAK float AW_ActivateDistance(void){return 48;}
 WEAK int AW_ConsoleWidth(void){return 38;}   /* aw_console.c: dbg give weapons lines its table up to it */

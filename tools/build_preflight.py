@@ -357,6 +357,16 @@ EARLY_CHECKS = [
     # earlier run, right after it when this build makes it (tools/image_early_checks.py)
     ('room-actor-frames', 'stored', 'image_early_checks:room_actor_frames'),
     ('room-actor-frames', AFTER + 'chim-room-batches', 'image_early_checks:room_actor_frames_after'),
+    # every outdoor creature and outdoor levelled list of the base game has a model in the actor library (the engine
+    # spawns none without one; OUTDOOR-CREATURES-REGRESSION-66, tools/actor_early_checks.py); the image step's actor
+    # spec check counts the placed table at the end
+    ('outdoor-creature-models', 'stored', 'actor_early_checks:exterior_creature_models'),
+    ('outdoor-creature-models', AFTER + 'actor-library', 'actor_early_checks:exterior_creature_models_after'),
+    # Seyda Neen's CHIM frame, predicted from the inputs the world stage reads, against its town's statics: the
+    # chim-town-seyda stage's own comparison, before the world stage instead of an hour into the build
+    # (BUILD-SEYDA-TOWN-CONTAINERS-67, tools/seyda_early_checks.py)
+    ('seyda-frame-town', 'stored', 'seyda_early_checks:frame_town'),
+    ('seyda-frame-town', AFTER + 'bsp', 'seyda_early_checks:frame_town_after'),
 ]
 
 

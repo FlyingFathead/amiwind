@@ -270,7 +270,9 @@ class FocusTableTests(unittest.TestCase):
         self.assertEqual(struct.unpack_from('<IIHBB', tail, 8)[3], 4)
         inventory = (SRC / 'aw_inventory.c').read_text(encoding='utf-8')
         self.assertIn("r->lock=(unsigned char)(row[0]=='C' && row[3]<=100?row[3]:0);", inventory)
-        self.assertIn("return container_open(&focus_rows[best]);", body(inventory, 'static int placed_use(void)'))
+        # PRISON-SHIP-ITEMS-TAKEABLE-65: once the Inventory window is allowed (tests/test_activate.py)
+        self.assertIn("return inventory_allowed()?container_open(&focus_rows[best]):1;",
+                      body(inventory, 'static int placed_use(void)'))
         self.assertIn('AW_CStripInit();', (SRC / 'aw_placed.c').read_text(encoding='utf-8'))
         strip = (SRC / 'aw_cstrip.c').read_text(encoding='utf-8')
         self.assertIn('AW_TryMalloc(sizeof(strip_t))', strip)        # allocated on open only
@@ -386,7 +388,10 @@ class PickupTests(unittest.TestCase):
         self.assertIn('if (!p->linked)', clip)
         hide = body(self.room, 'int ChimRoom_Hide (unsigned reference, int hide)')
         self.assertIn('R_RemoveEfrags', hide)
-        self.assertIn('ROOM_SOURCE_MASK', hide)               # every cut piece of the reference
+        # every cut piece of the reference, in either id form (REF-IDENTITY-MERGED-MASTER-66: RoomRefIs masks the
+        # piece bits off and reads a merged number as its stable id too)
+        self.assertIn('RoomRefIs (i, reference)', hide)
+        self.assertIn('& ROOM_SOURCE_MASK', body(self.room, 'static int RoomRefIs (int i, unsigned reference)'))
 
 
 class EngineTests(unittest.TestCase):

@@ -16,8 +16,10 @@ before anything expensive runs, names the run, leases it, runs the work in the c
                      before the recipes): the same checks, run name, pool, receipts and trial line as kind build, the
                      builder given --miniwind-preset PRESET (which builds from that recipe); the result records the
                      recipe's SHA-256; the purpose is miniwind-<scene> (default miniwind-PRESET)
-    chimport-region, smoke
-                     accepted in the request form, refused as not yet implemented
+    chimport-region  CHIMport cells measured by tools/chimport.py run (options.cells, options.masters): the same checks
+                     and run name as a build, the run's check (--dry-run) first; the result is read from the run's
+                     cells, so a run whose cells all failed is failed, not passed
+    smoke            accepted in the request form, refused as not yet implemented
 
 A build request may carry a build recipe (options.recipe, tools/build_recipe.py, docs/BUILD_RECIPES.md) instead of or
 next to its flags: the recipe file is staged into the build volume and handed to the builder with --recipe (flags then
@@ -1569,10 +1571,16 @@ def chimport_commands(config, request, facts, run_name):
     args = [build['python'], 'tools/chimport.py', 'run', '--data-files', build['inputs_mount'],
             '--palette', chim.get('palette') or f'{build["tools_dir"]}/palette.lmp', '--out', run_dir,
             '--workers', str(workers), '--jobs', str(cell_jobs), '--cells', options['cells'].strip(),
-            '--storage-pool', 'on', '--workspace', workspace]
+            # the shared pool with reused units linked read-only, never copied, as the island's runs did (docs/chim/
+            # CHIMPORT.md "The shared storage pool"; AW-CHIMPORT-REGION-POOL-COPY-67)
+            '--storage-pool', 'on', '--reuse-mode', 'pool', '--workspace', workspace]
     for key in ('qbsp', 'sdk'):
         if chim.get(key):
             args += ['--' + key, chim[key]]
+    if len(selected) > 1:
+        # the expansions' cells are in the merged master only: the run makes the presented data folder in its own run
+        # folder once (tools/presented_data.py) and its plan and cells read it (CHIMPORT-LAYER-CELL-EMPTY-67)
+        args += ['--presented-data', f'{run_dir}/data']
     if not options.get('world'):
         args += ['--no-world']      # cells alone, the island's stage check; the growing world is a build's work
     if options.get('timeout'):
@@ -1594,6 +1602,72 @@ def chimport_commands(config, request, facts, run_name):
         'run_dir': run_dir, 'source_dir': source, 'masters': list(selected), 'workers': workers,
         'cell_jobs': cell_jobs,
     }
+
+
+# chimport.py run prints one line per finished cell and exits 0 whatever its cells did (a failing cell never stops the
+# run, docs/chim/CHIMPORT.md), so the request's verdict is read from those lines: a run whose cells all failed is not
+# passed (AW-CHIMPORT-REGION-PASSED-ALL-FAILED-66: on 2026-11-12 all 8 cells stopped in 4-5 s and aw wrote passed).
+CHIMPORT_SELECTED_RE = re.compile(r'^chimport: (\d+) cells selected, (\d+) to do\b')
+CHIMPORT_CELL_RE = re.compile(r'^chimport: (-?\d+,-?\d+) ring \d+ (converted|FAILED) \(\d+ s\)(?: (.*))?$')
+CHIMPORT_PLAN_MISMATCH = 'plan-mismatch'     # tools/chimport.py PLAN_MISMATCH (tests check the two agree)
+
+
+def chimport_cells(log_text, requested):
+    """(step, numbers, failures) of a chimport-region run, read from its console log (the run's own stdout).
+
+    The step fails when no cell converted, when a requested cell is not in the run's plan (fewer selected than
+    requested), or when a selected cell has no result line (the run stopped or lost it). A cell that converted but
+    carries errors or failed audits is a measured result (its tracker status is failed or hull_pending), counted
+    apart, not a failed run: that is what the island's method records cell by cell."""
+    wanted = len(set(requested.split()))
+    selected = todo = None
+    cells = {}
+    for line in log_text.splitlines():
+        line = line.strip()
+        hit = CHIMPORT_SELECTED_RE.match(line)
+        if hit:
+            selected, todo = int(hit.group(1)), int(hit.group(2))
+            continue
+        hit = CHIMPORT_CELL_RE.match(line)
+        if hit:
+            classes = [c.strip() for c in (hit.group(3) or '').split(',') if c.strip()]
+            cells[hit.group(1)] = (hit.group(2) == 'converted', classes)
+    converted = sorted(k for k, (ok, why) in cells.items() if ok)
+    with_errors = sorted(k for k, (ok, why) in cells.items() if ok and why)
+    not_converted = sorted(k for k, (ok, why) in cells.items() if not ok)
+    # a cell whose build read less than its plan holds (chimport.py plan-mismatch, CHIMPORT-LAYER-CELL-EMPTY-67): the
+    # run read the wrong data or a reader is wrong, not a measured result
+    off_plan = sorted(k for k, (ok, why) in cells.items() if CHIMPORT_PLAN_MISMATCH in why)
+    expected = todo if todo is not None else wanted
+    missing = max(0, expected - len(cells))
+    classes = {}
+    for key in not_converted:
+        for name in cells[key][1] or ['unknown']:
+            classes[name] = classes.get(name, 0) + 1
+    by_class = ', '.join(f'{name} {n}' for name, n in sorted(classes.items(), key=lambda kv: (-kv[1], kv[0])))
+    numbers = {'cells_selected': selected, 'cells_converted': len(converted),
+               'cells_converted_with_errors': len(with_errors), 'cells_not_converted': len(not_converted),
+               'cells_without_result': missing, 'cells_off_plan': len(off_plan)}
+    failures = []
+    if selected is None:
+        failures.append('chimport: the run printed no cell selection (it stopped before its cells)')
+    elif selected < wanted:
+        failures.append(f'chimport: {wanted - selected} of the {wanted} requested cells are not in the run\'s plan')
+    if expected and not_converted and not converted:
+        failures.append(f'chimport: every cell failed: {len(not_converted)} of {expected} not converted'
+                        + (f' ({by_class})' if by_class else ''))
+    if missing:
+        failures.append(f'chimport: {missing} of {expected} {"selected" if todo is not None else "requested"} cells '
+                        f'have no result line (stopped or lost)')
+    if off_plan:
+        failures.append(f'chimport: {len(off_plan)} of {expected} cells were built from less than their plan holds '
+                        f'({CHIMPORT_PLAN_MISMATCH}: the run read other data than its plan): {" ".join(off_plan[:12])}')
+    detail = (f'{len(converted)} of {expected if expected is not None else wanted} cells converted'
+              f' ({len(with_errors)} with errors), {len(not_converted)} not converted'
+              + (f' ({by_class})' if by_class else '') + (f', {missing} without a result' if missing else ''))
+    if todo == 0 and selected == wanted and not failures:
+        detail = f'every one of the {selected} selected cells was finished before (nothing to do)'
+    return {'exit': None, 'ok': not failures, 'detail': detail[:300]}, numbers, failures
 
 
 def submit_chimport(config, request, dry_run, runner):
@@ -1653,6 +1727,9 @@ def submit_chimport(config, request, dry_run, runner):
     shown += [show(commands[key]) for key in ('check', 'build', 'feed')]
     notes.append('masters %s; %d cells at once, %d workers inside each' % (
         ','.join(commands['masters']), commands['workers'], commands['cell_jobs']))
+    if len(commands['masters']) > 1:
+        notes.append('data: the presented data folder %s/data, made once by the run (its receipt '
+                     'presented-data.json names the inputs and the presented master)' % commands['run_dir'])
     print(f'aw submit: {run_name}: chimport-region of {facts["commit"]} ({facts["version"]}) for '
           f'{request["requester"]}: {len(options["cells"].split())} cells', flush=True)
     steps = {'checks': {'exit': 0, 'ok': True, 'detail': 'version, integration head, cells, masters'}}
@@ -1694,12 +1771,19 @@ def submit_chimport(config, request, dry_run, runner):
     code = runner.logged(commands['build'], log_path, **stall_options(config, request, run_name))
     timings = {'build_s': round(time.time() - run_t0, 1)}
     steps['build'] = {'exit': code, 'ok': code == 0, 'detail': f'chimport.py run exit {code}'}
+    try:
+        log_text = Path(log_path).read_text(encoding='utf-8', errors='replace')
+    except OSError as exc:
+        log_text = ''
+        notes.append(f'the run\'s console log {log_path} is not readable: {exc}')
+    steps['cells'], cell_numbers, cell_failures = chimport_cells(log_text, options['cells'].strip())
+    print(f'aw submit: {run_name}: cells: {steps["cells"]["detail"]}', flush=True)
     f_code, f_out, _ = runner.capture(commands['feed'], timeout=300)
     fed = [line.strip() for line in f_out.splitlines() if line.strip().endswith('.json')]
     steps['feed'] = {'exit': f_code, 'ok': f_code == 0,
                      'detail': '%d tracker result file(s): store each with tools/cell_progress.py result --file'
                                % len(fed)}
-    result = 'passed' if steps['build']['ok'] else 'failed'
+    result = 'passed' if steps['build']['ok'] and steps['cells']['ok'] else 'failed'
     trial = {'time': aw.stamp(), 'run': commands['run_dir'], 'run_name': run_name,
              'version': facts['version'].lstrip('v'), 'commit': facts['commit'], 'started': run_started,
              'finished': aw.stamp(), 'result': result, 'failed_stage': None if result == 'passed' else 'chimport',
@@ -1708,9 +1792,10 @@ def submit_chimport(config, request, dry_run, runner):
     trials = append_trial(config, trial)
     steps['trial-log'] = {'exit': 0, 'ok': True, 'detail': str(trials or 'no build.trials_log configured')}
     return finish_build(config, request, run_name, lease, started, t0, facts, steps, notes, shown, reuse_info, [],
-                        numbers={'cells': len(options['cells'].split()), 'tracker_results': len(fed)},
-                        timings=timings, failed_stage=trial['failed_stage'], logs=[str(log_path)],
-                        artifacts=[commands['run_dir'], *fed], **({'cores': cores_info} if cores_info else {}))
+                        numbers={'cells': len(options['cells'].split()), 'tracker_results': len(fed), **cell_numbers},
+                        failures=cell_failures, timings=timings, failed_stage=trial['failed_stage'],
+                        logs=[str(log_path)], artifacts=[commands['run_dir'], *fed],
+                        **({'cores': cores_info} if cores_info else {}))
 
 
 PERF_GUARD_EXIT = 3   # tools/build.py: every stage passed, the perf guard failed the build result

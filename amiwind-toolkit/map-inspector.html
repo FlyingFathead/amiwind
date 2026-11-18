@@ -823,10 +823,11 @@ async function servedBuildOpen(sb,q){
   const ml=$('servedmaplist');ml.replaceChildren();for(const n of sb.maps){const o=document.createElement('option');o.value=n;ml.append(o);}
   $('servedmap').onchange=async()=>{const n=$('servedmap').value.trim();if(!n)return;try{const r=await fetch('/maps/'+encodeURIComponent(n.replace(/\.(bsp|chim)$/i,''))+'.bsp');if(!r.ok)throw Error('HTTP '+r.status+' for map '+n);await openFile(new File([await r.blob()],n+'.bsp'));}catch(e){$('hint').textContent='Cannot open the map: '+e.message;$('hint').className='error';}};
   const room=q.get('room');
+  // the world and the rooms store open on their own: a world this reader cannot read no longer stops the rooms (TOOLKIT-WORLD-FORMAT-STALE-64)
+  if(sb.world&&!room){try{await chimOpenWorld(AmiWindChim.urlSource(sb.base),sb.label,q.get('frame'),q.get('cell'),sb.base);}catch(e){$('hint').textContent='Cannot open the CHIM world of the served build: '+e.message;$('hint').className='error';}}
   try{
-    if(sb.world&&!room)await chimOpenWorld(AmiWindChim.urlSource(sb.base),sb.label,q.get('frame'));
     if(sb.interiors){
-      await chimOpenRooms(AmiWindChim.urlSource(sb.base),sb.label,null);
+      await chimOpenRooms(AmiWindChim.urlSource(sb.base),sb.label,null);chimRoom.key=sb.base;
       const dl=$('chimroomlist');dl.replaceChildren();for(const r of sb.rooms){const o=document.createElement('option');o.value=r;dl.append(o);}
       if(room){$('chimroomname').value=room;await chimShowRoom();}
       else if(!sb.world)$('chimroominfo').textContent='Served build '+sb.label+': '+sb.rooms.length+' rooms listed. Name a room and press Show room.';
@@ -837,7 +838,7 @@ async function servedBuildOpen(sb,q){
 // A bare name (?map=bmhlaalucouncil) loads <name>.bsp from the local map server (?maps=<base url>, default 127.0.0.1:8061);
 // a map server that resolves names as the engine does answers with the frame's .chim, recognised by its "_chim_frame" key.
 // ?world=<url of a chim-world folder>[&frame=frames/x-03/y-02] opens a CHIM world served over HTTP (Open CHIM world).
-if(typeof addEventListener==='function')addEventListener('load',async()=>{let q=new URLSearchParams(location.search),w=q.get('world'),u=q.get('map'),z=q.get('worldzip'),rs=q.get('rooms');if(!w&&!u&&!z&&!rs){const sb=await servedBuild();if(sb){await servedBuildOpen(sb,q);return;}}if(rs){try{if(q.get('heat'))$('heatsource').value=q.get('heat');await chimOpenRooms(AmiWindChim.urlSource(rs),rs,q.get('room'));if($('heatsource').value!=='visual'){$('mode').value='density';density();}}catch(e){$('hint').textContent='Cannot autoload the CHIM room: '+e.message;$('hint').className='error';}return;}if(z){try{const url=new URL(z,location.href);if(!['http:','https:'].includes(url.protocol)||url.username||url.password)throw Error('Use an HTTP(S) archive URL without credentials');const r=await fetch(url,{credentials:'omit'});if(!r.ok)throw Error('HTTP '+r.status);const b=await r.blob();if(b.size>128*1024*1024)throw Error('Archive exceeds 128 MiB inspection limit');const f=new File([b],decodeURIComponent(url.pathname.split('/').pop()));await chimOpenWorld(await chimReader().zipSource(f),f.name,q.get('frame'));}catch(e){reportError(e);}return;}if(w){try{await chimOpenWorld(AmiWindChim.urlSource(w),w,q.get('frame'));}catch(e){$('hint').textContent='Cannot autoload the CHIM world: '+e.message;$('hint').className='error';}return;}if(!u)return;if(!/[\/:]/.test(u))u=(q.get('maps')||'http://127.0.0.1:8061').replace(/\/$/,'')+'/'+(/\.(bsp|chim|json)$/i.test(u)?u:u+'.bsp');try{let r=await fetch(u);if(!r.ok)throw Error('HTTP '+r.status+' for '+u);let b=await r.blob();await openFile(new File([b],decodeURIComponent(u.split('/').pop().split('?')[0])));}catch(e){$('hint').textContent='Cannot autoload: '+e.message;$('hint').className='error';}});
+if(typeof addEventListener==='function')addEventListener('load',async()=>{let q=new URLSearchParams(location.search),w=q.get('world'),u=q.get('map'),z=q.get('worldzip'),rs=q.get('rooms');if(!w&&!u&&!z&&!rs){const sb=await servedBuild();if(sb){servedOpening=servedBuildOpen(sb,q);await servedOpening;return;}}if(rs){try{if(q.get('heat'))$('heatsource').value=q.get('heat');await chimOpenRooms(AmiWindChim.urlSource(rs),rs,q.get('room'));if(q.get('heat')||$('heatsource').value!=='visual'){$('mode').value='density';density();}}catch(e){$('hint').textContent='Cannot autoload the CHIM room: '+e.message;$('hint').className='error';}return;}if(z){try{const url=new URL(z,location.href);if(!['http:','https:'].includes(url.protocol)||url.username||url.password)throw Error('Use an HTTP(S) archive URL without credentials');const r=await fetch(url,{credentials:'omit'});if(!r.ok)throw Error('HTTP '+r.status);const b=await r.blob();if(b.size>128*1024*1024)throw Error('Archive exceeds 128 MiB inspection limit');const f=new File([b],decodeURIComponent(url.pathname.split('/').pop()));await chimOpenWorld(await chimReader().zipSource(f),f.name,q.get('frame'));}catch(e){reportError(e);}return;}if(w){try{await chimOpenWorld(AmiWindChim.urlSource(w),w,q.get('frame'),q.get('cell'),w);}catch(e){$('hint').textContent='Cannot autoload the CHIM world: '+e.message;$('hint').className='error';}return;}if(!u)return;if(!/[\/:]/.test(u))u=(q.get('maps')||'http://127.0.0.1:8061').replace(/\/$/,'')+'/'+(/\.(bsp|chim|json)$/i.test(u)?u:u+'.bsp');try{let r=await fetch(u);if(!r.ok)throw Error('HTTP '+r.status+' for '+u);let b=await r.blob();await openFile(new File([b],decodeURIComponent(u.split('/').pop().split('?')[0])));}catch(e){$('hint').textContent='Cannot autoload: '+e.message;$('hint').className='error';}});
 // Two readers: .bsp is a Quake BSP29 map (bsp() above); .chim is a CHIM map, CHIM's own format, read by the CHIM
 // reader (chim-reader.js). A file named .bsp whose worldspawn names a CHIM frame ("_chim_frame", the builder's own
 // test) is a CHIM frame map of a build before v0.0.36 and goes to the CHIM reader too.
@@ -897,7 +898,7 @@ function chimFrameScene(fd,name){
     return {vertices:g.vertices,polygons,triangles,edges:Array.from(edges,x=>x.split(',').map(Number)),faceCount:polygons.length,materialCount:new Set(polygons.map(p=>p.texinfo)).size};
   };
   for(const c of fd.chunks){
-    const g=finish(R.brushGeometry(c.image,{shift:c.shift||[0,0,0]}));if(!g.vertices.length)continue;
+    const g=finish(R.brushGeometry(c.lumps||c.image,{shift:c.shift||[0,0,0]}));if(!g.vertices.length)continue;
     let base;if(c.terrain){if(!terrainKey.has(c.terrain.id)){terrainKey.set(c.terrain.id,key);key+=g.faceCount;}base=terrainKey.get(c.terrain.id);}else{base=key;key+=g.faceCount;}
     vertexTotal+=g.vertices.length;
     objects.push(Object.assign(g,{name:'CHIM chunk '+c.index+' ('+c.cx+', '+c.cy+') · ground',model:0,terrainRole:'world_legacy',reference:'chunk '+c.index,entityIndex:0,storedFaceRange:[base,g.faceCount],chim:{kind:'chunk',chunk:c}}));
@@ -905,11 +906,11 @@ function chimFrameScene(fd,name){
   for(const c of fd.chunks)for(const r of c.owned){
     const m=fd.models.get(r.model);if(!m)continue;
     if(vertexTotal>1900000||objects.length>=9900){skipped++;continue;}
-    let g=finish(R.brushGeometry(m.image,{origin:r.origin,yaw:r.yaw})),solidOnly=!g.vertices.length;
+    let g=finish(R.brushGeometry(m.image,{origin:r.origin,yaw:r.yaw,angles:r.angles})),solidOnly=!g.vertices.length;
     if(solidOnly)g=chimBox(r.box[0],r.box[1]);           // a collision-only model (drawn as a sprite elsewhere): its drawn box
     if(!modelKey.has(r.model)){modelKey.set(r.model,key);key+=g.faceCount;}
     vertexTotal+=g.vertices.length;
-    objects.push(Object.assign(g,{name:'CHIM placement '+r.pid+' · '+m.name+(solidOnly?' (collision only, no faces: its drawn box)':''),model:r.model+1,reference:String(r.ref),entityIndex:r.pid+1,storedFaceRange:[modelKey.get(r.model),g.faceCount],origin:r.origin,angles:'0 '+r.yaw+' 0',chim:{kind:'placement',collisionOnly:solidOnly,record:r,chunk:c.index,model:m}}));
+    objects.push(Object.assign(g,{name:'CHIM placement '+r.pid+' · '+m.name+(solidOnly?' (collision only, no faces: its drawn box)':''),model:r.model+1,reference:String(r.ref),entityIndex:r.pid+1,storedFaceRange:[modelKey.get(r.model),g.faceCount],origin:r.origin,angles:r.angles?r.angles.join(' '):'0 '+r.yaw+' 0',chim:{kind:'placement',collisionOnly:solidOnly,record:r,chunk:c.index,model:m}}));
   }
   if(chim.map&&chim.map.frame_path&&fd.path.startsWith(chim.map.frame_path+'/')){const extra=chimMapObjects(chim.map,key).objects.filter(o=>o.chim.kind!=='map-bounds');objects.push(...extra.slice(0,Math.max(0,9990-objects.length)));}
   if(skipped)fd.problems.push(skipped+' placements not drawn (the inspector draws at most 10,000 objects and 2 million vertices)');
@@ -926,14 +927,30 @@ function chimFillFrames(){
   for(const {f,row} of chimFrameRows()){const o=document.createElement('option');o.value=f.path;o.textContent=f.path+' · cell '+f.cell.join(' ')+(row?(row.ok?' · fits, headroom ':' · OVER the CHIM zone by ')+chimFmt(Math.abs(row.headroom_bytes))+' B':'');sel.append(o);}
   if(keep&&chim.world.frames.some(f=>f.path===keep))sel.value=keep;
 }
-async function chimOpenWorld(source,label,framePath){
+// cell: "x,y" of an exterior cell (the World Map's Show in 3D): the frame that holds it (chim-reader.js frameHolding:
+// the named frame when the world has it, else the cell's own frame, else the frame whose area holds the cell's centre),
+// or a message that none does.
+// key: a name for the source (a served world's URL); the same world asked again is not read again.
+async function chimOpenWorld(source,label,framePath,cell,key){
   const R=chimReader();if(!R)throw Error('The CHIM reader (chim-reader.js) did not load');
-  chimInfo('Reading the CHIM world index ...');
-  const w=await R.openWorld(source);chim.world=w;chim.label=label;chim.heap=null;chim.heapLabel='';chim.frameData=null;chim.scan=null;chim.ring=null;
-  try{const raw=await source.read(w.reportBase+'chim-heap.json');if(raw){chim.heap=R.parseHeapReport(JSON.parse(new TextDecoder().decode(raw)));chim.heapLabel=w.reportBase+'chim-heap.json';}}catch(e){chim.heapLabel='chim-heap.json not read: '+(e.message||e);}
-  chimFillFrames();
-  if(framePath)$('chimframe').value=framePath.replace(/\/frame\.ccf$/,'').replace(/\/$/,'');
-  await chimShowFrame();
+  if(!(key&&chim.world&&chim.key===key)){
+    chimInfo('Reading the CHIM world index ...');
+    const w=await R.openWorld(source);chim.world=w;chim.key=key||null;chim.label=label;chim.heap=null;chim.heapLabel='';chim.frameData=null;chim.scan=null;chim.ring=null;
+    try{const raw=await source.read(w.reportBase+'chim-heap.json');if(raw){chim.heap=R.parseHeapReport(JSON.parse(new TextDecoder().decode(raw)));chim.heapLabel=w.reportBase+'chim-heap.json';}}catch(e){chim.heapLabel='chim-heap.json not read: '+(e.message||e);}
+    chimFillFrames();
+  }
+  if(await chimSelectFrame(framePath,cell))await chimShowFrame();
+}
+// Selects the frame named, or the frame that holds the cell; false (with the reason in the hint line) when this world has none.
+async function chimSelectFrame(framePath,cell){
+  const R=chimReader(),want=framePath?String(framePath).replace(/\/frame\.ccf$/,'').replace(/\/$/,''):'';
+  const xy=cell?String(cell).split(',').map(Number):null;
+  if(xy&&xy.length===2&&xy.every(Number.isInteger)){
+    const f=await R.frameHolding(chim.world,xy[0],xy[1],want||null);
+    if(!f){const msg='No frame of this CHIM world ('+chim.label+') holds cell '+xy.join(', ')+': it is not in this build.';chimInfo(msg);$('hint').textContent=msg;$('hint').className='error';return false;}
+    $('chimframe').value=f.path;
+  }else if(want)$('chimframe').value=want;
+  return true;
 }
 function chimSizes(){const R=chimReader();return chim.sizes||R.DEFAULT_SIZES;}
 async function chimShowFrame(){
@@ -995,7 +1012,7 @@ function chimInfoUpdate(){
   chimInfo(L.join('\n'));
 }
 // ---- CHIM rooms (chimi/rooms/<room>.crm + the interior store): every placement with its model's collision figures
-const chimRoom={store:null,label:'',data:null};
+const chimRoom={store:null,label:'',data:null,key:null};
 function chimCollisionText(s){
   if(!s)return 'Collision figures: not read';
   return 'Faces '+chimFmt(s.faces)+' · triangles '+chimFmt(s.triangles)+'\nBytes: drawing '+chimFmt(s.draw_bytes)+' B, collision '+chimFmt(s.collision_bytes)+' B (clipnodes '+chimFmt(s.clipnode_bytes)+' B, piece table '+chimFmt(s.piece_bytes)+' B, collision-only planes '+chimFmt(20*s.clip_only_planes)+' B)'
@@ -1007,14 +1024,14 @@ function chimRoomScene(rd,name){
   const R=chimReader(),objects=[],modelKey=new Map();let key=0;
   for(const r of rd.record.placements){
     const m=rd.models.get(r.model);if(!m)continue;if(objects.length>=9900)break;
-    const g0=R.brushGeometry(m.image,{origin:r.origin,yaw:r.yaw});
+    const g0=R.brushGeometry(m.image,{origin:r.origin,yaw:r.yaw,angles:r.angles});
     let g;
     if(!g0.vertices.length)g=chimBox(r.box[0],r.box[1]);
     else{const triangles=[],edges=new Set();for(const p of g0.polygons){for(let k=1;k+1<p.vertices.length;k++)triangles.push([p.vertices[0],p.vertices[k],p.vertices[k+1]]);for(let k=0;k<p.vertices.length;k++){const a=p.vertices[k],b=p.vertices[(k+1)%p.vertices.length];edges.add(a<b?a+','+b:b+','+a);}}
       g={vertices:g0.vertices,polygons:g0.polygons.map(p=>({vertices:p.vertices,texinfo:p.texinfo,lightmapped:p.lightmapped})),triangles,edges:Array.from(edges,x=>x.split(',').map(Number)),faceCount:g0.polygons.length,materialCount:new Set(g0.polygons.map(p=>p.texinfo)).size};}
     if(!modelKey.has(r.model)){modelKey.set(r.model,key);key+=g.faceCount;}
     const s=m.collision;
-    objects.push(Object.assign(g,{name:'CHIM room placement '+r.pid+' · '+m.name+(s&&s.ratio_bytes!==null?' · collision / visual '+s.ratio_bytes.toFixed(2):''),model:r.model+1,reference:String(r.ref),entityIndex:r.pid+1,storedFaceRange:[modelKey.get(r.model),g.faceCount],origin:r.origin,angles:'0 '+r.yaw+' 0',chim:{kind:'room-placement',record:r,model:m,collision:s}}));
+    objects.push(Object.assign(g,{name:'CHIM room placement '+r.pid+' · '+m.name+(s&&s.ratio_bytes!==null?' · collision / visual '+s.ratio_bytes.toFixed(2):''),model:r.model+1,reference:String(r.ref),entityIndex:r.pid+1,storedFaceRange:[modelKey.get(r.model),g.faceCount],origin:r.origin,angles:r.angles?r.angles.join(' '):'0 '+r.yaw+' 0',chim:{kind:'room-placement',record:r,model:m,collision:s}}));
   }
   return {format:'amiwind-mesh-inspector-1',source:name,metric:'CHIM room placements; heat by the Heat switch (visual, collision, ratio)',objects,textures:[],chim_room:rd.room};
 }
@@ -1077,6 +1094,30 @@ $('chimpick').onclick=()=>{if(!chim.tables)return;chim.picking=!chim.picking;$('
 $('chimring').onclick=()=>{const x=Number($('chimx').value),y=Number($('chimy').value);if(chim.tables&&Number.isFinite(x)&&Number.isFinite(y))chimRingAt(x,y);};
 // AmiWind Toolkit: the toolkit page (or a World Map that opened this window) hands over a map file.
 window.addEventListener('message',e=>{if((e.source===window.parent||e.source===window.opener)&&e.data&&e.data.type==='amiwind-open-map'&&e.data.file instanceof File)openFile(e.data.file);});
+// ... or a link instead of a file (the World Map's Show in 3D and 3D buttons): a served world's frame (world, frame, cell) or a
+// room of a served rooms store (rooms, room). What cannot open says why in the hint line, never nothing.
+let servedOpening=null;   // the served build's first open (servedBuildOpen); a link waits for it, so the link is what stays shown
+async function openLink(d){
+  if(servedOpening)try{await servedOpening;}catch(e){/* its own message is in the hint */}
+  try{
+    // a build folder chosen by hand on the World Map comes as its files (an image's id1 folder or a delivered copy)
+    const local=d.files&&d.files.length?AmiWindChim.filesSource(d.files):null,localKey=local?'files:'+d.files.length+':'+((d.files[0]&&d.files[0].webkitRelativePath)||''):null;
+    if(d.room){
+      const base=local?localKey:d.rooms||'/chim-world/build/';
+      if(!(chimRoom.store&&chimRoom.key===base)){await chimOpenRooms(local||AmiWindChim.urlSource(base),d.label||(local?'build folder':base),null);chimRoom.key=base;}
+      $('chimroomname').value=d.room;await chimShowRoom();
+      if(d.heat){$('heatsource').value=d.heat;$('mode').value='density';density();}
+    }else if(local)await chimOpenWorld(local,d.label||'build folder',d.frame||null,d.cell||null,localKey);
+    else if(d.world)await chimOpenWorld(AmiWindChim.urlSource(d.world),d.label||d.world,d.frame||null,d.cell||null,d.world);
+    else if(d.frame||d.cell){
+      // no served world (the Toolkit opened from disk): the world opened here, or what to open
+      if(chim.world){if(await chimSelectFrame(d.frame,d.cell))await chimShowFrame();}
+      else{$('hint').textContent='To see '+(d.frame?'CHIM frame '+d.frame+' (it holds cell '+d.cell+')':'cell '+d.cell)+': open the build\'s CHIM world with the CHIM world folder or zip button on the left, or serve the build with toolkit_serve.py --served-build.';$('hint').className='';}
+    }
+    else throw Error('the link names no CHIM world and no room');
+  }catch(e){$('hint').textContent='Cannot open '+(d.room?'room '+d.room:'the CHIM world')+': '+(e.message||e);$('hint').className='error';}
+}
+window.addEventListener('message',e=>{if((e.source===window.parent||e.source===window.opener)&&e.data&&e.data.type==='amiwind-open-link')openLink(e.data);});
 $('export').onclick=()=>{if(scene)downloadInspectionJSON('mesh',exportSceneInfo());};
 // Sub-cell cuts (build 020): planned region borders and divider cuts drawn as
 // translucent vertical rectangles in compiled BSP XYZ. Planning only: no map,

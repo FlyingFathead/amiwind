@@ -1951,20 +1951,24 @@ def startup_lines(mini, font_path, chim=False):
                                      measure=measure, width=TEXT_WIDTH, debug=mini.get('debug', False)))
 
 
-def flora_support_check(args):
+def flora_support_check(args, out):
     """Every bracket fungus of the CHIM world touches the tree it grows on (tools/chim/flora_support_audit.py,
     FLORA-FLOATING-DEV1-66): read only, on the finished CHIM stage, before the image's slow work. Fails on a floating
-    plant that config/flora-support.json does not list under known_floating (each listed with its reason)."""
+    plant that config/flora-support.json does not list under known_floating (each listed with its reason).
+    Its measurements go to OUT/flora-support.json, the image's own folder, as the image's other diagnostics do: written
+    into the run folder's root, the file was an entry outside every declared stage path, and every stage running beside
+    the image recorded it as its own undeclared output, its record refused for reuse
+    (BUILD-CELL-PROGRESS-UNDECLARED-OUTPUT-67)."""
     if not getattr(args, 'chim_world', None) or not getattr(args, 'data_files', None):
         return
     import build_profile
     from chim.flora_support_audit import main as flora_audit
     with build_profile.phase('Image: flora support check'):
         rc = flora_audit([str(args.chim_world), '--data-files', str(args.data_files), '--jobs', str(image_jobs(args)),
-                          '--json', str(Path(args.chim_world).parent / 'flora-support.json'), '--known-from-config'])
+                          '--json', str(Path(out) / 'flora-support.json'), '--known-from-config'])
     if rc:
         raise ValueError('Flora support check: bracket fungi float away from their trees '
-                         '(flora-support.json of this run; FLORA-FLOATING-DEV1-66)')
+                         '(image/flora-support.json of this run; FLORA-FLOATING-DEV1-66)')
 
 
 def image(args):
@@ -2007,12 +2011,13 @@ def image(args):
     heap_loader_source_sha256=verify_heap_loader_source_receipt(engine_record)
     build_mode=engine_record.get('hands','3d')
     if build_mode!=args.hands:raise ValueError('Image hands choice must match engine build')
-    flora_support_check(args)
     excluded=excluded_groups(args)
     if 'music' not in excluded and not getattr(args,'music',None):
         raise ValueError('--music is required unless the quick test build leaves the music out (--exclude music)')
     scene=ensure_external(args.scene,'AGA scene');out=new_output(args.out)
     if 'music' not in excluded:ensure_external(args.music,'converted music')
+    # before the image's slow work, its measurements in the image's own folder (BUILD-CELL-PROGRESS-UNDECLARED-OUTPUT-67)
+    flora_support_check(args, out)
     boot=out/'boot';copy_tree(scene/'id1',boot/'id1');(boot/'S').mkdir()
     seyda_native='seyda' in chim_native_towns(args)
     if seyda_native and (boot/'id1/maps/seyda.bsp').is_file():

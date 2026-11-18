@@ -466,6 +466,52 @@ def record_accounting(work, source, chim_refs):
     return {'by_type': by_type, 'totals': tot, 'conversion_errors': list(failed.values())[:20]}
 
 
+def source_facts(work):
+    """What the cell's source stage read for the cell (its terrain audit, work/audit/audit.json): the references, whether
+    the cell had no land there (flat ground at the default height), and the SHA-256 of the master it read. {} when the
+    audit was not written."""
+    audit = read_json(Path(work) / 'audit' / 'audit.json') or {}
+    area = audit.get('area') or {}
+    if not area:
+        return {}
+    return {'references': area.get('references'), 'default_land': bool(area.get('default_land_cells')),
+            'master_sha256': (audit.get('input') or {}).get('esm_sha256')}
+
+
+PLAN_MISMATCH = 'plan-mismatch'
+
+
+def plan_mismatch(row, res):
+    """Why a converted cell's build did not read what the run's plan holds for it, [] when it did
+    (CHIMPORT-LAYER-CELL-EMPTY-67). The plan reads the selected masters merged; a build that read less (no land where
+    the plan has land, fewer placements than the plan's) converted another cell than the one planned, for example an
+    expansion's cell read from the base game's file alone, built as flat ground with nothing placed and counted as
+    empty. Such a cell fails instead of counting as done."""
+    if not res.get('converted'):
+        return []
+    key = ckey((row['x'], row['y']))
+    facts = res.get('source') or {}
+    placed = ((res.get('records') or {}).get('totals') or {}).get('placed')
+    problems = []
+    if row.get('land') and facts.get('default_land'):
+        problems.append('the plan has land for %s, the build read none (flat ground at the default height)' % key)
+    if row.get('refs') and placed is not None and placed < row['refs']:
+        problems.append('the plan holds %d placements in %s, the build read %d' % (row['refs'], key, placed))
+    if problems and facts.get('master_sha256'):
+        problems.append('the build read the master with SHA-256 %s' % facts['master_sha256'])
+    return problems
+
+
+def check_against_plan(row, res):
+    """RES with a plan-mismatch error added when its build read less than its plan row (plan_mismatch); the status
+    follows (cell_status: an error fails the cell)."""
+    problems = plan_mismatch(row, res)
+    if problems:
+        res.setdefault('errors', []).append({'stage': 'plan-check', 'mechanism': PLAN_MISMATCH,
+                                             'message': '; '.join(problems)})
+    return res
+
+
 def audits_of(validate_report, stairs, heap, hulls, measured, records, receipt):
     """Each mechanism: status passed|failed|not_measured, detail text, numbers."""
     a = {}
@@ -520,12 +566,16 @@ def audits_of(validate_report, stairs, heap, hulls, measured, records, receipt):
         deep = [h for h in over if h not in for_memory and h not in owner]
         owner_stems = sorted({_mesh_stem(h['name']) for h in owner})
         put('hull_bevels', 'failed' if deep else 'passed',
-            '%d models over the hull-chain limit (max depth %d)%s%s' % (
+            '%d models over the hull-chain limit (max depth %d)%s%s%s' % (
                 len(deep), max([h['depth'] for h in hulls] or [0]),
+                ': ' + ', '.join('%s (depth %d, %d clipnodes)' % (h['name'], h['depth'], h['clipnodes'])
+                                 for h in sorted(deep, key=lambda h: -h['depth'])[:8]) if deep else '',
                 '; %d kept as chain for memory' % len(for_memory) if for_memory else '',
                 '; kept as chain, maintainer-accepted: %s' % ', '.join(
                     '%s (%s)' % (m, accepted[m]) for m in owner_stems) if owner_stems else ''),
             over_limit=len(deep), max_depth=max([h['depth'] for h in hulls] or [0]),
+            over_limit_models=[{'name': h['name'], 'depth': h['depth'], 'clipnodes': h['clipnodes']}
+                               for h in sorted(deep, key=lambda h: -h['depth'])],
             kept_as_chain_for_memory=sorted({_mesh_stem(h['name']) for h in for_memory} | kept_stems),
             kept_as_chain_owner_accepted=owner_stems,
             routed=len((receipt or {}).get('routed_hulls') or []))
@@ -542,8 +592,16 @@ def audits_of(validate_report, stairs, heap, hulls, measured, records, receipt):
         # DOOR records with a marker model (PrisonMarker, DivineMarker, TempleMarker: Marker_*.nif) are destinations
         # of the game's scripts, not doors anyone walks through; they stay deferred and are not missing door links
         # (CHIMPORT-DOOR-MARKER-AUDIT-36).
+        # The converter names a marker placement by tools/editor_markers.py marker_status ("editor marker (not
+        # drawn): <kind>") since the editor markers got their own module; the audit still looked only for the
+        # earlier text, so a cell with a marker door read "failed" with every walkable door converted (seen on
+        # Mournhold's Royal Palace courtyard, CHIMPORT-DOOR-MARKER-AUDIT-36 again). Both texts count.
         deferred = doors.get('deferred')
-        markers = deferred.get(MARKER_REASON, 0) if isinstance(deferred, dict) else 0
+        markers = 0
+        if isinstance(deferred, dict):
+            from editor_markers import marker_status
+            prefix = marker_status('')
+            markers = sum(n for reason, n in deferred.items() if reason == MARKER_REASON or reason.startswith(prefix))
         walkable = doors['placed'] - markers
         ok = doors['converted'] == walkable
         put('door_links', 'passed' if ok else 'failed', '%d of %d doors converted%s' % (
@@ -591,6 +649,7 @@ def convert_cell(cell, data_files, palette, out, qbsp=None, unit_cache=None, job
     chim_refs = {int(p['ref']) for s in (source or {}).get('frames', []) for p in s.get('placements', [])}
     records = record_accounting(work, source, chim_refs)
     result['records'] = records
+    result['source'] = source_facts(work)
     validate_report = stairs = heap = hulls = measured = None
     world = None
     if receipt is not None:
@@ -1485,10 +1544,31 @@ def inputs_lock(run_dir, data_files):
     return lock
 
 
+def presented_data_folder(data_files, folder, masters=None):
+    """The data folder a run reads: with expansions selected, the presented data folder FOLDER made from DATA_FILES
+    (tools/presented_data.py: the merged master of the selected game files under the base file's name, the other
+    selected masters header-only, everything else linked), so the plan, the input lock and every cell's build read
+    the same merged master; with the base game alone DATA_FILES itself. (folder, receipt or None)."""
+    from mwad.paths import resolve_data_files
+    import presented_data
+    folder, receipt = presented_data.make(resolve_data_files(data_files), folder, masters)
+    if receipt is None:
+        print('chimport: the base game alone: the data folder is read as it is', flush=True)
+    else:
+        print('chimport: presented data folder %s: masters %s, presented master SHA-256 %s, %d entries linked'
+              % (folder, ','.join(receipt['masters']), receipt['presented_sha256'], len(receipt['linked'])),
+              flush=True)
+    return Path(folder), receipt
+
+
 def run(args):
     run_dir = args.out
     run_dir.mkdir(parents=True, exist_ok=True)
     args.pool_dir, pool_origin = pool_choice(args)
+    if getattr(args, 'presented_data', None):
+        # the expansions' cells exist only in the merged master: every reader of the run reads it under the base
+        # file's name (CHIMPORT-LAYER-CELL-EMPTY-67: the plain data folder gave flat empty cells)
+        args.data_files, _ = presented_data_folder(args.data_files, args.presented_data)
     if args.dry_run:
         return _run(args, None)
     try:
@@ -1621,6 +1701,8 @@ def _run(args, pool_origin):
                            'wall_s': round(time.time() - t0, 2), 'cpu_s': 0.0, 'finished': now_iso()}
                     write_json(cdir / 'result.json', res)
                 res.update(ring=r['ring'], order=r['order'], name=r['name'], region=r['region'], land=r['land'])
+                # a cell whose build read less than its plan holds fails (CHIMPORT-LAYER-CELL-EMPTY-67)
+                check_against_plan(r, res)
                 write_json(cdir / 'result.json', res)
                 res['status'] = cell_status(res)
                 finished.append(res)
@@ -2252,6 +2334,11 @@ def _cli(argv=None):
         q.add_argument('--tracker-ingest', default='',
                        help='extra arguments of the tracker ingest after a feed (its usual inputs), one string')
         q.add_argument('--feed-every', type=int, default=180, help='seconds between automatic feeds (default 180)')
+        q.add_argument('--presented-data', type=Path, metavar='DIR',
+                       help='with expansions selected (AMIWIND_MASTERS), make the presented data folder DIR from '
+                            '--data-files (tools/presented_data.py: the merged master under the base file\'s name, the '
+                            'other masters header-only, everything else linked) and read it instead; the base game '
+                            'alone reads --data-files as it is')
         add_region_option(q)
         add_pool_options(q)
     c = sub.add_parser('cell', help='convert and audit one cell (what `run` starts per cell)')

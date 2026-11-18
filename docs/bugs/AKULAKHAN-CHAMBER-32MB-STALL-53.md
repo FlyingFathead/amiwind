@@ -165,4 +165,8 @@ Family: Map heap and memory budget (`heap-memory`). The heap model must match wh
 - WORLD-FLORA-HEAP-010 (no report page): Seyda sprite payload exceeds the final map heap headroom
 - ZONE-FREE-SHRINK-63 (no report page): The largest free block of the small memory zone shrinks about 140 bytes with every load
 
+Related bugs in other categories:
+
+- CONVERT-HEAVIER-THAN-ORIGINAL-67 (no report page): The conversion makes 556 models heavier than the original game (512 in rooms, 44 outdoors)
+
 <!-- END GENERATED CATEGORY -->

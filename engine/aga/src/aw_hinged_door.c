@@ -277,11 +277,17 @@ void AW_TrapCounts(unsigned long out[4]){
 /* The locked door's way through (OpenMW apps/openmw/mwclass/door.cpp Door::activate, rule read, not copied): the
  * player who carries the door's key opens it ("<key> used to open lock", GMST sKeyUsed); else, in god mode (dbg god),
  * the player goes through and the message box says so (the maintainer, 25 October 2026: "it should throw a
- * rectangle box text: 'God mode used to enter a locked door'"). 1 = through, 0 = refused. */
-static int lock_pass(unsigned reference){
-    const hd_lock_t *k=lock_row(reference);const char *key=k && k->key?key_pool+k->key-1:NULL;edict_t *p;
-    char text[160];aw_inventory_item_t item;
-    if(key && AW_StateGet(&aw_state,AW_ITEM,key)>0){
+ * rectangle box text: 'God mode used to enter a locked door'"). 1 = through, 0 = refused.
+ * LOCKED-CONTAINERS-NEVER-OPEN-67: the one rule for every lock, a door's and a container's (OpenMW 0.53
+ * mwclass/container.cpp Container::activate reads the same key, its unlock and its trap): KEY the key's record id
+ * (NULL none), GOD the god mode notice. (Declared here, not in aw_hinged_door.h: the CHIM world's stage key reads
+ * that header through chim_world.c.) */
+#define AW_CONTAINER_GOD_TEXT "God mode used to open a locked container"   /* the door's words, said of a container */
+extern int (*aw_lock_pass)(unsigned reference,const char *key);   /* aw_inventory.c container_open */
+static int lock_rule(unsigned reference,const char *key,const char *god){
+    edict_t *p;char text[160];aw_inventory_item_t item;
+    load();      /* the GMST sKeyUsed line of the table */
+    if(key && key[0] && AW_StateGet(&aw_state,AW_ITEM,key)>0){
         memset(&item,0,sizeof(item));
         snprintf(text,sizeof(text),"%s %s",AW_InventoryRead(key,&item) && item.name[0]?item.name:key,
                  key_used[0]?key_used:"used to open lock");
@@ -292,8 +298,17 @@ static int lock_pass(unsigned reference){
         return 1;
     }
     p=sv.active && svs.clients?svs.clients[0].edict:NULL;
-    if(p && ((int)p->v.flags&FL_GODMODE)){AW_UISubtitle("",AW_DOOR_GOD_TEXT,4);return 1;}
+    if(p && ((int)p->v.flags&FL_GODMODE)){AW_UISubtitle("",god,4);return 1;}
     return 0;
+}
+static int lock_pass(unsigned reference){
+    const hd_lock_t *k=lock_row(reference);
+    return lock_rule(reference,k && k->key?key_pool+k->key-1:NULL,AW_DOOR_GOD_TEXT);
+}
+/* LOCKED-CONTAINERS-NEVER-OPEN-67 (aw_inventory.c container_open through aw_lock_pass): a locked container opens for
+ * the key the player carries (unlocked for good, its trap disarmed), in god mode, and with dbg doorlocks off */
+static int container_lock_pass(unsigned reference,const char *key){
+    return !door_locks || lock_rule(reference,key,AW_CONTAINER_GOD_TEXT);
 }
 /* aw_scene.c (through aw_load_door_lock): a load door's lock. USE 0: 1 when it is locked now (the prompt says
  * Locked). USE 1, the player's use: 1 = refused (the LockedDoor sound to the player), 0 = through (unlocked, the
@@ -801,4 +816,5 @@ void AW_HingedDoorInit(void){
     aw_hinged_locked_sound=AW_HingedDoorLockedSound;
     aw_load_door_lock=AW_HingedDoorLoadLock;
     aw_trap_spring=AW_TrapSpring;   /* the containers' traps (aw_inventory.c container_open) */
+    aw_lock_pass=container_lock_pass;   /* and their locks (LOCKED-CONTAINERS-NEVER-OPEN-67) */
 }

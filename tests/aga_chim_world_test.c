@@ -1752,6 +1752,12 @@ static void roomtake(void){
     frame_at(64,64,40);assert(!door_solid(-100,-100));
     assert(ChimRoom_Hide(1002,0)==1 && door_solid(-100,-100));
     assert(ChimRoom_Hide(0,1)==0);
+    /* REF-IDENTITY-MERGED-MASTER-66: placement 2 is Tribunal's reference 1003 under the merged master's number
+     * (2^22 + 1003); the use table and the object state name it by its stable id (2^20 + 1003): both forms find it,
+     * the base game's own 1003 does not */
+    assert(ChimRoom_Has((1u<<20)|1003)==1 && ChimRoom_Has((1u<<22)|1003)==1 && ChimRoom_Has(1003)==0);
+    assert(door_solid(-100,60) && ChimRoom_Hide((1u<<20)|1003,1)==1 && !door_solid(-100,60));
+    assert(ChimRoom_Hide((1u<<22)|1003,0)==1 && door_solid(-100,60));
     end_map();
     assert(ChimRoom_Hide(1002,1)==0);               /* no room */
     printf("roomtake ok%c",10);

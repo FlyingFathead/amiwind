@@ -1,6 +1,6 @@
 # Save/load milestone: compact state and a manageable save list
 
-_Last updated with AmiWind v0.0.66 (14 November 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -117,6 +117,16 @@ intact; the completeness check shows the state is all there. Both are needed.
 Loading restores the whole state first, and only then do scripts and gameplay events run again, so that a load never
 repeats a reward, rolls loot again or fires a pick-up.
 
+Autosaves (`aw_autosaves`, Options > Prefs > Autosave history: 5 kept by default, 0 turns them off) are written after
+every map change once the player has been released from the opening, as soon as the player has stood settled for three
+seconds (alive, walking, on the ground, out of lava, slime and deep water, no fight, no window or menu, no loading
+screen, no photo mode, no voice line playing), and every five minutes of play in between. `dbg save status` shows how
+many autosaves the character has, when the next one is due, what holds it back at that moment and how the last save
+ended (written, or the part that refused it). The opening journey checks after the release that an autosave is on
+disk, so a game that stops writing them fails a test instead of going unnoticed. A save asked for while a script step
+runs waits for the step to end; a step that an error ended without finishing (the game's error handling jumped out of
+it) is let go at the next frame, with one console line, so it never holds the saves for the rest of the session.
+
 ### 8. Memory
 
 The peak extra memory while saving and loading is measured first: the live state, the temporary copies, the encoded
@@ -200,7 +210,7 @@ The references used are listed at the end of this page, among them the reference
 AWS1 decoding without invented history. See [journal schema and limits](WORLD_MAP_AND_JOURNAL.md).
 The original AWS1 prototype was implemented for the v0.0.21-dev1 opening slice,
 with registration/release eligibility. Character folders, quicksave, four fixed
-manual slots, 0–16 autosaves (default 3) and dual validated generations are
+manual slots, 0–16 autosaves (default 5) and dual validated generations are
 implemented. Native filesystem and failure acceptance are recorded with the
 playtest evidence. The design below remains the broader target; named manual
 saves, general object deltas and controlled original ESS comparisons are pending.

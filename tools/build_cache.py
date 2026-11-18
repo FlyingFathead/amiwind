@@ -2786,6 +2786,21 @@ def layer_table_view(text, layers, indent, field):
         doc['layers'] = kept
     else:
         del doc['layers']
+    # A layer may also own whole recipe blocks of the table ("layer_recipes": {layer: [recipe, ...]}): rows that apply
+    # only in the cells of a visual recipe that exists for that layer's places (Mournhold's districts: base game
+    # meshes that need the rule there and nowhere on Vvardenfell). Left out with the layer, block and all; a table
+    # without "layer_recipes" is written exactly as before.
+    recipes = doc.get('layer_recipes')
+    if isinstance(recipes, dict):
+        gone = {str(r) for layer in layers for r in recipes.get(layer, ())}
+        blocks = doc.get('recipe_meshes')
+        if isinstance(blocks, dict):
+            doc['recipe_meshes'] = {r: ms for r, ms in blocks.items() if r not in gone}
+        kept = {layer: rs for layer, rs in recipes.items() if layer not in layers}
+        if kept:
+            doc['layer_recipes'] = kept
+        else:
+            del doc['layer_recipes']
     return json.dumps(doc, indent=indent) + '\n'
 
 

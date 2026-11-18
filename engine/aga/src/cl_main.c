@@ -654,6 +654,7 @@ CL_ReadFromServer
 Read all incoming data from the server
 ===============
 */
+int cl_message_unreliable;	/* the message being parsed is a frame's update (cl_parse.c CL_ParseFault) */
 int CL_ReadFromServer (void)
 {
 	int		ret;
@@ -670,7 +671,13 @@ int CL_ReadFromServer (void)
 			break;
 
 		cl.last_received_message = realtime;
-		CL_ParseServerMessage ();
+		{
+			/* a frame's update (NET_GetMessage 2) that does not read is dropped, never the game (cl_parse.c
+			 * CL_ParseFault, NET-VIVEC-ENTITY-PACKET-OVERFLOW-66) */
+			cl_message_unreliable = ret == 2;
+			CL_ParseServerMessage ();
+			cl_message_unreliable = 0;
+		}
 	} while (ret && cls.state == ca_connected);
 
 	if (cl_shownet.value)
@@ -737,6 +744,15 @@ void CL_SendCmd (void)
 		return;
 	}
 
+	/* NET-VIVEC-ENTITY-PACKET-OVERFLOW-66: commands to the server past this buffer were cleared partway: the session
+	 * ends through Host_Error (the way back or the place loaded again, the box), never a message from its middle */
+	if (cls.message.overflowed)
+	{
+		SZ_Clear (&cls.message);
+		cls.message.overflowed = false;
+		Host_Error ("CL_WriteToServer: the commands to the server overflowed (%ld bytes)", (long)cls.message.maxsize);
+	}
+
 	if (NET_SendMessage (cls.netcon, &cls.message) == -1)
 		Host_Error ("CL_WriteToServer: lost server connection");
 
@@ -751,6 +767,7 @@ CL_Init
 void CL_Init (void)
 {
 	SZ_Alloc (&cls.message, 1024);
+	cls.message.allowoverflow = true;	/* every message buffer says it; caught in CL_WriteToServer */
 
 	CL_InitInput ();
 	AW_TorchInit ();

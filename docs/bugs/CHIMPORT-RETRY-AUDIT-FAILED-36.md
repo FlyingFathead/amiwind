@@ -183,6 +183,8 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - [CHIMPORT-NO-SHARED-POOL-35](CHIMPORT-NO-SHARED-POOL-35.md): The CHIMporter kept its own unit store beside the shared hashed storage pool: no pool flag, every run folder a private copy
 - [CHIMPORT-POOL-CROSS-MOUNT-36](CHIMPORT-POOL-CROSS-MOUNT-36.md): CHIMport run folder and the storage pool on two mounts of one volume: hard links fail across the mounts, so pooled units were copied, not linked
 - DOOR-CHECK-KNOWN-UNKEYED-54 (no report page): config/door-check-known.json is in no stage key: an edit to the known list never re-runs a passed image's door check
+- MESH-TABLE-LAYER-GROWS-67 (no report page): A row added to an expansion layer of a measured mesh table would re-key every unit recorded with that layer's earlier rows
+- MESH-TABLE-SECOND-LAYER-REKEY-67 (no report page): A row of a second expansion in a measured mesh table would re-key every unit recorded with the first expansion's rows
 - [MWAD-WALK-ORDER-35](MWAD-WALK-ORDER-35.md): Input check results depend on directory listing order
 - [REUSE-STOP-OLD-GROUPS-67](REUSE-STOP-OLD-GROUPS-67.md): The strict reuse check counts the units an older version of a bake left in its cache as work the build would redo, so a one-unit table with history stops a build that would reuse it
 

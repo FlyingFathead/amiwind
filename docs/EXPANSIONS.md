@@ -1,6 +1,6 @@
 # The expansions: Tribunal and Bloodmoon
 
-_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -9,6 +9,7 @@ _Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 - [What the builder does with them today](#what-the-builder-does-with-them-today)
 - [What you can see in the game today](#what-you-can-see-in-the-game-today)
 - [What you cannot see yet](#what-you-cannot-see-yet)
+- [The three stages, and where each land stands](#the-three-stages-and-where-each-land-stands)
 - [How the two places fit into the game](#how-the-two-places-fit-into-the-game)
 - [The plan](#the-plan)
 - [How the expansions are implemented](#how-the-expansions-are-implemented)
@@ -19,8 +20,8 @@ _Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 AmiWind's world comes from the original Morrowind game, and Morrowind has two expansions: **Tribunal**, which adds the
 city of Mournhold, and **Bloodmoon**, which adds the island of Solstheim. This page says what the builder does with
 them today, what can be seen in the game now, how the two places are planned to fit into the game, and what is known to
-be missing. The short version: the data of both expansions is part of the build by default since v0.0.66-dev2, but no
-finished Mournhold or Solstheim content is in the game yet.
+be missing. The short version: the data of both expansions is part of the build by default since v0.0.66-dev2 and
+their rooms are in the image, but Mournhold's outdoor districts and Solstheim's ground are not built yet.
 
 ## What the expansions are, and your own copies
 
@@ -61,9 +62,9 @@ builder warns, names the missing expansion and builds the base game alone.
   Mournhold's five districts or an expansion room the room stage could not convert are held back in the world door
   table with their reason, so they stay inert in the game instead of stopping the build. Every other door must still be
   linked.
-- **The expansion files are not yet checked on their own.** The builder does not yet require the Tribunal and Bloodmoon
-  files nor compare them with known sizes and SHA-256 the way it does for the base game's files. The check, which stops
-  a build before any stage when a selected expansion file is missing or differs, is planned for v0.0.66-dev3.
+- **The expansion files are checked before any stage.** Since v0.0.66-dev3 every selected expansion file must be in
+  the data folder with a known SHA-256 ([Known inputs](KNOWN_INPUTS.md)); a missing or different file stops the build
+  before its first stage with one line that names the file and the fix (the files in the data folder, or `--no-dlc`).
 
 ## What you can see in the game today
 
@@ -78,11 +79,42 @@ builder warns, names the missing expansion and builds the base game alone.
   the image yet, and the [survey](WORLD_SURVEY.md) lists Solstheim's exterior cells. The
   [census](performance/EXPANSIONS-CENSUS-v0.0.64.md) counts the places, placements and models of both.
 
+- **The rooms of both expansions.** The room stages convert the expansions' rooms with the island's: Mournhold's palace,
+  temple, shops and houses and Solstheim's rooms are in the image and can be entered with `dbg tp` and a room's map
+  name. Checked on the v0.0.66 image on a Raspberry Pi 4B (17 November 2026): the two transport scripts of the trip
+  between Ebonheart's Grand Council Chambers and Mournhold's Royal Palace, run through the console's test aid for a
+  dialogue answer's result script, move the player to the Reception Area beside Effe-Tei and back in front of Asciene
+  Rane. The trip through the dialogue window itself has not been played yet.
+
 ## What you cannot see yet
 
-No finished Mournhold or Solstheim content is in the game. You cannot travel to Mournhold or Solstheim, there is no
-Mournhold district or Solstheim ground to walk on, and the scripts of the two places do not run because their places
-are not in the image. The data being selected by default is the road to them, not their arrival.
+No finished Mournhold or Solstheim is in the game. Mournhold's five outdoor districts are not built, so the doors that
+lead out of the palace and the temple lead nowhere; there is no Solstheim ground to walk on and no boat to it; and no
+script attached to a person, creature or object of the two expansions runs yet (the build does not bind them).
+The data being selected by default is the road to them, not their arrival.
+
+## The three stages, and where each land stands
+
+Each expansion is brought in the way the base game was, in three stages, each with a count that is measured on a build:
+
+1. **The world.** Every exterior cell and every room converted and reachable.
+2. **The people and creatures.** Everyone the expansion places, in its own places and in Vvardenfell, present where the
+   original puts them and complete: attributes and other stats, inventory and equipment, combat style, animations, and
+   the scripts attached to them.
+3. **The script logic.** Global and start scripts, quest and dialogue result scripts, the dialogue's choices and
+   filters, message boxes, stats set by scripts, and the expansions' movies.
+
+Counted on the v0.0.66 build (17 November 2026):
+
+| | The world | People and creatures: placed / complete, of all placements | Scripts: compiled / attached to a placement |
+| --- | --- | --- | --- |
+| Mournhold (Tribunal) | the five districts 0 of 5; the rooms in the image except the districts and two set-aside cells | 354 / 90 of 412 | 194 / 0 |
+| Solstheim (Bloodmoon) | 0 of 144 land cells; its rooms in the image | 274 / 8 of 476 | 256 / 0 |
+| Placed in Vvardenfell by the expansions | (base game cells) | 59 / 12 of 59 | Tribunal 42 in use, all run; Bloodmoon 54 in use, 48 run |
+
+Most of the incomplete ones lack one of three things: the script attached to them, a place that is not built yet (57
+stand in Mournhold's districts, 202 outdoors on Solstheim), or an inventory rolled from a levelled list, a gap the base
+game shares. No stat and no combat style is missing.
 
 ## How the two places fit into the game
 
@@ -111,6 +143,23 @@ The plan for Mournhold:
 
 In the v0.0.66-dev2 snapshot the five districts are set aside: the room stages skip them and list them, and they come
 with Mournhold's own exterior.
+
+How they reach the outdoor converter (in work for v0.0.67): the converter reads squares of exterior grid cells, and a
+district is an interior cell with its own coordinates and no terrain. `tools/presented_exterior.py` therefore writes
+a presented copy of the merged game data in which each district is a block of exterior cells of its own, in a row
+south of every island and apart from the other blocks, with its placements moved by one offset and every door or
+marker that names the district pointing at the moved position; everything else is copied unchanged. The blocks
+come from `config/presented-exteriors.json` and the districts' names, so the same game files always give the same
+places. On the Game of the Year files: Godsreach 1 by 2 cells, the Great Bazaar and Plaza Brindisi Dorom 2 by 1, the
+Royal Palace courtyard 1 by 1, the Temple courtyard 2 by 2; 40 door and marker destinations are rewritten. No
+district is in a build yet.
+
+The outdoor converter reads that presented copy from a **presented data folder**, one folder for both expansions
+(`tools/presented_data.py`): the merged game data with the presented districts under the base game file's name, so
+Solstheim's cells and land are read from the same file as Vvardenfell's; the selected expansion files as empty
+stand-ins, so the same expansions stay selected and their archives are read in load order as in any build; and
+every other file and folder of your data folder as a link, never a copy. With the base game alone no such folder is
+made and the build reads your data folder as before.
 
 ### Getting to Mournhold
 
@@ -165,8 +214,8 @@ have Mournhold's five districts (they are set aside, so the doors leading out of
 yet), Solstheim's ground, the expansions' scripts running, or the check of the expansion files. The census of the changes
 the expansions make to the base game is being made; the chains below are what is known so far from the game files.
 
-1. **The files.** Both expansions' files are required and checked against known SHA-256 values before any stage (planned
-   for dev3), and every stage reads the selected archives (done in dev2).
+1. **The files.** Both expansions' files are required and checked against known SHA-256 values before any stage (done
+   in v0.0.66-dev3), and every stage reads the selected archives (done in dev2).
 2. **The changes to Vvardenfell.** Every record the expansions add to or change in the base game's world is listed from
    the game files (references placed in base cells, changed people and creatures, lines in base topics, new topics,
    scripts and start scripts, globals, the journal) and each is checked in the build. A chain works when four things hold:
@@ -207,8 +256,10 @@ checked against the build, including loose items in the wild.
 
 The open entries are in the [bug register](BUGS.md):
 
-- `BUILD-EXPANSION-INPUTS-UNCHECKED-66`: the expansion files are not required nor checked against known sizes and
-  SHA-256 yet (open).
+- `BUILD-EXPANSION-INPUTS-UNCHECKED-66`: the expansion files were not required nor checked against known SHA-256
+  values (fixed in v0.0.66-dev3).
+- `INTERIOR-RECEPTION-AREA-FPS-67`: Mournhold's Royal Palace Reception Area, the arrival room of the trip, runs at
+  about 3 frames a second on the Pi 4B (open).
 - `EXPANSION-TABLES-BASE-ONLY-66`: some tables still read the base game only (open); `EXPANSION-BASE-ONLY-TABLES-66`
   (the focus table) and `EXPANSION-ARCHIVE-READERS-66` (the archives) are its fixed parts (fixed in v0.0.66-dev2).
 - `WORLD-SURVEY-EXPANSION-ATLAS-66`: the world survey stopped on a terrain subdivision outside the island's atlas with

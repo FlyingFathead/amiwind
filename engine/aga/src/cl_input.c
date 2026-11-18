@@ -381,9 +381,11 @@ void CL_SendMove (usercmd_t *cmd)
 	sizebuf_t	buf;
 	byte	data[128];
 
+	memset (&buf, 0, sizeof(buf));
 	buf.maxsize = 128;
 	buf.cursize = 0;
 	buf.data = data;
+	buf.allowoverflow = true;	/* every message buffer says it; an overflowed one is not sent (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66) */
 
 	if (aw_walkto_move)
 		aw_walkto_move(cmd);	/* aw_walkto test aid (aw_debug.c); NULL in fixtures */
@@ -448,6 +450,8 @@ void CL_SendMove (usercmd_t *cmd)
 	if (++cl.movemessages <= 2)
 		return;
 
+	if (buf.overflowed)
+		return;		/* a move message is far below its 128 bytes; never one that starts in its middle */
 	if (NET_SendUnreliableMessage (cls.netcon, &buf) == -1)
 	{
 		Con_Printf ("CL_SendMove: lost server connection\n");

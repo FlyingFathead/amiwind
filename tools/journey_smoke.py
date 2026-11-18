@@ -18,6 +18,11 @@ fresh engine and loads the save the part before wrote), plus three words of its 
   expect fighting REF IN LIST  the actor REF is in the list and FIGHTING
   expect has NAME TEXT    the probe NAME's answer holds TEXT (case-insensitive)
   expect lacks NAME TEXT  the probe NAME's answer does not hold TEXT (an object that must stay gone)
+  expect autosaves from step N   every map change from step N on wrote the game's autosave (ENGINE-REGRESSION-GUARDS-67,
+                          SAVE-AUTOSAVE-REGRESSED-67): in the console of step N's part after its marker, and of each
+                          later part after its "Game restored" line, each map load ("Scene ready", not a streamed
+                          crossing, not a load of a save) is followed by a "Saved Autosave" line before the next load or
+                          the part's end; the failure names each map change without one
   expect known ID CHECK   any of the checks above, for a step that cannot pass today: ID is its register entry. Its
                           result is printed as KNOWN (failing as registered) or as a PASS that says the gap closed;
                           it is not counted in the journey's result (ENDGAME-HEART-SESSION-66: the chamber's collapse)
@@ -129,7 +134,10 @@ def parse(text):
             probes[name] = {'command': '%s "%s" in %s' % (side, needle, source), 'kind': 'pick', 'from': source,
                             'side': side, 'text': needle, 'part': probes[source]['part'], 'step': step}
         elif word == 'expect':
-            expects.append(parse_expect(rest, probes, where, step))
+            e = parse_expect(rest, probes, where, step)
+            if e['kind'] == 'autosaves' and e['from'] not in [s['step'] for s in steps]:
+                raise JourneyError('%s: expect autosaves from step %d: no step %d before it' % (where, e['from'], e['from']))
+            expects.append(e)
         elif word in SESSION_WORDS:
             if line.startswith('cmd echo %s ' % MARK):
                 raise JourneyError('%s: the %s marker lines are written by the tool' % (where, MARK))
@@ -162,6 +170,11 @@ def parse_expect(rest, probes, where, step):
     if re.match(r'known\b', rest):
         raise JourneyError('%s: expect known REGISTER-ID CHECK (the register id of the gap, e.g. ENDGAME-CHAMBER-COLLAPSE-63)'
                            % where)
+    m = re.fullmatch(r'autosaves\s+from\s+step\s+(\d+)', rest)
+    if m:
+        return {'kind': 'autosaves', 'from': int(m.group(1)), 'step': step, 'text': rest}
+    if re.match(r'autosaves\b', rest):
+        raise JourneyError('%s: expect autosaves from step N' % where)
     m = re.fullmatch(r'(dead|alive|fighting)\s+(\w+)\s+in\s+(\w+)', rest)
     if m:
         # the actor: a probe that took a reference (a kill), or the reference number itself
@@ -303,12 +316,13 @@ def judge(journey, runs):
 
 
 def judge_checks(journey, runs):
-    raw, values, missing_parts, stops = {}, {}, [], {}
+    raw, values, missing_parts, stops, consoles = {}, {}, [], {}, {}
     for part, run in zip(journey['parts'], runs):
         if run is None:
             missing_parts.append(part['name'])
             continue
         steps_text, console_text = run
+        consoles[part['name']] = console_text
         names = [p['name'] for p in journey['parts']]
         before = [s['step'] for s in journey['steps'] if names.index(s['part']) < names.index(part['name'])]
         stop = session_stop(steps_text, before[-1] if before else 0)
@@ -338,11 +352,11 @@ def judge_checks(journey, runs):
     out, fails, total, known_open, known_closed = [], 0, 0, [], []
     titles = {s['step']: s['title'] for s in journey['steps']}
     for e in journey['expects']:
-        ok, why = check(e, journey, raw, values)
+        ok, why = check(e, journey, raw, values, consoles)
         if not ok:
             names = [n for n in (e.get('probe'), e.get('ref'), e.get('list')) if n and not n.isdigit()]
-            part = journey['probes'][names[0]]['part']
-            if part in stops and any(n not in raw for n in names):
+            part = journey['probes'][names[0]]['part'] if names else None
+            if names and part in stops and any(n not in raw for n in names):
                 why = 'not reached: part %s stopped %s (%s)' % (
                     part, 'in step %d' % stops[part][0] if stops[part][0] else 'before step 1', stops[part][1][:200])
         head = 'step %s (%s): %s' % (e['step'], titles.get(e['step'], '?'), e['text'])
@@ -412,7 +426,53 @@ def answer_text(raw, name):
     return shown or 'empty answer'
 
 
-def check(e, journey, raw, values):
+def autosave_misses(journey, consoles, first):
+    """(map changes judged, [the ones without an autosave]) from step FIRST on: in the console of FIRST's part after
+    its step marker, and in each later part after its first "Game restored" line (a later part is a fresh engine: its
+    own start and the load of the save are no map change of the game). A map change is a "Scene ready" line of a map
+    load: a streamed crossing is none (no autosave is asked for it), a "Game restored" line right after it makes it the
+    load of a save (none asked either). It needs a "Saved Autosave" line before the next map load or the part's end."""
+    names = [p['name'] for p in journey['parts']]
+    start = next(s['part'] for s in journey['steps'] if s['step'] == first)
+    judged, misses = 0, []
+    for name in names[names.index(start):]:
+        if name not in consoles:
+            continue
+        on, pending = False, None
+        for line in consoles[name].splitlines():
+            s = line.strip()
+            if not on:
+                on = (re.fullmatch(r'%s STEP %d' % (MARK, first), s) is not None if name == start
+                      else s.startswith('Game restored:'))
+                continue
+            m = re.match(r'Scene ready: (\S+?),', s)
+            if m and 'streamed crossing' not in s:
+                if pending:
+                    misses.append('%s (part %s, the next map loaded first)' % pending)
+                pending = (m.group(1), name)
+                judged += 1
+            elif s.startswith('Game restored:') and pending:
+                pending = None
+                judged -= 1
+            elif s.startswith('Saved Autosave') and pending:
+                pending = None
+        if pending:
+            misses.append('%s (part %s, before the part ended)' % pending)
+    return judged, misses
+
+
+def check(e, journey, raw, values, consoles=None):
+    if e['kind'] == 'autosaves':
+        consoles = consoles or {}
+        start = next(s['part'] for s in journey['steps'] if s['step'] == e['from'])
+        if start not in consoles:
+            return False, 'no console of part %s' % start
+        judged, misses = autosave_misses(journey, consoles, e['from'])
+        if not judged:
+            return False, 'no map change from step %d on in the console' % e['from']
+        if misses:
+            return False, '%d of %d map changes wrote no autosave: %s' % (len(misses), judged, '; '.join(misses))
+        return True, ''
     if e['kind'] in ('dead', 'alive', 'fighting'):
         ref = float(e['ref']) if e['ref'].isdigit() else values.get(e['ref'])
         if not isinstance(ref, float):

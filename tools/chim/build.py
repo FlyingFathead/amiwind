@@ -264,6 +264,34 @@ def hull_surface_gate(area, models, prepared, mesh_fps, archive, mode, jobs, cac
     return over
 
 
+def gated_mesh_units(area, items, flight_meshes, models, archive, mode, jobs, cache, run=None, gate=None):
+    """(prepared, mesh_fps) of an area's meshes, each set behind the collision surface gate as soon as it is made (fail
+    fast, CHIM-MESH-STAIR-UNIT-SLOW-67, BUILD-STAIR-MESH-UNIT-SLOW-67): the plain mesh units, the gate on them, then
+    the stair collision mesh units of the meshes that hold a flight (stair_mesh.mesh_unit_stair: minutes on one core for
+    a large mesh) and the gate on those. A plain mesh over the step stops the area in seconds, before any stair unit
+    runs: the Mortrag Glacier cell (-26,26) ran two stair units of 19 min 33 s and 41 min 55 s and then stopped at the
+    gate on an iceberg shard that holds no flight. The units, their keys and the gate's verdict are as before; only
+    the order changes. ITEMS: [(fp, (mi, model, profile, archive, textures))] by model index; RUN and GATE stand in
+    for run_units and hull_surface_gate in tests."""
+    run = run or run_units
+    gate = gate or hull_surface_gate
+    prepared, mesh_fps = {}, {}
+    plain = [mi for mi in range(len(items)) if mi not in flight_meshes]
+    stairs = sorted(flight_meshes)
+    for kind, chosen in (('mesh', plain), ('mesh-stair', stairs)):
+        if kind == 'mesh-stair' and not chosen:
+            continue                      # (the plain pass runs, and gates, even when empty: its line as before)
+        if kind == 'mesh':
+            worker = mesh_unit
+        else:
+            from stair_mesh import mesh_unit_stair as worker
+        prepared.update(zip(chosen, run(kind, [items[mi] for mi in chosen], worker, jobs, cache)))
+        keys = mesh_result_keys([items[mi] for mi in chosen], prepared, chosen)
+        gate(area, models, {mi: prepared[mi] for mi in chosen}, keys, archive, mode, jobs, cache)
+        mesh_fps.update(keys)
+    return prepared, mesh_fps
+
+
 def mesh_fingerprint(model, profile, texture_records, kind='mesh'):
     """A mesh unit by content: its record without layout (mesh and collision hashes, materials with their
     textures' hashes), and its profile. KIND 'mesh-stair': the stair collision method 1 worker's code key
@@ -1715,12 +1743,12 @@ def resident_detail_tiles(work, settings, height, low, high, step, references=No
     resident of this town stands on the ground there (CHIM-VIVEC-FRAME-WIDE-41).
 
     The residents are the ones the town stage places (import_town.resident_cast: not excluded, not another
-    town's) in ground mode (actor_grounding.initial_state). One counts when its authored feet lie within
+    town's) in ground mode (actor_grounding_layers.outdoor_state). One counts when its authored feet lie within
     RESIDENT_GROUND_BAND of the original ground (height(x, y): the original sample, frame-local) at any
     corner of its 32-unit LAND square, so actors on walkways and roofs keep the plain tiles. Every tile
     within RESIDENT_DETAIL_REACH of it (the support search and its soles) is listed, inside the ground box.
     This is the frame-wide form of Seyda Neen's hand-listed terrain_detail_tiles."""
-    from actor_grounding import initial_state
+    from actor_grounding_layers import outdoor_state
     from import_town import frame_references, resident_cast
     if references is None:
         references = frame_references(work, settings)
@@ -1728,7 +1756,7 @@ def resident_detail_tiles(work, settings, height, low, high, step, references=No
     centre, scale = settings['centre'], settings['scale']
     tiles = set()
     for ref in cast:
-        if initial_state(ref['id']) != 'ground':
+        if outdoor_state(ref['id']) != 'ground':
             continue
         x, y = [(ref['position'][k] - centre[k]) * scale for k in range(2)]
         z = ref['position'][2] * scale
@@ -2036,18 +2064,10 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
         if model['source'] in rebuild_meshes:
             fp = fingerprint('mesh', fp, 'rebuild', time.time_ns())
         items.append((fp, (mi, model, profile, archive, index['textures'])))
+    # (the gate's seconds now count in the 'meshes' section: it runs between the plain and the stair units)
     with timer.section('meshes'):
-        prepared = {}
-        plain = [mi for mi in range(len(items)) if mi not in flight_meshes]
-        prepared.update(zip(plain, run_units('mesh', [items[mi] for mi in plain], mesh_unit, jobs, cache)))
-        if flight_meshes:
-            from stair_mesh import mesh_unit_stair
-            stairs = sorted(flight_meshes)
-            prepared.update(zip(stairs, run_units('mesh-stair', [items[mi] for mi in stairs], mesh_unit_stair, jobs,
-                                                  cache)))
-    mesh_fps = mesh_result_keys(items, prepared, range(len(items)))
-    with timer.section('collision surface gate'):
-        hull_surface_gate(town, index['models'], prepared, mesh_fps, archive, hull_points, jobs, cache)
+        prepared, mesh_fps = gated_mesh_units(town, items, flight_meshes, index['models'], archive, hull_points, jobs,
+                                              cache)
     if stair_collision == '1':
         # stair collision method 1: each mesh's stair check (prepare_mesh_bsp: lod stair_check) for the stage's
         # collected report and gate (chim_build: stair_mesh.require); method 0 writes nothing

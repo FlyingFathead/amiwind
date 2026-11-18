@@ -186,4 +186,8 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - WORLD-REGION-NAMES-VF-ONLY-64 (no report page): The open-world region directory accepts only Vvardenfell region names
 - WORLDMAP-ONE-ISLAND-64 (no report page): The in-game world map covers Vvardenfell only
 
+Related bugs in other categories:
+
+- INTERIOR-RECEPTION-AREA-FPS-67 (no report page): Mournhold, Royal Palace: Reception Area runs at 3.0 to 5.7 frames a second on the Pi 4B
+
 <!-- END GENERATED CATEGORY -->

@@ -2241,6 +2241,18 @@ def size_ledger_step(args, run):
                             getattr(args, 'size_growth_reason', None), log=lambda line: print(line, flush=True))
 
 
+def container_count_step(args, run):
+    """CONTAINER-WINDOW-59: the container count after a passed image build (tools/container_census.py build_step):
+    every placed container of the game masters against what this build makes openable, in the run folder
+    (container-census.json, the summary docs/performance/CONTAINERS.json is made from, and the full table). A
+    measurement: it never fails the build; its verdict against the known gaps is printed."""
+    if args.stage != 'aga' or args.dry_run or not getattr(args, 'data_files', None):
+        print('Container count: skipped (%s)' % ('--dry-run' if args.dry_run else 'no image in this build'), flush=True)
+        return None
+    import container_census
+    return container_census.build_step(run, args.data_files, log=lambda line: print(line, flush=True))
+
+
 def inclusion_step(args, run):
     """The CHIM inclusion entry of a passed build with a CHIM world (tools/chim_inclusion.py build_step): RUN/toolkit/
     chim-inclusion.json/.js = the repository ledger with this run's entry (state built) on top, so the run's World map
@@ -3919,6 +3931,7 @@ def _main(argv=None):
         inclusion = threading.Thread(target=inclusion_step, args=(args, run), name='chim-inclusion', daemon=True)
         inclusion.start()
         size_verdict = size_ledger_step(args, run)
+        container_count_step(args, run)
         resource_after_build(args, run)
         inclusion.join()
         summary.finish('passed', result, actor_acceptance=acceptance)

@@ -19,7 +19,8 @@ opens any map without picking a folder. Python standard library only.
                (or its cell-progress.json). It is read again on every request, so
                running cell_progress.py after a build updates the page on reload
                without restarting the server; without it the tracker is empty
-               until you use "Import progress" in the page
+               until you use "Import progress" in the page. An island-cells.json in
+               that folder is served for the Local view when --data has none
 
   --build DIR  a build folder of your own (tools/build.py run folder): its toolkit/cell-progress.json becomes
                --progress and, when the folder holds them, its world-progress.json / island files become --data,
@@ -30,7 +31,9 @@ opens any map without picking a folder. Python standard library only.
                picked up without restarting) laid out as the build wrote it: maps/ (the compiled maps, .bsp and .chim),
                chim/ (the CHIM world: world.cwi and frames/), chimi/ (the rooms store: world.cwi, packs, rooms/*.crm) and
                a SERVED-BUILD.json naming the build. The inspector lists its maps and rooms; map-inspector.html?room=NAME
-               opens a room by name. --maps and --chim-world still work and are served next to it
+               opens a room by name. /build/cell-maps.json names the frame that holds each exterior cell, /build/rooms.json
+               the built room of each interior cell, /build/room-faces.json the drawn faces of every room (the World
+               Map's Show in 3D, room 3D buttons and rooms heatmap). --maps and --chim-world still work and are served next to it
   --reference F  the project's reference progress file (default: docs/chim/cell-progress-reference.json of this
                repository, if present); the World Map's Compare layer shows your cells next to it
 
@@ -64,7 +67,7 @@ Usage:
   toolkit_serve.py [--build DIR] --data DIR [--maps DIR] [--metrics FILE] [--progress DIR|FILE] [--port 8031] [--open]
 Then open http://127.0.0.1:8031/ (printed).
 """
-import argparse, errno, json, mimetypes, queue, re, shlex, subprocess, sys, threading, time, webbrowser
+import argparse, errno, json, mimetypes, queue, re, shlex, struct, subprocess, sys, threading, time, webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
@@ -75,6 +78,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA_FILES = ('world-progress.json', 'island.png', 'island.json', 'island-world.png', 'island-world.json',
               'island-cells.json')
 METRICS_FILE = 'world-metrics.json'   # served from --metrics, never from the data folder
+CELLS_FILE = 'island-cells.json'      # the Local view: from --data, else from the --progress folder
 # The CHIM Progress Tracker files, served from --progress under these names (the progress folder's own file names).
 PROGRESS_FILES = {'cell-progress.json': 'application/json', 'cell-progress-next.json': 'application/json',
                   'cell-progress-curve.json': 'application/json', 'cell-progress-curve.png': 'image/png'}
@@ -129,6 +133,195 @@ def served_build_info(root):
     return {'ok': True, 'label': str(mark.get('label') or root.name), 'version': mark.get('version'), 'run': mark.get('run'),
             'commit': mark.get('commit'), 'maps': maps, 'rooms': rooms, 'base': '/chim-world/build/',
             'world': (root / 'chim' / 'world.cwi').is_file(), 'interiors': (root / 'chimi' / 'world.cwi').is_file()}
+
+
+CELL_UNITS, MAP_SCALE = 8192, 4         # an exterior cell in game units; game units per map unit (a frame's chunk grid)
+INDEX_ROW = 60                          # a row of the CHIM world index's file table (tools/chim/format.py FILE_ENTRY)
+
+
+def frame_rows(index):
+    """{(x, y): frame folder} of a CHIM world index (chim/world.cwi): its FRAM rows. The rows' layout is the same in
+    every world format, so this reads them directly (standard library only)."""
+    if len(index) < 104 or index[:8] != b'CHIMINDX':
+        return {}
+    files_at, count = struct.unpack_from('>II', index, 72)
+    out = {}
+    for i in range(count):
+        o = files_at + INDEX_ROW * i
+        if o + INDEX_ROW > len(index):
+            break
+        if index[o:o + 4] == b'FRAM':
+            path = index[o + 28:o + INDEX_ROW].split(b'\0')[0].decode('ascii', 'replace')
+            out[struct.unpack_from('>hh', index, o + 6)] = path[:-len('/frame.ccf')] if path.endswith('/frame.ccf') else path
+    return out
+
+
+def frame_area(frame_file):
+    """(x0, y0, x1, y1) in game units of a frame's chunk grid (its frame block: centre in game units, low corner and
+    chunks in map units), or None."""
+    try:
+        with open(frame_file, 'rb') as f:
+            head = f.read(64)
+    except OSError:
+        return None
+    if len(head) < 64 or head[:8] != b'CHIMFRAM':
+        return None
+    _, _, cx, cy, lx, ly, grain, nx, ny = struct.unpack_from('>hhffffHHH', head, 32)
+    x0, y0 = cx + MAP_SCALE * lx, cy + MAP_SCALE * ly
+    return x0, y0, x0 + MAP_SCALE * nx * grain, y0 + MAP_SCALE * ny * grain
+
+
+def served_map_heads(root):
+    """{map name: worldspawn} of every map of a served copy whose worldspawn names a CHIM frame or a CHIM room (the map
+    heads only: the header and the entity lump of each map, read on a thread pool)."""
+    from concurrent.futures import ThreadPoolExecutor
+    from map_files import FRAME_KEY, ROOM_KEY, head_bytes, map_files, worldspawn
+    files = map_files(Path(root) / 'maps', '*')
+    with ThreadPoolExecutor() as pool:            # a head read per map, about 1,300 on the island: I/O bound (default threads)
+        heads = list(pool.map(lambda p: worldspawn(head_bytes(p)), files))
+    return {p.stem.lower(): ws for p, ws in zip(files, heads) if FRAME_KEY in ws or ROOM_KEY in ws}
+
+
+def served_rooms(root, heads=None):
+    """The built room of each interior cell of a served copy: {cell ID: {"room": room record, "map": room map, "types":
+    [room types], "default_type": the type the door opens}}, from the room maps' worldspawn ("_aw_cell_id", "_chim_room",
+    "_chim_room_types"); the 3D Inspector opens a room by its record name (map-inspector.html?room=NAME)."""
+    from map_files import ROOM_KEY
+    heads = served_map_heads(root) if heads is None else heads
+    out = {}
+    for name, ws in sorted(heads.items()):
+        if ROOM_KEY not in ws:
+            continue
+        cell = ws.get('_aw_cell_id') or ws.get('message')
+        if cell and cell not in out:
+            types = ws.get('_chim_room_types', '').split()
+            out[cell] = {'room': ws[ROOM_KEY], 'map': name, 'types': [ws[ROOM_KEY] + 't' + t for t in types],
+                         'default_type': ws[ROOM_KEY] + 't' + ws['_chim_room_type_default'] if ws.get('_chim_room_type_default') else None}
+    return out
+
+
+def store_models(root):
+    """[(name, pack path, offset, bytes)] by model id of a served copy's rooms store index (chimi/world.cwi), read directly
+    (the index layout of every store format: tools/chim/format.py INDEX_TOC, MODEL_DIR); [] without a store."""
+    try:
+        data = (Path(root) / 'chimi' / 'world.cwi').read_bytes()
+    except OSError:
+        return []
+    if len(data) < 104 or data[:8] != b'CHIMINDX':
+        return []
+    files_at, nfiles, models_at, nmodels, _, _, _, names_at = struct.unpack_from('>8I', data, 72)
+    paths = [data[files_at + INDEX_ROW * i + 28:files_at + INDEX_ROW * (i + 1)].split(b'\0')[0].decode('ascii', 'replace')
+             for i in range(nfiles)]
+    out = []
+    for i in range(nmodels):
+        fi, _, offset, nbytes, _, name_at, _ = struct.unpack_from('>HHIIIII', data, models_at + 24 * i)
+        end = data.find(b'\0', names_at + name_at)
+        out.append((data[names_at + name_at:end].decode('utf-8', 'replace'), paths[fi] if fi < len(paths) else None, offset, nbytes))
+    return out
+
+
+def served_room_faces(root, top=8):
+    """The drawn faces of every room of a served copy's rooms store, for the rooms heatmap: {room: {"faces": the faces of
+    every placement (a model's faces once per placement), "placements", "models", "top": [[model, faces, placements,
+    placed faces]] the heaviest models first}}. A model's faces are its brush image's face lump (20 bytes a face), read
+    from the image's header in its pack; the placements from chimi/rooms/<room>.crm (each record's model id)."""
+    import collections
+    root = Path(root)
+    models = store_models(root)
+    faces = [0] * len(models)
+    packs = collections.defaultdict(list)
+    for i, (_, pack, offset, nbytes) in enumerate(models):
+        if pack and nbytes >= 124:
+            packs[pack].append((offset, i))
+    for pack, rows in packs.items():
+        try:
+            with open(root / 'chimi' / pack, 'rb') as f:
+                for offset, i in sorted(rows):
+                    f.seek(offset)
+                    head = f.read(124)
+                    if len(head) == 124 and struct.unpack_from('<i', head)[0] == 29:
+                        faces[i] = max(0, struct.unpack_from('<i', head, 4 + 8 * 7 + 4)[0]) // 20
+        except OSError:
+            continue
+    out = {}
+    try:
+        records = sorted((root / 'chimi' / 'rooms').glob('*.crm'))
+    except OSError:
+        records = []
+    for p in records:
+        try:
+            b = p.read_bytes()
+        except OSError:
+            continue
+        if len(b) < 64 or b[:8] != b'CHIMROOM':
+            continue
+        count, _, data_at = struct.unpack_from('>III', b, 16)
+        size = (len(b) - data_at) // count if count else 56
+        if size not in (48, 56):
+            continue
+        per = collections.Counter(struct.unpack_from('>I', b, data_at + size * k + 8)[0] for k in range(count))
+        heavy = sorted(((faces[m] * n, m, n) for m, n in per.items() if m < len(faces)), reverse=True)
+        out[p.stem] = {'faces': sum(f for f, _, _ in heavy), 'placements': count, 'models': len(per),
+                       'top': [[models[m][0], faces[m], n, f] for f, m, n in heavy[:top]]}
+    return out
+
+
+def served_cell_maps(root, heads=None):
+    """The frame that holds each exterior cell of a served copy, and that frame's maps: {"x,y": {"frame": folder,
+    "frame_id": its id or null, "maps": [map names]}}. A cell's frame is its region frame in the ownership table
+    (chim-regions.json, aw-chim-ownership-1), else the frame whose chunk area holds the cell's centre (a town frame:
+    Balmora's holds nine cells); a frame's maps are the maps whose worldspawn names its cell ("_chim_frame", a town's
+    -chim map). Read from the copy's world index, its frame files and its map heads; nothing else."""
+    from map_files import FRAME_KEY
+    root = Path(root)
+    try:
+        frames = frame_rows((root / 'chim' / 'world.cwi').read_bytes())
+    except OSError:
+        return {}
+    maps = {}
+    for name, ws in sorted((served_map_heads(root) if heads is None else heads).items()):
+        try:
+            cell = tuple(int(v) for v in ws.get(FRAME_KEY, '').split())
+        except ValueError:
+            continue
+        if len(cell) == 2:
+            maps.setdefault(cell, []).append(name)
+    try:
+        table = json.loads((root / 'chim-regions.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        table = None
+    table = table if isinstance(table, dict) and table.get('format') == 'aw-chim-ownership-1' else {}
+    id_cell = {f.get('id'): tuple(f.get('cell') or ()) for f in table.get('frames') or [] if isinstance(f, dict)}
+    out = {}
+
+    def held(key, cell, frame_id):
+        out[key] = {'frame': frames[cell], 'frame_id': frame_id, 'maps': sorted(set(maps.get(cell, [])))}
+    for key, row in (table.get('cells') or {}).items():
+        cell = id_cell.get((row or {}).get('frame'))
+        if cell in frames:
+            held(key, cell, row['frame'])
+    # the frames the table does not name (the towns): a cell whose centre lies in a town's chunk area is the town's; where
+    # two towns' areas overlap (Seyda Neen's and Vivec's at cell 1,-10), the one the centre lies deeper inside (the larger
+    # least distance to the area's edge: an area is its town's cells and a margin)
+    named, best = set(id_cell.values()), {}
+    for cell, folder in sorted(frames.items()):
+        if cell in named:
+            continue
+        area = frame_area(root / 'chim' / folder / 'frame.ccf')
+        if area is None:
+            continue
+        x0, y0, x1, y1 = area
+        for x in range(int(x0 // CELL_UNITS) - 1, int(x1 // CELL_UNITS) + 1):
+            for y in range(int(y0 // CELL_UNITS) - 1, int(y1 // CELL_UNITS) + 1):
+                key, px, py = '%d,%d' % (x, y), (x + 0.5) * CELL_UNITS, (y + 0.5) * CELL_UNITS
+                if key in out or not (x0 <= px < x1 and y0 <= py < y1):
+                    continue
+                inset = min(px - x0, x1 - px, py - y0, y1 - py)
+                if key not in best or inset > best[key][0]:
+                    best[key] = (inset, cell)
+    for key, (_, cell) in best.items():
+        held(key, cell, None)
+    return out
 
 
 def build_folders(build):
@@ -527,6 +720,40 @@ class Handler(SimpleHTTPRequestHandler):
             Handler.served_cache = (now, root)
         return root
 
+    cell_cache = (None, None)       # (served copy and its marker's write time, the cell table): made once per copy
+    cell_lock = threading.Lock()
+
+    def cell_maps(self, root):
+        """{'cells': served_cell_maps, 'rooms': served_rooms} of the served copy, made once per copy (a new copy has a new
+        SERVED-BUILD.json); a few seconds on a whole island (every map's head is read once for both), so pages asking at
+        once wait for the one table."""
+        try:
+            key = (str(root), (Path(root) / SERVED_MARK).stat().st_mtime_ns)
+        except OSError:
+            key = (str(root), None)
+        with Handler.cell_lock:
+            if Handler.cell_cache[0] != key:
+                label, heads = served_build_info(root)['label'], served_map_heads(root)
+                Handler.cell_cache = (key, {
+                    'cells': {'ok': True, 'format': 'aw-toolkit-cell-maps-1', 'label': label, 'cells': served_cell_maps(root, heads)},
+                    'rooms': {'ok': True, 'format': 'aw-toolkit-rooms-1', 'label': label, 'base': '/chim-world/build/',
+                              'rooms': served_rooms(root, heads)}})
+            return Handler.cell_cache[1]
+
+    faces_cache = (None, None)
+
+    def room_faces(self, root):
+        """served_room_faces of the served copy, made once per copy."""
+        try:
+            key = (str(root), (Path(root) / SERVED_MARK).stat().st_mtime_ns)
+        except OSError:
+            key = (str(root), None)
+        with Handler.cell_lock:
+            if Handler.faces_cache[0] != key:
+                Handler.faces_cache = (key, {'ok': True, 'format': 'aw-toolkit-room-faces-1', 'label': served_build_info(root)['label'],
+                                             'rooms': served_room_faces(root)})
+            return Handler.faces_cache[1]
+
     def maps_folder(self):
         """The folder maps are served from: --maps, else the served build's maps/."""
         if self.maps_dir:
@@ -794,6 +1021,11 @@ class Handler(SimpleHTTPRequestHandler):
         if parts == ['data', 'live-status.json']:
             f = self.progress_dir / PROGRESS_SOURCES['live-status.json'] if self.progress_dir else None
             return self.send_bytes(f.read_bytes(), 'application/json') if f and f.is_file() else self.send_nothing()
+        if parts == ['data', CELLS_FILE] and not (self.data_dir and (self.data_dir / CELLS_FILE).is_file()):
+            # the Local view's terrain and placements: beside the tracker data when --data has none (a served Toolkit
+            # whose data folder holds only the tracker still draws the cell; TOOLKIT-LOCAL-CHIM-CELL-NO-MAP-67)
+            f = self.progress_dir / CELLS_FILE if self.progress_dir else None
+            return self.send_validated(f, 'application/json') if f and f.is_file() else self.send_error(404)
         if len(parts) == 2 and parts[0] == 'data' and parts[1] in DATA_FILES and self.data_dir:
             return self.send_file(self.data_dir / parts[1])
         if parts == ['data', 'newest-build.json']:
@@ -801,6 +1033,19 @@ class Handler(SimpleHTTPRequestHandler):
         if parts == ['build', 'config.json']:
             root = self.build_root()
             return self.send_json(served_build_info(root)) if root else self.send_json({'ok': False, 'error': 'no served build'}, 404)
+        if parts == ['build', 'room-faces.json']:
+            # the drawn faces of every room of the served build and its heaviest models (the rooms heatmap)
+            root = self.build_root()
+            if not root:
+                return self.send_json({'ok': False, 'error': 'no served build'}, 404)
+            return self.send_json(self.room_faces(root))
+        if parts in (['build', 'cell-maps.json'], ['build', 'rooms.json']):
+            # the frame and frame maps that hold each exterior cell, and the built room of each interior cell, of the served
+            # build (the World Map's Show in 3D and its room tiles' 3D buttons)
+            root = self.build_root()
+            if not root:
+                return self.send_json({'ok': False, 'error': 'no served build'}, 404)
+            return self.send_json(self.cell_maps(root)['cells' if parts[1] == 'cell-maps.json' else 'rooms'])
         maps_dir = self.maps_folder()
         if parts == ['maps', 'index.json']:
             # x.bsp and the CHIM frame maps x.chim (tools/map_files.py): one name each

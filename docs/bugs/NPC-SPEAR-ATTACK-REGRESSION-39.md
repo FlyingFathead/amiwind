@@ -112,16 +112,19 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - ACTOR-ANNOTATE-ROOM-REFERENCE-48 (no report page): The image step stopped on a room corpse: its actor annotation looked up the support class by id alone, but room actors are classified by reference
 - [ACTOR-BAKE-CENTRE-SEAM-48](ACTOR-BAKE-CENTRE-SEAM-48.md): Bradil Elarven (Glassworker's Hall) left unbaked: his centre probe falls through the seam of two floor pieces
 - ACTOR-GROUND-BAKE-CHIM-ROOMS-48 (no report page): The image step stopped in the actor ground bake: it loaded the batch-room shell maps as classic collision scenes, and its error named no map
+- ACTOR-GROUNDING-CENSUS-CONFLICTS-67 (no report page): The exterior grounding census measures seven people listed as standing on the ground as off the ground, and cannot read five effect models as support
 - [ACTOR-LEVELLED-INVENTORY-ONE-PICK-66](ACTOR-LEVELLED-INVENTORY-ONE-PICK-66.md): An actor's levelled inventory is chosen once when the game is built, not when the actor is made
 - [ACTOR-LEVELLED-NO-WANDER-56](ACTOR-LEVELLED-NO-WANDER-56.md): Levelled creatures (most wild creatures) never wander or aggro: the Wander table held placed actors only
 - ACTOR-PACK-GUAR-MESH-BROKEN-64 (no report page): The pack guar at Ahemmusa Camp is drawn with its body parts scattered apart
 - [ACTOR-PACKAGES-NOT-HELD-66](ACTOR-PACKAGES-NOT-HELD-66.md): Travel, follow and escort packages of the people and creature records are not carried by the build
+- ACTOR-QUEUE-OTHER-MAP-67 (no report page): Actors still queued when the map changes spawn in the next map at the old map's coordinates
 - [ACTOR-RANGED-COMBAT-MISSING-66](ACTOR-RANGED-COMBAT-MISSING-66.md): People and creatures that carry a bow, crossbow or thrown weapon fight hand to hand or with a melee weapon
 - [ACTOR-RESPAWN-CORPSE-RULES-66](ACTOR-RESPAWN-CORPSE-RULES-66.md): Dead bodies are never cleared away; the death rules over time need the original numbers
 - [ACTOR-SPAWN-DROPTOFLOOR-49](ACTOR-SPAWN-DROPTOFLOOR-49.md): The resident spawn grounding as Quake's droptofloor, one rule with the build's room bake
 - ACTOR-STATE-NOT-READ-ON-SPAWN-54 (no report page): A spawned actor never reads its actor record back: a killed NPC respawns alive and lowered health resets on re-entry or load
 - [ACTOR-STATE-POOL-LIMITS-54](ACTOR-STATE-POOL-LIMITS-54.md): The actor record drops changes past 128 changed actors, 12 item changes or 8 spell changes per actor; package changes of the behaviour records and NPC positions are not saved
 - ACTOR-STORM-POSE-51 (no report page): Requested: characters shield their eyes in ash and blight storms (the idlestorm pose), as all regular NPCs and the player do in the original, often seen in Ald'ruhn
+- ACTOR-TABLE-SAME-MAP-RELOAD-67 (no report page): A reload of the map in play joins none of its actor table cells: no creatures until the next map change
 - [ACTOR-WANDER-AGGRO-52](ACTOR-WANDER-AGGRO-52.md): Requested: NPCs and creatures wander, idle and aggro by their own record variables (AI packages, Fight), as the original game does
 - AMBIENT-RESIDENTS-NOT-VISIBLE-54 (no report page): From the matched pose OpenMW shows four residents on the Seyda Neen square, AmiWind one far figure
 - [AMBIENT-UNSTUCK-FLOOD-61](AMBIENT-UNSTUCK-FLOOD-61.md): Walking residents in Seyda Neen keep falling back to the stuck-movement retry
@@ -137,6 +140,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - BALMORA-PEOPLE-FLOATING-65 (no report page): In Balmora several people stand in the air above the street, as in early versions
 - BARTER-SOLD-ITEM-LOST-58 (no report page): A thing the player sells to a merchant who does not stock it leaves the game instead of going into the merchants stock
 - BUILD-ACTOR-SPEC-EMPTY-ROOMS-66 (no report page): The image stage stopped on the actor spec check: the check did not read the room batch stage's new list of empty cells, so the one NPC of an empty Tribunal cell counted as missing
+- BUILD-ACTOR-SPEC-UNSPAWNABLE-67 (no report page): The actor spec check counted every actor table row outdoors as placed, also rows the game cannot spawn
 - [CAMERA-POV-TAP-LOST-36](CAMERA-POV-TAP-LOST-36.md): A Toggle POV (Tab) tap released before the next frame did not switch the view
 - [CAMERA-THIRDPERSON-COMBAT-NPC-HIDDEN-36](CAMERA-THIRDPERSON-COMBAT-NPC-HIDDEN-36.md): In combat, switching to third person (Tab) hides the NPC you are fighting; it reappears back in first person
 - CENSUS-GUARD-NO-PATH-TO-THIEF-65 (no report page): A theft in the census office brings the guard only when he can walk to the player: across the table he cannot
@@ -203,6 +207,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [NPC-HEAD-DECIMATION-33](NPC-HEAD-DECIMATION-33.md): NPC heads decimated into unrecognisable faces
 - [NPC-HEAD-STARVED-WHOLE-HAIR-54](NPC-HEAD-STARVED-WHOLE-HAIR-54.md): With whole hair some heads got only 28 to 52 triangles: Dark Elf women in robes
 - [NPC-IDLE-ONLY-ANIM-33](NPC-IDLE-ONLY-ANIM-33.md): NPCs play only their idle animation: no walking, running, turning or other animation groups
+- NPC-IDLE-TRACK-PLAYER-67 (no report page): Requested: an idle character turns its head and body slowly towards the player and follows the player's movements (the dock guard in the opening, the clerk of the Census and Excise Office)
 - [NPC-NEAR-SKIN-TEXELS-33](NPC-NEAR-SKIN-TEXELS-33.md): Original-head models had blurrier bodies than the budget model
 - [NPC-NO-RUN-ANIM-35](NPC-NO-RUN-ANIM-35.md): Companions and hostile NPCs walk but never run, and the walk looks wrong: release residents had only idle frames
 - NPC-NO-SPELLCASTING-65 (no report page): Hostile characters never cast spells in a fight
@@ -214,6 +219,8 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [NPC-WANDER-NOT-EXECUTED-35](NPC-WANDER-NOT-EXECUTED-35.md): Residents stand still: the original's Wander AI packages (radius, duration, idles) are decoded but not executed
 - [NPC-WEAPON-MESH-33](NPC-WEAPON-MESH-33.md): NPCs hold no weapons or shields; combat uses them unseen
 - NPC-WEREWOLF-NO-MODEL-66 (no report page): The werewolf NPCs of Bloodmoon get no model: their hair part has no attached geometry
+- OUTDOOR-CORPSE-NEIGHBOUR-JOIN-67 (no report page): The dead bodies the original places outdoors show only when the player arrives in their cell, never when their cell joins around the player
+- OUTDOOR-CREATURES-HOME-CELL-67 (no report page): The cell the player arrives in has none of its levelled creatures: the window's home frame never joins the actor table
 - [OUTDOOR-CREATURES-REGRESSION-66](OUTDOOR-CREATURES-REGRESSION-66.md): Regression: no outdoor creatures spawn, no mudcrabs or slaughterfish, though earlier versions had them
 - OUTDOOR-DEAD-BODY-GONE-66 (no report page): An outdoor body is gone at once on a later visit: it cannot be looted after leaving
 - PICKUP-E-OWNED-NO-TAKE-58 (no report page): On the v0.0.58-dev5 image the activate key on an aimed owned item (the Census Office Quill Pen, red name, red E: Steal) takes nothing; it is not in the inventory after a save and reload

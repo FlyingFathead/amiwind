@@ -319,18 +319,26 @@ def seyda_activated(maps, models, names):
     return [found[k] for k in sorted(found, key=int)], refused
 
 
+# The frame's own placements that the town maps do not hold as statics, each declared in the CHIM world's parity record
+# (chim.seyda.prepare_area; the apron owners' supplements by prepare_seyda) and counted as the town's by
+# seyda_static_check: the town flora the image adds, the original dressing the frame keeps (kelp, giant mushrooms), the
+# apron owners' supplements and the containers that open (SEYDA-CONTAINERS-NOT-DRAWN-67: exported and placed by the
+# frame as the tutorial barrel is; the town carrier holds the barrel itself, not them; BUILD-SEYDA-TOWN-CONTAINERS-67).
+FRAME_ADDITIONS = ('town_flora_added', 'source_dressing_added', 'apron_owner_added', 'open_containers')
+
+
 def seyda_static_check(maps, names, placed, parity):
     """(refusals, record): the frame_map.frame_entities statics rule both ways, on the entity dicts: every static
-    (func_wall with a scenery aw_ref) of the maps `names`, with the town flora the image adds and without the
-    harvest placements it removes (the CHIM world's parity record), is a CHIM placement of the frame, and the
-    reverse (for the town; a special map holds a subset: one way only)."""
+    (func_wall with a scenery aw_ref) of the maps `names`, with the frame's declared additions (FRAME_ADDITIONS: the
+    town flora the image adds, the dressing the frame keeps, the apron supplements, the containers that open) and
+    without the harvest placements it removes (the CHIM world's parity record), is a CHIM placement of the frame, and
+    the reverse (for the town; a special map holds a subset: one way only)."""
     from chim.frame_map import TERRAIN_REF
     statics = {int(e['aw_ref']) for name in names for e in maps[name]
                if e.get('classname') == 'func_wall' and e.get('model', '').startswith('*')
                and str(e.get('aw_ref', '')).isdigit() and int(e['aw_ref']) < TERRAIN_REF}
-    statics |= set(parity.get('town_flora_added') or [])
-    statics |= set(parity.get('source_dressing_added') or [])
-    statics |= set(parity.get('apron_owner_added') or [])
+    for key in FRAME_ADDITIONS:
+        statics |= set(parity.get(key) or [])
     statics -= set(parity.get('harvest_removed') or [])
     placed = {int(r) for r in placed if str(r).isdigit()}
     maps_only = sorted(statics - placed)
@@ -341,6 +349,58 @@ def seyda_static_check(maps, names, placed, parity):
                        % (len(maps_only), ', '.join(map(str, maps_only[:8]))))
     return refused, {'statics': len(statics), 'in_chunks': len(statics & placed), 'town_only': maps_only,
                      'chim_only': chim_only}
+
+
+def seyda_statics_refusals(maps, region_names, placed, parity):
+    """(refusals, town record, {special map: record}): seyda_static_check on the town, both ways (the town frame holds
+    the whole town), and on each special map (one way: it holds a subset). prepare_seyda and the builder's early check
+    of the frame against the town (tools/seyda_early_checks.py, before the world stage) call it alike."""
+    from prepare_seyda_regions import SPECIALS
+    refused, statics = seyda_static_check(maps, region_names, placed, parity)
+    if statics['chim_only']:       # the town frame holds the whole town: both ways
+        refused.append('%d CHIM statics are not in the town (first: %s)'
+                       % (len(statics['chim_only']), ', '.join(map(str, statics['chim_only'][:5]))))
+    specials = {}
+    for name, _ in SPECIALS:
+        srefused, specials[name] = seyda_static_check(maps, [name], placed, parity)
+        refused += srefused
+    return refused, statics, specials
+
+
+def seyda_container_check(data_files, catalogue, declared, placed):
+    """The containers that open which the frame declares as its own (the CHIM world's parity open_containers,
+    chim.seyda.prepare_area), bound before seyda_static_check counts them as the town's (FRAME_ADDITIONS): each is a
+    reference of the frame's source catalogue (CATALOGUE: CHIM_WORLD/work/seyda/source-catalogue.json, the original
+    audit's rows) that the frame's own rule chooses when re-applied to it (chim.seyda.open_container_refs: a CONT record
+    with a name that is not organic, physically in the frame's owned cells), once, and a placement of the frame.
+    Returns the sorted numbers; raises ValueError naming the first numbers that do not hold
+    (BUILD-SEYDA-TOWN-CONTAINERS-67)."""
+    from chim.seyda import open_container_refs
+    from mwad.paths import resolve_data_files
+    numbers = [int(n) for n in declared]
+    if len(set(numbers)) != len(numbers):
+        raise ValueError('Seyda Neen\'s declared containers repeat a reference')
+    if not Path(catalogue).is_file():
+        raise ValueError('Seyda Neen\'s declared containers need the frame\'s source catalogue %s' % catalogue)
+    rows = {r['number']: r for r in json.loads(Path(catalogue).read_text(encoding='utf-8'))['references']}
+    unknown = [n for n in numbers if n not in rows]
+    chosen = {r['number'] for r in open_container_refs(resolve_data_files(data_files), [rows[n] for n in numbers
+                                                                                        if n in rows], set())}
+    wrong = [n for n in numbers if n in rows and n not in chosen]
+    placed = {int(r) for r in placed if str(r).isdigit()}
+    unplaced = [n for n in numbers if n not in placed]
+    problems = []
+    if unknown:
+        problems.append('%d are not references of the frame\'s source catalogue (%s)'
+                        % (len(unknown), ', '.join(map(str, unknown[:8]))))
+    if wrong:
+        problems.append('%d are not containers that open in the frame\'s owned cells (%s)'
+                        % (len(wrong), ', '.join(map(str, wrong[:8]))))
+    if unplaced:
+        problems.append('%d are not placements of the frame (%s)' % (len(unplaced), ', '.join(map(str, unplaced[:8]))))
+    if problems:
+        raise ValueError('Seyda Neen\'s declared containers (CHIM parity open_containers): ' + '; '.join(problems))
+    return sorted(numbers)
 
 
 def seyda_frame_rows(maps, names, default):
@@ -427,9 +487,10 @@ def prepare_seyda(data_files, scene, chim_world, out, flora=None, town_source_in
     scene stage's complete town (maps/seyda.bsp, converted from the game data), cut by the same rules
     (seyda_maps), with the image's town flora rule (seyda_flora); the actors are fitted on the CHIM frame's own
     collision (ground_actors), the arrival is checked on it, and the statics are checked against the CHIM
-    placements (seyda_static_check). Writes OUT/entities.json (rows of the town frame map and of each special
-    frame map, the activated objects) and OUT/id1/seyda-regions.txt (the region table: harvest catalogues and
-    saves follow it)."""
+    placements (seyda_statics_refusals), the frame's declared additions counted (FRAME_ADDITIONS; the containers that
+    open bound to their rule first, seyda_container_check). Writes OUT/entities.json (rows of the town frame map and
+    of each special frame map, the activated objects) and OUT/id1/seyda-regions.txt (the region table: harvest
+    catalogues and saves follow it)."""
     import hashlib
     from mwad.paths import ensure_external
     from import_town import write_json
@@ -481,10 +542,11 @@ def prepare_seyda(data_files, scene, chim_world, out, flora=None, town_source_in
             raise ValueError('CHIM kelp additions require their original scenery index')
         check_dressing_additions(json.loads(Path(town_source_index).read_text(encoding='utf-8')),
                                  parity['source_dressing_added'])
-    refused, statics = seyda_static_check(maps, region_names, placed, parity)
-    if statics['chim_only']:       # the town frame holds the whole town: both ways
-        refused.append('%d CHIM statics are not in the town (first: %s)'
-                       % (len(statics['chim_only']), ', '.join(map(str, statics['chim_only'][:5]))))
+    if parity.get('open_containers'):
+        # the containers that open the frame places as its own (SEYDA-CONTAINERS-NOT-DRAWN-67), bound to their rule
+        parity['open_containers'] = seyda_container_check(
+            data_files, chim_world / 'work' / SEYDA / 'source-catalogue.json', parity['open_containers'], placed)
+    refused, statics, special_statics = seyda_statics_refusals(maps, region_names, placed, parity)
     rows, report = seyda_frame_rows(maps, region_names, default_region(layout)['name'])
     refused += report['refused']
     activated, bad = seyda_activated(maps, models, region_names)
@@ -501,9 +563,7 @@ def prepare_seyda(data_files, scene, chim_world, out, flora=None, town_source_in
         srows = [dict(fitted.get(e.get('aw_ref'), e)) if e.get('classname') == 'aw_npc' else e for e in srows]
         sact, bad = seyda_activated(maps, models, [name])
         refused += bad
-        srefused, sstatics = seyda_static_check(maps, [name], placed, parity)
-        refused += srefused
-        specials[name] = {'rows': srows, 'activated': sact, 'statics': sstatics, 'report': sreport}
+        specials[name] = {'rows': srows, 'activated': sact, 'statics': special_statics[name], 'report': sreport}
     if refused:
         raise ValueError('Seyda Neen on CHIM: ' + '; '.join(refused[:6]))
     (out / 'id1/seyda-regions.txt').write_text(directory_text(layout), encoding='ascii', newline='\n')

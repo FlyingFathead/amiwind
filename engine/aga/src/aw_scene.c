@@ -28,6 +28,7 @@
 #include "aw_listbox.h"
 #include "aw_activate.h"
 #include "aw_mapmarks.h"
+#include "aw_loaderr.h"
 /* Ordinary hinged doors (aw_hinged_door.c sets these; NULL: none). */
 int (*aw_hinged_use)(void);
 int (*aw_hinged_hint)(const char **name,const char **action);
@@ -606,34 +607,200 @@ static void tp_held_drop(const char *why) {
     tp_held[0]=0;
 }
 static int load_recovering;     /* the way back is loading */
-static int load_box_wanted;     /* 1: the box (OK / Load Game), 2: the load menu (no way back); aw_loadfail.c shows it */
+static int load_box_wanted;     /* 1: the OK box, 2: the load menu (no place to stay); aw_loadfail.c shows it */
 static char load_reason[160];
+/* SCENE-LOAD-FAIL-FALLBACK-67 / DBG-TP-NOT-FOUND-BOX-67: ONE CATCHER for every way into a place. Every scene load
+ * passes load_scene (dbg tp, doors and load doors, travel, a script's Position / PositionCell / Activate, a region
+ * crossing, dbg cam recall, the door roulette) and every map load passes Host_Map_f (AW_SceneMapBegin). A refusal
+ * before anything is left, and a load that fails after it (Host_Error, Host_EndGame, a map that does not spawn, a
+ * broken map file, not enough memory, a load that does not finish), end here: the console gets one debug block
+ * (aw_loaderr.c AW_LoadErrConsole), the player stays or is put back where he was, and the game's own message box
+ * says what went wrong with one OK button (aw_loadfail.c). With no place to stay the load menu names the error.
+ * lerr: the error the box shows (the first failure of the load); lcause: what the map load in flight noted
+ * (AW_SceneLoadNote: a broken file, the memory, a missing file, the time limit); map_loading: Host_Map_f started a
+ * map that has not spawned yet. */
+static aw_loaderr_t lerr,lcause;
+static int map_loading;
+static char map_loading_name[AW_LOADERR_MAP];
+static char via_next[96],load_via[96];   /* how the next / the running load started (the console block's command) */
+/* aw_loadfail.c: the check before anything is left (the map file's header and the memory its world needs), and the
+ * machine's free Fast (0) or Chip (1) RAM in bytes; NULL in the host fixtures: no check, not known. */
+int (*aw_load_precheck)(const char *map,aw_loaderr_t *e);
+long (*aw_load_memory_free)(int chip);
 static void load_from_capture(edict_t *p,int kind) {
     if(load_recovering || !p || !sv.active || !map_valid(sv.name)){if(!load_recovering)load_from.valid=0;return;}
     load_from.valid=1;load_from.kind=kind;copy_name(load_from.map,sizeof(load_from.map),sv.name);
     VectorCopy(p->v.origin,load_from.origin);VectorCopy(p->v.v_angle,load_from.angles);
     load_from.movetype=(int)p->v.movetype;load_from.health=p->v.health;
 }
+/* The dbg tp / dbg scene command as typed (the console routes dbg tp to aw_teleport, dbg scene to aw_scene). */
+static void typed_command(char *out,int size) {
+    int i,used;const char *name=Cmd_Argv(0);
+    used=snprintf(out,size,"%s",!strcmp(name,"aw_teleport")?"dbg tp":!strcmp(name,"aw_scene")?"dbg scene":name);
+    for(i=1;i<Cmd_Argc() && used>0 && used<size;i++)used+=snprintf(out+used,size-used," %s",Cmd_Argv(i));
+}
+/* The place's name the HUD shows (the map's worldspawn message, as %Cell: the part after the last "/"). */
+static void place_name(char *out,int size) {
+    const char *slash=strrchr(cl.levelname,'/');
+    copy_name(out,size,slash?slash+1+(slash[1]==' '):cl.levelname);
+}
+/* Where the player is now, into E (here_*). */
+static void error_here(aw_loaderr_t *e) {
+    edict_t *p=sv.active && svs.clients?svs.clients[0].edict:NULL;
+    e->here_ok=0;e->here_map[0]=e->here_place[0]=0;
+    if(!p || !sv.active)return;
+    copy_name(e->here_map,sizeof(e->here_map),sv.name);place_name(e->here_place,sizeof(e->here_place));
+    VectorCopy(p->v.origin,e->here);e->here_ok=1;
+}
+/* A fresh record of KIND for MAP (its place's name PLACE): the command, the free memory. */
+static void error_begin(aw_loaderr_t *e,int kind,const char *map,const char *place) {
+    memset(e,0,sizeof(*e));e->kind=kind;e->lump=-1;e->offset=-1;e->file_bytes=-1;e->fast_free=e->chip_free=-1;
+    copy_name(e->map,sizeof(e->map),map?map:"");copy_name(e->place,sizeof(e->place),place?place:"");
+    if(load_via[0])copy_name(e->command,sizeof(e->command),load_via);
+    if(aw_load_memory_free){e->fast_free=aw_load_memory_free(0);e->chip_free=aw_load_memory_free(1);}
+}
+/* The cause fields of S into D (the kind, the file, the bad lump, the memory, the engine's message). */
+static void error_cause(aw_loaderr_t *d,const aw_loaderr_t *s) {
+    d->kind=s->kind;copy_name(d->file,sizeof(d->file),s->file);d->file_bytes=s->file_bytes;
+    d->broken=s->broken;d->lump=s->lump;d->offset=s->offset;d->need=s->need;d->have=s->have;
+    copy_name(d->arena,sizeof(d->arena),s->arena);copy_name(d->detail,sizeof(d->detail),s->detail);
+}
+/* The console's debug block for the error (one per failure). */
+static void error_print(const aw_loaderr_t *e) {
+    char block[1536];
+    if(AW_LoadErrConsole(e,block,sizeof(block)))Con_Printf("%s",block);
+}
+/* A refusal before anything is left: the console block, the box in the next game frame; the player stays. */
+static void refusal_show(void) {
+    lerr.way=AW_WAY_NONE;error_here(&lerr);error_print(&lerr);load_box_wanted=1;
+}
+/* A dbg tp refusal (one path for every form): KIND for what was typed or asked (MAP, its place's name PLACE; POINT the
+ * original x y of a coordinate teleport). The console line that said it stays; the player is unchanged. */
+static void tp_refused(int kind,const char *map,const char *place,const float *point,const char *detail) {
+    char typed[96];
+    typed_command(typed,sizeof(typed));
+    copy_name(load_via,sizeof(load_via),typed);
+    error_begin(&lerr,kind,map,place);
+    if(point){lerr.x=point[0];lerr.y=point[1];}
+    if(detail)copy_name(lerr.detail,sizeof(lerr.detail),detail);
+    refusal_show();load_via[0]=0;
+}
+/* Host_Map_f (host_cmd.c), once a map load starts, the refusals passed: in flight until the spawn (AW_SceneSpawn). */
+void AW_SceneMapBegin(const char *name) {
+    map_loading=1;copy_name(map_loading_name,sizeof(map_loading_name),name?name:"");memset(&lcause,0,sizeof(lcause));
+    /* a map no scene load started: a saved game, a start, a typed map */
+    if(!pending)snprintf(load_via,sizeof(load_via),"map %s (a saved game, a start or a typed map)",map_loading_name);
+}
+int AW_SceneLoadInFlight(void){return pending || map_loading;}
+/* What the map load in flight met (aw_loadfail.c: the memory, a broken file, the time limit; Host_Map_f: the map not
+ * found or not spawned); the first one counts. */
+void AW_SceneLoadNote(const aw_loaderr_t *e) {
+    if(!e || lcause.kind || !AW_SceneLoadInFlight())return;
+    error_cause(&lcause,e);
+}
+/* The engine's message (Host_Error) as the kind when nothing more exact was noted. */
+static void cause_from_message(aw_loaderr_t *e,const char *why) {
+    if(lcause.kind){error_cause(e,&lcause);return;}
+    e->kind=AW_LOADERR_ERROR;
+    if(why && strstr(why,"forced load failure"))copy_name(e->detail,sizeof(e->detail),"forced failure (dbg loadfail)");
+    else{
+        if(why && (strstr(why," not found") || strstr(why,"missing")))e->kind=AW_LOADERR_MISSING_FILE;
+        copy_name(e->detail,sizeof(e->detail),why?why:"");
+    }
+}
 const char *AW_SceneLoadBoxText(void) {
-    return load_from.kind==AW_LOAD_TELEPORT?"Unable to teleport, see debug console with F10.":
-           load_from.kind==AW_LOAD_SCRIPT?"Unable to move there: the place failed to load. See debug console with F10.":
-           "Unable to go through the door: the place behind it failed to load. See debug console with F10.";
+    static char text[1024];
+    AW_LoadErrBox(&lerr,text,sizeof(text));
+    return text;
+}
+const char *AW_SceneLoadNoticeText(void) {
+    static char text[80];
+    AW_LoadErrNotice(&lerr,text,sizeof(text));
+    return text;
 }
 /* Host_Error / Host_EndGame (host.c, before the longjmp) and Host_Map_f when the map does not spawn. */
 void AW_SceneLoadFailed(const char *why) {
-    char command[32];
-    if(!pending)return;
+    char command[32];int was_loading=map_loading;
+    map_loading=0;
+    if(!pending){
+        /* a map load no scene load started (a save, a start, a typed map): no place to go back to; the load menu
+         * names the error. No load at all: as before (the error ends the session, the console says why). */
+        if(!was_loading)return;
+        tp_held_drop("the load failed");
+        error_begin(&lerr,AW_LOADERR_ERROR,map_loading_name,"");cause_from_message(&lerr,why);
+        lerr.way=AW_WAY_NOWHERE;error_print(&lerr);load_box_wanted=2;
+        return;
+    }
     tp_held_drop("the load failed");   /* DBG-TP-DURING-LOAD-66 */
     if(why && why[0]){Q_strcpy_bounded(load_reason,why,sizeof(load_reason));}
-    if(load_recovering || !load_from.valid){
-        /* the way back failed too, or there was no place to go back to: no load stays pending; the menus work */
-        Con_Printf("Load failed: %s; %s.\n",load_reason,load_recovering?"the way back failed as well":"no earlier place to return to");
+    if(load_recovering){
+        /* the way back failed too: the first error stays the box's, its way back failed; the load menu */
+        Con_Printf("Load failed: %s; the way back failed as well.\n",load_reason);
+        lerr.way=AW_WAY_FAILED;copy_name(lerr.back_map,sizeof(lerr.back_map),load_from.map);lerr.here_ok=0;
+        error_print(&lerr);
         pending=region_crossing=map_jump=0;load_recovering=0;load_from.valid=0;AW_StreamTransitionReady();
         load_box_wanted=2;      /* the load menu: a saved game is the way on (aw_loadfail.c) */
         return;
     }
+    error_begin(&lerr,AW_LOADERR_ERROR,next.target,next.label);cause_from_message(&lerr,why);
+    if(!load_from.valid){
+        /* there was no place to go back to: no load stays pending; the menus work */
+        Con_Printf("Load failed: %s; no earlier place to return to.\n",load_reason);
+        lerr.way=AW_WAY_NOWHERE;error_print(&lerr);
+        pending=region_crossing=map_jump=0;load_recovering=0;load_from.valid=0;AW_StreamTransitionReady();
+        load_box_wanted=2;
+        return;
+    }
+    lerr.way=AW_WAY_BACK;copy_name(lerr.back_map,sizeof(lerr.back_map),load_from.map);
+    copy_name(lerr.from_map,sizeof(lerr.from_map),load_from.map);VectorCopy(load_from.origin,lerr.from);lerr.from_ok=1;
+    error_print(&lerr);
     Con_Printf("Load failed: %s. Returning to %s at %ld %ld %ld.\n",load_reason,load_from.map,
         (long)load_from.origin[0],(long)load_from.origin[1],(long)load_from.origin[2]);
+    memset(&next,0,sizeof(next));copy_name(next.target,sizeof(next.target),load_from.map);
+    VectorCopy(load_from.origin,next.arrival);next.yaw=load_from.angles[1];
+    map_jump=3;region_crossing=0;crossing_movetype=load_from.movetype;health=load_from.health;
+    shroompicker_view=0;load_recovering=1;pending=1;started=Sys_FloatTime();
+    sprintf(command,"map %s\n",load_from.map);Cbuf_InsertText(command);
+}
+/* NET-VIVEC-ENTITY-PACKET-OVERFLOW-66 (the maintainer, 2026-11-17: every place that can still stop the game this way
+ * goes through the load-fallback box and the way back): Host_Error (host.c) in play, no load running. Each frame of
+ * play keeps the player's spot (play_spot_take, from AW_SceneTick); such an error loads that place again, the player
+ * where he was, and the box says why ("An error stopped the game in <map>; it was loaded again.", LF9). The same error
+ * again within a minute in the same map: no place to stay, the load menu names it. A load in flight goes back where
+ * it started, as before (AW_SceneLoadFailed); with no play yet (the menus) the error ends the session as before. */
+static struct {
+    int valid,movetype;char map[16];vec3_t origin,angles;float health;double reloaded;char reloaded_map[16];
+} play_spot;
+static void play_spot_take(edict_t *p) {
+    if(!map_valid(sv.name))return;
+    play_spot.valid=1;copy_name(play_spot.map,sizeof(play_spot.map),sv.name);
+    VectorCopy(p->v.origin,play_spot.origin);VectorCopy(p->v.v_angle,play_spot.angles);
+    play_spot.movetype=(int)p->v.movetype;play_spot.health=p->v.health;
+}
+void AW_SceneHostError(const char *why) {
+    char command[32];
+    if(pending || map_loading){AW_SceneLoadFailed(why);return;}
+    if(!play_spot.valid)return;
+    play_spot.valid=0;
+    tp_held_drop("an error stopped the game");
+    error_begin(&lerr,AW_LOADERR_ERROR,play_spot.map,"");lerr.in_play=1;
+    copy_name(lerr.detail,sizeof(lerr.detail),why?why:"");
+    copy_name(lerr.command,sizeof(lerr.command),"play (no load running)");
+    copy_name(lerr.from_map,sizeof(lerr.from_map),play_spot.map);VectorCopy(play_spot.origin,lerr.from);lerr.from_ok=1;
+    Q_strcpy_bounded(load_reason,why?why:"",sizeof(load_reason));
+    if(realtime-play_spot.reloaded<60 && realtime>=play_spot.reloaded && !strcmp(play_spot.reloaded_map,play_spot.map)){
+        Con_Printf("Error in play: %s; it came again soon after %s was loaded again.\n",load_reason,play_spot.map);
+        lerr.way=AW_WAY_NOWHERE;error_print(&lerr);load_box_wanted=2;
+        return;
+    }
+    play_spot.reloaded=realtime;copy_name(play_spot.reloaded_map,sizeof(play_spot.reloaded_map),play_spot.map);
+    lerr.way=AW_WAY_BACK;copy_name(lerr.back_map,sizeof(lerr.back_map),play_spot.map);
+    error_print(&lerr);
+    Con_Printf("Error in play: %s. Loading %s again at %ld %ld %ld.\n",load_reason,play_spot.map,
+        (long)play_spot.origin[0],(long)play_spot.origin[1],(long)play_spot.origin[2]);
+    load_from.valid=1;load_from.kind=AW_LOAD_SCRIPT;copy_name(load_from.map,sizeof(load_from.map),play_spot.map);
+    VectorCopy(play_spot.origin,load_from.origin);VectorCopy(play_spot.angles,load_from.angles);
+    load_from.movetype=play_spot.movetype;load_from.health=play_spot.health;
     memset(&next,0,sizeof(next));copy_name(next.target,sizeof(next.target),load_from.map);
     VectorCopy(load_from.origin,next.arrival);next.yaw=load_from.angles[1];
     map_jump=3;region_crossing=0;crossing_movetype=load_from.movetype;health=load_from.health;
@@ -646,24 +813,56 @@ static void load_recovered(edict_t *p) {
     load_recovering=0;load_from.valid=0;
     VectorCopy(load_from.angles,p->v.angles);VectorCopy(load_from.angles,p->v.v_angle);p->v.fixangle=1;
     p->v.movetype=load_from.movetype;noclip_anglehack=p->v.movetype==MOVETYPE_NOCLIP;
-    Con_Printf("Back at %s %ld %ld %ld after the failed load: %s\n",sv.name,(long)p->v.origin[0],(long)p->v.origin[1],
-        (long)p->v.origin[2],load_reason);
-    load_box_wanted=1;
+    Con_Printf("Back at %s %ld %ld %ld after the failed load (%s): %s\n",sv.name,(long)p->v.origin[0],(long)p->v.origin[1],
+        (long)p->v.origin[2],AW_LoadErrCode(lerr.kind),load_reason);
+    error_here(&lerr);load_box_wanted=1;
 }
-/* aw_loadfail.c: what to show after a failed load (1 the box, 2 the load menu, 0 nothing), taken once; and the
- * state dropped (dbg restartgame). */
+/* aw_loadfail.c: what to show after a failed load or a refusal (1 the OK box, 2 the load menu, 0 nothing), taken
+ * once; and the state dropped (dbg restartgame). */
 int AW_SceneLoadBoxTake(void) {
     int w=load_box_wanted;
     if(w==1 && (pending || !sv.active || cls.state!=ca_connected || cls.signon!=SIGNONS))return 0;  /* not arrived yet */
     load_box_wanted=0;return w;
 }
 void (*aw_loadfail_tick)(void);   /* aw_loadfail.c, each frame from AW_SceneTick */
+/* How the next load_scene starts, for the console block ("door 113893", "travel", "script PositionCell"). */
+static void via(const char *how,unsigned long number) {
+    if(number)snprintf(via_next,sizeof(via_next),"%s %lu",how,number);else copy_name(via_next,sizeof(via_next),how);
+}
+/* A region crossing whose map failed the check before leaving: refused once per map (the box once), the player held
+ * at the last spot inside the map he is in (AW_SceneTick's frame_last). */
+static char crossing_refused[16];
+static char prechecked[16];   /* a map that just passed the check (a ride checks before the fare): not read again */
+/* The check before anything is left (aw_load_precheck): 1 when LINK's map is refused (the box is up). HOW: the way
+ * the load starts ("" when not known). One file open and its 124-byte header per load. */
+static int precheck_refused(const aw_scene_link_t *link,const char *how) {
+    aw_loaderr_t e;
+    if(!aw_load_precheck)return 0;
+    if(prechecked[0] && !strcmp(prechecked,link->target)){prechecked[0]=0;return 0;}
+    if(region_crossing && !strcmp(crossing_refused,link->target))return 1;
+    memset(&e,0,sizeof(e));e.lump=-1;e.offset=-1;e.file_bytes=-1;
+    if(!aw_load_precheck(link->target,&e)){copy_name(prechecked,sizeof(prechecked),link->target);return 0;}
+    prechecked[0]=0;
+    error_begin(&lerr,e.kind,link->target,link->label);error_cause(&lerr,&e);
+    copy_name(lerr.command,sizeof(lerr.command),how && how[0]?how:region_crossing?"region crossing":"door");
+    if(tp_cmd)typed_command(lerr.command,sizeof(lerr.command));
+    if(region_crossing)copy_name(crossing_refused,sizeof(crossing_refused),link->target);
+    refusal_show();
+    return 1;
+}
 static void load_scene(aw_scene_link_t *link,int immediate) {
-    edict_t *p=svs.clients[0].edict;char command[32];
+    edict_t *p=svs.clients[0].edict;char command[32],how[96];
+    copy_name(how,sizeof(how),via_next);via_next[0]=0;   /* the caller's way (via), for this load only */
     if(pending || !map_valid(link->target))return;
     /* a marked room or frame on less Fast RAM (CHIM-32MB-SAVE-ENTRY-48): the strider, a door out of a room, dbg tp;
      * a region crossing was checked by the tick (AW_SceneFrameRefuse) */
     if(!region_crossing && AW_SceneEntryRefuse(link->target,link->arrival,0))return;
+    /* SCENE-LOAD-FAIL-FALLBACK-67: a damaged map file or one too big for this start's memory, refused before leaving */
+    if(precheck_refused(link,how))return;
+    prechecked[0]=0;
+    if(how[0])copy_name(load_via,sizeof(load_via),how);
+    else if(tp_cmd)typed_command(load_via,sizeof(load_via));
+    else copy_name(load_via,sizeof(load_via),region_crossing?"region crossing":no_followers?"script Position":"door");
     if(!AW_RegionSelect(link->target,link->arrival,intro_docks_variant.value==2 &&
        aw_story.stage>=AW_STAGE_SHIP && aw_story.stage<=AW_STAGE_OFFICE))return;
     if(region_crossing){
@@ -699,12 +898,18 @@ static void load_scene(aw_scene_link_t *link,int immediate) {
 /* LOADED_MAP (DEBUG-TP-MINIWIND-36): dbg tp only; on a disk without the open-world table (a MiniWind) a point inside
  * the loaded map resolves to that map (AW_WorldLoadedTarget). Scripts (Position) and the other callers keep the
  * table's answer alone. */
+/* Why the last map_teleport returned 0 (the dbg tp refusal's box only for a point no map holds): 1 a load runs, no
+ * game, the player is dead or the story holds him; 2 no map on this disk holds the point; 3 the load was refused
+ * before leaving (its own screen or box is up). */
+static int teleport_refused;
 static int map_teleport(const float *source_position,int use_height,int loaded_map) {
     aw_scene_link_t r;edict_t *p;float local[3];
+    teleport_refused=1;
     if(pending || !sv.active || svs.maxclients!=1 || !svs.clients ||
        !(p=svs.clients[0].edict) || cls.state!=ca_connected || p->v.health<=0 ||
        AW_StoryRestricted())return 0;
     memset(&r,0,sizeof(r));
+    teleport_refused=2;
     if(!AW_WorldMapTarget(source_position,r.target,r.arrival) &&
        !(loaded_map && AW_WorldLoadedTarget(sv.name,source_position,r.target,r.arrival)))return 0;
     if(use_height){
@@ -716,9 +921,15 @@ static int map_teleport(const float *source_position,int use_height,int loaded_m
     }
     r.yaw=p->v.v_angle[1];region_crossing=0;door_ready=0;door_close=0;
     crossing_movetype=p->v.movetype;
+    teleport_refused=3;
     no_followers=1;load_scene(&r,1);no_followers=0;
     if(!pending)return 0;
+    teleport_refused=0;
     map_jump=use_height?2:1;return 1;
+}
+/* A coordinate teleport of dbg tp that found no map for the point: the refusal's box (LF3). */
+static void point_refused(const float *source) {
+    if(teleport_refused==2)tp_refused(AW_LOADERR_NO_POINT,"","",source,NULL);
 }
 int AW_MapTeleportAt(const float *source_position,int use_height) {return map_teleport(source_position,use_height,0);}
 int AW_MapTeleport(const float *source_position) {return AW_MapTeleportAt(source_position,0);}
@@ -759,7 +970,7 @@ int AW_SceneShot(int global,const char *map,const float *point,int has_z,float y
         copy_name(r.target,sizeof(r.target),map);VectorCopy(point,r.arrival);
         r.yaw=yaw;region_crossing=0;door_ready=0;door_close=0;
         crossing_movetype=MOVETYPE_NOCLIP;
-        load_scene(&r,1);
+        via("dbg cam recall",0);load_scene(&r,1);
         if(!pending)return 0;
         map_jump=3;
     }
@@ -907,9 +1118,12 @@ static void travel_ride(int i) {
     memset(&r,0,sizeof(r));copy_name(r.target,sizeof(r.target),row->map);
     VectorCopy(row->arrival,r.arrival);r.yaw=row->yaw;
     if(AW_SceneEntryRefuse(r.target,r.arrival,0)){travel_open=0;return;}
-    if(!AW_ItemAdd(&aw_state,"gold_001",-travel_price[i])){travel_message="You do not have enough gold.";return;}
+    /* SCENE-LOAD-FAIL-FALLBACK-67: a damaged or too big destination is refused before the fare is paid (the box) */
+    copy_name(r.label,sizeof(r.label),row->label);
+    if(precheck_refused(&r,"travel")){travel_open=0;key_dest=key_game;return;}
+    if(!AW_ItemAdd(&aw_state,"gold_001",-travel_price[i])){travel_message="You do not have enough gold.";prechecked[0]=0;return;}
     if(travel_hours[i]>0)AW_ClockAdvance((travel_hours[i]>720?720:travel_hours[i])*3600000);
-    travel_open=0;key_dest=key_game;region_crossing=0;door_ready=0;door_close=0;load_scene(&r,0);
+    travel_open=0;key_dest=key_game;region_crossing=0;door_ready=0;door_close=0;via("travel",0);load_scene(&r,0);
 }
 int AW_TravelKey(int key) {
     /* The refused room's screen (AW_SceneRoomRefuse): ENTER returns the player to the game at the door; it holds the
@@ -935,7 +1149,7 @@ int AW_TravelKey(int key) {
         aw_scene_link_t r;const aw_town_t *town=AW_Town(travel_town);memset(&r,0,sizeof(r));
         if(travel_choice==0 && town && AW_TownArrival(travel_return?town->name:town->travel_target,travel_return,r.arrival,&r.yaw)){
             copy_name(r.target,sizeof(r.target),town->travel_target);
-            travel_open=0;key_dest=key_game;load_scene(&r,0);
+            travel_open=0;key_dest=key_game;via("silt strider",0);load_scene(&r,0);
         }else travel_message=AW_MiniwindActive()?AREA_UNAVAILABLE:"Destination not found.";
     }
     return 1;
@@ -985,7 +1199,9 @@ int AW_SceneUse(void) {
     if(pending || door_ready)return 1;
     if(aw_corpse_use && aw_corpse_use())return 1;    /* CORPSE-LOOT-60: a dead actor's body opens its inventory */
     if(!travel_by_talk() && travel_use())return 1;
-    if(!npc_hint() && (AW_InventoryUse() || AW_HarvestUse()))return 1;
+    /* PRISON-SHIP-ITEMS-TAKEABLE-65: a plant is a container too (OpenMW 0.53 Container::activate refuses its harvest
+     * while the Inventory window is not allowed) */
+    if(!npc_hint() && (AW_InventoryUse() || ((!aw_inventory_allowed || aw_inventory_allowed()) && AW_HarvestUse())))return 1;
     i=aimed_door();
     if(i<0)return aw_hinged_use?aw_hinged_use():0;   /* an ordinary hinged door (aw_hinged_door.c), else nothing here */
     if(aw_scene_intercept && aw_scene_intercept(links[i].reference))return 1;
@@ -1010,7 +1226,16 @@ static int use_link(int i) {
     if(!map_valid(links[i].target) || AW_SceneMapSize(links[i].target,path,sizeof(path))<0){
         /* A quick test build without interiors (aw_excluded.c): a friendly line, not a repair message. */
         if(AW_ContentExcludedSay("interiors",1)){AW_UISubtitle("","Area unavailable in this quick test build.",3);return 1;}
-        AW_UISubtitle("",AW_MiniwindActive()?AREA_UNAVAILABLE:"Interior not found.",3);return 1;
+        if(AW_MiniwindActive()){AW_UISubtitle("",AREA_UNAVAILABLE,3);return 1;}
+        /* SCENE-LOAD-FAIL-FALLBACK-67: a full build's door whose map is missing: the OK box names it (LF2) */
+        Con_Printf("Door %u to %s: interior not found.\n",links[i].reference,links[i].target);
+        via("door",links[i].reference);copy_name(load_via,sizeof(load_via),via_next);via_next[0]=0;
+        /* "-": the bank's door to a room the build did not convert: named by its label */
+        if(!strcmp(links[i].target,"-"))error_begin(&lerr,AW_LOADERR_NOT_ON_DISK,links[i].label,"");
+        else error_begin(&lerr,map_valid(links[i].target)?AW_LOADERR_NOT_ON_DISK:AW_LOADERR_NOT_FOUND,links[i].target,
+            links[i].label);
+        refusal_show();load_via[0]=0;
+        return 1;
     }
     if(!AW_SceneTargetBuilt(links[i].target)){
         /* the unbuilt-target guard: the map is here but its CHIM store (an expansion this build did not select) is
@@ -1024,7 +1249,7 @@ static int use_link(int i) {
     duration=AW_DoorSound(links[i].reference,0);
     if(duration>0){
         opening_door=links[i];door_ready=realtime+(duration>1?1:duration);
-    }else {door_close=links[i].reference;load_scene(&links[i],0);}
+    }else {door_close=links[i].reference;via("door",links[i].reference);load_scene(&links[i],0);}
     return 1;
 }
 /* Identity remains visible during speech; cooldown only controls playback. */
@@ -1071,7 +1296,8 @@ void AW_SceneDraw(void) {
         if(focus_title && (!ami || !AW_InventoryHint())){name=focus_title;npc=0;}else{name="";npc=1;}
         action=take;
     }
-    else if(!npc_hint() && (name=AW_HarvestHint())!=NULL){action="E: Pick";npc=1;}
+    else if(!npc_hint() && (!aw_inventory_allowed || aw_inventory_allowed()) && (name=AW_HarvestHint())!=NULL){
+        action="E: Pick";npc=1;}
     else if(!AW_OpeningHint(&name,&action)){
         i=aimed_door();
         if(i>=0){
@@ -1369,6 +1595,7 @@ void (*aw_tp_being_arrive)(void);   /* aw_tpplaces.c AW_TpBeingArrive (bound by 
 void AW_SceneSpawn(edict_t *p) {
     int placed=0;float eye;
     arrival_watch.on=0;
+    map_loading=0;crossing_refused[0]=0;   /* the map arrived (SCENE-LOAD-FAIL-FALLBACK-67) */
     if(aw_godmode_kept)p->v.flags=(float)((int)p->v.flags|FL_GODMODE);
     area_last_ok=0;frame_last_ok=0;frame_refused[0]=frame_mark_map[0]=0;
     logical_map[0]=0;VectorCopy(vec3_origin,logical_offset);logical_used=0;
@@ -1481,7 +1708,9 @@ void AW_SceneTick(void) {
             intro_docks_variant.value==2 && aw_story.stage>=AW_STAGE_SHIP && aw_story.stage<=AW_STAGE_OFFICE,AW_StreamLookahead()):NULL);
     if(door_ready){
         if(!sv.active || strcmp(door_scene(),opening_door.source)){door_ready=0;return;}
-        if(realtime>=door_ready){door_ready=0;door_close=opening_door.reference;load_scene(&opening_door,0);}
+        if(realtime>=door_ready){
+            door_ready=0;door_close=opening_door.reference;via("door",opening_door.reference);load_scene(&opening_door,0);
+        }
         return;
     }
     if(door_close && !pending && cls.state==ca_connected && cls.signon==SIGNONS){
@@ -1490,6 +1719,7 @@ void AW_SceneTick(void) {
     if(pending || !sv.active || cls.state!=ca_connected || cls.signon!=SIGNONS || key_dest!=key_game ||
        svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict) ||
        p->v.health<=0 || (p->v.movetype!=MOVETYPE_WALK && p->v.movetype!=MOVETYPE_NOCLIP))return;
+    play_spot_take(p);  /* where an error in play loads the place again (AW_SceneHostError) */
     harvest_follow(p,0);
     if(area_hold(p))return;
     memset(&r,0,sizeof(r));
@@ -1510,6 +1740,12 @@ void AW_SceneTick(void) {
     VectorCopy(p->v.velocity,crossing_velocity);crossing_movetype=p->v.movetype;
     region_crossing=1;
     load_scene(&r,1);
+    /* a crossing refused before leaving (a damaged or too big map, SCENE-LOAD-FAIL-FALLBACK-67): the player stays at
+     * the last spot inside the map he is in; the box said why once */
+    if(!pending && crossing_refused[0] && !strcmp(crossing_refused,r.target) && frame_last_ok){
+        VectorCopy(frame_last,p->v.origin);VectorCopy(frame_last,p->v.oldorigin);
+        p->v.velocity[0]=p->v.velocity[1]=0;SV_LinkEdict(p,false);
+    }
     if(!pending)region_crossing=0;
 }
 /* A partial-area build holds the player inside the town's CHIM frame: past
@@ -1599,20 +1835,33 @@ static void scene_command(void) {
         if(!strcmp(r.target,"global")){
             if(AW_MapTeleportAt(r.arrival,1)){Con_Printf("%s\n",r.label);return;}
             /* no map holds the point (a MiniWind, DEBUG-TP-MINIWIND-36): a town's own map still loads, as before */
-            if(!map_valid(s)){Con_Printf("%s: no map on this disk holds that point; player state unchanged.\n",r.label);return;}
+            if(!map_valid(s)){Con_Printf("%s: no map on this disk holds that point; player state unchanged.\n",r.label);
+                if(teleport_refused==2)tp_refused(AW_LOADERR_NO_POINT,s,r.label,r.arrival,NULL);
+                return;
+            }
         }
         else{
-            if(AW_SceneMapSize(r.target,path,sizeof(path))<124){Con_Printf("Destination not on this disk: %s.\n",r.label);return;}
+            if(AW_SceneMapSize(r.target,path,sizeof(path))<124){
+                Con_Printf("Destination not on this disk: %s.\n",r.label);
+                tp_refused(AW_LOADERR_NOT_ON_DISK,r.target,r.label,NULL,NULL);return;
+            }
             door_ready=0;door_close=0;Con_Printf("%s\n",r.label);load_scene(&r,1);return;
         }
     }
     if(!sv.active || Cmd_Argc()!=2 || (strcmp(s,"ship") && strcmp(s,"town") && !map_valid(s))) {
-        if(sv.active && Cmd_Argc()==2)Con_Printf("Unknown destination: %s.\n",Cmd_Argv(1));
+        if(sv.active && Cmd_Argc()==2){
+            Con_Printf("Unknown destination: %s.\n",Cmd_Argv(1));
+            tp_refused(AW_LOADERR_NOT_FOUND,Cmd_Argv(1),"",NULL,NULL);
+        }
         scene_help();return;
     }
     door_ready=0;door_close=0;
     size=AW_SceneMapSize(!strcmp(s,"ship")?"prison":!strcmp(s,"town")?"seyda":s,path,sizeof(path));
-    if(size<124){Con_Printf("Destination not on this disk: %s.\n",s);scene_help();return;}
+    if(size<124){
+        Con_Printf("Destination not on this disk: %s.\n",s);
+        tp_refused(AW_LOADERR_NOT_ON_DISK,!strcmp(s,"ship")?"prison":!strcmp(s,"town")?"seyda":s,"",NULL,NULL);
+        scene_help();return;
+    }
     if(map_valid(s)){
         if(AW_TownFlag(s,AW_TOWN_TELEPORT)){
             memset(&r,0,sizeof(r));copy_name(r.target,sizeof(r.target),s);
@@ -1625,7 +1874,10 @@ static void scene_command(void) {
                 }
                 load_scene(&r,1);
             }
-            else Con_Printf("%s conversion not found.\n",AW_Town(AW_TownFind(s))->title);
+            else{
+                Con_Printf("%s conversion not found.\n",AW_Town(AW_TownFind(s))->title);
+                tp_refused(AW_LOADERR_ERROR,s,AW_Town(AW_TownFind(s))->title,NULL,"its arrival point is not in the town table");
+            }
             return;
         }
         /* Select the destination area's entrance catalogue. Appended Balmora
@@ -1650,7 +1902,8 @@ static void scene_command(void) {
              Con_Printf("%s: at its door's arrival %ld %ld %ld.\n",title,(long)r.arrival[0],(long)r.arrival[1],(long)r.arrival[2]);
              load_scene(&r,1);return;
          }}
-        Con_Printf("No entrance or start found for %s.\n",s);return;
+        Con_Printf("No entrance or start found for %s.\n",s);
+        tp_refused(AW_LOADERR_ERROR,s,"",NULL,"no door leads in and the map has no start");return;
     }
     memset(&r,0,sizeof(r));copy_name(r.target,sizeof(r.target),!strcmp(s,"ship")?"prison":"seyda");
     if(!strcmp(s,"ship")){r.arrival[1]=-35;r.arrival[2]=-4;r.yaw=90;}
@@ -1679,7 +1932,7 @@ static void hors_command(void) {
     AW_SaveReset();svs.clients[0].edict->v.health=aw_character.current[0];
     svs.clients[0].edict->v.movetype=MOVETYPE_WALK;noclip_anglehack=false;
     memset(&r,0,sizeof(r));copy_name(r.target,sizeof(r.target),"seyda");r.arrival[2]=64;r.yaw=90;
-    Con_Printf("Created Hors: Nord, Barbarian, The Steed; after Census.\n");load_scene(&r,1);
+    Con_Printf("Created Hors: Nord, Barbarian, The Steed; after Census.\n");via("dbg aw hors",0);load_scene(&r,1);
 }
 static int teleport_coordinate(const char *text,float *result) {
     char *end;double value;const char *p;
@@ -1811,7 +2064,7 @@ static void teleport_command(void) {
         if(!map_teleport(source,0,1)){
             Con_Printf("Map marker teleport unavailable (no map on this disk holds %ld %ld); player state unchanged.\n",
                 (long)source[0],(long)source[1]);
-            disk_maps_note();
+            disk_maps_note();point_refused(source);
         }
         else Con_Printf("Teleport to the map marker: %ld %ld.\n",(long)source[0],(long)source[1]);
         return;
@@ -1820,8 +2073,10 @@ static void teleport_command(void) {
         /* Recorded exterior approach; reuse the checked coordinate route and
          * standing-surface placement rather than resetting the character. */
         source[0]=85676;source[1]=11440;source[2]=1852;
-        if(!AW_MapTeleportAt(source,1))
+        if(!AW_MapTeleportAt(source,1)){
             Con_Printf("Tel Uvirith teleport unavailable; start play on a disk containing this location.\n");
+            point_refused(source);
+        }
         return;
     }
     if(Cmd_Argc()==3 || Cmd_Argc()==4) {
@@ -1833,7 +2088,7 @@ static void teleport_command(void) {
         if(Cmd_Argc()==3)source[2]=0;
         if(!map_teleport(source,Cmd_Argc()==4,1)){
             Con_Printf("Coordinate teleport unavailable (no map on this disk holds that point); player state unchanged.\n");
-            disk_maps_note();
+            disk_maps_note();point_refused(source);
         }
         return;
     }
@@ -1912,7 +2167,7 @@ int AW_SceneLoadRoom(const char *map,const float *arrival,float yaw) {
     if(!(fabs(arrival[0])<32768 && fabs(arrival[1])<32768 && fabs(arrival[2])<32768))return 0;
     memset(&r,0,sizeof(r));copy_name(r.target,sizeof(r.target),map);VectorCopy(arrival,r.arrival);
     r.yaw=yaw;region_crossing=0;door_ready=0;door_close=0;crossing_movetype=p->v.movetype;
-    load_scene(&r,1);
+    via("script PositionCell",0);load_scene(&r,1);
     return pending!=0;
 }
 /* FIRST: the argument index of the seed (aw_teleport roulette [SEED], routed from dbg door roulette by aw_console.c,
@@ -2048,6 +2303,10 @@ void AW_SceneLoadReset(void) {
     tp_held_drop("a new game starts");   /* DBG-TP-DURING-LOAD-66: a held dbg tp is session state (New Game resets it) */
     AW_SceneCancelTransition();
     load_recovering=0;load_from.valid=0;load_box_wanted=0;travel_pending=NULL;
+    /* SCENE-LOAD-FAIL-FALLBACK-67: the load error, the map load in flight and the refusal memos are session state */
+    memset(&lerr,0,sizeof(lerr));memset(&lcause,0,sizeof(lcause));map_loading=0;
+    via_next[0]=load_via[0]=crossing_refused[0]=prechecked[0]=0;
+    memset(&play_spot,0,sizeof(play_spot));   /* the spot of play an error loads again (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66) */
     if(aw_scene_followers && sv.active && svs.clients && svs.clients[0].edict)aw_scene_followers(svs.clients[0].edict,-1);
 }
 void AW_SceneInit(void) {

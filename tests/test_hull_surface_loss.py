@@ -303,6 +303,66 @@ class ScaleSnap(unittest.TestCase):
                 scale_snap_step()
 
 
+@unittest.skipUnless(READY, 'needs numpy and scipy')
+class GateBeforeStairUnits(unittest.TestCase):
+    """The collision surface gate runs on the plain meshes before any stair collision mesh unit is made
+    (chim.build.gated_mesh_units; CHIM-MESH-STAIR-UNIT-SLOW-67, BUILD-STAIR-MESH-UNIT-SLOW-67): the Mortrag Glacier cell
+    (-26,26) ran two stair units of 19 min 33 s and 41 min 55 s on one core each, then stopped at the gate on an iceberg
+    shard that holds no flight, a verdict the gate gives in seconds."""
+
+    def area(self, over):
+        """Three meshes, the third with a flight; OVER: the model indices the stand-in gate fails."""
+        from chim import build as cb
+        ran, gated = [], []
+
+        def run(kind, items, worker, jobs, cache):
+            ran.append((kind, [task[0] for _, task in items], worker.__name__))
+            return [('v', 'f', [], [], {'unit': kind}) for _ in items]
+
+        def gate(area, models, prepared, keys, archive, mode, jobs, cache):
+            gated.append((sorted(prepared), sorted(keys)))
+            bad = sorted(set(prepared) & set(over))
+            if bad:
+                raise ValueError('%s: collision surface gate: %s' % (area, ', '.join(models[mi]['source'] for mi in bad)))
+            return []
+        models = [{'source': 'meshes/x/bm_ex_iceberg_shard02.nif'}, {'source': 'meshes/f/terrain_bm_icechunk_01.nif'},
+                  {'source': 'meshes/x/bm_ex_iceberg.nif'}]
+        items = [('fp%d' % mi, (mi, models[mi], {}, 'archive', {})) for mi in range(3)]
+        with mock.patch.object(cb, 'mesh_result_keys',
+                               side_effect=lambda items, prepared, indices, tag=None: {mi: 'key%d' % mi for mi in indices}):
+            try:
+                result = cb.gated_mesh_units('cm26_p26', items, {2}, models, 'archive', 'table', 1, None, run=run,
+                                             gate=gate)
+            except ValueError as exc:
+                result = exc
+        return result, ran, gated
+
+    def test_a_plain_mesh_over_the_step_stops_the_area_before_any_stair_unit(self):
+        result, ran, gated = self.area(over={0})
+        self.assertIsInstance(result, ValueError)
+        self.assertIn('bm_ex_iceberg_shard02', str(result))
+        self.assertEqual(ran, [('mesh', [0, 1], 'mesh_unit')])             # no mesh-stair unit was made
+        self.assertEqual(gated, [([0, 1], [0, 1])])
+
+    def test_every_mesh_is_made_and_gated_once(self):
+        (prepared, keys), ran, gated = self.area(over=set())
+        self.assertEqual(ran, [('mesh', [0, 1], 'mesh_unit'), ('mesh-stair', [2], 'mesh_unit_stair')])
+        self.assertEqual(gated, [([0, 1], [0, 1]), ([2], [2])])
+        self.assertEqual(sorted(prepared), [0, 1, 2])
+        self.assertEqual(prepared[2][4], {'unit': 'mesh-stair'})
+        self.assertEqual(keys, {0: 'key0', 1: 'key1', 2: 'key2'})
+        # a stair mesh over the step still stops the area, after its own unit
+        result, ran, gated = self.area(over={2})
+        self.assertIsInstance(result, ValueError)
+        self.assertEqual([kind for kind, _, _ in ran], ['mesh', 'mesh-stair'])
+
+    def test_the_area_build_calls_it(self):
+        text = (ROOT / 'tools' / 'chim' / 'build.py').read_text(encoding='utf-8')
+        body = text[text.index("with timer.section('meshes'):"):]
+        self.assertLess(body.index('gated_mesh_units('), body.index("if stair_collision == '1':"))
+        self.assertNotIn("run_units('mesh-stair'", text)                   # no stair unit outside the gated order
+
+
 class HeaviestFrames(unittest.TestCase):
     """tools/chim_heaviest_frames.py: the frames closest to the zone and the cells to check a converter change on
     before it is merged (CHIM-HULL-SURFACE-HEAP-46)."""

@@ -15,6 +15,10 @@ against what the build places, both sides from the same master and its reference
   water             the exterior references of swim-only creatures (CREA FLAG swims, neither walks nor flies) and of
                     levelled lists that give only such creatures (a subset of the two exterior kinds)
 
+An exterior row counts as placed only when the engine can spawn it (engine_places, OUTDOOR-CREATURES-REGRESSION-66):
+a person or creature with a model in this build, a levelled point whose list can give such a creature, with the
+actor table and the creatures switched on by the image's own default-game.cfg (engine_settings); a row the engine
+would skip ("without a model", a list of unmodelled creatures, the table or the creatures left off) is missing.
 A kind whose placed count falls short of the original by more than config/actor_census_allowlist.json allows
 ("area/kind": {"missing": n, "register": ID, "why": ...}) fails. With the expansions selected, the places the build
 sets aside on purpose leave both sides and are listed by name, each with its register entry (the same file's
@@ -40,6 +44,7 @@ creature census (build_aga.py finalize_image); by hand, in the shell container:
 """
 import argparse
 import json
+import re
 import struct
 import sys
 import time
@@ -199,6 +204,66 @@ def sort_refs(tags, refs, placed_inside, rooms_aside, planned):
             {k: dict(sorted(v.items())) for k, v in aside.items()})
 
 
+CONFIG = 'default-game.cfg'      # the image's shipped settings (tools/build_aga.py writes it into id1)
+
+
+def engine_settings(id1):
+    """{'table': the engine joins the exterior's actors from the actor table, 'creatures': it spawns creatures} as the
+    image's shipped default-game.cfg leaves them (aw_actors.c: table_on is 0 and creatures_on 1 until a settings line
+    says otherwise, the last line winning). Without "chim actors table 1" a joining cell reads its frame map, which
+    holds no levelled point (CHIM-EXTERIOR-ACTORS-MISSING-46: v0.0.47-dev2 shipped the table without the line);
+    "chim actors creatures 0" (dbg creatures off) spawns no creature at all."""
+    out = {'table': False, 'creatures': True}
+    path = Path(id1) / CONFIG
+    text = path.read_text(encoding='latin-1') if path.is_file() else ''
+    for line in text.splitlines():
+        words = line.split('//', 1)[0].split()
+        if words[:3] == ['chim', 'actors', 'table'] and len(words) == 4:
+            digits = re.match(r'[+-]?\d+', words[3])          # the engine reads it with atoi: "on" is 0
+            out['table'] = bool(digits and int(digits.group(0)))
+        elif (words[:3] == ['chim', 'actors', 'creatures'] and len(words) == 4) or \
+                (words[:2] == ['dbg', 'creatures'] and len(words) == 3):
+            word = words[-1].lower()
+            if word in ('on', 'true', '1', 'off', 'false', '0'):        # anything else: the usage line, no change
+                out['creatures'] = word in ('on', 'true', '1')
+    return out
+
+
+def list_gives_model(lists, index, bases, seen=frozenset()):
+    """Whether levelled list INDEX of the table's list section (actors.read_lists) can give, at some level, a creature
+    whose base has a model in this build (nested lists followed; an entry naming nothing gives nothing)."""
+    import actors
+    if lists is None or index in seen or index >= len(lists):
+        return False
+    for _level, target in lists[index][2]:
+        if target == 0xFFFF:
+            continue
+        if target & actors.NESTED:
+            if list_gives_model(lists, target & 0x7FFF, bases, seen | {index}):
+                return True
+        elif target < len(bases) and bases[target]['text']:
+            return True
+    return False
+
+
+def engine_places(base, bases, lists, settings):
+    """Whether the engine can spawn a row of BASE when its cell joins (aw_actors.c TableJoinKinds and SpawnOne, as the
+    image's SETTINGS leave them): a person or creature only with a model in this build (an empty base text is "without
+    a model": never spawned), a levelled point only when its list can give such a creature, no creature with the
+    creatures switched off. A corpse row: the frame map holding its cell places it (the region frames' authored dead,
+    the town stages' dead). Without the table, a joining cell reads its frame map: its people and placed creatures,
+    never a levelled point (tools/chim/region_actors.py defers them to the table)."""
+    import actors
+    kind = base['kind']
+    if kind == actors.KINDS['corpse']:
+        return bool(base['text'])
+    if kind == actors.KINDS['LEVC']:
+        return settings['table'] and settings['creatures'] and list_gives_model(lists, base.get('list', -1), bases)
+    if not base['text']:
+        return False
+    return kind == actors.KINDS['NPC_'] or settings['creatures']
+
+
 def placement(run, master_bytes, town_join=True, room_batches=None, exterior_terrain=None, groups=None):
     """({area: {kind: {'original', 'placed', 'source'}}}, [set-aside rows]) of build run RUN (the selected masters'
     world). ROOM_BATCHES, EXTERIOR_TERRAIN: the room batch and world terrain stage outputs (default: the run's own);
@@ -233,9 +298,17 @@ def placement(run, master_bytes, town_join=True, room_batches=None, exterior_ter
     # map's stage places its NPCs and corpses, the engine's town join its creatures and levelled points. A row in an
     # exterior cell the plan does not plan is in no map: it leaves the count with its original (set aside above).
     by_hash = {actors.fnv(i): i for i in tags}
-    _head, cells, recs, bases, _text_bytes = actors.read_table((id1 / 'maps' / 'chim-actors.cca').read_bytes())
+    table_bytes = (id1 / 'maps' / 'chim-actors.cca').read_bytes()
+    _head, cells, recs, bases, _text_bytes = actors.read_table(table_bytes)
+    lists = actors.read_lists(table_bytes)
+    settings = engine_settings(id1)
     kind_names = {v: k for k, v in actors.KINDS.items()}
-    source = 'maps/chim-actors.cca (town join %s)' % ('on' if town_join else 'off')
+    # OUTDOOR-CREATURES-REGRESSION-66: a row counts as placed only when the engine can spawn it (engine_places: its
+    # model, a levelled list that can give a modelled creature, the shipped settings); the check before counted every
+    # row of the table, so a build whose creatures had lost their models, or whose config left the table off, passed
+    source = 'maps/chim-actors.cca (town join %s; table %s, creatures %s in %s)' % (
+        'on' if town_join else 'off', 'on' if settings['table'] else 'OFF', 'on' if settings['creatures'] else 'OFF',
+        CONFIG)
     table_aside = 0
     for cell, first, n in cells:
         if planned is not None and tuple(cell) not in planned:
@@ -248,8 +321,11 @@ def placement(run, master_bytes, town_join=True, room_batches=None, exterior_ter
             kind = tags.get(ident) or kind_names.get(b['kind'])
             if kind not in KINDS:
                 continue
-            town_stage = kind_names.get(b['kind']) in acc.TOWN_STAGE_KINDS
-            if area == 'exterior-region' or town_stage or town_join:
+            # a town's people and dead: its resident stage places them; everything else: the engine's join (a town
+            # map's creatures and levelled points only with its town join)
+            town_stage = area == 'exterior-town' and kind_names.get(b['kind']) in acc.TOWN_STAGE_KINDS
+            joined = area == 'exterior-region' or town_join
+            if town_stage or (joined and engine_places(b, bases, lists, settings)):
                 out[area][kind]['placed'] += 1
                 if ident in water:
                     out['water'][kind]['placed'] += 1
@@ -343,6 +419,9 @@ def check(run, data_files, town_join=True, records=True, allowlist=ALLOWLIST, ga
     counts, set_aside = placement(run, master_path(Path(data_files)).read_bytes(), town_join, room_batches,
                                   exterior_terrain, groups)
     print('  masters: %s' % ', '.join(masters), flush=True)
+    settings = engine_settings(Path(run) / 'image' / 'boot' / 'id1')
+    print('  the engine\'s shipped settings (%s): actor table %s, creatures %s' % (
+        CONFIG, 'on' if settings['table'] else 'OFF', 'on' if settings['creatures'] else 'OFF'), flush=True)
     for area in sorted(counts):
         for kind in sorted(counts[area]):
             r = counts[area][kind]
@@ -365,7 +444,7 @@ def check(run, data_files, town_join=True, records=True, allowlist=ALLOWLIST, ga
         bad += record_verdict(fields, json.loads(Path(gaps).read_text(encoding='utf-8'))['gaps'])
         print('  %d fields compared (%.1f s)' % (len(fields), time.time() - t0), flush=True)
     return {'placement': counts, 'set_aside': set_aside, 'masters': list(masters), 'allowlist': allow,
-            'skipped': skipped, 'town_join': town_join,
+            'skipped': skipped, 'town_join': town_join, 'engine_settings': settings,
             'records': {f: {s: v[s]['records'] for s in ('missing', 'different')} for f, v in (fields or {}).items()},
             'failures': bad, 'seconds': round(time.time() - t0, 1)}
 

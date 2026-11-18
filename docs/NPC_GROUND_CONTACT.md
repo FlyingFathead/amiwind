@@ -1,6 +1,6 @@
 # Initial NPC placement and ground-contact workflow
 
-_Last updated with AmiWind v0.0.66-dev2 (14 November 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -8,6 +8,7 @@ _Last updated with AmiWind v0.0.66-dev2 (14 November 2026)._
 - [Classify the intended initial state first](#classify-the-intended-initial-state-first)
 - [Actors start where the game puts them](#actors-start-where-the-game-puts-them)
 - [Room residents by rule](#room-residents-by-rule)
+  - [The expansions' people outdoors (v0.0.67)](#the-expansions-people-outdoors-v0067)
   - [Where a CHIM room's residents are fitted (v0.0.48)](#where-a-chim-rooms-residents-are-fitted-v0048)
 - [Interior creatures and the levitating class](#interior-creatures-and-the-levitating-class)
 - [Actors the original disables at the start](#actors-the-original-disables-at-the-start)
@@ -87,6 +88,12 @@ only. When a town map starts, the engine takes the creatures and levelled creatu
 actor table (residents stay with the town frame). The build check `tools/chim/actor_census_check.py` counts the
 original's exterior people and creatures per area kind against what the image places and fails the build on a
 shortfall that `config/actor_census_allowlist.json` does not track.
+
+The region frame the game loads (after a teleport, a load, a door, a level change) is the window's home frame, and the
+home frame never joins the window: its people and placed creatures come with the frame map itself. Since v0.0.67 the
+engine also takes the home cell's levelled creature points from the actor table when such a map starts
+(OUTDOOR-CREATURES-HOME-CELL-67); before, the cell the player arrived in had none of its levelled creatures until its
+frame left the window and joined again. A map change drops the actors still queued for the map before.
 
 The ordinary ground contact keeps the reference's x and y. The towns' sideways search, which may move a resident
 up to 48 units to find a spot where every sole touches, is not used here: it would move the actor off the spot
@@ -176,6 +183,26 @@ Council Chambers, a base-game room) and 274 Bloodmoon's. 1,532 levelled lists ar
 The build checks the classes before any stage (`tools/build_preflight.py` `room_grounding_problems`): every NPC and
 creature resident of every room the room batches convert, with the selected expansions, in about 6 seconds
 (ROOM-BATCH-NPC-GROUNDING-48: the v0.0.66-dev2 build met the gap only at the room batches stage, 14 minutes in).
+
+### The expansions' people outdoors (v0.0.67)
+
+Outdoors a person is classed by id (`config/actor_grounding.json`), not by reference. The people only Tribunal and
+Bloodmoon place outdoors (Solstheim; Mournhold's districts, which the outdoor converter reads as exterior cells, see
+[the expansions](EXPANSIONS.md); the people the expansions add to Vvardenfell) are in a file of their own beside it,
+`config/actor_grounding_layers.json`, read by a module of its own, `tools/actor_grounding_layers.py`
+(`outdoor_state`: the policy first, the file only for an id the policy does not name). The outdoor frame path calls
+it; `tools/actor_grounding.py` itself is unchanged, because its code is in the keys of the room actor and actor
+ground units (a first form that read the file there would have baked all 2,342 room actors again, found by the
+build's unit check). The policy file's bytes therefore do not change when an expansion's people are added, and
+neither does a stage or unit key that names it or its reader. `tools/actor_grounding_census.py --write` writes the new ids there whenever an expansion is
+selected, and into the policy only for the base game alone.
+
+Measured on 17 November 2026 on the three game files with the districts presented as exterior cells: 700 outdoor
+placements of 607 people, 692 standing on the ground or on a placed object; 111 ids and 7 people placed dead go
+into the expansions' file; all 49 people of the five Mournhold districts measure ground on the districts' own road,
+platform and pavement models (there is no terrain under them). One person stays unresolved, Coventina Celata
+(`coventina celata`) at Raven Rock, 250 units above the ground with her own script, and is decided when Solstheim's
+cells are converted.
 
 ### Where a CHIM room's residents are fitted (v0.0.48)
 

@@ -318,11 +318,61 @@ def write_table(path, report, previous):
         rows = set(table)
         doc['meshes'] = sorted(rows | {m for ms in layers.values() for m in ms})
         doc['layers'] = layers
+    # and the recipe blocks a layer owns ("layer_recipes": rows for the cells of that layer's own visual recipes)
+    owned = previous.get('layer_recipes') or {}
+    if owned:
+        kept = {r: previous['recipe_meshes'][r] for rs in owned.values() for r in rs
+                if r in previous.get('recipe_meshes', {})}
+        doc['recipe_meshes'] = dict(sorted({**doc['recipe_meshes'], **kept}.items()))
+        doc['layer_recipes'] = owned
     Path(path).write_text(json.dumps(doc, indent=1) + '\n', encoding='utf-8', newline='\n')
     return doc
 
 
+def append_layer_rows(path, layer, meshes):
+    """Add MESHES (source paths) to the table at PATH as rows of the expansion LAYER: into the rows, and at the END of
+    the layer's list in the given order (a layer's list is append-only: an entry recorded with the layer's earlier
+    rows still matches, mesh_tables.matches). A mesh that is a row already is left as it is. Returns the meshes
+    added. The survey of an expansion's own cells (a data folder holding only those cells) gives the list; a base
+    game mesh among them belongs under a visual recipe of those cells (recipe_meshes), not here."""
+    doc = json.loads(Path(path).read_text(encoding='utf-8'))
+    have = {m.casefold() for m in doc['meshes']}
+    new = []
+    for mesh in meshes:
+        mesh = str(mesh).replace(chr(92), '/').casefold()
+        if not mesh.startswith('meshes/') or not mesh.endswith('.nif'):
+            raise ValueError('Not a mesh source path: %r' % mesh)
+        if mesh not in have and mesh not in new:
+            new.append(mesh)
+    if new:
+        doc['meshes'] = sorted(set(doc['meshes']) | set(new))
+        layers = doc.setdefault('layers', {})
+        layers[layer] = list(layers.get(layer, ())) + new
+        Path(path).write_text(json.dumps(doc, indent=1) + '\n', encoding='utf-8', newline='\n')
+    return new
+
+
+def append_main(argv):
+    ap = argparse.ArgumentParser(description='Append measured rows to an expansion layer of the hull-surface table')
+    ap.add_argument('--table', required=True)
+    ap.add_argument('--layer', required=True, help='the expansion layer (bloodmoon, tribunal)')
+    ap.add_argument('--rows', required=True, help='JSON file: a list of mesh source paths, or an object with --key')
+    ap.add_argument('--key', help='the list\'s key in the --rows object')
+    a = ap.parse_args(argv)
+    rows = json.loads(Path(a.rows).read_text(encoding='utf-8'))
+    if a.key:
+        rows = rows[a.key]
+    if not isinstance(rows, list):
+        raise SystemExit('--rows: not a list (give --key)')
+    new = append_layer_rows(a.table, a.layer, rows)
+    print('[hull-survey] %d rows appended to layer %s of %s (%d given)' % (len(new), a.layer, a.table, len(rows)))
+    return 0
+
+
 def main(argv=None):
+    argv = sys.argv[1:] if argv is None else list(argv)
+    if argv[:1] == ['append-layer']:
+        return append_main(argv[1:])
     ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     ap.add_argument('--data-files', required=True)
     ap.add_argument('--work', required=True, help='scratch folder for the export (must not exist; removed when done)')

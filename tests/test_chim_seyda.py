@@ -347,5 +347,39 @@ class OpeningOriginalCellTests(unittest.TestCase):
             seyda.opening_reference(authored, authored)
 
 
+class OpenContainerTests(unittest.TestCase):
+    """SEYDA-CONTAINERS-NOT-DRAWN-67: the frame adds the containers that open in its owned cells, as it adds the
+    tutorial barrel; a plant, a container outside its cells and one it already places stay out."""
+
+    def row(self, number, ident, x, y, kind='CONT', model='o/crate.nif'):
+        return dict(number=number, id=ident, type=kind, model=model, cell=[math.floor(x / 8192), math.floor(y / 8192)],
+                    position=[x, y, 200.], rotation_radians=[0., 0., 0.], scale=1.)
+
+    def test_the_containers_that_open_in_the_owned_cells(self):
+        from unittest import mock
+        settings = {'owned_cells': [[-3, -11], [1, -7]]}
+        audit = [self.row(1, 'CharGen_crate_01', -7862., -73174.),           # by the census office: added
+                 self.row(2, 'com_sack_gold_rnd', 4056., -79111.),            # cell (0, -10): added
+                 self.row(3, 'kollop_03_pearl', 2878., -93628.),              # organic: the harvest's
+                 self.row(4, 'crate_far', 9000., -73174.),                    # cell (1, -9): not the frame's
+                 self.row(172851, 'chargen barrel fatigue', -10781., -71863.),   # placed already (the barrel)
+                 self.row(5, 'CharGen_crate_02', -7812., -73112., kind='STAT'),  # not a container
+                 self.row(6, 'crate_no_model', -7900., -73100., model='')]
+        ids = frozenset({'chargen_crate_01', 'com_sack_gold_rnd', 'crate_far', 'chargen barrel fatigue',
+                         'chargen_crate_02', 'crate_no_model'})
+        with mock.patch('open_containers.data_open_container_ids', return_value=ids):
+            out = seyda.open_container_refs('data', audit, {172851}, settings)
+        self.assertEqual([r['number'] for r in out], [1, 2])
+
+    def test_prepare_area_places_them_and_records_them(self):
+        import inspect
+        source = inspect.getsource(seyda.prepare_area)
+        self.assertIn("open_container_refs(data, audit, {r['number'] for r in selected})", source)
+        self.assertIn("place_exported(*open_containers(data, work, extra), 'containers')", source)
+        self.assertIn("parity['open_containers']", source)
+        # the barrel keeps its own mesh key tag (its cached units hold)
+        self.assertIn("place_exported(*opening_barrel(data, work, barrel), 'opening')", source)
+
+
 if __name__ == '__main__':
     unittest.main()

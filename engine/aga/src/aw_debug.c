@@ -26,6 +26,7 @@
 #include "aw_view.h"
 #include "aw_inspect.h"
 #include "aw_inventory.h"
+#include "aw_story.h"
 #include "aw_statswin.h"
 #include "aw_fxrow.h"
 #include "aw_spelllist.h"
@@ -369,6 +370,8 @@ void AW_DebugInit(void) {
     Cmd_AddCommand("aw_census_type_set",AW_CensusTypeCommand);       /* census type amiwind|legacy|original */
     Cmd_AddCommand("aw_census_legacy",AW_CensusLegacyCommand);       /* the older alias (OPENING-REGRESSION-64) */
     aw_census_take_refused=AW_OpeningTakeRefused;                    /* nothing taken during the registration */
+    aw_inventory_allowed=AW_StoryInventoryAllowed;   /* no take, no container until EnableInventoryMenu (PRISON-SHIP-ITEMS-TAKEABLE-65) */
+    aw_object_labels=AW_StoryObjectLabels;           /* no name or action line on placed objects before the papers */
     AW_NpcPartsInit();     /* aw_npc_tables_areas (NPC-RECIPES-PER-AREA-59) */
     AW_CamInit();AW_InputDebugInit();AW_BoundsInit();AW_DoorAudioInit();AW_HingedDoorInit();aw_hinged_story=AW_OpeningHingedStory;AW_TalkInit();AW_MwscriptInit();AW_CompanionInit();AW_CombatInit();AW_AmbientInit();AW_MoveInit();AW_ActorsInit();AW_ViewInit();AW_LavaInit();AW_BreathInit();AW_MagicInit();AW_AnimInit();AW_GlutInit();AW_DialWindowInit();AW_AnimKitInit();AW_HalloweenInit();AW_DemoWindInit();AW_WaitInit();AW_LevelupInit();AW_ConsoleInit();AW_SceneInit();AW_TpPlacesInit();AW_LoadFailInit();AW_CensusInit();AW_UIInit();AW_IconsInit();AW_IntroInit();AW_SaveInit();AW_RecorderInit();
     aw_save_entry_refuse=AW_SceneSaveEntryRefuse;   /* a save in a 32 MB place on less Fast RAM (CHIM-32MB-SAVE-ENTRY-48) */

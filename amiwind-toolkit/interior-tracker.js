@@ -88,21 +88,28 @@
     for (const r of rooms) c[r.state] = (c[r.state] || 0) + 1;
     return STATES.filter(s => c[s]).map(s => '<span class="itn" title="' + esc(labelOf(ir, s)) + '"><i style="background:' + COLOURS[s] + '"></i>' + c[s] + '</span>').join('');
   }
-  function roomRow(ir, r) {
+  // opts.open3d(room): the room's built room when it can be opened in the 3D Inspector (the page knows the served build's rooms),
+  // else null: the row gets a 3D button, or a dash that says why not.
+  function roomRow(ir, r, opts) {
+    const built = opts && opts.open3d ? opts.open3d(r) : undefined;
     return '<tr data-room="' + esc(r.id) + '"' + (r.entrance && r.island !== NO_ISLAND ? ' data-cell="' + esc(r.entrance) + '" class="itgo" title="Show the entrance cell on the map"' : '') + '>' +
       '<td class="l">' + esc(r.name) + '</td><td class="l">' + chip(ir, r.state) + '</td><td class="l">' + esc(batchText(r.batch)) + '</td>' +
-      '<td class="l">' + esc((r.reasons || []).map(x => x.replace(/_/g, ' ')).join(', ') || '–') + '</td><td class="l">' + esc(r.master || '') + '</td></tr>';
+      '<td class="l">' + esc((r.reasons || []).map(x => x.replace(/_/g, ' ')).join(', ') || '–') + '</td><td class="l">' + esc(r.master || '') + '</td>' +
+      (built === undefined ? '' : '<td class="l">' + (built ? '<button type="button" class="it3d" data-room3d="' + esc(r.id) + '" title="Open ' + esc(r.name) +
+        ' (room ' + esc(built) + ') in the 3D Inspector">3D</button>' : '<span class="muted" title="Not a room of the served build">–</span>') + '</td>') + '</tr>';
   }
-  // The list under the map: island > entrance > rooms (each a <details>; all open while a query filters the list).
-  function listHtml(ir, query) {
+  // The list under the map: island > entrance > rooms (each a <details>; all open while a query filters the list). With
+  // opts.open3d every row has a 3D column.
+  function listHtml(ir, query, opts) {
     const rooms = filter(ir, query), open = String(query || '').trim() ? ' open' : '';
     if (!rooms.length) return '<p class="muted">No room matches.</p>';
-    const head = '<table class="mt itrooms"><thead><tr><th class="l">Room (cell ID)</th><th class="l">State</th><th class="l">Batch</th><th class="l">Reasons</th><th class="l">Master</th></tr></thead><tbody>';
+    const head = '<table class="mt itrooms"><thead><tr><th class="l">Room (cell ID)</th><th class="l">State</th><th class="l">Batch</th><th class="l">Reasons</th><th class="l">Master</th>' +
+      (opts && opts.open3d ? '<th class="l">3D</th>' : '') + '</tr></thead><tbody>';
     return '<p class="muted">' + num(rooms.length) + ' of ' + num(ir.rooms.length) + ' rooms. Click a room to show its entrance cell on the map.</p>' +
       grouped(ir, rooms).map(g => '<details class="itisland" data-island="' + esc(g.island) + '"' + open + '><summary><b>' + esc(g.label) + '</b> · ' + num(g.rooms) + ' rooms ' + stateCounts(ir, [].concat(...g.entrances.map(e => e.rooms))) +
         (g.island === NO_ISLAND ? ' <span class="muted">no door from any exterior leads to these; each keeps its own state</span>' : '') + '</summary>' +
         g.entrances.map(e => '<details class="itentrance"' + open + (e.cell ? ' data-cell="' + esc(e.cell) + '"' : '') + '><summary>' + esc(e.label) + ' · ' + e.rooms.length + ' ' + stateCounts(ir, e.rooms) + '</summary>' +
-          head + e.rooms.map(r => roomRow(ir, r)).join('') + '</tbody></table></details>').join('') + '</details>').join('');
+          head + e.rooms.map(r => roomRow(ir, r, opts)).join('') + '</tbody></table></details>').join('') + '</details>').join('');
   }
   // The side panel: per island, one line of the three groups (short; the list under the map is the main view).
   function overviewHtml(ir) {

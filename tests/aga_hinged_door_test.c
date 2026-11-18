@@ -29,6 +29,7 @@ void (*aw_hinged_tick)(double seconds);
 int (*aw_hinged_locked_sound)(void);
 int (*aw_load_door_lock)(unsigned reference,int use);
 int (*aw_trap_spring)(unsigned reference);   /* aw_inventory.c in the engine */
+int (*aw_lock_pass)(unsigned reference,const char *key);   /* aw_inventory.c in the engine (LOCKED-CONTAINERS-NEVER-OPEN-67) */
 /* The player's items: the engine's aw_state.c (linked); the key's catalogue name. */
 static void carry_key(int on){AW_StateSet(&aw_state,AW_ITEM,"key_Private Quarters",on);
     assert(AW_StateGet(&aw_state,AW_ITEM,"key_Private Quarters")==on);}
@@ -678,9 +679,39 @@ static void traps_mode(void){
     aw_trap_cast=NULL;
     printf("traps ok\n");
 }
+/* LOCKED-CONTAINERS-NEVER-OPEN-67: a locked container's way through, the doors' own rule through the hook
+ * (aw_inventory.c container_open asks it with the key its area record names): no key carried and no god mode: refused,
+ * nothing unlocked; the key carried: through, the original's message, unlocked for good on the world change list
+ * (aw_object_lock) and its trap disarmed without a cast; god mode: through with its notice, nothing unlocked;
+ * dbg doorlocks off: every lock passes. */
+static void container_locks_mode(void){
+    int i,calls;
+    table=trap_table;setup();AW_HingedDoorInit();assert(aw_lock_pass!=NULL);
+    aw_trap_cast=stand_in_cast;aw_object_lock=kept_lock;lock_calls=0;
+    /* no key carried: the named key does not open it, nor no key at all */
+    i=subtitles;assert(!aw_lock_pass(7000,"key_Private Quarters") && !aw_lock_pass(7000,NULL) && subtitles==i);
+    assert(lock_calls==0 && AW_TrapSpell(7000));
+    /* the key carried: through, unlocked for good, the trap disarmed (no cast) */
+    carry_key(1);calls=casts;
+    assert(aw_lock_pass(7000,"key_Private Quarters") && !strcmp(last_subtitle,"Private Quarters Key used to open lock"));
+    assert(lock_calls==1 && lock_last_ref==7000 && lock_last_lock==0 && AW_TrapSpell(7000)==NULL && casts==calls);
+    /* another container's key is not this one's */
+    assert(!aw_lock_pass(7001,NULL) && lock_calls==1);
+    carry_key(0);
+    /* god mode: through with the container's notice, nothing unlocked */
+    edicts[2].v.flags=FL_GODMODE;
+    assert(aw_lock_pass(7002,NULL) && !strcmp(last_subtitle,"God mode used to open a locked container") && lock_calls==1);
+    edicts[2].v.flags=0;
+    /* dbg doorlocks off: every lock passes; on again: refused */
+    argv1="locks";argv2="off";door_command();assert(aw_lock_pass(7002,NULL));
+    argv2="on";door_command();assert(!aw_lock_pass(7002,NULL));argv1=argv2=NULL;
+    aw_trap_cast=NULL;aw_object_lock=NULL;
+    printf("container locks ok\n");
+}
 int main(int argc,char **argv){
     assert(argc==2);
     if(!strcmp(argv[1],"traps")){traps_mode();return 0;}
+    if(!strcmp(argv[1],"containerlocks")){container_locks_mode();return 0;}
     if(!strcmp(argv[1],"movers")){movers_mode();return 0;}
     if(!strcmp(argv[1],"turns")){turns_mode();return 0;}
     if(!strcmp(argv[1],"locks")){locks_mode();return 0;}

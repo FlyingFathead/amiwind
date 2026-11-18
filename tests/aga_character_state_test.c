@@ -173,14 +173,18 @@ int main(void)
     assert(AW_StateGet(&aw_state,AW_GLOBAL,"CharGenState")==10);
     /* CHARGEN-INVENTORY-LOCKED-60: the inventory opens from the papers' activation on (CharGenStatsSheet:
      * EnableInventoryMenu), still inside the registration; never before the papers are laid out */
-    assert(!AW_StoryInventoryAllowed());aw_story.stage=AW_STAGE_REVIEW;
+    assert(!AW_StoryInventoryAllowed());
+    /* PRISON-SHIP-ITEMS-TAKEABLE-65: no placed object's name or action line on the ship (a new game's stage) nor
+     * during the registration; from the papers on they show, before the inventory is allowed */
+    assert(!AW_StoryObjectLabels());aw_story.stage=AW_STAGE_REVIEW;assert(!AW_StoryObjectLabels());
     assert(!AW_StoryPapersRead() && !AW_StoryInventoryAllowed());
-    aw_story.stage=AW_STAGE_PAPERS;assert(!AW_StoryInventoryAllowed());
+    aw_story.stage=AW_STAGE_PAPERS;assert(!AW_StoryInventoryAllowed() && AW_StoryObjectLabels());
     assert(AW_StoryPapersRead() && AW_StoryInventoryAllowed() && AW_StoryRestricted());
     AW_StoryReset(1);assert(!AW_StoryInventoryAllowed());
     aw_story.stage=AW_STAGE_COURTYARD;assert(AW_StoryInventoryAllowed());   /* papers taken */
     AW_StoryReset(1);aw_story.stage=AW_STAGE_PAPERS;aw_story.hall=1;assert(AW_StoryInventoryAllowed());
     AW_StoryReset(1);assert(AW_StateSet(&aw_state,AW_GLOBAL,"CharGenState",-1) && AW_StoryInventoryAllowed());
+    assert(AW_StoryObjectLabels());   /* the opening over: every label */
     /* MWSCRIPT-PLAYER-CONTROL-62: the scripts' switches start on, change only their own bits, take no row while
      * unchanged, sit beside the opening's own rule (both must allow) and go with a new game */
     AW_StoryReset(1);

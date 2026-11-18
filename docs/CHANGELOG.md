@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
+_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.67-dev2: second snapshot of v0.0.67, 17 November 2026](#v0067-dev2-second-snapshot-of-v0067-17-november-2026)
 - [v0.0.67-dev1: first snapshot of v0.0.67, 17 November 2026](#v0067-dev1-first-snapshot-of-v0067-17-november-2026)
 - [v0.0.66: Forward It Is, 16 November 2026](#v0066-forward-it-is-16-november-2026)
 - [v0.0.66-dev12: twelfth snapshot of v0.0.66, 16 November 2026](#v0066-dev12-twelfth-snapshot-of-v0066-16-november-2026)
@@ -204,6 +205,81 @@ _Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.67-dev2: second snapshot of v0.0.67, 17 November 2026
+
+The second development snapshot of v0.0.67, in development ([release notes](releases/notes/RELEASE-v0.0.67-dev2.md)). Its
+headline is three critical faults found in play on the v0.0.66 release, each fixed in source and checked in the emulator
+with its own engine. Emulator presets: `AmiWind-v0.0.67-dev2-FS-UAE.fs-uae` and `AmiWind-v0.0.67-dev2-WinUAE.uae`, both
+with 32 MB of Fast RAM.
+
+**New**
+
+- `dbg netstat` prints the last frame's update against the room in the frame message, the fullest frame since the map
+  started and the models that took the most bytes ([the frame message](NET_MESSAGES.md)).
+- Seyda Neen's crates, barrels, chests and sacks are drawn and open: its frame places the 19 containers that open in its
+  cells, the 14 that were not drawn among them
+  ([SEYDA-CONTAINERS-NOT-DRAWN-67](bugs/SEYDA-CONTAINERS-NOT-DRAWN-67.md)); the census office's and the prison ship's
+  containers, drawn as brushes of their own, are found by the view's aim
+  ([CONTAINER-BRUSH-ROWS-67](bugs/CONTAINER-BRUSH-ROWS-67.md)); containers follow the original's inventory rule in their
+  count and in the journey.
+- A place that cannot be loaded (a door, travel, a spell, a script, a debug teleport) leaves the player where he was and
+  names the error in the game's box with one button, **OK**; the load menu's error line fits its box and the console
+  says where the way back goes ([when a place cannot be loaded](LOAD_ERRORS.md)).
+- A page on [Morrowind units and AmiWind units](UNITS.md) (the 0.25 world scale and where it matters).
+- The Toolkit opens every room tile and every cell of the CHIM open world in the 3D Inspector (the reader takes every
+  world format from 0.5 to 0.12); its headline reads the expansions' rooms, and the rooms have a heatmap
+  ([TOOLKIT-LOCAL-CHIM-CELL-NO-MAP-67](bugs/TOOLKIT-LOCAL-CHIM-CELL-NO-MAP-67.md)).
+
+**Fixed**
+
+- The game no longer stops on a loading screen in busy places (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66): each frame's
+  update is built whole and copied in only where it fits, the player, the actors and the nearest things first; the
+  game's own connection carries 8 KB; a message that cannot fit is caught whole and dropped; the screen side drops an
+  update it cannot read instead of ending the game. In the emulator no "packet overflow" line was printed at Vivec or at
+  the Bitter Coast spot, against 4,668 at Vivec with the previous engine.
+- Autosaves are written again on every map change; a script error no longer holds every later save, and a check fails a
+  build in which they stop (SAVE-AUTOSAVE-NOT-WRITTEN-67).
+- Wild creatures are back outdoors: the cell the player arrives in gets its levelled creatures
+  (OUTDOOR-CREATURES-HOME-CELL-67), a new map drops the old map's queue (ACTOR-QUEUE-OTHER-MAP-67), and the build's
+  creature check counts what spawns (BUILD-ACTOR-SPEC-UNSPAWNABLE-67). In the emulator the Bitter Coast has 7 creatures
+  alive 30 seconds after arriving against 1 before, Red Mountain 12, Pelagiad 21 and the Moonmoth Legion Fort 13
+  ([OUTDOOR-CREATURES-REGRESSION-66](bugs/OUTDOOR-CREATURES-REGRESSION-66.md)). The creatures now also come back when
+  the same place is loaded again or a save made there is loaded (ACTOR-TABLE-SAME-MAP-RELOAD-67).
+- Nothing is taken, opened or harvested before the census papers allow the inventory, and a placed object shows no name
+  or action line before then ([PRISON-SHIP-ITEMS-TAKEABLE-65](bugs/PRISON-SHIP-ITEMS-TAKEABLE-65.md)).
+- The collision surface table has the rows of Solstheim's exterior models (appended to the Bloodmoon layer), of
+  Mournhold's districts and of the Royal Palace courtyard's banner hanger; a layer's rows are append-only and a unit
+  recorded with a shorter layer still matches (MESH-TABLE-LAYER-GROWS-67).
+- Seyda Neen's container record ids are read in the containers module, and the converted world's build keys stay as they
+  were after the load fallbacks.
+
+**Performance**
+
+- The frame message is built whole and paced across frames, nearest first, so a busy frame no longer costs a stop.
+- The CHIM areas' collision surface gate runs on the plain meshes before any stair collision unit is made, so a model it
+  refuses no longer holds a core for tens of minutes first.
+
+**Builder and tools**
+
+- The hull chain audit names the models it fails on; the image's flora support check writes into the image's own folder;
+  the tracker data stage's diagnostic file is inside its declared outputs, so a later build reuses the stage
+  (BUILD-CELL-PROGRESS-UNDECLARED-OUTPUT-67, fixed in source).
+- The early check `outdoor-creature-models` stops a build in its first minutes when an outdoor creature has no model in
+  the actor library.
+- The gate and delivery smoke now fail on engine error lines, on a map change without an autosave, on no creatures at
+  Seyda Neen (after its first load and after a reload of the same map) or at a wild stop, and on a frame update over the
+  ceiling.
+- The expansions' people outdoors are classed in a file of their own, and the grounding reads the expansions' ids in a
+  module of its own.
+- The Toolkit server reads the cell table's map heads with the thread pool's default size.
+- The release file list and the docs index carry the new pages and the frame message's rules include.
+- The bug register has entries for the faults above, the CHIMport findings of Solstheim (a cell only an expansion holds
+  counted as empty, the glacier's slow stair unit, the two icebergs' collision) and the conversion's heavier models.
+- The version label and the two emulator presets of v0.0.67-dev2 are made from the dev1 ones and are on the release file
+  list.
+- The MWScript tracker and the CHIM progress tracker are measured for this version: 611 of the original game's 1,074
+  scripts run and 9 more are carried by AmiWind's own code (433 wait for Mournhold and Solstheim).
 
 ## v0.0.67-dev1: first snapshot of v0.0.67, 17 November 2026
 

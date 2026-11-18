@@ -110,6 +110,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-CACHE-OVERBROAD-33](BUILD-CACHE-OVERBROAD-33.md): CHIM builds rerun the scene chain after merges that cannot change its outputs
 - [BUILD-CACHE-PER-WORKSPACE-33](BUILD-CACHE-PER-WORKSPACE-33.md): Per-file caches live in each build workspace, so a build on a new volume with --reuse-from converts everything again (MiniWind media 1,195 s instead of seconds)
 - [BUILD-CACHE-TRACE-PYTHONPATH-33](BUILD-CACHE-TRACE-PYTHONPATH-33.md): The stage read trace refused reuse of a reused run when another checkout was on PYTHONPATH
+- BUILD-CELL-PROGRESS-UNDECLARED-OUTPUT-67 (no report page): The tracker data stage (cell-progress) writes flora-support.json at the run folder's top, outside its declared outputs, so a later build refuses to reuse the stage
 - [BUILD-CHECK-ONE-CORE-66](BUILD-CHECK-ONE-CORE-66.md): The build's reuse check runs about six minutes on one core, and every snapshot runs it twice before its build starts
 - [BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46](BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46.md): A change in the shared collision converter rebuilds every CHIM frame and everything after it, even where the output is identical
 - [BUILD-CHIM-FRAME-SWAP-LATE-36](BUILD-CHIM-FRAME-SWAP-LATE-36.md): The image step builds 335 legacy maps of cells already on CHIM, then removes them before packing
@@ -229,6 +230,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-STAGE-INTERRUPT-ABSORBED-36](BUILD-STAGE-INTERRUPT-ABSORBED-36.md): The stage wrapper absorbed Ctrl-C: a stage that handled the interrupt and returned 0 counted as passed, and the build went on
 - [BUILD-STAGE-START-SHARE-33](BUILD-STAGE-START-SHARE-33.md): A pooled stage that starts while others run gets one worker as its start value
 - [BUILD-STAIR-GATE-OOM-42](BUILD-STAIR-GATE-OOM-42.md): The CHIM stair gate runs a whole-Vivec MiniWind out of memory: its worker pool breaks
+- [BUILD-STAIR-MESH-UNIT-SLOW-67](BUILD-STAIR-MESH-UNIT-SLOW-67.md): One stair collision unit of a Mournhold district model takes 8 to 12 minutes on one core
 - [BUILD-STAIR-WALK-BORDER-COPIES-41](BUILD-STAIR-WALK-BORDER-COPIES-41.md): The CHIM stair gate walks every frame's whole border, so each cell's flights are walked many times and unreachable copies can fail a build
 - [BUILD-STAIR-WALK-OFF-46](BUILD-STAIR-WALK-OFF-46.md): Every build walked the island stairs (about 1.5 million steps per release cycle); the stair walk is now off by default
 - [BUILD-STAIR-WALK-SCOPE-KEY-46](BUILD-STAIR-WALK-SCOPE-KEY-46.md): Development builds walk every step of the island again after any collision change: the CHIM gate ignored the walk scope and keyed each frame by all of its collision
@@ -243,6 +245,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [CHIM-EMPTY-MODEL-REPORT-40](CHIM-EMPTY-MODEL-REPORT-40.md): Terrain-only CHIM validation crashes while reporting the largest scenery model
 - [CHIM-INTERIORS-UNDERUSED-48](CHIM-INTERIORS-UNDERUSED-48.md): The CHIM interiors stage ran at 8.6 of 24 cores for 1 min 11 s
 - [CHIM-LEGACY-CHAIN-33](CHIM-LEGACY-CHAIN-33.md): CHIM builds still run the legacy exterior chain: frame maps read the legacy region maps, and the open world is built
+- CHIM-MESH-STAIR-UNIT-SLOW-67 (no report page): One stair collision unit of a Solstheim glacier cell takes 19.5 minutes on one core, and its second over 25
 - [CHIM-PVS-SLOW-33](CHIM-PVS-SLOW-33.md): Seyda Neen's CHIM visibility rows take 5.5 minutes and are rebuilt whenever the worker count changes
 - [CHIM-ROOM-FAIL-STAGE-48](CHIM-ROOM-FAIL-STAGE-48.md): One CHIM room that cannot be made failed the whole CHIM interiors stage (HOLD-LEVEL with every room batch by default)
 - [CHIM-ROOM-OVER-BUDGET-RETRY-48](CHIM-ROOM-OVER-BUDGET-RETRY-48.md): A model over the image budget is tried whole again on every run before its cached tiles are used: its room runs on one core
@@ -259,7 +262,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - IMAGE-GUARD-TORCHES-SLOW-66 (no report page): The image step's torch guards bake took 3.4 times as long, and the step ran on under half its cores
 - IMAGE-ROOM-ACTOR-BAKE-REFIT-66 (no report page): The image step's CHIM room actor bake fitted all 2,594 room residents again in the v0.0.66-dev3 build, where the v0.0.66-dev2 run had every one of them cached
 - IMAGE-ROOM-HEAP-ONE-CORE-66 (no report page): The image step's room heap check measures every room on one core
-- IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66 (no report page): The image step's CHIM room actor bake takes about two minutes on one core when every room resident is already cached
+- [IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66](IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66.md): The image step's CHIM room actor bake takes about two minutes on one core when every room resident is already cached
 - [MINIWIND-NO-INTERIOR-SCOPE-42](MINIWIND-NO-INTERIOR-SCOPE-42.md): A MiniWind of one room built the whole town: no scope converted only the start room
 - [MINIWIND-NOT-MINUTES-33](MINIWIND-NOT-MINUTES-33.md): A reused MiniWind build took about two hours instead of minutes
 - MINIWIND-NPCS-ONE-WORKER-64 (no report page): The npcs stage of a MiniWind sandbox build runs alone on 1 of its 8 workers

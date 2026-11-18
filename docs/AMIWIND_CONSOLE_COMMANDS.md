@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.67-dev1._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.67-dev2._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -58,10 +58,11 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg halloweentest` | - | [same words as halloween] the Halloween scene with the FPS counter on (bottom left) |
 | `dbg levelup` | `dbg skill progress` | [use SKILL [N [TYPE]] / raise SKILL [N] / book ID / read REF / check / rest [HOURS] / bed REF] levelling: no argument = level, progress, multipliers, each skill's progress; use = N skill uses (TYPE 0..3); raise = N raises; book = a skill book's first read; check = the level-up box when due; rest = HOURS (default 8), then the box when due (saved) |
 | `dbg lightgallery` | - | [off] lighting switches at this spot in a strip below the view: night mode, tint, lamps, glow, headlamp, horizon veil, time preview; arrows change, Esc done |
-| `dbg loadfail` | - | [N; no argument: status] a test aid: the next N map loads fail on purpose (0 = off); 1 shows the way back (the player returns to where the load started, with a message box: OK stays, Load Game opens the load menu), 2 a way back that fails as well (the load menu opens) |
+| `dbg loadfail` | - | [N [error/memory/lump/hang] / timeout [S]] test aid: the next N map loads fail (0 off); 1: the way back and the OK box naming the error, 2: the way back fails too (load menu); kinds: error, memory, lump (bad data in a lump), hang (never ends); timeout S: a stuck load fails after S s (120; 0 off) |
 | `dbg loadtrace` | - | [on / off / dump] the load trace (off by default; console aw_loadtrace 0/1): every file open, read, seek and close kept in memory with its time and load stage, printed and written to RAM:amiwind-loadtrace.txt when a scene is ready; dump: now |
 | `dbg maxstats` | `dbg maxstat` | every attribute and skill to 100 and the level to 83 (the highest the game's levelling reaches), health, magicka and fatigue worked out again by the character's own rules and full; the sheet before and after on the console |
 | `dbg memcensus` | - | [owners [on/off]] (the free Fast RAM and its largest block now, the map and the Hunk in use, in one console line; owners: the live blocks of 4 KiB or more by the address that asked for them, counted only after owners on, off by default) |
+| `dbg netstat` | - | the last frame's entity updates (things in sight, bytes wanted against the message's room, sent, waiting for the next frames), the fullest frame since the map started, and the models that took the most bytes |
 | `dbg nightgallery` | - | [here/off] (23:00 wide view, Masser, Secunda, stars; Esc returns) |
 | `dbg recorder` | - | [on/off / start / stop / play FILE / status] gameplay recorder (docs/GAME_RECORDER.md): no argument arms it; Ctrl+R records from a save taken at the start, (RECORDING) on the version line, and names the file at the stop; play 001 replays recordings/001.awr, (PLAYBACK), checkpoints compared, one RECORDER RESULT line |
 | `dbg restartgame` | - | (ends the running game cleanly, memory back to the boot level, then the startup logo and the main menu, as at boot; also after a failed load) |
@@ -246,6 +247,7 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg pos` | - | - |
 | `dbg probe` | - | (slow floor audit) |
 | `dbg rcount` | - | [0/1/2/3/4] once a second: renderer counts per frame (brush models, faces, clip fragments, edges, spans, surface cache, alias models) and timing split; 2 = remote state file only; 3 = 2 + brush-slot profile (walk/emit split, distance x size table, leaves per placement); 4 = 3 printed |
+| `dbg save status` | - | the autosave as it stands (read only): on or off and how many are kept, how many autosaves this character has, when the next is due, what holds it back now (a fight, a menu, the air, ...), a save waiting for a script step, and the last save's outcome (written, or why not) |
 | `dbg savelogs` | - | write the in-memory diagnostic logs to the game folder now (also done at Exit game) |
 | `dbg sealevel` | - | on/off |
 | `dbg show fps` | - | [on/off] |

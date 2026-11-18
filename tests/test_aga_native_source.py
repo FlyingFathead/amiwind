@@ -93,7 +93,12 @@ def area_fixture(id1):
     (id1 / 'inventory/items.awi').write_bytes(b'AWI2' + struct.pack('<I', len(rows)) + b''.join(rows))
     (id1 / 'gfx/icons.awl').write_bytes(b'AWL2' + struct.pack('<I', len(table)) + b''.join(table))
     (id1 / 'gfx/icons.awp').write_bytes(bytes(pack))
-    payload, report = prepare_area_tables.build(id1)
+    # LOCKED-CONTAINERS-NEVER-OPEN-67: container 1001 (room 10) names its key, an item of room 10's own (the focus
+    # stage's focus-extras.json: reference -> [trapped, key id]); 1000 has none
+    extras = id1 / 'focus-extras.json'
+    extras.write_text('{"1001": [0, "r10_a"]}\n', encoding='ascii')
+    expect += ['L 10 1001 r10_a', 'L 10 1000 -']
+    payload, report = prepare_area_tables.build(id1, extras)
     (id1 / 'areas.awa').write_bytes(payload)
     (id1 / 'expect.txt').write_text('\n'.join(expect) + '\n', encoding='ascii')
     return report
@@ -888,7 +893,7 @@ class NativeSourceTests(unittest.TestCase):
         self.compile_run("aga_hinged_door_test.c", [ROOT/"engine/aga/src/aw_hinged_door.c", Path(SOURCE)/"src/world.c",
                                                     Path(SOURCE)/"src/mathlib.c"],
                          argument_sets=[["table"], ["badtable"], ["door"], ["chim"], ["census"], ["locks"], ["kept"], ["movers"], ["turns"],
-                                        ["traps"]],
+                                        ["traps"], ["containerlocks"]],
                          cflags=["-fsanitize=undefined", "-fno-sanitize-recover=all"])
 
     def test_talk_rule_combat_dead_knocked_calm_and_one_read_a_frame(self):
@@ -1032,6 +1037,9 @@ class NativeSourceTests(unittest.TestCase):
             # the use key's ray and box rules (FOCUS-NPC-OVERRIDES-ITEM-62)
             if not any(p.name == "aw_activate_rules.c" for p in sources):
                 sources.append(tree/"src/aw_activate_rules.c")
+            # the load errors' kinds, box text and console block (SCENE-LOAD-FAIL-FALLBACK-67)
+            if not any(p.name == "aw_loaderr.c" for p in sources):
+                sources.append(tree/"src/aw_loaderr.c")
         # The one map path resolver (aw_mappath.c) every map-path builder asks.
         if any(p.name in MAP_PATH_USERS for p in sources) and not any(p.name == "aw_mappath.c" for p in sources):
             sources = [*sources, tree/"src/aw_mappath.c"]

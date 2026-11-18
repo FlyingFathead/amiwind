@@ -1,6 +1,6 @@
 # Build AmiWind on Linux
 
-_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
+_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -405,8 +405,15 @@ problem listed. A third phase, `after:STAGE`, runs a check the moment that stage
 output, and stops the build before the stages after it (the stage stays passed, so a build again takes its output).
 The image step's actor frames check runs this way on the room batches' own output (`tools/image_early_checks.py`):
 before the first stage when the room batches are taken from an earlier build, right after them when the build makes
-them, so a room actor whose frames the image would refuse stops the build in its first minutes, not at its end. A new check is a module of its own whose function takes the build's context and returns its problems
-(it never exits), plus one line in `EARLY_CHECKS`.
+them, so a room actor whose frames the image would refuse stops the build in its first minutes, not at its end. The
+outdoor creatures' models run the same way on the actor library's own output (`tools/actor_early_checks.py`): every
+creature the base game places outdoors and every outdoor levelled list must give a creature with a model, since the
+game spawns no creature without one. Seyda Neen's CHIM frame is compared with its town the same way
+(`tools/seyda_early_checks.py`): its placements, predicted from the inputs the world stage reads (the scenery
+selection, the tutorial barrel and the containers that open), go through the Seyda Neen town stage's own comparison
+with the town's statics right after the `bsp` stage (or before the first stage when that stage is taken from an earlier
+build), in about five seconds, instead of failing that town stage after the world. A new check is a module of its own
+whose function takes the build's context and returns its problems (it never exits), plus one line in `EARLY_CHECKS`.
 
 ### When a build fails
 

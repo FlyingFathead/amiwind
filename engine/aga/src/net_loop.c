@@ -8,7 +8,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -66,7 +66,7 @@ qsocket_t *Loop_Connect (char *host)
 {
 	if (Q_strcmp(host,"local") != 0)
 		return NULL;
-	
+
 	localconnectpending = true;
 
 	if (!loop_client)
@@ -97,8 +97,8 @@ qsocket_t *Loop_Connect (char *host)
 
 	loop_client->driverdata = (void *)loop_server;
 	loop_server->driverdata = (void *)loop_client;
-	
-	return loop_client;	
+
+	return loop_client;
 }
 
 
@@ -161,8 +161,10 @@ int Loop_SendMessage (qsocket_t *sock, sizebuf_t *data)
 
 	bufferLength = &((qsocket_t *)sock->driverdata)->receiveMessageLength;
 
+	/* NET-VIVEC-ENTITY-PACKET-OVERFLOW-66: the session ends (the way back or the place loaded again, the box), never
+	 * the game; the server's frame message keeps room for this one (sv_main.c SV_LoopDatagramRoom) */
 	if ((*bufferLength + data->cursize + 4) > NET_MAXMESSAGE)
-		Sys_Error("Loop_SendMessage: overflow\n");
+		Host_Error("Loop_SendMessage: overflow (%ld unread, %ld more)", (long)*bufferLength, (long)data->cursize);
 
 	buffer = ((qsocket_t *)sock->driverdata)->receiveMessage + *bufferLength;
 

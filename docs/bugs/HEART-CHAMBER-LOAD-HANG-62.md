@@ -89,5 +89,6 @@ Family: Loading and disk reads (`disk-loading`). Load time follows bytes read an
 Related bugs in other categories:
 
 - [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): Travelling from Seyda Neen to Balmora sometimes hangs on the Loading screen (boot smoke, 2 of about 5 runs)
+- LOAD-FATAL-ERRORS-67 (no report page): Memory that runs out or a damaged map file while a place loads ends the game instead of going back where the player was
 
 <!-- END GENERATED CATEGORY -->

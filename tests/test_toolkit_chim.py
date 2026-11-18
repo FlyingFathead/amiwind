@@ -222,5 +222,167 @@ class ToolkitChimReaderTests(unittest.TestCase):
         self.assertIn('tools/chim/format.py', READER.read_text(encoding='utf-8'))
 
 
+try:
+    import numpy  # noqa: F401 (the builder's world units need it; the gate image has it)
+except ImportError:  # pragma: no cover
+    numpy = None
+
+# The later world formats (TOOLKIT-WORLD-FORMAT-STALE-64), each written by the builder's own code on synthetic data:
+# name -> (the world format it is written as, how it is built).
+LATER = {'placed': (0, 8), 'reach': (0, 9), 'compact': (0, 10), 'generated': (0, 11), 'generated-irregular': (0, 11)}
+
+
+def later_world(name, out):
+    """A synthetic world of one later format: placed records with tilts (0.8, tests/test_chim_placed_format.py's
+    references), the reach index with terrain references (0.9), compact terrain records (0.10), generated terrain
+    records of the regular path (0.11, record version 1) and of the converter's own triangles (record version 2)."""
+    if name in ('placed', 'reach'):
+        from test_chim_placed_format import build
+        build(out, '0.8', {'reach_index': 'refs', 'terrain_refs': 'on'} if name == 'reach' else None)
+    else:
+        from test_chim_format import fixture
+        from test_chim_terc import ground
+        settings = {'grain': 256, 'sector_chunks': 2, 'terrain_refs': 'on',
+                    'terrain_pack': 'compact' if name == 'compact' else 'generate'}
+        if name == 'generated-irregular':
+            from test_chim_thgt import irregular_ground
+            fixture(out, ground=irregular_ground(), settings=settings)
+        else:
+            fixture(out, heights_of=ground, settings=settings)
+    heap.require_heap(out, sizes=SIZES)
+
+
+def python_terrain(out):
+    """Every TERR record of a world as tools/chim expands it: [{path, id, form, lumps: [[bytes, CRC-32]]}]."""
+    from chim import terc, thgt
+    root = Path(out) / 'chim'
+    _, files, _, _ = F.read_index((root / 'world.cwi').read_bytes())
+    rows = []
+    for f in sorted((f for f in files if f['kind'] == b'SECT'), key=lambda f: f['path']):
+        for r in F.read_sector((root / f['path']).read_bytes()):
+            if r['kind'] != b'TERR':
+                continue
+            data = r['data']
+            if thgt.is_generated(data):
+                form, image = 'generated-%d' % struct.unpack_from('>H', data, 12)[0], thgt.decode(data)
+            elif terc.is_compact(data):
+                form, image = 'compact', terc.decode(data)
+            else:
+                form, image = 'image', bytes(data)
+            rows.append({'path': f['path'], 'id': r['id'], 'form': form,
+                         'lumps': [[len(x), F.crc32(bytes(x))] for x in F.read_brush_image(image)]})
+    return sorted(rows, key=lambda r: (r['path'], r['id']))
+
+
+@unittest.skipUnless(node(), 'Node.js unavailable; the Toolkit CHIM checks need an existing interpreter')
+@unittest.skipIf(numpy is None, 'numpy is required to build the synthetic worlds')
+class ToolkitChimLaterFormatsTests(unittest.TestCase):
+    """The reader on worlds of formats 0.8 to 0.11, as the builder writes them today (a v0.0.66 world is 0.11: generated
+    terrain records, some compact, some plain; 48-byte records)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory(prefix='amiwind-toolkit-later-')
+        root = Path(cls.tmp.name)
+        cls.worlds = {}
+        for name in LATER:
+            later_world(name, root / name)
+            cls.worlds[name] = root / name
+        cls.sizes = root / 'sizes.json'
+        cls.sizes.write_text(json.dumps({'target_struct_sizes_bytes': SIZES}), encoding='utf-8')
+        cls.map = root / 'town-chim.chim'
+        frame_map(cls.map, cell=(0, 0))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def test_every_later_format_reads_as_the_python_reader_and_the_heap_gate(self):
+        for name, out in self.worlds.items():
+            want = python_frames(out)
+            got = run('world', out, self.sizes)
+            self.assertEqual(tuple(got['version']), LATER[name], name)
+            self.assertEqual(sorted(f['frame'] for f in got['loaded']), sorted(want), name)
+            for f in got['loaded']:
+                self.assertEqual(f['problems'], [], name)
+                for k, v in want[f['frame']].items():
+                    self.assertEqual(f[k], v, '%s %s %s' % (name, f['frame'], k))
+                self.assertEqual(f['report']['peak_bytes'], want[f['frame']]['scan']['peak_bytes'], name)
+        reach = run('world', self.worlds['reach'], self.sizes)['loaded']
+        self.assertGreater(sum(f['reach'] for f in reach), 0)              # the references were resolved to records
+
+    def test_compact_and_generated_terrain_expands_to_the_builders_bytes(self):
+        forms = set()
+        for name in ('compact', 'generated', 'generated-irregular'):
+            want = python_terrain(self.worlds[name])
+            got = sorted(run('terrain', self.worlds[name]), key=lambda r: (r['path'], r['id']))
+            self.assertEqual(len(got), len(want), name)
+            for g, w in zip(got, want):
+                self.assertEqual(g, w, name)
+            forms |= {r['form'] for r in got}
+        self.assertTrue({'compact', 'generated-1', 'generated-2'} <= forms, forms)
+
+    def test_placed_records_turn_by_their_three_angles(self):
+        from chim import placed as P
+        got = run('placed', self.worlds['placed'])
+        self.assertTrue(got and all(r['record_size'] == 56 for r in got))
+        tilted = [r for r in got if r['angles'] and (r['angles'][0] or r['angles'][2])]
+        self.assertTrue(tilted)
+        # the Python side: each owned record's model vertices placed with its origin and angles (chim.placed)
+        fails, world = validate(str(self.worlds['placed']))
+        self.assertEqual(list(fails), [])
+        boxes = {}
+        for _, _, chunks in world['frames']:
+            for c in chunks:
+                for r in c['owned']:
+                    lumps = F.read_brush_image(world['models'][r['model']]['image'])
+                    verts = [struct.unpack_from('<3f', lumps[3], at) for at in range(0, len(lumps[3]), 12)]
+                    pts = P.place_points(verts, r['origin'], r['angles'])
+                    boxes[r['ref']] = (pts.min(axis=0), pts.max(axis=0))
+        for r in tilted:
+            lo, hi = boxes[r['ref']]
+            for k in range(3):
+                self.assertAlmostEqual(r['box'][0][k], lo[k], delta=1e-2)
+                self.assertAlmostEqual(r['box'][1][k], hi[k], delta=1e-2)
+
+    def test_the_inspector_opens_a_generated_world(self):
+        out = self.worlds['generated']
+        got = run('page', PAGE, out, self.sizes, 'frames/x+00/y+00', self.map)
+        self.assertIn('world format 0.11', got['world']['hint'])
+        self.assertEqual(got['world']['chunks'], python_frames(out)['frames/x+00/y+00/frame.ccf']['chunks'])
+        self.assertGreater(got['world']['placements'], 0)
+
+    def test_the_frame_that_holds_a_cell(self):
+        out = self.worlds['generated']
+        self.assertEqual(run('cell', out, 0, 0)['frame'], 'frames/x+00/y+00')       # the frame of the cell itself
+        self.assertEqual(run('cell', out, 5, 5, 'frames/x+00/y+00/frame.ccf')['frame'], 'frames/x+00/y+00')   # named
+        # any other cell: held when the frame's chunk area holds its centre (game units = 4 x map units), else none
+        frame = F.read_frame((Path(out) / 'chim/frames/x+00/y+00/frame.ccf').read_bytes())[0]
+        lo = [frame['centre'][k] + 4 * frame['low'][k] for k in range(2)]
+        hi = [lo[0] + 4 * frame['nx'] * frame['grain'], lo[1] + 4 * frame['ny'] * frame['grain']]
+        held = 0
+        for x, y in ((1, 0), (0, -1), (-1, 1), (3, 3), (-4, 2)):
+            inside = lo[0] <= (x + 0.5) * 8192 < hi[0] and lo[1] <= (y + 0.5) * 8192 < hi[1]
+            held += inside
+            self.assertEqual(run('cell', out, x, y)['frame'], 'frames/x+00/y+00' if inside else None, (x, y))
+        self.assertLess(held, 5)                                                     # some cell is not held: none, never a guess
+
+
+@unittest.skipUnless(node(), 'Node.js unavailable; the Toolkit CHIM checks need an existing interpreter')
+class ToolkitChimVersionTests(unittest.TestCase):
+    def test_the_reader_lists_every_format_the_builder_writes(self):
+        """Prevention (TOOLKIT-WORLD-FORMAT-STALE-64): a world or store format the builder can write that the Toolkit
+        reader does not list fails here, not on the next build in the maintainer's browser."""
+        import chim
+        from chim import interior, placed, placement_light, reach, terc, thgt
+        world = {chim.FORMAT_VERSION, chim.REFS_FORMAT_VERSION, placed.FORMAT_VERSION, reach.FORMAT_VERSION,
+                 terc.FORMAT_VERSION, thgt.FORMAT_VERSION, placement_light.FORMAT_VERSION}
+        got = run('versions')
+        read, store = {tuple(v) for v in got['read']}, {tuple(v) for v in got['store']}
+        self.assertEqual(world - read, set(), 'world formats the Toolkit reader does not take')
+        self.assertIn(interior.FORMAT_VERSION, store)
+        self.assertEqual(set(F.READ_VERSIONS) - read - store, set(), 'formats chim.format reads that the Toolkit does not')
+
+
 if __name__ == '__main__':
     unittest.main()

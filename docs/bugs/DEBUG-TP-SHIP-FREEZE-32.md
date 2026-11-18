@@ -26,16 +26,17 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 - 2026-10-08: reported in v0.0.32-dev3
 - 2026-10-08: CENSUS-LOAD-SLOW-32 cause; REMOTE-CONSOLE-LOG-COST-32 and DEBUG-TP-SHIP-FREEZE-32: CENSUS-LOAD-SLOW-32: cause confirmed in one FS-UAE container (loaded machine, relative numbers): dev3 Census 8.8-20.9 s with the remote console on ...
+- 2026-11-17: v0.0.67-dev1: Cause attributed on 17 November 2026 (v0.0.67-dev1 line, the load fallbacks job): the same mechanism as CHIM-SEYDA-BALMORA-LOAD-HANG-43, captured on 16 November 2026.
 
 <!-- END GENERATED TIMELINE -->
 
-_Last updated with AmiWind v0.0.42-dev2 (17 October 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [Timeline](#timeline)
-- [Status: 8 October 2026](#status-8-october-2026)
+- [Status: 17 November 2026](#status-17-november-2026)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -49,11 +50,12 @@ _Last updated with AmiWind v0.0.42-dev2 (17 October 2026)._
 
 <!-- contents end -->
 
-## Status: 8 October 2026
+## Status: 17 November 2026
 
-Open; cause unknown, seen once, not reproduced in two more attempts. Found in an FS-UAE test
-session of the v0.0.32-dev3 image (remote console on) while measuring
-[CENSUS-LOAD-SLOW-32](CENSUS-LOAD-SLOW-32.md).
+Open; cause attributed (below, "How it happened"): the emulator's lost disk-done announcement of
+[CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md), a test-session mechanism a player's game does not
+have. Seen once, in an FS-UAE test session of the v0.0.32-dev3 image (remote console on) while measuring
+[CENSUS-LOAD-SLOW-32](CENSUS-LOAD-SLOW-32.md), not reproduced in two more attempts.
 
 ## Symptom
 
@@ -73,7 +75,24 @@ volume (each console line opens and closes a host file,
 
 ## How it happened
 
-Unknown.
+Attributed on 17 November 2026 to the mechanism of [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md),
+captured in a test session on 16 November 2026. With the remote console on, every console line and every write of the
+remote state file is a request to the remote-console folder, a host folder that the emulator serves as a drive from a
+host thread. FS-UAE 3.1.66 announces a finished request by setting a bit in a shared interrupt word that its emulator
+thread rewrites without atomic operations, so now and then the announcement is lost: the request is done, its reply is
+never sent, and the game sleeps on it for ever.
+
+The freeze of 8 October shows every sign of that: the remote console was on (the same traffic the later captures needed),
+the game stopped right after it had taken `dbg tp balmora` from the command file (the state file counted the command and
+was not rewritten again), the emulator ran on at full speed, no key or console line reached the game, and the load itself
+never began (no heap line of a new load). It was not captured in a debugger, so the cause is attributed by these signs,
+not measured. A player's game has no such drive. In v0.0.32 the music stream was also read in the main loop
+([HANG-IDLE-DUSK-35](HANG-IDLE-DUSK-35.md)), a second way the same lost reply could stop the game; it reads
+asynchronously since v0.0.36.
+
+The game side cannot catch a reply that never comes (the main loop itself waits for it). What the game does catch since
+v0.0.67: a load whose frames run but whose arrival never comes ends after a time limit and goes back, with an OK box
+saying "The load did not finish." ([LOAD_ERRORS.md](../LOAD_ERRORS.md)).
 
 ## Why it was not caught
 
@@ -88,7 +107,9 @@ jumps per session with 6-30 s gaps did not freeze.
 
 ## Repair
 
-Not yet; first a reproduction with the emulator debugger available to see where the guest is.
+For the test sessions, the way out of [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): the
+emulator's deterministic mode, which completes host-folder requests on the emulator thread. In the game: the load time
+limit and the failed-load box (v0.0.67, [LOAD_ERRORS.md](../LOAD_ERRORS.md)) for loads that stop while frames still run.
 
 ## Verification
 
@@ -148,6 +169,7 @@ Family: Debug commands and remote control (`debug-commands`). dbg commands, tele
 - [INSPECT-PIN-LOAD-DOOR-51](INSPECT-PIN-LOAD-DOOR-51.md): The inspect pin at an exterior load door names the building shell around it, not the door: the drawn door looks absent
 - MAP-TELEPORT-28 (no report page): F10 map teleport intermittently fails
 - [MINIWIND-CITY-COORD-TP-36](MINIWIND-CITY-COORD-TP-36.md): dbg tp X Y Z does not work inside the whole-city Vivec MiniWind: Coordinate teleport unavailable (no map on this disk holds that point)
+- MWSCRIPT-MOVE-WAITS-FOR-CONSOLE-67 (no report page): A script that moves the player to another place runs only after the console is closed
 - [REMOTE-CONSOLE-APPEND-31](REMOTE-CONSOLE-APPEND-31.md): Remote console log keeps only the last message
 - [REMOTE-CONSOLE-LOG-COST-32](REMOTE-CONSOLE-LOG-COST-32.md): With the remote console on, every console line costs about 7-18 ms in FS-UAE
 - [REMOTE-STATE-WIDTH-31](REMOTE-STATE-WIDTH-31.md): Remote state file printed 51.*ld for fractional fields

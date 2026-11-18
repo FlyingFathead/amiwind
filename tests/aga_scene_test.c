@@ -7,7 +7,18 @@
 #include "aw_world.h"
 #include "chim/chim.h"
 #include "aw_harvest_runtime.h"
+#include "aw_loaderr.h"
 aw_character_t aw_character;
+/* SCENE-LOAD-FAIL-FALLBACK-67: the check before leaving (aw_loadfail.c in the game): a map refused as too big for this
+ * start's memory (balmora) or with a short file (census) */
+static int precheck_hook(const char *map,aw_loaderr_t *e){
+ if(!strcmp(map,"balmora")){e->kind=AW_LOADERR_MEMORY;e->need=20000L*1024;e->have=9000L*1024;strcpy(e->arena,"map");return 1;}
+ if(!strcmp(map,"census")){
+  e->kind=AW_LOADERR_BROKEN;e->broken=AW_BROKEN_SHORT;e->lump=7;e->offset=4096;e->file_bytes=4096;
+  strcpy(e->file,"maps/census.bsp");strcpy(e->detail,"a lump runs past the end of the file (checked before leaving)");return 1;
+ }
+ return 0;
+}
 void AW_HeapAuditReport(const char *scene){}
 qboolean noclip_anglehack;
 kbutton_t in_mlook;
@@ -462,14 +473,17 @@ int main(void){
  }
 
  p.v.origin[0]=p.v.origin[1]=p.v.origin[2]=0;queued[0]=0;
- assert(AW_SceneUse());assert(!strcmp(notice,"Interior not found."));
+ /* SCENE-LOAD-FAIL-FALLBACK-67: a door whose room is not in the build: the OK box names it (LF2), nothing loads */
+ while(AW_SceneLoadBoxTake());
+ assert(AW_SceneUse());assert(AW_SceneLoadBoxTake()==1);
+ assert(strstr(AW_SceneLoadBoxText(),"Map Census and Excise Office was not found.\nIt is not on this disk. Code LF2.\nYou are in "));
  assert(!queued[0] && clear_buttons==1 && p.v.health==100); /* no transition or state loss */
- /* Quick test build without interiors: a friendly line instead of the repair message. */
+ /* Quick test build without interiors: a friendly line instead of the repair message (no box). */
  excluded_interiors=1;AW_ExcludedReset();
  assert(AW_SceneUse());assert(!strcmp(notice,"Area unavailable in this quick test build."));
- assert(!queued[0] && p.v.health==100);
+ assert(!queued[0] && p.v.health==100 && !AW_SceneLoadBoxTake());
  excluded_interiors=0;AW_ExcludedReset();
- assert(AW_SceneUse());assert(!strcmp(notice,"Interior not found."));
+ assert(AW_SceneUse());assert(AW_SceneLoadBoxTake()==1 && strstr(AW_SceneLoadBoxText(),"Code LF2."));
  occluded=1;assert(!AW_SceneUse());occluded=0;
  p.v.movetype=MOVETYPE_NOCLIP;assert(!AW_SceneUse());
  AW_SceneInit();assert(start_demo && demo_option && demo_option->value==1);
@@ -519,6 +533,15 @@ int main(void){
  assert(AW_SceneUse() && key_dest==key_menu);
  drawn[0]=0;assert(AW_TravelDraw());assert(strstr(drawn,"Balmora") && strstr(drawn,"Gnisis") && strstr(drawn,"Suran") && strstr(drawn,"Vivec") && strstr(drawn,"Cancel"));
 #ifdef BALMORA_AVAILABLE
+ /* SCENE-LOAD-FAIL-FALLBACK-67: the check before leaving refuses the ride (its world too big for this start's
+  * memory): nothing loads, the menu closes, the OK box names it (LF5); then the ride without the refusal */
+ {extern int (*aw_load_precheck)(const char *,aw_loaderr_t *);
+  while(AW_SceneLoadBoxTake());
+  aw_load_precheck=precheck_hook;queued[0]=0;
+  assert(AW_TravelKey(K_ENTER) && !queued[0] && key_dest==key_game && AW_StateGet(&aw_state,AW_ITEM,"gold_001")==87);
+  assert(AW_SceneLoadBoxTake()==1);
+  assert(strstr(AW_SceneLoadBoxText(),"Map balmora was found but could not be loaded.\nNot enough memory (needs 20000 KB, 9000 KB free). Code LF5.\nYou are in "));
+  aw_load_precheck=NULL;assert(AW_SceneUse() && key_dest==key_menu);}
  assert(AW_TravelKey(K_ENTER));assert(!strcmp(queued,"map balmora\n"));
  assert(key_dest==key_game && AW_StateGet(&aw_state,AW_ITEM,"gold_001")==87);
  strcpy(notice,"Old room greeting");
@@ -970,12 +993,14 @@ int main(void){
  {
   edict_t q;int before;
   assert(!AW_MiniwindActive() && quick);
-  /* A normal build (no notice file): a missing room still says "Interior not found." */
+  /* A normal build (no notice file): a missing room names itself in the OK box (LF2, SCENE-LOAD-FAIL-FALLBACK-67) */
   harvest_fixture=0;AW_SceneCancelTransition();strcpy(sv.name,"balmora");sv.active=true;cls.state=ca_connected;cls.signon=SIGNONS;
   key_dest=key_game;target_trace=travel_trace=occluded=0;door_duration=0;miniwind_rooms_missing=1;
   memset(p.v.origin,0,sizeof(p.v.origin));p.v.view_ofs[2]=30;p.v.movetype=MOVETYPE_WALK;p.v.health=73;
   cl.viewangles[0]=0;cl.viewangles[1]=90;queued[0]=0;
-  assert(AW_SceneUse() && !strcmp(notice,"Interior not found.") && !queued[0]);
+  while(AW_SceneLoadBoxTake());
+  assert(AW_SceneUse() && !queued[0] && AW_SceneLoadBoxTake()==1);
+  assert(strstr(AW_SceneLoadBoxText(),"Map bmcaius (Caius Cosades House) was not found.\nIt is not on this disk. Code LF2."));
   miniwind_fixture=1;AW_MiniwindInit();assert(AW_MiniwindActive());
   /* The same door in the partial-area build. */
   assert(AW_SceneUse() && !strcmp(notice,"Area unavailable") && !queued[0]);
@@ -1238,6 +1263,80 @@ int main(void){
   queued[0]=0;command_args[1]="seydaneen";teleport();assert(!queued[0] && held_lines==lines+4);
   sv.active=false;AW_SceneTick();assert(!queued[0] && held_dropped==dropped+2 && held_runs==runs+2);sv.active=true;
   AW_SceneCancelTransition();key_dest=key_game;command_argc=1;
+ }
+ /* SCENE-LOAD-FAIL-FALLBACK-67 / DBG-TP-NOT-FOUND-BOX-67: one catcher for every way into a place. A dbg tp refusal (a
+  * name not found, a map this build leaves out, a point no map holds) leaves the player where he is and asks for the OK
+  * box naming the error (LF1-LF3); the check before leaving refuses a damaged map (LF4) without loading; a load that
+  * fails after leaving (a door here) goes back, and the box names the cause the load noted with "You are in <place>";
+  * a way back that fails as well, and a saved game's load with no place to stay, ask for the load menu with the error
+  * on its notice line; an error with no load in flight asks for nothing. */
+ {
+  const char *box;aw_loaderr_t e;vec3_t at;extern int (*aw_load_precheck)(const char *,aw_loaderr_t *);
+  assert(teleport && scene);occluded=target_trace=travel_trace=0;door_duration=0;ship_available=1;roulette_fixture=0;
+  aw_story.stage=AW_STAGE_RELEASED;door_wall=0;
+  AW_SceneCancelTransition();CL_ClearState();strcpy(sv.name,"seyda");sv.active=true;AW_SceneSpawn(&p);finish_signon(&p);
+  strcpy(cl.levelname,"Seyda Neen");
+  p.v.movetype=MOVETYPE_WALK;p.v.health=73;cls.state=ca_connected;key_dest=key_game;
+  p.v.origin[0]=11;p.v.origin[1]=22;p.v.origin[2]=33;VectorCopy(p.v.origin,at);
+  while(AW_SceneLoadBoxTake());   /* nothing left over from the blocks above */
+  /* a name not found: LF1; nothing queued, the player unchanged */
+  command_args[0]="aw_teleport";command_args[1]="nowhere";command_argc=2;queued[0]=0;teleport();
+  assert(!queued[0] && !AW_SceneStarting() && VectorCompare(p.v.origin,at) && p.v.health==73);
+  assert(AW_SceneLoadBoxTake()==1 && !AW_SceneLoadBoxTake());
+  box=AW_SceneLoadBoxText();
+  assert(!strcmp(box,"Map nowhere was not found. Code LF1.\nYou are in Seyda Neen."));
+  /* a map of the game this build leaves out (the ship's map not on the disk): LF2 */
+  ship_available=0;command_args[1]="prisonship";queued[0]=0;teleport();
+  assert(!queued[0] && AW_SceneLoadBoxTake()==1);
+  assert(!strcmp(AW_SceneLoadBoxText(),"Map prison was not found.\nIt is not on this disk. Code LF2.\nYou are in Seyda Neen."));
+  ship_available=1;
+  /* a point no map holds: LF3 */
+  command_argc=3;command_args[1]="1900000";command_args[2]="-1900000";queued[0]=0;teleport();
+  assert(!queued[0] && AW_SceneLoadBoxTake()==1);
+  assert(!strcmp(AW_SceneLoadBoxText(),"No map holds the point 1900000 -1900000. Code LF3.\nYou are in Seyda Neen."));
+  /* the check before leaving: a map whose file ends before its lumps do (LF4), refused, nothing loads */
+  aw_load_precheck=precheck_hook;command_argc=2;command_args[1]="census";queued[0]=0;teleport();
+  assert(!queued[0] && !AW_SceneStarting() && AW_SceneLoadBoxTake()==1);
+  box=AW_SceneLoadBoxText();
+  assert(!strncmp(box,"Map census",10));
+  assert(strstr(box,"was found but could not be loaded.\nBroken map file (short read). Code LF4.\nYou are in Seyda Neen."));
+  aw_load_precheck=NULL;
+  /* a door's load that fails after leaving (the Hunk full while the room loads): back where the door was used, the box */
+  p.v.origin[0]=0;p.v.origin[1]=200;p.v.origin[2]=0;VectorCopy(p.v.origin,at);cl.viewangles[0]=0;cl.viewangles[1]=90;
+  queued[0]=0;assert(AW_SceneUse() && !strcmp(queued,"map census\n") && AW_SceneStarting());
+  AW_SceneMapBegin("census");assert(AW_SceneLoadInFlight());
+  memset(&e,0,sizeof(e));e.kind=AW_LOADERR_MEMORY;e.need=300000;e.have=120000;strcpy(e.arena,"hunk");e.lump=-1;e.offset=-1;
+  AW_SceneLoadNote(&e);
+  e.kind=AW_LOADERR_BROKEN;AW_SceneLoadNote(&e);       /* the first cause counts */
+  queued[0]=0;AW_SceneLoadFailed("Not enough memory for the load: hunk edicts needs 300000 bytes, 120000 free");
+  assert(!strcmp(queued,"map seyda\n") && AW_SceneStarting() && !AW_SceneLoadBoxTake());   /* going back: no box yet */
+  AW_SceneMapBegin("seyda");CL_ClearState();strcpy(cl.levelname,"Seyda Neen");strcpy(sv.name,"seyda");
+  AW_SceneSpawn(&p);finish_signon(&p);
+  assert(!AW_SceneStarting() && !AW_SceneLoadInFlight());
+  assert(fabs(p.v.origin[0]-at[0])<1 && fabs(p.v.origin[1]-at[1])<1 && fabs(p.v.origin[2]-at[2])<1 && p.v.health==73);
+  assert(AW_SceneLoadBoxTake()==1);
+  box=AW_SceneLoadBoxText();
+  assert(!strncmp(box,"Map census",10));
+  assert(strstr(box,"was found but could not be loaded.\nNot enough memory (needs 293 KB, 118 KB free). Code LF5.\nYou are in Seyda Neen."));
+  /* the way back fails as well: the load menu, the error on its notice line */
+  command_argc=2;command_args[0]="aw_teleport";command_args[1]="prisonship";queued[0]=0;teleport();
+  assert(!strcmp(queued,"map prison\n"));
+  AW_SceneMapBegin("prison");queued[0]=0;AW_SceneLoadFailed("map prison: forced load failure (aw_load_fail_test)");
+  assert(!strcmp(queued,"map seyda\n"));
+  AW_SceneMapBegin("seyda");AW_SceneLoadFailed("map seyda: forced load failure (aw_load_fail_test)");
+  assert(!AW_SceneStarting() && !AW_SceneLoadInFlight() && AW_SceneLoadBoxTake()==2);
+  assert(!strcmp(AW_SceneLoadBoxText(),"Map prison was found but could not be loaded, and the way back to seyda failed as well."
+                 "\nLoad error: forced failure (dbg loadfail). Code LF9.\nLoad a saved game to go on."));
+  assert(!strcmp(AW_SceneLoadNoticeText(),"LF9: map prison did not load; no way back."));
+  /* a saved game's load (no scene load started it): no place to go back to; a missing file names itself (LF8) */
+  sv.active=true;cls.state=ca_connected;
+  AW_SceneMapBegin("balmora");AW_SceneLoadFailed("Model progs/missing.mdl not found");
+  assert(AW_SceneLoadBoxTake()==2);
+  assert(!strcmp(AW_SceneLoadNoticeText(),"LF8: map balmora did not load."));
+  assert(strstr(AW_SceneLoadBoxText(),"A file it needs is missing (Model progs/missing.mdl not found). Code LF8."));
+  /* an error with no load in flight: nothing asked for (the session ends as before) */
+  AW_SceneLoadFailed("an error in play");assert(!AW_SceneLoadBoxTake() && !AW_SceneLoadInFlight());
+  AW_SceneCancelTransition();command_argc=1;
  }
  puts("scene, real client reset/signon, exact streaming view, drift policy, reverse/world crossings and explicit arrivals passed");
  return 0;

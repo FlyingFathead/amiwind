@@ -1,6 +1,6 @@
 # AmiWind 3D Map Inspector
 
-_Last updated with AmiWind v0.0.64-dev4 (10 November 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -680,6 +680,17 @@ Quake BSP reader. It is a port of the builder's reader (`tools/chim/format.py`) 
 ring model (`tools/chim/heap.py`); `tests/test_toolkit_chim.py` checks it against them. The file types are
 in [CHIM world format: file types](chim/WORLD_FORMAT.md#file-types).
 
+Since v0.0.67 it reads every world format the builder writes, 0.5 to 0.12 (it read 0.5 and 0.7 only, so the open
+world of every build since v0.0.47 could not be shown:
+[TOOLKIT-WORLD-FORMAT-STALE-64](bugs/TOOLKIT-WORLD-FORMAT-STALE-64.md)): generated terrain records (0.11, `THG1`,
+the default since v0.0.47) are generated into the same terrain image as the engine generates them (a port of
+`tools/chim/thgt.py`, both record versions), compact ones (0.10, `TRC1`) expanded as `tools/chim/terc.py` does,
+placed records of 56 bytes (0.8 on) turn their model by all three angles, reach references (0.9) are resolved to
+their owner records, and 0.12's light levels in the record flags are read. The test builds a synthetic world of each
+format with the builder's own code and compares every terrain lump byte for byte, every count, byte figure and
+the ring scan with the Python reader and the heap gate; another test fails when the builder can write a format the
+reader does not list.
+
 - **A CHIM map (`.chim`)** is a CHIM area's map: its entities and the `"_chim_frame"` key that names its
   frame, with no ground or objects of its own. The inspector shows the frame bounds, the collision-only
   clip walls and every point entity as a marker, and says which CHIM frame holds the geometry. A file
@@ -689,7 +700,11 @@ in [CHIM world format: file types](chim/WORLD_FORMAT.md#file-types).
 - **Open CHIM world** takes the build's `chim-world` folder (or its `chim` folder, or a zip of either;
   zip64 archives are not read). Only the files a frame needs are read: the index, the frame file, its
   sector files and the sector files of other frames that hold its terrain records, models or textures.
-  `?world=<url>&frame=frames/x-03/y-02` opens a world served over HTTP. The Toolkit server serves a
+  `?world=<url>&frame=frames/x-03/y-02` opens a world served over HTTP, and `?world=<url>&cell=-2,-2` the frame
+  that holds an exterior cell (the frame named with `frame` when the world has it, else the cell's own frame, else the
+  frame whose chunk area holds the cell's centre, read from the frame files around it: a town's frame holds its cells;
+  where two town areas hold it, the one it lies deeper inside); a cell no frame holds is said to be not in the build,
+  never guessed. The Toolkit server serves a
   build's world for this with `--chim-world NAME=DIR` (repeatable): it prints
   `map-inspector.html?world=/chim-world/NAME/` for each, and the memory heatmap comes from the world's
   own `chim-heap.json`.

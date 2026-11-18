@@ -623,12 +623,35 @@ int AW_ModalBlackBackground(void);
 int AW_UIMode(void);
 void AW_SceneCancelTransition(void);
 void AW_SceneLoadFailed(const char *why);
+void AW_SceneHostError(const char *why);   /* host.c Host_Error: a load in flight goes back, an error in play reloads */
 void AW_LoadFailInit(void);             /* aw_loadfail.c */
 void AW_CensusInit(void);               /* aw_census.c: dbg memcensus (a measuring build counts) */
 int AW_SceneLoadBoxTake(void);          /* aw_scene.c, for aw_loadfail.c */
 const char *AW_SceneLoadBoxText(void);
+const char *AW_SceneLoadNoticeText(void);   /* the load menu's notice when there is no place to stay */
 void AW_SceneLoadReset(void);
 extern void (*aw_loadfail_tick)(void);
+/* SCENE-LOAD-FAIL-FALLBACK-67 (aw_scene.c): Host_Map_f starts a map load (in flight until it spawns or fails) */
+void AW_SceneMapBegin(const char *name);
+int AW_SceneLoadInFlight(void);
+/* aw_loadfail.c, for Host_Map_f: dbg loadfail N KIND armed inside the real load (1), the hang kind (1 once), and the
+ * kind of a map that did not spawn (not found, not on this disk, or why) */
+int AW_LoadFailTestArm(void);
+int AW_LoadFailTestHang(void);
+void AW_LoadFailSpawn(const char *name);
+/* zone.c: an allocation that fails (the arena, the block's name, bytes needed and free); aw_loadfail.c sets it: during
+ * a map load it ends the load (Host_Error, the way back), else it returns and the allocator stops the game as before */
+extern void (*aw_alloc_failed)(const char *arena,const char *name,long need,long have);
+extern int aw_hunk_fail_test;                  /* zone.c: the next Hunk allocation fails (dbg loadfail N memory) */
+/* zone.c, at the fatal path's heap audit (Sys_Error); aw_loadfail.c sets it: during a map load a map whose decode
+ * stopped ends that load (Host_Error, the way back), else it returns and the game stops as before */
+extern void (*aw_fatal_hook)(void);
+/* model.c AW_MapFailure: the map decode a fatal error stopped (0 none), its file, size, the lump being decoded and
+ * where it starts, the bytes a section needed, the loader's message; it leaves the loader as after a finished load */
+enum {AW_MAPFAIL_NONE,AW_MAPFAIL_HEADER,AW_MAPFAIL_SHORT,AW_MAPFAIL_LUMP,AW_MAPFAIL_DATA,AW_MAPFAIL_MEMORY};
+typedef struct {char file[MAX_QPATH],why[128];long bytes,offset,need;int lump;} aw_mapfail_t;
+int AW_MapFailure(aw_mapfail_t *out);
+extern char aw_spawn_why[160];                /* sv_main.c: why the last SV_SpawnServer did not spawn */
 extern void (*aw_game_reset)(int new_game);   /* aw_intro.c; aw_loadfail.c sets it (the reset registry, aw_reset.h) */
 void AW_ResetBootMark(void);                  /* aw_loadfail.c, at the end of the start-up (host.c) */
 void AW_MwscriptNewGameReset(void);           /* aw_mwhost.c: the scripts' whole session reset (NEWGAME-STATE-RESET-62) */

@@ -295,6 +295,22 @@ keys use): an entry recorded before a layer's rows were added is still taken; a 
 changed after the entry was recorded with that layer, or a single mesh row still re-keys it. Tests:
 `tests/test_mesh_table_layer_rows.py`.
 
+Since v0.0.67 the same holds layer by layer (an entry recorded with the Bloodmoon rows is taken after the Tribunal
+rows), and a layer may own whole recipe blocks of the collision surface table: `"layer_recipes": {layer: [recipe]}`
+names the `recipe_meshes` blocks that exist for that layer's places. Mournhold's districts are presented as exterior
+cells with their own visual recipe, `mournhold-v1` (`config/visual-recipes.json`, no model rows: it only scopes
+measured rows); three base game models (`furn_bannerpost_02`, `terrain_rock_bc_08`, `terrain_rock_bc_09`) need the
+collision surface rule there and are listed under that recipe only, so their collision in every other cell that
+places them is unchanged. Such a block is left out of the base view with its layer, and an entry that read one of
+those meshes' rows before still matches while the mesh's row differs by that layer's recipe rows only.
+
+A layer's list is append-only: new rows go at its end, in the order they were measured, never sorted in. An entry
+recorded when a layer was shorter read none of the rows appended since, so a whole-table record also matches the
+table with any first part of each layer's list (`mesh_tables._shorter_layer_decisions`). Without this, Solstheim's
+rows after the Bloodmoon layer's first 25 would have missed every NPC appearance and creature model recorded with
+those 25. A layer row changed, removed or put anywhere but the end still re-keys, and so does the row of a mesh for
+the units that looked that mesh up (the cells that place it).
+
 ### World flora and world scenery regions (v0.0.64-dev4)
 
 The two region caches (`world-flora-region`, `world-scenery-region`) keyed every region on the whole of their tool

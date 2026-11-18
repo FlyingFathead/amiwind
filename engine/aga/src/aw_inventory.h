@@ -369,6 +369,20 @@ unsigned long AW_ContainerFileReads(void);
 int AW_AreaIcon(const char *key,int *w,int *h,unsigned char *pixels,int maxw,int maxh);
 void AW_AreaIconFallback(const char *key);
 int AW_AreaContainerFlags(unsigned reference);
+/* LOCKED-CONTAINERS-NEVER-OPEN-67: container REFERENCE's key record id from its area record into ID (SIZE bytes with
+ * its NUL): 1 found, 0 none (no key, no loaded area, an older areas.awa) */
+int AW_AreaContainerKey(unsigned reference,char *id,int size);
+/* PRISON-SHIP-ITEMS-TAKEABLE-65: the Inventory window allowed (aw_debug.c sets it to aw_story.c
+ * AW_StoryInventoryAllowed; NULL in the tools' tests: allowed). While it is not, the original takes no placed item and
+ * opens no container, a plant included (OpenMW 0.53 mwclass/container.cpp Container::activate, mwworld/class.cpp
+ * Class::defaultItemActivate, mwclass/light.cpp for a carryable light: a NullAction): the use key does nothing then and
+ * no action line shows; a book is still read, and a script that takes an object's activation still has it. */
+extern int (*aw_inventory_allowed)(void);
+/* PRISON-SHIP-ITEMS-TAKEABLE-65: placed objects' text overlays allowed (aw_debug.c sets it to aw_story.c
+ * AW_StoryObjectLabels; NULL in the tools' tests: allowed). While they are not, an aimed item, carryable light, book,
+ * container or named piece of furniture (a hammock) shows no name and no action line (AW_PlacedFocus, AW_ItemPrompt);
+ * doors and people keep theirs, and a book is still read with the use key. */
+extern int (*aw_object_labels)(void);
 /* the icon pack's reader (aw_icons.c sets it in AW_IconsInit): the carried items' pictures are read with an area load */
 extern int (*aw_area_picture_read)(const char *key,int *w,int *h,unsigned char *pixels,int maxw,int maxh);
 void AW_AreaStatus(void);

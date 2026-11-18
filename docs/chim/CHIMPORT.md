@@ -1,10 +1,17 @@
 # CHIMport: the whole island on CHIM, cell by cell
 
-_Last updated with AmiWind v0.0.46-dev1 (20 October 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [The expansions' cells](#the-expansions-cells)
+  - [Reading the expansions' data: the presented data folder](#reading-the-expansions-data-the-presented-data-folder)
+  - [A cell whose build read less than its plan fails](#a-cell-whose-build-read-less-than-its-plan-fails)
+  - [The sky of the expansions' exteriors](#the-sky-of-the-expansions-exteriors)
+  - [Crossing between the expansions' cells](#crossing-between-the-expansions-cells)
+  - [Presented exteriors (Mournhold's districts)](#presented-exteriors-mournholds-districts)
+  - [Where the expansions stand](#where-the-expansions-stand)
 - [Island results (9 October 2026)](#island-results-9-october-2026)
   - [Cells with hull policy pending](#cells-with-hull-policy-pending)
   - [Failure classes](#failure-classes)
@@ -42,8 +49,85 @@ and which mechanisms still fail. A failing cell never stops the run: it is
 recorded with the reason, and the run moves on.
 
 On CHIM today: every exterior cell of Vvardenfell, since v0.0.43 (the last cells joined by weight, the heaviest
-last); no classic region maps are left outdoors. Solstheim is not converted yet, and interiors stay Quake maps
+last); no classic region maps are left outdoors. Solstheim's 144 land cells are being converted by the same method
+(see [The expansions' cells](#the-expansions-cells)); none is finished yet, and interiors stay Quake maps
 ([progress tracker](PROGRESS_TRACKER.md)).
+
+## The expansions' cells
+
+Bloodmoon adds Solstheim, an island of 144 land cells north-west of Vvardenfell, and Tribunal adds Mournhold, whose
+outdoor districts are interior cells that behave like an exterior. Solstheim is converted like Vvardenfell: the
+same CHIMport run, the same audits, the same weight classes, the cells lightest first. Nothing about an expansion
+cell is special except where its records live.
+
+### Reading the expansions' data: the presented data folder
+
+The cells an expansion adds exist only in that expansion's file. CHIMport's plan reads the selected game files
+merged (`src/mwad/masters.py`, the masters named in `AMIWIND_MASTERS`), but parts of a cell's build open the data
+folder's base file and base archive by name (the cell's terrain audit, `src/mwad/audit.py`). On the plain data folder
+an expansion cell therefore has no land and no placements there: it is built as flat ground at the default height
+with nothing placed. The first live run of 8 Solstheim cells (17 November 2026) came out that way, every cell the
+same flat square, and was counted as empty (`CHIMPORT-LAYER-CELL-EMPTY-67` and `EXPANSION-READER-ONE-MASTER-64` in
+the [bug register](../BUGS.md)).
+
+So with expansions selected a run reads a **presented data folder** (`tools/presented_data.py`), made once in the
+run folder (`chimport.py run --presented-data DIR`; the master builder's chimport-region request passes
+`RUN/data`):
+
+- `Morrowind.esm`: the merged master of the selected game files, with Mournhold's outdoor districts presented as
+  exterior cells of their own (`tools/presented_exterior.py`);
+- the other selected masters (`Tribunal.esm`, `Bloodmoon.esm`) as header-only files, so the same masters stay
+  selected and the archives are layered as in any build (`src/mwad/archives.py`, a later archive wins);
+- every other entry of the data folder as a link to the original, nothing copied;
+- `presented-data.json`: the receipt (the inputs' SHA-256, the merged and the presented master's SHA-256, the
+  presented cells, what was linked).
+
+The plan, the input lock and every cell's build then read the same merged master under the base file's name. With
+the base game alone no folder is made and the data folder is read as it is, so the island's runs do not change.
+The Solstheim test frame of v0.0.64 got its land the same way, from a copied layered folder
+(`tools/chim_layer_data.py`); the presented folder links instead of copying.
+
+### A cell whose build read less than its plan fails
+
+Every converted cell is checked against the run's plan (`chimport.py plan_mismatch`): a cell whose build read no
+land where the plan has land, or fewer placements than the plan holds, gets the error `plan-mismatch` and the
+status failed. It never counts as empty, which the tracker counts as done. The cell's result records what its build
+read (`source`: references, land, the SHA-256 of the master) next to the plan's figures, and the master builder
+fails a chimport-region request with such a cell (`cells_off_plan` in its result).
+
+### The sky of the expansions' exteriors
+
+Every exterior frame of an expansion uses the shared exterior sky, like every frame of Vvardenfell: the frame map
+names `_aw_sky_mode` "exterior" and `_aw_sky_asset` "gfx/aw_shared_sky.lmp" in its worldspawn (written for every
+open-world frame by `tools/chim/frame_map.py` `open_world_worldspawn`), with the region's weather and the time of
+day as on the island; never a sky of its own per cell ([Day, night and sky](../DAY_NIGHT_AND_SKY.md)). The image
+checks that every sky asset a map names is present (`tools/build_exclusions.py` `check_always_included`). A CHIMport
+cell makes the frame only; its frame map is written when a build takes the cell, and the check that every
+Solstheim frame map names both keys is added with the first build that takes Solstheim's cells.
+
+### Crossing between the expansions' cells
+
+Solstheim's frames join the streamed world the way Vvardenfell's do: a crossing between two cells is the same
+frame-to-frame crossing ([Cell crossings](CELL_CROSSINGS.md)), and the frames ahead are kept in spare Fast RAM by
+the same prefetch ([CHIM features](FEATURES.md), "Streaming and memory"). The island's frame tables grow to hold
+Solstheim's frames; the proof is a measured walk across a Solstheim cell border, planned for the first group of
+cells that converts with its land and placements. Mournhold's districts are reached through doors, each district
+one frame or a small block of frames.
+
+### Presented exteriors (Mournhold's districts)
+
+To be written with the route of Mournhold's districts.
+
+### Where the expansions stand
+
+| Land | Cells | Finished | In the build's cell list |
+| --- | --- | --- | --- |
+| Vvardenfell | 1,390 cells of the progress reference | 1,390 | all of them |
+| Solstheim | 144 land cells | 0 | 0 |
+| Mournhold | 5 outdoor districts (interior cells that behave like an exterior) | 0 (their own route, above) | 0 |
+
+The 8 lightest Solstheim cells (levelled creatures and a few statics, 2 to 6 placements each) are converted again on
+the presented data folder; the heavier classes follow lightest first, with the forests (the cells with trees) last.
 
 ## Island results (9 October 2026)
 
@@ -219,9 +303,10 @@ Everything placed in the cell is taken: terrain, statics, flora, lights,
 doors, containers, activators and items become placed models. NPCs,
 creatures, levelled creatures and invisible source markers are counted and
 recorded as deferred with the converter's reason (the actor pipeline places
-them). Every placed record of the base master is accounted for per record
+them). Every placed record of the master the run reads is accounted for per record
 type: converted, deferred (with reason), failed (with the conversion error) or
-skipped (with reason).
+skipped (with reason), and the count is checked against the run's plan
+([A cell whose build read less than its plan fails](#a-cell-whose-build-read-less-than-its-plan-fails)).
 
 A cell without a LAND record gets flat ground at the default height
 (-2048 Morrowind units, the value OpenMW uses for cells without land) instead
@@ -231,7 +316,8 @@ square with missing land.
 
 ## Order: from the sea inwards
 
-`chimport.py plan` reads the base master once and writes the order:
+`chimport.py plan` reads the master once (the base game file, or the selected game files merged when expansions are
+selected; [The expansions' cells](#the-expansions-cells)) and writes the order:
 
 - **ring 0**: sea cells without land that hold any record (none in the base
   master: every cell that holds something has a LAND record there);
@@ -612,6 +698,8 @@ python3 tools/chimport.py status --out RUN
 - `--dry-run` prints what would run;
 - create `RUN/STOP` to stop starting new cells (running cells finish);
 - a restart continues from `RUN/state.json`;
+- `--presented-data DIR` with expansions selected (`AMIWIND_MASTERS`): make the presented data folder DIR from
+  `--data-files` and read it ([The expansions' cells](#reading-the-expansions-data-the-presented-data-folder));
 - `--sdk` lets the heap gate probe the engine's target sizes once per run;
 - `--world-every N` builds the growing world every N rings (and after the last), `--no-world` never;
 - `--tracker DIR --tracker-tool cell_progress.py` feeds the CHIM Progress Tracker as it goes.

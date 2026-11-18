@@ -258,7 +258,78 @@ class OriginalCount(unittest.TestCase):
         self.assertEqual({xy for interior, xy, _i in refs if not interior}, {(-2, -9)})
 
 
+class EnginePlaces(unittest.TestCase):
+    """OUTDOOR-CREATURES-REGRESSION-66: an exterior row counts as placed only when the engine can spawn it. The table of
+    tests/test_chim_levelled.py: in cell 0 0 the lists all_lev (11) and top_lev (12), the villager (13, no model in its
+    library) and the crab (14, a model); in cell 1 0 the list outer (21, a list inside a list) and late (22: only the
+    cliff racer, no model, and an unknown id). The check before counted every row of the table as placed."""
+
+    @classmethod
+    def setUpClass(cls):
+        from chim import actors as A
+        import test_chim_levelled as L
+        cls.A = A
+        data, _ = A.build_table(A.exterior_actors(L.MASTER), {}, A.levelled_lists(L.MASTER), A.creature_ids(L.MASTER),
+                                L.LIBRARY)
+        _head, _cells, cls.records, cls.bases, _ = A.read_table(data)
+        cls.lists = A.read_lists(data)
+
+    def placed(self, settings):
+        return {r['key'] for r in self.records
+                if asc.engine_places(self.bases[r['base']], self.bases, self.lists, settings)}
+
+    def test_only_what_the_engine_can_spawn(self):
+        self.assertEqual(self.placed({'table': True, 'creatures': True}), {11, 12, 14, 21})
+
+    def test_the_table_left_off_places_no_levelled_point(self):
+        # the frame maps hold the people and placed creatures, never a levelled point (CHIM-EXTERIOR-ACTORS-MISSING-46)
+        self.assertEqual(self.placed({'table': False, 'creatures': True}), {14})
+
+    def test_creatures_off_places_no_creature(self):
+        self.assertEqual(self.placed({'table': True, 'creatures': False}), set())
+
+    def test_every_creature_without_its_model(self):
+        # the actor library lost the creature models: every creature and levelled point is missing, the check fails
+        bare = [dict(b, text='') if b['kind'] == self.A.KINDS['CREA'] else b for b in self.bases]
+        got = {r['key'] for r in self.records
+               if asc.engine_places(bare[r['base']], bare, self.lists, {'table': True, 'creatures': True})}
+        self.assertEqual(got, set())
+        t = {a: {k: (o, o) for k, (o, _p) in v.items()} for a, v in DEV2.items()}
+        t['exterior-region']['LEVC'] = (4974, 0)
+        t['exterior-region']['CREA'] = (329, 0)
+        bad = asc.placement_verdict(counts(t), allowlist())
+        self.assertEqual(len(bad), 2, bad)
+
+    def test_shipped_settings(self):
+        cases = [
+            ('', {'table': False, 'creatures': True}),
+            ('chim actors table 1\n', {'table': True, 'creatures': True}),
+            ('// Actor table\nchim actors table 1\nchim actors table 0\n', {'table': False, 'creatures': True}),
+            ('chim actors table on\n', {'table': False, 'creatures': True}),          # the engine's atoi: "on" is 0
+            ('chim actors table 1\nchim actors creatures 0\n', {'table': True, 'creatures': False}),
+            ('chim actors table 1\ndbg creatures off\n', {'table': True, 'creatures': False}),
+            ('chim actors table 1\ndbg creatures maybe\n', {'table': True, 'creatures': True}),
+            ('chim actors table 1 // on\n', {'table': True, 'creatures': True}),
+        ]
+        for text, want in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                if text:
+                    (Path(tmp) / asc.CONFIG).write_text(text, encoding='latin-1')
+                self.assertEqual(asc.engine_settings(tmp), want, text)
+
+    def test_the_builder_writes_the_line_the_check_reads(self):
+        # tools/build_aga.py writes "chim actors table 1" into the image's default-game.cfg with the table on
+        src = (ROOT / 'tools' / 'build_aga.py').read_text(encoding='utf-8')
+        self.assertIn("b'chim actors table 1\\n'", src)
+
+
 class Wiring(unittest.TestCase):
+    def test_placement_counts_what_the_engine_spawns(self):
+        src = (ROOT / 'tools' / 'actor_spec_check.py').read_text(encoding='utf-8')
+        body = src.split('def placement(', 1)[1].split('\ndef ', 1)[0]
+        self.assertIn('engine_places(b, bases, lists, settings)', body)
+        self.assertIn('settings = engine_settings(id1)', body)
+
     def test_image_step_runs_it_after_the_census(self):
         src = (ROOT / 'tools' / 'build_aga.py').read_text(encoding='utf-8')
         census = src.index('creature_census_stage(boot/')

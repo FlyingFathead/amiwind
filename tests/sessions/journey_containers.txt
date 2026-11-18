@@ -1,0 +1,231 @@
+# The containers journey (CONTAINER-WINDOW-59; docs/performance/CONTAINERS.md): a FULL image, FS-UAE at 32 MB Fast,
+# started with --map seyda, in the session-script language of tools/journey_smoke.py. Every check reads the game's own
+# state (the container's contents now, the lock), never a picture; the shots are the evidence for the maintainer
+# (dbg all on: the position overlay in every one). Containers by reference, read from the game data with
+# tools/container_census.py: the Imperial Prison Ship's crate of Imperial weapons (421299, two fixed items: it never
+# opens in the original, nothing does before the release papers, PRISON-SHIP-ITEMS-TAKEABLE-65; a refusal check), and
+# on the ship before the papers no text overlay and no take: the crate, the travel lantern in the hold (391417), the
+# hammock (421473) and a bottle on the upper deck (299172), read through aw_placed aim's overlay line, a
+# crate of eggs on Balmora's street (41429, one fixed item, outdoors: aimed by its measured box), the census office's
+# basket (119620, owned: E: Steal in red; open after the papers) and its lock practice chest (119623, lock 1, no key:
+# Locked until lockpicks exist), Arrille's basket (331661, owned, fixed items and a levelled list) and his steel armour
+# crate (331573, a levelled list rolled on the first open), and Eldafire's large chest (321477, lock 30, its key
+# key_eldafire: LOCKED-CONTAINERS-NEVER-OPEN-67). Part A takes from the crate, leaves and comes back, and quicksaves;
+# part B loads that save in a fresh engine: what was taken stays taken and the opened lock stays open. Seyda Neen's own
+# crates join when their frame draws them (SEYDA-CONTAINERS-NOT-DRAWN-67).
+part A
+wait 8
+cmd developer 1
+cmd dbg all on
+cmd dbg headlamp off
+cmd aw_new_game
+wait 6
+key Escape
+waitfor map 90 prison
+wait 12
+xdo type Hors
+key Return
+mark
+saw 90 Intro speech: chargenwalk1
+wait 6
+key Return
+wait 3
+
+step 1 the Imperial Prison Ship before the release papers: no text overlay on anything (no name, no action line), E opens nothing and takes nothing (the crate, the travel lantern, the hammock, the upper deck's bottle)
+cmd dbg all on
+cmd noclip
+cmd aw_placed container 421299 aim
+wait 2
+boxes
+aimed 421299
+probe ship_crate_overlay aw_placed aim
+expect has ship_crate_overlay overlay none
+probe ship_crate_before aw_placed container 421299
+expect has ship_crate_before 2 kinds of item
+shot a1-ship-crate-no-overlay
+key e
+wait 3
+key t
+wait 2
+shot a2-ship-crate-stays-shut
+probe ship_crate_after aw_placed container 421299
+expect has ship_crate_after 2 kinds of item
+cmd aw_placed container 391417 aim
+wait 2
+boxes
+aimed 391417
+probe ship_lantern_overlay aw_placed aim
+expect has ship_lantern_overlay overlay none
+shot a1b-ship-lantern-no-overlay
+key e
+wait 3
+aimed 391417
+shot a1c-ship-lantern-not-taken
+cmd aw_placed container 421473 aim
+wait 2
+boxes
+aimed 421473
+probe ship_hammock_overlay aw_placed aim
+expect has ship_hammock_overlay overlay none
+shot a1d-ship-hammock-no-overlay
+cmd aw_placed container 299172 aim
+wait 2
+boxes
+aimed 299172
+probe ship_bottle_overlay aw_placed aim
+expect has ship_bottle_overlay overlay none
+shot a1e-ship-upper-deck-bottle-no-overlay
+key e
+wait 3
+aimed 299172
+shot a1f-ship-upper-deck-bottle-not-taken
+
+step 2 Balmora's street: an outdoor crate is aimed at by its box, opens, and one item is taken
+cmd aw_debug_hors
+wait 20
+waitfor screen 60 game
+cmd map balmora
+waitfor map 60 balmora
+wait 8
+cmd dbg all on
+cmd noclip
+cmd aw_placed container 41429 aim
+wait 2
+boxes
+aimed 41429
+probe street_crate_before aw_placed container 41429
+expect has street_crate_before 1 kinds of item
+shot a3-street-crate-aimed
+key e
+wait 3
+shot a4-street-crate-open
+key e
+wait 3
+key Escape
+wait 2
+probe street_crate_after aw_placed container 41429
+expect has street_crate_after 0 kinds of item
+
+step 3 the census office: an owned basket says E: Steal in red and opens; the lock practice chest stays Locked
+cmd map census
+waitfor map 60 census
+wait 6
+cmd dbg all on
+cmd noclip
+cmd aw_placed container 119620 aim
+wait 2
+boxes
+aimed 119620
+shot a5-census-basket-steal
+key e
+wait 3
+shot a6-census-basket-open
+key Escape
+wait 2
+cmd aw_placed container 119623 aim
+wait 2
+boxes
+aimed 119623
+key e
+wait 2
+shot a7-census-chest-locked
+probe census_chest aw_placed container 119623
+expect has census_chest lock 1
+
+step 4 Arrille's Tradehouse: his owned basket and the crate whose levelled list is rolled on the first open
+cmd map tradehouse
+waitfor map 60 tradehouse
+wait 6
+cmd dbg all on
+cmd noclip
+cmd aw_placed container 331661 aim
+wait 2
+boxes
+aimed 331661
+shot a8-arrille-basket-steal
+key e
+wait 3
+shot a9-arrille-basket-open
+key Escape
+wait 2
+cmd aw_placed container 331573 aim
+wait 2
+boxes
+aimed 331573
+key e
+wait 3
+shot a10-arrille-crate-levelled-open
+key Escape
+wait 2
+probe arrille_crate aw_placed container 331573
+expect lacks arrille_crate 0 kinds of item
+
+step 5 Eldafire's chest: Locked without its key; with key_eldafire carried it opens and stays unlocked
+cmd map eldafire
+waitfor map 60 eldafire
+wait 6
+cmd dbg all on
+cmd noclip
+cmd aw_placed container 321477 aim
+wait 2
+boxes
+aimed 321477
+probe chest_locked aw_placed container 321477
+expect has chest_locked lock 30
+key e
+wait 2
+shot a11-eldafire-chest-locked
+cmd player->additem key_eldafire 1
+wait 2
+key e
+wait 3
+shot a12-eldafire-chest-key-open
+key Escape
+wait 2
+probe chest_unlocked aw_placed container 321477
+expect has chest_unlocked lock 0
+
+step 6 back to Balmora's street: the crate taken from stays taken; the game's own quicksave
+cmd map balmora
+waitfor map 60 balmora
+wait 8
+probe street_crate_back aw_placed container 41429
+expect has street_crate_back 0 kinds of item
+mark
+cmd aw_quicksave
+saw 30 bytes, generation
+wait 4
+shot a13-saved
+
+part B
+wait 8
+cmd dbg all on
+cmd dbg headlamp off
+key Escape
+waitfor screen 10 menu
+key Up
+key Up
+key Up
+key Return
+waitfor screen 10 save
+key Return
+wait 2
+key Return
+wait 20
+waitfor screen 60 game
+boxes
+state map
+
+step 7 the loaded game: what was taken stays taken, the opened lock stays open
+probe street_crate_loaded aw_placed container 41429
+expect has street_crate_loaded 0 kinds of item
+cmd dbg all on
+cmd noclip
+cmd aw_placed container 41429 aim
+wait 2
+shot b1-street-crate-after-load
+cmd map eldafire
+waitfor map 60 eldafire
+wait 6
+probe chest_loaded aw_placed container 321477
+expect has chest_loaded lock 0

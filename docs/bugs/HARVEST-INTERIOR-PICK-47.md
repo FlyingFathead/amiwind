@@ -169,7 +169,7 @@ Family: Harvestable plants (`harvest`). Harvest catalogues are built by the buil
 - [HARVEST-EXPANSION-FLORA-62](HARVEST-EXPANSION-FLORA-62.md): The plants placed by the Tribunal and Bloodmoon masters are not harvestable
 - [HARVEST-EXTRA-TOWNS-32](HARVEST-EXTRA-TOWNS-32.md): Opt-in towns get no harvestable mushrooms
 - [HARVEST-GEOMETRY-GATE-32](HARVEST-GEOMETRY-GATE-32.md): The harvest geometry gate was never re-run on the shipped Seyda Neen maps
-- HARVEST-HYPHA-FACIA-FLOATING-65 (no report page): In Seyda Neen a Hypha Facia mushroom that grows on a tree's side floats in the air
+- [HARVEST-HYPHA-FACIA-FLOATING-65](HARVEST-HYPHA-FACIA-FLOATING-65.md): In Seyda Neen a Hypha Facia mushroom that grows on a tree's side floats in the air
 - [HARVEST-ORE-ROCKS-62](HARVEST-ORE-ROCKS-62.md): The ore and gem rocks in the mines cannot be mined
 - [HARVEST-ORGANIC-PLANTS-47](HARVEST-ORGANIC-PLANTS-47.md): Only the small mushrooms can be picked; every other harvestable plant is scenery
 - [HARVEST-PILOT-SHIPPING-32](HARVEST-PILOT-SHIPPING-32.md): 24 Seyda Neen maps still ship the six-plant pilot harvest catalogue

@@ -209,6 +209,7 @@ table.mt small{opacity:.8}
   <label>Status <input id="status" type="file" accept=".json"></label>
   <label>Island (local) <input id="island" type="file" accept=".png,.json" multiple></label>
   <label>Maps folder (local) <input id="mapsdir" type="file" webkitdirectory multiple></label>
+  <label title="A build's image id1 folder (or a delivered copy: maps, chim, chimi): its CHIM world and rooms open in 3D from the map">Build folder (local) <input id="builddir" type="file" webkitdirectory multiple></label>
   <label>Metrics (local) <input id="metricsfile" type="file" accept=".json"></label>
   <button id="copystate" title="Copy the toolkit version, loaded data, layers and selection as JSON">Copy state (JSON)</button>
   <a id="toinspector" href="map-inspector.html" target="_blank" style="color:#ffe28a;display:none">3D Map Inspector &#8599;</a>
@@ -295,8 +296,11 @@ table.mt small{opacity:.8}
   </section>
 </main>
 <section id="mournholdview" hidden aria-label="Rooms of the selected expansion">
-  <canvas id="mhmap" width="600" height="300" role="img" aria-label="Rooms of the selected expansion (Mournhold: its districts and rooms), coloured by state"></canvas>
+  <div><label>Colour by <select id="mhcolour" aria-label="Colour the rooms by"><option value="state">state</option>
+    <option value="faces">drawn faces (polycount heatmap of the served build)</option></select></label> <span id="mhfacesnote" class="muted"></span></div>
+  <canvas id="mhmap" width="600" height="300" role="img" aria-label="Rooms of the selected expansion (Mournhold: its districts and rooms), coloured by state or by drawn faces"></canvas>
   <div id="mhtip" class="muted">Hover a tile to see the room.</div>
+  <button type="button" id="mh3d" class="cta pick" hidden title="Open the chosen room in the 3D Inspector"></button>
   <div id="mhlegend" class="muted"></div>
   <div id="mhlist"></div>
 </section>
@@ -619,7 +623,10 @@ function openLinkedCell() {
   $('picked').textContent = describe(x, y, c, ' · ');
   showSelected(x, y, c); draw();
 }
-let servedMaps = new Set();
+let servedMaps = new Set(), servedBuild = null, servedCells = null, servedRooms = null;
+// A build folder chosen by hand (Build folder (local): an image's id1 folder, or a delivered copy): its files, handed to the
+// 3D Inspector with a link, and the rooms its room maps name ({cell ID: {room, ...}}).
+let localBuild = null, localRooms = null;
 async function autoload() {
   const get = async (name, kind) => {
     try { const r = await fetch('../data/' + name); return r.ok ? (kind === 'json' ? r.json() : r.blob()) : null; }
@@ -640,6 +647,18 @@ async function autoload() {
   const cells = await get('island-cells.json', 'json');
   if (cells) { cellsDetail = cells; if (chim) chimBuildIndex(); draw(); if (metricPick) showMetricsCell(metricPick.x, metricPick.y); }
   try { const r = await fetch('../maps/index.json'); if (r.ok) servedMaps = new Set(await r.json()); } catch (_) {}
+  // the served build (toolkit_serve.py --served-build): its CHIM world and rooms store, which Show in 3D opens by link
+  try { const r = await fetch('../build/config.json', {cache: 'no-store'}); const c = r.ok ? await r.json() : null; servedBuild = c && c.ok ? c : null; } catch (_) { servedBuild = null; }
+  // ... and the frame (with its frame maps) that holds each of its cells, from its own world (toolkit_serve.py served_cell_maps)
+  if (servedBuild && servedBuild.world) {
+    try { const r = await fetch('../build/cell-maps.json', {cache: 'no-store'}); const c = r.ok ? await r.json() : null; servedCells = c && c.ok && c.cells ? c.cells : null; } catch (_) { servedCells = null; }
+  }
+  // ... and the built room of each interior cell, for the room tiles' 3D buttons
+  if (servedBuild && servedBuild.interiors) {
+    try { const r = await fetch('../build/rooms.json', {cache: 'no-store'}); const c = r.ok ? await r.json() : null; servedRooms = c && c.ok && c.rooms ? c.rooms : null; } catch (_) { servedRooms = null; }
+    itRender(); if (EV && chim && evView) viewShow();
+  }
+  if (picked) showSelected(picked.x, picked.y, data && data.cells.find(c => c.x === picked.x && c.y === picked.y));
   openLinkedCell();
 }
 if (SERVED) autoload();
@@ -744,11 +763,7 @@ function drawLocal(x, y) {
   $('localtitle').innerHTML = 'Local: ' + (named ? '<b>' + escapeHtml(named) + '</b> · ' : '') + 'cell ' + x + ', ' + y;
   const lc = $('local'), l = lc.getContext('2d'), S = lc.width, k2 = S / 256;
   l.fillStyle = '#2a4256'; l.fillRect(0, 0, S, S);
-  if (!cellsDetail) {
-    l.fillStyle = '#9fb3c8'; l.font = '16px system-ui, sans-serif'; l.textAlign = 'center';
-    l.fillText('Load your island-cells.json with "Island (local)"', S / 2, S / 2); l.textAlign = 'start';
-    $('locallegend').textContent = ''; $('localpois').textContent = ''; return;
-  }
+  if (!cellsDetail) { drawLocalFromTracker(x, y, l, S); return; }
   const d = cellsDetail.cells[x + ',' + y];
   if (d && d.h) {
     const n = d.h.length, step = S / (n - 1);
@@ -783,6 +798,29 @@ function drawLocal(x, y) {
     cellsDetail.categories.map((k, i) => counts[k] ? '<span style="display:inline-block;width:10px;height:10px;border-radius:5px;background:' +
       CAT_COLOURS[i] + ';margin-right:6px"></span>' + k.replace('_', ' ') + ': ' + (known ? counts[k][1] + ' / ' : '') + counts[k][0] : '')
       .filter(Boolean).join('<br>');
+}
+// Without island-cells.json (the terrain and every original placement, made from your own Morrowind.esm) the Local view shows
+// what the CHIM Progress Tracker holds for the cell: its state in the newest build, its objects by type, what that build
+// converted, its rooms. Served, it never asks for a file by hand (TOOLKIT-LOCAL-CHIM-CELL-NO-MAP-67): the terrain picture
+// comes when the server has island-cells.json (toolkit_serve.py --data, or beside the tracker data).
+function drawLocalFromTracker(x, y, l, S) {
+  const c = chim && chimCells.get(x + ',' + y);
+  const cls = c ? chimCls(c) : null, row = cls && CHIM_BUCKETS[cls];
+  l.fillStyle = row ? row[0] : '#2a4256'; l.globalAlpha = .35; l.fillRect(0, 0, S, S); l.globalAlpha = 1;
+  l.fillStyle = '#edf3fa'; l.textAlign = 'center'; l.font = '600 18px system-ui, sans-serif';
+  l.fillText(c ? (c.name || c.region || 'cell ' + x + ', ' + y) : 'cell ' + x + ', ' + y, S / 2, S / 2 - 36);
+  l.font = '15px system-ui, sans-serif';
+  if (row) l.fillText(row[1].split(':')[0], S / 2, S / 2 - 10);
+  l.fillStyle = '#9fb3c8'; l.font = '13px system-ui, sans-serif';
+  l.fillText(SERVED ? 'Terrain picture: this server has no island-cells.json' : 'Terrain picture: load island-cells.json with "Island (local)"', S / 2, S / 2 + 22);
+  l.fillText(SERVED ? '(toolkit_serve.py --data DIR with your own island-cells.json)' : '(made from your own Morrowind.esm, tools/world_progress_background.py)', S / 2, S / 2 + 42);
+  l.textAlign = 'start';
+  if (!c) { $('locallegend').textContent = chim ? 'The tracker has no record of this cell.' : 'No CHIM progress data loaded.'; $('localpois').textContent = ''; return; }
+  const cats = Object.entries(c.categories || {}).filter(([, v]) => v && v.placed);
+  $('locallegend').innerHTML = '<b style="color:var(--ink)">Objects by type</b> (the CHIM Progress Tracker: placed in the original / converted in ' + escapeHtml(builtLabel()) + ')<br>' +
+    (cats.length ? cats.map(([k, v]) => escapeHtml(k) + ': ' + v.converted + ' / ' + v.placed + (v.deferred && Object.keys(v.deferred).length ? ' <span class="muted">(' + escapeHtml(Object.entries(v.deferred).map(([why, n]) => n + ' ' + why).join(', ')) + ')</span>' : '')).join('<br>') : 'nothing placed in this cell');
+  const rooms = (c.entrances || []).length;
+  $('localpois').innerHTML = (c.region ? 'Region: ' + escapeHtml(c.region) + '<br>' : '') + (rooms ? rooms + ' interior entrance' + (rooms === 1 ? '' : 's') + ' (World tab: the cell\'s tracker panel lists them)' : '');
 }
 let picked = null;
 window.addEventListener('resize', () => draw());
@@ -1278,35 +1316,77 @@ $('mapsdir').onchange = e => {
   if (picked) showSelected(picked.x, picked.y, data && data.cells.find(c => c.x === picked.x && c.y === picked.y));
 };
 function showSelected(x, y, c) {
-  const d = cellsDetail && cellsDetail.cells[x + ',' + y];
+  const d = cellsDetail && cellsDetail.cells[x + ',' + y] || (!cellsDetail && chim ? chimCells.get(x + ',' + y) : null);
   const name = d && (d.name || d.region) ? '<b>' + escapeHtml(d.name || d.region) + '</b>' + (d.name && d.region ? ' (' + escapeHtml(d.region) + ')' : '') + ' · ' : '';
   $('selected').innerHTML = 'Selected area: ' + name + 'cell ' + x + ', ' + y + ' · world ' + (x * 8192) + ', ' + (y * 8192) +
     ' to ' + (x * 8192 + 8191) + ', ' + (y * 8192 + 8191) + ' · cell ID exterior:' + x + ',' + y;
-  const maps = (c && c.maps) || [];
+  const entries = cellEntries(x, y, c);
   const go = document.createElement('button');
   go.className = 'cta';
-  go.textContent = maps.length ? '\u25b6 Local view (2D + 3D)' : '\u25b6 Local view (2D only; no AmiWind map here)';
-  go.onclick = () => { setMode('local'); if (maps.length) showMap(); };
+  go.textContent = entries.length ? '\u25b6 Local view (2D + 3D)' : '\u25b6 Local view (2D only: ' + noMapReason(x, y) + ')';
+  go.onclick = () => { setMode('local'); if (entries.length) showMap(); };
   $('ctaslot').innerHTML = ''; $('ctaslot').appendChild(go);
-  fillMapSelect(maps);
-  if (mode === 'local') { drawLocal(x, y); if (maps.length) showMap(); }
+  fillMapSelect(entries, x, y);
+  if (mode === 'local') { drawLocal(x, y); if (entries.length) showMap(); }
 }
-// Local mode: the selected cell's maps (town/area maps first), shown in the 3D view.
-function fillMapSelect(maps) {
+// The CHIM frame that holds a cell in the newest ingested build, as the tracker's memory audit of that build names it (a town
+// frame holds its neighbouring cells: -2,-2 is in Balmora's frame x-03/y-02), or null.
+function chimFrameOf(x, y) {
+  const c = chim && chimCells.get(x + ',' + y), mf = c && c.audits && c.audits.memory_fit, f = mf && mf.numbers && mf.numbers.frame;
+  return f ? String(f).replace(/\/frame\.ccf$/, '') : null;
+}
+// In the game in the newest ingested build (the legend's first group).
+function chimInGame(c) { return !!c && window.ChimLegend.GROUPS[0][2].includes(chimCls(c)); }
+function builtLabel() { return servedBuild ? servedBuild.label : chim && chim.headline && (chim.headline.in_game_label || chim.headline.in_game_build) || 'the newest build'; }
+// What Show in 3D can open for a cell: the CHIM frame that holds it in the open world (the tracker's memory audit names the frame
+// that owns the cell; else the served build's own cell table, toolkit_serve.py /build/cell-maps.json; else found by its cell in
+// the served world), that frame's own maps (a town's -chim map: its entities as markers), then the built maps the old progress
+// table names. Each entry: {kind, value, label, ...}.
+function cellEntries(x, y, c) {
+  const out = [], key = x + ',' + y, cc = chim && chimCells.get(key), sc = servedCells && servedCells[key];
+  const frame = chimFrameOf(x, y) || (sc && sc.frame) || null, same = sc && sc.frame === frame;
+  if (frame || (chimInGame(cc) && ((servedBuild && servedBuild.world) || localBuild)))
+    out.push({kind: 'frame', value: 'frame:' + (frame || key), frame, cell: key,
+      label: 'CHIM open world: ' + (frame ? 'frame ' + frame.replace(/^frames\//, '') + (same && sc.frame_id ? ' (' + sc.frame_id + ')' : '') : 'the frame of cell ' + x + ', ' + y) + ' · ' + builtLabel()});
+  const own = same ? sc.maps || [] : [];
+  for (const m of [...new Set([...own, ...((c && c.maps) || [])])])
+    out.push({kind: 'map', value: m, map: m, label: (mapFiles[m] ? mapFiles[m].name : m) + (own.includes(m) ? ' (CHIM frame map: its entities)' : '') + (hasMap(m) ? '' : ' (choose maps folder)')});
+  return out;
+}
+// Why a cell has nothing to open in 3D, in a few words.
+function noMapReason(x, y) {
+  const cc = chim && chimCells.get(x + ',' + y);
+  if (cc && !chimInGame(cc)) return 'not in the newest build';
+  if (!chim && !data) return 'no data loaded';
+  return 'no built map or CHIM frame holds this cell';
+}
+// Local mode: the selected cell's CHIM frame and maps (town/area maps first), shown in the 3D view.
+let localEntries = [], localCell = null;
+function fillMapSelect(entries, x, y) {
+  localEntries = entries; localCell = {x, y};
   const sel = $('mapselect'); sel.innerHTML = '';
-  for (const m of maps) {
-    const o = document.createElement('option'); o.value = m;
-    o.textContent = (mapFiles[m] ? mapFiles[m].name : m) + (hasMap(m) ? '' : ' (choose maps folder)'); sel.appendChild(o);
-  }
-  sel.disabled = $('open3d').disabled = !maps.length;
-  $('localhint').textContent = !maps.length ? 'No AmiWind map covers this cell.' :
+  for (const e of entries) { const o = document.createElement('option'); o.value = e.value; o.textContent = e.label; sel.appendChild(o); }
+  // never a dead button (TOOLKIT-LOCAL-CHIM-CELL-NO-MAP-67): with nothing to open, a click says why
+  sel.disabled = !entries.length; $('open3d').disabled = false;
+  $('localhint').textContent = !entries.length ? 'Nothing to open in 3D for this cell: ' + noMapReason(x, y) + '.' :
+    entries.some(e => e.kind === 'frame') ? (servedBuild && servedBuild.world ? '' : 'Show in 3D opens the 3D Inspector; there, open the build\'s CHIM world (Open CHIM world) and pick the frame named here.') :
     Object.keys(mapFiles).length || servedMaps.size ? '' : 'Choose your maps folder (id1/maps of a build) to see it in 3D.';
 }
 async function showMap() {
-  const m = $('mapselect').value; if (!m) return;
-  if (hasMap(m)) { const f = await mapFile(m); if (f) openInInspector(f); }
-  else { pendingOpen = m; $('mapsdir').click(); }
+  const v = $('mapselect').value, e = localEntries.find(q => q.value === v);
+  if (!e) {
+    const why = localCell ? 'Nothing to open in 3D for cell ' + localCell.x + ', ' + localCell.y + ': ' + noMapReason(localCell.x, localCell.y) + '.' : 'Click a cell on the World tab first.';
+    $('localhint').textContent = why; flashHint(); return;
+  }
+  if (e.kind === 'frame') {
+    if (servedBuild && servedBuild.world) { openLinkInInspector({world: servedBuild.base, frame: e.frame, cell: e.cell, label: servedBuild.label}); return; }
+    openLinkInInspector(localBuild ? {files: localBuild, frame: e.frame, cell: e.cell} : {frame: e.frame, cell: e.cell});
+    return;
+  }
+  if (hasMap(e.map)) { const f = await mapFile(e.map); if (f) openInInspector(f); else { $('localhint').textContent = 'The map ' + e.map + ' could not be read from the server.'; flashHint(); } }
+  else { pendingOpen = e.map; $('mapsdir').click(); }
 }
+function flashHint() { const h = $('localhint'); h.style.color = '#ffcf55'; if (typeof setTimeout === 'function') setTimeout(() => { h.style.color = ''; }, 2500); }
 $('open3d').onclick = showMap;
 $('mapselect').onchange = showMap;
 // The 3D Map Inspector lives inside the Local view; it loads on first use.
@@ -1326,15 +1406,34 @@ function openInInspector(file) {
   if (inspectorReady) { $('inspector3d').contentWindow.postMessage({type: 'amiwind-open-map', file}, '*'); return; }
   inspectorQueue = file; ensureInspector();
 }
+// A link instead of a file: a CHIM world frame ({world, frame, cell}) or a room ({rooms, room}) of the served build. Inside
+// the Toolkit the inspector tab opens it; on its own page the inspector below the Local view does.
+function linkQuery(link) {
+  const q = new URLSearchParams();
+  for (const k of ['world', 'frame', 'cell', 'rooms', 'room', 'heat']) if (link[k]) q.set(k, link[k]);
+  return q.toString();
+}
+function openLinkInInspector(link) {
+  if (EMBEDDED) { window.parent.postMessage({type: 'amiwind-open-inspector', link}, '*'); return; }
+  const frame = $('inspector3d');
+  if (inspectorReady) frame.contentWindow.postMessage(Object.assign({type: 'amiwind-open-link'}, link), '*');
+  else if (!frame.src) {      // first load: the link is its address, nothing else opens first (files and file-less links follow by message)
+    ensureInspector('map-inspector.html?' + linkQuery(link));
+    if (link.files || (!link.world && !link.rooms)) inspectorLinkQueue = link;
+  } else inspectorLinkQueue = link;
+  setMode('local');
+}
+let inspectorLinkQueue = null;
 // Load the embedded inspector once; whatever was asked for meanwhile is sent when ready.
-function ensureInspector() {
+function ensureInspector(src) {
   const frame = $('inspector3d');
   if (frame.src) return;
   frame.onload = () => {
     inspectorReady = true;
     if (inspectorQueue) { frame.contentWindow.postMessage({type: 'amiwind-open-map', file: inspectorQueue}, '*'); inspectorQueue = null; }
+    if (inspectorLinkQueue) { frame.contentWindow.postMessage(Object.assign({type: 'amiwind-open-link'}, inspectorLinkQueue), '*'); inspectorLinkQueue = null; }
   };
-  frame.src = 'map-inspector.html';
+  frame.src = src || 'map-inspector.html';
 }
 let mode = 'world';
 function setMode(m) {
@@ -1374,7 +1473,8 @@ function cellAt(e) {
 }
 // Place / region name from the local cells file (your own game data), if loaded.
 function placeName(x, y) {
-  const d = cellsDetail && cellsDetail.cells[x + ',' + y];
+  // without the local cells file, the CHIM Progress Tracker's own record of the cell (its name and region come from your game data too)
+  const d = cellsDetail && cellsDetail.cells[x + ',' + y] || (!cellsDetail && chim ? chimCells.get(x + ',' + y) : null);
   if (!d || !(d.name || d.region)) return '';
   return (d.name || d.region) + (d.name && d.region ? ' (' + d.region + ')' : '');
 }
@@ -1870,8 +1970,47 @@ function interiorTrackerUi() {
 function itRender() {
   if (!itIr) return;
   if (itFold && itFold.blocks[0] && itFold.blocks[0].folded) return;   // drawn when opened
-  $('itlist').innerHTML = IT.listHtml(itIr, $('itsearch').value);
+  $('itlist').innerHTML = IT.listHtml(itIr, $('itsearch').value, roomOpts());
 }
+// Room tiles in 3D (TOOLKIT-TILE-TO-INSPECTOR-67): the built room of an interior cell in the served build (/build/rooms.json) or
+// in a build folder chosen by hand; a room with several types (the Arena Pit) opens the type its door opens.
+function roomBuilt(r) {
+  const t = r && ((servedRooms && servedRooms[r.id]) || (localRooms && localRooms[r.id]));
+  return t ? t.default_type || t.room : null;
+}
+function roomOpts() { return servedRooms || localRooms ? {open3d: roomBuilt} : null; }
+function openRoom3d(id, heat) {
+  const r = (itIr && itIr.rooms || []).find(q => q.id === id) || {id}, room = roomBuilt(r);
+  if (!room) return false;
+  if (servedRooms && servedRooms[r.id] && servedBuild) openLinkInInspector(Object.assign({rooms: servedBuild.base, room, label: servedBuild.label}, heat ? {heat} : {}));
+  else openLinkInInspector(Object.assign({files: localBuild, room}, heat ? {heat} : {}));
+  return true;
+}
+// The rooms a chosen build folder's room maps name: each maps/<name>.chim (or .bsp) whose worldspawn has "_chim_room", by its
+// "_aw_cell_id" (only the header and the entity lump of each map are read).
+async function mapHead(file) {
+  const head = new DataView(await file.slice(0, 12).arrayBuffer());
+  if (head.byteLength < 12 || head.getInt32(0, true) !== 29) return {};
+  const at = head.getInt32(4, true), n = head.getInt32(8, true);
+  if (at < 0 || n <= 0 || at + n > file.size) return {};
+  const text = new TextDecoder('windows-1252').decode(await file.slice(at, at + n).arrayBuffer()), first = /\{([^{}]*)\}/.exec(text), ws = {};
+  if (first) for (const m of first[1].matchAll(/"([^"\n]*)"\s*"([^"\n]*)"/g)) ws[m[1]] = m[2];
+  return ws;
+}
+$('builddir').onchange = async e => {
+  const files = [...(e.target.files || [])];
+  if (!files.length) return;
+  localBuild = e.target.files; localRooms = {};
+  const maps = files.filter(f => /(^|\/)maps\/[^/]+\.(chim|bsp)$/i.test((f.webkitRelativePath || f.name).replace(/\\/g, '/')));
+  for (const f of maps) {
+    const ws = await mapHead(f), cell = ws._aw_cell_id || ws.message;
+    if (!ws._chim_room || !cell || localRooms[cell]) continue;
+    localRooms[cell] = {room: ws._chim_room, default_type: ws._chim_room_type_default ? ws._chim_room + 't' + ws._chim_room_type_default : null};
+  }
+  $('copied').textContent = 'Build folder: ' + Object.keys(localRooms).length + ' rooms, ' + (files.some(f => /(^|\/)chim\/world\.cwi$/.test(f.webkitRelativePath || '')) ? 'a CHIM world' : 'no CHIM world');
+  itRender(); if (EV && chim && evView) viewShow();
+  if (picked) showSelected(picked.x, picked.y, data && data.cells.find(c => c.x === picked.x && c.y === picked.y));
+};
 // Expansion views (expansion-views.js): the view switch above the map (Vvardenfell + Solstheim; Mournhold, which has no
 // exterior, on a screen of its own), done / partial / missing per view and the completion rate of each game. A view whose
 // content the loaded data does not hold is not offered.
@@ -1925,8 +2064,10 @@ function mhRender() {
   c2.setTransform(dpr, 0, 0, dpr, 0, 0); c2.clearRect(0, 0, evLayout.width, evLayout.height);
   c2.font = '600 13px system-ui, sans-serif'; c2.textBaseline = 'middle'; c2.fillStyle = '#9fb3c8';
   for (const h of Object.values(evLayout.heads)) c2.fillText(h.text, 8, h.y + 8);
+  const heatOn = $('mhcolour').value === 'faces' && !!servedFaces, maxFaces = heatOn ? Math.max(1, ...rooms.map(r => (roomFaces(r) || {}).faces || 0)) : 1;
   for (const t of evLayout.tiles) {
-    c2.fillStyle = IT.COLOURS[t.room.state] || '#888'; c2.fillRect(t.x, t.y, t.w - 1, t.h - 1);
+    const rf = heatOn ? roomFaces(t.room) : null;
+    c2.fillStyle = heatOn ? (rf ? heat(Math.sqrt(rf.faces / maxFaces)) : '#2a3a4c') : IT.COLOURS[t.room.state] || '#888'; c2.fillRect(t.x, t.y, t.w - 1, t.h - 1);
     if (evPicked && evPicked.id === t.room.id) { c2.strokeStyle = '#ffe28a'; c2.lineWidth = 2; c2.strokeRect(t.x + 1, t.y + 1, t.w - 3, t.h - 3); }
     if (t.district) {
       c2.fillStyle = '#081420'; c2.font = '12px system-ui, sans-serif';
@@ -1935,11 +2076,45 @@ function mhRender() {
     }
   }
   const cnt = EV.roomCounts(rooms), seen = new Set(rooms.map(r => r.state));
-  $('mhlegend').innerHTML = EV.countText(cnt) + ' of ' + cnt.total.toLocaleString() + ' rooms. ' + IT.STATES.filter(s => seen.has(s)).map(s => '<span><i style="background:' + IT.COLOURS[s] + '"></i>' +
+  $('mhlegend').innerHTML = heatOn ? 'Drawn faces per room of ' + escapeHtml(servedBuild ? servedBuild.label : 'the build') + ' (every placement counts its model\'s faces): ' +
+    '<span><i style="background:' + heat(0) + '"></i>few</span><span><i style="background:' + heat(.5) + '"></i></span><span><i style="background:' + heat(1) + '"></i>' + maxFaces.toLocaleString() + ' faces (the heaviest here)</span>' +
+    '<span><i style="background:#2a3a4c"></i>not a room of the build</span>'
+    : EV.countText(cnt) + ' of ' + cnt.total.toLocaleString() + ' rooms. ' + IT.STATES.filter(s => seen.has(s)).map(s => '<span><i style="background:' + IT.COLOURS[s] + '"></i>' +
     escapeHtml(IT.LABELS[s]) + ' ' + rooms.filter(r => r.state === s).length + '</span>').join('');
-  $('mhlist').innerHTML = itIr ? IT.listHtml(Object.assign({}, itIr, {rooms}), '') : '';
+  $('mhlist').innerHTML = (heatOn ? heaviestHtml(rooms) : '') + (itIr ? IT.listHtml(Object.assign({}, itIr, {rooms}), '', roomOpts()) : '');
+  const room = evPicked && roomBuilt(evPicked), b3 = $('mh3d');
+  b3.hidden = !evPicked || !roomOpts();
+  b3.disabled = false;
+  b3.textContent = evPicked ? (room ? '▶ Open ' + evPicked.name + ' in 3D' : evPicked.name + ': not a room of the build') : '';
 }
-function mhText(r) { return r.name + ' · ' + (IT.LABELS[r.state] || r.state) + ' · batch ' + IT.batchText(r.batch) + (r.reasons && r.reasons.length ? ' · ' + r.reasons.join(', ').replace(/_/g, ' ') : ''); }
+// The rooms heatmap (TOOLKIT-DLC-VIEWS-64): the drawn faces of every room of the served build and its heaviest models
+// (toolkit_serve.py /build/room-faces.json: each placement counts its model's faces), fetched when first shown.
+let servedFaces = null, facesLoading = false;
+function roomFaces(r) { const room = roomBuilt(r); return room && servedFaces ? servedFaces[room] || null : null; }
+async function loadRoomFaces() {
+  if (servedFaces || facesLoading || !(servedBuild && servedBuild.interiors)) return;
+  facesLoading = true; $('mhfacesnote').textContent = 'reading the faces of every room of the served build ...';
+  try { const r = await fetch('../build/room-faces.json', {cache: 'no-store'}); const c = r.ok ? await r.json() : null; servedFaces = c && c.ok ? c.rooms : null; } catch (_) { servedFaces = null; }
+  facesLoading = false;
+  $('mhfacesnote').textContent = servedFaces ? '' : 'no face table: the heatmap needs a served build (toolkit_serve.py --served-build)';
+  mhRender();
+}
+const modelText = m => escapeHtml(m[0]) + ' ' + m[1].toLocaleString() + ' faces' + (m[2] > 1 ? ' x ' + m[2] + ' = ' + m[3].toLocaleString() : '');
+// The heaviest rooms of the pane by drawn faces, each with its heaviest models and a 3D button (the inspector's density heat).
+function heaviestHtml(rooms) {
+  const rows = rooms.map(r => [r, roomFaces(r)]).filter(x => x[1]).sort((a, b) => b[1].faces - a[1].faces).slice(0, 15);
+  if (!rows.length) return '';
+  return '<h3>Heaviest rooms by drawn faces</h3><table class="mt"><thead><tr><th class="l">Room</th><th>Faces drawn</th><th>Placements</th><th class="l">Heaviest models (faces x placements)</th><th class="l">3D</th></tr></thead><tbody>' +
+    rows.map(([r, f]) => '<tr><td class="l">' + escapeHtml(r.name) + '</td><td>' + f.faces.toLocaleString() + '</td><td>' + f.placements.toLocaleString() + '</td><td class="l">' +
+      f.top.slice(0, 4).map(modelText).join('<br>') + '</td><td class="l"><button type="button" class="it3d" data-room3d="' + escapeHtml(r.id) + '" data-heat="visual" title="Open ' +
+      escapeHtml(r.name) + ' in the 3D Inspector with the polygon heatmap">3D</button></td></tr>').join('') + '</tbody></table>';
+}
+function mhText(r) {
+  const f = $('mhcolour').value === 'faces' ? roomFaces(r) : null;
+  return r.name + ' · ' + (f ? f.faces.toLocaleString() + ' faces drawn, heaviest: ' + f.top.slice(0, 3).map(m => m[0] + ' ' + m[3].toLocaleString()).join(', ') + ' · ' : '') +
+    (IT.LABELS[r.state] || r.state) + ' · batch ' + IT.batchText(r.batch) + (r.reasons && r.reasons.length ? ' · ' + r.reasons.join(', ').replace(/_/g, ' ') : '');
+}
+$('mhcolour').onchange = () => { if ($('mhcolour').value === 'faces') loadRoomFaces(); mhRender(); };
 $('mhmap').addEventListener('mousemove', e => {
   const t = evLayout && EV.hit(evLayout, e.offsetX, e.offsetY);
   $('mhtip').textContent = t ? mhText(t.room) : (evPicked ? mhText(evPicked) : 'Hover a tile to see the room.');
@@ -1948,8 +2123,14 @@ $('mhmap').addEventListener('click', e => {
   const t = evLayout && EV.hit(evLayout, e.offsetX, e.offsetY);
   evPicked = t ? t.room : null; mhRender();
 });
+$('mh3d').onclick = () => { if (evPicked && !openRoom3d(evPicked.id)) $('mhtip').textContent = evPicked.name + ': no room of this name in the build, nothing to open in 3D.'; };
+for (const id of ['itlist', 'mhlist']) $(id).addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('button[data-room3d]');
+  if (b) { e.stopPropagation(); openRoom3d(b.dataset.room3d, b.dataset.heat); }
+}, true);
 $('itsearch').addEventListener('input', () => itRender());
 $('itlist').addEventListener('click', e => {
+  if (e.target.closest && e.target.closest('button[data-room3d]')) return;
   const tr = e.target.closest && e.target.closest('tr[data-cell]');
   if (!tr) return;
   const [x, y] = tr.dataset.cell.split(',').map(Number);
@@ -2217,10 +2398,12 @@ function chimUi() {
 }
 function chimHeadSend() {
   if (!chim) return;
-  const msg = {type: 'amiwind-chim-head', headline: chim.headline, history: chim.history};
+  // the expansions' rooms and cells, the same figures as the view switch's cards and the completion line (TOOLKIT-DLC-VIEWS-64)
+  const expansions = EV ? EV.completion(chim) : null;
+  const msg = {type: 'amiwind-chim-head', headline: chim.headline, history: chim.history, expansions};
   if (window.parent !== window) window.parent.postMessage(msg, '*');
   else {
-    window.ChimHead.render($('chimhead'), chim.headline, chim.history, bucket => { chimPickBucket(bucket === chimBucket ? null : bucket); chimHeadSend(); }, chimBucket, {noFold: true});
+    window.ChimHead.render($('chimhead'), chim.headline, chim.history, bucket => { chimPickBucket(bucket === chimBucket ? null : bucket); chimHeadSend(); }, chimBucket, {noFold: true, expansions});
     // The summary line stays at the top; the colour chips, lighting and history lines move into the foldable legend block.
     const head = $('chimhead'), box = $('legendblock');
     for (const n of Array.from(box.children)) if (!n.classList.contains('foldbtn') && !n.classList.contains('foldtitle')) n.remove();
@@ -2268,6 +2451,7 @@ function setChim(doc, source, keepView) {
   if (first) viewRestore();
   chimBuildIndex(); interiorTrackerUi();
   chimUi(); chimHeadSend(); draw(); loadChimCurve(); viewsUi();
+  if (picked) showSelected(picked.x, picked.y, data && data.cells.find(q => q.x === picked.x && q.y === picked.y));   // its frame may be named now
   if (!SERVED) openLinkedCell();
   return true;
 }

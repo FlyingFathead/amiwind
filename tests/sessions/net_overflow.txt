@@ -1,0 +1,51 @@
+# The frame message (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66, docs/NET_MESSAGES.md): in Vivec and at the Bitter Coast
+# spot where the v0.0.66 release stopped (cell -2,-8, global -13677 -61720 604), dbg netstat says what a frame's
+# updates want against the message's room and how many wait for the next frames, and dbg sweep actors counts the live
+# actors (the creatures included). The console must hold no "packet overflow", no "Message overflow caught", no
+# "Frame update dropped" and no "Illegible server message". Run from a place in play (a full image's start map), 32 MB
+# Fast, warp off, the position overlay on; the console is opened for each netstat picture. The "emu" line runs the
+# emulator's folder drives on its own thread (CHIM-SEYDA-BALMORA-LOAD-HANG-43).
+emu deterministic=1
+wait 8
+cmd aw_crosshair off
+cmd dbg all on
+cmd dbg headlamp off
+state map
+cmd dbg tp vivec
+wait 90
+state map
+shot net-vivec-arrival
+cmd dbg netstat
+cmd dbg sweep actors
+wait 5
+cmd toggleconsole
+wait 2
+shot net-vivec-arrival-netstat-console
+cmd toggleconsole
+wait 30
+cmd dbg netstat
+wait 2
+cmd toggleconsole
+wait 2
+shot net-vivec-after-30s-netstat-console
+cmd toggleconsole
+cmd dbg tp -13677 -61720 604
+wait 90
+state map
+shot net-bitter-coast-stop-spot-arrival
+cmd dbg netstat
+cmd dbg sweep actors
+wait 5
+cmd toggleconsole
+wait 2
+shot net-bitter-coast-stop-spot-netstat-console
+cmd toggleconsole
+wait 30
+cmd dbg netstat
+wait 2
+cmd toggleconsole
+wait 2
+shot net-bitter-coast-after-30s-netstat-console
+cmd toggleconsole
+wait 2
+shot net-bitter-coast-after-30s

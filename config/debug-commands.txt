@@ -45,12 +45,13 @@ PLAYTESTING|inventory grant|aw_inventory|<quoted source item ID> <1..999> explic
 PLAYTESTING|kill|chim|[REF or crime] test kill: no argument = pick mode, a red crosshair over a living NPC or creature, attack kills it (the body lies down, can be searched), dbg kill, right click or Escape leaves; REF = chim actors kill REF; crime = pick mode whose kills are the player's crime (murder). One console line per kill; essential characters show the game's message
 PLAYTESTING|levelup|aw_levelup|[use SKILL [N [TYPE]] / raise SKILL [N] / book ID / read REF / check / rest [HOURS] / bed REF] levelling: no argument = level, progress, multipliers, each skill's progress; use = N skill uses (TYPE 0..3); raise = N raises; book = a skill book's first read; check = the level-up box when due; rest = HOURS (default 8), then the box when due (saved)
 PLAYTESTING|lightgallery|aw_lightgallery|[off] lighting switches at this spot in a strip below the view: night mode, tint, lamps, glow, headlamp, horizon veil, time preview; arrows change, Esc done
-PLAYTESTING|loadfail|aw_load_fail|[N; no argument: status] a test aid: the next N map loads fail on purpose (0 = off); 1 shows the way back (the player returns to where the load started, with a message box: OK stays, Load Game opens the load menu), 2 a way back that fails as well (the load menu opens)
+PLAYTESTING|loadfail|aw_load_fail|[N [error/memory/lump/hang] / timeout [S]] test aid: the next N map loads fail (0 off); 1: the way back and the OK box naming the error, 2: the way back fails too (load menu); kinds: error, memory, lump (bad data in a lump), hang (never ends); timeout S: a stuck load fails after S s (120; 0 off)
 PLAYTESTING|loadtrace|aw_loadtrace_cmd|[on / off / dump] the load trace (off by default; console aw_loadtrace 0/1): every file open, read, seek and close kept in memory with its time and load stage, printed and written to RAM:amiwind-loadtrace.txt when a scene is ready; dump: now
 PLAYTESTING|maxstat|aw_levelup|same as maxstats
 PLAYTESTING|maxstats|aw_levelup|every attribute and skill to 100 and the level to 83 (the highest the game's levelling reaches), health, magicka and fatigue worked out again by the character's own rules and full; the sheet before and after on the console
 PLAYTESTING|memcensus|aw_memcensus|[owners [on/off]] (the free Fast RAM and its largest block now, the map and the Hunk in use, in one console line; owners: the live blocks of 4 KiB or more by the address that asked for them, counted only after owners on, off by default)
 PLAYTESTING|modelgallery|aw_charplane|[number/name/ID]
+PLAYTESTING|netstat|aw_netstat|the last frame's entity updates (things in sight, bytes wanted against the message's room, sent, waiting for the next frames), the fullest frame since the map started, and the models that took the most bytes
 PLAYTESTING|nightgallery|aw_nightgallery|[here/off] (23:00 wide view, Masser, Secunda, stars; Esc returns)
 PLAYTESTING|npcgallery|aw_charplane|[number/name/ID]
 PLAYTESTING|pickcompanion|aw_pickcompanion|same as companion pick (again or Escape leaves pick mode)
@@ -130,7 +131,7 @@ VIDEO|vidplay|playvid|<1..17 / 01..17 / catalogue name> (alias of playvid)
 WORLD / TRAVEL|breath|aw_breath|(no argument) breath under water and drowning (docs/PLAYER_MOVEMENT.md): the breath left of fHoldBreathTime, head under water, Water Breathing, drowning damage taken, and what god mode held back (world damage, script and spell losses)
 WORLD / TRAVEL|door|aw_hinged_door|[status / list; no argument: open or close the hinged door under the crosshair, locks ignored] ordinary hinged doors (docs/DOOR_MAPPING.md): status counts the table and this map's doors, list prints each (reference, edict or CHIM, how far open, lock)
 WORLD / TRAVEL|door roulette|aw_teleport|[SEED] one random interior: loads you straight into a room of this disk at the room's own start and prints which (name, map id, cell number) and the seed; the same SEED loads the same room again (random tests of interior loading)
-WORLD / TRAVEL|doorlocks|aw_hinged_door|[on/off, true/false or 1/0; no argument toggles] door locks (default on; not saved): on = a locked load or hinged door opens only with its key or in god mode (the message box says which; else the locked sound); off = every lock ignored, until lockpicks and the Open spell exist
+WORLD / TRAVEL|doorlocks|aw_hinged_door|[on/off, true/false or 1/0; no argument toggles] door and container locks (default on; not saved): on = a locked load door, hinged door or container opens only with its key or in god mode (the message box says which; else the locked sound or Locked); off = every lock ignored, until lockpicks and the Open spell exist
 WORLD / TRAVEL|god|aw_godmode|[on/off, true/false or 1/0; no argument toggles] Quake god mode (no damage of any kind: blows, lava, falls, drowning, spells and scripts; the HUD shows GOD) (not saved)
 WORLD / TRAVEL|godmode|aw_godmode|same as god
 WORLD / TRAVEL|map compass|aw_compass|1/0 the compass strip at the top of the view: north and the hot marker's direction, here / near / far (default 0, saved; docs/WORLD_MAP_AND_JOURNAL.md)
@@ -249,6 +250,7 @@ DIAGNOSTICS|overlay|amiwind_show_debug|on/off true/false 1/0
 DIAGNOSTICS|pos|aw_pos|
 DIAGNOSTICS|probe|aw_probe|(slow floor audit)
 DIAGNOSTICS|rcount|aw_rcount|[0/1/2/3/4] once a second: renderer counts per frame (brush models, faces, clip fragments, edges, spans, surface cache, alias models) and timing split; 2 = remote state file only; 3 = 2 + brush-slot profile (walk/emit split, distance x size table, leaves per placement); 4 = 3 printed
+DIAGNOSTICS|save status|aw_save_status|the autosave as it stands (read only): on or off and how many are kept, how many autosaves this character has, when the next is due, what holds it back now (a fight, a menu, the air, ...), a save waiting for a script step, and the last save's outcome (written, or why not)
 DIAGNOSTICS|savelogs|aw_savelogs|write the in-memory diagnostic logs to the game folder now (also done at Exit game)
 DIAGNOSTICS|sealevel|amiwind_debug_sealevel|on/off
 DIAGNOSTICS|show fps|amiwind_debug_showfps|[on/off]

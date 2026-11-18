@@ -26,13 +26,16 @@ GOOD = {
     'table_back': 'GONE', 'crab_before': 0, 'crab_after': 1, 'plate_ledger': 'CLEAN', 'ring_taken': 1,
     'gold_before': 0, 'talk_screen': 'dialogue', 'papers_sellus': 0, 'package_sellus': 1, 'directions_sellus': 1,
     'gold_sellus': 87, 'journal_sellus': 1, 'package_again': 1, 'gold_again': 87, 'journal_again': 1,
-    'release_map': 'maps/seyda-chim.chim', 'state_released': -1,
+    'release_map': 'maps/seyda-chim.chim', 'state_released': -1, 'autosaves_released': 1,
     'victim': VICTIM, 'list_killed': 'DEAD', 'room_map': 'maps/census.bsp', 'court_map': 'maps/sncourt-chim.chim',
     'list_back': 'DEAD',
     'health_hurt': 40, 'health_healed': 90, 'cast_list': 1, 'fighter': 172002, 'list_fight': 'FIGHTING',
     'health_fought': 84, 'state_saved': -1, 'package_loaded': 1, 'gold_loaded': 87, 'ring_loaded': 1,
     'journal_loaded': 1, 'state_loaded': -1, 'list_loaded': 'DEAD', 'door_from': 'maps/seyda-chim.chim',
-    'door_to': 'maps/census.bsp', 'package_door': 1,
+    'door_to': 'maps/census.bsp', 'package_door': 1, 'creatures_seyda': 4, 'saves_held': 3,
+    # the fake game's map changes (fake_run): a map whose arrival writes no autosave, and where the autosave waits
+    # behind the next map change instead (both None: every arrival from the release on writes one)
+    'no_autosave_at': None,
 }
 
 
@@ -60,6 +63,19 @@ def answer(name, command, v):
         return rows + [
                 '  70 Fargoth ref 172002 cell -2 -9 at 140 210 30%s' % (' FIGHTING' if name == 'list_fight' else ''),
                 'chim actors: 2 actors alive, 90 edicts; joins 1']
+    if command == 'chim actors creatures on':
+        # aw_actors.c: the switch's answer counts the creatures alive in the loaded area
+        return ['Creatures on: %d alive, 0 released now, 0 spawns skipped while off (outdoor creatures; not saved)' % v]
+    if command == 'aw_save_status':
+        # aw_save.c save_status (SAVE-AUTOSAVE-REGRESSED-67): the autosaves of the character, what holds the next one
+        # (V a text: what holds it, with one autosave kept)
+        held, v = (v, 1) if isinstance(v, str) else ('nothing', v)
+        return ['Autosave: on, 5 kept (aw_autosaves); character folder %s' % ('made' if v else 'not made yet'),
+                'autosaves -> %d' % v,
+                'Next autosave: at the next map change or in 296 s',
+                'Held by: %s' % held,
+                'Last save: %s' % ('Autosave 1 written (12698 bytes, generation 1)' if v else
+                                   'refused: the items\' script values could not be kept')]
     if command == 'dbg cast spell list':
         return [' m0 Test spell (made) *', 'Selected: Test spell, cost 9, chance 100 %%; %d cast, 0 failed, 0 refused, %d landed' % (v, v)]
     if command == 'aw_placed ledger':
@@ -89,6 +105,15 @@ def fake_run(journey, part, values, stop_in=None):
             steps.append('08:00:05 smoke RESULT FAIL %s: not reached in 25 s; the player stands at local 20 -30 79' % line)
             return '\n'.join(steps) + '\n', '\n'.join(con) + '\n'
         steps.append('08:00:00 ' + line)
+        # the game's own lines of a map change (aw_scene.c, aw_save.c): every arrival says Scene ready; from the release
+        # (step 5) on each one writes an autosave, but at NO_AUTOSAVE_AT; part B's load of the quicksave is restored
+        m = re.fullmatch(r'waitfor (?:map|server) \d+ (\S+)', line)
+        if m:
+            con.append('Scene ready: %s, 912 ms, 2210304 hunk bytes, arrival checked' % m.group(1))
+            if step >= 5 and m.group(1) != values.get('no_autosave_at'):
+                con.append('Saved Autosave %d (12698 bytes, generation %d).' % (len(con), len(con)))
+        elif line == 'waitfor screen 60 game':
+            con += ['Scene ready: seyda, 1410 ms, 2210304 hunk bytes, arrival checked', 'Game restored: Hors.']
         m = re.fullmatch(r'cmd echo JOURNEY (PROBE|STEP) (\S+)', line)
         if m:
             con.append('JOURNEY %s %s' % m.groups())
@@ -275,6 +300,65 @@ class JourneySmoke(unittest.TestCase):
         ok, lines = js.judge(self.j, self.runs(dagger_taken='BACK'))
         self.assertTrue(any(l.startswith('FAIL step 2') and 'dagger_taken' in l for l in lines), lines)
 
+    def test_no_autosave_after_the_release_fails_step_5(self):
+        # SAVE-AUTOSAVE-REGRESSED-67: the release's map change must leave the game's own autosave on disk; the journey
+        # asks dbg save status after it, and a game that wrote none fails step 5 with the status's answer in the line
+        with tempfile.TemporaryDirectory() as d:
+            js.write_scripts(JOURNEY, d)
+            a = (Path(d) / 'part-A.txt').read_text(encoding='utf-8').splitlines()
+        self.assertLess(a.index('shot a6-released'), a.index('cmd echo JOURNEY PROBE autosaves_released'))
+        self.assertEqual(a[a.index('cmd echo JOURNEY PROBE autosaves_released') + 1], 'cmd aw_save_status')
+        ok, lines = js.judge(self.j, self.runs(autosaves_released=0))
+        bad = [l for l in lines if l.startswith('FAIL')]
+        self.assertFalse(ok)
+        self.assertEqual(len(bad), 1, lines)
+        self.assertIn('step 5', bad[0])
+        self.assertIn('autosaves_released', bad[0])
+
+    def test_a_map_change_without_its_autosave_fails_and_is_named(self):
+        """ENGINE-REGRESSION-GUARDS-67: from the release on every map change writes the game's autosave; a map change
+        without one fails the journey's last step and names the map and the part. The load of the quicksave (part B)
+        and the map changes before the release are none; at the end nothing holds the autosave back."""
+        e = [x for x in self.j['expects'] if x['kind'] == 'autosaves']
+        self.assertEqual([(x['from'], x['step']) for x in e], [(5, 9)])
+        self.assertEqual(js.autosave_misses(self.j, {'A': self.runs()[0][1], 'B': self.runs()[1][1]}, 5), (6, []))
+        ok, lines = js.judge(self.j, self.runs(no_autosave_at='sncourt'))
+        bad = [l for l in lines if l.startswith('FAIL')]
+        self.assertFalse(ok)
+        self.assertEqual(len(bad), 1, lines)
+        self.assertEqual(bad[0], 'FAIL step 9 (through a door: the restored game goes on): autosaves from step 5: 1 of 6 '
+                                 'map changes wrote no autosave: sncourt (part A, the next map loaded first)')
+        # the last map change of a part: before the part ended
+        ok, lines = js.judge(self.j, self.runs(no_autosave_at='census'))
+        bad = [l for l in lines if l.startswith('FAIL')]
+        self.assertIn('3 of 6 map changes wrote no autosave: census (part A, the next map loaded first); census (part A, '
+                      'the next map loaded first); census (part B, before the part ended)', bad[0])
+        # the arrivals before the release write none, and no map change of theirs is judged
+        a = self.runs()[0][1]
+        before = a[:a.index('JOURNEY STEP 5')]
+        self.assertIn('Scene ready: sncourt', before)
+        self.assertNotIn('Saved Autosave', before)
+        # a streamed crossing is no map change; a load of a save is none either
+        con = ('JOURNEY STEP 5\nScene ready: vf0877, 0 ms, streamed crossing (type 1), CHIM frame 3 4, 812 us\n'
+               'Scene ready: seyda, 1410 ms, 2210304 hunk bytes, arrival checked\nGame restored: Hors.\n'
+               'Scene ready: census, 912 ms, 2210304 hunk bytes, arrival checked\nSaved Autosave 2 (1 bytes, generation 2).\n')
+        self.assertEqual(js.autosave_misses(self.j, {'A': con}, 5), (1, []))
+        # something holds the autosave back at the end
+        ok, lines = js.judge(self.j, self.runs(saves_held='a fight'))
+        bad = [l for l in lines if l.startswith('FAIL')]
+        self.assertEqual(len(bad), 1, lines)
+        self.assertIn('has saves_held Held by: nothing: not in the answer', bad[0])
+        self.assertIn('Held by: a fight', bad[0])
+
+    def test_no_creature_alive_in_seyda_neen_fails_step_5(self):
+        # ENGINE-REGRESSION-GUARDS-67 (OUTDOOR-CREATURES-MISSING-66): the town is outdoors, its creatures are alive
+        ok, lines = js.judge(self.j, self.runs(creatures_seyda=0))
+        bad = [l for l in lines if l.startswith('FAIL')]
+        self.assertFalse(ok)
+        self.assertEqual(len(bad), 1, lines)
+        self.assertIn('step 5', bad[0])
+        self.assertIn('creatures_alive >= 1', bad[0])
+
     def test_a_lost_package_after_the_load_fails_step_8(self):
         ok, lines = js.judge(self.j, self.runs(package_loaded=0))
         self.assertFalse(ok)
@@ -440,6 +524,8 @@ class JourneySmoke(unittest.TestCase):
                           ('face 1 2\nprobe a x\nexpect a == 1\n', "not the walker step's form"),
                           ('aimed papers\nprobe a x\nexpect a == 1\n', "not the walker step's form"),
                           ('probe a x\nexpect lacks b y\n', 'before it is defined'),
+                          ('step 1 x\nexpect autosaves from step 2\n', 'no step 2 before it'),
+                          ('step 1 x\nexpect autosaves since 1\n', 'expect autosaves from step N'),
                           ('probe a x\n', 'no expect')):
             with self.assertRaises(js.JourneyError) as c:
                 js.parse(text)

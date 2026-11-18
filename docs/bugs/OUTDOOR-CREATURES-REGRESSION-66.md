@@ -1,5 +1,14 @@
 # OUTDOOR-CREATURES-REGRESSION-66: no outdoor creatures spawn around the towns
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.66-dev1 at 2026-11-13 15:09 +0200: the actor spec check on the v0.0.66-dev1 build (source 7130bd0, before the town join): the town maps place 0 of 4 creatures and 0 of 112 levelled creature points of their cells
+- Reported with v0.0.66 at 2026-11-17 19:42 +0200: seen again in play on the v0.0.66 release: no outdoor creatures at all; v0.0.67-dev1 has the same engine
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -9,7 +18,7 @@
 | Where | The whole island outdoors (the Bitter Coast, the waters, the roads) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.65 (last seen) |
+| Persists in | v0.0.65, v0.0.66, v0.0.67-dev1 (last seen) |
 | Severity | critical: the island has no wildlife: no creatures to fight, a core part of the game gone |
 | Family | Actors and NPCs (`actors-npc`) |
 | Playtest version | v0.0.65 |
@@ -28,16 +37,21 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 - 2026-11-13: reported in v0.0.65
 - 2026-11-13 15:09 +0200: seen again in v0.0.66-dev1: the actor spec check on the v0.0.66-dev1 build (source 7130bd0, before the town join): the town maps place 0 of 4 creatures and 0 of 112 levelled creature points of their cells
+- 2026-11-17: v0.0.66: Cause found. The build holds every outdoor creature: the v0.0.66 release build's actor table has all 329 placed creatures and 4,974 levelled points of the region cells and the 4 and 112 of the town cells, each with a model, and the town ...
+- 2026-11-17: v0.0.66: When it changed, from the delivery hops of every version (the same teleports each time): the region frames of v0.0.62, v0.0.65 and v0.0.66-dev1 join the same three cells around the arrival with the same counts (by Ald'ruhn -3 6, -3 7, -2 ...
+- 2026-11-17: v0.0.66: Seen again in play on the v0.0.66 release on 17 November: no wildlife outdoors.
+- 2026-11-17 19:42 +0200: seen again in v0.0.66: seen again in play on the v0.0.66 release: no outdoor creatures at all; v0.0.67-dev1 has the same engine
 
 <!-- END GENERATED TIMELINE -->
 
-_Last updated with AmiWind v0.0.66-dev1 (13 November 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
 - [Timeline](#timeline)
-- [Status: 13 November 2026](#status-13-november-2026)
+- [Status: 17 November 2026](#status-17-november-2026)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -50,49 +64,93 @@ _Last updated with AmiWind v0.0.66-dev1 (13 November 2026)._
 
 <!-- contents end -->
 
-## Status: 13 November 2026
+## Status: 17 November 2026
 
-Open, fixed in source on the v0.0.66 line, not in a numbered build yet. Reported twice: on the v0.0.65 release and
-on v0.0.66-dev1, whose source came before the fix.
+Open, seen again in play on the v0.0.66 release: no outdoor creatures at all. The cause is found; its two parts are
+fixed in source on the v0.0.67 line (not in a numbered build yet), each under its own entry:
+NET-VIVEC-ENTITY-PACKET-OVERFLOW-66 (the entity update) and OUTDOOR-CREATURES-HOME-CELL-67 (the arrival cell). To be
+seen in play once both are in a build: creatures in the cell the player arrives in and in the cells around it, at
+Seyda Neen and on the Bitter Coast.
 
 ## Symptom
 
-No mudcrab and no slaughterfish near Seyda Neen, where the game starts, and none in the other town maps' cells.
+No mudcrab and no slaughterfish near Seyda Neen, where the game starts, and in v0.0.66 no creatures anywhere in the
+wild, where earlier versions had them.
 
 ## Where
 
-The town maps (Seyda Neen, Balmora): their cells' creatures and levelled creature points.
+The whole island outdoors: the town maps' cells (until v0.0.66-dev2) and the region frames.
 
 ## How it happened
 
-The region frames place their cells' creatures from the actor table, but a town map's cells never joined that table,
-and the town frames place NPCs only. So the creatures of the cells a town map covers were never spawned: 4 placed
-creatures and 112 levelled creature points (46 of them lists of water creatures). The region frames still held
-theirs.
+Three causes, one after the other:
+
+1. Until v0.0.66-dev2 the cells inside a town map (Seyda Neen, Balmora) never joined the actor table, and the town
+   frames place people only, so their 4 placed creatures and 112 levelled creature points were never spawned. The
+   town join of v0.0.66-dev2 fixed that: the v0.0.66 delivery smoke queues and spawns 53 creatures at Seyda Neen.
+2. The cell the player arrives in (after a teleport, a load, a door, a level change) never gets its levelled
+   creatures: the region frame map brings its people and placed creatures but no levelled point, and the window's
+   home frame never joins the table (OUTDOOR-CREATURES-HOME-CELL-67). Levelled points are about nine in ten of the
+   wild's creatures (4,974 of 5,303 in the region cells).
+3. The server sends the entity updates in edict order and stops when the datagram is full. The creatures the cells
+   join are spawned last, so they are the highest edicts and the first left out of every frame that overflows
+   (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66); in v0.0.66 the overflow happens in the wild, so the creatures that did spawn
+   were not drawn.
+
+The build itself holds every outdoor creature: the v0.0.66 release build's actor table has all 329 placed creatures
+and 4,974 levelled points of the region cells and the 4 and 112 of the town cells, and each one has a model.
+
+When it changed, read from the delivery hops of every version (the same teleports each time):
+
+| Version | Region frames (the hops by Ald'ruhn and Khuul) | Entity update |
+| --- | --- | --- |
+| v0.0.47-dev3 to v0.0.66-dev1 | the three cells around the arrival join the actor table, the arrival cell never (cause 2) | never overflows |
+| v0.0.62, v0.0.65, v0.0.66-dev1 | the same cells with the same counts (-3 6, -3 7, -2 7; -9 16, -8 16, -8 17) | never overflows |
+| v0.0.66-dev2 | the same; the town join added (Vivec queues 85 creatures, and 83 of them were still queued when the next region map started, to spawn there: ACTOR-QUEUE-OTHER-MAP-67) | never overflows |
+| v0.0.66-dev3 to v0.0.67-dev1 | the same | overflows in Vivec (732 lines a stay in dev3, about 2,100 since) |
+| v0.0.66 (in play) | the same | overflows in the wild as well |
+
+So nothing changed in the region frames' actor joins or in the entity sending between v0.0.62, when the wild's
+creatures of the cells beside the player were seen (cliff racers, rats, scribs), and v0.0.65, whose report was the
+town cells of Seyda Neen (cause 1). The wild lost the rest in v0.0.66, when the entity update began to overflow and
+drop the joined creatures first (cause 3), on top of the arrival cell's gap that every version had (cause 2).
 
 ## Why it was not caught
 
-No build check compared the placed creatures per area with the original.
+The image step's actor spec check counted the rows of the actor table, not what the game spawns or sends
+(BUILD-ACTOR-SPEC-UNSPAWNABLE-67), and no delivery check counted the creatures alive and drawn in the wild.
 
 ## Reproduction
 
-Always: start a new game and walk the Seyda Neen shore.
+Always: teleport into the wild (the Bitter Coast west of Seyda Neen) and look around the arrival point.
 
 ## Repair
 
-The engine joins a town map's cells from the actor table when the map starts (aw_actors.c), with a spawn budget per
-tick.
+- The town join (v0.0.66-dev2): a town map joins its cells' creatures and levelled points from the actor table.
+- The home join (v0.0.67): a region frame map's first window tick joins its own cell's levelled points from the
+  table; a new map drops the queue of the map before (ACTOR-QUEUE-OTHER-MAP-67).
+- The entity update (v0.0.67, NET-VIVEC-ENTITY-PACKET-OVERFLOW-66): the actors are sent before still scenery and
+  nothing is lost when the datagram is full.
 
 ## Verification
 
-The actor spec check on the v0.0.66-dev1 build counts 0 of 4 creatures and 0 of 112 levelled points in the town
-cells; with the town join every exterior kind is placed. In game: to be seen at Seyda Neen on the next build.
+The engine's native test (`tests/test_aw_actors_native.py`, the home join) checks that a new map's home cell spawns
+exactly the builder's roll of its levelled points and nothing else, and that a map change drops the old queue. A
+scripted session on the v0.0.66 release image (before the fixes) counted, 30 seconds after each teleport: Seyda Neen 69
+actors alive (53 creatures of the town join); the Bitter Coast (cell -4 -9, 13 creature rows) 1; by Pelagiad (cell 1
+-6) 20 and by Moonmoth Legion Fort (cell 2 -3) 11, all from the cells beside the arrival cell; no overflow at those
+spots. In play, on the first build with both fixes: creatures in the arrival cell and the cells beside it at Seyda
+Neen, on the Bitter Coast (cell -4 -9) and on Red Mountain (cell 1 6, cliff racers), with a Tribunal Dwemer room as
+the control (its creatures were there before the fixes too).
 
 ## Prevention
 
-The image step's actor spec check (`tools/actor_spec_check.py`, docs/ACTOR_RECORDS.md "The build's actor spec
-check") stops a build whose people or creatures fall short of the original in any area kind (interiors, region and
-town exteriors, water) or whose actor records leave the tracked gaps.
+- The image step's actor spec check (`tools/actor_spec_check.py`, docs/ACTOR_RECORDS.md "The build's actor spec
+  check") counts an outdoor row only when the game can spawn it: a model in the build, a levelled list that can give
+  a modelled creature, the actor table and the creatures switched on in the image's own settings.
+- The early check `outdoor-creature-models` (`tools/actor_early_checks.py`) stops a build in its first minutes when
+  any outdoor creature or outdoor levelled list of the base game has no model in the actor library.
+- The home join's native test fails if the arrival cell's levelled points stop joining.
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -105,16 +163,19 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - ACTOR-ANNOTATE-ROOM-REFERENCE-48 (no report page): The image step stopped on a room corpse: its actor annotation looked up the support class by id alone, but room actors are classified by reference
 - [ACTOR-BAKE-CENTRE-SEAM-48](ACTOR-BAKE-CENTRE-SEAM-48.md): Bradil Elarven (Glassworker's Hall) left unbaked: his centre probe falls through the seam of two floor pieces
 - ACTOR-GROUND-BAKE-CHIM-ROOMS-48 (no report page): The image step stopped in the actor ground bake: it loaded the batch-room shell maps as classic collision scenes, and its error named no map
+- ACTOR-GROUNDING-CENSUS-CONFLICTS-67 (no report page): The exterior grounding census measures seven people listed as standing on the ground as off the ground, and cannot read five effect models as support
 - [ACTOR-LEVELLED-INVENTORY-ONE-PICK-66](ACTOR-LEVELLED-INVENTORY-ONE-PICK-66.md): An actor's levelled inventory is chosen once when the game is built, not when the actor is made
 - [ACTOR-LEVELLED-NO-WANDER-56](ACTOR-LEVELLED-NO-WANDER-56.md): Levelled creatures (most wild creatures) never wander or aggro: the Wander table held placed actors only
 - ACTOR-PACK-GUAR-MESH-BROKEN-64 (no report page): The pack guar at Ahemmusa Camp is drawn with its body parts scattered apart
 - [ACTOR-PACKAGES-NOT-HELD-66](ACTOR-PACKAGES-NOT-HELD-66.md): Travel, follow and escort packages of the people and creature records are not carried by the build
+- ACTOR-QUEUE-OTHER-MAP-67 (no report page): Actors still queued when the map changes spawn in the next map at the old map's coordinates
 - [ACTOR-RANGED-COMBAT-MISSING-66](ACTOR-RANGED-COMBAT-MISSING-66.md): People and creatures that carry a bow, crossbow or thrown weapon fight hand to hand or with a melee weapon
 - [ACTOR-RESPAWN-CORPSE-RULES-66](ACTOR-RESPAWN-CORPSE-RULES-66.md): Dead bodies are never cleared away; the death rules over time need the original numbers
 - [ACTOR-SPAWN-DROPTOFLOOR-49](ACTOR-SPAWN-DROPTOFLOOR-49.md): The resident spawn grounding as Quake's droptofloor, one rule with the build's room bake
 - ACTOR-STATE-NOT-READ-ON-SPAWN-54 (no report page): A spawned actor never reads its actor record back: a killed NPC respawns alive and lowered health resets on re-entry or load
 - [ACTOR-STATE-POOL-LIMITS-54](ACTOR-STATE-POOL-LIMITS-54.md): The actor record drops changes past 128 changed actors, 12 item changes or 8 spell changes per actor; package changes of the behaviour records and NPC positions are not saved
 - ACTOR-STORM-POSE-51 (no report page): Requested: characters shield their eyes in ash and blight storms (the idlestorm pose), as all regular NPCs and the player do in the original, often seen in Ald'ruhn
+- ACTOR-TABLE-SAME-MAP-RELOAD-67 (no report page): A reload of the map in play joins none of its actor table cells: no creatures until the next map change
 - [ACTOR-WANDER-AGGRO-52](ACTOR-WANDER-AGGRO-52.md): Requested: NPCs and creatures wander, idle and aggro by their own record variables (AI packages, Fight), as the original game does
 - AMBIENT-RESIDENTS-NOT-VISIBLE-54 (no report page): From the matched pose OpenMW shows four residents on the Seyda Neen square, AmiWind one far figure
 - [AMBIENT-UNSTUCK-FLOOD-61](AMBIENT-UNSTUCK-FLOOD-61.md): Walking residents in Seyda Neen keep falling back to the stuck-movement retry
@@ -130,6 +191,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - BALMORA-PEOPLE-FLOATING-65 (no report page): In Balmora several people stand in the air above the street, as in early versions
 - BARTER-SOLD-ITEM-LOST-58 (no report page): A thing the player sells to a merchant who does not stock it leaves the game instead of going into the merchants stock
 - BUILD-ACTOR-SPEC-EMPTY-ROOMS-66 (no report page): The image stage stopped on the actor spec check: the check did not read the room batch stage's new list of empty cells, so the one NPC of an empty Tribunal cell counted as missing
+- BUILD-ACTOR-SPEC-UNSPAWNABLE-67 (no report page): The actor spec check counted every actor table row outdoors as placed, also rows the game cannot spawn
 - [CAMERA-POV-TAP-LOST-36](CAMERA-POV-TAP-LOST-36.md): A Toggle POV (Tab) tap released before the next frame did not switch the view
 - [CAMERA-THIRDPERSON-COMBAT-NPC-HIDDEN-36](CAMERA-THIRDPERSON-COMBAT-NPC-HIDDEN-36.md): In combat, switching to third person (Tab) hides the NPC you are fighting; it reappears back in first person
 - CENSUS-GUARD-NO-PATH-TO-THIEF-65 (no report page): A theft in the census office brings the guard only when he can walk to the player: across the table he cannot
@@ -196,6 +258,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [NPC-HEAD-DECIMATION-33](NPC-HEAD-DECIMATION-33.md): NPC heads decimated into unrecognisable faces
 - [NPC-HEAD-STARVED-WHOLE-HAIR-54](NPC-HEAD-STARVED-WHOLE-HAIR-54.md): With whole hair some heads got only 28 to 52 triangles: Dark Elf women in robes
 - [NPC-IDLE-ONLY-ANIM-33](NPC-IDLE-ONLY-ANIM-33.md): NPCs play only their idle animation: no walking, running, turning or other animation groups
+- NPC-IDLE-TRACK-PLAYER-67 (no report page): Requested: an idle character turns its head and body slowly towards the player and follows the player's movements (the dock guard in the opening, the clerk of the Census and Excise Office)
 - [NPC-NEAR-SKIN-TEXELS-33](NPC-NEAR-SKIN-TEXELS-33.md): Original-head models had blurrier bodies than the budget model
 - [NPC-NO-RUN-ANIM-35](NPC-NO-RUN-ANIM-35.md): Companions and hostile NPCs walk but never run, and the walk looks wrong: release residents had only idle frames
 - NPC-NO-SPELLCASTING-65 (no report page): Hostile characters never cast spells in a fight
@@ -208,6 +271,8 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [NPC-WANDER-NOT-EXECUTED-35](NPC-WANDER-NOT-EXECUTED-35.md): Residents stand still: the original's Wander AI packages (radius, duration, idles) are decoded but not executed
 - [NPC-WEAPON-MESH-33](NPC-WEAPON-MESH-33.md): NPCs hold no weapons or shields; combat uses them unseen
 - NPC-WEREWOLF-NO-MODEL-66 (no report page): The werewolf NPCs of Bloodmoon get no model: their hair part has no attached geometry
+- OUTDOOR-CORPSE-NEIGHBOUR-JOIN-67 (no report page): The dead bodies the original places outdoors show only when the player arrives in their cell, never when their cell joins around the player
+- OUTDOOR-CREATURES-HOME-CELL-67 (no report page): The cell the player arrives in has none of its levelled creatures: the window's home frame never joins the actor table
 - OUTDOOR-DEAD-BODY-GONE-66 (no report page): An outdoor body is gone at once on a later visit: it cannot be looted after leaving
 - PICKUP-E-OWNED-NO-TAKE-58 (no report page): On the v0.0.58-dev5 image the activate key on an aimed owned item (the Census Office Quill Pen, red name, red E: Steal) takes nothing; it is not in the inventory after a save and reload
 - PIER-GUARD-WALKS-INTO-DOOR-65 (no report page): After the race choice the dock guard walks against the office door for about half a minute before stepping aside

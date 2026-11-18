@@ -110,4 +110,37 @@ static void zone_fragmentation_is_separate(void){
     for(i=1;i<n;i+=2)Z_Free(blocks[i]);
     assert(Z_TagMalloc(24000,1)!=NULL); /* merging free neighbors restores capacity */
 }
-int main(void){load_and_unload_peak();phase_log_preserves_outgoing_peak();cache_move_is_one_logical_allocation();cache_capacity_is_separate();zone_fragmentation_is_separate();return 0;}
+/* SCENE-LOAD-FAIL-FALLBACK-67: every allocator tells aw_alloc_failed (the arena, the block, bytes needed and free)
+ * before it would stop the game. During a map load the game's hook leaves from there (Host_Error, the way back) and the
+ * hunk, the cache and the zone are whole after it; in play it returns and the allocator stops the game as before. The
+ * test aid (dbg loadfail N memory) fails one Hunk allocation that would fit, then the next is served. */
+static jmp_buf dropped;
+static int in_load,hook_calls;static char hook_arena[16],hook_name[16];static long hook_need,hook_have;
+static void alloc_hook(const char *arena,const char *name,long need,long have){
+    hook_calls++;strncpy(hook_arena,arena,15);hook_arena[15]=0;strncpy(hook_name,name?name:"",15);hook_name[15]=0;
+    hook_need=need;hook_have=have;
+    if(in_load)longjmp(dropped,1);
+}
+static void allocation_failures_reach_the_hook(void){
+    cache_user_t cache={0};int low,high;
+    reset();aw_alloc_failed=alloc_hook;Hunk_AllocName(512*1024,"base");low=hunk_low_used;high=hunk_high_used;
+    in_load=1;hook_calls=0;
+    if(!setjmp(dropped)){Hunk_AllocName(hunk_size,"world");assert(0);}
+    assert(hook_calls==1 && !strcmp(hook_arena,"hunk") && !strcmp(hook_name,"world"));
+    assert(hook_need>hunk_size && hook_have==hunk_size-low-high);
+    assert(hunk_low_used==low && hunk_high_used==high);
+    aw_hunk_fail_test=1;
+    if(!setjmp(dropped)){Hunk_AllocName(1024,"edicts");assert(0);}
+    assert(hook_calls==2 && !strcmp(hook_name,"edicts") && !aw_hunk_fail_test && hunk_low_used==low);
+    assert(Hunk_AllocName(1024,"edicts") && hunk_low_used>low);
+    if(!setjmp(dropped)){Cache_Alloc(&cache,hunk_size,"actor");assert(0);}
+    assert(hook_calls==3 && !strcmp(hook_arena,"cache") && !cache.data);
+    mainzone=(memzone_t *)zone_arena.bytes;Z_ClearZone(mainzone,sizeof(zone_arena.bytes));
+    if(!setjmp(dropped)){Z_Malloc(sizeof(zone_arena.bytes));assert(0);}
+    assert(hook_calls==4 && !strcmp(hook_arena,"zone") && hook_have>0 && hook_have<hook_need);
+    in_load=0;expected_failure=1;
+    if(!setjmp(failure)){Hunk_AllocName(hunk_size,"late");assert(0);}
+    assert(hook_calls==5 && strstr(error_text,"Hunk_Alloc late"));
+    expected_failure=0;aw_alloc_failed=NULL;
+}
+int main(void){load_and_unload_peak();phase_log_preserves_outgoing_peak();cache_move_is_one_logical_allocation();cache_capacity_is_separate();zone_fragmentation_is_separate();allocation_failures_reach_the_hook();return 0;}

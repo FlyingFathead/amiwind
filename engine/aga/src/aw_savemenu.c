@@ -36,6 +36,9 @@ int AW_SaveMenuOpen(int loading)
     active=1;load_mode=loading;row=confirm=0;notice[0]=0;refresh();IN_AWClearButtons();return 1;
 }
 int AW_SaveMenuActive(void){return active;}
+/* The notice line under the slots, set after the menu opened (a failed load names its error there when there is no
+ * place to stay, SCENE-LOAD-FAIL-FALLBACK-67); it stays until a key sets another. */
+void AW_SaveMenuNotice(const char *text){Q_strcpy_bounded(notice,text?text:"",sizeof(notice));}
 int AW_SaveMenuKey(int key)
 {
     int slots=load_mode?21:5,ok;

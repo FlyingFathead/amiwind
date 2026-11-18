@@ -673,6 +673,11 @@ static int AW_TryStreamBrush(model_t *mod) {
     return 1;
 }
 
+/* SCENE-LOAD-FAIL-FALLBACK-67: the map whose brush decode Mod_LoadModel is running (NULL none), and the size of a map
+ * file too short to hold a header (-1 none), for AW_MapFailure; AW_MapDecode sets and clears them. */
+static model_t *aw_map_decoding;
+static long aw_map_short_bytes=-1;
+static void AW_MapDecode(model_t *mod);
 model_t *Mod_LoadModel (model_t *mod, qboolean crash)
 {
     unsigned *buf;
@@ -701,7 +706,9 @@ model_t *Mod_LoadModel (model_t *mod, qboolean crash)
 //
 // load the file
 //
-    if(AW_TryStreamBrush(mod))return mod;
+    AW_MapDecode(mod);
+    if(AW_TryStreamBrush(mod)){AW_MapDecode(NULL);return mod;}
+    AW_MapDecode(NULL);
 #if AW_STREAM_SPRITES
     if(Mod_TryStreamSprite(mod))return mod;
 #endif
@@ -767,7 +774,19 @@ model_t *Mod_LoadModel (model_t *mod, qboolean crash)
         break;
 
     default:
+        /* the whole-file path (the streamed one refused it: another version or a file shorter than a header);
+         * a file too short to hold a header is a broken map, never a header read past its end; AW_MapFailure
+         * names it for the failed-load box (SCENE-LOAD-FAIL-FALLBACK-67) */
+        AW_MapDecode (mod);
+        if (alias_bytes < (int)sizeof(dheader_t))
+        {
+            if (alias_file)
+                free (alias_file);
+            aw_map_short_bytes = alias_bytes;
+            Sys_Error ("Mod_LoadModel: %s is %d bytes, shorter than a map header", mod->name, alias_bytes);
+        }
         Mod_LoadBrushModel (mod, buf);
+        AW_MapDecode (NULL);
         break;
     }
 
@@ -849,6 +868,61 @@ static void AW_BrushError(char *fmt,...)
     va_start(args,fmt);vsnprintf(aw_brush_why,sizeof(aw_brush_why),fmt,args);va_end(args);
     if(aw_brush_arena && aw_brush_catch)longjmp(*aw_brush_catch,1);
     Sys_Error("%s",aw_brush_why);
+}
+/* SCENE-LOAD-FAIL-FALLBACK-67: Mod_LoadModel's brush decode of MOD begins (NULL: it ended); the loader's message of
+ * an earlier decode is forgotten. */
+static void AW_MapDecode(model_t *mod)
+{
+    aw_map_decoding=mod;aw_map_short_bytes=-1;aw_brush_why[0]=0;
+}
+/* SCENE-LOAD-FAIL-FALLBACK-67: the brush decode a fatal error stopped, for the failed-load box (aw_loadfail.c: the
+ * fatal path's hook, zone.c aw_fatal_hook, and an allocation that failed, aw_alloc_failed; tests/aga_bsp_slice_load_test.c).
+ * Returns 0 when no map decode of Mod_LoadModel was running (a CHIM arena decode ends its own load and never gets
+ * here); else AW_MAPFAIL_HEADER (another version, a section the header places before the file's start, a file
+ * shorter than a header), AW_MAPFAIL_SHORT (a section past the file's end: a truncated file), AW_MAPFAIL_LUMP (bad data
+ * in a known lump), AW_MAPFAIL_DATA (bad data elsewhere, or a stop that was not the loader's own) or AW_MAPFAIL_MEMORY
+ * (a section's temporary memory could not be had; OUT need its bytes). OUT gets the map's file, its size (-1 not
+ * known), the lump being decoded (Quake's numbers 0-14, -1 not known), where it starts (-1) and the loader's message.
+ * The lump: the first section of the decode order the streamed load had not finished (AW_RecordSection marks each
+ * section's end); the whole-file path does not record it. The loader is then left as a finished load leaves it (the
+ * file closed, the half-decoded map not present), so a load that ends there strands nothing. Kept out of the brush
+ * loaders on purpose: the packed-edge pin keys the CHIM world by their text (tools/engine_loader_policy.py), and an
+ * engine change never re-keys the world. */
+int AW_MapFailure(aw_mapfail_t *out)
+{
+    static const signed char order[HEADER_LUMPS]={LUMP_VERTEXES,LUMP_EDGES,LUMP_SURFEDGES,LUMP_TEXTURES,
+        LUMP_LIGHTING,LUMP_PLANES,LUMP_TEXINFO,LUMP_FACES,LUMP_MARKSURFACES,LUMP_VISIBILITY,LUMP_LEAFS,LUMP_MODELS,
+        LUMP_NODES,LUMP_CLIPNODES,LUMP_ENTITIES};
+    model_t *mod=aw_map_decoding;
+    int kind,i,at=-1;
+    if(!out)return 0;
+    out->file[0]=out->why[0]=0;out->bytes=out->offset=out->need=-1;out->lump=-1;
+    if(!mod || aw_brush_arena)return 0;
+    if(aw_map_short_bytes>=0){
+        kind=AW_MAPFAIL_HEADER;out->bytes=aw_map_short_bytes;
+        snprintf(out->why,sizeof(out->why),"the file is %ld bytes, shorter than a map header",aw_map_short_bytes);
+    }else{
+        const char *why=aw_brush_why;
+        if(aw_bsp_file && aw_bsp_lumps && aw_load_hunk_used)
+            for(i=0;i<HEADER_LUMPS && at<0;i++)if(!aw_bsp_used[(int)order[i]])at=order[i];
+        if(strstr(why,"wrong version number"))kind=AW_MAPFAIL_HEADER;
+        else if(!strcmp(why,"Invalid BSP section"))kind=at>=0 &&
+            (aw_bsp_lumps[at].fileofs<0 || aw_bsp_lumps[at].filelen<0)?AW_MAPFAIL_HEADER:AW_MAPFAIL_SHORT;
+        else if(!strcmp(why,"Short BSP section"))kind=AW_MAPFAIL_SHORT;
+        else if(!strcmp(why,"BSP section allocation failed")){kind=AW_MAPFAIL_MEMORY;out->need=aw_bsp_slice_bytes;}
+        else kind=at>=0?AW_MAPFAIL_LUMP:AW_MAPFAIL_DATA;
+        snprintf(out->why,sizeof(out->why),"%s",why);
+        if(aw_bsp_file){
+            out->bytes=aw_bsp_bytes;out->lump=at;
+            if(at>=0)out->offset=aw_bsp_lumps[at].fileofs;
+        }
+    }
+    strncpy(out->file,mod->name,sizeof(out->file)-1);out->file[sizeof(out->file)-1]=0;
+    if(aw_bsp_file){fclose(aw_bsp_file);aw_bsp_file=NULL;}
+    aw_bsp_position=-1;aw_bsp_lumps=NULL;aw_bsp_slice=NULL;aw_bsp_slice_bytes=0;
+    mod->needload=NL_UNREFERENCED;
+    AW_MapDecode(NULL);
+    return kind;
 }
 #define Sys_Error AW_BrushError
 /* After a caught error: the loader's state as a finished load leaves it. */

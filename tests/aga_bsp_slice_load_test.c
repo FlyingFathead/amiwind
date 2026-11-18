@@ -60,9 +60,11 @@ int Hunk_HighMark(void){
     if(temp_active){temp_active=0;Hunk_FreeToHighMark(temp_mark);}
     return high;
 }
+static int temp_fail;   /* the next temporary allocation fails, as a full Hunk's does (returns NULL) */
 void *Hunk_TempAlloc(int size){
     int bytes;
     assert(size>0);
+    if(temp_fail){temp_fail=0;return NULL;}
     if(size>temp_largest)temp_largest=size;
     temp_calls++;size=(size+15)&~15;
     if(temp_active){Hunk_FreeToHighMark(temp_mark);temp_active=0;}
@@ -70,9 +72,15 @@ void *Hunk_TempAlloc(int size){
     assert(low+high+bytes<=HEAP_BYTES);high+=bytes;track();temp_active=1;
     return block(heap+HEAP_BYTES-high,bytes,"temp");
 }
+/* SCENE-LOAD-FAIL-FALLBACK-67: an expected error is read as the game's fatal-path hook reads it (model.c AW_MapFailure:
+ * the kind, the file, its size, the lump and where it starts, the loader's message), and the loader must then be left
+ * as after a finished load (the file closed, the model not present, no decode running). */
+static int fail_kind;static aw_mapfail_t fail;static model_t *fail_model;
 void Sys_Error(char *fmt,...){
     va_list args;
     if(!expect_error){va_start(args,fmt);vfprintf(stderr,fmt,args);va_end(args);fputc('\n',stderr);abort();}
+    fail_kind=AW_MapFailure(&fail);
+    if(fail_kind)assert(!aw_bsp_file && !aw_bsp_lumps && !aw_map_decoding && fail_model->needload==NL_UNREFERENCED);
     longjmp(failure,1);
 }
 void Con_Printf(char *fmt,...){}
@@ -224,6 +232,26 @@ static void dump(char *path,const char *out){
     free(s.bytes);free(s.models);
 }
 
+/* SCENE-LOAD-FAIL-FALLBACK-67: the report a failed streamed load leaves for the failed-load box (see Sys_Error above). */
+static int test_hunk_used(void){return low+high+1;}   /* as aw_stream.c's: marks each section's end (never 0) */
+static size_t bad_prefetch(const char *name,long offset,byte *out,size_t bytes){   /* dbg loadfail N lump's aid */
+    (void)name;(void)offset;(void)out;return bytes+1;
+}
+static void expect_fail(const char *name,int kind,int lump,long bytes){
+    if(fail_kind!=kind || fail.lump!=lump || fail.bytes!=bytes || strcmp(fail.file,name) || !fail.why[0] ||
+       (lump>=0 && fail.offset!=((dheader_t *)image)->lumps[lump].fileofs) || (lump<0 && fail.offset!=-1)){
+        fprintf(stderr,"failed load report: kind %d lump %d bytes %ld offset %ld file %s why %s; wanted kind %d lump %d "
+            "bytes %ld\n",fail_kind,fail.lump,fail.bytes,fail.offset,fail.file,fail.why,kind,lump,bytes);abort();
+    }
+    fail_kind=-1;
+}
+/* As Mod_LoadModel streams a map: the decode marked as running (AW_MapDecode), then the streamed load. */
+static void stream_fails(char *name,size_t (*copy)(const char *,long,byte *,size_t)){
+    reset();expect_error=1;fail_kind=-1;aw_load_hunk_used=test_hunk_used;aw_load_prefetch_copy=copy;
+    if(!setjmp(failure)){fail_model=Mod_FindName(name);AW_MapDecode(fail_model);AW_TryStreamBrush(fail_model);assert(0);}
+    expect_error=0;aw_load_prefetch_copy=NULL;aw_load_hunk_used=NULL;
+    if(aw_bsp_file){fclose(aw_bsp_file);aw_bsp_file=NULL;}
+}
 /* Malformed streamed input must stop before any pointer is made from it. */
 static void malformed(char *path){
     static const int fields[]={LUMP_TEXTURES,LUMP_FACES,LUMP_NODES,LUMP_MARKSURFACES};
@@ -237,11 +265,36 @@ static void malformed(char *path){
         else if(fields[i]==LUMP_NODES)((dnode_t *)(copy+ofs))[1].planenum=1<<30;       /* plane outside */
         else ((short *)(copy+ofs))[0]=(short)0xffff;                                   /* face 65535 */
         f=fopen(name,"wb");assert(f && fwrite(copy,1,image_bytes,f)==(size_t)image_bytes);fclose(f);
-        reset();expect_error=1;
-        if(!setjmp(failure)){model_t *mod=Mod_FindName(name);AW_TryStreamBrush(mod);assert(0);}
-        expect_error=0;if(aw_bsp_file){fclose(aw_bsp_file);aw_bsp_file=NULL;}
+        stream_fails(name,NULL);
+        expect_fail(name,AW_MAPFAIL_LUMP,fields[i],image_bytes);   /* bad lump N: the lump being decoded */
         free(copy);
     }
+    /* a truncated file: a lump past the cut is a short read, named with where it starts */
+    f=fopen(name,"wb");assert(f && fwrite(image,1,image_bytes/2,f)==(size_t)(image_bytes/2));fclose(f);
+    stream_fails(name,NULL);
+    assert(fail_kind==AW_MAPFAIL_SHORT && fail.lump>=0);
+    expect_fail(name,AW_MAPFAIL_SHORT,fail.lump,image_bytes/2);
+    /* an intact file whose first section read gets bad data (the aid of dbg loadfail N lump): bad lump, the first one
+     * the decode reads (the vertexes) */
+    f=fopen(name,"wb");assert(f && fwrite(image,1,image_bytes,f)==(size_t)image_bytes);fclose(f);
+    stream_fails(name,bad_prefetch);
+    expect_fail(name,AW_MAPFAIL_LUMP,LUMP_VERTEXES,image_bytes);
+    /* a section's temporary memory not had: not enough memory, with the bytes it needed */
+    temp_fail=1;stream_fails(name,NULL);
+    assert(fail_kind==AW_MAPFAIL_MEMORY && fail.need>0 && fail.lump>=0 && !temp_fail);
+    expect_fail(name,AW_MAPFAIL_MEMORY,fail.lump,image_bytes);
+    /* another version, decoded from a file image: a bad header, no lump, the size not known on this path */
+    {byte *copy=malloc(image_bytes);model_t *mod;assert(copy);memcpy(copy,image,image_bytes);((int *)copy)[0]=30;
+     reset();expect_error=1;fail_kind=-1;
+     if(!setjmp(failure)){mod=fail_model=Mod_FindName(name);COM_FileBase(mod->name,loadname);loadmodel=mod;
+         mod->needload=NL_PRESENT;AW_MapDecode(mod);Mod_LoadBrushModel(mod,copy);assert(0);}
+     expect_error=0;free(copy);
+     expect_fail(name,AW_MAPFAIL_HEADER,-1,-1);}
+    /* a fatal error with no map decode running is not a map's: nothing named, the loader untouched; a decode that
+     * finished is not running either */
+    {aw_mapfail_t other;
+     assert(!AW_MapFailure(&other) && !other.file[0] && !other.why[0] && other.lump==-1);
+     AW_MapDecode(&mod_known[0]);AW_MapDecode(NULL);assert(!AW_MapFailure(&other));}
     remove(name);
 }
 

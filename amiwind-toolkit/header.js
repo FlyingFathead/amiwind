@@ -28,7 +28,7 @@
       ['Click a cell to select it; shift-click or shift-drag selects several.', 'Drag pans; + / - / fit / reset zoom; the wheel scrolls the page (turn on "wheel zoom", or hold Ctrl or Alt, to zoom the map with it).',
         'Colour by, Layers and the colour legend choose what the cells show; Controls and Collapse all fold the control blocks.'], 'AMIWIND_TOOLKIT.md'],
     local: ['Local view', 'One cell and the places it reaches, with its map, rooms and counts.',
-      ['Pick a cell on the World tab, then open Local.', 'Show in 3D opens its map in the 3D Inspector.'], 'AMIWIND_TOOLKIT.md'],
+      ['Pick a cell on the World tab, then open Local.', 'Show in 3D opens the CHIM frame that holds the cell (or its map) in the 3D Inspector, or says why there is nothing to open.'], 'AMIWIND_TOOLKIT.md'],
     inspector: ['3D Map Inspector (Polycount inspector)', 'A compiled map, a CHIM world or a CHIM room in 3D, with its faces, drawing and collision figures.',
       ['Open BSP / CHIM / JSON, or pick a map, or name a room (?room=NAME) on a served build.', 'Fly or orbit the camera; the heat switch colours by faces or collision.', 'Copy JSON exports the view; its "program.version" is the AmiWind version.'], 'POLYCOUNT_INSPECTOR.md'],
     monitor: ['Monitor', 'A build as it runs: stages, cores in use, logs and recent results, read only.',

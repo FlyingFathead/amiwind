@@ -1235,7 +1235,9 @@ class ReleaseUiTests(unittest.TestCase):
         # 2026-11-10 (maintainer, TOOLKIT-DLC-VIEWS-64): one row per land (Vvardenfell, Solstheim, Mournhold) and one for the
         # build, the two approved statuses relabelled "Fully approved cells/terrain" (display text only), a short legend.
         # 2026-11-10 (TOOLKIT-HEADLINE-ROWS-INLINE-64): the rows are block elements (div) with their layout CSS shipped in the script.
-        self.assertEqual(hashlib.sha256(head).hexdigest(), 'e19e156effdd3da23565ae21588b2ec98dc13a28f998878cbfe989dd2a3359ca')
+        # 2026-11-17 (maintainer, TOOLKIT-DLC-VIEWS-64): the Solstheim and Mournhold rows read the rooms and cells of the view
+        # switch's cards (expansion-views.js completion, sent with the headline); the header block and its layout are unchanged.
+        self.assertEqual(hashlib.sha256(head).hexdigest(), '0d0da906c2cda5e6e8269af5476a4b64b30c14008f076495b3a7db908950df18')
 
     def test_one_header_for_every_toolkit_page(self):
         # The shared header (header.js) is the logo block of index.html: same logo file, same version line. Pages opened on their

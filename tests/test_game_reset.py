@@ -239,11 +239,15 @@ class EngineWiring(unittest.TestCase):
 
     def test_a_failed_load_goes_back(self):
         host = code('host.c')
-        self.assertEqual(host.count('AW_SceneLoadFailed (string);'), 2)        # Host_Error and Host_EndGame
+        self.assertEqual(host.count('AW_SceneLoadFailed (string);'), 1)        # Host_EndGame
+        # Host_Error: a load in flight goes back the same way, an error in play loads the place again
+        # (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66, aw_scene.c AW_SceneHostError)
+        self.assertEqual(host.count('AW_SceneHostError (string);'), 1)
         self.assertIn('AW_SceneLoadFailed ("the map could not be spawned");', code('host_cmd.c'))
         scene = code('aw_scene.c')
         self.assertIn('load_from_capture(p,tp_cmd?AW_LOAD_TELEPORT:no_followers?AW_LOAD_SCRIPT:AW_LOAD_DOOR);', scene)
-        self.assertIn('"Unable to teleport, see debug console with F10."', scene)
+        # SCENE-LOAD-FAIL-FALLBACK-67: the box names the error itself (aw_loaderr.c; tests/test_load_fallbacks.py)
+        self.assertIn('AW_LoadErrBox(&lerr,text,sizeof(text));', scene)
         self.assertIn('map_jump=3;', scene[scene.index('void AW_SceneLoadFailed'):])
         catalogue = (ROOT / 'config' / 'debug-commands.txt').read_text(encoding='utf-8')
         self.assertIn('|restartgame|aw_restart_game|', catalogue)

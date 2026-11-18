@@ -182,6 +182,10 @@ static void close_reader(int take)
     active=0;book_free();book_reference=0;IN_AWClearButtons();
     if(was_book && take)AW_PlacedTake(reference);
 }
+/* PRISON-SHIP-ITEMS-TAKEABLE-65: a placed book is read before the Inventory window is allowed, but not taken: the
+ * original's book and scroll windows hide Take until then (OpenMW 0.53 mwgui/bookwindow.cpp 133-137 and
+ * scrollwindow.cpp 103-107 setInventoryAllowed) */
+static int take_allowed(void){return !aw_inventory_allowed || aw_inventory_allowed();}
 int AW_ReaderActive(void){return active;}
 int AW_ReaderResult(void){int r=result;result=0;return r;}
 void AW_ReaderMouse(int dx,int dy)
@@ -207,7 +211,7 @@ int AW_ReaderKey(int key)
         if((key==K_LEFTARROW || key==K_UPARROW || key==K_PGUP || key=='a' || key=='A') && page>0)page--;
         else if((key==K_RIGHTARROW || key==K_DOWNARROW || key==K_PGDN || key==K_SPACE || key=='d' || key=='D') &&
                 page+1<page_count)page++;
-        else if(key=='e' || key=='E' || key==K_ENTER)close_reader(1);
+        else if((key=='e' || key=='E' || key==K_ENTER) && take_allowed())close_reader(1);
         else if(key==K_ESCAPE)close_reader(0);
         return 1;
     }
@@ -246,10 +250,12 @@ void AW_ReaderDraw(void)
         /* BOOK-READER-58: the page count, then the two buttons; Take is white, Steal red (it belongs to someone) */
         sprintf(line,"< %ld/%ld >",(long)page+1,(long)page_count);
         AW_UIBookBegin();AW_UITextBox(10,152,300,16,line,ink);AW_UIBookEnd();
-        AW_UIBox(BOOK_TAKE_X,BOOK_BUTTON_Y,BOOK_BUTTON_W,BOOK_BUTTON_H);
-        Q_snprintf(line,sizeof(line),"E: %s",book_owned?"Steal":book_take);
-        AW_UITextBox(BOOK_TAKE_X,BOOK_BUTTON_Y,BOOK_BUTTON_W,BOOK_BUTTON_H,line,
-                     book_owned?AW_UIColor(220,40,40):AW_UIColor(255,255,255));
+        if(take_allowed()){     /* PRISON-SHIP-ITEMS-TAKEABLE-65: no Take before the Inventory window is allowed */
+            AW_UIBox(BOOK_TAKE_X,BOOK_BUTTON_Y,BOOK_BUTTON_W,BOOK_BUTTON_H);
+            Q_snprintf(line,sizeof(line),"E: %s",book_owned?"Steal":book_take);
+            AW_UITextBox(BOOK_TAKE_X,BOOK_BUTTON_Y,BOOK_BUTTON_W,BOOK_BUTTON_H,line,
+                         book_owned?AW_UIColor(220,40,40):AW_UIColor(255,255,255));
+        }
         AW_UIBox(BOOK_CLOSE_X,BOOK_BUTTON_Y,BOOK_BUTTON_W,BOOK_BUTTON_H);
         Q_snprintf(line,sizeof(line),"Esc: %s",book_close);
         AW_UITextBox(BOOK_CLOSE_X,BOOK_BUTTON_Y,BOOK_BUTTON_W,BOOK_BUTTON_H,line,AW_UIColor(255,255,255));

@@ -1,6 +1,6 @@
 # Game state reset and failed loads
 
-_Last updated with AmiWind v0.0.62-dev2 (8 November 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 ## One reset for every game state
 
@@ -39,14 +39,11 @@ use, so the two can be compared.
 
 ## Failed loads
 
-When a load fails (a door, a teleport, a script moving the player, any map load), the player is put back exactly
-where they were before it, with the game running, and a message box says so:
-
-- after a teleport: "Unable to teleport, see debug console with F10.";
-- after a door or a script: a line of its own.
-
-The console holds the exact reason. The box has two buttons: **OK** stays where you are, **Load Game** opens the load
-menu. If the way back fails too, the load menu opens. `dbg loadfail N` (a test aid) makes the next N map loads fail
-on purpose: 1 shows the way back, 2 a way back that fails as well.
+When a load fails (a door, a teleport, travel, a script moving the player, any map load), the player is put back
+exactly where they were before it, with the game running, and a message box with one button, **OK**, names the error
+("Map bmcaius was found but could not be loaded." and the reason, with a short code such as LF4). If the way back fails
+too, the load menu opens and names the error. The console holds a debug block with the details. Every kind, its code
+and every way into a place: [LOAD_ERRORS.md](LOAD_ERRORS.md). `dbg loadfail N [KIND]` (a test aid) makes the next N
+map loads fail on purpose: 1 shows the way back, 2 a way back that fails as well.
 
 Every message box shows the mouse pointer; a click on a button chooses it, as the keys do.

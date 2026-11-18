@@ -64,5 +64,43 @@ class Geometry(unittest.TestCase):
         self.assertEqual(audit.classify(dict(base, original_gap=9.0), 2.0), 'unsupported-in-original')
 
 
+class ImageCheckReport(unittest.TestCase):
+    """BUILD-CELL-PROGRESS-UNDECLARED-OUTPUT-67: the image step's flora support check writes flora-support.json into
+    the image's own folder. Written into the run folder's root it was outside every declared stage path, and the stages
+    running beside the image (cell-progress in the v0.0.67-dev1 build) recorded it as an undeclared output of their
+    own, their records refused for reuse."""
+
+    def test_the_measurements_go_into_the_image_folder(self):
+        import tempfile
+        from types import SimpleNamespace
+        from unittest import mock
+        import build_aga
+        import build_cache
+        with tempfile.TemporaryDirectory() as tmp:
+            run = Path(tmp) / 'build' / 'run'
+            out = run / 'image'
+            out.mkdir(parents=True)
+            args = SimpleNamespace(chim_world=run / 'chim-world', data_files=Path(tmp) / 'data')
+            asked = []
+            with mock.patch.object(audit, 'main', side_effect=lambda argv: asked.append(argv) or 0), \
+                    mock.patch.object(build_aga, 'image_jobs', return_value=2):
+                build_aga.flora_support_check(args, out)
+            argv = asked[0]
+            report = Path(argv[argv.index('--json') + 1])
+            self.assertEqual(report, out / 'flora-support.json')
+            # under the image stage's declared path (its --out), never an entry of the run folder's root
+            image_command = ['python3', 'tools/build_aga.py', 'image', '--out', str(out), '--chim-world',
+                             str(args.chim_world)]
+            roots = build_cache.output_roots(image_command, run)
+            self.assertIn(report.relative_to(run).parts[0], {root.split('/')[0] for root in roots})
+            self.assertNotEqual(report.parent, run)
+
+    def test_the_check_runs_once_the_image_folder_is_made(self):
+        text = (ROOT / 'tools' / 'build_aga.py').read_text(encoding='utf-8')
+        body = text[text.index('\ndef image(args):'):]
+        self.assertLess(body.index('out=new_output(args.out)'), body.index('flora_support_check(args, out)'))
+        self.assertLess(body.index('flora_support_check(args, out)'), body.index("copy_tree(scene/'id1'"))
+
+
 if __name__ == '__main__':
     unittest.main()

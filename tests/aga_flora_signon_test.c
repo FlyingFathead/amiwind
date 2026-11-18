@@ -14,6 +14,12 @@ void Sys_Error(char *error, ...)
     fprintf(stderr, "%s", error);
     exit(2);
 }
+/* Loop_SendMessage's overflow ends the session, not the game (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66) */
+void Host_Error(char *error, ...)
+{
+    fprintf(stderr, "%s", error);
+    exit(3);
+}
 void Con_Printf(char *fmt, ...) { (void)fmt; }
 void Con_DPrintf(char *fmt, ...) { (void)fmt; }
 

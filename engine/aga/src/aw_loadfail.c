@@ -1,9 +1,14 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * aw_loadfail.c: after a failed load (HEART-CHAMBER-LOAD-HANG-62), the game's own message box once the player is back
- * where the load started (aw_scene.c AW_SceneLoadFailed / AW_SceneLoadBoxTake): "OK" stays, "Load Game" opens the
- * load menu; when there was no way back, the load menu at once. The test aid dbg loadfail N (aw_load_fail_test, read
- * by host_cmd.c Host_Map_f) and dbg restartgame (DBG-RESTARTGAME-62). Kept apart from aw_scene.c so the host tests
- * that link the scene code need none of the box, menu or shutdown paths.
+ * aw_loadfail.c: a place that cannot be reached or loaded (SCENE-LOAD-FAIL-FALLBACK-67, DBG-TP-NOT-FOUND-BOX-67;
+ * before them HEART-CHAMBER-LOAD-HANG-62). Once the player is back where the load started, or still there after a
+ * refusal (aw_scene.c AW_SceneLoadFailed / AW_SceneLoadBoxTake), the game's own centred message box names the error
+ * (aw_loaderr.c: "Map <name> was not found.", "... was found but could not be loaded." and the reason, the code, "You
+ * are in <place>.") with one button, OK. With no place to stay, the main menu and the load menu with the error on its
+ * notice line. Here too: what ends a load instead of the game (an allocation that fails, a broken map file, a load
+ * that does not finish within aw_load_timeout seconds), the check before anything is left (the map's header and the
+ * memory its world needs), the test aid dbg loadfail N [KIND] (aw_load_fail_test, read by host_cmd.c Host_Map_f) and
+ * dbg restartgame (DBG-RESTARTGAME-62). Kept apart from aw_scene.c so the host tests that link the scene code need
+ * none of the box, menu, error or shutdown paths.
  */
 #include "quakedef.h"
 #include "aw_save.h"
@@ -14,29 +19,196 @@
 #include "aw_character.h"
 #include "aw_reset.h"
 #include "aw_move.h"
+#include "aw_loaderr.h"
+#include "aw_maps.h"
+#include "aw_region.h"
 #include "amiwind_version.h"
 #include "chim_version.h"
+#ifdef AMIGA
+#include <proto/exec.h>
+#include <exec/memory.h>
+#endif
 
 /* aw_load_fail_test N (a test setting): the next N map loads fail as a room that cannot load does (Host_Error after the
- * running game is left); 1 tests the way back, 2 a way back that fails too. */
+ * running game is left); 1 tests the way back, 2 a way back that fails too. The kind (dbg loadfail N KIND) makes the
+ * load fail inside its real path instead: memory (the first Hunk allocation of the load), lump (the map's first
+ * section read gets bad data: the brush loader's own check meets it, the error names that lump), hang (the client
+ * never connects: the time limit). */
 cvar_t aw_load_fail_test={"aw_load_fail_test","0"};
-static int box_open;
+/* The time limit of a map load without progress (the server's spawn, the client's connection and its sign-on steps),
+ * in seconds; 0 off. A load past it ends as a failed load ("The load did not finish."). Not saved. */
+static cvar_t aw_load_timeout={"aw_load_timeout","120"};
+enum {FAIL_ERROR,FAIL_MEMORY,FAIL_LUMP,FAIL_HANG,FAIL_KINDS};
+static const char *const fail_names[FAIL_KINDS]={"error","memory","lump","hang"};
+static int box_open,fail_kind,hang_armed;
+static double progress_at;static int progress_state;
+/* dbg loadfail N lump: the read-ahead's copy (aw_stream.c, model.c's aw_load_prefetch_copy) answers the map's next
+ * section read with one byte more than asked, which the brush loader refuses as bad data ("Invalid BSP prefetch
+ * length") inside the lump it is decoding. Once, then the real copy again (also when the load ends another way). */
+extern size_t (*aw_load_prefetch_copy)(const char *,long,byte *,size_t);
+static size_t (*prefetch_saved)(const char *,long,byte *,size_t);
+static int prefetch_armed;
+static void prefetch_restore(void) {
+    if(prefetch_armed){aw_load_prefetch_copy=prefetch_saved;prefetch_saved=NULL;prefetch_armed=0;}
+}
+static size_t prefetch_bad(const char *name,long offset,byte *out,size_t bytes) {
+    (void)offset;(void)out;
+    prefetch_restore();
+    Con_Printf("dbg loadfail: %s reads bad data.\n",name);
+    return bytes+1;
+}
 
+/* dbg loadfail N KIND: arm the kind inside this load (Host_Map_f); 0 for the plain error (Host_Map_f says it). */
+int AW_LoadFailTestArm(void) {
+    switch(fail_kind){
+    case FAIL_MEMORY:aw_hunk_fail_test=1;break;
+    case FAIL_LUMP:
+        if(!prefetch_armed){prefetch_saved=aw_load_prefetch_copy;aw_load_prefetch_copy=prefetch_bad;prefetch_armed=1;}
+        break;
+    case FAIL_HANG:hang_armed=1;break;
+    default:return 0;
+    }
+    Con_Printf("dbg loadfail: this load fails inside its own path (%s).\n",fail_names[fail_kind]);
+    return 1;
+}
+int AW_LoadFailTestHang(void) {int h=hang_armed;hang_armed=0;return h;}
+/* A record of KIND for the hooks below (the scene fills the map, the place and the command). */
+static void cause(aw_loaderr_t *e,int kind) {
+    memset(e,0,sizeof(*e));e->kind=kind;e->lump=-1;e->offset=-1;e->file_bytes=-1;e->fast_free=e->chip_free=-1;
+}
+/* Host_Map_f, a map that did not spawn: not found (its file is not on this disk) or why it did not spawn. */
+void AW_LoadFailSpawn(const char *name) {
+    aw_loaderr_t e;char path[MAX_QPATH+24];int size;
+    size=AW_SceneMapSize(name,path,sizeof(path));
+    cause(&e,size<0?(AW_MapId(name)>=0?AW_LOADERR_NOT_ON_DISK:AW_LOADERR_NOT_FOUND):AW_LOADERR_NO_SPAWN);
+    Q_strcpy_bounded(e.file,path,sizeof(e.file));e.file_bytes=size;
+    if(size>=0)Q_strcpy_bounded(e.detail,aw_spawn_why[0]?aw_spawn_why:"the server did not spawn the map",sizeof(e.detail));
+    AW_SceneLoadNote(&e);
+}
+/* zone.c: an allocation that failed. During a map load it ends that load (the half-loaded map is dropped by the way
+ * back's own load, Host_ClearMemory); in play it returns and the allocator stops the game as before. */
+static void alloc_failed(const char *arena,const char *name,long need,long have) {
+    aw_loaderr_t e;aw_mapfail_t m;
+    if(!AW_SceneLoadInFlight())return;
+    aw_hunk_fail_test=0;prefetch_restore();
+    cause(&e,AW_LOADERR_MEMORY);e.need=need;e.have=have<0?0:have;
+    Q_strcpy_bounded(e.arena,arena,sizeof(e.arena));
+    snprintf(e.detail,sizeof(e.detail),"%s allocation %s of %ld bytes, %ld free",arena,name?name:"?",need,have);
+    /* a map decode it stopped: its file named, the loader left as after a finished load (the file closed) */
+    if(AW_MapFailure(&m)){Q_strcpy_bounded(e.file,m.file,sizeof(e.file));e.file_bytes=m.bytes;}
+    AW_SceneLoadNote(&e);
+    Host_Error("Not enough memory for the load: %s %s needs %ld bytes, %ld free",arena,name?name:"?",need,have);
+}
+/* zone.c aw_fatal_hook, at the fatal path's heap audit (Sys_Error, after the input guard has left): a map decode the
+ * fatal error stopped (model.c AW_MapFailure names it and leaves the loader as after a finished load) ends that load,
+ * the input guard back first; anything else, and every fatal error outside a load, returns and the game stops as
+ * before. A second fatal error inside Host_Error does not match: AW_MapFailure ends the decode it names. */
+extern int hunk_size,hunk_low_used,hunk_high_used,host_hunklevel,hunk_tempmark;
+static void fatal(void) {
+    aw_mapfail_t m;aw_loaderr_t e;int kind;long have;
+    if(!AW_SceneLoadInFlight() || !(kind=AW_MapFailure(&m)))return;
+    prefetch_restore();
+    AW_InputGuardInit();
+    if(kind==AW_MAPFAIL_MEMORY){
+        have=(long)hunk_size-hunk_low_used-hunk_high_used;
+        cause(&e,AW_LOADERR_MEMORY);e.need=m.need;e.have=have<0?0:have;
+        Q_strcpy_bounded(e.arena,"hunk",sizeof(e.arena));
+    }else{
+        cause(&e,AW_LOADERR_BROKEN);e.lump=m.lump;e.offset=m.offset;
+        e.broken=kind==AW_MAPFAIL_HEADER?AW_BROKEN_HEADER:kind==AW_MAPFAIL_SHORT?AW_BROKEN_SHORT:
+            kind==AW_MAPFAIL_LUMP?AW_BROKEN_LUMP:AW_BROKEN_DATA;
+    }
+    Q_strcpy_bounded(e.file,m.file,sizeof(e.file));e.file_bytes=m.bytes;Q_strcpy_bounded(e.detail,m.why,sizeof(e.detail));
+    AW_SceneLoadNote(&e);
+    Host_Error("%s: %s",kind==AW_MAPFAIL_MEMORY?"Not enough memory for the load":"Broken map file",e.detail);
+}
+/* The machine's free Fast (0) or Chip (1) RAM in bytes for the console block; -1 off the Amiga. */
+static long memory_free(int chip) {
+#ifdef AMIGA
+    return (long)AvailMem(chip?MEMF_CHIP:MEMF_FAST);
+#else
+    (void)chip;return -1;
+#endif
+}
+/* The check before anything is left (aw_scene.c load_scene): the map file's header against its size (a damaged or
+ * truncated file), then the bytes its world needs once decoded (model.c AW_BrushBound, from the header alone) against
+ * what the Hunk holds for a map (all of it above the start-up's level, less its permanent top). One file open and 124
+ * bytes. 1 = refused, E says why. */
+extern qboolean hunk_tempactive;
+static int precheck(const char *map,aw_loaderr_t *e) {
+    char path[MAX_QPATH+24];FILE *f=NULL;unsigned char raw[sizeof(dheader_t)];dheader_t header;
+    long size,n,need,have;int lump,broken,i;
+    if((size=AW_SceneMapSize(map,path,sizeof(path)))<0)return 0;   /* not on this disk: its callers say so */
+    if(COM_FOpenFile(path,&f)<0 || !f)return 0;
+    n=(long)fread(raw,1,sizeof(raw),f);fclose(f);
+    cause(e,AW_LOADERR_BROKEN);Q_strcpy_bounded(e->file,path,sizeof(e->file));e->file_bytes=size;
+    if((broken=AW_LoadErrMapHeader(raw,n,size,&lump))!=0){
+        e->broken=broken;e->lump=lump;e->offset=broken==AW_BROKEN_SHORT?size:0;
+        Q_strcpy_bounded(e->detail,broken==AW_BROKEN_SHORT?"a lump runs past the end of the file (checked before leaving)":
+            "the map header does not read (checked before leaving)",sizeof(e->detail));
+        return 1;
+    }
+    memcpy(&header,raw,sizeof(header));
+    for(i=0;i<(int)(sizeof(header)/4);i++)((int *)&header)[i]=LittleLong(((int *)&header)[i]);
+    need=AW_BrushBound(&header,0,0);
+    have=(long)hunk_size-host_hunklevel-(hunk_tempactive?hunk_tempmark:hunk_high_used);
+    if(need>0 && need>have){
+        e->kind=AW_LOADERR_MEMORY;e->need=need;e->have=have<0?0:have;Q_strcpy_bounded(e->arena,"map",sizeof(e->arena));
+        snprintf(e->detail,sizeof(e->detail),"its world needs %ld bytes decoded, the map memory holds %ld (checked before leaving)",
+            need,have);
+        return 1;
+    }
+    return 0;
+}
+/* The time limit: a map load whose state (the server, the client's connection and sign-on) has not moved for
+ * aw_load_timeout seconds ends as a failed load. A long synchronous step is one frame and counts as progress when it
+ * moves the state; the limit only fires on a load that sits still while frames run. */
+static void timeout_tick(void) {
+    aw_loaderr_t e;int state;double now;
+    if(!AW_SceneLoadInFlight() || aw_load_timeout.value<=0){progress_at=0;return;}
+    now=Sys_FloatTime();state=(sv.active?1:0)|((int)cls.state<<1)|(cls.signon<<4);
+    if(!progress_at || state!=progress_state || now<progress_at){progress_at=now;progress_state=state;return;}
+    if(now-progress_at<aw_load_timeout.value)return;
+    progress_at=0;
+    cause(&e,AW_LOADERR_TIMEOUT);
+    snprintf(e.detail,sizeof(e.detail),"no progress for %ld s (sign-on %ld, aw_load_timeout)",(long)aw_load_timeout.value,
+        (long)cls.signon);
+    AW_SceneLoadNote(&e);
+    Host_Error("The load did not finish within %ld s",(long)aw_load_timeout.value);
+}
 static void tick(void) {
-    static const char *const buttons[2]={"OK","Load Game"};int b,want;
-    if(!box_open && key_dest==key_game && !AW_MsgBoxActive() && (want=AW_SceneLoadBoxTake())!=0){
-        if(want==2){Con_Printf("Failed load: no way back; the load menu.\n");AW_SaveMenuOpen(1);return;}
-        box_open=1;AW_MsgBoxShow(AW_SceneLoadBoxText(),buttons,2);return;
+    static const char *const buttons[1]={"OK"};int b,want;
+    timeout_tick();
+    if(prefetch_armed && !AW_SceneLoadInFlight())prefetch_restore();
+    if(!box_open && key_dest==key_game && !AW_MsgBoxActive() && !AW_SaveMenuActive() && (want=AW_SceneLoadBoxTake())!=0){
+        if(want==2){
+            /* no place to stay: the main menu and the load menu over it, the error on its notice line */
+            Con_Printf("Failed load: no place to stay; the load menu.\n");
+            Cmd_ExecuteString("aw_main_menu",src_command);
+            AW_SaveMenuOpen(1);AW_SaveMenuNotice(AW_SceneLoadNoticeText());return;
+        }
+        box_open=1;AW_MsgBoxShow(AW_SceneLoadBoxText(),buttons,1);return;
     }
     if(box_open && !AW_MsgBoxActive() && (b=AW_MsgBoxPressed())>=0){
         box_open=0;
-        Con_Printf("Failed load box: %s\n",b==1?"Load Game":"OK");
-        if(b==1)AW_SaveMenuOpen(1);
+        Con_Printf("Failed load box: OK\n");
     }
 }
 static void load_fail_command(void) {
-    if(Cmd_Argc()==2)Cvar_SetValue("aw_load_fail_test",(float)Q_atoi(Cmd_Argv(1)));
-    Con_Printf("dbg loadfail: the next %ld map loads fail on purpose (0 = off).\n",(long)aw_load_fail_test.value);
+    int i;
+    if(Cmd_Argc()>=2 && !Q_strcasecmp(Cmd_Argv(1),"timeout")){
+        if(Cmd_Argc()==3)Cvar_SetValue("aw_load_timeout",(float)Q_atoi(Cmd_Argv(2)));
+        Con_Printf("dbg loadfail timeout: a map load without progress for %ld s fails (0 = off).\n",(long)aw_load_timeout.value);
+        return;
+    }
+    if(Cmd_Argc()>=2)Cvar_SetValue("aw_load_fail_test",(float)Q_atoi(Cmd_Argv(1)));
+    if(Cmd_Argc()>=3){
+        for(i=0;i<FAIL_KINDS;i++)if(!Q_strcasecmp(Cmd_Argv(2),(char *)fail_names[i]))break;
+        if(i==FAIL_KINDS){Con_Printf("dbg loadfail N [error/memory/lump/hang]\n");return;}
+        fail_kind=i;
+    }else if(Cmd_Argc()==2)fail_kind=FAIL_ERROR;
+    Con_Printf("dbg loadfail: the next %ld map loads fail on purpose (%s; 0 = off).\n",(long)aw_load_fail_test.value,
+        fail_names[fail_kind]);
 }
 /* dbg restartgame: the running game ends cleanly (scene loads, the failed-load box, the story, sounds, the map's
  * memory back to the boot level: Host_ClearMemory gives the Hunk back to host_hunklevel and the models, CHIM's banks
@@ -129,9 +301,13 @@ static void version_command(void) {
 void AW_LoadFailInit(void) {
     Cmd_AddCommand("aw_version_info",version_command);
     Cvar_RegisterVariable(&aw_load_fail_test);
+    Cvar_RegisterVariable(&aw_load_timeout);
     Cmd_AddCommand("aw_load_fail",load_fail_command);
     Cmd_AddCommand("aw_restart_game",restart_command);
     aw_loadfail_tick=tick;
+    /* SCENE-LOAD-FAIL-FALLBACK-67: what ends a load instead of the game, the check before leaving, the free RAM */
+    aw_alloc_failed=alloc_failed;aw_fatal_hook=fatal;
+    aw_load_precheck=precheck;aw_load_memory_free=memory_free;
     register_resets();
     aw_game_reset=game_reset;     /* aw_intro.c: New Game resets through the registry */
 }

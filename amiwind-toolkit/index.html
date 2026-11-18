@@ -92,9 +92,22 @@ function showInspector(file) {
 }
 function send() {
   if (inspectorReady && inspectorQueue) {
-    inspector.contentWindow.postMessage({type: 'amiwind-open-map', file: inspectorQueue}, '*');
+    inspector.contentWindow.postMessage(inspectorQueue instanceof File ? {type: 'amiwind-open-map', file: inspectorQueue}
+      : Object.assign({type: 'amiwind-open-link'}, inspectorQueue.link), '*');
     inspectorQueue = null;
   }
+}
+// A link from the World Map (Show in 3D, the 3D buttons): a CHIM world frame ({world, frame, cell}) or a room ({rooms, room}) of
+// the served build. A first open loads the inspector with the link in its address, so it opens that and nothing else first.
+function showInspectorLink(link) {
+  mark('inspector');
+  if (!inspector.src) {
+    const q = new URLSearchParams();
+    for (const k of ['world', 'frame', 'cell', 'rooms', 'room', 'heat']) if (link[k]) q.set(k, link[k]);
+    inspector.onload = () => { inspectorReady = true; send(); };
+    inspector.src = 'map-inspector.html' + (q.size ? '?' + q.toString() : '');
+    if (!link.world && !link.rooms) inspectorQueue = {link};       // nothing to open by address: the inspector says what to do
+  } else { inspectorQueue = {link}; send(); }
 }
 document.getElementById('tab-world').onclick = () => { mark('world'); frame.contentWindow.postMessage({type: 'amiwind-set-mode', mode: 'world'}, '*'); };
 document.getElementById('tab-local').onclick = () => { mark('local'); frame.contentWindow.postMessage({type: 'amiwind-set-mode', mode: 'local'}, '*'); };
@@ -111,7 +124,7 @@ function chimHead(m) {
     frame.contentWindow.postMessage({type: 'amiwind-chim-pick', bucket: chimPicked}, '*');
     chimHead(m);
   };
-  window.ChimHead.render(document.getElementById('chimhead'), m.headline, m.history, pick, chimPicked);
+  window.ChimHead.render(document.getElementById('chimhead'), m.headline, m.history, pick, chimPicked, {expansions: m.expansions || null});
 }
 // The round "?" opens the help panel of the tab that is open (header.js: click, Enter or Space; Esc or a click outside closes it).
 document.getElementById('helpbtn').onclick = () => {
@@ -125,6 +138,7 @@ window.addEventListener('message', e => {
   if (e.data.type === 'amiwind-mode' && !inspector.classList.contains('active') && !monitorFrame.classList.contains('active') &&
       !meshFrame.classList.contains('active')) mark(e.data.mode);
   if (e.data.type === 'amiwind-open-inspector' && e.data.file instanceof File) showInspector(e.data.file);
+  else if (e.data.type === 'amiwind-open-inspector' && e.data.link && typeof e.data.link === 'object') showInspectorLink(e.data.link);
 });
 if(!new URLSearchParams(location.search).has('cell') && ['worldzip','world','map'].some(k=>new URLSearchParams(location.search).has(k)))showInspector(null);
 // a reload reopens the tab named in the address; Local waits for the map page, which takes its mode by message

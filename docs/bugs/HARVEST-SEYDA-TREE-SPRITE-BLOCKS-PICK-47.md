@@ -20,6 +20,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-21: reported in v0.0.47-dev1
+- 2026-11-17: seen again in v0.0.66: Seen again on the v0.0.66 release (Bitter Coast, Seyda Neen region): with the reduced tree model (the mesh flora_bc_tree_08 variants, drawn as a solid low trunk) the bracket fungi that grow from the side of the tree are not seen where the ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.56 (30 October 2026)._
 
 ## Status: 29 October 2026
@@ -106,7 +117,7 @@ Family: Harvestable plants (`harvest`). Harvest catalogues are built by the buil
 - [HARVEST-EXPANSION-FLORA-62](HARVEST-EXPANSION-FLORA-62.md): The plants placed by the Tribunal and Bloodmoon masters are not harvestable
 - [HARVEST-EXTRA-TOWNS-32](HARVEST-EXTRA-TOWNS-32.md): Opt-in towns get no harvestable mushrooms
 - [HARVEST-GEOMETRY-GATE-32](HARVEST-GEOMETRY-GATE-32.md): The harvest geometry gate was never re-run on the shipped Seyda Neen maps
-- HARVEST-HYPHA-FACIA-FLOATING-65 (no report page): In Seyda Neen a Hypha Facia mushroom that grows on a tree's side floats in the air
+- [HARVEST-HYPHA-FACIA-FLOATING-65](HARVEST-HYPHA-FACIA-FLOATING-65.md): In Seyda Neen a Hypha Facia mushroom that grows on a tree's side floats in the air
 - [HARVEST-INTERIOR-PICK-47](HARVEST-INTERIOR-PICK-47.md): Mushrooms inside interiors cannot be picked
 - [HARVEST-ORE-ROCKS-62](HARVEST-ORE-ROCKS-62.md): The ore and gem rocks in the mines cannot be mined
 - [HARVEST-ORGANIC-PLANTS-47](HARVEST-ORGANIC-PLANTS-47.md): Only the small mushrooms can be picked; every other harvestable plant is scenery

@@ -33,6 +33,19 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #endif
 
 static void AW_HeapAuditFailed(const char *,int,int);
+/* SCENE-LOAD-FAIL-FALLBACK-67: an allocation that fails (the arena, the block's name, bytes needed and free) is told
+ * here before the game stops. aw_loadfail.c sets it: during a map load it ends that load (Host_Error: the half-loaded
+ * map is dropped and the way back runs); otherwise it returns and the allocator stops the game as before. Every
+ * allocator checks before it changes anything, so leaving from here leaves the zone, the hunk and the cache whole.
+ * NULL in the host fixtures. The Quake III Arena idea: a failed hunk allocation there ends the level (ERR_DROP), not
+ * the program. */
+void (*aw_alloc_failed)(const char *arena,const char *name,long need,long have);
+int aw_hunk_fail_test;   /* the next Hunk_AllocName fails (dbg loadfail N memory) */
+/* The same for every other fatal error (Sys_Error): the heap audit's fatal-exit phase below is the first step of the
+ * fatal path outside sys_amiga.c (right after the input guard leaves; tests/aga_crash_report_test.c keeps that order),
+ * and sys_amiga.c stays as it is because the converted world's build keys read it whole. aw_loadfail.c sets it: a map
+ * whose decode stopped (model.c AW_MapFailure) ends that load; anything else returns and the game stops as before. */
+void (*aw_fatal_hook)(void);
 
 #define	DYNAMIC_SIZE	0xc000
 
@@ -165,6 +178,7 @@ Z_CheckHeap ();	// DEBUG
         }
         available=largest-(int)sizeof(memblock_t)-4;if(available<0)available=0;
         AW_HeapAuditFailed("zone",size,available);
+        if(aw_alloc_failed)aw_alloc_failed("zone","zone",size,available);   /* a map load: ends the load, not the game */
 		Sys_Error ("Z_Malloc: failed on allocation of %i bytes",size);
     }
 	Q_memset (buf, 0, size);
@@ -336,6 +350,7 @@ void AW_HeapAuditPhase(const char *scene,const char *phase) {
     memblock_t *block;int used,clearance,peak_clearance,zone_free=0,zone_largest=0;
     char previous_phase[32];
     unsigned long fast_free=0,fast_largest=0,chip_free=0,chip_largest=0;
+    if(aw_fatal_hook && phase && !strcmp(phase,"fatal-exit"))aw_fatal_hook();   /* SCENE-LOAD-FAIL-FALLBACK-67 */
     if(!hunk_base || hunk_size<=0)return;
     strcpy(previous_phase,aw_heap_phase);
     if(scene && *scene){strncpy(aw_heap_scene,scene,sizeof(aw_heap_scene)-1);aw_heap_scene[sizeof(aw_heap_scene)-1]=0;}
@@ -511,8 +526,10 @@ void *Hunk_AllocName (int size, char *name)
 
 	size = sizeof(hunk_t) + ((size+15)&~15);
 
-	if (hunk_size - hunk_low_used - hunk_high_used < size) {
+	if (hunk_size - hunk_low_used - hunk_high_used < size || aw_hunk_fail_test) {
+        aw_hunk_fail_test=0;   /* the test aid fails one allocation, as a full Hunk would */
         AW_HeapAuditFailed("low-hunk",size,hunk_size-hunk_low_used-hunk_high_used);
+        if(aw_alloc_failed)aw_alloc_failed("hunk",name,size,hunk_size-hunk_low_used-hunk_high_used);
 		Sys_Error ("Hunk_Alloc %s: need %ld bytes, free %ld of %ld",name,
 			(long)size,(long)(hunk_size-hunk_low_used-hunk_high_used),(long)hunk_size);
     }
@@ -810,6 +827,7 @@ cache_system_t *Cache_TryAlloc (int size, qboolean nobottom)
 	{
 		if (hunk_size - hunk_high_used - hunk_low_used < size) {
             AW_HeapAuditFailed("cache",size,hunk_size-hunk_low_used-hunk_high_used);
+            if(aw_alloc_failed)aw_alloc_failed("cache","cache",size,hunk_size-hunk_low_used-hunk_high_used);
 			Sys_Error ("Cache_TryAlloc: %i is greater then free hunk", size);
         }
 
@@ -1119,7 +1137,10 @@ void *Cache_Alloc (cache_user_t *c, int size, char *name)
 
 	// free the least recently used cahedat
 		if (cache_head.lru_prev == &cache_head)
+		{
+			if(aw_alloc_failed)aw_alloc_failed("cache",name,size,Cache_LargestFree());
 			Sys_Error ("Cache_Alloc: out of memory");
+		}
 													// not enough memory at all
 		aw_cache_evictions++;
 		Cache_Free ( cache_head.lru_prev->user );

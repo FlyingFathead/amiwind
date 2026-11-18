@@ -8,6 +8,7 @@
 #include "aw_activate.h"
 #include "aw_character.h"
 #include "aw_story.h"
+#include "aw_activated.h"
 #include "chim/chim.h"
 extern int AW_SceneryCount(void);
 #endif
@@ -2868,15 +2869,30 @@ int (*aw_container_lock)(unsigned reference,int original);
 /* TRAPS-WHEN-OPENED-63 (aw_hinged_door.c AW_TrapSpring sets it; NULL in the tools' tests: no traps): a trapped
  * container's use springs its trap instead of opening it; 1 when it sprang */
 int (*aw_trap_spring)(unsigned reference);
+/* LOCKED-CONTAINERS-NEVER-OPEN-67 (aw_hinged_door.c container_lock_pass sets it; NULL in the tools' tests: a lock
+ * holds): the doors' way through a lock, for a container: its key carried, god mode, dbg doorlocks off */
+int (*aw_lock_pass)(unsigned reference,const char *key);
 /* the lock level now: a script's Lock / Unlock on the world change list (slice 2), else the data's */
 static int container_lock(const focus_row_t *row){
     return aw_container_lock?aw_container_lock(row->reference,row->lock):row->lock;
 }
+/* LOCKED-CONTAINERS-NEVER-OPEN-67: the record id of container REFERENCE's key, from its area record's key slot
+ * (tools/prepare_area_tables.py: the key's item index there plus one); 1 with ID, 0 none (no key, no loaded area, an
+ * older areas.awa) */
+int AW_AreaContainerKey(unsigned reference,char *id,int size){
+    const area_t *a;const byte *c=area_container(reference,&a);int k;
+    if(!c || !id || size<2)return 0;
+    k=c[10]|(c[11]<<8);
+    return k>0 && area_item_id(a,k-1,id,size);
+}
 /* a container that opens (not organic): its strip, or the locked line; 1 when E was used here */
 static int container_open(const focus_row_t *row){
-    static char line[64];
+    static char line[64];char key[FOCUS_ID+1];
     if(row->kind!='C' || (row->action&3)!=FOCUS_ACT_TAKE)return 0;
-    if(container_lock(row)>0){
+    /* LOCKED-CONTAINERS-NEVER-OPEN-67: a locked one opens for its key (unlocked for good, its trap disarmed), in god
+     * mode or with dbg doorlocks off (OpenMW 0.53 mwclass/container.cpp Container::activate, rule read) */
+    if(container_lock(row)>0 &&
+       !(aw_lock_pass && aw_lock_pass(row->reference,AW_AreaContainerKey(row->reference,key,sizeof(key))?key:NULL))){
         if(!line[0] && !hud_setting("sLocked",line,sizeof(line)))strcpy(line,"Locked");
         AW_UISubtitle(row->name,line,3);return 1;
     }
@@ -2895,6 +2911,10 @@ void AW_ContainerCommand(void){
         unsigned want=(unsigned)strtoul(a,NULL,10);row=NULL;
         if(sv.active && svs.clients && svs.clients[0].edict)focus_refresh(svs.clients[0].edict);
         for(i=0;i<focus_count;i++)if(focus_rows[i].kind=='C' && focus_rows[i].reference==want)row=&focus_rows[i];
+        /* PRISON-SHIP-ITEMS-TAKEABLE-65: aim also at a placed item or a named object by its reference (the in-game
+         * check of the prison ship's travel lantern, bottles and hammock) */
+        if(!row && Cmd_Argc()>3 && !strcmp(Cmd_Argv(3),"aim"))
+            for(i=0;i<focus_count;i++)if(focus_rows[i].kind!='A' && focus_rows[i].reference==want)row=&focus_rows[i];
         if(!row){Con_Printf("aw_placed container: no container %u in this room or cell.\n",want);return;}
         o=1;a=Cmd_Argc()>3?Cmd_Argv(3):"";
     }else row=NULL;
@@ -2965,7 +2985,8 @@ void AW_ContainerCommand(void){
         if(pitch>70)pitch=70;
         VectorCopy(vec3_origin,p->v.velocity);p->v.angles[0]=pitch;p->v.angles[1]=yaw;p->v.angles[2]=0;
         p->v.fixangle=1;SV_LinkEdict(p,false);
-        Con_Printf("Aimed at %s (container %u): aw_view %d %d %d %d %d\n",row->name,row->reference,(int)p->v.origin[0],
+        Con_Printf("Aimed at %s (%s %u): aw_view %d %d %d %d %d\n",row->name,row->kind=='C'?"container":"object",
+                   row->reference,(int)p->v.origin[0],
                    (int)p->v.origin[1],(int)p->v.origin[2],(int)yaw,(int)pitch);
         return;
     }
@@ -3336,7 +3357,13 @@ static void focus_load(void){
         for(j=0;j<focus_count;j++)if(focus_rows[j].reference==(unsigned)v->_float){
             /* SIGNPOST-NAMES-MISSING-65: a board drawn as an edict (a scenery brush with its reference) has no
              * targeting of its own: its row stays */
-            if(focus_rows[j].kind=='I')focus_rows[j].live=1;else if(focus_rows[j].kind!='N')focus_rows[j].edict=1;
+            if(focus_rows[j].kind=='I')focus_rows[j].live=1;
+            /* CONTAINER-BRUSH-ROWS-67: a container drawn as a brush of its own (a compiled room's func_wall with its
+             * reference: the Imperial Prison Ship's 46, the census office's 12) has no use of its own either: its row
+             * stays, aimed where the view ray meets that brush (placed_target), else at its measured box. The
+             * courtyard barrel stays the opening's own (aw_opening.c: the ring) */
+            else if(focus_rows[j].kind=='C' && focus_rows[j].reference!=AW_REF_COURTYARD_BARREL)focus_rows[j].live=1;
+            else if(focus_rows[j].kind!='N')focus_rows[j].edict=1;
         }
     }
     /* In a room an item row counts only when the room draws the item: an edict that carries its reference or a
@@ -3404,8 +3431,9 @@ static int placed_target(void){
         if(row->kind=='A')continue;
         VectorAdd(row->at,shift,at);VectorSubtract(at,eye,delta);length=DotProduct(delta,delta);
         /* CENSUS-CRAB-PLATE-FOCUS-66: an item drawn as an edict of its own that the view ray meets first is aimed at
-         * that point, wherever on it the ray lands (as a drawn row by its model); nothing lies in front of it */
-        if(row->kind=='I' && row->live && view_ref && row->reference==view_ref){
+         * that point, wherever on it the ray lands (as a drawn row by its model); nothing lies in front of it.
+         * CONTAINER-BRUSH-ROWS-67: a container drawn as a brush of its own the same way */
+        if((row->kind=='I' || row->kind=='C') && row->live && view_ref && row->reference==view_ref){
             if(view_hit>nearest)continue;
             nearest=view_hit;best=i;continue;
         }
@@ -3482,6 +3510,12 @@ void AW_PlacedAimReport(void){
     {float view_hit;unsigned view_ref=view_reference(p,eye,f,reach,&view_hit);
      if(view_ref)Con_Printf("aw_placed aim: the view ray meets reference %u first, at %.1f\n",view_ref,view_hit);
      else Con_Printf("aw_placed aim: the view ray meets no edict with a reference within the reach\n");}
+    /* PRISON-SHIP-ITEMS-TAKEABLE-65: the text overlay the aimed placed object gets now, as AW_SceneDraw takes it (the
+     * name from AW_PlacedFocus, the action line from AW_ItemPrompt): "overlay none" before the papers */
+    {const char *name=NULL;char w[48],v[48],line[48];int owned=0,steal=0,named,acting;
+     named=AW_PlacedFocus(&name,w,v,sizeof(w),&owned) && name && name[0];acting=AW_ItemPrompt(line,sizeof(line),&steal);
+     Con_Printf("aw_placed aim: overlay %s%s%s%s\n",named?name:"",named && acting?" ":"",acting?line:"",
+                named || acting?"":"none");}
     /* the aimed row is always listed, also past the first twelve rows near the eye (the crab meat's was not) */
     for(i=0;i<focus_count;i++){
         focus_row_t *row=&focus_rows[i];
@@ -3518,11 +3552,15 @@ const float *AW_PlacedDoorAt(int i,unsigned *reference){
     *reference=row->reference;
     return row->at;
 }
+static int labels_allowed(void);
 int AW_PlacedFocus(const char **name,char *weight_line,char *value_line,int line_size,int *owned){
     static char label_weight[32],label_value[32];static int labels;
     int best,level;char number[24];
     if(!name || !weight_line || !value_line || line_size<2 || (best=placed_target())<0)return 0;
     if(focus_rows[best].kind=='A')return 0;   /* FOCUS-BOX-NO-ACTORS-58: items and doors only */
+    /* PRISON-SHIP-ITEMS-TAKEABLE-65: before the papers no name of an item, a container or a named piece of furniture
+     * (the prison ship's hammock); a door keeps its name */
+    if(focus_rows[best].kind!='D' && !labels_allowed())return 0;
     if(!labels){
         labels=1;
         if(!hud_setting("sWeight",label_weight,sizeof(label_weight)))strcpy(label_weight,"Weight");
@@ -3551,6 +3589,12 @@ int AW_PlacedFocus(const char **name,char *weight_line,char *value_line,int line
  * book reader is there (aw_book_reader); until then E takes it, so it prompts like any item. */
 int (*aw_book_reader)(unsigned reference);
 static char prompts[8][40];
+/* PRISON-SHIP-ITEMS-TAKEABLE-65 (aw_inventory.h): the Inventory window allowed; NULL (the tools' tests): allowed */
+int (*aw_inventory_allowed)(void);
+static int inventory_allowed(void){return !aw_inventory_allowed || aw_inventory_allowed();}
+/* PRISON-SHIP-ITEMS-TAKEABLE-65 (aw_inventory.h): placed objects' names and action lines allowed */
+int (*aw_object_labels)(void);
+static int labels_allowed(void){return !aw_object_labels || aw_object_labels();}
 /* CONTAINER-WINDOW-59: a container that opens reads "E: Open", "E: Steal" (red) when it is owned (opening it is
  * free, taking from it is theft), "Locked" while locked (red when owned); organic ones (flora) none: E picks them. */
 static int container_prompt(const focus_row_t *row,char *line,int size,int *steal){
@@ -3578,10 +3622,16 @@ int AW_ItemPrompt(char *line,int size,int *steal){
     }
     code=FOCUS_ACT_TAKE;
     if(drop_aimed()<0){
-        if((best=placed_target())>=0 && focus_rows[best].kind=='C')return container_prompt(&focus_rows[best],line,size,steal);
+        /* PRISON-SHIP-ITEMS-TAKEABLE-65: no action line while the Inventory window is not allowed (the use key does
+         * nothing then, placed_use); a book still reads. Before the papers none at all, a book's included: no text
+         * overlay on any placed object (AW_PlacedFocus) */
+        if(!labels_allowed())return 0;
+        if((best=placed_target())>=0 && focus_rows[best].kind=='C')
+            return inventory_allowed()?container_prompt(&focus_rows[best],line,size,steal):0;
         if(best<0 || focus_rows[best].kind!='I')return 0;
         code=focus_rows[best].action&7;
         if((code&3)==FOCUS_ACT_READ && !aw_book_reader)code=FOCUS_ACT_TAKE|(code&FOCUS_ACT_OWNED);
+        if((code&3)!=FOCUS_ACT_READ && !inventory_allowed())return 0;
     }
     if(!prompts[code][0])return 0;
     *steal=(code&FOCUS_ACT_OWNED)!=0;
@@ -3620,9 +3670,12 @@ int AW_PlacedBook(unsigned reference,char *id,int *owned){
     if(owned)*owned=row->owned!=0;
     return 1;
 }
-/* BOOK-READER-58: the reader's Take: the same path as E on the item (owned taking marked for CRIME-59). */
+/* BOOK-READER-58: the reader's Take: the same path as E on the item (owned taking marked for CRIME-59).
+ * PRISON-SHIP-ITEMS-TAKEABLE-65: no Take while the Inventory window is not allowed (the original's book and scroll
+ * windows hide it: OpenMW 0.53 mwgui/bookwindow.cpp and scrollwindow.cpp setInventoryAllowed) */
 int AW_PlacedTake(unsigned reference){
     focus_row_t *row=placed_row(reference);
+    if(!inventory_allowed())return 0;
     return row && !AW_ObjectDisabled(reference)?take_row(row):0;
 }
 /* the scripts' OnActivate on a placed item (aw_mwhost.c sets it: object_intercept; NULL without the scripts) */
@@ -3633,6 +3686,7 @@ int AW_PlacedActivate(unsigned reference){
     focus_row_t *row=placed_row(reference);
     if(!row || AW_ObjectDisabled(reference))return 0;
     if((row->action&3)==FOCUS_ACT_READ && aw_book_reader && aw_book_reader(row->reference))return 1;
+    if(!inventory_allowed())return 1;     /* PRISON-SHIP-ITEMS-TAKEABLE-65: the class's NullAction, as for E */
     return take_row(row);
 }
 /* OPENING-REGRESSION-64: 1 while the census office's registration forbids taking and using (aw_opening.c
@@ -3647,13 +3701,19 @@ static int placed_use(void){
     if(best>=0 && aw_census_take_refused && aw_census_take_refused()){
         AW_UISubtitle("","Finish your registration with the clerk first.",3);return 1;
     }
-    if(best>=0 && focus_rows[best].kind=='C')return container_open(&focus_rows[best]);   /* CONTAINER-WINDOW-59 */
+    /* PRISON-SHIP-ITEMS-TAKEABLE-65: while the Inventory window is not allowed (until the release papers' script runs
+     * EnableInventoryMenu) a container does not open and an item is not taken: the use key is spent on nothing, as the
+     * original's NullAction (OpenMW 0.53 mwclass/container.cpp Container::activate, mwworld/class.cpp
+     * Class::defaultItemActivate, mwclass/light.cpp for a carryable light) */
+    if(best>=0 && focus_rows[best].kind=='C')
+        return inventory_allowed()?container_open(&focus_rows[best]):1;   /* CONTAINER-WINDOW-59 */
     if(best<0 || (row=&focus_rows[best])->kind!='I')return 0;
     /* an item whose script reads OnActivate takes the use (the original's rule, as for doors and actors: aw_mwhost.c
      * object_intercept); the item does nothing until the script's Activate (AW_PlacedActivate above) */
     if(aw_inventory_intercept && aw_inventory_intercept(row->reference))return 1;
     /* a readable book opens the reader (reading is free); Take or Steal is inside it */
     if((row->action&3)==FOCUS_ACT_READ && aw_book_reader && aw_book_reader(row->reference))return 1;
+    if(!inventory_allowed())return 1;
     return take_row(row);
 }
 /* COLLECT-CAPACITY-REJECTED-60: a refused pickup says which limit refused it (AW_ItemRefusal); ID NULL when the

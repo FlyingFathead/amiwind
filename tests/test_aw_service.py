@@ -46,7 +46,8 @@ class FakeRunner:
     """Answers every container command by its --name; records what ran."""
 
     def __init__(self, check=CHECK_OK, check_exit=0, build_exit=0, summary=None, inputs=None, existing=(),
-                 records_exit=0, guard=None, guard_exit=0, guard_err='', ide=None, ide_exit=0):
+                 records_exit=0, guard=None, guard_exit=0, guard_err='', ide=None, ide_exit=0, build_log='build log\n'):
+        self.build_log = build_log
         self.ide = ide if ide is not None else {'verdict': 'passed', 'detail': '1 drive(s) whole IDE cylinders'}
         self.ide_exit = ide_exit
         self.check, self.check_exit, self.build_exit = check, check_exit, build_exit
@@ -104,7 +105,7 @@ class FakeRunner:
     def logged(self, command, log_path, **stall):
         self.ran.append(self.name(command))
         self.stall = stall
-        Path(log_path).write_text('build log\n', encoding='utf-8')
+        Path(log_path).write_text(self.build_log, encoding='utf-8')
         return self.build_exit
 
 
@@ -991,25 +992,112 @@ class ServiceTests(unittest.TestCase):
         for kind in aw_service.NOT_YET:
             self.assertRefused(self.request(kind=kind, options={}), 'not implemented yet')
 
+    @staticmethod
+    def chimport_log(*cells, selected=None):
+        """A chimport.py run console log: the selection line, then one line per (cell, converted, classes)."""
+        n = len(cells) if selected is None else selected
+        lines = ['chimport entry check: OK (source /vol/src/v036-abc1234)',
+                 f'chimport: {n} cells selected, {n} to do, 2 workers x 2 jobs, storage pool /vol/ws8/cache/p']
+        for key, converted, classes in cells:
+            lines.append(f'chimport: {key} ring 1 {"converted" if converted else "FAILED"} (5 s)'
+                         + (' ' + ', '.join(classes) if classes else ''))
+        lines.append('chimport: storage pool: stored 0.0 MB, linked 0.0 MB')
+        return '\n'.join(lines) + '\n'
+
     def test_chimport_region_measures_the_cells_with_the_selected_masters(self):
         # CHIM-SOL-FLORA-PATH-65: the island's CHIMport method for a layer's cells, through the master builder
         options = {'cells': '-20,23 -21,23', 'masters': ['Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm'],
                    'cell_jobs': 2}
+        log = self.chimport_log(('-20,23', True, []), ('-21,23', True, []))
         code, result, runner = self.submit(self.request(kind='chimport-region', purpose='solstheim-easy',
-                                                        options=options))
+                                                        options=options), FakeRunner(build_log=log))
         self.assertEqual(code, 0, result['notes'])
         self.assertEqual(aw.validate(result, aw.schema('aw-result-1')), [])
         run = [c for c in result['commands'] if 'tools/chimport.py run' in c and '--dry-run' not in c][0]
         for part in ("--cells '-20,23 -21,23'", '--no-world', '--jobs 2',
                      'AMIWIND_MASTERS=Morrowind.esm,Tribunal.esm,Bloodmoon.esm', '--pull never', '--network none',
-                     'amiwind.purpose='):
+                     'amiwind.purpose=', '--storage-pool on --reuse-mode pool',   # AW-CHIMPORT-REGION-POOL-COPY-67
+                     '--presented-data /vol/ws8/chimport/'):                      # CHIMPORT-LAYER-CELL-EMPTY-67
             self.assertIn(part, run)
+        self.assertRegex(run, r'--presented-data /vol/ws8/chimport/\S+/data ')
+        self.assertTrue(any('presented data folder' in n for n in result['notes']))
+        # the base game alone reads the data folder as it is
+        code, alone, _ = self.submit(self.request(kind='chimport-region', purpose='island',
+                                                  options={'cells': '1,1', 'masters': ['Morrowind.esm']}),
+                                     FakeRunner(build_log=self.chimport_log(('1,1', True, []))))
+        self.assertEqual(code, 0, alone['notes'])
+        self.assertFalse(any('--presented-data' in c for c in alone['commands']))
         self.assertTrue(any('--dry-run' in c for c in result['commands']))
-        self.assertEqual(result['numbers'], {'cells': 2, 'tracker_results': 1})
+        self.assertEqual(result['numbers'], {'cells': 2, 'tracker_results': 1, 'cells_selected': 2,
+                                             'cells_converted': 2, 'cells_converted_with_errors': 0,
+                                             'cells_not_converted': 0, 'cells_without_result': 0,
+                                             'cells_off_plan': 0})
+        self.assertTrue(result['steps']['cells']['ok'])
         self.assertIn('/vol/ws8/chimport/r/tracker/result-0001.json', result['artifacts'])
         names = runner.ran
         self.assertLess(names.index([n for n in names if '-check-' in n][0]),
                         names.index([n for n in names if '-build-' in n][0]))
+
+    def test_chimport_region_whose_cells_all_failed_is_not_passed(self):
+        # AW-CHIMPORT-REGION-PASSED-ALL-FAILED-66: chimport.py run exits 0 when every cell failed (a failing cell
+        # never stops the run); on 2026-11-12 all 8 cells stopped in 4-5 s on the palette and aw wrote passed
+        cells = '-19,16 -20,16 -21,15 -22,15 -21,16 -27,27 -23,15 -25,16'
+        log = self.chimport_log(*[(key, False, ['collision-union']) for key in cells.split()])
+        code, result, _ = self.submit(self.request(kind='chimport-region', purpose='sol-batch1-easy',
+                                                   options={'cells': cells}), FakeRunner(build_log=log))
+        self.assertEqual(code, aw.EXIT['failed'])
+        self.assertEqual(aw.validate(result, aw.schema('aw-result-1')), [])
+        self.assertEqual(result['status'], 'failed')
+        self.assertEqual(result['failed_stage'], 'chimport')
+        self.assertEqual(result['failed_steps'], ['cells'])
+        self.assertEqual(result['numbers']['cells_not_converted'], 8)
+        self.assertEqual(result['numbers']['cells_converted'], 0)
+        self.assertEqual(result['failures'],
+                         ['chimport: every cell failed: 8 of 8 not converted (collision-union 8)'])
+
+    def test_chimport_region_cells_read_from_the_run_log(self):
+        def verdict(log, cells='1,1 2,2'):
+            code, result, _ = self.submit(self.request(kind='chimport-region', purpose='sol', options={'cells': cells}),
+                                          FakeRunner(build_log=log))
+            return code, result
+        # some cells failing is the measured result of the island's method: passed, the failures counted
+        code, result = verdict(self.chimport_log(('1,1', True, []), ('2,2', False, ['heap-ring'])))
+        self.assertEqual(code, 0, result['failures'])
+        self.assertEqual(result['numbers']['cells_not_converted'], 1)
+        self.assertIn('1 of 2 cells converted', result['steps']['cells']['detail'])
+        self.assertIn('heap-ring 1', result['steps']['cells']['detail'])
+        # converted with errors (a failed audit) is converted: measured, not a failed run
+        code, result = verdict(self.chimport_log(('1,1', True, ['heap-ring', 'memory_fit']), ('2,2', True, [])))
+        self.assertEqual(code, 0, result['failures'])
+        self.assertEqual(result['numbers']['cells_converted_with_errors'], 1)
+        # a selected cell without its result line (stopped, lost): failed
+        code, result = verdict(self.chimport_log(('1,1', True, []), selected=2))
+        self.assertEqual(code, aw.EXIT['failed'])
+        self.assertIn('1 of 2 selected cells have no result line', ' '.join(result['failures']))
+        # a requested cell the plan does not hold: failed
+        code, result = verdict(self.chimport_log(('1,1', True, [])))
+        self.assertEqual(code, aw.EXIT['failed'])
+        self.assertIn("1 of the 2 requested cells are not in the run's plan", ' '.join(result['failures']))
+        # no cell lines at all (the run stopped before its cells): failed, never passed
+        code, result = verdict('build log\n')
+        self.assertEqual(code, aw.EXIT['failed'])
+        self.assertEqual(result['status'], 'failed')
+        self.assertIn('printed no cell selection', ' '.join(result['failures']))
+
+    def test_chimport_region_cells_built_off_plan_fail_the_run(self):
+        # CHIMPORT-LAYER-CELL-EMPTY-67: the first live run of 8 Solstheim cells converted every one as flat empty ground
+        # (the build read the base game's file alone); chimport.py now marks such a cell plan-mismatch, and a run with
+        # one is failed: it read other data than its plan, so its figures are not a measurement
+        cells = '-19,16 -23,15'
+        log = self.chimport_log(('-19,16', True, ['plan-mismatch']), ('-23,15', True, ['plan-mismatch']))
+        code, result, _ = self.submit(self.request(kind='chimport-region', purpose='sol', options={'cells': cells}),
+                                      FakeRunner(build_log=log))
+        self.assertEqual(code, aw.EXIT['failed'])
+        self.assertEqual(result['numbers']['cells_off_plan'], 2)
+        self.assertIn('built from less than their plan holds', ' '.join(result['failures']))
+        # the class name is chimport.py's own
+        self.assertIn("PLAN_MISMATCH = '%s'" % aw_service.CHIMPORT_PLAN_MISMATCH,
+                      (ROOT / 'tools' / 'chimport.py').read_text(encoding='utf-8'))
 
     def test_chimport_masters_copy_matches_the_reader(self):
         sys.path.insert(0, str(ROOT / 'src'))

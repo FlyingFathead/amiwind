@@ -247,6 +247,42 @@ def opening_barrel(data, work, barrel):
     return json.loads((parts / 'scenery-index.json').read_text(encoding='utf-8')), parts / 'scenery.mwpak'
 
 
+def open_container_refs(data, audit, have, settings=None):
+    """SEYDA-CONTAINERS-NOT-DRAWN-67: the frame's placements are the town scene's scenery selection, which keeps
+    statics, doors and named groups, so no crate, barrel, chest or sack of Seyda Neen was drawn and none opened. These
+    are the rows of the town AUDIT (placements.json) the frame adds: a container that opens (tools/open_containers.py:
+    a CONT record with a name, not organic; a plant stays with the harvest) whose physical cell is one of the frame's
+    owned cells (the rule of town_grid.reference_ownership) and whose number is not in HAVE (the tutorial barrel)."""
+    from open_containers import data_open_container_ids
+    settings = _config() if settings is None else settings
+    low, high = settings['owned_cells']
+    ids = data_open_container_ids(data)
+    out = []
+    for ref in audit:
+        if ref.get('type') != 'CONT' or not ref.get('model') or ref['number'] in have:
+            continue
+        cell = [math.floor(ref['position'][k] / 8192) for k in range(2)]
+        if str(ref.get('id', '')).casefold() in ids and all(low[k] <= cell[k] < high[k] for k in range(2)):
+            out.append(ref)
+    return out
+
+
+def open_containers(data, work, refs):
+    """The containers of open_container_refs exported as the tutorial barrel is (their own scenery archive):
+    (scenery index, archive path)."""
+    from prepare_quake import CENTRE
+    from prepare_scenery import export_refs
+    parts = Path(work) / 'open-containers-source'
+    group = 'open_containers'
+    if not (parts / 'scenery-index.json').is_file():
+        export_refs(data, parts, [dict(r, scene_groups=[group]) for r in refs],
+                    {group: {'references': [r['number'] for r in refs]}},
+                    [*CENTRE, 0], 4096, 32, {'scope': 'placed containers that open'})
+    index = json.loads((parts / 'scenery-index.json').read_text(encoding='utf-8'))
+    if sorted(r['number'] for r in index['references']) != sorted(r['number'] for r in refs):
+        raise ValueError('Seyda Neen container export differs from the containers that open (%s)' % parts)
+    return index, parts / 'scenery.mwpak'
+
 
 def write_source_metadata(legacy, work, selected, harvest_set=(), settings=None):
     """Bind this direct source path to original core cells and audited references.
@@ -475,31 +511,45 @@ def prepare_area(legacy, data, work, pal_bytes, qbsp, jobs, cache, timer, settin
             if r['number'] in hidden:
                 r['_story_hidden'] = True
         barrel = next(r for r in wanted if r['id'].casefold() == BARREL)
-        if barrel['number'] not in {r['number'] for r in selected}:
-            bindex, barchive = opening_barrel(data, work, barrel)
+        audit = json.loads((legacy / 'work/generated/seyda-neen/placements.json').read_text(encoding='utf-8'))
+        originals = {r['number']: r for r in audit}
+
+        def place_exported(bindex, barchive, tag):
+            """The references of an own scenery export (the tutorial barrel, the containers that open) placed as the
+            frame's own: their models appended, their meshes made, each bound to its audited original."""
             base = len(textures)
-            textures += bindex['textures']
-            items, added = [], {}
+            textures.extend(bindex['textures'])
+            units, added = [], {}
             for ref in bindex['references']:
                 model = bindex['models'][ref['model_index']]
                 if ref['model_index'] not in added:
                     profile = rock_profile(model['source'], model['triangles'])
-                    fp = fingerprint('mesh', 'opening', mesh_fingerprint(model, profile, bindex['textures']))
-                    items.append((fp, (ref['model_index'], model, profile, barchive, bindex['textures'])))
+                    fp = fingerprint('mesh', tag, mesh_fingerprint(model, profile, bindex['textures']))
+                    units.append((fp, (ref['model_index'], model, profile, barchive, bindex['textures'])))
                     added[ref['model_index']] = len(models)
                     models.append(dict(model, _profile=profile, _archive=str(barchive),
                                        materials=[dict(m, texture_index=None if m.get('texture_index') is None
                                                        else m['texture_index'] + base) for m in model['materials']]))
-            for (fp, task), result in zip(items, run_units('mesh', items, mesh_unit, jobs, cache)):
+            for (fp, task), result in zip(units, run_units('mesh', units, mesh_unit, jobs, cache)):
                 prepared[added[task[0]]] = result
-            mesh_fps.update(mesh_result_keys(items, prepared, [added[task[0]] for _, task in items], 'opening'))
-            audit = json.loads((legacy / 'work/generated/seyda-neen/placements.json').read_text())
-            originals = {r['number']: r for r in audit}
+            mesh_fps.update(mesh_result_keys(units, prepared, [added[task[0]] for _, task in units], tag))
             for ref in bindex['references']:
                 ref = opening_reference(ref, originals[ref['number']])
                 selected.append(dict(capture(ref), model_index=added[ref['model_index']]))
+
+        if barrel['number'] not in {r['number'] for r in selected}:
+            place_exported(*opening_barrel(data, work, barrel), 'opening')
         parity['opening'] = {'story_hidden': sorted(hidden & {r['number'] for r in selected}),
                              'barrel': barrel['number']}
+    with timer.section('open containers'):
+        extra = open_container_refs(data, audit, {r['number'] for r in selected})
+        if extra:
+            place_exported(*open_containers(data, work, extra), 'containers')
+            added_hidden = hidden & {r['number'] for r in extra}
+            for r in selected:
+                if r['number'] in added_hidden:
+                    r['_story_hidden'] = True
+        parity['open_containers'] = sorted(r['number'] for r in extra)
     with timer.section('town flora'):
         if flora:
             from chim.build import add_town_flora, town_flora

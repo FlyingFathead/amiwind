@@ -2,13 +2,14 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 5 times; something has to be done
+## PERSISTING: reported 6 times; something has to be done
 
 - Reported with v0.0.54 at 2026-10-27 18:21 +0200: Seen first in v0.0.54 (not registered then): the tests of gates 4250 and 4252 failed with "Cannot allocate memory" in the gate's compiler wrapper while several gates, builds and an emulator session ran.
 - Reported with v0.0.66-dev10 at 2026-11-16 (time not recorded): Seen again under load: a pregate run failed every check with "Cannot allocate memory" while a long build check ran.
 - Reported with v0.0.66-dev12 at 2026-11-16 (time not recorded): Seen again during the v0.0.66-dev12 delivery with the build from scratch running beside it: the package step stopped on a write error ("Cannot allocate memory") while writing the playtest ZIP, with memory available; the delivery was resumed from that step (DELIVER-RESUME-OWN-OUTPUT-66).
 - Reported with v0.0.66-dev12 at 2026-11-16 18:58 +0200: Seen again on the v0.0.66-dev12 line: a run of about 230 test modules from a worktree, eight at a time in a development container, had 14 modules fail on Cannot allocate memory reads of the repository while a build check ran beside it; run again two at a time beside the full build, every read of the bind mount failed the same way; the same modules from a copy of the committed tree inside the container read nothing over the mount.
 - Reported with v0.0.67-dev1 at 2026-11-17 (time not recorded): Seen again on 17 November 2026 under load: a pregate run read the release file list with grep, the read ended with "Cannot allocate memory", and the check then counted a listed test file as missing and refused the gate; the same branch passed the same pregate by itself minutes before, and the next gate of the same commit ran. A read error in that check is reported as a missing file.
+- Reported with v0.0.67-dev1 at 2026-11-17 17:12 +0200: Seen again in a gate's test container on 17 November 2026 while three gates shared the machine: the compiler wrapper of the native tests could not list its own folder (Cannot allocate memory), so test_chim_engine_native failed before compiling; the same commit had passed that test, and it is gated again.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -45,6 +46,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-16 18:58 +0200: seen again in v0.0.66-dev12: Seen again on the v0.0.66-dev12 line: a run of about 230 test modules from a worktree, eight at a time in a development container, had 14 modules fail on Cannot allocate memory reads of the repository while a build check ran beside it; run ...
 - 2026-11-17: seen again in v0.0.67-dev1: Seen again on 17 November 2026 under load: a pregate run read the release file list with grep, the read ended with "Cannot allocate memory", and the check then counted a listed test file as missing and refused the gate; the same branch ...
 - 2026-11-17: v0.0.67-dev1: Seen a second time the same day: in another pregate run every check of its main container failed at once, one of them with "OSError: [Errno 12] Cannot allocate memory" on listing the tools folder; the checks print nothing else, so each was ...
+- 2026-11-17 17:12 +0200: seen again in v0.0.67-dev1: Seen again in a gate's test container on 17 November 2026 while three gates shared the machine: the compiler wrapper of the native tests could not list its own folder (Cannot allocate memory), so test_chim_engine_native failed before ...
 
 <!-- END GENERATED TIMELINE -->
 
@@ -53,7 +55,7 @@ _Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 5 times; something has to be done](#persisting-reported-5-times-something-has-to-be-done)
+- [PERSISTING: reported 6 times; something has to be done](#persisting-reported-6-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Status: 16 November 2026](#status-16-november-2026)
 - [Symptom](#symptom)
@@ -146,6 +148,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [BUILD-VERSION-EMULATOR-PRESETS-38](BUILD-VERSION-EMULATOR-PRESETS-38.md): Version bump omitted matching emulator presets
 - [BUILD-WORLD-FINGERPRINT-RETIRED-38](BUILD-WORLD-FINGERPRINT-RETIRED-38.md): Content fingerprint requires an explicitly retired exterior BSP
 - [BUILD-WORLD-PACK-RETIRED-38](BUILD-WORLD-PACK-RETIRED-38.md): World disk packer requires explicitly omitted exterior BSP maps
+- CHECKS-NO-WILD-WALK-67 (no report page): The delivery checks never walk through the open world and never fail on engine error lines in the console, so the packet overflow reached the release
 - [CHIM-SEYDA-RECEIPT-TEXT-40](CHIM-SEYDA-RECEIPT-TEXT-40.md): New Seyda metadata and carrier writers omit explicit UTF-8 and LF
 - CI-01 (no report page): Windows short aliases mismatch resolved discovery paths in tests
 - CI-ACTIONS-CACHE-NODE20-54 (no report page): The GitHub workflow pinned actions/cache v4.2.3, which runs on Node 20, a runtime GitHub retires
@@ -228,6 +231,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - STALL-PROBE-PROMPT-LOG-LINE-66 (no report page): The stall examination missed the debugger's prompt when an emulator log line followed it on the same line, never resumed the emulator, and the paused session read as a stop of the game
 - STALL-PROBE-RUNNING-GAME-66 (no report page): The stall examination read a running game as a missing task or as waiting on a file reply: it walked only the ready and waiting task lists and took the wait mask of a task that was not waiting
 - TEST-ACTOR-LIBRARY-OFF-PLAN-48 (no report page): test_actor_library StageTests.test_on_by_default_off_selectable fails on the interiors line: the actor-library stage stays in the plan with --chim-actor-table off
+- TEST-BUILD-STALL-STARTUP-TIMING-67 (no report page): The build stall test of a startup watch (test_a_watch_started_before_the_run_name_writes_once_it_has_one) failed once in a gate on a busy machine: it allows the watch 0.2 s to write
 - [TEST-CENSUS-CONTRACTS-40](TEST-CENSUS-CONTRACTS-40.md): Three quick-character expected failures lack reconciled contracts
 - [TEST-CHIM-BIG-FRAME-TIMEOUT-33](TEST-CHIM-BIG-FRAME-TIMEOUT-33.md): The Balmora-sized CHIM world test times out on a loaded machine
 - TEST-CHIMPORT-POOL-COPY-REUSE-48 (no report page): test_chimport_pool test_copy_mode_reuses_by_verified_copy fails on the interiors branch head
@@ -244,7 +248,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [TEST-PARALLEL-SHARE-TIMING-36](TEST-PARALLEL-SHARE-TIMING-36.md): The fair-share scheduler test watched the freed budget for a fixed 4 s and failed on a loaded machine
 - TEST-POOL-LIVE-GROWTH-FLAKY-64 (no report page): The pool live growth test fails once in a full suite run while the machine is busy and passes when run alone
 - TEST-POOL-LONGEST-FIRST-LOAD-66 (no report page): The pool test of longest-first ordering failed once in a gate run while two other gates shared the machine, and passes when run alone
-- TEST-POOL-QUEUE-REFILL-TIMING-64 (no report page): The pool queue refill test (test_longest_first) failed once in a gate on a busy machine and passed on the rerun of the same commit
+- [TEST-POOL-QUEUE-REFILL-TIMING-64](TEST-POOL-QUEUE-REFILL-TIMING-64.md): The pool queue refill test (test_longest_first) failed once in a gate on a busy machine and passed on the rerun of the same commit
 - TEST-POOL-RESUME-SHELL-CONTAINER-58 (no report page): A stage-key test fails when run on its own in the shell container: a pool-mode resume reuses the scene-chain stage it should rerun
 - TEST-POOL-SCENE-RESUME-ENV-64 (no report page): A stage-key test fails when run directly in the shell container but passes in the gate
 - TEST-PORT-01 (no report page): Focused tests depended on repo root and Windows UTF-8 mode
@@ -266,6 +270,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [TOOLKIT-TEST-POINTERLOCK-31](TOOLKIT-TEST-POINTERLOCK-31.md): Inspector test left pointer lock set, breaking later drag checks
 - TOOLS-UNPINNED-WRITER-ATMOS-54 (no report page): tools/particle_emitters.py wrote JSON without pinned line endings
 - TRACKER-BUGS-PAGE-SIZE-58 (no report page): docs/BUGS.md lists every bug with its whole status, archived ones too, so the archive rotation cannot keep it under its size limit: it reached 95.06 % of 1 MiB
+- [VERSION-BUMP-TOOLKIT-HEADER-67](VERSION-BUMP-TOOLKIT-HEADER-67.md): A version opening leaves the Toolkit header, the previous-release pin and the size baseline at the old release, and the gate checks none of them
 
 Related bugs in other categories:
 

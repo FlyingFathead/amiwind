@@ -124,8 +124,9 @@ class ActorStateWiringTests(unittest.TestCase):
         # OUTDOOR-DEAD-BODY-GONE-66: a dead one not yet cleared is spawned and laid down as its body
         self.assertLess(spawn.index('Cleared (c);'), spawn.index('if (c && c->dead && (c->cleared || !corpses_on))'))
         self.assertIn('AW_CombatLayCorpse (ent)', spawn)
-        # the table join's body (TableJoin and a town map's cells, OUTDOOR-CREATURES-MISSING-66, call it)
-        join = body(actors, 'static void TableJoinKinds (int cx, int cy, const float *offset, int creatures_only)\n{')
+        # the table join's body (TableJoin, a town map's cells, OUTDOOR-CREATURES-MISSING-66, and a region map's home
+        # cell, OUTDOOR-CREATURES-HOME-CELL-67, call it)
+        join = body(actors, 'static void TableJoinKinds (int cx, int cy, const float *offset, int which)\n{')
         self.assertLess(join.index('Respawned (c);'), join.index('if (c && c->pick)'))
         self.assertIn('Respawned (c);', body(actors, 'static void LevelledEntity (edict_t *ent)'))
         self.assertIn('if (Respawned (c))', body(actors, 'static void ApplyLoaded (void)\n{'))
@@ -356,7 +357,12 @@ class LedgerWiringTests(unittest.TestCase):
         self.assertIn('aw_object_lock=AW_ObjectLock;aw_door_open=door_open;', host)
         hinged = code('aw_hinged_door.c')
         self.assertIn('if(aw_door_open)aw_door_open(d->ref,d->dir>0);', body(hinged, 'static int use_door(hd_door_t *d,int force){'))
-        self.assertIn('if(aw_object_lock)aw_object_lock(reference,0,0);', body(hinged, 'static int lock_pass(unsigned reference)'))
+        # LOCKED-CONTAINERS-NEVER-OPEN-67: the one lock rule of doors and containers (lock_pass and container_lock_pass)
+        self.assertIn('if(aw_object_lock)aw_object_lock(reference,0,0);',
+                      body(hinged, 'static int lock_rule(unsigned reference,const char *key,const char *god)'))
+        self.assertIn('return lock_rule(reference,', body(hinged, 'static int lock_pass(unsigned reference)'))
+        self.assertIn('lock_rule(reference,key,AW_CONTAINER_GOD_TEXT)',
+                      body(hinged, 'static int container_lock_pass(unsigned reference,const char *key)'))
         self.assertIn('!saved_open(d->ref)', body(hinged, 'void AW_HingedDoorSpawn(void)'))
         self.assertIn('if(saved_open(reference))', body(hinged, 'int AW_HingedDoorPlacement('))
         # the census hall door's story pose is folded in: the list or the story (an older save) opens it

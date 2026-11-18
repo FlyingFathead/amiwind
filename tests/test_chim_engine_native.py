@@ -391,12 +391,16 @@ def write_test_world(root, first=0, story=(), rows=False, refs=False, placed=Fal
 def write_test_room(root):
     """chim/rooms/doorroom.crm on the test world's store, written by the builder's room record writer
     (tools/chim/interior.py room_record): placement 0 is a door (reference 1001, model 1 at 124 64, yaw 0),
-    placement 1 a plain box (reference 1002, model 0 at -100 -100). Returns the record's references."""
+    placement 1 a plain box (reference 1002, model 0 at -100 -100), placement 2 an expansion's box (REF-IDENTITY-
+    MERGED-MASTER-66: Tribunal's reference 1003 by the merged master's number, 2^22 + 1003, model 0 at -100 60) and
+    placement 3 another plain box (reference 1004, model 0 at 40 -100; an even count keeps the room's model pointers
+    aligned on a 64-bit host, chim_room.c lays them after 9 floats a placement). Returns the record's references."""
     import math
     from chim import placed as P
     from chim.interior import read_room_record, room_record
     records, refs = [], []
-    for pid, ref, model, origin in ((0, 1001, 1, (124.0, 64.0, 0.0)), (1, 1002, 0, (-100.0, -100.0, 0.0))):
+    for pid, ref, model, origin in ((0, 1001, 1, (124.0, 64.0, 0.0)), (1, 1002, 0, (-100.0, -100.0, 0.0)),
+                                    (2, (1 << 22) | 1003, 0, (-100.0, 60.0, 0.0)), (3, 1004, 0, (40.0, -100.0, 0.0))):
         angles = (0.0, 0.0, 0.0)
         lo, hi = P.placed_box(origin, angles, *MODEL_BOXES[model][0])
         box = ([math.floor(v - 1) for v in lo], [math.ceil(v + 1) for v in hi])
@@ -513,7 +517,7 @@ class ChimWorldTests(unittest.TestCase):
                 self.assertGreater(write_test_world(tmp, first, story, rows, refs, placed, reach), 0)
                 if room:
                     # the record keeps each placement's reference: the door's is what the hinged door table keys
-                    self.assertEqual(write_test_room(tmp), [1001, 1002])
+                    self.assertEqual(write_test_room(tmp), [1001, 1002, (1 << 22) | 1003, 1004])
                 if rows:
                     self.assertTrue(list(Path(tmp).glob('chim/frames/*/*/r*/s*.ccs')))
             old = dict(os.environ)

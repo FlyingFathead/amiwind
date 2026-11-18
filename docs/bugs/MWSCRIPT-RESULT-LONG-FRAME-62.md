@@ -20,6 +20,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-07: reported in v0.0.62-dev1
+- 2026-11-17 13:30 +0200: seen again in v0.0.66: Seen again on the released v0.0.66 image on the Pi 4B: running the transport answers of Asciene Rane and Effe-Tei from the console held the game long enough that the remote control session stopped answering twice; the scripts themselves ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
 
 ## Status: 7 November 2026
@@ -85,5 +96,9 @@ Family: Loading and disk reads (`disk-loading`). Load time follows bytes read an
 - [SEYDA-LOAD-HANG-30](SEYDA-LOAD-HANG-30.md): Rare freeze during a Seyda Neen region load
 - [SEYDA-READ-SLOW-31](SEYDA-READ-SLOW-31.md): dev1 Seyda crossings read slower than the ov700 test image
 - [STREAM-FFS-SEEK-32](STREAM-FFS-SEEK-32.md): Random 16 KiB reads on FFS run at 0.44 MB/s and take most of the CPU
+
+Related bugs in other categories:
+
+- MWSCRIPT-MOVE-WAITS-FOR-CONSOLE-67 (no report page): A script that moves the player to another place runs only after the console is closed
 
 <!-- END GENERATED CATEGORY -->

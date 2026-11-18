@@ -5,6 +5,10 @@
 //   node tests/test_toolkit_chim.js heap HEAP_JSON                         the heap report as the page parses it
 //   node tests/test_toolkit_chim.js page HTML WORLD_DIR SIZES_JSON FRAME MAP_FILE
 //                                       the 3D Map Inspector's own CHIM code (DOM/WebGL stubbed: no GPU claim)
+//   node tests/test_toolkit_chim.js terrain WORLD_DIR      every terrain record's lumps as the reader expands them
+//   node tests/test_toolkit_chim.js placed WORLD_DIR       every owned placement's angles and drawn box
+//   node tests/test_toolkit_chim.js cell WORLD_DIR X Y [FRAME]   the frame that holds an exterior cell
+//   node tests/test_toolkit_chim.js versions               the world and store formats the reader takes
 // Prints one JSON document. Synthetic data only in the test suite; nothing here reads game data by itself.
 'use strict';
 const fs = require('fs'), path = require('path');
@@ -38,7 +42,7 @@ async function world(dir, sizesFile, frames) {
     const budget = row ? row.budget_bytes : (R.DEFAULT_MEMORY.zone_kib - 2 * R.DEFAULT_MEMORY.pool_kib) * 1024;
     const scan = R.ringScan(T, radius, budget, heap ? heap.sample_units : 64);
     const geometry = {terrain_faces: 0, placement_faces: 0};
-    for (const c of fd.chunks) geometry.terrain_faces += R.brushGeometry(c.image, {shift: c.shift || [0, 0, 0]}).faceCount;
+    for (const c of fd.chunks) geometry.terrain_faces += R.brushGeometry(c.lumps, {shift: c.shift || [0, 0, 0]}).faceCount;
     for (const c of fd.chunks) for (const r of c.owned) geometry.placement_faces += R.brushGeometry(fd.models.get(r.model).image, r).faceCount;
     out.loaded.push(Object.assign(R.frameSummary(fd), {problems: fd.problems, geometry,
       chunk_heap: fd.chunks.map(c => c.heap_bytes), model_heap: [...fd.models.values()].map(m => [m.id, m.heap_bytes]),
@@ -49,6 +53,43 @@ async function world(dir, sizesFile, frames) {
         ring_chunks: row.ring_chunks, ring_models: row.ring_models, ring_textures: row.ring_textures, budget_bytes: row.budget_bytes} : null}));
   }
   return out;
+}
+
+// Every terrain record (TERR) of a world's sector files as the reader expands it: per record its form (image, compact,
+// generated with its record version) and each of its 15 lumps as [bytes, CRC-32], to compare with tools/chim/terc.py
+// and tools/chim/thgt.py decode.
+async function terrain(dir) {
+  const src = dirSource(dir), out = [];
+  for (const p of src.list().filter(p => /\.ccs$/.test(p)).sort()) {
+    for (const r of R.readSector(await src.read(p))) {
+      if (r.kind !== 'TERR') continue;
+      const head = String.fromCharCode(...r.data.subarray(0, 4));
+      const form = head === 'THG1' ? 'generated-' + R.terrainFacts(r.data).version : head === 'TRC1' ? 'compact' : 'image';
+      out.push({path: p.replace(/^chim\//, ''), id: r.id, form, lumps: R.brushLumps(r.data).map(l => [l.length, R.crc32(l)])});
+    }
+  }
+  return out;
+}
+
+// Every owned placement of every frame: its angles (0.8 placed records) and the box of its drawn vertices.
+async function placed(dir) {
+  const w = await R.openWorld(dirSource(dir)), out = [];
+  for (const f of w.frames) {
+    const fd = await R.loadFrame(w, f.path, null);
+    for (const c of fd.chunks) for (const r of c.owned) {
+      const g = R.brushGeometry(fd.models.get(r.model).image, r);
+      if (!g.vertices.length) continue;
+      const lo = [0, 1, 2].map(k => Math.min(...g.vertices.map(v => v[k]))), hi = [0, 1, 2].map(k => Math.max(...g.vertices.map(v => v[k])));
+      out.push({ref: r.ref, angles: r.angles || null, record_size: c.record_size, box: [lo, hi]});
+    }
+  }
+  return out;
+}
+
+// The frame that holds exterior cell X,Y (frameHolding), with an optional frame named by the caller.
+async function cell(dir, x, y, hint) {
+  const w = await R.openWorld(dirSource(dir)), f = await R.frameHolding(w, Number(x), Number(y), hint || null);
+  return {frame: f ? f.path : null, frames: w.frames.map(q => [q.path, q.cell])};
 }
 
 function map(file) {
@@ -116,6 +157,10 @@ async function page(htmlFile, dir, sizesFile, frame, mapFile) {
   else if (mode === 'map') out = map(args[0]);
   else if (mode === 'heap') out = heap(args[0]);
   else if (mode === 'page') out = await page(args[0], args[1], args[2], args[3], args[4]);
-  else throw Error('usage: world|map|heap|page ...');
+  else if (mode === 'terrain') out = await terrain(args[0]);
+  else if (mode === 'placed') out = await placed(args[0]);
+  else if (mode === 'cell') out = await cell(args[0], args[1], args[2], args[3]);
+  else if (mode === 'versions') out = {read: R.READ_VERSIONS, store: R.STORE_VERSIONS};
+  else throw Error('usage: world|map|heap|page|terrain|placed|cell|versions ...');
   process.stdout.write(JSON.stringify(out) + '\n');
 })().catch(e => { process.stderr.write(String(e && e.stack || e) + '\n'); process.exit(1); });

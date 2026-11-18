@@ -179,6 +179,24 @@ reads(){ grep -o 'reads=[0-9]*' $R/awctl/console.log 2>/dev/null | tail -1 | cut
 # From 32 MB of Fast RAM no CHIM chunk may wait for room in the zone (CHIM-ZONE-BUDGET-33: 0 in Seyda Neen, Balmora and
 # Vivec at 32 MB since v0.0.51; at 16 MB the retries are the known cost). ZONEFULL=allow (--allow-zone-full) only counts.
 zonefull(){ grep -c "CHIM: .*zone full" $R/awctl/console.log 2>/dev/null; }
+# ENGINE-REGRESSION-GUARDS-67: the engine's known failure lines fail a run wherever they show in its console: an entity
+# update that overflowed the client's message (the old "packet overflow", the fixed engine's "Message overflow caught"),
+# a frame update the client dropped or could not read ("Frame update dropped", "Illegible server message"), and any
+# Host_Error (the game ended), and the message buffer's own overflow line (SZ_GetSpace, printed with developer 1 since
+# the fix; before it, the line of the bad message). ENGERR=allow (--allow-engine-errors) only counts them, for a run
+# that shows one on purpose.
+ENGERR_RE='packet overflow|Message overflow|Frame update dropped|Illegible server message|Host_Error|SZ_GetSpace'
+engerr(){ grep -E -m 1 "$ENGERR_RE" $R/awctl/console.log 2>/dev/null | cut -c1-160; }
+engerrs(){ grep -c -E "$ENGERR_RE" $R/awctl/console.log 2>/dev/null; }
+# netover: the first dbg netstat reading in the console (aw_netstat, NET-VIVEC-ENTITY-PACKET-OVERFLOW-66; the smoke reads
+# it at each of its stops, a script with "cmd aw_netstat") whose fullest frame since the map started wanted more bytes
+# than the game's own connection carries (the ceiling its line names), or that counts a frame update not sent; empty
+# when every reading is clean or none was taken. Judged with the engine error lines (ENGERR=allow only logs it).
+netover(){ awk '/^Frame update on /{c=""; m=$4; sub(/:$/,"",m); if (match($0,/own connection up to [0-9]+/)) c=substr($0,RSTART+21,RLENGTH-21)}
+  /^Since the map started: /{w=""; d=""; if (match($0,/the fullest wanted [0-9]+/)) w=substr($0,RSTART+19,RLENGTH-19)
+    if (match($0,/; [0-9]+ frame updates not sent/)) {d=substr($0,RSTART+2,RLENGTH-2); sub(/ .*/,"",d)}
+    if (d+0>0 || (c!="" && w+0>c+0)) {printf "%s: the fullest frame wanted %s bytes against the ceiling %s, %s frame updates not sent\n", m, w, c, d; exit}}' \
+  $R/awctl/console.log 2>/dev/null; }
 # finish RESULT: the first result stands; a finish reached inside $( ) (rc in status/advance) ends only that subshell,
 # so the outer script's own finish afterwards must not write a second result over it
 # SMOKE-INPLAY-UNSAMPLED-63: every stop is examined (stall.py) before the run ends and before any retry, whichever
@@ -197,6 +215,10 @@ finish(){ [ -e $R/finished ] && exit 0; : > $R/finished
         set -- "FAIL CHIM zone full $z times at $FASTMB MB of Fast RAM, with the CHIM cache skipped for this start by a key the smoke sent onto the startup logo (SMOKE-M-KEY-SKIPS-CHIM-CACHE-57)"
       else set -- "FAIL CHIM zone full $z times at $FASTMB MB of Fast RAM (none allowed from 32 MB: CHIM-ZONE-BUDGET-33)"; fi;; esac
     [ "$(st screen)" = game ] || set -- "FAIL the run ended outside play: screen $(st screen) (map $(st map))";; esac
+  [ "${REMOTE:-1}" = 0 ] || [ "${ENGERR:-fail}" = allow ] || case "$1" in PASS*) e=$(engerr)
+    [ -n "$e" ] && set -- "FAIL $(engerrs) engine error lines in the console (ENGINE-REGRESSION-GUARDS-67), the first: $e";; esac
+  [ "${REMOTE:-1}" = 0 ] || [ "${ENGERR:-fail}" = allow ] || case "$1" in PASS*) e=$(netover)
+    [ -n "$e" ] && set -- "FAIL dbg netstat in $e (ENGINE-REGRESSION-GUARDS-67)";; esac
   recstop; cp $R/home/Cache/Logs/fs-uae.log.txt $R/logs/fs-uae.log.txt 2>/dev/null
   grep -E "Caught illegal|Fault address|Suspicious" $R/logs/fs-uae.log.txt 2>/dev/null | tail -12 > $R/logs/emulator-faults.txt
   cp $R/awctl/console.log $R/logs/console.log 2>/dev/null; alive && shot final
@@ -491,6 +513,63 @@ if [ -s $R/script.txt ]; then
     finish "FAIL scripted run ended outside play: map $(st map), signon $(st signon), world leaves $(st world_leafs)"
   finish "PASS script, $(st map) running, $(( $(date +%s) - t0 )) s"
 fi
+# GUARDS-BEGIN (ENGINE-REGRESSION-GUARDS-67, SAVE-AUTOSAVE-REGRESSED-67): SAVES=check, the default on the plain route
+# from Seyda Neen (a full image, the gate's smoke): a character for the run first (the Hors preset in play, as
+# dbg aw hors 0 makes it: released, so a map change may save), then every map change of the route must write its
+# autosave within AUTOSAVE_WAIT s (30) of the map being in play, and at the end the save status must hold nothing back.
+# The outdoor creatures are counted at Seyda Neen and at one wild stop (WILD, the Bitter Coast spot of the maintainer's
+# game of 17 November 2026): none alive fails (CREATURES=known-gap only logs the count). Each stop takes a dbg netstat
+# reading, which finish judges with the engine error lines (netover). SAVES=off skips all of it.
+SAVES=${SAVES:-check}
+{ [ "$MAP1" = seyda ] && [ "${START:-map}" = map ]; } || SAVES=off
+case "$TP" in same\ *|view\ *|map:*) SAVES=off;; esac
+autosaved(){ [ "$SAVES" = check ] || return 0; s=0
+  while [ $s -lt $((${AUTOSAVE_WAIT:-30}*K)) ]; do alive || finish "FAIL emulator exited waiting for the autosave after $2"
+    since "$1" | grep -q '^Saved Autosave' && { log "autosave after $2: $(since "$1" | grep '^Saved Autosave' | tail -n 1)"; return 0; }
+    sleep 1; s=$((s+1)); done
+  finish "FAIL no autosave within ${AUTOSAVE_WAIT:-30} s after $2 (ENGINE-REGRESSION-GUARDS-67); the last save line: $(since "$1" | grep -E '^Save|^Saved|^Saves:' | tail -n 1)"; }
+# The actors of an arrival join from a queue, a few a tick, nearest first (aw_actors.c SpawnQueued): gate 11306 counted
+# 0 alive one second after the arrival in Seyda Neen with 53 actors still queued. So the count is asked again every
+# 5 s until one is alive or CREATURES_WAIT s (60) have passed.
+# creatures WHERE [GAP]: with GAP (a register id) the count is a known gap: asked for 10 s at most, logged, never failing;
+# a count above none says the gap passes now (the register to check)
+creatures(){ [ "$SAVES" = check ] || return 0; m=$(clines); rc "chim actors table"; rc "aw_sweep actors"
+  s=0; n=; t=; w=; cw=${CREATURES_WAIT:-60}; [ -n "$2" ] && cw=10
+  while [ $s -lt $((cw*K)) ]; do alive || finish "FAIL emulator exited counting the creatures at $1"
+    [ $((s % (5*K))) = 0 ] && rc "chim actors creatures on"; sleep 1; s=$((s+1))
+    n=$(since "$m" | sed -n 's/^Creatures on: \([0-9][0-9]*\) alive.*/\1/p' | tail -n 1)
+    t=$(since "$m" | sed -n 's/.* queued \([0-9][0-9]*\),.* levelled \([0-9][0-9]*\) (kept picks [0-9]*, nothing \([0-9][0-9]*\).*/\2 levelled, \3 rolled nothing, \1 actors queued/p' | tail -n 1)
+    w=$(since "$m" | sed -n 's/^ *actors: \(map [0-9]*, live [0-9]*\);.*/\1/p' | tail -n 1)
+    [ -n "$n" ] && [ "$n" -gt 0 ] 2>/dev/null && [ -n "$t" ] && break; done
+  log "creatures at $1: ${n:-no answer} alive after $s s; the actor table: ${t:-no answer}; dbg sweep actors: ${w:-no answer} ($(since "$m" | grep '^SWEEP RESULT' | tail -n 1 | cut -d' ' -f3-4))"
+  if [ -n "$2" ]; then
+    if [ "${n:-0}" -gt 0 ] 2>/dev/null; then log "known gap $2 passes now at $1: check the register"
+    else log "known gap $2 at $1: still no creature alive"; fi; return 0; fi
+  [ "${CREATURES:-check}" = known-gap ] && return 0
+  [ -n "$n" ] || finish "FAIL no answer to chim actors creatures at $1"
+  [ "$n" -gt 0 ] || finish "FAIL no outdoor creature alive at $1 within ${CREATURES_WAIT:-60} s (ENGINE-REGRESSION-GUARDS-67, OUTDOOR-CREATURES-MISSING-66); the actor table: ${t:-no answer}"; }
+# netstat_at WHERE: a dbg netstat reading at a stop (its fullest frame and its frame updates not sent are judged by
+# finish, netover); logged with the stop's name
+netstat_at(){ [ "$SAVES" = check ] || return 0; m=$(clines); rc "aw_netstat"; sleep $((2*K))
+  log "netstat at $1: $(since "$m" | grep '^Since the map started' | tail -n 1 | cut -c1-220)"; }
+# tp_to X Y WHAT: dbg tp to a wild point, until the server runs another map than now (150 s)
+tp_to(){ was=$(st server); rc "dbg tp $1 $2"; s=0; while [ $s -lt $((150*K)) ]; do alive || finish "FAIL emulator exited after dbg tp $1 $2"
+    [ "$(st server)" != "$was" ] && [ -n "$(st server)" ] && [ "$(st server)" != none ] && break; sleep 1; s=$((s+1)); done
+  [ $s -lt $((150*K)) ] || stall "dbg tp $1 $2 ($3) did not load a map (server $(st server))"; inplay "$3 ($(st server))"; }
+if [ "$SAVES" = check ]; then
+  # the creatures of Seyda Neen as the map's first load joins them, then again after the test character's preset reloads
+  # the same map: a hard check since the engine joins a map spawned again under its own name (gates 11306 and 11307
+  # found none after the reload, ACTOR-TABLE-SAME-MAP-RELOAD-67, logged as a known gap until the fix)
+  creatures "Seyda Neen"
+  M=$(clines); rc "aw_debug_hors 0"; s=0
+  while [ $s -lt $((150*K)) ]; do alive || finish "FAIL emulator exited making the Hors preset"
+    since "$M" | grep -q '^Scene ready: seyda' && break; sleep 1; s=$((s+1)); done
+  since "$M" | grep -q '^Created Hors' || finish "FAIL dbg aw hors 0 made no character: $(since "$M" | grep -i hors | tail -n 1)"
+  inplay "Seyda Neen as Hors"; autosaved "$M" "the Hors preset's arrival in Seyda Neen"
+  creatures "Seyda Neen after the preset's reload"
+  netstat_at "Seyda Neen"
+fi
+# GUARDS-END
 a=$(status); [ -n "$a" ] || stall "no answer to aw_music_status in $MAP1"
 sleep $((5*K)); b=$(advance "$a")
 [ -n "$a" ] && [ -n "$b" ] && [ "$b" -gt "$a" ] || finish "FAIL music not reading in $MAP1 (reads $a -> $b over ${MUSIC_WAIT:-45} s)"
@@ -517,22 +596,32 @@ map:*)  # a one-town image: the second load is another map it holds
 # REPEAT: the map change runs REPEAT times (back to MAP1 with "map MAP1" in between), so an intermittent hang
 # fails the smoke instead of passing on a lucky run (CHIM-SEYDA-BALMORA-LOAD-HANG-43).
 r=1; while :; do
-rc "dbg tp $TP"; s=0; while [ $s -lt $((150*K)) ]; do alive || finish "FAIL emulator exited after dbg tp $TP (load $r of $REPEAT)";
+M=$(clines); rc "dbg tp $TP"; s=0; while [ $s -lt $((150*K)) ]; do alive || finish "FAIL emulator exited after dbg tp $TP (load $r of $REPEAT)";
   [ "$(st server)" != "$MAP1" ] && [ -n "$(st server)" ] && [ "$(st server)" != none ] && break; sleep 1; s=$((s+1)); done
 [ $s -lt $((150*K)) ] || stall "dbg tp $TP did not load a map (server $(st server), load $r of $REPEAT)"
 [ $r -ge $REPEAT ] && break
-inplay "the second load ($(st server), load $r of $REPEAT)"; sleep $((3*K)); r=$((r+1))
-rc "map $MAP1"; loaded "$MAP1"; inplay "$MAP1 again (before load $r of $REPEAT)"; sleep $((3*K))
+inplay "the second load ($(st server), load $r of $REPEAT)"; autosaved "$M" "the load of $(st server) ($r of $REPEAT)"; sleep $((3*K)); r=$((r+1))
+M=$(clines); rc "map $MAP1"; loaded "$MAP1"; inplay "$MAP1 again (before load $r of $REPEAT)"; autosaved "$M" "$MAP1 again (before load $r of $REPEAT)"; sleep $((3*K))
 done; log "map change ran $r times";;
 esac
-inplay "the second load ($(st server))"
-play $PLAY "$(st server) (music off)"; shot map2
+inplay "the second load ($(st server))"; autosaved "${M:-0}" "the last load of $(st server)"; netstat_at "$(st server)"
+M2=$(st server); play $PLAY "$(st server) (music off)"; shot map2
 c=$(status); [ -n "$c" ] || stall "no answer to aw_music_status after the second load"
 [ "$c" = "$e" ] || finish "FAIL music read while off (reads $e -> $c)"
 rc "aw_music_status on"; sleep $((3*K)); d=$(advance "$c")
 [ -n "$d" ] && [ "$d" -gt "${c:-0}" ] || finish "FAIL music did not read again after dbg music on (reads $c -> $d over ${MUSIC_WAIT:-45} s)"
 play 5 "music on again"
-finish "PASS boot, $MAP1 and $(st server) loaded, music reads $a -> $b, off (reads stayed $c), on again ($c -> $d), $(( $(date +%s) - t0 )) s"
+# ENGINE-REGRESSION-GUARDS-67: the one wild stop (the Bitter Coast, an outdoor region map), after the music's checks
+# in the second map: its autosave, its creatures and its dbg netstat reading
+if [ "$SAVES" = check ]; then set -- ${WILD:--13677 -61720}; M=$(clines); tp_to "$1" "$2" "the wild stop"
+  autosaved "$M" "the wild stop ($(st server))"; creatures "the wild stop ($(st server))"; netstat_at "the wild stop"; fi
+# ENGINE-REGRESSION-GUARDS-67: at the end nothing may hold the autosave back (dbg save status, SAVE-AUTOSAVE-REGRESSED-67)
+if [ "$SAVES" = check ]; then m=$(clines); rc "aw_save_status"; s=0; h=
+  while [ $s -lt $((15*K)) ]; do alive || finish "FAIL emulator exited reading the save status"; sleep 1; s=$((s+1))
+    h=$(since "$m" | sed -n 's/^Held by: //p' | tail -n 1); [ -n "$h" ] && break; done
+  log "save status at the end: held by ${h:-no answer}; $(since "$m" | grep -E '^autosaves -> |^Last save:' | tr '\n' ' ')"
+  [ "$h" = nothing ] || finish "FAIL the save status at the end: held by ${h:-no answer} (ENGINE-REGRESSION-GUARDS-67)"; fi
+finish "PASS boot, $MAP1 and ${M2:-$(st server)} loaded, music reads $a -> $b, off (reads stayed $c), on again ($c -> $d)$([ "$SAVES" = check ] && echo ", the wild stop $(st server), an autosave on every map change, creatures alive outdoors"), $(( $(date +%s) - t0 )) s"
 '''
 
 
@@ -1268,6 +1357,10 @@ def main(argv=None):
     ap.add_argument('--allow-zone-full', action='store_true',
                     help='from 32 MB a CHIM "zone full" retry fails the smoke (CHIM-ZONE-BUDGET-33); with this it is '
                     'only counted (diagnostic runs)')
+    ap.add_argument('--allow-engine-errors', action='store_true',
+                    help='a packet overflow, Message overflow, Frame update dropped, Illegible server message or Host_Error '
+                    'line in the console fails the smoke (ENGINE-REGRESSION-GUARDS-67); with this it is only counted (a '
+                    'diagnostic run that shows one on purpose)')
     ap.add_argument('--repeat', type=int, default=3,
                     help='run the --tp map change this many times (back to --map in between), so an intermittent load hang '
                          'fails the smoke (CHIM-SEYDA-BALMORA-LOAD-HANG-43); default 3')
@@ -1419,7 +1512,7 @@ echo "readback=$(sha256sum /tmp/back | cut -d' ' -f1)"'''
             return 2
         docker(*base, '--cpus', args.cpus, '--memory', '3g', '--name', args.name + '-run', '--entrypoint', 'sh',
                '-e', f'PROF={args.prof}', '-e', f'WORLD={world.group(1) if world else ""}', '-e', f'MAP1={args.map}',
-               '-e', f'TP={args.tp}', '-e', f'PLAY={args.play}', '-e', f'REPEAT={max(1, args.repeat)}', '-e', f'START={args.start}', '-e', f'AFTER={args.after_load}', '-e', f'ILLEGAL={int(args.log_illegal)}', '-e', f'IDETRACE={int(args.ide_trace)}', '-e', f'LOADTRACE={int(args.load_trace)}', '-e', 'REMOTE=%d' % (args.remote == 'on'), '-e', f'ROUTESECS={args.route_seconds}', '-e', f'SHOTEVERY={args.shot_every}', '-e', f'FROZEN={args.frozen}','-e', f'KICK={args.kickstart}', '-e', f'FASTMB={args.fast_mb}', '-e', f'SWEEP={args.sweep}', '-e', 'ZONEFULL=%s' % ('allow' if args.allow_zone_full else 'fail'),
+               '-e', f'TP={args.tp}', '-e', f'PLAY={args.play}', '-e', f'REPEAT={max(1, args.repeat)}', '-e', f'START={args.start}', '-e', f'AFTER={args.after_load}', '-e', f'ILLEGAL={int(args.log_illegal)}', '-e', f'IDETRACE={int(args.ide_trace)}', '-e', f'LOADTRACE={int(args.load_trace)}', '-e', 'REMOTE=%d' % (args.remote == 'on'), '-e', f'ROUTESECS={args.route_seconds}', '-e', f'SHOTEVERY={args.shot_every}', '-e', f'FROZEN={args.frozen}','-e', f'KICK={args.kickstart}', '-e', f'FASTMB={args.fast_mb}', '-e', f'SWEEP={args.sweep}', '-e', 'ZONEFULL=%s' % ('allow' if args.allow_zone_full else 'fail'), '-e', 'ENGERR=%s' % ('allow' if args.allow_engine_errors else 'fail'),
                '--mount', f'type=volume,src={args.volume},dst=/w,volume-subpath={scratch}',
                '--mount', f'type=volume,src={args.volume},dst=/img,volume-subpath={args.image_dir},readonly',
                '-v', f'{args.roms.resolve()}:/roms:ro', '-v', f'{out}:/out', args.fsuae_image, '/out/probe.sh',

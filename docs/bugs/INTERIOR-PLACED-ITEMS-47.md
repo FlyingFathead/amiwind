@@ -216,7 +216,7 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [NIGHT-WINDOWS-LOST-CHIM-36](NIGHT-WINDOWS-LOST-CHIM-36.md): Windows no longer glow at night: the night-windows table has been empty since the towns moved to CHIM
 - PLAYER-WEREWOLF-ROBE-NOT-BAKED-66 (no report page): With Bloodmoon selected, the player parts stage stopped on the werewolf robe, a worn part with no player model
 - [PLAYTEST-PAYLOAD-COVERAGE-32](PLAYTEST-PAYLOAD-COVERAGE-32.md): The v0.0.32-dev1 playtest has no first-person hands and no harvest
-- REF-IDENTITY-MERGED-MASTER-66 (no report page): With both expansions selected the build stops in its focus stage: a merged reference number does not fit the stable id
+- [REF-IDENTITY-MERGED-MASTER-66](REF-IDENTITY-MERGED-MASTER-66.md): With both expansions selected the build stops in its focus stage: a merged reference number does not fit the stable id
 - [RELEASE-PRIVATE-NAMES-48](RELEASE-PRIVATE-NAMES-48.md): Two public files named the private working folder, and seven public lines used a banned abbreviation for actor behaviour
 - ROBE-PART-NOT-BAKED-62 (no report page): An equipped robe taken from Tarhiel is drawn in first person but not on the third-person body or in the inventory picture
 - [ROOM-ACTORS-FLOATING-48](ROOM-ACTORS-FLOATING-48.md): Regression: 1,662 residents of batch CHIM rooms stood above the floor, never fitted to it
@@ -225,8 +225,10 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [ROOM-BATCH-WATER-OUTSIDE-48](ROOM-BATCH-WATER-OUTSIDE-48.md): Room batches refused rooms whose cell water lies under or over everything the room places (water outside the room bounds)
 - ROOM-EMPTY-CELL-66 (no report page): Four expansion interior cells with no scenery were refused by the room batches stage as having no placement to convert
 - [ROOM-OBJECTS-MISSING-62](ROOM-OBJECTS-MISSING-62.md): In the Andrano Ancestral Tomb only the doors can be used: no containers, items or creatures
+- [SEYDA-CONTAINERS-NOT-DRAWN-67](SEYDA-CONTAINERS-NOT-DRAWN-67.md): Seyda Neen's crates, barrels, chest and sacks are not drawn and cannot be opened
 - [SEYDA-LANTERNS-MISSING-31](SEYDA-LANTERNS-MISSING-31.md): Seyda Neen lanterns light the night but are not in its maps
 - [SKY-FLAT-PALETTE-DRIFT-41](SKY-FLAT-PALETTE-DRIFT-41.md): Exterior sky flat with no clouds: the sampled palette drifted and the shared cloud sky silently fell back to a one-colour placeholder
+- [STAGE-READS-SELECTED-MASTERS-67](STAGE-READS-SELECTED-MASTERS-67.md): No build stage proves it read the game files the build selected, so a stage that reads only the base game goes unnoticed
 - TP-LIST-UNBUILT-EXTERIORS-66 (no report page): The teleport place list would list Solstheim places the image has no world for
 - TREE-SCALE-001 (no report page): Non-unit-scale tree sprites omitted; bounds too conservative
 - VIVEC-HOVER-VERIFY-48 (no report page): Vivec (the god) floats in meditation: verify whether it is his animation over a grounded collision origin or an active effect
@@ -235,6 +237,8 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 Related bugs in other categories:
 
 - CENSUS-BACK-TABLE-NOT-DRAWN-58 (no report page): The back-room table of the Census and Excise Office is not drawn
+- CENSUS-SHELF-PLATE-BAKED-67 (no report page): Census and Excise Office: a plate on the bookshelf is drawn as part of the room and cannot be taken, although in the original it is a separate item
+- [CONTAINER-BRUSH-ROWS-67](CONTAINER-BRUSH-ROWS-67.md): The containers of the Imperial Prison Ship and the Census and Excise Office cannot be opened: drawn as brushes of their own, their use rows are skipped
 - FOCUS-BOX-UNDRAWN-ITEMS-58 (no report page): The focus box showed for room items that the room does not draw, and the activate key then took nothing
 - [HARVEST-INTERIOR-PICK-47](HARVEST-INTERIOR-PICK-47.md): Mushrooms inside interiors cannot be picked
 - [HARVEST-ORGANIC-PLANTS-47](HARVEST-ORGANIC-PLANTS-47.md): Only the small mushrooms can be picked; every other harvestable plant is scenery

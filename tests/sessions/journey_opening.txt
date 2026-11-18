@@ -357,6 +357,17 @@ probe state_released aw_mwscript_status call getglobal CharGenState
 expect lacks release_map census
 expect state_released == -1
 shot a6-released
+# SAVE-AUTOSAVE-REGRESSED-67: the release's map change is the first after which the game may save, so the game's own
+# autosave is on disk by now (written 3 s after a settled arrival). dbg save status counts this character's autosaves;
+# on a miss its answer names what held the autosave back and how the last save ended
+wait 4
+probe autosaves_released aw_save_status
+expect autosaves_released >= 1
+# ENGINE-REGRESSION-GUARDS-67 (OUTDOOR-CREATURES-MISSING-66): Seyda Neen is outdoors, and its creatures are alive (the
+# switch is on by default: "on" changes nothing, its answer counts the creatures alive in the loaded area)
+probe creatures_seyda chim actors creatures on
+pick creatures_alive creatures_seyda after Creatures on:
+expect creatures_alive >= 1
 
 step 6 kill an actor, enter an interior, come back: the dead stay dead, and the captain's room lets the player out by either door
 cmd dbg god on
@@ -503,3 +514,10 @@ expect door_to != door_from
 expect has door_to census
 expect package_door == 1
 shot b2-through-the-door
+# ENGINE-REGRESSION-GUARDS-67: every map change since the release wrote its autosave (the release's, the captain's room
+# and the courtyard and back in part A, this door in part B; the load of the quicksave is none), and at the end nothing
+# holds the autosave back
+wait 4
+probe saves_held aw_save_status
+expect has saves_held Held by: nothing
+expect autosaves from step 5

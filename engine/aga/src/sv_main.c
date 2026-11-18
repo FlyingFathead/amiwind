@@ -27,6 +27,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "aw_spike.h"
 #include "aw_ambient.h"
 #include "aw_items.h"
+/* aw_actors.c: every server spawn is a new map for the actors, the same map's name too (ACTOR-TABLE-SAME-MAP-RELOAD-67).
+ * Declared here, not in aw_actors.h: the CHIM world stage keys that header, and this fix must move no world stage key. */
+void AW_ActorsServerReset (void);
 
 server_t		sv;
 server_static_t	svs;
@@ -35,6 +38,8 @@ void (*aw_inspect_reset)(void);
 char	localmodels[MAX_MODELS][5];			// inline model names for precache
 
 //============================================================================
+
+static void SV_NetStat_f (void);	/* dbg netstat (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66) */
 
 /*
 ===============
@@ -67,6 +72,7 @@ void SV_Init (void)
     Cvar_RegisterVariable (&sv_nostep);
     Cvar_RegisterVariable (&aw_step_rules);	/* aw_walk.c, docs/STEP_MOVEMENT.md (default 0) */
     Cvar_RegisterVariable (&aw_body_overlap);	/* world.c, DOOR-ARRIVAL-INSIDE-ACTOR-66 (default 1) */
+    Cmd_AddCommand ("aw_netstat", SV_NetStat_f);
 
     for (i=0 ; i<MAX_MODELS ; i++)
         sprintf (localmodels[i], "*%ld", (long)i);
@@ -361,6 +367,7 @@ SV_ClearDatagram
 void SV_ClearDatagram (void)
 {
     SZ_Clear (&sv.datagram);
+    sv.datagram.overflowed = false;	/* a frame's overflow was dropped with that frame (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66) */
 }
 
 /*
@@ -462,19 +469,76 @@ static float SV_AliasScale (edict_t *ent)
     return m && m->type == mod_alias ? s : 1;
 }
 
+/* NET-VIVEC-ENTITY-PACKET-OVERFLOW-66 (critical; the maintainer's hang of 2026-11-17 on the Bitter Coast, and Vivec
+ * since v0.0.66-dev7): the entity updates of a frame no longer fit the old 1024-byte message where many things are in
+ * sight (harvestable plants, residents, creatures, items). The old loop stopped at "packet overflow" once fewer than
+ * 16 bytes were left, but an update takes up to 28 since the 3-byte coordinates and the 2-byte model number; the last
+ * one then ran past the buffer, whose overflow flag was never set on this stack buffer: the message was cleared and
+ * written on from the middle of an update ("SZ_GetSpace: overflow"), and the screen side stopped on it
+ * ("CL_ParseServerMessage: Illegible server message"). Now every update is sized before it goes in (aw_netsend.inc),
+ * the nearest go first and the rest in the next frames, and the game's own connection (the loopback, which never
+ * leaves the machine) takes a larger message. sv_net_reserve: the bytes the caller keeps free after the entities (the
+ * frame's sounds and effects, sv.datagram). */
+/* The largest update of one entity, from SV_WriteEntityUpdate's format (the maintainer, 2026-11-17: sure to be caught,
+ * so computed from the format, never a literal): the bits and their second byte, the entity number as a short, the
+ * model as a short (protocol.h MSG_WriteModel), frame, colormap, skin and effects a byte each, three coordinates of
+ * AW_COORD_BYTES (aw_coord.h), three angles of a byte, and the AmiWind fields (their byte, the scale as a float, the
+ * frame's high byte): 28 bytes with 3-byte coordinates. tests/aga_netsend_test.c writes the largest update and
+ * checks it is exactly this. */
+#define AW_NETSEND_RECORD_MAX (1 + 1 + 2 + 2 + 4 + 3 * AW_COORD_BYTES + 3 + 1 + (int)sizeof(float) + 1)
+#include "aw_netsend.inc"
+static int sv_net_reserve;
+static unsigned char sv_net_missed[MAX_EDICTS];   /* frames each entity's update waited (cleared with a new server) */
+static aw_netsend_t sv_net_cand[MAX_EDICTS];
+static unsigned char sv_net_send[MAX_EDICTS];
+/* dbg netstat: the last frame and the fullest frame since the map started */
+static struct {
+    int candidates,wanted,budget,sent,sent_bytes,deferred,frames,frames_deferred,frames_over_1024,dropped;
+    int worst_wanted,worst_candidates,worst_budget,worst_deferred;
+    double said;
+} sv_net;
+static void SV_WriteEntityUpdate (edict_t *ent, int e, sizebuf_t *msg);
+/* One entity's update, built whole in OUT (AW_NETSEND_RECORD_MAX bytes) before it goes anywhere: its size in bytes, or
+ * -1 when it would not fit there (a format that grew past the computed largest update: never written, said once). */
+static int SV_EntityUpdateRecord (edict_t *ent, int e, byte *out)
+{
+    static qboolean said;
+    sizebuf_t	scratch;
+    memset (&scratch, 0, sizeof(scratch));
+    scratch.data = out;
+    scratch.maxsize = AW_NETSEND_RECORD_MAX;
+    scratch.allowoverflow = true;	/* caught here, never Sys_Error: an overflow marks it and clears it */
+    SV_WriteEntityUpdate (ent, e, &scratch);
+    if (scratch.overflowed)
+    {
+        if (!said)
+            Con_Printf ("Entity %ld: its update is larger than %ld bytes; not sent\n", (long)e, (long)AW_NETSEND_RECORD_MAX);
+        said = true;
+        return -1;
+    }
+    return scratch.cursize;
+}
+static int SV_EntityUpdateBytes (edict_t *ent, int e)
+{
+    byte record[AW_NETSEND_RECORD_MAX];
+    return SV_EntityUpdateRecord (ent, e, record);
+}
+
 void SV_WriteEntitiesToClient (edict_t	*clent, sizebuf_t *msg)
 {
-    int		e, i;
-    int		bits, frame, aw;
-    float	scale;
-    byte	*pvs;
-    vec3_t	org;
-    float	miss;
+    int		e, i, n, mark, budget, over, bytes, used;
+    byte	*pvs, record[AW_NETSEND_RECORD_MAX];
+    vec3_t	org, forward, right, up, dir;
+    float	dist;
     edict_t	*ent;
 
 // find the client's PVS
     VectorAdd (clent->v.origin, clent->v.view_ofs, org);
     pvs = SV_FatPVS (org);
+    AngleVectors (clent->v.v_angle, forward, right, up);
+    mark = msg->cursize;
+    budget = msg->maxsize - msg->cursize - sv_net_reserve;
+    used = over = n = 0;
 
 // send over all entities (excpet the client) that touch the pvs
     ent = NEXT_EDICT(sv.edicts);
@@ -501,14 +565,95 @@ void SV_WriteEntitiesToClient (edict_t	*clent, sizebuf_t *msg)
                 continue;		// not visible
         }
 
+        /* built whole first: its exact size and its place in the order; copied in at once while everything so far
+         * fits, never once the room left is smaller than the update */
+        bytes = SV_EntityUpdateRecord (ent, e, record);
+        if (bytes < 0)
+            continue;
+        VectorSubtract (ent->v.origin, org, dir);
+        dist = Length (dir);
+        sv_net_cand[n].e = (short)e;
+        sv_net_cand[n].bytes = (short)bytes;
+        /* an actor: one that moves by steps or flies (residents, creatures, guards) or is marked a monster */
+        sv_net_cand[n].key = ent == clent ? AW_NETSEND_FIRST :
+            AW_NetSendKey (dist, DotProduct (dir, forward) < 0,
+                           !(ent->v.movetype == MOVETYPE_STEP || ent->v.movetype == MOVETYPE_FLY ||
+                             ((int)ent->v.flags & FL_MONSTER)),
+                           e < MAX_EDICTS ? sv_net_missed[e] : 0);
+        n++;
+        if (!over && used + bytes <= budget)
+        {
+            SZ_Write (msg, record, bytes);
+            used += bytes;
+        }
+        else
+            over = 1;
+    }
+
+    sv_net.candidates = n;
+    sv_net.budget = budget;
+    for (i = 0, sv_net.wanted = 0; i < n; i++)
+        sv_net.wanted += sv_net_cand[i].bytes;
+    sv_net.deferred = 0;
+    if (over)
+    {
+        /* not everything fits: the nearest, in front first, the waiting ones forward; the rest in the next frames */
+        msg->cursize = mark;
+        used = AW_NetSendChoose (sv_net_cand, n, budget, sv_net_send);
+        for (i = 0; i < n; i++)
+        {
+            e = sv_net_cand[i].e;
+            if (sv_net_send[i] && SV_EntityUpdateRecord (EDICT_NUM(e), e, record) == sv_net_cand[i].bytes)
+            {
+                SZ_Write (msg, record, sv_net_cand[i].bytes);
+                if (e < MAX_EDICTS)
+                    sv_net_missed[e] = 0;
+            }
+            else
+            {
+                sv_net.deferred++;
+                if (e < MAX_EDICTS && sv_net_missed[e] < 255)
+                    sv_net_missed[e]++;
+            }
+        }
+        sv_net.frames_deferred++;
+        if (realtime - sv_net.said > 30 || sv_net.said > realtime)
+        {
+            sv_net.said = realtime;
+            Con_Printf ("Entity updates: %ld of %ld wait for the next frames (%ld of %ld bytes; dbg netstat)\n",
+                        (long)sv_net.deferred, (long)n, (long)sv_net.wanted, (long)budget);
+        }
+    }
+    else
+        for (i = 0; i < n; i++)
+            if (sv_net_cand[i].e < MAX_EDICTS)
+                sv_net_missed[sv_net_cand[i].e] = 0;
+    sv_net.sent = n - sv_net.deferred;
+    sv_net.sent_bytes = used;
+    sv_net.frames++;
+    if (sv_net.wanted + mark > MAX_DATAGRAM)
+        sv_net.frames_over_1024++;
+    if (sv_net.wanted > sv_net.worst_wanted)
+    {
+        sv_net.worst_wanted = sv_net.wanted;
+        sv_net.worst_candidates = n;
+        sv_net.worst_budget = budget;
+        sv_net.worst_deferred = sv_net.deferred;
+    }
+}
+
+/* One entity's update (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66: sized first by SV_EntityUpdateBytes, then written where it
+ * fits; at most AW_NETSEND_RECORD_MAX bytes). */
+static void SV_WriteEntityUpdate (edict_t *ent, int e, sizebuf_t *msg)
+{
+    int		i;
+    int		bits, frame, aw;
+    float	scale;
+    float	miss;
+
         scale = SV_AliasScale (ent);
         frame = (int)ent->v.frame;
         aw = (scale != 1 ? AWU_SCALE : 0) | (frame > 255 ? AWU_FRAME2 : 0);
-        if (msg->maxsize - msg->cursize < 16 + (aw ? 1 : 0) + (aw & AWU_SCALE ? 4 : 0) + (aw & AWU_FRAME2 ? 1 : 0))
-        {
-            Con_Printf ("packet overflow\n");
-            return;
-        }
 
 // send an update
         bits = 0;
@@ -599,7 +744,6 @@ void SV_WriteEntitiesToClient (edict_t	*clent, sizebuf_t *msg)
             if (aw & AWU_FRAME2)
                 MSG_WriteByte (msg, (frame >> 8) & 255);
         }
-    }
 }
 
 /*
@@ -771,14 +915,101 @@ void SV_WriteClientdataToMessage (edict_t *ent, sizebuf_t *msg)
 SV_SendClientDatagram
 =======================
 */
+/* NET-VIVEC-ENTITY-PACKET-OVERFLOW-66: the game's own connection (the loopback, net_loop.c: both sides in this
+ * program) carries a frame's message of up to AW_LOOP_DATAGRAM bytes instead of the 1024 a network packet holds. Its
+ * receive buffer (NET_MAXMESSAGE, 16384 bytes) also takes this frame's reliable message after it, and whatever the
+ * screen side has not read yet: the frame's message keeps that room free, so the reliable one always fits. Memory: this
+ * 8 KB buffer (static, in place of the 1 KB one on the stack), the entity order tables (about 6 KB); the loop buffers
+ * are unchanged. */
+#define AW_LOOP_DATAGRAM 8192
+static byte sv_loop_datagram[AW_LOOP_DATAGRAM];
+/* An overflow that still happens (every message buffer allows it explicitly, so it marks the buffer instead of
+ * stopping the game): that message is dropped whole and the console says so, at most once every 30 s. */
+static void SV_NetOverflowSaid (const char *what, int size)
+{
+    static double said = -1000;
+    static int count;
+    count++;
+    if (realtime - said >= 30 || realtime < said)
+    {
+        said = realtime;
+        Con_Printf ("Message overflow caught (%ld so far): %s, %ld bytes; not sent\n", (long)count, what, (long)size);
+    }
+}
+static int SV_LoopDatagramRoom (client_t *client)
+{
+    qsocket_t *peer;
+    int room;
+    if (!client->netconnection || Q_strcmp (client->netconnection->address, "LOCAL"))
+        return -1;		/* not the loopback: a network packet's size */
+    peer = (qsocket_t *)client->netconnection->driverdata;
+    if (!peer)
+        return -1;
+    room = NET_MAXMESSAGE - peer->receiveMessageLength - ((client->message.cursize + 4 + 3) & ~3) - 16;
+    if (room > AW_LOOP_DATAGRAM)
+        room = AW_LOOP_DATAGRAM;
+    return room < 16 ? 16 : room;	/* a nearly full buffer: a message that does not fit is not sent */
+}
+
+/* dbg netstat (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66): the last frame's entity updates against the message's room, the
+ * fullest frame since the map started, and the models that filled the last frame. */
+static void SV_NetStat_f (void)
+{
+    static int model_bytes[MAX_MODELS], model_count[MAX_MODELS];
+    int i, k, best, shown;
+    if (!sv.active)
+    {
+        Con_Printf ("dbg netstat: no map is running.\n");
+        return;
+    }
+    Con_Printf ("Frame update on %s: %ld entities in sight want %ld bytes, room %ld (a network packet %ld, the game's "
+                "own connection up to %ld, its buffer %ld); %ld sent in %ld bytes, %ld wait for the next frames\n",
+                sv.name, (long)sv_net.candidates, (long)sv_net.wanted, (long)sv_net.budget, (long)MAX_DATAGRAM,
+                (long)AW_LOOP_DATAGRAM, (long)NET_MAXMESSAGE, (long)sv_net.sent, (long)sv_net.sent_bytes,
+                (long)sv_net.deferred);
+    Con_Printf ("Since the map started: %ld frames, %ld with updates waiting, %ld over %ld bytes; the fullest wanted "
+                "%ld bytes for %ld entities (room %ld, %ld waited); %ld frame updates not sent\n",
+                (long)sv_net.frames, (long)sv_net.frames_deferred, (long)sv_net.frames_over_1024, (long)MAX_DATAGRAM,
+                (long)sv_net.worst_wanted, (long)sv_net.worst_candidates, (long)sv_net.worst_budget,
+                (long)sv_net.worst_deferred, (long)sv_net.dropped);
+    memset (model_bytes, 0, sizeof(model_bytes));
+    memset (model_count, 0, sizeof(model_count));
+    for (i = 0; i < sv_net.candidates; i++)
+    {
+        edict_t *ent = EDICT_NUM(sv_net_cand[i].e);
+        k = (int)ent->v.modelindex;
+        if (k > 0 && k < MAX_MODELS)
+        {
+            model_bytes[k] += sv_net_cand[i].bytes;
+            model_count[k]++;
+        }
+    }
+    for (shown = 0; shown < 8; shown++)
+    {
+        for (best = 0, k = 1; k < MAX_MODELS; k++)
+            if (model_bytes[k] > model_bytes[best])
+                best = k;
+        if (!best || !model_bytes[best])
+            break;
+        Con_Printf ("  %ld bytes: %ld x %s\n", (long)model_bytes[best], (long)model_count[best],
+                    sv.model_precache[best] ? sv.model_precache[best] : "?");
+        model_bytes[best] = 0;
+    }
+}
+
 qboolean SV_SendClientDatagram (client_t *client)
 {
     byte		buf[MAX_DATAGRAM];
     sizebuf_t	msg;
+    int			room;
 
-    msg.data = buf;
-    msg.maxsize = sizeof(buf);
+    room = SV_LoopDatagramRoom (client);
+    memset (&msg, 0, sizeof(msg));
+    msg.data = room > 0 ? sv_loop_datagram : buf;
+    msg.maxsize = room > 0 ? room : (int)sizeof(buf);
     msg.cursize = 0;
+    /* never sent overflowed: a full buffer clears and is marked, and such a message is dropped below */
+    msg.allowoverflow = true;
 
     MSG_WriteByte (&msg, svc_time);
     MSG_WriteFloat (&msg, sv.time);
@@ -786,11 +1017,26 @@ qboolean SV_SendClientDatagram (client_t *client)
 // add the client specific data to the datagram
     SV_WriteClientdataToMessage (client->edict, &msg);
 
+    /* the frame's sounds and effects keep their room after the entities */
+    sv_net_reserve = sv.datagram.cursize + 1 < msg.maxsize / 2 ? sv.datagram.cursize + 1 : 0;
     SV_WriteEntitiesToClient (client->edict, &msg);
+    sv_net_reserve = 0;
 
 // copy the server datagram if there is space
-    if (msg.cursize + sv.datagram.cursize < msg.maxsize)
+    /* (its own overflow, from a game script's writes, cleared it partway: not copied, SV_NetOverflowSaid) */
+    if (!sv.datagram.overflowed && msg.cursize + sv.datagram.cursize < msg.maxsize)
         SZ_Write (&msg, sv.datagram.data, sv.datagram.cursize);
+    else if (sv.datagram.overflowed)
+        SV_NetOverflowSaid ("the frame's sounds and effects (sv.datagram)", sv.datagram.maxsize);
+
+    if (msg.overflowed)
+    {
+        /* cannot happen with every update sized first; if it does, the frame's update is not sent (the screen side
+         * keeps the last one), never a message that starts in the middle of an update */
+        sv_net.dropped++;
+        SV_NetOverflowSaid ("a frame update", msg.maxsize);
+        return true;
+    }
 
 // send the datagram
     if (NET_SendUnreliableMessage (client->netconnection, &msg) == -1)
@@ -830,14 +1076,20 @@ void SV_UpdateToReliableMessages (void)
         }
     }
 
-    for (j=0, client = svs.clients ; j<svs.maxclients ; j++, client++)
-    {
-        if (!client->active)
-            continue;
-        SZ_Write (&client->message, sv.reliable_datagram.data, sv.reliable_datagram.cursize);
-    }
+    /* NET-VIVEC-ENTITY-PACKET-OVERFLOW-66: a broadcast that overflowed (a game script's writes) was cleared partway:
+     * dropped whole, never sent from the middle */
+    if (sv.reliable_datagram.overflowed)
+        SV_NetOverflowSaid ("a broadcast to every client (sv.reliable_datagram)", sv.reliable_datagram.maxsize);
+    else
+        for (j=0, client = svs.clients ; j<svs.maxclients ; j++, client++)
+        {
+            if (!client->active)
+                continue;
+            SZ_Write (&client->message, sv.reliable_datagram.data, sv.reliable_datagram.cursize);
+        }
 
     SZ_Clear (&sv.reliable_datagram);
+    sv.reliable_datagram.overflowed = false;
 }
 
 
@@ -854,9 +1106,11 @@ void SV_SendNop (client_t *client)
     sizebuf_t	msg;
     byte		buf[4];
 
+    memset (&msg, 0, sizeof(msg));
     msg.data = buf;
     msg.maxsize = sizeof(buf);
     msg.cursize = 0;
+    msg.allowoverflow = true;	/* every message buffer says it (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66) */
 
     MSG_WriteChar (&msg, svc_nop);
 
@@ -910,8 +1164,18 @@ void SV_SendClientMessages (void)
         // changes level
         if (host_client->message.overflowed)
         {
-            SV_DropClient (true);
+            /* NET-VIVEC-ENTITY-PACKET-OVERFLOW-66: the reliable message was cleared partway, so it is never sent.
+             * The game's own player is not dropped (that ended the game): the session ends through Host_Error, so
+             * the place he is in loads again (aw_scene.c AW_SceneHostError) and the box says why; a network
+             * client is dropped as before */
             host_client->message.overflowed = false;
+            if (!Q_strcmp (host_client->netconnection->address, "LOCAL"))
+            {
+                SZ_Clear (&host_client->message);
+                Host_Error ("The reliable message to the screen side overflowed (%ld bytes)",
+                            (long)host_client->message.maxsize);
+            }
+            SV_DropClient (true);
             continue;
         }
 
@@ -1044,9 +1308,11 @@ void SV_SendReconnect (void)
     char	data[128];
     sizebuf_t	msg;
 
+    memset (&msg, 0, sizeof(msg));
     msg.data = (byte *)data;
     msg.cursize = 0;
     msg.maxsize = sizeof(data);
+    msg.allowoverflow = true;	/* every message buffer says it (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66) */
 
     MSG_WriteChar (&msg, svc_stufftext);
     MSG_WriteString (&msg, "reconnect\n");
@@ -1098,6 +1364,10 @@ This is called at the start of each level
 */
 extern float		scr_centertime_off;
 
+/* Why the last SV_SpawnServer did not spawn its map, "" when it did or has not run (SCENE-LOAD-FAIL-FALLBACK-67:
+ * Host_Map_f names it in the failed load's box and console block). */
+char aw_spawn_why[160];
+
 qboolean SV_MapNameFits (const char *name)
 {
     if (name && strlen (name) <= SV_MAPNAME_MAX)
@@ -1118,8 +1388,12 @@ void SV_SpawnServer (char *server)
 
     /* Every caller (map, changelevel, restart, load) passes through here:
      * a name that does not fit is refused before anything changes. */
+    aw_spawn_why[0] = 0;
     if (!SV_MapNameFits (server))
+    {
+        Q_snprintf (aw_spawn_why, sizeof(aw_spawn_why), "the map name is too long");
         return;
+    }
     // let's not have any servers with no name
     if (hostname.string[0] == 0)
         Cvar_Set ("hostname", "UNNAMED");
@@ -1165,7 +1439,11 @@ void SV_SpawnServer (char *server)
     AW_ItemsSceneReset();  /* and fresh held-item precache indices (HELD-WEAPON-WRONG-MODEL-62) */
     AW_HalloweenServerReset();   /* and drop every edict pointer kept from the old server (HORS-AFTER-HALLOWEEN-CRASH-58) */
     AW_AmbientServerReset();
+    AW_ActorsServerReset();   /* the same map spawned again joins its cells again (ACTOR-TABLE-SAME-MAP-RELOAD-67) */
     if(aw_inspect_reset)aw_inspect_reset();
+    /* the waits of the entity updates and dbg netstat start again with the map (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66) */
+    memset (sv_net_missed, 0, sizeof(sv_net_missed));
+    memset (&sv_net, 0, sizeof(sv_net));
 
     COM_FormatPath (sv.name, sizeof(sv.name), "%s", server);	/* fits: SV_MapNameFits */
 #ifdef QUAKE2
@@ -1193,6 +1471,10 @@ void SV_SpawnServer (char *server)
     sv.signon.maxsize = sizeof(sv.signon_buf);
     sv.signon.cursize = 0;
     sv.signon.data = sv.signon_buf;
+    /* NET-VIVEC-ENTITY-PACKET-OVERFLOW-66: every message buffer allows its overflow explicitly: it is marked, caught
+     * where the buffer is sent (the frame's sounds, a broadcast: dropped whole; the sign-on: this load ends, the
+     * way back), never Sys_Error */
+    sv.datagram.allowoverflow = sv.reliable_datagram.allowoverflow = sv.signon.allowoverflow = true;
 
 // leave slots at start for clients only
     sv.num_edicts = svs.maxclients+1;
@@ -1230,7 +1512,12 @@ void SV_SpawnServer (char *server)
     {
         char why[160];
         if (AW_MapChimOrphan (server, why, sizeof(why)))
+        {
             Con_Printf ("Map %s unavailable: %s\n", server, why);
+            Q_snprintf (aw_spawn_why, sizeof(aw_spawn_why), "%s", why);
+        }
+        else
+            Q_snprintf (aw_spawn_why, sizeof(aw_spawn_why), "its world model %s did not load", sv.modelname);
         Con_Printf ("Couldn't spawn server %s\n", sv.modelname);
         sv.active = false;
         SCR_EndLoadingPlaque();
@@ -1244,6 +1531,8 @@ void SV_SpawnServer (char *server)
     {
         Con_Printf ("Map %s unavailable: %ld models, the engine holds %ld\n", sv.modelname,
                     (long)sv.worldmodel->numsubmodels, (long)(MAX_MODELS - 1));
+        Q_snprintf (aw_spawn_why, sizeof(aw_spawn_why), "%ld models, the engine holds %ld",
+                    (long)sv.worldmodel->numsubmodels, (long)(MAX_MODELS - 1));
         sv.active = false;
         SCR_EndLoadingPlaque();
         return;
@@ -1255,6 +1544,7 @@ void SV_SpawnServer (char *server)
         if (AW_MapRefused (sv.modelname, sv.worldmodel->entities, why, sizeof(why)))
         {
             Con_Printf ("Map %s unavailable: %s\n", sv.modelname, why);
+            Q_snprintf (aw_spawn_why, sizeof(aw_spawn_why), "%s", why);
             sv.active = false;
             SCR_EndLoadingPlaque();
             return;
@@ -1326,6 +1616,10 @@ void SV_SpawnServer (char *server)
 // create a baseline for more efficient communications
     aw_load_phase = "server: baseline";
     SV_CreateBaseline ();
+    /* a sign-on (the map's statics and baselines) past its buffer was cleared partway: this load ends (the way back
+     * and the box), never a client that reads a sign-on from its middle (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66) */
+    if (sv.signon.overflowed)
+        Host_Error ("The map's sign-on message is larger than %ld bytes", (long)sv.signon.maxsize);
 
 // send serverinfo to all connected clients
     for (i=0,host_client = svs.clients ; i<svs.maxclients ; i++, host_client++)

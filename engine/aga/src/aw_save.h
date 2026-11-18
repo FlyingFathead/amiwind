@@ -198,6 +198,7 @@ int AW_AutosaveCount(void);
 void AW_SetAutosaveCount(int count);
 int AW_SaveMenuOpen(int loading);
 int AW_SaveMenuActive(void);
+void AW_SaveMenuNotice(const char *text);   /* the notice line, after the menu opened */
 int AW_SaveMenuKey(int key);
 void AW_SaveMenuDraw(void);
 /* Encode with a change list (NULL or empty: exactly AW_SaveEncode's bytes) / decode one (CHANGES NULL: checked,
@@ -262,6 +263,11 @@ extern void (*aw_save_notice)(const char *line);   /* the on-screen line of a mi
  * returns 2, and AW_SaveTick writes it at the first frame that is not busy and has no load pending (the one line then
  * says Saved as usual). The recorder's starting save and the debug snapshot refuse while busy. */
 extern int (*aw_save_busy)(void);
+/* SAVE-AUTOSAVE-REGRESSED-67: the script host's step depth set back to 0 (aw_mwhost.c binds it; NULL: nothing to set).
+ * AW_SaveTick runs at the frame level (host.c), outside every script step, so a step it still finds running was ended
+ * by an error (Host_Error's longjmp out of a script step never counted it down); without this every later save, the
+ * autosaves included, waited for that step for good, silently. The tick sets it back and says so once. */
+extern void (*aw_save_busy_clear)(void);
 int AW_SaveQueued(void);   /* the slot a queued save waits for, -1 none */
 /* a new game's state begins (AW_SaveReset): the scripts start the original's run-once new-game scripts
  * (aw_mwhost.c AW_MwscriptNewGame, NPC-STORY-DISABLED-AT-START-42) */

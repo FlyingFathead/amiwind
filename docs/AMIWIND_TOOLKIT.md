@@ -103,6 +103,9 @@ by itself, so each one has to be chosen.
    terrain, its original placements, and the place and region names.
 3. **Maps folder (local).** A build's `id1/maps`, for the 3D Inspector: Quake maps (`.bsp`) and
    CHIM maps (`.chim`); where a map has both, the `.chim` is used, as the engine does.
+4. **Build folder (local).** A build's image `id1` folder (or a delivered copy: `maps`, `chim`, `chimi`): the World
+   Map then opens a cell's CHIM frame and any room the build holds in the 3D Inspector without a server (the files are
+   handed to the inspector; only the room maps' headers are read to name the rooms).
 
 ## The tabs
 
@@ -161,8 +164,22 @@ Vvardenfell's exterior cells, one square per cell, north up.
 One cell up close: its terrain, its named places and every original placement
 (filled = placed, red ring = not placed), counted by kind (statics, doors,
 lights, containers, NPCs and more), and the list of places in the cell with
-whether each interior is converted. **Map** lists the built maps that cover the
-cell; **Show in 3D** opens the chosen one in the 3D Inspector tab.
+whether each interior is converted. **Map** lists what the cell can be opened
+as; **Show in 3D** opens the chosen one in the 3D Inspector tab:
+
+- **The CHIM frame that holds the cell**, first, on every cell the newest build holds on CHIM: the frame the CHIM
+  Progress Tracker's memory audit names for the cell, else the served build's own cell table (below). A town cell
+  opens its town's frame (Balmora's frame holds nine cells). With a served build (`--served-build`) **Show in 3D**
+  opens that frame of the build's open world in the 3D Inspector; opened from disk, the inspector names the frame
+  to pick after **Open CHIM world**.
+- **The frame's own maps** (a town's `-chim` map: its entities as markers), then the built maps of the older World
+  progress table.
+
+With nothing to open, the World tab's **Local view** button says why (for example "not in the newest build"), and
+**Show in 3D** says so again when clicked. Without `island-cells.json` (made from your own `Morrowind.esm`, see
+[Your data](#your-data)) the Local view shows the tracker's record of the cell instead of the terrain picture: its
+state, its objects by type (placed in the original and converted by the build) and its region. A served Toolkit
+takes `island-cells.json` from `--data`, or from the `--progress` folder when `--data` has none.
 
 ### 3D Inspector
 
@@ -174,7 +191,10 @@ the crosshair. Open a map with **Show in 3D** in Local, or with **Open BSP /
 CHIM / JSON** in the inspector itself. A Quake map (`.bsp`) shows its polygons;
 a CHIM map (`.chim`) shows its entities and names the CHIM frame that holds its
 geometry; **Open CHIM world** shows a frame of a build's CHIM world with the
-memory each player position needs
+memory each player position needs (every world format the builder writes, 0.5
+to 0.12: compact and generated terrain records, placed records turned by all
+three angles, reach references), and `map-inspector.html?world=URL&cell=X,Y`
+opens the frame that holds an exterior cell
 ([CHIM maps and CHIM worlds](POLYCOUNT_INSPECTOR.md#chim-maps-and-chim-worlds)).
 
 ![3D Inspector on a CHIM map (.chim): its entities as markers and the CHIM frame that holds its geometry](images/amiwind-v0.0.36-toolkit-inspector-chim-map.png)
@@ -347,7 +367,8 @@ A headline sits at the top of the Toolkit page, on every tab, one row per land. 
 (percent)** (its 1,390 cells with a LAND record: 1,292 land cells and 98 sea-floor cells; open ocean is apart, see
 [what we count](chim/CELL_TRACKER.md#what-we-count)) with the completion levels beside it (**Fully approved cells**,
 **Fully approved terrain**, awaiting lighting) and the release the eligible figure is for. A second row reports **Solstheim
-(Bloodmoon DLC)**, a third **Mournhold (Tribunal DLC)** (not started, and not yet in the tracker's cell data), and a fourth
+(Bloodmoon DLC)**, a third **Mournhold (Tribunal DLC)** (both with their rooms and cells in the game, the figures of the
+view switch's cards below), and a fourth
 the build: how many cells are in the game and the newest ingested build. Done means converted and eligible for the release; "Fully approved" means not a single
 polygon off and approved by the project maintainer, so it can be lower than Done. The release in the eligible figure is
 computed from the VERSION file whenever the data is written (`tools/cell_progress.py`, `restamp` refreshes it without a
@@ -358,7 +379,14 @@ counted apart ("unmeasured audits on N converted cells") and are never counted a
 breakdown (maintainer-approved, playtested, audits passed, converted with failing audits, converted with nothing measured,
 not started) and a history line (passed cells per day). Click a number to highlight those cells on the map.
 
-Above the World map a view switch offers one pane per map: Vvardenfell (the base game), Solstheim (the Bloodmoon expansion, the same grid framed on the island, with its rooms under the map) and Mournhold (the Tribunal expansion, a screen of its own with its districts and rooms). Each pane shows its own done, partial and missing counts, and a line under the switch gives the completion rate of each. A data set without an expansion hides its pane. Details: [the expansion views](chim/PROGRESS_TRACKER.md#the-expansion-views-solstheim-and-mournhold).
+Above the World map a view switch offers one pane per map: Vvardenfell (the base game), Solstheim (the Bloodmoon expansion, the same grid framed on the island, with its rooms under the map) and Mournhold (the Tribunal expansion, a screen of its own with its districts and rooms). Each pane shows its own done, partial and missing counts, and a line under the switch gives the completion rate of each. A data set without an expansion hides its pane. The headline's rows for Solstheim and Mournhold read the same figures as these cards: the rooms in the game (for example "rooms 89 of 96 in the game"), the cells in the game, and both together, so an expansion whose rooms are in the game never reads "not started". On the Mournhold screen a click on a tile picks the room, and **Open ... in 3D** under the screen opens it in the 3D Inspector; the rooms listed under the screen have the same **3D** buttons as the interior tracker. Details: [the expansion views](chim/PROGRESS_TRACKER.md#the-expansion-views-solstheim-and-mournhold).
+
+**The rooms heatmap.** On the Mournhold screen (and under Solstheim's map) **Colour by** switches the room tiles from their
+state to their drawn faces in the served build: every placement counts its model's faces (the face lump of the model in the
+rooms store), so a room crowded with lamps and furniture reads hot. Hovering a tile names its faces and its heaviest models;
+under the screen the heaviest rooms of the view are listed with their heaviest models (faces x placements) and a **3D**
+button that opens the room in the 3D Inspector with the polygon heatmap on. The figures come from `/build/room-faces.json`
+of `toolkit_serve.py --served-build` (read once per delivered copy, from the copy's rooms store).
 
 **Expansion views.** Solstheim is on the main map view beside Vvardenfell. Mournhold has no exterior, so it has a map
 screen of its own (its districts and rooms) behind a view switch above the map. Each view shows its done, partial and
@@ -456,7 +484,11 @@ served, and a copy added while the server runs is picked up without a restart). 
 `maps/` (the compiled maps, `.bsp` and `.chim`), `chim/` (the CHIM world: `world.cwi` and `frames/`), `chimi/` (the rooms
 store: `world.cwi`, its packs and `rooms/*.crm`) and a `SERVED-BUILD.json` naming the build (label, version, run, commit),
 written last so a copy still being written is never served. The server answers `/build/config.json` with the build's
-label, maps and rooms; the World Map's Local view opens any of the maps by name; the inspector, opened with no `map`,
+label, maps and rooms, and `/build/cell-maps.json` with the frame that holds each exterior cell and that frame's maps
+(read from the copy's ownership table `chim-regions.json`, its world index and frame files and its map heads, once per
+copy: a cell's region frame, else the town frame whose chunk area holds the cell's centre), and `/build/rooms.json`
+with the built room of each interior cell (from the room maps' `_aw_cell_id` and `_chim_room`); the World Map's Local view
+opens any of the maps by name and the frame of a clicked cell; the inspector, opened with no `map`,
 `world` or `rooms` in its address, lists the maps and the rooms, opens the CHIM world, and
 `map-inspector.html?room=NAME` opens a room by name. `--maps` and `--chim-world` keep working beside it.
 
@@ -514,8 +546,10 @@ layer stays selectable.
 - **Interior tracker** (under the map, with interiors in the data): a block that folds like the other blocks, closed
   by default; its title line always shows how many rooms are in the game, not in the game yet and set aside. Opened,
   it lists every interior by island, then by entrance (town or place and its exterior cell), each group folding out
-  to its rooms: name (the cell ID), state chip in the legend colours, batch, reasons and master. A search box filters
-  the list; clicking a room selects and centres its entrance cell on the map. The rooms with no entrance area are their
+  to its rooms: name (the cell ID), state chip in the legend colours, batch, reasons and master, and, with a served build
+  or a build folder chosen with **Build folder (local)**, a **3D** button on every room the build holds (a dash on the
+  others) that opens the room in the 3D Inspector (a room with several types, such as the Arena Pit, opens the type its
+  door opens). A search box filters the list; clicking a room selects and centres its entrance cell on the map. The rooms with no entrance area are their
   own group at the end. The overview keeps only a short table of rooms per island in the three groups. The
   **Interiors** layer then marks each exterior cell that holds an entrance, coloured by its rooms' state. How the
   states are decided: [Interiors](chim/PROGRESS_TRACKER.md#interiors-every-room-on-the-tracker).

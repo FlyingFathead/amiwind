@@ -101,6 +101,7 @@ Family: Object placement and in-game geometry (`placement-geometry`). Placed obj
 - COURTYARD-ARRIVAL-STUCK-66 (no report page): Arriving in the census courtyard from the back room, the player was once stuck in solid: twenty "player is stuck" lines and two moves out
 - CREATURE-FLOATING-62 (no report page): A scrib in the wilderness floats above the terrain
 - [PORT-ROCK-ROTATION-23](PORT-ROCK-ROTATION-23.md): A rock by the Seyda Neen port was converted with the wrong rotation
+- PRISON-SHIP-FLOOR-STUCK-67 (no report page): On the prison ship the player gets stuck on a floor tile that stands out of the hold floor
 - ROCK-FLORA-SURFACE-29 (no report page): Angular rock-like surfaces newly appearing in Bitter Coast
 - ROOM-GROUND-STEEP-ICE-66 (no report page): With Bloodmoon selected, the image stage stopped on one Hound of Hircine in the Mortrag Glacier Inner Ring: its feet stand on a steep part of the converted ice floor
 - SHACK-VISIBILITY-29 (no report page): Indrele Rathryon shack front walls missing

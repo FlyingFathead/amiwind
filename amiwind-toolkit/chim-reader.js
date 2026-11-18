@@ -1,15 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // CHIM reader for the Toolkit's 3D Map Inspector: CHIM maps (.chim frame maps) and the CHIM world files
-// (chim/world.cwi index, chim/frames/x<X>/y<Y>/frame.ccf frame files, sNN.ccs sector files; world format 0.5
-// and 0.7), read in the browser from local files. Nothing is uploaded.
+// (chim/world.cwi index, chim/frames/x<X>/y<Y>/frame.ccf frame files, sNN.ccs sector files; world formats 0.5
+// to 0.12), read in the browser from local files. Nothing is uploaded.
 // It is a port of the builder's own reader, tools/chim/format.py (records, brush images, terrain references)
-// and of the CHIM heap gate's ring model, tools/chim/heap.py (zone block sizes, the active ring, the 64-unit
-// position scan); tests/test_toolkit_chim.py checks it against them on a synthetic world built by tools/chim.
+// with the later formats' modules (tools/chim/placed.py: 56-byte placed records with three angles, 0.8;
+// tools/chim/reach.py: reach references, 0.9; tools/chim/terc.py: compact terrain records, 0.10;
+// tools/chim/thgt.py: generated terrain records, 0.11; placement light levels in the flags, 0.12), and of the
+// CHIM heap gate's ring model, tools/chim/heap.py (zone block sizes, the active ring, the 64-unit position scan);
+// tests/test_toolkit_chim.py checks it against them on synthetic worlds of every format built by tools/chim.
 // Layout: docs/chim/WORLD_FORMAT.md. A .chim file is CHIM's own map format (the modified BSP format), read
 // here by its own reader (readChimMap), never by the inspector's Quake BSP reader.
 (function (root) {
   'use strict';
-  const READ_VERSIONS = [[0, 5], [0, 7]];
+  // Every world format the builder writes (tools/chim: chim.FORMAT_VERSION, REFS_FORMAT_VERSION and the
+  // FORMAT_VERSION of placed, reach, terc, thgt and placement_light); tests/test_toolkit_chim.py fails when the
+  // builder can write one this list does not name (TOOLKIT-WORLD-FORMAT-STALE-64).
+  const READ_VERSIONS = [[0, 5], [0, 7], [0, 8], [0, 9], [0, 10], [0, 11], [0, 12]];
   const KINDS = ['INDX', 'FRAM', 'SECT'];
   const RECORD_KINDS = ['CHNK', 'TERR', 'MODL', 'TEXR'];
   const LUMPS = ['entities', 'planes', 'textures', 'vertexes', 'visibility', 'nodes', 'texinfo', 'faces',
@@ -18,7 +24,11 @@
   const BSP_HEADER = 4 + 15 * 8;
   const HEADER = 32, SETTINGS = 40, TOC = 32, FILE_ROW = 60, MODEL_ROW = 24, TEXTURE_ROW = 24;
   const FRAME_BLOCK = 32, CHUNK_ROW = 28, SECTOR_ROW = 12, RECORD_ROW = 16, CHUNK_HEAD = 24, PLACEMENT = 48;
+  const PLACED = 56;                // the placed record of 0.8 on (tools/chim/placed.py PLACEMENT)
+  const CHUNK_MAGICS = ['CHK0', 'CHK1', 'CHK2', 'CHK3'];
   const TERRAIN_REF = 32;
+  // A brush image's lumps in its file order (tools/chim/format.py FILE_ORDER: the loader's order, the clipnodes last).
+  const FILE_ORDER = [3, 12, 13, 2, 8, 1, 6, 7, 11, 4, 10, 14, 5, 0, 9];
   const FLAG_OVER_16_LEAVES = 1, FLAG_STORY_HIDDEN = 2;
   // The heap ring's target ABI sizes (bytes). A build records its own, probed with the Amiga compiler from the
   // engine headers, as target_struct_sizes_bytes in the image's world-map-heap.json: load that file to use them.
@@ -194,34 +204,79 @@
     return out;
   }
 
-  function readPlacement(b, at) {
+  // A placement record: the 48 bytes of 0.4 to 0.7, or the 56-byte placed record of 0.8 on (tools/chim/placed.py:
+  // the 48 bytes, then the pitch and the roll), whose `angles` are Quake's entity angles (pitch, yaw, roll). From 0.12
+  // the high byte of the flags is the placement's light level (tools/chim/placement_light.py).
+  function readPlacement(b, at, size) {
     const d = dv(b);
-    return {pid: d.getUint32(at), ref: d.getUint32(at + 4), model: d.getUint32(at + 8),
+    const r = {pid: d.getUint32(at), ref: d.getUint32(at + 4), model: d.getUint32(at + 8),
       origin: [d.getFloat32(at + 12), d.getFloat32(at + 16), d.getFloat32(at + 20)], yaw: d.getFloat32(at + 24),
       owner: d.getUint16(at + 28), cell_dx: d.getInt8(at + 30), cell_dy: d.getInt8(at + 31),
       box: [[0, 1, 2].map(k => d.getInt16(at + 32 + 2 * k)), [0, 1, 2].map(k => d.getInt16(at + 38 + 2 * k))],
       leaves: d.getUint16(at + 44), flags: d.getUint16(at + 46)};
+    if (size === PLACED) {
+      r.angles = [d.getFloat32(at + 48), r.yaw, d.getFloat32(at + 52)];
+      r.light = r.flags >> 8;
+    }
+    return r;
   }
 
+  // A chunk record of any world format: CHK0 (terrain image inline) and CHK1 (terrain reference block, 0.7), whose
+  // head names the placement record size in its last u16 (0: 48 bytes; 56 from 0.8, tools/chim/placed.py), and CHK2
+  // / CHK3 (0.9, tools/chim/reach.py: the reach copies replaced by 4-byte references to the owner chunk's records,
+  // `reach_refs`, resolved per frame by resolveReach).
   function readChunk(data) {
     const b = u8(data), d = dv(b), magic = tag(b, 0);
-    if (magic !== 'CHK0' && magic !== 'CHK1') throw Error('Not a chunk record');
+    if (!CHUNK_MAGICS.includes(magic)) throw Error('Not a chunk record');
     const nOwned = d.getUint16(4), nReach = d.getUint16(6), imageAt = d.getUint32(8), imageRender = d.getUint32(12),
-      pvsBytes = d.getUint16(16), leaves = d.getUint16(18), pvlBytes = d.getUint16(20);
-    const recs = [];
-    for (let k = 0; k < nOwned + nReach; k++) recs.push(readPlacement(b, CHUNK_HEAD + k * PLACEMENT));
-    const pvsAt = CHUNK_HEAD + (nOwned + nReach) * PLACEMENT;
+      pvsBytes = d.getUint16(16), leaves = d.getUint16(18), pvlBytes = d.getUint16(20), named = d.getUint16(22);
+    if (named !== 0 && named !== PLACED) throw Error('Chunk record names a placement record of ' + named + ' bytes');
+    const size = named || PLACEMENT, refs = magic === 'CHK2' || magic === 'CHK3';
+    if (refs && size !== PLACED) throw Error('A 0.9 chunk record names a placement record of ' + named + ' bytes');
+    const owned = [];
+    for (let k = 0; k < nOwned; k++) owned.push(readPlacement(b, CHUNK_HEAD + k * size, size));
+    let at = CHUNK_HEAD + nOwned * size, reach = [], reachRefs = null;
+    if (refs) {
+      reachRefs = [];
+      for (let k = 0; k < nReach; k++) reachRefs.push([d.getUint16(at + 4 * k), d.getUint16(at + 4 * k + 2)]);
+      at += 4 * nReach;
+    } else {
+      for (let k = 0; k < nReach; k++) reach.push(readPlacement(b, at + k * size, size));
+      at += nReach * size;
+    }
+    const pvsAt = at;
     if (imageAt < pvsAt + pvsBytes + pvlBytes || imageAt + imageRender > b.length) throw Error('Chunk record parts overlap or overrun');
-    const out = {owned: recs.slice(0, nOwned), reach: recs.slice(nOwned), pvs: b.subarray(pvsAt, pvsAt + pvsBytes),
+    const out = {owned, reach, pvs: b.subarray(pvsAt, pvsAt + pvsBytes),
       pvl: b.subarray(pvsAt + pvsBytes, pvsAt + pvsBytes + pvlBytes), leaves, image: b.subarray(imageAt),
-      image_render: imageRender, render: imageAt + imageRender};
-    if (magic === 'CHK1') {
+      image_render: imageRender, render: imageAt + imageRender, record_size: size};
+    if (reachRefs) out.reach_refs = reachRefs;
+    if (magic === 'CHK1' || magic === 'CHK3') {
       const r = imageAt;
       if (r + TERRAIN_REF > b.length) throw Error('Terrain reference block outside the chunk record');
       out.ref = {id: d.getUint32(r), file: d.getUint16(r + 4), offset: d.getUint32(r + 8), bytes: d.getUint32(r + 12),
         render: d.getUint32(r + 16), shift: [d.getFloat32(r + 20), d.getFloat32(r + 24), d.getFloat32(r + 28)]};
     }
     return out;
+  }
+  // Format 0.9: every chunk's reach references replaced by the owner records they name (tools/chim/reach.py
+  // resolve_frame), so the frame holds the records a 0.8 frame stores as copies. chunks: one frame's chunks with
+  // `index` and `owned`. Returns the problems found (a reference that names no owned record).
+  function resolveReach(chunks) {
+    const byIndex = new Map(chunks.map(c => [c.index, c])), problems = [];
+    for (const c of chunks) {
+      if (!c.reach_refs) continue;
+      const out = [];
+      for (const [owner, k] of c.reach_refs) {
+        const o = byIndex.get(owner);
+        if (!o || owner === c.index || k >= o.owned.length || o.owned[k].owner !== owner) {
+          problems.push('chunk ' + c.index + ': reach reference (' + owner + ', ' + k + ') names no owned record');
+          continue;
+        }
+        out.push(o.owned[k]);
+      }
+      c.reach = out;
+    }
+    return problems;
   }
 
   // ------------------------------------------------------------ brush images (little-endian BSP29 lump sets)
@@ -247,17 +302,44 @@
     for (let i = 0; i < n; i++) out.push(d.getInt32(4 + 4 * i, true));
     return out;
   }
-  // The faces of a brush image as polygons, moved by shift (a referenced terrain record) or turned by yaw and
-  // moved to origin (a placement): {vertices, polygons: [{vertices, texinfo, texture (global id), uv, ...}]}.
+  // The 15 lumps of any brush image the world stores: a BSP29 image, a compact terrain record (TRC1, format 0.10)
+  // or a generated one (THG1, 0.11), the latter two expanded as the engine expands them (decodeCompact,
+  // generateTerrain). An array of lumps is returned as it is.
+  function brushLumps(data) {
+    if (Array.isArray(data)) return data;
+    const b = u8(data), kind = b.length >= 4 ? tag(b, 0) : '';
+    if (kind === 'THG1') return generateTerrain(b);
+    if (kind === 'TRC1') return decodeCompact(b);
+    return readBrushImage(b);
+  }
+  // Model to world for a placement (r_bsp.c R_BuildBmodelRotation, tools/chim/placed.py model_matrix): the yaw alone
+  // as before; with a pitch or a roll (the placed records of 0.8 on), the whole rotation of Quake's entity angles.
+  function placeTransform(place) {
+    const origin = (place && place.origin) || [0, 0, 0], angles = place && place.angles;
+    const rad = v => (v || 0) * Math.PI / 180;
+    if (!angles || (!angles[0] && !angles[2])) {
+      const yaw = rad(angles ? angles[1] : place && place.yaw), cy = Math.cos(yaw), sy = Math.sin(yaw);
+      return (x, y, z) => [origin[0] + x * cy - y * sy, origin[1] + x * sy + y * cy, origin[2] + z];
+    }
+    const sp = Math.sin(rad(angles[0])), cp = Math.cos(rad(angles[0])), sy = Math.sin(rad(angles[1])), cy = Math.cos(rad(angles[1]));
+    const sr = Math.sin(rad(angles[2])), cr = Math.cos(rad(angles[2]));
+    const mul = (A, B) => A.map(row => [0, 1, 2].map(j => row[0] * B[0][j] + row[1] * B[1][j] + row[2] * B[2][j]));
+    // world to model, rows: roll @ (pitch @ yaw); model to world is its transpose
+    const E = mul([[1, 0, 0], [0, cr, sr], [0, -sr, cr]], mul([[cp, 0, -sp], [0, 1, 0], [sp, 0, cp]], [[cy, sy, 0], [-sy, cy, 0], [0, 0, 1]]));
+    return (x, y, z) => [origin[0] + E[0][0] * x + E[1][0] * y + E[2][0] * z, origin[1] + E[0][1] * x + E[1][1] * y + E[2][1] * z,
+      origin[2] + E[0][2] * x + E[1][2] * y + E[2][2] * z];
+  }
+  // The faces of a brush image (bytes, or its lumps) as polygons, moved by shift (a referenced terrain record) or
+  // turned by the placement's angles (its yaw before 0.8) and moved to origin (a placement):
+  // {vertices, polygons: [{vertices, texinfo, texture (global id), uv, ...}]}.
   function brushGeometry(data, place) {
-    const lumps = readBrushImage(data), L = lumps.map(dv), refs = lumps[2].length ? readTextureRefs(lumps[2]) : [];
+    const lumps = brushLumps(data), L = lumps.map(dv), refs = lumps[2].length ? readTextureRefs(lumps[2]) : [];
     const nv = lumps[3].length / 12, ne = lumps[12].length / 4, nse = lumps[13].length / 4, nf = lumps[7].length / 20;
     const ntex = lumps[6].length / 40, npl = lumps[1].length / 20;
     let first = 0, count = nf;
     if (lumps[14].length >= 64) { first = L[14].getInt32(56, true); count = L[14].getInt32(60, true); }
     if (first < 0 || count < 0 || first + count > nf) throw Error('Brush image model face range outside its faces');
-    const origin = (place && place.origin) || [0, 0, 0], yaw = (place && place.yaw || 0) * Math.PI / 180;
-    const shift = (place && place.shift) || [0, 0, 0], cy = Math.cos(yaw), sy = Math.sin(yaw);
+    const shift = (place && place.shift) || [0, 0, 0], turn = placeTransform(place);
     const used = new Map(), vertices = [], polygons = [];
     const vertex = j => {
       if (j < 0 || j >= nv) throw Error('Invalid vertex index');
@@ -265,7 +347,7 @@
         const x = L[3].getFloat32(12 * j, true) + shift[0], y = L[3].getFloat32(12 * j + 4, true) + shift[1],
           z = L[3].getFloat32(12 * j + 8, true) + shift[2];
         used.set(j, vertices.length);
-        vertices.push([origin[0] + x * cy - y * sy, origin[1] + x * sy + y * cy, origin[2] + z]);
+        vertices.push(turn(x, y, z));
       }
       return used.get(j);
     };
@@ -309,6 +391,474 @@
     return {name, width, height, pixels: Array.from(b.subarray(mip0, mip0 + width * height))};
   }
 
+  // ------------------------------------------------------------ compact and generated terrain records (0.10, 0.11)
+
+  // The bytes and render bytes of the BSP29 image of 15 lumps (tools/chim/format.py brush_image's layout).
+  function imageLayout(lumps) {
+    let body = 0, render = null;
+    for (const k of FILE_ORDER) {
+      if (k === 9 && render === null) render = BSP_HEADER + body;
+      body = a4(body) + lumps[k].length;
+    }
+    return {bytes: a4(BSP_HEADER + body), render};
+  }
+  // Compact lump payloads (tools/chim/terc.py _unpack_lump): RAW, PLANES (axial normals as one-byte codes), UNIFORM
+  // (one light value), CLIPNODES and NODES with 16-bit plane numbers. The payloads keep the little-endian bytes.
+  function unpackLump(method, p) {
+    const d = dv(p);
+    if (method === 0) return p;
+    if (method === 1) {
+      const count = d.getUint32(0, true), codes = p.subarray(4, 4 + count), out = new Uint8Array(20 * count), o = dv(out);
+      let at = 4 + a4(count);
+      for (let k = 0; k < count; k++) {
+        let c = codes[k];
+        if (!c) { out.set(p.subarray(at, at + 20), 20 * k); at += 20; continue; }
+        c -= 1;
+        const kind = Math.floor(c / 24), axis = Math.floor((c % 24) / 8), negative = Math.floor((c % 8) / 4), signs = c % 4;
+        const others = [0, 1, 2].filter(i => i !== axis);
+        o.setFloat32(20 * k + 4 * axis, negative ? -1 : 1, true);
+        o.setFloat32(20 * k + 4 * others[0], signs & 1 ? -0 : 0, true);
+        o.setFloat32(20 * k + 4 * others[1], signs & 2 ? -0 : 0, true);
+        out.set(p.subarray(at, at + 4), 20 * k + 12);
+        o.setInt32(20 * k + 16, kind, true);
+        at += 4;
+      }
+      return out;
+    }
+    if (method === 2) return new Uint8Array(d.getUint32(0, true)).fill(p[4]);
+    if (method === 3) {
+      const n = d.getUint32(0, true), out = new Uint8Array(8 * n), o = dv(out);
+      for (let k = 0; k < n; k++) {
+        o.setInt32(8 * k, d.getUint16(4 + 6 * k, true), true);
+        o.setInt16(8 * k + 4, d.getInt16(4 + 6 * k + 2, true), true);
+        o.setInt16(8 * k + 6, d.getInt16(4 + 6 * k + 4, true), true);
+      }
+      return out;
+    }
+    if (method === 4) {
+      const n = d.getUint32(0, true), out = new Uint8Array(24 * n), o = dv(out);
+      for (let k = 0; k < n; k++) {
+        o.setInt32(24 * k, d.getUint16(4 + 22 * k, true), true);
+        out.set(p.subarray(4 + 22 * k + 2, 4 + 22 * k + 22), 24 * k + 4);
+      }
+      return out;
+    }
+    throw Error('Unknown compact terrain method ' + method);
+  }
+  // A compact terrain record (TRC1, tools/chim/terc.py decode): its 15 lumps, checked against the image size in its head.
+  function decodeCompact(data) {
+    const b = u8(data), d = dv(b);
+    if (tag(b, 0) !== 'TRC1') throw Error('Not a compact terrain record');
+    const imageBytes = d.getUint32(4), render = d.getUint32(8), count = d.getUint16(12);
+    if (count !== 15) throw Error('Compact terrain record with ' + count + ' lumps');
+    const lumps = new Array(15);
+    let at = 16 + 15 * 8;
+    FILE_ORDER.forEach((k, slot) => {
+      const method = b[16 + 8 * slot], n = d.getUint32(16 + 8 * slot + 4);
+      at = a4(at);
+      if (at + n > b.length) throw Error('Compact terrain lump outside the record');
+      lumps[k] = unpackLump(method, b.subarray(at, at + n));
+      at += n;
+    });
+    const got = imageLayout(lumps);
+    if (got.bytes !== imageBytes || got.render !== render)
+      throw Error('Compact terrain record expands to ' + got.bytes + ' bytes, its head says ' + imageBytes);
+    return lumps;
+  }
+  // Python's round() of a float: half to even (the generator's vertex keys, tools/chim/thgt.py).
+  function pyRound(x) {
+    const r = Math.round(x);
+    return Math.abs(x % 1) === 0.5 && r % 2 !== 0 ? r - 1 : r;
+  }
+  // The facts of a generated terrain record (THG1, tools/chim/thgt.py decode_facts): head, heights, tile facts
+  // (version 1) or tiles and triangles (version 2), node planes, texture references, planes and the standing hull.
+  function terrainFacts(data) {
+    const b = u8(data), d = dv(b);
+    if (tag(b, 0) !== 'THG1') throw Error('Not a generated terrain record');
+    const version = d.getUint16(12);
+    if (version !== 1 && version !== 2) throw Error('Generated terrain record version ' + version);
+    const nx = d.getUint16(14), ny = d.getUint16(16), nn = d.getUint16(18), f = k => d.getFloat32(20 + 4 * k);
+    const box = [f(0), f(1), f(2), f(3)], floor = f(4), ceiling = f(5), water = f(6), step = f(7);
+    const samples = d.getUint16(52), light = b[54], ws = b[55], nPl = d.getUint32(56), nClip = d.getUint32(60),
+      nRefs = d.getUint32(64), croot = d.getUint32(68);
+    let at = 72;
+    const gx = version === 1 ? nx + 1 : 4 * nx + 1, gy = version === 1 ? ny + 1 : 4 * ny + 1, heights = [];
+    for (let j = 0; j < gy; j++) { const row = []; for (let i = 0; i < gx; i++) row.push(d.getFloat32(at + 4 * (j * gx + i))); heights.push(row); }
+    at += 4 * gx * gy;
+    const facts = [];
+    if (version === 1) {
+      for (let j = 0; j < ny; j++) { const row = []; for (let i = 0; i < nx; i++) row.push([b[at + 2 * (j * nx + i)], b[at + 2 * (j * nx + i) + 1]]); facts.push(row); }
+      at += a4(2 * nx * ny);
+    } else {
+      const tableAt = at;
+      at += a4(2 * nx * ny);
+      let k = 0, tri = at;
+      for (let j = 0; j < ny; j++) {
+        const row = [];
+        for (let i = 0; i < nx; i++) {
+          const slot = b[tableAt + 2 * k], n = b[tableAt + 2 * k + 1], tris = [];
+          k++;
+          for (let t = 0; t < n; t++) tris.push([b[tri + 3 * t], b[tri + 3 * t + 1], b[tri + 3 * t + 2]]);
+          tri += 3 * n;
+          row.push([slot, tris]);
+        }
+        facts.push(row);
+      }
+      at += a4(tri - at);
+    }
+    const nodePlanes = [];
+    for (let k = 0; k < nn; k++) nodePlanes.push(d.getUint16(at + 2 * k));
+    at += a4(2 * nn);
+    const refs = b.subarray(at, at + nRefs);
+    at += nRefs;
+    const planes = unpackLump(b[at], b.subarray(at + 4, at + nPl));
+    at += nPl;
+    const clipnodes = unpackLump(b[at], b.subarray(at + 4, at + nClip));
+    const nTex = dv(refs).getInt32(0, true);
+    return {version, box, step, floor, ceiling, water, tiles: [nx, ny], heights, tile_facts: facts, node_planes: nodePlanes,
+      planes, texture_refs: refs.subarray(0, 4 + 4 * nTex), clipnodes, light, light_samples: samples, croot,
+      water_slot: ws === 0xFF ? null : ws, image_bytes: d.getUint32(4), render_bytes: d.getUint32(8)};
+  }
+  // The engine's terrain generator (chim/chim_thgt.c), a port of tools/chim/thgt.py generate(): the 15 lumps of the
+  // terrain image from its record's facts, by the builder's own rule (regular path: version 1; the converter's own
+  // triangles: version 2). Every value is computed in IEEE double as the builder computes it, so the lumps are the
+  // builder's byte for byte (tests/test_toolkit_chim.py compares them with tools/chim/thgt.py decode).
+  const CONTENTS_EMPTY = -1, CONTENTS_WATER = -3, TEX_SPECIAL = 1, GUARD = 1 / 16;
+  const PAIRS = [[[1, 0, 0], [0, -1, 0]], [[0, 1, 0], [0, 0, -1]], [[1, 0, 0], [0, 0, -1]]];
+  const MAX_POLY = 16, MAX_CALL_VERTS = 32, MAX_PIECES = 16, MAX_TEXINFO = 64, MAX_ITEMS = 64, ARENA_POINTS = 6144;
+  function generateTerrain(data) {
+    const p = terrainFacts(data), lumps = generateLumps(p), got = imageLayout(lumps);
+    if (got.bytes !== p.image_bytes) throw Error('Generated terrain record gives ' + got.bytes + ' bytes, its head says ' + p.image_bytes);
+    return lumps;
+  }
+  function generateLumps(p) {
+    const refuse = why => { throw Error('generated terrain: ' + why); };
+    const [x0, y0, x1, y1] = p.box, step = p.step, ceiling = p.ceiling, water = p.water, [nx, ny] = p.tiles;
+    const heights = p.heights, tiles = p.tile_facts, nodePlanes = p.node_planes;
+    const verts = [], edges = [[0, 0]], surf = [], faces = [], texinfo = [], txIndex = new Map();
+    const nodeRows = [], leafRows = [], marks = [];
+    let leafCount = 1, arena = 0;
+    const texinfoOf = (pair, slot, flags) => {
+      const key = pair + ',' + slot + ',' + flags;
+      if (!txIndex.has(key)) {
+        if (txIndex.size >= MAX_TEXINFO) refuse('more texture mappings than the engine holds');
+        txIndex.set(key, texinfo.length);
+        texinfo.push([PAIRS[pair][0], PAIRS[pair][1], slot, flags]);
+      }
+      return txIndex.get(key);
+    };
+    const emit = (surfaces, plane) => {
+      const first = faces.length, vmap = new Map(), emap = new Map();
+      const vertex = pt => {
+        const key = pyRound(pt[0] * 1e5) + ',' + pyRound(pt[1] * 1e5) + ',' + pyRound(pt[2] * 1e5);
+        if (!vmap.has(key)) {
+          if (vmap.size >= MAX_CALL_VERTS) refuse('more corners in one face call than the engine holds');
+          vmap.set(key, verts.length);
+          verts.push(pt);
+        }
+        return vmap.get(key);
+      };
+      for (const [pts, pair, slot, flags, side, light] of surfaces) {
+        const tx = texinfoOf(pair, slot, flags);
+        if (pts.length > MAX_POLY) refuse('a face of more corners than the engine holds');
+        const vs = pts.slice().reverse().map(vertex), firstedge = surf.length;
+        for (let k = 0; k < vs.length; k++) {
+          const a = vs[k], c = vs[(k + 1) % vs.length];
+          let ed;
+          if (emap.has(a + ',' + c)) ed = emap.get(a + ',' + c);
+          else if (emap.has(c + ',' + a)) ed = -emap.get(c + ',' + a);
+          else {
+            if (emap.size >= 2 * MAX_CALL_VERTS) refuse('more edges in one face call than the engine holds');
+            ed = edges.length;
+            emap.set(a + ',' + c, ed);
+            edges.push([a, c]);
+          }
+          surf.push(ed);
+        }
+        faces.push([plane, side, firstedge, vs.length, tx, light ? [0, 255, 255, 255] : [255, 255, 255, 255], light ? 0 : -1]);
+      }
+      const out = [];
+      for (let k = first; k < faces.length; k++) out.push(k);
+      return out;
+    };
+    const addNode = bounds => { nodeRows.push([null, null, bounds, 0, 0]); return nodeRows.length - 1; };
+    const addLeaf = (contents, bounds, fs) => {
+      leafRows.push([contents, bounds, marks.length, fs.length]);
+      marks.push(...fs);
+      leafCount += 1;
+      return -1 - (leafCount - 1);
+    };
+    const planeOf = k => { if (k >= nodePlanes.length) refuse('more nodes than the record names'); return nodePlanes[k]; };
+    const crossing = (pt, q, d, e) => [0, 1, 2].map(k => pt[k] + (q[k] - pt[k]) * d / (d - e));
+    const minZ = poly => Math.min(...poly.map(pt => pt[2]));
+    const clipBelow = poly => {
+      const out = [];
+      for (let i = 0; i < poly.length; i++) {
+        const pt = poly[i], q = poly[(i + 1) % poly.length], dp = pt[2] - water, dq = q[2] - water;
+        if (dp <= 0) { if (out.length >= MAX_POLY) refuse('a water polygon of more corners than the engine holds'); out.push(pt); }
+        if ((dp < 0 && 0 < dq) || (dq < 0 && 0 < dp)) {
+          if (out.length >= MAX_POLY) refuse('a water polygon of more corners than the engine holds');
+          out.push(crossing(pt, q, dp, dq));
+        }
+      }
+      return out.length >= 3 ? out : null;
+    };
+    const splitSurface = (poly, pair) => {
+      const axes = PAIRS[pair];
+      // Python's sum() starts from 0, so a zero product of -0 sums to +0: the same here
+      const uv = poly.map(pt => [0, 1].map(a => 0 + pt[0] * axes[a][0] + pt[1] * axes[a][1] + pt[2] * axes[a][2]));
+      for (let a = 0; a < 2; a++) {
+        const lo = Math.floor((Math.min(...uv.map(v => v[a])) - GUARD) / 16) * 16;
+        const hi = Math.ceil((Math.max(...uv.map(v => v[a])) + GUARD) / 16) * 16;
+        if (hi - lo <= 240) continue;
+        const cut = lo + 224, dist = uv.map(v => v[a] - cut), front = [], back = [];
+        for (let i = 0; i < poly.length; i++) {
+          const j = (i + 1) % poly.length, d = dist[i], e = dist[j], pt = poly[i];
+          if (front.length >= MAX_POLY - 1 || back.length >= MAX_POLY - 1) refuse('a texture split of more corners than the engine holds');
+          if (d <= 1e-6) back.push(pt);
+          if (d >= -1e-6) front.push(pt);
+          if ((d > 1e-6 && e < -1e-6) || (d < -1e-6 && e > 1e-6)) { const q = crossing(pt, poly[j], d, e); front.push(q); back.push(q); }
+        }
+        if (back.length < 3 || front.length < 3) refuse('a texture split leaves a sliver');
+        return splitSurface(back, pair).concat(splitSurface(front, pair));
+      }
+      return [poly];
+    };
+    const waterFaces = (flat, zlo, xy, fs, me) => {
+      const wn = addNode([xy[0], xy[1], zlo - 1, xy[2], xy[3], ceiling]), wpi = planeOf(wn);
+      const wf = emit([[flat, 0, p.water_slot, TEX_SPECIAL, 0, false], [flat.slice().reverse(), 0, p.water_slot, TEX_SPECIAL, 1, false]], wpi);
+      nodeRows[wn][3] = wf[0]; nodeRows[wn][4] = wf.length;
+      const tile = fs.concat(wf);
+      nodeRows[wn][0] = addLeaf(CONTENTS_EMPTY, [xy[0], xy[1], water, xy[2], xy[3], ceiling], tile);
+      nodeRows[wn][1] = addLeaf(CONTENTS_WATER, [xy[0], xy[1], zlo, xy[2], xy[3], water], tile);
+      nodeRows[me][0] = wn;
+    };
+    const groundNode = (poly, xy, pair, slot) => {
+      const zlo = minZ(poly), me = addNode([xy[0], xy[1], Math.min(zlo, water) - 1, xy[2], xy[3], ceiling]), pi = planeOf(me);
+      const parts = splitSurface(poly, pair);
+      if (parts.length > MAX_PIECES) refuse('more texture split pieces than the engine holds');
+      const fs = emit(parts.map(part => [part, pair, slot, 0, 0, true]), pi);
+      nodeRows[me][3] = fs[0]; nodeRows[me][4] = fs.length;
+      return {zlo, me, fs};
+    };
+    const surfaceSubtree = (poly, xy, pair, slot, under) => {
+      const {zlo, me, fs} = groundNode(poly, xy, pair, slot);
+      if (under) {
+        if (!(zlo < water)) refuse('a tile marked under water lies over it');
+        const low = clipBelow(poly);
+        if (low === null) refuse('a tile marked under water has no water face');
+        waterFaces(low.map(pt => [pt[0], pt[1], water]), zlo, xy, fs, me);
+      } else nodeRows[me][0] = addLeaf(CONTENTS_EMPTY, [xy[0], xy[1], zlo, xy[2], xy[3], ceiling], fs);
+      nodeRows[me][1] = -1;
+      return me;
+    };
+    // record version 2: the converter's own triangles (chim.terrain.chunk_terrain's irregular path)
+    const areaXY = poly => { let s = 0; for (let k = 0; k < poly.length; k++) { const a = poly[k], b = poly[(k + 1) % poly.length]; s += a[0] * b[1] - a[1] * b[0]; } return 0.5 * s; };
+    const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+    const length = n => Math.sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+    const groundPlane = poly => {
+      const p0 = poly[0];
+      let best = null, bl = 0;
+      for (let i = 1; i < poly.length - 1; i++) {
+        const a = [poly[i][0] - p0[0], poly[i][1] - p0[1], poly[i][2] - p0[2]], b = [poly[i + 1][0] - p0[0], poly[i + 1][1] - p0[1], poly[i + 1][2] - p0[2]];
+        const n = cross(a, b), ln = length(n);
+        if (best === null || ln > bl) { best = n; bl = ln; }
+      }
+      let n = [best[0] / bl, best[1] / bl, best[2] / bl];
+      if (n[2] < 0) n = [-n[0], -n[1], -n[2]];
+      return [n, n[0] * p0[0] + n[1] * p0[1] + n[2] * p0[2]];
+    };
+    const splitKeep = (poly, n, d, keep) => {
+      const out = [];
+      for (let i = 0; i < poly.length; i++) {
+        const pt = poly[i], q = poly[(i + 1) % poly.length];
+        const dp = keep * (n[0] * pt[0] + n[1] * pt[1] - d), dq = keep * (n[0] * q[0] + n[1] * q[1] - d);
+        if (dp >= -1e-9) { if (out.length >= MAX_POLY) refuse('a split piece of more corners than the engine holds'); out.push(pt); }
+        if ((dp > 1e-9 && dq < -1e-9) || (dp < -1e-9 && dq > 1e-9)) {
+          const t = dp / (dp - dq);
+          if (out.length >= MAX_POLY) refuse('a split piece of more corners than the engine holds');
+          out.push([pt[0] + (q[0] - pt[0]) * t, pt[1] + (q[1] - pt[1]) * t, pt[2] + (q[2] - pt[2]) * t]);
+        }
+      }
+      return out;
+    };
+    const cleanXY = (pts, eps = 1e-7) => {
+      const out = [];
+      for (const pt of pts) if (!out.length || Math.abs(pt[0] - out[out.length - 1][0]) > eps || Math.abs(pt[1] - out[out.length - 1][1]) > eps) out.push(pt);
+      if (out.length > 1 && Math.abs(out[0][0] - out[out.length - 1][0]) <= eps && Math.abs(out[0][1] - out[out.length - 1][1]) <= eps) out.pop();
+      let changed = true;
+      while (changed && out.length > 3) {
+        changed = false;
+        for (let i = 0; i < out.length; i++) {
+          const a = out[(i - 1 + out.length) % out.length], b = out[i], c = out[(i + 1) % out.length];
+          if (Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])) <= eps) { out.splice(i, 1); changed = true; break; }
+        }
+      }
+      return out;
+    };
+    const splitLine = (region, items) => {
+      let best = null, bestKey = null;
+      for (const poly of items) for (let i = 0; i < poly.length; i++) {
+        const a = poly[i], b = poly[(i + 1) % poly.length], ex = b[0] - a[0], ey = b[1] - a[1], ln = Math.sqrt(ex * ex + ey * ey);
+        if (ln < 1e-6) continue;
+        let n = [ey / ln, -ex / ln];
+        if (n[0] < -1e-12 || (Math.abs(n[0]) <= 1e-12 && n[1] < 0)) n = [-n[0], -n[1]];
+        const d = n[0] * a[0] + n[1] * a[1], side = region.map(([x, y]) => n[0] * x + n[1] * y - d);
+        if (Math.max(...side) <= 1e-6 || Math.min(...side) >= -1e-6) continue;
+        let cuts = 0, front = 0, back = 0;
+        for (const q of items) {
+          const dvs = q.map(pt => n[0] * pt[0] + n[1] * pt[1] - d), hi = Math.max(...dvs), lo = Math.min(...dvs);
+          if (hi > 1e-6 && lo < -1e-6) cuts++; else if (hi > 1e-6) front++; else back++;
+        }
+        const score = [cuts, Math.abs(front - back)];
+        if (bestKey === null || score[0] < bestKey[0] || (score[0] === bestKey[0] && score[1] < bestKey[1])) { best = [n, d]; bestKey = score; }
+      }
+      if (best === null) refuse('an irregular region no edge splits');
+      return best;
+    };
+    const dedupe = (poly, eps = 1e-6) => {
+      const out = [], far = (u, v) => Math.max(Math.abs(u[0] - v[0]), Math.abs(u[1] - v[1]), Math.abs(u[2] - v[2])) > eps;
+      for (const pt of poly) if (!out.length || far(pt, out[out.length - 1])) out.push(pt);
+      if (out.length > 1 && !far(out[0], out[out.length - 1])) out.pop();
+      return out.length >= 3 ? out : null;
+    };
+    const irregularSurface = (poly, xy, slot) => {
+      const a = [poly[1][0] - poly[0][0], poly[1][1] - poly[0][1], poly[1][2] - poly[0][2]];
+      const b = [poly[2][0] - poly[0][0], poly[2][1] - poly[0][1], poly[2][2] - poly[0][2]];
+      let n = cross(a, b);
+      const ln = length(n);
+      n = [n[0] / ln, n[1] / ln, n[2] / ln];
+      let best = -1, pair = null;
+      [n[2], -n[2], n[0], -n[0], n[1], -n[1]].forEach((c, k) => { if (c > best) { best = c; pair = Math.floor(k / 2); } });
+      if (pair === null) refuse('a ground polygon without texture axes');
+      const {zlo, me, fs} = groundNode(poly, xy, pair, slot);
+      let low = clipBelow(poly);
+      if (low !== null) low = dedupe(low);
+      const flat = low !== null && zlo < water ? low.map(pt => [pt[0], pt[1], water]) : null;
+      if (flat !== null && Math.abs(areaXY(flat)) > 1e-9) {
+        if (p.water_slot === null) refuse('water without its texture slot');
+        waterFaces(flat, zlo, xy, fs, me);
+      } else nodeRows[me][0] = addLeaf(CONTENTS_EMPTY, [xy[0], xy[1], zlo, xy[2], xy[3], ceiling], fs);
+      nodeRows[me][1] = -1;
+      return me;
+    };
+    const regionSubtree = (region, items, slot) => {
+      const xs = region.map(r => r[0]), ys = region.map(r => r[1]);
+      const xy = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+      const planes = items.map(groundPlane), [n0, d0] = planes[0];
+      if (planes.every(([n, d]) => Math.max(Math.abs(n[0] - n0[0]), Math.abs(n[1] - n0[1]), Math.abs(n[2] - n0[2])) < 1e-6 && Math.abs(d - d0) < 1e-3)) {
+        const exact = new Map(), key6 = v => pyRound(v * 1e6);
+        for (const poly of items) for (const pt of poly) exact.set(key6(pt[0]) + ',' + key6(pt[1]), pt[2]);
+        const face = region.map(([x, y]) => {
+          const z = exact.get(key6(x) + ',' + key6(y));
+          return [x, y, z !== undefined ? z : (d0 - n0[0] * x - n0[1] * y) / n0[2]];
+        });
+        return irregularSurface(face, xy, slot);
+      }
+      const [n, d] = splitLine(region, items);
+      let zlo = Infinity;
+      for (const poly of items) for (const pt of poly) zlo = Math.min(zlo, pt[2]);
+      const me = addNode([xy[0], xy[1], Math.min(zlo, water) - 1, xy[2], xy[3], ceiling]), sides = [], base = arena;
+      for (const keep of [1, -1]) {
+        const part = cleanXY(splitKeep(region.map(([x, y]) => [x, y, 0]), n, d, keep)), kept = [];
+        for (const poly of items) {
+          const piece = splitKeep(poly, n, d, keep);
+          if (piece.length >= 3 && Math.abs(areaXY(piece)) > 1e-6) {
+            if (kept.length >= MAX_ITEMS || arena + piece.length > ARENA_POINTS) refuse('more split pieces than the engine holds');
+            arena += piece.length;
+            kept.push(piece);
+          }
+        }
+        if (!kept.length || part.length < 3) refuse('an irregular split leaves an empty side');
+        sides.push(regionSubtree(part.map(pt => [pt[0], pt[1]]), kept, slot));
+        arena = base;
+      }
+      nodeRows[me][0] = sides[0]; nodeRows[me][1] = sides[1];
+      return me;
+    };
+    const irregularTile = (i, j) => {
+      const x = x0 + i * step, y = y0 + j * step, [slot, tris] = tiles[j][i], items = [];
+      for (const tri of tris) {
+        let poly = tri.map(v => [x + 32 * (v % 5), y + 32 * Math.floor(v / 5), heights[4 * j + Math.floor(v / 5)][4 * i + v % 5]]);
+        if (areaXY(poly) < 0) poly = poly.reverse();
+        items.push(poly);
+      }
+      if (!items.length || items.length > MAX_ITEMS || 3 * items.length > ARENA_POINTS) refuse('a tile without triangles, or more than the engine holds');
+      arena = 3 * items.length;
+      return regionSubtree([[x, y], [x + step, y], [x + step, y + step], [x, y + step]], items, slot);
+    };
+    const tileSubtree = (i, j) => {
+      if (p.version === 2) return irregularTile(i, j);
+      const x = x0 + i * step, y = y0 + j * step, [slot, facts] = tiles[j][i], h = (a, b) => heights[j + b][i + a];
+      const c = [[x, y, h(0, 0)], [x + step, y, h(1, 0)], [x + step, y + step, h(1, 1)], [x, y + step, h(0, 1)]];
+      const xy = [x, y, x + step, y + step], under = !!(facts & 2);
+      if (facts & 1) return surfaceSubtree(c, xy, (facts >> 2) & 3, slot, under);
+      const zlo = minZ(c), me = addNode([x, y, Math.min(zlo, water) - 1, x + step, y + step, ceiling]);
+      nodeRows[me][0] = surfaceSubtree([c[0], c[1], c[2]], xy, (facts >> 2) & 3, slot, under);
+      nodeRows[me][1] = surfaceSubtree([c[0], c[2], c[3]], xy, (facts >> 4) & 3, slot, under);
+      return me;
+    };
+    const gridSubtree = (i0, j0, i1, j1) => {
+      if (i1 - i0 === 1 && j1 - j0 === 1) return tileSubtree(i0, j0);
+      let halves;
+      if (i1 - i0 >= j1 - j0) { const mid = Math.floor((i0 + i1) / 2); halves = [[mid, j0, i1, j1], [i0, j0, mid, j1]]; }
+      else { const mid = Math.floor((j0 + j1) / 2); halves = [[i0, mid, i1, j1], [i0, j0, i1, mid]]; }
+      const me = addNode(null);
+      nodeRows[me][0] = gridSubtree(...halves[0]);
+      nodeRows[me][1] = gridSubtree(...halves[1]);
+      return me;
+    };
+    if (p.version !== 2 && p.water_slot === null && tiles.some(row => row.some(t => t[1] & 2))) refuse('water without its texture slot');
+    gridSubtree(0, 0, nx, ny);
+    if (nodeRows.length !== nodePlanes.length) refuse('the record names ' + nodePlanes.length + ' node planes, the tree has ' + nodeRows.length + ' nodes');
+    for (let k = nodeRows.length - 1; k >= 0; k--) {
+      if (nodeRows[k][2] !== null) continue;
+      const kids = [nodeRows[k][0], nodeRows[k][1]].filter(c => c >= 0).map(c => nodeRows[c][2]);
+      nodeRows[k][2] = [0, 1, 2].map(i => Math.min(...kids.map(b => b[i]))).concat([3, 4, 5].map(i => Math.max(...kids.map(b => b[i]))));
+    }
+    const shortBox = bx => bx.slice(0, 3).map(Math.floor).concat(bx.slice(3).map(Math.ceil));
+    const pack = (n, write) => { const out = new Uint8Array(n), o = dv(out); write(o); return out; };
+    const lumps = new Array(15).fill(new Uint8Array(0));
+    lumps[1] = p.planes;
+    lumps[2] = p.texture_refs;
+    lumps[3] = pack(12 * verts.length, o => verts.forEach((v, k) => { o.setFloat32(12 * k, v[0], true); o.setFloat32(12 * k + 4, v[1], true); o.setFloat32(12 * k + 8, v[2], true); }));
+    lumps[5] = pack(24 * nodeRows.length, o => nodeRows.forEach((r, k) => {
+      const at = 24 * k, bx = shortBox(r[2]);
+      o.setInt32(at, nodePlanes[k], true); o.setInt16(at + 4, r[0], true); o.setInt16(at + 6, r[1], true);
+      bx.forEach((v, i) => o.setInt16(at + 8 + 2 * i, v, true));
+      o.setUint16(at + 20, r[3], true); o.setUint16(at + 22, r[4], true);
+    }));
+    lumps[6] = pack(40 * texinfo.length, o => texinfo.forEach(([s, t, slot, flags], k) => {
+      const at = 40 * k;
+      [s[0], s[1], s[2], 0, t[0], t[1], t[2], 0].forEach((v, i) => o.setFloat32(at + 4 * i, v, true));
+      o.setInt32(at + 32, slot, true); o.setInt32(at + 36, flags, true);
+    }));
+    lumps[7] = pack(20 * faces.length, o => faces.forEach((f, k) => {
+      const at = 20 * k;
+      o.setUint16(at, f[0], true); o.setInt16(at + 2, f[1], true); o.setInt32(at + 4, f[2], true); o.setInt16(at + 8, f[3], true);
+      o.setUint16(at + 10, f[4], true); f[5].forEach((v, i) => o.setUint8(at + 12 + i, v)); o.setInt32(at + 16, f[6], true);
+    }));
+    lumps[8] = new Uint8Array(p.light_samples).fill(p.light);
+    lumps[9] = p.clipnodes;
+    lumps[10] = pack(28 * (1 + leafRows.length), o => {
+      o.setInt32(0, -2, true); o.setInt32(4, -1, true);
+      leafRows.forEach(([contents, bx, fm, nm], k) => {
+        const at = 28 * (k + 1);
+        o.setInt32(at, contents, true); o.setInt32(at + 4, -1, true);
+        shortBox(bx).forEach((v, i) => o.setInt16(at + 8 + 2 * i, v, true));
+        o.setUint16(at + 20, fm, true); o.setUint16(at + 22, nm, true);
+      });
+    });
+    lumps[11] = pack(2 * marks.length, o => marks.forEach((m, k) => o.setUint16(2 * k, m, true)));
+    lumps[12] = pack(4 * edges.length, o => edges.forEach(([a, c], k) => { o.setUint16(4 * k, a, true); o.setUint16(4 * k + 2, c, true); }));
+    lumps[13] = pack(4 * surf.length, o => surf.forEach((e, k) => o.setInt32(4 * k, e, true)));
+    lumps[14] = pack(64, o => {
+      [x0, y0, p.floor, x1, y1, ceiling, 0, 0, 0].forEach((v, i) => o.setFloat32(4 * i, v, true));
+      [0, p.croot, p.croot, p.croot, 0, 0, faces.length].forEach((v, i) => o.setInt32(36 + 4 * i, v, true));
+    });
+    return lumps;
+  }
+
   // ------------------------------------------------------------ the heap gate's ring model (tools/chim/heap.py)
 
   function sizesFrom(doc) {
@@ -337,7 +887,7 @@
   function textureBytes(width, height, sizes) {
     return sizes.hunk + a16(sizes.texture + Math.floor(width * height / 64) * 85);
   }
-  const lumpLengths = image => readBrushImage(image).map(l => l.length);
+  const lumpLengths = image => brushLumps(image).map(l => l.length);
 
   // The per-frame tables the ring needs: chunk blocks, which models and textures each chunk and model needs.
   function ringTables(frameData, sizes, extra) {
@@ -427,6 +977,40 @@
       .map(x => ({path: x.f.path.replace(/\/frame\.ccf$/, ''), file: x.f.path, cell: x.f.cell, row: x.row}));
     return world;
   }
+  // The frame of an open world that holds exterior cell (x, y), from the index alone: the frame the caller names when
+  // the world has it (the served build's cell table or the tracker's memory audit name it per cell), else the frame
+  // of the cell itself; null otherwise (frameHolding then reads the frames around it).
+  function frameForCell(world, x, y, hint) {
+    const path = hint ? String(hint).replace(/\/frame\.ccf$/, '').replace(/\/$/, '') : null;
+    if (path) { const f = world.frames.find(q => q.path === path); if (f) return f; }
+    return world.frames.find(q => q.cell[0] === x && q.cell[1] === y) || null;
+  }
+  // ... and when neither names it (a cell of a town frame: Balmora's frame x-03/y-02 holds nine cells, Seyda Neen's more):
+  // the frame whose chunk area holds the cell's centre, read from the frame files around the cell; where two areas hold
+  // it (Seyda Neen's and Vivec's at cell 1,-10), the one it lies deeper inside (an area is a town's cells and a margin;
+  // tools/toolkit_serve.py served_cell_maps, the same rule). Units: a frame's centre is in game units, its chunk grid in
+  // map units (a quarter), a cell 8,192 game units across. null when no frame holds it: never a guess.
+  const CELL_UNITS = 8192, MAP_SCALE = 4, NEAR_CELLS = 6;
+  async function frameHolding(world, x, y, hint) {
+    const found = frameForCell(world, x, y, hint);
+    if (found) return found;
+    const cx = (x + 0.5) * CELL_UNITS, cy = (y + 0.5) * CELL_UNITS;
+    let best = null, deepest = -Infinity;
+    for (const q of world.frames) {
+      if (Math.abs(q.cell[0] - x) > NEAR_CELLS || Math.abs(q.cell[1] - y) > NEAR_CELLS) continue;
+      if (!q.block) {
+        const item = await fileRow(world, q.row, []);
+        if (!item) continue;
+        try { q.block = readFrame(item.data).frame; } catch (e) { continue; }
+      }
+      const b = q.block, lo = [b.centre[0] + MAP_SCALE * b.low[0], b.centre[1] + MAP_SCALE * b.low[1]];
+      const hi = [lo[0] + MAP_SCALE * b.nx * b.grain, lo[1] + MAP_SCALE * b.ny * b.grain];
+      if (!(cx >= lo[0] && cx < hi[0] && cy >= lo[1] && cy < hi[1])) continue;
+      const inset = Math.min(cx - lo[0], hi[0] - cx, cy - lo[1], hi[1] - cy);
+      if (inset > deepest) { best = q; deepest = inset; }
+    }
+    return best;
+  }
   async function fileRow(world, row, problems) {
     if (world.cache.has(row)) return world.cache.get(row);
     const f = world.index.files[row];
@@ -441,6 +1025,13 @@
     }
     world.cache.set(row, item);
     return item;
+  }
+  // Reads the file rows not read yet, LIMIT at a time (each row once; fileRow keeps them).
+  async function prefetchRows(world, rows, problems, limit = 8) {
+    const todo = [...new Set(rows)].filter(r => r !== undefined && !world.cache.has(r));
+    let next = 0;
+    const worker = async () => { while (next < todo.length) { const r = todo[next++]; await fileRow(world, r, problems); } };
+    await Promise.all(Array.from({length: Math.min(limit, todo.length)}, worker));
   }
   function recordAt(item, offset) {
     if (!item || !item.records) return null;
@@ -460,38 +1051,58 @@
     const sectorRows = new Map();
     idx.files.forEach((f, row) => { if (f.kind === 'SECT' && f.cell[0] === cell[0] && f.cell[1] === cell[1]) sectorRows.set(f.sector, row); });
     const chunks = [], models = new Map(), textures = new Map();
-    const needModels = new Set(), needTextures = new Set();
+    const needModels = new Set(), needTextures = new Set(), terrainLumps = new Map();
+    // the files a frame needs are read several at a time (a served world: one request each, a few hundred for a town)
+    await prefetchRows(world, [...sectorRows.values()], problems);
+    const parsed = [];
     for (const c of dir) {
       const row = sectorRows.get(c.sector), item = row === undefined ? null : await fileRow(world, row, problems);
       const rec = recordAt(item, c.offset);
       if (!rec || rec.kind !== 'CHNK' || rec.id !== c.index) { problems.push('chunk ' + c.index + ' record not found'); continue; }
-      const parts = readChunk(rec.data);
-      let image = parts.image, render = parts.image_render, shift = null, terrain = null;
-      if (parts.ref) {
-        const titem = await fileRow(world, parts.ref.file, problems), t = recordAt(titem, parts.ref.offset);
-        if (!t || t.kind !== 'TERR' || t.id !== parts.ref.id || t.bytes !== parts.ref.bytes) { problems.push('chunk ' + c.index + ' terrain reference not found'); continue; }
-        image = t.data; render = parts.ref.render; shift = parts.ref.shift;
-        terrain = {id: parts.ref.id, file: idx.files[parts.ref.file].path, bytes: t.bytes, render: parts.ref.render, shift};
-      }
-      const lumps = readBrushImage(image), lens = lumps.map(l => l.length);
+      let parts;
+      try { parts = readChunk(rec.data); } catch (e) { problems.push('chunk ' + c.index + ': ' + (e.message || e)); continue; }
+      parsed.push([c, row, rec, parts]);
+    }
+    await prefetchRows(world, parsed.filter(p => p[3].ref).map(p => p[3].ref.file), problems);
+    for (const [c, row, rec, parts] of parsed) {
+      let image = parts.image, render = parts.image_render, shift = null, terrain = null, lumps = null;
+      try {
+        if (parts.ref) {
+          const titem = await fileRow(world, parts.ref.file, problems), t = recordAt(titem, parts.ref.offset);
+          if (!t || t.kind !== 'TERR' || t.id !== parts.ref.id || t.bytes !== parts.ref.bytes) { problems.push('chunk ' + c.index + ' terrain reference not found'); continue; }
+          image = t.data; render = parts.ref.render; shift = parts.ref.shift;
+          const form = tag(t.data, 0) === 'THG1' ? 'generated' : tag(t.data, 0) === 'TRC1' ? 'compact' : 'image';
+          terrain = {id: parts.ref.id, file: idx.files[parts.ref.file].path, bytes: t.bytes, render: parts.ref.render, shift, form};
+          // a record many chunks reference is expanded once per frame (generated and compact records: 0.10, 0.11)
+          const key = parts.ref.file + ':' + parts.ref.offset;
+          if (!terrainLumps.has(key)) terrainLumps.set(key, brushLumps(t.data));
+          lumps = terrainLumps.get(key);
+          if (form !== 'image') render = imageLayout(lumps).render;
+        } else lumps = brushLumps(image);
+      } catch (e) { problems.push('chunk ' + c.index + ' terrain: ' + (e.message || e)); continue; }
+      const lens = lumps.map(l => l.length);
       const terrainTextures = lumps[2].length ? readTextureRefs(lumps[2]) : [];
       for (const t of terrainTextures) needTextures.add(t);
-      for (const r of parts.owned.concat(parts.reach)) needModels.add(r.model);
-      chunks.push(Object.assign({}, c, {owned: parts.owned, reach: parts.reach, leaves: parts.leaves, image,
-        image_render: render, shift, terrain, record_bytes: rec.bytes, file: idx.files[row].path,
+      chunks.push(Object.assign({}, c, {owned: parts.owned, reach: parts.reach, reach_refs: parts.reach_refs, leaves: parts.leaves,
+        image, lumps, image_render: render, shift, terrain, record_bytes: rec.bytes, record_size: parts.record_size, file: idx.files[row].path,
         terrain_textures: terrainTextures, lump_lengths: lens, heap_bytes: sizes ? imageBytes(lens, sizes) : null}));
     }
+    // format 0.9: the reach references name records of this frame's own chunks
+    problems.push(...resolveReach(chunks));
+    for (const c of chunks) for (const r of c.owned.concat(c.reach)) needModels.add(r.model);
+    await prefetchRows(world, [...needModels].map(m => idx.models[m]).filter(Boolean).map(e => e.file), problems);
     for (const m of [...needModels].sort((p, q) => p - q)) {
       const e = idx.models[m];
       if (!e) { problems.push('model ' + m + ' is not in the index'); continue; }
       const item = await fileRow(world, e.file, problems), rec = recordAt(item, e.offset);
       if (!rec || rec.kind !== 'MODL' || rec.id !== m || rec.bytes !== e.bytes) { problems.push('model ' + m + ' record not found'); continue; }
-      const lumps = readBrushImage(rec.data), refs = lumps[2].length ? readTextureRefs(lumps[2]) : [];
+      const lumps = brushLumps(rec.data), refs = lumps[2].length ? readTextureRefs(lumps[2]) : [];
       for (const t of refs) needTextures.add(t);
       const lens = lumps.map(l => l.length);
       models.set(m, {id: m, name: e.name, bytes: e.bytes, render: e.render, image: rec.data, textures: refs,
         file: idx.files[e.file].path, lump_lengths: lens, heap_bytes: sizes ? imageBytes(lens, sizes, true) : null});
     }
+    await prefetchRows(world, [...needTextures].map(t => idx.textures[t]).filter(Boolean).map(e => e.file), problems);
     for (const t of [...needTextures].sort((p, q) => p - q)) {
       const e = idx.textures[t];
       if (!e) { problems.push('texture ' + t + ' is not in the index'); continue; }
@@ -713,7 +1324,7 @@
     const models = [];
     for (let i = 0; i < n; i++) models.push(d.getUint32(h.directory + 4 * i));
     const placements = [];
-    for (let i = 0; i < h.count; i++) placements.push(readPlacement(b, h.data + i * size));
+    for (let i = 0; i < h.count; i++) placements.push(readPlacement(b, h.data + i * size, size));
     return {bounds: [[0, 1, 2].map(k => d.getFloat32(HEADER + 4 * k)), [3, 4, 5].map(k => d.getFloat32(HEADER + 4 * k))],
       models, placements, version: h.version};
   }
@@ -765,6 +1376,7 @@
   }
 
   const api = {READ_VERSIONS, STORE_VERSIONS, collisionStats, readRoomRecord, openRoomStore, loadRoom, roomCollisionTotals, LUMPS, DEFAULT_SIZES, DEFAULT_MEMORY, FLAG_OVER_16_LEAVES, FLAG_STORY_HIDDEN, crc32, nameHash,
+    FILE_ORDER, brushLumps, decodeCompact, terrainFacts, generateTerrain, imageLayout, resolveReach, placeTransform, frameForCell, frameHolding,
     readHeader, readIndex, readFrame, readSector, readChunk, readPlacement, readBrushImage, readTextureRefs,
     brushGeometry, readMiptex, spatialOrder, sizesFrom, imageBytes, textureBytes, lumpLengths, ringTables, ringAt,
     ringScan, openWorld, loadFrame, frameSummary, parseHeapReport, readChimMap, isChimFrameMap, parseEntities,

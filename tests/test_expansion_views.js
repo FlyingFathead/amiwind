@@ -75,6 +75,23 @@ assert.deepStrictEqual([by.bloodmoon.done, by.bloodmoon.partial, by.bloodmoon.mi
 assert.deepStrictEqual([by.tribunal.done, by.tribunal.partial, by.tribunal.missing, by.tribunal.total, by.tribunal.rate], [1, 1, 3, 5, 20]);
 assert.strictEqual(V.rateText(by.tribunal), 'Mournhold (Tribunal): 20.0 % (1 of 5)');
 
+// the headline's expansion rows read the same numbers as the cards and the completion line (TOOLKIT-DLC-VIEWS-64): rooms in the
+// game are counted, never "not started" while the expansion's rooms are in the game
+const H = require(path.resolve(process.argv[2], 'chim-head.js'));
+const head = {islands: [{island: 1, name: 'Vvardenfell', cells: 5, done: 3, percent: 60}, {island: 2, name: 'Solstheim', cells: 3, done: 0}]};
+const strip = s => s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+const rows = H.headRows(head, comp).map(r => strip(r.html));
+assert.ok(!rows.some(t => /not started/.test(t)), rows.join(' | '));
+const solRow = rows.find(t => t.startsWith('Solstheim')), mhRow = rows.find(t => t.startsWith('Mournhold'));
+assert.ok(solRow.includes('rooms ' + by.bloodmoon.rooms.done + ' of ' + by.bloodmoon.rooms.total + ' in the game'), solRow);
+assert.ok(solRow.includes('cells ' + by.bloodmoon.cells.done + ' of ' + by.bloodmoon.cells.total + ' in the game'), solRow);
+assert.ok(solRow.includes('together ' + by.bloodmoon.done + ' of ' + by.bloodmoon.total + ' (' + by.bloodmoon.rate.toFixed(1) + ' %)'), solRow);
+assert.ok(mhRow.includes('rooms ' + by.tribunal.rooms.done + ' of ' + by.tribunal.rooms.total + ' in the game (20.0 %)'), mhRow);
+assert.ok(mhRow.includes('no exterior cells in the tracker') && mhRow.includes('rooms set aside 1'), mhRow);
+assert.ok(V.views(doc)[2].text.includes('of ' + by.tribunal.rooms.total + ' rooms'), 'the Mournhold card counts the same rooms');
+// without the expansions' figures (an older page) the rows are the headline's own, as before
+assert.ok(H.headRows(head).map(r => strip(r.html)).find(t => t.startsWith('Mournhold')).includes('not started'));
+
 // the Mournhold screen: districts first, then the rooms by state; every room is a tile, none overlaps, all inside the width
 const L = V.mournholdLayout(mr, 400);
 assert.strictEqual(L.tiles.length, 5);

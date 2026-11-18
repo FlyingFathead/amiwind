@@ -75,6 +75,9 @@ Family: Scene changes, arrivals and handoffs (`transitions-arrivals`). Cell, reg
 - INPUT-01 (no report page): Held Ctrl/Shift flight modifiers reset on cell changes
 - [INTERIOR-SPAWN-UNDERWATER-41](INTERIOR-SPAWN-UNDERWATER-41.md): Vivec underworks rooms spawn under their water
 - [INTRO-ROLES-30](INTRO-ROLES-30.md): NUM_FOR_EDICT bad-pointer crash on a Seyda Neen region change
+- LOAD-CLIENT-HALF-CONNECTED-67 (no report page): A model file a map needs that is missing, or a bad server message, leaves the game on the loading screen: the client stops reading the map half connected
+- LOAD-ERROR-NOT-NAMED-67 (no report page): A place that cannot be reached or loaded is not named on screen: a dbg tp refusal is a console line only, and the failed-load box says only to look at the console
+- LOAD-FATAL-ERRORS-67 (no report page): Memory that runs out or a damaged map file while a place loads ends the game instead of going back where the player was
 - SEYDA-TRANSITION-29 (no report page): v0.0.29-dev1: Cell/sub-cell passage problems around Seyda Neen
 - TRANSITION-EQUIPMENT-29 (no report page): Carried torch blinks out on cell/sub-cell arrival
 - TRANSITION-VIEW-29 (no report page): Automatic cell handoff forgets mouse orientation

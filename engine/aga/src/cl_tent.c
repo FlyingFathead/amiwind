@@ -291,7 +291,11 @@ void CL_ParseTEnt (void)
 #endif
 
 	default:
-		Sys_Error ("CL_ParseTEnt: bad type");
+		{
+			/* NET-VIVEC-ENTITY-PACKET-OVERFLOW-66: in a frame's update this drops the update, never the game */
+			extern void CL_ParseFault (char *fmt, ...);
+			CL_ParseFault ("CL_ParseTEnt: bad type %d", type);
+		}
 	}
 }
 

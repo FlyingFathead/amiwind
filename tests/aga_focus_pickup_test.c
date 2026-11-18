@@ -15,7 +15,7 @@ static model_t world,world2;
 char *pr_strings;
 static char strings[16];
 static int room_draws,taken,take_reference,notices,disabled;
-static byte focus_file[8+12+96+28],item_file[8+512],placed_file[8+16+48];
+static byte focus_file[8+12+96+28],item_file[8+2*512],placed_file[8+16+48];
 static int placed_size,focus_size=8+12+96;   /* AWF2: the rows alone; AWF3 (CELL-CHANGES-59): the owners list too */
 static void put32(byte *p,unsigned long v);
 static const char hud_text[]="iMaxActivateDist 192\nsWeight Weight\nsValue Value\nsTake Grab\n";
@@ -72,7 +72,7 @@ void AW_MwscriptRoomShift(float shift[3]){shift[0]=shift[1]=shift[2]=0;}
 int AW_ObjectDisabled(unsigned reference){return disabled && reference==QUILL;}
 int AW_ObjectTake(unsigned reference,int stolen){(void)stolen;take_reference=(int)reference;taken++;disabled=1;return 1;}
 int ChimRoom_Has(unsigned reference){return room_draws && reference==QUILL;}
-void AW_UIPickupNotice(const char *name,double duration){(void)duration;assert(!strcmp(name,"Quill Pen"));notices++;}
+void AW_UIPickupNotice(const char *name,double duration){(void)duration;assert(!strcmp(name,"Quill Pen") || !strcmp(name,"Candle"));notices++;}
 static int subtitles;   /* only the locked container's line (DOOR-TRAPS-NOT-SPRUNG-55 check) */
 void AW_UISubtitle(const char *speaker,const char *text,double duration){(void)speaker;(void)duration;assert(!strcmp(text,"Locked"));subtitles++;}
 void AW_CombatEquipmentChanged(void){}
@@ -104,9 +104,14 @@ static void tables(void){
     put32(focus_file+8,763);put32(focus_file+12,0);put32(focus_file+16,1);
     row[0]='I';row[1]=1;put32(row+4,QUILL);put32(row+8,80);put32(row+12,0);put32(row+16,116);
     memcpy(&bits,&weight,4);put32(row+20,bits);put32(row+24,1);memcpy(row+28,"Quill Pen",9);memcpy(row+64,"misc_quill",10);
-    memcpy(item_file,"AWI2",4);put32(item_file+4,1);
-    memcpy(item_file+8,"misc_quill",10);memcpy(item_file+8+64,"Quill Pen",9);put32(item_file+8+160,AW_INV_MISC);
-    put32(item_file+8+168,1);put32(item_file+8+172,bits);
+    /* the item table, ids ascending: a carryable light (PRISON-SHIP-ITEMS-TAKEABLE-65: the candle, flagged a light),
+     * then the quill */
+    memcpy(item_file,"AWI2",4);put32(item_file+4,2);
+    memcpy(item_file+8,"light_com_candle_02",19);memcpy(item_file+8+64,"Candle",6);put32(item_file+8+160,AW_INV_MISC);
+    put32(item_file+8+168,1);put32(item_file+8+172,bits);put32(item_file+8+180,AW_INV_LIGHT);
+    put32(item_file+8+164,128);put32(item_file+8+504,600);     /* its radius and burn time (a light's catalogue row) */
+    memcpy(item_file+8+512,"misc_quill",10);memcpy(item_file+8+512+64,"Quill Pen",9);
+    put32(item_file+8+512+160,AW_INV_MISC);put32(item_file+8+512+168,1);put32(item_file+8+512+172,bits);
 }
 /* CENSUS-CRAB-PLATE-FOCUS-66: the census office's back-room table as the table holds it: the owned Silverware Plate
  * (reference PLATE, row 0) and the crab meat lying on it (CRAB, row 1), their centres half a game unit apart (the
@@ -143,9 +148,16 @@ extern int (*aw_trap_spring)(unsigned reference);
 extern int (*aw_container_open)(unsigned reference,const char *name,int owned);
 static int trap_armed,springs,opens;
 static int trap_stand_in(unsigned reference){(void)reference;if(!trap_armed)return 0;trap_armed=0;springs++;return 1;}
+/* LOCKED-CONTAINERS-NEVER-OPEN-67: a stand-in for the doors' lock rule (aw_hinged_door.c container_lock_pass) */
+extern int (*aw_lock_pass)(unsigned reference,const char *key);
+static int pass_answer,passes;static unsigned pass_ref;
+static int pass_stand_in(unsigned reference,const char *key){(void)key;passes++;pass_ref=reference;return pass_answer;}
 static int open_stand_in(unsigned reference,const char *name,int owned){(void)reference;(void)name;(void)owned;opens++;return 1;}
 static int reader_opened;
 static int fake_reader(unsigned reference){reader_opened=(int)reference;return 1;}
+/* PRISON-SHIP-ITEMS-TAKEABLE-65: the Inventory window not allowed / allowed (aw_story.c AW_StoryInventoryAllowed) */
+static int not_allowed(void){return 0;}
+static int allowed(void){return 1;}
 int main(void){
     const char *name;char weight[48],value[48];int owned;
     /* PLACED-PIT-AXE-NO-FOCUS-61: the ray against a placed model's box (mathlib.c AW_RayAliasBox): an axe 20 units long
@@ -177,6 +189,10 @@ int main(void){
       level(1);
       if(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned))fprintf(stderr,"door %d: no focus row\n",d),assert(0);
       if(strcmp(name,doors[d].whole))fprintf(stderr,"door %d: name '%s'\n",d,name),assert(0);
+      /* PRISON-SHIP-ITEMS-TAKEABLE-65: a door keeps its name before the papers */
+      aw_object_labels=not_allowed;
+      assert(AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && !strcmp(name,doors[d].whole));
+      aw_object_labels=NULL;
       /* the same row in a file without the continuation: the name as written */
       memset(row+64,0,32);level(1);
       assert(AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && !strcmp(name,doors[d].head));
@@ -197,6 +213,10 @@ int main(void){
             !weight[0] && !value[0] && !owned);
      assert(!AW_ItemPrompt(prompt,sizeof(prompt),&steal));
      assert(!AW_InventoryUse() && !taken);
+     /* PRISON-SHIP-ITEMS-TAKEABLE-65: a named object that is not an item (a board here; the prison ship's hammock,
+      * an activator of its own) shows no name before the papers */
+     aw_object_labels=not_allowed;assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned));
+     aw_object_labels=allowed;assert(AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned));aw_object_labels=NULL;
      entities[1].v.v_angle[1]=20;assert(AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned));
      entities[1].v.v_angle[1]=30;assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned));
      entities[1].v.v_angle[1]=180;assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned));   /* behind */
@@ -234,6 +254,29 @@ int main(void){
      assert(AW_InventoryUse() && springs==1 && opens==1);
      trap_armed=1;row[3]=50;level(1);
      assert(AW_InventoryUse() && springs==1 && opens==1 && trap_armed && subtitles==1);
+     /* LOCKED-CONTAINERS-NEVER-OPEN-67: the doors' way through a lock (aw_hinged_door.c through aw_lock_pass): when
+      * it lets the player through (the key carried, god mode, dbg doorlocks off) the locked container opens (its trap
+      * first, as unlocked: the key has disarmed it in the engine); when it refuses, Locked as before */
+     trap_armed=0;aw_lock_pass=pass_stand_in;pass_answer=0;level(1);
+     assert(AW_InventoryUse() && opens==1 && subtitles==2 && passes==1 && pass_ref==QUILL);
+     pass_answer=1;level(1);
+     assert(AW_InventoryUse() && opens==2 && subtitles==2 && passes==2);
+     aw_lock_pass=NULL;row[3]=0;
+     /* CONTAINER-BRUSH-ROWS-67: a container drawn as a brush of its own (a compiled room's func_wall with its aw_ref:
+      * the Imperial Prison Ship's, the census office's) keeps its row: aimed where the view ray meets that brush, also
+      * turned 20 degrees off its origin (where the origin test misses), and E opens it; the courtyard barrel's brush
+      * stays the opening's own (no box, E does nothing here) */
+     ref_edicts=1;refs[2]._float=(float)QUILL;
+     level(1);sv.num_edicts=3;view_entity=2;view_fraction=19.5f/48;
+     assert(AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && !strcmp(name,"Sack"));
+     assert(AW_InventoryUse() && opens==3);
+     level(1);sv.num_edicts=3;view_entity=2;view_fraction=21.0f/48;entities[1].v.v_angle[1]=20;
+     assert(AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && !strcmp(name,"Sack"));
+     entities[1].v.v_angle[1]=0;
+     put32(row+4,172851);refs[2]._float=172851.0f;
+     level(1);sv.num_edicts=3;view_entity=2;view_fraction=19.5f/48;
+     assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && !AW_InventoryUse() && opens==3);
+     put32(row+4,QUILL);ref_edicts=0;view_entity=0;
      aw_trap_spring=NULL;aw_container_open=NULL;
      tables();level(1);
     }
@@ -262,6 +305,46 @@ int main(void){
       assert(AW_PlacedTake(QUILL) && taken==1 && take_reference==(int)QUILL && notices==1);
       assert(!AW_PlacedTake(QUILL) && taken==1);}
      aw_book_reader=NULL;focus_file[8+12+1]=1;focus_file[8+12+2]=0;level(1);}
+    /* PRISON-SHIP-ITEMS-TAKEABLE-65: before the Inventory window is allowed (the release papers' EnableInventoryMenu)
+     * the use key takes no item and no carryable light and opens no container (spent on nothing: the original's
+     * NullAction); a book is read but not taken (its Take refused, as the original's book window hides it). Before
+     * the papers (the prison ship's every deck: its bottles, its travel lantern, its crates; the dock, the
+     * registration) no text overlay at all: no name and no action line, a book's included. From the papers on, the
+     * inventory not yet allowed: the names show, no action line but a book's "E: Read". With the flag set all four
+     * work */
+    {char prompt[48];int steal=-1;byte *row=focus_file+8+12;
+     aw_inventory_allowed=not_allowed;aw_object_labels=not_allowed;level(1);          /* the ship, before the papers */
+     assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned));                 /* an item: no name */
+     assert(!AW_ItemPrompt(prompt,sizeof(prompt),&steal));                            /* nor an action line */
+     assert(AW_InventoryUse() && !taken && AW_StateGet(&aw_state,AW_ITEM,"misc_quill")==0);   /* and not taken */
+     row[2]=2;aw_book_reader=fake_reader;reader_opened=0;level(1);                      /* a book: read, not taken */
+     assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && !AW_ItemPrompt(prompt,sizeof(prompt),&steal));
+     assert(AW_InventoryUse() && reader_opened==(int)QUILL && !taken);
+     assert(!AW_PlacedTake(QUILL) && !taken && AW_StateGet(&aw_state,AW_ITEM,"misc_quill")==0);
+     aw_object_labels=allowed;level(1);                       /* the papers laid out, the inventory not yet allowed */
+     assert(AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && !strcmp(name,"Quill Pen"));
+     assert(AW_ItemPrompt(prompt,sizeof(prompt),&steal) && !strcmp(prompt,"E: Read"));
+     row[2]=1;level(1);assert(!AW_ItemPrompt(prompt,sizeof(prompt),&steal));             /* an item: its name only */
+     aw_object_labels=not_allowed;aw_book_reader=NULL;
+     memset(row+28,0,36+32);memcpy(row+28,"Candle",6);memcpy(row+64,"light_com_candle_02",19);level(1);
+     assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned));                 /* a carryable light (the */
+     assert(!AW_ItemPrompt(prompt,sizeof(prompt),&steal));                            /* ship's travel lantern): */
+     assert(AW_InventoryUse() && !taken && AW_StateGet(&aw_state,AW_ITEM,"light_com_candle_02")==0);   /* nothing */
+     row[0]='C';aw_container_open=open_stand_in;opens=0;level(1);                      /* a container (a crate): */
+     assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && !AW_ItemPrompt(prompt,sizeof(prompt),&steal));
+     assert(AW_InventoryUse() && opens==0);                                          /* no name, stays shut */
+     aw_inventory_allowed=allowed;aw_object_labels=allowed;level(1);                 /* the flag set: all four */
+     assert(AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && !strcmp(name,"Candle"));
+     assert(AW_ItemPrompt(prompt,sizeof(prompt),&steal) && AW_InventoryUse() && opens==1);
+     row[0]='I';level(1);
+     assert(AW_ItemPrompt(prompt,sizeof(prompt),&steal) && AW_InventoryUse() && taken==1 &&
+            AW_StateGet(&aw_state,AW_ITEM,"light_com_candle_02")==1);
+     tables();row[2]=2;level(1);
+     assert(AW_PlacedTake(QUILL) && taken==1 && take_reference==(int)QUILL && AW_StateGet(&aw_state,AW_ITEM,"misc_quill")==1);
+     tables();level(1);
+     assert(AW_ItemPrompt(prompt,sizeof(prompt),&steal) && AW_InventoryUse() && taken==1 &&
+            AW_StateGet(&aw_state,AW_ITEM,"misc_quill")==1);
+     tables();aw_container_open=NULL;aw_inventory_allowed=NULL;aw_object_labels=NULL;level(1);}
     assert(AW_InventoryUse());
     assert(taken==1 && take_reference==(int)QUILL && notices==1);
     assert(AW_StateGet(&aw_state,AW_ITEM,"misc_quill")==1);

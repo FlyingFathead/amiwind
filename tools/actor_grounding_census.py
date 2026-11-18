@@ -877,6 +877,17 @@ def main(argv=None):
         return 1 if problems else 0
     rows, facts, errors = measure(args.data_files, resolve_jobs(args.jobs))
     policy = json.loads(Path(policy_path).read_text())
+    # The expansions' id file beside the policy (actor_grounding_layers.layer_policy): its ids are known like the
+    # policy's, and with an expansion selected --write puts what is new THERE, so the base game's policy file does
+    # not move.
+    import actor_grounding_layers
+    from mwad.masters import is_base_only, selected_masters
+    layers_path = Path(policy_path).with_name(actor_grounding_layers.NAME)
+    layer_ground, layer_rules = actor_grounding_layers.layer_policy(layers_path)
+    base_policy = policy
+    policy = dict(policy, ground_npcs=sorted(set(policy['ground_npcs']) | set(layer_ground)),
+                  exceptions={**layer_rules, **policy['exceptions']})
+    layered = not is_base_only(selected_masters())
     ground, dead, candidates, conflicts = classify(rows, facts, policy)
     ids = {r['id'] for r in rows}
     summary = {'exterior_placements': len(rows), 'exterior_npcs': len(ids),
@@ -900,11 +911,39 @@ def main(argv=None):
                                            'new_authored_dead': dead, 'unresolved': candidates,
                                            'conflicts': conflicts, 'model_errors': errors}, indent=1) + '\n',
                                encoding='utf-8', newline='\n')
-    if args.write:
-        Path(policy_path).write_text(json.dumps(merged_policy(policy, ground, dead), indent=2) + '\n',
+    if args.write and layered:
+        layers_path.write_text(json.dumps(layers_doc(layer_ground, layer_rules, ground, dead, selected_masters()),
+                                          indent=1) + '\n', encoding='utf-8', newline='\n')
+        print('Expansions\' id file written: %s (%d ground ids, %d exceptions); the policy file is unchanged'
+              % (layers_path, len(set(layer_ground) | set(ground)), len({**layer_rules, **dead})))
+    elif args.write:
+        Path(policy_path).write_text(json.dumps(merged_policy(base_policy, ground, dead), indent=2) + '\n',
                                      encoding='utf-8', newline='\n')
         print('Policy written:', policy_path)
     return 0
+
+
+def layers_doc(known_ground, known_rules, ground, dead, masters):
+    """The expansions' id file (config/actor_grounding_layers.json, actor_grounding_layers.FORMAT): the ids already
+    in it and the newly measured ones. No positions or heights."""
+    import actor_grounding_layers
+    rules = dict(known_rules)
+    for identifier, rule in sorted(dead.items()):
+        if 'source' in rule:        # classify() words it for the base game's policy; here the record may be a layer's
+            rule = dict(rule, source=rule['source'].replace('(base master)', '(the selected game files)'))
+        rules.setdefault(identifier, rule)
+    return {'format': actor_grounding_layers.FORMAT,
+            'about': 'The initial support class, by id, of the people only the expansions place outdoors (Solstheim; '
+                     'Mournhold\'s districts presented as exterior cells; the expansions\' people in Vvardenfell), '
+                     'measured from the game data with the expansions selected '
+                     '(tools/actor_grounding_census.py --write). Read by tools/actor_grounding_layers.py for an id '
+                     'config/actor_grounding.json does not name, so that file does not move when an expansion\'s '
+                     'people are added. ground_npcs: standing on the ground or on a placed object; exceptions: as in '
+                     'the policy. No positions or heights.',
+            'generator': 'tools/actor_grounding_census.py --write (with the expansions selected)',
+            'masters': list(masters),
+            'ground_npcs': sorted(set(known_ground) | set(ground)),
+            'exceptions': {k: rules[k] for k in sorted(rules)}}
 
 
 if __name__ == '__main__':

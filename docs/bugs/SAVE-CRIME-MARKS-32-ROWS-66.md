@@ -20,11 +20,31 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.66-dev3 (15fc5080) | 2026-11-14 | gate 10772 passed on 15fc5080 | the crime marks grow from the heap past 32 rows; a second block carries the rows past 255 |
+| shipped | a numbered build | v0.0.66-dev3 build 2026_11_15_v0.0.66-dev3_full-v0.0.66-dev3_c0ab8f1 | 2026-11-15 | the delivered build (git merge-base --is-ancestor 15fc5080 c0ab8f11) | the build holds 15fc5080 |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-14: reported in v0.0.66-dev2
+- 2026-11-14: fixed in source: a gated commit, v0.0.66-dev3 (15fc5080); gate 10772 passed on 15fc5080: the crime marks grow from the heap past 32 rows; a second block carries the rows past 255
+- 2026-11-15: shipped: a numbered build, v0.0.66-dev3 build 2026_11_15_v0.0.66-dev3_full-v0.0.66-dev3_c0ab8f1; the delivered build (git merge-base --is-ancestor 15fc5080 c0ab8f11): the build holds 15fc5080
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.66-dev2 (14 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Status: 14 November 2026](#status-14-november-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -156,7 +176,9 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - COMBAT-THINK-COST-68040-54 (no report page): On the slow 68040 preset one combat decision step (think) costs 34 ms with one fighter and 44 ms with four
 - COMBAT-WEAPON-CHOICE-SKILL-66 (no report page): The weapon a fighter took into a fight ignored its skills: the highest maximum damage won
 - [CONSOLE-GETITEMCOUNT-UNNAMED-ITEM-66](CONSOLE-GETITEMCOUNT-UNNAMED-ITEM-66.md): The console's player->getitemcount answers "no such item id" for an item the player carries when no script and no actor names it (the census iron dagger)
+- [CONTAINER-BRUSH-ROWS-67](CONTAINER-BRUSH-ROWS-67.md): The containers of the Imperial Prison Ship and the Census and Excise Office cannot be opened: drawn as brushes of their own, their use rows are skipped
 - [CONTAINER-LEVELLED-CONTENTS-EMPTY-59](CONTAINER-LEVELLED-CONTENTS-EMPTY-59.md): Containers whose contents are levelled lists open empty
+- [CONTAINER-SCRIPT-ACTIVATE-67](CONTAINER-SCRIPT-ACTIVATE-67.md): Containers whose script takes the activation open directly, without their script
 - [CONTAINER-STRIP-OPEN-MANY-KINDS-61](CONTAINER-STRIP-OPEN-MANY-KINDS-61.md): With hundreds of kinds of item carried, opening a body or a container holds the game for about 10 seconds
 - CORPSE-DISPOSE-MISSING-65 (no report page): A corpse's loot window has no way to dispose of the body, so bodies pile up
 - [CORPSE-INVENTORY-NOT-OPENABLE-59](CORPSE-INVENTORY-NOT-OPENABLE-59.md): Bodies of dead NPCs and creatures cannot be opened to take what they carried
@@ -203,7 +225,9 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - JOURNAL-LOWER-INDEX-ENTRY-64 (no report page): A Journal command at or below the quest index adds no entry, no finished or restart mark and no notice
 - LAVA-NO-DAMAGE-63 (no report page): Lava does no damage and is not drawn in the Red Mountain lava pool
 - [LOADED-ITEMS-NOT-WEIGHED-61](LOADED-ITEMS-NOT-WEIGHED-61.md): After loading a save of another character the carried weight reads 0 until the next place load
+- [LOCKED-CONTAINERS-NEVER-OPEN-67](LOCKED-CONTAINERS-NEVER-OPEN-67.md): Locked containers never open: no key, lockpick or Open spell works on them
 - [MAP-MENU-BLOCKED-COURTYARD-65](MAP-MENU-BLOCKED-COURTYARD-65.md): In the opening the courtyard announces the map, but the map key stays blocked until the opening ends
+- MAP-PLACES-SHOWN-UNVISITED-67 (no report page): The map shows places the player has never visited (Pelagiad, the Moonmoth Legion fort)
 - MARKS-SUMMON-CARRIERS-NOT-LIVE-63 (no report page): The guarded items whose taking summons a guardian are not live references, so the summon never comes
 - MWSCRIPT-CELLCHANGED-VOLATILE-54 (no report page): CellChanged made the sound-marker scripts volatile: 85 percent of Vivec's per-frame script work
 - MWSCRIPT-CONSOLE-LOCAL-NAMES-63 (no report page): Show and ShowVars cannot name a script's local variables: Show reads globals only, ShowVars lists the locals by slot number, and ToggleScripts flips the saved scripts switch
@@ -257,7 +281,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [PLAYER-START-SPELLS-NOT-KNOWN-61](PLAYER-START-SPELLS-NOT-KNOWN-61.md): Character creation never puts the race, birthsign and class spells and abilities on the player record, so they cannot be cast or apply
 - PLAYER-WALK-SPEED-SLOW-51 (no report page): The starting walk speed feels very slow; check it against the original and OpenMW
 - POWER-COOLDOWN-NOT-SAVED-66 (no report page): Power cooldowns are not saved and not reset by a new game: a save and reload makes a used power ready again
-- PRISON-SHIP-ITEMS-TAKEABLE-65 (no report page): On the prison ship the spoons, plates and other dishes can be taken with the activate key
+- [PRISON-SHIP-ITEMS-TAKEABLE-65](PRISON-SHIP-ITEMS-TAKEABLE-65.md): On the prison ship the spoons, plates and other dishes can be taken with the activate key
 - [QC-AW-FLAME-SPAWN-32](QC-AW-FLAME-SPAWN-32.md): Every aw_flame entity prints load errors: the game logic has no aw_flame spawn function or aw_flame_size/aw_flame_shape fields
 - RACE-RESIST-NOT-ON-SPELL-DAMAGE-64 (no report page): A race ability that resists an element does not reduce spell damage of that element
 - [READY-MAGIC-SHOWS-WEAPON-65](READY-MAGIC-SHOWS-WEAPON-65.md): Readying magic (R by default) raises the equipped weapon instead of the spell-casting hands
@@ -268,6 +292,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - SAVE-ACTOR-BLOCK-OVERFLOW-59 (no report page): A full actor record pool (128 actors) can exceed the save's 32 KB actor block, which would refuse the save (calculated, not measured)
 - [SAVE-ACTOR-ROWS-BOUND-UNDER-GAME-66](SAVE-ACTOR-ROWS-BOUND-UNDER-GAME-66.md): The world change list holds at most 8,192 actor rows while the game places about 13,800 actor references
 - SAVE-ACTOR-ROWS-EXPANSION-ROOMS-66 (no report page): A save is refused once an NPC was in a room of an expansion: the saved actor rows took place numbers up to the base game's rooms only, and the expansions' rooms are numbered after them
+- SAVE-AUTOSAVE-NOT-WRITTEN-67 (no report page): Autosaves are not written at all in a played game of the v0.0.66 release
 - SAVE-CHANGES-FULL-REFUSES-SAVE-59 (no report page): When the world change list is full (2,048 entries for all actors and objects), the whole save is refused and the previous one kept
 - SAVE-EFFECTS-BLOCK-SIZE-61 (no report page): Loading a save with a spell effect active loses the effects and the made spells, enchanted items, soul gems and other blocks saved after them
 - SAVE-EQUIPMENT-29 (no report page): Quickload returns with hands and torch put away
@@ -303,6 +328,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - THIRDPERSON-ANIMS-AUDIT-62 (no report page): Third-person actions are not all mapped to the original's animation groups
 - TORCH-HIDES-HELM-62 (no report page): Holding a torch makes the worn helm disappear from the third-person body and the inventory figure; it returns when the torch is put away
 - [TOWN-OUTDOOR-SCRIPTS-NOT-ATTACHED-66](TOWN-OUTDOOR-SCRIPTS-NOT-ATTACHED-66.md): On a town map, scripted objects without an entity are never attached, so their scripts do not run (the falling mage's journal near Seyda Neen)
+- TP-BEING-TRIBUNAL-FALLS-THROUGH-67 (no report page): Teleporting to a character in some Tribunal interiors drops the player through the floor (the pawnbroker Ten-Tongues Weerhat, the Assassin)
 - TRAVEL-SERVICES-CHIM-51 (no report page): Silt strider rides between towns do not work: travel knows only the old Seyda Neen and Balmora town maps, not the CHIM world, and none of the other routes
 - UI-HUD-TOGGLE-KEY-51 (no report page): Requested: a key combination (for example Ctrl+Alt+H) that hides and shows the whole HUD in game, the crosshair with it
 - [UI-INVENTORY-INTEGRATION-40](UI-INVENTORY-INTEGRATION-40.md): Inventory integration and safe world placement remain incomplete

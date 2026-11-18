@@ -1688,7 +1688,9 @@ Each of these stops the build in seconds or minutes, before the image's slow wor
 - **Flora support.** At the start of the image step (`Image: flora support check`) every bracket fungus of the CHIM
   world is measured against the tree it grows on (`tools/chim/flora_support_audit.py`, the table
   `config/flora-support.json`). A fungus more than 2 units from its tree that the table does not list under
-  `known_floating` (each entry with its reason) stops the build; the run's `flora-support.json` has the measurements.
+  `known_floating` (each entry with its reason) stops the build; `image/flora-support.json` in the run folder has the
+  measurements (the image step's own folder: a file at the run folder's root is outside every stage's declared paths,
+  and the stages running beside the image recorded it as theirs, which refused their records for reuse).
   See [plants on trees](EXTERNAL_HARVEST_MODELS.md#plants-on-trees).
 - **Actor spec.** After the creature census (`tools/actor_spec_check.py`, about 35 seconds) the people and creatures
   placed per area kind and every actor's record are compared with the original; a shortfall beyond

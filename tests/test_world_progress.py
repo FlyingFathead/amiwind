@@ -148,7 +148,8 @@ class ToolkitTests(unittest.TestCase):
             html = (self.KIT / page).read_text(encoding='utf-8')
             self.assertIsNone(re.search(r'(src|href)\s*=\s*["\']https?:', html), page)
             for target in re.findall(r"fetch\(\s*'([^']*)'", html):
-                self.assertTrue(target.startswith(('../data/', '../maps/')), (page, target))
+                # the local server's data, maps and served build (toolkit_serve.py: /data/, /maps/, /build/)
+                self.assertTrue(target.startswith(('../data/', '../maps/', '../build/')), (page, target))
         index = (self.KIT / 'index.html').read_text(encoding='utf-8')
         self.assertIn('<title>AmiWind Toolkit</title>', index)
         for target in re.findall(r'(?:src|href)="([^"#]+)"', index):
@@ -217,7 +218,7 @@ class ViewerTests(unittest.TestCase):
     def test_viewer_is_self_contained(self):
         self.assertIsNone(re.search(r'(src|href)\s*=\s*["\']https?:', self.html))
         for target in re.findall(r"fetch\(\s*'([^']*)'", self.html):
-            self.assertTrue(target.startswith(('../data/', '../maps/')), target)
+            self.assertTrue(target.startswith(('../data/', '../maps/', '../build/')), target)
 
     def test_viewer_reads_this_format_and_only_draw_resizes(self):
         self.assertIn(wp.FORMAT, self.html)

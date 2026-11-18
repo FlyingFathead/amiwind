@@ -66,8 +66,10 @@ class EngineWiringTests(unittest.TestCase):
         event = mouse[mouse.index('void IN_AWMouseEvent'):]
         self.assertLess(event.index('aw_msgbox_mouse(dx,dy)'), event.index('if(key_dest!=key_game)'))
         loadfail = code('aw_loadfail.c')
-        self.assertIn('AW_MsgBoxShow(AW_SceneLoadBoxText(),buttons,2);', loadfail)
-        self.assertIn('{"OK","Load Game"}', loadfail)
+        # SCENE-LOAD-FAIL-FALLBACK-67: one button, OK (the load menu only when there is no place to stay)
+        self.assertIn('AW_MsgBoxShow(AW_SceneLoadBoxText(),buttons,1);', loadfail)
+        self.assertIn('buttons[1]={"OK"}', loadfail)
+        self.assertNotIn('"Load Game"', loadfail)
 
     def test_built_into_the_engine(self):
         make = (ROOT / 'engine' / 'aga' / 'Makefile').read_text(encoding='utf-8')

@@ -170,6 +170,7 @@ Family: Object placement and in-game geometry (`placement-geometry`). Placed obj
 - CREATURE-FLOATING-62 (no report page): A scrib in the wilderness floats above the terrain
 - [DOOR-ARRIVAL-INSIDE-ACTOR-66](DOOR-ARRIVAL-INSIDE-ACTOR-66.md): Coming back out of the census office onto the Seyda Neen street after a kill, the player arrives inside the guard who has walked to the door and stays stuck
 - [PORT-ROCK-ROTATION-23](PORT-ROCK-ROTATION-23.md): A rock by the Seyda Neen port was converted with the wrong rotation
+- PRISON-SHIP-FLOOR-STUCK-67 (no report page): On the prison ship the player gets stuck on a floor tile that stands out of the hold floor
 - ROCK-FLORA-SURFACE-29 (no report page): Angular rock-like surfaces newly appearing in Bitter Coast
 - ROOM-GROUND-STEEP-ICE-66 (no report page): With Bloodmoon selected, the image stage stopped on one Hound of Hircine in the Mortrag Glacier Inner Ring: its feet stand on a steep part of the converted ice floor
 - SHACK-VISIBILITY-29 (no report page): Indrele Rathryon shack front walls missing
@@ -180,7 +181,7 @@ Family: Object placement and in-game geometry (`placement-geometry`). Placed obj
 Related bugs in other categories:
 
 - [CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43](CHIM-BITTERCOAST-HEAP-SHAPEGUARD-43.md): Two Bitter Coast CHIM frames over the heap zone after the trunk shape guard
-- HARVEST-HYPHA-FACIA-FLOATING-65 (no report page): In Seyda Neen a Hypha Facia mushroom that grows on a tree's side floats in the air
+- [HARVEST-HYPHA-FACIA-FLOATING-65](HARVEST-HYPHA-FACIA-FLOATING-65.md): In Seyda Neen a Hypha Facia mushroom that grows on a tree's side floats in the air
 - TREE-PILLAR-28 (no report page): Sprite-tree roots extend into unintended striped pillars
 - [TREE-VIEW-FLOAT-38](TREE-VIEW-FLOAT-38.md): Sprite tree appears detached from terrain from particular viewing directions
 

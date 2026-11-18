@@ -80,6 +80,7 @@ Family: Mesh converter geometry (`converter-geometry`). Converted faces must be 
 - [BALMORA-TEMPLE-GEOMETRY-29](BALMORA-TEMPLE-GEOMETRY-29.md): Balmora Temple lower rooms: missing walls and floors, collision holes
 - BSP-LIGHT-01 (no report page): Vodunius face lightmap range exceeded its lighting lump
 - [BUILD-SEYDA-OCEAN-FLOOR-40](BUILD-SEYDA-OCEAN-FLOOR-40.md): Expanded Seyda ocean terrain collapses onto the fixed BSP seal
+- CENSUS-SHELF-PLATE-BAKED-67 (no report page): Census and Excise Office: a plate on the bookshelf is drawn as part of the room and cannot be taken, although in the original it is a separate item
 - CHIM-CAVE21-NONCONVEX-FACE-48 (no report page): The cave piece shared by in_moldcave_21, in_mudcave_21, in_pycave_21 and in_lavacave_21 has a non-convex face, so its collision falls back to the piece chain in every room that uses it
 - CHIM-COLLISION-ROOM-FILLED-54 (no report page): One convex collision piece fills the room above a floor of the same mesh: seven trapdoors and a Redoran hut door cannot be used
 - [CHIM-DOCK-TERRAIN-SEAM-47](CHIM-DOCK-TERRAIN-SEAM-47.md): A pale sliver gap shows where a dock end meets the ground (Bitter Coast, cell -5,-6)
@@ -116,6 +117,7 @@ Family: Mesh converter geometry (`converter-geometry`). Converted faces must be 
 - [MESH-VIVEC-CAP-GAP-38](MESH-VIVEC-CAP-GAP-38.md): Vivec giant mushroom cap has a visible opening
 - [NPC-GALLERY-SPIKE-33](NPC-GALLERY-SPIKE-33.md): One gallery model has a vertex 12 units outside its source shape (simplifier spike)
 - [NPC-JOINT-GAPS-33](NPC-JOINT-GAPS-33.md): NPC bodies open at the joints: each body part is reduced on its own and pulls back from the part it meets
+- PRISON-SHIP-TABLE-DARK-TRIANGLE-67 (no report page): A large dark triangle lies across the table in the prison ship hold
 - ROOM-EFFECT-MODEL-NO-TRIANGLES-66 (no report page): A summoning effect model without drawn triangles refused the whole Dome of Sotha Sil room
 - [ROUTED-HULL-NODE-ORDER-33](ROUTED-HULL-NODE-ORDER-33.md): A routed standing hull can start above nodes it reaches; the engine stops with "SV_RecursiveHullCheck: bad node number"
 - SEAM-AUDIT-IGNORES-RIM-TEARS-54 (no report page): The seam audit reports meshes with torn rims as ok

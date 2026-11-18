@@ -325,11 +325,16 @@ void Host_Map_f (void)
 
 	svs.serverflags = 0;			// haven't completed an episode yet
 	COM_FormatPath (name, sizeof(name), "%s", Cmd_Argv(1));	// fits: SV_MapNameFits
+	/* SCENE-LOAD-FAIL-FALLBACK-67: a map load is in flight until it spawns or fails: an error on the way (a broken
+	 * file, not enough memory, a missing file, the time limit) ends this load, not the game (aw_scene.c) */
+	AW_SceneMapBegin (name);
 	if (aw_load_fail_test.value >= 1)
 	{
-		/* the test setting: this load fails as a room that cannot load does (HEART-CHAMBER-LOAD-HANG-62) */
+		/* the test setting: this load fails as a room that cannot load does (HEART-CHAMBER-LOAD-HANG-62); dbg loadfail
+		 * N KIND makes it fail inside the real load instead (memory, lump, hang: AW_LoadFailTestArm) */
 		Cvar_SetValue ("aw_load_fail_test", aw_load_fail_test.value - 1);
-		Host_Error ("map %s: forced load failure (aw_load_fail_test)", name);
+		if (!AW_LoadFailTestArm ())
+			Host_Error ("map %s: forced load failure (aw_load_fail_test)", name);
 	}
 	AW_SPIKE_BEGIN (spike_t0);
 #ifdef QUAKE2
@@ -342,11 +347,13 @@ void Host_Map_f (void)
 	{
         S_CancelSceneVoice();
 		SCR_EndLoadingPlaque();
+		AW_LoadFailSpawn (name);	/* the map not found, or why it did not spawn (aw_loadfail.c) */
 		AW_SceneLoadFailed ("the map could not be spawned");	/* back where the load started */
 		return;
 	}
 
-	if (cls.state != ca_dedicated)
+	/* dbg loadfail N hang: the client never connects, so the load never arrives (the time limit's test) */
+	if (cls.state != ca_dedicated && !AW_LoadFailTestHang ())
 	{
 		/* cls.spawnparms was joined (bounded) before the old game was left. */
 		aw_load_phase = "client: connect local";
@@ -408,7 +415,13 @@ void Host_Changelevel_f (void)
 		return;		// the game goes on where it is, the refusal screen is up
 	SV_SaveSpawnparms ();
 	COM_FormatPath (level, sizeof(level), "%s", Cmd_Argv(1));
+	AW_SceneMapBegin (level);	/* SCENE-LOAD-FAIL-FALLBACK-67: the same catcher as Host_Map_f */
 	SV_SpawnServer (level);
+	if (!sv.active)
+	{
+		AW_LoadFailSpawn (level);
+		AW_SceneLoadFailed ("the map could not be spawned");
+	}
 #endif
 }
 

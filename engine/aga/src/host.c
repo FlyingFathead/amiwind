@@ -158,7 +158,9 @@ void Host_Error (char *error, ...)
 
     inerror = false;
 
-    AW_SceneLoadFailed (string);	/* a scene load in flight goes back where it started (HEART-CHAMBER-LOAD-HANG-62) */
+    /* a scene load in flight goes back where it started (HEART-CHAMBER-LOAD-HANG-62); an error in play loads the
+     * place again, the box says why (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66) */
+    AW_SceneHostError (string);
     longjmp (host_abortserver, 1);
 }
 
@@ -474,9 +476,11 @@ void Host_ShutdownServer(qboolean crash)
     while (count);
 
 // make sure all the clients know we're disconnecting
+    memset (&buf, 0, sizeof(buf));
     buf.data = (byte *)message;
     buf.maxsize = 4;
     buf.cursize = 0;
+    buf.allowoverflow = true;	/* every message buffer says it (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66) */
     MSG_WriteByte(&buf, svc_disconnect);
     count = NET_SendToAll(&buf, 5);
     if (count)

@@ -49,8 +49,11 @@ AW_RESIDENT_GROWS("saved actor rows (SAVE-ACTOR-ROWS-256-66)",AW_SAVE_ACTOR_ROWS
 static int rows_refused;
 /* SAVE-INSIDE-SCRIPT-STEP-66 (aw_save.h): inside a script step a save is queued, not taken */
 int (*aw_save_busy)(void);
+void (*aw_save_busy_clear)(void);   /* SAVE-AUTOSAVE-REGRESSED-67 (aw_save.h) */
 static int queued_slot=-1;
 static int busy(void){return aw_save_busy && aw_save_busy();}
+/* SAVE-AUTOSAVE-REGRESSED-67: the last save's outcome this session (written, or why not), for dbg save status */
+static char last_save[112];
 int AW_SaveQueued(void){return queued_slot;}
 static const char *actor_fields[]={"aw_hello_count","aw_manual_count","aw_hello_done"};
 static int make_directory(const char *directory)
@@ -396,15 +399,26 @@ void AW_SaveReset(void){
     /* the rows and a waiting load's sections given back first (SAVE-ACTOR-ROWS-256-66, MAP-EXPLORED-SAVE-BLOCK-66) */
     AW_SaveActorsFree(&world);AW_SaveActorsFree(&pending);AW_SaveChangesFree(&pending_changes);
     memset(&world,0,sizeof(world));loading=scheduled=0;last_auto=realtime;AW_LedgerClear(&aw_ledger);AW_JHistClear(&aw_jhist);
+    /* SAVE-AUTOSAVE-REGRESSED-67: a save the last game queued is not written into this one; the status starts empty */
+    queued_slot=-1;last_save[0]=0;
     if(aw_save_markers_reset)aw_save_markers_reset();   /* MAP-MULTI-MARKERS-66: no marker in a new game */
     if(aw_save_new_game)aw_save_new_game();}
-int AW_SaveAllowed(void)
+/* SAVE-AUTOSAVE-REGRESSED-67: why no save may be taken now, NULL when one may (AW_SaveAllowed's conditions in its
+ * order), so dbg save status names what holds a save instead of leaving it a guess */
+static const char *save_not_allowed(void)
 {
-    return sv.active && svs.maxclients==1 && aw_story.stage==AW_STAGE_RELEASED && aw_character.valid &&
-        svs.clients && svs.clients[0].edict && svs.clients[0].edict->v.health>0 &&
-        svs.clients[0].edict->v.movetype==MOVETYPE_WALK &&
-        !AW_CharacterActive() && !AW_ReaderActive() && !loading && scene_id()>=0;
+    if(!sv.active || svs.maxclients!=1)return "no single-player game is running";
+    if(aw_story.stage!=AW_STAGE_RELEASED)return "the opening has not released the player yet";
+    if(!aw_character.valid)return "no character has been made";
+    if(!svs.clients || !svs.clients[0].edict || !(svs.clients[0].edict->v.health>0))return "the player is dead";
+    if(svs.clients[0].edict->v.movetype!=MOVETYPE_WALK)return "the player is not walking (noclip or a scene)";
+    if(AW_CharacterActive())return "the character window is open";
+    if(AW_ReaderActive())return "a book or a scroll is open";
+    if(loading)return "a load waits for its map";
+    if(scene_id()<0)return "this place has no save id";
+    return NULL;
 }
+int AW_SaveAllowed(void){return !save_not_allowed();}
 uint32_t AW_SaveProfile(void){return world.profile;}
 int AW_AutosaveCount(void)
 {
@@ -464,6 +478,7 @@ static byte *refused(int bumped,const char *part)
 {
     save_undo(bumped);
     Con_Printf("Save refused: %s could not be kept; previous saves retained.\n",refused_part?refused_part:part);
+    snprintf(last_save,sizeof(last_save),"refused: %s could not be kept",refused_part?refused_part:part);
     refused_part=NULL;
     return NULL;
 }
@@ -579,7 +594,10 @@ int AW_SaveWrite(int slot)
     byte *raw;aw_save_t check;char filename[384],label[32];
     FILE *f;int n,side,ok,i;
     if(!AW_SaveAllowed() || slot<0 || slot>20 || !content() || !make_profile()){
-        Con_Printf("Save unavailable: complete registration and release first, and check the writable save folder.\n");return 0;
+        Con_Printf("Save unavailable: complete registration and release first, and check the writable save folder.\n");
+        snprintf(last_save,sizeof(last_save),"unavailable: %s",save_not_allowed()?save_not_allowed():
+                 !content()?"no save-content.bin in this image":"the save folder could not be made");
+        return 0;
     }
     sprintf(label,slot>=5?"Autosave %ld":slot?"Manual %ld":"Quicksave",(long)(slot>=5?slot-4:slot));
     /* SAVE-INSIDE-SCRIPT-STEP-66: asked for inside a script step, the save waits for the settled frame (AW_SaveTick) */
@@ -597,7 +615,8 @@ int AW_SaveWrite(int slot)
     if(ok && read_file(world.profile,slot,side,&check)){ok=check.sequence==world.sequence;AW_SaveRelease(&check);}
     else ok=0;
     if(!ok){
-        Con_Printf("Save write/readback failed; previous generation retained.\n");return 0;
+        Con_Printf("Save write/readback failed; previous generation retained.\n");
+        snprintf(last_save,sizeof(last_save),"%s: the write or its read-back failed",label);return 0;
     }
     /* Retention reduction only follows a successful new autosave. Manual and
      * other character files are never pruned by the autosave quota. */
@@ -606,6 +625,7 @@ int AW_SaveWrite(int slot)
         if(path(filename,sizeof(filename),world.profile,i,1))remove(filename);
     }
     Con_Printf("Saved %s (%ld bytes, generation %lu).\n",label,(long)n,(unsigned long)world.sequence);
+    snprintf(last_save,sizeof(last_save),"%s written (%ld bytes, generation %lu)",label,(long)n,(unsigned long)world.sequence);
     if(rows_refused){   /* said when it happened; said again with the save it concerns */
         Con_Printf("Saved actor rows: %d captures since the last save could not keep their actors' rows (not enough free memory).\n",
                    rows_refused);
@@ -720,23 +740,42 @@ int AW_SaveRead(uint32_t profile,int slot)
 }
 void AW_SaveSchedule(void){if(aw_story.stage==AW_STAGE_RELEASED){scheduled=1;settle=realtime+3;}}
 int AW_PlayerInCombat(void);
-static int autosave_safe(void)
+/* what holds an autosave back now, NULL when nothing does (SAVE-AUTOSAVE-REGRESSED-67: the tick and dbg save status
+ * read the same conditions, in this order); while dbg save status asks, the console it is typed in does not count */
+static int status_asked;
+static const char *autosave_hold(void)
 {
-    edict_t *p;
-    if(!AW_SaveAllowed() || cls.state!=ca_connected || cls.signon!=SIGNONS ||
-       key_dest!=key_game || sv.paused || AW_ModalWorldFrozen() || AW_LoadingScreen() ||
-       AW_PhotoModeActive() || AW_PlayerInCombat())return 0;
+    const char *why=save_not_allowed();edict_t *p;
+    if(why)return why;
+    if(cls.state!=ca_connected || cls.signon!=SIGNONS)return "the map is still connecting";
+    if(key_dest!=key_game && !(status_asked && key_dest==key_console))return "a menu or the console is open";
+    if(sv.paused)return "the game is paused";
+    if(AW_ModalWorldFrozen())return "a window holds the world";
+    if(AW_LoadingScreen())return "the loading screen is up";
+    if(AW_PhotoModeActive())return "photo mode is on";
+    if(AW_PlayerInCombat())return "a fight is on";
     p=svs.clients[0].edict;
     /* Use the same ground/liquid state maintained by Quake's player physics.
      * Being alive is insufficient: a falling or burning save can be lethal
      * on every reload. Keep the previous safe generation in those states. */
-    return ((int)p->v.flags&FL_ONGROUND) && p->v.waterlevel<2 &&
-        (p->v.waterlevel==0 || p->v.watertype==CONTENTS_WATER) &&
-        fabs(p->v.velocity[2])<1;
+    if(!((int)p->v.flags&FL_ONGROUND))return "the player is not on the ground";
+    if(p->v.waterlevel>=2)return "the player is under water";
+    if(p->v.waterlevel!=0 && p->v.watertype!=CONTENTS_WATER)return "the player stands in lava or slime";
+    if(!(fabs(p->v.velocity[2])<1))return "the player is falling or rising";
+    return NULL;
 }
+static int autosave_safe(void){return !autosave_hold();}
 void AW_SaveTick(void)
 {
     int n,slot;aw_save_t info;uint32_t oldest=0xffffffffU;
+    /* SAVE-AUTOSAVE-REGRESSED-67: this tick runs at the frame level (host.c), never inside a script step, so a step
+     * still counted as running here was ended by an error (Host_Error's longjmp out of it skipped the count down):
+     * every later save, the autosaves too, would wait for it for good without a word. Set back, said once. */
+    if(busy()){
+        if(aw_save_busy_clear)aw_save_busy_clear();
+        Con_Printf("Saves: a script step an error ended had left every save waiting; saves are taken again.\n");
+        snprintf(last_save,sizeof(last_save),"waited for a script step an error had ended; taken again");
+    }
     /* GAME-RECORDER-61: no save while the recorder records or plays back: a save changes the change list's
      * tables (the scripts' export) and would happen in one run and not the other; and no disk write during play */
     if(AW_RecorderActive())return;
@@ -859,9 +898,34 @@ static void quickload(void){
     }
     if(profile)AW_SaveRead(profile,slot);else Con_Printf("Choose a character in Load game first.\n");
 }
+/* aw_save_status (dbg save status, SAVE-AUTOSAVE-REGRESSED-67): the autosave as it stands, so a missing autosave is
+ * never a guess: on or off, the character's folder, how many autosaves it holds ("autosaves -> N", the line the
+ * opening journey checks), when the next one is due, what holds it back now, a save waiting for a script step, and
+ * the last save's outcome. Reads the slot files (a debug command; no state changes). */
+static void save_status(void)
+{
+    aw_save_t info;int slot,kept=0,newest=-1;uint32_t sequence=0;const char *hold;double due;
+    status_asked=1;hold=autosave_hold();status_asked=0;
+    Con_Printf("Autosave: %s, %d kept (aw_autosaves); character folder %s\n",AW_AutosaveCount()?"on":"off",
+               AW_AutosaveCount(),world.profile?"made":"not made yet (the first save makes it)");
+    if(world.profile && AW_CharacterLoad())for(slot=5;slot<=20;slot++)
+        if(newest_info(world.profile,slot,&info)>=0){kept++;if(info.sequence>=sequence){sequence=info.sequence;newest=slot;}}
+    Con_Printf("autosaves -> %d\n",kept);
+    if(newest>=0)Con_Printf("Newest autosave: Autosave %d, generation %lu\n",newest-4,(unsigned long)sequence);
+    due=scheduled?settle-realtime:300-(realtime-last_auto);
+    Con_Printf("Next autosave: %s%.0f s%s\n",scheduled?"due, after ":"at the next map change or in ",due>0?due:0,
+               scheduled?" settled":"");
+    /* the tick also waits while a voice line plays (AW_SaveTick), without counting its seconds against the settle */
+    if(!hold && AW_SpeechRemaining()>0)Con_Printf("Held by: a voice line still playing (%.0f s left)\n",AW_SpeechRemaining());
+    else Con_Printf("Held by: %s\n",hold?hold:"nothing");
+    if(queued_slot>=0)Con_Printf("Save queued: slot %d, written when the running script step ends%s\n",queued_slot,
+                                 busy()?" (one runs now)":"");
+    Con_Printf("Last save: %s\n",last_save[0]?last_save:"none this session");
+}
 void AW_SaveInit(void)
 {
     Cvar_RegisterVariable(&autosaves);Cmd_AddCommand("aw_quicksave",quicksave);Cmd_AddCommand("aw_quickload",quickload);
+    Cmd_AddCommand("aw_save_status",save_status);
     Cvar_RegisterVariable(&save_block);   /* the actor block's KB (MAP-EXPLORED-SAVE-BLOCK-66) */
     aw_save_ledger_rows=AW_LedgerRows;aw_save_ledger_encode=AW_LedgerEncode;aw_save_ledger_decode=AW_LedgerDecode;
     aw_save_journal_encode=AW_JHistEncode;aw_save_journal_decode=AW_JHistDecode;

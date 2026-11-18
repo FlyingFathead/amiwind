@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
+_Last updated with AmiWind v0.0.67-dev2 (17 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -27,10 +27,20 @@ More in the [gallery](docs/GALLERY.md).
 
 ## Where AmiWind stands (17 November 2026)
 
-The development line is **v0.0.67**, whose first snapshot is
-[v0.0.67-dev1](docs/releases/notes/RELEASE-v0.0.67-dev1.md), in development. It is the v0.0.66 release with the new
-line's label: nothing is new in the game yet. The line works on Tribunal and Bloodmoon in the game, on a builder that
-fails fast and says why, and on recording the build times again.
+The development line is **v0.0.67**, whose newest snapshot is
+[v0.0.67-dev2](docs/releases/notes/RELEASE-v0.0.67-dev2.md), in development. It fixes three critical faults found in
+play on the v0.0.66 release (below) and works on Tribunal and Bloodmoon in the game, on a builder that fails fast and
+says why, and on recording the build times again.
+
+**v0.0.67-dev2, in development**
+
+- **Fixed:** the game no longer stops on a loading screen in busy places such as Vivec and the Bitter Coast.
+- **Fixed:** autosaves are written again on every map change.
+- **Fixed:** wild creatures are back outdoors.
+- **New:** Seyda Neen's crates, barrels and chests open, and a place that cannot be loaded names its error and leaves
+  you where you were.
+
+The detail is in the [changelog](docs/CHANGELOG.md#v0067-dev2-second-snapshot-of-v0067-17-november-2026).
 
 The newest release is **v0.0.66: Forward It Is**. It takes the game forward on the road to the expansions and brings
 more of the original's rules to the people of Vvardenfell. It runs on CHIM Engine v0.2.2 and needs 32 MB of Fast RAM.
@@ -116,8 +126,8 @@ build prints where it is): one file with what failed and every setting, kept on 
 ([when a build fails](docs/LINUX_BUILD.md#when-a-build-fails)).
 
 The emulator presets of this version are
-[`AmiWind-v0.0.67-dev1-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.67-dev1-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.67-dev1-WinUAE.uae`](resources/emulators/AmiWind-v0.0.67-dev1-WinUAE.uae); both start with 32 MB of Fast
+[`AmiWind-v0.0.67-dev2-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.67-dev2-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.67-dev2-WinUAE.uae`](resources/emulators/AmiWind-v0.0.67-dev2-WinUAE.uae); both start with 32 MB of Fast
 RAM, the requirement. The presets of earlier versions are beside them in [resources/emulators](resources/emulators/). Everything
 else about building and playing: [Building and playing](docs/BUILDING_AND_PLAYING.md), the
 [Linux build guide](docs/LINUX_BUILD.md) and the [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md).
