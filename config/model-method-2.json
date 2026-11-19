@@ -1,0 +1,1353 @@
+{
+ "format": 1,
+ "about": "Method 2: hand-made reductions of one model each (MODEL-REPLACEMENT-OBJ-67; decided for the project on 17 November 2026). Method 1 is the conversion every model gets (the converter's profile reduction, planar merge or meshopt+merge by config/mesh-methods.json, and the rows of config/visual-recipes.json). A model with a row here is drawn by method 2 wherever it is placed (every CHIM frame and every CHIM room), keyed by its model path and the SHA-256 of its NIF file, so only that model type changes; collision, light and flames stay the original's. Method 1 stays selectable: per model (\"method\": 1 in its row) and for the whole build (AMIWIND_MODEL_METHOD=1). No game data is in this file: a row holds numbers only (the construction, which source parts to keep, the bake settings), and the builder makes the mesh and its textures from the user's own game files at build time (tools/model_method2.py, tools/lantern_rebuild.py, tools/hand_made_kinds.py). A row is used (method 2) when its texture memory added, as the engine holds it (a picture with its mip levels), is at most the mesh memory it saves, or a small growth with the faces down; a row that fails it stays on method 1, recorded with its numbers, until the maintainer decides (MODEL-REDUCTION-BATCHES-67). Each row records where it came from (source: batch, date, author), its counts (before, change, total) and its measured A/B.",
+ "models": {
+  "meshes/l/light_com_lantern_02.nif": {
+   "source_sha256": "9c889bfa717eb40adff816a4cc80ed2c4673c404d79f21069cc0e29ceca3ac40",
+   "method": 2,
+   "kind": "lantern_rings",
+   "panels": "frosted",
+   "source": {
+    "batch": "lantern pipeline checkpoint-002",
+    "date": "2026-11-17",
+    "author": "FlyingFathead"
+   },
+   "counts": {
+    "about": "triangles and distinct positions of the drawn mesh: the original as the converter reads it, the rebuild, and the change; faces_before = the faces one placement draws today (v0.0.67-dev1 rooms); faces_after: measured on the first build that carries the row",
+    "triangles_before": 229,
+    "triangles": 68,
+    "triangles_change": -161,
+    "positions_before": 166,
+    "positions": 39,
+    "positions_change": -127,
+    "faces_before": 203,
+    "faces_after": 58,
+    "faces_before_outdoors": 203,
+    "faces_outdoors": 58,
+    "texture_bytes_added": 21760,
+    "texture_bytes_added_frosted": 5440,
+    "mesh_bytes_saved_estimate": 15134,
+    "source_textures_no_longer_drawn": 2
+   },
+   "ab": "faces one placement draws, through the converter (rooms' and frames' profiles): 203 -> 58. Intake rule (texture memory added at most the mesh memory saved): the baked panels (one 256 x 64 picture with its mip levels, 21,760 bytes per model kind) exceed the about 15,134 bytes of mesh saved by about 6,600 bytes, before the two source textures it no longer draws (up to 10,880 bytes if no other model in the area uses them); the frosted panels (5,440 bytes) pass. So the row takes the frosted panels (17 November 2026, by the intake rule: judged by memory as the engine holds it), until the maintainer decides otherwise; the baked panels stay selectable (\"panels\": \"baked\", or AMIWIND_METHOD2_PANELS=baked for an A/B). Frame rate not measured yet (both ways: AMIWIND_MODEL_METHOD=1 against the default).",
+   "recipe": {
+    "units": "quake (Morrowind units x 0.25), Z up, texture v as in the OBJ convention (1 - v of the NIF): the numbers as the checkpoint measured them; tools/lantern_rebuild.py converts at one place each way",
+    "expected_source": {
+     "unique_positions": 166,
+     "triangles": 229,
+     "min": [
+      -2.31122,
+      -1.74864,
+      -8.79068
+     ],
+     "max": [
+      1.18607,
+      1.74864,
+      0.88633
+     ],
+     "bound_tolerance": 0.0001
+    },
+    "center_xy": [
+     -0.562575,
+     0
+    ],
+    "rings": [
+     [
+      -8.79068,
+      1.635245
+     ],
+     [
+      -8.11648,
+      1.748645
+     ],
+     [
+      -7.87901,
+      1.53365
+     ],
+     [
+      -3.07749,
+      1.53365
+     ],
+     [
+      -2.59737,
+      1.7177
+     ],
+     [
+      -1.56865,
+      0.55794
+     ]
+    ],
+    "panel_ring_pair": [
+     2,
+     3
+    ],
+    "ring_band_materials": [
+     "base",
+     "metal",
+     "panels",
+     "metal",
+     "roof"
+    ],
+    "handle": {
+     "source_material": 4,
+     "min_z": -1.5676,
+     "max_abs_y": 0.14,
+     "expected_vertices": 15,
+     "expected_triangles": 24
+    },
+    "materials": {
+     "base": 7,
+     "roof": 6,
+     "metal": 4
+    },
+    "uv": {
+     "base": [
+      0.1708,
+      0.9263
+     ],
+     "metal": [
+      0.15,
+      0.85
+     ],
+     "roof_u": [
+      0.489369,
+      0.885798
+     ],
+     "roof_v_start": 1.002107,
+     "roof_v_step": 0.25
+    },
+    "bake": {
+     "texture_size": 64,
+     "supersample": 4,
+     "ray_offset": 5,
+     "background_rgb": [
+      0.018,
+      0.015,
+      0.01
+     ]
+    },
+    "expected_output": {
+     "vertices": 39,
+     "triangles": 68,
+     "open_edges": 6
+    }
+   }
+  },
+  "meshes/l/light_paper_lantern_01.nif": {
+   "source_sha256": "43eb0f3cb04dc21bdaaa89f927e47d31b2094db3fa0516e595c94432b0a7687d",
+   "method": 2,
+   "kind": "conservative",
+   "source": {
+    "batch": "hand-made batch 001 (batches 001-004 delivery)",
+    "date": "2026-11-17",
+    "author": "FlyingFathead",
+    "approved": "the maintainer, by eye"
+   },
+   "notes": "Rope cross-section and bends are coarser. Paper body, lid and fittings remain unchanged. Existing holes, UV chart boundaries and extrema are locked.",
+   "counts": {
+    "about": "triangles of the drawn mesh as the converter reads it, before and after; faces one placement draws: today in the v0.0.67-dev1 run's stores (rooms / outdoors) and with this row through the converter (the rooms' profile; outdoors the frames' profile where measured); texture and mesh memory as the engine holds them (a picture with its mip levels; the model's store bytes scaled by its faces)",
+    "triangles_before": 194,
+    "triangles": 140,
+    "triangles_change": -54,
+    "faces_before_rooms": 182,
+    "faces_rooms": 138,
+    "faces_before_outdoors": 128,
+    "faces_outdoors": 120,
+    "open_edges_before": 6,
+    "open_edges": 6,
+    "texture_bytes_added": 0,
+    "mesh_bytes_saved_estimate": 4570,
+    "picture": null,
+    "source_textures_no_longer_drawn": 0
+   },
+   "ab": "intake rule holds (no texture added, faces down in every space measured); in-game frame rate not measured yet",
+   "recipe": {
+    "units": "Morrowind units, Z up, texture v as in the OBJ convention (1 - v of the NIF)",
+    "source_triangles": 194,
+    "expected_triangles": 140,
+    "settings": {
+     "kind": "conservative",
+     "shapes": {
+      "m3": {
+       "target": 32,
+       "qem_error": 3.0
+      }
+     }
+    }
+   }
+  },
+  "meshes/l/light_torch10.nif": {
+   "source_sha256": "39d9c7ad5cb541bcd89ecd9415979e11b8d4bff4b583a2c0d9fa0d69b874583b",
+   "method": 2,
+   "kind": "conservative",
+   "source": {
+    "batch": "hand-made batch 001 (batches 001-004 delivery)",
+    "date": "2026-11-17",
+    "author": "FlyingFathead",
+    "approved": "the maintainer, by eye"
+   },
+   "notes": "Shaft and metal curves are coarser; prong tips and outer bounds retained. Flame particles stay on the original game path.",
+   "counts": {
+    "about": "triangles of the drawn mesh as the converter reads it, before and after; faces one placement draws: today in the v0.0.67-dev1 run's stores (rooms / outdoors) and with this row through the converter (the rooms' profile; outdoors the frames' profile where measured); texture and mesh memory as the engine holds them (a picture with its mip levels; the model's store bytes scaled by its faces)",
+    "triangles_before": 238,
+    "triangles": 162,
+    "triangles_change": -76,
+    "faces_before_rooms": 180,
+    "faces_rooms": 137,
+    "faces_before_outdoors": 171,
+    "faces_outdoors": 137,
+    "open_edges_before": 22,
+    "open_edges": 22,
+    "texture_bytes_added": 0,
+    "mesh_bytes_saved_estimate": 4709,
+    "picture": null,
+    "source_textures_no_longer_drawn": 0
+   },
+   "ab": "intake rule holds (no texture added, faces down in every space measured); in-game frame rate not measured yet",
+   "recipe": {
+    "units": "Morrowind units, Z up, texture v as in the OBJ convention (1 - v of the NIF)",
+    "source_triangles": 238,
+    "expected_triangles": 162,
+    "settings": {
+     "kind": "conservative",
+     "shapes": {
+      "m0": {
+       "target": 14,
+       "qem_error": 3.0
+      },
+      "m2": {
+       "target": 40,
+       "qem_error": 3.0
+      },
+      "m3": {
+       "target": 50,
+       "qem_error": 3.0
+      }
+     }
+    }
+   }
+  },
+  "meshes/l/light_de_lamp_01.nif": {
+   "source_sha256": "47ba710591a3a16c45710c0c6feebdbb494b9f91b4fe459a3687557830886c32",
+   "method": 2,
+   "kind": "conservative",
+   "source": {
+    "batch": "hand-made batch 001 (batches 001-004 delivery)",
+    "date": "2026-11-17",
+    "author": "FlyingFathead",
+    "approved": "the maintainer, by eye"
+   },
+   "notes": "Stand curves are coarser. Candle and top plate remain unchanged; the open spaces between legs remain open.",
+   "counts": {
+    "about": "triangles of the drawn mesh as the converter reads it, before and after; faces one placement draws: today in the v0.0.67-dev1 run's stores (rooms / outdoors) and with this row through the converter (the rooms' profile; outdoors the frames' profile where measured); texture and mesh memory as the engine holds them (a picture with its mip levels; the model's store bytes scaled by its faces)",
+    "triangles_before": 280,
+    "triangles": 216,
+    "triangles_change": -64,
+    "faces_before_rooms": 265,
+    "faces_rooms": 205,
+    "faces_before_outdoors": null,
+    "faces_outdoors": null,
+    "open_edges_before": 32,
+    "open_edges": 32,
+    "texture_bytes_added": 0,
+    "mesh_bytes_saved_estimate": 6374,
+    "picture": null,
+    "source_textures_no_longer_drawn": 0
+   },
+   "ab": "intake rule holds (no texture added, faces down in every space measured); in-game frame rate not measured yet",
+   "recipe": {
+    "units": "Morrowind units, Z up, texture v as in the OBJ convention (1 - v of the NIF)",
+    "source_triangles": 280,
+    "expected_triangles": 216,
+    "settings": {
+     "kind": "conservative",
+     "shapes": {
+      "m2": {
+       "target": 104,
+       "qem_error": 3.0
+      }
+     }
+    }
+   }
+  },
+  "meshes/l/light_de_lantern_02.nif": {
+   "source_sha256": "223224909bb57f0bab2ad0135be75f63e8eebe466a05832ed7b9b64b6d38ea30",
+   "method": 1,
+   "kind": "profile_shell",
+   "source": {
+    "batch": "hand-made batch 002 (batches 001-004 delivery)",
+    "date": "2026-11-17",
+    "author": "FlyingFathead",
+    "approved": "the maintainer, by eye"
+   },
+   "notes": "Glass is frosted and opaque; candle and internal fittings are removed. Base bevels are simplified, with original profile heights, widest ring and complete handle/straps retained.",
+   "counts": {
+    "about": "triangles of the drawn mesh as the converter reads it, before and after; faces one placement draws: today in the v0.0.67-dev1 run's stores (rooms / outdoors) and with this row through the converter (the rooms' profile; outdoors the frames' profile where measured); texture and mesh memory as the engine holds them (a picture with its mip levels; the model's store bytes scaled by its faces)",
+    "triangles_before": 228,
+    "triangles": 134,
+    "triangles_change": -94,
+    "faces_before_rooms": 199,
+    "faces_rooms": 120,
+    "faces_before_outdoors": 199,
+    "faces_outdoors": null,
+    "open_edges_before": 24,
+    "open_edges": 6,
+    "texture_bytes_added": 348160,
+    "mesh_bytes_saved_estimate": 7819,
+    "picture": [
+     512,
+     512
+    ],
+    "source_textures_no_longer_drawn": 2
+   },
+   "ab": "intake rule FAILS: its baked picture adds 348160 bytes of texture memory (a picture of 512 x 512 with its mip levels, one per model kind) against about 7819 bytes of mesh memory saved; kept on method 1 until the maintainer decides (shown to him with these numbers)",
+   "recipe": {
+    "units": "Morrowind units, Z up, texture v as in the OBJ convention (1 - v of the NIF)",
+    "source_triangles": 228,
+    "expected_triangles": 134,
+    "settings": {
+     "kind": "profile_shell",
+     "retain_components": [
+      {
+       "material": "m8",
+       "component": 0,
+       "triangles": 42
+      }
+     ],
+     "frost_materials": [
+      "m0",
+      "m1",
+      "m2",
+      "m3",
+      "m4",
+      "m5",
+      "m6",
+      "m7"
+     ],
+     "bake_exclude_materials": [
+      "m9"
+     ],
+     "tile_size": 60,
+     "supersample": 4,
+     "rings": [
+      {
+       "materials": [
+        "m8"
+       ],
+       "z": -28.82544,
+       "corners": 8
+      },
+      {
+       "materials": [
+        "m8"
+       ],
+       "z": -27.86384,
+       "corners": 8
+      },
+      {
+       "materials": [
+        "m8"
+       ],
+       "z": -25.99008,
+       "corners": 8
+      },
+      {
+       "materials": [
+        "m0",
+        "m1",
+        "m2",
+        "m3",
+        "m4",
+        "m5",
+        "m6",
+        "m7"
+       ],
+       "z": -7.51294,
+       "corners": 8
+      },
+      {
+       "materials": [
+        "m8"
+       ],
+       "z": -7.19597,
+       "corners": 8
+      },
+      {
+       "materials": [
+        "m8"
+       ],
+       "z": -6.09824,
+       "corners": 8
+      }
+     ]
+    }
+   }
+  },
+  "meshes/l/light_de_lantern_06.nif": {
+   "source_sha256": "f26c925504d56e65924e19e71e3bceb2f2eaa8091db598ef4b45bdff350b35d1",
+   "method": 1,
+   "kind": "profile_shell",
+   "source": {
+    "batch": "hand-made batch 002 (batches 001-004 delivery)",
+    "date": "2026-11-17",
+    "author": "FlyingFathead",
+    "approved": "the maintainer, by eye"
+   },
+   "notes": "Glass is frosted and opaque; candle and internal fittings are removed. Base bevels are simplified, with original profile heights, widest ring and complete handle/straps retained.",
+   "counts": {
+    "about": "triangles of the drawn mesh as the converter reads it, before and after; faces one placement draws: today in the v0.0.67-dev1 run's stores (rooms / outdoors) and with this row through the converter (the rooms' profile; outdoors the frames' profile where measured); texture and mesh memory as the engine holds them (a picture with its mip levels; the model's store bytes scaled by its faces)",
+    "triangles_before": 228,
+    "triangles": 134,
+    "triangles_change": -94,
+    "faces_before_rooms": 199,
+    "faces_rooms": 120,
+    "faces_before_outdoors": 199,
+    "faces_outdoors": null,
+    "open_edges_before": 24,
+    "open_edges": 6,
+    "texture_bytes_added": 348160,
+    "mesh_bytes_saved_estimate": 7819,
+    "picture": [
+     512,
+     512
+    ],
+    "source_textures_no_longer_drawn": 2
+   },
+   "ab": "intake rule FAILS: its baked picture adds 348160 bytes of texture memory (a picture of 512 x 512 with its mip levels, one per model kind) against about 7819 bytes of mesh memory saved; kept on method 1 until the maintainer decides (shown to him with these numbers)",
+   "recipe": {
+    "units": "Morrowind units, Z up, texture v as in the OBJ convention (1 - v of the NIF)",
+    "source_triangles": 228,
+    "expected_triangles": 134,
+    "settings": {
+     "kind": "profile_shell",
+     "retain_components": [
+      {
+       "material": "m8",
+       "component": 0,
+       "triangles": 42
+      }
+     ],
+     "frost_materials": [
+      "m0",
+      "m1",
+      "m2",
+      "m3",
+      "m4",
+      "m5",
+      "m6",
+      "m7"
+     ],
+     "bake_exclude_materials": [
+      "m9"
+     ],
+     "tile_size": 60,
+     "supersample": 4,
+     "rings": [
+      {
+       "materials": [
+        "m8"
+       ],
+       "z": -28.770031522216797,
+       "corners": 8
+      },
+      {
+       "materials": [
+        "m8"
+       ],
+       "z": -27.808431522216797,
+       "corners": 8
+      },
+      {
+       "materials": [
+        "m8"
+       ],
+       "z": -25.934671522216796,
+       "corners": 8
+      },
+      {
+       "materials": [
+        "m0",
+        "m1",
+        "m2",
+        "m3",
+        "m4",
+        "m5",
+        "m6",
+        "m7"
+       ],
+       "z": -7.457531522216797,
+       "corners": 8
+      },
+      {
+       "materials": [
+        "m8"
+       ],
+       "z": -7.140561522216797,
+       "corners": 8
+      },
+      {
+       "materials": [
+        "m8"
+       ],
+       "z": -6.0428315222167965,
+       "corners": 8
+      }
+     ]
+    }
+   }
+  },
+  "meshes/l/light_de_lantern_08.nif": {
+   "source_sha256": "533d359be801701d4ada40507cbe89295210bbec5fb83be0a515c465060adcfe",
+   "method": 1,
+   "kind": "dunmer_lantern",
+   "source": {
+    "batch": "hand-made batch 002 (batches 001-004 delivery)",
+    "date": "2026-11-17",
+    "author": "FlyingFathead",
+    "approved": "the maintainer, by eye"
+   },
+   "notes": "Complete original loop and source corner-post taper retained. Middle bands are baked flat; roof and base use simpler planes. Four 60px panels in a 128px atlas.",
+   "counts": {
+    "about": "triangles of the drawn mesh as the converter reads it, before and after; faces one placement draws: today in the v0.0.67-dev1 run's stores (rooms / outdoors) and with this row through the converter (the rooms' profile; outdoors the frames' profile where measured); texture and mesh memory as the engine holds them (a picture with its mip levels; the model's store bytes scaled by its faces)",
+    "triangles_before": 178,
+    "triangles": 82,
+    "triangles_change": -96,
+    "faces_before_rooms": 145,
+    "faces_rooms": 72,
+    "faces_before_outdoors": 145,
+    "faces_outdoors": null,
+    "open_edges_before": 54,
+    "open_edges": 6,
+    "texture_bytes_added": 21760,
+    "mesh_bytes_saved_estimate": 7698,
+    "picture": [
+     128,
+     128
+    ],
+    "source_textures_no_longer_drawn": 3
+   },
+   "ab": "intake rule FAILS: its baked picture adds 21760 bytes of texture memory (a picture of 128 x 128 with its mip levels, one per model kind) against about 7698 bytes of mesh memory saved; kept on method 1 until the maintainer decides (shown to him with these numbers)",
+   "recipe": {
+    "units": "Morrowind units, Z up, texture v as in the OBJ convention (1 - v of the NIF)",
+    "source_triangles": 178,
+    "expected_triangles": 82,
+    "settings": {
+     "kind": "dunmer_lantern",
+     "center_xy": [
+      3.627405405,
+      7.7628e-07
+     ],
+     "rings": [
+      [
+       -32.1896057,
+       1.09734
+      ],
+      [
+       -28.2920227,
+       7.08197
+      ],
+      [
+       -28.06849,
+       6.57
+      ],
+      [
+       -11.77473,
+       9.43
+      ],
+      [
+       -11.1534786,
+       10.6200990677
+      ],
+      [
+       -4.2678031921,
+       1.956785
+      ]
+     ],
+     "bands": [
+      "m0",
+      "m0",
+      "panels",
+      "m0",
+      "m0"
+     ],
+     "panel_ring_pair": [
+      2,
+      3
+     ],
+     "frame": "m0",
+     "bottom_tip": -38.2960929871,
+     "handle": {
+      "material": "m0",
+      "min_z": -6.77,
+      "max_abs_y": 1.1,
+      "triangles": 36
+     },
+     "bake": {
+      "texture_size": 60,
+      "supersample": 4,
+      "ray_offset": 20,
+      "background_rgb": [
+       0.018,
+       0.015,
+       0.01
+      ]
+     },
+     "panel_rings_from_source": {
+      "material": "m0",
+      "heights": [
+       -28.0685,
+       -11.7747
+      ]
+     }
+    }
+   }
+  },
+  "meshes/l/light_de_lantern_12.nif": {
+   "source_sha256": "e33caecf3bfa0978e73060396d43121d3acc137acab8b3324b1e17168cc7594d",
+   "method": 1,
+   "kind": "dunmer_lantern",
+   "source": {
+    "batch": "hand-made batch 002 (batches 001-004 delivery)",
+    "date": "2026-11-17",
+    "author": "FlyingFathead",
+    "approved": "the maintainer, by eye"
+   },
+   "notes": "Complete original loop and source corner-post taper retained. Middle bands are baked flat; roof and base use simpler planes. Four 60px panels in a 128px atlas.",
+   "counts": {
+    "about": "triangles of the drawn mesh as the converter reads it, before and after; faces one placement draws: today in the v0.0.67-dev1 run's stores (rooms / outdoors) and with this row through the converter (the rooms' profile; outdoors the frames' profile where measured); texture and mesh memory as the engine holds them (a picture with its mip levels; the model's store bytes scaled by its faces)",
+    "triangles_before": 178,
+    "triangles": 82,
+    "triangles_change": -96,
+    "faces_before_rooms": 145,
+    "faces_rooms": 72,
+    "faces_before_outdoors": null,
+    "faces_outdoors": null,
+    "open_edges_before": 54,
+    "open_edges": 6,
+    "texture_bytes_added": 21760,
+    "mesh_bytes_saved_estimate": 7698,
+    "picture": [
+     128,
+     128
+    ],
+    "source_textures_no_longer_drawn": 3
+   },
+   "ab": "intake rule FAILS: its baked picture adds 21760 bytes of texture memory (a picture of 128 x 128 with its mip levels, one per model kind) against about 7698 bytes of mesh memory saved; kept on method 1 until the maintainer decides (shown to him with these numbers)",
+   "recipe": {
+    "units": "Morrowind units, Z up, texture v as in the OBJ convention (1 - v of the NIF)",
+    "source_triangles": 178,
+    "expected_triangles": 82,
+    "settings": {
+     "kind": "dunmer_lantern",
+     "center_xy": [
+      3.627405405,
+      7.7628e-07
+     ],
+     "rings": [
+      [
+       -32.1896057,
+       1.09734
+      ],
+      [
+       -28.2920227,
+       7.08197
+      ],
+      [
+       -28.06849,
+       6.57
+      ],
+      [
+       -11.77473,
+       9.43
+      ],
+      [
+       -11.1534786,
+       10.6200990677
+      ],
+      [
+       -4.2678031921,
+       1.956785
+      ]
+     ],
+     "bands": [
+      "m0",
+      "m0",
+      "panels",
+      "m0",
+      "m0"
+     ],
+     "panel_ring_pair": [
+      2,
+      3
+     ],
+     "frame": "m0",
+     "bottom_tip": -38.2960929871,
+     "handle": {
+      "material": "m0",
+      "min_z": -6.77,
+      "max_abs_y": 1.1,
+      "triangles": 36
+     },
+     "bake": {
+      "texture_size": 60,
+      "supersample": 4,
+      "ray_offset": 20,
+      "background_rgb": [
+       0.018,
+       0.015,
+       0.01
+      ]
+     },
+     "panel_rings_from_source": {
+      "material": "m0",
+      "heights": [
+       -28.0685,
+       -11.7747
+      ]
+     }
+    }
+   }
+  },
+  "meshes/l/light_paper_lantern_02.nif": {
+   "source_sha256": "6b6f87eb143ace4323f6773324b3ea3e86dd9b1834e22aeb9e6b8321df712344",
+   "method": 2,
+   "kind": "conservative",
+   "source": {
+    "batch": "hand-made batch 002 (batches 001-004 delivery)",
+    "date": "2026-11-17",
+    "author": "FlyingFathead",
+    "approved": "the maintainer, by eye"
+   },
+   "notes": "Rope cross-section and bends are coarser. Paper body, lid and fittings remain unchanged. Existing holes, UV chart boundaries and extrema are locked.",
+   "counts": {
+    "about": "triangles of the drawn mesh as the converter reads it, before and after; faces one placement draws: today in the v0.0.67-dev1 run's stores (rooms / outdoors) and with this row through the converter (the rooms' profile; outdoors the frames' profile where measured); texture and mesh memory as the engine holds them (a picture with its mip levels; the model's store bytes scaled by its faces)",
+    "triangles_before": 194,
+    "triangles": 140,
+    "triangles_change": -54,
+    "faces_before_rooms": 182,
+    "faces_rooms": 138,
+    "faces_before_outdoors": null,
+    "faces_outdoors": null,
+    "open_edges_before": 6,
+    "open_edges": 6,
+    "texture_bytes_added": 0,
+    "mesh_bytes_saved_estimate": 4570,
+    "picture": null,
+    "source_textures_no_longer_drawn": 0
+   },
+   "ab": "intake rule holds (no texture added, faces down in every space measured); in-game frame rate not measured yet",
+   "recipe": {
+    "units": "Morrowind units, Z up, texture v as in the OBJ convention (1 - v of the NIF)",
+    "source_triangles": 194,
+    "expected_triangles": 140,
+    "settings": {
+     "kind": "conservative",
+     "shapes": {
+      "m3": {
+       "target": 32,
+       "qem_error": 3.0
+      }
+     }
+    }
+   }
+  },
+  "meshes/l/light_de_lantern_04.nif": {
+   "source_sha256": "92e990bd383566c7d891c103d4320978ad0b50162b7db2e76c9068b3bada1f42",
+   "method": 1,
+   "kind": "profile_shell",
+   "source": {
+    "batch": "hand-made batch 003 (batches 001-004 delivery)",
+    "date": "2026-11-17",
+    "author": "FlyingFathead",
+    "approved": "the maintainer, by eye"
+   },
+   "notes": "Corner posts and roof ribs are baked onto closed planar surfaces. Original loop, eave rims and both tassel components are retained in full. Paper is opaque.",
+   "counts": {
+    "about": "triangles of the drawn mesh as the converter reads it, before and after; faces one placement draws: today in the v0.0.67-dev1 run's stores (rooms / outdoors) and with this row through the converter (the rooms' profile; outdoors the frames' profile where measured); texture and mesh memory as the engine holds them (a picture with its mip levels; the model's store bytes scaled by its faces)",
+    "triangles_before": 168,
+    "triangles": 112,
+    "triangles_change": -56,
+    "faces_before_rooms": 151,
+    "faces_rooms": 99,
+    "faces_before_outdoors": 151,
+    "faces_outdoors": null,
+    "open_edges_before": 52,
+    "open_edges": 28,
+    "texture_bytes_added": 87040,
+    "mesh_bytes_saved_estimate": 5452,
+    "picture": [
+     256,
+     256
+    ],
+    "source_textures_no_longer_drawn": 0
+   },
+   "ab": "intake rule FAILS: its baked picture adds 87040 bytes of texture memory (a picture of 256 x 256 with its mip levels, one per model kind) against about 5452 bytes of mesh memory saved; kept on method 1 until the maintainer decides (shown to him with these numbers)",
+   "recipe": {
+    "units": "Morrowind units, Z up, texture v as in the OBJ convention (1 - v of the NIF)",
+    "source_triangles": 168,
+    "expected_triangles": 112,
+    "settings": {
+     "kind": "profile_shell",
+     "retain_components": [
+      {
+       "material": "m0",
+       "component": 0,
+       "triangles": 36
+      },
+      {
+       "material": "m1",
+       "component": 1,
+       "triangles": 16
+      },
+      {
+       "material": "m1",
+       "component": 2,
+       "triangles": 16
+      },
+      {
+       "material": "m3",
+       "component": 0,
+       "triangles": 16
+      },
+      {
+       "material": "m3",
+       "component": 1,
+       "triangles": 12
+      }
+     ],
+     "tile_size": 60,
+     "supersample": 4,
+     "rings": [
+      {
+       "materials": [
+        "m1"
+       ],
+       "z": -28.70081,
+       "corners": 4,
+       "outer_per_quadrant": true,
+       "points_per_quadrant": 3
+      },
+      {
+       "materials": [
+        "m1"
+       ],
+       "z": -13.10434,
+       "corners": 4,
+       "outer_per_quadrant": true,
+       "points_per_quadrant": 3
+      }
+     ],
+     "tips": {
+      "bottom": {
+       "material": "m1",
+       "z": -38.177258
+      },
+      "top": {
+       "material": "m1",
+       "z": -2.643038
+      }
+     }
+    }
+   }
+  },
+  "meshes/l/light_de_lantern_09.nif": {
+   "source_sha256": "bbb7433d54d1f99757a2a0588843c940a6e1a94b34f42ef70b9ebf8ca7147f87",
+   "method": 1,
+   "kind": "profile_shell",
+   "source": {
+    "batch": "hand-made batch 003 (batches 001-004 delivery)",
+    "date": "2026-11-17",
+    "author": "FlyingFathead",
+    "approved": "the maintainer, by eye"
+   },
+   "notes": "Corner posts and roof ribs are baked onto closed planar surfaces. Original loop, eave rims and both tassel components are retained in full. Paper is opaque.",
+   "counts": {
+    "about": "triangles of the drawn mesh as the converter reads it, before and after; faces one placement draws: today in the v0.0.67-dev1 run's stores (rooms / outdoors) and with this row through the converter (the rooms' profile; outdoors the frames' profile where measured); texture and mesh memory as the engine holds them (a picture with its mip levels; the model's store bytes scaled by its faces)",
+    "triangles_before": 168,
+    "triangles": 112,
+    "triangles_change": -56,
+    "faces_before_rooms": 151,
+    "faces_rooms": 99,
+    "faces_before_outdoors": 151,
+    "faces_outdoors": null,
+    "open_edges_before": 52,
+    "open_edges": 28,
+    "texture_bytes_added": 87040,
+    "mesh_bytes_saved_estimate": 5452,
+    "picture": [
+     256,
+     256
+    ],
+    "source_textures_no_longer_drawn": 0
+   },
+   "ab": "intake rule FAILS: its baked picture adds 87040 bytes of texture memory (a picture of 256 x 256 with its mip levels, one per model kind) against about 5452 bytes of mesh memory saved; kept on method 1 until the maintainer decides (shown to him with these numbers)",
+   "recipe": {
+    "units": "Morrowind units, Z up, texture v as in the OBJ convention (1 - v of the NIF)",
+    "source_triangles": 168,
+    "expected_triangles": 112,
+    "settings": {
+     "kind": "profile_shell",
+     "retain_components": [
+      {
+       "material": "m0",
+       "component": 0,
+       "triangles": 36
+      },
+      {
+       "material": "m1",
+       "component": 1,
+       "triangles": 16
+      },
+      {
+       "material": "m1",
+       "component": 2,
+       "triangles": 16
+      },
+      {
+       "material": "m3",
+       "component": 0,
+       "triangles": 16
+      },
+      {
+       "material": "m3",
+       "component": 1,
+       "triangles": 12
+      }
+     ],
+     "tile_size": 60,
+     "supersample": 4,
+     "rings": [
+      {
+       "materials": [
+        "m1"
+       ],
+       "z": -28.70081,
+       "corners": 4,
+       "outer_per_quadrant": true,
+       "points_per_quadrant": 3
+      },
+      {
+       "materials": [
+        "m1"
+       ],
+       "z": -13.10434,
+       "corners": 4,
+       "outer_per_quadrant": true,
+       "points_per_quadrant": 3
+      }
+     ],
+     "tips": {
+      "bottom": {
+       "material": "m1",
+       "z": -38.177258
+      },
+      "top": {
+       "material": "m1",
+       "z": -2.643038
+      }
+     }
+    }
+   }
+  },
+  "meshes/l/light_de_lantern_13.nif": {
+   "source_sha256": "c0af4fdd8a8a2093955b4db032617f44d395a98aaa11817dfd58218bbf61b0fa",
+   "method": 1,
+   "kind": "profile_shell",
+   "source": {
+    "batch": "hand-made batch 003 (batches 001-004 delivery)",
+    "date": "2026-11-17",
+    "author": "FlyingFathead",
+    "approved": "the maintainer, by eye"
+   },
+   "notes": "Corner posts and roof ribs are baked onto closed planar surfaces. Original loop, eave rims and both tassel components are retained in full. Paper is opaque.",
+   "counts": {
+    "about": "triangles of the drawn mesh as the converter reads it, before and after; faces one placement draws: today in the v0.0.67-dev1 run's stores (rooms / outdoors) and with this row through the converter (the rooms' profile; outdoors the frames' profile where measured); texture and mesh memory as the engine holds them (a picture with its mip levels; the model's store bytes scaled by its faces)",
+    "triangles_before": 168,
+    "triangles": 112,
+    "triangles_change": -56,
+    "faces_before_rooms": 151,
+    "faces_rooms": 99,
+    "faces_before_outdoors": 151,
+    "faces_outdoors": null,
+    "open_edges_before": 52,
+    "open_edges": 28,
+    "texture_bytes_added": 87040,
+    "mesh_bytes_saved_estimate": 5452,
+    "picture": [
+     256,
+     256
+    ],
+    "source_textures_no_longer_drawn": 0
+   },
+   "ab": "intake rule FAILS: its baked picture adds 87040 bytes of texture memory (a picture of 256 x 256 with its mip levels, one per model kind) against about 5452 bytes of mesh memory saved; kept on method 1 until the maintainer decides (shown to him with these numbers)",
+   "recipe": {
+    "units": "Morrowind units, Z up, texture v as in the OBJ convention (1 - v of the NIF)",
+    "source_triangles": 168,
+    "expected_triangles": 112,
+    "settings": {
+     "kind": "profile_shell",
+     "retain_components": [
+      {
+       "material": "m0",
+       "component": 0,
+       "triangles": 36
+      },
+      {
+       "material": "m1",
+       "component": 1,
+       "triangles": 16
+      },
+      {
+       "material": "m1",
+       "component": 2,
+       "triangles": 16
+      },
+      {
+       "material": "m3",
+       "component": 0,
+       "triangles": 16
+      },
+      {
+       "material": "m3",
+       "component": 1,
+       "triangles": 12
+      }
+     ],
+     "tile_size": 60,
+     "supersample": 4,
+     "rings": [
+      {
+       "materials": [
+        "m1"
+       ],
+       "z": -28.70081,
+       "corners": 4,
+       "outer_per_quadrant": true,
+       "points_per_quadrant": 3
+      },
+      {
+       "materials": [
+        "m1"
+       ],
+       "z": -13.10434,
+       "corners": 4,
+       "outer_per_quadrant": true,
+       "points_per_quadrant": 3
+      }
+     ],
+     "tips": {
+      "bottom": {
+       "material": "m1",
+       "z": -38.177258
+      },
+      "top": {
+       "material": "m1",
+       "z": -2.643038
+      }
+     }
+    }
+   }
+  },
+  "meshes/l/light_de_lamp_03.nif": {
+   "source_sha256": "82159b2e71de6ae1f85aaab06508ca639bd90172e0c68ceeea9114fb7704ac4e",
+   "method": 2,
+   "kind": "conservative",
+   "source": {
+    "batch": "hand-made batch 003 (batches 001-004 delivery)",
+    "date": "2026-11-17",
+    "author": "FlyingFathead",
+    "approved": "the maintainer, by eye"
+   },
+   "notes": "Stand curves are coarser. Candle and top plate remain unchanged; the open spaces between legs remain open.",
+   "counts": {
+    "about": "triangles of the drawn mesh as the converter reads it, before and after; faces one placement draws: today in the v0.0.67-dev1 run's stores (rooms / outdoors) and with this row through the converter (the rooms' profile; outdoors the frames' profile where measured); texture and mesh memory as the engine holds them (a picture with its mip levels; the model's store bytes scaled by its faces)",
+    "triangles_before": 280,
+    "triangles": 216,
+    "triangles_change": -64,
+    "faces_before_rooms": 265,
+    "faces_rooms": 205,
+    "faces_before_outdoors": null,
+    "faces_outdoors": null,
+    "open_edges_before": 32,
+    "open_edges": 32,
+    "texture_bytes_added": 0,
+    "mesh_bytes_saved_estimate": 6393,
+    "picture": null,
+    "source_textures_no_longer_drawn": 0
+   },
+   "ab": "intake rule holds (no texture added, faces down in every space measured); in-game frame rate not measured yet",
+   "recipe": {
+    "units": "Morrowind units, Z up, texture v as in the OBJ convention (1 - v of the NIF)",
+    "source_triangles": 280,
+    "expected_triangles": 216,
+    "settings": {
+     "kind": "conservative",
+     "shapes": {
+      "m2": {
+       "target": 104,
+       "qem_error": 3.0
+      }
+     }
+    }
+   }
+  },
+  "meshes/l/light_paper_lantern_off.nif": {
+   "source_sha256": "1f2fb8592616e7c5849f80057c2b937f25bd61da185049134632a6e2a83f7e05",
+   "method": 2,
+   "kind": "conservative",
+   "source": {
+    "batch": "hand-made batch 003 (batches 001-004 delivery)",
+    "date": "2026-11-17",
+    "author": "FlyingFathead",
+    "approved": "the maintainer, by eye"
+   },
+   "notes": "Rope cross-section and bends are coarser. Paper body, lid and fittings remain unchanged. Existing holes, UV chart boundaries and extrema are locked.",
+   "counts": {
+    "about": "triangles of the drawn mesh as the converter reads it, before and after; faces one placement draws: today in the v0.0.67-dev1 run's stores (rooms / outdoors) and with this row through the converter (the rooms' profile; outdoors the frames' profile where measured); texture and mesh memory as the engine holds them (a picture with its mip levels; the model's store bytes scaled by its faces)",
+    "triangles_before": 194,
+    "triangles": 140,
+    "triangles_change": -54,
+    "faces_before_rooms": 182,
+    "faces_rooms": 138,
+    "faces_before_outdoors": null,
+    "faces_outdoors": null,
+    "open_edges_before": 6,
+    "open_edges": 6,
+    "texture_bytes_added": 0,
+    "mesh_bytes_saved_estimate": 4570,
+    "picture": null,
+    "source_textures_no_longer_drawn": 0
+   },
+   "ab": "intake rule holds (no texture added, faces down in every space measured); in-game frame rate not measured yet",
+   "recipe": {
+    "units": "Morrowind units, Z up, texture v as in the OBJ convention (1 - v of the NIF)",
+    "source_triangles": 194,
+    "expected_triangles": 140,
+    "settings": {
+     "kind": "conservative",
+     "shapes": {
+      "m3": {
+       "target": 32,
+       "qem_error": 3.0
+      }
+     }
+    }
+   }
+  },
+  "meshes/l/light_de_lamp_02.nif": {
+   "source_sha256": "876f0a436bb05651fe91eff283ded4fb2e46ce1f11cccc62729d4de4700b798e",
+   "method": 2,
+   "kind": "conservative",
+   "source": {
+    "batch": "hand-made batch 004 (batches 001-004 delivery)",
+    "date": "2026-11-17",
+    "author": "FlyingFathead",
+    "approved": "the maintainer, by eye"
+   },
+   "notes": "Stand curves are coarser. Candle and top plate remain unchanged; the open spaces between legs remain open.",
+   "counts": {
+    "about": "triangles of the drawn mesh as the converter reads it, before and after; faces one placement draws: today in the v0.0.67-dev1 run's stores (rooms / outdoors) and with this row through the converter (the rooms' profile; outdoors the frames' profile where measured); texture and mesh memory as the engine holds them (a picture with its mip levels; the model's store bytes scaled by its faces)",
+    "triangles_before": 280,
+    "triangles": 216,
+    "triangles_change": -64,
+    "faces_before_rooms": 265,
+    "faces_rooms": 205,
+    "faces_before_outdoors": null,
+    "faces_outdoors": null,
+    "open_edges_before": 32,
+    "open_edges": 32,
+    "texture_bytes_added": 0,
+    "mesh_bytes_saved_estimate": 6370,
+    "picture": null,
+    "source_textures_no_longer_drawn": 0
+   },
+   "ab": "intake rule holds (no texture added, faces down in every space measured); in-game frame rate not measured yet",
+   "recipe": {
+    "units": "Morrowind units, Z up, texture v as in the OBJ convention (1 - v of the NIF)",
+    "source_triangles": 280,
+    "expected_triangles": 216,
+    "settings": {
+     "kind": "conservative",
+     "shapes": {
+      "m2": {
+       "target": 104,
+       "qem_error": 3.0
+      }
+     }
+    }
+   }
+  },
+  "meshes/l/light_de_lamp_04.nif": {
+   "source_sha256": "bf834461d775c022387bb3d98ff2d89379bab04f7d3b2260a709f55c43ce892b",
+   "method": 2,
+   "kind": "conservative",
+   "source": {
+    "batch": "hand-made batch 004 (batches 001-004 delivery)",
+    "date": "2026-11-17",
+    "author": "FlyingFathead",
+    "approved": "the maintainer, by eye"
+   },
+   "notes": "Stand curves are coarser. Candle and top plate remain unchanged; the open spaces between legs remain open.",
+   "counts": {
+    "about": "triangles of the drawn mesh as the converter reads it, before and after; faces one placement draws: today in the v0.0.67-dev1 run's stores (rooms / outdoors) and with this row through the converter (the rooms' profile; outdoors the frames' profile where measured); texture and mesh memory as the engine holds them (a picture with its mip levels; the model's store bytes scaled by its faces)",
+    "triangles_before": 280,
+    "triangles": 216,
+    "triangles_change": -64,
+    "faces_before_rooms": 265,
+    "faces_rooms": 205,
+    "faces_before_outdoors": null,
+    "faces_outdoors": null,
+    "open_edges_before": 32,
+    "open_edges": 32,
+    "texture_bytes_added": 0,
+    "mesh_bytes_saved_estimate": 6402,
+    "picture": null,
+    "source_textures_no_longer_drawn": 0
+   },
+   "ab": "intake rule holds (no texture added, faces down in every space measured); in-game frame rate not measured yet",
+   "recipe": {
+    "units": "Morrowind units, Z up, texture v as in the OBJ convention (1 - v of the NIF)",
+    "source_triangles": 280,
+    "expected_triangles": 216,
+    "settings": {
+     "kind": "conservative",
+     "shapes": {
+      "m2": {
+       "target": 104,
+       "qem_error": 3.0
+      }
+     }
+    }
+   }
+  },
+  "meshes/l/light_de_lamp_05.nif": {
+   "source_sha256": "2f474644875428dcd63973fb1baad9fe1103d2eda530249dbbf82c7a667ba534",
+   "method": 2,
+   "kind": "conservative",
+   "source": {
+    "batch": "hand-made batch 004 (batches 001-004 delivery)",
+    "date": "2026-11-17",
+    "author": "FlyingFathead",
+    "approved": "the maintainer, by eye"
+   },
+   "notes": "Stand curves are coarser. Candle and top plate remain unchanged; the open spaces between legs remain open.",
+   "counts": {
+    "about": "triangles of the drawn mesh as the converter reads it, before and after; faces one placement draws: today in the v0.0.67-dev1 run's stores (rooms / outdoors) and with this row through the converter (the rooms' profile; outdoors the frames' profile where measured); texture and mesh memory as the engine holds them (a picture with its mip levels; the model's store bytes scaled by its faces)",
+    "triangles_before": 280,
+    "triangles": 216,
+    "triangles_change": -64,
+    "faces_before_rooms": 265,
+    "faces_rooms": 205,
+    "faces_before_outdoors": null,
+    "faces_outdoors": null,
+    "open_edges_before": 32,
+    "open_edges": 32,
+    "texture_bytes_added": 0,
+    "mesh_bytes_saved_estimate": 6384,
+    "picture": null,
+    "source_textures_no_longer_drawn": 0
+   },
+   "ab": "intake rule holds (no texture added, faces down in every space measured); in-game frame rate not measured yet",
+   "recipe": {
+    "units": "Morrowind units, Z up, texture v as in the OBJ convention (1 - v of the NIF)",
+    "source_triangles": 280,
+    "expected_triangles": 216,
+    "settings": {
+     "kind": "conservative",
+     "shapes": {
+      "m2": {
+       "target": 104,
+       "qem_error": 3.0
+      }
+     }
+    }
+   }
+  },
+  "meshes/l/light_de_lamp_06.nif": {
+   "source_sha256": "871544e1b7a288cc15e120961ca85c2026e29c5e26a7150038c79d23ebae2740",
+   "method": 2,
+   "kind": "conservative",
+   "source": {
+    "batch": "hand-made batch 004 (batches 001-004 delivery)",
+    "date": "2026-11-17",
+    "author": "FlyingFathead",
+    "approved": "the maintainer, by eye"
+   },
+   "notes": "Stand curves are coarser. Candle and top plate remain unchanged; the open spaces between legs remain open.",
+   "counts": {
+    "about": "triangles of the drawn mesh as the converter reads it, before and after; faces one placement draws: today in the v0.0.67-dev1 run's stores (rooms / outdoors) and with this row through the converter (the rooms' profile; outdoors the frames' profile where measured); texture and mesh memory as the engine holds them (a picture with its mip levels; the model's store bytes scaled by its faces)",
+    "triangles_before": 280,
+    "triangles": 216,
+    "triangles_change": -64,
+    "faces_before_rooms": 265,
+    "faces_rooms": 205,
+    "faces_before_outdoors": null,
+    "faces_outdoors": null,
+    "open_edges_before": 32,
+    "open_edges": 32,
+    "texture_bytes_added": 0,
+    "mesh_bytes_saved_estimate": 6384,
+    "picture": null,
+    "source_textures_no_longer_drawn": 0
+   },
+   "ab": "intake rule holds (no texture added, faces down in every space measured); in-game frame rate not measured yet",
+   "recipe": {
+    "units": "Morrowind units, Z up, texture v as in the OBJ convention (1 - v of the NIF)",
+    "source_triangles": 280,
+    "expected_triangles": 216,
+    "settings": {
+     "kind": "conservative",
+     "shapes": {
+      "m2": {
+       "target": 104,
+       "qem_error": 3.0
+      }
+     }
+    }
+   }
+  },
+  "meshes/l/light_de_lamp_07.nif": {
+   "source_sha256": "2d5f6d17ab3d6b3b3f081c2a223e1627489ccb7599d5469d84acc4ac666945c2",
+   "method": 2,
+   "kind": "conservative",
+   "source": {
+    "batch": "hand-made batch 004 (batches 001-004 delivery)",
+    "date": "2026-11-17",
+    "author": "FlyingFathead",
+    "approved": "the maintainer, by eye"
+   },
+   "notes": "Stand curves are coarser. Candle and top plate remain unchanged; the open spaces between legs remain open.",
+   "counts": {
+    "about": "triangles of the drawn mesh as the converter reads it, before and after; faces one placement draws: today in the v0.0.67-dev1 run's stores (rooms / outdoors) and with this row through the converter (the rooms' profile; outdoors the frames' profile where measured); texture and mesh memory as the engine holds them (a picture with its mip levels; the model's store bytes scaled by its faces)",
+    "triangles_before": 280,
+    "triangles": 216,
+    "triangles_change": -64,
+    "faces_before_rooms": 265,
+    "faces_rooms": 205,
+    "faces_before_outdoors": null,
+    "faces_outdoors": null,
+    "open_edges_before": 32,
+    "open_edges": 32,
+    "texture_bytes_added": 0,
+    "mesh_bytes_saved_estimate": 6370,
+    "picture": null,
+    "source_textures_no_longer_drawn": 0
+   },
+   "ab": "intake rule holds (no texture added, faces down in every space measured); in-game frame rate not measured yet",
+   "recipe": {
+    "units": "Morrowind units, Z up, texture v as in the OBJ convention (1 - v of the NIF)",
+    "source_triangles": 280,
+    "expected_triangles": 216,
+    "settings": {
+     "kind": "conservative",
+     "shapes": {
+      "m2": {
+       "target": 104,
+       "qem_error": 3.0
+      }
+     }
+    }
+   }
+  }
+ }
+}

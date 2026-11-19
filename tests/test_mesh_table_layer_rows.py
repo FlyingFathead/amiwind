@@ -180,6 +180,33 @@ class LayerRowTests(unittest.TestCase):
                             layers={'bloodmoon': LAYER, 'tribunal': ['meshes/x/rock.nif']}))
         self.assertFalse(mesh_tables.matches(before))                        # the rock is a row everywhere now
 
+    def test_a_recipe_block_given_to_a_layer_later_keeps_an_entry_recorded_with_its_rows(self):
+        """A layer gets its recipe block after its first rows (Solstheim's four base game models after the Bloodmoon
+        layer's rows): an entry recorded with those rows, before the block and before more rows, still matches; the
+        same block owned by no layer does not."""
+        base = {'format': 'aw-collision-hull-surface-1', 'meshes': sorted(BASE + LAYER[:1]),
+                'recipe_meshes': {'old-recipe': ['meshes/x/a.nif']}, 'layers': {'bloodmoon': LAYER[:1]}}
+        self.write_doc(base)
+        before = self.record()
+        block = {'old-recipe': ['meshes/x/a.nif'], 'snow-recipe': ['meshes/x/b.nif', 'meshes/m/basket.nif']}
+        grown = dict(base, meshes=sorted(BASE + LAYER), layers={'bloodmoon': LAYER}, recipe_meshes=block)
+        self.write_doc(dict(grown, layer_recipes={'bloodmoon': ['snow-recipe']}))
+        self.assertNotEqual(before, self.record())
+        self.assertTrue(mesh_tables.matches(before))
+        self.write_doc(grown)                                      # the block as base rows: a real change
+        self.assertFalse(mesh_tables.matches(before))
+
+    def test_the_shipped_tables_shorter_forms_are_worked_out_in_seconds(self):
+        import time
+        text = (ROOT / TABLE).read_text(encoding='utf-8')
+        self.path.write_text(text, encoding='utf-8')
+        mesh_tables._VIEWS.clear()
+        mesh_tables._SHORTER.clear()
+        began = time.monotonic()
+        found = mesh_tables._shorter_layer_decisions(TABLE)
+        self.assertLess(time.monotonic() - began, 20.0)
+        self.assertGreater(len(found), 100)
+
     def test_a_table_without_layer_recipes_is_viewed_as_before(self):
         from build_cache import layer_table_view
         text = table_text(BASE, LAYER)

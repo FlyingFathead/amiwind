@@ -60,6 +60,15 @@ BUBBLE = 'bubble'
 CONTINUOUS_VFX = frozenset({3, 4, 5, 6, 10, 14, 15, 16, 18, 23, 27, 58})
 CONTINUOUS_FLAG = 0x20
 BUBBLE_LENGTH = 1.5
+# MAGIC-SHELL-EGG-STYLE-67, the original's egg. Of every magic effect visual in the game data only the shields' hit
+# models are shells around the body (read 2026-11-18 from all MGEF records: e\magic_hit_S.nif of Shield,
+# e\fire_shield.nif, e\lightning_shield.nif and e\frost_shield.nif, each one textured sphere about 100 units wide and
+# 150 to 167 tall, from the feet to above the head); the other hit models are particles, lightning rods, rings and
+# columns. OpenMW attaches a hit model at the actor's root, the feet (apps/openmw/mwrender/animation.cpp
+# Animation::addEffect). So every effect's egg is the Shield's hit model (this effect's HVFX), worn with that effect's
+# own texture and colour, with the effect's own textured hit model (if any) baked into it in its place on the body;
+# the table gives its width (size) and its middle above the feet (radius) for a standard character.
+EGG_EFFECT = 3
 PHASE_ORDER = tuple(p[0] for p in PHASES) + (FAIL, BUBBLE)
 SOUND_FIELDS = (('cast', 'CSND'), ('bolt', 'BSND'), ('hit', 'HSND'), ('area', 'ASND'))
 # particles per phase, shared by its emitters (the bolt's: a second of trail): a 68040 budget, not the original's
@@ -365,11 +374,9 @@ def shell_ellipse(geometry, side):
     return (round(float(v[:, 0].max() - v[:, 0].min()) / side, 4), round(float(v[:, 2].max() - v[:, 2].min()) / side, 4))
 
 
-def shell_image(geometry, textures, grid=64):
-    """The effect's own hit model seen from the front (x across, z up; orthographic), as a see-through glow: every
-    triangle of its textured shapes rasterised with its texture, front and back layers added (a translucent shell
-    is brightest where it is seen edge-on), additive textures by brightness x alpha, others by alpha. Returns (colour
-    HxWx3, strength HxW 0..1, side in NIF units, centre z) or None when the model has no textured triangles."""
+def shell_frame(geometry):
+    """(side, centre z) in NIF units of the square a model's shell is baked into: as wide as its widest reach from the
+    middle (x across, z up, 8 % margin), centred on its height; None without vertices."""
     import numpy as np
     pts = [g['verts'] for g in geometry if len(g['verts'])]
     if not pts:
@@ -377,6 +384,21 @@ def shell_image(geometry, textures, grid=64):
     allv = np.concatenate(pts)
     zc = (allv[:, 2].min() + allv[:, 2].max()) / 2
     side = 2 * max(np.abs(allv[:, 0]).max(), np.abs(allv[:, 2] - zc).max()) * 1.08
+    return (float(side), float(zc)) if side > 0 else None
+
+
+def shell_image(geometry, textures, grid=64, frame=None):
+    """The effect's own hit model seen from the front (x across, z up; orthographic), as a see-through glow: every
+    triangle of its textured shapes rasterised with its texture, front and back layers added (a translucent shell
+    is brightest where it is seen edge-on), additive textures by brightness x alpha, others by alpha. Returns (colour
+    HxWx3, strength HxW 0..1, side in NIF units, centre z) or None when the model has no textured triangles. FRAME
+    (side, centre z): bake into that square instead of the model's own (shell_frame), e.g. the original's egg's, so
+    the model keeps its place on the body (MAGIC-SHELL-EGG-STYLE-67)."""
+    import numpy as np
+    own = shell_frame(geometry)
+    if own is None:
+        return None
+    side, zc = frame or own
     if not side > 0:
         return None
     acc = np.zeros((grid, grid, 3))
@@ -420,6 +442,31 @@ def shell_image(geometry, textures, grid=64):
     colour = acc / np.maximum(weight, 1e-6)[..., None]
     strength = np.clip(weight / np.percentile(weight[weight > 0], 95), 0, 1)
     return colour, strength, float(side), float(zc)
+
+
+def shell_union(a, b):
+    """Two shell images baked into the same frame (shell_image): each texel the stronger of the two; either may be
+    None."""
+    import numpy as np
+    if a is None or b is None:
+        return b if a is None else a
+    take = b[1] > a[1]
+    return np.where(take[..., None], b[0], a[0]), np.where(take, b[1], a[1]), a[2], a[3]
+
+
+def egg_of(mgef, models, read, N):
+    """The original's egg (EGG_EFFECT's hit model, e\\magic_hit_S.nif) as {'model', 'geometry', 'frame': (side, centre
+    z), 'outline'}; None when the data lacks it (each effect then keeps its own hit model's outline, as before)."""
+    row = mgef.get(EGG_EFFECT)
+    model = models.get((row.get('HVFX') or 'VFX_DefaultHit').casefold()) if row else None
+    if not model:
+        return None
+    geometry = []
+    mesh_parts(read('meshes/' + model.casefold().replace('\\', '/')), N, geometry)
+    frame = shell_frame(geometry)
+    if frame is None:
+        return None
+    return {'model': model, 'geometry': geometry, 'frame': frame, 'outline': shell_ellipse(geometry, frame[0])}
 
 
 def fine_path(path, letter='f'):
@@ -629,6 +676,14 @@ def prepare(data_files, id1):
     meshes, sprites, sounds, effects = {}, {}, {}, []
     report = {'format': 'AmiWind magic effects 1', 'table': TABLE, 'bolt_speed': speed, 'effects': {}, 'sprites': {},
               'sounds': {}, 'sound_map': sound_map(mgef, sound_files), 'refused': []}
+    try:
+        egg = egg_of(mgef, models, assets.read, N)
+    except Exception as error:  # noqa: BLE001 (without the egg each effect keeps its own outline, as before)
+        egg = None
+        report['refused'].append({'egg': EGG_EFFECT, 'error': str(error)})
+    if egg is not None:
+        report['egg'] = {'effect': EGG_EFFECT, 'model': egg['model'], 'outline': egg['outline'],
+                         'side': round(egg['frame'][0], 2), 'centre_z': round(egg['frame'][1], 2)}
 
     def mesh(model):
         key = model.casefold().replace('\\', '/')
@@ -755,26 +810,40 @@ def prepare(data_files, id1):
         if 'cast' not in fx['phases']:
             report['refused'].append({'effect': word, 'error': 'no cast mesh: %s' % notes.get('cast')})
             continue
-        # the bubble: the effect's own hit model baked from the front into a see-through sprite (the shell that wraps
-        # a character the spell holds on), its SIZE the model's width in map units for a standard character (the
-        # engine scales it to the actor); without a textured hit model the sphere of its hit texture (SIZE 0)
+        # the bubble: the shell that wraps a character the spell holds on, baked from the front into a see-through
+        # sprite: the original's egg (EGG_EFFECT's hit model) worn with this effect's own texture, its own textured
+        # hit model laid into it in its place; SIZE its width and RADIUS its middle above the feet in map units for a
+        # standard character (the engine places it on each character by OpenMW's addEffect rule). Without the egg in
+        # the data: the effect's own hit model on its own outline, else the sphere of its hit texture (SIZE 0).
         fx['flags'] = int(row.get('flags', 0)) | (CONTINUOUS_FLAG if index in CONTINUOUS_VFX else 0)
         source = (pictures.get('hit') or pictures.get('cast') or ((particle_texture, 13) if particle_texture else None))
         if source or phase_models.get('hit'):
             try:
                 key = ('bubble', word)
                 path = 'progs/awmx_%02d.spr' % len(sprites)
-                image, size, how = None, 0, 'sphere'
+                image, size, how, centre, own = None, 0, 'sphere', 0.0, None
                 if phase_models.get('hit'):
                     geometry = []
                     mesh_parts(assets.read('meshes/' + phase_models['hit'].casefold().replace('\\', '/')), N, geometry)
                     textures = {g['texture']: texture_rgba(effective_texture(g['texture'], g['root_first'],
                                                                              particle_texture)) for g in geometry}
-                    image = shell_image(geometry, textures)
+                    own = (geometry, textures) if geometry else None
                 outline = (1.0, 1.0)
-                if image is not None:
-                    size, how = round(min(512, image[2] * SCALE), 2), 'hit model on its own outline'
-                    outline = shell_ellipse(geometry, image[2])
+                if egg is not None:
+                    worn_texture = texture_rgba(source[0]) if source else None
+                    worn = shell_image(egg['geometry'], {g['texture']: worn_texture for g in egg['geometry']},
+                                       frame=egg['frame']) if worn_texture is not None else None
+                    mine = shell_image(*own, frame=egg['frame']) if own else None
+                    image = shell_union(worn, mine)
+                    if image is not None:
+                        size, centre, outline = (round(min(512, egg['frame'][0] * SCALE), 2),
+                                                 round(min(512, egg['frame'][1] * SCALE), 2), egg['outline'])
+                        how = 'the original egg (%s)%s' % (egg['model'], ', with its own hit model' if mine is not None else '')
+                if image is None and own:
+                    image = shell_image(*own)
+                    if image is not None:
+                        size, how = round(min(512, image[2] * SCALE), 2), 'hit model on its own outline'
+                        outline = shell_ellipse(own[0], image[2])
                 import numpy as np
                 body = texture_rgba(source[0]) if source else np.zeros((8, 8, 4), np.uint8)
                 # the shell shapes to choose (dbg cast shell egg|sphere): the egg, the hit model's own outline (the
@@ -792,10 +861,10 @@ def prepare(data_files, id1):
                 sprites[key] = path
                 report['sprites'][path] = {'texture': source[0] if source else None, 'bubble': word, 'from': how,
                                            'outline': outline, 'copies': copies, 'bytes': sum(copies.values())}
-                fx['phases'][BUBBLE] = {'length': BUBBLE_LENGTH, 'sprite': path, 'size': size, 'radius': 0,
+                fx['phases'][BUBBLE] = {'length': BUBBLE_LENGTH, 'sprite': path, 'size': size, 'radius': centre,
                                         'sound': None, 'emitters': []}
-                notes[BUBBLE] = {'sprite': path, 'from': how, 'size': size, 'hit_model': phase_models.get('hit'),
-                                 'outline': outline}
+                notes[BUBBLE] = {'sprite': path, 'from': how, 'size': size, 'centre': centre,
+                                 'hit_model': phase_models.get('hit'), 'outline': outline}
             except Exception as error:  # noqa: BLE001
                 report['refused'].append({'effect': word, 'phase': BUBBLE, 'error': str(error)})
         fail = sound_for(phase_sound(row, FAIL, school)[0])

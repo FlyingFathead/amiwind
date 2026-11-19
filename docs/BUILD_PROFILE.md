@@ -1,6 +1,6 @@
 # Build profile and stage reuse
 
-_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
+_Last updated with AmiWind v0.0.67-dev3 (18 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -85,7 +85,8 @@ the time goes. None of these changes what a build produces.
 | --- | --- |
 | `--jobs N` (`-j N`) | Exactly N workers for the whole build, shared by the stages that run at the same time; a warning when N exceeds the usable CPU threads, never a cap. Default: automatic (CPU count, quota, memory). See [PARALLEL_BUILD.md](history/superseded/PARALLEL_BUILD.md) |
 | `--serial-stages`, `--single-thread` | Diagnosis: stages one after another (keeping their jobs), or one worker in total |
-| `--reuse-from RUN` | Development builds: copy the outputs of stages whose input fingerprint did not change instead of running them; refused for release candidates and finals. See [Stage reuse](#stage-reuse-for-development-builds) |
+| `--reuse-from RUN` | Copy the outputs of stages whose input fingerprint did not change from this earlier run instead of running them; release candidates and finals too, unless `--release-from-scratch`. See [Stage reuse](#stage-reuse-for-development-builds) |
+| `--no-reuse` | This build only: take no stage from the earlier builds of the workspace, which a plain build does by default; every stage runs, its units still come from the workspace cache. See [reuse earlier builds by default](BUILD_CACHE.md#reuse-earlier-builds-by-default) |
 | `python tools/build.py status RUN` | Live progress of a running build: stages, cores in use, percent, ETA, idle-core warnings. See [Live progress and ETA](#live-progress-and-eta) |
 | `python tools/build.py profile report RUN` | The stage table, critical path, idle cores and suggestions of a finished build (`--html` for charts) |
 | `python tools/build.py profile compare RUN OLDER_RUN` | Per-stage wall time against an older run; slower stages are regressions (`--fail-on-regression` exits 3) |

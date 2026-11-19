@@ -140,7 +140,8 @@ class GameInputKeyTests(unittest.TestCase):
         for path, (indent, field) in build_cache.LAYER_ROW_TABLES.items():
             text = (ROOT / path).read_text(encoding='utf-8')
             doc = json.loads(text)
-            self.assertEqual(json.dumps(doc, indent=indent) + '\n', text, path)   # written as the view writes it
+            if path not in build_cache.HAND_WRITTEN_LAYER_TABLES:
+                self.assertEqual(json.dumps(doc, indent=indent) + '\n', text, path)   # written as the view writes it
             rows = {m.casefold() for m in doc[field]}
             layer = {m.casefold() for ms in (doc.get('layers') or {}).values() for m in ms}
             self.assertLessEqual(layer, rows, path)                               # every layer row is a row
@@ -150,6 +151,45 @@ class GameInputKeyTests(unittest.TestCase):
         # the base CHIM stage reads Morrowind only: it leaves both layers out
         self.assertEqual(build_cache.stage_layers_left_out('chim'), {'bloodmoon', 'tribunal'})
         self.assertEqual(build_cache.stage_layers_left_out('chim-sol'), {'tribunal'})
+
+    def test_an_expansions_visual_recipe_and_cell_rows_rekey_no_base_stage(self):
+        # BUILD-VISUAL-RECIPES-LAYER-ROWS-KEY-67: config/visual-recipes.json names Mournhold's and Solstheim's cells
+        # under "layers" and their recipes under "layer_recipes"; a stage that reads neither expansion keys the
+        # document without them, so a change to a district's recipe or cell row moves no base key
+        path = 'config/visual-recipes.json'
+        indent, field = build_cache.LAYER_ROW_TABLES[path]
+        text = (ROOT / path).read_text(encoding='utf-8')
+        doc = json.loads(text)
+        self.assertEqual(doc['layer_recipes'], {'tribunal': ['mournhold-v1'], 'bloodmoon': ['solstheim-v1']})
+        for layer, recipes in doc['layer_recipes'].items():
+            cells = {k for k, v in doc['cell_settings'].items() if v.get('visual_recipe') in recipes}
+            self.assertEqual(cells, set(doc['layers'][layer]), layer)      # every cell of a layer's recipe is named
+        base = build_cache.layer_table_view(text, {'tribunal', 'bloodmoon'}, indent, field)
+        view = json.loads(base)
+        self.assertEqual(sorted(view['recipes']), sorted(set(doc['recipes']) - {'mournhold-v1', 'solstheim-v1'}))
+        self.assertEqual(len(view['cell_settings']), len(doc['cell_settings']) - 15)
+        self.assertNotIn('layers', view)
+        self.assertNotIn('layer_recipes', view)
+        # a district's recipe, a district cell's settings, a new district cell: the base view is the same text
+        changed = json.loads(text)
+        changed['recipes']['mournhold-v1']['status'] = 'changed'
+        changed['cell_settings']['-12,-30']['no_land'] = False
+        changed['cell_settings']['6,-30'] = {'visual_recipe': 'mournhold-v1'}
+        changed['layers']['tribunal'].append('6,-30')
+        self.assertEqual(build_cache.layer_table_view(json.dumps(changed), {'tribunal', 'bloodmoon'}, indent, field),
+                         base)
+        # the module's own stage reads Tribunal: its view keeps the districts and moves with them
+        own = build_cache.stage_layers_left_out('tribunal-mournhold')
+        self.assertEqual(own, {'bloodmoon'})
+        self.assertNotEqual(build_cache.layer_table_view(json.dumps(changed), own, indent, field),
+                            build_cache.layer_table_view(text, own, indent, field))
+        self.assertIn('mournhold-v1', json.loads(build_cache.layer_table_view(text, own, indent, field))['recipes'])
+        # a base cell's row or a base recipe still re-keys the base stages
+        changed = json.loads(text)
+        first = next(k for k in changed['cell_settings'] if k not in doc['layers']['tribunal'] + doc['layers']['bloodmoon'])
+        changed['cell_settings'][first]['probe'] = 1
+        self.assertNotEqual(build_cache.layer_table_view(json.dumps(changed), {'tribunal', 'bloodmoon'}, indent, field),
+                            base)
 
     def test_older_blanket_key_stays_comparable(self):
         self.add_tribunal()

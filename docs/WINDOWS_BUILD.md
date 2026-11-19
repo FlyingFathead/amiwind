@@ -1,6 +1,6 @@
 # Windows build entry points and WSL notes
 
-_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
+_Last updated with AmiWind v0.0.67-dev3 (18 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -33,8 +33,12 @@ that the Windows path is consistently reliable.
 See [known issues and recovery limits](#windows-build-and-known-issues).
 
 After a failed Windows run, its logs and validated caches are worth keeping,
-and the next attempt uses a fresh run name. Compatible model-cache entries can
-be reused, but resuming every completed stage is not implemented. How often a
+and the next attempt uses a fresh run name. Run in the same build folder, the
+next build takes every stage an earlier build there passed unchanged, by default,
+as on Linux ([reuse earlier builds by default](BUILD_CACHE.md#reuse-earlier-builds-by-default));
+`.\build.cmd --no-reuse` runs every stage again, and
+`.\build.cmd --clean --workspace ..\amiwind-clean` builds from scratch in a new
+build folder. How often a
 retry succeeds is not known, and a retry that works is not a fix. Changes made
 for Windows keep the Linux build path and its validation gates working.
 

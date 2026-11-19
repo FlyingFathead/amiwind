@@ -368,18 +368,27 @@ def read_anim_build(run):
     residents (rooms, towns), the NPC library, the opening's people and the creature library."""
     import glob
     sys.path.insert(0, str(ROOT / 'tools'))
-    from anim_coverage import catalogue, table_groups
+    from anim_coverage import catalogue, table_groups, table_head
     run = Path(run)
     id1 = run / 'image/boot/id1'
     hooked = {g for g, how in catalogue() if how.startswith('pick:') or how.startswith('combat:')}
     tables = {}
 
-    def table_kinds(path, engine_only):
+    def table_names(path, depth=0):
+        """The groups the engine plays from table PATH: its own, then an appended table's base's (aw_skel.c: the
+        base's group of a name after the own ones; ACTOR-AUDIT-APPENDED-TABLES-66)."""
         if path not in tables:
             p = id1 / path
-            names = table_groups(p.read_bytes())[0] if p.is_file() else []
+            raw = p.read_bytes() if p.is_file() else b''
+            names = list(table_groups(raw)[0]) if raw else []
+            base = table_head(raw)[1] if raw else None
+            if base and depth < 2:
+                names += [g for g in table_names(base, depth + 1) if g not in names]
             tables[path] = names
-        return {anim_kind(g) for g in tables[path] if not engine_only or g in hooked} - {None}
+        return tables[path]
+
+    def table_kinds(path, engine_only):
+        return {anim_kind(g) for g in table_names(path) if not engine_only or g in hooked} - {None}
 
     def layout_kinds(model):
         """The kinds a model's layout plays (its engine groups), following a '>' full kit; ('none', set()) without

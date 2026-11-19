@@ -111,7 +111,7 @@ Family: Harvestable plants (`harvest`). Harvest catalogues are built by the buil
 - [CHIM-NATIVE-HARVEST-MISSING-36](CHIM-NATIVE-HARVEST-MISSING-36.md): Extra CHIM-native areas get no harvest catalogue: their plants cannot be picked
 - [ENGINE-HARVEST-MESSAGE-BOUND-35](ENGINE-HARVEST-MESSAGE-BOUND-35.md): The harvest pickup message joined lines into a fixed buffer without a bound
 - [ENTITY-TRACKER-HARVEST-32](ENTITY-TRACKER-HARVEST-32.md): The entity tracker did not count plants placed by harvest catalogues
-- FUNGI-FLOATING-62 (no report page): Bracket fungi float in the air on the Bitter Coast with no tree under them
+- [FUNGI-FLOATING-62](FUNGI-FLOATING-62.md): Bracket fungi float in the air on the Bitter Coast with no tree under them
 - [HARVEST-BITTERCOAST-29](HARVEST-BITTERCOAST-29.md): Only one of three nearby Bitter Coast mushrooms reportedly usable
 - [HARVEST-CHIM-REGION-LOSS-41](HARVEST-CHIM-REGION-LOSS-41.md): Harvestable plants lost on CHIM region cells: six cells place fewer or different plants than the baseline
 - [HARVEST-EXPANSION-FLORA-62](HARVEST-EXPANSION-FLORA-62.md): The plants placed by the Tribunal and Bloodmoon masters are not harvestable
@@ -125,12 +125,12 @@ Family: Harvestable plants (`harvest`). Harvest catalogues are built by the buil
 - [HARVEST-PLANTS-IN-COLLISION-33](HARVEST-PLANTS-IN-COLLISION-33.md): 51 placed harvest plants have their centre inside converted collision (terrain or a tree's convex root piece)
 - [HARVEST-SEYDA-STALE-32](HARVEST-SEYDA-STALE-32.md): v0.0.31 ships Seyda Neen harvest catalogues made for older map versions
 - [HARVEST-TREE-FUNGUS-62](HARVEST-TREE-FUNGUS-62.md): The bracket fungi growing from the tree trunks cannot be picked
-- HARVEST-WORLD-29 (no report page): Original mushroom placement, picking and persistent state worldwide
+- [HARVEST-WORLD-29](HARVEST-WORLD-29.md): Original mushroom placement, picking and persistent state worldwide
 
 Related bugs in other categories:
 
-- CHIM-MODEL-FENCE-FACES-64 (no report page): CHIM model faces cannot be alpha-tested, so crossed tree panels cannot be drawn as model variants
-- TREE-PILLAR-28 (no report page): Sprite-tree roots extend into unintended striped pillars
-- TREE-SCALE-001 (no report page): Non-unit-scale tree sprites omitted; bounds too conservative
+- [CHIM-MODEL-FENCE-FACES-64](CHIM-MODEL-FENCE-FACES-64.md): CHIM model faces cannot be alpha-tested, so crossed tree panels cannot be drawn as model variants
+- [TREE-PILLAR-28](TREE-PILLAR-28.md): Sprite-tree roots extend into unintended striped pillars
+- [TREE-SCALE-001](TREE-SCALE-001.md): Non-unit-scale tree sprites omitted; bounds too conservative
 
 <!-- END GENERATED CATEGORY -->

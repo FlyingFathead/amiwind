@@ -30,6 +30,8 @@ int AW_LampLitCount(void){return 2;}
 int R_SkyExterior(void){return 1;}
 int AW_GuardTorchNight(void){return 1;}
 int aw_efrags_bad=3;   /* r_efrag.c: the efrag safety net's count (CHIM-FRAME-EDGE-EFRAG-CRASH-36) */
+/* aw_scene.c, sv_main.c, cl_parse.c (AW-RECOVER): the errors the recovery chain took, the forced ones, the drops */
+int aw_scene_errors=1,aw_scene_errors_forced=4,aw_net_dropped=2,cl_parse_dropped=3;
 static int held;int AW_DayNightFrozen(void){return held;}
 /* the windows' own state (aw_worldui.c, aw_wait.c, aw_dialwin.c, ...): LOAD-STALL-SESSIONS-59 */
 static const char *the_window="";static int dialogue;
@@ -40,6 +42,8 @@ int AW_DialWindowActive(void){return dialogue;}
 int AW_LevelupBoxActive(void){return 0;}int AW_MsgBoxActive(void){return 0;}int AW_ListBoxActive(void){return 0;}
 int AW_QuickCharActive(void){return 0;}int AW_CharacterActive(void){return 0;}int AW_SaveMenuActive(void){return 0;}
 int AW_ReaderActive(void){return 0;}
+/* CONTAINER-WINDOW-SURVIVES-PLACE-CHANGE-67: the container window (aw_scene.c holds the hook, aw_cstrip.c sets it) */
+int (*aw_cstrip_open_now)(void);static int strip_open;static int strip_now(void){return strip_open;}
 static int exists(const char *p){FILE *f=fopen(p,"rb");if(f)fclose(f);return f!=NULL;}
 /* aw_loadtrace.c stand-in (CHIM-SEYDA-BALMORA-LOAD-HANG-43): the console log append's four calls are traced by name,
  * op 1 open, 3 seek, 5 write, 4 close; recorded here */
@@ -61,6 +65,7 @@ int main(void){
     f=fopen(state,"r");n=fread(text,1,sizeof text-1,f);fclose(f);text[n]=0;
     assert(strstr(text,"commands 1\n") && strstr(text,"time 01:19\n") && strstr(text,"lamps_lit 2\n") && strstr(text,"daylight 200\n") && strstr(text,"guard_night 1\n") && strstr(text,"efrags_bad 3\n") && strstr(text,"screen game\n") && strstr(text,"world_leafs 0\n") && strstr(text,"end\n"));
     assert(strstr(text,"daynight on\n") && !strstr(text,"daynight off\n"));
+    assert(strstr(text,"errors 1\nerrors_forced 4\nnet_dropped 5\n"));   /* AW-RECOVER: what the engine smoke fails on */
     assert(strstr(text,"scene vf0573\n"));   /* the scene the player stands in (type 1 crossings) */
     f=fopen(cmd,"w");fputs("aw_aim 113 -3\n",f);fclose(f);
     realtime=1.2;AW_RemotePoll();assert(exists(cmd)); /* within the period: not yet */
@@ -86,7 +91,7 @@ int main(void){
     f=fopen(state,"r");n=fread(text,1,sizeof text-1,f);fclose(f);text[n]=0;assert(strstr(text,"screen console\n"));
     key_dest=key_menu;the_window="window";dialogue=1;AW_RemoteBusy(101.8);   /* the dialogue window is a panel */
     f=fopen(state,"r");n=fread(text,1,sizeof text-1,f);fclose(f);text[n]=0;assert(strstr(text,"screen dialogue\n"));
-    dialogue=0;AW_RemoteBusy(102.4);   /* another panel (stats, the container strip): a generic window */
+    dialogue=0;AW_RemoteBusy(102.4);   /* another panel (the stats): a generic window */
     f=fopen(state,"r");n=fread(text,1,sizeof text-1,f);fclose(f);text[n]=0;assert(strstr(text,"screen window\n"));
     the_window="";key_dest=key_game;
 #ifdef AW_FRAME_MAP
@@ -136,6 +141,15 @@ int main(void){
         remove(logp);
         puts("remote console log: collected, one append a poll, heartbeat, full buffer and exit");
     }
+    /* CONTAINER-WINDOW-SURVIVES-PLACE-CHANGE-67: the container window over the game is "container" (it read "game", so
+     * a check could not tell it open); under the console, the console; closed, the game again */
+    aw_cstrip_open_now=strip_now;strip_open=1;key_dest=key_game;AW_RemoteBusy(110.0);
+    f=fopen(state,"r");n=fread(text,1,sizeof text-1,f);fclose(f);text[n]=0;assert(strstr(text,"screen container\n"));
+    key_dest=key_console;AW_RemoteBusy(110.6);
+    f=fopen(state,"r");n=fread(text,1,sizeof text-1,f);fclose(f);text[n]=0;assert(strstr(text,"screen console\n"));
+    key_dest=key_game;strip_open=0;AW_RemoteBusy(111.2);
+    f=fopen(state,"r");n=fread(text,1,sizeof text-1,f);fclose(f);text[n]=0;assert(strstr(text,"screen game\n"));
+    aw_cstrip_open_now=NULL;
     remove(state);snprintf(text,sizeof text,"rmdir %s",dir);assert(!system(text));
     puts("remote console: off by default, command file once, state file, period");
     return 0;

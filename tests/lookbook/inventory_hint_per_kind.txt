@@ -1,0 +1,28 @@
+# Look book page INVENTORY-HINT-PER-KIND (tests/lookbook/pages.json; a draft): the inventory's key line per item kind
+# (EQUIP-ACTION-REGRESSION-62, INVENTORY-EQUIPPED-LABEL-67). The number check waits for a readout of the key line
+# drawn under the open inventory (proposed: "aw_inventory keys", the line as drawn, for the selected item), which the
+# key-hint repair of the inventory adds; until then the page is a draft and only its pictures are taken.
+cmd aw_inventory give "steel longsword"
+cmd aw_inventory wear common_shirt_01
+cmd aw_inventory give p_restore_health_s 3
+wait 3
+key i
+wait 3
+key Tab
+wait 2
+probe keys_weapon aw_inventory keys
+expect has keys_weapon equip
+still inv-weapon
+key Tab
+key Tab
+wait 2
+probe keys_worn aw_inventory keys
+expect has keys_worn unequip
+still inv-worn
+key Tab
+wait 2
+probe keys_potion aw_inventory keys
+expect has keys_potion drink
+still inv-potion
+key Escape
+wait 2

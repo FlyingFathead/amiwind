@@ -382,7 +382,12 @@ void AW_IntroDraw(void) {
         AW_UITextPanel(0,vid.height,vid.width,vid.height-y,text,3);
     }
 }
-static void status(void){Con_Printf("Intro active %ld / Jiub %ld / guard %ld / prompt %ld / unlocked %ld / failed %ld\n",
+static void status(void){
+    /* PIER-GUARD-POST-STUCK-67: "aw_intro_status fixed|direct" (dbg opening dock) chooses the dock guard's walk first */
+    if(Cmd_Argc()>1 && !AW_OpeningDockRouteArg(Cmd_Argv(1))){
+        Con_Printf("aw_intro_status [fixed / direct]: the dock guard's walk (fixed: the pier's centre line, the default; "
+                   "direct: the earlier walk); no argument prints the opening's state\n");return;}
+    Con_Printf("Intro active %ld / Jiub %ld / guard %ld / prompt %ld / unlocked %ld / failed %ld\n",
     (long)active,(long)jiub_state,(long)guard_state,(long)prompt,(long)unlocked,(long)failed);
     Con_Printf("Deck guard state %ld / nearby timer %ld ms\n",(long)deck_state,(long)(deck_timer*1000));
     Con_Printf("Opening %ld / dock %ld / census %ld / hall %ld / captain %ld\n",

@@ -536,7 +536,7 @@ class EngineSmokeTests(unittest.TestCase):
         text = engine_smoke.PROBE
         start = text.index('play(){')
         end = text.index('(realtime $r1 -> $r2)"; }', start) + len('(realtime $r1 -> $r2)"; }')
-        body = text[start:end]
+        body = text[text.index('stre(){'):start] + text[start:end]
 
         def verdict(before, after):
             stubs = ('P=1\nK=1\nst(){ if [ $P = 1 ]; then set -- "$1" %s; else set -- "$1" %s; fi\n'
@@ -580,7 +580,7 @@ class EngineSmokeTests(unittest.TestCase):
         self.assertIn('STALL_GRACE:-30', text)
         start = text.index('play(){')
         end = text.index('(realtime $r1 -> $r2)"; }', start) + len('(realtime $r1 -> $r2)"; }')
-        body = text[start:end]
+        body = text[text.index('stre(){'):start] + text[start:end]
 
         def run(moves_at, what, grace=''):
             # sleep() is one second; from the sleep numbered moves_at on, realtime and/or the ticks move
@@ -881,6 +881,68 @@ class ScriptedSessionTests(unittest.TestCase):
                      'finish(){ echo "finish $1"; exit 0; }\nt0=0\n' % Path(tmp).as_posix())
             done = subprocess.run(['sh', '-c', stubs + block], capture_output=True, text=True, timeout=30, input='')
         self.assertEqual(done.stdout.splitlines()[:4], ['rec cycle', 'play 1', 'recstop', 'shot b'], done.stderr)
+
+    def test_clip_is_fragmented_and_recstop_ends_the_recorder_in_time(self):
+        """SESSION-CLIP-UNPLAYABLE-ON-STALL-67: the clip is a fragmented MP4 (no +faststart: its index comes only on a
+        clean stop), recstop waits for ffmpeg to end and ends it hard after 5 s, and finish stops it before the stall
+        examination."""
+        text = engine_smoke.PROBE
+        self.assertIn('+frag_keyframe+empty_moov+default_base_moof', text)
+        self.assertNotIn('+faststart', text)
+        self.assertIn('-g ${RECFPS:-15}', text)
+        self.assertIn('-flush_packets 1', text)
+        self.assertIn('kill -KILL $RP', text)
+        finish = text[text.index('finish(){'):]
+        self.assertLess(finish.index('recstop'), finish.index('stall.py'))
+
+    @unittest.skipUnless(shutil.which('sh') and shutil.which('ffmpeg') and shutil.which('ffprobe'), 'sh, ffmpeg and ffprobe are required')
+    def test_a_clip_cut_off_by_kill_still_plays(self):
+        """SESSION-CLIP-UNPLAYABLE-ON-STALL-67: rec's own ffmpeg flags, a recorder killed hard after 3 s (a stall, the
+        container going): ffprobe still reads a duration. The screen grab is a test pattern here; the flags are rec's."""
+        text = engine_smoke.PROBE
+        rec = text[text.index('rec(){'):text.index('recstop(){')]
+        with tempfile.TemporaryDirectory() as tmp:
+            for sub in ('shots', 'logs'):
+                Path(tmp, sub).mkdir()
+            # the stand-in swaps only the input (x11grab of :N becomes a test pattern); every output flag is rec's
+            stubs = ('R=%s\nN=0\nlog(){ :; }\n'
+                     'ffmpeg(){ a=; while [ $# -gt 0 ]; do case "$1" in\n'
+                     '    -f) shift;; -draw_mouse|-video_size|-framerate) shift;;\n'
+                     '    -i) shift; a="$a -f lavfi -i testsrc=size=1024x768:rate=15";; *) a="$a $1";; esac; shift; done\n'
+                     '  exec ffmpeg $a; }\n' % Path(tmp).as_posix())
+            # -re: the test pattern runs in real time like a screen grab, so 4 s of recording are 4 s
+            script = (stubs.replace('a="$a -f lavfi -i', 'a="$a -re -f lavfi -i') + rec +
+                      '\nrec clip\nsleep 4\nkill -KILL $RP\nwait $RP 2>/dev/null\n')
+            subprocess.run(['sh', '-c', script], capture_output=True, text=True, timeout=60, input='')
+            clip = Path(tmp, 'shots', 'clip.mp4')
+            self.assertTrue(clip.is_file(), 'no clip was written')
+            probe = subprocess.run(['ffprobe', '-v', 'error', '-count_packets', '-show_entries', 'stream=nb_read_packets,duration',
+                                    '-of', 'default=nw=1', str(clip)], capture_output=True, text=True, timeout=30)
+            self.assertEqual(probe.returncode, 0, probe.stderr)
+            values = dict(l.split('=', 1) for l in probe.stdout.split())
+            self.assertGreater(float(values['duration']), 0.5, probe.stdout + probe.stderr)
+            self.assertGreater(int(values['nb_read_packets']), 5, probe.stdout)
+
+    @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
+    def test_play_rereads_a_half_written_state_file_before_judging(self):
+        """SESSION-STALL-EMPTY-STATE-READ-67: the state file is rewritten in place and stayed half written (no end line)
+        over the whole wait's reads; the empty realtime reading was called a stall while the game ran. play re-reads."""
+        text = engine_smoke.PROBE
+        funcs = text[text.index('st(){ i=0;'):text.index('reads(){')] + text[text.index('stre(){'):text.index('# inplay WHAT')]
+        full = 'realtime %s\nticks %s\nscreen game\nend\n'
+        with tempfile.TemporaryDirectory() as tmp:
+            awctl = Path(tmp, 'awctl')
+            awctl.mkdir()
+            (awctl / 'state.txt').write_text(full % (100, 5), encoding='utf-8', newline='\n')
+            # 0.5 s: a half-written file (no end line); 3.5 s: the game's next whole write, the clock and ticks moved on
+            writer = ("(sleep 0.5; printf 'realtime 10' > $R/awctl/state.txt; sleep 3; "
+                      "printf 'realtime 101\\nticks 9\\nscreen game\\nend\\n' > $R/awctl/state.txt) &\n")
+            stubs = ('R=%s\nK=1\nSTATE_TRIES=2\nlog(){ echo "log $*"; }\nalive(){ return 0; }\n'
+                     'finish(){ echo "finish $1"; exit 0; }\n' % Path(tmp).as_posix())
+            done = subprocess.run(['sh', '-c', stubs + funcs + writer + 'play 1 test; echo played'], capture_output=True,
+                                  text=True, timeout=60, input='')
+        self.assertNotIn('finish', done.stdout, done.stdout + done.stderr)
+        self.assertTrue(done.stdout.rstrip().endswith('played'), done.stdout + done.stderr)
 
     @unittest.skipUnless(shutil.which('sh'), 'a POSIX shell is required')
     def test_a_quoted_id_with_a_space_reaches_the_command_file_unchanged(self):

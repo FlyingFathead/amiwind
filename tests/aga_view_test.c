@@ -76,6 +76,44 @@ static void vanity(void) {
     for(i=0;i<400;i++)AW_ViewIdle(&v,&r,0,AW_ViewVanityAllowed(1,1,1),.1f);
     assert(v.mode==AW_VIEW_FIRST);
 }
+/* VIEW-VANITY-UNDOES-SET-VIEW-67: an orbit holds the view at the player's heading and turns the camera with the mouse;
+ * a turn the game makes (a script's SetAngle, an arrival's facing, aw_view, aw_aim) is the player's new heading and
+ * stays. A check session waited 45 s after each teleport, the orbit (after 30 s) was running, and its aim at the Hall
+ * of Wails chest (yaw -102, pitch 21) was put back to the arrival heading (yaw 90, pitch 0): every aim missed. */
+static void orbit_hold(void) {
+    aw_view_t v;float view[3]={0,90,0},anchor[3]={0,0,0};int i;
+    AW_ViewReset(&v,&r);
+    for(i=0;i<301;i++)AW_ViewIdle(&v,&r,0,1,.1f);           /* 30.1 s without input: the orbit runs */
+    assert(v.mode==AW_VIEW_VANITY);
+    v.orbit_yaw=0;                                           /* its own 3 degrees a second aside */
+    AW_ViewOrbitHold(&v,view,anchor,1,0);                    /* the frame it began: the heading is its anchor */
+    assert(near(anchor[1],90) && near(view[1],90) && near(v.orbit_yaw,0));
+    view[1]=100;AW_ViewOrbitHold(&v,view,anchor,0,0);       /* the mouse: the camera turns, the player does not */
+    assert(near(view[1],90) && near(v.orbit_yaw,10));
+    /* the game turns the player: kept, the camera starts again from it */
+    view[0]=21;view[1]=-102;AW_ViewOrbitHold(&v,view,anchor,0,1);
+    assert(near(view[0],21) && near(view[1],-102) && near(anchor[0],21) && near(anchor[1],-102));
+    assert(near(v.orbit_yaw,0) && near(v.orbit_pitch,0));
+    /* the turn counts as input (AW_ViewFrame: the view moved): the orbit ends, the heading stays */
+    AW_ViewIdle(&v,&r,1,1,.1f);
+    assert(v.mode==AW_VIEW_FIRST && v.idle==0 && near(view[1],-102) && near(view[0],21));
+    /* before: the same turn without the game's mark was taken for the mouse and put back (the bug, kept as the rule
+     * for the mouse) */
+    view[0]=0;view[1]=90;anchor[0]=0;anchor[1]=90;v.mode=AW_VIEW_VANITY;v.orbit_yaw=0;
+    view[0]=21;view[1]=-102;AW_ViewOrbitHold(&v,view,anchor,0,0);
+    assert(near(view[1],90) && near(view[0],0));
+    /* no orbit running: the engine does not hold the view (AW_ViewFrame asks the hold in an orbit only); the turn is
+     * input and the view mode is unchanged */
+    AW_ViewReset(&v,&r);view[0]=21;view[1]=-102;
+    AW_ViewIdle(&v,&r,1,1,.1f);assert(v.mode==AW_VIEW_FIRST && near(view[1],-102));
+    /* the orbit still starts again after the delay */
+    for(i=0;i<301;i++)AW_ViewIdle(&v,&r,0,1,.1f);
+    assert(v.mode==AW_VIEW_VANITY);
+    /* the held Toggle POV orbit (preview) keeps a turn the game makes too, and goes on from it */
+    v.mode=AW_VIEW_PREVIEW;v.orbit_yaw=40;anchor[1]=10;view[1]=200;
+    AW_ViewOrbitHold(&v,view,anchor,0,1);
+    assert(v.mode==AW_VIEW_PREVIEW && near(anchor[1],200) && near(view[1],200) && near(v.orbit_yaw,0));
+}
 static void zoom(void) {
     aw_view_t v;
     AW_ViewReset(&v,&r);
@@ -226,9 +264,60 @@ static void held_torch_readmission(void) {
     assert(AW_ViewHeldRetry(0,AW_VIEW_HELD_FREE,8.2,&next));                /* a new eviction retries at once */
     assert(!AW_ViewHeldRetry(0,AW_VIEW_HELD_FREE,8.2,NULL));
 }
+/* PLAYER-VANITY-WALK-STUCK-67: every camera or control change restarts the body's animation state as a map load does,
+ * and after it the walk and the run play (their frames move on, the group is not restarted every frame) and no jump
+ * or landing frame stands in for them. Per path: the idle vanity orbit in and out, first/third person, noclip on and
+ * off, swimming in and out, a menu or dialogue over play and back, the body drawn or not, a new map. */
+static void walk_frames(const aw_anim_t *a,aw_anim_play_t *play,aw_anim_air_t *air,float speed,int want) {
+    int i,frame,last=-1,moved=0,group=-1;float rate=1;
+    for(i=0;i<20;i++){
+        group=AW_AnimPlayerMoveGroup(a,speed,0,0,&rate);
+        frame=AW_AnimPlayerAdvance(a,play,group,.05f,rate);
+        assert(AW_AnimAirFrame(a,air,1,0,0,0,.05f)<0);          /* on the ground: no jump or landing frame */
+        assert(group==want && play->group==want);
+        assert(frame>=a->g[want].base && frame<a->g[want].base+a->g[want].count);
+        if(last>=0 && frame!=last)moved++;
+        last=frame;
+    }
+    assert(moved>=5);                                            /* the cycle moves on: never restarted each frame */
+}
+static void body_restart(void) {
+    aw_anim_t a;aw_anim_play_t play;aw_anim_air_t air;aw_view_body_sig_t last,now;aw_view_t v;int i;
+    static const struct {int group,base,count;float x;} g[]={{AW_ANIM_IDLE,0,4,0},{AW_ANIM_WALK,4,8,20},
+        {AW_ANIM_RUN,12,8,60},{AW_ANIM_JUMP,20,4,0},{AW_ANIM_LAND,24,4,0}};
+    memset(&a,0,sizeof(a));
+    for(i=0;i<5;i++){a.g[g[i].group].present=1;a.g[g[i].group].base=(short)g[i].base;
+        a.g[g[i].group].count=(unsigned char)g[i].count;a.g[g[i].group].step=.1f;a.g[g[i].group].x=g[i].x;}
+    memset(&last,0,sizeof(last));memset(&now,0,sizeof(now));
+    now.valid=1;now.mode=AW_VIEW_THIRD;now.movetype=3;now.playing=1;now.drawn=1;
+    assert(AW_ViewBodySigChanged(&last,&now));                   /* the first frame of a map */
+    assert(!AW_ViewBodySigChanged(&last,&now));                  /* nothing changed: nothing restarted */
+    AW_ViewBodyRestart(&play,&air);
+    assert(play.group==255 && !air.airborne && !air.landing);
+    walk_frames(&a,&play,&air,24,AW_ANIM_WALK);
+    /* idle into the vanity orbit (the delay passed), then any input ends it: two changes, two restarts */
+    memset(&v,0,sizeof(v));v.mode=v.primary=AW_VIEW_THIRD;
+    AW_ViewIdle(&v,&r,0,1,r.vanity_delay+1);assert(v.mode==AW_VIEW_VANITY);
+    now.mode=v.mode;assert(AW_ViewBodySigChanged(&last,&now));
+    /* a stale state as the orbit could leave it: a landing that never ends, the walk's clock in the middle */
+    air.landing=1;air.play.group=AW_ANIM_LAND;air.play.index=1;play.group=AW_ANIM_WALK;play.phase=3.5f;
+    AW_ViewIdle(&v,&r,1,1,.1f);assert(v.mode==AW_VIEW_THIRD);
+    now.mode=v.mode;assert(AW_ViewBodySigChanged(&last,&now));
+    AW_ViewBodyRestart(&play,&air);
+    walk_frames(&a,&play,&air,24,AW_ANIM_WALK);
+    walk_frames(&a,&play,&air,70,AW_ANIM_RUN);
+    /* every other path that changes the camera or the control */
+    now.mode=AW_VIEW_FIRST;assert(AW_ViewBodySigChanged(&last,&now));now.mode=AW_VIEW_THIRD;assert(AW_ViewBodySigChanged(&last,&now));
+    now.movetype=8;assert(AW_ViewBodySigChanged(&last,&now));now.movetype=3;assert(AW_ViewBodySigChanged(&last,&now));
+    now.swimming=1;assert(AW_ViewBodySigChanged(&last,&now));now.swimming=0;assert(AW_ViewBodySigChanged(&last,&now));
+    now.playing=0;assert(AW_ViewBodySigChanged(&last,&now));now.playing=1;assert(AW_ViewBodySigChanged(&last,&now));
+    now.drawn=0;assert(AW_ViewBodySigChanged(&last,&now));now.drawn=1;assert(AW_ViewBodySigChanged(&last,&now));
+    last.valid=0;assert(AW_ViewBodySigChanged(&last,&now));     /* a new map (AW_ViewSceneSpawn) */
+    assert(!AW_ViewBodySigChanged(&last,&now));
+}
 int main(void) {
-    defaults();toggle();tap();vanity();zoom();death();body_layers();compact_body_layers();player_torch_emitters();
-    held_torch_readmission();
+    defaults();toggle();tap();vanity();orbit_hold();zoom();death();body_layers();compact_body_layers();player_torch_emitters();
+    held_torch_readmission();body_restart();
     puts("view rules ok");
     return 0;
 }

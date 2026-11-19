@@ -149,8 +149,10 @@ class EquipClassEngineTests(unittest.TestCase):
     def test_books_offer_read(self):
         source = (ROOT / 'engine/aga/src/aw_worldui.c').read_text(encoding='utf-8')
         self.assertIn('item->category==AW_INV_BOOK', source[source.index('static int inventory_readable('):])
-        self.assertIn('inventory_readable(item)?4:1', source)
-        self.assertIn('"Read"', source)
+        # INVENTORY-EQUIP-HINTS-67: the use key does the kind's one action (aw_inventory.c AW_InventoryItemAction; the
+        # table of every kind: tests/test_inventory_actions.py), a book's is Read; Read stays in the right button's menu
+        self.assertIn('case AW_INV_ACT_READ:return inventory_readable(item)?4:0;', source)
+        self.assertIn('if(inventory_readable(item)){what[n]=4;words[n++]="Read";}', source)
         reader = (ROOT / 'engine/aga/src/aw_reader.c').read_text(encoding='utf-8')
         self.assertIn('aw_worldui_read=carried_open', reader)
         opened = reader[reader.index('static int carried_open('):reader.index('static void close_reader(int take)\n{')]

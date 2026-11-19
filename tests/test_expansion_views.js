@@ -110,4 +110,27 @@ const LM = V.mournholdLayout(many, 400);
 assert.strictEqual(LM.tiles.length, 103);
 assert.ok(LM.tiles.every(t => t.x + t.w <= 400), 'rooms wrap inside the width');
 assert.ok(!('districts' in LM.heads), 'no district heading without districts');
+
+// Mournhold's presented cells (island 3, MOURNHOLD-EXTERIOR-CELLS-66): counted as Mournhold's cells beside its rooms, never as
+// Vvardenfell's, and drawn in neither map pane
+const withCells = Object.assign({}, doc, {cells: Object.assign({}, cells, {
+  '4,-30': cell(4, -30, 3, 'audits_passed', {bucket: 'audits_passed', converted: true}),
+  '5,-30': cell(5, -30, 3, 'not_in_build', {bucket: 'audits_passed', converted: true}),
+  '0,-30': cell(0, -30, 3, 'not_started')})});
+const ext3 = V.exteriorCounts(withCells);
+assert.deepStrictEqual(ext3.islands.map(i => [i.name, i.done, i.partial, i.missing, i.total]),
+  [['Vvardenfell', 3, 1, 1, 5], ['Solstheim', 0, 1, 2, 3], ['Mournhold', 1, 1, 1, 3]]);
+const by3 = Object.fromEntries(V.completion(withCells).map(r => [r.id, r]));
+assert.deepStrictEqual([by3.base.done, by3.base.partial, by3.base.missing, by3.base.total], [4, 1, 2, 7]);      // as before
+assert.deepStrictEqual([by3.tribunal.cells.done, by3.tribunal.cells.partial, by3.tribunal.cells.missing, by3.tribunal.cells.total], [1, 1, 1, 3]);
+assert.deepStrictEqual([by3.tribunal.done, by3.tribunal.total], [2, 8]);
+const mv = V.views(withCells).find(x => x.id === 'mournhold');
+assert.ok(mv.text.endsWith('cells: done 1 · partial 1 · missing 1 of 3'), mv.text);
+assert.deepStrictEqual([mv.cells.done, mv.cells.total], [1, 3]);
+assert.ok(!V.inPane(withCells.cells['4,-30'], 'vvardenfell') && !V.inPane(withCells.cells['4,-30'], 'solstheim'));
+assert.deepStrictEqual(V.paneBounds(withCells, 'vvardenfell'), [0, 0, 6, 0]);
+// the cells alone (no Tribunal rooms in the data) still offer the Mournhold card
+const cellsOnly = {headline: doc.headline, cells: {'4,-30': withCells.cells['4,-30']}, interior_rooms: {rooms: []}};
+assert.deepStrictEqual(V.views(cellsOnly).map(x => x.id), ['mournhold']);
+assert.deepStrictEqual(V.completion(cellsOnly).map(r => [r.id, r.present]), [['base', false], ['bloodmoon', false], ['tribunal', true]]);
 console.log('expansion views ok');

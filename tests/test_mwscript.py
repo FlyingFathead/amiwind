@@ -813,6 +813,50 @@ class CompilerTests(unittest.TestCase):
         self.assertEqual(f['PCEL_rows'], 3)
         self.assertIn('PCEL', awms.RESIDENT)
 
+    def test_position_cell_into_a_presented_district_goes_outdoors(self):
+        # MOURNHOLD-EXTERIOR-CELLS-66: with the districts a build presents as exterior cells and converts whole
+        # (tools/presented_exterior.py build_places), a PositionCell into one moves the player, and an actor, outdoors
+        # to the moved place (x and y plus the district's offset, the height kept: the move the presented master gave
+        # its placements); without them every move compiles byte for byte as before
+        places = {'test room': {'cell': 'Test Room', 'block': [-12, -30], 'size': [1, 1],
+                                'offset': [-100000.0, -250000.0]}}
+        with SyntheticData() as s:
+            media = MediaMap(s.data, catalogue(), SOUNDTRACK)
+            moved, moved_code = compile_program(s.data, media, handwritten=('chargen*',), rooms=ROOMS, presented=places)
+            plain, plain_code = compile_program(s.data, media, handwritten=('chargen*',), rooms=ROOMS)
+            empty, empty_code = compile_program(s.data, media, handwritten=('chargen*',), rooms=ROOMS, presented={})
+        self.assertEqual([c.code for c in empty_code], [c.code for c in plain_code])
+        self.assertEqual(empty.moves.rows, plain.moves.rows)
+        cell = {c.name: c for c in moved_code}['CellUser']
+        rows = [moved.moves.rows[a[0]] for _, n, a in awms.decode(cell.code) if n == 'PLAYERMOVE']
+        district, outdoors = rows
+        self.assertEqual((district['kind'], district['at'], district['yaw']), (1, (-96000.0, -242000.0, -200.0), 90.0))
+        self.assertEqual(district['map'], outdoors['map'])                  # outdoors: no map of its own
+        self.assertEqual((outdoors['kind'], outdoors['at']), (1, (100.0, 200.0, 300.0)))
+        # GetPCCell "Test Room": the district's block is where the player stands in it now
+        rows = {r['name'].casefold(): r for r in moved.pccells.rows}
+        plain_rows = {r['name'].casefold(): r for r in plain.pccells.rows}
+        self.assertEqual(rows['test room']['outside'], [(-12, -30)])
+        self.assertEqual(rows['test room']['rooms'], plain_rows['test room']['rooms'])
+        self.assertEqual(plain_rows['test room']['outside'], [])
+        # an actor's move into the district: outdoors, the original's units, kind 1, no room number
+        scripts = dict(SCRIPTS, MoverScript='''Begin MoverScript
+"mover_npc"->PositionCell 4100 8000 -200 5400 "Test Room"
+End''')
+        tmp = Path(tempfile.mkdtemp(prefix='aw-mwscript-pd-'))
+        try:
+            (tmp / 'Morrowind.esm').write_bytes(master_bytes(scripts, (record('NPC_', sub('NAME', 'mover_npc')),),
+                                                             [(201, 'mover_npc', (0, 0, 0))]))
+            data = GameData().load(tmp)
+            prog, compiled = compile_program(data, MediaMap(data, catalogue(), SOUNDTRACK), rooms=ROOMS,
+                                             presented=places)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        ops = [(n, a) for _, n, a in awms.decode({c.name: c for c in compiled}['MoverScript'].code)]
+        call = next(k for k, (n, a) in enumerate(ops) if n == 'NOTYET')
+        self.assertEqual([a[0] for n, a in ops[call - 6:call]], [-95900.0, -242000.0, -200.0, 270.0, 1, 0])
+        self.assertEqual(prog.visitors, {})                                 # no room to bring the actor into
+
     def test_position_cell_of_an_actor(self):
         # v0.0.62 (MWSCRIPT-POSITIONCELL-ACTORS-62; OpenMW transformationextensions.cpp OpPositionCell): anything but
         # the player goes to the host with x, y, z in the destination's units (a room: its map's own, a recentred

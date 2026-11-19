@@ -141,7 +141,8 @@ extern qboolean r_fov_greater_than_90;
 static edict_t *torch_player(void)
 {
     if(cls.state!=ca_connected || !sv.active || svs.maxclients!=1 ||
-       !svs.clients || !svs.clients[0].edict || cl.intermission || (AW_GalleryActive() && !AW_TorchTestActive()))return NULL;
+       !svs.clients || !svs.clients[0].edict || cl.intermission ||
+       (AW_GalleryActive() && !AW_TorchTestActive() && !AW_LightTestActive()))return NULL;   /* the light test holds lights */
     if(svs.clients[0].edict->v.health<=0)return NULL;
     return svs.clients[0].edict;
 }

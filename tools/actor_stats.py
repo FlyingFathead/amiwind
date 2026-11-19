@@ -281,11 +281,13 @@ def _pack_fields(tag, fields):
     return b''.join(struct.pack('>4sH', t.encode('ascii'), len(d)) + d for t, d in fields if t in KEEP[tag])
 
 
-def levelled_by_area(raw, numbers):
+def levelled_by_area(raw, numbers, presented=None):
     """{area key: [LEVC id hash]} of the levelled creature references of Morrowind.esm (RAW) by area (an interior by
     its room NUMBERS, an exterior cell by its grid key, as focus.awf): a levelled reference has no actor row, so its
-    area's stats section names the creatures its list can give from these."""
-    from prepare_focus import cells_of, exterior_key, GRID_BIAS
+    area's stats section names the creatures its list can give from these. PRESENTED (optional): the districts the
+    build presents as exterior cells, keyed by their block's cells as focus.awf keys them
+    (prepare_focus.cells_presented)."""
+    from prepare_focus import cells_presented, exterior_key, GRID_BIAS
     from mwad.esm import string
     levc = set()
     from mwad.esm import records, subrecords
@@ -295,7 +297,7 @@ def levelled_by_area(raw, numbers):
             if ident:
                 levc.add(ident.casefold())
     out = {}
-    for cell, interior, grid, _region, refs in cells_of(raw):
+    for cell, interior, grid, _region, refs in cells_presented(raw, presented):
         if interior:
             if not cell or cell.casefold() not in numbers:
                 continue
@@ -470,11 +472,16 @@ def shared_section(hashes, vocabulary, spell_row, shared):
     birthsign's spells, as the race's powers come from the race rows): births x { u32 id hash, u8 n, n x u16 ASPT row },
     named by the section's last 8 bytes, "BSG1" u16 births u16 the rows' offset in the section."""
     block, report = section(hashes, vocabulary, spell_row, seed=shared)
-    rows = []
+    rows, missing = [], []
     for ident in sorted(vocabulary.get('births', {})):
-        spells = [spell_row.get(_text(d).casefold()) for t, d in vocabulary['births'][ident] if t == 'NPCS']
+        names = [_text(d) for t, d in vocabulary['births'][ident] if t == 'NPCS']
+        spells = [spell_row.get(n.casefold()) for n in names]
+        # CHARGEN-ABILITY-DESCRIPTIONS-STOP-67: a birthsign spell without an ASPT row is named (shown and given as
+        # nothing otherwise: the birthsign window had no text for 11 of the 13 signs)
+        missing += ['%s: %s' % (ident, n) for n, r in zip(names, spells) if r is None]
         spells = [NO_SPELL if r is None else r for r in spells][:255]
         rows.append(struct.pack('>IB%dH' % len(spells), name_hash(ident), len(spells), *spells))
+    report['birth_spells_missing'] = missing
     if rows and len(block) <= 0xFFFF:
         at = len(block)
         block += b''.join(rows) + b'BSG1' + struct.pack('>HH', len(rows), at)

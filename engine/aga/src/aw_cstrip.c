@@ -22,6 +22,8 @@ typedef struct {
     unsigned reference;
     int owned;
     char title[40];
+    const void *world;   /* CONTAINER-WINDOW-SURVIVES-PLACE-CHANGE-67: the map and the player's spot it opened at */
+    float at[3];
 } strip_t;
 static strip_t *strip;
 static int mouse_x=160,mouse_y=160;
@@ -45,6 +47,17 @@ static void strip_close(void){
     AW_ContainerRelease();      /* CONTAINER-STRIP-TAKE-STALL-59 */
     strip_dirty=STRIP_DIRTY_FRAMES;   /* the frames after it closed show the view without it */
     IN_AWClearButtons();
+}
+/* the player's spot now (NULL without a player) */
+static const float *player_at(void){
+    return svs.clients && svs.clients[0].edict?svs.clients[0].edict->v.origin:NULL;
+}
+/* CONTAINER-WINDOW-SURVIVES-PLACE-CHANGE-67: the window stays with its place: off the game, a new map or a teleport
+ * (aw_cstrip_rules.c AW_CStripPlaceChanged) closes it. A debug teleport left the Hall of Wails chest's window open in
+ * the Temple's basement, and E there took the chest's coin. */
+static int strip_gone(void){
+    return !sv.active || cls.state!=ca_connected || key_dest!=key_game ||
+           AW_CStripPlaceChanged(strip->world,sv.worldmodel,strip->at,player_at());
 }
 /* the name an entry already had on either side (no disk read for it again after a take or a put) */
 static const aw_cstrip_entry_t *strip_known(const aw_cstrip_list_t *old,const char *id){
@@ -145,6 +158,8 @@ static int strip_open(unsigned reference,const char *name,int owned){
     if(!(strip=(strip_t *)AW_TryMalloc(sizeof(strip_t)))){AW_UISubtitle(name,"Not enough memory to open it.",3);return 1;}
     memset(strip,0,sizeof(*strip));
     strip->reference=reference;strip->owned=owned;Q_strcpy_bounded(strip->title,name,sizeof(strip->title));
+    strip->world=sv.worldmodel;
+    {const float *at=player_at();if(at){strip->at[0]=at[0];strip->at[1]=at[1];strip->at[2]=at[2];}}
     strip->list.columns=1;
     {   /* CONTAINER-STRIP-TAKE-STALL-59: the container's data read once here, not again on every take or put;
          * TRADEHOUSE-LONG-FRAME-59: an open of 100 ms or more says so */
@@ -269,7 +284,7 @@ static int click(void){
 int AW_CStripKey(int key){
     aw_cstrip_list_t *l;
     if(!strip)return 0;
-    if(key_dest!=key_game || !sv.active){strip_close();return 0;}
+    if(strip_gone()){strip_close();return 0;}
     l=&strip->list;
     strip_dirty=STRIP_DIRTY_FRAMES;
     if(key==K_MOUSE1 && !(key=click()))return 1;
@@ -293,7 +308,7 @@ void AW_CStripDraw(void){
     int left,columns,c,y,right=(int)vid.width-AW_CSTRIP_FRAME-4;aw_cstrip_list_t *l;const aw_cstrip_entry_t *e;char line[96];
     aw_cstrip_layout_t o;
     if(!strip)return;
-    if(!sv.active || cls.state!=ca_connected || key_dest!=key_game){strip_close();return;}
+    if(strip_gone()){strip_close();return;}
     if(white<0){white=AW_UIColor(255,255,255);red=AW_UIColor(220,40,40);grey=AW_UIColor(150,140,120);
                 gold=AW_UIColor(223,199,144);}
     l=&strip->list;
@@ -368,8 +383,16 @@ void AW_CStripDraw(void){
         ctext(left,o.name_y,line,right,l->side==AW_CSTRIP_CONTAINER && strip->owned?red:-1);
         if(AW_InventoryPropertiesLine(e->id,o.text_columns,line,sizeof(line)))ctext(left,o.props_y,line,right,-1);
     }else ctext(left,o.name_y,l->side==AW_CSTRIP_CONTAINER?"Empty.":"You carry nothing to put in.",right,-1);
-    ctext(left,o.keys_y,l->side==AW_CSTRIP_CONTAINER?(strip->owned?"E: Steal  Q: stack  T: all  Tab: put":
-                                                     "E: Take  Q: stack  T: all  Tab: put"):"E: Put  Q: stack  Tab: back",right,-1);
+    /* CONTAINER-STEAL-FLAG-CHECK-67 (the maintainer, 18 November 2026): an owned container's take reads "E: Steal" in
+     * red (taking is theft), the rest of the keys in the line's own colour */
+    if(l->side==AW_CSTRIP_CONTAINER && strip->owned){
+        static const char keys[]="E: Steal  Q: stack  T: all  Tab: put";
+        char steal[9];int w=AW_ConsoleCharWidth();if(w<1)w=8;
+        memcpy(steal,keys,8);steal[8]=0;                      /* "E: Steal" */
+        ctext(left,o.keys_y,steal,right,red);
+        ctext(left+8*w,o.keys_y,keys+8,right,-1);
+    }else ctext(left,o.keys_y,l->side==AW_CSTRIP_CONTAINER?"E: Take  Q: stack  T: all  Tab: put":
+                                                         "E: Put  Q: stack  Tab: back",right,-1);
     if(!AW_UICursor(mouse_x,mouse_y)){AW_UIFill(mouse_x,mouse_y,2,6,white);AW_UIFill(mouse_x,mouse_y,6,2,white);}
     if(strip_dirty>0){scr_copyeverything=1;strip_dirty--;}
 }

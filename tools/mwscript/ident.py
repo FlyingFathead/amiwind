@@ -15,11 +15,13 @@ ROOT = Path(__file__).resolve().parents[2]
 def compiler_files():
     """tools/mwscript/*.py, the stage (tools/prepare_mwscript.py), and tools/prepare_combat.py, whose autocalculation
     and equipment rules the actor table uses (actors.py); tools/room_batches.py and tools/town_interiors.py, whose
-    door arrival rule the player's PositionCell uses (rooms.py)."""
+    door arrival rule the player's PositionCell uses (rooms.py); tools/presented_exterior.py, whose move a
+    PositionCell into a presented district uses (codegen.py presented_move)."""
     return sorted((ROOT / 'tools' / 'mwscript').glob('*.py')) + [ROOT / 'tools' / 'prepare_mwscript.py',
                                                                    ROOT / 'tools' / 'prepare_combat.py',
                                                                    ROOT / 'tools' / 'room_batches.py',
-                                                                   ROOT / 'tools' / 'town_interiors.py']
+                                                                   ROOT / 'tools' / 'town_interiors.py',
+                                                                   ROOT / 'tools' / 'presented_exterior.py']
 
 
 def compiler_identity():

@@ -443,7 +443,10 @@ class EngineTests(unittest.TestCase):
         draw = body(self.scene, 'void AW_SceneDraw(void)')
         self.assertIn('ami=AW_SceneNameLabelsAmiWind()', draw)
         self.assertIn('if(!ami){', draw)                  # Morrowind: the box only, then return before any title or action
-        self.assertIn('if(ami && (!AW_UISpeakerAtRight()', draw)   # AmiWind only: the aimed name below the view
+        # AmiWind only: the aimed name below the view (HUD-TEXTS-OVERLAP-67: the one title, through focus_title_draw)
+        self.assertIn('who=ami?AW_SceneTargetName():NULL;', draw)
+        self.assertIn('if(title && *title && (!AW_UISpeakerAtRight() || style!=2))AW_UIObjectName(title,style);',
+                      body(self.scene, 'static void focus_title_draw('))
         keymaps = (ROOT/'config/keymaps.cfg').read_text(encoding='utf-8')
         self.assertIn('\naw_name_labels 1\n', keymaps)               # Reset to defaults
         commands = (ROOT/'config/debug-commands.txt').read_text(encoding='utf-8')

@@ -1,6 +1,6 @@
 # HUD: weapon and magic boxes
 
-_Last updated with AmiWind v0.0.64 (12 November 2026)._
+_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -11,6 +11,8 @@ _Last updated with AmiWind v0.0.64 (12 November 2026)._
 - [Window title bar](#window-title-bar)
 - [Engine (aw_icons.c)](#engine-aw_iconsc)
 - [Boxes on screen](#boxes-on-screen)
+- [The shared layout (v0.0.67)](#the-shared-layout-v0067)
+- [One target under the crosshair (v0.0.67)](#one-target-under-the-crosshair-v0067)
 
 <!-- contents end -->
 
@@ -191,7 +193,8 @@ is added to the pipeline once.
   nothing is bound) or the game's `^Action` defines. The game's own tutorial boxes are matched by the hash of their
   text in `config/tutorial-texts.json` (rendered into the engine by `tools/tutorial_texts.py render`), where
   `{key:COMMAND}` is the key bound now and `(not bound)` shows when none is. The inventory window's own keys are
-  bindable too (`aw_key_inv_use`, default `E ENTER`; `aw_key_inv_drop`, default `D`). A test fails on any new
+  bindable too (`aw_key_inv_use`, default `E ENTER`; `aw_key_inv_drop`, default `D`; since v0.0.67
+  `aw_key_inv_info`, default `P`, the item information box). A test fails on any new
   player-facing text in the engine that names a fixed key letter; `tests/key-hint-allowlist.json` lists the ones
   left to convert.
 - **Clearance.** Inside the frame's 4-pixel edge, the text keeps at least 4 clear pixel rows above its first line and
@@ -201,3 +204,43 @@ is added to the pipeline once.
   its key in parentheses in the right column (`Open it\t(I)`); an empty row; the `Ok` button centred and sized to its
   label. Lines stay within about 36 characters for the 320-pixel box. Keys go in parentheses: the game font's square
   brackets are ornaments, not brackets.
+
+## The shared layout (v0.0.67)
+
+Every menu, message box and HUD text is placed by one layout helper, `engine/aga/src/aw_layout.c`, never by pixel
+positions of its own. A screen gives its box; `AW_LayoutBox` returns where the title row, the content and the buttons
+go, and `AW_LayoutBoxHeight` gives the height a box needs for its content. Every number is in one table,
+`aw_layout_metrics`: the frame's 4-pixel edge, 4 clear pixels inside it, 22-pixel buttons sized to their labels
+(12 pixels each side, 48 at least) and centred with 8 pixels between them, and the button row 6 clear rows above
+the frame's inner bottom edge, never against it.
+
+- **Buttons.** The regular thick frame is the default; the thin outline stays selectable with the saved setting
+  `aw_ui_button_frame 0`. A focused or hovered button shows the menus' dark gold bar under its label.
+- **Dense lists.** Rows closer together than the game font's letters (the own class window's rows) use the console
+  font.
+- **Pick-ups.** Taking an item says what happened, "Picked up Bottle." or "Picked up 3 Bottle.", as the plants'
+  harvest line does. The original game shows no message, only the sound: the saved setting `aw_pickup_message 0`.
+- **Hints over a window.** A short notice without buttons over an open window (the dialogue window's "Continue the
+  conversation first.") is `AW_UIHintBox`: centred in the window, as wide as its text needs, its frame and padding
+  from `AW_LayoutBox` and `AW_LayoutBoxHeight`, its lines centred by their ink.
+- **Letters of the console font.** Both console fonts have the printable ASCII characters only, while the game's
+  texts use the Windows-1252 code page. A letter past them (an accented name, a curly quote) is drawn as its nearest
+  ASCII character, an acute u as u and a right single quote as a straight one, through one 128-entry table
+  (`AW_ConsoleTextGlyph`, `engine/aga/src/aw_console_glyphs.c`).
+- **The check.** While a test records, everything `aw_ui.c` draws is kept: each box, button and line of text (a line
+  by its painted pixels). `AW_LayoutCheck` reports a text or button that touches or leaves its box, a button closer
+  than the bottom margin to its box's bottom edge, and two texts on top of one another, the HUD included, unless a
+  box drawn between them covers the first. `tests/aga_ui_layout_test.c` proves the check catches each fault and
+  measures the message boxes; `tests/aga_spelllist_windows_test.c` measures the character windows. A screen moved
+  onto the helper gets its measurement in a test.
+
+## One target under the crosshair (v0.0.67)
+
+Only one thing has the focus in a frame, and it alone gets the title, the action line under it and the use key: the
+nearest thing along the view ray within the activation distance among a person or creature (where the ray enters
+their box), an item, container or plant, a load door and a hinged door. An item or plant inside a person's box counts
+as before them (a body lying on the floor, an arm's reach), and a door behind a person is never aimed at. A thing that
+had the focus keeps it while the new nearest is less than 4 units nearer, and a person whose animation moves their box
+off the ray stays aimed for a quarter of a second, so the focus does not flip between two things from frame to frame.
+The rule is `AW_FocusChoose` in `engine/aga/src/aw_activate_rules.c`, tested by number in
+`tests/aga_activate_rules_test.c`.

@@ -1,0 +1,151 @@
+# Look book page HELD-LIGHT-IN-HAND (tests/lookbook/pages.json; docs/lookbook/HELD-LIGHT-IN-HAND.md): a carried light
+# (the debug torch, the glass lantern, a candle) sits in the left hand in first person and in third person.
+# FP-TORCH-OUT-OF-HAND-67: on the v0.0.67-dev2 image every carried light floats away from the left hand in first
+# person, while third person is right. This page must FAIL there.
+#
+# Written in the journey language of tools/journey_smoke.py; tools/lookbook.py adds the page's step marker and turns
+# "still NAME" into the page's screenshot. Only commands that every image since v0.0.61 has (their resident names, not
+# the dbg words, so an older image runs the same page for a bisect):
+#   aw_debug_hors 0                Hors after the census at Seyda Neen's centre (menus and controls on)
+#   aw_camera first|third          the view
+#   key f                          the hands raised: a carried light is lit only with the hands up (aw_torch.c light_lit)
+#   aw_inventory grant "ID" 1      one of that item (the debug torch, test only, is aw_debug_torch): the diagnostic grant,
+#                                  in every image since v0.0.61 (dbg give and dbg torch came in v0.0.62)
+#   aw_inventory equip ID          equipped as the inventory's E does; equipping with the hands up lights it
+#   aw_inventory worn              "left hand: ID": the light is the one held
+#   aw_hands                       "... torch 1": the carried light is lit
+#   aw_aim YAW PITCH               the view turned (pitch 40: looking down at the hands, as in the maintainer's pictures)
+#   aw_camera held                 dbg camera held, the grip readout (engines from v0.0.67-dev3): the hand's vertices as
+#                                  drawn against the light's attach point and its nearest vertex ("nearest vertex N units
+#                                  from the hand"); older engines answer with the camera's usage line and the grip checks
+#                                  fail there (the bisect of old images reads the held and lit numbers and the stills)
+#   aw_photomode_ui 0, aw_photomode_hands 1, aw_photomode on|off
+#                                  photo mode with the hands and without its notice box: the full view without the
+#                                  status bar (in the normal view the left hand can sit below the screen's edge)
+# THE MAINTAINER'S ROUTINE (2026-11-18), each step proven by number before a still counts: (1) the view in first person
+# (tools/lookbook.py reads aw_camera's "View:" line before every first- or third-person still; a wrong mode fails the
+# page); (2) the light in the left hand and lit (aw_inventory worn, aw_hands below, and the worn list again with every
+# still); (3) the view looking down at the ground (the pitch read back from aw_camera, at least 30 for every first-person
+# "down", "steep" and "photo" still), plus a photo-mode still. Every still's line carries its version, engine, view,
+# pitch, what the hands hold and the place (OUT/STILLS.txt).
+# THE GRIP TOLERANCE (set 2026-11-18 from the v0.0.67-dev2 image with gate 11642's engine, every light vertex
+# measured): third person is held right there (torch 1.9, lantern 0.1 units from the drawn left hand), so third person
+# must stay within 2.5 units and first person within 0.5 units of the same light's third-person value (first person
+# read torch 4.2, lantern 3.2, candle 1.7 there: the known gap FP-TORCH-OUT-OF-HAND-67).
+# PICTURES ARE NEVER READ FOR ABSENCE OR PRESENCE (2026-11-18: the first reading of these stills said no left hand was
+# drawn; it was below the frame's edge at pitch 40): whether the hand and the light are drawn, and where, is the grip
+# number's job; the stills (down, steep and in photo mode) are there to look at. It starts where
+# tests/lookbook/prelude.txt leaves the player (Hors at Seyda Neen, first person).
+key f
+wait 3
+# the debug torch
+cmd aw_inventory grant "aw_debug_torch" 1
+wait 2
+cmd aw_inventory equip aw_debug_torch
+wait 3
+probe torch_worn aw_inventory worn
+expect has torch_worn left hand: aw_debug_torch
+probe torch_hands aw_hands
+pick torch_lit torch_hands after torch
+expect torch_lit == 1
+cmd aw_aim 0 40
+wait 2
+still torch-first-down
+cmd aw_aim 0 70
+wait 2
+still torch-first-steep
+cmd aw_photomode_ui 0
+cmd aw_photomode_hands 1
+cmd aw_photomode on
+wait 3
+still torch-first-photo
+cmd aw_photomode off
+wait 3
+cmd aw_photomode_hands 0
+cmd aw_photomode_ui 1
+cmd aw_aim 0 40
+wait 2
+probe torch_grip_first aw_camera held
+pick torch_gap_first torch_grip_first after nearest vertex
+cmd aw_camera third
+wait 3
+still torch-third
+probe torch_grip_third aw_camera held
+pick torch_gap_third torch_grip_third after nearest vertex
+expect torch_gap_third <= 2.5
+expect torch_gap_first <= torch_gap_third+0.5
+cmd aw_camera first
+wait 2
+# the glass lantern (light_de_lantern_02)
+cmd aw_inventory grant "light_de_lantern_02" 1
+wait 2
+cmd aw_inventory equip light_de_lantern_02
+wait 3
+probe lantern_worn aw_inventory worn
+expect has lantern_worn left hand: light_de_lantern_02
+probe lantern_hands aw_hands
+pick lantern_lit lantern_hands after torch
+expect lantern_lit == 1
+cmd aw_aim 0 40
+wait 2
+still lantern-first-down
+cmd aw_aim 0 70
+wait 2
+still lantern-first-steep
+cmd aw_photomode_ui 0
+cmd aw_photomode_hands 1
+cmd aw_photomode on
+wait 3
+still lantern-first-photo
+cmd aw_photomode off
+wait 3
+cmd aw_photomode_hands 0
+cmd aw_photomode_ui 1
+cmd aw_aim 0 40
+wait 2
+probe lantern_grip_first aw_camera held
+pick lantern_gap_first lantern_grip_first after nearest vertex
+cmd aw_camera third
+wait 3
+still lantern-third
+probe lantern_grip_third aw_camera held
+pick lantern_gap_third lantern_grip_third after nearest vertex
+expect lantern_gap_third <= 2.5
+expect lantern_gap_first <= lantern_gap_third+0.5
+cmd aw_camera first
+wait 2
+# a candle (light_com_candle_01_64)
+cmd aw_inventory grant "light_com_candle_01_64" 1
+wait 2
+cmd aw_inventory equip light_com_candle_01_64
+wait 3
+probe candle_worn aw_inventory worn
+expect has candle_worn left hand: light_com_candle_01_64
+cmd aw_aim 0 40
+wait 2
+still candle-first-down
+cmd aw_aim 0 70
+wait 2
+still candle-first-steep
+cmd aw_photomode_ui 0
+cmd aw_photomode_hands 1
+cmd aw_photomode on
+wait 3
+still candle-first-photo
+cmd aw_photomode off
+wait 3
+cmd aw_photomode_hands 0
+cmd aw_photomode_ui 1
+cmd aw_aim 0 40
+wait 2
+probe candle_grip_first aw_camera held
+pick candle_gap_first candle_grip_first after nearest vertex
+cmd aw_camera third
+wait 3
+still candle-third
+probe candle_grip_third aw_camera held
+pick candle_gap_third candle_grip_third after nearest vertex
+expect candle_gap_third <= 2.5
+expect candle_gap_first <= candle_gap_third+0.5
+cmd aw_camera first
+wait 2

@@ -63,7 +63,10 @@ class Choices(unittest.TestCase):
         self.assertIn('AW_DialChoiceStep(choice_count,choice_focus,1)', keys)
         self.assertIn('case K_ENTER:if(choice_focus>=0)pick_choice(choice_focus);return 1;', keys)
         self.assertIn('if((c=AW_DialChoiceAt(hits,nhits,mouse_x,mouse_y,row_h()))>=0)pick_choice(c);', keys)
-        self.assertIn('default:return 1;', keys)                   # typed letters, Goodbye, Escape: nothing
+        self.assertIn('default:return 1;', keys)                   # typed letters: nothing
+        # Goodbye and Escape are refused too, with the hint (DIALOGUE-GOODBYE-BLOCKED-HINT-67,
+        # tests/test_dialogue_text_variables.py)
+        self.assertIn('case K_ESCAPE:hint_until=realtime+AW_MsgBoxSeconds(CONTINUE_FIRST);return 1;', keys)
         self.assertNotIn('AW_ListBoxType', keys)
         key = body(win, 'static int key(int k,int mouse_x,int mouse_y){')
         self.assertLess(key.index('if(choice_count){int c=choice_key('), key.index('switch(k){'))

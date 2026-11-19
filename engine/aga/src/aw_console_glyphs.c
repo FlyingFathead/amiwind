@@ -3,6 +3,7 @@
  * Normal console mode keeps the existing 8x8 readable/retro font untouched.
  */
 #include "quakedef.h"
+#include "aw_layout.h"
 static int small=1;
 static const byte glyphs[95][5]={
 {0,0,0,0,0},
@@ -101,13 +102,30 @@ static const byte glyphs[95][5]={
 {6,2,3,2,6},
 {0,3,6,0,0}
 };
+/* UI-CONSOLE-FONT-SPECIAL-LETTERS-67: both console fonts have the 95 printable ASCII characters only, while the game's
+ * texts are Windows-1252 (the data's own encoding: "gro-Muzgúb", "protégé", "He’ll"). A character past 127 is drawn as
+ * the nearest one the font has (a letter without its accent, a curly quote straight), never as the one its low seven
+ * bits name (before: ú drew z, é i, ’ the large font's coloured digit). The game prints no coloured console line (Quake's
+ * \1 and \2 prefixes, the high bit in the console text), so the console's own text is unchanged. 128 bytes, one look-up
+ * a character. tests/test_dialogue_text_variables.py checks the table against the code page; tests/aga_console_test.c
+ * draws through it. */
+static const char cp1252_plain[129]=
+    "E?,f\".++^%S<O?Z?"     /* 0x80-0x8F: euro, -, low quote, florin, low double quote, ellipsis, daggers, ... */
+    "?''\"\"*--~Ts>o?zY"    /* 0x90-0x9F: curly quotes, bullet, dashes, tilde, trademark, s caron, ... */
+    " !cLoY|S\"ca<--R-"     /* 0xA0-0xAF: no-break space, inverted !, cent, pound, ... soft hyphen, (R), macron */
+    "o+23'uP.,1o>????"      /* 0xB0-0xBF: degree, plus-minus, superscripts, acute, micro, ... fractions, inverted ? */
+    "AAAAAAACEEEEIIII"      /* 0xC0-0xCF */
+    "DNOOOOOxOUUUUYTs"      /* 0xD0-0xDF */
+    "aaaaaaaceeeeiiii"      /* 0xE0-0xEF */
+    "dnooooo/ouuuuyty";     /* 0xF0-0xFF */
+int AW_ConsoleTextGlyph(int c) {c&=255;return c<128?c:(unsigned char)cp1252_plain[c-128];}
 void AW_ConsoleSetSmall(int value) {small=value!=0;}
 int AW_ConsoleCharWidth(void) {return small?4:8;}
 int AW_ConsoleCharHeight(void) {return small?6:8;}
 void AW_SmallString(int x,int y,const char *text) {
     int r,col,c,bits;byte *p;
     for(;*text && x<(int)vid.width;text++,x+=4){
-        c=*text&127;if(c<32 || c>126)continue;
+        c=AW_ConsoleTextGlyph((unsigned char)*text);if(c<32 || c>126)continue;
         for(r=0;r<5;r++){
             if(y+r<0 || y+r>=(int)vid.height)continue;
             bits=glyphs[c-32][r];p=vid.buffer+(y+r)*vid.rowbytes;
@@ -120,8 +138,10 @@ void AW_SmallString(int x,int y,const char *text) {
 void AW_SmallStringColor(int x,int y,int width,const char *text,int color) {
     int r,col,c,bits,right=x+width;byte *p;
     if(width<4 || !text)return;
+    /* UI-NO-SHARED-LAYOUT-67: the line as the layout check measures it (the 3x5 letters of the characters that fit) */
+    if(AW_LayoutRecording){int n=(int)strlen(text);if(n>width/4)n=width/4;if(n>0)AW_LayoutRecord(AW_LAYOUT_TEXT,x,y,4*n-1,5,text);}
     for(;*text && x+4<=right;text++,x+=4){
-        c=(unsigned char)*text;if(c<32 || c>126)c='?';
+        c=AW_ConsoleTextGlyph((unsigned char)*text);if(c<32 || c>126)c='?';
         for(r=0;r<5;r++){
             if(y+r<0 || y+r>=(int)vid.height)continue;
             bits=glyphs[c-32][r];p=vid.buffer+(y+r)*vid.rowbytes;
@@ -133,7 +153,7 @@ void AW_SmallStringColor(int x,int y,int width,const char *text,int color) {
 /* STEAL-PROMPT-58: a console character in a warning colour (the red "E: Steal" prompt): the small font in palette
  * index RED, the large font from the character set's coloured half (Quake's conchars, characters 128-255). */
 void AW_ConsoleCharacterRed(int x,int y,int c,int red) {
-    int r,col,bits;byte *p;c&=127;
+    int r,col,bits;byte *p;c=AW_ConsoleTextGlyph(c);
     if(!small){Draw_Character(x,y,c|128);return;}
     if(c<32 || c>126)return;
     for(r=0;r<5;r++) {
@@ -143,7 +163,7 @@ void AW_ConsoleCharacterRed(int x,int y,int c,int red) {
     }
 }
 void AW_ConsoleCharacter(int x,int y,int c) {
-    int r,col,bits;byte *p;c&=127;
+    int r,col,bits;byte *p;c=AW_ConsoleTextGlyph(c);
     if(!small){Draw_Character(x,y,c);return;}
     if(c==10)c='>';else if(c==11)c='_';
     if(c<32 || c>126)return;

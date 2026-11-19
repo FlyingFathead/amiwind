@@ -29,8 +29,9 @@ static int cyan_pixels,cyan_left,cyan_right,cyan_top,cyan_bottom,button_x,button
 /* Model the registered values used by the real panel; do not bypass mode logic. */
 /* six since OPENING-TUTORIAL-KEYS-65: the inventory's own key lists (aw_key_inv_use, aw_key_inv_drop) */
 /* eight since MAP-MULTI-MARKERS-66: aw_map_markers_max and aw_compass, registered last */
-static cvar_t *map_vars[8];static int map_var_count,debug_overlays=1;
-void Cvar_RegisterVariable(cvar_t *v){assert(map_var_count<8);v->value=atof(v->string);map_vars[map_var_count++]=v;}
+/* nine since INVENTORY-ITEM-INFO-67: the inventory's information key (aw_key_inv_info) */
+static cvar_t *map_vars[9];static int map_var_count,debug_overlays=1;
+void Cvar_RegisterVariable(cvar_t *v){assert(map_var_count<9);v->value=atof(v->string);map_vars[map_var_count++]=v;}
 void Cvar_SetValue(char *name,float value){int i;for(i=0;i<map_var_count;i++)if(!strcmp(name,map_vars[i]->name)){map_vars[i]->value=value;return;}assert(0);}
 int AW_DebugOverlaysEnabled(void){return debug_overlays;}
 int Cmd_Argc(void){return 1;}
@@ -102,10 +103,12 @@ void AW_UIText(int x,int y,const char *s,int c){strcat(drawn,s);}
 void AW_SmallStringColor(int x,int y,int width,const char *s,int c){
     /* the list panel, or the burden bar's band above the picture with its one-pixel shadow
      * (INVENTORY-BURDEN-TEXT-UNREADABLE-61: bar 8..122 x 21..30), or the armour rating's band under the picture
-     * (INVENTORY-NO-ARMOR-RATING-61: 7..123 x 182..195, inside the picture's box) */
+     * (INVENTORY-NO-ARMOR-RATING-61: 7..123 x 182..195, inside the picture's box), or the item information box's text
+     * area as the layout helper lays it out (INVENTORY-ITEM-INFO-67: 34..286 x 34..154, aw_iteminfo.h) */
     assert((x>=128 && x+width<=316 && y>=20 && y+5<=194) ||
            (x>=8 && x+width<=123 && y>=21 && y+5<=31) ||
-           (x>=7 && x+width<=124 && y>=182 && y+5<=195));
+           (x>=7 && x+width<=124 && y>=182 && y+5<=195) ||
+           (x>=34 && x+width<=286 && y>=34 && y+5<=154));
     assert((int)strlen(s)*4<=width);
     strcat(drawn,s);
 }
@@ -127,6 +130,11 @@ static void word(FILE *f,unsigned n){int i;for(i=0;i<4;i++)fputc((n>>(8*i))&255,
  * 3 = AWM2 with a broken section (point outside its bounds). Terrain avoids the lava index. */
 static int map_version;
 #define LAVA_INDEX 201
+/* MAP-WORLD-TAB-BLANK-67: map_island = an AWM1 map of the island's size, as world/map.awm of v0.0.67-dev1: 512 x 443
+ * pixels over source x -229376..196608, y -131072..237568 (52 x 45 cells, 832 units a pixel), all land of index
+ * ISLAND_LAND (no other fill of the map window uses it) */
+static int map_island;
+#define ISLAND_LAND 100
 static void half(FILE *f,int n){fputc(n&255,f);fputc((n>>8)&255,f);}
 static void fixed(FILE *f,const char *s,int n){int i;for(i=0;i<n;i++)fputc(i<(int)strlen(s)?s[i]:0,f);}
 static const char body[]="Welcome %PCName. An earned event.\0Another earned event.";
@@ -134,7 +142,12 @@ int COM_FOpenFile(char *name,FILE **out){
     FILE *f;int size,i;long base=137;unsigned bits;float value;
     opens++;if(missing){*out=NULL;return -1;}f=tmpfile();assert(f);*out=f;
     for(i=0;i<base;i++)fputc(0,f); /* Exercise packed-member-relative seeks. */
-    if(!strcmp(name,"world/map.awm")){
+    if(!strcmp(name,"world/map.awm") && map_island){
+        fputs("AWM1",f);half(f,512);half(f,443);
+        word(f,(unsigned)-229376);word(f,(unsigned)-131072);word(f,196608);word(f,237568);word(f,1);word(f,5);
+        fixed(f,"balmora",16);fixed(f,"Balmora",32);word(f,0);word(f,0);value=.25;memcpy(&bits,&value,4);word(f,bits);
+        for(i=0;i<512*443;i++)fputc(ISLAND_LAND,f);
+    }else if(!strcmp(name,"world/map.awm")){
         fputs(corrupt?"BAD!":map_version?"AWM2":"AWM1",f);fputc(32,f);fputc(0,f);fputc(32,f);fputc(0,f);
         word(f,(unsigned)-8192);word(f,(unsigned)-8192);word(f,8192);word(f,8192);word(f,1);word(f,5);
         fixed(f,"balmora",16);fixed(f,"Balmora",32);word(f,0);word(f,0);value=.25;memcpy(&bits,&value,4);word(f,bits);
@@ -154,9 +167,13 @@ int COM_FOpenFile(char *name,FILE **out){
         fixed(f,"quest",64);word(f,10);word(f,strlen(body)+1);word(f,sizeof(body)-strlen(body)-1);
     }else if(!strcmp(name,"world/entries.dat"))fwrite(body,1,sizeof(body),f);
     else if(!strcmp(name,"world/region-names.awn")){
-        /* MAP-ORIGINAL-POI-66: one region, three places, three cells (sorted by x, y); the two Vivec cells are one marker */
-        fputs("ARN2",f);word(f,1);word(f,3);word(f,3);
+        /* MAP-ORIGINAL-POI-66: one region, four places, four cells (sorted by x, y); the two Vivec cells are one marker.
+         * MAP-PLACES-SHOWN-UNVISITED-67: "Balmora" (cell -1,-1) shares the map area's title, so its square is the
+         * area's (drawn at the area's own spot), never a place square of its own */
+        fputs("ARN2",f);word(f,1);word(f,4);word(f,4);
         fixed(f,"Test Region",64);fixed(f,"Pelagiad",64);fixed(f,"Vivec, Arena",64);fixed(f,"Vivec, Foreign Quarter",64);
+        fixed(f,"Balmora",64);
+        word(f,(unsigned)-1);word(f,(unsigned)-1);word(f,0);word(f,3);
         word(f,(unsigned)-1);word(f,0);word(f,0);word(f,0);
         word(f,0);word(f,(unsigned)-1);word(f,0);word(f,1);
         word(f,0);word(f,0);word(f,0);word(f,2);
@@ -440,6 +457,25 @@ static int square_near(int x,int y){   /* a place square drawn centred within 1 
     for(i=0;i<squares_n;i++)if(abs(square_xy[i][0]-x)<=1 && abs(square_xy[i][1]-y)<=1)return 1;
     return 0;
 }
+/* MAP-PLACES-SHOWN-UNVISITED-67: ShowMap reveals the cells whose name STARTS with its text, in any case (OpenMW
+ * guiextensions.cpp OpShowMap, ciStartsWith): a text inside a name ("agiad", "Arena") reveals nothing (before, a name
+ * holding the text anywhere: ShowMap Vos revealed Tel Vos); "PELAGIAD" and "vivec" reveal Pelagiad and Vivec's cells */
+static void showmap_starts_test(void){
+    if(AW_WorldUIActive())AW_WorldUIKey(K_ESCAPE,1);
+    map_version=0;debug_overlays=0;Cvar_SetValue("aw_map_mode",1);AW_MapFogReset();
+    revealed_list[0]="agiad";revealed_list[1]="Arena";revealed_n=2;map_command();AW_WorldUIKey(K_HOME,1);
+    drag_test_point(150,140);draw();assert(!square_near(122,58) && !square_near(197,96));
+    AW_WorldUIKey('m',1);
+    revealed_list[0]="PELAGIAD";revealed_list[1]="vivec";map_command();AW_WorldUIKey(K_HOME,1);
+    drag_test_point(150,140);draw();assert(square_near(122,58) && square_near(197,96) && !square_near(160,96));
+    AW_WorldUIKey('m',1);
+    /* a settlement (the map's Balmora area at 0,0: screen 160,96) a ShowMap reveals shows on unexplored land too, at
+     * its own spot (before: only once explored, so Sellus Gravius's ShowMap Balmora showed nothing) */
+    revealed_list[0]="balmora";revealed_n=1;map_command();AW_WorldUIKey(K_HOME,1);
+    drag_test_point(150,140);draw();assert(square_near(160,96) && !square_near(122,58));
+    drag_test_point(160,96);draw();assert(strstr(drawn,"Balmora"));
+    AW_WorldUIKey('m',1);revealed_n=0;debug_overlays=1;Cvar_SetValue("aw_map_mode",0);
+}
 static void place_markers_test(void){
     if(AW_WorldUIActive())AW_WorldUIKey(K_ESCAPE,1);
     map_version=0;debug_overlays=1;revealed_n=0;Cvar_SetValue("aw_map_mode",0);
@@ -462,6 +498,7 @@ static void place_markers_test(void){
     revealed_list[1]="Vivec";revealed_n=2;map_command();AW_WorldUIKey(K_HOME,1);
     drag_test_point(197,96);draw();assert(strstr(drawn,"Vivec"));
     AW_WorldUIKey('m',1);revealed_n=0;
+    showmap_starts_test();debug_overlays=0;Cvar_SetValue("aw_map_mode",1);
     /* stage 2: the explored land. Nothing walked: the in-game map is all fog, no square, no name */
     AW_MapFogReset();map_command();AW_WorldUIKey(K_HOME,1);
     drag_test_point(150,140);draw();assert(!square_near(122,58) && !square_near(197,96) && !square_near(160,96));
@@ -482,6 +519,47 @@ static void place_markers_test(void){
      AW_WorldUIKey('m',1);assert(AW_MapFogImport(saved,n)==n);
      map_command();AW_WorldUIKey(K_HOME,1);drag_test_point(150,140);draw();assert(square_near(122,58) && square_near(160,96));
      AW_WorldUIKey('m',1);}
+    AW_MapFogReset();debug_overlays=1;Cvar_SetValue("aw_map_mode",0);
+}
+/* MAP-WORLD-TAB-BLANK-67: the in-game World view the first time it shows the player in a game, on the island-sized map
+ * after a short walk at Seyda Neen (source -11264,-71680, 13 reveals a fog square apart going north: about 3 x 15
+ * squares explored). Before, it opened at the whole-island fit: the explored land drew a few pixels wide under the
+ * player's arrow (at most a dozen land pixels) and the tab looked empty. Now: centred on the player at the closest zoom
+ * holding the explored land, by every route (open outdoors, the debug view switched to in-game); the player's own zoom
+ * kept on later opens and centred on the player; New Game and a load place it again. */
+static int land_pixels(void){int x,y,n=0;for(y=19;y<173;y++)for(x=4;x<316;x++)n+=pixels[y*320+x]==ISLAND_LAND;return n;}
+static int player_centred(void){   /* the test arrow (main's arrow_pixels, yaw 90: its 254 column just above the player)
+                                     * over the view's centre 160,96 (AW_UIFill draws nothing in this fixture) */
+    int x,y;
+    for(y=91;y<=93;y++)for(x=159;x<=161;x++)if(pixels[y*320+x]==254)return 1;
+    return 0;
+}
+static void world_first_view_test(void){
+    edict_t *player=svs.clients[0].edict;int k;
+    if(AW_WorldUIActive())AW_WorldUIKey(K_ESCAPE,1);
+    memset(arrow_pixels,255,sizeof(arrow_pixels));for(k=0;k<8;k++)arrow_pixels[k*64+7]=arrow_pixels[k*64+8]=254;
+    map_version=0;map_island=1;debug_overlays=0;Cvar_SetValue("aw_map_mode",1);arrow_on=1;cl.viewangles[YAW]=90;
+    strcpy(sv.name,"vf0000");player->v.origin[0]=(-11264-4096)/4.0f;player->v.origin[1]=-71680/4.0f;player->v.origin[2]=0;
+    player->v.angles[1]=0;
+    aw_save_markers_reset();                                   /* New Game */
+    AW_MapFogReset();for(k=0;k<13;k++)AW_MapFogReveal(-11264,-71680+k*1024.0f);
+    map_command();assert(AW_WorldUIActive());draw();
+    assert(land_pixels()>=150 && player_centred() && strstr(drawn,"WORLD"));
+    /* the player zooms out to the whole island: kept on the next open, centred on the player */
+    for(k=0;k<6;k++)AW_WorldUIKey('-',1);
+    draw();assert(land_pixels()<20);AW_WorldUIKey('m',1);
+    map_command();draw();assert(land_pixels()<20 && player_centred());AW_WorldUIKey('m',1);
+    /* a load places it again; so does New Game */
+    aw_save_markers_loaded();map_command();draw();assert(land_pixels()>=150 && player_centred());AW_WorldUIKey('m',1);
+    map_command();for(k=0;k<6;k++)AW_WorldUIKey('-',1);AW_WorldUIKey('m',1);   /* the whole-island zoom again */
+    aw_save_markers_reset();
+    /* the session's route: M with the debug HUD opens the debug view (no placement there), then the in-game view */
+    debug_overlays=1;map_command();draw();assert(strstr(drawn,"DEBUG MAP") && land_pixels()>1000);
+    Cvar_SetValue("aw_map_mode",1);draw();assert(land_pixels()>=150 && player_centred());AW_WorldUIKey('m',1);
+    /* nothing explored yet (a New Game at once): the Local view's zoom on the player, all fog */
+    aw_save_markers_reset();AW_MapFogReset();debug_overlays=0;
+    map_command();draw();assert(land_pixels()==0 && player_centred());AW_WorldUIKey('m',1);
+    map_island=0;arrow_on=0;cl.viewangles[YAW]=0;strcpy(sv.name,"balmora");memset(player->v.origin,0,sizeof player->v.origin);
     AW_MapFogReset();debug_overlays=1;Cvar_SetValue("aw_map_mode",0);
 }
 /* stage 3: the local map. The scene's doors (aw_scene.c AW_SceneMapDoor) and the interior test (aw_scene.c AW_Interior)
@@ -531,13 +609,20 @@ static void local_map_test(void){
     inside=doors_on=0;sv.worldmodel=NULL;strcpy(sv.name,"balmora");memset(player->v.origin,0,sizeof player->v.origin);
     AW_MapFogReset();debug_overlays=1;Cvar_SetValue("aw_map_mode",0);
 }
-int main(void){
+int main(int argc,char **argv){
     edict_t player;client_t client;int before;
     memset(&player,0,sizeof(player));memset(&client,0,sizeof(client));
     sv.active=1;svs.maxclients=1;svs.clients=&client;client.edict=&player;cls.state=ca_connected;
     strcpy(sv.name,"balmora");strcpy(aw_story.name,"Hors");
     vid.width=320;vid.height=200;vid.rowbytes=320;vid.buffer=pixels;
     AW_WorldUIInit();assert(map_command && journal_command);
+    /* one part alone (test_aga_native_source.py runs these apart too, so each fails on its own on a broken engine) */
+    if(argc>1){
+        if(!strcmp(argv[1],"world_first_view"))world_first_view_test();
+        else if(!strcmp(argv[1],"showmap_starts"))showmap_starts_test();
+        else assert(!"unknown part");
+        return 0;
+    }
     missing=1;map_command();assert(!AW_WorldUIActive() && key_dest==key_game);missing=0;
     corrupt=1;map_command();assert(!AW_WorldUIActive() && key_dest==key_game);corrupt=0;
     map_command();assert(AW_WorldUIActive() && key_dest==key_menu);
@@ -680,5 +765,6 @@ int main(void){
     lava_layer_test();
     place_markers_test();
     local_map_test();
+    world_first_view_test();
     return 0;
 }

@@ -1,6 +1,6 @@
 # Memory allocation and heap clearance
 
-_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
+_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -35,6 +35,9 @@ _Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 - [Exact edge and surface storage: 6 October follow-up](#exact-edge-and-surface-storage-6-october-follow-up)
 
 <!-- contents end -->
+
+The player's body and first-person arm parts are released the moment a race, sex or outfit change no longer draws
+them: [PLAYER_BODY.md](PLAYER_BODY.md#what-loads-and-what-is-let-go).
 
 ## Memory-saving candidates for the next round: 10 October 2026
 

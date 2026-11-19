@@ -58,7 +58,9 @@ static struct {
     double started, think_seconds, think_max;
 } stats;
 
-static struct {unsigned char on, click, red, drawn, kill, crime; int frame; edict_t *target;} pick;   /* kill: dbg kill's pick (DBG-KILL-60); crime: dbg kill crime's (CRIME-59) */
+static struct {unsigned char on, click, red, drawn, kill, crime, despawn; int frame; edict_t *target;} pick;   /* kill: dbg kill's pick (DBG-KILL-60); crime: dbg kill crime's (CRIME-59); despawn: dbg despawn's (DBG-SPAWN-MENU-67) */
+void (*aw_companion_despawn)(edict_t *e);
+int (*aw_companion_placeholder)(edict_t *e);
 static cvar_t think_interval={"aw_companion_think","0.1"};
 /* How close the follower keeps (feet to feet, game units). 96: out of the
  * player's way in a doorway, still in view. Not saved. */
@@ -427,6 +429,13 @@ static edict_t *pick_target(void) {
         pick.frame=host_framecount;pick.target=AW_NPCTargetReach(p,cl.viewangles,PICK_REACH);
         if(pick.target && pick.target==c.e)pick.target=NULL;
         if(pick.kill && pick.target && AW_CombatSlotState(pick.target,NULL)==2)pick.target=NULL;   /* a body is not killed twice */
+        /* dbg despawn: a model-only placeholder of dbg spawn is no NPC to the aim; the thing the view's ray hits */
+        if(pick.despawn && !pick.target && aw_companion_placeholder){
+            vec3_t eye,end,f,r,u;trace_t tr;
+            VectorAdd(p->v.origin,p->v.view_ofs,eye);AngleVectors(cl.viewangles,f,r,u);VectorMA(eye,PICK_REACH,f,end);
+            tr=SV_Move(eye,vec3_origin,vec3_origin,end,MOVE_NORMAL,p);
+            if(tr.ent && !tr.ent->free && aw_companion_placeholder(tr.ent))pick.target=tr.ent;
+        }
     }
     return pick.target;
 }
@@ -434,6 +443,13 @@ static edict_t *pick_target(void) {
  * as "chim actors kill" (AW_CombatTestEngage dead: it lies down, is not solid, its death is on the change list at once). */
 static void pick_act(edict_t *e) {
     int can=0;
+    /* dbg despawn (DBG-SPAWN-MENU-67): the aimed one goes (aw_mwhost.c: a spawned one for good, a game actor until its
+     * place loads again) */
+    if(pick.despawn){
+        if(aw_companion_despawn)aw_companion_despawn(e);
+        pick.target=NULL;pick.frame=-1;
+        return;
+    }
     if(!pick.kill){pick_npc(e);return;}
     /* dbg kill crime (CRIME-59): canCommitCrimeAgainst before the blow, then actorKilled (the murder when it is one) */
     if(pick.crime)can=AW_CrimeCanCommit(e);
@@ -446,7 +462,7 @@ static void pick_act(edict_t *e) {
 }
 /* view.c: 0 = not picking (normal crosshair rule), 1 = picking, no target
  * (white crosshair, even if the crosshair is off), 2 = red: click picks. */
-static void pick_escape(void) {if(pick.on && key_dest==key_menu){pick.on=0;pick.kill=0;Con_Printf("Pick mode off.\n");}}
+static void pick_escape(void) {if(pick.on && key_dest==key_menu){pick.on=0;pick.kill=0;pick.despawn=0;Con_Printf("Pick mode off.\n");}}
 int AW_CompanionCrosshair(int x,int y) {
     static int red=-1;int i;long best=0x7fffffff,d,r,g,b;
     pick_escape();
@@ -477,7 +493,7 @@ int AW_CompanionPickAim(void) {
     edict_t *t;
     pick_escape();
     if(!pick.on)return 0;
-    if(pick.kill){pick.on=0;pick.kill=0;Con_Printf("Pick mode off.\n");return 1;}   /* dbg kill: the right button leaves */
+    if(pick.kill || pick.despawn){pick.on=0;pick.kill=0;pick.despawn=0;Con_Printf("Pick mode off.\n");return 1;}   /* dbg kill, dbg despawn: the right button leaves */
     t=pick_target();
     if(t)pick_act(t);else Con_Printf("Pick: no NPC under the crosshair.\n");
     return 1;
@@ -527,7 +543,7 @@ static void stop(void) {
 }
 static void toggle_pick(void) {
     if(!player() || cls.state!=ca_connected){Con_Printf("AmiWind: start the local scene first.\n");return;}
-    pick.on=!pick.on;pick.kill=0;pick.frame=-1;pick.target=NULL;
+    pick.on=!pick.on;pick.kill=0;pick.despawn=0;pick.frame=-1;pick.target=NULL;
     Con_Printf(pick.on?"Pick mode: aim at an NPC (red crosshair) and attack or right-click to pick; dbg companion pick or Escape leaves.\n":
         "Pick mode off.\n");
 }
@@ -536,8 +552,16 @@ static void toggle_pick(void) {
 void AW_CompanionKillMode(void) {
     if(!player() || cls.state!=ca_connected){Con_Printf("AmiWind: start the local scene first.\n");return;}
     if(pick.on && pick.kill){pick.on=0;pick.kill=0;pick.crime=0;Con_Printf("Pick mode off.\n");return;}
-    pick.on=1;pick.kill=1;pick.crime=0;pick.frame=-1;pick.target=NULL;
+    pick.on=1;pick.kill=1;pick.crime=0;pick.despawn=0;pick.frame=-1;pick.target=NULL;
     Con_Printf("Kill mode: aim at an NPC or creature (red crosshair) and attack to kill it; dbg kill, a right click or Escape leaves.\n");
+}
+/* dbg despawn (DBG-SPAWN-MENU-67): the same pick, the attack (left button) removes the aimed NPC, creature or dbg spawn
+ * placeholder; dbg despawn again, a right click or Escape leaves */
+void AW_CompanionDespawnMode(void) {
+    if(!player() || cls.state!=ca_connected){Con_Printf("AmiWind: start the local scene first.\n");return;}
+    if(pick.on && pick.despawn){pick.on=0;pick.despawn=0;Con_Printf("Pick mode off.\n");return;}
+    pick.on=1;pick.despawn=1;pick.kill=0;pick.crime=0;pick.frame=-1;pick.target=NULL;
+    Con_Printf("Despawn mode: aim at an NPC or creature (red crosshair) and left-click to remove it; dbg despawn, a right click or Escape leaves.\n");
 }
 /* dbg kill crime (CRIME-59): the kill pick, each kill counted as the player's by the crime rules (a witnessed murder:
  * the bounty, the message, the reactions; an attacker or a creature: no crime) */

@@ -6,6 +6,7 @@
 #include "aw_tryalloc.h"
 #include "aw_textdef.h"
 #include "aw_levelup.h"
+#include "aw_iteminfo.h"
 static char text[8192],title[96];
 static unsigned short pages[512];
 static int page_count,page,active,action,result;
@@ -176,6 +177,19 @@ static int carried_open(const char *id)
     book_reference=0;book_owned=0;
     page=0;active=1;action=0;result=0;IN_AWClearButtons();return 1;
 }
+/* INVENTORY-ITEM-INFO-67 (aw_iteminfo.h aw_worldui_book_text): a carried book's or scroll's text for the item
+ * information box, its defines filled as the reader fills them, in a fresh allocation the caller frees; NULL when it
+ * is not in books.awb, there is no memory, or the reader is open (its book is not touched then). One read of
+ * books.awb (the index's binary search, then the text). */
+static char *book_text(const char *id)
+{
+    char *taken;
+    if(active || !id || strlen(id)>BOOK_ID)return NULL;
+    book_free();
+    if(!book_load(id) || !book_defines()){book_free();return NULL;}
+    taken=book;book=NULL;
+    return taken;
+}
 static void close_reader(int take)
 {
     unsigned reference=book_reference;int was_book=book!=NULL;
@@ -237,6 +251,7 @@ void AW_ReaderDraw(void)
     /* switch "E: Read" on: the inventory's hook to this reader (aw_inventory.c AW_ItemPrompt, placed_use) */
     if(!aw_book_reader)aw_book_reader=book_open;
     if(!aw_worldui_read)aw_worldui_read=carried_open;
+    if(!aw_worldui_book_text)aw_worldui_book_text=book_text;   /* INVENTORY-ITEM-INFO-67 */
     if(!active || key_dest!=key_game)return;
     AW_UIBox(2,2,316,196);
     /* Texture noise and curled edges obscure small text at 320x200. Keep the

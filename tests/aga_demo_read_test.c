@@ -13,6 +13,12 @@ void Con_Printf(char *format,...){(void)format;}
 void Sys_Error(char *format,...){(void)format;assert(!"Malformed demo caused fatal exit");abort();}
 void CL_Disconnect(void){CL_StopPlayback();cls.state=ca_disconnected;}
 int NET_GetMessage(struct qsocket_s *socket){(void)socket;return 0;}
+/* net_loop.c's: net_message grows for a recorded frame message larger than it (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66) */
+static byte grown[MAX_MSGLEN*2];static int grows;
+int Loop_Grow(int receive,int message){
+    (void)receive;grows++;if(message>(int)sizeof(grown))return 0;
+    net_message.data=grown;net_message.maxsize=sizeof(grown);return 1;
+}
 int Cmd_Argc(void){return 2;}
 char *Cmd_Argv(int index){return index?"fixture":"timedemo";}
 void COM_DefaultExtension(char *name,char *extension){(void)name;(void)extension;}
@@ -40,6 +46,13 @@ int main(void){
     reset(packet,18);assert(CL_GetMessage()==1);assert(net_message.cursize==2 && payload[0]==svc_nop && payload[1]==svc_disconnect);
     for(i=0;i<3;i++)assert(cl.mviewangles[0][i]==angles[i]);stopped();assert(conversions==1);
     for(i=0;i<3;i++){size=i==0?-1:i==1?0:MAX_MSGLEN+1;memcpy(packet,&size,4);reset(packet,4);stopped();}
+    /* a recorded frame message larger than net_message: it grows and the message reads whole; past the frame
+     * message's own bound (three length bytes) it is refused without growing */
+    {static byte big[16+MAX_MSGLEN+100];int before;size=MAX_MSGLEN+100;
+     memcpy(big,&size,4);memcpy(big+4,angles,12);memset(big+16,svc_nop,size);before=grows;
+     reset(big,16+size);assert(CL_GetMessage()==1 && grows==before+1);
+     assert(net_message.cursize==size && net_message.data==grown && grown[size-1]==svc_nop);stopped();
+     size=4194305;memcpy(packet,&size,4);before=grows;reset(packet,4);stopped();assert(grows==before);}
     mock_track="-1\n";cls.demonum=0;CL_TimeDemo_f();assert(cls.demoplayback && cls.timedemo && cls.demonum==-1 && cls.forcetrack==-1);CL_StopPlayback();
     mock_track="-0\n";CL_PlayDemo_f();assert(cls.demoplayback && cls.forcetrack==0);CL_StopPlayback();
     mock_track="2147483647\n";CL_PlayDemo_f();assert(cls.demoplayback && cls.forcetrack==2147483647);CL_StopPlayback();

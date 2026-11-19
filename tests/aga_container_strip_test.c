@@ -155,9 +155,10 @@ int main(void){
     assert(AW_InventoryUse()==0 && !opened);              /* no strip in this build: E does nothing */
     aw_container_open=fake_open;aw_container_lock=fake_lock;
     assert(AW_InventoryUse() && opened==CHEST && opened_owned==0);
-    /* owned: "E: Steal" drawn red; opening is free, the strip knows it is owned */
+    /* owned: "E: Open" drawn red (CONTAINER-STEAL-FLAG-CHECK-67; it read "E: Steal" before): opening is free, taking is
+     * theft, the strip knows it is owned and says "E: Steal" in red there */
     tables(1,1,0);level();opened=0;
-    assert(AW_ItemPrompt(prompt,sizeof(prompt),&steal) && steal && !strcmp(prompt,"E: Steal"));
+    assert(AW_ItemPrompt(prompt,sizeof(prompt),&steal) && steal && !strcmp(prompt,"E: Open"));
     assert(AW_InventoryUse() && opened==CHEST && opened_owned==1);
     /* locked (level 50): "Locked", the box's lock line, E opens nothing and says so; a script's Unlock opens it */
     tables(1,1,50);level();opened=0;
@@ -165,7 +166,7 @@ int main(void){
     assert(AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && !strcmp(weight,"Lock Level: 50"));
     assert(AW_InventoryUse() && !opened && subtitles==1 && !strcmp(last_subtitle,"Locked"));
     script_lock=0;
-    assert(AW_ItemPrompt(prompt,sizeof(prompt),&steal) && !strcmp(prompt,"E: Steal"));
+    assert(AW_ItemPrompt(prompt,sizeof(prompt),&steal) && steal && !strcmp(prompt,"E: Open"));   /* owned: red */
     assert(AW_InventoryUse() && opened==CHEST);
     script_lock=-1;
     /* organic (flora): no prompt, E falls through to the harvest */

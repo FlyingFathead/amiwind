@@ -6,6 +6,7 @@ static int locked,character,debug;
 client_state_t cl;
 int AW_OpeningLocked(void){return locked;}
 void AW_OpeningDockStatus(void){}
+int AW_OpeningDockRouteArg(const char *word){return 0;}   /* PIER-GUARD-POST-STUCK-67 */
 int AW_CharacterActive(void){return character;}
 int AW_DebugTestInputActive(void){return debug;}
 int main(void)

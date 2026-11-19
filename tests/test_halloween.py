@@ -238,7 +238,8 @@ class Wiring(unittest.TestCase):
         body = body[:body.index('\n}\n')]
         self.assertIn('hw.world=NULL;', body)
         self.assertNotIn('ED_Free', body)                     # the old edicts are never touched
-        self.assertIn('void AW_AmbientServerReset(void) {slots_world=NULL;}',
+        # (v0.0.67, WANDER-DOOR-AFTER-LOAD-67: the placements told for the old server go too; no edict touched)
+        self.assertIn('void AW_AmbientServerReset(void) {slots_world=NULL;memset(placed_ref,0,sizeof(placed_ref));}',
                       (SRC / 'aw_ambient.c').read_text(encoding='utf-8'))
 
     def test_catalogue_lines_fit_the_engine_reader(self):

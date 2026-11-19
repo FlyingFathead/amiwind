@@ -65,7 +65,9 @@ int main(void) {
      * (the drawing stopped after 3 before). Too many for the screen: as many as fit, (200-8-16-24)/10 = 15. */
     assert(AW_MsgBoxLinesShown(13,1,200,10)==13);
     assert(AW_MsgBoxLinesShown(3,1,200,10)==3);
-    assert(AW_MsgBoxLinesShown(40,1,200,10)==15);
+    /* UI-NO-SHARED-LAYOUT-67: the button row stands the shared bottom margin above the frame's edge, 6 rows more:
+     * (200-8-16-24-6)/10 = 14 */
+    assert(AW_MsgBoxLinesShown(40,1,200,10)==14);
     assert(AW_MsgBoxLinesShown(40,0,480,8)==AW_MSGBOX_LINES);             /* the drawing's own limit */
     assert(AW_MsgBoxLinesShown(0,1,200,10)==1 && AW_MsgBoxLinesShown(5,8,200,10)==1);   /* never below one line */
     /* the text holds a long release whole: 13 lines of up to 60 characters */
@@ -87,6 +89,8 @@ int main(void) {
             for(i=0;i<counts[k];i++){
                 AW_MsgBoxButtonRect(counts[k],i,f,r);
                 assert(r[0]>=f[0] && r[0]+r[2]<=f[0]+f[2] && r[1]+r[3]<=f[1]+f[3]+2 && r[3]==22);
+                /* UI-NO-SHARED-LAYOUT-67: never against the bottom edge: 6 clear rows above the frame's inner edge */
+                if(i/AW_MSGBOX_PER_ROW==(counts[k]-1)/AW_MSGBOX_PER_ROW)assert(f[1]+f[3]-4-(r[1]+r[3])==6);
                 assert(AW_MsgBoxButtonAt(counts[k],f,r[0]+r[2]/2,r[1]+r[3]/2)==i);
                 assert(AW_MsgBoxButtonAt(counts[k],f,r[0]-1,r[1])!=i);              /* just left of it: not this one */
             }

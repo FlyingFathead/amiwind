@@ -27,6 +27,7 @@
 #include "aw_tryalloc.h"
 #include "aw_listbox.h"
 #include "aw_activate.h"
+#include "aw_actors.h"     /* AW_CombatSlotState: a body's use box (FOCUS-NPC-OVERRIDES-ITEM-62) */
 #include "aw_mapmarks.h"
 #include "aw_loaderr.h"
 /* Ordinary hinged doors (aw_hinged_door.c sets these; NULL: none). */
@@ -49,6 +50,10 @@ int (*aw_can_talk)(edict_t *e);
  * heap and no cache bank, the 16 MB baseline). The player stays at the door; a screen on the loading art says
  * why, and ENTER returns to the game. */
 long aw_fast_ram_found_mb;
+/* the census office's exit door into Seyda Neen (Morrowind.esm placement 119659, CharGen Exit Door, whose script
+ * CharGenDoorExitCaptain ends the registration; the release below names it as 119659): the bare 'dbg aw hors' arrival
+ * (DBG-HORS-AFTER-CENSUS-67) */
+#define CENSUS_EXIT_DOOR 119659u
 #define ROOM_FAST_KEY "\"_chim_room_fast_mb\""
 #define ROOM_REFUSED_FIRST "Sorry, but this interior cannot be run with 16MB of Fast RAM."
 #define ROOM_REFUSED_SECOND "Press ENTER to return."
@@ -382,6 +387,24 @@ edict_t *AW_NPCTarget(edict_t *p,vec3_t angles) {return AW_NPCTargetReach(p,angl
 /* FOCUS-NPC-OVERRIDES-ITEM-62: where the view ray enters and leaves the box of the actor the last AW_NPCTargetReach
  * returned (map units from the eye); -1 when it returned none. */
 static float npc_aim_near=-1,npc_aim_far=-1;
+/* FOCUS-NPC-OVERRIDES-ITEM-62: the use box of E (aw_activate.h AW_ActorUseBox) from the stored box MINS..MAXS of a model
+ * storing FRAMES frames (0 not known): a person with one stored frame by his body, a body lying low, a creature as
+ * stored. A creature by aw_ambient.c's slot (its row's or its record's creature flag; -1 when E has no slot), else an
+ * outdoor creature of the actor library by its model (progs/c_*); a room creature (progs/a_*) without a slot is taken
+ * for a person (no file is read here). A few compares an actor, only for the actors the reach precheck lets through. */
+int (*aw_actor_creature)(edict_t *e);
+static int use_box_creature(edict_t *e) {
+    int c=aw_actor_creature?aw_actor_creature(e):-1;
+    if(c>=0)return c;
+    return e->v.model && !strncmp(pr_strings+e->v.model,"progs/c_",8);
+}
+static int actor_use_box(edict_t *e,int frames,const float *mins,const float *maxs,float *out_mins,float *out_maxs) {
+    eval_t *scale;
+    if(frames!=1 || !AW_ActorPersonHull(e->v.mins,e->v.maxs) || use_box_creature(e))
+        return AW_ActorUseBox(frames,0,0,1,mins,maxs,out_mins,out_maxs);
+    scale=GetEdictFieldValue(e,"aw_scale");
+    return AW_ActorUseBox(frames,AW_CombatSlotState(e,NULL)==2,1,scale?scale->_float:1,mins,maxs,out_mins,out_maxs);
+}
 /* The same test with a longer reach (dbg pickcompanion: 384 units). */
 edict_t *AW_NPCTargetReach(edict_t *p,vec3_t angles,float reach) {
     edict_t *e,*best=NULL;model_t *m;int i,j,index;float limit,lo,hi,o;
@@ -419,14 +442,20 @@ edict_t *AW_NPCTargetReach(edict_t *p,vec3_t angles,float reach) {
         /* The drawn frame's box (CORPSE-INVENTORY-NOT-OPENABLE-59), as aw_inspect.c model_hit: the whole model's
          * bounds enclose every frame, the lying death pose too, so a standing resident's box reached about a body's
          * length around him and held the crosshair over a body beside him, and a body's box stood a man's height
-         * over it. Cache_Check never loads: an evicted model keeps the whole-model bounds. */
-        {aliashdr_t *h=(aliashdr_t *)Cache_Check(&m->cache);mdl_t *md;maliasframedesc_t *fd;int f;
+         * over it. Cache_Check never loads: an evicted model keeps the whole-model bounds.
+         * FOCUS-NPC-OVERRIDES-ITEM-62: a person's model stores ONE frame since v0.0.52 (skeletal actors) whose box
+         * encloses every pose, so the drawn frame's box never narrowed him: his use box is his body's (actor_use_box),
+         * evicted too once a resident look has seen the one frame (AW_MODEL_ONE_STORED_FRAME, aw_activate.h). */
+        {aliashdr_t *h=(aliashdr_t *)Cache_Check(&m->cache);mdl_t *md;maliasframedesc_t *fd;int f,frames;
          VectorCopy(m->mins,fmins);VectorCopy(m->maxs,fmaxs);
+         frames=(m->flags&AW_MODEL_ONE_STORED_FRAME)?1:0;
          if(h && (md=(mdl_t *)((byte *)h+h->model))->numframes>0){
-            f=(int)e->v.frame;if(f<0 || f>=md->numframes)f=0;fd=&h->frames[f];
+            f=(int)e->v.frame;if(f<0 || f>=md->numframes)f=0;fd=&h->frames[f];frames=md->numframes;
+            m->flags=(m->flags&~AW_MODEL_ONE_STORED_FRAME)|(frames==1?AW_MODEL_ONE_STORED_FRAME:0);
             for(j=0;j<3;j++){fmins[j]=fd->bboxmin.v[j]*md->scale[j]+md->scale_origin[j];
                              fmaxs[j]=fd->bboxmax.v[j]*md->scale[j]+md->scale_origin[j];}
-         }}
+         }
+         actor_use_box(e,frames,fmins,fmaxs,fmins,fmaxs);}
         AngleVectors(e->v.angles,local,right,up);
         ray[0]=DotProduct(forward,local);ray[1]=-DotProduct(forward,right);ray[2]=DotProduct(forward,up);
         end[0]=DotProduct(delta,local);end[1]=-DotProduct(delta,right);end[2]=DotProduct(delta,up);
@@ -439,6 +468,8 @@ edict_t *AW_NPCTargetReach(edict_t *p,vec3_t angles,float reach) {
  * plant is aimed at before him or inside his box (aw_activate.h): the nearest thing along the view ray wins, as in
  * OpenMW 0.51, never the nearest actor. aw_activate_last keeps the numbers for `aw_placed aim`. */
 aw_activate_aim_t aw_activate_last;
+static int focus_kind(void);
+static edict_t *focus_actor;
 edict_t *AW_ActivateActor(edict_t *p,vec3_t angles) {
     edict_t *e=AW_NPCTarget(p,angles);
     aw_activate_last.actor_near=npc_aim_near;aw_activate_last.actor_far=npc_aim_far;
@@ -446,24 +477,71 @@ edict_t *AW_ActivateActor(edict_t *p,vec3_t angles) {
     aw_activate_last.plant=e?AW_HarvestAimDistance():-1;
     aw_activate_last.item_first=e && AW_ActivateItemFirst(AW_ActivateNearest(aw_activate_last.item,aw_activate_last.plant),
                                                           npc_aim_near,npc_aim_far);
+    /* HUD-TEXTS-OVERLAP-67: the player of this game gets the frame's ONE focus (focus_kind), the one the title and the
+     * action line show, so E talks to the person shown and to nobody when a door or an item is shown */
+    if(sv.active && svs.maxclients==1 && svs.clients && p==svs.clients[0].edict && cls.state==ca_connected)
+        return focus_kind()==AW_FOCUS_ACTOR?focus_actor:NULL;
     return aw_activate_last.item_first?NULL:e;
 }
-/* The scene draw asks for the target several times a frame (name, travel,
- * hints, speaker): compute it once per host frame, stamped the way Quake
- * stamps visframe, and again only if the view turned or the NPC went away. */
-static edict_t *npc_target(void) {
-    static int stamp=-1,cached_count;static edict_t *cached,*cached_player,*cached_edicts;static vec3_t cached_angles;
-    edict_t *p;
-    if(!sv.active || svs.maxclients!=1 || !svs.clients || !svs.clients[0].edict || cls.state!=ca_connected)return NULL;
+/* HUD-TEXTS-OVERLAP-67 / FOCUS-NPC-OVERRIDES-ITEM-62: ONE focus a frame. What the view ray meets within reach, by kind (an
+ * actor's box, an item or plant, a load door, a hinged door), goes to AW_FocusChoose (aw_activate_rules.c, host tested):
+ * the nearest along the ray takes the focus, alone: the title and the action line (AW_SceneDraw) and the use key
+ * (AW_SceneUse, and QC's aw_interact through AW_ActivateActor). A person's box no longer reaches past a nearer door or
+ * item, and a door behind him is not aimed at: before, the person's name and the door's were drawn on one spot and E
+ * opened the door. The scene draw asks several times a frame (name, travel, hints, speaker): computed once per host
+ * frame, stamped the way Quake stamps visframe, and again only if the view turned or the actor went away. */
+static int aimed_door(void);
+static float door_aim=-1;                 /* where aimed_door met its door (map units from the eye), -1 none */
+float (*aw_hinged_aim)(void);             /* aw_hinged_door.c: the aimed hinged door's distance, -1 none */
+static int focus_held_kind;
+static double focus_actor_seen;
+aw_focus_aim_t aw_focus_last;             /* the numbers of the last choice, for `aw_placed aim` */
+/* the ray against TARGET's whole model's box (every frame's bounds) within the reach of the talk, a wall in front ends it;
+ * a person whose model stores one frame by his body's box (FOCUS-NPC-OVERRIDES-ITEM-62, actor_use_box) */
+static int actor_whole_box(edict_t *p,edict_t *target,float *lo,float *hi) {
+    vec3_t eye,forward,right,up,delta,local,ray,end,wmins,wmaxs;model_t *m;int index=(int)target->v.modelindex;trace_t tr;
+    if(index<=0 || index>=MAX_MODELS || !(m=sv.models[index]) || m->type!=mod_alias)return 0;
+    VectorAdd(p->v.origin,p->v.view_ofs,eye);AngleVectors(cl.viewangles,forward,right,up);
+    VectorMA(eye,72,forward,end);
+    /* the talk test's own trace: it stops at him (then he is in front) or at a wall or another body before his box */
+    tr=SV_Move(eye,vec3_origin,vec3_origin,end,MOVE_NORMAL,p);
+    if(tr.startsolid || tr.allsolid)return 0;
+    VectorSubtract(eye,target->v.origin,delta);AngleVectors(target->v.angles,local,right,up);
+    ray[0]=DotProduct(forward,local);ray[1]=-DotProduct(forward,right);ray[2]=DotProduct(forward,up);
+    end[0]=DotProduct(delta,local);end[1]=-DotProduct(delta,right);end[2]=DotProduct(delta,up);
+    actor_use_box(target,(m->flags&AW_MODEL_ONE_STORED_FRAME)?1:0,m->mins,m->maxs,wmins,wmaxs);
+    return AW_RayBox(end,ray,wmins,wmaxs,lo,hi) && (tr.ent==target || *lo<tr.fraction*72);
+}
+static int focus_kind(void) {
+    static int stamp=-1,cached_count;static edict_t *cached_player,*cached_edicts;static vec3_t cached_angles;
+    edict_t *p,*e;aw_focus_aim_t aim;
+    if(!sv.active || svs.maxclients!=1 || !svs.clients || !svs.clients[0].edict || cls.state!=ca_connected){
+        focus_held_kind=AW_FOCUS_NONE;focus_actor=NULL;return AW_FOCUS_NONE;}
     p=svs.clients[0].edict;
     /* same frame, player, view and edict table (a scene load replaces it) */
     if(stamp==host_framecount && cached_player==p && cached_edicts==sv.edicts && cached_count==sv.num_edicts &&
-       VectorCompare(cached_angles,cl.viewangles) && (!cached || !cached->free))return cached;
-    cached=AW_ActivateActor(p,cl.viewangles);   /* FOCUS-NPC-OVERRIDES-ITEM-62: an item before him or by him wins */
+       VectorCompare(cached_angles,cl.viewangles) && (!focus_actor || !focus_actor->free))return focus_held_kind;
+    e=AW_NPCTarget(p,cl.viewangles);aim.actor_near=npc_aim_near;aim.actor_far=npc_aim_far;
+    /* the hold: the actor of the frame before whose drawn frame's box the ray just slipped out of (his animation moves
+     * it) stays aimed for a moment while the ray still meets his whole model's box */
+    if(e)focus_actor_seen=realtime;
+    else if(focus_actor && focus_held_kind==AW_FOCUS_ACTOR && cached_edicts==sv.edicts && !focus_actor->free &&
+            realtime>focus_actor_seen && realtime-focus_actor_seen<AW_FOCUS_HOLD_SECONDS &&
+            actor_whole_box(p,focus_actor,&aim.actor_near,&aim.actor_far))
+        e=focus_actor;
+    if(!e)aim.actor_near=aim.actor_far=-1;
+    aim.thing=AW_ActivateNearest(AW_InventoryAimDistance(),AW_HarvestAimDistance());
+    aim.door=aimed_door()>=0?door_aim:-1;
+    aim.hinged=aw_hinged_aim?aw_hinged_aim():-1;
+    focus_held_kind=AW_FocusChoose(&aim,focus_held_kind);
+    focus_actor=focus_held_kind==AW_FOCUS_ACTOR?e:NULL;aw_focus_last=aim;
     stamp=host_framecount;cached_player=p;cached_edicts=sv.edicts;cached_count=sv.num_edicts;
     VectorCopy(cl.viewangles,cached_angles);
-    return cached;
+    return focus_held_kind;
 }
+/* the person under the crosshair when he has the focus (the use key would talk to him), else NULL */
+static edict_t *npc_target(void) {return focus_kind()==AW_FOCUS_ACTOR?focus_actor:NULL;}
+int AW_SceneFocusKind(void) {return focus_kind();}
 /* 1 when a person is under the crosshair within reach (the use key would talk to him) */
 int AW_SceneNpcAimed(void) {return npc_target()!=NULL;}
 const char *AW_SceneTargetName(void) {
@@ -480,6 +558,8 @@ const char *AW_SceneTargetName(void) {
          return npc && !AW_UIVoiceAimOnly()?npc:NULL;
      }
      if(npc)return npc;
+     /* HUD-TEXTS-OVERLAP-67: an item's or plant's name never beside a door that has the frame's focus */
+     {int kind=focus_kind();if(kind==AW_FOCUS_DOOR || kind==AW_FOCUS_HINGED)return NULL;}
      item=AW_InventoryHint();return item?item:AW_HarvestHint();}
 }
 const char *AW_SceneWorldModel(const char *name) {
@@ -496,7 +576,7 @@ const char *AW_SceneWorldModel(const char *name) {
     }
     return NULL;
 }
-int AW_Interior(void) {return sv.active && (!strcmp(sv.name,"torchtest") || (AW_MapId(sv.name)>=0 && AW_TownFind(sv.name)<0 && AW_TerrainId(sv.name)<0));}
+int AW_Interior(void) {return sv.active && (!strcmp(sv.name,"torchtest") || !strcmp(sv.name,"lighttest") || (AW_MapId(sv.name)>=0 && AW_TownFind(sv.name)<0 && AW_TerrainId(sv.name)<0));}
 /* ENGINE-SCENE-NAME-BOUND-35: map names go into 16-byte fields; copy bounded. */
 static void copy_name(char *out,size_t size,const char *in){Q_strcpy_bounded(out,in,size);}
 static int map_valid(const char *name) {return AW_MapId(name)>=0;}
@@ -718,94 +798,168 @@ const char *AW_SceneLoadNoticeText(void) {
     AW_LoadErrNotice(&lerr,text,sizeof(text));
     return text;
 }
+/* AW-RECOVER: NO ERROR IN PLAY ENDS THE GAME (the maintainer, 2026-11-17, SCENE-LOAD-FAIL-FALLBACK-67). Every
+ * Host_Error in play (host.c, AW_SceneHostError below), every load that fails (AW_SceneLoadFailed) and an allocation
+ * that fails in play (aw_loadfail.c) go down one chain until the player is in play again, each step only when the one
+ * before it failed:
+ *   1 the map loaded again at the last good position (where he stood; for a failed load, where it started),
+ *   2 the newest autosave (aw_save.c through aw_scene_autosave_load, which aw_loadfail.c binds),
+ *   3 the previous map, at the last good position he had there,
+ * and only when all three fail, the load menu. The same error again within a minute of a recovery in the same map
+ * starts at the step after the one that recovered (a place that fails every time is not loaded for good). The box
+ * says what happened and where he is now; the console, and DEBUG.TXT with it (its copy), gets one line per step and
+ * the error's block. Each error is counted (aw_remote.c's state file: errors, errors_forced): the engine smoke fails a
+ * run with an error a test aid did not force, so causes are still found and fixed. */
+typedef struct {int valid,movetype;char map[16];vec3_t origin,angles;float health;} spot_t;
+static spot_t play_spot,prev_spot;   /* the last good position in play, and the last one in the map before it */
+static int play_now;                 /* the player is in play (a frame of play since the map arrived; 0 at the menus) */
+static int recover_step;             /* the step whose load runs now: 0 none, 1, 2 or 3 */
+static struct {int step;char map[16];double at;} recovered;   /* the last recovery that arrived: step, map, time */
+int aw_scene_errors,aw_scene_errors_forced,aw_scene_error_forced;
+int (*aw_scene_autosave_load)(char *label,int size);
+void (*aw_scene_save_drop)(void);
+/* Each frame of play (AW_SceneTick): the last good position; a new map keeps the last one of the map before. */
+static void play_spot_take(edict_t *p) {
+    if(!map_valid(sv.name))return;
+    if(play_spot.valid && strcmp(play_spot.map,sv.name))prev_spot=play_spot;
+    play_spot.valid=1;play_now=1;copy_name(play_spot.map,sizeof(play_spot.map),sv.name);
+    VectorCopy(p->v.origin,play_spot.origin);VectorCopy(p->v.v_angle,play_spot.angles);
+    play_spot.movetype=(int)p->v.movetype;play_spot.health=p->v.health;
+}
+int AW_SceneInPlay(void){return play_now && play_spot.valid && !AW_SceneLoadInFlight() && !recover_step;}
+/* an error the chain takes: counted, apart when a test aid forced it (dbg loadfail, dbg hosterror) */
+static void error_count(const char *why) {
+    if(aw_scene_error_forced || (why && strstr(why,"forced")))aw_scene_errors_forced++;else aw_scene_errors++;
+    aw_scene_error_forced=0;
+}
+/* A load of S's map with the player put at S's position and view (steps 1 and 3; the scene's own way back). */
+static void recover_load_spot(const spot_t *s) {
+    char command[32];
+    load_from.valid=1;load_from.kind=AW_LOAD_SCRIPT;copy_name(load_from.map,sizeof(load_from.map),s->map);
+    VectorCopy(s->origin,load_from.origin);VectorCopy(s->angles,load_from.angles);
+    load_from.movetype=s->movetype;load_from.health=s->health;
+    memset(&next,0,sizeof(next));copy_name(next.target,sizeof(next.target),s->map);
+    VectorCopy(s->origin,next.arrival);next.yaw=s->angles[1];
+    map_jump=3;region_crossing=0;crossing_movetype=s->movetype;health=s->health;
+    shroompicker_view=0;load_recovering=1;pending=1;started=Sys_FloatTime();
+    sprintf(command,"map %s\n",s->map);Cbuf_InsertText(command);
+}
+/* The chain from step FROM on (SPOT: the last good position for step 1). The first error stays the box's. */
+static void recover_from(int from,const spot_t *spot) {
+    char label[32];
+    if(from<=1 && spot && spot->valid){
+        recover_step=1;lerr.way=AW_WAY_BACK;copy_name(lerr.back_map,sizeof(lerr.back_map),spot->map);
+        Con_Printf("Recovery 1 of 3: %s again at %ld %ld %ld, the last good position.\n",spot->map,(long)spot->origin[0],
+            (long)spot->origin[1],(long)spot->origin[2]);
+        recover_load_spot(spot);return;
+    }
+    /* from here no scene load stays pending: the autosave's load is a saved game's (aw_save.c) */
+    pending=region_crossing=map_jump=0;load_recovering=0;load_from.valid=0;AW_StreamTransitionReady();
+    if(from<=2){
+        label[0]=0;
+        if(aw_scene_autosave_load && aw_scene_autosave_load(label,sizeof(label))){
+            recover_step=2;lerr.way=AW_WAY_AUTOSAVE;copy_name(lerr.save_label,sizeof(lerr.save_label),label);
+            Con_Printf("Recovery 2 of 3: the last autosave (%s).\n",label);
+            return;
+        }
+        Con_Printf("Recovery 2 of 3: no autosave to load.\n");
+    }
+    if(from<=3 && prev_spot.valid && strcmp(prev_spot.map,lerr.map) && strcmp(prev_spot.map,lerr.from_map)){
+        recover_step=3;lerr.way=AW_WAY_PREVIOUS;copy_name(lerr.previous_map,sizeof(lerr.previous_map),prev_spot.map);
+        Con_Printf("Recovery 3 of 3: the previous map, %s, at %ld %ld %ld.\n",prev_spot.map,(long)prev_spot.origin[0],
+            (long)prev_spot.origin[1],(long)prev_spot.origin[2]);
+        recover_load_spot(&prev_spot);return;
+    }
+    /* nothing left: the load menu, a saved game the way on (aw_loadfail.c) */
+    recover_step=0;play_now=0;
+    lerr.way=lerr.back_failed?AW_WAY_FAILED:AW_WAY_NOWHERE;
+    Con_Printf("Recovery: nothing left to load; the load menu.\n");
+    load_box_wanted=2;
+}
+/* A recovery's load arrived (AW_SceneSpawn): the box in the next game frame says where he is. */
+static void recover_arrived(edict_t *p) {
+    recovered.step=recover_step?recover_step:1;copy_name(recovered.map,sizeof(recovered.map),sv.name);recovered.at=realtime;
+    Con_Printf("Recovery: in play again in %s at %ld %ld %ld (%s).\n",sv.name,(long)p->v.origin[0],(long)p->v.origin[1],
+        (long)p->v.origin[2],recovered.step==2?"the last autosave":recovered.step==3?"the previous map":"the last good position");
+    recover_step=0;error_here(&lerr);load_box_wanted=1;
+}
 /* Host_Error / Host_EndGame (host.c, before the longjmp) and Host_Map_f when the map does not spawn. */
 void AW_SceneLoadFailed(const char *why) {
-    char command[32];int was_loading=map_loading;
+    int was_loading=map_loading;spot_t back;
     map_loading=0;
     if(!pending){
-        /* a map load no scene load started (a save, a start, a typed map): no place to go back to; the load menu
-         * names the error. No load at all: as before (the error ends the session, the console says why). */
-        if(!was_loading)return;
+        /* a map load no scene load started (a saved game, a start, a typed map, the game code's changelevel), or the
+         * autosave's load of the chain (AW-RECOVER). No load at all: nothing (an error in play: AW_SceneHostError). */
+        if(!was_loading && recover_step!=2)return;
         tp_held_drop("the load failed");
+        if(why && why[0])Q_strcpy_bounded(load_reason,why,sizeof(load_reason));
+        if(aw_scene_save_drop)aw_scene_save_drop();   /* a saved game whose load failed is never applied later */
+        if(recover_step==2){
+            Con_Printf("Recovery: the last autosave did not load: %s.\n",load_reason);
+            lerr.save_failed=1;recover_from(3,NULL);error_print(&lerr);
+            return;
+        }
+        error_count(why);
         error_begin(&lerr,AW_LOADERR_ERROR,map_loading_name,"");cause_from_message(&lerr,why);
-        lerr.way=AW_WAY_NOWHERE;error_print(&lerr);load_box_wanted=2;
+        /* in play (a save loaded from the game's menu, a changelevel) the chain from the last good position; with no
+         * game in play (the main menu) the load menu names the error, as before */
+        back=play_spot;back.valid=back.valid && play_now;
+        if(back.valid){
+            copy_name(lerr.from_map,sizeof(lerr.from_map),back.map);VectorCopy(back.origin,lerr.from);lerr.from_ok=1;
+            recover_from(1,&back);
+        }else{lerr.way=AW_WAY_NOWHERE;recover_step=0;play_now=0;load_box_wanted=2;}
+        error_print(&lerr);
         return;
     }
     tp_held_drop("the load failed");   /* DBG-TP-DURING-LOAD-66 */
     if(why && why[0]){Q_strcpy_bounded(load_reason,why,sizeof(load_reason));}
     if(load_recovering){
-        /* the way back failed too: the first error stays the box's, its way back failed; the load menu */
-        Con_Printf("Load failed: %s; the way back failed as well.\n",load_reason);
-        lerr.way=AW_WAY_FAILED;copy_name(lerr.back_map,sizeof(lerr.back_map),load_from.map);lerr.here_ok=0;
-        error_print(&lerr);
-        pending=region_crossing=map_jump=0;load_recovering=0;load_from.valid=0;AW_StreamTransitionReady();
-        load_box_wanted=2;      /* the load menu: a saved game is the way on (aw_loadfail.c) */
+        /* a step of the chain failed as well (the way back, the place again, the previous map): the next step; the
+         * first error stays the box's */
+        Con_Printf("Load failed: %s; %s failed as well.\n",load_reason,recover_step==3?"the previous map":"the way back");
+        if(recover_step==3)lerr.previous_failed=1;else lerr.back_failed=1;
+        lerr.here_ok=0;load_recovering=0;
+        recover_from(recover_step+1,NULL);error_print(&lerr);
         return;
     }
+    error_count(why);
     error_begin(&lerr,AW_LOADERR_ERROR,next.target,next.label);cause_from_message(&lerr,why);
     if(!load_from.valid){
-        /* there was no place to go back to: no load stays pending; the menus work */
+        /* there was no place to go back to: the rest of the chain */
         Con_Printf("Load failed: %s; no earlier place to return to.\n",load_reason);
-        lerr.way=AW_WAY_NOWHERE;error_print(&lerr);
-        pending=region_crossing=map_jump=0;load_recovering=0;load_from.valid=0;AW_StreamTransitionReady();
-        load_box_wanted=2;
+        recover_from(2,NULL);error_print(&lerr);
         return;
     }
-    lerr.way=AW_WAY_BACK;copy_name(lerr.back_map,sizeof(lerr.back_map),load_from.map);
     copy_name(lerr.from_map,sizeof(lerr.from_map),load_from.map);VectorCopy(load_from.origin,lerr.from);lerr.from_ok=1;
-    error_print(&lerr);
     Con_Printf("Load failed: %s. Returning to %s at %ld %ld %ld.\n",load_reason,load_from.map,
         (long)load_from.origin[0],(long)load_from.origin[1],(long)load_from.origin[2]);
-    memset(&next,0,sizeof(next));copy_name(next.target,sizeof(next.target),load_from.map);
-    VectorCopy(load_from.origin,next.arrival);next.yaw=load_from.angles[1];
-    map_jump=3;region_crossing=0;crossing_movetype=load_from.movetype;health=load_from.health;
-    shroompicker_view=0;load_recovering=1;pending=1;started=Sys_FloatTime();
-    sprintf(command,"map %s\n",load_from.map);Cbuf_InsertText(command);
+    back.valid=1;copy_name(back.map,sizeof(back.map),load_from.map);VectorCopy(load_from.origin,back.origin);
+    VectorCopy(load_from.angles,back.angles);back.movetype=load_from.movetype;back.health=load_from.health;
+    recover_from(1,&back);error_print(&lerr);
 }
-/* NET-VIVEC-ENTITY-PACKET-OVERFLOW-66 (the maintainer, 2026-11-17: every place that can still stop the game this way
- * goes through the load-fallback box and the way back): Host_Error (host.c) in play, no load running. Each frame of
- * play keeps the player's spot (play_spot_take, from AW_SceneTick); such an error loads that place again, the player
- * where he was, and the box says why ("An error stopped the game in <map>; it was loaded again.", LF9). The same error
- * again within a minute in the same map: no place to stay, the load menu names it. A load in flight goes back where
- * it started, as before (AW_SceneLoadFailed); with no play yet (the menus) the error ends the session as before. */
-static struct {
-    int valid,movetype;char map[16];vec3_t origin,angles;float health;double reloaded;char reloaded_map[16];
-} play_spot;
-static void play_spot_take(edict_t *p) {
-    if(!map_valid(sv.name))return;
-    play_spot.valid=1;copy_name(play_spot.map,sizeof(play_spot.map),sv.name);
-    VectorCopy(p->v.origin,play_spot.origin);VectorCopy(p->v.v_angle,play_spot.angles);
-    play_spot.movetype=(int)p->v.movetype;play_spot.health=p->v.health;
-}
+/* NET-VIVEC-ENTITY-PACKET-OVERFLOW-66 and AW-RECOVER (the maintainer, 2026-11-17: no error in play ends the game):
+ * Host_Error (host.c) in play, no load running: the chain from the last good position ("An error stopped the game in
+ * <map>; it was loaded again.", LF9). A load in flight, or a step of the chain still loading, goes on there
+ * (AW_SceneLoadFailed); with no game in play (the menus) the error ends the session as before. */
 void AW_SceneHostError(const char *why) {
-    char command[32];
-    if(pending || map_loading){AW_SceneLoadFailed(why);return;}
-    if(!play_spot.valid)return;
-    play_spot.valid=0;
+    spot_t spot;int from=1;
+    if(pending || map_loading || recover_step){AW_SceneLoadFailed(why);return;}
+    if(!play_now || !play_spot.valid)return;
+    spot=play_spot;
     tp_held_drop("an error stopped the game");
-    error_begin(&lerr,AW_LOADERR_ERROR,play_spot.map,"");lerr.in_play=1;
+    error_count(why);
+    error_begin(&lerr,AW_LOADERR_ERROR,spot.map,"");lerr.in_play=1;
     copy_name(lerr.detail,sizeof(lerr.detail),why?why:"");
     copy_name(lerr.command,sizeof(lerr.command),"play (no load running)");
-    copy_name(lerr.from_map,sizeof(lerr.from_map),play_spot.map);VectorCopy(play_spot.origin,lerr.from);lerr.from_ok=1;
+    copy_name(lerr.from_map,sizeof(lerr.from_map),spot.map);VectorCopy(spot.origin,lerr.from);lerr.from_ok=1;
     Q_strcpy_bounded(load_reason,why?why:"",sizeof(load_reason));
-    if(realtime-play_spot.reloaded<60 && realtime>=play_spot.reloaded && !strcmp(play_spot.reloaded_map,play_spot.map)){
-        Con_Printf("Error in play: %s; it came again soon after %s was loaded again.\n",load_reason,play_spot.map);
-        lerr.way=AW_WAY_NOWHERE;error_print(&lerr);load_box_wanted=2;
-        return;
-    }
-    play_spot.reloaded=realtime;copy_name(play_spot.reloaded_map,sizeof(play_spot.reloaded_map),play_spot.map);
-    lerr.way=AW_WAY_BACK;copy_name(lerr.back_map,sizeof(lerr.back_map),play_spot.map);
-    error_print(&lerr);
-    Con_Printf("Error in play: %s. Loading %s again at %ld %ld %ld.\n",load_reason,play_spot.map,
-        (long)play_spot.origin[0],(long)play_spot.origin[1],(long)play_spot.origin[2]);
-    load_from.valid=1;load_from.kind=AW_LOAD_SCRIPT;copy_name(load_from.map,sizeof(load_from.map),play_spot.map);
-    VectorCopy(play_spot.origin,load_from.origin);VectorCopy(play_spot.angles,load_from.angles);
-    load_from.movetype=play_spot.movetype;load_from.health=play_spot.health;
-    memset(&next,0,sizeof(next));copy_name(next.target,sizeof(next.target),load_from.map);
-    VectorCopy(load_from.origin,next.arrival);next.yaw=load_from.angles[1];
-    map_jump=3;region_crossing=0;crossing_movetype=load_from.movetype;health=load_from.health;
-    shroompicker_view=0;load_recovering=1;pending=1;started=Sys_FloatTime();
-    sprintf(command,"map %s\n",load_from.map);Cbuf_InsertText(command);
+    if(recovered.step && realtime-recovered.at<60 && realtime>=recovered.at && !strcmp(recovered.map,spot.map)){
+        /* the same place failing again soon after a recovery: the step after the one that recovered */
+        from=recovered.step+1;lerr.again=1;
+        Con_Printf("Error in play: %s; it came again within a minute of the recovery in %s.\n",load_reason,spot.map);
+    }else Con_Printf("Error in play: %s.\n",load_reason);
+    play_now=0;
+    recover_from(from,&spot);error_print(&lerr);
 }
 /* On the way back's arrival (AW_SceneSpawn): the view as it was; the box opens in the next game frame. */
 static void load_recovered(edict_t *p) {
@@ -815,7 +969,7 @@ static void load_recovered(edict_t *p) {
     p->v.movetype=load_from.movetype;noclip_anglehack=p->v.movetype==MOVETYPE_NOCLIP;
     Con_Printf("Back at %s %ld %ld %ld after the failed load (%s): %s\n",sv.name,(long)p->v.origin[0],(long)p->v.origin[1],
         (long)p->v.origin[2],AW_LoadErrCode(lerr.kind),load_reason);
-    error_here(&lerr);load_box_wanted=1;
+    recover_arrived(p);
 }
 /* aw_loadfail.c: what to show after a failed load or a refusal (1 the OK box, 2 the load menu, 0 nothing), taken
  * once; and the state dropped (dbg restartgame). */
@@ -1015,6 +1169,7 @@ static int aimed_door(void) {
         if(tr.startsolid || (1-tr.fraction)*distance>(links[i].bounds?DOOR_USE_SLACK:12.0f))continue;
         closest=distance;best=i;
     }
+    door_aim=best>=0?closest:-1;   /* HUD-TEXTS-OVERLAP-67: weighed against the actor's box (focus_kind) */
     return best;
 }
 /* Travel stays unavailable until the destination has a validated arrival
@@ -1193,17 +1348,22 @@ int (*aw_corpse_prompt)(char *line,int size,const char **name);
 int (*aw_corpse_use)(void);
 static int use_link(int i);
 int AW_SceneUse(void) {
-    int i;
+    int i,kind;
     if(AW_PlayerDead())return 1;   /* dead: nothing is used (the key is spent) */
     i=0;
     if(pending || door_ready)return 1;
+    /* HUD-TEXTS-OVERLAP-67: E acts on the frame's one focus, the thing the title and the action line show: a person
+     * (his body, his ride, else QC's talk after this returns 0), an item or plant, a load door, a hinged door */
+    kind=focus_kind();
     if(aw_corpse_use && aw_corpse_use())return 1;    /* CORPSE-LOOT-60: a dead actor's body opens its inventory */
     if(!travel_by_talk() && travel_use())return 1;
     /* PRISON-SHIP-ITEMS-TAKEABLE-65: a plant is a container too (OpenMW 0.53 Container::activate refuses its harvest
      * while the Inventory window is not allowed) */
-    if(!npc_hint() && (AW_InventoryUse() || ((!aw_inventory_allowed || aw_inventory_allowed()) && AW_HarvestUse())))return 1;
-    i=aimed_door();
-    if(i<0)return aw_hinged_use?aw_hinged_use():0;   /* an ordinary hinged door (aw_hinged_door.c), else nothing here */
+    if(!npc_hint() && kind!=AW_FOCUS_DOOR && kind!=AW_FOCUS_HINGED &&
+       (AW_InventoryUse() || ((!aw_inventory_allowed || aw_inventory_allowed()) && AW_HarvestUse())))return 1;
+    i=kind==AW_FOCUS_DOOR?aimed_door():-1;
+    /* an ordinary hinged door (aw_hinged_door.c), else nothing here */
+    if(i<0)return kind==AW_FOCUS_HINGED && aw_hinged_use?aw_hinged_use():0;
     if(aw_scene_intercept && aw_scene_intercept(links[i].reference))return 1;
     return use_link(i);
 }
@@ -1263,17 +1423,25 @@ static const char *npc_hint(void)
 /* CONTAINER-WINDOW-59: 1 while the container strip is open (aw_cstrip.c sets it): no prompt or box under it */
 int (*aw_cstrip_open_now)(void);
 /* npc_interaction_layout_template_001: Morrowind name, console action below. */
+/* HUD-TEXTS-OVERLAP-67: the one place the focus title is drawn under the view (or at the upper right, style 2) */
+static void focus_title_draw(const char *title,int style) {
+    if(title && *title && (!AW_UISpeakerAtRight() || style!=2))AW_UIObjectName(title,style);
+}
 void AW_SceneDraw(void) {
-    static int red=-1;int i,y,w,cw,npc=0,steal=0,ami=AW_SceneNameLabelsAmiWind(),focus_owned=0;
+    static int red=-1;int i,y,w,cw,npc=0,steal=0,ami=AW_SceneNameLabelsAmiWind(),focus_owned=0,kind;
     char line[80],take[48],focus_weight[48],focus_value[48];edict_t *driver;const char *name=NULL,*action=NULL,*focus_title=NULL;extern int scr_copyeverything;
+    const char *who;
     focus_weight[0]=focus_value[0]=0;
     /* The two name-label styles are exclusive (INFO-BOX-TEXT-CUT-62): AmiWind draws only the title and the action
-     * below the view, Morrowind only the framed box. */
-    if(ami && (!AW_UISpeakerAtRight() || target_style.value!=2))AW_UIObjectName(AW_SceneTargetName(),(int)target_style.value);
+     * below the view, Morrowind only the framed box. HUD-TEXTS-OVERLAP-67: ONE title a frame, the frame's focus's:
+     * WHO is the person's (or the item's, the plant's) name; an object's own title (a door, a placed item) replaces it,
+     * never beside it on the same spot. */
+    who=ami?AW_SceneTargetName():NULL;
     /* OPENING-REGRESSION-64: no use prompt or focus box while a script holds the player (DisablePlayerControls) */
     if(key_dest!=key_game || pending || AW_IntroUse() || !AW_ControlAllowed(AW_CONTROL_PLAYER) || AW_PlayerDead() || !sv.active || (aw_cstrip_open_now && aw_cstrip_open_now()) ||
        svs.maxclients!=1 || !svs.clients || cls.state!=ca_connected ||
-       svs.clients[0].edict->v.movetype!=MOVETYPE_WALK)return;
+       svs.clients[0].edict->v.movetype!=MOVETYPE_WALK){focus_title_draw(who,(int)target_style.value);return;}
+    kind=focus_kind();
     driver=travel_target();
     /* FOCUS-BOX-58: an aimed ground item or door within the activation distance gets the original's framed box.
      * FOCUS-BOX-NO-ACTORS-58: a creature or a person gets none: their name already shows under the view; aimed at
@@ -1283,7 +1451,8 @@ void AW_SceneDraw(void) {
      * aimed item's or container's title below the view with its action line and draws no box. */
     {
         const char *focus_name;
-        if(!driver && !npc_hint() &&
+        /* HUD-TEXTS-OVERLAP-67: a door that has the focus takes the title; no placed thing's beside it */
+        if(!driver && !npc_hint() && kind!=AW_FOCUS_DOOR && kind!=AW_FOCUS_HINGED &&
            (AW_InventoryFocus(&focus_name,focus_weight,focus_value,sizeof(focus_weight),&focus_owned) ||
             AW_PlacedFocus(&focus_name,focus_weight,focus_value,sizeof(focus_weight),&focus_owned)))
             focus_title=focus_name;
@@ -1291,22 +1460,23 @@ void AW_SceneDraw(void) {
     if(!driver && aw_corpse_prompt && aw_corpse_prompt(take,sizeof(take),&name)){action=take;npc=1;}   /* CORPSE-LOOT-60 */
     else if(driver){name=pr_strings+driver->v.netname;action="E: Talk";npc=1;}
     /* STEAL-PROMPT-58: an aimed takeable item (its name is in the focus box): "E: Take", or "E: Steal" in red */
-    else if(!npc_hint() && AW_ItemPrompt(take,sizeof(take),&steal)){
+    else if(!npc_hint() && kind!=AW_FOCUS_DOOR && kind!=AW_FOCUS_HINGED && AW_ItemPrompt(take,sizeof(take),&steal)){
         /* the AmiWind style puts the item's or container's title with its action line below the view */
         if(focus_title && (!ami || !AW_InventoryHint())){name=focus_title;npc=0;}else{name="";npc=1;}
         action=take;
     }
-    else if(!npc_hint() && (!aw_inventory_allowed || aw_inventory_allowed()) && (name=AW_HarvestHint())!=NULL){
+    else if(!npc_hint() && kind!=AW_FOCUS_DOOR && kind!=AW_FOCUS_HINGED && (!aw_inventory_allowed || aw_inventory_allowed()) &&
+            (name=AW_HarvestHint())!=NULL){
         action="E: Pick";npc=1;}
     else if(!AW_OpeningHint(&name,&action)){
-        i=aimed_door();
+        i=kind==AW_FOCUS_DOOR?aimed_door():-1;   /* HUD-TEXTS-OVERLAP-67: never a door behind the person shown */
         if(i>=0){
             name=links[i].label[0]?links[i].label:!strcmp(links[i].target,"seyda")?"Seyda Neen":"Imperial Prison Ship";
             action=!AW_StoryDoor(links[i].reference)?"Locked - finish duties":
                 AW_StoryRestricted() && !strcmp(links[i].target,"census") && aw_story.stage<AW_STAGE_OFFICE?"Speak to dock guard":
                 aw_load_door_lock && aw_load_door_lock(links[i].reference,0)?"Locked":
                 !map_valid(links[i].target)?(AW_ContentExcluded("interiors")?"Area unavailable":"Interior unavailable"):"Enter: E";
-        }else if(aw_hinged_hint && aw_hinged_hint(&name,&action)){
+        }else if(kind==AW_FOCUS_HINGED && aw_hinged_hint && aw_hinged_hint(&name,&action)){
         }else{ name=npc_hint();if(name){
             eval_t *voice;edict_t *target=npc_target();npc=1;
             voice=target?GetEdictFieldValue(target,"aw_voice"):NULL;
@@ -1317,6 +1487,8 @@ void AW_SceneDraw(void) {
         } }
     }
     if(!name && focus_title)name=focus_title;   /* a placed thing with no action of its own: its title still shows */
+    /* HUD-TEXTS-OVERLAP-67: the person's (the item's, the plant's) name, unless an object's own title replaces it below */
+    if(ami && (npc || !name || !*name))focus_title_draw(who,(int)target_style.value);
     if(!name)return;
     if(!ami){
         /* Morrowind: the box only (the item's or container's weight, value and lock lines when it is the focus row) */
@@ -1329,7 +1501,7 @@ void AW_SceneDraw(void) {
     }
     y=r_refdef.vrect.y+r_refdef.vrect.height;
     if((int)vid.height-y<20+AW_ConsoleCharHeight())return;
-    if(!npc &&(!AW_UISpeakerAtRight() || label_style.value!=2))AW_UIObjectName(name,(int)label_style.value);
+    if(!npc && *name)focus_title_draw(name,(int)label_style.value);   /* the object's title: WHO was not drawn */
     if(!action)return;
     sprintf(line,"(%s)",action);cw=AW_ConsoleCharWidth();w=strlen(line)*cw;
     if(steal && red<0)red=AW_UIColor(220,40,40);   /* the focus box's red name (aw_ui.c AW_UIFocusBox) */
@@ -1438,6 +1610,50 @@ static void arrival_clear_tick(void) {
     }else Con_Printf("Arrival: %s (ref %ld) stands on the arrival point and no clear spot is beside it; the player can "
         "walk out.\n",body->v.netname?pr_strings+body->v.netname:"a body",ref?(long)ref->_float:0L);
 }
+/* MOURNHOLD-BAZAAR-UNDER-WATER-67: an arrival by coordinates with a height (a named outdoor place, dbg tp X Y Z,
+ * Position) lands on the first surface at or below that height (AW_MapPlaceBelow). In Mournhold's Great Bazaar the
+ * street's collision is not in the ring yet when the player is placed: the search went past where the street comes a
+ * moment later and set the player down far below it, in the water under the district, from the first second on (read
+ * second by second: eye at frame-local -53 where the street is at 74; the same 60 units into the street; the game's
+ * own standing search finds the street some seconds later). The asked height names the floor, so a landing more
+ * than ARRIVAL_HOLD_DROP below it is taken as "the floor is not there yet": the player is held at the asked point
+ * (no gravity) while the ring loads around him, each frame asks the standing-spot rule for the floor under the
+ * point, and the first answer sets him down. After ARRIVAL_HOLD_SECONDS without one the player is put back where
+ * the first search had found a surface and let go (the placement as it was before: a point over open water or deep
+ * ground keeps its landing, a few seconds later). aw_arrival_hold 0: no hold. Not saved. */
+cvar_t aw_arrival_hold={"aw_arrival_hold","1",false,false,1};
+#define ARRIVAL_HOLD_DROP 64
+#define ARRIVAL_HOLD_SECONDS 8
+static struct {int on;vec3_t first;double until;} arrival_hold;
+static void arrival_hold_begin(edict_t *p,const vec3_t asked) {
+    vec3_t at;
+    if(!aw_arrival_hold.value || p->v.movetype!=MOVETYPE_WALK)return;
+    if(p->v.origin[2]+p->v.mins[2]>=asked[2]-ARRIVAL_HOLD_DROP)return;   /* landed at the asked floor */
+    VectorCopy(p->v.origin,arrival_hold.first);
+    at[0]=asked[0];at[1]=asked[1];at[2]=asked[2]-p->v.mins[2]+1;
+    install_spot(p,at);p->v.movetype=MOVETYPE_NONE;
+    arrival_hold.on=1;arrival_hold.until=sv.time+ARRIVAL_HOLD_SECONDS;
+    Con_Printf("Arrival: the first surface under %ld %ld is %ld below the asked height %ld; holding the player there "
+        "until the floor is loaded.\n",(long)asked[0],(long)asked[1],
+        (long)(asked[2]-(arrival_hold.first[2]+p->v.mins[2])),(long)asked[2]);
+}
+static void arrival_hold_tick(void) {
+    edict_t *p;vec3_t point;
+    if(!arrival_hold.on)return;
+    if(pending || !sv.active || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict) || p->free ||
+       p->v.movetype!=MOVETYPE_NONE){arrival_hold.on=0;return;}
+    if(standing_spot(p,p->v.origin,point)){
+        arrival_hold.on=0;install_spot(p,point);p->v.movetype=MOVETYPE_WALK;
+        Con_Printf("Arrival: the floor is loaded; the player stands at %ld %ld %ld.\n",
+            (long)point[0],(long)point[1],(long)point[2]);
+        return;
+    }
+    if(sv.time<=arrival_hold.until)return;
+    arrival_hold.on=0;install_spot(p,arrival_hold.first);p->v.movetype=MOVETYPE_WALK;
+    Con_Printf("Arrival: no floor came under the asked point in %ld seconds; the player is at the first surface "
+        "found, %ld %ld %ld.\n",(long)ARRIVAL_HOLD_SECONDS,(long)arrival_hold.first[0],(long)arrival_hold.first[1],
+        (long)arrival_hold.first[2]);
+}
 int AW_InteriorPlace(edict_t *p,vec3_t preferred) {
     vec3_t point;
     if(standing_spot(p,preferred,point)) {
@@ -1491,7 +1707,7 @@ static int arrival_place(edict_t *p,const vec3_t arrival,int jump) {
 /* An explicit debug scene restart owns no old door/cell arrival or voice tail. */
 void AW_SceneCancelTransition(void) {
     pending=region_crossing=map_jump=crossing_view_ready=shroompicker_view=0;
-    door_ready=0;door_close=0;S_CancelSceneVoice();arrival_watch.on=0;
+    door_ready=0;door_close=0;S_CancelSceneVoice();arrival_watch.on=0;arrival_hold.on=0;
     memset(&hand_snapshot,0,sizeof(hand_snapshot));hand_clock_ready=0;
     AW_TorchResetAnimation();
 }
@@ -1592,10 +1808,14 @@ static int stream_cross(edict_t *p,aw_scene_link_t *r){
  * clears it (aw_debug.c registers the reset). Not saved, as before. */
 int aw_godmode_kept;
 void (*aw_tp_being_arrive)(void);   /* aw_tpplaces.c AW_TpBeingArrive (bound by AW_TpPlacesInit) */
+/* DBG-HORS-AFTER-CENSUS-67: the bare 'dbg aw hors' from the main menu runs again in play once its quick start has
+ * arrived (hors_command); New Game drops it (the scene module's reset below) */
+static int hors_after_start;
 void AW_SceneSpawn(edict_t *p) {
     int placed=0;float eye;
-    arrival_watch.on=0;
+    arrival_watch.on=0;arrival_hold.on=0;
     map_loading=0;crossing_refused[0]=0;   /* the map arrived (SCENE-LOAD-FAIL-FALLBACK-67) */
+    aw_scene_error_forced=0;   /* AW-RECOVER: a test aid's failure that did not come is not kept for a later error */
     if(aw_godmode_kept)p->v.flags=(float)((int)p->v.flags|FL_GODMODE);
     area_last_ok=0;frame_last_ok=0;frame_refused[0]=frame_mark_map[0]=0;
     logical_map[0]=0;VectorCopy(vec3_origin,logical_offset);logical_used=0;
@@ -1627,6 +1847,8 @@ void AW_SceneSpawn(edict_t *p) {
             }
             p->v.movetype=crossing_movetype==MOVETYPE_NOCLIP?MOVETYPE_NOCLIP:MOVETYPE_WALK;
             noclip_anglehack=p->v.movetype==MOVETYPE_NOCLIP;
+            /* a height was asked and the landing is far below it: held until the floor is loaded */
+            if(map_jump==2 && placed)arrival_hold_begin(p,next.arrival);
             map_jump=0;
         }else if(region_crossing){
             VectorCopy(next.arrival,p->v.origin);VectorCopy(next.arrival,p->v.oldorigin);
@@ -1661,6 +1883,7 @@ void AW_SceneSpawn(edict_t *p) {
         load_recovered(p);load_from.valid=0;
         if(aw_scene_followers)aw_scene_followers(p,0);    /* the followers that came along arrive beside the player */
         if(aw_tp_being_arrive)aw_tp_being_arrive();       /* dbg tp to a being: beside it, facing it (DBG-TP-TO-NPC-66) */
+        if(hors_after_start){hors_after_start=0;Cbuf_AddText("aw_debug_hors\n");}   /* DBG-HORS-AFTER-CENSUS-67 */
     } else {
         if(aw_scene_followers)aw_scene_followers(p,-1);   /* another map loaded (a load, a restart): none come along */
         pending=shroompicker_view=0;memset(&hand_snapshot,0,sizeof(hand_snapshot));AW_TorchResetAnimation();
@@ -1675,6 +1898,7 @@ void AW_SceneSpawn(edict_t *p) {
         else AW_PlacePlayer(p,p->v.origin);
     }
     AW_IntroSpawn();AW_OpeningSpawn();if(aw_hinged_spawn)aw_hinged_spawn();AW_SaveSpawn();AW_InventorySpawn();if(!harvest_follow(p,1))AW_HarvestSpawn();
+    if(recover_step==2 && !pending)recover_arrived(p);   /* AW-RECOVER: the autosave's map arrived, its position set */
     if(aw_combat_scene)aw_combat_scene();
     AW_GallerySpawn(p);if(aw_companion_scene)aw_companion_scene(p);region_crossing=map_jump=0;
     if(AW_CharacterLoad() && (eye=AW_CharacterEyeHeight())>0)p->v.view_ofs[2]=eye+p->v.mins[2];
@@ -1697,8 +1921,10 @@ void AW_SceneTick(void) {
         if(!e->free){travel_from=e;travel_use();travel_from=NULL;}
     }
     aw_scene_link_t r;edict_t *p;
+    if(!sv.active)play_now=0;   /* AW-RECOVER: no game running (the main menu): an error is no error in play */
     if(aw_loadfail_tick)aw_loadfail_tick();
     tp_held_tick();     /* DBG-TP-DURING-LOAD-66: a dbg tp typed during the load runs now that it has arrived */
+    arrival_hold_tick();    /* MOURNHOLD-BAZAAR-UNDER-WATER-67: an arrival held until its floor is loaded */
     arrival_clear_tick();   /* DOOR-ARRIVAL-INSIDE-ACTOR-66: an actor that joined onto the arrival point */
     AW_NPCFloorRetry();
     if(!pending && aw_hinged_tick)aw_hinged_tick(host_frametime);   /* nothing unless a door turns */
@@ -1783,7 +2009,9 @@ static void scene_help(void) {
 /* dbg tp NAME for a place no town name reaches: teleport-names.txt in the game data (config/teleport-names.txt,
  * checked by the builder), one "name|map|x y z|yaw|label" per line; the arrival is where the game's own door into the
  * place puts the player. A map of "global" is an outdoor place: x y z are original Morrowind global coordinates, z the
- * height to land at or below (the route of dbg tp X Y Z). 1 with R filled when NAME is listed and its map is valid. */
+ * height to land at or below (the route of dbg tp X Y Z). A map of "-" is a place this image does not hold (the
+ * expansions' arrivals, tools/expansion_arrivals.py, DBG-TP-EXPANSION-ARRIVALS-66): its label says why and the caller
+ * moves nothing. 1 with R filled when NAME is listed and its map is valid (or "-"). */
 static int named_place(const char *name,aw_scene_link_t *r) {
     FILE *f;char line[192],key[24],map[16],label[96];float x,y,z,yaw;int found=0;
     COM_FOpenFile("teleport-names.txt",&f);
@@ -1792,7 +2020,7 @@ static int named_place(const char *name,aw_scene_link_t *r) {
     while(!found && fgets(line,sizeof(line),f)) {
         if(line[0]=='#')continue;
         if(Q_sscanf(line,"%23[^|]|%15[^|]|%f %f %f|%f|%95[^\r\n]",key,map,&x,&y,&z,&yaw,label)!=7)continue;
-        if(Q_strcasecmp(key,(char *)name) || (strcmp(map,"global") && !map_valid(map)))continue;
+        if(Q_strcasecmp(key,(char *)name) || (strcmp(map,"global") && strcmp(map,"-") && !map_valid(map)))continue;
         memset(r,0,sizeof(*r));copy_name(r->target,sizeof(r->target),map);copy_name(r->label,sizeof(r->label),label);
         r->arrival[0]=x;r->arrival[1]=y;r->arrival[2]=z;r->yaw=yaw;found=1;
     }
@@ -1832,6 +2060,12 @@ static void scene_command(void) {
     /* listed there, a town's map name too takes its street arrival (balmora: the map start was a roof edge,
      * TPNAMES-HEIGHTS-56); a map name not listed loads its map as before */
     if(sv.active && Cmd_Argc()==2 && strcmp(s,"ship") && strcmp(s,"town") && named_place(s,&r)){
+        /* a place this image does not hold: the expansion is not in the build, or the place not yet; nothing moves.
+         * The refusal goes through the one dbg tp refusal path (the box), as a place this build leaves out. */
+        if(!strcmp(r.target,"-")){
+            Con_Printf("%s\n",r.label);
+            tp_refused(AW_LOADERR_NOT_ON_DISK,s,"",NULL,r.label);return;
+        }
         if(!strcmp(r.target,"global")){
             if(AW_MapTeleportAt(r.arrival,1)){Con_Printf("%s\n",r.label);return;}
             /* no map holds the point (a MiniWind, DEBUG-TP-MINIWIND-36): a town's own map still loads, as before */
@@ -1849,6 +2083,9 @@ static void scene_command(void) {
         }
     }
     if(!sv.active || Cmd_Argc()!=2 || (strcmp(s,"ship") && strcmp(s,"town") && !map_valid(s))) {
+        /* a place's name as the list shows it (dbg tp "Mournhold, Royal Palace: Reception Area", dbg tp reception):
+         * the row the box would find, chosen as there (aw_tpplaces.c AW_TpPlacesFind, DBG-TP-EXPANSION-ARRIVALS-66) */
+        if(sv.active && Cmd_Argc()==2 && AW_TpPlacesFind(Cmd_Argv(1)))return;
         if(sv.active && Cmd_Argc()==2){
             Con_Printf("Unknown destination: %s.\n",Cmd_Argv(1));
             tp_refused(AW_LOADERR_NOT_FOUND,Cmd_Argv(1),"",NULL,NULL);
@@ -1912,15 +2149,49 @@ static void scene_command(void) {
 }
 static int quick_character(void);
 static void quick_go(aw_scene_link_t *r,const char *title);
+extern void (*aw_game_reset)(int new_game);   /* aw_intro.c, bound by aw_loadfail.c: New Game's own reset */
+/* DBG-HORS-AFTER-CENSUS-67: the bare 'dbg aw hors' (the maintainer, 2026-11-17): everything a New Game resets, through
+ * New Game's own reset (NEWGAME-STATE-RESET-62); then Hors; then the state of a player who has walked out of the census
+ * office, read from the game's own scripts (the generated AW_AfterCensus: the clerk's, the doors', the barrels' and the
+ * papers' end states, the menus and controls switched on, CharGenState -1, the dagger taken, Sellus Gravius's results:
+ * the papers handed in, the journal entry, the package, the directions, the disbursal, the topics); Fargoth's ring from
+ * the courtyard barrel; and the player at the census office's exit door into Seyda Neen, facing out, as its door brings
+ * a player out. 'dbg aw hors 0' keeps its start (HORS-FROM-MENU-58) and, in play, now the same New Game reset first
+ * (HORS-IN-PLAY-NO-NEW-GAME-RESET-67). */
+static void hors_census(void) {
+    aw_scene_link_t r;int i,scripts;
+    if(aw_game_reset)aw_game_reset(1);   /* bound at start-up (aw_loadfail.c); NULL only in the host fixtures */
+    else AW_SaveReset();
+    if(!AW_CharacterHorsCensus()){Con_Printf("Hors preset: character catalogue unavailable.\n");return;}
+    scripts=AW_MwscriptAfterCensus();
+    door_ready=0;door_close=0;
+    svs.clients[0].edict->v.health=aw_character.current[0];
+    svs.clients[0].edict->v.movetype=MOVETYPE_WALK;noclip_anglehack=false;
+    Con_Printf("Created Hors: Nord, Barbarian, The Steed; walked out of the census office%s.\n",
+               scripts?"":" (this disk's scripts have no AW_AfterCensus: the preset alone)");
+    read_links_for("census");
+    for(i=0;i<count;i++)if(links[i].reference==CENSUS_EXIT_DOOR && map_valid(links[i].target)){
+        via("dbg aw hors",0);load_scene(&links[i],1);return;
+    }
+    memset(&r,0,sizeof(r));copy_name(r.target,sizeof(r.target),"seyda");r.arrival[2]=64;r.yaw=90;
+    Con_Printf("dbg aw hors: the census exit door is not in this disk's door bank; Seyda Neen's centre instead.\n");
+    via("dbg aw hors",0);load_scene(&r,1);
+}
 static void hors_command(void) {
     aw_scene_link_t r;
-    /* 'dbg aw hors' alone means preset 0: the bare command used to print this usage and leave the player where they
-     * stood (the Arena Pit after the playground and the Halloween scene, HORS-AFTER-HALLOWEEN-STAYS-ARENA-58) */
+    /* 'dbg aw hors 0': the preset after Census at Seyda Neen's centre (the bare command did the same until v0.0.67;
+     * before that it printed this usage and left the player where they stood, HORS-AFTER-HALLOWEEN-STAYS-ARENA-58) */
     if(Cmd_Argc()>2 || (Cmd_Argc()==2 && strcmp(Cmd_Argv(1),"0"))){
-        Con_Printf("dbg aw hors [0]: a new Hors after Census in Seyda Neen (in play, or from the main menu)\n");return;
+        Con_Printf("dbg aw hors [0]: a new game as Hors who has walked out of the census office, at its door (0: Hors "
+                   "after Census at Seyda Neen's centre); in play or from the main menu\n");return;
     }
     if(pending){Con_Printf("dbg aw hors: a scene is still loading; try again when it has arrived.\n");return;}
+    if(Cmd_Argc()==1 && sv.active && svs.clients){hors_census();return;}
+    /* HORS-IN-PLAY-NO-NEW-GAME-RESET-67: 'dbg aw hors 0' in play also starts from what New Game resets (the same
+     * reset as the bare form), then the preset as before: no after-census script */
+    if(sv.active && svs.clients && aw_game_reset)aw_game_reset(1);
     if(!sv.active || !svs.clients){
+        hors_after_start=Cmd_Argc()==1;   /* the bare form: once the quick start has arrived, the census exit (below) */
         /* From the main menu (HORS-FROM-MENU-58): a fresh game straight to that point of the story, the census
          * skip's own quick start (Hors, Seyda Neen after the census), so a test needs no game started first. */
         if(!quick_character()){Con_Printf("Hors preset: character catalogue unavailable.\n");return;}
@@ -2056,9 +2327,25 @@ static void disk_maps_note(void) {
         Con_Printf("dbg tp X Y takes points inside the loaded map %s (you stand at %ld %ld).\n",
             sv.name,(long)here[0],(long)here[1]);
 }
+/* dbg tp WORDS that are no coordinates: a place's name in several words, as the list shows it (dbg tp reception area),
+ * the words joined with spaces and found as the box would (AW_TpPlacesFind, DBG-TP-EXPANSION-ARRIVALS-66); 1 when the
+ * list took it */
+static int place_words(void) {
+    char text[128];int i,n,used=0;
+    if(!sv.active)return 0;
+    for(i=1;i<Cmd_Argc();i++){
+        n=(int)strlen(Cmd_Argv(i));
+        if(used+n+2>(int)sizeof(text))return 0;
+        if(used)text[used++]=' ';
+        memcpy(text+used,Cmd_Argv(i),(size_t)n);used+=n;
+    }
+    text[used]=0;
+    return AW_TpPlacesFind(text);
+}
 static void teleport_command(void) {
     vec3_t source;
     if(Cmd_Argc()>=2 && !strcmp(Cmd_Argv(1),"roulette")){roulette_command(2);return;}   /* dbg door roulette [SEED] */
+    if(Cmd_Argc()>=3 && !teleport_coordinate(Cmd_Argv(1),&source[0]) && place_words())return;
     if(Cmd_Argc()==2 && (!strcmp(Cmd_Argv(1),"mark") || !strcmp(Cmd_Argv(1),"marker"))) {
         if(!AW_SceneMapMarker(source)){Con_Printf("no map marker set\n");return;}
         if(!map_teleport(source,0,1)){
@@ -2301,12 +2588,15 @@ static void teleport_entry(void) {if(tp_hold("aw_teleport"))return;tp_cmd=1;tele
  * CharGenState and ran as an unrestricted game (the idle orbit and the view switch on the ship and the pier). */
 void AW_SceneLoadReset(void) {
     tp_held_drop("a new game starts");   /* DBG-TP-DURING-LOAD-66: a held dbg tp is session state (New Game resets it) */
+    hors_after_start=0;                  /* DBG-HORS-AFTER-CENSUS-67: a pending bare 'dbg aw hors' from the menu */
     AW_SceneCancelTransition();
     load_recovering=0;load_from.valid=0;load_box_wanted=0;travel_pending=NULL;
     /* SCENE-LOAD-FAIL-FALLBACK-67: the load error, the map load in flight and the refusal memos are session state */
     memset(&lerr,0,sizeof(lerr));memset(&lcause,0,sizeof(lcause));map_loading=0;
     via_next[0]=load_via[0]=crossing_refused[0]=prechecked[0]=0;
     memset(&play_spot,0,sizeof(play_spot));   /* the spot of play an error loads again (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66) */
+    /* AW-RECOVER: the previous map's spot, the chain's step and the last recovery are session state */
+    memset(&prev_spot,0,sizeof(prev_spot));memset(&recovered,0,sizeof(recovered));play_now=recover_step=0;
     if(aw_scene_followers && sv.active && svs.clients && svs.clients[0].edict)aw_scene_followers(svs.clients[0].edict,-1);
 }
 void AW_SceneInit(void) {
@@ -2314,6 +2604,7 @@ void AW_SceneInit(void) {
     Cmd_AddCommand("aw_debug_hors",hors_command);
     Cvar_RegisterVariable(&intro_docks_variant);
     Cvar_RegisterVariable(&aw_arrival_clear);   /* DOOR-ARRIVAL-INSIDE-ACTOR-66 (default 1) */
+    Cvar_RegisterVariable(&aw_arrival_hold);    /* MOURNHOLD-BAZAAR-UNDER-WATER-67 (default 1) */
     Cvar_RegisterVariable(&target_style);Cmd_AddCommand("aw_target_place",target_style_command);
     Cvar_RegisterVariable(&label_style);Cmd_AddCommand("aw_label_style",label_style_command);
     Cvar_RegisterVariable(&target_names);Cmd_AddCommand("aw_target_names_set",target_names_command);

@@ -27,9 +27,12 @@ enum {AW_BROKEN_NONE,AW_BROKEN_HEADER,AW_BROKEN_SHORT,AW_BROKEN_LUMP,AW_BROKEN_D
 /* How the load ended for the player. */
 enum {
     AW_WAY_NONE,      /* nothing was left: a refusal before the load, the player never moved */
-    AW_WAY_BACK,      /* the way back worked: the player is where he started */
-    AW_WAY_FAILED,    /* the way back failed as well: no place to stay, the load menu */
-    AW_WAY_NOWHERE    /* there was no place to go back to (a save load, a start): the load menu */
+    AW_WAY_BACK,      /* the way back worked: the player is where he started (an error in play: the place again) */
+    AW_WAY_FAILED,    /* the way back failed as well, and every later step: no place to stay, the load menu */
+    AW_WAY_NOWHERE,   /* there was no place to go back to (a save load, a start), and no later step: the load menu */
+    /* AW-RECOVER (aw_scene.c, the maintainer, 2026-11-17: no error in play ends the game): the steps after the way back */
+    AW_WAY_AUTOSAVE,  /* the newest autosave was loaded (save_label) */
+    AW_WAY_PREVIOUS   /* the previous map was loaded at the last good position there (previous_map) */
 };
 #define AW_LOADERR_MAP 48   /* a map name (15 at most) or, for a door to a room the build did not convert, its label */
 typedef struct {
@@ -53,6 +56,11 @@ typedef struct {
     /* NET-VIVEC-ENTITY-PACKET-OVERFLOW-66: the error stopped the game in play, no load running (the map is the one he
      * was in): the way back loads that place again; AW_WAY_NOWHERE: the same error again soon after, the load menu */
     int in_play;
+    /* AW-RECOVER, how the chain went: the same error came again within a minute of a recovery (again); the way back or
+     * the place again failed (back_failed); the newest autosave and the previous map were tried and did not load
+     * either (save_failed, previous_failed); the autosave loaded ("Autosave 2") and the previous map */
+    int again,back_failed,save_failed,previous_failed;
+    char save_label[32],previous_map[AW_LOADERR_MAP];
 } aw_loaderr_t;
 
 const char *AW_LoadErrCode(int kind);       /* "LF1".."LF9"; "" for none or out of range */
@@ -65,7 +73,8 @@ void AW_LoadErrClean(char *out,int size,const char *in);
 int AW_LoadErrReason(const aw_loaderr_t *e,char *out,int size);
 /* The OK box's text, lines split by '\n': "Map <name> was not found." / "Map <name> was found but could not be
  * loaded." with the reason on the next line / "No map holds the point <X> <Y>." / "... and the way back to <map>
- * failed as well."; the code on the last error line ("Code LF4."); the last line "You are in <place>." (or, with no
+ * failed as well."; the code on the last error line ("Code LF4."); the later steps that did not load either; the last
+ * line "You are in <place>." (after the autosave or the previous map: which one was loaded, then where he is; with no
  * place to stay, that a saved game is the way on). Returns its length. */
 int AW_LoadErrBox(const aw_loaderr_t *e,char *out,int size);
 /* One short line for the load menu's notice (at most SIZE-1, e.g. 79): the code and the map. */
@@ -84,4 +93,13 @@ int AW_LoadErrMapHeader(const unsigned char *header,long header_bytes,long file_
 void AW_SceneLoadNote(const aw_loaderr_t *e);
 extern int (*aw_load_precheck)(const char *map,aw_loaderr_t *e);
 extern long (*aw_load_memory_free)(int chip);
+/* AW-RECOVER (aw_scene.c; aw_loadfail.c binds the save hooks to aw_save.c, NULL in the host fixtures): the newest
+ * autosave's load queued, its name in LABEL (1), or none (0); a saved game's load that failed, dropped so no later
+ * spawn applies it; 1 while the player is in play (an error now goes down the chain, not to the menus); the errors
+ * the chain took, those a test aid forced, and the flag a test aid sets when it arms one (the state file's errors and
+ * errors_forced: the engine smoke fails a run with any error not forced). */
+extern int (*aw_scene_autosave_load)(char *label,int size);
+extern void (*aw_scene_save_drop)(void);
+int AW_SceneInPlay(void);
+extern int aw_scene_errors,aw_scene_errors_forced,aw_scene_error_forced;
 #endif

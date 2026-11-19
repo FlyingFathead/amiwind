@@ -1,6 +1,6 @@
 # World map and progression journal
 
-_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -80,8 +80,15 @@ a name before the first comma ("Vivec, Arena", "Vivec, Foreign Quarter") are one
 the average of their cells. Hovering the pointer over a square names the place in a box beside it.
 
 - The in-game view shows the places the player knows: a place shows once its spot on the map is
-  explored (below), and a script's `ShowMap` reveals the places whose names hold its text (the
-  list `ShowMap` already kept, saved with the game and cleared by New Game).
+  explored (below), and a script's `ShowMap` reveals the places whose names start with its text,
+  in any case, as in the original and OpenMW: `ShowMap "Vivec"` reveals every Vivec cell (the
+  list `ShowMap` already kept, saved with the game and cleared by New Game). Until v0.0.67 a name
+  that held the text anywhere counted, so `ShowMap Vos` also revealed Tel Vos.
+- Dialogue reveals places the player has not visited, as in the original game: in the opening,
+  Sellus Gravius's answer about Balmora runs `ShowMap` for Balmora, Pelagiad and Moonmoth Legion
+  Fort, so their squares show from then on. The dialogue results of `Morrowind.esm` call `ShowMap`
+  515 times. A revealed settlement (Balmora, Seyda Neen) shows like any other place; until v0.0.67
+  a settlement showed only once its spot was explored, so Balmora stayed hidden after that answer.
 - The debug view shows every place.
 - No new image data: the names and cells come from `world/region-names.awn`, which the image
   already carries for the region line. The map reads it when it opens (66 bytes per named place
@@ -98,6 +105,14 @@ they walk, the way OpenMW's map fog clears: everything within 0.17 of a cell's w
 player. A place square shows once its spot is explored, or once a script's `ShowMap` names it.
 The debug view shows the whole island. The player's own markers and the hot marker are drawn
 above the fog; hovering one shows its name.
+
+The World view in play opens on the player. The first time it shows the player in a game (after
+New Game or a load), it is centred on the player at the closest zoom that still holds all the
+explored land around them, at most the Local view's zoom. After that it keeps the zoom the player
+chose and centres on the player each time the map opens, as OpenMW's world map does. Until v0.0.67
+it opened at the whole-island zoom, about 3 pixels a cell: a new game's explored land was a few
+pixels wide and lay under the player's arrow, so the World tab looked empty until the Local view
+had changed the zoom.
 
 - Resolution: each exterior cell is split into 8 by 8 squares (1024 units, about the width of a
   house). OpenMW splits a cell into 32 by 32 and the original game's saves into 16 by 16; 8 by 8

@@ -105,6 +105,14 @@ int main(int argc,char **argv) {
            AW_MagicFadeFrame(5,1)==3 && AW_MagicFadeFrame(1,0)==0);
     assert(near(AW_MagicAreaScale(0),1) && near(AW_MagicAreaScale(10),20));
     assert(near(AW_MagicGrow(10,1.6f,0,1),10) && near(AW_MagicGrow(10,1.6f,1,1),16) && near(AW_MagicGrow(10,1.6f,9,1),16));
+    /* MAGIC-SHELL-EGG-STYLE-67, OpenMW's Animation::addEffect fit on a creature (the original's units) */
+    {float s,o;
+     AW_MagicCreatureFit(29,28.5f,133,0,&s,&o);assert(near(s,1.0390625f) && near(o,0));          /* human-sized: as is */
+     AW_MagicCreatureFit(20,30,40,0,&s,&o);assert(near(s,1) && near(o,-88));                      /* small: never shrunk, sunk */
+     AW_MagicCreatureFit(20,30,40,1,&s,&o);assert(near(s,1) && near(o,-4.4f));                    /* flying: a twentieth */
+     AW_MagicCreatureFit(100,100,250,0,&s,&o);assert(near(s,1.953125f) && near(o,0));            /* tall: by its height */
+     AW_MagicCreatureFit(90,180,140,0,&s,&o);assert(near(s,2.8125f) && near(o,-12));             /* long and low: by its length */
+    }
     if(argc>1)read_file(argv[1]);
     printf("magic rules ok\n");
     return 0;

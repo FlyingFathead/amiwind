@@ -1,0 +1,15 @@
+{
+ "about": "The stage each expansion is worked at, the shipped default the build's actor spec check reads (tools/expansion_actor_check.py, docs/ACTOR_RECORDS.md 'The expansions' actors'). Each expansion is done the way the base game was, in three stages, each a milestone with a measured count. At milestone 1 the check reports the expansion's actors that are not complete as counts; from milestone 2 on it stops the build on each one, naming the actor, its reference, its place and what it lacks. Moving a milestone is a commit of this file; with the base game alone the check does not run.",
+ "milestones": {
+  "1": "the world: every exterior cell and every room of the expansion built and reachable",
+  "2": "the actors: every person and creature it places, in its own places and in Vvardenfell, placed and complete: every attribute and stat, inventory and equipment, combat style, an animation set the engine plays, and its own scripts attached with their variables",
+  "3": "the script logic: global, start, quest and dialogue result scripts, the dialogue's choices and filters, the message boxes, the stats scripts set and the expansion's movies"
+ },
+ "expansions": {
+  "Tribunal.esm": {"land": "Mournhold", "milestone": 1},
+  "Bloodmoon.esm": {"land": "Solstheim", "milestone": 1}
+ },
+ "tracked_gaps": {
+  "inventory levelled": {"register": "ACTOR-LEVELLED-INVENTORY-ONE-PICK-66", "why": "a levelled inventory is picked once at build time, the original rolls it per actor: a world-wide gap, reported with its count and never a stop"}
+ }
+}

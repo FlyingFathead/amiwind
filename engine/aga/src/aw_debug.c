@@ -32,6 +32,7 @@
 #include "aw_spelllist.h"
 #include "aw_textdef.h"
 #include "aw_alchemy.h"
+#include "aw_cycleitems.h"   /* dbg cycleitems, the item tester (DBG-CYCLEITEMS-67) */
 #include "aw_glut.h"
 #include "aw_dial.h"
 #include "aw_ambient.h"
@@ -355,7 +356,7 @@ void AW_DebugInit(void) {
     {extern void (*aw_walkto_move)(usercmd_t *);aw_walkto_move=walkto_move;}
     Cvar_RegisterVariable(&aw_logs_live);Cmd_AddCommand("aw_logs_live_set",logs_live_command);Cmd_AddCommand("aw_savelogs",savelogs_command);Cmd_AddCommand("aw_godmode",godmode_command);
     AW_ResetRegister("god mode across maps",godmode_reset,godmode_digest);
-    AW_GalleryInit();AW_SweepInit();AW_WorldUIInit();AW_PlacedInit();AW_StatsWindowInit();AW_FxRowInit();AW_SpellListInit();AW_TextDefineInit();AW_AlchemyInit();AW_DebugTorchInit();    AW_StreamInit();AW_PhotoInit();AW_SpikeInit();Chim_Init();
+    AW_GalleryInit();AW_SweepInit();AW_WorldUIInit();AW_PlacedInit();AW_StatsWindowInit();AW_FxRowInit();AW_SpellListInit();AW_TextDefineInit();AW_AlchemyInit();AW_DebugTorchInit();AW_CycleItemsInit();    AW_StreamInit();AW_PhotoInit();AW_SpikeInit();Chim_Init();
     /* CHIM's window (type 1 crossings) names a cell's region map through the world directory. */
     {extern int (*chim_cell_map)(int,int,char *,int);chim_cell_map=AW_CellMap;}
     /* OUTDOOR-CREATURES-MISSING-66: a town map's own cells take their creatures from the actor table. */

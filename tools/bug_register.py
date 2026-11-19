@@ -8,13 +8,15 @@ from it.
 Usage:
   bug_register.py render        rewrite every generated part (register, pages, families table,
                                 CHIM tracker); first marks every CHIM- ID and chim-streamer bug
-                                that lacks its CHIM part (printed, saved to bugs.json)
-  bug_register.py check         validate bugs.json; fail if any generated part is stale
+                                that lacks its CHIM part (printed, saved to bugs.json); makes the report
+                                page of every live entry that lacks one and lists it in release-files.json
+  bug_register.py check         validate bugs.json; fail if any generated part is stale, a live entry has
+                                no report page or a page is missing from tools/release-files.json
   bug_register.py add ID --title T --found VERSION --reported-by WHO --where TEXT
                          --severity S --severity-reason TEXT --family KEY
                          [--found-date YYYY-MM-DD] [--reproduction R] [--related ID...]
                          [--status TEXT] [--tag T...] [--chim PART] [build options]
-                                add an open bug (then write its report page and render)
+                                add an open bug (its report page is made by the tool, from the entry)
   bug_register.py set ID [--state open|fixed|closed] [--fixed-in V] [--status TEXT]
                          [--owner-accepted V|none] [--tag T...] [any fact option of add]
                          [--duplicate-of ID] [--persists-in V...] [--chim PART] [build options]
@@ -587,6 +589,68 @@ def unshipped_pages(bugs, root=ROOT):
     shipped = set(json.loads(listing.read_text(encoding='utf-8')))
     return sorted('docs/' + b['report'] for b in bugs if isinstance(b, dict) and b.get('report')
                   and 'docs/' + b['report'] not in shipped)
+
+
+def page_problems(bugs, pages=None):
+    """One line per LIVE entry without its report page: report empty or the file missing. Every entry has its page,
+    made by the tool (add, render), never written by hand (the maintainer, 19 November 2026; TRACKER-ENTRIES-WITHOUT-
+    PAGES-67: 643 of 1307 live entries had none). Archived entries are not listed here."""
+    pages = PAGES if pages is None else pages
+    live, _ = split([b for b in bugs if isinstance(b, dict)])
+    out = []
+    for b in live:
+        page = pages / ('%s.md' % b['id'])
+        if not b.get('report'):
+            out.append('%s: no report page%s (run tools/bug_register.py render, which makes it)'
+                       % (b['id'], ' linked (the file exists)' if page.is_file() else ''))
+        elif not page.is_file():
+            out.append('%s: report page missing (run tools/bug_register.py render, which makes it)' % b['id'])
+    return out
+
+
+def new_page_text(b):
+    """The first text of a report page: only the title line; render adds the facts, the timeline and the category."""
+    return '# %s: %s\n' % (b['id'], b['title'])
+
+
+def ensure_pages(bugs, pages=None):
+    """Give every live entry its report page: link an existing file, or create the page from the entry. Returns the IDs
+    of the pages created. The title line is all that is written; rendered_page fills the rest from bugs.json."""
+    pages = PAGES if pages is None else pages
+    live, _ = split([b for b in bugs if isinstance(b, dict)])
+    made = []
+    for b in live:
+        page = pages / ('%s.md' % b['id'])
+        if not page.is_file():
+            page.write_text(new_page_text(b), encoding='utf-8', newline='\n')
+            made.append(b['id'])
+        b['report'] = 'bugs/%s.md' % b['id']
+    return made
+
+
+def list_pages(bugs, root=None):
+    """List every report page in tools/release-files.json (the gate stages only that list), each in its sorted place
+    inside the run of docs/bugs/<ID>.md lines. Returns the paths added."""
+    root = ROOT if root is None else root
+    listing = root / 'tools' / 'release-files.json'
+    if not listing.is_file():
+        return []
+    files = json.loads(listing.read_text(encoding='utf-8'))
+    have = set(files)
+    added = []
+    for path in sorted('docs/' + b['report'] for b in bugs if isinstance(b, dict) and b.get('report')):
+        if path in have:
+            continue
+        run = [i for i, f in enumerate(files) if f.startswith('docs/bugs/') and f.count('/') == 2 and f.endswith('.md')]
+        at = next((i for i in run if files[i] > path), None)
+        if at is None:
+            at = run[-1] + 1 if run else len(files)
+        files.insert(at, path)
+        have.add(path)
+        added.append(path)
+    if added:
+        listing.write_text(json.dumps(files, indent=2) + '\n', encoding='utf-8', newline='\n')
+    return added
 
 
 def image_problems(bugs, pages=None, images=None, media=None):
@@ -2127,6 +2191,22 @@ def main(argv=None):
     if errors:
         print('\n'.join(errors), file=sys.stderr)
         return 1
+    if args.cmd == 'check':
+        missing = page_problems(bugs) + ['%s: not in tools/release-files.json' % p for p in unshipped_pages(bugs)]
+        if missing:
+            print('every register entry has its report page, made by the tool, and every page is listed in '
+                  'tools/release-files.json; %d problems:' % len(missing), file=sys.stderr)
+            print('\n'.join(missing), file=sys.stderr)
+            return 1
+    else:
+        # the tool makes the page of every live entry (add, reopen, render, ...) and lists it for the release
+        made = ensure_pages(bugs)
+        if made:
+            print('made %d report pages: %s' % (len(made), ', '.join(made) if len(made) <= 20 else
+                                                 ', '.join(made[:20]) + ', ...'))
+        for path in list_pages(bugs):
+            if len(made) <= 20:
+                print('listed %s in tools/release-files.json' % path)
     new = with_contents_lists(outputs(bugs, families))
     live, old = split(bugs)
     rotated = rotation(bugs)
@@ -2137,11 +2217,6 @@ def main(argv=None):
                   if t is None or not p.is_file() or p.read_text(encoding='utf-8') != t]
         if stale:
             print('stale generated files (run tools/bug_register.py render): ' + ', '.join(stale), file=sys.stderr)
-            return 1
-        unshipped = unshipped_pages(bugs)
-        if unshipped:
-            print('report pages not in tools/release-files.json (the gate stages only that list, so the register '
-                  'would link a missing page there): ' + ', '.join(unshipped), file=sys.stderr)
             return 1
         print('bug register ok: %d bugs (%d live, %d archived), %d with report pages' % (
             len(bugs), len(live), len(old), sum(1 for b in bugs if b['report'])))

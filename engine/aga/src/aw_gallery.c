@@ -20,6 +20,7 @@
 #include "aw_mappath.h"
 #include "aw_tryalloc.h"
 #include "aw_hand_models.h"
+#include "aw_cycleitems.h"   /* the light test corridor and the item tester (LIGHTTEST-MAP-67, DBG-CYCLEITEMS-67) */
 typedef struct {
     int number;char kind[8],model[2][24],id[96],name[96];float size[3];
     char race[32],cls[32],cell[64],mdl[64];   /* v2: the race, class, first cell and the game model of the actor */
@@ -43,6 +44,9 @@ static aw_save_t *back_state;
 typedef struct {char sound[96],text[2048];float duration;} gallery_voice_t;
 static gallery_voice_t *voice;
 static int back_intro,combat,torch_test,torch_actor;
+/* LIGHTTEST-MAP-67, DBG-CYCLEITEMS-67: the dark light test corridor (maps/lighttest.bsp, tools/build_lighttest.py):
+ * dbg lighttest and dbg cycleitems enter it (aw_cycleitems.c); the item tester leaves it when it ends */
+static int light_test;
 /* The Vivec Arena minigame (aw_arena.c) uses this session: arena_map is the
  * pit, the gallery floor or the captured scene itself ("here"). */
 static int arena;static char arena_map[32];
@@ -69,15 +73,17 @@ static vec3_t back_origin,back_angles;
 static float back_move,back_health,back_hand_goal;
 
 int AW_TorchTestActive(void){return torch_test && session && sv.active && !strcmp(sv.name,"torchtest");}
+int AW_LightTestActive(void){return light_test && session && sv.active && !strcmp(sv.name,"lighttest");}
 static int arena_here(void){return arena && session && sv.active && arena_map[0] && !strcmp(sv.name,arena_map);}
 /* Only captured, active diagnostic rooms may ignore the source story's input
  * restrictions. Revoke permission as soon as return begins, before map load. */
 int AW_DebugTestInputActive(void){
     return session && !returning && sv.active &&
         ((combat && !strcmp(sv.name,"charplane")) ||
-         (torch_test && !strcmp(sv.name,"torchtest")) || arena_here());
+         (torch_test && !strcmp(sv.name,"torchtest")) || (light_test && !strcmp(sv.name,"lighttest")) || arena_here());
 }
-int AW_GalleryActive(void){return sv.active && ((!arena && !strcmp(sv.name,"charplane")) || AW_TorchTestActive() || arena_here());}
+int AW_GalleryActive(void){return sv.active && ((!arena && !strcmp(sv.name,"charplane")) || AW_TorchTestActive() ||
+                                                AW_LightTestActive() || arena_here());}
 int AW_GalleryModal(void){return AW_GalleryActive() && key_dest==key_game && (page || help || editing);}
 static void normalize(const char *in,char *out) {
     int n=0;unsigned char c;
@@ -156,7 +162,7 @@ static FILE *open_catalogue(int *total,int *bad) {
 static void read_voice(void) {
     FILE *f=NULL;char line[2304],*path,*duration,*speech,*end;float seconds;
     if(voice){free(voice);voice=NULL;}
-    if(!session || combat || torch_test || COM_FOpenFile("gallery/voices.txt",&f)<0 || !f)return;
+    if(!session || combat || torch_test || light_test || COM_FOpenFile("gallery/voices.txt",&f)<0 || !f)return;
     if(!fgets(line,sizeof(line),f) || strcmp(line,"AWGV1\n")){fclose(f);return;}
     while(fgets(line,sizeof(line),f)){
         path=strchr(line,'\t');if(!path)break;*path++=0;
@@ -299,7 +305,7 @@ static void reload(void) {
         if(!strcmp(arena_map,back_map) && !AW_RegionSelect(back_map,back_origin,back_intro)){Con_Printf("Arena: scene region unavailable.\n");return;}
         sprintf(command,"map %s\n",arena_map);Cbuf_InsertText(command);return;
     }
-    Cbuf_InsertText(torch_test?"map torchtest\n":"map charplane\n");
+    Cbuf_InsertText(torch_test?"map torchtest\n":light_test?"map lighttest\n":"map charplane\n");
 }
 /* A browser row shown: a v2 row's entity text is read again by its index (the page keeps names only). */
 static void choose_row(int n) {
@@ -341,7 +347,9 @@ static int capture_game(void) {
 static void command(void) {
     char search[96];int i,n=0;
     if(Cmd_Argc()==2 && !Q_strcasecmp(Cmd_Argv(1),"exit")){leave();return;}
-    if(combat || torch_test || arena){Con_Printf("Exit combat/torch test or the arena before entering the NPC gallery.\n");return;}
+    if(combat || torch_test || light_test || arena){
+        Con_Printf("Exit combat/torch test, the light test or the arena before entering the NPC gallery.\n");return;
+    }
     if(AW_GalleryActive() && Cmd_Argc()==2 && !Q_strcasecmp(Cmd_Argv(1),"talk")){key_dest=key_game;talk();return;}
     if(AW_GalleryActive() && Cmd_Argc()==2 && !Q_strcasecmp(Cmd_Argv(1),"browse")){key_dest=key_game;open_browser();return;}
     if(AW_GalleryActive() && Cmd_Argc()==2 && !Q_strcasecmp(Cmd_Argv(1),"help")){key_dest=key_game;close_browser();help=1;return;}
@@ -452,6 +460,29 @@ static void torch_command(void){
 usage:
     Con_Printf("Usage: dbg torchtest [npc ID/name | empty/center/help/exit].\n");
 }
+/* LIGHTTEST-MAP-67: the light test corridor, entered as the torch test room is (the game captured, its map loaded);
+ * dbg lighttest 1 and the item tester start when the player arrives (AW_GallerySpawn: AW_LightTestReady) */
+int AW_GalleryLightTestEnter(void){
+    FILE *f=NULL;char path[AW_MAP_PATH_SIZE];
+    if(session || AW_GalleryActive()){Con_Printf("Exit the current gallery or test room first.\n");return 0;}
+    if(!sv.active || !sv.edicts || svs.maxclients!=1 || !svs.clients || !svs.clients[0].edict){
+        Con_Printf("Start a local game before the light test.\n");return 0;
+    }
+    if(COM_FOpenFile(AW_MapPath("lighttest",path,sizeof(path)),&f)<124 || !f){
+        if(f)fclose(f);
+        Con_Printf("The light test corridor is not in this image; rebuild the image.\n");return 0;
+    }
+    fclose(f);if(!capture_game())return 0;
+    light_test=1;body=0;notice[0]=0;reload();return 1;
+}
+void AW_GalleryLightTestLeave(void){if(light_test && session && !returning)leave();}
+/* back to the corridor's west end, facing along it (tools/build_lighttest.py START) */
+static void light_center(edict_t *p){
+    combat_center(p);p->v.origin[0]=AW_LIGHTTEST_START_X;p->v.angles[1]=0;
+    VectorCopy(p->v.origin,p->v.oldorigin);VectorCopy(p->v.angles,p->v.v_angle);VectorCopy(p->v.angles,cl.viewangles);
+    SV_LinkEdict(p,false);
+}
+void AW_GalleryLightTestCenter(void){if(AW_LightTestActive() && !returning)light_center(svs.clients[0].edict);}
 void AW_GalleryInit(void){Cmd_AddCommand("aw_charplane",command);Cmd_AddCommand("aw_combattest",combat_command);Cmd_AddCommand("aw_torchtest",torch_command);AW_ArenaInit();}
 /* ---- the Vivec Arena's session (aw_arena.c) ---- */
 int AW_GalleryArenaEnter(const char *map) {
@@ -545,10 +576,11 @@ void AW_GalleryEntities(void) {
      * must stay inactive then, but this captured session's map needs its
      * timings and actors before physics/baselines and client spawn. */
     subject=NULL;
-    if(!session || strcmp(sv.name,arena?arena_map:torch_test?"torchtest":"charplane"))return;
+    if(!session || strcmp(sv.name,arena?arena_map:torch_test?"torchtest":light_test?"lighttest":"charplane"))return;
     if(arena){
         AW_ArenaEntities();return;
     }
+    if(light_test)return;     /* the light test corridor: the player and what the hands hold, nothing else */
     if(combat || torch_test){
         if(!torch_test || !torch_actor)return; /* Empty tests need no catalogue. */
     }
@@ -597,7 +629,7 @@ void AW_GallerySpawn(edict_t *p) {
         if(voice){free(voice);voice=NULL;}
         if(torch_test)Cvar_SetValue("r_fullbright",back_fullbright);
         AW_ArenaEnd();arena=0;
-        returning=session=combat=torch_test=torch_actor=0;VectorCopy(back_origin,p->v.origin);VectorCopy(back_origin,p->v.oldorigin);
+        returning=session=combat=torch_test=torch_actor=light_test=0;VectorCopy(back_origin,p->v.origin);VectorCopy(back_origin,p->v.oldorigin);
         VectorCopy(vec3_origin,p->v.velocity);VectorCopy(back_angles,p->v.angles);VectorCopy(back_angles,p->v.v_angle);
         VectorCopy(back_angles,cl.viewangles);p->v.movetype=back_move;p->v.health=back_health;
         goal=GetEdictFieldValue(p,"aw_hand_goal");if(goal)goal->_float=back_hand_goal;
@@ -607,13 +639,16 @@ void AW_GallerySpawn(edict_t *p) {
     if(!AW_GalleryActive()){
         if(torch_test)Cvar_SetValue("r_fullbright",back_fullbright);
         AW_ArenaEnd();arena=0;
-        close_browser();editing=help=session=combat=torch_test=torch_actor=0;
+        close_browser();editing=help=session=combat=torch_test=torch_actor=light_test=0;
         if(back_state){AW_SaveRelease(back_state);free(back_state);back_state=NULL;}
         if(voice){free(voice);voice=NULL;}return;
     }
     if(!session)return;
     if(arena){AW_ArenaSpawn(p);return;}
     if(torch_test){torch_center(p);combat_pose(p,1);return;}
+    /* the light test corridor: the player at its west end, the hands raised, then a waiting walk or item tester
+     * starts (aw_cycleitems.c) */
+    if(light_test){light_center(p);combat_pose(p,1);AW_LightTestReady();return;}
     if(combat){combat_center(p);combat_pose(p,1);return;}
     distance=current.size[0]>current.size[1]?current.size[0]:current.size[1];
     if(distance<current.size[2])distance=current.size[2];
@@ -632,7 +667,7 @@ int AW_GalleryKey(int key,int down,int shift,int control) {
     if(arena)return AW_ArenaKey(key,down);
     if(key==K_F1){if(down){close_browser();editing=0;help=!help;IN_AWClearButtons();}return 1;}
     if(help){if(down && key==K_ESCAPE)help=0;return 1;}
-    if(combat || torch_test)return 0; /* Normal movement, hands and torch bindings. */
+    if(combat || torch_test || light_test)return 0; /* Normal movement, hands and torch bindings. */
     if(page){
         if(key==K_MOUSE1 && !down){scroll_drag=0;return 1;}
         if(!down)return 1;
@@ -736,6 +771,7 @@ void AW_GalleryDraw(void) {
     int v2row=!strcmp(current.model[0],"v2");
     if(!AW_GalleryActive() || key_dest!=key_game)return;
     if(arena){AW_ArenaDraw();return;}
+    if(light_test)return;     /* the light test draws only its own line (aw_cycleitems.c AW_CycleItemsDraw) */
     if(torch_test){
         line(0,"Torch test - dark enclosed room");
         line(1,torch_actor?current.name:"Empty room");line(2,"V: torch  F: hands  F1: help  Ctrl+X: return");

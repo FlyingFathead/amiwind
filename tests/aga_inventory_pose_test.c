@@ -54,6 +54,11 @@ int AW_ItemsAliasTag(model_t *m,int frame,int kind,float tag[6]){
     if(frame<0)return 1;tag_frame=frame;
     for(i=0;i<6;i++)tag[i]=(float)(frame*10+i);return 1;
 }
+/* FP-ARMS-NO-MODEL-SLOT-67: the model table the release of old player parts reads (model.c); no part model is released
+ * in this fixture (the assembled body is off, the race never changes) */
+int mod_numknown;
+model_t *Mod_Known(int i){(void)i;assert(0);return NULL;}
+void Mod_ReleaseAlias(model_t *m){(void)m;assert(0);}
 int AW_InventoryEquippedItem(int slot,aw_inventory_item_t *out){
     memset(out,0,sizeof(*out));
     if(slot==AW_SLOT_RIGHT && right_type>=0){out->category=AW_INV_WEAPON;out->subtype=right_type;strcpy(out->model,"items/weapon.mdl");return 1;}

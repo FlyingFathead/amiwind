@@ -41,6 +41,8 @@ float AW_CharacterEyeHeight(void);
 int AW_CharacterRebuild(aw_character_t *c);
 void AW_CharacterReset(void);
 int AW_CharacterHors(void);
+/* Hors without Sellus Gravius's duties (DBG-HORS-AFTER-CENSUS-67: the generated AW_AfterCensus runs his results) */
+int AW_CharacterHorsCensus(void);
 /* A ready-made character by catalogue IDs (race, class, birthsign; case-insensitive) and
  * name: the quick start of a direct-start build (tools/direct_start.py). 0 when an ID is
  * not in the catalogue. AW_CharacterHors is the Nord Barbarian preset. */

@@ -18,7 +18,9 @@ and a record that is not built takes the first group of config/creature-census.j
 it names some) matches it: an expansion master the image does not read, no model, a model the bake refused, summoned,
 placed by a script, placed indoors only, not used by the game data. check() names every record that is not built and
 that no group covers (an outdoor creature the build should have made, for one) and every master read that the config
-does not name: the image step stops on any of them, so no creature is ever left out silently. `--data-files DIR
+does not name: the image step stops on any of them, so no creature is ever left out silently. A levelled creature
+point of an expansion counts as placed by its merged reference number, as the actor checks count it (the entity
+tracker's rooms; outdoors the actor table in a converted cell). `--data-files DIR
 [--run RUN] [--json OUT]` prints it for an audit (RUN: a finished build run, for its image's facts).
 """
 import argparse
@@ -80,13 +82,17 @@ def read_master(raw):
     'lists': {id: [entry ids]}, 'cells': [(inside, region, cell, [(id, number)])], 'settings': {name: text},
     'scripts': {script id: [placed ids]}}; ids case-folded."""
     from mwad.audit import cell_data, normpath, records, subrecords
-    out = dict(creatures={}, deleted=set(), lists={}, cells=[], settings={}, scripts={})
+    out = dict(creatures={}, deleted=set(), lists={}, cells=[], settings={}, scripts={}, masts=[])
     topic = ''
     for tag, flags, payload in records(raw):
-        if tag not in ('CREA', 'LEVC', 'CELL', 'GMST', 'SCPT', 'DIAL', 'INFO'):
+        if tag not in ('TES3', 'CREA', 'LEVC', 'CELL', 'GMST', 'SCPT', 'DIAL', 'INFO'):
             continue
         subs = list(subrecords(payload))
         fields = dict(subs)
+        if tag == 'TES3':
+            # the file's own masters: a reference number's top byte names its file by them (merged_number)
+            out['masts'] = [_string(d) for t, d in subs if t == 'MAST']
+            continue
         if tag == 'DIAL':
             topic = _string(fields.get('NAME', b'')).casefold()
             continue
@@ -136,6 +142,38 @@ def read_master(raw):
     return out
 
 
+def merged_number(master, masts, number):
+    """Reference NUMBER of MASTER (its own masters MASTS) as the merging reader numbers it (mwad.masters): the owning
+    file's place among the game's masters x ADDON_KEY_STRIDE + the low bits, the top byte naming the file the reference
+    belongs to (0 the file itself, k its k-th master); the base game's numbers are unchanged. None when that file is no
+    game master."""
+    from mwad.esm import GAME_MASTERS
+    from mwad.masters import ADDON_KEY_STRIDE
+    top, low = number >> 24, number & 0xFFFFFF
+    owner = master if top == 0 else (masts[top - 1] if top <= len(masts) else None)
+    names = [m.casefold() for m in GAME_MASTERS]
+    if owner is None or owner.casefold() not in names:
+        return None
+    return names.index(owner.casefold()) * ADDON_KEY_STRIDE + low
+
+
+def expansion_point_placed(image, merged, inside, cell):
+    """An expansion's levelled creature point placed by the image, by the rule of the actor checks
+    (tools/actor_spec_check.py, tools/expansion_actor_check.py): in a room when the entity tracker's placed_refs
+    (IMAGE 'placed_rooms'; without it the maps' reference numbers, 'refs') hold its merged reference number; outdoors
+    when the actor table holds its key ('actor_keys') and the tracker counts its cell converted ('converted'). Not
+    placed when that is not known."""
+    if merged is None:
+        return False
+    if inside:
+        rooms = image.get('placed_rooms')
+        rooms = rooms if rooms is not None else image.get('refs')
+        return rooms is not None and merged in rooms
+    keys, converted = image.get('actor_keys'), image.get('converted')
+    return bool(keys) and bool(converted) and (merged & 0xFFFFFF) in keys and \
+        ('exterior:%d,%d' % tuple(cell)) in converted
+
+
 def _reach(lists, roots):
     """Every list ROOTS reach (themselves and the lists inside them)."""
     seen, todo = set(), [r for r in roots if r in lists]
@@ -153,10 +191,11 @@ def uses(masters):
     [(name, raw)] in load order (a later master's record of the same id replaces the earlier one; its cells add
     references). Each record: master (the first that defines it), mesh, name, dead, and per master read its uses:
     exterior {region: n}, interior {cell: n}, lists [ids], used_lists [ids], script [script ids], summon [settings]."""
-    creatures, lists, settings, scripts = {}, {}, {}, {}
+    creatures, lists, settings, scripts, masts = {}, {}, {}, {}, {}
     cells = []
     for name, raw in masters:
         got = read_master(raw)
+        masts[name] = got['masts']
         for ident in got['deleted']:
             creatures.pop(ident, None)
             lists.pop(ident, None)
@@ -184,7 +223,7 @@ def uses(masters):
                 placements.append((master, where, number, ident, cell))
             elif ident in lists:
                 (placed_lists_int if inside else placed_lists_ext).add(ident)
-                levelled.append((master, where, number, ident, cell))
+                levelled.append((master, where, number, ident, cell, merged_number(master, masts[master], number)))
     scripted_lists = {i for ids in scripts.values() for i in ids if i in lists}
     used = _reach(lists, placed_lists_ext | placed_lists_int | scripted_lists)
     for lid in sorted(lists):
@@ -265,7 +304,8 @@ def expansion_group(config):
 def census(masters, config=None, image=None):
     """The census of MASTERS ([(name, raw)], the base master first). IMAGE: None (no build verdict: the data's uses
     only), or {'built': set of record ids the image places, 'meshes': set of meshes the data holds or None,
-    'left_out': {mesh: reason}, 'kit_on_idle': {mesh: [groups]}, 'sounds_missing': [ids], 'partial': reason or None}."""
+    'left_out': {mesh: reason}, 'kit_on_idle': {mesh: [groups]}, 'sounds_missing': [ids], 'partial': reason or None,
+    and for the expansions' levelled points (expansion_point_placed) 'placed_rooms', 'converted', 'actor_keys'}."""
     config = config or load_config()
     statuses = {m['name']: m for m in config['masters']}
     unnamed = [n for n, _ in masters if n not in statuses]
@@ -321,12 +361,22 @@ def census(masters, config=None, image=None):
         entry['regions'][where] += 1
         region['missing'] += 1
         region['missing: ' + group['name']] += 1
-    for master, where, number, _lid, cell in data['levelled']:
+    # a levelled creature point: the base game's outdoors is spawned from the actor table, its rooms' when the room's
+    # map holds it; an expansion's by the actor checks' rule, by its merged reference number (expansion_point_placed;
+    # up to v0.0.67-dev1 every expansion point counted as not placed: 1,126 on the v0.0.66 release build, of which
+    # 262 in the rooms were placed, EXPANSION-TABLES-BASE-ONLY-66)
+    for master, where, number, _lid, cell, merged in data['levelled']:
         region = regions.setdefault(where, Counter())
         region['levelled_points'] += 1
-        if built is not None and master == base and (where != 'interior' or refs is None or number in refs):
+        if built is None:
+            continue
+        if master == base:
+            placed = where != 'interior' or refs is None or number in refs
+        else:
+            placed = expansion_point_placed(image, merged, where == 'interior', cell)
+        if placed:
             region['levelled_built'] += 1
-        elif built is not None:
+        else:
             levelled_out.append(dict(list=_lid, number=number, where=where, cell=cell, master=master))
     out_groups = [dict(g, regions=dict(sorted(g['regions'].items(), key=lambda kv: (-kv[1], kv[0]))))
                   for g in groups.values()]
@@ -467,8 +517,22 @@ def image_facts(id1=None, out=None, library=None, data_files=None, master=None, 
     if out is not None and (out / 'npc-voice-table.json').is_file():
         coverage = json.loads((out / 'npc-voice-table.json').read_text(encoding='utf-8')).get('coverage', {})
         sounds_missing = sorted(k.casefold() for k in coverage.get('creatures_unmapped') or {})
+    # the expansions' levelled points by the actor checks' rule (expansion_point_placed): the entity tracker's room
+    # placements and converted cells (OUT/entity-tracker.json, written before the census), the actor table's keys
+    placed_rooms = converted = actor_keys = None
+    if out is not None and (out / 'entity-tracker.json').is_file():
+        tracker = json.loads((out / 'entity-tracker.json').read_text(encoding='utf-8'))
+        if 'placed_refs' in tracker:
+            placed_rooms = {n for key, kinds in tracker['placed_refs'].items() if key.startswith('interior:')
+                            for kind in ('npc', 'creature') for n in kinds.get(kind, ())}
+        converted = {c.casefold() for c in tracker.get('converted_cells') or ()}
+    if id1 is not None and (Path(id1) / 'maps' / 'chim-actors.cca').is_file():
+        from chim.actors import read_table
+        _head, cells, rows, _bases, _text = read_table((Path(id1) / 'maps' / 'chim-actors.cca').read_bytes())
+        actor_keys = {r['key'] for _cell, first, n in cells for r in rows[first:first + n]}
     return dict(built=built, refs=refs, meshes=DataMeshes(data_files) if data_files else None, left_out=left_out,
-                kit_on_idle=on_idle, sounds_missing=sounds_missing, partial=partial)
+                kit_on_idle=on_idle, sounds_missing=sounds_missing, partial=partial, placed_rooms=placed_rooms,
+                converted=converted, actor_keys=actor_keys)
 
 
 ACTOR_ROWS = (b'aw_npc', b'aw_corpse', b'aw_levelled')
@@ -510,6 +574,9 @@ def summary(report):
             ' [' + g['register'] + ']' if g['register'] else '', ': ' + top if top else ''))
     for g in report['levelled_not_built']['groups']:
         lines.append('  %-44s %4d levelled creature points not placed [%s]' % (g['name'], g['points'], g['register']))
+    if report.get('levelled_not_built_expansions'):
+        lines.append('  %d levelled creature points of the expansions not placed: their rooms or cells are not in this '
+                     'image (placed ones count by their merged reference numbers)' % report['levelled_not_built_expansions'])
     if t['built_with_groups_on_idle']:
         lines.append('  %d built records stand on their idle for a group their model lacks' % t['built_with_groups_on_idle'])
     return lines

@@ -1,6 +1,6 @@
 # Build AmiWind on Linux
 
-_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
+_Last updated with AmiWind v0.0.67-dev3 (18 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -372,17 +372,31 @@ place. The default output parent is ignored `out/` in the checkout; the explicit
 location is included in source packages. Each build uses `build/<name>/`.
 
 Each run name is immutable. To retry, fix the reported dependency or conversion
-problem and choose a new name; automatic resume is not implemented. Preserve a
+problem and build again in the same workspace: a run without `--name` gets a new
+name by itself (`-try2`, ...), and the default reuse below takes every stage the
+stopped run passed (with `--name`, choose a new name). Preserve a
 successful image before experimenting. Disk conversion can be slow and requires
 space for the installed inputs, SDK, intermediate scenes, staged payload and
 final image at the same time. Keep build runs outside the source checkout and
 allow several times the final payload size; see [storage profiles](STORAGE.md).
 
-Development builds can skip work done before: `--reuse-from OLD_RUN` copies the
-unchanged stages of one earlier run, and `--prerendered DIR` keeps finished
+A build in a workspace that holds earlier builds skips the work they did, by
+default: after `git pull`, run the same command in the same build folder and only
+what changed is made again; every reused file is checked by its SHA-256. Its first
+minute lists each stage with the earlier build it comes from (version and date) or
+why it is made again, a terminal is asked once (`... Reuse them? [Y/n]`, Enter or
+no terminal = yes), and its start and its end summary say how many stages and units
+came from earlier builds. If something in the game then looks wrong or unstable,
+build once from scratch in a new build folder,
+`./build.sh --clean --workspace ../amiwind-clean` with the options you build with.
+`--no-reuse` runs every stage again for one build. See
+[reuse earlier builds by default](BUILD_CACHE.md#reuse-earlier-builds-by-default).
+`--reuse-from OLD_RUN` copies the unchanged stages of one named earlier run, and
+`--prerendered DIR` keeps finished
 CHIM worlds, interiors and region maps in a store folder by version and area
 and uses them in any later build whose stage fingerprints match. Both verify
-every copied file; release candidates and finals are built from scratch. See
+every copied file; release candidates and finals reuse like development builds
+unless `--release-from-scratch` is given (`--clean` is the from-scratch check). See
 [Speed](chim/build_guide/SPEED.md#prerendered-store---prerendered-dir).
 
 For a smaller host-only terrain test with no native toolchain:
@@ -412,8 +426,12 @@ game spawns no creature without one. Seyda Neen's CHIM frame is compared with it
 (`tools/seyda_early_checks.py`): its placements, predicted from the inputs the world stage reads (the scenery
 selection, the tutorial barrel and the containers that open), go through the Seyda Neen town stage's own comparison
 with the town's statics right after the `bsp` stage (or before the first stage when that stage is taken from an earlier
-build), in about five seconds, instead of failing that town stage after the world. A new check is a module of its own
-whose function takes the build's context and returns its problems (it never exits), plus one line in `EARLY_CHECKS`.
+build), in about five seconds, instead of failing that town stage after the world. The shared-sky check runs right
+after the image step (`tools/frame_sky_check.py`, phase `after:image`): every CHIM frame map the image step wrote must
+name the shared exterior sky in its worldspawn (`_aw_sky_mode` `exterior` and `_aw_sky_asset` `gfx/aw_shared_sky.lmp`,
+as the open-world worldspawn is written), or the build stops before it is called passed; a frame map without them would
+show black instead of the sky. A new check is a module of its own whose function takes the build's context and returns
+its problems (it never exits), plus one line in `EARLY_CHECKS`.
 
 ### When a build fails
 

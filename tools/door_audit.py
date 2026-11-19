@@ -94,13 +94,14 @@ def engine_map_names(maps_h, table_h):
 
 def terrain_id(name):
     """aw_maps.h AW_TerrainId: vf and four digits below 4096 (Vvardenfell's region maps, the ID itself), sl and four
-    digits below 4096 (Solstheim's frame maps, 4096 + the number; WORLD-REGION-NAMES-VF-ONLY-64), else -1."""
-    if len(name) != 6 or name[:2] not in ('vf', 'sl') or not name[2:].isdigit():
+    digits below 3840 (Solstheim's frame maps, 4096 + the number; WORLD-REGION-NAMES-VF-ONLY-64), mh and four digits
+    below 256 (Mournhold's district frame maps, 7936 + the number), else -1."""
+    bases = {'vf': (0, 4096), 'sl': (4096, 3840), 'mh': (7936, 256)}
+    if len(name) != 6 or name[:2] not in bases or not name[2:].isdigit():
         return -1
+    base, limit = bases[name[:2]]
     n = int(name[2:])
-    if n >= 4096:
-        return -1
-    return n + (4096 if name.startswith('sl') else 0)
+    return base + n if n < limit else -1
 
 
 def map_valid(name, names):

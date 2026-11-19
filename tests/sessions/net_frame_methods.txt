@@ -1,0 +1,125 @@
+# The frame message's two methods measured in the game (docs/performance/NET_FRAME.md, NET-VIVEC-ENTITY-PACKET-
+# OVERFLOW-66): FULL (aw_net_method 1, every update in sight each frame) against PACED (aw_net_method 2, at most
+# aw_net_send bytes a frame, the nearest first), standing still for 45 s each at four places: Vivec, the wilderness
+# spot where the v0.0.66 release stopped (cell -2,-8, global -13677 -61720 604), Seyda Neen on the Bitter Coast, and a
+# quiet interior (the Vivec arena pit). Each window: "chim spikes report" before and after (the window's frames and
+# their time: the average frame time; this works on engines without the methods too, for a "before" run), then
+# aw_netstat, the command behind dbg netstat, called by its own name so the session also runs on an image whose
+# command catalogue is older than the engine (the fullest frame and how close it came to the room, the waits, the
+# frame time, the client's reading time). The order of the two methods alternates by place. The console must hold no
+# "packet overflow", no "SZ_GetSpace: overflow", no "Message overflow caught", no "Frame update dropped" and no
+# "Illegible server message". Run from a place in play (a full image's start map), 32 MB Fast, warp off, the position
+# overlay on.
+emu deterministic=1
+wait 8
+cmd aw_crosshair off
+cmd dbg all on
+cmd dbg headlamp off
+state map
+cmd dbg tp vivec
+wait 90
+state map
+shot net-methods-vivec-arrival
+cmd dbg sweep actors
+cmd aw_net_method 1
+cmd aw_netstat reset
+cmd chim spikes report
+wait 45
+cmd chim spikes report
+cmd aw_netstat
+wait 3
+cmd toggleconsole
+wait 2
+shot net-methods-vivec-full-console
+cmd toggleconsole
+cmd aw_net_method 2
+cmd aw_netstat reset
+cmd chim spikes report
+wait 45
+cmd chim spikes report
+cmd aw_netstat
+wait 3
+cmd toggleconsole
+wait 2
+shot net-methods-vivec-paced-console
+cmd toggleconsole
+cmd dbg tp -13677 -61720 604
+wait 90
+state map
+shot net-methods-wild-stop-spot-arrival
+cmd dbg sweep actors
+cmd aw_netstat reset
+cmd chim spikes report
+wait 45
+cmd chim spikes report
+cmd aw_netstat
+wait 3
+cmd toggleconsole
+wait 2
+shot net-methods-wild-stop-spot-paced-console
+cmd toggleconsole
+cmd aw_net_method 1
+cmd aw_netstat reset
+cmd chim spikes report
+wait 45
+cmd chim spikes report
+cmd aw_netstat
+wait 3
+cmd toggleconsole
+wait 2
+shot net-methods-wild-stop-spot-full-console
+cmd toggleconsole
+cmd dbg tp seydaneen
+wait 90
+state map
+shot net-methods-bitter-coast-seyda-neen-arrival
+cmd dbg sweep actors
+cmd aw_netstat reset
+cmd chim spikes report
+wait 45
+cmd chim spikes report
+cmd aw_netstat
+wait 3
+cmd toggleconsole
+wait 2
+shot net-methods-bitter-coast-seyda-neen-full-console
+cmd toggleconsole
+cmd aw_net_method 2
+cmd aw_netstat reset
+cmd chim spikes report
+wait 45
+cmd chim spikes report
+cmd aw_netstat
+wait 3
+cmd toggleconsole
+wait 2
+shot net-methods-bitter-coast-seyda-neen-paced-console
+cmd toggleconsole
+cmd dbg tp arenapit
+wait 60
+state map
+shot net-methods-quiet-interior-arenapit-arrival
+cmd dbg sweep actors
+cmd aw_netstat reset
+cmd chim spikes report
+wait 45
+cmd chim spikes report
+cmd aw_netstat
+wait 3
+cmd toggleconsole
+wait 2
+shot net-methods-quiet-interior-arenapit-paced-console
+cmd toggleconsole
+cmd aw_net_method 1
+cmd aw_netstat reset
+cmd chim spikes report
+wait 45
+cmd chim spikes report
+cmd aw_netstat
+wait 3
+cmd toggleconsole
+wait 2
+shot net-methods-quiet-interior-arenapit-full-console
+cmd toggleconsole
+wait 2
+shot net-methods-quiet-interior-arenapit-full

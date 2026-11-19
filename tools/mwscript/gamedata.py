@@ -149,9 +149,10 @@ SCRIPTED = ('ACTI', 'ALCH', 'APPA', 'ARMO', 'BOOK', 'CLOT', 'CONT', 'CREA', 'DOO
 PLACEMENT_TYPES = ('NPC_', 'CREA', 'ACTI', 'STAT', 'CONT', 'DOOR')
 # The records that hold items (NPCO): their items' scripts run while the holder's area is loaded (bindings, BIND_HELD)
 HOLDERS = ('CONT', 'NPC_', 'CREA')
-# Records kept whole for the actor table (actors.py): the actors, what their stats come from, what they carry.
+# Records kept whole for the actor table (actors.py): the actors, what their stats come from, what they carry, and
+# the birthsigns, whose spells the character windows list and the new character gets (CHARGEN-ABILITY-DESCRIPTIONS-STOP-67).
 RECORD_TAGS = ('NPC_', 'CREA', 'RACE', 'CLAS', 'SKIL', 'WEAP', 'ARMO', 'CLOT', 'LEVI', 'SPEL', 'FACT', 'GMST',
-               'ALCH', 'APPA', 'BOOK', 'INGR', 'LIGH', 'LOCK', 'MISC', 'PROB', 'REPA', 'MGEF', 'ENCH')
+               'ALCH', 'APPA', 'BOOK', 'INGR', 'LIGH', 'LOCK', 'MISC', 'PROB', 'REPA', 'MGEF', 'ENCH', 'BSGN')
 
 
 def _text(data):
@@ -217,6 +218,10 @@ class GameData:
         # of those three types: [{'reference', 'id' (folded), 'type', 'interior', 'cell', 'position'}]
         self.holdings = {}
         self.holder_refs = []
+        # EXPANSION-HELD-ITEMS-66 (v0.0.67): the add-ons' own placed containers, NPCs and creatures, keyed by their
+        # load order as addon_references (addon_key), each with its 'master': their held items are bound only for the
+        # add-on worlds an image carries (compiler.held_bindings ADDONS)
+        self.addon_holder_refs = []
         # MWSCRIPT-INERT-SEEN-62: the folded local names the dialogue's Local and NotLocal filters read (from the
         # speaker's script, at run time): a script setting one is not inert (compiler.dialogue_read_slots)
         self.dialogue_locals = set()
@@ -465,6 +470,11 @@ class GameData:
                     self._placed_addon.append({'reference': key, 'id': r['id'], 'interior': interior,
                                                'cell': cell_name if interior else (gx, gy), 'master': master,
                                                'position': r.get('position', [0.0, 0.0, 0.0])})
+                    if base[0] in HOLDERS:
+                        self.addon_holder_refs.append({'reference': key, 'id': r['id'].casefold(), 'type': base[0],
+                                                       'interior': interior,
+                                                       'cell': cell_name if interior else (gx, gy), 'master': master,
+                                                       'position': r.get('position', [0.0, 0.0, 0.0])})
             if not base or not base[1]:
                 continue
             self.reference_counts[master] += 1

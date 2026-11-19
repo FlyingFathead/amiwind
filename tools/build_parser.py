@@ -113,6 +113,15 @@ def add_accept_entity_loss_group(p):
                         "on a layered test data folder (tools/chim_layer_data.py); the stages chim-sol-data and chim-sol "
                         "are keyed by Bloodmoon's files, the base stages keep their keys, and the image does not take "
                         "them. Off by default")
+    p.add_argument("--presented-exteriors", dest="presented_exteriors", choices=("off", "on"), default=None,
+                   help="The build module tribunal-mournhold (MOURNHOLD-EXTERIOR-CELLS-66): Mournhold's outdoor "
+                        "districts as a small map of their own. Unset or on, with Tribunal selected and district "
+                        "cells the tracker reference calls finished: the stages tribunal-mournhold-data (the "
+                        "presented data folder of the base master and Tribunal.esm, the districts as exterior cell "
+                        "blocks) and tribunal-mournhold (the districts' own CHIM world) join the plan and the image "
+                        "installs that world as a store of its own. off: the module is left out. Without Tribunal "
+                        "(--no-dlc), with a cell list of your own (--chim-regions) or in a MiniWind sandbox the "
+                        "stages and their commands are exactly the ones without the module; no base stage reads it")
     p.add_argument("--chim-sol-tree-copies", dest="chim_sol_tree_copies", choices=("off", "star", "switch"), default=None,
                    help="TEST BUILDS ONLY, with --chim-sol-test (TREES-DEPTH-56): off (unset, the default) the Solstheim trees as "
                         "their original models; star: the chim-sol stage draws them as closed star prisms "
@@ -355,6 +364,11 @@ def add_legacy_area_group(p):
                    help='classic room maps (the prison ship\'s hold): the listed props\' small closed parts (the '
                         'hammocks\' rings and knots of at most 2.5 units) drawn as their boxes (box, default), or every '
                         'part as authored (off, the method before; PRISON-SHIP-POLY-COLLISION-65)')
+    p.add_argument('--room-shapes', choices=('on', 'off'), default=None,
+                   help='classic room maps (the prison ship\'s hold): the listed shell shapes drawn as the original '
+                        'draws them through the visual reduction: the masts and the other shapes with collision kept '
+                        'whole, the table bands as boxes (on, default), or reduced like the rest (off, the method '
+                        'before; PRISON-SHIP-FLOOR-STUCK-67)')
     p.add_argument('--chim-fence-twosided-faces', choices=('off', 'mirror'), default=None,
                    help='CHIM builder: two-sided see-through planes (cobwebs, hanging moss and vines; EXPERIMENTAL, '
                         'ROOM-DECAL-ALPHA-62): mirror = a mirrored copy of each see-through face (the converter '
@@ -515,16 +529,23 @@ def add_serial_stages_group(p):
                         'is listed. Recorded in the build receipt (public_defaults). With --clean: the release\'s '
                         'from-scratch check')
     p.add_argument('--reuse-from', type=Path, metavar='RUN',
-                   help='Development builds: copy the verified outputs of stages whose input fingerprint is unchanged '
-                        'from this earlier run instead of running them; refused for release candidates and finals. '
-                        'See docs/BUILD_PROFILE.md')
+                   help='Copy the verified outputs of stages whose input fingerprint is unchanged from this earlier '
+                        'run instead of running them (release candidates and finals too, unless '
+                        '--release-from-scratch). See docs/BUILD_PROFILE.md')
     p.add_argument('--reuse-all-available', action='store_true',
-                   help='Development builds: look every stage\'s fingerprint up in every earlier run of the workspace '
-                        'that passed it (the stage index, WORKSPACE/cache/stage-index-v1.json) and reuse it from the '
-                        'newest run that can deliver it, with every --reuse-from check; a --reuse-from RUN is looked '
-                        'at first. Prints one line per stage before any stage runs and stops when a stage would bake '
-                        'again stored units or runs a per-item bake with no cache (see --allow-rebuild). '
+                   help='Look every stage\'s fingerprint up in every earlier run of the workspace that passed it (the '
+                        'stage index, WORKSPACE/cache/stage-index-v1.json) and reuse it from the newest run that can '
+                        'deliver it, with every --reuse-from check; a --reuse-from RUN is looked at first. Prints one '
+                        'line per stage before any stage runs and stops when a stage would bake again stored units or '
+                        'runs a per-item bake with no cache (see --allow-rebuild). A plain build whose workspace holds '
+                        'earlier builds does this by default, with those stops as notices (see --no-reuse). '
                         'See docs/BUILD_CACHE.md "Reuse every earlier run"')
+    # a choice, not a debugging opt-out: its dest does not start with no_ (as --no-live-tracker, tracker_declined)
+    p.add_argument('--no-reuse', dest='reuse_declined', action='store_true',
+                   help='This build only: take no stage from the earlier builds of the workspace (a plain build takes '
+                        'every stage they hold unchanged by default); every stage runs, its units still come from the '
+                        'workspace cache. --clean builds with nothing from earlier builds, in a new workspace. See '
+                        'docs/BUILD_CACHE.md "Reuse earlier builds by default"')
     p.add_argument('--allow-rebuild', action='append', default=[], metavar='STAGE:REASON',
                    help='With --reuse-all-available: let STAGE run although the stage plan would stop on it, for the '
                         'reason given (recorded in build-state.json); repeatable')

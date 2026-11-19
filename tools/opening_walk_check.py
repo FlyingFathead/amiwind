@@ -5,6 +5,8 @@ the dock guard reached his post beside the census office door.
 aw_intro_status prints "Dock guard at X Y Z / leg L / route started S failed F done D / retries R" (aw_opening.c
 AW_OpeningDockStatus). A walk passes only when a line with done 1 is seen within LIMIT status lines after the first
 line of his second walk (leg 0 or 1 with the route started), and his place then is within RADIUS of the post.
+Since PIER-GUARD-POST-STUCK-67 the line goes on with " / from the post P / box in solid N / waits W / route fixed|direct":
+a walk whose box stood inside a solid (a pier post) on any tick fails, even when he reached his post.
 
     python3 tools/opening_walk_check.py LOG [--limit 12] [--radius 24]
 exit 0 = reached, 1 = not reached (the last place and state printed), 2 = no dock guard line in the log.
@@ -16,11 +18,17 @@ import sys
 
 POST = (286.0, -214.0)     # aw_opening.c AW_PIER_GUARD_POST_X / _Y
 LINE = re.compile(r'Dock guard at (-?\d+) (-?\d+) (-?\d+) / leg (\d+) / route started (\d+) failed (\d+) done (\d+)'
-                  r' / retries (\d+)')
+                  r' / retries (\d+)(?: / from the post (\d+) / box in solid (\d+))?')
 
 
 def rows(text):
-    return [tuple(int(v) for v in m.groups()) for m in LINE.finditer(text)]
+    """(x, y, z, leg, started, failed, done, retries, box in solid) per status line; the solid count is 0 on a line
+    from an engine before PIER-GUARD-POST-STUCK-67."""
+    out = []
+    for m in LINE.finditer(text):
+        g = m.groups()
+        out.append(tuple(int(v) for v in g[:8]) + (int(g[9]) if g[9] is not None else 0,))
+    return out
 
 
 def check(text, limit=12, radius=24.0):
@@ -32,6 +40,8 @@ def check(text, limit=12, radius=24.0):
     if start is None:
         start = 0
     for i, r in enumerate(found[start:start + limit + 1]):
+        if r[8]:
+            return 1, 'dock guard\'s box stood inside a solid on %d ticks of his walk (at %d %d)' % (r[8], r[0], r[1])
         if r[6]:
             d = math.hypot(r[0] - POST[0], r[1] - POST[1])
             if d <= radius:

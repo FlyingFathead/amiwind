@@ -163,6 +163,29 @@ class ActorsNativeTests(unittest.TestCase):
         self.assertIn('base model progs/c_crab.mdl', out)
         self.assertIn('base model passed', out)
 
+    def test_spawn_list_reads_every_living_base_with_its_name(self):
+        # DBG-SPAWN-MENU-67: dbg spawn's list is every base of the table that spawns a living actor, with the record id
+        # and the name its text holds (the creature and NPC libraries write aw_source_id and netname, as here); a base
+        # without an id, a body (aw_corpse) and a creature without a model in this build are left out
+        import test_chim_levelled as L
+        library = {'crab': '"aw_source_id" "crab"\n"classname" "aw_npc"\n"model" "progs/c_crab.mdl"\n"netname" "Mudcrab"\n',
+                   'rat': '"aw_source_id" "rat"\n"classname" "aw_npc"\n"model" "progs/c_rat.mdl"\n',
+                   'rat_diseased': '"classname" "aw_npc"\n"model" "progs/c_rat.mdl"\n"netname" "Diseased Rat"\n',
+                   'dead_rat': '"aw_source_id" "dead_rat"\n"classname" "aw_corpse"\n"model" "progs/c_rat.mdl"\n'}
+        data, _ = self.A.build_table(self.A.exterior_actors(L.MASTER), {}, self.A.levelled_lists(L.MASTER),
+                                     self.A.creature_ids(L.MASTER), library)
+        tmp = Path(self.tmp.name)
+        (tmp / 'spawn-actors.cca').write_bytes(data)
+        result = subprocess.run([str(self.exe), 'baseeach', str(tmp / 'spawn-actors.cca'), str(tmp / 'frame.chim'), '0',
+                                 str(tmp / 'frame2.chim')], capture_output=True, text=True, cwd=tmp)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        given = sorted(set(l[5:] for l in result.stdout.splitlines() if l.startswith('each ')))
+        self.assertEqual(given, ['crab|Mudcrab|1', 'rat||1'])
+        count = int(next(l for l in result.stdout.splitlines() if l.startswith('base each ') and 'seen' not in l)[10:])
+        seen = int(next(l for l in result.stdout.splitlines() if l.startswith('base each seen '))[15:])
+        self.assertEqual(count, seen)
+        self.assertGreaterEqual(count, 2)
+
     def test_home_cell_joins_its_levelled_points(self):
         """OUTDOOR-CREATURES-HOME-CELL-67: the region frame map the session loads brings its cell's people and placed
         creatures but no levelled point (tools/chim/region_actors.py defers them), and the window's home frame never

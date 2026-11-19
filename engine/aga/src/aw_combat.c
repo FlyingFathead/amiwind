@@ -539,8 +539,13 @@ static float original_distance(edict_t *a,edict_t *b) {
     return (float)Length(d)/SCALE;
 }
 static slot_t *slot_of(edict_t *e) {int i;for(i=0;i<SLOTS;i++)if(slots[i].e==e)return &slots[i];return NULL;}
-static void print_swing(const char *who,const char *whom,int attack,const aw_swing_t *s) {
-    static const char *outcome[]={"miss","BLOCKED","fatigue","HIT"},*type[]={"chop","slash","thrust"};
+/* OWN: the attacker strikes with a creature's own attacks: its record's attack 1, 2 or 3 (OpenMW mwclass/creature.cpp
+ * hit takes them as the chop, slash and thrust types; CREATURE-NIXHOUND-HUMAN-MOVES-67: the readout said "chop", a
+ * weapon's word, for a nix-hound's bite) */
+static void print_swing(const char *who,const char *whom,int attack,int own,const aw_swing_t *s) {
+    static const char *outcome[]={"miss","BLOCKED","fatigue","HIT"},*weapon[]={"chop","slash","thrust"},
+                      *beast[]={"attack 1","attack 2","attack 3"};
+    const char *const *type=own?beast:weapon;
     if(!readout.value)return;
     if(s->roll<0 && s->roll!=-2){Con_Printf("Combat: %s swings at %s (already down)\n",who,whom);return;}
     if(s->roll==-2)Con_Printf("Combat: %s -> %s: no dice %s%s",who,whom,outcome[s->outcome],s->critical?" CRITICAL":"");
@@ -554,11 +559,9 @@ static void print_swing(const char *who,const char *whom,int attack,const aw_swi
     Con_Printf("%s (%s, swing %ld%%)\n",s->outcome>=AW_HIT_FATIGUE && s->knockdown?" KNOCKDOWN":"",
         type[attack>=0 && attack<3?attack:0],(long)(s->strength*100));
 }
-static void flash(float damage) {
-    cl.cshifts[CSHIFT_DAMAGE].destcolor[0]=190;cl.cshifts[CSHIFT_DAMAGE].destcolor[1]=20;cl.cshifts[CSHIFT_DAMAGE].destcolor[2]=20;
-    cl.cshifts[CSHIFT_DAMAGE].percent+=(int)(3*damage+10);
-    if(cl.cshifts[CSHIFT_DAMAGE].percent>150)cl.cshifts[CSHIFT_DAMAGE].percent=150;
-}
+/* DAMAGE-RED-HUE-67: the red hue of a hurt player is view.c's (V_HitHue: every drop of his health, from any source, in
+ * the original's hit colour and strength, faded over half a second, as OpenMW WindowManager::activateHitOverlay); the
+ * blow's own stand-in flash here (190 20 20 at 3 x damage + 10 of 256) is gone with it */
 
 /* ---- frames ---- */
 static void layout_default(slot_t *s) {
@@ -896,6 +899,10 @@ static void start_block(slot_t *s) {
 static void npc_react_miss(slot_t *s,edict_t *p,const aw_swing_t *out) {
     if(!miss_cvar.value || s->f.dead || s->f.knocked || s->state!=S_CHASE)return;
     if(out->miss_style==2){start_block(s);shield_sound(&s->f);return;}
+    /* CREATURE-NIXHOUND-HUMAN-MOVES-67: the side step is for NPCs and two-legged creatures only (rule from OpenMW
+     * 0.53 mwmechanics/aicombat.cpp AiCombatStorage::updateCombatMove: "dodge movements (for NPCs and bipedal
+     * creatures)"); a four-legged one slid sideways on its run cycle like a person and now only takes the miss */
+    if(s->f.creature==1)return;
     s->dodge_dir=(signed char)dodge_side(s,p);s->dodged=0;
     if(s->dodge_dir)set_state(s,S_DODGE,s->dodge_dir>0?G_DODGER:G_DODGEL);
 }
@@ -960,7 +967,7 @@ static void npc_strike(slot_t *s,edict_t *p) {
     else{
         totals.npc_hits++;
         if(out.outcome==AW_HIT_HEALTH && out.damage<=0){if(!mapped)sound(SND_HEALTH);}   /* god mode: the blow lands, nothing more */
-        else if(out.outcome==AW_HIT_HEALTH){totals.taken_health+=out.damage;flash(out.damage);if(!mapped)sound(SND_HEALTH);
+        else if(out.outcome==AW_HIT_HEALTH){totals.taken_health+=out.damage;if(!mapped)sound(SND_HEALTH);
             /* LEVEL-UP-58: Armor_HitByOpponent for the piece the blow lands on, Unarmored for an empty slot (OpenMW
              * files/data-mw/scripts/omw/combat/local.lua applyArmor); the slot by the roll the hit sounds used */
             {int c=AW_HIT_CLASS(&you,AW_CombatArmorHitSlot((int)((sound_state>>8)%100)));
@@ -970,7 +977,7 @@ static void npc_strike(slot_t *s,edict_t *p) {
             if(!you.dead)voice(p,AW_VOICE_HIT);}
         else{totals.taken_fatigue+=out.damage;if(!mapped)sound(SND_PUNCH);}
     }
-    print_swing(s->f.name,"you",s->attack,&out);
+    print_swing(s->f.name,"you",s->attack,s->f.creature==1,&out);
     /* the hit recovery: a blow that did damage and did not knock the player down (not in god mode: no damage) */
     if(out.outcome!=AW_HIT_BLOCKED && out.outcome!=AW_HIT_MISS && out.damage>0 && !out.knockdown && !you.knocked){
         you_hit_at=(float)sv.time;you_hit_roll=(int)((sound_state>>4)&0xFF);
@@ -1037,7 +1044,7 @@ static void npc_strike_actor(slot_t *s,slot_t *v) {
     v->f.aware=1;actor_strikes++;
     if(p && original_distance(s->e,p)<1024)swing_sounds(&out,&v->f,0);
     if(out.outcome!=AW_HIT_MISS && out.outcome!=AW_HIT_BLOCKED)actor_hits++;
-    if(readout.value)print_swing(s->f.name,v->f.name,s->attack,&out);
+    if(readout.value)print_swing(s->f.name,v->f.name,s->attack,s->f.creature==1,&out);
     /* the victim fights back (OpenMW onHit: the attacked actor takes the attacker as its target) unless it fights
      * the player */
     if(!v->f.dead && v->target_num && v->target_num!=(short)NUM_FOR_EDICT(s->e) && !actor_target(v))
@@ -1324,7 +1331,7 @@ static void player_strike(edict_t *p) {
         AW_LevelupUse(you.weapon?you.weapon_skill:AW_SK_H2H,0,1);
         if(!mapped)sound(out.critical?SND_CRITICAL:out.outcome==AW_HIT_HEALTH?SND_HEALTH:SND_PUNCH);
     }
-    print_swing("You",s->f.name,attack,&out);
+    print_swing("You",s->f.name,attack,0,&out);
     you_store(p);
     if(s->f.dead){
         set_state(s,S_DEAD,G_DEATH);s->e->v.solid=SOLID_NOT;SV_LinkEdict(s->e,false);sound(SND_FALL);
@@ -1625,11 +1632,11 @@ static void shot_hit(slot_t *s,edict_t *p,float strength) {
     if(out.outcome==AW_HIT_MISS || out.outcome==AW_HIT_BLOCKED){totals.npc_misses++;shots_missed++;}
     else{
         totals.npc_hits++;shots_hit++;
-        if(out.outcome==AW_HIT_HEALTH && out.damage>0){totals.taken_health+=out.damage;flash(out.damage);sound(SND_HEALTH);
+        if(out.outcome==AW_HIT_HEALTH && out.damage>0){totals.taken_health+=out.damage;sound(SND_HEALTH);
             if(!you.dead)voice(p,AW_VOICE_HIT);}
         else if(out.outcome==AW_HIT_FATIGUE)totals.taken_fatigue+=out.damage;
     }
-    print_swing(s->f.name,"you",0,&out);
+    print_swing(s->f.name,"you",0,s->f.creature==1,&out);
     if(out.knockdown && you.knocked==1)totals.player_down_until=sv.time+knock_seconds;
     you_store(p);
     if(you.dead){
@@ -1891,7 +1898,13 @@ static void think(slot_t *s,edict_t *p,float dt) {
     }
     if(s->path.mode==AW_PATH_LOST){
         totals.npc_flees++;
-        if(readout.value)Con_Printf("Combat: %s cannot reach you and flees\n",s->f.name);
+        /* CREATURE-HOSTILE-FLEES-67: where it gave up, so a sighting carries its own numbers (2026-11-18's sessions on
+         * the dev2 image fled 0 times: one scamp on the arena's flat floor, three at once, two on the ground of the
+         * maintainer's cliff racer picture): its place and the player's, the gap between the bodies and the height of
+         * the player's feet over its feet (a player on a rock above its reach is the original's case to flee) */
+        if(readout.value)Con_Printf("Combat: %s cannot reach you and flees (at %ld %ld %ld, you at %ld %ld %ld; gap %ld, "
+            "your feet %+ld)\n",s->f.name,(long)s->e->v.origin[0],(long)s->e->v.origin[1],(long)s->e->v.origin[2],
+            (long)p->v.origin[0],(long)p->v.origin[1],(long)p->v.origin[2],(long)gap,(long)dz);
         voice(s->e,AW_VOICE_FLEE);
         set_state(s,S_FLEE,G_RUN);s->decide_at=(float)sv.time+3.0f;return;
     }

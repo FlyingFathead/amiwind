@@ -161,7 +161,10 @@ class AlchemySourceContracts(unittest.TestCase):
         ui = code('aw_worldui.c')
         self.assertIn('ok=aw_worldui_use(item);', ui)
         self.assertIn('if(ok==2){close_panel();if(aw_worldui_alchemy_open)aw_worldui_alchemy_open();return;}', ui)
-        self.assertIn('inventory_action(inventory_usable(item)?3:', ui)   # then Read for books (4), else Equip
+        # INVENTORY-EQUIP-HINTS-67: the use key does the kind's one action; a potion's, an ingredient's and an
+        # apparatus' is Use through this hook (the table of every kind: tests/test_inventory_actions.py)
+        self.assertIn('case AW_INV_ACT_USE:return inventory_usable(item)?3:0;', ui)
+        self.assertIn('if(AW_INV_USABLE_KIND(it))return AW_INV_ACT_USE;', code('aw_inventory.c'))
         # MADE-ITEM-NO-PICTURE-62: a made item's row shows its base item's picture
         self.assertIn('aw_worldui_icon_id?aw_worldui_icon_id(it->id):it->id', ui)
         self.assertIn('aw_worldui_icon_id=icon_id;', code('aw_alchemy.c'))

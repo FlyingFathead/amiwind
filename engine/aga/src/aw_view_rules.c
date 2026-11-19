@@ -27,6 +27,18 @@
 
 #define SCALE .25f
 
+/* PLAYER-VANITY-WALK-STUCK-67 (aw_view.h) */
+int AW_ViewBodySigChanged(aw_view_body_sig_t *last,const aw_view_body_sig_t *now) {
+    int changed=!last->valid || !now->valid || last->mode!=now->mode || last->movetype!=now->movetype ||
+        last->swimming!=now->swimming || last->playing!=now->playing || last->drawn!=now->drawn;
+    *last=*now;
+    return changed;
+}
+void AW_ViewBodyRestart(aw_anim_play_t *play,aw_anim_air_t *air) {
+    memset(play,0,sizeof(*play));play->group=255;
+    memset(air,0,sizeof(*air));
+}
+
 int AW_ViewTorchParse(aw_view_torch_t *out,const unsigned char *p,int size,int frames) {
     int count,i,k;uint32_t value;int32_t signed_value;
     if(!out)return 0;
@@ -160,8 +172,23 @@ void AW_ViewReset(aw_view_t *v,const aw_view_rules_t *r) {
     v->mode=v->primary=AW_VIEW_FIRST;     /* the original starts in first person */
     v->distance=r->base_distance;
 }
+void AW_ViewLock(aw_view_t *v,int mode) {
+    if(mode!=AW_VIEW_FIRST && mode!=AW_VIEW_THIRD && mode!=AW_VIEW_VANITY){v->locked=0;return;}
+    v->locked=mode+1;v->mode=mode;v->idle=v->pov_held=0;
+    if(mode!=AW_VIEW_VANITY)v->primary=mode;
+    v->orbit_yaw=v->orbit_pitch=0;
+}
+int AW_ViewLockedMode(const aw_view_t *v) {return v && v->locked>0?v->locked-1:-1;}
+/* the locked mode held (called by every rule that would change the mode); 1 = locked */
+static int view_held(aw_view_t *v) {
+    if(!v->locked)return 0;
+    v->mode=v->locked-1;v->pov_held=0;
+    if(v->mode!=AW_VIEW_VANITY)v->primary=v->mode;
+    return 1;
+}
 void AW_ViewPOV(aw_view_t *v,const aw_view_rules_t *r,int held,float dt) {
     if(v->mode==AW_VIEW_DEATH)return;
+    if(view_held(v))return;
     if(held){
         v->pov_held+=dt;
         if((v->primary==AW_VIEW_THIRD || v->pov_held>=r->switch_limit) && v->mode!=AW_VIEW_PREVIEW){
@@ -180,6 +207,12 @@ void AW_ViewPOVTap(aw_view_t *v,const aw_view_rules_t *r) {
 int AW_ViewVanityAllowed(int enabled,int body,int arena) {return enabled && body && !arena;}
 void AW_ViewIdle(aw_view_t *v,const aw_view_rules_t *r,int input,int allowed,float dt) {
     if(v->mode==AW_VIEW_DEATH)return;
+    if(view_held(v)){
+        /* locked: the idle clock never starts the orbit; a locked orbit turns whatever the input */
+        v->idle=0;
+        if(v->mode==AW_VIEW_VANITY){v->orbit_yaw+=r->vanity_rate*dt;if(v->orbit_yaw>=360)v->orbit_yaw-=360;}
+        return;
+    }
     if(input)v->idle=0;else v->idle+=dt;
     if(allowed && v->idle>r->vanity_delay && v->mode!=AW_VIEW_VANITY){
         v->mode=AW_VIEW_VANITY;v->orbit_yaw=v->orbit_pitch=0;
@@ -192,8 +225,15 @@ void AW_ViewIdle(aw_view_t *v,const aw_view_rules_t *r,int input,int allowed,flo
         }
     }
 }
+void AW_ViewOrbitHold(aw_view_t *v,float view[3],float anchor[3],int entered,int forced) {
+    int k;
+    if(entered || forced)for(k=0;k<3;k++)anchor[k]=view[k];
+    if(forced)v->orbit_yaw=v->orbit_pitch=0;
+    v->orbit_yaw+=view[1]-anchor[1];v->orbit_pitch+=view[0]-anchor[0];     /* Quake angles: 0 pitch, 1 yaw */
+    for(k=0;k<3;k++)view[k]=anchor[k];
+}
 void AW_ViewZoom(aw_view_t *v,const aw_view_rules_t *r,float delta) {
-    if(v->mode==AW_VIEW_DEATH || !delta)return;
+    if(v->mode==AW_VIEW_DEATH || !delta || view_held(v))return;
     if(v->mode!=AW_VIEW_FIRST){
         if(delta>0 && v->distance<=r->min_distance && v->mode!=AW_VIEW_PREVIEW){
             v->primary=v->mode=AW_VIEW_FIRST;return;

@@ -74,6 +74,10 @@ int AW_LoadErrReason(const aw_loaderr_t *e,char *out,int size){
 }
 static void put_code(text_t *t,const aw_loaderr_t *e){put(t," Code ");put(t,AW_LoadErrCode(e->kind));put(t,".");}
 static int no_place(const aw_loaderr_t *e){return e->way==AW_WAY_FAILED || e->way==AW_WAY_NOWHERE;}
+/* AW-RECOVER: the way back (or the place again) failed, and the same error came again soon after a recovery; the
+ * records before the chain say both with their way alone (AW_WAY_FAILED; in play AW_WAY_NOWHERE) */
+static int back_failed(const aw_loaderr_t *e){return e->back_failed || e->way==AW_WAY_FAILED;}
+static int again(const aw_loaderr_t *e){return e->again || (e->in_play && e->way==AW_WAY_NOWHERE);}
 int AW_LoadErrBox(const aw_loaderr_t *e,char *out,int size){
     text_t t;char reason[192];
     t.out=out;t.size=size;t.used=0;
@@ -82,17 +86,37 @@ int AW_LoadErrBox(const aw_loaderr_t *e,char *out,int size){
     if(e->in_play){
         /* an error in play, no load running (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66): the place is loaded again */
         put(&t,"An error stopped the game in ");put_map(&t,e);
-        put(&t,e->way==AW_WAY_FAILED?", and loading it again failed as well":
-               e->way==AW_WAY_NOWHERE?" again soon after":"; it was loaded again");
+        if(again(e))put(&t," again soon after");
+        else if(back_failed(e))put(&t,", and loading it again failed as well");
+        else if(e->way==AW_WAY_BACK)put(&t,"; it was loaded again");
     }
     else if(e->kind==AW_LOADERR_NO_POINT)putf_long(&t,"No map holds the point %ld %ld",(long)e->x,(long)e->y);
     else{put(&t,"Map ");put_map(&t,e);put(&t,not_found(e->kind)?" was not found":" was found but could not be loaded");}
-    if(!e->in_play && e->way==AW_WAY_FAILED){put(&t,", and the way back to ");put_clean(&t,e->back_map[0]?e->back_map:"?");put(&t," failed as well");}
+    if(!e->in_play && back_failed(e)){put(&t,", and the way back to ");put_clean(&t,e->back_map[0]?e->back_map:"?");put(&t," failed as well");}
     put(&t,".");
     if(AW_LoadErrReason(e,reason,sizeof(reason))){put(&t,"\n");put(&t,reason);}
     put_code(&t,e);
     put(&t,"\n");
+    /* AW-RECOVER: the later steps that were tried and did not load either */
+    if(e->save_failed || e->previous_failed){
+        put(&t,e->save_failed && e->previous_failed?"The last autosave and the previous map did not load either.":
+               e->save_failed?"The last autosave did not load either.":"The previous map did not load either.");
+        put(&t,"\n");
+    }
     if(no_place(e))put(&t,"Load a saved game to go on.");
+    else if(e->way==AW_WAY_AUTOSAVE || e->way==AW_WAY_PREVIOUS){
+        /* AW-RECOVER: which one was loaded, then where he is (before the arrival: which one is loading) */
+        if(e->way==AW_WAY_AUTOSAVE){
+            put(&t,"The last autosave");
+            if(e->save_label[0]){put(&t," (");put_clean(&t,e->save_label);put(&t,")");}
+        }else{
+            put(&t,"The previous map");
+            if(e->previous_map[0]){put(&t,", ");put_clean(&t,e->previous_map);put(&t,",");}
+        }
+        if(e->here_place[0] || e->here_map[0]){
+            put(&t," was loaded. You are in ");put_clean(&t,e->here_place[0]?e->here_place:e->here_map);put(&t,".");
+        }else put(&t," is loading.");
+    }
     else if(!e->here_place[0] && !e->here_map[0] && e->way==AW_WAY_BACK && e->back_map[0]){
         /* the console's block is written when the load fails, before the way back has arrived */
         put(&t,e->in_play?"Loading ":"Going back to ");put_clean(&t,e->back_map);put(&t,e->in_play?" again.":".");
@@ -162,7 +186,17 @@ int AW_LoadErrConsole(const aw_loaderr_t *e,char *out,int size){
         put_point(&t,e->here_map,e->here);
         if(e->here_place[0]){put(&t," (");put_clean(&t,e->here_place);put(&t,")");}
         if(e->way==AW_WAY_BACK)put(&t,e->in_play?", the place loaded again":", back where the load started");
+        else if(e->way==AW_WAY_AUTOSAVE){
+            put(&t,", the last autosave");
+            if(e->save_label[0]){put(&t," (");put_clean(&t,e->save_label);put(&t,")");}
+        }
+        else if(e->way==AW_WAY_PREVIOUS)put(&t,", the previous map");
     }else if(e->way==AW_WAY_BACK){put(&t,e->in_play?"loading again ":"going back to ");put_clean(&t,e->back_map);}
+    else if(e->way==AW_WAY_AUTOSAVE){
+        put(&t,"loading the last autosave");
+        if(e->save_label[0]){put(&t," (");put_clean(&t,e->save_label);put(&t,")");}
+    }
+    else if(e->way==AW_WAY_PREVIOUS){put(&t,"loading the previous map ");put_clean(&t,e->previous_map);}
     else put(&t,"where he was");
     put(&t,"\n");
     return t.used;

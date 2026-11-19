@@ -1,0 +1,28 @@
+# Look book page ROBE-WORN (tests/lookbook/pages.json; docs/lookbook/ROBE-WORN.md): a common robe put on shows on the
+# body in third person and on the arms in first person (ROBE-PART-NOT-BAKED-62, confirmed by the maintainer on the
+# v0.0.67-dev2 image). The numbers: the robe is the one worn (aw_inventory worn), the third-person body is assembled
+# from what is worn and the first-person arms from parts (aw_camera's status lines); the pictures beside them.
+cmd aw_inventory wear common_robe_01
+wait 4
+probe robe_worn aw_inventory worn
+expect has robe_worn common_robe_01
+cmd aw_camera third
+wait 4
+probe robe_body aw_camera
+expect has robe_body Assembled body:
+expect lacks robe_body Assembled body: off
+pick robe_parts robe_body after Assembled body:
+expect robe_parts >= 2
+still robe-third
+cmd aw_camera first
+wait 3
+cmd aw_aim 0 50
+wait 2
+probe robe_arms aw_camera
+expect has robe_arms First-person arms:
+expect lacks robe_arms the baked arms
+still robe-first-down
+cmd aw_inventory unequip common_robe_01
+wait 2
+cmd aw_aim 0 0
+wait 1

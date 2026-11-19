@@ -429,6 +429,11 @@ class NativeSourceTests(unittest.TestCase):
         self.compile_run('aga_world_regions_test.c', [Path(SOURCE)/'src/aw_world.c'],
             cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
 
+    def test_mournhold_district_rows_join_the_one_region_table(self):
+        # MOURNHOLD-EXTERIOR-CELLS-66: the Tribunal module's own rows file (world/regions-mh.awr, mhNNNN)
+        self.compile_run('aga_world_regions_test.c', [Path(SOURCE)/'src/aw_world.c'],
+            cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'], arguments=['mournhold'])
+
     def test_coordinate_teleport_inside_the_loaded_map_without_the_region_table(self):
         # DEBUG-TP-MINIWIND-36: a MiniWind disk ships no open-world region table; dbg tp X Y resolves a point inside
         # the loaded map (its CHIM frame) and only that, and a refusal names the maps the disk holds
@@ -556,8 +561,9 @@ class NativeSourceTests(unittest.TestCase):
             cflags=['-Wl,--wrap=COM_FOpenFile','-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
 
     def test_inventory_fullscreen_events_real_equip_atomic_drop_and_exit(self):
+        # INVENTORY-ITEM-INFO-67: with the item information box (aw_iteminfo.c) and the layout helper it is laid out by
         self.compile_run('aga_inventory_ui_test.c', [Path(SOURCE)/'src'/n for n in
-            ('aw_worldui.c','aw_mapfog.c','aw_mapmarks.c','aw_listbox_rules.c','aw_msgbox_rules.c','aw_questbook.c','aw_jhist.c','aw_ledger.c','aw_textdef.c','aw_inventory.c','aw_harvest.c','aw_state.c','aw_save_codec.c','mathlib.c','common.c')],
+            ('aw_worldui.c','aw_mapfog.c','aw_mapmarks.c','aw_listbox_rules.c','aw_msgbox_rules.c','aw_questbook.c','aw_jhist.c','aw_ledger.c','aw_textdef.c','aw_inventory.c','aw_harvest.c','aw_state.c','aw_save_codec.c','mathlib.c','common.c','aw_iteminfo.c')],
             defines=['AW_INVENTORY_RULES_ONLY','AW_TEXTDEF_HOST_TEST'],
             cflags=['-Wl,--wrap=COM_FOpenFile','-Werror=implicit-function-declaration','-fsanitize=undefined,float-cast-overflow','-fno-sanitize-recover=all'])
 
@@ -580,6 +586,14 @@ class NativeSourceTests(unittest.TestCase):
     def test_world_map_journal_disk_bounds_navigation_and_modal_exit(self):
         self.compile_run('aga_worldui_test.c', [Path(SOURCE)/'src'/n for n in ('aw_worldui.c','aw_mapfog.c','aw_mapmarks.c','aw_listbox_rules.c','aw_msgbox_rules.c','aw_questbook.c','aw_jhist.c','aw_ledger.c','aw_textdef.c','aw_inventory.c','aw_state.c','aw_save_codec.c','mathlib.c')],
             defines=['AW_INVENTORY_RULES_ONLY','AW_TEXTDEF_HOST_TEST'], cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'])
+
+    def test_world_map_first_view_and_showmap_rule_parts(self):
+        # MAP-WORLD-TAB-BLANK-67 (the in-game World view's first showing in a game: on the player, the explored land in
+        # view, by every route) and MAP-PLACES-SHOWN-UNVISITED-67 (ShowMap: a cell name starting with the text), each
+        # part alone so each fails on its own when its rule breaks; the full run above has them too
+        self.compile_run('aga_worldui_test.c', [Path(SOURCE)/'src'/n for n in ('aw_worldui.c','aw_mapfog.c','aw_mapmarks.c','aw_listbox_rules.c','aw_msgbox_rules.c','aw_questbook.c','aw_jhist.c','aw_ledger.c','aw_textdef.c','aw_inventory.c','aw_state.c','aw_save_codec.c','mathlib.c')],
+            defines=['AW_INVENTORY_RULES_ONLY','AW_TEXTDEF_HOST_TEST'], cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'],
+            argument_sets=[('world_first_view',), ('showmap_starts',)])
 
     def test_mouse_event_order_accumulation_modal_reset_and_signed_deltas(self):
         cases = ('same_batch_tabs', 'sequential_clamp', 'game_accumulation',
@@ -1053,6 +1067,10 @@ class NativeSourceTests(unittest.TestCase):
         if any(p.name in ("common.c", "aw_inventory.c") for p in sources) and \
                 not any(p.name == "aw_fopenbuf.c" for p in sources):
             sources = [*sources, tree/"src/aw_fopenbuf.c"]
+        # the check command's view of a container (aw_inventory.c aw_placed container aim: AW_AimEye,
+        # DBG-CONTAINER-AIM-OUT-OF-REACH-67) is one of the use key's rules
+        if any(p.name == "aw_inventory.c" for p in sources) and not any(p.name == "aw_activate_rules.c" for p in sources):
+            sources = [*sources, tree/"src/aw_activate_rules.c"]
         if any(p.name in ("aw_scene.c", "aw_scenery.c") for p in sources):
             sources = [*sources, tree/"src/aw_harvest.c", tree/"src/aw_harvest_runtime.c"]
             if not any(p.name == "aw_state.c" for p in sources):
@@ -1070,6 +1088,10 @@ class NativeSourceTests(unittest.TestCase):
         # The music stream reads through the asynchronous reader (HANG-IDLE-DUSK-35).
         if any(p.name == "aw_music.c" for p in sources) and not any(p.name == "aw_aread.c" for p in sources):
             sources = [*sources, tree/"src/aw_aread.c"]
+        # UI-NO-SHARED-LAYOUT-67: the shared layout's table and check (aw_layout.c), for the box rules and the UI
+        if any(p.name in ("aw_ui.c", "aw_msgbox_rules.c", "aw_character.c") for p in sources) and \
+                not any(p.name == "aw_layout.c" for p in sources):
+            sources = [*sources, tree/"src/aw_layout.c"]
         # Weak stand-ins for the quick character screen, the test channels and the notice
         # (tests/aga_hook_stubs.c): fixtures that link the real modules keep them.
         sources = [*sources, ROOT/"tests/aga_hook_stubs.c"]
@@ -1146,6 +1168,29 @@ class NativeSourceTests(unittest.TestCase):
         self.assertIn('Cvar_RegisterVariable(&aw_arrival_clear);', scene)
         self.assertIn('Cvar_RegisterVariable (&aw_body_overlap);',
                       (ROOT/'engine/aga/src/sv_main.c').read_text(encoding='utf-8'))
+
+    def test_an_arrival_far_below_its_asked_height_is_held_until_the_floor_is_loaded(self):
+        # MOURNHOLD-BAZAAR-UNDER-WATER-67: a teleport with a height into Mournhold's Great Bazaar set the player down
+        # under the street from the first second on (eye at frame-local -53, the street at 74; the same 60 units into
+        # the street): the street's collision was not in the ring yet when the first surface at or below the height
+        # was searched. The asked height names the floor, so a landing more than 64 below it holds the player at the
+        # asked point without gravity while the ring loads, the standing-spot rule is asked each frame, and after
+        # 8 seconds without a floor the first landing is kept (a point over deep ground or open water).
+        scene = (ROOT/'engine/aga/src/aw_scene.c').read_text(encoding='utf-8')
+        begin = scene[scene.index('static void arrival_hold_begin('):scene.index('static void arrival_hold_tick(')]
+        self.assertIn('p->v.origin[2]+p->v.mins[2]>=asked[2]-ARRIVAL_HOLD_DROP)return;', begin)
+        self.assertIn('if(!aw_arrival_hold.value || p->v.movetype!=MOVETYPE_WALK)return;', begin)
+        self.assertIn('p->v.movetype=MOVETYPE_NONE;', begin)
+        tick = scene[scene.index('static void arrival_hold_tick('):scene.index('int AW_InteriorPlace(')]
+        self.assertIn('if(standing_spot(p,p->v.origin,point)){', tick)
+        self.assertIn('install_spot(p,arrival_hold.first);p->v.movetype=MOVETYPE_WALK;', tick)
+        self.assertIn('#define ARRIVAL_HOLD_DROP 64', scene)
+        self.assertIn('#define ARRIVAL_HOLD_SECONDS 8', scene)
+        self.assertIn('if(map_jump==2 && placed)arrival_hold_begin(p,next.arrival);', scene)
+        self.assertLess(scene.index('arrival_hold_tick();    /*'), scene.index('arrival_clear_tick();   /*'))
+        self.assertIn('Cvar_RegisterVariable(&aw_arrival_hold);', scene)
+        # a new map, a cancelled transition: no hold is carried over
+        self.assertIn('arrival_watch.on=0;arrival_hold.on=0;', scene)
 
     def test_failed_step_inside_solid_settles_once(self):
         # AMBIENT-UNSTUCK-FLOOD-61: a resident put back inside solid by a failed step searched for a clear spot at

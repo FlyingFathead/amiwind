@@ -1,6 +1,6 @@
 # Combat and the Vivec Arena minigame
 
-_Last updated with AmiWind v0.0.66-dev1 (13 November 2026)._
+_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -236,6 +236,12 @@ your own master file when the image is built.
   step-cell search) never warps and never gives up: it flees, running straight away for one second,
   then stands and watches, and decides again every three seconds, so it comes back as soon as you
   are reachable. Reference: `aicombat.cpp` (no path: flee; flee cooldown 3 s; no combat timeout).
+  With the combat readout on (the default) its line says where it gave up: its place and yours, the
+  gap between the two bodies and how high your feet are over its own, so a flight in the open can
+  be told from a player out of reach on a rock.
+- A creature whose Fight cannot reach 100 at any distance never attacks on sight, as in the original
+  (Fight plus 20 near you, less with distance): a scrib (Fight 50) goes on with its wandering when
+  you come near, as it does in the original.
 - Every swing costs fatigue: fFatigueAttackBase + load x fFatigueAttackMult +
   weapon weight x swing x fWeaponFatigueMult (the load counts since v0.0.66;
   the original masters set both load factors to 0, a mod may not). NPCs wait
@@ -258,6 +264,13 @@ your own master file when the image is built.
   land train their weapon's skill (Hand-to-hand for fists), a block trains Block, and a blow that hurts you trains
   the armour skill of the piece it lands on (Unarmored for an empty slot). Reference: `combat/local.lua`. The rules
   of the training and the level-up: [Levelling](CHARACTER_CREATION.md#levelling).
+- The red hue when you are hurt (v0.0.67): the screen takes a short red hue whenever your health drops, from a
+  blow, a spell, a fall, lava or drowning. The original shows its hit overlay texture at full strength on every loss
+  of health and fades it out over half a second (OpenMW `mwgui/windowmanagerimp.cpp`,
+  `WindowManager::activateHitOverlay`). AmiWind draws it as Quake's damage palette shift, in the overlay's own colour
+  and strength read from the game data (`textures\bm_player_hit_01`: dark red 129 0 0, a mean opacity of about 15 %
+  of the screen). It fades over the same half second. Before v0.0.67 only a blow showed a flash, at a strength that
+  a small hit barely moved.
 
 ## Blocking
 

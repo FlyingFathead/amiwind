@@ -221,8 +221,10 @@ class EngineSources(unittest.TestCase):
         self.assertIn('quick_go(&r,"Seyda Neen");', menu)
         self.assertIn('r.arrival[2]=64;r.yaw=90;', menu)                  # the same arrival as in play
         catalogue = (ROOT / 'config/debug-commands.txt').read_text(encoding='utf-8')
-        self.assertIn('PLAYTESTING|aw hors|aw_debug_hors|0 (new Hors, Nord / Barbarian / Steed, after Census; '
-                      'in play or from the main menu)', catalogue)
+        # DBG-HORS-AFTER-CENSUS-67: the bare form walks out of the census office; 0 keeps this start
+        self.assertIn('PLAYTESTING|aw hors|aw_debug_hors|[0] (alone: a new game, reset as New Game does, as Hors',
+                      catalogue)
+        self.assertIn('0: Hors after Census at Seyda Neen\'s centre; in play or from the main menu)', catalogue)
 
     @unittest.expectedFailure  # EXPERIMENTAL, unfinished: the quick character screen work in progress
     # (docs/EXPERIMENTAL_FLAGS.md); this check passes once that part is written

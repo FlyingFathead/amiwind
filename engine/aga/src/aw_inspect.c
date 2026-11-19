@@ -13,6 +13,7 @@
 #include "aw_character.h"
 #include "aw_inspect.h"
 #include "aw_world.h"
+#include "aw_combat.h"   /* AW_CombatFighter; aw_actorstate.h: the live record and the actor table */
 #define INSPECT_ROWS 10
 #define INSPECT_WIDTH AW_INSPECT_LINE
 #define INSPECT_REACH 2048.0f
@@ -42,6 +43,19 @@ static void text_field(const char *label,const char *value) {
 static const char *edict_string(edict_t *e,char *field) {
     eval_t *v=GetEdictFieldValue(e,field);
     return v && v->string?pr_strings+v->string:NULL;
+}
+/* CREATURE-HOSTILE-FLEES-67: an actor's own health, and where it was read. v.health is Quake's field: the engine keeps
+ * the player's there and never an actor's, so the line read 0.0 for every living creature (CREATURE-MESH-HOLES-62,
+ * COMBAT-DAEDROTH-NO-HIT-51). The fight's sheet while it fights, else its live record (the area load makes one for
+ * every placed actor), else its actor table row; NULL when it is no actor (the player keeps v.health). A few small
+ * reads per click, none per frame. */
+static const char *actor_health(edict_t *e,const char *id,long ref,float *now,float *max) {
+    const aw_fighter_t *f=AW_CombatFighter(e);aw_actor_t *a;aw_actor_base_t b;int row;
+    if(f){*now=f->health;*max=f->health_max;return "fight";}
+    if(!id || !*id || (row=AW_ActorFind(id))==AW_ACTOR_NONE)return NULL;
+    if(ref>0 && (a=AW_ActorGet((uint32_t)ref,row,0))!=NULL){*now=a->dyn_cur[0];*max=a->dyn_base[0];return "record";}
+    if(!AW_ActorBase(row,&b))return NULL;
+    *now=*max=(float)b.health;return "actor table";
 }
 /* R_AliasCheckBBox's current frame box and R_AliasSetUpTransform's pitch/scale.
  * Whole-model bounds include death poses: they can reach across a foreground
@@ -145,7 +159,7 @@ int AW_InspectTarget(int *edict,float *focal) {
 static void pin_target(void) {
     edict_t *best=NULL;entity_t *st=NULL;model_t *m;
     vec3_t eye,dir,position,global;float limit;int index,slot=-1,bounds=0,r;
-    char value[INSPECT_WIDTH];eval_t *ref;
+    char value[INSPECT_WIDTH];eval_t *ref;const char *id,*from;long number=0;float now,max;
     rows=0;
     r=pick(&best,&st,&slot,&bounds,eye,dir,&limit);
     if(!r){text_field("Inspect","no local scene");return;}
@@ -181,14 +195,18 @@ static void pin_target(void) {
         snprintf(value,sizeof(value),"entity %ld / %s",(long)NUM_FOR_EDICT(best),bounds?"frame bounds pick":"collision pick");text_field("PINNED",value);
         snprintf(value,sizeof(value),"%s / %s",best->v.classname?pr_strings+best->v.classname:"world",
                  best->v.netname?pr_strings+best->v.netname:"unnamed");text_field("class/name",value);
-        text_field("source id",edict_string(best,"aw_source_id"));
+        id=edict_string(best,"aw_source_id");
+        text_field("source id",id);
         ref=GetEdictFieldValue(best,"aw_ref");
         if(ref && isfinite(ref->_float) && ref->_float>0 && ref->_float<2147483648.0f){
-            snprintf(value,sizeof(value),"%ld",(long)ref->_float);text_field("source ref",value);
+            number=(long)ref->_float;snprintf(value,sizeof(value),"%ld",number);text_field("source ref",value);
         }else text_field("source ref",NULL);
         index=(int)best->v.modelindex;m=index>0 && index<MAX_MODELS?sv.models[index]:NULL;
         text_field("model",m?m->name:best->v.model?pr_strings+best->v.model:NULL);
-        snprintf(value,sizeof(value),"frame %ld / skin %ld / health %.1f",(long)best->v.frame,(long)best->v.skin,best->v.health);
+        if((from=actor_health(best,id,number,&now,&max))!=NULL)
+            snprintf(value,sizeof(value),"frame %ld / skin %ld / health %.1f of %.0f (%s)",(long)best->v.frame,
+                     (long)best->v.skin,now,max,from);
+        else snprintf(value,sizeof(value),"frame %ld / skin %ld / health %.1f",(long)best->v.frame,(long)best->v.skin,best->v.health);
         text_field("server runtime",value);
     }
     snprintf(value,sizeof(value),"%s / hit %.1f %.1f %.1f",sv.name,position[0],position[1],position[2]);text_field("scene",value);

@@ -3,6 +3,7 @@ on their own inputs, the bake code's reach and the settings it reads (NPC-LIBRAR
 build re-baked 418 appearances and 57 creature models because the stage was refused reuse); and the reuse plan marks
 a stage planned for reuse whose inputs are rebuilt as at risk."""
 import inspect
+import json
 import os
 import shutil
 import sys
@@ -282,6 +283,14 @@ class StoreErrorsLoud(unittest.TestCase):
                 locked.chmod(0o755)
 
 
+# BUILD-ROOM-ACTOR-REKEY-67: the room-actor key of the fit code after the room record readers moved into
+# tools/chim/room_records.py, and the keys of the v0.0.67-dev2 tree (0d6f7ab7) and the dev3 line (43c98a1f) its units
+# were stored under (measured in the container, tools/unit_store.py LEGACY_SOURCES)
+ROOM_ACTOR_KEY = 'b2af5feaea268a6f5d130b6bee116ab83c6f59ba41e6bbbc36d03034b7018b80'
+ROOM_ACTOR_OLDER = ('45e60497f2e8bc21ba39c84d15239ba879cfe12a5f373fceff724ed612c9c803',
+                    'd66c53fad4295a46ab4c286da92c55ad93903123b28dfa467f5b6139e966c738')
+
+
 class RoomActorUnits(unittest.TestCase):
     def test_placements_are_kept_as_they_settle_and_found(self):
         import actor_units
@@ -301,7 +310,7 @@ class RoomActorUnits(unittest.TestCase):
                     fitted.append(task[3]['aw_ref'])
                     keep(j, {'placed_origin': (0.0, 0.0, task[4][2] + 0.25), 'status': 'supported'})
             cache = pass_cache.UnitCache('room-actor', {'environment': {}}, 'r', folder + '/c')
-            with mock.patch('chim.interior.installed_room', side_effect=ValueError('no room record')):
+            with mock.patch('chim.room_records.installed_room', side_effect=ValueError('no room record')):
                 first = actor_units.fit_room_actors(tasks, 2, cache, maps, fit_all, log=lambda *a, **k: None)
                 self.assertEqual(fitted, ['0', '1', '2'])
                 fitted.clear()
@@ -311,6 +320,80 @@ class RoomActorUnits(unittest.TestCase):
                 (maps / 'room_a.chim').write_bytes(b'room a, other collision')
                 actor_units.fit_room_actors(tasks, 2, cache, maps, fit_all, log=lambda *a, **k: None)
                 self.assertEqual(fitted, ['0', '1', '2'], 'a changed room map re-keys its placements')
+
+    # the room-actor key: pass_cache.source_digest of these (room_actor_bake._bake)
+    FIT = (('tools/room_actor_bake.py', '_fit_head'), ('tools/room_actor_bake.py', '_fit_search'),
+           ('tools/actor_grounding.py', 'finish'))
+
+    def test_the_fit_reaches_the_room_records_not_the_room_conversion(self):
+        """BUILD-ROOM-ACTOR-REKEY-67: the fits read a room only through tools/chim/room_records.py, so neither the room
+        conversion (tools/chim/interior.py: its import-time code and the settings file a default value there names)
+        nor its settings (config/chim-rooms.json) are in the room-actor key; the readers the fit runs are."""
+        from build_cache import SourceIndex
+        import pass_cache
+        index = SourceIndex(ROOT, top_format=pass_cache.PASS_KEY_FORM)
+        files, units = set(), {}
+        for script, function in self.FIT:
+            python, data, uncertain, reached = index.entry_units(ROOT / script, function)
+            self.assertFalse(uncertain, function)
+            files |= set(python) | set(data)
+            for path, names in reached.items():
+                units.setdefault(path, set()).update(names)
+        self.assertNotIn('tools/chim/interior.py', files)
+        self.assertNotIn('config/chim-rooms.json', files)
+        self.assertLessEqual({'installed_room', 'store_model_images', 'read_room_record'},
+                             units.get('tools/chim/room_records.py', set()))
+
+    def test_a_room_conversion_edit_keeps_the_key_and_a_fit_input_reader_edit_moves_it(self):
+        """The room-actor key does not move for the room recipes and the everywhere switch (config/chim-rooms.json),
+        nor for the room visual functions and a new module-level setting of tools/chim/interior.py (v0.0.67-dev3:
+        those two files moved the key of all 2,342 fits, whose output they do not change); it still moves for an edit
+        of what the fit reads: the room record reader, the room collision and the fit itself."""
+        import pass_cache
+        with tempfile.TemporaryDirectory() as folder:
+            copy = Path(folder) / 'repo'
+            for part in ('tools', 'src', 'config'):
+                shutil.copytree(ROOT / part, copy / part, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+
+            def digest():
+                with mock.patch.multiple(pass_cache, ROOT=copy, _DIGESTS={}, _COVERED={}):
+                    return pass_cache.source_digest(*[(str(copy / script), function) for script, function in self.FIT])
+
+            def edit(relative, old, new):
+                path = copy / relative
+                text = path.read_text(encoding='utf-8')
+                self.assertIn(old, text, relative)
+                path.write_text(text.replace(old, new, 1), encoding='utf-8')
+            before = digest()
+            rooms = copy / 'config/chim-rooms.json'
+            settings = json.loads(rooms.read_text(encoding='utf-8'))
+            settings['recipe_rooms'] = dict(settings.get('recipe_rooms') or {}, ri0000000000='everywhere-v1')
+            settings['everywhere_in_rooms'] = not settings.get('everywhere_in_rooms', True)
+            rooms.write_text(json.dumps(settings, indent=1), encoding='utf-8')
+            interior = copy / 'tools/chim/interior.py'
+            interior.write_text(interior.read_text(encoding='utf-8') + "\nROOM_RECIPE_ROWS = ('ratio',)\n",
+                                encoding='utf-8')
+            edit('tools/chim/interior.py', "if everywhere and 'visual_recipe' not in profile:",
+                 "if everywhere and 'visual_recipe' not in profile and model['source']:")
+            self.assertEqual(digest(), before, 'a room conversion edit re-keyed the room actor fits')
+            for relative, old, new in (
+                    ('tools/chim/room_records.py', "r['light'] = flags >> 8", "r['light'] = (flags >> 8) & 255"),
+                    ('tools/chim/room_scene.py', "self.placements = len(room['placements'])",
+                     "self.placements = len(list(room['placements']))"),
+                    ('tools/room_actor_bake.py', 'ROOM_BOX_MARGIN = 4.0', 'ROOM_BOX_MARGIN = 4.5')):
+                edit(relative, old, new)
+                after = digest()
+                self.assertNotEqual(after, before, 'an edit of %s kept the room-actor key' % relative)
+                before = after
+
+    def test_the_fits_stored_before_the_room_records_module_are_found(self):
+        """Measured in the container: the room-actor key of this tree differs from the v0.0.67-dev2 tree's (0d6f7ab)
+        and from the dev3 line's (43c98a1f) only by the readers moved unchanged from tools/chim/interior.py into
+        tools/chim/room_records.py, interior.py and config/chim-rooms.json leaving the reach; the fits of a sample of
+        the dev2 image's rooms are byte-identical with all three trees. The units the dev2 run stored are taken while
+        the fit code is exactly this."""
+        import unit_store
+        self.assertEqual(unit_store.legacy_sources('room-actor', ROOM_ACTOR_KEY), ROOM_ACTOR_OLDER)
 
     def test_the_fit_keeps_each_placement_once_in_the_serial_path(self):
         import room_actor_bake as R

@@ -1,0 +1,80 @@
+# Look book page TELEPORT-ARRIVALS (tests/lookbook/pages.json; docs/lookbook/TELEPORT-ARRIVALS.md): a teleport to a
+# settlement of the picker's table arrives standing on its ground. Per place: the teleport (aw_teleport, the dbg tp
+# word's command), the arrival in play, then the height twice 4 seconds apart (aw_pos: "position X Y Z / movement M";
+# a fall or a push out of the ground changes it) and the standing box against the solids (aw_blockers: "solid 1/1" is a
+# box inside a solid). The six release smoke hops less Seyda Neen, where the session starts.
+cmd aw_teleport balmora
+wait 30
+boxes
+waitfor screen 90 game
+wait 6
+probe bal_pos0 aw_pos
+pick bal_z0 bal_pos0 before / movement
+wait 4
+probe bal_pos1 aw_pos
+pick bal_z1 bal_pos1 before / movement
+expect bal_z1 >= bal_z0-2
+expect bal_z1 <= bal_z0+2
+probe bal_box aw_blockers
+expect lacks bal_box solid 1/1
+still arrive-balmora
+cmd aw_teleport vivec
+wait 30
+boxes
+waitfor screen 90 game
+wait 6
+probe viv_pos0 aw_pos
+pick viv_z0 viv_pos0 before / movement
+wait 4
+probe viv_pos1 aw_pos
+pick viv_z1 viv_pos1 before / movement
+expect viv_z1 >= viv_z0-2
+expect viv_z1 <= viv_z0+2
+probe viv_box aw_blockers
+expect lacks viv_box solid 1/1
+still arrive-vivec
+cmd aw_teleport aldruhn
+wait 30
+boxes
+waitfor screen 90 game
+wait 6
+probe ald_pos0 aw_pos
+pick ald_z0 ald_pos0 before / movement
+wait 4
+probe ald_pos1 aw_pos
+pick ald_z1 ald_pos1 before / movement
+expect ald_z1 >= ald_z0-2
+expect ald_z1 <= ald_z0+2
+probe ald_box aw_blockers
+expect lacks ald_box solid 1/1
+still arrive-aldruhn
+cmd aw_teleport suran
+wait 30
+boxes
+waitfor screen 90 game
+wait 6
+probe sur_pos0 aw_pos
+pick sur_z0 sur_pos0 before / movement
+wait 4
+probe sur_pos1 aw_pos
+pick sur_z1 sur_pos1 before / movement
+expect sur_z1 >= sur_z0-2
+expect sur_z1 <= sur_z0+2
+probe sur_box aw_blockers
+expect lacks sur_box solid 1/1
+still arrive-suran
+cmd aw_teleport khuul
+wait 30
+boxes
+waitfor screen 90 game
+wait 6
+probe khu_pos0 aw_pos
+pick khu_z0 khu_pos0 before / movement
+wait 4
+probe khu_pos1 aw_pos
+pick khu_z1 khu_pos1 before / movement
+expect khu_z1 >= khu_z0-2
+expect khu_z1 <= khu_z0+2
+probe khu_box aw_blockers
+expect lacks khu_box solid 1/1
+still arrive-khuul

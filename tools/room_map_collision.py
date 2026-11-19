@@ -55,26 +55,35 @@ def set_shell_bevels(prepared, bevels):
 def prepare_room_models(scenery, shell_source, bevels, jobs=None):
     """({model index: prepared record} of every model of the room's scenery index, receipt), prepared as
     prepare_mesh_bsp._append_meshes prepares them (its profiles, the rocks' default profile, the interior flatten
-    profiles), with the shell's bevels set by the rule."""
+    profiles), with the shell's bevels set by the rule. The listed source shapes of room_map_shapes are drawn as the
+    original draws them: kept whole through the visual reduction (ROOM_MAP_WHOLE_SHAPES), or kept whole and then drawn
+    as the boxes of their parts (ROOM_MAP_BOX_SHAPES); --room-shapes off reduces them like the rest, the method
+    before. A model's receipts are its prepared lod's 'whole_shapes' and 'box_shapes'."""
     import json
     from build_jobs import resolve_jobs
     from build_parallel import ordered_map
     from prepare_mesh_bsp import _prepare_model, rock_profile
+    from room_map_shapes import box_shape_parts, box_shapes, whole_shape_view, whole_shapes
     from surface_flatten import load_profiles
     scenery = Path(scenery)
     index = json.loads((scenery / 'scenery-index.json').read_text())
     profiles = {name: profile for group in index.get('groups', {}).values()
                 for name, profile in group.get('visual_profiles', {}).items()}
     flatten = load_profiles(scene_kind='interior' if 'cell' in index else 'exterior')
-    tasks = []
+    tasks, whole = [], {}
     for mi, model in enumerate(index['models']):
         profile = profiles.setdefault(model['source'], rock_profile(model['source'], model['triangles']))
         if model['source'] in flatten:
             profile = {**profile, 'flatten': flatten[model['source']]}
+        model, profile, whole[mi] = whole_shape_view(model, profile, whole_shapes(model['source']))
         tasks.append((mi, model, profile, scenery / 'scenery.mwpak', index['textures']))
     workers = min(resolve_jobs(jobs), max(1, len(tasks)))
     # largest first by source triangles: the shell (32,297) starts before the props
     models = dict(ordered_map(_prepare_model, tasks, workers, cost=lambda task: task[1].get('triangles') or 0))
+    for mi, receipt in whole.items():
+        if receipt:
+            models[mi][4]['whole_shapes'] = receipt
+            models[mi], _ = box_shape_parts(models[mi], index['models'][mi], box_shapes(index['models'][mi]['source']))
     shells = [mi for mi, model in enumerate(index['models']) if model['source'] == shell_source]
     if len(shells) != 1:
         raise ValueError('The room shell %s is not one model of the scenery index' % shell_source)

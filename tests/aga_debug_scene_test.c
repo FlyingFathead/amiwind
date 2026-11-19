@@ -48,6 +48,13 @@ int AW_NavLoad(const char *map){return 1;}
 int AW_NavStart(edict_t *e,vec3_t p){return 1;}
 int AW_NavStartDirect(edict_t *e,vec3_t p){return 1;}   /* PIER-GUARD-WALKS-INTO-DOOR-65 */
 int AW_NavStep(double dt,int follow){return 0;}
+/* PIER-GUARD-POST-STUCK-67: the fixed route, its stop, its check counters and the slow turn */
+int AW_NavStartFixed(edict_t *e,const vec3_t *p,int n){return 1;}
+void AW_NavStop(void){}
+long AW_NavFixedSolid(void){return 0;}
+long AW_NavFixedWaits(void){return 0;}
+void AW_NavFixedReset(void){}
+int AW_ActorTurnToward(edict_t *e,const vec3_t t,float rate,double dt){return 1;}
 int AW_InteriorPlace(edict_t *e,vec3_t at){
     if(placement)VectorCopy(at,e->v.origin);return placement;
 }

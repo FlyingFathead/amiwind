@@ -46,7 +46,8 @@ SCENE_LOAD_CALLERS = {
     'use_link': 'doors and load doors, a script\'s Activate of a load door',
     'AW_SceneTick': 'a door after its opening sound, a region crossing',
     'scene_command': 'dbg tp NAME, dbg scene NAME (towns, rooms, the ship, named places)',
-    'hors_command': 'dbg aw hors',
+    'hors_command': 'dbg aw hors 0',
+    'hors_census': 'dbg aw hors (the census office exit door, DBG-HORS-AFTER-CENSUS-67)',
     'AW_SceneLoadRoom': 'a script\'s PositionCell into a room, the dbg tp list\'s rooms',
     'roulette_command': 'dbg door roulette',
 }
@@ -105,11 +106,12 @@ class EveryWayIn(unittest.TestCase):
         self.assertLess(plain.index('AW_SceneMapBegin (level);'), plain.index('SV_SpawnServer (level);'))
         self.assertIn('AW_SceneLoadFailed ("the map could not be spawned");', plain)
         # Host_EndGame and Host_Error end a load in flight there (the way back, or the load menu); Host_Error in play
-        # loads the place again (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66)
+        # loads the place again (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66), and a step of the recovery chain still loading
+        # goes on there (AW-RECOVER, tests/test_recover_in_play.py)
         self.assertEqual(code('host.c').count('AW_SceneLoadFailed (string);'), 1)
         self.assertEqual(code('host.c').count('AW_SceneHostError (string);'), 1)
         host_error = body(code('aw_scene.c'), 'void AW_SceneHostError(const char *why) {')
-        self.assertIn('if(pending || map_loading){AW_SceneLoadFailed(why);return;}', host_error)
+        self.assertIn('if(pending || map_loading || recover_step){AW_SceneLoadFailed(why);return;}', host_error)
         # the map arrived: no longer in flight
         spawn = body(code('aw_scene.c'), 'void AW_SceneSpawn(edict_t *p) {')
         self.assertIn('map_loading=0;', spawn)

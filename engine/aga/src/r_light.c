@@ -84,7 +84,7 @@ void R_InteriorLumaUpdate(void)
     if(strcmp(scene,interior_luma_scene)){
         strncpy(interior_luma_scene,scene,63);interior_luma_scene[63]=0;
         interior_luma_mode=AW_GameplayInteriorLightPolicy(scene,AW_Interior())?1:
-            (sv.active && R_SkyExterior() && strcmp(scene,"torchtest")?2:0);
+            (sv.active && R_SkyExterior() && strcmp(scene,"torchtest") && strcmp(scene,"lighttest")?2:0);
     }
     effective=interior_luma_mode && !AW_TorchTestActive()?R_LumaSetting(interior_luma_mode-1):1;
     if(effective!=interior_luma_factor){interior_luma_factor=effective;D_FlushCaches();}

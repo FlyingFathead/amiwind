@@ -588,6 +588,12 @@
    "meshes/f/terrain_rock_bc_08.nif",
    "meshes/f/terrain_rock_bc_09.nif"
   ],
+  "solstheim-v1": [
+   "meshes/i/in_dwrv_lift00.nif",
+   "meshes/m/misc_bellows10.nif",
+   "meshes/m/misc_com_basket_01.nif",
+   "meshes/o/contain_rock_ebony_01.nif"
+  ],
   "tel-uvirith-v1": [
    "meshes/i/in_t_crystal_02.nif",
    "meshes/x/ex_t_playertower_sprout.nif",
@@ -766,6 +772,9 @@
  "layer_recipes": {
   "tribunal": [
    "mournhold-v1"
+  ],
+  "bloodmoon": [
+   "solstheim-v1"
   ]
  }
 }

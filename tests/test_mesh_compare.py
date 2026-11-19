@@ -115,6 +115,24 @@ class ExportTests(unittest.TestCase):
                     n = sum(np.cross(p[i], p[(i + 1) % len(p)]) for i in range(len(p)))
                     self.assertGreater(float(n @ (p.mean(axis=0) - centre)), 0, line)
 
+    def test_the_mtl_names_the_readers_texture_and_the_original_keeps_its_uvs(self):
+        # MESH-EXPORT-FULL-67: the NIF reader names a material's texture texture_source; the MTL wrote no name for it
+        v = np.array([(x, y, z, x / 64.0, 0.25 if z else 0.0) for x, y, z, _, _ in BOX_V], float)
+        with tempfile.TemporaryDirectory() as tmp:
+            rec = mesh_export.export(v, np.array(BOX_F, int), [{'texture_source': 'Textures\\Tx_Lantern.DDS'}], {},
+                                     ['original', 'current'], tmp, 'meshes/test/box.nif')
+            self.assertIn('map_Kd Tx_Lantern.DDS', (Path(tmp) / 'test__box.mtl').read_text())
+            rows = {r['method']: r for r in rec['files']}
+            original = (Path(tmp) / rows['original']['file']).read_text()
+            current = (Path(tmp) / rows['current']['file']).read_text()
+        self.assertIn('# units: quake', original)
+        vts = [tuple(map(float, l.split()[1:])) for l in original.splitlines() if l.startswith('vt ')]
+        self.assertEqual(sorted(set(t for _, t in vts)), [0.75, 1.0])     # V counted from the bottom: 1 - v
+        faces = [l for l in original.splitlines() if l.startswith('f ')]
+        self.assertEqual(len(faces), 12)
+        self.assertTrue(all(all('/' in c for c in l.split()[1:]) for l in faces))
+        self.assertNotIn('vt ', current)                                   # converter faces: positions only
+
     def test_unknown_method_is_refused(self):
         with self.assertRaises(ValueError):
             mesh_export.variants(np.array(BOX_V, float), np.array(BOX_F, int), BOX_MATERIALS, {}, ['bogus'])

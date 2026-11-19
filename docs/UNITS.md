@@ -1,6 +1,6 @@
 # Units: Morrowind units and AmiWind units
 
-_Last updated with AmiWind v0.0.67 (17 November 2026)._
+_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
 
 AmiWind works in two units of length. Mixing them up makes a model four times too large or four times too small, so
 every tool and file that handles positions should say which one it uses.
@@ -45,17 +45,18 @@ rather than kept.
 
 ### Exporting and re-importing a model
 
-`tools/mesh_export.py` writes OBJ files in **AmiWind units**; its header line says so ("Quake units"). The builder
-reads models from the game's files in **Morrowind units** and scales them itself on the way in. A model exported,
-edited in a 3D program and handed back to the builder as a replacement must therefore be multiplied by **4** first,
-or it comes out a quarter of its size.
+`tools/mesh_convert.py` converts a model to OBJ+MTL and back in either unit: `--units morrowind|quake` (or
+`--scale N`) for its output, `--in-units` / `--in-scale` for an OBJ that does not say its own. Every OBJ it writes
+names its units in a header line that it reads back, so nobody has to multiply by hand; the builder's own mesh form
+is always Morrowind units. It handles the texture coordinates the same way in both directions (OBJ counts V from the
+bottom, the game's files from the top) and keeps every face counter-clockwise seen from its front. See
+[converting models](MESH_CONVERT.md).
 
-When importing an exported OBJ into a 3D program, choose Z up: many programs assume Y up for OBJ files and would lay
-the model on its side.
+`tools/mesh_export.py` (the Toolkit's Mesh Compare list) writes OBJ files in **AmiWind units**; its header line says
+so. The builder reads models from the game's files in **Morrowind units** and scales them itself on the way in.
 
-Planned: the converter gets `--units morrowind|quake` (or `--scale N`) for its input and its output separately, and
-every file it writes names its unit in the header, so nobody has to multiply by hand. The same release handles the
-texture coordinates the same way in both directions (OBJ counts V from the bottom, the game's files from the top).
+When importing an OBJ into a 3D program, choose Z up: many programs assume Y up for OBJ files and would lay the model
+on its side.
 
 ### Gravity
 

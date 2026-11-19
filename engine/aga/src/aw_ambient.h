@@ -140,6 +140,18 @@ int AW_AmbientTravelInRange (int dx, int dy, int dz);
 int AW_AmbientTravelPlan (const aw_ambient_pkg_t *p, int fx, int fy, int fz, int tx, int ty, int tz, int *goal);
 /* The local point nearest an offset from the start (an actor put off its route, after a fight), or -1. */
 int AW_AmbientNearest (const aw_ambient_pkg_t *p, int x, int y, int z);
+/* WANDER-DOOR-AFTER-LOAD-67 (rules from OpenMW 0.51 aiwander.cpp: the package keeps mInitialActorPosition in the save,
+ * writeState / the AiSequence::AiWander constructor, and getAllowedNodes ends in setCurrentPositionToClosestAllowedPosition;
+ * our own code):
+ *   AW_AmbientHomeOf   the origin a package's compiled routes are added to (they are offsets from the reference's
+ *                      position, tools/ambient_lut.py): PLACED, where the actor's placement put it, when it is known
+ *                      and the package has routes; else ORIGIN, where it stands (a script's package without routes
+ *                      wanders near the spot it starts on, as OpenMW's initial position). An actor a saved game or a
+ *                      left place's row put elsewhere keeps its routes where the game data has them.
+ *   AW_AmbientCurrent  cur = the allowed destination nearest the offset X Y Z (engine units from the start: where the
+ *                      actor stands); unchanged when none is allowed. At offset 0 it is AW_AmbientAllow's own choice. */
+void AW_AmbientHomeOf (const float origin[3], const float *placed, int routes, float home[3]);
+void AW_AmbientCurrent (aw_ambient_pkg_t *p, int x, int y, int z);
 /* AIFollowCell (v0.0.62; OpenMW 0.51 aifollow.cpp execute): 1 when a follow whose final point lies DIST2 (squared engine
  * units) from the actor is done by its position at follow distance FD. PLACE 0: no cell named, done near the point
  * anywhere (AmiWind's AIFollow before v0.0.62, kept); > 0: only in that room (ROOM the loaded room's stable number, 0
@@ -160,6 +172,12 @@ void AW_AmbientInit (void);
 void AW_AmbientPhysics (void);
 /* SV_SpawnServer: a new server (a same-map reload too): every slot reset at the next tick, no old edict touched. */
 void AW_AmbientServerReset (void);
+/* WANDER-DOOR-AFTER-LOAD-67 (aw_actors.c SpawnOne and ApplyLoaded): actor E, of this server, was placed at PLACED (this
+ * map's units: its reference's position, as the window or the map spawned it) and a saved row may have moved it since;
+ * its package's routes stay at PLACED (AW_AmbientHomeOf), and a package it already runs takes the destination nearest
+ * where it stands now as its current one. SPAWNED 1: told at its spawn (always kept); 0: told when its row moved it
+ * later (kept only when its spawn told nothing). Kept per edict until the next server spawn. */
+void AW_AmbientPlacedAt (struct edict_s *e, const float placed[3], int spawned);
 /* aw_actors.c (v0.0.57, SAVEGAME-COMPLETE-57): in a room, the change list's room entries applied after a load or on
  * entry, and the room's actors captured as they stand; called by SV_Physics after AW_AmbientPhysics. */
 void AW_ActorsRoomTick (void);

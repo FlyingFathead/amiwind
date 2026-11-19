@@ -96,6 +96,9 @@ typedef struct entity_s
 float R_SpriteEntityScale(const entity_t *ent);
 /* An alias entity's scale on one axis (0 x, 1 y, 2 z): R_SpriteEntityScale, the z axis aw_alias_zscale when set. */
 float R_AliasAxisScale(const entity_t *ent, int axis);
+/* An alias entity's drawn box in its own space (map units, scaled; z up from its origin): a skeletal model's last
+ * drawn pose's box, else its frame's; 0 when its model is not in the cache (r_alias.c; MAGIC-SHELL-EGG-STYLE-67). */
+int R_AliasEntityBox(const entity_t *e, float lo[3], float hi[3]);
 /* Flora cards: the push is this share of the card's world width, and it
  * applies only to the bottom AW_FLORA_BASE_SHARE of the card's rows (the
  * trunk base); the canopy and upper trunk keep the plane's depth, so a card

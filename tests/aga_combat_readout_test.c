@@ -24,7 +24,7 @@ int main(void){
     AW_CombatSeed(&random,123);aw_combat_dice=0;readout.value=1;
     before=v.fatigue;AW_CombatSwing(&settings,&a,&v,0,1,0,1,&random,&swing);
     assert(swing.roll==-2 && swing.outcome==AW_HIT_FATIGUE && v.fatigue<before);
-    saved=swing;as=a;vs=v;clear_output();print_swing("You","Living",0,&swing);
+    saved=swing;as=a;vs=v;clear_output();print_swing("You","Living",0,0,&swing);
     assert(strstr(output,"no dice fatigue") && strstr(output,"15.0 fatigue"));
     assert(!strstr(output,"already down") && !memcmp(&saved,&swing,sizeof(swing)));
     assert(!memcmp(&as,&a,sizeof(a)) && !memcmp(&vs,&v,sizeof(v)));
@@ -32,18 +32,22 @@ int main(void){
     a.damage[0][0]=a.damage[0][1]=10;
     before=v.health;AW_CombatSwing(&settings,&a,&v,0,1,0,1,&random,&swing);
     assert(swing.roll==-2 && swing.outcome==AW_HIT_HEALTH && v.health<before);
-    clear_output();print_swing("You","Living",0,&swing);
+    clear_output();print_swing("You","Living",0,0,&swing);
     assert(strstr(output,"no dice HIT") && strstr(output,"10.0 health") && !strstr(output,"already down"));
     v.dead=1;AW_CombatSwing(&settings,&a,&v,0,1,0,1,&random,&swing);
-    assert(swing.roll==-1);clear_output();print_swing("You","Dead",0,&swing);
+    assert(swing.roll==-1);clear_output();print_swing("You","Dead",0,0,&swing);
     assert(strstr(output,"already down") && !strstr(output,"no dice"));
     /* Ordinary resolved hit/miss/block formatting retains its outcome and roll. */
     memset(&swing,0,sizeof(swing));swing.blocked_roll=-1;swing.roll=7;swing.chance=55;swing.outcome=AW_HIT_MISS;
-    clear_output();print_swing("You","Living",0,&swing);assert(strstr(output,"chance 55 roll 7 miss"));
+    clear_output();print_swing("You","Living",0,0,&swing);assert(strstr(output,"chance 55 roll 7 miss"));
     swing.outcome=AW_HIT_HEALTH;swing.damage=3.5f;
-    clear_output();print_swing("You","Living",0,&swing);assert(strstr(output,"chance 55 roll 7 HIT") && strstr(output,"3.5 health"));
+    clear_output();print_swing("You","Living",0,0,&swing);assert(strstr(output,"chance 55 roll 7 HIT") && strstr(output,"3.5 health"));
+    assert(strstr(output,"(chop, swing"));                   /* a weapon's or the fists' attack type */
+    /* CREATURE-NIXHOUND-HUMAN-MOVES-67: a creature's own attacks read as its record's attack 1 to 3, never a weapon's */
+    clear_output();print_swing("Nix-Hound","you",2,1,&swing);
+    assert(strstr(output,"(attack 3, swing") && !strstr(output,"thrust") && !strstr(output,"chop"));
     swing.outcome=AW_HIT_BLOCKED;swing.blocked_roll=27;swing.block_chance=50;swing.damage=0;
-    clear_output();print_swing("You","Living",0,&swing);assert(strstr(output,"BLOCKED") && strstr(output,"block 27/50"));
-    readout.value=0;clear_output();print_swing("You","Living",0,&swing);assert(!output[0]);
+    clear_output();print_swing("You","Living",0,0,&swing);assert(strstr(output,"BLOCKED") && strstr(output,"block 27/50"));
+    readout.value=0;clear_output();print_swing("You","Living",0,0,&swing);assert(!output[0]);
     puts("real no-dice readout, dead, normal outcome and disabled controls pass");return 0;
 }

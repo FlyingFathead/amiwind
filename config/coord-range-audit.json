@@ -21,12 +21,6 @@
    "note": "the comment of AW_SOLSTHEIM_TERRAIN_BASE: the ID range of Solstheim's frame maps, not a position"
   },
   {
-   "file": "tools/chim/sol_test.py",
-   "contains": "if not 0 <= index < 4096:",
-   "class": "unrelated",
-   "note": "the number of Solstheim frame map names slNNNN the engine takes (AW_SOLSTHEIM_TERRAIN_BASE), not a position"
-  },
-  {
    "file": "engine/aga/src/aw_mwhost.c",
    "contains": "(long)numbers[0].i*8192L+4096L,(long)numbers[1].i*8192L+4096L",
    "class": "unrelated",
@@ -37,6 +31,12 @@
    "contains": "(long)x*8192L+4096L,(long)y*8192L+4096L",
    "class": "unrelated",
    "note": "CenterOnExterior (MW-CONSOLE-COMMANDS-62): the centre of an original Morrowind cell in original coordinates (half the cell's 8,192), handed to dbg tp, not a map-space position against the coordinate range"
+  },
+  {
+   "file": "engine/aga/src/sv_main.c",
+   "contains": "static cvar_t aw_net_send = {\"aw_net_send\", \"4096\", true};",
+   "class": "unrelated",
+   "note": "the PACED method's send budget, the bytes of entity updates one frame message carries (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66, docs/NET_MESSAGES.md), a message size, not a position"
   },
   {
    "file": "engine/aga/src/aw_coord.h",

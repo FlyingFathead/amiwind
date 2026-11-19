@@ -115,7 +115,7 @@ def meshes(data):
     return out
 
 
-def build(data_files, palette, out, jobs=None):
+def build(data_files, palette, out, jobs=None, presented=None):
     from mwad.paths import resolve_data_files
     from build_parallel import in_order_map
     import pass_cache
@@ -160,7 +160,7 @@ def build(data_files, palette, out, jobs=None):
     table = ('AWT1 %d\n' % len(rows) + ''.join(r + '\n' for r in rows)).encode('utf-8')
     (out / 'id1' / TABLE).write_bytes(table)
     # the items placed in the cells, by reference to the table's models (WORLD-OBJECT-PLACEMENT-59)
-    placed, receipt['placed'] = build_placed(data, read_table(table))
+    placed, receipt['placed'] = build_placed(data, read_table(table), presented)
     (out / 'id1' / PLACED).write_bytes(placed)
     print('[item-models] placed items: %d in %d rooms and %d exterior cells, %d distinct models; at most %d models in '
           'a room, %d around an exterior cell (limit %d)' % (
@@ -233,17 +233,19 @@ def alias_matrix(angles):
     return tuple((forward[i], -right[i], up[i]) for i in range(3))
 
 
-def placement_list(raw, items, table, numbers):
+def placement_list(raw, items, table, numbers, presented=None):
     """{key: [row]} of every placed takeable item of the master RAW whose mesh has a model in TABLE ({mesh key:
     payload path}, models.awt order = TABLE's insertion order), keyed as focus.awf keys its rooms (NUMBERS: folded
     interior cell name -> room number; exteriors by prepare_focus.exterior_key). A row: (reference, model row,
     model path, x, y, z, pitch, yaw, roll, scale). Carried lights are left to the maps' own light path (a lamp on a
-    table is drawn and lit there); every other item the catalogue (ITEMS: prepare_inventory.source_items) knows."""
-    from prepare_focus import cells_of, exterior_key, GRID_BIAS
+    table is drawn and lit there); every other item the catalogue (ITEMS: prepare_inventory.source_items) knows.
+    PRESENTED (optional): the districts the build presents as exterior cells; their items are keyed by their block's
+    cells at the moved positions, as focus.awf keys their rows (prepare_focus.cells_presented)."""
+    from prepare_focus import cells_presented, exterior_key, GRID_BIAS
     from prepare_inventory import mesh_key
     index = {key: i for i, key in enumerate(table)}
     out, missing = {}, {}
-    for cell, interior, grid, _, refs in cells_of(raw):
+    for cell, interior, grid, _, refs in cells_presented(raw, presented):
         if interior:
             if not cell or cell.casefold() not in numbers:
                 continue
@@ -373,14 +375,15 @@ def install_placed(stage, id1, receipt, table):
             'placed_sha256': placed['sha256']}
 
 
-def build_placed(data, table):
-    """(payload, receipt part) of the placed item list for the item model TABLE ({mesh key: path}, file order)."""
+def build_placed(data, table, presented=None):
+    """(payload, receipt part) of the placed item list for the item model TABLE ({mesh key: path}, file order);
+    PRESENTED: placement_list's."""
     from cell_numbers import load_table, room_numbers
     from mwad.paths import child_ci
     from mwad.masters import master_path
     from prepare_inventory import source_items
     numbers = room_numbers(load_table(data)[0])   # EXPANSION-BASE-ONLY-TABLES-66: every selected master's rooms
-    rows, missing = placement_list(master_path(data).read_bytes(), source_items(data)[0], table, numbers)
+    rows, missing = placement_list(master_path(data).read_bytes(), source_items(data)[0], table, numbers, presented)
     counts = check_placed(rows)
     payload = pack_placed(rows)
     rooms = {k: v for k, v in counts.items() if not k & 0x80000000}
@@ -403,10 +406,20 @@ def main():
     p.add_argument('--out', required=True, type=Path)
     from build_jobs import add_jobs
     add_jobs(p)
+    p.add_argument('--presented-receipt', type=Path,
+                   help='the presented data stage\'s receipt (only with the module tribunal-mournhold; '
+                        'MOURNHOLD-EXTERIOR-CELLS-66): the placed items of a district the build converts are keyed '
+                        'outdoors, at their moved places')
+    p.add_argument('--presented-cells', default='', help='the module\'s cells, with --presented-receipt')
     a = p.parse_args()
+    from prepare_focus import presented_places
+    presented = presented_places(a.presented_receipt, a.presented_cells)
+    if presented:
+        print('[item-models] presented districts: %s' % ', '.join(sorted(p['cell'] for p in presented.values())),
+              flush=True)
     # the palette the image step ends with (the hand catalogue's rule): the installed models need no remap
     from prepare_hand_catalog import runtime_palette
-    receipt = build(a.data_files, runtime_palette(a.data_files, a.palette), a.out, a.jobs)
+    receipt = build(a.data_files, runtime_palette(a.data_files, a.palette), a.out, a.jobs, presented)
     print('[item-models] %d meshes, %d converted (%d now), %d held; %d bytes (%d before the squeeze), %.1f s' % (
         receipt['meshes'], receipt['converted'], receipt['converted_now'], len(receipt['held']), receipt['bytes'],
         receipt['bytes_before_squeeze'], receipt['seconds']), flush=True)

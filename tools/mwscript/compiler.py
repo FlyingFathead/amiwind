@@ -43,16 +43,19 @@ def handwritten_patterns(config=None):
     return tuple(p.casefold() for p in json.loads(path.read_text(encoding='utf-8'))['handwritten']['patterns'])
 
 
-def compile_program(data, media=None, scripts=None, handwritten=None, rooms=None):
+def compile_program(data, media=None, scripts=None, handwritten=None, rooms=None, presented=None):
     """(Program, [Compiled]) for every script of DATA (the winning record of each id), in table order.
     SCRIPTS: compile these records instead (one master's own records, for the per-master measurement).
     HANDWRITTEN: name patterns marked SCRIPT_HANDWRITTEN (None: config/mwscript.json).
-    ROOMS: the room maps the player's PositionCell can load (rooms.room_table; None: the repo's own lists)."""
+    ROOMS: the room maps the player's PositionCell can load (rooms.room_table; None: the repo's own lists).
+    PRESENTED: the districts the build presents as exterior cells and converts (tools/presented_exterior.py
+    build_places; None or {}: none, every PositionCell as before)."""
     from fnmatch import fnmatchcase
     from .rooms import room_table
     patterns = handwritten_patterns() if handwritten is None else tuple(p.casefold() for p in handwritten)
     program = Program(data, media, scripts)
     program.rooms = room_table() if rooms is None else rooms
+    program.presented = dict(presented or {})
     parsed = {}
     globals_ = {k: v[0] for k, v in data.globals.items()}
     if scripts is not None:
@@ -154,7 +157,9 @@ def bindings(program, compiled=None, addons=()):
     [{'reference', 'script' (index), 'flags', 'cell' (x, y) or interior string index, 'position' (source units)}].
     COMPILED: leave out the references whose script is inert today (dead weight; back when it is compiled again).
     ADDONS: the add-on masters whose world the image carries (MWSCRIPT-ADDON-ATTACH-62, e.g. ('Tribunal.esm',)):
-    their own placements are bound too, by their load-order key (gamedata.addon_key); none today."""
+    their own placements are bound too, by their load-order key (gamedata.addon_key). The script stage gives the
+    build's selected expansions (tools/prepare_mwscript.py bound_addons, EXPANSION-SCRIPTS-NOT-ATTACHED-66); none
+    with the base game alone."""
     rows = []
     wanted = {m.casefold() for m in addons}
     extra = [r for r in getattr(program.data, 'addon_references', []) if r['master'].casefold() in wanted]
@@ -176,7 +181,7 @@ def bindings(program, compiled=None, addons=()):
                      'cell': program.data.interior_numbers.get(ref['cell'].casefold(), 0) if ref['interior']
                      else tuple(ref['cell']),
                      'position': [int(round(v)) for v in ref['position']], 'id': ref['id'], 'type': ref['type']})
-    rows.extend(held_bindings(program, compiled))
+    rows.extend(held_bindings(program, compiled, addons))
     rows.sort(key=lambda r: r['reference'])
     seen = set()
     unique = []
@@ -188,14 +193,20 @@ def bindings(program, compiled=None, addons=()):
     return unique
 
 
-def held_bindings(program, compiled=None):
+def held_bindings(program, compiled=None, addons=()):
     """BIND_HELD rows (MWSCRIPT-INVENTORY-HITONME-62): one per placed Morrowind.esm container, NPC or creature and each
     distinct carryable item of its record (NPCO) whose record names a compiled script that is not inert, in the
-    record's order; the holder's cell and position. A levelled item list in a holder names no item record: none."""
+    record's order; the holder's cell and position. A levelled item list in a holder names no item record: none.
+    ADDONS (EXPANSION-HELD-ITEMS-66, v0.0.67): the add-on masters whose own holders are read too (gamedata
+    addon_holder_refs, keyed by load order), as bindings binds their placements; what a holder holds is its record's
+    final NPCO list (the last master's record wins), for Morrowind.esm's holders as for the add-ons'."""
     data = program.data
     holdings = getattr(data, 'holdings', None) or {}
+    wanted = {m.casefold() for m in addons}
+    holders = list(getattr(data, 'holder_refs', None) or ()) + [
+        r for r in getattr(data, 'addon_holder_refs', None) or () if r['master'].casefold() in wanted]
     rows = []
-    for ref in getattr(data, 'holder_refs', None) or ():
+    for ref in holders:
         items, seen = [], set()
         for item in holdings.get(ref['id'], ()):
             tag, script = data.bases.get(item, (None, ''))

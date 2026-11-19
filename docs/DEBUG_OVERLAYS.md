@@ -1,6 +1,6 @@
 # Development overlays
 
-_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -335,7 +335,12 @@ kind placed five times or more (slaughterfish, mudcrabs, generic guards) is list
 one, in the room you are in first, else outdoors nearest to you. You arrive on a free spot beside the being, facing
 it: the player's size is tested against the walls, the furniture and the other actors at up to 48 points around
 it, never through a wall. If its area is loaded, that is where it stands now (one that walks about); otherwise its
-placed position. A being whose area this disk does not hold is not listed (the build report names it). A place,
+placed position. In a room you first arrive the way a door brings you in, standing on the being's floor at its
+placed position, and are then moved beside it (since v0.0.67: before, the arrival was taken at the being's feet, so
+the floor search began inside the floor and could take the floor under the room). `tools/tp_arrivals.py ID1` checks
+every such arrival of an image by number, with the rooms' teleports and every door into a room: it runs the game's
+floor search on each room's collision and fails on any arrival that ends under its floor. A being whose area this
+disk does not hold is not listed (the build report names it). A place,
 room or being that an expansion adds carries the expansion's name in this list only, for example Raven Rock
 (Bloodmoon) or Almalexia (Tribunal); a base-game place an expansion only changes keeps its plain name, and typing
 the plain name finds a tagged entry.

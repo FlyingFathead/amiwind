@@ -277,6 +277,29 @@ class StoredGroupOfRegionStages(unittest.TestCase):
             problems, _ = self.stops({'world-scenery'}, plans)
             self.assertIn('would bake again 2064 of the 2064 units', problems[0][1])
 
+    def test_terrain_runs_again_and_the_checklist_plans_no_map_nothing_to_bake(self):
+        """Third cause: rows added to the region directory (the eleven cells of Mournhold's districts, each a CHIM
+        region row after every existing one) make the terrain stage run again, so no receipt can be read. This build's
+        exterior checklist already says how many cells get an open-world map: with none, the region stages convert no
+        region and look up none of the stored Vvardenfell regions. A Mournhold row added or changed therefore stops
+        no build on them; a checklist that plans maps, or none given, keeps the full count."""
+        rebuilt = {'world-terrain', 'world-scenery', 'world-flora'}
+        none = {'bsp': 0, 'chim-region': 1359, 'chim-town': 61}
+        limits = RA.region_limits(self.STEPS, {}, rebuilt, none)
+        self.assertEqual(limits, {'world-scenery': 0, 'world-flora': 0})
+        closures = dict(self.closures, **{'world-terrain': set()})     # the terrain stage reaches neither region cache
+        rows = RA.unit_report(self.STEPS, closures, {}, self.cache, self.tmp.name, rebuilt, openers=self.openers,
+                              limits=limits)
+        self.assertEqual(RA.strict_problems(self.STEPS, rebuilt, rows, closures, set(), {}), [])
+        self.assertEqual(rows['world-scenery'], [('world-scenery-region', 0, 0)])
+        self.assertEqual(rows['world-flora'], [('world-flora-region', 0, 0)])
+        self.assertEqual(RA.region_limits(self.STEPS, {}, rebuilt, dict(none, bsp=3)), {})
+        self.assertEqual(RA.region_limits(self.STEPS, {}, rebuilt), {})
+        self.assertEqual(RA.region_limits(self.STEPS, {}, rebuilt, 'not a summary'), {})
+        # a terrain stage taken from an earlier run is still read from its receipt, whatever the checklist says
+        self.receipt([{'name': 'r0'}, {'name': 'c', 'chim_region': True}])
+        self.assertEqual(RA.region_limits(self.STEPS, self.plans, {'world-scenery'}, none), {'world-scenery': 1})
+
 
 def _fake_digests(opener, root=ROOT):
     """A pure stand-in for current_digests (module level: the forked workers call it by name)."""

@@ -484,10 +484,35 @@ int AW_InventoryCountText(long count,char *out,int size){
     if(count>9999L)return snprintf(out,(size_t)size,"%ldk",count/1000L);
     return snprintf(out,(size_t)size,"%ld",count);
 }
+/* INVENTORY-EQUIP-HINTS-67 (aw_inventory.h): one action per item kind, from the catalogue row alone (the builder's
+ * class flag, the alchemy kind, the category, the enchantment's kind). The order matters: a worn or wieldable class is
+ * Equip / Unequip whatever else it carries (a Cast When Used amulet is still worn first, as in the original); a Cast
+ * Once item that is not worn is used up by its cast (SCROLL-CAST-64, the maintainer's decision of 18 November 2026:
+ * a scroll is used, not read; its text is in the item's information box); a potion, an ingredient or an apparatus is
+ * used; any other book or note is read. */
+int AW_InventoryItemAction(const aw_inventory_item_t *it,int worn){
+    if(!it)return AW_INV_ACT_NONE;
+    if(it->flags&AW_INV_EQUIP)return worn?AW_INV_ACT_UNEQUIP:AW_INV_ACT_EQUIP;
+    if(it->enchant_kind==AW_ENCH_ONCE && it->enchantment[0])return AW_INV_ACT_CAST;
+    if(AW_INV_USABLE_KIND(it))return AW_INV_ACT_USE;
+    if(it->category==AW_INV_BOOK)return AW_INV_ACT_READ;
+    return AW_INV_ACT_NONE;
+}
+/* the original's words (Morrowind.esm sEquip, sUnequip, sUse; a book has no word of its own: "Read"), NULL for none */
+const char *AW_InventoryActionWord(int action){
+    switch(action){
+    case AW_INV_ACT_EQUIP:return "Equip";
+    case AW_INV_ACT_UNEQUIP:return "Unequip";
+    case AW_INV_ACT_USE:case AW_INV_ACT_CAST:return "Use";
+    case AW_INV_ACT_READ:return "Read";
+    }
+    return NULL;
+}
 
 #ifndef AW_INVENTORY_RULES_ONLY
 #include "aw_ledger.h"
 #include "aw_maps.h"
+#include "aw_iteminfo.h"
 /* STEAL-WITNESSED-NO-CRIME-61: COUNT of item ID (VALUE each) taken from OWNER (a faction when FACTION) is a theft:
  * the crime rules decide it (aw_crime.c sets the hook; NULL: no crime layer, the pure fixtures) */
 void (*aw_inventory_theft)(const char *owner,int faction,const char *id,int count,int value);
@@ -957,6 +982,10 @@ static float inv_condition(const char *id){
     return AW_ITEM_HAS(&aw_state,index,AW_ITEM_CONDITION)?COND(&aw_state,index):1;
 }
 float AW_InventoryCondition(const char *id){return inv_condition(id);}
+/* DBG-GIVE-SPELL-67 (aw_inventory.h): dbg give spell's words, from the first word after "spell" (aw_cast.c sets it) */
+void (*aw_inventory_give_spell)(int first);
+/* INVENTORY-ITEM-INFO-67 (aw_iteminfo.h aw_worldui_condition): the carried copy's condition for its information box */
+static int inv_condition_share(const char *id,float *share){*share=inv_condition(id);return 1;}
 /* A carried thing's condition (0..1 of its record's health) set, the dialogue's Repair service; 0 when not carried */
 int AW_InventorySetCondition(const char *id,float condition){
     int index=inv_item_index(&aw_state,id);
@@ -1201,6 +1230,12 @@ void AW_InventoryGrantCommand(void){
         if(Cmd_Argc()==4 && Q_strcasecmp(Cmd_Argv(3),"stats")){Con_Printf("dbg give weapons [stats]\n");return;}
         weapon_kit(Cmd_Argc()==3);return;
     }
+    /* DBG-GIVE-SPELL-67: dbg give spell [ID / all / list [N]] (aw_cast.c sets the hook) */
+    if(cmd_source==src_command && Cmd_Argc()>=3 && Cmd_Argc()<=5 && !Q_strcasecmp(Cmd_Argv(1),"give") &&
+       !Q_strcasecmp(Cmd_Argv(2),"spell")){
+        if(aw_inventory_give_spell)aw_inventory_give_spell(3);else Con_Printf("dbg give spell: no casting in this build.\n");
+        return;
+    }
     /* DBG-GIVE-MONEY-62: dbg give (the picker), dbg give money|coin|rich [N], dbg give ID [N], dbg additem the same */
     if(cmd_source==src_command && Cmd_Argc()==2 && !Q_strcasecmp(Cmd_Argv(1),"givecount")){AW_GiveCountBoxOpen();return;}
     if(cmd_source==src_command && Cmd_Argc()>=2 && Cmd_Argc()<=4 && !Q_strcasecmp(Cmd_Argv(1),"give")){give_command();return;}
@@ -1305,6 +1340,7 @@ void AW_InventoryInit(void){
     aw_inventory_hand_item=AW_InventoryEquippedItem;
     aw_magic_frame=AW_MagicFrame;aw_item_weight=inv_weight;aw_inventory_carried=AW_InventoryCarried;aw_inventory_read_row=AW_InventoryReadRow;
     aw_save_items_loaded=inv_items_loaded;
+    aw_worldui_condition=inv_condition_share;   /* INVENTORY-ITEM-INFO-67 */
 }
 static void inv_level(void){
     if(inventory_world!=sv.worldmodel){
@@ -2932,62 +2968,68 @@ void AW_ContainerCommand(void){
         if(!container_open(row))Con_Printf("aw_placed container: %s does not open here.\n",row->name);
         return;
     }
-    /* aim (for in-game checks; noclip on): stand 36 units from it on the player's side, at the player's height,
-     * looking at it, as aw_view would place the camera */
+    /* aim (for in-game checks; noclip on): the eye AW_AIM_EYE (24) units from the row's point (the centre of its box),
+     * 12 above it (6, 18, then level where that line is blocked), on a side with a clear line to the point, the
+     * player's side first, looking at the point (aw_activate_rules.c AW_AimEye); the player's box where it fits there (a
+     * first round), else in noclip. Then the use test (placed_target) is asked with that view, and "Aimed at" is said only
+     * when it takes this row; a miss names the row it takes instead (DBG-CONTAINER-AIM-OUT-OF-REACH-67: the eye stood
+     * 40 units out over the floor, 46 to 60 from the point, past the 48-unit reach, and looked 8 above it). The view is
+     * set as aw_view sets it; a running idle orbit ends there and keeps it (VIEW-VANITY-UNDOES-SET-VIEW-67). */
     if(!strcmp(a,"aim")){
-        edict_t *p=svs.clients?svs.clients[0].edict:NULL;vec3_t at,shift,d;float yaw,pitch;
+        static const float lifts[4]={12,6,18,0};
+        edict_t *p=svs.clients?svs.clients[0].edict:NULL;vec3_t at,shift,eye,spot;float yaw=0,pitch=0,dx,dy,len,t;
+        int fit,found=0,got,k,l;trace_t tr;
         if(!p || p->v.movetype!=MOVETYPE_NOCLIP){Con_Printf("Enable noclip, then aw_placed container aim [N]\n");return;}
         if(Cmd_Argc()>3+o){   /* the N-th container of the room or cell (0 first), in the table's order */
-            int want=atoi(Cmd_Argv(3+o)),k;
+            int want=atoi(Cmd_Argv(3+o));
             for(i=k=0;i<focus_count;i++)if(focus_rows[i].kind=='C' && k++==want){row=&focus_rows[i];break;}
             if(i==focus_count){Con_Printf("aw_placed container aim: %d containers here.\n",k);return;}
         }
         if(focus_outdoor)shift[0]=shift[1]=shift[2]=0;else AW_MwscriptRoomShift(shift);
         VectorAdd(row->at,shift,at);
-        /* a clear standing spot 40 units away (its feet on the container's floor), the side towards the player first,
-         * then round it, from where the container is in view */
-        {
-            /* sixteen directions, a sixteenth of a turn apart (no sin/cos: the 68040 lacks them) */
-            float dx=p->v.origin[0]-at[0],dy=p->v.origin[1]-at[1],len=(float)sqrt(dx*dx+dy*dy),t;int k;vec3_t spot,eye;trace_t tr;
+        /* sixteen directions, a sixteenth of a turn apart (no sin/cos: the 68040 lacks them), the player's side first */
+        for(fit=1;fit>=0 && !found;fit--){
+            dx=p->v.origin[0]-at[0];dy=p->v.origin[1]-at[1];len=(float)sqrt(dx*dx+dy*dy);
             if(len<1){dx=1;dy=0;len=1;}
             dx/=len;dy/=len;
-            for(k=0;k<16;k++,t=dx*0.92388f-dy*0.38268f,dy=dx*0.38268f+dy*0.92388f,dx=t){
-                int up;
-                spot[0]=at[0]+dx*40;spot[1]=at[1]+dy*40;
-                /* the lowest height the player's box fits at (under a low ceiling too) */
-                for(up=8;up<=48;up+=4){
-                    spot[2]=at[2]+(float)up;
-                    tr=SV_Move(spot,p->v.mins,p->v.maxs,spot,MOVE_NOMONSTERS,p);
-                    if(!tr.startsolid && !tr.allsolid)break;
+            for(k=0;k<16 && !found;k++,t=dx*0.92388f-dy*0.38268f,dy=dx*0.38268f+dy*0.92388f,dx=t)
+                for(l=0;l<4 && !found;l++){
+                    AW_AimEye(at,dx,dy,lifts[l],eye,&yaw,&pitch);
+                    VectorCopy(eye,spot);spot[2]-=p->v.view_ofs[2];
+                    if(fit){tr=SV_Move(spot,p->v.mins,p->v.maxs,spot,MOVE_NOMONSTERS,p);if(tr.startsolid || tr.allsolid)continue;}
+                    tr=SV_Move(eye,vec3_origin,vec3_origin,at,MOVE_NOMONSTERS,p);
+                    if(tr.fraction<1 && (1-tr.fraction)*AW_AIM_EYE>6)continue;    /* a wall between */
+                    found=1+fit;
                 }
-                if(up>48)continue;
-                VectorCopy(spot,eye);eye[2]+=p->v.view_ofs[2];
-                tr=SV_Move(eye,vec3_origin,vec3_origin,at,MOVE_NOMONSTERS,p);
-                if(tr.fraction<1 && (1-tr.fraction)*40>6)continue;
-                break;
-            }
-            if(k==16){
-                /* DBG-CONTAINER-AIM-NO-SPOT-59: no spot the room collision accepts (a basket against a counter): stay
-                 * in noclip 40 units from it on the player's side, at eye height over it, still looking at it, so E
-                 * on it can be checked; leaving noclip there may need dbg unstuck */
-                dx=p->v.origin[0]-at[0];dy=p->v.origin[1]-at[1];len=(float)sqrt(dx*dx+dy*dy);
-                if(len<1){dx=1;dy=0;len=1;}
-                spot[0]=at[0]+dx/len*40;spot[1]=at[1]+dy/len*40;spot[2]=at[2]+8;
-                Con_Printf("aw_placed container aim: no clear spot round %s; placed in noclip.\n",row->name);
-            }
-            VectorCopy(spot,p->v.origin);d[0]=at[0]-spot[0];d[1]=at[1]-spot[1];
-            yaw=(float)(atan2(d[1],d[0])*180/M_PI);
-            /* the crosshair on the container's own point when placed in noclip (the aim takes it within 6 units) */
-            pitch=(float)(atan2(spot[2]+p->v.view_ofs[2]-(at[2]+(k==16?0:8)),40)*180/M_PI);
         }
+        if(!found){
+            /* DBG-CONTAINER-AIM-NO-SPOT-59: no clear line from any side (a basket against a counter): the player's side,
+             * 12 above the point, in noclip, still looking at it; leaving noclip there may need dbg unstuck */
+            dx=p->v.origin[0]-at[0];dy=p->v.origin[1]-at[1];len=(float)sqrt(dx*dx+dy*dy);
+            if(len<1){dx=1;dy=0;len=1;}
+            AW_AimEye(at,dx/len,dy/len,12,eye,&yaw,&pitch);VectorCopy(eye,spot);spot[2]-=p->v.view_ofs[2];
+            Con_Printf("aw_placed container aim: no clear line to %s from any side; placed in noclip on the player's side.\n",
+                       row->name);
+        }else if(found==1)Con_Printf("aw_placed container aim: the player's box fits nowhere round %s; placed in noclip.\n",
+                                     row->name);
         Con_Printf("container at %d %d %d (room shift %d %d %d)\n",(int)at[0],(int)at[1],(int)at[2],(int)shift[0],
                    (int)shift[1],(int)shift[2]);
-        if(pitch>70)pitch=70;
-        VectorCopy(vec3_origin,p->v.velocity);p->v.angles[0]=pitch;p->v.angles[1]=yaw;p->v.angles[2]=0;
+        VectorCopy(spot,p->v.origin);VectorCopy(vec3_origin,p->v.velocity);
+        p->v.angles[0]=pitch;p->v.angles[1]=yaw;p->v.angles[2]=0;
+        VectorCopy(p->v.angles,p->v.v_angle);   /* the use test below sees the view now; the client is told (fixangle) */
         p->v.fixangle=1;SV_LinkEdict(p,false);
-        Con_Printf("Aimed at %s (%s %u): aw_view %d %d %d %d %d\n",row->name,row->kind=='C'?"container":"object",
-                   row->reference,(int)p->v.origin[0],
-                   (int)p->v.origin[1],(int)p->v.origin[2],(int)yaw,(int)pitch);
+        got=placed_target();
+        if(got==(int)(row-focus_rows))
+            Con_Printf("Aimed at %s (%s %u): aw_view %d %d %d %d %d\n",row->name,row->kind=='C'?"container":"object",
+                       row->reference,(int)p->v.origin[0],(int)p->v.origin[1],(int)p->v.origin[2],(int)yaw,(int)pitch);
+        else if(got>=0)
+            Con_Printf("aw_placed container aim: from this view the use goes to row %d (%c %u %s), not to %s %u: aw_view %d "
+                       "%d %d %d %d\n",got,focus_rows[got].kind,focus_rows[got].reference,focus_rows[got].name,row->name,
+                       row->reference,(int)p->v.origin[0],(int)p->v.origin[1],(int)p->v.origin[2],(int)yaw,(int)pitch);
+        else
+            Con_Printf("aw_placed container aim: from this view the use takes nothing (%s %u not met within the reach): "
+                       "aw_view %d %d %d %d %d\n",row->name,row->reference,(int)p->v.origin[0],(int)p->v.origin[1],
+                       (int)p->v.origin[2],(int)yaw,(int)pitch);
         return;
     }
     if((!strcmp(a,"take") || !strcmp(a,"put")) && Cmd_Argc()>3+o){
@@ -3539,6 +3581,14 @@ void AW_PlacedAimReport(void){
                    seen && seen->v.netname?pr_strings+seen->v.netname:"none",aw_activate_last.actor_near,
                    aw_activate_last.actor_far,aw_activate_last.item,aw_activate_last.plant);
     }
+    /* HUD-TEXTS-OVERLAP-67: the frame's one focus (title, action line and use key) and the numbers it was chosen by */
+    {
+        static const char *kinds[AW_FOCUS_KINDS]={"nothing","the actor","the item or plant","the load door","the hinged door"};
+        int kind=AW_SceneFocusKind();
+        Con_Printf("aw_placed aim: focus %s; actor %.1f..%.1f, thing %.1f, load door %.1f, hinged door %.1f\n",
+                   kind>=0 && kind<AW_FOCUS_KINDS?kinds[kind]:"?",aw_focus_last.actor_near,aw_focus_last.actor_far,
+                   aw_focus_last.thing,aw_focus_last.door,aw_focus_last.hinged);
+    }
 }
 /* WANDER-DOOR-RULE-66 (aw_inventory.h): the place's load doors for the residents' door rule; no file read, no search */
 int AW_PlacedDoors(float shift[3]){
@@ -3595,8 +3645,10 @@ static int inventory_allowed(void){return !aw_inventory_allowed || aw_inventory_
 /* PRISON-SHIP-ITEMS-TAKEABLE-65 (aw_inventory.h): placed objects' names and action lines allowed */
 int (*aw_object_labels)(void);
 static int labels_allowed(void){return !aw_object_labels || aw_object_labels();}
-/* CONTAINER-WINDOW-59: a container that opens reads "E: Open", "E: Steal" (red) when it is owned (opening it is
- * free, taking from it is theft), "Locked" while locked (red when owned); organic ones (flora) none: E picks them. */
+/* CONTAINER-WINDOW-59: a container that opens reads "E: Open", "Locked" while locked; organic ones (flora) none: E
+ * picks them. CONTAINER-STEAL-FLAG-CHECK-67 (the maintainer, 18 November 2026: the aim hint "E: Open" in red when
+ * opening it is part of a crime): an owned one reads "E: Open" in red (opening it is free, taking from it is theft:
+ * the container window then says "E: Steal" in red); before, it read "E: Steal" in the world. Locked and owned: red. */
 static int container_prompt(const focus_row_t *row,char *line,int size,int *steal){
     static char open[40],locked[40];
     if((row->action&3)!=FOCUS_ACT_TAKE)return 0;
@@ -3607,7 +3659,7 @@ static int container_prompt(const focus_row_t *row,char *line,int size,int *stea
         if(!hud_setting("sLocked",locked,sizeof(locked)))strcpy(locked,"Locked");
     }
     *steal=row->owned!=0;
-    Q_strcpy_bounded(line,container_lock(row)>0?locked:row->owned?"E: Steal":open,(size_t)size);
+    Q_strcpy_bounded(line,container_lock(row)>0?locked:open,(size_t)size);
     return 1;
 }
 int AW_ItemPrompt(char *line,int size,int *steal){
@@ -3736,7 +3788,7 @@ static int take_row(focus_row_t *row){
         char owner[AW_LEDGER_STOLEN_ID+1];int faction,stolen=row->owned && container_owner(row->reference,owner,&faction);
         if(stolen && aw_ledger_on)AW_LedgerStolenAdd(&aw_ledger,item.id,owner,faction,1);
         aw_state.inventory.initialized=1;
-        AW_UIPickupNotice(row->name,3);AW_CombatEquipmentChanged();
+        AW_UIPickupTaken(row->name,1,3);AW_CombatEquipmentChanged();   /* PICKUP-NAME-ONLY-BOX-67 */
         if(stolen)theft(owner,faction,item.id,1,item.value);
     }
     return 1;
@@ -3748,13 +3800,15 @@ int AW_InventoryUse(void){
         if((i=ledger_target())<0)return placed_use();
         if(!AW_LedgerPickup(&aw_state,&aw_ledger,map_drops[i].key)){
             AW_InventoryRefused(map_drops[i].label,NULL,1);return 1;}
-        AW_UIPickupNotice(map_drops[i].label,3);AW_CombatEquipmentChanged();    /* the notice keeps its own copy */
+        AW_UIPickupTaken(map_drops[i].label,1,3);AW_CombatEquipmentChanged();    /* the notice keeps its own copy */
         ED_Free(map_drops[i].e);map_drops[i]=map_drops[--map_drop_count];
         return 1;
     }
     i=inv_target();if(i<0)return placed_use();
-    if(!AW_InventoryPickup(&aw_state,i)){
-        AW_InventoryRefused(drop_label[i],aw_state.inventory.dropped[i].id,aw_state.inventory.dropped[i].count);return 1;}
-    AW_UIPickupNotice(drop_label[i],3);AW_CombatEquipmentChanged();ED_Free(drop_entity[i]);drop_entity[i]=NULL;return 1;
+    {int count=(int)aw_state.inventory.dropped[i].count;   /* read before the pick-up empties the row */
+     if(!AW_InventoryPickup(&aw_state,i)){
+         AW_InventoryRefused(drop_label[i],aw_state.inventory.dropped[i].id,aw_state.inventory.dropped[i].count);return 1;}
+     AW_UIPickupTaken(drop_label[i],count,3);}
+    AW_CombatEquipmentChanged();ED_Free(drop_entity[i]);drop_entity[i]=NULL;return 1;
 }
 #endif

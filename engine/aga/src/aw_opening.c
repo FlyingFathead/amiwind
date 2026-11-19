@@ -25,7 +25,45 @@ static int post_retries;static double post_retry;   /* the walk to his post trie
 #define AW_PIER_GUARD_FRONT_Y -213.4f
 #define AW_PIER_GUARD_POST_X 286.0f
 #define AW_PIER_GUARD_POST_Y -214.0f
-static int post_leg;   /* 0: to the point in front of the door, 1: aside to the post */
+/* PIER-GUARD-POST-STUCK-67 (the maintainer's design, 18 November 2026: the guard walks in the middle of the pier and only
+ * near the door goes to the side of it and faces the player). Both of his walks follow the pier's centre line, measured
+ * from the built world's own collision (v0.0.67-dev2 world, hull 1 of every placed model on the pier, for his box
+ * -7.32 -7.12 0 .. 7.32 7.12 33.25): the line of the dock pieces, ex_de_docks_end 321250 at 384.3 -223.8 (A) to
+ * ex_de_docks_end 321251 at 598.8 -361.7 (B), the line every piece lies on. The posts stand in pairs at the middle of
+ * each piece, and beside them his centre may go 19 units either side of the line; on the line his box keeps 19 units
+ * from every post. His own placement (366.5 -210.7) lies on it, 1.4 off. Distances along the line (T) from A toward B:
+ * the deck ends by the door at T -32 (357.4 -206.5); the plank point is T 240.9 (587.0 -354.1), the original's first
+ * AITravel point (-8914 -73093) moved 1 unit onto the line. Near the door he goes from the deck's end to the front point
+ * and the post above (the open ground between, walked since v0.0.65), on the side of the door away from the town gate,
+ * where the original's second AITravel also ends (330 -200.25, 21 units that side of the door's middle). Before
+ * (v0.0.66-dev2 to v0.0.67-dev2): his second walk went straight from wherever he met the player to the front point,
+ * along the pier's edge, and a detour round the first post it met could leave him among the posts and pilings by the
+ * pier's end, still walking (the maintainer's pictures of 18 November 2026). tests/test_pier_guard_route.py keeps the
+ * numbers to the measured posts. */
+#define AW_PIER_LINE_AX 384.3f
+#define AW_PIER_LINE_AY -223.8f
+#define AW_PIER_LINE_BX 598.8f
+#define AW_PIER_LINE_BY -361.7f
+#define AW_PIER_END_T -32.0f
+#define AW_PIER_PLANK_T 240.9f
+/* at his post he turns toward the player within this distance (512 original units), at this rate (degrees a second:
+ * slowly, the maintainer's word on 17 November 2026), else back toward the dock */
+#define AW_PIER_GUARD_WATCH 128.0f
+#define AW_PIER_GUARD_TURN 90.0f
+static int post_leg;   /* the earlier walk: 0 to the point in front of the door, 1 aside to the post; the fixed route:
+                        * 0 his walk to the plank, 1 his walk to the post (the second, after the race form) */
+/* the dock guard's walks: 1 the fixed route on the pier's centre line (PIER-GUARD-POST-STUCK-67, the default), 0 the
+ * earlier walks (the path grid to the plank, then straight to the front point and the post with the generic detour,
+ * v0.0.65-v0.0.67-dev2); "dbg opening dock fixed|direct" (aw_intro_status), not saved */
+static int aw_dock_route_fixed=1;
+int AW_OpeningDockRouteArg(const char *word)
+{
+    if(!Q_strcasecmp((char *)word,"fixed"))aw_dock_route_fixed=1;
+    else if(!Q_strcasecmp((char *)word,"direct"))aw_dock_route_fixed=0;
+    else return 0;
+    Con_Printf("Dock guard route: %s\n",aw_dock_route_fixed?"fixed (the pier's centre line)":"direct (the earlier walk)");
+    return 1;
+}
 /* the player's use of a placed reference as E gives it (aw_mwhost.c: its script's OnActivate); 1 when taken */
 int (*aw_opening_activate)(unsigned reference);
 /* CENSUS-INTRO-SCRIPTS-62: Sellus Gravius ("chargen captain") talks through the ordinary dialogue window, as in the
@@ -92,9 +130,55 @@ static float near_actor(int role)
     delta[2]+=actor->v.mins[2]-player->v.mins[2];
     return (float)sqrt(DotProduct(delta,delta));
 }
+/* PIER-GUARD-POST-STUCK-67: the point of the pier's centre line at T (the distance along it from A toward B) */
+static void pier_point(float t,vec3_t out)
+{
+    float dx=AW_PIER_LINE_BX-AW_PIER_LINE_AX,dy=AW_PIER_LINE_BY-AW_PIER_LINE_AY,length=(float)sqrt(dx*dx+dy*dy);
+    out[0]=AW_PIER_LINE_AX+dx/length*t;out[1]=AW_PIER_LINE_AY+dy/length*t;out[2]=31.5f;
+}
+/* PIER-GUARD-POST-STUCK-67: the fixed points of his walk from FROM: onto the centre line (the nearest point of it, a
+ * step across the deck when he stands off it), along it to the plank (the first walk) or to the deck's end by the door,
+ * then the front point and the post (the second). Returns the number of points (0: nothing to walk). */
+int AW_OpeningPierRoute(const vec3_t from,int second,vec3_t points[6])
+{
+    float dx=AW_PIER_LINE_BX-AW_PIER_LINE_AX,dy=AW_PIER_LINE_BY-AW_PIER_LINE_AY,length=(float)sqrt(dx*dx+dy*dy),t;
+    vec3_t candidate[6];int n=0,count=0,i;
+    t=((from[0]-AW_PIER_LINE_AX)*dx+(from[1]-AW_PIER_LINE_AY)*dy)/length;
+    if(second && t<AW_PIER_END_T){
+        /* past the deck's end (on the ground by the door): to the front point and the post */
+    }else{
+        if(t<AW_PIER_END_T)t=AW_PIER_END_T;
+        if(t>AW_PIER_PLANK_T)t=AW_PIER_PLANK_T;
+        pier_point(t,candidate[n++]);
+        pier_point(second?AW_PIER_END_T:AW_PIER_PLANK_T,candidate[n++]);
+    }
+    if(second){
+        candidate[n][0]=AW_PIER_GUARD_FRONT_X;candidate[n][1]=AW_PIER_GUARD_FRONT_Y;candidate[n++][2]=31.5f;
+        candidate[n][0]=AW_PIER_GUARD_POST_X;candidate[n][1]=AW_PIER_GUARD_POST_Y;candidate[n++][2]=31.5f;
+    }
+    /* points he already stands on, and repeats, are left out */
+    for(i=0;i<n;i++){
+        const float *last=count?points[count-1]:from;
+        if((candidate[i][0]-last[0])*(candidate[i][0]-last[0])+(candidate[i][1]-last[1])*(candidate[i][1]-last[1])<1)continue;
+        VectorCopy(candidate[i],points[count]);count++;
+    }
+    return count;
+}
 static int dock_route(int second)
 {
     vec3_t goal;
+    edict_t *guard=AW_IntroRole(5);
+    if(aw_dock_route_fixed && guard){
+        /* PIER-GUARD-POST-STUCK-67: the fixed route on the pier's centre line (the default) */
+        vec3_t points[6];int count=AW_OpeningPierRoute(guard->v.origin,second,points);
+        if(!count){route_started=0;route_done=1;return 1;}   /* already where the walk ends */
+        route_started=AW_NavStartFixed(guard,(const vec3_t *)points,count);
+        if(!route_started){
+            route_failed=1;Con_Printf("Dock route unavailable; story held for inspection.\n");
+            AW_UISubtitle("Dock guard","Route unavailable. Please report this checkpoint.",10);
+        }
+        return route_started;
+    }
     /* The final post is left of the door when approaching from the pier.
      * Leave the doorway clear and face southeast, out toward the docks. */
     /* CharGenRaceNPC's own two AITravel points (state 0: -8914 -73093, before the plank; state 50: -9944 -72481, next
@@ -122,10 +206,18 @@ static int dock_route(int second)
 void AW_OpeningDockStatus(void)
 {
     edict_t *g=sv.active && !strcmp(sv.name,"seyda")?AW_IntroRole(5):NULL;
+    float dx,dy;
     if(!g){Con_Printf("Dock guard none\n");return;}
-    Con_Printf("Dock guard at %ld %ld %ld / leg %ld / route started %ld failed %ld done %ld / retries %ld\n",
+    dx=g->v.origin[0]-AW_PIER_GUARD_POST_X;dy=g->v.origin[1]-AW_PIER_GUARD_POST_Y;
+    Con_Printf("Dock guard at %ld %ld %ld / leg %ld / route started %ld failed %ld done %ld / retries %ld",
         (long)g->v.origin[0],(long)g->v.origin[1],(long)g->v.origin[2],(long)post_leg,(long)route_started,
         (long)route_failed,(long)route_done,(long)post_retries);
+    /* PIER-GUARD-POST-STUCK-67: how far from his post, the ticks his box stood inside a solid during his walks (the
+     * opening journey asserts 0) and the times he waited for someone in his way, which walk, and how many of his walks
+     * started with his box under the floor at his placement and lifted out before the first tick (aw_nav.c) */
+    Con_Printf(" / from the post %ld / box in solid %ld / waits %ld / route %s / settled at the start %ld\n",
+        (long)(sqrt(dx*dx+dy*dy)+.5f),AW_NavFixedSolid(),AW_NavFixedWaits(),aw_dock_route_fixed?"fixed":"direct",
+        AW_NavFixedSettled());
 }
 static void hide(edict_t *e)
 {
@@ -141,6 +233,7 @@ void AW_OpeningSpawn(void)
 {
     int i,reference;edict_t *e;eval_t *v;
     route_started=route_failed=route_done=0;captain_papers=-1;post_retries=0;post_retry=0;post_leg=0;
+    if(!strcmp(sv.name,"seyda"))AW_NavFixedReset();   /* the walks' check counts from the dock map's start */
     if(aw_story.stage==AW_STAGE_DEMO)return;
     if(!strcmp(sv.name,"census") && aw_story.stage>=AW_STAGE_OFFICE)aw_story.ship_disabled=1;
     for(i=1;i<sv.num_edicts;i++){
@@ -201,15 +294,18 @@ int AW_OpeningTick(void)
         if(aw_story.dock==0){if(dock_route(0))aw_story.dock=10;}
         if(aw_story.dock==10){
             if(near_actor(5)<27){
-                /* Source AIWander 0 stops travel as soon as the player arrives. */
-                AW_NavLoad("seyda");route_started=0;aw_story.dock=20;
+                /* Source AIWander 0 stops travel as soon as the player arrives (he stands where he is: his walk
+                 * frames end, PIER-GUARD-POST-STUCK-67; before, the path grid was read again to stop it) */
+                AW_NavStop();route_started=0;aw_story.dock=20;
                 /* CharGenRaceNPC's DisablePlayerControls at his greeting (states 20-30), beside the pier's own hold
                  * (AW_OpeningLocked); his state 50 switches them on again below (OPENING-FIGHTING-ON-BEFORE-PAPERS-66) */
                 AW_ControlSet(AW_CONTROL_PLAYER,0);
-            }else if(!route_failed){
+            }else if(!route_failed && !route_done){
                 if(!route_started)dock_route(0);
                 if(route_started){result=AW_NavStep(dt,0);
-                if(result<0){route_failed=1;Con_Printf("Dock approach blocked.\n");}}
+                /* at the plank he waits there for the player (the walk is not started again) */
+                if(result>0){route_started=0;route_done=1;}
+                else if(result<0){route_failed=1;Con_Printf("Dock approach blocked.\n");}}
             }
         }
         if(aw_story.dock==20 && AW_IntroSpeak(5,"chargendock1"))aw_story.dock=30;
@@ -222,7 +318,8 @@ int AW_OpeningTick(void)
         }else if(aw_story.dock==50 && AW_SpeechRemaining()<=0){
             /* CharGenRaceNPC's state 50: EnablePlayerControls, then his walk to the door */
             AW_ControlSet(AW_CONTROL_PLAYER,1);
-            aw_story.dock=-1;route_started=route_failed=route_done=0;post_leg=0;dock_route(1);IN_AWClearButtons();
+            aw_story.dock=-1;route_started=route_failed=route_done=0;post_leg=aw_dock_route_fixed;dock_route(1);
+            IN_AWClearButtons();
         }else if(aw_story.dock==-1){
             /* OPENING-REGRESSION-64: a walk to his post held up (the player standing in his way after the race
              * menu: a plain travel does not wait for the player, nav.c) is tried again after a short pause instead
@@ -230,9 +327,12 @@ int AW_OpeningTick(void)
             if(route_failed && !route_done && post_retries<30){post_retry+=dt;if(post_retry>2){post_retry=0;post_retries++;route_failed=0;}}
             if(!route_started && !route_failed && !route_done)dock_route(1);
             if(route_started && !route_failed){result=AW_NavStep(dt,0);
-                if(result>0 && !post_leg){
+                if(result>0 && !post_leg && !aw_dock_route_fixed){
                     /* PIER-GUARD-WALKS-INTO-DOOR-65: in front of the door; the next tick starts the step aside */
                     route_started=0;post_leg=1;post_retries=0;
+                }else if(result>0 && aw_dock_route_fixed){
+                    /* PIER-GUARD-POST-STUCK-67: at his post; he turns to the player below */
+                    route_started=0;route_done=1;Con_Printf("Dock guard reached his post.\n");
                 }else if(result>0){
                     /* at his post he faces the dock (AmiWind's opening through v0.0.62, restored 11 November 2026):
                      * converted actors face local +Y, so native yaw 225 faces the dock at world yaw 315 */
@@ -240,7 +340,7 @@ int AW_OpeningTick(void)
                     route_started=0;route_done=1;
                     if(g){g->v.angles[1]=225;SV_LinkEdict(g,false);}
                 }
-                else if(result<0 && !post_leg){
+                else if(result<0 && !post_leg && !aw_dock_route_fixed){
                     /* PIER-GUARD-WALKS-INTO-DOOR-65: the front of the door taken (the player stands there): he steps
                      * aside to his post at once instead of pushing toward it */
                     route_started=0;post_leg=1;post_retries=0;Con_Printf("Dock guard: the front of the door is taken; to the post.\n");
@@ -252,6 +352,18 @@ int AW_OpeningTick(void)
             }
             /* at his post he stands as the travel left him (the script's AITravel sets no facing; the forced face toward
              * the pier went with the script's own post in v0.0.63) and does not keep following the player */
+            /* PIER-GUARD-POST-STUCK-67 (the maintainer: "faces the player"; NPC-IDLE-TRACK-PLAYER-67, his part): with the
+             * fixed route, at his post he turns slowly toward the player while the player is near, and back toward the
+             * dock (world bearing 315: the sea, the pier and the ship) when the player is gone */
+            if(aw_dock_route_fixed && route_done){
+                edict_t *g=AW_IntroRole(5),*p=svs.clients[0].edict;
+                if(g && p){
+                    vec3_t look;
+                    if(near_actor(5)<AW_PIER_GUARD_WATCH){VectorCopy(p->v.origin,look);}
+                    else{look[0]=g->v.origin[0]+45.25f;look[1]=g->v.origin[1]-45.25f;look[2]=g->v.origin[2];}
+                    AW_ActorTurnToward(g,look,AW_PIER_GUARD_TURN,dt);
+                }
+            }
         }
     }
     if(strcmp(sv.name,"census") || aw_story.stage<AW_STAGE_OFFICE)return 0;

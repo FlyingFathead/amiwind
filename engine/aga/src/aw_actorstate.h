@@ -190,11 +190,17 @@ int AW_ActorRemoveSpell(aw_actor_t *a,int spell);
 /* A spell's type (ASPT), name and price cost (ASPC, the game's rule: tools/mwscript/actors.py spell_cost); 0 when
  * the table has no ASPC (before v0.0.58) or SPELL is out of range. */
 int AW_ActorSpellInfo(int spell,int *type,char *name,int capacity,int *cost);
+/* DBG-GIVE-SPELL-67: how many ASPT rows the table holds (every spell an actor, a script, the starting rule or a trap
+ * names), and row SPELL's record id into OUT (1 when read) */
+int AW_ActorSpellCount(void);
+int AW_ActorSpellId(int spell,char *out,int capacity);
 /* The spells A holds now (its base list with the changes), up to MAX; the count. */
 int AW_ActorSpells(const aw_actor_t *a,int *out,int max);
 /* The items A holds now (gold aside) with counts and whether equipped, up to MAX; and an item's id (folded). */
 int AW_ActorItems(const aw_actor_t *a,int *items,int *counts,int *equipped,int max);
 int AW_ActorItemId(int item,char *out,int capacity);
+/* DBG-SPAWN-MENU-67: string INDEX of the table (a base's race, class or faction) as the game data writes it; 1 read */
+int AW_ActorString(int index,char *out,int capacity);
 /* Things sold to merchants that did not stock them (BARTER-SOLD-ITEM-LOST-58): per merchant REFERENCE and id, a
  * count; added (DELTA > 0) or bought back (< 0); carried in the saved game as an AWSL block. */
 /* Magic effects (AMGE, the MGEF records: flags, base cost, school) and a spell's effects (ASPE/AEFF, its ENAM);
@@ -270,7 +276,7 @@ int AW_GemRemove(int i);
 int AW_GemSoul(int i);
 int AW_GemsExport(unsigned char *out,int capacity);
 int AW_GemsImport(const unsigned char *p,int bytes);
-/* Places a script revealed on the map (ShowMap TEXT: the exterior cells whose name holds it; saved: AWMP the first
+/* Places a script revealed on the map (ShowMap TEXT: the exterior cells whose name starts with it; saved: AWMP the first
  * 255, "AWP2" u16 the rest, SAVE-REVEALED-PLACES-128-CAP-66), kept for the map's place markers. The list grows from the
  * heap to a guard of 1,024 (was 128 fixed). ExportMore / ImportMore as the made things' above. */
 void AW_RevealedReset(void);

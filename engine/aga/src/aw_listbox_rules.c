@@ -31,6 +31,27 @@ int AW_ListBoxMatches(const char *label,const char *search) {
     }
     return 0;
 }
+int AW_ListBoxNames(const char *label,const char *text) {
+    int end,i=0,j=0,a,b,any=0;
+    if(!label || !text)return 0;
+    end=(int)strlen(label);
+    /* the trailing " (...)" parts: "Mournhold, Royal Palace: Reception Area (Tribunal) (interior)" names the room */
+    while(end>2 && label[end-1]==')'){
+        int k=end-2;
+        while(k>0 && label[k]!='(')k--;
+        if(k<2 || label[k]!='(' || label[k-1]!=' ')break;
+        end=k-1;
+    }
+    for(;;){
+        while(i<end && !fold((unsigned char)label[i]))i++;
+        while(text[j] && !fold((unsigned char)text[j]))j++;
+        a=i<end?fold((unsigned char)label[i]):0;
+        b=text[j]?fold((unsigned char)text[j]):0;
+        if(a!=b)return 0;
+        if(!a)return any;
+        any=1;i++;j++;
+    }
+}
 static void keep_visible(aw_listbox_t *b) {
     int range;
     if(b->visible<1)b->visible=1;
@@ -232,6 +253,33 @@ void AW_TpNamesClose(aw_tp_names_t *n) {
 long AW_TpNamesHeld(const aw_tp_names_t *n) {
     return n->block?(long)(n->rows*sizeof(unsigned long))+(n->names?n->bytes:0):0;
 }
+long AW_TpNamesFind(FILE *f,long base,long size,const char *text,long *matches,char *list,int list_size) {
+    unsigned char head[AW_TPN_HEADER],r[2];char label[AW_TP_NAME];unsigned long rows,bytes;
+    long i,at,only=-1,count=0;int used=0,n,any=0,full=0;const char *t;
+    if(matches)*matches=0;
+    if(list && list_size>0)list[0]=0;
+    for(t=text;t && *t;t++)if(fold((unsigned char)*t))any=1;
+    if(!any || !f || fseek(f,base,SEEK_SET) || fread(head,1,AW_TPN_HEADER,f)!=AW_TPN_HEADER)return -1;
+    if(memcmp(head,"AWTN",4) || head[4] || head[5]!=1 || head[6] || head[7])return -1;
+    rows=be32(head+8);bytes=be32(head+12);
+    if(rows<1 || rows>65535ul || (long)(AW_TPN_HEADER+bytes)!=size)return -1;
+    for(i=0,at=0;i<(long)rows;i++){
+        if(at+2>(long)bytes || fread(r,1,2,f)!=2 || r[1]>=AW_TP_NAME || at+2+r[1]>(long)bytes ||
+           fread(label,1,r[1],f)!=(size_t)r[1])return -1;
+        label[r[1]]=0;at+=2+r[1];
+        if(AW_ListBoxNames(label,text)){if(matches)*matches=1;return i;}
+        if(!AW_ListBoxMatches(label,text))continue;
+        if(!count++)only=i;
+        n=(int)strlen(label);
+        if(list && !full && used+n+3<list_size){
+            if(used){list[used++]=';';list[used++]=' ';}
+            memcpy(list+used,label,(size_t)n+1);used+=n;
+        }
+        else full=1;                          /* the first labels only, in the list's order */
+    }
+    if(matches)*matches=count;
+    return count==1?only:count?-2:-1;
+}
 long AW_TpKindRows(const unsigned char *data,long size) {
     unsigned long rows;
     if(!data || size<AW_TPK_HEADER || memcmp(data,"AWTK",4) || data[4] || data[5]!=1 || data[6] || data[7]!=AW_TPK_ROW)
@@ -278,6 +326,13 @@ float AW_TpFacingYaw(const float *from,const float *to) {
     while(y<0)y+=360;
     while(y>=360)y-=360;
     return y;
+}
+/* TP-BEING-TRIBUNAL-FALLS-THROUGH-67: the being's feet lifted to a door arrival's height. The arrival search
+ * (aw_scene.c standing_spot) looks for a floor from 8 units over the arrival down to 88 under it; handed the feet,
+ * its first standing box stood in the floor and it took the next floor under the room (a teleport to 'Ten-Tongues'
+ * Weerhat landed 64 units under the pawnbroker's floor). */
+void AW_TpBeingArrival(const float *feet,float box_bottom,float *out) {
+    out[0]=feet[0];out[1]=feet[1];out[2]=feet[2]-box_bottom+.25f;
 }
 static int put_number(char *out,int at,int size,long v) {
     char digits[12];int n=0;unsigned long u=v<0?(unsigned long)(-(v+1))+1ul:(unsigned long)v;

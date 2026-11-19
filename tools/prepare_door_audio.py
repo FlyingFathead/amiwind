@@ -28,7 +28,10 @@ hinged-doors.txt (AWHD1, AW-20260928-12): every placed DOOR reference of Morrowi
                                                 world (MoveWorld, SetAtStart...), the Ghostgate portcullises first
   T <reference> <spell ID>                      trapped references, ascending (TRAPS-WHEN-OPENED-63): every placed
                                                 door (load door or hinged) and container whose reference names a
-                                                trap spell (TNAM); the engine casts it on the one who opens it
+                                                trap spell (TNAM); the engine casts it on the one who opens it. A
+                                                door by its number in the game data (as the door's map carries it),
+                                                a container by its stable id (tools/ref_identity.py stable_ref), the
+                                                key its use-table row has (aw_inventory.c container_open)
 flags: 1 locked (a lock level above 0 or a key: OpenMW components/esm3/cellref.cpp for content files), 2 key
 (KNAM), 4 trap (TNAM), 8 the DOOR record has a script. The census hall door keeps its story rule in the engine.
 """
@@ -261,12 +264,19 @@ HINGED_TRAPS,HINGED_TRAP_SPELLS,HINGED_TRAP_POOL=768,128,3072   # aw_hinged_door
 def trap_catalogue(raw):
     """TRAPS-WHEN-OPENED-63: [(reference, trap spell ID)] ascending of every placed DOOR and CONT reference that names
     a trap spell (TNAM; OpenMW 0.53 CellRef getTrap), deleted references and records left out. The masters' own
-    count (Morrowind.esm): 457 references, 85 distinct spells."""
-    bases=set();refs=[]
+    count (Morrowind.esm): 457 references, 85 distinct spells.
+
+    The key is the one the engine looks the trap up by: a door its number as the game data (the merged master with the
+    expansions) gives it, which its door rows and maps carry; a container its stable id (tools/ref_identity.py
+    stable_ref), the reference of its use-table row (aw_inventory.c container_open -> aw_trap_spring). The two are the
+    same number for the base game; an expansion's container was written under the merged number and its trap never
+    sprang (REF-IDENTITY-MERGED-MASTER-66: Tribunal 2, Bloodmoon 6)."""
+    from ref_identity import stable_ref
+    bases={};refs=[]
     for tag,flags,payload in records(raw):
         if tag in ('DOOR','CONT'):
             s=dict(subrecords(payload))
-            if 'DELE' not in s and 'NAME' in s:bases.add(string(s['NAME']).casefold())
+            if 'DELE' not in s and 'NAME' in s:bases[string(s['NAME']).casefold()]=tag
         elif tag=='CELL':
             ref=None
             for t,data in subrecords(payload):
@@ -278,8 +288,10 @@ def trap_catalogue(raw):
                 elif t=='DELE':ref['deleted']=True
     out={}
     for ref in refs:
-        if ref.get('deleted') or not ref.get('trap') or ref.get('id','').casefold() not in bases:continue
-        out[ref['number']]=key_id(ref['trap'])
+        tag=bases.get(ref.get('id','').casefold())
+        if ref.get('deleted') or not ref.get('trap') or tag is None:continue
+        number=stable_ref('Morrowind.esm',ref['number']) if tag=='CONT' else ref['number']
+        out[number]=key_id(ref['trap'])
     rows=sorted(out.items())
     spells={s.casefold() for _,s in rows}
     if len(rows)>HINGED_TRAPS or len(spells)>HINGED_TRAP_SPELLS or sum(len(s)+1 for s in spells)>HINGED_TRAP_POOL:

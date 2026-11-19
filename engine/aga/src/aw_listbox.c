@@ -68,7 +68,12 @@ static int buttons_y(void){return BOX_Y+PAD+char_h()+4;}
 static int search_y(void){return buttons_y()+(box.categories?char_h()+8:0);}
 static int list_y(void){return search_y()+char_h()+8;}
 static int footer_y(void){return BOX_Y+BOX_H-PAD-char_h();}
-static int list_h(void){int h=footer_y()-4-list_y();return h<row_h()?row_h():h;}
+/* DBG-SPAWN-MENU-67: the selected row's detail line and the switch row, over the footer when the box has them */
+static int line_step(void){return char_h()+3;}
+static int check_y(void){return footer_y()-line_step();}
+static int detail_y(void){return footer_y()-line_step()*(spec.check?2:1);}
+static int extra_h(void){return line_step()*((spec.detail?1:0)+(spec.check?1:0));}
+static int list_h(void){int h=footer_y()-4-extra_h()-list_y();return h<row_h()?row_h():h;}
 static int list_rows(void){return list_h()/row_h();}
 static int scroll_x(void){return BOX_X+BOX_W-PAD-SCROLL_W;}
 
@@ -125,6 +130,13 @@ static void draw(void){
     }
     if(!box.shown_count)centred(list_y(),"No match");
     if(bar)AW_UIScrollbar(scroll_x(),list_y()-1,rows*row_h(),box.shown_count,rows,box.top);
+    if(spec.detail && box.shown_count)
+        row_text(BOX_X+PAD,detail_y(),spec.detail(spec.ctx,AW_ListBoxSelected(&box)),BOX_X+BOX_W-PAD);
+    if(spec.check){   /* a box drawn in the font's cell, an x in it when on, then the words */
+        AW_UIFill(BOX_X+PAD,check_y()-1,char_w()+1,char_h()+2,dark);
+        if(spec.checked && *spec.checked)AW_ConsoleCharacter(BOX_X+PAD,check_y(),'x');
+        text(BOX_X+PAD+char_w()+4,check_y(),spec.check,BOX_X+BOX_W-PAD);
+    }
     Q_snprintf(line,sizeof(line),"%d of %d  Enter: go  Esc: close",box.shown_count?box.selection+1:0,box.shown_count);
     text(BOX_X+PAD,footer_y(),line,BOX_X+BOX_W-PAD);
 }
@@ -155,12 +167,18 @@ static int key(int k,int mouse_x,int mouse_y){
            mouse_y<buttons_y()+char_h()+2){
             AW_ListBoxChoose(&box,(mouse_x-(BOX_X+PAD))/((BOX_W-2*PAD)/box.categories));return 1;
         }
-        if(mouse_x>=BOX_X+PAD && mouse_x<BOX_X+BOX_W-PAD && mouse_y>=list_y()-1)
+        if(spec.check && spec.checked && mouse_x>=BOX_X+PAD && mouse_x<BOX_X+BOX_W-PAD && mouse_y>=check_y()-1 &&
+           mouse_y<check_y()+char_h()+2){*spec.checked=!*spec.checked;return 1;}
+        if(mouse_x>=BOX_X+PAD && mouse_x<BOX_X+BOX_W-PAD && mouse_y>=list_y()-1 &&
+           mouse_y<list_y()-1+box.visible*row_h())
+            r=AW_ListBoxClick(&box,(mouse_y-(list_y()-1))/row_h());
+        else if(mouse_x>=BOX_X+PAD && mouse_x<BOX_X+BOX_W-PAD && mouse_y>=list_y()-1 && !extra_h())
             r=AW_ListBoxClick(&box,(mouse_y-(list_y()-1))/row_h());
         else if(mouse_x<BOX_X || mouse_x>=BOX_X+BOX_W || mouse_y<BOX_Y || mouse_y>=BOX_Y+BOX_H)r=AW_LB_CLOSED;
         break;
     default:
-        if(k>=32 && k<127)AW_ListBoxType(&box,k);
+        if(k==' ' && spec.check && spec.checked)*spec.checked=!*spec.checked;
+        else if(k>=32 && k<127)AW_ListBoxType(&box,k);
         break;
     }
     if(r==AW_LB_CHOSEN)return choose();

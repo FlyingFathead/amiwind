@@ -17,8 +17,17 @@
  * Doors (v0.0.66, WANDER-DOOR-RULE-66; door_ahead below): every 1.5 s of an idle, a wanderer on its routes that faces a
  * door within 1.6 x the activation distance walks on; a walker stuck with a door ahead within the activation distance
  * drops its destination and those its route passes, and walks to another.
- * Not done (said in docs/NPC_PATHFINDING.md): occupied destinations, the package is not saved (an actor starts again
- * from its spawn), packages other than Wander.
+ * Not done (said in docs/NPC_PATHFINDING.md): occupied destinations, the package is not saved (an actor starts it again
+ * where it stands), packages other than Wander.
+ * Routes at the placement (v0.0.67, WANDER-DOOR-AFTER-LOAD-67; AW_AmbientHomeOf, AW_AmbientPlacedAt): the compiled
+ * routes are offsets from the reference's position, so a slot adds them to where the actor's placement put it, also
+ * when a saved game or a left place's row moved the actor before its slot was made, and takes the destination nearest
+ * where the actor stands as its current one (OpenMW 0.51 keeps the package's start in the save, aiwander.cpp
+ * mInitialActorPosition, and getAllowedNodes ends in setCurrentPositionToClosestAllowedPosition). Before, a slot made
+ * after the save's row moved its actor took its start from the saved spot (every destination moved by saved - placed),
+ * and one made before the move went on with the walk it had begun at the placement: in the v0.0.67-dev2 opening
+ * journey that walk took Fargoth from his saved spot toward his grid point by the Seyda Neen census office's street
+ * door, where the player stood, and he stayed there.
  */
 #include <string.h>
 #include "aw_ambient.h"
@@ -144,7 +153,7 @@ void AW_AmbientPoint(const aw_ambient_pkg_t *p,int i,int xyz[3],int *kind) {
 }
 static int allowed(const aw_ambient_pkg_t *p,int i) {return (p->allowed[i>>3]>>(i&7))&1;}
 void AW_AmbientAllow(aw_ambient_pkg_t *p,unsigned distance) {
-    int i,grid=0,kind,xyz[3];long best=-1,d;
+    int i,grid=0,kind,xyz[3];
     memset(p->allowed,0,sizeof(p->allowed));p->count=0;p->cur=0;p->distance=(unsigned short)distance;
     if(distance)for(i=0;i<p->destinations;i++){
         AW_AmbientPoint(p,i,xyz,&kind);
@@ -155,12 +164,23 @@ void AW_AmbientAllow(aw_ambient_pkg_t *p,unsigned distance) {
         if(kind==AW_AMBIENT_HOME || (kind==AW_AMBIENT_PARTWAY && distance==p->record_distance))
             p->allowed[i>>3]|=(unsigned char)(1<<(i&7));
     }
+    for(i=0;i<p->destinations;i++)if(allowed(p,i))p->count++;
+    AW_AmbientCurrent(p,0,0,0);                    /* the one closest to the start */
+    p->manual=(unsigned char)(distance>0 && p->count<2);
+}
+/* WANDER-DOOR-AFTER-LOAD-67 (aw_ambient.h): the allowed destination nearest an offset, the first of equals */
+static long axis(long d) {return d<-16383?-16383:d>16383?16383:d;}   /* three squares within a 32-bit long */
+void AW_AmbientCurrent(aw_ambient_pkg_t *p,int x,int y,int z) {
+    int i,xyz[3];long best=-1,d,dx,dy,dz;
     for(i=0;i<p->destinations;i++)if(allowed(p,i)){
-        p->count++;AW_AmbientPoint(p,i,xyz,NULL);
-        d=(long)xyz[0]*xyz[0]+(long)xyz[1]*xyz[1]+(long)xyz[2]*xyz[2];
+        AW_AmbientPoint(p,i,xyz,NULL);
+        dx=axis((long)xyz[0]-x);dy=axis((long)xyz[1]-y);dz=axis((long)xyz[2]-z);d=dx*dx+dy*dy+dz*dz;
         if(best<0 || d<best){best=d;p->cur=(unsigned char)i;}
     }
-    p->manual=(unsigned char)(distance>0 && p->count<2);
+}
+void AW_AmbientHomeOf(const float origin[3],const float *placed,int routes,float home[3]) {
+    const float *from=routes && placed?placed:origin;
+    home[0]=from[0];home[1]=from[1];home[2]=from[2];
 }
 int AW_AmbientPickDestination(const aw_ambient_pkg_t *p,unsigned roll) {
     /* the allowed destinations other than cur (WANDER-DOOR-RULE-66: cur itself may have been dropped) */
@@ -365,6 +385,9 @@ static aw_follow_t *follower_of(slot_t *s) {
 }
 static short slot_of[MAX_EDICTS];   /* slot + 1 per edict */
 static float none_ref[MAX_EDICTS];
+/* WANDER-DOOR-AFTER-LOAD-67: where each actor's placement put it, per edict with its reference (aw_actors.c tells,
+ * AW_AmbientPlacedAt; 16 bytes an edict, 9,600 in all), until the next server spawn; 0 reference: not told */
+static float placed_at[MAX_EDICTS][3],placed_ref[MAX_EDICTS];
 static int last_dry;               /* the contents at the last swim spot refused (status line) */  /* the reference an edict had when it was not found in the table */
 static model_t *slots_world;
 static unsigned long rng=1;
@@ -372,7 +395,8 @@ static float scan_at;
 static struct {unsigned long thinks,steps,traces,walks,idles,bad_idles,registered,unknown,no_walk,blob_bytes,manual,stuck,
                levelled,aggro_checks,aggro_engaged,aggro_full,flights,dry,travels,travels_done,follows,follows_done,
                unsticks,unstick_tests,settles,settled,escorts,crossed,standing,
-               door_checks,door_tests,door_found,door_idles,door_stuck,door_dropped;double seconds,worst,elapsed;} st;
+               door_checks,door_tests,door_found,door_idles,door_stuck,door_dropped,
+               placed,away,current;double seconds,worst,elapsed;} st;
 /* sv_phys.c SV_CheckStuck: every search for a clear spot (a box that starts in solid), its position tests, and the
  * searches that found none (AMBIENT-UNSTUCK-FLOOD-61) */
 extern unsigned long aw_stuck_searches,aw_stuck_tests,aw_stuck_failed;
@@ -604,11 +628,11 @@ static void reset_all(void) {
 }
 /* SV_SpawnServer: every slot's edict is stale, also on a reload of the same map, which the world check cannot see
  * (HORS-AFTER-HALLOWEEN-CRASH-58): the next tick resets every slot without touching its old edict. */
-void AW_AmbientServerReset(void) {slots_world=NULL;}
+void AW_AmbientServerReset(void) {slots_world=NULL;memset(placed_ref,0,sizeof(placed_ref));}
 int AW_AmbientEnabled(void) {return ambient_on;}
 /* ResetActors (OpenMW 0.51 worldimp.cpp World::resetActors: every active actor but the player back at its placed
- * position, its walking packages started again): a walker of this map at its home (where it was taken in), its slot released so it
- * chooses its package again at the next think. Nothing resident. */
+ * position, its walking packages started again): a walker of this map at its home (its placement since v0.0.67, else
+ * where it was taken in), its slot released so it chooses its package again at the next think. Nothing resident. */
 int AW_AmbientResetActors(void) {
     int i,n=0;vec3_t home;edict_t *e;
     if(slots_world!=sv.worldmodel)return 0;
@@ -698,7 +722,16 @@ static slot_t *start(edict_t *e,const aw_ambient_row_t *row) {
         if(r.flags&AW_AMBIENT_SWIMMER){memset(s->pkg.allowed,0,sizeof(s->pkg.allowed));s->pkg.count=0;s->pkg.manual=(unsigned char)(r.distance>0);}
     }
     else s->flags=record_flags(e);   /* no row: creature, flyer and swimmer from the actor record (as the builder's row) */
-    s->e=e;s->ref=field(e,"aw_ref",0);VectorCopy(e->v.origin,s->home);
+    s->e=e;s->ref=field(e,"aw_ref",0);
+    /* WANDER-DOOR-AFTER-LOAD-67: the routes where the placement put the actor (told by aw_actors.c), wherever a saved
+     * row has moved it since; the current destination the one nearest where it stands (OpenMW: the package's start is
+     * kept in the save, the current position the allowed one closest to the actor) */
+    AW_AmbientHomeOf(e->v.origin,s->ref>0 && placed_ref[n]==s->ref?placed_at[n]:NULL,row!=NULL,s->home);
+    if(row){
+        AW_AmbientCurrent(&s->pkg,(int)(e->v.origin[0]-s->home[0]),(int)(e->v.origin[1]-s->home[1]),
+                          (int)(e->v.origin[2]-s->home[2]));
+        if(s->home[0]!=e->v.origin[0] || s->home[1]!=e->v.origin[1])st.away++;
+    }
     if(aggro_on)aggro_facts(s);
     s->state=S_CHOOSE;s->at=-1;s->can_walk=(unsigned char)can_walk(e);
     if(!s->can_walk && s->pkg.distance){st.no_walk++;}
@@ -706,6 +739,19 @@ static slot_t *start(edict_t *e,const aw_ambient_row_t *row) {
     minutes_now(&s->minutes);
     s->num=(short)n;slot_of[n]=(short)(s-slots+1);st.registered++;
     return s;
+}
+/* FOCUS-NPC-OVERRIDES-ITEM-62 (aw_scene.c aw_actor_creature, the use key's actor box): 1 when E's slot is a creature's
+ * (its row's flag, tools/ambient_lut.py row_flags, or its record's, record_flags), 0 an NPC's, -1 when E has no slot.
+ * It only looks: no slot is made, released or reset, no file is read. */
+extern int (*aw_actor_creature)(edict_t *e);
+static int slot_creature(edict_t *e) {
+    int n;const slot_t *s;
+    if(!e || e->free || slots_world!=sv.worldmodel)return -1;
+    n=NUM_FOR_EDICT(e);
+    if(n<0 || n>=MAX_EDICTS || !slot_of[n])return -1;
+    s=&slots[slot_of[n]-1];
+    if(s->e!=e || s->ref!=field(e,"aw_ref",0))return -1;
+    return (s->flags&AW_AMBIENT_CREATURE)!=0;
 }
 static slot_t *slot_for(edict_t *e) {
     int n;slot_t *s;
@@ -1479,7 +1525,12 @@ int AW_AmbientWander(edict_t *e,int distance,int duration,int hour,const unsigne
     (void)hour;                                 /* stored by OpenMW, read nowhere */
     AW_AmbientIdleProfile(idle,amb_tried>0?amb_shared_t.multiplier:loaded>0?table.multiplier:49151u,s->cdf);
     s->repeat=(unsigned char)(repeat!=0);s->remain=(float)(duration>0?duration:0);s->bad=0;
-    if(s->pkg.blob)AW_AmbientAllow(&s->pkg,(unsigned)distance);
+    if(s->pkg.blob){
+        AW_AmbientAllow(&s->pkg,(unsigned)distance);
+        /* WANDER-DOOR-AFTER-LOAD-67: the current destination the allowed one nearest the actor (OpenMW getAllowedNodes) */
+        AW_AmbientCurrent(&s->pkg,(int)(e->v.origin[0]-s->home[0]),(int)(e->v.origin[1]-s->home[1]),
+                          (int)(e->v.origin[2]-s->home[2]));
+    }
     else{s->pkg.distance=(unsigned short)distance;s->pkg.manual=(unsigned char)(distance>0);}
     /* OpenMW starts a stacked package where the actor stands (mInitialActorPosition); the compiled routes are
      * relative to the spawn position, so the start stays there (an AmiWind simplification, docs/NPC_PATHFINDING.md) */
@@ -1520,6 +1571,32 @@ int AW_AmbientFlags(edict_t *e) {
     return s->flags;
 }
 
+/* ---- WANDER-DOOR-AFTER-LOAD-67: the placements (aw_ambient.h AW_AmbientPlacedAt; aw_actors.c tells) ----
+ * Kept per edict with its reference: a slot made later adds its routes there (start). A slot made before its actor's
+ * row moved it (the scan and the first window tick come in either order: in a session from the v0.0.67-dev2 journey's
+ * quicksave 11 of the 17 moved residents had one, Fargoth among them) took its routes where the actor stood when it was
+ * made, its placement, and may already have begun a walk from there; its actor now stands elsewhere, so that walk ends
+ * (before, it went on from the saved spot toward a waypoint chosen at the placement) and the destination nearest the
+ * actor becomes its current one. Its start is kept as the placement, not where the walk had brought the actor. */
+extern void (*aw_actors_placed)(edict_t *ent,const float placed[3],int spawned);   /* aw_actors.c */
+void AW_AmbientPlacedAt(edict_t *e,const float placed[3],int spawned) {
+    int n;float ref;slot_t *s;
+    if(!e || e->free || !placed || (n=NUM_FOR_EDICT(e))<=0 || n>=MAX_EDICTS || (ref=field(e,"aw_ref",0))<=0)return;
+    s=slots_world==sv.worldmodel?slot_for(e):NULL;
+    /* a spawn tells where the placement put the actor; a later move by its row only when no spawn told it (a window's
+     * actor moved there at its spawn already: it stands at its row's spot, not at its placement), and then a slot with
+     * routes made before the move knows the placement better (its start, before any step it took) */
+    if(spawned || placed_ref[n]!=ref){
+        const float *from=!spawned && s && s->pkg.blob?s->home:placed;
+        VectorCopy(from,placed_at[n]);placed_ref[n]=ref;st.placed++;}
+    if(!s || !s->pkg.blob || s->travel)return;
+    if(s->state==S_WALK){stop_walk(s);s->state=S_CHOOSE;}
+    VectorCopy(placed_at[n],s->home);
+    AW_AmbientCurrent(&s->pkg,(int)(e->v.origin[0]-s->home[0]),(int)(e->v.origin[1]-s->home[1]),
+                      (int)(e->v.origin[2]-s->home[2]));
+    st.current++;
+}
+
 /* ---- console ---- */
 static void status(void) {
     int i,active=0,walking=0,idling=0;
@@ -1551,6 +1628,9 @@ static void status(void) {
                 "with a door ahead; %lu idle residents sent on, %lu stuck walkers to another destination (%lu "
                 "destinations dropped)\n",doors_on?"on":"off",AW_PlacedDoors(shift),AW_HingedDoorCount(),st.door_checks,
                 st.door_tests,st.door_found,st.door_idles,st.door_stuck,st.door_dropped);}
+    Con_Printf("  routes at the placement (WANDER-DOOR-AFTER-LOAD-67): %lu placements told, %lu packages started away from "
+               "their placement (a saved place), %lu running packages given the destination where their actor stands\n",
+               st.placed,st.away,st.current);
     Con_Printf("  script packages: travels %lu (%lu done), follows %lu, escorts %lu (%lu follows and escorts done); "
                "followers through a door with the player %lu\n",st.travels,st.travels_done,st.follows,st.escorts,
                st.follows_done,st.crossed);
@@ -1633,12 +1713,14 @@ void AW_AmbientCommand(void) {
         int i;
         for(i=0;i<SLOTS;i++)if(slots[i].e){
             slot_t *s=&slots[i];
-            Con_Printf("%3d %-24s ref %ld state %d dist %u dests %u/%u cur %u goal %u at %d%s%s%s at %.0f %.0f %.0f flags %u ground %.0f scale %.3f unsticks %u model %s%s\n",
+            /* "home": where its routes start (its placement since v0.0.67, WANDER-DOOR-AFTER-LOAD-67) */
+            Con_Printf("%3d %-24s ref %ld state %d dist %u dests %u/%u cur %u goal %u at %d%s%s%s at %.0f %.0f %.0f home %.0f %.0f %.0f flags %u ground %.0f scale %.3f unsticks %u model %s%s\n",
                        i,source_id(s->e),(long)s->ref,s->state,s->pkg.distance,s->pkg.count,s->pkg.destinations,s->pkg.cur,
                        s->goal,s->at,s->pkg.manual?" manual":"",s->can_walk?"":" no-walk",
                        s->travel==1?" TRAVEL":s->travel==2?" TRAVEL-DONE":s->travel==5?" ESCORT":s->travel>=3?" FOLLOW":"",
                        s->e->v.origin[0],s->e->v.origin[1],
-                       s->e->v.origin[2],s->flags,field(s->e,"aw_ground_mode",-1),field(s->e,"aw_scale",1),s->unsticks,
+                       s->e->v.origin[2],s->home[0],s->home[1],s->home[2],s->flags,field(s->e,"aw_ground_mode",-1),
+                       field(s->e,"aw_scale",1),s->unsticks,
                        s->e->v.model?pr_strings+s->e->v.model:"-",AW_CombatSlotState(s->e,NULL)?" fighting":"");
         }
     }
@@ -1671,6 +1753,7 @@ void AW_AmbientInit(void) {
     aw_mwscript_package=AW_AmbientPackage;           /* AIFollowCell, AIEscort, AIEscortCell (v0.0.62) */
     aw_mwscript_followers=AW_AmbientFollowersOf;     /* the followers through a door (v0.0.62) */
     aw_actor_walks=walks_on_ground;                  /* CREATURE-FLOATING-62: aw_scene.c AW_NPCFloor's drop */
+    aw_actor_creature=slot_creature;                 /* FOCUS-NPC-OVERRIDES-ITEM-62: aw_scene.c's use box */
     aw_mwscript_packages_export=AW_AmbientPackagesExport;
     aw_mwscript_packages_import=AW_AmbientPackagesImport;
     aw_ambient_speed_attribute=AW_MwscriptSpeedAttribute;
@@ -1678,6 +1761,7 @@ void AW_AmbientInit(void) {
     aw_ambient_follow_start=AW_FollowStart;          /* the companion's follow think (v0.0.63, ESCORT-FOLLOW-63) */
     aw_ambient_follow_think=AW_FollowThink;
     aw_crime_pursue=pursue;                          /* CRIME-59: the guards' pursuit to arrest */
+    aw_actors_placed=AW_AmbientPlacedAt;             /* WANDER-DOOR-AFTER-LOAD-67: the routes at the placement */
     AW_MoveSettingsDefault(&move_defaults);
 }
 #endif

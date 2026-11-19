@@ -1672,6 +1672,91 @@ class CountingTests(unittest.TestCase):
         self.assertEqual(md.check(page), [])
 
 
+class PresentedCellsTests(unittest.TestCase):
+    """MOURNHOLD-EXTERIOR-CELLS-66: the cells a presented data folder gives Mournhold's districts are learnt from its
+    receipt (they have no LAND and no census cell): island 3 (Mournhold), set tribunal, named after their district, in
+    the public reference and in the build's named set. Without a receipt the tracker data is byte for byte as before."""
+    RECEIPT = {'format': 'aw-presented-data-1', 'presented_cells': [
+        {'cell': 'Mournhold, Synthetic Plaza', 'block': [4, -30], 'size': [2, 2], 'offset': [1.0, 2.0], 'placements': 9},
+        {'cell': 'Mournhold, Synthetic Court', 'block': [0, -30], 'size': [1, 1], 'offset': [3.0, 4.0], 'placements': 2}]}
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.out = Path(self.tmp.name) / 'trk'
+        self.other = Path(self.tmp.name) / 'other'
+
+    def test_the_receipt_gives_each_cell_of_a_block_its_district(self):
+        cells = cp.presented_cells(self.RECEIPT)
+        self.assertEqual(sorted(cells), ['0,-30', '4,-29', '4,-30', '5,-29', '5,-30'])
+        self.assertEqual(cells['5,-29'], {'name': 'Mournhold, Synthetic Plaza', 'block': [4, -30]})
+        own = {'format': 'aw-presented-exterior-1', 'cells': self.RECEIPT['presented_cells']}     # the presentation's own
+        self.assertEqual(cp.presented_cells(own), cells)
+        for none in (None, {}, {'format': 'aw-presented-data-1', 'presented_cells': []}, {'cells': {'1,1': {}}}):
+            self.assertEqual(cp.presented_cells(none), {}, none)
+
+    def test_presented_cells_are_mournholds_own_island(self):
+        doc = ingest(self.out, presented=self.RECEIPT)
+        c = doc['cells']['5,-29']
+        self.assertEqual((c['island'], c['set'], c['name'], c['land'], c['ring'], c['game_record']),
+                         (3, 'tribunal', 'Mournhold, Synthetic Plaza', True, None, True))
+        self.assertEqual(c['presented'], {'district': 'Mournhold, Synthetic Plaza', 'block': [4, -30]})
+        self.assertEqual(c['chim']['bucket'], 'not_started')
+        rows = {i['island']: i for i in doc['headline']['islands']}
+        self.assertEqual((rows[3]['name'], rows[3]['cells'], rows[3]['done']), ('Mournhold', 5, 0))
+        self.assertEqual((rows[1]['name'], rows[1]['cells']), ('Vvardenfell', 25))       # the island is as before
+        self.assertEqual({k: v['island'] for k, v in doc['cells'].items() if v['island'] == 3},
+                         {k: 3 for k in ('0,-30', '4,-29', '4,-30', '5,-29', '5,-30')})
+        self.assertTrue(doc['sources']['presented'])
+        import cell_progress_ref as REF
+        ref = REF.build(doc)
+        self.assertEqual(ref['cells']['0,-30'], dict(ref['cells']['0,-30'], island=3, name='Mournhold, Synthetic Court',
+                                                     status='not_started'))
+        self.assertEqual(ref['headline']['Mournhold'], {'cells': 5, 'done': 0})
+        text = REF.dumps(ref)
+        self.assertEqual(REF.check(text), [])
+        # the build's preflight reads the published reference: the cells are the tribunal set, Mournhold's named set
+        path = Path(self.tmp.name) / 'cell-progress-reference.json'
+        path.write_text(text, encoding='utf-8')
+        from chim import regions as R
+        statuses = R.load_status(path)
+        self.assertEqual(R.named_cells('mournhold', statuses), [(0, -30), (4, -30), (4, -29), (5, -30), (5, -29)])
+        self.assertEqual(statuses[(4, -30)]['name'], 'Mournhold, Synthetic Plaza')
+        self.assertNotIn((4, -30), R.named_cells('solstheim', statuses))
+
+    def test_a_chimport_result_of_a_presented_cell_is_taken(self):
+        result = {'format': cp.RESULT_FORMAT, 'build': 'chimport-mh', 'generated': '2026-11-17T20:00:00+00:00',
+                  'cells': {'4,-30': {'converted': True, 'audits': {'hidden_faces': {'status': 'passed'}}}}}
+        cp.record_result(self.out, result)
+        doc = ingest(self.out, presented=self.RECEIPT)
+        c = doc['cells']['4,-30']
+        self.assertTrue(c['chim']['converted'])
+        self.assertEqual(c['chim']['bucket'], 'audits_passed')
+        self.assertNotIn('4,-30', doc['result_ignored'])
+        self.assertEqual({i['island']: i['done'] for i in doc['headline']['islands']}[3], 1)
+        cp.record_result(self.other, result)
+        self.assertIn('4,-30', ingest(self.other)['result_ignored'])          # without the receipt: ignored, as before
+
+    def test_without_a_receipt_the_data_is_byte_for_byte_as_before(self):
+        ingest(self.out)
+        ingest(self.other, presented={'format': 'aw-presented-data-1', 'presented_cells': []})
+        name = cp.OUT_FILES['progress']
+        self.assertEqual((self.out / name).read_bytes(), (self.other / name).read_bytes())
+        third = Path(self.tmp.name) / 'third'
+        cp.ingest(third, progress=progress_doc(), metrics=metrics_layer(), census=census_doc(), now=NOW, presented=None)
+        self.assertEqual((self.out / name).read_bytes(), (third / name).read_bytes())
+
+    def test_the_build_stage_passes_the_receipt_on(self):
+        receipt = Path(self.tmp.name) / 'presented-data.json'
+        receipt.write_text(json.dumps(self.RECEIPT), encoding='utf-8')
+        import cell_progress_build
+        written = cell_progress_build.write(None, self.out, now=NOW, presented=receipt)
+        doc = json.loads(written.read_text(encoding='utf-8'))
+        self.assertEqual(doc['cells']['4,-30']['island'], 3)
+        written = cell_progress_build.write(None, self.other, now=NOW, presented=Path(self.tmp.name) / 'missing.json')
+        self.assertNotIn('4,-30', json.loads(written.read_text(encoding='utf-8'))['cells'])
+
+
 class PageTests(unittest.TestCase):
     KIT = ROOT / 'amiwind-toolkit'
 

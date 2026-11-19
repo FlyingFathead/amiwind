@@ -375,6 +375,45 @@ class RunsAloneTests(unittest.TestCase):
         self.assertEqual(hold(['media', 'music'], [], ['chim'], ['chim', 'media'])[0], set())
         self.assertEqual(hold(['media'], ['chim'], [], [])[0], set())
 
+    def test_a_heavy_stage_down_to_its_last_units_no_longer_holds_the_alone_stage(self):
+        # CHIM-MESH-STAIR-UNIT-SLOW-67: the stage of Mournhold's districts ran two single-core units for minutes while
+        # the outdoor world stage, which runs alone, waited for it on 2 of 24 cores. The stage's live status counts
+        # (its pools: units running, none queued, for a minute), never its plan estimate.
+        hold = rp.alone_hold
+        heavy = ['chim', 'media', 'scene']
+        self.assertEqual(hold(['chim', 'music'], ['scene'], ['chim'], heavy)[0], {'chim'})
+        self.assertEqual(hold(['chim', 'music'], ['scene'], ['chim'], heavy, tail={'scene'})[0], set())
+        # another heavy stage still running in full keeps it waiting; a further heavy stage never starts beside it
+        self.assertEqual(hold(['chim', 'media'], ['scene', 'other'], ['chim'], heavy + ['other'], tail={'scene'})[0],
+                         {'chim', 'media'})
+        self.assertEqual(hold(['chim', 'media'], ['scene'], ['chim'], heavy, tail={'scene'})[0], {'media'})
+        # a running alone stage is never a tail for the stages it holds back
+        self.assertEqual(hold(['media'], ['chim'], ['chim'], heavy, tail={'chim'})[0], {'media'})
+
+    def test_a_tail_is_one_or_two_running_units_and_none_queued_for_a_minute(self):
+        since = {}
+
+        def status(running, more=False):
+            return {'queued': 3 if more else 0, 'more': more, 'running': running, 'slowest': None, 'maps': 1}
+        tail = lambda demand, now: rp.tail_stages(demand, since, now)   # noqa: E731
+        self.assertEqual(tail({'scene': status(2)}, 100.0), set())              # first seen: not yet
+        self.assertEqual(tail({'scene': status(2)}, 159.0), set())
+        self.assertEqual(tail({'scene': status(1)}, 160.0), {'scene'})          # a minute of it
+        # units queued again (a new pass): no tail, and the minute starts again
+        self.assertEqual(tail({'scene': status(2, more=True)}, 170.0), set())
+        self.assertEqual(tail({'scene': status(2)}, 180.0), set())
+        self.assertEqual(tail({'scene': status(2)}, 240.0), {'scene'})
+        # three units running, no unit running (a serial phase: its memory is not known), no status: never a tail
+        for other in (status(3), status(0), None):
+            since.clear()
+            self.assertEqual(tail({'scene': other}, 0.0), set())
+            self.assertEqual(tail({'scene': other}, 500.0), set())
+        # a stage that ended is forgotten
+        since.update(gone=1.0)
+        tail({'scene': status(2)}, 600.0)
+        self.assertEqual(sorted(since), ['scene'])
+        self.assertEqual((rp.TAIL_UNITS, rp.TAIL_SECONDS), (2, 60.0))
+
     def test_the_scheduler_runs_it_alone(self):
         from build_parallel import execute_parallel
         stamp = ('import json, sys, time\nt0 = time.time(); time.sleep(.4)\n'

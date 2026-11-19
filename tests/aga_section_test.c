@@ -18,7 +18,9 @@ int main(int argc,char **argv)
  assert(AW_MapLogicalId("mi5b8154939f7ab")==8252);
  assert(!strcmp(AW_MapName(8253),"mi5b8154939f7ab") && !strcmp(AW_MapTitle(8253),"Abaelun Mine"));
  /* the last outdoor ID: Solstheim's frame maps take 4096..8191 of the terrain IDs (WORLD-REGION-NAMES-VF-ONLY-64) */
- assert(!strcmp(AW_MapName(8251),"sl4095") && !strcmp(AW_MapTitle(8251),"Solstheim"));
+ assert(!strcmp(AW_MapName(7995),"sl3839") && !strcmp(AW_MapTitle(7995),"Solstheim"));
+ /* and Mournhold's district frame maps the block's last 256 (the Tribunal layer's own small map) */
+ assert(!strcmp(AW_MapName(8251),"mh0255") && !strcmp(AW_MapTitle(8251),"Mournhold"));
  assert(!strcmp(AW_MapName(4155),"vf4095") && !strcmp(AW_MapTitle(4155),"Vvardenfell"));
  assert(AW_MapId("vf4096")==-1 && AW_MapId("vf8192")==-1 && !*AW_MapName(8254));
  assert(read_fixture(fixture,&d));old=d;

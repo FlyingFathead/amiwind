@@ -8,6 +8,10 @@
  * Beings rows (people and creatures by their own names). A being takes you to a free spot beside it, facing it: where
  * it stands now when its scene is loaded, else where it is placed; a common kind (flag AW_TP_NEAREST) to the nearest
  * one of its placements file (id1/tpk/<name>.tpk, read on choose only).
+ * v0.0.67 (TP-BEING-TRIBUNAL-FALLS-THROUGH-67): a row's point is the being's feet; into a room the arrival is that
+ * point lifted to a door arrival's height (AW_TpBeingArrival), so the arrival search stands the player on the being's
+ * floor even when the being is not in the room to step beside. Outdoors the point stays the feet (dbg tp X Y Z: Z
+ * names the floor).
  * Memory (the maintainer, 2026-11-13: no large block that could fragment the heap): while the box is open it holds
  * only the names list id1/tp-names.lut (labels, categories, one offset per row) as ONE block allocated at open and
  * freed at close; the world is paused under the box, so nothing streams meanwhile. When exec's largest free block
@@ -105,6 +109,23 @@ int AW_TpPlacesOpen(void){
     Con_DPrintf("Teleport list: %ld rows, %ld bytes held while open%s\n",rows,AW_TpNamesHeld(&names),
         whole?"":" (paged)");
     return 1;
+}
+/* dbg tp TEXT (DBG-TP-EXPANSION-ARRIVALS-66): the list's row TEXT names, read from the names list row by row (nothing
+ * held), and chosen as in the box; several rows: how many and the first names, the player stays where he is */
+int AW_TpPlacesFind(const char *text){
+    FILE *f=NULL;long size,row,matches=0,listed;char list[160];const char *p;
+    size=COM_FOpenFile((char *)names_path,&f);
+    if(size<AW_TPN_HEADER || !f){if(f)fclose(f);return 0;}
+    row=AW_TpNamesFind(f,ftell(f),size,text,&matches,list,sizeof(list));
+    fclose(f);
+    if(row>=0){chosen(NULL,(int)row);return 1;}
+    if(row==-2){
+        for(listed=list[0]?1:0,p=list;*p;p++)if(*p==';')listed++;
+        Con_Printf("dbg tp: %ld places hold \"%s\": %s%s. Type more of the name, or dbg tp alone for the list.\n",
+            matches,text,list,listed<matches?(listed?"; ...":"..."):"");
+        return 1;
+    }
+    return 0;
 }
 /* ------------------------------------------------------------------------ beings (DBG-TP-TO-NPC-66) */
 static struct {
@@ -236,7 +257,11 @@ void AW_TpBeingGo(const aw_tp_place_t *row){
     }
     want.active=1;
     if(r.map[0]){
-        if(!AW_SceneLoadRoom(r.map,point,0)){
+        /* the room is loaded the way a door loads it, so the arrival is a door's: the player's origin over the
+         * being's floor, never its feet (TP-BEING-TRIBUNAL-FALLS-THROUGH-67) */
+        float arrival[3];
+        AW_TpBeingArrival(point,p->v.mins[2],arrival);
+        if(!AW_SceneLoadRoom(r.map,arrival,0)){
             want.active=0;Con_Printf("Teleport: %s's room is not on this disk.\n",row->name);
         }
         return;

@@ -61,13 +61,14 @@ int AW_SpellEffectText(const aw_sl_effect_t *e,int constant,char *out,int capaci
         }
         add(out,capacity,&at,t);
     }
-    if(!constant){
+    if(constant!=1){
         static const char *ranges[]={"Self","Touch","Target"};
         d=e->duration;
         if(!(e->flags&AW_SL_APPLIED_ONCE) && d<1)d=1;
         if(d>0 && !(e->flags&AW_SL_NO_DURATION)){snprintf(t,sizeof(t)," for %d %s",d,d==1?"sec":"secs");add(out,capacity,&at,t);}
         if(e->area>0){snprintf(t,sizeof(t)," in %u ft area",e->area);add(out,capacity,&at,t);}
-        snprintf(t,sizeof(t)," on %s",ranges[e->range<3?e->range:0]);add(out,capacity,&at,t);
+        /* a potion has no target (widgets.cpp mNoTarget): AW_SL_NO_TARGET */
+        if(constant!=AW_SL_NO_TARGET){snprintf(t,sizeof(t)," on %s",ranges[e->range<3?e->range:0]);add(out,capacity,&at,t);}
     }
     return at;
 }

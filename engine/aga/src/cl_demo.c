@@ -87,6 +87,7 @@ CL_GetMessage
 Handles recording and playback of demos, on top of NET_ code
 ====================
 */
+extern int Loop_Grow (int receive, int message);	/* net_loop.c */
 int CL_GetMessage (void)
 {
     int r, i, size;
@@ -120,7 +121,9 @@ int CL_GetMessage (void)
             return 0;
         }
         size = LittleLong (size);
-        if (size <= 0 || size > MAX_MSGLEN) {
+        /* a frame message can be larger than MAX_MSGLEN on the game's own connection (NET-VIVEC-ENTITY-PACKET-
+         * OVERFLOW-66): net_message grows to it (net_loop.c), up to the frame message's own bound */
+        if (size <= 0 || size > 4194304 || (size > net_message.maxsize && !Loop_Grow (0, size))) {
             Con_Printf ("Invalid demo message size\n");
             CL_StopPlayback ();
             return 0;

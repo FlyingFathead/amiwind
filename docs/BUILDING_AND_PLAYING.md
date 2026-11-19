@@ -1,6 +1,6 @@
 # Building and playing
 
-_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
+_Last updated with AmiWind v0.0.67-dev3 (18 November 2026)._
 
 How to build AmiWind from your own Morrowind copy and run it in an emulator. The short version is in the [README](../README.md#build-it-from-your-own-morrowind).
 
@@ -71,7 +71,9 @@ These commands preview setup and check prerequisites. Follow the linked build
 guide to install the required tools and build the playable HDF.
 
 With `--reuse-from` or `--reuse-all-available`, `--check` also runs the build's first-minute reuse stop and exits with
-code 6 and its `STOP` lines when the build would stop there. A full build's image step stops early, with a named
+code 6 and its `STOP` lines when the build would stop there. In a build folder that holds earlier builds, a plain
+`--check` plans the default reuse (below) the same way, with its stops as notices, and prints what the build would ask.
+A full build's image step stops early, with a named
 cause, on a staged file of an unknown format, a bracket fungus floating away from its tree and an actor shortfall
 against the original: [the checks at the image step](BUILD_PROFILE.md#the-checks-a-contributor-meets-at-the-image-step).
 
@@ -85,14 +87,34 @@ it into its results folder.
 **Build speed:** `--jobs N` sets the exact worker count. While a build runs,
 `./build.sh status out/build/NAME` shows its progress, the cores in use and an
 ETA; afterwards `./build.sh profile report|compare|optimize out/build/NAME`
-shows where the time went and what to parallelize next. Development rebuilds can
-reuse unchanged stages with `--reuse-from`. See
+shows where the time went and what to parallelize next. A rebuild in the same build
+folder reuses unchanged stages by default (below); `--reuse-from RUN` names one earlier
+run. See
 [performance options](BUILD_PROFILE.md#performance-options). `--clean` builds the
 way a first-time user does (no earlier run, an empty cache), and `--public-defaults`
 refuses options a public user would not have: see
 [clean builds](BUILD_CACHE.md#clean-builds-and-public-defaults). The numbers of
 every build and gate can be kept in one database for comparisons across runs:
 [perf database](PERF_DATABASE.md).
+
+**Building again after an update:** after `git pull`, run the same build command in the
+same build folder. When the folder holds earlier builds, the builder reuses every stage
+they hold unchanged, by default, and makes again only what changed; every reused file is
+checked by its SHA-256. In its first minute it lists each stage with the earlier build it
+comes from (its version and date), or why it is made again, and in a terminal it asks once:
+
+```text
+Found N earlier builds in this build folder: M of T stages can be reused unchanged. Reuse them? [Y/n]
+```
+
+Enter means yes; without a terminal the answer is yes. At its start and in
+its end summary it says how many stages and units came from earlier builds and from which.
+If something in the game then looks wrong or unstable, build once from scratch in a new
+build folder: `./build.sh --clean --workspace ../amiwind-clean` (Windows:
+`.\build.cmd --clean --workspace ..\amiwind-clean`), with the options you build with; the
+notice says how long the last build of that folder that ran every stage took. `--no-reuse`
+runs every stage again for one build (their units still come from the build cache). See
+[reuse earlier builds by default](BUILD_CACHE.md#reuse-earlier-builds-by-default).
 
 **Disk space:** every build keeps its run folder and adds to the build cache, so
 the workspace grows with each release you build. When the build disk is 80 % full
@@ -109,7 +131,7 @@ Plan for a first build to take hours and to use the whole machine.
 | Kind of build | Measured time | What it means |
 | --- | --- | --- |
 | First build from scratch (`--clean`, nothing reused, empty cache) | about 265 minutes (4 h 25 min) for v0.0.57; 323 minutes for v0.0.51 | Every stage runs. Measured with up to 24 cores and 44 GiB of memory on a 12-core / 24-thread desktop CPU with 64 GB of RAM. |
-| Rebuild that reuses a previous run (`--reuse-from`) | from about 8 minutes to two hours; full builds up to v0.0.61 took 20 to 75 minutes; the v0.0.62 full build took hours more, because the new character bake costs more per character and a change of the bake code bakes every character again (room batches about 2 h 40 min, actor library about 40 min, the image step's player bodies over 35 min) | Only the stages whose inputs changed run again. The time depends on what changed: a version label alone is cheap, a change to the CHIM world, the models or the character bake is not. |
+| Rebuild that reuses earlier builds (the default in a build folder that holds them, or `--reuse-from`) | from about 8 minutes to two hours; full builds up to v0.0.61 took 20 to 75 minutes; the v0.0.62 full build took hours more, because the new character bake costs more per character and a change of the bake code bakes every character again (room batches about 2 h 40 min, actor library about 40 min, the image step's player bodies over 35 min) | Only the stages whose inputs changed run again. The time depends on what changed: a version label alone is cheap, a change to the CHIM world, the models or the character bake is not. |
 | Smaller test build ([MiniWind](MINIWIND.md)) | minutes: 3 to 25 minutes for recent ones, reusing a previous run | One spot of the world instead of the whole island. |
 
 Why the difference: every stage is keyed by its inputs (your game files, the

@@ -1,6 +1,6 @@
 # NPC pathfinding: how NPCs find their way
 
-_Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
+_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -491,6 +491,30 @@ v0.0.66-dev10 opening journey Fargoth (`fargoth`, reference 128964) stood by the
 reference, and 12 of the journey's 13 aims at the door went to him. Fixed in source, to be confirmed in play. Kept by
 `tests/aga_ambient_test.c` (a door ahead, the idle check, a stuck walker's dropped destinations) and
 `tests/test_ambient_lut.py`.
+
+**After a loaded game (v0.0.67, `WANDER-DOOR-AFTER-LOAD-67`).** A package's compiled points are offsets from the
+actor's placement (its reference's position), so the engine adds them to where the placement put the actor. A loaded
+game spawns the place's actors at their placements and then moves each one its saved row names, and the residents'
+packages start in either order around that move. Before v0.0.67 two things went wrong. A package started after the
+move added its routes to the saved spot, so every destination lay off the path grid by the actor's saved offset. A
+package started before the move (at the placement) kept the walk it had begun there, so after the move the actor went
+on from the saved spot toward a waypoint chosen at the placement. In the v0.0.67-dev2 opening journey that walk took
+Fargoth from his saved spot toward his grid point by the Census and Excise Office's street door, where the player
+stood; the player stopped him 15 units short of it, and he stood by the door through all thirteen of the journey's aims
+at it. Now the actor spawner tells the package where each actor was placed before a saved row moves it
+(`aw_actors.c` `SpawnOne` and `ApplyLoaded`, `aw_ambient.c` `AW_AmbientPlacedAt`): the routes stay at the placement, a
+walk begun before the move ends, and the package's current destination is the allowed one nearest where the actor
+stands. In a session from that journey's quicksave, 11 of the 17 residents the save moved had started their package
+before the move and 6 after; Fargoth stood at his saved spot by his grid point there, 160 units from the door. This is
+the original's behaviour as
+OpenMW 0.51 states it: the Wander package keeps its start position in the saved game (`aiwander.cpp`
+`mInitialActorPosition`, written and read with the package) and takes the allowed position closest to the actor as its
+current one (`setCurrentPositionToClosestAllowedPosition`), so a loaded wanderer walks on along the same routes and the
+door rule above applies to it as before the save. A script's package for an actor without compiled routes still
+wanders near the spot it starts on. Memory: 16 bytes an entity (9,600 bytes); no file read. `chim actors ambient list`
+prints each actor's route start (`home`), and `chim actors ambient` counts the placements told, the packages started
+away from their placement and the running ones given the destination where their actor stands. Kept by
+`tests/aga_ambient_test.c` (Fargoth's compiled package as the v0.0.67-dev2 build has it) and `tests/test_ambient_lut.py`.
 
 Not done yet (said so, not invented): occupied destinations (flyers and swimmers move since v0.0.57, below); the
 time of day is kept but unused (OpenMW reads it nowhere either); a package set by a script keeps the spawn position

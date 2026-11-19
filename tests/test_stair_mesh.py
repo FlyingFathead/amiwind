@@ -504,9 +504,12 @@ class KnownMeshTests(unittest.TestCase):
         data = json.loads((ROOT / 'config/stair-check-known.json').read_text(encoding='utf-8'))
         # 11 measured on 22 October; the 2 the dev2 verify run found pass since (CHIM-STAIR-METHOD1-UNFIXED-48)
         # plus the Bloodmoon layer's 3 (CHIM-SOLSTHEIM-STAIR-CHECK-64), named under layers
-        bloodmoon = data['layers']['bloodmoon']
+        # and the Tribunal layer's 2, found when Mournhold's districts were converted as exterior cells (the bazaar
+        # cart and a road piece, 18 November 2026)
+        bloodmoon, tribunal = data['layers']['bloodmoon'], data['layers']['tribunal']
         self.assertEqual(len(bloodmoon), 3)
-        self.assertEqual(len(set(data['meshes']) - set(bloodmoon)), 11)
+        self.assertEqual(sorted(tribunal), ['meshes/x/ex_mh_bazaar_cart_01.nif', 'meshes/x/ex_mh_road_03.nif'])
+        self.assertEqual(len(set(data['meshes']) - set(bloodmoon) - set(tribunal)), 11)
         self.assertNotIn('meshes/f/flora_tree_gl_06.nif', data['meshes'])
         self.assertNotIn('meshes/x/ex_t_slavemarket.nif', data['meshes'])
         self.assertTrue((ROOT / 'docs/bugs' / (data['class'] + '.md')).is_file())

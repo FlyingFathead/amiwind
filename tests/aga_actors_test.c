@@ -346,6 +346,9 @@ int AW_CombatSetHealth (edict_t *e, float health) {return 0;}
 void AW_CombatForget (edict_t *e) {}
 void AW_CompanionKillMode (void) {}
 void AW_CompanionKillCrime (void) {}	/* dbg kill crime (CRIME-59) */
+void AW_CompanionDespawnMode (void) {}	/* dbg despawn (DBG-SPAWN-MENU-67) */
+void AW_SpawnCommand (const char *id, const char *how) {(void)id; (void)how;}
+void AW_MwscriptDespawnAll (void) {}
 int ChimChunks_OriginCell (int *cx, int *cy) {*cx = *cy = 0; return 1;}
 /* the residents' recipe tables (aw_npc_parts.c, BUILD-NPC-RECIPES-PER-CELL-59): in with a join, out with a leave */
 static int parts_cells_in, parts_cells_out, parts_rooms;
@@ -1108,6 +1111,22 @@ static void base_model (void)
 	puts ("base model passed");
 }
 
+/* DBG-SPAWN-MENU-67: dbg spawn's list reads every base that spawns a living actor (classname aw_npc) with its record id,
+ * name and kind (aw_actors.c AW_ActorsBaseEach); prints "each ID|NAME|KIND" per base given and "base each N" */
+static void each_base (void *ctx, const char *id, const char *name, int kind)
+{
+	(*(int *)ctx)++;
+	printf ("each %s|%s|%d\n", id, name, kind);
+}
+static void base_each (void)
+{
+	int seen = 0;
+	assert (AW_ActorsBaseEach (NULL, NULL) == -1);
+	printf ("base each %d\n", AW_ActorsBaseEach (each_base, &seen));
+	assert (seen >= 0);
+	printf ("base each seen %d\n", seen);
+}
+
 /* OUTDOOR-CREATURES-HOME-CELL-67: a region frame map's own cell never joins the window (its people and placed
  * creatures come with the map's entity text, which holds no levelled point), so its levelled creatures were never
  * rolled. A new map's first window tick joins the home cell's levelled points from the table, and only those (the
@@ -1283,6 +1302,8 @@ int main (int argc, char **argv)
 		room_levelled ();
 	else if (!strcmp (argv[1], "basemodel"))
 		base_model ();
+	else if (!strcmp (argv[1], "baseeach"))
+		base_each ();
 	else if (!strcmp (argv[1], "deadstay"))
 		dead_stay_dead ();
 	else if (!strcmp (argv[1], "corpse"))

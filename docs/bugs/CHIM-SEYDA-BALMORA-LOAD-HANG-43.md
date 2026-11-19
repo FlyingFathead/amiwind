@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 47 times; something has to be done
+## PERSISTING: reported 48 times; something has to be done
 
 - Reported with v0.0.46 at 2026-10-20 20:09 +0300: Listed under Known in this build in the v0.0.46 release notes (still open at the release).
 - Reported with v0.0.53-dev2 at 2026-10-26 (time not recorded): 19:14 UTC door sample: the Yassu Mine room load (ri9f4c8ccd45) stopped after its BSP while a gate ran its emulator; the next try loaded in 7.6 s
@@ -51,6 +51,7 @@
 - Reported with v0.0.66-dev12 at 2026-11-16 (time not recorded): The deterministic-mode comparison, updated (test sessions only; the tally is DET-TALLY.txt of the comparison, repeat sessions of the Arena Pit loads on the v0.0.66-dev10 image at 32 MB Fast): as sessions run today, 8 valid runs, 76 Arena Pit loads, 2 stops; with the emulator's deterministic option, 8 valid runs, 80 loads, 0 stops. The comparison continues; no conclusion beyond these numbers. This line replaces the earlier tally of the same day (7 valid runs, 70 loads, 0 stops).
 - Reported with v0.0.66-dev10 at 2026-11-16 10:46 +0200: The mechanism captured in a plain repeat session on the v0.0.66-dev10 image (FS-UAE at 32 MB Fast, JIT, the remote-console folder served by the emulator's host thread): it stopped after nine arena pit loads with the game's packet a FINDINPUT of AWCTL:cmd.txt, the remote console's poll of its missing command file, its result already set (res1 0, res2 205), and the handler's state word for it -1: the emulator's host side finished the request and the handler was never told. The deterministic twin (emu deterministic=1) is being measured against it.
 - Reported with v0.0.66 at 2026-11-17 (time not recorded): Seen again on 17 November 2026 on the v0.0.66 release image, with the emulator in warp mode (warp_mode = 1): the opening journey stopped at its very first map load (map seyda). The stall examination found the game waiting on FINDOUTPUT of AWCTL:state.txt with the handler's word -1 (the request finished by the host side, the handler never told) and the state file left empty. Without warp this stop comes about once in 100 loads; warp emulates thousands of frames per second (about 23,000 in the first 15 s), and every frame updates the shared interrupt word that the folder's host thread also writes, so the race comes at once. A warp session needs the deterministic option (EMU-WARP-STARVES-GAME-CPU-67).
+- Reported with v0.0.67-dev2 at 2026-11-18 21:48 +0200: Seen again in an emulator room check of the v0.0.67-dev2 Mournhold module test build (32 MB Fast, JIT): the first load of Seyda Neen after boot never finished (server none); the stall examination found the game waiting on SIGF_DOS with no request of the game queued on any handler port, 4 of 5 samples in exec idle. 30 other room checks of the same build and session setup in the same run loaded Seyda Neen normally.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -131,6 +132,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-16: v0.0.66-dev12: Pi 4B A/B: the same repeat loads with the test console served from a host folder drive in Amiberry 8.5.0, 32 MB Fast, the v0.0.66-dev12 image: 10 valid sessions, 200 loads (100 into the Arena Pit), 0 stops, 0 failures.
 - 2026-11-16 10:46 +0200: seen again in v0.0.66-dev10: The mechanism captured in a plain repeat session on the v0.0.66-dev10 image (FS-UAE at 32 MB Fast, JIT, the remote-console folder served by the emulator's host thread): it stopped after nine arena pit loads with the game's packet a ...
 - 2026-11-17: seen again in v0.0.66: Seen again on 17 November 2026 on the v0.0.66 release image, with the emulator in warp mode (warp_mode = 1): the opening journey stopped at its very first map load (map seyda).
+- 2026-11-18 21:48 +0200: seen again in v0.0.67-dev2: Seen again in an emulator room check of the v0.0.67-dev2 Mournhold module test build (32 MB Fast, JIT): the first load of Seyda Neen after boot never finished (server none); the stall examination found the game waiting on SIGF_DOS with no ...
 
 <!-- END GENERATED TIMELINE -->
 
@@ -139,7 +141,7 @@ _Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 47 times; something has to be done](#persisting-reported-47-times-something-has-to-be-done)
+- [PERSISTING: reported 48 times; something has to be done](#persisting-reported-48-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -468,7 +470,7 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - [BUILD-IMAGE-CHIM-NATIVE-TOWN-36](BUILD-IMAGE-CHIM-NATIVE-TOWN-36.md): The image step of a CHIM-native town read legacy region maps that are never built: the Bitter Coast test build failed at the end of its image step on maps/bc000.bsp
 - [BUILD-LEGACY-CHAIN-DEFAULT-36](BUILD-LEGACY-CHAIN-DEFAULT-36.md): Builds still prepared CHIM towns through the legacy region-map chain by default, and a retired flag (--legacy-area) was accepted with only a warning
 - [CHIM-ACTOR-RING-33](CHIM-ACTOR-RING-33.md): A scripted actor step could move the CHIM chunk ring to the actor
-- CHIM-ACTOR-SPAWN-HITCH-54 (no report page): A joining cell's actor spawns cost 5 to 135 ms a tick: the first model load of one mudcrab took 135 ms, ten spawns took 502 ms
+- [CHIM-ACTOR-SPAWN-HITCH-54](CHIM-ACTOR-SPAWN-HITCH-54.md): A joining cell's actor spawns cost 5 to 135 ms a tick: the first model load of one mudcrab took 135 ms, ten spawns took 502 ms
 - [CHIM-ACTOR-TABLE-OFF-IN-GAME-47](CHIM-ACTOR-TABLE-OFF-IN-GAME-47.md): The actor table ships in v0.0.47-dev2, but the engine does not read it by default
 - [CHIM-ACTORS-OUTSIDE-RING-33](CHIM-ACTORS-OUTSIDE-RING-33.md): Actors outside the CHIM ring have no terrain collision
 - [CHIM-ACTORS-TOWN-RETURN-EMPTY-47](CHIM-ACTORS-TOWN-RETURN-EMPTY-47.md): With the type 1 window and the actor table, a town is empty after the player comes back into it from the region frames
@@ -517,6 +519,7 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - [CHIM-MIPTEX-OFFSET-UNCHECKED-35](CHIM-MIPTEX-OFFSET-UNCHECKED-35.md): CHIM texture mip offsets are taken from disk unchecked: a wrong offset makes the rasterizer read past its block
 - [CHIM-MODEL-ARENA-RESERVE-41](CHIM-MODEL-ARENA-RESERVE-41.md): Placed CHIM models reserve renderer nodes that their point-hull loader never allocates
 - [CHIM-MOLAG-MEMORY-38](CHIM-MOLAG-MEMORY-38.md): Tel Uvirith exterior cell (10,1) exceeds the CHIM active-ring memory budget
+- [CHIM-MOURNHOLD-PLAZA-OVER-16MB-67](CHIM-MOURNHOLD-PLAZA-OVER-16MB-67.md): The two frames of Mournhold's Plaza Brindisi Dorom are over the 16 MB zone budget: built as 32 MB frames, with about 50 chunk loads without room on a walk across
 - [CHIM-OCEAN-CELL-RECORD-CLASSIC-43](CHIM-OCEAN-CELL-RECORD-CLASSIC-43.md): 14 open-sea cells with a CELL record and no LAND stay classic: the build keeps a legacy map for each, the tracker counts them as open ocean and no cell list selects them
 - [CHIM-OCEAN-CELL-RECORD-ROUTING-43](CHIM-OCEAN-CELL-RECORD-ROUTING-43.md): The dev3 full build stops 30 minutes in, in world terrain: the 14 open-sea cells with a CELL record are routed as map-less ocean cells although each has an open-world map
 - [CHIM-PACK-DIRS-33](CHIM-PACK-DIRS-33.md): CHIM pack directories are fully resident and would grow to about 400 KB for the island
@@ -535,7 +538,7 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - [CHIM-REGION-MARGIN-STORAGE-36](CHIM-REGION-MARGIN-STORAGE-36.md): One-cell CHIM region frames store about 3.5 times their cell's terrain (the terrain-only margin)
 - [CHIM-REGION-POCKET-TOWN-CELLS-42](CHIM-REGION-POCKET-TOWN-CELLS-42.md): The legacy-pocket rule counts cells wholly inside a town frame as legacy: CHIM region cells around a town are left out for nothing
 - [CHIM-REGION-SEABED-NO-HEIGHTS-42](CHIM-REGION-SEABED-NO-HEIGHTS-42.md): The full build refuses the 98 heightless seabed cells as region cells (no original LAND), without naming the cell, although CHIMport converts them
-- CHIM-ROOM-16MB-REFUSAL-48 (no report page): On 16 MB of Fast RAM (or with Extra RAM off) a CHIM room larger than the zone ended the game with a host error at its door
+- [CHIM-ROOM-16MB-REFUSAL-48](CHIM-ROOM-16MB-REFUSAL-48.md): On 16 MB of Fast RAM (or with Extra RAM off) a CHIM room larger than the zone ended the game with a host error at its door
 - [CHIM-ROOM-BLANK-WALLS-54](CHIM-ROOM-BLANK-WALLS-54.md): Our capture camera stood inside a booth wall in Desele's House: the room drew blank from there; not visible to a player
 - [CHIM-ROOM-EFRAG-LIMIT-48](CHIM-ROOM-EFRAG-LIMIT-48.md): The efrag pool limit can leave CHIM room placements undrawn in large rooms
 - [CHIM-ROOM-ESTIMATE-48](CHIM-ROOM-ESTIMATE-48.md): 27 rooms set aside as too large for a CHIM room by a wrong estimate
@@ -544,16 +547,16 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - [CHIM-ROOM-STORE-SWITCH-DROPS-MODELS-48](CHIM-ROOM-STORE-SWITCH-DROPS-MODELS-48.md): Switching CHIM room stores drops the kept models
 - [CHIM-ROOM-SURFCACHE-LIGHT-48](CHIM-ROOM-SURFCACHE-LIGHT-48.md): The surface cache must rebuild when the same model is drawn at different room light levels
 - [CHIM-ROOMS-WATER-LAVA-48](CHIM-ROOMS-WATER-LAVA-48.md): Rooms with water or lava are not converted to CHIM rooms yet
-- CHIM-SEA-BETWEEN-ISLANDS-64 (no report page): The CHIM cell list holds no sea between Vvardenfell and Solstheim
+- [CHIM-SEA-BETWEEN-ISLANDS-64](CHIM-SEA-BETWEEN-ISLANDS-64.md): The CHIM cell list holds no sea between Vvardenfell and Solstheim
 - [CHIM-SEYDA-ACTOR-CONTACT-33](CHIM-SEYDA-ACTOR-CONTACT-33.md): rc1 image step refuses Seyda Neen's CHIM frame map: six actors stand 0.8-3.3 units off the CHIM ground
-- CHIM-SOLSTHEIM-CROWNS-NOT-DRAWN-64 (no report page): The Solstheim test frame draws the tree trunks but not their crowns
-- CHIM-SOLSTHEIM-STAR-HITCHES-64 (no report page): Single frames of about 100 to 134 ms in the Solstheim forest frame with the star trees
+- [CHIM-SOLSTHEIM-CROWNS-NOT-DRAWN-64](CHIM-SOLSTHEIM-CROWNS-NOT-DRAWN-64.md): The Solstheim test frame draws the tree trunks but not their crowns
+- [CHIM-SOLSTHEIM-STAR-HITCHES-64](CHIM-SOLSTHEIM-STAR-HITCHES-64.md): Single frames of about 100 to 134 ms in the Solstheim forest frame with the star trees
 - [CHIM-STAIR-PLATE-BEVELS-PER-PIECE-43](CHIM-STAIR-PLATE-BEVELS-PER-PIECE-43.md): CHIM model variants take only the mesh-wide exact-bevel flag: stair plates marked for exact standing bevels get the approximate axial hull
 - [CHIM-STAIR-STEPS-SOLID-43](CHIM-STAIR-STEPS-SOLID-43.md): Three stair meshes fail the CHIM stair walk: Redoran steps start in solid (Ald-ruhn, Maar Gan), Hlaalu steps blocked (Suran), a rope bridge starts in solid (0,8)
 - [CHIM-STATIC-PLACE-HOST-ERROR-35](CHIM-STATIC-PLACE-HOST-ERROR-35.md): Bad flora data at CHIM chunk activation ended the session with zone locks held; the next map then stopped the program
 - [CHIM-STATICS-FALLBACK-41](CHIM-STATICS-FALLBACK-41.md): A frame map with more than 512 streamed statics crashes when its CHIM world cannot load, instead of running without its chunks
 - [CHIM-STITCH-SHORELINE-36](CHIM-STITCH-SHORELINE-36.md): A CHIM area in the legacy world has no shoreline refinement: steps of up to 28 units at its border
-- CHIM-STORE-ONE-AT-A-TIME-64 (no report page): The engine streams one CHIM store at a time, so frames of a second store cannot sit beside the first in the open world
+- [CHIM-STORE-ONE-AT-A-TIME-64](CHIM-STORE-ONE-AT-A-TIME-64.md): The engine streams one CHIM store at a time, so frames of a second store cannot sit beside the first in the open world
 - [CHIM-TERRAIN-GRAFT-33](CHIM-TERRAIN-GRAFT-33.md): CHIM chunk terrain is a brush entity, not part of the world tree, so it does not occlude
 - [CHIM-TERRAIN-HULL-BEVELS-33](CHIM-TERRAIN-HULL-BEVELS-33.md): A standing box rests above the ground at convex CHIM terrain edges
 - [CHIM-TERRAIN-RECORDS-SIZE-46](CHIM-TERRAIN-RECORDS-SIZE-46.md): CHIM terrain records were stored whole: 489.4 MB of the v0.0.46 world's frame segments
@@ -578,18 +581,18 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - [CHIMPORT-RETRY-LAVA-STALE-SOURCE-36](CHIMPORT-RETRY-LAVA-STALE-SOURCE-36.md): CHIMport --retry-failed cannot rerun a lava cell of the island run: its stored source stage predates the lava conversion
 - [CHIMPORT-SEABED-NO-ISLAND-42](CHIMPORT-SEABED-NO-ISLAND-42.md): Seabed cells measured as empty sea lose their island in the tracker: they drop out of the published reference and the build calls them unknown
 - [COMBAT-PURSUIT-SLOPE-STALL-46](COMBAT-PURSUIT-SLOPE-STALL-46.md): A pursuer stops on a walkable slope: an actor step was refused when it moved more than a stair height along the slope
-- IMAGE-FORMATS-CHIM-ROOMS-48 (no report page): The payload preflight stops a CHIM rooms build: the image step does not know the room store and room record formats
-- IMAGE-ROOM-MAPS-ENGINE-REFUSED-48 (no report page): Every CHIM room is refused at its door and the game hangs on Loading: the engine accepts a .chim map only with a CHIM frame key
-- IMAGE-ROOM-MAPS-FINGERPRINT-48 (no report page): A CHIM rooms build stops at the content fingerprint: it requires maps/<room>.bsp after the room became maps/<room>.chim
+- [IMAGE-FORMATS-CHIM-ROOMS-48](IMAGE-FORMATS-CHIM-ROOMS-48.md): The payload preflight stops a CHIM rooms build: the image step does not know the room store and room record formats
+- [IMAGE-ROOM-MAPS-ENGINE-REFUSED-48](IMAGE-ROOM-MAPS-ENGINE-REFUSED-48.md): Every CHIM room is refused at its door and the game hangs on Loading: the engine accepts a .chim map only with a CHIM frame key
+- [IMAGE-ROOM-MAPS-FINGERPRINT-48](IMAGE-ROOM-MAPS-FINGERPRINT-48.md): A CHIM rooms build stops at the content fingerprint: it requires maps/<room>.bsp after the room became maps/<room>.chim
 - [IMAGE-ROOM-MAPS-LATE-PASSES-48](IMAGE-ROOM-MAPS-LATE-PASSES-48.md): Image checks after the CHIM rooms install skip CHIM rooms: entity tracker 47 cells against 52, dressing 81 pieces against 99, actor contact 0 placements against 93
-- IMAGE-ROOM-MAPS-OPTIMIZER-RECEIPT-48 (no report page): A CHIM rooms build stops at the map optimizer check: the room maps are staged but not in the optimizer receipt
-- IMAGE-ROOM-MAPS-SKIP-PASSES-48 (no report page): CHIM rooms were installed before the image passes that write a room worldspawn, so CHIM room maps would miss interior sky, hand metadata and cell numbers
-- WORLD-REGION-NAMES-VF-ONLY-64 (no report page): The open-world region directory accepts only Vvardenfell region names
-- WORLDMAP-ONE-ISLAND-64 (no report page): The in-game world map covers Vvardenfell only
+- [IMAGE-ROOM-MAPS-OPTIMIZER-RECEIPT-48](IMAGE-ROOM-MAPS-OPTIMIZER-RECEIPT-48.md): A CHIM rooms build stops at the map optimizer check: the room maps are staged but not in the optimizer receipt
+- [IMAGE-ROOM-MAPS-SKIP-PASSES-48](IMAGE-ROOM-MAPS-SKIP-PASSES-48.md): CHIM rooms were installed before the image passes that write a room worldspawn, so CHIM room maps would miss interior sky, hand metadata and cell numbers
+- [WORLD-REGION-NAMES-VF-ONLY-64](WORLD-REGION-NAMES-VF-ONLY-64.md): The open-world region directory accepts only Vvardenfell region names
+- [WORLDMAP-ONE-ISLAND-64](WORLDMAP-ONE-ISLAND-64.md): The in-game world map covers Vvardenfell only
 
 Related bugs in other categories:
 
-- ARRIVAL-LONG-FRAME-DEV6-59 (no report page): Arriving in Seyda Neen, the first frame of play lasts about 13 to 15 seconds; v0.0.59-dev6 test sessions stopped on it as a stall
+- [ARRIVAL-LONG-FRAME-DEV6-59](ARRIVAL-LONG-FRAME-DEV6-59.md): Arriving in Seyda Neen, the first frame of play lasts about 13 to 15 seconds; v0.0.59-dev6 test sessions stopped on it as a stall
 - [CONTAINER-STRIP-TAKE-STALL-59](CONTAINER-STRIP-TAKE-STALL-59.md): A take or put in the container strip can hold the game for seconds
 - [DBG-TP-DURING-LOAD-66](DBG-TP-DURING-LOAD-66.md): A dbg tp typed while a load is still running is lost: a town name does nothing, a place says no map holds the point, a room prints its name and stays
 - [EMU-WARP-STARVES-GAME-CPU-67](EMU-WARP-STARVES-GAME-CPU-67.md): In the emulator's warp mode the game gets far less processor time per second of its own clock, so its frames take seconds of game time
@@ -597,13 +600,13 @@ Related bugs in other categories:
 - [HEART-CHAMBER-LOAD-HANG-62](HEART-CHAMBER-LOAD-HANG-62.md): The game stops on the Loading screen when teleporting to the heart chamber, with the music still playing
 - IMAGE-IDE-CYLINDER-TAIL-59 (no report page): On the emulated A1200 IDE port the last 144 sectors of the world partition AW_WORLD0 were unreadable, so loading Khuul stopped the game
 - [IMAGE-LOADS-SLOWER-66](IMAGE-LOADS-SLOWER-66.md): Area loads on the v0.0.66-dev2 image take 1.3 to 2.2 times as long as on v0.0.66-dev1 with the same file work (Vivec 13.6 s against 29.9 s)
-- JOURNEY-DOOR-USE-GOES-TO-ACTOR-66 (no report page): The opening journey's use key at the census street door went to the body of the guard killed a step before, or to a message box still showing, and the step then waited for a load it had never asked for
-- NET-VIVEC-ENTITY-PACKET-OVERFLOW-66 (no report page): In Vivec the server's entity update overflows the client datagram every frame: packet overflow printed 1,938 times during one 45-second stay
+- [JOURNEY-DOOR-USE-GOES-TO-ACTOR-66](JOURNEY-DOOR-USE-GOES-TO-ACTOR-66.md): The opening journey's use key at the census street door went to the body of the guard killed a step before, or to a message box still showing, and the step then waited for a load it had never asked for
+- [NET-VIVEC-ENTITY-PACKET-OVERFLOW-66](NET-VIVEC-ENTITY-PACKET-OVERFLOW-66.md): In Vivec the server's entity update overflows the client datagram every frame: packet overflow printed 1,938 times during one 45-second stay
 - [SESSION-STALL-AFTER-LONG-FRAME-62](SESSION-STALL-AFTER-LONG-FRAME-62.md): The game stops with its clock frozen right after a frame of several seconds spent on console output or file reads, in three of ten scripted Seyda Neen sessions
 - [SEYDA-LOAD-HANG-30](SEYDA-LOAD-HANG-30.md): Rare freeze during a Seyda Neen region load
 - [SMOKE-DELIVERY-OLD-COPY-58](SMOKE-DELIVERY-OLD-COPY-58.md): The playtest delivery ran an old copy of the boot smoke: the v0.0.58 release smoke failed four times on a working image
-- STALL-PROBE-NAME-BPTR-66 (no report page): The stall examination showed no file name for a stuck open, lock or delete: it read the name at the raw BCPL pointer instead of the pointer times 4
-- STALL-PROBE-PROMPT-LOG-LINE-66 (no report page): The stall examination missed the debugger's prompt when an emulator log line followed it on the same line, never resumed the emulator, and the paused session read as a stop of the game
-- STALL-PROBE-RUNNING-GAME-66 (no report page): The stall examination read a running game as a missing task or as waiting on a file reply: it walked only the ready and waiting task lists and took the wait mask of a task that was not waiting
+- [STALL-PROBE-NAME-BPTR-66](STALL-PROBE-NAME-BPTR-66.md): The stall examination showed no file name for a stuck open, lock or delete: it read the name at the raw BCPL pointer instead of the pointer times 4
+- [STALL-PROBE-PROMPT-LOG-LINE-66](STALL-PROBE-PROMPT-LOG-LINE-66.md): The stall examination missed the debugger's prompt when an emulator log line followed it on the same line, never resumed the emulator, and the paused session read as a stop of the game
+- [STALL-PROBE-RUNNING-GAME-66](STALL-PROBE-RUNNING-GAME-66.md): The stall examination read a running game as a missing task or as waiting on a file reply: it walked only the ready and waiting task lists and took the wait mask of a task that was not waiting
 
 <!-- END GENERATED CATEGORY -->

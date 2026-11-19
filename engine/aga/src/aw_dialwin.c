@@ -107,6 +107,13 @@ static int leave_after;
 #define CODE_CHOICE(k) (-800-(k))
 static int choice_count,choice_number[CHOICES],choice_topic=-1,goodbye_only,choice_focus=-1;
 static char choice_text[CHOICES][CHOICE_CHARS];
+/* DIALOGUE-GOODBYE-BLOCKED-HINT-67: while a Choice is open (an answer waiting for its Continue row, or a question)
+ * Goodbye is drawn greyed out with the topics, as OpenMW 0.51 disables its Goodbye button and topic list then
+ * (DialogueWindow::updateTopicsPane: goodbyeEnabled = !isInChoice || mGoodbye); choosing it anyway (the button or
+ * Escape) shows this hint over the window for a message's time (AW_MsgBoxSeconds: OpenMW's fMessageTimePerChar), an
+ * AmiWind addition (the maintainer's request; the original and OpenMW show nothing). */
+#define CONTINUE_FIRST "Continue the conversation first."
+static double hint_until;
 extern int aw_worldui_panel_holds_escape;   /* aw_worldui.c: Esc goes to the open panel, which does not close */
 #define SERVICE_SPELLMAKING 3
 /* Spellmaking (OpenMW SpellCreationDialog): page 7 the spell being made, page 8 the effects to add */
@@ -523,7 +530,7 @@ static void release(void){
     free(sm);sm=NULL;free(sm_known);sm_known=NULL;free(sm_label);sm_label=NULL;sm_known_count=0;
     free(en);en=NULL;free(en_wares);en_wares=NULL;free(en_label);en_label=NULL;en_items=0;en_item=en_gem=en_edit=-1;
     memset(&conv,0,sizeof(conv));active=0;speaker=NULL;listed=0;history_len=0;nparas=0;nhits=0;focus=-1;
-    choice_count=0;choice_focus=-1;
+    choice_count=0;choice_focus=-1;hint_until=0;
 }
 static void closed(void){
     edict_t *e=speaker;int travel=travel_after,dispo=disposition,fighting=fight_started;
@@ -720,9 +727,13 @@ static void draw(void){
     if(!box.shown_count)text(list_x()+2,list_y(),"(no topics)",right);
     draw_bar(BAR_LIST);
     AW_UIFill(list_x(),button_y()-1,LIST_W,row_h(),dark);
-    {const char *g=T(AW_DIAL_TEXT_GOODBYE,"Goodbye");int glyphs=(int)strlen(g);
+    {const char *g=T(AW_DIAL_TEXT_GOODBYE,"Goodbye");int glyphs=(int)strlen(g),x;
      if(glyphs>LIST_W/char_w())glyphs=LIST_W/char_w();
-     text(list_x()+(LIST_W-glyphs*char_w())/2,button_y(),g,right);}
+     x=list_x()+(LIST_W-glyphs*char_w())/2;
+     /* DIALOGUE-GOODBYE-BLOCKED-HINT-67: greyed out with the topics while a Choice waits */
+     if(choice_count)for(;*g && x+char_w()<=right;g++,x+=char_w())char_in(x,button_y(),(unsigned char)*g,AW_UIColor(96,90,80));
+     else text(x,button_y(),g,right);}
+    if(choice_count && hint_until>realtime)AW_UIHintBox(BOX_X,BOX_Y,BOX_W,BOX_H,CONTINUE_FIRST,2);
 }
 /* %PCRank, %NextPCRank and %Cell of this conversation (aw_dial.c AW_DialFillDefines) */
 #define CELL_CHARS 64
@@ -1200,7 +1211,7 @@ static void pick_choice(int k){
     /* DIALOGUE-CHOICE-LINE-UNMARKED-60: the player's chosen answer is the player's line, in the same heading style
      * as a picked topic's name (the answer follows under it, with no heading of its own) */
     append(choice_text[k],1);
-    conv.cond.choice=choice_number[k];choice_count=0;choice_focus=-1;
+    conv.cond.choice=choice_number[k];choice_count=0;choice_focus=-1;hint_until=0;
     answer=topic>=0 && AW_DialFind(&conv,topic)>=0?AW_DialAnswer(&conv,topic,&state):-1;
     Con_DPrintf("Dialogue: choice %d (row %d) answered by %d\n",choice_number[k],k+1,answer);
     if(answer>=0)answer_with(topic,answer,"",1);  /* answer_of(topic,"") with the answer known */
@@ -1268,18 +1279,26 @@ static void step_link(int dir){
     if(!nhits){focus=-1;return;}
     focus=dir>0?(focus+1)%nhits:(focus<=0?nhits-1:focus-1);
 }
+/* the Goodbye button under the pointer (the drawing's row under the list) */
+static int on_goodbye(int mouse_x,int mouse_y){
+    return mouse_x>=list_x() && mouse_x<list_x()+LIST_W && mouse_y>=button_y()-1 && mouse_y<button_y()-1+row_h();
+}
 /* DIALOGUE-CHOICES-62: the keys while a Choice is open: Up/Down (and Left/Right) choose a row, Enter picks it, a click
- * on a row picks it; typed letters, the list, the links, Goodbye, Escape and a click outside do nothing (the original
- * and OpenMW 0.51 keep the conversation until a row is picked). -1: the key goes on (the scrolling keys and the bars). */
+ * on a row picks it; typed letters, the list, the links and a click outside do nothing, Goodbye and Escape only show
+ * the hint (DIALOGUE-GOODBYE-BLOCKED-HINT-67; the original and OpenMW 0.51 keep the conversation until a row is
+ * picked). -1: the key goes on (the scrolling keys and the bars). */
 static int choice_key(int k,int mouse_x,int mouse_y){
     switch(k){
     case K_UPARROW:case K_LEFTARROW:choice_focus=AW_DialChoiceStep(choice_count,choice_focus,-1);scroll=0;return 1;
     case K_DOWNARROW:case K_RIGHTARROW:choice_focus=AW_DialChoiceStep(choice_count,choice_focus,1);scroll=0;return 1;
     case K_ENTER:if(choice_focus>=0)pick_choice(choice_focus);return 1;
+    /* DIALOGUE-GOODBYE-BLOCKED-HINT-67: Goodbye chosen (Escape or its button) while the Choice waits: the hint */
+    case K_ESCAPE:hint_until=realtime+AW_MsgBoxSeconds(CONTINUE_FIRST);return 1;
     case K_MOUSE1:{
         int b=bar_at(mouse_x,mouse_y),c;
         bar_drag=-1;
         if(b>=0){bar_click(b,mouse_y);return 1;}
+        if(on_goodbye(mouse_x,mouse_y)){hint_until=realtime+AW_MsgBoxSeconds(CONTINUE_FIRST);return 1;}
         if((c=AW_DialChoiceAt(hits,nhits,mouse_x,mouse_y,row_h()))>=0)pick_choice(c);
         return 1;}
     case K_PGUP:case K_PGDN:case K_MWHEELUP:case K_MWHEELDOWN:return -1;
@@ -1325,8 +1344,7 @@ static int key(int k,int mouse_x,int mouse_y){
     case K_MWHEELUP:if(mouse_x<list_x())scroll+=3;else r=AW_ListBoxKey(&box,AW_LBKEY_UP);break;
     case K_MWHEELDOWN:if(mouse_x<list_x())scroll-=3;else r=AW_ListBoxKey(&box,AW_LBKEY_DOWN);break;
     case K_MOUSE1:
-        if(mouse_x>=list_x() && mouse_x<list_x()+LIST_W && mouse_y>=button_y()-1 && mouse_y<button_y()-1+row_h())
-            return 0;                                          /* Goodbye */
+        if(on_goodbye(mouse_x,mouse_y))return 0;               /* Goodbye */
         {int b=bar_at(mouse_x,mouse_y);bar_drag=-1;           /* DIALOGUE-SCROLLBARS-62: a pane's bar */
             if(b>=0){bar_click(b,mouse_y);return 1;}}
         {int h=AW_DialLinkHit(hits,nhits,mouse_x,mouse_y,row_h());   /* a link in the conversation: ask its topic */

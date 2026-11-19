@@ -37,7 +37,8 @@ static long command_files;
  * (AW_RemoteBusy), so a reader tells a paused game clock (a window open, a long step inside one
  * frame) from a dead engine. The screen line names an open window by the engine's own names
  * (the dialogue window opens as a world-UI panel, so it is asked first; another panel such as the
- * stats or the container strip is "window"); with none, game / menu / message by key_dest. */
+ * stats is "window"; the container window over the game is "container"); with none, game / menu / message by
+ * key_dest. */
 static unsigned long ticks;
 int AW_DialWindowActive(void);int AW_LevelupBoxActive(void);int AW_MsgBoxActive(void);
 int AW_ListBoxActive(void);int AW_QuickCharActive(void);int AW_CharacterActive(void);int AW_SaveMenuActive(void);
@@ -54,6 +55,9 @@ static const char *screen_name(void)
     if(AW_ReaderActive())return "book";
     if(AW_MsgBoxActive())return "messagebox";
     if(AW_ListBoxActive())return "listbox";
+    /* CONTAINER-WINDOW-SURVIVES-PLACE-CHANGE-67: the container window over the game (it keeps key_dest on the game,
+     * so a check read "game" while it was open) */
+    if(key_dest==key_game && aw_cstrip_open_now && aw_cstrip_open_now())return "container";
     return key_dest==key_game?"game":key_dest==key_menu?"menu":"message";
 }
 int AW_RemoteLogging(void){return aw_remote.value>0;}
@@ -155,6 +159,11 @@ static void write_state(void)
     fprintf(f,"daynight %s\n",AW_DayNightFrozen()?"off":"on");
     fprintf(f,"daylight %d\nlamps_lit %d\nexterior %d\nguard_night %d\n",r_daylight,AW_LampLitCount(),R_SkyExterior(),AW_GuardTorchNight());
     {extern int aw_efrags_bad;fprintf(f,"efrags_bad %d\n",aw_efrags_bad);}
+    /* AW-RECOVER (aw_scene.c): the errors in play the recovery chain took, those a test aid forced, and the frame
+     * messages dropped (sv_main.c, cl_parse.c); the engine smoke fails a run with an unforced error or a drop */
+    {extern int aw_scene_errors,aw_scene_errors_forced,aw_net_dropped,cl_parse_dropped;
+     fprintf(f,"errors %d\nerrors_forced %d\nnet_dropped %d\n",aw_scene_errors,aw_scene_errors_forced,
+             aw_net_dropped+cl_parse_dropped);}
     /* What the screen shows (SMOKE-PASSES-WITHOUT-MAP-36): a loaded server under the title menu
      * is not a played map. screen game = in play; world_leafs = the client's world model. */
     fprintf(f,"screen %s\nsignon %d\nworld_leafs %d\n",screen_name(),

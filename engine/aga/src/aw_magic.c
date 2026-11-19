@@ -24,6 +24,7 @@
 #include "aw_tryalloc.h"
 #include "aw_actorstate.h"
 #include "aw_cast.h"
+#include "aw_view.h"
 #include <math.h>
 
 extern particle_t *active_particles,*free_particles;
@@ -199,18 +200,29 @@ static void sprite(int fx,int phase,const vec3_t at,float size,int frame) {
  * actor); 1 the bubble (the effect's own shell texture on a translucent sphere in its colour, AW_MAGIC_BUBBLE);
  * 2 the bubble with small sprites swirling on its radius; 3 the swirling sprites only, more and brighter. Each at
  * full strength for the first half of its time, then fading. */
-/* aw_magic_orb (saved): the orb type in its ones (0-3, default 2) and the shell shape of the effect set in its tens
- * (AW_MAGIC_SHAPE_EGG 0, the default; AW_MAGIC_SHAPE_SPHERE 1): dbg cast orb N / dbg cast shell egg|sphere set it,
- * dbg cast ... shape egg|sphere overrides the shape for one cast. */
+/* aw_magic_orb (saved): the orb type in its ones (0-3, default 2), the shell shape of the effect set in its tens
+ * (AW_MAGIC_SHAPE_EGG 0, the default; AW_MAGIC_SHAPE_SPHERE 1) and the player's own held shell seen from his eyes in
+ * its hundreds (VIEW_TINTED 0, the default: a faint tint of the effect's colour; VIEW_VEILED 1: the v0.0.54 veil
+ * sprite before the eye, kept selectable): dbg cast orb N / dbg cast shell egg|sphere / dbg cast view tint|veil set
+ * it, dbg cast ... shape egg|sphere overrides the shape for one cast. */
 static cvar_t aw_magic_orb={"aw_magic_orb","2",true};
 static int orb_kind(void) {int v=(int)aw_magic_orb.value;return v<0?2:v%10>3?2:v%10;}
 static int shell_default(void) {int v=(int)aw_magic_orb.value;return v<0?0:(v/10)%10<AW_MAGIC_SHAPES?(v/10)%10:0;}
+enum {VIEW_TINTED,VIEW_VEILED,VIEW_LOOKS};
+static int view_look(void) {int v=(int)aw_magic_orb.value;return v<0?VIEW_TINTED:(v/100)%10<VIEW_LOOKS?(v/100)%10:VIEW_TINTED;}
+static void orb_store(int view,int shape,int type) {Cvar_SetValue("aw_magic_orb",(float)(view*100+shape*10+type));}
 #define orb_type orb_kind()
 #define SWIRL 6                /* swirling sprites of type 2 (type 3: twice as many) */
 #define SWIRL_TURN 2.4f         /* radians a second */
 #define SHELL_END .6f           /* a held shell fades over its last seconds */
 #define VIEW_VEIL 12.0f         /* the player's own shell, seen from inside: a faint veil this far before the eye */
 #define HOLD_DEFAULT 8.0f       /* dbg cast without dur: a ContinuousVfx effect's shell stays this long */
+/* MAGIC-SHELL-EGG-STYLE-67: the player's own held shell seen from his eyes is a tint of the effect's colour over the
+ * view (Quake's palette shift, the power-up slot: view.c V_CalcPowerupCshift), this many 256ths at full strength
+ * (Quake's quad damage: 30): the world seen through the see-through shell around him, with no sprite before the eye
+ * (the veil's 26-unit sprite 12 units away blew its dither up into a grid of squares across the view). */
+#define VIEW_TINT 40
+static int tint_rgb[3],tint_percent;   /* this frame's (AW_MagicUpdate clears it; aw_view_tint reads it) */
 /* How long the hit shell stays on its target: the spell's duration when it has one, else the passing orb. */
 static float hit_hold(const cast_t *c) {
     const aw_magic_effect_t *fx=&table->fx[c->fx];
@@ -238,28 +250,74 @@ static model_t *shell_model(int fx,int shape,int fine) {
     if(*m && (*m)->type!=mod_sprite)*m=NULL;
     return *m;
 }
-/* The middle of the player's own orb: AT keeps x and y, its height from his eye. Measured on the drawn body seen from
- * behind (FS-UAE session egg, 2026-10-28: at 0.43 of his height below the eye the shield's egg ended at his
- * shoulders, at 0.13 it floated from above the head to the knees): 0.33 below the eye, with OWN_EGG_SCALE, puts it
- * from the feet to just above the head. */
-#define OWN_EGG_SCALE 1.12f     /* the player's drawn body is a little taller than his hull's height */
-static void own_middle(vec3_t at,float height) {
-    if(!sv_player)return;
-    at[2]=sv_player->v.origin[2]+sv_player->v.view_ofs[2]-height*.33f;
+/* MAGIC-SHELL-EGG-STYLE-67: where a shell stands on a character, by the rule of OpenMW 0.53
+ * apps/openmw/mwrender/animation.cpp Animation::addEffect (read, not copied): the effect's model is attached at the
+ * actor's root, its feet, and drawn at the actor's own scale (an NPC's and the player's: the race's height, OpenMW
+ * mwclass/npc.cpp Npc::adjustScale on the whole actor); a creature's is also scaled to the creature's own bounds by
+ * max(width, depth, height / 2) / 64 when that is above 1, and moved down by what its height lacks of 128 units (a
+ * flying one by a twentieth of that), or by its height over 128 when it is wider than tall. The original's egg
+ * (gfx/magic.awm's bubble phase: tools/prepare_magic.py bakes it from the Shield's hit model e\magic_hit_S.nif for
+ * every effect) is SIZE map units wide with its middle RADIUS above the feet of a standard character. Before, the
+ * shell was sized from the collision hull, the same 33.25-unit human box for every actor (world.qc aw_npc_floor), so
+ * a larger creature's shell (Dagoth Ur's) wrapped only its middle. A creature's bounds are its drawn pose box
+ * (R_AliasEntityBox), as OpenMW takes the creature's own mesh bounds. */
+#define STD_HEIGHT 32.0f        /* a standard character's height (128 of the original's units) in map units */
+#define MW_PER_MAP 4.0f         /* the original's units in a map unit (tools/prepare_magic.py SCALE 0.25) */
+typedef struct {
+    float x,y,feet;             /* the character's root (its feet) */
+    float k,lift;               /* OpenMW's scale and its offset (map units, before the scale) */
+    float height,mid;           /* the drawn body's height and middle (the sphere and an image without the egg) */
+} shell_frame_t;
+static void shell_frame(int n,const vec3_t feet,float height,shell_frame_t *f) {
+    edict_t *e;aw_actor_t *a;vec3_t lo,hi;
+    f->x=feet[0];f->y=feet[1];f->feet=feet[2];f->k=1;f->lift=0;
+    f->height=height>8?height:STD_HEIGHT;f->mid=f->feet+f->height*.5f;
+    if(!sv.active || n<=0 || n>=sv.num_edicts || (e=EDICT_NUM(n))->free)return;
+    f->x=e->v.origin[0];f->y=e->v.origin[1];f->feet=e->v.origin[2]+e->v.mins[2];
+    if(e==sv_player){
+        f->k=AW_ViewRaceHeight();
+        f->height=(e->v.maxs[2]-e->v.mins[2]>8?e->v.maxs[2]-e->v.mins[2]:STD_HEIGHT)*f->k;f->mid=f->feet+f->height*.5f;
+        return;
+    }
+    a=AW_MwscriptActorOf(e,NULL);
+    if(n<cl.num_entities && R_AliasEntityBox(&cl_entities[n],lo,hi) && hi[2]-lo[2]>1){
+        f->height=hi[2]-lo[2];f->mid=e->v.origin[2]+(lo[2]+hi[2])*.5f;
+        if(a && a->kind==1){   /* a creature: OpenMW's bounds rule (aw_magic_rules.c), in the original's units */
+            float off;
+            AW_MagicCreatureFit((hi[0]-lo[0])*MW_PER_MAP,(hi[1]-lo[1])*MW_PER_MAP,(hi[2]-lo[2])*MW_PER_MAP,
+                                (a->record_flags&AWR_FLIES)!=0,&f->k,&off);
+            f->lift=off/MW_PER_MAP;
+            return;
+        }
+    }
+    /* an NPC: its own scale (the fused model is drawn at its race's height, the reference's scale on the entity) */
+    if(n<cl.num_entities)f->k=R_AliasAxisScale(&cl_entities[n],2);
+    if(!(f->k>.25f && f->k<4))f->k=1;
 }
-/* OWN: the orb wraps the player himself (seen from behind): a frame fainter, the finer copy; a sphere fallback also
- * smaller (the hit model's own outline keeps its size: the shield's egg reaches from the feet to above the head) */
-static void orb_at(const cast_t *c,const vec3_t centre,float height,float t,float length,int held,int own) {
+/* The shell's middle AT and its world size on the character it wraps (edict N; FEET and HEIGHT the cast's own record
+ * of it when N is gone), for SHAPE; *BODY: the drawn body's height (the swirl). OWN: the player himself. */
+static float shell_place(const cast_t *c,int n,const vec3_t feet,float height,int shape,int own,vec3_t at,float *body) {
+    const aw_magic_phase_t *bub=&table->fx[c->fx].phase[AW_MAGIC_BUBBLE];shell_frame_t f;float size;
+    shell_frame(n,feet,height,&f);
+    at[0]=f.x;at[1]=f.y;*body=f.height;
+    if(shape==AW_MAGIC_SHAPE_EGG && bub->present && bub->radius>0 && bub->sprite_size>0){
+        /* the original's egg on this character: from the feet to above the head */
+        at[2]=f.feet+(bub->radius+f.lift)*f.k;
+        return bub->sprite_size*f.k;
+    }
+    /* the sphere (and an image without the egg's height): around the drawn body's middle, never smaller than it; the
+     * hit model's own outline as wide as SIZE for a standard character; the player's own a little smaller (632831f7) */
+    at[2]=f.mid;
+    size=bub->present && bub->sprite_size*f.height/STD_HEIGHT>f.height*1.15f?bub->sprite_size*f.height/STD_HEIGHT:f.height*1.15f;
+    return own?size*.8f:size;
+}
+/* The shell at CENTRE, SIZE map units wide, around a body HEIGHT tall. OWN: the player himself (seen from behind): a
+ * frame fainter and the finer copy */
+static void orb_at(const cast_t *c,const vec3_t centre,float size,float height,float t,float length,int held,int own) {
     const aw_magic_effect_t *fx=&table->fx[c->fx];const aw_magic_phase_t *bub=&fx->phase[AW_MAGIC_BUBBLE];
     int f,i,n,k,bubble=bub->present,shape=c->shape>=0?c->shape:shell_default();model_t *m;
-    /* the baked hit model is as wide as SIZE for a standard character (32 map units tall): scaled to this one */
-    float size=bubble && bub->sprite_size*height/32.0f>height*1.15f?bub->sprite_size*height/32.0f:height*1.15f;
-    float radius=height*.5f;vec3_t at;   /* never smaller than the character it wraps */
-    if(!(length>0) || t>length || !(height>0))return;
-    /* the sphere around the player is a little smaller (as in 632831f7); the egg keeps the hit model's own size:
-     * from the feet to above the head */
-    if(own && (shape==AW_MAGIC_SHAPE_SPHERE || !(bubble && bub->sprite_size>0)))size*=.8f;
-    else if(own)size*=OWN_EGG_SCALE;
+    float radius=height*.5f;vec3_t at;
+    if(!(length>0) || t>length || !(height>0) || !(size>0))return;
     /* a shell held for the spell's duration (OpenMW: the hit model loops while the effect lasts) pulses between its
      * two strongest frames and fades at the end; a passing orb fades over its second half */
     if(held)f=t>length-SHELL_END?2+(t>length-SHELL_END*.5f):((int)(t*4)&1)+own;
@@ -434,10 +492,9 @@ static void update_cast(cast_t *c,int slot,float t0,float t1) {
             /* the orb around the caster, from the start of the cast to just after the spell leaves */
             float orb=ph->length>c->release+.5f?ph->length:c->release+.5f;
             if(t1<=orb){
-                for(k=0;k<3;k++)at[k]=c->feet[k];
-                at[2]+=c->height*.5f;
-                if(c->caster==0)own_middle(at,c->height);
-                orb_at(c,at,c->height,t1,orb,0,c->caster==0);
+                float body,wide=shell_place(c,c->caster>0?c->caster:sv_player?NUM_FOR_EDICT(sv_player):0,c->feet,
+                                            c->height,c->shape>=0?c->shape:shell_default(),c->caster==0,at,&body);
+                orb_at(c,at,wide,body,t1,orb,0,c->caster==0);
             }
             if(end<orb)end=orb;
         }
@@ -511,19 +568,31 @@ static void update_cast(cast_t *c,int slot,float t0,float t1) {
         }
         /* the shell wraps the character the spell lands on (OpenMW mwrender/animation.cpp addEffect: the hit model on
          * the target, looping for the effect's duration when its record has ContinuousVfx, removed when the effect
-         * ends: mwmechanics/character.cpp updateContinuousVfx) and follows it as it moves; the player's own view sees
-         * it as a faint veil before the eye */
+         * ends: mwmechanics/character.cpp updateContinuousVfx) and follows it as it moves, placed and sized on that
+         * character by addEffect's rule (shell_place); the player's own view sees it as a tint of the effect's colour
+         * (or the v0.0.54 veil before the eye: dbg cast view veil) */
         if(c->hit_actor && c->hit_height>0){
-            float len=hit_hold(c),*at3=c->hit;vec3_t now;
+            float len=hit_hold(c),body,wide;vec3_t feet,now;
             edict_t *t=c->target>0 && c->target<sv.num_edicts?EDICT_NUM(c->target):NULL;
-            if(t && !t->free){
-                VectorCopy(t->v.origin,now);now[2]+=(t->v.mins[2]+t->v.maxs[2])*.5f;at3=now;
-                /* the player's hull does not frame his drawn body (the egg sat around his knees, FS-UAE session
-                 * veil): his middle from his eye, which stands at about 0.93 of his height (own_middle) */
-                if(t==sv_player)own_middle(now,c->hit_height);
+            int own=t && t==sv_player;
+            if(t && t->free)t=NULL;
+            VectorCopy(c->hit,feet);feet[2]-=c->hit_height*.5f;   /* the landing's record when the target is gone */
+            /* the player's own shell: seen from his eyes or from behind, decided every frame (a held shell that
+             * landed in first person showed its veil in third person too, MAGIC-SHELL-EGG-STYLE-67) */
+            if(own && !chase_active.value){
+                if(c->duration>0 && fx->phase[AW_MAGIC_BUBBLE].present && la1<=len){
+                    /* the tint of the effect's colour, full until the shell's end fades it (VIEW_TINT) */
+                    int p=(int)(VIEW_TINT*(len-la1<SHELL_END?(len-la1)/SHELL_END:1));
+                    if(view_look()==VIEW_TINTED && p>tint_percent){
+                        tint_percent=p;for(k=0;k<3;k++)tint_rgb[k]=fx->rgb[k];
+                    }
+                }
+            }else{
+                wide=shell_place(c,t?c->target:0,feet,c->hit_height,c->shape>=0?c->shape:shell_default(),own,now,&body);
+                orb_at(c,now,wide,body,la1,len,c->duration>0,own);
             }
-            if(!c->hit_view)orb_at(c,at3,c->hit_height,la1,len,c->duration>0,t && t==sv_player);
-            else if(c->duration>0 && sv_player && fx->phase[AW_MAGIC_BUBBLE].present && la1<=len){
+            if(own && !chase_active.value && view_look()==VIEW_VEILED && c->duration>0 && sv_player &&
+               fx->phase[AW_MAGIC_BUBBLE].present && la1<=len){
                 vec3_t eye,fw,rt,upv;
                 /* before the eye the client draws from (r_refdef.vieworg, cl.viewangles): vpn is only the last
                  * frame's (FS-UAE session shell: no veil) */
@@ -568,8 +637,15 @@ static void update_cast(cast_t *c,int slot,float t0,float t1) {
         }
     }
 }
+/* view.c V_CalcPowerupCshift (aw_view_tint): the player's own held shell seen from his eyes, this frame's tint */
+static int view_tint(int rgb[3],int *percent) {
+    if(tint_percent<=0)return 0;
+    rgb[0]=tint_rgb[0];rgb[1]=tint_rgb[1];rgb[2]=tint_rgb[2];*percent=tint_percent;
+    return 1;
+}
 void AW_MagicUpdate(void) {
     int i;float dt;double t;
+    tint_percent=0;   /* set again below while a held shell on the player is seen from his eyes */
     if(!aw_magic_fx.value){
         if(last_world)clear_casts();
         last_world=NULL;return;
@@ -628,8 +704,9 @@ static void status(void) {
     Con_Printf("Last frame: %lu particles started, %lu sprites; %lu frames: %lu particles, %lu sprites, dropped %lu sprites, %lu particles\n",
                frame_particles,frame_sprites,frames,total_particles,total_sprites,dropped_sprites,dropped_particles);
     if(update_frames)Con_Printf("Update cost: %.3f ms a frame on average (spawning only; drawing is in the frame)\n",update_seconds*1000/update_frames);
-    Con_Printf("Shell: %s (orb type %d); casts with the animation: %lu started, %lu released, %lu failed\n",
-               shell_default()==AW_MAGIC_SHAPE_EGG?"egg (the default)":"sphere",orb_type,look_starts,look_releases,look_fails);
+    Con_Printf("Shell: %s (orb type %d), seen from your eyes: %s; casts with the animation: %lu started, %lu released, %lu failed\n",
+               shell_default()==AW_MAGIC_SHAPE_EGG?"egg (the default)":"sphere",orb_type,
+               view_look()==VIEW_TINTED?"tint (the default)":"veil",look_starts,look_releases,look_fails);
     if(last_sync.f_start)Con_Printf("Last cast frames: animation %d, look %d, cast sound %d, shell %d, release %d (%s)\n",
                                    last_sync.f_anim,last_sync.f_start,last_sync.f_sound,last_sync.f_shell,last_sync.f_release,
                                    AW_MagicInSync(last_sync.f_anim,last_sync.f_sound,last_sync.f_shell)?"in sync":"NOT in sync");
@@ -646,17 +723,26 @@ static void command(void) {
         static const char *const types[4]={"the first prototype (the cast glow)","the bubble","the bubble and swirling sprites",
                                           "swirling sprites only"};
         if(Cmd_Argc()==3 && Cmd_Argv(2)[0]>='0' && Cmd_Argv(2)[0]<='3' && !Cmd_Argv(2)[1])
-            Cvar_SetValue("aw_magic_orb",(float)(shell_default()*10+Cmd_Argv(2)[0]-'0'));
+            orb_store(view_look(),shell_default(),Cmd_Argv(2)[0]-'0');
         else if(Cmd_Argc()!=2){Con_Printf("Usage: dbg cast orb 0|1|2|3\n");return;}
         Con_Printf("Magic orb type %d: %s\n",orb_type,types[orb_type]);return;
     }
-    /* the shell shape of the effect set (AW_MAGIC_SHAPE_*): the egg (the hit model's own outline, the default) or the
-     * dotted sphere; saved with the orb type in aw_magic_orb */
+    /* the shell shape of the effect set (AW_MAGIC_SHAPE_*): the original's egg (the default) or the dotted sphere;
+     * saved with the orb type in aw_magic_orb */
     if(!Q_strcasecmp(a,"shell")){
         for(i=0;Cmd_Argc()==3 && i<AW_MAGIC_SHAPES;i++)
-            if(!Q_strcasecmp(Cmd_Argv(2),shapes[i])){Cvar_SetValue("aw_magic_orb",(float)(i*10+orb_type));break;}
+            if(!Q_strcasecmp(Cmd_Argv(2),shapes[i])){orb_store(view_look(),i,orb_type);break;}
         if(Cmd_Argc()>3 || (Cmd_Argc()==3 && i>=AW_MAGIC_SHAPES)){Con_Printf("Usage: dbg cast shell egg|sphere\n");return;}
         Con_Printf("Magic shell shape %d: %s\n",shell_default(),shapes[shell_default()]);return;
+    }
+    /* the player's own held shell seen from his eyes (MAGIC-SHELL-EGG-STYLE-67): a tint of the effect's colour (the
+     * default) or the v0.0.54 veil sprite before the eye; saved in aw_magic_orb's hundreds */
+    if(!Q_strcasecmp(a,"view")){
+        static char looks[VIEW_LOOKS][8]={"tint","veil"};   /* not const: Q_strcasecmp takes char * */
+        for(i=0;Cmd_Argc()==3 && i<VIEW_LOOKS;i++)
+            if(!Q_strcasecmp(Cmd_Argv(2),looks[i])){orb_store(i,shell_default(),orb_type);break;}
+        if(Cmd_Argc()>3 || (Cmd_Argc()==3 && i>=VIEW_LOOKS)){Con_Printf("Usage: dbg cast view tint|veil\n");return;}
+        Con_Printf("Your own shell seen from your eyes: %s\n",looks[view_look()]);return;
     }
     if(!aw_magic_fx.value){Con_Printf("Magic effects are off: dbg magicfx 1 turns them on (2 adds their light).\n");return;}
     if(!sv.active || svs.maxclients!=1 || !sv_player){Con_Printf("dbg cast: single-player game only.\n");return;}
@@ -682,7 +768,7 @@ static void command(void) {
                 (!Q_strcasecmp(Cmd_Argv(i+1),shapes[0]) || !Q_strcasecmp(Cmd_Argv(i+1),shapes[1]))){
             shape=Q_strcasecmp(Cmd_Argv(i+1),shapes[0])?AW_MAGIC_SHAPE_SPHERE:AW_MAGIC_SHAPE_EGG;i++;
         }
-        else{Con_Printf("Usage: dbg cast NAME [target | touch | self | fail] [npc] [area FEET] [dur SECONDS] [shape egg|sphere] [repeat]; dbg cast list / stop / orb N / shell egg|sphere\n");return;}
+        else{Con_Printf("Usage: dbg cast NAME [target | touch | self | fail] [npc] [area FEET] [dur SECONDS] [shape egg|sphere] [repeat]; dbg cast list / stop / orb N / shell egg|sphere / view tint|veil\n");return;}
     }
     for(i=0;i<CASTS;i++)if(!casts[i].used){slot=i;break;}
     if(slot<0){Con_Printf("dbg cast: %d casts already alive\n",CASTS);return;}
@@ -744,5 +830,6 @@ void AW_MagicCastLookRelease(int handle,int ok) {
 void AW_MagicInit(void) {
     Cvar_RegisterVariable(&aw_magic_fx);
     Cvar_RegisterVariable(&aw_magic_orb);
+    aw_view_tint=view_tint;
     Cmd_AddCommand("aw_magicfx",command);
 }

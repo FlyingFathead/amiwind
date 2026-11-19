@@ -1287,7 +1287,7 @@ def empty_miniwind_actor_evidence(args, maps):
     if not town or set(frames) != {town} or frames[town]:
         return None
     from map_files import scene_maps   # x.bsp and the CHIM room maps (IMAGE-ROOM-MAPS-LATE-PASSES-48)
-    if any(p.stem != 'torchtest' for p in scene_maps(maps)):
+    if any(p.stem not in ('torchtest', 'lighttest') for p in scene_maps(maps)):   # the two test rooms of every image
         return None
     from mwad.audit import load_esm
     from mwad.paths import child_ci
@@ -2118,6 +2118,12 @@ def image(args):
     torchtest_report=build_torchtest(boot/'id1/gfx/palette.lmp',boot/'id1/maps/torchtest.bsp',
                                     out/'torchtest-build',args.qbsp,args.vis,args.light)
     (out/'torchtest-staging.json').write_text(json.dumps(torchtest_report,indent=2)+'\n', newline='\n')
+    # LIGHTTEST-MAP-67: the dark light test corridor (dbg lighttest, dbg cycleitems; docs/ITEM_CYCLING.md), beside the
+    # torch room
+    from build_lighttest import build as build_lighttest
+    lighttest_report=build_lighttest(boot/'id1/gfx/palette.lmp',boot/'id1/maps/lighttest.bsp',
+                                     out/'lighttest-build',args.qbsp,args.vis,args.light)
+    (out/'lighttest-staging.json').write_text(json.dumps(lighttest_report,indent=2)+'\n',encoding='utf-8',newline='\n')
     torch_report=torch_job.result()
     (out/'torch-conversion.json').write_text(json.dumps(torch_report,indent=2)+'\n', newline='\n')
     # The world UI (map, journal, region names and weather: about 10 s on one core) reads only the game data and the
@@ -2466,14 +2472,39 @@ def staged_town_interiors(id1):
     return [room['map'] for room in town_interiors() if map_file(Path(id1) / 'maps', room['map']).is_file()]
 
 
+def presented_places(args):
+    """MOURNHOLD-EXTERIOR-CELLS-66: (places, report) of the presented districts this build converts whole
+    (tools/presented_exterior.py build_places, from --presented-receipt and --presented-cells); ({}, None) without the
+    presented-data stage, so every reader's input is then the same as before."""
+    path = getattr(args, 'presented_receipt', None)
+    if not path:
+        return {}, None
+    import presented_exterior
+    receipt = json.loads(Path(path).read_text(encoding='utf-8'))
+    return presented_exterior.build_places(receipt,
+                                           presented_exterior.cells_of_text(getattr(args, 'presented_cells', '') or ''))
+
+
+def layer_region_frames(args):
+    """{(x, y): (frame map, origin)} of the region frames this image installs as stores of their own (the
+    expansions' modules, --chim-layer-world: Mournhold's districts as mhNNNN; tools/chim/layer_stores.py
+    frame_holders); {} without one, so the door tables are then the ones before."""
+    values = getattr(args, 'chim_layer_world', None)
+    if not values:
+        return {}
+    from chim.layer_stores import frame_holders
+    return frame_holders(values)
+
+
 def write_prison_markers(args, id1, out):
     """id1/prison-markers.txt (CRIME-59): every prison marker of the owned master (its place in original units, facing,
     prison and that prison's evidence chest), written whole for every build: the engine teleports by original
-    coordinates and refuses a marker whose map the image does not hold. Returns the markers (also OUT/prison-markers.json)."""
+    coordinates and refuses a marker whose map the image does not hold. A marker in a presented district this build
+    converts is written at its moved place (presented_places). Returns the markers (also OUT/prison-markers.json)."""
     import world_doors
     from mwad.paths import child_ci
     from mwad.masters import master_path
-    markers = world_doors.prison_markers(master_path(args.data_files).read_bytes())
+    markers = world_doors.prison_markers(master_path(args.data_files).read_bytes(), presented_places(args)[0])
     (Path(id1)/world_doors.PRISON_MARKERS).write_text(world_doors.prison_markers_text(markers), encoding='cp1252',
                                                       newline='\n')
     (Path(out)/'prison-markers.json').write_text(json.dumps(markers, indent=1, sort_keys=True)+'\n', encoding='utf-8',
@@ -2502,6 +2533,10 @@ def write_world_doors(args, id1, out, chim_frames):
     registered = {row['id'] for row in load_registry()['towns']}
     towns = world_doors.town_holders([a for a in chim_frames['areas'] if a in registered])
     regions = room_batches.region_frames(chim_region_table(args.chim_world), (chim_frames or {}).get('region_maps'))
+    # the frames of the expansions' own worlds (Mournhold's districts, a store of their own): holders like the base
+    # world's region frames, so a district's doors are linked both ways
+    layer_frames = layer_region_frames(args)
+    regions.update(layer_frames)
     rooms = {cell: name for cell, name in room_batches.listed_maps().items() if name and map_file(maps, name).is_file()}
     held_back = {}
     if getattr(args, 'chim_room_batches', None):
@@ -2510,7 +2545,12 @@ def write_world_doors(args, id1, out, chim_frames):
         # the rooms the batch stage records as not made: their doors are held back, named, not unresolved
         held_back = {cell: why for cell, why in world_doors.held_back_places(record).items() if cell not in rooms}
     master_raw = master_path(args.data_files).read_bytes()
-    doors = original_doors(master_raw)
+    # MOURNHOLD-EXTERIOR-CELLS-66: the doors as the presented world has them (tools/presented_exterior.py present_doors:
+    # a door in a district this build converts is an exterior door at its moved place, a door into one leads outdoors
+    # to its moved arrival); without the presented-data stage the same doors as before
+    import presented_exterior
+    places, presented = presented_places(args)
+    doors = presented_exterior.present_doors(places, original_doors(master_raw))
     # dbg tp's list box: one "(interior)" row for every room this image holds (tools/tp_places_lut.py,
     # TP-MENU-INTERIORS-63); it opens the room through dbg tp <map>, at its door's arrival
     from tp_places_lut import image_rooms as tp_places_rooms
@@ -2519,6 +2559,8 @@ def write_world_doors(args, id1, out, chim_frames):
     # held back, named (EXPANSION-DOORS-HELD-BACK-66)
     from exterior_plan import planned_cells
     planned = planned_cells(getattr(args, 'exterior_terrain', None))
+    if planned is not None and layer_frames:
+        planned = planned | set(layer_frames)        # a module's own cells are planned by the module, not the checklist
     rows = world_doors.table(doors, rooms, towns, regions, room_offsets(), planned, held_back)
     wanted = {row['reference'] for row in rows if row['kind'] == 'door' and 'source' in row and 'target' in row}
     bounds = door_mesh_bounds(args.data_files, [d for d in doors if d['number'] in wanted])
@@ -2529,10 +2571,21 @@ def write_world_doors(args, id1, out, chim_frames):
     # (BUILD-SURVEY-KEY-CONFIG-35), and every stage would key the option history
     problems += world_doors.teleport_name_problems(
         world_doors.teleport_names((ROOT/'config'/'teleport-names.txt').read_bytes()), rooms)
+    # dbg tp's arrivals in the expansions (tools/expansion_arrivals.py, DBG-TP-EXPANSION-ARRIVALS-66): the image's
+    # teleport-names.txt gains a row per name of config/expansion-arrivals.json, a working destination when this build
+    # selected the expansion and this image holds the place, else a row whose label says why (nothing moves)
+    import expansion_arrivals
+    from mwad.masters import selected_masters
+    arrivals = expansion_arrivals.rows(presented_exterior.present_arrivals(places, expansion_arrivals.load()),
+                                       selected_masters(), rooms,
+                                       lambda point: world_doors.holder(point, towns, regions) is not None,
+                                       room_offsets())
+    (id1/'teleport-names.txt').write_bytes(
+        expansion_arrivals.text((ROOT/'config'/'teleport-names.txt').read_bytes(), arrivals))
     receipt = {'format': world_doors.FORMAT, 'towns': [t[0] for t in towns], 'region_frames': len(regions),
                'rooms': len(rooms), 'summary': world_doors.summary(rows), 'added': applied['added'],
                'filled': applied['filled'], 'banks_changed': applied['banks_changed'], 'unresolved': problems,
-               'rows': rows}
+               'rows': rows, 'arrivals': expansion_arrivals.summary(arrivals)}
     held = [row for row in rows if 'held_back' in row]
     if held:
         # only with held-back places (the expansions), so a base game receipt does not move
@@ -2546,6 +2599,28 @@ def write_world_doors(args, id1, out, chim_frames):
         print('World doors: %d doors and markers held back (world-doors.json held_back rows): %d in exterior cells '
               'this build does not plan, %d at rooms the room batch stage did not make' % (
                   len(held), outdoors, len(held) - outdoors), flush=True)
+    if presented is not None:
+        # MOURNHOLD-EXTERIOR-CELLS-66: which districts this build presents and converts whole, and their doors and
+        # markers linked or still held back (only with the presented-data stage, so another receipt does not move)
+        built = {name.casefold() for name in presented['built']}
+        every = built | {name.casefold() for name in presented['held']}
+
+        def touches(row, names):
+            return (row['source_cell'] or '').casefold() in names or (row['destination_cell'] or '').casefold() in names
+        released = sum(1 for row in rows if touches(row, built) and 'held_back' not in row and 'problem' not in row)
+        still = sum(1 for row in rows if touches(row, every) and 'held_back' in row)
+        receipt['presented'] = dict(presented, released=released, still_held=still)
+        (Path(out)/'world-doors.json').write_text(json.dumps(receipt, indent=1, sort_keys=True)+'\n', encoding='utf-8',
+                                                  newline='\n')
+        print('Presented districts: %d built (%s), %d held back, their whole block not converted (%s); %d doors and '
+              'markers into or out of them linked, %d still held back (world-doors.json presented)' % (
+                  len(presented['built']), ', '.join(presented['built']) or 'none', len(presented['held']),
+                  ', '.join(presented['held']) or 'none', released, still), flush=True)
+    states = receipt['arrivals']['states']
+    print('dbg tp expansion arrivals: %d names, %d present, %d need their expansion, %d not held by this image '
+          '(teleport-names.txt, world-doors.json arrivals)' % (len(arrivals), states.get('present', 0),
+                                                              states.get('needs the expansion', 0),
+                                                              states.get('not held', 0)), flush=True)
     # the travel services by the same holder rule (TRAVEL-SERVICES-CHIM-51, tools/prepare_travel.py): id1/travel.txt
     import prepare_travel
     travel = prepare_travel.write(id1, args.data_files, rooms, towns, regions, room_offsets())
@@ -2576,7 +2651,10 @@ def write_door_check(args, id1, out):
     jobs = resolve_jobs(getattr(args, 'jobs', None))
     id1, out = Path(id1), Path(out)
     engine_src = ROOT/'engine'/'aga'/'src'
-    doors = original_doors(master_path(args.data_files).read_bytes())
+    # the doors as the world door table read them (a presented district's doors at their moved places)
+    import presented_exterior
+    doors = presented_exterior.present_doors(presented_places(args)[0],
+                                             original_doors(master_path(args.data_files).read_bytes()))
     world_rows = json.loads((out/'world-doors.json').read_text(encoding='utf-8'))['rows']
     # the doors the world door table holds back (places this build does not hold: write_world_doors,
     # EXPANSION-DOORS-HELD-BACK-66) are not entrances of this image
@@ -2622,10 +2700,15 @@ def write_room_batch_links(args, id1, out, chim_frames):
     present.update(batch)
     towns = [t for t in frame_towns(prefer=chim_native_towns(args)) if town_map_present(maps, t[0])]
     regions = room_batches.region_frames(chim_region_table(args.chim_world), (chim_frames or {}).get('region_maps'))
+    regions.update(layer_region_frames(args))        # the expansions' own worlds' frames (Mournhold's districts)
     listed = {r['room'].casefold() for r in room_batches.rows(room_batches.load())}
-    receipt = room_batches.link_banks(id1, batch, present, original_doors(master_path(args.data_files)
-                                                                          .read_bytes()),
-                                      {'towns': towns, 'regions': regions}, room_offsets(), listed)
+    # MOURNHOLD-EXTERIOR-CELLS-66: a batch room's door into a district this build presents and converts leads outdoors
+    # to its moved arrival (tools/presented_exterior.py present_doors), linked through that block's region frame
+    import presented_exterior
+    doors = presented_exterior.present_doors(presented_places(args)[0],
+                                             original_doors(master_path(args.data_files).read_bytes()))
+    receipt = room_batches.link_banks(id1, batch, present, doors, {'towns': towns, 'regions': regions}, room_offsets(),
+                                      listed)
     receipt.update(rooms=len(batch), town_frames=[t[0] for t in towns], region_frames=len(regions))
     (Path(out)/'room-batch-links.json').write_text(json.dumps(receipt, indent=1, sort_keys=True)+'\n',
                                                    encoding='utf-8', newline='\n')
@@ -2788,6 +2871,36 @@ def region_actor_inputs(args, census, town_rows, special_rows, heap_mb):
     return {'refs': region_actors.by_cell(refs), 'texts': region_actors.library_texts(args.actor_library),
             'library_id1': Path(args.actor_library) / 'id1', 'town_refs': town_refs, 'held': held,
             'cache': region_actors.cache(), 'heap_mb': heap_mb}
+
+
+def layer_actor_inputs(args, heap_mb):
+    """A call (store, world folder) -> the actor inputs of an expansion store's frames, or None, for
+    chim.layer_stores.install; None itself without --chim-region-actors on or without the actor library stage.
+    The same inputs as region_actor_inputs gives the open world's frames, read from the store's OWN presented master
+    (the data stage beside its world folder: there a district's cells are exterior cells and its people's positions
+    are the moved ones), so a district's people stand in its frame maps (DISTRICT-PEOPLE-NOT-PLACED-67). No town
+    frame places a district's people. A store whose data stage wrote no master gets None (its maps stay as they
+    were)."""
+    if not region_actors_on(args) or not getattr(args, 'actor_library', None):
+        return None
+
+    def inputs(store, world):
+        from chim import region_actors
+        from chim.sol_test import presented_master
+        import start_disabled
+        master = presented_master(world, store)
+        if master is None:
+            return None
+        refs = region_actors.census_file(master)
+        held = {}
+        if start_disabled.mode() == 'original':
+            _, rows = start_disabled.held([r for r in refs if r['type'] != 'LEVC'],
+                                          start_disabled.table_for(args.data_files))
+            held = {r['reference']: r['reason'] for r in rows}
+        return {'refs': region_actors.by_cell(refs), 'texts': region_actors.library_texts(args.actor_library),
+                'library_id1': Path(args.actor_library) / 'id1', 'town_refs': set(), 'held': held,
+                'cache': region_actors.cache(), 'heap_mb': heap_mb}
+    return inputs
 
 
 def disk_layout_settings(args):
@@ -2969,6 +3082,7 @@ def finalize_image(args):
     torch_report=json.loads((out/'torch-conversion.json').read_text())
     combat_data=json.loads((out/'combat-data.json').read_text()) if (out/'combat-data.json').is_file() else None
     torchtest_report=json.loads((out/'torchtest-staging.json').read_text())
+    lighttest_report=json.loads((out/'lighttest-staging.json').read_text()) if (out/'lighttest-staging.json').is_file() else None
     world_scenery_acceptance=json.loads((out/'world-scenery-staging.json').read_text())
     movie=boot/'id1/intro/mw_intro.awv'
     # Owned cloud conversion/palette reservation is source-reproducible and runs
@@ -3306,7 +3420,16 @@ def finalize_image(args):
             if getattr(args, 'chim_sol_world', None) and any(str(v).startswith('chimsol=')
                                                              for v in args.chim_layer_world):
                 raise SystemExit('--chim-sol-world and --chim-layer-world chimsol=... both name the store chimsol')
-            layer_stores = install_layer_stores(args.chim_layer_world, boot/'id1', hand_metadata['worldspawn_fields'])
+            layer_stores = install_layer_stores(args.chim_layer_world, boot/'id1', hand_metadata['worldspawn_fields'],
+                                                actors=layer_actor_inputs(args, engine_record.get('heap_mb')))
+            for layer_record in layer_stores:
+                with_actors = [m['actors'] for m in layer_record.get('maps') or [] if m.get('actors')]
+                if with_actors:
+                    print('[chim-layer] store %s: %d actors placed in %d frame maps, %d deferred, %d left out' % (
+                        layer_record['store'], sum(a.get('placed', 0) for a in with_actors),
+                        sum(1 for a in with_actors if a.get('placed')),
+                        sum(len(a.get('deferred') or ()) for a in with_actors),
+                        sum(len(a.get('left_out') or ()) for a in with_actors)), flush=True)
             (out/'chim-layer-stores.json').write_text(json.dumps(layer_stores, indent=1, sort_keys=True)+'\n',
                                                       encoding='utf-8', newline='\n')
         # frame maps the gate marked 32 MB itself (over the 16 MB budget by this exact check, not by the CHIM stage's
@@ -3589,7 +3712,8 @@ def finalize_image(args):
     verify_heap_loader_source_receipt(engine_record)
     build_json={
         'version':VERSION,'hands':args.hands,'debug_luma':engine_record.get('debug_luma',False),'actor_ground_audit':actor_acceptance,
-        'npc_gallery':gallery_report,'torch_test':torchtest_report,'world_scenery':world_scenery_acceptance,
+        'npc_gallery':gallery_report,'torch_test':torchtest_report,'light_test':lighttest_report,
+        'world_scenery':world_scenery_acceptance,
         'world_flora':json.loads((out/'world-flora-staging.json').read_text(encoding='utf-8')) if (out/'world-flora-staging.json').is_file() else {'status':'not_requested'},
         'sky_asset_preparation':sky_asset_preparation,
         'placeholders_allowed':getattr(args,'placeholder_records',[]),
@@ -3801,6 +3925,15 @@ def main():
                    help='Interior rooms by batch (tools/chim_room_batches.py output; EXPERIMENTAL, --room-batches): their '
                         'room maps, residents and door banks installed after the CHIM towns; every door of a batch room '
                         'linked both ways once the frame maps are written (tools/room_batches.py link_banks)')
+    i.add_argument('--presented-receipt',dest='presented_receipt',type=Path,default=None,
+                   help='The presented-data stage\'s receipt (tools/presented_data.py, presented-data.json), given by '
+                        'tools/build.py only when that stage runs: Mournhold\'s districts as exterior cell blocks '
+                        '(MOURNHOLD-EXTERIOR-CELLS-66); with --presented-cells, the doors, dbg tp\'s arrivals and the '
+                        'jail\'s markers of the districts whose whole block this build converts are read where the '
+                        'presented world has them (tools/presented_exterior.py build_places)')
+    i.add_argument('--presented-cells',dest='presented_cells',default='',
+                   help='The CHIM cells the build converts ("x,y:k ..." as the chim stage takes them), with '
+                        '--presented-receipt')
     i.add_argument('--chim-town',dest='chim_town',type=Path,action='append',default=[],
                    help='A CHIM town made from the game data (tools/chim_town.py output), repeatable: its residents, '
                         'region table and door bank are installed and its CHIM frame map takes its entities; the '

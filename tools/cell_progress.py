@@ -18,6 +18,8 @@ Inputs (all optional; anything missing is "not measured", never guessed):
   --batch-plan batch-plan.json        the batch of each room ready for conversion (tools/door_graph.py plan)
   --chim-rooms FILE                    rooms made as CHIM rooms (repeatable): a chim-rooms-receipt.json, or a build's
                                        chim-interiors.json (the rooms its image installed: on CHIM rooms)
+  --presented presented-data.json     the presentation receipt of a presented data folder (tools/presented_data.py):
+                                       Mournhold's districts as exterior cells, island 3, named after their district
   OUT/audits/*.json                    audit results from other tools (format aw-cell-audit-1), see `record`
   OUT/results/*.json                   per-cell conversion results (format aw-cell-result-1), see `result`
   OUT/owner-status.json                playtested / approved cells, see `owner`
@@ -112,8 +114,14 @@ ACTOR_CATEGORIES = ('npcs', 'creatures')
 # Nonvisual markers (door/travel/north/editor markers) are not drawn and not required: they never block either completion
 # level (maintainer, 2026-10-09). Door destinations come from the door records. They stay in the by-type table.
 MARKERS_BLOCK_COMPLETE = False
-ISLAND_NAMES = {1: 'Vvardenfell', 2: 'Solstheim'}
+ISLAND_NAMES = {1: 'Vvardenfell', 2: 'Solstheim', 3: 'Mournhold'}
 SOLSTHEIM_ISLAND = 2
+# The cells the presented data folder gives Mournhold's outdoor districts (tools/presented_exterior.py: interior cells
+# that behave like an exterior, presented as exterior cell blocks south of every island): their own island and set,
+# learnt from the presentation receipt (--presented), never from LAND records, as they have none
+# (MOURNHOLD-EXTERIOR-CELLS-66). The Toolkit numbers Mournhold 3 too (amiwind-toolkit/chim-head.js LANDS).
+MOURNHOLD_ISLAND = 3
+PRESENTED_SET = 'tribunal'
 # The three groups of the legend (maintainer, 2026-10-22, TOOLKIT-LEGEND-STATES-UNCLEAR-48). Every cell is in exactly one:
 #   in_game      what the newest ingested CHIM build ships: its land cells in their completion states, and every sea cell it
 #                holds ("sea, in the game"), whatever an older run called it (TRACKER-IN-GAME-SEA-LABELLED-OCEAN-48)
@@ -305,6 +313,23 @@ def build_census(data_files, progress=print):
 
 
 # ------------------------------------------------------------------ small joins
+
+def presented_cells(receipt):
+    """{"x,y": {'name', 'block'}}: every exterior grid cell a presentation receipt gives an interior district (the
+    presented data folder's presented-data.json, format aw-presented-data-1, key presented_cells; or the presentation's
+    own receipt, aw-presented-exterior-1, key cells): each block's cells, named after their district. {} without a
+    receipt or without a presented cell (the base game alone, or no Tribunal)."""
+    rows = (receipt or {}).get('presented_cells')
+    if rows is None:
+        rows = (receipt or {}).get('cells') if (receipt or {}).get('format') == 'aw-presented-exterior-1' else None
+    out = {}
+    for row in rows or ():
+        (bx, by), (w, h) = row['block'], row.get('size') or (1, 1)
+        for dx in range(int(w)):
+            for dy in range(int(h)):
+                out[ckey(int(bx) + dx, int(by) + dy)] = {'name': row['cell'], 'block': [int(bx), int(by)]}
+    return out
+
 
 def contents_of(census_cell):
     c = census_cell['counts']
@@ -1122,7 +1147,9 @@ def _later(a, b):
 
 def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chim_runs=(), labels=None, commits=None,
            bugs=None, ledger=None, areas=None, now=None, png=False, config_dir=None, door_graph=None, batch_plan=None,
-           chim_rooms=()):
+           chim_rooms=(), presented=None):
+    """presented: a presentation receipt (presented_cells): Mournhold's districts as exterior cells, each of its own
+    island (MOURNHOLD_ISLAND) and set (PRESENTED_SET), named after its district; without one, nothing changes."""
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     now = now_iso(now)
@@ -1156,6 +1183,9 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
     keys = set(land) | set(met_cells) | set(cen_cells) | set(prog_cells)
     keys |= {k for d in digests for k, e in d['cells'].items() if e.get('converted')}
     keys |= {k for k, r in results.items() if r.get('empty') or r.get('ocean')}
+    # Mournhold's districts as the presented data folder gives them: no LAND, no census cell, a block of their own
+    pres = presented_cells(presented)
+    keys |= set(pres)
     cells = {}
     for k in sorted(keys, key=lambda s: parse_cell(s)):
         x, y = parse_cell(k)
@@ -1173,17 +1203,22 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
             contents = None
         if contents is not None and cost is not None:
             cost['refs_total'] = contents['refs_total']
+        pr = pres.get(k)
         cells[k] = {
-            'x': x, 'y': y, 'name': d.get('name') or nm.get('name') or '', 'region': d.get('region') or nm.get('region') or '',
-            'set': land_set.get(k) or (mc or {}).get('set') or '', 'land': k in land,
+            'x': x, 'y': y, 'name': d.get('name') or nm.get('name') or (pr or {}).get('name') or '',
+            'region': d.get('region') or nm.get('region') or '',
+            'set': land_set.get(k) or (mc or {}).get('set') or (PRESENTED_SET if pr else ''), 'land': k in land or bool(pr),
             # the original game data defines this cell (census, LAND record or estimator row); a cell without any came
-            # only from an ocean run's grid around the island and lies beyond the world's edge
-            'game_record': bool(cc) or k in land or k in land_records or (not census and bool(mc)),
+            # only from an ocean run's grid around the island and lies beyond the world's edge. A presented cell is
+            # defined by its district's record, moved by the presentation.
+            'game_record': bool(cc) or k in land or k in land_records or (not census and bool(mc)) or bool(pr),
             'contents': contents, 'legacy': legacy_of(pc), 'risk': risk, 'cost': cost,
             'chim': {'converted': False, 'builds': [], 'owner': None, 'on_chim_build': None, 'on_chim_builds': []},
             'audits': {m: {'status': 'not_measured', 'detail': None, 'build': None} for m in MECHANISMS},
             'bugs': [], 'last_build': None, 'provenance': None,
         }
+        if pr:
+            cells[k]['presented'] = {'district': pr['name'], 'block': pr['block']}
     # --- CHIM builds, oldest first, so the latest build to convert a cell sets its record
     digest_cell = {}
     area_cells = collections.defaultdict(set)
@@ -1342,6 +1377,9 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
     for rank, (c, r, isl) in enumerate(spiral, 1):
         rec = cells[ckey(*c)]
         rec['ring'], rec['spiral_rank'], rec['island'] = r, rank, isl or None
+    # the presented cells are no island of the grid (no LAND, no sea around them): Mournhold's own, no ring
+    for k in pres:
+        cells[k].update(ring=None, spiral_rank=None, island=MOURNHOLD_ISLAND)
     risky = [parse_cell(k) for k, r in cells.items() if r['risk']]
     ordered = OR.risk_order(risky, lambda c: cells[ckey(*c)]['risk']['score'],
                             lambda c: (cells[ckey(*c)]['contents'] or {}).get('refs_total'))
@@ -1349,7 +1387,7 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
         cells[ckey(*c)]['risk_rank'] = rank
     # Open-sea cells belong to the island of the nearest island cell of their own master set (the conversion job names
     # it: the base master's sea is Vvardenfell's map), else of any set (Chebyshev distance, then the lower island).
-    placed = [(parse_cell(k), r['island'], r.get('set')) for k, r in cells.items() if r.get('island')]
+    placed = [(parse_cell(k), r['island'], r.get('set')) for k, r in cells.items() if r.get('island') and k not in pres]
     for k, rec in cells.items():
         # a seabed cell measured as empty sea (CHIMport) is a sea cell too: without an island it would drop out of the
         # published reference and the build's regions preflight would call it unknown (CHIMPORT-SEABED-NO-ISLAND-42)
@@ -1478,6 +1516,8 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
     }
     if interior_rooms is not None:
         doc['interior_rooms'] = interior_rooms
+    if pres:
+        doc['sources']['presented'] = True       # only with a presentation receipt: data without one is as before
     stamp_document(doc)      # every version-derived field, from VERSION, at the moment the data is written
     write_json(out / OUT_FILES['progress'], doc)
     nxt = next_lists(cells, now)
@@ -1652,6 +1692,8 @@ def main(argv=None):
     ing.add_argument('--batch-plan', type=Path, help='tools/door_graph.py plan output: the batch of each ready room')
     ing.add_argument('--chim-rooms', type=Path, action='append', default=[],
                      help="a CHIM rooms receipt (chim-rooms-receipt.json) or a build's chim-interiors.json; repeatable")
+    ing.add_argument('--presented', type=Path,
+                     help="a presented data folder's receipt (presented-data.json): Mournhold's districts as cells")
     ing.add_argument('--png', action='store_true', help='also write the mesh reuse curve as a PNG')
     ing.add_argument('--now', help='timestamp to stamp (tests)')
     rec = sub.add_parser('record', help='record audit results from another tool')
@@ -1838,7 +1880,7 @@ def main(argv=None):
         print('shipped %s: %d plan cells flipped to shipped' % (a.release, n))
     remembered = read_json(src_path) or {}
     if a.cmd == 'ingest':
-        for k in SOURCE_KEYS + ('data_files', 'config_dir', 'door_graph', 'batch_plan'):
+        for k in SOURCE_KEYS + ('data_files', 'config_dir', 'door_graph', 'batch_plan', 'presented'):
             v = getattr(a, k)
             if v:
                 remembered[k] = str(v)
@@ -1877,7 +1919,8 @@ def main(argv=None):
                  remembered.get('config_dir') or str(Path(__file__).resolve().parents[1] / 'config'),
                  read_json(remembered['door_graph']) if remembered.get('door_graph') else None,
                  read_json(remembered['batch_plan']) if remembered.get('batch_plan') else None,
-                 room_receipts(remembered.get('chim_rooms', [])))
+                 room_receipts(remembered.get('chim_rooms', [])),
+                 read_json(remembered['presented']) if remembered.get('presented') else None)
     h = doc['headline']
     print(on_chim_line(h))
     # The audit figure: cells whose audits passed, over the LAND cells of every island (Solstheim included); empty-sea

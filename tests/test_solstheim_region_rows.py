@@ -25,6 +25,11 @@ int main(void){
     if(AW_TerrainId("vf0000")!=0 || AW_TerrainId("vf1234")!=1234)return 1;
     if(AW_TerrainId("sl0000")!=AW_SOLSTHEIM_TERRAIN_BASE || AW_TerrainId("sl0007")!=AW_SOLSTHEIM_TERRAIN_BASE+7)return 2;
     if(AW_TerrainId("vf4096")>=0 || AW_TerrainId("sl4096")>=0 || AW_TerrainId("sx0001")>=0)return 3;
+    /* Mournhold's district frames: the block's last 256 IDs, so Solstheim's end at sl3839 */
+    if(AW_TerrainId("mh0000")!=AW_MOURNHOLD_TERRAIN_BASE || AW_TerrainId("mh0255")!=AW_TERRAIN_END-1 ||
+       AW_TerrainId("mh0256")>=0 || AW_TerrainId("sl3839")!=AW_MOURNHOLD_TERRAIN_BASE-1 || AW_TerrainId("sl3840")>=0)return 9;
+    t=AW_TerrainId("mh0011");AW_TerrainName(t,name);if(strcmp(name,"mh0011") || strcmp(AW_IslandOf("mh0011"),"Mournhold") ||
+       strcmp(AW_MapTitle(AW_MapId("mh0011")),"Mournhold"))return 10;
     t=AW_TerrainId("sl0007");AW_TerrainName(t,name);if(strcmp(name,"sl0007"))return 4;
     AW_TerrainName(42,name);if(strcmp(name,"vf0042"))return 5;
     if(strcmp(AW_IslandOf("sl0003"),"Solstheim") || strcmp(AW_IslandOf("vf0003"),"Vvardenfell") ||

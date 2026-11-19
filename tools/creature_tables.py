@@ -526,6 +526,14 @@ def kit(rig, data, times, base=None):
         pairs, kind, _moves = creature_pose.GROUPS[name]
         span = next((f for pair in pairs for f in [frames_of(*pair)] if f), None)
         entry = {'name': name, 'kind': kind}
+        played = name
+        if span is None and name == 'run':
+            # CREATURE-NIXHOUND-HUMAN-MOVES-67: a creature without a run plays its walk when it runs (rule from OpenMW
+            # 0.53 mwmechanics/character.cpp refreshMovementAnims: a missing "run" group is taken as "walk", and only
+            # without either does the actor stand on its idle); before, it slid on its idle frame (the bone wolves,
+            # the netch bulls)
+            span = next((f for pair in creature_pose.GROUPS['walk'][0] for f in [frames_of(*pair)] if f), None)
+            played = 'walk' if span is not None else name
         if name in OPTIONAL and span is not None and span[2]:
             continue            # an optional group only from the creature's own file, never the base table's
         if span is None:
@@ -538,8 +546,9 @@ def kit(rig, data, times, base=None):
             raise ValueError('%s: group %s is %d table frames, the layout takes at most %d'
                              % (rig.model, name, count, LAYOUT_MAX))
         step = (times[b] - times[a]) / (b - a) if b > a else step0
-        entry.update(base=int(a), count=int(count), step=float(step), source='base' if based else 'table')
-        g = {} if based else by_name.get(name, {})
+        entry.update(base=int(a), count=int(count), step=float(step),
+                     source='base' if based else 'table' if played == name else played)
+        g = {} if based else by_name.get(played, {})
         if 'speed' in g:
             entry['speed'] = g['speed']
         if 'hit' in g:

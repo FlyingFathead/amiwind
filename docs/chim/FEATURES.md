@@ -1,12 +1,12 @@
 # CHIM feature tracker
 
-_Generated from `docs/chim/features.json` with AmiWind v0.0.67-dev2._
+_Generated from `docs/chim/features.json` with AmiWind v0.0.67-dev3._
 
 <!-- Generated whole by tools/chim_features.py render from docs/chim/features.json; do not edit by hand. -->
 
 What the [CHIM engine](README.md) has done for AmiWind, feature by feature: what each feature does, where it stands, the gain that was measured (what was compared, how and when) and how Quake's visibility culling still works with it. Generated from [`features.json`](features.json); a test fails when this page is stale. Bugs are on the [CHIM bug tracker](../bugs/CHIM_TRACKER.md); ideas and held-back work are collected in [CHIM ideas](IDEAS.md). How far the open world has been converted, cell by cell, is on the [CHIM cell tracker](CELL_TRACKER.md).
 
-CHIM version: 0.2.2. 46 features: 21 shipped, 1 in this release, 19 in progress, 4 planned, 1 ideas. Updated 23 October 2026.
+CHIM version: 0.2.2. 47 features: 21 shipped, 1 in this release, 20 in progress, 4 planned, 1 ideas. Updated 23 October 2026.
 
 ## What CHIM has done so far
 
@@ -37,7 +37,7 @@ Several features also have a cost, listed under their caveats: CHIM leaves less 
 | --- | --- | --- |
 | Shipped | in a published release | 21 |
 | In this release (CHIM 0.2.2) | in the line that becomes the next release; not yet published | 1 |
-| In progress | being built or measured; not finished | 19 |
+| In progress | being built or measured; not finished | 20 |
 | Planned | decided; no finished design or code | 4 |
 | Idea | written down, not decided | 1 |
 
@@ -96,6 +96,7 @@ Several features also have a cost, listed under their caveats: CHIM leaves less 
 | [Ground stored once](#ground-stored-once) | World format and disk | Terrain references (world format 0.7, --chim-terrain-refs, on by default since v0.0.36): every chunk's terrain is stored once per content in chunk-local units and placed at an offset by every chunk with it; the engine moves its copy when it grafts the chunk. Neighbouring CHIM region frames share their terrain margins, and repeated sea floor is one record. | 9.0 MB to 1.9 MB for seven region cells |
 | [Fewer faces per mesh (planar merge, meshoptimizer for large shells)](#fewer-faces-per-mesh-planar-merge-meshoptimizer-for-large-shells) | Builder and tools | Every CHIM mesh's coplanar triangles with one texture mapping become one convex Quake face (planar merge, lossless, never more faces); large hard-surface shells that a profile reduces use meshoptimizer's simplifier with locked borders instead of the profile's reducer (the arrival ship). A method table chooses per mesh by a measured rule; the earlier method stays selectable. | -2.1 % faces island-wide; the ship -9 %, shape error /7 |
 | [Cells ahead read into spare Fast RAM](#cells-ahead-read-into-spare-fast-ram) | Streaming and memory | Outdoors a cell border is a map change. With extra Fast RAM the files of the cells ahead are read in 32 KiB slices, in frames where nothing else is read, into the CHIM banks; later reads of them are copied from RAM. The 2x2 block at the nearest corner first (the cell walked towards leading), then the 3x3 ring; the block moves only past a margin. The world index stays in RAM across maps. 16 MiB: unchanged. | crossings 452 ms to about 220 ms (median) at 128 MiB |
+| [One model's replacement wherever it is placed](#one-models-replacement-wherever-it-is-placed) | Builder and tools | A model's replacement or reduction is used wherever that model is placed: every outdoor frame and, since v0.0.67, every CHIM room. Method 2, a hand-made low-polygon mesh of one model (the travel lantern first), is drawn wherever a model has one; method 1, today's conversion, stays selectable per model and for the whole build. | rooms: about 29 % fewer faces for the everywhere models; the lantern 203 to 58 faces |
 
 ### Planned
 
@@ -952,6 +953,29 @@ Lossless for every mesh except the meshopt+merge rows, each chosen by measuremen
 - Not yet in a played build: MiniWind look of the ship and a strider pending.
 
 **Read more:** [Mesh methods](MESH_METHODS.md).
+
+#### One model's replacement wherever it is placed
+
+**Status:** In progress. **ID:** `one-model-replacement-everywhere`.
+
+A model's replacement or reduction is used wherever that model is placed: every outdoor frame and, since v0.0.67, every CHIM room. Method 2, a hand-made low-polygon mesh of one model (the travel lantern first), is drawn wherever a model has one; method 1, today's conversion, stays selectable per model and for the whole build.
+
+**Measured gain:**
+
+- Rooms: 3,079 placements of the everywhere rows' models in 570 of 1,317 rooms draw 667,976 faces; at the faces the same models draw outdoors about 471,658 (about 29 % fewer). The travel lantern: 203 faces a placement to 58 (56 room placements in 34 rooms, 11,368 faces to about 3,248). Compared: the v0.0.67-dev1 run's room store (faces each placement draws) against the faces the same models draw in its outdoor frames; the lantern through the converter as the rooms convert it. *exact counts, 17 November 2026.*
+
+Counts from the build's own tables and the converter, not a CHIM run with the change yet; frame time not measured.
+
+**Visibility:** No change: the same placements and the same collision; only the drawn mesh of the named model types changes.
+
+**Caveats:**
+
+- The prison ship and the census office are classic compiled maps and do not take the replacements yet.
+- The lantern's panels are baked from the textures the builder exported (at most 128 texels), so they are softer than a bake from the full-size originals.
+
+**Read more:** [Mesh methods: the everywhere rows in the rooms, method 2](MESH_METHODS.md#method-2-hand-made-meshes).
+
+**Bugs:** [VISUAL-EVERYWHERE-ROOMS-67](../bugs/VISUAL-EVERYWHERE-ROOMS-67.md).
 
 ### Roadmap
 

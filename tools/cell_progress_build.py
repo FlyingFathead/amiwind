@@ -15,9 +15,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 TOOLKIT_FOLDER = 'toolkit'
 
 
-def write(chim_world, out, data_files=None, label=None, now=None, results=None):
+def write(chim_world, out, data_files=None, label=None, now=None, results=None, presented=None):
     """Ingest the CHIM world into OUT. `results` = a folder of aw-cell-result-1 files (CHIMport) to store first.
-    Returns the path of OUT/cell-progress.json, or None (with a printed warning) when it could not be written."""
+    `presented` = the build's presented data folder receipt (presented-data.json): Mournhold's districts as cells of
+    their own (cell_progress.ingest); none: as before. Returns the path of OUT/cell-progress.json, or None (with a
+    printed warning) when it could not be written."""
     try:
         import cell_progress as cp
         out = Path(out)
@@ -32,7 +34,9 @@ def write(chim_world, out, data_files=None, label=None, now=None, results=None):
             census = cp.build_census(Path(data_files), progress=lambda *a: None)
             cp.write_json(out / 'mesh-census.json', census)
         runs = ['build=%s' % chim_world] if chim_world and (Path(chim_world) / 'chim-receipt.json').is_file() else []
-        cp.ingest(out, census=census, chim_runs=runs, labels={'build': label or 'this build'}, now=now)
+        receipt = cp.read_json(presented) if presented and Path(presented).is_file() else None
+        cp.ingest(out, census=census, chim_runs=runs, labels={'build': label or 'this build'}, now=now,
+                  **({'presented': receipt} if receipt else {}))
         return out / cp.OUT_FILES['progress']
     except Exception as exc:     # noqa: BLE001 - never fail a build over the tracker
         print('WARNING: the cell progress data was not written (%s: %s); the build is unaffected' % (type(exc).__name__, exc),
@@ -47,10 +51,12 @@ def main(argv=None):
     ap.add_argument('--chim-world', type=Path, help='the CHIM world folder of the build (omit before it exists)')
     ap.add_argument('--data-files', type=Path, help='your Morrowind Data Files (the cell universe)')
     ap.add_argument('--results', type=Path, help='a folder of aw-cell-result-1 files')
+    ap.add_argument('--presented', type=Path,
+                    help="the build's presented data folder receipt (presented-data.json): Mournhold's districts as cells")
     ap.add_argument('--never-fail', action='store_true',
                     help='exit 0 even when the data could not be written (the builder stage: a warning, never a failed build)')
     a = ap.parse_args(argv)
-    return 0 if write(a.chim_world, a.out, a.data_files, results=a.results) or a.never_fail else 1
+    return 0 if write(a.chim_world, a.out, a.data_files, results=a.results, presented=a.presented) or a.never_fail else 1
 
 
 if __name__ == '__main__':

@@ -432,6 +432,10 @@ typedef struct
 	unsigned	levelled;	/* a levelled list's pick: its record's base hash (0 none; MWSCRIPT-UNPLACED-ATTACH-62) */
 } pending_t;
 void (*aw_actors_levelled_spawned)(edict_t *ent, unsigned hash);
+/* WANDER-DOOR-AFTER-LOAD-67: an actor's placement, told when it is spawned (SpawnOne, SPAWNED 1) or moved off it by its
+ * row (ApplyLoaded, SPAWNED 0: a window's actor its spawn told already keeps that one): aw_ambient.c
+ * AW_AmbientPlacedAt keeps its package's routes there (NULL: nothing told) */
+void (*aw_actors_placed)(edict_t *ent, const float placed[3], int spawned);
 static edict_t	*spawned_last;	/* SpawnOne's edict when it spawned one */
 
 static pending_t	pending[MAX_PENDING];
@@ -590,7 +594,7 @@ static int SpawnOne (pending_t *q)
 	dfunction_t *func;
 	server_state_t was = sv.state;
 	change_t *c;
-	float ref;
+	float ref, placed[3];
 	char *data;
 
 	ent = ED_Alloc ();
@@ -706,6 +710,7 @@ static int SpawnOne (pending_t *q)
 	sv.state = ss_loading;		/* the spawn function precaches its model and voice */
 	PR_ExecuteProgram (func - pr_functions);
 	sv.state = was;
+	VectorCopy (ent->v.origin, placed);	/* WANDER-DOOR-AFTER-LOAD-67: where the placement puts it, before its row */
 	if (c && c->moved && !ent->free)
 	{
 		float d[3];
@@ -719,6 +724,9 @@ static int SpawnOne (pending_t *q)
 		if (!c->dead && c->fight && AW_CombatTestEngage (ent, 0))
 			AW_CombatSetHealth (ent, c->health);
 	}
+	/* its package's routes stay where the placement put it, wherever its row moved it (aw_ambient.c) */
+	if (aw_actors_placed && !ent->free)
+		aw_actors_placed (ent, placed, 1);
 	if (c && c->dead && !ent->free)
 	{
 		/* OUTDOOR-DEAD-BODY-GONE-66: the body lies where it fell, lootable, until its clear delay (OpenMW 0.51
@@ -1796,6 +1804,23 @@ static void Command (void)
 		AW_CompanionKillCrime ();	/* dbg kill crime (CRIME-59): the pick's kill is the player's */
 		return;
 	}
+	/* DBG-SPAWN-MENU-67: dbg spawn [ID [model]] (the list box, or that record; aw_dbgspawn.c), dbg despawn (the red
+	 * crosshair pick, aw_companion.c) and dbg despawn all (every spawned one here, aw_mwhost.c); no command of their own */
+	if (Cmd_Argc () >= 3 && Cmd_Argc () <= 5 && !strcmp (a, "spawn"))
+	{
+		AW_SpawnCommand (Cmd_Argc () > 3 ? Cmd_Argv (3) : NULL, Cmd_Argc () > 4 ? Cmd_Argv (4) : NULL);
+		return;
+	}
+	if (Cmd_Argc () == 3 && !strcmp (a, "despawnpick"))
+	{
+		AW_CompanionDespawnMode ();
+		return;
+	}
+	if (Cmd_Argc () == 4 && !strcmp (a, "despawn") && !strcmp (Cmd_Argv (3), "all"))
+	{
+		AW_MwscriptDespawnAll ();
+		return;
+	}
 	if (Cmd_Argc () == 4 && !strcmp (a, "kill"))
 	{
 		float want = (float)Q_atof (Cmd_Argv (3));
@@ -2093,17 +2118,23 @@ static void ApplyLoaded (void)
 		}
 		if (c->moved && c->room != RoomNumber ())
 			;			/* a companion captured in another room (or outdoors): its position belongs there */
-		else if (c->moved && c->room)
-		{
-			VectorCopy (c->origin, e->v.origin);	/* room-local */
-			VectorCopy (c->angles, e->v.angles);
-			SV_LinkEdict (e, false);
-		}
 		else if (c->moved)
 		{
-			VectorSubtract (c->origin, d, e->v.origin);
+			/* WANDER-DOOR-AFTER-LOAD-67: where the map placed it, for its package's routes (aw_ambient.c) */
+			float placed[3];
+			VectorCopy (e->v.origin, placed);
+			if (c->room)
+			{
+				VectorCopy (c->origin, e->v.origin);	/* room-local */
+			}
+			else
+			{
+				VectorSubtract (c->origin, d, e->v.origin);
+			}
 			VectorCopy (c->angles, e->v.angles);
 			SV_LinkEdict (e, false);
+			if (aw_actors_placed)
+				aw_actors_placed (e, placed, 0);
 		}
 		if (c->dead)
 		{
@@ -2255,7 +2286,8 @@ int AW_ActorsPlaceRow (unsigned reference, const float local[3], float yaw)
 	change_t *c;
 	float d[3];
 	int summoned = reference >= AW_ACTORS_SUMMONED && reference < AW_ACTORS_SUMMONED + AW_ACTORS_SUMMONED_SLOTS;
-	if ((!summoned && (reference < AW_ACTORS_PLACED || reference > (AW_ACTORS_PLACED | 0xFFFFF))) ||
+	int spawned = reference >= AW_ACTORS_SPAWNED && reference < AW_ACTORS_SPAWNED + AW_ACTORS_SPAWNED_SLOTS;
+	if ((!summoned && !spawned && (reference < AW_ACTORS_PLACED || reference > (AW_ACTORS_PLACED | 0xFFFFF))) ||
 		!(c = Change ((float)reference, 1)))
 		return 0;
 	AW_LedgerActorReset (c);
@@ -2293,7 +2325,8 @@ void AW_ActorsPlacedForget (unsigned reference)
 {
 	change_t *c = Change ((float)reference, 0);
 	if (c && reference >= AW_ACTORS_SUMMONED && (reference >= AW_ACTORS_PLACED ||
-		reference < AW_ACTORS_SUMMONED + AW_ACTORS_SUMMONED_SLOTS))
+		reference < AW_ACTORS_SUMMONED + AW_ACTORS_SUMMONED_SLOTS ||
+		(reference >= AW_ACTORS_SPAWNED && reference < AW_ACTORS_SPAWNED + AW_ACTORS_SPAWNED_SLOTS)))
 		AW_LedgerActorReset (c);	/* no field left: not saved, the key free again */
 }
 
@@ -2342,6 +2375,77 @@ char *AW_ActorsBaseText (const char *id, unsigned long *length)
 		return text;
 	}
 	return NULL;
+}
+
+/* DBG-SPAWN-MENU-67: the value of KEY in a base's entity text T (N bytes, lines '"key" "value"'), into OUT; 1 found */
+static int BaseField (const char *t, unsigned n, const char *key, char *out, int size)
+{
+	unsigned i = 0, k = (unsigned)strlen (key), j;
+	int m;
+	out[0] = 0;
+	while (i + k + 4 < n)
+	{
+		if (t[i] == '"' && !strncmp (t + i + 1, key, k) && t[i+1+k] == '"')
+		{
+			for (j = i + k + 2; j < n && t[j] != '"' && t[j] != '\n'; j++)
+				;
+			if (j >= n || t[j] != '"')
+				return 0;
+			for (j++, m = 0; j < n && t[j] != '"' && t[j] != '\n'; j++)
+				if (m < size - 1)
+					out[m++] = t[j];
+			out[m] = 0;
+			return j < n && t[j] == '"';
+		}
+		while (i < n && t[i] != '\n')
+			i++;
+		i++;
+	}
+	return 0;
+}
+
+#define BASE_CHUNK	8192
+int AW_ActorsBaseEach (void (*each)(void *ctx, const char *id, const char *name, int kind), void *ctx)
+{
+	chim_actor_base_t b;
+	unsigned i, have_at = 0, have = 0;
+	char *chunk, id[64], name[64], classname[16];
+	long at;
+	int bytes, given = 0;
+	FILE *f;
+	if (!each || !TableLoad () || !(f = TableOpen (&at, &bytes)))
+		return -1;
+	if (!(chunk = AW_TryMalloc (BASE_CHUNK)))
+	{
+		fclose (f);
+		return -1;
+	}
+	for (i = 0; i < table.head.bases; i++)
+	{
+		if (!ChimActors_Base (table.bases + i*CHIM_ACTOR_BASE_BYTES, &table.head, &b) || !b.bytes ||
+			b.bytes > BASE_CHUNK || (b.kind != CHIM_ACTOR_KIND_CREATURE && b.kind != CHIM_ACTOR_KIND_NPC))
+			continue;
+		/* the texts lie one after another: a chunk holds many; one more read when this one is not in it */
+		if (!have || b.at < have_at || b.at + b.bytes > have_at + have)
+		{
+			if (fseek (f, at + (long)table.head.text_at + (long)b.at, SEEK_SET))
+				break;
+			have_at = b.at;
+			have = (unsigned)fread (chunk, 1, BASE_CHUNK, f);
+			if (have < b.bytes)
+				break;
+		}
+		if (!BaseField (chunk + (b.at - have_at), b.bytes, "classname", classname, sizeof(classname)) ||
+			strcmp (classname, "aw_npc") ||
+			!BaseField (chunk + (b.at - have_at), b.bytes, "aw_source_id", id, sizeof(id)) || !id[0])
+			continue;
+		(void)BaseField (chunk + (b.at - have_at), b.bytes, "netname", name, sizeof(name));
+		each (ctx, id, name, b.kind == CHIM_ACTOR_KIND_CREATURE ? 1 : 0);
+		given++;
+	}
+	free (chunk);
+	fclose (f);
+	return given;
 }
 
 /* Once a second: every placed actor's row whose place is here (this room; outdoors a cell the window holds, or near

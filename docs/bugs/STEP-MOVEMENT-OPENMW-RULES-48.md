@@ -98,8 +98,8 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [CHIM-HULL-SURFACE-RESURVEY-48](CHIM-HULL-SURFACE-RESURVEY-48.md): The v0.0.48-dev2 build stopped at the collision surface gate in Balmora: the gate measured treads stair method 1 removed, and the hull-surface table was measured under the old collision defaults
 - [CHIM-ROOM-CLIP-DRAWN-BOX-48](CHIM-ROOM-CLIP-DRAWN-BOX-48.md): A CHIM room's runtime collision skips a placement by its drawn box, and a store model's hull can reach past that box
 - [CHIM-SEYDA-EXPANDED-STAIRS-40](CHIM-SEYDA-EXPANDED-STAIRS-40.md): Expanded Seyda CHIM frame fails stair walks at two original references
-- CHIM-SOLSTHEIM-HULL-SURFACE-64 (no report page): The CHIM collision surface check refuses 25 Bloodmoon meshes that are not in its measured table
-- CHIM-SOLSTHEIM-STAIR-CHECK-64 (no report page): The geometric stair check fails on three Bloodmoon meshes
+- [CHIM-SOLSTHEIM-HULL-SURFACE-64](CHIM-SOLSTHEIM-HULL-SURFACE-64.md): The CHIM collision surface check refuses 25 Bloodmoon meshes that are not in its measured table
+- [CHIM-SOLSTHEIM-STAIR-CHECK-64](CHIM-SOLSTHEIM-STAIR-CHECK-64.md): The geometric stair check fails on three Bloodmoon meshes
 - [CHIM-STAIR-COLLISION-MESH-47](CHIM-STAIR-COLLISION-MESH-47.md): Stair collision method 1: a stairway collision mesh per flight, proven by a geometric check instead of a walk
 - [CHIM-STAIR-GATE-POOL-BROKEN-42](CHIM-STAIR-GATE-POOL-BROKEN-42.md): The CHIM stair gate of a whole-Vivec MiniWind stopped the build: a walk worker was killed
 - [CHIM-STAIR-METHOD1-UNFIXED-48](CHIM-STAIR-METHOD1-UNFIXED-48.md): Stair collision method 1 cannot yet make 11 meshes' flights pass the geometric stair check (ships, shipwreck, silt strider, tent, Daedric ruins and four buildings)
@@ -108,7 +108,7 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [COLLISION-CONVEX-LOSS-32](COLLISION-CONVEX-LOSS-32.md): Convex collision proxies lose and invent authored surfaces
 - [COLLISION-DISPARITY-WORLDWIDE-64](COLLISION-DISPARITY-WORLDWIDE-64.md): Collision data is far larger and deeper than the drawn meshes across the game
 - [COLLISION-HULL-CHAINS-33](COLLISION-HULL-CHAINS-33.md): 183 brush models across the island collide through standing-hull chains 512 to 31,659 clipnodes deep
-- COLLISION-ICEBERG-CLIPNODE-BUDGET-67 (no report page): The two icebergs of the Mortrag Glacier cannot be converted: their collision is over the clipnode budget
+- [COLLISION-ICEBERG-CLIPNODE-BUDGET-67](COLLISION-ICEBERG-CLIPNODE-BUDGET-67.md): The two icebergs of the Mortrag Glacier cannot be converted: their collision is over the clipnode budget
 - [COLLISION-NC-FLAGS-32](COLLISION-NC-FLAGS-32.md): Morrowind no-collision and editor-marker flags (NC, NCC, MRK, AvoidNode) are ignored by the mesh converters
 - [COLLISION-RCN-SCOPE-32](COLLISION-RCN-SCOPE-32.md): Authored collision meshes (RootCollisionNode) are used by some converters only
 - [COLLISION-ROUTE-NO-SPLIT-36](COLLISION-ROUTE-NO-SPLIT-36.md): Routed standing hulls of dense flora (kelp, kreshweed) stay one chain 277-305 clipnodes deep: the router finds no cut, so the cell stays hull-pending

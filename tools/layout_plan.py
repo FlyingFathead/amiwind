@@ -69,9 +69,9 @@ MAP_BASE = 'id1/maps/'
 # (model.c, aw_anim.c .anm, aw_items.c .tag: COM_FOpenFile / COM_Load*File). Music (aw_music.c opens
 # <gamedir>/music directly), saves, configs and everything else stay on DH0.
 # The expansions' CHIM stores of the v0.0.64 layer plan (BUILD-EXPANSIONS-31: chimsol for Solstheim, chimiti for
-# Tribunal, chimibm for Bloodmoon's rooms) move the same way, each a whole folder. A base build has none of them, so
-# its plan is unchanged.
-STORE_UNITS = ('id1/chimi/', 'id1/chimsol/', 'id1/chimiti/', 'id1/chimibm/')
+# Tribunal, chimibm for Bloodmoon's rooms) and chimmh (Mournhold's outdoor districts, the module tribunal-mournhold)
+# move the same way, each a whole folder. A base build has none of them, so its plan is unchanged.
+STORE_UNITS = ('id1/chimi/', 'id1/chimsol/', 'id1/chimiti/', 'id1/chimibm/', 'id1/chimmh/')
 ACTOR_PREFIX = 'id1/progs/a_'
 
 

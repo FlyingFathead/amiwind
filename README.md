@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.67-dev2 (17 November 2026)._
+_Last updated with AmiWind v0.0.67-dev3 (19 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -25,12 +25,24 @@ Like community projects such as
 
 More in the [gallery](docs/GALLERY.md).
 
-## Where AmiWind stands (17 November 2026)
+## Where AmiWind stands (19 November 2026)
 
 The development line is **v0.0.67**, whose newest snapshot is
-[v0.0.67-dev2](docs/releases/notes/RELEASE-v0.0.67-dev2.md), in development. It fixes three critical faults found in
-play on the v0.0.66 release (below) and works on Tribunal and Bloodmoon in the game, on a builder that fails fast and
-says why, and on recording the build times again.
+[v0.0.67-dev3](docs/releases/notes/RELEASE-v0.0.67-dev3.md), in development. It brings every race its own first-person
+hands, Mournhold's districts as a build module, the inventory's actions and a look book that checks what is confirmed in
+play, and it works on Tribunal and Bloodmoon in the game, on a builder that fails fast and says why, and on the model
+census.
+
+**v0.0.67-dev3, in development**
+
+- **New:** every race and sex has its own first-person hands, joined to its own wrist and forearm.
+- **New:** Mournhold's districts are in the build with their containers, items, doors and people; the inventory
+  shows one action per kind of item and casts scrolls.
+- **Fixed:** spell effects show the original's shell, creatures move and fight as in the original, and no error in
+  play ends the game.
+- Only the hands have been seen in play so far; the rest is checked by tests and the gate.
+
+The detail is in the [changelog](docs/CHANGELOG.md#v0067-dev3-third-snapshot-of-v0067-19-november-2026).
 
 **v0.0.67-dev2, in development**
 
@@ -126,8 +138,8 @@ build prints where it is): one file with what failed and every setting, kept on 
 ([when a build fails](docs/LINUX_BUILD.md#when-a-build-fails)).
 
 The emulator presets of this version are
-[`AmiWind-v0.0.67-dev2-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.67-dev2-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.67-dev2-WinUAE.uae`](resources/emulators/AmiWind-v0.0.67-dev2-WinUAE.uae); both start with 32 MB of Fast
+[`AmiWind-v0.0.67-dev3-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.67-dev3-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.67-dev3-WinUAE.uae`](resources/emulators/AmiWind-v0.0.67-dev3-WinUAE.uae); both start with 32 MB of Fast
 RAM, the requirement. The presets of earlier versions are beside them in [resources/emulators](resources/emulators/). Everything
 else about building and playing: [Building and playing](docs/BUILDING_AND_PLAYING.md), the
 [Linux build guide](docs/LINUX_BUILD.md) and the [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md).

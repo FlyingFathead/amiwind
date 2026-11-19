@@ -242,6 +242,26 @@ class DoorLinks(unittest.TestCase):
         self.assertEqual([(u['reference'], u['reason']) for u in receipt['unlinked']],
                          [(31, 'room not converted in this build')])
 
+    def test_a_door_into_a_presented_district_links_through_its_blocks_frame(self):
+        # MOURNHOLD-EXTERIOR-CELLS-66: Room C stands for a district the build presents as exterior cells (its block the
+        # region frame's cell 1,2) and converts: the doors read as the presented world has them (tools/
+        # presented_exterior.py present_doors) take Room B's door into it outdoors, through that frame, at the moved
+        # arrival; without the presentation it stays "room not converted in this build" (the test above)
+        import presented_exterior as P
+        places = {'room c': {'cell': 'Room C', 'block': [1, 2], 'size': [1, 1], 'offset': [8192.0, 16384.0]}}
+        receipt = R.link_banks(self.id1, self.batch, self.present, P.present_doors(places, self.doors), self.frames,
+                               listed={'room a', 'room b', 'room c'})
+        self.assertEqual(receipt['linked'], {'exterior_to_room': 1, 'room_to_exterior': 2, 'room_to_room': 3})
+        self.assertEqual(receipt['unlinked'], [])
+        fields, sep, label = self.rows('doors-%s.txt' % self.b)[1]
+        self.assertEqual((fields[1], label), ('vf0001', 'Room C'))           # the district's name stays the label
+        self.assertEqual([float(v) for v in fields[4:7]],
+                         [8193 * .25 - 2048.0, 16385 * .25 - 4096.0, 1 * .25 - 10.0 + R.FEET])
+        # a build that does not convert the district's whole block: build_places gives nothing, as before
+        places, report = P.build_places({'cells': [dict(places['room c'])]}, {(0, 0)})
+        self.assertEqual((places, report['held']), ({}, ['Room C']))
+        self.assertIs(P.present_doors(places, self.doors), self.doors)
+
     def test_an_exit_with_no_frame_stays_inert(self):
         receipt = R.link_banks(self.id1, self.batch, self.present, self.doors, {'towns': [], 'regions': {}})
         self.assertEqual(self.rows('doors-%s.txt' % self.a)[0][0][1], '-')

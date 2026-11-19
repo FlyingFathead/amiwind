@@ -205,8 +205,8 @@ _SHORTER = {}
 
 def _shorter_layer_decisions(table):
     """The whole-table decisions of the table as it was when its expansion layers were SHORTER: for each layer, only
-    the first k rows of its list (k = 0: the layer and the recipe blocks it owns not there at all), in every
-    combination over the layers. A layer's list is append-only, in the order the rows were added
+    the first k rows of its list, with or without the recipe blocks it owns (k = 0: the layer and its recipe blocks
+    not there at all), in every combination over the layers. A layer's list is append-only, in the order the rows were added
     (MESH-TABLE-LAYER-GROWS-67), so one of these is the table an entry was recorded on before the rows added since;
     it read none of them. Cached by the table's bytes."""
     import itertools
@@ -219,15 +219,27 @@ def _shorter_layer_decisions(table):
     head, views = _views(table)
     layers = data.get('layers') if isinstance(data.get('layers'), dict) else {}
     owned = data.get('layer_recipes') if isinstance(data.get('layer_recipes'), dict) else {}
-    parsed = {mesh: json.loads(view) for mesh, view in views.items()}
-    found = set()
     names = sorted(layers)
-    for lengths in itertools.product(*[range(len(layers[name]) + 1) for name in names]):
-        if all(k == len(layers[name]) for k, name in zip(lengths, names)):
+    rows = {name: [norm(mesh) for mesh in layers[name]] for name in names}
+    # the meshes a shorter layer can change: the layers' own rows and the meshes of the recipe blocks they own; every
+    # other mesh's decision is the same in every candidate
+    moving = {mesh for name in names for mesh in rows[name]}
+    moving |= {norm(mesh) for name in names for recipe in owned.get(name, ())
+               for mesh in (data.get('recipe_meshes') or {}).get(recipe, ())}
+    parsed = {mesh: json.loads(views[mesh]) for mesh in moving if mesh in views}
+    still = [(mesh, view) for mesh, view in views.items() if mesh not in parsed]
+    # per layer: its first k rows; with k rows left its own recipe blocks are there or not yet (a block is added
+    # after the layer's first rows, like a row), with none left they are gone
+    states = [[(k, drop) for k in range(len(rows[name]) + 1)
+               for drop in ((True,) if k == 0 or not owned.get(name) else (False, True))] for name in names]
+    found = set()
+    for chosen in itertools.product(*states):
+        if all(k == len(rows[name]) and (not drop or not owned.get(name))
+               for (k, drop), name in zip(chosen, names)):
             continue                                    # the table as it is
-        gone = {norm(mesh) for k, name in zip(lengths, names) for mesh in list(layers[name])[k:]}
-        recipes = {str(r) for k, name in zip(lengths, names) if k == 0 for r in owned.get(name, ())}
-        items = []
+        gone = {mesh for (k, _), name in zip(chosen, names) for mesh in rows[name][k:]}
+        recipes = {str(r) for (_, drop), name in zip(chosen, names) if drop for r in owned.get(name, ())}
+        items = list(still)
         for mesh, view in parsed.items():
             if mesh in gone or (recipes and 'recipes' in view):
                 view = dict(view)

@@ -1,6 +1,6 @@
 # Interiors on CHIM: CHIM rooms on a shared store
 
-_Last updated with AmiWind v0.0.64-dev3 (10 November 2026)._
+_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -184,6 +184,13 @@ records. Written by the same writer functions as the exterior world.
 | model list | 4 x models | store model ids, in load order |
 | placements | 56 x placements | placed records (format 0.8 layout, light level in the flags), model field = store id |
 
+The record format and its readers (`read_room_record`, `installed_room`: the record an installed room map names,
+`store_model_images`: the store models a room places) are in `tools/chim/room_records.py`; the room conversion,
+`tools/chim/interior.py`, imports them from there. The image step's room actor bake and the room collision its checks
+stand actors on (`tools/chim/room_scene.py`) import them from `room_records.py` directly, so the room actor key holds
+this small module, not the conversion and the room settings (BUILD-ROOM-ACTOR-REKEY-67: a new room conversion setting
+re-keyed all 2,342 room actor fits).
+
 ### The room map's keys
 
 Worldspawn of `maps/<room>.chim`: `"_chim_world" "chimi"` (the store folder, at most 8 characters, `a-z 0-9 _`) and
@@ -275,6 +282,16 @@ Worldspawn of `maps/<room>.chim`: `"_chim_world" "chimi"` (the store folder, at 
    BUILD-SUMMARY-INTERIOR-COUNTS-48): the rooms in the plan by stage, the rooms made into CHIM rooms, the rooms kept
    as classic maps with their reasons, the rooms that need 32 MB of Fast RAM (`_chim_room_fast_mb`, from the image's
    `chim-room-heap.json`) and the room residents by animation level.
+10. One model's replacement wherever that model is placed (v0.0.67, VISUAL-EVERYWHERE-ROOMS-67): every CHIM room
+   takes the everywhere recipe of `config/visual-recipes.json` as the CHIM frames do, every row kind (a reduction
+   ratio, a hand-made primitive such as the street lantern's shell, a panel, a collision tolerance), each row keyed by
+   the mesh's source path and SHA-256, so only that model type changes and only the rooms that place it get new
+   units (`tools/chim/interior.py room_visual_profiles`). A room's own `recipe_rooms` recipe still applies first, for
+   room-only extras (the Ald'ruhn Manor District's shells). The receipt row's `visual_recipes` names the meshes a
+   recipe changed in each room. `everywhere_in_rooms` false in `config/chim-rooms.json` keeps the method before
+   (only the `recipe_rooms` rooms, ratio rows only); `AMIWIND_VISUAL_EVERYWHERE=off` keeps the original meshes
+   outdoors and in the rooms. The prison ship and the census office are classic compiled maps and do not take the
+   recipe yet.
 
 ## The A/B
 

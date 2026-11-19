@@ -357,19 +357,37 @@ def load(path):
     return _MASTER[key]
 
 
+def rank_without_faction(npc, fields):
+    """True when the INFO FIELDS ask for a faction rank without naming a faction and the speaker NPC (mwad.dialogue
+    speaker()) has no faction: such an INFO is never said by them (DIALOGUE-RANK-WITHOUT-FACTION-67). The original's
+    rule as OpenMW 0.51 keeps it (mwdialogue/filter.cpp testActor: a rank with no faction is tested in the speaker's
+    own faction; npc.cpp getPrimaryFactionRank: -1 without one); mwad.dialogue's Context.compile reads the record's
+    rank field instead, which is 0 for every NPC without a faction in Morrowind.esm (1,926 records), so the faction
+    members' Background line ("I am %Name, %Class and %Rank of the %Faction.") was given to all of them with two empty
+    words. The voice and dialogue tables ask this before compile. The shared filter stays as it is for the residents'
+    build-time conversation greeting (mwad.dialogue.talk_greeting): no greeting of the masters differs by it (the two
+    rank-only greetings need PcExpelled), and a change there keys the CHIM towns again."""
+    from mwad.dialogue import _parsed
+    parsed = _parsed(fields)
+    return parsed is not None and not npc['faction'] and not parsed[7] and parsed[1] != -1
+
+
 def speaker_entries(kinds, infos, ident, home):
     """[(topic index, INFO index, text, SNAM, run-time conditions)] of one NPC: every INFO of every table topic
     (infos: [[fields]] per topic) it can ever say. The cell test is decided here against the NPC's home cell
     (HOME, home_cells()); an NPC placed in several cells or in none has no cell a test could name (NO_CELL: Cell
     fails, NotCell passes). A text keeps its defines for the engine (the speaker's from the NPC row, the player's
     from the game), '' when one of them cannot be filled for this speaker (mwad.dialogue.fill_defines: the line
-    is then said without text), so NPCs share entries."""
+    is then said without text), so NPCs share entries. An INFO that asks for a rank without a faction is never a
+    factionless speaker's (rank_without_faction)."""
     from mwad.dialogue import Context, fill_defines
     from mwad.esm import text
     context = Context(kinds, ident, cell=home or NO_CELL)
     out = []
     for t, fields_list in enumerate(infos):
         for i, fields in enumerate(fields_list):
+            if rank_without_faction(context.npc, fields):
+                continue
             runtime = context.compile(fields)
             if runtime is None:
                 continue

@@ -1,6 +1,6 @@
 # Keyboard and command reference
 
-_Last updated with AmiWind v0.0.64-dev5 (11 November 2026)._
+_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -97,7 +97,10 @@ The inventory is bound to I by default (`aw_inventory`), the Stats window to P
 (`aw_stats`) and the Magic window to O (`aw_magicmenu`); older saved key files get
 P and O when those keys are free. Since v0.0.61 R readies and lowers the magic (the attack button then casts the
 selected spell, [MAGIC_EFFECTS.md](MAGIC_EFFECTS.md)), and after `dbg recorder` Ctrl+R starts and stops a recording
-([GAME_RECORDER.md](GAME_RECORDER.md)). In the dialogue window Up and Down move the highlighted topic or answer, Enter
+([GAME_RECORDER.md](GAME_RECORDER.md)). Inside the inventory window its own keys are console settings
+(`aw_key_inv_use`, default E and Enter: the selected item's action; `aw_key_inv_drop`, D: drop one; since v0.0.67
+`aw_key_inv_info`, P: the item information box; [INVENTORY.md](INVENTORY.md)); P there opens the box, not the Stats
+window. In the dialogue window Up and Down move the highlighted topic or answer, Enter
 picks it and Tab switches to the conversation text, where Up and Down scroll it. Weapon sway has two styles, the
 AmiWind groove and a stiff one with still hands. Greyed rows are planned
 actions (quick keys) with their intended

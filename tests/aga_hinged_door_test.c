@@ -24,6 +24,7 @@ char *pr_strings="\0func_wall\0info_null";
 #define FUNC_WALL 1
 int (*aw_hinged_use)(void);
 int (*aw_hinged_hint)(const char **name,const char **action);
+float (*aw_hinged_aim)(void);   /* aw_scene.c's in the engine (HUD-TEXTS-OVERLAP-67) */
 void (*aw_hinged_spawn)(void);
 void (*aw_hinged_tick)(double seconds);
 int (*aw_hinged_locked_sound)(void);
@@ -176,6 +177,10 @@ static void door_mode(void){
     /* closed: blocks the doorway (x 0..4, y 0..32), the swing quadrant east is open */
     assert(solid_at(d,2,16,24) && !solid_at(d,16,-2,24));
     assert(AW_HingedDoorHint(&name,&action) && !strcmp(name,"Door") && !strcmp(action,"Open: E"));
+    /* HUD-TEXTS-OVERLAP-67: the aimed door's distance along the view is given to the one focus a frame (within reach),
+     * and the engine's scene reads it through the hook */
+    assert(aw_hinged_aim==AW_HingedDoorAimDistance);
+    {float at=AW_HingedDoorAimDistance();printf("hinged door aimed at %.1f\n",at);assert(at>0 && at<=56);}   /* HD_REACH */
     /* nothing moves, nothing is turned or tested */
     tick(.1,5);assert(d->v.angles[1]==0 && started==0);
     /* open: the Open Sound at the door, 90 degrees in one second, yaw falling */
@@ -187,7 +192,7 @@ static void door_mode(void){
     /* the collision turned with it: the doorway is free, the door lies along x, y -4..0 */
     assert(!solid_at(d,2,16,24) && solid_at(d,16,-2,24));
     /* the doorway is clear: the ray where the door stood finds nothing */
-    assert(!AW_HingedDoorHint(&name,&action));
+    assert(!AW_HingedDoorHint(&name,&action) && AW_HingedDoorAimDistance()<0);
     /* close: the Close Sound, back to the placed yaw */
     place_player(45,-2,180);
     assert(AW_HingedDoorHint(&name,&action) && !strcmp(action,"Close: E"));

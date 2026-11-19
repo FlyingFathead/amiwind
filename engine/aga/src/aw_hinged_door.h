@@ -50,6 +50,8 @@ void AW_HingedDoorTick(double seconds);
 /* The use key and the prompt: the hinged door under the crosshair. */
 int AW_HingedDoorUse(void);
 int AW_HingedDoorHint(const char **name,const char **action);
+/* HUD-TEXTS-OVERLAP-67: how far along the view (map units from the eye) the aimed door lies, -1 when none */
+float AW_HingedDoorAimDistance(void);
 /* 1: this func_wall must stay an edict (aw_scenery.c capture). */
 int AW_HingedDoorProtect(edict_t *e);
 /* Table lookup by reference number: the row, -1 none (also for host tests). */

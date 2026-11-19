@@ -1250,6 +1250,33 @@
       "to": null,
       "source": "tools/build.py, tools/chim_build.py, tools/chim/build.py (PRISON-SHIP-POLY-COLLISION-65)",
       "note": "null = off: nothing changes; on = the Seyda Neen ship (ex_de_ship) and the silt strider stored as the large-model cut's tiles at a 128 grain (chim.build.DRAW_TILES_ON: every face and convex piece whole in its tile), so the engine's per-model frustum test leaves out the parts behind the view; measured offline from the deck and the pier (faces tested per view, the heaviest view 16,378 to 12,927 from the deck and 16,494 to 11,805 from the pier); it re-keys those models' tile units, so it waits for a planned world rebuild"
+    },
+    {
+      "version": "0.0.67-dev2",
+      "option": "presented_exteriors",
+      "flag": "--presented-exteriors",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py tribunal_mournhold_commands and resolve_tribunal_mournhold, tools/tribunal_mournhold.py, tools/presented_data.py, tools/presented_exterior.py (MOURNHOLD-EXTERIOR-CELLS-66)",
+      "note": "the build module tribunal-mournhold: null (unset) or on = with Tribunal selected and district cells the tracker reference calls finished, the stages tribunal-mournhold-data (the presented data folder of the base master and Tribunal.esm: Mournhold's districts as exterior cell blocks) and tribunal-mournhold (the districts' own CHIM world) join the plan, and the image installs that world as a store of its own with its own frame maps and rows file; off = the module is left out. Without Tribunal, with off, with a cell list of the caller's own or in a MiniWind sandbox the stages and their commands are exactly the ones of a build without the module; the module's stages are keyed by the base files and Tribunal's files, and no base stage reads them"
+    },
+    {
+      "version": "0.0.67-dev3",
+      "option": "room_shapes",
+      "flag": "--room-shapes",
+      "change": "added",
+      "to": null,
+      "source": "tools/build.py, tools/room_map_shapes.py, tools/room_map_collision.py, tools/prepare_interior.py, tools/drawn_collision.py (PRISON-SHIP-FLOOR-STUCK-67, PRISON-SHIP-TABLE-DARK-TRIANGLE-67)",
+      "note": "null = on: in the prison ship's hold the listed shell shapes are drawn as the original draws them through the shell's visual reduction (the tables room_map_shapes.ROOM_MAP_WHOLE_SHAPES and ROOM_MAP_BOX_SHAPES): the two masts and the other shapes whose collision stays kept whole, the four tables' iron bands as the boxes of their parts; the shell 7,997 to 8,308 drawn faces; collision unchanged; the interior stage refuses a collision piece the original draws that stands without drawn faces (tools/drawn_collision.py); off = the listed shapes reduced like the rest (the method before; the check then only prints what it finds)"
+    },
+    {
+      "version": "0.0.67-dev3",
+      "option": "reuse_declined",
+      "flag": "--no-reuse",
+      "change": "added",
+      "to": false,
+      "source": "tools/build_parser.py, tools/reuse_all.py default_choice, tools/build.py (BUILD-OFFER-EARLIER-RUNS-67)",
+      "note": "A plain build (no --reuse-from, --reuse-all-available, --no-reuse, --clean, --release-from-scratch, --no-profile, --dry-run or --recover-image-from) in a workspace whose stage index holds earlier builds now plans its stages as --reuse-all-available does, with the first-minute stops as notices, asks once in a terminal (no terminal: yes) and prints what it took from which earlier build with the from-scratch build recommended if something looks wrong; --no-reuse (false by default) turns that off for one build: every stage runs, its units still come from the workspace cache. No stage key changes; the --reuse-all-available default stays off for explicit callers"
     }
   ],
   "current": {
@@ -1402,6 +1429,7 @@
       "palette": null,
       "partition_headroom_mib": null,
       "player_body": null,
+      "presented_exteriors": null,
       "quick_character": null,
       "quiet": false,
       "readiness_id": [],
@@ -1412,10 +1440,12 @@
       "resource_plan_json": null,
       "resource_threads": null,
       "reuse_all_available": false,
+      "reuse_declined": false,
       "room_batches": "all",
       "room_draw_tiles": null,
       "room_levelled_creatures": "table",
       "room_placed_creatures": "table",
+      "room_shapes": null,
       "room_small_parts": null,
       "scale_snap": null,
       "scenery_reduce": null,

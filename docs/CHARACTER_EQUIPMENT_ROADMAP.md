@@ -1,6 +1,9 @@
 # Mutable character equipment and shared assets
 
-_Last updated with AmiWind v0.0.40 (15 October 2026)._
+_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
+
+For the player character as it is built today (its parts per race and sex, what loads and what is let go on a race,
+sex or outfit change), see [PLAYER_BODY.md](PLAYER_BODY.md).
 
 Fixed, complete outfits are an interim conversion representation, not the final
 character architecture. A complete game must support taking clothing and armour

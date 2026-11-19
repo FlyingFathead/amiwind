@@ -1,9 +1,21 @@
 {
   "format": 1,
   "everywhere": "everywhere-v1",
+  "layers": {
+    "tribunal": ["-12,-30", "-12,-29", "-8,-30", "-7,-30", "-4,-30", "-3,-30", "0,-30", "4,-30", "5,-30", "4,-29", "5,-29"],
+    "bloodmoon": ["-19,23", "-20,25", "-24,23", "-25,19"]
+  },
+  "layer_recipes": {
+    "tribunal": ["mournhold-v1"],
+    "bloodmoon": ["solstheim-v1"]
+  },
   "recipes": {
     "mournhold-v1": {
-      "status": "No visual reduction. The recipe names the cells of Mournhold's five outdoor districts as the outdoor converter reads them (tools/presented_exterior.py, config/presented-exteriors.json), so that a measured table can hold rows that apply there and nowhere else: config/collision-hull-surface.json recipe_meshes lists the three base game models whose collision needs the surface rule in their Mournhold placements only.",
+      "status": "No visual reduction. The recipe names the cells of Mournhold's five outdoor districts as the outdoor converter reads them (tools/presented_exterior.py, config/presented-exteriors.json), so that a measured table can hold rows that apply there and nowhere else: config/collision-hull-surface.json recipe_meshes lists the three base game models whose collision needs the surface rule in their Mournhold placements only. Each of these cells also carries \"no_land\": true: an interior district presented as an exterior has no LAND record by design (its ground is its placed models), and the CHIM land checks (tools/chim/regions.py owned_land_problems, check_source_land) admit such a cell as flat default ground, as CHIMport converts it.",
+      "models": {}
+    },
+    "solstheim-v1": {
+      "status": "No visual reduction. The recipe names the Solstheim cells that place four base game models whose collision needs the surface rule there (a Dwemer lift, a bellows, a basket, an ebony rock; measured by the collision surface survey of the cells only the expansions add), so that config/collision-hull-surface.json recipe_meshes can list them for these cells and nowhere else.",
       "models": {}
     },
     "tel-uvirith-v1": {
@@ -408,37 +420,60 @@
   },
   "cell_settings": {
     "-12,-30": {
-      "visual_recipe": "mournhold-v1"
+      "visual_recipe": "mournhold-v1",
+      "no_land": true
     },
     "-12,-29": {
-      "visual_recipe": "mournhold-v1"
+      "visual_recipe": "mournhold-v1",
+      "no_land": true
     },
     "-8,-30": {
-      "visual_recipe": "mournhold-v1"
+      "visual_recipe": "mournhold-v1",
+      "no_land": true
     },
     "-7,-30": {
-      "visual_recipe": "mournhold-v1"
+      "visual_recipe": "mournhold-v1",
+      "no_land": true
     },
     "-4,-30": {
-      "visual_recipe": "mournhold-v1"
+      "visual_recipe": "mournhold-v1",
+      "no_land": true
     },
     "-3,-30": {
-      "visual_recipe": "mournhold-v1"
+      "visual_recipe": "mournhold-v1",
+      "no_land": true
     },
     "0,-30": {
-      "visual_recipe": "mournhold-v1"
+      "visual_recipe": "mournhold-v1",
+      "no_land": true
     },
     "4,-30": {
-      "visual_recipe": "mournhold-v1"
+      "visual_recipe": "mournhold-v1",
+      "no_land": true
     },
     "5,-30": {
-      "visual_recipe": "mournhold-v1"
+      "visual_recipe": "mournhold-v1",
+      "no_land": true
     },
     "4,-29": {
-      "visual_recipe": "mournhold-v1"
+      "visual_recipe": "mournhold-v1",
+      "no_land": true
     },
     "5,-29": {
-      "visual_recipe": "mournhold-v1"
+      "visual_recipe": "mournhold-v1",
+      "no_land": true
+    },
+    "-19,23": {
+      "visual_recipe": "solstheim-v1"
+    },
+    "-20,25": {
+      "visual_recipe": "solstheim-v1"
+    },
+    "-24,23": {
+      "visual_recipe": "solstheim-v1"
+    },
+    "-25,19": {
+      "visual_recipe": "solstheim-v1"
     },
     "10,1": {
       "visual_recipe": "tel-uvirith-v1",

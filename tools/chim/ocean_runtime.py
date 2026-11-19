@@ -138,6 +138,35 @@ def admit_cell(data_files, cell):
             'native_verified': False, 'packaged': False}
 
 
+def append_layer_rows(entries, cells):
+    """Append stable sequential directory rows for CHIM region cells outside the base game's exterior grid (layer
+    cells: an expansion's own cells, and the cells an interior that behaves like an exterior is presented as,
+    tools/presented_exterior.py). As the ocean rows below: every existing row and name stays as it is, the new rows
+    come after them and are metadata only (the cell's CHIM frame map takes the row); unlike an ocean row a layer row
+    has no open-sea admission, its frame is converted from the cell's own placements. Returns (entries, added)."""
+    entries = list(entries)
+    cells = sorted(set(map(tuple, cells)))
+    if not cells:
+        return entries, []
+    if any(e['name'] != 'vf%04d' % i for i, e in enumerate(entries)):
+        raise ValueError('Layer rows require a complete sequential world directory')
+    if len(entries) + len(cells) > 8192:
+        raise ValueError('Layer rows exceed the existing AWR2 runtime directory limit')
+    added = []
+    for x, y in cells:
+        world_box = (x * 2048, y * 2048, (x+1) * 2048, (y+1) * 2048)
+        for entry in entries:
+            lo, hi = entry['core']; ox, oy = entry['origin'][:2]
+            if (lo[0]+ox < world_box[2] and world_box[0] < hi[0]+ox
+                    and lo[1]+oy < world_box[3] and world_box[1] < hi[1]+oy):
+                raise ValueError('Layer cell %d,%d already has a core owner %s' % (x, y, entry['name']))
+        added.append({'name': 'vf%04d' % (len(entries)+len(added)), 'cell': [x, y],
+                      'origin': [x * 2048 + 1024, y * 2048 + 1024, 0.0], 'core': [[-1024, -1024], [1024, 1024]],
+                      'coverage': [[-1920, -1920], [1920, 1920]], 'divisions': 1,
+                      'converted': None, 'chim_region': True, 'layer_cell': True})
+    return entries + added, added
+
+
 def append_routing_rows(entries, cells, data_files):
     """Append stable sequential AWR2 rows for explicit ocean cells lacking a legacy core.
 

@@ -441,6 +441,10 @@ def prepare(data_files,id1,selected=(),palette=None,models=True,jobs=None,model_
     # records by a rule (tools/prepare_weapon_kit.py), every one a row of the catalogue just written.
     from prepare_weapon_kit import write_kit
     report['weapon_kit']=write_kit(id1,items,settings,row_flags,master_path(data).read_bytes())
+    # DBG-CYCLEITEMS-67: the index of every item the hands can hold (tools/holdable_items.py), from the same records and
+    # row flags, for the item tests (docs/INVENTORY.md "Every item the hands can hold")
+    from holdable_items import write_index
+    report['holdable']=write_index(id1,items,row_flags)
     if models:
         # One icon lookup table for the HUD boxes and the inventory (tools/prepare_icons.py):
         # the same referenced closure as the staged inventory resources.

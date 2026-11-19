@@ -89,12 +89,64 @@ def hard_surface(source):
             and not name.startswith(('flora_', 'terrain_')))
 
 
+def shape_error(vertices, faces, reduced_vertices, reduced_faces, samples=8000, seed=1):
+    """(Hausdorff distance, mean distance) between a mesh and its reduction, in the mesh's units: SAMPLES points on
+    each surface (area-weighted, a fixed seed, so the same meshes give the same numbers), each one's distance to the
+    other surface; the Hausdorff distance is the larger maximum of the two ways, the mean is source to reduction."""
+    import numpy as np
+    from seam_audit import _point_triangle_distance
+    v, f = np.asarray(vertices, float), np.asarray(faces, int)
+    rv, rf = np.asarray(reduced_vertices, float), np.asarray(reduced_faces, int)
+    rng = np.random.default_rng(seed)
+
+    def sample(vx, fx, n=samples):
+        t = vx[fx[:, :3], :3]
+        a = np.linalg.norm(np.cross(t[:, 1] - t[:, 0], t[:, 2] - t[:, 0]), axis=1)
+        pick = rng.choice(len(t), size=n, p=a / a.sum())
+        r1, r2 = rng.random(n), rng.random(n)
+        q = np.sqrt(r1)
+        t = t[pick]
+        return t[:, 0] * (1 - q)[:, None] + t[:, 1] * (q * (1 - r2))[:, None] + t[:, 2] * (q * r2)[:, None]
+    d1 = _point_triangle_distance(sample(v, f), rv[rf[:, :3], :3], 0.05)
+    d2 = _point_triangle_distance(sample(rv, rf), v[f[:, :3], :3], 0.05)
+    return float(max(d1.max(), d2.max())), float(d1.mean())
+
+
+def reduction_quality(vertices, faces, reduced_vertices, reduced_faces):
+    """Whether a reduction keeps the model intact, by the builder's own measures (docs/MODEL_CENSUS.md):
+    new_open / lost_open = open edges the reduction adds or loses against the source (meshopt.seam_check, both must be
+    0), seam_torn / rim_torn = the torn share of seam and free-rim length (seam_audit.measure, both must be 0), and
+    shape_error = the Hausdorff distance (shape_error) as a share of the source's bounding-box diagonal. A mesh with
+    no area on either side has no shape to compare: shape_error None."""
+    import numpy as np
+    from meshopt import seam_check
+    from seam_audit import measure as seams
+    v, f = np.asarray(vertices, float), np.asarray(faces, int)
+    rv, rf = np.asarray(reduced_vertices, float), np.asarray(reduced_faces, int)
+    # the seam gate welds by exact position: the source and the result in one vertex array
+    if not len(rf):
+        gate = seam_check(v[:, :3], f[:, :3], [])
+        return {'new_open': 0, 'lost_open': gate['lost_open'], 'seam_torn': None, 'rim_torn': None, 'shape_error': None}
+    both = np.vstack((v[:, :3], rv[:, :3]))
+    gate = seam_check(both, f[:, :3], np.asarray(rf[:, :3]) + len(v))
+    s = seams(v, f, rv, rf)
+    diagonal = float(np.linalg.norm(v[:, :3].max(axis=0) - v[:, :3].min(axis=0))) if len(v) else 0.0
+    error = None
+    if len(f) and len(rf) and diagonal > 0:
+        area = lambda vx, fx: float(np.linalg.norm(np.cross(vx[fx[:, 1], :3] - vx[fx[:, 0], :3],  # noqa: E731
+                                                            vx[fx[:, 2], :3] - vx[fx[:, 0], :3]), axis=1).sum())
+        if area(v, f) > 0 and area(rv, rf) > 0:
+            error = round(shape_error(v, f, rv, rf)[0] / diagonal, 5)
+    return {'new_open': gate['new_open'], 'lost_open': gate['lost_open'], 'seam_torn': s['seam']['torn_share'],
+            'rim_torn': s['rim']['torn_share'], 'shape_error': error}
+
+
 def measure(task):
     """One mesh both ways: faces, render bytes, seam audit, shape error (sampled both ways)."""
     import numpy as np
     from prepare_scenery import model_geometry, nif_reader
     from mwad.scene import unpack_geometry
-    from seam_audit import _point_triangle_distance, measure as seams
+    from seam_audit import measure as seams
     from static_lod import reduce_for_profile
     from world_estimate_data import MeshSource
     from planar_merge import converter_polygons, merged_polygons
@@ -112,21 +164,10 @@ def measure(task):
             base = converter_polygons(rv, rf, tex)
             polys = polys if len(polys) < len(base) else base
         s = seams(v, f, rv, rf)
-        rng = np.random.default_rng(1)
-
-        def sample(vx, fx, n=8000):
-            t = vx[fx[:, :3], :3]
-            a = np.linalg.norm(np.cross(t[:, 1] - t[:, 0], t[:, 2] - t[:, 0]), axis=1)
-            pick = rng.choice(len(t), size=n, p=a / a.sum())
-            r1, r2 = rng.random(n), rng.random(n)
-            q = np.sqrt(r1)
-            t = t[pick]
-            return t[:, 0] * (1 - q)[:, None] + t[:, 1] * (q * (1 - r2))[:, None] + t[:, 2] * (q * r2)[:, None]
-        d1 = _point_triangle_distance(sample(v, f), rv[rf[:, :3], :3], 0.05)
-        d2 = _point_triangle_distance(sample(rv, rf), v[f[:, :3], :3], 0.05)
+        hausdorff, mean = shape_error(v, f, rv, rf)
         row[name] = {'faces': len(polys), 'triangles': int(len(rf)), 'seam_torn': s['seam']['torn_share'],
-                     'rim_torn': s['rim']['torn_share'], 'hausdorff': round(float(max(d1.max(), d2.max())), 3),
-                     'mean_error': round(float(d1.mean()), 4)}
+                     'rim_torn': s['rim']['torn_share'], 'hausdorff': round(hausdorff, 3),
+                     'mean_error': round(mean, 4)}
     return row
 
 

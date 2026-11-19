@@ -42,7 +42,10 @@ class PureChimDiskTests(unittest.TestCase):
         # the first floor at or below it (AW_MapPlaceBelow) before the usual search.
         src = ROOT / 'engine/aga/src'
         console = (src / 'aw_console.c').read_text()
-        self.assertIn('"aw_teleport") && argc-j>3)return 0;', console)
+        # a fourth number is refused; a place's name may take more words (DBG-TP-EXPANSION-ARRIVALS-66, the router's
+        # own native test: tests/aga_console_test.c)
+        self.assertIn('"aw_teleport") && argc-j>3 &&\n'
+                      '       (argc-j>8 || (argv[j][0]>=\'0\' && argv[j][0]<=\'9\') || argv[j][0]==\'-\'', console)
         scene = (src / 'aw_scene.c').read_text()
         self.assertIn('if(Cmd_Argc()==3 || Cmd_Argc()==4) {', scene)
         # the command's own route also takes a point inside the loaded map on a MiniWind (DEBUG-TP-MINIWIND-36)

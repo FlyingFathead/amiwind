@@ -50,30 +50,73 @@ from mwscript.ident import compiler_files, compiler_identity, check as check_com
 from mwscript.ident import note_read as note_compiler_read  # noqa: E402
 
 
-def unit_inputs(data_files, media, music, config, rooms=None):
+def bound_addons(masters=None):
+    """The expansion masters whose OWN placements this image binds (EXPANSION-SCRIPTS-NOT-ATTACHED-66): the build's
+    selection after the base game (mwad.masters.selected_masters: MASTERS, else the environment variable
+    AMIWIND_MASTERS, which tools/build.py sets from --dlc / --no-dlc), in load order. () with the base game alone, so
+    a base-only build binds, writes and keys exactly what it did before. Until v0.0.67 the stage bound none, so every
+    scripted person, creature and object an expansion places ran without its script, also in the expansion rooms the
+    image holds (0 of the v0.0.66 release build's 9,095 bindings)."""
+    from mwad.masters import selected_masters
+    return tuple(m for m in selected_masters(masters) if m.casefold() != MASTERS[0].casefold())
+
+
+def presented_places(receipt, cells):
+    """MOURNHOLD-EXTERIOR-CELLS-66: the districts this build presents as exterior cells and converts whole, from the
+    presented-data stage's receipt RECEIPT (a path) and the build's CHIM cells CELLS ("x,y:k ..."), as the image step
+    reads them (tools/presented_exterior.py build_places); {} without a receipt."""
+    if not receipt:
+        return {}
+    import presented_exterior
+    return presented_exterior.build_places(json.loads(Path(receipt).read_text(encoding='utf-8')),
+                                           presented_exterior.cells_of_text(cells or ''))[0]
+
+
+def unit_inputs(data_files, media, music, config, rooms=None, addons=None, presented=None):
     from mwad.paths import child_ci
     from mwscript.rooms import room_table, table_digest
     # the room maps the player's PositionCell loads (the repo's room lists): keyed by what the table holds
+    from mwscript.aftercensus import CONFIG as AFTER_CENSUS
     inputs = {'compiler': compiler_identity(), 'config': sha(config),
-              'rooms': table_digest(room_table() if rooms is None else rooms)}
+              'rooms': table_digest(room_table() if rooms is None else rooms),
+              # DBG-HORS-AFTER-CENSUS-67: the path out of the census office the script AW_AfterCensus is read from
+              'after-census.json': sha(AFTER_CENSUS)}
     for name in MASTERS:
         path = child_ci(Path(data_files), name, required=False)
         inputs[name] = sha(path) if path else None
     inputs['media-coverage.json'] = sha(Path(media) / 'media-coverage.json')
     track = Path(music) / 'soundtrack.json' if music else None
     inputs['soundtrack.json'] = sha(track) if track and track.is_file() else None
+    # the expansions whose own placements are bound: only when there are any, so the base game's unit key stays
+    addons = bound_addons() if addons is None else tuple(addons)
+    if addons:
+        inputs['bound_addons'] = list(addons)
+    # the presented districts' moves: only when there are any, so every other build's unit key stays
+    if presented:
+        inputs['presented'] = {key: {'block': place['block'], 'size': place['size'], 'offset': place['offset']}
+                               for key, place in sorted(presented.items())}
     return inputs
 
 
-def build(data_files, media, music, out, config=CONFIG):
+def build(data_files, media, music, out, config=CONFIG, addons=None, presented=None):
+    """ADDONS: the expansion masters whose own placements are bound (None: bound_addons(), the build's selection).
+    PRESENTED: the presented districts this build converts (presented_places; a PositionCell into one goes outdoors)."""
+    addons = bound_addons() if addons is None else tuple(addons)
     config_data = json.loads(Path(config).read_text(encoding='utf-8'))
     data = GameData().load(data_files)
+    # DBG-HORS-AFTER-CENSUS-67: the bare 'dbg aw hors' starts AW_AfterCensus once: the state of a player who has walked
+    # out of the census office, read from the game's own scripts (tools/mwscript/aftercensus.py), compiled with them
+    from mwscript.aftercensus import inject as after_census
+    after = after_census(data)
     soundtrack = Path(music) / 'soundtrack.json' if music else None
     mapper = MediaMap.from_files(data, Path(media) / 'media-coverage.json',
                                  soundtrack if soundtrack and soundtrack.is_file() else None)
-    program, compiled = compile_program(data, mapper, handwritten=config_data['handwritten']['patterns'])
+    program, compiled = compile_program(data, mapper, handwritten=config_data['handwritten']['patterns'],
+                                        presented=presented)
     moves = {'rows': len(program.moves), 'rooms_known': len(program.rooms or {})}
-    binds = bindings(program, compiled)
+    if presented:
+        moves['presented_districts'] = sorted(place['cell'] for place in presented.values())
+    binds = bindings(program, compiled, addons=addons)
     # the build check (NPC-STORY-DISABLED-AT-START-42): a new game starts Main's run-once scripts and each of their
     # disables reaches its placed reference; a failure stops the stage here
     new_game = newgame.check(program, compiled)
@@ -115,6 +158,7 @@ def build(data_files, media, music, out, config=CONFIG):
               # SAVE-SCRIPT-ROW-HINT-ONLY-65: the scripts' variables by name (LOCN) and any names that share a key
               'local_names': getattr(program, 'local_names_report', None),
               'player_moves': moves,
+              'after_census': after,
               'new_game': {'scripts': new_game['scripts'], 'counts': new_game['counts'],
                            'controls': new_game['controls'],
                            'actors': sorted(d['id'] for d in new_game['disabled'] if d['type'] in newgame.ACTOR_TYPES)},
@@ -130,6 +174,18 @@ def build(data_files, media, music, out, config=CONFIG):
                         'music': media_rows(program.music)},
               'unmapped_uses': [{'script': s, 'kind': k, 'name': n, 'reason': why}
                                 for s, k, n, why in program.unresolved]}
+    if addons:
+        # EXPANSION-SCRIPTS-NOT-ATTACHED-66: the bindings of the selected expansions' own placements, per master (only
+        # with an expansion selected, so the base game's report is as before)
+        from mwscript.gamedata import ADDON_KEY_STRIDE
+        from mwscript.compiler import BIND_HELD
+
+        def owned(r, m):
+            return (r['reference'] & 0xFFFFFF) // ADDON_KEY_STRIDE == MASTERS.index(m)
+        per = {m: sum(1 for r in binds if owned(r, m)) for m in addons}
+        # EXPANSION-HELD-ITEMS-66: of those, the items their own holders carry (BIND_HELD rows)
+        held = {m: sum(1 for r in binds if r['flags'] & BIND_HELD and owned(r, m)) for m in addons}
+        report['bound_addons'] = {'masters': list(addons), 'rows': per, 'held': held}
     (Path(out) / 'mwscript-report.json').write_text(json.dumps(report, indent=1) + '\n', encoding='utf-8',
                                                    newline='\n')
     return report
@@ -144,11 +200,23 @@ def main(argv=None):
     p.add_argument('--config', type=Path, default=CONFIG)
     p.add_argument('--cache', type=Path, help='the shared pool (tools/file_cache.py): reuse an unchanged unit')
     p.add_argument('--cache-report', type=Path)
+    p.add_argument('--presented-receipt', type=Path,
+                   help='the presented-data stage\'s receipt (tools/build.py gives it only when that stage runs; '
+                        'MOURNHOLD-EXTERIOR-CELLS-66): a PositionCell into a district the build converts goes outdoors')
+    p.add_argument('--presented-cells', default='', help='the CHIM cells the build converts, with --presented-receipt')
     args = p.parse_args(argv)
+    presented = presented_places(args.presented_receipt, args.presented_cells)
     started = time.time()
     print('[mwscript] start: one unit (the whole program), 1 worker: the compiler reads every script once; '
           'serial by design (member access needs every script), measured in seconds', flush=True)
-    inputs = unit_inputs(args.data_files, args.media, args.music, args.config)
+    addons = bound_addons()
+    print('[mwscript] bound placements: Morrowind.esm%s' % (
+        ''.join(', ' + m + "'s own" for m in addons) or ' only (the base game alone)'), flush=True)
+    inputs = unit_inputs(args.data_files, args.media, args.music, args.config, addons=addons, presented=presented)
+    if args.presented_receipt:
+        print('[mwscript] presented districts: %s (a PositionCell into one goes outdoors to its moved place)'
+              % (', '.join(sorted(p['cell'] for p in presented.values())) or 'none converted whole by this build'),
+              flush=True)
     note_compiler_read()
     key =hashlib.sha256(json.dumps(inputs, sort_keys=True).encode()).hexdigest()
     target = args.out / 'id1' / NAME
@@ -165,7 +233,8 @@ def main(argv=None):
         (args.out / 'mwscript-report.json').write_text(json.dumps(report, indent=1) + '\n', encoding='utf-8',
                                                        newline='\n')
     else:
-        report = build(args.data_files, args.media, args.music, args.out, args.config)
+        report = build(args.data_files, args.media, args.music, args.out, args.config, addons=addons,
+                       presented=presented)
         if cache:
             cache.store(cache.key(key, {}), target, {'report': report})
     receipt = {'unit_key': key, 'inputs': inputs, 'cache': result, 'sha256': sha(target), 'bytes': target.stat().st_size}
@@ -181,6 +250,11 @@ def main(argv=None):
               report['scripts'], len(report['not_compiled']), report['bytes'], report['sha256'][:12],
               report['bindings'], m['sounds']['mapped'], m['sounds']['names'], m['voices']['mapped'],
               m['voices']['names'], m['music']['mapped'], m['music']['names'], result), flush=True)
+    ba = report.get('bound_addons')
+    if ba:   # EXPANSION-SCRIPTS-NOT-ATTACHED-66
+        print("[mwscript] the expansions' own scripted placements bound: %s (of them items their holders carry: %s)" % (
+            ', '.join('%s %d' % kv for kv in ba['rows'].items()),
+            ', '.join('%s %d' % kv for kv in (ba.get('held') or {}).items())), flush=True)
     t = report.get('tables')
     if t:   # EXPANSION-SCRIPT-LIMITS-66: what the engine allocates for the scripts, counted from every master
         c = report.get('tables_counted') or {}

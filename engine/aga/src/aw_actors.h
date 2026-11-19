@@ -55,6 +55,16 @@ extern void (*aw_actors_levelled_spawned)(edict_t *ent, unsigned hash);
  * AW_ActorsPlacedTick: the summon itself spawns them while its effect lasts. */
 #define AW_ACTORS_SUMMONED 0xE00000U
 #define AW_ACTORS_SUMMONED_SLOTS 0x100U
+/* Actors dbg spawn made (DBG-SPAWN-MENU-67; aw_mwhost.c AW_MwscriptSpawn): AW_ACTORS_SPAWNED | slot, content file index
+ * 14 past the summons' slots. Their row places them as they spawn; AW_ActorsPlacedTick never spawns them again, so a
+ * spawned actor stays while its place is loaded and does not come back (the next spawn in its slot forgets the row). */
+#define AW_ACTORS_SPAWNED 0xE10000U
+#define AW_ACTORS_SPAWNED_SLOTS 0x100U
+/* DBG-SPAWN-MENU-67: every base of the actor table that spawns a living actor (its text's classname aw_npc: an NPC or a
+ * creature the build has a model for), in the table's order: EACH gets the record id (aw_source_id), the name (netname,
+ * "" none) and the kind (0 NPC, 1 creature). The texts are read in chunks of the file and none is kept. The bases given,
+ * -1 when there is no table or no memory for a chunk. */
+int AW_ActorsBaseEach (void (*each)(void *ctx, const char *id, const char *name, int kind), void *ctx);
 /* REFERENCE's row (a placed or a summoned key): placed here, at LOCAL (this map's units) facing YAW; the row is made
  * new (1 kept, 0 refused). */
 int AW_ActorsPlaceRow (unsigned reference, const float local[3], float yaw);

@@ -1344,6 +1344,20 @@ def stage_dependencies(steps, skipped=()):
         # the CHIM world leaves out the harvest placements and adds the town flora (payload parity)
         if name == 'chim':
             deps = (*deps, *(d for d in ('harvest', 'world-flora-assets', 'world-survey') if d in names))
+        # the module tribunal-mournhold (tools/build.py tribunal_mournhold_commands, MOURNHOLD-EXTERIOR-CELLS-66): its
+        # data folder waits for nothing; its world reads that folder and the census palette; the image installs the
+        # world and, with the scripts, reads the folder's receipt (--presented-receipt: the districts' doors, arrivals,
+        # jail markers and PositionCell moves). No other stage waits for the module, and it waits for no world stage.
+        if name == 'tribunal-mournhold-data':
+            deps = ()
+        if name == 'tribunal-mournhold':
+            deps = tuple(d for d in ('census', 'tribunal-mournhold-data') if d in names)
+        # (and the focus table and the placed item list: a district's placed things keyed outdoors, tools/build.py
+        # TRIBUNAL_MOURNHOLD_READERS)
+        if name in ('image', 'mwscript', 'focus', 'item-models') and 'tribunal-mournhold-data' in names:
+            deps = (*deps, 'tribunal-mournhold-data')
+        if name == 'image' and 'tribunal-mournhold' in names:
+            deps = (*deps, 'tribunal-mournhold')
         if name == 'image' and 'seam-audit' in names:
             deps = (*deps, 'seam-audit')
         missing = set(deps) - set(names)
@@ -1372,7 +1386,45 @@ def create_run(run, metadata):
         (run / name).write_text(text, encoding='utf-8', newline='\n')
 
 
+def plan_argument_problems(steps):
+    """[problem] of a stage plan whose commands cannot be written to build-state.json: an argument that is not a
+    string (a Path appended to a command outside the builder's tool() helper), or a command that does not serialize.
+    The build writes its plan to build-state.json when the first stage starts; a Path there stopped a build minutes
+    in, after its stages had started (BUILD-NPCLOD-PATH-ARG-34, seen again with the module tribunal-mournhold's
+    receipt option). [] for a plan of strings."""
+    problems = []
+    for name, command in steps:
+        for index, part in enumerate(command):
+            if not isinstance(part, str):
+                problems.append('stage %s: argument %d (%r, after %r) is a %s, not a string'
+                                % (name, index, str(part), str(command[index - 1]) if index else '', type(part).__name__))
+    if not problems:
+        try:
+            json.dumps([[name, list(command)] for name, command in steps])
+        except (TypeError, ValueError) as exc:
+            problems.append('the stage plan does not serialize: %s' % exc)
+    return problems
+
+
+def state_text(receipt):
+    """The text of build-state.json. A value that is not JSON (a path object in a record) is written as its text,
+    never refused: the save that records a build's end must not fail, or the run's state reads "running" for a build
+    that has ended (a build stopped by exactly such a save kept that state, and the stall watcher took it for a
+    build at idle; BUILD-NPCLOD-PATH-ARG-34). The plan's own arguments are checked strictly before the first stage
+    (require_plan_arguments)."""
+    return json.dumps(receipt, indent=2, default=str) + '\n'
+
+
+def require_plan_arguments(steps):
+    """Stop before the first stage when the plan cannot be written to build-state.json (plan_argument_problems)."""
+    problems = plan_argument_problems(steps)
+    if problems:
+        raise ValueError('The stage plan cannot be recorded (every command argument must be a string; '
+                         'BUILD-NPCLOD-PATH-ARG-34):\n  ' + '\n  '.join(problems[:20]))
+
+
 def execute_parallel(steps, run, metadata, root):
+    require_plan_arguments(steps)
     dependencies = stage_dependencies(steps, plan_skipped(metadata))
     budget = int(metadata['compiler_jobs'])
     create_run(run, metadata)
@@ -1386,7 +1438,7 @@ def execute_parallel(steps, run, metadata, root):
 
     def save():
         temporary = run / 'build-state.tmp'
-        temporary.write_text(json.dumps(receipt, indent=2) + '\n')
+        temporary.write_text(state_text(receipt))
         temporary.replace(run / 'build-state.json')
 
     def drain(state):
@@ -1462,10 +1514,11 @@ def execute_parallel(steps, run, metadata, root):
     profile = build_profile.start(run, steps, metadata, dependencies)
     from resource_plan import SchedulerGuard   # key-neutral module (build_cache.INSTRUMENTATION_MODULES)
     guard = SchedulerGuard(budget, metadata.get('resource_plan_units'), parents=metadata.get('resource_plan_parents'))
-    from resource_plan import alone_hold
+    from resource_plan import alone_hold, tail_stages, TAIL_SECONDS
     alone_stages = list(metadata.get('resource_plan_alone') or ())
     heavy_stages = list(metadata.get('resource_plan_heavy') or ())
     alone_said = [()]
+    tail_since, tail_said = {}, [()]
     # live supervisor (key-neutral modules): free cores to queued work, underuse named (BUILD-STAGE-ALLOWANCE-STUCK-43)
     from stage_watch import StageWatch, lend_shares
     import build_digest
@@ -1483,7 +1536,21 @@ def execute_parallel(steps, run, metadata, root):
             if alone_stages:
                 # BUILD-CHIM-POOL-MEMORY-THROTTLE-59: a stage the plan runs alone gets the memory without the other
                 # memory-heavy stages; they wait and run at full width after it
-                hold, order = alone_hold([item[1][0] for item in ready], list(active), alone_stages, heavy_stages)
+                # a running heavy stage down to its last one or two units (its pools' live status, never its plan
+                # estimate) no longer keeps the alone stage waiting (resource_plan.tail_stages)
+                tail = tail_stages({n: watch.demand.get(n) for n, s in active.items() if s['parallel']},
+                                   tail_since, time.monotonic())
+                waiting = [item[1][0] for item in ready if item[1][0] in alone_stages]
+                released = tuple(sorted(n for n in tail if n in heavy_stages and n not in alone_stages)) \
+                    if waiting else ()
+                if released and released != tail_said[0]:
+                    print('Scheduler: %s %s down to one or two running units with none queued for %d s or more: %s '
+                          'no longer waits for %s' % (', '.join(released), 'is' if len(released) == 1 else 'are',
+                                                      TAIL_SECONDS, ', '.join(waiting),
+                                                      'it' if len(released) == 1 else 'them'), flush=True)
+                tail_said[0] = released
+                hold, order = alone_hold([item[1][0] for item in ready], list(active), alone_stages, heavy_stages,
+                                         tail)
                 by_name = {item[1][0]: item for item in ready}
                 ready = [by_name[n] for n in order if n not in hold]
                 said = tuple(sorted(hold))

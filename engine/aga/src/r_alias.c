@@ -887,6 +887,40 @@ static int AW_PoseBox (const model_t *model, const aliashdr_t *hdr, int frame, b
     return 0;
 }
 
+/* MAGIC-SHELL-EGG-STYLE-67: an alias entity's drawn box in its own space (map units, its scale on each axis applied,
+ * x across, y along, z up from its origin): a skeletal model's box of the pose it was last drawn in (AW_PoseBox, the
+ * cull's own box), else its frame's box. 0 when the model is not in the cache (never read from disk here: the cache
+ * pointer itself, what Cache_Check returns, without touching its age; the host tests link this file without it). */
+int R_AliasEntityBox (const entity_t *e, float lo[3], float hi[3])
+{
+    aliashdr_t	*hdr;
+    mdl_t		*mdl;
+    byte		pose[6];
+    const byte	*bmin, *bmax;
+    int			f, k;
+    float		s;
+    if (!e || !e->model || e->model->type != mod_alias || !(hdr = (aliashdr_t *)e->model->cache.data))
+        return 0;
+    mdl = (mdl_t *)((byte *)hdr + hdr->model);
+    if (mdl->numframes <= 0)
+        return 0;
+    f = hdr->aw_skel ? 0 : e->frame;
+    if (f < 0 || f >= mdl->numframes)
+        f = 0;
+    bmin = hdr->frames[f].bboxmin.v;
+    bmax = hdr->frames[f].bboxmax.v;
+    if (hdr->aw_skel && AW_PoseBox (e->model, hdr, AW_SkelEntityKey (e->model, hdr, e->frame, e->angles[YAW], NULL, NULL),
+                                    pose))
+        bmin = pose, bmax = pose + 3;
+    for (k=0 ; k<3 ; k++)
+    {
+        s = R_AliasAxisScale (e, k);
+        lo[k] = (bmin[k] * mdl->scale[k] + mdl->scale_origin[k]) * s;
+        hi[k] = (bmax[k] * mdl->scale[k] + mdl->scale_origin[k]) * s;
+    }
+    return 1;
+}
+
 void R_AliasSetupFrame (void)
 {
     int				frame;

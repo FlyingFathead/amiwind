@@ -80,9 +80,25 @@ def prepare(data_files,scene,out,qbsp,vis,light,jobs=None,vis_mode='fast'):
     # --room-small-parts off: every part as authored).
     from room_map_parts import apply_room_small_parts
     small_parts=apply_room_small_parts(prepared,index)
+    # prepare_room_models drew the listed source shapes as the original draws them (room_map_shapes: the masts and the
+    # other shapes with collision kept whole, the table bands as boxes; --room-shapes off: reduced like the rest). The
+    # receipts go to the report, then the check that every
+    # collision piece the original draws keeps drawn faces at its place: a standing one without them is an invisible
+    # post and stops the stage (with --room-shapes off, the method before, it is only printed), the low ones are
+    # reported (drawn_collision, PRISON-SHIP-FLOOR-STUCK-67).
+    room_shapes={index['models'][mi]['source']:{k:record[4][k] for k in ('whole_shapes','box_shapes') if k in record[4]}
+                 for mi,record in sorted(prepared.items()) if 'whole_shapes' in record[4]}
+    from drawn_collision import check_room
+    from room_map_env import room_shapes as room_shapes_mode
+    drawn,message=check_room(prepared,index)
+    print('drawn collision: %d models, %d pieces, %d drawn by the original, %d without drawn faces (%d standing)'%(
+        drawn['models'],drawn['pieces'],drawn['source_drawn'],drawn['lost'],drawn['standing']),flush=True)
+    if message and room_shapes_mode()=='on':raise ValueError('Invisible collision in the prison ship hold (drawn_collision):\n'+message)
+    if message:print('drawn collision with --room-shapes off (the method before), not refused:\n'+message,flush=True)
     report=append_meshes(base,out/'prison.bsp',parts,out/'id1/gfx/palette.lmp',centre=(0,0),lighting=lighting,jobs=jobs,
                          retain_dressing=interior_dressing(),prepared_models=prepared)
     report['shell_bevels']=shell_bevels;report['small_parts']=small_parts
+    report['room_shapes']=room_shapes;report['drawn_collision']=drawn
     from collision_index import index_model_collision
     report['collision_index'] = index_model_collision(out/'prison.bsp', shell['number'])
     # The shell's faces in draw tiles with their own boxes, so the engine's per-model frustum test leaves out the

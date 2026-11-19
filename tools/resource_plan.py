@@ -652,18 +652,48 @@ def plan(steps, running, jobs, got, gathered, reuse_from=None, stair_walk=None, 
     return doc
 
 
-def alone_hold(ready, active, alone, heavy):
+TAIL_UNITS = 2          # a stage with this many units running or fewer, and none queued, is in its tail
+TAIL_SECONDS = 60.0     # for this long, so a gap between two passes of a stage is not taken for its tail
+
+
+def tail_stages(demand, since, now, units=TAIL_UNITS, seconds=TAIL_SECONDS):
+    """The running stages that are down to their TAIL: by their pools' own live status (DEMAND: {stage:
+    tools/pool_status.py read() or None}, as the stage watch samples it) they have had 1 to UNITS units running and
+    none queued for SECONDS or more. Such a stage holds one or two workers' memory, whatever its plan estimate says,
+    and more cores cannot speed it up (each unit is one process). SINCE ({stage: when its tail was first seen}) is
+    kept between calls by the caller and updated here. A stage whose pools say nothing (None), that has units queued,
+    or that runs no unit at all (a serial phase of its main process, whose memory is not known from here) is never a
+    tail. Seen in a build: the stage of Mournhold's districts ran two single-core stair collision units for minutes
+    while the outdoor world stage, which runs alone, waited for it on 2 of 24 cores (CHIM-MESH-STAIR-UNIT-SLOW-67)."""
+    tail = set()
+    for name in list(since):
+        if name not in demand:
+            del since[name]
+    for name, status in demand.items():
+        running = int(status.get('running') or 0) if status is not None else 0
+        if status is not None and not status.get('more') and 1 <= running <= units:
+            since.setdefault(name, now)
+            if now - since[name] >= seconds:
+                tail.add(name)
+        else:
+            since.pop(name, None)
+    return tail
+
+
+def alone_hold(ready, active, alone, heavy, tail=()):
     """(the READY stages held back now, the READY stages in start order) for stages the plan runs alone
     (BUILD-CHIM-POOL-MEMORY-THROTTLE-59). ALONE: the stages that run alone; HEAVY: the memory-heavy stages (every alone
     stage is one). While an alone stage runs, or is ready and waits for the memory-heavy stages still running to end,
     no other memory-heavy stage starts; an alone stage starts only with no other memory-heavy stage running; alone
-    stages start first. Light stages are never held. Without ALONE nothing is held and the order is kept."""
+    stages start first. Light stages are never held. Without ALONE nothing is held and the order is kept.
+    TAIL (tail_stages): a running memory-heavy stage that is down to its last one or two units no longer keeps an
+    alone stage waiting; it still counts as running for every other rule."""
     alone, heavy = set(alone or ()), set(heavy or ()) | set(alone or ())
     if not alone:
         return set(), list(ready)
     held = set()
     running_alone = [n for n in active if n in alone]
-    running_heavy = [n for n in active if n in heavy]
+    running_heavy = [n for n in active if n in heavy and (n in alone or n not in set(tail or ()))]
     waiting_alone = [n for n in ready if n in alone]
     for name in ready:
         if name in alone:

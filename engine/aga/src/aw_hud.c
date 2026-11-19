@@ -324,6 +324,7 @@ void Sbar_Draw(void) {
     if(key_dest==key_console)return;
     /* DIALOGUE-BACKDROP-HUD-60: the dialogue screen stands on plain black: no status bars, compass or names behind it
      * (the debug lines below stay for checks) */
+    /* (the light test corridor draws no status bar at all: screen.c SCR_AWFullView, LIGHTTEST-MAP-67) */
     if(!(aw_ui_dialogue_backdrop && aw_ui_dialogue_backdrop())){
         AW_UIHud();
         compass();

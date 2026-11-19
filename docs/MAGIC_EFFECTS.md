@@ -1,14 +1,21 @@
 # Magic effects
 
-_Last updated with AmiWind v0.0.66-dev2 (14 November 2026)._
+_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [What it shows](#what-it-shows)
+  - [Which sound plays](#which-sound-plays)
+  - [Shell shapes](#shell-shapes)
 - [How it is made](#how-it-is-made)
+  - [In step with the cast (v0.0.66)](#in-step-with-the-cast-v0066)
 - [Console](#console)
 - [Casting (v0.0.61)](#casting-v0061)
+  - [Characters cast too (v0.0.66)](#characters-cast-too-v0066)
+  - [Magic items (v0.0.61)](#magic-items-v0061)
+  - [Summoning (v0.0.62)](#summoning-v0062)
+  - [Starting spells (v0.0.61)](#starting-spells-v0061)
 
 <!-- contents end -->
 
@@ -37,14 +44,15 @@ them, what the effects do and how enchanted items work, which are on by default 
   with a lit torch or a held light the readied-magic hands showed the fist of hand-to-hand beside it. Every image
   checks this on the data it ships (`tools/ready_hands.py`, run by the image step): the spell stances' open hands
   against the fists, on both first-person paths, and the image stops if the two do not differ.
-- **The orb**: the translucent sphere in the spell's colour that wraps the caster while casting and the character
-  a spell lands on, made from the effect's own shell texture with the effect's own hit model (a shield's body-shaped
-  shell, levitation's rings) drawn into it from the front. On the character a spell lands on it follows them and,
-  for the effects whose record keeps their hit visual for the whole duration (shields, levitation, light ...), stays
-  for that duration (`dbg cast NAME dur SECONDS`; 8 seconds by default), as in OpenMW; seen from the player's own
-  eyes it is a faint veil; `dbg cast orb 0|1|2|3` picks the type to compare: 0
-  the first prototype (the cast glow), 1 the bubble, 2 the bubble with small sprites swirling on its radius (the
-  default), 3 the swirling sprites only.
+- **The shell**: the original's egg-shaped shell in the spell's colour that wraps the caster while casting and the
+  character a spell lands on, from the feet to just above the head (see "Shell shapes" below), worn with the
+  effect's own texture, with the effect's own hit model (levitation's rings, the lightning, the restoration stars)
+  drawn into it in its place on the body. On the character a spell lands on it follows them and, for the effects
+  whose record keeps their hit visual for the whole duration (shields, levitation, light ...), stays for that
+  duration (`dbg cast NAME dur SECONDS`; 8 seconds by default), as in OpenMW. Seen from the player's own eyes it
+  is a faint tint of the effect's colour over the view (`dbg cast view veil` brings back the earlier veil, a sprite
+  before the eye); `dbg cast orb 0|1|2|3` picks the type to compare: 0 the first prototype (the cast glow), 1 the
+  bubble, 2 the bubble with small sprites swirling on its radius (the default), 3 the swirling sprites only.
 - **Hand glow**: a small cloud of sparks before the caster's hands, in the colours of the spell's particle texture.
 - **Cast**: the school's cast effect around the caster: its particles rising from the feet and a glowing orb as tall
   as the caster (seen from outside), or the burst before the hands (first person), and a glow sprite on each hand.
@@ -78,12 +86,42 @@ draws one sprite either way, at the same cost per pixel):
 
 | Shape | Name | What it looks like |
 |---|---|---|
-| 0 | egg (the default) | the effect's own hit model seen from the front: for the shield an upright "cosmic egg" about one and a half times as tall as wide, reaching from the feet to above the head, as in the original |
+| 0 | egg (the default) | the original's "cosmic egg" for every effect: the Shield effect's hit model (`e\magic_hit_S.nif`), an upright shell about one and a half times as tall as wide, from the feet to above the head, worn with the effect's own texture and colour |
 | 1 | sphere | a round, dotted see-through bubble in the effect's colour, strongest at its rim, with the hit model's pattern laid in (the first shell of v0.0.54, kept as its own shape for spells and effects that want it) |
 
 The shape is chosen with `dbg cast shell egg|sphere` (saved with the orb type) or for one cast with
-`dbg cast NAME ... shape sphere`. Shells seen close (the player's own seen from behind, the first-person veil) use
-a finer 64-pixel copy of the same shape.
+`dbg cast NAME ... shape sphere`. Shells seen close (the player's own seen from behind) use a finer 64-pixel copy of
+the same shape.
+
+**Where the egg comes from (v0.0.67).** Among all the magic effect visuals in the game data, only the shields' hit
+models are shells around the body: `e\magic_hit_S.nif` (Shield), `e\fire_shield.nif`, `e\lightning_shield.nif` and
+`e\frost_shield.nif`, each one textured shell about 100 units wide and 150 to 167 tall. The other effects' hit
+models are particles, lightning rods, rings or a column. Before v0.0.67 each effect's egg was its own hit model's
+outline, so the nine effects whose hit model has only particles (fire, frost, poison, drain, paralyze, light, dispel,
+turn undead, summon) fell back to the round dotted sphere. The image step now bakes every effect's egg from the
+Shield's hit model, and lays the effect's own textured hit model into it at its place on the body. The build report
+(`magic-effects.json`) names the egg's model and, per effect, what its shell was made from.
+
+**Where it stands on a character (v0.0.67).** The engine follows OpenMW's rule for an effect model on an actor
+(`apps/openmw/mwrender/animation.cpp`, `Animation::addEffect`):
+
+- The model stands at the actor's feet, at the actor's own scale. For the player this is the race's height; for a
+  character it is the reference's scale.
+- A creature's model is also fitted to the creature's own size. It is scaled by the largest of its width, its
+  length and half its height, over 64 units, when that is above 1.
+- A creature shorter than 128 units has its model lowered by the difference (a flying one by a twentieth of it).
+- A creature that is wider than it is tall has its model lowered by its height over 128.
+
+The creature's size is the box of the pose it is drawn in. Before v0.0.67 every shell was sized from the collision
+box, which is the same human-sized box for every actor. A larger creature's shell, such as Dagoth Ur's, then
+wrapped only the middle of its body.
+
+**Seen from the player's own eyes (v0.0.67).** A held shell on the player shows in first person as a faint tint of
+the effect's colour over the view, through Quake's own palette shift. It fades out at the shell's end. The earlier
+veil was a shell sprite just before the eye: its coarse dots grew into a grid of squares across the view, and it
+went on drawing after a switch to third person. That veil is kept as a choice: `dbg cast view veil`, back with
+`dbg cast view tint`, saved. Whether the player's own shell shows as first person or third person is now decided
+every frame.
 
 ## How it is made
 
@@ -129,6 +167,7 @@ release.
 | `dbg cast NAME npc` | the actor most in front of you (within 600 units) casts NAME at you |
 | `dbg cast orb 0` ... `3` | the orb type (see above; saved) |
 | `dbg cast shell egg` / `sphere` | the shell shape of the effect set (see below; saved) |
+| `dbg cast view tint` / `veil` | your own held shell seen from your eyes: a tint of its colour (the default) or the earlier veil (saved) |
 | `dbg cast NAME ... shape egg` / `sphere` | the shell shape for this one cast |
 | `dbg cast NAME ... dur SECONDS` | how long the hit shell stays on the character the spell lands on |
 | `dbg cast NAME area FEET` | a larger area burst |
@@ -237,7 +276,18 @@ shields, the iron shardaxe among them, were refused); Constant Effect items are 
   or `aw_magic select ID` in the console; a scroll needs no charge to be selected), ready magic and press the
   attack button (or `dbg cast now`): it is cast without a success roll, paying its charge as above (a Cast Once item
   is used up instead); Self effects on the player, Touch on the actor in reach, Target as a bolt. A selected item and
-  a selected spell exclude each other, as in the original.
+  a selected spell exclude each other, as in the original. Since v0.0.67 a Cast Once scroll is also cast by its Use
+  in the inventory window (E, Enter or a double-click; the window closes first): the same cast, without selecting it,
+  refused while a script keeps magic switched off. The console prints `Used <name> (cast once): N effects, M left.`
+  for each item cast this way or from the Magic window (see [INVENTORY.md](INVENTORY.md)).
+
+For tests, `dbg give spell` (v0.0.67) gives the player spells and powers of the game data as the scripts' AddSpell
+does, saved with the game: alone it opens a list box of them by name with Spells and Powers buttons (type to search,
+Enter learns one); `dbg give spell ID` learns one by its record id; `dbg give spell all` learns every listed one in
+its base form; `dbg give spell list [N]` prints page N of the list (20 a page) on the console. The list is the spells
+the build's actor table holds (every spell a person, a creature, a script, the starting rule or a trap names), of the
+kinds a player can know and cast; abilities, blights, diseases and curses are not given. The player's list keeps at
+most 255 changes and the Magic window lists 32 rows, so `all` shows those limits (PLAYER-SPELL-CAP-58).
 - **Constant Effect**: a worn item's effects are active while it is worn and end when it comes off (each magnitude
   rolled once when it is put on): a ring of Fortify Agility 30 takes Agility from 30 to 60 on and back to 30 off. They
   are kept in saved games and set again from what is worn after a load. The worn Constant Effect items of non-player

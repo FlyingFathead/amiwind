@@ -47,7 +47,10 @@ def selected_cells(data_files, masters=None, merged_dir=None):
     if is_base_only(masters):
         return source_cells(path)
     cells, digest = _master_cells(path)
-    grid = base_grid(child_ci(Path(data_files), BASE_MASTER))
+    base = child_ci(Path(data_files), BASE_MASTER)
+    if str(base) not in _GRIDS:
+        _GRIDS[str(base)] = base_grid(base)        # read once a process (layer_cells asks for it again)
+    grid = _GRIDS[str(base)]
     return [c for c in cells if c in grid], digest
 
 
@@ -133,7 +136,28 @@ def residual(box, towns):
     return parts
 
 
-def ocean_routing(selected, ocean_cells, mapped):
+_GRIDS = {}
+
+
+def layer_cells(kinds, data_files, masters=None):
+    """The CHIM region cells of KINDS ({cell: kind}) that lie outside the base game's exterior grid and are no open
+    ocean: the cells only an expansion adds, and the cells an interior that behaves like an exterior is presented as
+    (tools/presented_exterior.py: Mournhold's districts). No open-world map exists for them and the world survey
+    does not plan them; each gets a directory row appended after every existing row
+    (chim.ocean_runtime.append_layer_rows), so no existing row or name moves. With the base game alone there is
+    none, and the base game file is not read."""
+    from mwad.masters import BASE_MASTER, is_base_only, selected_masters
+    from mwad.paths import child_ci
+    if not kinds or is_base_only(selected_masters(masters)):
+        return []
+    path = child_ci(Path(data_files), BASE_MASTER)
+    if str(path) not in _GRIDS:
+        _GRIDS[str(path)] = base_grid(path)
+    grid = _GRIDS[str(path)]
+    return sorted(tuple(c) for c, kind in dict(kinds).items() if kind != 'ocean' and tuple(c) not in grid)
+
+
+def ocean_routing(selected, ocean_cells, mapped, layer_cells=()):
     """(routing cells, problems): the one rule for CHIM cells taken as open ocean (kind 'ocean': no LAND record),
     shared by the exterior checklist (make), the world terrain planner (prepare_world_regions.prepare) and the
     regions preflight (tools/build.py, in seconds before any stage). selected: every CHIM region cell; mapped: the
@@ -141,34 +165,48 @@ def ocean_routing(selected, ocean_cells, mapped):
     heights). An ocean cell with a row is replaced in place like any land region cell (its classic map is not
     made; its CHIM frame map takes the row); only an ocean cell without one gets an appended routing row
     (chim.ocean_runtime.append_routing_rows). Every selected land/seabed cell must have a row
-    (CHIM-OCEAN-CELL-RECORD-ROUTING-43)."""
+    (CHIM-OCEAN-CELL-RECORD-ROUTING-43), except the LAYER_CELLS (layer_cells above): they get rows of their own
+    kind, appended by the caller, and are not part of the routing cells returned here."""
     selected, mapped = {tuple(c) for c in selected}, {tuple(c) for c in mapped}
     ocean = {tuple(c) for c in ocean_cells}
+    layer = {tuple(c) for c in layer_cells}
     problems = []
+    stray = sorted(layer - selected)
+    if stray:
+        problems.append('%d layer cell(s) are not selected for CHIM (%s)'
+                        % (len(stray), ' '.join('%d,%d' % c for c in stray)))
+    both = sorted(layer & ocean)
+    if both:
+        problems.append('%d layer cell(s) are also taken as ocean (%s)'
+                        % (len(both), ' '.join('%d,%d' % c for c in both)))
+    mapped -= layer        # a caller that reads the merged master sees an expansion's own cells: they have no map
     loose = sorted(ocean - selected)
     if loose:
         problems.append('%d cell(s) taken as ocean are not selected for CHIM (%s)'
                         % (len(loose), ' '.join('%d,%d' % c for c in loose)))
-    unmapped = sorted(selected - mapped - ocean)
+    unmapped = sorted(selected - mapped - ocean - layer)
     if unmapped:
         problems.append('%d CHIM region cell(s) without an open-world map that are not open ocean (%s)'
                         % (len(unmapped), ' '.join('%d,%d' % c for c in unmapped)))
     return sorted((ocean & selected) - mapped), problems
 
 
-def make(cells, chim_cells, towns=(), master_sha256=None, *, ocean_cells=()):
-    """One row per original exterior LAND; partially covered cells name the BSP remainder."""
+def make(cells, chim_cells, towns=(), master_sha256=None, *, ocean_cells=(), layer_cells=()):
+    """One row per original exterior LAND; partially covered cells name the BSP remainder. LAYER_CELLS: the CHIM
+    region cells outside the base game's grid (layer_cells above), each a chim-region row of its own, listed under
+    "layer_cells"; without any the checklist is exactly the one before."""
     cells = [tuple(c) for c in cells]
     selected = [tuple(c) for c in chim_cells]
     if len(cells) != len(set(cells)) or len(selected) != len(set(selected)):
         raise ValueError('Duplicate exterior cell owner')
-    routing, problems = ocean_routing(selected, ocean_cells, cells)
+    routing, problems = ocean_routing(selected, ocean_cells, cells, layer_cells)
     if problems:
         raise ValueError('Exterior checklist: ' + '; '.join(problems))
     extra_ocean = set(routing)
+    extra_layer = {tuple(c) for c in layer_cells}
     selected = set(selected)
     rows = []
-    for x, y in sorted(set(cells) | extra_ocean):
+    for x, y in sorted(set(cells) | extra_ocean | extra_layer):
         box = (x * 2048, y * 2048, (x + 1) * 2048, (y + 1) * 2048)
         overlaps = [t['owner'] for t in towns if subtract(box, t['core']) != [box]]
         rest = residual(box, towns)
@@ -179,6 +217,7 @@ def make(cells, chim_cells, towns=(), master_sha256=None, *, ocean_cells=()):
                      'bsp_core': [list(p) for p in rest] if kind == 'bsp' else []})
     return {'format': FORMAT, 'master_sha256': master_sha256, 'towns': list(towns), 'cells': rows,
             **({'ocean_cells': [list(c) for c in sorted(extra_ocean)]} if extra_ocean else {}),
+            **({'layer_cells': [list(c) for c in sorted(extra_layer)]} if extra_layer else {}),
             'summary': {kind: sum(r['format'] == kind for r in rows)
                         for kind in ('bsp', 'chim-region', 'chim-town')},
             'interiors': 'Independent; no interior is selected, retired or converted by this checklist.'}
@@ -194,9 +233,10 @@ def validate(value):
     if value.get('format') != FORMAT:
         raise ValueError('Invalid exterior checklist format')
     ocean = {tuple(c) for c in value.get('ocean_cells', [])}
-    expected = make([r['cell'] for r in value['cells'] if tuple(r['cell']) not in ocean],
+    layer = {tuple(c) for c in value.get('layer_cells', [])}
+    expected = make([r['cell'] for r in value['cells'] if tuple(r['cell']) not in ocean | layer],
                     [r['cell'] for r in value['cells'] if r['format'] == 'chim-region'],
-                    value['towns'], value['master_sha256'], ocean_cells=ocean)
+                    value['towns'], value['master_sha256'], ocean_cells=ocean, layer_cells=layer)
     if value != expected:
         raise ValueError('Exterior checklist is inconsistent')
     return value
@@ -275,7 +315,9 @@ def classify_regions(plan, entries, master_sha256, chim_cells, *, before_ocean_r
     planned = {tuple(r['cell']): r for r in plan['cells']}
     expected_cells = set(planned)
     if before_ocean_routing:
+        # the rows the world terrain planner appends itself: the routing rows of open-sea cells and the layer cells'
         expected_cells -= {tuple(c) for c in plan.get('ocean_cells', [])}
+        expected_cells -= {tuple(c) for c in plan.get('layer_cells', [])}
     if {tuple(e['cell']) for e in entries} != expected_cells:
         raise ValueError('Terrain survey cells differ from the exterior checklist')
     selected = {c for c, row in planned.items() if row['format'] == 'chim-region'}

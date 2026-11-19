@@ -68,7 +68,20 @@ typedef struct {
     float idle;           /* camera.lua idleTimer */
     float distance;       /* third_person.lua baseDistance (game units) */
     float orbit_yaw, orbit_pitch;   /* the camera's turn around the player (preview, vanity) */
+    int locked;           /* dbg setpov: the locked mode + 1 (0 not locked): no key, timer or script changes it */
 } aw_view_t;
+/* dbg setpov (FP-TORCH-HAND-REGRESSION-67, the maintainer 2026-11-18: a debug switch that forces the view and locks it
+ * in with a message, for the test stills): MODE AW_VIEW_FIRST, AW_VIEW_THIRD or AW_VIEW_VANITY locks the view in it
+ * (the idle timer, Toggle POV, the wheel and the view commands no longer change it); -1 unlocks. Pure. */
+void AW_ViewLock(aw_view_t *v,int mode);
+/* The locked mode, or -1. Pure. */
+int AW_ViewLockedMode(const aw_view_t *v);
+/* A race or sex swap (dbg race, FP-ARMS-NO-MODEL-SLOT-67): the body's and the first-person arms' part models of the old
+ * one released at once (aw_view.c), both sets assembled again at the next frame that draws them; prints the model
+ * table before and after. */
+void AW_ViewPartsUnload(void);
+/* 1 = RACE (a race id) and sex are a beast race by the body recipe, 0 not, -1 unknown (DBG-RACE-SWAP-67). */
+int AW_ViewRaceBeast(const char *race,int female);
 
 void AW_ViewRulesDefault(aw_view_rules_t *r);
 void AW_ViewReset(aw_view_t *v,const aw_view_rules_t *r);
@@ -79,10 +92,29 @@ void AW_ViewPOVTap(aw_view_t *v,const aw_view_rules_t *r);
 /* One frame of the idle clock and the vanity orbit (camera.lua updateIdleTimer + updateVanity):
  * input = any key, mouse or movement this frame; allowed = vanity may start (alive, in game, enabled). */
 void AW_ViewIdle(aw_view_t *v,const aw_view_rules_t *r,int input,int allowed,float dt);
+/* One frame of an orbit's hold on the view (the preview and vanity orbits: the mouse turns the camera, not the
+ * player): VIEW (pitch, yaw, roll: the client's view angles) stays at ANCHOR, the player's heading, and what VIEW moved
+ * from it this frame turns the camera (orbit_yaw, orbit_pitch). ENTERED: the orbit began this frame, its anchor is the
+ * view now. FORCED: the game turned the player this frame (a script's SetAngle on the player, an arrival's facing,
+ * aw_view, aw_aim: the server's set-angle message): that is the player's new heading, so it becomes the anchor and the
+ * camera starts again from it (VIEW-VANITY-UNDOES-SET-VIEW-67; OpenMW apps/openmw/mwrender/camera.cpp Camera::setMode,
+ * instantTransition: leaving an orbit the camera takes the player's own rotation, which a script's turn has set). */
+void AW_ViewOrbitHold(aw_view_t *v,float view[3],float anchor[3],int entered,int forced);
 /* May the vanity orbit run: switched on (or started by hand), a player body, and no combat playground or Arena
  * fight: the orbit's full view skips the playground's drawing, which also runs its clock (the sounds mode went
  * silent after 30 s without input, CREATURE-SOUNDS-CLIFFRACER-SILENT-58). */
 int AW_ViewVanityAllowed(int enabled,int body,int arena);
+/* PLAYER-VANITY-WALK-STUCK-67: what the player body's animation state lives through besides the body itself: the view
+ * mode (first, third, the Toggle POV orbit, the vanity orbit, death), the movement type (walking, noclip), swimming,
+ * whether play has the keys (a menu, the dialogue window or the console over it), whether the body is drawn. After
+ * an idle vanity orbit the walk and run stayed stuck until a map load re-made the state; now a change of any of these
+ * restarts it as a load does (AW_ViewBodyRestart). SIG with valid 0 (a new map) always counts as a change. 1 when NOW
+ * differs from LAST; LAST becomes NOW. */
+typedef struct {int valid,mode,movetype,swimming,playing,drawn;} aw_view_body_sig_t;
+int AW_ViewBodySigChanged(aw_view_body_sig_t *last,const aw_view_body_sig_t *now);
+/* The body's animation clocks back to their start, as a new map leaves them: the move group (no group, the next frame
+ * picks it), the jump and landing state (none). */
+void AW_ViewBodyRestart(aw_anim_play_t *play,aw_anim_air_t *air);
 /* The wheel (camera.lua zoom): delta > 0 zooms in (10 per click in the original, here r->zoom_step). */
 void AW_ViewZoom(aw_view_t *v,const aw_view_rules_t *r,float delta);
 /* The camera stands behind the player (every mode but first person). */
@@ -119,6 +151,9 @@ void AW_ViewFrame(void);            /* once per client frame, before the view is
 int AW_ViewCamera(void);            /* replaces Chase_Update while the view is ours; 1 = done */
 void AW_ViewRoll(void);             /* the third-person and death views keep the horizon level */
 struct entity_s *AW_ViewBody(struct entity_s *ent);   /* the player's body for the drawn view entity, or NULL */
+/* the race's height scale of the player's assembled body (aw_player_parts.h), 1 without one (MAGIC-SHELL-EGG-STYLE-67:
+ * the shell on the player at the actor's own scale, as OpenMW's Npc::adjustScale scales the whole actor) */
+float AW_ViewRaceHeight(void);
 void AW_ViewInput(int key,int down);/* every key event: the idle clock, Toggle POV */
 int AW_ViewKey(int key);            /* the death prompt's keys; 1 = used */
 void AW_ViewDraw(void);             /* the death prompt */

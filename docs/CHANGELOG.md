@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
+_Last updated with AmiWind v0.0.67-dev3 (19 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.67-dev3: third snapshot of v0.0.67, 19 November 2026](#v0067-dev3-third-snapshot-of-v0067-19-november-2026)
 - [v0.0.67-dev2: second snapshot of v0.0.67, 17 November 2026](#v0067-dev2-second-snapshot-of-v0067-17-november-2026)
 - [v0.0.67-dev1: first snapshot of v0.0.67, 17 November 2026](#v0067-dev1-first-snapshot-of-v0067-17-november-2026)
 - [v0.0.66: Forward It Is, 16 November 2026](#v0066-forward-it-is-16-november-2026)
@@ -205,6 +206,72 @@ _Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.67-dev3: third snapshot of v0.0.67, 19 November 2026
+
+The third development snapshot of v0.0.67, in development ([release notes](releases/notes/RELEASE-v0.0.67-dev3.md)). Its
+headline is the first-person hands of every race, Mournhold's districts as a build module with their things and people,
+and the inventory's actions. Emulator presets: `AmiWind-v0.0.67-dev3-FS-UAE.fs-uae` and
+`AmiWind-v0.0.67-dev3-WinUAE.uae`, both with 32 MB of Fast RAM. The first-person hands of every race were seen in play on
+a test build; the other changes are fixed in source and covered by the test suite and the gate, and are still to be seen
+in play (see the release notes).
+
+**New**
+
+- Every race and sex draws its own first-person hands, in its own skin; four of the game's hand records name another
+  race's or sex's mesh, and they now draw their own, a deliberate departure from the original's data. The skins are
+  matched along each arm, so there is no steep colour step where the hand meets the wrist and the wrist the forearm
+  ([the player's body](PLAYER_BODY.md)).
+- `dbg race [N / NAME] [m / f]` swaps the player's race (by its number in the list or its name) and sex in place: the
+  stats stay, what the new race cannot wear goes back into the inventory, and the model table is read back
+  ([the player's body](PLAYER_BODY.md#debug-commands)).
+- Mournhold's five districts are a build module of their own, with their containers, items, activators, doors and people
+  keyed outdoors at their moved places; `dbg tp mournhold`, `solstheim`, `ravenrock` and `skaal` take the player to the
+  expansions' fixed places ([Mournhold notes](MOURNHOLD_NOTES.md)).
+- The scripts of 1,150 of Tribunal's and 1,178 of Bloodmoon's placed objects run, and the scripted items their people and
+  creatures carry get their scripts; the expansions' actors and stages are counted per land by a check of their own.
+- The inventory shows one action per kind of item with the Equipped tag, casts scrolls, has an item information key, and
+  marks an owned container's contents as stealing; `dbg give spell` lists and adds spells. A pick-up says what happened.
+- `dbg spawn` opens a list box over every creature and person of the build, `dbg despawn` takes the spawned one away;
+  `dbg setpov`, `dbg lighttest` and `dbg cycleitems` check held items in first and third person
+  ([item cycling](ITEM_CYCLING.md)).
+- The confirmed look book: every look and behaviour confirmed in play is a page with saved pictures and numbers, checked
+  on every development build ([the look book](LOOKBOOK.md)).
+- The model census (`tools/model_census.py`) and the mesh converter (`tools/mesh_convert.py`: OBJ+MTL both ways, any unit)
+  ([model census](MODEL_CENSUS.md), [mesh converter](MESH_CONVERT.md)); a replacement made for one model is used wherever
+  it is placed.
+
+**Fixed**
+
+- A race or sex swap or an outfit change releases the parts that are no longer drawn at once; before, after a few
+  changes in one place the first-person arms turned into an old hand model with holes and the held light was not
+  drawn (FP-ARMS-NO-MODEL-SLOT-67). In third person the High Elf man draws his own upper legs.
+- Spell effects show the original's egg-shaped shell sized to each character, and the player takes a short red hue when
+  hurt.
+- Creatures move and fight by the original's rules (the nix-hound's own animations, the defender's side-step only where
+  the original has it); the cliff racer is whole again.
+- Dialogue: no empty rank words for people without a faction, six conditions read as the original reads them, Goodbye
+  greyed while an answer waits for Continue; every topic's answer is checked against the original's filter rules.
+- The dock guard walks the middle of the pier to his post, also after a load; the birthsign window explains every sign.
+- The prison ship hold's masts and the table's iron bands are drawn as the original draws them.
+- The map's World tab opens on the player with the explored land in view, and the map shows only visited places.
+- One focus under the crosshair (a door behind a person is no longer aimed at), and one shared layout for menus and
+  message boxes with a check that fails a text or button out of its box.
+- No error in play ends the game: the place again, else the newest autosave, else the previous map.
+- A teleport that lands far below its asked height waits for the floor, so Mournhold's Great Bazaar should no longer land
+  under the water (fixed in source).
+- A screen recording of a stalled emulator session stays playable.
+
+**Builder and tools**
+
+- A plain build in a workspace that holds earlier builds reuses their unchanged stages by default and says what it
+  reuses and what it makes again.
+- Earlier checks: the stage plan's arguments in the first second, the presented districts and every frame map's sky in
+  the first minute.
+- The frame message's cost is measured; [the page](performance/NET_FRAME.md) holds the two methods and the rule that
+  picks the default.
+- Every bug register entry has its report page, made by the register tool; the tool and the pregate refuse an entry
+  without one.
 
 ## v0.0.67-dev2: second snapshot of v0.0.67, 17 November 2026
 

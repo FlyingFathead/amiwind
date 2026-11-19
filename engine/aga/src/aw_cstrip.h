@@ -47,6 +47,13 @@ int AW_CStripCell(const aw_cstrip_list_t *list,int x,int y,int left,int top,int 
  * of an owned container; FROM non-NULL: a Take All, "Took 5 items from Tarhiel". Shown only in the AmiWind name-label
  * style; the original and OpenMW 0.51 show no text for a take from a container (the item's own sound is all). */
 int AW_CStripTakeLine(char *out,int size,const char *name,int count,int stolen,const char *from,int total);
+/* CONTAINER-WINDOW-SURVIVES-PLACE-CHANGE-67: the window belongs to the place it opened in. 1 (close it) when the map is
+ * another (WORLD_NOW is not WORLD_OPEN) or the player stands more than AW_CSTRIP_PLACE_MOVE map units from AT_OPEN,
+ * where it opened (a teleport: the window holds the player's keys, so only the game moves him that far). OpenMW closes
+ * its container window when the container is no longer available (apps/openmw/mwgui/container.cpp
+ * ContainerWindow::onReferenceUnavailable); the original pauses the world under it. */
+#define AW_CSTRIP_PLACE_MOVE 64.0f
+int AW_CStripPlaceChanged(const void *world_open,const void *world_now,const float at_open[3],const float at_now[3]);
 /* aw_cstrip.c: the strip in the game (keys before the bindings, drawn over the view, the mouse while open), reached
  * through the hooks AW_CStripInit sets (quakedef.h). */
 int AW_CStripActive(void);

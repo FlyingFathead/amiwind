@@ -1,0 +1,22 @@
+# The look book's session start (tools/lookbook.py puts it before the first page of every session): a full image
+# started with --map seyda, then Hors after the census at Seyda Neen's centre (aw_debug_hors 0: menus and controls on,
+# released, so items, equipping and teleports work), first person, the debug HUD on and the headlamp on (geometry
+# pictures). Resident command names, not the dbg words, so an image back to v0.0.65 runs the same session.
+# Every page starts from here or from where the page before it left the player, and leaves the view in first person.
+emu deterministic=1
+wait 8
+cmd developer 1
+cmd dbg all on
+cmd dbg headlamp on
+mark
+cmd aw_debug_hors 0
+saw 30 Created Hors
+wait 20
+waitfor screen 60 game
+boxes
+cmd aw_camera first
+# the idle vanity camera off: in a scripted session nothing touches the keys, and after its delay it turns the view into
+# an orbit around the player (stills named first came out as third-person views, 2026-11-18); every first- or
+# third-person still is also preceded by a check of the camera mode by number (tools/lookbook.py)
+cmd aw_camera vanity off
+wait 2

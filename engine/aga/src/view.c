@@ -538,6 +538,38 @@ qboolean V_CheckGamma (void)
 
 
 
+/* DAMAGE-RED-HUE-67: the screen's red hue when the player takes damage, the original's hit overlay as Quake's damage
+ * palette shift. OpenMW (mwgui/windowmanagerimp.cpp WindowManager::activateHitOverlay) shows the original's
+ * textures\bm_player_hit_01 over the whole screen (textures\player_hit_01 over its middle without Bloodmoon) at full
+ * strength on every loss of health (a blow, a spell, a fall, lava, drowning) and fades it out over half a second. That
+ * texture, read from the game data on 18 November 2026: its colour 129 0 0 (alpha-weighted), its mean opacity 0.155
+ * over the screen, so 40 of 256 here. Any drop of the player's health between two frames of one map starts it. */
+#define HIT_HUE_R		129
+#define HIT_HUE_G		0
+#define HIT_HUE_B		0
+#define HIT_HUE_PERCENT	40
+#define HIT_HUE_SECONDS	0.5f
+static float	damage_drop = 150;	/* 256ths a second the damage shift fades: Quake's 150, the hit hue's 80 */
+static int		hit_health = -32768;
+static double	hit_time;
+static struct model_s	*hit_world;
+static void V_HitHue (void)
+{
+    int health = cl.stats[STAT_HEALTH];
+    if (hit_health != -32768 && cl.worldmodel == hit_world && health < hit_health && cl.time >= hit_time
+        && cl.time - hit_time < 1)
+    {
+        cl.cshifts[CSHIFT_DAMAGE].destcolor[0] = HIT_HUE_R;
+        cl.cshifts[CSHIFT_DAMAGE].destcolor[1] = HIT_HUE_G;
+        cl.cshifts[CSHIFT_DAMAGE].destcolor[2] = HIT_HUE_B;
+        cl.cshifts[CSHIFT_DAMAGE].percent = HIT_HUE_PERCENT;
+        damage_drop = HIT_HUE_PERCENT / HIT_HUE_SECONDS;
+    }
+    hit_health = health;
+    hit_time = cl.time;
+    hit_world = cl.worldmodel;
+}
+
 /*
 ===============
 V_ParseDamage
@@ -553,6 +585,7 @@ void V_ParseDamage (void)
     float	side;
     float	count;
 
+    damage_drop = 150;	/* Quake's own damage flash fades at its own rate */
     armor = MSG_ReadByte ();
     blood = MSG_ReadByte ();
     for (i=0 ; i<3 ; i++)
@@ -674,8 +707,13 @@ void V_SetContentsColor (int contents)
 V_CalcPowerupCshift
 =============
 */
+int (*aw_view_tint)(int rgb[3], int *percent);
 void V_CalcPowerupCshift (void)
 {
+    /* AmiWind has no Quake power-ups: the slot carries the player's own held magic shell seen from his eyes, a tint of
+     * the effect's colour (aw_magic.c; MAGIC-SHELL-EGG-STYLE-67) */
+    if (aw_view_tint && aw_view_tint (cl.cshifts[CSHIFT_POWERUP].destcolor, &cl.cshifts[CSHIFT_POWERUP].percent))
+        return;
     if (cl.items & IT_QUAD)
     {
         cl.cshifts[CSHIFT_POWERUP].destcolor[0] = 0;
@@ -816,7 +854,7 @@ void V_UpdatePalette (void)
     }
 
 // drop the damage value
-    cl.cshifts[CSHIFT_DAMAGE].percent -= host_frametime*150;
+    cl.cshifts[CSHIFT_DAMAGE].percent -= host_frametime*damage_drop;
     if (cl.cshifts[CSHIFT_DAMAGE].percent <= 0)
         cl.cshifts[CSHIFT_DAMAGE].percent = 0;
 
@@ -888,6 +926,7 @@ void V_UpdatePalette (void)
     /* The framebuffer retains its already displayed water/damage/gamma colours
      * until the destination is ready. Force a fresh world palette on release. */
     if(AW_LoadingFrozen()){frozen_palette=true;return;}
+    V_HitHue ();
     V_CalcPowerupCshift ();
     V_ScreenFadeUpdate ();
 
@@ -909,7 +948,7 @@ void V_UpdatePalette (void)
     }
 
 // drop the damage value
-    cl.cshifts[CSHIFT_DAMAGE].percent -= host_frametime*150;
+    cl.cshifts[CSHIFT_DAMAGE].percent -= host_frametime*damage_drop;
     if (cl.cshifts[CSHIFT_DAMAGE].percent <= 0)
         cl.cshifts[CSHIFT_DAMAGE].percent = 0;
 
@@ -1426,6 +1465,7 @@ void V_RenderView (void)
         /* PHOTO-CROSSHAIR-51: nothing over a clean frame: photo mode (its crosshair 0), the
          * hidden HUD (Ctrl+Alt+H, UI-HUD-TOGGLE-KEY-51), the vanity and dbg cam orbits and death. */
         int clean = AW_PlayerDead () || aw_hud_hidden || (aw_view_orbiting && aw_view_orbiting ());
+        clean = clean || AW_LightTestActive ();   /* LIGHTTEST-MAP-67: nothing over the light test corridor */
         /* Inspection uses the rendered camera centre, in either perspective; cosmetic
          * crosshair offsets must not move it. It is the player's crosshair (Options style,
          * crosshair on/off), so it follows the same rules (OPTIONS-CROSSHAIR-STYLE-48). */

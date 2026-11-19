@@ -210,6 +210,72 @@ class TextureTests(unittest.TestCase):
         raw = M.bubble_bytes(self.glow(), [128, 0, 128], self.palette(), shell=(colour, strength, side, zc))
         self.assertEqual(M.read_sprite(raw), (4, 32, 32))
 
+    def egg(self):
+        # an upright egg like the Shield's hit model (e\magic_hit_S.nif: 101 x 147, from z -2.7 to 144.2): a
+        # 16-sided ring of quads from the feet to above the head, widest at the middle
+        verts, uv, tris = [], [], []
+        heights = [-2.7, 30, 70.75, 110, 144.2]
+        widths = [10, 42, 50.6, 42, 10]
+        for j, (z, r) in enumerate(zip(heights, widths)):
+            for i in range(16):
+                a = i * 2 * math.pi / 16
+                verts.append([r * math.cos(a), r * math.sin(a), z])
+                uv.append([i / 16, j / 4])
+        for j in range(4):
+            for i in range(16):
+                p, q = j * 16 + i, j * 16 + (i + 1) % 16
+                tris += [[p, q, q + 16], [p, q + 16, p + 16]]
+        return [{'texture': 'egg', 'root_first': False, 'alpha': 13, 'verts': np.array(verts, dtype=float),
+                 'uv': np.array(uv, dtype=float), 'tris': np.array(tris)}]
+
+    def test_the_original_egg_for_every_effect(self):
+        # MAGIC-SHELL-EGG-STYLE-67: the egg's frame and outline; another model baked into the egg's frame keeps its
+        # place on the body (a ring at the feet stays at the bottom); the two baked shells joined texel by texel
+        egg = self.egg()
+        side, zc = M.shell_frame(egg)
+        self.assertAlmostEqual(zc, (144.2 - 2.7) / 2, places=3)
+        self.assertAlmostEqual(side, 2 * (144.2 + 2.7) / 2 * 1.08, places=3)
+        ax, az = M.shell_ellipse(egg, side)
+        self.assertGreater(az / ax, 1.4)                                    # upright, taller than wide
+        self.assertIsNone(M.shell_frame([]))
+        white = np.full((8, 8, 4), 255, np.uint8)
+        worn = M.shell_image(egg, {'egg': white}, frame=(side, zc))
+        self.assertEqual((worn[2], worn[3]), (side, zc))
+        ring = [{'texture': 'r', 'root_first': False, 'alpha': 13,
+                 'verts': np.array([[-40, 0, 0], [40, 0, 0], [40, 0, 10], [-40, 0, 10]], dtype=float),
+                 'uv': np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=float), 'tris': np.array([[0, 1, 2], [0, 2, 3]])}]
+        own = M.shell_image(ring, {'r': white})
+        placed = M.shell_image(ring, {'r': white}, frame=(side, zc))
+        rows = lambda s: [y for y in range(64) if s[1][y].max() > 0]        # noqa: E731
+        self.assertLess(min(rows(own)), 32)                                 # its own frame: centred on itself
+        self.assertGreater(min(rows(placed)), 50)                           # the egg's frame: at the feet
+        both = M.shell_union(worn, placed)
+        self.assertTrue((both[1] >= worn[1]).all() and (both[1] >= placed[1]).all())
+        self.assertIs(M.shell_union(None, worn), worn)
+        self.assertIs(M.shell_union(worn, None), worn)
+        # the egg is read from the Shield effect's hit visual (EGG_EFFECT 3, its HVFX), not from a fixed path
+        self.assertEqual(M.EGG_EFFECT, 3)
+        saved = M.mesh_parts
+        try:
+            def fake(raw, N, geometry=None):
+                self.assertEqual(raw, b'meshes/e/magic_hit_s.nif')
+                geometry.extend(egg)
+                return 1.0, [], []
+            M.mesh_parts = fake
+            found = M.egg_of({3: {'HVFX': 'VFX_ShieldHit'}}, {'vfx_shieldhit': 'e\\magic_hit_S.nif'},
+                             lambda path: path.encode(), None)
+        finally:
+            M.mesh_parts = saved
+        self.assertEqual(found['model'], 'e\\magic_hit_S.nif')
+        self.assertEqual(found['frame'], (side, zc))
+        self.assertEqual(found['outline'], (ax, az))
+        self.assertIsNone(M.egg_of({}, {}, lambda path: b'', None))
+        # the table carries the egg's middle above the feet as the bubble's radius (the engine's place on the body)
+        effects = sample_effects()
+        effects[0]['phases']['bubble'] = {'length': 1.5, 'sprite': 'progs/awmx_02.spr', 'size': 39.66, 'radius': 17.7,
+                                          'sound': None, 'emitters': []}
+        self.assertIn('ph fire bubble 1.5 progs/awmx_02.spr 39.66 17.7 -', M.table_text(250, effects))
+
     def test_ramp_brightest_first(self):
         colours = M.ramp(self.glow(), glow=True)
         self.assertEqual(len(colours), 8)
@@ -265,10 +331,10 @@ class EngineWiringTests(unittest.TestCase):
         self.assertEqual(kit.count('float AW_AnimKitCast(edict_t *e,const char *variant)'), 2)  # and its compiled-out stub
         # the orb types to compare (0 the first prototype kept), around the caster and the target; the shared fx API
         self.assertIn('#define orb_type orb_kind()', magic)
-        self.assertIn('orb_at(c,at,c->height,t1,orb,0,c->caster==0);', magic)
+        self.assertIn('orb_at(c,at,wide,body,t1,orb,0,c->caster==0);', magic)
         # the hit shell follows its target for the spell's duration (ContinuousVfx, dbg cast ... dur S); the
-        # player's own shell and the first-person veil take the finer copy, the veil its faintest frame
-        self.assertIn('orb_at(c,at3,c->hit_height,la1,len,c->duration>0,t && t==sv_player);', magic)
+        # player's own shell takes the finer copy; the first-person veil (kept: dbg cast view veil) its faintest frame
+        self.assertIn('orb_at(c,now,wide,body,la1,len,c->duration>0,own);', magic)
         self.assertIn('AW_FxSprite(fine,eye,VIEW_VEIL*2.2f,AW_MAGIC_FADE_FRAMES-1)', magic)
         # the shell shapes of the effect set: egg (default) and sphere, saved with the orb type in aw_magic_orb
         self.assertIn('static cvar_t aw_magic_orb={"aw_magic_orb","2",true};', magic)
@@ -285,6 +351,33 @@ class EngineWiringTests(unittest.TestCase):
         catalogue = (ROOT / 'config' / 'debug-commands.txt').read_text(encoding='utf-8')
         self.assertIn('PLAYTESTING|cast|aw_magicfx|', catalogue)
         self.assertIn('VIDEO|magicfx|aw_magic_fx|', catalogue)
+
+    def test_shell_on_the_body_by_openmw_add_effect(self):
+        # MAGIC-SHELL-EGG-STYLE-67: the shell stands at the character's feet at its own scale (OpenMW 0.53
+        # mwrender/animation.cpp Animation::addEffect), the egg's middle from the table (the bubble's radius), a
+        # creature fitted to its drawn pose box; before, every shell was sized from the same human hull
+        magic = self.code('aw_magic.c')
+        self.assertIn('at[2]=f.feet+(bub->radius+f.lift)*f.k;', magic)
+        self.assertIn('return bub->sprite_size*f.k;', magic)
+        self.assertIn('R_AliasEntityBox(&cl_entities[n],lo,hi)', magic)
+        self.assertIn('AW_MagicCreatureFit(', magic)
+        self.assertIn('f->k=AW_ViewRaceHeight();', magic)
+        self.assertNotIn('own_middle(', magic)                              # the eye-based guess for the player
+        self.assertIn('int R_AliasEntityBox (const entity_t *e, float lo[3], float hi[3])', self.code('r_alias.c'))
+        self.assertIn('float AW_ViewRaceHeight(void)', self.code('aw_view.c'))
+        # the player's own shell seen from his eyes: decided every frame, a tint of the effect's colour by default
+        # through Quake's power-up palette slot, the veil kept as a choice (dbg cast view tint|veil, aw_magic_orb's
+        # hundreds)
+        self.assertIn('if(own && !chase_active.value){', magic)
+        self.assertIn('enum {VIEW_TINTED,VIEW_VEILED,VIEW_LOOKS};', magic)
+        self.assertIn('aw_view_tint=view_tint;', magic)
+        self.assertIn('if(!Q_strcasecmp(a,"view")){', magic)
+        self.assertIn('orb_store(view_look(),shell_default(),Cmd_Argv(2)[0]-\'0\');', magic)   # setters keep the rest
+        view = self.code('view.c')
+        self.assertIn('if (aw_view_tint && aw_view_tint (cl.cshifts[CSHIFT_POWERUP].destcolor, '
+                      '&cl.cshifts[CSHIFT_POWERUP].percent))', view)
+        catalogue = (ROOT / 'config' / 'debug-commands.txt').read_text(encoding='utf-8')
+        self.assertIn('view tint/veil', catalogue)
 
     def test_image_step_writes_the_table(self):
         build = (ROOT / 'tools' / 'build_aga.py').read_text(encoding='utf-8')

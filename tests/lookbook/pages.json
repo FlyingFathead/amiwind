@@ -1,0 +1,190 @@
+{
+ "schema": 1,
+ "about": "The confirmed look book (docs/LOOKBOOK.md, tools/lookbook.py): every look and behaviour the maintainer has confirmed in play, kept as a page that every development build is checked against before it is delivered. Numbers first, pictures second. Pages of kind session run in one emulator session; journey pages read a journey that runs on every build; image pages check the image's files; gate pages are data checks that run in the gate itself.",
+ "pages": [
+  {
+   "id": "HELD-LIGHT-IN-HAND",
+   "title": "A carried light (the debug torch, the glass lantern, a candle) is held in the left hand in first and in third person",
+   "what": "Every carried light sits in the left hand: the torch, the glass lantern, candles and candlesticks, drawn as themselves with their flames, in first person and in third person, with the hands raised.",
+   "confirmed": [
+    {"date": "2026-11-07", "version": "v0.0.61", "how": "seen in game on the v0.0.61 release image: the candle, the pewter candlestick and the glass lantern drawn as themselves in the hand in first person (HELD-LIGHT-ALWAYS-TORCH-61)"},
+    {"date": "2026-11-18", "version": "v0.0.67-dev2", "how": "the maintainer's report of the regression: every carried light was held in the left hand in first person for many versions, and third person still holds it right"}
+   ],
+   "register": ["FP-TORCH-OUT-OF-HAND-67", "HELD-LIGHT-ALWAYS-TORCH-61", "HELD-LIGHT-NOT-IN-HAND-65"],
+   "docs": ["docs/THIRD_PERSON.md"],
+   "code": [
+    {"file": "engine/aga/src/aw_hand_models.c", "functions": ["AW_HandModelsApply", "AW_HandLightItemApply", "AW_HandItemPlace", "hand_item_on_bone"], "what": "the first-person light on the arms' shield bone, by the one held-item placement"},
+    {"file": "engine/aga/src/aw_view.c", "functions": ["hand_parts_bone_tag", "hand_parts_apply", "parts_draws", "parts_light_layer"], "what": "the arms from parts in first person (the hand's bone), the body's held light in third person"},
+    {"file": "engine/aga/src/aw_torch.c", "functions": ["held_own", "AW_HeldLight", "light_lit"], "what": "which light is held and lit"},
+    {"file": "tools/prepare_player_fp_parts.py", "functions": [], "what": "the first-person table and its light stance"},
+    {"file": "tools/held_lights.py", "functions": ["carried_place"], "what": "each light's carried place on the shield bone"}
+   ],
+   "kind": "session",
+   "status": "active",
+   "known": "FP-TORCH-OUT-OF-HAND-67",
+   "steps": "held_light_in_hand.txt",
+   "checks": [
+    "the light is the one in the left hand (aw_inventory worn) and it is lit (aw_hands: torch 1)",
+    "the view is first person, the light is in the left hand and lit, and the view looks down (at least 30 degrees) for every first-person still, each read back by number",
+    "the light's nearest vertex from the left hand it is drawn in (dbg camera held): in third person within 2.5 units, in first person within 0.5 units of the same light's third-person value"
+   ],
+   "stills": [
+    {"name": "torch-first-down", "what": "the debug torch in first person, looking down at the hands", "regions": [], "reference": false},
+    {"name": "torch-first-steep", "what": "the debug torch in first person, looking steeply down", "regions": [], "reference": false},
+    {"name": "torch-first-photo", "what": "the debug torch in first person in photo mode with the hands (the full view)", "regions": [], "reference": false},
+    {"name": "torch-third", "what": "the debug torch in third person", "regions": [], "reference": false},
+    {"name": "lantern-first-down", "what": "the glass lantern in first person, looking down", "regions": [], "reference": false},
+    {"name": "lantern-first-steep", "what": "the glass lantern in first person, looking steeply down", "regions": [], "reference": false},
+    {"name": "lantern-first-photo", "what": "the glass lantern in first person in photo mode with the hands", "regions": [], "reference": false},
+    {"name": "lantern-third", "what": "the glass lantern in third person", "regions": [], "reference": false},
+    {"name": "candle-first-down", "what": "a candle in first person, looking down", "regions": [], "reference": false},
+    {"name": "candle-first-steep", "what": "a candle in first person, looking steeply down", "regions": [], "reference": false},
+    {"name": "candle-first-photo", "what": "a candle in first person in photo mode with the hands", "regions": [], "reference": false},
+    {"name": "candle-third", "what": "a candle in third person", "regions": [], "reference": false}
+   ]
+  },
+  {
+   "id": "ROBE-WORN",
+   "title": "A worn robe is drawn on the body in first and in third person",
+   "what": "A common robe put on shows on the player's body in third person and on the arms in first person.",
+   "confirmed": [
+    {"date": "2026-11-18", "version": "v0.0.67-dev2", "how": "the maintainer's play session on the v0.0.67-dev2 image, wearing a common robe: it shows in both views (ROBE-PART-NOT-BAKED-62)"}
+   ],
+   "register": ["ROBE-PART-NOT-BAKED-62"],
+   "docs": ["docs/THIRD_PERSON.md"],
+   "code": [
+    {"file": "engine/aga/src/aw_view.c", "functions": ["parts_ready", "hand_parts_ready"], "what": "the body and the arms assembled from what is worn"},
+    {"file": "tools/prepare_player_parts.py", "functions": [], "what": "the third-person parts and their recipes"},
+    {"file": "tools/prepare_player_fp_parts.py", "functions": [], "what": "the first-person parts (a robe's own sleeves)"}
+   ],
+   "kind": "session",
+   "status": "active",
+   "steps": "robe_worn.txt",
+   "checks": [
+    "the robe is worn (aw_inventory worn) and the body is assembled from what is worn, with more slots than before it (aw_camera)",
+    "the first-person arms are assembled from parts with the robe on (aw_camera)"
+   ],
+   "stills": [
+    {"name": "robe-third", "what": "the robe on the body in third person", "regions": [], "reference": false},
+    {"name": "robe-first-down", "what": "the robe's sleeves in first person, looking down", "regions": [], "reference": false}
+   ]
+  },
+  {
+   "id": "TELEPORT-ARRIVALS",
+   "title": "A teleport to a settlement arrives on its ground, not under it, in a wall or in the air",
+   "what": "The teleport picker's places are arrived at standing on the ground: the player neither falls after the arrival nor is stuck in a solid.",
+   "confirmed": [
+    {"date": "2026-10-30", "version": "v0.0.57", "how": "the maintainer used the teleport picker between settlements and asked for it in every beta and smoke test (the settlement sweep)"}
+   ],
+   "register": ["DBG-TP-NO-FLOOR-FALLBACK-63", "TP-BEING-TRIBUNAL-FALLS-THROUGH-67"],
+   "docs": ["docs/AMIWIND_CONSOLE_COMMANDS.md"],
+   "code": [
+    {"file": "engine/aga/src/aw_scene.c", "functions": ["teleport_coordinate"], "what": "the teleport and its arrival point"},
+    {"file": "tools/tp_places_lut.py", "functions": [], "what": "the picker's places and their arrival points"}
+   ],
+   "kind": "session",
+   "status": "active",
+   "steps": "teleport_arrivals.txt",
+   "checks": [
+    "after each arrival the player's height stays within 2 units over 4 seconds (no fall) and the standing box is not in a solid (aw_pos, aw_blockers)"
+   ],
+   "stills": [
+    {"name": "arrive-balmora", "what": "the arrival in Balmora", "regions": [], "reference": false},
+    {"name": "arrive-vivec", "what": "the arrival in Vivec", "regions": [], "reference": false},
+    {"name": "arrive-aldruhn", "what": "the arrival in Ald'ruhn", "regions": [], "reference": false},
+    {"name": "arrive-suran", "what": "the arrival in Suran", "regions": [], "reference": false},
+    {"name": "arrive-khuul", "what": "the arrival in Khuul", "regions": [], "reference": false}
+   ]
+  },
+  {
+   "id": "DOCK-GUARD-POST",
+   "title": "In the opening the dock guard walks to his post by the census office door and is not caught in a pier post",
+   "what": "After the race choice the dock guard walks along the pier to his post beside the census office door, around the posts, and the player walks past him into the office.",
+   "confirmed": [
+    {"date": "2026-11-18", "version": "v0.0.67-dev2", "how": "the maintainer's report of the regression: the walk had worked from v0.0.66-dev2 (fixed there, confirmed in play by the opening journey on v0.0.66-dev5 and every journey since)"}
+   ],
+   "register": ["PIER-GUARD-WALKS-INTO-DOOR-65"],
+   "docs": ["docs/GAME_RECORDER.md"],
+   "code": [
+    {"file": "engine/aga/src/aw_intro.c", "functions": [], "what": "the opening's actors and the dock guard's walk"},
+    {"file": "engine/aga/src/aw_nav.c", "functions": [], "what": "a scripted walk round an obstacle on its last leg"}
+   ],
+   "kind": "journey",
+   "status": "active",
+   "journey": "tests/sessions/journey_opening.txt",
+   "journey_steps": [1],
+   "checks": [
+    "step 1 of the opening journey: the walk up the pier past the dock guard reaches the census office and the papers are taken (and, once the opening worker's check is in, the guard's box never overlaps a solid on his walk)"
+   ]
+  },
+  {
+   "id": "INVENTORY-HINT-PER-KIND",
+   "title": "The inventory's key line names the right action for every kind of item",
+   "what": "The key line under the inventory says equip (or unequip when worn) for weapons, armour, clothing and lights, use for potions and scrolls, read for books, eat for ingredients, and never offers equip on an item that cannot be equipped.",
+   "confirmed": [
+    {"date": "2026-11-18", "version": "v0.0.67-dev2", "how": "the maintainer's report of the regression: the equip hint had been fixed before and is missing again on items that can be equipped (EQUIP-ACTION-REGRESSION-62)"}
+   ],
+   "register": ["EQUIP-ACTION-REGRESSION-62", "INVENTORY-EQUIPPED-LABEL-67"],
+   "docs": ["docs/AMIWIND_CONSOLE_COMMANDS.md"],
+   "code": [
+    {"file": "engine/aga/src/aw_worldui.c", "functions": ["inventory_equippable", "inventory_usable", "inventory_readable"], "what": "the inventory window and its key line"},
+    {"file": "engine/aga/src/aw_inventory.c", "functions": ["AW_InventoryCanEquip"], "what": "what can be equipped"}
+   ],
+   "kind": "session",
+   "status": "draft",
+   "steps": "inventory_hint_per_kind.txt",
+   "checks": [
+    "the key line read back from the open inventory per item kind (a readout the inventory's key-hint repair adds)"
+   ],
+   "stills": [
+    {"name": "inv-weapon", "what": "the inventory on a weapon", "regions": [], "reference": false},
+    {"name": "inv-worn", "what": "the inventory on a worn piece of clothing", "regions": [], "reference": false},
+    {"name": "inv-potion", "what": "the inventory on a potion", "regions": [], "reference": false}
+   ]
+  },
+  {
+   "id": "CLIFF-RACER-WHOLE",
+   "title": "The cliff racer is drawn whole: wings joined to the body, no holes",
+   "what": "The cliff racer (and its blighted and diseased kinds, one mesh) is baked whole from its source: every source triangle on shared vertices, no open edge, the whole surface kept.",
+   "confirmed": [
+    {"date": "2026-11-18", "version": "v0.0.67-dev2", "how": "the maintainer's report of the regression: the racer had been whole since the v0.0.58 fix (CREATURE-RACER-MESH-SPIKE-58)"}
+   ],
+   "register": ["CREATURE-RACER-MESH-SPIKE-58"],
+   "docs": ["docs/ACTOR_RECORDS.md"],
+   "code": [
+    {"file": "tools/creature_library.py", "functions": [], "what": "the creature library's bake"},
+    {"file": "tools/creature_tables.py", "functions": [], "what": "the creature tables and their profiles"}
+   ],
+   "kind": "image",
+   "status": "draft",
+   "image_check": "The creature surface check of the image's creature library (tools/creature_surface.py, from the cliff racer repair): the cliff racer's model has its source's 965 triangles on 667 shared vertices, no open edge, and 100 % of the whole model's surface within 0.5 units; then a close-up still in first and third person.",
+   "checks": [
+    "965 of 965 triangles, 667 vertices, 0 open edges, the whole surface within 0.5 units of its source"
+   ]
+  }
+ ],
+ "seeds": [
+  {"what": "Held lights in the hand, first and third person", "register": ["FP-TORCH-OUT-OF-HAND-67"], "source": "the maintainer's report, 2026-11-18", "status": "written", "page": "HELD-LIGHT-IN-HAND"},
+  {"what": "A worn robe on the body in both views", "register": ["ROBE-PART-NOT-BAKED-62"], "source": "confirmed by the maintainer, 2026-11-18", "status": "written", "page": "ROBE-WORN"},
+  {"what": "Teleport arrivals on the ground", "register": ["DBG-TP-NO-FLOOR-FALLBACK-63"], "source": "the teleport picker, 2026-10-30", "status": "written", "page": "TELEPORT-ARRIVALS"},
+  {"what": "The dock guard's walk to his post in the opening", "register": ["PIER-GUARD-WALKS-INTO-DOOR-65"], "source": "reported again 2026-11-18", "status": "written", "page": "DOCK-GUARD-POST"},
+  {"what": "The inventory's key line per item kind", "register": ["EQUIP-ACTION-REGRESSION-62"], "source": "reported again 2026-11-18", "status": "written", "page": "INVENTORY-HINT-PER-KIND"},
+  {"what": "The cliff racer drawn whole", "register": ["CREATURE-RACER-MESH-SPIKE-58"], "source": "reported again 2026-11-18", "status": "written", "page": "CLIFF-RACER-WHOLE"},
+  {"what": "First-person clothing drawn on the arms: robes, long sleeves and gloves (page FP-CLOTHING-VISIBLE)", "register": ["ROBE-PART-NOT-BAKED-62"], "source": "confirmed by the maintainer, 2026-11-18, on v0.0.67-dev2", "status": "to write"},
+  {"what": "A held weapon or item sits in the hand in first and third person (page HELD-ITEM-IN-HAND)", "register": ["FP-TORCH-OUT-OF-HAND-67"], "source": "the held-light regression of 2026-11-18", "status": "to write"},
+  {"what": "The OK box of the character windows highlighted when the keys reach it", "register": ["RACE-MENU-OK-HIGHLIGHT-65"], "source": "confirmed by the maintainer (register closure)", "status": "to write"},
+  {"what": "Suran's dancers have their hair at the back of the head", "register": ["NPC-HAIR-BACK-MISSING-53"], "source": "confirmed by the maintainer (register closure)", "status": "to write"},
+  {"what": "The rock by the Seyda Neen port stands at its original rotation", "register": ["PORT-ROCK-ROTATION-23"], "source": "confirmed by the maintainer (register closure)", "status": "to write"},
+  {"what": "Shargam gro-Shagdub answers about Ralen Hlaalo after naming him (the answer choice by the original's rules)", "register": ["DIALOGUE-TOPIC-WHO-60"], "source": "confirmed by the maintainer, 2026-11-05", "status": "to write"},
+  {"what": "Sellus Gravius gives his dialogue, not only his greeting", "register": ["SELLUS-GRAVIUS-GREETING-ONLY-64"], "source": "the opening journey, step 4", "status": "to write"},
+  {"what": "After the papers the tutorial box is shown once", "register": ["TUTORIAL-BOX-SHOWN-TWICE-65"], "source": "a regression reported this week", "status": "to write"},
+  {"what": "A wandering resident does not stop and stand right by a door", "register": ["WANDER-DOOR-RULE-66"], "source": "a regression reported this week", "status": "to write"},
+  {"what": "The dialogue's answer choices against the original's filter rules for every NPC (a gate page)", "register": ["DIALOGUE-TOPIC-WHO-60"], "source": "the maintainer, 2026-11-18: the dialogue under the guard once finished", "status": "to write"},
+  {"what": "The opening: Jiub, the guard's walk, the census office (the regression tour)", "register": ["PIER-GUARD-WALKS-INTO-DOOR-65"], "source": "the regression tour asked for on 2026-11-07", "status": "to write"},
+  {"what": "The menus by the arrow keys: class and birthsign lists, their explanations", "register": ["RACE-MENU-OK-HIGHLIGHT-65"], "source": "the regression tour asked for on 2026-11-07", "status": "to write"},
+  {"what": "New Game after play leaves no state of the game before", "register": [], "source": "the regression tour asked for on 2026-11-07", "status": "to write"},
+  {"what": "Close-ups of NPCs and creatures with their open-edge counts", "register": [], "source": "the regression tour asked for on 2026-11-07", "status": "to write"},
+  {"what": "The shell of the egg-shaped magic effect drawn in the original's style", "register": [], "source": "a report of 2026-11-18", "status": "to write"},
+  {"what": "The creatures' attack table: each creature attacks with its own moves", "register": [], "source": "a report of 2026-11-18", "status": "to write"}
+ ]
+}

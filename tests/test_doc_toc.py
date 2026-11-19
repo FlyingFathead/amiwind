@@ -142,6 +142,33 @@ class RenderTests(unittest.TestCase):
         self.assertEqual(again, page if page.endswith('\n') else page + '\n')
         self.assertEqual(doc_toc.render(again), again)
 
+    def test_page_of_generated_blocks_only_ends_with_one_newline(self):
+        # DOC-TOC-BLANK-LINE-AT-EOF-67: a long report page made only of generated blocks gets its list BEFORE the
+        # category block (tools/bug_register.py requires the category section to end the page; the v0.0.67-dev3
+        # gate failed on REGISTER-WRITE-EINVAL-67 when the list went after it); the file ends with the category
+        # block and exactly one newline (the whitespace check refuses a blank line at the end), and rendering it
+        # again changes nothing.
+        def gen(name, heading, rows):
+            return (['<!-- BEGIN GENERATED %s: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->'
+                     % name, ''] + (['## ' + heading, ''] if heading else []) + rows
+                    + ['', '<!-- END GENERATED %s -->' % name, ''])
+        lines = ['# TEST-ONLY-GENERATED-67: T', '']
+        lines += gen('PERSISTING', 'PERSISTING: reported 2 times', ['- one', '- two'])
+        lines += gen('FACTS', None, ['| Fact | Value |', '| --- | --- |', '| Reported by | test |'])
+        lines += gen('TIMELINE', 'Timeline', ['- 2026-11-18: reported', '- 2026-11-19: seen again'])
+        lines += gen('CATEGORY', 'Bugs in the same category', ['- [B-%d](B-%d.md): bug %d' % (n, n, n)
+                                                                 for n in range(160)])
+        text = '\n'.join(lines[:-1]) + '\n'
+        out = doc_toc.render(text)
+        self.assertIn(doc_toc.START, out)
+        self.assertTrue(out.endswith('<!-- END GENERATED CATEGORY -->\n'), repr(out[-60:]))
+        self.assertFalse(out.endswith('\n\n'), repr(out[-60:]))
+        got = out.split('\n')
+        self.assertLess(got.index(doc_toc.END), got.index(
+            next(l for l in got if l.startswith('<!-- BEGIN GENERATED CATEGORY'))))
+        self.assertGreater(got.index(doc_toc.START), got.index('<!-- END GENERATED TIMELINE -->'))
+        self.assertEqual(doc_toc.render(out), out)
+
     def test_rerun_is_idempotent_and_strip_restores(self):
         text = doc(sub=2, body=40)
         once = doc_toc.render(text)

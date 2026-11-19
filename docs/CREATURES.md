@@ -1,11 +1,12 @@
 # Creatures: every creature of the game and what the build makes of it
 
-_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
+_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [What a creature is in the game data](#what-a-creature-is-in-the-game-data)
+- [How each creature moves and fights (v0.0.67)](#how-each-creature-moves-and-fights-v0067)
 - [The creature census (v0.0.62)](#the-creature-census-v0062)
 - [The census with the rooms' creatures (v0.0.62-dev1)](#the-census-with-the-rooms-creatures-v0062-dev1)
 - [The census of v0.0.61](#the-census-of-v0061)
@@ -29,6 +30,36 @@ The build makes one model per creature mesh, shared by every record that uses it
 placed creature outdoors is spawned from the actor table, which also rolls the levelled lists. Rooms carry their
 creatures and levelled creature points as entities the game spawns from the same table. What every record holds is listed in [ACTOR_RECORDS.md](ACTOR_RECORDS.md).
 
+## How each creature moves and fights (v0.0.67)
+
+The original's rules decide how a creature moves and fights. Only the record's two-legged flag makes a creature
+fight like a person:
+
+- **Animations.** A two-legged creature takes the shared human animation file first and then its own. Every other
+  creature takes only its own file (OpenMW `mwrender/creatureanimation.cpp`).
+- **A missing run.** A creature without a run group plays its walk when it runs. Only a creature with neither stands
+  on its idle (OpenMW `mwmechanics/character.cpp`, `refreshMovementAnims`).
+- **Attacks.** A four-legged creature strikes with its record's own attacks 1 to 3, which the original takes as the
+  chop, slash and thrust types (OpenMW `mwclass/creature.cpp`). A two-legged one fights hand to hand. The combat
+  readout names a creature's own attacks "attack 1" to "attack 3"; before v0.0.67 it said "chop", a weapon's word.
+- **Side steps.** Only NPCs and two-legged creatures side-step in a fight (OpenMW `mwmechanics/aicombat.cpp`,
+  `AiCombatStorage::updateCombatMove`). AmiWind's way of showing a miss had a missed creature slide sideways on its
+  run cycle like a person, whatever its kind. From v0.0.67 a four-legged creature only takes the miss.
+
+`tools/creature_moves.py table` writes the table of every creature record against a build's creature library: its
+flags, each group's source (its own table, the human base, its walk for a run, or idle), its attack style, whether it
+side-steps, and its mismatches. `check` fails when a row differs from the rules above. It was first run on 18 November
+2026 against the v0.0.67-dev2 build: 396 records, 42 two-legged. It found eight mismatches:
+
+- six living records (the bone and skeleton wolves, the netch bulls) ran on their idle frame although they have a
+  walk; this is fixed in v0.0.67 (`tools/creature_tables.py` gives the run its walk);
+- Almalexia and her warrior are human-shaped but not flagged two-legged in the data, and they take their attack from
+  the shared human table. The original plays their own weapon groups. This is still open.
+
+The kwama queens, Yagrum Bagarn and the Glenmoril ravens have no moving groups in their own files, and they stand on
+their idle as in the original. Dagoth Ur, Lorkhan's heart, the werewolf and Vivec are not in the creature library;
+their models come another way.
+
 ## The creature census (v0.0.62)
 
 The image step counts every creature record of Morrowind, Tribunal and Bloodmoon on every build
@@ -38,7 +69,11 @@ image places it: a map's actor row or a base of the actor table, with its model 
 reason that the config names: an expansion master the image does not read, summoned only, placed in rooms only, or
 not used by the game data at all. Each placement is checked too: an outdoor placement of a built creature is
 spawned from the actor table; a room placement is built when the room's map holds it; every levelled creature point
-of the base game's rooms must be in its room's map.
+of the base game's rooms must be in its room's map. A levelled creature point of Tribunal or Bloodmoon counts as placed
+by its reference number as the merged game data numbers it, the rule of the actor checks: in a room when the room's
+map holds it, outdoors when the actor table holds it in a converted cell. On the v0.0.66 release build that is 262 of
+the expansions' 1,126 points, all in rooms (113 of Tribunal, 149 of Bloodmoon); Bloodmoon's 864 outdoor points are
+not placed yet. Up to v0.0.67-dev1 the census counted every expansion point as not placed.
 
 The build stops on anything the census cannot account for: a creature that is not built and that no group of the
 config names (an outdoor creature the build should have made, a creature without a model, a mesh the bake refused, a

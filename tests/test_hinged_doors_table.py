@@ -190,6 +190,29 @@ class HingedDoorTable(unittest.TestCase):
         self.assertEqual((int(defines['HD_TRAPS']), int(defines['HD_TRAP_SPELLS']), int(defines['HD_TRAP_POOL'])),
                          (HINGED_TRAPS, HINGED_TRAP_SPELLS, HINGED_TRAP_POOL))
 
+    def test_an_expansion_container_trap_is_keyed_by_its_stable_id(self):
+        # REF-IDENTITY-MERGED-MASTER-66: the merged master numbers an expansion's reference master index * 2**22 + its
+        # own number; the engine looks a container's trap up by its use-table reference, the stable id (index * 2**20 +
+        # number), and a door's by the number its door rows and maps carry (the merged one)
+        from prepare_door_audio import trap_catalogue
+        tribunal = 1 << 22
+        raw = master() + record('CONT', sub('NAME', z('chest')) + sub('MODL', z('c\\x.nif')))
+        raw += cell('Hall of Winds',
+                    ref(90, 'chest', ('TNAM', z('trap_fire00'))),
+                    ref(tribunal + 23219, 'chest', ('TNAM', z('trap_fire00'))),
+                    ref(tribunal + 55, 'load_door', ('DODT', struct.pack('<6f', 0, 0, 0, 0, 0, 0)),
+                        ('TNAM', z('dread curse: health'))))
+        self.assertEqual(trap_catalogue(raw), [(40, 'poison'), (90, 'trap_fire00'), ((1 << 20) + 23219, 'trap_fire00'),
+                                               (tribunal + 55, 'dread curse: health')])
+
+    def test_the_base_game_trap_rows_do_not_move(self):
+        # the control: with the base game alone every key is the reference's own number, as before
+        from prepare_door_audio import trap_catalogue
+        raw = master() + record('CONT', sub('NAME', z('chest')) + sub('MODL', z('c\\x.nif')))
+        raw += cell('Tomb', ref(90, 'chest', ('TNAM', z('trap_fire00'))),
+                    ref(55, 'load_door', ('DODT', struct.pack('<6f', 0, 0, 0, 0, 0, 0)), ('TNAM', z('x'))))
+        self.assertEqual([n for n, _ in trap_catalogue(raw)], [40, 55, 90])
+
     def test_a_missing_authored_sound_stops_the_build(self):
         raw = door('d', 'Door', 'Nowhere') + cell('Room', ref(1, 'd'))
         with self.assertRaises(ValueError):

@@ -655,9 +655,15 @@ Read all incoming data from the server
 ===============
 */
 int cl_message_unreliable;	/* the message being parsed is a frame's update (cl_parse.c CL_ParseFault) */
+/* dbg netstat (sv_main.c): the time the client spends reading the server's messages, per frame: the last frame, the sum
+ * and the longest since the map started or dbg netstat reset, and how many frames read something
+ * (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66: what a larger frame message costs on the 68k) */
+double cl_net_parse_last, cl_net_parse_sum, cl_net_parse_max;
+int cl_net_parse_frames;
 int CL_ReadFromServer (void)
 {
 	int		ret;
+	double	parse_start = Sys_FloatTime (), parse_seconds;
 
 	cl.oldtime = cl.time;
 	if(!AW_ModalWorldFrozen())cl.time += host_frametime;
@@ -679,6 +685,12 @@ int CL_ReadFromServer (void)
 			cl_message_unreliable = 0;
 		}
 	} while (ret && cls.state == ca_connected);
+	parse_seconds = Sys_FloatTime () - parse_start;
+	cl_net_parse_last = parse_seconds;
+	cl_net_parse_sum += parse_seconds;
+	if (parse_seconds > cl_net_parse_max)
+		cl_net_parse_max = parse_seconds;
+	cl_net_parse_frames++;
 
 	if (cl_shownet.value)
 		Con_Printf ("\n");

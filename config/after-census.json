@@ -1,0 +1,14 @@
+{
+  "note": "DBG-HORS-AFTER-CENSUS-67: which of the game's own scripts make up the one required path out of the Census and Excise Office, for the bare 'dbg aw hors' (tools/mwscript/aftercensus.py). This file only SELECTS; every value the command sets is read from those scripts and from the speaker's dialogue results by the builder: each script's locals end at the last value the script sets them to, every lasting Enable/Disable switch at its last call along the path, the globals at their last Set, the doors at their Unlock, the objects at their Disable, the papers, the dagger and the ring taken, the speaker's results run. A script, a local or a statement named here that the game data does not have stops the build.",
+  "scripts": ["CharGenClassNPC", "CharGenStatsSheet", "CharGenDoorGuardTalker", "CharGenDagger", "CharGenFatigueBarrel",
+              "CharGen_ring_keley", "CharGenDoorEnterCaptain", "CharGenDialogueMessage", "CharGenDoorExitCaptain"],
+  "scripts_note": "In the order a player meets them: the clerk (class, birthsign, review), the papers, the door guard, the dagger on the back room's table, the courtyard barrel, Fargoth's ring from the courtyard barrel (the door to Sellus Gravius refuses without it), that door, Sellus Gravius, the exit door (refuses without his package; it sets CharGenState to -1). CharGenDoorExit is not on any record of the game data. Left out, as not on the required path: the bed, the stuff room's pick-up hints, the journal hint outside (it fires as the player walks out).",
+  "local_values": {},
+  "local_values_note": "A local whose after value is not the last one its script sets, as \"Script.local\": \"set local to N\" (the statement must be in the script). None today: the taken items' own scripts (the papers, the dagger, the ring) go with the items and stop at CharGenState -1.",
+  "speaker": "chargen captain",
+  "speaker_note": "Sellus Gravius: his results on the path (the papers handed in, the duties: the journal entry, the package, the directions, the disbursal, the topics) run as he runs them.",
+  "skip_functions": ["showmap"],
+  "skip_functions_note": "Results of topics off the path: ShowMap is his answer about Balmora, asked or not.",
+  "window_openers": ["enableclassmenu", "enablebirthmenu", "enablestatreviewmenu", "enablenamemenu", "enableracemenu"],
+  "window_openers_note": "These open the registration's windows; they are no lasting state."
+}

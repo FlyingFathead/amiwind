@@ -378,6 +378,9 @@ void V_UpdatePalette (void);
 void V_Register (void);
 void V_ParseDamage (void);
 void V_SetContentsColor (int contents);
+/* The power-up slot's tint while it has one (1, its colour and 256ths): the player's own held magic shell seen from his
+ * eyes (aw_magic.c sets it; NULL: none; MAGIC-SHELL-EGG-STYLE-67) */
+extern int (*aw_view_tint)(int rgb[3], int *percent);
 
 
 //

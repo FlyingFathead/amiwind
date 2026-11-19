@@ -1,5 +1,14 @@
 # HARVEST-ORGANIC-PLANTS-47: only the small mushrooms can be picked; every other harvestable plant is scenery
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.61 at 2026-11-07 02:35 +0200: flora census of the masters: 17,620 other plant and 4,883 egg sack, kollop and spore placements are still scenery; the bracket fungi on the tree trunks are now a harvest kind (HARVEST-TREE-FUNGUS-62)
+- Reported with v0.0.67-dev2 at 2026-11-18 (time not recorded): Counted on the v0.0.67-dev2 build in Tribunal's rooms: 399 plants, of which 350 are kinds the game harvests nowhere yet (125 of them in Godsreach, which is not built); the 49 small mushrooms of three rooms can be picked.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -29,6 +38,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-10-21: reported in v0.0.46
 - 2026-10-21: HARVEST-INTERIOR-PICK-47 found and fixed on a branch; INTERIOR-PLACED-ITEMS-47 and HARVEST-ORGANIC-PLANTS-47 registered: HARVEST-INTERIOR-PICK-47: in the v0.0.46 image a mushroom inside an interior is drawn but cannot be picked (checked in ...
 - 2026-11-07 02:35 +0200: seen again in v0.0.61: flora census of the masters: 17,620 other plant and 4,883 egg sack, kollop and spore placements are still scenery; the bracket fungi on the tree trunks are now a harvest kind (HARVEST-TREE-FUNGUS-62)
+- 2026-11-18: seen again in v0.0.67-dev2: Counted on the v0.0.67-dev2 build in Tribunal's rooms: 399 plants, of which 350 are kinds the game harvests nowhere yet (125 of them in Godsreach, which is not built); the 49 small mushrooms of three rooms can be picked.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -114,7 +124,7 @@ Family: Harvestable plants (`harvest`). Harvest catalogues are built by the buil
 - [CHIM-NATIVE-HARVEST-MISSING-36](CHIM-NATIVE-HARVEST-MISSING-36.md): Extra CHIM-native areas get no harvest catalogue: their plants cannot be picked
 - [ENGINE-HARVEST-MESSAGE-BOUND-35](ENGINE-HARVEST-MESSAGE-BOUND-35.md): The harvest pickup message joined lines into a fixed buffer without a bound
 - [ENTITY-TRACKER-HARVEST-32](ENTITY-TRACKER-HARVEST-32.md): The entity tracker did not count plants placed by harvest catalogues
-- FUNGI-FLOATING-62 (no report page): Bracket fungi float in the air on the Bitter Coast with no tree under them
+- [FUNGI-FLOATING-62](FUNGI-FLOATING-62.md): Bracket fungi float in the air on the Bitter Coast with no tree under them
 - [HARVEST-BITTERCOAST-29](HARVEST-BITTERCOAST-29.md): Only one of three nearby Bitter Coast mushrooms reportedly usable
 - [HARVEST-CHIM-REGION-LOSS-41](HARVEST-CHIM-REGION-LOSS-41.md): Harvestable plants lost on CHIM region cells: six cells place fewer or different plants than the baseline
 - [HARVEST-EXPANSION-FLORA-62](HARVEST-EXPANSION-FLORA-62.md): The plants placed by the Tribunal and Bloodmoon masters are not harvestable
@@ -128,7 +138,7 @@ Family: Harvestable plants (`harvest`). Harvest catalogues are built by the buil
 - [HARVEST-SEYDA-STALE-32](HARVEST-SEYDA-STALE-32.md): v0.0.31 ships Seyda Neen harvest catalogues made for older map versions
 - [HARVEST-SEYDA-TREE-SPRITE-BLOCKS-PICK-47](HARVEST-SEYDA-TREE-SPRITE-BLOCKS-PICK-47.md): Some mushrooms in the Seyda Neen region cannot be picked: a tree sprite blocks the pick
 - [HARVEST-TREE-FUNGUS-62](HARVEST-TREE-FUNGUS-62.md): The bracket fungi growing from the tree trunks cannot be picked
-- HARVEST-WORLD-29 (no report page): Original mushroom placement, picking and persistent state worldwide
+- [HARVEST-WORLD-29](HARVEST-WORLD-29.md): Original mushroom placement, picking and persistent state worldwide
 
 Related bugs in other categories:
 

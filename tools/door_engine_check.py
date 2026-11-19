@@ -82,6 +82,8 @@ def neighbour_walks(directory, holder, stand):
     directory: [(name, origin, core)] (chim.frame_map.world_directory)."""
     import door_audit
     frames = {n: (o, c) for n, o, c in directory}
+    if holder not in frames:
+        return []           # a frame of another world (job_lines names it): no walk in this directory
     origin, core = frames[holder]
     edges = sorted([(stand[0] - core[0], (-1, 0)), (core[2] - stand[0], (1, 0)), (stand[1] - core[1], (0, -1)),
                     (core[3] - stand[1], (0, 1))])
@@ -102,14 +104,26 @@ def neighbour_walks(directory, holder, stand):
     return out
 
 
+# A door whose region frame is not in the open-world directory this check walks (world/regions.awr): the frame of a
+# world of its own, installed as a store of its own with its own frame maps and rows file (Mournhold's districts,
+# mhNNNN: tools/chim/layer_stores.py). The check walks Vvardenfell's frames; such a door is listed with this reason
+# and never walked (DOOR-CHECK-MODULE-FRAME-MAPS-67: the check stopped an image's last step on the first such map).
+OWN_WORLD = ('its frame %s is not in the open-world directory this check walks (a frame of a world of its own, '
+             'installed as its own store): not walked here')
+
+
 def job_lines(rows, bank, directory):
     """[(row, job line or None, why not)] for the audit ROWS; BANK(map) -> parse_bank result or None."""
     out = []
+    walked = {name for name, _origin, _core in directory}
     for row in rows:
         if 'bank' not in row or not row.get('holder'):
             out.append((row, None, 'no bank row for the door (the audit: %s)' % '; '.join(row.get('problems') or [])))
             continue
         holder, box, target = row['holder'], row['bank']['box'], row['bank']['target']
+        if row.get('holder_kind') == 'region' and holder not in walked:
+            out.append((row, None, OWN_WORLD % holder))
+            continue
         room_bank = bank(target) if target and target != '-' else None
         exits = [l for l in (room_bank or {}).get('links', []) if l['reference'] == row.get('exit_reference')]
         stand = list(exits[0]['arrival']) if exits and exits[0]['target'] == holder else \

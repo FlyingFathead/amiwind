@@ -71,13 +71,23 @@ def sample_clips(events,stance='hh'):
         times.extend(np.linspace(a,b,count,endpoint=endpoint))
     return np.array(times),clips
 
-def appearance_parts(kinds, race='nord', female=False):
+# FP-HANDS-PER-RACE-67: the own-mesh rule (a hand record naming another race's or sex's mesh takes the race's own) is
+# tools/player_own_skin.py, imported inside appearance_parts and never at the top of this module: the NPC bakes import
+# this module for the stance tables above, so its import-time code is part of the resident-bake, guard-torch-skip and
+# player-view unit keys (UNIT-KEY-WHOLE-FILE-63, seen again 2026-11-18: the rule's constants here re-keyed all 2,323
+# stored residents although no NPC runs them; tests/test_fp_hands_per_race.py OwnSkinOutsideTheNpcKeys).
+
+def appearance_parts(kinds, race='nord', female=False, assets=None):
     """Owned race/sex skin, with explicit same-race first-person fallbacks.
 
     First-person skin for the requested sex wins. Arms may fall back to its
     third-person skin, then (for females) male first/third-person skin. This
     follows OpenMW's documented arm fallback order; never borrow another race.
+    With ASSETS (the game's files), a hand whose record names another race's or
+    sex's mesh takes the race's own one (player_own_skin.own_hand_mesh,
+    FP-HANDS-PER-RACE-67); 'record_mesh' keeps the mesh the record names.
     """
+    from player_own_skin import own_hand_mesh
     race=str(race).casefold()
     if race not in kinds['RACE'] or type(female) is not bool:
         raise ValueError('Unknown hand appearance')
@@ -98,9 +108,13 @@ def appearance_parts(kinds, race='nord', female=False):
             continue
         rank=min(c[0] for c in candidates)
         _,identifier,body=max((c for c in candidates if c[0]==rank),key=lambda c:c[1])
+        named=text(body,'MODL')
+        # judged by the record's own sex: a woman's fallback to the man's record keeps the man's mesh (the rule's)
+        mesh=own_hand_mesh(named,race,bool(first(body,'BYDT')[2]&1),assets)
         for slot in slots:
-            parts.append({'slot':slot,'attach':PART_NAMES[slot],'filter':PART_NAMES[slot],
-                          'id':identifier,'mesh':text(body,'MODL')})
+            row={'slot':slot,'attach':PART_NAMES[slot],'filter':PART_NAMES[slot],'id':identifier,'mesh':mesh}
+            if mesh!=named:row['record_mesh']=named
+            parts.append(row)
     return parts
 
 
@@ -124,7 +138,7 @@ def bake_appearance(assets, kinds, palette, race='nord', female=False, budget=32
     the same 28-frame contract for every stance."""
     if budget not in (320,480):raise ValueError('Hand budget must be 320 or 480')
     if topology not in ('reduced','source'):raise ValueError('Unknown hand topology profile')
-    race=str(race).casefold();parts=appearance_parts(kinds,race,female)
+    race=str(race).casefold();parts=appearance_parts(kinds,race,female,assets)
     if skeleton is None:skeleton=Skeleton(assets,'meshes/base_anim.1st.nif')
     times,clips=sample_clips(skeleton.events,stance)
     shapes,materials,textures=assemble(assets,{'parts':parts,'weight':1,'height':1},skeleton,times)

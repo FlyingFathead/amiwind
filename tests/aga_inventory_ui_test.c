@@ -20,9 +20,44 @@
 #include "aw_harvest.h"
 static aw_harvest_t h;
 #include "aga_harvest_fixture.h"
-typedef struct {int x,y,width;char value[160];} layout_text_t;
-static layout_text_t layout_text[64];
+typedef struct {int x,y,width,color;char value[160];} layout_text_t;
+static layout_text_t layout_text[128];   /* the window and the information box over it */
 static int layout_capture,layout_count,layout_mode,layout_noactions;
+/* INVENTORY-EQUIP-HINTS-67: one carried item of every kind the window tells apart (the catalogue rows as
+ * tools/prepare_inventory.py writes them), listed by name in this order */
+static int kinds_mode;
+static aw_inventory_item_t kinds[7];
+static void kinds_fill(void){
+    int i;memset(kinds,0,sizeof(kinds));
+    for(i=0;i<7;i++)strcpy(kinds[i].model,"progs/inv/fixture.mdl");
+    strcpy(kinds[0].id,"a_ring");strcpy(kinds[0].name,"A Ring");kinds[0].category=AW_INV_CLOTHING;
+    kinds[0].slots=(1U<<AW_SLOT_LRING)|(1U<<AW_SLOT_RRING);kinds[0].flags=AW_INV_EQUIP|AW_INV_DROP|AW_INV_EQUIP_SUPPORTED;
+    kinds[1]=kinds[0];strcpy(kinds[1].id,"b_ring");strcpy(kinds[1].name,"B Ring");
+    strcpy(kinds[2].id,"c_potion");strcpy(kinds[2].name,"C Potion");kinds[2].category=AW_INV_POTION;
+    kinds[2].flags=AW_INV_ALCHEMY|AW_INV_DROP;kinds[2].alchemy_kind=AW_ALCHEMY_POTION;
+    /* a Cast Once scroll (BOOK, the enchantment's kind AW_ENCH_ONCE): Use casts it (SCROLL-CAST-64) */
+    strcpy(kinds[3].id,"d_scroll");strcpy(kinds[3].name,"D Scroll");kinds[3].category=AW_INV_BOOK;
+    kinds[3].flags=AW_INV_DROP;kinds[3].enchant_kind=AW_ENCH_ONCE;strcpy(kinds[3].enchantment,"d_scroll_en");
+    strcpy(kinds[4].id,"e_book");strcpy(kinds[4].name,"E Book");kinds[4].category=AW_INV_BOOK;kinds[4].flags=AW_INV_DROP;
+    strcpy(kinds[5].id,"f_rock");strcpy(kinds[5].name,"F Rock");kinds[5].category=AW_INV_MISC;kinds[5].flags=AW_INV_DROP;
+    strcpy(kinds[6].id,"g_root");strcpy(kinds[6].name,"G Root");kinds[6].category=AW_INV_INGREDIENT;
+    kinds[6].flags=AW_INV_ALCHEMY|AW_INV_DROP;kinds[6].alchemy_kind=AW_ALCHEMY_INGREDIENT;
+}
+#include "aw_iteminfo.h"
+/* INVENTORY-ITEM-INFO-67: a book's text as the reader's hook gives it (a fresh allocation the window frees) */
+static int book_calls;
+static char *test_book_text(const char *id){
+    char *t=(char *)malloc(4000);int k;(void)id;book_calls++;
+    if(!t)return NULL;
+    strcpy(t,"First words of the book.");
+    for(k=0;k<40;k++)strcat(t," And the book goes on for many lines more.");
+    return t;
+}
+static int cast_calls,read_calls;static char cast_id[64],read_id[64];
+static int test_cast(const aw_inventory_item_t *it){cast_calls++;strcpy(cast_id,it->id);return 1;}
+static int test_read(const char *id){read_calls++;strcpy(read_id,id);return 1;}
+extern int (*aw_worldui_cast)(const aw_inventory_item_t *it);
+extern int (*aw_worldui_read)(const char *id);
 /* Controlled shared-helper results test modal routing, not a duplicate of the
  * scrollbar algorithm. aga_ui_test.c exercises the actual shared helper. */
 static int scroll_mode,scroll_target=-1,scroll_calls,scroll_top,scroll_total;
@@ -43,8 +78,8 @@ static char layout_title[160];
 void AW_SmallStringColor(int x,int y,int width,const char *value,int color){
     legacy_inventory_text(x,y,width,value,color);
     if(layout_capture){
-        layout_text_t *entry;assert(layout_count<64);entry=&layout_text[layout_count++];
-        entry->x=x;entry->y=y;entry->width=width;
+        layout_text_t *entry;assert(layout_count<128);entry=&layout_text[layout_count++];
+        entry->x=x;entry->y=y;entry->width=width;entry->color=color;
         strncpy(entry->value,value,sizeof(entry->value)-1);entry->value[sizeof(entry->value)-1]=0;
     }
 }
@@ -77,6 +112,10 @@ static aw_inventory_item_t fixture_item;
 static int sorting;
 int AW_InventoryBootstrap(void){aw_state.inventory.initialized=1;return 1;}
 int AW_InventoryRead(const char *id,aw_inventory_item_t *out){
+    if(kinds_mode){
+        int i;for(i=0;i<7;i++)if(!strcmp(id,kinds[i].id)){*out=kinds[i];return 1;}
+        return 0;
+    }
     if(scroll_mode){
         int i;char key[32];
         for(i=0;i<12;i++){
@@ -144,7 +183,10 @@ static int uses;
 static int test_use(const aw_inventory_item_t *it){uses++;return AW_ItemAdd(&aw_state,it->id,-1)?1:0;}
 int main(void){
     static client_t client;static edict_t actor;aw_state_t before;int calls;
-    assert(!map_journal_regressions());
+    {   /* the world UI test whole (its main takes an optional part name since MAP-WORLD-TAB-BLANK-67: none here) */
+        static char name[]="aga_worldui_test",*argv[]={name,NULL};
+        assert(!map_journal_regressions(1,argv));
+    }
     key_dest=key_game;cls.state=ca_connected;sv.active=1;svs.maxclients=1;svs.clients=&client;client.edict=&actor;
     actor.v.health=100;strcpy(sv.name,"seyda");memset(&aw_state,0,sizeof(aw_state));
     memset(&fixture_item,0,sizeof(fixture_item));strcpy(fixture_item.id,"fixture_ring");strcpy(fixture_item.name,"Fixture Ring");
@@ -207,13 +249,14 @@ int main(void){
      * console, a script): the picture, the armour rating, the row mark and the list follow at the next frame, without
      * reopening (OpenMW inventorywindow.cpp updateItemView + dirtyPreview on every store change); frames with no
      * change render nothing again */
-    draw();calls=preview_calls;draw();draw();assert(preview_calls==calls && !strstr(drawn,"* Fixture Ring"));
+    /* INVENTORY-EQUIPPED-LABEL-67: the worn row's mark is the word "Equipped" (in the highlight colour), not a "* " */
+    draw();calls=preview_calls;draw();draw();assert(preview_calls==calls && !strstr(drawn,"Equipped"));
     aw_worldui_armor_rating=test_armor;armor_calls=0;draw();assert(armor_calls==1);
     assert(AW_InventoryEquip(&aw_state,&fixture_item));
-    draw();assert(preview_calls==calls+1 && armor_calls==2 && strstr(drawn,"* Fixture Ring"));
+    draw();assert(preview_calls==calls+1 && armor_calls==2 && strstr(drawn,"Equipped") && !strstr(drawn,"* Fixture"));
     draw();draw();assert(preview_calls==calls+1 && armor_calls==2);
     assert(AW_InventoryUnequip(&aw_state,fixture_item.id));
-    draw();assert(preview_calls==calls+2 && armor_calls==3 && !strstr(drawn,"* Fixture Ring"));
+    draw();assert(preview_calls==calls+2 && armor_calls==3 && !strstr(drawn,"Equipped"));
     aw_worldui_armor_rating=NULL;
     assert(!strstr(drawn,"fixture_robe"));
     assert(AW_ItemAdd(&aw_state,"fixture_robe",1));draw();assert(strstr(drawn,"fixture_robe"));
@@ -305,7 +348,8 @@ int main(void){
         AW_WorldUIKey('i',1);layout_noactions=0;placement=1;
         AW_InventoryOpen();layout_point(300,149);AW_WorldUIKey(K_MOUSE3,1);layout_draw();
         label=layout_find("Equip");assert(label);x=label->x;y=label->y;
-        assert(y>=140 && y+5<172);
+        assert(y>=124 && y+5<172);   /* INVENTORY-ITEM-INFO-67: three rows now (Equip, Drop one, Info) */
+        label=layout_find("Info");assert(label && label->y+5<172);
         layout_point(x+2,y+2);AW_WorldUIKey(K_MOUSE1,1);
         assert(AW_InventoryEquipped(&aw_state,"layout_item_5"));
         for(i=0;i<5;i++){sprintf(id,"layout_item_%d",i);assert(!AW_InventoryEquipped(&aw_state,id));}
@@ -435,6 +479,100 @@ int main(void){
         assert(AW_InventoryCountType(1,1,'5',9)==5 && AW_InventoryCountType(5,0,'2',99)==52 && AW_InventoryCountType(5,0,'2',30)==30);
         assert(AW_InventoryCountType(52,0,'\b',99)==5 && AW_InventoryCountType(7,1,'\b',99)==0 && AW_InventoryCountType(7,0,'x',99)==7);
         puts("inventory double-click: equip/unequip with the notice, the potion's box (OK, Cancel, Esc, I, keys, digits, slider, buttons, the last one) pass");
+    }
+    /* INVENTORY-EQUIP-HINTS-67 (EQUIP-ACTION-REGRESSION-62 seen again on v0.0.67-dev2, INVENTORY-EQUIPPED-LABEL-67) and
+     * SCROLL-CAST-64: every kind's action in the key line ("E/Enter equip", "E/Enter unequip", "E/Enter use", "E/Enter
+     * read", none for a plain misc item) with the drop key; a worn row says "Equipped" in the highlight colour; an
+     * action's result line belongs to its row for a few seconds and never hides another row's hint (after one Equip
+     * every other item lost its hint on dev2); Use on a Cast Once scroll closes the window and casts it; Read stays in
+     * the right button's menu beside it */
+    {
+        const layout_text_t *t;int i,gold=AW_UIColor(223,199,144),high=AW_UIColor(150,220,120);
+        static const char *const want[7]={"E/Enter equip","E/Enter equip","E/Enter use","E/Enter use","E/Enter read",NULL,"E/Enter use"};
+        kinds_fill();kinds_mode=1;layout_capture=1;layout_mode=sorting=scroll_mode=0;test_clock=400;
+        memset(&aw_state,0,sizeof(aw_state));
+        for(i=0;i<7;i++)assert(AW_ItemAdd(&aw_state,kinds[i].id,1));
+        aw_worldui_use=test_use;aw_worldui_read=test_read;aw_worldui_cast=test_cast;uses=cast_calls=read_calls=0;
+        /* the pure rule over the same rows */
+        assert(AW_InventoryItemAction(&kinds[0],0)==AW_INV_ACT_EQUIP && AW_InventoryItemAction(&kinds[0],1)==AW_INV_ACT_UNEQUIP);
+        assert(AW_InventoryItemAction(&kinds[2],0)==AW_INV_ACT_USE && AW_InventoryItemAction(&kinds[3],0)==AW_INV_ACT_CAST);
+        assert(AW_InventoryItemAction(&kinds[4],0)==AW_INV_ACT_READ && AW_InventoryItemAction(&kinds[5],0)==AW_INV_ACT_NONE);
+        assert(AW_InventoryItemAction(&kinds[6],0)==AW_INV_ACT_USE && AW_InventoryItemAction(NULL,0)==AW_INV_ACT_NONE);
+        assert(!strcmp(AW_InventoryActionWord(AW_INV_ACT_EQUIP),"Equip") && !strcmp(AW_InventoryActionWord(AW_INV_ACT_UNEQUIP),"Unequip"));
+        assert(!strcmp(AW_InventoryActionWord(AW_INV_ACT_CAST),"Use") && !AW_InventoryActionWord(AW_INV_ACT_NONE));
+        AW_InventoryOpen();
+        for(i=0;i<7;i++){   /* each row in turn: its own action, the drop key, no other row's action */
+            if(i)AW_WorldUIKey(K_DOWNARROW,1);
+            layout_draw();t=layout_find("Up/Down select");assert(t && t->y==184 && t->color==gold);
+            if(want[i])assert(strstr(t->value,want[i]));else assert(!strstr(t->value,"E/Enter"));
+            assert(strstr(t->value,"D drop"));
+        }
+        AW_WorldUIKey(K_HOME,1);
+        AW_WorldUIKey('e',1);assert(AW_InventoryEquipped(&aw_state,"a_ring")==1);
+        layout_draw();t=layout_find("Up/Down select");assert(t && strstr(t->value,"E/Enter unequip"));
+        t=layout_find("Equipped");assert(t && t->color==high && t->x+t->width<=312-24 && t->y==57);   /* row 0 */
+        assert(layout_find("A Ring")->x+layout_find("A Ring")->width<=t->x);         /* the name gives it room */
+        assert(layout_find("Equipment updated."));
+        AW_WorldUIKey(K_DOWNARROW,1);layout_draw();                                   /* the next ring: its own hint */
+        t=layout_find("Up/Down select");assert(t && strstr(t->value,"E/Enter equip") && !strstr(t->value,"unequip"));
+        assert(!layout_find("Equipment updated.") && layout_find("RMB actions"));
+        AW_WorldUIKey(K_UPARROW,1);layout_draw();assert(layout_find("Equipment updated."));   /* its row, in time */
+        test_clock+=4.1;layout_draw();assert(!layout_find("Equipment updated.") && layout_find("RMB actions"));
+        /* the scroll: the right button offers Use (its cast) and Read; E casts it and the window closes */
+        for(i=0;i<3;i++)AW_WorldUIKey(K_DOWNARROW,1);
+        layout_point(160,54+3*16+4);AW_WorldUIKey(K_MOUSE3,1);layout_draw();
+        assert(layout_find("Use") && layout_find("Read") && layout_find("Drop one"));
+        AW_WorldUIKey('e',1);
+        assert(cast_calls==1 && !strcmp(cast_id,"d_scroll") && !read_calls && !AW_InventoryActive() && key_dest==key_game);
+        /* without casting in the build (no hook), a scroll is not cast and E does nothing; Read stays */
+        aw_worldui_cast=NULL;AW_InventoryOpen();for(i=0;i<3;i++)AW_WorldUIKey(K_DOWNARROW,1);
+        layout_draw();t=layout_find("Up/Down select");assert(t && !strstr(t->value,"E/Enter"));
+        AW_WorldUIKey('e',1);assert(AW_InventoryActive() && cast_calls==1 && !read_calls);
+        aw_worldui_cast=test_cast;
+        AW_WorldUIKey(K_DOWNARROW,1);AW_WorldUIKey('e',1);
+        assert(read_calls==1 && !strcmp(read_id,"e_book") && !AW_InventoryActive());
+        AW_InventoryOpen();for(i=0;i<6;i++)AW_WorldUIKey(K_DOWNARROW,1);
+        AW_WorldUIKey('e',1);assert(uses==1 && AW_InventoryActive());                 /* the root is used */
+        AW_WorldUIKey('i',1);assert(!AW_InventoryActive());
+        aw_worldui_use=NULL;aw_worldui_read=NULL;aw_worldui_cast=NULL;kinds_mode=layout_capture=0;
+        puts("inventory hints: equip, unequip with Equipped, use, a scroll's cast, read, none; the result line keeps to its row and time pass");
+    }
+    /* INVENTORY-ITEM-INFO-67: P (the information key, named in the key line) opens the selected item's box over the
+     * window; Esc, I and OK close it and keep the window; the use key in it does the item's action (Equip) and closes
+     * it; the right button's Info opens it; a book's box shows its text (the reader's hook, read once) and scrolls
+     * without moving the list */
+    {
+        aw_iteminfo_t fake;aw_layout_t l;int i,t[4],visible;
+        kinds_fill();kinds_mode=1;layout_capture=1;layout_mode=sorting=scroll_mode=0;test_clock=500;
+        memset(&aw_state,0,sizeof(aw_state));
+        for(i=0;i<7;i++)assert(AW_ItemAdd(&aw_state,kinds[i].id,1));
+        aw_worldui_read=test_read;aw_worldui_book_text=test_book_text;book_calls=read_calls=0;
+        AW_InventoryOpen();layout_draw();assert(layout_find("P info") && layout_find("P info")->y==176);
+        AW_WorldUIKey('p',1);layout_count=0;draw();assert(layout_find("Value: 0") && AW_InventoryActive());
+        AW_WorldUIKey(K_ESCAPE,1);assert(AW_InventoryActive());layout_count=0;draw();assert(!layout_find("Value: 0"));
+        AW_WorldUIKey('p',1);AW_WorldUIKey('i',1);assert(AW_InventoryActive());   /* I in the box: back to the window */
+        layout_count=0;draw();assert(!layout_find("Value: 0"));
+        AW_WorldUIKey('p',1);AW_WorldUIKey('e',1);                                /* the box's action: Equip */
+        assert(AW_InventoryEquipped(&aw_state,"a_ring")==1 && AW_InventoryActive());
+        layout_count=0;draw();assert(!layout_find("Value: 0"));
+        /* OK, clicked where the helper lays it out for an item with an action (Unequip now) */
+        memset(&fake,0,sizeof(fake));strcpy(fake.action,"Unequip");fake.chars=1000;AW_ItemInfoLayout(&fake,&l,t,&visible);
+        AW_WorldUIKey('p',1);layout_point(l.button[0][0]+4,l.button[0][1]+4);AW_WorldUIKey(K_MOUSE1,1);AW_WorldUIKey(K_MOUSE1,0);
+        assert(AW_InventoryActive() && AW_InventoryEquipped(&aw_state,"a_ring")==1);
+        layout_count=0;draw();assert(!layout_find("Value: 0"));
+        /* the book: its text in the box, read once; End scrolls the box, not the list */
+        for(i=0;i<4;i++)AW_WorldUIKey(K_DOWNARROW,1);
+        AW_WorldUIKey('p',1);assert(book_calls==1);layout_count=0;draw();assert(layout_find("First words of the book."));
+        AW_WorldUIKey(K_END,1);layout_count=0;draw();assert(!layout_find("First words of the book."));
+        AW_WorldUIKey(K_ESCAPE,1);AW_WorldUIKey('e',1);assert(read_calls==1 && !strcmp(read_id,"e_book"));   /* E: Read */
+        /* the right button's menu ends in Info */
+        AW_InventoryOpen();layout_point(160,54+4);AW_WorldUIKey(K_MOUSE3,1);layout_draw();
+        {const layout_text_t *info=layout_find("Info");assert(info);
+         layout_point(info->x+2,info->y+2);AW_WorldUIKey(K_MOUSE1,1);AW_WorldUIKey(K_MOUSE1,0);}
+        layout_count=0;draw();assert(layout_find("Value: 0"));
+        AW_WorldUIKey(K_ESCAPE,1);AW_WorldUIKey('i',1);assert(!AW_InventoryActive());
+        aw_worldui_read=NULL;aw_worldui_book_text=NULL;kinds_mode=layout_capture=0;
+        puts("inventory information box: P, Esc, I, OK, the use key's action, the right button's Info, a book's text and its scroll pass");
     }
     return 0;
 }

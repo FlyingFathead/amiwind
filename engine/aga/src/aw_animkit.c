@@ -21,6 +21,7 @@
 #include "aw_weather.h"
 #include "aw_hand_models.h"
 #include "aw_format.h"
+#include "aw_cycleitems.h"   /* the item tester's steps after each server frame (DBG-CYCLEITEMS-67) */
 
 static cvar_t animkit={"aw_animkit","1",true};
 void AW_SkelCastSound(edict_t *e,const aw_skel_table_t *t,int group,int from,int to);    /* aw_halloween.c */
@@ -639,7 +640,7 @@ int AW_AnimKitLabel(char *out,int size) {
 #if !AW_ANIMKIT
 static void compiled_out(void) {Con_Printf("dbg animkit: this engine was built without the animation kit (AW_ANIMKIT=0).\n");}
 void AW_AnimKitInit(void) {Cmd_AddCommand("aw_animkit_cmd",compiled_out);aw_anim_kit_enabled=0;AW_SkelReleaseInit();AW_AnimPickInit();}
-void AW_AnimKitTick(void) {AW_HandsTick();}
+void AW_AnimKitTick(void) {AW_HandsTick();AW_CycleItemsFrame();}
 float AW_AnimKitCast(edict_t *e,const char *variant) {(void)e;(void)variant;return -1;}
 #else
 /* aw_magic.c: E plays its table's spellcast group for VARIANT ("self", "touch", "target"), from the variant's start
@@ -669,6 +670,7 @@ float AW_AnimKitCast(edict_t *e,const char *variant) {
 void AW_AnimKitTick(void) {
     float dt;int i,done;
     AW_HandsTick();       /* the first-person hands (aw_hand_models.c; was world.qc aw_hands_update) */
+    AW_CycleItemsFrame(); /* dbg cycleitems: one check while it runs, nothing otherwise */
     sync();
     dt=(float)(realtime-last);last=realtime;
     /* a load or a stall stands still; a slow machine's long frames still play (SKEL-RUNTIME-COST-52: on the

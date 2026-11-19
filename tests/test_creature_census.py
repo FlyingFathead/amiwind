@@ -169,6 +169,48 @@ class CreatureCensusTests(unittest.TestCase):
         for ident in ('kwama queen', 'scamp_summon', 'Shulk Egg Mine'):
             self.assertNotIn(ident, text)
 
+    def test_the_expansions_levelled_points_count_by_their_merged_numbers(self):
+        """EXPANSION-TABLES-BASE-ONLY-66: an expansion's levelled point is placed when the image places its merged
+        reference number (the place of its owning master x 2^22 + the low bits): in a room by the entity tracker,
+        outdoors by the actor table in a converted cell; up to v0.0.67-dev1 every one counted as not placed."""
+        stride = 1 << 22
+        header = record('TES3', sub('HEDR', bytes(300)) + sub('MAST', b'Morrowind.esm\0') + sub('DATA', bytes(8)))
+        tribunal = header + levelled(b'mh_lev', b'nix-hound') + \
+            room(b'Mournhold Temple: Reception Area', ref(b'mh_lev', 7)) + \
+            exterior(-20, 20, b'Felsaad Coast Region', ref(b'mh_lev', 8)) + \
+            room(b'Shulk Egg Mine', ref(b'ex_wild_lev', (1 << 24) | 22))      # edits the base game's point 22
+        masters = [('Morrowind.esm', master()), ('Tribunal.esm', tribunal)]
+        self.assertEqual(C.read_master(tribunal)['masts'], ['Morrowind.esm'])
+        self.assertEqual([p[5] for p in C.uses(masters)['levelled'] if p[0] == 'Tribunal.esm'],
+                         [stride + 7, stride + 8, 22])
+        # no tracker and no actor table: the room point 22 is in the maps' numbers (refs), the other two not placed
+        report = C.census(masters, image=image())
+        self.assertEqual(report['levelled_not_built_expansions'], 2)
+        report = C.census(masters, image=image(refs={21}))
+        self.assertEqual(report['levelled_not_built_expansions'], 3)
+        # the tracker's rooms, the actor table and the converted cell: all three placed
+        placed = image(placed_rooms={22, stride + 7}, actor_keys={stride + 8}, converted={'exterior:-20,20'})
+        report = C.census(masters, image=placed)
+        self.assertEqual(report['levelled_not_built_expansions'], 0)
+        self.assertEqual(report['totals']['levelled_built'], 2 + 3)
+        self.assertEqual(report['regions']['Felsaad Coast Region'], dict(levelled_points=1, levelled_built=1))
+        # the actor table holds it but the cell is not converted (Solstheim today): not placed
+        report = C.census(masters, image=dict(placed, converted=set()))
+        self.assertEqual(report['levelled_not_built_expansions'], 1)
+        self.assertEqual(C.check(report), [])                                 # never a stop: the expansions wait
+
+    def test_the_base_game_census_does_not_move(self):
+        """The control: with the base game alone the report is the same whatever the image knows of the expansions."""
+        before = C.census([('Morrowind.esm', master())], image=image())
+        after = C.census([('Morrowind.esm', master())],
+                         image=image(placed_rooms={1 << 22}, actor_keys={(1 << 22) + 8}, converted={'exterior:1,1'}))
+        self.assertEqual(json.dumps(before, sort_keys=True, default=sorted),
+                         json.dumps(after, sort_keys=True, default=sorted))
+        self.assertEqual(C.merged_number('Morrowind.esm', [], 21), 21)
+        self.assertEqual(C.merged_number('Bloodmoon.esm', ['Morrowind.esm', 'Tribunal.esm'], (2 << 24) | 5),
+                         (1 << 22) + 5)
+        self.assertIsNone(C.merged_number('Other.esm', [], 5))
+
     def test_config_rules(self):
         config = json.loads(C.CONFIG.read_text(encoding='utf-8'))
         with tempfile.TemporaryDirectory() as td:

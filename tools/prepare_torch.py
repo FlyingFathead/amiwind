@@ -131,7 +131,7 @@ def prepare(data_files,id1,upper_arms='hidden',race='nord',female=False,topology
     start=skeleton.events['torch: start'];stop=skeleton.events['torch: stop']
     if not np.isfinite([start,stop]).all() or not 0<stop-start<60:raise ValueError('Invalid torch animation')
     times=np.linspace(start,stop,FRAMES,endpoint=False)
-    parts=view_parts(appearance_parts(kinds,race,female),upper_arms)
+    parts=view_parts(appearance_parts(kinds,race,female,assets),upper_arms)
     # Carried lights use the original left-hand Shield Bone attachment. Unlike
     # mirrored left body parts this rigid equipment mesh must not be mirrored.
     torch_part={'slot':10,'attach':'Shield Bone','filter':'','id':'torch','mesh':mesh,'carried_light':True}

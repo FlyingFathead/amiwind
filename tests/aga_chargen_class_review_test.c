@@ -43,6 +43,12 @@ void AW_UIText(int x,int y,const char *s,int color){
     if(seen_count<64)strcpy(seen[seen_count++],s);
     if(skill_n<16){skill_x[skill_n]=x;skill_y[skill_n]=y;skill_n++;}
 }
+/* UI-CHARGEN-CLASS-FONT-67: the own class window's rows in the console font (aw_console_glyphs.c): recorded like any
+ * other text, inside the screen */
+void AW_SmallStringColor(int x,int y,int width,const char *s,int color){
+    (void)color;assert(x>=0 && y>=0 && x+width<=320 && y+5<=200 && strlen(s)<96);
+    if(seen_count<64)strcpy(seen[seen_count++],s);
+}
 /* the house button (aw_ui.c AW_UIButton): the fixture records its text box like any other text */
 void AW_UIButton(int x,int y,int w,int h,const char *s,int lit,int colour){(void)lit;AW_UITextBox(x,y,w,h,s,colour);}
 void AW_UIButtonFocus(int x,int y,int w,int h,const char *s,int focused,int colour){(void)focused;AW_UITextBox(x,y,w,h,s,colour);}

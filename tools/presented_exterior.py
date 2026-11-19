@@ -18,7 +18,10 @@ bytes), so the base game alone is never touched. The blocks come from config/pre
 block, the spacing) and the cells' names in sorted order, so the same game files always give the same places.
 
 The receipt (JSON) lists, per cell: its block, its offset, its box before the move, and the counts; the stages that
-move the player to such a cell by name (a script's PositionCell) read their position from it.
+move the player to such a cell by name (a script's PositionCell) read their position from it, through this module's
+receipt_places, is_presented and present_position: the move itself is one function (moved_position), the one the
+presented master gets, so a reader and the master cannot drift. The stage that reads this file is presented-data
+(tools/build.py presented_data_commands, with --presented-exteriors); a stage that takes these helpers reaches it too.
 
     python3 tools/presented_exterior.py --master MERGED.esm --out PRESENTED.esm --receipt RECEIPT.json
 """
@@ -136,23 +139,127 @@ def plan(cells, config):
     return out
 
 
+def moved_position(offset, x, y, z):
+    """THE MOVE of a presented cell, the one definition: x and y plus the cell's OFFSET, the height kept, and the
+    exterior grid cell the moved position falls in (each axis floor(v / CELL_UNITS)). _moved_group applies it to a
+    placement and to a door destination; the stages that read a presented cell's places later (the door table, the
+    room links, the arrivals, a script's PositionCell) through present_position. ((grid x, grid y), (x, y, z))."""
+    mx, my = x + offset[0], y + offset[1]
+    return (math.floor(mx / CELL_UNITS), math.floor(my / CELL_UNITS)), (mx, my, z)
+
+
+def receipt_places(receipt):
+    """{folded cell name: {'cell', 'block', 'size', 'offset'}} of a presented receipt: this tool's ('cells') or the
+    presented-data stage's (tools/presented_data.py, 'presented_cells', the same rows), the shape plan() gives; {}
+    for None or a receipt that presents no cell (the base game alone)."""
+    if not receipt:
+        return {}
+    out = {}
+    for row in receipt.get('cells') or receipt.get('presented_cells') or ():
+        out[row['cell'].casefold()] = {'cell': row['cell'], 'block': [int(v) for v in row['block']],
+                                       'size': [int(v) for v in row['size']],
+                                       'offset': [float(v) for v in row['offset']]}
+    return out
+
+
+def is_presented(places, cell):
+    """True when CELL (a cell name, any case) is a presented cell of PLACES (receipt_places or plan)."""
+    return bool(cell) and cell.casefold() in places
+
+
+def present_position(places, cell, position):
+    """(exterior grid cell, moved position) of POSITION (x, y, z in game units, a placement or a destination of the
+    cell's own data) in the presented cell CELL, by moved_position; None when CELL is not presented."""
+    place = places.get(cell.casefold()) if cell else None
+    if place is None:
+        return None
+    return moved_position(place['offset'], position[0], position[1], position[2])
+
+
+def cells_of_text(text):
+    """{(x, y)} of a stage command's cell list ("x,y:k ..." as tools/chim/regions.py encode_cells writes it, or bare
+    "x,y" tokens)."""
+    out = set()
+    for token in (text or '').split():
+        x, _, y = token.partition(':')[0].partition(',')
+        out.add((int(x), int(y)))
+    return out
+
+
+def build_places(receipt, cells):
+    """(places, report) the readers of one build take: the presented cells of RECEIPT (receipt_places) whose WHOLE
+    block is among CELLS (the build's CHIM cells, {(x, y)}); a district whose block the build does not convert keeps
+    today's behaviour (its doors and arrivals held back), as without a receipt. REPORT: {'built': [names], 'held':
+    [names]} for the build's log line."""
+    places, built, held = receipt_places(receipt), {}, []
+    for key, place in sorted(places.items()):
+        block = {(place['block'][0] + dx, place['block'][1] + dy)
+                 for dx in range(place['size'][0]) for dy in range(place['size'][1])}
+        if block <= set(cells or ()):
+            built[key] = place
+        else:
+            held.append(place['cell'])
+    return built, {'built': sorted(p['cell'] for p in built.values()), 'held': held}
+
+
+def present_doors(places, doors):
+    """DOORS (mwad.interior.original_doors) as the presented world has them: a door that stands in a presented cell is
+    an exterior door at its moved place; a door into one leads outdoors to its moved arrival; both keep the cell's
+    name (a bank row's label reads it). The other doors are the same objects; without PLACES, DOORS itself, so a
+    reader given its result writes exactly what it wrote before."""
+    if not places:
+        return doors
+    out = []
+    for door in doors:
+        here = door['source_interior'] and is_presented(places, door['source_cell'])
+        there = door['destination_interior'] and is_presented(places, door['destination_cell'])
+        if not (here or there):
+            out.append(door)
+            continue
+        door = dict(door)
+        if here:
+            grid, moved = present_position(places, door['source_cell'], door['position'])
+            door.update(position=list(moved), source_interior=False, source_grid=list(grid))
+        if there:
+            destination = dict(door['destination'])
+            _grid, moved = present_position(places, door['destination_cell'], destination['position'])
+            destination['position'] = list(moved)
+            door.update(destination=destination, destination_interior=False)
+        out.append(door)
+    return out
+
+
+def present_arrivals(places, arrivals):
+    """config/expansion-arrivals.json's places (tools/expansion_arrivals.py) with a presented cell's place made an
+    outdoor place at its moved point, so dbg tp to a district lands where the presented world has it; without PLACES,
+    ARRIVALS itself."""
+    if not places:
+        return arrivals
+    out = []
+    for place in arrivals:
+        if place.get('cell') and is_presented(places, place['cell']):
+            _grid, moved = present_position(places, place['cell'], place['at'])
+            place = {k: v for k, v in place.items() if k != 'cell'}
+            place.update(outdoors=True, at=list(moved))
+        out.append(place)
+    return out
+
+
 def _moved_group(group, offset, places):
     """A reference's subrecords with its position moved by OFFSET and, when its door destination names a presented
-    cell, that destination made an exterior one at its moved position. (new subrecords, grid cell or None)."""
+    cell, that destination made an exterior one at its moved position (moved_position, both). (new subrecords, grid
+    cell or None)."""
     out, cell = [], None
     target = _field(group, 'DNAM')
     target = places.get(_text(target).casefold()) if target is not None else None
     for tag, data in group:
         if tag == 'DATA' and len(data) == 24 and offset is not None:
             v = list(struct.unpack('<6f', data))
-            v[0] += offset[0]
-            v[1] += offset[1]
-            cell = (math.floor(v[0] / CELL_UNITS), math.floor(v[1] / CELL_UNITS))
+            cell, v[:3] = moved_position(offset, v[0], v[1], v[2])
             data = struct.pack('<6f', *v)
         elif tag == 'DODT' and len(data) == 24 and target is not None:
             v = list(struct.unpack('<6f', data))
-            v[0] += target['offset'][0]
-            v[1] += target['offset'][1]
+            _grid, v[:3] = moved_position(target['offset'], v[0], v[1], v[2])
             data = struct.pack('<6f', *v)
         elif tag == 'DNAM' and target is not None:
             continue                                    # an exterior destination has no cell name

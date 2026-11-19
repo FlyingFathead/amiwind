@@ -8,7 +8,26 @@
 #include "aw_inventory.h"
 #include "aw_story.h"
 #include "aw_tryalloc.h"
+#include "aw_layout.h"
+#include "aw_format.h"
 extern byte *draw_chars;
+/* UI-NO-SHARED-LAYOUT-67: what is drawn is recorded for the layout check while a check records (aw_layout.h); a
+ * button's own frame and label are recorded as the button and its label, not as a box of their own */
+static int recording_button;
+static void text_bounds(const char *text,int *left,int *top,int *right,int *bottom);
+static void record_text(int x,int y,const char *text) {
+    char line[128];int n,l,t,r,b;const char *p=text,*end;
+    if(!AW_LayoutRecording)return;
+    while(*p){
+        end=strchr(p,'\n');n=end?(int)(end-p):(int)strlen(p);
+        if(n>(int)sizeof(line)-1)n=sizeof(line)-1;
+        memcpy(line,p,n);line[n]=0;
+        text_bounds(line,&l,&t,&r,&b);
+        if(r>l && b>t)AW_LayoutRecord(AW_LAYOUT_TEXT,x+l,y+t,r-l,b-t,line);
+        if(!end)break;
+        p=end+1;y+=AW_UIHeight();
+    }
+}
 extern int scr_copyeverything;
 static byte font_storage[26624],book_font[26624],skin[4104];
 static byte *font=font_storage;
@@ -444,6 +463,7 @@ int AW_UIWidth(const char *text) {
 void AW_UIText(int x,int y,const char *text,int color) {
     int start=x,c,xx,yy,w,h,ox,oy,k,shade;const byte *m,*pixels;byte *dst;
     initialize();
+    if(AW_LayoutRecording)record_text(x,y,text);
     while(*text) {
         c=(unsigned char)*text++;
         if(c=='\n'){x=start;y+=line_height;continue;}
@@ -570,6 +590,7 @@ void AW_UIFrame(int x,int y,int w,int h) {
 }
 void AW_UIBox(int x,int y,int w,int h) {
     initialize();if(w<8 || h<8)return;
+    if(!recording_button)AW_LayoutRecord(AW_LAYOUT_BOX,x,y,w,h,NULL);
     AW_UIFill(x,y,w,h,black);AW_UIFrame(x,y,w,h);
 }
 /* THE HOUSE STYLE of every small button and box (UI-THIN-BUTTON-62, decided by the maintainer 7 November 2026): a black
@@ -585,24 +606,46 @@ void AW_UIThinInner(int x,int y,int w,int h,int *ix,int *iy,int *iw,int *ih) {
 void AW_UIThinBox(int x,int y,int w,int h,int lit) {
     int line;
     initialize();if(w<2*AW_UI_THIN_LINE+1 || h<2*AW_UI_THIN_LINE+1)return;
+    if(!recording_button)AW_LayoutRecord(AW_LAYOUT_THIN_BOX,x,y,w,h,NULL);
     line=lit?AW_UIColor(223,199,144):AW_UIColor(120,109,87);
     AW_UIFill(x,y,w,h,black);
     AW_UIFill(x,y,w,AW_UI_THIN_LINE,line);AW_UIFill(x,y+h-AW_UI_THIN_LINE,w,AW_UI_THIN_LINE,line);
     AW_UIFill(x,y,AW_UI_THIN_LINE,h,line);AW_UIFill(x+w-AW_UI_THIN_LINE,y,AW_UI_THIN_LINE,h,line);
 }
-void AW_UIButton(int x,int y,int w,int h,const char *text,int lit,int colour) {
+/* UI-OK-BUTTON-THIN-FRAME-67 (the maintainer, 17 November 2026: the regular thick frame is better, the thin outline
+ * kept as a setting): aw_ui_button_frame 1 (the default) draws every button in the regular skin frame (AW_UIBox), 0 the
+ * thin outline of UI-THIN-BUTTON-62. Saved. */
+static cvar_t button_frame={"aw_ui_button_frame","1",true};
+int AW_UIButtonThick(void){return button_frame.value!=0;}
+/* the edge a button's frame shows: the skin's, or its one-pixel stand-in when the image has no skin */
+static int thick_edge(void){return skin_ready?AW_UI_FRAME_EDGE:1;}
+/* The text area inside a button's frame, whichever frame is set (the label is centred in it) */
+void AW_UIButtonInner(int x,int y,int w,int h,int *ix,int *iy,int *iw,int *ih) {
+    int e;
+    initialize();
+    if(!AW_UIButtonThick()){AW_UIThinInner(x,y,w,h,ix,iy,iw,ih);return;}
+    e=thick_edge();
+    if(ix)*ix=x+e;
+    if(iy)*iy=y+e;
+    if(iw)*iw=w-2*e;
+    if(ih)*ih=h-2*e;
+}
+static void button(int x,int y,int w,int h,const char *text,int lit,int fill,int colour) {
     int ix,iy,iw,ih;
-    AW_UIThinBox(x,y,w,h,lit);AW_UIThinInner(x,y,w,h,&ix,&iy,&iw,&ih);
+    initialize();
+    AW_LayoutRecord(AW_LAYOUT_BUTTON,x,y,w,h,text);
+    recording_button=1;
+    if(AW_UIButtonThick())AW_UIBox(x,y,w,h);else AW_UIThinBox(x,y,w,h,lit);
+    recording_button=0;
+    AW_UIButtonInner(x,y,w,h,&ix,&iy,&iw,&ih);
+    /* lit or focused: the thick frame has no lit line, so it shows the menus' dark gold bar under the label */
+    if(fill || (lit && AW_UIButtonThick()))AW_UIFill(ix,iy,iw,ih,AW_UIColor(54,47,32));
     AW_UITextBox(ix,iy,iw,ih,text,colour);
 }
+void AW_UIButton(int x,int y,int w,int h,const char *text,int lit,int colour) {button(x,y,w,h,text,lit,0,colour);}
 /* RACE-MENU-OK-HIGHLIGHT-65: a button that has the keyboard focus shows it as the menus' rows do (the dark gold bar
  * under the text, aw_character.c AW_UI_FOCUS_FILL) besides its lit line; the lit line alone was hardly seen. */
-void AW_UIButtonFocus(int x,int y,int w,int h,const char *text,int focused,int colour) {
-    int ix,iy,iw,ih;
-    AW_UIThinBox(x,y,w,h,focused);AW_UIThinInner(x,y,w,h,&ix,&iy,&iw,&ih);
-    if(focused)AW_UIFill(ix,iy,iw,ih,AW_UIColor(54,47,32));
-    AW_UITextBox(ix,iy,iw,ih,text,colour);
-}
+void AW_UIButtonFocus(int x,int y,int w,int h,const char *text,int focused,int colour) {button(x,y,w,h,text,focused,focused,colour);}
 void AW_UIOuterFrame(void) {
     if(ui_frame.value && key_dest==key_game && cls.state==ca_connected)
         AW_UIFrame(0,0,vid.width,vid.height);
@@ -649,6 +692,17 @@ int AW_UISubtitleIs(const char *text){return !speaker[0] && !strcmp(subtitle,tex
 void AW_UIPickupNotice(const char *text,double duration) {
     AW_UISubtitle("",text,duration);
     if(pending)pending_pickup=1;else subtitle_pickup=1;
+}
+/* PICKUP-NAME-ONLY-BOX-67 (the maintainer, 17 November 2026): a pick-up says what happened, "Picked up NAME." or
+ * "Picked up COUNT NAME." (the plants' harvest line already reads so, aw_harvest_runtime.c); the original shows no
+ * message on a pick-up, only the sound (OpenMW ActionTake): aw_pickup_message 0, saved. 1 (the default) says it. */
+static cvar_t pickup_message={"aw_pickup_message","1",true};
+void AW_UIPickupTaken(const char *name,int count,double duration) {
+    char line[160];
+    if(!name || !*name || !pickup_message.value)return;
+    if(count>1)Q_snprintf(line,sizeof(line),"Picked up %ld %s.",(long)count,name);
+    else Q_snprintf(line,sizeof(line),"Picked up %s.",name);
+    AW_UIPickupNotice(line,duration);
 }
 void AW_UIVoiceSubtitle(const char *name,const char *text,double duration) {
     AW_UISubtitle(name,text,duration);
@@ -945,6 +999,24 @@ int AW_UITextPanel(int x,int bottom,int w,int min_h,const char *text,int most) {
     AW_UICenteredLinesUpTo(x,y+AW_UI_FRAME_EDGE,w,h-2*AW_UI_FRAME_EDGE,text,most);
     return y;
 }
+/* DIALOGUE-GOODBYE-BLOCKED-HINT-67: a hint box without buttons (a notice over a window: "Continue the conversation
+ * first."), centred in the area X Y W H, as wide as its text needs (at most W) and as tall as its wrapped lines' ink
+ * (at most MOST lines). The frame and its padding come from the shared layout (aw_layout.c AW_LayoutBox,
+ * AW_LayoutBoxHeight), the lines are centred by their ink (the box pipeline). Returns the box's height (0: nothing
+ * drawn). tests/aga_ui_layout_test.c measures what it draws. */
+int AW_UIHintBox(int x,int y,int w,int h,const char *text,int most) {
+    aw_layout_t l;int in=aw_layout_metrics.edge+aw_layout_metrics.pad,bw,bh;
+    initialize();
+    if(!text || !*text || w<=2*in || h<=2*in)return 0;
+    bw=AW_UIWidth(text)+2*in+2;      /* the text, the inner margins and a clear pixel at each side: one line if it fits */
+    if(bw>w)bw=w;
+    bh=AW_LayoutBoxHeight(AW_UICenteredLinesInk(bw,text,most),0,0,0);
+    if(bh>h)bh=h;
+    AW_LayoutBox(&l,x+(w-bw)/2,y+(h-bh)/2,bw,bh,0,0,NULL,0);
+    AW_UIBox(l.box[0],l.box[1],l.box[2],l.box[3]);
+    AW_UICenteredLinesUpTo(l.box[0],l.content[1],l.box[2],l.content[3],text,most);
+    return bh;
+}
 /* Sentence-aware paging without a regex engine or per-frame allocation.
  * End punctuation can be followed by quotes; decimal points and common
  * abbreviations do not end a sentence. Oversized sentences word-wrap. */
@@ -1108,6 +1180,8 @@ void AW_UIInit(void) {
     Cvar_RegisterVariable(&voice_style);
     Cvar_RegisterVariable(&animate_item_pickups);
     Cvar_RegisterVariable(&text_box_type);
+    Cvar_RegisterVariable(&button_frame);   /* UI-OK-BUTTON-THIN-FRAME-67 */
+    Cvar_RegisterVariable(&pickup_message);   /* PICKUP-NAME-ONLY-BOX-67 */
     Cmd_AddCommand("aw_text_box",text_box_command);
     Cvar_RegisterVariable(&cursor_type);
     Cmd_AddCommand("aw_dialogue_method",dialogue_command);Cmd_AddCommand("aw_dialogue_layout",layout_command);

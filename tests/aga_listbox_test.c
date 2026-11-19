@@ -115,6 +115,11 @@ int main(void){
         {float a[3]={0,0,0},e[3]={0,10,0},w[3]={-10,0,0};
          assert(AW_TpFacingYaw(a,e)>89.9f && AW_TpFacingYaw(a,e)<90.1f);
          assert(AW_TpFacingYaw(a,w)>179.9f && AW_TpFacingYaw(a,w)<180.1f);}
+        /* TP-BEING-TRIBUNAL-FALLS-THROUGH-67: 'Ten-Tongues' Weerhat's row (-7 76 -91, his feet) arrives as a door
+         * does, 16.875 over his floor (the player's box bottom -16.625 plus .25), never at the feet */
+        {float feet[3]={-7,76,-91},arrival[3];
+         AW_TpBeingArrival(feet,-16.625f,arrival);
+         assert(arrival[0]==-7 && arrival[1]==76 && arrival[2]>-74.126f && arrival[2]<-74.124f);}
     }
 
     /* the settlements table */

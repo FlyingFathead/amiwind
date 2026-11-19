@@ -1,6 +1,6 @@
 # Carried torch
 
-_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
+_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -101,6 +101,11 @@ and an optional catalogue NPC. Reuse gallery entry/return machinery, not its
 daylit environment. Compare fixed pose/time with torch off/on, radius and strength;
 preserve the player's previous equipment, game state and scene on exit.
 This is requested next-candidate work, not a command shipped in RC1.
+
+**The light test corridor (v0.0.67):** `dbg lighttest` is a second dark test space beside the torch room, a long
+empty corridor for walking with any carried light, with the game's scripts paused and nothing over the view but the
+held items' names; `dbg lighttest 1` walks it with a look down at the hands, and `dbg cycleitems` holds every item
+there in turn ([ITEM_CYCLING.md](ITEM_CYCLING.md)). The torch room stays as it is.
 
 ## RC1 interior NPC follow-up: 6 October 2026
 

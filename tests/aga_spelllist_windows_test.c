@@ -155,6 +155,17 @@ static int count_in(int colour,int x,int y,int w,int h){
     return n;
 }
 static void draw(void){memset(frame,0,sizeof(frame));AW_CharacterDraw();}
+/* UI-NO-SHARED-LAYOUT-67: the shared layout check (aw_layout.c) over what the window draws: no text or button out of
+ * its box, no button against its box's bottom edge, no two texts on top of one another; the faults printed */
+#include "aw_layout.h"
+static int layout_faults(const char *what){
+    static aw_layout_record_t record;static char why[8192];int n;
+    memset(&record,0,sizeof(record));AW_LayoutRecording=&record;draw();AW_LayoutRecording=NULL;
+    n=AW_LayoutCheck(&record,why,sizeof(why));
+    printf("layout of %s: %d drawn, %d fault%s\n%s",what,record.count,n,n==1?"":"s",why);
+    assert(record.count>10);   /* the window was recorded: its boxes, buttons and lines */
+    return n;
+}
 /* what the panel adds: the window drawn without the panel's drawing, then with it; every changed pixel must lie in
  * X,Y W x H; returns how many changed (and how many right of the icons' column) */
 extern void (*aw_chargen_spells_draw)(int x,int y,int w,int h);
@@ -225,14 +236,28 @@ int main(void){
     /* the race window's View Stats box, the Breton: two abilities and a power, in the box's right column under the
      * skill bonuses, never past the box */
     assert(AW_CharacterOpen(1) && aw_character.race==1);   /* the preset's Breton */
+    assert(layout_faults("the race window")==0);
     AW_CharacterKey('v');
     assert(panel_only(158,126,148,66,&text)>0 && text>0);
     picture("2026_11_13_v0.0.66_race_breton_stats");
+    /* UI-RACE-STATS-RETURN-SPACING-67: the Return button under the attributes, the room under their heading */
+    assert(layout_faults("the race's View Stats box")==0);
     memcpy(before,frame,sizeof(before));
     AW_CharacterKey(K_PGDN);
     assert(panel_only(158,126,148,66,&text)>0 && memcmp(before,frame,sizeof(before)));
     picture("2026_11_13_v0.0.66_race_breton_stats_scrolled");
     AW_CharacterKey(K_ESCAPE);AW_CharacterClose();
+    /* UI-CHARGEN-CLASS-FONT-67: the class window and the own class window: the own class's rows in the console font no
+     * longer lie on top of one another (the game font's rows did, 9 rows apart) */
+    assert(AW_CharacterOpen(2));
+    assert(layout_faults("the class window")==0);
+    AW_CharacterKey('m');
+    picture("2026_11_17_v0.0.67_make_your_own_class");
+    assert(layout_faults("the own class window")==0);
+    AW_CharacterClose();
+    assert(AW_CharacterOpen(3));
+    assert(layout_faults("the birthsign window")==0);
+    AW_CharacterClose();
     printf("character spell windows: ok\n");
     return 0;
 }

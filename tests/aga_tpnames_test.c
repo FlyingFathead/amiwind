@@ -81,9 +81,58 @@ static FILE *names_file(long *size){
     return f;
 }
 
+/* ---- a typed name (dbg tp TEXT, DBG-TP-EXPANSION-ARRIVALS-66): the row the box would take, read row by row */
+static const char *const typed[]={"Balmora","Balmora, Hlaalo Manor (interior)",
+    "Mournhold, Royal Palace: Reception Area (Tribunal) (interior)",
+    "Mournhold, Royal Palace: Courtyard (Tribunal) (interior)","Seyda Neen","Seyda Neen (interior)","Fargoth"};
+#define TYPED 7
+static FILE *typed_file(long *size){
+    FILE *f=tmpfile();unsigned char head[16];long bytes=0;int i;
+    assert(f);
+    for(i=0;i<TYPED;i++)bytes+=2+(long)strlen(typed[i]);
+    memset(head,0,sizeof(head));memcpy(head,"AWTN",4);head[5]=1;head[11]=TYPED;
+    head[14]=(unsigned char)(bytes>>8);head[15]=(unsigned char)bytes;
+    fwrite(head,1,16,f);
+    for(i=0;i<TYPED;i++){fputc(i==6?3:i==0||i==4?1:2,f);fputc((int)strlen(typed[i]),f);fwrite(typed[i],1,strlen(typed[i]),f);}
+    fflush(f);
+    *size=16+bytes;
+    return f;
+}
+static void typed_names(void){
+    FILE *f;long size,matches;char list[200],small[40];
+    /* the name rule: the label without its trailing " (...)" parts, letters and digits, case ignored */
+    assert(AW_ListBoxNames(typed[2],"Mournhold, Royal Palace: Reception Area"));
+    assert(AW_ListBoxNames(typed[2],"mournhold royal palace reception area"));
+    assert(!AW_ListBoxNames(typed[2],"reception area") && !AW_ListBoxNames(typed[2],"mournhold royal palace"));
+    assert(AW_ListBoxNames("Ald-ruhn","aldruhn") && !AW_ListBoxNames("Ald-ruhn","ald") && !AW_ListBoxNames("Ald-ruhn",""));
+    assert(!AW_ListBoxNames("Ald-ruhn"," ,:") && !AW_ListBoxNames(NULL,"a") && !AW_ListBoxNames("a",NULL));
+    f=typed_file(&size);
+    /* named exactly: the room by its cell's name (the picker's label carries the tags) */
+    assert(AW_TpNamesFind(f,0,size,"Mournhold, Royal Palace: Reception Area",&matches,list,sizeof(list))==2 && matches==1);
+    /* one row holds it: that row */
+    assert(AW_TpNamesFind(f,0,size,"reception",&matches,list,sizeof(list))==2 && matches==1);
+    assert(AW_TpNamesFind(f,0,size,"fargoth",&matches,list,sizeof(list))==6);
+    /* several hold it, one is named: the named one (the first, the outdoor place before its room) */
+    assert(AW_TpNamesFind(f,0,size,"balmora",&matches,list,sizeof(list))==0);
+    assert(AW_TpNamesFind(f,0,size,"Seyda Neen",&matches,list,sizeof(list))==4);
+    /* several hold it, none is named: how many, and the first labels */
+    assert(AW_TpNamesFind(f,0,size,"royal palace",&matches,list,sizeof(list))==-2 && matches==2);
+    assert(!strcmp(list,"Mournhold, Royal Palace: Reception Area (Tribunal) (interior); "
+                        "Mournhold, Royal Palace: Courtyard (Tribunal) (interior)"));
+    assert(AW_TpNamesFind(f,0,size,"royal palace",&matches,small,sizeof(small))==-2 && matches==2 && !small[0]);
+    /* none holds it, no letters, a bad file */
+    assert(AW_TpNamesFind(f,0,size,"dagoth",&matches,list,sizeof(list))==-1 && matches==0 && !list[0]);
+    assert(AW_TpNamesFind(f,0,size," ,: ",&matches,list,sizeof(list))==-1);
+    assert(AW_TpNamesFind(f,0,size-1,"balmora",&matches,list,sizeof(list))==-1);
+    assert(AW_TpNamesFind(NULL,0,size,"balmora",NULL,NULL,0)==-1);
+    fclose(f);
+    puts("typed names ok");
+}
+
 int main(void){
     aw_tp_names_t n;FILE *f;long size,total0,largest0,total,largest,held_whole,held_paged;int i,k,c;
     char got[AW_TP_NAME],want[80];void *area;
+    typed_names();
     f=names_file(&size);
     heap_reset();heap_state(&total0,&largest0);
 

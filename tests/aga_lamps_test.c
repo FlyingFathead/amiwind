@@ -56,6 +56,7 @@ static void row_class(FILE *f,int cx,int cy,float x,float y,float z,int radius,i
 static void row(FILE *f,int cx,int cy,float x,float y,float z,int radius){row_class(f,cx,cy,x,y,z,radius,1);}
 int COM_FOpenFile(char *name,FILE **out){
     if(!strcmp(name,"world/regions-sl.awr")){*out=NULL;return -1;}   /* no Solstheim rows on this disk */
+    if(!strcmp(name,"world/regions-mh.awr")){*out=NULL;return -1;}   /* no Mournhold rows on this disk */
     FILE *f;unsigned count=5;
 #ifdef AW_FRAME_MAP
     if(!strcmp(name,"world/regions.awr")){region_asks++;*out=NULL;return -1;}   /* no region table on this disk */

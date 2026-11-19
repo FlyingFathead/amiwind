@@ -1,6 +1,6 @@
 # Modular NPCs: every body part stored once, assembled per actor
 
-_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
+_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -36,6 +36,9 @@ _Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
 - [Reproducing the numbers](#reproducing-the-numbers)
 
 <!-- contents end -->
+
+The player character is assembled the same way, from its own race's and sex's parts in first and third person:
+[PLAYER_BODY.md](PLAYER_BODY.md).
 
 **Request (maintainer, 9 October 2026):** humanoid NPCs are built from shared body
 parts, the way Morrowind builds them, instead of one complete model per actor.

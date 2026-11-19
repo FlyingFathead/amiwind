@@ -1,6 +1,6 @@
 # Experimental flags
 
-_Last updated with AmiWind v0.0.66-dev1 (13 November 2026)._
+_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
 
 Work that is in the source but not finished, or not yet the default, ships behind a switch that is
 off by default. A default build is unchanged by everything on this page; each switch has a test that
@@ -27,6 +27,7 @@ checks it is off by default.
 | `--chim-draw-tiles on` | builder | off | The Seyda Neen ship and the silt strider stored as draw tiles (the large-model cut's tiles at a 128-unit grain), so the parts behind the view are not tested | measured offline only; changes those models' stored units, so it waits for a planned rebuild of the world ([ship interior](SHIP_INTERIOR.md#the-weight-of-the-hold), PRISON-SHIP-POLY-COLLISION-65) |
 | `--room-draw-tiles 0` | builder | 512 | The prison ship hold's shell drawn as one model again (the method before v0.0.66-dev1); a number sets the most faces a draw tile holds | the old method, kept selectable ([ship interior](SHIP_INTERIOR.md#the-weight-of-the-hold), PRISON-SHIP-POLY-COLLISION-65) |
 | `--room-small-parts off` | builder | box | The hold's hammocks keep every ring and knot as authored (the method before v0.0.66-dev1) | the old method, kept selectable ([ship interior](SHIP_INTERIOR.md#the-weight-of-the-hold), PRISON-SHIP-POLY-COLLISION-65) |
+| `--room-shapes off` | builder | on | The hold's masts, raised deck, a post, a pole and the stairs' side boards reduced like the rest of the shell again, and the tables' iron bands reduced to slanted shapes (the method before v0.0.67-dev3; the interior stage then prints the invisible collision it finds instead of stopping) | the old method, kept selectable ([ship interior](SHIP_INTERIOR.md#drawn-where-it-collides), PRISON-SHIP-FLOOR-STUCK-67) |
 | `--chim-model-hull-patch off` | builder | on | Compiled model hulls stay exactly as compiled (the check is still recorded); the default adds back the pieces the compiler lost under a walkable surface | the old method, kept selectable (CHIM-COMPILED-HULL-SHORT-36) |
 | `--chim-model-hull-patch on` | builder | off | Compiled model hulls get the pieces the compiler lost under a walkable surface added back exactly | experimental: makes 11 Balmora and test-area models exact, but Balmora's ring has no zone room for it yet (CHIM-COMPILED-HULL-SHORT-36) |
 | `--chim-placement-format 0.8` (`chim_build.py --placement-format`) | builder (+ engine: reads 0.4 to 0.8) | 0.7 | CHIM world format 0.8: one model per mesh and scale, the whole rotation in a 56-byte placement record, collision from the mesh's own convex pieces expanded by the world-aligned player box when a trace meets them ([world format](chim/WORLD_FORMAT.md#placed-models-08-experimental)) | experimental: host tests only, no build or in-game look yet; estimated on the v0.0.46 world 32,714 models to 8,105 and about 455 MB less model and record bytes (CHIM-TILT-VARIANTS-SPLIT-33) |

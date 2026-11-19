@@ -274,6 +274,23 @@ extern const char *(*aw_worldui_icon_id)(const char *id);
                                 (it)->alchemy_kind<=AW_ALCHEMY_APPARATUS)
 /* the carried row's use: 1 when IT is a usable kind and aw_inventory_use is set */
 int AW_InventoryUsable(const aw_inventory_item_t *it);
+/* INVENTORY-EQUIP-HINTS-67 (EQUIP-ACTION-REGRESSION-62, SCROLL-CAST-64): the one action the inventory window offers for
+ * a carried item, from its catalogue row (pure): Equip or Unequip (WORN) for every class that is worn, wielded or held
+ * (the catalogue's flag 1: weapons, armour, clothing, rings and amulets, carried lights), Cast for a Cast Once item (a
+ * scroll: the cast uses it up), Use for a potion, an ingredient or an apparatus, Read for any other book; NONE for the
+ * rest. The use key, the double-click, the key line and the information box all take it from here. Word: the label the
+ * window shows (the original's sEquip, sUnequip, sUse), NULL for NONE. */
+enum {AW_INV_ACT_NONE,AW_INV_ACT_EQUIP,AW_INV_ACT_UNEQUIP,AW_INV_ACT_USE,AW_INV_ACT_CAST,AW_INV_ACT_READ};
+int AW_InventoryItemAction(const aw_inventory_item_t *it,int worn);
+const char *AW_InventoryActionWord(int action);
+/* SCROLL-CAST-64: the inventory window's Use on a Cast Once item (aw_cast.c sets it; aw_worldui.c defines it, NULL in
+ * the fixtures: not cast): the enchantment cast as the original casts a magic item (no roll, the item used up, Self on
+ * the player, Touch on the actor in reach, Target as a bolt); 1 cast, 0 refused with its own message */
+extern int (*aw_worldui_cast)(const aw_inventory_item_t *it);
+/* DBG-GIVE-SPELL-67: dbg give spell [ID / all / list [N]] (aw_cast.c sets it; aw_inventory.c defines it and routes the
+ * words to it): FIRST is the console argument after "spell". No argument: the list box of the game's spells and
+ * powers (Enter: learn one); ID: that one; all: every one; list [N]: page N of the list on the console. */
+extern void (*aw_inventory_give_spell)(int first);
 /* The focus box (FOCUS-BOX-58): the aimed ground item within the activation distance, its name and the box's
  * "Weight: x" and "Value: y" lines; owned 1 when taking it would be theft. 0 when no item is aimed at. */
 int AW_InventoryFocus(const char **name,char *weight_line,char *value_line,int line_size,int *owned);

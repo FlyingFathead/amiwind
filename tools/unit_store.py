@@ -98,6 +98,18 @@ LEGACY_SOURCES = {
     # run (stored under the old key) are taken while the bake code is exactly this.
     ('creature-model', '07fe655ad9b18d4bcf86b7c3d602e2b03fb6fad91c112f8b654796c317d2d6f3'):
         ('5826271f9a056d57c890c835c8281408b3933f05249c6f0892c3eae20cfe03fd',),
+    # room-actor (room_actor_bake._fit_head, _fit_search, actor_grounding.finish) after the room record readers moved
+    # unchanged from tools/chim/interior.py into tools/chim/room_records.py (BUILD-ROOM-ACTOR-REKEY-67). Compared unit by
+    # unit in the container against 0d6f7ab7 (v0.0.67-dev2, key 45e60497) and 43c98a1f (the v0.0.67-dev3 line, key
+    # d66c53fa, whose key moved for one new module line of interior.py and for config/chim-rooms.json, which a default
+    # value there names and no fit reads): every unit both reaches has the same text but the two import lines that now
+    # name chim.room_records; the moved readers have the same text; the units left out are interior.py's import-time
+    # code and the writers it reached (the store writer, chim.format and chim.placed writers), which no fit runs. The
+    # fits of 40 rooms of the dev2 image (247 placements) are byte-identical with the three trees. The 2,342 fits of
+    # the dev2 run are taken while the fit code is exactly this.
+    ('room-actor', 'b2af5feaea268a6f5d130b6bee116ab83c6f59ba41e6bbbc36d03034b7018b80'):
+        ('45e60497f2e8bc21ba39c84d15239ba879cfe12a5f373fceff724ed612c9c803',
+         'd66c53fad4295a46ab4c286da92c55ad93903123b28dfa467f5b6139e966c738'),
 }
 
 # AMIWIND_* settings that say where a stage does its work, never what a unit is made of: left out of a unit key

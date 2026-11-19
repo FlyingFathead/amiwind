@@ -139,6 +139,20 @@ class TableTests(unittest.TestCase):
         self.assertEqual(groups['walk']['count'], 2 * 8)        # 2 s loop at 8 frames a second, stop frame left out
         self.assertNotIn('speed', groups['walk'])               # no accumulation root (bip01 / root bone) to measure
 
+    def test_a_missing_run_plays_the_walk(self):
+        """CREATURE-NIXHOUND-HUMAN-MOVES-67: a creature with a walk but no run runs on its walk's frames (OpenMW
+        mwmechanics/character.cpp refreshMovementAnims), never on its idle frame; without a walk it stays on idle."""
+        import creature_tables as T
+        rig = self.rig(biped=True)
+        data, rep = T.table(rig)
+        groups = {g['name']: g for g in T.kit(rig, data, rep['times'])}
+        self.assertEqual(groups['run']['source'], 'walk')
+        self.assertEqual((groups['run']['base'], groups['run']['count'], groups['run']['step']),
+                         (groups['walk']['base'], groups['walk']['count'], groups['walk']['step']))
+        alone = self.rig()                                # its own file only: no walk, so the run stays on idle
+        own, own_rep = T.table(alone)
+        self.assertEqual({g['name']: g for g in T.kit(alone, own, own_rep['times'])}['run']['source'], 'idle')
+
     def test_a_missing_attachment_bone_rides_its_parent(self):
         """An appended table needs every bone of the humanoid table: a weapon or shield bone the creature lacks is
         added riding its hand with no offset (no part of the creature hangs on it)."""

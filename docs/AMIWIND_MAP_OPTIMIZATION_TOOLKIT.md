@@ -1,6 +1,6 @@
 # AmiWind Map Optimization Toolkit
 
-_Last updated with AmiWind v0.0.41-dev4 (16 October 2026)._
+_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -112,7 +112,11 @@ The top-level `everywhere` entry names a recipe applied in every CHIM cell and t
 (`everywhere-v1`): today the Dunmer streetlight `light_de_streetlight_01` becomes the procedural
 lantern shell everywhere, not only at Tel Uvirith. A cell's own recipe wins for the meshes it names;
 the everywhere recipe may not cap unnamed meshes. `AMIWIND_VISUAL_EVERYWHERE=off` keeps the original
-meshes (the method before).
+meshes (the method before). Since v0.0.67 every CHIM room takes the everywhere recipe too
+(`config/chim-rooms.json` `everywhere_in_rooms`), and a model with a hand-made mesh (method 2,
+`config/model-method-2.json`, keyed by model path and the SHA-256 of its NIF) is drawn by it wherever it is
+placed; `AMIWIND_MODEL_METHOD=1` keeps method 1 for every model, and `AMIWIND_METHOD2_PANELS=baked|frosted` picks
+the lantern panels for an A/B ([mesh methods](chim/MESH_METHODS.md#method-2-hand-made-meshes)).
 
 Eleven reduction rules reproduced the retained diagnostic geometry exactly;
 the procedural lantern reproduced its 32-triangle diagnostic shell, including

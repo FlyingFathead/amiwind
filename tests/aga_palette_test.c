@@ -66,6 +66,19 @@ int main(void) {
  assert(output[0]>output[1]+40 && output[1]==output[2]);
  V_SetContentsColor(CONTENTS_EMPTY);V_UpdatePalette();
  assert(output[0]==128 && output[1]==128 && output[2]==128);
+ /* DAMAGE-RED-HUE-67: a drop of the player's health starts the original's hit hue (129 0 0 at 40 of 256), which fades
+  * out over half a second; a rise does not, nor a drop across a map change */
+ host_frametime=0;cl.stats[STAT_HEALTH]=100;V_UpdatePalette();assert(cl.cshifts[CSHIFT_DAMAGE].percent==0);
+ cl.stats[STAT_HEALTH]=110;V_UpdatePalette();assert(cl.cshifts[CSHIFT_DAMAGE].percent==0);
+ cl.stats[STAT_HEALTH]=97;V_UpdatePalette();
+ assert(cl.cshifts[CSHIFT_DAMAGE].percent==40 && cl.cshifts[CSHIFT_DAMAGE].destcolor[0]==129 &&
+        cl.cshifts[CSHIFT_DAMAGE].destcolor[1]==0 && cl.cshifts[CSHIFT_DAMAGE].destcolor[2]==0);
+ assert(output[0]>output[1] && output[1]==output[2]);           /* the world leans red */
+ host_frametime=.25;V_UpdatePalette();assert(cl.cshifts[CSHIFT_DAMAGE].percent==20);
+ V_UpdatePalette();assert(cl.cshifts[CSHIFT_DAMAGE].percent==0);  /* gone after half a second */
+ host_frametime=0;V_UpdatePalette();assert(output[0]==128 && output[1]==128 && output[2]==128);
+ {static model_t other;cl.worldmodel=&other;cl.stats[STAT_HEALTH]=50;V_UpdatePalette();
+  assert(cl.cshifts[CSHIFT_DAMAGE].percent==0);cl.worldmodel=NULL;}
  puts("blue water, red damage, blood-red lava, combined shifts, fading and surfacing passed");
  return 0;
 }

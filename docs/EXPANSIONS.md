@@ -1,6 +1,6 @@
 # The expansions: Tribunal and Bloodmoon
 
-_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
+_Last updated with AmiWind v0.0.67-dev2 (19 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -11,6 +11,9 @@ _Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 - [What you cannot see yet](#what-you-cannot-see-yet)
 - [The three stages, and where each land stands](#the-three-stages-and-where-each-land-stands)
 - [How the two places fit into the game](#how-the-two-places-fit-into-the-game)
+  - [Mournhold](#mournhold)
+  - [Getting to Mournhold](#getting-to-mournhold)
+  - [Solstheim](#solstheim)
 - [The plan](#the-plan)
 - [How the expansions are implemented](#how-the-expansions-are-implemented)
 - [Known issues](#known-issues)
@@ -50,13 +53,23 @@ builder warns, names the missing expansion and builds the base game alone.
 - **The lists include the expansions' places.** When Bloodmoon is selected, Solstheim's cells are added where they are
   finished, and the expansions' rooms, Mournhold's five districts among them, are added as their own batches after the
   island's, so the island's batches and ids do not change.
+- **The scripts of the expansions' own placements are attached.** Since v0.0.67 the script stage binds every scripted
+  person, creature and object that a selected expansion places, as it binds the base game's, so they run their own
+  scripts where the image holds their place: 1,150 placements of Tribunal and 1,178 of Bloodmoon with both selected
+  (until then none ran its script, `EXPANSION-SCRIPTS-NOT-ATTACHED-66`), and the scripted items their own containers,
+  people and creatures carry, 77 of Tribunal and 42 of Bloodmoon, run their scripts while their holder's place is
+  loaded, as the base game's do. With the base game alone the bindings are byte for byte what they were; the script
+  engine's table sizes, counted from all three game files whatever the selection, grow by the expansions' carried
+  items (1 more attached instance, 118 more parked objects).
 - **The tables are being made to read the expansions.** Every table the builder makes from the game data is meant to read
   the selected expansions too. Done: the focus boxes of named objects, the rooms in the focus, item and area tables, the
   world survey, the exterior plan (the merged game data over the base game's exterior grid, as the survey reads it), the
   actor library's creatures (the 37 creature meshes only the expansion archives hold), and the archives of the selected
   expansions in every stage that reads the merged game data. Still read from the base game alone: the magic and travel
-  tables, the dialogue lookup, the container census room numbers and the harvest catalogue; the creature census is not
-  yet checked. The open entries are in the [bug register](BUGS.md).
+  tables, the dialogue lookup, the container census room numbers and the harvest catalogue. The creature census counts
+  the expansions' levelled creature points by the same reference numbers as the actor checks: on the v0.0.66 release
+  build 262 of 1,126 are placed, all in rooms ([creatures](CREATURES.md)). The open entries are in the
+  [bug register](BUGS.md).
 - **What the build does not hold yet is set aside, named.** The placements of the exterior cells only Bloodmoon adds are
   left out of the scenery and flora stages and counted, and the doors and markers that lead into Solstheim's exterior,
   Mournhold's five districts or an expansion room the room stage could not convert are held back in the world door
@@ -71,7 +84,15 @@ builder warns, names the missing expansion and builds the base game alone.
 - **The place list.** The `dbg tp` list of places reads the selected expansions as well as the base game. Mournhold's
   and the other expansion rooms the image holds are listed by name (a search for "Mournhold" finds them), and a
   Solstheim place is listed only where the build holds its world. With the base game alone the list is as before
-  ([console commands](AMIWIND_CONSOLE_COMMANDS.md)).
+  ([console commands](AMIWIND_CONSOLE_COMMANDS.md)). A place's name typed after `dbg tp` finds it as the list's search
+  does: `dbg tp "Mournhold, Royal Palace: Reception Area"` or `dbg tp reception`.
+- **The arrivals.** `dbg tp mournhold` (or `dbg tp tribunal`) puts the player in the Royal Palace's Reception Area, at
+  the spot and facing of Asciene Rane's own trip there; `dbg tp solstheim` (or `frostmoth`) at Fort Frostmoth's dock,
+  where the boat from Khuul lands; `dbg tp ravenrock` at Raven Rock's dock; `dbg tp skaal` in Skaal Village; and
+  `godsreach`, `greatbazaar`, `brindisi`, `palacecourtyard` and `templecourtyard` in Mournhold's districts. Each works
+  when the build selected its expansion and the image holds the place; otherwise it says which of the two is missing and
+  the player stays where he is. Today the Reception Area is held; Solstheim's places and the districts are not yet
+  (`config/expansion-arrivals.json`).
 - **The data in the tables.** The [MWScript tracker](MWSCRIPT_FEATURES.md) counts every script of the three game files
   and says which run: of Tribunal.esm's 255 scripts, 236 are used (45 run, 4 wait for a function, 187 belong to
   Mournhold); of Bloodmoon.esm's 336, 310 are used (48 run, 17 wait for a function, 245 belong to Solstheim). The
@@ -89,8 +110,9 @@ builder warns, names the missing expansion and builds the base game alone.
 ## What you cannot see yet
 
 No finished Mournhold or Solstheim is in the game. Mournhold's five outdoor districts are not built, so the doors that
-lead out of the palace and the temple lead nowhere; there is no Solstheim ground to walk on and no boat to it; and no
-script attached to a person, creature or object of the two expansions runs yet (the build does not bind them).
+lead out of the palace and the temple lead nowhere; there is no Solstheim ground to walk on and no boat to it; and the
+scripts of the expansions' places that are not in the image yet do not run (since v0.0.67 the build binds the
+expansions' own placements, so a script runs where the image holds its place; the v0.0.66 build bound none of them).
 The data being selected by default is the road to them, not their arrival.
 
 ## The three stages, and where each land stands
@@ -128,6 +150,10 @@ courtyard** and the **Temple courtyard**. The base game has no such cell. Counte
 Courtyard 302, Godsreach 282, Plaza Brindisi Dorom 187, Royal Palace courtyard 126
 ([census](performance/EXPANSIONS-CENSUS-v0.0.64.md)).
 
+What was measured and read about the districts while they were brought into the build (their cell flags, the water,
+the heights of the streets, the gates, the arrivals and the faults found) is in
+[Mournhold: observations on how Tribunal's city works](MOURNHOLD_NOTES.md).
+
 The plan for Mournhold:
 
 - The five districts are built into **one unified exterior of their own**, apart from the island's map. It shares the
@@ -160,6 +186,61 @@ Solstheim's cells and land are read from the same file as Vvardenfell's; the sel
 stand-ins, so the same expansions stay selected and their archives are read in load order as in any build; and
 every other file and folder of your data folder as a link, never a copy. With the base game alone no such folder is
 made and the build reads your data folder as before.
+
+A build with an expansion selected checks this in its first minute, before any stage
+(`tools/expansion_preflight.py`, about 11 seconds on the Game of the Year files): the districts can be presented from
+your game files (no block touches a cell of the game's own grid, none is larger than the largest block), and the
+cells that carry the districts' own collision rows are exactly the presented cells. A problem stops the build there
+with every finding named. A pass is recorded for the game files it checked, so the next build does not repeat it.
+
+**Mournhold is a small map of its own, built by a module of its own.** The expansions are build modules: an
+expansion's content is made by stages named after it, which are in a build only when its game file is selected, are
+keyed only by their own inputs, and which no stage of the base game reads. A build without an expansion, or with
+`--no-dlc`, has exactly the stages and commands it had before.
+
+The module `tribunal-mournhold` has two stages:
+
+- `tribunal-mournhold-data` makes the presented data folder from the base game file and `Tribunal.esm` alone;
+- `tribunal-mournhold` converts the districts' cells, and only those, into a world folder of their own
+  (`tools/tribunal_mournhold.py`: the outdoor converter, unchanged, with the module's own game files and its own
+  unit cache).
+
+The image installs that world as a store of its own beside Vvardenfell's, with its own frame maps (`mh0000`,
+`mh0001`, ...) and its own table of rows (`world/regions-mh.awr`). Mournhold is not connected to the Vvardenfell map:
+no Vvardenfell region, checklist row or cell list holds a district cell, so adding or changing a district re-makes
+nothing of Vvardenfell. In the game the districts' rows join the one table of outdoor places after Vvardenfell's and
+Solstheim's, so a door, a debug teleport or a script finds a district by its position; the map numbers of every
+existing place stay as they were. Within a district the cells are open to each other; a district of one cell has
+closed edges.
+
+Four stages of the base build take the module's receipt and its cells after their own unchanged command, and wait for
+the module's data stage: the image, the scripts, and the two stages that key placed things by area (`focus`, the
+table of what can be aimed at together with each area's levelled creatures, and `item-models`, the list of placed
+items). With the receipt they read a district's containers, items, activators, doors and people as standing in the
+cells of its block, at the moved positions, where the game asks for them outdoors; without it they write what they
+wrote before. A check in the build's first minute holds the districts' rows against the districts' own cells of the
+game files ([Mournhold notes](MOURNHOLD_NOTES.md#containers-items-and-activators-in-a-district)).
+
+A district cell is built once its conversion has been measured and recorded in the progress tracker; until then no
+build converts it, and the doors that lead there stay closed with their reason. A build's first minute says what
+happens to each selected expansion's cells (how many the tracker calls finished, and which module builds them), and
+stops when a selected expansion's finished cells would be left out without a stated reason. `--presented-exteriors
+off` leaves the module out.
+
+A cell that an expansion adds to the shared exterior grid (one of Solstheim's own) has no open-world map and is not
+planned by the world survey. The exterior checklist can plan it as a cell of its own, with a row in the region table
+after every existing row, so no existing row, name or saved position moves. No build takes such a cell yet:
+Solstheim's module follows Mournhold's.
+
+A district counts as built when every cell of its block is converted. For such a district the image step reads the
+doors, the arrivals and the jail's marker where the presented world has them, with the same move that placed the
+district's own objects: the doors from the rooms into the district and from the district into the rooms link
+through the district's outdoor frames, `dbg tp godsreach` and the other district names arrive outdoors in it, and an
+arrest in Mournhold releases the player in the Royal Palace courtyard. A script that moves the player or another
+character into a district moves them outdoors to the same place, and a script that asks whether the player is in a
+district counts the district's cells. The build's log names the districts built and those held back, with the doors
+and markers linked and still held. A district with part of its block not converted stays as it was, its doors closed
+with their reason.
 
 ### Getting to Mournhold
 
@@ -258,6 +339,8 @@ The open entries are in the [bug register](BUGS.md):
 
 - `BUILD-EXPANSION-INPUTS-UNCHECKED-66`: the expansion files were not required nor checked against known SHA-256
   values (fixed in v0.0.66-dev3).
+- `MOURNHOLD-BAZAAR-UNDER-WATER-67`: a teleport to the Great Bazaar leaves the player under the district's street, in
+  the water (open; the numbers are in the [Mournhold notes](MOURNHOLD_NOTES.md#arrivals)).
 - `INTERIOR-RECEPTION-AREA-FPS-67`: Mournhold's Royal Palace Reception Area, the arrival room of the trip, runs at
   about 3 frames a second on the Pi 4B (open).
 - `EXPANSION-TABLES-BASE-ONLY-66`: some tables still read the base game only (open); `EXPANSION-BASE-ONLY-TABLES-66`

@@ -442,6 +442,41 @@ def write_same(path, raw):
     path.write_bytes(raw)
 
 
+def own_skin_mesh(kinds, body, mesh, assets):
+    """FP-HANDS-PER-RACE-67 (decided for the project, 2026-11-18: the player is built from its own race's and sex's
+    parts): a skin part of a race (BYDT type 0, not a vampire's) whose MESH names another race or sex than the record's
+    own takes the record's race's and sex's own mesh of the same part when the game has it (player_own_skin.own_hand_mesh,
+    switch OWN_HAND_MESHES). On the game's data, in third person, the High Elf man's upper legs: b_n_high elf_m_upper
+    leg names b\\B_N_High Elf_F_Upper Leg.nif (the woman's) and draws b\\b_n_high elf_m_upper leg.nif; items and hairs
+    are not covered and stay as named (player_own_skin.rule_covers)."""
+    from mwad.npc import first, text
+    from player_own_skin import own_hand_mesh, rule_covers
+    record = kinds['BODY'].get(body)
+    raw = first(record, 'BYDT') if record is not None else None
+    if not rule_covers(raw):
+        return mesh
+    return own_hand_mesh(mesh, (text(record, 'FNAM') or '').casefold(), bool(raw[2] & 1), assets)
+
+
+def foreign_skin_parts(kinds, parts):
+    """[(body id, mesh)] of the skin parts among PARTS [(body id, mesh)] whose mesh's file name says another race or
+    sex than the record's own (player_own_skin.SKIN_MESH_NAME; the race read with or without its space, race_key): the
+    stage stops on any (FP-HANDS-PER-RACE-67). Hairs and items are not judged (player_own_skin.rule_covers;
+    PLAYER-PARTS-HAIR-FALSE-STOP-67: Tribunal's own Dark Elf hairs, b\\B_N_DarkElf_F_BarenziahH.NIF, stopped the stage)."""
+    from mwad.npc import first, text
+    from player_own_skin import SKIN_MESH_NAME, names_other, rule_covers
+    out = []
+    for body, mesh in parts:
+        record = kinds['BODY'].get(body)
+        raw = first(record, 'BYDT') if record is not None else None
+        if not rule_covers(raw):
+            continue
+        m = SKIN_MESH_NAME.match(str(mesh).replace('\\', '/').rsplit('/', 1)[-1].casefold())
+        if m and names_other(m, text(record, 'FNAM') or '', bool(raw[2] & 1)):
+            out.append((body, mesh))
+    return out
+
+
 def prepare(data, id1, palette, jobs=None, log=print):
     """Bake the parts library, the layouts and the recipe table into ID1. Returns the report."""
     import prepare_player_view as ppv
@@ -461,7 +496,16 @@ def prepare(data, id1, palette, jobs=None, log=print):
         mesh = text(record, 'MODL')
         if not mesh:
             continue
-        tasks.append((str(data), palette, skeleton, part_dict(slot, body, mesh), SLOT_CAP.get(slot, 32)))
+        own = own_skin_mesh(kinds, body, mesh, assets)      # FP-HANDS-PER-RACE-67: the race's own part
+        if own != mesh:
+            log('player parts: %s slot %d: the record names %s, the race\'s own %s is drawn (FP-HANDS-PER-RACE-67)'
+                % (body, slot, mesh, own))
+        tasks.append((str(data), palette, skeleton, part_dict(slot, body, own), SLOT_CAP.get(slot, 32)))
+    from player_own_skin import OWN_HAND_MESHES
+    foreign = foreign_skin_parts(kinds, sorted({(t[3]['id'], t[3]['mesh']) for t in tasks}))
+    if OWN_HAND_MESHES and foreign:
+        raise ValueError('FP-HANDS-PER-RACE-67: a player body part is another race\'s or sex\'s: %s' % '; '.join(
+            '%s %s' % f for f in foreign))
     # one model per (skeleton, slot, mesh): parts that name the same mesh in the same slot share it
     unique = {}
     for t in tasks:

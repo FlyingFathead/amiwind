@@ -322,6 +322,27 @@ class CrimeSourceTests(unittest.TestCase):
         self.assertEqual(world_doors.prison_markers(door + prison + outside),
                          [{'reference': 5, 'position': [100.5, 200.0, 30.0], 'yaw': 90.0, 'prison': 'Test Prison',
                            'chest': 77}])
+        # REF-IDENTITY-MERGED-MASTER-66: an expansion's evidence chest (the merged master's number: Tribunal's own 23
+        # is 2**22 + 23) is written under its stable id (2**20 + 23), the reference the engine changes a container's
+        # contents by (aw_crime.c confiscate); the base game's number stays as it is
+        jail = rec('CELL', [sub('NAME', z('Test Jail')), sub('DATA', struct.pack('<Iii', 1, 0, 0)),
+                            sub('FRMR', struct.pack('<I', (1 << 22) + 23)), sub('NAME', z('stolen_goods')),
+                            sub('DATA', struct.pack('<6f', 1, 2, 3, 0, 0, 0))])
+        # MOURNHOLD-EXTERIOR-CELLS-66: the courtyard marker of an exterior-like cell, written at its moved place when
+        # the build presents the cell (tools/presented_exterior.py: x and y plus the cell's offset, the height kept)
+        yard = rec('CELL', [sub('NAME', z('Test Yard')), sub('DATA', struct.pack('<Iii', 0x81, 0, 0)),
+                            sub('FRMR', struct.pack('<I', (1 << 22) + 9)), sub('NAME', z('PrisonMarker')),
+                            sub('DATA', struct.pack('<6f', 0, 384, 3802, 0, 0, 0)),
+                            sub('DODT', struct.pack('<6f', 0, 0, 0, 0, 0, 0)), sub('DNAM', z('Test Jail'))])
+        raw = door + prison + jail + outside + yard
+        plain = world_doors.prison_markers(raw)
+        self.assertEqual([(m['reference'], m['position'], m['chest']) for m in plain],
+                         [(5, [100.5, 200.0, 30.0], 77), ((1 << 22) + 9, [0.0, 384.0, 3802.0], (1 << 20) + 23)])
+        places = {'test yard': {'cell': 'Test Yard', 'block': [-12, -30], 'size': [1, 1], 'offset': [-94208.0, -241664.0]}}
+        moved = world_doors.prison_markers(raw, places)
+        self.assertEqual(moved[0], plain[0])                                   # not in a presented cell: as before
+        self.assertEqual(moved[1]['position'], [-94208.0, 384.0 - 241664.0, 3802.0])
+        self.assertEqual((moved[1]['chest'], moved[1]['prison']), ((1 << 20) + 23, 'Test Jail'))
 
     def test_a_scripts_item_change_on_the_player_is_told_in_the_conversation(self):
         notice = body('aw_mwhost.c', 'static void item_notice(')

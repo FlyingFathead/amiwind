@@ -38,8 +38,9 @@ TOPICS = {
                     info('p3', 'No gold?', kind=0, ONAM='robber', scvr=[CHOICE1, GOLD_UNDER]),
                     said(info('p4', 'Pay up.', kind=0, ONAM='robber'),
                          '; the demand\nChoice "Fine." 1, "Never!" 2 ; pay or fight')],
-    # answers that read a function only by its start value (PcVampire) and one the runner never reads (Weather)
-    'night talk': [info('v1', 'Kin.', kind=0, ONAM='lady', scvr=[CHOICE1, fn('PcVampire', 0, 1)]),
+    # answers that read a function only by its start value (Detected; PcVampire until v0.0.67-dev3) and one the
+    # runner never reads (Weather)
+    'night talk': [info('v1', 'Kin.', kind=0, ONAM='lady', scvr=[CHOICE1, fn('Detected', 0, 0)]),
                    info('v2', 'Rain.', kind=0, ONAM='lady', scvr=[CHOICE2, fn('Weather', 0, 4)]),
                    said(info('v3', 'Well?', kind=0, ONAM='lady'), 'Choice "Yes" 1 "No" 2')],
     # an answer that always passes before the branch answers (the original's data has a few)
@@ -75,7 +76,7 @@ class Rules(unittest.TestCase):
         self.assertEqual(self.by[('proposition', 2)]['status'], 'reachable')
         self.assertEqual(self.by[('proposition', 2)]['answer'], 'p1')
         self.assertEqual(self.by[('night talk', 1)]['status'], 'start_value')
-        self.assertEqual(self.by[('night talk', 1)]['why'], ['PcVampire'])
+        self.assertEqual(self.by[('night talk', 1)]['why'], ['Detected'])
         self.assertEqual(self.by[('night talk', 2)]['status'], 'unread')
         self.assertEqual(self.by[('night talk', 2)]['why'], ['Weather'])
         self.assertEqual(self.by[('stay', 1)]['status'], 'shadowed')
@@ -94,7 +95,8 @@ class Rules(unittest.TestCase):
         import dialogue_lut as D
         for name in D.LIVE_FUNCTIONS:
             self.assertEqual(C.classify(name), 'read')
-        self.assertEqual(C.classify('PcVampire'), 'start')
+        self.assertEqual(C.classify('PcVampire'), 'read')       # live since v0.0.67-dev3 (DIALOGUE-CONDITIONS-PARTIAL-67)
+        self.assertEqual(C.classify('Detected'), 'start')
         self.assertEqual(C.classify('Weather'), 'never')
         self.assertEqual(C.classify('Item'), 'read')
 

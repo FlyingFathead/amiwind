@@ -309,6 +309,23 @@ def file_cache_lines(record):
 
 
 
+def reuse_default_lines(run, record):
+    """The default build's cached-build note for the end summary (BUILD-OFFER-EARLIER-RUNS-67): the run's
+    build-state.json 'reuse_default' (tools/reuse_all.py settle_default) into RECORD and its lines: what came from
+    earlier builds and the from-scratch build recommended if something looks wrong; [] when the default did not apply."""
+    try:
+        state = json.loads((Path(run) / 'build-state.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return []
+    default = state.get('reuse_default') if isinstance(state, dict) else None
+    if not isinstance(default, dict):
+        return []
+    record['reuse_default'] = default
+    if default.get('on') and default.get('notice'):
+        return list(default['notice'])
+    return [f"Reuse of earlier builds: {'on' if default.get('on') else 'off'} ({default.get('selected_by')})"]
+
+
 def reuse_and_reference(run, version):
     """(record, lines) of the end summary's reuse and reference section (docs/BUILD_CACHE.md): stages reused and
     rebuilt with their causes, time saved, stage output hashes, the payload preflight and the reference check
@@ -340,6 +357,7 @@ def reuse_and_reference(run, version):
             record['reuse'] = dict(audit, saved_seconds=round(saved, 1))
     except (OSError, ValueError, KeyError, TypeError) as exc:
         lines.append(f'Reuse: not readable ({exc})')
+    lines += reuse_default_lines(run, record)
     try:
         import build_reference
         hashes = build_reference.stage_hashes(run)

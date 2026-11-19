@@ -329,8 +329,9 @@ def explain_parts(old, new):
     return explain(old, new)
 
 
-def print_preflight(result, stream=None, accepted=False):
-    """The preflight table: per stage, reuse or rebuild with the reason and the changed files that touch it."""
+def print_preflight(result, stream=None, accepted=False, accepted_by='--accept-rebuild'):
+    """The preflight table: per stage, reuse or rebuild with the reason and the changed files that touch it. ACCEPTED_BY
+    names what let too-broad rebuilds run (the default build's notice: BUILD-OFFER-EARLIER-RUNS-67)."""
     stream = stream or sys.stdout
     diff = result['source_diff']
     print(f"Reuse preflight: {result['reused']} of {result['stages']} stages planned for reuse, {result['rebuilt']} "
@@ -355,7 +356,7 @@ def print_preflight(result, stream=None, accepted=False):
     if result['too_broad']:
         print(f"!! {len(result['too_broad'])} rebuild(s) not explained by the source diff or the inputs (a key too "
               f"broad: {', '.join(result['too_broad'][:6])}): "
-              + ('accepted with --accept-rebuild.' if accepted else
+              + (f'accepted with {accepted_by}.' if accepted else
                  'stopping before any stage runs. Fix the key, or pass --accept-rebuild to build anyway.'),
               file=stream)
     elif result['unexpected']:

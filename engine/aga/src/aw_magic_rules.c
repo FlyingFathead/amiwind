@@ -191,6 +191,15 @@ float AW_MagicGrow(float size,float grow,float age,float length) {
     if(!(length>0))return size;
     return size*(1+(grow-1)*clamp01(age/length));
 }
+void AW_MagicCreatureFit(float bx,float by,float bz,int flies,float *scale,float *offset) {
+    float s=bx>by?bx:by,off=0;
+    if(bz*.5f>s)s=bz*.5f;
+    s/=64;
+    if(bz<128)off=bz-128;
+    else if(bz<bx+by)off=128-bz;
+    if(flies)off/=20;
+    *scale=s>1?s:1;*offset=off;
+}
 int AW_MagicDue(float t0,float t1,float at) {return t0<at && at<=t1;}
 int AW_MagicStartDue(int started,float t1) {return !started && t1>=0;}
 float AW_MagicCastRelease(float age) {return age>0?age:0;}

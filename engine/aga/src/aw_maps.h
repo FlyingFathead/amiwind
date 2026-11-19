@@ -110,20 +110,31 @@ static __inline__ const char *AW_MapLayer(int id)
  * (the Bloodmoon layer, world/regions-sl.awr) 4096..8191, so a save ID of either island never moves
  * (WORLD-REGION-NAMES-VF-ONLY-64). */
 #define AW_SOLSTHEIM_TERRAIN_BASE 4096
+/* Mournhold's district frame maps "mhNNNN" (the Tribunal layer's own small map, world/regions-mh.awr) take the last
+ * 256 IDs of that block, 7936..8191: no ID after the block moves, and Solstheim keeps 3840 (it has 144 land cells). */
+#define AW_MOURNHOLD_TERRAIN_BASE 7936
+#define AW_TERRAIN_END 8192
 static __inline__ int AW_TerrainId(const char *name)
 {
-    int i,n=0,sl;if(strlen(name)!=6)return -1;
-    sl=name[0]=='s' && name[1]=='l';
-    if(!sl && (name[0]!='v' || name[1]!='f'))return -1;
+    int i,n=0,sl,mh;if(strlen(name)!=6)return -1;
+    sl=name[0]=='s' && name[1]=='l';mh=name[0]=='m' && name[1]=='h';
+    if(!sl && !mh && (name[0]!='v' || name[1]!='f'))return -1;
     for(i=2;i<6;i++){if(name[i]<'0' || name[i]>'9')return -1;n=n*10+name[i]-'0';}
-    if(sl)return n<AW_SOLSTHEIM_TERRAIN_BASE?AW_SOLSTHEIM_TERRAIN_BASE+n:-1;
+    if(mh)return n<AW_TERRAIN_END-AW_MOURNHOLD_TERRAIN_BASE?AW_MOURNHOLD_TERRAIN_BASE+n:-1;
+    if(sl)return n<AW_MOURNHOLD_TERRAIN_BASE-AW_SOLSTHEIM_TERRAIN_BASE?AW_SOLSTHEIM_TERRAIN_BASE+n:-1;
     return n<AW_SOLSTHEIM_TERRAIN_BASE?n:-1;
 }
-/* The open-world map name of terrain ID T ("vfNNNN" or "slNNNN") into OUT (at least 7 bytes). */
+/* The open-world map name of terrain ID T ("vfNNNN", "slNNNN" or "mhNNNN") into OUT (at least 7 bytes). */
 static __inline__ void AW_TerrainName(int t,char *out)
 {
-    if(t>=AW_SOLSTHEIM_TERRAIN_BASE)sprintf(out,"sl%04ld",(long)(t-AW_SOLSTHEIM_TERRAIN_BASE));
+    if(t>=AW_MOURNHOLD_TERRAIN_BASE)sprintf(out,"mh%04ld",(long)(t-AW_MOURNHOLD_TERRAIN_BASE));
+    else if(t>=AW_SOLSTHEIM_TERRAIN_BASE)sprintf(out,"sl%04ld",(long)(t-AW_SOLSTHEIM_TERRAIN_BASE));
     else sprintf(out,"vf%04ld",(long)t);
+}
+/* The land of terrain ID T: "Mournhold", "Solstheim" or "Vvardenfell". */
+static __inline__ const char *AW_TerrainLand(int t)
+{
+    return t>=AW_MOURNHOLD_TERRAIN_BASE?"Mournhold":t>=AW_SOLSTHEIM_TERRAIN_BASE?"Solstheim":"Vvardenfell";
 }
 /* A region name without its land's name in front ("Solstheim, Brodir Grove Region" on Solstheim reads "Brodir
  * Grove Region": the HUD names the land first, then the region in it). Any land, any region; NULL stays NULL. */
@@ -134,10 +145,10 @@ static __inline__ const char *AW_RegionInLand(const char *land,const char *regio
     n=strlen(land);
     return n && !strncmp(region,land,n) && region[n]==',' && region[n+1]==' ' && region[n+2]?region+n+2:region;
 }
-/* The island (landmass) an open-world map lies on: "Solstheim" for its frame maps, else "Vvardenfell". */
+/* The land an open-world map lies on: "Solstheim" or "Mournhold" for their frame maps, else "Vvardenfell". */
 static __inline__ const char *AW_IslandOf(const char *map)
 {
-    return map && AW_TerrainId(map)>=AW_SOLSTHEIM_TERRAIN_BASE?"Solstheim":"Vvardenfell";
+    return AW_TerrainLand(map?AW_TerrainId(map):-1);
 }
 static __inline__ int AW_MapId(const char *name)
 {
@@ -174,7 +185,7 @@ static __inline__ const char *AW_MapTitle(int id)
 {
     static const char *const titles[AW_MAP_COUNT] = {"Imperial Prison Ship","Seyda Neen","Census and Excise Office","Arrille's Tradehouse","Census and Excise Warehouse","Draren Thiralas' House","Eldafire's House","Erene Llenim's Shack","Fargoth's House","Fine-Mouth's Shack","Foryn Gilnith's Shack","Indrele Rathryon's Shack","Lighthouse","Terurise Girvayne's House","Vodunius Nuccius' House","Addamasartus","Balmora","Astius Hanotepelus' House","Balyn Omarel's House","Caius Cosades' House","Clagius Clanler: Outfitter","Council Club","Dorisa Darvel: Bookseller","Dralasa Nithryon: Pawnbroker","Dralcea Arethi's House","Dralosa Athren's House","Drarayne Thelas' House","Drarayne Thelas' Storage","Dura gra-Bol's House","Eastern Guard Tower","Eight Plates","Fast Eddie's House","Guild of Fighters","Guild of Mages","Hecerinde's House","Hlaalo Manor","Hlaalu Council Manor","Itan's House","Karlirah's House","Lucky Lockup","Meldor: Armorer","Milie Hastien: Fine Clothier","Morag Tong Guild","Nalcarya of White Haven: Fine Alchemist","Nerano Manor","Nine Toes' House","Ra'Virr: Trader","Rarayn Radarys' House","Rithleen's House","South Wall Cornerclub","Temple","The Razor Hole","Tsiya's House","Tyermaillin's House","Tyravel Manor","Vorar Helas' House","Vori's House","Western Guard Tower North","Western Guard Tower South","Tharys Ancestral Tomb"};
     if(id>=AW_MAP_COUNT && id<AW_INTERIOR_MAP_BASE)
-        return id-AW_MAP_COUNT>=AW_SOLSTHEIM_TERRAIN_BASE?"Solstheim":"Vvardenfell";
+        return AW_TerrainLand(id-AW_MAP_COUNT);
     if(id>=AW_INTERIOR_MAP_BASE && id<AW_INTERIOR_MAP_END)return "Abaelun Mine";
     if(id>=AW_TOWN_MAP_BASE && id<AW_TOWN_INTERIOR_BASE)return AW_TownExtraTitle(id-AW_TOWN_MAP_BASE);
     if(id>=AW_TOWN_INTERIOR_BASE && id<AW_TOWN_INTERIOR_BASE+AW_TOWN_INTERIOR_COUNT)return AW_TownInteriorTitle(id-AW_TOWN_INTERIOR_BASE);

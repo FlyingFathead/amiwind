@@ -39,7 +39,11 @@
 #include "aw_hand_models.h"
 #include "aw_reset.h"
 #include "aw_story.h"
+#include "aw_spelllist.h"
+#include "aw_iteminfo.h"
+#include "aw_tryalloc.h"
 
+static void give_spell_command(int first);   /* DBG-GIVE-SPELL-67, below */
 static int cast_on=1;              /* dbg cast casting on|off */
 #define SCALE .25f                 /* original units -> map units (tools/prepare_quake.py SCALE) */
 #define UNITS_PER_FOOT 21.333333f  /* original units a foot (an area's radius; OpenMW Constants::UnitsPerFoot) */
@@ -350,6 +354,31 @@ static int item_magic(const aw_inventory_item_t *it,item_magic_t *out){
     magic_kept[k].v=*out;magic_kept[k].ok=out->n>0;
     return out->n>0;
 }
+/* INVENTORY-ITEM-INFO-67 (aw_iteminfo.h aw_worldui_enchant_lines): IT's enchantment as the original's tooltip lists
+ * it, one line per effect ("Jump 10 pts for 30 secs on Self"; a Constant Effect's without duration and range), the
+ * effect's name and the attribute or skill it names as the spell lists build them (aw_spelllist.c); '\n' between.
+ * One read of the enchantment's rows, when the information box opens. 1 when it wrote any. */
+static int item_magic_lines(const aw_inventory_item_t *it,char *out,int size){
+    item_magic_t mg;aw_sl_effect_t x;char line[AW_SL_TEXT*2];int i,at=0,group,n;
+    if(!out || size<1)return 0;
+    out[0]=0;
+    if(!item_magic(it,&mg))return 0;
+    for(i=0;i<mg.n;i++){
+        memset(&x,0,sizeof(x));
+        x.effect=mg.e[i].effect;x.range=mg.e[i].range;x.area=mg.e[i].area;x.duration=mg.e[i].duration;
+        x.min=mg.e[i].magnitude_min;x.max=mg.e[i].magnitude_max;x.flags=mg.m[i].flags;
+        Q_strncpy(x.name,mg.m[i].name,sizeof(x.name)-1);
+        AW_EffectKind(mg.e[i].effect,&group);
+        if(group==0 && mg.e[i].attribute>=0)Q_strncpy(x.arg,(char *)AW_StatsAttributeName(mg.e[i].attribute),sizeof(x.arg)-1);
+        else if(group==4 && mg.e[i].skill>=0)Q_strncpy(x.arg,(char *)AW_StatsSkillName(mg.e[i].skill),sizeof(x.arg)-1);
+        n=AW_SpellEffectText(&x,mg.type==AW_ENCH_CONSTANT-1,line,sizeof(line));
+        if(at && at<size-1)out[at++]='\n';
+        if(at+n>size-1)n=size-1-at;
+        if(n>0){memcpy(out+at,line,(size_t)n);at+=n;}
+        out[at]=0;
+    }
+    return at>0;
+}
 /* OpenMW CastSpell::cast(item) for the player's IT (ENCHANTMENT MG): the charge of a When Used or When Strikes item
  * by the Enchant skill (refused with the failure sound when too little; god mode free), the skill's use, a Cast Once
  * item used up; then Self on the player, Touch on TARGET, and Target on TARGET (a strike) or as a bolt (a use, BOLT).
@@ -388,13 +417,18 @@ static int item_cast(const aw_inventory_item_t *it,const item_magic_t *mg,edict_
     }
     return 1;
 }
-/* Cast When Used / Cast Once: the selected item, with magic ready (the cast button) or dbg cast now */
-static void use_item(const aw_inventory_item_t *it){
+/* Cast When Used / Cast Once: the selected item, with magic ready (the cast button) or dbg cast now; and (SCROLL-CAST-64,
+ * v0.0.67) a Cast Once item used in the inventory window. 1 when it was cast. */
+static int use_item(const aw_inventory_item_t *it){
     item_magic_t mg;
-    if(it->enchant_kind!=AW_ENCH_USED && it->enchant_kind!=AW_ENCH_ONCE)return;
-    if(!item_magic(it,&mg)){say("This item has no effect in this build.");return;}
+    if(it->enchant_kind!=AW_ENCH_USED && it->enchant_kind!=AW_ENCH_ONCE)return 0;
+    if(!item_magic(it,&mg)){say("This item has no effect in this build.");return 0;}
     lock_until=(float)sv.time+CAST_SECONDS;
-    if(item_cast(it,&mg,NULL,1)){item_uses++;Con_DPrintf("Used %s (%s)\n",it->name,it->enchant_kind==AW_ENCH_ONCE?"cast once":"when used");}
+    if(!item_cast(it,&mg,NULL,1))return 0;
+    item_uses++;
+    Con_Printf("Used %s (%s): %d effects, %d left.\n",it->name,it->enchant_kind==AW_ENCH_ONCE?"cast once":"when used",mg.n,
+               (int)AW_StateGet(&aw_state,AW_ITEM,it->id));
+    return 1;
 }
 /* WEAPON-STRIKE-ENCHANT-NOT-CAST-61 (aw_combat.h aw_combat_strike_enchant): a blow of ATTACKER reached VICTIM */
 #define NPC_CHARGES 16
@@ -542,6 +576,17 @@ static void cast_release(void){
     if(ranges&(1<<AW_RANGE_TOUCH)){touch();if(!look_held)AW_MagicCastLook(first_mgef(AW_RANGE_TOUCH),AW_RANGE_TOUCH,0,0);}
     if(ranges&(1<<AW_RANGE_TARGET)){launch();if(!look_held)AW_MagicCastLook(first_mgef(AW_RANGE_TARGET),AW_RANGE_TARGET,0,0);}
 }
+/* SCROLL-CAST-64 (aw_inventory.h aw_worldui_cast): the inventory window's Use on a Cast Once item, cast at once as the
+ * cast button casts a selected magic item (the maintainer's decision of 18 November 2026: a scroll is used, not read),
+ * with the cast button's refusals: casting off, no game, dead, a script's DisablePlayerMagic or DisablePlayerControls
+ * (OpenMW playercontrols.lua: no spell stance then), a cast still under way. The magic window's Magic Items stay. */
+static int inventory_cast(const aw_inventory_item_t *it){
+    if(!it || it->enchant_kind!=AW_ENCH_ONCE || !cast_on || !sv.active || !sv_player || sv_player->v.health<=0)return 0;
+    if(!AW_ControlAllowed(AW_CONTROL_PLAYER|AW_CONTROL_MAGIC)){say("You cannot use magic now.");return 0;}
+    if(lock_until>(float)sv.time+CAST_SECONDS)lock_until=0;
+    if(sv.time<lock_until || pending)return 0;
+    return use_item(it);
+}
 
 /* one carried item of AW_InventoryCarried: a Magic Items row when it can be cast (AW_MagicSelectable) */
 static void window_item(void *ctx,int state_row,const aw_inventory_item_t *it,int file_row){
@@ -603,6 +648,9 @@ void AW_CastFrame(void){
     edict_t *p=sv_player;
     aw_magic_castables=window_castables;aw_magic_select=window_select;aw_magic_status=window_status;
     aw_combat_strike_enchant=strike_enchant;
+    aw_worldui_cast=inventory_cast;   /* SCROLL-CAST-64: Use on a scroll in the inventory window */
+    aw_worldui_enchant_lines=item_magic_lines;   /* INVENTORY-ITEM-INFO-67: an enchantment's lines in its box */
+    aw_inventory_give_spell=give_spell_command;  /* DBG-GIVE-SPELL-67: dbg give spell, through the inventory command */
     if(!sv.active || !p || p->free)return;
     bolts_frame((float)host_frametime);
     /* a magic item newly selected (aw_magic select ID) deselects the spell */
@@ -723,6 +771,98 @@ static void spell_command(int A){
 }
 #undef ARG
 #undef ARGS
+/* ---- DBG-GIVE-SPELL-67: dbg give spell [ID / all / list [N]] (the maintainer, 18 November 2026: the spells of the
+ * game's files, one or all of them in their base form) ----
+ * The list is the actor table's spells (ASPT: every spell an actor, a script, the starting rule or a trap names) of the
+ * kinds a player can know and cast: spells and powers (abilities, blights, diseases and curses are not given). It is
+ * read once when the box opens or a word needs it (about seven small reads a row), held while the box is open and
+ * freed when it closes; nothing resident. The player's list keeps at most AW_ACTOR_SPELLS changes. */
+#include "aw_listbox.h"
+#define GIVE_SPELL_LABEL 56
+typedef struct {int row;unsigned char power;char label[GIVE_SPELL_LABEL];} give_spell_t;
+static give_spell_t *gs;static int gs_n,gs_ms;
+static void gs_free(void){free(gs);gs=NULL;gs_n=0;}
+static int gs_order(const void *a,const void *b){
+    return Q_strcasecmp((char *)((const give_spell_t *)a)->label,(char *)((const give_spell_t *)b)->label);
+}
+/* every spell and power of the table, by name: "Fireball (fireball)", "Mark [power] (mark)"; how many */
+static int gs_load(void){
+    int rows=AW_ActorSpellCount(),i,type,cost;char name[32],id[40];double t0=Sys_FloatTime();
+    gs_free();
+    if(rows<=0 || !(gs=(give_spell_t *)AW_TryCalloc((unsigned long)rows,sizeof(*gs))))return 0;
+    for(i=0;i<rows;i++){
+        if(!AW_ActorSpellInfo(i,&type,name,sizeof(name),&cost) || (type!=AW_SPELL_TYPE_SPELL && type!=AW_SPELL_TYPE_POWER))
+            continue;
+        AW_ActorSpellId(i,id,sizeof(id));
+        gs[gs_n].row=i;gs[gs_n].power=(unsigned char)(type==AW_SPELL_TYPE_POWER);
+        Q_snprintf(gs[gs_n].label,GIVE_SPELL_LABEL,"%s%s (%s)",name[0]?name:id,type==AW_SPELL_TYPE_POWER?" [power]":"",id);
+        gs_n++;
+    }
+    if(gs_n>1)qsort(gs,(size_t)gs_n,sizeof(*gs),gs_order);
+    gs_ms=(int)((Sys_FloatTime()-t0)*1000);
+    return gs_n;
+}
+/* give row ROW to the player: 1 given, 2 already known, 0 refused (no room in the player's list) */
+static int give_spell_row(int row){
+    aw_actor_t *p=AW_ActorPlayer();
+    if(!p)return 0;
+    if(AW_ActorHasSpell(p,row))return 2;
+    return AW_ActorAddSpell(p,row)?1:0;
+}
+static const char *gs_label(void *ctx,int row){(void)ctx;return row>=0 && row<gs_n?gs[row].label:"";}
+static int gs_category(void *ctx,int row){(void)ctx;return row>=0 && row<gs_n && gs[row].power?2:1;}
+static void gs_chosen(void *ctx,int row){
+    int r;char line[96];(void)ctx;
+    if(row<0 || row>=gs_n)return;
+    r=give_spell_row(gs[row].row);
+    Q_snprintf(line,sizeof(line),r==1?"You learn %s.":r==2?"You already know %s.":"No room for %s in your spells.",gs[row].label);
+    say(line);Con_Printf("%s\n",line);
+}
+static void gs_closed(void *ctx){(void)ctx;gs_free();}
+static void give_spell_command(int first){
+    int argc=Cmd_Argc()-first,i,given=0,known=0,no_room=0;const char *w=argc>0?Cmd_Argv(first):"";
+    if(!AW_ActorSpellCount()){Con_Printf("dbg give spell: no spell table in this build.\n");return;}
+    if(!AW_ActorPlayer()){Con_Printf("dbg give spell: no game.\n");return;}
+    if(argc==0){   /* the list box: Spells and Powers, type to search, Enter gives one */
+        static const char *const cats[3]={"All","Spells","Powers"};
+        aw_listbox_spec_t spec;
+        if(!gs_load()){Con_Printf("dbg give spell: no spell to list.\n");return;}
+        memset(&spec,0,sizeof(spec));
+        spec.title="Give a spell (Enter: learn it)";spec.count=gs_n;spec.label=gs_label;spec.chosen=gs_chosen;
+        spec.closed=gs_closed;spec.category_names=cats;spec.categories=3;spec.category=gs_category;
+        Con_Printf("dbg give spell: %d spells and powers, read in %d ms.\n",gs_n,gs_ms);
+        if(!AW_ListBoxOpen(&spec)){Con_Printf("dbg give spell: the list cannot open now (dbg give spell list [N]).\n");gs_free();}
+        return;
+    }
+    if(!Q_strcasecmp((char *)w,"list")){   /* the same list on the console, a page of 20 */
+        int page=argc>1?Q_atoi(Cmd_Argv(first+1)):1,pages;
+        if(!gs_load()){Con_Printf("dbg give spell: no spell to list.\n");return;}
+        pages=(gs_n+19)/20;if(page<1)page=1;if(page>pages)page=pages;
+        for(i=(page-1)*20;i<gs_n && i<page*20;i++)Con_Printf(" %s\n",gs[i].label);
+        Con_Printf("Page %d of %d (%d spells and powers; dbg give spell list N, dbg give spell ID, dbg give spell all).\n",
+                   page,pages,gs_n);
+        gs_free();return;
+    }
+    if(!Q_strcasecmp((char *)w,"all")){   /* every listed one, in its base form */
+        if(!gs_load()){Con_Printf("dbg give spell: no spell to list.\n");return;}
+        for(i=0;i<gs_n;i++){int r=give_spell_row(gs[i].row);if(r==1)given++;else if(r==2)known++;else no_room++;}
+        Con_Printf("dbg give spell all: %d learnt, %d known before, %d refused (the player's list keeps %d changes) of %d.\n",
+                   given,known,no_room,AW_ACTOR_SPELLS,gs_n);
+        {char line[96];Q_snprintf(line,sizeof(line),"You learn %d spells and powers.",given);say(line);}
+        gs_free();return;
+    }
+    {   /* one by its record id, case ignored */
+        char id[40];int rows=AW_ActorSpellCount(),type,cost,r;char name[32];
+        for(i=0;i<rows;i++)if(AW_ActorSpellId(i,id,sizeof(id)) && !Q_strcasecmp(id,(char *)w))break;
+        if(i==rows || !AW_ActorSpellInfo(i,&type,name,sizeof(name),&cost)){
+            Con_Printf("dbg give spell: no spell %s in this build (dbg give spell list).\n",w);return;}
+        if(type!=AW_SPELL_TYPE_SPELL && type!=AW_SPELL_TYPE_POWER){
+            Con_Printf("dbg give spell: %s is not a spell or a power (type %d).\n",w,type);return;}
+        r=give_spell_row(i);
+        Con_Printf("%s %s (%s).\n",r==1?"Learnt":r==2?"Already known:":"No room for",name[0]?name:id,id);
+        if(r==1){char line[96];Q_snprintf(line,sizeof(line),"You learn %s.",name[0]?name:id);say(line);}
+    }
+}
 /* aw_magicfx's words for casting (no command or setting of its own: the resident registry budget): "ready" (R),
  * "spell ...", "now", "casting on|off". 1 when the word was one of these. */
 int AW_CastCommand(void){

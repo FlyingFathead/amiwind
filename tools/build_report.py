@@ -959,8 +959,15 @@ def reuse(ctx):
     args, cache = ctx.args, ctx.stage_cache
     lines = []
     source = cache.get('reuse_from') or getattr(args, 'reuse_from', None)
+    # the default of a plain build (BUILD-OFFER-EARLIER-RUNS-67, tools/reuse_all.py settle_default)
+    default = ctx.metadata.get('reuse_default') or getattr(args, 'reuse_default_record', None)
+    if isinstance(default, dict):
+        lines.append('Reuse of earlier builds: %s (%s)%s' % (
+            'on' if default.get('on') else 'off', default.get('selected_by'),
+            '; asked: %s' % default['answered_by'] if default.get('answered_by') else ''))
     if getattr(args, 'reuse_all_available', False):
-        lines.append('Reuse: every earlier run of the workspace (--reuse-all-available)')
+        lines.append('Reuse: every earlier run of the workspace (--reuse-all-available%s)'
+                     % (', the default of this build' if isinstance(default, dict) and default.get('on') else ''))
     lines.append('Reuse source: %s' % (ctx.path(source) if source else 'none (every stage runs)'))
     mode = cache.get('reuse_mode') or getattr(args, 'reuse_mode', None)
     lines.append('Reuse mode: %s' % (mode or '-'))
@@ -993,6 +1000,12 @@ def reuse(ctx):
     if stops:
         lines.append('Reuse stops (the stored units the build would make again):')
         lines += ['  %s: %s' % (row[0], ctx.path(_short(row[1]))) for row in stops if len(row) >= 2]
+    notices = (cache.get('minute_one') or {}).get('notices') or []
+    if notices:
+        lines.append('Reuse notices (the default build made this stored work again and went on):')
+        lines += ['  %s: %s' % (row[0], ctx.path(_short(row[1]))) for row in notices if len(row) >= 2]
+    if isinstance(default, dict) and default.get('notice'):
+        lines += [ctx.path(line) for line in default['notice']]
     allowed = (cache.get('minute_one') or {}).get('allowed') or {}
     if allowed:
         lines.append('Allowed to rebuild: ' + '; '.join('%s: %s' % pair for pair in sorted(allowed.items())))

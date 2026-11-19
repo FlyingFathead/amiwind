@@ -3,12 +3,25 @@
 #include "aw_maps.h"
 #include "aw_world.h"
 #include <assert.h>
-static int opens,missing_map,broken_names,old_names,no_directory;
+static int opens,missing_map,broken_names,old_names,no_directory,mournhold_rows;
 void Con_Printf(char *fmt,...){}
 static void word(FILE *f,unsigned n){int i;for(i=0;i<4;i++)fputc((n>>(8*i))&255,f);}
 static void number(FILE *f,float value){unsigned n;memcpy(&n,&value,4);word(f,n);}
 int COM_FOpenFile(char *name,FILE **out){
     if(!strcmp(name,"world/regions-sl.awr")){*out=NULL;return -1;}   /* no Solstheim rows on this disk */
+    if(!strcmp(name,"world/regions-mh.awr")){
+        /* Mournhold's rows (argument "mournhold"): Godsreach's two cells -12,-30 and -12,-29, a cell 2048 map units */
+        float mh[2][11]={{-23552,-60416,0,-1024,-1024,1024,1024,-1920,-1920,1920,1920},
+                         {-23552,-58368,0,-1024,-1024,1024,1024,-1920,-1920,1920,1920}};
+        FILE *g;int r,c;
+        if(!mournhold_rows){*out=NULL;return -1;}   /* no Mournhold rows on this disk */
+        g=tmpfile();assert(g);*out=g;fputs("AWS1",g);word(g,2);
+        for(r=0;r<2;r++){
+            char id[8]={0};sprintf(id,"mh%04d",r);fwrite(id,1,8,g);
+            for(c=0;c<11;c++)number(g,mh[r][c]);
+        }
+        rewind(g);return 8+2*52;
+    }
     FILE *f=tmpfile();int i,k;float towns[2][7]={{0,0,0,-200,-200,200,200},{4096,0,0,-200,-200,200,200}};
     float rows[2][11]={{1024,0,512,-1024,-1024,1024,1024,-1920,-1920,1920,1920},
                        {3072,0,768,-1024,-1024,1024,1024,-1920,-1920,1920,1920}};
@@ -129,9 +142,27 @@ static int loaded_map_without_directory(void){
     puts("no region table: dbg tp resolves inside the loaded map only");
     return 0;
 }
+/* The Tribunal layer's own small map: Mournhold's district rows (world/regions-mh.awr, mhNNNN) follow Vvardenfell's
+ * in the one table; a point in a district is found by its coordinates, a walk from one cell of a district into the
+ * next crosses between their maps, and Vvardenfell's rows answer as before. */
+static int mournhold(void){
+    float s[3],b[3],c[3];char target[16];
+    mournhold_rows=1;
+    s[0]=-12*8192+4096;s[1]=-30*8192+4096;s[2]=NAN;
+    assert(AW_WorldMapTarget(s,target,b) && !strcmp(target,"mh0000") && b[0]==0 && b[1]==0);
+    assert(!strcmp(AW_MapTitle(AW_MapId(target)),"Mournhold"));
+    b[1]=1100;b[2]=0;assert(AW_WorldDestination("mh0000",b,target,c));
+    assert(!strcmp(target,"mh0001") && c[0]==0 && c[1]==-948 && AW_WorldContains("mh0001",c));
+    assert(AW_WorldToSource("mh0001",c,s) && s[0]==-12*8192+4096 && s[1]==-30*8192+4096+4400);
+    s[0]=4000;s[1]=0;s[2]=NAN;assert(AW_WorldMapTarget(s,target,b) && !strcmp(target,"vf0000") && b[0]==-24);
+    s[0]=-12*8192+4096;s[1]=-27*8192;assert(!AW_WorldMapTarget(s,target,b));   /* past the district: no map */
+    puts("mournhold rows: found by coordinates, crossed cell to cell, Vvardenfell unchanged");
+    return 0;
+}
 int main(int argc,char **argv){
     float a[3]={240,0,40},b[3],c[3],source[3];char target[16];int before;
     if(argc>1 && !strcmp(argv[1],"no-directory"))return loaded_map_without_directory();
+    if(argc>1 && !strcmp(argv[1],"mournhold"))return mournhold();
     frame_maps();
     /* with the region table on the disk the loaded map is never asked: the table answers (or refuses) as before */
     source[0]=-8000+400;source[1]=12000-200;source[2]=0;frame_name="seyda";
@@ -142,9 +173,13 @@ int main(int argc,char **argv){
     /* Outdoor save IDs stay fixed when interior sections are appended. */
     /* Vvardenfell's region maps take the terrain IDs 0..4095, Solstheim's frame maps slNNNN 4096..8191
      * (WORLD-REGION-NAMES-VF-ONLY-64): the last outdoor ID and the interior base stay where they were. */
-    assert(AW_MapId("vf4095")==4155 && AW_MapId("sl4095")==8251 && AW_INTERIOR_MAP_BASE==8252);
-    assert(!strcmp(AW_MapName(4155),"vf4095") && !strcmp(AW_MapName(8251),"sl4095"));
-    assert(AW_MapId("vf4096")==-1 && AW_MapId("sl4096")==-1 && AW_MapId("vf8191")==-1);
+    /* Mournhold's district frame maps mhNNNN take the block's last 256 IDs, 7936..8191 (Solstheim's 4096..7935) */
+    assert(AW_MapId("vf4095")==4155 && AW_MapId("sl3839")==7995 && AW_MapId("mh0000")==7996 &&
+           AW_MapId("mh0255")==8251 && AW_INTERIOR_MAP_BASE==8252);
+    assert(!strcmp(AW_MapName(4155),"vf4095") && !strcmp(AW_MapName(7995),"sl3839") && !strcmp(AW_MapName(8251),"mh0255"));
+    assert(AW_MapId("vf4096")==-1 && AW_MapId("sl3840")==-1 && AW_MapId("sl4096")==-1 && AW_MapId("mh0256")==-1 &&
+           AW_MapId("vf8191")==-1);
+    assert(!strcmp(AW_MapTitle(7996),"Mournhold") && !strcmp(AW_IslandOf("mh0003"),"Mournhold"));
     assert(AW_MapId("vf12")==-1 && AW_MapId("vf001x")==-1);
     assert(!strcmp(AW_MapName(AW_MAP_COUNT+1),"vf0001"));
     assert(AW_WorldDestination("seyda",a,target,b));

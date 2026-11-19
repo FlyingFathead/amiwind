@@ -264,6 +264,15 @@ def hull_surface_gate(area, models, prepared, mesh_fps, archive, mode, jobs, cac
     return over
 
 
+def mesh_units_with_method2(kind, items, worker, jobs, cache):
+    """run_units, with the method-2 meshes of the plain 'mesh' pass on their own unit kind and worker
+    (model_method2.run_mesh_units, MODEL-REPLACEMENT-OBJ-67); every other mesh and every other kind as run_units."""
+    if kind == 'mesh':
+        from model_method2 import run_mesh_units
+        return run_mesh_units(items, worker, jobs, cache, kind)
+    return run_units(kind, items, worker, jobs, cache)
+
+
 def gated_mesh_units(area, items, flight_meshes, models, archive, mode, jobs, cache, run=None, gate=None):
     """(prepared, mesh_fps) of an area's meshes, each set behind the collision surface gate as soon as it is made (fail
     fast, CHIM-MESH-STAIR-UNIT-SLOW-67, BUILD-STAIR-MESH-UNIT-SLOW-67): the plain mesh units, the gate on them, then
@@ -273,7 +282,7 @@ def gated_mesh_units(area, items, flight_meshes, models, archive, mode, jobs, ca
     gate on an iceberg shard that holds no flight. The units, their keys and the gate's verdict are as before; only
     the order changes. ITEMS: [(fp, (mi, model, profile, archive, textures))] by model index; RUN and GATE stand in
     for run_units and hull_surface_gate in tests."""
-    run = run or run_units
+    run = run or mesh_units_with_method2
     gate = gate or hull_surface_gate
     prepared, mesh_fps = {}, {}
     plain = [mi for mi in range(len(items)) if mi not in flight_meshes]
@@ -1971,9 +1980,11 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
     flatten = load_profiles(scene_kind='exterior')
     profiles, items = {}, []
     from visual_recipes import load_recipes, apply_recipe, everywhere_recipe
+    from model_method2 import apply_method2, is_method2, load_table as load_method2, unit_kind as method2_kind
     recipe_name = settings.get('visual_recipe')
     recipes = load_recipes()
     everywhere = everywhere_recipe(recipes)
+    method2_table = load_method2()
     archive = work / 'scenery/scenery.mwpak'
     budget = detail_budget(area_cut_settings(settings, settings_override).get('detail_budget'))
     from mesh_geometry import UNDERSIDE_DEPTH, STANDING_ROOM_DEPTH
@@ -2058,14 +2069,22 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
         # cell's own recipe left as they were; AMIWIND_VISUAL_EVERYWHERE=off keeps the originals
         if everywhere and 'visual_recipe' not in profile:
             profile = apply_recipe(profile, model, everywhere, recipes)
+        # method 2 (config/model-method-2.json, MODEL-REPLACEMENT-OBJ-67): a model's hand-made mesh wherever it is
+        # placed, keyed by path + NIF SHA-256; AMIWIND_MODEL_METHOD=1 or the row's "method": 1 keeps method 1
+        profile = apply_method2(profile, model, method2_table)
+        if is_method2(profile) and mi in flight_meshes:
+            raise ValueError('%s: a method-2 row and a stair flight on one mesh (config/model-method-2.json)'
+                             % model['source'])
         model['_profile'] = profile
         profiles[model['source']] = profile
-        fp = mesh_fingerprint(model, profile, index['textures'], 'mesh-stair' if mi in flight_meshes else 'mesh')
+        fp = mesh_fingerprint(model, profile, index['textures'],
+                              'mesh-stair' if mi in flight_meshes else method2_kind(profile))
         if model['source'] in rebuild_meshes:
             fp = fingerprint('mesh', fp, 'rebuild', time.time_ns())
         items.append((fp, (mi, model, profile, archive, index['textures'])))
     # (the gate's seconds now count in the 'meshes' section: it runs between the plain and the stair units)
     with timer.section('meshes'):
+        # (the plain pass puts the method-2 meshes on their own unit kind: mesh_units_with_method2)
         prepared, mesh_fps = gated_mesh_units(town, items, flight_meshes, index['models'], archive, hull_points, jobs,
                                               cache)
     if stair_collision == '1':

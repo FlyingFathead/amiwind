@@ -37,6 +37,7 @@
 #include "aw_animpick.h"
 #include "aw_move.h"       /* the sneak for the body's sneak groups (PLAYER-ANIM-GROUPS-NOT-PLAYED-66) */
 #include "aw_msgbox.h"     /* the death box's button rectangles (MSGBOX-NO-CURSOR-62) */
+#include "aw_tryalloc.h"   /* dbg camera held's measure, allocated per call (CONFIRMED-LOOKBOOK-67) */
 
 extern cvar_t chase_active;
 /* The hooks (defined beside their callers, NULL in fixtures without this file). */
@@ -52,6 +53,7 @@ extern void (*aw_view_draw)(void);
 extern void (*aw_combat_scene)(void);
 extern int (*aw_view_fullscreen)(void);
 extern int (*aw_view_orbiting)(void);
+extern void (*aw_view_turned)(void);   /* cl_parse.c: the server set the view (svc_setangle) */
 extern int (*aw_hand_parts_apply)(const char *race,int female,int stance,int frame);   /* aw_hand_models.c */
 extern struct model_s *(*aw_view_hand_part)(int i);                                     /* r_main.c */
 int AW_ArenaActive(void);
@@ -90,6 +92,9 @@ static aw_death_t death;
 static int death_mouse_x=-1,death_mouse_y=-1;   /* the death box's pointer (MSGBOX-NO-CURSOR-62) */
 static int ready,pov_down,pov_tapped,input_seen,owned,last_view=-1,warned,death_arena,acted;
 static vec3_t anchor,last_angles,death_angles;
+/* VIEW-VANITY-UNDOES-SET-VIEW-67: the game turned the player since the last frame (cl_parse.c svc_setangle) */
+static int view_forced;
+static void view_turned(void) {view_forced=1;}
 static char load_text[160]="The most recent Save Game is '%s'. \nWould you like to load it?";
 static char yes_text[16]="Yes",no_text[16]="No";
 static char save_label[64];
@@ -192,6 +197,24 @@ static void parts_release(void) {
  * (every part in the frame that needs the body, the parts left to the cache's LRU) */
 static cvar_t player_cache_cvar={"aw_player_cache","1"};
 static void part_pin(model_t *m,int on){if(m)Cache_Pin(&m->cache,on && player_cache_cvar.value);}
+/* FP-ARMS-NO-MODEL-SLOT-67 (the maintainer, 2026-11-18: swapping races and sexes unloads what was before): a part model
+ * that leaves its set (the body's or the first-person arms', on a race, sex or outfit change) is released at once
+ * (Mod_ReleaseAlias: its data freed, its slot in the engine's model table free for the next model), unless the other
+ * set draws it. Before, the old sets were only unpinned: each kept its slot, optional models are admitted only below
+ * the table's static base or into a released slot (model.c Mod_CanFindName), and after six race and sex changes in one
+ * place the Khajiit's arm parts found no slot, the arms fell back to the legacy hand model and the held light was not
+ * drawn. dbg race also releases both sets at the swap (AW_ViewPartsUnload). */
+static unsigned long parts_released;
+static void part_drop(model_t *m);
+/* model.c's NL_UNREFERENCED (its loader states are private there; model.c and model.h are not changed here: their
+ * bytes key the world stages): a released slot (tests/test_fp_hands_per_race.py checks the two agree) */
+#define VIEW_NL_UNREFERENCED 2
+/* the one place every race or sex change passes (the maintainer, 2026-11-18: dbg race, dbg set race, aw_quickchar_set,
+ * the character menus, New Game, a load): the body and the arms read the race and sex each frame they are drawn;
+ * a change since the last assembly releases both old sets at once (AW_ViewPartsUnload) before the new ones load */
+static char parts_race_seen[64];
+static int parts_female_seen=-1;
+static void parts_race_check(const char *race,int female);
 static aw_parts_body_t pend;
 static model_t *pend_models[AW_PARTS_MAX];
 static char pend_sig[sizeof(parts_sig)];
@@ -203,6 +226,7 @@ static int parts_in_use(const model_t *m){int i;for(i=0;i<AW_PARTS_MAX;i++)if(pa
 static int parts_ready(const char *race,int female) {
     const char *items[AW_PARTS_ITEMS],*head=NULL,*hair=NULL;char sig[sizeof(parts_sig)];
     aw_parts_body_t next;int n=0,s,i,ok,mark;byte *text;double t0,start;
+    parts_race_check(race,female);
     if(!parts_cvar.value || parts_failed)return 0;
     if(aw_character.valid){
         if(aw_character.head>=0 && aw_character.head<aw_part_count)head=aw_parts[aw_character.head].id;
@@ -230,7 +254,10 @@ static int parts_ready(const char *race,int female) {
         }
         if(!AW_SkelTableFor(next.table)){parts_failed=1;pend_on=0;Con_Printf("Assembled player body: no table %s.\n",next.table);return 0;}
         /* an assembly left unfinished: its parts no longer kept (those the body in use draws stay pinned) */
-        for(i=0;i<pend_count;i++)if(pend_models[i] && !parts_in_use(pend_models[i]))part_pin(pend_models[i],0);
+        for(i=0;i<pend_count;i++)if(pend_models[i] && !parts_in_use(pend_models[i])){
+            model_t *old=pend_models[i];
+            pend_models[i]=NULL;part_pin(old,0);part_drop(old);
+        }
         pend=next;strcpy(pend_sig,sig);pend_on=1;pend_next=pend_count=pend_frames=0;pend_t=0;
         pend_loads=aw_file_finds;
         memset(pend_models,0,sizeof(pend_models));
@@ -258,16 +285,22 @@ static int parts_ready(const char *race,int female) {
         pend_t+=Sys_FloatTime()-start;
         t0=Sys_FloatTime()-pend_t;      /* parts_ms below: the loading time in all, over its frames */
         pend_on=0;pend_frames++;
-        /* the parts of the body in use that the new one does not keep: back to the cache's LRU */
-        for(i=0;i<AW_PARTS_MAX;i++)if(part_models[i]){
-            int k,kept=0;
-            for(k=0;k<pend_count;k++)if(pend_models[k]==part_models[i])kept=1;
-            if(!kept)part_pin(part_models[i],0);
+        /* the parts of the body in use that the new one does not keep: unpinned, and released once the new set is the
+         * body's (FP-ARMS-NO-MODEL-SLOT-67) */
+        {
+            model_t *gone[AW_PARTS_MAX];int k,g=0;
+            for(i=0;i<AW_PARTS_MAX;i++)if(part_models[i]){
+                int kept=0;
+                for(k=0;k<pend_count;k++)if(pend_models[k]==part_models[i])kept=1;
+                if(!kept){part_pin(part_models[i],0);gone[g++]=part_models[i];}
+            }
+            parts_table=table;
+            parts_release();
+            parts=pend;parts.count=s=pend_count;
+            memcpy(part_models,pend_models,sizeof(part_models));
+            memset(pend_models,0,sizeof(pend_models));pend_count=0;
+            for(k=0;k<g;k++)part_drop(gone[k]);
         }
-        parts_table=table;
-        parts_release();
-        parts=pend;parts.count=s=pend_count;
-        memcpy(part_models,pend_models,sizeof(part_models));
         Con_Printf("Assembled player body: %d parts, %lu file lookups, %.0f ms over %d frames (%lu KB kept).\n",
             s,aw_file_finds-pend_loads,pend_t*1000,pend_frames,aw_cache_pinned_bytes/1024);
     }
@@ -313,10 +346,39 @@ static const aw_skel_table_t *hparts_table;
 static char hparts_sig[sizeof(parts_sig)];
 static int hparts_failed,hparts_built,hparts_shown,hparts_frame;
 static double hparts_ms;
+/* FP-ARMS-NO-MODEL-SLOT-67: the race, sex and outfit whose arm parts all found no model slot: the baked arms draw for
+ * it, and the parts are tried again at the next change (before, hparts_failed held them off for the session) */
+static char hparts_noslot_sig[sizeof(parts_sig)];
+static int hparts_in_use(const model_t *m){int i;for(i=0;i<AW_PARTS_MAX;i++)if(hpart_models[i]==m)return 1;return 0;}
+static int pend_in_use(const model_t *m){int i;for(i=0;i<pend_count;i++)if(pend_models[i]==m)return 1;return 0;}
+/* M, a part model that left its set: released now unless a set still draws it (FP-ARMS-NO-MODEL-SLOT-67) */
+static void part_drop(model_t *m) {
+    if(!m || m->type!=mod_alias || m->needload==VIEW_NL_UNREFERENCED || strncmp(m->name,"progs/parts/",12) ||
+       parts_in_use(m) || hparts_in_use(m) || pend_in_use(m))return;
+    part_pin(m,0);Mod_ReleaseAlias(m);parts_released++;
+}
+static model_t *hold_models[AW_PARTS_MAX];   /* the arms' set being replaced (hand_parts_ready) */
+static void hparts_drop_old(void) {
+    int i;
+    for(i=0;i<AW_PARTS_MAX;i++){model_t *m=hold_models[i];hold_models[i]=NULL;part_drop(m);}
+}
+extern int mod_numknown;   /* model.c: the slots of the loaded-model table (ENGINE-MODEL-TABLE-58) */
+/* the model table's slots in use (not released) and how many of them are the player's part models (progs/parts/) */
+static int model_slots_in_use(int *part_slots) {
+    int i,used=0,parts_n=0;
+    for(i=0;i<mod_numknown;i++){
+        model_t *m=Mod_Known(i);
+        if(m->needload==VIEW_NL_UNREFERENCED)continue;
+        used++;if(!strncmp(m->name,"progs/parts/",12))parts_n++;
+    }
+    if(part_slots)*part_slots=parts_n;
+    return used;
+}
 /* 0 = no arms from parts now (the baked arms draw); 1 = the parts are those of what is worn; 2 = assembled now */
 static int hand_parts_ready(const char *race,int female) {
-    const char *items[AW_PARTS_ITEMS];char sig[sizeof(hparts_sig)];aw_parts_body_t next;int n=0,s,i,ok,mark;
+    const char *items[AW_PARTS_ITEMS];char sig[sizeof(hparts_sig)];aw_parts_body_t next;int n=0,s,i,ok,mark,noslot=0;
     byte *text;double t0;
+    parts_race_check(race,female);
     if(!hand_parts_cvar.value || hparts_failed || !race)return 0;
     /* what is worn, as the body asks it (parts_ready): ids straight from the state, a string compare per frame */
     for(s=AW_SLOT_HELMET;s<=AW_SLOT_ROBE && n<AW_PARTS_ITEMS;s++)
@@ -324,21 +386,26 @@ static int hand_parts_ready(const char *race,int female) {
     snprintf(sig,sizeof(sig),"%s|%d",race,female);
     for(i=0;i<n;i++){size_t used=strlen(sig);snprintf(sig+used,sizeof(sig)-used,"|%s",items[i]);}
     if(hparts.count && hparts_table && !strcmp(sig,hparts_sig))return 1;
+    if(hparts_noslot_sig[0] && !strcmp(sig,hparts_noslot_sig))return 0;
     t0=Sys_FloatTime();
     mark=Hunk_LowMark();text=COM_LoadHunkFile("view/parts_1st.txt");
     ok=text && AW_PartsAssemble((const char *)text,com_filesize,race,female,NULL,NULL,items,n,&next);
     Hunk_FreeToLowMark(mark);
     /* ARRIVAL-LONG-FRAME-DEV6-59: the arms' parts are kept (pinned) while worn; the old set back to the LRU (a part
      * the new set keeps is pinned again below, still in memory: no disk read) */
+    /* the set in use: unpinned; released below once the new set is loaded (those it keeps stay: no disk read) */
+    memcpy(hold_models,hpart_models,sizeof(hold_models));
     for(i=0;i<AW_PARTS_MAX;i++)if(hpart_models[i] && !parts_in_use(hpart_models[i]))part_pin(hpart_models[i],0);
     hparts.count=0;memset(hpart_models,0,sizeof(hpart_models));
     if(!ok){
+        hparts_drop_old();
         hparts_failed=1;
         Con_Printf("First-person arms from parts unavailable (%s, %s): the baked arms draw.\n",
             text?"no recipe for this race and sex":"no view/parts_1st.txt in this image",race);
         return 0;
     }
     if(!(hparts_table=AW_SkelTableFor(next.table)) || hparts_table->frames<HAND_PART_FRAMES*HAND_PART_MELEE){
+        hparts_drop_old();
         hparts_failed=1;Con_Printf("First-person arms from parts: no usable table %s: the baked arms draw.\n",next.table);
         return 0;
     }
@@ -346,6 +413,7 @@ static int hand_parts_ready(const char *race,int female) {
     for(i=0,s=0;i<next.count;i++){
         model_t *m;aliashdr_t *h;
         if(!Mod_CanFindName(next.model[i])){
+            noslot++;
             Con_Printf("First-person arms from parts: no model slot for %s (slot %d).\n",next.model[i],next.slot[i]);
             continue;
         }
@@ -360,7 +428,15 @@ static int hand_parts_ready(const char *race,int female) {
         hpart_models[s]=m;strcpy(hparts.model[s],next.model[i]);hparts.slot[s]=next.slot[i];s++;
     }
     hparts.count=s;
-    if(!s){hparts_failed=1;Con_Printf("First-person arms from parts: no part loaded: the baked arms draw.\n");return 0;}
+    hparts_drop_old();
+    if(!s){
+        /* every part refused a slot: this outfit only (tried again at the next change); any other cause: the session */
+        if(noslot==next.count)strcpy(hparts_noslot_sig,sig);else hparts_failed=1;
+        Con_Printf("First-person arms from parts: no part loaded%s: the baked arms draw.\n",
+            noslot==next.count?" (no model slot; tried again at the next change)":"");
+        return 0;
+    }
+    hparts_noslot_sig[0]=0;
     strcpy(hparts_sig,sig);hparts_built++;hparts_ms=(Sys_FloatTime()-t0)*1000;
     Con_Printf("First-person arms from parts: %d parts in %.0f ms (%lu KB kept).\n",s,hparts_ms,aw_cache_pinned_bytes/1024);
     return 2;
@@ -389,17 +465,20 @@ static struct model_s *hand_part(int i) {
     if(!hparts_shown || cl.viewent.model!=hpart_models[0] || cl.viewent.frame!=hparts_frame)return NULL;
     return i>0 && i<hparts.count?hpart_models[i]:NULL;
 }
-/* aw_hand_models.c (aw_hand_parts_shield_tag, HELD-LIGHT-OWN-MODEL-61): the arms' shield bone at this frame's table
- * frame as a tag in the view model's space (the table's root carries the view: tools/prepare_player_fp_parts.py) */
-static int hand_parts_shield_tag(float tag[6]) {
+/* aw_hand_models.c (aw_hand_parts_bone_tag; HELD-LIGHT-OWN-MODEL-61, FP-TORCH-HAND-REGRESSION-67): the bone of HAND
+ * (AW_HAND_LEFT the shield bone, AW_HAND_RIGHT the weapon bone) of the arms drawn now, at this frame's table frame, as a
+ * tag in the view model's space (the table's root carries the view: tools/prepare_player_fp_parts.py): the one place
+ * every held item of first person rides */
+static int hand_parts_bone_tag(int hand,float tag[6]) {
     static float world[AW_SKEL_MAX_BONES][3][4];static const aw_skel_table_t *posed;static int posed_frame=-1;
     float scale[3],w=hparts.weight>0?hparts.weight:1,h=hparts.height>0?hparts.height:1;
-    if(!hparts_shown || !hparts_table || hparts.shield_bone<0 || hparts.shield_bone>=hparts_table->bones)return 0;
+    int bone=hand==AW_HAND_LEFT?hparts.shield_bone:hparts.weapon_bone;
+    if(!hparts_shown || !hparts_table || bone<0 || bone>=hparts_table->bones)return 0;
     if(posed!=hparts_table || posed_frame!=hparts_frame){
         AW_SkelPose(hparts_table,(float)hparts_frame,world);posed=hparts_table;posed_frame=hparts_frame;
     }
     scale[0]=scale[1]=w*.25f;scale[2]=h*.25f;
-    AW_SkelBoneTag((const float (*)[4])world[hparts.shield_bone],scale,tag);
+    AW_SkelBoneTag((const float (*)[4])world[bone],scale,tag);
     return 1;
 }
 static int body_find(const char *race,int female) {
@@ -871,8 +950,48 @@ again:
                                    dt*(move!=AW_PM_NONE && rate>0?rate:1),1,NULL);
     }
 }
+/* ---- the body's animation state across camera and control changes (PLAYER-VANITY-WALK-STUCK-67) ----
+ * The maintainer, 18 November 2026, on the v0.0.67-dev2 image: after the idle vanity orbit (also after view switches,
+ * perhaps noclip) the player's walk and run no longer played in third person (the body glided, small jerks, as if the
+ * group restarted every frame) while attacks, the sneak and swimming still played; a map load brought them back. A
+ * load re-makes the body's animation state; a camera or control change did not. Now every change of what that state
+ * lives through (aw_view.h aw_view_body_sig_t: the view mode, noclip, swimming, a menu or dialogue over play, the body
+ * drawn or not) restarts it as a load does: the move group, the jump and landing state, the weapon stance's pick and
+ * clock, the turn on the spot. The restarts, and the move group's and the air state's changes a second (a group
+ * restarted every frame shows there), are in "dbg camera". */
+static aw_view_body_sig_t body_sig;
+static int body_restart_on=1;   /* dbg camera motion restart on/off (not saved): off = the earlier way, for comparison */
+static struct {unsigned long restarts,switches,air_flips,window_switches,window_air,rate_switches,rate_air;double window;
+               int last_group,last_air;float speed;char why[24];} motion;
+static void body_motion_restart(const char *why) {
+    AW_ViewBodyRestart(&body_play,&body_air);
+    stance.picked=0;stance.t=0;stance.group[0]=0;stance.from=stance.to=-1;stance.rule=NULL;
+    memset(&turn,0,sizeof(turn));
+    motion.restarts++;strncpy(motion.why,why,sizeof(motion.why)-1);motion.why[sizeof(motion.why)-1]=0;
+}
+/* once a frame, after the view's own changes (AW_ViewFrame): a change of the signature restarts the body's animation */
+static void body_motion_check(edict_t *p) {
+    aw_view_body_sig_t now,was=body_sig;
+    memset(&now,0,sizeof(now));
+    now.valid=1;now.mode=view.mode;now.movetype=p?(int)p->v.movetype:-1;now.swimming=p && p->v.waterlevel>=2;
+    now.playing=key_dest==key_game && !con_forcedup;now.drawn=owned;
+    if(AW_ViewBodySigChanged(&body_sig,&now) && body_restart_on)
+        body_motion_restart(!was.valid?"map":was.mode!=now.mode?"view":was.movetype!=now.movetype?"movetype":
+                            was.swimming!=now.swimming?"water":was.playing!=now.playing?"menu":"drawn");
+}
+/* the body's move group and air state, counted a second at a time (the diagnosis of a group restarted every frame) */
+static void body_motion_count(int air,float speed) {
+    if(body_play.group!=motion.last_group){motion.switches++;motion.window_switches++;motion.last_group=body_play.group;}
+    if((air>=0)!=motion.last_air){motion.air_flips++;motion.window_air++;motion.last_air=air>=0;}
+    motion.speed=speed;
+    if(realtime-motion.window>=1 || realtime<motion.window){
+        motion.rate_switches=motion.window_switches;motion.rate_air=motion.window_air;
+        motion.window_switches=motion.window_air=0;motion.window=realtime;
+    }
+}
+float AW_ViewRaceHeight(void) {return body_parts && parts.height>.5f && parts.height<2?parts.height:1;}
 entity_t *AW_ViewBody(entity_t *ent) {
-    float speed,rate=1,dt=(float)host_frametime;int group,block=-1,air,fists,layer;edict_t *p=local_player();
+    float speed=0,rate=1,dt=(float)host_frametime;int group,block=-1,air,fists,layer;edict_t *p=local_player();
     held_visible=0;held_cursor=held_draw_count=0;
     if(!owned || !body_ready() || orbit.active)return NULL;     /* the orbit: the player is not there */
     fists=body_fists_ready(p);
@@ -890,6 +1009,7 @@ entity_t *AW_ViewBody(entity_t *ent) {
         death.stage==AW_DEATH_NONE && p && p->v.movetype==MOVETYPE_WALK && p->v.waterlevel<2,
         p && !((int)p->v.flags&FL_ONGROUND),p && p->v.velocity[2]>0,fists,dt);
     if(air>=0)body.frame=air;
+    body_motion_count(air,speed);
     if(death.stage==AW_DEATH_NONE && (layer=body_hand_layer(p,body.frame))>=0)body.frame=layer;
     if(death.stage==AW_DEATH_NONE && (layer=body_stance_frame(p,group,air>=0,dt,rate))>=0)body.frame=layer;
     if(death.stage==AW_DEATH_NONE && (block=body_block_frame(dt))>=0)body.frame=block;
@@ -1352,7 +1472,7 @@ void AW_ViewDraw(void) {
         snprintf(text,sizeof(text),"%.*s%s%s",n,load_text,save_label,at+2);
     }else strcpy(text,load_text);
     AW_UIBox(x,y,w,h);
-    AW_UICenteredLines(x+6,y+4,w-12,h-38,text);
+    AW_UICenteredLines(x+6,y+4,w-12,h-40,text);   /* above the buttons (UI-NO-SHARED-LAYOUT-67: they rose 2 rows) */
     for(i=0;i<death.count;i++){
         AW_DeathBoxButtonRect(death.count,i,vid.width,vid.height,r);   /* the pointer's rectangles too */
         AW_UIBox(r[0],r[1],r[2],r[3]);
@@ -1374,7 +1494,8 @@ static int playing(void) {
     return key_dest==key_game && !cl.paused && !con_forcedup && !AW_IntroUse();
 }
 void AW_ViewFrame(void) {
-    float dt=(float)host_frametime;int input,dead,mode_before;edict_t *p;
+    float dt=(float)host_frametime;int input,dead,mode_before,forced=view_forced;edict_t *p;
+    view_forced=0;      /* a turn the game made counts in this frame only */
     if(!ready)load_settings();
     if(dt<0)dt=0;
     if(dt>.25f)dt=.25f;
@@ -1394,6 +1515,12 @@ void AW_ViewFrame(void) {
     if(distance_cvar.value>=rules.min_distance && distance_cvar.value<=rules.max_distance && distance_cvar.value!=view.distance &&
        view.mode!=AW_VIEW_DEATH)view.distance=distance_cvar.value;
     /* aw_view_third set from the console or a config: the primary mode */
+    if((int)view_cvar.value!=last_view && AW_ViewLockedMode(&view)>=0){
+        /* dbg setpov: the lock holds; the setting follows it */
+        int third=AW_ViewLockedMode(&view)==AW_VIEW_THIRD;
+        if((int)view_cvar.value!=third)Cvar_SetValue(view_cvar.name,(float)third);
+        last_view=third;
+    }
     if((int)view_cvar.value!=last_view){
         int want=view_cvar.value?AW_VIEW_THIRD:AW_VIEW_FIRST;
         if(last_view>=0 && view.mode!=AW_VIEW_DEATH){
@@ -1424,10 +1551,10 @@ void AW_ViewFrame(void) {
             warned=1;view.mode=view.primary=AW_VIEW_FIRST;
         }
         if(view.mode==AW_VIEW_PREVIEW || view.mode==AW_VIEW_VANITY){
-            if(mode_before!=view.mode)VectorCopy(cl.viewangles,anchor);
-            /* the mouse turns the camera, not the player (camera.lua Preview) */
-            view.orbit_yaw+=cl.viewangles[YAW]-anchor[YAW];view.orbit_pitch+=cl.viewangles[PITCH]-anchor[PITCH];
-            VectorCopy(anchor,cl.viewangles);
+            /* the mouse turns the camera, not the player (camera.lua Preview); a turn the game made is the player's
+             * new heading and stays (VIEW-VANITY-UNDOES-SET-VIEW-67: it counts as input, so the vanity orbit ends
+             * there; before, the anchor was copied back over it) */
+            AW_ViewOrbitHold(&view,cl.viewangles,anchor,mode_before!=view.mode,forced);
         }else if(mode_before==AW_VIEW_PREVIEW){
             /* leaving the orbit: the player turns to the camera's heading (OpenMW turns the
              * character gradually, deferredPreviewRotation; AmiWind turns at once) */
@@ -1447,6 +1574,7 @@ void AW_ViewFrame(void) {
     }
     input_seen=pov_tapped=0;VectorCopy(cl.viewangles,last_angles);
     set_chase(AW_ViewBehind(&view));
+    body_motion_check(p);   /* PLAYER-VANITY-WALK-STUCK-67: a camera or control change restarts the body's animation */
 }
 void AW_ViewInput(int key,int down) {
     (void)key;
@@ -1465,20 +1593,127 @@ void AW_ViewSceneSpawn(void) {
     AW_ViewInventoryClear();
     AW_ItemsAliasClear();held_cursor=held_draw_count=0;
     memset(&body_air,0,sizeof(body_air));
+    body_sig.valid=0;   /* PLAYER-VANITY-WALK-STUCK-67: the new map's first frame restarts the body's animation */
     if(death.stage!=AW_DEATH_NONE)end_death();
     body_model=held_model=NULL;body_race=-2;body_torch=body_water=held_visible=torch_failed=water_failed=0;body_emitter.count=0;
     held_path[0]=0;held_next=0;
     /* a new map flushes the models: the parts are looked up again (the recipe read again at the first draw) */
     memset(part_models,0,sizeof(part_models));parts.count=0;parts_sig[0]=0;parts_table=NULL;body_parts=0;parts_failed=0;
+    hparts_noslot_sig[0]=0;     /* FP-ARMS-NO-MODEL-SLOT-67: the flush frees slots: the arms are tried again */
+}
+/* aw_view.h (FP-ARMS-NO-MODEL-SLOT-67, DBG-RACE-SWAP-67): a race or sex swap releases what the old one wore at once:
+ * the body's and the first-person arms' part models are unpinned and released, and both sets are assembled again for
+ * the new race and sex at the next frame that draws them. Prints the model table before and after, by number. */
+void AW_ViewPartsUnload(void) {
+    int i,before_parts,after_parts,before=model_slots_in_use(&before_parts),after;
+    model_t *gone[3*AW_PARTS_MAX];int g=0;
+    for(i=0;i<AW_PARTS_MAX;i++){
+        if(part_models[i])gone[g++]=part_models[i];
+        if(hpart_models[i])gone[g++]=hpart_models[i];
+        if(i<pend_count && pend_models[i])gone[g++]=pend_models[i];
+    }
+    for(i=0;i<g;i++)part_pin(gone[i],0);
+    memset(part_models,0,sizeof(part_models));parts.count=0;parts_sig[0]=0;body_parts=0;pend_on=0;
+    memset(pend_models,0,sizeof(pend_models));pend_count=0;
+    memset(hpart_models,0,sizeof(hpart_models));hparts.count=0;hparts_sig[0]=0;hparts_shown=0;hparts_noslot_sig[0]=0;
+    parts_failed=hparts_failed=0;        /* a refusal of the old race's data is not the new one's */
+    for(i=0;i<g;i++)part_drop(gone[i]);
+    if(aw_character.valid && aw_character.race>=0 && aw_character.race<aw_race_count){
+        snprintf(parts_race_seen,sizeof(parts_race_seen),"%s",aw_races[aw_character.race].id);
+        parts_female_seen=aw_character.female?1:0;
+    }
+    after=model_slots_in_use(&after_parts);
+    Con_Printf("Player parts released: model table %d slots in use (%d player parts) before, %d (%d) after; "
+               "%lu released in all.\n",before,before_parts,after,after_parts,parts_released);
+}
+static void parts_race_check(const char *race,int female) {
+    if(!race)return;
+    if(parts_female_seen>=0 && (parts_female_seen!=(female?1:0) || Q_strcasecmp(parts_race_seen,(char *)race)))
+        AW_ViewPartsUnload();
+    snprintf(parts_race_seen,sizeof(parts_race_seen),"%s",race);parts_female_seen=female?1:0;
+}
+/* aw_view.h (DBG-RACE-SWAP-67): 1 = RACE (a race id) and sex are a beast race by the body recipe's skeleton row (the
+ * builder writes it from the race's Beast flag, tools/prepare_player_parts.py race_rows), 0 not, -1 unknown (no recipe
+ * for it). One file read; nothing kept. */
+int AW_ViewRaceBeast(const char *race,int female) {
+    aw_parts_body_t next;byte *text;int mark,ok;
+    if(!race)return -1;
+    mark=Hunk_LowMark();text=COM_LoadHunkFile("view/parts.txt");
+    ok=text && AW_PartsAssemble((const char *)text,com_filesize,race,female,NULL,NULL,NULL,0,&next);
+    Hunk_FreeToLowMark(mark);
+    return ok?(next.beast?1:0):-1;
+}
+/* aw_quickchar.c aw_race_swapped (dbg race, DBG-RACE-SWAP-67): after a race or sex swap, the new race's equip rules at
+ * once (a beast race: nothing over the head, nothing on the feet, AW_InventoryBeastRefusal; each such piece back into
+ * the inventory, one line per item) and the old race's body and arm parts released (AW_ViewPartsUnload). Returns the
+ * items unequipped; *BEAST: 1 a beast race, 0 not, -1 unknown. */
+extern int (*aw_race_swapped)(int *beast);
+static int race_swapped(int *beast) {
+    int s,dropped=0,b=-1;
+    if(aw_character.valid && aw_character.race>=0 && aw_character.race<aw_race_count)
+        b=AW_ViewRaceBeast(aw_races[aw_character.race].id,aw_character.female?1:0);
+    for(s=0;s<AW_INVENTORY_SLOTS && b>0;s++){
+        aw_inventory_item_t it;const char *why;
+        if(!AW_InventoryEquippedItem(s,&it) || !(why=AW_InventoryBeastRefusal(&it,1)))continue;
+        if(AW_InventoryUnequip(&aw_state,it.id)){
+            dropped++;
+            Con_Printf("Race swap: %s (%s) back into the inventory: the new race cannot wear it (%s).\n",it.name,it.id,why);
+        }
+    }
+    AW_ViewPartsUnload();
+    if(beast)*beast=b;
+    return dropped;
 }
 
 /* The vanity orbit now, until any input (dbg vanitycamera on, dbg camera vanity now). */
+/* dbg setpov (aw_view.h AW_ViewLock; FP-TORCH-HAND-REGRESSION-67): the view locked in a mode for the test stills, with a
+ * message on the screen and in the console; nothing else switches it until dbg setpov off */
+static const char *mode_name(int m);
+static int pov_locked_say(void) {
+    if(AW_ViewLockedMode(&view)<0)return 0;
+    Con_Printf("POV locked: %s (dbg setpov off unlocks it).\n",mode_name(AW_ViewLockedMode(&view)));return 1;
+}
+/* the view as dbg setpov's number: 1 first person, 2 the vanity camera, 3 third person; 0 another (orbit, death) */
+static int pov_number(int mode) {
+    return mode==AW_VIEW_FIRST?1:mode==AW_VIEW_VANITY?2:mode==AW_VIEW_THIRD?3:0;
+}
+static void setpov_command(void) {
+    const char *a=Cmd_Argc()>1?Cmd_Argv(1):"";int mode=-2;char line[96];
+    if(!ready)load_settings();
+    if(!*a){
+        int locked=AW_ViewLockedMode(&view);
+        Con_Printf("POV: %s (setpov %d), primary %s; %s%s\n",mode_name(view.mode),pov_number(view.mode),
+                   mode_name(view.primary),locked<0?"not locked":"locked: ",locked<0?"":mode_name(locked));
+        return;
+    }
+    /* the maintainer's numbers (2026-11-18): 1 first person, 2 the vanity camera, 3 third person; the words alias them */
+    if(!strcmp(a,"1") || !Q_strcasecmp((char *)a,"first"))mode=AW_VIEW_FIRST;
+    else if(!strcmp(a,"2") || !Q_strcasecmp((char *)a,"vanity"))mode=AW_VIEW_VANITY;
+    else if(!strcmp(a,"3") || !Q_strcasecmp((char *)a,"third"))mode=AW_VIEW_THIRD;
+    else if(!Q_strcasecmp((char *)a,"off"))mode=-1;
+    if(mode==-2){Con_Printf("Usage: dbg setpov [1 first | 2 vanity | 3 third | off]\n");return;}
+    if(mode==-1){
+        if(AW_ViewLockedMode(&view)<0){Con_Printf("POV is not locked.\n");return;}
+        AW_ViewLock(&view,-1);view.mode=view.primary;
+        snprintf(line,sizeof(line),"POV unlocked: %s",mode_name(view.mode));
+    }else{
+        if(mode!=AW_VIEW_FIRST && !body_ready()){Con_Printf("No player body in this image: first person only.\n");return;}
+        if(death.stage!=AW_DEATH_NONE){Con_Printf("POV: not while the death camera runs.\n");return;}
+        if(orbit.active)AW_ViewOrbitEnd(0);
+        if(mode==AW_VIEW_VANITY)VectorCopy(cl.viewangles,anchor);
+        AW_ViewLock(&view,mode);vanity_forced=mode==AW_VIEW_VANITY;
+        Cvar_SetValue(view_cvar.name,(float)(view.primary==AW_VIEW_THIRD));last_view=(int)view_cvar.value;
+        snprintf(line,sizeof(line),"POV locked: %s (setpov %d)",mode_name(mode),pov_number(mode));
+    }
+    Con_Printf("%s.\n",line);AW_UISubtitle("",line,4);
+}
 static void vanity_start(void) {
     if(!ready)load_settings();
     if(!AW_StoryViewAllowed()){Con_Printf("Vanity camera: character registration is not complete.\n");return;}
     if(!AW_ControlAllowed(AW_CONTROL_VANITY)){Con_Printf("Vanity camera: a script has switched it off.\n");return;}
     if(!body_ready()){Con_Printf("No player body in this image (--player-body on builds it): no vanity camera.\n");return;}
     if(death.stage!=AW_DEATH_NONE || !local_player()){Con_Printf("Vanity camera: not now.\n");return;}
+    if(pov_locked_say())return;
     view.idle=rules.vanity_delay+1;VectorCopy(cl.viewangles,anchor);
     view.mode=AW_VIEW_VANITY;view.orbit_yaw=view.orbit_pitch=0;vanity_forced=1;
     Con_Printf("Vanity camera: orbiting until any input.\n");
@@ -1538,6 +1773,130 @@ static void zoom_command(void) {
     AW_ViewZoom(&view,&rules,clicks*rules.zoom_step);
     input_seen=1;
 }
+/* ---- dbg camera held (CONFIRMED-LOOKBOOK-67, FP-TORCH-OUT-OF-HAND-67): the light in the left hand against the hand
+ * it is drawn in, by number, for the look book's page HELD-LIGHT-IN-HAND (docs/LOOKBOOK.md). Read only, on demand:
+ * the vertices of the arms (first person) or of the body (third person) that hang on the left hand (the shield bone's
+ * parent and the bones under it, the shield bone left out), posed and placed as the renderer draws them, against the
+ * light's drawn place and every one of its own vertices. Nothing is kept (memory note: debug tools take the least
+ * memory): the hand's point list of at most HELD_POINTS (7 KB) and the posed bones (3 KB) are allocated for the call and
+ * freed after it; the light's vertices are measured as they are placed, none stored. */
+#define HELD_POINTS 600
+static float (*held_hand_points)[3],(*held_world)[3][4];
+static int held_under(const aw_skel_table_t *t,int bone,int root) {
+    int i;
+    for(i=0;i<AW_SKEL_MAX_BONES && bone>=0 && bone<t->bones;i++){if(bone==root)return 1;bone=t->parent[bone];}
+    return 0;
+}
+/* a point of a model's own space as the alias renderer places it (the tag composition the held items use) */
+static void held_place(const float origin[3],const float angles[3],const float p[3],float out[3]) {
+    float tag[6],a[3];
+    tag[0]=p[0];tag[1]=p[1];tag[2]=p[2];tag[3]=tag[4]=tag[5]=0;
+    AW_BlockCompose(origin,angles,tag,out,a);
+}
+/* the vertices of the part M (on table T, posed as WORLD) that hang on HAND or a bone under it and not on SKIP, as
+ * drawn: the pose quantised into the model's bytes and read back by its scale and origin, times the axis SCALE, placed
+ * at ORIGIN and ANGLES; appended to the hand points from N; the new count */
+static int held_hand(model_t *m,const aw_skel_table_t *t,const float world[][3][4],int hand,int skip,const float origin[3],
+                     const float angles[3],const float scale[3],int n) {
+    aliashdr_t *h;mdl_t *pmdl;aw_skel_block_t block;const unsigned char *v;int i,j,k;
+    if(!m || m->type!=mod_alias || !(h=(aliashdr_t *)Mod_Extradata(m)) || !h->aw_skel)return n;
+    pmdl=(mdl_t *)((byte *)h+h->model);
+    if(!AW_SkelBlockHead((byte *)h+h->aw_skel,AW_SKEL_BLOCK_HEAD+(long)pmdl->numverts*AW_SKEL_VERT_BYTES,pmdl->numverts,
+                         &block))return n;
+    for(i=0,v=block.data;i<pmdl->numverts && n<HELD_POINTS;i++,v+=AW_SKEL_VERT_BYTES){
+        int b=v[0];float in[3],pos,p[3];
+        if(b>=t->bones || b==skip || !held_under(t,b,hand))continue;
+        for(k=0;k<3;k++)in[k]=(float)(short)((v[4+2*k]<<8)|v[5+2*k])*block.rest_scale;
+        for(k=0;k<3;k++){
+            pos=world[b][k][3];
+            for(j=0;j<3;j++)pos+=world[b][k][j]*in[j];
+            p[k]=block.pose_step[k]!=0?((pos-block.pose_origin[k])/block.pose_step[k]*pmdl->scale[k]+pmdl->scale_origin[k])*
+                 scale[k]:0;
+        }
+        held_place(origin,angles,p,held_hand_points[n++]);
+    }
+    return n;
+}
+static float held_nearest(const float a[3],int n);
+/* every vertex of the light model's one frame placed at ORIGIN and ANGLES, against the N hand points: the nearest
+ * distance into *GAP (-1 none); the vertex count (all of them: nothing is stored per vertex) */
+static int held_item(model_t *m,const float origin[3],const float angles[3],int n,float *gap) {
+    aliashdr_t *h;mdl_t *pmdl;trivertx_t *v;int i,k;float p[3],at[3],d;
+    *gap=-1;
+    if(!m || m->type!=mod_alias || !(h=(aliashdr_t *)Mod_Extradata(m)))return 0;
+    pmdl=(mdl_t *)((byte *)h+h->model);v=(trivertx_t *)((byte *)h+h->frames[0].frame);
+    for(i=0;i<pmdl->numverts;i++){
+        for(k=0;k<3;k++)p[k]=v[i].v[k]*pmdl->scale[k]+pmdl->scale_origin[k];
+        held_place(origin,angles,p,at);
+        if((d=held_nearest(at,n))>=0 && (*gap<0 || d<*gap))*gap=d;
+    }
+    return pmdl->numverts;
+}
+static float held_nearest(const float a[3],int n) {
+    float best=-1,d,x,y,z;int i;
+    for(i=0;i<n;i++){
+        x=a[0]-held_hand_points[i][0];y=a[1]-held_hand_points[i][1];z=a[2]-held_hand_points[i][2];d=x*x+y*y+z*z;
+        if(best<0 || d<best)best=d;
+    }
+    return best<0?-1:(float)sqrt(best);
+}
+static void held_measure(void);
+static void held_report(void) {
+    unsigned long bytes=(unsigned long)HELD_POINTS*sizeof(float[3])+AW_SKEL_MAX_BONES*sizeof(float[3][4]);
+    void *block=AW_TryMalloc(bytes);
+    if(!block){Con_Printf("held light: no memory for the measure (%lu bytes)\n",bytes);return;}
+    held_world=(float (*)[3][4])block;
+    held_hand_points=(float (*)[3])(held_world+AW_SKEL_MAX_BONES);
+    held_measure();
+    free(block);held_hand_points=NULL;held_world=NULL;
+}
+static void held_measure(void) {
+    float (*world)[3][4]=held_world;
+    const aw_held_light_t *l=AW_HeldLight();const char *id=aw_state.inventory.equipped[AW_SLOT_LEFT];
+    float origin[3],angles[3],scale[3]={1,1,1},attach,gap=-1;int n=0,items,i,hand,third=chase_active.value!=0;model_t *lm;
+    if(!l){
+        Con_Printf("held light: none lit in the left hand (%s)%s\n",id[0]?id:"nothing equipped there",
+                   AW_TorchEquipped()?"; the carried torch's baked arms are drawn (the torch and the hand one model)":"");
+        return;
+    }
+    if(third){
+        if(!body_parts || !parts_table || parts.shield_bone<0 || parts.shield_bone>=parts_table->bones){
+            Con_Printf("held light: third person, %s: the body is not assembled from parts; not measured\n",id);return;
+        }
+        if(!held_light_placed(1)){Con_Printf("held light: third person, %s: not placed in the last frames\n",id);return;}
+        memcpy(origin,held_light_place,sizeof(origin));memcpy(angles,held_light_place+3,sizeof(angles));
+        hand=parts_table->parent[parts.shield_bone];
+        {
+            float layer;int root;
+            if(parts_light_layer(body.frame,&layer,&root))AW_SkelPoseLayer(parts_table,(float)body.frame,layer,root,world);
+            else AW_SkelPose(parts_table,(float)body.frame,world);
+        }
+        scale[0]=scale[1]=parts.weight>0?parts.weight:1;scale[2]=parts.height>0?parts.height:1;
+        for(i=0;i<parts.count;i++)
+            n=held_hand(part_models[i],parts_table,(const float (*)[3][4])world,hand,parts.shield_bone,body.origin,
+                        body.angles,scale,n);
+    }else{
+        if(!hparts_shown || !hparts_table || hparts.shield_bone<0 || hparts.shield_bone>=hparts_table->bones){
+            Con_Printf("held light: first person, %s: the arms are not drawn from parts; not measured\n",id);return;
+        }
+        if(!aw_hand_held_light || !aw_hand_held_light(origin,angles)){
+            Con_Printf("held light: first person, %s: not drawn in the last frame\n",id);return;
+        }
+        hand=hparts_table->parent[hparts.shield_bone];
+        AW_SkelPose(hparts_table,(float)hparts_frame,world);
+        for(i=0;i<hparts.count;i++)
+            n=held_hand(hpart_models[i],hparts_table,(const float (*)[3][4])world,hand,hparts.shield_bone,
+                        cl.viewent.origin,cl.viewent.angles,scale,n);
+    }
+    if(hand<0 || !n){Con_Printf("held light: %s person, %s: no vertex hangs on the left hand (bone %d)\n",third?"third":"first",
+                                id,hand);return;}
+    lm=Mod_ForName((char *)l->model,false);
+    items=held_item(lm,origin,angles,n,&gap);
+    attach=held_nearest(origin,n);
+    Con_Printf("held light: %s person, %s (%s); left hand bone %d, %d hand vertices, %d light vertices; attach point "
+               "%.1f units from the hand, nearest vertex %.1f units from the hand\n",third?"third":"first",id,l->model,hand,
+               n,items,attach,gap);
+}
 static const char *mode_name(int m) {
     return m==AW_VIEW_THIRD?"third person":m==AW_VIEW_PREVIEW?"orbit (Toggle POV held)":m==AW_VIEW_VANITY?"vanity orbit":
            m==AW_VIEW_DEATH?"death camera":"first person";
@@ -1565,7 +1924,13 @@ static void command(void) {
             for(i=0;i<hparts.count;i++)Con_Printf(" %d",hparts.slot[i]);
             Con_Printf("\n");
         }else Con_Printf("First-person arms: the baked arms (%s)\n",!hand_parts_cvar.value?"aw_hand_parts 0":
-            hparts_failed?"parts unavailable in this image":"parts not drawn yet");
+            hparts_failed?"parts unavailable in this image":hparts_noslot_sig[0]?"no model slot for this outfit":
+            "parts not drawn yet");
+        {   /* FP-ARMS-NO-MODEL-SLOT-67: the model table by number (the player's parts of old sets are released) */
+            int part_slots,used=model_slots_in_use(&part_slots);
+            Con_Printf("Model table: %d slots in use of %d known, %d of them player parts; %lu player parts released\n",
+                used,mod_numknown,part_slots,parts_released);
+        }
         /* FP-FOREARMS-BELOW-VIEW-61: the first-person model's own view (view.c) */
         if(aw_fp_view.value)Con_Printf("First-person view: the original's (aw_fp_view 1): its own field %.0f degrees "
             "high, the arms turn %.2f of the pitch; view pitch %.1f, arms pitch %.1f\n",V_FP_FOV,V_FP_NECK,
@@ -1594,9 +1959,18 @@ static void command(void) {
                 stance.group[0]?stance.group:"-",stance.rule?stance.rule:"-",stance.from,stance.to,stance.changes);
             if(p)Con_Printf("Player state: waterlevel %.0f, movetype %.0f, velocity %.1f %.1f %.1f\n",
                 p->v.waterlevel,p->v.movetype,p->v.velocity[0],p->v.velocity[1],p->v.velocity[2]);
+            /* PLAYER-VANITY-WALK-STUCK-67: walking, the move group changes a few times a second at most and the air
+             * state not at all; a group restarted every frame shows as one change per frame */
+            Con_Printf("Body motion: speed %.1f, on ground %d, air %s, group changes %lu in the last second (%lu in all), "
+                "air changes %lu (%lu), restarts %lu (last: %s)%s\n",motion.speed,p?((int)p->v.flags&FL_ONGROUND)!=0:-1,
+                body_air.airborne?"jumping":body_air.landing?"landing":"no",motion.rate_switches,motion.switches,
+                motion.rate_air,motion.air_flips,motion.restarts,motion.why[0]?motion.why:"none",
+                body_restart_on?"":" [restart off: dbg camera motion restart on]");
         }
         return;
     }
+    if(!Q_strcasecmp(a,"held")){held_report();return;}   /* CONFIRMED-LOOKBOOK-67: the grip by number */
+    if((!Q_strcasecmp(a,"first") || !Q_strcasecmp(a,"third") || !Q_strcasecmp(a,"toggle")) && pov_locked_say())return;
     if(!Q_strcasecmp(a,"first")){view.primary=view.mode=AW_VIEW_FIRST;Cvar_SetValue(view_cvar.name,0);last_view=0;return;}
     if(!Q_strcasecmp(a,"third")){Cvar_SetValue(view_cvar.name,1);return;}
     if(!Q_strcasecmp(a,"toggle")){Cvar_SetValue(view_cvar.name,view.primary==AW_VIEW_FIRST);return;}
@@ -1664,7 +2038,15 @@ static void command(void) {
             return;
         }
     }
-    Con_Printf("Usage: dbg camera [first | third | toggle | distance N | vanity on/off/now | death on/off | retry on/off | body on/off | parts on/off | stances on/off | hands on/off | fpview on/off | sway 1/2/bench | npcs [on/off] | die]\n");
+    /* PLAYER-VANITY-WALK-STUCK-67: the restart of the body's animation on camera and control changes, off for a
+     * before/after comparison (not saved) */
+    if(!Q_strcasecmp(a,"motion") && Cmd_Argc()==4 && !Q_strcasecmp(Cmd_Argv(2),"restart")){
+        body_restart_on=!Q_strcasecmp(Cmd_Argv(3),"on");
+        Con_Printf("Body motion restart on camera and control changes: %s\n",
+                   body_restart_on?"on (the default)":"off (the earlier way, for a comparison; not saved)");
+        return;
+    }
+    Con_Printf("Usage: dbg camera [first | third | toggle | distance N | vanity on/off/now | death on/off | retry on/off | body on/off | parts on/off | stances on/off | hands on/off | fpview on/off | sway 1/2/bench | npcs [on/off] | held | motion restart on/off | die]\n");
 }
 void AW_ViewInit(void) {
     Cvar_RegisterVariable(&view_cvar);Cvar_RegisterVariable(&distance_cvar);Cvar_RegisterVariable(&vanity_cvar);
@@ -1673,22 +2055,23 @@ void AW_ViewInit(void) {
     Cvar_RegisterVariable(&stances_cvar);
     aw_hand_weapon_hidden=weapon_hidden;aw_hand_parts_apply=hand_parts_apply;aw_view_hand_part=hand_part;aw_inventory_preview_pending=parts_pending;
     aw_torch_put_away=left_put_away;   /* READY-MAGIC-SHOWS-WEAPON-65: the carried light put away while magic is ready */
-    aw_inventory_player_beast=player_beast;
+    aw_inventory_player_beast=player_beast;aw_race_swapped=race_swapped;
     Cvar_RegisterVariable(&fullview_cvar);Cvar_RegisterVariable(&aw_inventory_preview_reserve);Cvar_RegisterVariable(&aw_inventory_preview_live);
     AW_ViewRulesDefault(&rules);AW_ViewReset(&view,&rules);
     Cmd_AddCommand("+aw_pov",pov_press);Cmd_AddCommand("-aw_pov",pov_release);
     Cmd_AddCommand("aw_view_zoom",zoom_command);Cmd_AddCommand("aw_camera",command);
     Cmd_AddCommand("aw_vanitycam",vanity_command);
+    Cmd_AddCommand("aw_setpov",setpov_command);   /* dbg setpov: the view locked for the test stills */
     aw_death_input_locked=AW_DeathLocked;
     aw_death_mouse=AW_ViewDeathMouse;   /* the death box's pointer (MSGBOX-NO-CURSOR-62) */
     aw_death_prompt_active=death_prompt_active;
     aw_view_frame=AW_ViewFrame;aw_view_camera=AW_ViewCamera;aw_view_body=AW_ViewBody;aw_view_hide_hands=AW_ViewThirdPerson;
     aw_view_held=view_held;aw_view_torch_emitter=view_torch_emitter;aw_view_torch_light=view_torch_light;
     /* HELD-LIGHT-OWN-MODEL-61: the held light's place, flames and arm pose in both views */
-    aw_view_held_flames=view_held_flames;aw_view_held_light=view_held_light;aw_hand_parts_shield_tag=hand_parts_shield_tag;
+    aw_view_held_flames=view_held_flames;aw_view_held_light=view_held_light;aw_hand_parts_bone_tag=hand_parts_bone_tag;
     aw_items_player_layer=player_light_layer;
     if(!R_AliasTorchLayer)R_AliasTorchLayer=AW_ItemsTorchLayer;
     aw_view_input=AW_ViewInput;aw_view_key=AW_ViewKey;aw_view_draw=AW_ViewDraw;aw_view_fullscreen=AW_ViewVanityFullscreen;
-    aw_view_orbiting=AW_ViewOrbiting;
+    aw_view_orbiting=AW_ViewOrbiting;aw_view_turned=view_turned;
     combat_scene=aw_combat_scene;aw_combat_scene=scene_spawn;   /* after AW_CombatInit (aw_debug.c) */
 }

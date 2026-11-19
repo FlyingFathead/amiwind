@@ -42,6 +42,7 @@ static int hud_debug;
 int AW_DebugTestInputActive(void){return hud_debug;}
 void AW_CharacterReset(void){}
 void AW_OpeningDockStatus(void){}
+int AW_OpeningDockRouteArg(const char *word){return 0;}   /* PIER-GUARD-POST-STUCK-67 */
 void AW_SaveReset(void){}
 void IN_AWClearButtons(void){}
 int AW_MusicStartTrack(int track){assert(track==4);return 1;}

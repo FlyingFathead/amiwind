@@ -465,6 +465,7 @@ int AW_ConsoleCharWidth(void);
 int AW_ConsoleCharHeight(void);
 void AW_ConsoleCharacter(int x,int y,int c);
 void AW_ConsoleCharacterRed(int x,int y,int c,int red);
+int AW_ConsoleTextGlyph(int c);   /* a game text's Windows-1252 character as the console fonts draw it (ASCII) */
 void AW_SmallString(int x,int y,const char *text);
 void AW_SmallStringColor(int,int,int,const char *,int);
 int AW_LightGalleryDraw(void);
@@ -534,6 +535,7 @@ extern int (*aw_inventory_intercept)(unsigned reference);   /* aw_inventory.c; a
 int ChimRoom_Hide(unsigned reference,int hide);   /* chim/chim_room.c: a room's placements of REFERENCE out (1) or back */
 int ChimRoom_Has(unsigned reference);             /* chim/chim_room.c: the loaded room's drawn placements of REFERENCE */
 void AW_MwscriptRoomShift(float shift[3]);
+int AW_MwscriptAfterCensus(void);   /* aw_mwhost.c: start AW_AfterCensus on the next tick (DBG-HORS-AFTER-CENSUS-67) */
 int AW_ObjectLockLevel(unsigned int reference,int original);
 int AW_MusicScriptTrack(int track);
 void AW_SceneTick(void);
@@ -736,6 +738,8 @@ void AW_UISubtitle(const char *,const char *,double);
 void AW_UIHeldNotice(const char *text,double duration,double hold);
 int AW_UISubtitleIs(const char *text);
 void AW_UIPickupNotice(const char *text,double duration);
+/* PICKUP-NAME-ONLY-BOX-67: "Picked up NAME." / "Picked up COUNT NAME." (aw_pickup_message 1, the default; 0 none) */
+void AW_UIPickupTaken(const char *name,int count,double duration);
 void AW_UICenterMessage(const char *);
 void AW_UIDraw(void);
 int AW_UIDialogueMethod(void);
@@ -756,6 +760,10 @@ void AW_UIThinBox(int x,int y,int w,int h,int lit);
 void AW_UIButton(int x,int y,int w,int h,const char *text,int lit,int colour);   /* the house button style (UI-THIN-BUTTON-62) */
 /* the same with the keyboard focus shown as the menus' rows show it (RACE-MENU-OK-HIGHLIGHT-65) */
 void AW_UIButtonFocus(int x,int y,int w,int h,const char *text,int focused,int colour);
+/* UI-OK-BUTTON-THIN-FRAME-67: 1 when buttons get the regular thick frame (aw_ui_button_frame, the default), 0 the thin
+ * outline; the text area inside the button's frame, whichever is set */
+int AW_UIButtonThick(void);
+void AW_UIButtonInner(int x,int y,int w,int h,int *ix,int *iy,int *iw,int *ih);
 int AW_SceneUIOption(int option,int change);   /* 0 aimed NPC names, 1 NPC place, 2 object place, 3 name labels (1 AmiWind, 0 Morrowind) */
 int AW_SceneNameLabelsAmiWind(void);          /* INFO-BOX-TEXT-CUT-62: 1 = no box over the view (the default) */
 #define AW_FOCUS_ROWS 12
@@ -791,6 +799,13 @@ int AW_ContentExcludedSay(const char *group,int always);
 void AW_ContentExcludedStartup(void);
 void AW_ExcludedReset(void);
 int AW_TorchTestActive(void);
+/* LIGHTTEST-MAP-67 (aw_gallery.c): the light test corridor (maps/lighttest.bsp) is the scene; entering it captures the
+ * game as the torch test does (1 = on its way), leaving it returns to the captured scene; center = back to its west
+ * end, facing along it */
+int AW_LightTestActive(void);
+int AW_GalleryLightTestEnter(void);
+void AW_GalleryLightTestLeave(void);
+void AW_GalleryLightTestCenter(void);
 int AW_DebugTestInputActive(void);
 int AW_GalleryModal(void);
 void AW_GalleryMouse(int dx,int dy);
@@ -824,6 +839,15 @@ int AW_NavDecode(const byte *,int);
 int AW_NavLoad(const char *);
 int AW_NavStart(edict_t *,vec3_t);
 int AW_NavStartDirect(edict_t *,vec3_t);   /* aw_nav.c: straight to the goal, no path grid (PIER-GUARD-WALKS-INTO-DOOR-65) */
+/* aw_nav.c, PIER-GUARD-POST-STUCK-67: a walk through fixed measured points (no grid, no detour, no side steps), its
+ * stop where the walker stands, its check counters (box inside a solid, waits for someone in the way) and their reset */
+int AW_NavStartFixed(edict_t *,const vec3_t *,int);
+void AW_NavStop(void);
+long AW_NavFixedSolid(void);
+long AW_NavFixedWaits(void);
+long AW_NavFixedSettled(void);   /* fixed walks whose box started inside a solid and was lifted out at their start */
+void AW_NavFixedReset(void);
+int AW_ActorTurnToward(edict_t *,const vec3_t,float,double);   /* aw_nav.c: a slow turn toward a point (NPC-IDLE-TRACK-PLAYER-67) */
 int AW_NavStep(double,int);
 qboolean AW_ActorStep(edict_t *,vec3_t,double);
 qboolean AW_ActorSettle(edict_t *);   /* aw_walk.c: one stuck search after a failed step, its clear spot kept */
@@ -857,6 +881,18 @@ int AW_CompanionPickMode(void);
 int AW_CompanionPickAim(void);
 void AW_CompanionKillMode(void);   /* dbg kill: the red-crosshair kill pick on or off (DBG-KILL-60) */
 void AW_CompanionKillCrime(void);  /* dbg kill crime: the same pick, the kill counted as the player's (CRIME-59) */
+/* DBG-SPAWN-MENU-67: dbg despawn, the same red-crosshair pick: the attack removes the aimed NPC or creature
+ * (aw_companion_despawn), the right button, the second command or Escape leave; aw_companion_placeholder names the
+ * model-only placeholders dbg spawn makes, which the pick also takes */
+void AW_CompanionDespawnMode(void);
+extern void (*aw_companion_despawn)(edict_t *e);
+extern int (*aw_companion_placeholder)(edict_t *e);
+/* dbg spawn [ID [model]] (aw_dbgspawn.c): no ID: the list box; ID: that record in front of the player, "model": only its
+ * model, a placeholder. dbg despawn all (aw_mwhost.c): every actor dbg spawn made on this map goes. */
+void AW_SpawnCommand(const char *id,const char *how);
+void AW_MwscriptDespawnAll(void);
+/* aw_mwhost.c: record ID in front of the player (FULL 1 with its stats, behaviour, items and script; 0 its model only); 1 made */
+int AW_MwscriptSpawn(const char *id,int full);
 /* Hooks set by AW_CompanionInit, defined beside their callers (NULL in
  * fixtures that compile those files alone): view.c, cl_input.c,
  * aw_scene.c, aw_save.c. */
@@ -938,6 +974,10 @@ int AW_IntroSpeak(int role,const char *stem);
 edict_t *AW_IntroRole(int role);
 int AW_OpeningTick(void);
 void AW_OpeningDockStatus(void);   /* aw_opening.c: the dock guard's place and walk for aw_intro_status (PIER-GUARD-WALKS-INTO-DOOR-65) */
+/* aw_opening.c, PIER-GUARD-POST-STUCK-67: the dock guard's fixed points from a place (the second walk or the first),
+ * and the walk's switch from aw_intro_status's word (fixed / direct; 1 when it was one of them) */
+int AW_OpeningPierRoute(const vec3_t from,int second,vec3_t points[6]);
+int AW_OpeningDockRouteArg(const char *word);
 int AW_OpeningLocked(void);
 void AW_OpeningSpawn(void);
 int AW_OpeningUse(void);
@@ -985,6 +1025,7 @@ void AW_UICenteredLinesUpTo(int x,int y,int w,int h,const char *text,int most);
 int AW_UICenteredLinesInk(int w,const char *text,int most);
 int AW_UITextBoxNeeds(int ink);
 int AW_UITextPanel(int x,int bottom,int w,int min_h,const char *text,int most);
+int AW_UIHintBox(int x,int y,int w,int h,const char *text,int most);   /* a box without buttons, centred in the area */
 const char *AW_UIPage(const char *text,int width,int rows,char *out,int capacity);
 
 const char *AW_SceneWorldModel(const char *name);

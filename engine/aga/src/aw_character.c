@@ -4,6 +4,7 @@
 #include "aw_character.h"
 #include "aw_tryalloc.h"
 #include "aw_ui_arrow.h"
+#include "aw_layout.h"
 
 aw_character_t aw_character;
 aw_race_t aw_races[16];
@@ -51,6 +52,8 @@ static int over_ok(void) {
 #define STATS_Y 133
 #define STATS_W 92
 #define STATS_H 23
+/* UI-RACE-STATS-RETURN-SPACING-67: the clear rows added between the box's Attributes heading and its list */
+#define STATS_LIST_GAP 5
 static int stats_open;
 static int over_stats(void) {
     return mouse_x>=STATS_X && mouse_x<STATS_X+STATS_W && mouse_y>=STATS_Y && mouse_y<STATS_Y+STATS_H;
@@ -482,7 +485,11 @@ void AW_CharacterReset(void)
 
 /* Explicit development restart. Resolve catalogue IDs and use the ordinary
  * stat builder; never invent a second set of Nord/class/birthsign values. */
-int AW_CharacterPreset(const char *race,const char *clas,const char *birth,int female,const char *name)
+/* DUTIES 0 (DBG-HORS-AFTER-CENSUS-67, the bare 'dbg aw hors'): Sellus Gravius's duties (the journal entry, the
+ * package, the directions, the disbursal) are left to the game's own dialogue results, which the generated script
+ * AW_AfterCensus runs (tools/mwscript/aftercensus.py): one writer for them, never added twice. Fargoth's ring is taken
+ * here either way: its courtyard barrel is the engine's own container fact. */
+static int preset(const char *race,const char *clas,const char *birth,int female,const char *name,int duties)
 {
     aw_character_t c;int i;
     if(!race || !clas || !birth || !name || !*name || strlen(name)>=sizeof(aw_story.name) || female<0 || female>1)return 0;
@@ -495,7 +502,7 @@ int AW_CharacterPreset(const char *race,const char *clas,const char *birth,int f
     c.head=part_next(-1,c.race,female,0,1);c.hair=part_next(-1,c.race,female,1,1);
     if(!AW_CharacterRebuild(&c))return 0;
     AW_StoryReset(0);strcpy(aw_story.name,name);
-    AW_CourtyardTakeRing();AW_CaptainDuties();
+    AW_CourtyardTakeRing();if(duties)AW_CaptainDuties();
     AW_StateSet(&aw_state,AW_GLOBAL,"CharGenState",-1);
     aw_story.stage=AW_STAGE_RELEASED;aw_story.ship_disabled=1;
     aw_story.hall=aw_story.hall_open=1;aw_story.captain=-1;
@@ -503,9 +510,15 @@ int AW_CharacterPreset(const char *race,const char *clas,const char *birth,int f
     aw_character=c;menu=accepted=review_return=confirming=0;AW_HeadClear();apply_eye();
     return 1;
 }
+int AW_CharacterPreset(const char *race,const char *clas,const char *birth,int female,const char *name)
+{
+    return preset(race,clas,birth,female,name,1);
+}
 /* Explicit development restart. Resolve catalogue IDs and use the ordinary
  * stat builder; never invent a second set of Nord/class/birthsign values. */
 int AW_CharacterHors(void){return AW_CharacterPreset("nord","barbarian","charioteer",0,"Hors");}
+/* the same Hors without Sellus Gravius's duties: the bare 'dbg aw hors' leaves them to his own dialogue results */
+int AW_CharacterHorsCensus(void){return preset("nord","barbarian","charioteer",0,"Hors",0);}
 
 #define LOWER(c) ((c)>='A' && (c)<='Z'?(c)+32:(c))
 /* Case-insensitive match that ignores spaces: "longblade" names "Long blade". */
@@ -802,19 +815,22 @@ void AW_CharacterDraw(void)
     }else if(menu==2 && class_way==2){
         /* CHARGEN-CENSUS-57 (c): the own class: specialization, two favored attributes, five major and five minor
          * skills, all different; arrows change the marked row, Enter goes on, OK makes the class */
-        AW_UISmallBegin();
+        /* UI-CHARGEN-CLASS-FONT-67: the rows in the console font (as the race's View Stats box lists the skill bonuses):
+         * the game font's 13-row letters on 9-row lines were drawn on top of one another; the console font's 5-row
+         * letters sit inside their line, centred, the heading and the buttons stay in the game font */
         for(i=0;i<CUSTOM_ROWS-1;i++){
             const char *label=i==0?"Specialization":i<3?"Favored attribute":i<8?"Major skill":"Minor skill";
             const char *value=i==0?specializations[custom.special]:i<3?attributes[custom.attributes[i-1]]:
                 skills[custom.skills[custom_skill(i)]];
             y=34+i*9;
             if(i==custom_row)AW_UIFill(12,y,296,9,AW_UIColor(54,47,32));
-            AW_UITextBox(12,y,100,9,label,muted);
-            AW_UITextBox(116,y,16,9,"<",gold);
-            AW_UITextBox(134,y,154,9,value,gold);
-            AW_UITextBox(290,y,16,9,">",gold);
+            AW_SmallStringColor(16,y+2,96,label,muted);
+            AW_SmallStringColor(120,y+2,8,"<",gold);
+            {int n=(int)strlen(value);if(n>154/4)n=154/4;   /* centred in the value column 134..288 */
+             AW_SmallStringColor(134+(154-4*n)/2,y+2,4*n,value,gold);}
+            AW_SmallStringColor(296,y+2,8,">",gold);
         }
-        AW_UISmallEnd();   /* the one hint row of this window is the footer's (CLASS-LIST-LAYOUT-62) */
+        /* the one hint row of this window is the footer's (CLASS-LIST-LAYOUT-62) */
     }else if(menu==2 || menu==3){
         const aw_class_t *k=&aw_classes[choice.clas];
         int selected=menu==2?choice.clas:choice.birth,count=list_count();
@@ -935,10 +951,16 @@ void AW_CharacterDraw(void)
         AW_UITextBox(14,30,292,18,line,gold);
         AW_UISmallBegin();
         AW_UITextBox(16,49,136,11,"Attributes",muted);
+        /* UI-RACE-STATS-RETURN-SPACING-67: room under the heading (STATS_LIST_GAP rows more), and a Return button under
+         * the list, laid out by the shared helper in the box's left column (aw_layout.c: the bottom margin kept). Enter,
+         * Escape, V or a click returns, as before. */
         for(i=0;i<8;i++){
             sprintf(line,"%s %ld",attributes[i],(long)r->attributes[i*2+choice.female]);
-            AW_UITextBox(16,61+i*11,136,11,line,gold);
+            AW_UITextBox(16,61+STATS_LIST_GAP+i*11,136,11,line,gold);
         }
+        {aw_layout_t l;int w=AW_UIWidth("Return");
+         AW_LayoutBox(&l,8,26,150,170,0,1,&w,0);
+         AW_UIButton(l.button[0][0],l.button[0][1],l.button[0][2],l.button[0][3],"Return",mouse_visible,gold);}
         AW_UITextBox(160,49,144,11,"Skill bonus",muted);
         if(spell_panel(&px,&py,&pw,&ph)){
             /* CHARGEN-ABILITY-DESCRIPTIONS-65: the bonuses in the console font, then the specials with what each one

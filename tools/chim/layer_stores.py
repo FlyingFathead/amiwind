@@ -10,7 +10,10 @@ the layer's world as its own store (the store names of the layer plan, tools/lay
   of the open-world region table (world/regions-sl.awr) and the region names (tools/chim/sol_test.py install, the
   same code the Solstheim test frame used);
 - Tribunal (Mournhold): store chimiti, rooms: the store only; its room maps name the store themselves
-  ("_chim_world" "chimiti") and come with the layer's room lists.
+  ("_chim_world" "chimiti") and come with the layer's room lists;
+- Tribunal's module tribunal-mournhold (Mournhold's outdoor districts, a small map of its own): store chimmh, region
+  frames: the store, one frame map mhNNNN per frame and the districts' rows file world/regions-mh.awr
+  (MODULE_STAGES below).
 
 The engine selects a store from the map it loads (chim_world.c Chim_StoreSelect) and refuses a door or a travel
 destination whose map, or whose map's store, is not in the image (aw_scene.c, the unbuilt-target guard).
@@ -27,6 +30,20 @@ LAYERS = {
 }
 STAGE_PREFIX = 'chim-layer-'
 OPTION = '--chim-layer-world'
+# The expansions' build modules whose stage makes a CHIM world of its own (tools/build.py "THE EXPANSIONS AS BUILD
+# MODULES"): stage name -> its expansion layer, its store and what the store holds. Mournhold's outdoor districts
+# (module tribunal-mournhold) are region frames in the store chimmh: the store, one frame map mhNNNN per frame and
+# the districts' own rows file world/regions-mh.awr (tools/chim/sol_test.py LANDS; engine aw_world.c), a small map
+# of its own beside Vvardenfell's.
+MODULE_STAGES = {
+    'tribunal-mournhold': {'layer': 'Tribunal', 'store': 'chimmh', 'kind': 'frames'},
+}
+
+
+def store_kinds():
+    """{store: kind} of every store the image can install (the layers' and the modules')."""
+    return dict({spec['store']: spec['kind'] for spec in LAYERS.values()},
+                **{spec['store']: spec['kind'] for spec in MODULE_STAGES.values()})
 
 
 def stage_name(layer):
@@ -43,13 +60,16 @@ def image_options(selected, stage_names, run):
     for layer in ('Tribunal', 'Bloodmoon'):
         if layer in (selected or ()) and stage_name(layer) in stage_names:
             out += [OPTION, '%s=%s' % (LAYERS[layer]['store'], Path(run) / stage_name(layer))]
+    for stage, spec in MODULE_STAGES.items():
+        if spec['layer'] in (selected or ()) and stage in stage_names:
+            out += [OPTION, '%s=%s' % (spec['store'], Path(run) / stage)]
     return out
 
 
 def parse(values):
     """[(store, world dir)] of the image's --chim-layer-world STORE=WORLD values; a store named twice, an unknown
     store or a missing '=' stops the image step at once (before anything is written)."""
-    known = {spec['store']: layer for layer, spec in LAYERS.items()}
+    known = store_kinds()
     out, seen = [], set()
     for value in values or ():
         store, sep, world = str(value).partition('=')
@@ -61,6 +81,25 @@ def parse(values):
             raise ValueError('%s: store %s given twice' % (OPTION, store))
         seen.add(store)
         out.append((store, Path(world)))
+    return out
+
+
+def frame_holders(values):
+    """{(x, y): (frame map, origin)} of the frames of every --chim-layer-world store that holds region frames, by the
+    names install() gives their frame maps (the store's world table in order: mh0000, mh0001, ...): the shape of
+    room_batches.region_frames, so the image's door tables link a door in or into such a frame as they link one of
+    the base world's region frames (MOURNHOLD-EXTERIOR-CELLS-66: a district's doors). {} for none."""
+    from chim.regions import TABLE_FILE, read_table
+    from chim.sol_test import LANDS, map_name
+    kinds = store_kinds()
+    out = {}
+    for store, world in parse(values):
+        if kinds[store] != 'frames':
+            continue
+        land = LANDS[store]
+        table = read_table(Path(world) / TABLE_FILE) or {}
+        for index, frame in enumerate(table.get('frames') or []):
+            out[tuple(frame['cell'])] = (map_name(index, land['prefix'], land['limit']), list(frame['origin']))
     return out
 
 
@@ -81,15 +120,19 @@ def copy_store(source, target):
     return files, size
 
 
-def install(values, id1, hand_fields):
-    """Install every --chim-layer-world store into ID1. Returns [record] (one per store), [] for none."""
+def install(values, id1, hand_fields, actors=None):
+    """Install every --chim-layer-world store into ID1. Returns [record] (one per store), [] for none.
+    ACTORS: a call (store, world folder) -> the store's frame actor inputs or None (tools/build_aga.py
+    layer_actor_inputs), or None: a store of frames then carries its cells' people in its frame maps
+    (chim.sol_test.install)."""
     pairs = parse(values)
-    kinds = {spec['store']: spec['kind'] for spec in LAYERS.values()}
+    kinds = store_kinds()
     records = []
     for store, world in pairs:
         if kinds[store] == 'frames':
             from chim.sol_test import install as install_frames
-            record = install_frames(world, id1, hand_fields, store=store)
+            record = install_frames(world, id1, hand_fields, store=store,
+                                    actors=actors(store, world) if actors is not None else None)
         else:
             files, size = copy_store(world / 'chim', Path(id1) / store)
             record = {'store': store, 'files': files, 'bytes': size, 'maps': []}

@@ -40,12 +40,12 @@ def body(text, head):
 @unittest.skipUnless(shutil.which('cc'), 'a host C compiler is required')
 class Native(unittest.TestCase):
     def test_the_server_never_runs_past_the_buffer(self):
-        native.NativeSourceTests().compile_run('aga_netsend_test.c', [SRC / 'common.c', SRC / 'mathlib.c'],
-                                               cflags=UBSAN)
+        native.NativeSourceTests().compile_run('aga_netsend_test.c',
+                                               [SRC / 'common.c', SRC / 'mathlib.c', SRC / 'net_loop.c'], cflags=UBSAN)
 
     def test_the_screen_side_drops_a_frame_update_that_does_not_read(self):
-        native.NativeSourceTests().compile_run('aga_netparse_test.c', [SRC / 'common.c', SRC / 'mathlib.c'],
-                                               cflags=UBSAN)
+        native.NativeSourceTests().compile_run('aga_netparse_test.c',
+                                               [SRC / 'common.c', SRC / 'mathlib.c', SRC / 'net_loop.c'], cflags=UBSAN)
 
 
 class Wiring(unittest.TestCase):
@@ -102,13 +102,40 @@ class Wiring(unittest.TestCase):
         self.assertIn('AW_SceneHostError (string);', code('host.c'))
         self.assertIn('play_spot_take(p);', code('aw_scene.c'))
 
+    def test_the_methods_and_the_room_are_saved_settings(self):
+        server = code('sv_main.c')
+        for name, default in (('aw_net_method', '1'), ('aw_net_send', '4096'), ('aw_net_frame', '32768'),
+                              ('aw_net_buffer', '65536'), ('aw_net_max', '262144')):
+            self.assertIn('static cvar_t %s = {"%s", "%s", true};' % (name, name, default), server)   # saved
+            self.assertIn('Cvar_RegisterVariable (&%s);' % name, server)
+        # growth only between frames: the room is prepared before the frame is written, asked for after it
+        send = strip_comments(body(server, 'qboolean SV_SendClientDatagram (client_t *client)'))
+        self.assertLess(send.index('room = SV_LoopDatagramRoom (client);'), send.index('MSG_WriteByte (&msg, svc_time);'))
+        self.assertLess(send.index('SV_WriteEntitiesToClient (client->edict, &msg);'), send.index('SV_NetRoomAsk ('))
+        self.assertNotIn('Loop_Grow', strip_comments(body(server, 'void SV_WriteEntitiesToClient (edict_t')))
+        loop = strip_comments(code('net_loop.c'))
+        self.assertIn('static byte *loop_receive;', loop)
+        self.assertNotIn('NET_MAXMESSAGE)\n\t\treturn 0;', loop)
+        self.assertIn('length = buffer[1] + (buffer[2] << 8) + (buffer[3] << 16);', loop)
+        self.assertIn('Loop_Grow (0, size)', code('cl_demo.c'))     # a demo of grown frames plays back
+
     def test_the_test_aid_and_its_documentation(self):
         self.assertIn('Cmd_AddCommand ("aw_netstat", SV_NetStat_f);', code('sv_main.c'))
         catalogue = (ROOT / 'config' / 'debug-commands.txt').read_text(encoding='utf-8')
         self.assertTrue(any(l.startswith('PLAYTESTING|netstat|aw_netstat|') for l in catalogue.splitlines()))
         page = (ROOT / 'docs' / 'NET_MESSAGES.md').read_text(encoding='utf-8')
-        for word in ('MAX_DATAGRAM', '8192', 'dbg netstat', 'nearest', 'LF9'):
+        for word in ('MAX_DATAGRAM', 'aw_net_method', 'aw_net_send', 'aw_net_frame', 'aw_net_buffer', 'aw_net_max',
+                     'dbg netstat', 'nearest', 'LF9', 'FULL', 'PACED'):
             self.assertIn(word, page)
+        self.assertIn('performance/NET_FRAME.md', page)
+        record = (ROOT / 'docs' / 'performance' / 'NET_FRAME.md').read_text(encoding='utf-8')
+        for word in ('FULL', 'PACED', 'aw_net_send', 'tests/sessions/net_frame_methods.txt', 'Recorded measurements'):
+            self.assertIn(word, record)
+        session = (ROOT / 'tests' / 'sessions' / 'net_frame_methods.txt').read_text(encoding='utf-8')
+        # aw_netstat by its own name: the session also runs on an image whose command catalogue is older
+        for line in ('cmd aw_net_method 1', 'cmd aw_net_method 2', 'cmd aw_netstat reset', 'cmd chim spikes report',
+                     'cmd dbg tp -13677 -61720 604'):
+            self.assertIn(line, session)
 
 
 if __name__ == '__main__':

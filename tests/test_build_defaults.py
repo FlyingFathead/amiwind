@@ -233,6 +233,9 @@ OPTIONS = {
     # planned world rebuild)
     'chim_draw_tiles': 'opt-in, not shipped',
     'room_small_parts': 'opt-in, not shipped',
+    # PRISON-SHIP-FLOOR-STUCK-67: unset = the hold's listed shell shapes drawn as the original draws them (the masts
+    # and the other shapes with collision whole, the table bands as boxes), what the release ships; off = before
+    'room_shapes': 'opt-in, not shipped',
     # world format 0.8: one model per mesh + scale, the full rotation in the record (CHIM-TILT-VARIANTS-SPLIT-33):
     # EXPERIMENTAL, 0.7 by default
     'chim_placement_format': 'opt-in, not shipped',
@@ -294,6 +297,9 @@ OPTIONS = {
     'dlc': 'mode', 'dlc_off': 'mode',
     # the Bloodmoon layer's CHIM test frames (TEST BUILDS ONLY; the image does not take them)
     'chim_sol_test': 'opt-in, not shipped', 'chim_sol_tree_copies': 'opt-in, not shipped',
+    # the build module tribunal-mournhold (Mournhold's districts as a world of their own): part of what selecting
+    # Tribunal builds; off leaves the module out
+    'presented_exteriors': 'mode',
     'name': 'tooling', 'sdk': 'tooling', 'vasm': 'tooling', 'upstream_archive': 'check',
     'quake_tools': 'tooling', 'qcc': 'tooling', 'ffmpeg': 'tooling', 'xdftool': 'tooling',
     'rdbtool': 'tooling', 'gallery_cache': 'tooling', 'gallery_seed_run': 'tooling',
@@ -307,6 +313,8 @@ OPTIONS = {
     'accept_rebuild': 'tooling', 'any_run_name': 'tooling',
     # Reuse every earlier run (tools/reuse_all.py, BUILD-UNIT-PREFLIGHT-63): which run a stage is taken from, never what it holds.
     'reuse_all_available': 'tooling', 'allow_rebuild': 'tooling',
+    # The default of a plain build turned off for one build (BUILD-OFFER-EARLIER-RUNS-67): which run, never what it holds.
+    'reuse_declined': 'tooling',
     # A first-time user's build and the release's from-scratch check (tools/clean_build.py): outputs unchanged.
     'clean': 'check', 'public_defaults': 'check', 'source_commit': 'tooling',
     'developer_mode': 'tooling', 'working_version': 'tooling', 'accept_version_mismatch': 'tooling',

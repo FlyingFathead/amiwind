@@ -1,0 +1,55 @@
+# The dialogue conditions that read the live game since v0.0.67-dev3 (DIALOGUE-CONDITIONS-PARTIAL-67): a sick player
+# is greeted as the original greets one. A FULL image, FS-UAE at 32 MB Fast, warp off, started with --map balmora; on
+# an image older than the fix, the engine (--engine) of the fixed commit. A character after the census (dbg aw hors).
+# Expected, on the pictures and in the console log (the lines the answer choice check gives, tools/dialogue_pick_check.py):
+# - Hul greets as met first: "Hello, <name>. I'm Hul, and this is Balmora. I don't believe we've met. ...";
+# - with the common disease Ataxia among the player's spells: "I'm sorry you're not feeling well, but you need to get
+#   cured of that disease. ..." (before v0.0.67-dev3 the first greeting again: the disease read its start value, none);
+# - with the blight disease Ash Woe Blight instead: "Not so close! I don't want to catch what you've got. And you've
+#   got a blight disease. ...";
+# - Dranas Dradas (the Camonna Tong, outside the Council Club) with Ataxia: "Keep your distance, outlander. Can't you
+#   tell you're sick? ...";
+# - well again (both diseases removed): a greeting without the disease line (met before by now, so it may differ
+#   from the first one).
+# The check computed the disease lines for a speaker met first; a speaker met before gets the same disease line when
+# the original's data orders it first (the greetings are searched Greeting 0 to 9, each in the data's order).
+wait 8
+cmd dbg all on
+cmd dbg headlamp off
+cmd dbg god on
+cmd dbg aw hors
+wait 60
+state map
+cmd dbg npcs talk hul
+wait 4
+shot c1-hul-greeting-well
+key Escape
+wait 2
+cmd player->addspell ataxia
+wait 1
+cmd dbg npcs talk hul
+wait 4
+shot c2-hul-greeting-common-disease
+key Escape
+wait 2
+cmd aw_npcs talk "dranas dradas"
+wait 4
+shot c3-dranas-greeting-common-disease
+key Escape
+wait 2
+cmd player->removespell ataxia
+cmd player->addspell "ash woe blight"
+wait 1
+cmd dbg npcs talk hul
+wait 4
+shot c4-hul-greeting-blight-disease
+key Escape
+wait 2
+cmd player->removespell "ash woe blight"
+wait 1
+cmd dbg npcs talk hul
+wait 4
+shot c5-hul-greeting-well-again
+key Escape
+wait 2
+state map

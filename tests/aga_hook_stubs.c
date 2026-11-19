@@ -15,6 +15,20 @@
 #include "aw_torch.h"
 #define WEAK __attribute__((weak))
 WEAK int AW_QuickCharActive(void){return 0;}
+/* UI-NO-SHARED-LAYOUT-67: the layout check's recorder (aw_layout.c): a fixture without it records nothing */
+#include "aw_layout.h"
+WEAK aw_layout_record_t *AW_LayoutRecording=0;
+WEAK void AW_LayoutRecord(int kind,int x,int y,int w,int h,const char *label){(void)kind;(void)x;(void)y;(void)w;(void)h;(void)label;}
+/* HUD-TEXTS-OVERLAP-67: the frame's one focus (aw_scene.c): a fixture without the scene has none */
+#include "aw_activate.h"
+WEAK aw_focus_aim_t aw_focus_last={-1,-1,-1,-1,-1};
+WEAK int AW_SceneFocusKind(void){return AW_FOCUS_NONE;}
+/* PICKUP-NAME-ONLY-BOX-67: aw_ui.c words a pick-up ("Picked up 3 Bottle."); a fixture without aw_ui.c gets the name in
+ * its own notice stand-in, as before (tests/aga_ui_layout_test.c checks the wording) */
+#pragma weak AW_UIPickupNotice   /* a fixture with neither (built without --gc-sections) links too */
+WEAK void AW_UIPickupTaken(const char *name,int count,double duration){
+    (void)count;if(AW_UIPickupNotice)AW_UIPickupNotice(name,duration);
+}
 /* TAKEN-LIGHT-FLAME-61: the effect links' users (aw_guard_torch.c, aw_lamps.c, chim/chim_chunks.c) and their source
  * (aw_inventory.c): a fixture without them has no exterior placement to hide and no link to apply. */
 WEAK void AW_StaticFlameLink(model_t *world,int ordinal,unsigned reference){(void)world;(void)ordinal;(void)reference;}
@@ -69,6 +83,9 @@ WEAK int AW_WeatherFrame(int days,int milliseconds,aw_weather_blend_t *out){(voi
 WEAK const unsigned char *R_InteriorFogColours(int r,int g,int b){(void)r;(void)g;(void)b;return 0;}
 /* The combat layer's death hook (aw_combat.c, COMBAT-PACK-SLOTS-57): fixtures linking aw_actors.c without it. */
 WEAK void (*aw_combat_actor_died)(struct edict_s *e);
+/* A fight's state (aw_combat.c): the use key's box of a body asks it (aw_scene.c, FOCUS-NPC-OVERRIDES-ITEM-62);
+ * fixtures without the fights have no body */
+WEAK int AW_CombatSlotState(edict_t *e,float *health){(void)e;if(health)*health=0;return 0;}
 /* The sky haze level (aw_fog.c, FOG-SKY-UNFOGGED-57): fixtures linking r_sky.c without aw_fog.c see no haze. */
 WEAK int AW_SkyHazeNow(void) {return 0;}
 /* The scripts' moon colour (aw_story.c, MWSCRIPT-GAPS-63): fixtures linking r_sky.c without it see a white Secunda. */
@@ -187,9 +204,39 @@ WEAK const aw_held_light_t *(*aw_held_light_now)(void);
 WEAK int (*aw_view_held_flames)(vec3_t out[AW_HELD_FLAMES]);
 WEAK int (*aw_view_held_light)(vec3_t out);
 WEAK int (*aw_hand_held_light)(float origin[3],float angles[3]);
-WEAK int (*aw_hand_parts_shield_tag)(float tag[6]);
+WEAK int (*aw_hand_parts_bone_tag)(int hand,float tag[6]);
+/* the light test and the item tester (aw_cycleitems.c, aw_gallery.c; LIGHTTEST-MAP-67, DBG-CYCLEITEMS-67) */
+WEAK void AW_CycleItemsFrame(void){}
+WEAK void AW_CycleItemsDraw(void){}
+WEAK void AW_CycleItemsInit(void){}
+WEAK int AW_CycleItemsActive(void){return 0;}
+WEAK void AW_LightTestReady(void){}
+WEAK int AW_LightTestActive(void){return 0;}
+WEAK int AW_GalleryLightTestEnter(void){return 0;}
+WEAK void AW_GalleryLightTestLeave(void){}
+WEAK void AW_GalleryLightTestCenter(void){}
+WEAK int (*aw_mwscript_paused)(void);
+WEAK float (*aw_view_held_gap)(int hand);
 WEAK int (*aw_held_light_item)(char id[64],char model[64],int *radius,int *flags,int *torch_radius);
 WEAK const char *AW_InventoryDropReason(void){return "Cannot place item here; kept.";}
+/* INVENTORY-EQUIP-HINTS-67 / SCROLL-CAST-64 / INVENTORY-ITEM-INFO-67: the inventory window's per-kind action rule
+ * (aw_inventory.c), its hooks (aw_worldui.c defines them; aw_cast.c, aw_alchemy.c, aw_reader.c, aw_inventory.c set
+ * them) and the item information box (aw_iteminfo.c), for fixtures that link one side without the other: no action,
+ * no box. */
+WEAK int AW_InventoryItemAction(const aw_inventory_item_t *it,int worn){(void)it;(void)worn;return 0;}
+WEAK const char *AW_InventoryActionWord(int action){(void)action;return NULL;}
+WEAK int (*aw_worldui_cast)(const aw_inventory_item_t *it);
+WEAK void (*aw_inventory_give_spell)(int first);   /* DBG-GIVE-SPELL-67 */
+#include "aw_iteminfo.h"
+WEAK int (*aw_worldui_condition)(const char *id,float *condition);
+WEAK int (*aw_worldui_enchant_lines)(const aw_inventory_item_t *it,char *out,int size);
+WEAK int (*aw_worldui_alchemy_lines)(const aw_inventory_item_t *it,char *out,int size);
+WEAK char *(*aw_worldui_book_text)(const char *id);
+WEAK aw_iteminfo_t *AW_ItemInfoOpen(const aw_inventory_item_t *it,const aw_iteminfo_extra_t *x,const char *action){(void)it;(void)x;(void)action;return 0;}
+WEAK void AW_ItemInfoClose(aw_iteminfo_t *b){(void)b;}
+WEAK void AW_ItemInfoDraw(const aw_iteminfo_t *b,int mouse_x,int mouse_y){(void)b;(void)mouse_x;(void)mouse_y;}
+WEAK int AW_ItemInfoKey(aw_iteminfo_t *b,int key,int mouse_x,int mouse_y,int use_key,int info_key){(void)b;(void)key;(void)mouse_x;(void)mouse_y;(void)use_key;(void)info_key;return AW_ITEMINFO_CLOSE;}
+WEAK void AW_ItemInfoDrag(aw_iteminfo_t *b,int mouse_y){(void)b;(void)mouse_y;}
 
 WEAK void AW_InventoryGrantCommand(void){}
 
@@ -209,6 +256,8 @@ WEAK int AW_MwConsoleLine(const char *text){(void)text;return 0;}
 WEAK void AW_RecorderDraw(void){}
 /* dbg tp's settlements box (aw_tpplaces.c, TP-PICKER-57): no table in fixtures, so the scene picker opens as before. */
 WEAK int AW_TpPlacesOpen(void){return 0;}
+/* dbg tp TEXT through the list (aw_tpplaces.c, DBG-TP-EXPANSION-ARRIVALS-66): no list in fixtures, so the name is unknown. */
+WEAK int AW_TpPlacesFind(const char *text){(void)text;return 0;}
 /* The scripts' control switches (aw_story.c, MWSCRIPT-PLAYER-CONTROL-62): every switch on in fixtures without it. */
 WEAK int AW_ControlAllowed(int controls){(void)controls;return 1;}
 WEAK int AW_ControlsDisabled(void){return 0;}

@@ -33,21 +33,15 @@ for p in (ROOT / 'tools', ROOT / 'src'):
 
 from chim import format as F  # noqa: E402
 from chim import placed as P  # noqa: E402  (registers world format 0.8)
+# The room record format (world format 0.13, the ROOM kind, both registered there) and its readers: kept in
+# chim/room_records.py so that the image step's room bakes and checks, which read rooms only through them, do not key
+# this module's import-time code and the settings file it names (BUILD-ROOM-ACTOR-REKEY-67)
+from chim.room_records import (FLAGS_AT, FORMAT_VERSION, ROOM_BLOCK, ROOM_KIND, TINT_SHIFT,  # noqa: E402,F401
+                               installed_room, read_room_record, store_model_images)
 from map_files import ROOM_KEY  # noqa: E402
 
 STORE = 'chimi'
-ROOM_KIND = b'ROOM'
-ROOM_BLOCK = struct.Struct('>6fII')          # bounds mins, maxs; model count; 0
-# World format 0.12: the placement light level in the high byte of a placed record's flags; 0.13: the light's tint
-# in bits 2-4 (interior_lighting.light_tint; the engine's tint tables, r_sky.c).
-FORMAT_VERSION = (0, 13)
-FLAGS_AT = 46                                # the flags' offset in a placed record (chim.format.PLACEMENT)
-TINT_SHIFT = 2
 PACK_BYTES = 64 << 20                        # a pack is closed past this size (classic FFS: files well under 1 GiB)
-if FORMAT_VERSION not in F.READ_VERSIONS:
-    F.READ_VERSIONS = F.READ_VERSIONS + (FORMAT_VERSION,)
-if ROOM_KIND not in F.KINDS:
-    F.KINDS = F.KINDS + (ROOM_KIND,)
 SCALE = 0.25
 
 
@@ -89,6 +83,58 @@ def room_recipe(room):
         if name not in load_recipes()['recipes']:
             raise ValueError('config/chim-rooms.json recipe_rooms: unknown visual recipe ' + name)
     return name
+
+
+EVERYWHERE_IN_ROOMS = 'everywhere_in_rooms'
+
+
+def everywhere_in_rooms():
+    """True when every room takes the everywhere recipe (config/chim-rooms.json everywhere_in_rooms, default true;
+    VISUAL-EVERYWHERE-ROOMS-67): one model's replacement wherever that model is placed, rooms included. False keeps the
+    method before v0.0.67: only the rooms recipe_rooms lists, and only their recipe's "ratio" rows. The everywhere
+    recipe's own switch (AMIWIND_VISUAL_EVERYWHERE=off, visual_recipes.everywhere_recipe) turns it off in the rooms
+    too."""
+    value = _rooms_config().get(EVERYWHERE_IN_ROOMS, True)
+    if not isinstance(value, bool):
+        raise ValueError('config/chim-rooms.json everywhere_in_rooms must be true or false')
+    return value
+
+
+def room_visual_profiles(models, used, profiles, recipe=None, everywhere=True, document=None, method2=None):
+    """The visual recipes (config/visual-recipes.json) and the hand-made meshes (method 2, config/model-method-2.json)
+    on a room's mesh profiles, in place on PROFILES {source: profile} for the models USED (indices into MODELS, the
+    room's scenery-index models). Returns {source: recipe name} of every mesh a recipe changed ('method-2' for a
+    hand-made mesh).
+
+    First the room's own recipe (RECIPE: config/chim-rooms.json recipe_rooms, room_recipe), its "ratio" rows only, as
+    before (MESHOPT-HOT-MODELS-57: room-only extras such as the Ald'ruhn Manor District's shells); then, with
+    EVERYWHERE, the everywhere recipe (visual_recipes.everywhere_recipe) for every mesh the room's recipe left as it
+    was, every row kind as the CHIM frames apply it (chim.build: ratio, primitive, panel, collision tolerance;
+    VISUAL-EVERYWHERE-ROOMS-67). Every row is keyed by the mesh's source path and packet SHA-256
+    (visual_recipes.apply_recipe), so only that model type changes, wherever it is placed; a mesh no row names keeps
+    its profile, so its unit key does not move. Last, method 2 (model_method2.apply_method2: a model's hand-made mesh
+    wherever it is placed, keyed by path + NIF SHA-256; METHOD2 the table, read when not given), as in the CHIM
+    frames."""
+    from model_method2 import apply_method2, load_table
+    from visual_recipes import apply_recipe, everywhere_recipe, load_recipes
+    document = load_recipes() if document is None else document
+    everywhere = everywhere_recipe(document) if everywhere else None
+    method2 = load_table() if method2 is None else method2
+    applied = {}
+    for mi in used:
+        model = models[mi]
+        profile = profiles[model['source']]
+        if recipe:
+            entry = document['recipes'][recipe]['models'].get(model['source'].replace(chr(92), '/').lower())
+            if entry is not None and 'ratio' in entry:
+                profile = apply_recipe(profile, model, recipe, document)
+        if everywhere and 'visual_recipe' not in profile:
+            profile = apply_recipe(profile, model, everywhere, document)
+        profile = apply_method2(profile, model, method2)
+        if 'visual_recipe' in profile:
+            applied[model['source']] = profile['visual_recipe']['name']
+        profiles[model['source']] = profile
+    return applied
 
 
 def _rooms_config():
@@ -166,40 +212,6 @@ def room_record(bounds, model_ids, records):
     return F.header(ROOM_KIND, len(records), models_at, models_at + len(models), total, FORMAT_VERSION) + body
 
 
-def read_room_record(data):
-    head = F.read_header(data, ROOM_KIND)
-    v = ROOM_BLOCK.unpack_from(data, F.HEADER.size)
-    n = v[6]
-    if head['directory'] != F.HEADER.size + ROOM_BLOCK.size or head['data'] != head['directory'] + 4 * n:
-        raise ValueError('Room record offsets do not match its model list')
-    models = list(struct.unpack_from('>%dI' % n, data, head['directory']))
-    at = head['data']
-    if at + head['count'] * P.PLACEMENT.size != len(data):
-        raise ValueError('Room record size does not match its placements')
-    records = [P.read_placement(data, at + i * P.PLACEMENT.size) for i in range(head['count'])]
-    for i, r in enumerate(records):
-        flags = struct.unpack_from('>H', data, at + i * P.PLACEMENT.size + FLAGS_AT)[0]
-        r['light'] = flags >> 8
-        r['tint'] = (flags >> TINT_SHIFT) & 7 if head['version'] >= (0, 13) else 0
-    return {'bounds': (v[0:3], v[3:6]), 'models': models, 'placements': records}
-
-
-def installed_room(map_path):
-    """The room record of an installed CHIM room map (maps/<room>.chim beside <store>/rooms/<room>.crm in the same
-    id1), read: {'bounds', 'models', 'placements'} plus 'store' (the store folder) and 'room'; None for a map that is
-    not a CHIM room. Raises ValueError when the room map names a record the image does not hold."""
-    from map_files import room_record, room_record_path
-    map_path = Path(map_path)
-    found = room_record(map_path)
-    if found is None:
-        return None
-    path = room_record_path(map_path.parent.parent, map_path)
-    if not path.is_file():
-        raise ValueError('CHIM room map %s names %s/rooms/%s.crm, which the image does not hold'
-                         % (map_path.name, found[0], found[1]))
-    return dict(read_room_record(path.read_bytes()), store=found[0], room=found[1])
-
-
 def installed_room_refs(map_path):
     """Reference numbers a CHIM room map places: its entities' aw_ref (residents, activated objects, sounds) and its
     room record's placements (the placed meshes the room map no longer carries as entities); empty for another map.
@@ -207,26 +219,6 @@ def installed_room_refs(map_path):
     from chim.cut import source_ref
     room = installed_room(map_path)
     return set() if room is None else {source_ref(p['ref']) for p in room['placements']}
-
-
-def store_model_images(id1, store, ids):
-    """{model id: brush image bytes} of the store models IDS, read from id1/<store>/world.cwi and only the pack files
-    that hold them (the whole store is never read for one room)."""
-    root = Path(id1) / store
-    _, files, models, _ = F.read_index((root / 'world.cwi').read_bytes())
-    packs, out = {}, {}
-    for i in sorted(set(ids)):
-        if not 0 <= i < len(models):
-            raise ValueError('%s: model %d is not in the store (%d models)' % (store, i, len(models)))
-        m = models[i]
-        path = files[m['file']]['path']
-        if path not in packs:
-            packs[path] = (root / path).read_bytes()
-        data = packs[path][m['offset']:m['offset'] + m['bytes']]
-        if len(data) != m['bytes']:
-            raise ValueError('%s: model %d runs past its pack %s' % (store, i, path))
-        out[i] = data
-    return out
 
 
 def room_placements(room_map):
@@ -290,7 +282,6 @@ def room_input(work, pal_bytes, qbsp, jobs, cache, timer, collision_cache, harve
     form: a harvestable plant stays a placed mesh, drawn and solid, not pickable)."""
     import numpy as np
     from chim.build import frame_input, mesh_fingerprint, mesh_unit
-    from chim.units import run_units
     from interior_lighting import light_tint, point_colour, point_light
     from prepare_mesh_bsp import rock_profile
     from surface_flatten import load_profiles, mount_references
@@ -319,27 +310,24 @@ def room_input(work, pal_bytes, qbsp, jobs, cache, timer, collision_cache, harve
             # collision, the open rim locked, as chim.build applies an area's budget
             profiles[model['source']] = dict(profiles[model['source']], ratio=target / model['triangles'],
                                              visual_triangle_target=target, lod_preserve_border=True)
-    # the hot room meshes through meshoptimizer with locked borders and the seam gate (config/chim-rooms.json
-    # recipe_rooms, MESHOPT-HOT-MODELS-57): only the rooms listed there and only the meshes their visual recipe names
-    # (source + packet SHA-256), so every other room and mesh keeps its unit key
-    recipe = room_recipe(work.name)
-    if recipe:
-        from visual_recipes import load_recipes, apply_recipe
-        recipes = load_recipes()
-        for mi in used:
-            model = index['models'][mi]
-            entry = recipes['recipes'][recipe]['models'].get(model['source'].replace(chr(92), '/').lower())
-            if entry is not None and 'ratio' in entry:
-                profiles[model['source']] = apply_recipe(profiles[model['source']], model, recipe, recipes)
+    # the visual recipes (room_visual_profiles): the room's own recipe (config/chim-rooms.json recipe_rooms, its ratio
+    # rows: MESHOPT-HOT-MODELS-57), then the everywhere recipe in every room as in the CHIM frames, each row keyed by
+    # the mesh's source + packet SHA-256 (VISUAL-EVERYWHERE-ROOMS-67): only the meshes a row names change, so only
+    # their units and the rooms that place them re-key
+    recipes_applied = room_visual_profiles(index['models'], used, profiles, room_recipe(work.name),
+                                           everywhere_in_rooms())
+    from model_method2 import run_mesh_units, unit_kind
     models = list(index['models'])
     items = []
     for mi in used:
         model = models[mi]
         profile = profiles[model['source']]
         model['_profile'] = profile
-        items.append((mesh_fingerprint(model, profile, index['textures']), (mi, model, profile, archive, index['textures'])))
+        # a method-2 mesh (config/model-method-2.json) is a unit of its own kind; every other mesh as before
+        items.append((mesh_fingerprint(model, profile, index['textures'], unit_kind(profile)),
+                      (mi, model, profile, archive, index['textures'])))
     with timer.section('meshes'):
-        prepared = dict(zip(used, run_units('mesh', items, mesh_unit, jobs, cache)))
+        prepared = dict(zip(used, run_mesh_units(items, mesh_unit, jobs, cache)))
     from chim.build import mesh_result_keys
     mesh_fps = mesh_result_keys(items, prepared, used)
     centre = [0.0, 0.0]
@@ -375,6 +363,12 @@ def room_input(work, pal_bytes, qbsp, jobs, cache, timer, collision_cache, harve
     out = {'room': work.name, 'spec': spec, 'levels': levels, 'tints': tints,
            'bounds': (tuple(float(v) for v in lo), tuple(float(v) for v in hi)),
            'cell': index.get('cell'), 'fallbacks': spec['fallbacks']}
+    if recipes_applied:
+        # the receipt row's visual_recipes: {recipe: [mesh sources]} of the meshes a recipe changed in this room
+        named = {}
+        for source, name in sorted(recipes_applied.items()):
+            named.setdefault(name, []).append(source.replace(chr(92), '/').lower())
+        out['visual_recipes'] = named
     if left_out is not None:
         # the record's coordinates are quarter-scale original ones less the frame centre: the harvest catalogue's
         # map origin (harvest_build: map position = quarter-scale original position - origin)
@@ -997,6 +991,9 @@ def build(room_works, palette, out, qbsp=None, jobs=1, unit_cache=None, harvest=
             # the image places these as harvest entities (harvest_build.chim_room_rows)
             row['harvest_left_out'] = room['harvest_left_out']
             row['harvest_origin'] = room['harvest_origin']
+        if room.get('visual_recipes'):
+            # the meshes a visual recipe changed in this room (room_visual_profiles, VISUAL-EVERYWHERE-ROOMS-67)
+            row['visual_recipes'] = room['visual_recipes']
         rows.append(row)
         _log('%s: %d placements, %d models%s' % (row['room'], row['placements'], row['models'],
                                                  ', %d harvestable plants left out' % len(row['harvest_left_out'])

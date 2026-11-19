@@ -402,6 +402,12 @@ def stats_maker(id1, stats_path):
                                  vocabulary)
     shared_block, shared_report = actor_stats.shared_section(outdoor, vocabulary, spell_row, tables)
     shared_report.pop('offsets', None)
+    if spell_row and shared_report.get('birth_spells_missing'):
+        # CHARGEN-ABILITY-DESCRIPTIONS-STOP-67: every birthsign spell has its row in the image's actor table, or the
+        # build stops here naming them (the birthsign window would list them as nothing and the new character would
+        # not get them; the v0.0.67-dev2 image lacked 15 of 19)
+        raise ValueError('birthsign spells without a row in id1/mwscript.awm (the actor table): '
+                         + ', '.join(shared_report['birth_spells_missing']))
 
     def make(references, key=None):
         placed = [hashes[r & 0xFFFFFF] for r in references if (r & 0xFFFFFF) in hashes]

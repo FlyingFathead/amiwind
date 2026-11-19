@@ -33,6 +33,7 @@ GOOD = {
     'health_fought': 84, 'state_saved': -1, 'package_loaded': 1, 'gold_loaded': 87, 'ring_loaded': 1,
     'journal_loaded': 1, 'state_loaded': -1, 'list_loaded': 'DEAD', 'door_from': 'maps/seyda-chim.chim',
     'door_to': 'maps/census.bsp', 'package_door': 1, 'creatures_seyda': 4, 'saves_held': 3,
+    'dock_walk': 'POST',
     # the fake game's map changes (fake_run): a map whose arrival writes no autosave, and where the autosave waits
     # behind the next map change instead (both None: every arrival from the release on writes one)
     'no_autosave_at': None,
@@ -76,6 +77,16 @@ def answer(name, command, v):
                 'Held by: %s' % held,
                 'Last save: %s' % ('Autosave 1 written (12698 bytes, generation 1)' if v else
                                    'refused: the items\' script values could not be kept')]
+    if command == 'aw_intro_status':
+        # aw_intro.c status and aw_opening.c AW_OpeningDockStatus (PIER-GUARD-POST-STUCK-67): at his post after the
+        # fixed walk (POST), or stopped among the posts and pilings at the pier's end with his box in a solid (SOLID)
+        dock = ('Dock guard at 286 -214 31 / leg 1 / route started 0 failed 0 done 1 / retries 0 / from the post 0 / '
+                'box in solid 0 / waits 0 / route fixed' if v == 'POST' else
+                'Dock guard at 371 -250 22 / leg 1 / route started 1 failed 0 done 0 / retries 0 / from the post 92 / '
+                'box in solid 37 / waits 0 / route direct')
+        return ['Intro active 0 / Jiub -1 / guard -1 / prompt 0 / unlocked 1 / failed 0',
+                'Deck guard state 0 / nearby timer 0 ms', 'Opening 3 / dock -1 / census 0 / hall 0 / captain 0',
+                'CharGenState 10 / FindSpymaster 0 / papers 0 / ring 0 / package 0', dock]
     if command == 'dbg cast spell list':
         return [' m0 Test spell (made) *', 'Selected: Test spell, cost 9, chance 100 %%; %d cast, 0 failed, 0 refused, %d landed' % (v, v)]
     if command == 'aw_placed ledger':
@@ -246,10 +257,52 @@ class JourneySmoke(unittest.TestCase):
         self.assertFalse(ok)
         self.assertTrue(any(l.startswith('FAIL step 7') for l in lines), lines)
 
+    def test_step_9_walks_to_the_door_before_it_aims(self):
+        # JOURNEY-STEP9-REACH-67 (the v0.0.67-dev2 journey): the quicksave held the player where step 7's dodges left it,
+        # 48.6 units along the aim from the census street door's point, past the use reach of 48, and part B aimed from
+        # there. Step 9 now walks to the door's arrival point first, then turns, aims and uses it; the aim, its retries and
+        # the reach are those of every other door (no step widens them)
+        with tempfile.TemporaryDirectory() as d:
+            js.write_scripts(JOURNEY, d)
+            b = (Path(d) / 'part-B.txt').read_text(encoding='utf-8').splitlines()
+        step = b.index('cmd echo JOURNEY STEP 9')
+        door = b.index('aimed 113833', step)
+        self.assertEqual(b[door - 2:door + 3], ['walkto 264 34 20', 'face 242.6 10.3 61', 'aimed 113833', 'key e',
+                                                'waitfor map 45 census'])
+        # the walk comes after the door_from probe, so that probe still reads the map the restored game stands in
+        self.assertLess(b.index('cmd echo JOURNEY PROBE door_from', step), b.index('walkto 264 34 20', step))
+        # one aim at the door, as part A's: no extra time or other form of the aim in part B
+        self.assertEqual([l for l in b if l.startswith('aimed ')], ['aimed 113833'])
+        # a walk that does not reach the arrival point (step 9's first walker step) stops step 9 and names it
+        runs = self.runs()
+        ok, lines = js.judge(self.j, [runs[0], fake_run(self.j, 'B', dict(GOOD), stop_in=9)])
+        self.assertFalse(ok)
+        self.assertTrue(any(l.startswith('STOP part B in step 9') and 'walkto 264 34 20' in l for l in lines), lines)
+
     def test_a_good_run_passes_every_check(self):
         ok, lines = js.judge(self.j, self.runs())
         self.assertTrue(ok, '\n'.join(l for l in lines if l.startswith('FAIL')))
         self.assertRegex(lines[-1], r'^JOURNEY RESULT PASS (\d+)/\1 checks, 9 steps$')
+
+    def test_the_dock_guard_stuck_among_the_pier_posts_fails_step_1(self):
+        """PIER-GUARD-POST-STUCK-67: after the race form the player stays on the pier for the dock guard's whole walk,
+        then aw_intro_status: done at his post, his box never inside a solid, the fixed route."""
+        with tempfile.TemporaryDirectory() as d:
+            js.write_scripts(JOURNEY, d)
+            a = (Path(d) / 'part-A.txt').read_text(encoding='utf-8').splitlines()
+        probe = a.index('cmd echo JOURNEY PROBE dock_walk')
+        self.assertEqual(a[probe + 1], 'cmd aw_intro_status')
+        race = a.index('waitfor screen 20 game')
+        self.assertLess(race, probe)
+        self.assertEqual([l for l in a[race:probe] if not l.startswith('wait ')], ['waitfor screen 20 game'],
+                         'the player moves before the guard has walked')
+        self.assertGreaterEqual(sum(int(l.split()[1]) for l in a[race + 1:probe] if l.startswith('wait ')), 45)
+        ok, lines = js.judge(self.j, self.runs(dock_walk='SOLID'))
+        self.assertFalse(ok)
+        bad = [l for l in lines if l.startswith('FAIL')]
+        self.assertEqual(len(bad), 4, lines)
+        self.assertTrue(all('step 1' in l for l in bad), bad)
+        self.assertTrue(any('dock_in_solid' in l for l in bad), bad)
 
     def test_the_crab_meat_step_checks_the_crab_meat_taken_and_the_plate_left(self):
         # CENSUS-CRAB-PLATE-FOCUS-66: aimed at the crab meat, the use key takes it, never the plate under it

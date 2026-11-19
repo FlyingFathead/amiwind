@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "quakedef.h"
 #include "aw_inspect.h"
+#include "aw_combat.h"
 #include <assert.h>
 client_state_t cl;
 client_static_t cls;
@@ -67,6 +68,17 @@ static int chim_pick(const float *start,const float *end,aw_chim_pick_t *out){
  out->fraction=chim_fraction;out->pid=4242;out->ref=172013;out->model=77;out->cell_x=2;out->cell_y=-10;
  out->origin[0]=-3968;out->origin[1]=3099;out->origin[2]=167;out->yaw=90;strcpy(out->name,"flora_emp_parasol_03");return 1;
 }
+/* CREATURE-HOSTILE-FLEES-67: an actor's own health. Entity 2 ("eloroth", row 7) may fight; entity 3 ("ordinator
+ * wander", row 9, reference 201385) has a live record; an id the table does not hold is no actor. */
+static aw_fighter_t fighter;static aw_actor_t record;static int fighting,has_record=1;
+const aw_fighter_t *AW_CombatFighter(struct edict_s *e){return fighting && e==entities+2?&fighter:NULL;}
+int AW_ActorFind(const char *id){return !strcmp(id,"eloroth")?7:!strcmp(id,"ordinator wander")?9:AW_ACTOR_NONE;}
+aw_actor_t *AW_ActorGet(uint32_t reference,int row,int create){
+ assert(!create);return has_record && reference==201385 && row==9?&record:NULL;
+}
+int AW_ActorBase(int row,aw_actor_base_t *out){
+ memset(out,0,sizeof(*out));if(row!=7 && row!=9)return 0;out->health=(unsigned short)(row==7?40:120);return 1;
+}
 /* Strip lines from the inspect module, as aw_hud.c asks for them under the view. */
 static char lines[4][AW_INSPECT_LINE];
 static int strip_lines(int max,int width){int i,n=aw_inspect_strip(lines,max,width);
@@ -129,7 +141,14 @@ int main(void){
  cl_entities[3].origin[0]=12;cl_entities[3].origin[1]=12;
  click();assert(strstr(output,"201388") && !strstr(output,"201385"));
  cl_entities[3].frame=1;click();assert(strstr(output,"201385") && strstr(output,"server runtime: frame 0") && strstr(output,"server local XYZ: 40.0 0.0 0.0"));
+ /* CREATURE-HOSTILE-FLEES-67: the health shown is the actor's own (its live record, else its actor table row), never
+  * Quake's v.health, which the engine keeps for the player only (it read 0.0 for every living creature) */
+ record.dyn_cur[0]=87.5f;record.dyn_base[0]=120;
+ click();assert(strstr(output,"health 87.5 of 120 (record)") && !strstr(output,"health 0.0"));
+ has_record=0;click();assert(strstr(output,"health 120.0 of 120 (actor table)"));has_record=1;
  cl_entities[3].frame=99;click();assert(strstr(output,"201388")); /* renderer falls back to frame zero */
+ assert(strstr(output,"health 40.0 of 40 (actor table)"));
+ fighting=1;fighter.health=12.5f;fighter.health_max=40;click();assert(strstr(output,"health 12.5 of 40 (fight)"));fighting=0;
  cl_entities[3].frame=0;cl_entities[3].origin[0]=40;cl_entities[3].origin[1]=0;
  /* No I/O or whole-model fallback when frame data is no longer resident. */
  alias.cache.data=NULL;click();assert(strstr(output,"no target"));alias.cache.data=&model_cache;

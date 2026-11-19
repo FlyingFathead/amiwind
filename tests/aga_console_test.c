@@ -7,7 +7,8 @@ viddef_t vid;
 int scr_copyeverything;
 int con_linewidth=38;
 void Con_CheckResize(void){}
-void Draw_Character(int x,int y,int c){}
+static int drawn_character=-1;   /* the large console font's last character (UI-CONSOLE-FONT-SPECIAL-LETTERS-67) */
+void Draw_Character(int x,int y,int c){drawn_character=c;}
 byte *host_basepal;
 byte *draw_chars;
 static int font_size=-1,catalogue_opens,catalogue_missing,catalogue_size_adjust;
@@ -106,7 +107,7 @@ static void every_entry_translates(void){
   /* dbg fog rule / dbg cut groups print aw_cull with no argument (switch bits) */
   snprintf(expect,sizeof expect,"%s%s\n",handler,
        !strcmp(bar1+1,"characterchange")?" appearance":!strcmp(bar1+1,"inventory grant")?" grant":
-       !strcmp(bar1+1,"give weapons")?" give weapons":
+       !strcmp(bar1+1,"give weapons")?" give weapons":!strcmp(bar1+1,"give spell")?" give spell":
        (!strcmp(bar1+1,"give") || !strcmp(bar1+1,"additem"))?" give":
        (!strcmp(bar1+1,"give money") || !strcmp(bar1+1,"give coin") || !strcmp(bar1+1,"give rich"))?" give money":
        (!strcmp(bar1+1,"noburden") || !strcmp(bar1+1,"unburdened") || !strcmp(bar1+1,"noweight"))?" noburden":
@@ -120,6 +121,7 @@ static void every_entry_translates(void){
        !strcmp(bar1+1,"creatures")?" actors creatures":!strcmp(bar1+1,"mwscript")?" about":
        !strcmp(bar1+1,"mwscript stats")?" stats":!strcmp(bar1+1,"mwscript result")?" result":
        !strcmp(bar1+1,"kill")?" actors killpick":
+       !strcmp(bar1+1,"spawn")?" actors spawn":!strcmp(bar1+1,"despawn")?" actors despawnpick":
        !strcmp(bar1+1,"weapon")?" box weapon":!strcmp(bar1+1,"gear")?" box gear":
        (!strcmp(bar1+1,"set race") || !strcmp(bar1+1,"set playerrace"))?" playerrace":"");
   /* DBG-SUPERSPEED-62: the camera and cast words keep their own word; a bare switch with a state gets the other
@@ -161,6 +163,18 @@ int main(int count,char **values){
     assert(AW_DebugTranslate(2,pick,output,sizeof(output))==1 && !strcmp(output,"chim actors killpick\n"));
     assert(AW_DebugTranslate(3,ref,output,sizeof(output))==1 && !strcmp(output,"chim actors kill 331662\n"));
     assert(AW_DebugTranslate(4,two,output,sizeof(output))==0);
+  }
+  { /* DBG-SPAWN-MENU-67: dbg spawn [ID [model]] = chim actors spawn (a record id with spaces stays one word), at most two
+     * words; dbg despawn = the red crosshair pick, dbg despawn all = every spawned one here, nothing else */
+    char *sp[]={"dbg","spawn","cliff racer","model","more"},*de[]={"dbg","despawn","all","more"};
+    assert(AW_DebugTranslate(2,sp,output,sizeof(output))==1 && !strcmp(output,"chim actors spawn\n"));
+    assert(AW_DebugTranslate(3,sp,output,sizeof(output))==1 && !strcmp(output,"chim actors spawn \"cliff racer\"\n"));
+    assert(AW_DebugTranslate(4,sp,output,sizeof(output))==1 && !strcmp(output,"chim actors spawn \"cliff racer\" model\n"));
+    assert(!AW_DebugTranslate(5,sp,output,sizeof(output)));
+    assert(AW_DebugTranslate(2,de,output,sizeof(output))==1 && !strcmp(output,"chim actors despawnpick\n"));
+    assert(AW_DebugTranslate(3,de,output,sizeof(output))==1 && !strcmp(output,"chim actors despawn all\n"));
+    assert(!AW_DebugTranslate(4,de,output,sizeof(output)));
+    de[2]="fargoth";assert(!AW_DebugTranslate(3,de,output,sizeof(output)));
   }
   assert(AW_DebugTranslate(2,tracker,output,sizeof(output))==1 && !strcmp(output,"aw_shroomtracker\n"));
   { /* DBG-TOGGLE-WORDS-31: toggle words reach settings as 1/0; commands keep their words. */
@@ -461,6 +475,22 @@ int main(int count,char **values){
  assert(!AW_DebugTranslate(3,tp_bad,output,sizeof(output)));
  tp_bad[2]="../prison";assert(!AW_DebugTranslate(3,tp_bad,output,sizeof(output)));
  assert(!AW_DebugTranslate(3,tp,output,8));
+ /* a place's name as the teleport list shows it (DBG-TP-EXPANSION-ARRIVALS-66): commas and colons pass in a quoted
+  * word (Quake's parser splits at a colon), a name may take up to 8 words, the separators stay refused */
+ {
+  char *place[]={"dbg","tp","Mournhold, Royal Palace: Reception Area"};
+  char *words[]={"dbg","tp","mournhold","royal","palace","reception","area"};
+  char *colon[]={"dbg","tp","reception",":","area"};
+  char *nine[]={"dbg","tp","a","b","c","d","e","f","g","h","i"};
+  assert(AW_DebugTranslate(3,place,output,sizeof(output))==1 &&
+         !strcmp(output,"aw_teleport \"Mournhold, Royal Palace: Reception Area\"\n"));
+  assert(AW_DebugTranslate(7,words,output,sizeof(output))==1 &&
+         !strcmp(output,"aw_teleport mournhold royal palace reception area\n"));
+  assert(AW_DebugTranslate(5,colon,output,sizeof(output))==1 && !strcmp(output,"aw_teleport reception \":\" area\n"));
+  assert(!AW_DebugTranslate(11,nine,output,sizeof(output)));
+  place[2]="Mournhold, Royal Palace;quit";assert(!AW_DebugTranslate(3,place,output,sizeof(output)));
+  place[2]="Mournhold, \"Royal Palace";assert(!AW_DebugTranslate(3,place,output,sizeof(output)));
+ }
  assert(AW_DebugTranslate(4,fog,output,sizeof(output))==1);assert(!strcmp(output,"aw_fog_distance 400\n"));
  assert(AW_DebugTranslate(4,distance,output,sizeof(output))==1);assert(!strcmp(output,"aw_fog_distance 500\n"));
  assert(AW_DebugTranslate(3,hud,output,sizeof(output))==1);
@@ -504,6 +534,17 @@ int main(int count,char **values){
    kit[3]="STATS";assert(AW_DebugTranslate(4,kit,output,sizeof(output))==1 && !strcmp(output,"aw_inventory give weapons STATS\n"));
    assert(!AW_DebugTranslate(5,kit,output,sizeof(output)));
    kit[3]="all";assert(!AW_DebugTranslate(4,kit,output,sizeof(output)));
+  }
+  { /* DBG-GIVE-SPELL-67: dbg give spell [ID / all / list [N]] reaches the inventory command, at most two words after it;
+     * a record id with spaces stays one word */
+   char *sp[]={"dbg","give","spell","list","2","more"};
+   assert(AW_DebugTranslate(3,sp,output,sizeof(output))==1 && !strcmp(output,"aw_inventory give spell\n"));
+   assert(AW_DebugTranslate(4,sp,output,sizeof(output))==1 && !strcmp(output,"aw_inventory give spell list\n"));
+   assert(AW_DebugTranslate(5,sp,output,sizeof(output))==1 && !strcmp(output,"aw_inventory give spell list 2\n"));
+   assert(!AW_DebugTranslate(6,sp,output,sizeof(output)));
+   sp[3]="all";assert(AW_DebugTranslate(4,sp,output,sizeof(output))==1 && !strcmp(output,"aw_inventory give spell all\n"));
+   sp[3]="bound dagger";
+   assert(AW_DebugTranslate(4,sp,output,sizeof(output))==1 && !strcmp(output,"aw_inventory give spell \"bound dagger\"\n"));
   }
   { /* DBG-GIVE-MONEY-62: dbg give alone (the picker), give ID [N], give money|coin|rich [N], additem the same as give;
      * the torch and weapon kit words keep their own routes */
@@ -584,6 +625,9 @@ int main(int count,char **values){
  assert(strstr(printed,"AUDIO\n--------------------------------------\n"));
  assert(strstr(printed,"VIDEO\n--------------------------------------\n"));
  assert(strstr(printed,"PLAYTESTING\n--------------------------------------\n"));
+ /* DBG-HELP-PAGER-TITLE-SPLIT-67: a page never ends between a group's title and its separator line */
+ {char split[200];snprintf(split,sizeof split,"%s\n\n--------------------------------------\n",PAGER_LINE);
+  assert(!strstr(printed,split));}
  assert(strstr(printed,"shroompicker [1..10/list]"));
  assert(!strstr(printed,"NOT PART"));
  pager_checks();
@@ -651,6 +695,32 @@ int main(int count,char **values){
  AW_SmallStringColor(-2,-2,40,"MMMMMMMM",71);
  for(i=0;i<64;i++)if(i<4 || i>=48 || (i-4)%12>=8)assert(pixels[i]==17);
  assert(AW_ConsoleCharWidth()==8);
+
+ /* UI-CONSOLE-FONT-SPECIAL-LETTERS-67: a game text's Windows-1252 character is drawn as the nearest one the console
+  * fonts have (the dialogue texts' u acute, e acute and right single quote; a capital with diaeresis, an em dash), in
+  * both fonts; never as the character its low seven bits name (before: u acute drew z) */
+ {static byte a[16*8],b[16*8];int k;
+  static const unsigned char pairs[][2]={{0xFA,'u'},{0xE9,'e'},{0x92,'\''},{0xC4,'A'},{0x97,'-'}};
+  byte *kept=vid.conbuffer;int kept_w=vid.conwidth,kept_row=vid.conrowbytes,kept_h=vid.conheight;
+  AW_ConsoleSetSmall(1);vid.conwidth=16;vid.conrowbytes=16;vid.conheight=8;
+  for(k=0;k<5;k++){
+   memset(a,0,sizeof(a));memset(b,0,sizeof(b));
+   vid.conbuffer=a;AW_ConsoleCharacter(0,0,pairs[k][1]);
+   vid.conbuffer=b;AW_ConsoleCharacter(0,0,pairs[k][0]);
+   assert(!memcmp(a,b,sizeof(a)));
+   assert(AW_ConsoleTextGlyph(pairs[k][0])==pairs[k][1]);
+  }
+  memset(a,0,sizeof(a));memset(b,0,sizeof(b));
+  vid.conbuffer=a;AW_ConsoleCharacter(0,0,'z');vid.conbuffer=b;AW_ConsoleCharacter(0,0,0xFA);
+  assert(memcmp(a,b,sizeof(a)));
+  for(k=0;k<256;k++){int g=AW_ConsoleTextGlyph(k);assert(k<128?g==k:(g>=32 && g<=126));}
+  AW_ConsoleSetSmall(0);
+  drawn_character=-1;AW_ConsoleCharacter(0,0,0xFA);assert(drawn_character=='u');
+  AW_ConsoleCharacter(0,0,0x92);assert(drawn_character=='\'');
+  AW_ConsoleCharacter(0,0,'Q');assert(drawn_character=='Q');
+  vid.conbuffer=kept;vid.conwidth=kept_w;vid.conrowbytes=kept_row;vid.conheight=kept_h;
+  printf("console fonts: Windows-1252 letters drawn as their nearest ASCII ok\n");
+ }
 
  return 0;
 }

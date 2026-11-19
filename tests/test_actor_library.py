@@ -125,6 +125,44 @@ class SideBySideTests(unittest.TestCase):
             with actor_library.NpcAllowance(3):
                 self.assertNotIn(build_parallel.ALLOWANCE_ENV, os.environ)    # outside the scheduler: nothing
 
+    def test_the_share_file_has_one_writer_at_a_time_and_its_own_temporary_name(self):
+        # BUILD-ACTOR-LIBRARY-SHARE-RACE-67: the half-second loop and the creatures' done callback wrote the NPC
+        # pool's share through one temporary name from two threads ("exception calling callback ...
+        # FileNotFoundError ... jobs/30-actor-library.tmp"), and that name was also the one the scheduler writes the
+        # stage's own allowance file through
+        import os
+        import tempfile
+        import threading
+        from pathlib import Path
+        import actor_library
+        import build_parallel
+        with tempfile.TemporaryDirectory() as tmp:
+            allowance = Path(tmp) / '30-actor-library'
+            allowance.write_text('12')
+            with patch.dict(os.environ, {build_parallel.ALLOWANCE_ENV: str(allowance)}):
+                with actor_library.NpcAllowance(3) as share:
+                    temporary = share.temporary()
+                    self.assertNotEqual(temporary, allowance.with_suffix('.tmp'))        # never the scheduler's
+                    self.assertTrue(temporary.name.startswith('30-actor-library.actor-npc.'))
+                    self.assertTrue(temporary.name.endswith('.tmp'))
+                    errors = []
+
+                    def hammer():
+                        try:
+                            for _ in range(400):
+                                share.write()
+                        except Exception as exc:      # the fault this test holds: a write that finds its file gone
+                            errors.append(exc)
+                    threads = [threading.Thread(target=hammer) for _ in range(6)]
+                    for t in threads:
+                        t.start()
+                    share.creatures_done()             # the callback's write, beside the others
+                    for t in threads:
+                        t.join()
+                    self.assertEqual(errors, [])
+                    self.assertEqual(share.path.read_text().strip(), '12')   # the creatures are done: the whole share
+                self.assertFalse(temporary.exists())
+
     def test_outside_the_scheduler_the_split_is_as_before(self):
         import os
         import actor_library
@@ -340,6 +378,30 @@ class LeftOutTests(unittest.TestCase):
         self.assertNotIn('villager', AL.plan(master, {'villager'})[3])               # the rule before v0.0.48
         self.assertNotIn('villager', AL.plan(master, {'villager'}, {13})[3])         # its only reference: a town's
         self.assertIn('villager', AL.plan(master, {'villager'}, {99})[3])            # a reference outside the towns
+
+    def test_the_people_of_a_cell_that_behaves_like_an_exterior_get_models(self):
+        """DISTRICT-PEOPLE-NOT-PLACED-67: Mournhold's districts are interior cells with the flag 0x80; they are built
+        as outdoor frames, so their people need library models. The plan saw exterior cells only: 38 records of
+        the districts had no model and their 49 people were left out of the frame maps. A plain room's people stay
+        out of the plan (the room stage fits them), and a master without such a cell plans what it planned."""
+        import struct
+        import actor_library as AL
+        from test_chim_levelled import MASTER, crea, ref
+        from test_entity_tracker import base, record, sub, z
+
+        def room(name, flags, refs):
+            return record('CELL', sub('NAME', z(name)), sub('DATA', struct.pack('<Iii', flags, 0, 0)), refs)
+        before = AL.plan(MASTER)
+        self.assertEqual(AL.district_actors(MASTER), {'NPC_': [], 'CREA': []})
+        master = (MASTER + base('NPC_', 'merchant') + base('NPC_', 'innkeeper') + crea('fabricant', 'r\\fab.nif', 'Fabricant')
+                  + room('City, Bazaar', 0x87, ref(71, 'merchant', (10.0, 20.0, 0.0)) + ref(72, 'fabricant', (30.0, 20.0, 0.0)))
+                  + room('City, Inn', 0x05, ref(73, 'innkeeper', (0.0, 0.0, 0.0))))
+        self.assertEqual(AL.district_actors(master), {'NPC_': ['merchant'], 'CREA': ['fabricant']})
+        meshes, _, _, npcs, _, _ = AL.plan(master)
+        self.assertIn('merchant', npcs)
+        self.assertNotIn('innkeeper', npcs)
+        self.assertIn('fabricant', [i for ids in meshes.values() for i in ids])
+        self.assertEqual(sorted(set(npcs) - set(before[3])), ['merchant'])
 
     def test_town_cast(self):
         import actor_library as AL

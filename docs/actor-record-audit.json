@@ -1,5 +1,5 @@
 {
- "build": "2026_11_12_v0.0.65_full-v0.0.65-release_20c6b9c",
+ "build": "2026_11_17_v0.0.66_full-v0.0.66-release-try2_ad5e9a0",
  "records": {
   "npc": 3041,
   "creature": 396
@@ -7,53 +7,53 @@
  "refs": 4798,
  "worst": [
   "inventory levelled",
-  "anim knockdown",
-  "anim idle",
-  "anim death",
-  "anim walk",
-  "anim hit",
-  "anim run",
-  "wander",
-  "anim swim",
+  "follow",
+  "scale",
+  "ranged weapon",
+  "armour",
   "anim spellcast",
-  "anim attack one-handed",
-  "anim block",
-  "anim attack thrown",
+  "anim knockdown",
+  "travel",
+  "anim walk",
+  "anim swim",
   "anim sneak",
+  "anim run",
+  "anim hit",
+  "anim death",
+  "anim block",
   "anim attack two-wide",
   "anim attack two-handed",
+  "anim attack thrown",
+  "anim attack one-handed",
   "anim attack hand-to-hand",
   "anim attack crossbow",
   "anim attack bow",
-  "anim attack",
-  "follow",
-  "scale",
-  "armour",
-  "ranged weapon",
-  "travel",
+  "anim idle",
+  "wander",
   "weapon",
+  "anim attack",
   "script locals",
   "escort"
  ],
  "anim_methods": {
   "not in this build": {
-   "records": 559,
-   "refs": 809,
+   "records": 157,
+   "refs": 44,
    "refs_mw": 2
   },
   "room resident": {
-   "records": 2073,
-   "refs": 2442,
-   "refs_mw": 2439
+   "records": 2248,
+   "refs": 2711,
+   "refs_mw": 2442
   },
   "NPC library": {
-   "records": 412,
-   "refs": 419,
+   "records": 496,
+   "refs": 491,
    "refs_mw": 419
   },
   "corpse": {
-   "records": 77,
-   "refs": 117,
+   "records": 88,
+   "refs": 128,
    "refs_mw": 113
   },
   "town resident": {
@@ -67,19 +67,19 @@
    "refs_mw": 6
   },
   "room resident (no layout: idle only)": {
-   "records": 5,
-   "refs": 5,
-   "refs_mw": 5
-  },
-  "creature library kf": {
-   "records": 209,
-   "refs": 863,
-   "refs_mw": 785
+   "records": 2,
+   "refs": 2,
+   "refs_mw": 2
   },
   "creature library skeletal": {
-   "records": 45,
-   "refs": 74,
-   "refs_mw": 74
+   "records": 385,
+   "refs": 1340,
+   "refs_mw": 849
+  },
+  "creature library kf": {
+   "records": 4,
+   "refs": 13,
+   "refs_mw": 10
   }
  },
  "opening": {
@@ -855,9 +855,9 @@
   },
   "ranged weapon": {
    "carried": {
-    "records": 202,
-    "refs": 237,
-    "refs_mw": 222
+    "records": 193,
+    "refs": 228,
+    "refs_mw": 213
    },
    "missing": {
     "records": 7,
@@ -865,9 +865,9 @@
     "refs_mw": 7
    },
    "different": {
-    "records": 43,
-    "refs": 50,
-    "refs_mw": 43
+    "records": 52,
+    "refs": 59,
+    "refs_mw": 52
    },
    "absent": {
     "records": 3185,
@@ -877,14 +877,14 @@
   },
   "armour": {
    "carried": {
-    "records": 1547,
-    "refs": 1879,
-    "refs_mw": 1633
+    "records": 1548,
+    "refs": 1880,
+    "refs_mw": 1634
    },
    "missing": {
-    "records": 23,
-    "refs": 62,
-    "refs_mw": 44
+    "records": 22,
+    "refs": 61,
+    "refs_mw": 43
    },
    "different": {
     "records": 0,
@@ -921,13 +921,13 @@
   },
   "wander": {
    "carried": {
-    "records": 2742,
-    "refs": 3816,
+    "records": 3152,
+    "refs": 4560,
     "refs_mw": 3738
    },
    "missing": {
-    "records": 520,
-    "refs": 750,
+    "records": 110,
+    "refs": 6,
     "refs_mw": 6
    },
    "different": {
@@ -1097,14 +1097,14 @@
   },
   "anim idle": {
    "carried": {
-    "records": 2799,
-    "refs": 3867,
-    "refs_mw": 3786
+    "records": 3192,
+    "refs": 4626,
+    "refs_mw": 3791
    },
    "missing": {
-    "records": 561,
-    "refs": 814,
-    "refs_mw": 7
+    "records": 157,
+    "refs": 44,
+    "refs_mw": 2
    },
    "different": {
     "records": 0,
@@ -1112,21 +1112,21 @@
     "refs_mw": 0
    },
    "absent": {
-    "records": 77,
-    "refs": 117,
+    "records": 88,
+    "refs": 128,
     "refs_mw": 113
    }
   },
   "anim walk": {
    "carried": {
-    "records": 2775,
-    "refs": 3834,
-    "refs_mw": 3753
+    "records": 3166,
+    "refs": 4588,
+    "refs_mw": 3755
    },
    "missing": {
-    "records": 561,
-    "refs": 811,
-    "refs_mw": 6
+    "records": 159,
+    "refs": 46,
+    "refs_mw": 4
    },
    "different": {
     "records": 0,
@@ -1134,21 +1134,21 @@
     "refs_mw": 0
    },
    "absent": {
-    "records": 101,
-    "refs": 153,
+    "records": 112,
+    "refs": 164,
     "refs_mw": 147
    }
   },
   "anim run": {
    "carried": {
-    "records": 2769,
-    "refs": 3820,
-    "refs_mw": 3739
+    "records": 3158,
+    "refs": 4564,
+    "refs_mw": 3741
    },
    "missing": {
-    "records": 559,
-    "refs": 801,
-    "refs_mw": 6
+    "records": 159,
+    "refs": 46,
+    "refs_mw": 4
    },
    "different": {
     "records": 0,
@@ -1156,20 +1156,20 @@
     "refs_mw": 0
    },
    "absent": {
-    "records": 109,
-    "refs": 177,
+    "records": 120,
+    "refs": 188,
     "refs_mw": 161
    }
   },
   "anim attack": {
    "carried": {
-    "records": 229,
-    "refs": 839,
+    "records": 344,
+    "refs": 1202,
     "refs_mw": 782
    },
    "missing": {
-    "records": 119,
-    "refs": 365,
+    "records": 4,
+    "refs": 2,
     "refs_mw": 2
    },
    "different": {
@@ -1185,14 +1185,14 @@
   },
   "anim attack hand-to-hand": {
    "carried": {
-    "records": 2542,
-    "refs": 2930,
-    "refs_mw": 2927
+    "records": 2839,
+    "refs": 3415,
+    "refs_mw": 3004
    },
    "missing": {
-    "records": 465,
-    "refs": 542,
-    "refs_mw": 81
+    "records": 157,
+    "refs": 46,
+    "refs_mw": 4
    },
    "different": {
     "records": 0,
@@ -1200,21 +1200,21 @@
     "refs_mw": 0
    },
    "absent": {
-    "records": 430,
-    "refs": 1326,
+    "records": 441,
+    "refs": 1337,
     "refs_mw": 898
    }
   },
   "anim attack one-handed": {
    "carried": {
-    "records": 2542,
-    "refs": 2930,
-    "refs_mw": 2927
+    "records": 2860,
+    "refs": 3471,
+    "refs_mw": 3004
    },
    "missing": {
-    "records": 485,
-    "refs": 598,
-    "refs_mw": 81
+    "records": 156,
+    "refs": 46,
+    "refs_mw": 4
    },
    "different": {
     "records": 0,
@@ -1222,21 +1222,21 @@
     "refs_mw": 0
    },
    "absent": {
-    "records": 410,
-    "refs": 1270,
+    "records": 421,
+    "refs": 1281,
     "refs_mw": 898
    }
   },
   "anim attack two-handed": {
    "carried": {
-    "records": 2542,
-    "refs": 2930,
-    "refs_mw": 2927
+    "records": 2839,
+    "refs": 3415,
+    "refs_mw": 3004
    },
    "missing": {
-    "records": 464,
-    "refs": 542,
-    "refs_mw": 81
+    "records": 156,
+    "refs": 46,
+    "refs_mw": 4
    },
    "different": {
     "records": 0,
@@ -1244,21 +1244,21 @@
     "refs_mw": 0
    },
    "absent": {
-    "records": 431,
-    "refs": 1326,
+    "records": 442,
+    "refs": 1337,
     "refs_mw": 898
    }
   },
   "anim attack two-wide": {
    "carried": {
-    "records": 2542,
-    "refs": 2930,
-    "refs_mw": 2927
+    "records": 2839,
+    "refs": 3415,
+    "refs_mw": 3004
    },
    "missing": {
-    "records": 464,
-    "refs": 542,
-    "refs_mw": 81
+    "records": 156,
+    "refs": 46,
+    "refs_mw": 4
    },
    "different": {
     "records": 0,
@@ -1266,21 +1266,21 @@
     "refs_mw": 0
    },
    "absent": {
-    "records": 431,
-    "refs": 1326,
+    "records": 442,
+    "refs": 1337,
     "refs_mw": 898
    }
   },
   "anim attack bow": {
    "carried": {
-    "records": 2542,
-    "refs": 2930,
-    "refs_mw": 2927
+    "records": 2839,
+    "refs": 3415,
+    "refs_mw": 3004
    },
    "missing": {
-    "records": 464,
-    "refs": 542,
-    "refs_mw": 81
+    "records": 156,
+    "refs": 46,
+    "refs_mw": 4
    },
    "different": {
     "records": 0,
@@ -1288,21 +1288,21 @@
     "refs_mw": 0
    },
    "absent": {
-    "records": 431,
-    "refs": 1326,
+    "records": 442,
+    "refs": 1337,
     "refs_mw": 898
    }
   },
   "anim attack crossbow": {
    "carried": {
-    "records": 2542,
-    "refs": 2930,
-    "refs_mw": 2927
+    "records": 2839,
+    "refs": 3415,
+    "refs_mw": 3004
    },
    "missing": {
-    "records": 464,
-    "refs": 542,
-    "refs_mw": 81
+    "records": 156,
+    "refs": 46,
+    "refs_mw": 4
    },
    "different": {
     "records": 0,
@@ -1310,21 +1310,21 @@
     "refs_mw": 0
    },
    "absent": {
-    "records": 431,
-    "refs": 1326,
+    "records": 442,
+    "refs": 1337,
     "refs_mw": 898
    }
   },
   "anim attack thrown": {
    "carried": {
-    "records": 2542,
-    "refs": 2930,
-    "refs_mw": 2927
+    "records": 2841,
+    "refs": 3417,
+    "refs_mw": 3004
    },
    "missing": {
-    "records": 466,
-    "refs": 544,
-    "refs_mw": 81
+    "records": 156,
+    "refs": 46,
+    "refs_mw": 4
    },
    "different": {
     "records": 0,
@@ -1332,21 +1332,21 @@
     "refs_mw": 0
    },
    "absent": {
-    "records": 429,
-    "refs": 1324,
+    "records": 440,
+    "refs": 1335,
     "refs_mw": 898
    }
   },
   "anim hit": {
    "carried": {
-    "records": 2793,
-    "refs": 3862,
-    "refs_mw": 3781
+    "records": 3184,
+    "refs": 4616,
+    "refs_mw": 3783
    },
    "missing": {
-    "records": 561,
-    "refs": 811,
-    "refs_mw": 6
+    "records": 159,
+    "refs": 46,
+    "refs_mw": 4
    },
    "different": {
     "records": 0,
@@ -1354,21 +1354,21 @@
     "refs_mw": 0
    },
    "absent": {
-    "records": 83,
-    "refs": 125,
+    "records": 94,
+    "refs": 136,
     "refs_mw": 119
    }
   },
   "anim knockdown": {
    "carried": {
-    "records": 2586,
-    "refs": 3003,
-    "refs_mw": 3000
+    "records": 3182,
+    "refs": 4607,
+    "refs_mw": 3777
    },
    "missing": {
-    "records": 770,
-    "refs": 1674,
-    "refs_mw": 791
+    "records": 163,
+    "refs": 59,
+    "refs_mw": 14
    },
    "different": {
     "records": 0,
@@ -1376,21 +1376,21 @@
     "refs_mw": 0
    },
    "absent": {
-    "records": 81,
-    "refs": 121,
+    "records": 92,
+    "refs": 132,
     "refs_mw": 115
    }
   },
   "anim death": {
    "carried": {
-    "records": 2873,
-    "refs": 3984,
-    "refs_mw": 3899
+    "records": 3276,
+    "refs": 4750,
+    "refs_mw": 3902
    },
    "missing": {
-    "records": 562,
-    "refs": 812,
-    "refs_mw": 7
+    "records": 159,
+    "refs": 46,
+    "refs_mw": 4
    },
    "different": {
     "records": 0,
@@ -1405,14 +1405,14 @@
   },
   "anim spellcast": {
    "carried": {
-    "records": 2556,
-    "refs": 2953,
-    "refs_mw": 2950
+    "records": 2881,
+    "refs": 3497,
+    "refs_mw": 3065
    },
    "missing": {
-    "records": 496,
-    "refs": 614,
-    "refs_mw": 129
+    "records": 160,
+    "refs": 59,
+    "refs_mw": 14
    },
    "different": {
     "records": 0,
@@ -1420,21 +1420,21 @@
     "refs_mw": 0
    },
    "absent": {
-    "records": 385,
-    "refs": 1231,
+    "records": 396,
+    "refs": 1242,
     "refs_mw": 827
    }
   },
   "anim block": {
    "carried": {
-    "records": 2542,
-    "refs": 2930,
-    "refs_mw": 2927
+    "records": 2852,
+    "refs": 3443,
+    "refs_mw": 3004
    },
    "missing": {
-    "records": 477,
-    "refs": 570,
-    "refs_mw": 81
+    "records": 156,
+    "refs": 46,
+    "refs_mw": 4
    },
    "different": {
     "records": 0,
@@ -1442,21 +1442,21 @@
     "refs_mw": 0
    },
    "absent": {
-    "records": 418,
-    "refs": 1298,
+    "records": 429,
+    "refs": 1309,
     "refs_mw": 898
    }
   },
   "anim sneak": {
    "carried": {
-    "records": 2542,
-    "refs": 2930,
-    "refs_mw": 2927
+    "records": 2839,
+    "refs": 3415,
+    "refs_mw": 3004
    },
    "missing": {
-    "records": 465,
-    "refs": 542,
-    "refs_mw": 81
+    "records": 157,
+    "refs": 46,
+    "refs_mw": 4
    },
    "different": {
     "records": 0,
@@ -1464,21 +1464,21 @@
     "refs_mw": 0
    },
    "absent": {
-    "records": 430,
-    "refs": 1326,
+    "records": 441,
+    "refs": 1337,
     "refs_mw": 898
    }
   },
   "anim swim": {
    "carried": {
-    "records": 2542,
-    "refs": 2930,
-    "refs_mw": 2927
+    "records": 2843,
+    "refs": 3498,
+    "refs_mw": 3004
    },
    "missing": {
-    "records": 469,
-    "refs": 625,
-    "refs_mw": 81
+    "records": 157,
+    "refs": 46,
+    "refs_mw": 4
    },
    "different": {
     "records": 0,
@@ -1486,8 +1486,8 @@
     "refs_mw": 0
    },
    "absent": {
-    "records": 426,
-    "refs": 1243,
+    "records": 437,
+    "refs": 1254,
     "refs_mw": 898
    }
   }

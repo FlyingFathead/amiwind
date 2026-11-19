@@ -1,6 +1,6 @@
 # Gameplay recorder
 
-_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
+_Last updated with AmiWind v0.0.67 (18 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -146,7 +146,10 @@ the courtyard, the captain's door), with the use key on what the view is aimed a
 by name (Morrowind, whose answer names his duties, then duties). Its nine steps:
 
 1. The opening to the papers taken at the census office: fighting is switched off from the ship until the papers;
-   after them the papers are carried and fighting and magic are on.
+   after them the papers are carried and fighting and magic are on. After the race menu the player stays on the pier
+   while the dock guard walks to his post beside the office door; then `aw_intro_status` must show him there (done,
+   at most 3 units from his post), his body never inside a solid on any tick of his walks (a pier post), and the
+   fixed route along the pier's centre line as the walk that ran.
 2. The hall guard's door and the back room: the door opens once the papers are carried, and the iron dagger on the
    back-room table (the one the clerk's tutorial box asks for) is taken. Then the crab meat (`ingred_crab_meat_01`) on
    the Silverware Plate (`misc_imp_silverware_plate_01`): the view is aimed at the crab meat, the game's focus row must
@@ -178,10 +181,13 @@ by name (Morrowind, whose answer names his duties, then duties). Its nine steps:
    journey).
 8. The game's own quicksave, then a new start of the engine and the load through the Load game window: the package,
    the gold, the ring, the journal, the dead actor and a script global are as they were saved.
-9. Through a door with E: the next area loads and the game goes on with the loaded inventory. At the end, every map
-   change since the release has written its autosave (the release's, the captain's room, the courtyard and back, and
-   this door; the load of the quicksave is not a map change), and `dbg save status` says nothing holds the next one
-   back.
+9. Through a door with E: the next area loads and the game goes on with the loaded inventory. The player first walks
+   to the census office's street door's arrival point, as a player walks up to a door, and then aims and uses it: the
+   quicksave holds the player where step 7's fight left it, and the dodges of that fight slide the player aside, in the
+   v0.0.67-dev2 journey past the door's use reach (changed after v0.0.67-dev2; the aim and the reach are those of every
+   other door). At the end, every map change since the release has written its autosave (the release's, the captain's
+   room, the courtyard and back, and this door; the load of the quicksave is not a map change), and `dbg save status`
+   says nothing holds the next one back.
 
 A second journey, `tests/sessions/journey_tarhiel.txt`, checks the falling mage on the Bitter Coast near Seyda Neen.
 Outside the trigger it checks that the mage is still held on his platform and that nothing has landed. After a walk

@@ -160,6 +160,11 @@ class CellSettings(unittest.TestCase):
         accepted = C.accepted_chains()
         self.assertIn('flora_kelp_03', accepted)
         self.assertIn('project decision', accepted['flora_kelp_03'])
+        # the statue of Azura in Mournhold's Temple courtyard (presented cell 4,-30), accepted on 18 November 2026
+        self.assertIn('project decision', accepted['azura'])
+        statue = [{'name': 'r/azura@s1', 'clipnodes': 484, 'depth': 484, 'over': True}]
+        h = C.audits_of(None, None, None, statue, None, {'by_type': {}, 'totals': {}}, None)['hull_bevels']
+        self.assertEqual((h['status'], h['outcome']), ('passed', 'kept_as_chain'))
         hulls = [{'name': 'f/flora_kelp_03@s1', 'clipnodes': 305, 'depth': 305, 'over': True},
                  {'name': 'f/flora_kelp_04@s1', 'clipnodes': 304, 'depth': 304, 'over': True}]
         rec = {'by_type': {}, 'totals': {}}

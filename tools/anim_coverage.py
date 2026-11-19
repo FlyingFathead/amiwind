@@ -28,6 +28,24 @@ CATALOGUE = ROOT / 'engine/aga/src/aw_animpick_catalogue.inc'
 HEADER = struct.Struct('>4sHHIffHH')        # engine aw_skel.h: "AWSK", version, bones, frames, rate, scale, groups, keys
 GROUP = struct.Struct('>24sII')
 KEY = struct.Struct('>32sHHI')
+# engine aw_skel.h: a version 3 table (CREATURE-APPENDED-TABLE-54) names its base table after the header and plays the
+# base's groups after its own; a version 4 table carries its scale section there (AW_SKEL_SCALED_EXT + its bytes)
+VERSION_APPENDED, VERSION_SCALED = 3, 4
+TABLE_NAME = 32                             # AW_SKEL_TABLE_NAME
+SCALED_EXT = 8                              # AW_SKEL_SCALED_EXT
+
+
+def table_head(data):
+    """(the bytes before the bone lists, the base table's path or None) of an AWSK table, as the engine's parse
+    (aw_skel.c) reads it. ACTOR-AUDIT-APPENDED-TABLES-66: every table was read as version 1, so an appended creature
+    table (the skeletons, goblins, dremora, liches and the rest on the humanoid skeleton) showed none of the groups the
+    engine plays from its base, and its own were read from the wrong place."""
+    version = HEADER.unpack_from(data, 0)[1]
+    if version == VERSION_APPENDED:
+        return HEADER.size + TABLE_NAME, data[HEADER.size:HEADER.size + TABLE_NAME].split(b'\0', 1)[0].decode('latin-1') or None
+    if version == VERSION_SCALED:
+        return HEADER.size + SCALED_EXT + struct.unpack_from('>I', data, HEADER.size + 4)[0], None
+    return HEADER.size, None
 # Entry points the engine has whose game-side caller comes with another item (the coverage says so, never "done").
 PENDING = {
     **{'idle%d' % n: 'AW_AnimPickIdleChances: the wander package chances (AI_W) from the ambient wander tables'
@@ -114,11 +132,12 @@ def catalogue(path=CATALOGUE):
 
 
 def table_groups(data):
-    """The group names of an AWSK table (engine aw_skel.h), in order, and {group: [text keys]}."""
+    """The group names of an AWSK table (engine aw_skel.h), in order, and {group: [text keys]}: the table's OWN groups
+    (an appended table's base is table_head's second value; its groups follow these in the engine)."""
     magic, _version, bones, _frames, _rate, _scale, groups, keys = HEADER.unpack_from(data, 0)
     if magic != b'AWSK':
         raise ValueError('not an AWSK table')
-    off = 24 + ((bones * 2 + 3) & ~3) + ((bones + 3) & ~3)
+    off = table_head(data)[0] + ((bones * 2 + 3) & ~3) + ((bones + 3) & ~3)
     names = []
     for _ in range(groups):
         name, _first, _last = GROUP.unpack_from(data, off)

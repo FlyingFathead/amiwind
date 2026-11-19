@@ -1,6 +1,6 @@
 # CHIM mesh methods
 
-_Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
+_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -11,6 +11,8 @@ _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 - [Measured](#measured)
   - [Tel Uvirith cell (10,1) diagnostic, 12 October 2026](#tel-uvirith-cell-101-diagnostic-12-october-2026)
 - [Hot models](#hot-models)
+  - [The everywhere rows in the rooms](#the-everywhere-rows-in-the-rooms)
+  - [Method 2: hand-made meshes](#method-2-hand-made-meshes)
   - [Stronger rows for the camps and Ald'ruhn](#stronger-rows-for-the-camps-and-aldruhn)
 - [Selecting a method](#selecting-a-method)
 - [Determinism, keys and checks](#determinism-keys-and-checks)
@@ -25,6 +27,10 @@ _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 How the CHIM builder turns each mesh into Quake faces. Quake faces are convex planar polygons, not
 triangles, and every face costs memory in the CHIM zone and time in the renderer, so the builder makes as
 few faces as the shape allows. Three methods exist and all stay selectable:
+
+What each method makes of every placed model, outdoors and in the rooms, with its quality (open edges, torn seams,
+shape error) and the method in use, is in the [model census](../MODEL_CENSUS.md), which every build writes: look a
+model up there before changing its method or adding a row, and again afterwards.
 
 | Method | Reduction | Faces | Lossless |
 | --- | --- | --- | --- |
@@ -243,6 +249,76 @@ original), and the Manor District's shells in that room only (`config/chim-rooms
 prison ship's hold is not helped by this method: its props are small parts with open rims that the locked
 borders keep (meshopt leaves 97-100 % of them even at 1-2 % error), and its shell is already reduced harder by
 its own profile; its cost is the count of props in view (14 beds, 15 barrels).
+
+### The everywhere rows in the rooms
+
+Up to v0.0.67-dev1 the everywhere rows reached the outdoor frames only: the CHIM rooms took a recipe only where
+`config/chim-rooms.json` `recipe_rooms` named one (the Manor District), and then only its ratio rows. Since v0.0.67
+every CHIM room takes the everywhere recipe as the frames do, keyed by the mesh's source and SHA-256, so only the
+named model types change (VISUAL-EVERYWHERE-ROOMS-67; [interior store](INTERIOR_STORE.md#builder-changes), item 10).
+Counted on the v0.0.67-dev1 run before the change: 3,079 room placements of everywhere models in 570 of 1,317 rooms
+drew 667,976 faces; at the faces the same models draw outdoors that is about 471,658 (about 29 % fewer). By land:
+Vvardenfell 2,954 placements (629,972 faces, about 444,927 after), Mournhold 83 (20,299, about 14,557), Solstheim 42
+(17,705, about 12,174). Most of it is the urns (contain_urn_05 alone: 1,519 placements, 196 to 141 faces each) and
+the paper lantern (455 placements, 182 to 128); the street lantern's shell is the largest cut per placement (66
+placements, 151 to 20 faces). The rooms with the most everywhere faces are Vivec's Redoran Waistworks and the
+ancestral tombs (their urns).
+
+### Method 2: hand-made meshes
+
+Decided for the project on 17 November 2026 (MODEL-REPLACEMENT-OBJ-67): what this page describes so far is method 1,
+the conversion every model gets (its profile's reduction, planar merge or meshopt+merge by the method table, and the
+recipe rows). Method 2 is a hand-made reduction of one model, for the small detailed props the simplifier cannot
+reduce because their rims are open (lanterns, lamps, beds, barrels). A model with a row in
+`config/model-method-2.json` is drawn by method 2 wherever it is placed, in every CHIM frame and every CHIM room,
+keyed by its model path and the SHA-256 of its NIF file, so only that model type changes. Its collision, its light
+(the LIGH record) and its flames stay the original's. Method 1 stays selectable per model (`"method": 1` in its row)
+and for the whole build (`AMIWIND_MODEL_METHOD=1`), so every A/B runs both ways. Each row records where it came from
+(batch, date, author), its counts before and after and its measured A/B.
+
+The row holds numbers only. The builder makes the mesh and its pictures at build time from the model and textures it
+exported from the user's own game files (`tools/model_method2.py`, a unit of its own kind `mesh-method2`, so no
+other mesh unit's key reaches that code), and they are never part of the repository or a package.
+
+The first row is the travel lantern `light_com_lantern_02` (kind `lantern_rings`, `tools/lantern_rebuild.py`, from the
+maintainer's lantern pipeline, checkpoint 002): six four-corner rings capped top and bottom, the roof as a truncated
+square pyramid (four planar sides), the source handle's 24 triangles kept as they are; 229 triangles and 166 distinct
+positions become 68 and 39. The posts, braces, glass and candle behind each side are baked into one opaque picture per
+side (64 x 64; the four side by side in one 256 x 64 texture: `"panels": "baked"`), or one procedural frosted picture
+for every side and every placement (`"panels": "frosted"`: no game artwork, a quarter of the texture). The row takes
+the frosted panels, by the memory rule below; `AMIWIND_METHOD2_PANELS=baked` or `frosted` sets every row's panels for
+an A/B. The recipe's numbers are in Quake units and the OBJ texture convention, as the checkpoint
+measured them; the builder works in Morrowind units, and `lantern_rebuild.py` converts at one place each way. The
+rebuilt lantern keeps the original's origin and bounds (within 1e-4 Quake units).
+
+Measured on the user's model through the converter as the rooms convert it (17 November 2026, the v0.0.67-dev1 room
+export): one placement draws 58 faces instead of 203. The rooms place it 56 times in 34 rooms (53 in Vvardenfell, 3 in
+Mournhold): 11,368 faces today, about 3,248 with method 2. Outdoors the game places it about a hundred times more
+(the original game's placements: 88 in Vvardenfell, 16 in Solstheim). Frame time and the in-game look: not measured
+yet (the first build that carries the row).
+
+**The hand-made batches 001-004** (17 November 2026, approved by the maintainer by eye; `tools/hand_made_kinds.py`):
+18 lights in three more kinds. `conservative` simplifies chosen parts of a model with its borders, texture seams and
+extremes locked and keeps its textures; `profile_shell` and `dunmer_lantern` rebuild a closed shell and bake its
+appearance into one picture. Each was put through the converter as method 2 and measured against what the v0.0.67-dev1
+build's stores hold (faces one placement draws), with the memory as the engine holds it: a baked picture with its mip
+levels against the mesh memory saved. The rule: a row is used when the texture memory it adds is at most the mesh
+memory it saves.
+
+| Models | Kind | Triangles | Faces a placement, rooms | Outdoors | Texture added | Used |
+| --- | --- | --- | --- | --- | ---: | --- |
+| light_de_lamp_01 to 07 (seven lamps) | conservative | 280 to 216 | 265 to 205 | rooms only | none | yes |
+| light_paper_lantern_01, 02, off | conservative | 194 to 140 | 182 to 138 | 128 to 120 | none | yes |
+| light_torch10 | conservative | 238 to 162 | 180 to 137 | 171 to 137 | none | yes |
+| light_de_lantern_08, 12 | dunmer_lantern | 178 to 82 | 145 to 72 | 145 to 72 | 21,760 bytes (128 x 128) | no: about 7,700 bytes of mesh saved |
+| light_de_lantern_04, 09, 13 | profile_shell | 168 to 112 | 151 to 99 | 151 to 99 | 87,040 bytes (256 x 256) | no: about 5,500 saved |
+| light_de_lantern_02, 06 | profile_shell | 228 to 134 | 199 to 120 | 199 to 120 | 348,160 bytes (512 x 512) | no: about 7,800 saved |
+
+The seven baked models are in the table on method 1 with their numbers until the maintainer decides; a smaller
+picture would change what he approved. The simplified ones keep every open edge they had (no new hole); the shells
+close most of theirs. The travel lantern's baked panels (21,760 bytes) exceed its about 15,100 bytes of mesh saved by
+about 6,600 bytes before the two textures it no longer draws; its frosted panels (5,440 bytes) pass, so its row takes
+the frosted panels until the maintainer decides otherwise.
 
 ### Stronger rows for the camps and Ald'ruhn
 

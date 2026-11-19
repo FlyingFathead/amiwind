@@ -45,17 +45,21 @@ typedef struct {
 } aw_magic_emitter_t;
 
 typedef struct {
-    float length,sprite_size,radius;   /* seconds; the sprite's world size; the area mesh's radius at scale 1 */
+    float length,sprite_size,radius;   /* seconds; the sprite's world size; the area mesh's radius at scale 1 (the
+                                        * bubble's: its middle above the feet of a standard character, the egg's
+                                        * place on the body; 0 in an image before v0.0.67-dev3: placed as before) */
     char sprite[AW_MAGIC_PATH],sound[AW_MAGIC_PATH];   /* "" when the phase has none */
     int emitters,present;
     aw_magic_emitter_t em[AW_MAGIC_EMITTERS];
 } aw_magic_phase_t;
 
 /* The shell shapes of the magic effect set (each effect's bubble is built in both, tools/prepare_magic.py: the
- * shape's sprites beside progs/awmx_NN.spr): 0 the egg, the effect's own hit model outline (the shield's upright
- * "cosmic egg", taller than wide, from the feet to above the head; the default); 1 the dotted sphere, a round see-
- * through bubble of the effect's colour strongest at its rim (kept from v0.0.54's first shell at the maintainer's
- * word, for spells and effects that want it). */
+ * shape's sprites beside progs/awmx_NN.spr): 0 the egg, the original's "cosmic egg" (the Shield's hit model
+ * e\magic_hit_S.nif, the only shell shape in the game's effect visuals besides the other shields', taller than wide,
+ * from the feet to above the head) worn by every effect with its own texture and colour, its own hit model laid in
+ * (MAGIC-SHELL-EGG-STYLE-67; before, an effect whose hit model has only particles got the round sphere here); the
+ * default; 1 the dotted sphere, a round see-through bubble of the effect's colour strongest at its rim (kept from
+ * v0.0.54's first shell at the maintainer's word, for spells and effects that want it). */
 enum {AW_MAGIC_SHAPE_EGG,AW_MAGIC_SHAPE_SPHERE,AW_MAGIC_SHAPES};
 /* The magic effect record's flag for a hit visual that stays on the target for the spell's whole duration (rule from
  * OpenMW components/esm3/loadmgef.hpp ContinuousVfx, mwmechanics/spellcasting.cpp and character.cpp
@@ -102,6 +106,12 @@ int AW_MagicFadeFrame(float age,float length);
 float AW_MagicAreaScale(float feet);
 /* The hit or area sprite's world size at AGE: grows from SIZE to SIZE x GROW over the phase. */
 float AW_MagicGrow(float size,float grow,float age,float length);
+/* MAGIC-SHELL-EGG-STYLE-67: an effect model on a creature whose bounds are BX x BY x BZ of the original's units, by
+ * the rule of OpenMW 0.53 apps/openmw/mwrender/animation.cpp Animation::addEffect (read, not copied): *SCALE is
+ * max(BX, BY, BZ / 2) / 64 when that is above 1, else 1; *OFFSET (the original's units, before the scale) is what BZ
+ * lacks of 128 (negative), or BZ over 128 taken off when it is wider (BX + BY) than tall, else 0; FLIES: a twentieth
+ * of it. An NPC's effect takes neither (only the actor's own scale). */
+void AW_MagicCreatureFit(float bx,float by,float bz,int flies,float *scale,float *offset);
 /* CAST-EGG-SYNC-62: the look of a cast that plays with the cast animation is held (its release AW_MAGIC_HELD_RELEASE)
  * until the spell itself leaves; a held look whose spell never leaves ends after AW_MAGIC_HELD_MAX seconds. */
 #define AW_MAGIC_HELD_RELEASE 1000.0f

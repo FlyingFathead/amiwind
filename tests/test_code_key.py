@@ -185,8 +185,9 @@ class ChimUnitKeyTests(unittest.TestCase):
             (root / 'tools/mesh_geometry.py').write_text(edited, encoding='utf-8')
             after = keys()
             changed = sorted(kind for kind in before if before[kind] != after[kind])
-            # (mesh-stair: stair collision method 1's mesh worker runs the same converter, CHIM-STAIR-COLLISION-MESH-47)
-            self.assertEqual(changed, ['hull-surface', 'mesh', 'mesh-stair'])
+            # (mesh-stair: stair collision method 1's mesh worker runs the same converter, CHIM-STAIR-COLLISION-MESH-47;
+            # mesh-method2: a hand-made mesh's worker runs it too for the collision and the faces, MODEL-REPLACEMENT-OBJ-67)
+            self.assertEqual(changed, ['hull-surface', 'mesh', 'mesh-method2', 'mesh-stair'])
             terrain = (root / 'tools/chim/terrain.py').read_text(encoding='utf-8')
             (root / 'tools/chim/terrain.py').write_text(
                 insert_after_docstring(terrain, 'def terrain_unit(', '    unused_probe = 1'), encoding='utf-8')

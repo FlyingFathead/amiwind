@@ -24,6 +24,7 @@ void AW_ReaderMouse(int x,int y){}
 static int opening_locked,character_modal;
 int AW_OpeningLocked(void){return opening_locked;}
 void AW_OpeningDockStatus(void){}
+int AW_OpeningDockRouteArg(const char *word){return 0;}   /* PIER-GUARD-POST-STUCK-67 */
 int AW_CharacterActive(void){return character_modal;}
 void AW_CharacterMouse(int x,int y){}
 static void (*command)(void),(*combat_command)(void),(*torch_command)(void);static int argc=1,bad,captures,region_selected;static char *args[4];

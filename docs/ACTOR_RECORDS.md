@@ -1,6 +1,6 @@
 # What every being can have: the actor records
 
-_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
+_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -30,7 +30,9 @@ _Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
   - [Held weapons](#held-weapons)
   - [Combat styles](#combat-styles)
   - [The animations](#the-animations)
+  - [Whole creature models and the surface check](#whole-creature-models-and-the-surface-check)
 - [The build's actor spec check](#the-builds-actor-spec-check)
+- [The expansions' actors](#the-expansions-actors)
 - [Sources and method](#sources-and-method)
 
 <!-- contents end -->
@@ -626,6 +628,41 @@ table (12 to 56 KB, or the shared humanoid table for the two-legged ones) is hel
 model costs CPU per drawn frame, as every person already does; not yet measured in a running game. Fargoth's and the
 guard's missing layout is FARGOTH-STANDING-NO-LAYOUT-66.
 
+Since v0.0.67 the audit reads a creature's table as the engine plays it (ACTOR-AUDIT-APPENDED-TABLES-66). A creature on
+the humanoid skeleton (the skeletons, goblins, dremora, liches and others) has a table appended to the shared humanoid
+table: its own groups first, then the humanoid table's. The audit read every table as a plain one, so it counted those
+creatures as playing nothing, or only their own few groups, while the game plays the whole humanoid set for them. On the
+v0.0.66 release build, read correctly, about 160 records lack a kind instead of up to 560, nearly all of them expansion
+actors that build does not place, and the gaps list says so.
+
+### Whole creature models and the surface check
+
+A creature whose gallery profile says `whole` (`config/gallery_model_quality.json`; today the cliff racer, whose thin
+wing membranes and tail every reduction left full of holes, CREATURE-RACER-MESH-SPIKE-58) keeps every source triangle
+on its source vertices, with the original textures in one skin atlas. Up to v0.0.65 that model came from the `kf`
+bake. The `skeletal` method from v0.0.66 did not read the profile: the racer was baked to 474 of its 965 triangles,
+every triangle on three vertices of its own with its own baked texture tile, 62 open edges (CREATURE-RACER-HOLES-67).
+And its root bone is named `root bone`, not `Bip01`, so its own table kept the walk's and the run's travel, and the
+box every pose is drawn in stretched to 8,069 units along its body: every drawn vertex was off by up to 15.8 units.
+
+Since v0.0.67-dev3 such a creature takes the skeletal method's whole route (`tools/creature_whole.py`): its own table,
+with its own root held in place in the walk and the run as OpenMW holds it, and its whole model on that table. The
+cliff racer: 965 triangles on its 667 vertices, skin 512 by 288 with the original textures, every pose drawn within
+1.75 units (0.4 % of its size), and all its table groups (the second and third attack, knockdown and its deaths). The
+route has its own unit worker, so the other creatures' models keep theirs.
+
+The library then compares every standing model, in the idle's first pose, with its source mesh posed the same way
+(`tools/creature_surface.py`): triangles, the share of the source's surface within one unit of the model, and the
+shapes whose surface the model lost (the `kf` bake's reduction check). A model whose profile keeps it whole and is not
+stops the stage; the others are written to the library report. On the v0.0.67-dev2 library, for the record: the cliff
+racer 83 % (474 triangles, two shapes lost), the frost giant 66 %, the netch bull and the kwama queen 69 %, the guar
+with its pack 70 %, every other creature from 82 to 100 %.
+
+The root travel is the same for every creature whose root bone is not named `Bip01`: their walk and run carry it, and
+their boxes are coarser (the three worst after the racer: 2.8, 2.5 and 1.4 % of their size; the rest 0.2 to 1.1 %).
+Holding every creature's own root re-bakes every creature model and room resident, so it comes as its own change after
+v0.0.67-dev3 (CREATURE-TABLE-ROOT-TRAVEL-67).
+
 ## The build's actor spec check
 
 Since v0.0.66 the image step stops a full build whose people and creatures fall short of the original or are out of
@@ -689,6 +726,38 @@ stage; when the build makes it, the moment it has passed. Every creature the bas
 outdoor levelled list must give a creature with a model in the library, or the build stops before the world stages
 and names the records (the v0.0.66 release library: 333 placed creatures and 5,082 levelled points, all with a model,
 about 2 seconds).
+
+## The expansions' actors
+
+Since v0.0.67 the same check has a third part when Tribunal or Bloodmoon is selected (`tools/expansion_actor_check.py`;
+with the base game alone it does not run and the report is as before). Each expansion is done in three stages, each a
+milestone with a measured count, and `config/expansion-stages.json` says which stage each one is worked at:
+
+1. the world: the expansion's rooms and exterior cells built and reachable;
+2. the actors: every person and creature it places, in its own places and in Vvardenfell, placed and complete: a model
+   the game plays, every stat its record has, its inventory and equipment, its combat style, every kind of animation
+   the original gives it, and its own script attached with its variables;
+3. the script logic: the global, start, quest and dialogue result scripts, the message boxes, the stats scripts set
+   and the expansion's movies.
+
+The report (`actor-spec-check.json`, key `expansion_actors`, with every placement in `expansion-actors.json` beside
+it) gives per land (Mournhold, Solstheim and the actors inserted into Vvardenfell) the places built, the actors placed
+and complete with the columns the others lack, and the scripts compiled, attached and running. At milestone 1 these
+are counts; from milestone 2 on, every incomplete actor of that expansion stops the build with a line naming the actor,
+its reference, its place and what it lacks, and the same check runs on the previous build's outputs before the first
+stage. A world-wide gap with its own register entry (the levelled inventory picked once at build time,
+ACTOR-LEVELLED-INVENTORY-ONE-PICK-66) is counted and named, never a stop.
+
+On the v0.0.66 release build's outputs (both expansions at milestone 1, about 20 seconds for this part):
+
+| Land | Actors placed | Complete | What the rest lack (placements) |
+| --- | ---: | ---: | --- |
+| Mournhold | 354 of 412 | 205 | script attached 172, placed 58 (the five districts and one empty room are set aside), model 41, animations 44, inventory 22 |
+| Solstheim | 274 of 476 | 93 | script attached 359, placed 202 (exterior cells not built yet) |
+| Inserted into Vvardenfell | 59 of 59 | 58 | inventory 1 |
+
+The missing script bindings are fixed in v0.0.67 (EXPANSION-SCRIPTS-NOT-ATTACHED-66), so the next build counts them
+attached.
 
 ## Sources and method
 

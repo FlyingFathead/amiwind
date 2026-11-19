@@ -979,5 +979,107 @@ class OceanLandPreflight(unittest.TestCase):
         self.assertEqual(R.ocean_land_problems({(1, 1): 'land'}, '/nowhere'), [])
 
 
+class MournholdSet(unittest.TestCase):
+    """MOURNHOLD-EXTERIOR-CELLS-66: Tribunal's layer set is Mournhold's presented cells (island 3, set tribunal in the
+    tracker files): every one is in the set, the unfinished ones are dropped with their reason, the earlier region
+    method (one legacy map per cell) cannot take one, and the land check names them apart (they have no LAND)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.status = Path(self.tmp.name) / 'cell-progress-reference.json'
+        cells = {'4,-30': {'status': DONE, 'ring': None, 'island': 3, 'name': 'Mournhold, Synthetic Plaza'},
+                 '5,-30': {'status': 'not_started', 'ring': None, 'island': 3, 'name': 'Mournhold, Synthetic Plaza'},
+                 '1,1': {'status': DONE, 'ring': 1, 'island': 1, 'name': 'Synthetic Coast'},
+                 '-20,23': {'status': DONE, 'ring': 1, 'island': 2, 'name': 'Synthetic Isle'}}
+        self.status.write_text(json.dumps({'format': 'aw-cell-reference-1', 'cells': cells}), encoding='utf-8')
+        self.statuses = R.load_status(self.status)
+
+    def test_island_3_is_the_tribunal_set_of_a_reference_file(self):
+        self.assertEqual({c: v['set'] for c, v in self.statuses.items()},
+                         {(4, -30): 'tribunal', (5, -30): 'tribunal', (1, 1): 'vvardenfell', (-20, 23): 'bloodmoon'})
+        self.assertEqual(self.statuses[(4, -30)]['name'], 'Mournhold, Synthetic Plaza')
+
+    def test_the_layer_sets_name_mournhold_for_tribunal(self):
+        self.assertEqual(R.layer_sets(), {'Bloodmoon.esm': 'solstheim', 'Tribunal.esm': 'mournhold'})
+        self.assertEqual(R.LAYER_SETS, {'Bloodmoon.esm': 'solstheim'})        # the module table is unchanged
+        self.assertEqual(R.named_cells('mournhold', self.statuses), [(4, -30), (5, -30)])
+        self.assertEqual(R.named_cells('solstheim', self.statuses), [(-20, 23)])
+        cells, explicit, _ = R.select(['mournhold'], self.statuses)
+        self.assertEqual((cells, explicit), ([(4, -30), (5, -30)], []))
+
+    def test_unfinished_cells_are_dropped_and_the_legacy_method_takes_none(self):
+        kept, problems, dropped = R.preflight([(4, -30), (5, -30)], set(), self.statuses, {})
+        self.assertEqual((kept, problems), ([(4, -30)], []))
+        self.assertEqual([d['cell'] for d in dropped], [[5, -30]])
+        self.assertIn('CHIMport status not_started', dropped[0]['reason'])
+        kept, problems, dropped = R.preflight([(4, -30)], set(), self.statuses, {}, one_map_only=True)
+        self.assertEqual((kept, problems), ([], []))
+        self.assertIn('presented cell of Mournhold has no legacy open-world map', dropped[0]['reason'])
+        kept, problems, dropped = R.preflight([(4, -30)], {(4, -30)}, self.statuses, {}, one_map_only=True)
+        self.assertEqual(kept, [])
+        self.assertIn('cell 4,-30: a presented cell of Mournhold', problems[0])
+
+    def test_both_land_checks_admit_a_cell_without_land_by_design(self):
+        # a presented cell has no LAND record; its recipe settings say so ("no_land"), and both the preflight's land
+        # check and the CHIM stage's (check_source_land) admit it as flat default ground; any other cell without
+        # LAND is still refused
+        from unittest import mock
+
+        def recipes(cell):
+            return {'visual_recipe': 'mournhold-v1', 'no_land': True} if tuple(cell) == (4, -30) else {}
+        with mock.patch('chim.ocean_runtime.land_cells', return_value={(1, 1)}), \
+                mock.patch('visual_recipes.cell_settings', side_effect=recipes):
+            problems = R.owned_land_problems({(4, -30): 'land', (1, 1): 'land', (9, 9): 'land'}, '/data')
+            settings = R.frame_settings(R.frame_row((4, -30)))
+            other = R.frame_settings(R.frame_row((9, 9)))
+        self.assertEqual(problems, ['1 region cell(s) the status file calls land or seabed have no LAND record in the '
+                                    'game data (the CHIM stage would refuse them: no original LAND, no open-ocean '
+                                    'admission): 9,9'])
+        self.assertTrue(settings['no_land'])
+        area = {'center': [4, -30], 'radius_cells': 1, 'cells': [{'x': 4, 'y': -30}], 'default_land_cells': [[4, -30]]}
+        self.assertIsNone(R.check_source_land(settings, {'area': area}, lambda: self.fail('no LAND list is read')))
+        area = {'center': [9, 9], 'radius_cells': 1, 'cells': [{'x': 9, 'y': 9}], 'default_land_cells': [[9, 9]]}
+        with self.assertRaisesRegex(ValueError, 'owned cell has no original LAND'):
+            R.check_source_land(other, {'area': area}, set())
+
+    def test_the_project_gives_exactly_the_districts_recipe_cells_no_land(self):
+        import json as _json
+        doc = _json.loads((ROOT / 'config' / 'visual-recipes.json').read_text(encoding='utf-8'))
+        rows = doc['cell_settings']
+        no_land = sorted(k for k, v in rows.items() if v.get('no_land'))
+        district = sorted(k for k, v in rows.items() if v.get('visual_recipe') == 'mournhold-v1')
+        self.assertEqual(no_land, district)
+        self.assertEqual(len(no_land), 11)
+        self.assertIn('"no_land": true', doc['recipes']['mournhold-v1']['status'])
+
+
+class LayerSetsInTheBuild(unittest.TestCase):
+    """The base world's cell list takes no expansion's named set, whatever is selected: an expansion's cells are its
+    build module's (tests/test_presented_data_stage.py: Mournhold's districts by tribunal-mournhold,
+    MOURNHOLD-EXTERIOR-CELLS-66)."""
+
+    def resolve(self, masters, presented):
+        import build
+        from unittest import mock
+        args = SimpleNamespace(chim_regions=[], chim_regions_status=None, miniwind=False, chim_region_rows=None,
+                               expansion_layers={'masters': masters}, presented_exteriors=presented, data_files=None)
+        seen = {}
+
+        def plan(values, status, towns=(), one_map_only=False):
+            seen['values'] = list(values)
+            return R.ownership({(1, 1): 'land'}, {'values': values}), []
+        with mock.patch.object(R, 'plan', side_effect=plan):
+            build.resolve_chim_regions(args, {'builder': 'chim', 'chim_areas': []})
+        return seen['values'][1:]
+
+    def test_no_selected_layer_adds_its_set_to_the_base_list(self):
+        both = ['Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm']
+        for masters in (both, ['Morrowind.esm', 'Bloodmoon.esm'], ['Morrowind.esm', 'Tribunal.esm'], ['Morrowind.esm']):
+            self.assertEqual(self.resolve(masters, None), [], masters)
+        # the named sets themselves stay known (the modules and the tracker read them)
+        self.assertEqual(R.layer_sets(), {'Bloodmoon.esm': 'solstheim', 'Tribunal.esm': 'mournhold'})
+
+
 if __name__ == '__main__':
     unittest.main()

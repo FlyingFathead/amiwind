@@ -1,6 +1,6 @@
 # MiniWind: the test ground
 
-_Last updated with AmiWind v0.0.64-dev1 (10 November 2026)._
+_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -248,6 +248,10 @@ configuration.
 - [Start straight in the game](chim/build_guide/DIRECT_START.md): start points
   and characters.
 - [Quick test builds](chim/build_guide/QUICK_TEST_BUILDS.md): exclusions.
+- [The light test and the item tester](ITEM_CYCLING.md): `dbg lighttest`, a dark
+  corridor with nothing in it or over it but the held items' names (`dbg lighttest
+  1` walks it); `dbg cycleitems`, every item the hands can hold in turn there,
+  walked with and used, with its grip checked; in every build.
 
 ## Setting the scene up on arrival
 

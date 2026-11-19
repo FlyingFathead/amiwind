@@ -383,9 +383,14 @@ def prerequisites(args, interactive=False):
         selected = decode_cells(getattr(args, 'chim_regions_cells', None) or '')
         if selected and (getattr(args, 'chim_region_rows', None) or 'game-data') != 'game-data':
             raise ValueError('Full builds require CHIM rows from game data: no duplicate legacy conversion')
+        # the CHIM region cells outside the base game's grid (the cells an expansion adds to the shared grid): rows of
+        # their own after every existing one; none with the base game alone. Mournhold's districts are never among
+        # them: they are the module tribunal-mournhold's own world (resolve_tribunal_mournhold)
+        args.layer_cells = exterior_plan.layer_cells(
+            selected, args.data_files, (getattr(args, 'expansion_layers', None) or {}).get('masters'))
         exterior_checklist = exterior_plan.make(cells, selected,
             exterior_plan.town_cores(chim_native_towns(args, args.builder_options)), master_sha,
-            ocean_cells=[c for c, kind in selected.items() if kind == 'ocean'])
+            ocean_cells=[c for c, kind in selected.items() if kind == 'ocean'], layer_cells=args.layer_cells)
         print('Exterior checklist before conversion: ' + ', '.join(
             '%d %s' % (n, kind) for kind, n in exterior_checklist['summary'].items()), flush=True)
     args.exterior_checklist = exterior_checklist
@@ -824,6 +829,75 @@ def chim_sol_test_commands(args, steps, tool, run, tools, jobs):
     if copies == 'switch':
         extra += ['--chim-sol-alt', '1=' + str(run / 'chim-sol-star')]
     return [(name, list(command) + extra if name == 'image' else command) for name, command in steps]
+
+
+# THE EXPANSIONS AS BUILD MODULES (decided for the project 2026-11-18, MOURNHOLD-EXTERIOR-CELLS-66): an expansion's
+# content is built by stages of its own, named by the expansion (tribunal-*, bloodmoon-*), in the plan only when its
+# master is selected, keyed only by their own inputs; no base stage reads their outputs or takes an option from them
+# (the image, which installs every stage's output, and the stages that make the merged variant of a small table are
+# the readers). Without the master, or with the module off, the plan is the one before.
+#
+# Module tribunal-mournhold: Mournhold's outdoor districts as a small map of their own, not part of the Vvardenfell
+# map (no Vvardenfell region, checklist row or cell list holds a district cell):
+# - tribunal-mournhold-data: the presented data folder (tools/presented_data.py) of the base master and Tribunal.esm
+#   only: the districts' interior cells as exterior cell blocks;
+# - tribunal-mournhold: the districts' CHIM world (tools/tribunal_mournhold.py: tools/chim_build.py on that folder,
+#   the module's own cells, its own unit cache), installed by the image as the store chimmh with its own frame maps
+#   mhNNNN and its own rows file world/regions-mh.awr (tools/chim/layer_stores.py).
+TRIBUNAL_MOURNHOLD_DATA_STAGE = 'tribunal-mournhold-data'
+TRIBUNAL_MOURNHOLD_STAGE = 'tribunal-mournhold'
+TRIBUNAL_MOURNHOLD_MASTERS = 'Morrowind.esm,Tribunal.esm'
+# The stages that take the module's receipt and its cells after their unchanged base command: the image, the scripts,
+# and the two stages that key placed things by area (the focus table with the areas' levelled creatures, and the
+# placed item list): a district's containers, items, activators and doors are keyed outdoors at their moved places,
+# where the game asks for them (tools/prepare_focus.py cells_presented). tools/build_parallel.py
+# stage_dependencies makes each wait for the module's data stage.
+TRIBUNAL_MOURNHOLD_READERS = ('image', 'mwscript', 'focus', 'item-models')
+
+
+def module_chim_options(args, cells):
+    """The opt-in CHIM settings of the build (chim_stage_options) for a module's own CHIM world, with the module's
+    CELLS in place of the base world's cell list: the base list is not on the module's command line, so a change
+    to it re-keys no module stage."""
+    options, out, skip = chim_stage_options(args), [], False
+    for part in options:
+        if skip:
+            skip = False
+        elif part == '--chim-regions-cells':
+            skip = True
+        else:
+            out.append(part)
+    return out + ['--chim-regions-cells', cells]
+
+
+def tribunal_mournhold_commands(args, steps, tool, run, tools, jobs):
+    """The module tribunal-mournhold (the note above): with Tribunal selected and district cells to build
+    (args.tribunal_mournhold_cells, resolve_tribunal_mournhold) its two stages join the plan before the base CHIM
+    world stage, which they neither read nor change. The image takes the districts' world as a store of its own
+    (chim_layer_image_commands) and, with the scripts stage, the presentation receipt and the module's cells: the
+    districts' doors, arrivals, jail markers and PositionCell moves lead to the districts this build converts whole
+    (tools/presented_exterior.py build_places); the focus and item-models stages take the same two options
+    (TRIBUNAL_MOURNHOLD_READERS). Without the module: STEPS unchanged, every command line as before."""
+    cells = getattr(args, 'tribunal_mournhold_cells', None)
+    if not cells:
+        return steps
+    folder, world = run / TRIBUNAL_MOURNHOLD_DATA_STAGE, run / TRIBUNAL_MOURNHOLD_STAGE
+    lighting = next((command[command.index('--lighting-type') + 1] for name, command in steps
+                     if name == 'chim' and '--lighting-type' in command), 'hybrid')
+    index = next(i for i, (name, _) in enumerate(steps) if name == 'chim')
+    steps = list(steps)
+    steps[index:index] = [
+        (TRIBUNAL_MOURNHOLD_DATA_STAGE, tool('presented_data.py', '--data-files', args.data_files, '--out', folder,
+                                             '--masters', TRIBUNAL_MOURNHOLD_MASTERS)),
+        (TRIBUNAL_MOURNHOLD_STAGE, tool('tribunal_mournhold.py', '--data-files', folder,
+                                        '--palette', run / 'intro-scene/id1/gfx/palette.lmp', '--out', world,
+                                        '--qbsp', tools['qbsp'], *module_chim_options(args, cells),
+                                        '--lighting-type', lighting,
+                                        '--unit-cache', args.workspace / 'cache/tribunal-mournhold-units',
+                                        '--jobs', jobs, '--validate', '--stats', '--sdk', args.sdk))]
+    # strings only: the commands go into build-state.json (BUILD-NPCLOD-PATH-ARG-34)
+    presented = ['--presented-receipt', str(folder / 'presented-data.json'), '--presented-cells', str(cells)]
+    return [(n, list(c) + presented if n in TRIBUNAL_MOURNHOLD_READERS else c) for n, c in steps]
 
 
 def chim_layer_image_commands(args, steps, run):
@@ -1494,6 +1568,7 @@ def commands(args, tools, run):
             steps = [(name, command + ['--chim-world', str(run / 'chim-world'), '--chim-lighting-type',
                                        builder.get('chim_lighting_type') or 'hybrid'] if name == 'image' else command)
                      for name, command in steps]
+            steps = tribunal_mournhold_commands(args, steps, tool, run, tools, jobs)
             steps = chim_sol_test_commands(args, steps, tool, run, tools, jobs)
             steps = chim_layer_image_commands(args, steps, run)
             steps = chim_town_commands(args, builder, steps, tool, run, tools, jobs)
@@ -1578,6 +1653,10 @@ def commands(args, tools, run):
         if isinstance(record, dict) and isinstance(record.get('stages'), list) and 'image' in record['stages'] \
                 and 'player-view' not in record['stages']:
             record['stages'].insert(record['stages'].index('image'), 'player-view')
+    # the plan is written to build-state.json when the first stage starts: every argument a string, checked here in
+    # the plan's first second, for the build and for --check alike (BUILD-NPCLOD-PATH-ARG-34)
+    from build_parallel import require_plan_arguments
+    require_plan_arguments(steps)
     return steps
 
 
@@ -1831,10 +1910,11 @@ def resolve_chim_regions(args, builder=None):
             args.chim_regions_cells = None
             return None
         values, default = ['@' + str(CHIM_CELLS_DEFAULT)], True
-        # each selected layer's exterior as its named set: its finished cells are taken, the rest dropped with their
-        # reason (CHIM-SOL-FLORA-PATH-65); with --no-dlc nothing is added, so the base build is unchanged
-        masters = (getattr(args, 'expansion_layers', None) or {}).get('masters') or []
-        values += [chim_regions.LAYER_SETS[m] for m in masters if m in chim_regions.LAYER_SETS]
+        # The base world's cell list is this list alone, whatever expansions are selected: an expansion's cells (its
+        # named set, tools/chim/regions.py layer_sets) belong to its build module (resolve_tribunal_mournhold below
+        # for Mournhold's districts), so the base world's cell list, checklist and stages are the ones of a build
+        # without expansions. (Until v0.0.67-dev2 the selected layers' sets were meant to be added here, but this runs
+        # before the masters are selected, so no build ever took one: BUILD-LAYER-SETS-NEVER-TAKEN-67.)
     builder = builder or resolve_builder(args)
     if builder['builder'] != 'chim':
         raise ValueError('--chim-regions needs the CHIM builder (--builder chim)')
@@ -1874,6 +1954,47 @@ def resolve_chim_regions(args, builder=None):
     return {'selection': table['selection'], 'counts': c, 'dropped': table['dropped'], 'default': default}
 
 
+TRIBUNAL_MASTER = 'Tribunal.esm'
+
+
+def resolve_tribunal_mournhold(args, builder=None):
+    """The module tribunal-mournhold's cells (MOURNHOLD-EXTERIOR-CELLS-66): Mournhold's presented districts that the
+    tracker reference calls finished (the named set of Tribunal.esm, tools/chim/regions.py layer_sets), as the
+    module's own cell list args.tribunal_mournhold_cells; None when the module is not built: Tribunal not selected
+    (--no-dlc, --dlc bloodmoon), no CHIM builder, a MiniWind sandbox, a cell list of the caller's own (--chim-regions:
+    a test of named cells builds those and nothing else), --presented-exteriors off, or no finished district cell.
+    The base world's cell list (resolve_chim_regions) never holds these cells. Returns the record for the build log."""
+    from chim import regions as chim_regions
+    import build_cache
+    args.tribunal_mournhold_cells = None
+    # the selection itself (--dlc / --no-dlc): args.expansion_layers is set only later, with the game data check
+    # (BUILD-LAYER-SETS-NEVER-TAKEN-67: read from there, the masters were always empty here)
+    masters = build_cache.master_list(expansion_selection(args))
+    if TRIBUNAL_MASTER not in masters or getattr(args, 'miniwind', False) or getattr(args, 'chim_regions', None):
+        return None
+    if (getattr(args, 'presented_exteriors', None) or 'on') == 'off':
+        return None
+    builder = builder or resolve_builder(args)
+    if builder['builder'] != 'chim':
+        return None
+    status = getattr(args, 'chim_regions_status', None) or CHIM_CELLS_STATUS_DEFAULT
+    table, problems = chim_regions.plan([chim_regions.layer_sets()[TRIBUNAL_MASTER]], status, towns=())
+    kinds = chim_regions.table_kinds(table)
+    problems += chim_regions.owned_land_problems(kinds, getattr(args, 'data_files', None))
+    if problems:
+        raise ValueError('The module tribunal-mournhold (Mournhold\'s districts) failed its cell preflight before any '
+                         'stage (--presented-exteriors off builds without it):' + (chr(10) + '  ')
+                         + (chr(10) + '  ').join(problems))
+    if not kinds:
+        return None
+    args.tribunal_mournhold_cells = chim_regions.encode_cells(kinds)
+    c = table['counts']
+    print('Module tribunal-mournhold: %d Mournhold district cells in %d frames, a world of their own (the stages '
+          'tribunal-mournhold-data and tribunal-mournhold); %d dropped' % (c['cells'], c['frames'], len(table['dropped'])),
+          flush=True)
+    return {'selection': table['selection'], 'counts': c, 'dropped': table['dropped']}
+
+
 def debug_settings(args):
     """What a DEBUG ONLY MiniWind build changes from a playtest (recorded in its receipts)."""
     out = {}
@@ -1901,12 +2022,14 @@ def execute(steps, run, metadata):
     if metadata.get('compiler_jobs', 1) > 1 and not metadata.get('serial_stages', False):
         from build_parallel import execute_parallel
         return execute_parallel(steps, run, metadata, ROOT)
-    from build_parallel import create_run
+    from build_parallel import create_run, require_plan_arguments
+    require_plan_arguments(steps)       # before the run folder and the first stage (BUILD-NPCLOD-PATH-ARG-34)
     create_run(run, metadata)
     receipt = {**metadata, "status": "running", "steps": []}
+    from build_parallel import state_text
     def save():
         temporary = run / "build-state.tmp"
-        temporary.write_text(json.dumps(receipt, indent=2) + "\n")
+        temporary.write_text(state_text(receipt))
         temporary.replace(run / "build-state.json")
     save()
     import build_profile
@@ -2014,6 +2137,16 @@ def focus_box_preflight(args):
             'FOCUS_BOXES / CONTAINER_BOXES): %s' % (len(missing), ', '.join('%s %s (%s)' % row for row in missing[:20])))
 
 
+def reuse_all_request(args):
+    """build_cache.prepare's reuse_all request: None without --reuse-all-available; 'strict' (the first-minute stop) when
+    it was given, False when it is the default of a plain build (BUILD-OFFER-EARLIER-RUNS-67: notices, no stop)."""
+    if not getattr(args, 'reuse_all_available', False):
+        return None
+    record = getattr(args, 'reuse_default_record', None)
+    return {'workspace': str(Path(args.workspace).resolve()), 'allowed': getattr(args, 'allow_rebuild_map', {}),
+            'strict': not (record and record.get('on'))}
+
+
 def unit_stop_check(args, tools, run):
     """`build.py --check` with --reuse-from or --reuse-all-available: the stage plan and the reuse stop of the build's
     first minute (build_cache.prepare with the same options: every stage's key, the reuse plan, the reuse preflight,
@@ -2032,6 +2165,9 @@ def unit_stop_check(args, tools, run):
     with Progress("Recording input, tool and source checksums for the reuse check"):
         metadata = provenance(args, tools)
     metadata['expansion_layers'] = getattr(args, 'expansion_layers', None)
+    if getattr(args, 'exterior_checklist', None) is not None:
+        # as the build records it: the unit report reads how many cells get an open-world map (reuse_all.region_limits)
+        metadata['exterior_checklist'] = args.exterior_checklist['summary']
     os.environ[build_cache.MASTERS_ENV] = ','.join((metadata['expansion_layers'] or {}).get('masters')
                                                    or build_cache.master_list([]))
     problem = focus_box_preflight(args)
@@ -2051,9 +2187,7 @@ def unit_stop_check(args, tools, run):
         build_cache.prepare(steps, run, metadata, args.reuse_from, args.reuse_mode,
                             scope=getattr(args, 'fingerprint_scope', 'units'), pool=storage_pool_dir(args),
                             forced=forced, accept_rebuild=getattr(args, 'accept_rebuild', False),
-                            reuse_all=({'workspace': str(Path(args.workspace).resolve()),
-                                        'allowed': getattr(args, 'allow_rebuild_map', {})}
-                                       if getattr(args, 'reuse_all_available', False) else None))
+                            reuse_all=reuse_all_request(args))
     except ValueError as exc:
         print(f'Check FAILED: the build would stop before its first stage: {exc}', flush=True)
         return UNIT_STOP_EXIT
@@ -2063,6 +2197,12 @@ def unit_stop_check(args, tools, run):
         # (BUILD-PREFLIGHT-SERIAL-REPEATED-66): valid whether or not the plan stops, it depends on the files only
         save_preflight_analysis()
     print('Reuse check (--check): passed (no reuse stop)', flush=True)
+    record = getattr(args, 'reuse_default_record', None)
+    if record and record.get('on'):
+        # the default build's question and cached-build notice as the build would print them (BUILD-OFFER-EARLIER-RUNS-67)
+        import reuse_all
+        reuse_all.settle_default(record, metadata.get('stage_cache') or {}, len(steps), args.workspace,
+                                 interactive=False, write=lambda line: print(line, flush=True), check=True)
     problems = stored_early_problems(args, metadata, steps, run)
     if problems:
         print('Check FAILED: the build would stop before its first stage: early checks: %d problem%s:\n  %s' % (
@@ -2251,6 +2391,27 @@ def container_count_step(args, run):
         return None
     import container_census
     return container_census.build_step(run, args.data_files, log=lambda line: print(line, flush=True))
+
+
+def model_census_step(args, run):
+    """MODEL-CENSUS-TOOL-67: the model census after a passed image build (tools/model_census.py build_step): every
+    placed model's original triangles, what each mesh method makes of it outdoors and in the rooms, whether it keeps
+    the model intact, and the method in use, in RUN/model-census/ (docs/MODEL_CENSUS.md). A measurement: it never
+    fails the build. Not a stage, so it keys no stage and no stage keys it; each model's result is reused from the
+    workspace's cache while its NIF, the census code and the method tables are unchanged. Skipped for dry runs,
+    builds without an image and MiniWind builds (AMIWIND_MODEL_CENSUS=on runs it there too; =off skips it)."""
+    if args.stage != 'aga' or args.dry_run or not getattr(args, 'data_files', None):
+        print('Model census: skipped (%s)' % ('--dry-run' if args.dry_run else 'no image in this build'), flush=True)
+        return None
+    switch = os.environ.get('AMIWIND_MODEL_CENSUS', '').strip().lower()
+    if getattr(args, 'miniwind', False) and switch != 'on':
+        print('Model census: skipped (a MiniWind build; AMIWIND_MODEL_CENSUS=on runs it)', flush=True)
+        return None
+    import model_census
+    commit = (getattr(args, 'run_name_record', None) or {}).get('commit')
+    return model_census.build_step(run, args.data_files, jobs=getattr(args, 'jobs', None),
+                                   cache_dir=Path(args.workspace) / 'cache' / 'model-census-v1', name=Path(run).name,
+                                   commit=commit, log=lambda line: print(line, flush=True))
 
 
 def inclusion_step(args, run):
@@ -2989,9 +3150,11 @@ def export_converter_environment(args):
     from hollow_bevels_env import export_hollow_bevels
     export_hollow_bevels(getattr(args, "chim_hollow_bevels", None))
     # the draw tiles of a classic room map's shell (PRISON-SHIP-POLY-COLLISION-65): the option, else the default
-    from room_map_env import export_room_draw_tiles, export_room_small_parts
+    from room_map_env import export_room_draw_tiles, export_room_shapes, export_room_small_parts
     export_room_draw_tiles(getattr(args, "room_draw_tiles", None))
     export_room_small_parts(getattr(args, "room_small_parts", None))
+    # the listed shell shapes drawn as the original draws them (PRISON-SHIP-FLOOR-STUCK-67): the option, else on
+    export_room_shapes(getattr(args, "room_shapes", None))
     from lava import export_lava
     export_lava(args.font_options["lava"])
     from build_font_options import export_world_map
@@ -3405,6 +3568,8 @@ def _main(argv=None):
             return 0
         # CHIM regions (default: the in-repo cell list, config/chim-cells.json): the cell preflight in seconds, before any stage
         args.chim_regions_record = resolve_chim_regions(args)
+        # the expansions' modules: their own cells, never in the base world's list
+        args.tribunal_mournhold_record = resolve_tribunal_mournhold(args)
         if args.stage == 'aga' and not args.dry_run:
             # rc/final images contain the previous release (RELEASE-PREVIOUS-FIXES-MISSING-33)
             from previous_release import require_previous_release
@@ -3506,6 +3671,14 @@ def _main(argv=None):
             from build_cache import require_reuse_allowed
             require_reuse_allowed(VERSION, args.allow_release_reuse)
             args.reuse_from = args.reuse_from.expanduser().resolve()
+        # BUILD-OFFER-EARLIER-RUNS-67: a plain build in a workspace that holds earlier builds takes every stage they hold
+        # unchanged (--reuse-all-available, its first-minute stops as notices); --no-reuse, --clean and
+        # --release-from-scratch keep it off; an explicit reuse option is the caller's choice (tools/reuse_all.py)
+        import reuse_all as _reuse_default
+        args.reuse_default_record = _reuse_default.default_choice(args)
+        if args.reuse_default_record is not None:
+            print(_reuse_default.default_line(args.reuse_default_record), flush=True)
+            args.reuse_all_available = bool(args.reuse_default_record['on'])
         if getattr(args, 'reuse_all_available', False):
             if args.no_profile or args.recover_image_from or args.dry_run:
                 raise ValueError('--reuse-all-available needs a profiled AGA or terrain build (not --no-profile, '
@@ -3851,16 +4024,31 @@ def _main(argv=None):
             if reuse_mode in ('hardlink', 'pool') and not pool_record['links']:
                 reuse_mode = 'copy'
             metadata['storage_pool']['reuse_mode'] = reuse_mode
+        planned = steps
         try:
             steps = build_cache.prepare(steps, run, metadata, args.reuse_from, reuse_mode,
                                         scope=getattr(args, 'fingerprint_scope', 'units'), prerendered=store,
                                         pool=storage_pool_dir(args), forced=forced,
                                         accept_rebuild=getattr(args, 'accept_rebuild', False),
-                                        reuse_all=({'workspace': str(Path(args.workspace).resolve()),
-                                                    'allowed': getattr(args, 'allow_rebuild_map', {})}
-                                                   if getattr(args, 'reuse_all_available', False) else None))
+                                        reuse_all=reuse_all_request(args))
         finally:
             save_preflight_analysis()   # for the next start of the same tree (BUILD-PREFLIGHT-SERIAL-REPEATED-66)
+        record = getattr(args, 'reuse_default_record', None)
+        if record is not None:
+            if record['on']:
+                # the default build (BUILD-OFFER-EARLIER-RUNS-67): asked once in a terminal (no terminal: yes), then the
+                # cached-build notice; the answer no plans the build again with no stage from an earlier build
+                import reuse_all as _reuse_default
+                _reuse_default.settle_default(record, metadata.get('stage_cache') or {}, len(planned), args.workspace,
+                                              interactive=sys.stdin.isatty() and not args.yes,
+                                              write=lambda line: print(line, flush=True))
+                if not record['on']:
+                    args.reuse_all_available = False
+                    build_cache.PLANS.pop(str(run), None)
+                    steps = build_cache.prepare(planned, run, metadata, None, reuse_mode,
+                                                scope=getattr(args, 'fingerprint_scope', 'units'), prerendered=store,
+                                                pool=storage_pool_dir(args), accept_rebuild=False, reuse_all=None)
+            metadata['reuse_default'] = record   # build-state.json, the summary and the build report read it
         if args.reuse_from and args.allow_release_reuse:
             metadata['stage_cache']['release_reuse'] = 'allowed: the from-scratch gate runs separately'
         if args.stage == 'aga' and not args.dry_run:
@@ -3932,6 +4120,7 @@ def _main(argv=None):
         inclusion.start()
         size_verdict = size_ledger_step(args, run)
         container_count_step(args, run)
+        model_census_step(args, run)
         resource_after_build(args, run)
         inclusion.join()
         summary.finish('passed', result, actor_acceptance=acceptance)

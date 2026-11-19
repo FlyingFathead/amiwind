@@ -103,7 +103,11 @@ const char *AW_DebugToggleState(const char *words,const char *command) {
 }
 static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capacity) {
     int used,n,k,setting,quoted,spaced;char *token;const char *flip;
-    if(!strcmp(r->command,"aw_teleport") && argc-j>3)return 0;   /* dbg tp X Y [Z] */
+    /* dbg tp X Y [Z]: a fourth number is refused; a place's name as the list shows it may take more words (dbg tp
+     * reception area, DBG-TP-EXPANSION-ARRIVALS-66), at most 8 */
+    if(!strcmp(r->command,"aw_teleport") && argc-j>3 &&
+       (argc-j>8 || (argv[j][0]>='0' && argv[j][0]<='9') || argv[j][0]=='-' || argv[j][0]=='+' || argv[j][0]=='.'))
+        return 0;
     if(!strcmp(r->command,"aw_shroomtracker") && argc!=j)return 0;
     if(!strcmp(r->command,"aw_shroompicker")){
         if(argc-j>1)return 0;
@@ -176,6 +180,12 @@ static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capa
         if(argc-j>1 || (argc>j && Q_strcasecmp(argv[j],"stats")) || used+14>capacity)return 0;
         strcpy(out+used," give weapons");used+=13;
     }
+    /* dbg give spell [ID / all / list [N]] (DBG-GIVE-SPELL-67): the inventory command's spell words, no resident
+     * command of their own */
+    if(!strcmp(r->command,"aw_inventory") && !strcmp(r->words,"give spell")){
+        if(argc-j>2 || used+12>capacity)return 0;
+        strcpy(out+used," give spell");used+=11;
+    }
     /* dbg give [ID [N] / money|coin|rich [N]] and dbg additem, the same (DBG-GIVE-MONEY-62): the inventory command's give
      * words (alone: the item picker), no resident command of their own */
     if(!strcmp(r->command,"aw_inventory") && (!strcmp(r->words,"give") || !strcmp(r->words,"additem") ||
@@ -216,6 +226,16 @@ static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capa
         /* dbg kill crime (CRIME-59): the same pick, the kill counted as the player's (the murder when it is one) */
         if(!Q_strcasecmp(argv[j],"crime")){strcpy(out+used," actors killpick crime\n");return 1;}
         strcpy(out+used," actors kill");used+=12;
+    }
+    /* dbg spawn [ID [model]] and dbg despawn [all] (DBG-SPAWN-MENU-67): "chim actors spawn ..." (the list box, or that
+     * record), "chim actors despawnpick" (the red crosshair pick) and "chim actors despawn all"; no resident command */
+    if(!strcmp(r->command,"chim") && !strcmp(r->words,"spawn")){
+        if(argc-j>2 || used+14>capacity)return 0;
+        strcpy(out+used," actors spawn");used+=13;
+    }
+    if(!strcmp(r->command,"chim") && !strcmp(r->words,"despawn")){
+        if(argc-j>1 || (argc>j && Q_strcasecmp(argv[j],"all")) || used+21>capacity)return 0;
+        strcpy(out+used,argc==j?" actors despawnpick\n":" actors despawn all\n");return 1;
     }
     /* dbg mwscript alone: what the compiled scripts do and what was loaded (DBG-MWSCRIPT-SILENT-56); dbg mwscript
      * status keeps the counts only */
@@ -258,7 +278,10 @@ static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capa
     /* A quoted word with a space or an apostrophe (a record ID such as "agronian guy", a topic, a race) reaches every
      * command route quoted again, as one argument; a setting takes one plain value. Up to v0.0.62-dev1 only the
      * inventory, race and result routes took them, and dbg npcs talk "agronian guy" was refused as an unknown
-     * debug command (TEST-HARNESS-MINIWIND-62). The characters stay checked: no separator, quote or new command. */
+     * debug command (TEST-HARNESS-MINIWIND-62). The characters stay checked: no separator, quote or new command.
+     * A place's name holds commas and colons too (dbg tp "Mournhold, Royal Palace: Reception Area" was refused as an
+     * unknown debug command, DBG-TP-EXPANSION-ARRIVALS-66): they pass in a quoted word, as Quake's parser splits at a
+     * colon as well. */
     spaced=!setting;
     for(;j<argc;j++){
         token=argv[j];
@@ -269,12 +292,13 @@ static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capa
             else if(!Q_strcasecmp(token,"off") || !Q_strcasecmp(token,"false") || !Q_strcasecmp(token,"no"))token="0";
         }
         n=(int)strlen(token);
-        quoted=spaced && (strchr(token,' ')!=NULL || strchr(token,'\'')!=NULL);   /* Quake's parser splits at ' */
+        quoted=spaced && (strchr(token,' ')!=NULL || strchr(token,'\'')!=NULL ||   /* Quake's parser splits at ' */
+                          strchr(token,':')!=NULL);
         if(!n || used+n+(quoted?5:3)>capacity)return 0;
         for(k=0;k<n;k++)if(!((token[k]>='a'&&token[k]<='z') ||
             (token[k]>='A'&&token[k]<='Z') || (token[k]>='0'&&token[k]<='9') ||
             token[k]=='-' || token[k]=='+' || token[k]=='.' || token[k]=='_' ||
-            (spaced && (token[k]==' ' || token[k]=='\''))))return 0;
+            (spaced && (token[k]==' ' || token[k]=='\'' || token[k]==',' || token[k]==':'))))return 0;
         out[used++]=' ';if(quoted)out[used++]='"';
         memcpy(out+used,token,n);used+=n;if(quoted)out[used++]='"';
     }
@@ -350,13 +374,23 @@ int AW_ConsolePageRows(void) {
     int rows=(int)vid.conheight/8/2-5;
     return rows<8?20:rows;
 }
+/* a group's separator line (dashes only, help() below) */
+static int pager_rule(const char *line,int n){
+    int k;
+    for(k=0;k<n;k++)if(line[k]!='-')return 0;
+    return n>0;
+}
 static void pager_page(void) {
-    int rows=AW_ConsolePageRows(),width=AW_ConsoleWidth(),used=0,n,need;char *line,*end,keep;
+    int rows=AW_ConsolePageRows(),width=AW_ConsoleWidth(),used=0,n,need,pair,next;char *line,*end,keep;
     while(pager_text && pager_pos<pager_used){
         line=pager_text+pager_pos;end=strchr(line,'\n');
         n=end?(int)(end-line):(int)strlen(line);
         need=n<1?1:(n+width-1)/width;
-        if(used && used+need>rows)break;
+        /* DBG-HELP-PAGER-TITLE-SPLIT-67: a group's title stays with its separator line: when the pair does not fit,
+         * the page ends before the title (it ended between them: the title alone at the bottom of a page) */
+        pair=need;
+        if(end && (next=(int)strcspn(end+1,"\n"))>0 && pager_rule(end+1,next))pair+=(next+width-1)/width;
+        if(used && used+pair>rows)break;
         keep=line[n];line[n]=0;Con_Printf("%s\n",line);line[n]=keep;
         used+=need;pager_pos+=n+(end?1:0);
     }

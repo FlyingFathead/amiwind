@@ -60,6 +60,7 @@ static size_t prefetch_bad(const char *name,long offset,byte *out,size_t bytes) 
 
 /* dbg loadfail N KIND: arm the kind inside this load (Host_Map_f); 0 for the plain error (Host_Map_f says it). */
 int AW_LoadFailTestArm(void) {
+    aw_scene_error_forced=1;   /* AW-RECOVER: this load's error is a test aid's (the state file's errors_forced) */
     switch(fail_kind){
     case FAIL_MEMORY:aw_hunk_fail_test=1;break;
     case FAIL_LUMP:
@@ -86,10 +87,18 @@ void AW_LoadFailSpawn(const char *name) {
     AW_SceneLoadNote(&e);
 }
 /* zone.c: an allocation that failed. During a map load it ends that load (the half-loaded map is dropped by the way
- * back's own load, Host_ClearMemory); in play it returns and the allocator stops the game as before. */
+ * back's own load, Host_ClearMemory); in play (AW-RECOVER, no error in play ends the game) it is an error in play that
+ * the chain takes, the place loaded again (the allocator checks before it changes anything, so leaving from here leaves
+ * the zone, the hunk and the cache whole); with no game in play it returns and the allocator stops as before. */
+static void alloc_failed_in_play(const char *arena,const char *name,long need,long have) {
+    Host_Error("Not enough memory in play: %s %s needs %ld bytes, %ld free",arena,name?name:"?",need,have);
+}
 static void alloc_failed(const char *arena,const char *name,long need,long have) {
     aw_loaderr_t e;aw_mapfail_t m;
-    if(!AW_SceneLoadInFlight())return;
+    if(!AW_SceneLoadInFlight()){
+        if(AW_SceneInPlay())alloc_failed_in_play(arena,name,need,have);
+        return;
+    }
     aw_hunk_fail_test=0;prefetch_restore();
     cause(&e,AW_LOADERR_MEMORY);e.need=need;e.have=have<0?0:have;
     Q_strcpy_bounded(e.arena,arena,sizeof(e.arena));
@@ -210,6 +219,32 @@ static void load_fail_command(void) {
     Con_Printf("dbg loadfail: the next %ld map loads fail on purpose (%s; 0 = off).\n",(long)aw_load_fail_test.value,
         fail_names[fail_kind]);
 }
+/* AW-RECOVER test aid, dbg hosterror script|client|now: an error in play on purpose, where one comes from: inside the
+ * next frame's script step (aw_mwhost.c, the step still counted as running, as a script's own error leaves it for the
+ * autosave's queue heal), in the screen side's read of the next server message (cl_parse.c), or at once from the
+ * console. In a load: dbg loadfail N. Each ends in play again by aw_scene.c's chain, counted as forced. */
+extern void (*aw_mwhost_step_error)(void);
+extern void (*cl_parse_force_error)(void);
+static void forced_script(void) {
+    aw_mwhost_step_error=NULL;aw_scene_error_forced=1;
+    Host_Error("forced error in a script step (dbg hosterror script)");
+}
+static void forced_client(void) {
+    cl_parse_force_error=NULL;aw_scene_error_forced=1;
+    Host_Error("forced error in the client's read of a server message (dbg hosterror client)");
+}
+static void hosterror_command(void) {
+    char *what=Cmd_Argc()>=2?Cmd_Argv(1):"";
+    if(!Q_strcasecmp(what,"script")){
+        aw_mwhost_step_error=forced_script;Con_Printf("dbg hosterror: the next script step ends in an error on purpose.\n");
+    }else if(!Q_strcasecmp(what,"client")){
+        cl_parse_force_error=forced_client;
+        Con_Printf("dbg hosterror: the next server message the screen side reads ends in an error on purpose.\n");
+    }else if(!Q_strcasecmp(what,"now")){
+        Con_Printf("dbg hosterror: an error in play now.\n");aw_scene_error_forced=1;
+        Host_Error("forced error in play (dbg hosterror now)");
+    }else Con_Printf("dbg hosterror script/client/now: an error in play on purpose (dbg loadfail N for one in a load)\n");
+}
 /* dbg restartgame: the running game ends cleanly (scene loads, the failed-load box, the story, sounds, the map's
  * memory back to the boot level: Host_ClearMemory gives the Hunk back to host_hunklevel and the models, CHIM's banks
  * with the map), then the startup logo and the main menu, as at boot, without quitting; also from a stranded load. */
@@ -304,6 +339,8 @@ void AW_LoadFailInit(void) {
     Cvar_RegisterVariable(&aw_load_timeout);
     Cmd_AddCommand("aw_load_fail",load_fail_command);
     Cmd_AddCommand("aw_restart_game",restart_command);
+    Cmd_AddCommand("aw_host_error",hosterror_command);   /* AW-RECOVER test aid */
+    aw_scene_autosave_load=AW_SaveRecoverAutosave;aw_scene_save_drop=AW_SaveLoadDrop;   /* AW-RECOVER: the chain's saves */
     aw_loadfail_tick=tick;
     /* SCENE-LOAD-FAIL-FALLBACK-67: what ends a load instead of the game, the check before leaving, the free RAM */
     aw_alloc_failed=alloc_failed;aw_fatal_hook=fatal;

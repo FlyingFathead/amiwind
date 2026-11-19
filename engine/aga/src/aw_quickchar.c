@@ -13,6 +13,9 @@
 #include "aw_story.h"
 #include "aw_character.h"
 #include "aw_quickchar.h"
+/* aw_view.c (DBG-RACE-SWAP-67): after a race or sex swap, the new race's equip rules and the release of the old parts;
+ * returns the items unequipped, -1 when the race is not known to be a beast race or not (NULL in the host tests) */
+int (*aw_race_swapped)(int *beast);
 
 static cvar_t skip_census={"aw_skip_census","0"};
 static cvar_t voice={"aw_quickchar_voice","1",true};
@@ -264,6 +267,79 @@ static void race_command(void){
     Con_Printf("Player race: %ld: %s. Gender, class, birthsign, name, equipment, level and stats retained.\n",
         (long)index,aw_races[index].name);
 }
+/* aw_race [N|NAME] [m|f] (dbg race; DBG-RACE-SWAP-67, the maintainer 2026-11-18: change the race and sex quickly from the
+ * console, by number or name; the game's rules change with them): no argument lists the races with their numbers and
+ * the current race and sex; a number (the list's) or a name swaps the race, m or f the sex, both may be given. Stats,
+ * class, birthsign, name and level are kept (as dbg set race keeps them); a valid head and hair are chosen; what the
+ * new race cannot wear (a beast race: nothing over the head, nothing on the feet, aw_inventory.c
+ * AW_InventoryBeastRefusal, the original's rule) goes back into the inventory, one line per item; the old race's body
+ * and first-person arm parts are released at once and both are assembled again (aw_view.c AW_ViewPartsUnload). A debug
+ * command: a save made after it records the swapped race and sex. */
+static void swap_command(void){
+    char value[64];int i,n=0,index=-1,numeric=1,sex=-1,last=Cmd_Argc()-1,beast=-1,dropped=0;size_t used=0,len;
+    edict_t *p;aw_character_t trial;
+    if(cmd_source!=src_command)return;
+    if(!AW_CharacterLoad() || aw_race_count<1 || aw_race_count>16){Con_Printf("Character catalogue unavailable.\n");return;}
+    if(last>=1 && (!Q_strcasecmp(Cmd_Argv(last),"m") || !Q_strcasecmp(Cmd_Argv(last),"f"))){
+        sex=Cmd_Argv(last)[0]=='f' || Cmd_Argv(last)[0]=='F';last--;
+    }
+    if(last<1 && sex<0){
+        race_list();
+        if(aw_character.valid)Con_Printf("Player now: race %ld: %s, sex %s.\n",(long)aw_character.race,
+            aw_races[aw_character.race].name,aw_character.female?"f":"m");
+        Con_Printf("Usage: dbg race [N|NAME] [m|f]\n");
+        return;
+    }
+    if(last>=1){
+        value[0]=0;
+        for(i=1;i<=last;i++){
+            len=strlen(Cmd_Argv(i));
+            if(!len || used+len+(i>1?1:0)>=sizeof(value)){Con_Printf("Race name is empty or too long.\n");return;}
+            if(i>1)value[used++]=' ';
+            memcpy(value+used,Cmd_Argv(i),len+1);used+=len;
+        }
+        for(i=0;value[i];i++)if(value[i]<'0' || value[i]>'9'){numeric=0;break;}
+        if(numeric){
+            for(i=0;value[i];i++){
+                n=n*10+value[i]-'0';
+                if(n>=aw_race_count){Con_Printf("Race number must be 0..%ld.\n",(long)aw_race_count-1);return;}
+            }
+            index=n;
+        }else for(i=0;i<aw_race_count;i++)
+            if(race_name_equal(value,aw_races[i].id) || race_name_equal(value,aw_races[i].name)){index=i;break;}
+        if(index<0){Con_Printf("Unknown race: %s.\n",value);race_list();return;}
+    }
+    if(!sv.active || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict) ||
+       cls.state!=ca_connected || !aw_character.valid){
+        Con_Printf("Start or load a local character first.\n");return;
+    }
+    if(AW_StoryRestricted() || active || AW_CharacterActive()){
+        Con_Printf("Finish character registration or close its menu first.\n");return;
+    }
+    if(p->v.health<=0){Con_Printf("Race cannot change while the player is dead.\n");return;}
+    trial=aw_character;
+    if(index>=0 && index!=trial.race && !AW_CharacterSet(&trial,"race",aw_races[index].id,NULL)){
+        Con_Printf("Race cannot be applied: character data or appearance is incomplete.\n");return;
+    }
+    if(sex>=0 && sex!=trial.female && !AW_CharacterSet(&trial,"sex",sex?"f":"m",NULL)){
+        Con_Printf("Sex cannot be applied: character data or appearance is incomplete.\n");return;
+    }
+    if(trial.race==aw_character.race && trial.female==aw_character.female){
+        Con_Printf("Player race: %ld: %s, sex %s (unchanged).\n",(long)trial.race,aw_races[trial.race].name,
+            trial.female?"f":"m");
+        return;
+    }
+    /* the appearance from the trial (a valid head and hair); the stats, class and level as they were */
+    aw_character.race=trial.race;aw_character.female=trial.female;aw_character.head=trial.head;aw_character.hair=trial.hair;
+    p->v.view_ofs[2]=AW_CharacterEyeHeight()+p->v.mins[2];
+    IN_AWClearButtons();
+    /* the game's equip rules for the new race and sex and the old parts released, at once (aw_view.c) */
+    if(aw_race_swapped)dropped=aw_race_swapped(&beast);
+    Con_Printf("Player race: %ld: %s, sex %s%s (dbg race: stats, class, birthsign, name and level kept; %d item%s "
+        "unequipped; the body and the first-person arms assembled again).\n",(long)aw_character.race,
+        aw_races[aw_character.race].name,aw_character.female?"f":"m",beast>0?", a beast race":beast<0?
+        ", beast unknown":"",dropped,dropped==1?"":"s");
+}
 /* aw_quickchar_show: the current character as one console line per group (read-back for tests). */
 static void show_command(void){
     int i;
@@ -287,5 +363,6 @@ void AW_QuickCharInit(void){
     Cmd_AddCommand("aw_quickchar",quickchar_command);
     Cmd_AddCommand("aw_quickchar_set",set_command);
     Cmd_AddCommand("aw_quickchar_show",show_command);
+    Cmd_AddCommand("aw_race",swap_command);
     Cmd_AddCommand("aw_seed",seed_command);
 }

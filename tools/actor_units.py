@@ -198,11 +198,12 @@ def unpack_creature(row, files):
             'record': row['record']}, row['seconds']
 
 
-def bake_creatures(tasks, jobs, cache, inputs, log=print):
+def bake_creatures(tasks, jobs, cache, inputs, log=print, worker=None):
     """([(key, out, seconds, error)] of TASKS in input order, as ordered_map(creature_library._unit) gave them, and
     how many came from CACHE): a model stored for the same inputs is taken from it (unless --rebuild-unit
     creature-model:KEY names it); the rest are baked on the worker pool and each is stored the moment it is back.
-    creature_library._unit returns a failed model with its error, so a failure never ends the map."""
+    creature_library._unit returns a failed model with its error, so a failure never ends the map. WORKER: another
+    worker of that form (creature_whole.unit, the whole route under its own code key); default creature_library._unit."""
     import creature_library as L
     from pass_cache import forced
     results, todo = [None] * len(tasks), []
@@ -230,7 +231,7 @@ def bake_creatures(tasks, jobs, cache, inputs, log=print):
                 packed = pack_creature(out, seconds)
                 if packed is not None:
                     return unit_store.stored(cache, inputs(tasks[index]), *packed)
-        failed = unit_store.run_each(CREATURE_CACHE, L._unit, [(index, tasks[index]) for index in todo],
+        failed = unit_store.run_each(CREATURE_CACHE, worker or L._unit, [(index, tasks[index]) for index in todo],
                                      [creature_name(tasks[index]) for index in todo], max(1, jobs), keep,
                                      fallback=lambda name: CREATURE_FALLBACK_SECONDS, label='Creature library',
                                      already=cached, log=log)
@@ -288,7 +289,7 @@ def room_actor_inputs(maps, task, memo):
     (its bytes before the bake writes the fitted origins), the store models that room places (their collision), the
     actor's model and layout (its soles), and the placement (entity, authored origin, angles). MEMO: per-room digests
     of this bake."""
-    from chim.interior import installed_room, store_model_images
+    from chim.room_records import installed_room, store_model_images
     from map_files import map_file
     _, _, selected, e, authored, angles = task
     maps = Path(maps)

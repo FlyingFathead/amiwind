@@ -102,6 +102,14 @@ void AW_BlockCompose(const float base_origin[3],const float base_angles[3],const
         }else angles[2]=(float)(Q_atan2(m[1][2],m[2][2])*57.29577951308232);
     }else {angles[1]=(float)(Q_atan2(-m[1][0],m[1][1])*57.29577951308232);angles[2]=0;}
 }
+/* FP-TORCH-HAND-REGRESSION-67 (aw_hand_models.h): the one first-person held-item placement, both hands */
+void AW_HandItemPlace(const float view_origin[3],const float view_angles[3],const float bone_tag[6],
+                      const float carried[6],float origin[3],float angles[3]) {
+    float o[3],a[3];
+    AW_BlockCompose(view_origin,view_angles,bone_tag,o,a);
+    if(!carried){memcpy(origin,o,sizeof(o));memcpy(angles,a,sizeof(a));return;}
+    AW_BlockCompose(o,a,carried,origin,angles);
+}
 int AW_HandStance(int weapon) {
     /* weapon = 1 + the WEAP type: short blade 0, long blade 1, blunt 3 and axe 7 are one-handed; long blade 2,
      * blunt 4 and axe 8 two-handed close; blunt 5 and spear 6 two-handed wide (the original's idle1h/idle2c/idle2w). */
@@ -406,18 +414,32 @@ static int hand_weapon(int index,int with_arms) {
     }
     weapon_visible=1;return 1;
 }
+/* aw_view.c: the arms from parts' bone of a hand this frame as a tag in the view model's space; 0 none */
+int (*aw_hand_parts_bone_tag)(int hand,float tag[6]);
+/* FP-TORCH-HAND-REGRESSION-67: what a hand holds, placed on that hand's own bone of the arms from parts drawn this frame
+ * (AW_HandItemPlace): 1 with ORIGIN and ANGLES */
+static int hand_item_on_bone(int hand,const float carried[6],float origin[3],float angles[3]) {
+    float tag[6];
+    if(!aw_hand_parts_bone_tag || !aw_hand_parts_bone_tag(hand,tag))return 0;
+    AW_HandItemPlace(cl.viewent.origin,cl.viewent.angles,tag,carried,origin,angles);
+    return 1;
+}
+static int weapon_parts;     /* the weapon rides the arms from parts (1) or the baked stance arms (0) this frame */
 int AW_HandWeaponItemApply(void) {
     float origin[3],angles[3];int frame=cl.viewent.frame-weapon_frame_base;
     if(!weapon_visible || !weapon_model || weapon_stance<0 || weapon_stance>=weapon_data.stances || !weapon_base ||
        cl.viewent.model!=weapon_base)return 0;
-    if(frame<0)frame=0;
-    if(frame>=AW_HAND_WEAPON_FRAMES)frame=AW_HAND_WEAPON_FRAMES-1;
-    AW_BlockCompose(cl.viewent.origin,cl.viewent.angles,weapon_data.tag[weapon_stance][frame],origin,angles);
+    /* FP-TORCH-HAND-REGRESSION-67: on the arms from parts the weapon takes the one held-item placement, their own Weapon
+     * Bone (the baked tags of gfx/hand-weapons.aww agree with it within 0.05 units and 0.4 degrees on the v0.0.67-dev2
+     * image, every stance and frame); the baked stance arms (aw_hand_parts 0) keep their baked tags */
+    if(!weapon_parts || !hand_item_on_bone(AW_HAND_RIGHT,NULL,origin,angles)){
+        if(frame<0)frame=0;
+        if(frame>=AW_HAND_WEAPON_FRAMES)frame=AW_HAND_WEAPON_FRAMES-1;
+        AW_BlockCompose(cl.viewent.origin,cl.viewent.angles,weapon_data.tag[weapon_stance][frame],origin,angles);
+    }
     cl.viewent.model=weapon_model;cl.viewent.frame=0;
     VectorCopy(origin,cl.viewent.origin);VectorCopy(angles,cl.viewent.angles);return 1;
 }
-/* aw_view.c: the arms from parts' shield bone this frame as a tag in the view model's space; 0 none */
-int (*aw_hand_parts_shield_tag)(float tag[6]);
 static model_t *held_light_model(const char *path)
 {
     if(strcmp(path,light_path)){
@@ -437,19 +459,14 @@ static model_t *held_light_model(const char *path)
 }
 int AW_HandLightItemApply(void) {
     extern int r_framecount;
-    const aw_held_light_t *l;float tag[6],origin[3],angles[3];model_t *m;
+    const aw_held_light_t *l;model_t *m;
     if(!light_visible || !light_base || cl.viewent.model!=light_base || !(l=AW_HeldLight()) ||
-       !aw_hand_parts_shield_tag || !aw_hand_parts_shield_tag(tag) || !(m=held_light_model(l->model)))return 0;
-    /* the view model's place, then the shield bone, then the light's own carried-light place on it */
-    AW_BlockCompose(cl.viewent.origin,cl.viewent.angles,tag,origin,angles);
-    AW_BlockCompose(origin,angles,l->offset,light_pose,light_pose+3);
-    /* forward by the torch arms' own view offset (tools/prepare_torch.py VIEW_OFFSET, 4 units: the whole held torch is
-     * moved forward so it does not crowd the camera), so a candle or lantern sits where the torch's hand does */
-    {
-        vec3_t a,forward,right,up;int i;
-        VectorCopy(cl.viewent.angles,a);a[PITCH]=-a[PITCH];AngleVectors(a,forward,right,up);
-        for(i=0;i<3;i++)light_pose[i]+=AW_HAND_LIGHT_FORWARD*forward[i];
-    }
+       !(m=held_light_model(l->model)))return 0;
+    /* FP-TORCH-HAND-REGRESSION-67: the one held-item placement: the view model's place, then the left hand's shield
+     * bone of the arms drawn this frame, then the light's own carried-light place on it, nothing else (the light's
+     * grip on the shield bone, as in third person); the 4 units forward along the view it had since cd67bdcf (v0.0.61)
+     * put the grip 4.00 units off the hand */
+    if(!hand_item_on_bone(AW_HAND_LEFT,l->offset,light_pose,light_pose+3))return 0;
     light_pose_frame=r_framecount;
     cl.viewent.model=m;cl.viewent.frame=0;
     memcpy(cl.viewent.origin,light_pose,3*sizeof(float));memcpy(cl.viewent.angles,light_pose+3,3*sizeof(float));return 1;
@@ -494,7 +511,7 @@ int AW_HandModelsApply(void)
     const char *race="nord",*path;int female=0,index=-1,i,equipped,frames,view;
     model_t **wanted,*base=cl.viewent.model;
     aw_hand_held_light=hand_held_light;light_visible=0;
-    weapon_visible=0;weapon_base=NULL;weapon_frame_base=0;
+    weapon_visible=0;weapon_base=NULL;weapon_frame_base=0;weapon_parts=0;
     AW_TorchUseHandAssets(0);
     if(!appearance_count || !base)return 0;
     /* Do not replace an actual weapon or other custom viewmodel. */
@@ -554,7 +571,7 @@ int AW_HandModelsApply(void)
             return 1;
         }
         if(aw_hand_parts_apply(race,female,stance,frame)){
-            if(armed){weapon_base=cl.viewent.model;weapon_frame_base=stance*AW_HAND_WEAPON_FRAMES;}
+            if(armed){weapon_base=cl.viewent.model;weapon_frame_base=stance*AW_HAND_WEAPON_FRAMES;weapon_parts=1;}
             AW_TorchUseHandAssets(1);release_owned(base,"progs/v_nord.mdl");AW_TorchReleaseLegacyCache();
             return 1;
         }

@@ -468,6 +468,50 @@ class AmbientSourceContractTests(unittest.TestCase):
         hinged = self.code('aw_hinged_door.c')
         self.assertIn('if(d->dir || d->amount>0 || (d->edict && EDICT_NUM(d->edict)->free))return 0;', hinged)
 
+    def test_routes_stay_at_the_placement(self):
+        # WANDER-DOOR-AFTER-LOAD-67 (OpenMW 0.51 aiwander.cpp: the package's mInitialActorPosition is saved and loaded,
+        # getAllowedNodes ends in setCurrentPositionToClosestAllowedPosition): the compiled routes are offsets from the
+        # reference's position, so a slot adds them to where the placement put the actor, also when a saved row moved
+        # it before the slot was made (the old rule moved every destination by the saved offset), and a slot made before
+        # the move ends the walk it began at the placement (the old rule let Fargoth go on from his saved spot toward his
+        # grid point by the Seyda Neen census door, where the player stood); its current destination is the one nearest it
+        c = self.code('aw_ambient.c')
+        start = c[c.index('static slot_t *start(edict_t *e,const aw_ambient_row_t *row) {'):c.index('static slot_t *slot_for(')]
+        self.assertNotIn('VectorCopy(e->v.origin,s->home);', start)
+        self.assertIn('AW_AmbientHomeOf(e->v.origin,s->ref>0 && placed_ref[n]==s->ref?placed_at[n]:NULL,row!=NULL,s->home);',
+                      start)
+        self.assertLess(start.index('AW_AmbientAllow(&s->pkg,r.distance);'), start.index('AW_AmbientCurrent(&s->pkg,'))
+        self.assertLess(start.index('AW_AmbientHomeOf('), start.index('AW_AmbientCurrent(&s->pkg,'))
+        allow = c[c.index('void AW_AmbientAllow('):c.index('void AW_AmbientHomeOf(')]
+        self.assertIn('AW_AmbientCurrent(p,0,0,0);', allow)        # at the start: the same choice as before
+        placed = c[c.index('void AW_AmbientPlacedAt(edict_t *e,const float placed[3],int spawned) {'):c.index('static void status(void)')]
+        # a spawn's placement always; a later move by the row only when no spawn told one (a window's actor its spawn
+        # moved already stands at its row's spot), and then the start of a slot made before the move (its placement,
+        # before any step it took: Fargoth's slot in the session from the v0.0.67-dev2 quicksave had walked 4.7 units)
+        self.assertIn('s=slots_world==sv.worldmodel?slot_for(e):NULL;', placed)
+        self.assertIn('if(spawned || placed_ref[n]!=ref){', placed)
+        self.assertIn('const float *from=!spawned && s && s->pkg.blob?s->home:placed;', placed)
+        self.assertIn('VectorCopy(from,placed_at[n]);placed_ref[n]=ref;', placed)
+        self.assertIn('if(!s || !s->pkg.blob || s->travel)return;', placed)
+        # the walk begun at the placement ends: it would go on from the saved spot toward a waypoint chosen there
+        self.assertIn('if(s->state==S_WALK){stop_walk(s);s->state=S_CHOOSE;}', placed)
+        self.assertIn('VectorCopy(placed_at[n],s->home);', placed)
+        self.assertIn('aw_actors_placed=AW_AmbientPlacedAt;', c)
+        self.assertIn('void AW_AmbientServerReset(void) {slots_world=NULL;memset(placed_ref,0,sizeof(placed_ref));}', c)
+        wander = c[c.index('int AW_AmbientWander(edict_t *e,'):c.index('int AW_AmbientAiPackage(')]
+        self.assertLess(wander.index('AW_AmbientAllow(&s->pkg,(unsigned)distance);'), wander.index('AW_AmbientCurrent(&s->pkg,'))
+        a = self.code('aw_actors.c')
+        self.assertIn('void (*aw_actors_placed)(edict_t *ent, const float placed[3], int spawned);', a)
+        spawn = a[a.index('static int SpawnOne (pending_t *q)'):a.index('static int		table_on;')]
+        # the placement taken after the spawn function, before the row moves the actor; told after the move
+        self.assertLess(spawn.index('PR_ExecuteProgram (func - pr_functions);'), spawn.index('VectorCopy (ent->v.origin, placed);'))
+        after = spawn[spawn.index('VectorCopy (ent->v.origin, placed);'):]   # the row's move comes after the copy
+        self.assertLess(after.index('VectorSubtract (c->origin, d, ent->v.origin);'), after.index('aw_actors_placed (ent, placed, 1);'))
+        applied = a[a.index('static void ApplyLoaded (void)'):a.index('int AW_ActorsMoveTo (unsigned reference,')]
+        self.assertLess(applied.index('VectorCopy (e->v.origin, placed);'), applied.index('VectorSubtract (c->origin, d, e->v.origin);'))
+        self.assertLess(applied.index('VectorSubtract (c->origin, d, e->v.origin);'), applied.index('aw_actors_placed (e, placed, 0);'))
+        self.assertIn('VectorCopy (c->origin, e->v.origin);', applied)   # a room's row: room-local
+
     def test_no_search_at_run_time(self):
         c = self.code('aw_ambient.c')
         for word in ('aStar', 'dijkstra', 'heap', 'queue'):

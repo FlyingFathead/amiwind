@@ -91,7 +91,8 @@ class Wiring(unittest.TestCase):
     def test_both_views_draw_the_light_itself(self):
         hands, view, r_main = code('aw_hand_models.c'), code('aw_view.c'), code('r_main.c')
         self.assertIn('aw_hand_parts_apply(race,female,AW_HAND_LIGHT_STANCE,cl.viewent.frame)', hands)
-        self.assertIn('AW_BlockCompose(origin,angles,l->offset,light_pose,light_pose+3);', hands)
+        # the one held-item placement on the left hand's bone (FP-TORCH-HAND-REGRESSION-67, tests/test_fp_held_item.py)
+        self.assertIn('hand_item_on_bone(AW_HAND_LEFT,l->offset,light_pose,light_pose+3)', hands)
         self.assertIn('if(AW_HandLightItemApply()){', r_main)
         self.assertIn('#define HAND_PART_STANCES 11', view)      # the light (7), then the spell stances (8-10)
         self.assertIn('AW_BlockCompose(origin,angles,light->offset,out->origin,out->angles);', view)

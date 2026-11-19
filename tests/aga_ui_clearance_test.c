@@ -143,13 +143,16 @@ int main(void){
         sprintf(label,"message box text, %d line%s",n,n==1?"":"s");
         check(label,measure(y,y+4+h+AW_UI_FRAME_EDGE,x+6,x+300-6),n);
     }
-    /* the death box's text area (aw_view.c AW_ViewDraw: AW_UICenteredLines in the box less 38 rows for its buttons) */
+    /* the death box's text area (aw_view.c AW_ViewDraw: AW_UICenteredLines in the box less 40 rows for its buttons,
+     * which stand the shared bottom margin above the frame's edge: UI-NO-SHARED-LAYOUT-67) */
     for(n=1;n<=3;n++){
-        int x=(320-AW_DEATHBOX_W)/2,y=(200-AW_DEATHBOX_H)/2;
+        int x=(320-AW_DEATHBOX_W)/2,y=(200-AW_DEATHBOX_H)/2,r[4];
         memset(frame,0x5a,sizeof(frame));AW_UIFill(0,0,320,200,0);
-        AW_UICenteredLines(x+6,y+4,AW_DEATHBOX_W-12,AW_DEATHBOX_H-38,text_of(n));
+        AW_UICenteredLines(x+6,y+4,AW_DEATHBOX_W-12,AW_DEATHBOX_H-40,text_of(n));
         sprintf(label,"death box text, %d line%s",n,n==1?"":"s");
-        check(label,measure(y,y+4+AW_DEATHBOX_H-38+AW_UI_FRAME_EDGE,x+6,x+AW_DEATHBOX_W-6),n);
+        check(label,measure(y,y+4+AW_DEATHBOX_H-40+AW_UI_FRAME_EDGE,x+6,x+AW_DEATHBOX_W-6),n);
+        AW_DeathBoxButtonRect(2,0,320,200,r);
+        assert(y+4+AW_DEATHBOX_H-40<=r[1] && y+AW_DEATHBOX_H-AW_UI_FRAME_EDGE-(r[1]+r[3])==6);
     }
     /* the message box's buttons sized to their labels (UI-TEXT-BOX-CLEARANCE-64): one Ok button is no longer stretched
      * across the box; it is centred, its label plus the padding wide (at least the minimum) */

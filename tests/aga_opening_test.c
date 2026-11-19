@@ -25,11 +25,28 @@ static void count_added(const char *id,int32_t count){(void)count;added++;strcpy
 static int guard_role8;   /* the captain's edict stands in for the hall door guard */
 edict_t *AW_IntroRole(int role){return role==5?&guard:role==6 && clerk.v.modelindex?&clerk:
     role==7 && captain.v.modelindex && !guard_role8?&captain:role==8 && guard_role8?&captain:NULL;}
-int AW_NavLoad(const char *s){nav_stops++;return 1;}
+int AW_NavLoad(const char *s){return 1;}
+/* the dock guard stops where he meets the player (his walk frames end; PIER-GUARD-POST-STUCK-67) */
+void AW_NavStop(void){nav_stops++;}
 int AW_NavStart(edict_t *e,vec3_t goal){nav_starts++;VectorCopy(goal,nav_goal);return 1;}
 /* PIER-GUARD-WALKS-INTO-DOOR-65: the dock guard's two measured legs go straight, without the path grid */
 int AW_NavStartDirect(edict_t *e,vec3_t goal){nav_starts++;VectorCopy(goal,nav_goal);return 1;}
 int AW_NavStep(double dt,int wait){return nav_result;}
+/* PIER-GUARD-POST-STUCK-67: the fixed route's points (nav_goal: its last), the check counters, the slow turn (here at
+ * once, the point it turned toward kept) */
+static vec3_t fixed_points[8],look_at;static int fixed_count,turns;
+int AW_NavStartFixed(edict_t *e,const vec3_t *p,int n){
+    int i;assert(n>=1 && n<=8);nav_starts++;fixed_count=n;for(i=0;i<n;i++)VectorCopy(p[i],fixed_points[i]);
+    VectorCopy(p[n-1],nav_goal);return 1;}
+long AW_NavFixedSolid(void){return 0;}
+long AW_NavFixedWaits(void){return 0;}
+long AW_NavFixedSettled(void){return 0;}
+void AW_NavFixedReset(void){}
+int AW_ActorTurnToward(edict_t *e,const vec3_t t,float rate,double dt){
+    assert(rate>0 && rate<=180);turns++;VectorCopy(t,look_at);
+    e->v.angles[1]=(float)(atan2(t[1]-e->v.origin[1],t[0]-e->v.origin[0])*180/M_PI-90);
+    if(e->v.angles[1]<0)e->v.angles[1]+=360;return 1;}
+static int near_point(const float *p,float x,float y){return fabs(p[0]-x)<.2f && fabs(p[1]-y)<.2f;}
 int AW_IntroSpeak(int role,const char *s){if(speech)return 0;strcpy(line,s);speech=1;return 1;}
 double AW_SpeechRemaining(void){return speech;}
 int AW_CharacterDone(void){int d=done;done=0;return d;}
@@ -77,6 +94,10 @@ int main(void)
     player.v.mins[2]=-16.625f;player.v.origin[2]=38.625f;guard.v.origin[2]=22;
     AW_StoryReset(1);assert(AW_StoryTransition(AW_STAGE_DOCK));
     player.v.origin[0]=27;AW_OpeningTick();assert(aw_story.dock==10 && !speech && !AW_OpeningLocked());
+    /* PIER-GUARD-POST-STUCK-67: his first walk is the fixed route: onto the pier's centre line (here from far off it: the
+     * deck's end by the door, 357.4 -206.5) and along it to the plank point (586.9 -354.1) */
+    assert(nav_starts==1 && fixed_count==2 && near_point(fixed_points[0],357.4f,-206.5f) &&
+           near_point(fixed_points[1],586.9f,-354.1f));
     /* Exact 3-D source radius, not horizontal-only and not NPC feet to body centre. */
     player.v.origin[0]=26;player.v.origin[2]+=20;
     AW_OpeningTick();assert(aw_story.dock==10);player.v.origin[2]-=20;
@@ -86,17 +107,33 @@ int main(void)
     speech=0;AW_OpeningTick();assert(menu==1 && aw_story.dock==40 && AW_OpeningLocked());
     done=1;menu=0;AW_OpeningTick();assert(aw_story.stage==AW_STAGE_OFFICE && AW_OpeningLocked());
     for(i=0;i<16;i++)AW_OpeningTick();assert(aw_story.dock==50 && !strcmp(line,"chargendock2") && AW_OpeningLocked());
+    /* PIER-GUARD-POST-STUCK-67 (the maintainer's design, 18 November 2026): after the race form he walks the pier's
+     * centre line to the deck's end by the door, then to the front point (320.7 -213.4) and his post beside the door
+     * (286 -214): one fixed route, no detour. From where he met the player on the pier (560 -336, on the line), the
+     * points are the deck's end, the front point and the post */
+    guard.v.origin[0]=560;guard.v.origin[1]=-336;
     speech=0;AW_OpeningTick();assert(aw_story.dock==-1 && !AW_OpeningLocked() && nav_starts==2);
-    /* PIER-GUARD-WALKS-INTO-DOOR-65 (the maintainer's design, 12 November 2026): after the race form he walks to a fixed
-     * point in front of the census office door (320.7 -213.4), then steps aside to his post beside the door (286 -214),
-     * both straight and measured from the door table; on arrival he faces the sea, the pier and the ship (native yaw
-     * 225) and keeps it; while walking his facing is the travel's. Before (v0.0.54-v0.0.62 and rc2): one walk on the
-     * path grid to 299 -202, whose nearest grid point is the door's corner, where he pushed against the door */
-    assert(nav_goal[0]==320.7f && nav_goal[1]==-213.4f);
-    guard.v.angles[1]=10;nav_result=0;AW_OpeningTick();assert(guard.v.angles[1]==10);
-    nav_result=1;AW_OpeningTick();assert(nav_starts==2 && guard.v.angles[1]==10);   /* in front of the door */
-    AW_OpeningTick();assert(nav_starts==3 && nav_goal[0]==286.f && nav_goal[1]==-214.f && guard.v.angles[1]==225);
-    for(i=0;i<5;i++)AW_OpeningTick();assert(nav_starts==3 && guard.v.angles[1]==225);
+    assert(fixed_count==3 && near_point(fixed_points[0],357.4f,-206.5f) && near_point(fixed_points[1],320.7f,-213.4f) &&
+           near_point(fixed_points[2],286.f,-214.f));
+    assert(nav_goal[0]==286.f && nav_goal[1]==-214.f);
+    /* while walking his facing is the travel's (nav); at his post he turns: toward the dock while the player is far */
+    guard.v.angles[1]=10;nav_result=0;turns=0;AW_OpeningTick();assert(guard.v.angles[1]==10 && !turns);
+    guard.v.origin[0]=286;guard.v.origin[1]=-214;
+    nav_result=1;AW_OpeningTick();assert(nav_starts==2 && turns==1);
+    assert(near_point(look_at,286+45.25f,-214-45.25f) && fabs(guard.v.angles[1]-225)<.01f);
+    /* ... and toward the player when the player comes near (the maintainer: "faces the player") */
+    player.v.origin[0]=300;player.v.origin[1]=-180;
+    for(i=0;i<5;i++)AW_OpeningTick();
+    assert(nav_starts==2 && turns==6 && near_point(look_at,300,-180));
+    /* the earlier walk stays selectable (aw_intro_status direct): the front point, then the post, facing the dock */
+    assert(AW_OpeningDockRouteArg("direct") && !AW_OpeningDockRouteArg("sideways"));
+    aw_story.dock=50;speech=0;nav_result=0;AW_OpeningTick();
+    assert(aw_story.dock==-1 && nav_starts==3 && nav_goal[0]==320.7f && nav_goal[1]==-213.4f);
+    guard.v.angles[1]=10;nav_result=1;AW_OpeningTick();assert(nav_starts==3 && guard.v.angles[1]==10);   /* in front of the door */
+    AW_OpeningTick();assert(nav_starts==4 && nav_goal[0]==286.f && nav_goal[1]==-214.f && guard.v.angles[1]==225);
+    for(i=0;i<5;i++)AW_OpeningTick();assert(nav_starts==4 && guard.v.angles[1]==225);
+    assert(AW_OpeningDockRouteArg("fixed"));
+    player.v.origin[0]=26;player.v.origin[1]=0;guard.v.origin[0]=0;guard.v.origin[1]=0;
     /* INTRO-DOCK-GUARD-BLOCKS-DOOR-62, by numbers: his box at the post (half widths 7.32 x 7.12, as the converted
      * actors') and the office door's box of the shipped door table (doors-seyda.txt 113893: 308.86..332.61,
      * -173.38..-149.62) do not overlap, and the space between them is wider than the player's box (2 x 7.32): the

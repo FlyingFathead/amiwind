@@ -23,6 +23,7 @@
 #include "aw_mapmarks.h"
 #include "aw_listbox.h"
 #include "aw_msgbox.h"
+#include "aw_iteminfo.h"
 #include <stdint.h>
 #include <ctype.h>
 static void mm_close_all(void);   /* the map markers' boxes and menu (MAP-MULTI-MARKERS-66) */
@@ -105,6 +106,12 @@ typedef struct {
     int click_row;double click_time;
     int confirm,confirm_count,confirm_max,confirm_fresh,confirm_drag;aw_inventory_item_t confirm_item;
     char notice[96];double notice_until;
+    /* INVENTORY-EQUIP-HINTS-67: MESSAGE (an action's result) is shown for the row it was said for (message_row; -1 any
+     * row) until message_until; then the row's own hint is back. Before, the message stayed for every row until the
+     * next action, so after one Equip no other item showed its key hint. */
+    double message_until;int message_row;
+    /* INVENTORY-ITEM-INFO-67: the item information box over the window (aw_iteminfo.c), NULL while closed */
+    aw_iteminfo_t *info;
     byte preview[INV_PREVIEW_W*INV_PREVIEW_H];
 } inventory_panel_t;
 #define INV_CONFIRM_X 140
@@ -119,6 +126,10 @@ typedef struct {
 #define INV_CONFIRM_OK_X (INV_CONFIRM_X+20)
 #define INV_CONFIRM_CANCEL_X (INV_CONFIRM_X+INV_CONFIRM_W-20-INV_CONFIRM_BUTTON_W)
 #define INV_NOTICE_SECONDS 3.0
+/* INVENTORY-EQUIPPED-LABEL-67: the "Equipped" mark at the end of a worn item's row (8 glyphs and a gap), in the
+ * highlight colour */
+#define INV_EQUIPPED_W 36
+#define INV_EQUIPPED_COLOUR AW_UIColor(150,220,120)
 static inventory_panel_t *inventory;
 int AW_InventoryActive(void){return modal==3;}
 static const char *const inventory_categories[]={"All","Weapons","Armour","Clothing","Potions","Ingredients","Books","Misc"};
@@ -130,6 +141,9 @@ static byte *map_data,*map_pixels;
 static int map_w,map_h,map_bounds[4],area_count,marker,map_ocean;
 static float map_x,map_y,player_x,player_y,player_z,map_step;
 static int map_view_ready,teleport_mode,teleport_selected;
+/* MAP-WORLD-TAB-BLANK-67: 1 once the in-game World view has been placed on the player in this game (map_world_place);
+ * 0 again on New Game and after a load (mm_reset, mm_loaded) */
+static int map_world_placed;
 static cvar_t aw_map_mode={"aw_map_mode","0",true}; /* 0=Debug, 1=In-Game */
 static cvar_t aw_map_debug_available={"aw_map_debug_available","1",true};
 /* v2 map layers: lava pools on by default; aw_map_format 1 draws a v2 file as v1. */
@@ -150,6 +164,8 @@ static map_place_t *map_places;static int map_place_count,map_place_hover=-1;
 /* Stage 2: the explored land (aw_mapfog.c) as one bit per fog square (1024 source units) over the map's bounds, built
  * when the map opens from the explored cells' rows and freed on close; the in-game view hides the rest. */
 static byte *fog_mask;static int fog_gx0,fog_gy0,fog_w,fog_h;
+/* MAP-WORLD-TAB-BLANK-67: the explored squares' bounds in the mask (fog_x1 < fog_x0: nothing explored) */
+static int fog_x0,fog_y0,fog_x1=-1,fog_y1=-1;
 static const char *map_hover_name;
 /* Stage 3, the local map (local_build): local_room = the plan of the loaded room is in local_pixels */
 static int map_local,map_local_choice,local_room;
@@ -217,7 +233,7 @@ static void close_panel(void){
         Con_Printf("Inventory preview (%s): %d renders, last %d ms; %u frames, %d us per frame; picture %d bytes kept, pose model freed after each render.\n",
             AW_ViewInventoryLive()?"live":"still",inventory->preview_renders,(int)(inventory->preview_render_seconds*1000),
             inventory->preview_frames,(int)(inventory->preview_seconds*1e6/inventory->preview_frames),INV_PREVIEW_W*INV_PREVIEW_H);
-    if(inventory){free(inventory->keys);free(inventory->rows);}
+    if(inventory){free(inventory->keys);free(inventory->rows);AW_ItemInfoClose(inventory->info);}
     free(inventory);inventory=NULL;AW_InventoryPreviewClear();
     free(map_data);map_data=map_pixels=NULL;lava_pools=lava_points=NULL;lava_count=0;
     free(map_places);map_places=NULL;map_place_count=0;map_place_hover=-1;
@@ -283,6 +299,7 @@ void AW_InventoryOpen(void){
     for(i=0;i<INV_VISIBLE;i++)inventory->icon_row[i]=-1;
     inventory->click_row=-1;   /* INVENTORY-DOUBLECLICK-62: no click yet */
     inventory->angle=(float)M_PI;opened(3);
+    inventory->message_row=-1;inventory->message_until=1e30;   /* the window's own faults stay said */
     if(!AW_InventoryBootstrap())strcpy(inventory->message,"Initial item catalogue unavailable.");
     inventory_refresh();
 }
@@ -352,6 +369,7 @@ static void inventory_refresh(void){
         if(!inventory->keys || !inventory->rows){
             free(inventory->keys);free(inventory->rows);inventory->keys=NULL;inventory->rows=NULL;
             strcpy(inventory->message,"Inventory: not enough memory for the list.");kinds=0;
+            inventory->message_row=-1;inventory->message_until=1e30;
         }
     }
     /* the engine: every kind's record at once (one pass over the item file for more than 8 kinds, keeping each
@@ -434,9 +452,80 @@ static int inventory_droppable(const aw_inventory_item_t *item){
     return item && (item->flags&AW_INV_DROP) &&
         (!AW_InventoryEquipped(&aw_state,item->id) || inventory_equippable(item));
 }
+/* SCROLL-CAST-64 (aw_inventory.h): a Cast Once item's Use (aw_cast.c sets it; NULL in the fixtures) */
+int (*aw_worldui_cast)(const aw_inventory_item_t *it);
+/* INVENTORY-EQUIP-HINTS-67: the item's one action (aw_inventory.c AW_InventoryItemAction, by its kind), and the
+ * inventory_action code that does it here (0 when this window cannot do it: no reader, no alchemy, no casting) */
+static int inventory_act(const aw_inventory_item_t *item){
+    return item?AW_InventoryItemAction(item,AW_InventoryEquipped(&aw_state,item->id)>0):AW_INV_ACT_NONE;
+}
+static int inventory_castable(const aw_inventory_item_t *item){
+    return aw_worldui_cast && inventory_act(item)==AW_INV_ACT_CAST;
+}
+static int inventory_primary(const aw_inventory_item_t *item){
+    switch(inventory_act(item)){
+    case AW_INV_ACT_EQUIP:case AW_INV_ACT_UNEQUIP:return 1;
+    case AW_INV_ACT_USE:return inventory_usable(item)?3:0;
+    case AW_INV_ACT_CAST:return inventory_castable(item)?5:0;
+    case AW_INV_ACT_READ:return inventory_readable(item)?4:0;
+    }
+    return 0;
+}
+#define INV_MESSAGE_SECONDS 4.0
+/* an action's result line: for the selected row, a few seconds (the row's hint comes back after it) */
+static void inventory_said(void){
+    inventory->message_row=inventory->selected;inventory->message_until=Sys_FloatTime()+INV_MESSAGE_SECONDS;
+}
+static const char *inventory_message(void){
+    if(!inventory->message[0] || Sys_FloatTime()>=inventory->message_until ||
+       (inventory->message_row>=0 && inventory->message_row!=inventory->selected))return NULL;
+    return inventory->message;
+}
+/* INVENTORY-ITEM-INFO-67 (aw_iteminfo.h): the sources of what the box shows beyond the catalogue row (NULL in the
+ * fixtures) and the information key, bindable and saved like the use and drop keys (OPENING-TUTORIAL-KEYS-65): P, as
+ * I closes the window */
+int (*aw_worldui_condition)(const char *id,float *condition);
+int (*aw_worldui_enchant_lines)(const aw_inventory_item_t *it,char *out,int size);
+int (*aw_worldui_alchemy_lines)(const aw_inventory_item_t *it,char *out,int size);
+char *(*aw_worldui_book_text)(const char *id);
+cvar_t aw_key_inv_info={"aw_key_inv_info","P",true};
+#define INV_INFO_MAGIC 1024
+/* the box for the selected item: its condition and charge now, its effect lines, a book's text, its action's word; the
+ * text and the effect lines are read once, here, and freed when it closes */
+static void inventory_info_open(void){
+    aw_inventory_item_t *item=inventory_selected();aw_iteminfo_extra_t x;char *magic=NULL,*body=NULL;
+    const char *word;int act;
+    if(!item || inventory->info)return;
+    memset(&x,0,sizeof(x));
+    if(aw_worldui_condition)x.condition_known=aw_worldui_condition(item->id,&x.condition);
+    if(item->enchant_kind!=AW_ENCH_NONE && item->charge_max>0){x.charge_known=1;x.charge=AW_MagicCharge(&aw_state,item);}
+    if((aw_worldui_enchant_lines || aw_worldui_alchemy_lines) && (magic=(char *)AW_TryMalloc(INV_INFO_MAGIC))!=NULL){
+        magic[0]=0;
+        if(item->enchant_kind!=AW_ENCH_NONE && aw_worldui_enchant_lines)aw_worldui_enchant_lines(item,magic,INV_INFO_MAGIC);
+        else if((item->flags&AW_INV_ALCHEMY) && aw_worldui_alchemy_lines)aw_worldui_alchemy_lines(item,magic,INV_INFO_MAGIC);
+        x.magic=magic;
+    }
+    if(item->category==AW_INV_BOOK && aw_worldui_book_text)x.body=body=aw_worldui_book_text(item->id);
+    act=inventory_act(item);word=inventory_primary(item)?AW_InventoryActionWord(act):NULL;
+    inventory->info=AW_ItemInfoOpen(item,&x,word);
+    free(magic);free(body);
+    if(!inventory->info){strcpy(inventory->message,"Not enough memory for the item's information.");inventory_said();}
+    inventory->context=0;
+}
+static void inventory_info_close(void){AW_ItemInfoClose(inventory->info);inventory->info=NULL;drag=0;}
 static void inventory_action(int action){
     aw_inventory_item_t *item=inventory_selected();int ok=0;
     if(!item)return;
+    if(action==5 && inventory_castable(item)){
+        /* SCROLL-CAST-64: E/Use casts a Cast Once item (the maintainer's decision of 18 November 2026; the original
+         * casts it from the magic menu, which stays: Magic Items). The window closes first so the spell is seen; the
+         * cast says its own refusal. */
+        aw_inventory_item_t cast=*item;
+        close_panel();
+        aw_worldui_cast(&cast);
+        return;
+    }
+    if(action==6){inventory_info_open();return;}   /* INVENTORY-ITEM-INFO-67: the right button's Info */
     inventory->preview_state=0;   /* equipment may change: one new still picture */
     inventory->armor_state=0;     /* and the armour rating again */
     if(action==1 && inventory_equippable(item)){
@@ -446,7 +535,7 @@ static void inventory_action(int action){
             const char *key=AW_InventoryEquipRefusal();
             if(!key || !aw_worldui_game_text || !aw_worldui_game_text(key,inventory->message,sizeof(inventory->message)))
                 strcpy(inventory->message,"This item cannot be equipped now.");
-            inventory->context=0;inventory_refresh();return;
+            inventory->context=0;inventory_refresh();inventory_said();return;
         }
         AW_CombatEquipmentStore();
         if(worn){
@@ -479,7 +568,7 @@ static void inventory_action(int action){
         ok=AW_InventoryDropHere(item,1);
         strcpy(inventory->message,ok?"Dropped one item.":AW_InventoryDropReason());
     }
-    inventory->context=0;inventory_refresh();
+    inventory->context=0;inventory_refresh();inventory_said();
 }
 /* INVENTORY-DOUBLECLICK-62 (aw_inventory.h): a double-click on a row does what dropping the item on the character
  * picture does in the original and OpenMW 0.51 (inventorywindow.cpp onAvatarClicked, useItem): what can be worn goes
@@ -516,7 +605,7 @@ static void inventory_confirm_ok(void){
     if(!used)strcpy(inventory->message,"Cannot use this item now.");
     else Q_snprintf(inventory->message,sizeof(inventory->message),"%s: %d %s.",item.name[0]?item.name:item.id,used,
                     inventory_use_verb(&item,1));
-    inventory_refresh();
+    inventory_refresh();inventory_said();
 }
 static void inventory_confirm_key(int key){
     int max=inventory->confirm_max,count=inventory->confirm_count,stack=max>1;
@@ -561,7 +650,22 @@ static void inventory_double(int row){
     }
     if(inventory_consumable(item)){inventory_confirm_open(item);return;}
     if(inventory_usable(item)){inventory_action(3);return;}     /* an apparatus: the alchemy window */
+    if(inventory_castable(item)){inventory_action(5);return;}   /* SCROLL-CAST-64: a Cast Once scroll is cast */
     if(inventory_readable(item)){inventory_action(4);return;}
+}
+/* The right button's menu (INVENTORY-EQUIP-HINTS-67), one list for its drawing and its clicks: the item's action (a
+ * potion's Drink, an ingredient's Eat), Read for any book or scroll (the original's ActionRead, kept beside a scroll's
+ * cast), Drop one. WHAT: the inventory_action codes, WORDS: the labels; the number of entries. */
+#define INV_MENU 4
+static int inventory_menu(const aw_inventory_item_t *item,int what[INV_MENU],const char *words[INV_MENU]){
+    int n=0,act=inventory_act(item),primary=inventory_primary(item);
+    if(primary==3){what[n]=3;words[n++]=item->alchemy_kind==AW_ALCHEMY_POTION?"Drink":
+                                       item->alchemy_kind==AW_ALCHEMY_INGREDIENT?"Eat":"Use";}
+    else if(primary==1 || primary==5){what[n]=primary;words[n++]=AW_InventoryActionWord(act);}
+    if(inventory_readable(item)){what[n]=4;words[n++]="Read";}
+    if(inventory_droppable(item)){what[n]=2;words[n++]="Drop one";}
+    what[n]=6;words[n++]="Info";   /* INVENTORY-ITEM-INFO-67: the item information box (the original's sInfo) */
+    return n;
 }
 static void inventory_confirm_draw(int gold,int muted){
     char line[128];const aw_inventory_item_t *it=&inventory->confirm_item;int max=inventory->confirm_max,x,y=INV_CONFIRM_Y;
@@ -646,6 +750,14 @@ static void inventory_key(int key){
     if(!inventory)return;
     drag=0;
     if(inventory->confirm){inventory_confirm_key(key);return;}   /* INVENTORY-DOUBLECLICK-62: the box answers first */
+    if(inventory->info){   /* INVENTORY-ITEM-INFO-67: the information box answers first; its action is the window's */
+        int r=AW_ItemInfoKey(inventory->info,key,mouse_x,mouse_y,win_key(aw_key_inv_use.string,key),
+                             win_key(aw_key_inv_info.string,key));
+        if(r==AW_ITEMINFO_CLOSE)inventory_info_close();
+        else if(r==AW_ITEMINFO_ACTION){int a=inventory_primary(item);inventory_info_close();if(a)inventory_action(a);}
+        else if(inventory->info->drag)drag=K_MOUSE1;
+        return;
+    }
     /* The original picture does not turn; turning is the live preview's (aw_inventory_preview_live 1). */
     if(key==K_LEFTARROW){if(AW_ViewInventoryLive())inventory->angle-=.25f;return;}
     if(key==K_RIGHTARROW){if(AW_ViewInventoryLive())inventory->angle+=.25f;return;}
@@ -653,37 +765,29 @@ static void inventory_key(int key){
     if(AW_ListNavKey(key,&inventory->selected,&inventory->top,inventory->count,INV_VISIBLE)){inventory->context=0;return;}
     if(key==K_TAB){inventory->category=(inventory->category+1)%8;inventory->selected=inventory->top=0;inventory_filter();}
     if(key=='o'){inventory->sort=(inventory->sort+1)%3;inventory_filter();}
-    if(win_key(aw_key_inv_use.string,key)){inventory_action(inventory_usable(item)?3:inventory_readable(item)?4:1);return;}
+    /* INVENTORY-EQUIP-HINTS-67: the use key does the item's one action (Equip, Unequip, Use, a scroll's cast, Read) */
+    if(win_key(aw_key_inv_use.string,key)){int a=inventory_primary(item);if(a)inventory_action(a);return;}
     if(win_key(aw_key_inv_drop.string,key)){inventory_action(2);return;}
+    if(win_key(aw_key_inv_info.string,key)){inventory_info_open();return;}   /* INVENTORY-ITEM-INFO-67 */
     if(key==K_MOUSE3 || key==K_MOUSE2){
+        int what[INV_MENU];const char *words[INV_MENU];
         if(mouse_x<128 || mouse_x>=inventory_list_right() || mouse_y<INV_LIST_Y || mouse_y>=INV_LIST_Y+INV_VISIBLE*INV_ROW_H)return;
         row=inventory->top+(mouse_y-INV_LIST_Y)/INV_ROW_H;if(row>=inventory->count)return;
         inventory->selected=row;
         inventory->context=inventory->count!=0;
-        /* room for its entries above the footer: two as before, three with Drink/Eat/Use (ALCHEMY-61) */
+        /* room for its entries above the footer (ALCHEMY-61: up to three) */
         item=inventory_item(row,NULL);
         inventory->context_x=minmax(mouse_x,128,206);
-        inventory->context_y=minmax(mouse_y,50,INV_CONTROLS_Y-(inventory_usable(item) || inventory_readable(item)?3:2)*16-4);
+        inventory->context_y=minmax(mouse_y,50,INV_CONTROLS_Y-(item?inventory_menu(item,what,words):0)*16-4);
         return;
     }
     if(key==K_MOUSE1){
         if(inventory->context){
-            x=inventory->context_x;y=inventory->context_y;row=0;
-            if(inventory_usable(item)){
-                if(mouse_x>=x && mouse_x<x+110 && mouse_y>=y+row*16 && mouse_y<y+(row+1)*16){inventory_action(3);return;}
-                row++;
-            }
-            if(inventory_readable(item)){
-                if(mouse_x>=x && mouse_x<x+110 && mouse_y>=y+row*16 && mouse_y<y+(row+1)*16){inventory_action(4);return;}
-                row++;
-            }
-            if(inventory_equippable(item)){
-                if(mouse_x>=x && mouse_x<x+110 && mouse_y>=y+row*16 && mouse_y<y+(row+1)*16){inventory_action(1);return;}
-                row++;
-            }
-            if(inventory_droppable(item)){
-                if(mouse_x>=x && mouse_x<x+110 && mouse_y>=y+row*16 && mouse_y<y+(row+1)*16){inventory_action(2);return;}
-            }
+            int what[INV_MENU],n;const char *words[INV_MENU];
+            x=inventory->context_x;y=inventory->context_y;
+            n=item?inventory_menu(item,what,words):0;
+            for(row=0;row<n;row++)
+                if(mouse_x>=x && mouse_x<x+110 && mouse_y>=y+row*16 && mouse_y<y+(row+1)*16){inventory_action(what[row]);return;}
             inventory->context=0;return;
         }
         top=AW_UIScrollHit(mouse_x,mouse_y,INV_SCROLL_X,INV_LIST_Y,
@@ -873,6 +977,39 @@ static void inventory_armor(void){
     AW_SmallStringColor(x+1,INV_ARMOR_Y+1,w,line,AW_UIColor(0,0,0));
     AW_SmallStringColor(x,INV_ARMOR_Y,w,line,AW_UIColor(255,255,255));
 }
+/* INVENTORY-EQUIP-HINTS-67: the key line's second row: the list keys, then the selected item's action with the use key
+ * as it is bound now ("E/Enter equip", "E/Enter unequip", "E/Enter use", "E/Enter read"; the maintainer, 18 November
+ * 2026: the action in the key line when there is one) and the drop key. The live preview's turning goes on the first
+ * row after the category key. A token that would not fit its row is left out, never cut. */
+#define INV_KEYLINE_CHARS 45
+static void keyline_add(char *row,int size,const char *token){
+    int n=(int)strlen(row),t=(int)strlen(token);
+    if(!t || n+(n?3:0)+t>INV_KEYLINE_CHARS || n+3+t>=size)return;
+    if(n)strcat(row,"   ");
+    strcat(row,token);
+}
+static void inventory_keyline(const aw_inventory_item_t *item,int gold){
+    char row[96],keys[32],token[64];int a=item?inventory_primary(item):0,i;const char *word;
+    row[0]=0;keyline_add(row,sizeof(row),"Up/Down select");
+    if(a && (word=AW_InventoryActionWord(inventory_act(item)))!=NULL){
+        win_key_words(aw_key_inv_use.string,keys,sizeof(keys));
+        Q_snprintf(token,sizeof(token),"%s %s",keys,word);
+        for(i=(int)strlen(keys)+1;token[i];i++)if(token[i]>='A' && token[i]<='Z')token[i]+='a'-'A';
+        keyline_add(row,sizeof(row),token);
+    }
+    if(item && inventory_droppable(item)){
+        win_key_words(aw_key_inv_drop.string,keys,sizeof(keys));
+        Q_snprintf(token,sizeof(token),"%s drop",keys);keyline_add(row,sizeof(row),token);
+    }
+    /* Turning belongs to the old live preview only (UI-INVENTORY-PREVIEW-STILL-42). */
+    if(AW_ViewInventoryLive())keyline_add(row,sizeof(row),"Left/Right turn");
+    inventory_text(132,INV_CONTROLS_Y+8,180,5,row,gold);
+    /* INVENTORY-ITEM-INFO-67: the information key on the first row, after the category key, while an item is chosen */
+    if(item){
+        win_key_words(aw_key_inv_info.string,keys,sizeof(keys));
+        Q_snprintf(token,sizeof(token),"%s info",keys);inventory_text(252,INV_CONTROLS_Y,60,5,token,gold);
+    }
+}
 static void inventory_draw(void){
     int i,j,x,row,index,right=inventory_list_right();aw_inventory_item_t *item;char line[160];
     int gold=AW_UIColor(223,199,144),muted=AW_UIColor(150,135,104);
@@ -898,11 +1035,16 @@ static void inventory_draw(void){
     inventory_text(132,44,180,10,line,muted);
     if(!inventory->count)inventory_text(134,73,174,38,"No carried items in this category.",muted);
     for(i=0;i<INV_VISIBLE && (row=inventory->top+i)<inventory->count;i++){
+        int worn;
         item=inventory_item(row,NULL);if(!item)break;
+        worn=AW_InventoryEquipped(&aw_state,item->id)>0;
         if(row==inventory->selected)AW_UIFill(130,INV_LIST_Y+i*INV_ROW_H,right-130,INV_ROW_H,AW_UIColor(44,36,20));
         inventory_icon(i,row,132,INV_LIST_Y+i*INV_ROW_H);
-        sprintf(line,"%s%s",AW_InventoryEquipped(&aw_state,item->id)?"* ":"",item->name);
-        inventory_text(151,INV_LIST_Y+i*INV_ROW_H,right-24-151,11,line,gold);
+        /* INVENTORY-EQUIPPED-LABEL-67: a worn or held item says "Equipped" in the highlight colour at the end of its
+         * name's column (the name gives it the room; it was a "* " before the name) */
+        inventory_text(151,INV_LIST_Y+i*INV_ROW_H,right-24-151-(worn?INV_EQUIPPED_W:0),11,item->name,gold);
+        if(worn)inventory_text(right-24-INV_EQUIPPED_W+4,INV_LIST_Y+i*INV_ROW_H,INV_EQUIPPED_W-4,11,"Equipped",
+                               INV_EQUIPPED_COLOUR);
         /* DBG-GIVE-MONEY-62: four characters at most (1000000 gold: "1m"), the column holds five */
         AW_InventoryCountText((long)AW_StateGet(&aw_state,AW_ITEM,item->id),line,sizeof(line));
         inventory_text(right-22,INV_LIST_Y+i*INV_ROW_H,22,11,line,gold);
@@ -914,43 +1056,29 @@ static void inventory_draw(void){
         if(index)sprintf(line,"Weight %.2f  Value %ld",item->weight,(long)item->value);
         else strcpy(line,"Item details unavailable");
         inventory_text(132,INV_DETAILS_Y,180,8,line,muted);
-        {   /* OPENING-TUTORIAL-KEYS-65: the footer names the keys bound now (aw_key_inv_use, aw_key_inv_drop) */
-            char use[32],drop[32],foot[96];
-            const char *verb=inventory_usable(item)?(item->alchemy_kind==AW_ALCHEMY_POTION?"drink":
-                             item->alchemy_kind==AW_ALCHEMY_INGREDIENT?"eat":"use"):
-                             inventory_readable(item)?"read":inventory_equippable(item)?"equip":NULL;
-            win_key_words(aw_key_inv_use.string,use,sizeof(use));win_key_words(aw_key_inv_drop.string,drop,sizeof(drop));
-            if(verb)snprintf(foot,sizeof(foot),"%s %s  %s drop  RMB actions",use,verb,drop);
-            else if(inventory_droppable(item))snprintf(foot,sizeof(foot),"%s drop  RMB actions",drop);
-            else snprintf(foot,sizeof(foot),"Actions unavailable for this item");
-            inventory_status(inventory->message[0]?inventory->message:foot,muted);
+        {   /* the status line: an action's result for a few seconds (INVENTORY-EQUIP-HINTS-67), else whether the right
+             * button has anything to offer; the action itself is in the key line below */
+            int what[INV_MENU];const char *words[INV_MENU],*said=inventory_message();
+            inventory_status(said?said:inventory_menu(item,what,words)>1?"RMB actions":"Actions unavailable for this item",muted);
         }
-    }
+    }else if(inventory_message())inventory_status(inventory_message(),muted);
     if(inventory->context && item){
-        x=inventory->context_x;j=inventory->context_y;row=0;
-        if(inventory_usable(item))row++;
-        if(inventory_readable(item))row++;
-        if(inventory_equippable(item))row++;
-        if(inventory_droppable(item))row++;
-        if(row){
-            AW_UIFill(x,j,110,row*16,AW_UIColor(10,9,7));AW_UIBox(x,j,110,row*16);row=0;
-            if(inventory_usable(item)){
-                inventory_text(x+4,j+row*16+2,102,13,item->alchemy_kind==AW_ALCHEMY_POTION?"Drink":
-                               item->alchemy_kind==AW_ALCHEMY_INGREDIENT?"Eat":"Use",gold);row++;
-            }
-            if(inventory_readable(item)){inventory_text(x+4,j+row*16+2,102,13,"Read",gold);row++;}
-            if(inventory_equippable(item)){inventory_text(x+4,j+row*16+2,102,13,AW_InventoryEquipped(&aw_state,item->id)?"Unequip":"Equip",gold);row++;}
-            if(inventory_droppable(item))inventory_text(x+4,j+row*16+2,102,13,"Drop one",gold);
+        int what[INV_MENU],n;const char *words[INV_MENU];
+        n=inventory_menu(item,what,words);
+        x=inventory->context_x;j=inventory->context_y;
+        if(n){
+            AW_UIFill(x,j,110,n*16,AW_UIColor(10,9,7));AW_UIBox(x,j,110,n*16);
+            for(row=0;row<n;row++)inventory_text(x+4,j+row*16+2,102,13,words[row],gold);
         }else inventory->context=0;
     }
     /* Frame bottom pixels are 192..195: all footer glyphs finish by188. */
     AW_UIFill(132,INV_CONTROLS_Y-2,180,1,muted);
     inventory_text(INV_CLOSE_X,INV_CONTROLS_Y,INV_CLOSE_W,5,"I/Esc close",gold);
     inventory_text(192,INV_CONTROLS_Y,120,5,"Tab category",gold);
-    /* Turning belongs to the old live preview only (UI-INVENTORY-PREVIEW-STILL-42). */
-    inventory_text(132,INV_CONTROLS_Y+8,180,5,AW_ViewInventoryLive()?"Up/Down select   Left/Right turn":"Up/Down select",gold);
+    inventory_keyline(item,gold);
     /* INVENTORY-DOUBLECLICK-62: the consumable's box over the list, else the short equip notice */
     if(inventory->confirm)inventory_confirm_draw(gold,muted);else inventory_notice_draw(gold);
+    if(inventory->info)AW_ItemInfoDraw(inventory->info,mouse_x,mouse_y);   /* INVENTORY-ITEM-INFO-67: over it all */
 }
 static void map_fit(void){
     float sx=(float)map_w/310,sy=(float)map_h/150;
@@ -1008,15 +1136,14 @@ static int lava_section(const byte *p,int size){
     if(total!=points)return 0;
     lava_pools=p+16;lava_points=pt;lava_count=pools;return 1;
 }
-/* case-insensitive: does TEXT hold PART (ShowMap's rule, aw_mwhost.c) */
-static int ci_holds(const char *text,const char *part){
-    int i,j;
+/* case-insensitive: does the cell name TEXT start with PART (ShowMap's rule: OpenMW guiextensions.cpp OpShowMap,
+ * Misc::StringUtils::ciStartsWith; "Vivec" reveals "Vivec" and "Vivec, Arena"). MAP-PLACES-SHOWN-UNVISITED-67: it used to
+ * match a name that holds PART anywhere, so ShowMap Vos revealed Tel Vos as well (the one such case in Morrowind.esm). */
+static int ci_starts(const char *text,const char *part){
+    int j;
     if(!*part)return 0;
-    for(i=0;text[i];i++){
-        for(j=0;part[j] && text[i+j] && tolower((unsigned char)text[i+j])==tolower((unsigned char)part[j]);j++){}
-        if(!part[j])return 1;
-    }
-    return 0;
+    for(j=0;part[j] && text[j] && tolower((unsigned char)text[j])==tolower((unsigned char)part[j]);j++){}
+    return !part[j];
 }
 /* The place markers from world/region-names.awn (ARN2: names, places, cells; 64-byte labels; rows <iiII> x, y,
  * region, place). Bounded: 128 groups; a missing or bad file leaves the map without markers. */
@@ -1048,7 +1175,7 @@ static void map_places_load(void){
             memcpy(map_places[j].name,label,(size_t)n);map_places[j].name[n]=0;map_place_count++;
         }
         group[i]=(short)j;
-        for(k=0;k<AW_RevealedCount();k++){const char *r=AW_RevealedAt(k);if(r && ci_holds(label,r)){map_places[j].known=1;break;}}
+        for(k=0;k<AW_RevealedCount();k++){const char *r=AW_RevealedAt(k);if(r && ci_starts(label,r)){map_places[j].known=1;break;}}
     }
     for(i=0;i<(int)cells;i++){
         if(fread(row,1,16,f)!=16)goto fail;
@@ -1072,7 +1199,7 @@ static void map_places_load(void){
 }
 static void map_fog_build(void){
     const float square=AW_MAPFOG_CELL/AW_MAPFOG_GRID;int i,j,k,x,y,gx,gy,gx1,gy1;const unsigned char *bits;
-    free(fog_mask);fog_mask=NULL;
+    free(fog_mask);fog_mask=NULL;fog_x0=fog_y0=0;fog_x1=fog_y1=-1;
     fog_gx0=(int)floor(map_bounds[0]/square);gx1=(int)floor((map_bounds[2]-1)/square);
     fog_gy0=(int)floor(map_bounds[1]/square);gy1=(int)floor((map_bounds[3]-1)/square);
     fog_w=gx1-fog_gx0+1;fog_h=gy1-fog_gy0+1;
@@ -1086,6 +1213,8 @@ static void map_fog_build(void){
             gx=x*AW_MAPFOG_GRID+k-fog_gx0;gy=y*AW_MAPFOG_GRID+j-fog_gy0;
             if(gx<0 || gy<0 || gx>=fog_w || gy>=fog_h)continue;
             bit=gy*fog_w+gx;fog_mask[bit>>3]|=(byte)(1<<(bit&7));
+            if(fog_x1<fog_x0){fog_x0=fog_x1=gx;fog_y0=fog_y1=gy;}
+            else{if(gx<fog_x0)fog_x0=gx;if(gx>fog_x1)fog_x1=gx;if(gy<fog_y0)fog_y0=gy;if(gy>fog_y1)fog_y1=gy;}
         }
 }
 /* 1 when the fog square (mask column GX, row GY) is explored */
@@ -1160,6 +1289,31 @@ static void local_zoom(void){
     for(z=0;z<5 && base/(1<<(z+1))>=want*.75f;z++){}
     zoom=z;map_fit();map_player();
 }
+/* MAP-WORLD-TAB-BLANK-67: the in-game World view, the first time it shows the player in a game, is centred on the player
+ * (OpenMW centres its world map on the player: mapwindow.cpp MapWindow::centerView) at the closest zoom, at most the
+ * Local view's, that still holds all the explored land around the player. It used to open at the whole-island fit
+ * (zoom 0: about 3 pixels a cell), where a new game's explored land is a few pixels wide and lies under the player's
+ * 16-pixel arrow: the World tab looked empty until the Local view had changed the zoom (v0.0.66-dev2 to v0.0.67-dev1,
+ * since the explored land hides the rest). Later showings keep the player's zoom and only centre on the player. */
+static void map_explored_view(void){
+    const float square=AW_MAPFOG_CELL/AW_MAPFOG_GRID;float kx,ky,rx,ry,base;int z,top;
+    local_zoom();top=zoom;                     /* about 3 x 3 cells, on the player: nothing explored yet stays here */
+    if(fog_x1<fog_x0)return;
+    kx=map_w/(float)(map_bounds[2]-map_bounds[0]);ky=map_h/(float)(map_bounds[3]-map_bounds[1]);
+    /* map pixels from the player to the farthest explored edge, across and up or down */
+    rx=player_x-(fog_gx0+fog_x0)*square;if((fog_gx0+fog_x1+1)*square-player_x>rx)rx=(fog_gx0+fog_x1+1)*square-player_x;
+    ry=player_y-(fog_gy0+fog_y0)*square;if((fog_gy0+fog_y1+1)*square-player_y>ry)ry=(fog_gy0+fog_y1+1)*square-player_y;
+    rx*=kx;ry*=ky;
+    zoom=0;map_fit();base=map_step;
+    for(z=top;z>0;z--)if(rx*(1<<z)<=150*base && ry*(1<<z)<=74*base)break;   /* half the view: 156 x 77 pixels */
+    zoom=z;map_fit();map_player();
+}
+/* the in-game World view placed on the player once a game (open_map, the World tab, the IN-GAME button all lead here:
+ * AW_WorldUIDraw calls it before the view is drawn); afterwards centred on the player at each open (open_map) */
+static void map_world_place(void){
+    if(map_world_placed || teleport_mode || !marker || map_local || !map_in_game())return;
+    map_explored_view();map_world_placed=1;
+}
 static void map_set_local(int local){
     map_local=local && !teleport_mode;
     if(!AW_Interior())map_local_choice=map_local;
@@ -1199,6 +1353,9 @@ static void open_map(void){
         map_local=1;
         AW_MapFogRoomReveal(sv.name,svs.clients[0].edict->v.origin[0],svs.clients[0].edict->v.origin[1],local_min,local_max);
     }else{map_local=0;if(map_local_choice && marker)map_set_local(1);}
+    /* MAP-WORLD-TAB-BLANK-67: the World view, once placed in this game, opens centred on the player at the zoom kept
+     * (OpenMW MapWindow::centerView); its first placement waits for the first draw (map_world_place) */
+    if(map_world_placed && !map_local && marker && map_in_game())map_player();
     mm_close_all();mm_max();mm_migrate();
     opened(1);
     if(marker)Con_Printf("World map position: %ld %ld %ld (%s).\n",(long)player_x,(long)player_y,(long)player_z,sv.name);
@@ -1287,8 +1444,9 @@ static void mm_migrate(void){
         AW_StateSet(&aw_state,AW_GLOBAL,marker_keys[2],0);Con_Printf("Map marker: the old marker is marker %d now.\n",AW_MapMarksCount());
     }
 }
-static void mm_loaded(void){AW_MapMarksLoaded();mm_max();mm_migrate();}
-static void mm_reset(void){mm_close_all();AW_MapMarksReset();}
+/* MAP-WORLD-TAB-BLANK-67: a loaded or a new game places the in-game World view on the player again (map_world_place) */
+static void mm_loaded(void){AW_MapMarksLoaded();mm_max();mm_migrate();map_world_placed=0;}
+static void mm_reset(void){mm_close_all();AW_MapMarksReset();map_world_placed=0;}
 static int mm_at_pointer(void){
     int i,mx,my,d,best=17,hit=-1;const aw_mapmark_t *m;
     for(i=0;(m=AW_MapMark(i))!=NULL;i++){
@@ -1886,12 +2044,14 @@ void AW_WorldUIInit(void){aw_journal_entry_exists=journal_entry_exists;AW_Invent
     Cvar_RegisterVariable(&aw_map_debug_available);
     Cvar_RegisterVariable(&aw_map_lava);Cvar_RegisterVariable(&aw_map_format);
     Cvar_RegisterVariable(&aw_key_inv_use);Cvar_RegisterVariable(&aw_key_inv_drop);   /* OPENING-TUTORIAL-KEYS-65 */
+    Cvar_RegisterVariable(&aw_key_inv_info);   /* INVENTORY-ITEM-INFO-67 */
     Cvar_RegisterVariable(&aw_map_markers_max);Cvar_RegisterVariable(&aw_compass);    /* MAP-MULTI-MARKERS-66 */
     Cmd_AddCommand("aw_teleport_map",open_teleport_map);Cmd_AddCommand("aw_worldmap",open_normal_map);Cmd_AddCommand("aw_journal",open_journal);Cmd_AddCommand("aw_inventory",inventory_command);}
 void AW_WorldUIMouse(int dx,int dy){
     int top;
     if(!modal || key_dest!=key_menu)return;
     if(modal==1 && drag){
+        map_world_placed=1;   /* MAP-WORLD-TAB-BLANK-67: a pan the player makes is kept */
         if(marker_click){
             marker_drag_x+=dx;marker_drag_y+=dy;
             if(marker_drag_x*marker_drag_x+marker_drag_y*marker_drag_y>9){
@@ -1901,7 +2061,9 @@ void AW_WorldUIMouse(int dx,int dy){
     }
     mouse_x=minmax(mouse_x+dx,0,319);mouse_y=minmax(mouse_y+dy,0,199);
     if(modal==4 && drag==K_MOUSE1 && aw_worldui_panel_drag)aw_worldui_panel_drag(mouse_x,mouse_y);   /* a scroll bar */
-    if(modal==3 && inventory && inventory->confirm){   /* INVENTORY-DOUBLECLICK-62: the count slider held */
+    if(modal==3 && inventory && inventory->info){      /* INVENTORY-ITEM-INFO-67: the box's scroll bar held */
+        if(drag==K_MOUSE1)AW_ItemInfoDrag(inventory->info,mouse_y);
+    }else if(modal==3 && inventory && inventory->confirm){   /* INVENTORY-DOUBLECLICK-62: the count slider held */
         if(drag==K_MOUSE1 && inventory->confirm_drag)
             inventory->confirm_count=AW_InventorySliderCount(mouse_x,INV_CONFIRM_RAIL_X,INV_CONFIRM_RAIL_W,inventory->confirm_max);
     }else if(modal==3 && inventory && drag==K_MOUSE1){
@@ -1929,6 +2091,7 @@ int AW_WorldUIKey(int key,int down){
         /* a left click without a drag no longer places a marker (the right button does, MAP-MULTI-MARKERS-66) */
         if(modal==1 && key==K_MOUSE1 && marker_click)marker_click=0;
         if((modal==1 && key==drag) || (modal==4 && key==K_MOUSE1) || (modal==2 && (key==K_MOUSE1 || key==K_MOUSE2)) || (modal==3 && key==K_MOUSE1))drag=0;
+        if(modal==3 && key==K_MOUSE1 && inventory && inventory->info)inventory->info->drag=0;
         return 1;
     }
     if(key==K_F10 || key=='`'){close_panel();return 0;}
@@ -1937,6 +2100,8 @@ int AW_WorldUIKey(int key,int down){
     if(key==K_ESCAPE && modal==4 && aw_worldui_panel_holds_escape){if(!panel_key(key,mouse_x,mouse_y))close_panel();return 1;}
     /* INVENTORY-DOUBLECLICK-62: Esc (or I) in the consumable's box is its Cancel, the window stays */
     if(modal==3 && inventory && inventory->confirm && (key==K_ESCAPE || key=='i' || key=='I')){inventory_confirm_close();return 1;}
+    /* INVENTORY-ITEM-INFO-67: Esc (or I) in the information box is its OK: back to the window */
+    if(modal==3 && inventory && inventory->info && (key==K_ESCAPE || key=='i' || key=='I')){inventory_info_close();return 1;}
     if(key==K_ESCAPE || (modal==1 && (key=='m' || key=='M')) || (modal==2 && (key=='j' || key=='J')) || (modal==3 && (key=='i' || key=='I'))){close_panel();return 1;}
     if(modal==3){inventory_key(key);return 1;}
     if(modal==4){if(key==K_MOUSE1)drag=K_MOUSE1;if(!panel_key(key,mouse_x,mouse_y))close_panel();return 1;}
@@ -1953,6 +2118,10 @@ int AW_WorldUIKey(int key,int down){
         if(key==K_TAB && !teleport_mode && (map_local || marker || local_room)){map_set_local(!map_local);return 1;}
         /* the room's plan has no pan, zoom or marker: the pointer only names doors */
         if(map_local && local_room && key==K_MOUSE1 && mouse_x>=4 && mouse_x<316 && mouse_y>=19 && mouse_y<173)return 1;
+        /* MAP-WORLD-TAB-BLANK-67: a view the player sets (zoom, pan, Home, P) is kept: no first placement over it */
+        if(key==K_MWHEELUP || key==K_MWHEELDOWN || key=='+' || key=='=' || key=='-' || key==K_HOME || key=='p' ||
+           key==K_LEFTARROW || key==K_RIGHTARROW || key==K_UPARROW || key==K_DOWNARROW ||
+           key=='a' || key=='d' || key=='w' || key=='s')map_world_placed=1;
         if(key==K_MWHEELUP || key=='+' || key=='='){zoom=minmax(zoom+1,0,5);map_fit();}
         if(key==K_MWHEELDOWN || key=='-'){zoom=minmax(zoom-1,0,5);map_fit();}
         if(key==K_LEFTARROW || key=='a')map_x-=24*map_step;
@@ -2257,10 +2426,14 @@ static void map_draw(void){
     }
     /* Settlement landmarks are shared by both views; only diagnostics differ. */
     for(i=0;i<area_count;i++){
+        int known=0,k;
         px=(areas[i].x-map_bounds[0])*map_w/(map_bounds[2]-map_bounds[0]);py=(map_bounds[3]-areas[i].y)*map_h/(map_bounds[3]-map_bounds[1]);
         mx=4+(int)((px-left)/map_step);my=19+(int)((py-top)/map_step);
+        /* MAP-PLACES-SHOWN-UNVISITED-67: a settlement a script's ShowMap revealed shows like any other place (the
+         * opening's Sellus Gravius reveals Balmora with Pelagiad and Moonmoth Legion Fort; it stayed hidden before) */
+        for(k=0;k<map_place_count;k++)if(!strcmp(map_places[k].name,areas[i].title)){known=map_places[k].known;break;}
         if(!in_game){if(mx>=6 && mx<313 && my>=22 && my<161){AW_UIFill(mx-1,my-1,3,3,gold);text(mx+4,my,areas[i].title,314);}}
-        else if(mx>=6 && mx<314 && my>=21 && my<171 && fog_open_at(areas[i].x,areas[i].y)){
+        else if(mx>=6 && mx<314 && my>=21 && my<171 && (known || fog_open_at(areas[i].x,areas[i].y))){
             /* in play a settlement is a place square like the others, named only on mouse-over */
             AW_UIFill(mx-2,my-2,5,5,edge);AW_UIFill(mx-1,my-1,3,3,inner);
             d=(mx-mouse_x)*(mx-mouse_x)+(my-mouse_y)*(my-mouse_y);
@@ -2479,6 +2652,7 @@ int AW_WorldUIDraw(void){
     if(!modal)return 0;
     if(!sv.active || strcmp(opened_scene,sv.name) || key_dest!=key_menu){close_panel();return 0;}
     if(modal==1){
+        map_world_place();   /* MAP-WORLD-TAB-BLANK-67: the in-game World view's first placement in a game */
         /* Bounded ocean margin also keeps float-to-pixel casts in range. */
         if(map_x<-map_w)map_x=-map_w;
         if(map_x>2*map_w)map_x=2*map_w;

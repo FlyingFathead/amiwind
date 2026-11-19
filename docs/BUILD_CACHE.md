@@ -1,6 +1,6 @@
 # Build cache: resuming and reusing work safely
 
-_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
+_Last updated with AmiWind v0.0.67-dev3 (18 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -14,11 +14,13 @@ _Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
   - [Expansion rows in the measured tables (v0.0.64-dev3)](#expansion-rows-in-the-measured-tables-v0064-dev3)
   - [World flora and world scenery regions (v0.0.64-dev4)](#world-flora-and-world-scenery-regions-v0064-dev4)
   - [The merging reader and the expansion layers (v0.0.66-dev1)](#the-merging-reader-and-the-expansion-layers-v0066-dev1)
+  - [The room actor fits read the room records only (v0.0.67-dev3)](#the-room-actor-fits-read-the-room-records-only-v0067-dev3)
   - [Collision defaults of v0.0.48-dev2: what rebuilds once](#collision-defaults-of-v0048-dev2-what-rebuilds-once)
 - [Narrowed reuse: what a stage really used](#narrowed-reuse-what-a-stage-really-used)
   - [Edits proven to change no output (v0.0.66-dev3)](#edits-proven-to-change-no-output-v0066-dev3)
 - [Reuse preflight](#reuse-preflight)
 - [Reuse every earlier run](#reuse-every-earlier-run)
+- [Reuse earlier builds by default](#reuse-earlier-builds-by-default)
 - [The pre-flight on every core, once per source tree](#the-pre-flight-on-every-core-once-per-source-tree)
 - [Run names](#run-names)
 - [Entry check](#entry-check)
@@ -308,7 +310,9 @@ A layer's list is append-only: new rows go at its end, in the order they were me
 recorded when a layer was shorter read none of the rows appended since, so a whole-table record also matches the
 table with any first part of each layer's list (`mesh_tables._shorter_layer_decisions`). Without this, Solstheim's
 rows after the Bloodmoon layer's first 25 would have missed every NPC appearance and creature model recorded with
-those 25. A layer row changed, removed or put anywhere but the end still re-keys, and so does the row of a mesh for
+those 25. The same holds for a recipe block a layer is given after its first rows: four base game models placed in
+four Solstheim cells (a Dwemer lift, a bellows, a basket, an ebony rock) are listed under the recipe `solstheim-v1`
+of those cells, which the Bloodmoon layer owns. A layer row changed, removed or put anywhere but the end still re-keys, and so does the row of a mesh for
 the units that looked that mesh up (the cells that place it).
 
 ### World flora and world scenery regions (v0.0.64-dev4)
@@ -362,6 +366,25 @@ Measured against the v0.0.66-dev1 build's units (base game): with both expansion
 residents change (53 wear armour the expansions change, 3 have a changed record), 4 of the 80 player view units (one
 body), and about 3 % of the NPC library's appearances; the 935 batched rooms bake again (they read 47 textures the
 expansion archives replace).
+
+### The room actor fits read the room records only (v0.0.67-dev3)
+
+The room actor fits (`room-actor`, 2,342 placements) read a room through three functions of the room conversion,
+`tools/chim/interior.py`: the room record an installed room map names, its records and the store models it places. Their
+key counted the conversion's whole import-time code (the store writer class and every module constant), the writers that
+code reaches, and `config/chim-rooms.json`, which a default value of a settings helper there names. The v0.0.67-dev3
+line added one setting to the rooms (the everywhere recipe in every room: one new module line and two new keys in the
+settings file), and every fit would have run again, though no fit reads either. The readers and the record format now
+live in `tools/chim/room_records.py` (moved unchanged; `interior.py` imports them), and the fits, the room collision
+(`chim/room_scene.py`) and the fits' inputs (`actor_units.room_actor_inputs`) read them there. The key holds 66 files
+instead of 71; a room conversion or room settings edit keeps it, an edit of the readers, the room collision or the fit
+moves it (`tests/test_actor_units.py` `RoomActorUnits`). The fits stored under the two earlier keys are found again
+through `unit_store.LEGACY_SOURCES`: every unit both keys reach has the same text but the two import lines, and the fits
+of 40 rooms (247 placements) of the dev2 image are byte-identical with the dev2 tree, the dev3 line and this one. That
+row moves the world scenery and world flora stage keys, which hold the table whole (BUILD-STAGE-KEY-UNIT-STORE-63);
+pairs in `build_cache.PROVEN_EQUAL_SOURCES` keep both while the row is their only change. A room whose store models
+change (the rooms the everywhere recipe reaches) still fits its residents again: the inputs hold those models by
+content. The inputs do not hold the room record's placements themselves (BUILD-ROOM-ACTOR-INPUT-RECORD-67).
 
 ### Collision defaults of v0.0.48-dev2: what rebuilds once
 
@@ -569,7 +592,51 @@ development workspace, found 25 of 47 stages in earlier runs (all 25 in the stop
 run, the newest); `--reuse-from` the v0.0.62 release run alone holds 24 of them.
 
 The build server's development and release chains build with `--reuse-all-available`; the
-`--reuse-from` run the request names is looked at first (docs/AW.md).
+`--reuse-from` run the request names is looked at first (docs/AW.md). A plain build does the
+same by default when its workspace holds earlier builds, with these stops as notices (next section).
+
+## Reuse earlier builds by default
+
+A player who built AmiWind once can update the source (`git pull`) and build again in the same
+build folder: only what changed is made again. A plain build (`./build.sh`, `build.cmd`, or
+`tools/build.py` with no reuse option) in a workspace whose stage index holds earlier builds plans
+its stages as `--reuse-all-available` does (above). Every rule of this page holds: a stage is taken
+only when the checksum of exactly what it reads is unchanged, and every file it takes is checked
+against its recorded SHA-256 (BUILD-OFFER-EARLIER-RUNS-67, since v0.0.67-dev3).
+
+- **When.** None of `--reuse-from`, `--reuse-all-available`, `--no-reuse`, `--clean`,
+  `--release-from-scratch`, `--no-profile`, `--dry-run` or `--recover-image-from` is given, and the
+  stage index holds at least one earlier build that passed a stage. Release candidates and finals take
+  it like development builds: the release kind changes no key. The start line says which:
+  `Reuse of earlier builds: on (the default: N earlier builds in this workspace)`, or `off` with the
+  reason. The modes that build nothing (`--plan`, `--versions`, the setup modes) are not affected.
+- **Minute one.** The stage plan prints one line per stage as above: `reused from RUN`, or
+  `rebuild: WHY` with the units its unit caches give back. For this build the stops (more than 5 % of
+  a unit cache baked again, a per-item bake with no cache, a whole stage with no cache), and a rebuild
+  the reuse preflight finds unexplained (a key too broad), are notices: `NOTICE STAGE: WHY; this build
+  makes that again and goes on`. The build says what it makes again and why, and goes on; such a stage
+  only costs its own time. Given explicitly, `--reuse-all-available` and `--reuse-from` still stop
+  there, as the build server's chains need.
+- **The question.** After the plan, in a terminal, the build asks once:
+  `Found N earlier builds in this build folder: M of T stages can be reused unchanged. Reuse them? [Y/n]`.
+  Enter or yes takes them; no plans the build again with no stage from an earlier build (every stage
+  runs, their units still come from the workspace cache). With no terminal the answer is yes, printed
+  after the question. With nothing to reuse there is no question. The answer and how it was given are
+  recorded in `build-state.json` (`reuse_default`).
+- **The notice.** When stages come from earlier builds, the build prints, at its start and again in
+  its end summary and its build report: how many stages came from earlier builds and from which (each
+  run with its version and date), how many units the stages it runs again take from the workspace
+  cache, and the advice to build once from scratch in a new build folder if something in the game
+  looks wrong or unstable: `./build.sh --clean --workspace ../amiwind-clean` (Windows:
+  `.\build.cmd --clean --workspace ..\amiwind-clean`), with how long the last build of the workspace
+  that ran every stage took (from its `build-profile.json`; "not known" when the workspace has none).
+  The from-scratch build needs a new folder: `--clean` refuses a filled cache and never empties one.
+  The same note is in `build-state.json` and `build-summary.json` (`reuse_default`).
+- **Off for one build.** `--no-reuse` takes no stage from an earlier build: every stage runs, and
+  their units still come from the workspace cache. `--clean` in a new workspace takes nothing from
+  earlier builds at all.
+- **The check.** `tools/build.py --check` plans the default build the same way, read only, and prints
+  its notices, what the build would ask and the notice. Tests: `tests/test_reuse_default.py`.
 
 ## The pre-flight on every core, once per source tree
 
@@ -773,7 +840,8 @@ or a stage key; when given, the build receipt (`build-state.json`) records them.
   folder (`AMIWIND_PASS_CACHE`, `AMIWIND_CACHE_FALLBACK`, `AMIWIND_STORAGE_POOL`,
   `AMIWIND_COST_HISTORY`, `AMIWIND_STAIR_RECORDS`) are ignored and listed;
 - the start line says `CLEAN BUILD (--clean)`, and the receipt carries `"clean": true`
-  with what the build started without (`clean_build`).
+  with what the build started without (`clean_build`);
+- the default reuse of earlier builds ([above](#reuse-earlier-builds-by-default)) is off.
 
 `--public-defaults` refuses, before any stage, what a public user would not have, and
 lists every refused option with its reason:
@@ -814,8 +882,9 @@ build's own output names only, no game content and no local paths.
 
 The build's last section, "Reuse and reference", lists the stages reused and
 rebuilt with their causes (a warning for any unexpected rebuild), the time reuse
-saved, the stage hashes recorded, the reference check and the payload
-preflight's result; the same figures are in `build-summary.json`.
+saved, the cached-build note of a build that reused earlier builds by default
+([above](#reuse-earlier-builds-by-default)), the stage hashes recorded, the reference
+check and the payload preflight's result; the same figures are in `build-summary.json`.
 
 ## Largest unit
 

@@ -882,6 +882,21 @@ int AW_SaveLatest(uint32_t profile,char *label,int capacity)
     if(best>=0 && capacity>0)AW_SaveDescription(profile,best,label,capacity);
     return best;
 }
+/* AW-RECOVER (aw_scene.c's recovery chain, bound by aw_loadfail.c; SCENE-LOAD-FAIL-FALLBACK-67): the newest autosave
+ * of this character (slots 5-20, the highest generation), its load queued as a load from the menu is (AW_SaveRead),
+ * its name in LABEL ("Autosave 2"); 0 when the character has none or it does not load (AW_SaveRead says why). */
+int AW_SaveRecoverAutosave(char *label,int size)
+{
+    aw_save_t info;int slot,best=-1;uint32_t sequence=0,profile=world.profile;
+    if(size>0)label[0]=0;
+    if(!profile || !AW_CharacterLoad())return 0;
+    for(slot=5;slot<=20;slot++)if(newest_info(profile,slot,&info)>=0 && (best<0 || info.sequence>sequence)){best=slot;sequence=info.sequence;}
+    if(best<0)return 0;
+    if(size>0)snprintf(label,size,"Autosave %d",best-4);
+    return AW_SaveRead(profile,best)==1;
+}
+/* AW-RECOVER: a saved game whose map failed to load is dropped, so the next map's spawn does not apply it */
+void AW_SaveLoadDrop(void){if(loading){loading=0;pending_drop();}}
 static void quicksave(void){   /* without a profile no save is written: say so, as quickload does (QUICKSAVE-NO-PROFILE-SILENT-57) */
     if(!world.profile){Con_Printf("Choose a character in Load game first: no save without one.\n");return;}
     AW_SaveWrite(0);}

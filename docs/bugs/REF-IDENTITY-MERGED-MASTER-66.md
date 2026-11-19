@@ -2,10 +2,12 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 4 times; something has to be done
 
 - Reported with v0.0.67-dev1 at 2026-11-17 (time not recorded): Seen again in play of v0.0.67-dev1, in a Tribunal Dwemer ruin: the creature was there but none of the containers tried would open. The engine side is fixed in source (the room's reference check accepts either form of the identity, e347d357 on the v0.0.67-dev2 line, not in dev1) and awaits the in-game proof. Another possible cause is locked containers without a key (LOCKED-CONTAINERS-NEVER-OPEN-67).
 - Reported with v0.0.66 at 2026-11-17 15:08 +0200: Seen again in the engine (the container count on the v0.0.66 release build): the room records of the expansions' rooms name each placement by the merged master's number (master index x 2^22 + its own number), the use table by the stable id (master index x 2^20 + number), and the engine compares the two as they are (chim_room.c ChimRoom_Has, ChimRoom_RayRef, ChimRoom_Hide). In the 150 built rooms of Tribunal and Bloodmoon a placed item therefore counts as not drawn and cannot be taken, a taken one is not hidden, and 1,709 containers are aimed by their measured box only.
+- Reported with v0.0.67-dev2 at 2026-11-18 (time not recorded): Seen again in the trap table of the v0.0.67-dev2 build: the trapped containers of the expansions (Tribunal 2, Bloodmoon 6; the first, the Ornate Dwemer Chest (dwrv_chest_satchel00) in Bamz-Amschend, Hall of Winds) have their trap rows under the merged master's number (tools/prepare_door_audio.py trap_catalogue), while the engine looks a container's trap up by its use-table reference, the stable id (aw_inventory.c container_open, aw_hinged_door.c trap_row), so these traps never spring. The doors' trap, lock and door rows use the merged number on both sides and are not affected.
+- Reported with v0.0.67-dev2 at 2026-11-18 (time not recorded): Seen again in the jail's markers of the v0.0.67-dev2 build (id1/prison-markers.txt, tools/world_doors.py prison_markers): the evidence chests of Mournhold, Royal Palace: Jail (4217167) and Fort Frostmoth, Prison (8420587) are written under the merged master's number, while the engine changes a container's contents under its use-table reference, the stable id (aw_crime.c confiscate, AW_ContainerChange), so the stolen things an arrest takes there go to a container nobody opens. Mournhold's marker (4211011) is written at its place inside the Royal Palace courtyard, an exterior-like cell, which the release reads as a global position: an arrest there would release the player far from Mournhold.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -31,11 +33,24 @@
 
 ## Timeline
 
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.67 (8c736b4b) | 2026-11-18 | gate 11038; tests/test_hinged_doors_table.py | The containers' trap rows (the report of 2026-11-18: 2 Tribunal and 6 Bloodmoon traps under the merged number, never sprung) are written under the stable id the engine looks a container's trap up by; doors keep the number their door rows carry; with the base game alone the table is byte for byte as before. The entry stays open for its other readers. |
+
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-12: reported in v0.0.66-dev1
 - 2026-11-17: seen again in v0.0.67-dev1: Seen again in play of v0.0.67-dev1, in a Tribunal Dwemer ruin: the creature was there but none of the containers tried would open.
 - 2026-11-17 15:08 +0200: seen again in v0.0.66: Seen again in the engine (the container count on the v0.0.66 release build): the room records of the expansions' rooms name each placement by the merged master's number (master index x 2^22 + its own number), the use table by the stable id ...
+- 2026-11-18: seen again in v0.0.67-dev2: Seen again in the trap table of the v0.0.67-dev2 build: the trapped containers of the expansions (Tribunal 2, Bloodmoon 6; the first, the Ornate Dwemer Chest (dwrv_chest_satchel00) in Bamz-Amschend, Hall of Winds) have their trap rows ...
+- 2026-11-18: seen again in v0.0.67-dev2: Seen again in the jail's markers of the v0.0.67-dev2 build (id1/prison-markers.txt, tools/world_doors.py prison_markers): the evidence chests of Mournhold, Royal Palace: Jail (4217167) and Fort Frostmoth, Prison (8420587) are written under ...
+- 2026-11-18: v0.0.67-dev2: Measured on the v0.0.67-dev2 build's tables: each of the 826 containers in the built Tribunal rooms that open in the original has its room placement under the merged number and its use-table row and contents record under the stable id, and ...
+- 2026-11-18: v0.0.67-dev2: The in-game check of four containers of the expansions' rooms on the v0.0.67-dev2 image did not reach them because of the check itself (VIEW-VANITY-UNDOES-SET-VIEW-67, DBG-CONTAINER-AIM-OUT-OF-REACH-67).
+- 2026-11-18: v0.0.67-dev2: Seen in play on the v0.0.67-dev2 image (a check session, 32 MB Fast, warp off): the use key takes the containers of the expansions' rooms by their room placements and opens them: the Heavy Dwemer Chest in Bamz-Amschend, Hall of Wails (its ...
+- 2026-11-18: v0.0.67: Fixed in source for the jail (6f41f814, gate 11500): the evidence chests of the prison markers are written under their stable ids (tools/world_doors.py prison_markers), and a marker in a presented district Mournhold's build converts is ...
+- 2026-11-18: fixed in source: a gated commit, v0.0.67 (8c736b4b); gate 11038; tests/test_hinged_doors_table.py: The containers' trap rows (the report of 2026-11-18: 2 Tribunal and 6 Bloodmoon traps under the merged number, never sprung) are written under the stable id the engine looks a container's trap up by; doors keep the number their door rows ...
 
 <!-- END GENERATED TIMELINE -->
 
@@ -57,9 +72,9 @@ In play of v0.0.67-dev1, in a Tribunal Dwemer ruin, the creature was there but n
 
 Family: Content silently missing from a build (`build-content-missing`). Every omission is receipted; payload and entity counts are compared with the last release; shipped features are on by default. See [families](README.md#families).
 
-- ACTOR-LIBRARY-BASE-ARCHIVE-66 (no report page): The actor library baked the creatures from the base game archive alone, so the 37 creature meshes of Tribunal and Bloodmoon were missing
+- [ACTOR-LIBRARY-BASE-ARCHIVE-66](ACTOR-LIBRARY-BASE-ARCHIVE-66.md): The actor library baked the creatures from the base game archive alone, so the 37 creature meshes of Tribunal and Bloodmoon were missing
 - [ACTOR-LIBRARY-LEFT-OUT-48](ACTOR-LIBRARY-LEFT-OUT-48.md): The actor library made no model for corpse creatures and for town NPCs standing outside the towns: 9 outdoor references left out
-- ACTOR-MOVING-RUNTIME-GROUND-48 (no report page): Moving actors (levitation, flying creatures, jumping, swimming, knockback, scripted SetPos) need runtime grounding beyond the build-time bake
+- [ACTOR-MOVING-RUNTIME-GROUND-48](ACTOR-MOVING-RUNTIME-GROUND-48.md): Moving actors (levitation, flying creatures, jumping, swimming, knockback, scripted SetPos) need runtime grounding beyond the build-time bake
 - [ARENA-PIT-NO-INTERIOR-33](ARENA-PIT-NO-INTERIOR-33.md): The Vivec Arena minigame fights on the test floor: the Arena Pit interior is not in v0.0.33 builds
 - [AUDIO-MISSING-SOURCES-32](AUDIO-MISSING-SOURCES-32.md): The image step reports missing sources for 7 voices and 2 effects
 - BUILD-AWF-AWS-EXTENSION-CLASH-54 (no report page): New fog and smoke tables took the extensions .awf and .aws, which already mean font and sprite: the palette overlay parsed the fog table as a font
@@ -72,8 +87,9 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [BUILD-HARVEST-NATIVE-TOWN-ORDER-36](BUILD-HARVEST-NATIVE-TOWN-ORDER-36.md): The image step's harvest check refused a CHIM-native town's catalogues before its frame map was written
 - [BUILD-HARVEST-NOT-BUILT-32](BUILD-HARVEST-NOT-BUILT-32.md): Mushroom harvest data is not built by the builder
 - [BUILD-IMAGE-NATIVE-BALMORA-CACHE-36](BUILD-IMAGE-NATIVE-BALMORA-CACHE-36.md): The image step asked for the legacy Balmora cache when Balmora is CHIM-native
-- BUILD-INTRO-SEAM-STOP-CHARGEN-CLASS-64 (no report page): A MiniWind build of the v0.0.64-dev2 line stops in the intro stage: the seam check stops the bake of the character creation class NPC with 14 new uncovered openings
+- [BUILD-INTRO-SEAM-STOP-CHARGEN-CLASS-64](BUILD-INTRO-SEAM-STOP-CHARGEN-CLASS-64.md): A MiniWind build of the v0.0.64-dev2 line stops in the intro stage: the seam check stops the bake of the character creation class NPC with 14 new uncovered openings
 - [BUILD-LAVA-COVERAGE-38](BUILD-LAVA-COVERAGE-38.md): Full dev2 world omits the reported lava cells
+- [BUILD-LAYER-SETS-NEVER-TAKEN-67](BUILD-LAYER-SETS-NEVER-TAKEN-67.md): A default build with expansions selected took none of their finished outdoor cells: the cell list was resolved before the expansions were selected
 - [BUILD-LEGACY-TOWN-MAPS-SHIPPED-36](BUILD-LEGACY-TOWN-MAPS-SHIPPED-36.md): CHIM-native Seyda Neen is still built through the legacy chain: 65 sn maps are built and removed before packing (build time, not payload)
 - [BUILD-MINIWIND-ARENA-PIT-REFUSED-36](BUILD-MINIWIND-ARENA-PIT-REFUSED-36.md): Regression against v0.0.35: the Vivec Arena Pit is in no CHIM build (no CHIM-native stage made the Arena's rooms), and its start was refused as not converted
 - [BUILD-MINIWIND-BALMORA-ASSUMED-36](BUILD-MINIWIND-BALMORA-ASSUMED-36.md): A MiniWind image of another town fails its content fingerprint: the Balmora region table was always required
@@ -84,8 +100,8 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [BUILD-STANDALONE-STAGES-32](BUILD-STANDALONE-STAGES-32.md): Door overlay and interior section tools are outside the builder; their use in v0.0.31 is unverified
 - [CHIM-CELL-FEATURE-LIST-INCOMPLETE-38](CHIM-CELL-FEATURE-LIST-INCOMPLETE-38.md): Cell feature list incomplete: original placements and gameplay support are not reconciled with packaged coverage
 - [CHIM-COAST-OBJECTS-MISSING-36](CHIM-COAST-OBJECTS-MISSING-36.md): Objects including Dwemer ruins are reported missing from the CHIM coast
-- CHIM-FENCE-WRONG-ARCHIVE-64 (no report page): The see-through texture check read a texture from the wrong archive and stopped the CHIM stage
-- CHIM-LARGE-ROOMS-EXPANSIONS-66 (no report page): With the expansions selected, the CHIM interiors stage stopped: the large-rooms table listed none of their large rooms
+- [CHIM-FENCE-WRONG-ARCHIVE-64](CHIM-FENCE-WRONG-ARCHIVE-64.md): The see-through texture check read a texture from the wrong archive and stopped the CHIM stage
+- [CHIM-LARGE-ROOMS-EXPANSIONS-66](CHIM-LARGE-ROOMS-EXPANSIONS-66.md): With the expansions selected, the CHIM interiors stage stopped: the large-rooms table listed none of their large rooms
 - [CHIM-LAVA-TERRAIN-SPIKES-38](CHIM-LAVA-TERRAIN-SPIKES-38.md): Angular terrain wedges cross a lava pool in the final-image inspection
 - [CHIM-NATIVE-IMAGE-NO-SHARED-SKY-36](CHIM-NATIVE-IMAGE-NO-SHARED-SKY-36.md): CHIM-native images with no legacy exterior (MiniWinds of one town) ship without the shared sky their frame maps name
 - [CHIM-REGION-DOORS-NO-ROOMS-48](CHIM-REGION-DOORS-NO-ROOMS-48.md): The load doors of CHIM region frames never lead into a room
@@ -93,40 +109,40 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [CHIM-ROOM-LAVA-UNDER-WATER-48](CHIM-ROOM-LAVA-UNDER-WATER-48.md): CHIM rooms could not hold a lava pool whose bed reaches under the water level: 3 base-game rooms set aside
 - [CHIM-ROOM-SHELL-NO-HULL-48](CHIM-ROOM-SHELL-NO-HULL-48.md): Batch CHIM rooms declared no standing hull, so the actor ground check refused all 1,910 of their residents
 - [CHIM-TRACKER-APRON-40](CHIM-TRACKER-APRON-40.md): Tracker counts town apron dependencies as complete original cells
-- EXPANSION-DOORS-HELD-BACK-66 (no report page): With the expansions selected, the image step would stop on 273 doors and markers that lead to places the build does not hold
-- EXPANSION-TABLES-BASE-ONLY-66 (no report page): Some of the builder's tables read the base game only while Tribunal and Bloodmoon are selected
-- EXTERIOR-EXPANSION-ONLY-CELLS-66 (no report page): With the expansions selected, the world scenery and world flora stages would stop on the placements of Solstheim's exterior cells
-- EXTERIOR-PLAN-MASTER-LAYERS-66 (no report page): With the expansions selected, the world terrain stage stopped: the exterior plan and the world survey hashed different game data
+- [EXPANSION-DOORS-HELD-BACK-66](EXPANSION-DOORS-HELD-BACK-66.md): With the expansions selected, the image step would stop on 273 doors and markers that lead to places the build does not hold
+- [EXPANSION-TABLES-BASE-ONLY-66](EXPANSION-TABLES-BASE-ONLY-66.md): Some of the builder's tables read the base game only while Tribunal and Bloodmoon are selected
+- [EXTERIOR-EXPANSION-ONLY-CELLS-66](EXTERIOR-EXPANSION-ONLY-CELLS-66.md): With the expansions selected, the world scenery and world flora stages would stop on the placements of Solstheim's exterior cells
+- [EXTERIOR-PLAN-MASTER-LAYERS-66](EXTERIOR-PLAN-MASTER-LAYERS-66.md): With the expansions selected, the world terrain stage stopped: the exterior plan and the world survey hashed different game data
 - FOCUS-ROOM-BACK-TABLE-58 (no report page): In the Census and Excise Office the back-room table with the Iron Dagger is not drawn and aiming at the dagger shows no item box
 - [GUARD-TORCH-REBAKE-MISMATCH-48](GUARD-TORCH-REBAKE-MISMATCH-48.md): Eight guards first staged in v0.0.48 get no torch: their base models do not rebake exactly
 - [GUARD-TORCH-TYPES-LIMIT-48](GUARD-TORCH-TYPES-LIMIT-48.md): The image step stops on Too many distinct staged guard models: the batch rooms bring more than 32 guard types
 - IMAGE-IDE-CYLINDER-TAIL-59 (no report page): On the emulated A1200 IDE port the last 144 sectors of the world partition AW_WORLD0 were unreadable, so loading Khuul stopped the game
 - IMAGE-WORLD-BATCH-PAIRS-52 (no report page): The image stopped writing a world partition: the boot units moved off DH0 (source, volume path pairs) were turned into paths before the pairs were read
-- INTERIOR-ACTIVATORS-LEFT-OUT-52 (no report page): Interiors leave out every activator but the beds: the heart of Lorkhan is missing from Akulakhan s Chamber, and bar counters, shrines and Dwemer machinery from hundreds of rooms
+- [INTERIOR-ACTIVATORS-LEFT-OUT-52](INTERIOR-ACTIVATORS-LEFT-OUT-52.md): Interiors leave out every activator but the beds: the heart of Lorkhan is missing from Akulakhan s Chamber, and bar counters, shrines and Dwemer machinery from hundreds of rooms
 - [INTERIOR-NO-AMBI-66](INTERIOR-NO-AMBI-66.md): The room stage stops on interior cells without AMBI: the Mournhold plazas with Tribunal on
 - [INTERIOR-PLACED-ITEMS-47](INTERIOR-PLACED-ITEMS-47.md): Takeable and movable items and containers in converted interiors are not live objects (placed items are left out)
-- JOURNAL-EXPANSION-OVERRIDES-66 (no report page): With the expansions selected, the world UI stage stopped on a journal stage both the base game and an expansion hold
+- [JOURNAL-EXPANSION-OVERRIDES-66](JOURNAL-EXPANSION-OVERRIDES-66.md): With the expansions selected, the world UI stage stopped on a journal stage both the base game and an expansion hold
 - [LAVA-NOT-IMPLEMENTED-33](LAVA-NOT-IMPLEMENTED-33.md): Lava is drawn as plain static meshes: no liquid surface, no damage, no view tint, never tracked
 - MINIWIND-EXTERIOR-CHIM-INTERIORS-52 (no report page): An exterior MiniWind stops in its image step: the image is told to install the CHIM interior store that the exterior scope does not build
 - [MINIWIND-PAYLOAD-NOT-SLIM-33](MINIWIND-PAYLOAD-NOT-SLIM-33.md): MiniWind #2 was built with the full movie and voice payload
 - [NIGHT-WINDOWS-LOST-CHIM-36](NIGHT-WINDOWS-LOST-CHIM-36.md): Windows no longer glow at night: the night-windows table has been empty since the towns moved to CHIM
-- PLAYER-WEREWOLF-ROBE-NOT-BAKED-66 (no report page): With Bloodmoon selected, the player parts stage stopped on the werewolf robe, a worn part with no player model
+- [PLAYER-WEREWOLF-ROBE-NOT-BAKED-66](PLAYER-WEREWOLF-ROBE-NOT-BAKED-66.md): With Bloodmoon selected, the player parts stage stopped on the werewolf robe, a worn part with no player model
 - [PLAYTEST-PAYLOAD-COVERAGE-32](PLAYTEST-PAYLOAD-COVERAGE-32.md): The v0.0.32-dev1 playtest has no first-person hands and no harvest
 - [RELEASE-PRIVATE-NAMES-48](RELEASE-PRIVATE-NAMES-48.md): Two public files named the private working folder, and seven public lines used a banned abbreviation for actor behaviour
-- ROBE-PART-NOT-BAKED-62 (no report page): An equipped robe taken from Tarhiel is drawn in first person but not on the third-person body or in the inventory picture
+- [ROBE-PART-NOT-BAKED-62](ROBE-PART-NOT-BAKED-62.md): An equipped robe taken from Tarhiel is drawn in first person but not on the third-person body or in the inventory picture
 - [ROOM-ACTORS-FLOATING-48](ROOM-ACTORS-FLOATING-48.md): Regression: 1,662 residents of batch CHIM rooms stood above the floor, never fitted to it
 - [ROOM-BATCH-HARVEST-48](ROOM-BATCH-HARVEST-48.md): Harvestable plants in batch rooms may stay baked scenery
 - [ROOM-BATCH-NPC-GROUNDING-48](ROOM-BATCH-NPC-GROUNDING-48.md): The residents of rooms no town list holds have no grounding class: --room-batches 5 is refused (62 NPCs in 22 rooms)
 - [ROOM-BATCH-WATER-OUTSIDE-48](ROOM-BATCH-WATER-OUTSIDE-48.md): Room batches refused rooms whose cell water lies under or over everything the room places (water outside the room bounds)
-- ROOM-EMPTY-CELL-66 (no report page): Four expansion interior cells with no scenery were refused by the room batches stage as having no placement to convert
+- [ROOM-EMPTY-CELL-66](ROOM-EMPTY-CELL-66.md): Four expansion interior cells with no scenery were refused by the room batches stage as having no placement to convert
 - [ROOM-OBJECTS-MISSING-62](ROOM-OBJECTS-MISSING-62.md): In the Andrano Ancestral Tomb only the doors can be used: no containers, items or creatures
 - [SEYDA-CONTAINERS-NOT-DRAWN-67](SEYDA-CONTAINERS-NOT-DRAWN-67.md): Seyda Neen's crates, barrels, chest and sacks are not drawn and cannot be opened
 - [SEYDA-LANTERNS-MISSING-31](SEYDA-LANTERNS-MISSING-31.md): Seyda Neen lanterns light the night but are not in its maps
 - [SKY-FLAT-PALETTE-DRIFT-41](SKY-FLAT-PALETTE-DRIFT-41.md): Exterior sky flat with no clouds: the sampled palette drifted and the shared cloud sky silently fell back to a one-colour placeholder
 - [STAGE-READS-SELECTED-MASTERS-67](STAGE-READS-SELECTED-MASTERS-67.md): No build stage proves it read the game files the build selected, so a stage that reads only the base game goes unnoticed
-- TP-LIST-UNBUILT-EXTERIORS-66 (no report page): The teleport place list would list Solstheim places the image has no world for
-- TREE-SCALE-001 (no report page): Non-unit-scale tree sprites omitted; bounds too conservative
-- VIVEC-HOVER-VERIFY-48 (no report page): Vivec (the god) floats in meditation: verify whether it is his animation over a grounded collision origin or an active effect
-- WORLD-SURVEY-EXPANSION-ATLAS-66 (no report page): With both expansions selected the build stops in its world survey: a terrain subdivision outside the island's atlas
+- [TP-LIST-UNBUILT-EXTERIORS-66](TP-LIST-UNBUILT-EXTERIORS-66.md): The teleport place list would list Solstheim places the image has no world for
+- [TREE-SCALE-001](TREE-SCALE-001.md): Non-unit-scale tree sprites omitted; bounds too conservative
+- [VIVEC-HOVER-VERIFY-48](VIVEC-HOVER-VERIFY-48.md): Vivec (the god) floats in meditation: verify whether it is his animation over a grounded collision origin or an active effect
+- [WORLD-SURVEY-EXPANSION-ATLAS-66](WORLD-SURVEY-EXPANSION-ATLAS-66.md): With both expansions selected the build stops in its world survey: a terrain subdivision outside the island's atlas
 
 <!-- END GENERATED CATEGORY -->

@@ -193,6 +193,10 @@ int AW_SaveDescription(uint32_t profile,int slot,char *out,int capacity);
 enum {AW_SLOT_EMPTY,AW_SLOT_UNREADABLE,AW_SLOT_OTHER_DATA,AW_SLOT_OK};
 int AW_SaveSlotState(uint32_t profile,int slot);
 int AW_SaveLatest(uint32_t profile,char *label,int capacity);
+/* AW-RECOVER (aw_scene.c's chain, SCENE-LOAD-FAIL-FALLBACK-67): the newest autosave's load queued, "Autosave N" in
+ * LABEL (1), or none (0); a saved game whose map failed to load dropped, so no later spawn applies it */
+int AW_SaveRecoverAutosave(char *label,int size);
+void AW_SaveLoadDrop(void);
 uint32_t AW_SaveProfile(void);
 int AW_AutosaveCount(void);
 void AW_SetAutosaveCount(int count);

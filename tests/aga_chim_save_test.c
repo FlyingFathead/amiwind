@@ -52,6 +52,7 @@ static int refuse_check(const char *scene,const float *position)
 static int legacy;
 int COM_FOpenFile(char *name,FILE **f){
     if(!strcmp(name,"world/regions-sl.awr")){*f=NULL;return -1;}   /* no Solstheim rows on this disk */
+    if(!strcmp(name,"world/regions-mh.awr")){*f=NULL;return -1;}   /* no Mournhold rows on this disk */
     const char *table="AWBR1 4 96 540 50 50 30 90 -500 12 20 66\n"
         "bm000 -512 -512 1024 1024 -512 -512 2048 2048\n"
         "bm001 1024 0 2048 1024 0 0 2048 2048\n"

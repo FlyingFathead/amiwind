@@ -1625,6 +1625,39 @@
         "ENGINE-HEAP-FIXED-SIZE-43"
       ],
       "commits": []
+    },
+    {
+      "id": "one-model-replacement-everywhere",
+      "name": "One model's replacement wherever it is placed",
+      "area": "builder",
+      "summary": "A model's replacement or reduction is used wherever that model is placed: every outdoor frame and, since v0.0.67, every CHIM room. Method 2, a hand-made low-polygon mesh of one model (the travel lantern first), is drawn wherever a model has one; method 1, today's conversion, stays selectable per model and for the whole build.",
+      "status": "in-progress",
+      "version": null,
+      "gains": [
+        {
+          "text": "Rooms: 3,079 placements of the everywhere rows' models in 570 of 1,317 rooms draw 667,976 faces; at the faces the same models draw outdoors about 471,658 (about 29 % fewer). The travel lantern: 203 faces a placement to 58 (56 room placements in 34 rooms, 11,368 faces to about 3,248)",
+          "compared": "the v0.0.67-dev1 run's room store (faces each placement draws) against the faces the same models draw in its outdoor frames; the lantern through the converter as the rooms convert it",
+          "basis": "count",
+          "date": "2026-11-17"
+        }
+      ],
+      "gain_short": "rooms: about 29 % fewer faces for the everywhere models; the lantern 203 to 58 faces",
+      "gain_note": "Counts from the build's own tables and the converter, not a CHIM run with the change yet; frame time not measured.",
+      "caveats": [
+        "The prison ship and the census office are classic compiled maps and do not take the replacements yet.",
+        "The lantern's panels are baked from the textures the builder exported (at most 128 texels), so they are softer than a bake from the full-size originals."
+      ],
+      "vis": "No change: the same placements and the same collision; only the drawn mesh of the named model types changes.",
+      "links": [
+        {
+          "title": "Mesh methods: the everywhere rows in the rooms, method 2",
+          "path": "docs/chim/MESH_METHODS.md#method-2-hand-made-meshes"
+        }
+      ],
+      "bugs": [
+        "VISUAL-EVERYWHERE-ROOMS-67"
+      ],
+      "commits": []
     }
   ]
 }

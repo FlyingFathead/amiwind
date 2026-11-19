@@ -358,7 +358,11 @@ def _insert_at(lines, title):
     # A generated block right under the title (a bug page's fact table, written by
     # tools/bug_register.py render) stays with the title: the list goes after it, so the
     # two generators never move each other's blocks.
-    while j < len(lines) and lines[j].startswith(GENERATED_BEGIN):
+    # The category block is never skipped: tools/bug_register.py requires it to END the page, so on a page made only of
+    # generated blocks (facts, timeline, category) the list goes before it, never after (the v0.0.67-dev3 gate's
+    # test_pages_carry_fact_table_and_category_section on REGISTER-WRITE-EINVAL-67).
+    while (j < len(lines) and lines[j].startswith(GENERATED_BEGIN)
+           and not lines[j].startswith(GENERATED_BEGIN + 'CATEGORY')):
         end = next((k for k in range(j + 1, len(lines)) if lines[k].startswith(GENERATED_END)), None)
         if end is None:
             break
@@ -427,7 +431,10 @@ def render(text):
         before.pop()
     while after and after[0].strip() == '' and len(after) > 1:
         after.pop(0)
-    new = (before + [''] if before else []) + block(entries) + [''] + after
+    # DOC-TOC-BLANK-LINE-AT-EOF-67: when nothing follows the list (a page made only of generated blocks), the file
+    # ends right after it with one newline, never with a blank line the whitespace check refuses.
+    tail = after if any(l.strip() for l in after) else []
+    new = (before + [''] if before else []) + block(entries) + [''] + tail
     return '\n'.join(new)
 
 

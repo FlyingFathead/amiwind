@@ -91,7 +91,9 @@ OWN_ROUTES = {('aw_cull', 'fog rule'), ('aw_cull', 'cut groups'), ('aw_teleport'
               # the casting words of aw_magicfx and the player-body words of aw_camera: each is a command of its own
               ('aw_magicfx', 'cast casting'), ('aw_magicfx', 'cast now'), ('aw_magicfx', 'cast ready'),
               ('aw_magicfx', 'cast spell'), ('aw_magicfx', 'cast start'), ('aw_magicfx', 'cast strike'),
-              ('aw_camera', 'camera fpview'), ('aw_camera', 'camera hands'), ('aw_camera', 'camera parts')}
+              ('aw_camera', 'camera fpview'), ('aw_camera', 'camera hands'), ('aw_camera', 'camera parts'),
+              # the look book's grip readout (CONFIRMED-LOOKBOOK-67): a read-only command of its own
+              ('aw_camera', 'camera held')}
 # the inventory command's give words (DBG-GIVE-MONEY-62): commands of their own, with their aliases on their row
 OWN_ROUTES |= {('aw_inventory', 'give'), ('aw_inventory', 'give money')}
 ROUTE_ALIASES = {('aw_inventory', 'additem'): 'give', ('aw_inventory', 'give coin'): 'give money',

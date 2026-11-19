@@ -381,8 +381,8 @@ def record_verdict(fields, gaps):
     return bad
 
 
-def records_audit(run, data_files):
-    """The actor record audit's field table over build RUN."""
+def records_report(run, data_files):
+    """The actor record audit's whole report over build RUN (its field table and its rows)."""
     import actor_record_audit as ara
     records, refs = ara.read_masters(data_files)
     build = ara.read_build(run)
@@ -390,7 +390,12 @@ def records_audit(run, data_files):
     if missing:
         raise ValueError('actor spec check: the build has no %s to compare' % ', '.join(missing))
     build['anim'] = ara.read_anim_build(run)
-    return ara.audit(records, refs, build, original=ara.OriginalGroups(ara.game_reader(data_files)))['fields']
+    return ara.audit(records, refs, build, original=ara.OriginalGroups(ara.game_reader(data_files)))
+
+
+def records_audit(run, data_files):
+    """The actor record audit's field table over build RUN."""
+    return records_report(run, data_files)['fields']
 
 
 def set_aside_lines(set_aside):
@@ -437,22 +442,43 @@ def check(run, data_files, town_join=True, records=True, allowlist=ALLOWLIST, ga
     for line in skipped:
         print('  skipped: %s' % line, flush=True)
     print('  placement: %.1f s' % (time.time() - t0), flush=True)
-    fields = None
+    fields = audit = expansion = None
     if records:
         print('=== PHASE 2/2: the actor records (actor_record_audit) ===', flush=True)
-        fields = records_audit(Path(run), data_files)
+        audit = records_report(Path(run), data_files)
+        fields = audit['fields']
         bad += record_verdict(fields, json.loads(Path(gaps).read_text(encoding='utf-8'))['gaps'])
         print('  %d fields compared (%.1f s)' % (len(fields), time.time() - t0), flush=True)
-    return {'placement': counts, 'set_aside': set_aside, 'masters': list(masters), 'allowlist': allow,
-            'skipped': skipped, 'town_join': town_join, 'engine_settings': settings,
-            'records': {f: {s: v[s]['records'] for s in ('missing', 'different')} for f, v in (fields or {}).items()},
-            'failures': bad, 'seconds': round(time.time() - t0, 1)}
+    if audit is not None and not is_base_only(masters):
+        # part 3, the expansions' actors and stages per land (tools/expansion_actor_check.py, config/expansion-stages.json):
+        # counts at milestone 1, a stop per incomplete actor from milestone 2; with the base game alone it does not run
+        # and the report has no such key
+        print("=== PHASE 3: the expansions' actors and stages (expansion_actor_check) ===", flush=True)
+        import expansion_actor_check as eac
+        expansion = eac.check(Path(run), data_files, list(masters), audit)
+        for land, c in expansion['lands'].items():
+            print('  %-24s stage 2: %s of %s actor placements placed, %s complete; failing %s' % (
+                land, c['stage 2 actors placed'], c['stage 2 actor placements'], c['stage 2 actors complete'],
+                c['stage 2 failing columns'] or '-'), flush=True)
+        bad += expansion['failures']
+    report = {'placement': counts, 'set_aside': set_aside, 'masters': list(masters), 'allowlist': allow,
+              'skipped': skipped, 'town_join': town_join, 'engine_settings': settings,
+              'records': {f: {s: v[s]['records'] for s in ('missing', 'different')} for f, v in (fields or {}).items()},
+              'failures': bad, 'seconds': round(time.time() - t0, 1)}
+    if expansion is not None:
+        report['expansion_actors'] = {k: expansion[k] for k in ('setting', 'lands', 'failures')}
+        report['_expansion_rows'] = expansion['rows']
+    return report
 
 
 def stage(run, data_files, out):
     """The image step's verdict: writes OUT/actor-spec-check.json and stops (ValueError) on any failure. The set-aside
     places come from the run's own stage outputs (RUN/chim-room-batches, RUN/world-terrain: tools/build.py's names)."""
     report = check(run, data_files)
+    rows = report.pop('_expansion_rows', None)
+    if rows is not None:   # every expansion actor placement, one row each (only with an expansion selected)
+        (Path(out) / 'expansion-actors.json').write_text(json.dumps(rows, indent=1, default=str) + '\n',
+                                                         encoding='utf-8', newline='\n')
     (Path(out) / REPORT).write_text(json.dumps(report, indent=1, sort_keys=True) + '\n', encoding='utf-8',
                                     newline='\n')
     if report['failures']:
@@ -475,6 +501,7 @@ def main(argv=None):
     a = ap.parse_args(argv)
     report = check(a.run, a.data_files, a.town_join == 'on', not a.no_records, room_batches=a.room_batches,
                    exterior_terrain=a.exterior_terrain)
+    report.pop('_expansion_rows', None)
     if a.json:
         a.json.write_text(json.dumps(report, indent=1, sort_keys=True) + '\n', encoding='utf-8', newline='\n')
     for line in report['failures']:

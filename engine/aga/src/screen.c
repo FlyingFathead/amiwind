@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "aw_inspect.h"
+#include "aw_cycleitems.h"
 #include "r_local.h"
 int (*aw_fx_strip_lines)(void);   /* aw_fxrow.c: the debug HUD's lines for the active effects' icons (HUD-ACTIVE-EFFECTS-ROW-64) */
 
@@ -228,6 +229,9 @@ static int scr_aw_full_view;
 /* Photo mode or the vanity orbit: the intermission's full-screen view (view size 120, no status lines). */
 static int SCR_AWFullView (void)
 {
+    /* LIGHTTEST-MAP-67: the light test corridor too (nothing over its world but the held items' line) */
+    if (AW_LightTestActive ())
+        return 1;
     return AW_PhotoModeActive () || (aw_view_fullscreen && aw_view_fullscreen ()) || aw_hud_hidden;
 }
 
@@ -535,8 +539,8 @@ void SCR_DrawConsole (void)
     }
     else
     {
-        if ((key_dest == key_game && AW_DebugOverlaysEnabled()) || key_dest == key_message)
-            Con_DrawNotify ();	// only draw notify in game
+        if ((key_dest == key_game && AW_DebugOverlaysEnabled() && !AW_LightTestActive()) || key_dest == key_message)
+            Con_DrawNotify ();	// only draw notify in game (never over the light test corridor: LIGHTTEST-MAP-67)
     }
 }
 
@@ -1027,16 +1031,23 @@ void SCR_UpdateScreen (void)
     }
     else
     {
-        if (AW_DebugOverlaysEnabled()) {
+        /* LIGHTTEST-MAP-67: the light test corridor: no HUD, crosshair, notice, message box, subtitle, debug text or
+         * counter over the world; only the held items' line (AW_CycleItemsDraw), and what the player opens (the
+         * console, the menu, a world window) */
+        int clean = AW_LightTestActive ();
+        if (AW_DebugOverlaysEnabled() && !clean) {
             SCR_DrawRam ();
             SCR_DrawNet ();
             SCR_DrawTurtle ();
         }
-        /* Photo mode: no pause plaque, prompts, names or subtitles. */
-        if (!AW_PhotoModeActive())
-            SCR_DrawPause ();
+        if (!clean) {
+            /* Photo mode: no pause plaque, prompts, names or subtitles. */
+            if (!AW_PhotoModeActive())
+                SCR_DrawPause ();
+        }
         AW_PhotoDraw ();
-        SCR_CheckDrawCenterString ();
+        if (!clean)
+            SCR_CheckDrawCenterString ();
         /* The vanity orbit's full view: nothing over the world, as the original hides its HUD
          * (aw_vanity_fullview 1, the default; photo mode keeps its own rules below). */
         vanity = SCR_AWFullView () && !AW_PhotoModeActive ();
@@ -1044,16 +1055,18 @@ void SCR_UpdateScreen (void)
             Sbar_Draw ();
         if (!AW_PhotoModeActive() && !vanity)
             AW_SceneDraw();
-        AW_IntroDraw();
-        AW_HalloweenDraw();		/* dbg halloween: its FPS counter and greeting box, photo mode or not */
-        if (aw_view_draw)
-            aw_view_draw ();
+        if (!clean) {
+            AW_IntroDraw();
+            AW_HalloweenDraw();		/* dbg halloween: its FPS counter and greeting box, photo mode or not */
+            if (aw_view_draw)
+                aw_view_draw ();
+        }
         /* DIALOGUE-MSGBOX-BEHIND-60: the messages (a notice such as an item added, a script's message box) are the
          * top layer, as in the original: over the container strip (drawn by AW_IntroDraw) here, and over the world
          * windows (the dialogue window, the inventory, the map: drawn by M_Draw) after them, below. */
         over_window = AW_WorldUIActive ();
         aw_ui_over_window = over_window || (aw_cstrip_open_now && aw_cstrip_open_now ());
-        if (!over_window) {
+        if (!over_window && !clean) {
             /* In photo mode the message box shows only photo mode's own notice. With the HUD hidden
              * (Ctrl+Alt+H) messages, dialogue and menus stay: only the HUD goes. */
             if ((!AW_PhotoModeActive() && (!vanity || aw_hud_hidden)) || AW_PhotoNoticeShowing())
@@ -1067,7 +1080,12 @@ void SCR_UpdateScreen (void)
             AW_GalleryDraw();
         if (!vanity)
             AW_UIOuterFrame();
-        AW_FpsDraw();			/* dbg fps: the bottom-left corner of the screen, the vanity orbit too */
+        if (!clean)
+            AW_FpsDraw();		/* dbg fps: the bottom-left corner of the screen, the vanity orbit too */
+        /* dbg lighttest, dbg cycleitems (LIGHTTEST-MAP-67, DBG-CYCLEITEMS-67): the held items (the tester's item, its
+         * number and step) at the top left, in photo mode too, so every still and clip of them says what it shows;
+         * nothing outside the corridor while the tester does not run */
+        AW_CycleItemsDraw();
         SCR_DrawConsole ();
         M_Draw ();
         /* the version line with (RECORDING) / (PLAYBACK) at the top (GAME-RECORDER-61), over the windows (the

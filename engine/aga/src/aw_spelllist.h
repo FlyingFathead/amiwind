@@ -49,8 +49,9 @@ typedef struct {int rows,spells;aw_sl_row_t row[AW_SL_ROWS];} aw_sl_list_t;
 /* The magnitude kind of EFFECT (loadmgef.cpp): */
 enum {AW_SL_MAG_NONE,AW_SL_MAG_POINTS,AW_SL_MAG_PERCENT,AW_SL_MAG_FEET,AW_SL_MAG_LEVEL,AW_SL_MAG_TIMES_INT};
 int AW_SpellMagnitudeKind(int effect,unsigned long flags);
-/* The effect's line into OUT (CAPACITY bytes): CONSTANT 1 for an ability's effect (no duration, area or range). Its
- * length. */
+/* The effect's line into OUT (CAPACITY bytes): CONSTANT 1 for an ability's effect (no duration, area or range);
+ * AW_SL_NO_TARGET for a potion's (its duration, no range: widgets.cpp mNoTarget; INVENTORY-ITEM-INFO-67). Its length. */
+#define AW_SL_NO_TARGET 2
 int AW_SpellEffectText(const aw_sl_effect_t *e,int constant,char *out,int capacity);
 /* The rows of the N spells S: the groups Abilities (abilities and the other always-active kinds), Powers and Spells,
  * in that order, each with a heading, its spells by name in their order and every effect's line, names wrapped to

@@ -21,11 +21,20 @@ with, for a stage that bakes into a unit cache, "N of T units from the cache". W
 build stops in its first minute (strict_problems) when a stage would bake again more than 5 % of the units a unit
 cache already holds for it, or when a stage to rebuild runs a per-item bake with no cache at all; each needs a named
 --allow-rebuild STAGE:REASON to go on.
+
+The default of a plain build (BUILD-OFFER-EARLIER-RUNS-67): a build given none of --reuse-from, --reuse-all-available,
+--no-reuse, --clean, --release-from-scratch, --no-profile, --dry-run or --recover-image-from, in a workspace whose stage
+index holds earlier builds, takes --reuse-all-available by itself (default_choice). For that build the first-minute
+stops are notices: it says what it makes again and why and goes on (an explicit --reuse-all-available keeps the stop).
+It asks once in a terminal whether to reuse (ask_reuse; no terminal: yes) and prints the cached-build notice
+(notice_lines): how many stages and units come from earlier builds and from which, and the from-scratch build in a new
+build folder recommended if something in the game looks wrong. Reuse stays content-keyed and every file SHA-256 checked.
 """
 import ast
 import json
 import os
 from pathlib import Path
+import re
 import sys
 import time
 
@@ -90,8 +99,10 @@ def run_entry(run):
     fingerprints = cache.get('fingerprints') or {}
     stages = {step['name']: fingerprints[step['name']] for step in state.get('steps') or ()
               if step.get('status') == 'passed' and step.get('name') in fingerprints}
+    # the version the run built (the default build's notice names it beside the run; BUILD-OFFER-EARLIER-RUNS-67)
+    version = state.get('runtime_version') or (state.get('run_name') or {}).get('version')
     return {'started': _started(state, path), 'schema': cache.get('schema'), 'status': state.get('status'),
-            'stages': stages}
+            'stages': stages, **({'version': version} if isinstance(version, str) and version else {})}
 
 
 def update_index(workspace, write=True):
@@ -583,14 +594,26 @@ def regions_to_make(terrain_run, stage='world-terrain'):
         return None
 
 
-def region_limits(steps, plans, rebuilt):
+def region_limits(steps, plans, rebuilt, checklist=None):
     """{stage: most units it can look up} for the REBUILT region stages whose terrain stage is taken from an earlier
     run by the plan (its receipt is read there); a stage whose terrain stage runs again, or whose receipt is unreadable,
-    has no limit (all its stored units count, as before)."""
+    has no limit (all its stored units count, as before).
+
+    CHECKLIST: the summary of this build's exterior checklist ({'bsp': N, 'chim-region': N, 'chim-town': N},
+    exterior_plan.make, made before any stage). When the terrain stage runs again its receipt does not exist yet, but
+    the checklist already says what it will hold: a region stage converts exactly the regions of 'bsp' cells (every
+    other row is a CHIM region cell or routing only). With no 'bsp' cell it converts none, so none of its stored units
+    is looked up (BUILD-REUSE-STOP-COUNTS-STORED-GROUP-64, third cause: the eleven rows of Mournhold's districts make
+    the terrain stage run again, and the plan counted all 2,064 and 1,931 stored Vvardenfell regions as baked again,
+    though the build converts none of them)."""
     limits = {}
     for name, _ in steps:
         terrain = REGION_STAGES.get(name)
-        if name not in rebuilt or terrain is None or terrain not in plans:
+        if name not in rebuilt or terrain is None:
+            continue
+        if terrain not in plans:
+            if isinstance(checklist, dict) and checklist.get('bsp') == 0:
+                limits[name] = 0
             continue
         count = regions_to_make(plans[terrain].get('from'), terrain)
         if count is not None:
@@ -770,6 +793,213 @@ def minute_one_lines(steps, plans, reasons, unit_rows):
                   else f'{cache}: ? of {held} units (key unreadable)' for cache, usable, held in unit_rows.get(name, ())]
         lines.append(line + (' | ' + '; '.join(counts) if counts else ''))
     return lines
+
+
+def notice_problem_lines(problems):
+    """The default build's first-minute notices: the strict stop's findings, each said as what the build makes again
+    and why, never a STOP line (the build server reads STOP lines as a stopped check)."""
+    lines = [f'NOTICE {stage}: {why}; this build makes that again and goes on' for stage, why in problems]
+    if problems:
+        stages = sorted({stage for stage, _ in problems})
+        lines.append(f'Reuse notice (the default build): {len(stages)} stage(s) make stored work again '
+                     f"({', '.join(stages[:6])}{', ...' if len(stages) > 6 else ''}); the build goes on. Given "
+                     'explicitly, --reuse-all-available stops here instead (see --allow-rebuild).')
+    return lines
+
+
+# --------------------------------------------------------------------------
+# The default of a plain build (BUILD-OFFER-EARLIER-RUNS-67): reuse every earlier build of the workspace, ask once,
+# say so at the start and the end
+
+# An explicit reuse choice: the default does not apply and nothing about it is recorded.
+EXPLICIT = (('reuse_from', '--reuse-from'), ('reuse_all_available', '--reuse-all-available'))
+# Options that keep the default off for this build, in the order their name is given as the reason.
+DEFAULT_OFF = (('reuse_declined', '--no-reuse'), ('clean', '--clean'), ('no_profile', '--no-profile'),
+               ('dry_run', '--dry-run'), ('recover_image_from', '--recover-image-from'))
+# Modes that build nothing: the default does not apply (a --check does: it plans the stages as the build would).
+NO_BUILD_MODES = ('plan', 'host_plan', 'versions', 'check_inputs', 'install_dependencies', 'install_sdk',
+                  'estimate_world', 'layout_selftest', 'resource_plan')
+VERSION_IN_NAME = re.compile(r'_v([0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z]+[0-9]+)?)_')
+# The from-scratch build the notice recommends. --clean refuses a filled workspace cache and never empties it
+# (tools/clean_build.py), so the command names a new build folder; the Windows form is the docs/WINDOWS_BUILD.md launcher.
+CLEAN_COMMAND = './build.sh --clean --workspace ../amiwind-clean'
+CLEAN_COMMAND_WINDOWS = r'.\build.cmd --clean --workspace ..\amiwind-clean'
+FULL_BUILD_LOOKUPS = 50   # build profiles read at most for the last build that ran every stage (newest passed first)
+
+
+def earlier_builds(index):
+    """Names of the runs in the stage index that passed at least one stage: the earlier builds a build can take from."""
+    return sorted(name for name, entry in (index.get('runs') or {}).items() if entry.get('stages'))
+
+
+def default_choice(args, index=None):
+    """The reuse default of this build: None where it does not apply (an explicit --reuse-from or --reuse-all-available,
+    or a mode that builds nothing), else {'on', 'selected_by', 'earlier_builds'}. On only for a plain build whose
+    workspace's stage index (INDEX; default: read from ARGS.workspace, never written) holds an earlier build that passed
+    a stage. --no-reuse together with an explicit reuse option is a contradiction (ValueError)."""
+    explicit = [flag for dest, flag in EXPLICIT if getattr(args, dest, None)]
+    if explicit:
+        if getattr(args, 'reuse_declined', False):
+            raise ValueError('--no-reuse contradicts ' + ' and '.join(explicit) + '; give one of them')
+        return None
+    if any(getattr(args, mode, None) for mode in NO_BUILD_MODES):
+        return None
+    for dest, flag in DEFAULT_OFF:
+        if getattr(args, dest, None):
+            return {'on': False, 'selected_by': flag, 'earlier_builds': None}
+    if getattr(args, 'allow_release_reuse', None) is False:
+        return {'on': False, 'selected_by': '--release-from-scratch', 'earlier_builds': None}
+    if index is None:
+        try:
+            index = update_index(args.workspace, write=False)
+        except Exception as exc:  # noqa: BLE001 - an unreadable index is no earlier build, never a failed build
+            return {'on': False, 'selected_by': f'the stage index could not be read ({type(exc).__name__}: {exc})',
+                    'earlier_builds': 0}
+    found = len(earlier_builds(index))
+    if not found:
+        return {'on': False, 'selected_by': 'no earlier build in this workspace', 'earlier_builds': 0}
+    return {'on': True, 'earlier_builds': found,
+            'selected_by': f"the default: {found} earlier build{'' if found == 1 else 's'} in this workspace"}
+
+
+def default_line(record):
+    """The build's start line about the default."""
+    if record['on']:
+        return (f"Reuse of earlier builds: on ({record['selected_by']}): every stage they hold unchanged is taken, each "
+                'file checked by its SHA-256; --no-reuse turns it off for one build')
+    return f"Reuse of earlier builds: off ({record['selected_by']})"
+
+
+def run_label(name, entry=None):
+    """'v0.0.66, built 2026-11-17' of an earlier run: its version (the stage index, else its run name) and start date."""
+    entry = entry or {}
+    version = entry.get('version')
+    if not version:
+        match = VERSION_IN_NAME.search(str(name))
+        version = match.group(1) if match else None
+    started = str(entry.get('started') or '')[:10]
+    return '%s, built %s' % ('v' + version if version else 'version not recorded', started or 'on a date not recorded')
+
+
+def duration_text(seconds):
+    minutes = int(round(float(seconds) / 60.0))
+    hours, minutes = divmod(minutes, 60)
+    return f'{hours} h {minutes:02d} min' if hours else f'{minutes} min'
+
+
+def last_full_build(workspace, index=None, limit=FULL_BUILD_LOOKUPS):
+    """{'run', 'label', 'seconds'} of the newest passed build of WORKSPACE that ran every stage itself (its
+    build-profile.json lists no reused stage), or None. Dry runs and MiniWind test builds do not count. Reads at most
+    LIMIT profiles, newest passed runs first."""
+    index = index if index is not None else update_index(workspace, write=False)
+    runs = index.get('runs') or {}
+    order = sorted((name for name, entry in runs.items() if entry.get('status') == 'passed' and entry.get('stages')
+                    and '_dry-run' not in name and '_miniwind' not in name),
+                   key=lambda name: runs[name].get('started') or '', reverse=True)
+    for name in order[:limit]:
+        try:
+            profile = json.loads((Path(workspace) / 'build' / name / 'build-profile.json').read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(profile, dict):
+            continue
+        stages, seconds = profile.get('stages'), profile.get('wall_seconds')
+        if (not stages or not isinstance(seconds, (int, float)) or isinstance(seconds, bool)
+                or any(isinstance(row, dict) and row.get('reused') for row in stages)):
+            continue
+        return {'run': name, 'label': run_label(name, runs[name]), 'seconds': round(float(seconds), 1)}
+    return None
+
+
+def question_text(found, reusable, total):
+    return (f"Found {found} earlier build{'' if found == 1 else 's'} in this build folder: {reusable} of {total} stages "
+            'can be reused unchanged. Reuse them? [Y/n] ')
+
+
+def ask_reuse(question, interactive, read=input, write=print):
+    """(yes, how): QUESTION asked once in a terminal (INTERACTIVE); Enter, or any answer but one starting with n, is
+    yes. With no terminal the answer is yes, printed after the question so the log shows what was decided."""
+    if not interactive:
+        write(question + 'yes (no terminal to ask)')
+        return True, 'no terminal: yes'
+    try:
+        reply = read(question)
+    except EOFError:
+        write('yes (no answer)')
+        return True, 'terminal, no answer: yes'
+    reply = str(reply or '').strip().lower()
+    if reply.startswith('n'):
+        return False, 'terminal: no'
+    return True, 'terminal: yes' + ('' if reply in ('y', 'yes') else ' (the default)')
+
+
+def notice_lines(record):
+    """The cached-build notice of a default build that took stages from earlier builds: at its start, in its end
+    summary and in its build report."""
+    lines = [f"Earlier builds reused: {record.get('stages_reused') or 0} of {record.get('stages') or 0} stages come "
+             'from earlier builds of this workspace, each file checked by its SHA-256:']
+    for source in record.get('sources') or ():
+        lines.append(f"   {source['stages']:3d} stage{' ' if source['stages'] == 1 else 's'} from {source['label']} "
+                     f"({source['run']})")
+    found, held = (list(record.get('units') or ()) + [0, 0])[:2]
+    if held:
+        lines.append(f'   the stages that run again take {found:,} of the {held:,} units they look up from the '
+                     'workspace cache')
+    lines.append('If something in the game looks wrong or unstable, build once from scratch in a new build folder, '
+                 'with the options you build with:')
+    lines.append(f'   {CLEAN_COMMAND}    (Windows: {CLEAN_COMMAND_WINDOWS})')
+    full = record.get('last_full_build')
+    if full:
+        lines.append(f"   The last build of this workspace that ran every stage took {duration_text(full['seconds'])} "
+                     f"({full['label']}, {full['run']}).")
+    else:
+        lines.append('   How long a build that runs every stage takes here: not known (this workspace records none).')
+    return lines
+
+
+def settle_default(record, stage_cache, total, workspace, interactive, read=input, write=print, check=False,
+                   index=None):
+    """The default build after its stage plan: RECORD (default_choice's) filled from STAGE_CACHE (metadata['stage_cache']
+    after build_cache.prepare) and TOTAL (the build's stage count), the question asked once (ask_reuse; a --check, CHECK,
+    only says what a build would ask), and the cached-build notice printed when the answer is yes. Returns RECORD; with
+    the answer no, record['on'] is False and the caller plans the build again without the earlier builds."""
+    index = index if index is not None else update_index(workspace, write=False)
+    runs = index.get('runs') or {}
+    reused = [row for row in (stage_cache.get('reused') or {}).values()
+              if isinstance(row, dict) and not str(row.get('from') or '').startswith('prerendered ')]
+    counts = {}
+    for row in reused:
+        source = Path(str(row.get('from'))).name
+        counts[source] = counts.get(source, 0) + 1
+    minute = stage_cache.get('minute_one') or {}
+    rows = {tuple(row) for found in (minute.get('units') or {}).values() for row in found if len(row) == 3}
+    record.update(stages_reused=len(reused), stages=total,
+                  units=[sum(row[1] or 0 for row in rows), sum(row[2] or 0 for row in rows)],
+                  sources=[{'run': name, 'stages': count, 'label': run_label(name, runs.get(name))}
+                           for name, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))],
+                  notices=len(minute.get('notices') or ()), last_full_build=last_full_build(workspace, index))
+    found = record.get('earlier_builds') or len(earlier_builds(index))
+    if not reused:
+        record.update(asked=False, answer=None, answered_by='nothing to reuse')
+        write(f'Reuse of earlier builds: none of the {total} stages is held unchanged by the {found} earlier build(s) of '
+              'this workspace; every stage runs, its units still come from the workspace cache')
+        return record
+    question = question_text(found, len(reused), total)
+    if check:
+        record.update(asked=False, answer=None, answered_by='--check: a build would ask')
+        write('A build would ask: ' + question.rstrip())
+    else:
+        yes, how = ask_reuse(question, interactive, read=read, write=write)
+        record.update(asked=bool(interactive), answer='yes' if yes else 'no', answered_by=how)
+        if not yes:
+            record.update(on=False, selected_by='answered no at the start of the build')
+            write('Reuse of earlier builds: off for this build (answered no): every stage runs, its units still come '
+                  'from the workspace cache')
+            return record
+    record['notice'] = notice_lines(record)
+    for line in record['notice']:
+        write(line)
+    return record
 
 
 # --------------------------------------------------------------------------

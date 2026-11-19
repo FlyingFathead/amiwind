@@ -102,6 +102,25 @@ class Coverage(unittest.TestCase):
 
 
 class Tool(unittest.TestCase):
+    def test_appended_and_scaled_tables_read_as_the_engine_reads_them(self):
+        # ACTOR-AUDIT-APPENDED-TABLES-66: a version 3 table names its base after the header (AW_SKEL_TABLE_NAME bytes)
+        # and a version 4 table carries its scale section there; read as version 1 they showed no group at all
+        plain = awsk(['idle', 'walkforward'])
+        appended = plain[:4] + struct.pack('>H', anim_coverage.VERSION_APPENDED) + plain[6:24] + \
+            b'progs/humanoid.awsk'.ljust(anim_coverage.TABLE_NAME, b'\0') + plain[24:]
+        scaled = plain[:4] + struct.pack('>H', anim_coverage.VERSION_SCALED) + plain[6:24] + \
+            struct.pack('>II', 1, 8) + b'\0' * 8 + plain[24:]
+        self.assertEqual(anim_coverage.table_groups(plain)[0], ['idle', 'walkforward'])
+        self.assertEqual(anim_coverage.table_head(plain), (24, None))
+        self.assertEqual(anim_coverage.table_groups(appended)[0], ['idle', 'walkforward'])
+        self.assertEqual(anim_coverage.table_head(appended), (24 + 32, 'progs/humanoid.awsk'))
+        self.assertEqual(anim_coverage.table_groups(scaled)[0], ['idle', 'walkforward'])
+        # the engine's own sizes, so the reader follows a change of the format
+        h = code('aw_skel.h')
+        for name, value in (('AW_SKEL_VERSION_APPENDED', 3), ('AW_SKEL_VERSION_SCALED', 4), ('AW_SKEL_TABLE_NAME', 32),
+                            ('AW_SKEL_SCALED_EXT', 8), ('AW_SKEL_HEADER', 24)):
+            self.assertRegex(h, r'#define %s\s+%d\b' % (name, value))
+
     def test_report_marks_never_played_and_pending(self):
         groups = ['idle', 'walkforward', 'idle3', 'spellcast', 'moonwalk']
         data = awsk(groups, [('spellcast', 'self start')])

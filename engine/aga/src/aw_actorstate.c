@@ -674,6 +674,16 @@ int AW_ActorSpellInfo(int spell,int *type,char *name,int capacity,int *cost){
     if(name && U16(e)!=0xFFFF)string_at((int)U16(e),name,capacity,0);
     return 1;
 }
+/* DBG-GIVE-SPELL-67: the ASPT rows (every spell an actor, a script, the starting rule or a trap names) and a row's
+ * record id */
+int AW_ActorSpellCount(void){return st?(int)st->aspt.rows:0;}
+int AW_ActorSpellId(int spell,char *out,int capacity){
+    unsigned char e[ASPT_BYTES];
+    if(!out || capacity<2)return 0;
+    out[0]=0;
+    if(!st || spell<0 || (uint32_t)spell>=st->aspt.rows || !fetch(st->aspt.offset+(uint32_t)spell*ASPT_BYTES,e,ASPT_BYTES))return 0;
+    return string_at((int)U16(e),out,capacity,0);
+}
 int AW_ActorSpells(const aw_actor_t *a,int *out,int max){
     aw_actor_base_t b;int i,n=0;unsigned char e[2];
     if(!st || !a)return 0;
@@ -870,6 +880,10 @@ int AW_ActorItemId(int item,char *out,int capacity){
     aw_item_t it;
     if(capacity>0)out[0]=0;
     return AW_ActorItem(item,&it) && string_of((int)it.id,out,capacity);
+}
+int AW_ActorString(int index,char *out,int capacity){
+    if(capacity>0)out[0]=0;
+    return st && capacity>1 && index!=AW_ACTOR_NONE && string_at(index,out,capacity,0);
 }
 /* --- things sold to merchants that did not stock them (BARTER-SOLD-ITEM-LOST-58) ---
  * They go into that merchant's stock and can be bought back, as in the original (OpenMW moves them into its
@@ -1279,7 +1293,7 @@ int AW_GemsImportMore(const unsigned char *p,int bytes){
     return 6+k;
 }
 /* --- places a script revealed on the map (ShowMap; OpenMW guiextensions.cpp OpShowMap: every exterior cell whose
- * name holds the text becomes known) --- the texts, kept for the map's place markers (INGAME-MAP-ORIGINAL-57) and
+ * name starts with the text becomes known, aw_worldui.c ci_starts) --- the texts, kept for the map's place markers (INGAME-MAP-ORIGINAL-57) and
  * saved (AWMP); nothing until the first ShowMap. SAVE-REVEALED-PLACES-128-CAP-66: the list grows from the heap by
  * doubling to a guard far above the game (the dialogue results alone call ShowMap 249 times; was 128 fixed, the 129th
  * place neither revealed nor saved); the AWMP block keeps its one-byte count and the first 255, the rest ride in AWP2 */

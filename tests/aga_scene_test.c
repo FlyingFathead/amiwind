@@ -19,12 +19,23 @@ static int precheck_hook(const char *map,aw_loaderr_t *e){
  }
  return 0;
 }
+/* AW-RECOVER: the newest autosave (aw_save.c in the game, through aw_loadfail.c): its load queued as a saved game's is,
+ * here of census; and a saved game's failed load dropped */
+static int fixture_autosaves,fixture_drops;
+static int fixture_autosave(char *label,int size){
+ fixture_autosaves++;snprintf(label,size,"Autosave 2");Cbuf_InsertText("map census\n");return 1;
+}
+static void fixture_save_drop(void){fixture_drops++;}
 void AW_HeapAuditReport(const char *scene){}
 qboolean noclip_anglehack;
 kbutton_t in_mlook;
 static float door_duration;static int audio_open,audio_close;
 float AW_DoorSound(unsigned ref,int close){if(close)audio_close++;else audio_open++;return door_duration;}
 int AW_CharacterHors(void){aw_character.valid=1;strcpy(aw_story.name,"Hors");return 1;}
+/* DBG-HORS-AFTER-CENSUS-67: the bare 'dbg aw hors' (the script host and New Game's reset are not in this fixture) */
+int AW_CharacterHorsCensus(void){aw_character.valid=1;strcpy(aw_story.name,"Hors");return 1;}
+int AW_MwscriptAfterCensus(void){return 0;}
+void (*aw_game_reset)(int new_game);
 static int preset_calls,preset_female;static char preset_race[32];
 int AW_CharacterPreset(const char *race,const char *clas,const char *birth,int female,const char *name){
  preset_calls++;preset_female=female;strcpy(preset_race,race);(void)clas;(void)birth;
@@ -83,6 +94,9 @@ static int door_hint(const char **name,const char **action){
  if(!hinged_door)return 0;
  *name="Door";*action="Open: E";return 1;
 }
+/* HUD-TEXTS-OVERLAP-67: the hinged door's distance along the view, weighed in the one focus a frame */
+extern float (*aw_hinged_aim)(void);
+static float door_aim_at(void){return hinged_door?30:-1;}
 int AW_ConsoleCharHeight(void){return 8;}
 int AW_ConsoleCharWidth(void){return 8;}
 void AW_ConsoleCharacter(int x,int y,int c){int n=strlen(hint);assert(n<79);hint[n]=c;hint[n+1]=0;}
@@ -205,6 +219,7 @@ static int room_map(const char *name,FILE **f){
 }
 int COM_FOpenFile(char *name,FILE **f){
  if(!strcmp(name,"world/regions-sl.awr")){*f=NULL;return -1;}   /* no Solstheim rows on this disk */
+ if(!strcmp(name,"world/regions-mh.awr")){*f=NULL;return -1;}   /* no Mournhold rows on this disk */
 #ifdef AW_DOOR_ENGINE_CHECK
  /* tools/door_engine_check.c: the files of a built image instead of this fixture's (DOOR-ENTRANCE-AUDIT-51) */
  return door_check_open(name,f);
@@ -380,7 +395,8 @@ trace_t SV_Move(vec3_t a,vec3_t mins,vec3_t maxs,vec3_t b,int type,edict_t *p){
  /* FOCUS-NPC-OVERRIDES-ITEM-62: the use key's choice also asks the plant aim, whose point test (a zero-length move)
   * finds no solid here */
  if(target_trace && VectorCompare(a,b))return t;
- if(target_trace){assert(type==MOVE_NORMAL);assert(fabs((b[0]-a[0])*(b[0]-a[0])+(b[1]-a[1])*(b[1]-a[1])+(b[2]-a[2])*(b[2]-a[2])-72*72)<.1);t.fraction=.5;t.ent=occluded?NULL:&target;return t;}
+ /* HUD-TEXTS-OVERLAP-67: the one focus a frame also asks the load doors (their wall trace, MOVE_NOMONSTERS, below) */
+ if(target_trace && type==MOVE_NORMAL){assert(fabs((b[0]-a[0])*(b[0]-a[0])+(b[1]-a[1])*(b[1]-a[1])+(b[2]-a[2])*(b[2]-a[2])-72*72)<.1);t.fraction=.5;t.ent=occluded?NULL:&target;return t;}
  if(harvest_fixture && occluded){t.fraction=.1f;return t;}
  if(type==MOVE_NOMONSTERS){door_traces++;VectorCopy(a,door_trace_from);VectorCopy(b,door_trace_to);if(occluded)t.fraction=.3f;
   else if(door_wall>0){vec3_t d;VectorSubtract(b,a,d);t.fraction=1-door_wall/Length(d);}
@@ -494,6 +510,9 @@ int main(void){
  ship_available=0;start_demo();assert(!strcmp(queued,"map seyda\n"));
  target_trace=1;target.v.classname=1;target.v.netname=8;target.v.modelindex=1;
  p.v.movetype=MOVETYPE_WALK;voice.string=8;
+ /* HUD-TEXTS-OVERLAP-67: the view turned off the census door the use above opened: with the one focus a frame, that
+  * door (nearer than this fixture's person, whose hit stands at any angle) would take the focus from him */
+ cl.viewangles[1]=0;
  assert(names_option->value==1);names_option->value=0;assert(!AW_SceneTargetName());names_option->value=1;
  names_option->value=0;voice_aim=1;assert(!AW_SceneTargetName());
  names_option->value=1;voice_aim=0;
@@ -871,7 +890,7 @@ int main(void){
  {
   static const char *want_name[]={"Quill Pen","Basket"},*want_action[]={"(E: Take)","(E: Open)"};int k;
   assert(labels_option && labels_option->value==1 && AW_SceneNameLabelsAmiWind());
-  aw_hinged_hint=door_hint;
+  aw_hinged_hint=door_hint;aw_hinged_aim=door_aim_at;
   for(k=0;k<2;k++){
    focus_kind=k+1;box_calls=0;hint[0]=object_name[0]=0;AW_SceneDraw();   /* an item, a container */
    assert(!box_calls && !strcmp(object_name,want_name[k]) && !strcmp(hint,want_action[k]));
@@ -889,7 +908,7 @@ int main(void){
   assert(!box_calls && !strcmp(object_name,"Identification papers") && !strcmp(hint,"(Read: E)"));
   labels_option->value=0;box_calls=0;hint[0]=object_name[0]=0;AW_SceneDraw();
   assert(box_calls==1 && !strcmp(box_name,"Identification papers") && !hint[0] && !object_name[0]);labels_option->value=1;opening_hint=0;
-  aw_hinged_hint=NULL;
+  aw_hinged_hint=NULL;aw_hinged_aim=NULL;
  }
  /* One-command regression location uses checked teleport and does not reset
   * picked facts/inventory. Final signon must not quantize the requested aim. */
@@ -1272,6 +1291,7 @@ int main(void){
   * on its notice line; an error with no load in flight asks for nothing. */
  {
   const char *box;aw_loaderr_t e;vec3_t at;extern int (*aw_load_precheck)(const char *,aw_loaderr_t *);
+  AW_SceneLoadReset();   /* no last good position or previous map from the blocks above (AW-RECOVER) */
   assert(teleport && scene);occluded=target_trace=travel_trace=0;door_duration=0;ship_available=1;roulette_fixture=0;
   aw_story.stage=AW_STAGE_RELEASED;door_wall=0;
   AW_SceneCancelTransition();CL_ClearState();strcpy(sv.name,"seyda");sv.active=true;AW_SceneSpawn(&p);finish_signon(&p);
@@ -1336,6 +1356,90 @@ int main(void){
   assert(strstr(AW_SceneLoadBoxText(),"A file it needs is missing (Model progs/missing.mdl not found). Code LF8."));
   /* an error with no load in flight: nothing asked for (the session ends as before) */
   AW_SceneLoadFailed("an error in play");assert(!AW_SceneLoadBoxTake() && !AW_SceneLoadInFlight());
+  AW_SceneCancelTransition();command_argc=1;
+ }
+ /* AW-RECOVER (the maintainer, 2026-11-17: no error in play ends the game): an error in play loads the place again at
+  * the last good position and the box says so; the same error within a minute of that: the newest autosave; again:
+  * the previous map at its last good position; again: the load menu. A load whose way back fails takes the autosave,
+  * a failing autosave (dropped, never applied later) the previous map. Every error counted, the forced ones apart. */
+ {
+  vec3_t at,census_at;int errors,forced;
+  AW_SceneLoadReset();while(AW_SceneLoadBoxTake());
+  aw_scene_autosave_load=fixture_autosave;aw_scene_save_drop=fixture_save_drop;
+  occluded=target_trace=travel_trace=0;door_duration=0;ship_available=1;roulette_fixture=0;door_wall=0;
+  aw_story.stage=AW_STAGE_RELEASED;realtime=1000;
+  /* in play in the prison, then in seyda: the prison is the previous map */
+  AW_SceneCancelTransition();CL_ClearState();strcpy(sv.name,"prison");sv.active=true;cls.state=ca_connected;key_dest=key_game;
+  AW_SceneSpawn(&p);finish_signon(&p);strcpy(cl.levelname,"Prison Ship");
+  p.v.movetype=MOVETYPE_WALK;p.v.health=73;p.v.origin[0]=1;p.v.origin[1]=2;p.v.origin[2]=3;
+  queued[0]=0;AW_SceneTick();assert(!queued[0] && AW_SceneInPlay());
+  CL_ClearState();strcpy(sv.name,"seyda");AW_SceneSpawn(&p);finish_signon(&p);strcpy(cl.levelname,"Seyda Neen");
+  p.v.movetype=MOVETYPE_WALK;p.v.health=73;p.v.origin[0]=11;p.v.origin[1]=22;p.v.origin[2]=33;VectorCopy(p.v.origin,at);
+  queued[0]=0;AW_SceneTick();assert(!queued[0] && AW_SceneInPlay());
+  /* 1: the place again at the last good position; the box once he is there */
+  errors=aw_scene_errors;forced=aw_scene_errors_forced;
+  sv.active=false;queued[0]=0;   /* Host_Error has shut the server down before it calls the scene */
+  AW_SceneHostError("The reliable message to the screen side overflowed (16380 bytes)");
+  assert(!strcmp(queued,"map seyda\n") && AW_SceneStarting() && !AW_SceneInPlay());
+  assert(aw_scene_errors==errors+1 && aw_scene_errors_forced==forced && !AW_SceneLoadBoxTake());
+  sv.active=true;AW_SceneMapBegin("seyda");CL_ClearState();strcpy(cl.levelname,"Seyda Neen");strcpy(sv.name,"seyda");
+  p.v.origin[0]=p.v.origin[1]=p.v.origin[2]=0;AW_SceneSpawn(&p);finish_signon(&p);
+  assert(!AW_SceneStarting() && fabs(p.v.origin[0]-at[0])<1 && fabs(p.v.origin[1]-at[1])<1 && fabs(p.v.origin[2]-at[2])<1);
+  assert(p.v.health==73 && AW_SceneLoadBoxTake()==1);
+  assert(!strcmp(AW_SceneLoadBoxText(),"An error stopped the game in seyda; it was loaded again.\n"
+                 "Error: The reliable message to the screen side overflowed (16380 bytes). Code LF9.\nYou are in Seyda Neen."));
+  /* 2: the same place again within a minute: the newest autosave (aw_save.c in the game: a saved game's load) */
+  realtime+=20;p.v.movetype=MOVETYPE_WALK;queued[0]=0;AW_SceneTick();assert(!queued[0]);
+  sv.active=false;queued[0]=0;AW_SceneHostError("forced error in a script step (dbg hosterror script)");
+  assert(fixture_autosaves==1 && !strcmp(queued,"map census\n") && !AW_SceneStarting());
+  assert(aw_scene_errors==errors+1 && aw_scene_errors_forced==forced+1);
+  sv.active=true;AW_SceneMapBegin("census");CL_ClearState();strcpy(cl.levelname,"Census and Excise Office");
+  strcpy(sv.name,"census");p.v.origin[0]=40;p.v.origin[1]=50;p.v.origin[2]=60;AW_SceneSpawn(&p);finish_signon(&p);
+  assert(AW_SceneLoadBoxTake()==1);
+  assert(!strcmp(AW_SceneLoadBoxText(),"An error stopped the game in seyda again soon after.\n"
+                 "Error: forced error in a script step (dbg hosterror script). Code LF9.\n"
+                 "The last autosave (Autosave 2) was loaded. You are in Census and Excise Office."));
+  /* 3: again within a minute, now in census: the previous map, seyda, at its last good position */
+  realtime+=20;p.v.movetype=MOVETYPE_WALK;VectorCopy(p.v.origin,census_at);queued[0]=0;AW_SceneTick();assert(!queued[0]);
+  sv.active=false;queued[0]=0;AW_SceneHostError("forced error in play (dbg hosterror now)");
+  assert(!strcmp(queued,"map seyda\n") && AW_SceneStarting() && fixture_autosaves==1);
+  sv.active=true;AW_SceneMapBegin("seyda");CL_ClearState();strcpy(cl.levelname,"Seyda Neen");strcpy(sv.name,"seyda");
+  p.v.origin[0]=p.v.origin[1]=p.v.origin[2]=0;AW_SceneSpawn(&p);finish_signon(&p);
+  assert(fabs(p.v.origin[0]-at[0])<1 && fabs(p.v.origin[1]-at[1])<1 && AW_SceneLoadBoxTake()==1);
+  assert(!strcmp(AW_SceneLoadBoxText(),"An error stopped the game in census again soon after.\n"
+                 "Error: forced error in play (dbg hosterror now). Code LF9.\n"
+                 "The previous map, seyda, was loaded. You are in Seyda Neen."));
+  /* 4: again within a minute: nothing left, the load menu */
+  realtime+=20;p.v.movetype=MOVETYPE_WALK;queued[0]=0;AW_SceneTick();assert(!queued[0]);
+  sv.active=false;queued[0]=0;AW_SceneHostError("forced error in play (dbg hosterror now)");
+  assert(!queued[0] && !AW_SceneStarting() && AW_SceneLoadBoxTake()==2 && !AW_SceneInPlay());
+  assert(!strncmp(AW_SceneLoadBoxText(),"An error stopped the game in seyda again soon after.\n",53));
+  assert(strstr(AW_SceneLoadBoxText(),"\nLoad a saved game to go on."));
+  assert(!strcmp(AW_SceneLoadNoticeText(),"LF9: an error stopped the game in seyda."));
+  /* at the menus (no game in play): an error asks for nothing, as before */
+  queued[0]=0;AW_SceneHostError("an error at the menus");assert(!queued[0] && !AW_SceneLoadBoxTake());
+  /* a teleport's load in play that fails, its way back failing too: the autosave, whose load fails as well (dropped,
+   * never applied later): the previous map, census, at its last good position */
+  sv.active=true;realtime+=100;AW_SceneMapBegin("seyda");CL_ClearState();strcpy(cl.levelname,"Seyda Neen");
+  strcpy(sv.name,"seyda");AW_SceneSpawn(&p);finish_signon(&p);
+  p.v.movetype=MOVETYPE_WALK;p.v.health=73;p.v.origin[0]=0;p.v.origin[1]=200;p.v.origin[2]=0;
+  cl.viewangles[0]=0;cl.viewangles[1]=90;queued[0]=0;AW_SceneTick();assert(!queued[0]);
+  command_argc=2;command_args[0]="aw_teleport";command_args[1]="prisonship";queued[0]=0;teleport();
+  assert(!strcmp(queued,"map prison\n"));
+  AW_SceneMapBegin("prison");queued[0]=0;AW_SceneLoadFailed("map prison: forced load failure (aw_load_fail_test)");
+  assert(!strcmp(queued,"map seyda\n"));
+  AW_SceneMapBegin("seyda");queued[0]=0;AW_SceneLoadFailed("map seyda: forced load failure (aw_load_fail_test)");
+  assert(fixture_autosaves==2 && !strcmp(queued,"map census\n") && !AW_SceneStarting());
+  AW_SceneMapBegin("census");queued[0]=0;AW_SceneLoadFailed("map census: forced load failure (aw_load_fail_test)");
+  assert(fixture_drops==1 && !strcmp(queued,"map census\n") && AW_SceneStarting());
+  AW_SceneMapBegin("census");CL_ClearState();strcpy(cl.levelname,"Census and Excise Office");strcpy(sv.name,"census");
+  p.v.origin[0]=p.v.origin[1]=p.v.origin[2]=0;AW_SceneSpawn(&p);finish_signon(&p);
+  assert(fabs(p.v.origin[0]-census_at[0])<1 && fabs(p.v.origin[1]-census_at[1])<1 && AW_SceneLoadBoxTake()==1);
+  assert(!strcmp(AW_SceneLoadBoxText(),"Map prison was found but could not be loaded, and the way back to seyda failed as well.\n"
+                 "Load error: forced failure (dbg loadfail). Code LF9.\nThe last autosave did not load either.\n"
+                 "The previous map, census, was loaded. You are in Census and Excise Office."));
+  assert(aw_scene_errors==errors+1);   /* the forced ones apart */
+  aw_scene_autosave_load=NULL;aw_scene_save_drop=NULL;AW_SceneLoadReset();while(AW_SceneLoadBoxTake());
   AW_SceneCancelTransition();command_argc=1;
  }
  puts("scene, real client reset/signon, exact streaming view, drift policy, reverse/world crossings and explicit arrivals passed");

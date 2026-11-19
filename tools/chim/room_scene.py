@@ -45,7 +45,7 @@ class RoomScene(Scene):
     COLLISION = 'store models (each placement turned by its record angles), piece tables not read'
 
     def __init__(self, map_path, hull=0):
-        from chim.interior import installed_room, store_model_images
+        from chim.room_records import installed_room, store_model_images
         map_path = Path(map_path)
         super().__init__(map_path.read_bytes(), hull=hull)
         room = installed_room(map_path)

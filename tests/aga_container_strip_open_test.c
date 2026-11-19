@@ -314,6 +314,20 @@ int main(void){
     console_open();assert(strstr(console,"does not open here") && AW_CStripActive());
     /* a strip open across a new map is closed by the next frame's draw (its held data released with the place) */
     level();sv.active=0;aw_cstrip_draw();assert(!AW_CStripActive());
+    /* CONTAINER-WINDOW-SURVIVES-PLACE-CHANGE-67: a debug teleport left the Hall of Wails chest's window open in the
+     * Temple's basement (the game kept running: sv.active stayed set), and E there took the chest's coin. Now a new map
+     * closes it at the next frame with the game running, and so does a teleport on the same map (the player past
+     * AW_CSTRIP_PLACE_MOVE from where it opened: the next key finds it closed and is not taken); a step keeps it. */
+    {
+        float here[3]={0,0,16},step[3]={20,0,16},far_away[3]={200,0,16};int a,b;
+        assert(!AW_CStripPlaceChanged(&a,&a,here,step) && AW_CStripPlaceChanged(&a,&a,here,far_away));
+        assert(AW_CStripPlaceChanged(&a,&b,here,here) && !AW_CStripPlaceChanged(&a,&a,here,NULL));
+    }
+    tables();level();assert(AW_InventoryUse() && AW_CStripActive());
+    level();assert(sv.active && cls.state==ca_connected);aw_cstrip_draw();assert(!AW_CStripActive());
+    tables();level();assert(AW_InventoryUse() && AW_CStripActive());
+    entities[1].v.origin[0]+=20;aw_cstrip_draw();assert(AW_CStripActive());
+    entities[1].v.origin[0]+=200;assert(!aw_cstrip_key('d') && !AW_CStripActive());
     AW_LedgerClear(&aw_ledger);
     assert(focus_small_opens>=2 && com_fopen_buffer==0);   /* the held contents and owner were searched small */
     puts("aga_container_strip_open_test ok");

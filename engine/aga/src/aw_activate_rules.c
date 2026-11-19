@@ -33,3 +33,72 @@ float AW_ActivateNearest(float a,float b){
     if(b<0)return a;
     return a<b?a:b;
 }
+void AW_AimEye(const float at[3],float dx,float dy,float lift,float eye[3],float *yaw,float *pitch){
+    float flat;
+    if(lift<0)lift=0;
+    if(lift>AW_AIM_EYE-1)lift=AW_AIM_EYE-1;
+    flat=(float)sqrt(AW_AIM_EYE*AW_AIM_EYE-lift*lift);
+    eye[0]=at[0]+dx*flat;eye[1]=at[1]+dy*flat;eye[2]=at[2]+lift;
+    *yaw=(float)(atan2(-dy,-dx)*180/3.14159265358979);
+    *pitch=(float)(atan2(lift,flat)*180/3.14159265358979);
+}
+/* FOCUS-NPC-OVERRIDES-ITEM-62 (aw_activate.h): a person's use box from his body, not from the every-pose box */
+int AW_ActorPersonHull(const float mins[3],const float maxs[3]){
+    static const float lo[3]={-AW_PERSON_HALF_X,-AW_PERSON_HALF_Y,0},hi[3]={AW_PERSON_HALF_X,AW_PERSON_HALF_Y,AW_PERSON_TOP};
+    int j;
+    if(!mins || !maxs)return 0;
+    for(j=0;j<3;j++)if(fabs(mins[j]-lo[j])>0.01f || fabs(maxs[j]-hi[j])>0.01f)return 0;
+    return 1;
+}
+int AW_ActorUseBox(int frames,int dead,int person,float scale,const float mins[3],const float maxs[3],float out_mins[3],
+                   float out_maxs[3]){
+    float lo[3],hi[3],half;int j;
+    for(j=0;j<3;j++){lo[j]=mins[j];hi[j]=maxs[j];}   /* read first: OUT may be the stored box itself */
+    for(j=0;j<3;j++){out_mins[j]=lo[j];out_maxs[j]=hi[j];}
+    if(frames!=1 || !person)return AW_USEBOX_STORED;
+    if(!(scale>0.01f && scale<64.0f))scale=1;
+    if(dead){
+        if(lo[2]+AW_BODY_TOP*scale<hi[2])out_maxs[2]=lo[2]+AW_BODY_TOP*scale;
+        return AW_USEBOX_LYING;
+    }
+    /* a stored box beside the origin (a model drawn off its feet) is kept whole */
+    for(j=0;j<2;j++){
+        half=(j?AW_PERSON_HALF_Y:AW_PERSON_HALF_X)*scale;
+        if(lo[j]>half || hi[j]<-half)return AW_USEBOX_STORED;
+    }
+    for(j=0;j<2;j++){
+        half=(j?AW_PERSON_HALF_Y:AW_PERSON_HALF_X)*scale;
+        if(lo[j]<-half)out_mins[j]=-half;
+        if(hi[j]>half)out_maxs[j]=half;
+    }
+    return AW_USEBOX_BODY;
+}
+float AW_FocusDistance(const aw_focus_aim_t *aim,int kind){
+    if(!aim)return -1;
+    switch(kind){
+    case AW_FOCUS_ACTOR:return aim->actor_far<0?-1:aim->actor_near;
+    case AW_FOCUS_THING:return aim->thing;
+    case AW_FOCUS_DOOR:return aim->door;
+    case AW_FOCUS_HINGED:return aim->hinged;
+    }
+    return -1;
+}
+/* HUD-TEXTS-OVERLAP-67 (aw_activate.h): the kinds in the order a tie goes */
+int AW_FocusChoose(const aw_focus_aim_t *aim,int previous){
+    static const int order[4]={AW_FOCUS_ACTOR,AW_FOCUS_THING,AW_FOCUS_HINGED,AW_FOCUS_DOOR};
+    float d,best_d=-1,held;int i,best=AW_FOCUS_NONE,actor_out;
+    if(!aim)return AW_FOCUS_NONE;
+    /* an item or plant before the actor or inside his box takes him out of the choice (FOCUS-NPC-OVERRIDES-ITEM-62) */
+    actor_out=aim->actor_far<0 || AW_ActivateItemFirst(aim->thing,aim->actor_near,aim->actor_far);
+    for(i=0;i<4;i++){
+        if(order[i]==AW_FOCUS_ACTOR && actor_out)continue;
+        d=AW_FocusDistance(aim,order[i]);
+        if(d<0)continue;
+        if(best==AW_FOCUS_NONE || d<best_d){best=order[i];best_d=d;}
+    }
+    /* the frame before's kind stays while it is still met and the new one is not clearly nearer */
+    if(best!=AW_FOCUS_NONE && previous!=best && previous>AW_FOCUS_NONE && previous<AW_FOCUS_KINDS &&
+       !(previous==AW_FOCUS_ACTOR && actor_out) && (held=AW_FocusDistance(aim,previous))>=0 && held-best_d<AW_FOCUS_HOLD)
+        return previous;
+    return best;
+}

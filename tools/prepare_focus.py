@@ -854,6 +854,60 @@ def cells_of(raw):
         yield cell or '', interior, grid, region, refs
 
 
+def cells_presented(raw, places=None):
+    """cells_of(RAW) as the presented world has it (MOURNHOLD-EXTERIOR-CELLS-66): an interior cell that PLACES names
+    (tools/presented_exterior.py build_places: the districts this build converts whole, each an exterior cell block
+    of its own) is yielded as the exterior cells of its block, in the block's order, each with the references whose
+    moved position falls in it. The move is presented_exterior.moved_position, the one the presented master gets (x
+    and y plus the cell's offset, the height kept), so a table row and the world's own placement cannot drift; a
+    reference without a position stays with the block's first cell. A moved reference is a copy: RAW's own are not
+    changed. Without PLACES every cell is cells_of's own, in its order: the base game alone reads exactly what it
+    read before. The readers that key their rows by area take their cells from here (placements, the levelled
+    creature areas of tools/actor_stats.py, the placed item list of tools/prepare_item_models.py)."""
+    if not places:
+        yield from cells_of(raw)
+        return
+    from presented_exterior import moved_position
+    for cell, interior, grid, region, refs in cells_of(raw):
+        place = places.get(cell.casefold()) if interior and cell else None
+        if place is None:
+            yield cell, interior, grid, region, refs
+            continue
+        block, size = place['block'], place['size']
+        per = {(block[0] + dx, block[1] + dy): [] for dx in range(size[0]) for dy in range(size[1])}
+        for ref in refs:
+            spot = (block[0], block[1])
+            if len(ref.get('DATA', b'')) == 24:
+                v = list(struct.unpack('<6f', ref['DATA']))
+                spot, v[:3] = moved_position(place['offset'], v[0], v[1], v[2])
+                ref = dict(ref, DATA=struct.pack('<6f', *v))
+            if spot not in per:
+                raise ValueError('A placement of %s (reference %d) falls outside its presented block'
+                                 % (cell, ref['number']))
+            per[spot].append(ref)
+        for spot, moved in per.items():
+            yield cell, False, spot, region, moved
+
+
+def presented_counts(rooms, numbers, places):
+    """{district name: {'rows', 'kinds': {kind: rows}, 'cells': {"x,y": rows}, 'left_in_room': rows}} of placements()'
+    result ROOMS for the presented cells PLACES: what each district's block holds, and the rows still under its room
+    number (none, when the readers took the places)."""
+    out = {}
+    for key, place in sorted(places.items()):
+        kinds, cells = {}, {}
+        for dx in range(place['size'][0]):
+            for dy in range(place['size'][1]):
+                gx, gy = place['block'][0] + dx, place['block'][1] + dy
+                rows = rooms.get(exterior_key(gx, gy), ())
+                cells['%d,%d' % (gx, gy)] = len(rows)
+                for row in rows:
+                    kinds[row[0]] = kinds.get(row[0], 0) + 1
+        out[place['cell']] = {'rows': sum(cells.values()), 'kinds': dict(sorted(kinds.items())), 'cells': cells,
+                              'left_in_room': len(rooms.get(numbers.get(key), ())) if key in numbers else 0}
+    return out
+
+
 def place_names(raw):
     """Exterior grid -> the name the original shows for a door leading there: the cell's own name (a town, a
     ruin), else its region's name."""
@@ -870,13 +924,16 @@ def place_names(raw):
     return out
 
 
-def placements(raw, objects, numbers, extras=None):
+def placements(raw, objects, numbers, extras=None, presented=None):
     """Table key -> rows: interior cells of this master by their room number, exterior cells by exterior_key.
     EXTRAS (a dict, optional; AREA-TABLES-59): reference -> (trapped, key item id) of every placed container and door
-    that has a trap (TNAM) or a key (KNAM), for the per-area tables (tools/prepare_area_tables.py)."""
+    that has a trap (TNAM) or a key (KNAM), for the per-area tables (tools/prepare_area_tables.py).
+    PRESENTED (cells_presented's places, optional): the districts this build presents as exterior cells have their
+    rows under their block's exterior keys at the moved positions, where the game asks for them outdoors; a sign
+    board's and a container's box is made from the moved position."""
     rooms = {}
     places = place_names(raw)
-    for cell, interior, grid, region, refs in cells_of(raw):
+    for cell, interior, grid, region, refs in cells_presented(raw, presented):
         if interior:
             if not cell or cell.casefold() not in numbers:
                 continue
@@ -957,7 +1014,18 @@ def window_rows(counts):
     return best, at
 
 
-def build(data_files):
+def presented_places(receipt, cells):
+    """MOURNHOLD-EXTERIOR-CELLS-66: the districts this build presents as exterior cells and converts whole, from the
+    presented data stage's receipt RECEIPT (a path) and the build's module cells CELLS ("x,y:k ..."), as the image
+    step and the scripts read them (tools/presented_exterior.py build_places); {} without a receipt."""
+    if not receipt:
+        return {}
+    import presented_exterior
+    return presented_exterior.build_places(json.loads(Path(receipt).read_text(encoding='utf-8')),
+                                           presented_exterior.cells_of_text(cells or ''))[0]
+
+
+def build(data_files, presented=None):
     from cell_numbers import load_table, room_numbers
     data = resolve_data_files(Path(data_files))
     raw = master_path(data).read_bytes()
@@ -965,7 +1033,7 @@ def build(data_files):
     numbers = room_numbers(table)   # EXPANSION-BASE-ONLY-TABLES-66: every selected master's rooms
     extras = {}
     levelled = item_lists(raw)
-    rooms = placements(raw, objects_of(raw, levelled), numbers, extras)
+    rooms = placements(raw, objects_of(raw, levelled), numbers, extras, presented)
     index, body, held, owners, containers = [], [], {}, {}, {}
     for number in sorted(rooms):
         rows = sorted(rooms[number], key=lambda r: r[2])
@@ -1003,6 +1071,12 @@ def build(data_files):
     # AREA-TABLES-59: traps and keys of placed containers and doors (not in focus.awf; read by
     # tools/prepare_area_tables.py from the stage's focus-extras.json)
     report['extras'] = {str(k): [int(t), key] for k, (t, key) in sorted(extras.items())}
+    if presented:
+        # only with presented districts, so the base game's receipt is the one before
+        report['presented'] = presented_counts(rooms, numbers, presented)
+        left = {name: row['left_in_room'] for name, row in report['presented'].items() if row['left_in_room']}
+        if left:
+            raise SystemExit('[focus] rows of presented districts left under their room numbers: %s' % left)
     return payload, report
 
 
@@ -1010,8 +1084,17 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--data-files', required=True, type=Path)
     p.add_argument('--out', required=True, type=Path)
+    p.add_argument('--presented-receipt', type=Path,
+                   help='the presented data stage\'s receipt (tools/build.py gives it only with the module '
+                        'tribunal-mournhold; MOURNHOLD-EXTERIOR-CELLS-66): the placed things of a district the build '
+                        'converts are keyed outdoors, at their moved places')
+    p.add_argument('--presented-cells', default='', help='the module\'s cells, with --presented-receipt')
     a = p.parse_args()
-    payload, report = build(a.data_files)
+    presented = presented_places(a.presented_receipt, a.presented_cells)
+    payload, report = build(a.data_files, presented)
+    for name, row in (report.get('presented') or {}).items():
+        print('[focus] presented district %s: %d placed things outdoors %s in cells %s' % (
+            name, row['rows'], row['kinds'], row['cells']), flush=True)
     (a.out / 'id1').mkdir(parents=True, exist_ok=True)
     (a.out / 'id1/focus.awf').write_bytes(payload)
     extras = report.pop('extras')
@@ -1026,7 +1109,7 @@ def main():
     numbers = room_numbers(load_table(data)[0])
     # EXPANSION-BASE-ONLY-TABLES-66: the merged master (the base file's own bytes when it is alone)
     vocabulary = actor_stats.write_vocabulary(recs, gmst, actor_stats.levelled_by_area(
-        master_path(data).read_bytes(), numbers))
+        master_path(data).read_bytes(), numbers, presented))
     (a.out / actor_stats.FILE_NAME).write_bytes(vocabulary)
     print('[focus] actor stats: %d NPC and %d creature records, %d bytes' % (len(recs['NPC_']), len(recs['CREA']),
                                                                              len(vocabulary)), flush=True)

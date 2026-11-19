@@ -1,6 +1,15 @@
 # Prison-ship interior preview
 
-_Last updated with AmiWind v0.0.66-dev1 (13 November 2026)._
+_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [Entering and leaving](#entering-and-leaving)
+- [The weight of the hold](#the-weight-of-the-hold)
+- [Drawn where it collides](#drawn-where-it-collides)
+
+<!-- contents end -->
 
 The current checkpoint starts in a locally converted Imperial Prison Ship cell. This is
 a walkable lighting/loading experiment, not the opening quest or character
@@ -123,3 +132,53 @@ has exact standing bevels (the map has 3,145 clipnodes for 26,787 drawn faces) a
 (the largest kit piece spans less than half of the room on two axes), so neither method applies there. The two debug
 scenes have no placed models, and every CHIM room already takes the rooms' rule (no room type defaults to exact
 bevels). The hold was the only case.
+
+## Drawn where it collides
+
+The hold's shell is drawn at 8 % of its faces: its structural shapes (hull, floors, ceiling, walls, steps, plank) whole
+and every other shape reduced, each connected part to about 8 % of its faces and at least 4. Its collision is the
+authored one, unreduced. Where a reduced shape carries collision, the player can meet collision with nothing drawn at
+its place. The drawn-collision check (`tools/drawn_collision.py`) measures it: for every collision piece, the share
+of its surface within 2 map units of a drawn face, in the source mesh and in the converted room; a piece the source
+draws that keeps under half of that share is lost, and a lost piece taller than the engine's step (8.5 units) stands
+in the player's way.
+
+Measured on the v0.0.67-dev2 hold: of the shell's 1,205 collision pieces the source draws 1,000; 62 had lost their
+drawn faces, 40 of them standing:
+
+- the two masts, one on each deck (`Tri mast` and `Tri LLmast`, five-sided columns of 30 faces reduced to 4): on the
+  upper deck the player walked into a post with only the tile at its foot drawn (PRISON-SHIP-FLOOR-STUCK-67);
+- the raised deck at both ends of the hold (`Tri In_DE_ship_upperlevel 0`, 216 faces reduced to 85): its walls and
+  floor plates;
+- a post on the lower deck (`Tri Post11 0`), a pole by the stairs (`Tri pose06 0`) and four side boards of the stairs
+  (`Tri slat 0`, `slat01 0`, `slat04 0`, `slat07 0`).
+
+The same reduction gave each of the four tables' iron bands (`Tri Furn_Com_Table_02 1` to `05 1`, two bands of 40
+faces on each table, a thin sleeve around the table top) 4 faces: a slanted two-sided shape rising 1.6 units over the
+band, the dark triangle across the table top (PRISON-SHIP-TABLE-DARK-TRIANGLE-67).
+
+The method, `--room-shapes on` (the default; off = the method before): the listed shapes (`tools/room_map_shapes.py`)
+are drawn as the original draws them. The masts and the other shapes with collision are kept whole through the
+reduction, by their exact names (a prefix cannot name them: `Tri mast` is also the start of `Tri mast01` and
+`Tri mast02`, the iron collars at the mast's foot and top, which stay reduced). The bands are kept whole and then drawn
+as the boxes of their parts, six faces each, spanning the band exactly. The keep is done in the room map's own
+preparation, without a change to the shared reducer, so only the interior stage is built again.
+
+| Measure (the v0.0.67-dev2 hold) | Before | After |
+| --- | ---: | ---: |
+| The shell's drawn faces | 7,997 | 8,308 (+311, +3.9 %) |
+| The room's drawn faces, every placement | 24,584 | 24,895 (+1.3 %) |
+| The masts (each) | 4 | 18 |
+| The raised deck | 85 | 216 |
+| The post, the pole (each) | 4 | 48 |
+| The stairs' side boards (each) | 4 | 16 |
+| A table's two bands | 8 | 12 |
+| Collision pieces lost / standing | 62 / 40 | 1 / 0 |
+| Collision | 1,205 pieces | the same pieces, byte-identical |
+
+The one piece left is the end of a lower-deck support beam (`Tri LLsupportbeam09 0`), 7 units tall, under a step; its
+shape whole would cost 335 faces. The interior stage runs the check after the models are prepared (about 5 seconds): a
+standing lost piece stops the stage with its place and the shapes drawn there (with `--room-shapes off` it is printed
+instead); the low ones are written to the stage's report (`drawn_collision`). Not changed: the hold's other posts without collision stay reduced to 4 faces each. Not
+measured yet: the frame time in the hold on the Raspberry Pi 4B, and the faces tested per view (the added faces sit in
+a few of the shell's draw tiles, at most 311 more in any view against the worst view's 21,356).

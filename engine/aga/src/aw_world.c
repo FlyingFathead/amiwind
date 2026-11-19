@@ -112,22 +112,35 @@ static int read_row(FILE *f,const char *prefix,int i,terrain_region_t *r){
 }
 /* Rows 0..count_vf-1 are Vvardenfell's region maps (world/regions.awr, vfNNNN), the rows after them Solstheim's
  * frame maps (world/regions-sl.awr, slNNNN, terrain IDs from AW_SOLSTHEIM_TERRAIN_BASE): one table, so a Solstheim
- * cell is found by its coordinates exactly as a Vvardenfell one (WORLD-REGION-NAMES-VF-ONLY-64). */
-static int count_vf;
-static int row_terrain(int i){return i<count_vf?i:AW_SOLSTHEIM_TERRAIN_BASE+i-count_vf;}
+ * cell is found by its coordinates exactly as a Vvardenfell one (WORLD-REGION-NAMES-VF-ONLY-64). After those,
+ * Mournhold's district frame maps (world/regions-mh.awr, mhNNNN, terrain IDs from AW_MOURNHOLD_TERRAIN_BASE): the
+ * Tribunal layer's own small map, the same row form as Solstheim's file. */
+static int count_vf,count_sl;
+static int row_terrain(int i){
+    if(i<count_vf)return i;
+    return i<count_vf+count_sl?AW_SOLSTHEIM_TERRAIN_BASE+i-count_vf:AW_MOURNHOLD_TERRAIN_BASE+i-count_vf-count_sl;
+}
 static int terrain_row(int t){
     if(t<0)return -1;
     if(t<AW_SOLSTHEIM_TERRAIN_BASE)return t<count_vf?t:-1;
-    t=count_vf+t-AW_SOLSTHEIM_TERRAIN_BASE;return t<count?t:-1;
+    if(t<AW_MOURNHOLD_TERRAIN_BASE){t-=AW_SOLSTHEIM_TERRAIN_BASE;return t<count_sl?count_vf+t:-1;}
+    t=count_vf+count_sl+t-AW_MOURNHOLD_TERRAIN_BASE;return t<count?t:-1;
 }
 static void row_name(int i,char *out){AW_TerrainName(row_terrain(i),out);}
+/* A layer's rows file ("AWS1", u32 rows, 52 bytes a row): its row count (1..LIMIT), 0 when it is not valid. */
+static int layer_rows(FILE *g,int gsize,int limit){
+    byte header[8];int m;
+    if(gsize<8 || fread(header,1,8,g)!=8 || memcmp(header,"AWS1",4))return 0;
+    m=(int)word(header+4);return m>=1 && m<=limit && gsize==8+m*52?m:0;
+}
 static int load_directory(void){
-    FILE *f=NULL,*g=NULL;byte header[8],row[52];int size,gsize,n=0,m=0,i,k,t;terrain_region_t slots[2];
+    FILE *f=NULL,*g=NULL,*h=NULL;byte header[8],row[52];int size,gsize,hsize,n=0,m=0,d=0,i,k,t;terrain_region_t slots[2];
     if(attempted)return count>0;
     memset(slots,0,sizeof(slots));   /* a town row has no cover: zero, never the stack's (TOWN-OUTDOOR-SCRIPTS-NOT-ATTACHED-66) */
     attempted=1;size=COM_FOpenFile("world/regions.awr",&f);
     gsize=COM_FOpenFile("world/regions-sl.awr",&g);
-    if(!f && !g)return 0;
+    hsize=COM_FOpenFile("world/regions-mh.awr",&h);
+    if(!f && !g && !h)return 0;
     if(f){
         if(size<64 || fread(header,1,8,f)!=8 || memcmp(header,"AWR2",4))goto bad;
         n=(int)word(header+4);if(n<1 || n>AW_SOLSTHEIM_TERRAIN_BASE || size!=64+n*52)goto bad;
@@ -138,13 +151,12 @@ static int load_directory(void){
             if(!valid_town(&slots[i]))goto bad;
         }
     }
-    if(g){
-        if(gsize<8 || fread(header,1,8,g)!=8 || memcmp(header,"AWS1",4))goto bad;
-        m=(int)word(header+4);if(m<1 || m>AW_SOLSTHEIM_TERRAIN_BASE || gsize!=8+m*52)goto bad;
-    }
-    regions=(terrain_region_t *)AW_TryMalloc((n+m)*sizeof(*regions));if(!regions)goto bad;
+    if(g && !(m=layer_rows(g,gsize,AW_MOURNHOLD_TERRAIN_BASE-AW_SOLSTHEIM_TERRAIN_BASE)))goto bad;
+    if(h && !(d=layer_rows(h,hsize,AW_TERRAIN_END-AW_MOURNHOLD_TERRAIN_BASE)))goto bad;
+    regions=(terrain_region_t *)AW_TryMalloc((n+m+d)*sizeof(*regions));if(!regions)goto bad;
     for(i=0;i<n;i++)if(!read_row(f,"vf",i,&regions[i]))goto bad;
     for(i=0;i<m;i++)if(!read_row(g,"sl",i,&regions[n+i]))goto bad;
+    for(i=0;i<d;i++)if(!read_row(h,"mh",i,&regions[n+m+i]))goto bad;
     if(f){
         for(t=0;t<AW_TOWN_COUNT;t++){
             i=AW_Town(t)->world_slot;if(i<0 || i>1)continue;
@@ -153,14 +165,17 @@ static int load_directory(void){
         fclose(f);
     }
     if(g)fclose(g);
-    count_vf=n;count=n+m;table_towns();
+    if(h)fclose(h);
+    count_vf=n;count_sl=m;count=n+m+d;table_towns();
     if(n)Con_Printf("Vvardenfell: %ld terrain regions; ",(long)n);
     if(m)Con_Printf("Solstheim: %ld frame maps; ",(long)m);
-    Con_Printf("%ld directory bytes.\n",(long)((n+m)*sizeof(*regions)));return 1;
+    if(d)Con_Printf("Mournhold: %ld frame maps; ",(long)d);
+    Con_Printf("%ld directory bytes.\n",(long)((n+m+d)*sizeof(*regions)));return 1;
 bad:
     if(f)fclose(f);
     if(g)fclose(g);
-    free(regions);regions=NULL;count=count_vf=0;memset(town_ready,0,sizeof(town_ready));
+    if(h)fclose(h);
+    free(regions);regions=NULL;count=count_vf=count_sl=0;memset(town_ready,0,sizeof(town_ready));
     Con_Printf("Invalid or unavailable Vvardenfell region directory.\n");return 0;
 }
 /* Town with a world handoff (directory slot or table frame), or -1. */

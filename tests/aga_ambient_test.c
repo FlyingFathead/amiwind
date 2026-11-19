@@ -214,6 +214,69 @@ int main(int argc,char **argv) {
         d[0]=100;d[1]=250;assert(!AW_AmbientDoorAhead(at,f,d,48.0f));
         checks+=12;
     }
+    {   /* WANDER-DOOR-AFTER-LOAD-67: Fargoth (`fargoth`, reference 128964) as the v0.0.67-dev2 build compiled him
+         * (npc-ambient.lut row 924: distance 512, five grid destinations and his start; offsets from his placement in
+         * the Seyda Neen frame, 188.30493 115.45898 42.14743), his package started after a save's row put him at 228.3
+         * 62.5 38.0, 54 units from the census office's street door (113833 at 247 11; where the old rule's walk left him
+         * in the v0.0.67-dev2 journey). The routes stay where the game data has them (OpenMW keeps the package's start in
+         * the save), his current destination is the one nearest him (P1, the grid point by the door), and a walk on from
+         * the door goes to a destination away from it. With the old rule the routes started where the row put him:
+         * every destination 40 units east and 53 south, one of them (P1's, at 285 9) 38 units from the door, and the
+         * start's nearest (P3) taken as where he stood. */
+        static const short off[6][3]={{-57,-28,-6},{57,-53,-11},{96,56,-9},{-9,38,2},{104,-35,-11},{0,0,0}};
+        static const unsigned char kind[6]={AW_AMBIENT_GRID,AW_AMBIENT_GRID,AW_AMBIENT_GRID,AW_AMBIENT_GRID,
+                                            AW_AMBIENT_GRID,AW_AMBIENT_HOME};
+        static const float placed[3]={188.30493f,115.45898f,42.14743f},saved[3]={228.3f,62.5f,38.0f},door[2]={247,11};
+        unsigned char blob[6*AW_AMBIENT_POINT+6*6];aw_ambient_pkg_t pk;float home[3],f[2],at[2],tx,ty;
+        int i,j,k,xyz[3],goal,start_cur,seen[6];
+        memset(blob,0,sizeof(blob));
+        for(i=0;i<6;i++){
+            for(j=0;j<3;j++){blob[AW_AMBIENT_POINT*i+2*j]=(unsigned char)((unsigned short)off[i][j]>>8);
+                             blob[AW_AMBIENT_POINT*i+2*j+1]=(unsigned char)((unsigned short)off[i][j]&255);}
+            blob[AW_AMBIENT_POINT*i+6]=kind[i];
+            for(j=0;j<6;j++)blob[6*AW_AMBIENT_POINT+6*i+j]=(unsigned char)j;   /* every destination one hop away */
+        }
+        memset(&pk,0,sizeof(pk));pk.blob=blob;pk.points=6;pk.destinations=6;pk.record_distance=512;
+        AW_AmbientPoint(&pk,1,xyz,NULL);assert(xyz[0]==57 && xyz[1]==-53 && xyz[2]==-11);
+        AW_AmbientAllow(&pk,512);
+        assert(pk.count==5 && !pk.manual && pk.cur==3);              /* five grid points; P3 nearest the start */
+        start_cur=pk.cur;
+        AW_AmbientCurrent(&pk,0,0,0);assert(pk.cur==start_cur);      /* at the start: AW_AmbientAllow's own choice */
+        /* the routes' origin: his placement, not where the save put him; without a placement told, or for a script's
+         * package without routes, where he stands (as before) */
+        AW_AmbientHomeOf(saved,placed,1,home);
+        assert(home[0]==placed[0] && home[1]==placed[1] && home[2]==placed[2]);
+        {float h2[3];AW_AmbientHomeOf(saved,NULL,1,h2);assert(h2[0]==saved[0] && h2[1]==saved[1] && h2[2]==saved[2]);
+         AW_AmbientHomeOf(saved,placed,0,h2);assert(h2[0]==saved[0] && h2[1]==saved[1]);}
+        /* where he stands, P1 (17 units east, under the door's arrival side) is his current destination */
+        AW_AmbientCurrent(&pk,(int)(saved[0]-home[0]),(int)(saved[1]-home[1]),(int)(saved[2]-home[2]));
+        assert(pk.cur==1);
+        AW_AmbientPoint(&pk,1,xyz,NULL);tx=home[0]+xyz[0];ty=home[1]+xyz[1];
+        assert(fabs(tx-245.30493f)<0.01f && fabs(ty-62.45898f)<0.01f);   /* the game data's grid point */
+        /* only P1 of his destinations lies by the door (within 1.6 x the activation distance, 76.8) */
+        for(i=0;i<5;i++){
+            float dx,dy;AW_AmbientPoint(&pk,i,xyz,NULL);dx=home[0]+xyz[0]-door[0];dy=home[1]+xyz[1]-door[1];
+            assert((i==1)==(dx*dx+dy*dy<=76.8f*76.8f));
+        }
+        /* idle where he was saved, facing the door (54 units, within 76.8): the idle check sends him on, to a
+         * destination other than P1, every one of them away from the door */
+        at[0]=saved[0];at[1]=saved[1];
+        {double a=atan2(door[1]-at[1],door[0]-at[0])*180.0/3.14159265358979323846-90.0;facing(a,f);}
+        assert(AW_AmbientIdleCheck(&pk) && AW_AmbientDoorAhead(at,f,door,76.8f));
+        memset(seen,0,sizeof(seen));
+        for(k=0;k<300;k++){
+            float dx,dy;goal=AW_AmbientPickDestination(&pk,(unsigned)k*7919u);
+            assert(goal>=0 && goal!=1 && goal<5);seen[goal]++;
+            AW_AmbientPoint(&pk,goal,xyz,NULL);dx=home[0]+xyz[0]-door[0];dy=home[1]+xyz[1]-door[1];
+            assert(dx*dx+dy*dy>76.8f*76.8f);
+        }
+        assert(seen[0] && seen[2] && seen[3] && seen[4]);
+        /* far from his routes: the nearest still found (5000 units: P4); past 16383 units on an axis the differences are
+         * clamped there, so a 32-bit long never overflows (the undefined-behaviour check of this build would stop it) */
+        AW_AmbientCurrent(&pk,5000,-5000,0);assert(pk.cur==4);
+        AW_AmbientCurrent(&pk,30000,-30000,0);assert(pk.cur<5);
+        checks+=14;
+    }
     printf("aga_ambient_test: %d checks passed\n",checks);
     free(data);
     return 0;

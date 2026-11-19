@@ -197,7 +197,9 @@ from mwad.dialogue import Context as _Context, RUNTIME as _RUNTIME  # noqa: E402
 
 class TopicContext(_Context):
     """mwad.dialogue.Context for a conversation topic or greeting: Choice is decided while the game runs (no choice
-    is open when a greeting is picked)."""
+    is open when a greeting is picked); an INFO that asks for a faction rank without naming a faction is never said
+    by a speaker without a faction (greeting_lut.rank_without_faction, OpenMW filter.cpp testActor;
+    DIALOGUE-RANK-WITHOUT-FACTION-67)."""
 
     def __init__(self, kinds, ident, cell):
         _Context.__init__(self, kinds, ident, cell=cell)
@@ -206,6 +208,11 @@ class TopicContext(_Context):
         if function == 'Choice':
             return _RUNTIME
         return _Context.static(self, function, variable, op, value)
+
+    def compile(self, fields):
+        if G.rank_without_faction(self.npc, fields):
+            return None
+        return _Context.compile(self, fields)
 
 
 def info_index(topics, names):
@@ -1175,7 +1182,7 @@ def build(kinds, topics, dials, homes=None, masks=None, left=None):
     """(AWDL1 bytes, report) from loaded records (kinds with the dialogue records, topics, dial_names())."""
     homes = homes or {}
     names = table_topics(dials)
-    order, _facts, early = G.plan_npcs(kinds, homes)
+    order, facts, early = G.plan_npcs(kinds, homes)
     left = dict(early, **(left or {}))
     bits = {i: n for n, i in enumerate(order)}
     if masks is None:
@@ -1194,6 +1201,7 @@ def build(kinds, topics, dials, homes=None, masks=None, left=None):
     report.update(conversation_buffer(table, keep))
     report['coverage'] = coverage(table)
     report['ui_texts_missing'] = ui_texts_of(kinds)[1]     # the window's words the master lacks: the fallback shown
+    report['defines'] = define_check(table, keep, facts, kinds.get('GLOB', {}))
     return raw, report
 
 
@@ -1210,7 +1218,10 @@ LIVE_FUNCTIONS = ('Health_Percent', 'PcHealthPercent', 'PcHealth', 'TalkedToPc',
                   'PcConjuration', 'PcMysticism', 'PcRestoration', 'PcAlchemy', 'PcUnarmored', 'PcSecurity', 'PcSneak',
                   'PcAcrobatics', 'PcLightArmor', 'PcShortBlade', 'PcMarksman', 'PcMercantile', 'PcSpeechcraft',
                   'PcHandToHand', 'SameSex', 'SameRace', 'ShouldAttack',
-                  'Alarmed')   # v0.0.62 (CRIME-59): the speaker's mark from the crime rules (an alarmed guard)
+                  'Alarmed',   # v0.0.62 (CRIME-59): the speaker's mark from the crime rules (an alarmed guard)
+                  # v0.0.67-dev3 (DIALOGUE-CONDITIONS-PARTIAL-67): the player's diseases, the value worn, Corprus and
+                  # vampirism (aw_mwhost.c player_disease, player_worn_value, player_has_effect), the speaker attacked
+                  'PcCommonDisease', 'PcBlightDisease', 'PcClothingModifier', 'PcCorprus', 'PcVampire', 'Attacked')
 
 
 def coverage(table):
@@ -1263,6 +1274,96 @@ def conversation_buffer(table, order):
         return {'conversation_buffer_max': 0, 'conversation_buffer_median': 0, 'conversation_buffer_npc': ''}
     return {'conversation_buffer_max': sizes[-1][0], 'conversation_buffer_npc': sizes[-1][1],
             'conversation_buffer_median': sizes[len(sizes) // 2][0]}
+
+
+# DIALOGUE-TEXT-VARIABLES-67: the defines the engine fills from the speaker's NPC row (greeting_lut.npc_facts, aw_glut.c
+# AW_GlutSpeakerValues); the player's (%PCName ...) and the conversation's (%PCRank, %Cell) come from the game
+ROW_DEFINES = ('class', 'race', 'faction', 'rank')
+PC_RANK_DEFINES = ('pcrank', 'nextpcrank', 'pcnextrank')
+_UNKNOWN_DEFINE = re.compile(r'[%^][A-Za-z_][A-Za-z0-9_]*')
+
+
+def define_check(table, order, facts, global_names):
+    """Every text define of the answers each NPC row can give, against what the engine fills for that speaker
+    (aw_textdef.c AW_TextDefineValue with the row's values): {'empty': [[npc, topic, define]] (the first 20),
+    'empty_count', 'data_empty', 'data_empty_count', 'unknown': [[topic, word]] (the first 20), 'unknown_count',
+    'pc_rank_without_faction', 'uses': {define: answers}}.
+    EMPTY (refuses the image step, define_refusal): %Faction or %Rank in an answer for anyone (no actor named) that a
+    speaker without a faction can be given: the original says such answers only to faction members (OpenMW
+    filter.cpp testActor), so the filter let one through (DIALOGUE-RANK-WITHOUT-FACTION-67).
+    DATA_EMPTY (reported, drawn empty as OpenMW draws it): a speaker define the game's own records leave empty: a
+    faction without a name for the speaker's rank (Morrowind.esm: the Sixth House and the Talos Cult have none), a
+    class or race without a name (the Buoyant Armiger class), an answer naming one actor without a faction.
+    UNKNOWN (refuses): '%' or '^' and a name that is neither a define nor one of GLOBAL_NAMES (OpenMW leaves it as
+    written; a word after a percent sign, "100% sure", is plain text). pc_rank_without_faction counts the answers with
+    %PCRank or %NextPCRank a speaker without a faction can give: '%' there, as in OpenMW (getPCRank)."""
+    globals_by_length = sorted((g.casefold() for g in global_names), key=len, reverse=True)
+    topic_name = [name for name, _kind in table['topics']]
+    parsed, unknown, uses = {}, [], {}
+
+    def parse(e, topic):
+        if e in parsed:
+            return parsed[e]
+        offset = table['entries'][e][0]
+        line = table['text'](offset) if offset != NONE32 else ''
+        used, at = set(), 0
+        while at < len(line):
+            c = line[at]
+            if c == text_defines.CODE and at + 1 < len(line):
+                used.add(text_defines.NAMES[ord(line[at + 1]) - 1])
+                at += 2
+                continue
+            if c in '%^':
+                k, n = text_defines.match(line, at + 1)      # a define left as written (a link span cuts it)
+                if k >= 0:
+                    used.add(text_defines.NAMES[k])
+                    at += 1 + n
+                    continue
+                low = line[at + 1:at + 64].casefold()
+                g = next((g for g in globals_by_length if low.startswith(g)), None)
+                if g:
+                    used.add('global')
+                    at += 1 + len(g)
+                    continue
+                word = _UNKNOWN_DEFINE.match(line, at)
+                if word:
+                    unknown.append([topic_name[topic], word.group(0)])
+            at += 1
+        for d in used:
+            uses[d] = uses.get(d, 0) + 1
+        parsed[e] = used
+        return used
+    empty, data, counts, pc_rank = [], [], {'empty': 0, 'data': 0}, 0
+    for n, row in enumerate(table['rows']):
+        ident = order[n] if n < len(order) else ''
+        values = facts.get(ident, (0, 0, -1, {}))[3]
+        for topic in sorted(row):
+            for e in candidates(table, n, topic):
+                used = parse(e, topic)
+                for d in ROW_DEFINES:
+                    if d in used and not values.get(d):
+                        ours = d in ('faction', 'rank') and not values.get('faction') and \
+                            not table['entries'][e][6] & ENTRY_ACTOR
+                        found = empty if ours else data
+                        counts['empty' if ours else 'data'] += 1
+                        if len(found) < 20:
+                            found.append([ident, topic_name[topic], '%' + d])
+                if not values.get('faction') and used.intersection(PC_RANK_DEFINES):
+                    pc_rank += 1
+    return {'empty': empty, 'empty_count': counts['empty'], 'data_empty': data, 'data_empty_count': counts['data'],
+            'unknown': unknown[:20], 'unknown_count': len(unknown), 'pc_rank_without_faction': pc_rank,
+            'uses': dict(sorted(uses.items()))}
+
+
+def define_refusal(report):
+    """The image step's refusal of a table with an empty or unknown text define ('' none; define_check)."""
+    d = report.get('defines') or {}
+    if d.get('empty_count') or d.get('unknown_count'):
+        return ('Dialogue table: %d answers for faction members would be given to a speaker without a faction, their '
+                'rank or faction word empty (%s), and %d hold an unknown define (%s): DIALOGUE-TEXT-VARIABLES-67' % (
+                    d.get('empty_count', 0), '; '.join('%s %s %s' % tuple(x) for x in d.get('empty', [])[:5]),
+                    d.get('unknown_count', 0), '; '.join('%s %s' % tuple(x) for x in d.get('unknown', [])[:5])))
+    return ''
 
 
 def _chunk_local(kinds, topics, names, homes, bits, ids):
@@ -1368,6 +1469,9 @@ def image_step(data, id1, out=None, jobs=1):
                          '%d / %d / %d' % (report['resident_bytes'], report['conversation_bytes'],
                                            report['conversation_buffer_max'], RESIDENT_BUDGET, CONVERSATION_BUDGET,
                                            BUFFER_BUDGET))
+    why = define_refusal(report)
+    if why:
+        raise ValueError(why)
     voices = Path(id1) / G.NAME
     if voices.is_file():
         # the NPC rows are the voice table's: the engine finds the row by the voice table's lookup

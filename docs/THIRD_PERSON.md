@@ -1,6 +1,6 @@
 # Third person, vanity camera and the death scene
 
-_Last updated with AmiWind v0.0.66-dev2 (14 November 2026)._
+_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -15,6 +15,7 @@ _Last updated with AmiWind v0.0.66-dev2 (14 November 2026)._
   - [The inventory picture](#the-inventory-picture)
 - [First-person arms](#first-person-arms)
   - [The first-person view](#the-first-person-view)
+  - [What the hands hold in first person](#what-the-hands-hold-in-first-person)
 - [Console](#console)
 - [Build switches](#build-switches)
 
@@ -31,7 +32,7 @@ most recent save. AmiWind adds one choice to that question: **Retry fight** afte
 | --- | --- |
 | Tab (Toggle POV) | A short press switches between first and third person. Held longer than a quarter of a second, the mouse turns the camera around the character instead of turning the character; on release the character turns to face the camera's heading. In third person the orbit starts at once. A tap shorter than one frame (a quick press, or a slow frame on the Amiga) counts as a short press. |
 | Mouse wheel | Third person: closer / further (2.5 units a click, between 7.5 and 200). Wheel in at the closest distance goes to first person; wheel out in first person goes to third person at the closest distance. |
-| (no input for a while) | The vanity camera: after `fVanityDelay` seconds (the game's own setting, 30 in Morrowind) the camera turns slowly around the character, 3 degrees a second, until any key, mouse movement or movement. While it orbits, the view fills the whole screen with nothing over it: no stat bars, compass, names, prompts or subtitles, as the original hides its interface in the vanity camera. Any input ends the orbit and brings the interface and the normal view size back. `aw_vanity_fullview 0` (saved) keeps the orbit inside the normal interface. |
+| (no input for a while) | The vanity camera: after `fVanityDelay` seconds (the game's own setting, 30 in Morrowind) the camera turns slowly around the character, 3 degrees a second, until any key, mouse movement or movement. While it orbits, the view fills the whole screen with nothing over it: no stat bars, compass, names, prompts or subtitles, as the original hides its interface in the vanity camera. Any input ends the orbit and brings the interface and the normal view size back. `aw_vanity_fullview 0` (saved) keeps the orbit inside the normal interface. A turn the game makes while the orbit runs (a script turning the character, an arrival's facing, the check commands `aw_view` and `aw_aim`) is the character's new heading: the orbit ends there and the view keeps it, as OpenMW's camera takes the character's own rotation when it leaves an orbit (it went back to where the orbit began, VIEW-VANITY-UNDOES-SET-VIEW-67). |
 
 Tab, the wheel and the bindings are written into new and older key configurations (`aw_controls_migrate`
 fills them only when the key is free).
@@ -260,6 +261,52 @@ the original does (the rule OpenMW follows in `npcanimation.cpp`). A robe shows 
 `.1st` chest record) and covers the arms under them; a robe without one leaves the arms as they are. Changing gloves
 or gauntlets in the inventory changes the hands at once. The drawn weapon is held in the same stances as before.
 
+The whole player body, first and third person, per race and sex: [PLAYER_BODY.md](PLAYER_BODY.md).
+
+**Every race and sex has its own first-person hands (v0.0.67).** Decided for the project on 18 November 2026, a
+deliberate departure from the original's data, which OpenMW follows (it draws the mesh a record names as it is): four
+of the game's first-person hand records (Morrowind.esm; Tribunal and Bloodmoon do not change them) name another race's
+or sex's mesh, whose textures are that one's skin:
+
+| Race and sex | Record | Mesh it names | Drawn instead (the game's own, used by no record) |
+| --- | --- | --- | --- |
+| Nord man | `b_n_nord_m_hands.1st` | `b\B_N_Imperial_M_Hands.1st.nif` (`TX_B_N_Imperial_M_Hfinger`, `_Hthumb`, `_Hpalm`) | `b\b_n_nord_m_hands.1st.nif` (`TX_B_N_Nord_M_Hfinger`, `_Hthumb`, `_Hpalm`) |
+| Imperial woman | `b_n_imperial_f_hands.1st` | `b\B_N_Nord_F_Hands.1st.nif` (`TX_B_N_Nord_F_H...`) | `b\b_n_imperial_f_hands.1st.nif` (`TX_B_N_Imperial_F_H...`) |
+| Dark Elf man | `b_n_dark elf_m_hand.1st` | `b\B_N_Dark Elf_F_Hands.1st.NIF` (`TX_B_N_Dark Elf_F_H...`) | `b\b_n_dark elf_m_hands.1st.nif` (`TX_B_N_Dark Elf_M_H...`) |
+| Redguard man | `b_n_redguard_m_hands.1st` | `b\B_N_Redguard_F_Hands.1st.nif` (`TX_B_N_Redguard_F_H...`) | `b\b_n_redguard_m_hands.1st.nif` (`TX_B_N_Redguard_M_H...`) |
+
+The own meshes have the same 580 triangles as the ones named. The rule is general (`tools/player_own_skin.py`
+`own_hand_mesh`: a hand record whose mesh's file name says another race or sex takes the race's and sex's own
+first-person hand mesh when the game has it) and on the game's data it changes exactly those four; every first-person
+path takes it (the arms from parts, the baked hands, the carried torch's arms and the shield guard's arms). Every other
+part is the race's own record by the original's order (the sex's first-person part, then its third-person one, then for
+a woman the man's: the Argonian woman's forearm is the man's, the game has no other).
+
+**No steep colour step at the seams of the arm.** In first person the hand meets the wrist part (slots 8 and 9) and
+the wrist meets the forearm, and a part's colour where it meets the next is not its whole colour. Measured as drawn
+(the skin texels of each part's triangles at its vertices within 0.75 units of the other part, on the game palette),
+the step where the hand meets the wrist was up to 54.9 per channel on the v0.0.67-dev2 image (the Nord man), and the
+game's own wrist and forearm parts step by up to 36.6 (the Khajiit man). The image step now tints, along each arm of
+every race and sex, the wrist to the forearm at their seam and then the hand to the wrist as it now draws (a factor per
+channel, measured, at most four bakes, the best kept), aiming within 8 (one step of the palette's skin colours), and
+stops the image when a seam is left more than 16 off or a hand is another race's or sex's (`player-fp-parts.json`
+"seam_gaps", "own_hand_meshes"). Every race's and sex's records, meshes, textures and measured seams:
+[FP-HANDS-PER-RACE-67](bugs/FP-HANDS-PER-RACE-67.md). Tests: `tests/test_fp_hands_per_race.py`,
+`tests/test_fp_bare_hand_skin.py`.
+
+Switches (in the source, the shipped default first): `tools/player_own_skin.py` `OWN_HAND_MESHES` (True; False = the
+records' meshes as the game names them); `tools/prepare_player_fp_parts.py` `SEAM_MATCH` ('seams'; 'forearm' = the
+first v0.0.67 method, each hand tinted to its forearm's whole colour; 'off' = no tint, the seams only reported) and
+`OWN_SKIN` (True: a hand of another race's or sex's textures takes the race's own). The original's look: `SEAM_MATCH`
+'off', `OWN_SKIN` False and `OWN_HAND_MESHES` False.
+
+**Part models are released when they leave.** On a race, sex or outfit change the part models the new body and arms
+no longer draw are released at once (their slots in the engine's model table freed), and `dbg race` releases both sets
+at the swap. Before, they were only unpinned and kept their slots; after a few race or outfit changes in one place the
+first-person arm parts found no slot and the arms fell back to an old hand model without the held light
+(FP-ARMS-NO-MODEL-SLOT-67). `dbg camera` prints the model table by number ("Model table: N slots in use of M known, P of
+them player parts").
+
 ### The first-person view
 
 Since v0.0.61 the arms, the drawn weapon, the torch, a held light and their flames are drawn as the original draws
@@ -280,6 +327,20 @@ show, and a worn shirt's or robe's sleeves cover them. A lantern hangs below the
 handle shows. Not yet seen in game: the glass lantern in first person, a still in the middle of a swing, and the frame
 times of this view on the Raspberry Pi 4B. Register: FP-FOREARMS-BELOW-VIEW-61 ([BUGS.md](BUGS.md)).
 Tests: `tests/aga_viewmodel_bob_test.c`.
+
+### What the hands hold in first person
+
+Since v0.0.67 every held item in first person has one placement, the original's: the item on its own hand's bone of
+the first-person arms it is drawn with (the drawn weapon on the right hand's Weapon Bone, a carried light on the left
+hand's Shield Bone, OpenMW 0.51 `npcanimation.cpp`), at the frame drawn, then the item's own carried place on the bone
+(a light's turn and offset, the same numbers third person uses), and nothing else. The left arm holding a light plays
+the original's first-person `torch` group (the raised arm and the fingers round the handle). From v0.0.61 to
+v0.0.67-dev2 a carried light was also moved 4 units forward along the view, which the arms it rides were not: its grip
+sat 4 units from the hand (on the v0.0.67-dev2 image the torch's nearest point 4.2 units from the hand, the glass
+lantern's 3.2, a candle's 1.9; now 1.7, 0.1 and 0.1, as in third person). The drawn weapon's place is the same as
+before (its earlier tags agree with its bone within 0.05 units). In the normal view the hand holding a light sits below
+the screen's lower edge; it shows looking down. Register: FP-TORCH-OUT-OF-HAND-67 ([BUGS.md](BUGS.md)). Tests:
+`tests/test_fp_held_item.py`, `tests/aga_held_item_test.c`.
 
 How it is built (`tools/prepare_player_fp_parts.py`, in the image step after the player view):
 
@@ -328,7 +389,39 @@ equipped; the third-person body puts them away too (since v0.0.66-dev2; [MAGIC_E
 | `dbg camera stances on/off` | The drawn weapon's stance on the assembled body (on, the default) or the body's own poses (off); `aw_player_stances`, saved. |
 | `dbg camera fpview on/off` | The original's first-person view (on, the default: the arms, weapon and held light with their own 60-degree field of view, lagging the pitch) or the world's projection with the arms following the whole pitch (off, the previous method); `aw_fp_view`, saved. `dbg camera` shows it with the view's and the arms' pitch. |
 | `dbg camera hands on/off` | The first-person arms assembled from what is worn (on, the default) or the baked arms (off); `aw_hand_parts`, saved. `dbg camera` lists the arms' parts, their frame and the last assembly's time. |
+| `dbg camera motion restart on/off` | The restart of the body's animation on camera and control changes (on, the default); off is the earlier way, for a before/after comparison (not saved). |
 | `dbg camera die` | Test the death scene: the player dies as from world damage (like lava). |
+
+`dbg setpov`, the view locked for test pictures and checks:
+
+| Command | What it does |
+| --- | --- |
+| `dbg setpov 1` (or `first`) | First person, locked. |
+| `dbg setpov 2` (or `vanity`) | The vanity camera circling the player, locked. |
+| `dbg setpov 3` (or `third`) | Third person, locked. |
+| `dbg setpov off` | Unlocks it; the view rules apply again (the idle vanity camera after its delay, Toggle POV, the wheel). |
+| `dbg setpov` | The current view by its number (1 first, 2 vanity, 3 third; 0 another, such as the death camera) and whether it is locked. |
+
+Each setting says so on the screen and in the console ("POV locked: first person (setpov 1)", "POV unlocked: ...").
+While the view is locked the idle vanity camera never starts, and Toggle POV, the wheel, `dbg camera first/third/
+toggle` and `dbg camera vanity now` do not change it (the console says it is locked). Every test session and look book
+page locks the view before its pictures and reads it back with `dbg setpov`. Tests: `tests/test_setpov.py`,
+`tests/aga_view_lock_test.c`.
+
+`dbg race`, the player's race and sex swapped in place, for checks of the body and the first-person arms of every race
+(DBG-RACE-SWAP-67):
+
+| Command | What it does |
+| --- | --- |
+| `dbg race` | The playable races with their numbers, and the current race and sex. |
+| `dbg race 5` or `dbg race khajiit` | Swaps the race (by its number in the list or its name, `dark elf` or `darkelf`). |
+| `dbg race f`, `dbg race nord m` | Swaps the sex, or both. |
+
+Stats, class, birthsign, name and level stay; a valid head and hair are chosen. The game's rules for the new race apply
+at once: what it cannot wear (a beast race: nothing over the head, nothing on the feet) goes back into the inventory,
+one console line per item. The old race's body and first-person arm parts are released at once ("Player parts
+released: model table N slots in use ... before, M after") and both are assembled again; one line reads the result back
+("Player race: 5: Khajiit, sex f, a beast race ..."). It is a debug command: a save made after it keeps the swap.
 
 `dbg vanitycamera` (alias `dbg vanitycam`), the vanity camera on its own:
 
@@ -343,6 +436,16 @@ equipped; the third-person body puts them away too (since v0.0.66-dev2; [MAGIC_E
 
 Keys typed in the console (the command itself, closing the console) do not count as input, so an orbit started
 from the console keeps running until the first key or mouse movement in the game.
+
+The body's animation after a camera or control change (v0.0.67): the body's walk, run, jump and landing clocks, the
+drawn weapon's stance and the turn on the spot start again whenever the view mode changes (first or third person,
+the Toggle POV orbit, the vanity orbit in and out, the death camera), noclip goes on or off, the player goes into or
+out of the water, a menu, the dialogue window or the console comes over play or goes, or the body starts or stops
+being drawn, the same way a new map starts them. Before, after an idle vanity orbit the walk and run could stay
+stuck in third person (the body glided in its standing pose) until the next map load. `dbg camera` shows the body's
+motion: its speed, whether it stands on the ground, the jump or landing state, how often its move group and its air
+state changed in the last second (walking, a few times at most; a group started again every frame shows as one
+change a frame) and the restarts with the last one's cause.
 
 Named shots for inspection and screenshots: `dbg cam mark NAME` saves where you stand and look (with the
 time of day, headlamp and fog distance), `dbg cam recall NAME` brings that shot back, `dbg cam list` lists the

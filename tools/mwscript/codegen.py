@@ -177,6 +177,9 @@ class Program:
         self.visitors = {}
         self._place_rows = None   # the objects the scripts' Place calls name (the PLAC section): place_rows()
         self.rooms = None        # {interior cell: room map and recentring} (rooms.room_table; compiler.py sets it)
+        # MOURNHOLD-EXTERIOR-CELLS-66: the presented districts this build converts whole (tools/presented_exterior.py
+        # build_places; compiler.py sets it): a PositionCell into one goes outdoors to its moved place
+        self.presented = {}
         self.unresolved = []      # (script, kind, name, reason)
         for name, (kind, value, spelling) in data.globals.items():
             self.globals.get(name, {'name': spelling, 'type': kind, 'value': value})
@@ -302,6 +305,12 @@ class Program:
         rooms = sorted(n for cell, n in d.interior_numbers.items() if cell.startswith(key))
         outside = sorted(xy for xy, (cell, region) in d.exteriors.items()
                          if (cell or d.regions.get(region) or d.default_cell_name).casefold().startswith(key))
+        # MOURNHOLD-EXTERIOR-CELLS-66: a district this build presents as exterior cells is where the player stands in
+        # it now: its block's grid cells
+        blocks = [(p['block'][0] + dx, p['block'][1] + dy) for p in (self.presented or {}).values()
+                  if p['cell'].casefold().startswith(key) for dx in range(p['size'][0]) for dy in range(p['size'][1])]
+        if blocks:
+            outside = sorted(set(outside) | set(blocks))
         if any(n > 0xFFFF for n in rooms) or any(not (-128 <= v <= 127) for xy in outside for v in xy):
             raise CompileError('GetPCCell %r: a cell outside the table\'s ranges' % name)
         wild = d.default_cell_name.casefold().startswith(key)
@@ -405,7 +414,11 @@ class Program:
             return None
         x, y, z, rot = (float(n[1]) for n in numbers)
         key = cells[0].casefold()
-        if key in self.data.interior_numbers:
+        moved = self.presented_move(cells[0], (x, y, z))
+        if moved is not None:
+            # MOURNHOLD-EXTERIOR-CELLS-66: a district this build presents as exterior cells: outdoors, at its moved place
+            row = {'kind': PLAYERMOVE_KINDS['outdoors'], 'map': NONE, 'at': moved, 'yaw': rot}
+        elif key in self.data.interior_numbers:
             room = (self.rooms or {}).get(key)
             if room is None:
                 return None
@@ -415,6 +428,17 @@ class Program:
         else:
             row = {'kind': PLAYERMOVE_KINDS['outdoors'], 'map': NONE, 'at': (x, y, z), 'yaw': rot}
         return self.moves.get((row['kind'], row['map'], row['at'], row['yaw']), row)
+
+    def presented_move(self, cell, position):
+        """The moved place (x, y, z, the original's global units) of POSITION in CELL when CELL is a district this build
+        presents as exterior cells and converts (self.presented: tools/presented_exterior.py build_places), by the
+        move the presented master gave its placements (present_position); None otherwise, so a build without the
+        presented-data stage compiles every PositionCell as before."""
+        if not self.presented:
+            return None
+        from presented_exterior import present_position
+        found = present_position(self.presented, cell, position)
+        return None if found is None else tuple(found[1])
 
     def actor_move(self, args):
         """(kind, room number, x, y, z, yaw) of a PositionCell of anything but the player, 'unknown' for a cell the
@@ -432,6 +456,10 @@ class Program:
         x, y, z, rot = (float(n[1]) for n in numbers)
         yaw = round((-rot / 60.0) % 360.0, 5) % 360.0
         key = cells[0].casefold()
+        moved = self.presented_move(cells[0], (x, y, z))
+        if moved is not None:
+            # MOURNHOLD-EXTERIOR-CELLS-66: into a district this build presents: outdoors, at its moved place
+            return (PLAYERMOVE_KINDS['outdoors'], 0) + moved + (yaw,)
         if key in self.data.interior_numbers:
             room = (self.rooms or {}).get(key) or {}
             offset = room.get('offset') or (0.0, 0.0, 0.0)

@@ -109,7 +109,7 @@ def prepare(data_files, id1, palette_path, races=()):
     entries, reports = [], []
     for race in playable:
         for female in (False, True):
-            parts = view_parts(appearance_parts(kinds, race, female), 'hidden')
+            parts = view_parts(appearance_parts(kinds, race, female, assets), 'hidden')
             shapes, materials, textures = npc_geometry.assemble(
                 assets, {'parts': parts, 'weight': 1, 'height': 1}, skeleton, times)
             for shape in shapes:

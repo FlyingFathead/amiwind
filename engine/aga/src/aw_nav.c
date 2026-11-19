@@ -23,6 +23,18 @@ static float best_distance;
 static vec3_t detour;
 static int detour_on,detour_plans;
 static const int detour_side[8]={32,-32,48,-48,64,-64,96,-96};
+/* PIER-GUARD-POST-STUCK-67 (the maintainer's design, 18 November 2026: "walks directly in the center of the pier"): a
+ * scripted walk along fixed waypoints measured from the scene's own collision and coordinates (the dock guard: the
+ * Seyda Neen pier's centre line, then aside to his post by the census office door; aw_opening.c). No path grid, no
+ * detour and no side steps: the points are measured clear of every solid (tests/test_pier_guard_route.py), so a step
+ * that does not go through is never steered round (the straight last leg with its detour above ended on whichever
+ * side of a pier post the walk began, v0.0.66 to v0.0.67-dev2). A step the player or another actor blocks waits for
+ * them on the line; a step the world blocks for 5 s ends the walk (-1) with its place printed. Every tick the walker's
+ * box is tested where it stands, and a box inside a solid is counted: the opening journey asserts 0 for his walks. */
+#define AW_FIXED_POINTS 8
+static vec3_t fixed_point[AW_FIXED_POINTS];
+static int fixed_count,fixed_at,fixed_on,fixed_waiting;
+static long fixed_solid,fixed_waits,fixed_settled;
 static int line_clear(vec3_t from,vec3_t to) {
     trace_t tr=SV_Move(from,walker->v.mins,walker->v.maxs,to,MOVE_NOMONSTERS,walker);
     return !tr.startsolid && !tr.allsolid && tr.fraction==1;
@@ -63,7 +75,7 @@ static unsigned u16(const byte *p){return p[0]+(p[1]<<8);}
 static float f32(const byte *p){float f;memcpy(&f,p,4);return LittleFloat(f);}
 int AW_NavDecode(const byte *data,int size) {
     int i,j,at=6,n;float f;
-    node_count=edge_count=route_count=0;walker=NULL;
+    node_count=edge_count=route_count=0;walker=NULL;fixed_on=0;
     if(size<6 || memcmp(data,"AWN1",4))return 0;
     n=u16(data+4);if(n<1 || n>AW_NODES)return 0;
     for(i=0;i<n;i++) {
@@ -78,7 +90,7 @@ int AW_NavDecode(const byte *data,int size) {
 }
 int AW_NavLoad(const char *map) {
     FILE *f=NULL;byte raw[2822];char path[48];int n;
-    node_count=0;walker=NULL;
+    node_count=0;walker=NULL;fixed_on=0;
     if(strlen(map)>16 || strstr(map,"..") || strchr(map,'/'))return 0;
     sprintf(path,"intro/%s.awn",map);n=COM_FOpenFile(path,&f);
     if(!f)return 0;
@@ -93,7 +105,7 @@ static int nearest(vec3_t point) {
 }
 int AW_NavStart(edict_t *actor,vec3_t goal) {
     int previous[AW_NODES],queue[AW_NODES],head=0,tail=0,a,b,i,start,end;vec3_t entry;trace_t trace;
-    walker=NULL;route_count=route_at=0;if(!node_count || !actor)return 0;
+    walker=NULL;route_count=route_at=0;fixed_on=0;if(!node_count || !actor)return 0;
     start=nearest(actor->v.origin);end=nearest(goal);
     for(i=0;i<node_count;i++)previous[i]=-1;
     queue[tail++]=start;previous[start]=start;
@@ -117,9 +129,114 @@ int AW_NavStart(edict_t *actor,vec3_t goal) {
  * destination itself), for a short measured leg whose straight line is known clear; the grid's nearest point there can
  * lie where the walker must not go (the census door's corner) */
 int AW_NavStartDirect(edict_t *actor,vec3_t goal) {
-    walker=NULL;route_count=route_at=0;if(!actor)return 0;
+    walker=NULL;route_count=route_at=0;fixed_on=0;if(!actor)return 0;
     VectorCopy(goal,destination);walker=actor;blocked=animation=stalled=0;player_wait=0;best_distance=1e30f;
     detour_on=detour_plans=0;return 1;
+}
+/* PIER-GUARD-POST-STUCK-67: a walk through COUNT fixed points (feet points; only x and y are steered, the ground gives
+ * the height), the last one the destination. 0 when there is no actor or the count is out of range. */
+int AW_NavStartFixed(edict_t *actor,const vec3_t *points,int count) {
+    int i;trace_t tr;float z;
+    walker=NULL;route_count=route_at=0;fixed_on=0;
+    if(!actor || !points || count<1 || count>AW_FIXED_POINTS)return 0;
+    for(i=0;i<count;i++)VectorCopy(points[i],fixed_point[i]);
+    fixed_count=count;fixed_at=0;fixed_on=1;fixed_waiting=0;
+    /* PIER-GUARD-POST-STUCK-67 (the journey on the fixed route, 2026-11-18: "box in solid 1", its one tick at point 0,
+     * 366 -210 17): a resident's baked placement fits his rendered soles to the floor, so his standing box can start
+     * under it (the dock guard's, 5.75 units into the pier deck, top 22.75); the first step's stuck search
+     * (AW_WalkPlayer's SV_CheckStuck) lifted it then. The same search here, before the first tick, so the box-in-solid
+     * count is the route's own; the lift is counted apart (AW_NavFixedSettled, aw_intro_status "settled at the start").
+     * No clear spot found: he stays, and the first tick counts it as before. */
+    tr=SV_Move(actor->v.origin,actor->v.mins,actor->v.maxs,actor->v.origin,MOVE_NOMONSTERS,actor);
+    if(tr.startsolid || tr.allsolid){
+        z=actor->v.origin[2];
+        if(AW_ActorSettle(actor)){
+            fixed_settled++;
+            Con_Printf("Fixed route: the walker's box started inside a solid at %ld %ld %ld; settled %.2f up\n",
+                (long)actor->v.origin[0],(long)actor->v.origin[1],(long)z,actor->v.origin[2]-z);
+        }
+    }
+    VectorCopy(points[count-1],destination);walker=actor;blocked=animation=stalled=0;player_wait=0;best_distance=1e30f;
+    detour_on=detour_plans=0;return 1;
+}
+/* the walk ends where the walker stands (the dock guard meeting the player: the script's AIWander 0) */
+void AW_NavStop(void) {
+    eval_t *field;
+    if(walker){walker->v.frame=0;field=GetEdictFieldValue(walker,"aw_moving");if(field)field->_float=0;}
+    walker=NULL;fixed_on=0;
+}
+/* the fixed walks' check (aw_intro_status): ticks a walker's box stood inside a solid, and the times it waited for
+ * someone in its way; cleared when the dock map starts (aw_opening.c AW_OpeningSpawn) */
+long AW_NavFixedSolid(void){return fixed_solid;}
+long AW_NavFixedWaits(void){return fixed_waits;}
+long AW_NavFixedSettled(void){return fixed_settled;}
+void AW_NavFixedReset(void){fixed_solid=fixed_waits=fixed_settled=0;fixed_waiting=0;}
+static int fixed_stop(int result) {
+    eval_t *field;
+    walker->v.frame=0;field=GetEdictFieldValue(walker,"aw_moving");if(field)field->_float=0;
+    walker=NULL;fixed_on=0;return result;
+}
+static int fixed_step(double dt) {
+    vec3_t delta,move,end;float length=0,step;eval_t *field;trace_t tr;
+    tr=SV_Move(walker->v.origin,walker->v.mins,walker->v.maxs,walker->v.origin,MOVE_NOMONSTERS,walker);
+    if(tr.startsolid || tr.allsolid){
+        if(!fixed_solid)Con_Printf("Fixed route: the walker's box is inside a solid at %ld %ld %ld (point %ld)\n",
+            (long)walker->v.origin[0],(long)walker->v.origin[1],(long)walker->v.origin[2],(long)fixed_at);
+        fixed_solid++;
+    }
+    for(;;){
+        VectorSubtract(fixed_point[fixed_at],walker->v.origin,delta);delta[2]=0;
+        length=(float)sqrt(delta[0]*delta[0]+delta[1]*delta[1]);
+        if(length>=1 || fixed_at>=fixed_count-1)break;
+        fixed_at++;
+    }
+    if(length<1)return fixed_stop(1);
+    step=22*dt;if(step>length)step=length;
+    move[0]=delta[0]*step/length;move[1]=delta[1]*step/length;move[2]=0;
+    walker->v.angles[1]=Q_atan2(delta[1],delta[0])*180/M_PI-90;
+    if(AW_ActorStep(walker,move,dt)){
+        if(fixed_waiting){fixed_waiting=0;Con_Printf("Fixed route: the way is clear; walking on.\n");}
+        blocked=0;field=GetEdictFieldValue(walker,"aw_moving");if(field)field->_float=1;
+        animation+=dt;field=GetEdictFieldValue(walker,"aw_walk_step");
+        walker->v.frame=13+((int)(animation/(field && field->_float>.02?field->_float:.125))%8);
+        return 0;
+    }
+    VectorAdd(walker->v.origin,move,end);
+    tr=SV_Move(walker->v.origin,walker->v.mins,walker->v.maxs,end,MOVE_NORMAL,walker);
+    if(tr.ent && (tr.ent==svs.clients[0].edict || tr.ent->v.solid==SOLID_SLIDEBOX) && (tr.fraction<1 || tr.startsolid)){
+        /* the player or an actor stands on the line: wait for them, never round them */
+        if(!fixed_waiting){fixed_waiting=1;fixed_waits++;
+            Con_Printf("Fixed route: waiting at %ld %ld for %s in the way.\n",(long)walker->v.origin[0],
+                (long)walker->v.origin[1],tr.ent==svs.clients[0].edict?"the player":"an actor");}
+        blocked=0;walker->v.frame=0;field=GetEdictFieldValue(walker,"aw_moving");if(field)field->_float=0;return 0;
+    }
+    if(blocked==0)Con_Printf("Fixed route step blocked at %ld %ld %ld, point %ld of %ld (%ld %ld): solid %ld/%ld, frac %ld\n",
+        (long)walker->v.origin[0],(long)walker->v.origin[1],(long)walker->v.origin[2],(long)fixed_at,(long)fixed_count,
+        (long)fixed_point[fixed_at][0],(long)fixed_point[fixed_at][1],(long)tr.startsolid,(long)tr.allsolid,
+        (long)(tr.fraction*1000));
+    blocked+=dt;walker->v.frame=0;
+    if(blocked>5){
+        Con_Printf("Fixed route blocked at %ld %ld %ld; walk held.\n",(long)walker->v.origin[0],(long)walker->v.origin[1],
+            (long)walker->v.origin[2]);
+        return fixed_stop(-1);
+    }
+    return 0;
+}
+/* NPC-IDLE-TRACK-PLAYER-67 (the dock guard at his post, PIER-GUARD-POST-STUCK-67): ACTOR's yaw turns toward TARGET by at
+ * most RATE degrees a second, the short way round. Converted actors face local +Y: the native yaw is the world bearing
+ * - 90, as the walks set it. 1 when it faces the target (within 2 degrees). */
+int AW_ActorTurnToward(edict_t *actor,const vec3_t target,float rate,double dt) {
+    float want,diff,turn;
+    if(!actor || dt<=0)return 0;
+    want=Q_atan2(target[1]-actor->v.origin[1],target[0]-actor->v.origin[0])*180/M_PI-90;
+    diff=want-actor->v.angles[1];
+    while(diff>180)diff-=360;
+    while(diff<-180)diff+=360;
+    turn=rate*(float)dt;
+    if(fabs(diff)<=turn)actor->v.angles[1]+=diff;else actor->v.angles[1]+=diff>0?turn:-turn;
+    while(actor->v.angles[1]>=360)actor->v.angles[1]-=360;
+    while(actor->v.angles[1]<-360)actor->v.angles[1]+=360;
+    return fabs(diff)<=2 || fabs(diff)<=turn;
 }
 int AW_NavStep(double dt,int wait_for_player) {
     vec3_t delta,move,target,side;float length,step,angle;eval_t *field;int i,moved;
@@ -127,6 +244,7 @@ int AW_NavStep(double dt,int wait_for_player) {
     if(!walker)return -1;
     if(dt<=0)return 0;
     if(dt>.1)dt=.1;
+    if(fixed_on)return fixed_step(dt);
     if(wait_for_player){VectorSubtract(walker->v.origin,svs.clients[0].edict->v.origin,delta);
         if(Length(delta)>96){walker->v.frame=0;return 0;}}
     /* The final grid node may lie beyond the requested stop (including inside

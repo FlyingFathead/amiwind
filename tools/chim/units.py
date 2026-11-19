@@ -63,6 +63,9 @@ TOOLS['variant-placed'] = TOOLS['variant'] + ['tools/chim/placed.py']
 TOOLS['tiles-placed'] = TOOLS['tiles'] + ['tools/chim/placed.py']
 # a model over one brush image's budgets stored as tiles (chim.budget_tiles, CHIM-ROOM-CLIPNODE-BUDGET-48): own kinds
 TOOLS['tiles-budget'] = TOOLS['tiles'] + ['tools/chim/budget_tiles.py']
+# method 2, a model's hand-made mesh (config/model-method-2.json, MODEL-REPLACEMENT-OBJ-67): its own kind, so the
+# default 'mesh' key never reaches that code
+TOOLS['mesh-method2'] = _GEOMETRY + ['tools/model_method2.py', 'tools/lantern_rebuild.py', 'tools/hand_made_kinds.py']
 TOOLS['tiles-budget-placed'] = TOOLS['tiles-placed'] + ['tools/chim/budget_tiles.py']
 # Build switches read from the environment by the converter functions (the stair rule:
 # mesh_geometry.collision_pieces, COLLISION-STAIR-SLOPE-32).
@@ -109,6 +112,8 @@ CODE_ENTRIES = {
     'pvs': [('tools/chim/visibility.py', 'pvs_unit'), ('tools/chim/visibility.py', 'pvl_unit'),
             ('tools/chim/ground.py', '<top>')],
 }
+# method 2 (config/model-method-2.json, MODEL-REPLACEMENT-OBJ-67): the hand-made mesh's worker, its own kind
+CODE_ENTRIES['mesh-method2'] = [('tools/model_method2.py', 'mesh_unit_method2')]
 # Off: keys of the 'files' form only (A/B, and what every build used before code keys).
 CODE_KEYS_VARIABLE = 'AMIWIND_UNIT_CODE_KEYS'
 

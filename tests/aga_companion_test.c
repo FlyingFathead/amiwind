@@ -42,6 +42,9 @@ edict_t *AW_NPCTargetReach(edict_t *p,vec3_t angles,float reach){(void)p;(void)a
 static int kills,dead_slot;static edict_t *killed;
 int AW_CombatSlotState(edict_t *e,float *health){(void)e;(void)health;return dead_slot?2:0;}
 int AW_CombatTestEngage(edict_t *t,int dead){assert(dead==1);killed=t;kills++;return 1;}
+/* DBG-SPAWN-MENU-67: dbg despawn's click hands the aimed actor to aw_mwhost.c (here: counted) */
+static edict_t *despawned;static int despawns;
+static void despawn_hook(edict_t *e){despawned=e;despawns++;}
 void Draw_Fill(int x,int y,int w,int h,int c){(void)x;(void)y;(void)w;(void)h;fills++;fill_colour=c;}
 double Sys_FloatTime(void){return clock_now+=.0001;}
 /* aw_anim.c engine glue: models here have no layout file (previous frames). */
@@ -133,6 +136,22 @@ int main(void){
      assert(AW_CompanionPickAim()==1 && !AW_CompanionPickMode() && kills==1);
      AW_CompanionKillMode();assert(AW_CompanionPickMode());AW_CompanionKillMode();assert(!AW_CompanionPickMode());
      target=NULL;fills=0;}
+    /* DBG-SPAWN-MENU-67: dbg despawn = the same red crosshair; the attack hands the aimed actor to aw_companion_despawn
+     * and kills nothing, the right button and the second command leave, the companion is not touched */
+    {AW_CompanionDespawnMode();assert(AW_CompanionPickMode());
+     aw_companion_despawn=despawn_hook;
+     target=npc;host_framecount++;assert(AW_CompanionCrosshair(0,0)==2);
+     assert(AW_CompanionButtons(1)==0 && despawns==1 && despawned==npc && kills==1 && !AW_CompanionEdict(npc));
+     AW_CompanionButtons(0);
+     target=NULL;host_framecount++;assert(AW_CompanionCrosshair(0,0)==1);      /* nothing aimed at: the white one */
+     assert(AW_CompanionButtons(1)==0 && despawns==1);
+     AW_CompanionButtons(0);
+     assert(AW_CompanionPickAim()==1 && !AW_CompanionPickMode() && despawns==1);
+     AW_CompanionDespawnMode();assert(AW_CompanionPickMode());AW_CompanionDespawnMode();assert(!AW_CompanionPickMode());
+     /* the kill mode after it kills again (the despawn flag is gone) */
+     AW_CompanionKillMode();target=npc;host_framecount++;assert(AW_CompanionButtons(1)==0 && kills==2 && despawns==1);
+     AW_CompanionButtons(0);AW_CompanionKillMode();assert(!AW_CompanionPickMode());
+     aw_companion_despawn=NULL;target=NULL;fills=0;}
     /* pick mode: off -> no effect on the crosshair or the attack */
     assert(!AW_CompanionPickMode() && AW_CompanionCrosshair(0,0)==0 && AW_CompanionButtons(3)==3);
     assert(AW_CompanionPickAim()==0);          /* the right button (+aw_alt) leaves it to the next context */

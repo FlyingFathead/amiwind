@@ -357,6 +357,29 @@ EARLY_CHECKS = [
     # earlier run, right after it when this build makes it (tools/image_early_checks.py)
     ('room-actor-frames', 'stored', 'image_early_checks:room_actor_frames'),
     ('room-actor-frames', AFTER + 'chim-room-batches', 'image_early_checks:room_actor_frames_after'),
+    # the expansions' interior cells that behave like an exterior (Mournhold's districts) can be presented as exterior
+    # cell blocks from the selected game files, and the districts' recipe names exactly those cells
+    # (tools/expansion_preflight.py; nothing to do with the base game alone)
+    ('presented-exteriors', 'inputs', 'expansion_preflight:presented_exteriors'),
+    # every selected expansion's named set of cells is built by its module (Mournhold's districts by
+    # tribunal-mournhold), or the log says why not; a selected set with finished cells that no module takes stops
+    # the build here instead of making an image without them (BUILD-LAYER-SETS-NEVER-TAKEN-67)
+    ('expansion-module-cells', 'inputs', 'expansion_preflight:module_sets'),
+    # the frame maps a module's world gets in the image (Mournhold's districts: mhNNNN) are known to every table the
+    # image's last steps build: the engine's map names, the door check's job table, the disk layout; with the image
+    # step's own code, from the names alone (DOOR-CHECK-MODULE-FRAME-MAPS-67: found 1 h 34 min into a build)
+    ('module-frame-maps', 'inputs', 'expansion_preflight:module_frame_maps'),
+    # the placed things of the districts the module builds (containers, items, activators, doors, people) keyed
+    # outdoors at their moved places: every reference in one cell of its block, the same rows by count and kind as
+    # the cell gives as a room, inside the engine's tables; from the game files alone, before any stage
+    ('district-tables', 'inputs', 'expansion_preflight:district_tables'),
+    # right after a module's world stage has passed: its real frame maps, installed into a scratch folder with the
+    # image's own code, against the image's last per-map checks (the engine's tables, the sky, the map names and the
+    # rows file, the door check's job table, the effect links' reader): minutes into a build, not in its last step
+    ('module-store-maps', AFTER + 'tribunal-mournhold', 'expansion_preflight:module_store_after'),
+    # the expansions' actors at milestone 2 or more (config/expansion-stages.json): every incomplete one of the reuse
+    # source's stored outputs, before the first stage; nothing at milestone 1 (tools/expansion_actor_check.py)
+    ('expansion-actors', 'stored', 'expansion_actor_check:early'),
     # every outdoor creature and outdoor levelled list of the base game has a model in the actor library (the engine
     # spawns none without one; OUTDOOR-CREATURES-REGRESSION-66, tools/actor_early_checks.py); the image step's actor
     # spec check counts the placed table at the end
@@ -367,6 +390,9 @@ EARLY_CHECKS = [
     # (BUILD-SEYDA-TOWN-CONTAINERS-67, tools/seyda_early_checks.py)
     ('seyda-frame-town', 'stored', 'seyda_early_checks:frame_town'),
     ('seyda-frame-town', AFTER + 'bsp', 'seyda_early_checks:frame_town_after'),
+    # every CHIM frame map the image step writes names the shared exterior sky, as open_world_worldspawn writes it
+    # (tools/frame_sky_check.py): the frame maps exist only from the image step on
+    ('frame-map-sky', AFTER + 'image', 'frame_sky_check:frame_map_sky_after'),
 ]
 
 

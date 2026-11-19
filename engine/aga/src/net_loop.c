@@ -21,10 +21,78 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "net_loop.h"
+#include "aw_tryalloc.h"	/* the grown buffers: allocations that can say no (the Amiga's malloc traps instead) */
 
 qboolean	localconnectpending = false;
 qsocket_t	*loop_client = NULL;
 qsocket_t	*loop_server = NULL;
+
+/* NET-VIVEC-ENTITY-PACKET-OVERFLOW-66: what the game's server sends the client in this program arrives in an allocated
+ * buffer that grows instead of the client socket's fixed array (NET_MAXMESSAGE), and the client reads each message
+ * into net_message, which grows with it. sv_main.c sizes both at the first frame of a game (its settings
+ * aw_net_buffer and aw_net_frame) and grows them between frames when a frame asks for more; never in the middle of a
+ * message, never smaller. What is unread stays. The server's own receive buffer (the client's moves and commands)
+ * keeps its fixed array. */
+static byte *loop_receive;
+static int loop_receive_size;
+static byte *Loop_Buffer (qsocket_t *sock)
+{
+	return sock == loop_client && loop_receive ? loop_receive : sock->receiveMessage;
+}
+static int Loop_Size (qsocket_t *sock)
+{
+	return sock == loop_client && loop_receive ? loop_receive_size : NET_MAXMESSAGE;
+}
+int Loop_ReceiveSize (void)	/* the client's receive buffer now */
+{
+	return loop_receive ? loop_receive_size : NET_MAXMESSAGE;
+}
+int Loop_Unread (void)		/* what the client has not read yet */
+{
+	return loop_client ? loop_client->receiveMessageLength : 0;
+}
+/* Grow the client's receive buffer to RECEIVE bytes and net_message to MESSAGE bytes (each only when larger than now;
+ * 0 leaves it). 1 when both are at least that large afterwards, 0 when memory was short (nothing changed then). */
+int Loop_Grow (int receive, int message)
+{
+	byte *r = NULL, *m = NULL;
+	if (receive > Loop_ReceiveSize ())
+	{
+		if (!(r = AW_TryMalloc (receive)))
+			return 0;
+		if (loop_client && loop_client->receiveMessageLength)
+			Q_memcpy (r, Loop_Buffer (loop_client), loop_client->receiveMessageLength);
+	}
+	if (message > net_message.maxsize)
+	{
+		if (!(m = AW_TryMalloc (message)))
+		{
+			if (r)
+				free (r);
+			return 0;
+		}
+		if (net_message.cursize)
+			Q_memcpy (m, net_message.data, net_message.cursize);
+	}
+	if (r)
+	{
+		if (loop_receive)
+			free (loop_receive);
+		loop_receive = r;
+		loop_receive_size = receive;
+	}
+	if (m)
+	{
+		/* the first net_message is the Hunk's (net_main.c SZ_Alloc): never freed, only replaced */
+		static byte *grown;
+		if (grown)
+			free (grown);
+		grown = m;
+		net_message.data = m;
+		net_message.maxsize = message;
+	}
+	return 1;
+}
 
 int Loop_Init (void)
 {
@@ -129,20 +197,22 @@ int Loop_GetMessage (qsocket_t *sock)
 	int		ret;
 	int		length;
 
+	byte	*buffer = Loop_Buffer (sock);
+
 	if (sock->receiveMessageLength == 0)
 		return 0;
 
-	ret = sock->receiveMessage[0];
-	length = sock->receiveMessage[1] + (sock->receiveMessage[2] << 8);
-	// alignment byte skipped here
+	/* the length is three bytes (a grown message is longer than 65535 bytes; NET-VIVEC-ENTITY-PACKET-OVERFLOW-66) */
+	ret = buffer[0];
+	length = buffer[1] + (buffer[2] << 8) + (buffer[3] << 16);
 	SZ_Clear (&net_message);
-	SZ_Write (&net_message, &sock->receiveMessage[4], length);
+	SZ_Write (&net_message, &buffer[4], length);
 
 	length = IntAlign(length + 4);
 	sock->receiveMessageLength -= length;
 
 	if (sock->receiveMessageLength)
-		Q_memcpy(sock->receiveMessage, &sock->receiveMessage[length], sock->receiveMessageLength);
+		Q_memcpy(buffer, &buffer[length], sock->receiveMessageLength);
 
 	if (sock->driverdata && ret == 1)
 		((qsocket_t *)sock->driverdata)->canSend = true;
@@ -163,20 +233,18 @@ int Loop_SendMessage (qsocket_t *sock, sizebuf_t *data)
 
 	/* NET-VIVEC-ENTITY-PACKET-OVERFLOW-66: the session ends (the way back or the place loaded again, the box), never
 	 * the game; the server's frame message keeps room for this one (sv_main.c SV_LoopDatagramRoom) */
-	if ((*bufferLength + data->cursize + 4) > NET_MAXMESSAGE)
+	if (IntAlign (*bufferLength + data->cursize + 4) > Loop_Size ((qsocket_t *)sock->driverdata))
 		Host_Error("Loop_SendMessage: overflow (%ld unread, %ld more)", (long)*bufferLength, (long)data->cursize);
 
-	buffer = ((qsocket_t *)sock->driverdata)->receiveMessage + *bufferLength;
+	buffer = Loop_Buffer ((qsocket_t *)sock->driverdata) + *bufferLength;
 
 	// message type
 	*buffer++ = 1;
 
-	// length
+	// length: three bytes (the fourth of the header was an unused alignment byte)
 	*buffer++ = data->cursize & 0xff;
-	*buffer++ = data->cursize >> 8;
-
-	// align
-	buffer++;
+	*buffer++ = (data->cursize >> 8) & 0xff;
+	*buffer++ = (data->cursize >> 16) & 0xff;
 
 	// message
 	Q_memcpy(buffer, data->data, data->cursize);
@@ -197,20 +265,19 @@ int Loop_SendUnreliableMessage (qsocket_t *sock, sizebuf_t *data)
 
 	bufferLength = &((qsocket_t *)sock->driverdata)->receiveMessageLength;
 
-	if ((*bufferLength + data->cursize + sizeof(byte) + sizeof(short)) > NET_MAXMESSAGE)
+	/* the whole record (its 4-byte header, aligned) must fit: the old test counted 3 header bytes */
+	if (IntAlign (*bufferLength + data->cursize + 4) > Loop_Size ((qsocket_t *)sock->driverdata))
 		return 0;
 
-	buffer = ((qsocket_t *)sock->driverdata)->receiveMessage + *bufferLength;
+	buffer = Loop_Buffer ((qsocket_t *)sock->driverdata) + *bufferLength;
 
 	// message type
 	*buffer++ = 2;
 
-	// length
+	// length: three bytes (the fourth of the header was an unused alignment byte)
 	*buffer++ = data->cursize & 0xff;
-	*buffer++ = data->cursize >> 8;
-
-	// align
-	buffer++;
+	*buffer++ = (data->cursize >> 8) & 0xff;
+	*buffer++ = (data->cursize >> 16) & 0xff;
 
 	// message
 	Q_memcpy(buffer, data->data, data->cursize);

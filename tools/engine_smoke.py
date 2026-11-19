@@ -162,11 +162,17 @@ advance(){ until_t=$(( $(date +%s) + ${MUSIC_WAIT:-45}*K )); v=
 shot(){ ffmpeg -loglevel error -y -f x11grab -draw_mouse 0 -video_size 1024x768 -i :$N -frames:v 1 $R/shots/$1.png 2>/dev/null; }
 # rec NAME / recstop: an H.264 clip of the screen (shots/NAME.mp4, RECFPS frames a second, RECCRF quality; no
 # audio: the emulator's sound goes to the dummy driver) while the script goes on; finish stops it.
+# SESSION-CLIP-UNPLAYABLE-ON-STALL-67: the clip is a fragmented MP4 with a keyframe every second (-g = the frame rate), so a
+# recording cut off by a stall or by the container going plays up to the cut (a file made for fast start gets its index
+# only on a clean stop: "moov atom not found"); recstop asks ffmpeg to end, waits up to 5 s, and only then ends it hard.
 RP=
 rec(){ [ -z "$RP" ] || recstop; ffmpeg -loglevel error -y -f x11grab -draw_mouse 0 -framerate ${RECFPS:-15} -video_size 1024x768 -i :$N \
-  -c:v libx264 -preset veryfast -crf ${RECCRF:-30} -pix_fmt yuv420p -movflags +faststart $R/shots/$1.mp4 < /dev/null > $R/logs/rec-$1.log 2>&1 &
+  -c:v libx264 -preset veryfast -crf ${RECCRF:-30} -g ${RECFPS:-15} -pix_fmt yuv420p -flush_packets 1 -movflags +frag_keyframe+empty_moov+default_base_moof $R/shots/$1.mp4 < /dev/null > $R/logs/rec-$1.log 2>&1 &
   RP=$!; log "rec $1"; }
-recstop(){ [ -n "$RP" ] || return 0; kill -INT $RP 2>/dev/null; wait $RP 2>/dev/null; RP=; log "rec stopped"; }
+recstop(){ [ -n "$RP" ] || return 0; kill -INT $RP 2>/dev/null; w=0
+  while [ $w -lt 25 ] && kill -0 $RP 2>/dev/null; do sleep 0.2; w=$((w+1)); done
+  kill -0 $RP 2>/dev/null && { kill -KILL $RP 2>/dev/null; log "rec did not end in 5 s: ended hard"; }
+  wait $RP 2>/dev/null; RP=; log "rec stopped"; }
 # st KEY: one value of the game's state file. The game rewrites the file in place, so a read can catch it half
 # written (gate 1907: "realtime 62.10 -> " empty). Only a copy that ends with its "end" line counts; else read again
 # (up to 20 times, 0.2 s apart) before giving up with an empty value.
@@ -207,9 +213,14 @@ idetrim(){ [ "${IDETRACE:-0}" = 1 ] && return 0; for f in "$@"; do [ -f "$f" ] |
     n=$(grep -c -E '^IDE[0-9]* ' "$f" 2>/dev/null); grep -v -E '^IDE[0-9]* ' "$f" > "$f.trim" 2>/dev/null; mv "$f.trim" "$f"
     log "ide trace: ${n:-0} lines left out of $(basename $f) (--ide-trace keeps them)"; done; }
 finish(){ [ -e $R/finished ] && exit 0; : > $R/finished
+  recstop   # first: the examination below can take long, and a clip must be closed before anything can take the container
   case "$1" in FAIL*) [ -e $R/examined ] || ! alive || { : > $R/examined
       log "examined at the stop: $( (python3 $R/stall.py 5 || echo 'STALL unknown: stall check could not run') 2>>$R/logs/stall-errors.txt | tail -n 1)"; };; esac
   [ "${REMOTE:-1}" = 0 ] || case "$1" in PASS*) b=$(st efrags_bad); [ -n "$b" ] && [ "$b" != 0 ] && set -- "FAIL efrag safety net used $b times (console: Efrag safety net)"
+    # AW-RECOVER (docs/LOAD_ERRORS.md): the game stays in play after an error, but a run with one fails so the cause
+    # is fixed; the test aids' forced errors (errors_forced) never fail it
+    e=$(st errors); [ -n "$e" ] && [ "$e" != 0 ] && set -- "FAIL an error in play was recovered $e times; the game stayed in play (console: Recovery, Error in play, Load failed)"
+    d=$(st net_dropped); [ -n "$d" ] && [ "$d" != 0 ] && set -- "FAIL a frame message was dropped $d times (console: Message overflow caught, Frame update dropped)"
     z=$(zonefull); [ "${z:-0}" -gt 0 ] && [ "$FASTMB" -ge 32 ] && [ "${ZONEFULL:-fail}" != allow ] && case "$1" in PASS*)
       if grep -q 'CHIM cache off (skipped for this start)' $R/awctl/console.log 2>/dev/null; then
         set -- "FAIL CHIM zone full $z times at $FASTMB MB of Fast RAM, with the CHIM cache skipped for this start by a key the smoke sent onto the startup logo (SMOKE-M-KEY-SKIPS-CHIM-CACHE-57)"
@@ -241,9 +252,12 @@ emucheck_sh(){ m=; while IFS= read -r l; do k=${l%% = *}; v=${l#* = }
 # play S: S seconds of game time; the emulator must stay up and the game clock must move. A window open (screen not
 # "game": inventory, journal, rest, dialogue, ...) whose realtime stood still while the engine's ticks moved is long
 # work inside one frame, not a stall (LOAD-STALL-SESSIONS-59); with neither moving it is a stall as before.
-play(){ r1=$(st realtime); t1=$(st ticks); s=0
+# SESSION-STALL-EMPTY-STATE-READ-67: st gives an empty value when the state file (rewritten in place) stayed half written
+# for all its tries; an empty reading is no verdict. stre KEY reads again (EMPTY_RETRIES rounds of 1 s, 10) until it has a value.
+stre(){ v=$(st $1); e=0; while [ -z "$v" ] && [ $e -lt ${EMPTY_RETRIES:-10} ]; do sleep 1; e=$((e+1)); v=$(st $1); done; echo "$v"; }
+play(){ r1=$(stre realtime); t1=$(stre ticks); s=0
   while [ $s -lt $(($1*K)) ]; do alive || finish "FAIL emulator exited during $2 (map $(st map))"; sleep 1; s=$((s+1)); done
-  r2=$(st realtime); t2=$(st ticks); w=$(st screen)
+  r2=$(stre realtime); t2=$(stre ticks); w=$(st screen)
   # SESSION-STALL-AFTER-LONG-FRAME-62: neither realtime nor ticks moved over the wait. The game writes its state file
   # between frames and on the long-work heartbeat only, so one frame of several seconds without a heartbeat (file
   # reads for a script command, a long console print) reads the same as a dead game over a short wait: a session was
@@ -264,6 +278,8 @@ play(){ r1=$(st realtime); t1=$(st ticks); s=0
     r2=$(st realtime)
     [ -n "$r2" ] && [ "$r2" != "$r1" ] && { log "long frame (busy) during $2: realtime stood at $r1 for $1 s and $g s more while the engine ran (ticks $t1 -> $t2)"; return 0; }
     finish "FAIL long frame (busy) during $2: realtime stood at $r1 for $1 s and ${BUSY_GRACE:-60} s more while the engine ran (ticks $t1 -> $t2), not a disk stall"; fi
+  # still no realtime reading after the re-reads, but the ticks moved: the engine runs; the empty value is not a stall
+  [ -z "$r2" ] && [ -n "$t2" ] && [ "$t1" != "$t2" ] && { log "no realtime reading during $2 (state file unreadable), ticks $t1 -> $t2: the engine runs"; return 0; }
   [ -n "$r2" ] && [ "$r1" != "$r2" ] || finish "FAIL game stalled during $2 (realtime $r1 -> $r2)"; }
 # inplay WHAT: the map is in play, not only loaded under a menu (SMOKE-PASSES-WITHOUT-MAP-36): within 30 s the
 # client has its world (signon 4, world leaves) and the screen is the game. An engine without these state lines fails.

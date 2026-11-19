@@ -1,0 +1,63 @@
+# No error in play ends the game (SCENE-LOAD-FAIL-FALLBACK-67, docs/LOAD_ERRORS.md "No error in play ends the
+# game"): an error forced in a script step, in the screen side's read of a server message, and in a load, each ends in
+# play again with the OK box saying what happened; the same error within a minute takes the next step (the last
+# autosave, then the previous map). The test aids by their own names (aw_host_error = dbg hosterror, aw_load_fail =
+# dbg loadfail), so the session also runs on an image whose command catalogue is older than the engine. Each box and
+# console with the position overlay. The state file's errors stay 0 (every error here is forced; errors_forced counts
+# them) and the run ends in play. Run from a place in play (a full image's start map, a character made), 32 MB Fast,
+# warp off.
+emu deterministic=1
+wait 8
+cmd aw_crosshair off
+cmd dbg all on
+cmd dbg headlamp off
+state map
+cmd dbg tp seydaneen
+wait 60
+state map
+shot recover-start-seyda-neen
+# 1. an error inside a script step: the place again at the last good position
+cmd aw_host_error script
+wait 30
+state map
+state errors_forced
+shot recover-script-step-box
+key Return
+wait 3
+cmd toggleconsole
+wait 2
+shot recover-script-step-console
+cmd toggleconsole
+# 2. an error in the screen side's read within a minute: the last autosave (with none, the previous map)
+cmd aw_host_error client
+wait 30
+state map
+shot recover-client-read-again-box
+key Return
+wait 3
+cmd toggleconsole
+wait 2
+shot recover-client-read-again-console
+cmd toggleconsole
+# 3. past the minute, a load that fails: the way back; then a load whose way back fails as well: the last autosave
+wait 65
+cmd aw_load_fail 1
+cmd dbg tp balmora
+wait 45
+state map
+shot recover-load-way-back-box
+key Return
+wait 3
+cmd aw_load_fail 2
+cmd dbg tp balmora
+wait 60
+state map
+state errors
+state errors_forced
+shot recover-load-way-back-failed-box
+key Return
+wait 3
+cmd toggleconsole
+wait 2
+shot recover-load-console
+cmd toggleconsole

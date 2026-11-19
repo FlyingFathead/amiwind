@@ -83,7 +83,9 @@ char *svc_strings[] =
 extern int cl_message_unreliable;
 static jmp_buf cl_parse_drop;
 static qboolean cl_parse_catching;
-static int cl_parse_dropped;
+int cl_parse_dropped;	/* the frame updates dropped, for the state file (aw_remote.c net_dropped) */
+/* AW-RECOVER test aid (dbg hosterror client, aw_loadfail.c sets it): called before the next server message is read */
+void (*cl_parse_force_error)(void);
 static double cl_parse_said = -1000;
 void CL_ParseFault (char *fmt, ...) __attribute__((format(printf, 1, 2)));
 void CL_ParseFault (char *fmt, ...)
@@ -827,6 +829,9 @@ void CL_ParseStaticSound (void)
 
 #define SHOWNET(x) if(cl_shownet.value==2)Con_Printf ("%3i:%s\n", msg_readcount-1, x);
 
+/* VIEW-VANITY-UNDOES-SET-VIEW-67: told when the server sets the view (svc_setangle: a script's SetAngle on the player,
+ * an arrival's facing, aw_view, aw_aim), so the idle orbit keeps that heading (aw_view.c sets it; NULL without it) */
+void (*aw_view_turned)(void);
 /*
 =====================
 CL_ParseServerMessage
@@ -836,6 +841,8 @@ static void CL_ParseMessage (void);
 void CL_ParseServerMessage (void)
 {
 	/* a frame's update that does not read is dropped, never the game (CL_ParseFault) */
+	if (cl_parse_force_error)
+		cl_parse_force_error ();
 	if (!cl_message_unreliable || cls.demoplayback)
 	{
 		cl_parse_catching = false;	/* also after a frame's update that left through Host_EndGame */
@@ -951,6 +958,8 @@ static void CL_ParseMessage (void)
 		case svc_setangle:
 			for (i=0 ; i<3 ; i++)
 				cl.viewangles[i] = MSG_ReadAngle ();
+			if (aw_view_turned)
+				aw_view_turned ();
 			break;
 
 		case svc_setview:

@@ -405,8 +405,12 @@ static int near_eye(const hd_door_t *d,const vec3_t eye){
 }
 /* The door under the crosshair: the first thing a point trace from the eye
  * meets within reach (actors and other objects in front hide it). */
+/* HUD-TEXTS-OVERLAP-67: where aimed() met its door along the view (map units from the eye), for the one focus a frame
+ * (aw_scene.c focus_kind weighs it against an actor's box, an item and a load door) */
+static float aimed_at=-1;
 static hd_door_t *aimed(void){
     edict_t *p;vec3_t eye,end,forward,right,up;trace_t tr,own;int i;hd_door_t *d,*best=NULL;float nearest;
+    aimed_at=-1;
     if(!placed_count || !sv.active || !svs.clients)return NULL;
     p=svs.clients[0].edict;if(!p || p->v.movetype!=MOVETYPE_WALK)return NULL;
     VectorAdd(p->v.origin,p->v.view_ofs,eye);
@@ -419,12 +423,14 @@ static hd_door_t *aimed(void){
     for(;i<placed_count;i++){
         d=&placed[i];
         if(!near_eye(d,eye))continue;
-        if(d->edict){if(tr.ent==EDICT_NUM(d->edict))return d;continue;}
+        if(d->edict){if(tr.ent==EDICT_NUM(d->edict)){aimed_at=tr.fraction*HD_REACH;return d;}continue;}
         if(tr.ent!=sv.edicts || !clip(d,eye,vec3_origin,vec3_origin,end,&own))continue;
         if(own.fraction<1 && own.fraction<=nearest){best=d;nearest=own.fraction;}
     }
+    if(best)aimed_at=nearest*HD_REACH;
     return best;
 }
+float AW_HingedDoorAimDistance(void){return aimed()?aimed_at:-1;}
 /* Object state (v0.0.51, aw_mwhost.c sets it; NULL without the scripts): 1 when a script that reads OnActivate
  * takes the use of the door REFERENCE (the original's rule); it opens on the script's Activate. */
 int (*aw_hinged_intercept)(unsigned reference);
@@ -793,6 +799,7 @@ static void command(void){
 }
 extern int (*aw_hinged_use)(void);
 extern int (*aw_hinged_hint)(const char **name,const char **action);
+extern float (*aw_hinged_aim)(void);
 extern void (*aw_hinged_spawn)(void);
 extern void (*aw_hinged_tick)(double seconds);
 extern void (*aw_hinged_map_begin)(void);
@@ -812,6 +819,7 @@ int AW_HingedDoorLockedSound(void){
 void AW_HingedDoorInit(void){
     Cmd_AddCommand("aw_hinged_door",command);
     aw_hinged_use=AW_HingedDoorUse;aw_hinged_hint=AW_HingedDoorHint;aw_hinged_spawn=AW_HingedDoorSpawn;
+    aw_hinged_aim=AW_HingedDoorAimDistance;   /* HUD-TEXTS-OVERLAP-67: the one focus a frame */
     aw_hinged_tick=AW_HingedDoorTick;aw_hinged_map_begin=AW_HingedDoorMapBegin;aw_hinged_protect=AW_HingedDoorProtect;
     aw_hinged_locked_sound=AW_HingedDoorLockedSound;
     aw_load_door_lock=AW_HingedDoorLoadLock;

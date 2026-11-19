@@ -84,12 +84,42 @@ class ActivateSourceTests(unittest.TestCase):
         self.assertIn('AW_PlacedFocus(&focus_name,', draw)
 
     def test_every_use_path_asks_the_same_choice(self):
-        # the prompt and the name under the view (aw_scene.c npc_target), E (pr_cmds.c aw_npctarget) and the body's
-        # search (aw_corpse.c) all go through AW_ActivateActor; the plain actor test stays for combat and spells
-        self.assertIn('cached=AW_ActivateActor(p,cl.viewangles);', code('aw_scene.c'))
+        # HUD-TEXTS-OVERLAP-67: ONE focus a frame (aw_scene.c focus_kind, the rule AW_FocusChoose): the prompt and the
+        # name under the view (npc_target), E (pr_cmds.c aw_npctarget and AW_SceneUse) and the body's search
+        # (aw_corpse.c) all take it; the plain actor test stays for combat and spells
+        scene = code('aw_scene.c')
+        self.assertIn('static edict_t *npc_target(void) {return focus_kind()==AW_FOCUS_ACTOR?focus_actor:NULL;}', scene)
+        self.assertIn('return focus_kind()==AW_FOCUS_ACTOR?focus_actor:NULL;', body('aw_scene.c', 'edict_t *AW_ActivateActor('))
         self.assertIn('AW_ActivateActor(player,player->v.v_angle)', body('pr_cmds.c', 'static void PF_aw_npctarget('))
         self.assertIn('AW_ActivateActor(p,p->v.v_angle)', body('aw_corpse.c', 'static edict_t *corpse_target('))
         self.assertNotIn('AW_ActivateActor', code('aw_combat.c'))
+
+    def test_one_focus_a_frame_weighs_every_kind_on_the_ray(self):
+        # HUD-TEXTS-OVERLAP-67: the actor's box, the item or plant, the load door and the hinged door, each by where the
+        # view ray meets it, go to the one rule; the actor's hold uses his whole model's box for a moment only
+        choice = body('aw_scene.c', 'static int focus_kind(void) {')
+        for part in ('e=AW_NPCTarget(p,cl.viewangles);aim.actor_near=npc_aim_near;aim.actor_far=npc_aim_far;',
+                     'aim.thing=AW_ActivateNearest(AW_InventoryAimDistance(),AW_HarvestAimDistance());',
+                     'aim.door=aimed_door()>=0?door_aim:-1;', 'aim.hinged=aw_hinged_aim?aw_hinged_aim():-1;',
+                     'focus_held_kind=AW_FocusChoose(&aim,focus_held_kind);',
+                     'realtime>focus_actor_seen && realtime-focus_actor_seen<AW_FOCUS_HOLD_SECONDS'):
+            self.assertIn(part, choice)
+        self.assertIn('door_aim=best>=0?closest:-1;', body('aw_scene.c', 'static int aimed_door(void) {'))
+        self.assertIn('aw_hinged_aim=AW_HingedDoorAimDistance;', code('aw_hinged_door.c'))
+
+    def test_the_use_key_and_the_title_follow_the_one_focus(self):
+        # HUD-TEXTS-OVERLAP-67: E opens a load door or a hinged door only when it has the focus (a door behind the person
+        # shown is never opened); the draw gives ONE title: the person's (WHO) or an object's own, never both
+        use = body('aw_scene.c', 'int AW_SceneUse(void) {')
+        self.assertIn('i=kind==AW_FOCUS_DOOR?aimed_door():-1;', use)
+        self.assertIn('return kind==AW_FOCUS_HINGED && aw_hinged_use?aw_hinged_use():0;', use)
+        draw = body('aw_scene.c', 'void AW_SceneDraw(void) {')
+        self.assertEqual(draw.count('AW_UIObjectName('), 0)
+        self.assertEqual(draw.count('focus_title_draw('), 3)
+        self.assertIn('if(ami && (npc || !name || !*name))focus_title_draw(who,(int)target_style.value);', draw)
+        self.assertIn('if(!npc && *name)focus_title_draw(name,(int)label_style.value);', draw)
+        self.assertIn('i=kind==AW_FOCUS_DOOR?aimed_door():-1;', draw)
+        self.assertIn('kind==AW_FOCUS_HINGED && aw_hinged_hint && aw_hinged_hint(&name,&action)', draw)
 
     def test_the_choice_weighs_the_item_and_the_plant_against_the_actors_box(self):
         choice = body('aw_scene.c', 'edict_t *AW_ActivateActor(')
@@ -100,6 +130,31 @@ class ActivateSourceTests(unittest.TestCase):
         target = body('aw_scene.c', 'edict_t *AW_NPCTargetReach(')
         self.assertIn('AW_RayBox(end,ray,fmins,fmaxs,&lo,&hi) && lo<limit){limit=lo;best=e;npc_aim_near=lo;npc_aim_far=hi;}',
                       target)
+
+    def test_a_persons_use_box_is_his_body(self):
+        # FOCUS-NPC-OVERRIDES-ITEM-62: a person's model stores one frame since v0.0.52 whose box encloses every pose;
+        # the use test and the focus hold take his body's box (aw_activate_rules.c AW_ActorUseBox, host tested by
+        # aga_activate_rules_test.c and aga_npc_contact_test.c), evicted too by the bit a resident look keeps; a
+        # creature by aw_ambient.c's slot, else its progs/c_ model; a body by the fight's state
+        target = body('aw_scene.c', 'edict_t *AW_NPCTargetReach(')
+        narrow = 'actor_use_box(e,frames,fmins,fmaxs,fmins,fmaxs);'
+        self.assertIn(narrow, target)
+        self.assertLess(target.index(narrow), target.index('AW_RayBox(end,ray,fmins,fmaxs,&lo,&hi)'))
+        self.assertIn('m->flags=(m->flags&~AW_MODEL_ONE_STORED_FRAME)|(frames==1?AW_MODEL_ONE_STORED_FRAME:0);', target)
+        whole = body('aw_scene.c', 'static int actor_whole_box(')
+        self.assertIn('actor_use_box(target,(m->flags&AW_MODEL_ONE_STORED_FRAME)?1:0,m->mins,m->maxs,wmins,wmaxs);',
+                      whole)
+        self.assertIn('AW_RayBox(end,ray,wmins,wmaxs,lo,hi)', whole)
+        box = body('aw_scene.c', 'static int actor_use_box(')
+        self.assertIn('AW_ActorPersonHull(e->v.mins,e->v.maxs)', box)
+        self.assertIn('use_box_creature(e)', box)
+        self.assertIn('AW_CombatSlotState(e,NULL)==2', box)
+        self.assertIn('!strncmp(pr_strings+e->v.model,"progs/c_",8)', body('aw_scene.c', 'static int use_box_creature('))
+        self.assertIn('aw_actor_creature=slot_creature;', code('aw_ambient.c'))
+        # the loaders and model.h stay as they are: their sources are pinned in the CHIM world stages' key
+        # (tools/engine_loader_policy.py), so the bit is kept by the use test itself
+        for name in ('model.h', 'model.c', 'model_alias_stream.inc'):
+            self.assertNotIn('AW_MODEL_ONE_STORED_FRAME', (SRC / name).read_text(encoding='utf-8'))
 
     def test_an_actors_own_focus_row_never_hides_an_item(self):
         placed = body('aw_inventory.c', 'static int placed_target(void){')
@@ -132,6 +187,24 @@ class ActivateSourceTests(unittest.TestCase):
 
     def test_the_rules_file_is_built(self):
         self.assertIn('aw_activate_rules.c', (ROOT / 'engine' / 'aga' / 'Makefile').read_text(encoding='utf-8'))
+
+    def test_the_container_aim_check_stands_within_reach_and_asks_the_use_test(self):
+        # DBG-CONTAINER-AIM-OUT-OF-REACH-67: aw_placed container aim stood 40 units out over the floor (the eye 46 to 60
+        # from the row's point, past the 48-unit reach) and looked 8 above the point; it said "Aimed at" whatever the
+        # use would take. Now the eye is AW_AIM_EYE from the point (aw_activate_rules.c AW_AimEye, tested natively), the
+        # use test (placed_target) is asked with that view, and "Aimed at" is said only when it takes this row.
+        command = body('aw_inventory.c', 'void AW_ContainerCommand(void){')
+        aim = command[command.index('if(!strcmp(a,"aim")){'):command.index('if((!strcmp(a,"take")')]
+        self.assertIn('AW_AimEye(at,dx,dy,lifts[l],eye,&yaw,&pitch);', aim)
+        self.assertNotIn('*40', aim)
+        self.assertNotIn('+8', aim)
+        self.assertIn('VectorCopy(p->v.angles,p->v.v_angle);', aim)
+        self.assertLess(aim.index('VectorCopy(p->v.angles,p->v.v_angle);'), aim.index('got=placed_target();'))
+        self.assertIn('if(got==(int)(row-focus_rows))', aim)
+        self.assertLess(aim.index('if(got==(int)(row-focus_rows))'), aim.index('"Aimed at %s (%s %u): aw_view'))
+        self.assertIn('from this view the use goes to row %d (%c %u %s), not to %s %u', aim)
+        self.assertIn('from this view the use takes nothing', aim)
+        self.assertIn('#define AW_AIM_EYE 24.0f', code('aw_activate.h'))
 
 
 if __name__ == '__main__':

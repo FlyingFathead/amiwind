@@ -1,7 +1,7 @@
 {
  "schema": "mwscript-features 1",
- "updated": "2026-11-17",
- "version": "0.0.67-dev2",
+ "updated": "2026-11-19",
+ "version": "0.0.67-dev3",
  "intro": "One row per script record of the game: what names it, where it stands, which functions it calls and what its conditions test, and what state AmiWind has it in. The data is measured from the game's masters with the builder's own compiler; the page lists record ids, counts and states only. When the work list runs dry, the scripting work is taken from here row by row, toward the next landmark: every game script running as in the original. On Vvardenfell the scripts left are the character creation ones; the rest belong to Mournhold and Solstheim.",
  "measured": {
   "masters": {
@@ -9,7 +9,7 @@
    "Tribunal.esm": "2ace511f23cc2a9ddd5f3aa59c7919789b9378cf4b17c8ae3375dd6b782f3f2b",
    "Bloodmoon.esm": "bd27090d0e6ad4c1bf1abc83f1a2dac56fcc82cae7bfe8263c413fb301801357"
   },
-  "compiler": "716c389abc13a7fa67e5513cb51d4ca964cb79f7035d5eb64b5759798e83366a",
+  "compiler": "881ec4ed1444df6046548b2a36b9288716fb2bc42f10c4de310179062bbd2778",
   "host": [
    "addsoulgem",
    "addtopic",
@@ -281,7 +281,7 @@
    "user4",
    "wakeuppc"
   ],
-  "date": "2026-11-17",
+  "date": "2026-11-19",
   "bindings": 9095,
   "start_scripts": 4,
   "placed_scripted": 11171

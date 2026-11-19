@@ -38,6 +38,8 @@ int main(void){
     e=fx(63,"Almsivi Intervention",NULL,0,0,0,0,AW_SL_NO_DURATION|AW_SL_NO_MAGNITUDE);
     assert(!strcmp(line(&e,0),"Almsivi Intervention on Self"));
     e=fx(117,"Restore Health",NULL,1,1,0,1,0);assert(!strcmp(line(&e,0),"Restore Health 1 pt for 1 sec on Touch"));
+    /* INVENTORY-ITEM-INFO-67: a potion's effect has its duration and no target (widgets.cpp mNoTarget) */
+    e=fx(75,"Restore Health",NULL,10,10,5,0,0);assert(!strcmp(line(&e,AW_SL_NO_TARGET),"Restore Health 10 pts for 5 secs"));
     e=fx(85,"Damage Health",NULL,4,4,0,1,AW_SL_APPLIED_ONCE);assert(!strcmp(line(&e,0),"Damage Health 4 pts on Touch"));
     /* the groups in the original's order whatever the record order: a power listed first goes under Powers */
     memset(s,0,sizeof(s));

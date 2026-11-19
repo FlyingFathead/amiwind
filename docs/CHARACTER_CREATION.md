@@ -1,6 +1,6 @@
 # Next milestone: dock and Census Office character creation
 
-_Last updated with AmiWind v0.0.66-dev5 (15 November 2026)._
+_Last updated with AmiWind v0.0.67 (18 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -286,6 +286,17 @@ of the shared stats record). Their names, effects and magic-effect names come
 from the actor table, and the icons from the active-effect row's file
 (`gfx/effects.awe`). A window without those tables (an old build) shows the
 names as before.
+
+Every birthsign spell has its row in the actor table since v0.0.67. Before, the
+table gave a row only to the spells some character, race, starting
+rule or trap named, so 15 of the 19 spells of the 13 signs had none: the window
+showed the list for the first two signs only (The Tower and The Ritual, and
+those without Tower Key and Mara's Gift), and The Steed showed only "Ability"
+and "Charioteer". The same rows give the new character the sign's spells, so
+those 15 were not given either. The builder now adds every sign's spells after
+every other row (the rows already there keep their numbers), and the area
+tables refuse a birthsign spell without a row, naming it
+(`tests/test_chargen_spells.py`).
 
 Cost, measured on the code: about 11 KB resident (the list and up to 32 icons of
 12 x 12, static). Showing another race or sign reads its spell rows from the

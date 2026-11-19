@@ -97,13 +97,21 @@ NON_REUSABLE = {
 # folder made the chim stage's fingerprint change with every build that added units
 # (BUILD-CACHE-CHIM-UNITS-33). The media and intro stages use the per-file asset pool the same way.
 CONTENT_ADDRESSED = {('npc-gallery', '--cache'), ('world-terrain', '--cache'), ('chim', '--unit-cache'),
-                     ('media', '--cache'), ('intro', '--cache')}
+                     ('media', '--cache'), ('intro', '--cache'),
+                     # the module tribunal-mournhold's own unit cache (the same UnitCache as the chim stage's, in a
+                     # folder of its own): hashed as an outside folder, the units a run stored re-keyed the stage for
+                     # the next run (BUILD-MODULE-UNIT-CACHE-IN-KEY-67: a resumed build would have run it again)
+                     ('tribunal-mournhold', '--unit-cache')}
 # Content-addressed cache folders by place, whatever stage or option names them. The CHIM unit cache is shared:
 # the chim stage and the CHIM rooms stage (chim-interiors, tools/chim/interior.py: the same UnitCache, every unit
 # keyed by its own fingerprint and code key) both name WORKSPACE/cache/chim-units. Listed by stage only, the
 # rooms stage hashed the shared folder, which other builds grow past EXTERNAL_DIRECTORY_LIMIT: the stage was
 # never reusable (CHIM-INTERIORS-REUSE-MISS-48, "unexpected rebuild: chim-interiors (other)").
-CONTENT_ADDRESSED_FOLDERS = frozenset({'{WORKSPACE}/cache/chim-units'})
+CONTENT_ADDRESSED_FOLDERS = frozenset({'{WORKSPACE}/cache/chim-units', '{WORKSPACE}/cache/tribunal-mournhold-units'})
+# Content-addressed caches whose row is in the stage key from the stage's first run on, before the folder exists (the
+# other rows above appear with their folder, as they always have: their keys stay as they are). A new stage with a
+# cache of its own belongs here.
+CONTENT_ADDRESSED_FROM_THE_START = frozenset({('tribunal-mournhold', '--unit-cache')})
 # The shared storage pool (WORKSPACE/cache/asset-pool-v1, --storage-pool-dir, tools/storage_pool.py) is
 # content-addressed whatever stage or option names it: every object is stored by its own SHA-256 and every
 # reader (tools/file_cache.py FileCache) looks objects up by a reuse key made of the inputs the object depends
@@ -249,13 +257,20 @@ PROVEN_EQUAL_SOURCES = {
     #   reach, only the LEGACY_SOURCES table changed, by two rows for other unit caches (interior-room-chim, 872924c1;
     #   creature-model, BUILD-CREATURE-KEY-REASON-TEXT-66). The stages look the table up for their own region caches
     #   only, whose rows are unchanged, and no build of this line converts a region (every region is a CHIM cell).
+    # The same again on the v0.0.67-dev3 line (BUILD-ROOM-ACTOR-REKEY-67): one LEGACY_SOURCES row for the room-actor
+    # cache, which neither stage opens; the second pair is the v0.0.67-dev2 run's recorded value (0d6f7ab7) and this
+    # checkout's, measured in the container.
     'world-scenery': {
         'tools/unit_store.py': (('units4:ce06698122d4567894f4170f8e71dfadf60be760a621941fdeb62e16afa9f7b7',
-                                 'units4:976fb8dc7acb1645f06122a56520758c639e284d2988547759678bcf323f3a7f'),),
+                                 'units4:976fb8dc7acb1645f06122a56520758c639e284d2988547759678bcf323f3a7f'),
+                                ('units4:976fb8dc7acb1645f06122a56520758c639e284d2988547759678bcf323f3a7f',
+                                 'units4:92f2b9c805c125f511001c78122614297a5852a4b889034f1c71e3f57277ba52')),
     },
     'world-flora': {
         'tools/unit_store.py': (('units4:ce06698122d4567894f4170f8e71dfadf60be760a621941fdeb62e16afa9f7b7',
-                                 'units4:976fb8dc7acb1645f06122a56520758c639e284d2988547759678bcf323f3a7f'),),
+                                 'units4:976fb8dc7acb1645f06122a56520758c639e284d2988547759678bcf323f3a7f'),
+                                ('units4:976fb8dc7acb1645f06122a56520758c639e284d2988547759678bcf323f3a7f',
+                                 'units4:92f2b9c805c125f511001c78122614297a5852a4b889034f1c71e3f57277ba52')),
     },
 }
 
@@ -2623,6 +2638,11 @@ def external_inputs(name, command, run, metadata, skip_hashing=False, index=None
         if position < 2 or part.startswith('-') or under_run(part, run) is not None:
             continue  # Interpreter and stage script (source digest), options, run paths.
         path = Path(part)
+        if path.is_absolute() and (name, option) in CONTENT_ADDRESSED_FROM_THE_START:
+            # named in the key whether the folder exists yet or not: the stage's first run makes it, and a key that
+            # gains this row afterwards is a key that moved (BUILD-MODULE-UNIT-CACHE-IN-KEY-67)
+            result[f'{option}={normalize_path(part, rows) or "{EXTERNAL}"}'] = 'not hashed (content-addressed cache)'
+            continue
         if not path.is_absolute() or not path.exists():
             continue
         if str(path) in tools or str(path) in tool_dirs or path.resolve() == Path(sys.executable).resolve():
@@ -2696,6 +2716,17 @@ STAGE_GAME_INPUTS = {
     'chim-sol': BASE_GAME_INPUTS + LAYER_GAME_INPUTS['bloodmoon'],
     'chim-sol-star': BASE_GAME_INPUTS + LAYER_GAME_INPUTS['bloodmoon'],
     'chim-sol-trees': BASE_GAME_INPUTS + LAYER_GAME_INPUTS['bloodmoon'],   # --chim-sol-tree-copies star
+    # the module tribunal-mournhold (tools/build.py "THE EXPANSIONS AS BUILD MODULES"): Mournhold's districts as a
+    # world of their own, from the base master and archive plus Tribunal's and from nothing of Bloodmoon's
+    'tribunal-mournhold-data': BASE_GAME_INPUTS + LAYER_GAME_INPUTS['tribunal'],
+    'tribunal-mournhold': BASE_GAME_INPUTS + LAYER_GAME_INPUTS['tribunal'],
+}
+# A build module's stages read their OWN master list, whatever else the build selects: {stage: its layers in load
+# order}. Such a stage is keyed by these layers' files and this master list only (stage_components), so selecting or
+# changing another expansion re-keys none of them.
+MODULE_STAGE_LAYERS = {
+    'tribunal-mournhold-data': ('tribunal',),
+    'tribunal-mournhold': ('tribunal',),
 }
 # {(run, stage): digest of every game input}: the key form before the narrowing, for reuse sources fingerprinted with
 # it (comparable); kept out of the fingerprint itself. Set by stage_components.
@@ -2711,6 +2742,8 @@ PREVIOUS_GAME_INPUTS = {}
 MASTERS_ENV = 'AMIWIND_MASTERS'
 BASE_MASTER = 'Morrowind.esm'
 LAYER_ORDER = (('tribunal', 'Tribunal.esm'), ('bloodmoon', 'Bloodmoon.esm'))
+# a stage that reads the selected layers without its code naming MASTERS_ENV is named here (none today: the
+# presented data folder is the module tribunal-mournhold's, keyed by its own layers, MODULE_STAGE_LAYERS)
 LAYER_READING_STAGES = set()
 
 
@@ -2764,7 +2797,18 @@ def declared_game_inputs(name, inputs, allowed=None):
 # inputs keys the table WITHOUT those rows and that block, as the file bytes were before them, so adding a layer's
 # rows re-keys no base stage; a stage that reads the layer keys the whole file.
 LAYER_ROW_TABLES = {'config/collision-hull-surface.json': (1, 'meshes'),
-                    'config/stair-check-known.json': (2, 'meshes')}
+                    'config/stair-check-known.json': (2, 'meshes'),
+                    # the visual recipes: an expansion's cells in "cell_settings" (named under "layers") and its own
+                    # recipes in "recipes" (named under "layer_recipes"): a recipe or a cell row of Mournhold's
+                    # districts or of Solstheim re-keys no base stage (BUILD-VISUAL-RECIPES-LAYER-ROWS-KEY-67). The
+                    # file is written by hand, so a stage that leaves a layer out keys the remaining document's
+                    # canonical text, not the file's bytes
+                    'config/visual-recipes.json': (1, 'cell_settings')}
+# layer-row tables written by hand, not by a tool as json.dumps writes them: their whole-file key is the file's bytes,
+# a view without a layer the canonical text of what is left
+HAND_WRITTEN_LAYER_TABLES = ('config/visual-recipes.json',)
+# the fields of a layer-row table that hold whole recipe blocks by recipe name (layer_table_view "layer_recipes")
+LAYER_RECIPE_FIELDS = ('recipe_meshes', 'recipes')
 
 
 def layer_table_view(text, layers, indent, field):
@@ -2793,9 +2837,10 @@ def layer_table_view(text, layers, indent, field):
     recipes = doc.get('layer_recipes')
     if isinstance(recipes, dict):
         gone = {str(r) for layer in layers for r in recipes.get(layer, ())}
-        blocks = doc.get('recipe_meshes')
-        if isinstance(blocks, dict):
-            doc['recipe_meshes'] = {r: ms for r, ms in blocks.items() if r not in gone}
+        for block_field in LAYER_RECIPE_FIELDS:
+            blocks = doc.get(block_field)
+            if isinstance(blocks, dict):
+                doc[block_field] = {r: ms for r, ms in blocks.items() if r not in gone}
         kept = {layer: rs for layer, rs in recipes.items() if layer not in layers}
         if kept:
             doc['layer_recipes'] = kept
@@ -2868,8 +2913,10 @@ def stage_components(name, command, run, metadata, index, dependencies, fingerpr
                            if str(path) in joined or str(Path(path).parent) in command}
     if '--data-files' in command:
         inputs = metadata.get('input_sha256') or {}
-        reads_layers = stage_reads_layers(name, script, index)
-        layers = selected_layers(metadata) if reads_layers else []
+        module = MODULE_STAGE_LAYERS.get(name)
+        reads_layers = module is not None or stage_reads_layers(name, script, index)
+        # a module's stage: its own layers, never the build's whole selection
+        layers = list(module) if module is not None else (selected_layers(metadata) if reads_layers else [])
         allowed = stage_game_masters(name, layers, reads_layers)
         declared = declared_game_inputs(name, inputs, allowed)
         components['game_inputs'] = {'form': 2, 'masters': sorted(allowed), 'digest': digest_json(declared)}
@@ -4813,8 +4860,12 @@ def minute_one(steps, run, metadata, cache, reasons, index, reuse_all):
     closures = (CLOSURES.get(str(run)) or {}).get('stages') or {}
     units = (CLOSURES.get(str(run)) or {}).get('units') or {}
     unit_rows = RA.unit_report(steps, closures, units, pass_cache.folder(), reuse_all['workspace'], rebuilt,
-                               root=index.root, limits=RA.region_limits(steps, plans, rebuilt))
-    print('Stage plan (--reuse-all-available), before any stage runs:', flush=True)
+                               root=index.root,
+                               limits=RA.region_limits(steps, plans, rebuilt,
+                                                       (metadata or {}).get('exterior_checklist')))
+    print('Stage plan (%s), before any stage runs:' % ('--reuse-all-available' if reuse_all.get('strict', True)
+                                                       else 'every earlier build of the workspace, the default'),
+          flush=True)
     for line in RA.minute_one_lines(steps, plans, reasons, unit_rows):
         print(line, flush=True)
     allowed = reuse_all.get('allowed') or {}
@@ -4829,12 +4880,20 @@ def minute_one(steps, run, metadata, cache, reasons, index, reuse_all):
                 break
     problems = RA.strict_problems(steps, rebuilt, unit_rows, closures, RA.uncached_bakes(index.root), allowed,
                                   units=units, costs=costs, reasons=reasons)
+    # the default of a plain build (BUILD-OFFER-EARLIER-RUNS-67, reuse_all['strict'] False): the same findings are
+    # notices, the build goes on and says what it makes again and why; given explicitly, --reuse-all-available stops
+    strict = reuse_all.get('strict', True)
     cache['minute_one'] = {'units': {name: [list(row) for row in found] for name, found in unit_rows.items()},
-                           'allowed': allowed, 'stops': [list(row) for row in problems]}
+                           'allowed': allowed, 'stops': [list(row) for row in problems] if strict else [],
+                           **({} if strict else {'mode': 'default build: notices, no stop',
+                                                 'notices': [list(row) for row in problems]})}
     for stage, reason in sorted(allowed.items()):
         if stage in rebuilt:
             print(f'   allowed to rebuild: {stage}: {reason}', flush=True)
-    if problems:
+    if problems and not strict:
+        for line in RA.notice_problem_lines(problems):
+            print(line, flush=True)
+    elif problems:
         metadata['stage_cache'] = cache
         for stage, why in problems:
             print(f'STOP {stage}: {why}', flush=True)
@@ -4911,9 +4970,10 @@ def prepare(steps, run, metadata, reuse_from=None, mode='copy', index=None, scop
             else:
                 result.append((name, command))
         if reuse_all is not None:
-            print(f"Reuse of every earlier run of the workspace (--reuse-all-available): {len(plans)} of {len(steps)} "
-                  f"stages reused ({mode}) from {len(cache['reuse_all']['sources'])} run(s); every other stage runs.",
-                  flush=True)
+            print(f"Reuse of every earlier run of the workspace (--reuse-all-available"
+                  f"{'' if reuse_all.get('strict', True) else ', the default of this build'}): {len(plans)} of "
+                  f"{len(steps)} stages reused ({mode}) from {len(cache['reuse_all']['sources'])} run(s); every other "
+                  'stage runs.', flush=True)
             for source, count in sorted(cache['reuse_all']['sources'].items(), key=lambda item: -item[1]):
                 print(f'   {count:3d} stage(s) from {source}', flush=True)
         else:
@@ -4937,7 +4997,12 @@ def prepare(steps, run, metadata, reuse_from=None, mode='copy', index=None, scop
         # that touch it, before any stage runs; a rebuild the source diff and the inputs do not explain stops here.
         import reuse_report
         check = run_preflight(steps, reasons, compared, reuse_from, index, reused=plans)
-        reuse_report.print_preflight(check, sys.stdout, accepted=accept_rebuild)
+        # the default of a plain build (BUILD-OFFER-EARLIER-RUNS-67): a rebuild the diff does not explain only costs
+        # the time of that stage, so it is a notice there and the build goes on; an explicit reuse option still stops
+        default_build = reuse_all is not None and not reuse_all.get('strict', True)
+        reuse_report.print_preflight(check, sys.stdout, accepted=accept_rebuild or default_build,
+                                     accepted_by='--accept-rebuild' if accept_rebuild else
+                                     'the default build (a notice, no stop): they run again')
         sys.stdout.flush()
         cache['preflight'] = {key: check[key] for key in ('stages', 'reused', 'rebuilt', 'unexpected', 'policy')}
         cache['preflight']['source_diff'] = {key: len(value) if isinstance(value, list) else value
@@ -4953,7 +5018,9 @@ def prepare(steps, run, metadata, reuse_from=None, mode='copy', index=None, scop
             check['too_broad'] = [name for name in check['too_broad'] if name not in advisory]
             cache['preflight']['advisory_rebuilt'] = relaxed
         cache['preflight']['too_broad'] = check['too_broad']
-        if check['too_broad'] and not accept_rebuild:
+        if check['too_broad'] and default_build and not accept_rebuild:
+            cache['preflight']['too_broad_noticed'] = 'the default build: a notice, the stages run again'
+        if check['too_broad'] and not accept_rebuild and not default_build:
             metadata['stage_cache'] = cache
             raise ValueError(f"Reuse preflight: {len(check['too_broad'])} stage(s) would be rebuilt although neither "
                              f"the source diff nor their inputs explain it ({', '.join(check['too_broad'][:6])}); "

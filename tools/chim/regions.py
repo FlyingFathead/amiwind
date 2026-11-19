@@ -93,7 +93,9 @@ def load_status(path):
     for key, rec in cells.items():
         chim = rec.get('chim') if isinstance(rec.get('chim'), dict) else None
         status = chim.get('status') if chim is not None else rec.get('status')
-        island = rec.get('set') or {1: 'vvardenfell', 2: 'bloodmoon'}.get(rec.get('island'), '')
+        # island 3: the cells the presented data folder gives Mournhold's outdoor districts (set tribunal; the tracker's
+        # ingest learns them from the presentation receipt, MOURNHOLD-EXTERIOR-CELLS-66)
+        island = rec.get('set') or {1: 'vvardenfell', 2: 'bloodmoon', 3: 'tribunal'}.get(rec.get('island'), '')
         legacy = rec.get('legacy') if isinstance(rec.get('legacy'), dict) else {}
         # the failing audits and the CHIMport run that measured them, for a refusal that says how old they are
         audits = (rec.get('audits') if isinstance(rec.get('audits'), dict) else {})
@@ -165,10 +167,21 @@ def match_region(name, statuses):
     raise ValueError('Unknown region %r. Regions in the tracker file: %s' % (name, '; '.join(known)))
 
 
+def layer_sets():
+    """{master: named set} of the expansion layers' exteriors, each added to a default CHIM build when its master is
+    selected (tools/build.py resolve_chim_regions): Solstheim for Bloodmoon (LAYER_SETS, CHIM-SOL-FLORA-PATH-65) and
+    Mournhold for Tribunal (its outdoor districts as the presented data folder gives them, MOURNHOLD-EXTERIOR-CELLS-66).
+    A function and not a wider LAYER_SETS: the module's import-time code is in the key of every world stage that
+    imports this module, and only the build's own preflight reads these sets, so no stage key moves with them."""
+    return dict(LAYER_SETS, **{'Tribunal.esm': 'mournhold'})
+
+
 def named_cells(name, statuses):
     """Cells of a named set, on Vvardenfell: seabed (empty sea), coast (finished land cells of ring 1, the
     cells touching the sea), sea-ring (both), coast2 (EVERY cell of rings 1 and 2, whatever its status: the
-    preflight drops the ones that cannot go on CHIM, each with its reason)."""
+    preflight drops the ones that cannot go on CHIM, each with its reason). An expansion layer's set (layer_sets):
+    solstheim, every cell of Bloodmoon's island; mournhold, every presented cell of Mournhold's districts (set
+    tribunal); whatever their status, the preflight dropping the unfinished ones with their reason."""
     main = {c: v for c, v in statuses.items() if v['set'] == 'vvardenfell'}
     if name == 'seabed':
         return sorted(c for c, v in main.items() if v['status'] in SEABED)
@@ -182,6 +195,10 @@ def named_cells(name, statuses):
         # EVERY cell of Solstheim, whatever its status: the preflight drops the unfinished ones with their reason,
         # so the layer grows as CHIMport finishes its cells (the island's method; open sea only by explicit cell)
         return sorted(c for c, v in statuses.items() if v['set'] == 'bloodmoon')
+    if name == 'mournhold':
+        # EVERY presented cell of Mournhold's districts, whatever its status, as for Solstheim: the preflight drops the
+        # unfinished ones with their reason, so the set grows as CHIMport finishes its cells
+        return sorted(c for c, v in statuses.items() if v['set'] == 'tribunal')
     raise ValueError('Unknown named set: ' + name)
 
 
@@ -204,7 +221,7 @@ def select(specs, statuses, read_file=read_cell_file):
                 for region in regions:
                     cells.update(region_cells(match_region(region, statuses), statuses))
                 record['files'].append(rec)
-            elif part.casefold() in NAMED:
+            elif part.casefold() in NAMED or part.casefold() in layer_sets().values():
                 cells.update(named_cells(part.casefold(), statuses))
             else:
                 cells.update(region_cells(match_region(part, statuses), statuses))
@@ -370,6 +387,15 @@ def preflight(cells, explicit, statuses, town_boxes, one_map_only=False):
             else:                     # a named set (coast2) or region name: left out with its reason, listed
                 dropped.append({'cell': list(cell), 'reason': reason})
             continue
+        if one_map_only and rec.get('set') == 'tribunal':
+            # a presented cell (an interior district presented as an exterior) has no open-world map of its own
+            reason = ('a presented cell of Mournhold has no legacy open-world map; the earlier region method '
+                      '(--chim-region-rows legacy) copies one')
+            if cell in explicit:
+                problems.append('cell %s: %s' % (cell_key(cell), reason))
+            else:
+                dropped.append({'cell': list(cell), 'reason': reason})
+            continue
         maps = rec.get('legacy_maps')
         if one_map_only and maps is not None and len(maps) != 1:
             problems.append('cell %s: the tracker lists %d legacy maps for it; the earlier region method '
@@ -509,8 +535,11 @@ def check_source_land(settings, audit, land_records=None, source=None):
     defaultHeight); mwad.audit.default_land is that height. land_records: a
     callable or set of the cells with a live LAND record in the masters
     (chim.ocean_runtime.land_cells), read only when the owned cell has no
-    heights; a cell with no LAND record at all is still refused. source: the
-    audit file (path, sha256) named in a refusal.
+    heights; a cell with no LAND record at all is still refused, unless its
+    settings carry "no_land" (config/visual-recipes.json cell_settings: a cell
+    without LAND by design, Mournhold's districts presented as exteriors,
+    MOURNHOLD-EXTERIOR-CELLS-66), which is admitted as flat default ground.
+    source: the audit file (path, sha256) named in a refusal.
     """
     if not settings.get('region_source_apron'):
         return None
@@ -525,6 +554,12 @@ def check_source_land(settings, audit, land_records=None, source=None):
                          'centre %s radius %s against source_cell, source_radius %s)'
                          % (where, list(area['center']), area['radius_cells'], settings['source_radius']))
     if settings.get('ocean_runtime') or cell not in {tuple(c) for c in area['default_land_cells']}:
+        return None
+    if settings.get('no_land'):
+        # a cell with no LAND record by design (config/visual-recipes.json cell_settings "no_land": Mournhold's
+        # districts presented as exteriors, their ground their placed models): flat default ground, as CHIMport
+        # converts it. The key is written out here and in owned_land_problems, not as a module constant: the
+        # module's import-time code is in the key of every world stage that imports it.
         return None
     records = land_records() if callable(land_records) else land_records
     if records is not None and cell in {tuple(c) for c in records}:
@@ -579,13 +614,16 @@ def ocean_land_problems(kinds, data_files):
 def owned_land_problems(kinds, data_files):
     """Land/seabed region cells with no LAND record at all in the masters: check_source_land refuses them inside
     the CHIM stage (no heights and no ocean admission), so the preflight names them in seconds first. A LAND
-    record without heights is fine (flat seabed, CHIM-REGION-SEABED-NO-HEIGHTS-42)."""
+    record without heights is fine (flat seabed, CHIM-REGION-SEABED-NO-HEIGHTS-42), and so is a cell whose
+    settings carry "no_land" (config/visual-recipes.json cell_settings: Mournhold's districts presented as exteriors
+    have no LAND by design; check_source_land admits them as flat default ground, MOURNHOLD-EXTERIOR-CELLS-66)."""
     owned = sorted(c for c, k in kinds.items() if k != 'ocean')
     if not owned or not data_files:
         return []
     from chim.ocean_runtime import land_cells
+    from visual_recipes import cell_settings
     land = land_cells(data_files)
-    bad = [c for c in owned if tuple(c) not in land]
+    bad = [c for c in owned if tuple(c) not in land and not cell_settings(c).get('no_land')]
     if not bad:
         return []
     return ['%d region cell(s) the status file calls land or seabed have no LAND record in the game data (the '

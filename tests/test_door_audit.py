@@ -50,10 +50,13 @@ def row(source, target, ref, mins, maxs, arrival=(0, 0, 0), yaw=90.0, label='A T
 class EngineNames(unittest.TestCase):
     def test_every_list_and_the_terrain_rule(self):
         for name in ('seyda', 'mi000000000001', 'vivec_city', 'bmhouse', 'ri0123456789', 'vf0042', 'vf4095',
-                     'sl0000', 'sl4095'):
+                     'sl0000', 'sl3839', 'mh0000', 'mh0255'):
             self.assertTrue(door_audit.map_valid(name, NAMES), name)
         self.assertEqual((door_audit.terrain_id('vf0042'), door_audit.terrain_id('sl0007')), (42, 4103))
-        for name in ('', 'vf4096', 'vf8191', 'sl4096', 'vf42', 'ri0000000000', 'nowhere', 'riaaaaaaaaa'):
+        # Mournhold's district frame maps: the outdoor block's last 256 IDs (aw_maps.h AW_MOURNHOLD_TERRAIN_BASE)
+        self.assertEqual((door_audit.terrain_id('mh0000'), door_audit.terrain_id('mh0255')), (7936, 8191))
+        for name in ('', 'vf4096', 'vf8191', 'sl3840', 'sl4096', 'mh0256', 'vf42', 'ri0000000000', 'nowhere',
+                     'riaaaaaaaaa'):
             self.assertFalse(door_audit.map_valid(name, NAMES), name)
 
 

@@ -49,7 +49,9 @@ canvas{flex:1;width:100%;min-height:200px;display:block;background:#0b121a;touch
 </div>
 <div id="help" class="muted">Both views share one camera, as in the 3D Map Inspector: drag to orbit, middle-drag to move closer or farther,
 right-drag or Shift-drag to pan, wheel to zoom; W/S/A/D (or the arrow keys) fly, E/Q up and down, Shift 4x faster, Ctrl or Alt 4x slower.
-Back faces are drawn darker red. Files are read in your browser; nothing is uploaded.</div>
+Back faces are drawn darker red. Files are read in your browser; nothing is uploaded.
+To convert any model to OBJ+MTL in Morrowind or Quake units, with its textures, or back to the builder's form: tools/mesh_convert.py
+(docs/MESH_CONVERT.md). The server list is in Quake units; compare files of the same units (each file's header line names them).</div>
 <script src="view-camera.js"></script>
 <script>
 'use strict';

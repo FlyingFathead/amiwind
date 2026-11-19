@@ -1,8 +1,10 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include "quakedef.h"
+#include "aw_activate.h"   /* AW_MODEL_ONE_STORED_FRAME (FOCUS-NPC-OVERRIDES-ITEM-62) */
 #include <assert.h>
 server_t sv;
-char *pr_strings="\0aw_npc\0Resident";
+/* string offsets: 1 the class, 8 the name, 17 an outdoor creature's model (FOCUS-NPC-OVERRIDES-ITEM-62) */
+char *pr_strings="\0aw_npc\0Resident\0progs/c_guar.mdl";
 static edict_t entities[4];static model_t model;
 static float wall=1000,floor_z;static int blocked,steep,chim_on;static eval_t mode,valid,baked;
 edict_t *EDICT_NUM(int n){assert(n>=0 && n<4);return &entities[n];}
@@ -10,7 +12,13 @@ edict_t *EDICT_NUM(int n){assert(n>=0 && n<4);return &entities[n];}
  * swims), the drop setting */
 static int record_walks;extern int (*aw_actor_walks)(edict_t *e);
 static int walks(edict_t *e){(void)e;return record_walks;}
-eval_t *GetEdictFieldValue(edict_t *e,char *name){if(!strcmp(name,"aw_ground_mode"))return &mode;if(!strcmp(name,"aw_ground_valid"))return &valid;if(!strcmp(name,"aw_ground_baked"))return &baked;return NULL;}
+/* FOCUS-NPC-OVERRIDES-ITEM-62: the instance scale (aw_scale) when SCALE_ON, the fight's state (2 a body) */
+static int scale_on,slot_state;static eval_t scale;
+int AW_CombatSlotState(edict_t *x,float *health){(void)x;if(health)*health=0;return slot_state;}
+/* aw_ambient.c's answer (its wander slot's creature flag; -1 no slot) */
+static int slot_kind=-1;extern int (*aw_actor_creature)(edict_t *e);
+static int creature_slot(edict_t *x){(void)x;return slot_kind;}
+eval_t *GetEdictFieldValue(edict_t *e,char *name){if(!strcmp(name,"aw_ground_mode"))return &mode;if(!strcmp(name,"aw_ground_valid"))return &valid;if(!strcmp(name,"aw_ground_baked"))return &baked;if(!strcmp(name,"aw_scale"))return scale_on?&scale:NULL;return NULL;}
 void SV_LinkEdict(edict_t *e,qboolean touch){}
 int AW_RegionGroundCoverage(const float *point){return 1;}
 int Chim_Active(void){return chim_on;}
@@ -62,6 +70,51 @@ int main(void){
      {vec3_t down={30,0,0};assert(AW_NPCTarget(p,down)==e);}             /* looking down at the body: hit */
      e->v.frame=7;e->v.origin[1]=12;assert(!AW_NPCTarget(p,angles));      /* a frame out of range: frame 0 */
      e->v.frame=0;e->v.origin[1]=0;resident=0;
+     model.mins[0]=model.mins[1]=-4;model.maxs[0]=model.maxs[1]=4;}
+    /* FOCUS-NPC-OVERRIDES-ITEM-62: a skeletal person, the kind the game ships since v0.0.52, holds ONE stored frame
+     * whose box encloses every pose (here 60 by 60 by 40, the two frames above together); his animation's frame
+     * numbers run past it (frame 0's box). The use is tested against his body: world.qc aw_npc_floor's hull, half
+     * widths 7.32 by 7.12 times his scale, never wider than the stored box, its height kept for the head; a body
+     * against the stored box lowered to 8 units over its floor. Before, the stored box reached 30 units around him
+     * (Aleri Aren 44 units from the door back in the Mournhold Guards' Quarters, Fargoth at the census office door).
+     * THE GUARD'S LESSON: the two-frame fixture above passed from v0.0.60-dev3 on while every person the game shipped
+     * had one frame; a test fixture is of the kind the game ships. */
+    {static const vec3_t hull_lo={-7.32f,-7.12f,0},hull_hi={7.32f,7.12f,33.25f};vec3_t down={30,0,0};
+     model.mins[0]=model.mins[1]=-30;model.maxs[0]=model.maxs[1]=30;model.maxs[2]=40;
+     VectorCopy(hull_lo,e->v.mins);VectorCopy(hull_hi,e->v.maxs);resident=1;
+     /* two frames, the person's hull: the drawn frame's box as before, the lying frame not narrowed */
+     e->v.frame=1;e->v.origin[1]=24;assert(AW_NPCTarget(p,down)==e);
+     e->v.frame=0;e->v.origin[1]=12;assert(!AW_NPCTarget(p,angles));
+     /* ONE frame */
+     alias.m.numframes=1;frame_box(&alias.h.frames[0],-30,-30,0,30,30,40);e->v.frame=22;
+     e->v.origin[1]=12;assert(!AW_NPCTarget(p,angles));                   /* standing beside the line: missed */
+     e->v.origin[1]=0;assert(AW_NPCTarget(p,angles)==e);                  /* on it, at the head above the hull: hit */
+     e->v.origin[1]=6;assert(AW_NPCTarget(p,angles)==e);                  /* inside his half width: hit */
+     e->v.origin[1]=12;scale_on=1;scale._float=2;
+     assert(AW_NPCTarget(p,angles)==e);scale_on=0;                        /* twice his size, 14.24 wide: hit */
+     e->v.model=17;assert(AW_NPCTarget(p,angles)==e);e->v.model=0;        /* an outdoor creature: the stored box */
+     /* a creature by its wander slot (aw_ambient.c): a room creature (progs/a_*) keeps the stored box; the slot's
+      * word wins over the model's name; no slot: the name decides */
+     aw_actor_creature=creature_slot;slot_kind=1;assert(AW_NPCTarget(p,angles)==e);
+     slot_kind=0;e->v.model=17;assert(!AW_NPCTarget(p,angles));
+     slot_kind=-1;assert(AW_NPCTarget(p,angles)==e);e->v.model=0;assert(!AW_NPCTarget(p,angles));
+     aw_actor_creature=NULL;
+     /* evicted: the whole model's bounds, narrowed the same once a resident look has seen the one stored frame (the
+      * bit it keeps in model_t flags); never seen resident, as before */
+     model.flags=0;resident=0;assert(AW_NPCTarget(p,angles)==e);         /* not known yet: the whole bounds */
+     resident=1;assert(!AW_NPCTarget(p,angles) && (model.flags&AW_MODEL_ONE_STORED_FRAME));   /* seen: learnt */
+     resident=0;assert(!AW_NPCTarget(p,angles));                          /* evicted: still his body */
+     e->v.origin[1]=0;assert(AW_NPCTarget(p,angles)==e);
+     resident=1;
+     slot_state=2;e->v.origin[1]=0;assert(!AW_NPCTarget(p,angles));      /* a body, level over it: missed */
+     assert(AW_NPCTarget(p,down)==e);                                     /* looking down at it: hit */
+     e->v.origin[1]=24;assert(AW_NPCTarget(p,down)==e);                   /* across the line: its stored width */
+     slot_state=0;
+     /* two frames again: a resident look forgets the one-frame bit */
+     alias.m.numframes=2;frame_box(&alias.h.frames[0],-4,-4,0,4,4,40);e->v.frame=0;e->v.origin[1]=0;
+     assert(AW_NPCTarget(p,angles)==e && !(model.flags&AW_MODEL_ONE_STORED_FRAME));
+     VectorCopy(vec3_origin,e->v.mins);VectorCopy(vec3_origin,e->v.maxs);
+     resident=0;model.flags=0;
      model.mins[0]=model.mins[1]=-4;model.maxs[0]=model.maxs[1]=4;}
     floor_z=126;e->v.origin[2]=144;
     assert(AW_NPCFloor(e));assert(fabs(e->v.origin[2]-126.25f)<.001);

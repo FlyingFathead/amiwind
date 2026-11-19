@@ -2327,6 +2327,142 @@ static int place_here(int row,const place_row_t *r,const vec3_t local,float yaw)
      if(!placed_spawn(key)){AW_ActorsPlacedForget(key);AW_MwvmForget(key);return 0;}
      return 1;}
 }
+/* --- dbg spawn (DBG-SPAWN-MENU-67): any NPC or creature the build has a model for (the actor table's base of the record,
+ * aw_actors.h AW_ActorsBaseText), in front of the player as a summon appears (safePlaceObject: 120 game units ahead, the
+ * next direction when that way is blocked, on the ground), facing the player, a new reference AW_ACTORS_SPAWNED | slot.
+ * FULL 1 (the box's "[x] spawn in with base attributes", the default): the actor as the game makes one, its record's
+ * stats, behaviour (its Fight rating: an aggressive one attacks), carried items, and its record's script: the levelled
+ * lists' row of the record (LACT) or the script of a placed reference of the same id (BNAM, then that reference's BIND
+ * row). FULL 0: its model only, standing, with no behaviour, script or fight (a placeholder to look at). A spawned one
+ * stays while its place is loaded; leaving or a load does not bring it back (the next spawn in its slot forgets the old
+ * row and script values). Cost: one base read from the actor table and a few binary-search reads; nothing per frame. */
+#define SPAWN_DISTANCE (120*0.25f)
+static unsigned long spawns_made,spawns_refused,spawns_removed;
+static int spawn_cursor;
+static string_t placeholder_class;static void *placeholder_map;
+static int spawned_key(uint32_t key){return key>=AW_ACTORS_SPAWNED && key<AW_ACTORS_SPAWNED+AW_ACTORS_SPAWNED_SLOTS;}
+static int placeholder_edict(edict_t *e){
+    return e && !e->free && placeholder_map==(void *)sv.worldmodel && placeholder_class && e->v.classname==placeholder_class;
+}
+/* a free slot: one whose actor is not here (its old row and script values forgotten); -1 all 256 are here */
+static int spawn_slot(void){
+    int n,slot;uint32_t key;
+    for(n=0;n<(int)AW_ACTORS_SPAWNED_SLOTS;n++){
+        slot=(spawn_cursor+n)%(int)AW_ACTORS_SPAWNED_SLOTS;key=AW_ACTORS_SPAWNED|(uint32_t)slot;
+        if(edict_of_ref(key))continue;
+        AW_ActorsPlacedForget(key);AW_MwvmForget(key);
+        spawn_cursor=slot+1;
+        return slot;
+    }
+    return -1;
+}
+/* the script a placed reference of the record whose folded id hashes to H runs (BNAM by the id's hash, then the BIND row
+ * of its first reference); 1 found */
+static int bound_script(uint32_t h,int *script){
+    uint32_t off,rows,bytes,lo=0,hi,ref;unsigned char b[8];FILE *f=NULL;long base,low=0,high;unsigned char row[24];int found=0;
+    if(!AW_MwvmSection("BNAM",&off,&rows,&bytes) || !rows)return 0;
+    hi=rows;
+    while(lo<hi){
+        uint32_t mid=(lo+hi)/2,v;
+        if(actor_read(NULL,off+8u*mid,b,4))return 0;
+        v=((uint32_t)b[0]<<24)|((uint32_t)b[1]<<16)|((uint32_t)b[2]<<8)|b[3];
+        if(v<h)lo=mid+1;else hi=mid;
+    }
+    if(lo>=rows || actor_read(NULL,off+8u*lo,b,8) || (((uint32_t)b[0]<<24)|((uint32_t)b[1]<<16)|((uint32_t)b[2]<<8)|b[3])!=h)
+        return 0;
+    ref=((uint32_t)b[4]<<24)|((uint32_t)b[5]<<16)|((uint32_t)b[6]<<8)|b[7];
+    if(!AW_MwvmSection("BIND",&off,&rows,&bytes) || !rows || COM_FOpenFile(FILE_NAME,&f)<=0 || !f){if(f)fclose(f);return 0;}
+    base=ftell(f);high=(long)rows-1;
+    while(low<=high){
+        long mid=(low+high)/2;uint32_t r;
+        if(fseek(f,base+(long)off+24L*mid,SEEK_SET) || fread(row,1,24,f)!=24)break;
+        r=((uint32_t)row[0]<<24)|((uint32_t)row[1]<<16)|((uint32_t)row[2]<<8)|row[3];
+        if(r<ref)low=mid+1;else if(r>ref)high=mid-1;
+        else{*script=(row[4]<<8)|row[5];found=1;break;}
+    }
+    fclose(f);
+    return found;
+}
+int AW_MwscriptSpawn(const char *id,int full){
+    unsigned long n=0;char *text,*out,tail[40],folded[64];vec3_t base,local;float yaw;edict_t *e;int t,i,slot,script=-1;
+    uint32_t key;const char *how="";
+    if(!sv.active || !sv_player || !id || !*id){Con_Printf("dbg spawn: start the game first.\n");return 0;}
+    if(!(text=AW_ActorsBaseText(id,&n))){
+        Con_Printf("dbg spawn: %s has no model in this build (only the people and creatures it makes can be spawned).\n",id);
+        spawns_refused++;return 0;
+    }
+    if((slot=spawn_slot())<0){
+        free(text);Con_Printf("dbg spawn: %ld spawned ones are here already; dbg despawn all first.\n",(long)AW_ACTORS_SPAWNED_SLOTS);
+        spawns_refused++;return 0;
+    }
+    key=AW_ACTORS_SPAWNED|(uint32_t)slot;
+    VectorCopy(sv_player->v.origin,base);base[2]+=sv_player->v.mins[2];yaw=sv_player->v.v_angle[1];
+    place_spot(base,yaw,SPAWN_DISTANCE,0,1,local);
+    t=sprintf(tail,"\n\"aw_ref\" \"%lu\"\n}",(unsigned long)key);
+    out=n>=2 && text[n-1]=='}'?(char *)AW_TryMalloc(n+(unsigned long)t+1):NULL;
+    if(out){memcpy(out,text,n-1);memcpy(out+n-1,tail,(size_t)t+1);}
+    free(text);
+    e=out && AW_ActorsPlaceRow(key,local,yaw+180)?AW_ActorsSpawnVisitor(out,n-1+(unsigned long)t):NULL;
+    free(out);
+    if(!e){
+        AW_ActorsPlacedForget(key);spawns_refused++;
+        Con_Printf("dbg spawn: %s could not be spawned here (dbg creatures off, no free entity, or its record is dead).\n",id);
+        return 0;
+    }
+    edict_refs_refresh();
+    if(full){
+        for(i=0;id[i] && i<(int)sizeof(folded)-1;i++)folded[i]=(char)tolower((unsigned char)id[i]);
+        folded[i]=0;
+        if(AW_MwvmLevelledScript(AW_MwvmTextHash(folded,i),&script) || bound_script(AW_MwvmTextHash(folded,i),&script)){
+            if(attach_script(key,script,map_room?AWB_INTERIOR:0,NUM_FOR_EDICT(e),e->v.origin)>=0){attach_edicts++;how=", its script runs";}
+            else{attach_refused++;how=", its script could not attach";}
+        }
+    }else{
+        /* the model only: out of every actor system (behaviour, fights, dialogue, the area's actor window) */
+        if(placeholder_map!=(void *)sv.worldmodel || !placeholder_class){
+            placeholder_class=ED_NewString("aw_dbg_placeholder")-pr_strings;placeholder_map=(void *)sv.worldmodel;
+        }
+        AW_CombatForget(e);
+        e->v.classname=placeholder_class;e->v.think=0;e->v.nextthink=0;e->v.movetype=MOVETYPE_NONE;
+        e->v.takedamage=DAMAGE_NO;VectorCopy(vec3_origin,e->v.velocity);
+        AW_ActorsPlacedForget(key);
+        SV_LinkEdict(e,false);
+        how=", its model only";
+    }
+    summon_flash(e->v.origin);
+    spawns_made++;
+    Con_Printf("dbg spawn: %s (%s, ref %lu)%s.\n",e->v.netname?pr_strings+e->v.netname:id,id,(unsigned long)key,how);
+    return 1;
+}
+/* dbg despawn's click (aw_companion.c): the aimed actor goes; a spawned one with its row and script values, a game actor
+ * until its place loads again (its row of the world change list stays as it was) */
+static void spawn_remove(edict_t *e){
+    eval_t *v;uint32_t key;
+    if(!e || e->free)return;
+    v=field_ref(e);key=v && v->_float>0?(uint32_t)v->_float:0;
+    Con_Printf("dbg despawn: %s%s\n",e->v.netname?pr_strings+e->v.netname:"?",
+               spawned_key(key)?" (spawned) is gone":" is gone until its place loads again");
+    summon_flash(e->v.origin);
+    if(key && !spawned_key(key))AW_MwvmDetach(key);   /* its script's values parked, as an actor leaving the map */
+    if(placeholder_edict(e))ED_Free(e);else AW_ActorsRemove(e);
+    if(spawned_key(key)){AW_ActorsPlacedForget(key);AW_MwvmForget(key);}
+    edict_refs_refresh();
+    spawns_removed++;
+}
+void AW_MwscriptDespawnAll(void){
+    int i,n=0;edict_t *e;eval_t *v;
+    if(!sv.active){Con_Printf("dbg despawn all: start the game first.\n");return;}
+    for(i=1;i<sv.num_edicts;i++){
+        e=EDICT_NUM(i);
+        if(e->free || !(v=field_ref(e)) || !spawned_key(v->_float>0?(uint32_t)v->_float:0))continue;
+        if(placeholder_edict(e))ED_Free(e);else AW_ActorsRemove(e);
+        AW_ActorsPlacedForget((uint32_t)v->_float);AW_MwvmForget((uint32_t)v->_float);
+        n++;spawns_removed++;
+    }
+    if(n)edict_refs_refresh();
+    Con_Printf("dbg despawn all: %d spawned one%s gone (spawned %lu, refused %lu, removed %lu this session).\n",n,n==1?"":"s",
+               spawns_made,spawns_refused,spawns_removed);
+}
 static int place_call(int instance,int target,int function,const aw_mwcell_t *numbers,int count){
     place_row_t r;vec3_t base,local;float yaw=0;int i,row,copies=1,made=0;
     if(function==AWF_PLACEATPC || function==AWF_PLACEATME){
@@ -3725,8 +3861,8 @@ static int host_call(int instance,int target,int function,const aw_mwcell_t *num
         if(!AW_OpeningScriptMenu(function==AWF_ENABLECLASSMENU?2:function==AWF_ENABLEBIRTHMENU?3:4))return 0;
         AW_MwvmStateChanged();return 1;
     case AWF_SHOWMAP:{
-        /* ShowMap TEXT: the exterior cells whose name holds TEXT become known on the map (OpenMW OpShowMap); kept
-         * for the map's place markers (INGAME-MAP-ORIGINAL-57), which do not exist yet */
+        /* ShowMap TEXT: the exterior cells whose name starts with TEXT become known on the map (OpenMW OpShowMap);
+         * kept for the map's place markers (aw_worldui.c map_places_load, MAP-PLACES-SHOWN-UNVISITED-67) */
         const char *text=call_string(strings,nstrings,0);
         if(!text || !*text)return 0;
         if(!AW_RevealedAdd(text)){Con_DPrintf("MWScript: ShowMap %s not kept (the revealed places list is full)\n",text);return 0;}
@@ -4060,9 +4196,56 @@ static int speaker_pair(const aw_glut_cond_t *c,unsigned fn,long *out){
     }
     return AW_DialPairFunction(&p,fn,out);
 }
+/* DIALOGUE-CONDITIONS-PARTIAL-67: the player's diseases, the value worn, Corprus and vampirism read the live game, as
+ * OpenMW 0.51 filter.cpp reads them: PcCommonDisease and PcBlightDisease a common (ASPT 3) or a blight (ASPT 2) disease
+ * among the player's spells (Spells::hasCommonDisease, hasBlightDisease); PcClothingModifier the summed value of what
+ * the player wears in the slots 0..15 (everything but the hands and the ammunition); PcCorprus and PcVampire a Corprus
+ * (132) or Vampirism (133) magnitude among the player's effects, the active ones and the always-active spells of the
+ * list (getMagicEffects). The spell list and the item records partly live on disk, so each answer is kept with what it
+ * depends on (the player's record, its spell changes, the pool's epoch; the worn ids): a file is read once after a
+ * change, never for every condition. Attacked reads the speaker's attacked flag, the one GetAttacked reads
+ * (attacked_now). Before v0.0.67-dev3 these six read their start-of-game value. */
+static struct {const aw_actor_t *who;uint16_t base;unsigned long epoch,print;int valid,common,blight;} disease_memo;
+static struct {uint32_t worn[AW_SLOT_BELT+1];long value;int valid;} worn_memo;
+static unsigned long spell_print(const aw_actor_t *a){
+    unsigned long f=a->nspells;int i;
+    for(i=0;i<a->nspells;i++)f=f*31u+(unsigned long)a->spells[i].spell*2u+(a->spells[i].change>0);
+    return f;
+}
+static int player_disease(int type){
+    aw_actor_t *p;unsigned long epoch,print;
+    if(!AW_MwscriptActors() || (p=AW_ActorPlayer())==NULL)return 0;
+    epoch=AW_ActorStateEpoch()+creation_generation;print=spell_print(p);
+    if(!disease_memo.valid || disease_memo.who!=p || disease_memo.base!=p->base || disease_memo.epoch!=epoch ||
+       disease_memo.print!=print){
+        disease_memo.common=AW_ActorHasSpellType(p,3)!=0;disease_memo.blight=AW_ActorHasSpellType(p,2)!=0;
+        disease_memo.who=p;disease_memo.base=p->base;disease_memo.epoch=epoch;disease_memo.print=print;disease_memo.valid=1;
+    }
+    return type==3?disease_memo.common:disease_memo.blight;
+}
+static long player_worn_value(void){
+    uint32_t worn[AW_SLOT_BELT+1];int slot;aw_inventory_item_t it;long value=0;
+    for(slot=0;slot<=AW_SLOT_BELT;slot++){
+        const char *id=aw_state.inventory.equipped[slot];
+        worn[slot]=id[0] && AW_StateGet(&aw_state,AW_ITEM,id)>0?AW_LedgerNameHash(id)|1u:0;
+    }
+    if(worn_memo.valid && !memcmp(worn_memo.worn,worn,sizeof(worn)))return worn_memo.value;
+    for(slot=0;slot<=AW_SLOT_BELT;slot++)if(worn[slot] && AW_InventoryEquippedItem(slot,&it))value+=it.value;
+    memcpy(worn_memo.worn,worn,sizeof(worn));worn_memo.value=value;worn_memo.valid=1;
+    return value;
+}
+static int player_has_effect(int effect){
+    return AW_EffectsMagnitude(AW_ACTOR_PLAYER_REF,effect,AW_EFFECT_NO_ARG)+
+           passive_of(player_record(),AW_ACTOR_PLAYER_REF,effect)!=0;
+}
 /* SCVR function numbers (mwad.dialogue FUNCTIONS): the player's standing and the character's stats */
 static int live_function(const aw_glut_cond_t *c,unsigned fn,long *out){
     if(fn==44 || fn==45 || fn==71)return speaker_pair(c,fn,out);        /* SameSex, SameRace, ShouldAttack */
+    if(fn==40 || fn==41){*out=player_disease(fn==40?3:2);return 1;}      /* PcCommonDisease, PcBlightDisease */
+    if(fn==42){*out=player_worn_value();return 1;}                        /* PcClothingModifier */
+    if(fn==58 || fn==60){*out=player_has_effect(fn==58?132:133);return 1;} /* PcCorprus, PcVampire */
+    if(fn==62){                                                           /* Attacked: the speaker's, as GetAttacked */
+        *out=c->speaker>0 && c->speaker<sv.num_edicts && attacked_now(EDICT_NUM(c->speaker));return 1;}
     if(fn==5){*out=AW_StandingReputation();return 1;}                      /* PcReputation */
     if(fn==43){*out=AW_StandingCrime();return 1;}                          /* PcCrimeLevel */
     if(fn==49){                                                            /* Alarmed (CRIME-59): the speaker's mark */
@@ -4118,9 +4301,8 @@ static int live_global(const char *name,float *out){
 static int standing_rank(const char *faction,int *expelled){*expelled=AW_StandingExpelled(faction);return AW_StandingRank(faction);}
 static int player_diseased=-1;   /* the last read (a disk read: never on the engage tick), -1 not read yet */
 static int disposition_diseased(int read){
-    aw_actor_t *p;
-    if(read && AW_MwscriptActors() && (p=AW_ActorPlayer())!=NULL)
-        player_diseased=AW_ActorHasSpellType(p,2) || AW_ActorHasSpellType(p,3);
+    if(read && AW_MwscriptActors() && AW_ActorPlayer()!=NULL)
+        player_diseased=player_disease(2) || player_disease(3);   /* the conditions' kept answer (above) */
     return player_diseased>0;
 }
 static int disposition_weapon_drawn(void){
@@ -4217,7 +4399,8 @@ static const aw_glut_live_t live={live_journal,live_dead,live_item,live_rank,liv
 /* --- loading and the map's objects --- */
 /* a new game (aw_save.c AW_SaveReset, every opening and quick start): its run-once scripts start on the next tick */
 static int new_game_pending,new_game_started;static unsigned long new_games;
-static void new_game_hook(void){new_game_pending=1;new_game_started=0;}
+static int after_census_row=-1;   /* DBG-HORS-AFTER-CENSUS-67 (AW_MwscriptAfterCensus): New Game drops a pending one */
+static void new_game_hook(void){new_game_pending=1;new_game_started=0;after_census_row=-1;}
 static int load(void){
     FILE *f=NULL;int length,i,n;unsigned char head[16];uint32_t wanted;char name[64];long base;
     if(resident || load_failed)return resident!=NULL;
@@ -4553,6 +4736,27 @@ static void join_fights(float dt){
  * interpreter, else a script's own change (a SET of CharGenState) goes back into aw_state. One global lookup per file
  * load (the index is kept), then two reads per tick. */
 static int chargen_global=-2;static int32_t chargen_synced=0x7fffffff;
+/* DBG-HORS-AFTER-CENSUS-67: the bare 'dbg aw hors' asks for AW_AfterCensus, the script the builder writes from the
+ * game's own chargen scripts and Sellus Gravius's results (tools/mwscript/aftercensus.py: the state of a player who has
+ * walked out of the census office). It starts on the first tick after the new game's own start (the run-once scripts,
+ * CharGen's switches), so its Enable calls are the last word; it runs once (it ends with StopScript). 0: the file is
+ * not loaded or has no such script (an older disk). */
+int AW_MwscriptAfterCensus(void){
+    int s;char name[64];
+    if(!load())return 0;
+    for(s=0;s<AW_MwvmScriptCount();s++){
+        read_string(AW_MwvmScriptName(s),name,sizeof(name));
+        if(same_id(name,"AW_AfterCensus")){after_census_row=s;return 1;}
+    }
+    return 0;
+}
+static void after_census_start(void){
+    if(after_census_row<0 || new_game_pending)return;
+    AW_MwvmGlobalScriptSet(after_census_row,1);AW_MwvmStateChanged();
+    Con_Printf("dbg aw hors: AW_AfterCensus started (row %d): the state after the census office, from the game's "
+               "scripts.\n",after_census_row);
+    after_census_row=-1;
+}
 static void chargen_sync(void){
     int32_t story,script;int type=0;aw_mwcell_t c;
     if(chargen_global==-2){
@@ -4574,6 +4778,8 @@ static void chargen_sync(void){
  * local map fog clears (localmap.cpp updatePlayer: every frame, 0.17 of a cell around the player); here once the player
  * has moved 128 source units, a few dozen bit tests. A place square shows once its spot is explored (aw_worldui.c).
  * Saved with the game (AWFG), cleared by New Game. */
+/* AW-RECOVER test aid (dbg hosterror script, aw_loadfail.c sets it): called inside the frame's script step; NULL in play */
+void (*aw_mwhost_step_error)(void);
 static void map_visit(void){
     static int have;static float last_x,last_y;float source[3];
     if(!AW_WorldToSource(sv.name,sv_player->v.origin,source)){   /* an interior: its own room fog (stage 3) */
@@ -4585,7 +4791,10 @@ static void map_visit(void){
     if(have && fabsf(source[0]-last_x)<128 && fabsf(source[1]-last_y)<128 && AW_MapFogCells())return;
     have=1;last_x=source[0];last_y=source[1];
     AW_MapFogReveal(source[0],source[1]);
-}void AW_MwscriptTick(float dt){
+}
+/* a debug room's pause of the game's scripts (aw_cycleitems.c: the light test corridor); NULL = never */
+int (*aw_mwscript_paused)(void);
+void AW_MwscriptTick(float dt){
     int k,n,i;vec3_t player;
     /* no game running (a load, the main menu): a script's message box goes with it */
     if(!sv.active || cls.signon!=SIGNONS || !sv_player){AW_MsgBoxClear();return;}
@@ -4595,6 +4804,8 @@ static void map_visit(void){
     }
     map_visit();
     if(!mwscript.value){AW_MsgBoxClear();AW_MusicAmbience(0);return;}
+    /* LIGHTTEST-MAP-67: the light test corridor pauses them too (aw_cycleitems.c; aw_lighttest_scripts 1 runs them) */
+    if(aw_mwscript_paused && aw_mwscript_paused()){AW_MsgBoxClear();AW_MusicAmbience(0);return;}
     {   /* ARRIVAL-LONG-FRAME-DEV6-59: the parts of a first tick that take long are named */
         double t0=Sys_FloatTime(),t1,t2;int was=resident!=NULL;
         if(!load())return;
@@ -4610,6 +4821,7 @@ static void map_visit(void){
         }
         t1=Sys_FloatTime();
         chargen_sync();   /* OPENING-REGRESSION-64: before any script runs this tick */
+        after_census_start();   /* DBG-HORS-AFTER-CENSUS-67: after the new game's own start, before the scripts run */
         if(script_model!=map_model){script_model=map_model;attach_map();attaching=0;carried_sync();}
         t2=Sys_FloatTime();
         if(t2-t0>.3)Con_Printf("MWScript first tick: file %s %.0f ms, map attach %.0f ms.\n",was?"kept":"loaded",
@@ -4657,6 +4869,9 @@ static void map_visit(void){
     removed_flush();   /* the items the player no longer carries: their carried scripts stop */
     levelled_flush();   /* the actors levelled lists gave since the last frame: their records' scripts */
     {double t0=Sys_FloatTime();
+     /* AW-RECOVER's test aid (dbg hosterror script, aw_loadfail.c): an error in a step of its own just before the tick,
+      * counted as running as the tick is, so it leaves the step counted as a script's own error would */
+     if(aw_mwhost_step_error){script_depth++;aw_mwhost_step_error();script_depth--;}
      script_depth++;AW_MwvmTick(dt,player);script_depth--;   /* SAVE-INSIDE-SCRIPT-STEP-66: a save asked for in here waits */
      if(Sys_FloatTime()-t0>.3)Con_Printf("MWScript tick: %.0f ms (scripts run this frame).\n",(Sys_FloatTime()-t0)*1000);}
     deleted_flush();   /* MWSCRIPT-SETDELETE-STOPS-66: the objects SetDelete took out: their scripts stop now */
@@ -5718,6 +5933,7 @@ void AW_MwscriptInit(void){
     Cvar_RegisterVariable(&mwscript);
     stats_hooks();
     aw_actors_ref_flags=actors_ref_flags;aw_actors_forget=AW_ActorForget;aw_save_notice=save_notice;
+    aw_companion_despawn=spawn_remove;aw_companion_placeholder=placeholder_edict;   /* dbg despawn (DBG-SPAWN-MENU-67) */
     aw_actor_dead_record=actor_dead_record;
     aw_actor_hurt_record=actor_hurt_record;   /* the unload row only for a changed actor (the save contract, rule 2) */
     aw_mwvm_clock=Sys_FloatTime;   /* MWSCRIPT-TICK-SHARE-66 */

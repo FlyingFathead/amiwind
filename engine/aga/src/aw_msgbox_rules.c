@@ -12,6 +12,10 @@
 #include <string.h>
 #include "aw_msgbox.h"
 #include "aw_format.h"
+#include "aw_layout.h"
+/* UI-NO-SHARED-LAYOUT-67: the rows a box's button row moved up so its foot stands the shared bottom margin above the
+ * frame's inner edge (the last row's foot stood 4 rows above the frame's bottom, on that edge) */
+#define MSGBOX_FOOT (aw_layout_metrics.edge+aw_layout_metrics.bottom_margin-4)
 
 static void put(char *out,int capacity,int *n,const char *text,int length) {
     while(length-- > 0 && *n < capacity-1)out[(*n)++]=*text++;
@@ -74,7 +78,7 @@ int AW_MsgBoxLinesShown(int lines,int rows,int screen,int line) {
     int room;
     if(lines<1)lines=1;
     if(line<1)line=1;
-    room=(screen-8-16-rows*24)/line;
+    room=(screen-8-16-rows*24-MSGBOX_FOOT)/line;
     if(room<1)room=1;
     if(lines>room)lines=room;
     return lines>AW_MSGBOX_LINES?AW_MSGBOX_LINES:lines;
@@ -93,11 +97,13 @@ int AW_MsgBoxTake(aw_msgbox_t *m) {int b=m->pressed;m->pressed=-1;return b;}
 
 /* Where a box and its buttons are on the screen (MSGBOX-NO-CURSOR-62): the pointer's hit test and the drawing use
  * the same rectangles. A script's box (and the failed-load box): at most 300 wide, centred, TEXT_PX of text, its
- * buttons in rows of AW_MSGBOX_PER_ROW, 22 high. FRAME and RECT: x, y, w, h. */
+ * buttons in rows of AW_MSGBOX_PER_ROW, 22 high. FRAME and RECT: x, y, w, h.
+ * UI-NO-SHARED-LAYOUT-67: the button rows stand the shared layout's bottom margin above the frame's inner edge
+ * (aw_layout.c aw_layout_metrics), never against it: the box is that much taller than before (MSGBOX_FOOT, above). */
 void AW_MsgBoxLayout(int count,int vw,int vh,int text_px,int frame[4]) {
     int rows=(count+AW_MSGBOX_PER_ROW-1)/AW_MSGBOX_PER_ROW;
     frame[2]=vw-16<300?vw-16:300;
-    frame[3]=8+text_px+8+rows*24;
+    frame[3]=8+text_px+8+rows*24+MSGBOX_FOOT;
     if(frame[3]>vh-8)frame[3]=vh-8;
     frame[0]=(vw-frame[2])/2;frame[1]=(vh-frame[3])/2;
 }
@@ -105,7 +111,7 @@ void AW_MsgBoxButtonRect(int count,int i,const int frame[4],int rect[4]) {
     int rows=(count+AW_MSGBOX_PER_ROW-1)/AW_MSGBOX_PER_ROW,row=i/AW_MSGBOX_PER_ROW,col=i%AW_MSGBOX_PER_ROW;
     int in_row=row==rows-1?count-row*AW_MSGBOX_PER_ROW:AW_MSGBOX_PER_ROW;
     rect[2]=(frame[2]-16-(in_row-1)*8)/in_row;rect[3]=22;
-    rect[0]=frame[0]+8+col*(rect[2]+8);rect[1]=frame[1]+frame[3]-rows*24+row*24-2;
+    rect[0]=frame[0]+8+col*(rect[2]+8);rect[1]=frame[1]+frame[3]-rows*24+row*24-2-MSGBOX_FOOT;
 }
 /* UI-TEXT-BOX-CLEARANCE-64: a button as wide as its label (LABEL_W pixels) and its padding, at least
  * AW_MSGBOX_BUTTON_MIN and never wider than its share of the row; the row's buttons centred with 8 pixels between them
@@ -138,11 +144,12 @@ int AW_MsgBoxButtonAt(int count,const int frame[4],int px,int py) {
     }
     return -1;
 }
-/* The death box (aw_view.c AW_ViewDraw): 280 x 96, centred, COUNT buttons in one row, 24 high, 32 above its foot. */
+/* The death box (aw_view.c AW_ViewDraw): 280 x 96, centred, COUNT buttons in one row, 24 high, their foot the shared
+ * bottom margin above the frame's inner edge (UI-NO-SHARED-LAYOUT-67: it stood 4 rows above the foot, on that edge). */
 void AW_DeathBoxButtonRect(int count,int i,int vw,int vh,int rect[4]) {
     int x=(vw-AW_DEATHBOX_W)/2,y=(vh-AW_DEATHBOX_H)/2;
     rect[2]=(AW_DEATHBOX_W-16-(count-1)*8)/count;rect[3]=24;
-    rect[0]=x+8+i*(rect[2]+8);rect[1]=y+AW_DEATHBOX_H-32;
+    rect[0]=x+8+i*(rect[2]+8);rect[1]=y+AW_DEATHBOX_H-aw_layout_metrics.edge-aw_layout_metrics.bottom_margin-24;
 }
 int AW_DeathBoxButtonAt(int count,int vw,int vh,int px,int py) {
     int i,r[4];

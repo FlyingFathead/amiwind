@@ -31,6 +31,8 @@
 #include "aw_levelup.h"
 #include "aw_statswin.h"
 #include "aw_tryalloc.h"
+#include "aw_spelllist.h"
+#include "aw_iteminfo.h"
 
 #define SETTINGS_FILE "alchemy/settings.txt"
 #define SKILL_ALCHEMY 16
@@ -127,6 +129,44 @@ static void effect_name(const data_t *d,const aw_alchemy_effect_t *x,char *out,i
     }
     if(AW_ActorMagicEffect(x->effect,&m) && m.name[0])Q_snprintf(out,size,"%s",m.name);
     else Q_snprintf(out,size,"Effect %d",x->effect);
+}
+/* INVENTORY-ITEM-INFO-67 (aw_iteminfo.h aw_worldui_alchemy_lines): a potion's or an ingredient's effects as the
+ * original's tooltip lists them (OpenMW 0.53 mwclass/potion.cpp and ingredient.cpp): an effect the player's Alchemy
+ * cannot know yet is "?" (Alchemy::knownEffect: AW_AlchemyPotionVisible, AW_AlchemyIngredientVisible); a potion's with
+ * its magnitude and duration and no target (aw_spelllist_rules.c AW_SpellEffectText, AW_SL_NO_TARGET), an
+ * ingredient's by its name alone. '\n' between; the data file read once, when the information box opens. 1 when it
+ * wrote any. */
+static int alchemy_lines(const aw_inventory_item_t *it,char *out,int size){
+    data_t *d;int i,at=0,n,potion;float alchemy,intelligence,luck;char name[48],line[AW_SL_TEXT*2];
+    if(!out || size<1)return 0;
+    out[0]=0;
+    if(!(it->flags&AW_INV_ALCHEMY) || (it->alchemy_kind!=AW_ALCHEMY_POTION && it->alchemy_kind!=AW_ALCHEMY_INGREDIENT))return 0;
+    if(!(d=data_load()))return 0;
+    player_stats(&alchemy,&intelligence,&luck);
+    potion=it->alchemy_kind==AW_ALCHEMY_POTION;
+    for(i=0;i<it->alchemy_count && i<AW_INV_ALCHEMY_EFFECTS;i++){
+        const aw_alchemy_effect_t *x=&it->alchemy[i];
+        if(x->effect==AW_ALCHEMY_NO_EFFECT)continue;
+        if(!(potion?AW_AlchemyPotionVisible(alchemy,d->set.wort,i):AW_AlchemyIngredientVisible(alchemy,d->set.wort,i)))
+            strcpy(line,"?");
+        else{
+            effect_name(d,x,name,sizeof(name));
+            if(potion){
+                aw_sl_effect_t e;aw_mgef_t m;
+                memset(&e,0,sizeof(e));e.effect=x->effect;e.min=e.max=x->magnitude;e.duration=x->duration;
+                if(AW_ActorMagicEffect(x->effect,&m))e.flags=m.flags;
+                Q_strncpy(e.name,name,sizeof(e.name)-1);
+                AW_SpellEffectText(&e,AW_SL_NO_TARGET,line,sizeof(line));
+            }else Q_snprintf(line,sizeof(line),"%s",name);
+        }
+        n=(int)strlen(line);
+        if(at && at<size-1)out[at++]='\n';
+        if(at+n>size-1)n=size-1-at;
+        if(n>0){memcpy(out+at,line,(size_t)n);at+=n;}
+        out[at]=0;
+    }
+    free(d);
+    return at>0;
 }
 static float fatigue_term(void){
     float maximum=0,current=AW_CombatPlayerFatigue(&maximum);
@@ -541,4 +581,5 @@ static const char *icon_id(const char *id){
 void AW_AlchemyInit(void){
     aw_inventory_use=use_item;aw_inventory_command=command;
     aw_worldui_use=use_item;aw_worldui_alchemy_open=open_hook;aw_worldui_icon_id=icon_id;
+    aw_worldui_alchemy_lines=alchemy_lines;   /* INVENTORY-ITEM-INFO-67 */
 }

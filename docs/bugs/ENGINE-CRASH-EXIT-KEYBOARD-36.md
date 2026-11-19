@@ -197,7 +197,7 @@ Family: Boot and engine start-up (`boot-startup`). The boot check and engine sta
 
 Related bugs in other categories:
 
-- AW25-05 (no report page): Console typed only uppercase letters and shifted digits
+- [AW25-05](AW25-05.md): Console typed only uppercase letters and shifted digits
 - CONSOLE-CAPS-29 (no report page): FS-UAE F10 Caps Lock appears stuck
 
 <!-- END GENERATED CATEGORY -->

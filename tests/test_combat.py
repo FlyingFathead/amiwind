@@ -108,6 +108,15 @@ class CombatSourceContractTests(unittest.TestCase):
         self.assertIn('AW_CombatFleeDecisionVs(&aw_combat_ai,&s->f,d,were,anti)', code('aw_combat.c'))
         self.assertIn('werewolf %63s %f', code('aw_combat.c'))
 
+    def test_cannot_reach_line_carries_its_numbers(self):
+        # CREATURE-HOSTILE-FLEES-67: a fighter that gives up the chase prints where (its place and the player's), the
+        # gap and the height of the player's feet over its own, so a sighting in play is read by number
+        combat = code('aw_combat.c')
+        lost = combat[combat.index('if(s->path.mode==AW_PATH_LOST){'):]
+        lost = lost[:lost.index('set_state(s,S_FLEE,G_RUN)')]
+        self.assertIn('"Combat: %s cannot reach you and flees (at %ld %ld %ld, you at %ld %ld %ld; gap %ld, "', lost)
+        self.assertIn('(long)gap,(long)dz', lost)
+
     def test_best_attack_on_by_default_in_prefs_and_migrated_once(self):
         # BEST-ATTACK-OPTION-62: on by default (an AmiWind default), one saved value shown on Options > Prefs, and a
         # configuration saved before it (defaults level below 2) takes the new default once.

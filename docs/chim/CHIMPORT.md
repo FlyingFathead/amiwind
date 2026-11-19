@@ -1,6 +1,6 @@
 # CHIMport: the whole island on CHIM, cell by cell
 
-_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
+_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -101,9 +101,10 @@ Every exterior frame of an expansion uses the shared exterior sky, like every fr
 names `_aw_sky_mode` "exterior" and `_aw_sky_asset` "gfx/aw_shared_sky.lmp" in its worldspawn (written for every
 open-world frame by `tools/chim/frame_map.py` `open_world_worldspawn`), with the region's weather and the time of
 day as on the island; never a sky of its own per cell ([Day, night and sky](../DAY_NIGHT_AND_SKY.md)). The image
-checks that every sky asset a map names is present (`tools/build_exclusions.py` `check_always_included`). A CHIMport
-cell makes the frame only; its frame map is written when a build takes the cell, and the check that every
-Solstheim frame map names both keys is added with the first build that takes Solstheim's cells.
+checks that every sky asset a map names is present (`tools/build_exclusions.py` `check_always_included`), and right
+after the image step the build checks that every CHIM frame map names both keys (`tools/frame_sky_check.py`, an early
+check of phase `after:image`). A CHIMport cell makes the frame only; its frame map is written when a build takes the
+cell.
 
 ### Crossing between the expansions' cells
 
@@ -116,7 +117,23 @@ one frame or a small block of frames.
 
 ### Presented exteriors (Mournhold's districts)
 
-To be written with the route of Mournhold's districts.
+Mournhold's five outdoor districts are interior cells that behave like an exterior. The presented data folder gives
+each one an exterior block of its own in a row south of every island (`tools/presented_exterior.py`, the blocks in
+`config/presented-exteriors.json`): 11 grid cells in all, -12,-30 to 5,-29. Its receipt, `presented-data.json`,
+lists each district with its block. Such a cell has no LAND record and no row in the census, so the tracker learns it
+from the receipt: `tools/cell_progress.py ingest --presented RUN/data/presented-data.json`. The tracker then counts
+it as a cell of Mournhold (island 3, set `tribunal`), named after its district, in the public reference and in the
+Toolkit's Mournhold card beside the district rooms. Without a receipt the tracker data is the same as before.
+
+A default CHIM build with Tribunal selected adds Mournhold's named set (`mournhold`, `tools/chim/regions.py`
+`layer_sets`). Like Solstheim's, the set holds every presented cell, takes the finished ones and drops the rest with
+their reason.
+
+The eleven cells carry `"no_land": true` in `config/visual-recipes.json` `cell_settings`, beside their recipe
+`mournhold-v1`. A district's ground is its placed models, so it has no LAND record by design. Both land checks admit
+such a cell as flat default ground, as CHIMport converts it: the build's preflight (`owned_land_problems`) and the
+CHIM stage's (`check_source_land`). Any other cell without LAND is still refused. The earlier region method
+(`--chim-region-rows legacy`) cannot take a presented cell, because there is no open-world map to copy.
 
 ### Where the expansions stand
 
@@ -124,7 +141,7 @@ To be written with the route of Mournhold's districts.
 | --- | --- | --- | --- |
 | Vvardenfell | 1,390 cells of the progress reference | 1,390 | all of them |
 | Solstheim | 144 land cells | 0 | 0 |
-| Mournhold | 5 outdoor districts (interior cells that behave like an exterior) | 0 (their own route, above) | 0 |
+| Mournhold | 11 presented cells of the 5 outdoor districts (interior cells that behave like an exterior) | 0 (their own route, above) | 0 |
 
 The 8 lightest Solstheim cells (levelled creatures and a few statics, 2 to 6 placements each) are converted again on
 the presented data folder; the heavier classes follow lightest first, with the forests (the cells with trees) last.

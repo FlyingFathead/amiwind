@@ -249,6 +249,38 @@ def opening_ids(master):
     return {i for i, _ in OPENING_ACTORS if i.encode('cp1252') + b'\0' in low}
 
 
+DISTRICT_FLAG = 0x80            # an interior cell that behaves like an exterior (Tribunal's Mournhold districts)
+
+
+def district_actors(master):
+    """{'NPC_': [ids], 'CREA': [ids]} (lower case, sorted): the NPC and creature records with a non-deleted reference
+    in an interior cell that behaves like an exterior (cell flag 0x80: Tribunal's five Mournhold districts; the base
+    game has no such cell, so its answer is empty). The districts are built as outdoor frames of their own
+    (tools/tribunal_mournhold.py), whose people stand in the frame maps as the open world's do, so the library makes
+    their models too (DISTRICT-PEOPLE-NOT-PLACED-67); chim.actors.exterior_actors does not see them: in the game
+    data the districts are interiors. Kept here, not in chim.actors, so no CHIM world stage's code changes."""
+    from mwad.audit import cell_data, records, string, subrecords
+    types, cells = {}, []
+    for tag, flags, payload in records(master):
+        if flags & 0x20:
+            continue
+        if tag == 'CELL':
+            cell = cell_data(list(subrecords(payload)))
+            if cell['flags'] & 1 and cell['flags'] & DISTRICT_FLAG:
+                cells.append(cell)
+        elif tag in ('NPC_', 'CREA'):
+            fields = dict(subrecords(payload))
+            if 'NAME' in fields and 'DELE' not in fields:
+                types[string(fields['NAME']).casefold()] = tag
+    out = {'NPC_': set(), 'CREA': set()}
+    for cell in cells:
+        for ref in cell['refs']:
+            ident = ref.get('id', '').casefold()
+            if not ref.get('deleted') and ident in types and 'position' in ref:
+                out[types[ident]].add(ident)
+    return {k: sorted(v) for k, v in out.items()}
+
+
 def plan(master, residents=(), town_refs=None):
     """(creature meshes {mesh: [ids]}, two-legged {mesh: bool}, scales {mesh: [scale]}, NPC ids, the creature plan,
     corpse meshes {mesh: [ids]}) of the exterior.
@@ -273,6 +305,10 @@ def plan(master, residents=(), town_refs=None):
     # v0.0.62 (MWSCRIPT-GAP-FUNCTIONS-62): every actor a script places, placed in the world or not
     by_script = A.script_placed_actors(master)
     want |= set(by_script['CREA'])
+    # the people and creatures of the cells that behave like an exterior (Mournhold's districts, built as outdoor
+    # frames of their own): none in the base game alone (DISTRICT-PEOPLE-NOT-PLACED-67)
+    in_districts = district_actors(master)
+    want |= set(in_districts['CREA'])
     for lid in used:
         want |= {e for e, _ in lists[lid][2] if e in creatures}
     planned = L.plan(master)
@@ -296,7 +332,7 @@ def plan(master, residents=(), town_refs=None):
     residents = {r.casefold() for r in residents}
     npcs = sorted({b.casefold() for n, b, t, *_ in refs if t == 'NPC_' and
                    (b.casefold() not in residents or (town_refs is not None and n not in town_refs))} |
-                  set(by_script['NPC_']) | opening_ids(master))
+                  set(by_script['NPC_']) | set(in_districts['NPC_']) | opening_ids(master))
     return meshes, bipedal, {m: sorted(v) for m, v in scales.items()}, npcs, planned, corpses
 
 
@@ -344,6 +380,8 @@ class NpcAllowance:
         from build_parallel import ALLOWANCE_ENV
         self.env, self.source = ALLOWANCE_ENV, os.environ.get(ALLOWANCE_ENV)
         self.creature_jobs, self.done, self.path, self.thread = creature_jobs, False, None, None
+        import threading
+        self.lock = threading.Lock()
 
     def value(self):
         """What the NPC pool may hold now."""
@@ -353,12 +391,22 @@ class NpcAllowance:
             return None
         return max(1, live - (0 if self.done else self.creature_jobs))
 
+    def temporary(self):
+        """The file a write goes through: this writer's own name beside its file. Never the file's name with the
+        suffix replaced: for "30-actor-library.actor-npc" that is "30-actor-library.tmp", the name the scheduler
+        writes its own allowance file through (BUILD-ACTOR-LIBRARY-SHARE-RACE-67)."""
+        return self.path.with_name('%s.%d.tmp' % (self.path.name, os.getpid()))
+
     def write(self):
-        v = self.value()
-        if v is not None:
-            tmp = self.path.with_suffix('.tmp')
-            tmp.write_text(str(v), encoding='ascii', newline='\n')
-            os.replace(tmp, self.path)
+        # one writer at a time: the half-second loop and the creatures' done callback both write, each from its own
+        # thread; through one temporary name the second replace found the file gone
+        # (BUILD-ACTOR-LIBRARY-SHARE-RACE-67: "exception calling callback ... FileNotFoundError")
+        with self.lock:
+            v = self.value()
+            if v is not None:
+                tmp = self.temporary()
+                tmp.write_text(str(v), encoding='ascii', newline='\n')
+                os.replace(tmp, self.path)
 
     def creatures_done(self):
         self.done = True
@@ -387,7 +435,7 @@ class NpcAllowance:
             self.stop.set()
             self.thread.join()
             os.environ[self.env] = self.source
-            for p in (self.path, self.path.with_suffix('.tmp')):
+            for p in (self.path, self.temporary()):
                 try:
                     p.unlink()
                 except OSError:

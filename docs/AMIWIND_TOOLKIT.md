@@ -1,6 +1,6 @@
 # AmiWind Toolkit
 
-_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
+_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -419,6 +419,11 @@ python3 tools/cell_progress.py ingest --out DIR \
   batch and reasons, none left out. `--chim-rooms FILE` (repeatable) is a CHIM rooms receipt or a build's
   `chim-interiors.json`: the rooms on CHIM rooms. Without them the tracker works as before, without the interior
   tracker.
+- `--presented presented-data.json` (the receipt of a presented data folder, `tools/presented_data.py`) adds
+  Mournhold's outdoor districts as exterior cells. Each cell of a district's block is a cell of Mournhold (island 3),
+  named after its district, with no LAND and no census row, so its contents stay not measured until it is converted.
+  The World Map counts these cells on the Mournhold card beside the district rooms. Without the receipt the data is
+  the same as before.
 - The command remembers its inputs (`DIR/sources.json`). Run it again after every build; it is idempotent: the same
   inputs give the same files. Anything it cannot measure is `not_measured`, never a guess.
 

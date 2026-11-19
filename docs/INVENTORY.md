@@ -1,13 +1,16 @@
 # Inventory
 
-_Last updated with AmiWind v0.0.66-dev1 (13 November 2026)._
+_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [Items and actions](#items-and-actions)
+  - [One action per kind, and the key line (v0.0.67)](#one-action-per-kind-and-the-key-line-v0067)
+  - [The item information box (v0.0.67)](#the-item-information-box-v0067)
   - [Weapon kit for testing (dbg give weapons)](#weapon-kit-for-testing-dbg-give-weapons)
   - [Every weapon, shield and piece of gear (dbg weapon, dbg gear)](#every-weapon-shield-and-piece-of-gear-dbg-weapon-dbg-gear)
+  - [Every item the hands can hold (the holdable index)](#every-item-the-hands-can-hold-the-holdable-index)
   - [Any item, and gold (dbg give, dbg give money)](#any-item-and-gold-dbg-give-dbg-give-money)
 - [Carry weight](#carry-weight)
 - [Armour rating](#armour-rating)
@@ -55,7 +58,58 @@ names, categories, quantities, weights, values and converted icons. All, Weapons
 Armour, Clothing, Potions, Ingredients, Books and Misc tabs filter the list;
 O cycles name/value/weight sorting. Up/down and wheel select, Tab changes category,
 left/right rotates the body preview. Right-click opens only available actions.
-E or Enter equips/unequips the selected supported item; D drops one.
+E or Enter does the selected item's action; D drops one.
+
+### One action per kind, and the key line (v0.0.67)
+
+Every carried item has one action, decided by its kind from the game data, and the use key (E or Enter, as bound),
+the double-click and the key line at the bottom all take it from the same rule:
+
+| Kind | Action | Key line |
+| --- | --- | --- |
+| Weapon (not arrows or bolts), shield, armour piece, clothing, ring, amulet, carried light | Equip; Unequip when worn or held | `E/Enter equip`, `E/Enter unequip` |
+| Scroll with a Cast Once enchantment | Use: cast at once, the scroll used up | `E/Enter use` |
+| Potion, ingredient, alchemy apparatus | Use (drink, eat, the alchemy window) | `E/Enter use` |
+| Any other book, note or scroll | Read | `E/Enter read` |
+| Misc items, keys, soul gems | none | (none) |
+| Arrows and bolts, lockpicks and probes, repair tools | none yet (see below) | (none) |
+
+The words are the original's (sEquip, sUnequip, sUse in the game data). The key line's second row shows the list keys,
+then the selected item's action and the drop key when it can be dropped (`Up/Down select   E/Enter unequip   D drop`);
+its first row keeps `I/Esc close` and `Tab category`, and names the information key (`P info`, below). A worn or
+held item says **Equipped** at the end of its row in a
+highlight colour (it was a `*` before the name). An action's result ("Equipment updated.", a drop refused) shows in the
+line above the key line for a few seconds and only for the row it was said for; before v0.0.67 it stayed for every row
+until the next action, so after one Equip no other item showed its key hint (EQUIP-ACTION-REGRESSION-62 seen again on
+the v0.0.67-dev2 image).
+
+The original also equips arrows and bolts (the ammunition slot), lockpicks and probes (the right hand), and uses
+repair tools (the repair window); this engine carries them until the player shoots, picks locks and repairs
+(INVENTORY-EQUIP-KINDS-NOT-YET-67). A table over every item kind and subtype the catalogue takes, built by the real
+builder stage and judged by the engine's own reader and rule, fails the gate when a kind's action changes or a new
+kind has none decided (`tests/test_inventory_actions.py`, `tests/aga_inventory_actions_test.c`).
+
+### The item information box (v0.0.67)
+
+P (`aw_key_inv_info`, bindable; I closes the window) or Info in the right button's menu opens a box over the window
+with the selected item's properties, as the original's tooltip shows them for its kind, and its written text:
+
+- a weapon: its type (the skill it trains, one or two handed), Chop, Slash and Thrust (a bow or a crossbow: Attack; a
+  thrown weapon: Attack at twice its damage, as it is the weapon and the ammunition), its condition now and full;
+- armour and shields: the Armor Rating, the condition, the weight with its class (Light, Medium, Heavy);
+- an apparatus: its quality;
+- every item: its weight and value;
+- an enchanted item: the enchantment's kind (Cast Once, Cast When Strikes, Cast When Used, Constant Effect), one line
+  per effect ("Jump 10 pts for 30 secs on Self"), and its charge now and full for When Strikes and When Used;
+- a potion or an ingredient: its effects; one the player's Alchemy skill cannot know yet shows "?", as in the original;
+- a book or a scroll: its text, after an empty line (a scroll's text is read here; its Use casts it).
+
+A text longer than the box gets a vertical scroll bar: Up/Down, Page Up/Down, Home/End, the wheel, or the bar with
+the mouse. The button row at the bottom has OK (back to the window; Esc, I and P do the same) and the item's action
+(Equip, Unequip, Use, Read; E or Enter as bound), when it has one. The armour rating shown is the piece's own; the
+window's total under the picture counts the skills. The box is laid out by the shared layout helper and measured by
+the layout check (`tests/aga_ui_layout_test.c`); it keeps its text and lines only while it is open, and a book's text
+is read once from the book file when its box opens.
 
 A double-click on a row (two clicks within half a second) does what dropping the item on the character picture does
 in the original and OpenMW 0.51: a weapon, armour, clothing, a ring, an amulet or a light goes on (or comes off when
@@ -65,9 +119,12 @@ box naming it with OK and Cancel, so nothing is drunk or eaten by a slip: with m
 slider and a number field for how many (1 to the stack, starting at 1; Left/Right, Page Up/Down, Home/End, digits
 and Backspace, or the mouse on the slider), and OK uses that many one after the other, as OpenMW uses a dragged
 stack one at a time. Enter is OK; Esc or I is Cancel and keeps the window open. OpenMW's own count box starts at the
-whole stack; this one starts at one. A scroll used here is read, as a book is (OpenMW 0.51 reads a scroll on use);
-an enchanted one-use scroll is cast from the Magic window's Magic Items (below, since v0.0.64). Tests:
-`tests/aga_inventory_ui_test.c`.
+whole stack; this one starts at one. A scroll with a Cast Once enchantment is cast by its Use (E, Enter or a
+double-click): the window closes and the scroll's spell is cast as the cast button casts a magic item, no success
+roll, the scroll used up (decided for the project on 18 November 2026; the original reads a scroll there and casts it
+only from the magic menu, which still works: the Magic window's Magic Items, below, since v0.0.64). A script that
+switches magic off (the opening, before the release papers) refuses it. Any scroll or book can still be read from the
+right button's menu. Tests: `tests/aga_inventory_ui_test.c`.
 
 The equipment set is rings and amulets (a Constant Effect ring or amulet acts while worn and ends when taken off, also
 across a save; see [MAGIC_EFFECTS.md](MAGIC_EFFECTS.md) "Magic items"), clothing, armour, and converted melee, ranged
@@ -182,6 +239,21 @@ a grant is refused only when memory says no, and the console says so.
 The rows come from the item catalogue (`inventory/items.awi`), read once when the box opens (a debug command, never in
 play) and freed when it closes: nothing is kept while it is shut. The console says how many rows it read, the bytes
 the box held and how long the read took. Tests: `tests/aga_weapon_kit_test.c` (which box, the order, the line).
+
+### Every item the hands can hold (the holdable index)
+
+The image step writes `inventory/holdable.txt` beside the item catalogue (`tools/holdable_items.py`, from the same
+records of Morrowind, Tribunal and Bloodmoon; never written by hand): one line per item the player can hold in the
+hands, with its game name, its id, its kind, its hand or hands and its action. By the original's rules (as OpenMW
+0.51 reads them): a weapon in the right hand, both hands for a two-handed weapon, a bow or a crossbow (arrows and bolts
+are ammunition, not held); a shield or a carried light in the left hand; a lockpick or a probe in the right. The
+action is the original's animation of its use: the weapon type's attack (`shortbladeonehand`, `weapononehand`,
+`weapontwohand`, `bluntonehand`, `blunttwohand`, `weapontwowide`, `bowandarrow`, `crossbow`, `throwweapon`), `block`
+for a shield, `pickprobe` for a lockpick or a probe, `none` for a light (it is carried). A last column says whether
+the inventory equips it today. On the current game data that is 632 items, 620 of them equipped today (the 6
+lockpicks and 6 probes are not held yet): 417 weapons, 51 shields, 152 lights. It is the list the item tester goes
+through (`dbg cycleitems`, [ITEM_CYCLING.md](ITEM_CYCLING.md)); nothing reads it in play. The build receipt names its counts (`inventory-data.json` "holdable"). Tests:
+`tests/test_holdable_items.py`.
 
 ### Any item, and gold (dbg give, dbg give money)
 
@@ -316,8 +388,15 @@ desks, closets, the corpse and mummy containers and the rest) can be opened. Aim
 at one within the activation distance: its name shows below the view (the framed
 box over the view only in the Morrowind name-label style, see
 [Dialogue and wait](DIALOGUE_AND_WAIT.md#name-labels-amiwind-or-morrowind)) and the line under
-the view reads "E: Open", or "E: Steal" in red when it belongs to someone (opening
-is free, taking from it is theft). A locked container reads "Locked", its box
+the view reads "E: Open", in red when it belongs to someone (opening is free, taking
+from it is theft; until v0.0.67 the line read "E: Steal" there), and the strip's key
+line then reads "E: Steal" in red. A container belongs to someone when its placement
+names an owner or a faction (in the game data: 9,698 owned and 601 faction-owned of
+42,044 placed containers, 25,695 of them flora; the outdoor crates, barrels and chests
+of Seyda Neen belong to no one). The original also lets a faction's members of the
+rank the placement asks take freely, and frees a placement whose global variable is
+set; this engine frees any member and reads no global yet
+(OWNED-FACTION-RANK-GLOBAL-IGNORED-67). A locked container reads "Locked", its box
 shows "Lock Level: N" as the original's tooltip does, and E does not open it; the
 lock level comes from the placement in the game data, and a script's Lock or
 Unlock on the world change list overrides it. Organic containers (flora) are not
@@ -357,7 +436,17 @@ the disk again (CONTAINER-STRIP-TAKE-STALL-59); a take or put that still holds t
 frame for 100 ms or more says so in the console. While the strip is open the
 whole screen is copied out only for two frames after a change (a key, the mouse,
 a take or a put), otherwise only the view (CONTAINER-STRIP-REDRAW-COST-59). E and
-`aw_placed container REF open` open the strip the same way. Bodies of dead people
+`aw_placed container REF open` open the strip the same way. The strip belongs to the
+place it opened in: a new map or a teleport (the player more than 64 map units from
+where it opened) closes it at the next frame, as OpenMW closes its container window
+when the container is no longer available; it stayed open through a teleport and a
+take then changed the first container (CONTAINER-WINDOW-SURVIVES-PLACE-CHANGE-67).
+The game's state file for test sessions reads `screen container` while it is open.
+For in-game checks, `aw_placed container REF aim` (noclip on) puts the eye 24 map
+units from the container's point (the centre of its box) on a side with a clear line
+to it, looks at it, and asks the use test with that view: it says `Aimed at` only
+when the use takes that container, else which row it takes instead
+(DBG-CONTAINER-AIM-OUT-OF-REACH-67). Bodies of dead people
 and creatures open in the same strip ("E: Search"; v0.0.60). With hundreds of kinds
 carried the strip still opens fast: its rows are named in one pass over the item table
 instead of one file search per kind, so with 415 kinds carried a body's strip opens in

@@ -8,6 +8,12 @@
  */
 #include "../engine/aga/src/cl_parse.c"
 #include <assert.h>
+/* the game's own connection (net_loop.c, linked beside), for a grown frame message */
+extern qsocket_t *loop_client, *loop_server;
+extern int Loop_Grow (int receive, int message);
+extern int Loop_ReceiveSize (void);
+extern int Loop_SendUnreliableMessage (qsocket_t *sock, sizebuf_t *data);
+extern int Loop_GetMessage (qsocket_t *sock);
 
 extern short ShortNoSwap (short l);
 extern int LongNoSwap (int l);
@@ -155,5 +161,42 @@ int main (void)
     for (i = 0; i < 1; i++)
         printf ("frame updates dropped: %d, console lines: %d, sessions ended for a reliable message: %d\n",
                 cl_parse_dropped, dropped_lines, host_errors);
+
+    /* a grown frame message on the game's own connection: longer than 65535 bytes (a three-byte length), it goes
+     * through the grown receive buffer into the grown net_message and reads whole */
+    {
+        static qsocket_t client_sock, server_sock;
+        static byte big[70000];
+        sizebuf_t m;
+        int k = 0, dropped = cl_parse_dropped, errors = host_errors;
+        memset (&client_sock, 0, sizeof (client_sock));
+        memset (&server_sock, 0, sizeof (server_sock));
+        loop_client = &client_sock;
+        loop_server = &server_sock;
+        client_sock.driverdata = &server_sock;
+        server_sock.driverdata = &client_sock;
+        assert (Loop_Grow (140000, 80000) && Loop_ReceiveSize () == 140000 && net_message.maxsize == 80000);
+        memset (&m, 0, sizeof (m));
+        m.data = big;
+        m.maxsize = sizeof (big);
+        t = 20.0f;
+        big[0] = svc_time; memcpy (big + 1, &t, 4); m.cursize = 5;
+        while (m.cursize + 5 <= (int)sizeof (big))
+        {
+            big[m.cursize++] = U_SIGNAL | U_ORIGIN1;
+            big[m.cursize++] = (byte)(1 + k++ % 200);
+            big[m.cursize++] = 0x00; big[m.cursize++] = 0x20; big[m.cursize++] = 0x00;	/* 32.0 */
+        }
+        assert (m.cursize > 65535);
+        assert (Loop_SendUnreliableMessage (&server_sock, &m) == 1 && client_sock.receiveMessageLength > 65535);
+        assert (Loop_GetMessage (&client_sock) == 2 && net_message.cursize == m.cursize && !client_sock.receiveMessageLength);
+        assert (!memcmp (net_message.data, big, m.cursize));
+        cl_message_unreliable = 1;
+        if (!setjmp (host_error))
+            CL_ParseServerMessage ();
+        assert (host_errors == errors && cl_parse_dropped == dropped);
+        assert (cl.mtime[0] == 20.0f && cl_entities[150].msgtime == 20.0f && cl_entities[150].msg_origins[0][0] == 32.0f);
+        printf ("a grown frame message of %d bytes read whole (%d entity updates)\n", m.cursize, k);
+    }
     return 0;
 }

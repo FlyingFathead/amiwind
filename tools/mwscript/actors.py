@@ -461,6 +461,25 @@ class ActorTables:
         # springs and casts it with the spell code (aw_cast.c AW_CastOn)
         self.report['trap_spells'] = sum(1 for key, ident in self.trap_spells.items()
                                          if key in self.records['SPEL'] and self.spell(ident) >= 0)
+        # CHARGEN-ABILITY-DESCRIPTIONS-STOP-67: every birthsign's spells get their ASPT rows too, after every other row
+        # (the numbers above stay as they were). The birthsign window lists a sign's spells by these rows and the new
+        # character gets them by the same rows (the shared stats record's birthsign rows, tools/actor_stats.py
+        # shared_section); before, a spell no actor, race or start rule named had none: 15 of the 19 spells of the
+        # base game's 13 signs (The Steed's Charioteer, The Thief's Akaviri Danger-sense ...) were shown and given as
+        # nothing. In the masters' record order; a spell id the masters lack is counted and left out.
+        given, unknown = 0, []
+        for sign, fields in self.records.get('BSGN', {}).items():
+            for tag, data in fields:
+                if tag != 'NPCS':
+                    continue
+                ident = _text(data)
+                if ident.casefold() in self.records['SPEL']:
+                    self.spell(ident)
+                    given += 1
+                else:
+                    unknown.append('%s: %s' % (sign, ident))
+        self.report['birthsign_spells'] = given
+        self.report['birthsign_spells_unknown'] = unknown
         actb = bytearray()
         for row in self.rows:
             actb += struct.pack('>HBBH8H27B4BBBbHHHHHHIHHHHBB6HH', row['id'], row['kind'], row['flags'],

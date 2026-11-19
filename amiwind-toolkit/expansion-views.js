@@ -14,7 +14,10 @@
   const DONE_BUCKETS = new Set(['complete', 'terrain_complete', 'complete_unlit', 'terrain_complete_unlit', 'approved', 'playtested',
     'audits_passed', 'empty_sea']);
   const SOLSTHEIM = 2;
-  const ISLAND_NAMES = {1: 'Vvardenfell', 2: 'Solstheim'};
+  // Mournhold's districts as the presented data folder gives them: exterior cells of island 3 (tools/cell_progress.py
+  // MOURNHOLD_ISLAND, chim-head.js LANDS), counted as Mournhold's cells beside its rooms, never as Vvardenfell's.
+  const MOURNHOLD_ISLAND = 3;
+  const ISLAND_NAMES = {1: 'Vvardenfell', 2: 'Solstheim', 3: 'Mournhold'};
   const num = v => Number(v || 0).toLocaleString('en-US');
   const rate = (done, total) => total ? Math.round(1000 * done / total) / 10 : 0;
   const zero = () => ({done: 0, partial: 0, missing: 0, total: 0, rate: 0});
@@ -90,7 +93,7 @@
   function completion(doc) {
     const ext = exteriorCounts(doc), cells = {base: zero(), bloodmoon: zero(), tribunal: zero()}, rooms = {base: [], bloodmoon: [], tribunal: []};
     for (const i of ext.islands) {
-      const set = cells[i.island === SOLSTHEIM ? 'bloodmoon' : 'base'];
+      const set = cells[i.island === SOLSTHEIM ? 'bloodmoon' : i.island === MOURNHOLD_ISLAND ? 'tribunal' : 'base'];
       for (const k of ['done', 'partial', 'missing']) set[k] += i[k];
       close(set);
     }
@@ -139,11 +142,13 @@
       out.push({id: 'solstheim', label: 'Solstheim', sub: 'Bloodmoon', kind: 'cells', unit: 'cells', counts: c, rooms: rc,
         text: countText(c) + ' of ' + num(c.total) + ' cells' + (rc.total ? ' · rooms: ' + countText(rc) + ' of ' + num(rc.total) : '')});
     }
-    const mr = mournholdRooms(doc);
-    if (mr.length) {
+    const mr = mournholdRooms(doc), mc = isl(MOURNHOLD_ISLAND);
+    if (mr.length || (mc && mc.total)) {
       const rc = roomCounts(mr);
       out.push({id: MOURNHOLD, label: 'Mournhold', sub: 'Tribunal', kind: 'rooms', unit: 'rooms', counts: rc,
-        text: countText(rc) + ' of ' + num(rc.total) + ' rooms' + (rc.set_aside ? ' (' + num(rc.set_aside) + ' set aside, counted as missing)' : '')});
+        ...(mc && mc.total ? {cells: mc} : {}),
+        text: countText(rc) + ' of ' + num(rc.total) + ' rooms' + (rc.set_aside ? ' (' + num(rc.set_aside) + ' set aside, counted as missing)' : '') +
+          (mc && mc.total ? ' · cells: ' + countText(mc) + ' of ' + num(mc.total) : '')});
     }
     return out;
   }

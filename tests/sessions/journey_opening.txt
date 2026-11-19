@@ -89,7 +89,19 @@ key Return
 wait 2
 key Return
 waitfor screen 20 game
+# PIER-GUARD-POST-STUCK-67: the player stays on the pier where the dock guard met him while the guard says his line and
+# walks the pier's centre line to his post beside the census office door (about 25 s of game time from here); then
+# his walk's own check from aw_intro_status: he is done at the post, his box never stood inside a solid (a pier post)
+# on any tick of his walks, and the walk was the fixed route (the earlier one is "aw_intro_status direct")
 wait 50
+probe dock_walk aw_intro_status
+pick dock_done dock_walk after done
+pick dock_from_post dock_walk after from the post
+pick dock_in_solid dock_walk after box in solid
+expect dock_done == 1
+expect dock_from_post <= 3
+expect dock_in_solid == 0
+expect has dock_walk route fixed
 cmd aw_view walk 470 -420
 wait 12
 cmd aw_view walk off
@@ -503,6 +515,12 @@ shot b1-loaded
 
 step 9 through a door: the restored game goes on
 probe door_from state map
+# JOURNEY-STEP9-REACH-67: to the street door's arrival point first, as a player walks up to a door before using it. The
+# quicksave holds the player where step 7 left it, and that fight's dodges slide the player 10 units each (the v0.0.67-dev2
+# journey's save: 33 units north-west of the arrival point, the door's point 48.6 units along the aim, past the use
+# reach of 48), so the aim from the restored spot alone could not reach the door. The aim, the reach and the retries
+# are unchanged.
+walkto 264 34 20
 face 242.6 10.3 61
 aimed 113833
 key e

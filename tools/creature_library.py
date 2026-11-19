@@ -129,12 +129,20 @@ def bake(data, palette, meshes, out_id1, jobs=1, method=DEFAULT_METHOD, bipedal=
     import pass_cache
     if method not in METHODS:
         raise ValueError('Unknown creature library method: ' + str(method))
-    tasks = []
+    # a mesh whose gallery profile says 'whole' takes the skeletal method's whole route (tools/creature_whole.py: every
+    # source triangle on its source vertices, its own table with its accumulation root held; CREATURE-RACER-HOLES-67),
+    # baked by that route's own worker under its own code key, so the other models keep theirs
+    import creature_whole
+    whole = creature_whole.whole_meshes(meshes) if method == 'skeletal' else set()
+    tasks, whole_tasks = [], []
     for mesh, ids in sorted(meshes.items()):
         app = {'id': ids[0], 'kind': 'CREA', 'name': ids[0], 'mesh': mesh}
         for scale in [1.0] + sorted(set((scales or {}).get(mesh, ())) - {1.0}):
             if method in ('resident', 'skeletal') and scale != 1.0:
                 continue        # 'skeletal': the engine scales a live actor (AWU_SCALE); one model per mesh
+            if mesh in whole:
+                whole_tasks.append((creature_whole.METHOD, data, palette, app, bool((bipedal or {}).get(mesh)), scale))
+                continue
             tasks.append((method, data, palette, app, bool((bipedal or {}).get(mesh)), scale))
     for mesh, ids in sorted((corpses or {}).items()):
         app = {'id': ids[0], 'kind': 'CREA', 'name': ids[0], 'mesh': mesh}
@@ -153,6 +161,16 @@ def bake(data, palette, meshes, out_id1, jobs=1, method=DEFAULT_METHOD, bipedal=
                                                  lambda task: actor_units.creature_inputs(task, palette_sha256))
     print('Creature library: %d models (%d from the unit cache %s, %d baked)' % (
         len(tasks), cached, actor_units.CREATURE_CACHE, len(tasks) - cached), flush=True)
+    if whole_tasks:
+        entry = ((creature_whole.__file__, 'unit'),)
+        whole_cache = actor_units.open_cache(actor_units.CREATURE_CACHE, entry, pass_cache.source_digest(*entry),
+                                             pass_cache.previous_digests(*entry), pass_cache.covered_lines(*entry))
+        more, more_cached = actor_units.bake_creatures(
+            whole_tasks, jobs, whole_cache, lambda task: actor_units.creature_inputs(task, palette_sha256),
+            worker=creature_whole.unit)
+        print('Creature library: %d whole models on the skeletal method (%s; %d from the unit cache, %d baked)' % (
+            len(whole_tasks), ', '.join(sorted(whole)), more_cached, len(whole_tasks) - more_cached), flush=True)
+        results = list(results) + list(more)
     for key, out, seconds, error in results:
         if out is None and error and error.startswith('BakeStop'):
             # the seam stop is never a mesh left out: every one is listed, then the stage fails
@@ -195,6 +213,17 @@ def bake(data, palette, meshes, out_id1, jobs=1, method=DEFAULT_METHOD, bipedal=
                 done[key] = dict(record, **{KF_FALLBACK: why})
                 print('Creature library: %s baked with kf instead (skeletal refused: %s)' % (key, why), flush=True)
             failed.update(still)
+        # every standing model against its source mesh (tools/creature_surface.py, CREATURE-RACER-HOLES-67): reported
+        # on each record; a whole-profile model that is not whole stops the stage
+        from creature_surface import check_library
+        surface = check_library(data, done, out_id1, bipedal, whole, jobs)
+        for key, row in surface['rows'].items():
+            done[key] = dict(done[key], surface=row)
+        for key, why in surface['unchecked'].items():
+            done[key] = dict(done[key], surface={'unchecked': why})
+        if surface['stops']:
+            raise ValueError('Creature library: a model whose profile keeps it whole is not whole '
+                             '(creature_surface):\n  %s' % '\n  '.join(surface['stops']))
     return done, failed
 
 

@@ -687,7 +687,10 @@ def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=No
     # (no LAND) whose CELL record gave it an open-world map is replaced in place like any land region cell (it is in
     # skipped); only ocean cells without a map get routing rows (CHIM-OCEAN-CELL-RECORD-ROUTING-43).
     from exterior_plan import ocean_routing
-    routing, problems = ocean_routing(cells, ocean_cells or (), {tuple(e['cell']) for e in entries})
+    # the CHIM region cells outside the base game's grid (the exterior checklist's layer_cells: an expansion's own
+    # cells, a presented interior's): no survey entry and no map; each gets a row appended after the ocean rows
+    layer_cells = sorted(tuple(c) for c in (checklist or {}).get('layer_cells', ()))
+    routing, problems = ocean_routing(cells, ocean_cells or (), {tuple(e['cell']) for e in entries}, layer_cells)
     if problems:
         # every failure names its unit (CHIM-OCEAN-ROUTING-UNNAMED-41)
         raise ValueError('CHIM region cells do not match the open-world directory: ' + '; '.join(problems))
@@ -698,6 +701,14 @@ def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=No
     ocean_cells = set(routing)
     from chim.ocean_runtime import append_routing_rows
     entries, ocean_rows = append_routing_rows(entries, ocean_cells, data)
+    layer_rows = []
+    if layer_cells:
+        from chim.ocean_runtime import append_layer_rows
+        entries, layer_rows = append_layer_rows(entries, layer_cells)
+        print('World terrain: %d CHIM region cell(s) outside the base game\'s grid get a directory row of their own, '
+              'after every existing row (%s)' % (len(layer_rows), ' '.join('%d,%d' % c for c in layer_cells)),
+              flush=True)
+        ocean_rows = ocean_rows + layer_rows       # from here on handled alike: rows without a map or a survey entry
     compiled=[e for e in entries if e['name'] not in skipped | routing_only | {r['name'] for r in ocean_rows}]
     for e in compiled:
         local = region_lava(e, pools)
@@ -743,8 +754,10 @@ def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=No
     if checklist:
         receipt['exterior_checklist'] = checklist
         receipt['routing_only_maps_not_made'] = sorted(routing_only)
-    if ocean_rows:
-        receipt['ocean_routing_rows'] = [dict(e) for e in ocean_rows]
+    if [e for e in ocean_rows if not e.get('layer_cell')]:
+        receipt['ocean_routing_rows'] = [dict(e) for e in ocean_rows if not e.get('layer_cell')]
+    if layer_rows:
+        receipt['layer_rows'] = [dict(e) for e in layer_rows]
     if skipped or ocean_rows:
         receipt['chim_region_cells']=sorted([list(c) for c in cells])
     if not only:

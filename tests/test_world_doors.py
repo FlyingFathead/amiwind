@@ -70,6 +70,34 @@ class Table(unittest.TestCase):
         self.assertEqual(rows[5]['kind'], 'marker')
         self.assertNotIn('problem', rows[5])
 
+    def test_the_doors_of_a_presented_district_resolve_through_its_blocks_frames(self):
+        # MOURNHOLD-EXTERIOR-CELLS-66: a district the build presents as exterior cells (its block the region frame's
+        # cell 3,0) and converts: its doors read as the presented world has them (tools/presented_exterior.py
+        # present_doors) resolve through that frame, the way in from a room, the way out into it, and its jail marker;
+        # without the presentation they are held back as today
+        import presented_exterior as P
+        doors = [door(10, 'Some Room', [0.0, 0.0, 0.0], 'Town, Plaza', [100.0, 50.0, 8.0], interior=True),
+                 door(11, 'Town, Plaza', [200.0, 60.0, 8.0], 'Some Room', [5.0, 5.0, 0.0], interior=True),
+                 door(12, 'Town, Plaza', [210.0, 60.0, 8.0], 'Some Room', [5.0, 5.0, 0.0], ident='PrisonMarker',
+                      interior=True)]
+        rooms, held_back = {'some room': 'ri0003'}, {'town, plaza': 'an exterior-like cell'}
+        plain = world_doors.table(doors, rooms, [TOWN], REGIONS, held_back=held_back)
+        self.assertEqual([('held_back' in r, 'problem' in r) for r in plain], [(True, False)] * 3)
+        places = {'town, plaza': {'cell': 'Town, Plaza', 'block': [3, 0], 'size': [1, 1], 'offset': [3 * 8192.0, 0.0]}}
+        rows = {r['reference']: r for r in world_doors.table(P.present_doors(places, doors), rooms, [TOWN], REGIONS,
+                                                              held_back=held_back)}
+        self.assertEqual((rows[10]['source'], rows[10]['target'], rows[10]['direction']),
+                         ('ri0003', 'vf0042', 'room_to_exterior'))
+        self.assertEqual(rows[10]['destination_cell'], 'Town, Plaza')       # the label the bank row shows
+        self.assertEqual(rows[10]['arrival'][:2], [(100.0 + 24576.0) * .25 - 24576.0, 50.0 * .25])
+        self.assertEqual((rows[11]['source'], rows[11]['holder'], rows[11]['target'], rows[11]['direction']),
+                         ('vf0042', 'region', 'ri0003', 'exterior_to_room'))
+        self.assertEqual((rows[12]['kind'], rows[12]['source']), ('marker', 'vf0042'))
+        self.assertFalse(any('held_back' in r or 'problem' in r for r in rows.values()))
+        # without places: the same doors, so the same rows
+        self.assertEqual(world_doors.table(P.present_doors({}, doors), rooms, [TOWN], REGIONS, held_back=held_back),
+                         plain)
+
     def test_build_check_lists_every_unresolved_row(self):
         problems = world_doors.unresolved_problems(list(self.rows().values()))
         self.assertEqual(len(problems), 1)

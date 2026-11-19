@@ -3,6 +3,13 @@
 #include <stddef.h>
 #include <stdio.h>
 #include "aw_cstrip.h"
+int AW_CStripPlaceChanged(const void *world_open,const void *world_now,const float at_open[3],const float at_now[3]){
+    float d,sum=0;int k;
+    if(world_open!=world_now)return 1;
+    if(!at_open || !at_now)return 0;
+    for(k=0;k<3;k++){d=at_now[k]-at_open[k];sum+=d*d;}
+    return sum>AW_CSTRIP_PLACE_MOVE*AW_CSTRIP_PLACE_MOVE;      /* no square root: the squares compared */
+}
 int AW_CStripTakeLine(char *out,int size,const char *name,int count,int stolen,const char *from,int total){
     int n;
     if(!out || size<2){return 0;}

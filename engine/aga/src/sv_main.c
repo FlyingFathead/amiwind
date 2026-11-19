@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "aw_spike.h"
 #include "aw_ambient.h"
 #include "aw_items.h"
+#include "aw_tryalloc.h"	/* the frame buffer: an allocation that can say no (the Amiga's malloc traps instead) */
 /* aw_actors.c: every server spawn is a new map for the actors, the same map's name too (ACTOR-TABLE-SAME-MAP-RELOAD-67).
  * Declared here, not in aw_actors.h: the CHIM world stage keys that header, and this fix must move no world stage key. */
 void AW_ActorsServerReset (void);
@@ -40,6 +41,7 @@ char	localmodels[MAX_MODELS][5];			// inline model names for precache
 //============================================================================
 
 static void SV_NetStat_f (void);	/* dbg netstat (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66) */
+static cvar_t aw_net_method, aw_net_send, aw_net_frame, aw_net_buffer, aw_net_max;	/* the frame message's settings */
 
 /*
 ===============
@@ -73,6 +75,11 @@ void SV_Init (void)
     Cvar_RegisterVariable (&aw_step_rules);	/* aw_walk.c, docs/STEP_MOVEMENT.md (default 0) */
     Cvar_RegisterVariable (&aw_body_overlap);	/* world.c, DOOR-ARRIVAL-INSIDE-ACTOR-66 (default 1) */
     Cmd_AddCommand ("aw_netstat", SV_NetStat_f);
+    Cvar_RegisterVariable (&aw_net_method);	/* the frame message (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66), saved */
+    Cvar_RegisterVariable (&aw_net_send);
+    Cvar_RegisterVariable (&aw_net_frame);
+    Cvar_RegisterVariable (&aw_net_buffer);
+    Cvar_RegisterVariable (&aw_net_max);
 
     for (i=0 ; i<MAX_MODELS ; i++)
         sprintf (localmodels[i], "*%ld", (long)i);
@@ -488,15 +495,30 @@ static float SV_AliasScale (edict_t *ent)
 #define AW_NETSEND_RECORD_MAX (1 + 1 + 2 + 2 + 4 + 3 * AW_COORD_BYTES + 3 + 1 + (int)sizeof(float) + 1)
 #include "aw_netsend.inc"
 static int sv_net_reserve;
+static int sv_net_limit;	/* the bytes this frame's message may hold (PACED: aw_net_send; 0: the whole room) */
 static unsigned char sv_net_missed[MAX_EDICTS];   /* frames each entity's update waited (cleared with a new server) */
 static aw_netsend_t sv_net_cand[MAX_EDICTS];
 static unsigned char sv_net_send[MAX_EDICTS];
-/* dbg netstat: the last frame and the fullest frame since the map started */
+/* dbg netstat: the last frame, and since the map started or dbg netstat reset: the fullest frame, the waits */
 static struct {
     int candidates,wanted,budget,sent,sent_bytes,deferred,frames,frames_deferred,frames_over_1024,dropped;
-    int worst_wanted,worst_candidates,worst_budget,worst_deferred;
-    double said;
+    int worst_wanted,worst_candidates,worst_budget,worst_deferred,worst_need;
+    int wait_max,waited;	/* the longest wait of an update that went out after waiting, in frames; how many did */
+    double wait_sum,said;
+    double frame_sum,frame_max;	/* the time from one frame message to the next, in seconds */
+    int frame_n;
 } sv_net;
+/* an update that goes out after waiting: its wait counted for dbg netstat, then none */
+static void SV_NetSent (int e)
+{
+    if (e >= MAX_EDICTS || !sv_net_missed[e])
+        return;
+    sv_net.waited++;
+    sv_net.wait_sum += sv_net_missed[e];
+    if (sv_net_missed[e] > sv_net.wait_max)
+        sv_net.wait_max = sv_net_missed[e];
+    sv_net_missed[e] = 0;
+}
 static void SV_WriteEntityUpdate (edict_t *ent, int e, sizebuf_t *msg);
 /* One entity's update, built whole in OUT (AW_NETSEND_RECORD_MAX bytes) before it goes anywhere: its size in bytes, or
  * -1 when it would not fit there (a format that grew past the computed largest update: never written, said once). */
@@ -537,7 +559,10 @@ void SV_WriteEntitiesToClient (edict_t	*clent, sizebuf_t *msg)
     pvs = SV_FatPVS (org);
     AngleVectors (clent->v.v_angle, forward, right, up);
     mark = msg->cursize;
-    budget = msg->maxsize - msg->cursize - sv_net_reserve;
+    budget = (sv_net_limit > 0 && sv_net_limit < msg->maxsize ? sv_net_limit : msg->maxsize) - msg->cursize -
+             sv_net_reserve;
+    if (budget < 0)
+        budget = 0;
     used = over = n = 0;
 
 // send over all entities (excpet the client) that touch the pvs
@@ -606,8 +631,7 @@ void SV_WriteEntitiesToClient (edict_t	*clent, sizebuf_t *msg)
             if (sv_net_send[i] && SV_EntityUpdateRecord (EDICT_NUM(e), e, record) == sv_net_cand[i].bytes)
             {
                 SZ_Write (msg, record, sv_net_cand[i].bytes);
-                if (e < MAX_EDICTS)
-                    sv_net_missed[e] = 0;
+                SV_NetSent (e);
             }
             else
             {
@@ -617,7 +641,8 @@ void SV_WriteEntitiesToClient (edict_t	*clent, sizebuf_t *msg)
             }
         }
         sv_net.frames_deferred++;
-        if (realtime - sv_net.said > 30 || sv_net.said > realtime)
+        /* the room ran short (PACED waits by design and says nothing) */
+        if (!sv_net_limit && (realtime - sv_net.said > 30 || sv_net.said > realtime))
         {
             sv_net.said = realtime;
             Con_Printf ("Entity updates: %ld of %ld wait for the next frames (%ld of %ld bytes; dbg netstat)\n",
@@ -626,8 +651,7 @@ void SV_WriteEntitiesToClient (edict_t	*clent, sizebuf_t *msg)
     }
     else
         for (i = 0; i < n; i++)
-            if (sv_net_cand[i].e < MAX_EDICTS)
-                sv_net_missed[sv_net_cand[i].e] = 0;
+            SV_NetSent (sv_net_cand[i].e);
     sv_net.sent = n - sv_net.deferred;
     sv_net.sent_bytes = used;
     sv_net.frames++;
@@ -916,62 +940,159 @@ SV_SendClientDatagram
 =======================
 */
 /* NET-VIVEC-ENTITY-PACKET-OVERFLOW-66: the game's own connection (the loopback, net_loop.c: both sides in this
- * program) carries a frame's message of up to AW_LOOP_DATAGRAM bytes instead of the 1024 a network packet holds. Its
- * receive buffer (NET_MAXMESSAGE, 16384 bytes) also takes this frame's reliable message after it, and whatever the
- * screen side has not read yet: the frame's message keeps that room free, so the reliable one always fits. Memory: this
- * 8 KB buffer (static, in place of the 1 KB one on the stack), the entity order tables (about 6 KB); the loop buffers
- * are unchanged. */
-#define AW_LOOP_DATAGRAM 8192
-static byte sv_loop_datagram[AW_LOOP_DATAGRAM];
+ * program) carries a frame's message far larger than the 1024 bytes a network packet holds, with room to spare that
+ * grows when a frame needs it, and a separate budget for what one frame may send (the maintainer, 2026-11-17: room to
+ * spare, grown when needed, the sizes settings; what is sent each frame is what costs time on the 68k). All saved:
+ * - aw_net_method and aw_net_send (below): FULL sends everything in sight; PACED at most aw_net_send bytes a frame,
+ *   past it the nearest first and the rest in the next frames. The defaults come from the in-game measurement
+ *   (docs/performance/NET_FRAME.md).
+ * - aw_net_frame (32768): the frame message's room at the start of each map; aw_net_buffer (65536): the client's
+ *   receive buffer at the first frame of a game; aw_net_max (262144): the room never grows past it.
+ * - A frame that wants more than three quarters of its room (up to its send budget) doubles the room, and the receive
+ *   buffer with it, for the next frame: never in the middle of a message, never past aw_net_max, one console line.
+ *   Nothing shrinks during a map; the room starts again from aw_net_frame at the next map.
+ * - The receive buffer also takes this frame's reliable message after it and whatever the client has not read: the
+ *   frame's room keeps that free, so the reliable one always fits.
+ * The fullest frame the engine can make today is about 18 KB (MAX_EDICTS 600 updates of at most 28 bytes, the player's
+ * data, the frame's sounds and effects), under the starting room: the growth is for a larger entity table or format.
+ * Memory, allocated once at the first frame and only grown: the frame buffer (the room) and the receive buffer and
+ * net_message (net_loop.c): 128 KB at the start sizes, about 0.8 MB at aw_net_max. */
+/* Two methods to compare (methods as switches), live from the console, saved: 1 FULL, every update in sight each
+ * frame, the room growing as needed; 2 PACED, at most aw_net_send bytes a frame, the nearest first, the rest in the
+ * next frames. The default is the one that measured better (docs/performance/NET_FRAME.md). */
+static cvar_t aw_net_method = {"aw_net_method", "1", true};
+static cvar_t aw_net_send = {"aw_net_send", "4096", true};
+static cvar_t aw_net_frame = {"aw_net_frame", "32768", true};
+static cvar_t aw_net_buffer = {"aw_net_buffer", "65536", true};
+static cvar_t aw_net_max = {"aw_net_max", "262144", true};
+#define AW_NET_LIMIT 4194304	/* the settings' own bound: a message's length fits three bytes (net_loop.c) */
+extern int Loop_ReceiveSize (void);
+extern int Loop_Unread (void);
+extern int Loop_Grow (int receive, int message);
+static byte *sv_frame_data;	/* the frame buffer: allocated, the size of the room or more */
+static int sv_frame_size;
+static int sv_frame_room;	/* the room now; 0 until the first frame of a map */
+static int sv_frame_grow;	/* the room the last frame asked for (0 none) */
+static struct {
+    int count, from, to, wanted, at_max;
+} sv_net_grown;
+static int SV_NetSetting (cvar_t *v, int low, int high)
+{
+    int n = (int)v->value;
+    return n < low ? low : n > high ? high : n;
+}
 /* An overflow that still happens (every message buffer allows it explicitly, so it marks the buffer instead of
  * stopping the game): that message is dropped whole and the console says so, at most once every 30 s. */
+int aw_net_dropped;	/* the messages dropped so, for the state file (aw_remote.c net_dropped: the engine smoke fails on it) */
 static void SV_NetOverflowSaid (const char *what, int size)
 {
     static double said = -1000;
-    static int count;
-    count++;
+    aw_net_dropped++;
     if (realtime - said >= 30 || realtime < said)
     {
         said = realtime;
-        Con_Printf ("Message overflow caught (%ld so far): %s, %ld bytes; not sent\n", (long)count, what, (long)size);
+        Con_Printf ("Message overflow caught (%ld so far): %s, %ld bytes; not sent\n", (long)aw_net_dropped, what, (long)size);
     }
 }
+/* Before a frame is written: the room from the setting (raised settings count from the next frame on) and what the
+ * last frame asked for, the frame buffer and the connection's buffers grown to it; never past aw_net_max. */
+static void SV_NetRoomPrepare (void)
+{
+    static qboolean short_said;
+    int max = SV_NetSetting (&aw_net_max, MAX_DATAGRAM, AW_NET_LIMIT);
+    int start = SV_NetSetting (&aw_net_frame, MAX_DATAGRAM, max);
+    int want = sv_frame_room > start ? sv_frame_room : start, receive;
+    byte *data;
+    if (sv_frame_grow > want)
+        want = sv_frame_grow;
+    if (want > max)
+        want = max;
+    sv_frame_grow = 0;
+    receive = SV_NetSetting (&aw_net_buffer, NET_MAXMESSAGE, AW_NET_LIMIT);
+    if (receive < want + MAX_MSGLEN + 64)
+        receive = want + MAX_MSGLEN + 64;
+    if (want > sv_frame_size)
+    {
+        if ((data = AW_TryMalloc (want)) != NULL)
+        {
+            if (sv_frame_data)
+                free (sv_frame_data);
+            sv_frame_data = data;
+            sv_frame_size = want;
+        }
+    }
+    if ((want > sv_frame_size || !Loop_Grow (receive, want > MAX_MSGLEN ? want : MAX_MSGLEN)) && !short_said)
+    {
+        short_said = true;
+        Con_Printf ("Frame message: not enough memory for %ld bytes of room; it stays at %ld\n", (long)want,
+                    (long)sv_frame_size);
+    }
+    sv_frame_room = want < sv_frame_size ? want : sv_frame_size;
+}
+/* The room of this frame's message to CLIENT: on the game's own connection the room (what is free in the client's
+ * receive buffer after its unread messages and this frame's reliable one at most); -1 for a network client (a packet,
+ * MAX_DATAGRAM). */
 static int SV_LoopDatagramRoom (client_t *client)
 {
-    qsocket_t *peer;
     int room;
-    if (!client->netconnection || Q_strcmp (client->netconnection->address, "LOCAL"))
-        return -1;		/* not the loopback: a network packet's size */
-    peer = (qsocket_t *)client->netconnection->driverdata;
-    if (!peer)
+    if (!client->netconnection || Q_strcmp (client->netconnection->address, "LOCAL") || !client->netconnection->driverdata)
         return -1;
-    room = NET_MAXMESSAGE - peer->receiveMessageLength - ((client->message.cursize + 4 + 3) & ~3) - 16;
-    if (room > AW_LOOP_DATAGRAM)
-        room = AW_LOOP_DATAGRAM;
+    SV_NetRoomPrepare ();
+    if (!sv_frame_data)
+        return -1;		/* no memory for a larger one: a network packet's size */
+    room = Loop_ReceiveSize () - Loop_Unread () - ((client->message.cursize + 4 + 3) & ~3) - 16;
+    if (room > sv_frame_room)
+        room = sv_frame_room;
     return room < 16 ? 16 : room;	/* a nearly full buffer: a message that does not fit is not sent */
 }
 
-/* dbg netstat (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66): the last frame's entity updates against the message's room, the
- * fullest frame since the map started, and the models that filled the last frame. */
+/* dbg netstat [reset] (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66): the method and its budget, the room and its growth, the
+ * last frame's entity updates, and since the map started or the last reset the fullest frame, how close it came to the
+ * room, the waits, the frame time and the client's reading time per frame; the models that filled the last frame.
+ * reset: a new measuring window (to compare the two methods in one session). */
+extern double cl_net_parse_last, cl_net_parse_sum, cl_net_parse_max;
+extern int cl_net_parse_frames;
 static void SV_NetStat_f (void)
 {
     static int model_bytes[MAX_MODELS], model_count[MAX_MODELS];
-    int i, k, best, shown;
+    int i, k, best, shown, paced = (int)aw_net_method.value == 2;
+    if (Cmd_Argc () >= 2 && !Q_strcasecmp (Cmd_Argv (1), "reset"))
+    {
+        memset (&sv_net, 0, sizeof(sv_net));
+        cl_net_parse_last = cl_net_parse_sum = cl_net_parse_max = 0;
+        cl_net_parse_frames = 0;
+        Con_Printf ("dbg netstat: a new measuring window starts.\n");
+        return;
+    }
     if (!sv.active)
     {
         Con_Printf ("dbg netstat: no map is running.\n");
         return;
     }
-    Con_Printf ("Frame update on %s: %ld entities in sight want %ld bytes, room %ld (a network packet %ld, the game's "
-                "own connection up to %ld, its buffer %ld); %ld sent in %ld bytes, %ld wait for the next frames\n",
-                sv.name, (long)sv_net.candidates, (long)sv_net.wanted, (long)sv_net.budget, (long)MAX_DATAGRAM,
-                (long)AW_LOOP_DATAGRAM, (long)NET_MAXMESSAGE, (long)sv_net.sent, (long)sv_net.sent_bytes,
-                (long)sv_net.deferred);
-    Con_Printf ("Since the map started: %ld frames, %ld with updates waiting, %ld over %ld bytes; the fullest wanted "
-                "%ld bytes for %ld entities (room %ld, %ld waited); %ld frame updates not sent\n",
+    Con_Printf ("Method %s (aw_net_method %ld)%s%ld; room %ld bytes (aw_net_frame %ld, up to aw_net_max %ld), "
+                "receive buffer %ld; grown %ld times (last %ld to %ld for a frame of %ld bytes)\n",
+                paced ? "PACED" : "FULL", (long)(paced ? 2 : 1), paced ? ", budget aw_net_send " : ", budget the room ",
+                (long)(paced ? SV_NetSetting (&aw_net_send, MAX_DATAGRAM, AW_NET_LIMIT) : sv_frame_room),
+                (long)sv_frame_room, (long)aw_net_frame.value, (long)aw_net_max.value, (long)Loop_ReceiveSize (),
+                (long)sv_net_grown.count, (long)sv_net_grown.from, (long)sv_net_grown.to, (long)sv_net_grown.wanted);
+    Con_Printf ("Last frame on %s: %ld entities in sight want %ld bytes, budget %ld; %ld sent in %ld bytes, %ld wait\n",
+                sv.name, (long)sv_net.candidates, (long)sv_net.wanted, (long)sv_net.budget, (long)sv_net.sent,
+                (long)sv_net.sent_bytes, (long)sv_net.deferred);
+    Con_Printf ("Since then: %ld frames, %ld with updates waiting, %ld over %ld bytes; the fullest frame %ld bytes (%ld%% "
+                "of the room, %ld entities, %ld waited); longest wait %ld frames, %ld updates waited %ld.%ld frames on "
+                "average; %ld frame messages not sent\n",
                 (long)sv_net.frames, (long)sv_net.frames_deferred, (long)sv_net.frames_over_1024, (long)MAX_DATAGRAM,
-                (long)sv_net.worst_wanted, (long)sv_net.worst_candidates, (long)sv_net.worst_budget,
-                (long)sv_net.worst_deferred, (long)sv_net.dropped);
+                (long)sv_net.worst_need, sv_frame_room ? (long)(sv_net.worst_need * 100L / sv_frame_room) : 0L,
+                (long)sv_net.worst_candidates, (long)sv_net.worst_deferred, (long)sv_net.wait_max, (long)sv_net.waited,
+                sv_net.waited ? (long)(sv_net.wait_sum / sv_net.waited) : 0L,
+                sv_net.waited ? (long)(sv_net.wait_sum * 10 / sv_net.waited) % 10 : 0L, (long)sv_net.dropped);
+    Con_Printf ("Frame time %ld.%ld ms average, %ld ms longest (%ld frames); the client reads %ld us a frame on average, "
+                "%ld us longest, %ld us the last frame\n",
+                sv_net.frame_n ? (long)(sv_net.frame_sum * 1000 / sv_net.frame_n) : 0L,
+                sv_net.frame_n ? (long)(sv_net.frame_sum * 10000 / sv_net.frame_n) % 10 : 0L,
+                (long)(sv_net.frame_max * 1000), (long)sv_net.frame_n,
+                cl_net_parse_frames ? (long)(cl_net_parse_sum * 1e6 / cl_net_parse_frames) : 0L,
+                (long)(cl_net_parse_max * 1e6), (long)(cl_net_parse_last * 1e6));
     memset (model_bytes, 0, sizeof(model_bytes));
     memset (model_count, 0, sizeof(model_count));
     for (i = 0; i < sv_net.candidates; i++)
@@ -997,15 +1118,60 @@ static void SV_NetStat_f (void)
     }
 }
 
+/* After a frame was written on the game's own connection: a frame that wanted more than three quarters of the room
+ * (FULL: everything in sight; PACED: up to its budget) doubles the room for the next frame (SV_NetRoomPrepare grows
+ * the buffers then), never past aw_net_max; one console line. NEED: the bytes the whole frame wanted. */
+static void SV_NetRoomAsk (int need)
+{
+    int max = SV_NetSetting (&aw_net_max, MAX_DATAGRAM, AW_NET_LIMIT), to = sv_frame_room;
+    if (need > sv_net.worst_need)
+        sv_net.worst_need = need;
+    if (need * 4 <= sv_frame_room * 3)
+        return;
+    if (sv_frame_room >= max)
+    {
+        if (!sv_net_grown.at_max)
+            Con_Printf ("Frame message: at its largest room, %ld bytes (aw_net_max), a frame on %s wanted %ld; the "
+                        "nearest go first\n", (long)sv_frame_room, sv.name, (long)need);
+        sv_net_grown.at_max = 1;
+        return;
+    }
+    while (need * 4 > to * 3 && to < max)
+        to *= 2;
+    if (to > max)
+        to = max;
+    sv_frame_grow = to;
+    sv_net_grown.count++;
+    sv_net_grown.from = sv_frame_room;
+    sv_net_grown.to = to;
+    sv_net_grown.wanted = need;
+    Con_Printf ("Frame message: the room grows from %ld to %ld bytes for the next frame (a frame on %s wanted %ld)\n",
+                (long)sv_frame_room, (long)to, sv.name, (long)need);
+}
+
 qboolean SV_SendClientDatagram (client_t *client)
 {
     byte		buf[MAX_DATAGRAM];
     sizebuf_t	msg;
-    int			room;
+    int			room, head, paced;
 
     room = SV_LoopDatagramRoom (client);
+    paced = (int)aw_net_method.value == 2;
+    {
+        /* dbg netstat: the frame time, one frame message to the next (a pause or a load is not a frame) */
+        static double last;
+        double dt = realtime - last;
+        last = realtime;
+        if (dt > 0 && dt < 2)
+        {
+            sv_net.frame_sum += dt;
+            if (dt > sv_net.frame_max)
+                sv_net.frame_max = dt;
+            sv_net.frame_n++;
+        }
+    }
     memset (&msg, 0, sizeof(msg));
-    msg.data = room > 0 ? sv_loop_datagram : buf;
+    msg.data = room > 0 ? sv_frame_data : buf;
     msg.maxsize = room > 0 ? room : (int)sizeof(buf);
     msg.cursize = 0;
     /* never sent overflowed: a full buffer clears and is marked, and such a message is dropped below */
@@ -1016,11 +1182,18 @@ qboolean SV_SendClientDatagram (client_t *client)
 
 // add the client specific data to the datagram
     SV_WriteClientdataToMessage (client->edict, &msg);
+    head = msg.cursize;
 
-    /* the frame's sounds and effects keep their room after the entities */
+    /* the frame's sounds and effects keep their room after the entities; PACED: at most aw_net_send bytes a frame */
     sv_net_reserve = sv.datagram.cursize + 1 < msg.maxsize / 2 ? sv.datagram.cursize + 1 : 0;
+    sv_net_limit = room > 0 && paced ? SV_NetSetting (&aw_net_send, MAX_DATAGRAM, AW_NET_LIMIT) : 0;
     SV_WriteEntitiesToClient (client->edict, &msg);
-    sv_net_reserve = 0;
+    if (room > 0)
+    {
+        int need = head + sv_net.wanted + sv.datagram.cursize;
+        SV_NetRoomAsk (paced && need > sv_net_limit ? sv_net_limit : need);
+    }
+    sv_net_reserve = sv_net_limit = 0;
 
 // copy the server datagram if there is space
     /* (its own overflow, from a game script's writes, cleared it partway: not copied, SV_NetOverflowSaid) */
@@ -1444,6 +1617,8 @@ void SV_SpawnServer (char *server)
     /* the waits of the entity updates and dbg netstat start again with the map (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66) */
     memset (sv_net_missed, 0, sizeof(sv_net_missed));
     memset (&sv_net, 0, sizeof(sv_net));
+    memset (&sv_net_grown, 0, sizeof(sv_net_grown));
+    sv_frame_room = 0;	/* the room starts again from aw_net_frame; the buffers keep their size */
 
     COM_FormatPath (sv.name, sizeof(sv.name), "%s", server);	/* fits: SV_MapNameFits */
 #ifdef QUAKE2

@@ -1,15 +1,21 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
  * NET-VIVEC-ENTITY-PACKET-OVERFLOW-66: a frame's message from the game's server to its screen side, on the real server
  * code (sv_main.c SV_WriteEntitiesToClient, SV_SendClientDatagram, included here for its static parts) with the real
- * message writers and readers (common.c). The datagram is filled far past its size (600 things in sight, each with
- * the largest update there is) and must never overflow: everything that goes in reads back whole, the nearest go
- * first, nothing waits more than a few frames, the game's own connection takes up to 8 KB and keeps room for the
- * reliable message, a network packet stays at 1024 bytes. The old rule (16 bytes left before an update of up to 28)
- * is shown to run past the buffer, as in the maintainer's stop on the Bitter Coast. Sys_Error and Host_Error stop
- * the test.
+ * message writers and readers (common.c) and the game's own connection (net_loop.c). The datagram is filled far past
+ * its size (600 things in sight, each with the largest update there is) and must never overflow: everything that goes
+ * in reads back whole, the creatures and the nearest go first, nothing waits more than a few frames. On the game's own
+ * connection the room comes from the settings (aw_net_frame), a frame that wants more than three quarters of it grows
+ * the room and the buffers for the next frame (which then goes whole), a raised setting counts from the next frame,
+ * the room keeps space for the reliable message, at aw_net_max the nearest go first with no overflow, and PACED keeps
+ * to its budget (aw_net_send); a network packet stays at 1024 bytes. An overflow that still happens is caught, said
+ * once and not sent. The old rule (16 bytes left before an update of up to 28) is shown to run past the buffer, as in
+ * the maintainer's stop on the Bitter Coast. Sys_Error and Host_Error stop the test.
  */
 #include "../engine/aga/src/sv_main.c"
 #include <assert.h>
+extern qsocket_t *loop_client;
+double cl_net_parse_last, cl_net_parse_sum, cl_net_parse_max;	/* cl_main.c's, read by dbg netstat */
+int cl_net_parse_frames;
 
 /* common.c's byte order (COM_Init sets it in the game) */
 extern short ShortNoSwap (short l);
@@ -38,7 +44,7 @@ static int printed;
 void Con_Printf (char *fmt, ...) {(void)fmt; printed++;}
 void Con_DPrintf (char *fmt, ...) {(void)fmt;}
 static sizebuf_t sent;
-static byte sent_data[NET_MAXMESSAGE];
+static byte sent_data[262144];
 static int sends;
 int NET_SendUnreliableMessage (qsocket_t *sock, sizebuf_t *data)
 {
@@ -112,6 +118,8 @@ static void world (int n, int scaled)
     EDICT_NUM (1)->v.v_angle[1] = 0;	/* looking along +x: the things are in front */
     memset (sv_net_missed, 0, sizeof (sv_net_missed));
     memset (&sv_net, 0, sizeof (sv_net));
+    memset (&sv_net_grown, 0, sizeof (sv_net_grown));
+    sv_frame_room = sv_frame_grow = 0;	/* a new map: the room starts again from aw_net_frame */
 }
 
 /* ---- the entity updates read back with the real readers; returns how many, fills SEEN ---- */
@@ -214,9 +222,10 @@ static void old_rule (void)
     assert (overflowed > 0);
 }
 
+#define LOOP_ROOM 8192
 int main (void)
 {
-    byte data[AW_LOOP_DATAGRAM];
+    byte data[LOOP_ROOM];
     sizebuf_t msg;
     unsigned char seen[THINGS];
     int frame, e, n, wait[THINGS], longest;
@@ -234,7 +243,7 @@ int main (void)
     {
         world (THINGS, 1);
         memset (&msg, 0, sizeof (msg));
-        msg.data = data; msg.maxsize = n ? AW_LOOP_DATAGRAM : MAX_DATAGRAM;	/* allowoverflow off: Sys_Error */
+        msg.data = data; msg.maxsize = n ? LOOP_ROOM : MAX_DATAGRAM;	/* allowoverflow off: Sys_Error */
         SV_WriteEntitiesToClient (EDICT_NUM (1), &msg);
         assert (msg.cursize <= msg.maxsize && !msg.overflowed);
         memset (seen, 0, sizeof (seen));
@@ -274,34 +283,70 @@ int main (void)
     printf ("the longest wait over 120 frames: %d frames\n", longest);
     assert (longest <= 17 + 8);
 
-    /* the whole frame message: the game's own connection takes up to 8 KB, keeps room for this frame's reliable
-     * message and what the screen side has not read; a network client keeps 1024 bytes */
+    /* the whole frame message on the game's own connection (FULL): the room from aw_net_frame (8192 here); a frame of
+     * about 13 KB wants more than three quarters of it, so the room and the buffers grow for the next frame, which
+     * goes whole */
     world (THINGS, 0);
     memset (&client, 0, sizeof (client));
     memset (&local, 0, sizeof (local)); memset (&peer, 0, sizeof (peer)); memset (&remote, 0, sizeof (remote));
     strcpy (local.address, "LOCAL");
     local.driverdata = &peer;
+    loop_client = &peer;
     client.netconnection = &local;
     client.edict = EDICT_NUM (1);
     client.message.data = data; client.message.maxsize = 1;	/* only its size is read */
-    assert (SV_SendClientDatagram (&client) && sends == 1);
-    assert (sent.cursize > MAX_DATAGRAM && sent.cursize <= AW_LOOP_DATAGRAM);
-    peer.receiveMessageLength = 12000;
-    client.message.cursize = 2000;
-    assert (SV_SendClientDatagram (&client) && sends == 2);
-    assert (sent.cursize <= NET_MAXMESSAGE - 12000 - 2004 - 16);
-    /* full: the frame update overflows its 16 bytes; caught, said once, dropped whole (never sent from its middle) */
-    peer.receiveMessageLength = NET_MAXMESSAGE;
-    client.message.cursize = 0;
+    aw_net_method.value = 1; aw_net_send.value = 4096;
+    aw_net_frame.value = 8192; aw_net_buffer.value = 16384; aw_net_max.value = 262144;
     e = printed;
+    assert (SV_SendClientDatagram (&client) && sends == 1);
+    assert (sent.cursize > MAX_DATAGRAM && sent.cursize <= 8192 && sv_net.deferred > 0);
+    assert (sv_net_grown.count == 1 && sv_net_grown.from == 8192 && sv_net_grown.to == 32768 && printed == e + 2);
+    assert (SV_SendClientDatagram (&client) && sends == 2);
+    assert (sv_frame_room == 32768 && sv_net.deferred == 0 && sent.cursize > 8192);	/* the whole frame */
+    assert (Loop_ReceiveSize () >= 32768 + MAX_MSGLEN && net_message.maxsize >= 32768 && sv_net_grown.count == 1);
+    printf ("FULL: a frame of %d bytes grew the room from 8192 to %d and went whole the next frame\n", sent.cursize,
+            sv_frame_room);
+    /* a raised setting counts from the next frame; nothing shrinks during a map */
+    aw_net_frame.value = 65536;
+    assert (SV_SendClientDatagram (&client) && sv_frame_room == 65536 && sv_frame_size >= 65536);
+    aw_net_frame.value = 8192;
+    assert (SV_SendClientDatagram (&client) && sv_frame_room == 65536);
+    /* the room keeps space for what the client has not read and this frame's reliable message */
+    peer.receiveMessageLength = Loop_ReceiveSize () - 3000;
+    client.message.cursize = 1000;
+    assert (SV_SendClientDatagram (&client) && sent.cursize <= 3000 - 1004 - 16);
+    /* full: the frame message overflows its 16 bytes; caught, said once, dropped whole (never sent from its middle) */
+    peer.receiveMessageLength = Loop_ReceiveSize ();
+    client.message.cursize = 0;
+    n = sends; e = printed;
     assert (SV_SendClientDatagram (&client));
-    printf ("full buffer: sends %d, dropped %d, console lines %d\n", sends, sv_net.dropped, printed - e);
-    assert (sends == 2 && sv_net.dropped == 1 && printed == e + 1);
-    assert (SV_SendClientDatagram (&client) && sends == 2 && sv_net.dropped == 2 && printed == e + 1);
+    printf ("full buffer: sends %d, dropped %d, console lines %d\n", sends - n, sv_net.dropped, printed - e);
+    assert (sends == n && sv_net.dropped == 1 && printed == e + 1);
+    assert (SV_SendClientDatagram (&client) && sends == n && sv_net.dropped == 2 && printed == e + 1);
     peer.receiveMessageLength = 0;
+
+    /* at aw_net_max the room does not grow: the nearest go first, nothing past the buffer, said once */
+    world (THINGS, 0);
+    aw_net_frame.value = 8192; aw_net_max.value = 8192;
+    e = printed;
+    assert (SV_SendClientDatagram (&client) && SV_SendClientDatagram (&client));
+    assert (sv_frame_room == 8192 && sent.cursize <= 8192 && sv_net.deferred > 0 && sv_net_grown.count == 0);
+    assert (sv_net_grown.at_max && printed == e + 2);	/* the room ran short once (FULL), the largest room once */
+    aw_net_max.value = 262144;
+
+    /* PACED keeps to its budget, the nearest first; it never grows the room for what it would not send */
+    world (THINGS, 0);
+    aw_net_method.value = 2; aw_net_send.value = 4096; aw_net_frame.value = 32768;
+    assert (SV_SendClientDatagram (&client) && sent.cursize <= 4096 + 64 && sv_net.deferred > 0);
+    assert (sv_net_grown.count == 0 && sv_frame_room == 32768);
+    for (e = ACTORS; e < THINGS; e++)
+        assert (!sv_net_missed[e]);	/* the creatures went */
+    printf ("PACED: %d of %d updates in %d bytes, budget 4096\n", sv_net.sent, sv_net.candidates, sent.cursize);
+    aw_net_method.value = 1;
+
+    /* a network client keeps a packet's size */
     strcpy (remote.address, "192.168.1.2");
     client.netconnection = &remote;
-    assert (SV_SendClientDatagram (&client) && sends == 3 && sent.cursize <= MAX_DATAGRAM);
-    printf ("loopback room 8192, after 12000 unread and a 2000-byte reliable message the frame update fits the rest\n");
+    assert (SV_SendClientDatagram (&client) && sent.cursize <= MAX_DATAGRAM);
     return 0;
 }

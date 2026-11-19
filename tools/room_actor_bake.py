@@ -245,7 +245,7 @@ class _RoomFitter(_Fitter):
             from audit_walkability import axes
             from check_actor_ground import entities
             from chim import format as F
-            from chim.interior import installed_room, store_model_images
+            from chim.room_records import installed_room, store_model_images
             from map_files import map_file
             path = map_file(self.maps, name)
             raw = path.read_bytes()

@@ -48,8 +48,19 @@ int AW_HandWeaponItemApply(void);
  * hands with the left arm on the original's torch group; tools/prepare_player_fp_parts.py LIGHT_STANCE), and after the
  * arms are drawn, 1 with cl.viewent set to the held light's own model on their shield bone for this frame. */
 #define AW_HAND_LIGHT_STANCE 7
-#define AW_HAND_LIGHT_FORWARD 4.0f   /* the torch arms' view offset (tools/prepare_torch.py VIEW_OFFSET) */
 int AW_HandLightItemApply(void);
+/* FP-TORCH-HAND-REGRESSION-67: ONE placement of a held item in first person, for both hands, as the original carries
+ * it (OpenMW 0.51 npcanimation.cpp, read not copied: a carried light or a shield on "Shield Bone", the weapon on "Weapon
+ * Bone", of the first-person skeleton the arms are drawn on) and as our third person does (aw_view.c parts_draws): the
+ * view model's place, then that hand's bone of the arms from parts at their frame (BONE_TAG, aw_view.c
+ * hand_parts_bone_tag), then the item's own carried place on the bone (CARRIED: a light's carried-light offset, its
+ * .hld; NULL none). Nothing else: no offset from the view. Before, a held light was also moved 4 units forward along
+ * the view (AW_HAND_LIGHT_FORWARD, the baked torch arms' view offset, cd67bdcf, v0.0.61) while the arms it rides were
+ * not: its grip sat 4.00 units from the shield bone, off the hand. Pure. */
+#define AW_HAND_RIGHT 0
+#define AW_HAND_LEFT 1
+void AW_HandItemPlace(const float view_origin[3],const float view_angles[3],const float bone_tag[6],
+                      const float carried[6],float origin[3],float angles[3]);
 /* PLAYER-CASTING-59 (v0.0.66): the spell stance of the arms from parts, one per spell range (the first-person table's
  * groups 'sps', 'spt', 'sp' after the light: tools/prepare_player_fp_parts.py SPELL_STANCES): AW_HAND_SPELL_STANCE +
  * aw_magic_cast_range (0 self, 1 touch, 2 target). The baked arms carry one spell stance of their own, the target cast:
@@ -63,7 +74,9 @@ int AW_HandLightItemApply(void);
 extern int aw_magic_cast_range;
 /* aw_cast.c, a cast that goes: the hands play the cast (the attack clip) from the ready stance. 1 = started. */
 int AW_HandsCastStart(void);
-extern int (*aw_hand_parts_shield_tag)(float tag[6]);
+/* aw_view.c: the arms from parts' bone of HAND (AW_HAND_RIGHT the weapon bone, AW_HAND_LEFT the shield bone) at the
+ * frame drawn now, as a tag in the view model's space (AW_SkelBoneTag at the parts' 0.25 scale); 0 none */
+extern int (*aw_hand_parts_bone_tag)(int hand,float tag[6]);
 /* The first-person hand clips (FIRST-PERSON-HANDS-IN-C-54): the builder writes them to gfx/hand-anims.txt in the image
  * (tools/hand_metadata.py hand_table; read by aw_hands.c), never into a map's worldspawn or the QuakeC, so a change to the hands rebuilds
  * the image only. Text: "AWHA1", then "clip NAME FIRST COUNT DURATION" for idle, draw, lower and punch (frames of the

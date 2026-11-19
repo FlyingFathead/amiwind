@@ -49,6 +49,29 @@ class ViewRulesNativeTests(unittest.TestCase):
         native.NativeSourceTests().compile_run('aga_player_dead_test.c', [], cflags=UBSAN)
 
 
+class BodyMotionRestartWiring(unittest.TestCase):
+    """PLAYER-VANITY-WALK-STUCK-67: after the idle vanity orbit the walk and run stuck until a map load; every camera or
+    control change restarts the body's animation state now (the rules: tests/aga_view_test.c body_restart)."""
+
+    def test_the_frame_checks_the_signature_after_the_views_changes(self):
+        view = code('aw_view.c')
+        frame = body(view, 'void AW_ViewFrame(void)')
+        self.assertTrue(frame.rstrip('}').rstrip().endswith('body_motion_check(p);'), 'the check is not the last step')
+        self.assertLess(frame.index('set_chase(AW_ViewBehind(&view));'), frame.index('body_motion_check(p);'))
+        check = body(view, 'static void body_motion_check(edict_t *p)')
+        for field in ('now.mode=view.mode', 'now.movetype=', 'now.swimming=', 'now.playing=', 'now.drawn=owned'):
+            self.assertIn(field, check)
+        restart = body(view, 'static void body_motion_restart(const char *why)')
+        for reset in ('AW_ViewBodyRestart(&body_play,&body_air);', 'stance.picked=0;', 'memset(&turn,0,sizeof(turn));'):
+            self.assertIn(reset, restart)
+
+    def test_a_new_map_restarts_it_and_the_status_shows_it(self):
+        view = code('aw_view.c')
+        self.assertIn('body_sig.valid=0;', body(view, 'void AW_ViewSceneSpawn(void)'))
+        self.assertIn('body_motion_count(air,speed);', body(view, 'entity_t *AW_ViewBody(entity_t *ent)'))
+        self.assertIn('"Body motion: speed %.1f, on ground %d, air %s, group changes %lu in the last second', view)
+
+
 class ViewEngineContracts(unittest.TestCase):
     def test_first_person_is_the_default_and_the_settings_come_from_the_image(self):
         view = (SRC / 'aw_view.c').read_text(encoding='utf-8')
@@ -87,6 +110,26 @@ class ViewEngineContracts(unittest.TestCase):
         self.assertIn('AW_ViewInit();', code('aw_debug.c'))
         make = (ROOT / 'engine/aga/Makefile').read_text(encoding='utf-8')
         self.assertIn('aw_view_rules.c aw_view.c', make)
+
+    def test_a_turn_the_game_makes_survives_the_idle_orbit(self):
+        # VIEW-VANITY-UNDOES-SET-VIEW-67: the server's set-angle message marks the frame (cl_parse.c), and the orbit's hold
+        # (aw_view_rules.c AW_ViewOrbitHold, tested natively) takes the new heading as its anchor instead of copying the
+        # old anchor back over it; only an orbit holds the view.
+        parse = code('cl_parse.c')
+        setangle = parse[parse.index('case svc_setangle:'):parse.index('case svc_setview:')]
+        self.assertIn('if (aw_view_turned)', setangle)
+        self.assertLess(setangle.index('MSG_ReadAngle'), setangle.index('aw_view_turned ();'))
+        self.assertIn('void (*aw_view_turned)(void);', parse)
+        view = code('aw_view.c')
+        frame = body(view, 'void AW_ViewFrame(void)')
+        self.assertIn('forced=view_forced;', frame)
+        self.assertLess(frame.index('view_forced=0;'), frame.index('if(!ready)load_settings();'))
+        orbit = frame[frame.index('if(view.mode==AW_VIEW_PREVIEW || view.mode==AW_VIEW_VANITY){'):]
+        self.assertIn('AW_ViewOrbitHold(&view,cl.viewangles,anchor,mode_before!=view.mode,forced);',
+                      orbit[:orbit.index('}')])
+        self.assertEqual(frame.count('AW_ViewOrbitHold('), 1)
+        self.assertNotIn('VectorCopy(anchor,cl.viewangles);', frame[:frame.index('else if(mode_before==AW_VIEW_PREVIEW)')])
+        self.assertIn('aw_view_turned=view_turned;', body(view, 'void AW_ViewInit(void)'))
 
     def test_relink_keeps_its_cursor_and_draws_the_body_through_its_own_pointer(self):
         # CAMERA-THIRDPERSON-COMBAT-NPC-HIDDEN-36: `ent = aw_view_body (ent)` moved CL_RelinkEntities'

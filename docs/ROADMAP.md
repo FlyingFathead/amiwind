@@ -1,6 +1,6 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.67-dev2 (17 November 2026)._
+_Last updated with AmiWind v0.0.67-dev3 (19 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -124,9 +124,11 @@ The first snapshot, [v0.0.67-dev1](releases/notes/RELEASE-v0.0.67-dev1.md), is t
 label. The second, [v0.0.67-dev2](releases/notes/RELEASE-v0.0.67-dev2.md), is done: it fixes the three critical faults
 found in play on the v0.0.66 release (the stop on a loading screen in busy places, the missing autosaves, the missing
 wild creatures), opens Seyda Neen's containers and the opening's item rule, adds the fallbacks for a place that cannot
-be loaded, the first Solstheim and Mournhold collision rows and the Toolkit's 3D views of rooms and cells. Next:
-v0.0.67-dev3 opens with the shared layout of every menu and message box and the crosshair's targeting. The line holds,
-in order:
+be loaded, the first Solstheim and Mournhold collision rows and the Toolkit's 3D views of rooms and cells. The third,
+[v0.0.67-dev3](releases/notes/RELEASE-v0.0.67-dev3.md), is the newest snapshot, in development: every race's own
+first-person hands, Mournhold's districts as a build module with their things and people, the expansions' scripts bound,
+the inventory's actions, the shared layout of menus and message boxes, the confirmed look book, creatures and spell
+effects as in the original, and a builder that reuses earlier builds by default. The line holds, in order:
 
 1. **Tribunal and Bloodmoon in the game**, by the plan under "Next version" below: the files checked; every change the
    expansions make to Vvardenfell working end to end (the boat at Khuul, Louis Beauchamp in Ald'ruhn, Asciene Rane in

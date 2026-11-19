@@ -94,6 +94,43 @@ static void in_play(void){
     AW_LoadErrNotice(&e,n,sizeof(n));assert(!strcmp(n,"LF9: an error stopped the game in bc_m2."));
     strcpy(e.map,"a_map_name_far_longer_than_twenty");AW_LoadErrNotice(&e,n,sizeof(n));assert(strlen(n)<=56);
 }
+/* AW-RECOVER (no error in play ends the game): the steps after the way back, the last autosave and the previous map;
+ * the steps that did not load either; the console's "now" line before and after the arrival */
+static void recovered(void){
+    aw_loaderr_t e;char t[1536];
+    /* in play, the same error again soon after: the last autosave */
+    e=make(AW_LOADERR_ERROR,"seyda","");e.in_play=1;e.again=1;e.way=AW_WAY_AUTOSAVE;strcpy(e.save_label,"Autosave 2");
+    strcpy(e.detail,"forced error in a script step (dbg hosterror script)");
+    strcpy(e.here_place,"Census and Excise Office");
+    assert(!strcmp(box(&e),"An error stopped the game in seyda again soon after.\n"
+                           "Error: forced error in a script step (dbg hosterror script). Code LF9.\n"
+                           "The last autosave (Autosave 2) was loaded. You are in Census and Excise Office."));
+    AW_LoadErrConsole(&e,t,sizeof(t));assert(strstr(t,"  now: seyda at 1 2 3 (Census and Excise Office), the last autosave (Autosave 2)\n"));
+    /* written before the arrival: which one is loading */
+    e.here_map[0]=e.here_place[0]=0;e.here_ok=0;
+    assert(strstr(box(&e),"Code LF9.\nThe last autosave (Autosave 2) is loading."));
+    AW_LoadErrConsole(&e,t,sizeof(t));assert(strstr(t,"  now: loading the last autosave (Autosave 2)\n"));
+    /* in play, the place again failed: ", and loading it again failed as well", then the autosave */
+    e=make(AW_LOADERR_ERROR,"seyda","");e.in_play=1;e.back_failed=1;e.way=AW_WAY_AUTOSAVE;
+    assert(!strncmp(box(&e),"An error stopped the game in seyda, and loading it again failed as well.\n",73));
+    assert(strstr(box(&e),"\nThe last autosave was loaded. You are in Seyda Neen."));
+    /* a load whose way back failed, the autosave too: the previous map */
+    e=make(AW_LOADERR_ERROR,"prison","");strcpy(e.detail,"forced failure (dbg loadfail)");e.back_failed=1;e.save_failed=1;
+    strcpy(e.back_map,"seyda");e.way=AW_WAY_PREVIOUS;strcpy(e.previous_map,"census");strcpy(e.here_place,"Census and Excise Office");
+    assert(!strcmp(box(&e),"Map prison was found but could not be loaded, and the way back to seyda failed as well.\n"
+                           "Load error: forced failure (dbg loadfail). Code LF9.\nThe last autosave did not load either.\n"
+                           "The previous map, census, was loaded. You are in Census and Excise Office."));
+    AW_LoadErrConsole(&e,t,sizeof(t));assert(strstr(t,"(Census and Excise Office), the previous map\n"));
+    e.here_map[0]=e.here_place[0]=0;e.here_ok=0;AW_LoadErrConsole(&e,t,sizeof(t));
+    assert(strstr(t,"  now: loading the previous map census\n") && strstr(t,"The previous map, census, is loading."));
+    /* every step failed: the load menu, the steps that did not load either */
+    e.previous_failed=1;e.way=AW_WAY_FAILED;
+    assert(strstr(box(&e),"Code LF9.\nThe last autosave and the previous map did not load either.\nLoad a saved game to go on."));
+    e.save_failed=0;assert(strstr(box(&e),"Code LF9.\nThe previous map did not load either.\nLoad a saved game to go on."));
+    /* a way back that was never tried (a load from no place) and no autosave: no "way back" in the text */
+    e=make(AW_LOADERR_ERROR,"prison","");e.way=AW_WAY_PREVIOUS;strcpy(e.previous_map,"census");
+    assert(!strncmp(box(&e),"Map prison was found but could not be loaded.\n",46) && !strstr(box(&e),"way back"));
+}
 /* engine text in a box or a line: no codes the box or the console could read */
 static void cleaning(void){
     char c[32];aw_loaderr_t e;
@@ -151,7 +188,7 @@ static void header(void){
     assert(AW_LoadErrMapHeader(NULL,0,0,NULL)==AW_BROKEN_HEADER);
 }
 int main(void){
-    codes();boxes();no_place();in_play();cleaning();console();header();
+    codes();boxes();no_place();in_play();recovered();cleaning();console();header();
     puts("load errors: codes, boxes, the way back, notices, cleaning, the console block and the header check passed");
     return 0;
 }

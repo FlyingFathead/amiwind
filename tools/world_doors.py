@@ -293,16 +293,23 @@ PRISON_FORMAT = 'AWPM1'
 EVIDENCE_CHEST = 'stolen_goods'            # OpenMW confiscateStolenItems: the prison's evidence chest
 
 
-def prison_markers(raw):
+def prison_markers(raw, places=None):
     """The prison markers of a master (CRIME-59): every PrisonMarker reference with a destination, where an arrest lets
     the player out (OpenMW 0.51 World::teleportToClosestMarker: the marker's own place, original units and facing), the
     prison it names and that prison's evidence chest (World::confiscateStolenItems: the first stolen_goods reference of
     the marker's destination cell; 0 when it has none). Sorted by reference:
-    [{'reference', 'position', 'yaw', 'prison', 'chest'}]."""
+    [{'reference', 'position', 'yaw', 'prison', 'chest'}].
+    The chest by its stable id (tools/ref_identity.py stable_ref), the reference the engine changes a container's
+    contents by (aw_crime.c confiscate; REF-IDENTITY-MERGED-MASTER-66: the expansions' chests were written under the
+    merged master's number); the base game's numbers are both forms at once. PLACES (tools/presented_exterior.py
+    build_places): a marker that stands in a presented district (Mournhold's Royal Palace courtyard) is written at its
+    moved place, where the presented world has it; without PLACES every marker is as before."""
     import math
     from mwad.audit import cell_data
     from mwad.esm import is_deleted, records, subrecords
     from mwad.interior import original_doors
+    from presented_exterior import present_doors
+    from ref_identity import stable_ref
     chests = {}
     for tag, flags, payload in records(raw):
         if tag != 'CELL':
@@ -315,9 +322,9 @@ def prison_markers(raw):
             continue
         for ref in cell['refs']:
             if ref.get('id', '').casefold() == EVIDENCE_CHEST and not ref.get('deleted'):
-                chests.setdefault(cell['name'].casefold(), ref['number'])
+                chests.setdefault(cell['name'].casefold(), stable_ref('Morrowind.esm', ref['number']))
     out = []
-    for door in original_doors(raw):
+    for door in present_doors(places or {}, original_doors(raw)):
         if door['id'].casefold() not in MARKER_IDS:
             continue
         yaw = math.degrees(door.get('rotation_radians', [0, 0, 0])[2]) % 360.0
@@ -341,6 +348,8 @@ def prison_markers_text(markers):
 
 TELEPORT_NAMES = 'teleport-names.txt'      # config/ and the game data: dbg tp NAME (engine aw_scene.c named_place)
 GLOBAL_PLACE = 'global'                    # the map of an outdoor place: x y z are original global coordinates
+NOT_HERE = '-'                             # the map of a place this image does not hold: the label says why, nothing
+                                           # moves (tools/expansion_arrivals.py, DBG-TP-EXPANSION-ARRIVALS-66)
 
 
 def teleport_names(raw):
@@ -366,10 +375,11 @@ def teleport_names(raw):
 
 
 def teleport_name_problems(names, rooms):
-    """One line per named place whose map is not a room the image holds (rooms: {cell: map})."""
+    """One line per named place whose map is not a room the image holds (rooms: {cell: map}); a place written as not
+    held (NOT_HERE) says so itself."""
     held = set(rooms.values())
     return ['named place %s: map %s is not in this image' % (name, place[0])
-            for name, place in sorted(names.items()) if place[0] != GLOBAL_PLACE and place[0] not in held]
+            for name, place in sorted(names.items()) if place[0] not in (GLOBAL_PLACE, NOT_HERE) and place[0] not in held]
 
 
 def unresolved_problems(rows):
