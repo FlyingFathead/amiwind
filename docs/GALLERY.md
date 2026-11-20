@@ -7,6 +7,7 @@ What changed in each version: [changelog](CHANGELOG.md).
 <!-- contents start -->
 ## Contents
 
+- [v0.0.67: Tribunal Introduced: Mournhold's districts](#v0067-tribunal-introduced-mournholds-districts)
 - [v0.0.66: A first look at Mournhold (Tribunal)](#v0066-a-first-look-at-mournhold-tribunal)
 - [v0.0.56-dev1: Ald'ruhn on a Raspberry Pi](#v0056-dev1-aldruhn-on-a-raspberry-pi)
 - [v0.0.44: By Azura's Trees!](#v0044-by-azuras-trees)
@@ -25,7 +26,25 @@ What changed in each version: [changelog](CHANGELOG.md).
 
 <!-- contents end -->
 
-_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
+_Last updated with AmiWind v0.0.67 (19 November 2026)._
+
+## v0.0.67: Tribunal Introduced: Mournhold's districts
+
+Mournhold, the city of the Tribunal expansion, outdoors for the first time: the Great Bazaar, Godsreach, the
+Royal Palace courtyard and Plaza Brindisi Dorom, in the third development snapshot of v0.0.67 in FS-UAE (32 MB Fast RAM, first person, the
+game's own fog and light), enlarged two times without smoothing. The way there is the original's: Asciene Rane's
+transport from Ebonheart to the Royal Palace, then out through the palace door.
+
+| | |
+| --- | --- |
+| ![Under a stall's awning in the Great Bazaar of Mournhold, the arcade and the people of the market beyond, v0.0.67](images/amiwind-v0.0.67-mournhold-greatbazaar-awning.png) | ![Under a stall's awning in the Great Bazaar of Mournhold looking north, a pot on the counter, the arches and the sky, v0.0.67](images/amiwind-v0.0.67-mournhold-greatbazaar-market-north.png) |
+| **The Great Bazaar**, under a stall's awning. | **The Great Bazaar**, looking north past the counter. |
+| ![A street of Godsreach in Mournhold between the district's high walls, a street lamp on the right and the sky at the far end, v0.0.67](images/amiwind-v0.0.67-mournhold-godsreach-street.png) | ![Looking east along a street of Godsreach in Mournhold, in the district's haze, v0.0.67](images/amiwind-v0.0.67-mournhold-godsreach-street-east.png) |
+| **Godsreach**, between the high walls. | **Godsreach** in the district's haze. |
+| ![The arcade of the Royal Palace courtyard in Mournhold, street lamps among the arches, v0.0.67](images/amiwind-v0.0.67-mournhold-palace-courtyard-arcade.png) | ![Looking south down the arcade outside the Royal Palace door in Mournhold, lamps and the open courtyard on the right, v0.0.67](images/amiwind-v0.0.67-mournhold-palace-courtyard-south.png) |
+| **The Royal Palace courtyard**, through the arcade. | **Outside the palace door**, looking down the arcade. |
+| ![The Great Bazaar's street in Mournhold as a player enters it from the Plaza Brindisi Dorom door, a tree on the left and the street running on into the haze, v0.0.67](images/amiwind-v0.0.67-mournhold-greatbazaar-street-from-plaza.png) | ![Standing in the water below Plaza Brindisi Dorom in Mournhold, the Plaza's walls and the sky beyond, photo mode, v0.0.67](images/amiwind-v0.0.67-mournhold-plaza-brindisi-dorom-water.png) |
+| **The Great Bazaar**, its street seen from the Plaza door. | **Plaza Brindisi Dorom**, its walls seen from the water below, in photo mode. |
 
 ## v0.0.66: A first look at Mournhold (Tribunal)
 

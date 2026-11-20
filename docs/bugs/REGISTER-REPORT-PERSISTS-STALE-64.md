@@ -64,6 +64,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [DOCS-RELEASE-EVIDENCE-SCOPE-39](DOCS-RELEASE-EVIDENCE-SCOPE-39.md): Release notes conflate earlier image evidence and open bug identities
 - [DOCS-ROADMAP-IMPLEMENTATION-39](DOCS-ROADMAP-IMPLEMENTATION-39.md): Roadmap retains obsolete implementation and coverage claims
 - [DOCS-TOC-RENDER-FIGHT-33](DOCS-TOC-RENDER-FIGHT-33.md): The contents-list writer and the bug register renderer move each other's blocks on bug pages
+- [DOOR-GRAPH-CELL-TEST-AS-TELEPORT-67](DOOR-GRAPH-CELL-TEST-AS-TELEPORT-67.md): The door graph marks two Tribunal cells as reached by script because a script tests the player's cell name, although nothing moves the player there
 - [DOOR-GRAPH-MWAD-SHADOW-48](DOOR-GRAPH-MWAD-SHADOW-48.md): tools/door_graph.py fails to start when PYTHONPATH names both src and tools
 - [DRYRUN-LIBS-LABEL-32](DRYRUN-LIBS-LABEL-32.md): A dry-run image built with --amiga-libs still says it contains no game assets or ROMs only
 - [ESTIMATE-EVR-BELOW-CUR-31](ESTIMATE-EVR-BELOW-CUR-31.md): World estimate: "everything" comes out below "current content" in some regions
@@ -81,6 +82,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - PREFLIGHT-PERSISTING-PARSE-53 (no report page): The release preflight counted only persisting bugs whose line ended in NOT SCHEDULED, so lapsed deferrals printed 0 bugs and half a list
 - [PUBLIC-REFERENCE-SCREENSHOT-40](PUBLIC-REFERENCE-SCREENSHOT-40.md): Original-game reference screenshot included in the public source list
 - [REGISTER-ADD-NO-RELEASE-ROW-48](REGISTER-ADD-NO-RELEASE-ROW-48.md): bug_register.py add does not list a new report page in tools/release-files.json or write its contents list: the v0.0.48 final gate failed on both
+- [REGISTER-CONCURRENT-WRITE-LOST-67](REGISTER-CONCURRENT-WRITE-LOST-67.md): Two register writes at the same time in one checkout lose an entry: the later writer saves the register from a copy read before the earlier writer's change
 - REGISTER-DEFERRAL-EXPIRES-53 (no report page): A maintainer deferral naming a release (deferred to v0.0.52) still counted as a reason inside that release, so deferrals never expired
 - [REGISTER-REGRESSION-HANDLER-52](REGISTER-REGRESSION-HANDLER-52.md): Requested: a bug that comes back after it was fixed or closed must be found and reopened as a regression, never registered again as new
 - [RELEASE-WORKING-VERSION-ISOLATION-39](RELEASE-WORKING-VERSION-ISOLATION-39.md): Publishing an earlier release reads the next development version record
@@ -116,11 +118,13 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [TOOLKIT-VERSION-CHECK-NO-GIT-64](TOOLKIT-VERSION-CHECK-NO-GIT-64.md): The Toolkit version check passes in a source tree without git history, so the gate lets a stale Toolkit version line through and the dev delivery stops after the build
 - [TOOLKIT-WORLD-MAP-FRAME-LOOP-64](TOOLKIT-WORLD-MAP-FRAME-LOOP-64.md): The World Map vanished in Firefox after the frame was sized to its own content
 - [TOOLKIT-WORLD-MAP-NESTED-SCROLL-64](TOOLKIT-WORLD-MAP-NESTED-SCROLL-64.md): The World Map scrolls as separate boxes: the headline stays while the map frame scrolls, and the wheel over the map never scrolls the page
+- [TRACK-FIXED-UMBRELLA-STEPS-ALL-67](TRACK-FIXED-UMBRELLA-STEPS-ALL-67.md): Marking one fault fixed through the tracker intake marked every fault of its plan item fixed when that item groups many
 - [TRACKER-AREA-CELLS-RUN-WIDE-42](TRACKER-AREA-CELLS-RUN-WIDE-42.md): The CHIM tracker gives every area of a build all of the build's cells: Balmora holds 811 cells, so an area or shipped-towns plan selector takes most of the island
 - [TRACKER-CHIM-COUNT-STALE-44](TRACKER-CHIM-COUNT-STALE-44.md): The CHIM progress tracker still reports 1,193 of 1,436 cells after a build with every exterior cell: it counts audits over both islands, not what the build put on CHIM
 - [TRACKER-CHIM-LINK-MERGE-33](TRACKER-CHIM-LINK-MERGE-33.md): A merge dropped the CHIM Engine tracker link from the register; the integration head fails a tracker test
 - TRACKER-CHIM-PAGE-REPORT-LINKS-55 (no report page): The generated CHIM Engine tracker page links its report pages as bugs/bugs/<ID>.md: 45 links name no file
 - TRACKER-CHIM-PAGE-SIZE-48 (no report page): The generated CHIM tracker page reached 75 % of its 256 KiB release text limit
+- [TRACKER-DISTRICTS-COUNTED-TWICE-67](TRACKER-DISTRICTS-COUNTED-TWICE-67.md): The progress tracker counts Mournhold's five districts twice: as their open-terrain cells in the game and again as rooms not started
 - [TRACKER-ENTRIES-WITHOUT-PAGES-67](TRACKER-ENTRIES-WITHOUT-PAGES-67.md): Half of the live bug entries have no report page: the category lists and links name them without a page to open (643 of 1307, 517 of them open, 207 from v0.0.66 and v0.0.67)
 - [TRACKER-FIXED-LEFT-OPEN-36](TRACKER-FIXED-LEFT-OPEN-36.md): Fixed work whose bug entry stayed open (LAVA-NOT-IMPLEMENTED-33)
 - [TRACKER-IN-GAME-SEA-LABELLED-OCEAN-48](TRACKER-IN-GAME-SEA-LABELLED-OCEAN-48.md): The cell tracker calls cells that are in the game ocean: cell -15,-8 stands alone in the sea on the World map
@@ -137,6 +141,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [TRACKER-RELEASE-HEADROOM-MISSING-42](TRACKER-RELEASE-HEADROOM-MISSING-42.md): The CHIM tracker keeps no memory headroom per cell from a full build, and older CHIMport results replace a newer full build's audits: every headroom figure dates from the v0.0.36-v0.0.40 builders
 - TRACKER-SEA-CELL-LAND-GREEN-57 (no report page): The world map paints in-game sea cells land-green in its build view: a lone tile at -15,-8 looks like leftover land
 - [TRACKER-SEA-CELL-SET-36](TRACKER-SEA-CELL-SET-36.md): The CHIM tracker's island view leaves out 37 land cells that hold only terrain and sea; one is labelled Solstheim
+- [TRACKERS-COUNT-MOURNHOLD-OUT-67](TRACKERS-COUNT-MOURNHOLD-OUT-67.md): The script tracker and the CHIM progress tracker still count Mournhold as not in the game: 187 Tribunal scripts are listed as add-on only and Mournhold's exterior shows 0
 - [WIN-02](WIN-02.md): Cancelled Windows stage leaves child workers alive
 
 <!-- END GENERATED CATEGORY -->

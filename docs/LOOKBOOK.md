@@ -1,6 +1,17 @@
 # The confirmed look book
 
-_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
+_Last updated with AmiWind v0.0.67 (19 November 2026)._
+
+## State at v0.0.67
+
+The book has six pages: three session pages that run in the emulator on every development build (the held light in the
+left hand, the worn robe, the teleport arrivals), one journey page (the dock guard's post), one more session page
+(the inventory's hint per kind) and one image page (the cliff racer whole), the last two still drafts. On the
+v0.0.67-dev3 image, from which the v0.0.67 release is made, the three active session pages passed (`LOOKBOOK RESULT PASS
+3/3 pages`; the journey page of the dock guard's post is run with the opening journey, not in that session, and the two
+drafts are not run yet; the release's own delivery runs the book again on the release image before the kit): the debug torch, the glass lantern and a candle were within 1.8 units of the left hand in first person and 1.9 in
+third, which closed the register's first-person torch fault (FP-TORCH-OUT-OF-HAND-67). The run kept its stills; the pages have no reference
+pictures yet, so only their numbers count.
 
 Every look and behaviour the maintainer has confirmed in play is kept as a page of the look book, and every development
 build is checked against the whole book before it is delivered. A regression of something already confirmed is then

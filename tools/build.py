@@ -897,7 +897,10 @@ def tribunal_mournhold_commands(args, steps, tool, run, tools, jobs):
                                         '--jobs', jobs, '--validate', '--stats', '--sdk', args.sdk))]
     # strings only: the commands go into build-state.json (BUILD-NPCLOD-PATH-ARG-34)
     presented = ['--presented-receipt', str(folder / 'presented-data.json'), '--presented-cells', str(cells)]
-    return [(n, list(c) + presented if n in TRIBUNAL_MOURNHOLD_READERS else c) for n, c in steps]
+    # the tracker data of the build counts the districts' world as the build's own (TRACKERS-MOURNHOLD-NOT-COUNTED-67)
+    tracker = ['--presented', str(folder / 'presented-data.json'), '--module-chim-world', str(world)]
+    return [(n, list(c) + presented if n in TRIBUNAL_MOURNHOLD_READERS else list(c) + tracker if n == 'cell-progress'
+             else c) for n, c in steps]
 
 
 def chim_layer_image_commands(args, steps, run):

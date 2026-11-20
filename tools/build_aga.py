@@ -2564,7 +2564,10 @@ def write_world_doors(args, id1, out, chim_frames):
     rows = world_doors.table(doors, rooms, towns, regions, room_offsets(), planned, held_back)
     wanted = {row['reference'] for row in rows if row['kind'] == 'door' and 'source' in row and 'target' in row}
     bounds = door_mesh_bounds(args.data_files, [d for d in doors if d['number'] in wanted])
-    applied = world_doors.apply(id1, rows, bounds)
+    # DISTRICT-GATE-ON-CELL-BORDER-67: a district door next to an inner border of its block is also a row of the
+    # neighbouring frame's bank (the use key reads the bank of the frame the player stands in); none without a module
+    copies = world_doors.border_copies(rows, bounds, layer_frames)
+    applied = world_doors.apply(id1, rows + copies, bounds)
     problems = world_doors.unresolved_problems(rows)
     # the named places of dbg tp (teleport-names.txt) lead into rooms of this image too
     # the literal file name: a path built from a variable reads as the whole config/ folder to the stage keys
@@ -2590,6 +2593,13 @@ def write_world_doors(args, id1, out, chim_frames):
     if held:
         # only with held-back places (the expansions), so a base game receipt does not move
         receipt['held_back'] = len(held)
+    if copies:
+        # only with a module's frames, so a base game receipt does not move
+        receipt['border_copies'] = [{'reference': c['reference'], 'from': c['border_copy_of'], 'to': c['source']}
+                                    for c in copies]
+        print('World doors: %d district doors next to an inner cell border also written into the neighbouring '
+              "frame's bank (%s)" % (len(copies), ', '.join('%d %s>%s' % (c['reference'], c['border_copy_of'],
+                                                                          c['source']) for c in copies)), flush=True)
     (Path(out)/'world-doors.json').write_text(json.dumps(receipt, indent=1, sort_keys=True)+'\n', encoding='utf-8',
                                               newline='\n')
     print('World doors: %d doors and markers, %d rows added to the door banks, %d filled, %d unresolved '

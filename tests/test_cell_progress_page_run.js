@@ -38,7 +38,7 @@ const sandbox = Object.assign(win, {document: doc, window: win, console, setTime
 const context = vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(kit + '/chim-legend.js', 'utf8'), context);
 // The interior tracker block (panel-fold.js, interior-tracker.js), as the page loads them.
-for (const f of ['panel-fold.js', 'interior-tracker.js', 'expansion-views.js']) if (fs.existsSync(kit + '/' + f)) vm.runInContext(fs.readFileSync(kit + '/' + f, 'utf8'), context);
+for (const f of ['panel-fold.js', 'interior-tracker.js', 'expansion-views.js', 'completion-panel.js']) if (fs.existsSync(kit + '/' + f)) vm.runInContext(fs.readFileSync(kit + '/' + f, 'utf8'), context);
 const html = fs.readFileSync(kit + '/world-map.html', 'utf8');
 const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
 let code = scripts[scripts.length - 1];

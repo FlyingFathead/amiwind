@@ -137,7 +137,8 @@ original uses, 611 run and 9 more are carried by AmiWind's own code; 433 belong 
 them. The [CHIM progress tracker](../../chim/PROGRESS_TRACKER.md) shows how far each land and part has come.
 
 - **Mournhold and Solstheim are not playable yet.** Their rooms are in the image, but not their outdoors, the way there
-  or their quests. Two of Solstheim's models, the icebergs of the Mortrag Glacier, cannot be converted yet: their
+  or their quests. Corrected for v0.0.67: the way to Mournhold works (see [the v0.0.67
+  notes](RELEASE-v0.0.67.md#known-in-this-build)); its quests and much of its play are not ready. Two of Solstheim's models, the icebergs of the Mortrag Glacier, cannot be converted yet: their
   collision is over the clipnode budget (COLLISION-ICEBERG-CLIPNODE-BUDGET-67). The Royal Palace's Reception Area runs
   at 3.0 to 5.7 frames a second on the Raspberry Pi 4B (INTERIOR-RECEPTION-AREA-FPS-67).
 - **Fixed in source, still to be seen in play on a build of this snapshot:** the frame message, the arrival cell's

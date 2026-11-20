@@ -33,11 +33,65 @@ class CurrentStateBlockTests(unittest.TestCase):
         self.assertIn(state['in_game_label'], block)
         self.assertIn(str(newest['built_at'])[:10], block)
         label_version = state['in_game_label'].lstrip('v').split(' ')[0]
-        if label_version != version:
-            self.assertIn('has no ingested build yet', block)     # a newer VERSION says so
+        if cps.release_of(label_version) != cps.release_of(version):
+            self.assertIn('has no ingested build yet', block)     # a newer release in development says so
+        else:
+            # a dev or release-candidate build of the release in development is its ingested build
+            self.assertNotIn('has no ingested build yet', block)
         # the data is stamped for this release line (the newest ingested build may still be of the release before, until
         # the first build of a new line is ingested: the block then says so, above)
         self.assertEqual(state['version_stamp']['release'], cps.release_of(version))
+
+    def test_a_build_of_the_release_in_development_is_its_ingested_build(self):
+        # TRACKERS-MOURNHOLD-NOT-COUNTED-67 (docs review H7): the page called v0.0.67 in development with no ingested
+        # build while its dev3 build was ingested; only a newest build of an earlier release says so
+        self.assertEqual(cps.building_note('v0.0.67-dev3 (a375b13f)', '0.0.67'), '')
+        self.assertEqual(cps.building_note('v0.0.67-dev3 (a375b13f)', '0.0.67-dev4'), '')
+        self.assertEqual(cps.building_note('v0.0.67 (abc)', '0.0.67'), '')
+        self.assertIn('0.0.67, has no ingested build yet', cps.building_note('v0.0.66 (ad5e9a0a)', '0.0.67'))
+        self.assertIn('has no ingested build yet', cps.building_note('v0.0.66-dev12 (ac37e80b)', '0.0.67-dev1'))
+        # the whole block follows
+        _, state, scripts, _ = load()
+        state = copy.deepcopy(state)
+        state['in_game_label'] = 'v0.0.67-dev3 (a375b13f)'
+        self.assertNotIn('has no ingested build yet', cps.render_block(state, scripts, '0.0.67'))
+        state['in_game_label'] = 'v0.0.66 (ad5e9a0a)'
+        self.assertIn('has no ingested build yet', cps.render_block(state, scripts, '0.0.67'))
+
+    def test_later_rooms_that_are_in_the_game_are_not_called_later(self):
+        # the Mournhold rooms were listed as waiting for a batch while 87 of 93 were in the game
+        _, state, scripts, _ = load()
+        state = copy.deepcopy(state)
+        ir = state['interiors']
+        ir['later'] = [{'batch': 'later: Mournhold', 'island': 'Mournhold', 'master': 'Tribunal.esm',
+                        'waits_for': 'it waits for a batch'}]
+        ir['headline']['Mournhold'].update({'on_chim_rooms': 87, 'total': 93, 'not_started': 5})
+        text = '\n'.join(cps.interior_block(state))
+        self.assertIn('87 of its 93 rooms are in the game on CHIM rooms; 5 not started yet', text)
+        self.assertNotIn('it waits for a batch', text)
+        ir['headline']['Mournhold'].update({'on_chim_rooms': 0})
+        self.assertIn('it waits for a batch', '\n'.join(cps.interior_block(state)))
+
+    def test_mournhold_is_counted_on_chim_when_its_world_is_in_the_newest_build(self):
+        # the exterior table's Mournhold line carries its land cells whenever the data has them, never "not in the build"
+        # beside "11 of 11" done
+        _, state, scripts, version = load()
+        # the builds table adds up: its Mournhold column is beside the other two, so the row's total is their sum
+        block = cps.render_block(state, scripts, version)
+        self.assertIn('| Build | Built | Vvardenfell | Solstheim | Mournhold | All cells on CHIM |', block)
+        for line in block.splitlines():
+            m = re.match(r'^\| v0\.0\.\d+[^|]* \| \d{4}-\d\d-\d\d \| ([\d,]+) \+ ([\d,]+) \| ([\d,]+) \+ ([\d,]+) \| '
+                         r'([\d,]+) \+ ([\d,]+) \| ([\d,]+) \|$', line)
+            if m and line.startswith('| ' + state['builds'][0]['label']):
+                parts = [int(x.replace(',', '')) for x in m.groups()]
+                self.assertEqual(sum(parts[:6]), parts[6], line)
+        rows = {r[0]: r for r in cps.exterior_rows(state)[1]}
+        mh = rows['Mournhold (Tribunal)']
+        done = next(i for i in state['islands'] if i['name'] == 'Mournhold')
+        if done['done']:
+            self.assertNotEqual(mh[1], 'not in the build', 'Mournhold has done cells but no cell on CHIM in the newest build')
+            self.assertRegex(mh[1], r'^\d+ land')
+            self.assertNotEqual(mh[1], '0 land + 0 sea cells')
 
     def test_a_hand_edited_or_stale_block_is_refused(self):
         page, state, scripts, version = load()

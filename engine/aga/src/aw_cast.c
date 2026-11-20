@@ -42,6 +42,7 @@
 #include "aw_spelllist.h"
 #include "aw_iteminfo.h"
 #include "aw_tryalloc.h"
+#include "aw_roll.h"
 
 static void give_spell_command(int first);   /* DBG-GIVE-SPELL-67, below */
 static int cast_on=1;              /* dbg cast casting on|off */
@@ -479,7 +480,7 @@ static void worn_frame(void){
            mg.type!=AW_ENCH_CONSTANT-1)continue;
         for(k=0;k<mg.n;k++){
             float mag=mg.m[k].flags&AW_MGEF_NO_MAGNITUDE?1:AW_CastMagnitude(mg.e[k].magnitude_min,mg.e[k].magnitude_max,
-                                                                              (float)(rand()&32767)/32768.0f);
+                                                                              (float)AW_Roll(32768)/32768.0f);
             int arg=mg.e[k].attribute>=0?mg.e[k].attribute:mg.e[k].skill>=0?mg.e[k].skill:AW_EFFECT_NO_ARG;
             if(AW_EffectsLand(p,mg.e[k].effect,arg,mag,AW_EFFECT_CONSTANT,AW_EFFECT_SOURCE_CONSTANT+s))worn_landed++;
             else worn_refused++;
@@ -551,7 +552,7 @@ static void cast_release(void){
     if(!cast_allowed(p,god)){looks_release(-1);return;}   /* the magicka spent since the start (another cast, a drain) */
     chance=god?100.0f:AW_CastChanceNow();
     if(spell.type==AW_SPELL_TYPE_SPELL && !god){p->dyn_cur[1]-=(float)spell.cost;AW_MwscriptPlayerStore(p);}
-    roll=rand()%100;
+    roll=AW_Roll(100);
     if(roll>=(int)chance && chance<100){   /* CastSpell::cast: roll0to99 >= chance fails */
         /* sMagicSkillFail; the school's failure sound comes with the look (aw_magic_fx), not yet without it */
         fails++;say("You failed casting the spell.");

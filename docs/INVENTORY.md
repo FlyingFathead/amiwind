@@ -1,6 +1,6 @@
 # Inventory
 
-_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
+_Last updated with AmiWind v0.0.67 (19 November 2026)._
 
 <!-- contents start -->
 ## Contents

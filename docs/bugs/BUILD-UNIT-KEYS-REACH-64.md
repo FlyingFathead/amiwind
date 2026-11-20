@@ -24,7 +24,7 @@
 | Persists in | v0.0.64-dev5, v0.0.66-dev1, v0.0.65 (last seen) |
 | Severity | high: The v0.0.64-dev5 build stopped at its reuse check: about 3 hours of bakes would have run again; no effect on the game. |
 | Family | Build speed (`build-speed`) |
-| Deferred by the maintainer | 2026-11-16: deferred to v0.0.67 by the maintainer (2026-11-16); the v0.0.66 release ships without it, and what would confirm a fix is in the status |
+| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
 | From commit | source and engine 8a36dfa |
 | CHIM engine version | none: legacy engine |
@@ -42,8 +42,8 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-13 01:41 +0200: seen again in v0.0.66-dev1: the v0.0.66-dev1 build (base game only) baked all 1,769 room residents again (about 7 h) because the merging reader of the expansions is in every unit key, though its output for the base game alone is the base game file itself
 - 2026-11-13 13:50 +0200: seen again in v0.0.66-dev1: on the v0.0.66 line after the dev1 build: a default-off parameter added to the shared skeletal bake (only the creature models pass it) and a module text edit in the NPC library re-keyed all 2,147 room residents, 2,342 room actor fits and ...
 - 2026-11-13 16:20 +0200: seen again in v0.0.66-dev2: the v0.0.66-dev2 build stopped at its reuse stop on 16 stages (resident-bake 0 of 2147, interior-room 0 of 198, interior-room-chim 0 of 1059, player-parts 0 of 2158 and more): module-level lines and signature defaults count as import-time ...
-- 2026-11-16: deferred by the maintainer: deferred to v0.0.67 by the maintainer (2026-11-16); the v0.0.66 release ships without it, and what would confirm a fix is in the status
 - 2026-11-18 06:12 +0200: seen again in v0.0.67-dev2: the v0.0.67-dev3 line checked against the v0.0.67-dev2 build: all 2,342 room actor fits would have run again.
+- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
 
 <!-- END GENERATED TIMELINE -->
 
@@ -257,6 +257,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-STAIR-WALK-SLOW-33](BUILD-STAIR-WALK-SLOW-33.md): The image step's stair walk spent most of its time in interpreted collision traces and brute-force headroom tests (1,751 s of the rc1c image step)
 - [BUILD-STATS-SERIAL-36](BUILD-STATS-SERIAL-36.md): The CHIM stats step runs serially and silently on one core
 - [BUILD-STORAGE-DUPLICATES-33](BUILD-STORAGE-DUPLICATES-33.md): Build storage keeps full duplicate copies of images, stage outputs and packages, and nothing removes them
+- [BUILD-TESTER-32GB-OOM-67](BUILD-TESTER-32GB-OOM-67.md): A tester's build on a machine with 32 GB of memory ran out of memory after about 32 hours
 - [BUILD-TOWN-ACTOR-FIT-SERIAL-64](BUILD-TOWN-ACTOR-FIT-SERIAL-64.md): The Vivec town stage fits its residents onto the frame collision on one core after the resident bake
 - [BUILD-UNDERUSE-GATE-36](BUILD-UNDERUSE-GATE-36.md): The profiler did not flag long underused phases: 7 min 44 s of CHIM statistics on 1 of 24 cores and 77 s of zone walk on 1 core showed nowhere
 - [BUILD-WINDOWS-DOCKER-SLOW-31](BUILD-WINDOWS-DOCKER-SLOW-31.md): Docker builds and disk-image steps on Windows folders are slow

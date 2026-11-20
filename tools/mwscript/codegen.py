@@ -525,7 +525,11 @@ class Program:
     def _place_add(self, ident):
         d = self.data
         recs = getattr(d, 'records', {})
-        if ident in recs.get('NPC_', {}) or ident in recs.get('CREA', {}):
+        levelled = ident in getattr(d, 'levelled_lists', {})
+        if ident in recs.get('NPC_', {}) or ident in recs.get('CREA', {}) or levelled:
+            # v0.0.67 (MWSCRIPT-PLACE-OTHER-KINDS-62): a levelled creature list places one creature of it at the
+            # player's level (OpenMW 0.51 mwclass/creaturelevlist.cpp): an actor, rolled by the engine from the actor
+            # table's list of that id (aw_actors.c AW_ActorsLevelledText; tools/chim/actors.py named_lists)
             kind = 'actor'
         elif any(ident in recs.get(tag, {}) for tag in PLACE_ITEM_TAGS):
             kind = 'item'
@@ -546,9 +550,15 @@ class Program:
         # v0.0.62 (MWSCRIPT-GAP-FUNCTIONS-62): every NPC or creature record can be made (with no placed reference, from
         # the actor table's base the builder adds for each actor a script places: chim.actors script_placed_actors);
         # any other object from a placed reference of its record (its entity in a map, the template)
-        carried = kind in ('item', 'actor') or (kind == 'other' and bool(refs))
+        # v0.0.67 (MWSCRIPT-PLACE-OTHER-KINDS-62): an object no map places but whose record has a script (Tribunal's
+        # trapProjectile, Bloodmoon's transformation effects) is made as a point of its own where the call puts it,
+        # its script running on it (OpenMW OpPlaceItem makes it from its record); its model is not drawn (no map
+        # converted it); an object with neither a placed reference nor a script stays "not yet" (nothing to run)
+        point = kind == 'other' and not refs and script != NONE
+        carried = kind in ('item', 'actor') or (kind == 'other' and (bool(refs) or point))
         row = {'key': ident, 'id': self.string(ident), 'kind': PLACE_KINDS[kind], 'template': template,
-               'home': home, 'script': script, 'carried': carried}
+               'home': home, 'script': script, 'carried': carried, 'point': point,
+               'levelled': levelled and kind == 'actor'}
         self._place_index[ident] = len(self._place_rows)
         self._place_rows.append(row)
         return self._place_index[ident]
@@ -1054,10 +1064,12 @@ class ScriptCompiler:
                        'getcurrenttime', 'getmasserphase', 'getsecundaphase', 'getstartingpos', 'getstartingangle',
                        'pcget3rdperson', 'getpcjumping', 'getspellreadied', 'getstandingactor',
                        'getcollidingactor', 'getpcrunning', 'getforcejump', 'getforcemovejump', 'getarmortype',
-                       'samefaction', 'getfactionreaction') or \
+                       'samefaction', 'getfactionreaction', 'getpcsleep') or \
                 (fn.name.startswith('get') and fn.name[3:] in MAGIC_EFFECT_CALLS):
             # a fight starts without the state generation moving: the script asks every frame; so do the angles, the
-            # detection, the line of sight, a knockdown and the weather (v0.0.62), as GetPos does
+            # detection, the line of sight, a knockdown and the weather (v0.0.62), as GetPos does; and the sleep
+            # (v0.0.67, GETPCSLEEP-NOT-CARRIED-OUT-67: the hours of a rest pass over a few frames, and a script that
+            # waits for the sleep must not sleep through them)
             self.flags |= SCRIPT_VOLATILE
         if fn.name == 'geteffect':
             # v0.0.57: the effect's number (0 none known) as the call's number; the engine reads the active effects

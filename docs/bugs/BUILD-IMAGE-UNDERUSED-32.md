@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 19 times; something has to be done
+## PERSISTING: reported 22 times; something has to be done
 
 - Reported with v0.0.32-dev at 2026-10-08 (time not recorded): BUILD-IMAGE-UNDERUSED-32: parts of the image step still serial
 - Reported with v0.0.36-dev3 at 2026-10-11 00:43 +0300: audio payload and CHIM maps serial, stats on one core
@@ -23,6 +23,9 @@
 - Reported with v0.0.67-dev2 at 2026-11-18 (time not recorded): Seen again in the Mournhold module test build of 104174ce (2026-11-18, resumed from the run before): the image step went through its 1348 CHIM region frame maps one after another on 1 of 24 planned cores for over 5 minutes. Every map was reused from the cache, so the time is a per-map copy or check that could run in parallel or as one batch.
 - Reported with v0.0.67-dev3 at 2026-11-18 22:06 +0200: Seen again on the v0.0.67-dev3 line test build: the image step ran on 9.1 of 24 planned cores for 5 min; the builder's own underuse warning gave 4.3 of 24 cores for 176 s with 1291 units queued and 23 running in the finalize phase (held by the stage: its pools run fewer units than allowed), then the CHIM room actor bake (1317 rooms, 2612 NPC residents) on about one core.
 - Reported with v0.0.67-dev3 at 2026-11-19 03:25 +0200: Seen again on a test build of the v0.0.67-dev3 line: the image step's actor record check ran on one core for about six minutes while the other cores sat idle.
+- Reported with v0.0.67-dev3 at 2026-11-19 09:41 +0200: Seen again on the v0.0.67-dev3 build: the image step ran on one core for about six minutes while the other cores sat idle.
+- Reported with v0.0.67-dev3 at 2026-11-19 10:07 +0200: The v0.0.67-dev3 image stage ran under half of its cores three times while units were queued (11 minutes 22 seconds at an average of 4.6 of 24 cores).
+- Reported with v0.0.67 at 2026-11-19 16:41 +0200: Seen again in the v0.0.67 release build: the image step ran on one core for over six minutes while 23 stayed idle.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -38,7 +41,7 @@
 | Persists in | v0.0.62-dev1, v0.0.67-dev1 (last seen) |
 | Severity | high: Regressed in v0.0.62-dev1 (was medium): Several image passes run serially or leave most CPUs idle, slowing builds. |
 | Family | Build speed (`build-speed`) |
-| Deferred by the maintainer | 2026-11-16: deferred to v0.0.67 by the maintainer (2026-11-16); the v0.0.66 release ships without it, and what would confirm a fix is in the status |
+| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
 | Came back (regression) | in v0.0.62-dev1 (fixed in v0.0.48 before) |
 
 <!-- END GENERATED FACTS -->
@@ -67,13 +70,16 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-09 15:10 +0200: seen again in v0.0.63-dev3: Seen in the v0.0.63-dev3 build (run 2026_11_09_v0.0.63-dev3_full-v0.0.63-dev3-try2_6e68096): the CHIM room actor bake took all 2,342 placements from its unit cache room-actor (0 fitted), yet the step took 1m22s on 1.3 of 24 cores: the ...
 - 2026-11-10 02:34 +0200: seen again in v0.0.63: Seen again in the v0.0.63 release build: the image step links its 7,181 media files one by one at about 2 of 24 cores.
 - 2026-11-11 01:51 +0200: seen again in v0.0.64-dev4: v0.0.64-dev4 full build: the image step wrote its disk layout in 122 s against 66 s before, two units on about 1.3 cores.
-- 2026-11-16: deferred by the maintainer: deferred to v0.0.67 by the maintainer (2026-11-16); the v0.0.66 release ships without it, and what would confirm a fix is in the status
 - 2026-11-17: seen again in v0.0.66: Seen again in the v0.0.66 from-scratch check (commit ac37e80b, 20 cores): the image step 50 min 17 s at 9.76 of 20 cores; its finalize 42 min 12 s at 8.98; the guard torches 17 min 16 s at 4.36, six models one after another, all skipped ...
 - 2026-11-17 13:59 +0200: seen again in v0.0.67-dev1: Seen again in the v0.0.67-dev1 build (run 2026_11_17_v0.0.67-dev1_full-v0.0.67-dev1_6458e88, commit 6458e88): the image step's finalize took 10 min 36 s at 3.9 of 24 cores; the whole build took 15 min 44 s with 4.2 of 24 cores busy on ...
 - 2026-11-18: seen again in v0.0.67-dev2: Seen again in the Mournhold test build of 58d58089 (2026-11-18): the image step's early phases ran one after another on 1 to 3 cores for about 4 minutes (the stall watcher: 1.0 of 24 cores for 5 min): torch 6.6 s, player view 15.0 s, world ...
 - 2026-11-18: seen again in v0.0.67-dev2: Seen again in the Mournhold module test build of 104174ce (2026-11-18, resumed from the run before): the image step went through its 1348 CHIM region frame maps one after another on 1 of 24 planned cores for over 5 minutes.
 - 2026-11-18 22:06 +0200: seen again in v0.0.67-dev3: Seen again on the v0.0.67-dev3 line test build: the image step ran on 9.1 of 24 planned cores for 5 min; the builder's own underuse warning gave 4.3 of 24 cores for 176 s with 1291 units queued and 23 running in the finalize phase (held by ...
+- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
 - 2026-11-19 03:25 +0200: seen again in v0.0.67-dev3: Seen again on a test build of the v0.0.67-dev3 line: the image step's actor record check ran on one core for about six minutes while the other cores sat idle.
+- 2026-11-19 09:41 +0200: seen again in v0.0.67-dev3: Seen again on the v0.0.67-dev3 build: the image step ran on one core for about six minutes while the other cores sat idle.
+- 2026-11-19 10:07 +0200: seen again in v0.0.67-dev3: The v0.0.67-dev3 image stage ran under half of its cores three times while units were queued (11 minutes 22 seconds at an average of 4.6 of 24 cores).
+- 2026-11-19 16:41 +0200: seen again in v0.0.67: Seen again in the v0.0.67 release build: the image step ran on one core for over six minutes while 23 stayed idle.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -82,7 +88,7 @@ _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 19 times; something has to be done](#persisting-reported-19-times-something-has-to-be-done)
+- [PERSISTING: reported 22 times; something has to be done](#persisting-reported-22-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Seen again: 7 November 2026 (v0.0.62-dev1)](#seen-again-7-november-2026-v0062-dev1)
 - [Status: 23 October 2026 (v0.0.48)](#status-23-october-2026-v0048)
@@ -371,6 +377,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-STAIR-WALK-SLOW-33](BUILD-STAIR-WALK-SLOW-33.md): The image step's stair walk spent most of its time in interpreted collision traces and brute-force headroom tests (1,751 s of the rc1c image step)
 - [BUILD-STATS-SERIAL-36](BUILD-STATS-SERIAL-36.md): The CHIM stats step runs serially and silently on one core
 - [BUILD-STORAGE-DUPLICATES-33](BUILD-STORAGE-DUPLICATES-33.md): Build storage keeps full duplicate copies of images, stage outputs and packages, and nothing removes them
+- [BUILD-TESTER-32GB-OOM-67](BUILD-TESTER-32GB-OOM-67.md): A tester's build on a machine with 32 GB of memory ran out of memory after about 32 hours
 - [BUILD-TOWN-ACTOR-FIT-SERIAL-64](BUILD-TOWN-ACTOR-FIT-SERIAL-64.md): The Vivec town stage fits its residents onto the frame collision on one core after the resident bake
 - [BUILD-UNDERUSE-GATE-36](BUILD-UNDERUSE-GATE-36.md): The profiler did not flag long underused phases: 7 min 44 s of CHIM statistics on 1 of 24 cores and 77 s of zone walk on 1 core showed nowhere
 - [BUILD-UNIT-KEYS-REACH-64](BUILD-UNIT-KEYS-REACH-64.md): New collision settings re-keyed the NPC, creature, player-body and resident unit caches, which never read them

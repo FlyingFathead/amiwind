@@ -1237,7 +1237,10 @@ class ReleaseUiTests(unittest.TestCase):
         # 2026-11-10 (TOOLKIT-HEADLINE-ROWS-INLINE-64): the rows are block elements (div) with their layout CSS shipped in the script.
         # 2026-11-17 (maintainer, TOOLKIT-DLC-VIEWS-64): the Solstheim and Mournhold rows read the rooms and cells of the view
         # switch's cards (expansion-views.js completion, sent with the headline); the header block and its layout are unchanged.
-        self.assertEqual(hashlib.sha256(head).hexdigest(), '0d0da906c2cda5e6e8269af5476a4b64b30c14008f076495b3a7db908950df18')
+        # 2026-11-19 (maintainer, TOOLKIT-EXPANSION-COMPLETION-67): one unified count when the data's readiness is given: every
+        # land in the same three columns (open terrain, rooms, total ready), a row for all lands, the audit figures on the line
+        # under each land; without readiness the rows are as before, and the header block and its layout are unchanged.
+        self.assertEqual(hashlib.sha256(head).hexdigest(), 'e2c5f50d1579a89e653b6d2306edc140643ee33853f191906e9838ac835afea6')
 
     def test_one_header_for_every_toolkit_page(self):
         # The shared header (header.js) is the logo block of index.html: same logo file, same version line. Pages opened on their
@@ -1529,7 +1532,8 @@ class PlanTests(ReleaseUiTests):
         r = subprocess.run([node, str(ROOT / 'tests' / 'test_cell_progress_page_run.js'), str(self.KIT), str(path)],
                            capture_output=True, text=True, timeout=120)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertIn('interiors 2 rooms · in the game 0 · not in the game yet 1 · set aside 1 · entrance cells 1 · '
+        # the test cell no door leads to is a room to build, not set aside (ROOMS-SET-ASIDE-NOT-BUILT-67)
+        self.assertIn('interiors 2 rooms · in the game 0 · not in the game yet 2 · set aside 0 · entrance cells 1 · '
                       'list rows 2', r.stdout)
         # with a Tribunal room: the Mournhold view is offered and its screen draws
         graph['rooms'].append({'name': 'Mournhold, Temple Courtyard', 'hard': ['behaves_exterior'], 'island': 'Mournhold',

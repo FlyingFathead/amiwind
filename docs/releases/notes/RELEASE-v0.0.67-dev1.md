@@ -109,7 +109,8 @@ belong to Mournhold and Solstheim and wait for them. The [CHIM progress tracker]
 far each land and part has come.
 
 - **Mournhold and Solstheim are not playable yet.** Their rooms are in the image, but not their outdoors, the way there
-  or their quests.
+  or their quests. Corrected for v0.0.67: the way to Mournhold works (see [the v0.0.67
+  notes](RELEASE-v0.0.67.md#known-in-this-build)); its quests and much of its play are not ready.
 - **The Heart Chamber's collapse is not animated, so the end of the main quest cannot play yet**
   (`ENDGAME-CHAMBER-COLLAPSE-63`).
 - **A resident can still stand in front of a door**

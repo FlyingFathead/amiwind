@@ -74,6 +74,8 @@ void AW_Mark(int n){}
 void AW_EndMark(int n){}
 void AW_IntroTick(void){intro++;}
 void AW_WaitTick(void){waits++;}
+/* GETPCSLEEP-NOT-CARRIED-OUT-67: a rest's hours pass under its window, so their tick runs every frame, held or not */
+static int rests;void AW_RestTick(void){rests++;}
 void AW_MwscriptTick(float dt){(void)dt;}
 void AW_SaveTick(void){saves++;}
 void AW_SceneTick(void){scenes++;}
@@ -145,7 +147,7 @@ int main(void){
     assert(fabs(cl.time-7.04)<.00001 && scenery==2 && harvest==2);
 #else
     for(i=0;i<200;i++)_Host_Frame(.02f);
-    assert(!physics && sv.time==7 && !intro && !waits && !scenes);
+    assert(!physics && sv.time==7 && !intro && !waits && !scenes && rests==200);
     assert(presentation==200 && audio==200 && extra_audio==200 && music==400 && saves==200);
     assert(commands==200 && network==200 && realtime>3.99);
     death_prompt=0;freeze->value=1;before=sv.time;_Host_Frame(.02f);

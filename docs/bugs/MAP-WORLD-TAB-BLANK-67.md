@@ -9,9 +9,12 @@
 | Where | The in-game map window (tabs Debug, World, Local, In-game), World tab, inside and outside; seen in Seyda Neen |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.66 (last seen) |
+| Persists in | fixed in v0.0.67-dev3 |
 | Severity | high: the world map, one of the two maps of the original, shows nothing to look at |
 | Family | Menus, HUD, map screen and text (`ui-text`) |
+| Fix commit | `daf068dd` |
+| Fixed on | 2026-11-17 |
+| Planning item | `MAP-WORLD-TAB-BLANK-67` |
 | Playtest version | 2026_11_17_v0.0.66_full-v0.0.66-release-try2_ad5e9a0 |
 | From commit | source ad5e9a0, engine ad5e9a0, CHIM world unknown |
 | CHIM engine version | CHIM unknown, engine ad5e9a0, world format unknown |
@@ -29,6 +32,9 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.67-dev1 (daf068dd) | 2026-11-17 | gate 11360; tests/aga_worldui_test.c world_first_view_test, also run alone | the first World view of a game is centred on the player with the explored land in view, by every route to it; the test fails on the engine before the fix |
+| shipped | a development build | v0.0.67-dev3 (a375b13f) | 2026-11-19 | the fix commit daf068dd is an ancestor of the delivered dev3 head a375b13f and not of the dev2 head | the dev3 build places the first World view of a game on the player at the zoom that holds the explored land |
+| confirmed by a test | a test module | v0.0.67-dev3 (a375b13f) | 2026-11-19 | tests/aga_worldui_test.c world_first_view_test, compiled and run by tests/test_aga_native_source.py in gate 11450 | it fails on the engine before the fix (under 20 land pixels in view) |
+| confirmed in play | an emulator session | v0.0.67-dev1 (image with the engine of a86955ee, which holds daf068dd) | 2026-11-19 | a clean New Game on the opening route, the World tab opened outdoors, before and after pictures of the same step: before only the arrow and two place squares on a blank background, after the explored land around the player | the first showing of the World tab draws the explored land; the dev3 build holds the same engine change |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
@@ -36,6 +42,9 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-17: v0.0.66: After swapping from the World tab to the Local tab and back, the World tab drew the explored land: only the first showing of the World tab is blank.
 - 2026-11-17: v0.0.67-dev1: Cause found: the World view in play opened at the whole-island zoom (about 3 screen pixels a cell).
 - 2026-11-17: fixed in source: a gated commit, v0.0.67-dev1 (daf068dd); gate 11360; tests/aga_worldui_test.c world_first_view_test, also run alone: the first World view of a game is centred on the player with the explored land in view, by every route to it; the test fails on the engine before the fix
+- 2026-11-19: shipped: a development build, v0.0.67-dev3 (a375b13f); the fix commit daf068dd is an ancestor of the delivered dev3 head a375b13f and not of the dev2 head: the dev3 build places the first World view of a game on the player at the zoom that holds the explored land
+- 2026-11-19: confirmed by a test: a test module, v0.0.67-dev3 (a375b13f); tests/aga_worldui_test.c world_first_view_test, compiled and run by tests/test_aga_native_source.py in gate 11450: it fails on the engine before the fix (under 20 land pixels in view)
+- 2026-11-19: confirmed in play: an emulator session, v0.0.67-dev1 (image with the engine of a86955ee, which holds daf068dd); a clean New Game on the opening route, the World tab opened outdoors, before and after pictures of the same step: before only the arrow and two place squares on a blank background, after the explored land around the player: the first showing of the World tab draws the explored land; the dev3 build holds the same engine change
 
 <!-- END GENERATED TIMELINE -->
 
@@ -135,6 +144,7 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - [RACE-MENU-OK-HIGHLIGHT-65](RACE-MENU-OK-HIGHLIGHT-65.md): The OK box of the character windows shows no highlight when the keys reach it
 - RAM-WARNING-BOX-52 (no report page): Requested: under 32 MB of Fast RAM a WARNING message box for a few seconds before the AmiWind logo
 - [SIGNPOST-NAMES-MISSING-65](SIGNPOST-NAMES-MISSING-65.md): Signposts do not show what they read when the player looks at them
+- [STATS-WINDOW-COLOURS-UNTIL-LOAD-67](STATS-WINDOW-COLOURS-UNTIL-LOAD-67.md): Stats window draws a raised attribute almost black and the birthsign icons brown until a saved game is loaded
 - [SUBTITLE-BOX-HIDES-STATS-63](SUBTITLE-BOX-HIDES-STATS-63.md): The box of a spoken line rises over the whole lower part of the screen and hides the stat bar
 - [TOOLKIT-CELL-HIGHLIGHT-SCALE-38](TOOLKIT-CELL-HIGHLIGHT-SCALE-38.md): Selected-cell outline offset on scaled displays
 - [TOOLKIT-INCLUSION-PACKAGE-38](TOOLKIT-INCLUSION-PACKAGE-38.md): CHIM inclusion metadata omitted from Toolkit packaging rules

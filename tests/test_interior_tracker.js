@@ -24,8 +24,12 @@ assert.strictEqual(IT.overviewHtml(null), '');
 assert.strictEqual(IT.entranceCells(null).size, 0);
 
 const ir = IT.section(doc);
-assert.deepStrictEqual(IT.counts(ir), {total: 6, in_game: 1, not_in_game: 2, set_aside: 3});
-assert.strictEqual(IT.titleLine(ir), '6 rooms · in the game 1 · not in the game yet 2 · set aside 3');
+// a room no door leads to is a room to build, never set aside (ROOMS-SET-ASIDE-NOT-BUILT-67)
+assert.deepStrictEqual(IT.counts(ir), {total: 6, in_game: 1, not_in_game: 4, set_aside: 1});
+assert.strictEqual(IT.titleLine(ir), '6 rooms · in the game 1 · not in the game yet 4 · set aside 1');
+// a district built as open terrain is in the game; a built room reached by its picker link too
+assert.deepStrictEqual(IT.counts({rooms: [room('Mournhold, Godsreach', 'Mournhold', 'district'), room('Sotha Sil,', 'Mournhold', 'on_chim_rooms'),
+  room('Vor Lair, Interior', 'none', 'no_entrance')]}), {total: 3, in_game: 2, not_in_game: 1, set_aside: 0});
 
 // grouped by island, then by entrance; the rooms with no entrance area are their own group at the end
 const g = IT.grouped(ir, ir.rooms);
@@ -46,7 +50,8 @@ assert.strictEqual(IT.filter(ir, '').length, 6);
 const html = IT.listHtml(ir, '');
 assert.ok(html.includes('data-room="Town, Inn" data-cell="1,2"'));
 assert.ok(html.includes('data-room="ToddTest">'));
-assert.ok(html.includes('Set aside: no entrance, no script'));
+assert.ok(html.includes('Not built yet: no door, and no script or dialogue line names it'));
+assert.ok(!html.includes('Set aside: no entrance'));
 assert.ok(html.indexOf('data-island="none"') > html.indexOf('data-island="Vvardenfell"'));
 assert.ok(!html.includes(' open>'), 'the groups start closed');
 assert.ok(IT.listHtml(ir, 'grotto').includes(' open>'), 'a search opens the groups that match');

@@ -433,10 +433,12 @@ def write(program, compiled, binds, conf=None):
     # PLAC (v0.0.62, MWSCRIPT-PLACE-OBJECTS-62): 12 bytes an object the scripts' Place calls name, in the order of
     # codegen.Program.place_rows (sorted by folded id): u16 id, u16 the template's home room map (0xFFFF none), u32 the
     # template reference (0 none), u16 the record's script (0xFFFF none), u8 kind (0 an actor, 1 an item, 2 other),
-    # u8 flags (1 the engine can make it); resident
+    # u8 flags (1 the engine can make it; v0.0.67: 2 a point of its own, no map places the record, its script runs on
+    # it; 4 a levelled creature list, one creature of it rolled at the player's level); resident
     places = p.place_rows() if hasattr(p, 'place_rows') else []
     plac = (b''.join(struct.pack('>HHIHBB', r['id'], r['home'], r['template'], r['script'], r['kind'],
-                                 1 if r['carried'] else 0) for r in places), len(places))
+                                 (1 if r['carried'] else 0) | (2 if r.get('point') else 0) |
+                                 (4 if r.get('levelled') else 0)) for r in places), len(places))
     # EQUP (v0.0.62, MWSCRIPT-GAP-FUNCTIONS-62): 8 bytes a carried item whose script declares OnPCEquip or
     # PCSkipEquip, sorted by folded id: u16 id, u16 its script, u8 OnPCEquip's slot, u8 PCSkipEquip's slot (0xFF none),
     # u16 0; resident

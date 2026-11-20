@@ -815,17 +815,23 @@ def ledger_by_build(path):
 # ------------------------------------------------------------------ the ingest
 
 def load_runs(out, specs, labels, commits):
-    """Digest the given CHIM runs into OUT/runs/NAME.json, then return every digest oldest build first."""
+    """Digest the given CHIM runs into OUT/runs/NAME.json, then return every digest oldest build first. A spec is
+    NAME=PATH, or NAME=PATH|MODULEPATH|... when the build's image holds worlds of their own beside the base world (the
+    module tribunal-mournhold's districts): the later folders' cells count as the same build's."""
     runs_dir = out / 'runs'
     for spec in specs:
         name, _, path = spec.partition('=')
         if not path:
             raise SystemExit('--chim-run wants NAME=PATH, got %r' % spec)
+        paths = path.split('|')
+        if len(paths) == 1:
+            # a build run's world with its modules' worlds beside it counts them as the same build's
+            paths += CH.module_worlds(paths[0])
         stamp = None
-        rp = CH.report_path(path, 'receipt')
+        rp = CH.report_path(paths[0], 'receipt')
         if rp.is_file():
             stamp = datetime.datetime.fromtimestamp(rp.stat().st_mtime, datetime.timezone.utc).isoformat(timespec='seconds')
-        d = CH.digest(name, path, labels.get(name), commits.get(name), stamp)
+        d = CH.digest_many(name, paths, labels.get(name), commits.get(name), stamp)
         write_json(runs_dir / (name + '.json'), d)
     digests = []
     for p in sorted(runs_dir.glob('*.json')) if runs_dir.is_dir() else []:
@@ -1484,7 +1490,9 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
     interior_rooms = None
     if door_graph:
         import cell_progress_rooms as RM
-        room_rows = RM.rooms(door_graph, our_maps(config_dir), chim_rooms, batch_plan)
+        # Mournhold's districts the presented data gives as open terrain are in the game (ROOMS-SET-ASIDE-NOT-BUILT-67)
+        districts = {c['presented']['district'] for c in cells.values() if c.get('presented')}
+        room_rows = RM.rooms(door_graph, our_maps(config_dir), chim_rooms, batch_plan, districts)
         RM.attach(interiors, room_rows)
         interior_rooms = RM.section(room_rows, batch_plan)
     for k, trees in entrances.items():
@@ -1695,6 +1703,9 @@ def main(argv=None):
     ing.add_argument('--presented', type=Path,
                      help="a presented data folder's receipt (presented-data.json): Mournhold's districts as cells")
     ing.add_argument('--png', action='store_true', help='also write the mesh reuse curve as a PNG')
+    ing.add_argument('--scripts', type=Path,
+                     help='the MWScript tracker for the completion panel (default: this repository\'s '
+                          'docs/mwscript-features.json)')
     ing.add_argument('--now', help='timestamp to stamp (tests)')
     rec = sub.add_parser('record', help='record audit results from another tool')
     rec.add_argument('--out', type=Path, required=True)
@@ -1921,6 +1932,14 @@ def main(argv=None):
                  read_json(remembered['batch_plan']) if remembered.get('batch_plan') else None,
                  room_receipts(remembered.get('chim_rooms', [])),
                  read_json(remembered['presented']) if remembered.get('presented') else None)
+    # The unified readiness count per land and the completion panel per master (tools/master_completion.py,
+    # TOOLKIT-EXPANSION-COMPLETION-67), added here by the command line after the ingest and written with it: never inside
+    # ingest(), so no build stage is keyed by the generator, the MWScript tracker it reads or the sections it writes
+    # (the build's own tracker copy has none; the Toolkit then counts the readiness by the same rules).
+    import master_completion
+    master_completion.attach(doc, census, master_completion.scripts(master_completion.load_scripts(
+        getattr(a, 'scripts', None) or Path(__file__).resolve().parents[1] / 'docs' / 'mwscript-features.json')))
+    write_json(out / OUT_FILES['progress'], doc)
     h = doc['headline']
     print(on_chim_line(h))
     # The audit figure: cells whose audits passed, over the LAND cells of every island (Solstheim included); empty-sea

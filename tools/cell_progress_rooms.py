@@ -11,35 +11,47 @@ touched. Inputs, all private and optional:
   the repo config folder               the rooms in the game today (scene lists, cell_progress.our_maps)
 
 Parity: every room of the door graph gets a row, keyed by its cell name (the cell's ID in the game data); no room is
-dropped. A room's state, first match wins:
-  on_chim_rooms  in the game on a CHIM room: a build's chim-interiors.json installed it, or a CHIM room record was
-                 made for a room in the game
+dropped, and none is set aside (ROOMS-SET-ASIDE-NOT-BUILT-67, the maintainer's rule of 19 November 2026: every space of
+every master is built). A room is green (in the game) when it is built, with its way in (way_in, the row's 'entry'): a
+load door leads in ('door'); no door does and a script, a dialogue result or a travel service moves the player there
+by the cell's name, which resolves to the built room through the room list ('script'; a GetPCCell test is no way
+in); or nothing in the game data leads there and its dbg tp picker row reaches it
+('picker': the image lists every room it holds there, tools/tp_places_lut.py image_rooms). A room's state, first
+match wins:
+  on_chim_rooms  in the game on a CHIM room (a build's chim-interiors.json installed it, or a CHIM room record was made
+                 for a room in the game), reached by its way in
   room_map       in the game as today's room map
+  district       a cell that behaves like an exterior (Mournhold's districts), in the game as open terrain: the
+                 district module built it and the presented data names it
   converted      a CHIM room record was made for it, not in the game yet
-  test_cell      no door reaches it, a developers' test cell (tools/door_graph.py TEST_CELLS)
-  teleport_only  no door reaches it, a script sends the player there
-  no_entrance    no door reaches it and no script names it
-  hard_case      set aside by the door graph for another reason (lava at or under the water, size on the 32 MiB
-                 minimum machine, behaves like an exterior); water, lava, Levitate-only and over the 16 MiB zone are
-                 notes on a room (its row's 'notes'), not reasons to set it aside (v0.0.48)
+  test_cell      not built yet; no door reaches it, a developers' test cell (tools/door_graph.py TEST_CELLS)
+  teleport_only  not built yet; no door reaches it, a script or a dialogue line sends the player there
+  no_entrance    not built yet; no door reaches it and no script names it
+  hard_case      only in a graph with a reason this reader does not know (every reason of a graph made before v0.0.67
+                 is a note now)
   not_started    everything else
-The states fall into the three groups of the World map legend: in the game, not in the game yet, set aside (each
-with its reason).
+The states fall into the groups of the World map legend: in the game, not in the game yet, and set aside, which only
+an unknown reason reaches.
 """
 import collections
 
 import door_graph as DG
 
-STATES = ('on_chim_rooms', 'room_map', 'converted', 'not_started', 'hard_case', 'test_cell', 'teleport_only',
-          'no_entrance')
+STATES = ('on_chim_rooms', 'room_map', 'district', 'converted', 'not_started', 'test_cell', 'teleport_only',
+          'no_entrance', 'hard_case')
 STATE_LABELS = {'on_chim_rooms': 'In the game on CHIM rooms', 'room_map': 'In the game as a room map',
-                'converted': 'Converted, not in the game yet', 'not_started': 'Not started',
-                'hard_case': 'Set aside: hard case', 'test_cell': 'Set aside: test cell',
-                'teleport_only': 'Set aside: teleport only', 'no_entrance': 'Set aside: no entrance, no script'}
+                'district': 'In the game as open terrain (a district)',
+                'converted': 'Converted, not in the game yet',
+                'not_started': 'Not started',
+                'test_cell': 'Not built yet: a test cell, no door leads there',
+                'teleport_only': 'Not built yet: no door, a script or a dialogue line sends the player there',
+                'no_entrance': 'Not built yet: no door, and no script or dialogue line names it',
+                'hard_case': 'Set aside: a reason this tracker does not know'}
 GROUPS = collections.OrderedDict((
-    ('in_game', ('In the game', ('on_chim_rooms', 'room_map'))),
-    ('not_in_game', ('Not in the game yet', ('converted', 'not_started'))),
-    ('set_aside', ('Set aside, with a reason', ('hard_case', 'test_cell', 'teleport_only', 'no_entrance')))))
+    ('in_game', ('In the game', ('on_chim_rooms', 'room_map', 'district'))),
+    ('not_in_game', ('Not in the game yet', ('converted', 'not_started', 'test_cell', 'teleport_only',
+                                             'no_entrance'))),
+    ('set_aside', ('Set aside, with a reason', ('hard_case',)))))
 GROUP_OF = {s: g for g, (_, states) in GROUPS.items() for s in states}
 ISLAND_ORDER = ('Vvardenfell', 'Solstheim', 'Mournhold', 'none')
 ISLAND_LABELS = {'none': 'No entrance area'}
@@ -75,11 +87,35 @@ def chim_room_cells(receipts, maps=None):
     return made, installed
 
 
-def room_state(name_cf, hard, in_game, made, installed=(), parity=None):
+def way_in(room):
+    """How the player gets into a room of the door graph: 'door' (a door chain from the open world leads in: access
+    door, or teleport for a room behind a door of a room a script sends the player to), 'script' (no door leads in; a
+    script, a dialogue result or a travel service moves the player there: PositionCell, a travel destination; access
+    teleport_only; a cell name in a test such as GetPCCell moves no one, DOOR-GRAPH-CELL-TEST-AS-TELEPORT-67), or None
+    (access unreachable: nothing in the game data leads there). A row without an access (an old graph) counts as a
+    door."""
+    access = room.get('access') or 'door'
+    if access in ('door', 'teleport'):
+        return 'door'
+    if access == 'teleport_only':
+        return 'script'
+    return None
+
+
+ENTRY_TEXT = {'door': 'a door', 'script': 'a script or a dialogue line moves the player there (PositionCell)',
+              'picker': 'no door or script in the game data; reached by its picker link (dbg tp)'}
+
+
+def room_state(name_cf, hard, in_game, made, installed=(), parity=None, district=False):
+    """A built room is green: its way in is a door, a script or dialogue line whose target resolves to the built room
+    map through the room list, or, for a room nothing in the game data leads to, its dbg tp picker row (the image lists
+    every room it holds there, tools/tp_places_lut.py image_rooms)."""
     if name_cf in installed or (name_cf in in_game and name_cf in made):
         return 'on_chim_rooms'
     if name_cf in in_game:
         return 'room_map'
+    if district:
+        return 'district'
     if name_cf in made:
         return 'converted'
     if parity:
@@ -87,6 +123,11 @@ def room_state(name_cf, hard, in_game, made, installed=(), parity=None):
     if hard:
         return 'hard_case'
     return 'not_started'
+
+
+def is_district(room):
+    """A cell flagged "behaves like an exterior" (Mournhold's districts): the graph row's flag, or its reason."""
+    return bool(room.get('behaves_exterior')) or 'behaves_exterior' in DG.access_reasons(room)
 
 
 def batches_of(plan):
@@ -101,23 +142,31 @@ def batches_of(plan):
     return out
 
 
-def rooms(graph, in_game=None, receipts=(), plan=None):
-    """{name casefold: room tracker row} for every room of the door graph (none is left out)."""
+def rooms(graph, in_game=None, receipts=(), plan=None, districts=()):
+    """{name casefold: room tracker row} for every room of the door graph (none is left out). DISTRICTS: the cell names
+    the presented data gives Mournhold's open terrain (tools/cell_progress.py presented_cells): a district among them is
+    in the game, built as open terrain by the district module."""
     maps = {k.casefold(): v for k, v in (in_game or {}).items()} if isinstance(in_game, dict) else \
         {k.casefold(): None for k in (in_game or ())}
     made, installed = chim_room_cells(receipts, {k: v for k, v in maps.items() if v})
     batch_of = batches_of(plan)
+    districts = {d.casefold() for d in districts or ()}
     out = {}
     for r in (graph or {}).get('rooms', []):
         k = r['name'].casefold()
-        # a graph made before v0.0.48 lists water, lava and Levitate-only as hard cases: they are notes now (the
-        # rooms are converted like any room), as in a graph made today
+        # a graph made before lists water, lava and Levitate-only (before v0.0.48) and no door, teleport only, behaves
+        # like an exterior and over a limit (before v0.0.67) as hard cases: they are notes now (every room is built),
+        # as in a graph made today; the reasons stay on the row to say what leads there
         listed = list(r.get('hard') or [])
         hard = [h for h in listed if h not in DG.NOTES]
         notes = list(dict.fromkeys(list(r.get('notes') or []) + [h for h in listed if h in DG.NOTES]))
-        state = room_state(k, hard, maps, made, installed, DG.parity_state(dict(r, hard=hard)))
+        state = room_state(k, hard, maps, made, installed, DG.parity_state(dict(r, hard=hard, notes=notes)),
+                           district=is_district(r) and k in districts)
+        entry = way_in(r) or 'picker'
         out[k] = {'id': r['name'], 'name': r['name'], 'master': r['master'], 'island': r['island'], 'state': state,
-                  'label': STATE_LABELS[state], 'group': GROUP_OF[state], 'reasons': hard, 'notes': notes,
+                  'label': STATE_LABELS[state], 'group': GROUP_OF[state],
+                  'reasons': hard + [x for x in DG.access_reasons(r) if x not in hard], 'notes': notes,
+                  'way_in': entry, 'entry': ENTRY_TEXT[entry],
                   'batch': batch_of.get(k), 'access': r.get('access'), 'entrance': r.get('entrance_exterior'),
                   'settlement': r.get('settlement'), 'region': r.get('region'),
                   'on_chim_rooms': state == 'on_chim_rooms', 'our_map': maps.get(k)}

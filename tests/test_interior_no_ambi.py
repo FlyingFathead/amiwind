@@ -84,8 +84,10 @@ class NoAmbiTests(unittest.TestCase):
                 mock.patch('mwad.masters.master_path', return_value=merged):
             keep, left = chim_room_batches.exterior_like_rooms(self.root, rows)
         self.assertEqual(keep, [{'room': 'Mournhold, Shop'}])
+        # a district is built as open terrain by the district module (ROOMS-SET-ASIDE-NOT-BUILT-67), never "waiting"
         self.assertEqual(left, [{'cell': 'Mournhold, Plaza', 'master': 'Tribunal.esm',
-                                 'state': chim_room_batches.EXTERIOR_LIKE_STATE}])
+                                 'state': 'a district, built as open terrain by the district module '
+                                          '(tribunal-mournhold), not as a room'}])
 
     def test_room_stage_base_game_alone_untouched(self):
         rows = [{'room': 'Lit Room'}]

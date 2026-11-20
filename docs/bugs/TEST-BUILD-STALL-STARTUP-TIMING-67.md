@@ -126,6 +126,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [BUILD-EXECUTABLES-LIST-UNGATED-36](BUILD-EXECUTABLES-LIST-UNGATED-36.md): A file committed executable but missing from tools/release.py EXECUTABLES (tools/engine_smoke.py) broke the source ZIP only at kit time
 - [BUILD-FACE-KEY-FORM-TEST-48](BUILD-FACE-KEY-FORM-TEST-48.md): The face key test tied the gallery face keys to the stage key form; stage keys in form 3 failed it (the faces rightly keep form 2)
 - [BUILD-FAILURE-REPORT-66](BUILD-FAILURE-REPORT-66.md): Requested: a failed build writes one report file with everything needed to find its cause; the intro stage failure of a build of v0.0.64 and v0.0.65 outside the project came with its traceback, but without the build settings, the versions, which copy of the game data or the stage plan
+- [BUILD-GATE-SHORT-SHA-67](BUILD-GATE-SHORT-SHA-67.md): A release build was refused as ungated right after its gate passed: the gate recorded the commit with nine digits and the build looked for eight
 - [BUILD-LAVA-CORE-BOUNDS-38](BUILD-LAVA-CORE-BOUNDS-38.md): Lava sandbox bounds are not divisible by its core size
 - [BUILD-LAVA-PRESET-FIXTURE-38](BUILD-LAVA-PRESET-FIXTURE-38.md): Lava sandbox addition omitted the preset inventory fixture
 - [BUILD-SEYDA-CARRIER-VOICE-DIR-40](BUILD-SEYDA-CARRIER-VOICE-DIR-40.md): Fresh Seyda carrier cannot publish a resident voice without an inherited sound directory
@@ -139,6 +140,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - CI-01 (no report page): Windows short aliases mismatch resolved discovery paths in tests
 - CI-ACTIONS-CACHE-NODE20-54 (no report page): The GitHub workflow pinned actions/cache v4.2.3, which runs on Node 20, a runtime GitHub retires
 - [CI-BOOTSTRAP-NUMPY-32](CI-BOOTSTRAP-NUMPY-32.md): The public CI tool bootstrap fails: tools/build.py imports numpy before the tools exist
+- [CI-DRYRUN-CANCELLED-DEV3-67](CI-DRYRUN-CANCELLED-DEV3-67.md): The public CI's dry-run build of the v0.0.67-dev3 snapshot ran past its 20-minute limit and was cancelled; it took about two minutes before
 - [CI-ERICW-SKIP-31](CI-ERICW-SKIP-31.md): Torch test room test never runs in hosted CI or the builder image
 - [CI-HOSTDEPS-30](CI-HOSTDEPS-30.md): Host CI job fails: scenery export needs the NIF reader for non-NIF test data
 - [CI-JOBS-UNNAMED-53](CI-JOBS-UNNAMED-53.md): The six test jobs of the v0.0.53 CI split shipped with no names, and the maintainer was not told the new job list
@@ -188,14 +190,17 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - LINUX-VALID-02 (no report page): Linux test fixtures failed to link (missing stubs)
 - [MWAD-NAME-CLASH-66](MWAD-NAME-CLASH-66.md): tools/mwad.py has the name of the src/mwad package and hides it for any process with tools before src
 - [MWAD-TEXT-WRITER-LF-35](MWAD-TEXT-WRITER-LF-35.md): Some JSON and text writers do not pin LF and UTF-8
+- [NOTES-MOURNHOLD-WAY-STALE-67](NOTES-MOURNHOLD-WAY-STALE-67.md): The development notes of v0.0.67 said the way to Mournhold was not in the build, while the trip to Mournhold and back already worked
 - [OPS-GATE-UNLISTED-TESTS-36](OPS-GATE-UNLISTED-TESTS-36.md): The gate runs only the tests listed in the public file list, and nothing checked that every test file is listed
 - [PLAYTEST-SHIPPED-WITHOUT-SMOKE-36](PLAYTEST-SHIPPED-WITHOUT-SMOKE-36.md): The v0.0.36-dev3 private playtest package was published with an engine that dies on every map load: no ship step or gate booted it
 - PREGATE-GLOBAL-SHADOW-58 (no report page): Pregate C check misses global shadowing; the engine build fails on it
 - PREGATE-SYNTAX-SKIP-SILENT-57 (no report page): The pre-gate C syntax check skipped itself without failing on worktrees in the per-version folder layout
+- [PUBLIC-GUARD-SPELLS-TOOL-NAMES-67](PUBLIC-GUARD-SPELLS-TOOL-NAMES-67.md): The public privacy check spells the private words it refuses, split in pieces, in its own code
 - [REGISTER-WRITE-EINVAL-67](REGISTER-WRITE-EINVAL-67.md): The register tool stops now and then with "Invalid argument" while it writes docs/BUGS.md, after it has already saved the entry
 - [REGRESSION-GUARD-MISSING-67](REGRESSION-GUARD-MISSING-67.md): Things the maintainer had confirmed working in play come back broken in later builds: no check kept them proven after their fix
 - [RELEASE-CHECK-NOTES-LATE-66](RELEASE-CHECK-NOTES-LATE-66.md): The release check of the notes' core-use claims ran only when the snapshot package was made, after the build and its play tests, and read a sentence about allowed workers as a claim
 - [RELEASE-CONNECT-STEP-SKIPPED-53](RELEASE-CONNECT-STEP-SKIPPED-53.md): After v0.0.52 and v0.0.53 were published the release's connect-it-fully step was skipped: the pinned previous release and the size baseline stayed at v0.0.51
+- [RELEASE-GATE-COMPLETENESS-LOST-67](RELEASE-GATE-COMPLETENESS-LOST-67.md): The release check passes with rooms of a shipped expansion missing and without checking the expansions' doors
 - [RELEASE-INCLUSION-CHECK-LATE-48](RELEASE-INCLUSION-CHECK-LATE-48.md): The release guard does not check the CHIM inclusion ledger: the v0.0.48 kit stopped in its source step after the guard and the full suite had passed
 - [RELEASE-KIT-NO-REPAIR-MODE-35](RELEASE-KIT-NO-REPAIR-MODE-35.md): The release kit has no repair mode for a commit already pushed
 - [RELEASE-KIT-PUSH-BEFORE-CI-45](RELEASE-KIT-PUSH-BEFORE-CI-45.md): The release kit pushes to main before CI has passed
@@ -204,6 +209,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [RELEASE-PATCH-SIZE-33](RELEASE-PATCH-SIZE-33.md): The release preflight refuses the whitespace baseline of v0.0.33-dev1 as oversized text
 - [RELEASE-PATCH-TARGET-VERSION-39](RELEASE-PATCH-TARGET-VERSION-39.md): RC1 publication baseline lacks its target version
 - [ROOM-TRACE-VISIT-GUARD-48](ROOM-TRACE-VISIT-GUARD-48.md): Long downward traces on the Hall of Processing's collision raise the trace visit guard (Cyclic or excessive collision tree)
+- [ROUTE-PREFLIGHT-OWN-PROOFS-STOP-67](ROUTE-PREFLIGHT-OWN-PROOFS-STOP-67.md): The release route's final preflight stops on the proof sessions of its own release image
 - [SESSION-CLIP-UNPLAYABLE-ON-STALL-67](SESSION-CLIP-UNPLAYABLE-ON-STALL-67.md): The screen recording of an emulator session that stalls cannot be opened: the recorder is cut off before it writes the index of the MP4 file, so the clip of the session that showed the stall is lost
 - [SESSION-ENGINE-NOT-A-FILE-67](SESSION-ENGINE-NOT-A-FILE-67.md): An emulator session given an engine path that is not a file runs the image with no engine and waits 320 s for the remote control, instead of refusing at once
 - [SESSION-PASS-DEAD-ENGINE-57](SESSION-PASS-DEAD-ENGINE-57.md): The scripted test session reported PASS while the engine had crashed

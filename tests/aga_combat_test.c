@@ -93,10 +93,19 @@ static int add_string(const char *s){int at=string_at;strcpy(strings+at,s);strin
 edict_t *EDICT_NUM(int n){return &edicts[n];}
 int NUM_FOR_EDICT(edict_t *e){return (int)(e-edicts);}   /* COMBAT-ACTOR-VS-ACTOR-62: a slot's target by number */
 eval_t *GetEdictFieldValue(edict_t *e,char *name){
-    static const char *names[]={"aw_hand_state","aw_hand_started","aw_hand_punch","aw_source_id"};
-    int i;for(i=0;i<4;i++)if(!strcmp(name,names[i]))return &fields[e-edicts][i];
+    static const char *names[]={"aw_hand_state","aw_hand_started","aw_hand_punch","aw_source_id","aw_ref"};
+    int i;for(i=0;i<5;i++)if(!strcmp(name,names[i]))return &fields[e-edicts][i];
     return NULL;
 }
+/* PLAZA-FABRICANTS-LIVE-AT-START-67: the world change list's answer (aw_mwhost.c AW_ObjectDisabled): the references a
+ * script's Disable took out of the world here, at most four */
+static unsigned disabled_refs[4];
+int AW_ObjectDisabled(unsigned reference){
+    int i;for(i=0;i<4;i++)if(reference && disabled_refs[i]==reference)return 1;
+    return 0;
+}
+/* GAENOR-ATTACKS-AT-START-67: sv_main.c SV_SpawnServer's call (declared there, not in aw_combat.h) */
+void AW_CombatServerReset(void);
 void SV_LinkEdict(edict_t *e,qboolean touch){(void)e;(void)touch;}
 trace_t SV_Move(vec3_t a,vec3_t mi,vec3_t ma,vec3_t b,int type,edict_t *e){
     trace_t t;(void)ma;(void)e;aw_sv_move_calls++;
@@ -688,6 +697,60 @@ int main(void){
      printf("ranged ok: 3 arrows shot from %.0f, health %.0f -> %.0f, shaft points %ld\n",(double)x0,(double)h0,
             (double)p->v.health,(long)shaft_points);
      AW_CombatClear();ranged_actor=0;p->v.health=60;}
+    /* PLAZA-FABRICANTS-LIVE-AT-START-67 (Tribunal.esm, the game data's numbers): the Plaza's Verminous Fabricant
+     * fabricant_verm_attack, reference 24388 of Tribunal.esm (key 4218692), Fight 100, script fab_attack_2 ("if
+     * FabAttack == 1 enable ... else disable"), disables itself at its first run on a game that never started An Attack
+     * on Mournhold. Disabled, it starts no fight by any route (the ambient aggro, StartCombat, a crime, an ally's join, a
+     * resumed fight of the change list all engage here); before v0.0.67 it attacked on sight from 2,506 original units,
+     * drawn again by its fight's mover. A body's slot is no fight and is still laid; enabled, it fights again. */
+    {aw_fighter_t fab;
+     AW_CombatClear();aw_combat_scene();p->v.health=1000;p->v.button0=0;
+     npc->v.solid=SOLID_BBOX;npc->v.origin[0]=p->v.origin[0]-100;npc->v.origin[1]=p->v.origin[1];npc->v.nextthink=2;
+     assert(AW_CombatActorLoad("mevil molor",&fab));fab.fight=100;
+     fields[2][4]._float=4218692;disabled_refs[0]=4218692;
+     assert(!AW_CombatEngage(npc,&fab,NULL) && AW_CombatHostiles()==0 && !AW_CombatFighter(npc));
+     assert(AW_CombatSlotState(npc,NULL)==0 && !AW_PlayerInCombat());
+     tick(20);assert(AW_CombatHostiles()==0 && npc->v.nextthink==2);   /* no fight: its own think untouched */
+     /* the level 50 Gaenor (gaenor_b, key 4218889, Gaenor_bScript: Disable while MS_Natural < 25) alike */
+     fields[2][4]._float=4218889;disabled_refs[1]=4218889;assert(!AW_CombatEngage(npc,&fab,NULL));
+     /* a body (a saved death laid down again) keeps its slot whatever its state: no fight */
+     fields[3][4]._float=4218692;assert(AW_CombatLayCorpse(resident) && AW_CombatSlotState(resident,NULL)==2);
+     assert(AW_CombatHostiles()==0);
+     AW_CombatClear();fields[3][4]._float=0;
+     /* the same reference enabled again (FabAttack 1: its script's Enable): it fights */
+     disabled_refs[0]=disabled_refs[1]=0;fields[2][4]._float=4218692;
+     assert(AW_CombatEngage(npc,&fab,NULL) && AW_CombatHostiles()==1);
+     AW_CombatClear();fields[2][4]._float=0;
+     printf("disabled actors ok: key 4218692 and 4218889 refused while disabled, a body laid, the enabled one fights\n");}
+    /* GAENOR-ATTACKS-AT-START-67: the fight slots name edicts; a server spawn (any map change: a door, a teleport, a
+     * load, in Vvardenfell or Mournhold alike) frees the old map's edicts and the new map's take the same memory, so a
+     * slot kept over it read as a fight of the new map's actor at that edict number (the actors' change list captured it
+     * during the map's first window tick and resumed it). Measured on v0.0.67-dev3: the two Verminous Fabricants
+     * fighting in Plaza Brindisi Dorom (its 2nd and 4th actors, keys 4218689 and 4218692) became both Gaenors of the
+     * Temple Courtyard (its 2nd and 4th, keys 4218593 and 4218889; Fight 30, no script of theirs attacks), and Dravil
+     * Indrano and Gureryne Selvilo of the Great Bazaar. Here first a plain map change in Vvardenfell: a mudcrab of the
+     * Seyda Neen shore (Morrowind.esm reference 341046, Fight 83) in a fight, then a door, and the next map's resident
+     * (here reference 128964, Fargoth, Fight 30) takes its edict; the Mournhold case after it. */
+    {aw_fighter_t crab,fab;
+     AW_CombatClear();aw_combat_scene();p->v.health=1000;
+     assert(AW_CombatActorLoad("mevil molor",&crab));crab.fight=83;
+     npc->v.solid=SOLID_BBOX;npc->v.origin[0]=p->v.origin[0]-100;npc->v.origin[1]=p->v.origin[1];
+     fields[2][4]._float=341046;assert(AW_CombatEngage(npc,&crab,NULL) && AW_CombatSlotState(npc,NULL)==1);
+     /* the map changes: SV_SpawnServer drops the old server's fights before the new map's entities spawn */
+     AW_CombatServerReset();
+     npc->v.netname=add_string("Fargoth");fields[2][4]._float=128964;      /* the new map's resident at that edict */
+     assert(AW_CombatSlotState(npc,NULL)==0 && !AW_CombatFighter(npc) && AW_CombatHostiles()==0);
+     assert(!AW_PlayerInCombat() && !AW_CombatRetryAvailable());
+     /* Mournhold: two fighters in the Plaza, then the Temple Courtyard's actors at their edicts */
+     assert(AW_CombatActorLoad("mevil molor",&fab));fab.fight=100;
+     fields[2][4]._float=4218689;fields[3][4]._float=4218692;resident->v.solid=SOLID_BBOX;
+     assert(AW_CombatEngage(npc,&fab,NULL) && AW_CombatEngage(resident,&fab,NULL) && AW_CombatHostiles()==2);
+     AW_CombatServerReset();
+     fields[2][4]._float=4218593;fields[3][4]._float=4218889;              /* gaenor, gaenor_b */
+     assert(AW_CombatSlotState(npc,NULL)==0 && AW_CombatSlotState(resident,NULL)==0 && AW_CombatHostiles()==0);
+     AW_CombatServerReset();                                                 /* nothing kept: nothing dropped */
+     fields[2][4]._float=fields[3][4]._float=0;aw_combat_scene();
+     printf("server spawn ok: no fight of the old map reaches the new map's actors\n");}
     printf("combat ok: %ld steps, %ld sounds\n",(long)steps,(long)sounds);
     AW_CombatClear();assert(items_hidden>=items_shown);   /* every release hides them */
     return 0;

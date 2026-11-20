@@ -91,10 +91,13 @@ def snapshot(doc):
     interiors['headline'] = ir.get('headline') or {}
     interiors['classic_rooms'] = [{'id': r['id'], 'island': r.get('island'), 'label': r.get('label')}
                                   for r in rooms if r.get('state') == 'room_map']
+    # the unified readiness count (tools/master_completion.py): the data's own, or counted now by the same rules
+    import master_completion as MC
+    ready = doc.get('readiness') if (doc.get('readiness') or {}).get('format') == MC.FORMAT else MC.readiness(doc)
     return {'format': FORMAT, 'generated': doc.get('generated'), 'version_stamp': doc.get('version_stamp'),
             'eligible_release': head.get('eligible_release'), 'in_game_label': head.get('in_game_label'),
             'groups': fig['groups'], 'states': fig['states'], 'islands': islands, 'builds': builds,
-            'interiors': interiors if ir else None}
+            'interiors': interiors if ir else None, 'readiness': MC.summary(ready)}
 
 
 def dumps(state):
@@ -128,6 +131,43 @@ def exterior_rows(state):
     return rel, rows
 
 
+READY_LABELS = {'vvardenfell': 'Vvardenfell (main game)', 'solstheim': 'Solstheim (Bloodmoon)',
+                'mournhold': 'Mournhold (Tribunal)'}
+
+
+def fig(f):
+    return '%s of %s (%.1f %%)' % (n(f['ready']), n(f['total']), f['percent'])
+
+
+def ready_block(state):
+    """The unified count per land (TOOLKIT-EXPANSION-COMPLETION-67): open terrain ready, rooms ready, total ready, the
+    same three columns as the Toolkit's headline, from the same readiness section (tools/master_completion.py)."""
+    r = state.get('readiness')
+    if not r:
+        return ['No readiness count in this snapshot: python3 tools/cell_progress_state.py snapshot --from <tracker data>.',
+                '']
+    rows = [[READY_LABELS.get(x['id'], x['name']), fig(x['terrain']), fig(x['rooms']), fig(x['total'])] for x in r['lands']]
+    rows.append(['**All lands**', fig(r['all']['terrain']), fig(r['all']['rooms']), '**%s**' % fig(r['all']['total'])])
+    out = [r['definition'], ''] + table(['Land', 'Open terrain ready', 'Rooms ready', 'Total ready'], rows) + ['']
+    for x in r['lands']:
+        bits = ['open terrain: %s %s' % (y['label'], n(y['count'])) for y in x['terrain']['not_ready']]
+        bits += ['rooms: %s %s' % (y['label'], n(y['count'])) for y in x['rooms']['not_ready']]
+        names = x['rooms'].get('not_ready_names') or []
+        line = '- %s: not ready: %s.' % (x['name'], '; '.join(bits) if bits else 'none')
+        if names:
+            line += ' The rooms: %s.' % '; '.join(names)
+        if x['rooms'].get('as_terrain'):
+            line += ' Counted once, as open terrain: %s.' % '; '.join(x['rooms']['as_terrain'])
+        out.append(line)
+    return out + ['']
+
+
+def readme_line(state):
+    """The README's progress line, from the same snapshot (the coordinator passes it on to the README's owner)."""
+    import master_completion as MC
+    return MC.line(state['readiness'])
+
+
 def interior_block(state):
     ir = state.get('interiors')
     if not ir or not ir.get('headline'):
@@ -145,6 +185,13 @@ def interior_block(state):
     rows.append(['All', n(tot.get('total'))] + [n(tot.get(c)) for c in cols] +
                 [n((tot.get('groups') or {}).get('set_aside'))])
     out = table(['Land', 'Rooms'] + [labels.get(c, c) for c in cols] + ['Set aside, with a reason'], rows)
+    districts = sum(len(x['rooms'].get('as_terrain') or []) for x in (state.get('readiness') or {}).get('lands', []))
+    if districts:
+        # TRACKER-DISTRICTS-COUNTED-TWICE-67: this table keeps the door graph's view; say how it meets the Ready table
+        out += ['', 'This table counts every room of the door graph by the island its entrance is on, the districts '
+                'among them. The Ready table above counts each room for its master\'s land, and the %s districts a land '
+                'presents as open terrain once, as open terrain; the rooms no door leads to are rooms still to build, '
+                'not ready.' % n(districts)]
     reasons = Counter()
     for h in head.values():
         reasons.update(h.get('hard_reasons') or {})
@@ -162,7 +209,13 @@ def interior_block(state):
                        r['id'] for r in classic))
     out.append('')
     for later in ir.get('later') or []:
-        out.append('- %s (%s): %s.' % (later['batch'], later['master'], later['waits_for']))
+        h = head.get(later.get('island')) or {}
+        if h.get('on_chim_rooms'):
+            # the batch is no longer later: its rooms are in the game (TRACKERS-MOURNHOLD-NOT-COUNTED-67)
+            out.append('- %s (%s): %s of its %s rooms are in the game on CHIM rooms; %s not started yet.' % (
+                later['island'], later['master'], n(h['on_chim_rooms']), n(h.get('total')), n(h.get('not_started'))))
+        else:
+            out.append('- %s (%s): %s.' % (later['batch'], later['master'], later['waits_for']))
     return out + ['']
 
 
@@ -189,23 +242,36 @@ def build_rows(state):
         if not t or t < FIRST_BUILD_ROW:
             continue
         isl = {i['name']: i for i in b.get('islands', [])}
-        v, s = isl.get('Vvardenfell', {}), isl.get('Solstheim', {})
+        v, s, m = isl.get('Vvardenfell', {}), isl.get('Solstheim', {}), isl.get('Mournhold', {})
         rows.append([b['label'], str(b['built_at'])[:10], '%s + %s' % (n(v.get('land')), n(v.get('sea'))),
-                     '%s + %s' % (n(s.get('land')), n(s.get('sea'))), n(b['cells'])])
+                     '%s + %s' % (n(s.get('land')), n(s.get('sea'))), '%s + %s' % (n(m.get('land')), n(m.get('sea'))),
+                     n(b['cells'])])
     return rows
+
+
+def building_note(label, version):
+    """The sentence after the newest ingested build's date, or '' when none is needed. The newest ingested build of
+    the release in development (a dev or release-candidate build of it, or the release itself) is the build of the
+    version in development, so nothing says "no ingested build" (TRACKERS-MOURNHOLD-NOT-COUNTED-67, docs review H7:
+    the page called v0.0.67 in development with no ingested build while its dev3 build was ingested). Only a newest
+    build of an earlier release says the version in development has none."""
+    built = label.lstrip('v').split(' ')[0]
+    if built == version or (release_of(built) and release_of(built) == release_of(version)):
+        return ''
+    return ('; the version in development, %s, has no ingested build yet, so these are the figures of the newest '
+            'ingested one' % version)
 
 
 def render_block(state, script_doc, version):
     newest = (state.get('builds') or [{}])[0]
     label = state.get('in_game_label') or newest.get('label') or 'none'
-    late = '' if label.lstrip('v').split(' ')[0] == version else (
-        '; the version in development, %s, has no ingested build yet, so these are the figures of the newest ingested '
-        'one' % version)
+    late = building_note(label, version)
     rel, ext = exterior_rows(state)
     g = state.get('groups') or {}
     out = ['_Counted from the tracker data generated %s: newest ingested build **%s**, built %s%s. Every number below is '
            'read from that data and from the MWScript tracker when this block is rendered; none is typed by hand._' % (
                str(state.get('generated'))[:10], label, str(newest.get('built_at', ''))[:10], late), '',
+           '### Ready, per land', ''] + ready_block(state) + [
            '### Exterior cells, per land', '',
            'The tracker draws the open world as one square per cell. "On CHIM" counts what a frame of the newest '
            'build\'s CHIM world owns; the audit columns count cells by their measured status ("done" is complete, '
@@ -227,7 +293,7 @@ def render_block(state, script_doc, version):
     out += ['### Builds, newest first', '',
             'Cells on CHIM (land + sea) in each ingested build since v%s, from the tracker data; older builds are in the '
             'history of this page and on the [cell tracker](CELL_TRACKER.md).' % '.'.join(str(x) for x in FIRST_BUILD_ROW), '']
-    out += table(['Build', 'Built', 'Vvardenfell', 'Solstheim', 'All cells on CHIM'], rows)
+    out += table(['Build', 'Built', 'Vvardenfell', 'Solstheim', 'Mournhold', 'All cells on CHIM'], rows)
     earlier = [b for b in state.get('builds', []) if (version_tuple(b['label'].lstrip('v')) or (9, 9, 9)) < FIRST_BUILD_ROW]
     listed = [b for b in state.get('builds', []) if (version_tuple(b['label'].lstrip('v')) or (0, 0, 0)) >= FIRST_BUILD_ROW]
     if earlier and listed:
@@ -280,8 +346,12 @@ def main(argv=None):
     rp.add_argument('--page', default=str(PAGE))
     cp_ = sub.add_parser('check')
     cp_.add_argument('--page', default=str(PAGE))
+    sub.add_parser('readme-line', help='print the README progress line from the snapshot')
     a = ap.parse_args(argv)
     version = (ROOT / 'VERSION').read_text(encoding='utf-8').strip()
+    if a.cmd == 'readme-line':
+        print(readme_line(json.loads(STATE.read_text(encoding='utf-8'))))
+        return 0
     if a.cmd == 'snapshot':
         doc = json.loads(Path(a.src).read_text(encoding='utf-8'))
         Path(a.out).write_text(dumps(snapshot(doc)), encoding='utf-8', newline='\n')

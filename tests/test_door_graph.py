@@ -169,11 +169,15 @@ class DoorGraphTests(unittest.TestCase):
         self.assertEqual((rooms['Grotto']['hard'], rooms['Grotto']['notes']), ([], ['water']))
         self.assertEqual(rooms['Grotto']['water']['height'], -50.0)
         self.assertEqual((rooms['Smithy']['hard'], rooms['Smithy']['notes']), ([], ['lava']))
-        self.assertEqual(rooms['Vault']['hard'], ['teleport_only'])
-        self.assertEqual(rooms['Attic']['hard'], ['unreachable'])
+        # no door leads in: a note of what leads there, never a reason to leave the room out (ROOMS-SET-ASIDE-NOT-BUILT-67)
+        self.assertEqual((rooms['Vault']['hard'], rooms['Vault']['notes']), ([], ['teleport_only']))
+        self.assertEqual((rooms['Attic']['hard'], rooms['Attic']['notes']), ([], ['unreachable']))
+        self.assertEqual(G.HARD_REASONS, ())
+        self.assertEqual(doc['summary']['hard_rooms'], 0)
         self.assertTrue(rooms['Tower Foot']['telvanni'])
         self.assertEqual((rooms['Tower Top']['hard'], rooms['Tower Top']['notes']), ([], ['levitate_only']))
-        self.assertEqual(doc['summary']['notes'], {'lava': 1, 'levitate_only': 1, 'water': 1})
+        self.assertEqual(doc['summary']['notes'], {'lava': 1, 'levitate_only': 1, 'teleport_only': 1,
+                                                   'unreachable': 1, 'water': 1})
         self.assertEqual(rooms['Tower Foot']['hard'], [])
         self.assertEqual(rooms['Hall']['hard'], [])
         self.assertEqual(doc['summary']['levitate_doors'], 1)
@@ -261,10 +265,10 @@ class DoorGraphTests(unittest.TestCase):
         self.assertEqual(rooms['Cellar']['access'], 'unreachable')
         self.assertEqual(rooms['City Gate']['island'], 'Mournhold')
         self.assertEqual(rooms['City Gate']['access'], 'teleport_only')
-        # a cell that behaves like an exterior is no room (INTERIOR-NO-AMBI-66): set aside, waiting for the Mournhold
-        # exterior work, and still noted
-        self.assertEqual(rooms['City Gate']['hard'], ['teleport_only', 'behaves_exterior'])
-        self.assertIn('behaves_exterior', rooms['City Gate']['notes'])
+        # a cell that behaves like an exterior (INTERIOR-NO-AMBI-66) is in its batch like any room and built as open
+        # terrain by the district module: noted, never set aside (ROOMS-SET-ASIDE-NOT-BUILT-67)
+        self.assertEqual(rooms['City Gate']['hard'], [])
+        self.assertEqual(rooms['City Gate']['notes'], ['teleport_only', 'behaves_exterior'])
         self.assertEqual(rooms['Palace']['access'], 'teleport')
         self.assertEqual(rooms['Palace']['island'], 'Mournhold')
         self.assertEqual(rooms['Palace']['hard'], [])
@@ -332,9 +336,10 @@ class DoorGraphTests(unittest.TestCase):
         self.assertEqual((later['batch'], later['master'], later['rooms']),
                          ('later: Mournhold', 'Tribunal.esm', ['City Gate', 'Palace']))
         self.assertIn('plan --layers', later['waits_for'])    # the hold lifted: the layer batches (v0.0.65)
-        # an exterior-like cell is set aside, never parity (INTERIOR-NO-AMBI-66)
+        # an exterior-like cell is never parity (INTERIOR-NO-AMBI-66) and never set aside: both rooms are ready
+        # (ROOMS-SET-ASIDE-NOT-BUILT-67)
         self.assertEqual(later['parity'], [])
-        self.assertEqual(later['aside_reasons'], {'behaves_exterior': 1, 'teleport_only': 1})
+        self.assertEqual((later['ready'], later['aside'], later['aside_reasons']), (2, 0, {}))
         # the Cellar lost its door to the expansion: no door reaches it, so it joins the Vvardenfell parity batch
         self.assertIn('Cellar', plan['batches'][-1]['rooms'])
         self.assertIn('## Later batches (expansions)', G.plan_markdown(plan))
@@ -349,10 +354,12 @@ class DoorGraphTests(unittest.TestCase):
         self.assertEqual(both['batches'][:n], alone['batches'])
         layer = both['batches'][n:]
         self.assertTrue(layer and all(b['master'] == 'Tribunal.esm' for b in layer))
-        self.assertEqual(sorted(r for b in layer for r in b['rooms']), ['Palace'])
-        # the exterior-like cell is listed with its master, not converted (INTERIOR-NO-AMBI-66)
+        # the district is in its layer's batch like any room (ROOMS-SET-ASIDE-NOT-BUILT-67) and listed with how it is
+        # built: open terrain, by the district module (INTERIOR-NO-AMBI-66)
+        self.assertEqual(sorted(r for b in layer for r in b['rooms']), ['City Gate', 'Palace'])
+        self.assertEqual(both['aside'], [])
         self.assertEqual(both['exterior_like'], [{'cell': 'City Gate', 'master': 'Tribunal.esm',
-                                                  'state': 'an exterior-like cell, waiting for the Mournhold exterior work'}])
+                                                  'state': 'a district, built as open terrain by the district module'}])
         self.assertEqual(both['summary']['later'], {})
         self.assertEqual(both['later'], [])
         self.assertEqual(G.plan(doc, None, batch_rooms=40, layers=()), alone)
@@ -364,6 +371,60 @@ class DoorGraphTests(unittest.TestCase):
         self.assertEqual(G.parity_state({'name': 'Somewhere', 'hard': ['unreachable']}), 'no_entrance')
         self.assertIsNone(G.parity_state({'name': 'Somewhere', 'hard': ['water']}))
         self.assertIsNone(G.parity_state({'name': 'ToddTest', 'hard': []}))
+        # a graph made since v0.0.67 carries what leads there among the notes (ROOMS-SET-ASIDE-NOT-BUILT-67)
+        self.assertEqual(G.parity_state({'name': 'ToddTest', 'hard': [], 'notes': ['unreachable']}), 'test_cell')
+        self.assertEqual(G.parity_state({'name': 'Sotha Sil,', 'hard': [], 'notes': ['teleport_only']}), 'teleport_only')
+        self.assertIsNone(G.parity_state({'name': 'Mournhold, Godsreach', 'hard': [],
+                                          'notes': ['teleport_only', 'behaves_exterior']}))
+
+    def test_only_what_moves_the_player_is_a_way_in(self):
+        """DOOR-GRAPH-CELL-TEST-AS-TELEPORT-67: a cell name in a test (Tribunal's TribunalMain: GetPCCell "Sotha Sil,"
+        == 1, GetPCCell "Mournhold") moves no one; PositionCell in a script or a dialogue result does, quoted or not
+        (Tribunal's SothaSilTeleport: Player->PositionCell -50,-124,-37,90 "Sotha Sil, Outer Flooded Halls")."""
+        main = 'begin TribunalMain\nif ( GetPCCell "Sotha Sil," == 1 )\nendif\nif ( GetPCCell "Mournhold" == 1 )\nendif\nend'
+        self.assertEqual(G.moves_to(main), set())
+        self.assertEqual(G.moves_to('Player->PositionCell -50,-124,-37,90 "Sotha Sil, Outer Flooded Halls"'),
+                         {'sotha sil, outer flooded halls'})
+        self.assertEqual(G.moves_to('Karrod->PositionCell 10 20 30 0 "Mournhold, Royal Palace Throne Room"\n'),
+                         {'mournhold, royal palace throne room'})
+        self.assertEqual(G.moves_to('player->positioncell 1 2 3 0 Vault'), {'vault'})
+        self.assertEqual(G.moves_to('MessageBox "Mournhold is far"'), set())
+
+    def test_no_room_of_any_master_is_left_out_of_the_plan(self):
+        """ROOMS-SET-ASIDE-NOT-BUILT-67 (the maintainer's rule of 19 November 2026: if a place is in the game, it is in
+        the game): every room of the graph is in a batch of the plan, whatever its reason; a graph made before v0.0.67
+        with the reasons on its hard list included. Today's graph set 6 rooms aside: Akulakhan's Chamber (over a CHIM
+        room limit) and Mournhold's five districts (behaves like an exterior)."""
+        def room(name, master, island, access, hard=(), notes=(), settlement=None):
+            return {'name': name, 'master': master, 'island': island, 'access': access, 'hard': list(hard),
+                    'notes': list(notes), 'settlement': settlement, 'region': 'R', 'depth': 1, 'kept_placements': 1,
+                    'models': [], 'over_limit': ['model_block'] if 'over_limit' in hard + notes else []}
+        mw, tr, bm = 'Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm'
+        for old in (True, False):
+            def r(name, master, island, access, reasons=(), settlement=None):
+                return room(name, master, island, access, hard=tuple(reasons) if old else (),
+                            notes=() if old else tuple(reasons), settlement=settlement)
+            graph = {'masters': [], 'rooms': [
+                r("Akulakhan's Chamber", mw, 'Vvardenfell', 'door', ['over_limit']),
+                r('Balmora, Inn', mw, 'Vvardenfell', 'door', settlement='Balmora'),
+                r('ToddTest', mw, 'none', 'unreachable', ['unreachable']),
+                r('Magas Volar', mw, 'none', 'teleport_only', ['teleport_only']),
+                r('Mournhold, Godsreach', tr, 'Mournhold', 'teleport', ['behaves_exterior']),
+                r('Mournhold, Great Bazaar', tr, 'Mournhold', 'teleport', ['behaves_exterior']),
+                r('Sotha Sil,', tr, 'none', 'unreachable', ['unreachable']),
+                r('Sotha Sil, Outer Flooded Halls', tr, 'Mournhold', 'teleport'),
+                r('Mournhold, Royal Palace', tr, 'none', 'unreachable', ['unreachable']),
+                r('Vor Lair, Interior', bm, 'none', 'unreachable', ['unreachable']),
+                r('Raven Rock, Bar', bm, 'Solstheim', 'door', settlement='Raven Rock')]}
+            plan = G.plan(graph, None, batch_rooms=40, layers=['Tribunal.esm', 'Bloodmoon.esm'])
+            batched = sorted(n for b in plan['batches'] for n in b['rooms'])
+            self.assertEqual(batched, sorted(x['name'] for x in graph['rooms']), 'old graph' if old else 'new graph')
+            self.assertEqual((plan['aside'], plan['summary']['aside'], plan['summary']['aside_reasons']), ([], 0, {}))
+            # the rooms no door reaches keep their parity batch, so no other room's batch moves
+            parity = {p['room']: p['state'] for b in plan['batches'] for p in b.get('parity', ())}
+            self.assertEqual(parity, {'ToddTest': 'test_cell', 'Magas Volar': 'teleport_only',
+                                      'Sotha Sil,': 'no_entrance', 'Mournhold, Royal Palace': 'no_entrance',
+                                      'Vor Lair, Interior': 'no_entrance'})
 
     def test_plan_packs_small_groups_and_splits_large_ones(self):
         def room(name, town, models, region='R'):
@@ -436,8 +497,9 @@ class TrackerRoomsTests(unittest.TestCase):
                                   {'store': 'chimi', 'rooms': [{'room': 'mape'}], 'not_in_image': []}],
                         plan={'batches': [{'batch': 3, 'rooms': ['D']}, {'batch': 4, 'rooms': ['ToddTest', 'V']}],
                               'later': [{'batch': 'later: Mournhold', 'rooms': ['W']}]})
+        # an older graph's over_limit is a note now: B is a room to build, not a hard case (ROOMS-SET-ASIDE-NOT-BUILT-67)
         self.assertEqual({k: r['state'] for k, r in rows.items()},
-                         {'a': 'on_chim_rooms', 'b': 'hard_case', 'c': 'converted', 'd': 'not_started',
+                         {'a': 'on_chim_rooms', 'b': 'not_started', 'c': 'converted', 'd': 'not_started',
                           'e': 'on_chim_rooms', 'toddtest': 'test_cell', 'v': 'teleport_only', 'w': 'no_entrance',
                           'g': 'not_started'})
         # a build's chim-interiors.json (rows named by our map name) puts a room on CHIM rooms
@@ -452,18 +514,85 @@ class TrackerRoomsTests(unittest.TestCase):
                          ('not_started', [], ['water', 'levitate_only']))
         self.assertEqual((rows['d']['batch'], rows['v']['batch'], rows['w']['batch']), (3, 4, 'later: Mournhold'))
         self.assertEqual((rows['g']['id'], rows['g']['entrance'], rows['g']['settlement']), ('G', '3,-4', 'Town'))
-        self.assertEqual({k: r['group'] for k, r in rows.items() if k in ('a', 'c', 'w')},
-                         {'a': 'in_game', 'c': 'not_in_game', 'w': 'set_aside'})
+        self.assertEqual({k: r['group'] for k, r in rows.items() if k in ('a', 'c', 'w', 'toddtest', 'v')},
+                         {'a': 'in_game', 'c': 'not_in_game', 'w': 'not_in_game', 'toddtest': 'not_in_game',
+                          'v': 'not_in_game'})
         head = RM.headline(rows)
         self.assertEqual(list(head), ['Vvardenfell', 'Solstheim', 'none'])
         self.assertEqual(head['Vvardenfell']['total'], 5)
-        self.assertEqual(head['Vvardenfell']['hard_case'], 1)
-        self.assertEqual(head['Vvardenfell']['hard_reasons'], {'over_limit': 1})
-        self.assertEqual(dict(head['Vvardenfell']['groups']), {'in_game': 2, 'not_in_game': 2, 'set_aside': 1})
+        self.assertEqual(head['Vvardenfell']['hard_case'], 0)
+        self.assertEqual(head['Vvardenfell']['hard_reasons'], {})
+        self.assertEqual(dict(head['Vvardenfell']['groups']), {'in_game': 2, 'not_in_game': 3, 'set_aside': 0})
         self.assertEqual(head['Solstheim']['not_started'], 1)
         self.assertEqual((head['none']['test_cell'], head['none']['teleport_only'], head['none']['no_entrance']),
                          (1, 1, 1))
         self.assertEqual(RM.totals(rows)['total'], len(self.GRAPH['rooms']))
+
+    def test_a_build_with_every_tribunal_room_in_reads_all_green(self):
+        """ROOMS-SET-ASIDE-NOT-BUILT-67: a room no door leads to is a room to build (never "set aside"); once built it
+        is green when its way in is found: a door, or (no door) the script or dialogue line that names the cell, which
+        resolves to the built room through the room list, or, when nothing in the game data leads there, its dbg tp
+        picker row. Mournhold's districts that the presented data gives as open terrain are green as districts. Before
+        this change the districts read 'not started' and the rooms with no door 'set aside'."""
+        tr = 'Tribunal.esm'
+        graph = {'rooms': [
+            {'name': 'Mournhold, Godsreach', 'hard': [], 'notes': ['behaves_exterior'], 'behaves_exterior': True,
+             'island': 'Mournhold', 'master': tr, 'access': 'teleport'},
+            {'name': 'Mournhold, Great Bazaar', 'hard': ['behaves_exterior'], 'island': 'Mournhold', 'master': tr,
+             'access': 'teleport'},                                            # a graph made before v0.0.67
+            {'name': 'Mournhold, Royal Palace: Courtyard', 'hard': [], 'notes': ['behaves_exterior'],
+             'island': 'Mournhold', 'master': tr, 'access': 'teleport'},
+            {'name': 'Sotha Sil, Outer Flooded Halls', 'hard': [], 'notes': [], 'island': 'Mournhold', 'master': tr,
+             'access': 'teleport'},
+            # an empty cell: only a GetPCCell test names it, which moves no one (DOOR-GRAPH-CELL-TEST-AS-TELEPORT-67)
+            {'name': 'Sotha Sil,', 'hard': [], 'notes': ['unreachable'], 'island': 'none', 'master': tr,
+             'access': 'unreachable'},
+            # no door; a script moves the player there (MHTransportScript's PositionCell); a graph made before
+            {'name': 'Mournhold, Royal Palace: Reception Area', 'hard': ['teleport_only'], 'island': 'Mournhold',
+             'master': tr, 'access': 'teleport_only'},
+            {'name': 'Mournhold Temple', 'hard': [], 'notes': ['unreachable'], 'island': 'none', 'master': tr,
+             'access': 'unreachable'},
+            {'name': 'Mournhold, Royal Palace', 'hard': ['unreachable'], 'island': 'none', 'master': tr,
+             'access': 'unreachable'}]}                                       # an empty cell: one NPC, no scenery
+        districts = ['Mournhold, Godsreach', 'Mournhold, Great Bazaar', 'Mournhold, Royal Palace: Courtyard']
+        built = ['Sotha Sil, Outer Flooded Halls', 'Sotha Sil,', 'Mournhold, Royal Palace: Reception Area',
+                 'Mournhold Temple', 'Mournhold, Royal Palace']
+        image = {'store': 'chimi', 'not_in_image': [], 'rooms': [{'room': 'map%d' % i} for i in range(len(built))]}
+        receipt = {'format': 'aw-chim-rooms-1', 'rooms': [{'cell': n, 'room': 'map%d' % i} for i, n in enumerate(built)]}
+        # nothing built yet: no room is set aside; the rooms no door leads to are rooms to build, with what leads there
+        rows = RM.rooms(graph)
+        self.assertEqual([r['name'] for r in rows.values() if r['group'] == 'set_aside'], [])
+        self.assertEqual((rows['sotha sil,']['state'], rows['sotha sil,']['group'], rows['sotha sil,']['way_in']),
+                         ('no_entrance', 'not_in_game', 'picker'))
+        reception = rows['mournhold, royal palace: reception area']
+        self.assertEqual((reception['state'], reception['group'], reception['way_in']),
+                         ('teleport_only', 'not_in_game', 'script'))
+        # every room built, the districts presented: every room of the master is green, each with its way in
+        rows = RM.rooms(graph, receipts=[receipt, image], districts=districts)
+        states = {r['name']: r['state'] for r in rows.values()}
+        self.assertEqual(states, {'Mournhold, Godsreach': 'district', 'Mournhold, Great Bazaar': 'district',
+                                  'Mournhold, Royal Palace: Courtyard': 'district',
+                                  'Sotha Sil, Outer Flooded Halls': 'on_chim_rooms', 'Sotha Sil,': 'on_chim_rooms',
+                                  'Mournhold, Royal Palace: Reception Area': 'on_chim_rooms',
+                                  'Mournhold Temple': 'on_chim_rooms', 'Mournhold, Royal Palace': 'on_chim_rooms'})
+        self.assertEqual(sorted(r['name'] for r in rows.values() if r['group'] == 'in_game'), sorted(states))
+        # the way in: a door chain; a script or dialogue line naming the cell; or, when nothing in the game data leads
+        # there, its dbg tp picker row (every room the image holds has one)
+        self.assertEqual({r['name']: r['way_in'] for r in rows.values() if r['state'] == 'on_chim_rooms'},
+                         {'Sotha Sil, Outer Flooded Halls': 'door', 'Sotha Sil,': 'picker',
+                          'Mournhold, Royal Palace: Reception Area': 'script', 'Mournhold Temple': 'picker',
+                          'Mournhold, Royal Palace': 'picker'})
+        self.assertEqual(rows['mournhold, royal palace']['entry'],
+                         'no door or script in the game data; reached by its picker link (dbg tp)')
+        # a district the presented data does not give is not in the game yet (never green on a guess)
+        rows = RM.rooms(graph, receipts=[receipt, image], districts=districts[:1])
+        self.assertEqual(rows['mournhold, great bazaar']['state'], 'not_started')
+        # the readiness count of the land agrees: the built rooms with a way in are ready
+        import master_completion as MC
+        rows = RM.rooms(graph, receipts=[receipt, image], districts=districts)
+        mh = next(x for x in MC.readiness({'cells': {}, 'interior_rooms': {'rooms': list(rows.values())}})['lands']
+                  if x['id'] == 'mournhold')
+        self.assertEqual((mh['rooms']['ready'], mh['rooms']['total'], mh['rooms']['not_ready']), (8, 8, []))
 
     def test_attach_is_additive(self):
         recs = [{'name': 'A', 'chim': {'status': 'not_started'}}, {'name': 'Z'}]
@@ -488,8 +617,8 @@ class TrackerRoomsTests(unittest.TestCase):
         self.assertEqual(md.interior_lines(plain), [])
         text = '\n'.join(md.interior_lines(doc))
         self.assertIn('## Interiors', text)
-        self.assertIn('**9 rooms: in the game 0; not in the game yet 4; set aside, with a reason 5.**', text)
-        self.assertIn('| Set aside, with a reason | Set aside: test cell | 0 | 0 | 1 | 1 |', text)
+        self.assertIn('**9 rooms: in the game 0; not in the game yet 9; set aside, with a reason 0.**', text)
+        self.assertIn('| Not in the game yet | Not built yet: a test cell, no door leads there | 0 | 0 | 1 | 1 |', text)
         self.assertNotIn('ToddTest', text)                 # aggregate counts only
         self.assertIn('| Group | State | Vvardenfell | Solstheim | No entrance area | All |', text)
         resorted = dict(doc, interior_rooms=dict(ir, headline=dict(sorted(ir['headline'].items()))))

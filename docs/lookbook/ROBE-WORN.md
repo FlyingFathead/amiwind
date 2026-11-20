@@ -1,6 +1,6 @@
 # Look book page ROBE-WORN
 
-_Generated from tests/lookbook/pages.json with AmiWind v0.0.67-dev2._
+_Generated from tests/lookbook/pages.json with AmiWind v0.0.67._
 
 A worn robe is drawn on the body in first and in third person.
 

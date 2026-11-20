@@ -9,9 +9,12 @@
 | Where | builder: the cell-progress stage's outputs (flora-support.json at the top of the run folder) against its declared stage paths (tools/build_cache.py record check) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.67-dev1 (last seen) |
+| Persists in | fixed in v0.0.67-dev2 |
 | Severity | low: every build after one that ran the stage runs it again instead of reusing it: a reuse plan against the v0.0.67-dev1 run lists it as an UNEXPECTED rebuild (old records refused); the stage is short |
 | Family | Build speed (`build-speed`) |
+| Fix commit | `2955617b` |
+| Fixed on | 2026-11-17 |
+| Planning item | `BUILD-CELL-PROGRESS-UNDECLARED-OUTPUT-67` |
 | Playtest version | v0.0.67-dev1 |
 | From commit | source unknown, engine unknown, CHIM world unknown |
 | CHIM engine version | CHIM 0.2.2, engine unknown, world format 0.11 |
@@ -29,12 +32,18 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.67-dev2 (2955617b) | 2026-11-17 | gate 11079 passed on 429fa835; tests/test_flora_support.py ImageCheckReport | the flora support check writes flora-support.json into the image step's own folder, under its declared path, and runs once that folder is made (the test fails on the old path) |
+| shipped | a development build | v0.0.67-dev2 (0d6f7ab7) | 2026-11-19 | the fix commit 2955617b (merged as gated 429fa835) is an ancestor of the pushed dev2 head 0d6f7ab7 | the dev2 build holds the flora support check writing its file under the image's own declared path |
+| confirmed by a test | a test module | v0.0.67-dev2 (0d6f7ab7) | 2026-11-19 | tests/test_flora_support.py ImageCheckReport, run by gate 11079 on 429fa835 | a builder-only fix, so no play check applies: the test fails with the file in the run folder's root |
+| confirmed by a build | a development build | v0.0.67-dev3 (a375b13f) | 2026-11-19 | the dev3 build 2026_11_19_v0.0.67-dev3_full-dev3_a375b13 reused its cell-progress stage from the earlier dev2-line run: "Reuse preflight: 46 of 50 stages planned for reuse, 4 rebuilt (2 by policy), 0 UNEXPECTED" | no stage record is refused for an output outside its declared paths any more |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-17: reported in v0.0.67-dev1
 - 2026-11-17: v0.0.67-dev1: Cause, measured on the v0.0.67-dev1 run (read only): the image step's flora support check wrote flora-support.json into the run folder's root, outside every declared stage path.
 - 2026-11-17: fixed in source: a gated commit, v0.0.67-dev2 (2955617b); gate 11079 passed on 429fa835; tests/test_flora_support.py ImageCheckReport: the flora support check writes flora-support.json into the image step's own folder, under its declared path, and runs once that folder is made (the test fails on the old path)
+- 2026-11-19: shipped: a development build, v0.0.67-dev2 (0d6f7ab7); the fix commit 2955617b (merged as gated 429fa835) is an ancestor of the pushed dev2 head 0d6f7ab7: the dev2 build holds the flora support check writing its file under the image's own declared path
+- 2026-11-19: confirmed by a test: a test module, v0.0.67-dev2 (0d6f7ab7); tests/test_flora_support.py ImageCheckReport, run by gate 11079 on 429fa835: a builder-only fix, so no play check applies: the test fails with the file in the run folder's root
+- 2026-11-19: confirmed by a build: a development build, v0.0.67-dev3 (a375b13f); the dev3 build 2026_11_19_v0.0.67-dev3_full-dev3_a375b13 reused its cell-progress stage from the earlier dev2-line run: "Reuse preflight: 46 of 50 stages planned for reuse, 4 rebuilt (2 by policy), 0 UNEXPECTED": no stage record is refused for an output outside its declared paths any more
 
 <!-- END GENERATED TIMELINE -->
 
@@ -190,6 +199,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-STAIR-WALK-SLOW-33](BUILD-STAIR-WALK-SLOW-33.md): The image step's stair walk spent most of its time in interpreted collision traces and brute-force headroom tests (1,751 s of the rc1c image step)
 - [BUILD-STATS-SERIAL-36](BUILD-STATS-SERIAL-36.md): The CHIM stats step runs serially and silently on one core
 - [BUILD-STORAGE-DUPLICATES-33](BUILD-STORAGE-DUPLICATES-33.md): Build storage keeps full duplicate copies of images, stage outputs and packages, and nothing removes them
+- [BUILD-TESTER-32GB-OOM-67](BUILD-TESTER-32GB-OOM-67.md): A tester's build on a machine with 32 GB of memory ran out of memory after about 32 hours
 - [BUILD-TOWN-ACTOR-FIT-SERIAL-64](BUILD-TOWN-ACTOR-FIT-SERIAL-64.md): The Vivec town stage fits its residents onto the frame collision on one core after the resident bake
 - [BUILD-UNDERUSE-GATE-36](BUILD-UNDERUSE-GATE-36.md): The profiler did not flag long underused phases: 7 min 44 s of CHIM statistics on 1 of 24 cores and 77 s of zone walk on 1 core showed nowhere
 - [BUILD-UNIT-KEYS-REACH-64](BUILD-UNIT-KEYS-REACH-64.md): New collision settings re-keyed the NPC, creature, player-body and resident unit caches, which never read them

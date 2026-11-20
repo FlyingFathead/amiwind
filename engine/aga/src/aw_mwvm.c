@@ -210,8 +210,16 @@ void AW_MwvmReset(void){
     drsc_index_state=0;drsc_index.count=0;
 }
 int AW_MwvmLoaded(void){return vmp && vm.loaded;}
+/* REST-CUT-TOO-OFTEN-67: Random's starting value at a load (the first one and every New Game's): the machine's boot
+ * seed (sys_amiga.c, once at boot), or the recording's while the gameplay recorder runs (aw_recorder.c seed_streams; 0
+ * there gives the boot's back), so a load inside a recording starts from the same value in the recording and its
+ * replay. Never set (the host tests): the fixed 0x2545F491 of before, the same Random rolls in every session. */
+static uint32_t boot_rng,start_rng;
+static uint32_t start_value(void){return start_rng?start_rng:0x2545F491u;}
+void AW_MwvmBootSeed(unsigned long seed){boot_rng=start_rng=(uint32_t)seed;}
+void AW_MwvmStartSeed(unsigned long seed){start_rng=seed?(uint32_t)seed:boot_rng;}
 /* GAME-RECORDER-FIGHT-SEED-61: Random's generator set from the gameplay recorder's seed at its frame 0 */
-void AW_MwvmSeed(unsigned long seed){if(vmp)vm.rng=seed?(uint32_t)seed:0x2545F491u;}
+void AW_MwvmSeed(unsigned long seed){if(vmp)vm.rng=seed?(uint32_t)seed:start_value();}
 /* the OBJS rows placed once, sorted by reference (an insertion sort of a few hundred rows, once at load), so an
  * attach or a detach finds its row with a binary search and notes the instance there (MWSCRIPT-MEMBER-LOOKUP-COST-66) */
 static void sort_objects(void){
@@ -292,7 +300,7 @@ int AW_MwvmLoad(const unsigned char *data,unsigned long bytes,const aw_mwvm_host
         vm.runnable[i]=(unsigned char)check_code(vm.code+off,n,s[2]);
     }
     sort_objects();
-    vm.low=0;vm.high=size_cells;vm.rng=0x2545F491u;vm.loaded=1;
+    vm.low=0;vm.high=size_cells;vm.rng=start_value();vm.loaded=1;
     for(i=0;i<vm.nstrt;i++)AW_MwvmStartScript((int)U16(vm.strt+2*i));
     return 1;
 }
@@ -351,6 +359,11 @@ int AW_MwvmGlobalName(int g,int *type){
 }
 const aw_mwvm_stats_t *AW_MwvmStats(void){return ON?&vm.stats:&no_stats;}
 unsigned long AW_MwvmFunctionCalls(int f){return ON && f>=0 && f<AWM_FUNCTIONS?vm.fcalls[f]:0;}
+/* DBG-DBATTACK-67: the one script whose Random a debug command makes sure (-1 none; not saved, not reset by a load:
+ * the command ends it when its rest ends) */
+static int forced_random=-1;
+void AW_MwvmForceRandom(int script){forced_random=script;}
+int AW_MwvmForcedRandom(void){return forced_random;}
 int AW_MwvmFunctionName(int f){return ON && f>=0 && f<AWM_FUNCTIONS?(int)vm.fname[f]-1:-1;}
 aw_mwvm_instance_t *AW_MwvmInstance(int k){return ON && k>=0 && k<vm.ninst?&vm.inst[k]:NULL;}
 int AW_MwvmInstanceCount(void){return ON?vm.ninst:0;}
@@ -966,6 +979,8 @@ static int run(int k){
             int32_t n=sp[-1].i;
             vm.rng=vm.rng*1664525u+1013904223u;
             sp[-1].f=n>0?(float)(int32_t)((vm.rng>>8)%(uint32_t)n):0.0f;
+            /* DBG-DBATTACK-67: a debug command's sure roll: the lowest number for that one script (AW_MwvmForceRandom) */
+            if(forced_random>=0 && (int)in->script==forced_random){sp[-1].f=0.0f;vm.stats.forced_rolls++;}
             break;}
         case AWM_MENUMODE:sp->i=h && h->menu_mode?h->menu_mode():0;sp++;break;
         case AWM_CELLCHANGED:sp->i=(in->flags&AWI_CELLCHANGED)?1:0;sp++;break;

@@ -26,7 +26,9 @@
   const HELP = {
     world: ['World Map', 'The map of the game world, coloured by how far the conversion has come, with the CHIM Progress Tracker headline above it.',
       ['Click a cell to select it; shift-click or shift-drag selects several.', 'Drag pans; + / - / fit / reset zoom; the wheel scrolls the page (turn on "wheel zoom", or hold Ctrl or Alt, to zoom the map with it).',
-        'Colour by, Layers and the colour legend choose what the cells show; Controls and Collapse all fold the control blocks.'], 'AMIWIND_TOOLKIT.md'],
+        'Colour by, Layers and the colour legend choose what the cells show; Controls and Collapse all fold the control blocks.',
+        'Ready, in the headline: in the game on CHIM, the same for every land. Open terrain counts the land\'s exterior cells of land or empty sea (open ocean and cells beyond the world\'s edge are not counted); rooms count every interior cell for the land of its master, and a district the land presents as open terrain is counted once, under open terrain. Everything else is not ready, with its reason; a room no door leads to is a room still to build. The approval and lighting audit figures are on the line under each land.',
+        'Completion per game (under the view switch): for Tribunal, Bloodmoon and Morrowind, the cells and rooms, the scripts by state, the start scripts, the things placed by kind and the load doors; every count opens the list behind it, and what nothing measures yet says "not measured yet".'], 'AMIWIND_TOOLKIT.md'],
     local: ['Local view', 'One cell and the places it reaches, with its map, rooms and counts.',
       ['Pick a cell on the World tab, then open Local.', 'Show in 3D opens the CHIM frame that holds the cell (or its map) in the 3D Inspector, or says why there is nothing to open.'], 'AMIWIND_TOOLKIT.md'],
     inspector: ['3D Map Inspector (Polycount inspector)', 'A compiled map, a CHIM world or a CHIM room in 3D, with its faces, drawing and collision figures.',

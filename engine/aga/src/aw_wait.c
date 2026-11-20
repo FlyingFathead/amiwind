@@ -12,6 +12,7 @@
 #include "aw_sky.h"
 #include "aw_mappath.h"
 #include "aw_rest.h"
+#include "aw_roll.h"
 #include "aw_levelup.h"
 #include "aw_move.h"
 #include "aw_pcstanding.h"
@@ -434,10 +435,27 @@ static void rest_store(const aw_rest_body_t *b)
     svs.clients[0].edict->v.health=b->health;aw_character.current[0]=b->health;
     aw_character.current[1]=b->magicka;aw_character.current[2]=b->fatigue;
 }
-int AW_RestSleeping(void){return modal==3 && rest_sleeping;}
-/* WakeUpPC (MWSCRIPT-SMALL-FUNCTIONS-62; OpenMW 0.51 miscextensions.cpp OpWakeUpPC, waitdialog.cpp wakeUp: the sleep
- * stops): the window open in rest mode closes, as GetPCSleep reads it; a wait is not a sleep and stays */
-int AW_RestWake(void){if(!AW_RestSleeping())return 0;close_modal();return 1;}
+/* GETPCSLEEP-NOT-CARRIED-OUT-67: the hours of a rest or a wait pass over frames, as OpenMW 0.51 passes them
+ * (mwgui/timeadvancer.cpp: an hour every 1/60 s of real time, several in one frame when the frame is longer;
+ * waitdialog.cpp onWaitingProgressChanged: the clock hour by hour), so the game's scripts run between the hours (host.c
+ * runs them every frame while the window is up) and GetPCSleep reads 1 while the hours of a rest pass (waitdialog.hpp
+ * getSleeping: the hours running and the player sleeping; not while the window only waits for the choice). Every rest
+ * gives the scripts at least one frame asleep: the first hours pass in the frame the rest starts, the end comes in a
+ * later frame. WakeUpPC stops it (waitdialog.cpp wakeUp). Before v0.0.67 the hours passed in one call on Enter, so a
+ * script never saw the sleep itself (dbAttackScript, Tribunal's Dark Brotherhood attack). */
+#define REST_HOURS_A_SECOND 60.0
+static int rest_running,rest_wanted,rest_done,rest_stop,rest_cut;static double rest_due;
+int AW_RestSleeping(void){return modal==3 && rest_sleeping && rest_running;}
+int AW_RestCanSleep(void){return modal==3 && rest_sleeping;}
+static void rest_finish(int woken);
+/* WakeUpPC (MWSCRIPT-SMALL-FUNCTIONS-62; OpenMW 0.51 miscextensions.cpp OpWakeUpPC, waitdialog.cpp wakeUp): the hours
+ * stop where they are (what they restored is kept; the planned interruption still comes: its line and its creature;
+ * no level-up) and the window closes, as it does when it only waits for the choice; 1 when a rest window was there */
+int AW_RestWake(void){
+    if(modal!=3)return 0;
+    if(rest_running)rest_finish(1);else close_modal();
+    return 1;
+}
 /* T or a bed: the refusals, then the window in rest or wait mode. BED_REFERENCE: the bed used (0 for T). */
 int AW_RestOpen(unsigned long bed_reference)
 {
@@ -496,36 +514,89 @@ int AW_RestOpen(unsigned long bed_reference)
     if(key_dest==key_console)Con_ToggleConsole_f();
     hours=1;open_modal(3);return 1;
 }
-/* HOURS in rest or wait mode: the clock, recharge and spell effects hour by hour, the stats by the rules, the wilderness
- * interruption, then the level-up when a full rest ends with it due. */
+/* HOURS in rest or wait mode: the wilderness interruption planned, then the hours pass over the frames (AW_RestTick).
+ * REST-CUT-TOO-OFTEN-67: the roll is AW_Roll (aw_roll.h: one draw, its top bits), drawn only when a sleep list can cut
+ * the rest, as before; the roll and how many of the hours' values cut go to the console at the end (rest_finish), so a
+ * run's cut rate is counted from its log. */
+static int rest_roll=-1,rest_roll_hours;
 static void rest_run(int wanted)
 {
-    int done=0,stop=0,interrupted=0;aw_rest_body_t b;char line[160],verb[16];
-    if(rest_sleeping && rest_list[0] && rest_data)stop=AW_RestInterruptAt(&rest_settings,wanted,rand()%wanted);
-    while(done<(stop?stop:wanted)){
-        if(!AW_ClockAdvance(3600000))break;
+    if(rest_running || wanted<1)return;
+    rest_roll=rest_sleeping && rest_list[0] && rest_data?AW_Roll(wanted):-1;rest_roll_hours=wanted;
+    rest_stop=rest_roll>=0?AW_RestInterruptAt(&rest_settings,wanted,rest_roll):0;
+    rest_wanted=wanted;rest_done=0;rest_cut=0;rest_due=0;rest_running=1;
+}
+/* "roll R of 0..W-1, a cut below C": C = how many of the W values cut (3 of 12 at fSleepRandMod 0.25) */
+static void rest_roll_line(char *out,int size)
+{
+    int value,cuts=0;
+    for(value=0;value<rest_roll_hours;value++)if(AW_RestInterruptAt(&rest_settings,rest_roll_hours,value))cuts++;
+    snprintf(out,size,"roll %d of 0..%d, a cut below %d",rest_roll,rest_roll_hours-1,cuts);
+}
+/* DBG-DBATTACK-67: the open rest window's Enter from code (dbg dbattack): HOURS of rest or wait; 1 when they started */
+int AW_RestStart(int count)
+{
+    if(modal!=3 || rest_running || count<1 || count>24)return 0;
+    rest_run(count);
+    return rest_running;
+}
+/* Every frame, the world held or not (host.c): the hours this frame's real time is worth, at least one (the clock,
+ * recharge and spell effects hour by hour), or, once they are all done, the end. */
+void AW_RestTick(void)
+{
+    int end,n;
+    if(!rest_running)return;
+    if(!sv.active || svs.maxclients!=1 || !svs.clients || !svs.clients[0].edict){rest_running=0;return;}
+    if(modal!=3){rest_stop=0;rest_finish(1);return;}   /* the window closed by other code: the hours done count */
+    end=rest_stop?rest_stop:rest_wanted;
+    if(rest_done>=end){rest_finish(0);return;}
+    if(host_frametime>0 && host_frametime<1)rest_due+=host_frametime*REST_HOURS_A_SECOND;
+    n=(int)rest_due;
+    if(n<1)n=1;
+    rest_due-=n;if(rest_due<0)rest_due=0;
+    while(n-->0 && rest_done<end){
+        if(!AW_ClockAdvance(3600000)){rest_cut=1;rest_stop=0;rest_wanted=rest_done;break;}   /* no clock: it ends here */
         if(timescale.value>0){
             if(aw_magic_frame)aw_magic_frame(3600.0f/timescale.value);
             AW_MwscriptEffectsAdvance(3600.0f/timescale.value);
         }
-        done++;
+        rest_done++;
     }
+}
+/* The hours done: the stats by the rules, the window closed, then the interruption (planned, or WOKEN with one
+ * planned: OpenMW wakeUp runs onWaitingInterrupted), else the line, and the level-up when a full rest ends with it due */
+static void rest_finish(int woken)
+{
+    int done=rest_done,interrupted=rest_stop && (woken || done==rest_stop),full=!woken && !rest_cut && done==rest_wanted;
+    aw_rest_body_t b;char line[160],verb[16];
+    rest_running=0;
     clock_fraction=0;
     rest_body(&b);AW_RestRestore(&rest_settings,&b,(float)done,rest_sleeping);rest_store(&b);
-    interrupted=stop && done==stop;
-    close_modal();
+    if(modal==3)close_modal();
     if(interrupted){
+        /* REST-CUT-NO-CREATURE-67: the game's line on screen and in the log, then the region's creature (OpenMW
+         * onWaitingInterrupted: messageBox sSleepInterrupt, spawnRandomCreature; aw_mwhost.c rest_creature) */
+        char roll[64];
         rest_text("sSleepInterrupt","Your rest has been interrupted.",line,sizeof(line));AW_UISubtitle("",line,5);
-        if(aw_rest_spawn)aw_rest_spawn(rest_list);
+        Con_Printf("rest: %s (after %ld of %ld h, sleep list %s)\n",line,(long)done,(long)rest_wanted,
+                   rest_list[0]?rest_list:"-");
+        rest_roll_line(roll,sizeof(roll));Con_Printf("rest: %s\n",roll);   /* REST-CUT-TOO-OFTEN-67: the roll */
+        if(aw_rest_spawn && rest_list[0])aw_rest_spawn(rest_list);
         return;
     }
+    if(rest_roll>=0){              /* a rest a sleep list could have cut, and did not: its roll in the log too */
+        char roll[64];rest_roll_line(roll,sizeof(roll));
+        Con_Printf("rest: %s (%ld of %ld h, sleep list %s; %s)\n",woken?"woken, no cut planned":"not interrupted",
+                   (long)done,(long)rest_roll_hours,rest_list,roll);
+    }
+    if(woken)return;               /* stopWaiting: the script that woke the player says why */
     {char date[80];
     date_now(AW_DATE_REST,date,sizeof(date));
     rest_text(rest_sleeping?"sRest":"sWait",rest_sleeping?"Rest":"Wait",verb,sizeof(verb));
     snprintf(line,sizeof(line),"%s: %ld h. %s",verb,(long)done,date);}
     AW_UISubtitle("",line,5);
     /* only a full rest opens a due level-up (OpenMW WaitDialog::onWaitingFinished) */
-    if(rest_sleeping && done==wanted)AW_LevelupRested();
+    if(rest_sleeping && full)AW_LevelupRested();
 }
 /* CRIME-59: the jail's days as a rest (OpenMW jailscreen.cpp onJailFinished: rest(days x 24, true) and the time) */
 void AW_RestPass(int many,int sleeping)
@@ -650,7 +721,7 @@ void AW_WaitInit(void){
 void AW_WaitTick(void) {
     double delta;int whole;
     /* daynight_hold is kept here on purpose: it outlives the map change. */
-    if(!sv.active){modal=0;clock_fraction=0;gallery_stop();cycle_steps=0;light_active=0;return;}
+    if(!sv.active){modal=0;rest_running=0;clock_fraction=0;gallery_stop();cycle_steps=0;light_active=0;return;}
     if(!date_names_read)AW_DateNamesEnsure();   /* once a session, the first game's arrival: the journal's month names */
     if(daynight_hold)hold_clock();
     (void)AW_DayGalleryClock(0);
@@ -703,6 +774,7 @@ int AW_WaitKey(int key) {
            !strcmp(keybindings[key],"aw_quick_help")){quick_help();return 1;}
         return 0;
     }
+    if(modal==3 && rest_running)return 1;   /* the hours are passing: no key stops them (OpenMW WaitDialog::exit) */
     if(key_dest!=key_menu){modal=0;return 0;}
     if(key==K_ESCAPE || (modal==2 && (key==K_ENTER || key==K_F1))){close_modal();return 1;}
     if(modal==3){   /* rest or wait: 1 to 24 hours, Until Healed in rest mode */
@@ -739,7 +811,10 @@ int AW_WaitDraw(void) {
         AW_UIBox(18,24,284,152);AW_UISmallBegin();
         AW_UITextBox(26,32,268,20,rest_line[1],-1);
         AW_UITextBox(26,57,268,20,rest_line[0],-1);
-        snprintf(line,sizeof(line),"%ld %.40s",(long)hours,rest_line[2]);AW_UITextBox(26,85,268,22,line,-1);
+        if(rest_running)snprintf(line,sizeof(line),"%ld / %ld %.40s",(long)rest_done,(long)rest_wanted,
+                                 rest_line[2]);   /* the hours passing (OpenMW's progress bar) */
+        else snprintf(line,sizeof(line),"%ld %.40s",(long)hours,rest_line[2]);
+        AW_UITextBox(26,85,268,22,line,-1);
         AW_UITextBox(26,116,268,20,"Arrows / A D: 1 to 24 hours",-1);
         if(rest_until>0)snprintf(line,sizeof(line),"Enter: %.15s  H: %.31s  Esc",rest_line[3],rest_line[4]);
         else snprintf(line,sizeof(line),"Enter: %.15s   Esc: cancel",rest_line[3]);

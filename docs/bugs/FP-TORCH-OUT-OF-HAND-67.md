@@ -9,9 +9,12 @@
 | Where | first-person view with a torch equipped (the debug torch from dbg give and another torch kind), seen looking down in the West Gash (cell -8,17): the torch stands as a long stick away from the left hand; in third person the same torch is held correctly |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.67-dev2 (last seen) |
+| Persists in | fixed in v0.0.67-dev3 |
 | Severity | medium: the held light, a constant sight in caves and at night, looks detached from the hand |
 | Family | Actors and NPCs (`actors-npc`) |
+| Fix commit | `6e7111d3` |
+| Fixed on | 2026-11-18 |
+| Planning item | `FP-TORCH-OUT-OF-HAND-67` |
 | Playtest version | v0.0.67-dev2 |
 | From commit | source unknown, engine unknown, CHIM world unknown |
 | CHIM engine version | CHIM 0.2.2, engine unknown, world format 0.11 |
@@ -29,12 +32,20 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.67-dev2 (6e7111d3) | 2026-11-18 | tests/test_fp_held_item.py and tests/aga_held_item_test.c, the grip numbers read from the v0.0.67-dev2 image | the light's grip lands on the left hand's shield bone for every view and pose; the old 4-unit push read 4.00 units off it |
+| fixed in source | a gated commit | v0.0.67-dev3 (a375b13f) | 2026-11-19 | gate 11450 of the planning item FP-TORCH-OUT-OF-HAND-67 | Seen in play on the v0.0.67-dev3 image and approved by the maintainer: the look book reads the debug torch, the glass lantern and a candle within 1.8 units of the left hand in first person and within 1.9 in third person; the fix is 6e7111d3, the light's forward push removed. |
+| shipped | a development build | v0.0.67-dev3 (a375b13f) | 2026-11-19 | the build of a375b13f, gate 11450, delivered as v0.0.67-dev3 | the fix 6e7111d3 (the light placed on the hand bone without the forward push) is in the image |
+| confirmed in play | the look book | v0.0.67-dev3 (a375b13f) | 2026-11-19 | page HELD-LIGHT-IN-HAND (tests/lookbook), the distance read by the debug camera | the nearest vertex of the debug torch, the glass lantern and a candle is within 1.8 units of the left hand in first person and within 1.9 in third person |
+| confirmed by the maintainer | the maintainer | v0.0.67-dev3 (a375b13f) | 2026-11-19 | the look book stills of the held lights | the held lights are in the left hand in first and in third person |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-18: reported in v0.0.67-dev2
 - 2026-11-18: v0.0.67-dev2: Guarded by the look book page HELD-LIGHT-IN-HAND (docs/lookbook/HELD-LIGHT-IN-HAND.md): A carried light (the debug torch, the glass lantern, a candle) is held in the left hand in first and in third person; a change to the code it lives in ...
 - 2026-11-18: fixed in source: a gated commit, v0.0.67-dev2 (6e7111d3); tests/test_fp_held_item.py and tests/aga_held_item_test.c, the grip numbers read from the v0.0.67-dev2 image: the light's grip lands on the left hand's shield bone for every view and pose; the old 4-unit push read 4.00 units off it
+- 2026-11-19: fixed in source: a gated commit, v0.0.67-dev3 (a375b13f); gate 11450 of the planning item FP-TORCH-OUT-OF-HAND-67: Seen in play on the v0.0.67-dev3 image and approved by the maintainer: the look book reads the debug torch, the glass lantern and a candle within 1.8 units of the left hand in first person and within 1.9 in third person; the fix is ...
+- 2026-11-19: shipped: a development build, v0.0.67-dev3 (a375b13f); the build of a375b13f, gate 11450, delivered as v0.0.67-dev3: the fix 6e7111d3 (the light placed on the hand bone without the forward push) is in the image
+- 2026-11-19: confirmed in play: the look book, v0.0.67-dev3 (a375b13f); page HELD-LIGHT-IN-HAND (tests/lookbook), the distance read by the debug camera: the nearest vertex of the debug torch, the glass lantern and a candle is within 1.8 units of the left hand in first person and within 1.9 in third person
+- 2026-11-19: confirmed by the maintainer: the maintainer, v0.0.67-dev3 (a375b13f); the look book stills of the held lights: the held lights are in the left hand in first and in third person
 
 <!-- END GENERATED TIMELINE -->
 
@@ -118,6 +129,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [DIALOGUE-WINDOW-LAYOUT-57](DIALOGUE-WINDOW-LAYOUT-57.md): Requested: the dialogue window has no disposition bar, no Persuasion and no service entries, as the original has
 - [ESSENTIAL-DEATH-MESSAGE-66](ESSENTIAL-DEATH-MESSAGE-66.md): The essential character death message is shown only for deaths in a fight
 - [FARGOTH-STANDING-NO-LAYOUT-66](FARGOTH-STANDING-NO-LAYOUT-66.md): Fargoth's and the opening Imperial guard's standing models carry no animation layout
+- [GAENOR-ATTACKS-AT-START-67](GAENOR-ATTACKS-AT-START-67.md): Two Gaenors, one of them at level 50, attack a new player in the Temple Courtyard
 - [GUARD-WALK-REGRESSION-62](GUARD-WALK-REGRESSION-62.md): The guard at the start turns on the spot on his way to his post beside the door and then stands in the player's route into the Census and Excise Office
 - [GUARDS-FIGHT-EACH-OTHER-65](GUARDS-FIGHT-EACH-OTHER-65.md): Two guards who come after the player in Seyda Neen start fighting each other
 - [HAIR-CHECK-ACTOR-GROUND-1999-54](HAIR-CHECK-ACTOR-GROUND-1999-54.md): The actor ground check still refused skeletal models past 1,999 vertices
@@ -170,6 +182,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [PLAYER-ROBE-WAIST-SEAM-67](PLAYER-ROBE-WAIST-SEAM-67.md): With a robe on, the third-person player body shows a cut at the waist: the robe's skirt and the upper body do not join
 - [PLAYER-SPELL-CAP-58](PLAYER-SPELL-CAP-58.md): The player can hold only 8 spell changes, so a ninth bought spell is refused
 - [PLAYER-VANITY-WALK-STUCK-67](PLAYER-VANITY-WALK-STUCK-67.md): After the idle vanity camera starts, the player's walk and run animations stop in third person until the next map load
+- [PLAZA-FABRICANTS-LIVE-AT-START-67](PLAZA-FABRICANTS-LIVE-AT-START-67.md): Plaza Brindisi Dorom holds the fabricants of a later quest from the start of a new game, one ready to attack on sight
 - [RANDOM-SPAWN-IDLE-63](RANDOM-SPAWN-IDLE-63.md): Creatures from the Ghostgate random spawn stand idle next to the player instead of attacking
 - [RESIDENT-ANIM-BYTE-BUDGET-48](RESIDENT-ANIM-BYTE-BUDGET-48.md): A room resident whose animation kit model is over the alias byte budget at every rung stopped the whole room stage (ienas nadus)
 - [ROOM-LEVELLED-INTRO-ROOMS-62](ROOM-LEVELLED-INTRO-ROOMS-62.md): Addamasartus and Tharys Ancestral Tomb have no levelled creatures: the intro scene converts their rooms without the levelled creature points

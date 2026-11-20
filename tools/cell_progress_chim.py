@@ -202,6 +202,52 @@ def _declared_ownership(base,receipt):
     return declared,counts,notes
 
 
+def merge_digests(first, more):
+    """The digest of a build whose image holds worlds of their own beside its base world (TRACKERS-MOURNHOLD-NOT-COUNTED-67:
+    the module tribunal-mournhold's districts are a CHIM world of their own, in their own run folder, installed as a
+    store of their own): FIRST with the cells, audits, frames, areas and reports of each digest in MORE added. A cell
+    in two worlds is refused when both convert it (one cell, one owner); the run-level figures, placements and models
+    stay the base world's. MORE empty: FIRST as it is."""
+    for other in more:
+        for k, e in other['cells'].items():
+            have = first['cells'].get(k)
+            if have is not None and have.get('converted') and e.get('converted'):
+                raise ValueError('cell %s is converted by two worlds of one build' % k)
+            if have is None or e.get('converted'):
+                first['cells'][k] = e
+        for mech, per in other['audits'].items():
+            first['audits'].setdefault(mech, {}).update(per)
+        first['frames'] = first['frames'] + other['frames']
+        first['areas'] = sorted(set(first['areas']) | set(other['areas']))
+        first['frame_ownership'] = list(first['frame_ownership']) + list(other['frame_ownership'])
+        first['reports'] = sorted(set(first['reports']) | set(other['reports']))
+    first['cells'] = {k: first['cells'][k] for k in sorted(first['cells'], key=lambda s: tuple(int(x) for x in s.split(',')))}
+    return first
+
+
+def module_worlds(base):
+    """The module worlds beside a build run's base world folder (BASE = RUN/chim-world): RUN/<stage> of every build
+    module (tools/chim/layer_stores.py MODULE_STAGES: tribunal-mournhold) that has a CHIM receipt. [] for any other
+    folder, so a CHIMport run or a single-area run is digested as it was."""
+    from chim.layer_stores import MODULE_STAGES
+    base = Path(base)
+    if base.name != 'chim-world':
+        return []
+    return [str(base.parent / stage) for stage in sorted(MODULE_STAGES)
+            if (base.parent / stage / REPORTS_RECEIPT).is_file()]
+
+
+REPORTS_RECEIPT = 'chim-%s.json' % REPORTS['receipt']
+
+
+def digest_many(name, bases, label=None, commit=None, built_at=None):
+    """digest() of the build's base world (the first of BASES) with the worlds of its modules merged in (the rest)."""
+    bases = list(bases)
+    first = digest(name, bases[0], label, commit, built_at)
+    return merge_digests(first, [digest('%s+%d' % (name, i), b, label, commit, built_at)
+                                 for i, b in enumerate(bases[1:], 1)])
+
+
 def digest(name, base, label=None, commit=None, built_at=None):
     """The per-cell digest of one run, or raises ValueError when it has no receipt."""
     rep = {k: _read(report_path(base, k)) for k in REPORTS}

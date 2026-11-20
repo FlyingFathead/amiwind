@@ -148,10 +148,40 @@
     return {html: '<b>In the game: ' + fmt(h.groups.in_game) + ' cells</b> · newest ingested build ' + esc(label) + ' · accounted for ' + fmt(h.groups.accounted_for) + ' of ' + fmt(h.groups.cells),
       title: 'Build run: ' + (h.in_game_build || 'none')};
   }
+  // THE UNIFIED COUNT (TOOLKIT-EXPANSION-COMPLETION-67): with the data's readiness (tools/master_completion.py, through
+  // expansion-views.js readiness()), every land gets the same row: open terrain ready, rooms ready, total ready, then one row
+  // for all lands together. The approval and lighting audit figures stay, on the line under the land, apart from the count.
+  const READY_LABELS = {vvardenfell: 'Vvardenfell (main game)', solstheim: 'Solstheim (Bloodmoon DLC)', mournhold: 'Mournhold (Tribunal DLC)'};
+  const figText = f => fmt(f.ready) + ' of ' + fmt(f.total) + ' (' + (+f.percent).toFixed(1) + ' %)';
+  const readyCounts = x => 'open terrain ready <b>' + figText(x.terrain) + '</b> · rooms ready <b>' + figText(x.rooms) + '</b> · total ready <b>' + figText(x.total) + '</b>';
+  function notReadyText(land) {
+    const part = (name, p) => ((p && p.not_ready) || []).map(r => name + ' ' + r.label + ' ' + fmt(r.count));
+    const bits = part('open terrain:', land.terrain).concat(part('rooms:', land.rooms));
+    const asT = (land.rooms && land.rooms.as_terrain) || [];
+    return (bits.length ? 'not ready: ' + bits.join(' · ') : 'not ready: none') +
+      (asT.length ? ' · ' + fmt(asT.length) + ' district' + (asT.length === 1 ? '' : 's') + ' counted once, as open terrain' : '');
+  }
+  function readinessRow(land, isl, release) {
+    const audit = isl && isl.cells ? '<span class="chimdetail">audits (open terrain): ' + FULL_CELLS + ' ' + fmt(isl.complete) + ' · ' + FULL_TERRAIN + ' ' + fmt(isl.terrain_complete) +
+      ' · awaiting lighting ' + fmt((isl.complete_unlit || 0) + (isl.terrain_complete_unlit || 0)) + ' · passed, something deferred ' + fmt(isl.audits_passed) +
+      (isl.eligible != null ? ' · eligible for ' + esc(release || 'the next release') + ': ' + fmt(isl.eligible) : '') + '</span>' : '';
+    return {html: esc(READY_LABELS[land.id] || land.name) + ': ' + readyCounts(land) + audit + '<span class="chimdetail">' + esc(notReadyText(land)) + '</span>', title: null};
+  }
+  function readinessRows(h, ready) {
+    const isl = h.islands || [], title = ready.definition || '';
+    const rows = ready.lands.map(l => Object.assign(readinessRow(l, isl.find(i => i.island === l.island), h.eligible_release), {title}));
+    rows.push({html: '<b>All lands</b>: ' + readyCounts(ready.all), title});
+    return rows;
+  }
   // expansions: expansion-views.js completion(doc) (the World Map page sends it with the headline), or nothing (older pages):
-  // then the expansion rows are made from the headline's cells alone, as before.
+  // then the expansion rows are made from the headline's cells alone, as before. readiness: the unified count (above), which
+  // replaces the land rows when it is given.
   const EXPANSION_OF = {2: 'bloodmoon', 3: 'tribunal'};
-  function headRows(h, expansions) {
+  function headRows(h, expansions, ready) {
+    if (ready && ready.lands && ready.all) {
+      const b0 = buildRow(h);
+      return b0 ? readinessRows(h, ready).concat([b0]) : readinessRows(h, ready);
+    }
     const isl = h.islands || [];
     const rows = LANDS.map(([id, label]) => {
       const exp = expansions && EXPANSION_OF[id] ? expansions.find(e => e.id === EXPANSION_OF[id] && e.present) : null;
@@ -164,8 +194,8 @@
   // into one line ("1 390Solstheim"). Real block elements, one <div class="chimrow"> per land and one for the build, inside one
   // full-width <div class="chimrows chimtitle"> (chimtitle keeps the group at the top of the World Map's page header); the layout
   // CSS is injected with the script, so every page that draws the headline gets it.
-  function rowsHtml(h, expansions) {
-    return '<div class="chimrows chimtitle">' + headRows(h, expansions).map(r => '<div class="chimrow"' + (r.title ? ' title="' + esc(r.title) + '"' : '') + '>' + r.html + '</div>').join('') + '<div class="chimrule"></div></div>';
+  function rowsHtml(h, expansions, ready) {
+    return '<div class="chimrows chimtitle">' + headRows(h, expansions, ready).map(r => '<div class="chimrow"' + (r.title ? ' title="' + esc(r.title) + '"' : '') + '>' + r.html + '</div>').join('') + '<div class="chimrule"></div></div>';
   }
   const FULL_CELLS = 'Fully approved cells:', FULL_TERRAIN = 'Fully approved terrain:';
   // The fold state of the summary block, kept per browser in localStorage (every access guarded; without storage it lasts until reload).
@@ -202,7 +232,7 @@
     // The summary under the rows (chips, accounted for, lighting, unmeasured, history) folds as one block; the choice is kept per
     // browser. A page with its own fold for it (the World Map's legend block) passes opts.noFold and gets the plain pieces.
     const fold = !(opts && opts.noFold), folded = summaryFolded();
-    el.innerHTML = rowsHtml(h, opts && opts.expansions) + (fold ? '<div class="chimsumbar"><button type="button" class="chimsumbtn" aria-expanded="' + !folded + '" title="Fold or unfold the tracker summary">' +
+    el.innerHTML = rowsHtml(h, opts && opts.expansions, opts && opts.readiness) + (fold ? '<div class="chimsumbar"><button type="button" class="chimsumbtn" aria-expanded="' + !folded + '" title="Fold or unfold the tracker summary">' +
       (folded ? CLOSED : OPEN) + ' Tracker summary</button></div><div class="chimsummary"' + (folded ? ' hidden' : '') + '>' + rest + '</div>' : rest);
     const sumBtn = el.querySelector('.chimsumbtn');
     if (sumBtn) sumBtn.onclick = () => setSummary(el, sumBtn.getAttribute('aria-expanded') === 'true');
@@ -216,7 +246,7 @@
       more.nextElementSibling.hidden = !open;
     };
   }
-  const api = {render, setSummary, summaryFolded, SUM_KEY, rowsHtml, headRows, expansionRow, CSS, PARTS, STATE_PARTS, GROUPS, SETTLED_TEXT, SETTLED_GREY, layout, groupsHtml, MORE_KEY};
+  const api = {render, setSummary, summaryFolded, SUM_KEY, rowsHtml, headRows, expansionRow, readinessRows, CSS, PARTS, STATE_PARTS, GROUPS, SETTLED_TEXT, SETTLED_GREY, layout, groupsHtml, MORE_KEY};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.ChimHead = api;
 })(typeof window !== 'undefined' ? window : this);

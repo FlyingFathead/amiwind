@@ -1,6 +1,6 @@
 # Look book page DOCK-GUARD-POST
 
-_Generated from tests/lookbook/pages.json with AmiWind v0.0.67-dev2._
+_Generated from tests/lookbook/pages.json with AmiWind v0.0.67._
 
 In the opening the dock guard walks to his post by the census office door and is not caught in a pier post.
 

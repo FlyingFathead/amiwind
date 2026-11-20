@@ -1,6 +1,6 @@
 # Mournhold: observations on how Tribunal's city works
 
-_Last updated with AmiWind v0.0.67-dev2 (19 November 2026)._
+_Last updated with AmiWind v0.0.67 (19 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -13,6 +13,7 @@ _Last updated with AmiWind v0.0.67-dev2 (19 November 2026)._
 - [The gates](#the-gates)
 - [Arrivals](#arrivals)
 - [What the expansions change in the base game](#what-the-expansions-change-in-the-base-game)
+- [Every space of Tribunal and Bloodmoon in the image](#every-space-of-tribunal-and-bloodmoon-in-the-image)
 - [What follows from this for a port](#what-follows-from-this-for-a-port)
 
 <!-- contents end -->
@@ -179,9 +180,17 @@ With the districts built, the image links 69 doors and markers that name a distr
 **A gate on a cell border.** Godsreach is presented as two cells, and its gate to the Plaza stands on the border
 between them. A door belongs to the frame map of the cell that holds its position, and the use key looks for doors in
 the frame the player stands in. A player in Godsreach's other cell, a step from the gate, therefore cannot use it
-(register entry `DISTRICT-GATE-ON-CELL-BORDER-67`, open). The original never has this case: there the district is one
-cell. Ways to solve it: give a door near an inner border to both cells' tables, let the game look in the neighbouring
-cell's table as well, or lay the blocks so that no door stands on an inner border.
+(register entry `DISTRICT-GATE-ON-CELL-BORDER-67`). The original never has this case: there the district is one
+cell. The gate from the Plaza sets the player 6 units inside Godsreach's northern cell, and the gate's box reaches 19
+units into that cell, while its row was only in the southern cell's table.
+
+**The fix (v0.0.67, the image's door tables).** A district door whose box comes within the use key's reach of an
+inner border of its block is also written into the table of the cell beside it: the same door, the same way through,
+its box in that cell's coordinates. In the v0.0.67-dev3 image's tables that is 8 of the districts' 40 doors:
+Godsreach's two gates (to the Plaza and to the Temple courtyard), the Great Bazaar's two gates (to the Plaza and to
+the Temple courtyard), the Plaza's gate to the Royal Palace courtyard and its way down to Bamz-Amschend, and the
+Temple courtyard's door into the Temple and its gate to the Royal Palace courtyard. Doors elsewhere in the game are
+not touched: the base game's frames have no such blocks.
 
 ## Arrivals
 
@@ -192,16 +201,43 @@ player's height:
 | Arrival | Result |
 | --- | --- |
 | Godsreach, Plaza Brindisi Dorom, the Temple courtyard, the Royal Palace courtyard | standing on the floor |
-| The Great Bazaar | **under the street** |
+| The Great Bazaar | **under the street** on the dev2 test build; on the top of the gate's wall above the street on the dev3 image; on the street with the fix below |
 | The Royal Palace: Reception Area and the other rooms checked | standing on the floor |
 
-**The Great Bazaar fault** (register entry `MOURNHOLD-BAZAAR-UNDER-WATER-67`, open). The teleport left the player at
+**The Great Bazaar fault** (register entry `MOURNHOLD-BAZAAR-UNDER-WATER-67`). The teleport left the player at
 about -173: 470 units under the street, which is at 297 there, and 173 under the water surface. The picture is the
 underwater one and the breath bar runs, so the district looks flooded. It is not: the street is dry, and the player is
-under it, in the place where a district has nothing to stand on. The water is right; the arrival is wrong. The cause
-is not proven yet. Two candidates are being checked by number: the street's collision is not there yet at the moment
-the player is set down, or the gate's leaf, which stands right beside the arrival point, pushes the player off the spot. The fix
-and its check are recorded here and in the register entry when they are in.
+under it, in the place where a district has nothing to stand on. The water is right; the arrival is wrong.
+
+**The cause, by number.** The arrival point itself is right. The gate from the Plaza (reference 24401 of Tribunal.esm)
+sets the player at -503 -2578 at height 378 in the Bazaar's own coordinates. Moved by the district's offset, that is
+23 units west of the border between the Bazaar's two cells, so it lies in the western cell's frame at frame-local 1018
+-660. The gate from the Temple courtyard (reference 25213) is the same case, 24 units west of the border. The fault is
+where the player is set down around that point. It lies 13 units north of the district's own gate to the Plaza, and
+the player's standing box there overlaps that gate's wall from the street up. Traced on the build's own collision of
+the district, with every part of it loaded:
+
+- A teleport with a height looks for the first surface at or below it. With the box blocked at the asked height, the
+  search stepped down until the box was clear. The first clear place was under the street's slab, about 140 under the
+  street's top at 297, so the player fell through the empty space under the district onto the water surface at 0.
+  That was the dev2 arrival under the water, not a floor that loaded late.
+- The dev3 change caught such a landing (more than 256 under the asked height) and asked the arrival search for a
+  floor at the asked point. That search tries the point and eight places 64 units around it, from a little above the
+  asked height downward, and takes the first floor it meets. Its first floor was the flat top of the same gate wall,
+  64 units east and higher than the asked height (490 by the game's own position command). The street lies 64 units
+  north (364, which is 67 over the street at 297, as a player stands).
+
+**The fix (v0.0.67, the teleport's arrival).** A teleport whose first landing is far under the asked height now asks
+the arrival search at the asked point at once, and for this case alone that search takes a floor beside the point
+that is higher than the asked height only when it finds no other floor. The original game sets the player at the
+marker and lets him come down onto the floor under it, which never puts him on a wall top beside it. The Great
+Bazaar's teleport now lands on the street, 64 units north of the point. A teleport that lands at its asked floor is
+never touched, so the settlement teleports keep their arrivals, and doors, rooms and teleports to a person keep the
+search as it was. Applied to every arrival, the same preference would have moved 58 of the 6,210 room arrivals of
+the dev3 image (people in yurts set under their floor among them): there a floor a few units above the marker beside
+it is common and right. Checked by number on the dev3 image's collision: every door and teleport into the five
+districts lands where it landed before, except the two names of the Great Bazaar teleport, which now land on the
+street. The doors from the Plaza and the Temple courtyard already stood on the street.
 
 Two smaller findings from the same check:
 
@@ -274,14 +310,44 @@ What a build does with it (the test build of 18 November 2026, both expansions s
 
 Known gaps for a base game with the expansions on:
 
-- The people of Mournhold's five districts are not placed (`DISTRICT-PEOPLE-NOT-PLACED-67`): 50 people and 8
-  creatures. The rooms' people are.
-- Some people's scripts are not attached to them: 27 in Mournhold and 47 on Solstheim
-  (`EXPANSION-SCRIPTS-NOT-ATTACHED-66`).
+- The people of Mournhold's five districts are placed: all 57 are in the district frame maps of the release build, still
+  to be seen in play (`DISTRICT-PEOPLE-NOT-PLACED-67`). The rooms' people are placed.
+- Some people's scripts were not attached to them (27 in Mournhold and 47 on Solstheim); since v0.0.67 the script stage
+  binds them, to be seen in play (`EXPANSION-SCRIPTS-NOT-ATTACHED-66`).
 - S'virr stands in Khuul, and his boat to Fort Frostmoth is left out of the travel table until Solstheim's outdoors
   are built; the boat from Fort Frostmoth back to Khuul is in it.
 - Whether the Dark Brotherhood attack plays (a sleeping player woken, the attackers placed beside him) has not
-  been checked in the game yet.
+  been checked in the game yet; the sleep test the script waits on is fixed in source and `dbg dbattack` tests the path.
+
+## Every space of Tribunal and Bloodmoon in the image
+
+Every cell of every master is built, whatever leads there (decided for the project on 19 November 2026): a room no door
+leads to is still in the game. Measured on the release build of 19 November 2026 (door graph, the image's room and
+frame lists, every load door followed both ways, every script and dialogue result read):
+
+- Tribunal has 96 interior cells. 89 are rooms on CHIM rooms. The five districts are open terrain in 11 frame maps
+  (`mh0000` to `mh0010`), with all 57 of their people and creatures in those maps. The last two, "Sotha Sil," and
+  "Mournhold, Royal Palace", hold no scenery in the game data (the second holds one person) and are built as empty
+  rooms from this version on: a shell with no scenery around their references, the start in its middle, the person
+  placed.
+- Tribunal's cells hold 253 load doors: 250 lead both ways in the image, 3 are one-way in the original itself, and 3
+  are being looked at.
+- What moves the player into Tribunal's spaces without a door, each target a room or a district frame in the image:
+  PositionCell in SothaSilTeleport (Sotha Sil, Outer Flooded Halls), mazedbandEnd_Script (Sotha Sil, Dome of Sotha
+  Sil; Mournhold Temple: High Chapel; Vivec, High Fane), MHTransportScript (Mournhold, Royal Palace: Reception Area),
+  karrodMovement (Mournhold, Royal Palace Throne Room; Mournhold, The Winged Guar), Warlord_aScript (Mournhold, Royal
+  Palace: Jail), SadriThief, Shunari_Plague, the match-maker scripts (the districts and Mournhold, Trader),
+  LorkhanHeart (Akulakhan's Chamber) and VVTransportScript (Ebonheart, Grand Council Chambers).
+- No door, script or dialogue result moves the player into "Sotha Sil," or "Mournhold, Royal Palace". The only
+  mentions are tests: TribunalMain asks GetPCCell "Sotha Sil,", and two dialogue lines carry a Not Cell condition on
+  "Mournhold, Royal Palace". Both match by prefix, as the original: GetPCCell "Sotha Sil," is true in every Sotha Sil
+  room, and those lines are said nowhere whose cell name starts with "Mournhold, Royal Palace". Each of the two is
+  reached by its row in the `dbg tp` picker, which lists every room the image holds; no door is added.
+- Bloodmoon's 98 interior cells are in the room list; 95 of its 233 load doors lead to Solstheim's outdoors, which are
+  not in the game yet (the next version's work). "Vor Lair, Chambers of Alta Vor" and "Vor Lair, Interior" are unused
+  Bloodmoon cells with no reference at all; they are built as empty rooms too, reached by their picker rows.
+- The tracker counts all of them: a room is in the game when it is built and reached by its way in (a door, a script
+  or dialogue result that moves the player, or the picker row); a district built as open terrain is in the game.
 
 ## What follows from this for a port
 

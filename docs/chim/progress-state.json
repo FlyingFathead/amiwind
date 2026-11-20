@@ -1,6 +1,106 @@
 {
  "builds": [
   {
+   "built_at": "2026-11-18T10:28:16+00:00",
+   "cells": 1420,
+   "commit": "2b086671",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    },
+    {
+     "land": 11,
+     "name": "Mournhold",
+     "sea": 0
+    }
+   ],
+   "label": "v0.0.67 (2b086671)",
+   "land": 1303,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-18T10:28:16+00:00",
+   "cells": 1409,
+   "commit": "a375b13f",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
+    }
+   ],
+   "label": "v0.0.67-dev3 (a375b13f)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-17T22:41:55+00:00",
+   "cells": 1409,
+   "commit": "0d6f7ab7",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
+    }
+   ],
+   "label": "v0.0.67-dev2 (0d6f7ab7)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-14T09:49:03+00:00",
+   "cells": 1409,
+   "commit": "eb5f8d83",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
+    }
+   ],
+   "label": "v0.0.67-dev1 (eb5f8d83)",
+   "land": 1292,
+   "sea": 117
+  },
+  {
    "built_at": "2026-11-14T09:49:03+00:00",
    "cells": 1409,
    "commit": "ad5e9a0a",
@@ -14,6 +114,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.66 (ad5e9a0a)",
@@ -34,6 +139,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.66-dev9 (803f83cd)",
@@ -54,6 +164,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.66-dev8 (3a64d00e)",
@@ -74,6 +189,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.66-dev7 (a33bba98)",
@@ -94,6 +214,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.66-dev6 (629a2dbd)",
@@ -114,6 +239,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.66-dev5 (1427e0da)",
@@ -134,6 +264,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.66-dev4 (010ce4a9)",
@@ -154,6 +289,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.66-dev3 (c0ab8f11)",
@@ -174,6 +314,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.66-dev2 (3988c6e4)",
@@ -194,6 +339,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.66-dev12 (ac37e80b)",
@@ -214,6 +364,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.66-dev11 (26ed570f)",
@@ -234,6 +389,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.66-dev10 (f446092e)",
@@ -254,6 +414,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.66-dev1 (662ffae6)",
@@ -274,6 +439,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.65-rc4 (51221ddb)",
@@ -294,6 +464,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.65-rc2 (6f00103b)",
@@ -314,6 +489,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.65 (9bd80ee1)",
@@ -334,6 +514,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.65 (20c6b9c6)",
@@ -354,6 +539,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.64 (b3dc0a2b)",
@@ -374,6 +564,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.64-dev4 (dbe3869b)",
@@ -394,6 +589,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.64-dev3 (bf2743fa)",
@@ -414,6 +614,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.64-dev2 (874440d3)",
@@ -434,6 +639,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.64-dev1 (4bd67418)",
@@ -454,6 +664,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.63 (84bc6f57)",
@@ -474,6 +689,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.63-dev5 (5a4c4720)",
@@ -494,6 +714,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.63-dev4 (1ba2e352)",
@@ -514,6 +739,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.63-dev3 (6e680965)",
@@ -534,6 +764,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.63-dev2 (d2c64081)",
@@ -554,6 +789,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.63-dev1 (dc356e39)",
@@ -574,6 +814,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.62 (1d5eda8b)",
@@ -594,6 +839,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.62-dev1 (089421bf)",
@@ -614,6 +864,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.61 (1a0640a3)",
@@ -634,6 +889,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.61-dev3 (ad4f9501)",
@@ -654,6 +914,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.61-dev2 (cf155318)",
@@ -674,6 +939,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.61-dev2 (afa644d4)",
@@ -694,6 +964,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.61-dev1 (ef794b33)",
@@ -714,6 +989,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.61-dev1 (be26b03b)",
@@ -734,6 +1014,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.61-dev1 (66d0ed70)",
@@ -754,6 +1039,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.61-dev1 (374d59b1)",
@@ -774,6 +1064,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.60 (1fed45df)",
@@ -794,6 +1089,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.60-dev4 (bbf3ba8f)",
@@ -814,6 +1114,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.60-dev3 (bcf788db)",
@@ -834,6 +1139,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.60-dev2 (d2388458)",
@@ -854,6 +1164,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.60-dev1 (e61a8b94)",
@@ -874,6 +1189,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.60-dev1 (e4f5aa97)",
@@ -894,6 +1214,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.59 (feaee79e)",
@@ -914,6 +1239,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.59-dev6 (dd81a5b3)",
@@ -934,6 +1264,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.59-dev6 (52aaeae1)",
@@ -954,6 +1289,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.59-dev5 (f08583e0)",
@@ -974,6 +1314,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.59-dev4 (ca347985)",
@@ -994,6 +1339,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.59-dev3 (0ce27527)",
@@ -1014,6 +1364,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.59-dev1 (41bea321)",
@@ -1034,6 +1389,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.58 (b370794e)",
@@ -1054,6 +1414,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.58-dev6 (7a2c5935)",
@@ -1074,6 +1439,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.58-dev5 (2fb3bf49)",
@@ -1094,6 +1464,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.58-dev4 (9155d6d6)",
@@ -1114,6 +1489,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.58-dev3 (738edf26)",
@@ -1134,6 +1514,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.58-dev2 (25a8ddbc)",
@@ -1154,6 +1539,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.58-dev1 (3d610fa9)",
@@ -1174,6 +1564,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.57 (7ff625e5)",
@@ -1194,6 +1589,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.57-dev5 (095612e9)",
@@ -1214,6 +1614,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.57-dev4 (c53994d6)",
@@ -1234,6 +1639,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.57-dev3 (8297a0b4)",
@@ -1254,6 +1664,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.57-dev2 (d725e23a)",
@@ -1274,6 +1689,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.57-dev1 (efc9db36)",
@@ -1294,6 +1714,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.57-dev1 (4f112b16)",
@@ -1314,6 +1739,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.56 release, Some Velvet Morning (b213657)",
@@ -1334,6 +1764,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.47 release, clean public build (791771f7)",
@@ -1354,6 +1789,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.44 release, every exterior cell on CHIM (c84f850)",
@@ -1374,6 +1814,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.44-dev1 every exterior cell on CHIM (793d7c1)",
@@ -1394,6 +1839,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.43-dev2 full build (b55a5ce)",
@@ -1414,6 +1864,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.43-dev1 full build (7ac15b1)",
@@ -1434,6 +1889,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.42 final (a241ba1)",
@@ -1454,6 +1914,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.42-dev1 full proof build (5e043ad)",
@@ -1473,6 +1938,11 @@
     {
      "land": 0,
      "name": "Solstheim",
+     "sea": 0
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
      "sea": 0
     }
    ],
@@ -1494,6 +1964,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.41 final release: rings 0-4 + Bitter Coast + Azura's Coast (ce7ace6)",
@@ -1514,6 +1989,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.41-dev5 regional build: rings 0-4 + Bitter Coast + Azura's Coast (74ae87b)",
@@ -1534,6 +2014,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.41-dev4 rings 0-4 (87f6534)",
@@ -1554,6 +2039,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.41-dev3 rings 0-3 (513 cells, b00e9c4)",
@@ -1574,6 +2064,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 1
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.41-dev2 rings 0-2 (371 cells, 91a8b23)",
@@ -1593,6 +2088,11 @@
     {
      "land": 0,
      "name": "Solstheim",
+     "sea": 0
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
      "sea": 0
     }
    ],
@@ -1614,6 +2114,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 0
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.40-dev2 original-cell Vivec conversion; native and package checks pending",
@@ -1633,6 +2138,11 @@
     {
      "land": 0,
      "name": "Solstheim",
+     "sea": 0
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
      "sea": 0
     }
    ],
@@ -1654,6 +2164,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 0
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.38 cells (1,-3) and (10,-1): isolated CHIM gates passed; final package and native verification pending",
@@ -1673,6 +2188,11 @@
     {
      "land": 0,
      "name": "Solstheim",
+     "sea": 0
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
      "sea": 0
     }
    ],
@@ -1694,6 +2214,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 0
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "v0.0.38-dev2 full current playable build (c2eaa5a)",
@@ -1713,6 +2238,11 @@
     {
      "land": 0,
      "name": "Solstheim",
+     "sea": 0
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
      "sea": 0
     }
    ],
@@ -1734,6 +2264,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 0
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "MiniWind #2 mw2-033b3 (Balmora, dev1 line)",
@@ -1753,6 +2288,11 @@
     {
      "land": 0,
      "name": "Solstheim",
+     "sea": 0
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
      "sea": 0
     }
    ],
@@ -1774,6 +2314,11 @@
      "land": 0,
      "name": "Solstheim",
      "sea": 0
+    },
+    {
+     "land": 0,
+     "name": "Mournhold",
+     "sea": 0
     }
    ],
    "label": "CHIM M2 seyda-009 (Seyda Neen)",
@@ -1783,15 +2328,15 @@
  ],
  "eligible_release": "v0.0.67",
  "format": "aw-progress-state-1",
- "generated": "2026-11-17T05:32:18+00:00",
+ "generated": "2026-11-19T15:00:33+00:00",
  "groups": {
-  "accounted_for": 2158,
-  "cells": 2311,
-  "in_game": 1409,
+  "accounted_for": 2169,
+  "cells": 2322,
+  "in_game": 1420,
   "not_in_game": 153,
   "settled": 749
  },
- "in_game_label": "v0.0.66 (ad5e9a0a)",
+ "in_game_label": "v0.0.67 (2b086671)",
  "interiors": {
   "classic_rooms": [
    {
@@ -2008,11 +2553,184 @@
    "playtested": 0,
    "terrain_complete": 0,
    "terrain_complete_unlit": 0
+  },
+  {
+   "approved": 0,
+   "audits_passed": 1,
+   "cells": 11,
+   "complete": 0,
+   "complete_unlit": 0,
+   "converted": 11,
+   "done": 11,
+   "eligible": 11,
+   "empty_sea": 0,
+   "island": 3,
+   "lighting": {
+    "lit": 0,
+    "not_measured": 0,
+    "partial": 0,
+    "unlit": 11
+   },
+   "map_cells": 11,
+   "name": "Mournhold",
+   "not_started": 0,
+   "ocean": 0,
+   "passed": 11,
+   "percent": 100.0,
+   "playtested": 0,
+   "terrain_complete": 0,
+   "terrain_complete_unlit": 10
   }
  ],
+ "readiness": {
+  "all": {
+   "rooms": {
+    "percent": 99.5,
+    "ready": 1317,
+    "total": 1323
+   },
+   "terrain": {
+    "percent": 90.7,
+    "ready": 1401,
+    "total": 1545
+   },
+   "total": {
+    "percent": 94.8,
+    "ready": 2718,
+    "total": 2868
+   }
+  },
+  "build": "v0.0.67 (2b086671)",
+  "definition": "Ready = in the game on CHIM, the same for every land. Open terrain: the land's exterior cells of land or empty sea (open ocean and cells beyond the world's edge are not counted), ready when the newest ingested build holds the cell on CHIM and no audit of it failed. Rooms: every interior cell, counted for the land of its master, ready when it is in the game on CHIM rooms; a district the land presents as open terrain is counted once, under open terrain. Everything else is not ready, with its reason; a room no door leads to is a room still to build, never left out.",
+  "format": "aw-land-readiness-1",
+  "lands": [
+   {
+    "game": "Morrowind (main game)",
+    "id": "vvardenfell",
+    "island": 1,
+    "master": "Morrowind.esm",
+    "name": "Vvardenfell",
+    "rooms": {
+     "as_terrain": [],
+     "not_ready": [
+      {
+       "count": 2,
+       "label": "in the game as a room map of our own, not on CHIM rooms",
+       "reason": "room_map"
+      }
+     ],
+     "not_ready_names": [
+      "Imperial Prison Ship",
+      "Seyda Neen, Census and Excise Office"
+     ],
+     "percent": 99.8,
+     "ready": 1129,
+     "total": 1131
+    },
+    "terrain": {
+     "not_ready": [],
+     "percent": 100.0,
+     "ready": 1390,
+     "total": 1390
+    },
+    "total": {
+     "percent": 99.9,
+     "ready": 2519,
+     "total": 2521
+    }
+   },
+   {
+    "game": "Bloodmoon",
+    "id": "solstheim",
+    "island": 2,
+    "master": "Bloodmoon.esm",
+    "name": "Solstheim",
+    "rooms": {
+     "as_terrain": [],
+     "not_ready": [
+      {
+       "count": 2,
+       "label": "still to build: no door leads there, and no script or dialogue line names it",
+       "reason": "no_entrance"
+      }
+     ],
+     "not_ready_names": [
+      "Vor Lair, Chambers of Alta Vor",
+      "Vor Lair, Interior"
+     ],
+     "percent": 98.0,
+     "ready": 99,
+     "total": 101
+    },
+    "terrain": {
+     "not_ready": [
+      {
+       "count": 144,
+       "label": "not in the game yet (Solstheim)",
+       "reason": "solstheim"
+      }
+     ],
+     "percent": 0.0,
+     "ready": 0,
+     "total": 144
+    },
+    "total": {
+     "percent": 40.4,
+     "ready": 99,
+     "total": 245
+    }
+   },
+   {
+    "game": "Tribunal",
+    "id": "mournhold",
+    "island": 3,
+    "master": "Tribunal.esm",
+    "name": "Mournhold",
+    "rooms": {
+     "as_terrain": [
+      "Mournhold, Godsreach",
+      "Mournhold, Great Bazaar",
+      "Mournhold, Plaza Brindisi Dorom",
+      "Mournhold, Royal Palace: Courtyard",
+      "Mournhold, Temple Courtyard"
+     ],
+     "not_ready": [
+      {
+       "count": 1,
+       "label": "still to build: no door leads there, a script or a dialogue line sends the player there",
+       "reason": "teleport_only"
+      },
+      {
+       "count": 1,
+       "label": "still to build: no door leads there, and no script or dialogue line names it",
+       "reason": "no_entrance"
+      }
+     ],
+     "not_ready_names": [
+      "Sotha Sil,",
+      "Mournhold, Royal Palace"
+     ],
+     "percent": 97.8,
+     "ready": 89,
+     "total": 91
+    },
+    "terrain": {
+     "not_ready": [],
+     "percent": 100.0,
+     "ready": 11,
+     "total": 11
+    },
+    "total": {
+     "percent": 98.0,
+     "ready": 100,
+     "total": 102
+    }
+   }
+  ]
+ },
  "states": {
   "approved": 0,
-  "audits_passed": 376,
+  "audits_passed": 377,
   "complete": 0,
   "complete_unlit": 13,
   "converted_failing": 0,
@@ -2028,7 +2746,7 @@
   "settled": 749,
   "solstheim": 153,
   "terrain_complete": 0,
-  "terrain_complete_unlit": 804
+  "terrain_complete_unlit": 814
  },
  "version_stamp": {
   "release": "v0.0.67",

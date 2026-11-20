@@ -12,6 +12,7 @@
 | Persists in | v0.0.66 (last seen) |
 | Severity | medium: Regressed in v0.0.66 (was low): a repeated box to close; nothing is blocked |
 | Family | Menus, HUD, map screen and text (`ui-text`) |
+| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
 | Came back (regression) | in v0.0.66 (fixed in v0.0.65 before) |
 | Playtest version | v0.0.65-rc3 |
 | From commit | source unknown, engine unknown, CHIM world unknown |
@@ -29,6 +30,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 - 2026-11-12: reported in v0.0.65-rc3
 - 2026-11-17: came back in v0.0.66 (fixed in v0.0.65 before): The v0.0.65 fix hid the second hint after the stats box and the inventory box only.
+- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
 
 <!-- END GENERATED TIMELINE -->
 
@@ -129,6 +131,7 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - [RACE-MENU-OK-HIGHLIGHT-65](RACE-MENU-OK-HIGHLIGHT-65.md): The OK box of the character windows shows no highlight when the keys reach it
 - RAM-WARNING-BOX-52 (no report page): Requested: under 32 MB of Fast RAM a WARNING message box for a few seconds before the AmiWind logo
 - [SIGNPOST-NAMES-MISSING-65](SIGNPOST-NAMES-MISSING-65.md): Signposts do not show what they read when the player looks at them
+- [STATS-WINDOW-COLOURS-UNTIL-LOAD-67](STATS-WINDOW-COLOURS-UNTIL-LOAD-67.md): Stats window draws a raised attribute almost black and the birthsign icons brown until a saved game is loaded
 - [SUBTITLE-BOX-HIDES-STATS-63](SUBTITLE-BOX-HIDES-STATS-63.md): The box of a spoken line rises over the whole lower part of the screen and hides the stat bar
 - [TOOLKIT-CELL-HIGHLIGHT-SCALE-38](TOOLKIT-CELL-HIGHLIGHT-SCALE-38.md): Selected-cell outline offset on scaled displays
 - [TOOLKIT-INCLUSION-PACKAGE-38](TOOLKIT-INCLUSION-PACKAGE-38.md): CHIM inclusion metadata omitted from Toolkit packaging rules

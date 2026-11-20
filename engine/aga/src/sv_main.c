@@ -31,6 +31,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 /* aw_actors.c: every server spawn is a new map for the actors, the same map's name too (ACTOR-TABLE-SAME-MAP-RELOAD-67).
  * Declared here, not in aw_actors.h: the CHIM world stage keys that header, and this fix must move no world stage key. */
 void AW_ActorsServerReset (void);
+/* aw_combat.c: the fights' edict pointers of the old server go (GAENOR-ATTACKS-AT-START-67). Declared here, not in
+ * aw_combat.h, for the same reason: the CHIM world stage keys that header. */
+void AW_CombatServerReset (void);
+/* aw_mwhost.c: every server spawn attaches the map again for the scripts and the object state, the same map's too, so
+ * the edicts of a disabled or taken reference are hidden at every load (PLAZA-FABRICANTS-LIVE-AT-START-67). Declared
+ * here, not in a header a stage keys. */
+void AW_MwscriptServerReset (void);
 
 server_t		sv;
 server_static_t	svs;
@@ -1611,8 +1618,11 @@ void SV_SpawnServer (char *server)
     AW_AnimSceneReset();   /* same-map reloads also need fresh mover precaches */
     AW_ItemsSceneReset();  /* and fresh held-item precache indices (HELD-WEAPON-WRONG-MODEL-62) */
     AW_HalloweenServerReset();   /* and drop every edict pointer kept from the old server (HORS-AFTER-HALLOWEEN-CRASH-58) */
+    AW_CombatServerReset();      /* the fights' too: a kept slot became a fight of the new map's actor at its edict number
+                                    (GAENOR-ATTACKS-AT-START-67) */
     AW_AmbientServerReset();
     AW_ActorsServerReset();   /* the same map spawned again joins its cells again (ACTOR-TABLE-SAME-MAP-RELOAD-67) */
+    AW_MwscriptServerReset();   /* and attaches its scripts and object state again (PLAZA-FABRICANTS-LIVE-AT-START-67) */
     if(aw_inspect_reset)aw_inspect_reset();
     /* the waits of the entity updates and dbg netstat start again with the map (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66) */
     memset (sv_net_missed, 0, sizeof(sv_net_missed));

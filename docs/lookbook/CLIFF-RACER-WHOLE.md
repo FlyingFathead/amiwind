@@ -1,6 +1,6 @@
 # Look book page CLIFF-RACER-WHOLE
 
-_Generated from tests/lookbook/pages.json with AmiWind v0.0.67-dev2._
+_Generated from tests/lookbook/pages.json with AmiWind v0.0.67._
 
 The cliff racer is drawn whole: wings joined to the body, no holes.
 
@@ -43,3 +43,4 @@ The cliff racer's model is drawn broken: the wings do not join the body, the par
 - 2026-11-18 Guarded by the look book page CLIFF-RACER-WHOLE (docs/lookbook/CLIFF-RACER-WHOLE.md): The cliff racer is drawn whole: wings joined to the body, no holes; a change to the code it lives in must pass that page before it is merged (docs/LOOKBOOK.md).
 - 2026-11-18 fixed in source: a commit on the dev line, v0.0.67-dev3 line (cfcc4d9a) (tests/test_creature_whole.py and the whole route baked on the game data, measured against the v0.0.65 whole model)
 - 2026-11-18 regressed on v0.0.67-dev2 (was fixed in v0.0.58): A regression on the v0.0.67-dev2 image (the maintainer's picture, 2026-11-18): a cliff racer in the Ashlands (`cliff racer`, reference 393760, model progs/c_64031b3f740e_k.mdl) is drawn as flat wing plates apart from a thin body, full of holes, as before the v0.0.58 fix. Whether the blighted cliff racer is whole too is to be checked; if it is, its model is the reference for the plain one.
+- 2026-11-19 shipped: a development build, v0.0.67-dev3 (a375b13f) (the fix commit cfcc4d9a is an ancestor of the delivered dev3 head a375b13f (git merge-base --is-ancestor) and not of the dev2 head 0d6f7ab7)

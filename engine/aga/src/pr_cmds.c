@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "aw_glut.h"
 #include "aw_dial.h"
 #include "aw_talk.h"
+#include "aw_roll.h"
 
 #define	RETURN_EDICT(e) (((int *)pr_globals)[OFS_RETURN] = EDICT_TO_PROG(e))
 
@@ -485,7 +486,7 @@ void PF_random (void)
 {
     float		num;
 
-    num = (rand ()&0x7fff) / ((float)0x7fff);
+    num = AW_Roll (0x8000) / ((float)0x7fff);	// AmiWind: Quake's 0..1, from the draw's top bits (aw_roll.h)
 
     G_FLOAT(OFS_RETURN) = num;
 }

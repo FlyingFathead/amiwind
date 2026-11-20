@@ -20,9 +20,12 @@
 | Where | the builder's reuse report (stage unit counts), world-flora stage |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.67-dev2 (last seen) |
+| Persists in | fixed in v0.0.67-dev3 |
 | Severity | high: Regressed in v0.0.67-dev2 (was medium): a wrong count hides which stages really rebuilt and sends the reuse review after work that never ran; the build outpu... |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
+| Fix commit | `c534a39c` |
+| Fixed on | 2026-11-18 |
+| Planning item | `BUILD-REUSE-STOP-STORED-GROUP-FIX-66` |
 | Came back (regression) | in v0.0.67-dev2 (fixed in v0.0.66-dev8 before) |
 | Playtest version | 2026_11_10_v0.0.64-dev3_full-v0.0.64-dev3_bf2743f |
 | From commit | source bf2743f, engine bf2743f, CHIM world bf2743f |
@@ -42,6 +45,9 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | developer | v0.0.67-dev2 (tools/reuse_all.py region_limits) | 2026-11-18 | when the terrain stage runs again, the limit comes from this build's exterior checklist, made before any stage: with no cell that gets an open-world map the region stages look up none of their stored units; tests/test_reuse_all.py holds the case and the cases that still count in full | the checklist already says what the terrain receipt will hold |
+| shipped | a development build | v0.0.67-dev3 (a375b13f) | 2026-11-19 | the fix commit c534a39c (tools/reuse_all.py) is an ancestor of the delivered dev3 head a375b13f and not of the dev2 head | the dev3 build holds the stop that takes its limit from this build's exterior checklist when the terrain stage runs again |
+| confirmed by a test | a test module | v0.0.67-dev3 (a375b13f) | 2026-11-19 | tests/test_reuse_all.py (the case of a terrain stage that runs again and the cases that still count in full) and tests/test_exterior_layer_cells.py, run by gate 11450 on a375b13f | a builder-only fix, so no play check applies: the tests fail on the earlier counting and pass on the fix |
+| confirmed by a build | a development build | v0.0.67-dev3 (a375b13f) | 2026-11-19 | the check of the dev3 build 2026_11_19_v0.0.67-dev3_full-dev3_a375b13: "Reuse check (--check): passed (no reuse stop)", world terrain, world scenery and world flora planned as reused from the earlier build with no allowance | the stop did not come back on the build that holds the fix (that build's terrain stage was reused, so the test above carries the case of a terrain stage that runs again) |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
@@ -55,6 +61,9 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-15 14:23 +0200: seen again in v0.0.66-dev6: Seen again on the v0.0.66-dev6 line: the unit check of 00dfab13 stopped world-scenery (2,064 of 2,064) and world-flora (1,931 of 1,931) although the first repair was in it.
 - 2026-11-18: came back in v0.0.67-dev2 (fixed in v0.0.66-dev8 before): Seen again in the check of a build that holds Mournhold's districts: their eleven rows in the region directory make the world terrain stage run again, so its receipt could not be read, and the plan counted all 2,064 stored world scenery ...
 - 2026-11-18: fixed in source: developer, v0.0.67-dev2 (tools/reuse_all.py region_limits); when the terrain stage runs again, the limit comes from this build's exterior checklist, made before any stage: with no cell that gets an open-world map the region stages look up none of their stored units; tests/test_reuse_all.py holds the case and the cases that still count in full: the checklist already says what the terrain receipt will hold
+- 2026-11-19: shipped: a development build, v0.0.67-dev3 (a375b13f); the fix commit c534a39c (tools/reuse_all.py) is an ancestor of the delivered dev3 head a375b13f and not of the dev2 head: the dev3 build holds the stop that takes its limit from this build's exterior checklist when the terrain stage runs again
+- 2026-11-19: confirmed by a test: a test module, v0.0.67-dev3 (a375b13f); tests/test_reuse_all.py (the case of a terrain stage that runs again and the cases that still count in full) and tests/test_exterior_layer_cells.py, run by gate 11450 on a375b13f: a builder-only fix, so no play check applies: the tests fail on the earlier counting and pass on the fix
+- 2026-11-19: confirmed by a build: a development build, v0.0.67-dev3 (a375b13f); the check of the dev3 build 2026_11_19_v0.0.67-dev3_full-dev3_a375b13: "Reuse check (--check): passed (no reuse stop)", world terrain, world scenery and world flora planned as reused from the earlier build with no allowance: the stop did not come back on the build that holds the fix (that build's terrain stage was reused, so the test above carries the case of a terrain stage that runs again)
 
 <!-- END GENERATED TIMELINE -->
 

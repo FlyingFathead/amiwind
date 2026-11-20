@@ -1,6 +1,6 @@
 # Door graph: every load door and every interior
 
-_Last updated with AmiWind v0.0.66 (14 November 2026)._
+_Last updated with AmiWind v0.0.67 (19 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -111,13 +111,18 @@ from: Tribunal.esm is Mournhold, Bloodmoon.esm is Solstheim, the base game is `n
 
 ### Hard cases
 
-A room's `hard` reasons (the batch plan sets it aside, or, for the first two, puts it in the parity batch):
+No room is set aside (v0.0.67, [ROOMS-SET-ASIDE-NOT-BUILT-67](../bugs/ROOMS-SET-ASIDE-NOT-BUILT-67.md); decided for
+the project on 19 November 2026: if a place is in the game, it is in the game, and a room no door leads to is still
+built). The reasons below set a room aside until v0.0.67; they are notes now, `hard` stays empty, and every room is
+in a batch of the plan. A graph made before keeps them on its `hard` list and every reader takes them as notes:
 
-- `unreachable`: no door chain and no script reaches it.
-- `teleport_only`: no load door leads into it; a script or dialogue moves the player there.
-- `behaves_exterior` (a hard case until v0.0.65, a note since): the cell's "behaves like an exterior" flag (sky and
-  weather inside a cell, as Mournhold's districts); the room gets the shared exterior sky.
-- `over_limit`: it passes one of the CHIM room limits (names in `over_limit`).
+- `unreachable`: no door chain and no script reaches it; in its master's parity batch.
+- `teleport_only`: no load door leads into it; a script or dialogue moves the player there; in its master's parity
+  batch.
+- `behaves_exterior`: the cell's "behaves like an exterior" flag (sky and weather inside a cell, as Mournhold's
+  districts); in its batch like any room, and the builder builds it as open terrain with the district module.
+- `over_limit`: it passes one of the CHIM room limits (names in `over_limit`); in its batch like any room, so a room
+  that cannot be made fails its own room unit by name instead of leaving a silent gap.
 
 A room's `notes` (v0.0.48, the maintainer's decisions of 23 October 2026: these rooms are converted like any room):
 
@@ -227,8 +232,16 @@ drops their `later` entry. `room-batches --append-layers --previous config/room-
 list: the island's batches stay exactly as they are (their rooms keep their save ids), and each expansion batch gets a
 `layer` (its master) and ids from the list's `next_id` on. The builder takes a layer's batches only when that
 expansion is selected (`--dlc`; with `--no-dlc` the island's batches alone). The five Mournhold districts whose cell
-behaves like an exterior are converted like any room since v0.0.65: the room converter gives them the shared exterior
-sky (`_aw_sky_mode exterior`, `chim_room_batches.sky_keys`), and `behaves_exterior` is a note, no longer a hard case.
+behaves like an exterior are in their batch like any room, and `behaves_exterior` is a note, never a reason to leave
+them out (v0.0.67). The room stage hands them to the district module, which builds them as open terrain, in their own
+frame maps, with their people placed (`chim_room_batches.exterior_like_rooms`); the room record lists them with that
+state.
+
+**What leads into a room.** A way in is only what moves the player: a load door chain, or PositionCell in a script or a
+dialogue result, or a travel service's destination, naming the cell (`door_graph.moves_to`). A cell name in a test,
+such as GetPCCell, moves no one and is no way in (DOOR-GRAPH-CELL-TEST-AS-TELEPORT-67). GetPCCell and the dialogue's
+Not Cell condition match a cell name by prefix, as the original does: GetPCCell "Sotha Sil," is true in every room
+whose name starts so.
 
 ## Rooms by batch in the builder
 
@@ -417,14 +430,23 @@ state, the first that matches. The states fall into the three groups of the Worl
 
 | group | state | meaning |
 | --- | --- | --- |
-| in the game | `on_chim_rooms` | on a CHIM room: a build's `chim-interiors.json` installed it, or a CHIM rooms receipt names a room that is in the game |
+| in the game | `on_chim_rooms` | on a CHIM room (a build's `chim-interiors.json` installed it, or a CHIM rooms receipt names a room that is in the game), reached by its way in |
 | in the game | `room_map` | in the game as today's room map |
+| in the game | `district` | a cell that behaves like an exterior, in the game as open terrain: the presented data names it (the district module built it) |
 | not in the game yet | `converted` | a CHIM room record was made for it, not in the game yet |
 | not in the game yet | `not_started` | everything else |
-| set aside, with a reason | `test_cell` | no door reaches it; a developers' test cell |
-| set aside, with a reason | `teleport_only` | no door reaches it; a script sends the player there |
-| set aside, with a reason | `no_entrance` | no door reaches it and no script names it |
-| set aside, with a reason | `hard_case` | set aside by the graph for another reason (lava at or under the water, size, behaves like an exterior) |
+| not in the game yet | `test_cell` | not built yet; no door reaches it; a developers' test cell |
+| not in the game yet | `teleport_only` | not built yet; no door reaches it; a script or a dialogue line sends the player there |
+| not in the game yet | `no_entrance` | not built yet; no door reaches it and no script names it |
+| set aside, with a reason | `hard_case` | only a reason this reader does not know (none since v0.0.67) |
+
+A room is in the game when it is built, with its way in (`way_in` and `entry` on its row): `door` (a door chain from
+the open world leads in), `script` (no door; a script or a dialogue line names the cell, which resolves to the built
+room through the room list), or `picker` (nothing in the game data leads there: its row in the dbg tp picker, which
+lists every room the image holds). A cell that holds no scenery in the game data ("Sotha Sil,", "Mournhold, Royal
+Palace", "Vor Lair, Chambers of Alta Vor", "Vor Lair, Interior") is built as an empty room: a shell with no scenery,
+a box around its references, the start in its middle and its actors placed (`tools/chim_room_batches.py`
+`build_empty`).
 
 Each row also has `notes` (water, lava, Levitate-only, over the 16 MiB zone): those rooms are not set aside. A graph
 made before v0.0.48 that still lists water, lava or Levitate-only as hard reasons is read the same way.

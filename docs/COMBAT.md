@@ -1,6 +1,6 @@
 # Combat and the Vivec Arena minigame
 
-_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
+_Last updated with AmiWind v0.0.67 (19 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -271,6 +271,18 @@ your own master file when the image is built.
   and strength read from the game data (`textures\bm_player_hit_01`: dark red 129 0 0, a mean opacity of about 15 %
   of the screen). It fades over the same half second. Before v0.0.67 only a blow showed a flash, at a strength that
   a small hit barely moved.
+- Actors a script keeps out of the world (v0.0.67; fixed in source after the third snapshot, still to be seen in play): a person or creature its script has disabled starts no fight
+  and joins none (on sight, by a script's StartCombat, as a crime witness, as an ally or as a resumed fight), and its
+  wandering stops until a script enables it again; one disabled during a fight leaves it. The original takes a
+  disabled reference out of the scene (OpenMW `mwworld/worldimp.cpp` World::disable), so nothing fights it. Before,
+  only its model was taken off: the eight fabricants of Plaza Brindisi Dorom, which their own scripts disable until
+  the attack on the city begins, attacked a new player on sight and were drawn again for the fight.
+- A fight belongs to the actors in it (v0.0.67; fixed in source after the third snapshot, still to be seen in play): a map change (a door, a teleport, a load) drops the fights of the
+  map left before the new map's actors spawn; an actor of the old map that was fighting takes its fight up again
+  when the player returns to it, from its own entry in the world's change list. Before, the new map's actors that
+  took the fighters' places in memory attacked at once: after a fight in Plaza Brindisi Dorom, both Gaenors of the
+  Temple Courtyard, or two merchants of the Great Bazaar. `dbg combat` counts the fights refused for a disabled
+  actor and the fight slots dropped at map changes.
 
 ## Blocking
 

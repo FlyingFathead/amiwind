@@ -24,7 +24,7 @@
 | Persists in | v0.0.46, v0.0.48-dev2, v0.0.65 (last seen) |
 | Severity | high: the open world is empty of people and creatures; gameplay outdoors is missing |
 | Family | CHIM world streamer (`chim-streamer`) |
-| Deferred by the maintainer | 2026-11-16: deferred by the maintainer's release decision to v0.0.67 (v0.0.66 is made from its twelfth snapshot; the rest of the roadmap goes to later versions) |
+| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
 | Playtest version | v0.0.46 release |
 | From commit | source a3fb9b7, engine a3fb9b7, CHIM world a3fb9b7 |
@@ -56,7 +56,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-13: fixed in source: a gated commit, v0.0.66-dev2 (d3dc2493); a town map joins its own cells' creatures and levelled points from the actor table; tools/chim/actor_census_check.py stops a build whose placed counts per area fall short of the original: the 116 creature points of the Seyda Neen and Balmora cells are placed; a shortfall fails the build
 - 2026-11-13 10:28 +0200: seen again in v0.0.65: Seen again with v0.0.65: no mudcrabs or slaughterfish around Seyda Neen.
 - 2026-11-15: shipped: the v0.0.66-dev2 release build, v0.0.66-dev2 (3988c6e4, build 2026_11_14_v0.0.66-dev2_full); the delivered dev2 build holds the commit: a numbered build carries the fix
-- 2026-11-16: deferred by the maintainer: deferred by the maintainer's release decision to v0.0.67 (v0.0.66 is made from its twelfth snapshot; the rest of the roadmap goes to later versions)
+- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
 
 <!-- END GENERATED TIMELINE -->
 

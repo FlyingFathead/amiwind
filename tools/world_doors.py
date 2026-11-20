@@ -228,6 +228,44 @@ def holders_of(rows):
     return {row['reference']: (row['source'], row['holder'], row['frame']) for row in rows if 'source' in row}
 
 
+BORDER_REACH = 64.0     # map units: the use key's reach (aw_scene.c door_hit, 56 from the eye) and a margin
+CELL_MAP_UNITS = 2048.0  # one exterior cell in map units (8192 of the original's, SCALE)
+
+
+def border_copies(rows, door_bounds, frames, reach=BORDER_REACH):
+    """DISTRICT-GATE-ON-CELL-BORDER-67: a door row of the table for each neighbouring frame's bank whose cell the door
+    stands next to. A presented district (tools/presented_exterior.py) is a block of several exterior cells, and the
+    original's one cell has no inner border; a door on such a border belongs to the frame whose cell holds its
+    position, while the player in front of it may stand in the cell beside (Godsreach's gate to Plaza Brindisi Dorom,
+    reference 4219376: its box reaches 19 units into the northern cell, where the gate from the Plaza sets the player,
+    and its row was only in the southern frame's bank; the use key reads the bank of the frame the player stands in).
+    FRAMES: {(x, y): (map, origin)} of a module's own frames (tools/chim/layer_stores.py frame_holders); only rows held
+    by one of them as a region frame, whose door box (door_box, its mesh bounds DOOR_BOUNDS) comes within REACH of the
+    border to a neighbouring cell of FRAMES, get a copy for that neighbour: the same door, target, arrival, yaw and
+    label, its box in the neighbour's coordinates. [] without FRAMES (the base game's banks stay as they are)."""
+    by_map = {value[0]: (cell, value[1]) for cell, value in (frames or {}).items()}
+    out = []
+    for row in rows:
+        if row.get('kind') != 'door' or 'source' not in row or 'target' not in row or row.get('holder') != 'region':
+            continue
+        here = by_map.get(row['source'])
+        if here is None or row['reference'] not in door_bounds:
+            continue
+        (cx, cy), origin = here
+        low, high = door_box(door_bounds[row['reference']], 'region', origin, pad=0.)
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            other = frames.get((cx + dx, cy + dy))
+            if other is None:
+                continue
+            axis, step = (0, dx) if dx else (1, dy)
+            cell = (cx, cy)[axis]
+            near = (high[axis] + reach >= (cell + 1) * CELL_MAP_UNITS - origin[axis] if step > 0
+                    else low[axis] - reach <= cell * CELL_MAP_UNITS - origin[axis])
+            if near:
+                out.append(dict(row, source=other[0], frame=list(other[1]), border_copy_of=row['source']))
+    return out
+
+
 def apply(id1, rows, door_bounds):
     """Write the table into the image's door banks: a missing door gets its row, a row still "-" its target. door_bounds:
     {reference: original mesh bounds} (town_interiors.door_mesh_bounds). Markers are never written into a bank.
@@ -271,7 +309,8 @@ def apply(id1, rows, door_bounds):
                     filled += 1
                     dirty = True
                 continue
-            source_map, frame_kind, frame = holders[row['reference']]
+            # the row's own holder (a border copy's is its neighbour frame; for every other row the same as holders)
+            source_map, frame_kind, frame = row['source'], row['holder'], row['frame']
             box = door_box(door_bounds[row['reference']], frame_kind, frame, pad)
             label = row['destination_cell'] if row['direction'] != 'room_to_exterior' else EXTERIOR_LABEL
             lines.insert(len(lines) - 1, row_line(source_map, row['target'], row['reference'], box, row['arrival'],

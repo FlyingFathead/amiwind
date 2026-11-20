@@ -858,6 +858,25 @@ class Store:
                 'index_bytes': len(index), 'pack_bytes': sum(f['bytes'] for f in files)}
 
 
+def empty_room_input(work):
+    """The room input of an empty room (tools/chim_room_batches.py build_empty, its conversion record's form 'empty
+    room', ROOMS-SET-ASIDE-NOT-BUILT-67): no models and no placements, its box from its conversion record; None for
+    every other room (room_input makes those). (The form is written here, not as a module constant: no import-time
+    change for the other rooms' units.)"""
+    work = Path(work)
+    try:
+        conversion = json.loads((work / 'conversion.json').read_text())
+    except (OSError, ValueError):
+        return None
+    if conversion.get('form') != 'empty room':
+        return None
+    lo, hi = conversion['bounds']
+    spec = {'placements': [], 'variants': [], 'textures': {}, 'fallbacks': [], 'over_budget_tiles': {}}
+    return {'room': work.name, 'spec': spec, 'levels': {}, 'tints': {},
+            'bounds': (tuple(float(v) for v in lo), tuple(float(v) for v in hi)), 'cell': conversion.get('cell'),
+            'fallbacks': [], 'units': {}, 'timing': {}}
+
+
 def _room_task(task):
     """One room's input on a pool worker (its own unit cache handle on the shared cache folder and its own timer)."""
     from chim.units import Timer, UnitCache
@@ -867,8 +886,10 @@ def _room_task(task):
     kind = task[6] if len(task) > 6 else None
     cache, timer = UnitCache(Path(unit_cache)), Timer()
     try:
-        room = room_input(work, Path(palette).read_bytes(), qbsp, 1, cache, timer, Path(collision_cache), harvest,
-                          settings=kind[1] if kind else None)
+        room = empty_room_input(work)
+        if room is None:
+            room = room_input(work, Path(palette).read_bytes(), qbsp, 1, cache, timer, Path(collision_cache), harvest,
+                              settings=kind[1] if kind else None)
         if kind is not None:
             room['type'], room['type_default'] = kind[0], kind[2]
     except Exception as error:  # noqa: BLE001 (one room's failure costs that room only, named: CHIM-ROOM-FAIL-STAGE-48)
@@ -888,7 +909,9 @@ def room_cost(task):
     room's shell map holds no mesh, so its scenery export's size (the meshes its models are made from)."""
     work = Path(task[0])
     if (work / PLACEMENTS_FILE).is_file():
-        return (work / 'source/scenery.mwpak').stat().st_size
+        pack = work / 'source/scenery.mwpak'
+        return pack.stat().st_size if pack.is_file() else 0     # an empty room (empty_room_input): no export
+    return (work / 'room.bsp').stat().st_size
     return (work / 'room.bsp').stat().st_size
 
 

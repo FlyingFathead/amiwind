@@ -459,10 +459,11 @@ def interior_lines(doc):
         order.index(i) if i in order else len(order) - 1, i))}
     tot = ir.get('totals') or {}
     out = ['## Interiors', '',
-           'Every interior cell of the game has a room on the tracker, keyed by its cell ID: none is left out. A room '
-           'is in the game, not in the game yet, or set aside with its reason (a set-aside room keeps its state and is '
-           'converted in a later batch). Rooms are counted by the island their entrance is on; rooms with no entrance '
-           'area are counted on their own.', '']
+           'Every interior cell of the game has a room on the tracker, keyed by its cell ID: none is left out, and none '
+           'is set aside: a room no door leads to is a room to build, with what leads there. A room is in the game when '
+           'it is built and its way in is found (a door, or the script or dialogue line that names it); a district '
+           'built as open terrain is in the game. Rooms are counted by the island their entrance is on; rooms with no '
+           'entrance area are counted on their own.', '']
     if tot:
         out += ['**%s rooms: %s.**' % (n(tot.get('total', 0)), '; '.join(
             '%s %s' % (g['label'].lower(), n((tot.get('groups') or {}).get(g['id'], 0))) for g in groups)), '']

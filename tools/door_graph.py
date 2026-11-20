@@ -7,9 +7,9 @@ your own Morrowind.esm and, when present, Tribunal.esm and Bloodmoon.esm (a miss
 error: docs/ROADMAP.md step 7), merges them in load order as the game does, and writes one JSON (format
 aw-door-graph-1): every load door (exterior to interior, interior to interior, interior to exterior), and per
 interior cell its master, its island (Vvardenfell, Solstheim, Mournhold or none), its entrances and exits, how it is
-reached, and the hard cases a batch conversion sets aside (lava at or under the water, over a CHIM room limit on the
-32 MiB minimum machine, behaves like an exterior; teleport-only and unreachable go to the parity batch). Water, lava,
-Levitate-only and over the 16 MiB zone are notes: those rooms are converted like any room (v0.0.48).
+reached, and its notes. No room is set aside (v0.0.67, ROOMS-SET-ASIDE-NOT-BUILT-67: every space of every master is
+built): unreachable, teleport-only, behaves like an exterior and over a CHIM room limit are notes like water, lava,
+Levitate-only and over the 16 MiB zone (v0.0.48); the rooms no door reaches are the parity batch of their master.
 
     python3 tools/door_graph.py graph --data-files DIR --out GRAPH.json [--mesh-cache FILE] [--sdk DIR] [--jobs N]
         parse the masters (every core: each master is cut into record ranges parsed side by side) and write the
@@ -76,10 +76,14 @@ LEVITATE_TOWER_STEP = 512.0
 LEVITATE_TOWER_TOP = 3072.0
 TELVANNI_SHARE = 0.25              # share of the room's architecture placements from the Telvanni interior kit
 TELVANNI_KIT = re.compile(r'(^|/)in_t_')
-# What sets a room aside (v0.0.48, the maintainer's decisions of 23 October 2026: water, lava and Levitate-only rooms
-# are converted like any room and keep a note; the size limit is the zone of the 32 MiB minimum machine)
-HARD_REASONS = ('unreachable', 'teleport_only', 'behaves_exterior', 'lava_under_water', 'over_limit')
-NOTES = ('levitate_only', 'water', 'lava', 'zone_over_16mb', 'behaves_exterior')
+# What sets a room aside: nothing (ROOMS-SET-ASIDE-NOT-BUILT-67, the maintainer's rule of 19 November 2026: if a place
+# is in the game, it is in the game; a room no door leads to is still built). The reasons that set a room aside until
+# v0.0.67 are notes now, like water, lava and Levitate-only since the decisions of 23 October 2026: every room is in a
+# batch of the plan. A graph made before keeps them on its `hard` list; every reader takes them as notes.
+HARD_REASONS = ()
+SET_ASIDE_BEFORE = ('unreachable', 'teleport_only', 'behaves_exterior', 'over_limit')
+NOTES = ('levitate_only', 'water', 'lava', 'zone_over_16mb', 'behaves_exterior', 'unreachable', 'teleport_only',
+         'over_limit', 'lava_under_water')
 ROOM_STATES = ('on_chim_rooms', 'room_map', 'converted', 'not_started', 'hard_case', 'test_cell', 'teleport_only',
                'no_entrance')
 TOWN_MIN_ROOMS = 4                 # a named exterior cell with fewer rooms behind its doors is not a town (batch plan)
@@ -220,6 +224,21 @@ def parse_cell(payload, flags):
             'deleted': bool(flags & 0x20) or 'DELE' in header, 'refs': refs}
 
 
+# What moves the player into a cell by its name (DOOR-GRAPH-CELL-TEST-AS-TELEPORT-67): PositionCell in a script or a
+# dialogue result ("Player->PositionCell -50, -124, -37, 90 "Sotha Sil, Outer Flooded Halls""), the cell its last
+# argument names, quoted or not. A cell name in a test (GetPCCell "Sotha Sil," == 1) or anywhere else moves no one and
+# is no way in.
+MOVE_QUOTED = re.compile(r'\bpositioncell\b[^"\n;]*"([^"\n]+)"', re.I)
+MOVE_BARE = re.compile(r'\bpositioncell\b\s*,?\s*(?:[-+]?[\w.]+\s*,?\s*){4}([^\s",;][^\s",;]*)\s*$', re.I | re.M)
+
+
+def moves_to(text):
+    """{cell name casefold} that TEXT (a script's source or a dialogue result) moves the player or an actor into."""
+    out = {m.casefold() for m in MOVE_QUOTED.findall(text or '')}
+    out |= {m.casefold() for m in MOVE_BARE.findall(text or '')}
+    return out
+
+
 def parse_range(task):
     """Worker: the objects, scripts, quoted cell names and cells of one record range of one master."""
     import lava
@@ -240,12 +259,15 @@ def parse_range(task):
                 objects[key] = None
                 continue
             objects[key] = [tag, normmodel(cstr(s.get('MODL', b''))), cstr(s.get('SCRI', b'')).casefold()]
+            if tag == 'NPC_':
+                # a travel service moves the player to its destinations; an interior one names its cell (DNAM)
+                quoted.update(cstr(v).casefold() for k, v in subrecords(payload) if k == 'DNAM' and cstr(v))
         elif tag == 'SCPT':
             s = {}
             for k, v in subrecords(payload):
                 s.setdefault(k, v)
             text = s.get('SCTX', b'').decode('cp1252', 'replace')
-            quoted.update(q.casefold() for q in re.findall(r'"([^"\n]+)"', text))
+            quoted.update(moves_to(text))
             name = cstr(s.get('SCHD', b'')[:32]).casefold()
             dps, _sound = lava.script_contract(text)
             if name and dps > 0:
@@ -253,7 +275,7 @@ def parse_range(task):
         elif tag == 'INFO':
             for k, v in subrecords(payload):
                 if k == 'BNAM':
-                    quoted.update(q.casefold() for q in re.findall(r'"([^"\n]+)"', v.decode('cp1252', 'replace')))
+                    quoted.update(moves_to(v.decode('cp1252', 'replace')))
         elif tag == 'CELL':
             c = parse_cell(payload, flags)
             if c is not None:
@@ -790,22 +812,23 @@ def build_graph(data_files, jobs=None, mesh_cache=None, warn=print, engine_sourc
             room['fits_16mb'] = sizes['need_bytes'] <= limits['zone_room_bytes']
         room['over_limit'] = over_limit(room, limits, sizes)
         hard, notes = [], []
-        if inf['access'] == 'unreachable':
-            hard.append('unreachable')
-        if inf['access'] == 'teleport_only':
-            hard.append('teleport_only')
+        # A room no door reaches (no door and no script: unreachable; a script or a dialogue line sends the player
+        # there: teleport_only) is built like any room, in its master's parity batch (ROOMS-SET-ASIDE-NOT-BUILT-67,
+        # the maintainer's rule of 19 November 2026): a note of what leads there, never a reason to leave it out
+        if inf['access'] in PARITY_REASONS:
+            notes.append(inf['access'])
         # Levitate-only, water and lava rooms are converted like any room (the maintainer's decisions of 23 October
         # 2026: CHIM rooms carry their water and lava; a Levitate-only room is in, not reachable on foot until the
         # spell exists): notes, not hard cases
         if inf['access'] == 'door' and k not in on_foot:
             notes.append('levitate_only')
         if room['behaves_exterior']:
-            # INTERIOR-NO-AMBI-66: a cell flagged "behave like exterior" (Tribunal's Mournhold plazas) is an exterior
+            # INTERIOR-NO-AMBI-66: a cell flagged "behave like exterior" (Tribunal's Mournhold districts) is an exterior
             # for the original and the reference engine: no AMBI, lit by the region's weather and the moving sun
-            # (OpenMW scene.cpp configureAmbient only for !quasi-exterior; worldimp.cpp updateWeather). It is not a
-            # room: the room stages leave it out and list it, waiting for the Mournhold exterior work. No cell of the
+            # (OpenMW scene.cpp configureAmbient only for !quasi-exterior; worldimp.cpp updateWeather). It is in its
+            # batch like any room; the builder builds it as open terrain with the district module (tools/
+            # tribunal_mournhold.py; tools/chim_room_batches.py exterior_like_rooms hands it there). No cell of the
             # base game carries the flag, so the base plan is unchanged.
-            hard.append('behaves_exterior')
             notes.append('behaves_exterior')
         if water:
             notes.append('water')
@@ -819,7 +842,8 @@ def build_graph(data_files, jobs=None, mesh_cache=None, warn=print, engine_sourc
                 notes.append('lava_under_water')
                 room['lava_under_water'] = under
         if room['over_limit']:
-            hard.append('over_limit')
+            # built like any room: a room over a CHIM room limit fails its own room unit loudly, never a silent gap
+            notes.append('over_limit')
         if room.get('fits_16mb') is False:
             notes.append('zone_over_16mb')        # loads with the 32 MB machine's bank, not on 16 MB
         room['hard'] = hard
@@ -878,16 +902,26 @@ def our_rooms(config_dir):
     return cell_progress.our_maps(config_dir)
 
 
+def access_reasons(room):
+    """The reasons that set a room aside until v0.0.67 (SET_ASIDE_BEFORE), in order: on the `hard` list of a graph made
+    before, among the `notes` since. They say what leads there or what to watch, and never leave a room out."""
+    out = []
+    for x in list(room.get('hard') or ()) + list(room.get('notes') or ()):
+        if x in SET_ASIDE_BEFORE and x not in out:
+            out.append(x)
+    return out
+
+
 def parity_state(room):
     """The state of a room no door reaches (test_cell, teleport_only, no_entrance), else None."""
-    hard = room.get('hard') or ()
-    if 'behaves_exterior' in hard:
-        return None        # an exterior-like cell is no room at all (INTERIOR-NO-AMBI-66): set aside, never parity
-    if not any(h in hard for h in PARITY_REASONS):
+    reasons = access_reasons(room)
+    if 'behaves_exterior' in reasons:
+        return None        # a district: batched like any room, built as open terrain by the district module
+    if not any(h in reasons for h in PARITY_REASONS):
         return None
     if room['name'].casefold() in TEST_CELLS:
         return 'test_cell'
-    return 'teleport_only' if 'teleport_only' in hard else 'no_entrance'
+    return 'teleport_only' if 'teleport_only' in reasons else 'no_entrance'
 
 
 def in_vvardenfell_plan(room):
@@ -911,7 +945,7 @@ def parity_order(room):
 
 def parity_rows(rooms):
     return [{'room': r['name'], 'state': parity_state(r), 'label': PARITY_STATES[parity_state(r)],
-             'reasons': list(r['hard']), 'master': r['master'], 'island': r['island']}
+             'reasons': access_reasons(r), 'master': r['master'], 'island': r['island']}
             for r in sorted(rooms, key=parity_order)]
 
 
@@ -937,13 +971,15 @@ def plan(graph, config_dir=None, batch_rooms=40, chim_rooms=(), layers=()):
             base['later'] = [b for b in base['later'] if b['master'] != master]
             base['summary']['later'].pop(LATER[master][0], None)
             base['summary']['batches'] = len(base['batches'])
-            # the layer's rooms left out (exterior-like cells and the other hard cases), listed with their master
+            # nothing of the layer is left out (ROOMS-SET-ASIDE-NOT-BUILT-67); its districts are listed with how they
+            # are built (in their batch; the builder makes them open terrain with the district module)
             for row in part['aside']:
                 base['aside'].append(dict(row, master=master))
-                if 'behaves_exterior' in row['reasons']:
+            for r in sub['rooms']:
+                if 'behaves_exterior' in access_reasons(r):
                     base.setdefault('exterior_like', []).append(
-                        {'cell': row['room'], 'master': master,
-                         'state': 'an exterior-like cell, waiting for the Mournhold exterior work'})
+                        {'cell': r['name'], 'master': master,
+                         'state': 'a district, built as open terrain by the district module'})
             base['summary'].setdefault('layers', {})[LATER[master][0]] = part['summary']['rooms']
         base['layers'] = list(layers)
         return base
@@ -952,9 +988,11 @@ def plan(graph, config_dir=None, batch_rooms=40, chim_rooms=(), layers=()):
     # Vvardenfell: the rooms whose door chain starts there, and the base game's rooms with no island (reached by
     # script or not at all: they can only be hard cases).
     rooms = [r for r in graph['rooms'] if in_vvardenfell_plan(r) or graph.get('_layer')]
-    ready = [r for r in rooms if not r['hard']]
+    # every room is in a batch (ROOMS-SET-ASIDE-NOT-BUILT-67): a graph's `hard` list, from a graph made before
+    # v0.0.67, is read as notes; the rooms no door reaches keep their final parity batch, so no other room moves
     parity = [r for r in rooms if parity_state(r)]
-    aside = [r for r in rooms if r['hard'] and not parity_state(r)]
+    ready = [r for r in rooms if not parity_state(r)]
+    aside = []
     # A town: a named exterior cell with at least TOWN_MIN_ROOMS rooms behind its doors (a lone named ruin or
     # tomb goes with its region).
     size = collections.Counter(r['settlement'] for r in rooms if r['settlement'])
@@ -1023,11 +1061,9 @@ def plan(graph, config_dir=None, batch_rooms=40, chim_rooms=(), layers=()):
                          key=lambda r: r['name'].casefold())
         if not members:
             continue
-        held = [r for r in members if r['hard'] and not parity_state(r)]
         later.append({'batch': 'later: ' + island, 'island': island, 'master': master, 'waits_for': why,
                       'rooms': [r['name'] for r in members],
-                      'ready': sum(1 for r in members if not r['hard']), 'aside': len(held),
-                      'aside_reasons': dict(sorted(collections.Counter(h for r in held for h in r['hard']).items())),
+                      'ready': sum(1 for r in members if not parity_state(r)), 'aside': 0, 'aside_reasons': {},
                       'parity': parity_rows([r for r in members if parity_state(r)])})
     return {'format': PLAN_FORMAT, 'generator': 'tools/door_graph.py plan', 'graph_masters': graph['masters'],
             'island': 'Vvardenfell', 'batch_rooms': batch_rooms,

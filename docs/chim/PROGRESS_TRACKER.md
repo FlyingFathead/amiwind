@@ -1,11 +1,12 @@
 # CHIM Progress Tracker
 
-_Last updated with AmiWind v0.0.67-dev3 (19 November 2026)._
+_Last updated with AmiWind v0.0.67 (19 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [Current state](#current-state)
+  - [Ready, per land](#ready-per-land)
   - [Exterior cells, per land](#exterior-cells-per-land)
   - [Interiors, per land](#interiors-per-land)
   - [Scripting](#scripting)
@@ -23,6 +24,8 @@ _Last updated with AmiWind v0.0.67-dev3 (19 November 2026)._
 - [Legend checkboxes and presets](#legend-checkboxes-and-presets)
 - [The map view](#the-map-view)
 - [The expansion views: Solstheim and Mournhold](#the-expansion-views-solstheim-and-mournhold)
+- [Ready, per land: one count for every land](#ready-per-land-one-count-for-every-land)
+- [Completion per game: Tribunal, Bloodmoon, Morrowind](#completion-per-game-tribunal-bloodmoon-morrowind)
 - [Interiors: every room on the tracker](#interiors-every-room-on-the-tracker)
 - [Included in build: what each packaged build holds](#included-in-build-what-each-packaged-build-holds)
 - [Track your own build and compare with the project](#track-your-own-build-and-compare-with-the-project)
@@ -43,7 +46,22 @@ _Last updated with AmiWind v0.0.67-dev3 (19 November 2026)._
 
 <!-- BEGIN GENERATED CURRENT STATE: from docs/chim/progress-state.json and docs/mwscript-features.json; run python3 tools/cell_progress_state.py render -->
 
-_Counted from the tracker data generated 2026-11-17: newest ingested build **v0.0.66 (ad5e9a0a)**, built 2026-11-14; the version in development, 0.0.67-dev3, has no ingested build yet, so these are the figures of the newest ingested one. Every number below is read from that data and from the MWScript tracker when this block is rendered; none is typed by hand._
+_Counted from the tracker data generated 2026-11-19: newest ingested build **v0.0.67 (2b086671)**, built 2026-11-18. Every number below is read from that data and from the MWScript tracker when this block is rendered; none is typed by hand._
+
+### Ready, per land
+
+Ready = in the game on CHIM, the same for every land. Open terrain: the land's exterior cells of land or empty sea (open ocean and cells beyond the world's edge are not counted), ready when the newest ingested build holds the cell on CHIM and no audit of it failed. Rooms: every interior cell, counted for the land of its master, ready when it is in the game on CHIM rooms; a district the land presents as open terrain is counted once, under open terrain. Everything else is not ready, with its reason; a room no door leads to is a room still to build, never left out.
+
+| Land | Open terrain ready | Rooms ready | Total ready |
+| :-- | --: | --: | --: |
+| Vvardenfell (main game) | 1,390 of 1,390 (100.0 %) | 1,129 of 1,131 (99.8 %) | 2,519 of 2,521 (99.9 %) |
+| Solstheim (Bloodmoon) | 0 of 144 (0.0 %) | 99 of 101 (98.0 %) | 99 of 245 (40.4 %) |
+| Mournhold (Tribunal) | 11 of 11 (100.0 %) | 89 of 91 (97.8 %) | 100 of 102 (98.0 %) |
+| **All lands** | 1,401 of 1,545 (90.7 %) | 1,317 of 1,323 (99.5 %) | **2,718 of 2,868 (94.8 %)** |
+
+- Vvardenfell: not ready: rooms: in the game as a room map of our own, not on CHIM rooms 2. The rooms: Imperial Prison Ship; Seyda Neen, Census and Excise Office.
+- Solstheim: not ready: open terrain: not in the game yet (Solstheim) 144; rooms: still to build: no door leads there, and no script or dialogue line names it 2. The rooms: Vor Lair, Chambers of Alta Vor; Vor Lair, Interior.
+- Mournhold: not ready: rooms: still to build: no door leads there, a script or a dialogue line sends the player there 1; rooms: still to build: no door leads there, and no script or dialogue line names it 1. The rooms: Sotha Sil,; Mournhold, Royal Palace. Counted once, as open terrain: Mournhold, Godsreach; Mournhold, Great Bazaar; Mournhold, Plaza Brindisi Dorom; Mournhold, Royal Palace: Courtyard; Mournhold, Temple Courtyard.
 
 ### Exterior cells, per land
 
@@ -53,9 +71,9 @@ The tracker draws the open world as one square per cell. "On CHIM" counts what a
 | :-- | --: | --: | --: | --: | --: | --: | --: |
 | Vvardenfell (main game) | 1,292 land + 116 sea cells | 1,390 of 1,390 (100.0 %) | 0 | 0 | 817 | 376 | 0 |
 | Solstheim (Bloodmoon) | 0 land + 1 sea cells | 0 of 144 (0.0 %) | 0 | 0 | 0 | 0 | 144 |
-| Mournhold (Tribunal) | no exterior cells in the tracker data |  |  |  |  |  |  |
+| Mournhold (Tribunal) | 11 land + 0 sea cells | 11 of 11 (100.0 %) | 0 | 0 | 10 | 1 | 0 |
 
-Every cell of the tracker in three groups: **in the game 1,409**, not in the game yet 153, settled (beyond the world's edge, nothing to build) 749; accounted for 2,158 of 2,311.
+Every cell of the tracker in three groups: **in the game 1,420**, not in the game yet 153, settled (beyond the world's edge, nothing to build) 749; accounted for 2,169 of 2,322.
 
 None of Solstheim's land cells is on CHIM in this build.
 
@@ -69,22 +87,24 @@ None of Solstheim's land cells is on CHIM in this build.
 | No entrance area | 16 | 13 | 0 | 0 | 0 | 3 |
 | All | 1,328 | 1,317 | 2 | 0 | 5 | 4 |
 
+This table counts every room of the door graph by the island its entrance is on, the districts among them. The Ready table above counts each room for its master's land, and the 5 districts a land presents as open terrain once, as open terrain; the rooms no door leads to are rooms still to build, not ready.
+
 Set aside: teleport only 1, no entrance, no script 3. Reasons (a room can have two): teleport only 1, unreachable 3.
 Rooms that are in the game as room maps of our own, not as CHIM rooms: Imperial Prison Ship; Seyda Neen, Census and Excise Office. The builder converts them from the original cells into regular Quake maps with the opening sequence's own markers, and counts them as in the game; they stay room maps until CHIM rooms keep object state.
 
-- later: Mournhold (Tribunal.esm): Mournhold is reached by script (Tribunal's teleport): its rooms are batched with plan --layers (the Tribunal layer, CHIM-SOL-FLORA-PATH-65).
-- later: Solstheim (Bloodmoon.esm): Solstheim's rooms (Bloodmoon) are batched with plan --layers (the Bloodmoon layer, beside its exterior cells, CHIM-SOL-FLORA-PATH-65).
+- Mournhold (Tribunal.esm): 87 of its 93 rooms are in the game on CHIM rooms; 5 not started yet.
+- Solstheim (Bloodmoon.esm): 96 of its 96 rooms are in the game on CHIM rooms; 0 not started yet.
 
 ### Scripting
 
-Counted from the MWScript tracker ([MWScript features](../MWSCRIPT_FEATURES.md)), measured 19 November 2026 for AmiWind v0.0.67-dev3 with the builder's own compiler: 620 of the 1,074 scripts the original game uses run as scripts or are carried by AmiWind's own code (611 run, 9 carried); 9,095 script records are bound to placed objects.
+Counted from the MWScript tracker ([MWScript features](../MWSCRIPT_FEATURES.md)), measured 19 November 2026 for AmiWind v0.0.67 with the builder's own compiler: 934 of the 1,074 scripts the original game uses run as scripts or are carried by AmiWind's own code (925 run, 9 carried); 11,542 script records are bound to placed objects.
 
 | State | Scripts |
 | :-- | --: |
-| runs | 611 |
+| runs | 925 |
 | carried by AmiWind's own code | 9 |
-| uses a function the interpreter lacks | 21 |
-| only in an add-on world | 433 |
+| uses a function the interpreter lacks | 2 |
+| only in an add-on world | 138 |
 
 133 more scripts are never named by anything in the original game (test and example scripts, replaced versions, cut content) and are listed apart on that page.
 
@@ -92,74 +112,78 @@ Counted from the MWScript tracker ([MWScript features](../MWSCRIPT_FEATURES.md))
 
 Cells on CHIM (land + sea) in each ingested build since v0.0.49, from the tracker data; older builds are in the history of this page and on the [cell tracker](CELL_TRACKER.md).
 
-| Build | Built | Vvardenfell | Solstheim | All cells on CHIM |
-| :-- | --: | --: | --: | --: |
-| v0.0.66 (ad5e9a0a) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.66-dev9 (803f83cd) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.66-dev8 (3a64d00e) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.66-dev7 (a33bba98) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.66-dev6 (629a2dbd) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.66-dev5 (1427e0da) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.66-dev4 (010ce4a9) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.66-dev3 (c0ab8f11) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.66-dev2 (3988c6e4) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.66-dev12 (ac37e80b) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.66-dev11 (26ed570f) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.66-dev10 (f446092e) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.66-dev1 (662ffae6) | 2026-11-13 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.65-rc4 (51221ddb) | 2026-11-11 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.65-rc2 (6f00103b) | 2026-11-11 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.65 (9bd80ee1) | 2026-11-11 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.65 (20c6b9c6) | 2026-11-11 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.64 (b3dc0a2b) | 2026-11-11 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.64-dev4 (dbe3869b) | 2026-11-10 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.64-dev3 (bf2743fa) | 2026-11-10 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.64-dev2 (874440d3) | 2026-11-09 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.64-dev1 (4bd67418) | 2026-11-09 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.63 (84bc6f57) | 2026-11-09 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.63-dev5 (5a4c4720) | 2026-11-09 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.63-dev4 (1ba2e352) | 2026-11-09 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.63-dev3 (6e680965) | 2026-11-09 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.63-dev2 (d2c64081) | 2026-11-09 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.63-dev1 (dc356e39) | 2026-11-09 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.62 (1d5eda8b) | 2026-11-07 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.62-dev1 (089421bf) | 2026-11-07 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.61 (1a0640a3) | 2026-11-06 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.61-dev3 (ad4f9501) | 2026-11-06 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.61-dev2 (cf155318) | 2026-11-06 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.61-dev2 (afa644d4) | 2026-11-06 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.61-dev1 (ef794b33) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.61-dev1 (be26b03b) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.61-dev1 (66d0ed70) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.61-dev1 (374d59b1) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.60 (1fed45df) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.60-dev4 (bbf3ba8f) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.60-dev3 (bcf788db) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.60-dev2 (d2388458) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.60-dev1 (e61a8b94) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.60-dev1 (e4f5aa97) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.59 (feaee79e) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.59-dev6 (dd81a5b3) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.59-dev6 (52aaeae1) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.59-dev5 (f08583e0) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.59-dev4 (ca347985) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.59-dev3 (0ce27527) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.59-dev1 (41bea321) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.58 (b370794e) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.58-dev6 (7a2c5935) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.58-dev5 (2fb3bf49) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.58-dev4 (9155d6d6) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.58-dev3 (738edf26) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.58-dev2 (25a8ddbc) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.58-dev1 (3d610fa9) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.57 (7ff625e5) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.57-dev5 (095612e9) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.57-dev4 (c53994d6) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.57-dev3 (8297a0b4) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.57-dev2 (d725e23a) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.57-dev1 (efc9db36) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.57-dev1 (4f112b16) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 1,409 |
-| v0.0.56 release, Some Velvet Morning (b213657) | 2026-10-28 | 1,292 + 116 | 0 + 1 | 1,409 |
+| Build | Built | Vvardenfell | Solstheim | Mournhold | All cells on CHIM |
+| :-- | --: | --: | --: | --: | --: |
+| v0.0.67 (2b086671) | 2026-11-18 | 1,292 + 116 | 0 + 1 | 11 + 0 | 1,420 |
+| v0.0.67-dev3 (a375b13f) | 2026-11-18 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.67-dev2 (0d6f7ab7) | 2026-11-17 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.67-dev1 (eb5f8d83) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.66 (ad5e9a0a) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.66-dev9 (803f83cd) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.66-dev8 (3a64d00e) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.66-dev7 (a33bba98) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.66-dev6 (629a2dbd) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.66-dev5 (1427e0da) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.66-dev4 (010ce4a9) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.66-dev3 (c0ab8f11) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.66-dev2 (3988c6e4) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.66-dev12 (ac37e80b) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.66-dev11 (26ed570f) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.66-dev10 (f446092e) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.66-dev1 (662ffae6) | 2026-11-13 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.65-rc4 (51221ddb) | 2026-11-11 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.65-rc2 (6f00103b) | 2026-11-11 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.65 (9bd80ee1) | 2026-11-11 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.65 (20c6b9c6) | 2026-11-11 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.64 (b3dc0a2b) | 2026-11-11 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.64-dev4 (dbe3869b) | 2026-11-10 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.64-dev3 (bf2743fa) | 2026-11-10 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.64-dev2 (874440d3) | 2026-11-09 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.64-dev1 (4bd67418) | 2026-11-09 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.63 (84bc6f57) | 2026-11-09 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.63-dev5 (5a4c4720) | 2026-11-09 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.63-dev4 (1ba2e352) | 2026-11-09 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.63-dev3 (6e680965) | 2026-11-09 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.63-dev2 (d2c64081) | 2026-11-09 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.63-dev1 (dc356e39) | 2026-11-09 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.62 (1d5eda8b) | 2026-11-07 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.62-dev1 (089421bf) | 2026-11-07 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.61 (1a0640a3) | 2026-11-06 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.61-dev3 (ad4f9501) | 2026-11-06 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.61-dev2 (cf155318) | 2026-11-06 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.61-dev2 (afa644d4) | 2026-11-06 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.61-dev1 (ef794b33) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.61-dev1 (be26b03b) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.61-dev1 (66d0ed70) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.61-dev1 (374d59b1) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.60 (1fed45df) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.60-dev4 (bbf3ba8f) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.60-dev3 (bcf788db) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.60-dev2 (d2388458) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.60-dev1 (e61a8b94) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.60-dev1 (e4f5aa97) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.59 (feaee79e) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.59-dev6 (dd81a5b3) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.59-dev6 (52aaeae1) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.59-dev5 (f08583e0) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.59-dev4 (ca347985) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.59-dev3 (0ce27527) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.59-dev1 (41bea321) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.58 (b370794e) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.58-dev6 (7a2c5935) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.58-dev5 (2fb3bf49) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.58-dev4 (9155d6d6) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.58-dev3 (738edf26) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.58-dev2 (25a8ddbc) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.58-dev1 (3d610fa9) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.57 (7ff625e5) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.57-dev5 (095612e9) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.57-dev4 (c53994d6) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.57-dev3 (8297a0b4) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.57-dev2 (d725e23a) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.57-dev1 (efc9db36) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.57-dev1 (4f112b16) | 2026-10-30 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
+| v0.0.56 release, Some Velvet Morning (b213657) | 2026-10-28 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
 
 The tracker data holds no ingested build between v0.0.47 and v0.0.56; the figures of v0.0.48 are in the history table below.
 
@@ -331,6 +355,53 @@ expansion shows no view and no figures for it.
   so the expansions are never mixed into the base game's figure.
 The code is `amiwind-toolkit/expansion-views.js` (pure functions, checked by `tests/test_expansion_views.js`); the
 page wiring is in `world-map.html`.
+
+## Ready, per land: one count for every land
+
+The headline above the Toolkit's map, the Ready table at the top of this page's current state and the README's progress
+line all show the same three columns for every land: **open terrain ready**, **rooms ready** and **total ready**, then one
+line for all lands together. They come from one generator, `tools/master_completion.py`, which the tracker ingest runs
+and whose result the tracker data keeps as `readiness`; the Toolkit draws that and never counts on its own (for older
+data without it, it counts by the same rules, and `tests/test_master_completion.py` checks that both agree).
+
+- **Ready** means in the game on CHIM, the same for every land.
+- **Open terrain** is the land's exterior cells of land or empty sea; the open ocean and the cells beyond the world's
+  edge are not counted. A cell is ready when the newest ingested build holds it on CHIM and no audit of it failed.
+- **Rooms** are every interior cell of the game, counted for the land of its master (Tribunal: Mournhold, Bloodmoon:
+  Solstheim, the base game: Vvardenfell; a base-game room on Solstheim counts for Solstheim, and a room with no entrance
+  area counts for its master's land). A room is ready when it is in the game on CHIM rooms. A district a land presents
+  as open terrain (Mournhold's five districts) is counted once, under open terrain.
+- **Not ready** is everything else, each with its reason: a room map of our own (in the game, not on CHIM rooms),
+  converted but not in the game yet, not started, and a room no door leads to, which is a room still to build (with what
+  leads there: a script, a dialogue line, or nothing found), never left out of the count.
+- The approval and lighting audit figures (fully approved cells and terrain, awaiting lighting, eligible for the next
+  release) stay on the line under each land, apart from the readiness count.
+
+`python3 tools/cell_progress_state.py readme-line` prints the README's line from the same snapshot.
+
+## Completion per game: Tribunal, Bloodmoon, Morrowind
+
+Under the view switch, the World Map has a **Completion per game** panel, Tribunal first, then Bloodmoon and Morrowind.
+For the chosen game it gives, by number, with every count opening the list behind it:
+
+1. **Cells and rooms:** the readiness count above, the rooms not ready by name and reason, and the districts counted as
+   open terrain.
+2. **Scripts:** the game file's scripts by state (runs, carried by AmiWind's own code, uses a function the interpreter
+   lacks, only in an add-on world, named by nothing), each by name, from the [MWScript tracker](../MWSCRIPT_FEATURES.md)
+   with its states worked out again from the interpreter's function table; a script that lacks a function names it.
+3. **Variables:** the game file's globals, its journal topics, and how many of them the save's state table carries and
+   keeps: not measured yet; no measuring step counts them yet.
+4. **Things placed, by kind** (people, creatures, items, containers, doors, activators, lights): how many the original
+   places in the land's own cells (the census of the masters); in the game, keyed in the save's change list and
+   aimable: not measured yet.
+5. **Start scripts** and their state.
+6. **Exits and entrances:** the load doors in the land's cells, how many have a door back and which do not (the census
+   door records), whether the build's door tables carry them (not measured yet), and the rooms no door leads to with what
+   leads there.
+
+The data is the tracker's `completion` section (`tools/master_completion.py`, written by the ingest); the page code is
+`amiwind-toolkit/completion-panel.js`, checked by `tests/test_completion_panel.js`. What no source measures yet says
+"not measured yet" with the work item that will measure it, never a guess.
 
 ## Interiors: every room on the tracker
 

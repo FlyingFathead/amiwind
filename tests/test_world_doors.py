@@ -146,6 +146,61 @@ class Apply(unittest.TestCase):
             self.assertNotIn(5, parsed)
 
 
+class BorderCopies(unittest.TestCase):
+    """DISTRICT-GATE-ON-CELL-BORDER-67: Godsreach (cells -12,-30 and -12,-29, frames mh0000 and mh0001, centred origins)
+    as the v0.0.67-dev3 image's banks have it: its gate to the Plaza (4219376) stands on the border, its row only in
+    mh0000's bank, while the gate from the Plaza sets the player at -690 -1018 in mh0001."""
+    FRAMES = {(-12, -30): ('mh0000', [-23552.0, -60416.0, 0.0]), (-12, -29): ('mh0001', [-23552.0, -58368.0, 0.0])}
+
+    @staticmethod
+    def bounds(origin, low, high):
+        # mesh bounds in original units that give the bank's box in the frame of ORIGIN (door_box: x .25 - origin)
+        return [[(low[k] + origin[k]) * 4 for k in range(3)], [(high[k] + origin[k]) * 4 for k in range(3)]]
+
+    def setUp(self):
+        south, north = self.FRAMES[(-12, -30)][1], self.FRAMES[(-12, -29)][1]
+        self.door_bounds = {
+            4219376: self.bounds(south, (-729.96893, 995.73703, 19.87399), (-714.24203, 1042.74357, 90.05164)),
+            4215142: self.bounds(south, (-247.64070, 834.30724, 58.09289), (-236.24391, 875.27305, 108.01289)),
+            4219377: self.bounds(north, (595.71791, -1046.21854, 19.87834), (611.44483, -999.21200, 90.05598))}
+        row = {'kind': 'door', 'direction': 'exterior_to_exterior', 'holder': 'region', 'yaw': 315.0}
+        self.rows = [
+            dict(row, reference=4219376, source='mh0000', frame=list(south), target='mh0004', arrival=[256.0, 401.0, 86.875],
+                 destination_cell='Mournhold, Plaza Brindisi Dorom', source_cell='Mournhold, Godsreach'),
+            dict(row, reference=4215142, source='mh0000', frame=list(south), target='ri53c6526d53',
+                 arrival=[-0.40105, 32.81609, 5.35036], direction='exterior_to_room',
+                 destination_cell='Mournhold, Museum of Artifacts', source_cell='Mournhold, Godsreach'),
+            dict(row, reference=4219377, source='mh0001', frame=list(north), target='mh0007', arrival=[-71.5, 352.25, 70.875],
+                 destination_cell='Mournhold, Temple Courtyard', source_cell='Mournhold, Godsreach', yaw=60.0)]
+
+    def test_the_gates_on_the_inner_border_get_a_row_in_the_bank_beside(self):
+        copies = world_doors.border_copies(self.rows, self.door_bounds, self.FRAMES)
+        self.assertEqual(sorted((c['reference'], c['border_copy_of'], c['source']) for c in copies),
+                         [(4219376, 'mh0000', 'mh0001'), (4219377, 'mh0001', 'mh0000')])   # not the museum door
+        self.assertEqual(world_doors.border_copies(self.rows, self.door_bounds, {}), [])      # the base game: none
+        with tempfile.TemporaryDirectory() as tmp:
+            id1 = Path(tmp)
+            for name in ('mh0000', 'mh0001'):
+                (id1 / ('doors-%s.txt' % name)).write_text('AWD3\n', encoding='cp1252')
+            world_doors.apply(id1, self.rows + copies, self.door_bounds)
+            north = {int(p[0][2]): p for p in map(parse_row, (id1 / 'doors-mh0001.txt').read_text(
+                encoding='cp1252').split('\n')) if p}
+            south = {int(p[0][2]): p for p in map(parse_row, (id1 / 'doors-mh0000.txt').read_text(
+                encoding='cp1252').split('\n')) if p}
+        self.assertEqual(sorted(north), [4219376, 4219377])
+        self.assertEqual(sorted(south), [4215142, 4219376, 4219377])
+        gate = north[4219376][0]
+        self.assertEqual((gate[0], gate[1]), ('mh0001', 'mh0004'))
+        box = [float(v) for v in gate[3].split()]
+        # the same box 2048 units over: the southern frame's 995.7 .. 1042.7 is -1052.3 .. -1005.3 in the northern one
+        for got, want in zip(box, (-729.96893, 995.73703 - 2048, 19.87399, -714.24203, 1042.74357 - 2048, 90.05164)):
+            self.assertAlmostEqual(got, want, places=3)
+        self.assertEqual([float(v) for v in gate[4:8]], [256.0, 401.0, 86.875, 315.0])     # the same way to the Plaza
+        # the player set down by the gate from the Plaza (-690 -1018 in mh0001) has the gate within the use reach
+        self.assertLess(max(box[0] - (-690.0), -690.0 - box[3], 0.0) ** 2 +
+                        max(box[1] - (-1018.0), -1018.0 - box[4], 0.0) ** 2, 56.0 ** 2)
+
+
 class OpeningDoors(unittest.TestCase):
     def test_the_opening_scene_keeps_its_own_doors(self):
         # the prison ship, the pier, the census office and the courtyard: no leaving the census office before the

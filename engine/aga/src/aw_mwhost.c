@@ -54,6 +54,7 @@
 #include "aw_sky.h"
 #include "aw_mapfog.h"      /* the map's explored land (MAP-ORIGINAL-POI-66) */
 #include <ctype.h>
+#include "aw_roll.h"        /* the spell magnitude and resistance rolls (REST-CUT-TOO-OFTEN-67) */
 
 #define FILE_NAME "mwscript.awm"
 #define MAX_RESIDENT (1024*1024)
@@ -86,6 +87,7 @@ static unsigned char *resident;static unsigned long resident_bytes,file_bytes;
 static const char *load_why="not read yet";   /* the console answer (dbg mwscript): why the file is not loaded */
 static int load_failed,attached_map;
 static char map_name[64];static void *map_model,*script_model;   /* the map the objects / the scripts attached to */
+static unsigned long server_spawns;   /* AW_MwscriptServerReset: each one attaches the map again (the same map's too) */
 static char *topic_names;static int *topic_offsets;static int32_t *topic_values;
 /* ambience: the loop is a dungeon ambience (the sound table's flag 2, tools/mwscript/awms.py AMBIENCE_SOUNDS): while one
  * plays the exploration music rests (TOMB-MUSIC-OVER-AMBIENT-60, aw_music.c AW_MusicAmbience) */
@@ -454,11 +456,22 @@ static int exterior_hide(uint32_t ref,int hide){
     for(i=0;i<n;i++)ChimChunks_GonePid(pids[i],hide);
     return n;
 }
+/* PLAZA-FABRICANTS-LIVE-AT-START-67: E, about to be hidden by a Disable, leaves a fight it is in alive (the StopCombat
+ * route); the fights it would start later are refused by the combat layer itself (aw_combat.c AW_CombatEngage) */
+static unsigned long disabled_fights_ended;
+static void disabled_fight_end(edict_t *e){
+    const aw_fighter_t *f=e && !e->free?AW_CombatFighter(e):NULL;
+    if(f && !f->dead && aw_mwscript_combat_end && aw_mwscript_combat_end(e))disabled_fights_ended++;
+}
 static void object_hide(object_t *o){
     int number=entity_of_reference(o->ref);edict_t *e=edict_of(number);
     exterior_hide(o->ref,1);
     ChimRoom_Hide(o->ref,1);           /* its placements in a CHIM room (no edict) leave too */
     if(!e || e->free)return;
+    /* PLAZA-FABRICANTS-LIVE-AT-START-67: an actor disabled in a fight leaves it first (its standing model back from
+     * the fight's mover), so what is kept to show again is its own model; OpenMW's disabled reference fights nobody.
+     * A body keeps its slot (it holds the corpse, not a fight). */
+    disabled_fight_end(e);
     if(o->entity!=number || o->map!=attached_map || e->v.modelindex){
         float m,s;shown_state(e,&m,&s);o->model=m;o->solid=s;o->entity=number;o->map=attached_map;
     }
@@ -516,6 +529,7 @@ static void ledger_hide(uint32_t ref){
     ChimRoom_Hide(ref,1);
     if(!e || e->free || hidden_find(ref,0))return;
     if(!(h=hidden_find(ref,1))){ledger_refused++;return;}
+    disabled_fight_end(e);             /* PLAZA-FABRICANTS-LIVE-AT-START-67: out of its fight, its own model kept */
     h->entity=number;shown_state(e,&h->model,&h->solid);
     e->v.modelindex=0;e->v.solid=SOLID_NOT;SV_LinkEdict(e,false);ledger_hidden++;
 }
@@ -527,6 +541,19 @@ static void ledger_show(uint32_t ref){
     e=edict_of(h->entity);
     if(e && !e->free){e->v.modelindex=h->model;e->v.solid=h->solid;SV_LinkEdict(e,false);}
     *h=hidden[--hidden_count];
+}
+/* PLAZA-FABRICANTS-LIVE-AT-START-67: a Disable of a reference the list holds disabled already changes nothing on the
+ * list (OpenMW 0.51 World::disable returns at once for a reference that is not enabled), but an edict of it that this
+ * map still draws is hidden now: drawn while disabled is never right, whichever load spawned it. An entry this map
+ * kept for the reference belongs to an edict made again since (it shows a model): it goes, and the drawn edict's own
+ * model is kept instead. The common case (the edict hidden already, or none here) costs one binary search of the
+ * map's edicts by reference. */
+static unsigned long ledger_rehidden;
+static void disabled_drawn(uint32_t ref){
+    edict_t *e=edict_of(entity_of_reference(ref));hidden_t *h;
+    if(!e || e->free || !e->v.modelindex)return;
+    if((h=hidden_find(ref,0))!=NULL)*h=hidden[--hidden_count];
+    ledger_hide(ref);ledger_rehidden++;
 }
 /* The row of REF, NULL when the list has none */
 static aw_ledger_row_t *ledger_row(uint32_t ref){
@@ -562,7 +589,7 @@ static int32_t ledger_object(uint32_t ref,int op,int32_t value){
         }
         return 0;
     case AWM_DISABLE:
-        if(r && (r->fields&AW_LEDGER_DISABLED))return 0;
+        if(r && (r->fields&AW_LEDGER_DISABLED)){disabled_drawn(ref);return 0;}
         if(!(r=AW_LedgerPut(&aw_ledger,ref))){ledger_refused++;return 0;}
         r->fields|=AW_LEDGER_DISABLED;ledger_hide(ref);    /* its place: unknown (read on every map) */
         return 0;
@@ -652,6 +679,10 @@ void AW_MwscriptLedgerStatus(void){
                aw_ledger_on?"on":"off (the fixed tables)",aw_ledger.count,n[0],n[1],n[2],n[3],n[4],n[5],n[7],
                aw_ledger.stolen_count,AW_LedgerResident(&aw_ledger)+(unsigned long)hidden_capacity*sizeof(hidden_t),
                aw_ledger.refused,hidden_count,ledger_hidden,ledger_refused);
+    /* PLAZA-FABRICANTS-LIVE-AT-START-67: every server spawn attaches its map again (the same map's too); a drawn edict
+     * of a disabled reference that its next Disable hid (0 is right: the map's attach hid them all) */
+    Con_Printf("  map attach: %lu server spawns, %lu maps attached; %lu edicts of a disabled reference hidden again by "
+               "a Disable\n",server_spawns,(unsigned long)attached_map,ledger_rehidden);
     /* slice 4: the script and dialogue tables (the globals, quests and topics as of the last save or load) against the
      * game's own counts, and the named facts */
     Con_Printf("  slice 4: %d globals changed (of %d), %d quest stages (of %d quests), %d topics known (of %d), "
@@ -733,9 +764,11 @@ static unsigned long objects_deleted,objects_undeleted,deleted_refused;
 static void deleted_script(uint32_t ref){
     if(ref>=AW_ACTORS_PLACED && ref<=(AW_ACTORS_PLACED|0xFFFFF))AW_MwvmForget(ref);else AW_MwvmDetach(ref);
 }
+static void placed_gone(uint32_t ref);
 static void deleted_flush(void){
     int i;
     for(i=0;i<deleted_count;i++)deleted_script(deleted_pending[i]);
+    for(i=0;i<deleted_count;i++)placed_gone(deleted_pending[i]);   /* a script-made reference leaves for good (v0.0.67) */
     deleted_count=0;
 }
 static int object_deleted(uint32_t ref){
@@ -1270,7 +1303,7 @@ int AW_MwscriptLand(edict_t *target,const aw_spell_effect_t *e,const aw_mgef_t *
             if(AW_ActorRemoveSpellType(a,e[i].effect==69?3:2)>0)k++;
             continue;
         }
-        mag=m[i].flags&AW_MGEF_NO_MAGNITUDE?1:AW_CastMagnitude(e[i].magnitude_min,e[i].magnitude_max,(float)(rand()&32767)/32768.0f);
+        mag=m[i].flags&AW_MGEF_NO_MAGNITUDE?1:AW_CastMagnitude(e[i].magnitude_min,e[i].magnitude_max,(float)AW_Roll(32768)/32768.0f);
         {   /* RACE-RESIST-NOT-ON-SPELL-DAMAGE-64 (OpenMW 0.53 spellresistance.cpp getEffectMultiplier): the target's
              * resist, shield and weakness (active effects and the always-on abilities of its race, birthsign and
              * list) and its Willpower / Luck roll take their share; the caster's chance counts as 100 (a trap, or a
@@ -1283,7 +1316,7 @@ int AW_MwscriptLand(edict_t *target,const aw_spell_effect_t *e,const aw_mgef_t *
                 if(wk>=0)attr-=AW_EffectsMagnitude(who,wk,AW_EFFECT_NO_ARG)+AW_ActorPassiveMagnitude(a,wk);
                 fat=AW_CastFatigueTerm(1.25f,0.5f,a->dyn_cur[2],a->dyn_base[2]);
                 resist=AW_CastResistance(attr,AW_ActorStat(a,AWA_ATTRIBUTE+2),AW_ActorStat(a,AWA_ATTRIBUTE+7),fat,100.0f,
-                                         (float)(rand()%10001)/100.0f,(m[i].flags&AW_MGEF_NO_MAGNITUDE)!=0);
+                                         (float)AW_Roll(10001)/100.0f,(m[i].flags&AW_MGEF_NO_MAGNITUDE)!=0);
                 resists_seen++;
                 if(resist>=100.0f){resists_full++;
                     Con_DPrintf("Spell: effect %d resisted in full (resistance %.0f %%)\n",e[i].effect,(double)resist);continue;}
@@ -2076,7 +2109,7 @@ static int position_cell(int instance,int target,const aw_mwcell_t *numbers,int 
 #define PLACE_ITEM 1
 #define PLACE_OTHER 2            /* v0.0.62: an activator, a static, a container: from its template's entity */
 #define PLACE_COPIES 16          /* the most copies one call makes (the game's calls ask for 1) */
-typedef struct {int id,home,script,kind,carried;uint32_t template_ref;} place_row_t;
+typedef struct {int id,home,script,kind,carried,point,levelled;uint32_t template_ref;} place_row_t;
 static unsigned long places,places_refused,places_away,placed_spawned,placed_no_text;
 static int place_row(int row,place_row_t *out){
     uint32_t off,rows,bytes;const unsigned char *r;
@@ -2085,6 +2118,7 @@ static int place_row(int row,place_row_t *out){
     r=resident+off+12*row;
     out->id=(r[0]<<8)|r[1];out->home=(r[2]<<8)|r[3];out->template_ref=rd_be32(r+4);out->script=(r[8]<<8)|r[9];
     out->kind=r[10];out->carried=r[11]&1;
+    out->point=(r[11]&2)!=0;out->levelled=(r[11]&4)!=0;   /* v0.0.67 (MWSCRIPT-PLACE-OTHER-KINDS-62) */
     return out->carried;
 }
 /* a free key for a new placement of PLAC row ROW: 0 when the row's 4,095 are used */
@@ -2094,10 +2128,15 @@ static uint32_t placed_key(int row){
     for(n=1;n<=0xFFF;n++){key=AW_ACTORS_PLACED|((uint32_t)row<<12)|n;if(AW_ActorsPlacedFree(key))return key;}
     return 0;
 }
-/* the entity text a placed actor of row R spawns from, with its own reference KEY ("{" .. "}", to free; NULL none) */
-static char *placed_text(const place_row_t *r,uint32_t key,unsigned long *length){
+/* the entity text a placed actor of row R spawns from, with its own reference KEY ("{" .. "}", to free; NULL none).
+ * v0.0.67 (MWSCRIPT-PLACE-OTHER-KINDS-62): a levelled creature list's row gives one creature of the list rolled for KEY
+ * at the player's level, kept under KEY (aw_actors.c AW_ActorsLevelledText; OpenMW 0.51 creaturelevlist.cpp), *PICKED
+ * that creature record's hash (its script) */
+static char *placed_text(const place_row_t *r,uint32_t key,unsigned long *length,unsigned *picked){
     unsigned long n=0;const char *text=NULL,*block;char *own=NULL,*out,id[64],map[64],tail[40];int t;
-    if(r->template_ref){
+    if(r->levelled){
+        if(read_string(r->id,id,sizeof(id)))text=own=AW_ActorsLevelledText(id,key,&n,picked);
+    }else if(r->template_ref){
         const char *ents=sv.worldmodel?sv.worldmodel->entities:NULL;
         if(ents && (block=AW_MwvmEntityBlock(ents,(unsigned long)strlen(ents),r->template_ref,&n))!=NULL)text=block;
         else if((block=carried_of(r->template_ref,&n))!=NULL)text=block;
@@ -2152,19 +2191,60 @@ static edict_t *object_spawn(const char *text,unsigned long n,uint32_t key){
     VectorCopy(origin,e->v.origin);SV_LinkEdict(e,false);placed_objects++;
     return e;
 }
+/* v0.0.67 (MWSCRIPT-PLACE-OTHER-KINDS-62): an object no map places but whose record has a script (Tribunal's
+ * trapProjectile, which flies at the player and casts its spell; Bloodmoon's transformation effects): a point entity of
+ * its own where its row KEY puts it, no model (no map converted the record's), not solid, under its own reference, so
+ * its record's script runs on it: it moves it (SetPos), casts from it (ExplodeSpell), disables and deletes it. OpenMW
+ * 0.51 OpPlaceItem makes the reference from its record. NULL when no entity is free (a full map leaves it out). */
+static string_t point_class;static void *point_map;static unsigned long placed_points;
+static edict_t *point_spawn(uint32_t key){
+    edict_t *e;eval_t *v;float origin[3],angles[3];
+    if(!sv.active || !object_edict_free() || !AW_ActorsRowPlace(key,origin,angles))return NULL;
+    if(point_map!=(void *)sv.worldmodel || !point_class){
+        point_class=ED_NewString("aw_placed_point")-pr_strings;point_map=(void *)sv.worldmodel;
+    }
+    e=ED_Alloc();
+    e->v.classname=point_class;e->v.movetype=MOVETYPE_NONE;e->v.solid=SOLID_NOT;
+    VectorCopy(origin,e->v.origin);VectorCopy(angles,e->v.angles);
+    if((v=field_ref(e))!=NULL)v->_float=(float)key;
+    SV_LinkEdict(e,false);placed_points++;
+    return e;
+}
+/* v0.0.67 (MWSCRIPT-PLACE-OTHER-KINDS-62; OpenMW 0.51 mwworld/cellstore.cpp writeReferences: a deleted reference that did
+ * not come from a content file is not kept): a script-made reference (AW_ACTORS_PLACED) that SetDelete deleted leaves for
+ * good after the frame's run: its edict goes, its row of the actors' change list and its deleted row of the world change
+ * list are dropped (so it is not spawned again on a return or a load, not saved, and its key is free again). Before, a
+ * trap's projectile or an effect a script placed and deleted stayed as a hidden row, one more for every shot. */
+static unsigned long placed_gones;
+static void placed_gone(uint32_t ref){
+    aw_ledger_row_t *r;int n;edict_t *e;
+    if(ref<AW_ACTORS_PLACED || ref>(AW_ACTORS_PLACED|0xFFFFF) || !aw_ledger_on || !(r=ledger_row(ref)) ||
+       !(r->fields&AW_LEDGER_TAKEN))return;
+    ledger_show(ref);                          /* this map's hidden entry goes with the edict */
+    if((n=edict_of_ref(ref))>0 && (e=edict_of(n))!=NULL && !e->free){if(is_actor(e))AW_ActorsRemove(e);else ED_Free(e);}
+    AW_ActorsPlacedForget(ref);
+    if((r=ledger_row(ref))!=NULL){r->fields=0;AW_LedgerTidy(&aw_ledger,ref);}
+    edict_refs_refresh();placed_gones++;
+}
 static int placed_spawn(unsigned key){
-    place_row_t r;unsigned long n=0;char *text;edict_t *e;
+    place_row_t r;unsigned long n=0;char *text;edict_t *e;unsigned picked=0;int script;
     if(key<AW_ACTORS_PLACED || !place_row((int)((key>>12)&0xFF),&r) || r.kind==PLACE_ITEM)return 0;
     if(r.kind!=PLACE_ACTOR && edict_of_ref(key))return 1;   /* an object already here (AliveWithRef sees actors only) */
-    if(!(text=placed_text(&r,key,&n))){placed_no_text++;return 0;}
-    e=r.kind==PLACE_ACTOR?AW_ActorsSpawnVisitor(text,n):object_spawn(text,n,key);
-    free(text);
+    if(r.point)e=r.kind==PLACE_ACTOR?NULL:point_spawn(key);
+    else{
+        if(!(text=placed_text(&r,key,&n,&picked))){placed_no_text++;return 0;}
+        e=r.kind==PLACE_ACTOR?AW_ActorsSpawnVisitor(text,n):object_spawn(text,n,key);
+        free(text);
+    }
     if(!e)return 0;
     edict_refs_refresh();
-    if(r.script!=AWM_NONE){
+    script=r.script;
+    /* a levelled list's creature runs its own record's script (the list has none: MWSCRIPT-UNPLACED-ATTACH-62) */
+    if(script==AWM_NONE && picked && !AW_MwvmLevelledScript(picked,&script))script=AWM_NONE;
+    if(script!=AWM_NONE){
         int k;
         AW_MwvmDetach(key);       /* spawned again (a return, a load): its values parked, then on the new edict */
-        k=attach_script(key,r.script,map_room?AWB_INTERIOR:0,NUM_FOR_EDICT(e),e->v.origin);
+        k=attach_script(key,script,map_room?AWB_INTERIOR:0,NUM_FOR_EDICT(e),e->v.origin);
         if(k>=0)attach_edicts++;else attach_refused++;
     }
     placed_spawned++;
@@ -2433,6 +2513,46 @@ int AW_MwscriptSpawn(const char *id,int full){
     spawns_made++;
     Con_Printf("dbg spawn: %s (%s, ref %lu)%s.\n",e->v.netname?pr_strings+e->v.netname:id,id,(unsigned long)key,how);
     return 1;
+}
+/* --- the creature of a wilderness rest that is cut short (v0.0.67, REST-CUT-NO-CREATURE-67; the rules of OpenMW 0.51
+ * mwgui/waitdialog.cpp onWaitingInterrupted and mwworld/worldimp.cpp spawnRandomCreature, our own code): when the rest
+ * stops (aw_wait.c, its interruption hour) the region's sleep list (levelup/rest.txt "sleepregion", the region record's
+ * BNAM) gives 1 + a roll below iNumberCreatures creatures (1 in the game data, so one), each a pick of the list at the
+ * player's level (aw_actors.c AW_ActorsLevelledText; the builder puts every region's sleep list in the actor table:
+ * tools/chim/actors.py named_lists), placed 220 units in front of the player, the next direction when that way is
+ * blocked, on the ground (safePlaceObject, as a summon appears), facing the player, as the game makes it: its record's
+ * stats, behaviour (a hostile one attacks) and script. Its key is a dbg spawn slot (AW_ACTORS_SPAWNED | slot): it stays
+ * while its place is loaded; leaving or a load does not bring it back (the original keeps it in the cell). Cost: one
+ * base and one list roll read from the actor table, at the end of a rest; nothing per frame. */
+#define REST_CREATURE_DISTANCE (220*0.25f)
+static unsigned long rest_creatures,rest_creatures_none;
+static void rest_creature(const char *sleep_list){
+    unsigned long n=0;char *text,*out,tail[40];vec3_t base,local;float yaw;edict_t *e;int t,slot,script=-1;
+    unsigned hash=0;uint32_t key;
+    if(!sv.active || !sv_player || !sleep_list || !*sleep_list || (slot=spawn_slot())<0){rest_creatures_none++;return;}
+    key=AW_ACTORS_SPAWNED|(uint32_t)slot;
+    if(!(text=AW_ActorsLevelledText(sleep_list,key,&n,&hash))){
+        AW_ActorsPlacedForget(key);rest_creatures_none++;
+        Con_Printf("rest: the sleep list %s gave no creature this build can make (none at this level, or no model).\n",
+                   sleep_list);
+        return;
+    }
+    VectorCopy(sv_player->v.origin,base);base[2]+=sv_player->v.mins[2];yaw=sv_player->v.v_angle[1];
+    place_spot(base,yaw,REST_CREATURE_DISTANCE,0,1,local);
+    t=sprintf(tail,"\n\"aw_ref\" \"%lu\"\n}",(unsigned long)key);
+    out=n>=2 && text[n-1]=='}'?(char *)AW_TryMalloc(n+(unsigned long)t+1):NULL;
+    if(out){memcpy(out,text,n-1);memcpy(out+n-1,tail,(size_t)t+1);}
+    free(text);
+    e=out && AW_ActorsPlaceRow(key,local,yaw+180)?AW_ActorsSpawnVisitor(out,n-1+(unsigned long)t):NULL;
+    free(out);
+    if(!e){AW_ActorsPlacedForget(key);rest_creatures_none++;
+        Con_Printf("rest: the creature of %s could not be placed here (no free entity).\n",sleep_list);return;}
+    edict_refs_refresh();
+    if(hash && AW_MwvmLevelledScript(hash,&script) &&
+       attach_script(key,script,map_room?AWB_INTERIOR:0,NUM_FOR_EDICT(e),e->v.origin)>=0)attach_edicts++;
+    rest_creatures++;spawns_made++;
+    Con_Printf("rest: interrupted by %s from %s (ref %lu).\n",e->v.netname?pr_strings+e->v.netname:"a creature",sleep_list,
+               (unsigned long)key);
 }
 /* dbg despawn's click (aw_companion.c): the aimed actor goes; a spawned one with its row and script values, a game actor
  * until its place loads again (its row of the world change list stays as it was) */
@@ -3731,7 +3851,7 @@ static int land_spfx(int row){
     {const unsigned char *h=resident+off+4*row;int first=(h[0]<<8)|h[1],nfx=h[2];
      for(e=0;e<nfx;e++){
          const unsigned char *x=resident+off+4*rows+8*(first+e);int lo=(x[4]<<8)|x[5],hi=(x[6]<<8)|x[7];
-         float m=(float)(hi>lo?lo+rand()%(hi-lo+1):lo);
+         float m=(float)(hi>lo?lo+AW_Roll(hi-lo+1):lo);
          if(x[0]==4){   /* a cure: the spells of that type go (0: Cure Poison, no poison state yet) */
              if(x[1])AW_ActorRemoveSpellType(p,x[1]);
              cures++;continue;
@@ -3833,7 +3953,11 @@ static int host_call(int instance,int target,int function,const aw_mwcell_t *num
         /* ShowRestMenu on a bed (the bed's script, Bed_Standard): the rest window with that bed (REST-WAIT-59, aw_wait.c;
          * OpenMW OpShowRestMenu with sleepInBed); without a reference, the window as T opens it */
         AW_RestOpen((unsigned long)target_reference(instance,target));return 1;
-    case AWF_GETPCSLEEP:result->f=(float)AW_RestSleeping();return AW_MWVM_CALL_READ;
+    case AWF_GETPCSLEEP:
+        /* GetPCSleep (OpenMW 0.51 miscextensions.cpp OpGetPcSleep: a whole number, 1 while the hours of a rest pass,
+         * aw_wait.c AW_RestSleeping). GETPCSLEEP-NOT-CARRIED-OUT-67: written as a fraction before v0.0.67, so the
+         * scripts' whole-number "GetPCSleep == 1" read 1065353216 and never held */
+        result->i=AW_RestSleeping();return AW_MWVM_CALL_READ;
     case AWF_ENABLESTATSMENU:case AWF_ENABLEINVENTORYMENU:case AWF_ENABLEMAGICMENU:case AWF_ENABLEMAPMENU:{
         /* the census office's scripts turn the menus on (CENSUS-INTRO-SCRIPTS-62; OpenMW OpEnableWindow): saved */
         int menu=function==AWF_ENABLESTATSMENU?AW_MENU_STATS:function==AWF_ENABLEINVENTORYMENU?AW_MENU_INVENTORY:
@@ -4794,6 +4918,121 @@ static void map_visit(void){
 }
 /* a debug room's pause of the game's scripts (aw_cycleitems.c: the light test corridor); NULL = never */
 int (*aw_mwscript_paused)(void);
+/* --- dbg dbattack (DBG-DBATTACK-67; the maintainer's test of GETPCSLEEP-NOT-CARRIED-OUT-67): where the rest window
+ * offers Rest, an 8-hour rest on which Tribunal's own dbAttackScript attacks for certain. Nothing is spawned by hand:
+ * only the script's Random is made to give its lowest number for that one script while the rest passes (aw_mwvm.c
+ * AW_MwvmForceRandom), so the script's own path runs: GetPCSleep 1 in the rest's frames (aw_wait.c AW_RestTick), its
+ * roll, WakeUpPC, its PlaceAtPC of the assassin for the player's level, its DBAttack 1; the assassin's record decides
+ * the fight. Every step is reported on the console by name and number, a failing one with FAILED and the reason; the
+ * script's own exclusions (TR_dbAttack 50 or more, the Census and Excise Office, its odds spent after earlier attacks)
+ * are reported as the step where it stopped. Not saved; the sure roll ends with the rest. */
+int AW_PlayerInCombat(void);   /* aw_combat.c */
+static struct {int state,script,frames,asleep;unsigned long wakes,places,rolls;double ended;} dbattack;
+static int script_named(const char *want){
+    int i,n=AW_MwvmScriptCount();char name[64];
+    for(i=0;i<n;i++)if(read_string(AW_MwvmScriptName(i),name,sizeof(name)) && !Q_strcasecmp(name,(char *)want))return i;
+    return -1;
+}
+static int global_named(const char *want,int32_t *value){
+    int g,n=AW_MwvmGlobalCount(),type;char name[64];
+    for(g=0;g<n;g++)
+        if(read_string(AW_MwvmGlobalName(g,&type),name,sizeof(name)) && !Q_strcasecmp(name,(char *)want)){
+            *value=AW_MwvmGlobalInt(g);return 1;
+        }
+    return 0;
+}
+static void dbattack_report(void){
+    int i,found=0;int32_t v=0;
+    for(i=1;i<sv.num_edicts;i++){
+        edict_t *e=EDICT_NUM(i);eval_t *s;vec3_t d;
+        if(e->free || !(s=field_source(e)) || !s->string || Q_strncasecmp(pr_strings+s->string,"db_assassin",11))continue;
+        VectorSubtract(e->v.origin,sv_player->v.origin,d);
+        Con_Printf("dbg dbattack: %s (%s) is here, %.0f game units from the player%s.\n",
+                   e->v.netname?pr_strings+e->v.netname:"?",pr_strings+s->string,Length(d)*4,e->v.health>0?"":" (dead)");
+        found++;
+    }
+    if(!found)Con_Printf("dbg dbattack: FAILED: no Dark Brotherhood assassin (db_assassin*) is in this map after the "
+                         "script's PlaceAtPC (see the Place calls line of dbg mwscript status).\n");
+    if(!global_named("dbattack",&v))Con_Printf("dbg dbattack: FAILED: the global DBAttack is not in this build.\n");
+    else Con_Printf("dbg dbattack: the global DBAttack is %ld%s.\n",(long)v,v==1?", as the script sets it":
+                    " (FAILED: the script sets it to 1)");
+}
+static void dbattack_tick(void){
+    unsigned long woke,placed,rolls;
+    if(!dbattack.state)return;
+    if(!sv.active || !sv_player){AW_MwvmForceRandom(-1);dbattack.state=0;return;}
+    if(dbattack.state==1){
+        dbattack.frames++;
+        if(AW_RestSleeping())dbattack.asleep++;
+        if(*AW_WaitWindowName())return;            /* the rest still passes */
+        AW_MwvmForceRandom(-1);
+        woke=wakeups-dbattack.wakes;placed=places-dbattack.places;rolls=AW_MwvmStats()->forced_rolls-dbattack.rolls;
+        Con_Printf("dbg dbattack: the rest ended after %d frames, %d of them asleep (GetPCSleep 1)%s.\n",dbattack.frames,
+                   dbattack.asleep,dbattack.asleep?"":": FAILED, no frame of the scripts saw the sleep");
+        Con_Printf("dbg dbattack: dbAttackScript made %lu sure roll(s); WakeUpPC %lu; places made %lu.\n",rolls,woke,placed);
+        if(!rolls)Con_Printf("dbg dbattack: FAILED: dbAttackScript did not roll: it stops before its roll at TR_dbAttack 50 "
+                             "or more and in the Census and Excise Office.\n");
+        else if(!woke)Con_Printf("dbg dbattack: FAILED: the roll did not wake the player: the script's odds for this level "
+                                 "are spent (each earlier attack takes 10 from them).\n");
+        else if(!placed)Con_Printf("dbg dbattack: FAILED: the script's PlaceAtPC placed nobody (the assassin's record cannot "
+                                   "be made in this build, or no free entity).\n");
+        dbattack_report();
+        dbattack.state=2;dbattack.ended=realtime;
+        return;
+    }
+    /* the fight: the assassin's own behaviour, within 3 seconds of waking */
+    if(AW_PlayerInCombat()){
+        Con_Printf("dbg dbattack: the assassin attacks: the player is in a fight %.1f s after waking.\n",realtime-dbattack.ended);
+        dbattack.state=0;
+    }else if(realtime-dbattack.ended>3){
+        Con_Printf("dbg dbattack: FAILED: no fight within 3 s of waking.\n");dbattack.state=0;
+    }
+}
+static void dbattack_command(void){
+    int s;
+    if(!sv.active || !sv_player){Con_Printf("dbg dbattack: start the game first.\n");return;}
+    if(!mwscript.value || !resident || !AW_MwvmScriptCount()){
+        Con_Printf("dbg dbattack: FAILED: the game's compiled scripts are not running (dbg mwscript on).\n");return;}
+    if((s=script_named("dbattackscript"))<0){
+        Con_Printf("dbg dbattack: FAILED: Tribunal's dbAttackScript is not in this build (Tribunal is not among its masters).\n");
+        return;
+    }
+    if(dbattack.state==1 || *AW_WaitWindowName()){Con_Printf("dbg dbattack: close the window first (a rest or wait is up).\n");return;}
+    if(!AW_MwvmScriptRunning(s)){
+        if(!AW_MwvmGlobalScriptSet(s,1)){Con_Printf("dbg dbattack: FAILED: dbAttackScript (script %d) could not be started.\n",s);return;}
+        Con_Printf("dbg dbattack: dbAttackScript was not running (Tribunal's start, MarkTRStartScript, starts it): started.\n");
+    }
+    if(!AW_RestOpen(0)){
+        Con_Printf("dbg dbattack: FAILED: the rest window does not open here (its line says why: water, the air, enemies "
+                   "near, or resting not allowed yet).\n");
+        return;
+    }
+    if(!AW_RestCanSleep()){
+        AW_RestWake();
+        Con_Printf("dbg dbattack: FAILED: sleeping is not allowed here (the window offers Wait only): go where Rest is offered.\n");
+        return;
+    }
+    dbattack.script=s;dbattack.frames=dbattack.asleep=0;dbattack.wakes=wakeups;dbattack.places=places;
+    dbattack.rolls=AW_MwvmStats()->forced_rolls;
+    AW_MwvmForceRandom(s);
+    if(!AW_RestStart(8)){
+        AW_MwvmForceRandom(-1);AW_RestWake();Con_Printf("dbg dbattack: FAILED: the rest did not start.\n");return;}
+    dbattack.state=1;
+    Con_Printf("dbg dbattack: resting 8 hours with dbAttackScript's roll made sure (script %d).\n",s);
+}
+/* PLAZA-FABRICANTS-LIVE-AT-START-67: every server spawn is a new map for the scripts and the object state, the same
+ * map's name too (sv_main.c SV_SpawnServer calls this beside AW_ActorsServerReset). The tick told a new map by its world
+ * model and its name, and a spawn of the map already loaded (a teleport inside it, a "map" of its own name) gets the
+ * same model slot back by name (model.c Mod_FindName): the edicts the spawn made again were never matched to their
+ * references, the ones the world change list holds disabled or taken were not hidden (ledger_attach), and the scripts
+ * stayed bound to the old edicts. A script's Disable of a reference already disabled changes nothing, so the Plaza's
+ * four fabricants (4218689, 4218690, 4218692, 4218693, disabled by fab_attack_1 / fab_attack_2 until An Attack on
+ * Mournhold) and Seyda Neen's Dreamer_Talker04, Dreamer_Talker05 and agronian guy (297837, 297840, 474443, disabled once
+ * by Startup) stood drawn after such a spawn. A save's load (objects_import) and New Game cleared the map already, so
+ * they attached; now every spawn does, as OpenMW 0.51 loads a cell from its references' enabled state each time. Cost:
+ * the map's attach once per spawn, during its load, as any map change. Declared by its caller, not in a header. */
+void AW_MwscriptServerReset(void);
+void AW_MwscriptServerReset(void){map_model=NULL;script_model=NULL;server_spawns++;}
 void AW_MwscriptTick(float dt){
     int k,n,i;vec3_t player;
     /* no game running (a load, the main menu): a script's message box goes with it */
@@ -4874,6 +5113,7 @@ void AW_MwscriptTick(float dt){
      if(aw_mwhost_step_error){script_depth++;aw_mwhost_step_error();script_depth--;}
      script_depth++;AW_MwvmTick(dt,player);script_depth--;   /* SAVE-INSIDE-SCRIPT-STEP-66: a save asked for in here waits */
      if(Sys_FloatTime()-t0>.3)Con_Printf("MWScript tick: %.0f ms (scripts run this frame).\n",(Sys_FloatTime()-t0)*1000);}
+    dbattack_tick();   /* DBG-DBATTACK-67: what this frame's scripts did with the debug rest */
     deleted_flush();   /* MWSCRIPT-SETDELETE-STOPS-66: the objects SetDelete took out: their scripts stop now */
     leave_now();   /* PositionCell: the actors moved to another place leave this map now */
     AW_ActorsPlacedTick(placed_spawn);   /* the actors scripts placed here come back (once a second; MWSCRIPT-PLACE-OBJECTS-62) */
@@ -4951,10 +5191,10 @@ static void status_counts(void){
     AW_MwscriptLedgerStatus();
     {const aw_actorstate_stats_t *a=AW_ActorStateStats();
      Con_Printf("actor record: %d actors, %lu bytes kept; calls %lu (%lu with no actor), records made %lu, changed %lu, "
-                "dropped %lu, full %lu, disk reads %lu; combat started %lu stopped %lu; wanders %lu; killed by a script's "
-                "health %lu\n",AW_ActorCount(),
+                "dropped %lu, full %lu, disk reads %lu; combat started %lu stopped %lu (%lu by a Disable); wanders %lu; "
+                "killed by a script's health %lu\n",AW_ActorCount(),
                 AW_ActorStateResident(),actor_calls,actor_misses,a->created,a->changed,a->evicted,a->full,a->reads,
-                combat_starts,combat_stops,wanders,script_deaths);}
+                combat_starts,combat_stops,disabled_fights_ended,wanders,script_deaths);}
     Con_Printf("player standing: crime level %d, reputation %d; calls %lu (%lu not carried out)%s; PlayGroup %lu "
                "(%lu with no skeletal actor or group); topics added %lu (of %d, %d bytes kept); cures cast %lu; spell effects "
                "landed %lu, active %d, refused %lu; ForceGreeting %lu (%lu not possible); Rotate %lu (%lu with no entity); AITravel %lu (%lu not possible); AIFollow %lu (%lu not possible); Position %lu (%lu not possible)\n",
@@ -4965,8 +5205,9 @@ static void status_counts(void){
                "entity to spawn); %d leaving\n",poscells,poscells_away,poscells_refused,visitors_spawned,visitors_no_text,
                leaving_count);
     Con_Printf("Place calls: %lu made (%lu kept for another place), %lu not possible; placed actors spawned %lu (%lu with "
-               "no entity to spawn), of them objects %lu\n",places,places_away,places_refused,placed_spawned,placed_no_text,
-               placed_objects);
+               "no entity to spawn), of them objects %lu, points %lu; deleted for good %lu; rest creatures %lu (%lu none)\n",
+               places,places_away,places_refused,placed_spawned,placed_no_text,placed_objects,placed_points,placed_gones,
+               rest_creatures,rest_creatures_none);
     AW_ActorsPlacedStatus();
     {int sm,alive=0;for(sm=0;sm<SUMMONS;sm++)alive+=summons[sm].used;
      Con_Printf("Summoned creatures: %d now; %lu called up, %lu back by the player, %lu ended with their effect, %lu died, "
@@ -5958,6 +6199,7 @@ void AW_MwscriptInit(void){
     aw_item_added=item_added;   /* OnPCAdd (CENSUS-INTRO-SCRIPTS-62) */
     aw_item_removed=item_removed;   /* a carried item's script stops with the last one (MWSCRIPT-UNPLACED-ATTACH-62) */
     aw_actors_levelled_spawned=levelled_spawned;   /* a levelled pick runs its record's script (the same item) */
+    aw_rest_spawn=rest_creature;   /* a wilderness rest cut short brings its creature (REST-CUT-NO-CREATURE-67) */
     aw_opening_activate=object_intercept;      /* census type amiwind: the clerk starts his talk (OPENING-REGRESSION-64) */
     aw_inventory_intercept=object_intercept;   /* OnActivate takes a placed item's use */   /* OnActivate takes a door's use */
     aw_actor_disabled=AW_ObjectDisabled;   /* the CHIM window spawns no disabled actor */
@@ -5971,6 +6213,7 @@ void AW_MwscriptInit(void){
     aw_combat_effect_magnitude=effect_magnitude_of;   /* RESIST-NORMAL-WEAPONS-61: the blow's resistance (v0.0.61-weapons) */
 #endif
     Cmd_AddCommand("aw_mwscript_status",status);
+    Cmd_AddCommand("aw_dbattack",dbattack_command);   /* dbg dbattack (DBG-DBATTACK-67) */
     Cmd_AddCommand("aw_mw_target",mw_target);   /* MW-CONSOLE-COMMANDS-62: the console target finder (dbg mw target) */
     /* STEAL-WITNESSED-NO-CRIME-61: the crime rules read the witnesses and the player here */
     aw_crime_witness=crime_witness;aw_crime_attack=crime_attack;aw_crime_thief=crime_thief;

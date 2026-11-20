@@ -1,6 +1,6 @@
 # Next milestone: dock and Census Office character creation
 
-_Last updated with AmiWind v0.0.67 (18 November 2026)._
+_Last updated with AmiWind v0.0.67 (19 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -509,8 +509,9 @@ level progress; misc skills add nothing. Every rise also counts for the skill's 
 the level progress reaches iLevelupTotal (10), the game's "You should rest and meditate on what you've learned."
 shows. The Stats window (P) shows the level progress as a bar under the level.
 
-**The level-up box** opens when a rest ends with the level-up due. Until resting itself lands,
-`dbg levelup rest [HOURS]` rests (moves the clock) and opens it. The box shows the level's picture (by how your
+**The level-up box** opens when a rest (T, Rest) runs its full length with the level-up due
+([RESTING.md](RESTING.md#the-level-up-after-a-rest)); `dbg levelup rest [HOURS]` does the same without the window.
+The box shows the level's picture (by how your
 raises split over combat, magic and stealth, as the original picks it), "You have ascended to Level N", the level's
 own sentence (from the install's Morrowind.ini when it has one, else the game's general line), the three gold coins,
 and the eight attributes with their multipliers: x2 to x5 by the number of raises of each attribute since the last
@@ -545,6 +546,19 @@ The level cap of 83: the original and OpenMW 0.51 have no cap of their own (SetL
 nothing else); 78 is the highest level the levelling reaches by skill use (the ten major and minor skills from 30 and
 15 to 100 are 775 raises, ten a level) and 83 counting the skill books. Each of the three prints the sheet before and
 after on the console. Tests: `tests/aga_levelup_rules_test.c`, `tests/aga_console_test.c`.
+
+**Seen in play** on the v0.0.67-dev3 image (19 November 2026, 32 MB of Fast RAM in the emulator, a Nord Barbarian with
+the Steed's +25 Speed, set to level 40, on the Bitter Coast, walking): `dbg levelup raise Axe 10` gave "Your Axe skill
+increased to 55." with the rest line and a full level progress (10 of 10); the Stats window showed level 40 with its
+bar full. A 12-hour rest cut after 9 hours opened no box and left the level at 40 (the level-up stays due). The next
+full 12-hour rest opened the box with "You have ascended to Level 41", the level's sentence, three coins and the
+level-up music; Strength carried the multiplier x5. With coins on Strength, Speed and Endurance: Strength 60 to 65,
+Speed 50 to 51 (76 with the Steed's 25), Endurance 50 to 51, health 250 to 255 (a tenth of Endurance 51), level
+progress back to 0 of 10. The same values showed in the Stats window and the console after a map change and back, after
+a quicksave and after loading it; the save list names the level (L41). Open: the Stats window draws the Speed value
+near-black and the birthsign icons brown from the start of a game until a save is loaded, while the numbers are right
+([STATS-WINDOW-COLOURS-UNTIL-LOAD-67](bugs/STATS-WINDOW-COLOURS-UNTIL-LOAD-67.md)); a new game through character
+creation was not checked.
 
 As in the original, the box has no cancel: Esc does nothing, the box stays until every coin is placed and OK is
 pressed. Only the console key (a debugging aid) closes it; the level-up then stays due and the next rest opens the box

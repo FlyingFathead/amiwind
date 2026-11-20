@@ -21,7 +21,7 @@
 | Persists in | v0.0.62 (last seen) |
 | Severity | high: Regressed in v0.0.62 (was medium): two minutes of every image step; the project rule is every core busy |
 | Family | Build speed (`build-speed`) |
-| Deferred by the maintainer | 2026-11-16: deferred by the maintainer's release decision to v0.0.67 (v0.0.66 is made from its twelfth snapshot; the rest of the roadmap goes to later versions) |
+| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
 | Came back (regression) | in v0.0.62 (fixed in v0.0.48-dev2 before) |
 | Playtest version | 2026_10_22_v0.0.48-dev2_miniwind-balmora-rooms-bsp_1336ba94 |
 | From commit | source 1336ba9, engine 1336ba9, CHIM world 1336ba9 |
@@ -49,7 +49,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-08 18:18 +0000: seen again in v0.0.62: Release build 7011540: the player view used all 24 cores for about 15 minutes, 11 to 12 cores from about 37 minutes in and 7 cores after 63 minutes.
 - 2026-11-09: fixed in source: a gated commit, v0.0.63 (dc440813, branch v0.0.63-speed); tools/player_view_schedule.py: one flow, each torch body after its own body, the fitting tries of a body as units over idle workers; tests/test_player_view_schedule.py: on the v0.0.62 release build's unit times the stage falls from 95 to about 44 minutes once the fitted tries are known
 - 2026-11-15: shipped: the v0.0.66-dev2 release build, v0.0.66-dev2 (3988c6e4, build 2026_11_14_v0.0.66-dev2_full); the delivered dev2 build holds the commit: a numbered build carries the fix
-- 2026-11-16: deferred by the maintainer: deferred by the maintainer's release decision to v0.0.67 (v0.0.66 is made from its twelfth snapshot; the rest of the roadmap goes to later versions)
+- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
 
 <!-- END GENERATED TIMELINE -->
 
@@ -296,6 +296,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-STAIR-WALK-SLOW-33](BUILD-STAIR-WALK-SLOW-33.md): The image step's stair walk spent most of its time in interpreted collision traces and brute-force headroom tests (1,751 s of the rc1c image step)
 - [BUILD-STATS-SERIAL-36](BUILD-STATS-SERIAL-36.md): The CHIM stats step runs serially and silently on one core
 - [BUILD-STORAGE-DUPLICATES-33](BUILD-STORAGE-DUPLICATES-33.md): Build storage keeps full duplicate copies of images, stage outputs and packages, and nothing removes them
+- [BUILD-TESTER-32GB-OOM-67](BUILD-TESTER-32GB-OOM-67.md): A tester's build on a machine with 32 GB of memory ran out of memory after about 32 hours
 - [BUILD-TOWN-ACTOR-FIT-SERIAL-64](BUILD-TOWN-ACTOR-FIT-SERIAL-64.md): The Vivec town stage fits its residents onto the frame collision on one core after the resident bake
 - [BUILD-UNDERUSE-GATE-36](BUILD-UNDERUSE-GATE-36.md): The profiler did not flag long underused phases: 7 min 44 s of CHIM statistics on 1 of 24 cores and 77 s of zone walk on 1 core showed nowhere
 - [BUILD-UNIT-KEYS-REACH-64](BUILD-UNIT-KEYS-REACH-64.md): New collision settings re-keyed the NPC, creature, player-body and resident unit caches, which never read them

@@ -756,11 +756,16 @@ void AW_CombatRecorderSeed(unsigned long seed) {
     if(!seed)return;
     seed_used=recorder_fight_seed();AW_CombatSeed(&rng,seed_used);totals.seed=seed_used;
 }
+/* REST-CUT-TOO-OFTEN-67: the machine's boot seed (sys_amiga.c, after Host_Init) goes into the per-encounter seed, so
+ * the first fight of every session no longer rolls the same dice (15808476, 11058447, 6300542 ... for encounters 1, 2,
+ * 3 on every boot before). 0 (never set: the host tests) keeps those seeds. aw_combat_seed and the recorder win. */
+static unsigned long boot_seed;
+void AW_CombatBootSeed(unsigned long seed) {boot_seed=seed&0xffffffffUL;}
 static void begin_encounter(void) {
     unsigned long seed=(unsigned long)seed_cvar.value;
     if(recorder_seed){recorder_fights++;seed=recorder_fight_seed();}
     /* 24 bits: exact in the float cvar, so a printed seed replays (aw_combat_seed). */
-    if(!seed){seed=(0x41c64e6dUL^((encounters+1)*2654435761UL))&0xffffffUL;if(!seed)seed=1;}
+    if(!seed){seed=(0x41c64e6dUL^((boot_seed*2246822519UL)&0xffffffffUL)^((encounters+1)*2654435761UL))&0xffffffUL;if(!seed)seed=1;}
     AW_CombatSeed(&rng,seed);seed_used=seed;encounters++;
     memset(&totals,0,sizeof(totals));totals.seed=seed;totals.started=sv.time;
     memset(&cost,0,sizeof(cost));      /* the thinks per second of dbg combat are this encounter's */
@@ -776,9 +781,22 @@ static void begin_encounter(void) {
  * a scene load): no encounter starts, no weapon is drawn, no battle cry and no "attacks" line (COMBAT-DEAD-ACTOR-RELOAD-59). */
 static int engage_dead;
 static int lay_saved;       /* AW_CombatLayCorpse: a saved death laid down again (no essential message) */
+/* PLAZA-FABRICANTS-LIVE-AT-START-67: 1 when E's reference is out of the world by a script's Disable (or taken): the
+ * world change list's answer (aw_mwhost.c AW_ObjectDisabled). OpenMW 0.51 World::disable takes such a reference out of
+ * the scene, so nothing fights it and it fights nobody (mwworld/worldimp.cpp; its local script keeps running). Here the
+ * disabled edict stays with its model taken off, so every fight it would start is refused at the one engage below. */
+static unsigned long disabled_refused;
+static int disabled_actor(edict_t *e) {
+    eval_t *v=e?GetEdictFieldValue(e,"aw_ref"):NULL;
+    return v && v->_float>=1 && v->_float<=16777215.0f && AW_ObjectDisabled((unsigned int)v->_float);
+}
 int AW_CombatEngage(edict_t *e,const aw_fighter_t *fighter,const char *layout) {
     slot_t *s=slot_of(e);int i;
     if(!combat_on.value || !e || e->free || !fighter || !AW_CombatSettingsLoad())return 0;
+    /* a disabled actor starts no fight and joins none: on sight (the ambient aggro), a script's StartCombat, a crime,
+     * an ally's join or a resumed fight of the change list alike (the Plaza's fabricants, which their own script
+     * fab_attack_1 / fab_attack_2 disables until FabAttack is 1). A corpse's slot (engage_dead) is not a fight. */
+    if(!engage_dead && disabled_actor(e)){disabled_refused++;return 0;}
     if(!s){
         for(i=0;i<SLOTS && slots[i].e;i++){}
         /* every slot taken: a fallen fighter's slot is reused (a pack of more than SLOTS keeps coming as the first
@@ -2043,6 +2061,22 @@ void AW_CombatCost(float *per_second,float *ms_mean,float *ms_max,int *fighters)
     if(ms_max)*ms_max=(float)(cost.max*1000);
     if(fighters)*fighters=AW_CombatHostiles();
 }
+/* GAENOR-ATTACKS-AT-START-67: sv_main.c SV_SpawnServer, before the new map's entities spawn (beside the other
+ * modules' "drop every edict pointer kept from the old server"). The slots, the enemy bar's actor, the retry's actors
+ * and the shots in flight name edicts of the old server; the new map's edicts take the same places in memory, so a
+ * kept slot read as a fight of the new map's actor at that edict number: the actors' change list captured it as
+ * fighting during the map's first window tick (aw_actors.c Tick, inside the player's scene set-up, before
+ * AW_CombatSceneSpawn below), and its row then started that fight (ApplyLoaded): the two fabricants fighting in the
+ * Plaza became both Gaenors of the Temple Courtyard. Every fight of the old map is on its actors' rows already
+ * (captured each tick), so nothing is lost here. The rest of the scene set-up (music, the view, the settings mark)
+ * stays with AW_CombatSceneSpawn. */
+static unsigned long server_resets,stale_dropped;
+void AW_CombatServerReset(void);    /* its prototype here: aw_combat.h is keyed by the CHIM world stage (sv_main.c) */
+void AW_CombatServerReset(void) {
+    int i;
+    for(i=0;i<SLOTS;i++)if(slots[i].e){stale_dropped++;memset(&slots[i],0,sizeof(slots[i]));}
+    enemy=NULL;memset(&retry,0,sizeof(retry));shots_clear();server_resets++;
+}
 /* aw_scene.c: a new map; the old edicts are gone. */
 void AW_CombatSceneSpawn(void) {
     int i;for(i=0;i<SLOTS;i++)memset(&slots[i],0,sizeof(slots[i]));
@@ -2062,6 +2096,9 @@ static void report(void) {
     Con_Printf("Flee by rating: %s; aggro and flee settings %s; flees %ld\n",flee_on?"on":"off",
         ai_ok?"loaded":"missing (rebuild the image)",(long)totals.npc_flees);
     Con_Printf("Sounds: %s\n",sounds_on?"as OpenMW (dbg combat sounds on)":"one per outcome (dbg combat sounds off)");
+    /* PLAZA-FABRICANTS-LIVE-AT-START-67, GAENOR-ATTACKS-AT-START-67 */
+    Con_Printf("Disabled actors: %lu fights refused; server spawns %lu, old fight slots dropped %lu\n",disabled_refused,
+        server_resets,stale_dropped);
     Con_Printf("Best attack: %s; hit contact: %s (swings found by the cone %ld)\n",best_cvar.value?"on":"off",
         contact_on?"cone when the crosshair misses":"crosshair only",(long)totals.player_contacts);
     Con_Printf("Spells: %s; spell choices %lu, casts %lu, failed %lu (ratings %lu; all actors' casts %lu; spell reads %lu, at the fight's start only)\n",

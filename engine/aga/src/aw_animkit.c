@@ -22,6 +22,7 @@
 #include "aw_hand_models.h"
 #include "aw_format.h"
 #include "aw_cycleitems.h"   /* the item tester's steps after each server frame (DBG-CYCLEITEMS-67) */
+#include "aw_roll.h"         /* the idle and variant rolls (REST-CUT-TOO-OFTEN-67) */
 
 static cvar_t animkit={"aw_animkit","1",true};
 void AW_SkelCastSound(edict_t *e,const aw_skel_table_t *t,int group,int from,int to);    /* aw_halloween.c */
@@ -435,9 +436,9 @@ static void drive(picker_t *p,edict_t *e,const aw_skel_table_t *t,const aw_anim_
         else if(!fighting && p->has_chances){
             if(realtime>=p->idle_until){
                 unsigned char rolls[8];int i;
-                for(i=0;i<8;i++)rolls[i]=(unsigned char)(rand()%101);
-                p->idle=(unsigned char)AW_PickWanderIdle(p->chances,IDLE_CHANCE_MULT,rand()%101,rolls);
-                p->idle_until=realtime+5+rand()%5;      /* the wander package's next choice (AmiWind pacing) */
+                for(i=0;i<8;i++)rolls[i]=(unsigned char)AW_Roll(101);
+                p->idle=(unsigned char)AW_PickWanderIdle(p->chances,IDLE_CHANCE_MULT,AW_Roll(101),rolls);
+                p->idle_until=realtime+5+AW_Roll(5);    /* the wander package's next choice (AmiWind pacing) */
             }
             s.idle=p->idle;
         }
@@ -458,7 +459,7 @@ static void drive(picker_t *p,edict_t *e,const aw_skel_table_t *t,const aw_anim_
     default:return;      /* the dodge: the AmiWind sidestep plays as it is */
     }
     if(g!=AW_ANIM_KNOCK && g!=AW_ANIM_DEATH)p->knocked=0;
-    if(s.event!=p->last.event || !p->picked)p->roll=(unsigned char)(rand()&255);
+    if(s.event!=p->last.event || !p->picked)p->roll=(unsigned char)AW_Roll(256);
     s.roll=p->roll;
     /* a hit, a fall or a death ends a draw or a cast at once */
     if(s.event==AW_PE_HIT || s.event==AW_PE_KNOCKDOWN || s.event==AW_PE_KNOCKOUT || s.event==AW_PE_DEATH)p->over_from=-1;

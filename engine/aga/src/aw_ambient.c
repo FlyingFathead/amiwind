@@ -396,7 +396,7 @@ static struct {unsigned long thinks,steps,traces,walks,idles,bad_idles,registere
                levelled,aggro_checks,aggro_engaged,aggro_full,flights,dry,travels,travels_done,follows,follows_done,
                unsticks,unstick_tests,settles,settled,escorts,crossed,standing,
                door_checks,door_tests,door_found,door_idles,door_stuck,door_dropped,
-               placed,away,current;double seconds,worst,elapsed;} st;
+               placed,away,current,disabled;double seconds,worst,elapsed;} st;
 /* sv_phys.c SV_CheckStuck: every search for a clear spot (a box that starts in solid), its position tests, and the
  * searches that found none (AMBIENT-UNSTUCK-FLOOD-61) */
 extern unsigned long aw_stuck_searches,aw_stuck_tests,aw_stuck_failed;
@@ -1212,6 +1212,11 @@ void AW_AmbientPhysics(void) {
          * companion, the animation stage) owns the actor */
         if(!AW_CombatSlotState(s->e,NULL) && !s->fighting &&
            (AW_CompanionEdict(s->e) || s->e->v.nextthink<=0 || field(s->e,"aw_story_hidden",0)))continue;
+        /* PLAZA-FABRICANTS-LIVE-AT-START-67: a script's Disable takes the actor out of the world (OpenMW World::disable:
+         * out of the scene, its packages not run): no aggro check, no wander, no idle while disabled; it goes on where
+         * it stood when a script enables it (the Plaza's fabricants, fab_attack_1 / fab_attack_2, until FabAttack is 1) */
+        if(!AW_CombatSlotState(s->e,NULL) && s->ref>=1 && s->ref<=16777215.0f && AW_ObjectDisabled((unsigned int)s->ref)){
+            st.disabled++;continue;}
         if(dt>.5f)dt=.5f;
         {double a0;AW_SPIKE_BEGIN(a0);st.thinks++;think(s,dt);
          if(aw_spike_on && a0>0)AW_SpikeEnt(s->num,Sys_FloatTime()-a0);}   /* the slowest actor named on the spike line */
@@ -1609,8 +1614,8 @@ static void status(void) {
                st.registered,st.unknown,st.no_walk,st.blob_bytes);
     Con_Printf("  %lu flying or swimming steps (straight, off the ground; %lu swim spots out of water skipped, last contents %d)\n",st.flights,st.dry,last_dry);
     Con_Printf("  %lu levelled creatures on their reference's routes; aggro %s: %lu checks, %lu fights started, %lu waited (4 fighting); "
-               "%lu actors without a package watched for it\n",
-               st.levelled,aggro_on?"on":"off",st.aggro_checks,st.aggro_engaged,st.aggro_full,st.standing);
+               "%lu actors without a package watched for it; %lu thinks skipped for a disabled actor\n",
+               st.levelled,aggro_on?"on":"off",st.aggro_checks,st.aggro_engaged,st.aggro_full,st.standing,st.disabled);
     {long held=0;int k;for(k=0;k<amb_count;k++)held+=amb[k].bytes;
      Con_Printf("  per area (aw_ambient_areas %d): %s; %d areas in memory (%ld bytes, levelled packages %ld rows); %lu loads, "
                 "%lu bytes, %d ms in all, last %d areas %ld bytes %d ms; %lu rows found in memory, %lu actors in none; "

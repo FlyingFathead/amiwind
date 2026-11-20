@@ -32,6 +32,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "aw_quickchar.h"
 #include "aw_testbox.h"
 #include "aw_tryalloc.h"
+#include "aw_rest.h"
+#include "aw_combat.h"
+#include "aw_mwvm.h"
+#include <time.h>	/* the boot seed's clock off the Amiga (host tests) */
 
 /*
 
@@ -797,6 +801,7 @@ void _Host_Frame (float time)
         AW_TestBoxFrame();AW_TestPollFrame();
         if(!AW_ModalWorldFrozen())AW_IntroTick();
         if(!AW_ModalWorldFrozen())AW_WaitTick();
+        AW_RestTick();	/* a rest's hours, under its window: the scripts below see each frame (GETPCSLEEP-NOT-CARRIED-OUT-67) */
         AW_AnimKitTick();
         AW_HalloweenTick();
         AW_SPIKE_END (AW_SP_TICKS, aw_tk0_, 0);
@@ -945,6 +950,35 @@ Host_Init
  * follows it (ticks advance, realtime stands), so a test session tells it from a dead engine. */
 extern void (*S_ExtraUpdateHook)(void);
 static void Host_RemoteBusy (void) {AW_RemoteBusy (Sys_FloatTime ());}
+/* REST-CUT-TOO-OFTEN-67 (docs/RESTING.md "The roll"): the game's random streams start from the machine's clock, once a
+ * boot, at the end of Host_Init (the timer is open, the boot's file loads have put their timing into the E-clock) and
+ * before the first frame runs a command: the C library's generator (every AW_Roll of aw_roll.h, QuakeC random, the
+ * effects), the per-encounter fight seeds (aw_combat.c) and MWScript Random's start at a load (aw_mwvm.c). Before,
+ * every boot drew from one fixed sequence: newlib's state 1, the fights 15808476, 11058447, 6300542 ..., Random from
+ * 0x2545F491. aw_seed N (a config's too: it runs in the first frame) and a recording or its replay (seeded every frame
+ * from the recording) still set the C library's generator; dbg combat seed N the fights'. */
+#ifdef AMIGA
+unsigned long AW_ClockSeed (void);	/* amiga_stubs.c: DateStamp and the E-clock */
+#endif
+static void boot_seed (void)
+{
+    unsigned long h;
+#ifdef AMIGA
+    h = AW_ClockSeed ();
+#else
+    h = (unsigned long)time (NULL);
+#endif
+    /* murmur3's finaliser: every bit of the clocks reaches every bit of the seed */
+    h &= 0xffffffffUL;
+    h ^= h >> 16; h = (h * 0x7feb352dUL) & 0xffffffffUL; h ^= h >> 15; h = (h * 0x846ca68bUL) & 0xffffffffUL; h ^= h >> 16;
+    if (!h)
+        h = 1;
+    srand ((unsigned)h);
+    AW_CombatBootSeed (h);
+    AW_MwvmBootSeed (h);
+    Con_Printf ("Random: boot seed %lu (from the clock; aw_seed N sets the rolls for a test)\n", h);
+}
+
 void Host_Init (quakeparms_t *parms)
 {
 
@@ -1045,6 +1079,7 @@ void Host_Init (quakeparms_t *parms)
     /* the boot level dbg restartgame comes back to (DBG-RESTARTGAME-62; its "Restart:" line) */
     Con_Printf ("Boot: Hunk %ld bytes low, %ld high.\n", (long)Hunk_LowMark (), (long)Hunk_HighMark ());
     AW_ResetBootMark ();	/* what a New Game's reset must give (aw_reset.h, NEWGAME-STATE-RESET-62) */
+    boot_seed ();		/* the game's random streams from the clock (REST-CUT-TOO-OFTEN-67) */
 
     host_initialized = true;
 

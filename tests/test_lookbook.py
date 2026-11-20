@@ -161,11 +161,13 @@ class ComposeTests(unittest.TestCase):
 
 
 class JudgeTests(unittest.TestCase):
-    def run_book(self, overrides=None, known=False, **kw):
+    def run_book(self, overrides=None, known=False, mark=None, **kw):
         book = lb.load_book()
         if not known:   # the judge's own verdicts, without the book's known gaps (KnownGapTests below has them)
             for p in book['pages']:
                 p.pop('known', None)
+        if mark:        # (page id, register id): a known gap set by the test itself, whatever the book carries now
+            next(p for p in book['pages'] if p['id'] == mark[0])['known'] = mark[1]
         td = tempfile.TemporaryDirectory()
         self.addCleanup(td.cleanup)
         d = td.name
@@ -261,17 +263,20 @@ class JudgeTests(unittest.TestCase):
             self.assertIn(want, line)
 
     def test_a_known_gap_reports_and_does_not_stop(self):
-        # HELD-LIGHT-IN-HAND carries known FP-TORCH-OUT-OF-HAND-67 until its fix: the miss is KNOWN, not counted
-        ok, lines, report = self.run_book({'torch_grip_first': [BAD_GRIP]}, known=True)
+        # a page with a known gap (set here by the test: HELD-LIGHT-IN-HAND carried FP-TORCH-OUT-OF-HAND-67 until its
+        # fix, and the book's mark was taken out when it closed): the miss is KNOWN, not counted
+        mark = ('HELD-LIGHT-IN-HAND', 'FP-TORCH-OUT-OF-HAND-67')
+        ok, lines, report = self.run_book({'torch_grip_first': [BAD_GRIP]}, known=True, mark=mark)
         self.assertTrue(ok, '\n'.join(lines))
         page = next(p for p in report['pages'] if p['page'] == 'HELD-LIGHT-IN-HAND')
         self.assertEqual(page['state'], 'KNOWN')
         self.assertIn('known gaps: HELD-LIGHT-IN-HAND', lines[-1])
         # when its checks pass, the page says the gap closed
-        ok, lines, report = self.run_book(known=True)
+        ok, lines, report = self.run_book(known=True, mark=mark)
         self.assertTrue(any('closed: take the known mark out' in ln for ln in lines), lines)
         # a stop in a known page still fails the run
-        ok, lines, report = self.run_book(known=True, stop_step=1, result='FAIL walkto 1 2: not reached in 30 s')
+        ok, lines, report = self.run_book(known=True, mark=mark, stop_step=1,
+                                          result='FAIL walkto 1 2: not reached in 30 s')
         self.assertFalse(ok)
 
     def test_a_journey_page_reads_the_journey_result(self):

@@ -480,10 +480,14 @@ def exterior_like_rooms(data, rooms, masters=None):
         for key in exterior_like_cells(child_ci(Path(data), name).read_bytes()):
             origin.setdefault(key, name)
     keep, left = [], []
+    # what becomes of such a cell (ROOMS-SET-ASIDE-NOT-BUILT-67): the district module builds it as open terrain. The
+    # text is here, not in EXTERIOR_LIKE_STATE (the earlier text, kept): that module constant is import-time code in
+    # the keys of every room unit, so a change there would re-key them all
+    state = 'a district, built as open terrain by the district module (tribunal-mournhold), not as a room'
     for row in rooms:
         key = row['room'].casefold()
         if key in flagged:
-            left.append({'cell': row['room'], 'master': origin.get(key, '?'), 'state': EXTERIOR_LIKE_STATE})
+            left.append({'cell': row['room'], 'master': origin.get(key, '?'), 'state': state})
         else:
             keep.append(row)
     return keep, left
@@ -508,6 +512,44 @@ def empty_rooms(entries, cells):
         empty[entry['cell']] = ('empty in the game data: no placement the room converter keeps (%d references%s); '
                                 '%d doors lead in' % (len(live), ': ' + held if live else '', len(cell['entrances'])))
     return keep, empty
+
+
+def build_empty(task):
+    """One room whose cell holds no placement the room converter keeps (empty_rooms; ROOM-EMPTY-CELL-66: "Sotha Sil,",
+    "Mournhold, Royal Palace", "Vor Lair, Chambers of Alta Vor", "Vor Lair, Interior"), built as the original has it
+    (ROOMS-SET-ASIDE-NOT-BUILT-67, the maintainer's rule of 19 November 2026: if a place is in the original, it is in
+    AmiWind): a shell map with no scenery, a box EMPTY_HALF around its references (or the origin) and EMPTY_HEIGHT
+    high, the start in its middle, and no placements; the residents step places its actors like any room's (the
+    smuggler of "Mournhold, Royal Palace"), and the image lists it in dbg tp like every room it holds. Its own function,
+    outside build_shell's reach, so no other room unit re-keys; never stored in the unit cache (it reads nothing to
+    convert and takes milliseconds). Returns (report, cell) as build_shell. (Its numbers are written here, not as module
+    constants: this module's import-time code is in the keys of every room unit, effect_models.)"""
+    EMPTY_HALF = 256.0        # the box: this far around its references (or the origin) on x and y
+    EMPTY_HEIGHT = 256.0      # and this high above the lowest of them
+    data, scene, entry, timings, cell = task
+    slug = entry['map']
+    root = Path(scene) / 'area-work' / slug
+    root.mkdir(parents=True, exist_ok=False)
+    live = [r for r in cell['refs'] if not r.get('deleted') and r.get('position')]
+    points = [[float(v) * 0.25 for v in r['position'][:3]] for r in live] or [[0.0, 0.0, 0.0]]
+    lo = [min(p[i] for p in points) - EMPTY_HALF for i in range(2)] + [min(p[2] for p in points) - EDGE]
+    hi = [max(p[i] for p in points) + EMPTY_HALF for i in range(2)] + [lo[2] + EDGE + EMPTY_HEIGHT]
+    spawn = [(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0, lo[2] + EDGE + SPAWN_LIFT]
+    from prepare_npcs import quote
+    world = ['"classname" "worldspawn"', '"message" ' + quote(cell['name']), '"%s" "1"' % SHELL_KEY] + \
+        sky_keys(cell) + ([timings] if timings else [])
+    entities = ['{\n' + '\n'.join(world) + '\n}',
+                entity_text({'classname': 'info_player_start', 'origin': ' '.join(map(str, spawn)), 'angle': 0.0})]
+    (root / 'room.bsp').write_bytes(shell_map(lo, hi, entities))
+    (root / 'placements.json').write_text('[]\n', encoding='utf-8', newline='\n')
+    report = {'map': slug, 'cell': cell['name'], 'form': 'empty room', 'spawn': spawn, 'yaw': 0.0,
+              'start_rule': 'an empty cell of the original: the middle of its box (to check in the game)',
+              'placements': 0, 'references': 0, 'omitted': [], 'water_height': None,
+              'lava': {'mode': 'none', 'pools': []}, **({'sky': 'exterior'} if sky_keys(cell) else {}),
+              'bounds': [list(map(float, lo)), list(map(float, hi))], 'master_sha256': cell.get('master_sha256'),
+              'bytes': (root / 'room.bsp').stat().st_size, 'actors': len(live)}
+    (root / 'conversion.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8', newline='\n')
+    return report, cell
 
 
 def read_cells(data, todo):
@@ -593,8 +635,7 @@ def prepare(batches, data_files, scene, out, held_by=(), ffmpeg='ffmpeg', jobs=N
     rooms, held, refused = room_batches.plan(doc, chosen, held_by, root)
     rooms, exterior_like = exterior_like_rooms(data, rooms)
     for row in exterior_like:
-        _log('not converted: %s (%s): an exterior-like cell, waiting for the Mournhold exterior work'
-             % (row['cell'], row['master']))
+        _log('not a room: %s (%s): %s' % (row['cell'], row['master'], row['state']))
     _log('batches %s: %d rooms to convert, %d left to other stages (%s), %d refused; %d workers' % (
         room_batches.selection_text(chosen), len(rooms), len(held), ', '.join(sorted(set(held.values()))) or 'none',
         len(refused), jobs))
@@ -625,11 +666,19 @@ def prepare(batches, data_files, scene, out, held_by=(), ffmpeg='ffmpeg', jobs=N
                              '; '.join('%s (%d)' % (r, len(v)) for r, v in sorted(unclassified.items()))))
     _log('preflight: every resident NPC of %d rooms has its grounding class (%.1f s)'
          % (len(entries), time.perf_counter() - t0))
+    every = entries
     entries, empty = empty_rooms(entries, cells)
-    for room, why in sorted(empty.items()):
-        _log('not converted: %s: %s' % (room, why))
     t0 = time.perf_counter()
     results = convert(data, work, entries, timings, jobs, refresh=lambda todo: {e['map']: cells[e['map']] for e in todo})
+    # the rooms whose cell holds no scenery are built too, as empty rooms (build_empty; ROOMS-SET-ASIDE-NOT-BUILT-67)
+    for entry in every:
+        if entry['cell'] in empty:
+            try:
+                results[entry['map']] = ('ok', build_empty((data, work, entry, timings, cells[entry['map']])), True)
+                _log('%s (%s): built as an empty room (%s)' % (entry['map'], entry['cell'], empty[entry['cell']]))
+            except Exception as error:  # noqa: BLE001 (named, as a failed room unit)
+                results[entry['map']] = ('failed', '%s: %s' % (type(error).__name__, error), True)
+    entries = every
     units_seconds = time.perf_counter() - t0
     converted, reports, failed, rows = {}, [], {}, []
     for entry in entries:
@@ -726,12 +775,13 @@ def prepare(batches, data_files, scene, out, held_by=(), ffmpeg='ffmpeg', jobs=N
     if exterior_like:
         record['exterior_like'] = exterior_like       # only with the expansions: the base game has no such cell
     if empty:
-        record['empty'] = empty                       # only with the expansions: every base game room holds scenery
+        # built as empty rooms and listed in 'rooms' like any room (ROOMS-SET-ASIDE-NOT-BUILT-67); what their cell holds
+        record['built_empty'] = empty                 # only with the expansions: every base game room holds scenery
     (out / RECORD).write_text(json.dumps(record, indent=1, sort_keys=True) + '\n', encoding='utf-8', newline='\n')
     _log('%d rooms converted (%d made, %d from the unit cache), %d left to other stages, %d refused or failed%s; '
          '%d door banks; %.1f s (units %.1f s, residents %.1f s)' % (
              len(rows), made, len(rows) - made, len(held), len(record['refused']),
-             ', %d empty in the game data' % len(empty) if empty else '', len(banks),
+             ', %d of them built as empty rooms' % len(empty) if empty else '', len(banks),
              record['seconds']['total'], units_seconds, residents_seconds))
     if fallback['count']:
         _log('%d residents baked at a smaller animation level (alias byte budget): %s' % (

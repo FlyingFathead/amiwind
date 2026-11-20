@@ -187,6 +187,20 @@ table.mt small{opacity:.8}
 #mhlegend span{display:inline-block;margin-right:12px;font-size:13px}
 #mhlegend i{display:inline-block;width:10px;height:10px;margin-right:4px;vertical-align:middle}
 #mhlist{overflow-x:auto;margin-top:8px}
+/* Completion per game (completion-panel.js): one panel per master, every count opens its list. */
+#completionpanel{margin:8px 0;padding:8px 10px;background:var(--panel);border:1px solid var(--line);border-radius:6px;font-size:14px;overflow-x:auto}
+#completionpanel[hidden]{display:none}
+#completionpanel h2{font-size:16px;margin:0 0 6px;color:#ffe28a}
+#completionpanel h3{font-size:15px;margin:8px 0 4px}
+#cpswitch{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+#cpswitch button{background:#203346;color:var(--ink);border:1px solid #456;border-radius:5px;padding:5px 10px;cursor:pointer}
+#cpswitch button[aria-pressed="true"]{border-color:#ffe28a;background:#2c4660}
+#completionpanel table.mt td{white-space:normal}
+#completionpanel tr.cphead th{background:#1a2c3d;color:#ffe28a}
+#completionpanel a.cplink{color:#8bd5ff}
+#completionpanel .cpnm{color:#ffb347}
+#completionpanel details.cplist{margin:4px 0}
+#completionpanel details.cplist ul{margin:2px 0 6px;columns:2 22em}
 </style>
 </head>
 <body>
@@ -251,6 +265,11 @@ table.mt small{opacity:.8}
   <div id="viewcounts"></div>
   <div id="viewrates" class="muted" aria-label="Completion rate per game"></div>
 </div>
+<section id="completionpanel" hidden aria-label="Completion per game">
+  <h2>Completion per game</h2>
+  <div id="cpswitch" role="group" aria-label="Game"></div>
+  <div id="cpbody"></div>
+</section>
 <div id="selected">Selected area: click a cell on the map</div>
 <div id="multi" class="muted" style="color:#ffd24a"></div>
 <main id="mainview">
@@ -332,6 +351,7 @@ table.mt small{opacity:.8}
 <script src="chim-inclusion.js"></script>
 <script src="interior-tracker.js"></script>
 <script src="expansion-views.js"></script>
+<script src="completion-panel.js"></script>
 <!--AW-LIVE-DATA-->
 <script>
 const $ = id => document.getElementById(id), canvas = $('map'), ctx = canvas.getContext('2d');
@@ -1970,7 +1990,21 @@ function interiorTrackerUi() {
 function itRender() {
   if (!itIr) return;
   if (itFold && itFold.blocks[0] && itFold.blocks[0].folded) return;   // drawn when opened
-  $('itlist').innerHTML = IT.listHtml(itIr, $('itsearch').value, roomOpts());
+  $('itlist').innerHTML = IT.listHtml(itIr, $('itsearch').value, listOpts());
+}
+// The unified readiness count of the loaded data (expansion-views.js readiness(): the data's own, or counted by the same
+// rules for older data), kept per loaded document.
+let evReady = null, evReadyFor = null;
+function readyOf() {
+  if (!EV || !chim) return null;
+  if (evReadyFor !== chim) { evReady = EV.readiness(chim); evReadyFor = chim; }
+  return evReady;
+}
+// The room lists group by the land of the unified count, so a land's group holds the rooms its count holds.
+function listOpts() {
+  const o = Object.assign({}, roomOpts() || {}), r = readyOf();
+  if (r) o.byLand = EV.landGrouping(r);
+  return Object.keys(o).length ? o : null;
 }
 // Room tiles in 3D (TOOLKIT-TILE-TO-INSPECTOR-67): the built room of an interior cell in the served build (/build/rooms.json) or
 // in a build folder chosen by hand; a room with several types (the Arena Pit) opens the type its door opens.
@@ -2031,8 +2065,36 @@ function viewsUi() {
   $('viewcounts').textContent = cur ? (evList.length > 1 ? '' : cur.label + ': ') + cur.text : '';
   $('viewcounts').hidden = !cur || evList.length > 1;
   $('viewrates').innerHTML = rates.length ? 'Completion: ' + rates.map(r => '<span class="evrate">' + escapeHtml(EV.rateText(r)) + '</span>').join('') : '';
+  cpUi();
   viewShow();
 }
+// The completion panel per game (completion-panel.js, TOOLKIT-EXPANSION-COMPLETION-67): Tribunal first, then Bloodmoon and
+// Morrowind; the tracker data's `completion` section and the unified count; a click on a count opens its list.
+const CP = window.AmiWindCompletion || null, CP_KEY = 'amiwind-completion-game-1';
+let cpGame = null;
+function cpUi() {
+  const ready = readyOf(), list = CP && ready ? CP.masters(chim.completion, ready) : [];
+  $('completionpanel').hidden = !list.length;
+  if (!list.length) return;
+  if (!cpGame) { try { cpGame = window.localStorage.getItem(CP_KEY); } catch (_) { /* no storage */ } }
+  if (!list.some(g => g.id === cpGame)) cpGame = list[0].id;
+  $('cpswitch').innerHTML = CP.switchHtml(list, cpGame);
+  $('cpbody').innerHTML = CP.panelHtml(chim.completion || null, ready, cpGame);
+}
+$('cpswitch').addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('button[data-cp]');
+  if (!b) return;
+  cpGame = b.dataset.cp;
+  try { window.localStorage.setItem(CP_KEY, cpGame); } catch (_) { /* no storage */ }
+  cpUi();
+});
+$('cpbody').addEventListener('click', e => {
+  const a = e.target.closest && e.target.closest('a[data-cplist]');
+  if (!a) return;
+  e.preventDefault();
+  const d = document.getElementById(a.dataset.cplist);
+  if (d) { d.open = true; if (d.scrollIntoView) d.scrollIntoView({block: 'nearest', behavior: 'smooth'}); }
+});
 function viewShow() {
   const mh = evView === EV.MOURNHOLD, rooms = evRooms();
   $('mainview').hidden = mh; $('mournholdview').hidden = !rooms.length;     // Solstheim: its rooms under the map; Mournhold: the screen alone
@@ -2081,7 +2143,7 @@ function mhRender() {
     '<span><i style="background:#2a3a4c"></i>not a room of the build</span>'
     : EV.countText(cnt) + ' of ' + cnt.total.toLocaleString() + ' rooms. ' + IT.STATES.filter(s => seen.has(s)).map(s => '<span><i style="background:' + IT.COLOURS[s] + '"></i>' +
     escapeHtml(IT.LABELS[s]) + ' ' + rooms.filter(r => r.state === s).length + '</span>').join('');
-  $('mhlist').innerHTML = (heatOn ? heaviestHtml(rooms) : '') + (itIr ? IT.listHtml(Object.assign({}, itIr, {rooms}), '', roomOpts()) : '');
+  $('mhlist').innerHTML = (heatOn ? heaviestHtml(rooms) : '') + (itIr ? IT.listHtml(Object.assign({}, itIr, {rooms}), '', listOpts()) : '');
   const room = evPicked && roomBuilt(evPicked), b3 = $('mh3d');
   b3.hidden = !evPicked || !roomOpts();
   b3.disabled = false;
@@ -2400,10 +2462,12 @@ function chimHeadSend() {
   if (!chim) return;
   // the expansions' rooms and cells, the same figures as the view switch's cards and the completion line (TOOLKIT-DLC-VIEWS-64)
   const expansions = EV ? EV.completion(chim) : null;
-  const msg = {type: 'amiwind-chim-head', headline: chim.headline, history: chim.history, expansions};
+  // the unified count per land (TOOLKIT-EXPANSION-COMPLETION-67): the headline draws it instead of the per-land rows
+  const readiness = readyOf();
+  const msg = {type: 'amiwind-chim-head', headline: chim.headline, history: chim.history, expansions, readiness};
   if (window.parent !== window) window.parent.postMessage(msg, '*');
   else {
-    window.ChimHead.render($('chimhead'), chim.headline, chim.history, bucket => { chimPickBucket(bucket === chimBucket ? null : bucket); chimHeadSend(); }, chimBucket, {noFold: true, expansions});
+    window.ChimHead.render($('chimhead'), chim.headline, chim.history, bucket => { chimPickBucket(bucket === chimBucket ? null : bucket); chimHeadSend(); }, chimBucket, {noFold: true, expansions, readiness});
     // The summary line stays at the top; the colour chips, lighting and history lines move into the foldable legend block.
     const head = $('chimhead'), box = $('legendblock');
     for (const n of Array.from(box.children)) if (!n.classList.contains('foldbtn') && !n.classList.contains('foldtitle')) n.remove();

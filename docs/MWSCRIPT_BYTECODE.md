@@ -1,6 +1,6 @@
 # MWScript compiled by the builder
 
-_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
+_Last updated with AmiWind v0.0.67 (19 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -566,7 +566,12 @@ the speaker without lip movement yet.
 
 Object state (v0.0.51): `Enable`, `Disable`, `GetDisabled`, `Lock`, `Unlock`, `GetLocked`, on the script's own
 object or the one named before `->`. A disabled object with an entity is hidden and not solid until `Enable`, also
-after a map change (its new entity is hidden again); `Lock` without a number takes the level the object had last
+after a map change (its new entity is hidden again). Since v0.0.67 that holds for every load of a map, the map already
+in play included: a teleport inside the place or a reload of it attaches the map again, so the Plaza Brindisi Dorom's
+fabricants and the Dreamers Startup disabled in Seyda Neen stay hidden; before, such a load drew them, because the
+engine told a new map by its file and name alone and a `Disable` of a reference already disabled did nothing
+([PLAZA-FABRICANTS-LIVE-AT-START-67](bugs/PLAZA-FABRICANTS-LIVE-AT-START-67.md)). A `Disable` of a disabled reference
+whose entity is still drawn hides it as well (counted in `dbg mwscript status`, "map attach"); `Lock` without a number takes the level the object had last
 (100 when it never had one). Both are kept in saved games, by the object's reference, in the same change list as the
 actors' state (an object's entry carries "disabled" and "lock set, level"). An actor the CHIM world spawns as its
 cell joins is not spawned while disabled; since v0.0.62 its entity text is kept while its cell stays in the window (16
@@ -768,7 +773,8 @@ import route (no new opcode, no change of the file's format):
 | `GetWeaponDrawn` | the player's hands readied without a torch; an actor while it fights | miscextensions.cpp OpGetWeaponDrawn |
 | `OnKnockout` | 1 in the frame a script first sees the actor knocked down (a blow's or fatigue's) | statsextensions.cpp OpOnKnockout; actors.cpp |
 | `SetDelete` | 1 deletes the object for good, as an item the player took: it leaves the world, Enable does not bring it back, its local script stops after the frame and no map binds it again; 0 undeletes it (its script binds at the next map load); kept in saved games | miscextensions.cpp OpSetDelete, worldimp.cpp deleteObject / undeleteObject |
-| `WakeUpPC` | the rest window open for sleeping closes (a wait stays) | miscextensions.cpp OpWakeUpPC; waitdialog.cpp wakeUp |
+| `GetPCSleep` | 1 while the hours of a rest pass (over the frames since v0.0.67, so every rest gives the scripts at least one frame asleep), 0 while the window only offers the rest, during a wait and in play; a whole number (before v0.0.67 the host wrote it as a fraction, so a script's `GetPCSleep == 1` never held) | miscextensions.cpp OpGetPcSleep; waitdialog.hpp getSleeping; timeadvancer.cpp |
+| `WakeUpPC` | the hours of a rest or wait stop where they are (the hours passed count, no level-up; a planned wilderness interruption still comes) and the window closes, also when it only offers the rest | miscextensions.cpp OpWakeUpPC; waitdialog.cpp wakeUp |
 
 Angles and moves act on an object with an entity; CHIM scenery without one cannot turn or move yet (counted in
 `aw_mwscript_status`, as Rotate's). The reads that change without the state generation moving (the angles, detection,
@@ -926,11 +932,30 @@ reports it and does nothing).
 - **A carried item** is a drop row of the world change list (the next drop serial, the item's id, the place and
   position), shown at once when its place is loaded and taken as any drop (CELL-CHANGES-59).
 
+- **A levelled creature list** (v0.0.67, [MWSCRIPT-PLACE-OTHER-KINDS-62](BUGS.md); OpenMW 0.51
+  mwclass/creaturelevlist.cpp: a placed list gives one creature of it at the player's level) is an actor row with the
+  levelled flag (PLAC flags 4): the engine rolls one creature of the list of that id in the actor table for the new
+  reference at the player's level, keeps the pick under it (a return or a load gives the same creature), and spawns it
+  as above, its record's script attached. The builder puts every list a Place call names, and every region's sleep
+  list, in the actor table with a base of its own (tools/chim/actors.py named_lists). Tribunal's fab_cent_fight_watch
+  places two of in_dwe_all_tribunal's centurions in Bamz-Amschend this way.
+- **A scripted object no map places** (v0.0.67; an activator whose record has a script: Tribunal's trapProjectile,
+  Bloodmoon's transformation effects) is a point row (PLAC flags 2): an entity of its own where the call puts it, not
+  drawn (no map converted its model), not solid, under its new reference, so its record's script runs on it: the mine's
+  projectile moves to the player (SetPos), casts its spell (ExplodeSpell), disables and deletes itself. An object with
+  neither a placed reference nor a script stays "not yet": it would show nothing and run nothing.
+- **A deleted script-made reference leaves for good** (v0.0.67; OpenMW mwworld/cellstore.cpp writeReferences keeps no
+  deleted reference that no content file made): after the frame's run, SetDelete 1 on a reference of the `F00000`
+  block frees its edict and drops its rows of both change lists, so it is not spawned again on a return or a load, not
+  saved, and its key is free again; a projectile the mine fires every few seconds no longer leaves a row behind.
+
 Not carried yet, kept as "not yet" and counted in the feature tracker: an NPC or creature whose record no reference
 in Vvardenfell places (Ranes Ienith, Rerlas Mon's rats, the Dark Brotherhood attackers of Tribunal and most of
-Bloodmoon's: no converted model, [MWSCRIPT-PLACE-NO-MODEL-62](BUGS.md)), and activators, containers and levelled
-creature lists (Solstheim's and Mournhold's effects and spriggans, [MWSCRIPT-PLACE-OTHER-KINDS-62](BUGS.md)). Game
-data, 7 November 2026: 41 objects named (21 NPCs, 9 creatures, 4 items, 7 others), 11 of them made by the engine.
+Bloodmoon's: no converted model, [MWSCRIPT-PLACE-NO-MODEL-62](BUGS.md)), and an object with neither a placed reference
+nor a script. Game data, 7 November 2026: 41 objects named (21 NPCs, 9 creatures, 4 items, 7 others), 11 of them made
+by the engine. Measured 19 November 2026 (0.0.67, the feature tracker): every PlaceItem call of the game is carried out
+(24 scripts, 37 uses; it was missing in 19 scripts before), the scripts with a function missing went from 21 to 2 (the two
+water levers of Old Mournhold, [MWSCRIPT-WATER-LEVEL-STATIC-67](BUGS.md)), the scripts that run from 611 to 617.
 Measured with the feature tracker (MWSCRIPT_FEATURES.md, 7 November 2026, against the integration line with
 AIFollowCell, AIEscort, the player's control switches and the small functions): scripts that run whole 468 before,
 472 after (of 1,207); scripts with a function missing 149 before, 139 after (6 more are whole but placed only in an

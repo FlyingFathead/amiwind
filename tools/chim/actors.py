@@ -201,6 +201,35 @@ def script_placed_actors(master):
     return out
 
 
+def named_lists(master):
+    """The levelled creature lists (lower case, sorted) the engine rolls by their id (v0.0.67): every region's sleep list
+    (REGN BNAM: the creature a wilderness rest that is cut short brings, REST-CUT-NO-CREATURE-67; OpenMW 0.51
+    waitdialog.cpp onWaitingInterrupted, worldimp.cpp spawnRandomCreature) and every list a PlaceAtPC, PlaceAtMe,
+    PlaceItem or PlaceItemCell of the scripts or dialogue results names (Tribunal's fab_cent_fight_watch places
+    in_dwe_all_tribunal, MWSCRIPT-PLACE-OTHER-KINDS-62; OpenMW mwclass/creaturelevlist.cpp: a placed list gives one
+    creature of the list at the player's level). The same text scan as script_placed_actors, kept apart from it so the
+    actor library's stage (which reads that one) keeps its key."""
+    from mwad.audit import records, string, subrecords
+    named, levc = set(), set()
+    for tag, flags, payload in records(master):
+        if flags & 0x20:
+            continue
+        fields = list(subrecords(payload))
+        if tag == 'LEVC':
+            name = next((d for t, d in fields if t == 'NAME'), None)
+            if name is not None and not any(t == 'DELE' for t, _ in fields):
+                levc.add(string(name, errors='replace').casefold())
+        elif tag == 'REGN':
+            named.update(string(d, errors='replace').casefold() for t, d in fields if t == 'BNAM' and d.strip(b'\0'))
+        elif tag in ('SCPT', 'INFO'):
+            for t, d in fields:
+                if t in ('SCTX', 'BNAM'):
+                    for line in string(d, errors='replace').splitlines():
+                        for m in SCRIPT_PLACE.finditer(line.split(';', 1)[0]):
+                            named.add(m.group(1).strip('"').casefold())
+    return sorted(named & levc)
+
+
 def used_lists(lists, roots):
     """The lists ROOTS reach, themselves and every list inside them, sorted (the table's list order)."""
     seen, todo = set(), [r for r in roots if r in lists]
@@ -458,7 +487,7 @@ def table_list_order(lists, refs, room_roots=(), placed=()):
 
 
 def build_table(refs, built=None, lists=None, creatures=None, library=None, scales=None, room_roots=(), placed=(),
-                script_placed=(), summoned=()):
+                script_placed=(), summoned=(), named=()):
     """(table bytes, report) from exterior_actors' rows and built_actors' rows (keyed by reference number).
 
     Without LISTS: version 1, as before. With LISTS (levelled_lists of the master) and CREATURES (creature_ids):
@@ -472,7 +501,11 @@ def build_table(refs, built=None, lists=None, creatures=None, library=None, scal
     take their texts at that scale (the original scales the creature a list gives by the list reference's scale:
     OpenMW mwclass/creaturelevlist.cpp).
     PLACED (room_placed_creatures; version 2 only): the creatures placed in rooms, each a list of one after the real
-    lists (placed_lists), so a room's 'aw_levelled' entity spawns it; its creature base takes its library text."""
+    lists (placed_lists), so a room's 'aw_levelled' entity spawns it; its creature base takes its library text.
+    NAMED (named_lists; version 2 only, v0.0.67): the lists the engine rolls by their id (a region's sleep list, a list
+    a script places): the ones not in the table yet come after every other list (so the indices before them stay), and
+    each named list gets a levelled base of its own at the end of the bases, with the list's id hash and its index (the
+    engine takes the last levelled base of an id: aw_actors.c AW_ActorsLevelledText)."""
     built = built or {}
     library = {k.casefold(): v for k, v in (library or {}).items()}
     v2 = lists is not None
@@ -490,6 +523,10 @@ def build_table(refs, built=None, lists=None, creatures=None, library=None, scal
                      and '%.4f' % scaled[n] in baked_scales for lid in used_lists(lists, {b.casefold()})})
     for lid, sc in copies:
         list_index[(lid, sc)] = len(list_index)
+    named_roots = sorted({n.casefold() for n in named} & set(lists)) if v2 else []
+    named_extra = [lid for lid in used_lists(lists, set(named_roots)) if lid not in list_index]
+    for lid in named_extra:
+        list_index[lid] = len(list_index)
     bases, base_index, texts = [], {}, bytearray()
     records = []
     kinds_seen = {}
@@ -535,7 +572,7 @@ def build_table(refs, built=None, lists=None, creatures=None, library=None, scal
         kinds_seen[kind] = kinds_seen.get(kind, 0) + 1
     # the lists' entries: a creature the list can give gets a creature base (its library text, or none)
     table_lists, missing = [], []
-    for lid, sc in [(lid, 1.0) for lid in order] + copies:
+    for lid, sc in [(lid, 1.0) for lid in order] + copies + [(lid, 1.0) for lid in named_extra]:
         flags, chance, entries = lists[lid]
         out_entries = []
         for entry, level in entries:
@@ -563,6 +600,10 @@ def build_table(refs, built=None, lists=None, creatures=None, library=None, scal
     # effect lands
     summon_bases = [base_of(i, KINDS['CREA'], text_at(i, 1.0)) for i in sorted({s.casefold() for s in summoned})
                     if v2 and i in creatures]
+    # NAMED (v0.0.67): a levelled base per named list, always its own (not shared with an exterior reference's base, so
+    # the last levelled base of the id is the unscaled list)
+    for lid in named_roots:
+        bases.append((list_index[lid], 0, KINDS['LEVC'], fnv(lid)))
     if len(bases) > (0x7FFF if v2 else 0xFFFF):
         raise ValueError('Too many actor bases')
     records.sort(key=lambda r: ((r[0][0] // PAGE, r[0][1] // PAGE), r[0], r[1]))
@@ -621,7 +662,8 @@ def build_table(refs, built=None, lists=None, creatures=None, library=None, scal
                               'list_bytes': len(lists_raw), 'creature_bases': len(targets),
                               'creature_bases_with_model': sum(1 for t in targets if bases[t][1]),
                               'entries_naming_nothing': len(missing), 'scaled_list_copies': len(copies),
-                              'placed_lists': len(placed)}
+                              'placed_lists': len(placed), 'named_lists': len(named_roots),
+                              'named_lists_added': len(named_extra)}
         report['scaled_records'] = sum(1 for r in records if r[6] != 1.0)
         report['summoned'] = {'creatures': len(summon_bases),
                               'with_model': sum(1 for b in summon_bases if bases[b][1])}
@@ -722,7 +764,7 @@ def master_tables(master_path):
     return (exterior_actors(master), levelled_lists(master), creature_ids(master), exterior_scales(master),
             rooms['LEVC'], room_placed_creatures(master, references=rooms),
             [(i, 'NPC_') for i in by_script['NPC_']] + [(i, 'CREA') for i in by_script['CREA']],
-            summoned_creatures(master))
+            summoned_creatures(master), named_lists(master))
 
 
 def write_table(path, master_path, maps, chim_root=None, library=None, tables=None):
@@ -736,12 +778,13 @@ def write_table(path, master_path, maps, chim_root=None, library=None, tables=No
     placed = rest[1] if len(rest) > 1 else ()
     script_placed = rest[2] if len(rest) > 2 else ()
     summoned = rest[3] if len(rest) > 3 else {}
+    named = rest[4] if len(rest) > 4 else ()
     built = built_actors(maps, frame_centres(chim_root) if chim_root else {})
     if library is not None and not isinstance(library, dict):
         from creature_library import base_texts
         library = base_texts(library)
     data, report = build_table(refs, built, levelled, creatures, library, scales, room_roots, placed, script_placed,
-                               summoned=summoned.values())
+                               summoned=summoned.values(), named=named)
     report['room_list_roots'] = len(room_roots)
     report['room_placed_creatures'] = len(placed)
     Path(path).write_bytes(data)

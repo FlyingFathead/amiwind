@@ -1,10 +1,13 @@
 # Current project state
 
-_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
+_Last updated with AmiWind v0.0.67 (19 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [19 November 2026: v0.0.67 - Tribunal Introduced](#19-november-2026-v0067---tribunal-introduced)
+  - [What already works](#what-already-works)
+  - [What comes next](#what-comes-next)
 - [6 November 2026: v0.0.61-dev3 - development snapshot](#6-november-2026-v0061-dev3---development-snapshot)
 - [25 October 2026: v0.0.51 - Let There Be More Inner Light](#25-october-2026-v0051---let-there-be-more-inner-light)
 - [21 October 2026: v0.0.47-dev1 - development snapshot](#21-october-2026-v0047-dev1---development-snapshot)
@@ -30,6 +33,30 @@ _Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
   - [28 September 15:50 maintainer follow-up](#28-september-1550-maintainer-follow-up)
 
 <!-- contents end -->
+
+## 19 November 2026: v0.0.67 - Tribunal Introduced
+
+The newest release is [v0.0.67: Tribunal Introduced](releases/notes/RELEASE-v0.0.67.md), running on CHIM Engine v0.2.2
+and needing 32 MB of Fast RAM. The sections below this one describe the project as it stood on earlier dates and are
+kept as history; the [changelog](CHANGELOG.md) and the release notes have every version in between.
+
+### What already works
+
+All of Vvardenfell's outdoors (1,408 exterior cells) and 1,121 of its 1,123 interiors are CHIM maps, with the people and
+creatures the game places in them; character creation through the opening, the inventory, the journal and the map,
+saving and loading with what the player changes staying changed, combat and casting, talking and the services, crime
+with witnesses, guards and jail, alchemy, and containers. Tribunal's additions to Vvardenfell are in the build, and
+Mournhold is reached from Ebonheart and walked from the palace to the Plaza; on the release image a new game starts the
+city in peace, the Great Bazaar's teleport arrival and Godsreach's gate work, a fight is not carried to the next map,
+and the Dark Brotherhood's attack on a rest was seen at level 40. The tracker of the base game's systems
+([game features](GAME_FEATURES.md)) counts what is done, partial and missing.
+
+### What comes next
+
+Mournhold's quests and most of its play, the districts' frame rate, Solstheim and Bloodmoon, the end of the main quest,
+pickpocketing, locks, making your own enchantments and real-hardware speed (the first figures from testers are in
+[AmiWind on real hardware](REAL_HARDWARE.md)). The order is in the [roadmap](ROADMAP.md); the known problems are in the
+[bug tracker](BUGS.md) and under "Known in this build" in the release notes.
 
 ## 6 November 2026: v0.0.61-dev3 - development snapshot
 

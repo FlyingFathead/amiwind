@@ -1,6 +1,6 @@
 # The player's body: parts per race and sex, first and third person
 
-_Last updated with AmiWind v0.0.67-dev2 (19 November 2026)._
+_Last updated with AmiWind v0.0.67 (19 November 2026)._
 
 The player character is put together from the game's own body parts, the same way the modular NPCs are
 ([MODULAR_NPCS.md](MODULAR_NPCS.md)): for each of the twenty choices of race and sex, each body slot takes that race's

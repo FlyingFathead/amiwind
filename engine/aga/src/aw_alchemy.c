@@ -28,6 +28,7 @@
 #include "aw_cast.h"
 #include "aw_effects.h"
 #include "aw_combat.h"
+#include "aw_roll.h"
 #include "aw_levelup.h"
 #include "aw_statswin.h"
 #include "aw_tryalloc.h"
@@ -193,7 +194,7 @@ static int eat(const aw_inventory_item_t *it){
     m.flags|=AW_EffectHarmful(it->alchemy[0].effect)?AW_ALCHEMY_MGEF_HARMFUL:0;
     if(!AW_ItemAdd(&aw_state,it->id,-1))return 0;
     player_stats(&alchemy,&intelligence,&luck);
-    roll=rand()%100;
+    roll=AW_Roll(100);
     ok=AW_AlchemyEat(alchemy,intelligence,luck,fatigue_term(),roll,m.flags,m.base_cost,&magnitude,&duration);
     d=data_load();meals++;
     if(ok){
@@ -336,7 +337,7 @@ static int potion_record(float weight){
     }
     if(!win->d->tiers)return -1;
     memset(&m,0,sizeof(m));
-    tier=rand()%win->d->tiers;
+    tier=AW_Roll(win->d->tiers);
     Q_strcpy_bounded(m.base,win->d->tier[tier],sizeof(m.base));Q_strcpy_bounded(m.name,win->name,sizeof(m.name));
     m.charge=weight;m.charge_max=(float)win->value;m.cast_type=AW_MADE_POTION;m.effects=win->nfx;
     for(k=0;k<win->nfx;k++)spell_effect(&win->fx[k],&m.effect[k]);
@@ -369,7 +370,7 @@ static int create_once(void){
     if(ready==AW_ALCHEMY_TOO_FEW){message(win->d->text[T_TOO_FEW]);notice(win->message);return 0;}
     if(win->d->set.loaded!=AW_ALCHEMY_SETTINGS_ALL){message("Alchemy settings missing from this image.");return 0;}
     factor=AW_AlchemyFactor(win->skill,win->intelligence,win->luck);
-    roll=rand()%100;weight=AW_AlchemyWeight(s);
+    roll=AW_Roll(100);weight=AW_AlchemyWeight(s);
     if(ready==AW_ALCHEMY_NO_EFFECTS || !AW_AlchemySucceeds(factor,roll,win->nfx)){
         use_up();brews_failed++;
         message(win->d->text[T_FAILED]);notice(win->message);sound(win->d,S_FAIL);

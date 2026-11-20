@@ -478,6 +478,7 @@ void AW_GlutSpeakerValues(const aw_glut_t *g,int npc,const char *name,aw_textdef
 #include "aw_combat.h"
 #include "aw_tryalloc.h"
 #include "aw_character.h"
+#include "aw_roll.h"
 
 static cvar_t lut_on={"aw_npc_voice_lut","1",true};   /* 0: the previous method (per-model bark lines only) */
 /* 1: a spoken or shown line's defines filled in one pass through the getter table (TEXT-MACROS-DIALOGUE-CODES-59);
@@ -701,7 +702,7 @@ static void state_of(edict_t *e,int talked,aw_glut_state_t *s) {
     s->player_health=p && !p->free?(int)p->v.health:100;
     s->player_health_percent=p && !p->free && p->v.max_health>0?(int)(p->v.health*100/p->v.max_health):100;
     s->talked=talked;
-    s->random100=rand()%101;
+    s->random100=AW_Roll(101);
 }
 static int read_text(int entry,char *out,int capacity) {
     FILE *f=NULL;long offset=AW_GlutTextOffset(&table,entry),start;int n;

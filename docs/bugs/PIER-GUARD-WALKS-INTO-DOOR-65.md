@@ -12,6 +12,7 @@
 | Persists in | v0.0.67-dev2 (last seen) |
 | Severity | critical: Regressed in v0.0.66-dev1 (was high): the opening looks broken and the way to the census office is blocked while he pushes against the door |
 | Family | Actors and NPCs (`actors-npc`) |
+| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
 | Came back (regression) | in v0.0.66-dev1 (fixed in v0.0.65 before); in v0.0.67-dev2 (fixed in v0.0.66-dev2 before) |
 | Playtest version | v0.0.65-rc2 |
 | From commit | source unknown, engine unknown, CHIM world unknown |
@@ -43,6 +44,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-18: v0.0.67-dev2: Measured on the built images (SHA-256): no commit between v0.0.66 and v0.0.67-dev2 changed the dock guard's walk or the pier.
 - 2026-11-18: came back in v0.0.67-dev2 (fixed in v0.0.66-dev2 before): Came back on the v0.0.67-dev2 image (the maintainer's pictures, 2026-11-18): in the opening the dock guard stands inside a pier post on the Seyda Neen dock and stays there (cell -2,-9, local 445 -267 and 346 -187 at two moments of one ...
 - 2026-11-18: fixed in source: a gated commit, v0.0.67-dev2 (916b21de, with 4386e297; gate 11561 passed on 1b67c7aa); tests/aga_nav_test.c, tests/aga_opening_test.c, tests/test_pier_guard_route.py, tests/test_journey_smoke.py; gate 11561: both of the dock guard's walks follow the pier's centre line measured from the built world's collision, with no detour or side step, then the front of the office door and his post beside it; the route keeps clear of every measured post ...
+- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
 
 <!-- END GENERATED TIMELINE -->
 
@@ -127,6 +129,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [ESSENTIAL-DEATH-MESSAGE-66](ESSENTIAL-DEATH-MESSAGE-66.md): The essential character death message is shown only for deaths in a fight
 - [FARGOTH-STANDING-NO-LAYOUT-66](FARGOTH-STANDING-NO-LAYOUT-66.md): Fargoth's and the opening Imperial guard's standing models carry no animation layout
 - [FP-TORCH-OUT-OF-HAND-67](FP-TORCH-OUT-OF-HAND-67.md): In first person a held torch floats away from the left hand: a regression, the torch was held in the hand before
+- [GAENOR-ATTACKS-AT-START-67](GAENOR-ATTACKS-AT-START-67.md): Two Gaenors, one of them at level 50, attack a new player in the Temple Courtyard
 - [GUARD-WALK-REGRESSION-62](GUARD-WALK-REGRESSION-62.md): The guard at the start turns on the spot on his way to his post beside the door and then stands in the player's route into the Census and Excise Office
 - [GUARDS-FIGHT-EACH-OTHER-65](GUARDS-FIGHT-EACH-OTHER-65.md): Two guards who come after the player in Seyda Neen start fighting each other
 - [HAIR-CHECK-ACTOR-GROUND-1999-54](HAIR-CHECK-ACTOR-GROUND-1999-54.md): The actor ground check still refused skeletal models past 1,999 vertices
@@ -178,6 +181,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [PLAYER-ROBE-WAIST-SEAM-67](PLAYER-ROBE-WAIST-SEAM-67.md): With a robe on, the third-person player body shows a cut at the waist: the robe's skirt and the upper body do not join
 - [PLAYER-SPELL-CAP-58](PLAYER-SPELL-CAP-58.md): The player can hold only 8 spell changes, so a ninth bought spell is refused
 - [PLAYER-VANITY-WALK-STUCK-67](PLAYER-VANITY-WALK-STUCK-67.md): After the idle vanity camera starts, the player's walk and run animations stop in third person until the next map load
+- [PLAZA-FABRICANTS-LIVE-AT-START-67](PLAZA-FABRICANTS-LIVE-AT-START-67.md): Plaza Brindisi Dorom holds the fabricants of a later quest from the start of a new game, one ready to attack on sight
 - [RANDOM-SPAWN-IDLE-63](RANDOM-SPAWN-IDLE-63.md): Creatures from the Ghostgate random spawn stand idle next to the player instead of attacking
 - [RESIDENT-ANIM-BYTE-BUDGET-48](RESIDENT-ANIM-BYTE-BUDGET-48.md): A room resident whose animation kit model is over the alias byte budget at every rung stopped the whole room stage (ienas nadus)
 - [ROOM-LEVELLED-INTRO-ROOMS-62](ROOM-LEVELLED-INTRO-ROOMS-62.md): Addamasartus and Tharys Ancestral Tomb have no levelled creatures: the intro scene converts their rooms without the levelled creature points

@@ -24,11 +24,19 @@
 
 ## Timeline
 
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.67 (cd16e141) | 2026-11-19 | gate 11843 of the planning item MOURNHOLD-BAZAAR-UNDER-WATER-67 | A teleport whose first landing is far under its asked height searches at the asked point at once and takes a higher spot beside it only when no other exists: dbg tp greatbazaar lands on the street (the cause was the Plaza gate wall beside the point, not a late-loading street); fix 2b1bc8db; not yet seen in play. |
+
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-18: reported in v0.0.67-dev2
 - 2026-11-18 16:29 +0200: v0.0.67-dev2: Measured on the test image's own collision, in the original's units: in the Great Bazaar's western cell the surfaces a player can stand on lie between 25 and 297, none of them under 0; the street under the arrival point is at 297.
 - 2026-11-18 18:05 +0200: v0.0.67-dev2: The arrival read second by second on the same test image: one second after the teleport by the district's name the eye is at frame-local -53 (the street is at 74) and it stays there: the player is set down low at once, he does not fall.
+- 2026-11-19: fixed in source: a gated commit, v0.0.67 (cd16e141); gate 11843 of the planning item MOURNHOLD-BAZAAR-UNDER-WATER-67: A teleport whose first landing is far under its asked height searches at the asked point at once and takes a higher spot beside it only when no other exists: dbg tp greatbazaar lands on the street (the cause was the Plaza gate wall beside ...
+- 2026-11-19 12:03 +0200: seen again in v0.0.67-dev3: Seen again on the third development snapshot of v0.0.67, with the cause narrowed: the teleport's point and the Plaza door's arrival lie a few units inside the Bazaar's frame, right beside the gate to Plaza Brindisi Dorom; under that point ...
 
 <!-- END GENERATED TIMELINE -->
 
@@ -62,6 +70,7 @@ Family: Scene changes, arrivals and handoffs (`transitions-arrivals`). Cell, reg
 - [LOAD-ERROR-NOT-NAMED-67](LOAD-ERROR-NOT-NAMED-67.md): A place that cannot be reached or loaded is not named on screen: a dbg tp refusal is a console line only, and the failed-load box says only to look at the console
 - [LOAD-FATAL-ERRORS-67](LOAD-FATAL-ERRORS-67.md): Memory that runs out or a damaged map file while a place loads ends the game instead of going back where the player was
 - [PUNCH-3P-HEART-CHAMBER-67](PUNCH-3P-HEART-CHAMBER-67.md): After a teleport to the Heart Chamber the player's punch at a dreamer does not land or does not show in third-person view; in first person it works
+- [ROOM-ARRIVAL-FLOODED-ON-ROOF-67](ROOM-ARRIVAL-FLOODED-ON-ROOF-67.md): Arriving in a flooded room puts the player on top of the room instead of in its water (Sotha Sil, Outer Flooded Halls)
 - SEYDA-TRANSITION-29 (no report page): v0.0.29-dev1: Cell/sub-cell passage problems around Seyda Neen
 - [TP-BAZAAR-ARRIVAL-UNDER-FLOOR-67](TP-BAZAAR-ARRIVAL-UNDER-FLOOR-67.md): The teleport to Mournhold's Great Bazaar leaves the player under the district's floor, in water
 - [TRANSITION-EQUIPMENT-29](TRANSITION-EQUIPMENT-29.md): Carried torch blinks out on cell/sub-cell arrival
@@ -72,5 +81,6 @@ Family: Scene changes, arrivals and handoffs (`transitions-arrivals`). Cell, reg
 Related bugs in other categories:
 
 - [DISTRICT-PLACED-THINGS-NO-ROW-67](DISTRICT-PLACED-THINGS-NO-ROW-67.md): In Mournhold's districts no container, item, activator or door sign can be aimed at: their rows are keyed as a room's, and the game outdoors asks for the cells around the player
+- [GODSREACH-CANAL-NO-WATER-67](GODSREACH-CANAL-NO-WATER-67.md): Godsreach's canal is dry: the district has no water below its streets
 
 <!-- END GENERATED CATEGORY -->

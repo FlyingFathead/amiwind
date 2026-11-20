@@ -36,6 +36,7 @@
 #include "aw_levelup.h"
 #include "aw_dial_links.h"
 #include "aw_pcstanding.h"
+#include "aw_roll.h"
 
 #define BOX_X 8
 #define BOX_Y 6
@@ -491,7 +492,7 @@ static void persuade(int kind){
     aw_dial_person_t player,npc;aw_dial_persuasion_t r;int fight,flee;char name[48];
     if(!affordable(kind))return;
     AW_MwscriptPersons(speaker_record,speaker_reference,&player,&npc,&fight,&flee);
-    AW_DialPersuade(&table,kind,&player,&npc,disposition,rand()%100,fight,flee,&r);
+    AW_DialPersuade(&table,kind,&player,&npc,disposition,AW_Roll(100),fight,flee,&r);
     disposition_sync();
     if(r.temp>0 && r.perm>0 && original_base+r.perm+permanent_change<0)r.perm=-(original_base+permanent_change);
     current_base+=r.temp;permanent_change+=r.perm;

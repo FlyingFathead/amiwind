@@ -21,7 +21,6 @@
    ],
    "kind": "session",
    "status": "active",
-   "known": "FP-TORCH-OUT-OF-HAND-67",
    "steps": "held_light_in_hand.txt",
    "checks": [
     "the light is the one in the left hand (aw_inventory worn) and it is lit (aw_hands: torch 1)",

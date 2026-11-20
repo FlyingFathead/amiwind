@@ -65,7 +65,10 @@
   }
 
   // ---- rooms (the interiors) -----------------------------------------------------------------------------------------
-  const roomGroup = r => r.group || ({on_chim_rooms: 'in_game', room_map: 'in_game', converted: 'not_in_game', not_started: 'not_in_game'}[r.state] || 'set_aside');
+  // No room is set aside (ROOMS-SET-ASIDE-NOT-BUILT-67): a room no door leads to is a room to build, a district built as
+  // open terrain is in the game; only a state this page does not know falls to "set aside".
+  const roomGroup = r => r.group || ({on_chim_rooms: 'in_game', room_map: 'in_game', district: 'in_game', converted: 'not_in_game',
+    not_started: 'not_in_game', test_cell: 'not_in_game', teleport_only: 'not_in_game', no_entrance: 'not_in_game'}[r.state] || 'set_aside');
   function roomClass(r) {
     if (roomGroup(r) === 'in_game') return 'done';
     return r.state === 'converted' ? 'partial' : 'missing';
@@ -85,7 +88,7 @@
   const roomsOf = doc => (doc && doc.interior_rooms && Array.isArray(doc.interior_rooms.rooms)) ? doc.interior_rooms.rooms : [];
   const mournholdRooms = doc => roomsOf(doc).filter(r => roomSet(r) === 'tribunal');
   // A district of Mournhold: an interior cell that acts like an exterior (the door graph's `behaves_exterior` reason).
-  const isDistrict = r => (r.reasons || []).includes('behaves_exterior');
+  const isDistrict = r => r.state === 'district' || !!r.behaves_exterior || (r.reasons || []).includes('behaves_exterior');
 
   // ---- completion per expansion, beside the base game ----------------------------------------------------------------
   // {id, label, present, done, partial, missing, total, rate, cells, rooms} for the base game, Bloodmoon and Tribunal; an
@@ -159,7 +162,7 @@
   // Districts as large tiles in a row (wrapping), then every other room as a small square, ordered by state then name. Tiles
   // are {x, y, w, h, room, district}; `height` is the total.
   const DISTRICT_W = 150, DISTRICT_H = 64, ROOM = 14, GAP = 4, PAD = 8, HEAD = 22;
-  const STATE_ORDER = ['on_chim_rooms', 'room_map', 'converted', 'not_started', 'hard_case', 'test_cell', 'teleport_only', 'no_entrance'];
+  const STATE_ORDER = ['on_chim_rooms', 'room_map', 'district', 'converted', 'not_started', 'test_cell', 'teleport_only', 'no_entrance', 'hard_case'];
   const stateRank = s => { const i = STATE_ORDER.indexOf(s); return i < 0 ? STATE_ORDER.length : i; };
   function mournholdLayout(rooms, width) {
     const w = Math.max(width || 600, DISTRICT_W + 2 * PAD);
@@ -189,8 +192,93 @@
     return null;
   }
 
+  // ---- the unified readiness count per land (TOOLKIT-EXPANSION-COMPLETION-67) ---------------------------------------
+  // The tracker ingest writes it (tools/master_completion.py readiness(), the data's `readiness` key) and every view draws
+  // that. Older data without the key: computeReadiness() counts it here by the same rules, and tests/test_master_completion.py
+  // checks that both give the same numbers on the same data. Ready = in the game on CHIM, the same for every land.
+  const READY_FORMAT = 'aw-land-readiness-1';
+  const LANDS = [{id: 'vvardenfell', name: 'Vvardenfell', game: 'Morrowind (main game)', master: 'Morrowind.esm', island: 1},
+    {id: 'solstheim', name: 'Solstheim', game: 'Bloodmoon', master: 'Bloodmoon.esm', island: 2},
+    {id: 'mournhold', name: 'Mournhold', game: 'Tribunal', master: 'Tribunal.esm', island: 3}];
+  const READY_TEXT = 'Ready = in the game on CHIM, the same for every land. Open terrain: the land\'s exterior cells of land or ' +
+    'empty sea (open ocean and cells beyond the world\'s edge are not counted), ready when the newest ingested ' +
+    'build holds the cell on CHIM and no audit of it failed. Rooms: every interior cell, counted for the land ' +
+    'of its master, ready when it is in the game on CHIM rooms; a district the land presents as open terrain ' +
+    'is counted once, under open terrain. Everything else is not ready, with its reason; a room no door ' +
+    'leads to is a room still to build, never left out.';
+  const CELL_REASONS = {solstheim: 'not in the game yet (Solstheim)', not_started: 'not started',
+    not_in_build: 'converted, not in the newest build', empty_sea: 'empty sea, not in the newest build',
+    ocean: 'open sea, not in the newest build', converted_failing: 'converted, failing audits',
+    not_converted: 'not converted (tried, could not finish)', hull_policy_pending: 'hull policy pending'};
+  const READY_ROOM_STATES = ['on_chim_rooms', 'district'];   // as tools/master_completion.py READY_ROOM_STATES
+  const ROOM_REASONS = {room_map: 'in the game as a room map of our own, not on CHIM rooms',
+    converted: 'converted, not in the game yet',
+    not_started: 'not started',
+    teleport_only: 'still to build: no door leads there, a script or a dialogue line sends the player there',
+    no_entrance: 'still to build: no door leads there, and no script or dialogue line names it',
+    test_cell: 'still to build: no door leads there, a developers\' test cell', hard_case: 'still to build: set aside as a hard case'};
+  const LEADS = {door: 'a door', teleport: 'a door from a room that a script or a dialogue line sends the player to',
+    teleport_only: 'a script or a dialogue line sends the player there; no door leads in',
+    unreachable: 'nothing found: no door, and no script or dialogue line names it'};
+  // one decimal, rounded half up on whole numbers (as tools/master_completion.py pct)
+  const readyPct = (r, t) => t ? Math.floor((2000 * r + t) / (2 * t)) / 10 : 0;
+  const figure = (r, t) => ({ready: r, total: t, percent: readyPct(r, t)});
+  const cmp = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+  function landOfRoom(r) {
+    if (r.master === 'Tribunal.esm' || r.island === 'Mournhold') return 'mournhold';
+    if (r.master === 'Bloodmoon.esm' || r.island === 'Solstheim') return 'solstheim';
+    return 'vvardenfell';
+  }
+  const terrainCounted = c => !!(c && c.island) && (!!c.land || (c.chim || {}).bucket === 'empty_sea');
+  const cellReady = c => (c.chim || {}).group === 'in_game';
+  function reasonRows(rows, labels) {
+    const order = Object.keys(labels), by = new Map();
+    for (const [reason, item] of rows) { if (!by.has(reason)) by.set(reason, []); by.get(reason).push(item); }
+    const rank = k => { const i = order.indexOf(k); return i < 0 ? order.length : i; };
+    return [...by.entries()].sort((a, b) => rank(a[0]) - rank(b[0]) || cmp(a[0], b[0])).map(([k, v]) => ({reason: k,
+      label: labels[k] || k.replace(/_/g, ' '), count: v.length, items: v.sort((a, b) => cmp(a.name || '', b.name || '') || cmp(a.id, b.id))}));
+  }
+  function computeReadiness(doc) {
+    const cells = (doc && doc.cells) || {}, rooms = roomsOf(doc), names = {};
+    const lands = LANDS.map(land => {
+      const mine = Object.entries(cells).filter(([, c]) => c.island === land.island && terrainCounted(c));
+      names[land.id] = new Set(mine.filter(([, c]) => c.name).map(([, c]) => String(c.name).toLowerCase()));
+      const ready = mine.filter(([, c]) => cellReady(c)).length;
+      const notReady = reasonRows(mine.filter(([, c]) => !cellReady(c)).map(([k, c]) => [(c.chim || {}).state || 'not_started', {id: k, name: c.name || ''}]), CELL_REASONS);
+      return {id: land.id, name: land.name, game: land.game, master: land.master, island: land.island, terrain: Object.assign(figure(ready, mine.length), {not_ready: notReady})};
+    });
+    for (const land of lands) {
+      const rs = rooms.filter(r => landOfRoom(r) === land.id), terr = names[land.id];
+      const asTerrain = rs.filter(r => terr.has(String(r.name).toLowerCase())).map(r => r.name).sort(cmp);
+      const counted = rs.filter(r => !terr.has(String(r.name).toLowerCase()));
+      const ready = counted.filter(r => READY_ROOM_STATES.includes(r.state)).length;
+      const notReady = reasonRows(counted.filter(r => !READY_ROOM_STATES.includes(r.state)).map(r => [r.state || 'not_started',
+        {id: r.id, name: r.name, access: r.access == null ? null : r.access, leads: LEADS[r.access || ''] || r.access || '', reasons: (r.reasons || []).slice()}]), ROOM_REASONS);
+      land.rooms = Object.assign(figure(ready, counted.length), {not_ready: notReady, as_terrain: asTerrain});
+      land.total = figure(land.terrain.ready + land.rooms.ready, land.terrain.total + land.rooms.total);
+    }
+    const all = {};
+    for (const k of ['terrain', 'rooms', 'total']) all[k] = figure(lands.reduce((n, l) => n + l[k].ready, 0), lands.reduce((n, l) => n + l[k].total, 0));
+    return {format: READY_FORMAT, definition: READY_TEXT, lands, all, build: ((doc && doc.headline) || {}).in_game_label == null ? null : doc.headline.in_game_label};
+  }
+  // The data's own readiness when the ingest wrote it, else counted here by the same rules; null without tracker data.
+  function readiness(doc) {
+    if (!doc) return null;
+    if (doc.readiness && doc.readiness.format === READY_FORMAT) return doc.readiness;
+    return doc.cells ? computeReadiness(doc) : null;
+  }
+  // The land of a room for the room list (interior-tracker.js listHtml opts.byLand): its land's name, and whether it is
+  // one of the districts counted as open terrain.
+  function landGrouping(ready) {
+    const asTerrain = new Set(), label = {};
+    for (const l of (ready && ready.lands) || []) { label[l.id] = l.name; for (const n of (l.rooms && l.rooms.as_terrain) || []) asTerrain.add(n); }
+    return {landOf: r => ({key: label[landOfRoom(r)] || landOfRoom(r), label: label[landOfRoom(r)] || landOfRoom(r)}), asTerrain,
+      counts: Object.fromEntries(((ready && ready.lands) || []).map(l => [l.name, l.rooms]))};
+  }
+
   const api = {WORLD, MOURNHOLD, counted, cellClass, exteriorCounts, roomClass, roomCounts, roomSet, mournholdRooms, isDistrict, completion, bloodmoonRooms, inPane, paneBounds,
-    countText, rateText, views, pick, mournholdLayout, hit, DISTRICT_W, DISTRICT_H, ROOM};
+    countText, rateText, views, pick, mournholdLayout, hit, DISTRICT_W, DISTRICT_H, ROOM,
+    READY_FORMAT, LANDS, READY_TEXT, landOfRoom, readiness, computeReadiness, readyPct, landGrouping};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.AmiWindViews = api;
 })(typeof window !== 'undefined' ? window : this);

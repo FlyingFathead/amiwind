@@ -12,7 +12,7 @@
 | Persists in | v0.0.63 (last seen) |
 | Severity | high: Regressed in v0.0.63 (was medium): gates and mechanisms that the world uses to let the player through do not respond |
 | Family | Game logic (QuakeC) and saves (`game-logic`) |
-| Deferred by the maintainer | 2026-11-16: deferred by the maintainer's release decision to v0.0.67 (v0.0.66 is made from its twelfth snapshot; the rest of the roadmap goes to later versions) |
+| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
 | Came back (regression) | in v0.0.63 (fixed in v0.0.63 before) |
 | Playtest version | v0.0.62-dev1 |
 | From commit | source unknown, engine unknown, CHIM world unknown |
@@ -41,7 +41,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-10 02:34 +0200: came back in v0.0.63 (fixed in v0.0.63 before): Not working on the v0.0.63 release image: at the Ghostgate the switches and portcullises answer "no such reference here", so they cannot be activated.
 - 2026-11-10 06:01 +0200: seen again in v0.0.64-dev1: Seen again in the v0.0.64-dev1 in-game check (FS-UAE, 32 MB Fast): at the Ghostgate "ex_gg_gateswitch_01"->Activate answers "activate: no such reference here"; the portcullis ex_gg_portcullis_01 stays at z 1408, also after a save and a ...
 - 2026-11-16: v0.0.66-dev11: No in-game check of the Ghostgate switches on a v0.0.64 or later build is recorded: the opening journeys and the end-of-quest sessions of the v0.0.66 dev builds do not reach the Ghostgate.
-- 2026-11-16: deferred by the maintainer: deferred by the maintainer's release decision to v0.0.67 (v0.0.66 is made from its twelfth snapshot; the rest of the roadmap goes to later versions)
+- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
 
 <!-- END GENERATED TIMELINE -->
 
@@ -167,6 +167,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [COMBAT-CHASE-SPEED-FIXED-66](COMBAT-CHASE-SPEED-FIXED-66.md): Every fighter chased, fled and flew at one fixed speed instead of its own Speed and Athletics
 - [COMBAT-DAEDROTH-NO-HIT-51](COMBAT-DAEDROTH-NO-HIT-51.md): A daedroth outside the Azura s Coast stronghold cannot be punched: the blows pass through it; its runtime health reads 0.0
 - [COMBAT-FATIGUE-HEALTH-DAMAGE-39](COMBAT-FATIGUE-HEALTH-DAMAGE-39.md): Clarify Eldafire bare-fist fatigue damage versus armed guard health damage
+- [COMBAT-FIGHT-CARRIED-TO-NEW-MAP-67](COMBAT-FIGHT-CARRIED-TO-NEW-MAP-67.md): After a map change, the actors of the new place who take the places of the last place's fighters in memory attack the player at once
 - [COMBAT-FIST-BLOCK-33](COMBAT-FIST-BLOCK-33.md): A fighter with a shield blocks while fighting with fists
 - [COMBAT-FLEE-RULE-PARTIAL-66](COMBAT-FLEE-RULE-PARTIAL-66.md): Fleeing by the Flee rating was off by default and left out the werewolf case and a spell as the best action
 - [COMBAT-HIT-CHANCE-EFFECTS-62](COMBAT-HIT-CHANCE-EFFECTS-62.md): The melee hit chance leaves out Fortify Attack, Blind, Sanctuary, Chameleon and Invisibility, and the player's attributes are counted without their Fortify and Damage
@@ -236,6 +237,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [FACTION-EXPEL-MESSAGE-64](FACTION-EXPEL-MESSAGE-64.md): An expulsion from a faction shows no message to the player
 - [FACTION-STATS-PAGE-64](FACTION-STATS-PAGE-64.md): The stats page shows no factions, ranks, reputation or bounty
 - [FALL-LANDING-KNOCKDOWN-62](FALL-LANDING-KNOCKDOWN-62.md): A hard landing does not knock the player or an actor down, and an NPC's landing plays no landing sound
+- [GETPCSLEEP-NOT-CARRIED-OUT-67](GETPCSLEEP-NOT-CARRIED-OUT-67.md): Resting never wakes the scripts that wait for the player's sleep: the Dark Brotherhood never attacks a resting player
 - [GODMODE-COMBAT-DAMAGE-61](GODMODE-COMBAT-DAMAGE-61.md): With god mode on, a fight's blows still take the player's health and kill the player
 - [GODMODE-LAVA-DEATH-62](GODMODE-LAVA-DEATH-62.md): The player can die in a lava pool with god mode on
 - [GUARD-RESIST-ARREST-NOTHING-61](GUARD-RESIST-ARREST-NOTHING-61.md): Choosing to resist arrest in a guard's conversation does nothing: the guard does not attack
@@ -278,6 +280,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [MWSCRIPT-STATE-NOT-SAVED-48](MWSCRIPT-STATE-NOT-SAVED-48.md): The compiled scripts' values (globals, object and script locals, journal indexes) are not in saved games
 - [MWSCRIPT-STOPCOMBAT-UNWIRED-62](MWSCRIPT-STOPCOMBAT-UNWIRED-62.md): A script's StopCombat never ended a fight: the combat layer's end of one actor's fight was never connected to it
 - [MWSCRIPT-UNPLACED-RECORD-SCRIPTS-61](MWSCRIPT-UNPLACED-RECORD-SCRIPTS-61.md): Scripts of records that are never placed in a cell (items carried, given or sold, actors from levelled lists) are compiled but never run
+- [MWSCRIPT-WATER-LEVEL-STATIC-67](MWSCRIPT-WATER-LEVEL-STATIC-67.md): The water levers of Old Mournhold do not move the water: SetWaterLevel and ModWaterLevel are not carried out, because a room's water is fixed in its converted map
 - [NEWGAME-OPENING-UNRESTRICTED-64](NEWGAME-OPENING-UNRESTRICTED-64.md): After New Game the opening runs as a free game: the dock guard stays idle on the pier, the race menu never opens, the pier and the census office hold nothing
 - [NEWGAME-STATE-RESET-62](NEWGAME-STATE-RESET-62.md): A New Game started from the menu after playing leaves the fireplace of the Census and Excise Office unlit
 - [OBJECT-ENABLE-NOT-DRAWN-65](OBJECT-ENABLE-NOT-DRAWN-65.md): Objects switched back on by a script stay invisible: the release papers in the census office can be read but are not drawn on the table
@@ -311,10 +314,13 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [PRISON-SHIP-ITEMS-TAKEABLE-65](PRISON-SHIP-ITEMS-TAKEABLE-65.md): On the prison ship the spoons, plates and other dishes can be taken with the activate key
 - [QC-AW-FLAME-SPAWN-32](QC-AW-FLAME-SPAWN-32.md): Every aw_flame entity prints load errors: the game logic has no aw_flame spawn function or aw_flame_size/aw_flame_shape fields
 - [RACE-RESIST-NOT-ON-SPELL-DAMAGE-64](RACE-RESIST-NOT-ON-SPELL-DAMAGE-64.md): A race ability that resists an element does not reduce spell damage of that element
+- [RANDOM-STREAMS-SAME-EVERY-BOOT-67](RANDOM-STREAMS-SAME-EVERY-BOOT-67.md): Every session rolls the same fight dice and script random numbers, because the game's random streams start from fixed values at each start of the game
 - [READY-MAGIC-SHOWS-WEAPON-65](READY-MAGIC-SHOWS-WEAPON-65.md): Readying magic (R by default) raises the equipped weapon instead of the spell-casting hands
 - [RENDER-METADATA-29](RENDER-METADATA-29.md): Native renderer metadata warns as an unknown QuakeC field
 - [RESIST-NORMAL-WEAPONS-61](RESIST-NORMAL-WEAPONS-61.md): Ghosts and other creatures that resist normal weapons take full damage from ordinary weapons, with no "no effect" message
 - [REST-CENSUS-NO-CELL-ID-61](REST-CENSUS-NO-CELL-ID-61.md): The rest window offers Rest in the Census and Excise Office, a cell the game marks as no sleeping
+- [REST-CUT-NO-CREATURE-67](REST-CUT-NO-CREATURE-67.md): A wilderness rest that is cut short brings no creature and no message
+- [REST-CUT-TOO-OFTEN-67](REST-CUT-TOO-OFTEN-67.md): Wilderness rests are cut short by a creature far more often than the original's one in four
 - [REST-OWNED-BED-ALWAYS-REFUSED-62](REST-OWNED-BED-ALWAYS-REFUSED-62.md): Someone else's bed was always refused; in the original sleeping in it is a crime only when someone sees it
 - [ROOM-HALL-OF-MINISTRY-RATS-NOT-DISABLED-67](ROOM-HALL-OF-MINISTRY-RATS-NOT-DISABLED-67.md): Mournhold Temple: Hall of Ministry holds seven Infected Rats at the start of a new game, and one attacks: their script should keep them away until the Crimson Plague quest
 - [ROOM-NORENEN-DUR-ATRONACHS-DIE-67](ROOM-NORENEN-DUR-ATRONACHS-DIE-67.md): Norenen-dur, Basilica of Divine Whispers: two of its three atronachs are dead seconds after they attack, without the player striking

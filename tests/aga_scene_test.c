@@ -376,7 +376,69 @@ static float door_wall;
 /* A streamed crossing (type 1): CHIM moved its window, the running map stays (aw_chim_world.c's hook). */
 static int stream_crossings;
 static int stream_cross_hook(const float *origin,int *cx,int *cy){(void)origin;*cx=-2;*cy=-9;stream_crossings++;return 1;}
-int SV_PointContents(vec3_t p){return water_feet?CONTENTS_WATER:CONTENTS_EMPTY;}
+/* MOURNHOLD-BAZAAR-UNDER-WATER-67: the Great Bazaar's arrival in its frame map mh0002, as the v0.0.67-dev3 image's own
+ * collision has it (traced on tools/chim/collision.py FrameScene, the standing hull, heights of the player's origin): the
+ * gate from the Plaza (4218705) and dbg tp greatbazaar put the player at local 1018.26052 -659.99921, 13 units north of
+ * the district's own gate to the Plaza. The street (4202246) is level at 90.83 everywhere around, a slab from 57; the
+ * gate's wall (4219413) holds the standing box at the point from the slab up to a steep top at 144.82, west of it to
+ * 176.77 and south of it to 263.88, and 16 units east of the point it has a flat ledge at 122.5 (empty under it down
+ * to the street). Under the district: nothing down to its floor at -495.38, and the water at 0. BZ_SHIFT moves the
+ * whole scene (a teleport's own coordinates). Traced in 1/1024 steps like tests/aga_spawn_test.c. */
+static int bazaar,bz_nostreet;static vec3_t bz_shift;
+static int bazaar_box(const vec3_t q,float *top_normal){
+ float x=q[0],y=q[1],z=q[2];
+ if(z<-495.38f){*top_normal=1;return 1;}
+ if(x>=1028 && x<1042 && y>=-668 && y<-652 && z>=100 && z<=122.5f){*top_normal=1;return 1;}      /* the ledge */
+ if(x>=1008 && x<1028 && y>=-668 && y<-652 && z>=57 && z<=144.82f){*top_normal=.13f;return 1;}   /* the wall at the point */
+ if(x>=994 && x<1008 && y>=-668 && y<-652 && z>=57 && z<=176.77f){*top_normal=.13f;return 1;}   /* west of it */
+ if(x>=990 && x<1050 && y>=-690 && y<-668 && z>=57 && z<=263.88f){*top_normal=.13f;return 1;}   /* the gate, south */
+ if(!bz_nostreet && z>=57 && z<=90.83f){*top_normal=1;return 1;}                                 /* the street */
+ return 0;
+}
+static int bazaar_solid(const vec3_t p,float *n){vec3_t q;VectorSubtract(p,bz_shift,q);return bazaar_box(q,n);}
+/* a standing box's trace through a fixture's solid (heights of the player's origin), in 1/1024 steps */
+static trace_t sampled_move(vec3_t a,vec3_t b,int (*solid)(const vec3_t,float *)){
+ trace_t t;int i;float u,previous=0,n=1;vec3_t p;
+ memset(&t,0,sizeof t);t.fraction=1;VectorCopy(b,t.endpos);
+ t.startsolid=t.allsolid=solid(a,&n);
+ for(i=0;i<=1024;i++){
+  u=i/1024.f;p[0]=a[0]+u*(b[0]-a[0]);p[1]=a[1]+u*(b[1]-a[1]);p[2]=a[2]+u*(b[2]-a[2]);
+  if(!solid(p,&n))t.allsolid=false;
+  else if(i && !t.startsolid){
+   t.fraction=previous;t.endpos[0]=a[0]+previous*(b[0]-a[0]);t.endpos[1]=a[1]+previous*(b[1]-a[1]);
+   t.endpos[2]=a[2]+previous*(b[2]-a[2]);t.plane.normal[2]=n;break;
+  }
+  previous=u;
+ }
+ if(t.allsolid){t.fraction=0;VectorCopy(a,t.endpos);}
+ return t;
+}
+static trace_t bazaar_move(vec3_t a,vec3_t b){return sampled_move(a,b,bazaar_solid);}
+/* WET-ARRIVAL (v0.0.68): "Sotha Sil, Outer Flooded Halls" (map ri60b45e81e3) as the v0.0.67 image bd761b8's own
+ * collision has it (tools/chim/room_scene.py RoomScene, the standing hull, heights of the player's origin): the room
+ * box -200.27 -484.18 -119.94 to 1376 548.87 249.4,
+ * its edge solid, the water at 0 over the whole box; the hall's floor (4206802) a shell the standing box meets from
+ * 0.83 (its top: the feet at -15.8, under the water) down to -32.83 (its underside); the hall's vault from 49.18 (under
+ * it) up to 82.82 (its top, outside the hall: where AW_MapPlace stood the player, GetPos 331.425 for the line's -37).
+ * SothaSilTeleport's point -12.5 -31 7.625 (the feet at -37 original) and the room's start, the door's arrival from the
+ * Inner Flooded Halls, 1256.24 32.79 20.875. Added for the cases: a pillar solid at every height, a pit with no floor
+ * down to the edge, and a dry landing whose top is at 20. */
+static int flooded;static model_t flooded_world;
+static int flooded_box(const vec3_t q,float *top_normal){
+ float x=q[0],y=q[1],z=q[2];
+ *top_normal=1;
+ if(x<=-200.27f+7.32f || x>=1376.0f-7.32f || y<=-484.18f+7.12f || y>=548.87f-7.12f ||
+    z<=-119.94f+16.625f || z>=249.4f-16.625f)return 1;                                   /* the room's edge */
+ if(x>=100 && x<140 && y>=-50 && y<-10){*top_normal=.13f;return 1;}                      /* a pillar */
+ if(x>=1100 && x<1200 && y>=-50 && y<50 && z>=-32.83f && z<=20)return 1;                 /* a dry landing */
+ if(!(x>=600 && x<700 && y>=-100 && y<0) && z>=-32.83f && z<=.83f)return 1;             /* the floor; a pit */
+ if(z>=49.18f && z<=82.82f)return 1;                                                     /* the vault */
+ return 0;
+}
+int SV_PointContents(vec3_t p){
+ if(flooded)return p[2]<0?CONTENTS_WATER:CONTENTS_EMPTY;              /* the room's water plane at 0 */
+ if(bazaar)return p[2]-bz_shift[2]<0?CONTENTS_WATER:CONTENTS_EMPTY;   /* the district's water surface at 0 */
+ return water_feet?CONTENTS_WATER:CONTENTS_EMPTY;}
 /* DOOR-ARRIVAL-INSIDE-ACTOR-66: one actor's box (its origin at its feet) that the position tests see, and world.c's
  * overlap query for it; the console lines of the arrival's step */
 static int body_on;static edict_t body;
@@ -387,7 +449,10 @@ static int body_overlaps(const vec3_t o,const vec3_t mins,const vec3_t maxs){
 }
 edict_t *AW_BodyOverlapping(edict_t *e){return body_on && e!=&body && body_overlaps(e->v.origin,e->v.mins,e->v.maxs)?&body:NULL;}
 trace_t SV_Move(vec3_t a,vec3_t mins,vec3_t maxs,vec3_t b,int type,edict_t *p){
- trace_t t;memset(&t,0,sizeof(t));t.fraction=1;VectorCopy(b,t.endpos);
+ trace_t t;
+ if(flooded)return sampled_move(a,b,flooded_box);
+ if(bazaar)return bazaar_move(a,b);
+ memset(&t,0,sizeof(t));t.fraction=1;VectorCopy(b,t.endpos);
  /* a position test meets the actor's box (bodies count in MOVE_NORMAL, never in MOVE_NOBODIES) */
  if(body_on && type==MOVE_NORMAL && VectorCompare(a,b) && body_overlaps(a,mins,maxs)){t.startsolid=t.allsolid=true;t.fraction=0;return t;}
  if(all_solid==1 || (all_solid==2 && fabs(a[0])<100 && fabs(a[1])<100)){t.startsolid=t.allsolid=true;t.fraction=0;return t;}
@@ -1005,6 +1070,83 @@ int main(void){
   assert(q.v.movetype==MOVETYPE_NOCLIP && q.v.origin[2]==77);
   water_feet=1;assert(!AW_Unstuck(&q));water_feet=0;assert(q.v.origin[2]==77);
  }
+ /* MOURNHOLD-BAZAAR-UNDER-WATER-67 (the v0.0.67-dev3 image: dbg tp greatbazaar stood on the gate wall's ledge, GetPos
+  * 490, the street at 297), at the Great Bazaar's point (the fixture above, the real values). The gate from the Plaza
+  * (its bank arrival 111.4471): the door's search takes the street 16 units north, before and after the fix. That
+  * search (doors, rooms, beings, dbg unstuck) keeps its one pass: from the held height it still meets the ledge first
+  * (1034 -660 122.75), as before; only the teleport below takes the preference. */
+ {
+  edict_t q;
+  vec3_t held={1018.26052f,-659.99921f,102.572f+16.625f+1},door={1018.26052f,-659.99921f,111.44710f};
+  memset(&q,0,sizeof(q));q.v.mins[0]=-7.32f;q.v.mins[1]=-7.12f;q.v.mins[2]=-16.625f;
+  q.v.maxs[0]=7.32f;q.v.maxs[1]=7.12f;q.v.maxs[2]=16.625f;
+  bazaar=1;VectorCopy(vec3_origin,bz_shift);
+  assert(AW_InteriorPlace(&q,door));
+  assert(fabs(q.v.origin[0]-1018.26052f)<.01f && fabs(q.v.origin[1]+643.99921f)<.01f && fabs(q.v.origin[2]-91.08f)<.1f);
+  assert(AW_InteriorPlace(&q,held));
+  assert(fabs(q.v.origin[0]-1034.26052f)<.01f && fabs(q.v.origin[1]+659.99921f)<.01f && fabs(q.v.origin[2]-122.75f)<.1f);
+  bazaar=0;
+ }
+ /* dbg tp X Y Z (map_jump 2) to the Bazaar's point, the asked floor 102.572 of teleport-names.txt: the first search
+  * lands on the water far under the asked height (the stub above, as the image's map_place did), and the arrival puts
+  * the player on the street at the asked point at once, walking, nothing held. Before the fix: held at the asked point,
+  * then set on the ledge 16 units east (the dev3 image's GetPos 490). With the street gone the ledge is the only spot,
+  * and it is still taken (no arrival that found a spot before finds none now). */
+ for(i=0;i<2;i++){
+  vec3_t street;
+  AW_SceneCancelTransition();strcpy(sv.name,"seyda");p.v.health=73;p.v.movetype=MOVETYPE_WALK;
+  cls.state=ca_connected;cls.signon=SIGNONS;aw_story.stage=AW_STAGE_RELEASED;
+  p.v.mins[0]=-7.32f;p.v.mins[1]=-7.12f;p.v.mins[2]=-16.625f;p.v.maxs[0]=7.32f;p.v.maxs[1]=7.12f;p.v.maxs[2]=16.625f;
+  command_argc=4;command_args[0]="aw_teleport";command_args[1]="-11264";command_args[2]="-71680";command_args[3]="410.288";
+  queued[0]=0;teleport();assert(!strcmp(queued,"map seyda\n"));
+  bazaar=2;bz_nostreet=i;CL_ClearState();AW_SceneSpawn(&p);
+  VectorSubtract(p.v.origin,bz_shift,street);
+  if(!i)assert(fabs(street[0]-1018.26052f)<.01f && fabs(street[1]+643.99921f)<.01f && fabs(street[2]-91.08f)<.1f);
+  else assert(fabs(street[0]-1034.26052f)<.01f && fabs(street[1]+659.99921f)<.01f && fabs(street[2]-122.75f)<.1f);
+  assert(p.v.movetype==MOVETYPE_WALK);
+  AW_SceneTick();VectorSubtract(p.v.origin,bz_shift,street);      /* no hold moves him afterwards */
+  assert(fabs(street[2]-(i?122.75f:91.08f))<.1f && p.v.movetype==MOVETYPE_WALK);
+  bazaar=bz_nostreet=0;VectorCopy(vec3_origin,bz_shift);
+  VectorCopy(vec3_origin,p.v.mins);VectorCopy(vec3_origin,p.v.maxs);command_argc=1;
+ }
+ /* WET-ARRIVAL (v0.0.68): a room arrival whose point lies in the room's water is taken (the fixture above, the
+  * Outer Flooded Halls' real heights). Before the fix the dry search refused every spot of the hall (its whole floor
+  * is under the water), the room's start too, and AW_MapPlace stood the player on the vault's top (here: the stub
+  * leaves him at the start, and it is called). Now: SothaSilTeleport's point (its feet in the water) is taken as it
+  * is, the player wading there; the door's arrival (its feet in the air) stands on the submerged floor under it
+  * (OpenMW's trace down); a point over a pit with no floor stays where it is (swimming); a point in a pillar, in the
+  * void under the floor (water closed above it) or outside the room box falls back as before, and a dry arrival
+  * takes its dry spot as before. */
+ {
+  static const struct {float at[3];int how;float z;} cases[]={
+   {{-12.5f,-31.0f,7.625f},1,7.625f},         /* SothaSilTeleport (PMOV row 22): the point, wading */
+   {{1256.24f,32.79f,20.875f},1,1.08f},       /* the door from the Inner Flooded Halls (feet dry, the floor wet) */
+   {{650.0f,-50.0f,7.625f},1,7.625f},         /* over the pit: no floor within reach, at the point, swimming */
+   {{120.0f,-30.0f,7.625f},0,0},              /* in the pillar: solid geometry */
+   {{-12.5f,-31.0f,-60.0f},0,0},              /* under the floor: water closed above it */
+   {{1500.0f,0.0f,7.625f},0,0},               /* outside the room box */
+   {{1150.0f,0.0f,30.0f},2,20.25f}};          /* a dry landing: the dry search, unchanged */
+  static const vec3_t start={1256.24f,32.79f,20.875f};
+  extern int (*aw_load_precheck)(const char *,aw_loaderr_t *);
+  model_t *world=sv.worldmodel;int k,calls;
+  aw_load_precheck=NULL;flooded=1;sv.worldmodel=&flooded_world;
+  flooded_world.mins[0]=-200.27f;flooded_world.mins[1]=-484.18f;flooded_world.mins[2]=-119.94f;
+  flooded_world.maxs[0]=1376.0f;flooded_world.maxs[1]=548.87f;flooded_world.maxs[2]=249.4f;
+  for(k=0;k<(int)(sizeof(cases)/sizeof(cases[0]));k++){
+   AW_SceneCancelTransition();strcpy(sv.name,"seyda");p.v.health=73;p.v.movetype=MOVETYPE_WALK;
+   cls.state=ca_connected;cls.signon=SIGNONS;aw_story.stage=AW_STAGE_RELEASED;
+   p.v.mins[0]=-7.32f;p.v.mins[1]=-7.12f;p.v.mins[2]=-16.625f;p.v.maxs[0]=7.32f;p.v.maxs[1]=7.12f;p.v.maxs[2]=16.625f;
+   queued[0]=0;assert(AW_SceneLoadRoom("census",cases[k].at,90) && !strcmp(queued,"map census\n"));
+   strcpy(sv.name,"census");assert(AW_Interior());VectorCopy(start,p.v.origin);calls=map_place_calls;
+   AW_SceneSpawn(&p);
+   if(cases[k].how){
+    assert(map_place_calls==calls && fabs(p.v.origin[0]-cases[k].at[0])<.01f && fabs(p.v.origin[1]-cases[k].at[1])<.01f);
+    assert(fabs(p.v.origin[2]-cases[k].z)<.2f && p.v.movetype==MOVETYPE_WALK);
+   }else assert(map_place_calls==calls+1 && VectorCompare(p.v.origin,start));
+  }
+  flooded=0;sv.worldmodel=world;AW_SceneCancelTransition();
+  VectorCopy(vec3_origin,p.v.mins);VectorCopy(vec3_origin,p.v.maxs);
+ }
 #ifdef BALMORA_AVAILABLE
  /* A partial-area build (aw_miniwind.c, tools/miniwind.py): the logo and New
   * Game quick-start in its town with the notice; exits to areas it does not
@@ -1455,5 +1597,13 @@ void AW_SaveSpawn(void){}
 void AW_SaveReset(void){}
 
 qboolean AW_MapPlace(edict_t *p,const float *xy){map_place_calls++;VectorCopy(xy,last_map_arrival);return !map_place_blocked;}
-qboolean AW_MapPlaceBelow(edict_t *p,const float *point){map_place_calls++;VectorCopy(point,last_map_arrival);return !map_place_blocked;}
+qboolean AW_MapPlaceBelow(edict_t *p,const float *point){map_place_calls++;VectorCopy(point,last_map_arrival);
+ /* MOURNHOLD-BAZAAR-UNDER-WATER-67: the Bazaar scene around the asked point, and the first search's landing there as
+  * the image's map_place made it (aw_spawn.c: its clear start stepped down through the street, the fall onto the water
+  * surface at 0: "102 below the asked height 102") */
+ if(bazaar==2){
+  bz_shift[0]=point[0]-1018.26052f;bz_shift[1]=point[1]+659.99921f;bz_shift[2]=point[2]-102.572f;
+  p->v.origin[0]=point[0];p->v.origin[1]=point[1];p->v.origin[2]=bz_shift[2]-p->v.mins[2]+.25f;return true;
+ }
+ return !map_place_blocked;}
 const char *aw_map_place_failure="";

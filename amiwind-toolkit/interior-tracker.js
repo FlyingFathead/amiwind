@@ -6,16 +6,21 @@
 // node. Data without interiors (older tracker files) gives null / empty results, and the page hides the block.
 (function (root) {
   // The states in legend order, and their colours (the chip colours of the list and the map layer).
-  const STATES = ['on_chim_rooms', 'room_map', 'converted', 'not_started', 'hard_case', 'test_cell', 'teleport_only', 'no_entrance'];
-  const COLOURS = {on_chim_rooms: '#7dffa6', room_map: '#46c37b', converted: '#6ea4df', not_started: '#3a4f66',
-    hard_case: '#b07ae0', test_cell: '#8a96a8', teleport_only: '#e0a040', no_entrance: '#c2185b'};
-  const LABELS = {on_chim_rooms: 'In the game on CHIM rooms', room_map: 'In the game as a room map', converted: 'Converted, not in the game yet',
-    not_started: 'Not started', hard_case: 'Set aside: hard case', test_cell: 'Set aside: test cell', teleport_only: 'Set aside: teleport only',
-    no_entrance: 'Set aside: no entrance, no script'};
-  // The three groups of the legend.
-  const GROUPS = [{id: 'in_game', label: 'In the game', states: ['on_chim_rooms', 'room_map']},
-    {id: 'not_in_game', label: 'Not in the game yet', states: ['converted', 'not_started']},
-    {id: 'set_aside', label: 'Set aside, with a reason', states: ['hard_case', 'test_cell', 'teleport_only', 'no_entrance']}];
+  // No room is set aside (ROOMS-SET-ASIDE-NOT-BUILT-67): a room no door leads to is a room to build; a district built as open
+  // terrain is in the game; a built room is reached by its way in (tools/cell_progress_rooms.py way_in: a door, a script, or
+  // for a room nothing in the game data leads to, its dbg tp picker row).
+  const STATES = ['on_chim_rooms', 'room_map', 'district', 'converted', 'not_started', 'test_cell', 'teleport_only', 'no_entrance', 'hard_case'];
+  const COLOURS = {on_chim_rooms: '#7dffa6', room_map: '#46c37b', district: '#5fe0b0', converted: '#6ea4df', not_started: '#3a4f66',
+    test_cell: '#8a96a8', teleport_only: '#e0a040', no_entrance: '#c2185b', hard_case: '#b07ae0'};
+  const LABELS = {on_chim_rooms: 'In the game on CHIM rooms', room_map: 'In the game as a room map', district: 'In the game as open terrain (a district)',
+    converted: 'Converted, not in the game yet',
+    not_started: 'Not started', test_cell: 'Not built yet: a test cell, no door leads there',
+    teleport_only: 'Not built yet: no door, a script or a dialogue line sends the player there',
+    no_entrance: 'Not built yet: no door, and no script or dialogue line names it', hard_case: 'Set aside: a reason this tracker does not know'};
+  // The groups of the legend.
+  const GROUPS = [{id: 'in_game', label: 'In the game', states: ['on_chim_rooms', 'room_map', 'district']},
+    {id: 'not_in_game', label: 'Not in the game yet', states: ['converted', 'not_started', 'test_cell', 'teleport_only', 'no_entrance']},
+    {id: 'set_aside', label: 'Set aside, with a reason', states: ['hard_case']}];
   const ISLANDS = ['Vvardenfell', 'Solstheim', 'Mournhold'];
   const NO_ISLAND = 'none', NO_ISLAND_LABEL = 'No entrance area';
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
@@ -42,7 +47,7 @@
     return num(c.total) + ' rooms · ' + groupsOf(ir).map(g => g.label.replace(', with a reason', '').toLowerCase() + ' ' + num(c[g.id])).join(' · ');
   }
   const islandLabel = (ir, i) => i === NO_ISLAND ? NO_ISLAND_LABEL : ((ir && ir.islands && ir.islands[i]) || i);
-  const batchText = b => b == null ? 'none (set aside)' : (typeof b === 'number' ? 'batch ' + b : String(b));
+  const batchText = b => b == null ? 'none' : (typeof b === 'number' ? 'batch ' + b : String(b));
   // Where a room is entered from: the town or place of its exterior door, else the exterior cell.
   function entranceKey(r) {
     if (r.island === NO_ISLAND) return 'none';
@@ -67,10 +72,13 @@
   const islandOrder = (a, b) => islandRank(a) - islandRank(b) || a.localeCompare(b);
   // [{island, label, rooms, entrances: [{key, label, cell, rooms}]}]: islands in order, then the rooms with no entrance area
   // as their own group at the end; entrances by name, rooms by name.
-  function grouped(ir, rooms) {
+  // byLand (expansion-views.js landGrouping): group by the land the unified count gives a room (its master's land) instead of
+  // its island, so a land's group holds the same rooms as its count; its rooms with no entrance area are an entrance group of
+  // their own inside it (TOOLKIT-EXPANSION-COMPLETION-67: the list said 93 Mournhold rooms beside a count of 96).
+  function grouped(ir, rooms, byLand) {
     const isl = new Map();
     for (const r of rooms) {
-      const i = r.island || NO_ISLAND;
+      const i = byLand ? byLand.landOf(r).key : (r.island || NO_ISLAND);
       if (!isl.has(i)) isl.set(i, new Map());
       const m = isl.get(i), k = entranceKey(r);
       if (!m.has(k)) m.set(k, {key: k, label: entranceLabel(r), cell: r.island !== NO_ISLAND && r.entrance ? r.entrance : null, rooms: []});
@@ -78,8 +86,9 @@
     }
     const order = [...isl.keys()].sort(islandOrder);
     const byName = (a, b) => a.name.localeCompare(b.name);
+    const last = k => (k === 'script') + 2 * (k === 'none');
     return order.map(i => ({island: i, label: islandLabel(ir, i), rooms: [...isl.get(i).values()].reduce((n, e) => n + e.rooms.length, 0),
-      entrances: [...isl.get(i).values()].sort((a, b) => (a.key === 'script') - (b.key === 'script') || a.label.localeCompare(b.label))
+      entrances: [...isl.get(i).values()].sort((a, b) => last(a.key) - last(b.key) || a.label.localeCompare(b.label))
         .map(e => Object.assign(e, {rooms: e.rooms.sort(byName)}))}));
   }
   const chip = (ir, st) => '<span class="itchip" style="border-color:' + (COLOURS[st] || '#888') + '"><i style="background:' + (COLOURS[st] || '#888') + '"></i>' + esc(labelOf(ir, st)) + '</span>';
@@ -105,8 +114,16 @@
     if (!rooms.length) return '<p class="muted">No room matches.</p>';
     const head = '<table class="mt itrooms"><thead><tr><th class="l">Room (cell ID)</th><th class="l">State</th><th class="l">Batch</th><th class="l">Reasons</th><th class="l">Master</th>' +
       (opts && opts.open3d ? '<th class="l">3D</th>' : '') + '</tr></thead><tbody>';
+    const byLand = opts && opts.byLand;
+    // with byLand: the land's group says how its rooms meet its count (districts counted once, as open terrain)
+    const landNote = g => {
+      if (!byLand) return '';
+      const all = [].concat(...g.entrances.map(e => e.rooms)), asT = all.filter(r => byLand.asTerrain.has(r.name)).length, c = (byLand.counts || {})[g.island];
+      return (asT ? ' <span class="muted">(' + num(all.length - asT) + ' in the land\'s count; ' + num(asT) + ' district' + (asT === 1 ? '' : 's') + ' counted once, as open terrain)</span>' : '') +
+        (c && !String(query || '').trim() ? ' <span class="muted">· rooms ready ' + num(c.ready) + ' of ' + num(c.total) + '</span>' : '');
+    };
     return '<p class="muted">' + num(rooms.length) + ' of ' + num(ir.rooms.length) + ' rooms. Click a room to show its entrance cell on the map.</p>' +
-      grouped(ir, rooms).map(g => '<details class="itisland" data-island="' + esc(g.island) + '"' + open + '><summary><b>' + esc(g.label) + '</b> · ' + num(g.rooms) + ' rooms ' + stateCounts(ir, [].concat(...g.entrances.map(e => e.rooms))) +
+      grouped(ir, rooms, byLand).map(g => '<details class="itisland" data-island="' + esc(g.island) + '"' + open + '><summary><b>' + esc(g.label) + '</b> · ' + num(g.rooms) + ' rooms' + landNote(g) + ' ' + stateCounts(ir, [].concat(...g.entrances.map(e => e.rooms))) +
         (g.island === NO_ISLAND ? ' <span class="muted">no door from any exterior leads to these; each keeps its own state</span>' : '') + '</summary>' +
         g.entrances.map(e => '<details class="itentrance"' + open + (e.cell ? ' data-cell="' + esc(e.cell) + '"' : '') + '><summary>' + esc(e.label) + ' · ' + e.rooms.length + ' ' + stateCounts(ir, e.rooms) + '</summary>' +
           head + e.rooms.map(r => roomRow(ir, r, opts)).join('') + '</tbody></table></details>').join('') + '</details>').join('');

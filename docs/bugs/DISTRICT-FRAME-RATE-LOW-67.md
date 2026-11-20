@@ -27,6 +27,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 - 2026-11-18: reported in v0.0.67-dev2
 - 2026-11-18 17:20 +0200: v0.0.67-dev2: From the build's own world statistics (the same test build): the districts' world holds 11 frames, 2,371 placements and 620,158 placed faces, about 56,000 a frame.
+- 2026-11-19 12:28 +0200: seen again in v0.0.67-dev3: Seen again: facing the statue in Plaza Brindisi Dorom the frame rate drops to about 2 frames a second; the Temple courtyard runs at 10 to 14.
 
 <!-- END GENERATED TIMELINE -->
 

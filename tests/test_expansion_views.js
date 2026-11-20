@@ -35,12 +35,18 @@ assert.deepStrictEqual(ext.islands.map(i => [i.name, i.done, i.partial, i.missin
 assert.deepStrictEqual([ext.total.done, ext.total.partial, ext.total.missing, ext.total.total], [3, 2, 3, 8]);
 assert.strictEqual(ext.islands[0].rate, 60);
 
-// rooms: in the game = done, converted = partial, the rest (set aside included) = missing
+// rooms: in the game = done, converted = partial, the rest = missing; a room no door leads to (the test cell) is a room
+// to build, never set aside (ROOMS-SET-ASIDE-NOT-BUILT-67)
 const mr = V.mournholdRooms(doc);
 assert.strictEqual(mr.length, 5);
 const rc = V.roomCounts(mr);
-assert.deepStrictEqual([rc.done, rc.partial, rc.missing, rc.total, rc.set_aside], [1, 1, 3, 5, 1]);
+assert.deepStrictEqual([rc.done, rc.partial, rc.missing, rc.total, rc.set_aside], [1, 1, 3, 5, 0]);
 assert.deepStrictEqual(mr.filter(V.isDistrict).map(r => r.name).sort(), ['Mournhold, Great Bazaar', 'Mournhold, Temple Courtyard']);
+// a district built as open terrain (state district) is a district tile drawn as in the game
+const built = room('Mournhold, Godsreach', 'Mournhold', 'district', 'Tribunal.esm');
+assert.ok(V.isDistrict(built));
+assert.strictEqual(V.roomClass(built), 'done');
+assert.strictEqual(V.roomClass(room('Sotha Sil,', 'Mournhold', 'teleport_only', 'Tribunal.esm')), 'missing');
 
 // views: the map view is named after the islands the data holds; Mournhold is offered when Tribunal rooms are there
 let v = V.views(doc);
@@ -48,7 +54,7 @@ assert.deepStrictEqual(v.map(x => x.id), ['vvardenfell', 'solstheim', 'mournhold
 assert.deepStrictEqual(v.map(x => x.label), ['Vvardenfell', 'Solstheim', 'Mournhold']);
 assert.strictEqual(v[0].text, 'done 3 · partial 1 · missing 1 of 5 cells');      // Vvardenfell's cells only
 assert.ok(v[1].text.startsWith('done 0 · partial 1 · missing 2 of 3 cells · rooms: done 0 · partial 0 · missing 1 of 1'), v[1].text);
-assert.ok(v[2].text.includes('of 5 rooms') && v[2].text.includes('1 set aside'), v[2].text);
+assert.ok(v[2].text.includes('of 5 rooms') && !v[2].text.includes('set aside'), v[2].text);
 assert.strictEqual(V.pick(v, 'mournhold'), 'mournhold');
 assert.strictEqual(V.pick(v, 'gone'), 'vvardenfell');
 // each map pane frames and draws its own island
@@ -87,7 +93,7 @@ assert.ok(solRow.includes('rooms ' + by.bloodmoon.rooms.done + ' of ' + by.blood
 assert.ok(solRow.includes('cells ' + by.bloodmoon.cells.done + ' of ' + by.bloodmoon.cells.total + ' in the game'), solRow);
 assert.ok(solRow.includes('together ' + by.bloodmoon.done + ' of ' + by.bloodmoon.total + ' (' + by.bloodmoon.rate.toFixed(1) + ' %)'), solRow);
 assert.ok(mhRow.includes('rooms ' + by.tribunal.rooms.done + ' of ' + by.tribunal.rooms.total + ' in the game (20.0 %)'), mhRow);
-assert.ok(mhRow.includes('no exterior cells in the tracker') && mhRow.includes('rooms set aside 1'), mhRow);
+assert.ok(mhRow.includes('no exterior cells in the tracker') && !mhRow.includes('set aside'), mhRow);
 assert.ok(V.views(doc)[2].text.includes('of ' + by.tribunal.rooms.total + ' rooms'), 'the Mournhold card counts the same rooms');
 // without the expansions' figures (an older page) the rows are the headline's own, as before
 assert.ok(H.headRows(head).map(r => strip(r.html)).find(t => t.startsWith('Mournhold')).includes('not started'));

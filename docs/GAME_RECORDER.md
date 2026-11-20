@@ -1,6 +1,6 @@
 # Gameplay recorder
 
-_Last updated with AmiWind v0.0.67 (18 November 2026)._
+_Last updated with AmiWind v0.0.67 (19 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -79,7 +79,11 @@ the same first frame in play. Every random stream the game's logic draws from fo
 - the general generator (monster moves, spells, persuasion, rests, harvest rolls, effects) is set again at the start
   of every frame from the seed and the frame's number, so a roll drawn on one frame in one run and not in the other
   cannot shift the rolls of the frames after it;
-- the game no longer draws a roll per wall-clock frame while the recorder runs.
+- the game no longer draws a roll per wall-clock frame while the recorder runs;
+- since v0.0.67 each boot starts the game's random numbers from the machine's clock
+  ([Resting: the roll](RESTING.md#the-roll)); a recording does not depend on it: the generator is set every frame as
+  above, and a load inside the recording (a New Game) starts the script language's Random from the recording's seed,
+  not the boot's. When the recorder stops, the boot's start comes back.
 
 Each played frame uses the recorded length instead
 of the measured one, so a slow machine and a fast one run the same frames. The recorded keys go through the game's

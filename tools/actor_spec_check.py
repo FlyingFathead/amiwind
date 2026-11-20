@@ -151,7 +151,8 @@ def set_aside_rooms(room_batches):
     made = {r['room'].casefold() for r in record.get('rooms') or ()}
     out = {}
     for row in record.get('exterior_like') or ():
-        out[row['cell'].casefold()] = ('exterior_like', row.get('state') or 'an exterior-like cell')
+        # a district: built as open terrain by the district module (ROOMS-SET-ASIDE-NOT-BUILT-67; the stage's own text)
+        out[row['cell'].casefold()] = ('exterior_like', row.get('state') or 'a district, built as open terrain')
     for cell, why in sorted((record.get('refused') or {}).items()):
         out.setdefault(cell.casefold(), ('refused', str(why)))
     for cell, why in sorted((record.get('empty') or {}).items()):

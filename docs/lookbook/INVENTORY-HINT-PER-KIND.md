@@ -1,6 +1,6 @@
 # Look book page INVENTORY-HINT-PER-KIND
 
-_Generated from tests/lookbook/pages.json with AmiWind v0.0.67-dev2._
+_Generated from tests/lookbook/pages.json with AmiWind v0.0.67._
 
 The inventory's key line names the right action for every kind of item.
 

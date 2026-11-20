@@ -1176,13 +1176,19 @@ class NativeSourceTests(unittest.TestCase):
         # was searched. The asked height names the floor, so a landing more than 64 below it holds the player at the
         # asked point without gravity while the ring loads, the standing-spot rule is asked each frame, and after
         # 8 seconds without a floor the first landing is kept (a point over deep ground or open water).
+        # Since the v0.0.67 release fix (the dev3 image: on the gate wall's top, GetPos 490): the landing first asks the
+        # search at the asked point at once, both there and in the hold with the first pass that takes no spot beside
+        # the point above the asked height (standing_search BELOW); the behaviour itself: tests/aga_scene_test.c.
         scene = (ROOT/'engine/aga/src/aw_scene.c').read_text(encoding='utf-8')
         begin = scene[scene.index('static void arrival_hold_begin('):scene.index('static void arrival_hold_tick(')]
         self.assertIn('p->v.origin[2]+p->v.mins[2]>=asked[2]-ARRIVAL_HOLD_DROP)return;', begin)
         self.assertIn('if(!aw_arrival_hold.value || p->v.movetype!=MOVETYPE_WALK)return;', begin)
         self.assertIn('p->v.movetype=MOVETYPE_NONE;', begin)
+        self.assertLess(begin.index('if(standing_search(p,at,point,1)){'), begin.index('p->v.movetype=MOVETYPE_NONE;'))
         tick = scene[scene.index('static void arrival_hold_tick('):scene.index('int AW_InteriorPlace(')]
-        self.assertIn('if(standing_spot(p,p->v.origin,point)){', tick)
+        self.assertIn('if(standing_search(p,p->v.origin,point,1)){', tick)
+        # every other arrival keeps the search's one pass (standing_spot: BELOW off)
+        self.assertIn('return standing_search(p,preferred,point,0);', scene)
         self.assertIn('install_spot(p,arrival_hold.first);p->v.movetype=MOVETYPE_WALK;', tick)
         self.assertIn('#define ARRIVAL_HOLD_DROP 64', scene)
         self.assertIn('#define ARRIVAL_HOLD_SECONDS 8', scene)

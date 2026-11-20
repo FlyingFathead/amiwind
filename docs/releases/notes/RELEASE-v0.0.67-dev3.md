@@ -151,7 +151,8 @@ The [MWScript tracker](../../MWSCRIPT_FEATURES.md) shows how many of the game's 
 [CHIM progress tracker](../../chim/PROGRESS_TRACKER.md) shows how far each land and part has come.
 
 - **Mournhold and Solstheim are not playable yet.** Mournhold's districts are in the image as a module, but the way
-  there, their quests and most of their scripts are not. Two of Solstheim's models, the icebergs of the Mortrag Glacier,
+  there, their quests and most of their scripts are not. Corrected for v0.0.67: the way to Mournhold works (see [the
+  v0.0.67 notes](RELEASE-v0.0.67.md#known-in-this-build)); its quests and much of its play are not ready. Two of Solstheim's models, the icebergs of the Mortrag Glacier,
   cannot be converted yet (COLLISION-ICEBERG-CLIPNODE-BUDGET-67).
 - **Fixed in source, still to be seen in play on a build of this snapshot:** the districts' containers, items,
   activators, doors and people, the arrival hold at the Great Bazaar, the person's use box, the shared layout of menus

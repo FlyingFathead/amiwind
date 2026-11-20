@@ -12,6 +12,7 @@
 | Persists in | v0.0.67-dev2 (last seen) |
 | Severity | high: Regressed in v0.0.67-dev2 (was medium): Unreleased branch only; the build fails at the first resident stage, about 4 minutes in, and resumes from the stages... |
 | Family | Build speed (`build-speed`) |
+| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
 | Came back (regression) | in v0.0.67-dev2 (fixed in v0.0.35 before) |
 
 <!-- END GENERATED FACTS -->
@@ -31,6 +32,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-10-09: reported in v0.0.34-dev
 - 2026-11-18 12:10 +0200: came back in v0.0.67-dev2 (fixed in v0.0.35 before): Seen again, in another place: a test build with the module that builds Mournhold's districts stopped 171 seconds in, in the builder itself, when the stage plan was written to build-state.json: "Object of type PosixPath is not JSON ...
 - 2026-11-18 12:10 +0200: fixed in source: developer, v0.0.67-dev2 (tools/build.py tribunal_mournhold_commands, tools/build_parallel.py require_plan_arguments); the receipt option is a string; and the plan itself is checked in its first second, for a build and for a check alike and again before the first stage: every command argument must be a string and the plan must serialize, else the build stops there and names the stage, the argument and the option before it; tests/test_presented_data_stage.py holds the module's plan and a plan with a path: a plan that cannot be recorded must stop before any stage starts, whichever option adds the path
+- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
 
 <!-- END GENERATED TIMELINE -->
 
@@ -250,6 +252,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-STAIR-WALK-SLOW-33](BUILD-STAIR-WALK-SLOW-33.md): The image step's stair walk spent most of its time in interpreted collision traces and brute-force headroom tests (1,751 s of the rc1c image step)
 - [BUILD-STATS-SERIAL-36](BUILD-STATS-SERIAL-36.md): The CHIM stats step runs serially and silently on one core
 - [BUILD-STORAGE-DUPLICATES-33](BUILD-STORAGE-DUPLICATES-33.md): Build storage keeps full duplicate copies of images, stage outputs and packages, and nothing removes them
+- [BUILD-TESTER-32GB-OOM-67](BUILD-TESTER-32GB-OOM-67.md): A tester's build on a machine with 32 GB of memory ran out of memory after about 32 hours
 - [BUILD-TOWN-ACTOR-FIT-SERIAL-64](BUILD-TOWN-ACTOR-FIT-SERIAL-64.md): The Vivec town stage fits its residents onto the frame collision on one core after the resident bake
 - [BUILD-UNDERUSE-GATE-36](BUILD-UNDERUSE-GATE-36.md): The profiler did not flag long underused phases: 7 min 44 s of CHIM statistics on 1 of 24 cores and 77 s of zone walk on 1 core showed nowhere
 - [BUILD-UNIT-KEYS-REACH-64](BUILD-UNIT-KEYS-REACH-64.md): New collision settings re-keyed the NPC, creature, player-body and resident unit caches, which never read them

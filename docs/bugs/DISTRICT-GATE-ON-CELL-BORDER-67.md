@@ -19,6 +19,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-18: reported in v0.0.67-dev2
+- 2026-11-19 11:35 +0200: seen again in v0.0.67-dev3: Seen again on the third development snapshot of v0.0.67: from Godsreach's arrival the gate to Plaza Brindisi Dorom, a few steps away across the district's inner cell border, cannot be used; the use key finds no door and nothing loads.
+
+<!-- END GENERATED TIMELINE -->
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category

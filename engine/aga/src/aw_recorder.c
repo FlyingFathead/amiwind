@@ -153,6 +153,8 @@ static void seed_streams(void)
 {
     AW_CombatRecorderSeed(stream_seed(0xC0DE0001U));     /* the fight's dice (aw_combat.c) */
     AW_MwvmSeed(stream_seed(0xC0DE0002U));               /* MWScript Random (aw_mwvm.c) */
+    AW_MwvmStartSeed(stream_seed(0xC0DE0002U));          /* ... and its start at a load inside the recording, not the
+                                                          * boot's (REST-CUT-TOO-OFTEN-67: the boot seed differs) */
     aw_levelled_seed=stream_seed(0xC0DE0003U)|1U;        /* the levelled container rolls (aw_inventory.c) */
 }
 static void frame_seed(unsigned long n){srand((unsigned)stream_seed((uint32_t)n));}
@@ -161,7 +163,8 @@ static void release(void)
     if(!file)free(stream);      /* a playback's frames lie inside its file buffer */
     free(file);free(checks);free(save);
     stream=file=save=NULL;checks=NULL;used=capacity=cursor=stream_bytes=0;check_count=check_capacity=0;save_bytes=0;
-    if(mode==RECORDING || mode==PLAYING)AW_CombatRecorderSeed(0);   /* the fights' own seeds again */
+    if(mode==RECORDING || mode==PLAYING){AW_CombatRecorderSeed(0);AW_MwvmStartSeed(0);}   /* the fights' own seeds
+                                                          * and Random's boot start again */
     cur.open=0;mode=IDLE;
 }
 static void minutes(double t,long *m,long *s){long n=(long)t;*m=n/60;*s=n%60;}

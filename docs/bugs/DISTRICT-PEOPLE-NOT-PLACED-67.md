@@ -27,6 +27,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 - 2026-11-18: reported in v0.0.67-dev2
 - 2026-11-18 18:05 +0200: v0.0.67-dev2: Counted from the districts' own presented game data: 57 actor references in the districts' cells (49 people, 8 creatures; 38 with a script), none of them in a frame map: a district's frame map held its worldspawn, its start and its flames.
+- 2026-11-19 22:38 +0200: seen again in v0.0.67: In the v0.0.67 image every person and creature of the five Mournhold districts is placed in the district maps (57 of 57); the actor checks do not read the district maps, so they still report them as not placed.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -56,5 +57,6 @@ Family: Town and interior import (`town-import`). The town importer converts eve
 Related bugs in other categories:
 
 - [DISTRICT-PLACED-THINGS-NO-ROW-67](DISTRICT-PLACED-THINGS-NO-ROW-67.md): In Mournhold's districts no container, item, activator or door sign can be aimed at: their rows are keyed as a room's, and the game outdoors asks for the cells around the player
+- [PLAZA-FABRICANTS-LIVE-AT-START-67](PLAZA-FABRICANTS-LIVE-AT-START-67.md): Plaza Brindisi Dorom holds the fabricants of a later quest from the start of a new game, one ready to attack on sight
 
 <!-- END GENERATED CATEGORY -->

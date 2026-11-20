@@ -1,6 +1,6 @@
 # The expansions: Tribunal and Bloodmoon
 
-_Last updated with AmiWind v0.0.67-dev2 (19 November 2026)._
+_Last updated with AmiWind v0.0.67 (19 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -24,7 +24,9 @@ AmiWind's world comes from the original Morrowind game, and Morrowind has two ex
 city of Mournhold, and **Bloodmoon**, which adds the island of Solstheim. This page says what the builder does with
 them today, what can be seen in the game now, how the two places are planned to fit into the game, and what is known to
 be missing. The short version: the data of both expansions is part of the build by default since v0.0.66-dev2 and
-their rooms are in the image, but Mournhold's outdoor districts and Solstheim's ground are not built yet.
+their rooms are in the image. Since v0.0.67 Mournhold is reached from Ebonheart through the characters' own dialogue and
+back, and its five outdoor districts, built as a world of their own, can be walked; its quests and much of its play are
+not ready, and Solstheim's ground is not built yet.
 
 ## What the expansions are, and your own copies
 
@@ -91,11 +93,17 @@ builder warns, names the missing expansion and builds the base game alone.
   where the boat from Khuul lands; `dbg tp ravenrock` at Raven Rock's dock; `dbg tp skaal` in Skaal Village; and
   `godsreach`, `greatbazaar`, `brindisi`, `palacecourtyard` and `templecourtyard` in Mournhold's districts. Each works
   when the build selected its expansion and the image holds the place; otherwise it says which of the two is missing and
-  the player stays where he is. Today the Reception Area is held; Solstheim's places and the districts are not yet
-  (`config/expansion-arrivals.json`).
+  the player stays where he is. Today the Reception Area and the five districts are held; Solstheim's places are not yet
+  (`config/expansion-arrivals.json`). On the v0.0.67-dev3 image all five districts were visited by teleport (19 November
+  2026); the teleport to the Great Bazaar landed under its street and under water
+  ([MOURNHOLD-BAZAAR-UNDER-WATER-67](bugs/MOURNHOLD-BAZAAR-UNDER-WATER-67.md), open; a landing that searches for the
+  floor at the asked point at once, instead of the first spot a blocked box gives, is made in source and not yet seen in
+  play), while the two district doors into the Great Bazaar, walked
+  through, set the player on the street.
 - **The data in the tables.** The [MWScript tracker](MWSCRIPT_FEATURES.md) counts every script of the three game files
-  and says which run: of Tribunal.esm's 255 scripts, 236 are used (45 run, 4 wait for a function, 187 belong to
-  Mournhold); of Bloodmoon.esm's 336, 310 are used (48 run, 17 wait for a function, 245 belong to Solstheim). The
+  and says which run: of Tribunal.esm's 255 scripts, 236 are used (233 run, 2 wait for a function: the water levers of
+  Old Mournhold, 1 belongs to a room the image does not hold); of Bloodmoon.esm's 336, 310 are used (173 run, 137
+  belong to Solstheim's outdoor regions). The
   [world mechanisms](WORLD_MECHANISMS.md) page lists the switches and levers of Mournhold and Solstheim, marked as not in
   the image yet, and the [survey](WORLD_SURVEY.md) lists Solstheim's exterior cells. The
   [census](performance/EXPANSIONS-CENSUS-v0.0.64.md) counts the places, placements and models of both.
@@ -105,12 +113,30 @@ builder warns, names the missing expansion and builds the base game alone.
   name. Checked on the v0.0.66 image on a Raspberry Pi 4B (17 November 2026): the two transport scripts of the trip
   between Ebonheart's Grand Council Chambers and Mournhold's Royal Palace, run through the console's test aid for a
   dialogue answer's result script, move the player to the Reception Area beside Effe-Tei and back in front of Asciene
-  Rane. The trip through the dialogue window itself has not been played yet.
+  Rane. The trip through the dialogue window itself was played by hand on the v0.0.67-dev3 image (19 November 2026, 32 MB
+  of Fast RAM in the emulator): Asciene Rane's topic and choice in Ebonheart, Grand Council Chambers took the player to
+  Mournhold, Royal Palace: Reception Area at her script's position, the player walked out through the palace door into
+  the courtyard and through the gate into Plaza Brindisi Dorom, and Effe-Tei's topic and choice took the player back at
+  his script's position.
 
 ## What you cannot see yet
 
-No finished Mournhold or Solstheim is in the game. Mournhold's five outdoor districts are not built, so the doors that
-lead out of the palace and the temple lead nowhere; there is no Solstheim ground to walk on and no boat to it; and the
+No finished Mournhold or Solstheim is in the game. Mournhold's five outdoor districts are in the image and can be
+walked, but they are not ready: they draw at 8 to 16 frames a second
+([DISTRICT-FRAME-RATE-LOW-67](bugs/DISTRICT-FRAME-RATE-LOW-67.md)), the Plaza is not drawn looking south from its
+arrival point ([DISTRICT-PLAZA-NOT-DRAWN-FROM-ARRIVAL-67](bugs/DISTRICT-PLAZA-NOT-DRAWN-FROM-ARRIVAL-67.md)), Godsreach's
+gate to the Plaza stood on a cell border and could not be used; its door is now written into both cells' tables, fixed
+in source and still to be seen in play
+([DISTRICT-GATE-ON-CELL-BORDER-67](bugs/DISTRICT-GATE-ON-CELL-BORDER-67.md)), the Plaza's fabricants and two Gaenors
+attack a new player
+([PLAZA-FABRICANTS-LIVE-AT-START-67](bugs/PLAZA-FABRICANTS-LIVE-AT-START-67.md),
+[GAENOR-ATTACKS-AT-START-67](bugs/GAENOR-ATTACKS-AT-START-67.md)), a fight is carried over a map change
+([COMBAT-FIGHT-CARRIED-TO-NEW-MAP-67](bugs/COMBAT-FIGHT-CARRIED-TO-NEW-MAP-67.md)), Godsreach's canal is reported dry
+and that is not proven ([GODSREACH-CANAL-NO-WATER-67](bugs/GODSREACH-CANAL-NO-WATER-67.md)), the water levers of Old
+Mournhold do not move the water
+([MWSCRIPT-WATER-LEVEL-STATIC-67](bugs/MWSCRIPT-WATER-LEVEL-STATIC-67.md)), and the Dark Brotherhood's attack in sleep
+that starts Tribunal did not come on the dev3 image; fixed in source, to be seen in play
+([GETPCSLEEP-NOT-CARRIED-OUT-67](bugs/GETPCSLEEP-NOT-CARRIED-OUT-67.md)). There is no Solstheim ground to walk on and no boat to it; and the
 scripts of the expansions' places that are not in the image yet do not run (since v0.0.67 the build binds the
 expansions' own placements, so a script runs where the image holds its place; the v0.0.66 build bound none of them).
 The data being selected by default is the road to them, not their arrival.
@@ -167,18 +193,18 @@ The plan for Mournhold:
 - Each district has its **own local map**, drawn like a room's, and the world map keeps your marker at Ebonheart while
   you are in Mournhold (see Getting to Mournhold below).
 
-In the v0.0.66-dev2 snapshot the five districts are set aside: the room stages skip them and list them, and they come
-with Mournhold's own exterior.
+(History: in the v0.0.66-dev2 snapshot the five districts were set aside; the room stages skipped them and listed them.
+Since v0.0.67 they come with Mournhold's own exterior.)
 
-How they reach the outdoor converter (in work for v0.0.67): the converter reads squares of exterior grid cells, and a
+How they reach the outdoor converter (built for v0.0.67): the converter reads squares of exterior grid cells, and a
 district is an interior cell with its own coordinates and no terrain. `tools/presented_exterior.py` therefore writes
 a presented copy of the merged game data in which each district is a block of exterior cells of its own, in a row
 south of every island and apart from the other blocks, with its placements moved by one offset and every door or
 marker that names the district pointing at the moved position; everything else is copied unchanged. The blocks
 come from `config/presented-exteriors.json` and the districts' names, so the same game files always give the same
 places. On the Game of the Year files: Godsreach 1 by 2 cells, the Great Bazaar and Plaza Brindisi Dorom 2 by 1, the
-Royal Palace courtyard 1 by 1, the Temple courtyard 2 by 2; 40 door and marker destinations are rewritten. No
-district is in a build yet.
+Royal Palace courtyard 1 by 1, the Temple courtyard 2 by 2; 40 door and marker destinations are rewritten. The
+five districts are in the v0.0.67 image through the module below.
 
 The outdoor converter reads that presented copy from a **presented data folder**, one folder for both expansions
 (`tools/presented_data.py`): the merged game data with the presented districts under the base game file's name, so
@@ -221,6 +247,12 @@ cells of its block, at the moved positions, where the game asks for them outdoor
 wrote before. A check in the build's first minute holds the districts' rows against the districts' own cells of the
 game files ([Mournhold notes](MOURNHOLD_NOTES.md#containers-items-and-activators-in-a-district)).
 
+The two trackers count the module's work. The CHIM progress tracker's data for a build (`cell-progress`, which waits
+for the module's stages) takes the districts' world beside the base world, so the districts' frames count as
+Mournhold's exterior on CHIM in that build. The script tracker ([MWScript features](MWSCRIPT_FEATURES.md)) is measured
+against a build's image: the districts and the rooms the image holds count as carried, and a script placed only in
+cells the image does not carry is the only kind still listed as outside the image.
+
 A district cell is built once its conversion has been measured and recorded in the progress tracker; until then no
 build converts it, and the doors that lead there stay closed with their reason. A build's first minute says what
 happens to each selected expansion's cells (how many the tracker calls finished, and which module builds them), and
@@ -254,10 +286,9 @@ In the original game the way in is a teleport, and AmiWind plans to keep it as a
 
 AmiWind has no separate travel system for this. These are dialogue choices whose result scripts move the player, and
 they run on the dialogue and script support the game already has ([dialogue features](DIALOGUE_FEATURES.md),
-[MWScript tracker](MWSCRIPT_FEATURES.md)). The rooms named above are read from Tribunal's data. Mournhold is not
-converted yet: the Reception Area is a room and converts with the other rooms, and the five districts are converted as
-described above, so the trip works once they are. The way there, through Ebonheart and the Grand Council Chambers,
-still needs a playtest.
+[MWScript tracker](MWSCRIPT_FEATURES.md)). The rooms named above are read from Tribunal's data. The
+Reception Area is a room and converts with the other rooms, and the five districts are converted as described above. The way there, through Ebonheart and the Grand Council Chambers, and back was played in the emulator on
+19 November 2026 (see "What you can see in the game today").
 
 While you are in Mournhold, the world map keeps your marker at Ebonheart, the last place outdoors you left from. Each of
 the five outdoor districts has its own local map, drawn like a room's.
@@ -278,7 +309,8 @@ generated.
 ## The plan
 
 - **Tribunal (Mournhold):** the five districts as one exterior of their own, the ordinary rooms, the weather driven by Tribunal's
-  scripts, the teleport trip above, then the 187 scripts that belong to Mournhold.
+  scripts, the teleport trip above, and Tribunal's scripts (233 of its 236 used scripts run since v0.0.67; the water
+  levers of Old Mournhold are left).
 - **Bloodmoon (Solstheim):** the exterior cells as part of the outdoor map, with the tree method its forests need (the
   star-shaped spruces and tree crowns are test-build methods that are measured but not settled), then its rooms and the
   245 scripts that belong to Solstheim.
@@ -289,8 +321,9 @@ generated.
 
 The order of the work, from the files to the playtests. Each step is tracked in the [roadmap](ROADMAP.md).
 
-**What dev2 has and does not have.** dev2 has the data of both expansions in the build by default, the merged reader, the
-archives read in load order, keys that follow the selection and lists that include the expansions' places. It does not
+**What dev2 had and did not have (history: the v0.0.66-dev2 snapshot; the v0.0.67 image holds the districts and runs the
+expansions' scripts, see above).** dev2 had the data of both expansions in the build by default, the merged reader, the
+archives read in load order, keys that follow the selection and lists that include the expansions' places. It did not
 have Mournhold's five districts (they are set aside, so the doors leading out of the palace and the temple lead nowhere
 yet), Solstheim's ground, the expansions' scripts running, or the check of the expansion files. The census of the changes
 the expansions make to the base game is being made; the chains below are what is known so far from the game files.
@@ -340,7 +373,13 @@ The open entries are in the [bug register](BUGS.md):
 - `BUILD-EXPANSION-INPUTS-UNCHECKED-66`: the expansion files were not required nor checked against known SHA-256
   values (fixed in v0.0.66-dev3).
 - `MOURNHOLD-BAZAAR-UNDER-WATER-67`: a teleport to the Great Bazaar leaves the player under the district's street, in
-  the water (open; the numbers are in the [Mournhold notes](MOURNHOLD_NOTES.md#arrivals)).
+  the water (open; fixed in source, not yet seen in play; the numbers are in the [Mournhold notes](MOURNHOLD_NOTES.md#arrivals)).
+- The district entries of 19 November 2026 (open): `DISTRICT-FRAME-RATE-LOW-67`, `DISTRICT-PLAZA-NOT-DRAWN-FROM-ARRIVAL-67`,
+  `DISTRICT-GATE-ON-CELL-BORDER-67`, `PLAZA-FABRICANTS-LIVE-AT-START-67`, `GAENOR-ATTACKS-AT-START-67`,
+  `COMBAT-FIGHT-CARRIED-TO-NEW-MAP-67`, `GODSREACH-CANAL-NO-WATER-67`, `MWSCRIPT-WATER-LEVEL-STATIC-67` and
+  `GETPCSLEEP-NOT-CARRIED-OUT-67`, each linked above.
+- Fixed in source after the third snapshot, still to be seen in play: the Great Bazaar teleport, Godsreach's gate, the
+  Plaza's fabricants, the two Gaenors and the carried fights, the Dark Brotherhood's attack in sleep.
 - `INTERIOR-RECEPTION-AREA-FPS-67`: Mournhold's Royal Palace Reception Area, the arrival room of the trip, runs at
   about 3 frames a second on the Pi 4B (open).
 - `EXPANSION-TABLES-BASE-ONLY-66`: some tables still read the base game only (open); `EXPANSION-BASE-ONLY-TABLES-66`

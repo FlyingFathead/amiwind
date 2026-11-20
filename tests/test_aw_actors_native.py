@@ -186,6 +186,37 @@ class ActorsNativeTests(unittest.TestCase):
         self.assertEqual(count, seen)
         self.assertGreaterEqual(count, 2)
 
+    def test_a_named_list_is_rolled_by_its_id(self):
+        # v0.0.67 (REST-CUT-NO-CREATURE-67, MWSCRIPT-PLACE-OTHER-KINDS-62): the builder's named lists (a region's sleep
+        # list, a list a script places) are in the table with a levelled base of their own, last among the bases; the
+        # engine rolls one by its id for a reference and keeps the pick (aw_actors.c AW_ActorsLevelledText). Before
+        # v0.0.67 a list no exterior reference names had no base: the engine could not find it by id at all.
+        import test_chim_levelled as L
+        refs = self.A.exterior_actors(L.MASTER)
+        data, report = self.A.build_table(refs, {}, self.A.levelled_lists(L.MASTER), self.A.creature_ids(L.MASTER),
+                                          L.LIBRARY, named=('UNUSED', 'late', 'not_a_list'))
+        self.assertEqual((report['levelled']['named_lists'], report['levelled']['named_lists_added']), (2, 1))
+        _, _, _, bases, _ = self.A.read_table(data)
+        lists = self.A.read_lists(data)
+        tail = bases[-2:]
+        self.assertEqual([b['hash'] for b in tail], [self.A.fnv('late'), self.A.fnv('unused')])
+        self.assertTrue(all(b['kind'] == self.A.KINDS['LEVC'] and not b['text'] for b in tail))
+        unused = lists[tail[1]['list']]
+        self.assertEqual(len(unused[2]), 1)
+        self.assertEqual(bases[unused[2][0][1]]['text'], L.LIBRARY['crab'])      # the crab, with its model
+        tmp = Path(self.tmp.name)
+        (tmp / 'named-actors.cca').write_bytes(data)
+        result = subprocess.run([str(self.exe), 'named', str(tmp / 'named-actors.cca'), str(tmp / 'frame.chim'), '0',
+                                 str(tmp / 'frame2.chim')], capture_output=True, text=True, cwd=tmp)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('named unused progs/c_crab.mdl', result.stdout)
+        self.assertIn('named lists passed', result.stdout)
+        # without names the table is byte for byte the table of before
+        plain, _ = self.A.build_table(refs, {}, self.A.levelled_lists(L.MASTER), self.A.creature_ids(L.MASTER),
+                                      L.LIBRARY)
+        self.assertEqual(plain, self.A.build_table(refs, {}, self.A.levelled_lists(L.MASTER),
+                                                   self.A.creature_ids(L.MASTER), L.LIBRARY, named=())[0])
+
     def test_home_cell_joins_its_levelled_points(self):
         """OUTDOOR-CREATURES-HOME-CELL-67: the region frame map the session loads brings its cell's people and placed
         creatures but no levelled point (tools/chim/region_actors.py defers them), and the window's home frame never

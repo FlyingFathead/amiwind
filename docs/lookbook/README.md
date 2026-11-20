@@ -1,12 +1,12 @@
 # The confirmed look book
 
-_Generated from tests/lookbook/pages.json with AmiWind v0.0.67-dev2._
+_Generated from tests/lookbook/pages.json with AmiWind v0.0.67._
 
 Every look and behaviour the maintainer has confirmed in play, checked on every development build before it is delivered ([LOOKBOOK.md](../LOOKBOOK.md)). One reference page per page below.
 
 | Page | Kind | Status | Register | Modules | Marked blocks | Last recorded pass |
 |---|---|---|---|---|---|---|
-| [HELD-LIGHT-IN-HAND](HELD-LIGHT-IN-HAND.md) | session | active (known gap) | [FP-TORCH-OUT-OF-HAND-67](../bugs/FP-TORCH-OUT-OF-HAND-67.md), [HELD-LIGHT-ALWAYS-TORCH-61](../bugs/HELD-LIGHT-ALWAYS-TORCH-61.md), [HELD-LIGHT-NOT-IN-HAND-65](../bugs/HELD-LIGHT-NOT-IN-HAND-65.md) | `aw_hand_models.c`, `aw_view.c`, `aw_torch.c`, `prepare_player_fp_parts.py`, `held_lights.py` | 0 | - |
+| [HELD-LIGHT-IN-HAND](HELD-LIGHT-IN-HAND.md) | session | active | [FP-TORCH-OUT-OF-HAND-67](../bugs/FP-TORCH-OUT-OF-HAND-67.md), [HELD-LIGHT-ALWAYS-TORCH-61](../bugs/HELD-LIGHT-ALWAYS-TORCH-61.md), [HELD-LIGHT-NOT-IN-HAND-65](../bugs/HELD-LIGHT-NOT-IN-HAND-65.md) | `aw_hand_models.c`, `aw_view.c`, `aw_torch.c`, `prepare_player_fp_parts.py`, `held_lights.py` | 0 | - |
 | [ROBE-WORN](ROBE-WORN.md) | session | active | [ROBE-PART-NOT-BAKED-62](../bugs/ROBE-PART-NOT-BAKED-62.md) | `aw_view.c`, `prepare_player_parts.py`, `prepare_player_fp_parts.py` | 0 | - |
 | [TELEPORT-ARRIVALS](TELEPORT-ARRIVALS.md) | session | active | [DBG-TP-NO-FLOOR-FALLBACK-63](../bugs/DBG-TP-NO-FLOOR-FALLBACK-63.md), [TP-BEING-TRIBUNAL-FALLS-THROUGH-67](../bugs/TP-BEING-TRIBUNAL-FALLS-THROUGH-67.md) | `aw_scene.c`, `tp_places_lut.py` | 0 | - |
 | [DOCK-GUARD-POST](DOCK-GUARD-POST.md) | journey | active | [PIER-GUARD-WALKS-INTO-DOOR-65](../bugs/PIER-GUARD-WALKS-INTO-DOOR-65.md) | `aw_intro.c`, `aw_nav.c` | 0 | - |

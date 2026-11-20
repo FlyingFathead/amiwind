@@ -74,6 +74,9 @@ void AW_ActorsPlacedForget (unsigned reference);
 int AW_ActorsPlacedFree (unsigned reference);
 /* The actor table's entity text of record ID ("{" .. "}", a copy to free, *LENGTH its bytes), or NULL. */
 char *AW_ActorsBaseText (const char *id, unsigned long *length);
+/* v0.0.67: one creature of the levelled list ID rolled for REFERENCE at the player's level, the pick kept under it, as
+ * its entity text ("{" .. "}", a copy to free, *LENGTH its bytes; *HASH the creature record's hash), or NULL. */
+char *AW_ActorsLevelledText (const char *id, unsigned reference, unsigned long *length, unsigned *hash);
 /* Once a second: the placed actors whose row puts them here and that do not live are spawned by SPAWN (1 spawned). */
 void AW_ActorsPlacedTick (int (*spawn)(unsigned reference));
 /* "placed actors: ..." for aw_mwscript_status. */

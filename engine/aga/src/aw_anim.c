@@ -299,6 +299,7 @@ void AW_AnimEvents(const aw_anim_t *a,int group,unsigned long crossed,void (*emi
 #include "quakedef.h"
 #include "aw_combat.h"
 #include "aw_glut.h"      /* AW_GLUT_* topics only: the table is reached through the hooks below */
+#include "aw_roll.h"      /* the voice odds and pick rolls (REST-CUT-TOO-OFTEN-67) */
 
 /* One parsed layout per model in use (by model index), reset per level. */
 #define TABLE 64
@@ -519,7 +520,7 @@ int AW_VoiceSay(edict_t *e,int topic,int odds) {
     /* Dead: nobody talks to the player any more (OpenMW Actors greets only a living player; no idle or fight
      * lines either: an AmiWind rule, PLAYER-DEATH-LIMBO-35). */
     if(AW_PlayerDead() && e!=p)return 0;      /* the player's own death line still plays (COMBAT-VOICES-SILENT-33) */
-    if(odds<10000 && (rand()%10000)>=odds)return 0;
+    if(odds<10000 && AW_Roll(10000)>=odds)return 0;
     if(topic==AW_VOICE_IDLE_LINE){                             /* OpenMW Actors::playIdleDialogue */
         vec3_t from,to,d;trace_t tr;
         if(!p || p->free)return 0;
@@ -541,7 +542,7 @@ int AW_VoiceSay(edict_t *e,int topic,int odds) {
     {model_t *m=model_of(e);if(m && !slot(m))AW_AnimPrep(e);}   /* spawned after the load (Arena fighters) */
     a=AW_AnimOf(e);
     player=p && !p->free && p->v.max_health>0?(int)(p->v.health*100/p->v.max_health):100;
-    if((line=AW_VoicePick(a,topic,health_percent(e),player,rand()%101,voice_pick.value!=0,rand()))<0)return 0;
+    if((line=AW_VoicePick(a,topic,health_percent(e),player,AW_Roll(101),voice_pick.value!=0,rand()))<0)return 0;
     return AW_VoicePlay(e,a->voice[topic][line].hash);
 }
 /* aw_combat.c's hook: the original's rules (OpenMW): the fight starts = Attack, always

@@ -1547,12 +1547,28 @@ static int standing_try(edict_t *p,const vec3_t preferred,float dx,float dy,int 
     VectorCopy(point,feet);feet[2]+=p->v.mins[2]+1;
     return SV_PointContents(feet)==CONTENTS_EMPTY;
 }
-static int standing_spot(edict_t *p,const vec3_t preferred,vec3_t point) {
-    int i,drop;
+/* MOURNHOLD-BAZAAR-UNDER-WATER-67 (the v0.0.67-dev3 image): BELOW, for a teleport whose first landing was far under
+ * its asked height (arrival_hold_begin), a first pass takes no spot BESIDE the asked point that is higher than the
+ * asked height: there that is a wall top, a roof or an arch ridge, never where the player was put. The Great Bazaar's
+ * arrival (mh0002 local 1018 -660, 13 units from the district's gate to the Plaza) has the standing box inside the
+ * gate's wall at every height from the street up, and the search's first spot was the 16-unit try east at drop 0, the
+ * flat top of that wall at 122.75 (GetPos 490), while the street lies 16 units north at 91.08 (GetPos 364, the street
+ * at 297). The original sets the player at the marker and he comes down onto the floor under it (OpenMW 0.51
+ * World::adjustPosition: a trace down from just above the position). The asked point itself keeps the 8 units above
+ * it; when the first pass finds nothing the search takes any spot, as before. Every other arrival (a door, a room, a
+ * being, dbg unstuck) keeps the one pass: there a floor a few units above the asked point beside it is common and
+ * right (the A/B on the dev3 image's 6,210 room arrivals: the first pass for all of them moved 58, and yurt arrivals
+ * of 3 people under their floor), and tools/arrival_spot.py, which the build's checks use, is that one pass. */
+static int standing_search(edict_t *p,const vec3_t preferred,vec3_t point,int below) {
+    int i,drop,pass;
     static int offsets[9][2]={{0,0},{16,0},{-16,0},{0,16},{0,-16},{16,16},{-16,16},{16,-16},{-16,-16}};
-    for(drop=0;drop<=64;drop+=8)for(i=0;i<9;i++)
-        if(standing_try(p,preferred,(float)offsets[i][0],(float)offsets[i][1],drop,point))return 1;
+    for(pass=below?0:1;pass<2;pass++)for(drop=0;drop<=64;drop+=8)for(i=0;i<9;i++)
+        if(standing_try(p,preferred,(float)offsets[i][0],(float)offsets[i][1],drop,point) &&
+           (pass || !i || point[2]<=preferred[2]))return 1;
     return 0;
+}
+static int standing_spot(edict_t *p,const vec3_t preferred,vec3_t point) {
+    return standing_search(p,preferred,point,0);
 }
 static void install_spot(edict_t *p,const vec3_t point) {
     VectorCopy(point,p->v.origin);VectorCopy(point,p->v.oldorigin);VectorCopy(vec3_origin,p->v.velocity);
@@ -1611,26 +1627,39 @@ static void arrival_clear_tick(void) {
         "walk out.\n",body->v.netname?pr_strings+body->v.netname:"a body",ref?(long)ref->_float:0L);
 }
 /* MOURNHOLD-BAZAAR-UNDER-WATER-67: an arrival by coordinates with a height (a named outdoor place, dbg tp X Y Z,
- * Position) lands on the first surface at or below that height (AW_MapPlaceBelow). In Mournhold's Great Bazaar the
- * street's collision is not in the ring yet when the player is placed: the search went past where the street comes a
- * moment later and set the player down far below it, in the water under the district, from the first second on (read
- * second by second: eye at frame-local -53 where the street is at 74; the same 60 units into the street; the game's
- * own standing search finds the street some seconds later). The asked height names the floor, so a landing more
- * than ARRIVAL_HOLD_DROP below it is taken as "the floor is not there yet": the player is held at the asked point
- * (no gravity) while the ring loads around him, each frame asks the standing-spot rule for the floor under the
- * point, and the first answer sets him down. After ARRIVAL_HOLD_SECONDS without one the player is put back where
- * the first search had found a surface and let go (the placement as it was before: a point over open water or deep
- * ground keeps its landing, a few seconds later). aw_arrival_hold 0: no hold. Not saved. */
+ * Position) lands on the first surface at or below that height (AW_MapPlaceBelow). The asked height names the floor,
+ * so a landing more than ARRIVAL_HOLD_DROP below it is wrong. In Mournhold's Great Bazaar (dbg tp greatbazaar, mh0002
+ * local 1018 -660, asked 102) the standing box at the asked point is inside the district's gate wall from the street
+ * up, so the first search's clear start steps down through the street (its top at 91, the first clear start at 56)
+ * and the player falls through the empty space under the district onto the water surface at 0 (v0.0.67-dev2: under
+ * the water; measured on the dev3 image's own collision, tools/chim/collision.py FrameScene: the same landing with
+ * every frame loaded, so not a floor that comes late). Such a landing first asks the standing-spot search at the
+ * asked point (the search a door's arrival uses, with the first pass BELOW above: never a wall top beside the point
+ * while a floor not above the asked height is there), and its spot sets the player down at once: the Bazaar's street
+ * 16 units north, 1018 -644 91 (GetPos 364, the street at 297 and 67 over it; the dev3 hold had set him on the wall
+ * top). Without a spot the player is held at the asked point (no gravity), each frame asks that search again (a
+ * floor that comes with the ring), and the first answer sets him down. After ARRIVAL_HOLD_SECONDS without
+ * one the player is put back where the first search had found a surface and let go (the placement as it was before:
+ * a point over open water or deep ground keeps its landing, a few seconds later). A landing at the asked floor is
+ * never touched (every settlement of the teleport picker). aw_arrival_hold 0: no hold. Not saved. */
 cvar_t aw_arrival_hold={"aw_arrival_hold","1",false,false,1};
 #define ARRIVAL_HOLD_DROP 64
 #define ARRIVAL_HOLD_SECONDS 8
 static struct {int on;vec3_t first;double until;} arrival_hold;
 static void arrival_hold_begin(edict_t *p,const vec3_t asked) {
-    vec3_t at;
+    vec3_t at,point,first;
     if(!aw_arrival_hold.value || p->v.movetype!=MOVETYPE_WALK)return;
     if(p->v.origin[2]+p->v.mins[2]>=asked[2]-ARRIVAL_HOLD_DROP)return;   /* landed at the asked floor */
-    VectorCopy(p->v.origin,arrival_hold.first);
+    VectorCopy(p->v.origin,first);
     at[0]=asked[0];at[1]=asked[1];at[2]=asked[2]-p->v.mins[2]+1;
+    if(standing_search(p,at,point,1)){
+        install_spot(p,point);
+        Con_Printf("Arrival: the first surface under %ld %ld is %ld below the asked height %ld; the player stands on the "
+            "floor at the asked point, %ld %ld %ld.\n",(long)asked[0],(long)asked[1],
+            (long)(asked[2]-(first[2]+p->v.mins[2])),(long)asked[2],(long)point[0],(long)point[1],(long)point[2]);
+        return;
+    }
+    VectorCopy(first,arrival_hold.first);
     install_spot(p,at);p->v.movetype=MOVETYPE_NONE;
     arrival_hold.on=1;arrival_hold.until=sv.time+ARRIVAL_HOLD_SECONDS;
     Con_Printf("Arrival: the first surface under %ld %ld is %ld below the asked height %ld; holding the player there "
@@ -1642,7 +1671,7 @@ static void arrival_hold_tick(void) {
     if(!arrival_hold.on)return;
     if(pending || !sv.active || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict) || p->free ||
        p->v.movetype!=MOVETYPE_NONE){arrival_hold.on=0;return;}
-    if(standing_spot(p,p->v.origin,point)){
+    if(standing_search(p,p->v.origin,point,1)){
         arrival_hold.on=0;install_spot(p,point);p->v.movetype=MOVETYPE_WALK;
         Con_Printf("Arrival: the floor is loaded; the player stands at %ld %ld %ld.\n",
             (long)point[0],(long)point[1],(long)point[2]);
@@ -1686,16 +1715,62 @@ int AW_Unstuck(edict_t *p) {
     install_spot(p,point);p->v.movetype=MOVETYPE_WALK;noclip_anglehack=false;
     Con_Printf("Unstuck: %ld %ld %ld\n",(long)point[0],(long)point[1],(long)point[2]);return 1;
 }
-/* A scene arrival tries the requested point, then the scene's own spawn point
- * (the town default), then the highest clear floor at the requested XY (a map
+/* WET-ARRIVAL (v0.0.68; SothaSilTeleport on the v0.0.67 image bd761b8): a room arrival whose point lies in the
+ * room's water. The standing-spot search wants dry feet, and the whole floor of "Sotha Sil, Outer Flooded Halls"
+ * lies under its water (the floor at feet -15.8, the water at 0), so the script's PositionCell point, the door from
+ * the Inner Flooded Halls and dbg tp to a being there all fell through to AW_MapPlace, which stood the player on the
+ * top of the hall's own mesh, outside the hall (GetPos 331 for the line's -37). The original sets the player at the
+ * marker; OpenMW 0.51 (World::adjustPosition, forced for the player by PositionCell) brings him down onto the floor
+ * under it, through the water; a door does that only while the player is not swimming there. So in a room the point
+ * is taken, when the dry search finds nothing there and: it lies in the room's box; the standing box is clear there
+ * (not in solid geometry); its feet are in water (then the point itself: the player wades or swims there, as the
+ * original sets him), or, its feet in the air, the walkable floor the box meets within the dry search's own reach
+ * under it (WET_REACH) has its feet in water (then that floor: the door marker over a flooded floor); and that water
+ * is open to the air (the box swept straight up reaches a height where its head is out of the water: never the void
+ * under a floor). Bodies do not count here (an actor on the point is the arrival watch's,
+ * DOOR-ARRIVAL-INSIDE-ACTOR-66). A point in solid
+ * geometry, outside the room box, in dry air over no floor, or in water closed above still falls back as before;
+ * every arrival with a dry spot is unchanged (the dry search runs first). Outdoors this does not apply (aw_spawn.c
+ * keeps its water surface rule). The build's mirror: tools/arrival_spot.py wet_spot, tools/tp_arrivals.py in-water. */
+#define WET_REACH 88    /* standing_try's deepest floor under the point: 24 under the last drop of 64 */
+static int wet_arrival(edict_t *p,const vec3_t arrival,vec3_t point) {
+    vec3_t at,low,feet,high;trace_t tr;int k;
+    if(!AW_Interior() || !sv.worldmodel)return 0;
+    for(k=0;k<3;k++)if(!(arrival[k]>sv.worldmodel->mins[k] && arrival[k]<sv.worldmodel->maxs[k]))return 0;
+    VectorCopy(arrival,at);
+    tr=SV_Move(at,p->v.mins,p->v.maxs,at,MOVE_NOBODIES,p);
+    if(tr.startsolid || tr.allsolid)return 0;
+    VectorCopy(at,point);VectorCopy(at,feet);feet[2]+=p->v.mins[2]+1;
+    if(SV_PointContents(feet)!=CONTENTS_WATER){
+        VectorCopy(at,low);low[2]-=WET_REACH;
+        tr=SV_Move(at,p->v.mins,p->v.maxs,low,MOVE_NOBODIES,p);
+        if(tr.fraction>=1 || tr.plane.normal[2]<AW_WALKABLE_Z)return 0;
+        VectorCopy(tr.endpos,point);point[2]+=.25f;
+        VectorCopy(point,feet);feet[2]+=p->v.mins[2]+1;
+        if(SV_PointContents(feet)!=CONTENTS_WATER)return 0;
+    }
+    VectorCopy(point,high);high[2]=sv.worldmodel->maxs[2];
+    tr=SV_Move(point,p->v.mins,p->v.maxs,high,MOVE_NOBODIES,p);
+    if(tr.startsolid || tr.allsolid)return 0;
+    VectorCopy(tr.endpos,high);high[2]+=p->v.maxs[2]-1;
+    return SV_PointContents(high)==CONTENTS_EMPTY;
+}
+/* A scene arrival tries the requested point, then (a room's water, WET-ARRIVAL above) the point in the water, then
+ * the scene's own spawn point (the town default), then the highest clear floor at the requested XY (a map
  * teleport tries that first). If all fail the player stays at the spawn point,
  * which is also the stuck-recovery anchor: never the frame origin under the
  * sea (VIVEC-ARENA-TP-ARRIVAL-32). */
 static int arrival_place(edict_t *p,const vec3_t arrival,int jump) {
-    vec3_t spawn,point;
+    vec3_t spawn,point;int dry;
     VectorCopy(p->v.origin,spawn);
     if(jump && AW_MapPlace(p,arrival))return 1;
-    if(standing_spot(p,arrival,point) ||
+    dry=standing_spot(p,arrival,point);
+    if(!dry && !jump && wet_arrival(p,arrival,point)) {
+        install_spot(p,point);
+        Con_Printf("Interior spawn: %ld %ld %ld (in the room's water: no dry floor at the arrival)\n",
+            (long)point[0],(long)point[1],(long)point[2]);return 1;
+    }
+    if(dry ||
        ((spawn[0]!=arrival[0] || spawn[1]!=arrival[1] || spawn[2]!=arrival[2]) && standing_spot(p,spawn,point))) {
         install_spot(p,point);
         Con_Printf("Interior spawn: %ld %ld %ld\n",(long)point[0],(long)point[1],(long)point[2]);return 1;

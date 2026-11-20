@@ -4,8 +4,10 @@
 is generated. The game parity tracker's twin (tools/game_features.py), one row per script record of the game.
 
 Usage:
-  mwscript_features.py measure --data-files DIR   read the masters and compile them as the builder does
-                                                  (tools/mwscript), write docs/mwscript-features.json, render the page
+  mwscript_features.py measure --data-files DIR [--image-build RUN]
+                                                  read the masters and compile them as the builder does
+                                                  (tools/mwscript), write docs/mwscript-features.json, render the page;
+                                                  RUN = the build whose image's add-on districts and rooms count
   mwscript_features.py render                     recompute every row's state against the interpreter's current
                                                   function table (tools/mwscript/functions.py), rewrite the JSON's
                                                   states and docs/MWSCRIPT_FEATURES.md
@@ -25,8 +27,9 @@ state:
   attached-not-run   the game attaches it, but the build does not run it: a hand-written rule carries it
                      (config/mwscript.json), or nothing it does is seen yet (left out of the file)
   not-attached       compiles whole, but nothing in the build attaches or starts it
-  not-in-image       its records are placed (or made by the scripts) only in an add-on's world (Mournhold, Solstheim),
-                     not in the image yet
+  not-in-image       its records are placed (or made by the scripts) only in cells of an add-on's world (Mournhold,
+                     Solstheim) that the image does not carry; the districts and rooms the measured build's image
+                     holds count as carried (measure --image-build, TRACKERS-MOURNHOLD-NOT-COUNTED-67)
   inert              nothing names it (no record, no start, no StartScript, no dialogue), or its records are never
                      placed in any world and nothing makes them (refs made_by: the masters of the scripts whose Place
                      call names one): it never runs in the original either
@@ -262,7 +265,7 @@ def state_of(row):
         return 'runs', 'runs on the items placed containers and actors hold, while their area is loaded'
     placed_addon = any(game['placed'].get(m) for m in MASTERS[1:])
     if placed_addon:
-        return 'not-in-image', 'placed only in an add-on world, not in the image yet'
+        return 'not-in-image', 'placed only in cells of an add-on world that the image does not carry'
     runtime = runtime_attach(row)
     if runtime and row['inert']:
         return 'attached-not-run', 'nothing it does is seen yet: left out of the file'
@@ -492,7 +495,47 @@ def conditions(tree):
     return tests[0], sorted(reads)
 
 
-def measure(data_files):
+def image_world(build):
+    """What a build's image carries of the add-on worlds, read from the build's own run folder (never typed here;
+    TRACKERS-MOURNHOLD-NOT-COUNTED-67): {'build', 'addons': the add-on masters the scripts stage bound, 'districts':
+    the outdoor districts the image presents (the module tribunal-mournhold's cells), 'rooms': the rooms the image's
+    interior store holds, 'interiors': every interior cell (folded name) of those two}. The sources: the scripts
+    stage's receipt (mwscript/mwscript-receipt.json: bound_addons, presented) and the room store's receipt
+    (chim-interiors/chim-rooms-receipt.json "rooms": the cell of every room the store holds). A missing file leaves its part empty, so a build
+    without the module or the rooms counts none of them."""
+    build = Path(build)
+
+    def read(*parts):
+        p = build.joinpath(*parts)
+        return json.loads(p.read_text(encoding='utf-8')) if p.is_file() else {}
+    inputs = read('mwscript', 'mwscript-receipt.json').get('inputs') or {}
+    districts = sorted(k.casefold() for k in (inputs.get('presented') or {}))
+    store = read('chim-interiors', 'chim-rooms-receipt.json')
+    rooms = sorted({r['cell'].casefold() for r in store.get('rooms', ()) if r.get('cell')})
+    named = re.search(r'v\d+\.\d+\.\d+(?:-(?:dev|rc)\d+)?', build.name)       # the version, not the folder's name
+    return {'build': named.group(0) if named else build.name, 'addons': list(inputs.get('bound_addons') or ()),
+            'districts': districts,
+            'rooms': rooms, 'interiors': sorted(set(districts) | set(rooms))}
+
+
+def bound_in_image(binds, image, interior_names, masters=MASTERS):
+    """The bindings the image attaches in cells it carries. A Morrowind.esm binding stays as it is; an add-on's own
+    binding counts only when its cell is one of the image's interior cells (the room store's rooms and the presented
+    districts). An add-on's exterior cell is never counted: no add-on exterior is in the image. IMAGE None (no build
+    given): the add-ons' bindings are all dropped, as before. interior_names: {interior number: folded cell name}."""
+    from mwscript.gamedata import ADDON_KEY_STRIDE
+    carried = set((image or {}).get('interiors') or ())
+    out = []
+    for b in binds:
+        owner = (b['reference'] & 0xFFFFFF) // ADDON_KEY_STRIDE
+        if owner == 0:
+            out.append(b)
+        elif owner < len(masters) and isinstance(b['cell'], int) and interior_names.get(b['cell'], '') in carried:
+            out.append(b)
+    return out
+
+
+def measure(data_files, image_build=None):
     from mwscript.gamedata import GameData
     from mwscript.compiler import compile_program, bindings, handwritten_patterns
     from mwscript.codegen import SCRIPT_HANDWRITTEN, SCRIPT_INERT, SCRIPT_DIALOGUE, SCRIPT_START
@@ -519,8 +562,20 @@ def measure(data_files):
     inner = interior_regions(placed, data.exteriors)
     print('=== PHASE 3/4: the compiler, as the builder runs it ===', flush=True)
     program, compiled = compile_program(data, None, handwritten=handwritten_patterns())
-    binds = bindings(program, compiled)
-    # MWSCRIPT-INVENTORY-HITONME-62: the rows of items placed containers and actors hold count apart (held)
+    # TRACKERS-MOURNHOLD-NOT-COUNTED-67: with a build given, the add-on worlds its image carries are bound as the
+    # scripts stage binds them (its bound_addons); only the bindings in cells the image holds count as attached
+    image = image_world(image_build) if image_build else None
+    binds = bindings(program, compiled, addons=tuple((image or {}).get('addons') or ()))
+    in_file = len(binds)
+    addon_in_file = sum(1 for b in binds if (b['reference'] & 0xFFFFFF) // gamedata.ADDON_KEY_STRIDE)
+    names ={number: name for name, number in data.interior_numbers.items()}
+    binds = bound_in_image(binds, image, names)
+    if image:
+        image['bound_in_image'] = {m: sum(1 for b in binds if (b['reference'] & 0xFFFFFF) // gamedata.ADDON_KEY_STRIDE ==
+                                          MASTERS.index(m)) for m in image['addons']}
+        print('  image %s: add-ons %s, %d districts, %d rooms; bindings attached there %s (%d bound in the file, %d '
+              'kept)' % (image['build'], ', '.join(image['addons']) or 'none', len(image['districts']),
+                         len(image['rooms']), image['bound_in_image'], in_file, len(binds)), flush=True)    # MWSCRIPT-INVENTORY-HITONME-62: the rows of items placed containers and actors hold count apart (held)
     from mwscript.compiler import BIND_HELD
     bound = Counter(b['script'] for b in binds if not b['flags'] & BIND_HELD)
     held = Counter(b['script'] for b in binds if b['flags'] & BIND_HELD)
@@ -649,9 +704,14 @@ def measure(data_files):
           flush=True)
     measured = {'masters': {m: data.master_sha256.get(m) for m in MASTERS}, 'compiler': compiler_identity(),
                 'host': sorted(HOST),
-                'date': time.strftime('%Y-%m-%d'), 'bindings': len(binds),
+                'date': time.strftime('%Y-%m-%d'), 'bindings': in_file,
                 'start_scripts': len(data.start_scripts), 'placed_scripted': len([p for p in placed
                                                                                   if base_of.get(p['id'])])}
+    if image:
+        # the image's own add-on worlds, counted from the build: names of cells are not kept, only how many
+        measured['image'] = {'build': image['build'], 'addons': image['addons'], 'districts': len(image['districts']),
+                             'rooms': len(image['rooms']), 'bound_in_image': image['bound_in_image'],
+                             'addon_in_file': addon_in_file}
     return measured, rows, results
 
 
@@ -833,7 +893,7 @@ def render(doc):
              GENERATED, '', doc['intro'], '',
              'Of the %s scripts the original game uses, **%s run** as scripts and **%s are carried by AmiWind\'s own '
              'code**; of the rest, %s use a function the interpreter lacks, %s are attached but not run, %s are '
-             'compiled but not attached, %s belong to an add-on world not in the image yet, %s are not converted. '
+             'compiled but not attached, %s are placed only in add-on cells the image does not carry, %s are not converted. '
              'The %s scripts that nothing in the original game ever names (test and example scripts, replaced '
              'versions, cut content) are listed apart under Not used in the original game.' % (
                  _n(len(rows) - st['inert']), _n(st['runs']), _n(st['carried']), _n(st['missing-function']),
@@ -844,8 +904,9 @@ def render(doc):
                        'placed: while the player carries its item, on the actor a levelled list gives, or on the '
                        'object a script places; a script with no function, whose own locals the dialogue keeps on the '
                        'speaker without it, counts as running)',
-               'not-in-image': 'compiles whole, but its records are placed (or made by scripts) only in Mournhold or '
-                               'Solstheim, which are not in the image yet',
+               'not-in-image': 'compiles whole, but its records are placed (or made by scripts) only in cells of '
+                               'Mournhold or Solstheim that the image does not carry (the image\'s own districts and '
+                               'rooms count as carried: the measurement reads them from the build)',
                'inert': 'compiles whole, but no record, start, StartScript or dialogue result names it, or the records '
                         'that name it are never placed and nothing makes them: it never runs in the original either',
                'missing-function': 'compiles, but calls at least one function the interpreter does not carry out yet '
@@ -896,6 +957,17 @@ def render(doc):
               '(tools/mwscript/functions.py) whenever the page is rendered, so a function carried out later moves its '
               'scripts without a new measurement.' % (long_date(meas['date']), _n(meas['placed_scripted']),
                                                        _n(meas['bindings']), _n(meas['start_scripts'])), '']
+    img = meas.get('image')
+    if img:
+        # TRACKERS-MOURNHOLD-NOT-COUNTED-67: what the measured image carries of the add-on worlds, read from the build
+        lines += ['The image measured: build %s. Its scripts stage bound the own placements of %s; the image carries %s '
+                  'outdoor districts and %s rooms of the interior store, and %s of the %s add-on bindings in the file '
+                  'sit in those cells (%s). A script placed only in add-on cells outside them is "%s".' % (
+                      img['build'], ', '.join(a.replace('.esm', '') for a in img['addons']) or 'no add-on',
+                      _n(img['districts']), _n(img['rooms']), _n(sum(img['bound_in_image'].values())),
+                      _n(img['addon_in_file']),
+                      ', '.join('%s %s' % (m.replace('.esm', ''), _n(n)) for m, n in img['bound_in_image'].items()),
+                      LABELS['not-in-image']), '']
     lines += why_not_run(rows)
     lines += counterparts_section()
     # where OpenMW deliberately differs from the original engine
@@ -1010,13 +1082,16 @@ def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('command', choices=('measure', 'render', 'check'))
     p.add_argument('--data-files')
+    p.add_argument('--image-build', help='measure: the run folder of the build whose image is measured; its add-on '
+                   'worlds (the presented districts, the rooms of the interior store, the add-ons the scripts stage '
+                   'bound) count as in the image. Without it the add-on worlds are not in the image.')
     p.add_argument('--version', help='the AmiWind version the page names (measure; default: the JSON\'s or VERSION)')
     p.add_argument('--updated', help='the date the page names, YYYY-MM-DD (default: today)')
     a = p.parse_args(argv)
     if a.command == 'measure':
         if not a.data_files:
             p.error('measure needs --data-files')
-        measured, rows, results = measure(a.data_files)
+        measured, rows, results = measure(a.data_files, a.image_build)
         old = load() if DATA.is_file() else {}
         doc = {'schema': SCHEMA, 'updated': a.updated or time.strftime('%Y-%m-%d'),
                'version': a.version or old.get('version') or (ROOT / 'VERSION').read_text(encoding='utf-8').strip(),

@@ -2,7 +2,8 @@
 """The seven expansion rooms the v0.0.66-dev2 room batches refused (tools/chim_room_batches.py, tools/lava.py):
 
 - ROOM-EMPTY-CELL-66: a cell with no placement the room converter keeps (only an NPC, or no reference at all) is listed
-  by name as empty in the game data, never converted and never refused;
+  by name as empty in the game data and never refused; since v0.0.67 it is built as an empty room
+  (ROOMS-SET-ASIDE-NOT-BUILT-67);
 - LAVA-POOL-NOT-LAVA-NAMED-66: a molten pool whose layers are not named lava (Sotha Sil's hot oil) is a pool by its
   flowing layers (lava.room_pools_of), equal to pools_of for every lava-named pool, and its activator leaves the
   statics;
@@ -226,6 +227,73 @@ class EmptyRooms(unittest.TestCase):
         self.assertIn('1 references: NPC_ a shady smuggler', empty['Mournhold, Royal Palace'])
         self.assertIn('(0 references)', empty['Sotha Sil,'])
         self.assertIn('0 doors lead in', empty['Sotha Sil,'])
+
+    def test_an_empty_cell_is_built_as_an_empty_room(self):
+        """ROOMS-SET-ASIDE-NOT-BUILT-67 (the maintainer's rule of 19 November 2026: if a place is in the original, it is in
+        AmiWind): the four cells of the masters with no scenery ("Sotha Sil,", "Mournhold, Royal Palace" with its one
+        NPC, the two Vor Lair cells) are built as empty rooms: a shell map with no scenery around their references,
+        the start in its middle, no placements; the CHIM interiors stage makes an empty room record of each, and the
+        image's room map of it carries no placement. Before, the room stage listed them as empty and built none."""
+        import chim.interior as I
+        from chim.frame_map import entities
+        scene = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, scene, True)
+        smuggler = {'number': 4219120, 'id': 'a shady smuggler', 'type': 'NPC_', 'model': '',
+                    'position': [400.0, -800.0, 120.0]}
+        cells = {'mournhold, royal palace': {'name': 'Mournhold, Royal Palace', 'refs': [smuggler], 'entrances': [],
+                                             'flags': 1, 'master_sha256': 'a' * 64},
+                 'sotha sil,': {'name': 'Sotha Sil,', 'refs': [], 'entrances': [], 'flags': 1, 'master_sha256': 'b' * 64}}
+        for slug, cell in (('rmpalace', cells['mournhold, royal palace']), ('rsothasil', cells['sotha sil,'])):
+            report, back = B.build_empty((None, scene, {'map': slug, 'cell': cell['name']}, None, cell))
+            self.assertIs(back, cell)
+            work = scene / 'area-work' / slug
+            self.assertEqual((report['form'], report['placements']), ('empty room', 0))
+            self.assertEqual(json.loads((work / 'placements.json').read_text()), [])
+            (lo, hi) = report['bounds']
+            # the box holds its references (quarter scale) and the start stands inside it
+            for ref in cell['refs']:
+                self.assertTrue(all(lo[i] < ref['position'][i] * 0.25 < hi[i] for i in range(3)))
+            self.assertTrue(all(lo[i] < report['spawn'][i] < hi[i] for i in range(3)))
+            world = entities((work / 'room.bsp').read_bytes())
+            self.assertEqual(world[0].get('classname'), 'worldspawn')
+            self.assertEqual(world[0].get(B.SHELL_KEY), '1')
+            self.assertIn('info_player_start', [e.get('classname') for e in world])
+            # the CHIM interiors stage: an empty room record, no models, no placements
+            room = I.empty_room_input(work)
+            self.assertEqual((room['room'], room['cell'], room['spec']['placements']), (slug, cell['name'], []))
+            self.assertIsNone(I.unsupported(work))
+            self.assertEqual(I.room_cost((str(work),)), 0)
+            data, row = I.Store().add_room(room)
+            self.assertEqual((row['placements'], row['models']), (0, 0))
+        # every other room keeps room_input (a room with scenery has no empty form)
+        self.assertIsNone(I.empty_room_input(scene / 'nowhere'))
+
+    def test_what_points_to_the_empty_cells_matches_by_prefix(self):
+        """What the masters point at these cells with (measured in all three masters, 19 November 2026): Tribunal's
+        TribunalMain asks `GetPCCell "Sotha Sil," == 1`, and two Tribunal dialogue lines carry a Not Cell condition on
+        "Mournhold, Royal Palace". Both match by prefix, as the original (OpenMW cellextensions.cpp OpGetPCCell and
+        filter.cpp Function_NotCell, ciStartsWith): GetPCCell "Sotha Sil," is true in every "Sotha Sil, ..." room and in
+        "Sotha Sil," itself, and the Not Cell lines are said nowhere in "Mournhold, Royal Palace..." (the engine's
+        AW_GLUT_OP_CELL: starts_with). The GetPCCell row is made here from the names, so the engine compares numbers."""
+        from types import SimpleNamespace
+        from mwscript import codegen
+        numbers = {'sotha sil,': 1217, 'sotha sil, outer flooded halls': 949, 'sotha sil, dome of sotha sil': 948,
+                   'mournhold, royal palace': 1165, 'mournhold, royal palace throne room': 1166,
+                   'mournhold, royal palace: jail': 1168, 'mournhold temple': 1170}
+        data = SimpleNamespace(interior_numbers=numbers, exteriors={}, regions={}, default_cell_name='Wilderness')
+        prog = SimpleNamespace(data=data, pccells=codegen.Table(), presented={})
+        row = prog.pccells.rows[codegen.Program.pccell(prog, 'Sotha Sil,')]
+        self.assertEqual((row['rooms'], row['outside'], row['wilderness']), ([948, 949, 1217], [], False))
+        row = prog.pccells.rows[codegen.Program.pccell(prog, 'Mournhold, Royal Palace')]
+        self.assertEqual(row['rooms'], [1165, 1166, 1168])
+        # the dialogue's Not Cell condition (the reference the dialogue table is checked against): a prefix too
+        import dialogue_pick_check as P
+        st = {'cell': 'Mournhold, Royal Palace: Jail'}
+        self.assertFalse(P._select('NotCell', 'mournhold, royal palace', 0, 0, {}, st, None))
+        self.assertTrue(P._select('NotCell', 'mournhold, royal palace', 0, 0, {}, {'cell': 'Mournhold Temple'}, None))
+        engine = (ROOT / 'engine/aga/src/aw_glut.c').read_text(encoding='utf-8', errors='replace')
+        self.assertIn('case AW_GLUT_OP_CELL:', engine)
+        self.assertIn('starts_with(cell,want)', engine)
 
     def test_the_counts_keep_empty_rooms_in_the_plan_and_out_of_the_classic_maps(self):
         import interior_counts as C

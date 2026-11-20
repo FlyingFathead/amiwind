@@ -12,6 +12,7 @@
 | Persists in | v0.0.67-dev2 (last seen) |
 | Severity | high: Regressed in v0.0.67-dev2 (was medium): Every cliff racer in the game is affected if it is the shared model; it is the most common hostile creature outdoors |
 | Family | Actors and NPCs (`actors-npc`) |
+| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
 | Came back (regression) | in v0.0.67-dev2 (fixed in v0.0.58 before) |
 | Playtest version | v0.0.57-dev4 (c53994d6) |
 | From commit | source c53994d, engine unknown, CHIM world c53994d |
@@ -30,6 +31,7 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a commit on the dev line | v0.0.67-dev3 line (cfcc4d9a) | 2026-11-18 | tests/test_creature_whole.py and the whole route baked on the game data, measured against the v0.0.65 whole model | the cliff racer baked whole on its own table: 965 of 965 triangles on its 667 vertices with the original textures, its root held, every pose drawn within 1.75 units |
+| shipped | a development build | v0.0.67-dev3 (a375b13f) | 2026-11-19 | the fix commit cfcc4d9a is an ancestor of the delivered dev3 head a375b13f (git merge-base --is-ancestor) and not of the dev2 head 0d6f7ab7 | the whole-model route for the cliff racer is in the dev3 build; it stays open until a play check shows the creature |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
@@ -38,6 +40,8 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-18: v0.0.67-dev2: Guarded by the look book page CLIFF-RACER-WHOLE (docs/lookbook/CLIFF-RACER-WHOLE.md): The cliff racer is drawn whole: wings joined to the body, no holes; a change to the code it lives in must pass that page before it is merged ...
 - 2026-11-18: came back in v0.0.67-dev2 (fixed in v0.0.58 before): A regression on the v0.0.67-dev2 image (the maintainer's picture, 2026-11-18): a cliff racer in the Ashlands (`cliff racer`, reference 393760, model progs/c_64031b3f740e_k.mdl) is drawn as flat wing plates apart from a thin body, full of ...
 - 2026-11-18: fixed in source: a commit on the dev line, v0.0.67-dev3 line (cfcc4d9a); tests/test_creature_whole.py and the whole route baked on the game data, measured against the v0.0.65 whole model: the cliff racer baked whole on its own table: 965 of 965 triangles on its 667 vertices with the original textures, its root held, every pose drawn within 1.75 units
+- 2026-11-19: shipped: a development build, v0.0.67-dev3 (a375b13f); the fix commit cfcc4d9a is an ancestor of the delivered dev3 head a375b13f (git merge-base --is-ancestor) and not of the dev2 head 0d6f7ab7: the whole-model route for the cliff racer is in the dev3 build; it stays open until a play check shows the creature
+- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
 
 <!-- END GENERATED TIMELINE -->
 
@@ -121,6 +125,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [ESSENTIAL-DEATH-MESSAGE-66](ESSENTIAL-DEATH-MESSAGE-66.md): The essential character death message is shown only for deaths in a fight
 - [FARGOTH-STANDING-NO-LAYOUT-66](FARGOTH-STANDING-NO-LAYOUT-66.md): Fargoth's and the opening Imperial guard's standing models carry no animation layout
 - [FP-TORCH-OUT-OF-HAND-67](FP-TORCH-OUT-OF-HAND-67.md): In first person a held torch floats away from the left hand: a regression, the torch was held in the hand before
+- [GAENOR-ATTACKS-AT-START-67](GAENOR-ATTACKS-AT-START-67.md): Two Gaenors, one of them at level 50, attack a new player in the Temple Courtyard
 - [GUARD-WALK-REGRESSION-62](GUARD-WALK-REGRESSION-62.md): The guard at the start turns on the spot on his way to his post beside the door and then stands in the player's route into the Census and Excise Office
 - [GUARDS-FIGHT-EACH-OTHER-65](GUARDS-FIGHT-EACH-OTHER-65.md): Two guards who come after the player in Seyda Neen start fighting each other
 - [HAIR-CHECK-ACTOR-GROUND-1999-54](HAIR-CHECK-ACTOR-GROUND-1999-54.md): The actor ground check still refused skeletal models past 1,999 vertices
@@ -173,6 +178,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [PLAYER-ROBE-WAIST-SEAM-67](PLAYER-ROBE-WAIST-SEAM-67.md): With a robe on, the third-person player body shows a cut at the waist: the robe's skirt and the upper body do not join
 - [PLAYER-SPELL-CAP-58](PLAYER-SPELL-CAP-58.md): The player can hold only 8 spell changes, so a ninth bought spell is refused
 - [PLAYER-VANITY-WALK-STUCK-67](PLAYER-VANITY-WALK-STUCK-67.md): After the idle vanity camera starts, the player's walk and run animations stop in third person until the next map load
+- [PLAZA-FABRICANTS-LIVE-AT-START-67](PLAZA-FABRICANTS-LIVE-AT-START-67.md): Plaza Brindisi Dorom holds the fabricants of a later quest from the start of a new game, one ready to attack on sight
 - [RANDOM-SPAWN-IDLE-63](RANDOM-SPAWN-IDLE-63.md): Creatures from the Ghostgate random spawn stand idle next to the player instead of attacking
 - [RESIDENT-ANIM-BYTE-BUDGET-48](RESIDENT-ANIM-BYTE-BUDGET-48.md): A room resident whose animation kit model is over the alias byte budget at every rung stopped the whole room stage (ienas nadus)
 - [ROOM-LEVELLED-INTRO-ROOMS-62](ROOM-LEVELLED-INTRO-ROOMS-62.md): Addamasartus and Tharys Ancestral Tomb have no levelled creatures: the intro scene converts their rooms without the levelled creature points

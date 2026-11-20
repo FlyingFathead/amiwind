@@ -21,7 +21,7 @@
 | Persists in | v0.0.61 (last seen) |
 | Severity | medium: Regressed in v0.0.61 (was low): Angular jagged shoreline in terrain and water; visual only, cause unconfirmed. |
 | Family | Mesh converter geometry (`converter-geometry`) |
-| Deferred by the maintainer | 2026-11-16: deferred to v0.0.67 by the maintainer (2026-11-16); the v0.0.66 release ships without it, and what would confirm a fix is in the status |
+| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
 | Came back (regression) | in v0.0.61 (closed before) |
 
 <!-- END GENERATED FACTS -->
@@ -37,7 +37,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-10-05: INLAND-SHORE-29: angular inland shoreline reported (OPEN): Observed version: v0.0.29-dev1.
 - 2026-11-07: seen again in v0.0.61: Seen again on the v0.0.61 release image: saw-tooth water edges in Suran (cell 6,-7) and at ponds across the map.
 - 2026-11-07: came back in v0.0.61 (closed before): Seen on the v0.0.61 release image: the water edge at shores and ponds runs in saw-tooth steps, in Suran (cell 6,-7) and at ponds across the map (tracker COASTLINE-JAGGED-62).
-- 2026-11-16: deferred by the maintainer: deferred to v0.0.67 by the maintainer (2026-11-16); the v0.0.66 release ships without it, and what would confirm a fix is in the status
+- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
 
 <!-- END GENERATED TIMELINE -->
 

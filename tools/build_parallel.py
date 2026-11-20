@@ -1358,6 +1358,9 @@ def stage_dependencies(steps, skipped=()):
             deps = (*deps, 'tribunal-mournhold-data')
         if name == 'image' and 'tribunal-mournhold' in names:
             deps = (*deps, 'tribunal-mournhold')
+        # the tracker data counts the districts' world with the base world (TRACKERS-MOURNHOLD-NOT-COUNTED-67)
+        if name == 'cell-progress':
+            deps = (*deps, *(d for d in ('tribunal-mournhold-data', 'tribunal-mournhold') if d in names))
         if name == 'image' and 'seam-audit' in names:
             deps = (*deps, 'seam-audit')
         missing = set(deps) - set(names)

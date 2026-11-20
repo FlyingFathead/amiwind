@@ -2377,6 +2377,84 @@ char *AW_ActorsBaseText (const char *id, unsigned long *length)
 	return NULL;
 }
 
+/* v0.0.67 (REST-CUT-NO-CREATURE-67, MWSCRIPT-PLACE-OTHER-KINDS-62): one creature of the levelled list ID (a region's
+ * sleep list, a list a script places), rolled for REFERENCE at the player's level as a levelled reference is
+ * (ChimActors_LevelledPick, the game's rule read from OpenMW 0.51 levelledlist.cpp getLevelledItem; the pick kept in the
+ * change list under REFERENCE, so the same reference gives the same creature again), as its entity text "{" .. "}" (a
+ * copy the caller frees; *LENGTH its bytes) and *HASH the creature record's hash (its script: AW_MwvmLevelledScript).
+ * The list is the last levelled base of the id's hash (the builder's named lists: tools/chim/actors.py named_lists).
+ * NULL: no table or lists, no such list, the roll gave nothing (chance none, nothing at this level), or the creature has
+ * no model in this build. One base read from the file. */
+char *AW_ActorsLevelledText (const char *id, unsigned reference, unsigned long *length, unsigned *hash)
+{
+	chim_actor_base_t b, got;
+	unsigned h = 2166136261u, i, list = 0, pick;
+	int found = 0, bytes;
+	const char *s;
+	char *text = NULL;
+	change_t *c;
+	long at;
+	FILE *f;
+	if (!id || !*id || !TableLoad () || !table.lists)
+		return NULL;
+	for (s = id; *s; s++)
+		h = (h ^ (unsigned char)(*s >= 'A' && *s <= 'Z' ? *s + 32 : *s)) * 16777619u;
+	for (i = 0; i < table.head.bases; i++)
+		if (ChimActors_Base (table.bases + i*CHIM_ACTOR_BASE_BYTES, &table.head, &b) && b.hash == h &&
+			b.kind == CHIM_ACTOR_KIND_LEVELLED && b.at < table.head.lists)
+		{
+			list = b.at;
+			found = 1;
+		}
+	if (!found)
+		return NULL;
+	table.levelled++;
+	c = Change ((float)reference, 0);
+	if (c && c->pick)
+	{
+		pick = c->pick;
+		table.levelled_kept++;
+	}
+	else
+	{
+		unsigned state = ChimActors_RollSeed (reference, roll_seed);
+		int level = aw_character.valid && aw_character.level > 0 ? aw_character.level : 1;
+		int rolled = ChimActors_LevelledPick (table.lists, list, level, &state);
+		pick = rolled < 0 ? 1 : (unsigned)rolled + 2;
+		if ((c = Change ((float)reference, 1)) != NULL)
+			c->pick = (unsigned short)pick;
+	}
+	if (pick == 1 || !ChimActors_Base (table.bases + (pick-2)*CHIM_ACTOR_BASE_BYTES, &table.head, &got))
+	{
+		table.levelled_none++;
+		return NULL;
+	}
+	if (!got.bytes || (got.kind != CHIM_ACTOR_KIND_CREATURE && got.kind != CHIM_ACTOR_KIND_NPC))
+	{
+		table.levelled_no_model++;
+		return NULL;
+	}
+	if (!(f = TableOpen (&at, &bytes)))
+		return NULL;
+	if ((text = AW_TryMalloc (got.bytes + 3)) != NULL &&
+		!fseek (f, at + (long)table.head.text_at + (long)got.at, SEEK_SET) && fread (text + 1, 1, got.bytes, f) == got.bytes)
+	{
+		text[0] = '{';
+		text[got.bytes+1] = '}';
+		text[got.bytes+2] = 0;
+		*length = got.bytes + 2;
+		if (hash)
+			*hash = got.hash;
+	}
+	else
+	{
+		free (text);
+		text = NULL;
+	}
+	fclose (f);
+	return text;
+}
+
 /* DBG-SPAWN-MENU-67: the value of KEY in a base's entity text T (N bytes, lines '"key" "value"'), into OUT; 1 found */
 static int BaseField (const char *t, unsigned n, const char *key, char *out, int size)
 {

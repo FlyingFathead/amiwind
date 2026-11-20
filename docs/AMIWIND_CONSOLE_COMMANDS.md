@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.67-dev3._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.67._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -52,6 +52,7 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg creatures` | `dbg despawn`, `dbg kill`, `dbg spawn` | [on/off, true/false or 1/0; no argument toggles] the outdoor creatures (default on; not saved): off removes the wild creatures alive (their state kept) and spawns none, to compare frame rate, memory and behaviour; on brings them back as their cells join again |
 | `dbg cycleitems` | - | [start [N] / from N / kind KIND / here / status / stop] the item tester in the light test corridor (docs/ITEM_CYCLING.md): every item the hands can hold in turn: hands empty, held, the 20 s walk, its attack; the grip checked every frame; a console line per item, CYCLEITEMS RESULT at the end; its line at the top left |
 | `dbg daycycle gallery` | - | [here/off] (eight-stage camera tour; here keeps this view; Esc returns) |
+| `dbg dbattack` | - | (Tribunal; where Rest is offered) an 8-hour rest on which Tribunal's dbAttackScript attacks for certain: its roll made sure for that rest, the real path runs (asleep, its PlaceAtPC puts the Dark Brotherhood assassin by you, WakeUpPC, the fight, DBAttack 1); each step and any failure on the console |
 | `dbg dbgtorch` | `dbg debugtorch`, `dbg gear`, `dbg give dbgtorch`, `dbg give debugtorch`, `dbg give spell`, `dbg give weapons`, `dbg inventory grant`, `dbg torch`, `dbg weapon` | same as torch: one more debug torch in the inventory, with a message |
 | `dbg demowind` | - | [on / off / next / prev / effect 1-2 / dist 0-7 / status] DemoWind (docs/DEMOWIND.md): the effects test kit, fullscreen, no world; each effect with its ms a frame and bytes on screen; Left/Right effect, Up/Down distance to Red Mountain, Esc off |
 | `dbg give money` | `dbg give coin`, `dbg give rich` | [N] N gold (default 1000000; at most 999999999, the gold limit, which every gold gain keeps to), saved like any grant, with a message |

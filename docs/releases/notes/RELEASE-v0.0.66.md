@@ -22,7 +22,8 @@ its controls and doors as the original does.
 
 This is not the arrival of Mournhold or Solstheim. Their rooms are converted and in the image (the debug teleport reaches
 them), but their outdoors, the way there in play and their quests are not in the game yet: the expansions' finished
-content and the rest of the open plan move to v0.0.67 and later ([roadmap](../../ROADMAP.md)). The game needs 32 MB of
+content and the rest of the open plan move to v0.0.67 and later ([roadmap](../../ROADMAP.md); corrected for v0.0.67: the
+way to Mournhold works, see [the v0.0.67 notes](RELEASE-v0.0.67.md#known-in-this-build)). The game needs 32 MB of
 Fast RAM.
 
 Most of the changes below were checked by the test suite and the gates of the snapshots; what was seen in play is under
@@ -296,7 +297,8 @@ of this release, `AmiWind-v0.0.66-FS-UAE.fs-uae` and `AmiWind-v0.0.66-WinUAE.uae
 ## Known in this build
 
 - **Mournhold and Solstheim are not playable yet.** Their rooms are in the image, but not their outdoors, the way there
-  or their quests; they come with v0.0.67 and later.
+  or their quests; they come with v0.0.67 and later. Corrected for v0.0.67: the way to Mournhold works (see [the v0.0.67
+  notes](RELEASE-v0.0.67.md#known-in-this-build)); its quests and much of its play are not ready.
 - **The Heart Chamber's collapse is not animated, so the end of the main quest cannot play yet**
   (`ENDGAME-CHAMBER-COLLAPSE-63`).
 - **One of the three dreamer workers stays alive after EndGame's `SetHealth 0`**

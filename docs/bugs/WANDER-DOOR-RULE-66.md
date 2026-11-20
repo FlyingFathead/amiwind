@@ -22,7 +22,7 @@
 | Persists in | v0.0.66-dev12 (last seen) |
 | Severity | medium: Regressed in v0.0.66-dev12 (was low): a resident can stand on a door's arrival point or in front of a door; since DOOR-ARRIVAL-INSIDE-ACTOR-66 it no longer t... |
 | Family | Actors and NPCs (`actors-npc`) |
-| Deferred by the maintainer | 2026-11-16: deferred by the maintainer's release decision to v0.0.67 (v0.0.66 is made from its twelfth snapshot; the rest of the roadmap goes to later versions) |
+| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
 | Came back (regression) | in v0.0.66-dev12 (fixed in v0.0.66-dev11 before) |
 | Playtest version | 2026_11_15_v0.0.66-dev7_full-v0.0.66-dev7_a33bba9 |
 | From commit | source and engine a33bba9 |
@@ -49,7 +49,6 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-16: Before the regression: shipped, v0.0.66-dev11 build 2026_11_16_v0.0.66-dev11_full-v0.0.66-dev11_26ed570 (a numbered build; the delivered build: the build holds 237b5a6f)
 - 2026-11-16: Before the regression: confirmed in play, v0.0.66-dev11 build 2026_11_16_v0.0.66-dev11_full-v0.0.66-dev11_26ed570 (the opening journey; the opening journey's step 9: the aim at the census office's street door found no resident in the way ...
 - 2026-11-16: came back in v0.0.66-dev12 (fixed in v0.0.66-dev11 before): The v0.0.66-dev12 opening journey (ac37e80b) stopped part B in step 9 as the dev10 journey had: the use key aimed at the door 113833 went to the actor Fargoth standing in front of it (focus row 164) in 13 tries around pitch 9.9 and yaw ...
-- 2026-11-16: deferred by the maintainer: deferred by the maintainer's release decision to v0.0.67 (v0.0.66 is made from its twelfth snapshot; the rest of the roadmap goes to later versions)
 - 2026-11-16 01:50 +0200: seen again in v0.0.66-dev10: Seen again in the v0.0.66-dev10 opening journey (FS-UAE at 32 MB Fast, JIT), part B step 9: Fargoth (128964) stood at 227 62 38 by the census office's street door (113833, its reference at 247 11), and 12 of the 13 aims at the door went to ...
 - 2026-11-18: seen again in v0.0.67-dev2: Seen again in the v0.0.67-dev2 delivery's opening journey (the build of 0d6f7ab7, 32 MB Fast, warp off): part B stopped in step 9, after the game's own quicksave was loaded: the census office's street door (`113833`) was aimed at 13 times ...
 - 2026-11-18: v0.0.67-dev2: Cause of the return in the v0.0.67-dev2 opening journey (part B, step 9, after the game's own quicksave was loaded) found: a Wander package's compiled route points are offsets from the actor's placement, but the engine added them to where ...
@@ -57,6 +56,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-18: v0.0.67-dev2: The same session with the fixed engine (gate 11462 on d9556d22): the use key went to the street door on the 4th aim from its arrival point, no actor in the way (aims 1 to 3 had the door 6.0 to 6.7 units off the aim).
 - 2026-11-18: fixed in source: a gated commit, v0.0.67-dev2 (3e7308b9); tests/aga_ambient_test.c (Fargoth's compiled Wander package as the v0.0.67-dev2 build has it, after a load that left him by the census street door; it fails with the old rule) and tests/test_ambient_lut.py test_routes_stay_at_the_placement (the wiring): a loaded wanderer's routes stay where the game data has them and its current destination is the one nearest it, so the door rule sends it on from a door as before the save; the cause of the return in the v0.0.67-dev2 journey (every ...
 - 2026-11-18: confirmed by a test: the opening journey, v0.0.67-dev2 image with the engine of 2d772eb7 (gate 11463); tests/sessions/journey_opening.txt, both parts in FS-UAE at 32 MB Fast, warp off, with that engine; and two sessions from the v0.0.67-dev2 journey's quicksave, on that image's own engine and on the engine of gate 11462: the journey passed 46 of 46 checks: after the game's own quicksave was loaded, step 9 went through the census office's street door (the census map, the package carried, no save held back), with no resident standing at the door (Fargoth was ...
+- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
 
 <!-- END GENERATED TIMELINE -->
 
@@ -236,6 +236,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [ESSENTIAL-DEATH-MESSAGE-66](ESSENTIAL-DEATH-MESSAGE-66.md): The essential character death message is shown only for deaths in a fight
 - [FARGOTH-STANDING-NO-LAYOUT-66](FARGOTH-STANDING-NO-LAYOUT-66.md): Fargoth's and the opening Imperial guard's standing models carry no animation layout
 - [FP-TORCH-OUT-OF-HAND-67](FP-TORCH-OUT-OF-HAND-67.md): In first person a held torch floats away from the left hand: a regression, the torch was held in the hand before
+- [GAENOR-ATTACKS-AT-START-67](GAENOR-ATTACKS-AT-START-67.md): Two Gaenors, one of them at level 50, attack a new player in the Temple Courtyard
 - [GUARD-WALK-REGRESSION-62](GUARD-WALK-REGRESSION-62.md): The guard at the start turns on the spot on his way to his post beside the door and then stands in the player's route into the Census and Excise Office
 - [GUARDS-FIGHT-EACH-OTHER-65](GUARDS-FIGHT-EACH-OTHER-65.md): Two guards who come after the player in Seyda Neen start fighting each other
 - [HAIR-CHECK-ACTOR-GROUND-1999-54](HAIR-CHECK-ACTOR-GROUND-1999-54.md): The actor ground check still refused skeletal models past 1,999 vertices
@@ -288,6 +289,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [PLAYER-ROBE-WAIST-SEAM-67](PLAYER-ROBE-WAIST-SEAM-67.md): With a robe on, the third-person player body shows a cut at the waist: the robe's skirt and the upper body do not join
 - [PLAYER-SPELL-CAP-58](PLAYER-SPELL-CAP-58.md): The player can hold only 8 spell changes, so a ninth bought spell is refused
 - [PLAYER-VANITY-WALK-STUCK-67](PLAYER-VANITY-WALK-STUCK-67.md): After the idle vanity camera starts, the player's walk and run animations stop in third person until the next map load
+- [PLAZA-FABRICANTS-LIVE-AT-START-67](PLAZA-FABRICANTS-LIVE-AT-START-67.md): Plaza Brindisi Dorom holds the fabricants of a later quest from the start of a new game, one ready to attack on sight
 - [RANDOM-SPAWN-IDLE-63](RANDOM-SPAWN-IDLE-63.md): Creatures from the Ghostgate random spawn stand idle next to the player instead of attacking
 - [RESIDENT-ANIM-BYTE-BUDGET-48](RESIDENT-ANIM-BYTE-BUDGET-48.md): A room resident whose animation kit model is over the alias byte budget at every rung stopped the whole room stage (ienas nadus)
 - [ROOM-LEVELLED-INTRO-ROOMS-62](ROOM-LEVELLED-INTRO-ROOMS-62.md): Addamasartus and Tharys Ancestral Tomb have no levelled creatures: the intro scene converts their rooms without the levelled creature points

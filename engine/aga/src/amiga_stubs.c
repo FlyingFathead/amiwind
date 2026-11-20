@@ -52,6 +52,24 @@ int unlink(const char *path) {
     return DeleteFile((STRPTR)path) ? 0 : -1;
 }
 
+// REST-CUT-TOO-OFTEN-67: the machine's clocks for the boot seed (host.c boot_seed, once at the end of Host_Init):
+// DateStamp (a battery clock's date and time; an emulated A1200 has none, so it counts from boot) and the E-clock's
+// count since boot (its low word moves 709379 times a second, so two boots differ in it), mixed by the caller.
+unsigned long AW_ClockSeed(void) {
+    struct DateStamp stamp;
+    unsigned long h;
+    DateStamp(&stamp);
+    h = ((unsigned long)stamp.ds_Days * 1440UL + (unsigned long)stamp.ds_Minute) * 3000UL + (unsigned long)stamp.ds_Tick;
+#ifndef __PPC__
+    if (TimerBase != NULL) {
+        struct EClockVal eclock;
+        ReadEClock(&eclock);
+        h ^= (unsigned long)eclock.ev_lo * 2654435761UL ^ (unsigned long)eclock.ev_hi * 2246822519UL;
+    }
+#endif
+    return h & 0xffffffffUL;
+}
+
 // strnicmp - case-insensitive string compare (DOS/Windows name)
 // GCC libc has strncasecmp instead
 #include <string.h>

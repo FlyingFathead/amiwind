@@ -1,6 +1,6 @@
 # Look book page HELD-LIGHT-IN-HAND
 
-_Generated from tests/lookbook/pages.json with AmiWind v0.0.67-dev2._
+_Generated from tests/lookbook/pages.json with AmiWind v0.0.67._
 
 A carried light (the debug torch, the glass lantern, a candle) is held in the left hand in first and in third person.
 
@@ -32,7 +32,7 @@ A scripted session step of the look book (`tests/lookbook/held_light_in_hand.txt
 - the view is first person, the light is in the left hand and lit, and the view looks down (at least 30 degrees) for every first-person still, each read back by number
 - the light's nearest vertex from the left hand it is drawn in (dbg camera held): in third person within 2.5 units, in first person within 0.5 units of the same light's third-person value
 
-Status: checked on every development build; a known gap of FP-TORCH-OUT-OF-HAND-67 until it is fixed.
+Status: checked on every development build.
 
 ## The code it lives in
 
@@ -56,10 +56,14 @@ No code is marked yet: the marker goes on the code once the page passes.
 
 ### [FP-TORCH-OUT-OF-HAND-67](../bugs/FP-TORCH-OUT-OF-HAND-67.md)
 
-In first person a held torch floats away from the left hand: a regression, the torch was held in the hand before. State: open; found in v0.0.67-dev2.
+In first person a held torch floats away from the left hand: a regression, the torch was held in the hand before. State: fixed, fixed in v0.0.67-dev3; found in v0.0.67-dev2.
 
 - 2026-11-18 Guarded by the look book page HELD-LIGHT-IN-HAND (docs/lookbook/HELD-LIGHT-IN-HAND.md): A carried light (the debug torch, the glass lantern, a candle) is held in the left hand in first and in third person; a change to the code it lives in must pass that page before it is merged (docs/LOOKBOOK.md).
 - 2026-11-18 fixed in source: a gated commit, v0.0.67-dev2 (6e7111d3) (tests/test_fp_held_item.py and tests/aga_held_item_test.c, the grip numbers read from the v0.0.67-dev2 image)
+- 2026-11-19 confirmed by the maintainer: the maintainer, v0.0.67-dev3 (a375b13f) (the look book stills of the held lights)
+- 2026-11-19 confirmed in play: the look book, v0.0.67-dev3 (a375b13f) (page HELD-LIGHT-IN-HAND (tests/lookbook), the distance read by the debug camera)
+- 2026-11-19 fixed in source: a gated commit, v0.0.67-dev3 (a375b13f) (gate 11450 of the planning item FP-TORCH-OUT-OF-HAND-67)
+- 2026-11-19 shipped: a development build, v0.0.67-dev3 (a375b13f) (the build of a375b13f, gate 11450, delivered as v0.0.67-dev3)
 
 ### [HELD-LIGHT-ALWAYS-TORCH-61](../bugs/HELD-LIGHT-ALWAYS-TORCH-61.md)
 

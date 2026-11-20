@@ -19,6 +19,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-18: reported in v0.0.67-dev2
+- 2026-11-19 11:26 +0200: seen again in v0.0.67-dev3: Seen again on the third development snapshot of v0.0.67, now with the renderer's counts: from the Plaza's arrival looking south only 22 of the 24 placements its frame links are sent and nothing of the Plaza shows, with the fog off too ...
+
+<!-- END GENERATED TIMELINE -->
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category

@@ -294,6 +294,16 @@ static void daynight_hold(void){
 /* REST-WAIT-59: T opens Rest in the wilderness and Wait in a no-sleep cell; the refusals with the game's lines; the
  * restoration by mode; Until Healed; the level-up only after a full rest; beds: owned refused, rented and a guild bed
  * at rank allowed, Rest even in a no-sleep cell. */
+/* the creature of a rest cut short (aw_mwhost.c rest_creature in the engine): the calls and the list handed over */
+static int spawn_calls;static char spawn_list[64];
+static void rest_spawn_seen(const char *list){spawn_calls++;snprintf(spawn_list,sizeof(spawn_list),"%s",list);}
+/* the frames of a started rest (host.c: AW_RestTick, then the scripts): how many frames' scripts saw GetPCSleep 1 */
+static int rest_frames(void){
+    int asleep=0,n;
+    for(n=0;n<50 && *AW_WaitWindowName();n++){AW_RestTick();if(AW_RestSleeping())asleep++;}
+    assert(!*AW_WaitWindowName());
+    return asleep;
+}
 static void rest_and_wait(void){
     int clock;
     AW_StateReset();assert(AW_ClockEnsure());rest_data=1;
@@ -307,27 +317,70 @@ static void rest_and_wait(void){
     player.v.flags=FL_ONGROUND;hostiles=0;
     /* the wilderness: Rest, 8 hours: health 0.1 x 50 x 8, magicka 0.15 x 40 x 8, fatigue full; the level-up after it */
     clock=AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ms");
-    open_wait();assert(key_dest==key_menu && AW_RestSleeping() && AW_WaitDraw());
+    /* GETPCSLEEP-NOT-CARRIED-OUT-67 (OpenMW 0.51 waitdialog.hpp getSleeping, timeadvancer.cpp): the open window only
+     * offers the rest (GetPCSleep 0 before the choice; before v0.0.67 it read 1 here and the hours then passed in one
+     * call, so no script frame ever saw the sleep); after Enter the hours pass over the frames (AW_RestTick, an hour per
+     * 1/60 s, at least one a frame) with GetPCSleep 1 in at least one frame of scripts, and no key stops them */
+    open_wait();assert(key_dest==key_menu && AW_RestCanSleep() && !AW_RestSleeping() && AW_WaitDraw());
     {int i;for(i=0;i<7;i++)AW_WaitKey(K_RIGHTARROW);}AW_WaitKey(K_ENTER);
+    assert(key_dest==key_menu && AW_RestSleeping() && AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ms")==clock);
+    AW_WaitKey(K_ESCAPE);assert(key_dest==key_menu && AW_RestSleeping());
+    assert(rest_frames()>=1);
     assert(key_dest==key_game && player.v.health==80 && aw_character.current[1]==68 && aw_character.current[2]==200);
     assert(level_ups==1 && effect_seconds==8*3600/30.0f && !AW_RestSleeping());
     assert(AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ms")==(clock+8*3600000)%86400000);
-    /* Until Healed: health 80 of 100 at 5 an hour = 4 hours; magicka 68 of 80 at 6 = 2: four hours */
-    open_wait();AW_WaitKey('h');assert(player.v.health==100 && aw_character.current[1]==80 && level_ups==2);
-    /* a no-sleep town cell: Wait; fatigue only, no level-up */
+    /* WakeUpPC (waitdialog.cpp wakeUp) after 3 of 8 hours at an hour a frame: the window closes, the 3 hours count
+     * (health 80 + 3 x 5, magicka 68 + 3 x 6 up to 80), no level-up; then nothing is asleep and a second wake does nothing */
+    host_frametime=1.0/60;clock=AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ms");
+    open_wait();{int i;for(i=0;i<7;i++)AW_WaitKey(K_RIGHTARROW);}AW_WaitKey(K_ENTER);
+    AW_RestTick();AW_RestTick();AW_RestTick();assert(AW_RestSleeping());
+    assert(AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ms")==(clock+3*3600000)%86400000);
+    assert(AW_RestWake() && key_dest==key_game && !AW_RestSleeping() && !AW_RestWake());
+    assert(player.v.health==95 && aw_character.current[1]==80 && level_ups==1);
+    AW_RestTick();assert(AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ms")==(clock+3*3600000)%86400000);
+    host_frametime=1;
+    /* Until Healed: health 95 of 100 at 5 an hour = 1 hour; magicka full */
+    open_wait();AW_WaitKey('h');assert(rest_frames()>=1);
+    assert(player.v.health==100 && aw_character.current[1]==80 && level_ups==2);
+    /* a no-sleep town cell: Wait; fatigue only, no level-up; its hours pass over frames too, never asleep */
     cell_x=-2;cell_y=-9;player.v.health=50;aw_character.current[2]=10;
-    open_wait();assert(key_dest==key_menu && !AW_RestSleeping());AW_WaitKey(K_ENTER);
-    assert(player.v.health==50 && aw_character.current[2]==200 && level_ups==2);
+    open_wait();assert(key_dest==key_menu && !AW_RestCanSleep() && !AW_RestSleeping());AW_WaitKey(K_ENTER);
+    assert(!AW_RestSleeping() && *AW_WaitWindowName());
+    {int i;for(i=0;i<10 && *AW_WaitWindowName();i++){AW_RestTick();assert(!AW_RestSleeping());}}
+    assert(key_dest==key_game && player.v.health==50 && aw_character.current[2]==200 && level_ups==2);
     /* the same in a no-sleep interior by its cell ID */
-    cell_kind=2;cell_id="Seyda Neen, Census and Excise Office";open_wait();assert(!AW_RestSleeping());AW_WaitKey(K_ESCAPE);
+    cell_kind=2;cell_id="Seyda Neen, Census and Excise Office";open_wait();assert(!AW_RestCanSleep());AW_WaitKey(K_ESCAPE);
     /* beds: an owned bed refuses with its line and opens nothing; rented (its global set) and a guild bed at the asked
      * rank give Rest even here; a bed lifts the air rule but not water */
     subtitle[0]=0;assert(!AW_RestOpen(100) && key_dest==key_game && !strcmp(subtitle,"Test: not your bed."));
     assert(!AW_RestOpen(101));AW_StateSet(&aw_state,AW_GLOBAL,"rent_test",1);
-    assert(AW_RestOpen(101) && AW_RestSleeping());AW_WaitKey(K_ESCAPE);
-    player_rank=1;assert(!AW_RestOpen(102));player_rank=2;assert(AW_RestOpen(102) && AW_RestSleeping());AW_WaitKey(K_ESCAPE);
-    player.v.flags=0;assert(AW_RestOpen(999) && AW_RestSleeping());AW_WaitKey(K_ESCAPE);
+    assert(AW_RestOpen(101) && AW_RestCanSleep());AW_WaitKey(K_ESCAPE);
+    player_rank=1;assert(!AW_RestOpen(102));player_rank=2;assert(AW_RestOpen(102) && AW_RestCanSleep());AW_WaitKey(K_ESCAPE);
+    player.v.flags=0;assert(AW_RestOpen(999) && AW_RestCanSleep());AW_WaitKey(K_ESCAPE);
     player.v.waterlevel=1;assert(!AW_RestOpen(999));player.v.waterlevel=0;player.v.flags=FL_ONGROUND;
+    /* REST-CUT-NO-CREATURE-67 (OpenMW waitdialog.cpp startWaiting, onWaitingInterrupted): outdoors in a region with a
+     * sleep list a 12-hour rest is cut one time in four (a roll of the hours below fSleepRandMod 0.25 x 12) after
+     * 12 - int(0.3 x 12) = 9 hours, with the game's line and the region's sleep list handed to the creature's spawn
+     * (aw_mwhost.c rest_creature); an undisturbed one runs its 12 hours and spawns nothing */
+    cell_kind=1;cell_x=cell_y=5;cell_region="Test Region";aw_rest_spawn=rest_spawn_seen;
+    {int tries,cut=0,whole=0;
+     for(tries=0;tries<200 && (!cut || !whole);tries++){
+         int before=AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ms"),calls=spawn_calls,i;
+         subtitle[0]=0;open_wait();assert(AW_RestCanSleep());
+         for(i=0;i<11;i++)AW_WaitKey(K_RIGHTARROW);
+         AW_WaitKey(K_ENTER);assert(rest_frames()>=1);
+         if(spawn_calls>calls){
+             assert(spawn_calls==calls+1 && !strcmp(spawn_list,"ex_test_sleep") && !strcmp(subtitle,"Test: interrupted."));
+             assert(AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ms")==(before+9*3600000)%86400000);
+             cut++;
+         }else{
+             assert(!strncmp(subtitle,"Rest: 12 h.",11));
+             assert(AW_StateGet(&aw_state,AW_GLOBAL,"amiwind:clock:ms")==(before+12*3600000)%86400000);
+             whole++;
+         }
+     }
+     assert(cut && whole);}
+    aw_rest_spawn=NULL;cell_region="Quiet Region";
     cell_kind=1;cell_x=cell_y=5;rest_data=0;aw_character.valid=0;
 }
 int main(void){

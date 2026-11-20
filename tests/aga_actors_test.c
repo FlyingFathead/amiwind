@@ -1111,6 +1111,32 @@ static void base_model (void)
 	puts ("base model passed");
 }
 
+/* v0.0.67 (REST-CUT-NO-CREATURE-67, MWSCRIPT-PLACE-OTHER-KINDS-62): a list the engine rolls by its id (the builder's
+ * named lists: 'unused', no exterior reference, gives the crab; 'late' gives nothing below level 4): the creature's
+ * text and hash, the same pick again for the same reference, none for an unknown id, and the list is no NPC or creature
+ * base (AW_ActorsBaseText stays NULL); prints "named KEY TEXT-MODEL" for the Python side */
+static void named_lists (void)
+{
+	unsigned long n = 0, m = 0;
+	unsigned hash = 0, again = 0;
+	char *text, *second;
+	reset_level ();
+	aw_character.valid = 1;
+	aw_character.level = 1;
+	text = AW_ActorsLevelledText ("UNUSED", 0xE10005u, &n, &hash);
+	assert (text && n >= 2 && text[0] == '{' && text[n-1] == '}' && strstr (text, "progs/c_crab.mdl") && hash);
+	second = AW_ActorsLevelledText ("unused", 0xE10005u, &m, &again);
+	assert (second && m == n && !strcmp (text, second) && again == hash);	/* kept under the reference */
+	printf ("named unused %s\n", strstr (text, "progs/c_crab.mdl") ? "progs/c_crab.mdl" : "?");
+	free (text);
+	free (second);
+	assert (!AW_ActorsLevelledText ("late", 0xE10006u, &n, &hash));		/* nothing at level 1 */
+	assert (!AW_ActorsLevelledText ("no_such_list", 0xE10007u, &n, &hash));
+	assert (!AW_ActorsLevelledText ("", 0xE10007u, &n, &hash));
+	assert (!AW_ActorsBaseText ("unused", &n));
+	puts ("named lists passed");
+}
+
 /* DBG-SPAWN-MENU-67: dbg spawn's list reads every base that spawns a living actor (classname aw_npc) with its record id,
  * name and kind (aw_actors.c AW_ActorsBaseEach); prints "each ID|NAME|KIND" per base given and "base each N" */
 static void each_base (void *ctx, const char *id, const char *name, int kind)
@@ -1304,6 +1330,8 @@ int main (int argc, char **argv)
 		base_model ();
 	else if (!strcmp (argv[1], "baseeach"))
 		base_each ();
+	else if (!strcmp (argv[1], "named"))
+		named_lists ();
 	else if (!strcmp (argv[1], "deadstay"))
 		dead_stay_dead ();
 	else if (!strcmp (argv[1], "corpse"))

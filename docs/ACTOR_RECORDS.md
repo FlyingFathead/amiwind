@@ -1,6 +1,6 @@
 # What every being can have: the actor records
 
-_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
+_Last updated with AmiWind v0.0.67 (19 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -675,14 +675,16 @@ spec (`tools/actor_spec_check.py`, run right after the creature census, about 35
   rooms, the references the image's maps carry, each under its own record's kind (a levelled point of an expansion
   room counts like one of the base game's); outdoors, the actor table under the town and region rules. A kind short by
   more than `config/actor_census_allowlist.json` allows fails; each allowed shortfall names its register entry.
-  With the expansions selected, the places the build sets aside on purpose leave both sides and are listed by name
-  with their register entry (the same file's `set_aside`): Mournhold's districts, which behave like an exterior and
-  wait for the Mournhold exterior work (INTERIOR-NO-AMBI-66), the expansion rooms the room stage refused
-  (EXPANSION-ROOMS-REFUSED-66), the cells the game data leaves empty, which the room stage lists as empty and makes no
-  room of (no scenery to convert, at most an actor, and no door leads in; ROOM-EMPTY-CELL-66), and Solstheim's
-  exterior cells, which no map holds yet (EXTERIOR-EXPANSION-ONLY-CELLS-66). Each list of rooms the room stage does not
-  make is read as its own group, by the name the stage records it under. Only an expansion's references are set aside;
-  a base game reference in such a place still counts as missing. With the base game alone nothing is set aside.
+  With the expansions selected, the places the room stage does not make as rooms leave both sides and are listed by
+  name with their register entry (the same file's `set_aside`): Mournhold's districts, which behave like an exterior
+  and are built as open terrain by the district module, not as rooms (INTERIOR-NO-AMBI-66; their people are in the
+  district frame maps), the expansion rooms the room stage refused (EXPANSION-ROOMS-REFUSED-66), and Solstheim's
+  exterior cells, which no map holds yet (EXTERIOR-EXPANSION-ONLY-CELLS-66). The cells the game data leaves empty (no
+  scenery to convert, at most an actor, and no door leads in; ROOM-EMPTY-CELL-66) are built as empty rooms since
+  v0.0.67 and count like any room, their actors included (ROOMS-SET-ASIDE-NOT-BUILT-67). Each list of rooms the room
+  stage does not make is read as its own group, by the name the stage records it under. Only an expansion's
+  references are left out; a base game reference in such a place still counts as missing. With the base game alone
+  nothing is left out.
 - Records: the audit above over the build's actor data; a field (level, attributes, skills, health, magicka,
   fatigue, behaviour values, flags, spells, inventory, the carried weapon and ranged weapon, packages, animations)
   with more missing or different records than `config/actor-record-gaps.json` lists fails.

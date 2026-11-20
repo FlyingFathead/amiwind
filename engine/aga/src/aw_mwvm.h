@@ -132,7 +132,12 @@ typedef struct {
     double tick_time,host_time;
     /* EXPANSION-SCRIPT-LIMITS-66: refusals of each table the build planned (every one is also told to the host) */
     unsigned long full_instances,full_cells,full_parked,full_park_cells;
+    unsigned long forced_rolls;     /* DBG-DBATTACK-67: Random calls a debug command made sure (AW_MwvmForceRandom) */
 } aw_mwvm_stats_t;
+/* DBG-DBATTACK-67: SCRIPT's Random gives its lowest number (0) while set, so its roll succeeds; -1 ends it. A debug
+ * command's guarantee (dbg dbattack: Tribunal's dbAttackScript attacks on that one rest), never set by the game. */
+void AW_MwvmForceRandom(int script);
+int AW_MwvmForcedRandom(void);
 /* the clock the two times use (seconds; the host sets it, NULL: not timed) */
 extern double (*aw_mwvm_clock)(void);
 /* The import route's counters: NOTYET calls run per function number (AWM_FUNCTIONS of them), and the string index
@@ -145,6 +150,10 @@ int AW_MwvmFunctionName(int function);
 int AW_MwvmLoad(const unsigned char *data,unsigned long bytes,const aw_mwvm_host_t *host);
 void AW_MwvmReset(void);
 void AW_MwvmSeed(unsigned long seed);   /* Random's generator (the gameplay recorder's frame 0; 0 = the load's value) */
+/* Random's starting value at every load (REST-CUT-TOO-OFTEN-67): the boot seed once at boot (sys_amiga.c), a
+ * recording's while the recorder runs (0 gives the boot's back); neither set: the fixed 0x2545F491 */
+void AW_MwvmBootSeed(unsigned long seed);
+void AW_MwvmStartSeed(unsigned long seed);
 int AW_MwvmLoaded(void);
 /* Table access for the host. */
 int AW_MwvmScriptCount(void);

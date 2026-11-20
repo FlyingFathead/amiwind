@@ -52,8 +52,11 @@ int AW_RestBedAllowed(const char *owner,const char *faction,int rank,int global_
 
 /* aw_wait.c: the engine side. */
 int AW_RestOpen(unsigned long bed_reference);   /* T (0) or a bed's ShowRestMenu; 1 when the window opened */
-int AW_RestSleeping(void);                      /* GetPCSleep: the window is open in rest mode */
-int AW_RestWake(void);                          /* WakeUpPC: the rest window closes; 1 when the player slept */
+int AW_RestSleeping(void);                      /* GetPCSleep: the hours of a rest are passing (GETPCSLEEP-NOT-CARRIED-OUT-67) */
+int AW_RestCanSleep(void);                      /* the window is open in rest mode (sleeping allowed here) */
+int AW_RestWake(void);                          /* WakeUpPC: the hours stop, the window closes; 1 when one was there */
+void AW_RestTick(void);                         /* every frame (host.c), the world held or not: the hours passing */
+int AW_RestStart(int count);                    /* COUNT hours: the open window's Enter from code (dbg dbattack) */
 /* A refused bed (the trespass crime, CRIME-59; NULL until it lands): the bed's reference and its owner or faction. */
 extern void (*aw_rest_bed_refused)(unsigned long reference,const char *owner);
 /* v0.0.62 (CRIME-59; OpenMW sleepInBed): someone else's bed is a crime when seen; the hook (aw_crime.c) commits it and

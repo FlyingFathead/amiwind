@@ -15,10 +15,23 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 TOOLKIT_FOLDER = 'toolkit'
 
 
-def write(chim_world, out, data_files=None, label=None, now=None, results=None, presented=None):
+def run_spec(chim_world, modules=()):
+    """The ingest's run spec of one build: NAME=WORLD, with the build's module worlds after it, separated by '|'
+    (cell_progress.load_runs). A world with no CHIM receipt is left out; no base world: no run at all, as before.
+    TRACKERS-MOURNHOLD-NOT-COUNTED-67: the module tribunal-mournhold's districts are a CHIM world of their own, so
+    their frames count as this build's, as Mournhold's exterior on CHIM."""
+    def has(path):
+        return bool(path) and (Path(path) / 'chim-receipt.json').is_file()
+    if not has(chim_world):
+        return []
+    return ['build=' + '|'.join([str(chim_world)] + [str(m) for m in modules if has(m)])]
+
+
+def write(chim_world, out, data_files=None, label=None, now=None, results=None, presented=None, modules=()):
     """Ingest the CHIM world into OUT. `results` = a folder of aw-cell-result-1 files (CHIMport) to store first.
     `presented` = the build's presented data folder receipt (presented-data.json): Mournhold's districts as cells of
-    their own (cell_progress.ingest); none: as before. Returns the path of OUT/cell-progress.json, or None (with a
+    their own (cell_progress.ingest); none: as before. `modules` = the CHIM world folders of the build's modules
+    (tribunal-mournhold), counted with the base world. Returns the path of OUT/cell-progress.json, or None (with a
     printed warning) when it could not be written."""
     try:
         import cell_progress as cp
@@ -33,7 +46,7 @@ def write(chim_world, out, data_files=None, label=None, now=None, results=None, 
         if census is None and data_files and Path(data_files).is_dir():
             census = cp.build_census(Path(data_files), progress=lambda *a: None)
             cp.write_json(out / 'mesh-census.json', census)
-        runs = ['build=%s' % chim_world] if chim_world and (Path(chim_world) / 'chim-receipt.json').is_file() else []
+        runs = run_spec(chim_world, modules)
         receipt = cp.read_json(presented) if presented and Path(presented).is_file() else None
         cp.ingest(out, census=census, chim_runs=runs, labels={'build': label or 'this build'}, now=now,
                   **({'presented': receipt} if receipt else {}))
@@ -53,10 +66,14 @@ def main(argv=None):
     ap.add_argument('--results', type=Path, help='a folder of aw-cell-result-1 files')
     ap.add_argument('--presented', type=Path,
                     help="the build's presented data folder receipt (presented-data.json): Mournhold's districts as cells")
+    ap.add_argument('--module-chim-world', type=Path, action='append', default=[],
+                    help="the CHIM world folder of a build module (tribunal-mournhold: Mournhold's districts), counted "
+                         "as this build's own cells; repeatable")
     ap.add_argument('--never-fail', action='store_true',
                     help='exit 0 even when the data could not be written (the builder stage: a warning, never a failed build)')
     a = ap.parse_args(argv)
-    return 0 if write(a.chim_world, a.out, a.data_files, results=a.results, presented=a.presented) or a.never_fail else 1
+    return 0 if write(a.chim_world, a.out, a.data_files, results=a.results, presented=a.presented,
+                      modules=a.module_chim_world) or a.never_fail else 1
 
 
 if __name__ == '__main__':

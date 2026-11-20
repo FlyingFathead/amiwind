@@ -1,11 +1,11 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.67-dev3 (19 November 2026)._
+_Last updated with AmiWind v0.0.67 (19 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.67: in development, from 17 November 2026](#v0067-in-development-from-17-november-2026)
+- [v0.0.67: Tribunal Introduced, released 19 November 2026](#v0067-tribunal-introduced-released-19-november-2026)
 - [v0.0.66: Forward It Is, released 16 November 2026](#v0066-forward-it-is-released-16-november-2026)
 - [v0.0.65: Reintroducing Vvardenfell](#v0065-reintroducing-vvardenfell)
 - [Next version: the two expansion worlds](#next-version-the-two-expansion-worlds)
@@ -118,17 +118,27 @@ _Last updated with AmiWind v0.0.67-dev3 (19 November 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
-## v0.0.67: in development, from 17 November 2026
+## v0.0.67: Tribunal Introduced, released 19 November 2026
 
-The first snapshot, [v0.0.67-dev1](releases/notes/RELEASE-v0.0.67-dev1.md), is the v0.0.66 release with the new line's
-label. The second, [v0.0.67-dev2](releases/notes/RELEASE-v0.0.67-dev2.md), is done: it fixes the three critical faults
-found in play on the v0.0.66 release (the stop on a loading screen in busy places, the missing autosaves, the missing
-wild creatures), opens Seyda Neen's containers and the opening's item rule, adds the fallbacks for a place that cannot
-be loaded, the first Solstheim and Mournhold collision rows and the Toolkit's 3D views of rooms and cells. The third,
-[v0.0.67-dev3](releases/notes/RELEASE-v0.0.67-dev3.md), is the newest snapshot, in development: every race's own
-first-person hands, Mournhold's districts as a build module with their things and people, the expansions' scripts bound,
-the inventory's actions, the shared layout of menus and message boxes, the confirmed look book, creatures and spell
-effects as in the original, and a builder that reuses earlier builds by default. The line holds, in order:
+v0.0.67, "Tribunal Introduced", is made from the third development snapshot, from its builds and caches
+([release notes](releases/notes/RELEASE-v0.0.67.md); every change with links to the three snapshots' notes: the
+[changelog](CHANGELOG.md#v0067-tribunal-introduced-19-november-2026)). What already works, of the plan below: Tribunal's
+additions to Vvardenfell are in the build and Mournhold can be reached from Ebonheart in the dialogue window used by hand
+and walked from the Reception Area through the palace door and the gate to Plaza Brindisi Dorom, with the way back by
+Effe-Tei, shown in the emulator on the v0.0.67-dev3 image (step 2, begun); Mournhold's five districts are a build module of their own with their things and people
+(step 4, begun; the districts' open entries are in the bug tracker); the expansions' scripts of placed objects are bound
+(step 5, begun); Solstheim's and Mournhold's collision rows and the Toolkit's room and cell views are in (steps 3 and 7,
+begun). It also mended the three critical faults found in play on v0.0.66 (the stop on a loading screen in busy places,
+the missing autosaves, the missing wild creatures), gave every race its own first-person hands, the inventory's
+actions, the confirmed look book, creatures and spell effects as in the original, and a builder that fails fast and
+reuses earlier builds by default.
+
+**What comes next, moved to v0.0.68 and later:** Mournhold's quests and the rest of its play (the Dark Brotherhood's attack in sleep, seen on the release image at level 40 and still being tested at other levels, the journal, a save and load there, the districts' frame rate and open
+entries), Solstheim built like the island, the expansions' remaining scripts and dialogue, the save with their counts,
+the playtests of every chain, the Heart Chamber's collapse and the end of the main quest, the shores' saw-tooth steps,
+and the builder's open entries (the under-used image and room batch stages, the town stages' resident bake cost, the
+journey's door aim). The order of record is the plan under "Next version" below; no dates are promised. The line
+v0.0.67 held, in order:
 
 1. **Tribunal and Bloodmoon in the game**, by the plan under "Next version" below: the files checked; every change the
    expansions make to Vvardenfell working end to end (the boat at Khuul, Louis Beauchamp in Ald'ruhn, Asciene Rane in
@@ -188,9 +198,9 @@ v0.0.66, and in it the census office becomes a room built like every other inter
 
 ## Next version: the two expansion worlds
 
-The line in development, v0.0.67, brings the expansions' finished content, Tribunal's Mournhold and Bloodmoon's
-Solstheim, and takes up what v0.0.66 moved on; no dates are promised. The plan below was begun in v0.0.66, whose
-snapshots are kept under it as they were written. The measured speed figures of the v0.0.66 line and what is still to
+The next line, v0.0.68, continues with the expansions' finished content, Tribunal's Mournhold and Bloodmoon's
+Solstheim, and takes up what v0.0.67 moved on; no dates are promised. The plan below was begun in v0.0.66 and carried on
+in v0.0.67 (see its section above), and the v0.0.66 snapshots are kept under it as they were written. The measured speed figures of the v0.0.66 line and what is still to
 be measured, among it the frame rate on the Raspberry Pi 4B, are on the
 [v0.0.66 performance page](performance/V0.0.66-PERFORMANCE.md).
 

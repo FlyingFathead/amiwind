@@ -1,6 +1,6 @@
 # AmiWind Toolkit
 
-_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
+_Last updated with AmiWind v0.0.67 (19 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -363,13 +363,17 @@ exterior cell, the interiors reached from it, what is converted, what each audit
 mapped there before, and the order to convert the rest in. It is built on the data the Toolkit already has (the
 World progress table for the legacy mapping quality, the Map metrics layer for risk and cost) and adds the CHIM side.
 
-A headline sits at the top of the Toolkit page, on every tab, one row per land. **Vvardenfell (main game) Done: N of 1,390
-(percent)** (its 1,390 cells with a LAND record: 1,292 land cells and 98 sea-floor cells; open ocean is apart, see
-[what we count](chim/CELL_TRACKER.md#what-we-count)) with the completion levels beside it (**Fully approved cells**,
-**Fully approved terrain**, awaiting lighting) and the release the eligible figure is for. A second row reports **Solstheim
-(Bloodmoon DLC)**, a third **Mournhold (Tribunal DLC)** (both with their rooms and cells in the game, the figures of the
-view switch's cards below), and a fourth
-the build: how many cells are in the game and the newest ingested build. Done means converted and eligible for the release; "Fully approved" means not a single
+A headline sits at the top of the Toolkit page, on every tab, one row per land, all in the same three columns:
+**open terrain ready**, **rooms ready** and **total ready**, then a row for **all lands** together and a last row for the
+build (how many cells are in the game and the newest ingested build). Ready means in the game on CHIM, the same for every
+land; a district a land presents as open terrain (Mournhold's five) is counted once, under open terrain, and everything
+not ready is named with its reason, a room no door leads to as a room still to build
+([ready, per land](chim/PROGRESS_TRACKER.md#ready-per-land-one-count-for-every-land); the same numbers as that page and
+the README, from one generator). Under each land, on a line of its own, are the audit figures: **Fully approved cells**,
+**Fully approved terrain**, awaiting lighting and the release the eligible figure is for (Vvardenfell's 1,390 cells with a
+LAND record: 1,292 land cells and 98 sea-floor cells; open ocean is apart, see
+[what we count](chim/CELL_TRACKER.md#what-we-count)). Older tracker data without the readiness count draws the earlier
+rows: Done means converted and eligible for the release; "Fully approved" means not a single
 polygon off and approved by the project maintainer, so it can be lower than Done. The release in the eligible figure is
 computed from the VERSION file whenever the data is written (`tools/cell_progress.py`, `restamp` refreshes it without a
 new ingest), and `tools/tracker_version_check.py` (run by the pregate and the gate) fails when the data or the pages show
@@ -380,6 +384,12 @@ breakdown (maintainer-approved, playtested, audits passed, converted with failin
 not started) and a history line (passed cells per day). Click a number to highlight those cells on the map.
 
 Above the World map a view switch offers one pane per map: Vvardenfell (the base game), Solstheim (the Bloodmoon expansion, the same grid framed on the island, with its rooms under the map) and Mournhold (the Tribunal expansion, a screen of its own with its districts and rooms). Each pane shows its own done, partial and missing counts, and a line under the switch gives the completion rate of each. A data set without an expansion hides its pane. The headline's rows for Solstheim and Mournhold read the same figures as these cards: the rooms in the game (for example "rooms 89 of 96 in the game"), the cells in the game, and both together, so an expansion whose rooms are in the game never reads "not started". On the Mournhold screen a click on a tile picks the room, and **Open ... in 3D** under the screen opens it in the 3D Inspector; the rooms listed under the screen have the same **3D** buttons as the interior tracker. Details: [the expansion views](chim/PROGRESS_TRACKER.md#the-expansion-views-solstheim-and-mournhold).
+
+**Completion per game.** Under the view switch a panel gives Tribunal (Mournhold), Bloodmoon (Solstheim) and Morrowind
+(Vvardenfell) by number: the cells and rooms ready, the scripts by state, the variables, the things placed by kind, the
+start scripts and the load doors, every count opening the list behind it; what no source measures yet says "not
+measured yet". The room list groups each room under the land of that count, so a land's group and its count hold the
+same rooms. Details: [completion per game](chim/PROGRESS_TRACKER.md#completion-per-game-tribunal-bloodmoon-morrowind).
 
 **The rooms heatmap.** On the Mournhold screen (and under Solstheim's map) **Colour by** switches the room tiles from their
 state to their drawn faces in the served build: every placement counts its model's faces (the face lump of the model in the

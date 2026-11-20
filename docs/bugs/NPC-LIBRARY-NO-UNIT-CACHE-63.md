@@ -22,7 +22,7 @@
 | Persists in | v0.0.64-dev2 (last seen) |
 | Severity | critical: Regressed in v0.0.64-dev2 (was high): each refused reuse of the stage costs 2,600 to 2,750 s re-baking 418 appearances and 57 creature models whose own input... |
 | Family | Build speed (`build-speed`) |
-| Deferred by the maintainer | 2026-11-16: deferred by the maintainer's release decision to v0.0.67 (v0.0.66 is made from its twelfth snapshot; the rest of the roadmap goes to later versions) |
+| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
 | Came back (regression) | in v0.0.64-dev2 (fixed in v0.0.63 before) |
 | Playtest version | 2026_11_09_v0.0.63-dev1_full-v0.0.63-dev1_dc356e3 |
 | From commit | source dc356e3, engine dc356e3, CHIM world dc356e3 |
@@ -44,7 +44,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-10 07:40 +0200: came back in v0.0.64-dev2 (fixed in v0.0.63 before): The v0.0.64-dev2 build (d031c7b5, reusing the dev1 run) took 0 of 418 NPC appearances and 0 of 48 creature models from their unit caches and baked them all, about 20 minutes; the dev1 build had taken 418 of 418 from the cache.
 - 2026-11-10 12:11 +0200: seen again in v0.0.64-dev2: Creature half: two MiniWind runs of the same source tree (akulakhan-chamber try2 and try3, 10 November) each baked all 48 creature models of the actor library again while the NPC appearances came from their unit cache (450 of 451).
 - 2026-11-16: v0.0.66-dev11: The v0.0.66-dev11 chain build took the actor library from its unit caches (the stage took 2.0 s on 4 cores); the rebakes after a change outside the actors' own inputs are BUILD-UNIT-KEYS-REACH-64.
-- 2026-11-16: deferred by the maintainer: deferred by the maintainer's release decision to v0.0.67 (v0.0.66 is made from its twelfth snapshot; the rest of the roadmap goes to later versions)
+- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
 
 <!-- END GENERATED TIMELINE -->
 
@@ -257,6 +257,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-STAIR-WALK-SLOW-33](BUILD-STAIR-WALK-SLOW-33.md): The image step's stair walk spent most of its time in interpreted collision traces and brute-force headroom tests (1,751 s of the rc1c image step)
 - [BUILD-STATS-SERIAL-36](BUILD-STATS-SERIAL-36.md): The CHIM stats step runs serially and silently on one core
 - [BUILD-STORAGE-DUPLICATES-33](BUILD-STORAGE-DUPLICATES-33.md): Build storage keeps full duplicate copies of images, stage outputs and packages, and nothing removes them
+- [BUILD-TESTER-32GB-OOM-67](BUILD-TESTER-32GB-OOM-67.md): A tester's build on a machine with 32 GB of memory ran out of memory after about 32 hours
 - [BUILD-TOWN-ACTOR-FIT-SERIAL-64](BUILD-TOWN-ACTOR-FIT-SERIAL-64.md): The Vivec town stage fits its residents onto the frame collision on one core after the resident bake
 - [BUILD-UNDERUSE-GATE-36](BUILD-UNDERUSE-GATE-36.md): The profiler did not flag long underused phases: 7 min 44 s of CHIM statistics on 1 of 24 cores and 77 s of zone walk on 1 core showed nowhere
 - [BUILD-UNIT-KEYS-REACH-64](BUILD-UNIT-KEYS-REACH-64.md): New collision settings re-keyed the NPC, creature, player-body and resident unit caches, which never read them

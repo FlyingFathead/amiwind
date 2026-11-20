@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.67-dev3 (19 November 2026)._
+_Last updated with AmiWind v0.0.67 (19 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.67: Tribunal Introduced, 19 November 2026](#v0067-tribunal-introduced-19-november-2026)
 - [v0.0.67-dev3: third snapshot of v0.0.67, 19 November 2026](#v0067-dev3-third-snapshot-of-v0067-19-november-2026)
 - [v0.0.67-dev2: second snapshot of v0.0.67, 17 November 2026](#v0067-dev2-second-snapshot-of-v0067-17-november-2026)
 - [v0.0.67-dev1: first snapshot of v0.0.67, 17 November 2026](#v0067-dev1-first-snapshot-of-v0067-17-november-2026)
@@ -206,6 +207,144 @@ _Last updated with AmiWind v0.0.67-dev3 (19 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.67: Tribunal Introduced, 19 November 2026
+
+v0.0.67 is made from the third development snapshot, from its builds and caches ([release
+notes](releases/notes/RELEASE-v0.0.67.md)). It carries every snapshot of the line, each with its own notes:
+[dev1](releases/notes/RELEASE-v0.0.67-dev1.md), [dev2](releases/notes/RELEASE-v0.0.67-dev2.md) and
+[dev3](releases/notes/RELEASE-v0.0.67-dev3.md). It runs on CHIM Engine v0.2.2 and needs 32 MB of Fast RAM; emulator
+presets `AmiWind-v0.0.67-FS-UAE.fs-uae` and `AmiWind-v0.0.67-WinUAE.uae`. It introduces Tribunal: Tribunal's additions to
+Vvardenfell are in the build (Apelles Matius and Asciene Rane in Ebonheart). The trip to Mournhold was shown in the emulator
+on 19 November 2026 on the v0.0.67-dev3 image in the dialogue window used by hand: Asciene Rane's topic and choice took
+the player to Mournhold, Royal Palace: Reception Area at her script's position, the player walked out through the palace
+door into the courtyard and through the gate into Plaza Brindisi Dorom, and Effe-Tei's topic and choice took the player
+back to Ebonheart (on 17 November, on the Raspberry Pi 4B with the v0.0.66 image, the two answers had been run through the
+debug console). Mournhold can be reached and walked from the palace to the Plaza; its quests and much of its play are not
+ready yet, and Solstheim is not in the game. The boot smoke, the six hops and the look book ran on the dev3 image, from
+which the release is made; the release's own delivery repeats them on the release image before the kit.
+Several fixes are made in source and covered by tests and are still to be seen in play; the [bug tracker](BUGS.md) keeps
+them open until then. After the third snapshot, the first-person held light was seen in play on its image and confirmed
+by the maintainer, and the look book passed 3 of 3 pages on it.
+
+**New**
+
+- Mournhold's five districts are a build module of their own, with their containers, items, activators, doors and people
+  keyed outdoors at their moved places, placed in source and still to be seen in play; `dbg tp mournhold`, `solstheim`,
+  `ravenrock` and `skaal` (dev3;
+  [Mournhold notes](MOURNHOLD_NOTES.md)).
+- The scripts of 1,150 of Tribunal's and 1,178 of Bloodmoon's placed objects run, and the scripted items their people and
+  creatures carry get their scripts; the expansions' actors and stages are counted per land (dev3).
+- The collision surface table has the rows of Solstheim's exterior models, of Mournhold's districts and of the Royal
+  Palace courtyard's banner hanger (dev2).
+- A place that cannot be loaded names its error in the game's box with one button, and the player stays where he was
+  ([when a place cannot be loaded](LOAD_ERRORS.md); dev2).
+- The Toolkit opens every room tile and every cell of the CHIM open world in the 3D Inspector (dev2).
+- Every race and sex draws its own first-person hands in its own skin, with no colour step at the wrist; `dbg race`
+  swaps race and sex in place ([the player's body](PLAYER_BODY.md); dev3).
+- The inventory shows one action per kind of item with the Equipped tag, casts scrolls, has an item information key and
+  marks stealing; `dbg give spell`; a pick-up says what happened ([INVENTORY.md](INVENTORY.md); dev3).
+- Seyda Neen's 19 containers are drawn and open (dev2; fixed in source, still to be seen in play); nothing is taken before
+  the census papers allow the inventory (dev2; fixed in source, still to be seen in play).
+- `dbg netstat` (dev2); `dbg spawn` and `dbg despawn`, `dbg setpov`, `dbg lighttest` and `dbg cycleitems` (dev3).
+- The confirmed look book, the model census, the mesh converter and the units page ([the look book](LOOKBOOK.md),
+  [model census](MODEL_CENSUS.md), [mesh converter](MESH_CONVERT.md), [units](UNITS.md); dev2, dev3).
+
+**Fixed**
+
+- Arriving in a flooded room puts the player in its water instead of on top of the room: the first flooded hall of the
+  Clockwork City, entered by its teleport, its door or the debug teleport, had the player on the hall's roof; 140 of the
+  image's 6,217 room arrivals move into the room's water, dry arrivals are unchanged (fixed in source, its entry open
+  until a played game shows it; see the release notes' "Known in this build").
+- The game no longer stops on a loading screen in busy places, autosaves are written again, and wild creatures are back
+  outdoors (dev2; measured in the emulator, the entries stay open until a played game shows them:
+  [NET-VIVEC-ENTITY-PACKET-OVERFLOW-66](bugs/NET-VIVEC-ENTITY-PACKET-OVERFLOW-66.md),
+  [SAVE-AUTOSAVE-NOT-WRITTEN-67](bugs/SAVE-AUTOSAVE-NOT-WRITTEN-67.md),
+  [OUTDOOR-CREATURES-REGRESSION-66](bugs/OUTDOOR-CREATURES-REGRESSION-66.md), with their measurements in the dev2 entry
+  below). The dev3 image's boot smoke again showed an autosave on every map
+  change and creatures alive outdoors.
+- The first-person held light is in the left hand again (FP-TORCH-OUT-OF-HAND-67; seen in play on the dev3 image,
+  confirmed by the maintainer, and 3 of 3 look book pages passed on it).
+- Race, sex and outfit changes release the parts they replace, so the first-person arms no longer turn into an old hand
+  model with holes (FP-ARMS-NO-MODEL-SLOT-67); the High Elf man draws his own upper legs (dev3).
+- Spell effects show the original's egg-shaped shell and the player takes a short red hue when hurt; creatures move and
+  fight by the original's rules; the cliff racer is whole again (dev3).
+- Dialogue: no empty rank words, six conditions read as the original reads them, every topic's answer checked against
+  the original's filter rules (dev3).
+- The dock guard's walk, the birthsign window, the prison ship hold's masts and table, the map's World tab and visited
+  places, one focus under the crosshair, one shared layout for menus and boxes, an error in play sends the player back to
+  the place, the newest autosave or the previous map (out of memory and a damaged map file still end the game), the
+  third-person walk after the idle camera (dev3; fixed in source).
+- A teleport that lands far below its asked height takes the floor at the asked point (seen in play on the release image).
+- Scripts see the player asleep while a rest passes, a wilderness rest that is cut short brings its creature, `dbg
+  dbattack` (seen in play on the release image; scripts that place levelled creature lists and scripted objects are fixed
+  in source, still to be seen in play;
+  [GETPCSLEEP-NOT-CARRIED-OUT-67](bugs/GETPCSLEEP-NOT-CARRIED-OUT-67.md),
+  [REST-CUT-NO-CREATURE-67](bugs/REST-CUT-NO-CREATURE-67.md),
+  [MWSCRIPT-PLACE-OTHER-KINDS-62](bugs/MWSCRIPT-PLACE-OTHER-KINDS-62.md)).
+- Godsreach's gate to the Plaza can be used from both sides of the cell border it stands on (seen in play on the release
+  image; [DISTRICT-GATE-ON-CELL-BORDER-67](bugs/DISTRICT-GATE-ON-CELL-BORDER-67.md)).
+- Mournhold greets a new character in peace: a person or creature its script keeps out of the world no longer fights,
+  and a fight is not carried to the next map (seen in play on the release image).
+- A wilderness rest is cut short as often as the original's rule gives, not more: every start of the game replayed the
+  same random numbers (fixed in source for the respin, still to be seen in play;
+  [REST-CUT-TOO-OFTEN-67](bugs/REST-CUT-TOO-OFTEN-67.md)); a person or creature a script keeps out of the world also
+  stays out after a debug teleport inside the loaded map (fixed in source for the respin, still to be seen in play).
+  The two fixes: 4d1ca449 (the start seed and the game's own rolls,
+  [RANDOM-STREAMS-SAME-EVERY-BOOT-67](bugs/RANDOM-STREAMS-SAME-EVERY-BOOT-67.md)) and fe36d037 (every load of a map
+  hides what the scripts disabled, [PLAZA-FABRICANTS-LIVE-AT-START-67](bugs/PLAZA-FABRICANTS-LIVE-AT-START-67.md)).
+
+Seen in play on the release image (the run 2b086671), in the emulator: the Dark Brotherhood's attack on a rest, by `dbg
+dbattack` and naturally on a 12-hour rest in the wilderness at level 40 with its wake message on screen (levels 10 and 20
+are still being tested); the wilderness creature that cuts a rest, from the region's list at the right hour; Mournhold's
+start state on a new game, peaceful in the Plaza, the Temple Courtyard and the Hall of Ministry; the Great Bazaar's
+teleport arrival on the street; Godsreach's gate to the Plaza; and a fight not carried to the next map, in Vvardenfell and
+in Mournhold.
+
+**Performance**
+
+- The frame message is built whole and paced across frames, nearest first; the CHIM areas' collision gate runs on the
+  plain meshes before any stair collision unit (dev2, dev3; [the page](performance/NET_FRAME.md)).
+
+**Builder and tools**
+
+- A plain build reuses earlier builds by default and says what it reuses and what it makes again (dev3).
+- One failure page per failed build, one list of early checks, the build report's environment summary and failure kind,
+  live numbers from the first second, the strict reuse stop counted by what one build looks up, CHIMport cell keys
+  without the request id (dev1).
+- The gate and delivery smoke fail on engine error lines, a map change without an autosave, no creatures at Seyda Neen
+  or a frame update over the ceiling; the early check `outdoor-creature-models` (dev2).
+- Every bug tracker entry has its report page, made by the register tool (dev3).
+- The progress pages are measured for this version: 925 of the original game's 1,074 scripts run and 9 more are carried
+  by AmiWind's own code (2 use a function the interpreter lacks, 138 belong to places the image does not hold yet;
+  611, 21 and 433 before the trackers counted the expansions' rooms and districts and before PlaceItem and the
+  player's sleep were carried out); Tribunal.esm: 233 of its 236 used scripts run; the
+  [CHIM progress tracker](chim/PROGRESS_TRACKER.md) counts Vvardenfell's 1,408 exterior cells (1,292 land and 116 sea) on
+  CHIM. They count Mournhold's 11 exterior cells and its rooms the image holds
+  ([TRACKERS-COUNT-MOURNHOLD-OUT-67](bugs/TRACKERS-COUNT-MOURNHOLD-OUT-67.md), fixed in source), and none of Solstheim's
+  land cells is on CHIM.
+- The version label and the two release emulator presets, both with 32 MB of Fast RAM, are on the release file list.
+
+Seen in play on the dev3 image on 19 November 2026 (detail in the notes): both district doors into the Great Bazaar set
+the player on the street; a full 12-hour rest opened the level-up box and the character went from level 40 to level 41
+(Strength 60 to 65, Speed 50 to 51, Endurance 50 to 51, health 250 to 255), the same after a map change, a save and a
+load; 2 of 14 twelve-hour rests were cut after 9 hours, as the rule gives.
+
+Known, what does not work yet: Mournhold's quests and much of its play are not ready (not yet shown in play: the
+journal entries, a save and load in Mournhold; the Dark Brotherhood's attack was seen at level 40 only,
+[GETPCSLEEP-NOT-CARRIED-OUT-67](bugs/GETPCSLEEP-NOT-CARRIED-OUT-67.md)); Solstheim is not in the game; the Heart
+Chamber's collapse is not animated; the districts' open entries (the frame rate of 8 to 16 frames a second,
+[MOURNHOLD-BAZAAR-UNDER-WATER-67](bugs/MOURNHOLD-BAZAAR-UNDER-WATER-67.md), [DISTRICT-GATE-ON-CELL-BORDER-67](bugs/DISTRICT-GATE-ON-CELL-BORDER-67.md),
+[GAENOR-ATTACKS-AT-START-67](bugs/GAENOR-ATTACKS-AT-START-67.md),
+[COMBAT-FIGHT-CARRIED-TO-NEW-MAP-67](bugs/COMBAT-FIGHT-CARRIED-TO-NEW-MAP-67.md) and the Plaza's fabricants stay open
+until the maintainer closes them; the Plaza's zone budget and drawing, Norenen-dur's atronachs, Godsreach's canal reported
+dry and not proven ([GODSREACH-CANAL-NO-WATER-67](bugs/GODSREACH-CANAL-NO-WATER-67.md)), the water levers of Old Mournhold
+([MWSCRIPT-WATER-LEVEL-STATIC-67](bugs/MWSCRIPT-WATER-LEVEL-STATIC-67.md))); a wilderness rest was cut too often in one
+session ([REST-CUT-TOO-OFTEN-67](bugs/REST-CUT-TOO-OFTEN-67.md)); the Stats window's colours until a load
+([STATS-WINDOW-COLOURS-UNTIL-LOAD-67](bugs/STATS-WINDOW-COLOURS-UNTIL-LOAD-67.md)); `dbg tp` with a comma in a room
+name ([DBG-TP-ROOM-NAME-COMMA-67](bugs/DBG-TP-ROOM-NAME-COMMA-67.md)); locked containers never open; the debug spawn's
+cell; the image step's cores and the town stages' resident bake cost. The full list, every open entry of the line with
+its page, is in the release notes.
 
 ## v0.0.67-dev3: third snapshot of v0.0.67, 19 November 2026
 

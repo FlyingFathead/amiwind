@@ -104,6 +104,18 @@ class LevelledTableTests(unittest.TestCase):
         self.assertEqual(self.report['levelled']['creature_bases_with_model'], 2)
         self.assertEqual(self.report['by_kind']['LEVC'], 4)
 
+    def test_named_lists_are_the_sleep_lists_and_the_lists_scripts_place(self):
+        """v0.0.67 (REST-CUT-NO-CREATURE-67, MWSCRIPT-PLACE-OTHER-KINDS-62): the lists the engine rolls by id are every
+        region's sleep list (REGN BNAM) and every list a Place call of a script or a dialogue result names; a placed
+        creature or an id that is no list is not one, nor a Place call in a comment."""
+        script = b'Begin trapper\nPlaceItem "Unused" 1 2 3 0\nPlaceAtPC crab 1 64 0\n; PlaceItem top_lev 0 0 0 0\nEnd\n'
+        extra = (record('REGN', sub('NAME', z('Test Region')), sub('BNAM', z('Maybe'))) +
+                 record('REGN', sub('NAME', z('Empty Region')), sub('BNAM', b'\0')) +
+                 record('SCPT', sub('SCHD', b'trapper'.ljust(52, b'\0')), sub('SCTX', script)) +
+                 record('INFO', sub('INAM', z('1')), sub('BNAM', b'PlaceAtMe "outer" 1 0 0')))
+        self.assertEqual(self.A.named_lists(MASTER + extra), ['maybe', 'outer', 'unused'])
+        self.assertEqual(self.A.named_lists(MASTER), [])
+
     def test_rule_by_hand(self):
         """The rule, worked by hand: all levels <= the player's, or only the highest; chance none; nested lists."""
         self.assertEqual(self.dist('all_lev', 1), {'rat': 1.0})

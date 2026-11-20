@@ -65,8 +65,14 @@ class TheBaseStagesAreUnchanged(unittest.TestCase):
         # the base stage list: the plan without the module's two stages, in the same order
         self.assertEqual([n for n in names if not n.startswith('tribunal-')], [n for n, _ in base_steps()])
         commands, before = dict(steps), dict(base_steps())
-        for name in ('census', 'chim', 'cell-progress'):
+        for name in ('census', 'chim'):
             self.assertEqual(commands[name], before[name], name)
+        # the tracker data counts the districts' world as the build's own (TRACKERS-MOURNHOLD-NOT-COUNTED-67): the
+        # stage takes the presentation receipt and the module's world after its unchanged base command
+        self.assertEqual(commands['cell-progress'][:len(before['cell-progress'])], before['cell-progress'])
+        self.assertEqual([str(p) for p in commands['cell-progress'][len(before['cell-progress']):]],
+                         ['--presented', str(Path('/run') / 'tribunal-mournhold-data' / 'presented-data.json'),
+                          '--module-chim-world', str(Path('/run') / 'tribunal-mournhold')])
         # the image installs every stage's output and the scripts make the merged variant of a small table: they
         # take the module's receipt and its cells, after their unchanged base command
         receipt = str(Path('/run') / 'tribunal-mournhold-data' / 'presented-data.json')
@@ -105,8 +111,11 @@ class TheBaseStagesAreUnchanged(unittest.TestCase):
         from build_parallel import stage_dependencies
         with_module = stage_dependencies(module_steps(), LEFT_OUT)
         without = stage_dependencies(base_steps(), LEFT_OUT)
-        for name in ('census', 'chim', 'cell-progress'):
+        for name in ('census', 'chim'):
             self.assertEqual(with_module[name], without[name], name)
+        # only the tracker data waits for the module: it counts the districts' world (TRACKERS-MOURNHOLD-NOT-COUNTED-67)
+        self.assertEqual(set(with_module['cell-progress']) - set(without['cell-progress']),
+                         {'tribunal-mournhold-data', 'tribunal-mournhold'})
         self.assertEqual(with_module['tribunal-mournhold-data'], ())
         self.assertEqual(with_module['tribunal-mournhold'], ('census', 'tribunal-mournhold-data'))
         self.assertEqual(set(with_module['image']) - set(without['image']),

@@ -9,9 +9,12 @@
 | Where | tools/engine_smoke.py, rec and recstop in the emulator-side script (the clips in shots/) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.67-dev2 (last seen) |
+| Persists in | fixed in v0.0.67-dev3 |
 | Severity | medium: The session that stalled is the one whose clip is wanted as evidence, and it was the one that could not be opened; the run itself and its logs are unaffected. |
 | Family | Gates, CI and tests (`tests-ci`) |
+| Fix commit | `903860b4` |
+| Fixed on | 2026-11-18 |
+| Planning item | `SESSION-CLIP-PLAYABLE-67` |
 | Playtest version | v0.0.67-dev2 |
 | From commit | source 0d6f7ab, engine 0d6f7ab, CHIM world 0d6f7ab |
 | CHIM engine version | CHIM 0.2.2, engine 0d6f7ab, world format unknown |
@@ -29,11 +32,15 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.67-dev2 (903860b4) | 2026-11-18 | gate 11760 of the planning item SESSION-CLIP-PLAYABLE-67 | session clips are fragmented MP4s that play up to a stall or a kill; the recorder stops before the stall examination; the wait check re-reads an empty state value; merged into the dev3 line as e14a2590 |
+| shipped | a development build | v0.0.67-dev3 (a375b13f) | 2026-11-19 | the fix commit 903860b4 (merged into the dev3 line as e14a2590) is an ancestor of the delivered dev3 head a375b13f and not of the dev2 head | the dev3 build holds the fragmented session clip and the recorder stopped before the stall examination |
+| confirmed by a test | a test module | v0.0.67-dev3 (a375b13f) | 2026-11-19 | tests/test_engine_smoke.py test_clip_is_fragmented_and_recstop_ends_the_recorder_in_time, run by gate 11760 on 903860b4 and by gate 11450 on a375b13f | test tooling only, so no play check applies: the test fails without the fragmented flags and the bounded wait |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-18: reported in v0.0.67-dev2
 - 2026-11-18: fixed in source: a gated commit, v0.0.67-dev2 (903860b4); gate 11760 of the planning item SESSION-CLIP-PLAYABLE-67: session clips are fragmented MP4s that play up to a stall or a kill; the recorder stops before the stall examination; the wait check re-reads an empty state value; merged into the dev3 line as e14a2590
+- 2026-11-19: shipped: a development build, v0.0.67-dev3 (a375b13f); the fix commit 903860b4 (merged into the dev3 line as e14a2590) is an ancestor of the delivered dev3 head a375b13f and not of the dev2 head: the dev3 build holds the fragmented session clip and the recorder stopped before the stall examination
+- 2026-11-19: confirmed by a test: a test module, v0.0.67-dev3 (a375b13f); tests/test_engine_smoke.py test_clip_is_fragmented_and_recstop_ends_the_recorder_in_time, run by gate 11760 on 903860b4 and by gate 11450 on a375b13f: test tooling only, so no play check applies: the test fails without the fragmented flags and the bounded wait
 
 <!-- END GENERATED TIMELINE -->
 
@@ -54,6 +61,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [BUILD-EXECUTABLES-LIST-UNGATED-36](BUILD-EXECUTABLES-LIST-UNGATED-36.md): A file committed executable but missing from tools/release.py EXECUTABLES (tools/engine_smoke.py) broke the source ZIP only at kit time
 - [BUILD-FACE-KEY-FORM-TEST-48](BUILD-FACE-KEY-FORM-TEST-48.md): The face key test tied the gallery face keys to the stage key form; stage keys in form 3 failed it (the faces rightly keep form 2)
 - [BUILD-FAILURE-REPORT-66](BUILD-FAILURE-REPORT-66.md): Requested: a failed build writes one report file with everything needed to find its cause; the intro stage failure of a build of v0.0.64 and v0.0.65 outside the project came with its traceback, but without the build settings, the versions, which copy of the game data or the stage plan
+- [BUILD-GATE-SHORT-SHA-67](BUILD-GATE-SHORT-SHA-67.md): A release build was refused as ungated right after its gate passed: the gate recorded the commit with nine digits and the build looked for eight
 - [BUILD-LAVA-CORE-BOUNDS-38](BUILD-LAVA-CORE-BOUNDS-38.md): Lava sandbox bounds are not divisible by its core size
 - [BUILD-LAVA-PRESET-FIXTURE-38](BUILD-LAVA-PRESET-FIXTURE-38.md): Lava sandbox addition omitted the preset inventory fixture
 - [BUILD-SEYDA-CARRIER-VOICE-DIR-40](BUILD-SEYDA-CARRIER-VOICE-DIR-40.md): Fresh Seyda carrier cannot publish a resident voice without an inherited sound directory
@@ -67,6 +75,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - CI-01 (no report page): Windows short aliases mismatch resolved discovery paths in tests
 - CI-ACTIONS-CACHE-NODE20-54 (no report page): The GitHub workflow pinned actions/cache v4.2.3, which runs on Node 20, a runtime GitHub retires
 - [CI-BOOTSTRAP-NUMPY-32](CI-BOOTSTRAP-NUMPY-32.md): The public CI tool bootstrap fails: tools/build.py imports numpy before the tools exist
+- [CI-DRYRUN-CANCELLED-DEV3-67](CI-DRYRUN-CANCELLED-DEV3-67.md): The public CI's dry-run build of the v0.0.67-dev3 snapshot ran past its 20-minute limit and was cancelled; it took about two minutes before
 - [CI-ERICW-SKIP-31](CI-ERICW-SKIP-31.md): Torch test room test never runs in hosted CI or the builder image
 - [CI-HOSTDEPS-30](CI-HOSTDEPS-30.md): Host CI job fails: scenery export needs the NIF reader for non-NIF test data
 - [CI-JOBS-UNNAMED-53](CI-JOBS-UNNAMED-53.md): The six test jobs of the v0.0.53 CI split shipped with no names, and the maintainer was not told the new job list
@@ -116,14 +125,17 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - LINUX-VALID-02 (no report page): Linux test fixtures failed to link (missing stubs)
 - [MWAD-NAME-CLASH-66](MWAD-NAME-CLASH-66.md): tools/mwad.py has the name of the src/mwad package and hides it for any process with tools before src
 - [MWAD-TEXT-WRITER-LF-35](MWAD-TEXT-WRITER-LF-35.md): Some JSON and text writers do not pin LF and UTF-8
+- [NOTES-MOURNHOLD-WAY-STALE-67](NOTES-MOURNHOLD-WAY-STALE-67.md): The development notes of v0.0.67 said the way to Mournhold was not in the build, while the trip to Mournhold and back already worked
 - [OPS-GATE-UNLISTED-TESTS-36](OPS-GATE-UNLISTED-TESTS-36.md): The gate runs only the tests listed in the public file list, and nothing checked that every test file is listed
 - [PLAYTEST-SHIPPED-WITHOUT-SMOKE-36](PLAYTEST-SHIPPED-WITHOUT-SMOKE-36.md): The v0.0.36-dev3 private playtest package was published with an engine that dies on every map load: no ship step or gate booted it
 - PREGATE-GLOBAL-SHADOW-58 (no report page): Pregate C check misses global shadowing; the engine build fails on it
 - PREGATE-SYNTAX-SKIP-SILENT-57 (no report page): The pre-gate C syntax check skipped itself without failing on worktrees in the per-version folder layout
+- [PUBLIC-GUARD-SPELLS-TOOL-NAMES-67](PUBLIC-GUARD-SPELLS-TOOL-NAMES-67.md): The public privacy check spells the private words it refuses, split in pieces, in its own code
 - [REGISTER-WRITE-EINVAL-67](REGISTER-WRITE-EINVAL-67.md): The register tool stops now and then with "Invalid argument" while it writes docs/BUGS.md, after it has already saved the entry
 - [REGRESSION-GUARD-MISSING-67](REGRESSION-GUARD-MISSING-67.md): Things the maintainer had confirmed working in play come back broken in later builds: no check kept them proven after their fix
 - [RELEASE-CHECK-NOTES-LATE-66](RELEASE-CHECK-NOTES-LATE-66.md): The release check of the notes' core-use claims ran only when the snapshot package was made, after the build and its play tests, and read a sentence about allowed workers as a claim
 - [RELEASE-CONNECT-STEP-SKIPPED-53](RELEASE-CONNECT-STEP-SKIPPED-53.md): After v0.0.52 and v0.0.53 were published the release's connect-it-fully step was skipped: the pinned previous release and the size baseline stayed at v0.0.51
+- [RELEASE-GATE-COMPLETENESS-LOST-67](RELEASE-GATE-COMPLETENESS-LOST-67.md): The release check passes with rooms of a shipped expansion missing and without checking the expansions' doors
 - [RELEASE-INCLUSION-CHECK-LATE-48](RELEASE-INCLUSION-CHECK-LATE-48.md): The release guard does not check the CHIM inclusion ledger: the v0.0.48 kit stopped in its source step after the guard and the full suite had passed
 - [RELEASE-KIT-NO-REPAIR-MODE-35](RELEASE-KIT-NO-REPAIR-MODE-35.md): The release kit has no repair mode for a commit already pushed
 - [RELEASE-KIT-PUSH-BEFORE-CI-45](RELEASE-KIT-PUSH-BEFORE-CI-45.md): The release kit pushes to main before CI has passed
@@ -132,6 +144,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [RELEASE-PATCH-SIZE-33](RELEASE-PATCH-SIZE-33.md): The release preflight refuses the whitespace baseline of v0.0.33-dev1 as oversized text
 - [RELEASE-PATCH-TARGET-VERSION-39](RELEASE-PATCH-TARGET-VERSION-39.md): RC1 publication baseline lacks its target version
 - [ROOM-TRACE-VISIT-GUARD-48](ROOM-TRACE-VISIT-GUARD-48.md): Long downward traces on the Hall of Processing's collision raise the trace visit guard (Cyclic or excessive collision tree)
+- [ROUTE-PREFLIGHT-OWN-PROOFS-STOP-67](ROUTE-PREFLIGHT-OWN-PROOFS-STOP-67.md): The release route's final preflight stops on the proof sessions of its own release image
 - [SESSION-ENGINE-NOT-A-FILE-67](SESSION-ENGINE-NOT-A-FILE-67.md): An emulator session given an engine path that is not a file runs the image with no engine and waits 320 s for the remote control, instead of refusing at once
 - [SESSION-PASS-DEAD-ENGINE-57](SESSION-PASS-DEAD-ENGINE-57.md): The scripted test session reported PASS while the engine had crashed
 - [SESSION-STALL-CENSUS-QUICKSTART-58](SESSION-STALL-CENSUS-QUICKSTART-58.md): On the v0.0.58-dev6 image a session that quick-starts into the Census and Excise Office at 135 172 64 stalls before its first still: the runner reports game stalled with the game clock frozen at 23.23 s
