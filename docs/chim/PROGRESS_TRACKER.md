@@ -1,6 +1,6 @@
 # CHIM Progress Tracker
 
-_Last updated with AmiWind v0.0.67 (19 November 2026)._
+_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -46,26 +46,26 @@ _Last updated with AmiWind v0.0.67 (19 November 2026)._
 
 <!-- BEGIN GENERATED CURRENT STATE: from docs/chim/progress-state.json and docs/mwscript-features.json; run python3 tools/cell_progress_state.py render -->
 
-_Counted from the tracker data generated 2026-11-19: newest ingested build **v0.0.67 (2b086671)**, built 2026-11-18. Every number below is read from that data and from the MWScript tracker when this block is rendered; none is typed by hand._
+_Counted from the tracker data generated 2026-11-20: newest ingested build **v0.0.67 (2b086671)**, built 2026-11-18; the version in development, 0.0.68-dev1, has no ingested build yet, so these are the figures of the newest ingested one. Every number below is read from that data and from the MWScript tracker when this block is rendered; none is typed by hand._
 
 ### Ready, per land
 
-Ready = in the game on CHIM, the same for every land. Open terrain: the land's exterior cells of land or empty sea (open ocean and cells beyond the world's edge are not counted), ready when the newest ingested build holds the cell on CHIM and no audit of it failed. Rooms: every interior cell, counted for the land of its master, ready when it is in the game on CHIM rooms; a district the land presents as open terrain is counted once, under open terrain. Everything else is not ready, with its reason; a room no door leads to is a room still to build, never left out.
+Ready = in the game on CHIM, the same for every land. Open terrain: the land's exterior cells of land or empty sea (open ocean and cells beyond the world's edge are not counted), ready when the newest ingested build holds the cell on CHIM and no audit of it failed. Rooms: every interior cell, counted for the land of its master, ready when it is in the game: on CHIM rooms, or as a room map of our own (special interiors, named under the count); a district the land presents as open terrain is counted once, under open terrain. Everything else is not ready, with its reason; a room no door leads to is a room still to build, never left out.
 
 | Land | Open terrain ready | Rooms ready | Total ready |
 | :-- | --: | --: | --: |
-| Vvardenfell (main game) | 1,390 of 1,390 (100.0 %) | 1,129 of 1,131 (99.8 %) | 2,519 of 2,521 (99.9 %) |
-| Solstheim (Bloodmoon) | 0 of 144 (0.0 %) | 99 of 101 (98.0 %) | 99 of 245 (40.4 %) |
-| Mournhold (Tribunal) | 11 of 11 (100.0 %) | 89 of 91 (97.8 %) | 100 of 102 (98.0 %) |
-| **All lands** | 1,401 of 1,545 (90.7 %) | 1,317 of 1,323 (99.5 %) | **2,718 of 2,868 (94.8 %)** |
+| Vvardenfell (main game) | 1,390 of 1,390 (100.0 %) | 1,131 of 1,131 (100.0 %) | 2,521 of 2,521 (100.0 %) |
+| Solstheim (Bloodmoon) | 0 of 144 (0.0 %) | 101 of 101 (100.0 %) | 101 of 245 (41.2 %) |
+| Mournhold (Tribunal) | 11 of 11 (100.0 %) | 91 of 91 (100.0 %) | 102 of 102 (100.0 %) |
+| **All lands** | 1,401 of 1,545 (90.7 %) | 1,323 of 1,323 (100.0 %) | **2,724 of 2,868 (95.0 %)** |
 
-- Vvardenfell: not ready: rooms: in the game as a room map of our own, not on CHIM rooms 2. The rooms: Imperial Prison Ship; Seyda Neen, Census and Excise Office.
-- Solstheim: not ready: open terrain: not in the game yet (Solstheim) 144; rooms: still to build: no door leads there, and no script or dialogue line names it 2. The rooms: Vor Lair, Chambers of Alta Vor; Vor Lair, Interior.
-- Mournhold: not ready: rooms: still to build: no door leads there, a script or a dialogue line sends the player there 1; rooms: still to build: no door leads there, and no script or dialogue line names it 1. The rooms: Sotha Sil,; Mournhold, Royal Palace. Counted once, as open terrain: Mournhold, Godsreach; Mournhold, Great Bazaar; Mournhold, Plaza Brindisi Dorom; Mournhold, Royal Palace: Courtyard; Mournhold, Temple Courtyard.
+- Vvardenfell: not ready: none. Special interiors, ready, in the game as room maps of our own: Imperial Prison Ship; Seyda Neen, Census and Excise Office.
+- Solstheim: not ready: open terrain: not in the game yet (Solstheim) 144.
+- Mournhold: not ready: none. Counted once, as open terrain: Mournhold, Godsreach; Mournhold, Great Bazaar; Mournhold, Plaza Brindisi Dorom; Mournhold, Royal Palace: Courtyard; Mournhold, Temple Courtyard.
 
 ### Exterior cells, per land
 
-The tracker draws the open world as one square per cell. "On CHIM" counts what a frame of the newest build's CHIM world owns; the audit columns count cells by their measured status ("done" is complete, awaiting lighting, passed or empty sea; every figure and definition: [what we count](CELL_TRACKER.md#what-we-count)). Eligible for v0.0.67: 1,390 of 1,390 cells.
+The tracker draws the open world as one square per cell. "On CHIM" counts what a frame of the newest build's CHIM world owns; the audit columns count cells by their measured status ("done" is complete, awaiting lighting, passed or empty sea; every figure and definition: [what we count](CELL_TRACKER.md#what-we-count)). Eligible for v0.0.68: 1,390 of 1,390 cells.
 
 | Land | On CHIM in the newest build | Done (audited) | Fully approved cells | Fully approved terrain | Awaiting lighting | Passed, something deferred | Not started |
 | :-- | --: | --: | --: | --: | --: | --: | --: |
@@ -83,21 +83,20 @@ None of Solstheim's land cells is on CHIM in this build.
 | :-- | --: | --: | --: | --: | --: | --: |
 | Vvardenfell | 1,123 | 1,121 | 2 | 0 | 0 | 0 |
 | Solstheim | 96 | 96 | 0 | 0 | 0 | 0 |
-| Mournhold | 93 | 87 | 0 | 0 | 5 | 1 |
-| No entrance area | 16 | 13 | 0 | 0 | 0 | 3 |
-| All | 1,328 | 1,317 | 2 | 0 | 5 | 4 |
+| Mournhold | 91 | 86 | 0 | 0 | 0 | 0 |
+| No entrance area | 18 | 18 | 0 | 0 | 0 | 0 |
+| All | 1,328 | 1,321 | 2 | 0 | 0 | 0 |
 
 This table counts every room of the door graph by the island its entrance is on, the districts among them. The Ready table above counts each room for its master's land, and the 5 districts a land presents as open terrain once, as open terrain; the rooms no door leads to are rooms still to build, not ready.
 
-Set aside: teleport only 1, no entrance, no script 3. Reasons (a room can have two): teleport only 1, unreachable 3.
 Rooms that are in the game as room maps of our own, not as CHIM rooms: Imperial Prison Ship; Seyda Neen, Census and Excise Office. The builder converts them from the original cells into regular Quake maps with the opening sequence's own markers, and counts them as in the game; they stay room maps until CHIM rooms keep object state.
 
-- Mournhold (Tribunal.esm): 87 of its 93 rooms are in the game on CHIM rooms; 5 not started yet.
+- Mournhold (Tribunal.esm): 86 of its 91 rooms are in the game on CHIM rooms; 0 not started yet.
 - Solstheim (Bloodmoon.esm): 96 of its 96 rooms are in the game on CHIM rooms; 0 not started yet.
 
 ### Scripting
 
-Counted from the MWScript tracker ([MWScript features](../MWSCRIPT_FEATURES.md)), measured 19 November 2026 for AmiWind v0.0.67 with the builder's own compiler: 934 of the 1,074 scripts the original game uses run as scripts or are carried by AmiWind's own code (925 run, 9 carried); 11,542 script records are bound to placed objects.
+Counted from the MWScript tracker ([MWScript features](../MWSCRIPT_FEATURES.md)), measured 20 November 2026 for AmiWind v0.0.68-dev1 with the builder's own compiler: 934 of the 1,074 scripts the original game uses run as scripts or are carried by AmiWind's own code (925 run, 9 carried); 11,542 script records are bound to placed objects.
 
 | State | Scripts |
 | :-- | --: |
@@ -115,6 +114,9 @@ Cells on CHIM (land + sea) in each ingested build since v0.0.49, from the tracke
 | Build | Built | Vvardenfell | Solstheim | Mournhold | All cells on CHIM |
 | :-- | --: | --: | --: | --: | --: |
 | v0.0.67 (2b086671) | 2026-11-18 | 1,292 + 116 | 0 + 1 | 11 + 0 | 1,420 |
+| v0.0.67 (ca71149) | 2026-11-18 | 1,292 + 116 | 0 + 1 | 11 + 0 | 1,420 |
+| v0.0.67 (bd761b88) | 2026-11-18 | 1,292 + 116 | 0 + 1 | 11 + 0 | 1,420 |
+| v0.0.67 (1246c429) | 2026-11-18 | 1,292 + 116 | 0 + 1 | 11 + 0 | 1,420 |
 | v0.0.67-dev3 (a375b13f) | 2026-11-18 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
 | v0.0.67-dev2 (0d6f7ab7) | 2026-11-17 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
 | v0.0.67-dev1 (eb5f8d83) | 2026-11-14 | 1,292 + 116 | 0 + 1 | 0 + 0 | 1,409 |
@@ -369,11 +371,14 @@ data without it, it counts by the same rules, and `tests/test_master_completion.
   edge are not counted. A cell is ready when the newest ingested build holds it on CHIM and no audit of it failed.
 - **Rooms** are every interior cell of the game, counted for the land of its master (Tribunal: Mournhold, Bloodmoon:
   Solstheim, the base game: Vvardenfell; a base-game room on Solstheim counts for Solstheim, and a room with no entrance
-  area counts for its master's land). A room is ready when it is in the game on CHIM rooms. A district a land presents
-  as open terrain (Mournhold's five districts) is counted once, under open terrain.
-- **Not ready** is everything else, each with its reason: a room map of our own (in the game, not on CHIM rooms),
-  converted but not in the game yet, not started, and a room no door leads to, which is a room still to build (with what
-  leads there: a script, a dialogue line, or nothing found), never left out of the count.
+  area counts for its master's land). A room is ready when it is in the game: on CHIM rooms, or as a room map of our
+  own. The room maps of our own are the **special interiors** (today the opening sequence's Imperial Prison Ship and
+  Seyda Neen, Census and Excise Office): they are ready, in the count, and named under it, from the rooms the data
+  holds in that state. A district a land presents as open terrain (Mournhold's five districts) is counted once, under
+  open terrain.
+- **Not ready** is everything else, each with its reason: converted but not in the game yet, not started, and a room no
+  door leads to, which is a room still to build (with what leads there: a script, a dialogue line, or nothing found),
+  never left out of the count.
 - The approval and lighting audit figures (fully approved cells and terrain, awaiting lighting, eligible for the next
   release) stay on the line under each land, apart from the readiness count.
 
@@ -384,8 +389,8 @@ data without it, it counts by the same rules, and `tests/test_master_completion.
 Under the view switch, the World Map has a **Completion per game** panel, Tribunal first, then Bloodmoon and Morrowind.
 For the chosen game it gives, by number, with every count opening the list behind it:
 
-1. **Cells and rooms:** the readiness count above, the rooms not ready by name and reason, and the districts counted as
-   open terrain.
+1. **Cells and rooms:** the readiness count above, the special interiors by name, the rooms not ready by name and
+   reason, and the districts counted as open terrain.
 2. **Scripts:** the game file's scripts by state (runs, carried by AmiWind's own code, uses a function the interpreter
    lacks, only in an add-on world, named by nothing), each by name, from the [MWScript tracker](../MWSCRIPT_FEATURES.md)
    with its states worked out again from the interpreter's function table; a script that lacks a function names it.

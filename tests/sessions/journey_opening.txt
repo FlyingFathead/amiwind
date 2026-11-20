@@ -12,6 +12,10 @@
 # entities and doors-census.txt (room units = the original's / 4), the courtyard and the street from doors-seyda.txt
 # and the courtyard barrel's frame-map entity (reference 172851). Item ids and the reward are the game's own
 # (engine/aga/src/aw_state.c AW_CaptainDuties: the directions, the package and 87 gold, A1_1_FindSpymaster 1).
+# ACCELERATED-PLAYTHROUGH-66 (17 November 2026): after a map change the session waits until the map is in play and
+# settled ("until loaded", tools/engine_smoke.py UNTIL-STEPS), never a fixed number of seconds; Sellus Gravius' journal
+# entry is waited for by its index ("until journal"). The load of part B's quicksave keeps its fixed wait: the old map
+# is still loaded under the menu, so a load condition could be met before the load starts.
 part A
 wait 8
 cmd developer 1
@@ -44,7 +48,7 @@ wait 40
 cmd aw_view walk off
 cmd map seyda
 waitfor map 90 intro_docks
-wait 10
+until loaded 60
 cmd dbg all on
 boxes
 cmd noclip
@@ -264,7 +268,7 @@ face 201.5 224 71
 aimed 119665
 key e
 waitfor map 45 sncourt
-wait 6
+until loaded 60
 boxes
 probe away_map state map
 # the door back into the back room is behind the arrival point
@@ -272,7 +276,7 @@ face 78 -175.5 66
 aimed 113864
 key e
 waitfor map 45 census
-wait 4
+until loaded 60
 boxes
 probe back_map state map
 # the same look at the same spot: the game's aim report lists the dagger's row switched off (taken), not back on
@@ -287,7 +291,7 @@ face 201.5 224 71
 aimed 119665
 key e
 waitfor map 45 sncourt
-wait 6
+until loaded 60
 boxes
 
 step 4 Fargoth's ring (the Engraved Ring of Healing, `ring_keley`) and Sellus Gravius: papers taken, the package given, the journal on, the reward once
@@ -307,7 +311,7 @@ face 155.8 -65.3 64
 aimed 113889
 key e
 waitfor map 45 census
-wait 4
+until loaded 60
 boxes
 probe gold_before player->getitemcount gold_001
 walkto 315 -95 20
@@ -327,6 +331,7 @@ shot a5-sellus-duties
 key Escape
 waitfor screen 8 game
 boxes
+until journal A1_1_FindSpymaster 1 15
 probe papers_sellus player->getitemcount "chargen statssheet"
 probe package_sellus player->getitemcount bk_a1_1_caiuspackage
 probe directions_sellus player->getitemcount bk_a1_1_directionscaiuscosades
@@ -362,7 +367,7 @@ face 292.7 -186 71
 aimed 119659
 key e
 waitfor server 45 seyda
-wait 8
+until loaded 60
 boxes
 probe release_map state map
 probe state_released aw_mwscript_status call getglobal CharGenState
@@ -400,7 +405,7 @@ face 242.6 10.3 61
 aimed 113833
 key e
 waitfor map 45 census
-wait 4
+until loaded 60
 boxes
 probe room_map state map
 # out by the courtyard door (119660), in again from the courtyard (113889), out by the exit door (119659): after the
@@ -412,14 +417,14 @@ face 291.3 -60.3 71
 aimed 119660
 key e
 waitfor map 45 sncourt
-wait 4
+until loaded 60
 boxes
 probe court_map state map
 face 155.8 -65.3 64
 aimed 113889
 key e
 waitfor map 45 census
-wait 4
+until loaded 60
 boxes
 walkto 286 -125 25
 walkto 285 -160 25
@@ -428,7 +433,7 @@ face 292.7 -186 71
 aimed 119659
 key e
 waitfor server 45 seyda
-wait 10
+until loaded 60
 probe list_back chim actors list
 expect has room_map census
 expect has court_map sncourt
@@ -525,7 +530,7 @@ face 242.6 10.3 61
 aimed 113833
 key e
 waitfor map 45 census
-wait 4
+until loaded 60
 probe door_to state map
 probe package_door player->getitemcount bk_a1_1_caiuspackage
 expect door_to != door_from

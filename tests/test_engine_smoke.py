@@ -6,6 +6,7 @@ here. These checks keep the scripts runnable and the steps that caught the dev3 
 """
 import contextlib
 import io
+import re
 import shutil
 import subprocess
 import sys
@@ -1194,6 +1195,95 @@ class LoadHangExperimentTests(unittest.TestCase):
                                  'jit_compiler = 1\ncpu_idle = 0\n' + want_lines, (warp, limit))
         # the readers of the result line still see PASS and FAIL with the mark at its end
         self.assertTrue(engine_smoke.WARP_MARK.startswith(' [warp run'))
+
+    UNTIL_STUBS = r'''K=1; N=0; Q=0
+mkdir -p $R/logs $R/awctl; : > $R/awctl/console.log
+sleep(){ N=$((N+1)); }
+alive(){ return 0; }
+key(){ :; }
+shot(){ :; }
+log(){ echo "$*" >> $R/logs/steps.log; }
+finish(){ echo "RESULT $*" >> $R/logs/steps.log; exit 0; }
+stall(){ echo "STALL $*" >> $R/logs/steps.log; exit 0; }
+'''
+
+    def run_until(self, scenario, call):
+        """The probe's walker block (the UNTIL-STEPS among it) in sh, with st/rc stubs on a fake clock (one sleep = one
+        second of game clock): steps.log afterwards."""
+        probe = engine_smoke.PROBE
+        block = probe[probe.index('# WALKER-STEPS-BEGIN'):probe.index('# WALKER-STEPS-END')]
+        with tempfile.TemporaryDirectory() as tmp:
+            r = Path(tmp)
+            done = subprocess.run(['sh', '-c', 'R=%s\n%s\n%s\n%s\n%s\n' % (r.as_posix(), self.UNTIL_STUBS, scenario, block,
+                                                                       call)],
+                                  capture_output=True, text=True, timeout=60)
+            self.assertEqual(done.returncode, 0, done.stderr)
+            return (r / 'logs' / 'steps.log').read_text(encoding='utf-8') if (r / 'logs' / 'steps.log').exists() else ''
+
+    def test_until_steps_wait_by_condition(self):
+        """ACCELERATED-PLAYTHROUGH-66 step 1 (17 November 2026): waits by condition instead of fixed seconds. until loaded
+        returns once the map is in play and its game clock moved 2 s with a frame under 100 ms (a message box on arrival
+        counts as in play); a map that never loads is examined as a stall; until journal asks getjournalindex until the
+        index is reached, and fails naming an unknown quest or the last index read; until map is waitfor map."""
+        if not shutil.which('sh'):
+            self.skipTest('a POSIX shell is required')
+        self.assertIn('until\\ *) set -- ${line#until }; until_step "$@";;', engine_smoke.PROBE)
+        arrive = r'''st(){ case "$1" in signon) [ $N -ge 2 ] && echo 4 || echo 2;; world_leafs) echo 620;;
+  screen) echo ${SCREEN:-game};; realtime) echo "$N";; frame_ms) [ $N -ge 4 ] && echo 20.0 || echo 100.0;;
+  map) echo maps/census.bsp;; esac; }'''
+        out = self.run_until(arrive, 'until_step loaded 30; echo done >> $R/logs/steps.log')
+        self.assertIn('until loaded: maps/census.bsp after 4 s (game clock 2 -> 4, frame 20.0 ms, screen game)', out)
+        self.assertIn('done', out)
+        out = self.run_until('SCREEN=messagebox\n' + arrive, 'until_step loaded 30')
+        self.assertIn('screen messagebox', out)
+        never = r'''st(){ case "$1" in signon) echo 2;; world_leafs) echo 0;; screen) echo menu;; realtime) echo "$N";;
+  frame_ms) echo 100.0;; map) echo none;; esac; }'''
+        out = self.run_until(never, 'until_step loaded 5')
+        self.assertIn('STALL the map did not load and settle in 5 s: screen menu, signon 2', out)
+        # a frame still at the cap is not settled, however long the clock ran
+        slow = arrive.replace('[ $N -ge 4 ] && echo 20.0 || echo 100.0', 'echo 100.0')
+        self.assertIn('STALL the map did not load and settle in 6 s', self.run_until(slow, 'until_step loaded 6'))
+        # until journal: asked until the index is reached, read from the console's answer line
+        answers = r'''st(){ case "$1" in map) echo maps/census.bsp;; screen) echo game;; esac; }
+rc(){ Q=$((Q+1)); [ $Q -ge ${READY:-2} ] && i=1 || i=0
+  echo "dbg mwscript call journal: A1_1_FindSpymaster $i" >> $R/awctl/console.log; }'''
+        out = self.run_until(answers, 'until_step journal a1_1_findspymaster 1 20')
+        self.assertRegex(out, r'until journal a1_1_findspymaster 1: index 1 after \d+ s')
+        out = self.run_until('READY=99\n' + answers, 'until_step journal A1_1_FindSpymaster 1 4')
+        self.assertIn("RESULT FAIL until journal A1_1_FindSpymaster 1: read '0' after 4 s", out)
+        unknown = r'''st(){ echo x; }
+rc(){ echo "dbg mwscript call journal QUEST [INDEX]: no such quest (the file must be loaded)" >> $R/awctl/console.log; }'''
+        out = self.run_until(unknown, 'until_step journal nosuchquest 1 10')
+        self.assertIn('RESULT FAIL until journal nosuchquest 1: dbg mwscript call journal QUEST [INDEX]: no such quest', out)
+        # until map / screen / server are the waitfor forms; an unknown condition stops the run
+        out = self.run_until(arrive, 'until_step map census 5')
+        self.assertIn('waitfor map census: after 0 s', out)
+        self.assertIn('RESULT FAIL until fly: not a condition', self.run_until(arrive, 'until_step fly 3'))
+
+    def test_every_session_file_uses_only_the_probes_words(self):
+        """Every line of tests/sessions/*.txt is a comment, a word the probe's script loop knows (read from the probe's own
+        dispatch), or a journey word (tools/journey_smoke.py): the probe skips any other line as a comment, so a mistyped
+        step would pass unseen. The journeys also parse (ACCELERATED-PLAYTHROUGH-66: keep every existing session working)."""
+        import journey_smoke
+        probe = engine_smoke.PROBE
+        loop = probe[probe.index('while IFS= read -r line <&3'):probe.index('done 3< $R/script.txt')]
+        words = set(re.findall(r'^\s+([a-z]+)(?:\\ \*)?\)', loop, re.M))
+        self.assertTrue({'cmd', 'wait', 'walkto', 'waitfor', 'until', 'state'} <= words, words)
+        journey_words = {'part', 'step', 'probe', 'pick', 'expect', 'emu'}
+        sessions = sorted(Path(engine_smoke.HERE.parent, 'tests', 'sessions').glob('*.txt'))
+        self.assertTrue(sessions)
+        for f in sessions:
+            text = f.read_text(encoding='utf-8')
+            is_journey = bool(re.search(r'^(part|step|expect) ', text, re.M))
+            if is_journey:
+                journey_smoke.parse(text)
+            for no, raw in enumerate(text.splitlines(), 1):
+                line = raw.strip()
+                if not line or line.startswith('#'):
+                    continue
+                word = line.split()[0]
+                allowed = words | {'emu'} | (journey_words if is_journey else set())
+                self.assertIn(word, allowed, '%s line %d: %r is no step word the probe knows' % (f.name, no, line))
 
     def test_frozen_clock_from_a_list_of_frames(self):
         judge = engine_smoke.judge_frames

@@ -1,5 +1,14 @@
 # ROOMS-SET-ASIDE-NOT-BUILT-67: Rooms that no door leads to are set aside and not built, although a script, a teleport or travel can lead there
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.67 at 2026-11-19 22:40 +0200: In the v0.0.67 image every interior cell of the three game files is built except four cells that hold no scenery (one with a single person, three with nothing); rooms that no door leads to are built in their parity batches.
+- Reported with v0.0.67 at 2026-11-20 13:52 +0200: Seen in play on the rooms image on 19 November 2026: the four rooms without scenery load by their names, show their person, and come back after a save, a leave and a load.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -34,6 +43,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-19: reported in v0.0.67
 - 2026-11-19: fixed in source: a gated commit, v0.0.67 (bd09b8ed); gate 11981 of the planning item ROOMS-SET-ASIDE-NOT-BUILT-67: Every room of the three masters is in the build plan and none is set aside; the four cells the game data leaves empty are built as empty rooms with a teleport-picker link; the tracker shows districts and door-less rooms as they are.
 - 2026-11-19 22:40 +0200: seen again in v0.0.67: In the v0.0.67 image every interior cell of the three game files is built except four cells that hold no scenery (one with a single person, three with nothing); rooms that no door leads to are built in their parity batches.
+- 2026-11-20 13:52 +0200: seen again in v0.0.67: Seen in play on the rooms image on 19 November 2026: the four rooms without scenery load by their names, show their person, and come back after a save, a leave and a load.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -122,5 +132,8 @@ Related bugs in other categories:
 
 - [DOOR-GRAPH-CELL-TEST-AS-TELEPORT-67](DOOR-GRAPH-CELL-TEST-AS-TELEPORT-67.md): The door graph marks two Tribunal cells as reached by script because a script tests the player's cell name, although nothing moves the player there
 - [ROOM-ARRIVAL-FLOODED-ON-ROOF-67](ROOM-ARRIVAL-FLOODED-ON-ROOF-67.md): Arriving in a flooded room puts the player on top of the room instead of in its water (Sotha Sil, Outer Flooded Halls)
+- [ROOM-ARRIVAL-STAND-NO-SPOT-67](ROOM-ARRIVAL-STAND-NO-SPOT-67.md): About 146 room arrivals still find no place to set the player down (flooded rooms closed above, markers inside solid geometry)
+- [ROOM-EMPTY-START-ON-REFERENCES-67](ROOM-EMPTY-START-ON-REFERENCES-67.md): The start of a room without scenery is the middle of the box around its references: the player lands on a person or falls
+- [TRACKER-ROOM-MAPS-NOT-READY-67](TRACKER-ROOM-MAPS-NOT-READY-67.md): The progress tracker counts the two opening rooms (the prison ship and the Census and Excise Office) as not ready although both are in the game
 
 <!-- END GENERATED CATEGORY -->

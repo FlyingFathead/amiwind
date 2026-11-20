@@ -348,6 +348,12 @@ def header(ctx):
                                            ' (not made: the build stopped before its first stage)'))
         if (ctx.run / 'FAILURE.md').is_file() and not ctx.foreign:
             lines.append('Short form: %s (the failure page the Toolkit Monitor shows)' % ctx.path(ctx.run / 'FAILURE.md'))
+    if ctx.status == 'failed':
+        # what to do now, as the build printed it last (BUILD-OOM-HELP-AND-TIP-68)
+        try:
+            lines += [''] + [ctx.path(line) for line in tip_lines(ctx)]
+        except Exception as exc:  # noqa: BLE001 - the advice never hides the report
+            lines.append('What to do now: not written (%s)' % type(exc).__name__)
     lines += [''] + environment(ctx)
     lines += ['',
               'This file stays on this computer: nothing is sent anywhere. Send it when you ask for help with this '
@@ -357,14 +363,17 @@ def header(ctx):
     return lines
 
 
-def environment(ctx):
-    """The short environment summary under the result (BUILD-REPORT-MACHINE-ALL-OS-67); a line that cannot be read
-    says so in its place."""
+def environment(ctx, start=False):
+    """The short environment summary under the result (BUILD-REPORT-MACHINE-ALL-OS-67), with the swap and the memory
+    peaks (BUILD-OOM-HELP-AND-TIP-68); a line that cannot be read says so in its place. START: the block the build
+    prints at its start (start_lines), without the peaks."""
     rows = (('Operating system', system_text), ('Container', container), ('Python', python_text),
-            ('Cores', lambda: cores_text(ctx)), ('Memory', memory_text),
-            ('Free space', lambda: '%s in the workspace, %s in the temp folder' % (free_text(ctx.workspace),
-                                                                                  free_text(temp_folder()))))
-    lines = ['Environment (parts 3 and 5 have the details):']
+            ('Cores', lambda: cores_text(ctx)), ('Memory', memory_text), ('Swap', swap_text)) + (
+        () if start else (('Memory peak', lambda: memory_peak_text(ctx)),)) + (
+        ('Free space', lambda: '%s in the workspace, %s in the temp folder' % (free_text(ctx.workspace),
+                                                                              free_text(temp_folder()))),)
+    lines = ['Machine at the start of the build (a failed build\'s report has it again):' if start else
+             'Environment (parts 3 and 5 have the details):']
     for title, read in rows:
         try:
             value = read()
@@ -869,7 +878,8 @@ def _mac_memory(run):
     return int(total), None, 'sysctl hw.memsize; vm_stat did not answer'
 
 
-def _windows_memory(kernel32=None):
+def _windows_status(kernel32=None):
+    """(MEMORYSTATUSEX, None) from GlobalMemoryStatusEx, or (None, why)."""
     import ctypes
 
     class Status(ctypes.Structure):          # MEMORYSTATUSEX
@@ -881,9 +891,16 @@ def _windows_memory(kernel32=None):
     try:
         kernel32 = kernel32 or ctypes.windll.kernel32
         if not kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
-            return None, None, 'GlobalMemoryStatusEx did not answer'
+            return None, 'GlobalMemoryStatusEx did not answer'
     except (AttributeError, OSError) as exc:
-        return None, None, 'GlobalMemoryStatusEx not reached (%s)' % type(exc).__name__
+        return None, 'GlobalMemoryStatusEx not reached (%s)' % type(exc).__name__
+    return status, None
+
+
+def _windows_memory(kernel32=None):
+    status, why = _windows_status(kernel32)
+    if status is None:
+        return None, None, why
     return int(status.ullTotalPhys), int(status.ullAvailPhys), 'GlobalMemoryStatusEx'
 
 
@@ -899,6 +916,91 @@ def memory_text(system=None, **readers):
         if limit and limit.isdigit() and int(limit) < total:
             text += ', container limit %s' % _size(int(limit))
     return text + ' (%s)' % how
+
+
+SWAP_UNITS = {'K': 1 << 10, 'M': 1 << 20, 'G': 1 << 30, 'T': 1 << 40}
+
+
+def swap(system=None, read=None, run=None, kernel32=None):
+    """(total, free, how) in bytes of the machine's swap (BUILD-OOM-HELP-AND-TIP-68): Linux /proc/meminfo SwapTotal and
+    SwapFree, macOS sysctl vm.swapusage, Windows the page files (GlobalMemoryStatusEx: the commit limit less the
+    physical memory); (None, None, why) where nothing answers. READ, RUN and KERNEL32 stand in for the file reader,
+    subprocess.run and the Windows kernel in tests."""
+    system = system or platform.system()
+    if system == 'Linux':
+        found = {}
+        for row in ((read or _read)('/proc/meminfo') or '').splitlines():
+            key, _, value = row.partition(':')
+            if key in ('SwapTotal', 'SwapFree'):
+                try:
+                    found[key] = int(value.split()[0]) * 1024
+                except (ValueError, IndexError):
+                    pass
+        if 'SwapTotal' in found:
+            return found['SwapTotal'], found.get('SwapFree'), '/proc/meminfo'
+        return None, None, '/proc/meminfo did not answer'
+    if system == 'Darwin':
+        try:
+            done = (run or subprocess.run)(['sysctl', '-n', 'vm.swapusage'], capture_output=True, text=True,
+                                           errors='replace', timeout=MEMORY_SECONDS, stdin=subprocess.DEVNULL)
+            text = done.stdout if done.returncode == 0 else ''
+        except (OSError, subprocess.SubprocessError):
+            text = ''
+        values = {name: re.search(r'\b%s = ([0-9.]+)([KMGT])' % name, text) for name in ('total', 'free')}
+        if values['total']:
+            def size(found):
+                return int(float(found.group(1)) * SWAP_UNITS[found.group(2)]) if found else None
+            return size(values['total']), size(values['free']), 'sysctl vm.swapusage'
+        return None, None, 'sysctl vm.swapusage did not answer'
+    if system == 'Windows':
+        status, why = _windows_status(kernel32)
+        if status is None:
+            return None, None, why
+        total = max(0, int(status.ullTotalPageFile) - int(status.ullTotalPhys))
+        free = max(0, int(status.ullAvailPageFile) - int(status.ullAvailPhys))
+        return total, min(free, total), 'GlobalMemoryStatusEx: the commit limit less the physical memory'
+    return None, None, 'no swap reader for %s' % system
+
+
+def swap_text(system=None, cgroup=None, **readers):
+    """The swap line: its total and what is free, or none; on Linux also a container's own swap limit (cgroup
+    memory.swap.max, CGROUP(path) stands in for the file in tests)."""
+    system = system or platform.system()
+    total, free, how = swap(system, **readers)
+    if total is None:
+        text = 'Not available (%s)' % how
+    elif total == 0:
+        text = 'none (%s)' % how
+    else:
+        text = '%s total, %s (%s)' % (_size(total), '%s free' % _size(free) if free is not None else 'free not read', how)
+    if system == 'Linux':
+        limit = (cgroup or (lambda path: _cgroup(path)))('/sys/fs/cgroup/memory.swap.max')
+        if limit == '0':
+            text += '; the container allows no swap (cgroup memory.swap.max 0)'
+        elif limit and limit.isdigit():
+            text += '; container swap limit %s' % _size(int(limit))
+    return text
+
+
+def memory_peak_text(ctx):
+    """The build's memory peak beside the memory it saw, and the failed stage's peak with its largest process
+    (tools/build_failure.py build_memory_seen and stage_memory; BUILD-OOM-HELP-AND-TIP-68)."""
+    import build_failure
+    seen = build_failure.build_memory_seen(ctx.run) if ctx.run is not None else {}
+    parts = []
+    if seen.get('peak'):
+        parts.append('%s of the %s the build saw (%s)%s' % (
+            _size(seen['peak']), _size(seen['limit']), seen['source'],
+            ', with %s running' % ', '.join(seen['peak_stages']) if seen.get('peak_stages') else ''))
+    elif seen:
+        parts.append('not recorded; the build saw %s (%s)' % (_size(seen['limit']), seen['source']))
+    for step in ctx.failed_stages():
+        name = str(step.get('name'))
+        found = build_failure.stage_memory(ctx.run, name, ctx.workspace)
+        if found:
+            parts.append('the failed stage %s reached %s, its largest process %s (%s)' % (
+                name, _size(found['peak']), _size(found['largest']), found['source']))
+    return '; '.join(parts) if parts else 'not recorded (the build kept no memory figures)'
 
 
 def free_text(folder):
@@ -921,8 +1023,36 @@ def temp_folder():
 def machine(ctx):
     temp = temp_folder()
     return ['Operating system: ' + system_text(), 'Cores: ' + cores_text(ctx), 'Memory: ' + memory_text(),
+            'Swap: ' + swap_text(), 'Memory peak: ' + memory_peak_text(ctx),
             'Free space in the workspace: ' + free_text(ctx.workspace),
             'Free space in the temp folder (%s): %s' % (ctx.path(temp), free_text(temp))]
+
+
+def start_lines(args, root=None):
+    """The machine block a build prints at its start (BUILD-OOM-HELP-AND-TIP-68): the environment summary's lines, so a
+    build that is ended without a report (the whole build killed for memory) still has them in its log. Never raises."""
+    try:
+        from types import SimpleNamespace
+        workspace = Path(getattr(args, 'workspace', None) or (Path(root or ROOT) / 'out'))
+        paths = Paths(workspace, root or ROOT)
+        return environment(SimpleNamespace(args=args, workspace=workspace, path=paths.text), start=True)
+    except Exception as exc:  # noqa: BLE001 - the start lines never stop the build
+        return ['Machine at the start of the build: not read (%s)' % type(exc).__name__]
+
+
+def tip_lines(ctx):
+    """The block a failed build ends with (tools/build_failure.py tip_lines), at the top of the report: from the run's
+    failure record, else from the builder's own error."""
+    import build_failure
+    rec = None
+    if ctx.run is not None and not ctx.foreign:
+        rec = build_failure._read_record(ctx.run)
+    argv = [str(part) for part in getattr(ctx.args, '_argv', None) or []]
+    report = getattr(ctx, 'report_file', None)
+    if rec is not None:
+        return build_failure.tip_lines(rec, ctx.run, ctx.workspace, argv=argv, live=True, report=report)
+    return build_failure.tip_lines(build_failure.bare_record(ctx.error, argv), None, ctx.workspace, argv=argv,
+                                   live=True, report=report)
 
 
 def stage_plan(ctx):
@@ -1038,6 +1168,7 @@ def write(args, status, error=None, metadata=None, steps=None, factory=None, roo
         ctx = Context(args, status, error, metadata, steps, factory, root, version, result, code)
         name = ctx.name or fallback_name(version)
         path = report_path(ctx.workspace, name)
+        ctx.report_file = path
         text = render(ctx)
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary = path.with_name(path.name + '.tmp')

@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.61 at 2026-11-07 02:34 +0200: Dreamers stand on the roads from the start of a new game (the maintainer's play); cause: the global script Main never ran, so its run-once Startup never disabled them
 - Reported with v0.0.67-dev2 at 2026-11-18 (time not recorded): Seen again with the v0.0.67-dev2 engine (8aa02cf3) on the v0.0.67-dev1 image: after a teleport inside Seyda Neen (the scene spawns again), the actor sweep names two Dreamers (`Dreamer_Talker04`, `Dreamer_Talker05`) and the Argonian of the opening (`agronian guy`) as disabled by a script but drawn. After the first spawn, the test character preset and a save loaded in place, the sweep finds no such actor.
+- Reported with v0.0.67 at 2026-11-20 13:57 +0200: Seen in play on the respin image 1246c42 on 19 November 2026: people a script keeps out of the world stay hidden after a load of the map in play.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -47,13 +48,14 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-07: shipped: a numbered build, v0.0.62-dev1 build 2026_11_07_v0.0.62-dev1_full-v0.0.62-dev1_089421b; the delivered build: the build holds b998cb2d
 - 2026-11-07 02:34 +0200: seen again in v0.0.61: Dreamers stand on the roads from the start of a new game (the maintainer's play); cause: the global script Main never ran, so its run-once Startup never disabled them
 - 2026-11-18: seen again in v0.0.67-dev2: Seen again with the v0.0.67-dev2 engine (8aa02cf3) on the v0.0.67-dev1 image: after a teleport inside Seyda Neen (the scene spawns again), the actor sweep names two Dreamers (`Dreamer_Talker04`, `Dreamer_Talker05`) and the Argonian of the ...
+- 2026-11-20 13:57 +0200: seen again in v0.0.67: Seen in play on the respin image 1246c42 on 19 November 2026: people a script keeps out of the world stay hidden after a load of the map in play.
 
 <!-- END GENERATED TIMELINE -->
 
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Symptom](#symptom)
 - [Where](#where)

@@ -1,5 +1,14 @@
 # DISTRICT-GATE-ON-CELL-BORDER-67: Godsreach's gate to Plaza Brindisi Dorom cannot be used: it stands on the border of the district's two cells, in the door table of the cell the player does not stand in
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.67-dev3 at 2026-11-19 11:35 +0200: Seen again on the third development snapshot of v0.0.67: from Godsreach's arrival the gate to Plaza Brindisi Dorom, a few steps away across the district's inner cell border, cannot be used; the use key finds no door and nothing loads.
+- Reported with v0.0.67 at 2026-11-20 13:18 +0200: Seen in play on the release image 2b086671 on 19 November 2026: the gate of Godsreach to the Plaza is found by the use key and its arrival is placed on the floor.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -27,6 +36,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 - 2026-11-18: reported in v0.0.67-dev2
 - 2026-11-19 11:35 +0200: seen again in v0.0.67-dev3: Seen again on the third development snapshot of v0.0.67: from Godsreach's arrival the gate to Plaza Brindisi Dorom, a few steps away across the district's inner cell border, cannot be used; the use key finds no door and nothing loads.
+- 2026-11-20 13:18 +0200: seen again in v0.0.67: Seen in play on the release image 2b086671 on 19 November 2026: the gate of Godsreach to the Plaza is found by the use key and its arrival is placed on the floor.
 
 <!-- END GENERATED TIMELINE -->
 

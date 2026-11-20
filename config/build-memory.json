@@ -1,0 +1,33 @@
+{
+ "schema": "amiwind-build-memory-1",
+ "about": "The memory the stages of a whole build reached, measured in a from-scratch build of the whole game (its build-profile.json: peak_bytes = the stage's process tree at its peak, largest_process_bytes = its largest single process, workers = the most workers it ran). A failed build reads it when neither this build nor an earlier build of its workspace measured the stage (tools/build_failure.py, the advice a build prints when it stops for memory): a stage whose largest process holds most of its peak is not helped by fewer workers. Stages under 1 GiB are left out. Measurements, not limits: nothing is built from this file, so no stage key reads it.",
+ "measured_in": "the v0.0.66 from-scratch build of the whole game (16 November 2026, --jobs 20, 48 GiB given)",
+ "measured_in_short": "the v0.0.66 from-scratch build",
+ "build": "2026_11_16_v0.0.66-dev12_full-v0.0.66-from-scratch-release-check-the-plain-builder-command_ac37e80",
+ "build_wall_seconds": 37380.2,
+ "build_peak_bytes": 46922517709,
+ "build_peak_note": "the build's memory in use at its peak, the file cache not counted (build-progress.json), with the stages chim and chim-room-batches running side by side",
+ "build_peak_stages": ["chim", "chim-room-batches"],
+ "stages": {
+  "actor-library": {"peak_bytes": 29024219136, "largest_process_bytes": 1563533312, "workers": 10, "wall_seconds": 8495.5},
+  "chim": {"peak_bytes": 26948403200, "largest_process_bytes": 25867624448, "workers": 10, "wall_seconds": 23455.1},
+  "image": {"peak_bytes": 20059922432, "largest_process_bytes": 9684430848, "workers": 20, "wall_seconds": 3017.0},
+  "chim-room-batches": {"peak_bytes": 18651406336, "largest_process_bytes": 1911230464, "workers": 20, "wall_seconds": 33623.7},
+  "chim-interiors": {"peak_bytes": 9603035136, "largest_process_bytes": 4056100864, "workers": 20, "wall_seconds": 258.5},
+  "balmora-interiors": {"peak_bytes": 7405576192, "largest_process_bytes": 1523458048, "workers": 9, "wall_seconds": 2585.9},
+  "chim-town-seyda": {"peak_bytes": 7172341760, "largest_process_bytes": 6415245312, "workers": 5, "wall_seconds": 251.5},
+  "chim-rooms-vivec_city": {"peak_bytes": 7038930944, "largest_process_bytes": 1547698176, "workers": 6, "wall_seconds": 6107.3},
+  "chim-town-vivec_city": {"peak_bytes": 6270738432, "largest_process_bytes": 1096327168, "workers": 10, "wall_seconds": 1105.6},
+  "area": {"peak_bytes": 5031452672, "largest_process_bytes": 1518100480, "workers": 6, "wall_seconds": 1223.7},
+  "intro": {"peak_bytes": 4761497600, "largest_process_bytes": 506896384, "workers": 20, "wall_seconds": 116.1},
+  "chim-town-balmora": {"peak_bytes": 4585975808, "largest_process_bytes": 789647360, "workers": 7, "wall_seconds": 530.9},
+  "player-view": {"peak_bytes": 3435921408, "largest_process_bytes": 582045696, "workers": 7, "wall_seconds": 16910.8},
+  "hand-catalog": {"peak_bytes": 2876444672, "largest_process_bytes": 617263104, "workers": 5, "wall_seconds": 302.0},
+  "character": {"peak_bytes": 2797178880, "largest_process_bytes": 409296896, "workers": 5, "wall_seconds": 166.9},
+  "census": {"peak_bytes": 2365431808, "largest_process_bytes": 417890304, "workers": 20, "wall_seconds": 15.3},
+  "seam-audit": {"peak_bytes": 2042548224, "largest_process_bytes": 366247936, "workers": 10, "wall_seconds": 104.7},
+  "interior": {"peak_bytes": 2023174144, "largest_process_bytes": 413925376, "workers": 20, "wall_seconds": 27.5},
+  "media": {"peak_bytes": 1518964736, "largest_process_bytes": 543645696, "workers": 19, "wall_seconds": 114.6},
+  "world-survey": {"peak_bytes": 1224839168, "largest_process_bytes": 985255936, "workers": 5, "wall_seconds": 86.1}
+ }
+}

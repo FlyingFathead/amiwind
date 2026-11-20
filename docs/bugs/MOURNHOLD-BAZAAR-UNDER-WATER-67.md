@@ -1,5 +1,14 @@
 # MOURNHOLD-BAZAAR-UNDER-WATER-67: Mournhold's Great Bazaar is under water: the player arrives and walks below a water surface, with the breath bar on, and drowns
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.67-dev3 at 2026-11-19 12:03 +0200: Seen again on the third development snapshot of v0.0.67, with the cause narrowed: the teleport's point and the Plaza door's arrival lie a few units inside the Bazaar's frame, right beside the gate to Plaza Brindisi Dorom; under that point the arrival finds no street in its own frame and sets the player on the gate's model, about 126 units above the road, which is there below. Both doors into the Bazaar from the neighbouring districts could not be used from where a player stands in front of them, so the Bazaar cannot be entered by its doors either.
+- Reported with v0.0.67 at 2026-11-20 13:15 +0200: Seen in play on the release image 2b086671 on 19 November 2026: the teleport to the Great Bazaar and the arrivals through the Plaza, Temple courtyard and Godsreach gates set the player down on the street, steady after four seconds.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -37,6 +46,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-18 18:05 +0200: v0.0.67-dev2: The arrival read second by second on the same test image: one second after the teleport by the district's name the eye is at frame-local -53 (the street is at 74) and it stays there: the player is set down low at once, he does not fall.
 - 2026-11-19: fixed in source: a gated commit, v0.0.67 (cd16e141); gate 11843 of the planning item MOURNHOLD-BAZAAR-UNDER-WATER-67: A teleport whose first landing is far under its asked height searches at the asked point at once and takes a higher spot beside it only when no other exists: dbg tp greatbazaar lands on the street (the cause was the Plaza gate wall beside ...
 - 2026-11-19 12:03 +0200: seen again in v0.0.67-dev3: Seen again on the third development snapshot of v0.0.67, with the cause narrowed: the teleport's point and the Plaza door's arrival lie a few units inside the Bazaar's frame, right beside the gate to Plaza Brindisi Dorom; under that point ...
+- 2026-11-20 13:15 +0200: seen again in v0.0.67: Seen in play on the release image 2b086671 on 19 November 2026: the teleport to the Great Bazaar and the arrivals through the Plaza, Temple courtyard and Godsreach gates set the player down on the street, steady after four seconds.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -71,6 +81,8 @@ Family: Scene changes, arrivals and handoffs (`transitions-arrivals`). Cell, reg
 - [LOAD-FATAL-ERRORS-67](LOAD-FATAL-ERRORS-67.md): Memory that runs out or a damaged map file while a place loads ends the game instead of going back where the player was
 - [PUNCH-3P-HEART-CHAMBER-67](PUNCH-3P-HEART-CHAMBER-67.md): After a teleport to the Heart Chamber the player's punch at a dreamer does not land or does not show in third-person view; in first person it works
 - [ROOM-ARRIVAL-FLOODED-ON-ROOF-67](ROOM-ARRIVAL-FLOODED-ON-ROOF-67.md): Arriving in a flooded room puts the player on top of the room instead of in its water (Sotha Sil, Outer Flooded Halls)
+- [ROOM-ARRIVAL-STAND-NO-SPOT-67](ROOM-ARRIVAL-STAND-NO-SPOT-67.md): About 146 room arrivals still find no place to set the player down (flooded rooms closed above, markers inside solid geometry)
+- [ROOM-EMPTY-START-ON-REFERENCES-67](ROOM-EMPTY-START-ON-REFERENCES-67.md): The start of a room without scenery is the middle of the box around its references: the player lands on a person or falls
 - SEYDA-TRANSITION-29 (no report page): v0.0.29-dev1: Cell/sub-cell passage problems around Seyda Neen
 - [TP-BAZAAR-ARRIVAL-UNDER-FLOOR-67](TP-BAZAAR-ARRIVAL-UNDER-FLOOR-67.md): The teleport to Mournhold's Great Bazaar leaves the player under the district's floor, in water
 - [TRANSITION-EQUIPMENT-29](TRANSITION-EQUIPMENT-29.md): Carried torch blinks out on cell/sub-cell arrival

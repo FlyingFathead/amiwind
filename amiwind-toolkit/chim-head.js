@@ -152,14 +152,18 @@
   // expansion-views.js readiness()), every land gets the same row: open terrain ready, rooms ready, total ready, then one row
   // for all lands together. The approval and lighting audit figures stay, on the line under the land, apart from the count.
   const READY_LABELS = {vvardenfell: 'Vvardenfell (main game)', solstheim: 'Solstheim (Bloodmoon DLC)', mournhold: 'Mournhold (Tribunal DLC)'};
+  const SPECIAL_TEXT = 'special interiors, in the game as room maps of our own';   // as expansion-views.js SPECIAL_TEXT
   const figText = f => fmt(f.ready) + ' of ' + fmt(f.total) + ' (' + (+f.percent).toFixed(1) + ' %)';
   const readyCounts = x => 'open terrain ready <b>' + figText(x.terrain) + '</b> · rooms ready <b>' + figText(x.rooms) + '</b> · total ready <b>' + figText(x.total) + '</b>';
   function notReadyText(land) {
     const part = (name, p) => ((p && p.not_ready) || []).map(r => name + ' ' + r.label + ' ' + fmt(r.count));
     const bits = part('open terrain:', land.terrain).concat(part('rooms:', land.rooms));
     const asT = (land.rooms && land.rooms.as_terrain) || [];
+    // the special interiors are ready rooms (in the count), named from the data, never a reason (TRACKER-ROOM-MAPS-NOT-READY-67)
+    const special = (land.rooms && land.rooms.special) || [];
     return (bits.length ? 'not ready: ' + bits.join(' · ') : 'not ready: none') +
-      (asT.length ? ' · ' + fmt(asT.length) + ' district' + (asT.length === 1 ? '' : 's') + ' counted once, as open terrain' : '');
+      (asT.length ? ' · ' + fmt(asT.length) + ' district' + (asT.length === 1 ? '' : 's') + ' counted once, as open terrain' : '') +
+      (special.length ? ' · ' + SPECIAL_TEXT + ': ' + special.join('; ') : '');
   }
   function readinessRow(land, isl, release) {
     const audit = isl && isl.cells ? '<span class="chimdetail">audits (open terrain): ' + FULL_CELLS + ' ' + fmt(isl.complete) + ' · ' + FULL_TERRAIN + ' ' + fmt(isl.terrain_complete) +

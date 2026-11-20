@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.67 (19 November 2026)._
+_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.68-dev1: first snapshot of v0.0.68, 20 November 2026](#v0068-dev1-first-snapshot-of-v0068-20-november-2026)
 - [v0.0.67: Tribunal Introduced, 19 November 2026](#v0067-tribunal-introduced-19-november-2026)
 - [v0.0.67-dev3: third snapshot of v0.0.67, 19 November 2026](#v0067-dev3-third-snapshot-of-v0067-19-november-2026)
 - [v0.0.67-dev2: second snapshot of v0.0.67, 17 November 2026](#v0067-dev2-second-snapshot-of-v0067-17-november-2026)
@@ -207,6 +208,51 @@ _Last updated with AmiWind v0.0.67 (19 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.68-dev1: first snapshot of v0.0.68, 20 November 2026
+
+The first development snapshot of v0.0.68, in development ([release notes](releases/notes/RELEASE-v0.0.68-dev1.md)). The
+version has no title yet, and this snapshot is not Solstheim: that is the line's work, in progress on its own branches
+([roadmap](ROADMAP.md)). The game is the one of v0.0.67; what changed is in the builder, the tracker and the tools.
+Emulator presets: `AmiWind-v0.0.68-dev1-FS-UAE.fs-uae` and `AmiWind-v0.0.68-dev1-WinUAE.uae`, both with 32 MB of Fast
+RAM. The changes are covered by the test suite and the gate; none changes the game in play, so none was seen in play.
+
+**Fixed**
+
+- The progress tracker counts the Imperial Prison Ship and Seyda Neen, Census and Excise Office, which are in the game as
+  room maps of their own, as ready, and lists them as special interiors under the land's count: Vvardenfell's rooms are
+  1,131 of 1,131, Solstheim's 101 of 101 and Mournhold's 91 of 91. The Toolkit's completion panel and the
+  [CHIM progress tracker](chim/PROGRESS_TRACKER.md) show them the same way
+  ([TRACKER-ROOM-MAPS-NOT-READY-67](bugs/TRACKER-ROOM-MAPS-NOT-READY-67.md)).
+
+**Builder and tools**
+
+- A build that stops, for memory or anything else, ends with a plain block: why it stopped, that the finished work is
+  kept, the exact command that continues from the same build folder, and what to try for that cause. The block also opens
+  the build report and the failure page, and a build cancelled with Ctrl+C ends with the command that continues it. The
+  build guide has a section on it ([the build stopped or ran out of memory: what now?](LINUX_BUILD.md#the-build-stopped-or-ran-out-of-memory-what-now);
+  [building and playing](BUILDING_AND_PLAYING.md)), with the memory each large stage reached in the v0.0.66 from-scratch
+  build and `config/build-memory.json` as the reference figures (BUILD-OOM-HELP-AND-TIP-68).
+- The build report gains the machine's swap, the build's memory peak beside the memory it had and the failed stage's
+  peak with its largest process; the machine block (cores, memory, swap, free space) is printed at the start of every
+  build.
+- The session language waits by condition: `until map`, `until screen`, `until server`, `until loaded` and `until journal`
+  replace fixed waits in the automated playthroughs, and the opening journey uses them
+  ([FS-UAE development access](FS-UAE-DEVELOPMENT.md), [the game recorder](GAME_RECORDER.md); ACCELERATED-PLAYTHROUGH-66).
+- The private word, instruction file and channel lists left the public tree, and the public-text tests' own comments no
+  longer name the words they forbid ([PUBLIC-GUARD-SPELLS-TOOL-NAMES-67](bugs/PUBLIC-GUARD-SPELLS-TOOL-NAMES-67.md)).
+- The bug tracker records the faults, sightings and fixes of 20 November: the flooded-room arrival
+  (ROOM-ARRIVAL-FLOODED-ON-ROOF-67), the water level reads and drowning of Old Mournhold's sewers
+  (GETWATERLEVEL-COLUMN-NOT-ROOM-67, ACTOR-DROWNING-NOT-CARRIED-67), the release route's upload step
+  (ROUTE-UPLOAD-AFTER-PUSH-67), the progress tracker's unreadable inputs (CELL-PROGRESS-SOURCE-UNREADABLE-SILENT-67), the
+  performance database's missing import times (PERF-DB-CHIMPORT-NO-WALL-67) and the register's concurrent write
+  (REGISTER-CONCURRENT-WRITE-LOST-67); see [the bug tracker](BUGS.md).
+
+**Documentation**
+
+- The README, the roadmap and the build pages name the v0.0.68-dev1 presets and the build stop help; the roadmap lists
+  the debug arena's custom play mode, the debug teleport's note for a water arrival, the build's memory plan and the move
+  of the early studies into their own folder as planned work.
 
 ## v0.0.67: Tribunal Introduced, 19 November 2026
 

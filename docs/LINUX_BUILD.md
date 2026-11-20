@@ -1,6 +1,6 @@
 # Build AmiWind on Linux
 
-_Last updated with AmiWind v0.0.67-dev3 (18 November 2026)._
+_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -12,6 +12,7 @@ _Last updated with AmiWind v0.0.67-dev3 (18 November 2026)._
 - [3. Check, then build](#3-check-then-build)
   - [Early checks](#early-checks)
   - [When a build fails](#when-a-build-fails)
+  - [The build stopped or ran out of memory: what now?](#the-build-stopped-or-ran-out-of-memory-what-now)
 - [4. Boot your private image](#4-boot-your-private-image)
 - [Rebuilding only the first NPC slice](#rebuilding-only-the-first-npc-slice)
 - [Repeatable conversion choices](#repeatable-conversion-choices)
@@ -352,16 +353,18 @@ first failed stage and records the command, timing and log path in
 `../amiwind-local/build/first-town/build-state.json`. Stage logs are in `logs/`.
 A failed build also writes `FAILURE.md` (and the same as data in `failure.json`)
 in the run folder, the one failure page, and prints it at the end of its output:
-first the failure's kind when it ran out of memory or disk ([below](#when-a-build-fails)),
-then the failed stage, its exit, its error lines, the traceback (a stage's own Python
+first what to do now (the block the build also ends with:
+[what now](#the-build-stopped-or-ran-out-of-memory-what-now)), the failure's kind when it ran out of memory or disk
+([below](#when-a-build-fails)), then the failed stage, its exit, its error lines, the traceback (a stage's own Python
 process prints the traceback of the error it stops on into its log), the last 60
 lines of the stage's log, what was not completed (the stages not started or
 cancelled with it, the units it refused or left out), the settings the build ran
 with (its options as given, `build-recipe.json` with every option's value, the
 builder and its masters, the data folder, the `AMIWIND_` settings the failed
 stage read), the run's commit, the name of the full build report (below) and the
-command that builds again from the run with `--reuse-from`. The build's last
-line names the page (`Failure details: .../FAILURE.md`). The Toolkit Monitor
+command that builds again from the run with `--reuse-from`. After the page, one
+line names it (`Failure details: .../FAILURE.md`) and the block of what to do now
+comes last, as the build's very last lines. The Toolkit Monitor
 links it under Progress ([Monitor](AMIWIND_TOOLKIT.md#monitor)).
 `python3 tools/build_failure.py RUN --print` writes the page again for a failed
 run, an earlier builder's included; `--out DIR` writes it into another folder and
@@ -448,14 +451,19 @@ A failed build writes one report, `logs/BUILD-REPORT-<run>.txt` in the build wor
    tool against the recorded reference, and whether the build ran in a container;
 4. the game data: each master and archive with its size, SHA-256 and the known copy it matches, so two copies of the
    game are told apart;
-5. the machine: operating system, cores, memory and the free space of the workspace and the temp folder;
+5. the machine: operating system, cores, memory, swap, the memory peaks (the build's own beside the memory it had, and
+   the failed stage's with its largest process) and the free space of the workspace and the temp folder;
 6. the stage plan with each stage's state, time and workers;
 7. the reuse state: the reuse source, the stages reused, the stages not reused and why, the reuse stops.
 
-Under its result line, a short **environment summary** comes first: the operating system and its release, whether the
-build ran in a container, Python against the recorded reference version, the cores, the memory and the free space.
+Under its result line come the block the build printed last ([what now](#the-build-stopped-or-ran-out-of-memory-what-now))
+and a short **environment summary**: the operating system and its release, whether the build ran in a container,
+Python against the recorded reference version, the cores, the memory, the swap, the memory peaks and the free space.
 Memory is read on Linux (`/proc/meminfo`), macOS (`sysctl hw.memsize` and `vm_stat`) and Windows (the system's memory
-status); the report says `Not available` only where nothing answers. The container line says what was checked and what
+status); the swap on Linux (`/proc/meminfo` SwapTotal and SwapFree, and a container's own swap limit), macOS (`sysctl
+vm.swapusage`) and Windows (the page files: the commit limit less the physical memory); the report says `Not
+available` only where nothing answers. Every build prints the same summary, without the peaks, before it records its
+inputs, so a build that is ended without a report still shows in its log what it started with. The container line says what was checked and what
 each check found. Our builder image carries its own mark, `AW_RUNTIME` with the image tag in `AW_RUNTIME_IMAGE` (set by
 the image, by `tools/run_docker.py` and by the master builder), so a build there reads `yes (our builder image TAG)`.
 Otherwise the line names the signals container engines leave (`/.dockerenv`, `/run/.containerenv`, the `container`
@@ -465,22 +473,117 @@ because finding no signal does not prove there is no container. The mark has no 
 from the same build outside it.
 
 When the failure carries the marks of running out of memory or disk, the report (right under its result line) and
-`FAILURE.md` (as its first lines) name its **kind**: `OUT OF MEMORY` (a stage or worker ended by signal 9, exit -9 or
+`FAILURE.md` (right under the block of what to do now) name its **kind**: `OUT OF MEMORY` (a stage or worker ended by signal 9, exit -9 or
 137, a process pool whose worker was ended, `MemoryError`, errno 12) or `OUT OF DISK` (errno 28 "No space left on
 device", errno 122 "Disk quota exceeded"), as `proven` or `likely, not proven`, with what was found and what to do.
 `MemoryError` and the two disk errors prove their kind; inside a container, so does the memory controller's kill
 counter (`oom_kill` in the control group's `memory.events`) when it rose between the build's start and the failure, and
 when it did not rise an out-of-memory hint is reported as `not proven`. An out-of-disk failure shows the free space of
-the workspace and the temp folder at the start and at the failure. Out of memory: build again from the run with fewer
-workers (`--jobs`) or more memory for the build. Out of disk: free space (`python3 tools/build_gc.py plan out` lists
-what can go) or use another workspace, or point `TMPDIR` elsewhere when the temp folder is the full one.
+the workspace and the temp folder at the start and at the failure. What to do for each kind, and why the same command
+in the same build folder continues the build: the next section.
 
 The report stays on your computer; nothing is sent anywhere. It holds no environment value other than the `AMIWIND_`
 settings, the build options, the builder image's mark and the `container` variable; paths in the workspace are written
 relative to it, paths in the source checkout start with `<source>` and your home folder is `~`. `--report` writes one for a passed or cancelled build too, and for a
 `--check` or `--plan` that stops on an error (without it those write nothing). `FAILURE.md` in the run folder is the
 failure page the Toolkit Monitor shows and names this report; a build that stopped before it made its run folder has
-only the report, and its last line names it.
+only the report, and the line before the block of what to do now names it.
+
+### The build stopped or ran out of memory: what now?
+
+**Do not start over, and do not delete the build folder.** A build that stops (out of memory, out of disk, a stage's
+error, Ctrl+C, the machine switched off) keeps what it finished: every stage that passed, and inside the stage that
+stopped the units it stores as it goes (a room, a world frame, a character), in the build folder (the workspace,
+`out/` by default). Some steps of the CHIM world stage itself still run again in full; that is being fixed
+([BUILD-TESTER-32GB-OOM-67](bugs/BUILD-TESTER-32GB-OOM-67.md)).
+
+1. Fix the cause when the build names one (below).
+2. Run the same command again, from the same folder. A build in a build folder that holds earlier builds takes every
+   finished stage back by default (from v0.0.67; in a terminal it asks once, `... Reuse them? [Y/n]`, and Enter or no
+   terminal means yes), and a stage that runs again takes its finished units from the build cache; every file taken
+   back is checked by its SHA-256. If you gave the stopped build a `--name`, leave it out or choose a new one: a run
+   name is used once.
+3. With v0.0.66 or older, add `--reuse-all-available` to the same command, or run the `--reuse-from` line at the end
+   of the stopped run's `FAILURE.md`.
+
+`--clean`, `--no-reuse` and a new `--workspace` start from nothing: they are for a deliberate from-scratch build only.
+
+From v0.0.68 a failed build ends with a block that says this for its own stop, with the command ready to copy; the
+same block opens `FAILURE.md` and the build report. A stop of the CHIM world stage in a container limited to 32 GiB:
+
+```text
+========================================================================
+THE BUILD STOPPED in the stage chim, after 6 h 30 min: OUT OF MEMORY (likely, not proven).
+  The stage reached 25.1 GiB; one process of it (its main process, as a rule) held 24.1 GiB of that
+  (measured in this build).
+  This build had 32.0 GiB of memory (the container's limit) and no swap; its peak: 31.6 GiB, with
+  chim, chim-room-batches running.
+
+Your finished work is kept: do not delete the build folder. Run the same command again,
+from the same folder; every stage and unit that finished is taken back (each checked by SHA-256):
+
+  ./build.sh --data-files /games/Morrowind --workspace ../amiwind-local
+
+Before you run it again:
+  - Fewer workers (-j) do not help in this stage: one process holds most of its memory.
+  - Add swap (about 16 GiB or more), or give the build more memory (the memory limit of its
+    container or virtual machine: Docker --memory and --memory-swap, WSL 2 memory= and swap= in
+    .wslconfig), or close other programs.
+  - ./build.sh --resource-plan with the same options lists what each stage needs against what the
+    build gets.
+Build report (the one file to send when you ask for help): ../amiwind-local/logs/BUILD-REPORT-<run>.txt
+Help: docs/LINUX_BUILD.md, "The build stopped or ran out of memory: what now?"
+========================================================================
+```
+
+**Out of memory.** What helps depends on where the stage's memory was; the block says which, from what this build
+measured (else an earlier build of the same build folder, else the reference figures in `config/build-memory.json`):
+
+- **In its workers** (most stages: the room batches, the actor library, the image step): about half the workers,
+  `-j N`; the block prints the command with N filled in. If it stops again, swap or more memory as below.
+- **In one process** (the CHIM world stage, `chim`, holds the whole world in its main process): fewer workers do not
+  help. Add swap or give the build more memory.
+- **Swap** on Linux, for example a 16 GiB swap file (`swapon --show` and `free -h` show it; a line in `/etc/fstab`
+  keeps it after a restart):
+
+  ```sh
+  sudo fallocate -l 16G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+  ```
+
+- **In a container or a virtual machine** the build has the memory given to it, not the machine's: Docker `--memory`
+  (with `--memory-swap` for swap; Docker Desktop: Settings, Resources), WSL 2 `memory=` and `swap=` in the
+  `.wslconfig` file in your Windows user folder, then `wsl --shutdown`. The build report's Memory line names the
+  container's limit when there is one.
+- **Before you start**, `./build.sh --resource-plan` with your build's options prints, without building anything, each
+  stage's measured need against the memory and threads the build gets (`OK`, `WILL THROTTLE`, `WILL NOT FIT`).
+
+What a whole build needs, measured in the v0.0.66 from-scratch build of the whole game (`config/build-memory.json`):
+its memory in use peaked at 43.7 GiB, the file cache not counted, while the CHIM world stage and the room batches ran
+side by side. The largest stages:
+
+| Stage | Peak | Largest process | Workers | Time |
+|---|---|---|---|---|
+| `actor-library` | 27.0 GiB | 1.5 GiB | 10 | 2 h 22 min |
+| `chim` (the CHIM world) | 25.1 GiB | 24.1 GiB | 10 | 6 h 31 min |
+| `image` | 18.7 GiB | 9.0 GiB | 20 | 50 min |
+| `chim-room-batches` | 17.4 GiB | 1.8 GiB | 20 | 9 h 20 min |
+| `chim-interiors` | 8.9 GiB | 3.8 GiB | 20 | 4 min |
+
+So a machine with 32 GiB needs swap for the difference while those two stages run side by side; a builder that runs
+them one after another when the memory is short is being worked on in the same item.
+
+**Out of disk.** Free space on the disk of the build folder: `python3 tools/build_gc.py plan out` lists what can go
+and deletes nothing (`--delete` removes exactly what it lists as expired; see
+[free disk space](BUILD_CACHE.md#free-disk-space)). When the temp folder is the full one, point `TMPDIR` at a folder
+with room. A `--workspace` on another disk starts that folder empty.
+
+**The whole build was ended** (the terminal shows `Killed`, the machine restarted, the container was stopped): no
+failure page is written then, and the same command, from the same folder, still continues the build. The first lines
+of the build's output show the machine it started with (cores, memory, swap, free space).
+
+**What to send when you ask for help:** `logs/BUILD-REPORT-<run>.txt` from the build folder. Without one (the whole
+build was ended): the end of the build's output and its first lines, the AmiWind version or commit you built, and the
+memory the build had (the machine's, or the limit of its container or virtual machine).
 
 ## 4. Boot your private image
 

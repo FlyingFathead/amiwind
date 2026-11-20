@@ -92,6 +92,7 @@ COLLISION-TRACE-COST-33, COLLISION-HULL-CHAINS-33, AW-20260928-12).
 
 Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and game state. See [families](README.md#families).
 
+- [ACTOR-DROWNING-NOT-CARRIED-67](ACTOR-DROWNING-NOT-CARRIED-67.md): People and creatures under water never run out of breath or drown; only the player does, so the flood that drowns the Black Dart gang in Old Mournhold: Temple Sewers West cannot work once the water moves
 - [ACTOR-HELLO-CLAMPED-61](ACTOR-HELLO-CLAMPED-61.md): An actor's Hello value is cut to 255 although the record holds it in 16 bits (up to 300 in the game data)
 - [ACTOR-LOAD-NOT-COUNTED-66](ACTOR-LOAD-NOT-COUNTED-66.md): The carried load of NPCs and creatures was not counted in their fights
 - [ACTOR-STATS-FAR-FALLBACK-61](ACTOR-STATS-FAR-FALLBACK-61.md): A being outside the loaded areas still reads its stats from the island-wide actor table
@@ -183,10 +184,12 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [DIALOGUE-RING-DISPOSITION-CHECK-60](DIALOGUE-RING-DISPOSITION-CHECK-60.md): Disposition after handing Fargoth his ring needs checking against the original
 - [DIALOGUE-TEXT-DEFINES-PARTIAL-67](DIALOGUE-TEXT-DEFINES-PARTIAL-67.md): Incomplete: the text defines %PCCrimeLevel, %PCClothingModifier and the global-variable defines are not filled in an answer
 - [DIALOGUE-TOPIC-WHO-60](DIALOGUE-TOPIC-WHO-60.md): Shargam gro-Shagdub answers "Who?" about Ralen Hlaalo right after naming him in his rumors
+- [DISTRICT-NEW-FIGHT-ATTACKERS-ON-SAME-MAP-RELOAD-67](DISTRICT-NEW-FIGHT-ATTACKERS-ON-SAME-MAP-RELOAD-67.md): After a teleport inside Plaza Brindisi Dorom the guards and high ordinators attack the player together with the fabricants
 - [DISTRICT-PLACED-THINGS-NO-ROW-67](DISTRICT-PLACED-THINGS-NO-ROW-67.md): In Mournhold's districts no container, item, activator or door sign can be aimed at: their rows are keyed as a room's, and the game outdoors asks for the cells around the player
 - [DOOR-LOAD-LOCKS-MISSING-51](DOOR-LOAD-LOCKS-MISSING-51.md): Load doors ignore the original game's locks: every door into a room opens, locked or not
 - [DOOR-TRAPS-NOT-SPRUNG-55](DOOR-TRAPS-NOT-SPRUNG-55.md): Trapped doors and containers open without their trap
 - DROP-CHIM-REFUSED-59 (no report page): Dropping an item on a streamed outdoor map is refused: Cannot place items in this area yet
+- [DROP-REFUSED-CENSUS-ROOM-67](DROP-REFUSED-CENSUS-ROOM-67.md): Dropping an item in the first room of the Census and Excise Office is refused with "Cannot place items in this area yet; kept."
 - DROP-ROOM-BRUSH-ENTITY-59 (no report page): Dropping an item in a converted room is refused: Item path or footprint obstructed
 - [DROP-STACK-ONE-ROW-PER-UNIT-59](DROP-STACK-ONE-ROW-PER-UNIT-59.md): Dropping a stack drops one piece per key press, each its own ground item, so the map's ground item limit (32) fills with single coins
 - [DROPPED-LIGHT-NO-EFFECTS-61](DROPPED-LIGHT-NO-EFFECTS-61.md): A carriable light that is dropped shows no flame and gives no light where it lies
@@ -198,14 +201,18 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [EQUIP-ACTION-REGRESSION-62](EQUIP-ACTION-REGRESSION-62.md): Some weapons, armour and clothing show no Equip action in the inventory (the census office dagger reads "Actions unavailable for this item")
 - [EQUIP-SHARDAXE-REFUSED-61](EQUIP-SHARDAXE-REFUSED-61.md): Equipping the iron shardaxe is refused while the iron longsword can be equipped
 - [EXPANSION-SCRIPTS-NOT-ATTACHED-66](EXPANSION-SCRIPTS-NOT-ATTACHED-66.md): The scripts of the people, creatures and objects that Tribunal and Bloodmoon place are not attached, also in the expansion rooms the image holds
+- [FABRICANTS-STAY-DRAWN-IN-FIGHT-67](FABRICANTS-STAY-DRAWN-IN-FIGHT-67.md): Two verminous fabricants that a script keeps out of the world stay drawn while they fight
 - [FACTION-EXPEL-MESSAGE-64](FACTION-EXPEL-MESSAGE-64.md): An expulsion from a faction shows no message to the player
 - [FACTION-STATS-PAGE-64](FACTION-STATS-PAGE-64.md): The stats page shows no factions, ranks, reputation or bounty
 - [FALL-LANDING-KNOCKDOWN-62](FALL-LANDING-KNOCKDOWN-62.md): A hard landing does not knock the player or an actor down, and an NPC's landing plays no landing sound
+- [GETANGLE-PLAYER-Z-READS-OBJECT-AXIS-67](GETANGLE-PLAYER-Z-READS-OBJECT-AXIS-67.md): A script reading the player's angle on the z axis gets a value 90 degrees off the view
 - [GETPCSLEEP-NOT-CARRIED-OUT-67](GETPCSLEEP-NOT-CARRIED-OUT-67.md): Resting never wakes the scripts that wait for the player's sleep: the Dark Brotherhood never attacks a resting player
+- [GETWATERLEVEL-COLUMN-NOT-ROOM-67](GETWATERLEVEL-COLUMN-NOT-ROOM-67.md): GetWaterLevel reads the water in the player's column, not the room's own level, so it reads 0 in Old Mournhold: Temple Sewers West, whose water lies under every placement: the Black Dart gang's script then sets their health to 0 on arrival and the lit torches switch to burned out
 - [GODMODE-COMBAT-DAMAGE-61](GODMODE-COMBAT-DAMAGE-61.md): With god mode on, a fight's blows still take the player's health and kill the player
 - [GODMODE-LAVA-DEATH-62](GODMODE-LAVA-DEATH-62.md): The player can die in a lava pool with god mode on
 - [GUARD-RESIST-ARREST-NOTHING-61](GUARD-RESIST-ARREST-NOTHING-61.md): Choosing to resist arrest in a guard's conversation does nothing: the guard does not attack
 - [HAND-TO-HAND-NO-HIT-64](HAND-TO-HAND-NO-HIT-64.md): Fists rarely land and do almost nothing, even after the stats are raised during the fight
+- [HANDS-STATE-LOST-THROUGH-DOORS-67](HANDS-STATE-LOST-THROUGH-DOORS-67.md): A readied spell stance turns into a weapon or fists stance after the player goes through a door into a building
 - [INTRO-CAMERA-GATING-38](INTRO-CAMERA-GATING-38.md): Opening vanity and third-person cameras expose an unselected default race
 - [INVENTORY-CATALOG-LOOKUP-40](INVENTORY-CATALOG-LOOKUP-40.md): Inventory catalogue lookup and name sorting use an equality-only comparison
 - [INVENTORY-CATALOGUE-PARTIAL-54](INVENTORY-CATALOGUE-PARTIAL-54.md): The item catalogue holds Morrowind items only: no lockpicks, probes, repair tools, apparatus or carried lights
@@ -276,6 +283,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [POWER-COOLDOWN-NOT-SAVED-66](POWER-COOLDOWN-NOT-SAVED-66.md): Power cooldowns are not saved and not reset by a new game: a save and reload makes a used power ready again
 - [PRISON-SHIP-ITEMS-TAKEABLE-65](PRISON-SHIP-ITEMS-TAKEABLE-65.md): On the prison ship the spoons, plates and other dishes can be taken with the activate key
 - [QC-AW-FLAME-SPAWN-32](QC-AW-FLAME-SPAWN-32.md): Every aw_flame entity prints load errors: the game logic has no aw_flame spawn function or aw_flame_size/aw_flame_shape fields
+- [QUICKLOAD-EMPTY-ROOM-SPAWN-BLOCKED-67](QUICKLOAD-EMPTY-ROOM-SPAWN-BLOCKED-67.md): A quick load into a room without scenery reports a blocked spawn although the player is restored in place
 - [RACE-RESIST-NOT-ON-SPELL-DAMAGE-64](RACE-RESIST-NOT-ON-SPELL-DAMAGE-64.md): A race ability that resists an element does not reduce spell damage of that element
 - [RANDOM-STREAMS-SAME-EVERY-BOOT-67](RANDOM-STREAMS-SAME-EVERY-BOOT-67.md): Every session rolls the same fight dice and script random numbers, because the game's random streams start from fixed values at each start of the game
 - [READY-MAGIC-SHOWS-WEAPON-65](READY-MAGIC-SHOWS-WEAPON-65.md): Readying magic (R by default) raises the equipped weapon instead of the spell-casting hands

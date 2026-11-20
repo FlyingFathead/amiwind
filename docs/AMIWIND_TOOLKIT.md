@@ -1,6 +1,6 @@
 # AmiWind Toolkit
 
-_Last updated with AmiWind v0.0.67 (19 November 2026)._
+_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -366,8 +366,9 @@ World progress table for the legacy mapping quality, the Map metrics layer for r
 A headline sits at the top of the Toolkit page, on every tab, one row per land, all in the same three columns:
 **open terrain ready**, **rooms ready** and **total ready**, then a row for **all lands** together and a last row for the
 build (how many cells are in the game and the newest ingested build). Ready means in the game on CHIM, the same for every
-land; a district a land presents as open terrain (Mournhold's five) is counted once, under open terrain, and everything
-not ready is named with its reason, a room no door leads to as a room still to build
+land; a room in the game as a room map of our own is ready and named on the land's line as a special interior; a
+district a land presents as open terrain (Mournhold's five) is counted once, under open terrain, and everything not
+ready is named with its reason, a room no door leads to as a room still to build
 ([ready, per land](chim/PROGRESS_TRACKER.md#ready-per-land-one-count-for-every-land); the same numbers as that page and
 the README, from one generator). Under each land, on a line of its own, are the audit figures: **Fully approved cells**,
 **Fully approved terrain**, awaiting lighting and the release the eligible figure is for (Vvardenfell's 1,390 cells with a

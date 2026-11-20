@@ -162,6 +162,7 @@ Family: Map heap and memory budget (`heap-memory`). The heap model must match wh
 - [CHIM-STRIDER-RING-33](CHIM-STRIDER-RING-33.md): The closed-hull strider (MESH-LOD-OPEN-SEAMS-33, variant E) puts CHIM Balmora's active ring over the heap budget
 - [CHIM-ZONE-BUDGET-33](CHIM-ZONE-BUDGET-33.md): The engine's default CHIM zone does not hold the active ring of Seyda Neen or of Balmora's south-west corner
 - [CHIM-ZONE-RESERVE-EARLY-33](CHIM-ZONE-RESERVE-EARLY-33.md): chim_reserve_kib is checked before the map's actors and precaches load, so it cannot keep the Hunk gap
+- [CHIMPORT-HEAP-NOT-BUILD-FRAMES-68](CHIMPORT-HEAP-NOT-BUILD-FRAMES-68.md): Each cell of a CHIM import is built with older terrain storage settings than a build uses and without its neighbouring cells in the memory ring, so the memory use recorded for the cell differs from what a build measures for it
 - CRASH-01 (no report page): Heap exhaustion on sn012 after Hors travel from Jiub name entry
 - [ENGINE-HEAP-FIXED-SIZE-43](ENGINE-HEAP-FIXED-SIZE-43.md): The game heap is a fixed 11 MiB from the build: with 128 MB of RAM Vivec still runs under the 2 MiB safety gap and loads pause
 - [ESTIMATE-HEAP-STALE-32](ESTIMATE-HEAP-STALE-32.md): World estimate heap coefficients were fitted to the old loader model

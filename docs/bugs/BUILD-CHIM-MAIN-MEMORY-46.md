@@ -2,11 +2,12 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 3 times; something has to be done
+## PERSISTING: reported 4 times; something has to be done
 
 - Reported with v0.0.51-dev1 at 2026-10-25 (time not recorded): dev1 resource plan: the chim stage throttled to 2 of 24 workers beside a 19,913 MiB parent in a 45 GiB container (about 2 h 10 min planned)
 - Reported with v0.0.51 at 2026-10-28 (time not recorded): A tester's public v0.0.51 full build on a Linux machine: the chim stage ran 38 h 41 min at 0.4 cores on 1 to 2 of its 8 workers and then failed when a worker was killed (BUILD-GUARD-BLIND-NO-CGROUP-55, BUILD-CHIM-EARLY-CHECK-POOL-55).
 - Reported with v0.0.59-dev5 at 2026-11-02 (time not recorded): v0.0.59-dev5 full build at 2026-11-02 16:02 +0200 / 2026-11-02 14:02 UTC (f08583e0, lease 44 GiB): the chim stage plan is 14 of 24 workers beside a 20.4 GiB main process, wall about 25 min; a 54 GiB lease would run it at full width.
+- Reported with v0.0.66 at 2026-11-20 12:50 +0200: Measured again in the v0.0.66 full build from scratch: the CHIM stage main process held 24.1 GiB of a 25.1 GiB stage peak (20.4 GiB in v0.0.59-dev5); running at once with the room batches, memory use peaked at 43.7 GiB, more than a 32 GiB machine has.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -40,6 +41,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-10-25: seen again in v0.0.51-dev1: dev1 resource plan: the chim stage throttled to 2 of 24 workers beside a 19,913 MiB parent in a 45 GiB container (about 2 h 10 min planned)
 - 2026-10-28: seen again in v0.0.51: A tester's public v0.0.51 full build on a Linux machine: the chim stage ran 38 h 41 min at 0.4 cores on 1 to 2 of its 8 workers and then failed when a worker was killed (BUILD-GUARD-BLIND-NO-CGROUP-55, BUILD-CHIM-EARLY-CHECK-POOL-55).
 - 2026-11-02: seen again in v0.0.59-dev5: v0.0.59-dev5 full build at 2026-11-02 16:02 +0200 / 2026-11-02 14:02 UTC (f08583e0, lease 44 GiB): the chim stage plan is 14 of 24 workers beside a 20.4 GiB main process, wall about 25 min; a 54 GiB lease would run it at full width.
+- 2026-11-20 12:50 +0200: seen again in v0.0.66: Measured again in the v0.0.66 full build from scratch: the CHIM stage main process held 24.1 GiB of a 25.1 GiB stage peak (20.4 GiB in v0.0.59-dev5); running at once with the room batches, memory use peaked at 43.7 GiB, more than a 32 GiB ...
 
 <!-- END GENERATED TIMELINE -->
 
@@ -48,7 +50,7 @@ _Last updated with AmiWind v0.0.46-dev1 (20 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -196,6 +198,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - BUILD-INPUTS-LOCK-TMP-RACE-54 (no report page): Two MiniWinds started together race on the input lock: one fixed temp name, so the first build dies at start
 - [BUILD-INTERIORS-UNDERUSED-62](BUILD-INTERIORS-UNDERUSED-62.md): The Balmora interiors stage ran at 2.46 of 12 allowed cores with 16 units queued in the v0.0.62 release build
 - [BUILD-JOBS-RESOLVE-PER-STAGE-32](BUILD-JOBS-RESOLVE-PER-STAGE-32.md): With automatic jobs, stages of one build plan can get different worker counts
+- [BUILD-KIT-SOURCE-COPY-ONE-CORE-67](BUILD-KIT-SOURCE-COPY-ONE-CORE-67.md): The source copy of a release kit writes 4.5 GB on about one core and takes about eighteen minutes
 - [BUILD-LARGE-ROOMS-CHECK-LATE-66](BUILD-LARGE-ROOMS-CHECK-LATE-66.md): The large-rooms table check runs about an hour and a half into a build instead of in its first minute
 - BUILD-M68K-ICE-SKEL-PARSE-52 (no report page): The m68k compiler crashed on the animation table parse (internal compiler error in patch_jump_insn); the host tests compile it with the host compiler only
 - [BUILD-MINIWIND-FINGERPRINT-ENGINE-33](BUILD-MINIWIND-FINGERPRINT-ENGINE-33.md): Every build stage's source fingerprint took in the engine sources through the MiniWind module

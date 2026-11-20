@@ -90,6 +90,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [BUILD-SCRATCH-DISK-GROWTH-32](BUILD-SCRATCH-DISK-GROWTH-32.md): Build scratch volumes grow the container disk image on the system drive
 - [BUILD-STALE-BSP-CONFIG-48](BUILD-STALE-BSP-CONFIG-48.md): Docs and config still described things that ship as .chim as .bsp maps
 - BUILD-SUMMARY-INTERIOR-COUNTS-48 (no report page): The build summary and the inclusion ledger do not say how many interiors a build includes
+- [CELL-PROGRESS-SOURCE-UNREADABLE-SILENT-67](CELL-PROGRESS-SOURCE-UNREADABLE-SILENT-67.md): The CHIM Progress Tracker's result and ingest steps write the tracker data without any remembered input they cannot read, with no error: a step run without one of those inputs drops the mapping quality, the limits, the place names, the build history or the rooms in the game
 - [CENSUS-DISTRICT-CONTAINERS-AS-ROOMS-67](CENSUS-DISTRICT-CONTAINERS-AS-ROOMS-67.md): The container count still reads a Mournhold district as a room: its 171 containers would be counted as having no row once their rows are keyed outdoors
 - [CHIMPORT-CLI-MWAD-SHADOW-66](CHIMPORT-CLI-MWAD-SHADOW-66.md): chimport.py run stops on a fresh run folder: stair_walk puts tools/ first, so tools/mwad.py loads in place of the package mwad
 - [CHIMPORT-DOOR-MARKER-AUDIT-36](CHIMPORT-DOOR-MARKER-AUDIT-36.md): The CHIMport door audit counted marker DOOR records (PrisonMarker) as missing door links: 6 cells failed door_links, Seyda Neen among them
@@ -123,6 +124,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - MONITOR-WARNINGS-ROW-54 (no report page): Requested: the Toolkit build monitor gathers every warning of a build in one yellow row, Warnings: N with a view of the lines
 - [MWSCRIPT-TRACKER-MAIN-INERT-63](MWSCRIPT-TRACKER-MAIN-INERT-63.md): The script tracker called Main named by nothing, although the game always starts it and AmiWind carries its work
 - [PACKAGE-PORTABILITY-28](PACKAGE-PORTABILITY-28.md): Rebundled ZIPs lost exec modes; Windows path aliases accepted
+- [PERF-DB-CHIMPORT-NO-WALL-67](PERF-DB-CHIMPORT-NO-WALL-67.md): The performance database records the master builder's CHIM import runs without their times, so it cannot answer how long such a run takes
 - [PKG-STALE-RUNTIME-32](PKG-STALE-RUNTIME-32.md): The sealed v0.0.31 playtest contains a stale launcher preset folder
 - [PLAYTEST-KNOWN-ISSUES-STALE-54](PLAYTEST-KNOWN-ISSUES-STALE-54.md): The v0.0.54 playtest package's KNOWN-ISSUES list was made from the register of the build commit, older than the release's register
 - PREFLIGHT-DISK-FIGURE-53 (no report page): The release preflight does not check the shipped disk figure, so the final commit failed its gate on it (gate 4078)
@@ -135,6 +137,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [RELEASE-WORKING-VERSION-ISOLATION-39](RELEASE-WORKING-VERSION-ISOLATION-39.md): Publishing an earlier release reads the next development version record
 - [RELEASE-WS-BASELINE-VERSION-33](RELEASE-WS-BASELINE-VERSION-33.md): Every new VERSION failed the whitespace preflight until a docs/PATCH-v<VERSION>.json was made by hand
 - [ROOM-RESIDENTS-NOT-CACHED-48](ROOM-RESIDENTS-NOT-CACHED-48.md): The room stages bake every resident again on every run: 26 s of a 39 s rerun with every room unit reused
+- [ROUTE-UPLOAD-AFTER-PUSH-67](ROUTE-UPLOAD-AFTER-PUSH-67.md): The release route's upload to the download site is refused when the release was published on the code host first
 - [SESSION-AW-VIEW-IN-SOLID-54](SESSION-AW-VIEW-IN-SOLID-54.md): The session tooling's aw_view puts the camera outside the room or inside a wall without a warning
 - [SMOKE-START-ENTER-MENU-52](SMOKE-START-ENTER-MENU-52.md): An engine smoke script started with START enter can stay in the main menu: its Return skipped the intro movie instead
 - [TEST-CHIMPORT-POOL-COPY-MODE-48](TEST-CHIMPORT-POOL-COPY-MODE-48.md): test_chimport_pool's copy-mode reuse test fails in the gate container: the units are computed again
@@ -186,8 +189,10 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [TRACKER-REGISTER-SIZE-33](TRACKER-REGISTER-SIZE-33.md): The bug register outgrew the release text-file size limit
 - [TRACKER-REGISTER-SIZE-36](TRACKER-REGISTER-SIZE-36.md): The live register bugs.json reached 75 % of its 1 MiB release text limit; the size warning was raised to 85 % until a second archive rotation
 - [TRACKER-RELEASE-HEADROOM-MISSING-42](TRACKER-RELEASE-HEADROOM-MISSING-42.md): The CHIM tracker keeps no memory headroom per cell from a full build, and older CHIMport results replace a newer full build's audits: every headroom figure dates from the v0.0.36-v0.0.40 builders
+- [TRACKER-ROOM-MAPS-NOT-READY-67](TRACKER-ROOM-MAPS-NOT-READY-67.md): The progress tracker counts the two opening rooms (the prison ship and the Census and Excise Office) as not ready although both are in the game
 - TRACKER-SEA-CELL-LAND-GREEN-57 (no report page): The world map paints in-game sea cells land-green in its build view: a lone tile at -15,-8 looks like leftover land
 - [TRACKER-SEA-CELL-SET-36](TRACKER-SEA-CELL-SET-36.md): The CHIM tracker's island view leaves out 37 land cells that hold only terrain and sea; one is labelled Solstheim
+- [TRACKER-STAMP-BLOCKS-WORKER-GATES-68](TRACKER-STAMP-BLOCKS-WORKER-GATES-68.md): After the main line takes a new development version, every other branch's pre-check is refused until that version is published
 - [TRACKERS-COUNT-MOURNHOLD-OUT-67](TRACKERS-COUNT-MOURNHOLD-OUT-67.md): The script tracker and the CHIM progress tracker still count Mournhold as not in the game: 187 Tribunal scripts are listed as add-on only and Mournhold's exterior shows 0
 - [WIN-02](WIN-02.md): Cancelled Windows stage leaves child workers alive
 

@@ -1,6 +1,6 @@
 # Building and playing
 
-_Last updated with AmiWind v0.0.67-dev3 (18 November 2026)._
+_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
 
 How to build AmiWind from your own Morrowind copy and run it in an emulator. The short version is in the [README](../README.md#build-it-from-your-own-morrowind).
 
@@ -84,6 +84,13 @@ log, every setting, the versions, which copy of the game data and the stage plan
 computer until you send it ([when a build fails](LINUX_BUILD.md#when-a-build-fails)). A Docker build's helper copies
 it into its results folder.
 
+**When a build stops or runs out of memory:** do not start over and do not delete the build folder. Run the same
+command again, from the same folder: every finished stage and unit is taken back (by default from v0.0.67; with
+v0.0.66 or older add `--reuse-all-available`). The build's last lines say why it stopped, give that command ready to
+copy and what to change first (for memory: about half the workers with `-j`, or swap and more memory for the stages
+whose main process holds it). The whole answer, with the measured memory a build needs:
+[the build stopped or ran out of memory: what now?](LINUX_BUILD.md#the-build-stopped-or-ran-out-of-memory-what-now).
+
 **Build speed:** `--jobs N` sets the exact worker count. While a build runs,
 `./build.sh status out/build/NAME` shows its progress, the cores in use and an
 ETA; afterwards `./build.sh profile report|compare|optimize out/build/NAME`
@@ -150,7 +157,11 @@ The disk grows by one run folder per build, see the disk space note above.
 **Memory:** the figures above used up to 44 GiB. 16 GiB of RAM is not enough today for
 a whole build: a tester's build on a machine with 15 GiB of RAM and 14 GiB of swap
 ran out of memory and stopped after about 38 hours
-([BUILD-CHIM-MAIN-MEMORY-46](bugs/BUILD-CHIM-MAIN-MEMORY-46.md)). The least memory a
+([BUILD-CHIM-MAIN-MEMORY-46](bugs/BUILD-CHIM-MAIN-MEMORY-46.md)). The v0.0.66 from-scratch
+build peaked at 43.7 GiB with the CHIM world stage (25.1 GiB, 24.1 GiB of it in one
+process) and the room batches running side by side, so a 32 GiB machine needs swap for
+the difference for now ([measured per stage](LINUX_BUILD.md#the-build-stopped-or-ran-out-of-memory-what-now);
+[BUILD-TESTER-32GB-OOM-67](bugs/BUILD-TESTER-32GB-OOM-67.md)). The least memory a
 whole build needs is still being worked out (plan item PLAN-16GB-CHECK); until it is
 measured, no smaller figure is promised.
 A normal build includes everything the release ships; no extra option is

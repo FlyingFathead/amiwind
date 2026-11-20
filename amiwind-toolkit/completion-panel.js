@@ -48,6 +48,13 @@
     const rNot = [].concat(...land.rooms.not_ready.map(r => r.items.map(i => Object.assign({reason: r.label}, i))));
     row('Rooms (interiors) ready', fig(land.rooms) + (rNot.length ? ' · not ready ' + link(p + 'rooms', rNot.length) : ''), 'tracker data: the door graph\'s rooms and the rooms the newest build holds');
     lists.push(listBlock(p + 'rooms', 'Rooms not ready, by name', rNot, i => esc(i.name) + ' <span class="muted">(' + esc(i.reason) + (i.leads && i.access !== 'door' ? '; what leads there: ' + esc(i.leads) : '') + ')</span>'));
+    // the special interiors: ready rooms (in the count) in the game as room maps of our own, named from the data, never a
+    // reason (TRACKER-ROOM-MAPS-NOT-READY-67)
+    const special = land.rooms.special || [];
+    if (special.length) {
+      row('&nbsp;&nbsp;ready, special interiors (room maps of our own)', link(p + 'special', special.length), 'in the game as a room map of our own, not on CHIM rooms');
+      lists.push(listBlock(p + 'special', 'Special interiors, in the game as room maps of our own', special.map(n => ({name: n})), i => esc(i.name)));
+    }
     for (const r of land.rooms.not_ready) row('&nbsp;&nbsp;' + esc(r.label), link(p + 'rooms', r.count), 'the room\'s state');
     const asT = land.rooms.as_terrain || [];
     if (asT.length) {

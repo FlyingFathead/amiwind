@@ -128,6 +128,7 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - [BUILD-CHECK-READONLY-WORKSPACE-67](BUILD-CHECK-READONLY-WORKSPACE-67.md): tools/build.py --check cannot check the reuse plan of a workspace that is mounted read-only: its build preflight stops on the cache folders it cannot write before the reuse plan is made
 - [BUILD-CHECK-UNIT-STOPS-MISSING-66](BUILD-CHECK-UNIT-STOPS-MISSING-66.md): The build check passes while the build itself stops at its first-minute unit-cache reuse stop
 - [BUILD-CHIM-HEAP-KEY-LOADER-63](BUILD-CHIM-HEAP-KEY-LOADER-63.md): An engine model loader edit re-keys the whole CHIM world and its interiors
+- [BUILD-CHIM-KEY-ARRIVAL-SPOT-REACH-67](BUILD-CHIM-KEY-ARRIVAL-SPOT-REACH-67.md): The converted world stage is keyed by the arrival search's Python mirror, so a change there would convert the whole outdoor world again (about 27 minutes)
 - [BUILD-CHIM-KEY-ENGINE-FILE-WHOLE-54](BUILD-CHIM-KEY-ENGINE-FILE-WHOLE-54.md): chim_world.c is keyed whole into the CHIM world, so a diagnostic print re-keys the world
 - BUILD-CHIM-KEY-ENGINE-SOURCES-49 (no report page): An engine source edit rebuilds the whole CHIM world: the CHIM stage imports project_version, whose engine check names engine/aga/src files
 - [BUILD-CHIM-KEY-UNDERDECLARED-35](BUILD-CHIM-KEY-UNDERDECLARED-35.md): The CHIM stage's fingerprint left out the tracker code it ran (8 files, 2 functions): a wrong-reuse risk
@@ -216,6 +217,7 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - [CHIMPORT-NO-SHARED-POOL-35](CHIMPORT-NO-SHARED-POOL-35.md): The CHIMporter kept its own unit store beside the shared hashed storage pool: no pool flag, every run folder a private copy
 - [CHIMPORT-POOL-CROSS-MOUNT-36](CHIMPORT-POOL-CROSS-MOUNT-36.md): CHIMport run folder and the storage pool on two mounts of one volume: hard links fail across the mounts, so pooled units were copied, not linked
 - [CHIMPORT-RETRY-AUDIT-FAILED-36](CHIMPORT-RETRY-AUDIT-FAILED-36.md): CHIMport --retry-failed never reran cells that converted but failed an audit (memory fit, doors, hull chains): the runner marks them done
+- [CHIMPORT-UNITS-NOT-SHARED-WITH-BUILD-68](CHIMPORT-UNITS-NOT-SHARED-WITH-BUILD-68.md): A build module's world stage converts again every unit a CHIMport run already made for the same cells
 - [DOOR-CHECK-KNOWN-UNKEYED-54](DOOR-CHECK-KNOWN-UNKEYED-54.md): config/door-check-known.json is in no stage key: an edit to the known list never re-runs a passed image's door check
 - [MESH-TABLE-LAYER-GROWS-67](MESH-TABLE-LAYER-GROWS-67.md): A row added to an expansion layer of a measured mesh table would re-key every unit recorded with that layer's earlier rows
 - [MESH-TABLE-SECOND-LAYER-REKEY-67](MESH-TABLE-SECOND-LAYER-REKEY-67.md): A row of a second expansion in a measured mesh table would re-key every unit recorded with the first expansion's rows

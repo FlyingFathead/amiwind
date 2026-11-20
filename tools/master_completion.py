@@ -12,11 +12,15 @@ READY (READY_TEXT below says it in plain words):
                 legend group is "in the game").
   rooms         every interior cell of the game, counted for the land of its master (Tribunal: Mournhold, Bloodmoon:
                 Solstheim, the base game: Vvardenfell; a base-game room on Solstheim counts for Solstheim). Ready: in the
-                game on CHIM rooms. A room the game presents as the land's open terrain (Mournhold's districts) is
-                counted once, under open terrain (TRACKER-DISTRICTS-COUNTED-TWICE-67).
-  not ready     everything else, each with its reason: a room map of our own (in the game, not on CHIM rooms),
-                converted but not in the game yet, not started, and a room no door leads to: still to build, with what
-                leads there (ROOMS-SET-ASIDE-NOT-BUILT-67); it is never left out of the count.
+                game, the in-game group of tools/cell_progress_rooms.py: on CHIM rooms, as a room map of our own, or as
+                a district. The room maps of our own (the opening sequence's Imperial Prison Ship and Seyda Neen,
+                Census and Excise Office today) are special interiors: ready, and named under the count (`special`,
+                the rows whose state is room_map; TRACKER-ROOM-MAPS-NOT-READY-67). A room the game presents as the
+                land's open terrain (Mournhold's districts) is counted once, under open terrain
+                (TRACKER-DISTRICTS-COUNTED-TWICE-67).
+  not ready     everything else, each with its reason: converted but not in the game yet, not started, and a room no
+                door leads to: still to build, with what leads there (ROOMS-SET-ASIDE-NOT-BUILT-67); it is never left
+                out of the count.
 
 The completion panel per master (Tribunal, Bloodmoon, Morrowind) adds, from the same data and the MWScript tracker
 (docs/mwscript-features.json, its states worked out again by tools/mwscript_features.py): the scripts by state, each
@@ -28,7 +32,9 @@ import collections
 import json
 from pathlib import Path
 
-FORMAT = 'aw-land-readiness-1'
+# -2: a room map of our own counts ready and is named as a special interior (TRACKER-ROOM-MAPS-NOT-READY-67); data
+# written as -1 counted it not ready, so every reader counts such data again by the rules below
+FORMAT = 'aw-land-readiness-2'
 COMPLETION_FORMAT = 'aw-master-completion-1'
 NOT_MEASURED = 'MOURNHOLD-STATE-TRACKING-PARITY-67'
 LANDS = (
@@ -43,18 +49,25 @@ MASTER_ORDER = ('mournhold', 'solstheim', 'vvardenfell')      # the completion p
 READY_TEXT = ('Ready = in the game on CHIM, the same for every land. Open terrain: the land\'s exterior cells of land or '
               'empty sea (open ocean and cells beyond the world\'s edge are not counted), ready when the newest ingested '
               'build holds the cell on CHIM and no audit of it failed. Rooms: every interior cell, counted for the land '
-              'of its master, ready when it is in the game on CHIM rooms; a district the land presents as open terrain '
-              'is counted once, under open terrain. Everything else is not ready, with its reason; a room no door '
-              'leads to is a room still to build, never left out.')
+              'of its master, ready when it is in the game: on CHIM rooms, or as a room map of our own (special '
+              'interiors, named under the count); a district the land presents as open terrain is counted once, under '
+              'open terrain. Everything else is not ready, with its reason; a room no door leads to is a room still to '
+              'build, never left out.')
 CELL_REASONS = {'solstheim': 'not in the game yet (Solstheim)', 'not_started': 'not started',
                 'not_in_build': 'converted, not in the newest build', 'empty_sea': 'empty sea, not in the newest build',
                 'ocean': 'open sea, not in the newest build', 'converted_failing': 'converted, failing audits',
                 'not_converted': 'not converted (tried, could not finish)', 'hull_policy_pending': 'hull policy pending'}
-# Ready rooms: on CHIM rooms with a way in, or a district the district module built as open terrain (when the data has
-# no presented cell to count it under the terrain); the Toolkit's tiles draw both green (ROOMS-SET-ASIDE-NOT-BUILT-67)
-READY_ROOM_STATES = ('on_chim_rooms', 'district')
-ROOM_REASONS = {'room_map': 'in the game as a room map of our own, not on CHIM rooms',
-                'converted': 'converted, not in the game yet',
+# Ready rooms = the in-game group of tools/cell_progress_rooms.py GROUPS, the states the Toolkit's tiles draw green: on
+# CHIM rooms with a way in, a room map of our own, or a district the district module built as open terrain (when the
+# data has no presented cell to count it under the terrain). The Toolkit's expansion-views.js READY_ROOM_STATES is the
+# same list; tests/test_master_completion.py keeps the three in step. 'room_map' was left out on 19 November 2026
+# (f87deed76, b82bd6693), which counted the opening sequence's two rooms not ready (TRACKER-ROOM-MAPS-NOT-READY-67).
+READY_ROOM_STATES = ('on_chim_rooms', 'room_map', 'district')
+# Special interiors: ready rooms in the game as a room map of our own, not on CHIM rooms; named under the count, never a
+# reason (the rows whose state is room_map, whatever the data holds)
+SPECIAL_ROOM_STATES = ('room_map',)
+SPECIAL_TEXT = 'special interiors, in the game as room maps of our own'
+ROOM_REASONS = {'converted': 'converted, not in the game yet',
                 'not_started': 'not started',
                 'teleport_only': 'still to build: no door leads there, a script or a dialogue line sends the player there',
                 'no_entrance': 'still to build: no door leads there, and no script or dialogue line names it',
@@ -135,7 +148,8 @@ def readiness(doc):
                                 'leads': LEADS.get(r.get('access') or '', r.get('access') or ''),
                                 'reasons': list(r.get('reasons') or [])})
                               for r in counted if r.get('state') not in READY_ROOM_STATES], ROOM_REASONS)
-        land['rooms'] = dict(figure(ready, len(counted)), not_ready=not_ready, as_terrain=as_terrain)
+        special = sorted(r['name'] for r in counted if r.get('state') in SPECIAL_ROOM_STATES)
+        land['rooms'] = dict(figure(ready, len(counted)), not_ready=not_ready, as_terrain=as_terrain, special=special)
         t, m = land['terrain'], land['rooms']
         land['total'] = figure(t['ready'] + m['ready'], t['total'] + m['total'])
     every = {k: figure(sum(by_id[i][k]['ready'] for i in by_id), sum(by_id[i][k]['total'] for i in by_id))
@@ -156,6 +170,7 @@ def summary(ready_doc):
                              not_ready=[{k: x[k] for k in ('reason', 'label', 'count')} for x in p['not_ready']])
         row['rooms']['not_ready_names'] = [i['name'] for x in land['rooms']['not_ready'] for i in x['items']]
         row['rooms']['as_terrain'] = list(land['rooms'].get('as_terrain') or [])
+        row['rooms']['special'] = list(land['rooms'].get('special') or [])
         out['lands'].append(row)
     return out
 

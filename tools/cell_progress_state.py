@@ -156,6 +156,9 @@ def ready_block(state):
         line = '- %s: not ready: %s.' % (x['name'], '; '.join(bits) if bits else 'none')
         if names:
             line += ' The rooms: %s.' % '; '.join(names)
+        if x['rooms'].get('special'):
+            # ready rooms named from the data, never a reason (TRACKER-ROOM-MAPS-NOT-READY-67)
+            line += ' Special interiors, ready, in the game as room maps of our own: %s.' % '; '.join(x['rooms']['special'])
         if x['rooms'].get('as_terrain'):
             line += ' Counted once, as open terrain: %s.' % '; '.join(x['rooms']['as_terrain'])
         out.append(line)

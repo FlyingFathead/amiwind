@@ -23,7 +23,6 @@ sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'tools')]
 import build  # noqa: E402
 import build_cache  # noqa: E402
 import build_report  # noqa: E402
-import bug_register  # noqa: E402
 from build_parallel import execute_parallel  # noqa: E402
 
 POSIX = os.name == 'posix'
@@ -233,9 +232,14 @@ class EarlyFailureTests(unittest.TestCase):
                                                               % build.VERSION))
             self.assertEqual(len(reports), 1, out)
             self.assertIn('Build report: %s' % reports[0], out)
-            # the build's last line names the one page there is (no run folder: the report)
-            self.assertEqual(err.strip().splitlines()[-1], 'Failure details: %s (the build stopped before it made its '
-                                                           'run folder)' % reports[0])
+            # the line that names the one page there is (no run folder: the report), then, as the build's last lines,
+            # what to do now (BUILD-OOM-HELP-AND-TIP-68)
+            import build_failure
+            lines = err.strip().splitlines()
+            named = lines.index('Failure details: %s (the build stopped before it made its run folder)' % reports[0])
+            self.assertEqual((lines[named + 1], lines[-1]), (build_failure.TIP_RULE, build_failure.TIP_RULE))
+            self.assertEqual(lines[named + 2], 'THE BUILD STOPPED before its first stage, on its own error:')
+            self.assertIn('Build report (the one file to send when you ask for help): %s' % reports[0], lines)
             text = reports[0].read_text(encoding='utf-8')
             self.assertIn('Run: not named yet', text)
             self.assertIn('The builder stopped outside its stages: ValueError: --prerendered takes one store folder',
@@ -498,10 +502,12 @@ class EnvironmentTests(unittest.TestCase):
         head = text.split('\n1. Result\n')[0]
         block = head.split('\nEnvironment (parts 3 and 5 have the details):\n')[1].split('\n\n')[0].splitlines()
         self.assertEqual([row.split(':')[0].strip() for row in block],
-                         ['Operating system', 'Container', 'Python', 'Cores', 'Memory', 'Free space'])
+                         ['Operating system', 'Container', 'Python', 'Cores', 'Memory', 'Swap', 'Memory peak',
+                          'Free space'])
         self.assertTrue(block[1].startswith('  Container: yes (our builder image amiwind-builder:local)'), block[1])
         self.assertRegex(block[2], r'^  Python: \S+ \(\w+\), the recorded reference \S+: (matching|newer|older|unknown)$')
-        self.assertRegex(block[5], r'^  Free space: .+ in the workspace, .+ in the temp folder$')
+        self.assertEqual(block[6], '  Memory peak: not recorded (the build kept no memory figures)')
+        self.assertRegex(block[7], r'^  Free space: .+ in the workspace, .+ in the temp folder$')
         self.assertIn('\nFree space in the temp folder (', text)
         self.assertLess(text.index('\nResult: passed\n'), text.index('\nEnvironment ('))
 
@@ -557,8 +563,8 @@ class PublicTextTests(unittest.TestCase):
         for text in (page, (ROOT / 'tools' / 'build_report.py').read_text(encoding='utf-8'),
                      Path(__file__).read_text(encoding='utf-8')):
             lowered = text.lower()
-            self.assertEqual([w for w in bug_register.PRIVATE_WORDS if w in lowered], [])
-            for word in ('tele' + 'gram', 'the ' + 'owner', ' cha' + 't ', 'chann' + 'el'):
+            # the full private word lists are checked by the maintainer's own tooling, not here
+            for word in ('the ' + 'owner', ' cha' + 't ', 'chann' + 'el'):
                 self.assertNotIn(word, lowered)
 
 

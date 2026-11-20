@@ -9,9 +9,10 @@
 | Where | Engine: the corpse and container loot window |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | fixed in v0.0.61 |
-| Severity | low: readable but cramped; the key help line is cut off at the bottom |
+| Persists in | v0.0.67 (last seen) |
+| Severity | medium: Regressed in v0.0.67 (was low): readable but cramped; the key help line is cut off at the bottom |
 | Family | Menus, HUD, map screen and text (`ui-text`) |
+| Came back (regression) | in v0.0.67 (fixed in v0.0.61 before) |
 | Playtest version | v0.0.61-dev1 |
 | From commit | source 374d59b, engine 374d59b, CHIM world 374d59b |
 | CHIM engine version | CHIM 0.2.2, engine 374d59b, world format unknown |
@@ -19,6 +20,17 @@
 | Platform or emulator | the delivered v0.0.61-dev1 image (playtest) |
 
 <!-- END GENERATED FACTS -->
+
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-05: reported in v0.0.61-dev1
+- 2026-11-20 14:47 +0200: came back in v0.0.67 (fixed in v0.0.61 before): Seen again in the v0.0.67 release: the container window's Take All and Close buttons have too little room above and below them; the room to their sides is right.
+
+<!-- END GENERATED TIMELINE -->
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -32,6 +44,7 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - [AW25-03](AW25-03.md): Map marker reported stale; HUD lacked global/local positions
 - [BARTER-TRADE-WINDOW-MISSING-67](BARTER-TRADE-WINDOW-MISSING-67.md): Missing: the original trade window: an offer the player changes, a running total of both sides, the merchant gold limit and restocking, haggling
 - [BLANK-PAPER-READ-60](BLANK-PAPER-READ-60.md): A blank sheet of paper offers Read although it has no text
+- [BOOK-PICTURE-MARKER-SHOWN-67](BOOK-PICTURE-MARKER-SHOWN-67.md): A book shows a line with a literal picture marker where the original draws an image (seen in a book on the stars, page 3 of 15)
 - BOOK-TEXT-MACROS-58 (no report page): A book read where it lies shows the text defines as written (Name: %PCName Race: %PCRace Class: %PCClass)
 - CHAR-CONFIRM-BORDER-29 (no report page): Character Go back / Choose actions lack OK-style frames
 - [CHARGEN-ABILITY-DESCRIPTIONS-65](CHARGEN-ABILITY-DESCRIPTIONS-65.md): The birthsign and race menus do not show what an ability or a special power does

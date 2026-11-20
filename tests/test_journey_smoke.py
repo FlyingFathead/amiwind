@@ -498,6 +498,32 @@ class JourneySmoke(unittest.TestCase):
         stop = [l for l in lines if l.startswith('STOP part A')]
         self.assertTrue(stop and js.WARP_MARK not in stop[0], stop)
 
+    def test_until_steps_take_their_forms(self):
+        """ACCELERATED-PLAYTHROUGH-66 step 1: waits by condition (tools/engine_smoke.py UNTIL-STEPS) pass into the parts'
+        scripts as written; a wrong form is refused with the step's name."""
+        head = 'part A\nstep 1 x\nprobe a getjournalindex A1_1_FindSpymaster\nexpect a == 1\n'
+        for good in ('until map census 45', 'until screen game 10', 'until server seyda 60', 'until loaded 60',
+                     'until journal A1_1_FindSpymaster 1 30', 'until journal A1_1_FindSpymaster -1 5',
+                     'until map seyda-chim.chim 30'):
+            j = js.parse(head + good + '\n')
+            self.assertIn(good, j['parts'][0]['lines'], good)
+        for bad in ('until loaded', 'until map census', 'until journal A1_1_FindSpymaster 30', 'until fly 3',
+                    'until loaded soon', 'until journal A1 1 x'):
+            with self.assertRaises(js.JourneyError, msg=bad) as e:
+                js.parse(head + bad + '\n')
+            self.assertIn("until", str(e.exception))
+
+    def test_the_opening_waits_for_its_loads_by_condition(self):
+        """ACCELERATED-PLAYTHROUGH-66 step 1: no fixed wait follows a map change in the opening journey: each waitfor map
+        or server is followed by until loaded, and Sellus Gravius' journal entry is waited for by its index."""
+        lines = [l.strip() for l in JOURNEY.read_text(encoding='utf-8').splitlines()
+                 if l.strip() and not l.strip().startswith('#')]
+        changes = [i for i, l in enumerate(lines) if re.match(r'waitfor (map|server) ', l)]
+        for i in changes:
+            self.assertFalse(lines[i + 1].startswith('wait '), 'a fixed wait after %r' % lines[i])
+        self.assertGreaterEqual(sum(lines[i + 1] == 'until loaded 60' for i in changes), 10)
+        self.assertIn('until journal A1_1_FindSpymaster 1 15', lines)
+
     def test_part_b_not_run_fails(self):
         ok, lines = js.judge(self.j, [self.runs()[0], None])
         self.assertFalse(ok)

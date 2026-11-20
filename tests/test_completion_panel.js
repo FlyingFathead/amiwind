@@ -15,6 +15,25 @@ const counted = EV.readiness(bare);
 assert.strictEqual(EV.readiness(null), null);
 assert.strictEqual(EV.readyPct(1, 3), 33.3); assert.strictEqual(EV.readyPct(1, 8), 12.5); assert.strictEqual(EV.readyPct(0, 0), 0);
 
+// TRACKER-ROOM-MAPS-NOT-READY-67 (a regression of 19 November 2026): a room map of our own is in the game, so it is ready,
+// named as a special interior and never a reason; the old rule counted it not ready. Data written by that rule (format -1)
+// is counted again by the current one.
+const mapRoom = (name, state) => ({id: name, name, island: 'Vvardenfell', master: 'Morrowind.esm', state, access: 'door', reasons: []});
+const two = EV.computeReadiness({cells: {}, interior_rooms: {rooms: [mapRoom('Imperial Prison Ship', 'room_map'),
+  mapRoom('Seyda Neen, Census and Excise Office', 'room_map'), mapRoom('Seyda Neen, Arrille\'s Tradehouse', 'on_chim_rooms')]}});
+const vv = two.lands.find(l => l.id === 'vvardenfell');
+assert.deepStrictEqual([vv.rooms.ready, vv.rooms.total, vv.rooms.percent], [3, 3, 100], 'room maps of our own count ready');
+assert.deepStrictEqual(vv.rooms.not_ready, [], 'a room map of our own is not a reason');
+assert.deepStrictEqual(vv.rooms.special, ['Imperial Prison Ship', 'Seyda Neen, Census and Excise Office']);
+assert(EV.READY_ROOM_STATES.includes('room_map') && EV.SPECIAL_ROOM_STATES.every(s => EV.READY_ROOM_STATES.includes(s)));
+const oldRule = Object.assign({}, two, {format: 'aw-land-readiness-1'});
+assert.notStrictEqual(EV.readiness({cells: {}, interior_rooms: {rooms: []}, readiness: oldRule}), oldRule, 'old-rule data is counted again');
+const vvRow = H.readinessRows({islands: []}, two)[0].html;
+assert(vvRow.includes(EV.SPECIAL_TEXT + ': Imperial Prison Ship; Seyda Neen, Census and Excise Office'), 'the head row names them: ' + vvRow);
+assert(vvRow.includes('not ready: none'), 'and nothing of Vvardenfell is not ready: ' + vvRow);
+const vvPanel = CP.panelHtml(null, two, 'vvardenfell');
+assert(vvPanel.includes('special interiors (room maps of our own)') && vvPanel.includes('id="cp-vvardenfell-special"'), 'the panel names them');
+
 // the headline: one row per land with the same three columns, one for all lands, then the build
 const rows = H.headRows(doc.headline, null, doc.readiness);
 assert.strictEqual(rows.length, 5, 'three lands, all lands, the build: ' + rows.length);

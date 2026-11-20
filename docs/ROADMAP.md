@@ -1,10 +1,11 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.67 (19 November 2026)._
+_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.68: in progress, first snapshot 20 November 2026](#v0068-in-progress-first-snapshot-20-november-2026)
 - [v0.0.67: Tribunal Introduced, released 19 November 2026](#v0067-tribunal-introduced-released-19-november-2026)
 - [v0.0.66: Forward It Is, released 16 November 2026](#v0066-forward-it-is-released-16-november-2026)
 - [v0.0.65: Reintroducing Vvardenfell](#v0065-reintroducing-vvardenfell)
@@ -117,6 +118,34 @@ _Last updated with AmiWind v0.0.67 (19 November 2026)._
 [CHIM-RECIPE-APRON-SCOPE-41](bugs/CHIM-RECIPE-APRON-SCOPE-41.md) — 15 October 2026, v0.0.41 candidate: recipe repair converted all four affected frames with structural PASS. Three still failed the unchanged memory gate (peaks 6,957,632; 6,939,952; 6,644,768 bytes for (10,0), (10,1), (9,2)); (11,0) passed at 5,875,568 bytes. The separate placed-model reserve repair passes all four on identical world bytes. A complete successor world and recipe/model/sprite equivalence and native checks remain pending.
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
+
+## v0.0.68: in progress, first snapshot 20 November 2026
+
+v0.0.68 has no title yet. Its first development snapshot,
+[v0.0.68-dev1](releases/notes/RELEASE-v0.0.68-dev1.md), is out; it is not Solstheim yet and the game in it is the one of
+v0.0.67. What it carries: the progress tracker counts the two opening rooms (the Imperial Prison Ship and Seyda Neen,
+Census and Excise Office) as ready and lists them as special interiors; a build that stops ends with a plain block
+(why, that the finished work is kept, the command that continues it, what to try); the automated playthroughs wait by
+condition; and the private word lists left the public tree. The work of the line is the plan under "Next version"
+below: Tribunal's Mournhold with its quests and Bloodmoon's Solstheim, with their scripts, dialogue and save, in the
+order of record there; no dates are promised.
+
+Planned in this line, besides the plan below:
+
+- **A build that fits a 32 GB machine, and continues after a stop.** A plan from the measured stage peaks in the build's
+  first minute, stages that do not fit side by side run one after another, every reduction written as a warning in the
+  log, the work of the long stages stored as it finishes so a stop does not redo hours, and the CHIM world stage's main
+  process split; the build guide and the README state the memory a build needs (BUILD-TESTER-32GB-OOM-67). The advice
+  after a stop is in dev1.
+- **The debug arena's custom play mode.** A choose-your-opponent list of every creature and person of the game (search,
+  sort by name or level) with a stats box to confirm, one or several opponents with their aggression on, and your own
+  level, stats, skills and gear set on a console-font screen, started from the arena's title screen
+  (DBG-ARENA-PICKER-62).
+- **The debug teleport says when it sets the player down in water** with no dry floor at that point, such as a flooded
+  room or a dive-only passage (DBG-TP-WATER-ARRIVAL-WARNING-68).
+- **Early studies in their own folder.** Studies and plans of earlier development eras move into the history folder,
+  each marked as historical, so the main docs describe the game and the builder as they are now
+  (DOCS-EARLY-STUDIES-ARCHIVED-68).
 
 ## v0.0.67: Tribunal Introduced, released 19 November 2026
 

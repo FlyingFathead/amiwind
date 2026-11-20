@@ -1,6 +1,6 @@
 # FS-UAE development access
 
-_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
+_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -87,12 +87,21 @@ shots and replays. It takes one step per line:
 - `examine NAME`: logs the stall examination of the running game (the processor samples, what every task and
   file-system handler waits on, the game's pending file request, the load trace ring) without failing the run: a
   baseline that a later stop's line is read against.
+- `until map NAME SECS`, `until screen NAME SECS`, `until server NAME SECS`: wait until that value of the game's state
+  holds NAME, at most SECS seconds.
+- `until loaded SECS`: after a map change, wait until the map is in play (its world loaded, the game or a message box
+  on the screen) and has settled: the game's clock has moved 2 seconds since, and the last frame took under 100 ms. A
+  map that does not get there in SECS seconds is examined like any other stop.
+- `until journal QUEST N SECS`: wait until the quest's journal index is N or more (the game is asked about once a
+  second).
 - `emu KEY=VALUE`: an extra line for the emulator's configuration, as `--emu-option` gives one (below), so that a
   session script asks for the emulator setting it needs itself. It is read before the emulator starts, checked in
   the emulator's start-up log, and refused for a key the smoke sets itself (warp among them, below).
 
 Any other line is a comment. The run passes if the game survives the whole script. When the examination of a stop
-fails, its error is kept in `logs/stall-errors.txt` and the emulator is resumed all the same.
+fails, its error is kept in `logs/stall-errors.txt` and the emulator is resumed all the same. The `until` steps wait
+only as long as the game needs: a fixed `wait` counts the host's seconds, which are too many on a quiet machine and too
+few on a loaded one.
 
 **Warp mode is never a measurement** (decided for the project, 17 November 2026). FS-UAE's warp mode runs the
 emulated machine without frame pacing and without sound. Checks that read the game's state (the inventory, the

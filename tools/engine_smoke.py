@@ -492,11 +492,49 @@ look_at(){ k=0; seen=
     [ "$got" = none ] && break
     seen="$seen ${got:-?}"; k=$((k+1)); done
   shot "lookat-missing-$1"; finish "FAIL lookat $1: not among the nearest drawn placed items (saw:${seen:- none}; local $(st local))"; }
+# UNTIL-STEPS (ACCELERATED-PLAYTHROUGH-66, 17 November 2026): waits by condition instead of a fixed number of seconds,
+# each with a limit in seconds, so a session waits only as long as the game needs (a fixed "wait N" is host seconds,
+# too long on a quiet machine and too short on a loaded one; the opening journey held 579 s of them):
+#   until map NAME SECS      the client's map holds NAME (as waitfor map); "until screen" and "until server" alike
+#   until loaded SECS        after a map change: the map is in play (signon 4, its world, the game or a message box on
+#                            the screen) and has settled: the game clock moved SETTLE seconds (2) since it was first
+#                            seen in play, and the last frame took under 100 ms; a box on arrival is left for "boxes"
+#   until journal QUEST N SECS   the quest's journal index is N or more (getjournalindex, asked about once a second)
+until_step(){ k=$1; shift
+  case "$k" in
+    map|screen|server) wait_for "$k" "$2" "$1";;
+    loaded) until_loaded "$1";;
+    journal) until_journal "$1" "$2" "$3";;
+    *) finish "FAIL until $k: not a condition (map, screen, server, loaded, journal)";;
+  esac; }
+until_loaded(){ s=0; r0=
+  while [ $s -lt $((${1:-60}*K)) ]; do alive || finish "FAIL emulator exited waiting for the map to load"
+    w=$(st screen)
+    if [ "$(st signon)" = 4 ] && [ "$(st world_leafs)" -gt 0 ] 2>/dev/null && { [ "$w" = game ] || [ "$w" = messagebox ]; }; then
+      r=$(st realtime); f=$(st frame_ms)
+      if [ -z "$r0" ]; then r0=$r
+      elif echo "$r0 $r $f ${SETTLE:-2}" | awk 'NF==4 && $2-$1>=$4 && $3<100 {ok=1} END{exit !ok}'; then
+        log "until loaded: $(st map) after $s s (game clock $r0 -> $r, frame $f ms, screen $w)"; return 0; fi
+    else r0=; fi
+    sleep 1; s=$((s+1)); done
+  shot until-loaded
+  stall "the map did not load and settle in ${1:-60} s: screen $(st screen), signon $(st signon), world leaves $(st world_leafs), map $(st map)"; }
+until_journal(){ q=$1; want=$2; s=0; v=
+  while [ $s -lt $((${3:-30}*K)) ]; do alive || finish "FAIL emulator exited waiting for the journal of $q"
+    M0=$(clines); rc "getjournalindex $q"; t=0; a=
+    while [ $t -lt $((5*K)) ]; do sleep 1; t=$((t+1)); s=$((s+1))
+      a=$(since "$M0" | grep -i 'dbg mwscript call journal' | tail -n 1); [ -n "$a" ] && break; done
+    case "$a" in *"no such quest"*) finish "FAIL until journal $q $want: $a";; esac
+    v=$(echo "$a" | sed -n 's/.*call journal: [^ ]* \(-\{0,1\}[0-9][0-9]*\).*/\1/p')
+    [ -n "$v" ] && [ "$v" -ge "$want" ] 2>/dev/null && { log "until journal $q $want: index $v after $s s"; return 0; }
+  done
+  finish "FAIL until journal $q $want: read '${v:-no answer}' after ${3:-30} s (map $(st map), screen $(st screen))"; }
 # WALKER-STEPS-END
 # SCRIPT: a scripted session instead of the music and second-load steps (evidence shots, replays). One step per line:
 # "cmd TEXT" console command, "key NAME" key press, "xdo ARGS" raw xdotool steps (mouse, held keys), "wait S" S seconds of game time (the game must keep running),
 # "shot NAME" screenshot shots/NAME.png, "rec NAME" starts the clip shots/NAME.mp4, "recstop" ends it,
-# "state KEY" logs that state value, "examine NAME" logs the stall examination of the running game (a baseline);
+# "state KEY" logs that state value, "examine NAME" logs the stall examination of the running game (a baseline),
+# "until map|screen|server NAME SECS", "until loaded SECS", "until journal QUEST N SECS" wait by condition (UNTIL-STEPS);
 # other lines are comments. Ends PASS
 # when the game survives the whole script.
 if [ -s $R/script.txt ]; then
@@ -522,6 +560,7 @@ if [ -s $R/script.txt ]; then
     face\ *) set -- ${line#face }; face "$1" "$2" "$3";;
     aimed\ *) set -- ${line#aimed }; aimed "$1" "$2";;
     lookat\ *) look_at "${line#lookat }";;
+    until\ *) set -- ${line#until }; until_step "$@";;
     esac
     alive || finish "FAIL emulator exited after script step: $line"
   done 3< $R/script.txt

@@ -1240,7 +1240,9 @@ class ReleaseUiTests(unittest.TestCase):
         # 2026-11-19 (maintainer, TOOLKIT-EXPANSION-COMPLETION-67): one unified count when the data's readiness is given: every
         # land in the same three columns (open terrain, rooms, total ready), a row for all lands, the audit figures on the line
         # under each land; without readiness the rows are as before, and the header block and its layout are unchanged.
-        self.assertEqual(hashlib.sha256(head).hexdigest(), 'e2c5f50d1579a89e653b6d2306edc140643ee33853f191906e9838ac835afea6')
+        # 2026-11-20 (maintainer, TRACKER-ROOM-MAPS-NOT-READY-67): the line under each land names its special interiors (ready
+        # rooms in the game as room maps of our own, from the data); the header block and its layout are unchanged.
+        self.assertEqual(hashlib.sha256(head).hexdigest(), '1d2fed11812ee95e2608134d0b17d94976a99a5b5ec03c67bb93c975322c6e00')
 
     def test_one_header_for_every_toolkit_page(self):
         # The shared header (header.js) is the logo block of index.html: same logo file, same version line. Pages opened on their

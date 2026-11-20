@@ -117,8 +117,9 @@ class ReadinessTests(unittest.TestCase):
 
     def test_rooms_by_master_districts_once_and_still_to_build(self):
         v, s, m = self.lands['vvardenfell'], self.lands['solstheim'], self.lands['mournhold']
-        # a base-game room on Solstheim counts for Solstheim; a no-entrance room for its master's land
-        self.assertEqual((v['rooms']['ready'], v['rooms']['total']), (1, 3))
+        # a base-game room on Solstheim counts for Solstheim; a no-entrance room for its master's land; the prison ship
+        # (a room map of our own) is ready (TRACKER-ROOM-MAPS-NOT-READY-67)
+        self.assertEqual((v['rooms']['ready'], v['rooms']['total']), (2, 3))
         self.assertEqual((s['rooms']['ready'], s['rooms']['total']), (2, 3))
         # the plaza is open terrain (its cells), so it is not a room as well; the others are not ready with a reason
         self.assertEqual(m['rooms']['as_terrain'], ['Mournhold, Plaza Brindisi Dorom'])
@@ -128,15 +129,51 @@ class ReadinessTests(unittest.TestCase):
                                    'no_entrance': ['Mournhold, Royal Palace']})
         sotha = m['rooms']['not_ready'][1]['items'][0]
         self.assertIn('script', sotha['leads'])
-        self.assertEqual(v['rooms']['not_ready'][0]['label'], MC.ROOM_REASONS['room_map'])
+        # Vvardenfell's only room not ready is the test cell; the ship is named as a special interior, not as a reason
+        self.assertEqual({r['reason']: [i['name'] for i in r['items']] for r in v['rooms']['not_ready']},
+                         {'test_cell': ['ToddTest']})
+        self.assertEqual(v['rooms']['special'], ['Imperial Prison Ship'])
+        self.assertEqual((s['rooms']['special'], m['rooms']['special']), ([], []))
+
+    def test_a_room_map_of_our_own_counts_ready(self):
+        """TRACKER-ROOM-MAPS-NOT-READY-67, a regression of f87deed76 / b82bd6693 (19 November 2026): the ready room
+        states left out 'room_map', so the opening sequence's two rooms, in the game as room maps of our own since
+        v0.0.48, were counted not ready (Vvardenfell rooms 1,129 of 1,131). Fails on that rule."""
+        rooms = [room('Imperial Prison Ship', 'Vvardenfell', 'Morrowind.esm', 'room_map', 'teleport_only'),
+                 room('Seyda Neen, Census and Excise Office', 'Vvardenfell', 'Morrowind.esm', 'room_map'),
+                 room('Seyda Neen, Arrille\'s Tradehouse', 'Vvardenfell', 'Morrowind.esm', 'on_chim_rooms')]
+        ready = MC.readiness({'cells': {}, 'interior_rooms': {'rooms': rooms}})
+        v = next(x for x in ready['lands'] if x['id'] == 'vvardenfell')
+        self.assertEqual((v['rooms']['ready'], v['rooms']['total'], v['rooms']['percent']), (3, 3, 100.0))
+        self.assertEqual(v['rooms']['not_ready'], [])
+        self.assertEqual(v['rooms']['special'], ['Imperial Prison Ship', 'Seyda Neen, Census and Excise Office'])
+        self.assertIn('room map of our own', ready['definition'])
+        self.assertIn('special interiors', ready['definition'])
+        summ = MC.summary(ready)['lands'][0]['rooms']
+        self.assertEqual((summ['not_ready'], summ['not_ready_names'], summ['special']),
+                         ([], [], ['Imperial Prison Ship', 'Seyda Neen, Census and Excise Office']))
+        # no ready state is a reason: a not-ready label for one would put it under "not ready" again
+        self.assertFalse(set(MC.READY_ROOM_STATES) & set(MC.ROOM_REASONS))
+
+    def test_ready_rooms_are_the_in_game_group(self):
+        """One definition: the ready room states are the tracker's in-game group (tools/cell_progress_rooms.py GROUPS),
+        the states the Toolkit's tiles draw green; the Toolkit's own list is checked against it in ToolkitParityTests."""
+        import cell_progress_rooms as RM
+        self.assertEqual(tuple(MC.READY_ROOM_STATES), tuple(RM.GROUPS['in_game'][1]))
+        self.assertTrue(set(MC.SPECIAL_ROOM_STATES) <= set(MC.READY_ROOM_STATES))
+
+    def test_old_readiness_data_is_counted_again(self):
+        """Data whose readiness was written by the old rule (format aw-land-readiness-1) is never drawn as it is."""
+        self.assertNotEqual(MC.FORMAT, 'aw-land-readiness-1')
 
     def test_totals_and_all_lands(self):
         for land in self.ready['lands']:
             t, r, a = land['terrain'], land['rooms'], land['total']
             self.assertEqual((a['ready'], a['total']), (t['ready'] + r['ready'], t['total'] + r['total']))
         a = self.ready['all']
-        self.assertEqual((a['total']['ready'], a['total']['total']), (10, 19))
-        self.assertEqual(a['total']['percent'], 52.6)
+        self.assertEqual((a['total']['ready'], a['total']['total']), (11, 19))
+        self.assertEqual(a['total']['percent'], 57.9)
+        self.assertEqual((a['rooms']['ready'], a['rooms']['total']), (6, 11))
         self.assertEqual(MC.pct(1, 8), 12.5)
         self.assertEqual(MC.pct(1, 3), 33.3)
         self.assertEqual(MC.pct(2, 3), 66.7)
@@ -196,6 +233,9 @@ class ReadinessTests(unittest.TestCase):
         state = json.loads((ROOT / 'docs' / 'chim' / 'progress-state.json').read_text(encoding='utf-8'))
         r = state.get('readiness')
         self.assertIsNotNone(r, 'docs/chim/progress-state.json carries the readiness count (snapshot it again)')
+        self.assertEqual(r['format'], MC.FORMAT, 'the snapshot is counted by the current rules (snapshot it again)')
+        for land in r['lands']:      # a special interior is ready: never under "not ready" as well
+            self.assertFalse(set(land['rooms'].get('special') or []) & set(land['rooms']['not_ready_names']), land['name'])
         islands = {i['island']: i for i in state['islands']}
         for land in r['lands']:
             if land['island'] in islands:
@@ -228,6 +268,20 @@ class ToolkitParityTests(unittest.TestCase):
         self.assertIn('PASS completion panel', res.stdout)
         counted = json.loads(res.stdout.splitlines()[0])
         self.assertEqual(counted, json.loads(json.dumps(doc['readiness'])), 'the page counts as the generator does')
+
+    def test_toolkit_ready_room_states_are_the_generators(self):
+        """The Toolkit's READY_ROOM_STATES, SPECIAL_ROOM_STATES and READY_FORMAT are the generator's
+        (TRACKER-ROOM-MAPS-NOT-READY-67: the two lists were left without 'room_map' together)."""
+        node = shutil.which('node')
+        if not node:
+            self.skipTest('Node.js unavailable')
+        script = ('const v = require(process.argv[1]); console.log(JSON.stringify([v.READY_ROOM_STATES, '
+                  'v.SPECIAL_ROOM_STATES, v.READY_FORMAT, v.SPECIAL_TEXT]))')
+        res = subprocess.run([node, '-e', script, str(ROOT / 'amiwind-toolkit' / 'expansion-views.js')],
+                             capture_output=True, text=True, timeout=60)
+        self.assertEqual(res.returncode, 0, res.stdout + res.stderr)
+        self.assertEqual(json.loads(res.stdout), [list(MC.READY_ROOM_STATES), list(MC.SPECIAL_ROOM_STATES), MC.FORMAT,
+                                                  MC.SPECIAL_TEXT])
 
 
 if __name__ == '__main__':

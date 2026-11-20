@@ -176,5 +176,6 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 Related bugs in other categories:
 
 - [DIALOGUE-AGGRO-62](DIALOGUE-AGGRO-62.md): A robber whose answer ends in a threat does nothing once the talk closes
+- [DISTRICT-NEW-FIGHT-ATTACKERS-ON-SAME-MAP-RELOAD-67](DISTRICT-NEW-FIGHT-ATTACKERS-ON-SAME-MAP-RELOAD-67.md): After a teleport inside Plaza Brindisi Dorom the guards and high ordinators attack the player together with the fabricants
 
 <!-- END GENERATED CATEGORY -->

@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.67 (19 November 2026)._
+_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -60,6 +60,10 @@ the [changelog](docs/CHANGELOG.md#v0067-tribunal-introduced-19-november-2026) an
 [v0.0.67 release notes](docs/releases/notes/RELEASE-v0.0.67.md), which link the notes of the three development
 snapshots. Known problems: the notes' "Known in this build" and [the bug tracker](docs/BUGS.md).
 
+**In development: v0.0.68-dev1** (20 November 2026), the first snapshot of the next version: the game is the one of
+v0.0.67, and a build that stops now says why, keeps its work and prints the command that continues it
+([v0.0.68-dev1 notes](docs/releases/notes/RELEASE-v0.0.68-dev1.md)).
+
 The release before it, **v0.0.66: Forward It Is**, took the game forward on the road to the expansions: people and
 creatures cast spells and shoot bows, the dead stay dead, a fuller map, a save that keeps every change, and an opening
 that holds its controls as the original does ([v0.0.66 notes](docs/releases/notes/RELEASE-v0.0.66.md)).
@@ -67,7 +71,7 @@ that holds its controls as the original does ([v0.0.66 notes](docs/releases/note
 ## What already works
 
 - **Vvardenfell, whole.** All 1,408 exterior cells of the main island (1,292 land and 116 sea) on CHIM, streamed as you walk, and 1,121 of its
-  1,123 interiors as CHIM rooms (the prison ship and the census office stay room maps of their own), with the people and
+  1,123 interiors as CHIM rooms (the prison ship and the census office are room maps of their own, counted as ready), with the people and
   creatures the game places in them ([CHIM progress tracker](docs/chim/PROGRESS_TRACKER.md),
   [the map's colours](docs/chim/CHIM_PROGRESS_MAP.md)). Every load door of the base game leads in and back out.
 - **Play:** character creation through the opening; the inventory, the journal and the map; saving and loading, with what
@@ -112,8 +116,10 @@ What is not working yet, and what is in work:
 Every system of the base game with its state: [game features](docs/GAME_FEATURES.md). Known problems:
 [the bug tracker](docs/BUGS.md).
 
-**Then v0.0.68** continues with the expansions' finished content: Tribunal's Mournhold with its quests and Bloodmoon's
-Solstheim, with their scripts; then the rest of the open plan. The order of record is the [roadmap](docs/ROADMAP.md); no dates are promised.
+**Then v0.0.68** (in development, [dev1](docs/releases/notes/RELEASE-v0.0.68-dev1.md) is out) continues with the
+expansions' finished content: Tribunal's Mournhold with its quests and Bloodmoon's Solstheim, with their scripts; a
+build that fits a 32 GB machine; then the rest of the open plan. The order of record is the [roadmap](docs/ROADMAP.md);
+no dates are promised.
 
 ## Build it from your own Morrowind
 
@@ -143,11 +149,14 @@ spot: [MiniWind: the test ground](docs/MINIWIND.md) and the [build type referenc
 
 **If a build fails, send the file `logs/BUILD-REPORT-<run>.txt`** from the build workspace (`out/` by default; the
 build prints where it is): one file with what failed and every setting, kept on your computer until you send it
-([when a build fails](docs/LINUX_BUILD.md#when-a-build-fails)).
+([when a build fails](docs/LINUX_BUILD.md#when-a-build-fails)). **A build that stopped, out of memory included, is
+never started over:** do not delete the build folder, run the same command again from the same folder, and the
+finished work is taken back; the build's last lines say what to change first
+([the build stopped or ran out of memory: what now?](docs/LINUX_BUILD.md#the-build-stopped-or-ran-out-of-memory-what-now)).
 
 The emulator presets of this version are
-[`AmiWind-v0.0.67-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.67-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.67-WinUAE.uae`](resources/emulators/AmiWind-v0.0.67-WinUAE.uae); both start with 32 MB of Fast
+[`AmiWind-v0.0.68-dev1-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.68-dev1-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.68-dev1-WinUAE.uae`](resources/emulators/AmiWind-v0.0.68-dev1-WinUAE.uae); both start with 32 MB of Fast
 RAM, the requirement. The presets of earlier versions are beside them in [resources/emulators](resources/emulators/). Everything
 else about building and playing: [Building and playing](docs/BUILDING_AND_PLAYING.md), the
 [Linux build guide](docs/LINUX_BUILD.md) and the [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md).

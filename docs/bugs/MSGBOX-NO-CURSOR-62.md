@@ -86,6 +86,7 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - [AW25-03](AW25-03.md): Map marker reported stale; HUD lacked global/local positions
 - [BARTER-TRADE-WINDOW-MISSING-67](BARTER-TRADE-WINDOW-MISSING-67.md): Missing: the original trade window: an offer the player changes, a running total of both sides, the merchant gold limit and restocking, haggling
 - [BLANK-PAPER-READ-60](BLANK-PAPER-READ-60.md): A blank sheet of paper offers Read although it has no text
+- [BOOK-PICTURE-MARKER-SHOWN-67](BOOK-PICTURE-MARKER-SHOWN-67.md): A book shows a line with a literal picture marker where the original draws an image (seen in a book on the stars, page 3 of 15)
 - BOOK-TEXT-MACROS-58 (no report page): A book read where it lies shows the text defines as written (Name: %PCName Race: %PCRace Class: %PCClass)
 - CHAR-CONFIRM-BORDER-29 (no report page): Character Go back / Choose actions lack OK-style frames
 - [CHARGEN-ABILITY-DESCRIPTIONS-65](CHARGEN-ABILITY-DESCRIPTIONS-65.md): The birthsign and race menus do not show what an ability or a special power does

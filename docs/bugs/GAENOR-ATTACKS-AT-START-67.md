@@ -34,6 +34,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 - 2026-11-19: reported in v0.0.67-dev3
 - 2026-11-19: fixed in source: a gated commit, v0.0.67 (e502f689); gate 11902 of the planning item GAENOR-ATTACKS-AT-START-67: A fight of the map left no longer passes to the actors of the next map, and the level 50 Gaenor stays out of the world and out of fights until his quest stage; fixed in source, the in-game check follows
+- 2026-11-20 13:23 +0200: seen again in v0.0.67: Seen in play on the release image 2b086671 on 19 November 2026: on a new game the beggar in the Temple courtyard does not attack and his dialogue opens.
 
 <!-- END GENERATED TIMELINE -->
 

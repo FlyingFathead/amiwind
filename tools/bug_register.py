@@ -347,21 +347,11 @@ def _line_ok(text, limit):
 LINE_MAX = 2000
 
 
-# Names the public text never holds, any case (the maintainer, 24 and 29 October 2026): kept in pieces so no file of the
-# tree spells them. tests/test_public_tree_private_words.py takes this tuple for its whole-tree check, and the gate's
-# first step (the maintainer's private list, a longer one) checks every commit.
-PRIVATE_WORDS = ('cla' + 'ude', 'open' + 'ai', 'chatg' + 'pt', 'anthrop' + 'ic', 'cop' + 'ilot', 'gem' + 'ini',
-                 'deep' + 'seek', 'mid' + 'journey')
-
 
 def validate_facts(b, ids, families, where):
     errors = []
-    # the register is public: no field of any bug names the private working folder or a tool (the maintainer,
-    # 24 October 2026; tests/test_public_tree_private_words.py checks the whole public tree in the gate)
-    text = json.dumps(b, ensure_ascii=False).lower()
-    for word in PRIVATE_WORDS:
-        if word in text:
-            errors.append('%s: a field holds a private word (%s...): the register is public' % (where, word[:3]))
+    # the register is public: its private-word check runs in the maintainer's own tooling (the privacy step of every
+    # gate and the release guard read the whole public tree, the register included), not in the public tree
     missing = [k for k in FACTS if k not in b]
     if missing:
         if needs_facts(b) or has_facts(b):

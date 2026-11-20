@@ -1,5 +1,14 @@
 # PLAZA-FABRICANTS-LIVE-AT-START-67: Plaza Brindisi Dorom holds the fabricants of a later quest from the start of a new game, one ready to attack on sight
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.67 at 2026-11-19 19:10 +0200: Seen again on the v0.0.67 release image after the fight fix: on the first arrival in Plaza Brindisi Dorom the four fabricants are hidden and peaceful, but a teleport inside the Plaza, which loads the same map again, draws all four (they do not fight). The same happens in Seyda Neen loaded again while the player is there: two Dreamers and the falling mage, whom the new game's start script keeps away, are drawn. Leaving a place and coming back is not affected. Cause: a load of the map already in play was not taken as a new map, so what the scripts had disabled was not hidden again.
+- Reported with v0.0.67 at 2026-11-20 13:55 +0200: Seen in play on the respin image 1246c42 on 19 November 2026: after a teleport inside the map the hidden fabricants stay hidden.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -36,8 +45,18 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-19: fixed in source: a gated commit, v0.0.67 (e502f689); gate 11902 of the planning item PLAZA-FABRICANTS-LIVE-AT-START-67: A person or creature that its script keeps out of the world no longer starts or joins a fight; fixed in source, the in-game check follows
 - 2026-11-19: fixed in source: a gated commit, v0.0.67 (791ec8df); gate 11940 of the planning item PLAZA-FABRICANTS-LIVE-AT-START-67: Every load of a map hides what the scripts disabled: seen in play on the v0.0.67 respin image in the Plaza and Seyda Neen after a teleport inside the map, a quickload and a change of place
 - 2026-11-19 19:10 +0200: seen again in v0.0.67: Seen again on the v0.0.67 release image after the fight fix: on the first arrival in Plaza Brindisi Dorom the four fabricants are hidden and peaceful, but a teleport inside the Plaza, which loads the same map again, draws all four (they do ...
+- 2026-11-20 13:55 +0200: seen again in v0.0.67: Seen in play on the respin image 1246c42 on 19 November 2026: after a teleport inside the map the hidden fabricants stay hidden.
 
 <!-- END GENERATED TIMELINE -->
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Timeline](#timeline)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -196,7 +215,9 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 Related bugs in other categories:
 
 - [COMBAT-FIGHT-CARRIED-TO-NEW-MAP-67](COMBAT-FIGHT-CARRIED-TO-NEW-MAP-67.md): After a map change, the actors of the new place who take the places of the last place's fighters in memory attack the player at once
+- [DISTRICT-NEW-FIGHT-ATTACKERS-ON-SAME-MAP-RELOAD-67](DISTRICT-NEW-FIGHT-ATTACKERS-ON-SAME-MAP-RELOAD-67.md): After a teleport inside Plaza Brindisi Dorom the guards and high ordinators attack the player together with the fabricants
 - [DISTRICT-PEOPLE-NOT-PLACED-67](DISTRICT-PEOPLE-NOT-PLACED-67.md): The people of Mournhold's five districts are not in the game: 50 of Mournhold's 168 people and 8 of its 244 creatures are not placed
 - [EXPANSION-SCRIPTS-NOT-ATTACHED-66](EXPANSION-SCRIPTS-NOT-ATTACHED-66.md): The scripts of the people, creatures and objects that Tribunal and Bloodmoon place are not attached, also in the expansion rooms the image holds
+- [FABRICANTS-STAY-DRAWN-IN-FIGHT-67](FABRICANTS-STAY-DRAWN-IN-FIGHT-67.md): Two verminous fabricants that a script keeps out of the world stay drawn while they fight
 
 <!-- END GENERATED CATEGORY -->

@@ -1,5 +1,14 @@
 # BUILD-SETUP-ONE-CORE-66: A full build spends about five minutes on one core before its first stage starts
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.66-dev2 at 2026-11-13 20:08 +0000: PERSISTING: the v0.0.66-dev2 start-up ran on one core for about 9 minutes, three times for the same commit and settings: the plan check (522.7 s, passed), the build request's own check, then the build's start before its first stage. Planned: a build reuses a passed check of the same commit and arguments; the unit key pass runs in parallel.
+- Reported with v0.0.67 at 2026-11-20 14:34 +0200: Seen again in the v0.0.67 rooms build: the setup before the first stage ran on one of 24 workers for minutes; the stages then used about eight cores.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -26,8 +35,18 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 - 2026-11-12: reported in v0.0.66-dev1
 - 2026-11-13 20:08 +0000: seen again in v0.0.66-dev2: PERSISTING: the v0.0.66-dev2 start-up ran on one core for about 9 minutes, three times for the same commit and settings: the plan check (522.7 s, passed), the build request's own check, then the build's start before its first stage.
+- 2026-11-20 14:34 +0200: seen again in v0.0.67: Seen again in the v0.0.67 rooms build: the setup before the first stage ran on one of 24 workers for minutes; the stages then used about eight cores.
 
 <!-- END GENERATED TIMELINE -->
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Timeline](#timeline)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -107,6 +126,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - BUILD-INPUTS-LOCK-TMP-RACE-54 (no report page): Two MiniWinds started together race on the input lock: one fixed temp name, so the first build dies at start
 - [BUILD-INTERIORS-UNDERUSED-62](BUILD-INTERIORS-UNDERUSED-62.md): The Balmora interiors stage ran at 2.46 of 12 allowed cores with 16 units queued in the v0.0.62 release build
 - [BUILD-JOBS-RESOLVE-PER-STAGE-32](BUILD-JOBS-RESOLVE-PER-STAGE-32.md): With automatic jobs, stages of one build plan can get different worker counts
+- [BUILD-KIT-SOURCE-COPY-ONE-CORE-67](BUILD-KIT-SOURCE-COPY-ONE-CORE-67.md): The source copy of a release kit writes 4.5 GB on about one core and takes about eighteen minutes
 - [BUILD-LARGE-ROOMS-CHECK-LATE-66](BUILD-LARGE-ROOMS-CHECK-LATE-66.md): The large-rooms table check runs about an hour and a half into a build instead of in its first minute
 - BUILD-M68K-ICE-SKEL-PARSE-52 (no report page): The m68k compiler crashed on the animation table parse (internal compiler error in patch_jump_insn); the host tests compile it with the host compiler only
 - [BUILD-MINIWIND-FINGERPRINT-ENGINE-33](BUILD-MINIWIND-FINGERPRINT-ENGINE-33.md): Every build stage's source fingerprint took in the engine sources through the MiniWind module

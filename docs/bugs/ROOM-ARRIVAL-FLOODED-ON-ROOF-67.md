@@ -34,6 +34,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 - 2026-11-20: reported in v0.0.67
 - 2026-11-20: fixed in source: a gated commit, v0.0.67 (ee87ad84); gate 12101 of the planning item ROOM-ARRIVAL-FLOODED-ON-ROOF-67: A room arrival in the room's water is taken there (wade or swim, or set down on the flooded floor under a marker) instead of on top of the room; dry arrivals unchanged.
+- 2026-11-20 13:54 +0200: seen again in v0.0.67: Seen in play on the next release image on 20 November 2026: the script teleport into the first flooded hall now sets the player down in its water, inside the hall.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -68,6 +69,8 @@ Family: Scene changes, arrivals and handoffs (`transitions-arrivals`). Cell, reg
 - [LOAD-FATAL-ERRORS-67](LOAD-FATAL-ERRORS-67.md): Memory that runs out or a damaged map file while a place loads ends the game instead of going back where the player was
 - [MOURNHOLD-BAZAAR-UNDER-WATER-67](MOURNHOLD-BAZAAR-UNDER-WATER-67.md): Mournhold's Great Bazaar is under water: the player arrives and walks below a water surface, with the breath bar on, and drowns
 - [PUNCH-3P-HEART-CHAMBER-67](PUNCH-3P-HEART-CHAMBER-67.md): After a teleport to the Heart Chamber the player's punch at a dreamer does not land or does not show in third-person view; in first person it works
+- [ROOM-ARRIVAL-STAND-NO-SPOT-67](ROOM-ARRIVAL-STAND-NO-SPOT-67.md): About 146 room arrivals still find no place to set the player down (flooded rooms closed above, markers inside solid geometry)
+- [ROOM-EMPTY-START-ON-REFERENCES-67](ROOM-EMPTY-START-ON-REFERENCES-67.md): The start of a room without scenery is the middle of the box around its references: the player lands on a person or falls
 - SEYDA-TRANSITION-29 (no report page): v0.0.29-dev1: Cell/sub-cell passage problems around Seyda Neen
 - [TP-BAZAAR-ARRIVAL-UNDER-FLOOR-67](TP-BAZAAR-ARRIVAL-UNDER-FLOOR-67.md): The teleport to Mournhold's Great Bazaar leaves the player under the district's floor, in water
 - [TRANSITION-EQUIPMENT-29](TRANSITION-EQUIPMENT-29.md): Carried torch blinks out on cell/sub-cell arrival

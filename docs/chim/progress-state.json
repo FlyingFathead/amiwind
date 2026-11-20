@@ -27,6 +27,81 @@
   },
   {
    "built_at": "2026-11-18T10:28:16+00:00",
+   "cells": 1420,
+   "commit": "ca71149",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    },
+    {
+     "land": 11,
+     "name": "Mournhold",
+     "sea": 0
+    }
+   ],
+   "label": "v0.0.67 (ca71149)",
+   "land": 1303,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-18T10:28:16+00:00",
+   "cells": 1420,
+   "commit": "bd761b88",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    },
+    {
+     "land": 11,
+     "name": "Mournhold",
+     "sea": 0
+    }
+   ],
+   "label": "v0.0.67 (bd761b88)",
+   "land": 1303,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-18T10:28:16+00:00",
+   "cells": 1420,
+   "commit": "1246c429",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 116
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 1
+    },
+    {
+     "land": 11,
+     "name": "Mournhold",
+     "sea": 0
+    }
+   ],
+   "label": "v0.0.67 (1246c429)",
+   "land": 1303,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-18T10:28:16+00:00",
    "cells": 1409,
    "commit": "a375b13f",
    "islands": [
@@ -2326,9 +2401,9 @@
    "sea": 0
   }
  ],
- "eligible_release": "v0.0.67",
+ "eligible_release": "v0.0.68",
  "format": "aw-progress-state-1",
- "generated": "2026-11-19T15:00:33+00:00",
+ "generated": "2026-11-20T10:22:10+00:00",
  "groups": {
   "accounted_for": 2169,
   "cells": 2322,
@@ -2356,7 +2431,8 @@
     "label": "In the game",
     "states": [
      "on_chim_rooms",
-     "room_map"
+     "room_map",
+     "district"
     ]
    },
    {
@@ -2364,42 +2440,42 @@
     "label": "Not in the game yet",
     "states": [
      "converted",
-     "not_started"
+     "not_started",
+     "test_cell",
+     "teleport_only",
+     "no_entrance"
     ]
    },
    {
     "id": "set_aside",
     "label": "Set aside, with a reason",
     "states": [
-     "hard_case",
-     "test_cell",
-     "teleport_only",
-     "no_entrance"
+     "hard_case"
     ]
    }
   ],
   "headline": {
    "Mournhold": {
     "converted": 0,
+    "district": 5,
     "groups": {
-     "in_game": 87,
-     "not_in_game": 5,
-     "set_aside": 1
+     "in_game": 91,
+     "not_in_game": 0,
+     "set_aside": 0
     },
     "hard_case": 0,
-    "hard_reasons": {
-     "teleport_only": 1
-    },
+    "hard_reasons": {},
     "no_entrance": 0,
-    "not_started": 5,
-    "on_chim_rooms": 87,
+    "not_started": 0,
+    "on_chim_rooms": 86,
     "room_map": 0,
-    "teleport_only": 1,
+    "teleport_only": 0,
     "test_cell": 0,
-    "total": 93
+    "total": 91
    },
    "Solstheim": {
     "converted": 0,
+    "district": 0,
     "groups": {
      "in_game": 96,
      "not_in_game": 0,
@@ -2417,6 +2493,7 @@
    },
    "Vvardenfell": {
     "converted": 0,
+    "district": 0,
     "groups": {
      "in_game": 1123,
      "not_in_game": 0,
@@ -2434,22 +2511,21 @@
    },
    "none": {
     "converted": 0,
+    "district": 0,
     "groups": {
-     "in_game": 13,
+     "in_game": 18,
      "not_in_game": 0,
-     "set_aside": 3
+     "set_aside": 0
     },
     "hard_case": 0,
-    "hard_reasons": {
-     "unreachable": 3
-    },
-    "no_entrance": 3,
+    "hard_reasons": {},
+    "no_entrance": 0,
     "not_started": 0,
-    "on_chim_rooms": 13,
+    "on_chim_rooms": 18,
     "room_map": 0,
     "teleport_only": 0,
     "test_cell": 0,
-    "total": 16
+    "total": 18
    }
   },
   "islands": {
@@ -2460,13 +2536,14 @@
   },
   "labels": {
    "converted": "Converted, not in the game yet",
-   "hard_case": "Set aside: hard case",
-   "no_entrance": "Set aside: no entrance, no script",
+   "district": "In the game as open terrain (a district)",
+   "hard_case": "Set aside: a reason this tracker does not know",
+   "no_entrance": "Not built yet: no door, and no script or dialogue line names it",
    "not_started": "Not started",
    "on_chim_rooms": "In the game on CHIM rooms",
    "room_map": "In the game as a room map",
-   "teleport_only": "Set aside: teleport only",
-   "test_cell": "Set aside: test cell"
+   "teleport_only": "Not built yet: no door, a script or a dialogue line sends the player there",
+   "test_cell": "Not built yet: a test cell, no door leads there"
   },
   "later": [
    {
@@ -2484,17 +2561,18 @@
   ],
   "totals": {
    "converted": 0,
+   "district": 5,
    "groups": {
-    "in_game": 1319,
-    "not_in_game": 5,
-    "set_aside": 4
+    "in_game": 1328,
+    "not_in_game": 0,
+    "set_aside": 0
    },
    "hard_case": 0,
-   "no_entrance": 3,
-   "not_started": 5,
-   "on_chim_rooms": 1317,
+   "no_entrance": 0,
+   "not_started": 0,
+   "on_chim_rooms": 1321,
    "room_map": 2,
-   "teleport_only": 1,
+   "teleport_only": 0,
    "test_cell": 0,
    "total": 1328
   }
@@ -2585,8 +2663,8 @@
  "readiness": {
   "all": {
    "rooms": {
-    "percent": 99.5,
-    "ready": 1317,
+    "percent": 100.0,
+    "ready": 1323,
     "total": 1323
    },
    "terrain": {
@@ -2595,14 +2673,14 @@
     "total": 1545
    },
    "total": {
-    "percent": 94.8,
-    "ready": 2718,
+    "percent": 95.0,
+    "ready": 2724,
     "total": 2868
    }
   },
   "build": "v0.0.67 (2b086671)",
-  "definition": "Ready = in the game on CHIM, the same for every land. Open terrain: the land's exterior cells of land or empty sea (open ocean and cells beyond the world's edge are not counted), ready when the newest ingested build holds the cell on CHIM and no audit of it failed. Rooms: every interior cell, counted for the land of its master, ready when it is in the game on CHIM rooms; a district the land presents as open terrain is counted once, under open terrain. Everything else is not ready, with its reason; a room no door leads to is a room still to build, never left out.",
-  "format": "aw-land-readiness-1",
+  "definition": "Ready = in the game on CHIM, the same for every land. Open terrain: the land's exterior cells of land or empty sea (open ocean and cells beyond the world's edge are not counted), ready when the newest ingested build holds the cell on CHIM and no audit of it failed. Rooms: every interior cell, counted for the land of its master, ready when it is in the game: on CHIM rooms, or as a room map of our own (special interiors, named under the count); a district the land presents as open terrain is counted once, under open terrain. Everything else is not ready, with its reason; a room no door leads to is a room still to build, never left out.",
+  "format": "aw-land-readiness-2",
   "lands": [
    {
     "game": "Morrowind (main game)",
@@ -2612,19 +2690,14 @@
     "name": "Vvardenfell",
     "rooms": {
      "as_terrain": [],
-     "not_ready": [
-      {
-       "count": 2,
-       "label": "in the game as a room map of our own, not on CHIM rooms",
-       "reason": "room_map"
-      }
-     ],
-     "not_ready_names": [
+     "not_ready": [],
+     "not_ready_names": [],
+     "percent": 100.0,
+     "ready": 1131,
+     "special": [
       "Imperial Prison Ship",
       "Seyda Neen, Census and Excise Office"
      ],
-     "percent": 99.8,
-     "ready": 1129,
      "total": 1131
     },
     "terrain": {
@@ -2634,8 +2707,8 @@
      "total": 1390
     },
     "total": {
-     "percent": 99.9,
-     "ready": 2519,
+     "percent": 100.0,
+     "ready": 2521,
      "total": 2521
     }
    },
@@ -2647,19 +2720,11 @@
     "name": "Solstheim",
     "rooms": {
      "as_terrain": [],
-     "not_ready": [
-      {
-       "count": 2,
-       "label": "still to build: no door leads there, and no script or dialogue line names it",
-       "reason": "no_entrance"
-      }
-     ],
-     "not_ready_names": [
-      "Vor Lair, Chambers of Alta Vor",
-      "Vor Lair, Interior"
-     ],
-     "percent": 98.0,
-     "ready": 99,
+     "not_ready": [],
+     "not_ready_names": [],
+     "percent": 100.0,
+     "ready": 101,
+     "special": [],
      "total": 101
     },
     "terrain": {
@@ -2675,8 +2740,8 @@
      "total": 144
     },
     "total": {
-     "percent": 40.4,
-     "ready": 99,
+     "percent": 41.2,
+     "ready": 101,
      "total": 245
     }
    },
@@ -2694,24 +2759,11 @@
       "Mournhold, Royal Palace: Courtyard",
       "Mournhold, Temple Courtyard"
      ],
-     "not_ready": [
-      {
-       "count": 1,
-       "label": "still to build: no door leads there, a script or a dialogue line sends the player there",
-       "reason": "teleport_only"
-      },
-      {
-       "count": 1,
-       "label": "still to build: no door leads there, and no script or dialogue line names it",
-       "reason": "no_entrance"
-      }
-     ],
-     "not_ready_names": [
-      "Sotha Sil,",
-      "Mournhold, Royal Palace"
-     ],
-     "percent": 97.8,
-     "ready": 89,
+     "not_ready": [],
+     "not_ready_names": [],
+     "percent": 100.0,
+     "ready": 91,
+     "special": [],
      "total": 91
     },
     "terrain": {
@@ -2721,8 +2773,8 @@
      "total": 11
     },
     "total": {
-     "percent": 98.0,
-     "ready": 100,
+     "percent": 100.0,
+     "ready": 102,
      "total": 102
     }
    }
@@ -2749,7 +2801,7 @@
   "terrain_complete_unlit": 814
  },
  "version_stamp": {
-  "release": "v0.0.67",
+  "release": "v0.0.68",
   "source": "the version file"
  }
 }

@@ -20,6 +20,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-17: reported in v0.0.66
+- 2026-11-20 14:38 +0200: seen again in v0.0.67: Seen again in the v0.0.67 release: the platter on the shelf of the first room is still drawn as part of the bookshelf and cannot be taken.
+
+<!-- END GENERATED TIMELINE -->
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -84,6 +95,7 @@ Related bugs in other categories:
 
 - [CENSUS-CRAB-PLATE-FOCUS-66](CENSUS-CRAB-PLATE-FOCUS-66.md): Census back room: looking at the crab meat on the table, the use key goes to the silver plate under it, so E steals the plate instead of taking the crab meat
 - [CHIM-COURT-BARREL-USE-33](CHIM-COURT-BARREL-USE-33.md): Census courtyard on CHIM: Fargoth's ring barrel cannot be used, so the opening cannot proceed
+- [DROP-REFUSED-CENSUS-ROOM-67](DROP-REFUSED-CENSUS-ROOM-67.md): Dropping an item in the first room of the Census and Excise Office is refused with "Cannot place items in this area yet; kept."
 - [INTERIOR-PLACED-ITEMS-47](INTERIOR-PLACED-ITEMS-47.md): Takeable and movable items and containers in converted interiors are not live objects (placed items are left out)
 
 <!-- END GENERATED CATEGORY -->

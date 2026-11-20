@@ -2,11 +2,12 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 3 times; something has to be done
+## PERSISTING: reported 4 times; something has to be done
 
 - Reported with v0.0.67-dev2 at 2026-11-18 (time not recorded): Seen again on 2026-11-18 at about 12:37, this time on the save of docs/bugs/bugs.json itself: the report was not saved and the run stopped; the file stayed whole (the open failed before any write) and a second run saved it. A failure in the middle of a write would leave the file cut short, so the tool should write to a temporary file and rename it, and try again on this error.
 - Reported with v0.0.67-dev3 at 2026-11-19 03:27 +0200: Seen again on the v0.0.67-dev3 line: writing the bug list from the shell container failed once with an invalid-argument error; the next write worked and the list was intact.
 - Reported with v0.0.67-dev3 at 2026-11-19 12:25 +0200: Seen again while several jobs wrote the register at the same time: writing a rendered page or the docs index failed with an invalid-argument error; a retry passed.
+- Reported with v0.0.68 at 2026-11-20 12:19 +0200: Seen again while two jobs wrote the register: writing an archive file of the bug list failed with an invalid-argument error after the new entry had been written, and the intake reported that nothing was written; the entry was there without its work-list item until it was added by hand.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -39,13 +40,14 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-18: seen again in v0.0.67-dev2: Seen again on 2026-11-18 at about 12:37, this time on the save of docs/bugs/bugs.json itself: the report was not saved and the run stopped; the file stayed whole (the open failed before any write) and a second run saved it.
 - 2026-11-19 03:27 +0200: seen again in v0.0.67-dev3: Seen again on the v0.0.67-dev3 line: writing the bug list from the shell container failed once with an invalid-argument error; the next write worked and the list was intact.
 - 2026-11-19 12:25 +0200: seen again in v0.0.67-dev3: Seen again while several jobs wrote the register at the same time: writing a rendered page or the docs index failed with an invalid-argument error; a retry passed.
+- 2026-11-20 12:19 +0200: seen again in v0.0.68: Seen again while two jobs wrote the register: writing an archive file of the bug list failed with an invalid-argument error after the new entry had been written, and the intake reported that nothing was written; the entry was there without ...
 
 <!-- END GENERATED TIMELINE -->
 
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Bugs in the same category](#bugs-in-the-same-category)
 

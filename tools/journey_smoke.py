@@ -70,6 +70,9 @@ WALKER_WORDS = {
     'face': re.compile(r'%s %s %s' % (NUM, NUM, NUM)),
     'aimed': re.compile(r'\d+( \d+)?'),
     'lookat': re.compile(r'\d+'),
+    # waits by condition (tools/engine_smoke.py UNTIL-STEPS): a map, screen or server value, the map loaded and
+    # settled after a change, a quest's journal index; each with a limit in seconds
+    'until': re.compile(r'(?:(?:map|screen|server) [A-Za-z0-9_.-]+ \d+|loaded \d+|journal [A-Za-z0-9_]+ -?\d+ \d+)'),
 }
 OPS = ('==', '!=', '>=', '<=', '>', '<')
 MARK = 'JOURNEY'

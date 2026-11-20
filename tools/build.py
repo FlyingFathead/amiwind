@@ -3332,12 +3332,27 @@ def write_build_report(args, status, error=None, metadata=None, steps=None, resu
 FAILURE_LINE = None     # the line that names a failed build's failure page (failure_details), for the build's last line
 
 
+def cancel_hint(args, run=None):
+    """The lines after "Cancelled." (BUILD-OOM-HELP-AND-TIP-68): the finished work is kept, and the command that
+    continues the build from the same folder (RUN: the cancelled run, which a --reuse-from then names). Never raises."""
+    try:
+        import build_failure
+        options, notes = build_failure.continue_options([str(part) for part in getattr(args, '_argv', None) or []],
+                                                        run if run is not None and Path(run).is_dir() else None)
+        return ('Your finished work is kept: run the same command again, from the same folder, to continue:\n  %s\n'
+                % build_failure.command_line(options) + ''.join('  (%s)\n' % note for note in notes))
+    except Exception:  # noqa: BLE001 - the hint never hides the cancel
+        return ''
+
+
 def failure_details(args, summary, error, metadata=None, steps=None):
     """The one failure page of a failed build and the line that names it (BUILD-FAILURE-NO-DETAILS-66,
     BUILD-FAILURE-REPORT-66): RUN/FAILURE.md and failure.json (written as the stage failed, or now for an error of the
     build itself; tools/build_failure.py), then the build report logs/BUILD-REPORT-<run>.txt in the workspace
     (tools/build_report.py), then the page printed with the report named in it. The returned line is the build's last
-    line; without a run folder (a stop before the first stage) it names the build report. Never raises."""
+    line; without a run folder (a stop before the first stage) it names the build report. After it come the build's
+    very last lines (BUILD-OOM-HELP-AND-TIP-68, tools/build_failure.py tip_lines): why it stopped, that the finished
+    work is kept with the command that continues it, and what to try for that cause. Never raises."""
     global FAILURE_LINE
     line = None
     try:
@@ -3346,10 +3361,17 @@ def failure_details(args, summary, error, metadata=None, steps=None):
         if run is not None:
             build_failure.ensure(run, error)
         report = write_build_report(args, 'failed', error, metadata, steps)
-        if run is not None and build_failure.report(run, error) is not None:
+        rec = build_failure.report(run, error) if run is not None else None
+        if rec is not None:
             line = build_failure.last_line(run)
         elif report is not None:
             line = 'Failure details: %s (the build stopped before it made its run folder)' % report
+        argv = [str(part) for part in getattr(args, '_argv', None) or []]
+        workspace = getattr(args, 'workspace', None) or ROOT / 'out'
+        tip = build_failure.tip_text(rec if rec is not None else build_failure.bare_record(error, argv),
+                                     run=run if rec is not None else None, workspace=workspace, argv=argv, live=True,
+                                     report=report)
+        line = line + '\n' + tip if line else tip
     except Exception as exc:  # noqa: BLE001 - the failure page never hides the build's own failure
         print('[failure] the failure details were not written: %s: %s' % (type(exc).__name__, exc), flush=True)
     FAILURE_LINE = line
@@ -3923,6 +3945,9 @@ def _main(argv=None):
             save_recipe(args, 'planned')
             return 0
         mode = 'AGA image recovery (retained rc3 conversion)' if recovery else 'asset-free dry run (not playable)' if args.dry_run else miniwind_mode(args.miniwind_scope, args.miniwind_town, args.miniwind_debug) if args.miniwind else 'AGA conversion and image' if args.stage == 'aga' else 'terrain conversion'
+        # the machine at the start, in the log (BUILD-OOM-HELP-AND-TIP-68): a build ended without a report (the whole
+        # build killed for memory) still shows the cores, the memory, the swap and the free space it started with
+        print('\n'.join(build_report.start_lines(args, ROOT)), flush=True)
         summary = BuildSummary(run, VERSION, mode)
         with Progress("Recording input, tool and source checksums"):
             metadata = provenance(args, tools)
@@ -4166,7 +4191,7 @@ def _main(argv=None):
             summary.finish('cancelled')
             save_recipe(args, 'cancelled')
         write_build_report(args, 'cancelled', exc, metadata, steps)      # --report only
-        p.exit(130, "\nCancelled.\n")
+        p.exit(130, "\nCancelled.\n" + cancel_hint(args, summary.run if summary else None))
     except (OSError, ValueError, RuntimeError) as exc:
         if summary and not summary.finished:
             summary.finish('failed')

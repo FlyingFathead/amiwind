@@ -1,6 +1,6 @@
 # CHIM Engine tracker
 
-_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.67._
+_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.68-dev1._
 
 <!-- Generated whole by tools/bug_register.py render from docs/bugs/bugs.json; do not edit by hand. -->
 
@@ -30,6 +30,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [BUILD-PIPELINE-UNDERUTILIZATION-36](BUILD-PIPELINE-UNDERUTILIZATION-36.md): Umbrella: several builder phases run on one core while the rest of the machine idles, and some do work the build no longer needs (reported 5 times, open)
 - [BUILD-STATS-SERIAL-36](BUILD-STATS-SERIAL-36.md): The CHIM stats step runs serially and silently on one core (reported 5 times, fixed)
 - [CHIM-EXTERIOR-ACTORS-MISSING-46](CHIM-EXTERIOR-ACTORS-MISSING-46.md): Most outdoor NPCs and every outdoor creature are missing: region frames place no actors (93 of 566 exterior NPC references, 0 of 5,415 creature references) (reported 5 times, open)
+- [BUILD-CHIM-MAIN-MEMORY-46](BUILD-CHIM-MAIN-MEMORY-46.md): The CHIM stage main process holds so much memory that the memory guard starves its own workers (reported 4 times, open)
 - [BUILD-CHIM-STAIR-WALK-UNCACHED-36](BUILD-CHIM-STAIR-WALK-UNCACHED-36.md): CHIM frames are stair-walked again on every build: about 69 minutes for 270 frames (reported 4 times, fixed)
 - [BUILD-IMAGE-CHIM-MAPS-SERIAL-36](BUILD-IMAGE-CHIM-MAPS-SERIAL-36.md): The image step writes the CHIM region cells' .chim maps one by one on half a core, silently (reported 4 times, fixed)
 - [BUILD-OPTIMIZER-CACHE-KEY-BROAD-36](BUILD-OPTIMIZER-CACHE-KEY-BROAD-36.md): Regression: the image step's BSP optimizer pass cache reused 13 of 2,658 maps; its key covers the whole image tool, so any image-code change redoes every map (reported 4 times, fixed)
@@ -39,7 +40,6 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [CHIM-FRAME-EDGE-EFRAG-CRASH-36](CHIM-FRAME-EDGE-EFRAG-CRASH-36.md): R_StoreEfrags: Bad entity type 270440 ends the game: a leaf link to an entity whose model is NULL (normal play in Seyda Neen; noclip past the Vivec frame edge) (reported 4 times, fixed)
 - [CHIM-ROOM-HEART-CHAMBER-LOAD-50](CHIM-ROOM-HEART-CHAMBER-LOAD-50.md): Entering Akulakhan's Chamber when it cannot load stops the game with an error at the console instead of refusing at the door (reported 4 times, open)
 - [BUILD-CHIM-FRAME-SWAP-LATE-36](BUILD-CHIM-FRAME-SWAP-LATE-36.md): The image step builds 335 legacy maps of cells already on CHIM, then removes them before packing (reported 3 times, fixed)
-- [BUILD-CHIM-MAIN-MEMORY-46](BUILD-CHIM-MAIN-MEMORY-46.md): The CHIM stage main process holds so much memory that the memory guard starves its own workers (reported 3 times, open)
 - [BUILD-IMAGE-AUDIO-SERIAL-36](BUILD-IMAGE-AUDIO-SERIAL-36.md): The image step puts the audio payload in one file at a time while 22 of 24 cores sit idle (reported 3 times, fixed)
 - [BUILD-IMAGE-REGION-MAPS-SERIAL-43](BUILD-IMAGE-REGION-MAPS-SERIAL-43.md): The image step's CHIM frame-map phases run on one core: the world read six times, ground traces on whole frames (reported 3 times, open)
 - [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): The image step scans maps on about one core and runs the actor ground check under half the pool (reported 3 times, open)
@@ -81,6 +81,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 
 Newest first: the last 10 dated events of CHIM bugs, from their entries (reports, history, closure steps).
 
+- 2026-11-20 [BUILD-CHIM-MAIN-MEMORY-46](BUILD-CHIM-MAIN-MEMORY-46.md): seen again in v0.0.66: Measured again in the v0.0.66 full build from scratch: the CHIM stage main process held 24.1 GiB of a 25.1 GiB stage peak (20.4 GiB in v0.0.59-dev5); running at once with the room batches, memory use peaked at 43.7 GiB, more than a 32 GiB ...
 - 2026-11-19 [BUILD-ACTOR-LIBRARY-UNDERUSED-54](BUILD-ACTOR-LIBRARY-UNDERUSED-54.md): seen again in v0.0.67-dev3: Seen again on a test build of the v0.0.67-dev3 line: the actor-library stage ran on about 4 of its 12 allowed cores for about six minutes with 31 units queued and none running.
 - 2026-11-19 [BUILD-CHIM-SERIAL-SECTIONS-44](BUILD-CHIM-SERIAL-SECTIONS-44.md): seen again in v0.0.67-dev3: Seen again on the hands test build of eb12ebaf (2026_11_19_v0.0.67-dev2_full-hands-image4): in the CHIM world pack phase the stage ran on 1.4 of 24 cores for 60 s with 859 units queued and 23 running; the builder's underused check says the ...
 - 2026-11-19 [CHIMPORT-DOOR-MARKER-AUDIT-36](CHIMPORT-DOOR-MARKER-AUDIT-36.md): deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
@@ -90,7 +91,6 @@ Newest first: the last 10 dated events of CHIM bugs, from their entries (reports
 - 2026-11-18 [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): seen again in v0.0.67-dev2: Seen again in an emulator room check of the v0.0.67-dev2 Mournhold module test build (32 MB Fast, JIT): the first load of Seyda Neen after boot never finished (server none); the stall examination found the game waiting on SIGF_DOS with no ...
 - 2026-11-18 [BUILD-ACTOR-LIBRARY-UNDERUSED-54](BUILD-ACTOR-LIBRARY-UNDERUSED-54.md): seen again in v0.0.67-dev3: Seen again on the v0.0.67-dev3 line test build: the actor-library stage ran on 1.0 of 24 planned cores for about 310 s while the NPC library was at 507-512 of 530 and the creature library baked its one remaining unit (the storm atronach ...
 - 2026-11-18 [CHIM-MESH-STAIR-UNIT-SLOW-67](CHIM-MESH-STAIR-UNIT-SLOW-67.md): v0.0.67-dev2: The scheduler part of the third sighting is fixed in source: a memory-heavy stage that is down to one or two running units with none queued for a minute, by its pools' own live status and never by its plan estimate, no longer keeps a stage ...
-- 2026-11-18 [CHIM-MESH-STAIR-UNIT-SLOW-67](CHIM-MESH-STAIR-UNIT-SLOW-67.md): seen again in v0.0.67-dev2: Seen again in a build, in the stage that converts Mournhold's eleven district cells as a world of their own: the stage started on 3 workers and its allowance rose to 5, 10, 13 and then 24 workers as other stages ended, but for more than ...
 
 ## Engine streaming and memory
 

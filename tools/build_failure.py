@@ -18,6 +18,11 @@ BUILD_SCAN_BYTES of each, line by line) and writes only those two files; it neve
 cannot be written is a warning). The Monitor's reader uses the same code read only (derive) for a failed run without
 the files, a run of an earlier builder.
 
+The page starts with the block the build also prints as its very last lines (tip_lines, BUILD-OOM-HELP-AND-TIP-68),
+written for whoever ran the build: why it stopped (out of memory, out of disk, or the stage's own error), that the
+finished work is kept, with the exact command that continues it (the same command, from the same folder), and what to
+try for that cause.
+
   python3 tools/build_failure.py RUN [--print]       write the failure files of a failed run (again), print the page
   python3 tools/build_failure.py RUN --out DIR       write them into DIR instead: the run folder is only read
 """
@@ -25,8 +30,11 @@ import argparse
 from collections import deque
 from datetime import datetime, timezone
 import json
+import os
+import platform
 import re
 import shlex
+import subprocess
 import sys
 import traceback
 from pathlib import Path
@@ -97,6 +105,30 @@ KIND_ADVICE = {
           'then build again from this run'}
 CGROUP_EVENTS = ('/sys/fs/cgroup/memory.events', '/sys/fs/cgroup/memory/memory.oom_control')
 _START = {}                      # the build's start: {'oom_kill': n or None, 'free': {place: bytes or None}}
+# THE TIP (BUILD-OOM-HELP-AND-TIP-68): the block a failed build ends with, for whoever ran it rather than a developer:
+# (1) why it stopped: out of memory, out of disk, or the stage's own error; (2) the finished work is kept: the same
+# command again, from the same folder, ready to copy (continue_options); (3) what to try for that cause. Out of memory,
+# the advice follows where the stage's memory was (stage_memory): in one large process (its main process, as a rule:
+# fewer workers do not help; swap or more memory) or in its workers (about half the workers first). The stage's figures
+# come from this build's own profile, else an earlier build of its workspace (cache/resource-history.jsonl), else the
+# reference build's measured peaks (config/build-memory.json). The same block heads FAILURE.md and the build report.
+TIP_RULE = '=' * 72
+TIP_WIDTH = 100                  # the tip's text lines are wrapped here; command lines stay whole
+HELP_SECTION = 'docs/LINUX_BUILD.md, "The build stopped or ran out of memory: what now?"'
+MEMORY_SCHEMA = 'amiwind-build-memory-1'
+MEMORY_REFERENCE = Path(__file__).resolve().parent.parent / 'config' / 'build-memory.json'
+GIB = float(1 << 30)
+ONE_PROCESS_SHARE = 0.5          # a stage whose largest process held this share of its peak or more: one process holds it
+SWAP_HEADROOM_GIB = 2.0          # the swap advised: the reference build's peak plus this, less the memory the build had,
+SWAP_STEP_GIB = 4                # rounded up to whole steps of this,
+MIN_SWAP_GIB = 8                 # and never less than this
+# The command that continues a failed build leaves out the run's own options (a run name is used once, the commit is the
+# checkout's own) and those that would make the finished work again (--clean also refuses a workspace cache that is no
+# longer empty); a --reuse-from names the failed run instead, which holds what the earlier run gave and what it finished.
+CONTINUE_DROPS = ('--name', '--save-recipe', '--source-commit')
+FROM_SCRATCH_OPTIONS = ('--clean', '--no-reuse', '--release-from-scratch')
+JOB_OPTIONS = ('-j', '--jobs', '--j', '--single-thread')
+DOCKER_RUNTIME = 'docker-builder'   # tools/build_report.py RUNTIMES: the build ran in our Docker builder (tools/run_docker.py)
 
 
 def _clean(raw):
@@ -305,7 +337,7 @@ def record(run, error=None, scan_bytes=BUILD_SCAN_BYTES, path=None):
     named = state.get('run_name') if isinstance(state.get('run_name'), dict) else {}
     out = {'schema': SCHEMA, 'run': run.name, 'status': state.get('status') or 'failed', 'written_at': _stamp(),
            'commit': named.get('commit'), 'version': named.get('version') or state.get('runtime_version'),
-           'failed_stages': stages, 'stages_recorded': len(steps),
+           'failed_stages': stages, 'stages_recorded': len(steps), 'jobs': _int(state.get('compiler_jobs')),
            'cancelled_stages': [str(s.get('name')) for s in steps if s.get('status') == 'cancelled'],
            'not_started': [str(n) for n in state.get('not_started') or []],
            'settings': settings(state, where, [row['name'] for row in stages]),
@@ -507,6 +539,324 @@ def kind_lines(found, markdown=False):
     return lines
 
 
+def _split_option(part):
+    """(option, its value when written into the same word, else None): --name=X, -j4 and -j=4 carry their value."""
+    if part.startswith('--') and '=' in part:
+        option, _, value = part.partition('=')
+        return option, value
+    if part.startswith('-j') and not part.startswith('--') and len(part) > 2:
+        return '-j', part[2:].lstrip('=')
+    return part, None
+
+
+def continue_options(argv, run_path=None, jobs=None):
+    """(options, notes): ARGV, the failed build's own options, as the command that continues it from the same folder.
+    Left out: the run's own options (CONTINUE_DROPS: a new run name is chosen by itself) and FROM_SCRATCH_OPTIONS, each
+    said in NOTES; a --reuse-from names RUN_PATH, the failed run, instead (it holds what the earlier run gave and what it
+    finished). Without a reuse option the builder's default (v0.0.67 and later) takes every finished stage of the build
+    folder back, and every finished unit comes from its cache either way. JOBS: -j JOBS in place of the build's own
+    worker option."""
+    out, notes, skip = [], [], False
+    for part in [str(item) for item in argv or []]:
+        if skip:
+            skip = False
+            continue
+        option, attached = _split_option(part)
+        if option in CONTINUE_DROPS:
+            skip = attached is None
+            if option == '--name':
+                note = '--name is left out: a run name is used once (add --name NEW to choose one)'
+                if note not in notes:
+                    notes.append(note)
+            continue
+        if option == '--reuse-from' and run_path is not None:
+            skip = attached is None
+            out += ['--reuse-from', str(run_path)]
+            continue
+        if option in FROM_SCRATCH_OPTIONS:
+            notes.append('%s is left out: it would make the finished work again (build from scratch only on purpose, in '
+                         'a new build folder)' % option)
+            continue
+        if jobs is not None and option in JOB_OPTIONS:
+            skip = attached is None and option != '--single-thread'
+            continue
+        out.append(part)
+    if jobs is not None:
+        out += ['-j', str(jobs)]
+    return out, notes
+
+
+def command_line(options, system=None):
+    """The build command with OPTIONS as the player types it: ./build.sh on Linux and macOS, .\\build.cmd on Windows
+    (both start tools/build.py with the same options)."""
+    if (system or platform.system()) == 'Windows':
+        return ('.\\build.cmd ' + subprocess.list2cmdline(list(options))).rstrip()
+    return ('./build.sh ' + shlex.join(list(options))).rstrip()
+
+
+def _gib(value):
+    return '%.1f GiB' % (value / GIB)
+
+
+def reference_memory(path=None):
+    """The reference build's measured stage peaks (config/build-memory.json), {} when it cannot be read."""
+    doc = _load_state(Path(path) if path else MEMORY_REFERENCE)
+    return doc if doc.get('schema') == MEMORY_SCHEMA else {}
+
+
+def _history_row(workspace, stage):
+    """(peak, largest, workers) bytes of STAGE's newest full-build row in the workspace's resource history
+    (WORKSPACE/cache/resource-history.jsonl, tools/resource_plan.py), or None."""
+    path = Path(workspace) / 'cache' / 'resource-history.jsonl'
+    try:
+        if not path.is_file() or path.stat().st_size > MAX_STATE_BYTES:
+            return None
+        lines = path.read_text(encoding='utf-8', errors='replace').splitlines()
+    except OSError:
+        return None
+    for line in reversed(lines):
+        try:
+            item = json.loads(line)
+        except ValueError:
+            continue
+        measured = item.get('measured') if isinstance(item, dict) else None
+        if item.get('stage') != stage or not isinstance(measured, dict) or item.get('scope') == 'miniwind':
+            continue
+        total, largest = measured.get('total_mib'), measured.get('largest_mib')
+        if isinstance(total, (int, float)) and total > 0:
+            largest = largest if isinstance(largest, (int, float)) else total
+            return int(total * (1 << 20)), int(largest * (1 << 20)), _int(measured.get('jobs'))
+    return None
+
+
+def stage_memory(run, stage, workspace=None, reference=None):
+    """Where the memory of STAGE was: {'stage', 'peak', 'largest', 'workers', 'source', 'one_process'} (bytes; workers:
+    the most it ran), from this build's own profile (RUN/build-profile.json), else the workspace's earlier builds, else
+    the reference build (config/build-memory.json); None when none of them measured it. one_process: its largest single
+    process (its main process, as a rule) held ONE_PROCESS_SHARE of its peak or more, or it ran one worker, so fewer
+    workers would not free its memory."""
+    found = None
+    if run is not None:
+        for row in _load_state(Path(run) / 'build-profile.json').get('stages') or []:
+            if isinstance(row, dict) and row.get('name') == stage and not row.get('reused'):
+                peak, largest = _int(row.get('peak_tree_rss_bytes')), _int(row.get('peak_process_rss_bytes'))
+                if peak or largest:
+                    found = (peak, largest, _int(row.get('jobs_max')) or _int(row.get('jobs')), 'measured in this build')
+                break
+    if found is None and workspace is not None:
+        row = _history_row(workspace, stage)
+        if row:
+            found = row + ('measured in an earlier build of this build folder',)
+    if found is None:
+        reference = reference_memory() if reference is None else reference
+        row = (reference.get('stages') or {}).get(stage)
+        if isinstance(row, dict) and (_int(row.get('peak_bytes')) or _int(row.get('largest_process_bytes'))):
+            found = (_int(row.get('peak_bytes')), _int(row.get('largest_process_bytes')), _int(row.get('workers')),
+                     'measured in %s' % (reference.get('measured_in_short') or 'the reference build'))
+    if found is None:
+        return None
+    peak, largest, workers, source = found
+    peak = max(peak or 0, largest or 0)
+    largest = largest or peak
+    return {'stage': stage, 'peak': peak, 'largest': largest, 'workers': workers, 'source': source,
+            'one_process': (workers or 1) <= 1 or largest >= ONE_PROCESS_SHARE * peak}
+
+
+def build_memory_seen(run):
+    """{'limit', 'source', 'peak', 'peak_stages'} of the memory the build saw (bytes; source: 'the container\'s limit'
+    or 'the machine') and its peak so far, the file cache not counted (RUN/build-progress.json); {} when not recorded."""
+    memory = _load_state(Path(run) / 'build-progress.json').get('memory') if run is not None else None
+    if not isinstance(memory, dict) or not isinstance(memory.get('limit_gib'), (int, float)):
+        return {}
+    peak = memory.get('peak_gib')
+    return {'limit': int(memory['limit_gib'] * GIB),
+            'source': 'the container\'s limit' if memory.get('source') == 'container' else 'the machine',
+            'peak': int(peak * GIB) if isinstance(peak, (int, float)) else None,
+            'peak_stages': [str(name) for name in memory.get('peak_stages') or []]}
+
+
+def swap_now():
+    """(total, free, how) of the swap now (tools/build_report.py swap), or None where it cannot be read."""
+    try:
+        import build_report
+        total, free, how = build_report.swap()
+    except Exception:  # noqa: BLE001 - the tip never stops on a reader
+        return None
+    return (total, free, how) if total is not None else None
+
+
+def advised_swap_gib(limit, reference):
+    """The swap to add, in GiB: the reference build's peak plus SWAP_HEADROOM_GIB less the memory LIMIT the build had,
+    rounded up to whole SWAP_STEP_GIB, at least MIN_SWAP_GIB."""
+    peak = _int((reference or {}).get('build_peak_bytes'))
+    if not peak or not limit:
+        return MIN_SWAP_GIB
+    need = peak / GIB + SWAP_HEADROOM_GIB - limit / GIB
+    steps = -(-max(0.0, need) // SWAP_STEP_GIB)
+    return max(MIN_SWAP_GIB, int(steps * SWAP_STEP_GIB))
+
+
+def _one_line(text, most=400):
+    text = ' '.join(str(text).split())
+    return text if len(text) <= most else text[:most] + ' ...'
+
+
+def _para(text, first='  ', rest=None):
+    """TEXT wrapped at TIP_WIDTH for a terminal, each line starting with FIRST (then REST); words are never broken, so
+    a path or a command stays whole."""
+    import textwrap
+    return textwrap.wrap(text, width=TIP_WIDTH, initial_indent=first, subsequent_indent=first if rest is None else rest,
+                         break_long_words=False, break_on_hyphens=False) or [first.rstrip()]
+
+
+def _bullet(text):
+    return _para(text, '  - ', '    ')
+
+
+def _report_of(run, report):
+    if report is not None:
+        return Path(report)
+    if run is not None:
+        run = Path(run)
+        return run.parent.parent / REPORT_FOLDER / (REPORT_PREFIX + run.name + REPORT_SUFFIX)
+    return None
+
+
+def tip_lines(rec, run=None, workspace=None, argv=None, live=False, system=None, environ=None, reference=None,
+              report=None, files=True):
+    """The block a failed build ends with (THE TIP above): plain lines for whoever ran the build. REC: the failure
+    record (record(), or bare_record() for a stop before the run folder); RUN: the run folder; ARGV: the build's own
+    options (default: the record's); LIVE: in the failing build, so the swap is read now; REPORT: the build report's
+    path (default: the run's); FILES: False reads no file of the run or the workspace (the Monitor's reader, which reads
+    a run only through its checked paths). Never raises."""
+    try:
+        return _tip_lines(rec, run, workspace, argv, live, system, os.environ if environ is None else environ,
+                          reference_memory() if reference is None else reference, report, files)
+    except Exception as exc:  # noqa: BLE001 - the tip never hides the failure
+        return [TIP_RULE, 'The build stopped; the advice could not be written (%s). Run the same command again from '
+                          'the same folder: the finished work is kept.' % type(exc).__name__, TIP_RULE]
+
+
+def _tip_lines(rec, run, workspace, argv, live, system, environ, reference, report, files):
+    run = Path(run) if run is not None else None
+    if workspace is None and run is not None:
+        workspace = run.parent.parent
+    readable = run if files else None             # the run's own files, read for the memory figures
+    stages = rec.get('failed_stages') or []
+    first = stages[0] if stages else {}
+    stage = rec.get('stage')
+    kind = next(iter(rec.get('kinds') or []), None)
+    if argv is None:
+        argv = (rec.get('settings') or {}).get('command_line') or []
+    elapsed = first.get('elapsed_seconds')
+    if stage:
+        where = ' in the stage %s%s' % (stage, ', after %s' % _seconds(elapsed) if isinstance(elapsed, (int, float))
+                                         else '')
+    else:
+        where = ' before its first stage' if not rec.get('stages_recorded') else ' outside its stages'
+    L = [TIP_RULE]
+    if kind:
+        L.append('THE BUILD STOPPED%s: %s (%s).' % (where, kind['kind'], kind['proof']))
+    else:
+        L += ['THE BUILD STOPPED%s, on its own error:' % where] + _para(_one_line(rec.get('error') or 'not recorded'))
+    memory = (stage_memory(readable, stage, workspace if files else None, reference)
+              if kind and kind['kind'] == MEMORY and stage else None)
+    seen = build_memory_seen(readable) if readable is not None and kind and kind['kind'] == MEMORY else {}
+    swap = swap_now() if live and kind and kind['kind'] == MEMORY else None
+    if memory and memory['one_process']:
+        L += _para('The stage reached %s; one process of it (its main process, as a rule) held %s of that (%s).' % (
+            _gib(memory['peak']), _gib(memory['largest']), memory['source']))
+    elif memory:
+        L += _para('The stage reached %s, most of it in its workers (its largest process: %s; %s).' % (
+            _gib(memory['peak']), _gib(memory['largest']), memory['source']))
+    if seen or swap:
+        parts = []
+        if seen:
+            parts.append('%s of memory (%s)' % (_gib(seen['limit']), seen['source']))
+        if swap:
+            parts.append('no swap' if not swap[0] else '%s of swap' % _gib(swap[0]))
+        text = 'This build had ' + ' and '.join(parts)
+        if seen.get('peak'):
+            text += '; its peak: %s%s' % (_gib(seen['peak']), ', with %s running' % ', '.join(seen['peak_stages'])
+                                         if seen.get('peak_stages') else '')
+        L += _para(text + '.')
+    # (2) the finished work is kept: the same command, ready to copy
+    options, notes = continue_options(argv, run)
+    if stages or rec.get('stages_recorded'):
+        L += ['', 'Your finished work is kept: do not delete the build folder. Run the same command again,',
+              'from the same folder; every stage and unit that finished is taken back (each checked by SHA-256):']
+    else:
+        L += ['', 'Nothing of this build was made yet; earlier builds in the build folder are kept and taken back.',
+              'Fix what the error names, then run the command again, from the same folder:']
+    L += ['', '  ' + command_line(options, system)]
+    for note in notes:
+        L += _para('(%s)' % note)
+    if environ.get('AW_RUNTIME') == DOCKER_RUNTIME:
+        L += _para('(This build ran in the AmiWind Docker builder: run the same docker builder command again with a '
+                   'new --name; it builds in the same volume and takes the finished work back.)')
+    L.append('')
+    # (3) what to try for that cause
+    L.append('Before you run it again:')
+    budget = rec.get('jobs') or _int(first.get('jobs')) or (memory or {}).get('workers')
+    more = ('give the build more memory (the memory limit of its container or virtual machine: Docker --memory and '
+            '--memory-swap, WSL 2 memory= and swap= in .wslconfig), or close other programs')
+    if kind and kind['kind'] == MEMORY:
+        swap_gib = advised_swap_gib(seen.get('limit'), reference)
+        if memory and memory['one_process'] or not budget or budget <= 1:
+            if memory and memory['one_process']:
+                L += _bullet('Fewer workers (-j) do not help in this stage: one process holds most of its memory.')
+            L += _bullet('Add swap (about %d GiB or more), or %s.' % (swap_gib, more))
+        else:
+            half = max(1, budget // 2)
+            L += _bullet('Use about half the workers (this build had %d): the same command with -j %d:' % (budget, half))
+            L.append('      ' + command_line(continue_options(argv, run, jobs=half)[0], system))
+            if memory is None:
+                L += _bullet('If one process of the stage holds the memory, fewer workers do not help: add swap (about '
+                             '%d GiB or more), or %s.' % (swap_gib, more))
+            else:
+                L += _bullet('If it stops again: add swap (about %d GiB or more), or %s.' % (swap_gib, more))
+        L += _bullet('./build.sh --resource-plan with the same options lists what each stage needs against what the '
+                     'build gets.')
+    elif kind and kind['kind'] == DISK:
+        L += _bullet('Free space on the disk of the build folder: python3 tools/build_gc.py plan %s lists what can go '
+                     'and deletes nothing (--delete removes exactly what it lists as expired).'
+                     % (workspace if workspace is not None else 'WORKSPACE'))
+        L += _bullet('When the temp folder is the full one, point TMPDIR at a folder with room.')
+        L += _bullet('A --workspace on a roomier disk starts that folder empty: free space here first if you can.')
+    elif stages:
+        L += _bullet('Fix what the error line names (the failure page has its traceback and the stage\'s last log '
+                     'lines).')
+        L += _bullet('If it stops the same way again, send the build report when you ask for help.')
+    else:
+        L += _bullet('Fix what the error line names (the build report below has the details).')
+        L += _bullet('If it stops the same way again, send the build report when you ask for help.')
+    found = _report_of(run, report)
+    if found is not None:
+        L.append('Build report (the one file to send when you ask for help): %s' % found)
+    L += ['Help: ' + HELP_SECTION, TIP_RULE]
+    return L
+
+
+def tip_text(rec, **options):
+    return '\n'.join(tip_lines(rec, **options))
+
+
+def bare_record(error=None, argv=None):
+    """The failure record of a build that stopped before it made its run folder: its error and kind only."""
+    message = (str(error.code if error.code is not None else '') if isinstance(error, SystemExit)
+               else '%s: %s' % (type(error).__name__, str(error).strip())) if error is not None else 'not recorded'
+    rec = {'error': message.strip().splitlines()[0] if message.strip() else 'not recorded', 'stage': None,
+           'failed_stages': [], 'stages_recorded': 0,
+           'settings': {'command_line': [str(part) for part in argv or []]}}
+    if error is not None and not isinstance(error, SystemExit):
+        rec['builder_error'] = {'type': type(error).__name__, 'message': str(error)[:4000]}
+    try:
+        rec['kinds'] = kinds(rec, error, live=True)
+    except Exception:  # noqa: BLE001 - the kind never hides the failure
+        rec['kinds'] = []
+    return rec
+
+
 def not_completed(rec):
     """What the failed build did not complete: the stages not started and those cancelled with it, and the units the
     failed stages refused or left out."""
@@ -560,6 +910,10 @@ def render(rec):
     L = ['# Build failure: %s' % rec.get('run'), '',
          '_Written by the builder when the build failed (tools/build_failure.py). The stage logs and the build\'s '
          'own output keep everything; this is the short form._', '']
+    tip = [line for line in rec.get('tip') or [] if line != TIP_RULE]
+    if tip:
+        # the block the build printed as its last lines (BUILD-OOM-HELP-AND-TIP-68): what happened and what to do now
+        L += ['## What to do now', ''] + _block(tip) + ['']
     L += kind_lines(rec.get('kinds'), markdown=True)       # out of memory, out of disk: first, when their marks are there
     if stages:
         for s in stages:
@@ -665,6 +1019,7 @@ def write(run, error=None):
         report_file = full_report(run)
         if report_file is not None:
             rec['report'] = str(report_file)
+        rec['tip'] = tip_lines(rec, run, live=True)      # what to do now, with the command that continues the build
         rec['source'] = 'build'
         _save(run, rec)
         return rec
@@ -721,6 +1076,7 @@ def derive(run, path=None, scan_bytes=MONITOR_SCAN_BYTES):
     if _load_state(where('build-state.json')).get('status') != 'failed':
         return None, None
     rec = record(run, None, scan_bytes, where)
+    rec['tip'] = tip_lines(rec, run, files=path is None)
     rec['source'] = 'derived'
     return rec, render(rec)
 
@@ -739,6 +1095,7 @@ def main(argv=None):
         report_file = full_report(a.run)
         if report_file is not None:
             rec['report'] = str(report_file)
+        rec['tip'] = tip_lines(rec, a.run)
         rec['source'] = 'command'
         a.out.mkdir(parents=True, exist_ok=True)
         _save(a.out, rec)

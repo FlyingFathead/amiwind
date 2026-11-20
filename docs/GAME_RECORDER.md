@@ -1,6 +1,6 @@
 # Gameplay recorder
 
-_Last updated with AmiWind v0.0.67 (19 November 2026)._
+_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -302,7 +302,11 @@ turn, naming where the player stands:
 - `lookat REF`: turn the view to a small placed item that the map does not draw itself (the town's items, not a
   room's own) with the game's own test aim at the nearest placed items;
 - `topic NAME`: in the open dialogue window, type the topic's name into its search box and choose it;
-- `mark` and `saw SECS TEXT`: a console line printed after the mark.
+- `mark` and `saw SECS TEXT`: a console line printed after the mark;
+- `until loaded SECS`: after a door or a teleport, wait until the new map is in play and has settled, instead of a
+  fixed number of seconds; `until map NAME SECS` (also `screen`, `server`) and `until journal QUEST N SECS` (the
+  quest's journal index reaches N) wait the same way. The opening journey uses `until loaded` after every map change
+  and `until journal` for Sellus Gravius' entry.
 
 A part whose session stopped is reported with the step it stopped in and why, and every check it never reached says
 so. `tools/journey_smoke.py`:

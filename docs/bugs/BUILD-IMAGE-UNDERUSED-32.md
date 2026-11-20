@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 22 times; something has to be done
+## PERSISTING: reported 24 times; something has to be done
 
 - Reported with v0.0.32-dev at 2026-10-08 (time not recorded): BUILD-IMAGE-UNDERUSED-32: parts of the image step still serial
 - Reported with v0.0.36-dev3 at 2026-10-11 00:43 +0300: audio payload and CHIM maps serial, stats on one core
@@ -26,6 +26,8 @@
 - Reported with v0.0.67-dev3 at 2026-11-19 09:41 +0200: Seen again on the v0.0.67-dev3 build: the image step ran on one core for about six minutes while the other cores sat idle.
 - Reported with v0.0.67-dev3 at 2026-11-19 10:07 +0200: The v0.0.67-dev3 image stage ran under half of its cores three times while units were queued (11 minutes 22 seconds at an average of 4.6 of 24 cores).
 - Reported with v0.0.67 at 2026-11-19 16:41 +0200: Seen again in the v0.0.67 release build: the image step ran on one core for over six minutes while 23 stayed idle.
+- Reported with v0.0.67 at 2026-11-20 13:48 +0200: Seen again in the v0.0.67 respin build: the image step ran its phase after the room batches on one of 24 cores for more than six minutes.
+- Reported with v0.0.67 at 2026-11-20 13:50 +0200: Seen again in the v0.0.67 release build: the image step's room actor bake ran on one of 24 cores for more than six minutes.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -80,6 +82,8 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-19 09:41 +0200: seen again in v0.0.67-dev3: Seen again on the v0.0.67-dev3 build: the image step ran on one core for about six minutes while the other cores sat idle.
 - 2026-11-19 10:07 +0200: seen again in v0.0.67-dev3: The v0.0.67-dev3 image stage ran under half of its cores three times while units were queued (11 minutes 22 seconds at an average of 4.6 of 24 cores).
 - 2026-11-19 16:41 +0200: seen again in v0.0.67: Seen again in the v0.0.67 release build: the image step ran on one core for over six minutes while 23 stayed idle.
+- 2026-11-20 13:48 +0200: seen again in v0.0.67: Seen again in the v0.0.67 respin build: the image step ran its phase after the room batches on one of 24 cores for more than six minutes.
+- 2026-11-20 13:50 +0200: seen again in v0.0.67: Seen again in the v0.0.67 release build: the image step's room actor bake ran on one of 24 cores for more than six minutes.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -88,7 +92,7 @@ _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 22 times; something has to be done](#persisting-reported-22-times-something-has-to-be-done)
+- [PERSISTING: reported 24 times; something has to be done](#persisting-reported-24-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Seen again: 7 November 2026 (v0.0.62-dev1)](#seen-again-7-november-2026-v0062-dev1)
 - [Status: 23 October 2026 (v0.0.48)](#status-23-october-2026-v0048)
@@ -302,6 +306,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - BUILD-INPUTS-LOCK-TMP-RACE-54 (no report page): Two MiniWinds started together race on the input lock: one fixed temp name, so the first build dies at start
 - [BUILD-INTERIORS-UNDERUSED-62](BUILD-INTERIORS-UNDERUSED-62.md): The Balmora interiors stage ran at 2.46 of 12 allowed cores with 16 units queued in the v0.0.62 release build
 - [BUILD-JOBS-RESOLVE-PER-STAGE-32](BUILD-JOBS-RESOLVE-PER-STAGE-32.md): With automatic jobs, stages of one build plan can get different worker counts
+- [BUILD-KIT-SOURCE-COPY-ONE-CORE-67](BUILD-KIT-SOURCE-COPY-ONE-CORE-67.md): The source copy of a release kit writes 4.5 GB on about one core and takes about eighteen minutes
 - [BUILD-LARGE-ROOMS-CHECK-LATE-66](BUILD-LARGE-ROOMS-CHECK-LATE-66.md): The large-rooms table check runs about an hour and a half into a build instead of in its first minute
 - BUILD-M68K-ICE-SKEL-PARSE-52 (no report page): The m68k compiler crashed on the animation table parse (internal compiler error in patch_jump_insn); the host tests compile it with the host compiler only
 - [BUILD-MINIWIND-FINGERPRINT-ENGINE-33](BUILD-MINIWIND-FINGERPRINT-ENGINE-33.md): Every build stage's source fingerprint took in the engine sources through the MiniWind module

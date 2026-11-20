@@ -28,6 +28,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 - 2026-11-18: reported in v0.0.67-dev2
 - 2026-11-18: v0.0.67-dev2: Cause found. The nix-hound's animations are its own (the v0.0.67-dev2 creature library: every group from its own xnixhound.kf table, none from the human files). The person-like moves came from the AmiWind way of showing a miss: a defender ...
+- 2026-11-20 13:33 +0200: seen again in v0.0.67: Seen on the release image 2b086671 on 19 November 2026: the attack of a nix-hound feels the same as a person's; a closer look in the combat test arena follows.
 
 <!-- END GENERATED TIMELINE -->
 

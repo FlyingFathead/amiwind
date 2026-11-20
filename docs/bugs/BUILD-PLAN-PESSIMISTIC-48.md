@@ -199,6 +199,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - BUILD-INPUTS-LOCK-TMP-RACE-54 (no report page): Two MiniWinds started together race on the input lock: one fixed temp name, so the first build dies at start
 - [BUILD-INTERIORS-UNDERUSED-62](BUILD-INTERIORS-UNDERUSED-62.md): The Balmora interiors stage ran at 2.46 of 12 allowed cores with 16 units queued in the v0.0.62 release build
 - [BUILD-JOBS-RESOLVE-PER-STAGE-32](BUILD-JOBS-RESOLVE-PER-STAGE-32.md): With automatic jobs, stages of one build plan can get different worker counts
+- [BUILD-KIT-SOURCE-COPY-ONE-CORE-67](BUILD-KIT-SOURCE-COPY-ONE-CORE-67.md): The source copy of a release kit writes 4.5 GB on about one core and takes about eighteen minutes
 - [BUILD-LARGE-ROOMS-CHECK-LATE-66](BUILD-LARGE-ROOMS-CHECK-LATE-66.md): The large-rooms table check runs about an hour and a half into a build instead of in its first minute
 - BUILD-M68K-ICE-SKEL-PARSE-52 (no report page): The m68k compiler crashed on the animation table parse (internal compiler error in patch_jump_insn); the host tests compile it with the host compiler only
 - [BUILD-MINIWIND-FINGERPRINT-ENGINE-33](BUILD-MINIWIND-FINGERPRINT-ENGINE-33.md): Every build stage's source fingerprint took in the engine sources through the MiniWind module
