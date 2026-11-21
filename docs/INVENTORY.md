@@ -1,6 +1,6 @@
 # Inventory
 
-_Last updated with AmiWind v0.0.67 (19 November 2026)._
+_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -105,8 +105,10 @@ with the selected item's properties, as the original's tooltip shows them for it
 - a book or a scroll: its text, after an empty line (a scroll's text is read here; its Use casts it).
 
 A text longer than the box gets a vertical scroll bar: Up/Down, Page Up/Down, Home/End, the wheel, or the bar with
-the mouse. The button row at the bottom has OK (back to the window; Esc, I and P do the same) and the item's action
-(Equip, Unequip, Use, Read; E or Enter as bound), when it has one. The armour rating shown is the piece's own; the
+the mouse. The button row at the bottom has OK (back to the window; Enter, Esc, I and P do the same) and the item's
+action (Equip, Unequip, Use, Read; the use key E as bound, or the button), when it has one. Since v0.0.68 Enter in the
+box is always its OK and never acts on the item (in v0.0.67 it did the item's action, so Enter on a worn item took it
+off). The armour rating shown is the piece's own; the
 window's total under the picture counts the skills. The box is laid out by the shared layout helper and measured by
 the layout check (`tests/aga_ui_layout_test.c`); it keeps its text and lines only while it is open, and a book's text
 is read once from the book file when its box opens.

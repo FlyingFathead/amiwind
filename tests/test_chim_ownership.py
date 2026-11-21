@@ -161,6 +161,55 @@ class OwnershipTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'no compiled footprint'):
             manifest(spec, selected)
 
+    def test_compiled_apron_leaves_a_neighbours_far_piece_to_its_cells_frame(self):
+        # CHIM-FRAME-EDGE-CLAMPS-OUTSIDE-TILES-68: a piece of a neighbour's reference wholly outside the frame is held
+        # by the frame of its position's cell when that cell has one; the frame's own pieces always stay
+        from chim.cut import piece_ref
+        from chim.ownership import cell_of, select_compiled_apron
+        refs = copy.deepcopy(self.refs)
+        rows = self.source['frames'][0]['frame_ownership']['references']
+        dep = next(r['original']['number'] for r in rows if r['role'] == 'dependency')
+        own = next(r['original']['number'] for r in rows if r['role'] == 'owner')
+
+        centre = self.specs[0]['frame']['centre']
+        position = {r['number']: r['_chim_original']['position'] for r in refs}
+
+        def origin_in(cell):
+            # a frame-local origin at the middle of CELL (Morrowind cells of 8,192 units; frame units are a quarter)
+            return (((cell[0] + .5) * 8192 - centre[0]) / 4, ((cell[1] + .5) * 8192 - centre[1]) / 4, 0.)
+        home = cell_of(position[dep])
+        far_cell = (home[0] + 1, home[1])             # the next cell: its frame takes the reference (radius 1)
+        too_far = (home[0] + 2, home[1])              # two cells on: that frame does not take the reference
+
+        def with_far_pieces(cell=far_cell):
+            spec = copy.deepcopy(self.specs[0])
+            for number in (dep, own):
+                base = next(p for p in spec['placements'] if p['ref'] == number)
+                spec['placements'].append(dict(base, ref=piece_ref(number, 1), origin=origin_in(cell)))
+            return spec
+        spec = with_far_pieces()
+        selected, excluded = select_compiled_apron(spec, refs, [far_cell])
+        kept = [p['ref'] for p in spec['placements']]
+        self.assertNotIn(piece_ref(dep, 1), kept)
+        self.assertIn(dep, kept)                            # the neighbour's piece that reaches in stays
+        self.assertIn(piece_ref(own, 1), kept)              # the frame's own reference: never left out
+        self.assertEqual(excluded, [])
+        self.assertEqual(selected, refs)
+        self.assertEqual([r['ref'] for r in spec['apron_pieces_dropped']], [piece_ref(dep, 1)])
+        self.assertEqual(spec['apron_pieces_dropped'][0]['cell'], list(far_cell))
+        self.assertEqual(len(manifest(spec, selected)['references']), len(refs))
+        # the cell has no frame of its own (or no world is named): the piece stays, never in nobody's frame
+        for cells in ([], [too_far], None):
+            spec = with_far_pieces()
+            select_compiled_apron(spec, refs, cells)
+            self.assertIn(piece_ref(dep, 1), [p['ref'] for p in spec['placements']], cells)
+            self.assertNotIn('apron_pieces_dropped', spec)
+        # a piece two cells from its reference: the frame of its cell does not take the reference, so it stays
+        spec = with_far_pieces(too_far)
+        select_compiled_apron(spec, refs, [too_far, far_cell])
+        self.assertIn(piece_ref(dep, 1), [p['ref'] for p in spec['placements']])
+        self.assertNotIn('apron_pieces_dropped', spec)
+
     def test_compiled_apron_rejects_nonfinite_footprints_and_duplicate_sources(self):
         from chim.ownership import select_compiled_apron
         spec = copy.deepcopy(self.specs[0]); refs = copy.deepcopy(self.refs)

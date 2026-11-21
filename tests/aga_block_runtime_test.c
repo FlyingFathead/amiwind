@@ -19,6 +19,7 @@ int AW_TorchEquipped(void){return torch;}
 int r_framecount;
 int (*aw_hand_held_light)(float origin[3],float angles[3]);
 const aw_held_light_t *AW_HeldLight(void){return NULL;}
+const aw_held_light_t *AW_HeldLightShown(void){return NULL;}
 void AW_TorchUseHandAssets(int value){(void)value;}
 int AW_ModalWorldFrozen(void){return 0;}
 void Con_Printf(char *fmt,...){(void)fmt;warnings++;}

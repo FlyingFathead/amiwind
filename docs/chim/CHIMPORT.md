@@ -1,6 +1,6 @@
 # CHIMport: the whole island on CHIM, cell by cell
 
-_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
+_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -31,6 +31,8 @@ _Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
 - [The growing world](#the-growing-world)
 - [Figures per cell](#figures-per-cell)
 - [Store once across the run](#store-once-across-the-run)
+- [Converted as a build converts it](#converted-as-a-build-converts-it)
+  - [The cell's shape: alone or as a build's frame](#the-cells-shape-alone-or-as-a-builds-frame)
 - [The shared storage pool](#the-shared-storage-pool)
 - [Open sea: one shared ocean chunk](#open-sea-one-shared-ocean-chunk)
 - [Running CHIMport yourself](#running-chimport-yourself)
@@ -598,6 +600,84 @@ texture is converted once and reused by every later cell, so the run's
 hashed once per run (`RUN/inputs.lock`, the build's input lock), not once per
 cell.
 
+## Converted as a build converts it
+
+A cell is converted with the settings a default build uses, so that what CHIMport measures is what a build
+stores and the units it makes are the ones a build asks for (from v0.0.68; CHIMPORT-UNITS-NOT-SHARED-WITH-BUILD-68
+and CHIMPORT-HEAP-NOT-BUILD-FRAMES-68 in the [bug register](../BUGS.md)):
+
+- **The frame settings** (`--frame-settings build`, the default): the settings a default build's CHIM stage gives
+  the converter: the compiled terrain hull, terrain references, the generated terrain records (world format 0.11)
+  and the rippling texture for shapes that scroll, beside CHIMport's own grain and sectors. A test compares them
+  with the build's defaults, so a changed build default is noticed. Without a qbsp binary the compiled terrain hull
+  cannot be made and the terrain hull is the converter's automatic choice. `--frame-settings cell-v1` keeps the
+  settings of the runs before v0.0.68 (terrain copied into every chunk, the BSP29 terrain packing, routed terrain
+  hulls on regular ground, still textures) for comparison.
+- **The converter switches** (the stair rules, the standing-hull form, the lava mode, the hollow bevels and the
+  scenery reduction): set for every cell from the build's own defaults (`config/build-defaults.json`), by the same
+  functions a build uses. Every unit's key includes these values, so before this a CHIMport unit and a build's unit
+  of the same mesh had different keys although they converted the same way. A value set in the environment for a
+  comparison run stays and is named in the run's record.
+- **The record**: every `cells/<cell>/result.json` and the run's `summary.json` and `state.json` hold `settings`:
+  the frame settings and their set's name, the switch values and the palette's SHA-256. The palette must be the
+  build's own game palette (`intro-scene/id1/gfx/palette.lmp` of a build), as the texture units depend on it.
+
+What changes with the frame settings: the terrain's records and its standing hull, so a cell's memory figures.
+Measured on Mournhold's eleven district cells (CHIMport against a build of the same cells, 18 November 2026): for the
+one district cell without a neighbour, the earlier settings gave a load ring peak 1.7 % above the build's. For a cell
+whose neighbours are converted too, a build's ring also holds the neighbours' chunks, which a cell converted alone
+does not: there the cell-alone figures were 15 % to 89 % of the build's. A build checks every frame it takes with its
+own memory gate, so no game image depends on these figures; the tracker's memory figures and the verdict on a cell
+near the limit do.
+
+### The cell's shape: alone or as a build's frame
+
+`--cell-shape` chooses what each cell's frame holds (from v0.0.68):
+
+- **`cell`** (the default for now): the cell alone, nothing of its neighbours. Its memory figures are the cell's
+  "alone" figures, the ones in the island's results so far.
+- **`region`**: the frame a build installs for the cell, made by the build's own function for that one cell (the
+  region frame of `tools/chim/regions.py`, with the build's terrain margin). The frame reaches 896 map units
+  into each neighbour: the neighbours' placements and terrain in that apron are copied in, so it has 15 by 15 chunks
+  around the cell's own 8 by 8, stored in the world's default sectors as a build stores them. Its memory figures are
+  the ones a build measures for that frame. A cell with no land, and a neighbour over the sea or with no record, is
+  flat ground at the default height, as in a build, so `--missing-land refuse` is not accepted with this shape.
+
+In the region shape the counts stay the owned cell's: the placements by record type, the plan check, the tracker's
+record numbers and the cell's status (a cell with nothing placed of its own is empty). What the neighbours put in the
+frame is recorded as its own numbers, in `result.json` under `apron`:
+
+- per neighbouring cell: whether the source stage read it, whether its ground was land or flat default ground, the
+  placements read there, how many of them the frame holds, and the frame's chunks over that cell;
+- the owned cell's chunks (a chunk across the cell's edge counts as the owned cell's on every side, so 9 by 9) and
+  the totals over the apron (144 chunks);
+- the neighbours read as flat default ground.
+
+A neighbour the source stage did not read makes the cell fail (mechanism `apron-incomplete`): a smaller apron is never
+silent. The frame's own figures (memory, faces, bytes, chunks, meshes) are the whole frame's, as a build has them.
+`summary.json` adds the apron's totals per ring and in total (`apron_placements_read`, `apron_placements_in_frame`,
+`apron_chunks`), and the tracker's cell figures add `apron`, so a table can show what the neighbours cost. The shape
+is part of every cell's key (a cell in the region shape is never taken from a cell-shape conversion) and is recorded
+beside the frame settings and switches in `result.json`, `summary.json`, `state.json` and every growing world's
+`world.json`; the run prints it in its first lines. Units are shared between the shapes where they are the same work:
+the meshes, textures, variants, tiles and stair units of a placement are keyed by its model and its own placement
+values, not by the frame, while the terrain chunks, the cut of each placement into the frame's chunks and the
+visibility are the frame's own (the region frame's chunk grid lies half a chunk from the cell frame's), so a cell
+converted in the other shape makes those again.
+
+**The world a region frame stands for.** A build keeps a piece of a neighbour's model (a tile or a cut piece) that
+lies wholly outside a region frame out of that frame when the cell under the piece has a frame of its own in the same
+world: that frame holds it (`tools/chim/ownership.py` `select_compiled_apron`). Otherwise the piece stays and is given
+to the frame's edge chunk, so no piece is ever in nobody's frame; the frame's own references always keep every
+piece. A CHIM import converts each cell's frame as a world of its own, so a region run writes the world its frames
+stand for once, `RUN/world-frame-cells.json`: the run's own cells and every land and seabed cell the project's
+reference (`docs/chim/cell-progress-reference.json`) calls finished. Each cell process takes it (`--world-cells`), the
+cell's key holds those cells, and `result.json` names them under `world_frames` with the neighbours that were among
+them, so a cell's memory figure is never read without the world it was measured in. Cells whose figures depend on
+each other this way (Solstheim's glacier -26,26 and its eight neighbours, whose frames hold the glacier's iceberg
+tiles when the glacier has no frame) are converted in one run, so each is in the others' world, and are taken as
+finished together or not at all.
+
 ## The shared storage pool
 
 `--storage-pool on` puts CHIMport on the builder's shared, content-addressed
@@ -717,6 +797,11 @@ python3 tools/chimport.py status --out RUN
 - a restart continues from `RUN/state.json`;
 - `--presented-data DIR` with expansions selected (`AMIWIND_MASTERS`): make the presented data folder DIR from
   `--data-files` and read it ([The expansions' cells](#reading-the-expansions-data-the-presented-data-folder));
+- `--frame-settings build|cell-v1` the frame settings of every cell (default build:
+  [Converted as a build converts it](#converted-as-a-build-converts-it));
+- `--cell-shape cell|region` each cell alone (default) or as the frame a build installs for it, with its
+  neighbours' apron ([The cell's shape](#the-cells-shape-alone-or-as-a-builds-frame)); through the master builder,
+  the `chimport-region` request's `cell_shape` option;
 - `--sdk` lets the heap gate probe the engine's target sizes once per run;
 - `--world-every N` builds the growing world every N rings (and after the last), `--no-world` never;
 - `--tracker DIR --tracker-tool cell_progress.py` feeds the CHIM Progress Tracker as it goes.

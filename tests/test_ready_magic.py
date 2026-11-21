@@ -31,7 +31,8 @@ class ReadyMagicStance(unittest.TestCase):
         # stance, so with either in the left hand R showed the right hand's fist); the torch and a held light are put
         # away while magic is ready (not drawn, no light cast), the shield too (the guard and the third-person body)
         hands, torch, view = code('aw_hand_models.c'), code('aw_torch.c'), code('aw_view.c')
-        self.assertIn('view=AW_HandView(spell_shown(),AW_TorchEquipped(),AW_HeldLight()!=NULL);', hands)
+        # LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67: the light's view while it is held, lit or put out by V
+        self.assertIn('view=AW_HandView(spell_shown(),AW_TorchEquipped(),AW_HeldLightShown()!=NULL);', hands)
         self.assertIn('equipped=view==AW_HAND_VIEW_TORCH;', hands)
         self.assertIn('if(view==AW_HAND_VIEW_LIGHT){', hands)
         self.assertIn('if(view==AW_HAND_VIEW_SPELL && aw_hand_parts_apply(race,female,AW_HAND_SPELL_STANCE+spell_range(),frame)){',
@@ -51,7 +52,10 @@ class ReadyMagicStance(unittest.TestCase):
         self.assertIn('int (*aw_torch_put_away)(void);', torch)
         self.assertIn('The light is put away while magic is ready', torch)
         self.assertIn('extern int (*aw_torch_put_away)(void);', code('aw_torch.h'))
-        self.assertIn('static int left_put_away(void) {return !AW_HandCarriesLeft(aw_magic_readied);}', view)
+        # magic ready first (1); LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67 adds a drawn two-handed weapon (2)
+        start = view.index('static int left_put_away(void) {')
+        away = view[start:view.index('\n}', start)]
+        self.assertIn('if(!AW_HandCarriesLeft(aw_magic_readied))return 1;', away)
         self.assertIn('aw_torch_put_away=left_put_away;', view)
         self.assertIn('!AW_HandCarriesLeft(aw_magic_readied) || (drawn && right && AW_TWO_HANDED(right->weapon))', view)
 

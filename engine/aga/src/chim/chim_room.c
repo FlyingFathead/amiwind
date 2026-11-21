@@ -17,6 +17,7 @@
 #include "quakedef.h"
 #include "chim_local.h"
 #include "aw_activate.h"
+#include "aw_water.h"
 
 extern efrag_t	**lastlink;
 extern vec3_t	r_emins, r_emaxs;
@@ -37,6 +38,7 @@ static struct
 	vec3_t			mins, maxs;		/* the drawn boxes of every placement */
 	model_t			*link_world;	/* the client map its efrags were made in */
 	int				linked, efrags, waiting;
+	long			water_moves, water_relinked;	/* the water plane's moves, the placements linked again (ChimRoom_WaterMoved) */
 	int				doors;			/* hinged door placements (aw_hinged_door.c) */
 	long			bytes, model_bytes;
 	double			seconds;
@@ -135,6 +137,10 @@ static void TurnPlace (chim_place_t *p, float *rot, const float *d, vec3_t mins,
 	}
 }
 
+/* CHIM-GONE-LIST-64-CAP-68: 1 while pid's placement is gone (taken or disabled): a mover's relink (out, then back)
+ * leaves such a placement out, never brings it back (chim_chunks.c) */
+int ChimChunks_GoneNow (unsigned pid);
+
 int ChimMovers_Turn (unsigned pid, const float *d, float *now)
 {
 	int i, j, n = 0, grown = 0;
@@ -161,8 +167,10 @@ int ChimMovers_Turn (unsigned pid, const float *d, float *now)
 			{
 				if (!(c->places[j].flags & CHIM_PLACE_TURNED) && !grown)
 				{
-					ChimChunks_GonePid (pid, 1);	/* out before the box grows */
-					grown = 1;
+					/* out before the box grows (a gone one is out already and stays so: -1) */
+					grown = ChimChunks_GoneNow (pid) ? -1 : 1;
+					if (grown > 0)
+						ChimChunks_GonePid (pid, 1);
 				}
 				TurnPlace (&c->places[j], c->rot ? c->rot + 9*j : NULL, d, c->mins, c->maxs);
 				if (now && !n)
@@ -170,7 +178,7 @@ int ChimMovers_Turn (unsigned pid, const float *d, float *now)
 				n++;
 			}
 	}
-	if (grown)
+	if (grown > 0)
 		ChimChunks_GonePid (pid, 0);
 	return n;
 }
@@ -188,6 +196,7 @@ int ChimMovers_Shift (unsigned pid, const float *d, int relink)
 			}
 		return n;
 	}
+	relink = relink && !ChimChunks_GoneNow (pid);	/* a gone placement stays out: no relink of it */
 	if (relink)
 		ChimChunks_GonePid (pid, 1);
 	for (i=0 ; i<chim_frame.count ; i++)
@@ -551,6 +560,49 @@ void ChimRoom_Link (void)
 		Con_Printf ("CHIM: room %s: %ld placements not drawn, the efrag pool is full\n", room.name, (long)room.waiting);
 }
 
+/* MWSCRIPT-WATER-LEVEL-STATIC-67 (v0.0.68): the room world's water plane moved from OLD_Z to NEW_Z (aw_water.c
+ * AW_WaterPlaneSet, through aw_water_relink). A placement is drawn from the leaves its box was linked into, and the
+ * plane parts the room world's air leaf from its water leaf: a placement whose drawn box the plane passed (its side
+ * changed: wholly above, cut by it, wholly under) is linked again, so it is drawn on its right side of the surface; the
+ * rest keep their efrags (a crank's rise passes a few of a room's placements a frame). A placement waiting for the
+ * efrag pool stays waiting (ChimRoom_Link counts it), a taken or disabled one stays out (ChimRoom_Hide). The server's
+ * collision never uses the leaves. Nothing while no room is linked in the client's map. */
+static int WaterSide (const chim_place_t *p, float z)
+{
+	if (p->mins[2] >= z)
+		return 1;
+	if (p->maxs[2] <= z)
+		return -1;
+	return 0;
+}
+
+static void ChimRoom_WaterMoved (float old_z, float new_z)
+{
+	int i;
+	if (!room.on || !room.link_world || room.link_world != cl.worldmodel)
+		return;
+	room.water_moves++;
+	for (i=0 ; i<room.count ; i++)
+	{
+		chim_place_t *p = &room.places[i];
+		if (!p->linked || !p->ent.efrag || WaterSide (p, old_z) == WaterSide (p, new_z))
+			continue;
+		R_RemoveEfrags (&p->ent);
+		room.efrags -= p->leaves;
+		room.linked--;
+		LinkOne (p);
+		room.water_relinked++;
+	}
+}
+
+void (*aw_water_relink)(float old_z, float new_z) = ChimRoom_WaterMoved;
+
+/* The placements the water plane's moves linked again in the loaded room (0 with no room). */
+long ChimRoom_WaterRelinked (void)
+{
+	return room.on ? room.water_relinked : 0;
+}
+
 /* Server side (world.c SV_Move through aw_chim_clip): every placement whose
  * drawn box the move's box meets. */
 void ChimRoom_Clip (vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, trace_t *best)
@@ -676,4 +728,7 @@ void ChimRoom_Report (void)
 	if (room_grown)
 		Con_Printf ("room: loaded whole on try %d; it grew %d time%s, each after a request the full zone refused (counted as failed, then loaded again)\n",
 			room_tries, room_grown, room_grown == 1 ? "" : "s");
+	if (room.water_moves)
+		Con_Printf ("room: the water plane moved %ld times; %ld placements it passed were linked again\n",
+			room.water_moves, room.water_relinked);
 }

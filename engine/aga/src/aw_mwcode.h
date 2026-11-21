@@ -266,6 +266,9 @@
 #define AWF_HURTSTANDINGACTOR 227
 /* v0.0.63 (MW-CONSOLE-COMMANDS-62): the not-yet functions with call sites (aw_mwhost.c gap_call) */
 #define AWF_GETWATERLEVEL 212
+/* v0.0.68 (MWSCRIPT-WATER-LEVEL-STATIC-67): the room's water moved (aw_mwhost.c, aw_water.c) */
+#define AWF_SETWATERLEVEL 443
+#define AWF_MODWATERLEVEL 311
 #define AWF_GETCOLLIDINGPC 101
 #define AWF_HURTCOLLIDINGACTOR 226
 #define AWF_GETWEAPONTYPE 215

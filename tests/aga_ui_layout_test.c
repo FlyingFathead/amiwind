@@ -179,6 +179,9 @@ int main(void){
         assert(strstr(b->text,"Weight: 24\nValue: 96"));
         begin();AW_ItemInfoDraw(b,0,0);assert(faults("item information: a sword, OK and Equip")==0);
         assert(AW_ItemInfoKey(b,K_ESCAPE,0,0,0,0)==AW_ITEMINFO_CLOSE && AW_ItemInfoKey(b,'e',0,0,1,0)==AW_ITEMINFO_ACTION);
+        /* ITEM-VIEW-ENTER-UNEQUIPS-67: Enter (one of the window's use keys) is the box's OK: it closes the box and never
+         * acts on the item; before (4307f71f6) it did the item's action, an Unequip on a worn one */
+        assert(AW_ItemInfoKey(b,K_ENTER,0,0,1,0)==AW_ITEMINFO_CLOSE && AW_ItemInfoKey(b,K_ENTER,0,0,0,0)==AW_ITEMINFO_CLOSE);
         AW_ItemInfoClose(b);
         /* a Cast Once scroll: its enchantment, its effect line and its text, which needs the scroll bar */
         memset(&it,0,sizeof(it));strcpy(it.id,"sc_icarianflight");strcpy(it.name,"Scroll of Icarian Flight");

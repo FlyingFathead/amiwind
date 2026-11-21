@@ -1572,6 +1572,9 @@ def commands(args, tools, run):
                                        builder.get('chim_lighting_type') or 'hybrid'] if name == 'image' else command)
                      for name, command in steps]
             steps = tribunal_mournhold_commands(args, steps, tool, run, tools, jobs)
+            # the module bloodmoon-solstheim (Solstheim's outdoor cells; its own file, the module rule above)
+            steps = __import__('bloodmoon_solstheim_module').commands(args, steps, tool, run, tools, jobs,
+                                                                     module_chim_options)
             steps = chim_sol_test_commands(args, steps, tool, run, tools, jobs)
             steps = chim_layer_image_commands(args, steps, run)
             steps = chim_town_commands(args, builder, steps, tool, run, tools, jobs)
@@ -3595,6 +3598,10 @@ def _main(argv=None):
         args.chim_regions_record = resolve_chim_regions(args)
         # the expansions' modules: their own cells, never in the base world's list
         args.tribunal_mournhold_record = resolve_tribunal_mournhold(args)
+        args.bloodmoon_solstheim_record = __import__('bloodmoon_solstheim_module').resolve(
+            args, early_masters(args), lambda: resolve_builder(args),
+            getattr(args, 'chim_regions_status', None) or CHIM_CELLS_STATUS_DEFAULT,
+            log=lambda line: print(line, flush=True))
         if args.stage == 'aga' and not args.dry_run:
             # rc/final images contain the previous release (RELEASE-PREVIOUS-FIXES-MISSING-33)
             from previous_release import require_previous_release

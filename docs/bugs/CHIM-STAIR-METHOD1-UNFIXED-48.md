@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.48-dev2 at 2026-10-23 (time not recorded): verify run hull-surface-measure_ff378d73: stair check stops on flora_tree_gl_06 (method 0) and ex_t_slavemarket (method 1), not on the known list; blocks the release CHIM stage
 - Reported with v0.0.67-dev2 at 2026-11-18 (time not recorded): Mournhold's districts, converted by the build's own region path as eleven presented exterior cells (a measurement run, 19 models with flights): two more models keep method 0's collision: the bazaar cart (`meshes/x/ex_mh_bazaar_cart_01.nif`: flight 0, no place on the tread for the standing box) and a road piece (`meshes/x/ex_mh_road_03.nif`: flight 2, no floor under the drawn tread). Both are listed as known under the Tribunal layer of config/stair-check-known.json; the other 17 pass.
+- Reported with v0.0.68-dev3 at 2026-11-21 03:45 +0200: Nine more Solstheim meshes (a door, a steam machine, two barrow tombs, three colony buildings, the colony pier and a bridge) join the list of meshes whose stairs keep their original collision for now.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -38,6 +39,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-10-22: reported in v0.0.48-dev2
 - 2026-10-23: seen again in v0.0.48-dev2: verify run hull-surface-measure_ff378d73: stair check stops on flora_tree_gl_06 (method 0) and ex_t_slavemarket (method 1), not on the known list; blocks the release CHIM stage
 - 2026-11-18: seen again in v0.0.67-dev2: Mournhold's districts, converted by the build's own region path as eleven presented exterior cells (a measurement run, 19 models with flights): two more models keep method 0's collision: the bazaar cart ...
+- 2026-11-21 03:45 +0200: seen again in v0.0.68-dev3: Nine more Solstheim meshes (a door, a steam machine, two barrow tombs, three colony buildings, the colony pier and a bridge) join the list of meshes whose stairs keep their original collision for now.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -46,7 +48,7 @@ _Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Status: 23 October 2026](#status-23-october-2026)
 - [Symptom](#symptom)
@@ -183,6 +185,7 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [COLLISION-TRACE-COST-33](COLLISION-TRACE-COST-33.md): Movement traces near large models walk long standing-hull chains: tens of ms per trace on a slow 68040 (emulator-relative)
 - [COLLISION-TRACE-LIMIT-ROUTED-ROOM-36](COLLISION-TRACE-LIMIT-ROUTED-ROOM-36.md): The tool collision tracer stops on the Vivec Arena Pit's routed hull (visit limit), so its start spot cannot be traced
 - [HULL-SURFACE-TENT03-MISSING-57](HULL-SURFACE-TENT03-MISSING-57.md): The collision surface table left out one Ashlander yurt (ex_ashl_tent_03): its walkable collision lay 64 units under its convex pieces
+- [PELAGIAD-STAIRS-STUCK-67](PELAGIAD-STAIRS-STUCK-67.md): A stairway up in Pelagiad cannot be climbed: the player gets stuck on it
 - [RECIPE-ROW-MOVES-COLLISION-57](RECIPE-ROW-MOVES-COLLISION-57.md): A mesh reduction row changed the Imperial ship's collision: the dev4 build stopped at the collision surface gate in Vivec City (64 units)
 - RED-MOUNTAIN-SLOPE-TOO-STEEP-51 (no report page): Red Mountain (cell 2,7): a slope too steep to walk up, the player cannot go forward
 - [ROOM-PYLON-ROOF-48](ROOM-PYLON-ROOF-48.md): Grand Inquisitor and Tamira Vian (Hall of Processing) stand inside collision: a convex piece of ex_stronghold_pylon01 slopes 14 units over the floor they stand on

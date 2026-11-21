@@ -2,11 +2,12 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 3 times; something has to be done
+## PERSISTING: reported 4 times; something has to be done
 
 - Reported with v0.0.44-dev1 at 2026-10-19 14:54 +0300: maintainer playtest: still load-snags between cells even with 1 GiB of RAM expansion (no prefetch in this build); first job after v0.0.44
 - Reported with v0.0.45 at 2026-10-20 04:33 +0300: baseline measured on the crossing route: v0.0.45 at 128 MB about a third of v0.0.44 (light edge 293 to 123 ms), at 16 MB 1 to 7 % faster; CHIM frame start and chunk ring dominate
 - Reported with v0.0.46-dev1 at 2026-10-20 13:58 +0300: type 1 prototype (chim crossing 1): worst frame after a crossing 83 to 42 ms at 128 MB, 373 to 66 ms at 16 MB; approach at 16 MB 66 to 80 ms
+- Reported with v0.0.67 at 2026-11-20 16:35 +0200: Seen again in the v0.0.67 release: crossing between outdoor maps pauses noticeably, and the music can loop during the pause.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -40,6 +41,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-10-19 14:54 +0300: seen again in v0.0.44-dev1: maintainer playtest: still load-snags between cells even with 1 GiB of RAM expansion (no prefetch in this build); first job after v0.0.44
 - 2026-10-20 04:33 +0300: seen again in v0.0.45: baseline measured on the crossing route: v0.0.45 at 128 MB about a third of v0.0.44 (light edge 293 to 123 ms), at 16 MB 1 to 7 % faster; CHIM frame start and chunk ring dominate
 - 2026-10-20 13:58 +0300: seen again in v0.0.46-dev1: type 1 prototype (chim crossing 1): worst frame after a crossing 83 to 42 ms at 128 MB, 373 to 66 ms at 16 MB; approach at 16 MB 66 to 80 ms
+- 2026-11-20 16:35 +0200: seen again in v0.0.67: Seen again in the v0.0.67 release: crossing between outdoor maps pauses noticeably, and the music can loop during the pause.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -48,7 +50,7 @@ _Last updated with AmiWind v0.0.45 (20 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Status: 19 October 2026](#status-19-october-2026)
 - [Symptom](#symptom)
@@ -186,10 +188,12 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - [CHIM-FERN-NCO-SOLID-38](CHIM-FERN-NCO-SOLID-38.md): Fire ferns marked NCO become solid in CHIM mesh conversion
 - CHIM-FRAME-16MB-REFUSAL-48 (no report page): Five CHIM region frames are over or within 64 KiB of the 16 MB heap budget: on 16 MB of Fast RAM (or with Extra RAM off) their rings may not fit the zone
 - [CHIM-FRAME-COORD-RANGE-33](CHIM-FRAME-COORD-RANGE-33.md): One Vivec city frame does not fit Quake's coordinate range (network coordinates are 1/8-unit shorts)
+- [CHIM-FRAME-EDGE-CLAMPS-OUTSIDE-TILES-68](CHIM-FRAME-EDGE-CLAMPS-OUTSIDE-TILES-68.md): A large model's tiles that lie beyond a CHIM frame's edge are all given to its edge chunks, so one memory ring at the frame's corner holds every tile of the model
 - [CHIM-FRAME-EDGE-EFRAG-CRASH-36](CHIM-FRAME-EDGE-EFRAG-CRASH-36.md): R_StoreEfrags: Bad entity type 270440 ends the game: a leaf link to an entity whose model is NULL (normal play in Seyda Neen; noclip past the Vivec frame edge)
 - [CHIM-FRAME-GROUND-TRACE-38](CHIM-FRAME-GROUND-TRACE-38.md): CHIM image assembly exceeds collision traversal guard in cell 6,-5
 - [CHIM-FRAME-WORLD-BOUNDS-33](CHIM-FRAME-WORLD-BOUNDS-33.md): A CHIM frame map must carry an empty world whose bounds cover the frame
 - [CHIM-FROZEN-ACTORS-33](CHIM-FROZEN-ACTORS-33.md): Frozen CHIM actors: projectiles stop mid-air and timers stop
+- [CHIM-GONE-LIST-64-CAP-68](CHIM-GONE-LIST-64-CAP-68.md): Outdoors, after 64 placement pieces have been taken or switched off, the next ones stay drawn and solid: the engine's list of hidden placements is full
 - [CHIM-GRAFT-FAIL-NO-FLOOR-35](CHIM-GRAFT-FAIL-NO-FLOOR-35.md): A CHIM map whose frame world cannot start loses its far terrain too: the player may spawn over void
 - [CHIM-GRAFT-REPACK-EMPTY-33](CHIM-GRAFT-REPACK-EMPTY-33.md): A frame world repack without room for the whole ring drops every chunk: the world vanishes and the player falls under Seyda Neen
 - [CHIM-HANDOFF-POPIN-36](CHIM-HANDOFF-POPIN-36.md): Most of a CHIM area's objects are not drawn from the legacy side and appear at the handover (Gnaar Mok, a Dwemer ruin)
@@ -278,6 +282,7 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - [IMAGE-ROOM-MAPS-LATE-PASSES-48](IMAGE-ROOM-MAPS-LATE-PASSES-48.md): Image checks after the CHIM rooms install skip CHIM rooms: entity tracker 47 cells against 52, dressing 81 pieces against 99, actor contact 0 placements against 93
 - [IMAGE-ROOM-MAPS-OPTIMIZER-RECEIPT-48](IMAGE-ROOM-MAPS-OPTIMIZER-RECEIPT-48.md): A CHIM rooms build stops at the map optimizer check: the room maps are staged but not in the optimizer receipt
 - [IMAGE-ROOM-MAPS-SKIP-PASSES-48](IMAGE-ROOM-MAPS-SKIP-PASSES-48.md): CHIM rooms were installed before the image passes that write a room worldspawn, so CHIM room maps would miss interior sky, hand metadata and cell numbers
+- [OUTDOOR-DISABLE-NOT-HIDDEN-68](OUTDOOR-DISABLE-NOT-HIDDEN-68.md): Outdoors, a placement a script switches off stays drawn and solid unless it is a carriable light
 - [WORLD-REGION-NAMES-VF-ONLY-64](WORLD-REGION-NAMES-VF-ONLY-64.md): The open-world region directory accepts only Vvardenfell region names
 - [WORLDMAP-ONE-ISLAND-64](WORLDMAP-ONE-ISLAND-64.md): The in-game world map covers Vvardenfell only
 

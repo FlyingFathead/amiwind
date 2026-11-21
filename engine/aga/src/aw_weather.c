@@ -93,6 +93,9 @@ int AW_WeatherScriptLoad(const unsigned char *p,int bytes)
 }
 /* New Game and every save load (NEWGAME-STATE-RESET-62): no region changed by a script */
 void AW_WeatherScriptClear(void){AW_WeatherScriptReset(&script);}
+/* the console's ChangeWeather and ModRegion (v0.0.68, MW-CONSOLE-COMMANDS-62): read only, nothing new kept */
+int AW_WeatherForced(void){return forced;}
+const unsigned char *AW_WeatherRegionChances(int region){load();return loaded?AW_WeatherChancesOf(&script,&table,region):NULL;}
 /* The Red Mountain pull is our stand-in for the mountain's blight (REDMOUNTAIN-SKY-55): once a script gives the Red
  * Mountain region chances with no ash and no blight (the end of the main quest: EndGame's ModRegion), it stops, as
  * the original's sky over the mountain clears then. */
@@ -199,11 +202,16 @@ static void weather_command(void)
     Con_Printf(" (table %s",loaded?"loaded":"missing: clear sky");
     if(loaded && player_source(source)){
         int region=AW_RegionIndexAt(source);const unsigned char *c=AW_WeatherChancesOf(&script,&table,region);
-        /* the chances in effect: a script's ModRegion's when it changed them (MWSCRIPT-COMPLETE-LANDMARK) */
-        if(c)
-            Con_Printf("; region %ld: clear %ld cloudy %ld foggy %ld overcast %ld rain %ld thunder %ld ash %ld blight %ld snow %ld blizzard %ld",
-                (long)region,(long)c[0],(long)c[1],(long)c[2],(long)c[3],(long)c[4],(long)c[5],(long)c[6],(long)c[7],
+        char id[64];
+        /* the chances in effect: a script's ModRegion's when it changed them (MWSCRIPT-COMPLETE-LANDMARK); v0.0.68: the
+         * region's id as ChangeWeather and ModRegion take it on the console (the compiled scripts' region table) */
+        if(c){
+            if(AW_MwscriptRegionId(region,id,(int)sizeof id))Con_Printf("; region %ld \"%s\"",(long)region,id);
+            else Con_Printf("; region %ld",(long)region);
+            Con_Printf(": clear %ld cloudy %ld foggy %ld overcast %ld rain %ld thunder %ld ash %ld blight %ld snow %ld blizzard %ld",
+                (long)c[0],(long)c[1],(long)c[2],(long)c[3],(long)c[4],(long)c[5],(long)c[6],(long)c[7],
                 (long)c[8],(long)c[9]);
+        }
     }
     if(script.count)Con_Printf("; %ld regions changed by scripts%s",(long)script.count,mountain_cleared()?
                                ", Red Mountain cleared":"");

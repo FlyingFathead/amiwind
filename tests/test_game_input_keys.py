@@ -142,15 +142,64 @@ class GameInputKeyTests(unittest.TestCase):
             doc = json.loads(text)
             if path not in build_cache.HAND_WRITTEN_LAYER_TABLES:
                 self.assertEqual(json.dumps(doc, indent=indent) + '\n', text, path)   # written as the view writes it
-            rows = {m.casefold() for m in doc[field]}
+            fields = field if isinstance(field, tuple) else (field,)       # one rows field, or several
+            rows = {m.casefold() for one in fields for m in doc[one]}
             layer = {m.casefold() for ms in (doc.get('layers') or {}).values() for m in ms}
             self.assertLessEqual(layer, rows, path)                               # every layer row is a row
             view = json.loads(build_cache.layer_table_view(text, {'bloodmoon', 'tribunal'}, indent, field))
             self.assertNotIn('layers', view)
-            self.assertFalse(layer & {m.casefold() for m in view[field]}, path)
+            self.assertFalse(layer & {m.casefold() for one in fields for m in view[one]}, path)
         # the base CHIM stage reads Morrowind only: it leaves both layers out
         self.assertEqual(build_cache.stage_layers_left_out('chim'), {'bloodmoon', 'tribunal'})
         self.assertEqual(build_cache.stage_layers_left_out('chim-sol'), {'tribunal'})
+
+    def test_an_expansions_grounding_row_rekeys_only_the_stages_that_read_it(self):
+        # BUILD-KEY-GROUNDING-LAYERS-WHOLE-FILE-68: config/actor_grounding_layers.json is a layer-row table; a Solstheim
+        # person (a Bloodmoon row) left the base world stage and Mournhold's module keyed as before, and the reverse
+        path = 'config/actor_grounding_layers.json'
+        indent, field = build_cache.LAYER_ROW_TABLES[path]
+        self.assertEqual(field, ('ground_npcs', 'exceptions'))
+        dead = {'mode': 'authored_dead', 'reason': 'Authored initially dead NPC.'}
+        base = {'format': 'AmiWind actor grounding layers 1', 'about': 'a', 'generator': 'g',
+                'masters': ['Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm'],
+                'ground_npcs': ['aenar', 'plitinius mero'], 'exceptions': {'elberoth': dead}}
+        text0 = json.dumps(base, indent=indent) + '\n'
+        chim = build_cache.stage_layers_left_out('chim')
+        mournhold = build_cache.stage_layers_left_out('tribunal-mournhold')
+        sol = build_cache.stage_layers_left_out('chim-sol')
+
+        def view(doc, left_out):
+            return build_cache.layer_table_view(json.dumps(doc, indent=indent) + '\n', left_out, indent, field)
+        # a Bloodmoon person classed ground and another authored dead: rows in both fields, named under the layer
+        bloodmoon = dict(base, ground_npcs=['aenar', 'coventina celata', 'plitinius mero'],
+                         exceptions={'elberoth': dead, 'solstheim dead': dead},
+                         layers={'bloodmoon': ['coventina celata', 'solstheim dead']})
+        self.assertEqual(view(bloodmoon, chim), text0)                 # the base world stage: as before
+        self.assertEqual(view(bloodmoon, mournhold), text0)            # Mournhold's module: as before
+        self.assertNotEqual(view(bloodmoon, sol), text0)               # the Solstheim stage reads them
+        # the reverse: a Tribunal row moves Mournhold's module only
+        tribunal = dict(base, ground_npcs=['aenar', 'mournhold person', 'plitinius mero'],
+                        layers={'tribunal': ['mournhold person']})
+        self.assertEqual(view(tribunal, chim), text0)
+        self.assertEqual(view(tribunal, sol), text0)
+        self.assertNotEqual(view(tribunal, mournhold), text0)
+        # a row no layer names still re-keys every stage that reads the file
+        plain = dict(base, ground_npcs=['aenar', 'plitinius mero', 'someone'])
+        for left_out in (chim, mournhold, sol):
+            self.assertNotEqual(view(plain, left_out), text0)
+        # through the stage key's own step: the value the chim stage keys is the SHA-256 of the file before the row
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / 'config').mkdir()
+            (Path(d) / path).write_text(json.dumps(bloodmoon, indent=indent) + '\n', encoding='utf-8')
+            for stage, same in (('chim', True), ('tribunal-mournhold', True), ('chim-sol', False)):
+                keyed = build_cache.layer_table_values({path: 'whole file'}, stage, d)[path]
+                self.assertEqual(keyed == hashlib.sha256(text0.encode('utf-8')).hexdigest(), same, stage)
+        # the shipped file: Coventina Celata of Solstheim's cell -21,24 is a Bloodmoon row (SOL-COVENTINA-NO-GROUND-
+        # CLASS-68), so her class moved no base key
+        text = (ROOT / path).read_text(encoding='utf-8')
+        self.assertIn('coventina celata', json.loads(text)['layers']['bloodmoon'])
+        self.assertNotIn('coventina celata',
+                         json.loads(build_cache.layer_table_view(text, chim, indent, field))['ground_npcs'])
 
     def test_an_expansions_visual_recipe_and_cell_rows_rekey_no_base_stage(self):
         # BUILD-VISUAL-RECIPES-LAYER-ROWS-KEY-67: config/visual-recipes.json names Mournhold's and Solstheim's cells
@@ -206,6 +255,45 @@ class GameInputKeyTests(unittest.TestCase):
         for name, parts in old.items():
             compared = build_cache.comparable(parts, components[name], self.run, name)
             self.assertEqual(build_cache.explain(parts, compared), ['game_inputs'])
+
+    def test_code_handed_to_a_cache_key_does_not_make_a_stage_read_the_layers(self):
+        # BUILD-KEY-CHIM-READS-LAYERS-VIA-UNIT-KEY-68: the CHIM source catalogue cache hands import_town.collect to a
+        # unit key; that reach names the master list through the merging reader's module, and the base chim stage was
+        # keyed by the expansions' masters, archives and master list. A stage reads the layers by its own code only.
+        tools = self.repository / 'tools'
+        (tools / 'masters.py').write_text("import os\nMASTERS_ENV = 'AMIWIND_MASTERS'\n\n\ndef selected():\n"
+                                          "    return os.environ.get(MASTERS_ENV, '')\n")
+        (tools / 'catalogue.py').write_text("def collect():\n    import masters\n    return masters.selected()\n")
+        (tools / 'stage_world.py').write_text("import sys\nimport catalogue\nfrom pass_cache import source_digest\n\n\n"
+                                              "def main():\n    print(sys.argv, source_digest((catalogue.__file__, 'collect')))\n"
+                                              "\n\nmain()\n")
+        (tools / 'stage_media.py').write_text("import masters\nprint(masters.selected())\n")
+        index = build_cache.SourceIndex(self.repository, top_format=build_cache.STAGE_TOP_FORMAT)
+        world, media = tools / 'stage_world.py', tools / 'stage_media.py'
+        self.assertIn(build_cache.MASTERS_ENV, index.environment_names(world))      # the key still counts that code
+        self.assertNotIn(build_cache.MASTERS_ENV, index.own_environment_names(world))
+        self.assertFalse(build_cache.stage_reads_layers('world', world, index))
+        self.assertTrue(build_cache.stage_reads_layers('media', media, index))      # its own code reads the list
+        self.add_tribunal()
+        metadata = {'compiler_jobs': 1, 'input_sha256': game_inputs(self.data), 'data_files': str(self.data),
+                    'tools': {}, 'tool_sha256': {}, 'version_comparison': [],
+                    'expansion_layers': {'selected': ['Tribunal']}}
+        steps = [(name, [sys.executable, str(script), '--data-files', str(self.data), '--out', str(self.run / name)])
+                 for name, script in (('world', world), ('media', media))]
+        components = build_cache.fingerprint_steps(steps, self.run, metadata,
+                                                   build_cache.SourceIndex(self.repository,
+                                                                           top_format=build_cache.STAGE_TOP_FORMAT))[1]
+        self.assertEqual(components['world']['game_inputs']['masters'], ['morrowind.bsa', 'morrowind.esm'])
+        self.assertNotIn('load_order', components['world']['game_inputs'])
+        self.assertEqual(components['media']['game_inputs']['load_order'], ['Morrowind.esm', 'Tribunal.esm'])
+
+    def test_the_base_chim_stage_reads_no_layer(self):
+        # the base world's CHIM stage is keyed by the base game's files whatever the build selects
+        # (BUILD-KEY-CHIM-READS-LAYERS-VIA-UNIT-KEY-68); the modules of the expansions are keyed by their own layers
+        index = build_cache.SourceIndex(ROOT, top_format=build_cache.STAGE_TOP_FORMAT)
+        self.assertFalse(build_cache.stage_reads_layers('chim', ROOT / 'tools' / 'chim_build.py', index))
+        self.assertEqual(build_cache.stage_game_masters('chim', ['tribunal', 'bloodmoon'], False),
+                         build_cache.BASE_GAME_INPUTS)
 
 
 if __name__ == '__main__':

@@ -169,6 +169,24 @@ class HingedDoorTable(unittest.TestCase):
         source = (ROOT / 'engine/aga/src/aw_hinged_door.c').read_text(encoding='utf-8')
         self.assertEqual(int(dict(re.findall(r'#define (HD_\w+) (\d+)', source))['HD_MOVERS']), HINGED_MOVERS)
 
+    def test_a_crate_that_floats_on_the_water_is_an_m_row(self):
+        # MWSCRIPT-WATER-LEVEL-STATIC-67: a script that moves its own object to the water level a crank raises (the
+        # Forgotten Sewer's floating crates: SetPos by GetWaterLevel, no OnActivate) makes its object a row; a script
+        # that moves its object on its own with no water and no use (a swinging sign) still does not
+        def script(name, text):
+            return record('SCPT', sub('SCHD', name.encode().ljust(32, b'\0') + bytes(20)) + sub('SCTX', text.encode()))
+        def cont(identifier, script_name):
+            return record('CONT', sub('NAME', z(identifier)) + sub('MODL', z('x\\c.nif')) + sub('SCRI', z(script_name)))
+        raw = master()
+        raw += script('FloatOnWater', 'begin FloatOnWater\nfloat level\nset level to GetWaterLevel\n'
+                      'if ( level > ( GetStartingPos z ) )\n\tSetPos z level\nendif\nend')
+        raw += script('SwingSign', 'begin SwingSign\nRotate x 5\nend')
+        raw += cont('crate_float', 'FloatOnWater') + cont('sign_swing', 'SwingSign')
+        raw += cell('Sewer', ref(700, 'crate_float'), ref(701, 'crate_float'), ref(702, 'sign_swing'))
+        refs, moved = mover_catalogue(raw)
+        self.assertEqual(refs, [700, 701])
+        self.assertEqual(moved, {'crate_float': ['floatonwater']})
+
     def test_trapped_doors_and_containers_are_the_t_rows(self):
         # TRAPS-WHEN-OPENED-63: every placed door (hinged or load) and container naming a trap spell; a deleted one,
         # a static and a trapless one are not rows; the engine's bounds are the tool's

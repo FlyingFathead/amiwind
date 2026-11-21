@@ -37,6 +37,9 @@ OPTION = '--chim-layer-world'
 # of its own beside Vvardenfell's.
 MODULE_STAGES = {
     'tribunal-mournhold': {'layer': 'Tribunal', 'store': 'chimmh', 'kind': 'frames'},
+    # Solstheim's outdoor cells (module bloodmoon-solstheim, tools/bloodmoon_solstheim_module.py): region frames in
+    # the store chimsol, one frame map slNNNN per frame and the rows file world/regions-sl.awr
+    'bloodmoon-solstheim': {'layer': 'Bloodmoon', 'store': 'chimsol', 'kind': 'frames'},
 }
 
 
@@ -56,13 +59,20 @@ def stage_name(layer):
 def image_options(selected, stage_names, run):
     """The image's --chim-layer-world options: one per SELECTED layer whose stage is among STAGE_NAMES, in the
     layer plan's order (Tribunal, Bloodmoon: the masters' load order). [] for no layer (the image unchanged)."""
-    out = []
+    out, stores = [], {}
     for layer in ('Tribunal', 'Bloodmoon'):
         if layer in (selected or ()) and stage_name(layer) in stage_names:
             out += [OPTION, '%s=%s' % (LAYERS[layer]['store'], Path(run) / stage_name(layer))]
+            stores[LAYERS[layer]['store']] = stage_name(layer)
     for stage, spec in MODULE_STAGES.items():
         if spec['layer'] in (selected or ()) and stage in stage_names:
+            if spec['store'] in stores:
+                # one store, one stage: a plan with a layer stage and a module stage for the same store is a builder
+                # fault, said here before any stage instead of by the image step at the end
+                raise ValueError('the stages %s and %s both make the store %s: one plan holds one of them'
+                                 % (stores[spec['store']], stage, spec['store']))
             out += [OPTION, '%s=%s' % (spec['store'], Path(run) / stage)]
+            stores[spec['store']] = stage
     return out
 
 
@@ -90,13 +100,13 @@ def frame_holders(values):
     room_batches.region_frames, so the image's door tables link a door in or into such a frame as they link one of
     the base world's region frames (MOURNHOLD-EXTERIOR-CELLS-66: a district's doors). {} for none."""
     from chim.regions import TABLE_FILE, read_table
-    from chim.sol_test import LANDS, map_name
+    from chim.sol_test import land_of, map_name
     kinds = store_kinds()
     out = {}
     for store, world in parse(values):
         if kinds[store] != 'frames':
             continue
-        land = LANDS[store]
+        land = land_of(store, world)
         table = read_table(Path(world) / TABLE_FILE) or {}
         for index, frame in enumerate(table.get('frames') or []):
             out[tuple(frame['cell'])] = (map_name(index, land['prefix'], land['limit']), list(frame['origin']))

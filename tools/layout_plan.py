@@ -426,6 +426,30 @@ def follows_or_grew(planned, actual, shrink=None):
         return changed, str(exc)
 
 
+def plan_following(boot_files, maps, chim_files, headroom_mib, boot_headroom_mib, planned, shrink=None):
+    """(plan, grown): the image step's layout of the staged payload against PLANNED, the payload preflight's plan.
+    grown is None when the staged payload follows PLANNED (follows_or_grew); else (bytes changed, why) and the plan
+    is made ONCE, fresh, from the staged files (margin 1, no follow), as follows_or_grew allows. This also covers a
+    payload that grew past what DH0 can hold with only the units PLANNED moved, where following raises before
+    follows_or_grew could see the growth: the v0.0.68-dev3 build's preflight planned DH0 with no unit moved, then the
+    Solstheim store went onto DH0 and the boot payload reached 2,144,630,599 bytes, so the image step stopped with
+    "moving 0 of the 5168 units" (IMAGE-BOOT-PAYLOAD-OVER-2GIB-48, seen again). Any other refusal still stops."""
+    try:
+        plan = plan_compact(boot_files, maps, chim_files, headroom_mib, boot_headroom_mib, follow=planned)
+    except ValueError as exc:
+        if not str(exc).startswith('Boot payload '):
+            raise
+        now = (sum(int(b) for p, b in boot_files.items() if str(p) != VOLUMES_FILE) + sum(int(b) for _, b in maps)
+               + sum(int(b) for _, b in (chim_files or ())))
+        grown = (now - sum(r['payload'] for r in planned.get('partitions', ())),
+                 'DH0 no longer fits with the units the plan moved: %s' % exc)
+    else:
+        grown = follows_or_grew(planned, plan, shrink=shrink)
+        if grown is None:
+            return plan, None
+    return plan_compact(boot_files, maps, chim_files, headroom_mib, boot_headroom_mib, margin=1), grown
+
+
 def assign(plan, maps):
     """{partition: [map paths]} of MAPS (boot-relative paths) as the plan places them; maps the plan does not
     name stay with DH0's files only if the plan put them there (else ValueError)."""

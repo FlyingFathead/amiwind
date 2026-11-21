@@ -1,6 +1,6 @@
 # MWScript features
 
-_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
+_Last updated with AmiWind v0.0.68-dev3 (20 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -33,13 +33,13 @@ _Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
 
 One row per script record of the game: what names it, where it stands, which functions it calls and what its conditions test, and what state AmiWind has it in. The data is measured from the game's masters with the builder's own compiler; the page lists record ids, counts and states only. When the work list runs dry, the scripting work is taken from here row by row, toward the next landmark: every game script running as in the original. On Vvardenfell the scripts left are the character creation ones; the rest belong to Mournhold and Solstheim.
 
-Of the 1,074 scripts the original game uses, **925 run** as scripts and **9 are carried by AmiWind's own code**; of the rest, 2 use a function the interpreter lacks, 0 are attached but not run, 0 are compiled but not attached, 138 are placed only in add-on cells the image does not carry, 0 are not converted. The 133 scripts that nothing in the original game ever names (test and example scripts, replaced versions, cut content) are listed apart under Not used in the original game.
+Of the 1,074 scripts the original game uses, **927 run** as scripts and **9 are carried by AmiWind's own code**; of the rest, 0 use a function the interpreter lacks, 0 are attached but not run, 0 are compiled but not attached, 138 are placed only in add-on cells the image does not carry, 0 are not converted. The 133 scripts that nothing in the original game ever names (test and example scripts, replaced versions, cut content) are listed apart under Not used in the original game.
 
 | State | Scripts | What it means |
 | --- | ---: | --- |
-| runs | 925 | compiles whole, and the build attaches it to its objects or starts it (a record that is never placed: while the player carries its item, on the actor a levelled list gives, or on the object a script places; a script with no function, whose own locals the dialogue keeps on the speaker without it, counts as running) |
+| runs | 927 | compiles whole, and the build attaches it to its objects or starts it (a record that is never placed: while the player carries its item, on the actor a levelled list gives, or on the object a script places; a script with no function, whose own locals the dialogue keeps on the speaker without it, counts as running) |
 | carried by AmiWind's own code | 9 | not run as a script because AmiWind's own code does what it does (the section Carried by AmiWind's own code names the code and compares it step by step) |
-| uses a function the interpreter lacks | 2 | compiles, but calls at least one function the interpreter does not carry out yet (those calls do nothing and read 0) |
+| uses a function the interpreter lacks | 0 | compiles, but calls at least one function the interpreter does not carry out yet (those calls do nothing and read 0) |
 | attached, not run | 0 | the game attaches it, but the build does not run it: a hand-written rule carries it, or nothing it does is seen yet |
 | compiled, not attached | 0 | compiles whole, but nothing in the build attaches or starts it: its records are never placed, and nothing makes them at run time yet |
 | only in an add-on world | 138 | compiles whole, but its records are placed (or made by scripts) only in cells of Mournhold or Solstheim that the image does not carry (the image's own districts and rooms count as carried: the measurement reads them from the build) |
@@ -51,7 +51,7 @@ Of the 1,074 scripts the original game uses, **925 run** as scripts and **9 are 
 | Game file | All | Used in the original | Runs | AmiWind code | Function missing | Attached, not run | Not attached | Add-on world | Not converted | Not used |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | Morrowind.esm | 616 | 528 | 519 | 9 | 0 | 0 | 0 | 0 | 0 | 88 |
-| Tribunal.esm | 255 | 236 | 233 | 0 | 2 | 0 | 0 | 1 | 0 | 19 |
+| Tribunal.esm | 255 | 236 | 235 | 0 | 0 | 0 | 0 | 1 | 0 | 19 |
 | Bloodmoon.esm | 336 | 310 | 173 | 0 | 0 | 0 | 0 | 137 | 0 | 26 |
 
 Dialogue result scripts (the lines a topic answer runs) are compiled as scripts of their own: 7,411 results, 7,411 run whole, 0 use a function the interpreter lacks, 0 are not converted.
@@ -68,7 +68,7 @@ Dialogue answers that start or change a fight (StartCombat, SetFight, ModFight):
 
 Measured on 20 November 2026 from the three masters (Morrowind, Tribunal, Bloodmoon) with the builder's own compiler (tools/mwscript), 11,171 placed scripted references, 11,542 bindings in the compiled file, 4 start scripts. The states are worked out again from the interpreter's function table (tools/mwscript/functions.py) whenever the page is rendered, so a function carried out later moves its scripts without a new measurement.
 
-The image measured: build v0.0.67. Its scripts stage bound the own placements of Tribunal, Bloodmoon; the image carries 5 outdoor districts and 1,317 rooms of the interior store, and 1,837 of the 2,447 add-on bindings in the file sit in those cells (Tribunal 1,227, Bloodmoon 610). A script placed only in add-on cells outside them is "only in an add-on world".
+The image measured: build v0.0.68-dev2. Its scripts stage bound the own placements of Tribunal, Bloodmoon; the image carries 5 outdoor districts and 1,321 rooms of the interior store, and 1,837 of the 2,447 add-on bindings in the file sit in those cells (Tribunal 1,227, Bloodmoon 610). A script placed only in add-on cells outside them is "only in an add-on world".
 
 ## Why the others do not run
 
@@ -79,7 +79,6 @@ Each script that does not run, by its reason, and where its area is: Vvardenfell
 | only in an add-on world | placed only in cells of an add-on world that the image does not carry | 0 | 138 | 138 |
 | named by nothing | nothing names it: it never runs in the original either | 122 | 0 | 122 |
 | named by nothing | its records are never placed and nothing makes them: it never runs in the original either | 11 | 0 | 11 |
-| uses a function the interpreter lacks | calls a function the interpreter does not carry out yet | 0 | 2 | 2 |
 
 ## Carried by AmiWind's own code
 
@@ -103,7 +102,7 @@ Functions whose work AmiWind's own code does (the script calls into it):
 | AIFollow, AIFollowCell, AIEscort, AIEscortCell | an actor follows or escorts a target; the packages' rules (the hours, the place, the end that GetAIPackageDone reads) in aw_ambient.c | engine/aga/src/aw_companion.c AW_FollowThink (the debug companion's follow think, aw_follow.h; the movement of the packages since v0.0.63) | same | one implementation since ESCORT-FOLLOW-63; the packages never place a follower near its target inside a cell, which is OpenMW's own rule (the follower catches up through doors with the player, aw_ambient.c) | not yet |
 | StartCombat, StopCombat, GetTarget | an actor fights the player or another actor; the fight ends; whom it fights | engine/aga/src/aw_combat.c AW_CombatEngage, AW_CombatEngageAgainst (a slot's target: the player or another actor), AW_CombatTargetOf; through aw_mwhost.c host_combat | same | fights between two actors since COMBAT-ACTOR-VS-ACTOR-62; allies (followers and escorts, both ways) and guards (against creatures in a fight) join on sight (aw_mwhost.c join_fights, OpenMW actors.cpp engageCombat); the player's own followers and escorts help the player against whoever fights him and never start a fight with the player by their Fight value; OpenMW's optional setting for followers attacking on sight (off by default) is not carried | not yet |
 
-The original game's console commands (docs/CONSOLE_COMMANDS_MORROWIND.md): 392 in all; 22 run AmiWind's own command, 282 run through the script interpreter's host, 3 are AmiWind's own names (kept), 72 planned, 13 not applicable. The aliases:
+The original game's console commands (docs/CONSOLE_COMMANDS_MORROWIND.md): 395 in all; 22 run AmiWind's own command, 309 run through the script interpreter's host, 3 are AmiWind's own names (kept), 48 planned, 13 not applicable. The aliases:
 
 | Original | AmiWind | Parity | Note |
 | --- | --- | --- | --- |
@@ -217,7 +216,7 @@ The area of a script is where most of its placed references stand: the region fo
 
 | Area | Scripts | Runs | AmiWind code | Function missing | Attached, not run | Not attached | Add-on world | Named by nothing | Not converted |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| mournhold (tribunal) | 194 | 191 | 0 | 2 | 0 | 0 | 1 | 0 | 0 |
+| mournhold (tribunal) | 194 | 193 | 0 | 0 | 0 | 0 | 1 | 0 | 0 |
 | named by nothing | 123 | 0 | 1 | 0 | 0 | 0 | 0 | 122 | 0 |
 | ascadian isles region | 115 | 115 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | hirstaang forest region | 103 | 42 | 0 | 0 | 0 | 0 | 61 | 0 | 0 |
@@ -239,7 +238,7 @@ The area of a script is where most of its placed references stand: the region fo
 | sheogorad | 13 | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | brodir grove region | 7 | 1 | 0 | 0 | 0 | 0 | 6 | 0 | 0 |
 | interior with no way out | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| **All** | **1207** | **925** | **9** | **2** | **0** | **0** | **138** | **133** | **0** |
+| **All** | **1207** | **927** | **9** | **0** | **0** | **0** | **138** | **133** | **0** |
 
 ## By function
 
@@ -247,9 +246,7 @@ Every function the game's scripts call. Scripts: the script records that call it
 
 | Function | Group | Carried out | Scripts | Uses | In conditions | Missing in | Only gap | Dialogue | Dialogue missing |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| setwaterlevel | world | no | 3 | 3 | 0 | 3 | 2 | 0 | 0 |
 | cast | spells | host, in part | 53 | 126 | 0 | 1 | 1 | 5 | 0 |
-| modwaterlevel | world | no | 1 | 1 | 0 | 1 | 0 | 0 | 0 |
 | getjournalindex | journal | yes | 547 | 1371 | 535 | 0 | 0 | 0 | 0 |
 | disable | world | yes | 390 | 832 | 0 | 0 | 0 | 52 | 0 |
 | journal | journal | yes | 378 | 610 | 0 | 0 | 0 | 3091 | 0 |
@@ -386,6 +383,7 @@ Every function the game's scripts call. Scripts: the script records that call it
 | modwillpower | stats | yes | 3 | 5 | 0 | 0 | 0 | 0 | 0 |
 | setmagicka | stats | yes | 3 | 4 | 0 | 0 | 0 | 0 | 0 |
 | setmarksman | stats | yes | 3 | 4 | 0 | 0 | 0 | 0 | 0 |
+| setwaterlevel | world | host | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
 | setwerewolfacrobatics | stats | host | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
 | disablelevitation | control | host | 2 | 3 | 0 | 0 | 0 | 0 | 0 |
 | enablelevitation | control | host | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
@@ -472,6 +470,7 @@ Every function the game's scripts call. Scripts: the script records that call it
 | modpersonality | stats | yes | 1 | 2 | 0 | 0 | 0 | 0 | 0 |
 | modshortblade | stats | yes | 1 | 2 | 0 | 0 | 0 | 0 | 0 |
 | modspear | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| modwaterlevel | world | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | payfine | stats | host | 1 | 1 | 0 | 0 | 0 | 3 | 0 |
 | pcclearexpelled | stats | host | 1 | 1 | 0 | 0 | 0 | 23 | 0 |
 | pcexpelled | stats | host | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
@@ -1100,7 +1099,7 @@ Referenced by: the records that carry the script and their placed references per
 | BolsIndalen | mournhold (tribunal) | runs | 1 NPC; placed 1 (Tribunal 1); speaker of 56 dialogue results | bols indalen | - | 1: global, local | - | - |
 | cavein_script | mournhold (tribunal) | runs | 1 activator; placed 2 (Tribunal 2) | act_dwe_cavein00 | getangle, getbuttonpressed, getdistance, getitemcount, getpos, getsecondspassed, messagebox, onactivate, playgroup, removeitem, sethealth | 20: getdistance, getitemcount, local, onactivate | - | - |
 | cent_fab_attack | mournhold (tribunal) | runs | 1 creature; placed 1 (Tribunal 1) | centurion_steam_c_l | cellchanged, sethealth, startcombat | 3: cellchanged, local, other script | - | - |
-| changeWater_-550_400 | mournhold (tribunal) | uses a function the interpreter lacks | 1 activator; placed 2 (Tribunal 2) | act_h20crank_-550_400 | getangle, getsecondspassed, getwaterlevel, menumode, onactivate, playsound3d, setangle, setwaterlevel | 15: local, menumode, onactivate | - | 1 not carried out: setwaterlevel |
+| changeWater_-550_400 | mournhold (tribunal) | runs | 1 activator; placed 2 (Tribunal 2) | act_h20crank_-550_400 | getangle, getsecondspassed, getwaterlevel, menumode, onactivate, playsound3d, setangle, setwaterlevel | 15: local, menumode, onactivate | - | - |
 | chapeldoorScript | mournhold (tribunal) | runs | 2 door; placed 4 (Tribunal 4) | ex_mh_temple_door_01_ch, in_mh_door_02_chapel | activate, getjournalindex, messagebox, onactivate, playsound | 3: getjournalindex, local, onactivate | - | - |
 | Collide_damage_100 | mournhold (tribunal) | runs | 1 activator; placed 2 (Tribunal 2) | act_sotha_spikes | hurtcollidingactor | - | - | - |
 | Collide_damage_kill | mournhold (tribunal) | runs | 2 activator; placed 5 (Tribunal 5) | act_sotha_dicer, act_sotha_tenderizer | hurtcollidingactor | - | - | - |
@@ -1255,7 +1254,7 @@ Referenced by: the records that carry the script and their placed references per
 | Therdon2Script | mournhold (tribunal) | runs | 1 NPC; placed 1 (Tribunal 1); speaker of 1 dialogue results | therdon2 | disable, enable, getdeadcount | 4: getdeadcount, local, other script | - | - |
 | TherdonScript | mournhold (tribunal) | runs | 1 NPC; placed 1 (Tribunal 1); speaker of 3 dialogue results | therdon | disable | 2: local | - | - |
 | ThrudScript | mournhold (tribunal) | runs | 1 NPC; placed 1 (Tribunal 1); speaker of 8 dialogue results | thrud | aiwander, cellchanged, disable, getdeadcount, getjournalindex, ondeath | 11: cellchanged, getdeadcount, getjournalindex, local, ondeath | - | - |
-| torch_lever | mournhold (tribunal) | uses a function the interpreter lacks | 1 activator; placed 1 (Tribunal 1) | act_torch_lever_uni | gethealth, getsecondspassed, getwaterlevel, menumode, messagebox, modwaterlevel, onactivate, playgroup, playsound, sethealth, setwaterlevel | 10: gethealth, local, menumode, onactivate | - | 2 not carried out: modwaterlevel, setwaterlevel |
+| torch_lever | mournhold (tribunal) | runs | 1 activator; placed 1 (Tribunal 1) | act_torch_lever_uni | gethealth, getsecondspassed, getwaterlevel, menumode, messagebox, modwaterlevel, onactivate, playgroup, playsound, sethealth, setwaterlevel | 10: gethealth, local, menumode, onactivate | - | - |
 | tr_weathlev1 | mournhold (tribunal) | runs | 3 activator; placed 3 (Tribunal 3) | act_dwe_lever_a, act_dwe_lever_b, act_dwe_lever_c | getjournalindex, messagebox, onactivate, playgroup | 6: getjournalindex, local, onactivate, other script | - | - |
 | tr_weathmachine | mournhold (tribunal) | runs | 1 activator; placed 1 (Tribunal 1) | act_dwe_weather00 | changeweather, getangle, getsecondspassed, journal, menumode, modregion, playsound, setangle | 35: local, menumode | - | - |
 | treedeadScript | mournhold (tribunal) | runs | 2 activator; placed 136 (Tribunal 136) | act_flora_treedead_mh_01, act_flora_treedead_mh_02 | disable, enable, getdisabled | 4: getdisabled, global, local | - | - |

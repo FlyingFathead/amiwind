@@ -136,6 +136,110 @@ class Outdoors(unittest.TestCase):
                       str(e.exception))
 
 
+def sub(tag, data):
+    data = data.encode('cp1252') + b'\0' if isinstance(data, str) else data
+    return tag.encode('ascii') + struct.pack('<I', len(data)) + data
+
+
+def record(tag, *subs, flags=0):
+    payload = b''.join(subs)
+    return tag.encode('ascii') + struct.pack('<III', len(payload), 0, flags) + payload
+
+
+def script(name, text):
+    return record('SCPT', sub('SCHD', name.encode('ascii').ljust(32, b'\0') + bytes(20)), sub('SCTX', text.encode('cp1252')))
+
+
+def cell(x, y, *refs):
+    out = [sub('NAME', ''), sub('DATA', struct.pack('<Iii', 0, x, y))]
+    for number, ident in refs:
+        out += [sub('FRMR', struct.pack('<I', number)), sub('NAME', ident),
+                sub('DATA', struct.pack('<6f', x * 8192.0 + 100, y * 8192.0 + 200, 50.0, 0, 0, 0))]
+    return record('CELL', *out)
+
+
+class ScriptedPlacements(unittest.TestCase):
+    """OUTDOOR-DISABLE-NOT-HIDDEN-68: an outdoor placement a script can Disable or Enable gets 'P' rows, as a taken
+    light does, so the CHIM world hides it. The masters' own forms: a stronghold stage's bare Disable in the script its
+    pieces run (strong2_construct), "ex_gg_particles_01"->Disable (the Ghostfence's end), a dialogue result's
+    "wolfgiver"->disable on an actor (left out: an actor's edict is hidden), DisablePlayerControls and GetDisabled
+    (no switch of an object)."""
+
+    def master(self):
+        return b''.join([
+            record('TES3', sub('HEDR', bytes(300))),
+            record('ACTI', sub('NAME', 'strong_wall_02'), sub('SCRI', 'strong2_construct')),
+            record('ACTI', sub('NAME', 'ex_gg_particles_01')),
+            record('STAT', sub('NAME', 'plain_rock')),
+            record('NPC_', sub('NAME', 'wolfgiver'), sub('SCRI', 'wolfscript')),
+            script('strong2_construct', 'Begin strong2_construct\nif ( GetJournalIndex HH_Stronghold < 200 )\n'
+                                        '    Disable\nelse\n    Enable\nendif\nEnd\n'),
+            script('ghostfencescript', 'Begin ghostfencescript\n"ex_gg_particles_01"->Disable\n'
+                                       'DisablePlayerControls\nif ( GetDisabled == 1 )\nendif\nEnd\n'),
+            record('INFO', sub('INAM', '1'), sub('BNAM', '"wolfgiver"->disable')),
+            cell(-5, -5, (101, 'strong_wall_02'), (102, 'plain_rock'), (103, 'ex_gg_particles_01'),
+                 (104, 'wolfgiver'))])
+
+    def test_the_script_tables_name_the_switched_placements(self):
+        ids, scripts, kinds, scripted = L.script_targets({'Morrowind.esm': self.master()})
+        self.assertEqual(ids, {'ex_gg_particles_01', 'wolfgiver'})
+        self.assertEqual(scripts, {'strong2_construct'})               # ghostfencescript: no bare Disable of its own
+        self.assertEqual((kinds['wolfgiver'], scripted['strong_wall_02']), ('NPC_', 'strong2_construct'))
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / 'Morrowind.esm').write_bytes(self.master())
+            got = L.scripted_placements(tmp)
+        from ref_identity import stable_ref
+        self.assertEqual(sorted(got), [stable_ref('Morrowind.esm', 101), stable_ref('Morrowind.esm', 103)])
+        self.assertEqual(got[stable_ref('Morrowind.esm', 101)]['cell'], (-5, -5))
+
+    def test_a_scripted_piece_gets_its_row_and_the_check_holds_it(self):
+        strong, ghost = 101, 103
+        scripted = {strong: {'id': 'strong_wall_02', 'master': 'Morrowind.esm', 'interior': False, 'cell': (-5, -5),
+                             'position': (0.0, 0.0, 0.0), 'flames': False},
+                    ghost: {'id': 'ex_gg_particles_01', 'master': 'Morrowind.esm', 'interior': False, 'cell': (-5, -5),
+                            'position': (0.0, 0.0, 0.0), 'flames': False}}
+        world = {'frames': [(0, {'cell': (-5, -5)}, [{'owned': [{'pid': 9001, 'ref': strong},
+                                                                {'pid': 9002, 'ref': (2 << 24) | strong}]}])],
+                 'models': []}
+        # the particles: an entity of a frame map (one with no flames of this world's frame)
+        frame = [{'classname': 'worldspawn', '_chim_frame': '-6 -5'},
+                 {'classname': 'func_wall', 'aw_ref': str(ghost), 'model': '*1'}]
+        with Image({'vf0001.chim': frame}) as im:
+            rows = L.area_rows(im.id1, world, {}, scripted)
+            key = L.area_key(scripted[strong])
+            self.assertEqual(rows[key], [(L.KIND_PLACE, 0, 9001, strong), (L.KIND_PLACE, 0, 9002, strong)])
+            got = L.check(im.id1, {}, world, links=rows, scripted=scripted)
+            self.assertEqual(got['scripted exterior placements'], 2)
+            self.assertEqual(got['scripted placements drawn as entities (hidden by their edict)'], 1)
+            self.assertEqual(got['scripted targets with no CHIM piece and no entity'], [])
+            with self.assertRaises(ValueError) as e:
+                L.check(im.id1, {}, world, links={}, scripted=scripted)
+            self.assertIn('CHIM placement 9001 of reference %d (strong_wall_02) has no effect link in its cell, so it '
+                          'cannot be switched off' % strong, str(e.exception))
+            # a target with no piece and no entity is named, a finding
+            lone = dict(scripted)
+            lone[105] = dict(scripted[ghost], id='lone_piece')
+            got = L.check(im.id1, {}, world, links=rows, scripted=lone)
+            self.assertEqual(got['scripted targets with no CHIM piece and no entity'], ['105 lone_piece (-5, -5)'])
+
+    def test_a_district_piece_goes_into_its_presented_cell(self):
+        # Mournhold's districts (MOURNHOLD-EXTERIOR-CELLS-66): an interior cell the build presents outdoors; its pieces
+        # are in the store of frames (a layer world) and their rows in the area of the presented block's cell
+        import presented_exterior as P
+        places = P.receipt_places({'cells': [{'cell': 'Mournhold, Temple Courtyard', 'block': [4, -30], 'size': [2, 2],
+                                              'offset': [40000.0, -245000.0]}]})
+        tree = 2001
+        scripted = {tree: {'id': 'flora_tree_mh_01', 'master': 'Tribunal.esm', 'interior': True,
+                           'cell': 'Mournhold, Temple Courtyard', 'position': (100.0, 300.0, 20.0), 'flames': False}}
+        layer = {'frames': [(0, {'cell': (4, -30)}, [{'owned': [{'pid': 12, 'ref': tree}]}])], 'models': []}
+        with Image({}) as im:
+            rows = L.area_rows(im.id1, None, {}, scripted, layers=[layer], places=places)
+        grid, _ = P.present_position(places, 'Mournhold, Temple Courtyard', (100.0, 300.0, 20.0))
+        self.assertEqual(rows, {L.area_key({'cell': grid}): [(L.KIND_PLACE, 0, 12, tree)]})
+        self.assertEqual(grid, (4, -30))
+        self.assertEqual(L.placed_outdoors(scripted), {})                # without the presented cells: a room
+
+
 class Sections(unittest.TestCase):
     def pack(self, records):
         """A small AWA1 pack: no directories, the records in key order."""
@@ -185,10 +289,15 @@ class EngineReaders(unittest.TestCase):
 
     def test_a_taken_exterior_light_leaves_the_chim_world_and_its_effects_go(self):
         chunks = self.code('chim/chim_chunks.c')
-        self.assertIn('(gone_count && Gone (p->pid))', chunks)
-        self.assertIn('gone_count = 0;', chunks)
+        # CHIM-GONE-LIST-64-CAP-68: a bit per placement of the loaded frame, the block's third row (no list, no cap)
+        self.assertIn('Hidden (p) || Gone (p->pid) ||', chunks)
+        self.assertIn('size = n*sizeof(chim_entry_t) + cells*sizeof(short) + 3*bits;', chunks)
+        self.assertNotIn('CHIM_GONE_PIDS', chunks)
         host = self.code('aw_mwhost.c')
         self.assertIn('if(!room)room=exterior_hide(reference,1);', host)
+        # every piece of the reference, as its rows name it: no array of pieces (pids[16] before)
+        self.assertIn('return AW_AreaEffectHide(ref,hide);', host)
+        self.assertNotIn('pids[16]', host)
         lamps = self.code('aw_lamps.c')
         self.assertIn('if(lamps[i].ref && aw_lamp_gone && aw_lamp_gone(lamps[i].ref))continue;', lamps)
         self.assertIn('aw_lamp_gone=AW_ObjectDisabled;', host)
@@ -197,7 +306,13 @@ class EngineReaders(unittest.TestCase):
 
     def test_the_image_step_writes_and_checks_them(self):
         image = (ROOT / 'tools/build_aga.py').read_text(encoding='utf-8')
-        self.assertIn("stage_effect_links(boot/'id1', args.data_files, chim_world_data, out)", image)
+        self.assertIn("stage_effect_links(boot/'id1', args.data_files, chim_world_data, out, layers=effect_link_layers(args),",
+                      image)
+        # OUTDOOR-DISABLE-NOT-HIDDEN-68: every store of frames the image installs (Solstheim's, Mournhold's districts)
+        # gives its rows in the same call, and the districts by their presented cells
+        self.assertIn("places=presented_places(args)[0])", image)
+        self.assertIn("out += [str(world) for store, world in parse(values) if kinds.get(store) == 'frames']", image)
+        self.assertIn("out.append(str(args.chim_sol_world))", image)
         self.assertIn("check_image(boot/'id1', args.data_files, out)", image)
         self.assertLess(image.index('stage_effect_links(boot'), image.index('chim_world_held.clear()'))
 

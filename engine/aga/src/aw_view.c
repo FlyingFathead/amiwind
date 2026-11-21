@@ -448,9 +448,16 @@ static int hand_parts_ready(const char *race,int female) {
 static int weapon_hidden(void) {return aw_magic_readied;}
 /* READY-MAGIC-SHOWS-WEAPON-65 (v0.0.66): the left hand's torch or light put away while magic is ready (aw_torch.h
  * aw_torch_put_away; aw_hand_models.h AW_HandCarriesLeft) */
-static int left_put_away(void) {return !AW_HandCarriesLeft(aw_magic_readied);}
+/* LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67: and while a two-handed weapon is drawn (2), as the original (OpenMW 0.51,
+ * read not copied: mwrender/actoranimation.cpp updateCarriedLeftVisible hides the carried-left item for a TwoHanded
+ * weapon type; a one-handed weapon or the fists keep it) */
+static int left_put_away(void);
+/* LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67: the left arm of the arms drawn this frame on the light stance's frame (its
+ * table frame, -1 none), from the left arm's root (hand_parts_left_light, below) */
+static int hparts_left_layer=-1,hparts_left_root=-1;
+static const aw_skel_table_t *hparts_left_table;
 static int hand_parts_apply(const char *race,int female,int stance,int frame) {
-    hparts_shown=0;
+    hparts_shown=0;hparts_left_layer=-1;
     if(stance<0 || stance>=HAND_PART_STANCES || !hand_parts_ready(race,female) ||
        hparts_table->frames<(stance+1)*HAND_PART_FRAMES)return 0;
     if(frame<0)frame=0;
@@ -458,6 +465,24 @@ static int hand_parts_apply(const char *race,int female,int stance,int frame) {
     hparts_frame=stance*HAND_PART_FRAMES+frame;
     cl.viewent.model=hpart_models[0];cl.viewent.frame=hparts_frame;
     hparts_shown=1;return 1;
+}
+/* LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67: the left arm of the arms applied this frame on the light stance, as the
+ * third-person body holds a light beside a weapon (parts_light_layer): a one-handed weapon in the right hand and the
+ * light in the left at once. The root looked up once per table (aw_skel.c AW_SkelLeftArmRoot; measured on the
+ * v0.0.68-dev1 image: bone 2 of 42, and the layered pose keeps the weapon bone 0.000 units off its own stance over all
+ * 28 frames). */
+static int hand_parts_left_light(int frame) {
+    hparts_left_layer=-1;
+    if(!hparts_shown || !hparts_table || hparts_table->frames<(AW_HAND_LIGHT_STANCE+1)*HAND_PART_FRAMES)return 0;
+    if(hparts_left_table!=hparts_table){
+        hparts_left_table=hparts_table;
+        hparts_left_root=AW_SkelLeftArmRoot(hparts_table,hparts.shield_bone,hparts.weapon_bone);
+    }
+    if(hparts_left_root<0)return 0;
+    if(frame<0)frame=0;
+    if(frame>=HAND_PART_FRAMES)frame=HAND_PART_FRAMES-1;
+    hparts_left_layer=AW_HAND_LIGHT_STANCE*HAND_PART_FRAMES+frame;
+    return 1;
 }
 /* r_main.c (aw_view_hand_part): the further parts (I from 1) of the arms drawn this frame, NULL after the last. */
 static struct model_s *hand_part(int i) {
@@ -470,12 +495,16 @@ static struct model_s *hand_part(int i) {
  * tag in the view model's space (the table's root carries the view: tools/prepare_player_fp_parts.py): the one place
  * every held item of first person rides */
 static int hand_parts_bone_tag(int hand,float tag[6]) {
-    static float world[AW_SKEL_MAX_BONES][3][4];static const aw_skel_table_t *posed;static int posed_frame=-1;
+    static float world[AW_SKEL_MAX_BONES][3][4];static const aw_skel_table_t *posed;static int posed_frame=-1,posed_layer=-1;
     float scale[3],w=hparts.weight>0?hparts.weight:1,h=hparts.height>0?hparts.height:1;
     int bone=hand==AW_HAND_LEFT?hparts.shield_bone:hparts.weapon_bone;
     if(!hparts_shown || !hparts_table || bone<0 || bone>=hparts_table->bones)return 0;
-    if(posed!=hparts_table || posed_frame!=hparts_frame){
-        AW_SkelPose(hparts_table,(float)hparts_frame,world);posed=hparts_table;posed_frame=hparts_frame;
+    /* LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67: posed as the renderer draws the arms, the left arm on its light layer */
+    if(posed!=hparts_table || posed_frame!=hparts_frame || posed_layer!=hparts_left_layer){
+        if(hparts_left_layer>=0)
+            AW_SkelPoseLayer(hparts_table,(float)hparts_frame,(float)hparts_left_layer,hparts_left_root,world);
+        else AW_SkelPose(hparts_table,(float)hparts_frame,world);
+        posed=hparts_table;posed_frame=hparts_frame;posed_layer=hparts_left_layer;
     }
     scale[0]=scale[1]=w*.25f;scale[2]=h*.25f;
     AW_SkelBoneTag((const float (*)[4])world[bone],scale,tag);
@@ -486,6 +515,15 @@ static int body_find(const char *race,int female) {
     for(i=0;i<body_count;i++)if(bodies[i].female==female && !Q_strcasecmp(bodies[i].race,(char *)race))return i;
     for(i=0;i<body_count && bodies[i].female!=female;i++);
     return i<body_count?i:-1;
+}
+/* LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67 (left_put_away, declared above): a drawn two-handed weapon too (2); the
+ * weapon's row asked here only (the parts' readers take no catalogue row) */
+static int left_put_away(void) {
+    edict_t *p=local_player();eval_t *goal;aw_inventory_item_t right;
+    if(!AW_HandCarriesLeft(aw_magic_readied))return 1;
+    goal=p?GetEdictFieldValue(p,"aw_hand_goal"):NULL;
+    return goal && goal->_float==1 && AW_InventoryEquippedItem(AW_SLOT_RIGHT,&right) && right.category==AW_INV_WEAPON &&
+           right.weapon>0 && AW_TWO_HANDED(right.weapon)?2:0;
 }
 /* The body of the character's race and sex (the original's player record, a Dark Elf man,
  * before a character exists). 1 = a body is ready. */
@@ -661,15 +699,25 @@ static int parts_inventory_items(int frame,model_t *models[2],float origins[2][3
     int kind,n=0,bone,posed=0;aw_inventory_item_t item;float tag[6],scale[3];
     scale[0]=scale[1]=parts.weight*.25f;scale[2]=parts.height*.25f;
     for(kind=0;kind<2;kind++){
+        const aw_held_light_t *light=NULL;
         bone=kind?parts.shield_bone:parts.weapon_bone;
         if(bone<0 || bone>=parts_table->bones || (kind && !inventory_left))continue;
-        if(!AW_InventoryEquippedItem(kind?AW_SLOT_LEFT:AW_SLOT_RIGHT,&item) || !item.model[0] ||
-           (kind && (item.category!=AW_INV_ARMOUR || item.subtype!=8)))continue;
-        models[n]=Mod_ForName(item.model,false);
+        if(!AW_InventoryEquippedItem(kind?AW_SLOT_LEFT:AW_SLOT_RIGHT,&item) || !item.model[0])continue;
+        /* LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67: a carried light in the left hand is in the picture too, as itself at
+         * its carried place on the shield bone (OpenMW 0.51 characterpreview.cpp shows the carried-left item, read not
+         * copied); before, only a shield was, and a light beside a weapon was missing from the equipped picture */
+        if(kind && (item.flags&AW_INV_LIGHT))light=AW_HeldLightCarried();
+        if(kind && !light && (item.category!=AW_INV_ARMOUR || item.subtype!=8))continue;
+        models[n]=Mod_ForName(light?(char *)light->model:item.model,false);
         if(!models[n] || models[n]->type!=mod_alias || !Cache_Check(&models[n]->cache))continue;
         if(!posed){AW_SkelPose(parts_table,(float)frame,world);posed=1;}
         AW_SkelBoneTag((const float (*)[4])world[bone],scale,tag);
-        memcpy(origins[n],tag,3*sizeof(float));memcpy(angles[n],tag+3,3*sizeof(float));n++;
+        if(light){
+            /* the carried place on the bone (AW_BlockCompose takes and gives alias angles: the pitch negated) */
+            float base[3]={-tag[3],tag[4],tag[5]};
+            AW_BlockCompose(tag,base,light->offset,origins[n],angles[n]);angles[n][0]=-angles[n][0];
+        }else{memcpy(origins[n],tag,3*sizeof(float));memcpy(angles[n],tag+3,3*sizeof(float));}
+        n++;
     }
     return n;
 }
@@ -827,9 +875,10 @@ static int body_fists_ready(edict_t *p) {
     v=GetEdictFieldValue(p,"aw_hand_goal");if(!v || v->_float!=1)return 0;
     v=GetEdictFieldValue(p,"aw_hand_state");
     if(!v || (v->_float!=2 && v->_float!=3))return 0;
-    /* The carried-light pose is separate; do not show two fists around a
-     * missing torch. Attack overlays and carried equipment are separate. */
-    v=GetEdictFieldValue(p,"aw_torch");return !v || v->_float!=1;
+    /* The baked torch body's pose is separate; do not show two fists around a missing torch. A held light of its own on
+     * the assembled body rides the fists' stance with its left arm on the torch group (LIGHT-AND-WEAPON-REPLACE-EACH-
+     * OTHER-67). Attack overlays and carried equipment are separate. */
+    return !body_torch;
 }
 static int body_hand_layer(edict_t *p,int frame) {
     eval_t *v;int state;float started,duration,fraction;
@@ -837,7 +886,7 @@ static int body_hand_layer(edict_t *p,int frame) {
        p->v.waterlevel>=2 || p->v.movetype!=MOVETYPE_WALK)return -1;
     v=GetEdictFieldValue(p,"aw_hand_state");if(!v || (v->_float!=1 && v->_float!=3 && v->_float!=4))return -1;
     state=(int)v->_float;
-    v=GetEdictFieldValue(p,"aw_torch");if(v && v->_float==1)return -1;
+    if(body_torch)return -1;     /* the baked torch body's own pose (LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67) */
     v=GetEdictFieldValue(p,"aw_hand_started");if(!v)return -1;started=v->_float;
     duration=AW_HandDuration(state==1?AW_HAND_DRAW:state==3?AW_HAND_PUNCH:AW_HAND_LOWER,0);
     if(!(duration>0 && duration<=60))return -1;
@@ -891,7 +940,12 @@ static int body_turn(int move,float dt){
 static int body_stance_frame(edict_t *p,int group,int air,float dt,float rate){
     eval_t *v;aw_pick_state_t s;aw_pick_t o;aw_pick_player_t in;int hand,goal,move=AW_PM_NONE,run=0,gi,react,roll;float age;
     if(!stances_cvar.value || !body_parts || !parts_table || !p || p->v.health<=0)return -1;
-    if((v=GetEdictFieldValue(p,"aw_torch")) && v->_float==1)return -1;
+    /* LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67: a lit light no longer takes the weapon's stance away: the body holds the
+     * weapon's stance and its left arm the light (parts_light_layer, on the renderer's pose), as the original layers the
+     * torch group on the left arm over the rest (OpenMW 0.51 character.cpp, BlendMask_LeftArm, read not copied); only
+     * the baked torch body (body_torch: a torch without its own held model) keeps its own pose. Since the assembled
+     * body's stances (WEAPONS-57) a lit light (aw_torch 1) dropped the stance: the weapon hung in an idle arm. */
+    if(body_torch)return -1;
     hand=(v=GetEdictFieldValue(p,"aw_hand_state"))?(int)v->_float:0;
     goal=(v=GetEdictFieldValue(p,"aw_hand_goal"))?(int)v->_float:0;
     if(group==AW_ANIM_WALK || group==AW_ANIM_RUN || group==AW_ANIM_READYWALK || group==AW_ANIM_READYRUN){
@@ -906,7 +960,15 @@ static int body_stance_frame(edict_t *p,int group,int air,float dt,float rate){
     /* PLAYER-ANIM-GROUPS-NOT-PLAYED-66 (v0.0.66): with the stance, the sneak (the key or ForceSneak), the turn on the
      * spot and the reaction to the last blow (hit1..5, knockdown, knockout: AW_CombatPlayerReaction) */
     memset(&in,0,sizeof(in));
-    in.weapon=aw_magic_readied?AW_PW_SPELL:AW_InventoryEquippedWeaponType();in.hand=hand;in.goal=goal;in.move=move;
+    in.weapon=aw_magic_readied?AW_PW_SPELL:AW_InventoryEquippedWeaponType();
+    /* PLAYER-PUNCH-THIRDPERSON-39 / TP-DRAW-WEAPON-LAGS-67: the bare hands rising, striking or lowering play the
+     * original's handtohand group (equip, the attack by type, unequip) on the hands' clock, as a drawn weapon plays
+     * its own; the ready fists keep their move groups (idlehh, walkforwardhh, runforwardhh: body_fists_ready). Since
+     * the assembled body (61b64c83f, v0.0.59-dev5) the baked body's hand layers were not there and the stance pick
+     * took real weapons only: in third person the fists had no draw, punch or lower (the swing heard, the body
+     * still; the raised fists only after the draw clip had run out). */
+    if(in.weapon==AW_PW_NONE && (hand==1 || hand==3 || hand==4))in.weapon=AW_PW_HANDTOHAND;
+    in.hand=hand;in.goal=goal;in.move=move;
     in.run=run;in.attack=AW_CombatPlayerAttackType();in.air=air;in.swim=p->v.waterlevel>=2;
     in.sneak=AW_MoveSneaking() || aw_move_force_sneak;in.turn=body_turn(move,dt);
     react=AW_CombatPlayerReaction(&age,&roll);
@@ -1069,9 +1131,16 @@ static int parts_light_layer(int frame,float *layer_frame,int *root) {
 static int player_light_layer(const model_t *m,const void *skel_table,int frame,float *layer_frame,int *root) {
     extern int r_framecount;
     static int asked=-1,held;      /* the held light asked once a frame, not once per drawn part */
+    /* LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67: the first-person arms with a one-handed weapon and the light: their left
+     * arm on the light stance (hand_parts_left_light), every part of them at the frame drawn */
+    if(m && skel_table && skel_table==(const void *)hparts_table && hparts_shown && hparts_left_layer>=0 &&
+       hparts_left_root>=0 && frame==hparts_frame && hparts_in_use(m)){
+        *layer_frame=(float)hparts_left_layer;*root=hparts_left_root;return 1;
+    }
     if(!body_parts || !parts_table || skel_table!=(const void *)parts_table || !m || !chase_active.value ||
        !parts_in_use(m))return 0;
-    if(asked!=r_framecount){asked=r_framecount;held=AW_HeldLight()!=NULL;}
+    /* the light in the hand, lit or put out (LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67) */
+    if(asked!=r_framecount){asked=r_framecount;held=AW_HeldLightShown()!=NULL;}
     return held && parts_light_layer(frame,layer_frame,root);
 }
 static model_t *held_light_model;            /* the held light's model drawn this frame (NULL none) */
@@ -1094,7 +1163,9 @@ static void parts_draws(edict_t *p) {
     drawn=goal && AW_HandShowsWeapon(goal->_float==1,aw_magic_readied);   /* the spell stance: no weapon in the hand */
     right=parts_hand_item(0);
     scale[0]=scale[1]=parts.weight*.25f;scale[2]=parts.height*.25f;
-    light=AW_HeldLight();
+    /* LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67: the light in the left hand while it is held, lit or put out (its flames
+     * and light only when lit), beside the weapon in the right */
+    light=AW_HeldLightShown();
     if(light)layered=parts_light_layer(body.frame,&layer,&root);
     for(kind=0;kind<2;kind++){
         model_t *model;entity_t *out=&inventory_held[kind];
@@ -1883,7 +1954,10 @@ static void held_measure(void) {
             Con_Printf("held light: first person, %s: not drawn in the last frame\n",id);return;
         }
         hand=hparts_table->parent[hparts.shield_bone];
-        AW_SkelPose(hparts_table,(float)hparts_frame,world);
+        /* posed as drawn: with a one-handed weapon the left arm on the light stance (LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67) */
+        if(hparts_left_layer>=0)
+            AW_SkelPoseLayer(hparts_table,(float)hparts_frame,(float)hparts_left_layer,hparts_left_root,world);
+        else AW_SkelPose(hparts_table,(float)hparts_frame,world);
         for(i=0;i<hparts.count;i++)
             n=held_hand(hpart_models[i],hparts_table,(const float (*)[3][4])world,hand,hparts.shield_bone,
                         cl.viewent.origin,cl.viewent.angles,scale,n);
@@ -2055,6 +2129,7 @@ void AW_ViewInit(void) {
     Cvar_RegisterVariable(&stances_cvar);
     aw_hand_weapon_hidden=weapon_hidden;aw_hand_parts_apply=hand_parts_apply;aw_view_hand_part=hand_part;aw_inventory_preview_pending=parts_pending;
     aw_torch_put_away=left_put_away;   /* READY-MAGIC-SHOWS-WEAPON-65: the carried light put away while magic is ready */
+    aw_hand_parts_left_light=hand_parts_left_light;   /* LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67: weapon and light at once */
     aw_inventory_player_beast=player_beast;aw_race_swapped=race_swapped;
     Cvar_RegisterVariable(&fullview_cvar);Cvar_RegisterVariable(&aw_inventory_preview_reserve);Cvar_RegisterVariable(&aw_inventory_preview_live);
     AW_ViewRulesDefault(&rules);AW_ViewReset(&view,&rules);

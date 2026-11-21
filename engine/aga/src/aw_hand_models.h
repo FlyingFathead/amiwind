@@ -77,6 +77,15 @@ int AW_HandsCastStart(void);
 /* aw_view.c: the arms from parts' bone of HAND (AW_HAND_RIGHT the weapon bone, AW_HAND_LEFT the shield bone) at the
  * frame drawn now, as a tag in the view model's space (AW_SkelBoneTag at the parts' 0.25 scale); 0 none */
 extern int (*aw_hand_parts_bone_tag)(int hand,float tag[6]);
+/* LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67, aw_view.c: the arms from parts applied this frame take their left arm from the
+ * light stance (AW_HAND_LIGHT_STANCE) at the hands' FRAME (0..27), over the stance applied, in the drawing and in the
+ * bone tags; 0 when the table has no light stance or no left arm root (the stance applied stays whole). The layer ends
+ * with the next aw_hand_parts_apply. NULL in fixtures without it. */
+extern int (*aw_hand_parts_left_light)(int frame);
+/* The weapon stances (AW_HandStance) a carried light is held beside: one-handed (1h) and thrown (1t); the two-handed
+ * stances, the bow and the crossbow put it away (OpenMW 0.51 updateCarriedLeftVisible: the TwoHanded weapon types,
+ * read not copied). Pure. */
+int AW_HandStanceOneHanded(int stance);
 /* The first-person hand clips (FIRST-PERSON-HANDS-IN-C-54): the builder writes them to gfx/hand-anims.txt in the image
  * (tools/hand_metadata.py hand_table; read by aw_hands.c), never into a map's worldspawn or the QuakeC, so a change to the hands rebuilds
  * the image only. Text: "AWHA1", then "clip NAME FIRST COUNT DURATION" for idle, draw, lower and punch (frames of the

@@ -2,12 +2,13 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 4 times; something has to be done
+## PERSISTING: reported 5 times; something has to be done
 
 - Reported with v0.0.54-dev1 at 2026-10-27 17:17 +0200: PERSISTING (27 October 2026, the NPC docs audit): 6 of 2,031 placed items in interiors are takeable.
 - Reported with v0.0.58-dev4 at 2026-11-01 05:16 +0000: The office's 124 takeable items now share one inline model per equal item (57 models instead of 124), the shared bake taken from the first equal item, so the office stays under the engine's model table. Each item keeps its own func_wall edict and reference, so the aim box, taking with the activate key and the saved taken state work as before.
 - Reported with v0.0.58-dev3 at 2026-11-01 05:33 +0200: PERSISTING (v0.0.58-dev3 test image): the opening's Census and Excise Office is a compiled room map (tools/prepare_census.py) that leaves all 124 small items out (Iron Dagger 119577, Quill Pen 406347, the meal on the back-room table and others): they are not drawn and cannot be taken. Only the registration paper is kept, as the opening's own object.
 - Reported with v0.0.61 at 2026-11-07 (time not recorded): Seen again on the v0.0.61 release image: in the Andrano Ancestral Tomb no container or placed item can be used (ROOM-OBJECTS-MISSING-62).
+- Reported with v0.0.67 at 2026-11-20 15:58 +0200: Seen again on the v0.0.67 release image: many takeable items that the original places in interiors of the main game are not there. The first room to be counted against the game data is the Census and Excise Office.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -43,6 +44,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-01 05:16 +0000: seen again in v0.0.58-dev4: The office's 124 takeable items now share one inline model per equal item (57 models instead of 124), the shared bake taken from the first equal item, so the office stays under the engine's model table.
 - 2026-11-01 05:33 +0200: seen again in v0.0.58-dev3: PERSISTING (v0.0.58-dev3 test image): the opening's Census and Excise Office is a compiled room map (tools/prepare_census.py) that leaves all 124 small items out (Iron Dagger 119577, Quill Pen 406347, the meal on the back-room table and ...
 - 2026-11-07: seen again in v0.0.61: Seen again on the v0.0.61 release image: in the Andrano Ancestral Tomb no container or placed item can be used (ROOM-OBJECTS-MISSING-62).
+- 2026-11-20 15:58 +0200: seen again in v0.0.67: Seen again on the v0.0.67 release image: many takeable items that the original places in interiors of the main game are not there.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -51,7 +53,7 @@ _Last updated with AmiWind v0.0.56 (30 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
+- [PERSISTING: reported 5 times; something has to be done](#persisting-reported-5-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Status: 21 October 2026](#status-21-october-2026)
 - [Symptom](#symptom)
@@ -228,9 +230,11 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [ROOM-EMPTY-CELL-66](ROOM-EMPTY-CELL-66.md): Four expansion interior cells with no scenery were refused by the room batches stage as having no placement to convert
 - [ROOM-OBJECTS-MISSING-62](ROOM-OBJECTS-MISSING-62.md): In the Andrano Ancestral Tomb only the doors can be used: no containers, items or creatures
 - [ROOMS-SET-ASIDE-NOT-BUILT-67](ROOMS-SET-ASIDE-NOT-BUILT-67.md): Rooms that no door leads to are set aside and not built, although a script, a teleport or travel can lead there
+- [SCRIPTED-TARGETS-NOT-IN-IMAGE-68](SCRIPTED-TARGETS-NOT-IN-IMAGE-68.md): Outdoor objects that the game's scripts switch on and off (the Ghostfence's glow, the opening's barriers, parts of the Telvanni stronghold) are not in the built world at all
 - [SEYDA-CONTAINERS-NOT-DRAWN-67](SEYDA-CONTAINERS-NOT-DRAWN-67.md): Seyda Neen's crates, barrels, chest and sacks are not drawn and cannot be opened
 - [SEYDA-LANTERNS-MISSING-31](SEYDA-LANTERNS-MISSING-31.md): Seyda Neen lanterns light the night but are not in its maps
 - [SKY-FLAT-PALETTE-DRIFT-41](SKY-FLAT-PALETTE-DRIFT-41.md): Exterior sky flat with no clouds: the sampled palette drifted and the shared cloud sky silently fell back to a one-colour placeholder
+- [SOL-MODULE-CACHE-NOT-PICKLED-68](SOL-MODULE-CACHE-NOT-PICKLED-68.md): The Solstheim build module's world stage stopped at once: the shared unit cache it installs could not be handed to the converter's worker processes
 - [STAGE-READS-SELECTED-MASTERS-67](STAGE-READS-SELECTED-MASTERS-67.md): No build stage proves it read the game files the build selected, so a stage that reads only the base game goes unnoticed
 - [TP-LIST-UNBUILT-EXTERIORS-66](TP-LIST-UNBUILT-EXTERIORS-66.md): The teleport place list would list Solstheim places the image has no world for
 - [TREE-SCALE-001](TREE-SCALE-001.md): Non-unit-scale tree sprites omitted; bounds too conservative

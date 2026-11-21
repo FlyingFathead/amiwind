@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.66-dev1 at 2026-11-13 (time not recorded): Seen again on v0.0.66-dev1: tree-side mushrooms still hang in the air in Seyda Neen by the lighthouse (cell -2,-9, local about -43 20).
 - Reported with v0.0.66 at 2026-11-17 (time not recorded): Seen again on the v0.0.66 release (Bitter Coast, Seyda Neen region): with the reduced tree model (the mesh flora_bc_tree_08 variants, drawn as a solid low trunk) the bracket fungi that grow from the side of the tree are not seen where the original places them: in cell -2,-9 (local 1 90 64) none shows at the trunk, and in cell -2,-8 (local -603 2489 151, a Hypha Facia aimed at, placement 74598) the fungus stands apart from the trunk. A tree drawn as sprites gives no trunk surface to hold a fungus or to pick it, and the radius of the tree blocks the pick of a fungus behind it. Two ways, both to leave the fungus pickable: (a) the fungi are drawn as sprites together with the tree, or (b) the trunk is drawn as polygons so the fungus sits on it (the flora support list, config/flora-support.json, holds the measured shifts).
+- Reported with v0.0.67 at 2026-11-20 15:24 +0200: Seen again on the v0.0.67 release image: with the reduced tree model the bracket fungi are no longer at the side of the trunk where the original places them. Also, the vines of that tree model appear to hang in the air; drawing the vines as crossed sprite panels is suggested.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -39,6 +40,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-13: seen again in v0.0.66-dev1: Seen again on v0.0.66-dev1: tree-side mushrooms still hang in the air in Seyda Neen by the lighthouse (cell -2,-9, local about -43 20).
 - 2026-11-17: seen again in v0.0.66: Seen again on the v0.0.66 release (Bitter Coast, Seyda Neen region): with the reduced tree model (the mesh flora_bc_tree_08 variants, drawn as a solid low trunk) the bracket fungi that grow from the side of the tree are not seen where the ...
 - 2026-11-17: v0.0.66: Plan for the tree fungus, three ways, each leaving the fungus pickable and selectable as a method: (a) the fungi drawn as sprites together with the tree; (b) the trunk drawn as polygons so the fungus sits on it; (c) a level of detail by ...
+- 2026-11-20 15:24 +0200: seen again in v0.0.67: Seen again on the v0.0.67 release image: with the reduced tree model the bracket fungi are no longer at the side of the trunk where the original places them.
 
 <!-- END GENERATED TIMELINE -->
 

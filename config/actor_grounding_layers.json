@@ -39,6 +39,7 @@
   "calvus horatius",
   "capiton popillius",
   "cimber valerius",
+  "coventina celata",
   "daron",
   "dralora favelnim",
   "drathas reyas",
@@ -156,5 +157,10 @@
    "source": "NPC_ record NPDT: health 0 (the selected game files)",
    "reason": "Authored initially dead NPC; preserve the converted death pose and placement."
   }
+ },
+ "layers": {
+  "bloodmoon": [
+   "coventina celata"
+  ]
  }
 }

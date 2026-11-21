@@ -1,0 +1,24 @@
+{
+ "format": "aw-collision-union-bsp2-1",
+ "about": "Meshes whose standing-hull union the collision compiler refuses in its standard format (Map exceeds BSP29 node/leaf limit: more than 32,767 nodes or leaves) and which are compiled in its BSP2 format instead: their own unit kinds, chosen by mesh in chim.build frame_input (tools/chim/union_bsp2.py; CHIM-COLLISION-UNION-FALLBACK-41). A row with tiles true is a model over one brush image's budget, its tiles' unions compiled one by one. Each row with its measured reason; an expansion's rows are named under layers, so they key only the stages that read that layer.",
+ "meshes": {
+  "x/bm_ex_iceberg_shard01": {
+   "reason": "Solstheim's iceberg shard (1,776 convex pieces, Bloodmoon): measured 2026-11-20 on 10 of its placed variants: 6 refused in BSP29 (their unions need 33,965 to 37,011 nodes), all 6 compile in BSP2, standing check short 0 and over 0, standing hull 456,500 to 489,848 bytes instead of the chain's 1,301,052 to 1,302,540; the 4 that compile in BSP29 give the same hull in BSP2"
+  },
+  "x/bm_ex_iceberg": {
+   "tiles": true,
+   "reason": "Solstheim's glacier iceberg (14,679 convex pieces, Bloodmoon), over one image's clipnode budget and stored as 97 tiles at grain 256: measured 2026-11-20, every tile's union compiles in BSP2, the tiles' standing hulls 6,920,516 bytes instead of their chains' 10,816,548"
+  },
+  "x/bm_ex_iceberg_collapsed": {
+   "tiles": true,
+   "reason": "Solstheim's collapsed iceberg (8,300 convex pieces, Bloodmoon), stored as 66 tiles at grain 256: measured 2026-11-20, every tile's union compiles in BSP2, the tiles' standing hulls 4,406,200 bytes instead of their chains' 6,099,512"
+  }
+ },
+ "layers": {
+  "bloodmoon": [
+   "x/bm_ex_iceberg_shard01",
+   "x/bm_ex_iceberg",
+   "x/bm_ex_iceberg_collapsed"
+  ]
+ }
+}

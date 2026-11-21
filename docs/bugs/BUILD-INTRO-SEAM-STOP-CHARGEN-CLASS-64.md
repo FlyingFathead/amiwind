@@ -113,9 +113,11 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [ROOM-EMPTY-CELL-66](ROOM-EMPTY-CELL-66.md): Four expansion interior cells with no scenery were refused by the room batches stage as having no placement to convert
 - [ROOM-OBJECTS-MISSING-62](ROOM-OBJECTS-MISSING-62.md): In the Andrano Ancestral Tomb only the doors can be used: no containers, items or creatures
 - [ROOMS-SET-ASIDE-NOT-BUILT-67](ROOMS-SET-ASIDE-NOT-BUILT-67.md): Rooms that no door leads to are set aside and not built, although a script, a teleport or travel can lead there
+- [SCRIPTED-TARGETS-NOT-IN-IMAGE-68](SCRIPTED-TARGETS-NOT-IN-IMAGE-68.md): Outdoor objects that the game's scripts switch on and off (the Ghostfence's glow, the opening's barriers, parts of the Telvanni stronghold) are not in the built world at all
 - [SEYDA-CONTAINERS-NOT-DRAWN-67](SEYDA-CONTAINERS-NOT-DRAWN-67.md): Seyda Neen's crates, barrels, chest and sacks are not drawn and cannot be opened
 - [SEYDA-LANTERNS-MISSING-31](SEYDA-LANTERNS-MISSING-31.md): Seyda Neen lanterns light the night but are not in its maps
 - [SKY-FLAT-PALETTE-DRIFT-41](SKY-FLAT-PALETTE-DRIFT-41.md): Exterior sky flat with no clouds: the sampled palette drifted and the shared cloud sky silently fell back to a one-colour placeholder
+- [SOL-MODULE-CACHE-NOT-PICKLED-68](SOL-MODULE-CACHE-NOT-PICKLED-68.md): The Solstheim build module's world stage stopped at once: the shared unit cache it installs could not be handed to the converter's worker processes
 - [STAGE-READS-SELECTED-MASTERS-67](STAGE-READS-SELECTED-MASTERS-67.md): No build stage proves it read the game files the build selected, so a stage that reads only the base game goes unnoticed
 - [TP-LIST-UNBUILT-EXTERIORS-66](TP-LIST-UNBUILT-EXTERIORS-66.md): The teleport place list would list Solstheim places the image has no world for
 - [TREE-SCALE-001](TREE-SCALE-001.md): Non-unit-scale tree sprites omitted; bounds too conservative
@@ -124,6 +126,7 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 
 Related bugs in other categories:
 
+- [ACTOR-BAKE-NO-SEAM-STOP-68](ACTOR-BAKE-NO-SEAM-STOP-68.md): The creature library's default bake route and the residents' bake run no seam check, so models with open seams and thinned limbs reach the image unjudged
 - [BUILD-FAILURE-REPORT-66](BUILD-FAILURE-REPORT-66.md): Requested: a failed build writes one report file with everything needed to find its cause; the intro stage failure of a build of v0.0.64 and v0.0.65 outside the project came with its traceback, but without the build settings, the versions, which copy of the game data or the stage plan
 
 <!-- END GENERATED CATEGORY -->

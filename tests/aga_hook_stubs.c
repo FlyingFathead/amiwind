@@ -34,8 +34,10 @@ WEAK void AW_UIPickupTaken(const char *name,int count,double duration){
 WEAK void AW_StaticFlameLink(model_t *world,int ordinal,unsigned reference){(void)world;(void)ordinal;(void)reference;}
 WEAK void AW_LampLink(unsigned row,unsigned reference){(void)row;(void)reference;}
 WEAK int ChimChunks_GonePid(unsigned pid,int gone){(void)pid;(void)gone;return 0;}
-WEAK int AW_AreaEffectPids(unsigned reference,unsigned *pids,int most){(void)reference;(void)pids;(void)most;return 0;}
+WEAK int AW_AreaEffectHide(unsigned reference,int hide){(void)reference;(void)hide;return 0;}
 WEAK void AW_AreaEffectsApply(void){}
+/* CHIM-GONE-LIST-64-CAP-68: chim/chim_chunks.c's hook for a window's joined frame (aw_inventory.c sets it) */
+WEAK void (*chim_slot_joined)(void);
 /* The crime rules (aw_crime.c, CRIME-59): dbg kill crime (aw_companion.c) asks them; a fixture without them: no crime. */
 struct edict_s;
 WEAK int AW_CrimeCanCommit(struct edict_s *victim){(void)victim;return 0;}
@@ -199,6 +201,14 @@ WEAK int AW_HandWeaponItemApply(void){return 0;}
 WEAK int AW_HandLightItemApply(void){return 0;}
 WEAK void AW_HeldLightDraw(void){}
 WEAK const aw_held_light_t *AW_HeldLight(void){return NULL;}
+WEAK const aw_held_light_t *AW_HeldLightShown(void){return NULL;}
+WEAK const aw_held_light_t *AW_HeldLightCarried(void){return NULL;}
+/* aw_hand_models.c's composition, for fixtures that hold aw_view.c without it (the inventory picture's held light) */
+WEAK void AW_BlockCompose(const float base_origin[3],const float base_angles[3],const float tag[6],float origin[3],
+                          float angles[3]){(void)base_origin;(void)base_angles;(void)tag;memset(origin,0,3*sizeof(float));
+                          memset(angles,0,3*sizeof(float));}
+WEAK void (*aw_torch_notice)(int lit);
+WEAK int (*aw_hand_parts_left_light)(int frame);
 WEAK void AW_HeldFlameDraw(const vec3_t origin,const float shape[4],int view){(void)origin;(void)shape;(void)view;}
 WEAK const aw_held_light_t *(*aw_held_light_now)(void);
 WEAK int (*aw_view_held_flames)(vec3_t out[AW_HELD_FLAMES]);

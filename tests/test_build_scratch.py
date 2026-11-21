@@ -31,6 +31,8 @@ SMALL_TRANSIENT = {
     'tools/build_versions.py': (1, 'cwd for a tool version probe (--version output only)'),
     'tools/check_world_map_heap.py': (1, 'target ABI probe: one C file compiled to assembly (-S), nothing is run'),
     'tools/collision_bsp.py': (1, 'one tiny .map compiled by qbsp (the compiler is run from its own path)'),
+    'tools/chim/union_bsp2.py': (1, 'the same collision .map as tools/collision_bsp.py, compiled by qbsp in BSP2 (the '
+                                 'compiler is run from its own path)'),
     'tools/prepare_area.py': (1, 'one greeting mp3/wav (under 1 MB) converted by ffmpeg'),
     'tools/prepare_intro.py': (1, 'one sound file converted by ffmpeg'),
     'tools/prepare_media_assets.py': (1, 'one archived sound at a time, per worker (the video ones use dir=)'),

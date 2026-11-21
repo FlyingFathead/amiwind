@@ -8,6 +8,7 @@ the add-ons' own placements are keyed by their load-order index (addon_key, sinc
 (addon_references): an image binds them only for the add-on worlds it carries (compiler.bindings ADDONS).
 """
 import hashlib
+import math
 import re
 import struct
 from pathlib import Path
@@ -71,6 +72,34 @@ def new_game_scripts(text):
 
 
 _WEATHER = re.compile(r'^changeweather[\s,]+' + _TARGET + r'[\s,]+(\d+)$', re.I)
+
+
+def selected_regions(region_records, masters=None):
+    """The folded region ids that live in the build's masters (MASTERS, else mwad.masters.selected_masters: the
+    environment variable AMIWIND_MASTERS, which tools/build.py sets from --dlc / --no-dlc; the base game alone by
+    default): REGION_RECORDS [(master, folded id, deleted)] in load order, a later deleted record removing the id, as
+    the merged master the world UI stage reads (mwad.masters.master_path) has them (v0.0.68, REGION-INDEX-BASE-ONLY-68)."""
+    from mwad.masters import selected_masters
+    chosen = {m.casefold() for m in selected_masters(masters)}
+    live = set()
+    for master, ident, deleted in region_records:
+        if master.casefold() not in chosen:
+            continue
+        if deleted:
+            live.discard(ident)
+        else:
+            live.add(ident)
+    return live
+
+
+def region_catalogue(data):
+    """The folded region ids in the image's region catalogue order, the one list the region index comes from: the index a
+    compiled ChangeWeather or ModRegion hands the engine (codegen.hostcall), the new game's weather rows (awms NGWE) and
+    the console's region table (awms RGNS, v0.0.68, MW-CONSOLE-COMMANDS-62: ChangeWeather and ModRegion typed on the
+    console). The catalogue is world/region-names.awn and world/region-weather.aww (tools/prepare_world_ui.py
+    region_names, region_weather: the sorted region ids of the build's merged masters, mwad.masters.master_path); a region
+    it lacks has no index. DATA.base_regions holds the ids of those masters (selected_regions)."""
+    return sorted(getattr(data, 'base_regions', ()) or ())
 
 
 def new_game_weather(text):
@@ -190,6 +219,11 @@ class GameData:
         self.master_lists = {}     # master -> its own MAST list (the TES3 header)
         self.reference_counts = {m: 0 for m in MASTERS}     # placed scripted references per master
         self.object_refs = {}      # folded base id -> [reference numbers] (Morrowind.esm, every placed ref)
+        # EXPANSION-TABLES-BASE-ONLY-66, seen again 2026-11-20 (the Black Dart gang of Old Mournhold: Temple Sewers
+        # West): folded base id -> [merged reference keys] of the add-ons' own placements with a record, so a script
+        # naming an object only an expansion places (torch_lever's "Black Dart Gilur"->SetHealth 25) reaches it
+        # (codegen.Program.object); object_refs above stays Morrowind.esm's for its other readers
+        self.addon_object_refs = {}
         # the cell each placed actor (an NPC_ or CREA reference of Morrowind.esm) stands in: reference number -> the
         # folded interior cell id, or None outdoors (PositionCell's visitors, codegen.Program.visitor)
         self.actor_cells = {}
@@ -202,6 +236,12 @@ class GameData:
         self.gmst = {}             # folded float game settings
         self.interior_ids = []     # [(master, [interior cell ids])] (tools/cell_numbers.py)
         self.interior_numbers = {} # folded interior cell id -> its stable number (_aw_cell_int)
+        # GETWATERLEVEL-COLUMN-NOT-ROOM-67 (v0.0.68): every interior cell's water, the last master's record of it
+        # winning: folded cell id -> {'water': the flag (CELL flags 0x02), 'level': the original's units}. Rule from
+        # OpenMW components/esm3/loadcell.cpp Cell::loadCell (lines 129-159): the level comes from INTV (whole) or WHGT
+        # (a float, a non-finite one ignored), the later sub-record winning; a later master's record of the cell
+        # keeps the earlier level unless it gives one; never given, the level is 0 (Cell::blank). awms.water_rows.
+        self.interior_water = {}
         self.exteriors = {}        # (x, y) -> (cell name, folded region id) of every exterior CELL record
         self.regions = {}          # folded REGN id -> its name
         self.topics = {}           # folded DIAL topic id (type 0) -> its name
@@ -225,9 +265,18 @@ class GameData:
         # MWSCRIPT-INERT-SEEN-62: the folded local names the dialogue's Local and NotLocal filters read (from the
         # speaker's script, at run time): a script setting one is not inert (compiler.dialogue_read_slots)
         self.dialogue_locals = set()
-        # the folded REGN ids of Morrowind.esm: sorted, their places are the region catalogue's indexes the engine's
-        # weather uses (tools/prepare_world_ui.py region_names / region_weather; ChangeWeather, ModRegion)
+        # the folded REGN ids of the masters the build selects: sorted, their places are the region catalogue's indexes
+        # the engine's weather uses (tools/prepare_world_ui.py region_names / region_weather; ChangeWeather, ModRegion).
+        # v0.0.68 (REGION-INDEX-BASE-ONLY-68): worked out at the end of load() from region_records and the build's
+        # selection (mwad.masters.selected_masters), the masters the world UI stage merges its master from; until
+        # v0.0.68 it held Morrowind.esm's alone, while since v0.0.66-dev4 the world UI writes the tables from the
+        # merged masters (all sixteen regions of the three), so a script's region index named another region
         self.base_regions = set()
+        # (master, folded id, deleted) of every REGN record, in load order
+        self.region_records = []
+        # v0.0.68 (MW-CONSOLE-COMMANDS-62): folded REGN id -> the id as its record writes it (Sheogorad, Molag Mar Region:
+        # the id, not the display name, is what ChangeWeather and ModRegion name), for the console's region table
+        self.region_ids = {}
         # TRAPS-WHEN-OPENED-63: the trap spells placed references name (TNAM), folded id -> id, first-seen order: the
         # actor table gives each an ASPT row, so the engine casts a trap with the spell code (actors.py)
         self.trap_spells = {}
@@ -255,6 +304,7 @@ class GameData:
             self._master(name, raw)
             from cell_numbers import interior_cell_ids
             self.interior_ids.append((name, interior_cell_ids(raw)))
+        self.base_regions = selected_regions(self.region_records)
         from cell_numbers import number_cells
         # the stable interior numbers the builder stamps into each room map (_aw_cell_int, tools/cell_numbers.py)
         self.interior_numbers = {r['cell'].casefold(): r['number'] for r in number_cells(self.interior_ids)}
@@ -353,11 +403,12 @@ class GameData:
                     self.default_cell_name = _text(fields['STRV'])
             elif tag == 'REGN':
                 fields = dict(subrecords(payload))
-                ident = _text(fields.get('NAME', b'')).casefold()
+                written = _text(fields.get('NAME', b''))
+                ident = written.casefold()
                 if ident:
                     self.regions[ident] = _text(fields.get('FNAM', b'')) or ident
-                    if master == MASTERS[0] and 'DELE' not in fields:
-                        self.base_regions.add(ident)
+                    self.region_ids[ident] = written
+                    self.region_records.append((master, ident, 'DELE' in fields))
             elif tag == 'DIAL':
                 # the dialogue topics (DATA type 0) AddTopic names and the dialogue window lists (v0.0.57)
                 parts = list(subrecords(payload)); fields = dict(parts)
@@ -404,6 +455,22 @@ class GameData:
         for payload in pending_refs:
             self._cell(master, payload)
 
+    def _interior_water(self, name, flags, parts):
+        """GETWATERLEVEL-COLUMN-NOT-ROOM-67: the water of interior NAME from one CELL record's header (PARTS before its
+        first reference): the flag from FLAGS, the level from INTV or WHGT (the later one winning, as OpenMW reads
+        them), an earlier master's level kept when this record gives none."""
+        row = self.interior_water.setdefault(name.casefold(), {'water': False, 'level': 0.0})
+        row['water'] = bool(flags & 2)
+        for tag, data in parts:
+            if tag in ('FRMR', 'MVRF'):
+                break
+            if tag == 'INTV' and len(data) == 4:
+                row['level'] = float(struct.unpack('<i', data)[0])
+            elif tag == 'WHGT' and len(data) == 4:
+                level = struct.unpack('<f', data)[0]
+                if math.isfinite(level):
+                    row['level'] = level
+
     def _cell(self, master, payload):
         parts = list(subrecords(payload))
         head = {}
@@ -432,6 +499,8 @@ class GameData:
         cell_flags, gx, gy = struct.unpack('<Iii', head['DATA']) if len(head.get('DATA', b'')) == 12 else (0, 0, 0)
         interior = bool(cell_flags & 1)
         cell_name = _text(head.get('NAME', b''))
+        if interior and 'DATA' in head:
+            self._interior_water(cell_name, cell_flags, parts)
         if not interior:
             # the name GetPCCell compares (the last master's record of the grid cell wins)
             old = self.exteriors.get((gx, gy), ('', ''))
@@ -470,6 +539,7 @@ class GameData:
                     self._placed_addon.append({'reference': key, 'id': r['id'], 'interior': interior,
                                                'cell': cell_name if interior else (gx, gy), 'master': master,
                                                'position': r.get('position', [0.0, 0.0, 0.0])})
+                    self.addon_object_refs.setdefault(r['id'].casefold(), []).append(key)
                     if base[0] in HOLDERS:
                         self.addon_holder_refs.append({'reference': key, 'id': r['id'].casefold(), 'type': base[0],
                                                        'interior': interior,

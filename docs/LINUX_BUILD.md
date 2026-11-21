@@ -494,7 +494,9 @@ only the report, and the line before the block of what to do now names it.
 **Do not start over, and do not delete the build folder.** A build that stops (out of memory, out of disk, a stage's
 error, Ctrl+C, the machine switched off) keeps what it finished: every stage that passed, and inside the stage that
 stopped the units it stores as it goes (a room, a world frame, a character), in the build folder (the workspace,
-`out/` by default). Some steps of the CHIM world stage itself still run again in full; that is being fixed
+`out/` by default). From v0.0.68 the CHIM world's source catalogues of its areas and the room batches' residents are
+kept as they finish too, also when the stage runs again in a new run folder; the CHIM world's assembly of its areas
+in its main process still runs again in full; that is being fixed
 ([BUILD-TESTER-32GB-OOM-67](bugs/BUILD-TESTER-32GB-OOM-67.md)).
 
 1. Fix the cause when the build names one (below).
@@ -555,7 +557,10 @@ measured (else an earlier build of the same build folder, else the reference fig
   `.wslconfig` file in your Windows user folder, then `wsl --shutdown`. The build report's Memory line names the
   container's limit when there is one.
 - **Before you start**, `./build.sh --resource-plan` with your build's options prints, without building anything, each
-  stage's measured need against the memory and threads the build gets (`OK`, `WILL THROTTLE`, `WILL NOT FIT`).
+  stage's measured need against the memory and threads the build gets (`OK`, `WILL THROTTLE`), and one
+  `WARN memory plan:` line for each thing it changes for the memory: stages run one after another, fewer workers, a
+  stage that needs more than the memory (it runs anyway, with the swap counted). A real build prints the same at its
+  start and lists the lines in `build-summary.md`; it is never refused for memory.
 
 What a whole build needs, measured in the v0.0.66 from-scratch build of the whole game (`config/build-memory.json`):
 its memory in use peaked at 43.7 GiB, the file cache not counted, while the CHIM world stage and the room batches ran
@@ -569,8 +574,11 @@ side by side. The largest stages:
 | `chim-room-batches` | 17.4 GiB | 1.8 GiB | 20 | 9 h 20 min |
 | `chim-interiors` | 8.9 GiB | 3.8 GiB | 20 | 4 min |
 
-So a machine with 32 GiB needs swap for the difference while those two stages run side by side; a builder that runs
-them one after another when the memory is short is being worked on in the same item.
+From v0.0.68 the builder runs two stages one after another when their measured peaks do not fit the memory it has
+and one of them holds its memory in one process (the CHIM world stage beside the room batches with 32 GiB), and says
+so in a `WARN memory plan:` line at its start; a first build plans with these figures. Stages whose memory is in
+their workers still run side by side, each with fewer workers. The CHIM world stage alone still needs about 25 GiB:
+below that, add swap.
 
 **Out of disk.** Free space on the disk of the build folder: `python3 tools/build_gc.py plan out` lists what can go
 and deletes nothing (`--delete` removes exactly what it lists as expired; see

@@ -38,6 +38,7 @@
 #include "d_local.h"
 #include "chim/chim_local.h"
 #include "aw_horizon.h"
+#include "aw_water.h"
 
 qboolean aw_loading_music=false;
 static short same_short(short v){return v;}
@@ -391,6 +392,7 @@ static int entry_at(float x,float y){
 }
 /* Every placement of an active chunk is drawn by exactly one chunk, the owner
  * when it is active; efrags in the world leaves are exactly those linked. */
+int ChimChunks_GoneNow(unsigned pid);   /* CHIM-GONE-LIST-64-CAP-68: 1 while the placement is taken or disabled */
 static int check_once(void){
     static unsigned char seen[1024];
     int i,j,linked=0,leaves=0,n,efrags,one,most,ef_n;efrag_t *ef;
@@ -417,7 +419,7 @@ static int check_once(void){
         for(j=0;j<c->records;j++){
             if(!c->places[j].ent.model){assert(e->partial && !c->places[j].linked);continue;}
             assert(seen[c->places[j].pid] || ((c->places[j].flags&CHIM_RECORD_STORY_HIDDEN) &&
-                chim_story_hidden && chim_story_hidden()));
+                chim_story_hidden && chim_story_hidden()) || ChimChunks_GoneNow(c->places[j].pid));   /* taken/disabled */
         }
         if(!e->partial)for(j=0;j<c->models;j++)assert(c->model_list[j].model);
     }
@@ -1014,6 +1016,51 @@ static void bigframe(void){
     check_once();check_world();
     end_map();
     printf("bigframe ok%c",10);
+}
+
+/* CHIM-GONE-LIST-64-CAP-68: a frame's gone placements are a bit per placement it owns (chim_chunks.c GoneBits), so
+ * more than 64 can be taken or disabled in one stay: the old list held 64 and refused the 65th, which stayed linked
+ * (drawn and solid). Here 80 of the big frame's linked placements go, stay out through more frames, one comes back
+ * alone, an id of no loaded frame is refused and counted, chim status says both, and a new map has them all again. */
+static void gone(void){
+    unsigned ids[80],first=0;vec3_t at;int i,n=0,k;
+    reset_engine();Chim_Init();
+    set_cvar("chim_zone_kib",8192);set_cvar("chim_reserve_kib",0);
+    for(k=0;k<2;k++){
+        begin_map(frame_map);assert(Chim_Active() && chim_frame.count==576);
+        VectorSet(world.mins,-1536,-1536,-1024);VectorSet(world.maxs,1536,1536,2048);
+        VectorSet(at,0,0,40);aw_chim_spawn(at);check_once();first=chim_frame.first_pid;
+        if(!k){
+            for(i=0;i<400 && n<80;i++)if(placement((unsigned)i))ids[n++]=(unsigned)i;
+            printf("gone: %d linked placements around the spawn%c",n,10);
+            assert(n>64);
+            for(i=0;i<n;i++){
+                assert(ChimChunks_GonePid(ids[i]+first,1)==1);   /* the old list: 0 from the 65th */
+                assert(!placement(ids[i]) && ChimChunks_GoneNow(ids[i]+first));
+            }
+            /* away and back: chunks leave and come again, reconciled each time; the gone ones stay out */
+            for(i=0;i<6;i++){frame_at(256.f*(float)i,256.f*(float)i,40);check_once();}
+            for(i=0;i<6;i++){frame_at(0,0,40);check_once();}
+            for(i=0;i<n;i++)assert(!placement(ids[i]));
+            /* the last one taken (past the old list's 64) comes back alone; gone twice is still one bit */
+            assert(ChimChunks_GonePid(ids[n-1]+first,1)==1);
+            assert(ChimChunks_GonePid(ids[n-1]+first,0)==1);check_once();
+            for(i=0;i<n;i++)assert(i==n-1?placement(ids[i])!=NULL:placement(ids[i])==NULL);
+            assert(ChimChunks_GonePid(first+chim_frame.frame.owned_total+5,1)==0);   /* of no loaded frame */
+            console_used=0;console[0]=0;console_capture=1;ChimChunks_Report();console_capture=0;
+            {char want[160];
+             snprintf(want,sizeof(want),"gone placements (taken or disabled): %d, a bit per placement of the loaded "
+                      "frames (%lu bytes); 1 asked for no loaded frame (last id %lu)",n-1,
+                      (unsigned long)((chim_frame.frame.owned_total+7)>>3),
+                      (unsigned long)(first+chim_frame.frame.owned_total+5));
+             assert(strstr(console,want));}
+        }else{
+            for(i=0;i<n;i++)assert(placement(ids[i]));   /* a new map: its areas name them again; none here */
+            assert(!ChimChunks_GoneNow(ids[0]+first));
+        }
+        end_map();
+    }
+    printf("gone ok%c",10);
 }
 
 /* -chimcache: models and textures in the persistent bank survive the map. */
@@ -1761,6 +1808,37 @@ static void roomtake(void){
     end_map();
     assert(ChimRoom_Hide(1002,1)==0);               /* no room */
     printf("roomtake ok%c",10);
+}
+
+/* MWSCRIPT-WATER-LEVEL-STATIC-67: the room's water plane moved (aw_water.c AW_WaterPlaneSet through the room
+ * loader's hook aw_water_relink, chim_room.c ChimRoom_WaterMoved). The room's four placements: the door (model 1,
+ * drawn box z -1..33) and three boxes (model 0, z -1..65). A placement whose box the plane passed is linked again,
+ * once per pass, the others keep their efrags; the efrag count is the same after (none leaked, none doubled); a
+ * taken placement stays out; nothing before the room is linked in the client's map, nothing with no room. */
+static void roomwater(void){
+    int before;
+    reset_engine();Chim_Init();
+    begin_map(room_map);assert(ChimRoom_Active());
+    assert(aw_water_relink);
+    aw_water_relink(-1000,16);assert(ChimRoom_WaterRelinked()==0);   /* not linked in the client's map yet */
+    frame_at(64,64,40);
+    before=aw_efrags_used;assert(before>0);
+    aw_water_relink(-1000,-900);assert(ChimRoom_WaterRelinked()==0);  /* under every placement both times */
+    aw_water_relink(-900,16);assert(ChimRoom_WaterRelinked()==4);     /* now it cuts all four */
+    assert(aw_efrags_used==before);
+    aw_water_relink(16,20);assert(ChimRoom_WaterRelinked()==4);       /* still cuts all four: nothing */
+    aw_water_relink(20,50);assert(ChimRoom_WaterRelinked()==5);       /* over the door, still through the boxes */
+    aw_water_relink(50,100);assert(ChimRoom_WaterRelinked()==8);      /* over every box too */
+    assert(aw_efrags_used==before && door_solid(-100,-100));
+    /* the box 1002 taken: it stays out while the water falls back under everything */
+    assert(ChimRoom_Hide(1002,1)==1);
+    aw_water_relink(100,-900);assert(ChimRoom_WaterRelinked()==11);
+    assert(!door_solid(-100,-100) && aw_efrags_used<=before);
+    console_used=0;console[0]=0;console_capture=1;ChimRoom_Report();console_capture=0;
+    assert(strstr(console,"the water plane moved 6 times; 11 placements it passed were linked again"));
+    end_map();
+    aw_water_relink(-900,16);assert(ChimRoom_WaterRelinked()==0);     /* no room */
+    printf("roomwater ok%c",10);
 }
 
 /* A CHIM room whose models do not fit the map's zone and the cache banks
@@ -2526,6 +2604,7 @@ int main(int argc,char **argv){
     else if(!strcmp(argv[1],"autoram"))autoram();
     else if(!strcmp(argv[1],"spawn"))spawn();
     else if(!strcmp(argv[1],"bigframe"))bigframe();
+    else if(!strcmp(argv[1],"gone"))gone();
     else if(!strcmp(argv[1],"seam"))seam();
     else if(!strcmp(argv[1],"slots"))slots();
     else if(!strcmp(argv[1],"still"))still();
@@ -2541,6 +2620,7 @@ int main(int argc,char **argv){
     else if(!strcmp(argv[1],"door"))door();
     else if(!strcmp(argv[1],"roomdoor"))roomdoor();
     else if(!strcmp(argv[1],"roomtake"))roomtake();
+    else if(!strcmp(argv[1],"roomwater"))roomwater();
     else if(!strcmp(argv[1],"roomgrow"))roomgrow();
     else if(!strcmp(argv[1],"placed"))placed_world();
     else if(!strcmp(argv[1],"catalogue"))catalogue_dump();

@@ -94,6 +94,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 
 - [ACTOR-MODEL-ERROR-UNNAMED-48](ACTOR-MODEL-ERROR-UNNAMED-48.md): The actor model decoder's stops name neither the model nor the refused field
 - ACTOR-RECEIPT-01 (no report page): Windows actor-audit receipt hash did not match the CRLF-written file
+- [AW-CHIMPORT-ONE-NEGATIVE-CELL-68](AW-CHIMPORT-ONE-NEGATIVE-CELL-68.md): A CHIM import request for one cell whose coordinate starts with a minus sign is refused: the converter reads the cell as an option
 - [AW-CHIMPORT-REGION-NO-PALETTE-66](AW-CHIMPORT-REGION-NO-PALETTE-66.md): aw chimport-region passes a palette, qbsp and SDK the builder image does not hold: every cell fails in seconds
 - [AW-CHIMPORT-REGION-PASSED-ALL-FAILED-66](AW-CHIMPORT-REGION-PASSED-ALL-FAILED-66.md): aw chimport-region reports passed when every cell of the run failed
 - [AW-CHIMPORT-REGION-POOL-COPY-67](AW-CHIMPORT-REGION-POOL-COPY-67.md): aw chimport-region copies the units it reuses from the shared pool instead of linking them
@@ -153,12 +154,14 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - REGISTER-DEFERRAL-EXPIRES-53 (no report page): A maintainer deferral naming a release (deferred to v0.0.52) still counted as a reason inside that release, so deferrals never expired
 - [REGISTER-REGRESSION-HANDLER-52](REGISTER-REGRESSION-HANDLER-52.md): Requested: a bug that comes back after it was fixed or closed must be found and reopened as a regression, never registered again as new
 - [REGISTER-REPORT-PERSISTS-STALE-64](REGISTER-REPORT-PERSISTS-STALE-64.md): bug_register.py report records a new sighting but leaves the versions the bug persists in unchanged
+- [REGISTER-STEP-RENDERS-ALL-PAGES-68](REGISTER-STEP-RENDERS-ALL-PAGES-68.md): Every single closure step or field change in the bug register rewrites all of its generated pages, so a batch of steps for a handful of entries takes half an hour
 - [RELEASE-WORKING-VERSION-ISOLATION-39](RELEASE-WORKING-VERSION-ISOLATION-39.md): Publishing an earlier release reads the next development version record
 - [RELEASE-WS-BASELINE-VERSION-33](RELEASE-WS-BASELINE-VERSION-33.md): Every new VERSION failed the whitespace preflight until a docs/PATCH-v<VERSION>.json was made by hand
 - [ROOM-RESIDENTS-NOT-CACHED-48](ROOM-RESIDENTS-NOT-CACHED-48.md): The room stages bake every resident again on every run: 26 s of a 39 s rerun with every room unit reused
 - [ROUTE-UPLOAD-AFTER-PUSH-67](ROUTE-UPLOAD-AFTER-PUSH-67.md): The release route's upload to the download site is refused when the release was published on the code host first
 - [SESSION-AW-VIEW-IN-SOLID-54](SESSION-AW-VIEW-IN-SOLID-54.md): The session tooling's aw_view puts the camera outside the room or inside a wall without a warning
 - [SMOKE-START-ENTER-MENU-52](SMOKE-START-ENTER-MENU-52.md): An engine smoke script started with START enter can stay in the main menu: its Return skipped the intro movie instead
+- [STUCK-WATCH-NIGHT-BY-HOUR-ONLY-68](STUCK-WATCH-NIGHT-BY-HOUR-ONLY-68.md): The stall watcher judged night only by the clock, so an alert the session had not yet acknowledged still reached the maintainer after night mode was switched on in the evening
 - [TEST-CHIMPORT-POOL-COPY-MODE-48](TEST-CHIMPORT-POOL-COPY-MODE-48.md): test_chimport_pool's copy-mode reuse test fails in the gate container: the units are computed again
 - TEST-TOOLKIT-LINE-TIED-VERSION-49 (no report page): The Toolkit fold test tied the Toolkit line (Last updated with AmiWind vX) to VERSION: the v0.0.50-dev1 bump failed gate 3840 although the Toolkit had not changed
 - [TOOLING-HEADLESS-BROWSER-31](TOOLING-HEADLESS-BROWSER-31.md): No headless browser in the Docker images: Toolkit screenshots cannot be made in Docker
@@ -188,6 +191,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [TOOLKIT-WORLD-MAP-FRAME-LOOP-64](TOOLKIT-WORLD-MAP-FRAME-LOOP-64.md): The World Map vanished in Firefox after the frame was sized to its own content
 - [TOOLKIT-WORLD-MAP-NESTED-SCROLL-64](TOOLKIT-WORLD-MAP-NESTED-SCROLL-64.md): The World Map scrolls as separate boxes: the headline stays while the map frame scrolls, and the wheel over the map never scrolls the page
 - [TRACK-FIXED-UMBRELLA-STEPS-ALL-67](TRACK-FIXED-UMBRELLA-STEPS-ALL-67.md): Marking one fault fixed through the tracker intake marked every fault of its plan item fixed when that item groups many
+- [TRACK-UPDATE-MOVED-ITEM-FIRST-68](TRACK-UPDATE-MOVED-ITEM-FIRST-68.md): Updating a work item whose id also exists as a moved copy in an older version file wrote the note into the old moved copy instead of the live item
 - [TRACKER-AREA-CELLS-RUN-WIDE-42](TRACKER-AREA-CELLS-RUN-WIDE-42.md): The CHIM tracker gives every area of a build all of the build's cells: Balmora holds 811 cells, so an area or shipped-towns plan selector takes most of the island
 - [TRACKER-CHIM-COUNT-STALE-44](TRACKER-CHIM-COUNT-STALE-44.md): The CHIM progress tracker still reports 1,193 of 1,436 cells after a build with every exterior cell: it counts audits over both islands, not what the build put on CHIM
 - [TRACKER-CHIM-LINK-MERGE-33](TRACKER-CHIM-LINK-MERGE-33.md): A merge dropped the CHIM Engine tracker link from the register; the integration head fails a tracker test

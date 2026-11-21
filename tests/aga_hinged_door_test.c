@@ -573,6 +573,18 @@ static void movers_mode(void){
      aw_chim_place_origin=NULL;}
     /* SetAtStart: back by everything it moved (1.5 before and 52.5 now), relinked */
     assert(AW_MoverAtStart(5000) && fabs(shifted[2]+1.5f)<.01f && relinks==2 && AW_MoverMoved()==0);
+    /* SETPOS-MOVER-NO-ENTITY-68: SetPos Z of a mover (the Forgotten Sewer's floating crates ride the water this way):
+     * to the value from where it stands now, the other axes kept; nothing without its position now (no hook), for a
+     * reference that is no mover, or an axis past Z; the same value again moves nothing. Before, SetPos needed an
+     * entity and a mover never moved */
+    {float before=shifted[2];int n;
+     assert(!AW_MoverSetAxis(5000,2,20));                   /* the frames' hook does not answer: no position now */
+     aw_chim_place_origin=chim_origin;n=shifts;
+     assert(AW_MoverSetAxis(5000,2,20) && fabs(shifted[2]-20)<.01f && shifted[0]==0 && shifted[1]==0 && shifts==n+1);
+     assert(AW_MoverMoved()==1 && AW_MoverSetAxis(5000,2,20) && shifts==n+1);
+     assert(!AW_MoverSetAxis(4001,2,20) && !AW_MoverSetAxis(5000,3,20) && !AW_MoverSetAxis(5000,-1,20));
+     assert(AW_MoverAtStart(5000) && fabs(shifted[2]-before)<.01f && AW_MoverMoved()==0);
+     aw_chim_place_origin=NULL;}
     /* New Game: every mover back at its start */
     d[2]=5;assert(AW_MoverShift(6000,d) && !AW_MoverShift(4000,d) && AW_MoverMoved()==1);
     AW_MoverReset();assert(AW_MoverMoved()==0);

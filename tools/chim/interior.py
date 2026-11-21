@@ -416,14 +416,21 @@ def room_liquids(work):
     'lava': [{'hull': counter-clockwise [[x, y], ...], 'top': z}]} in the room map's units, taken from the brushes
     its room map compiles (room.map: the "*water" brush, one "*lava" prism per pool, tools/lava.pool_brushes) and
     checked against its conversion record (water_height x SCALE, the pools' tops). why: the reason a room with
-    liquids cannot be a CHIM room yet (None when it can)."""
+    liquids cannot be a CHIM room yet (None when it can).
+
+    A room whose water the room batch left out (tools/chim_room_batches.py water_plane: its level lies under every
+    placement, so no plane, named in the record's water_note) gets {'water': None, 'lava': [], 'water_floor': True}:
+    its room map's world then carries a water plane at the box floor (room_map), which the engine puts at the room's
+    own level and moves with the scripts (engine/aga/src/aw_water.c, MWSCRIPT-WATER-LEVEL-STATIC-67). Such a room with
+    lava pools keeps no plane (the lava would be carved under it, and the engine moves only a plain water plane)."""
     import lava
     work = Path(work)
     conversion = json.loads((work / 'conversion.json').read_text())
     height = conversion.get('water_height')
     pools = (conversion.get('lava') or {}).get('pools') or []
+    dropped = height is None and 'under every placement' in str(conversion.get('water_note') or '')
     if height is None and not pools:
-        return None, None
+        return ({'water': None, 'lava': [], 'water_floor': True} if dropped else None), None
     brushes = map_brushes((work / 'room.map').read_text(encoding='cp1252'))
     water = None
     if height is not None:
@@ -595,6 +602,19 @@ def liquid_world(lo, hi, liquids, miptex):
                                            textures=names)
 
 
+def water_floor_miptex(palette):
+    """The "*water" texture of a room whose water plane the room batch left out (room_liquids' water_floor), whose
+    compiled map holds none: the one the room batches give every room's water (tools/chim_room_batches.py build_shell,
+    prepare_area.build_room's: a flat 64 x 64 colour on the game PALETTE, the palette.lmp path). Made here, beside the
+    room map, so the room batch units keep their keys (build_shell is not touched)."""
+    from PIL import Image
+    from prepare_quake import miptex
+    tile = Image.new('P', (16, 16), 255)
+    tile.putpalette(Path(palette).read_bytes())
+    liquid = Image.new('RGB', (64, 64), (65, 87, 91)).quantize(palette=tile, dither=Image.Dither.NONE)
+    return miptex(WATER_TEXTURE, liquid)
+
+
 def lava_beds(liquids):
     """The solid bed under each lava pool (tools/lava.pool_brushes: BED_THICKNESS under the liquid), as convex
     collision pieces (points, lo, hi) for chim.frame_map.add_clip_pieces."""
@@ -623,14 +643,17 @@ def liquid_extent(liquids):
     return lo, hi
 
 
-def room_map(room_bsp, name, record, bounds, liquids=None, store=None, types=None):
+def room_map(room_bsp, name, record, bounds, liquids=None, store=None, types=None, palette=None):
     """maps/<room>.chim: the room map's entities with its placed meshes taken out (they are the room record's
     placements, checked at the same origins), the activated objects as collision-only edicts, and a shell world:
     empty space closed by clip walls on six sides. A room with liquids (room_liquids) gets them in that world
     (liquid_world: the water plane and the lava cells, with the room map's own "*water" and "*lava" textures) and
-    each lava bed as one more clip model; the box grows to hold them. store: the interior store folder the record's
-    model ids name (a batch room's shell map gets its static flames from it). Returns (bytes, report); raises
-    ValueError on anything that cannot be carried."""
+    each lava bed as one more clip model; the box grows to hold them. A room whose water the batch left out
+    (water_floor) gets its water plane at the box floor plus one unit, with the batches' "*water" texture made from
+    PALETTE (the game palette, palette.lmp) when the map has none: the engine puts the plane at the room's own level
+    at every attach and moves it with the scripts (engine/aga/src/aw_water.c); under every placement it draws nothing.
+    store: the interior store folder the record's model ids name (a batch room's shell map gets its static flames
+    from it). Returns (bytes, report); raises ValueError on anything that cannot be carried."""
     from chim.frame_map import (FRAME_KEY, activated_refs, add_clip_models, add_clip_pieces, empty_world, entities,
                                 entity_text, keep_activated, model_bounds)
     data = Path(room_bsp).read_bytes()
@@ -715,7 +738,14 @@ def room_map(room_bsp, name, record, bounds, liquids=None, store=None, types=Non
         ext_lo, ext_hi = liquid_extent(liquids)
         lo = [min(a, b - EDGE_MARGIN) for a, b in zip(lo, ext_lo)]
         hi = [max(a, b + EDGE_MARGIN) for a, b in zip(hi, ext_hi)]
-        lumps, liquid_report = liquid_world(lo, hi, liquids, miptex_named(data, (WATER_TEXTURE, '*lava')))
+        textures = miptex_named(data, (WATER_TEXTURE, '*lava'))
+        if liquids.get('water_floor') and liquids.get('water') is None:
+            # MWSCRIPT-WATER-LEVEL-STATIC-67: the plane the batch left out, at the room box's floor (the level the
+            # scripts read is the cell's own, from the script file's water rows, not this plane's)
+            liquids = dict(liquids, water=lo[2] + 1.0)
+            if WATER_TEXTURE not in textures and palette is not None:
+                textures[WATER_TEXTURE] = water_floor_miptex(palette)
+        lumps, liquid_report = liquid_world(lo, hi, liquids, textures)
     else:
         lumps = empty_world(lo, hi)
     t = WALL
@@ -737,7 +767,8 @@ def room_map(room_bsp, name, record, bounds, liquids=None, store=None, types=Non
     report = {'entities': len(rows), 'placements_checked': len(carried), 'activated': kept,
               'edge': {'margin': EDGE_MARGIN, 'thickness': WALL, 'walls': len(numbers)}}
     if liquid_report is not None:
-        report['liquids'] = dict(liquid_report, water=liquids.get('water'), lava_pools=len(liquids.get('lava') or ()))
+        report['liquids'] = dict(liquid_report, water=liquids.get('water'), lava_pools=len(liquids.get('lava') or ()),
+                                 **({'water_floor': True} if liquids.get('water_floor') else {}))
     if flame_report is not None:
         report['flames'] = flame_report
     return out, report
@@ -1050,9 +1081,10 @@ def _room_map_task(task):
     """One room's CHIM room map on a pool worker: (room, bytes, report); the caller alone writes the files."""
     bsp, name, record_path, bounds, liquids = task[:5]
     types = task[5] if len(task) > 5 else None
+    palette = task[6] if len(task) > 6 else None      # the game palette (a room whose batch left its water out)
     # the store is the folder above rooms/<room>.crm
     data, report = room_map(bsp, name, Path(record_path).read_bytes(), bounds, liquids,
-                            store=Path(record_path).parent.parent, types=types)
+                            store=Path(record_path).parent.parent, types=types, palette=palette)
     return name, data, report
 
 
@@ -1071,13 +1103,15 @@ def install(rooms_out, id1, jobs=1):
         raise ValueError('An interior store is already installed: %s' % target)
     copy_tree(rooms_out / STORE, target)        # writable copies (the stage output may be read-only in the pool)
     installed, absent, tasks = [], [], []
+    palette = id1 / 'gfx/palette.lmp'
+    palette = str(palette) if palette.is_file() else None
     for row in receipt['rooms']:
         bsp = id1 / 'maps' / (row['room'] + '.bsp')
         if not bsp.is_file():
             absent.append(row['room'])
             continue
         tasks.append((str(bsp), row['room'], str(target / 'rooms' / (row['room'] + '.crm')), row['bounds'],
-                      row.get('liquids'), (row['types'], row['type_default']) if 'types' in row else None))
+                      row.get('liquids'), (row['types'], row['type_default']) if 'types' in row else None, palette))
     for name, data, report in ordered_map(_room_map_task, tasks, max(1, int(jobs or 1)),
                                           cost=lambda t: Path(t[0]).stat().st_size):
         bsp = id1 / 'maps' / (name + '.bsp')

@@ -22,7 +22,18 @@ Models, each labelled with where its numbers come from:
 * the stair walk model (tools/chim/stair_pool.py, calibrated on the v0.0.41 world and the v0.0.42 Vivec frame:
   128 MiB + 18 x the frame's placed MiB per walk worker) for every stage that builds a CHIM world: the largest frame
   from the stair gate's own log line of an earlier run, else estimated from the stored frame's size on disk;
+* measured in the reference build: a full build's stage that none of the above measured in a full build takes the
+  stage peaks of the reference build (config/build-memory.json, the v0.0.66 from-scratch build of the whole game): its
+  memory only, never its time;
 * estimated, no data yet: a stage never measured (512 MiB a worker, 256 MiB parent).
+
+Memory decisions (BUILD-TESTER-32GB-OOM-67), each one WARN line ("WARN memory plan: ...") in the checklist, the log and
+build-summary.md: two stages whose measured peaks at their planned workers do not fit side by side in the build's
+memory run one after another (the larger runs alone, both are memory-heavy); a stage run with fewer workers for
+memory; a stage whose largest unit is larger than the memory it plans with. The swap counts for that last one only
+(more than the memory in one process may still fit with the swap, slower); a full build below its need runs anyway
+with the stop advice (the same command in the same build folder keeps every finished stage and unit), never refused
+as WILL NOT FIT; a MiniWind still is.
 
 The plan is recorded as RESOURCE-PLAN.json in the run folder (schema resource-plan-1, SCHEMA_DOCUMENT below, validated
 like the other receipts); after a passed build the actual peaks of every stage are written next to the estimates, a
@@ -70,6 +81,21 @@ PLAUSIBLE_WORKER_PER_LARGEST = 2.0
 SCOPES = ('miniwind', 'full')
 MIB = float(1 << 20)
 GIB = float(1 << 30)
+# A FIRST BUILD PLANS FROM MEASURED PEAKS (BUILD-TESTER-32GB-OOM-67): a tester's 32 GB machine built for 32 hours and
+# stopped for memory; with no measurement at all every stage was "estimated, no data yet" and the CHIM world (its main
+# process alone about 24 GiB) ran beside the room batches (about 17 GiB). A full build's stage that neither its runs nor
+# the workspace's history measured takes the reference build's measured peaks (config/build-memory.json, read through
+# tools/build_failure.py reference_memory); stages whose measured peaks do not fit side by side in the build's memory run
+# one after another (the alone and memory-heavy lists the scheduler honours); every such decision and every reduction
+# of workers for memory is a WARN line (WARN_PREFIX) in the log and in build-summary.md (tools/build_digest.py); the
+# swap counts when one stage's largest process is larger than the memory, and a full build below its need runs with
+# the stop advice, never refused as WILL NOT FIT.
+REFERENCE_LABEL = 'measured in the reference build'
+WARN_PREFIX = 'WARN memory plan: '
+# A stage whose largest process holds this share of its planned peak or more keeps its memory in one process: fewer
+# workers do not free it, so the running memory guard cannot make room beside it (as tools/build_failure.py says when
+# a build stops for memory).
+ONE_PROCESS_SHARE = 0.5
 
 
 # --------------------------------------------------------------------------
@@ -161,10 +187,52 @@ def build_memory(root='/sys/fs/cgroup'):
     return total, max(0, total - free), 0
 
 
+def machine_swap():
+    """(total, free, how) bytes of the machine's swap (tools/build_report.py swap: Linux /proc/meminfo, macOS sysctl,
+    Windows the page files), or (None, None, why) where nothing answers."""
+    try:
+        import build_report
+        return build_report.swap()
+    except Exception as exc:  # noqa: BLE001 - a plan never stops on a reader
+        return None, None, '%s: %s' % (type(exc).__name__, exc)
+
+
+def swap_limit(root='/sys/fs/cgroup'):
+    """This container's own swap limit in bytes (cgroup v2 memory.swap.max, v1 memory.memsw less memory), or None
+    without one ('max', no cgroup)."""
+    root = Path(root)
+    text = _read(root / 'memory.swap.max')
+    if text is not None:
+        return _int(text)
+    both = _int(_read(root / 'memory' / 'memory.memsw.limit_in_bytes'))
+    memory = _int(_read(root / 'memory' / 'memory.limit_in_bytes'))
+    if both is not None and memory is not None and both < (1 << 50):
+        return max(0, both - memory)
+    return None
+
+
+def swap_room(memory_gb=None, root='/sys/fs/cgroup'):
+    """(bytes, source) of the swap a build may count (BUILD-TESTER-32GB-OOM-67): the machine's free swap, at most the
+    container's own swap limit; 0 for an asked memory (a lease: the container it runs in is not known yet)."""
+    if memory_gb is not None:
+        return 0, 'not counted (asked memory)'
+    total, free, how = machine_swap()
+    machine = free if free is not None else total
+    if machine is None:
+        return 0, 'unknown (%s)' % how
+    cap = swap_limit(root)
+    if cap == 0:
+        return 0, 'the container allows no swap (cgroup memory.swap.max 0)'
+    if cap is not None and cap < machine:
+        return cap, 'the container\'s swap limit (cgroup memory.swap.max)'
+    return machine, 'the machine\'s free swap (%s)' % how
+
+
 def limits(memory_gb=None, threads=None, root='/sys/fs/cgroup'):
-    """What the build gets: {'memory_bytes', 'memory_source', 'used_bytes', 'threads', 'threads_source'}. Given values
-    (--resource-memory-gb / --resource-threads: the container the build will run in, e.g. a lease) win over this
-    process's own cgroup, which wins over the machine."""
+    """What the build gets: {'memory_bytes', 'memory_source', 'used_bytes', 'threads', 'threads_source', 'swap_bytes',
+    'swap_source'}. Given values (--resource-memory-gb / --resource-threads: the container the build will run in, e.g.
+    a lease) win over this process's own cgroup, which wins over the machine. The swap counts only when one stage's
+    largest process is larger than the memory (plan())."""
     limit, used, _cache = cgroup_memory(root)
     total, _free = host_memory()
     if memory_gb is not None:
@@ -182,8 +250,10 @@ def limits(memory_gb=None, threads=None, root='/sys/fs/cgroup'):
         count, tsource = min(quota, host_threads()), 'container CPU quota (cgroup cpu.max)'
     else:
         count, tsource = host_threads(), 'no CPU quota: the machine'
+    swap, ssource = swap_room(memory_gb, root)
     return {'memory_bytes': memory, 'memory_source': msource, 'used_bytes': used or 0,
-            'threads': count, 'threads_source': tsource, 'machine_bytes': total, 'machine_threads': host_threads()}
+            'threads': count, 'threads_source': tsource, 'machine_bytes': total, 'machine_threads': host_threads(),
+            'swap_bytes': swap, 'swap_source': ssource}
 
 
 # --------------------------------------------------------------------------
@@ -360,11 +430,38 @@ def read_history(workspace):
     return out
 
 
-def gather(reuse_from=None, workspace=None, extra_runs=(), scope=None, stair_walk=None):
+def reference_rows(reference):
+    """{stage: measurement} of the reference build's measured stage peaks (REFERENCE: config/build-memory.json as
+    tools/build_failure.py reference_memory reads it): its largest process, its peak and the workers it ran, scope
+    'full', marked 'reference'. Memory only: its from-scratch time is not counted ('wall' None), so a build that reuses
+    a stage's units is never planned at the reference build's hours (BUILD-PLAN-PESSIMISTIC-48)."""
+    rows = {}
+    if not isinstance(reference, dict):
+        return rows
+    name = str(reference.get('build') or 'the reference build')
+    short = str(reference.get('measured_in_short') or reference.get('measured_in') or name)
+    for stage, row in (reference.get('stages') or {}).items():
+        try:
+            total = float(row['peak_bytes']) / MIB
+            largest = float(row.get('largest_process_bytes') or row['peak_bytes']) / MIB
+            jobs = max(1, int(row.get('workers') or 1))
+        except (KeyError, TypeError, ValueError, AttributeError):
+            continue
+        total = max(total, largest)
+        rows[str(stage)] = {'jobs': jobs, 'largest_mib': round(largest, 1), 'total_mib': round(total, 1),
+                            'worker_mib': round((total - largest) / jobs, 1), 'wall': None, 'cores': None,
+                            'run': name, 'scope': 'full', 'reference': True, 'measured_in': short}
+    return rows
+
+
+def gather(reuse_from=None, workspace=None, extra_runs=(), scope=None, stair_walk=None, reference=None):
     """Every measurement this plan can use: {'stages': {stage: [measurement + 'run' + 'scope']}, 'stair': (frame, MiB,
     source) or None, 'runs': [run, ...], 'scope': SCOPE (the planned build's, 'miniwind' or 'full'; None: every
     measurement counts, the earlier method), 'stair_walk': STAIR_WALK (the build's stair walk scope; 'off': no stair
-    figure is looked for)}. History rows: the newest HISTORY_ROWS per stage and scope."""
+    figure is looked for), 'reference': the reference measurements used, or None}. History rows: the newest
+    HISTORY_ROWS per stage and scope. A full build's stage that none of them measured in a full build takes the
+    reference build's row (REFERENCE: the document, default config/build-memory.json; False: none), never a MiniWind's
+    (like for like, BUILD-RESOURCE-PLAN-MINIWIND-FULL-PARENT-52)."""
     stages, runs = {}, []
     order = []
     for start in [reuse_from, *extra_runs]:
@@ -403,7 +500,21 @@ def gather(reuse_from=None, workspace=None, extra_runs=(), scope=None, stair_wal
             newest.setdefault(row['scope'], []).append(row)
         for kept in newest.values():
             stages.setdefault(name, []).extend(kept[-HISTORY_ROWS:])
-    return {'stages': stages, 'stair': stair, 'runs': runs, 'scope': scope, 'stair_walk': stair_walk}
+    used = None
+    if scope == 'full' and reference is not False:
+        if not isinstance(reference, dict):
+            from build_failure import reference_memory     # the one reader of config/build-memory.json
+            reference = reference_memory()
+        rows, added = reference_rows(reference), []
+        for name in sorted(rows):
+            if not any(r.get('scope') in (None, 'full') for r in stages.get(name, ())):
+                stages.setdefault(name, []).append(rows[name])
+                added.append(name)
+        if added:
+            used = {'build': str(reference.get('build') or ''), 'measured_in': rows[added[0]]['measured_in'],
+                    'stages': added}
+    return {'stages': stages, 'stair': stair, 'runs': runs, 'scope': scope, 'stair_walk': stair_walk,
+            'reference': used}
 
 
 # --------------------------------------------------------------------------
@@ -429,9 +540,13 @@ def stage_model(name, command, measurements, stair=None, scope=None, stair_walk=
         worker = max(r['worker_mib'] for r in rows)
         timed = [r for r in rows if r.get('wall') is not None]
         newest = timed[0] if timed else {'jobs': rows[0]['jobs'], 'wall': None, 'cores': None}
-        model = {'source': 'measured (%d run%s%s)' % (len(rows), '' if len(rows) == 1 else 's',
-                                                    ', %d failed' % (len(rows) - len(timed)) if len(timed) < len(rows)
-                                                    else ''),
+        reference = all(r.get('reference') for r in rows)
+        where = rows[0].get('measured_in') or rows[0].get('run')
+        model = {'source': ('%s (%s; its memory only)' % (REFERENCE_LABEL, where) if reference else
+                            'measured (%d run%s%s)' % (len(rows), '' if len(rows) == 1 else 's',
+                                                       ', %d failed' % (len(rows) - len(timed)) if len(timed) < len(rows)
+                                                       else '')),
+                 'reference': reference,
                  'parent_mib': parent, 'worker_mib': worker, 'unit_mib': max(parent, worker),
                  'largest_unit': 'the stage\'s largest process (measured %.0f MiB)' % parent,
                  'ref_jobs': newest['jobs'], 'ref_wall': round(newest['wall'], 1) if newest['wall'] is not None else None,
@@ -539,9 +654,11 @@ def plan(steps, running, jobs, got, gathered, reuse_from=None, stair_walk=None, 
     stair_walk = stair_walk or gathered.get('stair_walk')
     memory_mib = got['memory_bytes'] / MIB if got.get('memory_bytes') else None
     room = memory_mib * HEADROOM if memory_mib else None
+    swap_mib = (got.get('swap_bytes') or 0) / MIB
     threads = max(1, int(got.get('threads') or jobs or 1))
     jobs = max(1, int(jobs or 1))
     rows, refusals, models = [], [], {}
+    short = []           # (stage, fits with the swap): one unit larger than the memory, run anyway (WARN)
     # a stage without --jobs runs one process (the scheduler holds one worker for it)
     plans = {name: jobs if '--jobs' in [str(part) for part in command or ()] else 1 for name, command in steps}
     for name, command in steps:
@@ -579,14 +696,27 @@ def plan(steps, running, jobs, got, gathered, reuse_from=None, stair_walk=None, 
                                'memory-heavy stage beside it %d; the others wait until it is done'
                                % (beside, max(1, by_memory), '' if by_memory == 1 else 's', min(by_alone, planned)))
                 by_memory, beside = by_alone, 0.0
-        if room is not None and model['unit_mib'] > room:
+        # one unit larger than the memory (BUILD-TESTER-32GB-OOM-67): with the swap counted it may still fit (slower);
+        # a full build runs it anyway with a WARN line and the stop advice, never refused; a MiniWind is refused as before
+        below = room is not None and model['unit_mib'] > room
+        on_swap = below and swap_mib > 0 and model['unit_mib'] <= (memory_mib + swap_mib) * HEADROOM
+        if below and not on_swap and scope != 'full':
             status = 'WILL NOT FIT'
             reasons.append('one unit (%s) needs about %.0f MiB, the build plans with %.0f MiB (%.0f %% of %.1f GiB)'
                            % (model['largest_unit'], model['unit_mib'], room, HEADROOM * 100, memory_mib / 1024.))
             workers = 0
         else:
             workers = max(1, min(planned, by_threads, by_memory))
-            if workers < planned:
+            if below:
+                status = 'WILL THROTTLE'
+                reasons.append('one unit (%s) needs about %.0f MiB, more than the %.0f MiB the build plans with (%.0f %% '
+                               'of %.1f GiB): %s' % (
+                                   model['largest_unit'], model['unit_mib'], room, HEADROOM * 100, memory_mib / 1024.,
+                                   'with %.1f GiB of swap counted it fits: it runs on one worker, slower while it swaps'
+                                   % (swap_mib / 1024.) if on_swap else
+                                   'below the need: it runs anyway, on one worker (WARN line below)'))
+                short.append((name, on_swap))
+            elif workers < planned:
                 status = 'WILL THROTTLE'
                 if by_memory < planned:
                     reasons.append('memory holds %d worker%s at about %.0f MiB each beside a %.0f MiB parent%s'
@@ -625,12 +755,15 @@ def plan(steps, running, jobs, got, gathered, reuse_from=None, stair_walk=None, 
         rows.append(row)
         if status == 'WILL NOT FIT':
             refusals.append('%s: %s' % (name, reasons[0]))
+    throttle_alone = [r['stage'] for r in rows if r.get('alone')]
+    pairs, shared, partners = side_by_side(rows, models, after, memory_mib, alone and memory_mib is not None)
     walls = [r['wall_s'] for r in rows if r['wall_s'] is not None]
     fulls = [r['full_speed_wall_s'] for r in rows if r['full_speed_wall_s'] is not None]
     doc = {'schema': SCHEMA, 'written': time.strftime('%Y-%m-%dT%H:%M:%S%z'), 'jobs': jobs,
            'got': {'memory_mib': round(memory_mib, 1) if memory_mib else None,
                    'memory_source': got.get('memory_source'), 'threads': threads,
-                   'threads_source': got.get('threads_source'), 'headroom': HEADROOM},
+                   'threads_source': got.get('threads_source'), 'headroom': HEADROOM,
+                   'swap_mib': round(swap_mib, 1), 'swap_source': str(got.get('swap_source') or 'not read')},
            'reuse_from': str(reuse_from) if reuse_from else None, 'measured_runs': gathered.get('runs', []),
            'stages_total': len(steps), 'stages_running': len(rows), 'stages': rows,
            'wall_s': round(sum(walls), 1) if walls else None,
@@ -644,12 +777,138 @@ def plan(steps, running, jobs, got, gathered, reuse_from=None, stair_walk=None, 
     alone_rows = [r['stage'] for r in rows if r.get('alone')]
     if alone_rows:
         doc['alone'] = alone_rows
-        # the stages that may not run beside one that runs alone (each alone stage is one of them)
-        doc['memory_heavy'] = sorted({r['stage'] for r in rows if r['full_speed_mib'] >= HEAVY_MIB} | set(alone_rows))
+        # the stages that may not run beside one that runs alone (each alone stage is one of them): with a stage
+        # alone for the memory beside it, every memory-heavy stage; with stages alone only because their measured
+        # peaks do not fit side by side, the stages they do not fit beside
+        heavy = {r['stage'] for r in rows if r['full_speed_mib'] >= HEAVY_MIB} if throttle_alone else set()
+        doc['memory_heavy'] = sorted(heavy | set(alone_rows) | partners)
     if stair_walk:
         doc['stair_walk'] = str(stair_walk)
-    doc['verdict'] = 'refused' if refusals else 'throttled' if any(r['status'] != 'OK' for r in rows) else 'ok'
+    if gathered.get('reference'):
+        doc['reference'] = gathered['reference']
+    warnings = memory_warnings(rows, pairs, shared, short, got, memory_mib, swap_mib, room)
+    if warnings:
+        doc['memory_warnings'] = warnings
+    doc['verdict'] = ('refused' if refusals else 'throttled' if warnings or any(r['status'] != 'OK' for r in rows)
+                      else 'ok')
     return doc
+
+
+def one_process(row):
+    """True when ROW's stage keeps its planned peak in one process (ONE_PROCESS_SHARE): fewer workers free nothing."""
+    return row['parent_mib'] >= ONE_PROCESS_SHARE * row['peak_total_mib']
+
+
+def side_by_side(rows, models, after, memory_mib, apply=True):
+    """(serialized [(a, b, a's peak, b's peak, the stage that runs alone)], shared [(a, b, a's peak, b's peak)], the
+    stages held beside one that runs alone) for the stages whose MEASURED peaks at their planned workers do not fit
+    side by side in the build's memory (BUILD-TESTER-32GB-OOM-67): two stages that neither wait for the other (AFTER),
+    both with a measurement (their own or the reference build's; an estimate without data never counts), whose peaks
+    together exceed MEMORY_MIB.
+    Such a pair runs one after another when the running memory guard cannot make room for both: one of them keeps its
+    memory in one process (one_process: the CHIM world's main process, about 24 GiB), or one worker each beside their
+    parents is already too much. Of each such pair the larger runs alone unless one of them already does, and both are
+    memory-heavy (alone_hold: an alone stage runs with no memory-heavy stage beside it). The rows get 'alone' and
+    'not_beside'. A pair whose memory is in the workers of both stages still runs side by side ('shared'): the guard
+    of the running build gives each fewer workers while both run, and a pool that loses a worker sends its units out
+    again at half the width. APPLY False: nothing found."""
+    if not apply or not memory_mib:
+        return [], [], set()
+    measured = [r for r in rows if models[r['stage']]['runs'] and r['status'] != 'WILL NOT FIT']
+    pairs = []
+    for i, a in enumerate(measured):
+        for b in measured[i + 1:]:
+            if b['stage'] in after.get(a['stage'], ()) or a['stage'] in after.get(b['stage'], ()):
+                continue
+            if a['peak_total_mib'] + b['peak_total_mib'] > memory_mib:
+                pairs.append((a, b))
+    pairs.sort(key=lambda p: (-(p[0]['peak_total_mib'] + p[1]['peak_total_mib']), p[0]['stage'], p[1]['stage']))
+    partners, found, shared = set(), [], []
+    for a, b in pairs:
+        least = sum(r['parent_mib'] + r['worker_mib'] for r in (a, b))
+        if not (one_process(a) or one_process(b) or least > memory_mib):
+            shared.append((a['stage'], b['stage'], a['peak_total_mib'], b['peak_total_mib']))
+            continue
+        if a.get('alone') or b.get('alone'):
+            first = a if a.get('alone') else b
+        else:
+            first = max((a, b), key=lambda r: (r['peak_total_mib'], r['parent_mib'], r['stage']))
+            other = b if first is a else a
+            first['alone'] = True
+            first['reasons'].append('runs alone: its measured peak and that of %s (about %.0f + %.0f MiB) do not fit '
+                                    'side by side in the %.0f MiB the build gets; they run one after another'
+                                    % (other['stage'], first['peak_total_mib'], other['peak_total_mib'], memory_mib))
+        partners.update((a['stage'], b['stage']))
+        for one, other in ((a, b), (b, a)):
+            one.setdefault('not_beside', [])
+            if other['stage'] not in one['not_beside']:
+                one['not_beside'].append(other['stage'])
+        found.append((a['stage'], b['stage'], a['peak_total_mib'], b['peak_total_mib'], first['stage']))
+    return found, shared, partners
+
+
+def memory_warnings(rows, pairs, shared, short, got, memory_mib, swap_mib, room):
+    """The plan's memory decisions, one WARN line each ({'key', 'stages', 'text'}; the text starts with WARN_PREFIX),
+    printed with the checklist and shown in build-summary.md (BUILD-TESTER-32GB-OOM-67): stages that do not fit side by
+    side and run one after another ('side-by-side:A+B'), stages that share the memory through the running guard
+    ('shared:A+B'), a stage alone for the memory beside it ('alone:S'), every stage run with fewer workers for memory
+    ('workers:S'), and a stage whose largest unit is larger than the memory ('below-need:S', with the stop advice: the
+    same command in the same build folder keeps every finished stage and unit)."""
+    by_name = {r['stage']: r for r in rows}
+    out = []
+
+    def add(key, stages, text):
+        out.append({'key': key, 'stages': list(stages), 'text': WARN_PREFIX + text})
+
+    def models_of(a, b):
+        return (by_name[a]['model'] if by_name[a]['model'] == by_name[b]['model'] else
+                '%s; %s' % (by_name[a]['model'], by_name[b]['model']))
+    for a, b, peak_a, peak_b, first in pairs:
+        add('side-by-side:%s+%s' % (a, b), (a, b),
+            '%s and %s do not fit side by side: about %.0f + %.0f MiB at their planned workers (%s), more than the '
+            '%.0f MiB of memory the build gets, and %s: they run one after another (%s runs alone; the memory-heavy '
+            'stages wait while it runs)' % (
+                a, b, peak_a, peak_b, models_of(a, b), memory_mib,
+                'the memory of %s is in one process, which fewer workers do not free' % ' and '.join(
+                    s for s in (a, b) if one_process(by_name[s])) if one_process(by_name[a]) or one_process(by_name[b])
+                else 'one worker each beside their main processes is already too much', first))
+    for a, b, peak_a, peak_b in shared:
+        add('shared:%s+%s' % (a, b), (a, b),
+            '%s and %s together need about %.0f + %.0f MiB at their planned workers (%s), more than the %.0f MiB of '
+            'memory the build gets: their memory is in their workers, so they run side by side with fewer workers each '
+            'while both run (the running memory guard caps them; a pool that loses a worker sends its units out again '
+            'at half the width)' % (a, b, peak_a, peak_b, models_of(a, b), memory_mib))
+    for r in rows:
+        name = r['stage']
+        if any(reason.startswith('runs alone: beside the ') for reason in r['reasons']):
+            add('alone:%s' % name, (name,), '%s %s (%s)' % (
+                name, next(x for x in r['reasons'] if x.startswith('runs alone: beside the ')), r['model']))
+        memory = [x for x in r['reasons'] if x.startswith('memory holds ')]
+        if memory and not any(name == s for s, _ in short):
+            longer = ''
+            if r['wall_s'] is not None and r['full_speed_wall_s'] is not None and r['wall_s'] > r['full_speed_wall_s']:
+                longer = '; about %s longer than at full width' % _seconds(r['wall_s'] - r['full_speed_wall_s'])
+            add('workers:%s' % name, (name,), '%s runs %d of %d workers: %s (%s)%s' % (
+                name, r['workers'], r['planned_workers'], memory[0], r['model'], longer))
+    for name, on_swap in short:
+        r = by_name[name]
+        try:
+            from build_failure import HELP_SECTION, advised_swap_gib, reference_memory
+            swap_gib = advised_swap_gib(int((memory_mib or 0) * MIB), reference_memory())
+            help_section = HELP_SECTION
+        except Exception:  # noqa: BLE001 - the advice never stops a plan
+            swap_gib, help_section = None, 'docs/LINUX_BUILD.md'
+        add('below-need:%s' % name, (name,),
+            '%s needs about %.0f MiB in its largest unit (%s; %s), more than the %.0f MiB the build plans with (%.0f %% '
+            'of %.1f GiB of memory)%s. It runs anyway, on one worker; if it stops for memory, run the same command '
+            'again in the same build folder: every finished stage and unit is kept (%s); more memory for the build%s '
+            'lets it finish' % (
+                name, r['unit_mib'], r['largest_unit'], r['model'], room, HEADROOM * 100, (memory_mib or 0) / 1024.,
+                '; with %.1f GiB of swap counted it fits with the swap, slower while it swaps' % (swap_mib / 1024.)
+                if on_swap else '; %s' % ('even with %.1f GiB of swap counted' % (swap_mib / 1024.) if swap_mib
+                                          else 'no swap counted (%s)' % (got.get('swap_source') or 'not read')),
+                help_section, ' or about %d GiB of swap' % swap_gib if swap_gib else ''))
+    return out
 
 
 TAIL_UNITS = 2          # a stage with this many units running or fewer, and none queued, is in its tail
@@ -795,6 +1054,13 @@ def checklist(doc):
                 '', '', ('%d reused, %d to bake (of %d stored; wall from the units to bake); units new to the cache: '
                          'counted by the stage' % (u['reused'], u['to_bake'], u['held'])) if u else 'no unit cache',
                 '; NEW WORK, no history: starts first' if r.get('new_work') else ''))
+    if doc.get('reference'):
+        lines.append('Resource plan: %d stage(s) not measured in this workspace are planned from the reference build\'s '
+                     'measured peaks (%s, config/build-memory.json): %s' % (
+                         len(doc['reference']['stages']), doc['reference']['measured_in'],
+                         ', '.join(doc['reference']['stages'])))
+    # every memory decision of the plan, one WARN line each (BUILD-TESTER-32GB-OOM-67; build-summary.md shows them too)
+    lines.extend(w['text'] for w in doc.get('memory_warnings') or [])
     if doc.get('new_work'):
         lines.append('Resource plan: new work first (no history, started before the known stages): %s'
                      % ', '.join(doc['new_work']))
@@ -894,6 +1160,13 @@ SCHEMA_DOCUMENT = json.loads(r"""
     },
     "headroom": {
      "type": "number"
+    },
+    "swap_mib": {
+     "type": "number",
+     "minimum": 0
+    },
+    "swap_source": {
+     "type": "string"
     }
    }
   },
@@ -1018,6 +1291,12 @@ SCHEMA_DOCUMENT = json.loads(r"""
      },
      "alone": {
       "type": "boolean"
+     },
+     "not_beside": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
      },
      "new_work": {
       "type": "boolean"
@@ -1226,6 +1505,57 @@ SCHEMA_DOCUMENT = json.loads(r"""
    "type": "array",
    "items": {
     "type": "string"
+   }
+  },
+  "memory_warnings": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "required": [
+     "key",
+     "stages",
+     "text"
+    ],
+    "additionalProperties": false,
+    "properties": {
+     "key": {
+      "type": "string",
+      "minLength": 1
+     },
+     "stages": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     },
+     "text": {
+      "type": "string",
+      "minLength": 1
+     }
+    }
+   }
+  },
+  "reference": {
+   "type": "object",
+   "required": [
+    "build",
+    "measured_in",
+    "stages"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "build": {
+     "type": "string"
+    },
+    "measured_in": {
+     "type": "string"
+    },
+    "stages": {
+     "type": "array",
+     "items": {
+      "type": "string"
+     }
+    }
    }
   }
  }

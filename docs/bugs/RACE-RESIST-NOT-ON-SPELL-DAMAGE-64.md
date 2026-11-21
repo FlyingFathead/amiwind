@@ -123,6 +123,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [DOOR-LOAD-LOCKS-MISSING-51](DOOR-LOAD-LOCKS-MISSING-51.md): Load doors ignore the original game's locks: every door into a room opens, locked or not
 - [DOOR-TRAPS-NOT-SPRUNG-55](DOOR-TRAPS-NOT-SPRUNG-55.md): Trapped doors and containers open without their trap
 - DROP-CHIM-REFUSED-59 (no report page): Dropping an item on a streamed outdoor map is refused: Cannot place items in this area yet
+- [DROP-ONLY-WHAT-IS-CARRIED-68](DROP-ONLY-WHAT-IS-CARRIED-68.md): A scripted Drop puts on the ground what the actor holds of the item and no more; OpenMW makes up the rest (a freed slave leaves one bracer, not two)
 - [DROP-REFUSED-CENSUS-ROOM-67](DROP-REFUSED-CENSUS-ROOM-67.md): Dropping an item in the first room of the Census and Excise Office is refused with "Cannot place items in this area yet; kept."
 - DROP-ROOM-BRUSH-ENTITY-59 (no report page): Dropping an item in a converted room is refused: Item path or footprint obstructed
 - [DROP-STACK-ONE-ROW-PER-UNIT-59](DROP-STACK-ONE-ROW-PER-UNIT-59.md): Dropping a stack drops one piece per key press, each its own ground item, so the map's ground item limit (32) fills with single coins
@@ -139,7 +140,9 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [FACTION-EXPEL-MESSAGE-64](FACTION-EXPEL-MESSAGE-64.md): An expulsion from a faction shows no message to the player
 - [FACTION-STATS-PAGE-64](FACTION-STATS-PAGE-64.md): The stats page shows no factions, ranks, reputation or bounty
 - [FALL-LANDING-KNOCKDOWN-62](FALL-LANDING-KNOCKDOWN-62.md): A hard landing does not knock the player or an actor down, and an NPC's landing plays no landing sound
+- [FIGHT-STANCE-KEY-IGNORED-WHILE-RUNNING-67](FIGHT-STANCE-KEY-IGNORED-WHILE-RUNNING-67.md): While the run key is held, the key that readies the fight stance does nothing
 - [GETANGLE-PLAYER-Z-READS-OBJECT-AXIS-67](GETANGLE-PLAYER-Z-READS-OBJECT-AXIS-67.md): A script reading the player's angle on the z axis gets a value 90 degrees off the view
+- [GETEFFECT-TABLE-84-OF-143-68](GETEFFECT-TABLE-84-OF-143-68.md): GetEffect knew 84 of the game's 143 magic effects, three of them by another name than their game setting id
 - [GETPCSLEEP-NOT-CARRIED-OUT-67](GETPCSLEEP-NOT-CARRIED-OUT-67.md): Resting never wakes the scripts that wait for the player's sleep: the Dark Brotherhood never attacks a resting player
 - [GETWATERLEVEL-COLUMN-NOT-ROOM-67](GETWATERLEVEL-COLUMN-NOT-ROOM-67.md): GetWaterLevel reads the water in the player's column, not the room's own level, so it reads 0 in Old Mournhold: Temple Sewers West, whose water lies under every placement: the Black Dart gang's script then sets their health to 0 on arrival and the lit torches switch to burned out
 - [GODMODE-COMBAT-DAMAGE-61](GODMODE-COMBAT-DAMAGE-61.md): With god mode on, a fight's blows still take the player's health and kill the player
@@ -162,6 +165,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [MAP-MENU-BLOCKED-COURTYARD-65](MAP-MENU-BLOCKED-COURTYARD-65.md): In the opening the courtyard announces the map, but the map key stays blocked until the opening ends
 - [MAP-PLACES-SHOWN-UNVISITED-67](MAP-PLACES-SHOWN-UNVISITED-67.md): The map shows places the player has never visited (Pelagiad, the Moonmoth Legion fort)
 - [MARKS-SUMMON-CARRIERS-NOT-LIVE-63](MARKS-SUMMON-CARRIERS-NOT-LIVE-63.md): The guarded items whose taking summons a guardian are not live references, so the summon never comes
+- [MODREGION-KEEPS-UNGIVEN-CHANCES-68](MODREGION-KEEPS-UNGIVEN-CHANCES-68.md): ModRegion with fewer than ten chances kept the region's own chances for the other weathers and allowed a chance over 100
 - [MWSCRIPT-CELLCHANGED-VOLATILE-54](MWSCRIPT-CELLCHANGED-VOLATILE-54.md): CellChanged made the sound-marker scripts volatile: 85 percent of Vivec's per-frame script work
 - [MWSCRIPT-CONSOLE-LOCAL-NAMES-63](MWSCRIPT-CONSOLE-LOCAL-NAMES-63.md): Show and ShowVars cannot name a script's local variables: Show reads globals only, ShowVars lists the locals by slot number, and ToggleScripts flips the saved scripts switch
 - MWSCRIPT-DATA-UNKNOWN-NAMES-48 (no report page): Four Bloodmoon scripts read names declared nowhere in the game data and do not compile
@@ -221,6 +225,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [QUICKLOAD-EMPTY-ROOM-SPAWN-BLOCKED-67](QUICKLOAD-EMPTY-ROOM-SPAWN-BLOCKED-67.md): A quick load into a room without scenery reports a blocked spawn although the player is restored in place
 - [RANDOM-STREAMS-SAME-EVERY-BOOT-67](RANDOM-STREAMS-SAME-EVERY-BOOT-67.md): Every session rolls the same fight dice and script random numbers, because the game's random streams start from fixed values at each start of the game
 - [READY-MAGIC-SHOWS-WEAPON-65](READY-MAGIC-SHOWS-WEAPON-65.md): Readying magic (R by default) raises the equipped weapon instead of the spell-casting hands
+- [REGION-INDEX-BASE-ONLY-68](REGION-INDEX-BASE-ONLY-68.md): In an image with the expansions, a script's ChangeWeather and ModRegion changed another region than the one it names: the end of the main quest changed the Grazelands' weather instead of Red Mountain's, and Mournhold's weather lines did nothing
 - [RENDER-METADATA-29](RENDER-METADATA-29.md): Native renderer metadata warns as an unknown QuakeC field
 - [RESIST-NORMAL-WEAPONS-61](RESIST-NORMAL-WEAPONS-61.md): Ghosts and other creatures that resist normal weapons take full damage from ordinary weapons, with no "no effect" message
 - [REST-CENSUS-NO-CELL-ID-61](REST-CENSUS-NO-CELL-ID-61.md): The rest window offers Rest in the Census and Excise Office, a cell the game marks as no sleeping
@@ -257,6 +262,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [SELLUS-GRAVIUS-GREETING-ONLY-64](SELLUS-GRAVIUS-GREETING-ONLY-64.md): Using Sellus Gravius gives only his greeting line instead of his dialogue
 - [SERVER-FRAME-ARRIVAL-33](SERVER-FRAME-ARRIVAL-33.md): The server frame costs about 226 ms per frame at the Balmora arrival camera on a slow 68040
 - [SERVICE-REFUSAL-UNCLOTHED-60](SERVICE-REFUSAL-UNCLOTHED-60.md): Arrille refuses to barter at disposition 80 (player without clothes)
+- [SETPOS-MOVER-NO-ENTITY-68](SETPOS-MOVER-NO-ENTITY-68.md): SetPos does nothing on a scripted object drawn as a room placement without its own entity: the floating crates of Old Mournhold, Forgotten Sewer stay on the floor when the water rises
 - [SKILL-BOOKS-MISSING-62](SKILL-BOOKS-MISSING-62.md): Reading a skill book does not raise its skill: the original raises it by one on the first read
 - [SKILL-RAISE-NOT-SEEN-62](SKILL-RAISE-NOT-SEEN-62.md): In a playtest of v0.0.61 no skill was ever seen to rise: no skill-increased line and no sound in normal play
 - [SPELL-EFFECTS-TABLE-CUT-64](SPELL-EFFECTS-TABLE-CUT-64.md): Game spells cast nothing: the actor table read only the first 32 sections of the compiled scripts file
@@ -270,6 +276,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [TORCH-HIDES-HELM-62](TORCH-HIDES-HELM-62.md): Holding a torch makes the worn helm disappear from the third-person body and the inventory figure; it returns when the torch is put away
 - [TOWN-OUTDOOR-SCRIPTS-NOT-ATTACHED-66](TOWN-OUTDOOR-SCRIPTS-NOT-ATTACHED-66.md): On a town map, scripted objects without an entity are never attached, so their scripts do not run (the falling mage's journal near Seyda Neen)
 - [TP-BEING-TRIBUNAL-FALLS-THROUGH-67](TP-BEING-TRIBUNAL-FALLS-THROUGH-67.md): Teleporting to a character in some Tribunal interiors drops the player through the floor (the pawnbroker Ten-Tongues Weerhat, the Assassin)
+- [TP-DRAW-WEAPON-LAGS-67](TP-DRAW-WEAPON-LAGS-67.md): In third person, drawing or sheathing the weapon or fists starts late, also when the player stands still
 - TRAVEL-SERVICES-CHIM-51 (no report page): Silt strider rides between towns do not work: travel knows only the old Seyda Neen and Balmora town maps, not the CHIM world, and none of the other routes
 - [UI-HUD-TOGGLE-KEY-51](UI-HUD-TOGGLE-KEY-51.md): Requested: a key combination (for example Ctrl+Alt+H) that hides and shows the whole HUD in game, the crosshair with it
 - [UI-INVENTORY-INTEGRATION-40](UI-INVENTORY-INTEGRATION-40.md): Inventory integration and safe world placement remain incomplete
@@ -282,6 +289,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [WEATHER-STATE-NOT-SAVED-66](WEATHER-STATE-NOT-SAVED-66.md): The current weather and its change in progress are not saved: a load rolls the weather again
 - [WEREWOLF-BODY-NOT-DRAWN-63](WEREWOLF-BODY-NOT-DRAWN-63.md): A player turned into a werewolf by a script keeps his own body: the werewolf model is not drawn
 - [WEREWOLF-RUN-SPEED-63](WEREWOLF-RUN-SPEED-63.md): A player in werewolf form runs at his normal run speed: the werewolf run multiplier is not applied
+- [WEREWOLF-TRANSFORM-RULES-PARTIAL-68](WEREWOLF-TRANSFORM-RULES-PARTIAL-68.md): Turning into a werewolf changes only the stats and takes the gear off: health, the readied spell, temporary effects, the closed windows and the witnesses of the change are not carried
 - [WORLD-BUTTONS-62](WORLD-BUTTONS-62.md): Buttons and levers that should act do nothing, for example the Ghostgate gate buttons on both sides
 - [WORLD-OBJECT-STATE-NOT-SAVED-59](WORLD-OBJECT-STATE-NOT-SAVED-59.md): World objects taken or moved are not remembered: they come back when the cell or room reloads, and saves do not keep them
 

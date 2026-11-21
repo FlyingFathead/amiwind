@@ -55,6 +55,8 @@
 #include "aw_mapfog.h"      /* the map's explored land (MAP-ORIGINAL-POI-66) */
 #include <ctype.h>
 #include "aw_roll.h"        /* the spell magnitude and resistance rolls (REST-CUT-TOO-OFTEN-67) */
+#include "aw_water.h"       /* a room's water level (GETWATERLEVEL-COLUMN-NOT-ROOM-67, v0.0.68) */
+#include "aw_drown.h"       /* NPCs drown (ACTOR-DROWNING-NOT-CARRIED-67, v0.0.68): the health path, the room's water */
 
 #define FILE_NAME "mwscript.awm"
 #define MAX_RESIDENT (1024*1024)
@@ -450,11 +452,10 @@ static uint32_t target_reference(int instance,int target){
     return AW_MwvmObjectReference(target);
 }
 /* TAKEN-LIGHT-FLAME-61: REF's placements of the CHIM exterior world (no edict; the loaded areas' effect links name
- * them) out (HIDE 1) or back (0); the placements named (0: none outdoors here). */
+ * them) out (HIDE 1) or back (0); the placements named (0: none outdoors here). CHIM-GONE-LIST-64-CAP-68: every piece
+ * the rows name, however many (aw_inventory.c AW_AreaEffectHide; an array of 16 pieces before) */
 static int exterior_hide(uint32_t ref,int hide){
-    unsigned pids[16];int i,n=AW_AreaEffectPids(ref,pids,16);
-    for(i=0;i<n;i++)ChimChunks_GonePid(pids[i],hide);
-    return n;
+    return AW_AreaEffectHide(ref,hide);
 }
 /* PLAZA-FABRICANTS-LIVE-AT-START-67: E, about to be hidden by a Disable, leaves a fight it is in alive (the StopCombat
  * route); the fights it would start later are refused by the combat layer itself (aw_combat.c AW_CombatEngage) */
@@ -1478,6 +1479,25 @@ static void script_death(aw_actor_t *a,edict_t *e,int was_dead,float before){
     if(is_actor(e) && !AW_CombatSpellHit(e,0,0))AW_CombatTestEngage(e,1);
     script_deaths++;
 }
+/* ACTOR-DROWNING-NOT-CARRIED-67 (aw_drown.c): an NPC loses LOSS health as a script's ModCurrentHealth -LOSS takes it
+ * (the fight's sheet read first and written back, OpenMW's setHealth in updateDrowning), its death by the path above;
+ * 1 when this loss killed it, 0 when not, -1 when the edict has no NPC record. */
+int AW_MwscriptActorHurt(edict_t *e,float loss){
+    aw_actor_t *a=record_of_edict(e);aw_fighter_t *f;int was_dead;float before;unsigned long died=script_deaths;
+    if(!a || a->kind!=0 || a->reference==AW_ACTOR_PLAYER_REF)return -1;
+    if(!(loss>0))return 0;
+    f=fighter_of(e);from_fighter(a,f);
+    was_dead=(a->flags&AWL_DEAD)!=0;before=a->dyn_cur[0];
+    AW_ActorModCurrent(a,AWA_HEALTH,-loss);
+    script_death(a,e,was_dead,before);
+    to_fighter(a,f);
+    return script_deaths!=died;
+}
+/* the reference of an NPC edict's record (0: none, or not an NPC) */
+uint32_t AW_MwscriptNpcReference(edict_t *e){
+    aw_actor_t *a=record_of_edict(e);
+    return a && a->kind==0 && a->reference!=AW_ACTOR_PLAYER_REF?a->reference:0;
+}
 static aw_mwcell_t host_actor(int instance,int target,int verb,int stat,aw_mwcell_t value){
     aw_mwcell_t out;edict_t *e;aw_actor_t *a=actor_of(instance,target,&e);aw_fighter_t *f;
     int whole=stat>=AWA_LEVEL && verb!=AWV_RATIO,was_dead;float v,before;
@@ -1711,6 +1731,43 @@ static int pc_kind,pc_x,pc_y;
 static long map_room;                /* the loaded room's stable number, 0 outdoors (attach_map) */
 static float room_shift[3];          /* a room map's local position = game position / 4 + this (attach_map) */
 static int host_player_cell(int *x,int *y){*x=pc_x;*y=pc_y;return pc_kind;}
+/* GETWATERLEVEL-COLUMN-NOT-ROOM-67 (v0.0.68): the loaded room's water as the scripts read it, looked up in the script
+ * file's WATR rows once per map (water_room_attach; aw_water.h): WATER_TABLE 1 when the file has the rows (an older
+ * file: 0, and GetWaterLevel finds the water in the player's column as before), ROOM_WATER 1 when the room's cell has
+ * the water flag, ROOM_WATER_LEVEL then its level in the original's units. */
+static int water_table,room_water;
+static float room_water_level,room_water_record;
+static unsigned long water_reads,water_column_reads,water_rooms_found,water_rooms_dry;
+/* MWSCRIPT-WATER-LEVEL-STATIC-67 (v0.0.68): SetWaterLevel and ModWaterLevel move the room's level; it is kept as the
+ * room's named fact of the world change list ("amiwind:water:<number>", the float's bits: saved and loaded with the
+ * list, cleared by New Game with it), read back at every attach of the room, and the room world's water plane follows
+ * (aw_water.c). */
+static unsigned long water_sets,water_refused_outside,water_refused_dry,water_restored,water_fact_full;
+static void water_room_attach(void){
+    uint32_t off,rows,bytes;
+    room_water=0;room_water_level=room_water_record=0;water_table=0;
+    if(!resident || !AW_MwvmSection("WATR",&off,&rows,&bytes) || off+bytes>resident_bytes ||
+       (unsigned long)AW_WATER_ROW_BYTES*rows>bytes)return;
+    water_table=1;
+    if(!map_room)return;
+    room_water=AW_WaterRow(resident+off,rows,(unsigned long)map_room,&room_water_level);
+    if(room_water)water_rooms_found++;else water_rooms_dry++;
+    room_water_record=room_water_level;
+    if(room_water){
+        char id[32];int32_t kept;
+        AW_WaterFactId(id,(unsigned long)map_room);
+        if(AW_LedgerFact(&aw_ledger,id,&kept)){room_water_level=AW_WaterFactLevel((long)kept);water_restored++;}
+    }
+}
+/* After the map's attach (its shift known): the room world's water plane found, and put at the room's level (map
+ * units: a quarter scale plus the room's shift). A room at its record's level changes nothing. */
+/* ACTOR-DROWNING-NOT-CARRIED-67 (aw_drown.c): 1 while the loaded map is a room whose cell has the water flag */
+int AW_MwscriptRoomWater(void){return water_table && map_room && room_water;}
+static void water_plane_apply(void){
+    AW_WaterPlaneFind();
+    if(water_table && map_room && room_water && AW_WaterPlaneMovable())
+        AW_WaterPlaneSet(room_water_level*0.25f+room_shift[2]);
+}
 /* The loaded room map's shift (map units = game units / 4 + shift), found when the map attached; the focus box's
  * placed rows use it (aw_inventory.c). 0 outdoors or before the scripts attached this map. */
 void AW_MwscriptRoomShift(float shift[3]){int i;for(i=0;i<3;i++)shift[i]=room_shift[i];}
@@ -1730,10 +1787,16 @@ static void player_cell_update(void){
     if(kind!=pc_kind || x!=pc_x || y!=pc_y){pc_kind=kind;pc_x=x;pc_y=y;AW_MwvmStateChanged();}
 }
 /* GetPos (rule from OpenMW apps/openmw/mwscript/transformationextensions.cpp OpGetPos: the reference's position on
- * the axis, in game units) */
+ * the axis, in game units). SETPOS-MOVER-NO-ENTITY-68 (v0.0.68): a scripted mover the CHIM world draws without an
+ * entity (WORLD-BUTTONS-62; the floating crates of Old Mournhold's Forgotten Sewer) reads where it stands now
+ * (AW_MoverOrigin), the same position SetPos moves, never the spot its instance was attached at. */
+static uint32_t transform_reference(int instance,int target);
 static float host_position(int instance,int target,int axis){
-    vec3_t local;float game[3];
-    if(axis<0 || axis>2 || locate(instance,target,local)<0)return 0.0f;
+    vec3_t local,now;float game[3];int n;uint32_t ref;
+    if(axis<0 || axis>2)return 0.0f;
+    n=locate(instance,target,local);
+    if(n<=0 && (ref=transform_reference(instance,target))!=0 && AW_MoverOrigin(ref,now)){VectorCopy(now,local);n=0;}
+    if(n<0)return 0.0f;
     to_game_units(local,game);
     return game[axis];
 }
@@ -3038,8 +3101,20 @@ static int small_call(int instance,int target,int function,const aw_mwcell_t *nu
     case AWF_SETPOS:{
         /* SetPos AXIS VALUE (OpenMW OpSetPos): the reference's position on the axis, the original's units */
         float game[3];vec3_t local;int k;
-        if(!axis || count<1 || !(e=transform_target(instance,target)))return 1;
+        if(!axis || count<1)return 1;
         k=tolower((unsigned char)axis[0])-'x';
+        if(!(e=transform_entity(instance,target))){
+            /* SETPOS-MOVER-NO-ENTITY-68 (v0.0.68): a scripted mover the CHIM world draws as a placement without an
+             * entity (the floating crates of Old Mournhold's Forgotten Sewer, script floatAboveStartHeight) moves to
+             * the value on that axis: from where it stands now (AW_MoverOrigin, map units) by the difference, the
+             * other axes kept (AW_MoverShift); before, SetPos needed an entity and the crates never floated */
+            vec3_t now;uint32_t ref=transform_reference(instance,target);
+            if(k>=0 && k<=2 && AW_MoverOrigin(ref,now)){
+                to_game_units(now,game);game[k]=numbers[0].f;map_point(game,local);
+                if(AW_MoverSetAxis(ref,k,local[k])){mover_moves++;transforms++;return 1;}
+            }
+            transforms_missed++;return 1;
+        }
         if(k<0 || k>2){transforms_missed++;return 1;}
         start_keep(e);
         to_game_units(e->v.origin,game);game[k]=numbers[0].f;map_point(game,local);
@@ -3699,12 +3774,25 @@ static int gap_call(int instance,int target,int function,const aw_mwcell_t *numb
         return AW_MWVM_CALL_READ;
     }
     if(function==AWF_GETWATERLEVEL){
-        /* GetWaterLevel (cellextensions.cpp OpGetWaterLevel): 0 outdoors (the original's oddity); in a room the water
-         * surface in the original's units: the top of the water in the player's column, found from the room map's
-         * contents (the room's own water is baked into it); 0 when the column has no water */
-        int x,y;vec3_t p;float game[3];int k2,in;
+        /* GetWaterLevel (OpenMW 0.51 apps/openmw/mwscript/cellextensions.cpp OpGetWaterLevel, lines 181-199): 0
+         * outdoors (the original's oddity), the room's own level in a room whose cell has the water flag, the lowest
+         * float in a room without it. GETWATERLEVEL-COLUMN-NOT-ROOM-67 (v0.0.68): the level is the room's row of the
+         * script file's WATR section (water_room_attach), one stored read; before, the top of the water in the
+         * player's column, 0 where the column had none (a room whose water lies under every placement has no water
+         * in its map: Old Mournhold: Temple Sewers West read 0 for its -1500, and its scripts took the room for
+         * flooded). An older file without the rows keeps that column walk. */
+        int x,y,where;vec3_t p;float game[3];int k2,in;
         result->f=0;
-        if(!sv.active || !sv_player || host_player_cell(&x,&y)!=2)return AW_MWVM_CALL_READ;
+        if(!sv.active || !sv_player)return AW_MWVM_CALL_READ;
+        where=host_player_cell(&x,&y);
+        if(water_table){
+            water_reads++;
+            result->f=AW_WaterReading(where==2?AW_WATER_ROOM:where==1?AW_WATER_OUTDOORS:AW_WATER_NOWHERE,room_water,
+                                      room_water_level);
+            return AW_MWVM_CALL_READ;
+        }
+        if(where!=2)return AW_MWVM_CALL_READ;
+        water_column_reads++;
         VectorCopy(sv_player->v.origin,p);
         in=SV_PointContents(p)<=CONTENTS_WATER && SV_PointContents(p)>=CONTENTS_LAVA;
         for(k2=0;k2<1024;k2++){   /* two units a step: down to the water, or up out of it */
@@ -3715,6 +3803,32 @@ static int gap_call(int instance,int target,int function,const aw_mwcell_t *numb
         if(k2>=1024)return AW_MWVM_CALL_READ;
         to_game_units(p,game);result->f=game[2];
         return AW_MWVM_CALL_READ;
+    }
+    if(function==AWF_SETWATERLEVEL || function==AWF_MODWATERLEVEL){
+        /* SetWaterLevel / ModWaterLevel (OpenMW 0.51 apps/openmw/mwscript/cellextensions.cpp OpSetWaterLevel and
+         * OpModWaterLevel, lines 201-245; mwworld/worldimp.cpp setWaterHeight, lines 1881-1885): the player's room's
+         * level set to VALUE or moved by it, its surface and what lies under water following. MWSCRIPT-WATER-LEVEL-
+         * STATIC-67 (v0.0.68): the level is the room's named fact (water_room_attach reads it back), the room world's
+         * water plane moves (aw_water.c), the scripts that read the level wake. Outdoors OpenMW stops the script with
+         * an error, and a room without the water flag saves no level: both are counted here and change nothing. */
+        int x,y,where;char id[32];float level;
+        if(count<1)return 1;
+        where=host_player_cell(&x,&y);
+        if(!water_table || !AW_WaterCallChanges(where==2?AW_WATER_ROOM:AW_WATER_OUTDOORS,room_water)){
+            if(where==2)water_refused_dry++;else water_refused_outside++;
+            return 1;
+        }
+        level=AW_WaterLevelAfter(function==AWF_MODWATERLEVEL,room_water_level,numbers[0].f);
+        if(!(level==level) || level>1.0e9f || level<-1.0e9f){water_refused_dry++;return 1;}
+        water_sets++;
+        if(level!=room_water_level){
+            room_water_level=level;
+            AW_WaterFactId(id,(unsigned long)map_room);
+            if(!AW_LedgerFactSet(&aw_ledger,id,(int32_t)AW_WaterFactValue(level)))water_fact_full++;
+            if(AW_WaterPlaneMovable())AW_WaterPlaneSet(level*0.25f+room_shift[2]);
+            AW_MwvmStateChanged();
+        }
+        return 1;
     }
     if(function==AWF_HASSOULGEM){result->i=soul_gems(function,target,call_string(strings,nstrings,0),0);
                                  return AW_MWVM_CALL_READ;}
@@ -4714,6 +4828,7 @@ static void attach_map(void){
      * and GetPCCell by the original's exterior cells); a room map (compiled or a CHIM room) has neither. */
     {float zero[3]={0,0,0};vec3_t at;    /* the player's cell: a room's number (its shift comes with the bindings) */
      map_room=AW_SourceToWorld(sv.name,zero,at)?0:map_cell_number();room_shift[0]=room_shift[1]=room_shift[2]=0;}
+    water_room_attach();     /* the room's own water level (GETWATERLEVEL-COLUMN-NOT-ROOM-67) */
     for(i=0;i<LOOPS;i++)if(loops[i].used){S_StopSound(loops[i].entity,loops[i].channel);loops[i].used=0;}
     memset(says,0,sizeof(says));
     if(!AW_MwvmSection("BIND",&offset,&rows,&bytes))return;
@@ -5061,7 +5176,7 @@ void AW_MwscriptTick(float dt){
         t1=Sys_FloatTime();
         chargen_sync();   /* OPENING-REGRESSION-64: before any script runs this tick */
         after_census_start();   /* DBG-HORS-AFTER-CENSUS-67: after the new game's own start, before the scripts run */
-        if(script_model!=map_model){script_model=map_model;attach_map();attaching=0;carried_sync();}
+        if(script_model!=map_model){script_model=map_model;attach_map();water_plane_apply();attaching=0;carried_sync();}
         t2=Sys_FloatTime();
         if(t2-t0>.3)Con_Printf("MWScript first tick: file %s %.0f ms, map attach %.0f ms.\n",was?"kept":"loaded",
                                (t1-t0)*1000,(t2-t1)*1000);
@@ -5187,7 +5302,22 @@ static void status_counts(void){
                 "matched\n",hits_kept,AW_CombatLastHitCount(),AW_COMBAT_LAST_HITS,
                 (int)(AW_COMBAT_LAST_HITS*2*sizeof(unsigned long)),hits_npc,hits_read,hits_matched);
      Con_Printf("region weather by scripts: %lu ChangeWeather and ModRegion calls kept, %lu refused (%d bytes)\n",
-                weather_calls,weather_refused,(int)sizeof(aw_weather_script_t));}
+                weather_calls,weather_refused,(int)sizeof(aw_weather_script_t));
+     /* GETWATERLEVEL-COLUMN-NOT-ROOM-67: the room's water as the scripts read it */
+     if(!water_table)Con_Printf("room water: the script file has no water rows: GetWaterLevel reads the player's column "
+                                "(%lu reads)\n",water_column_reads);
+     else if(!map_room)Con_Printf("room water: outdoors, GetWaterLevel reads 0; %lu reads; rooms with water %lu, "
+                                  "without %lu\n",water_reads,water_rooms_found,water_rooms_dry);
+     else if(room_water)Con_Printf("room water: room %ld, level %.1f (its record %.1f); %lu reads; rooms with water %lu, "
+                                   "without %lu\n",map_room,room_water_level,room_water_record,water_reads,
+                                   water_rooms_found,water_rooms_dry);
+     else Con_Printf("room water: room %ld has no water: GetWaterLevel reads the lowest float; %lu reads; rooms with "
+                     "water %lu, without %lu\n",map_room,water_reads,water_rooms_found,water_rooms_dry);
+     /* MWSCRIPT-WATER-LEVEL-STATIC-67: the levels set by the scripts, and the plane */
+     Con_Printf("water levels by scripts: %lu SetWaterLevel and ModWaterLevel calls, %lu outdoors (nothing), %lu in a "
+                "room without water (nothing), %lu levels read back from the saved changes, %lu not kept (the change "
+                "list full)\n",water_sets,water_refused_outside,water_refused_dry,water_restored,water_fact_full);
+     AW_WaterPlaneStatus();}
     AW_MwscriptLedgerStatus();
     {const aw_actorstate_stats_t *a=AW_ActorStateStats();
      Con_Printf("actor record: %d actors, %lu bytes kept; calls %lu (%lu with no actor), records made %lu, changed %lu, "
@@ -6182,6 +6312,7 @@ void AW_MwscriptInit(void){
     aw_save_drop_actor_records=save_drop_actor_records;
     aw_save_new_game=new_game_hook;   /* the original's run-once new-game scripts (NPC-STORY-DISABLED-AT-START-42) */
     AW_FallInit();                    /* held and falling actors (SCRIPTED-EVENT-FALLING-MAGE-61) */
+    AW_WaterInit();                   /* the rooms' water planes (MWSCRIPT-WATER-LEVEL-STATIC-67) */
     aw_worldui_equip_script=equip_script;   /* OnPCEquip and PCSkipEquip (MWSCRIPT-GAP-FUNCTIONS-62) */
     aw_inventory_equip_script=equip_script;   /* and the console's equip / unequip (MWSCRIPT-UNPLACED-RECORD-SCRIPTS-61) */
     AW_StandingReset();AW_EffectsReset();
@@ -6789,6 +6920,354 @@ static int trap_cast(const char *spell){
     return row>=0 && AW_CastOn(NULL,NULL,row)>0;
 }
 static float console_number(const char *s){return (float)Q_atof((char *)s);}
+/* --- v0.0.68 (MW-CONSOLE-COMMANDS-62): ChangeWeather and ModRegion typed on the console. A script line gets its region
+ * as the index the compiler works out (tools/mwscript/codegen.py hostcall: the region catalogue's order); a typed line
+ * names the region by its id, found here in the compiled file's region table (RGNS, tools/mwscript/awms.py
+ * region_rows: the same list in the same order), and the call then goes the way a compiled line's does (host_call
+ * AWF_CHANGEWEATHER / AWF_MODREGION -> aw_weather.c, saved with the scripts' weather, cleared by New Game). Rules from
+ * OpenMW apps/openmw/mwscript/skyextensions.cpp OpChangeWeather (79-96: a region the game has not is reported and
+ * changes nothing) and OpModRegion (98-127: the chances given, each 0..100, none for the weathers past them), read, not
+ * copied. Disk reads only while a line runs or dbg weather prints: a 2-byte row and its id per region --- */
+static int region_row_id(int row,char *s,int capacity){
+    uint32_t off,rows,bytes;unsigned char b[2];
+    s[0]=0;
+    if(row<0 || !AW_MwscriptActors() || !AW_MwvmSection("RGNS",&off,&rows,&bytes) || (uint32_t)row>=rows)return 0;
+    return !actor_read(NULL,off+2u*(uint32_t)row,b,2) && read_string((b[0]<<8)|b[1],s,capacity)>0;
+}
+int AW_MwscriptRegionId(int region,char *out,int capacity){return out && capacity>1 && region_row_id(region,out,capacity);}
+static void append_text(char *out,int capacity,int *at,const char *text){   /* *AT the length so far, cut at CAPACITY */
+    while(*text && *at<capacity-1)out[(*at)++]=*text++;
+    out[*at]=0;
+}
+/* the row of region id ID in RGNS (-1 none; -2 no table: an older file or the scripts off); LIST the table's ids */
+static int console_region(const char *id,char *list,int capacity){
+    uint32_t off,rows,bytes,i;char s[64];int at=0,found=-1;
+    list[0]=0;
+    if(!AW_MwscriptActors() || !AW_MwvmSection("RGNS",&off,&rows,&bytes) || !rows)return -2;
+    for(i=0;i<rows;i++){
+        if(!region_row_id((int)i,s,sizeof(s)))continue;
+        if(found<0 && same_id(s,id))found=(int)i;
+        if(at)append_text(list,capacity,&at,", ");
+        append_text(list,capacity,&at,"\"");append_text(list,capacity,&at,s);append_text(list,capacity,&at,"\"");
+    }
+    return found;
+}
+static int console_whole(const char *s){   /* a whole number as typed (a sign, then digits) */
+    if(*s=='-' || *s=='+')s++;
+    if(!isdigit((unsigned char)*s))return 0;
+    while(isdigit((unsigned char)*s))s++;
+    return !*s;
+}
+static void console_weather(int k,int who,int command,const aw_mwcon_line_t *l,char *answer,int capacity){
+    static char list[400];
+    aw_mwcell_t numbers[1+AW_WEATHERS],result;unsigned char strings[2]={0,0};const unsigned char *c;
+    const char *name=AW_MwConsoleCommandName(command,NULL);unsigned long before=weather_calls;int region,n,i,w;
+    region=console_region(l->arg[0],list,(int)sizeof(list));
+    if(region==-2){
+        Q_snprintf(answer,capacity,"%s: no region table in the compiled scripts (an older id1/mwscript.awm, or dbg mwscript off).\n",name);
+        return;
+    }
+    if(region<0){Q_snprintf(answer,capacity,"%s: no region \"%s\" in this image; its regions: %s\n",name,l->arg[0],list);return;}
+    memset(numbers,0,sizeof(numbers));result.i=0;numbers[0].i=region;
+    if(command==AW_MWCON_CHANGEWEATHER){
+        w=console_whole(l->arg[1])?(int)console_number(l->arg[1]):-1;
+        if(w<0 || w>=AW_WEATHERS){
+            Q_snprintf(answer,capacity,"%s: the weather is a number, 0 (%s) to %d (%s).\n",name,aw_weather_names[0],
+                       AW_WEATHERS-1,aw_weather_names[AW_WEATHERS-1]);
+            return;
+        }
+        numbers[1].i=w;n=2;
+    }else{
+        for(n=1;n<l->args && n<=AW_WEATHERS;n++){
+            if(!console_whole(l->arg[n])){Q_snprintf(answer,capacity,"%s: the chances are whole numbers, 0 to 100.\n",name);return;}
+            numbers[n].i=(int32_t)console_number(l->arg[n]);
+        }
+    }
+    host_call(k,who,command==AW_MWCON_CHANGEWEATHER?AWF_CHANGEWEATHER:AWF_MODREGION,numbers,n,strings,0,&result);
+    region_row_id(region,list,(int)sizeof(list));   /* the id as its record writes it */
+    if(weather_calls==before){
+        Q_snprintf(answer,capacity,"%s \"%s\": not kept (this image has no region weather table).\n",name,list);
+        return;
+    }
+    if(command==AW_MWCON_CHANGEWEATHER){
+        w=AW_WeatherForced();
+        Q_snprintf(answer,capacity,"%s \"%s\" (region %d) -> %s (%d) until the region's next weather change%s%s%s\n",name,
+                   list,region,aw_weather_names[numbers[1].i],(int)numbers[1].i,w>=0?"; dbg weather forces ":"",
+                   w>=0?aw_weather_names[w]:"",w>=0?" (dbg weather auto shows the region's)":"");
+        return;
+    }
+    c=AW_WeatherRegionChances(region);
+    i=Q_snprintf(answer,capacity,"%s \"%s\" (region %d) -> chances",name,list,region);
+    for(n=0;c && n<AW_WEATHERS && i>0 && i<capacity;n++)
+        i+=Q_snprintf(answer+i,(size_t)(capacity-i)," %s %d",aw_weather_names[n],(int)c[n]);
+    if(i>0 && i<capacity)Q_snprintf(answer+i,(size_t)(capacity-i)," for the rest of the game\n");
+}
+/* --- v0.0.68 (MW-CONSOLE-COMMANDS-62): BecomeWerewolf and SetWerewolfAcrobatics typed on the console. A script line
+ * gets the werewolf's game settings as the numbers the compiler packs (tools/mwscript/codegen.py werewolf_settings:
+ * GMST fWereWolf*); a typed line reads the same numbers from the compiled file (WERE, tools/mwscript/awms.py
+ * werewolf_rows) and makes the same call (host_call AWF_BECOMEWEREWOLF / AWF_SETWEREWOLFACROBATICS: the form, its
+ * stats and the kept own stats saved in AWWF, cleared by New Game). On an NPC by id-> BecomeWerewolf needs no settings
+ * (the werewolf NPC list). Rules from OpenMW apps/openmw/mwscript/statsextensions.cpp OpSetWerewolf 1178-1188 and
+ * OpSetWerewolfAcrobatics 1190-1199, mwmechanics/mechanicsmanagerimp.cpp setWerewolf 1880-1978 and
+ * applyWerewolfAcrobatics 1980-1988 (read, not copied). Ten 4-byte reads per line, never in a frame of play --- */
+#define CONSOLE_WERE_ROWS 10
+static int were_settings(int32_t *rows){
+    uint32_t off,n,bytes,i;unsigned char b[4];
+    if(!AW_MwscriptActors() || !AW_MwvmSection("WERE",&off,&n,&bytes) || n<CONSOLE_WERE_ROWS)return 0;
+    for(i=0;i<CONSOLE_WERE_ROWS;i++){
+        if(actor_read(NULL,off+4u*i,b,4))return 0;
+        rows[i]=(int32_t)(((uint32_t)b[0]<<24)|((uint32_t)b[1]<<16)|((uint32_t)b[2]<<8)|b[3]);
+    }
+    return 1;
+}
+static void console_werewolf(int k,int who,int command,const char *target,char *answer,int capacity){
+    aw_mwcell_t numbers[CONSOLE_WERE_ROWS],result;unsigned char strings[2]={0,0};int32_t rows[CONSOLE_WERE_ROWS];
+    const char *name=AW_MwConsoleCommandName(command,NULL);unsigned long before=were_calls;int was=were.player,i,have;
+    aw_actor_t *p;
+    memset(rows,0,sizeof(rows));have=were_settings(rows);
+    if(who==AW_MWVM_PLAYER && !have){
+        Q_snprintf(answer,capacity,"%s: no werewolf settings in the compiled scripts (an older id1/mwscript.awm, or dbg mwscript off).\n",name);
+        return;
+    }
+    memset(numbers,0,sizeof(numbers));result.i=0;
+    if(command==AW_MWCON_BECOMEWEREWOLF){
+        for(i=0;i<CONSOLE_WERE_ROWS-1;i++)numbers[i].i=rows[i];
+        host_call(k,who,AWF_BECOMEWEREWOLF,numbers,have?CONSOLE_WERE_ROWS-1:0,strings,0,&result);
+        if(who!=AW_MWVM_PLAYER)
+            Q_snprintf(answer,capacity,"%s: %s %s.\n",name,target[0]?target:"the target",
+                       were_calls!=before?"is a werewolf (IsWerewolf 1)":"not kept (no reference, or the 16 werewolf NPCs kept already)");
+        else if(was)Q_snprintf(answer,capacity,"%s: the player is a werewolf already.\n",name);
+        else Q_snprintf(answer,capacity,"%s: the player is a werewolf: the werewolf's attributes and skills from the game settings, "
+                        "his own kept for UndoWerewolf, his equipped items taken off.\n",name);
+        return;
+    }
+    numbers[0].i=rows[CONSOLE_WERE_ROWS-1];
+    host_call(k,who,AWF_SETWEREWOLFACROBATICS,numbers,have?1:0,strings,0,&result);
+    p=who==AW_MWVM_PLAYER?player_record():NULL;
+    if(were_calls!=before && p)Q_snprintf(answer,capacity,"%s: the player's Acrobatics %d (fWereWolfAcrobatics).\n",name,(int)p->skill_base[20]);
+    else Q_snprintf(answer,capacity,"%s: not kept (the player's alone are kept here).\n",name);
+}
+/* --- v0.0.68 (MW-CONSOLE-COMMANDS-62, CONSOLE-STARTSCRIPT-STOPSCRIPT-67): StartScript, StopScript and ScriptRunning
+ * typed on the console. A script line names the global script by the row the compiler works out; a typed line names it
+ * by its id, found by the id's name hash in the compiled file's SCRH section (script_row, the lookup a load finds a
+ * saved script by: the section read for the line and freed after it) and checked against the row's own name. Then the
+ * compiled line's work: the global instance started or stopped (AW_MwvmGlobalScriptSet, as dbg mwscript call
+ * startscript ROW), or its running state read (AW_MwvmScriptRunning). Rules from OpenMW
+ * apps/openmw/mwscript/miscextensions.cpp OpStartScript 144-162, OpScriptRunning 164-173, OpStopScript 175-195 (read,
+ * not copied): a name with no script record is reported and changes nothing. A target given by id-> is not kept: the
+ * compiled StartScript keeps none either. Peak 4 bytes a script row while the line runs (about 34 KB), nothing kept --- */
+static int console_script_row(const char *id){
+    char name[64];int s=id[0]?script_row(AW_LedgerNameHash(id),-1):-1;
+    script_names_done();
+    if(s>=0 && (!read_string(AW_MwvmScriptName(s),name,sizeof(name)) || !same_id(name,id)))s=-1;
+    return s;
+}
+static void console_script(int command,const aw_mwcon_line_t *l,char *answer,int capacity){
+    const char *name=AW_MwConsoleCommandName(command,NULL);char id[64];int s,was;
+    if(!AW_MwvmScriptCount()){
+        Q_snprintf(answer,capacity,"%s: the compiled scripts are not loaded (dbg mwscript on).\n",name);return;}
+    if((s=console_script_row(l->arg[0]))<0){
+        Q_snprintf(answer,capacity,"%s: no script \"%s\" in the compiled scripts.\n",name,l->arg[0]);return;}
+    if(!read_string(AW_MwvmScriptName(s),id,sizeof(id)))Q_strncpy(id,(char *)l->arg[0],sizeof(id)-1);
+    id[sizeof(id)-1]=0;
+    was=AW_MwvmScriptRunning(s);
+    if(command==AW_MWCON_SCRIPTRUNNING){Q_snprintf(answer,capacity,"%s %s -> %d\n",name,id,was);return;}
+    if(!AW_MwvmGlobalScriptSet(s,command==AW_MWCON_STARTSCRIPT)){
+        Q_snprintf(answer,capacity,"%s %s: not kept (the script cannot run here, or the script engine's tables are full).\n",
+                   name,id);
+        return;
+    }
+    AW_MwvmStateChanged();
+    Q_snprintf(answer,capacity,"%s %s: %s (it was %s).\n",name,id,AW_MwvmScriptRunning(s)?"running":"stopped",
+               was?"running":"stopped");
+}
+/* --- v0.0.68 (MW-CONSOLE-COMMANDS-62, family 4): PlaySound, PlaySoundVP, PlaySound3D, PlaySound3DVP, GetSoundPlaying,
+ * StreamMusic and SayDone typed on the console. A script line names a sound or a music file by the row the compiler
+ * works out (SNDS, MUSI); a typed line names it by its id or path, found among those rows by name (a string read a
+ * row, the sounds the game's scripts name), and then the compiled line's host call plays it (host_sound,
+ * host_sound_playing, host_music, host_say_done). StreamMusic of a file no script names: its soundtrack number by the
+ * file's stem from the music catalogue (aw_music.c AW_MusicTrackByName, as dbg ost play finds it), played as a script's
+ * StreamMusic plays it. Rules from OpenMW apps/openmw/mwscript/soundextensions.cpp OpSayDone 50-59, OpStreamMusic
+ * 61-72, OpPlaySound 74-85, OpPlaySoundVP 87-104, OpPlaySound3D 106-120, OpPlaySoundVP3D 122-142, OpGetSoundPlaying
+ * 160- (read, not copied). The loop forms need a script that keeps the loop going and stay planned. Disk reads only
+ * while a line runs, nothing kept --- */
+static int console_sound_row(const char *id){
+    int k,n=AW_MwvmSoundCount();char s[64];
+    for(k=0;k<n;k++)if(read_string(AW_MwvmSoundName(k),s,sizeof(s)) && same_id(s,id))return k;
+    return -1;
+}
+static int console_music_row(const char *path){
+    int k,n=AW_MwvmMusicCount();char s[128];
+    for(k=0;k<n;k++)if(read_string(AW_MwvmMusicName(k),s,sizeof(s)) && same_id(s,path))return k;
+    return -1;
+}
+static void console_sound(int k,int who,edict_t *e,int command,const aw_mwcon_line_t *l,char *answer,int capacity){
+    const char *name=AW_MwConsoleCommandName(command,NULL);int row,i,track,playing,entity;float gain=1,pitch=1;
+    if(!AW_MwvmScriptCount()){
+        Q_snprintf(answer,capacity,"%s: the compiled scripts are not loaded (dbg mwscript on).\n",name);return;}
+    if(command==AW_MWCON_SAYDONE){Q_snprintf(answer,capacity,"%s -> %d\n",name,host_say_done(k,who));return;}
+    if(command==AW_MWCON_STREAMMUSIC){
+        if((row=console_music_row(l->arg[0]))>=0){host_music(row);track=AW_MwvmMusic(row);}
+        else if((track=AW_MusicTrackByName(l->arg[0]))>=0)AW_MusicScriptTrack(track);
+        if(track<0)Q_snprintf(answer,capacity,"%s: no soundtrack file \"%s\" (the music catalogue's names: dbg ost play).\n",name,l->arg[0]);
+        else Q_snprintf(answer,capacity,"%s %s: soundtrack %02d once, then the playlist.\n",name,l->arg[0],track);
+        return;
+    }
+    if((row=console_sound_row(l->arg[0]))<0){
+        Q_snprintf(answer,capacity,"%s: no sound \"%s\" among the %d the game's scripts name.\n",name,l->arg[0],AW_MwvmSoundCount());
+        return;
+    }
+    if(command==AW_MWCON_GETSOUNDPLAYING){
+        /* the target's sound by its own instance or its entity (a scratch instance is the console line's own) */
+        entity=e?NUM_FOR_EDICT(e):0;playing=host_sound_playing(k,who,row);
+        for(i=0;i<LOOPS && !playing;i++)
+            if(loops[i].used && loops[i].sound==row && entity>0 && loops[i].entity==entity && realtime<loops[i].until)playing=1;
+        Q_snprintf(answer,capacity,"%s %s -> %d\n",name,l->arg[0],playing);
+        return;
+    }
+    if(command==AW_MWCON_PLAYSOUNDVP || command==AW_MWCON_PLAYSOUND3DVP){
+        gain=console_number(l->arg[1]);pitch=console_number(l->arg[2]);}
+    host_sound(k,who,row,command==AW_MWCON_PLAYSOUND || command==AW_MWCON_PLAYSOUNDVP?AW_MWSND_2D:AW_MWSND_3D,gain,pitch);
+    Q_snprintf(answer,capacity,"%s %s: sound row %d played%s.\n",name,l->arg[0],row,
+               command==AW_MWCON_PLAYSOUND || command==AW_MWCON_PLAYSOUNDVP?"":" at the target");
+}
+/* --- v0.0.68 (MW-CONSOLE-COMMANDS-62): the placing family typed. PlaceAtPC and PlaceAtMe ID COUNT DISTANCE DIRECTION,
+ * PlaceItem ID X Y Z ZROT: the object is found among the PLAC rows (the objects the game's Place calls name, the row's
+ * own id checked; dbg mwscript call placeatpc finds it the same way), then the compiled line's host call (place_call).
+ * PlaceAtMe places at the target given by id->, else at the player. A count below 0 or a direction outside 0..3 is
+ * refused and nothing is placed. An object no Place call names is answered, nothing placed (any record: work item
+ * CONSOLE-PLACE-ANY-RECORD-68). PlaceItemCell stays planned: its cell's room and place are the compiler's. Rules from
+ * OpenMW apps/openmw/mwscript/transformationextensions.cpp OpPlaceItem 541-585, OpPlaceAt 587-625 (read, not copied).
+ * Nothing kept: the rows are the resident PLAC section --- */
+static int place_row_named(const char *id){
+    uint32_t off,rows,bytes,row;char s[64];
+    if(!resident || !id || !AW_MwvmSection("PLAC",&off,&rows,&bytes) || off+bytes>resident_bytes || 12ul*rows>bytes)
+        return -1;
+    for(row=0;row<rows;row++){
+        const unsigned char *p=resident+off+12*row;
+        if(read_string((p[0]<<8)|p[1],s,sizeof(s)) && same_id(s,id))return (int)row;
+    }
+    return -1;
+}
+static void console_place(int k,int who,int command,const aw_mwcon_line_t *l,char *answer,int capacity){
+    const char *name=AW_MwConsoleCommandName(command,NULL);aw_mwcell_t numbers[5],result;unsigned char strings[2];
+    unsigned long before=places,refused=places_refused;place_row_t r;int row,i,count,direction;
+    if(!AW_MwvmScriptCount()){
+        Q_snprintf(answer,capacity,"%s: the compiled scripts are not loaded (dbg mwscript on).\n",name);return;}
+    if((row=place_row_named(l->arg[0]))<0){
+        Q_snprintf(answer,capacity,"%s: no object \"%s\" among those the game's Place calls name.\n",name,l->arg[0]);return;}
+    if(!place_row(row,&r)){Q_snprintf(answer,capacity,"%s: %s (row %d) cannot be made yet.\n",name,l->arg[0],row);return;}
+    memset(numbers,0,sizeof(numbers));result.i=0;
+    console_texts[0]=l->arg[0];strings[0]=CONSOLE_STRING>>8;strings[1]=CONSOLE_STRING&255;
+    if(command==AW_MWCON_PLACEITEM){
+        for(i=0;i<4;i++)numbers[i].f=console_number(l->arg[i+1]);
+        numbers[4].i=row;
+        host_call(k,who,AWF_PLACEITEM,numbers,5,strings,1,&result);
+    }else{
+        count=(int)console_number(l->arg[1]);direction=(int)console_number(l->arg[3]);
+        if(count<0 || direction<0 || direction>3){
+            Q_snprintf(answer,capacity,"%s: the count is 0 or more; the direction 0 front, 1 back, 2 left, 3 right.\n",name);
+            return;
+        }
+        numbers[0].i=count;numbers[1].f=console_number(l->arg[2]);numbers[2].i=direction;numbers[3].i=row;
+        host_call(k,who,command==AW_MWCON_PLACEATPC?AWF_PLACEATPC:AWF_PLACEATME,numbers,4,strings,1,&result);
+    }
+    Q_snprintf(answer,capacity,"%s %s (row %d): %lu made%s.\n",name,l->arg[0],row,places-before,
+               places_refused>refused?", the rest refused (aw_mwscript_status)":"");
+}
+/* --- v0.0.68 (MW-CONSOLE-COMMANDS-62, family 6): the spells, the effects, the items and the topics typed.
+ * RemoveSpellEffects, ExplodeSpell and GetSpellEffects SPELL: the spell's ASPT row by its id (the lookup AddSpell takes);
+ * HasItemEquipped ITEM: the item's AITM row; Drop ITEM COUNT: the AITM row and the item's PLAC row (the items the game's
+ * Drop and Place calls name); GetEffect EFFECT: the effect's number, a typed game setting id (with or without sEffect)
+ * found in the compiled file's effect table (EFFN: the compiler's own) or a whole number, as OpenMW takes it; AddTopic
+ * TOPIC: the topic's TOPC row by its name hash (the saved topics' table) and its own name; Cast SPELL TARGET: by the
+ * player the spell is selected (OpenMW: the player only selects it), by anything else it is cast on the target, found
+ * as the player or by its id. Then each the compiled line's host call. Rules from OpenMW apps/openmw/mwscript/
+ * statsextensions.cpp OpRemoveSpellEffects 556-569; miscextensions.cpp OpGetEffect 562-601, OpDrop 666-754,
+ * OpGetSpellEffects 835-, OpCast 1260-1307, OpExplodeSpell 1310-; containerextensions.cpp OpHasItemEquipped 427-;
+ * dialogueextensions.cpp OpAddTopic 118-135 (read, not copied). Disk reads only while a line runs; nothing kept --- */
+#define CONSOLE_EFFECTS 143
+static int console_effect(const char *typed){
+    uint32_t off,rows,bytes,i;unsigned char b[2*CONSOLE_EFFECTS];char s[48];const char *name=typed;long v;
+    if(typed[0]!='-' && console_whole(typed)){v=atol(typed);return v<=32767?(int)v:-1;}
+    if(!Q_strncasecmp((char *)name,"seffect",7))name+=7;
+    if(!AW_MwscriptActors() || !AW_MwvmSection("EFFN",&off,&rows,&bytes) || !rows || rows>CONSOLE_EFFECTS ||
+       actor_read(NULL,off,b,2u*rows))return -1;
+    for(i=0;i<rows;i++)if(read_string((b[2*i]<<8)|b[2*i+1],s,sizeof(s))>0 && same_id(s,name))return (int)i;
+    return -1;
+}
+static int console_topic(const char *name){
+    const uint32_t *h;uint32_t key,off,rows,bytes;unsigned char b[2];char s[96];int i;
+    if(!AW_MwscriptActors() || !(h=topic_hash_table()) || !AW_MwvmSection("TOPC",&off,&rows,&bytes) ||
+       (int)rows!=topic_rows)return -1;
+    key=topic_key(AW_DialNameHash(name,(int)strlen(name)));
+    for(i=0;i<topic_rows;i++)
+        if(h[i]==key && !actor_read(NULL,off+2u*(uint32_t)i,b,2) && read_string((b[0]<<8)|b[1],s,sizeof(s))>0 &&
+           same_id(s,name))return i;
+    return -1;
+}
+static void console_spells(int k,int who,int command,const aw_mwcon_line_t *l,char *answer,int capacity){
+    const char *name=AW_MwConsoleCommandName(command,NULL);aw_mwcell_t numbers[3],result;unsigned char strings[4];
+    int row,n,item,plac;place_row_t r;unsigned long before,missed;
+    if(!AW_MwvmScriptCount()){
+        Q_snprintf(answer,capacity,"%s: the compiled scripts are not loaded (dbg mwscript on).\n",name);return;}
+    memset(numbers,0,sizeof(numbers));memset(strings,0,sizeof(strings));result.i=0;
+    console_texts[0]=l->arg[0];strings[0]=CONSOLE_STRING>>8;strings[1]=CONSOLE_STRING&255;
+    if(command==AW_MWCON_GETEFFECT){
+        if((n=console_effect(l->arg[0]))<0){
+            Q_snprintf(answer,capacity,"%s %s -> 0 (no such effect: a game setting id as sEffectPoison, or a number)\n",
+                       name,l->arg[0]);return;}
+        numbers[0].i=n;host_call(k,who,AWF_GETEFFECT,numbers,1,strings,0,&result);
+        Q_snprintf(answer,capacity,"%s %s -> %d\n",name,l->arg[0],(int)result.i);return;
+    }
+    if(command==AW_MWCON_ADDTOPIC){
+        if((row=console_topic(l->arg[0]))<0){
+            Q_snprintf(answer,capacity,"%s: no topic \"%s\"; nothing added.\n",name,l->arg[0]);return;}
+        numbers[0].i=row;n=host_call(k,who,AWF_ADDTOPIC,numbers,1,strings,0,&result);
+        Q_snprintf(answer,capacity,"%s %s: %s.\n",name,l->arg[0],n?"known":"not kept (no topic table)");return;
+    }
+    if(command==AW_MWCON_HASITEMEQUIPPED || command==AW_MWCON_DROP){
+        if((item=console_item_row(l->arg[0]))<0){Q_snprintf(answer,capacity,"%s: no such item id: %s\n",name,l->arg[0]);return;}
+        numbers[0].i=item;
+        if(command==AW_MWCON_HASITEMEQUIPPED){
+            host_call(k,who,AWF_HASITEMEQUIPPED,numbers,1,strings,1,&result);
+            Q_snprintf(answer,capacity,"%s %s -> %d\n",name,l->arg[0],(int)result.i);return;
+        }
+        if((n=(int)console_number(l->arg[1]))<0){Q_snprintf(answer,capacity,"%s: the count is 0 or more.\n",name);return;}
+        if(!n)return;                                  /* OpenMW: nothing to do */
+        if((plac=place_row_named(l->arg[0]))<0 || !place_row(plac,&r) || r.kind!=PLACE_ITEM){
+            Q_snprintf(answer,capacity,"%s: %s is not among the items the game's Drop and Place calls name.\n",name,
+                       l->arg[0]);return;}
+        before=places;numbers[0].i=n;numbers[1].i=item;numbers[2].i=plac;
+        host_call(k,who,AWF_DROP,numbers,3,strings,1,&result);
+        Q_snprintf(answer,capacity,"%s %s: %lu on the ground.\n",name,l->arg[0],places-before);return;
+    }
+    if((row=console_spell_row(l->arg[0]))<0){Q_snprintf(answer,capacity,"%s: no such spell id: %s\n",name,l->arg[0]);return;}
+    numbers[0].i=row;
+    if(command==AW_MWCON_CAST){
+        if(who==AW_MWVM_PLAYER){
+            AW_CastSelect(0,row);
+            Q_snprintf(answer,capacity,"%s %s: selected (the player's Cast selects the spell).\n",name,l->arg[0]);return;}
+        console_texts[1]=l->arg[1];strings[2]=(CONSOLE_STRING+1)>>8;strings[3]=(CONSOLE_STRING+1)&255;
+        /* the target: the player, else no object row (one past the last): the host finds it by its id */
+        numbers[1].i=Q_strcasecmp((char *)l->arg[1],"player")?AW_MwvmObjectCount():AW_MWVM_PLAYER;
+        before=casts_on;missed=casts_missed;
+        host_call(k,who,AWF_CAST,numbers,2,strings,2,&result);
+        console_texts[1]=NULL;
+        Q_snprintf(answer,capacity,"%s %s on %s: %s.\n",name,l->arg[0],l->arg[1],casts_on>before?"cast":
+                   casts_missed>missed?"not cast (no such target here, or a spell with no effects)":"nothing");
+        return;
+    }
+    if(command==AW_MWCON_GETSPELLEFFECTS){
+        host_call(k,who,AWF_GETSPELLEFFECTS,numbers,1,strings,1,&result);
+        Q_snprintf(answer,capacity,"%s %s -> %d\n",name,l->arg[0],(int)result.i);return;
+    }
+    before=explodes;
+    host_call(k,who,command==AW_MWCON_EXPLODESPELL?AWF_EXPLODESPELL:AWF_REMOVESPELLEFFECTS,numbers,1,strings,
+              command==AW_MWCON_EXPLODESPELL?0:1,&result);
+    if(command==AW_MWCON_EXPLODESPELL)
+        Q_snprintf(answer,capacity,"%s %s: %s.\n",name,l->arg[0],explodes>before?"exploded":"nothing (no effects here)");
+}
 static int console_command(const char *target,int command,const aw_mwcon_line_t *l,char *answer,int capacity){
     int k,who,row,n,i;edict_t *e;aw_mwcell_t numbers[6],result;unsigned char strings[4];int32_t values[13];
     const char *name=AW_MwConsoleCommandName(command,NULL);
@@ -6855,6 +7334,32 @@ static int console_command(const char *target,int command,const aw_mwcon_line_t 
         console_texts[0]=l->arg[0];strings[0]=CONSOLE_STRING>>8;strings[1]=CONSOLE_STRING&255;
         for(i=1;i<l->args && i<5;i++)numbers[i-1].f=console_number(l->arg[i]);
         host_call(k,who,command==AW_MWCON_AIFOLLOW?AWF_AIFOLLOW:AWF_AIESCORT,numbers,4,strings,1,&result);
+        break;
+    case AW_MWCON_CHANGEWEATHER:case AW_MWCON_MODREGION:
+        /* v0.0.68: the region by its typed id (RGNS), then the compiled line's call (console_weather above) */
+        console_weather(k,who,command,l,answer,capacity);
+        break;
+    case AW_MWCON_BECOMEWEREWOLF:case AW_MWCON_SETWEREWOLFACROBATICS:
+        /* v0.0.68: the werewolf's game settings from the compiled file (WERE), then the compiled line's call */
+        console_werewolf(k,who,command,target,answer,capacity);
+        break;
+    case AW_MWCON_STARTSCRIPT:case AW_MWCON_STOPSCRIPT:case AW_MWCON_SCRIPTRUNNING:
+        /* v0.0.68: the global script by its id (SCRH), then the compiled line's work */
+        console_script(command,l,answer,capacity);
+        break;
+    case AW_MWCON_PLAYSOUND:case AW_MWCON_PLAYSOUNDVP:case AW_MWCON_PLAYSOUND3D:case AW_MWCON_PLAYSOUND3DVP:
+    case AW_MWCON_GETSOUNDPLAYING:case AW_MWCON_STREAMMUSIC:case AW_MWCON_SAYDONE:
+        /* v0.0.68: the sound or music row by its name, then the compiled line's host call */
+        console_sound(k,who,e,command,l,answer,capacity);
+        break;
+    case AW_MWCON_PLACEATPC:case AW_MWCON_PLACEATME:case AW_MWCON_PLACEITEM:
+        /* v0.0.68: the object's PLAC row by its id, then the compiled line's host call */
+        console_place(k,who,command,l,answer,capacity);
+        break;
+    case AW_MWCON_REMOVESPELLEFFECTS:case AW_MWCON_EXPLODESPELL:case AW_MWCON_GETSPELLEFFECTS:case AW_MWCON_GETEFFECT:
+    case AW_MWCON_HASITEMEQUIPPED:case AW_MWCON_DROP:case AW_MWCON_ADDTOPIC:case AW_MWCON_CAST:
+        /* v0.0.68: the spell, item, effect or topic row by its id, then the compiled line's host call */
+        console_spells(k,who,command,l,answer,capacity);
         break;
     }
     console_texts[0]=NULL;

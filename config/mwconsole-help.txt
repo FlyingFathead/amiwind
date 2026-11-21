@@ -6,12 +6,16 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  additem: runs
  addsoulgem: runs
  addspell: runs
+ addtopic: runs
  aiescort: runs
  aifollow: runs
  aitravel: runs
  aiwander: runs
+ becomewerewolf: runs
+ cast: runs
  centeroncell / coc: dbg tp "<cell>"
  centeronexterior / coe: dbg tp <x*8192+4096> <y*8192+4096>
+ changeweather: runs
  clearforcejump: runs
  clearforcemovejump: runs
  clearforcerun: runs
@@ -19,6 +23,7 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  disable: runs
  disablelevitation: runs
  disableteleporting: runs
+ drop: runs
  dropsoulgem: runs
  enable: runs
  enablebirthmenu: dbg quickchar birthsign
@@ -35,6 +40,7 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  enablestatsmenu: runs
  enableteleporting: runs
  equip: runs
+ explodespell: runs
  face: runs
  fadein: runs
  fadeout: runs
@@ -68,6 +74,7 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  getdisabled: runs
  getdisposition: runs
  getdistance: runs
+ geteffect: runs
  getenchant: runs
  getendurance: runs
  getfactionreaction: runs
@@ -119,10 +126,12 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  getsecurity: runs
  getshortblade: runs
  getsneak: runs
+ getsoundplaying: runs
  getspear: runs
  getspeechcraft: runs
  getspeed: runs
  getspell: runs
+ getspelleffects: runs
  getstandingpc: runs
  getstartingpos: runs
  getstat: runs
@@ -135,6 +144,7 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  getwerewolfkills: runs
  getwillpower: runs
  gotojail: runs
+ hasitemequipped: runs
  hassoulgem: runs
  hitonme: runs
  hurtcollidingactor: runs
@@ -183,6 +193,7 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  modpccrimelevel: runs
  modpcfacrep: runs
  modpersonality: runs
+ modregion: runs
  modreputation: runs
  modrestoration: runs
  modscale: runs
@@ -194,6 +205,7 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  modspeed: runs
  modstrength: runs
  modunarmored: runs
+ modwaterlevel: runs
  modwillpower: runs
  move: runs
  moveworld: runs
@@ -213,7 +225,14 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  pcjoinfaction: runs
  pclowerrank: runs
  pcraiserank: runs
+ placeatme: runs
+ placeatpc: runs
+ placeitem: runs
  playgroup: runs
+ playsound: runs
+ playsound3d: runs
+ playsound3dvp: runs
+ playsoundvp: runs
  position: runs
  positioncell: runs
  raiserank: runs
@@ -221,12 +240,15 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  removeitem: runs
  removesoulgem: runs
  removespell: runs
+ removespelleffects: runs
  repairedonme: echo 0
  resetactors / ra: runs
  resurrect: runs
  rotate: runs
  rotateworld: runs
  samefaction: runs
+ saydone: runs
+ scriptrunning: runs
  setacrobatics: runs
  setagility: runs
  setalarm: runs
@@ -280,13 +302,18 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  setspeed: runs
  setstrength: runs
  setunarmored: runs
+ setwaterlevel: runs
+ setwerewolfacrobatics: runs
  setwillpower: runs
  show: runs
  showmap: runs
  showrestmenu: runs
  showvars / sv: runs
  startcombat: runs
+ startscript: runs
  stopcombat: runs
+ stopscript: runs
+ streammusic: runs
  toggleai / tai: runs
  togglecollision / tcl: noclip
  togglecombatstats / tcs: aw_combat_readout toggled

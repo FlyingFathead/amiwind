@@ -200,7 +200,10 @@ int AW_PickPlayerState(int weapon,int hand,int goal,int move,int run,int attack,
     memset(out,0,sizeof(*out));out->weapon=AW_PW_NONE;
     /* PLAYER-CASTING-59: the spell stance (magic ready) is a stance as a drawn weapon: idlespell, spellcast equip /
      * unequip, and the attack is the cast (AW_PE_ATTACK -> AW_PE_CAST by out->range, set by the caller) */
-    if(!(real(weapon) || weapon==AW_PW_SPELL) || swim)return 0;
+    /* PLAYER-PUNCH-THIRDPERSON-39 / TP-DRAW-WEAPON-LAGS-67: so are the bare hands (AW_PW_HANDTOHAND, given by the caller
+     * while the fists rise, strike or lower): the handtohand group's equip, attack by type and unequip (OpenMW 0.51
+     * character.cpp updateWeaponState plays the hand-to-hand weapon type's group as any weapon's, read not copied) */
+    if(!(real(weapon) || weapon==AW_PW_SPELL || weapon==AW_PW_HANDTOHAND) || swim)return 0;
     out->weapon=(signed char)weapon;
     if(hand==1)out->event=AW_PE_EQUIP;
     else if(hand==4)out->event=AW_PE_UNEQUIP;

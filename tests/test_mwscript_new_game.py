@@ -261,6 +261,36 @@ class AddonBindingTests(unittest.TestCase):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    # EXPANSION-TABLES-BASE-ONLY-66, seen again 2026-11-20: a script naming an object only an expansion places reaches
+    # it by its merged key (Old Mournhold's lever torch_lever sets the Black Dart gang's health to 25 by name; the
+    # object table held Morrowind.esm's placements only, so the four calls found no actor and the gang kept 240
+    # health under the flood); an id Morrowind.esm places keeps its own reference, one placed twice by an add-on none
+    def test_an_object_only_an_addon_places_is_reached_by_name(self):
+        from mwscript.gamedata import ADDON_KEY_STRIDE
+        tmp = Path(tempfile.mkdtemp(prefix='aw-addonobjs-'))
+        try:
+            mw = [record('TES3', sub('HEDR', b'\0' * 300)), record('LIGH', sub('NAME', 'lamp_x')),
+                  cell_exterior(1, 2, [(301, 'lamp_x', (0, 0, 0))])]
+            tr = [record('TES3', sub('HEDR', b'\0' * 300), sub('MAST', 'Morrowind.esm'), sub('DATA', b'\0' * 8)),
+                  scpt('LeverScript', 'begin LeverScript\n"lamp_tr"->Disable\n"lamp_x"->Disable\n'
+                                      '"lamp_twice"->Disable\nend'),
+                  record('LIGH', sub('NAME', 'lamp_tr')), record('LIGH', sub('NAME', 'lamp_twice')),
+                  record('ACTI', sub('NAME', 'lever_x'), sub('SCRI', 'LeverScript')),
+                  cell_exterior(3, 4, [(77, 'lamp_tr', (1, 2, 3)), (78, 'lamp_x', (0, 0, 0)),
+                                       (79, 'lamp_twice', (0, 0, 0)), (80, 'lamp_twice', (5, 0, 0)),
+                                       (81, 'lever_x', (0, 0, 0))])]
+            (tmp / 'Morrowind.esm').write_bytes(b''.join(mw))
+            (tmp / 'Tribunal.esm').write_bytes(b''.join(tr))
+            data = GameData().load(tmp)
+            self.assertEqual(data.addon_object_refs['lamp_tr'], [ADDON_KEY_STRIDE + 77])
+            prog, _ = compile_program(data, None, handwritten=(), rooms={})
+            row = {k: prog.objects.rows[i] for k, i in prog.objects.index.items()}
+            self.assertEqual((row['lamp_tr']['reference'], row['lamp_tr']['placed']), (ADDON_KEY_STRIDE + 77, 1))
+            self.assertEqual(row['lamp_x']['reference'], 301)                  # Morrowind.esm's own, as before
+            self.assertEqual((row['lamp_twice']['reference'], row['lamp_twice']['placed']), (0, 2))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
 
 class ReaderTests(unittest.TestCase):
     def test_main_block_only(self):

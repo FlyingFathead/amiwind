@@ -1107,20 +1107,24 @@ def populate(data,scene,rooms,reports,ffmpeg='ffmpeg',jobs=None,
         list(ordered_map(warm_resident_table,warm,max(1,min(resolve_jobs(jobs),len(warm)))))
         print('Residents: %d shared animation table(s) ready for %d bakes in %.1f s'%(
             len(warm),len(pending),time.perf_counter()-started),flush=True)
-    # the bakes left, on the shared pool as before (only the misses); one "[done/total]" line per resident (the time is
-    # since the bakes began: the results come back in order)
-    from unit_store import progress_line
+    # the bakes left, on the shared pool as before (only the misses); one "[done/total]" line per resident with its own
+    # time. Each resident is published into its own folder and stored the moment its worker hands it back
+    # (unit_store.completed_units), not in input order: a stop (out of memory, a lost worker) keeps every resident that
+    # finished behind a slower one (BUILD-TESTER-32GB-OOM-67), and a lost worker's residents go out again at half the
+    # width (build_parallel.completed_map). They are installed in identifier order below, as before.
+    from unit_store import completed_units,progress_line
     if tasks:print('Residents [%d/%d] cached, %d to make'%(len(tasks)-len(pending),len(tasks),len(pending)),flush=True)
-    began=time.perf_counter()
-    for (task,cache,inputs,folder),baked in zip(pending,ordered_map(build_resident_reads,[p[0] for p in pending],max(1,min(resolve_jobs(jobs),len(pending) or 1))) if pending else ()):
+    made=0
+    for index,seconds,baked in (completed_units(build_resident_reads,[(i,p[0]) for i,p in enumerate(pending)],max(1,min(resolve_jobs(jobs),len(pending) or 1))) if pending else ()):
+        task,cache,inputs,folder=pending[index]
         read=baked[3].pop('_layer_reads',None) if isinstance(baked[3],dict) else None
         identifier,record=publish_resident(folder,*baked)
         record=json_record(record)
         if resident_layer_gaps(task,read):cache=None
         store_resident(cache,inputs,folder,identifier,record)
         done[identifier]=(record,folder,True)
-        print(progress_line('Residents',len(tasks)-len(pending)+sum(1 for d in done.values() if d[2]),len(tasks),
-                            identifier,time.perf_counter()-began),flush=True)
+        made+=1
+        print(progress_line('Residents',len(tasks)-len(pending)+made,len(tasks),identifier,seconds),flush=True)
     restored=0
     for identifier in [t[2]['id'] for t in tasks]:
         record,folder,made=done[identifier]

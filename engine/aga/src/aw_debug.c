@@ -182,6 +182,10 @@ static void hands(void) {
         (long)p->v.waterlevel,(long)p->v.movetype,
         (long)cl.cmd.forwardmove,(long)cl.cmd.sidemove,(long)cl.cmd.upmove);
     AW_IntroInputReport();
+    {   /* HANDS-STATE-LOST-THROUGH-DOORS-67: the stance the hands keep through doors, read back in play */
+        extern int aw_magic_readied;
+        Con_Printf("hands stance: %s\n",aw_magic_readied?"magic ready":field(p,"aw_hand_goal")?"weapon or fists ready":"lowered");
+    }
 }
 static void npcs(void) {
     int i;edict_t *p;if(!player())return;

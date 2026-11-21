@@ -2,12 +2,13 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 4 times; something has to be done
+## PERSISTING: reported 5 times; something has to be done
 
 - Reported with v0.0.66-dev1 at 2026-11-13 05:58 +0200: failed again in gate 10262 (worktree v0.0.66-prisonship, commit 6918c15d, which does not touch build_parallel) while the machine ran the dev1 build and three other gates: the second of the two first-started units was 3 instead of 10
 - Reported with v0.0.67-dev1 at 2026-11-17 16:52 +0200: Seen again in a gate run of 17 November 2026 while three gates shared the machine: the first two units to start were not the two most expensive (test_longest_first); the change under test touched no build tool, and the same commit is gated again.
 - Reported with v0.0.67-dev2 at 2026-11-18 (time not recorded): Seen again: gate 11581 (branch v0.0.67-playfx, commit 226fa021) failed fast on test_pool_queue_refill.QueueRefill.test_longest_first, the first failing module after 9 of 822, while a full build and another gate ran on the machine; the commit changes no build scheduling code (magic shell, creature moves, a register entry, the red hue). Re-gated on the next commit.
 - Reported with v0.0.67-dev2 at 2026-11-18 06:02 +0200: Seen again in gate 11466 (the v0.0.67-wanderdoor branch, 0a742694, a register-only commit whose code passed gates 11462 and 11463): test_pool_queue_refill.QueueRefill.test_longest_first failed while two gates and several pregates shared the machine (gate slot 2 of 3, holders 2), the suite stopped by fail-fast after 20 modules.
+- Reported with v0.0.68-dev1 at 2026-11-21 00:05 +0200: The pool queue refill test failed again in a gate while other work loaded the machine, and passed in the next gate of the same branch.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -42,6 +43,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-17 16:52 +0200: seen again in v0.0.67-dev1: Seen again in a gate run of 17 November 2026 while three gates shared the machine: the first two units to start were not the two most expensive (test_longest_first); the change under test touched no build tool, and the same commit is gated ...
 - 2026-11-18: seen again in v0.0.67-dev2: Seen again: gate 11581 (branch v0.0.67-playfx, commit 226fa021) failed fast on test_pool_queue_refill.QueueRefill.test_longest_first, the first failing module after 9 of 822, while a full build and another gate ran on the machine; the ...
 - 2026-11-18 06:02 +0200: seen again in v0.0.67-dev2: Seen again in gate 11466 (the v0.0.67-wanderdoor branch, 0a742694, a register-only commit whose code passed gates 11462 and 11463): test_pool_queue_refill.QueueRefill.test_longest_first failed while two gates and several pregates shared ...
+- 2026-11-21 00:05 +0200: seen again in v0.0.68-dev1: The pool queue refill test failed again in a gate while other work loaded the machine, and passed in the next gate of the same branch.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -50,7 +52,7 @@ _Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
+- [PERSISTING: reported 5 times; something has to be done](#persisting-reported-5-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Status: 17 November 2026](#status-17-november-2026)
 - [Symptom](#symptom)
@@ -244,6 +246,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [TEST-PARALLEL-SHARE-TIMING-36](TEST-PARALLEL-SHARE-TIMING-36.md): The fair-share scheduler test watched the freed budget for a fixed 4 s and failed on a loaded machine
 - [TEST-POOL-LIVE-GROWTH-FLAKY-64](TEST-POOL-LIVE-GROWTH-FLAKY-64.md): The pool live growth test fails once in a full suite run while the machine is busy and passes when run alone
 - [TEST-POOL-LONGEST-FIRST-LOAD-66](TEST-POOL-LONGEST-FIRST-LOAD-66.md): The pool test of longest-first ordering failed once in a gate run while two other gates shared the machine, and passes when run alone
+- [TEST-POOL-QUEUE-REFILL-TIMING-68](TEST-POOL-QUEUE-REFILL-TIMING-68.md): The pool queue test that checks the longest units start first fails now and then on a loaded machine
 - [TEST-POOL-RESUME-SHELL-CONTAINER-58](TEST-POOL-RESUME-SHELL-CONTAINER-58.md): A stage-key test fails when run on its own in the shell container: a pool-mode resume reuses the scene-chain stage it should rerun
 - [TEST-POOL-SCENE-RESUME-ENV-64](TEST-POOL-SCENE-RESUME-ENV-64.md): A stage-key test fails when run directly in the shell container but passes in the gate
 - TEST-PORT-01 (no report page): Focused tests depended on repo root and Windows UTF-8 mode

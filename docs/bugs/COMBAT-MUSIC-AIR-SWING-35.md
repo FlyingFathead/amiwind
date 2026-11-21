@@ -109,4 +109,8 @@ Family: Music and sound (`audio`). The mixer must stay fed through loads and sce
 - [TOMB-MUSIC-OVER-AMBIENT-60](TOMB-MUSIC-OVER-AMBIENT-60.md): Ancestral tombs play the exploration music over the tomb ambience
 - WIN-05 (no report page): Intermittent WinUAE background-music snapping
 
+Related bugs in other categories:
+
+- [CREATURE-DUPLICATE-SPAWN-WARP-68](CREATURE-DUPLICATE-SPAWN-WARP-68.md): A wilderness mudcrab turns into several copies that stand inside each other and jump between positions; the combat music keeps playing after they are dead
+
 <!-- END GENERATED CATEGORY -->

@@ -292,6 +292,7 @@ int ChimRoom_Active (void);
 void ChimRoom_Link (void);
 void ChimRoom_Clip (vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, trace_t *best);
 void ChimRoom_Report (void);
+long ChimRoom_WaterRelinked (void);	/* the placements the water plane's moves linked again (MWSCRIPT-WATER-LEVEL-STATIC-67) */
 int ChimChunks_Pick (const vec3_t start, const vec3_t end, aw_chim_pick_t *out);
 /* 0.9 reach references: served from a resident owner catalogue, read from
  * disk, and the owner record runs read (chim_chunks.c ReachRecord). */

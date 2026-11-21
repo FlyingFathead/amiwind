@@ -2,11 +2,12 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 3 times; something has to be done
+## PERSISTING: reported 4 times; something has to be done
 
 - Reported with v0.0.33-rc1 at 2026-10-09 (time not recorded): gate 1051 failed test_processes_keep_order_and_limit_nested_threads (all nine results from one worker)
 - Reported with v0.0.36-dev3 at 2026-10-11 00:35 +0300: gate 1782 failed, time approximate (first registered as TEST-PARALLEL-ORDER-FLAKY-36)
 - Reported with v0.0.36-dev3 at 2026-10-11 01:10 +0300: gate 1786 failed, time approximate; gates 1783, 1785 and 1787 passed (first registered as TEST-PARALLEL-ORDER-FLAKY-36)
+- Reported with v0.0.68-dev1 at 2026-11-20 16:59 +0200: Seen again: the pool order test failed once in a gate while other gates loaded the machine, and passed when run again.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -40,6 +41,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-10-11 00:35 +0300: seen again in v0.0.36-dev3: gate 1782 failed, time approximate (first registered as TEST-PARALLEL-ORDER-FLAKY-36)
 - 2026-10-11 01:10 +0300: seen again in v0.0.36-dev3: gate 1786 failed, time approximate; gates 1783, 1785 and 1787 passed (first registered as TEST-PARALLEL-ORDER-FLAKY-36)
 - 2026-10-16: Register audit: open means open: 37 closed: 26 superseded by CHIM (legacy Seyda, Balmora, Arena frame and region-map paths), 7 repaired outside the source tree or not AmiWind bugs, 4 duplicates.
+- 2026-11-20 16:59 +0200: seen again in v0.0.68-dev1: Seen again: the pool order test failed once in a gate while other gates loaded the machine, and passed when run again.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -48,7 +50,7 @@ _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Status: 9 October 2026](#status-9-october-2026)
 - [Symptom](#symptom)
@@ -244,6 +246,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [TEST-POOL-LIVE-GROWTH-FLAKY-64](TEST-POOL-LIVE-GROWTH-FLAKY-64.md): The pool live growth test fails once in a full suite run while the machine is busy and passes when run alone
 - [TEST-POOL-LONGEST-FIRST-LOAD-66](TEST-POOL-LONGEST-FIRST-LOAD-66.md): The pool test of longest-first ordering failed once in a gate run while two other gates shared the machine, and passes when run alone
 - [TEST-POOL-QUEUE-REFILL-TIMING-64](TEST-POOL-QUEUE-REFILL-TIMING-64.md): The pool queue refill test (test_longest_first) failed once in a gate on a busy machine and passed on the rerun of the same commit
+- [TEST-POOL-QUEUE-REFILL-TIMING-68](TEST-POOL-QUEUE-REFILL-TIMING-68.md): The pool queue test that checks the longest units start first fails now and then on a loaded machine
 - [TEST-POOL-RESUME-SHELL-CONTAINER-58](TEST-POOL-RESUME-SHELL-CONTAINER-58.md): A stage-key test fails when run on its own in the shell container: a pool-mode resume reuses the scene-chain stage it should rerun
 - [TEST-POOL-SCENE-RESUME-ENV-64](TEST-POOL-SCENE-RESUME-ENV-64.md): A stage-key test fails when run directly in the shell container but passes in the gate
 - TEST-PORT-01 (no report page): Focused tests depended on repo root and Windows UTF-8 mode

@@ -34,6 +34,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 - 2026-11-18: reported in v0.0.67-dev2
 - 2026-11-18: fixed in source: a gated commit, v0.0.67-dev3 (6af03ce3); gate 11602 of the planning item INVENTORY-ITEM-INFO-67: the information box on the shared layout helper: properties per kind, the text, a scroll bar, OK and the action
+- 2026-11-20 15:44 +0200: seen again in v0.0.67: On the v0.0.67 release image the inventory's item information view lacks the item's icon at the original's size, the description and the attributes, and its layout is to be improved.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -100,6 +101,7 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - [INVENTORY-OPEN-WINDOW-NO-REFRESH-61](INVENTORY-OPEN-WINDOW-NO-REFRESH-61.md): An item given and worn through the console while the inventory window is open does not show in that window until it is opened again
 - [INVENTORY-PREVIEW-STALE-61](INVENTORY-PREVIEW-STALE-61.md): The inventory character preview does not change when equipment is put on or taken off in the window
 - [ITEM-ICONS-MISSING-62](ITEM-ICONS-MISSING-62.md): The container window shows clothing, armour, books, scrolls and potions as text without a picture, and the pictures it does show are small and sit in the corner of the slot, on a brown background
+- [ITEM-VIEW-ENTER-UNEQUIPS-67](ITEM-VIEW-ENTER-UNEQUIPS-67.md): In the inventory's item information view, Enter unequips the item being viewed instead of only closing the view
 - [JOURNAL-HYPERLINKS-QUEST-ENTRIES-67](JOURNAL-HYPERLINKS-QUEST-ENTRIES-67.md): Incomplete: the journal hyperlinks work on topic pages only: the quest entries (the dated pages) carry no link spans
 - [JOURNAL-NOTICE-EMPTY-ENTRY-67](JOURNAL-NOTICE-EMPTY-ENTRY-67.md): Incomplete: the journal updated notice is shown for a new entry with empty text, where OpenMW skips it
 - [JOURNAL-QUEST-ENTRIES-NOT-SEEN-67](JOURNAL-QUEST-ENTRIES-NOT-SEEN-67.md): Incomplete: the quests and their finished and restart marks in the journal book are not seen in a built game

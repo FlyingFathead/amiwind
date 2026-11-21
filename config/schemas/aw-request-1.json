@@ -123,6 +123,7 @@
         "masters": {"type": "array", "items": {"type": "string"}, "description": "the masters in load order (AMIWIND_MASTERS); default the base game file alone"},
         "workers": {"type": "integer", "minimum": 1, "description": "cells converted at once (default: leased cores / cell_jobs)"},
         "cell_jobs": {"type": "integer", "minimum": 1, "description": "worker processes inside each cell (default 2)"},
+        "cell_shape": {"enum": ["cell", "region"], "description": "cell (default: each cell alone) or region (each cell as the frame a build installs for it, with its neighbours' apron; tools/chimport.py --cell-shape)"},
         "world": {"type": "boolean", "description": "also build the growing world (default false: the cells alone)"},
         "timeout": {"type": "integer", "minimum": 60, "description": "seconds per cell before it is stopped"},
         "workspace": {"type": "string", "pattern": "^/"},

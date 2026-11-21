@@ -258,8 +258,11 @@ static void torch_hand_to_hand(edict_t *p)
     sv.time=50.5;AW_HandsTick();AW_TorchUpdate();
     assert(*field(p,"aw_hand_state")==2 && *field(p,"aw_hand_goal")==1);
     for(i=0;i<10;i++){sv.time=50.5+i*.02;AW_HandsTick();AW_TorchUpdate();}
-    assert(!*field(p,"aw_torch") && !AW_TorchEquipped());       /* F: the fists stay up */
+    /* F: the fists stay up, and (LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67, decided for the project 2026-11-20) the light
+     * beside them is lit by default; V puts it out */
+    assert(*field(p,"aw_torch")==1 && AW_TorchEquipped());
     hands_model(p);
+    toggle_torch();AW_TorchUpdate();assert(!AW_TorchEquipped() && cl_dlights[0].radius==0);  /* V: off */
     toggle_torch();AW_TorchUpdate();assert(AW_TorchEquipped() && cl_dlights[0].radius>0);   /* V: on */
     toggle_torch();
     for(i=0;i<10;i++){sv.time=51+i*.02;AW_HandsTick();AW_TorchUpdate();}
@@ -305,6 +308,44 @@ static void torch_magic_ready(edict_t *p)
     p->v.impulse=202;AW_HandsTick();AW_TorchUpdate();
     assert(!aw_magic_readied && *field(p,"aw_hand_goal")==1 && AW_TorchEquipped() && cl_dlights[0].radius>0);
     aw_torch_put_away=NULL;aw_torch_item_lit=NULL;
+}
+/* LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67 (decided for the project 2026-11-20): a light equipped beside the weapon or the
+ * fists is lit by default: F raises the hands and lights it; V after F puts out only the light and lights it again,
+ * each with its notice; a punch never lights it again (TORCH-HAND-TO-HAND-64); lowering puts it out and F lights it
+ * again. Since TORCH-HAND-TO-HAND-64 (06e9c4a7, v0.0.65) F left it out: the weapon or the fists came up without the
+ * light, and V then lit it in the weapon's place. This phase FAILS on that code (after F: aw_torch 0). The notice
+ * hook is weak here so the phase also links against a torch without it (the old code). */
+__attribute__((weak)) void (*aw_torch_notice)(int lit);
+static int notices[2];
+static void notice_fixture(int lit){notices[lit!=0]++;}
+static void light_lit_by_default(edict_t *p)
+{
+    int i;
+    set_table(.4f,2,.3f,.5f);
+    memset(&p->v,0,progs->entityfields*4);p->v.health=100;
+    aw_torch_item_lit=item_lit_fixture;item_equipped=1;aw_torch_notice=notice_fixture;notices[0]=notices[1]=0;sv.time=70;
+    AW_TorchUpdate();assert(!*field(p,"aw_torch") && !AW_TorchEquipped());     /* equipped, the hands down: out */
+    p->v.impulse=202;AW_HandsTick();AW_TorchUpdate();
+    for(i=0;i<30;i++){sv.time=70.02+i*.02;AW_HandsTick();AW_TorchUpdate();}
+    assert(*field(p,"aw_hand_state")==2 && *field(p,"aw_hand_goal")==1);
+    assert(*field(p,"aw_torch")==1 && AW_TorchEquipped() && cl_dlights[0].radius>0);   /* F: up and lit */
+    toggle_torch();AW_TorchUpdate();
+    assert(!*field(p,"aw_torch") && !AW_TorchEquipped() && cl_dlights[0].radius==0);   /* V: out ... */
+    assert(notices[0]==1 && notices[1]==0);                                             /* ... and said so */
+    p->v.button0=1;sv.time=71;AW_HandsTick();AW_TorchUpdate();assert(*field(p,"aw_hand_state")==3);
+    p->v.button0=0;
+    for(i=0;i<40;i++){sv.time=71+i*.02;AW_HandsTick();AW_TorchUpdate();}
+    assert(*field(p,"aw_hand_state")==2 && !*field(p,"aw_torch"));      /* a punch never lights it again */
+    toggle_torch();AW_TorchUpdate();
+    assert(*field(p,"aw_torch")==1 && AW_TorchEquipped() && notices[1]==1);            /* V: lit again, said so */
+    p->v.impulse=202;AW_HandsTick();AW_TorchUpdate();
+    for(i=0;i<30;i++){sv.time=72+i*.02;AW_HandsTick();AW_TorchUpdate();}
+    assert(!*field(p,"aw_hand_state") && !*field(p,"aw_hand_goal") && !*field(p,"aw_torch"));   /* F: down and out */
+    toggle_torch();assert(!*field(p,"aw_torch") && notices[0]==1 && notices[1]==1);    /* V with the hands down: nothing */
+    p->v.impulse=202;AW_HandsTick();AW_TorchUpdate();
+    for(i=0;i<30;i++){sv.time=73+i*.02;AW_HandsTick();AW_TorchUpdate();}
+    assert(*field(p,"aw_hand_state")==2 && *field(p,"aw_torch")==1 && AW_TorchEquipped());   /* F again: lit again */
+    aw_torch_item_lit=NULL;aw_torch_notice=NULL;
 }
 int main(int argc,char **argv)
 {
@@ -374,6 +415,7 @@ int main(int argc,char **argv)
     assert(cl_dlights[0].radius==0 && metadata_warnings==before+1);
     torch_hand_to_hand(p);
     torch_magic_ready(p);
-    puts("QC/torch lifecycle passed: missing metadata, raise, V toggle, viewmodel, light, lower, punch, death, zeroed-VM handoff and readied-magic phases.");
+    light_lit_by_default(p);
+    puts("QC/torch lifecycle passed: missing metadata, raise, V toggle, viewmodel, light, lower, punch, death, zeroed-VM handoff, readied-magic and lit-by-default phases.");
     free(sv.edicts);free(raw);return 0;
 }

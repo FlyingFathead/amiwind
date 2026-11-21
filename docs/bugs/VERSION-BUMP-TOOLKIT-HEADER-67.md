@@ -20,11 +20,23 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-17: reported in v0.0.67-dev1
+- 2026-11-20 16:56 +0200: seen again in v0.0.68-dev1: Seen again when v0.0.68 opened: the Toolkit header, the previous-release pin and the size baseline were left at v0.0.67's predecessor and were each caught late, one before the build and two at delivery.
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [Timeline](#timeline)
 - [Status: 17 November 2026](#status-17-november-2026)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -224,6 +236,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [TEST-POOL-LIVE-GROWTH-FLAKY-64](TEST-POOL-LIVE-GROWTH-FLAKY-64.md): The pool live growth test fails once in a full suite run while the machine is busy and passes when run alone
 - [TEST-POOL-LONGEST-FIRST-LOAD-66](TEST-POOL-LONGEST-FIRST-LOAD-66.md): The pool test of longest-first ordering failed once in a gate run while two other gates shared the machine, and passes when run alone
 - [TEST-POOL-QUEUE-REFILL-TIMING-64](TEST-POOL-QUEUE-REFILL-TIMING-64.md): The pool queue refill test (test_longest_first) failed once in a gate on a busy machine and passed on the rerun of the same commit
+- [TEST-POOL-QUEUE-REFILL-TIMING-68](TEST-POOL-QUEUE-REFILL-TIMING-68.md): The pool queue test that checks the longest units start first fails now and then on a loaded machine
 - [TEST-POOL-RESUME-SHELL-CONTAINER-58](TEST-POOL-RESUME-SHELL-CONTAINER-58.md): A stage-key test fails when run on its own in the shell container: a pool-mode resume reuses the scene-chain stage it should rerun
 - [TEST-POOL-SCENE-RESUME-ENV-64](TEST-POOL-SCENE-RESUME-ENV-64.md): A stage-key test fails when run directly in the shell container but passes in the gate
 - TEST-PORT-01 (no report page): Focused tests depended on repo root and Windows UTF-8 mode

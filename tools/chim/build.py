@@ -537,6 +537,25 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
                         results[i] = res
         else:
             results = run_fitting(run_units, 'variant', items, variant_unit, jobs, cache, _log)
+            # a listed mesh whose collision union the compiler refused (config/collision-union-bsp2.json): the same
+            # variant again with the union compiled in BSP2, its own unit kind (chim.union_bsp2,
+            # CHIM-COLLISION-UNION-FALLBACK-41); taken only when it compiled. Every other result as it was.
+            from chim.union_bsp2 import redo_indices, variant_unit_bsp2
+            redo = redo_indices(results, items)
+            if redo:
+                # run_fitting: a union over one image's compiled-node budget comes back as over_budget, not as a
+                # stopped stage; that variant keeps its fallback
+                again = run_fitting(run_units, 'variant-bsp2',
+                                    [(fingerprint('variant-bsp2', items[i][0]), items[i][1]) for i in redo],
+                                    variant_unit_bsp2, jobs, cache, _log)
+                for i, res in zip(redo, again):
+                    if res.get('lumps') and not res.get('collision_fallback') and not res.get('over_budget'):
+                        _log('collision union compiled in BSP2: %s' % items[i][1]['model']['source'])
+                        results[i] = res
+                    else:
+                        _log('collision union refused in BSP2 too: %s: %s' % (
+                            items[i][1]['model']['source'], res.get('collision_compiler_tail')
+                            or res.get('collision_fallback') or res.get('over_budget')))
         variant_fps = {k: fp for k, (fp, _) in zip(order, items)}
         variant_tasks = {k: task for k, (_, task) in zip(order, items)}
     # A model one brush image cannot hold (chim.budget_tiles: Akulakhan's cave shell, 6,281 collision plates and
@@ -550,13 +569,18 @@ def frame_input(*, frame, centre, models, references, prepared, profiles, mesh_f
         with timer.section('over-budget model tiles'):
             g0 = (settings or {}).get('grain', 256)
             tile_items = []
+            from chim.union_bsp2 import budget_tile_unit_union, tiles_listed
             for i in over:
                 task = dict(items[i][1], grain=g0)
-                for key in ('qbsp', 'collision_cache', 'terrain_clip'):
+                # a model listed for unions tile by tile (config/collision-union-bsp2.json "tiles": the glacier's
+                # icebergs) keeps the compiler for its own kind; every other model's task and kind as before
+                union = not task.get('placed') and task.get('qbsp') and tiles_listed(task['model']['source'])
+                for key in (('terrain_clip',) if union else ('qbsp', 'collision_cache', 'terrain_clip')):
                     task.pop(key, None)
-                kind = 'tiles-budget-placed' if task.get('placed') else 'tiles-budget'
+                kind = 'tiles-budget-union' if union else 'tiles-budget-placed' if task.get('placed') else 'tiles-budget'
                 tile_items.append((kind, fingerprint(kind, items[i][0], g0, TILE_MIN), task))
-            for kind, run in (('tiles-budget', budget_tile_unit), ('tiles-budget-placed', budget_tile_unit_placed)):
+            for kind, run in (('tiles-budget', budget_tile_unit), ('tiles-budget-placed', budget_tile_unit_placed),
+                              ('tiles-budget-union', budget_tile_unit_union)):
                 at = [j for j, item in enumerate(tile_items) if item[0] == kind]
                 if at:
                     for j, (grain, tiles) in zip(at, run_units(kind, [tile_items[j][1:] for j in at], run, jobs,
@@ -1007,8 +1031,11 @@ def lava_section(pools):
 
 
 def source_stage(data, work, jobs, settings):
-    """import_town.collect, or its verified earlier result."""
+    """import_town.collect, or its verified earlier result: the run's own work folder when its receipt matches, else
+    the area's catalogue from the unit cache (chim.source_units: kept across runs, BUILD-TESTER-32GB-OOM-67), else
+    collect, whose files then go into the unit cache."""
     from import_town import collect, source_receipt
+    from chim import source_units
     expected = source_receipt(data, settings)
     path = work / 'source-receipt.json'
     if path.is_file():
@@ -1029,8 +1056,14 @@ def source_stage(data, work, jobs, settings):
         work.rename(archive)
         _log('source conversion changed; earlier stage preserved in ' + archive.name)
     work.mkdir(parents=True, exist_ok=True)
+    cache, inputs = source_units.unit(settings, expected)
+    if source_units.restore(cache, inputs, work, expected):
+        _log('source stage taken from the unit cache %s (inputs verified)' % source_units.UNIT)
+        return json.loads((work / 'scenery/scenery-index.json').read_text())
+    before = source_units.files_of(work)
     collect(data, work, jobs, settings)
-    (work / 'source-receipt.json').write_text(json.dumps(expected, indent=2) + '\n')
+    (work / 'source-receipt.json').write_text(source_units.receipt_text(expected))
+    source_units.store(cache, inputs, work, before, work.name)
     return json.loads((work / 'scenery/scenery-index.json').read_text())
 
 
@@ -1157,7 +1190,7 @@ HULL_FALLBACK_STEPS = 8      # meshes the heap fallback may turn back into chain
 
 def build_areas(areas, data_files, out, palette, qbsp=None, jobs=None, settings_override=None, use_cache=True,
                 rebuild_meshes=(), mesh_occluders=True, unit_cache=None, harvest=None, flora=None, legacy_run=None,
-                texture_effects=(), far_terrain=True, hull_fallback_sdk=None):
+                texture_effects=(), far_terrain=True, hull_fallback_sdk=None, frame_cells=None):
     """build_world (one CHIM world, a frame per area) with the routed-hull heap fallback
     (COLLISION-TRACE-COST-33), for every caller of the shared builder. With hull_fallback_sdk (the Amiga SDK
     the heap gate probes the target sizes with) and auto hulls (mesh_geometry_env.model_hull_mode): while a
@@ -1166,7 +1199,7 @@ def build_areas(areas, data_files, out, palette, qbsp=None, jobs=None, settings_
     (every other unit comes from the cache). The receipt records it: hull_fallback = {kept_as_chain: [mesh
     stems], kept_as_chain_for_memory: count, reason}. The strict heap gate still runs after it (chim_build)."""
     args = (areas, data_files, out, palette, qbsp, jobs, settings_override, use_cache, rebuild_meshes,
-            mesh_occluders, unit_cache, harvest, flora, legacy_run, texture_effects, far_terrain)
+            mesh_occluders, unit_cache, harvest, flora, legacy_run, texture_effects, far_terrain, frame_cells)
     receipt = build_world(*args)
     from mesh_geometry_env import model_hull_mode
     if hull_fallback_sdk is None or model_hull_mode() != 'auto':
@@ -1235,7 +1268,7 @@ def routed_peak_mesh(out, kept):
 
 def build_world(areas, data_files, out, palette, qbsp=None, jobs=None, settings_override=None, use_cache=True,
                 rebuild_meshes=(), mesh_occluders=True, unit_cache=None, harvest=None, flora=None, legacy_run=None,
-                texture_effects=(), far_terrain=True):
+                texture_effects=(), far_terrain=True, frame_cells=None):
     """One CHIM world holding a frame per area (town id of config/towns.json), stored once across them.
 
     rebuild_meshes: mesh sources whose units are built again (as after a converter change for them);
@@ -1248,6 +1281,10 @@ def build_world(areas, data_files, out, palette, qbsp=None, jobs=None, settings_
     after the sky-bank translation (none by default);
     far_terrain: write each frame's far terrain layer, OUT/far/<cx>_<cy>.far (chim.far; on by default,
     False only for comparisons: the frame map then has no far land).
+    frame_cells: the cells with a frame of their own in the world these frames belong to (chim.ownership
+    select_compiled_apron: a neighbour's piece wholly outside a region frame is held by its own cell's frame);
+    default the region frames of AREAS; a CHIMport run, which builds a cell's frame as a world of its own, gives the
+    cells of the world it stands for.
     Writes OUT/chim/, OUT/chim-source.json (a section per frame) and OUT/chim-receipt.json."""
     from build_jobs import resolve_jobs
     from mwad.paths import ensure_external, resolve_data_files
@@ -1278,6 +1315,9 @@ def build_world(areas, data_files, out, palette, qbsp=None, jobs=None, settings_
     from town_config import generated_areas
     generated = generated_areas()
     regional = [t for t in areas if t in generated]
+    if frame_cells is None:
+        frame_cells = sorted({tuple(generated[t]['source_cell']) for t in regional if 'source_cell' in generated[t]})
+    frame_cells = [tuple(c) for c in frame_cells]
     prepared = {}
     if len(regional) > 1 and jobs > 1:
         # The towns too, first, each on one worker, beside the region frames (B5, v0.0.42): prepared after them
@@ -1290,7 +1330,7 @@ def build_world(areas, data_files, out, palette, qbsp=None, jobs=None, settings_
                                  % (len(regional), len(towns))):
             prepared = prepare_areas_parallel(towns + regional, generated, data, out, pal_bytes, qbsp, jobs, cache,
                                               timer, settings_override, rebuild_meshes, mesh_occluders, harvest_set,
-                                              flora, legacy_run=legacy_run)
+                                              flora, legacy_run=legacy_run, frame_cells=frame_cells)
     import build_profile
     turn = [t for t in areas if t not in prepared]
     turn_timer = build_profile.phase('CHIM world: areas in turn', '%d areas' % len(turn)).__enter__() if turn else None
@@ -1309,7 +1349,7 @@ def build_world(areas, data_files, out, palette, qbsp=None, jobs=None, settings_
         else:
             spec, section, parity[town], count = prepare_area(
                 town, data, out / 'work' / town, pal_bytes, qbsp, jobs, cache, timer, settings_override,
-                rebuild_meshes, mesh_occluders, harvest_set, flora)
+                rebuild_meshes, mesh_occluders, harvest_set, flora, frame_cells)
         # fail fast (BUILD-CHIM-VALIDATE-LATE-36): this frame's terrain geometry is checked now, not after
         # every other frame is built; the whole-world validation still runs at the end (chim_build --validate)
         with timer.section('early frame checks'):
@@ -1839,7 +1879,7 @@ def _prepare_area_task(task):
     """Worker of prepare_areas_parallel: one area (a generated region frame, or a town) prepared with one job,
     its early frame checks and its timing and unit counts."""
     (town, settings, data, work, pal_bytes, qbsp, cache, settings_override, rebuild_meshes, mesh_occluders,
-     harvest_set, flora, legacy_run) = task
+     harvest_set, flora, legacy_run, frame_cells) = task
     from town_config import register_generated
     from chim.validate import early_frame_failures
     from chim import source_memo
@@ -1855,7 +1895,7 @@ def _prepare_area_task(task):
     else:
         spec, section, parity, count = prepare_area(town, data, work, pal_bytes, qbsp, 1, cache, timer,
                                                     settings_override, rebuild_meshes, mesh_occluders, harvest_set,
-                                                    flora)
+                                                    flora, frame_cells)
     with timer.section('early frame checks'):
         early = early_frame_failures(spec, section, town, 1)
     return (spec, section, parity, count), early, timer.sections, cache.stats, getattr(cache, 'pool_stats', None)
@@ -1908,14 +1948,14 @@ def area_weights(towns, generated, data):
 
 
 def prepare_areas_parallel(towns, generated, data, out, pal_bytes, qbsp, jobs, cache, timer, settings_override,
-                           rebuild_meshes, mesh_occluders, harvest_set, flora, legacy_run=None):
+                           rebuild_meshes, mesh_occluders, harvest_set, flora, legacy_run=None, frame_cells=None):
     """{town: prepare_area result} of generated areas (CHIM region frames) and towns, one area per worker
     (BUILD-CHIM-STAGE-IDLE-START-36). The first frame whose early checks fail stops the stage, named; unit
     counts and timings are merged into the caller's cache and timer. Towns (not generated) are listed first,
     so they start first."""
     from build_costs import costed_map
     tasks = [(t, generated.get(t), data, out / 'work' / t, pal_bytes, qbsp, _area_cache(cache), settings_override,
-              rebuild_meshes, mesh_occluders, harvest_set, flora, legacy_run) for t in towns]
+              rebuild_meshes, mesh_occluders, harvest_set, flora, legacy_run, frame_cells) for t in towns]
     results = {}
     # Largest first (BUILD-CHIM-REGION-FRAMES-TAIL-43): each frame's seconds from the cost history of earlier
     # builds, else the references placed in its source cells; towns (no generated settings) are the heaviest and
@@ -1942,8 +1982,9 @@ def prepare_areas_parallel(towns, generated, data, out, pal_bytes, qbsp, jobs, c
 
 
 def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings_override, rebuild_meshes,
-                 mesh_occluders, harvest_set, flora):
-    """One area's frame input, source section, parity record and mesh count (build_areas)."""
+                 mesh_occluders, harvest_set, flora, frame_cells=None):
+    """One area's frame input, source section, parity record and mesh count (build_areas). frame_cells: the cells
+    with a frame of their own in this world (chim.ownership.select_compiled_apron; None: the method before)."""
     from import_town import ground_assets, terrain_at, terrain_material, TERRAIN_CEILING, TERRAIN_FLOOR
     from prepare_quake import SCALE
     from surface_flatten import load_profiles, mount_references, NeighboringFacadeSupport
@@ -2241,7 +2282,7 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
     outside_apron = []
     if settings.get('region_source_apron'):
         from chim.ownership import select_compiled_apron
-        selected, outside_apron = select_compiled_apron(spec, selected)
+        selected, outside_apron = select_compiled_apron(spec, selected, frame_cells)
     doors = [[(r['position'][0] - centre[0]) * SCALE, (r['position'][1] - centre[1]) * SCALE]
              for r in selected if r.get('type') == 'DOOR' and r.get('destination')]
     section = {'town': town, 'cell': list(frame['cell']),
@@ -2274,5 +2315,8 @@ def prepare_area(town, data, work, pal_bytes, qbsp, jobs, cache, timer, settings
     from chim.ownership import manifest
     if outside_apron:
         section['outside_apron'] = outside_apron
+    if spec.get('apron_pieces_dropped'):
+        # pieces of neighbours' references held by their own cells' frames (CHIM-FRAME-EDGE-CLAMPS-OUTSIDE-TILES-68)
+        section['apron_pieces_dropped'] = spec.pop('apron_pieces_dropped')
     section['frame_ownership'] = manifest(spec, selected)
     return spec, section, parity, len(prepared)

@@ -1,11 +1,11 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
+_Last updated with AmiWind v0.0.68-dev3 (21 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.68: in progress, first snapshot 20 November 2026](#v0068-in-progress-first-snapshot-20-november-2026)
+- [v0.0.68: in progress, third snapshot 21 November 2026](#v0068-in-progress-third-snapshot-21-november-2026)
 - [v0.0.67: Tribunal Introduced, released 19 November 2026](#v0067-tribunal-introduced-released-19-november-2026)
 - [v0.0.66: Forward It Is, released 16 November 2026](#v0066-forward-it-is-released-16-november-2026)
 - [v0.0.65: Reintroducing Vvardenfell](#v0065-reintroducing-vvardenfell)
@@ -119,24 +119,46 @@ _Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
-## v0.0.68: in progress, first snapshot 20 November 2026
+## v0.0.68: in progress, third snapshot 21 November 2026
 
-v0.0.68 has no title yet. Its first development snapshot,
-[v0.0.68-dev1](releases/notes/RELEASE-v0.0.68-dev1.md), is out; it is not Solstheim yet and the game in it is the one of
-v0.0.67. What it carries: the progress tracker counts the two opening rooms (the Imperial Prison Ship and Seyda Neen,
-Census and Excise Office) as ready and lists them as special interiors; a build that stops ends with a plain block
-(why, that the finished work is kept, the command that continues it, what to try); the automated playthroughs wait by
-condition; and the private word lists left the public tree. The work of the line is the plan under "Next version"
+v0.0.68 has no title yet. Its third development snapshot,
+[v0.0.68-dev3](releases/notes/RELEASE-v0.0.68-dev3.md), is out. What dev3 carries: **Solstheim's first cells in the
+build**, work in progress: 135 of the island's 144 open terrain cells (110 land, 25 sea floor) as a world of their own,
+reached only by the debug teleport to their frames and not yet seen in play; no door, travel or place name leads there,
+the sea frames around the coast, the people, creatures and containers outdoors are still to come, and the glacier and its
+eight neighbouring cells wait for their collision to be reworked. Also in dev3: the original's console commands for
+spells, items and topics, `GetEffect` for all 143 magic effects, an unlimited list of outdoor pieces taken or disabled,
+the hide rows of every outdoor piece a script switches off (190 objects that scripts switch are still not in the built
+world at all), and builder work for Solstheim's collision and the keys of the outdoor world stage. The second snapshot,
+[v0.0.68-dev2](releases/notes/RELEASE-v0.0.68-dev2.md), is not Solstheim. What dev2 carries: the hands
+mended after the v0.0.67 playtest (a light and a one-handed weapon held together, third-person fists with the original's
+animations, readied magic through doors, the item box's Enter); the moving water of Old Mournhold's two levers and the
+drowning of people under water, both seen working in play; more of the original's console commands (weather,
+werewolf, scripts, sounds, placing); the region table that made weather scripts change the wrong region; the region
+converter for Solstheim's open terrain, which is converted but not in the game yet; the build's memory plan; and the
+outer-hull measure of reduced models. The first snapshot,
+[v0.0.68-dev1](releases/notes/RELEASE-v0.0.68-dev1.md), carried the opening rooms counted as ready, the plain block of a
+stopped build and the playthroughs' waits by condition. The work of the line is the plan under "Next version"
 below: Tribunal's Mournhold with its quests and Bloodmoon's Solstheim, with their scripts, dialogue and save, in the
 order of record there; no dates are promised.
 
 Planned in this line, besides the plan below:
 
+- **Every creature as its original record.** Every creature of the game carries the level, health, attributes, attacks,
+  soul, diseases and items of its original record, checked field by field with a count for each, and the netch roam where
+  the original places them (CREATURE-RECORDS-PARITY-AUDIT-68).
+- **Every lever, valve, button and crank listed.** Each one the player can use is listed with what it does and whether it
+  works in the game, land by land, and each one that does nothing is tracked as a fault (ACTIVATORS-AUDIT-ALL-LANDS-68).
+- **The progress summary shows converted cells.** For every land, the cells already converted but not yet in a built
+  image, with each cell's state, next to the cells that are ready in the game (TOOLKIT-SOL-CONVERTED-COUNT-68).
+- **The werewolf drawn without gaps.** A player who becomes a werewolf is drawn as the werewolf, and the body passes the
+  outer-hull measure before it is drawn (WEREWOLF-BODY-63).
+
 - **A build that fits a 32 GB machine, and continues after a stop.** A plan from the measured stage peaks in the build's
   first minute, stages that do not fit side by side run one after another, every reduction written as a warning in the
   log, the work of the long stages stored as it finishes so a stop does not redo hours, and the CHIM world stage's main
   process split; the build guide and the README state the memory a build needs (BUILD-TESTER-32GB-OOM-67). The advice
-  after a stop is in dev1.
+  after a stop is in dev1; the plan from the measured peaks, the resident stores and the catalogue cache are in dev2.
 - **The debug arena's custom play mode.** A choose-your-opponent list of every creature and person of the game (search,
   sort by name or level) with a stats box to confirm, one or several opponents with their aggression on, and your own
   level, stats, skills and gear set on a console-font screen, started from the arena's title screen

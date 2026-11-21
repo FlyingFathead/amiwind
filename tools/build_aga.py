@@ -1829,6 +1829,25 @@ ACTOR_LOGIC_LINES = (b'// Compiled game logic (default on since v0.0.57): the ga
                      b'aw_body_overlap 1\naw_arrival_clear 1\n')
 
 
+def stage_water_plane_config(id1):
+    """MWSCRIPT-WATER-LEVEL-STATIC-67 (v0.0.68): a room's water moves with the scripts (SetWaterLevel, ModWaterLevel;
+    engine/aga/src/aw_water.c, aw_water_movable, 1 in the engine too); the line states it in the game's default
+    settings so the image says what it starts with. "aw_water_movable 0" in the console keeps every room's water where
+    the builder put it (the method before, for an A/B)."""
+    path = Path(id1) / 'default-game.cfg'
+    raw = path.read_bytes()
+    if not raw.endswith(b'\n'):
+        raw += b'\n'
+    path.write_bytes(raw + WATER_PLANE_LINES)
+    return {'on': True, 'config': 'id1/default-game.cfg', 'line': 'aw_water_movable 1'}
+
+
+WATER_PLANE_LINES = (b'// Moving water (default on since v0.0.68): a room\'s water rises and falls when a script sets\n'
+                     b'// its level (the levers and cranks of Old Mournhold). "aw_water_movable 0" in the console\n'
+                     b'// keeps the water where the builder put it.\n'
+                     b'aw_water_movable 1\n')
+
+
 CHIM_CROSSING_LINES = (b'// Cell crossings (builder option --chim-crossing 0|1, default 1 since v0.0.47): type 1, the\n'
                        b'// region frames around the player as one window. Read when a map starts; not saved.\n'
                        b'// "chim crossing 0" in the console before a map starts gives the old crossing back.\n'
@@ -2068,6 +2087,7 @@ def image(args):
     args.image_chim_crossing_record=stage_chim_crossing(args, boot/'id1')  # build.json, only for type 1
     args.image_chim_actor_table_config=stage_chim_actor_table_config(args, boot/'id1')  # build.json, only when on
     args.image_actor_logic_config=stage_actor_logic_config(boot/'id1')  # compiled scripts + Wander packages on
+    args.image_water_plane_config=stage_water_plane_config(boot/'id1')  # moving water (aw_water_movable 1)
     # --death-retry off (tools/prepare_player_view.py): aw_death_retry 0 in the game defaults.
     from prepare_player_view import stage_death_retry
     args.image_death_retry_record=stage_death_retry(getattr(args,'no_death_retry',False), boot/'id1')
@@ -2483,6 +2503,21 @@ def presented_places(args):
     receipt = json.loads(Path(path).read_text(encoding='utf-8'))
     return presented_exterior.build_places(receipt,
                                            presented_exterior.cells_of_text(getattr(args, 'presented_cells', '') or ''))
+
+
+def effect_link_layers(args):
+    """The world folders of the stores of frames this image installs (--chim-layer-world stores of kind 'frames',
+    tools/chim/layer_stores.py; --chim-sol-world): tools/effect_links.py writes the hide rows of their placements
+    (OUTDOOR-DISABLE-NOT-HIDDEN-68). [] without one."""
+    out = []
+    values = getattr(args, 'chim_layer_world', None)
+    if values:
+        from chim.layer_stores import parse, store_kinds
+        kinds = store_kinds()
+        out += [str(world) for store, world in parse(values) if kinds.get(store) == 'frames']
+    if getattr(args, 'chim_sol_world', None):
+        out.append(str(args.chim_sol_world))
+    return out
 
 
 def layer_region_frames(args):
@@ -2954,28 +2989,28 @@ def compact_layout(args, boot, out, part, omitted_maps, chim_frames, settings, j
     chim_root = Path(args.chim_world)/'chim' if getattr(args, 'chim_world', None) else None
     planned_path = out/'layout-plan.json'
     planned = json.loads(planned_path.read_text(encoding='utf-8')) if planned_path.is_file() else None
-    # the boot units the preflight's plan moved to world volumes go where it put them (follow)
-    plan = layout_plan.plan_compact(boot_rows, [(p.relative_to(boot).as_posix(), p.stat().st_size) for p in maps],
-                                    layout_plan.walk(chim_root) if chim_root else None,
-                                    settings['headroom_mib'], settings['boot_headroom_mib'], follow=planned)
+    map_rows = [(p.relative_to(boot).as_posix(), p.stat().st_size) for p in maps]
+    chim_rows = layout_plan.walk(chim_root) if chim_root else None
     if planned is not None:
-        grown = layout_plan.follows_or_grew(planned, plan, shrink=shrink)
+        # the boot units the preflight's plan moved to world volumes go where it put them (follow); a payload that
+        # changed after the plan, also one DH0 can no longer hold with only the planned units moved, is planned ONCE,
+        # fresh, from the staging folder as it is now (no follow), so the layout is minimal for what is actually
+        # staged (rc1-try5 followed the 3-partition plan after payload sharing had made 2 enough, and require_minimal
+        # refused it; v0.0.68-dev3 stopped on following a plan that moved nothing: IMAGE-BOOT-PAYLOAD-OVER-2GIB-48)
+        plan, grown = layout_plan.plan_following(boot_rows, map_rows, chim_rows, settings['headroom_mib'],
+                                                 settings['boot_headroom_mib'], planned, shrink=shrink)
         if grown is None:
             print('Layout plan followed: the staged payload matches %s (%d partitions, every payload within its '
                   'headroom)' % (planned_path.name, len(plan['partitions'])), flush=True)
             source = planned_path.name
         else:
-            # the payload changed after the preflight planned it: plan ONCE, fresh, from the staging folder as it is
-            # now (no follow), so the layout is minimal for what is actually staged (rc1-try5 followed the 3-partition
-            # plan after payload sharing had made 2 enough, and require_minimal refused it)
-            plan = layout_plan.plan_compact(boot_rows, [(p.relative_to(boot).as_posix(), p.stat().st_size) for p in maps],
-                                            layout_plan.walk(chim_root) if chim_root else None,
-                                            settings['headroom_mib'], settings['boot_headroom_mib'], margin=1)
             print('WARNING: the staged payload changed by %+d bytes after the payload preflight planned it (%s); '
                   'planned again from the staging folder: %d partitions' % (grown[0], grown[1], len(plan['partitions'])),
                   flush=True)
             source = 'image step (planned again from the staged files: the payload changed after %s)' % planned_path.name
     else:
+        plan = layout_plan.plan_compact(boot_rows, map_rows, chim_rows, settings['headroom_mib'],
+                                        settings['boot_headroom_mib'])
         print('Layout plan: no plan from the payload preflight in this run; planned now from the staged payload',
               flush=True)
         source = 'image step'
@@ -3457,7 +3492,11 @@ def finalize_image(args):
         # TAKEN-LIGHT-FLAME-61: a carriable light's CHIM placements, frame map flames and night lamp rows tied to it in
         # its cell's own record of areas.awa (tools/effect_links.py), checked over the whole world
         from effect_links import stage as stage_effect_links
-        stage_effect_links(boot/'id1', args.data_files, chim_world_data, out)
+        # OUTDOOR-DISABLE-NOT-HIDDEN-68: the placements a script can switch off get their rows too, in the base world
+        # and in every store of frames this image installs (Solstheim's, Mournhold's districts at their presented
+        # cells), so the first image that holds such a store has its rows
+        stage_effect_links(boot/'id1', args.data_files, chim_world_data, out, layers=effect_link_layers(args),
+                           places=presented_places(args)[0])
         # the CHIM world read once for the image step is not needed after its last reader (the heap gate)
         chim_world_held.clear()
         chim_world_data = None
@@ -3800,6 +3839,8 @@ def finalize_image(args):
         build_json['chim_crossing'] = args.image_chim_crossing_record
     if getattr(args, 'image_chim_actor_table_config', None):
         build_json['chim_actor_table_config'] = args.image_chim_actor_table_config
+    if getattr(args, 'image_water_plane_config', None):
+        build_json['water_plane'] = args.image_water_plane_config
     recipe_record = os.environ.get('AMIWIND_BUILD_RECIPE')
     if recipe_record:
         # The build's recipe (tools/build_recipe.py ENV, set by tools/build.py; never part of a stage key): a reused

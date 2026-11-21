@@ -373,10 +373,18 @@ EARLY_CHECKS = [
     # outdoors at their moved places: every reference in one cell of its block, the same rows by count and kind as
     # the cell gives as a room, inside the engine's tables; from the game files alone, before any stage
     ('district-tables', 'inputs', 'expansion_preflight:district_tables'),
+    # every table builder's READER on the selected game files, without baking: the exterior cells, the load doors,
+    # travel, magic, the creature and container census with the focus tables' read, the journal and region names,
+    # the harvest catalogue, the world survey, the dialogue tables, the script plan. A reader that cannot read an
+    # expansion's records fails here, with every other failing reader, before the first stage
+    # (tools/table_reader_check.py; nothing to do with the base game alone)
+    ('table-readers', 'inputs', 'table_reader_check:table_readers'),
     # right after a module's world stage has passed: its real frame maps, installed into a scratch folder with the
     # image's own code, against the image's last per-map checks (the engine's tables, the sky, the map names and the
     # rows file, the door check's job table, the effect links' reader): minutes into a build, not in its last step
     ('module-store-maps', AFTER + 'tribunal-mournhold', 'expansion_preflight:module_store_after'),
+    # the same right after Solstheim's world stage (module bloodmoon-solstheim): its slNNNN frame maps and rows file
+    ('module-store-maps', AFTER + 'bloodmoon-solstheim', 'expansion_preflight:module_store_after'),
     # the expansions' actors at milestone 2 or more (config/expansion-stages.json): every incomplete one of the reuse
     # source's stored outputs, before the first stage; nothing at milestone 1 (tools/expansion_actor_check.py)
     ('expansion-actors', 'stored', 'expansion_actor_check:early'),

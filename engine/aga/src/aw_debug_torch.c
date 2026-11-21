@@ -8,6 +8,8 @@
  */
 #include "quakedef.h"
 #include "aw_inventory.h"
+#include "aw_msgbox.h"
+#include "aw_textdef.h"
 /* Not saved in config.cfg: the image's game config decides, a saved value never overrides it. */
 static cvar_t aw_debug_torch={"aw_debug_torch","0"};
 extern void (*aw_scene_census_exit)(void);
@@ -76,9 +78,26 @@ void AW_DebugTorchGive(void)
                (long)AW_StateGet(&aw_state,AW_ITEM,AW_DEBUG_TORCH_ID));
     AW_UISubtitle("",line,4);
 }
+/* LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67 (aw_torch.c aw_torch_notice; decided for the project 2026-11-20): V after F
+ * changes only the light in the left hand, and the notice box says what it did, with the light's name and the key the
+ * player has bound to the light (the box pipeline, AW_MsgBoxShow; never a key written into the text) */
+extern void (*aw_torch_notice)(int lit);
+static int AW_LightNoticeText(char *out,int size,const char *name,const char *key,int lit)
+{
+    if(!out || size<1 || !name || !name[0])return 0;
+    if(lit)Q_snprintf(out,size,key && key[0]?"Re-ignited %s. (%s to put it out)":"Re-ignited %s.",name,key);
+    else Q_snprintf(out,size,key && key[0]?"Put out %s. (%s to re-ignite while unsheathed)":"Put out %s.",name,key);
+    return 1;
+}
+static void light_notice(int lit)
+{
+    aw_inventory_item_t item;char text[160];
+    if(!AW_InventoryEquippedItem(AW_SLOT_LEFT,&item) || !(item.flags&AW_INV_LIGHT))return;
+    if(AW_LightNoticeText(text,sizeof(text),item.name,AW_TextBoundKeyForCommand("aw_torch"),lit))AW_MsgBoxShow(text,NULL,0);
+}
 void AW_DebugTorchInit(void)
 {
     Cvar_RegisterVariable(&aw_debug_torch);
     aw_scene_census_exit=census_exit;aw_torch_item_lit=item_lit;aw_held_light_item=held_item;
-    aw_torch_debug_equip=debug_equip;
+    aw_torch_debug_equip=debug_equip;aw_torch_notice=light_notice;
 }

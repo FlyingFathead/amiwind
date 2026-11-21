@@ -216,7 +216,7 @@ SKY / LIGHTING|torch flame|aw_torch_flame_set|[classic/brightbase/sparks or 1/2/
 SKY / LIGHTING|torch radius|aw_torch_radius_set|[32..288] (player + admitted guard lights; default 192, classic 144)
 SKY / LIGHTING|torch strength|aw_torch_strength_set|[0..1] (player + admitted guards; default 0.7; local light only)
 SKY / LIGHTING|warm light|aw_warm_light|1/0 torch, lamp and window light takes the light hue (default 1)
-SKY / LIGHTING|weather|aw_weather_set|[on/off / skyonly / auto / clear cloudy foggy overcast rain thunder ash blight snow blizzard] region weather: sky, fog and land light from the region's chances (default on, saved; skyonly: sky and fog only; off: clear sky); a name forces it until auto; no argument: the weather and chances
+SKY / LIGHTING|weather|aw_weather_set|[on/off / skyonly / auto / clear cloudy foggy overcast rain thunder ash blight snow blizzard] region weather: sky, fog and land light from the region's chances (default on, saved; skyonly: sky and fog only; off: clear sky); a name forces it until auto; no argument: the weather, region id (ChangeWeather, ModRegion take it), chances
 UI / CONSOLE|console bg color|aw_console_color|black/blue/gray or R G B
 UI / CONSOLE|console font|aw_console_size|small/normal
 UI / CONSOLE|effects|aw_effects_status|(no argument) the active effects on you (docs/HUD_ACTIVE_EFFECTS.md): each icon's effect and sources, the pictures held and read, the strip lines the debug HUD gives them

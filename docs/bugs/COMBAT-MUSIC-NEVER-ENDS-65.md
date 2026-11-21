@@ -20,6 +20,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-13: reported in v0.0.65
+- 2026-11-20 17:24 +0200: seen again in v0.0.67: Seen again in v0.0.67 on the Ascadian Isles shore: the battle music stayed on after the fight because a slaughterfish in the sea stayed hostile without reaching the player; a far debug teleport did not end it, a door did.
+
+<!-- END GENERATED TIMELINE -->
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category

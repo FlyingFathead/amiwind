@@ -25,7 +25,8 @@ def _worker_catches(module, name):
     return None
 
 
-POOL_MAPS = frozenset({'costed_map', 'ordered_map', 'completed_map', 'governed_map', 'in_order_map', 'spread_map'})
+POOL_MAPS = frozenset({'costed_map', 'ordered_map', 'completed_map', 'governed_map', 'in_order_map', 'spread_map',
+                       'completed_units'})
 
 
 def _name(func):
@@ -38,12 +39,12 @@ ORDERED_MAPS = frozenset({'costed_map', 'ordered_map', 'in_order_map'})
 
 
 def _is_store(node):
-    """A call that stores a unit: store_files / store_unit, or put() on something named like a cache
-    (chim.units.UnitCache.put)."""
+    """A call that stores a unit: store_files / store_unit / store_resident (prepare_area: a resident's unit), or put()
+    on something named like a cache (chim.units.UnitCache.put)."""
     if not isinstance(node, ast.Call):
         return False
     name = _name(node.func)
-    if name in ('store_files', 'store_unit'):
+    if name in ('store_files', 'store_unit', 'store_resident'):
         return True
     if name == 'put' and isinstance(node.func, ast.Attribute):
         owner = node.func.value
@@ -136,10 +137,11 @@ class UnitsKeptOnFailure(unittest.TestCase):
         self.assertEqual(sorted(set(PENDING) - found), [])
 
     def test_unit_cache_stages_store_in_completed_order(self):
-        """The CHIM units and the player parts stages store each unit as it comes back, not in input order."""
+        """The CHIM units, the player parts stages and the room stages' residents (prepare_area.populate,
+        BUILD-TESTER-32GB-OOM-67) store each unit as it comes back, not in input order."""
         problems = []
         for rel in ('tools/chim/units.py', 'tools/prepare_player_parts.py', 'tools/prepare_player_fp_parts.py',
-                    'tools/prepare_player_view.py'):
+                    'tools/prepare_player_view.py', 'tools/prepare_area.py'):
             problems += _stores_in_input_order(ast.parse((ROOT / rel).read_text(encoding='utf-8')), rel)
         self.assertEqual(problems, [])
 

@@ -1341,6 +1341,8 @@ void AW_InventoryInit(void){
     aw_magic_frame=AW_MagicFrame;aw_item_weight=inv_weight;aw_inventory_carried=AW_InventoryCarried;aw_inventory_read_row=AW_InventoryReadRow;
     aw_save_items_loaded=inv_items_loaded;
     aw_worldui_condition=inv_condition_share;   /* INVENTORY-ITEM-INFO-67 */
+    {extern void (*chim_slot_joined)(void);
+     chim_slot_joined=AW_AreaEffectsApply;      /* CHIM-GONE-LIST-64-CAP-68: a window's joined frame gets its gone bits */}
 }
 static void inv_level(void){
     if(inventory_world!=sv.worldmodel){
@@ -2220,16 +2222,17 @@ static unsigned long area_name_hash(const char *s){
     for(;*s;s++){unsigned c=(unsigned char)*s;if(c>='A' && c<='Z')c+=32;h=((h^c)*16777619ul)&0xFFFFFFFFul;}
     return h?h:1;
 }
-/* TAKEN-LIGHT-FLAME-61: the CHIM exterior placement ids of REFERENCE in the loaded areas' effect links (every cut
- * piece; the place's areas and the cache), at most MOST; their count. A take or a Disable outdoors hides them. */
-int AW_AreaEffectPids(unsigned reference,unsigned *pids,int most){
+/* TAKEN-LIGHT-FLAME-61: the CHIM exterior placements of REFERENCE in the loaded areas' effect links (every cut piece;
+ * the place's areas and the cache) out of the world (HIDE 1) or back (0); their count. A take or a Disable outdoors
+ * hides them. CHIM-GONE-LIST-64-CAP-68: each piece as its row names it, no array between (16 pieces at most before) */
+int AW_AreaEffectHide(unsigned reference,int hide){
     int i,k,n=0;
     for(i=0;reference && i<AREA_SLOTS;i++){
         const area_t *a=&areas[i];
         if(!a->blob || !a->links)continue;
-        for(k=0;k<a->link_rows && n<most;k++){
+        for(k=0;k<a->link_rows;k++){
             const byte *r=a->links+k*AREA_LINK;
-            if(r[0]=='P' && focus_u32(r+8)==reference)pids[n++]=(unsigned)focus_u32(r+4);
+            if(r[0]=='P' && focus_u32(r+8)==reference){ChimChunks_GonePid((unsigned)focus_u32(r+4),hide);n++;}
         }
     }
     return n;

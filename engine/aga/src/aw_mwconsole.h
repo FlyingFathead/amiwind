@@ -11,7 +11,11 @@
 #ifndef AW_MWCONSOLE_H
 #define AW_MWCONSOLE_H
 
-#define AW_MWCON_ARGS 6
+/* v0.0.68 (MW-CONSOLE-COMMANDS-62): 13 arguments, the most a line of the original takes (OpenMW
+ * components/compiler/extensions0.cpp 38 "aiwander" fff/llllllllll: range, duration, time, the unused chance, eight
+ * idles, reset; 346 "modregion" S/llllllllllX: the region and ten chances). 6 before: ModRegion's chances past the
+ * fifth and AIWander's idles past the third were dropped */
+#define AW_MWCON_ARGS 13
 #define AW_MWCON_TEXT 64
 
 typedef struct {
@@ -24,11 +28,21 @@ typedef struct {
 /* the stat calls' verbs (as aw_mwvm.h AWV_*: 0 get, then set, mod, mod current) */
 enum {AW_MWCON_GET, AW_MWCON_SET, AW_MWCON_MOD, AW_MWCON_MODCURRENT};
 
-/* the commands run through the MWScript host on any target (aw_mwhost.c console_command) */
+/* the commands run through the MWScript host on any target (aw_mwhost.c console_command); v0.0.68: ChangeWeather and
+ * ModRegion, the region by its id in the compiled file's region table (RGNS), then the call a compiled line makes;
+ * BecomeWerewolf and SetWerewolfAcrobatics, the werewolf's game settings from the compiled file (WERE); StartScript,
+ * StopScript and ScriptRunning, the global script by its name (the compiled file's SCRH name hashes); the sounds
+ * (PlaySound, PlaySoundVP, PlaySound3D, PlaySound3DVP, GetSoundPlaying), StreamMusic and SayDone, the sound or music
+ * row by its name */
 enum {AW_MWCON_ADDITEM,AW_MWCON_REMOVEITEM,AW_MWCON_GETITEMCOUNT,AW_MWCON_EQUIP,AW_MWCON_ADDSPELL,
       AW_MWCON_REMOVESPELL,AW_MWCON_ENABLE,AW_MWCON_DISABLE,AW_MWCON_GETDISABLED,AW_MWCON_POSITION,
       AW_MWCON_POSITIONCELL,AW_MWCON_SETPOS,AW_MWCON_GETPOS,AW_MWCON_SETANGLE,AW_MWCON_GETANGLE,AW_MWCON_AIWANDER,
-      AW_MWCON_AITRAVEL,AW_MWCON_AIFOLLOW,AW_MWCON_AIESCORT,AW_MWCON_COMMANDS};
+      AW_MWCON_AITRAVEL,AW_MWCON_AIFOLLOW,AW_MWCON_AIESCORT,AW_MWCON_CHANGEWEATHER,AW_MWCON_MODREGION,
+      AW_MWCON_BECOMEWEREWOLF,AW_MWCON_SETWEREWOLFACROBATICS,AW_MWCON_STARTSCRIPT,AW_MWCON_STOPSCRIPT,
+      AW_MWCON_SCRIPTRUNNING,AW_MWCON_PLAYSOUND,AW_MWCON_PLAYSOUNDVP,AW_MWCON_PLAYSOUND3D,AW_MWCON_PLAYSOUND3DVP,
+      AW_MWCON_GETSOUNDPLAYING,AW_MWCON_STREAMMUSIC,AW_MWCON_SAYDONE,AW_MWCON_PLACEATPC,AW_MWCON_PLACEATME,
+      AW_MWCON_PLACEITEM,AW_MWCON_REMOVESPELLEFFECTS,AW_MWCON_EXPLODESPELL,AW_MWCON_GETSPELLEFFECTS,AW_MWCON_GETEFFECT,
+      AW_MWCON_HASITEMEQUIPPED,AW_MWCON_DROP,AW_MWCON_ADDTOPIC,AW_MWCON_CAST,AW_MWCON_COMMANDS};
 
 typedef struct {
     void (*exec)(const char *text);                       /* an AmiWind console line */

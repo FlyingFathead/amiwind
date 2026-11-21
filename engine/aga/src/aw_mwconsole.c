@@ -137,7 +137,32 @@ static const struct {const char *name;int command,least;} commands[]={
     {"position",AW_MWCON_POSITION,3},{"positioncell",AW_MWCON_POSITIONCELL,4},{"setpos",AW_MWCON_SETPOS,2},
     {"getpos",AW_MWCON_GETPOS,1},{"setangle",AW_MWCON_SETANGLE,2},{"getangle",AW_MWCON_GETANGLE,1},
     {"aiwander",AW_MWCON_AIWANDER,3},{"aitravel",AW_MWCON_AITRAVEL,3},{"aifollow",AW_MWCON_AIFOLLOW,2},
-    {"aiescort",AW_MWCON_AIESCORT,5}};
+    {"aiescort",AW_MWCON_AIESCORT,5},
+    /* v0.0.68: ChangeWeather REGION WEATHER, ModRegion REGION [CHANCES...] (OpenMW compiler extensions0.cpp: "Sl",
+     * "S/llllllllllX"): the region is a typed id, found by the host in the region catalogue */
+    {"changeweather",AW_MWCON_CHANGEWEATHER,2},{"modregion",AW_MWCON_MODREGION,1},
+    /* v0.0.68: BecomeWerewolf, SetWerewolfAcrobatics (OpenMW extensions0.cpp 499, 502: no arguments; the player or the
+     * target by id->); UndoWerewolf needs nothing compiled and runs through the function table */
+    {"becomewerewolf",AW_MWCON_BECOMEWEREWOLF,0},{"setwerewolfacrobatics",AW_MWCON_SETWEREWOLFACROBATICS,0},
+    /* v0.0.68 (CONSOLE-STARTSCRIPT-STOPSCRIPT-67): StartScript NAME, StopScript NAME, ScriptRunning NAME (OpenMW
+     * extensions0.cpp: a global script by its id) */
+    {"startscript",AW_MWCON_STARTSCRIPT,1},{"stopscript",AW_MWCON_STOPSCRIPT,1},{"scriptrunning",AW_MWCON_SCRIPTRUNNING,1},
+    /* v0.0.68: the sounds, StreamMusic, SayDone (OpenMW extensions0.cpp 355-367: "cXX" the sound, "cff" the sound,
+     * volume and pitch, "S" the music file, SayDone none); StopSound stays AmiWind's own stopsound (a collision); the
+     * loop forms stay planned (no script keeps a typed loop going) */
+    {"playsound",AW_MWCON_PLAYSOUND,1},{"playsoundvp",AW_MWCON_PLAYSOUNDVP,3},{"playsound3d",AW_MWCON_PLAYSOUND3D,1},
+    {"playsound3dvp",AW_MWCON_PLAYSOUND3DVP,3},{"getsoundplaying",AW_MWCON_GETSOUNDPLAYING,1},
+    {"streammusic",AW_MWCON_STREAMMUSIC,1},{"saydone",AW_MWCON_SAYDONE,0},
+    /* v0.0.68: PlaceAtPC and PlaceAtMe ID COUNT DISTANCE DIRECTION, PlaceItem ID X Y Z ZROT (OpenMW extensions0.cpp
+     * 525-527: "clflX", "cffffX"); PlaceItemCell stays planned (its cell is the compiler's) */
+    {"placeatpc",AW_MWCON_PLACEATPC,4},{"placeatme",AW_MWCON_PLACEATME,4},{"placeitem",AW_MWCON_PLACEITEM,5},
+    /* v0.0.68: the spells, the effects, the items, the topics (OpenMW extensions0.cpp 113, 167, 237-238, 268, 271, 278,
+     * 455: RemoveSpellEffects, ExplodeSpell, GetSpellEffects, HasItemEquipped "c", GetEffect and AddTopic "S", Drop "cl",
+     * Cast "SS") */
+    {"removespelleffects",AW_MWCON_REMOVESPELLEFFECTS,1},{"explodespell",AW_MWCON_EXPLODESPELL,1},
+    {"getspelleffects",AW_MWCON_GETSPELLEFFECTS,1},{"geteffect",AW_MWCON_GETEFFECT,1},
+    {"hasitemequipped",AW_MWCON_HASITEMEQUIPPED,1},{"drop",AW_MWCON_DROP,2},{"addtopic",AW_MWCON_ADDTOPIC,1},
+    {"cast",AW_MWCON_CAST,2}};
 #define NCOMMAND ((int)(sizeof(commands)/sizeof(commands[0])))
 const char *AW_MwConsoleCommandName(int command,int *least){
     int k;
@@ -145,7 +170,9 @@ const char *AW_MwConsoleCommandName(int command,int *least){
     return NULL;
 }
 int AW_MwConsoleRun(const char *text,const aw_mwcon_host_t *host){
-    aw_mwcon_line_t l;static char line[512];int k,verb,stat;float value;   /* static: the 68k stack is small */
+    /* static: the 68k stack is small (the line is 964 bytes with its 13 arguments since v0.0.68); a line runs whole
+     * before the next one is read (an AmiWind line it becomes is queued, never run inside this call) */
+    static aw_mwcon_line_t l;static char line[512];int k,verb,stat;float value;
     if(!host || !AW_MwConsoleParse(text,&l))return 0;
     for(k=0;k<NCOMMAND;k++){
         if(strcmp(l.name,commands[k].name))continue;

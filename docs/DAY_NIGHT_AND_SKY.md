@@ -1,6 +1,6 @@
 # Trees and Grass, Day and Night
 
-_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
+_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -81,6 +81,20 @@ Now each region draws its own weather:
   builds exactly the tables of before.
 - `dbg weather` shows the weather and the region's chances; `dbg weather blight` (or any weather name) forces one
   until `dbg weather auto`; `dbg weather off` (saved as `aw_weather 0`) brings back the clear sky everywhere.
+- The original game's `ChangeWeather` and `ModRegion` work on the console as typed (v0.0.68), with the region's id
+  as its record writes it (`dbg weather` names the region the player is in): `ChangeWeather "Bitter Coast Region" 4`
+  gives that region rain (0 clear to 9 blizzard) until its next weather change, and `ModRegion "Red Mountain Region"
+  50 50` gives it new chances for the rest of the game, in the weathers' order (clear, cloudy, foggy, overcast, rain,
+  thunder, ash, blight, snow, blizzard), each 0 to 100, the ones not given 0 (OpenMW's rule; before v0.0.68 those kept
+  the region's own). They take the same path as the game's scripts, so the change is saved and New Game clears it. A
+  region the image's region table does not hold is answered with the list of those it holds: an image with both
+  expansions (the default) has all sixteen regions of the three game files, Mournhold's and Solstheim's six among them
+  (Moesring Mountains has the most snow and blizzard), one without them the nine of Vvardenfell. A weather forced with
+  `dbg weather NAME` hides the region's own until `dbg weather auto`.
+- The region a script's `ChangeWeather` or `ModRegion` names is the same one (fixed in v0.0.68): the scripts counted
+  the regions of the base game alone while an image with the expansions orders its region table over all three game
+  files, so the end of the main quest changed the Grazelands' weather instead of clearing Red Mountain's
+  (REGION-INDEX-BASE-ONLY-68 in [the bug register](bugs/README.md)).
 
 The land's light under a weather (v0.0.54, [WEATHER-AMBIENT-SUN-UNUSED-51](bugs/README.md)): until v0.0.53 only the
 sky and the fog followed the weather, so the land under an ash or blight storm, Red Mountain above all, was lit as on

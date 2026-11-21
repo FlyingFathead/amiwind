@@ -45,6 +45,8 @@ float AW_BreathFraction(float left,float hold);
 /* Engine glue (aw_breath.c). */
 void AW_BreathInit(void);
 void AW_BreathPhysics(void);
+/* the hold and suffocation settings as the image gives them (the NPCs' drowning, aw_drown.c, uses the same) */
+void AW_BreathSettingsGet(aw_breath_settings_t *out);
 /* aw_ui.c: the breath bar (top of the view, the middle) when shown: its fill and whether it flashes; 0 none */
 extern int (*aw_breath_bar)(float *fraction,int *flashing);
 

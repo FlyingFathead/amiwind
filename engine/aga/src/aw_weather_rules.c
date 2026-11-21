@@ -147,9 +147,15 @@ int AW_WeatherScriptModRegion(aw_weather_script_t *s,const aw_weather_table_t *t
     if(!s || !t || region<0 || region>=t->regions || n<0)return 0;
     before=weather_in_period(s,t,region,period);
     if((i=script_row(s,t,region))<0)return 0;
-    /* RegionWeather::setChances: the given chances replace the first ones, the rest keep theirs */
-    for(k=0;k<n && k<AW_WEATHERS;k++)
-        s->row[i].chances[k]=(unsigned char)(chances[k]<0?0:chances[k]>255?255:chances[k]);
+    /* v0.0.68 (MODREGION-KEEPS-UNGIVEN-CHANCES-68): RegionWeather::setChances (OpenMW apps/openmw/mwworld/weather.cpp
+     * 270-279) takes the whole list OpModRegion builds (apps/openmw/mwscript/skyextensions.cpp 98-127): the chances
+     * given, each clamped to 0..100, and none for every weather past them. Before, the weathers past the given ones kept
+     * the region's own chances (a Solstheim region's snow and blizzard after an eight-number line) and a chance was
+     * clamped to 255 */
+    for(k=0;k<AW_WEATHERS;k++){
+        int v=k<n?chances[k]:0;
+        s->row[i].chances[k]=(unsigned char)(v<0?0:v>100?100:v);
+    }
     s->row[i].has_chances=1;
     /* a weather the new chances still allow stays until the region's next change; else the new chances choose */
     if(s->row[i].chances[before]){s->row[i].weather=(signed char)before;s->row[i].period=period;}

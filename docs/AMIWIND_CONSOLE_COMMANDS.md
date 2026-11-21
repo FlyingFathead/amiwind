@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.68-dev1._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.68-dev3._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -197,7 +197,7 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg torch radius` | - | [32..288] (player + admitted guard lights; default 192, classic 144) |
 | `dbg torch strength` | - | [0..1] (player + admitted guards; default 0.7; local light only) |
 | `dbg warm light` | - | 1/0 torch, lamp and window light takes the light hue (default 1) |
-| `dbg weather` | - | [on/off / skyonly / auto / clear cloudy foggy overcast rain thunder ash blight snow blizzard] region weather: sky, fog and land light from the region's chances (default on, saved; skyonly: sky and fog only; off: clear sky); a name forces it until auto; no argument: the weather and chances |
+| `dbg weather` | - | [on/off / skyonly / auto / clear cloudy foggy overcast rain thunder ash blight snow blizzard] region weather: sky, fog and land light from the region's chances (default on, saved; skyonly: sky and fog only; off: clear sky); a name forces it until auto; no argument: the weather, region id (ChangeWeather, ModRegion take it), chances |
 
 ## Ui / Console
 

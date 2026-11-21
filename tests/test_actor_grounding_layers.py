@@ -107,6 +107,17 @@ class Layers(unittest.TestCase):
         named = {i.casefold() for i in policy['ground_npcs']} | {k.casefold() for k in policy['exceptions']}
         self.assertFalse((set(ground) | set(rules)) & named)
 
+    def test_the_hand_classed_ids_stay_in_the_shipped_file(self):
+        """Ids classed by hand from a measurement the census cannot write itself, each with its register entry:
+        SOL-COVENTINA-NO-GROUND-CLASS-68: Coventina Celata (Solstheim cell -21,24) is measured 250 units above the land
+        with nothing under her, alive, no levitation, her script moves her nowhere; the engine the game follows traces
+        such a person down onto the ground below when the cell becomes active, so she is ground. A census --write
+        keeps known ids (layers_doc), and this test keeps them from being dropped by hand."""
+        shipped = ROOT / 'config' / 'actor_grounding_layers.json'
+        ground, rules = agl.layer_policy(shipped)
+        self.assertIn('coventina celata', ground)
+        self.assertNotIn('coventina celata', rules)
+
 
 if __name__ == '__main__':
     unittest.main()

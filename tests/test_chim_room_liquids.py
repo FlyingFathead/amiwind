@@ -195,6 +195,48 @@ class RoomLiquidWorldTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 I.room_map(path, 'fixture', record, BOUNDS, {'water': 20.0, 'lava': []})
 
+    def test_water_the_batch_left_out_comes_back_at_the_box_floor(self):
+        """MWSCRIPT-WATER-LEVEL-STATIC-67: a room whose water lies under every placement (Temple Sewers West and six
+        more) had no water node, so nothing could raise its water. Its world now has the plain water plane at the room
+        box's floor plus one unit, which the engine moves to the cell's level (aw_water.c finds it: the root node, the
+        open air in front, the water behind, the two "*water" faces), with the batches' texture made from the palette
+        when the compiled map has none; without a palette such a room is refused as any room lacking a texture."""
+        bsp, record = fixture_room(textures=('voidwall',))
+        floor = BOUNDS[0][2] - I.EDGE_MARGIN + 1.0
+        with tempfile.TemporaryDirectory() as tmp:
+            path, palette = Path(tmp) / 'fixture.bsp', Path(tmp) / 'palette.lmp'
+            path.write_bytes(bsp)
+            palette.write_bytes(bytes(v for i in range(256) for v in (i, (i * 3) % 256, (255 - i))))
+            data, report = I.room_map(path, 'fixture', record, BOUNDS, {'water': None, 'lava': [], 'water_floor': True},
+                                      palette=palette)
+            # the image step's task carries the palette to the room map
+            task = (str(path), 'fixture', str(Path(tmp) / 'rooms' / 'fixture.crm'), BOUNDS,
+                    {'water': None, 'lava': [], 'water_floor': True}, None, str(palette))
+            (Path(tmp) / 'rooms').mkdir()
+            (Path(tmp) / 'rooms' / 'fixture.crm').write_bytes(record)
+            self.assertEqual(I._room_map_task(task)[1], data)
+            with self.assertRaises(ValueError):
+                I.room_map(path, 'fixture', record, BOUNDS, {'water': None, 'lava': [], 'water_floor': True})
+        lumps = F.read_brush_image(data)
+        root = struct.unpack_from('<9f7i', lumps[14], 0)[9]
+        pn, front, back = struct.unpack_from('<ihh', lumps[5], 24 * root)
+        self.assertEqual(struct.unpack_from('<4f', lumps[1], 20 * pn), (0.0, 0.0, 1.0, floor))
+        self.assertEqual([struct.unpack_from('<i', lumps[10], 28 * (-1 - c))[0] for c in (front, back)], [-1, -3])
+        self.assertEqual(contents(lumps, (0.0, 0.0, floor - 0.5)), -3)
+        self.assertEqual(contents(lumps, (0.0, 0.0, floor + 0.5)), -1)
+        self.assertEqual(contents(lumps, (0.0, 0.0, 16.0)), -1)             # every placement stands in the open air
+        faces = world_faces(lumps)
+        self.assertEqual(sorted(f[2] for f in faces), [0, 1])
+        for name, flags, _, zs in faces:
+            self.assertEqual((name, flags & 1), ('*water', 1))
+            self.assertTrue(all(abs(z - floor) < 1e-4 for z in zs))
+        tex = lumps[2]
+        offsets = struct.unpack_from('<%di' % struct.unpack_from('<i', tex)[0], tex, 4)
+        heads = {tex[o:o + 16].split(b'\0')[0]: struct.unpack_from('<II', tex, o + 16) for o in offsets}
+        self.assertEqual(heads[b'*water'], (64, 64))
+        self.assertEqual(report['liquids']['water'], floor)
+        self.assertTrue(report['liquids']['water_floor'])
+
 
 def room_work(tmp, water=None, pools=(), water_brush=None):
     """A converted room's work folder as prepare_area.build_room leaves it: conversion.json and room.map."""
@@ -240,6 +282,32 @@ class RoomLiquidSourceTests(unittest.TestCase):
         self.assertIsNone(liquids['water'])
         self.assertEqual(liquids['lava'][0]['top'], -12.5)
         self.assertEqual(sorted(map(tuple, liquids['lava'][0]['hull'])), sorted(map(tuple, hull)))
+
+    def test_water_under_every_placement_asks_for_a_floor_plane(self):
+        """The room batch's own note (tools/chim_room_batches.py water_plane) for a level under every placement: no
+        brush, no room.map; the liquids ask for the floor plane (room_map). With lava pools the room keeps none."""
+        import chim_room_batches as S
+        level, top, note = S.water_plane(-1500.0, -382.1, 256.4)        # Temple Sewers West's numbers
+        self.assertIsNone(level)
+        self.assertIn('under every placement', note)
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp) / 'room'
+            work.mkdir()
+            (work / 'conversion.json').write_text(json.dumps({'water_height': None, 'water_note': note,
+                                                              'lava': {'mode': 'quake', 'pools': []}}))
+            self.assertEqual(I.room_liquids(work), ({'water': None, 'lava': [], 'water_floor': True}, None))
+            self.assertIsNone(I.unsupported(work))
+        with tempfile.TemporaryDirectory() as tmp:
+            hull = [[10.0, 0.0], [40.0, 5.0], [30.0, 30.0], [5.0, 20.0]]
+            work = room_work(tmp, pools=[(hull, -12.5)])
+            conversion = json.loads((work / 'conversion.json').read_text())
+            (work / 'conversion.json').write_text(json.dumps(dict(conversion, water_note=note)))
+            liquids, why = I.room_liquids(work)
+        self.assertIsNone(why)
+        self.assertNotIn('water_floor', liquids)
+        self.assertIsNone(liquids['water'])
+        # a note of the other kind (water over every placement keeps its level) asks for nothing new
+        self.assertIsNotNone(S.water_plane(1200.0, -382.1, 256.4)[0])
 
     def test_mismatches_keep_the_room_map_lava_under_water_comes_over(self):
         with tempfile.TemporaryDirectory() as tmp:

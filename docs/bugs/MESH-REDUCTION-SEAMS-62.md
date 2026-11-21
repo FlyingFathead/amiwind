@@ -1,5 +1,16 @@
 # MESH-REDUCTION-SEAMS-62: Reduced actor models lose seams and thin their limbs, and nothing compared them with the original
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 4 times; something has to be done
+
+- Reported with v0.0.67 at 2026-11-20 15:55 +0200: Seen again on the v0.0.67 release image: in the NPC gallery the first character has his head detached from his body, and a named tame guar has its surface torn open. Reduced actor models are again losing their seams; the commit that broke it is to be found and a test written that fails on the old behaviour.
+- Reported with v0.0.67 at 2026-11-20 16:00 +0200: More characters of the NPC gallery show gaps and openings between body parts, and thin arms and hands whose width does not match the original. The widths and openings of reduced models are to be measured against the original (circumference or volume of the limbs).
+- Reported with v0.0.67 at 2026-11-20 16:04 +0200: Thin arms and hands of reduced character models again show up in the gallery; the reduced parts are to keep the outer measures of the original (the width, circumference or volume of each limb).
+- Reported with v0.0.67 at 2026-11-20 16:09 +0200: Another creature of the gallery, a Dagoth ash vampire, is drawn with its parts torn apart and its surface scattered. The reduced parts are to be stitched so that the outer hull has no gap and the outer dimensions of the original stay.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -19,12 +30,27 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-07: reported in v0.0.62-dev1
+- 2026-11-20 15:55 +0200: seen again in v0.0.67: Seen again on the v0.0.67 release image: in the NPC gallery the first character has his head detached from his body, and a named tame guar has its surface torn open.
+- 2026-11-20 16:00 +0200: seen again in v0.0.67: More characters of the NPC gallery show gaps and openings between body parts, and thin arms and hands whose width does not match the original.
+- 2026-11-20 16:04 +0200: seen again in v0.0.67: Thin arms and hands of reduced character models again show up in the gallery; the reduced parts are to keep the outer measures of the original (the width, circumference or volume of each limb).
+- 2026-11-20 16:09 +0200: seen again in v0.0.67: Another creature of the gallery, a Dagoth ash vampire, is drawn with its parts torn apart and its surface scattered.
+
+<!-- END GENERATED TIMELINE -->
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
 
 Family: Mesh converter geometry (`converter-geometry`). Converted faces must be planar, wound to their plane, non-degenerate and within engine ranges; checked by the face validator. See [families](README.md#families).
 
+- [ACTOR-BAKE-NO-SEAM-STOP-68](ACTOR-BAKE-NO-SEAM-STOP-68.md): The creature library's default bake route and the residents' bake run no seam check, so models with open seams and thinned limbs reach the image unjudged
 - [ASH-TREE-HOLES-62](ASH-TREE-HOLES-62.md): The reduced-polygon ash tree in the Ashlands shows holes in its surface
 - [ATRONACH-FLAME-MESH-62](ATRONACH-FLAME-MESH-62.md): The flame atronach's reduced mesh is broken and it has no flames
 - [AW-20260928-21](AW-20260928-21.md): Exterior Census door/wall overlap
@@ -34,6 +60,7 @@ Family: Mesh converter geometry (`converter-geometry`). Converted faces must be 
 - BSP-LIGHT-01 (no report page): Vodunius face lightmap range exceeded its lighting lump
 - [BUILD-INTERIOR-INDEX-ROUTED-33](BUILD-INTERIOR-INDEX-ROUTED-33.md): Full build stops in the interior stage: the prison ship collision index expects a convex-piece chain, but the converter now routes large standing hulls
 - [BUILD-SEYDA-OCEAN-FLOOR-40](BUILD-SEYDA-OCEAN-FLOOR-40.md): Expanded Seyda ocean terrain collapses onto the fixed BSP seal
+- [CANDLESTICK-CANDLES-FLOAT-67](CANDLESTICK-CANDLES-FLOAT-67.md): The candles of the three-candle Silver Candlestick do not touch the holder and seem to float
 - [CENSUS-SHELF-PLATE-BAKED-67](CENSUS-SHELF-PLATE-BAKED-67.md): Census and Excise Office: a plate on the bookshelf is drawn as part of the room and cannot be taken, although in the original it is a separate item
 - [CHIM-CAVE21-NONCONVEX-FACE-48](CHIM-CAVE21-NONCONVEX-FACE-48.md): The cave piece shared by in_moldcave_21, in_mudcave_21, in_pycave_21 and in_lavacave_21 has a non-convex face, so its collision falls back to the piece chain in every room that uses it
 - [CHIM-COLLISION-ROOM-FILLED-54](CHIM-COLLISION-ROOM-FILLED-54.md): One convex collision piece fills the room above a floor of the same mesh: seven trapdoors and a Redoran hut door cannot be used
@@ -82,5 +109,6 @@ Family: Mesh converter geometry (`converter-geometry`). Converted faces must be 
 Related bugs in other categories:
 
 - [PLAYER-BODY-LEG-SHAPE-39](PLAYER-BODY-LEG-SHAPE-39.md): Nord player legs appear abnormally thin in RC1
+- [SKEL-POSE-GRID-THINS-LIMBS-68](SKEL-POSE-GRID-THINS-LIMBS-68.md): A skeletal model's rest frame is stored on a byte grid spanning every pose, which thins narrow limbs as drawn
 
 <!-- END GENERATED CATEGORY -->

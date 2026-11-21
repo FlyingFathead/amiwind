@@ -1,12 +1,12 @@
 # The original game's console commands in AmiWind
 
-_Last updated with AmiWind v0.0.64-dev4 (11 November 2026)._
+_Last updated with AmiWind v0.0.68-dev3 (20 November 2026)._
 
 Debug steps written for the original game work in AmiWind's console as typed: an original console command that does not clash with one of AmiWind's runs AmiWind's own command for the same job, or runs through the game's script interpreter as a script line would. The names are matched without regard to case, the short and long forms alike (tgm and ToggleGodMode). A line may name its target first (player->SetStrength 50); arguments are separated by spaces or commas, and an id with spaces goes in quotes. These names are not listed in dbg help; dbg help mw (or dbg mw help) lists them page by page. A line without a target runs on the console target, chosen with dbg mw target from a list of the references on the map (typed to filter by name, id or kind, nearest first; the input line shows it), or on the player when none is chosen. Item and spell ids are found in the actor table (what an actor carries or a script names), so such a line may take a moment.
 
 With thanks to the UESP for its Morrowind:Console page (https://en.uesp.net/wiki/Morrowind:Console), which lists the original's commands; the list here is also checked against OpenMW 0.51.
 
-392 commands: 22 alias, 282 vm, 3 collision, 72 planned, 13 not applicable.
+395 commands: 22 alias, 309 vm, 3 collision, 48 planned, 13 not applicable.
 
 Very high values of Speed or Acrobatics (SetSpeed, SetAcrobatics) make the player hard to control, as in the original.
 
@@ -30,7 +30,7 @@ These names are AmiWind's own commands; AmiWind's meaning is kept.
 | addspell |  | Stats | works (run as a script line) | the MWScript host (aw_mwhost.c host_spell), on any reference by id-> or the console target |
 | addtolevcreature |  | Misc | planned | not carried out yet: the levelled lists are read from the actor table on disk; an edit needs a saved change list |
 | addtolevitem |  | Misc | planned | not carried out yet: the levelled lists are read from the actor table on disk; an edit needs a saved change list |
-| addtopic |  | Dialogue | planned | its arguments are worked out by the compiler (the topic row) |
+| addtopic |  | Dialogue | works (run as a script line) | the MWScript host (aw_mwhost.c console_spells: the topic by its name, then the call a compiled AddTopic makes) |
 | aiactivate |  | Ai | planned | not carried out yet: the ambient tables have no package that walks to an object and uses it |
 | aiescort |  | Ai | works (run as a script line) | the MWScript host (aw_mwhost.c host_call AIEscort), on any reference by id-> or the console target |
 | aiescortcell |  | Ai | planned | its arguments are worked out by the compiler (the room number) |
@@ -38,13 +38,13 @@ These names are AmiWind's own commands; AmiWind's meaning is kept.
 | aifollowcell |  | Ai | planned | its arguments are worked out by the compiler (the room number) |
 | aitravel |  | Ai | works (run as a script line) | the MWScript host (aw_mwhost.c host_call AITravel), on any reference by id-> or the console target |
 | aiwander |  | Ai | works (run as a script line) | the MWScript host (aw_mwhost.c host_wander), on any reference by id-> or the console target |
-| becomewerewolf |  | Stats | planned | its arguments are worked out by the compiler (the werewolf settings) |
+| becomewerewolf |  | Stats | works (run as a script line) | the MWScript host (aw_mwhost.c console_werewolf: the werewolf's game settings from the compiled scripts, then the call a compiled BecomeWerewolf makes): the player takes the werewolf's attributes and skills, his own kept for UndoWerewolf, his equipped items taken off; an NPC by id-> counts as a werewolf |
 | betacomment | bc | Misc | not applicable | editor note |
-| cast |  | Misc | planned | its arguments are worked out by the compiler (the spell's effect row) |
+| cast |  | Misc | works (run as a script line) | the MWScript host (aw_mwhost.c console_spells: the spell by its id; the player selects it, anything else casts it on the target by the call a compiled Cast makes) |
 | cellchanged |  | Cell | planned | an interpreter opcode with compiled arguments (a sound, topic, script or message row) |
 | centeroncell | coc | Cell | works (AmiWind's own command) | dbg tp "<cell>" |
 | centeronexterior | coe | Cell | works (AmiWind's own command) | dbg tp <x*8192+4096> <y*8192+4096> |
-| changeweather |  | Sky | planned | its arguments are worked out by the compiler (the region index) |
+| changeweather |  | Sky | works (run as a script line) | the MWScript host (aw_mwhost.c console_weather: the region by its id in the compiled scripts' region table, then the call a compiled ChangeWeather makes): the region's weather 0 (clear) to 9 (blizzard) until its next weather change; a region the image has not is named with the image's regions |
 | choice |  | Misc | planned | its arguments are worked out by the compiler (a dialogue result only) |
 | clearforcejump |  | Control | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | clearforcemovejump |  | Misc | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
@@ -55,7 +55,7 @@ These names are AmiWind's own commands; AmiWind's meaning is kept.
 | disablelevitation |  | Misc | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | disableteleporting |  | Misc | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | dontsaveobject |  | Misc | planned | an interpreter opcode with compiled arguments (a sound, topic, script or message row) |
-| drop |  | Misc | planned | its arguments are worked out by the compiler (the item's row) |
+| drop |  | Misc | works (run as a script line) | the MWScript host (aw_mwhost.c console_spells: the item by its id among those the game's Drop and Place calls name, then the call a compiled Drop makes): from the target (id-> or the console target) |
 | dropsoulgem |  | Misc | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | enable |  | Misc | works (run as a script line) | the MWScript host (aw_mwhost.c host_object), on any reference by id-> or the console target |
 | enablebirthmenu |  | Gui | works (AmiWind's own command) | dbg quickchar birthsign |
@@ -72,7 +72,7 @@ These names are AmiWind's own commands; AmiWind's meaning is kept.
 | enablestatsmenu |  | Gui | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | enableteleporting |  | Misc | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | equip |  | Container | works (run as a script line) | the MWScript host (aw_mwhost.c the inventory's equip (the player only)), on any reference by id-> or the console target |
-| explodespell |  | Misc | planned | its arguments are worked out by the compiler (the spell's row) |
+| explodespell |  | Misc | works (run as a script line) | the MWScript host (aw_mwhost.c console_spells: the spell by its id, then the call a compiled ExplodeSpell makes): at the target (id-> or the console target) |
 | face |  | Ai | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | fadein |  | Misc | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | fadeout |  | Misc | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
@@ -110,7 +110,7 @@ These names are AmiWind's own commands; AmiWind's meaning is kept.
 | getdisabled |  | Misc | works (run as a script line) | the MWScript host (aw_mwhost.c host_object), on any reference by id-> or the console target |
 | getdisposition |  | Stats | works (run as a script line) | the MWScript host by the compiler's function table (host_actor), on any reference by id-> or the console target |
 | getdistance |  | Transformation | works (run as a script line) | the MWScript host by the compiler's function table (host_distance), on any reference by id-> or the console target |
-| geteffect |  | Misc | planned | its arguments are worked out by the compiler (the effect number) |
+| geteffect |  | Misc | works (run as a script line) | the MWScript host (aw_mwhost.c console_spells: the effect by its game setting id or its number, then the call a compiled GetEffect makes): 1 while an effect of it is on the target |
 | getenchant |  | Stats | works (run as a script line) | the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target |
 | getendurance |  | Stats | works (run as a script line) | the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target |
 | getfactionreaction |  | Dialogue | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
@@ -165,10 +165,12 @@ These names are AmiWind's own commands; AmiWind's meaning is kept.
 | getsecurity |  | Stats | works (run as a script line) | the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target |
 | getshortblade |  | Stats | works (run as a script line) | the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target |
 | getsneak |  | Stats | works (run as a script line) | the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target |
+| getsoundplaying |  | Sound | works (run as a script line) | the MWScript host (aw_mwhost.c console_sound: the sound by its id among the sounds the game's scripts name): 1 while that sound plays on the target, else 0 |
 | getspear |  | Stats | works (run as a script line) | the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target |
 | getspeechcraft |  | Stats | works (run as a script line) | the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target |
 | getspeed |  | Stats | works (run as a script line) | the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target |
 | getspell |  | Stats | works (run as a script line) | the MWScript host by the compiler's function table (host_spell), on any reference by id-> or the console target |
+| getspelleffects |  | Misc | works (run as a script line) | the MWScript host (aw_mwhost.c console_spells: the spell by its id, then the call a compiled GetSpellEffects makes): 1 while an effect of it is on the target |
 | getsquareroot |  | Misc | planned | an interpreter opcode with compiled arguments (a sound, topic, script or message row) |
 | getstandingpc |  | Misc | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | getstartingpos |  | Transformation | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
@@ -184,6 +186,7 @@ These names are AmiWind's own commands; AmiWind's meaning is kept.
 | getwindspeed |  | Misc | planned | not carried out yet: the weather has no wind speed yet |
 | goodbye |  | Dialogue | planned | its arguments are worked out by the compiler (a dialogue result only) |
 | gotojail |  | Misc | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
+| hasitemequipped |  | Misc | works (run as a script line) | the MWScript host (aw_mwhost.c console_spells: the item by its id, then the call a compiled HasItemEquipped makes): 1 when the target wears or holds it |
 | hassoulgem |  | Container | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | help |  | Misc | AmiWind's own command of that name | AmiWind's help (dbg help); the original's list of commands is under dbg help mw |
 | hitattemptonme |  | Misc | planned | not carried out yet: the combat layer keeps only the blows that land (HitOnMe); a missed swing is not kept |
@@ -237,7 +240,7 @@ These names are AmiWind's own commands; AmiWind's meaning is kept.
 | modpcfacrep |  | Stats | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | modpcvisionbonus |  | Stats | planned | not carried out yet: the renderer has no player-side brightness term (Night Eye) yet; it needs an A/B on the Pi |
 | modpersonality |  | Stats | works (run as a script line) | the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target |
-| modregion |  | Sky | planned | its arguments are worked out by the compiler (the region index) |
+| modregion |  | Sky | works (run as a script line) | the MWScript host (aw_mwhost.c console_weather: the region by its id in the compiled scripts' region table, then the call a compiled ModRegion makes): the region's chances for the rest of the game, up to ten in the weathers' order, each 0 to 100, the ones not given 0; saved |
 | modreputation |  | Dialogue | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | modrestoration |  | Stats | works (run as a script line) | the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target |
 | modscale |  | Transformation | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
@@ -249,7 +252,7 @@ These names are AmiWind's own commands; AmiWind's meaning is kept.
 | modspeed |  | Stats | works (run as a script line) | the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target |
 | modstrength |  | Stats | works (run as a script line) | the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target |
 | modunarmored |  | Stats | works (run as a script line) | the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target |
-| modwaterlevel |  | Cell | planned | not carried out yet: a room's water is baked into its map; moving it needs moving water in the engine |
+| modwaterlevel |  | Cell | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | modwillpower |  | Stats | works (run as a script line) | the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target |
 | move |  | Transformation | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | moveworld |  | Transformation | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
@@ -270,18 +273,18 @@ These names are AmiWind's own commands; AmiWind's meaning is kept.
 | pcjoinfaction |  | Stats | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | pclowerrank |  | Stats | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | pcraiserank |  | Stats | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
-| placeatme |  | Transformation | planned | its arguments are worked out by the compiler (the placing rows) |
-| placeatpc |  | Transformation | planned | its arguments are worked out by the compiler (the placing rows) |
-| placeitem |  | Transformation | planned | its arguments are worked out by the compiler (the placing rows) |
-| placeitemcell |  | Transformation | planned | its arguments are worked out by the compiler (the placing rows) |
+| placeatme |  | Transformation | works (run as a script line) | the MWScript host (aw_mwhost.c console_place: the object by its id among those the game's Place calls name, then the call a compiled PlaceAtMe makes): at the target (id-> or the console target) |
+| placeatpc |  | Transformation | works (run as a script line) | the MWScript host (aw_mwhost.c console_place: the object by its id among those the game's Place calls name, then the call a compiled PlaceAtPC makes) |
+| placeitem |  | Transformation | works (run as a script line) | the MWScript host (aw_mwhost.c console_place: the object by its id among those the game's Place calls name, then the call a compiled PlaceItem makes): in the player's cell |
+| placeitemcell |  | Transformation | planned | its arguments are worked out by the compiler (the placing rows and the cell's room and place) |
 | playbink |  | Misc | not applicable | the original's video player (AmiWind: dbg playvid) |
 | playgroup |  | Animation | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
-| playloopsound3d |  | Misc | planned | an interpreter opcode with compiled arguments (a sound, topic, script or message row) |
-| playloopsound3dvp |  | Misc | planned | an interpreter opcode with compiled arguments (a sound, topic, script or message row) |
-| playsound |  | Sound | planned | an interpreter opcode with compiled arguments (a sound, topic, script or message row) |
-| playsound3d |  | Sound | planned | an interpreter opcode with compiled arguments (a sound, topic, script or message row) |
-| playsound3dvp |  | Sound | planned | an interpreter opcode with compiled arguments (a sound, topic, script or message row) |
-| playsoundvp |  | Sound | planned | an interpreter opcode with compiled arguments (a sound, topic, script or message row) |
+| playloopsound3d |  | Misc | planned | runs in scripts; typed on the console not yet: a loop runs while the script that starts it runs; a typed loop has no script to keep it going, and the original's StopSound that ends it is AmiWind's own stopsound here |
+| playloopsound3dvp |  | Misc | planned | runs in scripts; typed on the console not yet: a loop runs while the script that starts it runs; a typed loop has no script to keep it going, and the original's StopSound that ends it is AmiWind's own stopsound here |
+| playsound |  | Sound | works (run as a script line) | the MWScript host (aw_mwhost.c console_sound: the sound by its id among the sounds the game's scripts name, then the call a compiled PlaySound makes): on the listener |
+| playsound3d |  | Sound | works (run as a script line) | the MWScript host (aw_mwhost.c console_sound: the sound by its id among the sounds the game's scripts name, then the call a compiled PlaySound3D makes): at the target (id-> or the console target) |
+| playsound3dvp |  | Sound | works (run as a script line) | the MWScript host (aw_mwhost.c console_sound, as PlaySound3D with the volume; the engine's mixer has no pitch) |
+| playsoundvp |  | Sound | works (run as a script line) | the MWScript host (aw_mwhost.c console_sound, as PlaySound with the volume; the engine's mixer has no pitch) |
 | position |  | Transformation | works (run as a script line) | the MWScript host (aw_mwhost.c host_call Position), on any reference by id-> or the console target |
 | positioncell |  | Transformation | works (run as a script line) | the MWScript host (aw_mwhost.c dbg tp to the cell (the player only)), on any reference by id-> or the console target |
 | raiserank |  | Stats | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
@@ -293,7 +296,7 @@ These names are AmiWind's own commands; AmiWind's meaning is kept.
 | removeitem |  | Container | works (run as a script line) | the MWScript host (aw_mwhost.c host_item), on any reference by id-> or the console target |
 | removesoulgem |  | Misc | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | removespell |  | Stats | works (run as a script line) | the MWScript host (aw_mwhost.c host_spell), on any reference by id-> or the console target |
-| removespelleffects |  | Misc | planned | its arguments are worked out by the compiler (the spell's row) |
+| removespelleffects |  | Misc | works (run as a script line) | the MWScript host (aw_mwhost.c console_spells: the spell by its id, then the call a compiled RemoveSpellEffects makes): on the target (id-> or the console target) |
 | repairedonme |  | Misc | works (AmiWind's own command) | echo 0 (as OpenMW 0.51: always 0) |
 | resetactors | ra | Transformation | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | resurrect |  | Stats | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
@@ -301,8 +304,8 @@ These names are AmiWind's own commands; AmiWind's meaning is kept.
 | rotateworld |  | Transformation | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | samefaction |  | Dialogue | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | say |  | Sound | AmiWind's own command of that name | the engine's chat line (say); the script function Say runs from scripts |
-| saydone |  | Sound | planned | an interpreter opcode with compiled arguments (a sound, topic, script or message row) |
-| scriptrunning |  | Misc | planned | an interpreter opcode with compiled arguments (a sound, topic, script or message row) |
+| saydone |  | Sound | works (run as a script line) | the MWScript host (aw_mwhost.c console_sound, the call a compiled SayDone makes): 1 when the target's spoken line has ended, else 0 |
+| scriptrunning |  | Misc | works (run as a script line) | the MWScript host (aw_mwhost.c console_script: the global script by its id, found by its name hash in the compiled scripts): 1 while it runs, else 0 |
 | setacrobatics |  | Stats | works (run as a script line) | the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target |
 | setagility |  | Stats | works (run as a script line) | the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target |
 | setalarm |  | Ai | works (run as a script line) | the MWScript host by the compiler's function table (host_actor), on any reference by id-> or the console target |
@@ -358,8 +361,8 @@ These names are AmiWind's own commands; AmiWind's meaning is kept.
 | setspeed |  | Stats | works (run as a script line) | the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target |
 | setstrength |  | Stats | works (run as a script line) | the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target |
 | setunarmored |  | Stats | works (run as a script line) | the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target |
-| setwaterlevel |  | Cell | planned | not carried out yet: a room's water is baked into its map; moving it needs moving water in the engine |
-| setwerewolfacrobatics |  | Misc | planned | its arguments are worked out by the compiler (the werewolf settings) |
+| setwaterlevel |  | Cell | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
+| setwerewolfacrobatics |  | Misc | works (run as a script line) | the MWScript host (aw_mwhost.c console_werewolf: the game setting fWereWolfAcrobatics from the compiled scripts, then the call a compiled SetWerewolfAcrobatics makes): the player's Acrobatics |
 | setwillpower |  | Stats | works (run as a script line) | the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target |
 | show |  | Misc | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | showmap |  | Gui | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
@@ -368,11 +371,11 @@ These names are AmiWind's own commands; AmiWind's meaning is kept.
 | showvars | sv | Misc | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |
 | skipanim |  | Animation | planned | not carried out yet: the animation kit has no per-frame skip |
 | startcombat |  | Ai | works (run as a script line) | the MWScript host by the compiler's function table (host_combat), on any reference by id-> or the console target |
-| startscript |  | Misc | planned | an interpreter opcode with compiled arguments (a sound, topic, script or message row) |
+| startscript |  | Misc | works (run as a script line) | the MWScript host (aw_mwhost.c console_script: the global script by its id, found by its name hash in the compiled scripts, started as a compiled StartScript starts it; saved, New Game resets it) |
 | stopcombat |  | Ai | works (run as a script line) | the MWScript host by the compiler's function table (host_combat), on any reference by id-> or the console target |
-| stopscript |  | Misc | planned | an interpreter opcode with compiled arguments (a sound, topic, script or message row) |
+| stopscript |  | Misc | works (run as a script line) | the MWScript host (aw_mwhost.c console_script: the global script by its id, found by its name hash in the compiled scripts, stopped as a compiled StopScript stops it; saved, New Game resets it) |
 | stopsound |  | Sound | AmiWind's own command of that name | the engine's stopsound (all sounds); the script function StopSound runs from scripts |
-| streammusic |  | Sound | planned | an interpreter opcode with compiled arguments (a sound, topic, script or message row) |
+| streammusic |  | Sound | works (run as a script line) | the MWScript host (aw_mwhost.c console_sound: the file a script names, else its soundtrack number by the file's stem from the music catalogue, then played once as a compiled StreamMusic plays it, the playlist after it) |
 | t3d |  | Misc | not applicable | renderer test |
 | testcells |  | Cell | planned | not carried out yet: loading every exterior cell in turn: a test of a desktop engine, far beyond a 32 MB machine |
 | testinteriorcells |  | Cell | planned | not carried out yet: loading every interior cell in turn: a test of a desktop engine, far beyond a 32 MB machine |
@@ -403,7 +406,7 @@ These names are AmiWind's own commands; AmiWind's meaning is kept.
 | togglestats | tst | Console | works (AmiWind's own command) | dbg fps (the FPS counter, toggles) |
 | toggletexturestring | tts | Console | not applicable | original renderer readout |
 | togglevanitymode | tvm | Misc | works (AmiWind's own command) | dbg vanitycam on |
-| togglewater | twa | Misc | planned | not carried out yet: a room's water is baked into its map as world surfaces; the renderer has no switch to leave it out |
+| togglewater | twa | Misc | planned | not carried out yet: a room's water is drawn as its map's world surfaces; the renderer has no switch to leave it out |
 | togglewireframe | twf | Misc | not applicable | renderer |
 | toggleworld | tw | Misc | planned | not carried out yet: the renderer has no switch to leave out the world map while drawing the objects |
 | turnmoonred |  | Sky | works (run as a script line) | the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target |

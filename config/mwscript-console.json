@@ -64,9 +64,8 @@
     "OpenMW 0.51"
    ],
    "group": "Dialogue",
-   "state": "planned",
-   "amiwind": "",
-   "why": "its arguments are worked out by the compiler (the topic row)"
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_spells: the topic by its name, then the call a compiled AddTopic makes)"
   },
   {
    "name": "aiactivate",
@@ -140,9 +139,8 @@
     "OpenMW 0.51"
    ],
    "group": "Stats",
-   "state": "planned",
-   "amiwind": "",
-   "why": "its arguments are worked out by the compiler (the werewolf settings)"
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_werewolf: the werewolf's game settings from the compiled scripts, then the call a compiled BecomeWerewolf makes): the player takes the werewolf's attributes and skills, his own kept for UndoWerewolf, his equipped items taken off; an NPC by id-> counts as a werewolf"
   },
   {
    "name": "betacomment",
@@ -161,9 +159,8 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "its arguments are worked out by the compiler (the spell's effect row)"
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_spells: the spell by its id; the player selects it, anything else casts it on the target by the call a compiled Cast makes)"
   },
   {
    "name": "cellchanged",
@@ -203,9 +200,8 @@
     "OpenMW 0.51"
    ],
    "group": "Sky",
-   "state": "planned",
-   "amiwind": "",
-   "why": "its arguments are worked out by the compiler (the region index)"
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_weather: the region by its id in the compiled scripts' region table, then the call a compiled ChangeWeather makes): the region's weather 0 (clear) to 9 (blizzard) until its next weather change; a region the image has not is named with the image's regions"
   },
   {
    "name": "choice",
@@ -306,9 +302,8 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "its arguments are worked out by the compiler (the item's row)"
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_spells: the item by its id among those the game's Drop and Place calls name, then the call a compiled Drop makes): from the target (id-> or the console target)"
   },
   {
    "name": "dropsoulgem",
@@ -460,9 +455,8 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "its arguments are worked out by the compiler (the spell's row)"
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_spells: the spell by its id, then the call a compiled ExplodeSpell makes): at the target (id-> or the console target)"
   },
   {
    "name": "face",
@@ -807,9 +801,8 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "its arguments are worked out by the compiler (the effect number)"
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_spells: the effect by its game setting id or its number, then the call a compiled GetEffect makes): 1 while an effect of it is on the target"
   },
   {
    "name": "getenchant",
@@ -1301,6 +1294,15 @@
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
   },
   {
+   "name": "getsoundplaying",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Sound",
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_sound: the sound by its id among the sounds the game's scripts name): 1 while that sound plays on the target, else 0"
+  },
+  {
    "name": "getspear",
    "sources": [
     "original"
@@ -1335,6 +1337,15 @@
    "group": "Stats",
    "state": "vm",
    "amiwind": "the MWScript host by the compiler's function table (host_spell), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getspelleffects",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_spells: the spell by its id, then the call a compiled GetSpellEffects makes): 1 while an effect of it is on the target"
   },
   {
    "name": "getsquareroot",
@@ -1473,6 +1484,15 @@
    "group": "Misc",
    "state": "vm",
    "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "hasitemequipped",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_spells: the item by its id, then the call a compiled HasItemEquipped makes): 1 when the target wears or holds it"
   },
   {
    "name": "hassoulgem",
@@ -1960,9 +1980,8 @@
     "OpenMW 0.51"
    ],
    "group": "Sky",
-   "state": "planned",
-   "amiwind": "",
-   "why": "its arguments are worked out by the compiler (the region index)"
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_weather: the region by its id in the compiled scripts' region table, then the call a compiled ModRegion makes): the region's chances for the rest of the game, up to ten in the weathers' order, each 0 to 100, the ones not given 0; saved"
   },
   {
    "name": "modreputation",
@@ -2069,9 +2088,8 @@
     "OpenMW 0.51"
    ],
    "group": "Cell",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out yet: a room's water is baked into its map; moving it needs moving water in the engine"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "modwillpower",
@@ -2260,9 +2278,8 @@
     "OpenMW 0.51"
    ],
    "group": "Transformation",
-   "state": "planned",
-   "amiwind": "",
-   "why": "its arguments are worked out by the compiler (the placing rows)"
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_place: the object by its id among those the game's Place calls name, then the call a compiled PlaceAtMe makes): at the target (id-> or the console target)"
   },
   {
    "name": "placeatpc",
@@ -2270,9 +2287,8 @@
     "OpenMW 0.51"
    ],
    "group": "Transformation",
-   "state": "planned",
-   "amiwind": "",
-   "why": "its arguments are worked out by the compiler (the placing rows)"
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_place: the object by its id among those the game's Place calls name, then the call a compiled PlaceAtPC makes)"
   },
   {
    "name": "placeitem",
@@ -2280,9 +2296,8 @@
     "OpenMW 0.51"
    ],
    "group": "Transformation",
-   "state": "planned",
-   "amiwind": "",
-   "why": "its arguments are worked out by the compiler (the placing rows)"
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_place: the object by its id among those the game's Place calls name, then the call a compiled PlaceItem makes): in the player's cell"
   },
   {
    "name": "placeitemcell",
@@ -2292,7 +2307,7 @@
    "group": "Transformation",
    "state": "planned",
    "amiwind": "",
-   "why": "its arguments are worked out by the compiler (the placing rows)"
+   "why": "its arguments are worked out by the compiler (the placing rows and the cell's room and place)"
   },
   {
    "name": "playbink",
@@ -2320,7 +2335,7 @@
    "group": "Misc",
    "state": "planned",
    "amiwind": "",
-   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+   "why": "runs in scripts; typed on the console not yet: a loop runs while the script that starts it runs; a typed loop has no script to keep it going, and the original's StopSound that ends it is AmiWind's own stopsound here"
   },
   {
    "name": "playloopsound3dvp",
@@ -2330,7 +2345,7 @@
    "group": "Misc",
    "state": "planned",
    "amiwind": "",
-   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+   "why": "runs in scripts; typed on the console not yet: a loop runs while the script that starts it runs; a typed loop has no script to keep it going, and the original's StopSound that ends it is AmiWind's own stopsound here"
   },
   {
    "name": "playsound",
@@ -2338,9 +2353,8 @@
     "OpenMW 0.51"
    ],
    "group": "Sound",
-   "state": "planned",
-   "amiwind": "",
-   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_sound: the sound by its id among the sounds the game's scripts name, then the call a compiled PlaySound makes): on the listener"
   },
   {
    "name": "playsound3d",
@@ -2348,9 +2362,8 @@
     "OpenMW 0.51"
    ],
    "group": "Sound",
-   "state": "planned",
-   "amiwind": "",
-   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_sound: the sound by its id among the sounds the game's scripts name, then the call a compiled PlaySound3D makes): at the target (id-> or the console target)"
   },
   {
    "name": "playsound3dvp",
@@ -2358,9 +2371,8 @@
     "OpenMW 0.51"
    ],
    "group": "Sound",
-   "state": "planned",
-   "amiwind": "",
-   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_sound, as PlaySound3D with the volume; the engine's mixer has no pitch)"
   },
   {
    "name": "playsoundvp",
@@ -2368,9 +2380,8 @@
     "OpenMW 0.51"
    ],
    "group": "Sound",
-   "state": "planned",
-   "amiwind": "",
-   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_sound, as PlaySound with the volume; the engine's mixer has no pitch)"
   },
   {
    "name": "position",
@@ -2480,9 +2491,8 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "its arguments are worked out by the compiler (the spell's row)"
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_spells: the spell by its id, then the call a compiled RemoveSpellEffects makes): on the target (id-> or the console target)"
   },
   {
    "name": "repairedonme",
@@ -2555,9 +2565,8 @@
     "OpenMW 0.51"
    ],
    "group": "Sound",
-   "state": "planned",
-   "amiwind": "",
-   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_sound, the call a compiled SayDone makes): 1 when the target's spoken line has ended, else 0"
   },
   {
    "name": "scriptrunning",
@@ -2565,9 +2574,8 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_script: the global script by its id, found by its name hash in the compiled scripts): 1 while it runs, else 0"
   },
   {
    "name": "setacrobatics",
@@ -3071,9 +3079,8 @@
     "OpenMW 0.51"
    ],
    "group": "Cell",
-   "state": "planned",
-   "amiwind": "",
-   "why": "not carried out yet: a room's water is baked into its map; moving it needs moving water in the engine"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "setwerewolfacrobatics",
@@ -3081,9 +3088,8 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "its arguments are worked out by the compiler (the werewolf settings)"
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_werewolf: the game setting fWereWolfAcrobatics from the compiled scripts, then the call a compiled SetWerewolfAcrobatics makes): the player's Acrobatics"
   },
   {
    "name": "setwillpower",
@@ -3168,9 +3174,8 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_script: the global script by its id, found by its name hash in the compiled scripts, started as a compiled StartScript starts it; saved, New Game resets it)"
   },
   {
    "name": "stopcombat",
@@ -3187,9 +3192,8 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_script: the global script by its id, found by its name hash in the compiled scripts, stopped as a compiled StopScript stops it; saved, New Game resets it)"
   },
   {
    "name": "stopsound",
@@ -3206,9 +3210,8 @@
     "OpenMW 0.51"
    ],
    "group": "Sound",
-   "state": "planned",
-   "amiwind": "",
-   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_sound: the file a script names, else its soundtrack number by the file's stem from the music catalogue, then played once as a compiled StreamMusic plays it, the playlist after it)"
   },
   {
    "name": "t3d",
@@ -3540,7 +3543,7 @@
    "group": "Misc",
    "state": "planned",
    "amiwind": "",
-   "why": "not carried out yet: a room's water is baked into its map as world surfaces; the renderer has no switch to leave it out"
+   "why": "not carried out yet: a room's water is drawn as its map's world surfaces; the renderer has no switch to leave it out"
   },
   {
    "name": "togglewireframe",

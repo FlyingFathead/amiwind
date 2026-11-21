@@ -261,6 +261,7 @@ modsuperjump host 307 - l
 modswimspeed host 308 - l
 modunarmored actor 2 25 -
 modwaterbreathing host 310 - l
+modwaterlevel host 311 - f
 modwaterwalking host 312 - l
 modwillpower actor 2 2 -
 move host 314 - cf
@@ -368,6 +369,7 @@ setsuperjump host 439 - l
 setswimspeed host 440 - l
 setunarmored actor 1 25 -
 setwaterbreathing host 442 - l
+setwaterlevel host 443 - f
 setwaterwalking host 444 - l
 setwillpower actor 1 2 -
 show host 447 - c

@@ -1361,6 +1361,16 @@ def stage_dependencies(steps, skipped=()):
         # the tracker data counts the districts' world with the base world (TRACKERS-MOURNHOLD-NOT-COUNTED-67)
         if name == 'cell-progress':
             deps = (*deps, *(d for d in ('tribunal-mournhold-data', 'tribunal-mournhold') if d in names))
+        # the module bloodmoon-solstheim (tools/bloodmoon_solstheim_module.py), the same shape: its data folder waits
+        # for nothing; its world reads that folder and the census palette; the image installs the world and reads the
+        # folder's master for the land's region names; the tracker data counts the world. No other stage waits for
+        # the module, and it waits for no world stage.
+        if name == 'bloodmoon-solstheim-data':
+            deps = ()
+        if name == 'bloodmoon-solstheim':
+            deps = tuple(d for d in ('census', 'bloodmoon-solstheim-data') if d in names)
+        if name in ('image', 'cell-progress'):
+            deps = (*deps, *(d for d in ('bloodmoon-solstheim-data', 'bloodmoon-solstheim') if d in names))
         if name == 'image' and 'seam-audit' in names:
             deps = (*deps, 'seam-audit')
         missing = set(deps) - set(names)

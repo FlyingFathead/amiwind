@@ -609,6 +609,25 @@ class ChimWorldTests(unittest.TestCase):
         out = self.run_world(['bigframe'], big=True)[0]
         self.assertIn('bigframe ok', out)
 
+    def test_more_than_64_placements_go_and_stay_gone(self):
+        # CHIM-GONE-LIST-64-CAP-68: the frame's gone placements are a bit per placement it owns (chim_chunks.c
+        # GoneBits, the frame block's third row): 80 of the 400 go in one stay and stay out through chunks leaving and
+        # coming back, one comes back alone, an id of no loaded frame is refused and counted, a new map starts empty.
+        # The old list held 64 a map and refused the 65th, which stayed drawn and solid.
+        out = self.run_world(['gone'], big=True)[0]
+        self.assertIn('gone ok', out)
+        chunks = (SRC / 'chim' / 'chim_chunks.c').read_text(encoding='latin-1')
+        self.assertNotIn('CHIM_GONE_PIDS', chunks)
+        self.assertIn('return chim_frame.drawn + 2 * ((chim_frame.frame.owned_total + 7) >> 3);', chunks)
+        self.assertIn('size = cells * (int)sizeof(short) + 3*bits + 16;', chunks)      # a window's slot the same
+        # the movers' relink keeps a placement gone for its own reason out (chim_room.c)
+        room = (SRC / 'chim' / 'chim_room.c').read_text(encoding='latin-1')
+        self.assertIn('relink = relink && !ChimChunks_GoneNow (pid);', room)
+        self.assertIn('grown = ChimChunks_GoneNow (pid) ? -1 : 1;', room)
+        # the build's fit check counts the third row (tools/chim/heap.py)
+        from chim import heap
+        self.assertEqual(heap.CHUNK_INDEX_BIT_ROWS, 3)
+
     def test_spawn_grafts_the_ring_before_any_trace(self):
         out = self.run_world(['spawn'])[0]
         self.assertIn('spawn ok', out)
@@ -860,6 +879,16 @@ class ChimWorldTests(unittest.TestCase):
         # go, it is no longer solid, and an Enable brings it back.
         out = self.run_world(['roomtake'], placed=True, room=True)[0]
         self.assertIn('roomtake ok', out)
+
+    def test_the_water_plane_relinks_only_the_placements_it_passed(self):
+        # MWSCRIPT-WATER-LEVEL-STATIC-67: a script moves a room's water (aw_water.c through the room loader's hook,
+        # chim_room.c ChimRoom_WaterMoved): only the placements whose side of the plane changed are linked again, the
+        # efrag count stays, a taken placement stays out, nothing before the room is linked or with no room.
+        out = self.run_world(['roomwater'], placed=True, room=True)[0]
+        self.assertIn('roomwater ok', out)
+        source = (SRC / 'chim' / 'chim_room.c').read_text(encoding='utf-8')
+        self.assertIn('void (*aw_water_relink)(float old_z, float new_z) = ChimRoom_WaterMoved;', source)
+        self.assertNotIn('void (*aw_water_relink)', (SRC / 'aw_water.c').read_text(encoding='utf-8'))
 
     def test_a_chim_room_short_of_zone_grows_into_free_fast_ram_then_the_hunk(self):
         # ROOM-AKULAKHAN-HEAP-52: a room map holds nothing but its room; one whose models do not fit the zone and the

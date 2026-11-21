@@ -111,8 +111,8 @@ if ( OnActivate == 1 )
     Activate
     PlaySound "Chime"
 endif
-ModWaterLevel 100
-ModWaterLevel 100
+ModPCVisionBonus 100
+ModPCVisionBonus 100
 End''',
     # the actor record (v0.0.54): stats, items, spells, combat, wander and the dead count reach the host
     'ActorUser': '''Begin ActorUser
@@ -141,7 +141,7 @@ End''',
     'Inert': '''Begin Inert
 float t
 set t to t + GetSecondsPassed
-SetWaterLevel 0.5
+SetPCVisionBonus 0.5
 End''',
     'Looper': '''Begin Looper
 short n
@@ -537,6 +537,213 @@ class WeatherCallTests(unittest.TestCase):
         self.assertTrue(any('a region the image has not' in w for w in c.warnings))
         self.assertEqual(len(calls), 2)                # Mournhold's calls: no code
 
+    def test_the_console_region_table_is_the_compilers_order(self):
+        """v0.0.68 (MW-CONSOLE-COMMANDS-62): RGNS holds the region catalogue's ids in its order, each as its record
+        writes it, and row N is the index a compiled ChangeWeather hands the engine, so an id typed on the console finds
+        the region a script line names. The masters' own ids whose display name differs (Morrowind.esm: Sheogorad,
+        shown as Sheogorad Region; Molag Mar Region, shown as Molag Amur Region): the id is what both name. Snow (8)
+        and blizzard (9) compile as any weather. A region the catalogue lacks (Bloodmoon's) has no row and no code."""
+        from mwscript.awms import decode, region_rows
+        from mwscript.functions import FUNCTION_NUMBERS
+        from mwscript.gamedata import region_catalogue
+        text = ('Begin WeatherTyped\nChangeWeather "sheogorad" 8\nChangeWeather "Molag Mar Region" 9\n'
+                'ChangeWeather "Moesring Mountains Region" 9\nStopScript WeatherTyped\nEnd WeatherTyped\n')
+        records = [record('REGN', sub('NAME', 'Sheogorad'), sub('FNAM', 'Sheogorad Region')),
+                   record('REGN', sub('NAME', 'Molag Mar Region'), sub('FNAM', 'Molag Amur Region'))]
+        d = Path(tempfile.mkdtemp(prefix='aw-mwscript-rgns-'))
+        try:
+            (d / 'Morrowind.esm').write_bytes(master_bytes(dict(SCRIPTS, WeatherTyped=text), records))
+            data = GameData().load(d)
+            prog, compiled = compile_program(data, None, handwritten=(), rooms=ROOMS)
+            f = awms.read(awms.write(prog, compiled, bindings(prog, compiled))[0])
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+        self.assertEqual(region_catalogue(data), ['bitter coast region', 'molag mar region', 'sheogorad'])
+        self.assertEqual(region_rows(data), ['Bitter Coast Region', 'Molag Mar Region', 'Sheogorad'])
+        self.assertEqual(data.regions['sheogorad'], 'Sheogorad Region')      # the display name is not the id
+        names = awms.strings(f)
+        rows = [names[struct.unpack_from('>H', f['RGNS'], 2 * i)[0]] for i in range(f['RGNS_rows'])]
+        self.assertEqual(rows, region_rows(data))
+        self.assertGreater(awms.ORDER.index('RGNS'), awms.ORDER.index('BIND'))   # on disk, not resident
+        c = next(c for c in compiled if c.name == 'WeatherTyped')
+        ops = list(decode(c.code))
+        calls = [i for i, (_, n, a) in enumerate(ops) if n == 'NOTYET' and a[0] == FUNCTION_NUMBERS['changeweather']]
+        self.assertEqual(len(calls), 2)                # Moesring Mountains Region: not in this catalogue, no code
+        for at, (region, weather) in zip(calls, (('Sheogorad', 8), ('Molag Mar Region', 9))):
+            self.assertEqual(ops[at - 2][1:], ('PUSHB', [rows.index(region)]))
+            self.assertEqual(ops[at - 1][1:], ('PUSHB', [weather]))
+
+    def test_the_region_index_is_the_images_table_order(self):
+        """v0.0.68 (REGION-INDEX-BASE-ONLY-68): the region index a script line (and the console, by RGNS) hands the
+        engine is the region's row in the image's own region tables, which the world UI stage writes from the build's
+        masters merged (tools/prepare_world_ui.py region_names / region_weather on mwad.masters.master_path). Since
+        v0.0.66-dev4 that merge holds the expansions' regions; the compiler still counted Morrowind.esm's alone, so with
+        Tribunal and Bloodmoon selected EndGame's "Red Mountain Region" (index 1 of the base game's here) named another
+        row of the image's table. The masters' own region ids: Mournhold Region (Tribunal.esm), Moesring Mountains
+        Region and Brodir Grove Region (Bloodmoon.esm)."""
+        from unittest import mock
+        from mwad.masters import merge
+        from mwscript.awms import decode
+        from mwscript.functions import FUNCTION_NUMBERS
+        from mwscript.gamedata import region_catalogue
+        import prepare_world_ui
+        text = ('Begin RedEnd\nModRegion "Red Mountain Region" 50 50 0 0 0 0 0 0\nChangeWeather "Red Mountain Region" 0\n'
+                'ChangeWeather "Mournhold Region" 5\nChangeWeather "Moesring Mountains Region" 9\nStopScript RedEnd\n'
+                'End RedEnd\n')
+        base = master_bytes(dict(SCRIPTS, RedEnd=text),
+                            [record('REGN', sub('NAME', 'Red Mountain Region'), sub('FNAM', 'Red Mountain Region'))])
+        addon = lambda *regions: b''.join([record('TES3', sub('HEDR', b'\0' * 300), sub('MAST', 'Morrowind.esm'))] +
+                                          [record('REGN', sub('NAME', r), sub('FNAM', r)) for r in regions])
+        tribunal, bloodmoon = addon('Mournhold Region'), addon('Moesring Mountains Region', 'Brodir Grove Region')
+        d = Path(tempfile.mkdtemp(prefix='aw-mwscript-regions-'))
+        try:
+            (d / 'Morrowind.esm').write_bytes(base)
+            (d / 'Tribunal.esm').write_bytes(tribunal)
+            (d / 'Bloodmoon.esm').write_bytes(bloodmoon)
+            found = {}
+            for masters in ('', 'Morrowind.esm,Tribunal.esm,Bloodmoon.esm'):
+                with mock.patch.dict(os.environ, {'AMIWIND_MASTERS': masters}):
+                    data = GameData().load(d)
+                    prog, compiled = compile_program(data, None, handwritten=(), rooms=ROOMS)
+                found[masters] = data, compiled
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+        # the image's own region names, in their row order, as the world UI writes them from the merged masters
+        merged = merge([('Morrowind.esm', base), ('Tribunal.esm', tribunal), ('Bloodmoon.esm', bloodmoon)])
+        for masters, raw in (('', base), ('Morrowind.esm,Tribunal.esm,Bloodmoon.esm', merged)):
+            awn = prepare_world_ui.region_names(raw)
+            n = struct.unpack_from('<I', awn, 4)[0]
+            table = [awn[16 + 64 * i:16 + 64 * (i + 1)].rstrip(b'\0').decode('cp1252') for i in range(n)]
+            data, compiled = found[masters]
+            self.assertEqual([data.regions[r] for r in region_catalogue(data)], table, masters)
+            ops = list(decode(next(c for c in compiled if c.name == 'RedEnd').code))
+            calls = [(i, a) for i, (_, op, a) in enumerate(ops)
+                     if op == 'NOTYET' and a[0] in (FUNCTION_NUMBERS['changeweather'], FUNCTION_NUMBERS['modregion'])]
+            red = table.index('Red Mountain Region')
+            self.assertEqual(ops[calls[0][0] - 9][1:], ('PUSHB', [red]), masters)    # ModRegion's region
+            self.assertEqual(ops[calls[1][0] - 2][1:], ('PUSHB', [red]), masters)    # ChangeWeather's
+            if masters:
+                self.assertEqual(table, ['Bitter Coast Region', 'Brodir Grove Region', 'Moesring Mountains Region',
+                                         'Mournhold Region', 'Red Mountain Region'])
+                self.assertEqual(len(calls), 4)   # Mournhold's and Moesring's lines are code with their expansions
+                self.assertEqual(ops[calls[2][0] - 2][1:], ('PUSHB', [table.index('Mournhold Region')]))
+                self.assertEqual(ops[calls[3][0] - 2][1:], ('PUSHB', [table.index('Moesring Mountains Region')]))
+            else:
+                self.assertEqual(table, ['Bitter Coast Region', 'Red Mountain Region'])
+                self.assertEqual(len(calls), 2)   # the base game alone: those regions are not in its table
+
+
+class WerewolfConsoleTests(unittest.TestCase):
+    """v0.0.68 (MW-CONSOLE-COMMANDS-62, family 2): BecomeWerewolf and SetWerewolfAcrobatics typed on the console read
+    the werewolf's game settings from the compiled file (WERE), the very numbers a compiled line hands the engine. On
+    the masters' own settings (Bloodmoon.esm's GMST fWereWolf*, the two misspelled names fWereWolfIntellegence and
+    fWereWolfMerchantile among them), as the masters' own lines write the calls (Player->BecomeWereWolf,
+    Player->SetWereWolfAcrobatics: WereChangeScript, hircineringScript)."""
+
+    BLOODMOON = {'Strength': 150, 'Intellegence': 0, 'WillPower': 0, 'Agility': 150, 'Speed': 90, 'Endurance': 150,
+                 'Personality': 0, 'Luck': 25, 'Block': 0, 'Armorer': 0, 'MediumArmor': 0, 'HeavyArmor': 0,
+                 'BluntWeapon': 0, 'LongBlade': 0, 'Axe': 0, 'Spear': 0, 'Athletics': 50, 'Enchant': 0,
+                 'Destruction': 0, 'Alteration': 0, 'Illusion': 0, 'Conjuration': 0, 'Mysticism': 0, 'Restoration': 0,
+                 'Alchemy': 0, 'Unarmored': 100, 'Sneak': 95, 'Acrobatics': 80, 'LightArmor': 0, 'ShortBlade': 0,
+                 'Marksman': 0, 'Merchantile': 0, 'Speechcraft': 0, 'HandtoHand': 100}   # Security left out: 255
+
+    def test_the_were_rows_are_the_compiled_numbers(self):
+        from mwscript.awms import decode, WERE_ROWS
+        from mwscript.functions import FUNCTION_NUMBERS, ATTRIBUTES, SKILLS
+        text = ('Begin WereTest\nPlayer->BecomeWereWolf\nPlayer->SetWereWolfAcrobatics\nPlayer->UndoWerewolf\n'
+                'StopScript WereTest\nEnd WereTest\n')
+        gmsts = [record('GMST', sub('NAME', 'fWereWolf' + k), sub('FLTV', struct.pack('<f', v)))
+                 for k, v in self.BLOODMOON.items()]
+        d = Path(tempfile.mkdtemp(prefix='aw-mwscript-were-'))
+        try:
+            (d / 'Morrowind.esm').write_bytes(master_bytes(dict(SCRIPTS, WereTest=text), gmsts))
+            data = GameData().load(d)
+            prog, compiled = compile_program(data, None, handwritten=(), rooms=ROOMS)
+            f = awms.read(awms.write(prog, compiled, bindings(prog, compiled))[0])
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+        self.assertEqual(WERE_ROWS, 10)
+        self.assertEqual(f['WERE_rows'], WERE_ROWS)
+        rows = list(struct.unpack('>10i', f['WERE']))
+        self.assertGreater(awms.ORDER.index('WERE'), awms.ORDER.index('BIND'))   # on disk, not resident
+        packed = b''.join(struct.pack('>i', v) for v in rows[:9])
+        stat = dict(zip(ATTRIBUTES + SKILLS, packed))
+        self.assertEqual((stat['strength'], stat['intelligence'], stat['speed'], stat['luck']), (150, 0, 90, 25))
+        self.assertEqual((stat['sneak'], stat['mercantile'], stat['handtohand'], stat['acrobatics']), (95, 0, 100, 80))
+        self.assertEqual(stat['security'], 255)                               # no setting: the player's own stays
+        self.assertEqual(packed[35], 255)                                     # the pad after the 35 settings
+        self.assertEqual(rows[9], 80)                                         # SetWerewolfAcrobatics: fWereWolfAcrobatics
+        c = next(c for c in compiled if c.name == 'WereTest')
+        ops = list(decode(c.code))
+        calls = {a[0]: i for i, (_, n, a) in enumerate(ops) if n == 'NOTYET'}
+        become, acro = calls[FUNCTION_NUMBERS['becomewerewolf']], calls[FUNCTION_NUMBERS['setwerewolfacrobatics']]
+        self.assertEqual([a[0] for _, _, a in ops[become - 9:become]], rows[:9])   # the console hands the same numbers
+        self.assertEqual([a[0] for _, _, a in ops[acro - 1:acro]], rows[9:])
+
+
+class EffectTableTests(unittest.TestCase):
+    """v0.0.68 (GETEFFECT-TABLE-84-OF-143-68): GetEffect names an effect by its game setting id, the order and the ids
+    of OpenMW components/esm3/loadmgef.cpp sGmstEffectIds (all 143, the expansions' last), or by its number (OpenMW
+    miscextensions.cpp OpGetEffect). The table had 84 and named three of them by another word: a GetEffect of the other
+    59, or of sEffectDrainSpellpoints, compiled to a constant 0. The three masters' own GetEffect lines name five
+    effects (Blind, Chameleon, FireDamage, Invisibility, Poison) and keep their numbers."""
+
+    def test_the_effects_are_the_games_ids_in_its_order(self):
+        from mwscript.codegen import EFFECT_NAMES
+        from mwscript.awms import decode
+        from mwscript.functions import FUNCTION_NUMBERS
+        self.assertEqual(len(EFFECT_NAMES), 143)
+        number = {n.casefold(): i for i, n in enumerate(EFFECT_NAMES)}
+        self.assertEqual(len(number), 143)                                    # no id twice
+        self.assertEqual((number['drainspellpoints'], number['restorespellpoints'], number['fortifyspellpoints']),
+                         (19, 76, 81))
+        self.assertEqual([number[n] for n in ('blind', 'chameleon', 'firedamage', 'invisibility', 'poison')],
+                         [47, 40, 14, 39, 27])                               # the masters' own lines
+        self.assertEqual((number['fortifyattribute'], number['fortifyskill'], number['fortifymagickamultiplier']),
+                         (79, 83, 84))
+        self.assertEqual((number['corpus'], number['stuntedmagicka'], number['summonfabricant'],
+                          number['summoncreature01'], number['summoncreature05']), (132, 136, 137, 138, 142))
+        text = ('Begin EffectTest\nshort a\nset a to ( player->GetEffect sEffectDrainSpellpoints )\n'
+                'set a to ( player->GetEffect sEffectSummonCreature05 )\nset a to ( player->GetEffect "14" )\n'
+                'set a to ( player->GetEffect sEffectDrainMagicka )\nStopScript EffectTest\nEnd EffectTest\n')
+        d = Path(tempfile.mkdtemp(prefix='aw-mwscript-effects-'))
+        try:
+            (d / 'Morrowind.esm').write_bytes(master_bytes(dict(SCRIPTS, EffectTest=text)))
+            data = GameData().load(d)
+            prog, compiled = compile_program(data, None, handwritten=(), rooms=ROOMS)
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+        c = next(c for c in compiled if c.name == 'EffectTest')
+        ops = list(decode(c.code))
+        calls = [i for i, (_, n, a) in enumerate(ops) if n == 'NOTYET' and a[0] == FUNCTION_NUMBERS['geteffect']]
+        self.assertEqual([ops[i - 1][1:] for i in calls], [('PUSHB', [19]), ('PUSHW', [142]), ('PUSHB', [14])])
+        # sEffectDrainMagicka is no game setting id (the game writes Spellpoints): a constant 0, as in OpenMW
+        self.assertIn("GetEffect of an unknown effect 'drainmagicka': reads 0", c.warnings)
+
+    def test_the_console_effect_table_is_the_compilers_numbers(self):
+        """v0.0.68 (MW-CONSOLE-COMMANDS-62, family 6): EFFN holds the effect table in its order, row N the number a
+        compiled GetEffect hands the engine, so an id typed on the console finds the effect a script line names; on
+        disk, not resident."""
+        from mwscript.codegen import EFFECT_NAMES
+        text = 'Begin EffectRows\nshort a\nset a to ( GetEffect sEffectPoison )\nStopScript EffectRows\nEnd EffectRows\n'
+        d = Path(tempfile.mkdtemp(prefix='aw-mwscript-effn-'))
+        try:
+            (d / 'Morrowind.esm').write_bytes(master_bytes(dict(SCRIPTS, EffectRows=text)))
+            data = GameData().load(d)
+            prog, compiled = compile_program(data, None, handwritten=(), rooms=ROOMS)
+            f = awms.read(awms.write(prog, compiled, bindings(prog, compiled))[0])
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+        names = awms.strings(f)
+        self.assertEqual(f['EFFN_rows'], 143)
+        rows = [names[struct.unpack_from('>H', f['EFFN'], 2 * i)[0]] for i in range(f['EFFN_rows'])]
+        self.assertEqual(rows, list(EFFECT_NAMES))
+        self.assertEqual(rows.index('Poison'), 27)
+        self.assertGreater(awms.ORDER.index('EFFN'), awms.ORDER.index('BIND'))   # on disk, not resident
+        ops = list(awms.decode(next(c for c in compiled if c.name == 'EffectRows').code))
+        at = next(i for i, (_, n, a) in enumerate(ops) if n == 'NOTYET')
+        self.assertEqual(ops[at - 1][1:], ('PUSHB', [rows.index('Poison')]))
+
 
 class HeldItemBindingTests(unittest.TestCase):
     """MWSCRIPT-INVENTORY-HITONME-62: the scripts of items a placed container holds (OpenMW 0.51 localscripts.cpp
@@ -786,9 +993,10 @@ class CompilerTests(unittest.TestCase):
         names = {c.name: c for c in compiled}
         calls = [a for _, n, a in awms.decode(names['NotYetUser'].code) if n == 'NOTYET']
         self.assertEqual(len(calls), 2)
-        # v0.0.63 batch 3: COE is carried out now; ModWaterLevel stays not yet (the water is baked into the maps)
-        self.assertEqual(calls[0][0], FUNCTION_NUMBERS['modwaterlevel'])
-        self.assertEqual(prog.strings.rows[calls[0][1]], 'modwaterlevel')
+        # v0.0.63 batch 3: COE is carried out now; v0.0.68: ModWaterLevel too (MWSCRIPT-WATER-LEVEL-STATIC-67), so the
+        # not-yet example is ModPCVisionBonus (no renderer brightness term yet)
+        self.assertEqual(calls[0][0], FUNCTION_NUMBERS['modpcvisionbonus'])
+        self.assertEqual(prog.strings.rows[calls[0][1]], 'modpcvisionbonus')
         self.assertEqual(calls[0][2] & 0x1F, 1)                    # one number: 100
         cell = names['CellUser']
         # PositionCell: the player's moves are worked out here; the player's into a room no list names stays not yet;
@@ -1908,7 +2116,7 @@ class InterpreterTests(unittest.TestCase):
         stats = next(l for l in out if l.startswith('stats')).split()
         self.assertGreater(int(stats[4]), 0)                       # quiet skips happened
         notyet = [l for l in out if l.split()[1:2] == ['notyet']]
-        # ModWaterLevel and PositionCell (the player's into a room no list names; the stub host carries out no call, so the
+        # ModPCVisionBonus and PositionCell (the player's into a room no list names; the stub host carries out no call, so the
         # other object's goes the same way), once each (OnActivate and Activate run since v0.0.51; never used here,
         # OnActivate reads 0; AIWander runs since v0.0.54)
         self.assertEqual(len(notyet), 2, notyet)
@@ -2135,7 +2343,7 @@ class ImportRouteTests(unittest.TestCase):
 
     def test_not_yet_calls_are_counted_and_handed_to_the_host(self):
         from mwscript.functions import FUNCTION_NUMBERS
-        travel = FUNCTION_NUMBERS['modwaterlevel']    # v0.0.63 batch 3: COE is carried out now
+        travel = FUNCTION_NUMBERS['modpcvisionbonus']    # v0.0.63 batch 3: COE is carried out now; v0.0.68 ModWaterLevel
         out = self.run_vm(4)
         calls = [l.split()[1:] for l in out if l.split()[1:3] == ['call', str(travel)]]
         self.assertTrue(calls, out)
@@ -2143,8 +2351,8 @@ class ImportRouteTests(unittest.TestCase):
         self.assertEqual(calls[0][4:], ['strings', '0'])
         counted = {int(l.split()[1]): l.split() for l in out if l.startswith('function')}
         self.assertEqual(int(counted[travel][2]), len(calls))
-        self.assertEqual(int(counted[travel][3]), self.prog.strings.index['modwaterlevel'])
-        travel_line = str(self.prog.strings.index['modwaterlevel'])
+        self.assertEqual(int(counted[travel][3]), self.prog.strings.index['modpcvisionbonus'])
+        travel_line = str(self.prog.strings.index['modpcvisionbonus'])
         self.assertEqual(len([l for l in out if l.split()[1:3] == ['notyet', travel_line]]), 1)    # logged once
         # carried out by number (the host answers): no log, the host count instead
         out = self.run_vm(4, env={'CALLS': str(travel)})

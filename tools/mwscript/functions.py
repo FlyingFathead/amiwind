@@ -532,7 +532,10 @@ HOST = {'getpccrimelevel', 'setpccrimelevel', 'modpccrimelevel',
         # OpGetWaterLevel: 0 outdoors, the room's water surface), GetCollidingPC and HurtCollidingActor
         # (miscextensions.cpp: the player touching the object; as HurtStandingActor), GetWeaponType
         # (containerextensions.cpp: the right hand's weapon type, -1 none) and GetStat (statsextensions.cpp: a dummy, 0)
-        'getwaterlevel', 'getcollidingpc', 'hurtcollidingactor', 'getweapontype', 'getstat'}
+        'getwaterlevel', 'getcollidingpc', 'hurtcollidingactor', 'getweapontype', 'getstat',
+        # v0.0.68 (MWSCRIPT-WATER-LEVEL-STATIC-67): the room's water moved (cellextensions.cpp OpSetWaterLevel,
+        # OpModWaterLevel: the player's room's level; its plane in the room's world, engine/aga/src/aw_water.c)
+        'setwaterlevel', 'modwaterlevel'}
 RESISTS = ('resistfire', 'resistfrost', 'resistshock', 'resistmagicka', 'resistdisease', 'resistblight',
            'resistcorprus', 'resistpoison', 'resistnormalweapons', 'resistparalysis')
 # v0.0.63 (UNDERWATER-BREATH-62): Get/Set/ModWaterBreathing, the same host call as the resistances (OpenMW 0.51
@@ -591,6 +594,7 @@ HOST_EFFECTS = set(CONTROL_SETS) | MENU_ENABLES | {'placeatpc', 'placeatme', 'pl
                                     'removeeffects', 'removespelleffects', 'addsoulgem', 'dropsoulgem',
                                     'enablelevelupmenu', 'becomewerewolf', 'undowerewolf',
                                     'setwerewolfacrobatics', 'setscale', 'modscale', 'resurrect', 'playbink', 'changeweather', 'modregion',
+                                    'setwaterlevel', 'modwaterlevel',
                                     'aifollowcell', 'aiescort', 'aiescortcell', 'positioncell','showrestmenu', 'raiserank', 'lowerrank', 'showmap', 'clearinfoactor', 'choice', 'goodbye', 'modfactionreaction', 'setfactionreaction', 'forcegreeting', 'rotate', 'aitravel', 'aifollow', 'position','playgroup', 'loopgroup', 'addtopic', 'cast','setpccrimelevel', 'modpccrimelevel', 'setreputation', 'modreputation', 'pcraiserank',
                 'pclowerrank', 'pcjoinfaction', 'pcexpell', 'pcclearexpelled', 'setpcfacrep', 'modpcfacrep'} | \
     {verb + r for r in MAGIC_EFFECT_CALLS for verb in ('set', 'mod')} | CONSOLE_GROUP

@@ -43,9 +43,11 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-CACHE-TRACE-PYTHONPATH-33](BUILD-CACHE-TRACE-PYTHONPATH-33.md): The stage read trace refused reuse of a reused run when another checkout was on PYTHONPATH
 - [BUILD-CELL-PROGRESS-UNDECLARED-OUTPUT-67](BUILD-CELL-PROGRESS-UNDECLARED-OUTPUT-67.md): The tracker data stage (cell-progress) writes flora-support.json at the run folder's top, outside its declared outputs, so a later build refuses to reuse the stage
 - [BUILD-CHECK-ONE-CORE-66](BUILD-CHECK-ONE-CORE-66.md): The build's reuse check runs about six minutes on one core, and every snapshot runs it twice before its build starts
+- [BUILD-CHECK-REPEATED-AFTER-PASSED-CHECK-68](BUILD-CHECK-REPEATED-AFTER-PASSED-CHECK-68.md): Before building, the builder checks the plan again even when an identical check passed a few minutes earlier
 - [BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46](BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46.md): A change in the shared collision converter rebuilds every CHIM frame and everything after it, even where the output is identical
 - [BUILD-CHIM-FRAME-SWAP-LATE-36](BUILD-CHIM-FRAME-SWAP-LATE-36.md): The image step builds 335 legacy maps of cells already on CHIM, then removes them before packing
 - [BUILD-CHIM-KEY-SKY-OVERLAY-TABLE-59](BUILD-CHIM-KEY-SKY-OVERLAY-TABLE-59.md): The CHIM world stage and its ocean units are keyed by the whole sky palette overlay module, so a new image file extension rebuilds the CHIM world
+- [BUILD-CHIM-KEY-SOURCE-UNITS-ENV-68](BUILD-CHIM-KEY-SOURCE-UNITS-ENV-68.md): The source catalogue cache of the CHIM areas puts the settings of several unrelated modules into the CHIM world stage's key
 - [BUILD-CHIM-MAIN-MEMORY-46](BUILD-CHIM-MAIN-MEMORY-46.md): The CHIM stage main process holds so much memory that the memory guard starves its own workers
 - [BUILD-CHIM-POOL-MEMORY-THROTTLE-59](BUILD-CHIM-POOL-MEMORY-THROTTLE-59.md): A CHIM stage rebuild runs its area pool on 8 of 24 workers because the stage's parent and the stages beside it hold most of the build's memory
 - [BUILD-CHIM-REGION-FRAMES-TAIL-43](BUILD-CHIM-REGION-FRAMES-TAIL-43.md): The CHIM region-frame step runs its last frames on one worker while the other cores sit idle
@@ -99,6 +101,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-KIT-SOURCE-COPY-ONE-CORE-67](BUILD-KIT-SOURCE-COPY-ONE-CORE-67.md): The source copy of a release kit writes 4.5 GB on about one core and takes about eighteen minutes
 - [BUILD-LARGE-ROOMS-CHECK-LATE-66](BUILD-LARGE-ROOMS-CHECK-LATE-66.md): The large-rooms table check runs about an hour and a half into a build instead of in its first minute
 - BUILD-M68K-ICE-SKEL-PARSE-52 (no report page): The m68k compiler crashed on the animation table parse (internal compiler error in patch_jump_insn); the host tests compile it with the host compiler only
+- [BUILD-MEMPLAN-CHIM-5-OF-22-68](BUILD-MEMPLAN-CHIM-5-OF-22-68.md): The build's memory plan runs the outdoor world stage on 5 of 22 workers, taking about an hour instead of about half that, because it counts a 25 GB parent process
 - [BUILD-MINIWIND-FINGERPRINT-ENGINE-33](BUILD-MINIWIND-FINGERPRINT-ENGINE-33.md): Every build stage's source fingerprint took in the engine sources through the MiniWind module
 - [BUILD-MINIWIND-STAGE-CLOSURE-33](BUILD-MINIWIND-STAGE-CLOSURE-33.md): The MiniWind plan puts the CHIM builder modules into every conversion stage's fingerprint
 - [BUILD-NESTED-POOL-ALLOWANCE-33](BUILD-NESTED-POOL-ALLOWANCE-33.md): Pool workers open their own pools sized to the whole stage's allowance
@@ -212,10 +215,12 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [PLAYER-VIEW-SKIN-ROWS-STOP-62](PLAYER-VIEW-SKIN-ROWS-STOP-62.md): The image step's player view stopped the v0.0.62 final build after 1 h 13 min: an Alias skin rows overflow ended it instead of trying the next smaller body
 - [RELEASE-GUARD-SLOW-CLONE-51](RELEASE-GUARD-SLOW-CLONE-51.md): The release guard, the fail-fast first step of a release, took 6 minutes on about 0.14 of a core: its release check clones the whole repository through the Windows-mounted drive
 - RELEASE-SUITE-RECORD-SERIAL-51 (no report page): The release's suite record runs the whole test suite again on one core for about 22 minutes, right after the gate ran the same tests in about 2 minutes
+- [REUSE-VERIFY-SLOW-BESIDE-MODULE-STAGES-68](REUSE-VERIFY-SLOW-BESIDE-MODULE-STAGES-68.md): Reusing the room batches of an earlier build took about 37 seconds where earlier reuses took 5
 - [ROOM-BAKE-FOOTPRINT-SLOW-48](ROOM-BAKE-FOOTPRINT-SLOW-48.md): The room actor bake's footprint rule with the collision-box test is more than 100 times slower
 - [ROOM-BATCH-CORES-49](ROOM-BATCH-CORES-49.md): The room batches stage ran on about two of its eight cores for minutes before its first room, and kept few of its finished rooms when stopped
 - ROOM-RESIDENTS-KEY-SERIAL-49 (no report page): The room residents step opens its unit cache once per resident: 233 s on one core before any cached resident is restored
 - [SHELL-ORPHAN-STARVES-GATE-66](SHELL-ORPHAN-STARVES-GATE-66.md): A leftover process in the shell container starved a gate; nothing in the master builder noticed the stall
+- [STALL-SLOW-STAGE-VS-REUSE-TIME-68](STALL-SLOW-STAGE-VS-REUSE-TIME-68.md): The builder's slow-stage warning compared a stage that had to run with the few seconds an earlier build took to reuse it, and so called a normal run eight times too slow
 - [UNIT-CACHE-STORE-ERRORS-SILENT-63](UNIT-CACHE-STORE-ERRORS-SILENT-63.md): A unit that the unit cache failed to store was reported as stored: a cache folder the build user could not write lost every unit without a word
 - [UNIT-KEY-WHOLE-FILE-63](UNIT-KEY-WHOLE-FILE-63.md): The resident and room unit caches keyed every unit on the whole of their tool files, so an unrelated edit to tools/prepare_area.py re-keyed all 1,769 residents and every room, and the v0.0.63-dev1 build baked them all again
 - [UNIT-STORED-AT-MAP-END-62](UNIT-STORED-AT-MAP-END-62.md): The image step's player view stored its finished bodies only when its whole pool map ended: a step stopped midway kept none of them, so every resume baked every player body again

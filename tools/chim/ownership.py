@@ -67,13 +67,27 @@ def intersects(a, b):
 
 
 
-def select_compiled_apron(spec, references):
+def cell_of(point):
+    """The Morrowind cell (x, y) of a world position (Morrowind units)."""
+    return (int(math.floor(point[0] / CORE_GRID)), int(math.floor(point[1] / CORE_GRID)))
+
+
+def select_compiled_apron(spec, references, frame_cells=None, source_radius=1):
     """Remove only external apron selections with no actual compiled footprint.
 
     Source bounds conservatively transform the original box. A rotated compiled
     mesh can be smaller; keep every owned original and every piece reaching the
     apron, and record exact excluded originals and boxes for source accounting.
     The unchanged manifest guard still rejects missing pieces and bad ownership.
+
+    FRAME_CELLS: the cells that have a frame of their own in this world (None: the method before). A piece of an
+    apron reference (a tile or cut piece of a neighbour's model) whose compiled footprint lies wholly outside this
+    frame's coverage is left out of this frame when the cell of its position has a frame of its own that takes the
+    reference (the reference's cell within that frame's SOURCE_RADIUS, chim.regions.frame_settings): that frame
+    holds it. Otherwise it stays (given to the frame's edge chunk, chim.world chunk_of), so no piece is ever in
+    nobody's frame; a piece of the frame's own references always stays (CHIM-FRAME-EDGE-CLAMPS-OUTSIDE-TILES-68:
+    the 163 iceberg tiles of the glacier -26,26 sat in its neighbours' corner chunks). The pieces left out are
+    listed in spec['apron_pieces_dropped'].
     """
     from chim.world import frame_box, f32, placed_box, turn_of
     frame = spec['frame']; centre = frame['centre']
@@ -81,6 +95,7 @@ def select_compiled_apron(spec, references):
     coverage = [centre[k] + 4*frame['low'][k] for k in range(2)]
     coverage += [coverage[k] + 4*frame['span'][k] for k in range(2)]
     footprints = {}
+    piece_box = {}
     for p in spec['placements']:
         v = spec['variants'][p['variant']]
         if not all(math.isfinite(x) for x in [*p['origin'], p['yaw'], *v['lo'], *v['hi']]):
@@ -91,7 +106,9 @@ def select_compiled_apron(spec, references):
         if not all(math.isfinite(x) for x in box):
             raise ValueError('Nonfinite compiled apron footprint')
         footprints.setdefault(source_ref(p['ref']), []).append(box)
+        piece_box[p['ref']] = box
     selected, excluded, seen = [], [], set()
+    apron = {}          # {number: the reference's cell} of the kept references of the apron
     for ref in references:
         src = original(ref['_chim_original']); number = src['number']
         if number in seen:
@@ -103,9 +120,28 @@ def select_compiled_apron(spec, references):
                              'coverage': coverage, 'reason': 'compiled footprint outside this apron'})
         else:
             selected.append(ref)
+            if not contains(core, src['position']):
+                apron[number] = cell_of(src['position'])
     removed = {r['original']['number'] for r in excluded}
-    if removed:
-        spec['placements'] = [p for p in spec['placements'] if source_ref(p['ref']) not in removed]
+    dropped = set()
+    if frame_cells is not None and apron:
+        cells = {tuple(c) for c in frame_cells}
+        rows = []
+        for p in spec['placements']:
+            box = piece_box[p['ref']]
+            if source_ref(p['ref']) not in apron or intersects(coverage, box):
+                continue
+            where = [centre[k] + 4 * p['origin'][k] for k in range(2)]
+            at, home = cell_of(where), apron[source_ref(p['ref'])]
+            if at in cells and max(abs(at[0] - home[0]), abs(at[1] - home[1])) <= source_radius:
+                dropped.add(p['ref'])
+                rows.append({'ref': p['ref'], 'original': source_ref(p['ref']), 'cell': list(cell_of(where)),
+                             'compiled_footprint': box})
+        if rows:
+            spec['apron_pieces_dropped'] = rows
+    if removed or dropped:
+        spec['placements'] = [p for p in spec['placements']
+                              if source_ref(p['ref']) not in removed and p['ref'] not in dropped]
         used = {p['variant'] for p in spec['placements']}
         spec['variants'] = {k: v for k, v in spec['variants'].items() if k in used}
     return selected, excluded

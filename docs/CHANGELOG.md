@@ -1,10 +1,12 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
+_Last updated with AmiWind v0.0.68-dev3 (21 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.68-dev3: third snapshot of v0.0.68, 21 November 2026](#v0068-dev3-third-snapshot-of-v0068-21-november-2026)
+- [v0.0.68-dev2: second snapshot of v0.0.68, 20 November 2026](#v0068-dev2-second-snapshot-of-v0068-20-november-2026)
 - [v0.0.68-dev1: first snapshot of v0.0.68, 20 November 2026](#v0068-dev1-first-snapshot-of-v0068-20-november-2026)
 - [v0.0.67: Tribunal Introduced, 19 November 2026](#v0067-tribunal-introduced-19-november-2026)
 - [v0.0.67-dev3: third snapshot of v0.0.67, 19 November 2026](#v0067-dev3-third-snapshot-of-v0067-19-november-2026)
@@ -208,6 +210,149 @@ _Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.68-dev3: third snapshot of v0.0.68, 21 November 2026
+
+The third development snapshot of v0.0.68, in development ([release notes](releases/notes/RELEASE-v0.0.68-dev3.md)). The
+version has no title yet. Solstheim's first cells are in the build, reached only by the debug teleport and not yet seen in
+play ([roadmap](ROADMAP.md)). Emulator presets: `AmiWind-v0.0.68-dev3-FS-UAE.fs-uae` and
+`AmiWind-v0.0.68-dev3-WinUAE.uae`, both with 32 MB of Fast RAM. None of the changes has been seen in play; they are covered
+by their tests and the gates of their branches (console commands 12263, outdoor pieces taken or disabled 12264, outdoor
+pieces that scripts switch off 12265, the Solstheim branch and the builder work 12050, 12054 and 12055).
+
+**New**
+
+- Solstheim, first cells, work in progress: the 135 finished open terrain cells of the island (110 land, 25 sea floor, of
+  144) are held by the Bloodmoon build module as frames `sl0000` to `sl0134`, reached with `dbg tp` only: no door, travel
+  or place name leads there, there are no sea frames around the coast, and the people, creatures and containers outdoors
+  are only what the frames carry. The glacier and its eight neighbouring cells are not in yet. Two more rocks
+  (`terrain_rock_bm_65`, `terrain_rock_bm_64`) were accepted as standing-hull chains. The reference
+  `docs/chim/cell-progress-reference.json` is published again (144 cells, 135 finished). The
+  [CHIM progress tracker](chim/PROGRESS_TRACKER.md) counts from the newest ingested build, not this snapshot's, and still
+  counts Solstheim as not in the game until it is ingested.
+- Console commands of the original typed on the console, family 6: `Cast`, `ExplodeSpell`, `RemoveSpellEffects`,
+  `GetSpellEffects`, `GetEffect`, `HasItemEquipped`, `Drop` and `AddTopic`; the console finds the spell, item and topic
+  rows from what is typed, `Cast` by the player selects the spell, `Drop` with a count below 0 is refused and with 0 does
+  nothing; the list now counts 395 commands, 309 run through the script interpreter, 48 planned
+  ([the console command list](CONSOLE_COMMANDS_MORROWIND.md); MW-CONSOLE-COMMANDS-62).
+- `GetEffect` knows all 143 magic effects by their game setting ids, with or without the `sEffect` prefix, or by number;
+  it knew 84 and named three by another name (GETEFFECT-TABLE-84-OF-143-68). The three game files' own `GetEffect` lines
+  keep their compiled code.
+
+**Fixed**
+
+- Taken and disabled outdoor pieces have no limit: the list held 64 for each map and a piece past it stayed drawn and
+  solid; it is now one bit for each placement a frame owns, sized from the build's count (CHIM-GONE-LIST-64-CAP-68). An id
+  of no loaded frame is refused, counted and named in `chim status`; a piece a mover relinks stays out.
+- Every outdoor piece that a script can disable or enable has its hide row, in Vvardenfell and in Mournhold's districts;
+  before, only carriable lights had one, so a disabled static stayed drawn and solid (OUTDOOR-DISABLE-NOT-HIDDEN-68).
+  The build's check names every scripted target with neither a piece nor an entity (SCRIPTED-TARGETS-NOT-IN-IMAGE-68,
+  open).
+- A scripted `Drop` leaves what the actor carries, as in the original: closed as not a fault
+  (DROP-ONLY-WHAT-IS-CARRIED-68).
+
+**Builder and tools**
+
+- The outdoor world stage is keyed by the base game's files again: a stage reads the expansion layers only by its own
+  code, so a change of the expansions' files or of the selection does not rebuild the base world
+  (BUILD-KEY-CHIM-READS-LAYERS-VIA-UNIT-KEY-68).
+- Collision unions that the compiler's standard format refuses (over 32,767 nodes) are compiled in the larger format for
+  the meshes a list names: Solstheim's iceberg shards and the glacier's two icebergs; a union over one image's budget keeps
+  its fallback instead of stopping the stage (CHIM-COLLISION-UNION-FALLBACK-41). The map text is written with LF line ends
+  and UTF-8, and the compile's temporary folder is on the list of reviewed temporary folders.
+- A neighbour's model pieces wholly outside a frame are left to the frame of their own cell where there is one, so the 163
+  iceberg tiles no longer sit in one corner chunk of each neighbour; a CHIM import converts each region frame as a world
+  of its own (CHIM-FRAME-EDGE-CLAMPS-OUTSIDE-TILES-68; [CHIM import](chim/CHIMPORT.md)).
+- Solstheim's world stage reads and feeds the shared storage pool, and the pool's cache now reaches the converter's
+  worker processes (SOL-MODULE-CACHE-NOT-PICKLED-68): in this snapshot's build it took 19,434 units (772.9 MB) a CHIM
+  import of the same cells had made. Nine more Solstheim models with stairs keep the original's collision for their
+  steps and are listed as known, as three were before (CHIM-STAIR-METHOD1-UNFIXED-48, open).
+- The bug tracker records the night of 20 to 21 November: the memory plan on the outdoor world stage
+  (BUILD-MEMPLAN-CHIM-5-OF-22-68), the scripted outdoor objects missing from the world (SCRIPTED-TARGETS-NOT-IN-IMAGE-68),
+  the slow-stage warning against reuse times (STALL-SLOW-STAGE-VS-REUSE-TIME-68), the memory report's hull planes
+  (CHIM-HEAP-SPLIT-HULL-PLANES-DRAWN-68) and the register's page rendering (REGISTER-STEP-RENDERS-ALL-PAGES-68); see
+  [the bug tracker](BUGS.md).
+
+**Documentation**
+
+- The README and the roadmap name the v0.0.68-dev3 presets and snapshot and say Solstheim's first cells are in the build.
+  The MWScript tracker is measured for this version (927 scripts run, 9 carried). The console command page, the script
+  engine's format page (with the effect table of `GetEffect`) and the documentation index name the current version.
+
+## v0.0.68-dev2: second snapshot of v0.0.68, 20 November 2026
+
+The second development snapshot of v0.0.68, in development ([release notes](releases/notes/RELEASE-v0.0.68-dev2.md)). The
+version has no title yet, and this snapshot is not Solstheim: that is the line's work, in progress on its own branches
+([roadmap](ROADMAP.md)). Emulator presets: `AmiWind-v0.0.68-dev2-FS-UAE.fs-uae` and `AmiWind-v0.0.68-dev2-WinUAE.uae`,
+both with 32 MB of Fast RAM. The hands fixes, the water levers and the drowning were seen in play on a v0.0.68-dev1 image
+with this snapshot's engine; the other changes are covered by their tests and the gates of their branches.
+
+**Fixed and seen in play**
+
+- A carried light and a one-handed weapon are held together and both drawn, in first person, in third person and in the
+  inventory picture; a two-handed weapon, the bow, the crossbow or readied magic puts the light away until it is
+  sheathed (LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67). The light is lit when the hands are raised; the light key then puts
+  out or relights only the light, with a notice, and the light stays in the hand while it is out. The light put away for
+  a two-handed weapon reads the weapon's own row.
+- Third-person fists draw, punch and lower with the original's hand-to-hand animations, also while running, and the
+  stance key works while the run key is held (PLAYER-PUNCH-THIRDPERSON-39, TP-DRAW-WEAPON-LAGS-67,
+  FIGHT-STANCE-KEY-IGNORED-WHILE-RUNNING-67; [third person](THIRD_PERSON.md)).
+- Readied magic stays readied through doors, teleports and cell changes (HANDS-STATE-LOST-THROUGH-DOORS-67); `dbg hands`
+  names the stance the hands keep.
+- Enter in the inventory's item information box only closes it (ITEM-VIEW-ENTER-UNEQUIPS-67; [inventory](INVENTORY.md)).
+
+**New**
+
+- `SetWaterLevel` and `ModWaterLevel` move a room's water, saved with the game; the water plane, the placements it passes
+  and the floating crates of Old Mournhold: Forgotten Sewer follow, and a room whose water lies under every placement
+  gets its plane; `GetWaterLevel` reads the room's own level (MWSCRIPT-WATER-LEVEL-STATIC-67,
+  GETWATERLEVEL-COLUMN-NOT-ROOM-67). Seen in play: Old Mournhold's torch lever floods Temple Sewers West, and the
+  crank of Forgotten Sewer raises the water, floats the crates and opens the trap door into the flooded hall. A scripted
+  object placed in a room without an entity of its own answers `SetPos` and `GetPos` (SETPOS-MOVER-NO-ENTITY-68), and a
+  script reaches by name an object only an expansion places (EXPANSION-TABLES-BASE-ONLY-66).
+- People under water in rooms hold their breath for 20 seconds and then lose 3 health a second, by the original's rule,
+  the people living in a room included; seen in play: the Black Dart gang drowns in the flood
+  (ACTOR-DROWNING-NOT-CARRIED-67).
+- Console commands of the original typed on the console: `ChangeWeather`, `ModRegion`, `BecomeWerewolf`,
+  `SetWerewolfAcrobatics`, `StartScript`, `StopScript`, `ScriptRunning`, `PlaySound`, `PlaySoundVP`, `PlaySound3D`,
+  `PlaySound3DVP`, `GetSoundPlaying`, `StreamMusic`, `SayDone`, `PlaceAtPC`, `PlaceAtMe` and `PlaceItem`; a console line
+  keeps 13 arguments ([the console command list](CONSOLE_COMMANDS_MORROWIND.md); MW-CONSOLE-COMMANDS-62,
+  CONSOLE-STARTSCRIPT-STOPSCRIPT-67). `ModRegion` keeps the original's chances (MODREGION-KEEPS-UNGIVEN-CHANCES-68).
+
+**Fixed**
+
+- In an image with the expansions a script's region is the region it names: the end of the main quest changed the
+  Grazelands' weather instead of Red Mountain's and Mournhold's weather lines did nothing, because the table counted the
+  base game's regions only (REGION-INDEX-BASE-ONLY-68).
+
+**Builder and tools**
+
+- The CHIM import converts each cell with a default build's frame settings and converter switches, has a region cell
+  shape (each cell as the frame a build installs for it, with its neighbours in an apron), and a build's Solstheim world
+  stage takes the units an import stored in the shared pool. Solstheim's open terrain is converted by it but is not in the
+  game, and its build module is work in progress (CHIMPORT-UNITS-NOT-SHARED-WITH-BUILD-68,
+  CHIMPORT-HEAP-NOT-BUILD-FRAMES-68). The import's own settings test is on the release file list.
+- The build's memory plan: a full build with no measurement plans from the reference build's stage peaks
+  (`config/build-memory.json`), stages that cannot fit side by side run one after another and every reduction is
+  logged; the room stages store each resident as it is baked; each CHIM area's source catalogue is kept in the unit
+  cache across runs; every table builder's reader runs on the selected game files in the first minute; a module's store
+  that cannot fit one partition is named right after its world stage; the table readers' check keeps its merged file in
+  the builder's scratch folder (BUILD-TESTER-32GB-OOM-67, in work).
+- `tools/outer_hull.py` measures a reduced actor model against the original's outer measures, with its test; its first
+  run on the v0.0.67 library failed 77 of 83 creature models (ACTOR-BAKE-NO-SEAM-STOP-68). The reduction that uses it is
+  not in this build; the quadric reducer is unchanged.
+- The bug tracker records the evening of 20 November: the mudcrab copies and the combat music kept after their death
+  (CREATURE-DUPLICATE-SPAWN-WARP-68), the census office re-entry crash (CENSUS-COURTYARD-REENTRY-CRASH-68), the thinned
+  limbs of skeletal models (SKEL-POSE-GRID-THINS-LIMBS-68), the partial werewolf change
+  (WEREWOLF-TRANSFORM-RULES-PARTIAL-68), the console list's missing functions (CONSOLE-CENSUS-MISSES-FUNCTIONS-68),
+  `SetPos` on room placements (SETPOS-MOVER-NO-ENTITY-68), the use key with collision off (USE-KEY-DEAD-IN-NOCLIP-68) and
+  the Solstheim conversion faults (SOL-COVENTINA-NO-GROUND-CLASS-68, SOL-ICE-CELLS-RING-OVER-68); see
+  [the bug tracker](BUGS.md).
+
+**Documentation**
+
+- The README and the roadmap name the v0.0.68-dev2 presets and snapshot; the roadmap lists the audits of the original's creature records and of the levers and valves, the progress
+  summary's converted-cells line and the werewolf body as planned work.
 
 ## v0.0.68-dev1: first snapshot of v0.0.68, 20 November 2026
 

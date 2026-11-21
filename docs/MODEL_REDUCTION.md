@@ -1,6 +1,19 @@
 # How AmiWind reduces a model, and how to check it
 
-_Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
+_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [1. Measure the original first](#1-measure-the-original-first)
+- [2. Budgets](#2-budgets)
+- [3. The reduction](#3-the-reduction)
+- [4. The proof, by numbers](#4-the-proof-by-numbers)
+- [5. Running the seam check](#5-running-the-seam-check)
+- [6. The Toolkit page](#6-the-toolkit-page)
+- [7. The outer-hull check: the original's outer measures](#7-the-outer-hull-check-the-originals-outer-measures)
+
+<!-- contents end -->
 
 The original game's characters and creatures carry far more triangles than an Amiga can draw at speed, so the
 builder reduces every actor model it bakes. A reduction is only correct when the reduced model still has every
@@ -132,3 +145,38 @@ the button on the page; served by `tools/toolkit_serve.py`, `seam-check.html?rec
 Status on 7 November 2026: the checks run in the bake on the development branch; the measurements of the first
 models (Jiub, the prison ship guards, Nels Llendo, the Alit) are in the [NPC model page](NPC_MODEL_CACHE.md), and
 the sweep over every actor model is in progress.
+
+## 7. The outer-hull check: the original's outer measures
+
+Decided for the project on 20 November 2026: a reduced model keeps the original's outer measures. Its outer hull has
+no gap, and its outer dimensions (the extent of the body, the girth of the arms, legs and other parts, the surface
+it covers) stay those of the original; the reduced parts are stitched to that hull, so a seam never opens and a limb
+never thins to a stick. `tools/outer_hull.py` measures exactly that, on the model as the build wrote it, against the
+original posed the way the bake posed it (a creature in its idle's first pose, a character in the first pose of its
+animation kit):
+
+| Measure | What it reads | Passes when |
+| --- | --- | --- |
+| extent | the box of the reduced surface against the original's, per axis | every axis within 3 % |
+| girth | per part (a creature's shapes; a character's arms, legs, neck and tail by the bone that moves them; each connected piece on its own), the cut across the part's long axis at 25, 50 and 75 % of its length: the reduced surface near the part's own original surface, against the original cut (a flat plate's thickness is not a girth; a piece under 4 % of the model's size is a detail) | every part keeps 80 % |
+| lost | the original's pieces (a claw, an antenna, a hand) the reduced surface no longer reaches | none |
+| hull | the share of the original's surface within one unit of the reduced surface | 97 % or more |
+| open | open edges of the reduced model (all parts welded where their points meet) that the original does not have | none |
+| seams | every join where one part's rim rests on another part without sharing its points (a neck on a chest, a wrist on a hand): the reduced model must still cover a point half a unit in from the rim | at most 5 % of the joins' length open, no opening past half a unit |
+| tear | a skeletal model's copies of one point (vertices that meet in the rest pose), over every pose of its animation table | reported, not judged yet |
+
+In the project's shell container, from a checkout:
+
+    python3 tools/outer_hull.py library --run <a build's run folder> --data-files <game data> [--creatures all|MESH,...] [--npcs ID,...] [--json OUT]
+    python3 tools/outer_hull.py creature --mesh r/guar.nif --model <baked model .mdl> --data-files <game data> [--table <its .awsk>]
+
+The first measures every creature model of the build's creature library and the named characters (from the room
+batches' resident records, or the NPC library), prints one line per model and exits 1 when one fails. The numbers
+are the verdict; a picture is for people to look at.
+
+Measured on the v0.0.67 release library, 20 November 2026 (the first run of the check): the cliff racer, baked whole
+since v0.0.67-dev3, passes; the guar family, the Dagoth ash vampires' mesh, the Alit and the sampled characters of
+the gallery fail it, as do 77 of the library's 83 creature models. The guar keeps 90 % of its original's surface and
+has 134 new open edges, the pack guar 70 % and 241 with two parts lost; the sampled characters' forearms and upper
+arms fall to between 0.2 and 0.5 of their girth, and some bodies are 5 to 13 % narrower than the original. The work
+that brings every model through the check is MESH-REDUCTION-SEAMS-62 in the [bug register](bugs/README.md).

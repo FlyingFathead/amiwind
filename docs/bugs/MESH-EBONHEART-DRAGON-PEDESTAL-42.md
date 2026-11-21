@@ -187,6 +187,7 @@ as the game composes it (per mesh, island wide).
 
 Family: Mesh converter geometry (`converter-geometry`). Converted faces must be planar, wound to their plane, non-degenerate and within engine ranges; checked by the face validator. See [families](README.md#families).
 
+- [ACTOR-BAKE-NO-SEAM-STOP-68](ACTOR-BAKE-NO-SEAM-STOP-68.md): The creature library's default bake route and the residents' bake run no seam check, so models with open seams and thinned limbs reach the image unjudged
 - [ASH-TREE-HOLES-62](ASH-TREE-HOLES-62.md): The reduced-polygon ash tree in the Ashlands shows holes in its surface
 - [ATRONACH-FLAME-MESH-62](ATRONACH-FLAME-MESH-62.md): The flame atronach's reduced mesh is broken and it has no flames
 - [AW-20260928-21](AW-20260928-21.md): Exterior Census door/wall overlap
@@ -196,6 +197,7 @@ Family: Mesh converter geometry (`converter-geometry`). Converted faces must be 
 - BSP-LIGHT-01 (no report page): Vodunius face lightmap range exceeded its lighting lump
 - [BUILD-INTERIOR-INDEX-ROUTED-33](BUILD-INTERIOR-INDEX-ROUTED-33.md): Full build stops in the interior stage: the prison ship collision index expects a convex-piece chain, but the converter now routes large standing hulls
 - [BUILD-SEYDA-OCEAN-FLOOR-40](BUILD-SEYDA-OCEAN-FLOOR-40.md): Expanded Seyda ocean terrain collapses onto the fixed BSP seal
+- [CANDLESTICK-CANDLES-FLOAT-67](CANDLESTICK-CANDLES-FLOAT-67.md): The candles of the three-candle Silver Candlestick do not touch the holder and seem to float
 - [CENSUS-SHELF-PLATE-BAKED-67](CENSUS-SHELF-PLATE-BAKED-67.md): Census and Excise Office: a plate on the bookshelf is drawn as part of the room and cannot be taken, although in the original it is a separate item
 - [CHIM-CAVE21-NONCONVEX-FACE-48](CHIM-CAVE21-NONCONVEX-FACE-48.md): The cave piece shared by in_moldcave_21, in_mudcave_21, in_pycave_21 and in_lavacave_21 has a non-convex face, so its collision falls back to the piece chain in every room that uses it
 - [CHIM-COLLISION-ROOM-FILLED-54](CHIM-COLLISION-ROOM-FILLED-54.md): One convex collision piece fills the room above a floor of the same mesh: seven trapdoors and a Redoran hut door cannot be used

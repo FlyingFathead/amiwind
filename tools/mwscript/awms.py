@@ -32,8 +32,9 @@
   NEWG  2 bytes a script a new game starts once (Main's CharGenState block: Startup, VampireCheck; v0.0.62,
         NPC-STORY-DISABLED-AT-START-42): u16 script; resident, optional (an older file: none)
   NGWE  4 bytes a region's weather a new game sets for a new-game script AmiWind's own code carries (v0.0.63,
-        OPENING-WEATHER-NOT-CLOUDY-63; CharGen's ChangeWeather): u16 the region's catalogue index (sorted Morrowind.esm
-        region ids, as ChangeWeather's), u8 weather, u8 0; resident, optional (an older file: none)
+        OPENING-WEATHER-NOT-CLOUDY-63; CharGen's ChangeWeather): u16 the region's catalogue index (the sorted region
+        ids of the build's masters, as ChangeWeather's: gamedata.region_catalogue), u8 weather, u8 0; resident,
+        optional (an older file: none)
   NGCS  4 bytes the control switches a new-game script AmiWind's own code carries sets on its first run (v0.0.66,
         OPENING-FIGHTING-ON-BEFORE-PAPERS-66; CharGen's DisablePlayerControls, -Jumping, -ViewSwitch, VanityMode,
         -Fighting, -Magic): u16 the switches it leaves off, u16 those it leaves on (gamedata.CONTROL_BITS, the
@@ -51,6 +52,11 @@
   PADD  8 bytes a carryable item record that names a script (its OnPCAdd slot, or 0xFF none; resident; write() below)
   LACT  8 bytes a scripted NPC or creature record a levelled list names (resident; write() below)
   EQUP  8 bytes a carried item whose script has OnPCEquip or PCSkipEquip (resident; write() below)
+  WATR  8 bytes a room whose cell has the water flag (v0.0.68, GETWATERLEVEL-COLUMN-NOT-ROOM-67), ascending by the
+        room's stable number: u16 the number (the room map's _aw_cell_int), u8 flags (1: the water flag), u8 0, f32 the
+        room's water level in the original's units (gamedata.interior_water); resident, optional (an older file: the
+        engine finds the level from the room map's water, as before). GetWaterLevel reads the loaded room's row (the
+        engine's aw_water.h).
   TOPC  2 bytes a dialogue topic (DIAL type 0), sorted by folded id: u16 name (on disk; AddTopic hands the row)
   AIDX, ASPX  2 bytes a row: the AITM / ASPT rows sorted by folded id (v0.0.63, MW-CONSOLE-COMMANDS-62: the
         console's lookup of an item or spell id, a binary search); on disk, optional (an older file: a scan)
@@ -71,6 +77,22 @@
         id (name_hash). A save keeps a held item's locals by (holder, item), not by its ordinal among the holder's items.
   SCRH  every script row's name hash (v0.0.66, SAVE-SCRIPT-ROW-HINT-ONLY-65; on disk, optional): u32 name_hash a row,
         so a load finds a saved script whose row moved in a rebuilt file with one read.
+  RGNS  2 bytes a region of the image's region catalogue, in its order (v0.0.68, MW-CONSOLE-COMMANDS-62;
+        gamedata.region_catalogue): u16 the region's id as its record writes it. The row number is the region index a
+        compiled ChangeWeather or ModRegion hands the engine; the console's ChangeWeather and ModRegion find a typed id
+        here (a read of a few rows per console line) and dbg weather names the region it shows. On disk, optional (an
+        older file: the console names no region).
+  WERE  4 bytes a row, 10 rows (v0.0.68, MW-CONSOLE-COMMANDS-62; codegen.Program.werewolf_settings, the numbers a
+        compiled BecomeWerewolf and SetWerewolfAcrobatics hand the engine): rows 0-8 BecomeWerewolf's, the werewolf's
+        eight attributes then 27 skills from the game settings (GMST fWereWolf*), a byte each (255: none), four to a
+        row, high byte first; row 9 SetWerewolfAcrobatics' value (fWereWolfAcrobatics). Signed 32-bit. The console's
+        BecomeWerewolf and SetWerewolfAcrobatics read them (10 reads of 4 bytes per console line). On disk, optional
+        (an older file: the console's player forms refuse).
+  EFFN  2 bytes a magic effect, 143 rows in the game's numbering (v0.0.68, MW-CONSOLE-COMMANDS-62; codegen.EFFECT_NAMES,
+        the table a compiled GetEffect takes its number from): u16 the effect's game setting id without "sEffect".
+        Row N is the number a compiled GetEffect hands the engine; the console's GetEffect finds a typed id here (one
+        read of the section and the names up to the match, per console line). On disk, optional (an older file: the
+        console's GetEffect takes a number only).
 
 The engine keeps scripts, globals, quests and worn items in a save by the name hash of their id (aw_ledger.h,
 name_hash below): write() refuses a file in which two different names share one (their saved values would mix).
@@ -84,9 +106,9 @@ from .opcodes import NAME, LAYOUT
 MAGIC = b'AWMS'
 VERSION = 1
 TYPES = {'s': 0, 'l': 1, 'f': 2}
-ORDER = ('CONF', 'GLOB', 'JRNL', 'SNDS', 'VOIC', 'MUSI', 'OBJS', 'SCRP', 'STRT', 'NEWG', 'NGWE', 'NGCS', 'HELD', 'OACT', 'PCEL', 'PMOV', 'SPFX', 'VISI', 'PLAC', 'PADD', 'LACT', 'EQUP', 'CODE', 'BIND', 'STRS',
+ORDER = ('CONF', 'GLOB', 'JRNL', 'SNDS', 'VOIC', 'MUSI', 'OBJS', 'SCRP', 'STRT', 'NEWG', 'NGWE', 'NGCS', 'HELD', 'OACT', 'PCEL', 'PMOV', 'SPFX', 'VISI', 'PLAC', 'PADD', 'LACT', 'EQUP', 'WATR', 'CODE', 'BIND', 'STRS',
          'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'TOPC', 'ASPC', 'ASPE', 'AEFF', 'AMGE', 'DRSC', 'AENC', 'APCS',
-         'AIDX', 'ASPX') + ('BNAM',) + ('LOCN', 'HITM', 'SCRH')
+         'AIDX', 'ASPX') + ('BNAM',) + ('LOCN', 'HITM', 'SCRH') + ('RGNS', 'WERE', 'EFFN')
 # The actor sections (actors.py, docs/ACTOR_STATE.md): OACT is resident (a script's target -> its actor row); the
 # others stay on disk and are read a row at a time by the engine's actor state (aw_actorstate.c).
 ACTOR_SECTIONS = ('OACT', 'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'ASPC', 'ASPE', 'AEFF', 'AMGE', 'AENC', 'APCS',
@@ -178,6 +200,34 @@ def fnv1a(text):
 
 
 NO_SLOT = 0xFF   # a PADD row whose script has no OnPCAdd local: the script runs while carried, nothing is set
+WATER_FLAG = 1   # a WATR row's flags: the room's cell carries the water flag (CELL flags 0x02)
+WATER_ROW = struct.Struct('>HBBf')
+
+
+def water_rows(data):
+    """The WATR rows (v0.0.68, GETWATERLEVEL-COLUMN-NOT-ROOM-67): [(stable number, flags, level)] of every interior cell
+    of DATA (gamedata.GameData) whose cell has the water flag and a stable number (the room map's _aw_cell_int),
+    ascending by number, the level in the original's units. GetWaterLevel in such a room reads its level; in a room
+    with no row, the lowest float; outdoors 0 (OpenMW apps/openmw/mwscript/cellextensions.cpp OpGetWaterLevel)."""
+    numbers = getattr(data, 'interior_numbers', {}) or {}
+    rows = []
+    for cell, water in (getattr(data, 'interior_water', {}) or {}).items():
+        number = numbers.get(cell)
+        if not water.get('water') or not number:
+            continue
+        if not 0 < number <= 0xFFFF:
+            raise ValueError('WATR: room %r has the stable number %r, past the row\'s 16 bits' % (cell, number))
+        rows.append((number, WATER_FLAG, float(water.get('level', 0.0))))
+    rows.sort()
+    for a, b in zip(rows, rows[1:]):
+        if a[0] == b[0]:
+            raise ValueError('WATR: two water rooms share the stable number %d' % a[0])
+    return rows
+
+
+def water_section(rows):
+    """(bytes, rows) of the WATR section of ROWS (water_rows)."""
+    return b''.join(WATER_ROW.pack(n, f, 0, level) for n, f, level in rows), len(rows)
 
 
 def new_game_weather_rows(program, compiled):
@@ -186,9 +236,9 @@ def new_game_weather_rows(program, compiled):
     carries them (compiled hand-written: CharGen). A script that runs sets its own weather. A region the image has not
     is left out, as ChangeWeather's call is no code then."""
     from .codegen import SCRIPT_HANDWRITTEN
-    from .gamedata import new_game_weather
+    from .gamedata import new_game_weather, region_catalogue
     p = program
-    regions = sorted(getattr(p.data, 'base_regions', ()) or ())
+    regions = region_catalogue(p.data)
     scripts = getattr(p.data, 'scripts', {})
     out = []
     for name in getattr(p.data, 'new_game', []):
@@ -200,6 +250,31 @@ def new_game_weather_rows(program, compiled):
             if region in regions and 0 <= weather < 10:
                 out.append((regions.index(region), weather))
     return out
+
+
+def region_rows(data):
+    """The RGNS rows (v0.0.68, MW-CONSOLE-COMMANDS-62): the region ids of DATA's region catalogue in its order
+    (gamedata.region_catalogue), each as its record writes it (gamedata.region_ids; the folded id when unknown). Row N is
+    region index N, the number a compiled ChangeWeather or ModRegion hands the engine."""
+    written = getattr(data, 'region_ids', {}) or {}
+    from .gamedata import region_catalogue
+    return [written.get(r, r) for r in region_catalogue(data)]
+
+
+WERE_ROWS = 10   # 9 BecomeWerewolf numbers (35 settings, four a number) and SetWerewolfAcrobatics' one
+
+
+def werewolf_rows(program):
+    """The WERE rows (v0.0.68, MW-CONSOLE-COMMANDS-62): the numbers a compiled BecomeWerewolf hands the engine, then
+    SetWerewolfAcrobatics' one, from the same function the compiler takes them from (codegen.Program.werewolf_settings);
+    [] for a program without it."""
+    settings = getattr(program, 'werewolf_settings', None)
+    if settings is None:
+        return []
+    rows = list(settings(True)) + list(settings(False))
+    if len(rows) != WERE_ROWS:
+        raise ValueError('WERE: %d werewolf numbers, the engine reads %d' % (len(rows), WERE_ROWS))
+    return rows
 
 
 def new_game_control_rows(program, compiled):
@@ -451,6 +526,14 @@ def write(program, compiled, binds, conf=None):
     topics = sorted(rows(), key=rows().get) if rows else []
     names = getattr(p.data, 'topics', {})
     topc = (b''.join(struct.pack('>H', p.string(names[k])) for k in topics), len(topics))
+    # RGNS (v0.0.68, MW-CONSOLE-COMMANDS-62): the region catalogue's ids in its order, u16 name; on disk. Interned here,
+    # before STRS is written below
+    regions = region_rows(p.data)
+    rgns = (b''.join(struct.pack('>H', p.string(name)) for name in regions), len(regions))
+    # EFFN (v0.0.68, MW-CONSOLE-COMMANDS-62): the magic effects' ids in the game's numbering, u16 name; on disk. Interned
+    # here, before STRS is written below
+    from .codegen import EFFECT_NAMES
+    effn = (b''.join(struct.pack('>H', p.string(name)) for name in EFFECT_NAMES), len(EFFECT_NAMES))
     # DRSC (v0.0.58, DIALOGUE-COMPLETE-58): the dialogue's result scripts, 12 bytes a row sorted by (hash, length,
     # speaker script): u32 FNV-1a of the result text, u16 its length, u16 the speaker's script (0xFFFF none), u16 the
     # compiled _dlg_N script, u16 flags (1: did not compile); on disk, read when an answer is shown
@@ -485,6 +568,8 @@ def write(program, compiled, binds, conf=None):
     # sorted by the FNV-1a of its folded id: u32 hash, u16 script, u16 0; resident
     lact_rows = levelled_actor_rows(p)
     sections['LACT'] = (b''.join(struct.pack('>IHH', h, s, 0) for h, s in lact_rows), len(lact_rows))
+    # WATR (v0.0.68, GETWATERLEVEL-COLUMN-NOT-ROOM-67): every water room's own level; resident
+    sections['WATR'] = water_section(water_rows(p.data))
     bnam_rows = bound_name_rows(binds)
     sections['BNAM'] = (b''.join(struct.pack('>II', h, r) for h, r in bnam_rows), len(bnam_rows))
     # LOCN and HITM (v0.0.66): the scripts' variables by name and the held items by item, for the save; on disk
@@ -493,6 +578,10 @@ def write(program, compiled, binds, conf=None):
     hitm_rows = held_item_rows(binds)
     sections['HITM'] = (b''.join(struct.pack('>II', k, h) for k, h in hitm_rows), len(hitm_rows))
     sections['SCRH'] = (b''.join(struct.pack('>I', name_hash(row['name'])) for row in p.scripts.rows), len(p.scripts.rows))
+    sections['RGNS'] = rgns
+    were = werewolf_rows(p)
+    sections['WERE'] = (b''.join(struct.pack('>i', v) for v in were), len(were))
+    sections['EFFN'] = effn
     actors = getattr(p, 'actors', None)
     if actors is not None:
         sections.update(actors.sections(p.objects.rows))

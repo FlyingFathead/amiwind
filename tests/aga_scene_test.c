@@ -45,6 +45,9 @@ keydest_t key_dest=key_game;double realtime;
 #define ORIGINAL_STRINGS "\0aw_npc\0Fargoth\0worldspawn\0Darvame Hleran\0Selvil Sareloth\0progs/v_nord.mdl"
 char *pr_strings=ORIGINAL_STRINGS "\0func_wall\0*1";
 static int harvest_fixture,section_doors;
+/* ROOM-ARRIVAL-STAND-NO-SPOT-67 (v0.0.68): Seyda Neen's doors into the flooded fixture room, as the Forgotten Sewer's
+ * trap door leads into its hall once a crank has flooded it: a marker in the water closed above, one in the pillar */
+static int flooded_doors;
 static eval_t harvest_reference;
 static model_t harvest_world,harvest_model;
 static char object_name[80];
@@ -275,6 +278,11 @@ int COM_FOpenFile(char *name,FILE **f){
   if(picker_file_mode==7)size-=4; /* Member ends within label despite trailing file bytes. */
   if(picker_file_mode==8)size+=40; /* Advertised member extends beyond actual EOF. */
   assert(!fseek(*f,start,SEEK_SET));return picker_file_mode==4?5000:size;
+ }
+ if(flooded_doors && !strcmp(name,"doors-seyda.txt")){
+  const char *s="AWD3\nseyda census 474499 -5 35 25 5 45 35 -12.5 -31 -60 90\tFlooded hall\n"
+                "seyda census 474500 -5 35 25 5 45 35 120 -30 7.625 90\tPillar\n";
+  *f=tmpfile();assert(*f);fputs(s,*f);rewind(*f);return strlen(s);
  }
  if(section_doors && (!strcmp(name,"doors-vf0000.txt") || !strcmp(name,"doors-mi5b8154939f7aa.txt"))){
   const char *s=!strcmp(name,"doors-vf0000.txt")?
@@ -1143,6 +1151,28 @@ int main(void){
     assert(map_place_calls==calls && fabs(p.v.origin[0]-cases[k].at[0])<.01f && fabs(p.v.origin[1]-cases[k].at[1])<.01f);
     assert(fabs(p.v.origin[2]-cases[k].z)<.2f && p.v.movetype==MOVETYPE_WALK);
    }else assert(map_place_calls==calls+1 && VectorCompare(p.v.origin,start));
+  }
+  /* ROOM-ARRIVAL-STAND-NO-SPOT-67 (v0.0.68, the Forgotten Sewer's trap door once a crank has flooded the hall under
+   * it): a load door's own marker in the water closed above is taken, as the original and OpenMW set the player at
+   * the marker (the same point from a script's PositionCell, the case under the floor above, still falls back); a
+   * marker in solid geometry still falls back. Before the fix the door's marker fell back to the room's start too. */
+  {
+   static const struct {unsigned ref;float at[3];int how;} doors[]={
+    {474499,{-12.5f,-31.0f,-60.0f},1},          /* the flooded hall: in the water, closed above */
+    {474500,{120.0f,-30.0f,7.625f},0}};         /* in the pillar */
+   for(k=0;k<(int)(sizeof(doors)/sizeof(doors[0]));k++){
+    AW_SceneCancelTransition();strcpy(sv.name,"prison");p.v.health=73;p.v.movetype=MOVETYPE_WALK;
+    cls.state=ca_connected;cls.signon=SIGNONS;aw_story.stage=AW_STAGE_RELEASED;door_duration=0;
+    p.v.mins[0]=-7.32f;p.v.mins[1]=-7.12f;p.v.mins[2]=-16.625f;p.v.maxs[0]=7.32f;p.v.maxs[1]=7.12f;p.v.maxs[2]=16.625f;
+    assert(!AW_SceneActivate(999));                   /* another map's links read: the next read is seyda's own */
+    flooded_doors=1;strcpy(sv.name,"seyda");queued[0]=0;
+    assert(AW_SceneActivate(doors[k].ref) && !strcmp(queued,"map census\n"));
+    flooded_doors=0;
+    strcpy(sv.name,"census");assert(AW_Interior());VectorCopy(start,p.v.origin);calls=map_place_calls;
+    AW_SceneSpawn(&p);
+    if(doors[k].how)assert(map_place_calls==calls && VectorCompare(p.v.origin,doors[k].at) && p.v.movetype==MOVETYPE_WALK);
+    else assert(map_place_calls==calls+1 && VectorCompare(p.v.origin,start));
+   }
   }
   flooded=0;sv.worldmodel=world;AW_SceneCancelTransition();
   VectorCopy(vec3_origin,p.v.mins);VectorCopy(vec3_origin,p.v.maxs);

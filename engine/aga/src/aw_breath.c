@@ -9,6 +9,7 @@
 #include "aw_effects.h"
 #include "aw_cast.h"
 #include "aw_reset.h"
+#include "aw_drown.h"
 
 static aw_breath_settings_t settings;
 static int settings_state;               /* 0 not read, 1 from the image, 2 the original's values */
@@ -49,7 +50,18 @@ static float water_breathing(edict_t *p) {
     if(aw_combat_effect_magnitude)return aw_combat_effect_magnitude(p,AW_EFFECT_WATER_BREATHING);
     return AW_EffectsMagnitude(AW_ACTOR_PLAYER_REF,AW_EFFECT_WATER_BREATHING,AW_EFFECT_NO_ARG);
 }
+/* the settings as the image gives them (the NPCs' drowning uses the same, aw_drown.c) */
+void AW_BreathSettingsGet(aw_breath_settings_t *out) {
+    load_settings();
+    if(out)*out=settings;
+}
+static void breath_player(void);
+/* the player's breath, then the NPCs' (ACTOR-DROWNING-NOT-CARRIED-67, aw_drown.c) */
 void AW_BreathPhysics(void) {
+    breath_player();
+    AW_DrownPhysics();
+}
+static void breath_player(void) {
     edict_t *p;float dt=(float)host_frametime,loss;
     submerged=breathing=0;
     if(!sv.active || svs.maxclients!=1 || !svs.clients || !(p=svs.clients[0].edict)){left=-1;return;}
@@ -84,6 +96,7 @@ static void breath_command(void) {
                settings.suffocation,drown_damage,drown_ticks,sound_path[0]?sound_path:"none in this image");
     Con_Printf(" settings %s; god mode held back %lu world damages (%.1f health) and %lu script or spell losses\n",
                settings_state==1?"from the image":"the original's values",held,world_held,AW_MwscriptGodHealthHeld());
+    AW_DrownStatus();
 }
 /* New Game: a full breath, nothing taken (aw_reset.h) */
 static void reset_breath(int new_game) {(void)new_game;left=-1;submerged=breathing=0;drown_ticks=0;drown_damage=0;sound_next=0;}
@@ -92,4 +105,5 @@ void AW_BreathInit(void) {
     aw_breath_bar=bar;
     Cmd_AddCommand("aw_breath",breath_command);
     AW_ResetRegister("breath (drowning)",reset_breath,digest_breath);
+    AW_DrownInit();
 }

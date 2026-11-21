@@ -214,7 +214,8 @@ _MOVER_CALL=re.compile(r'^\s*(?:(?:"([^"]+)"|([A-Za-z0-9_\-]+))\s*->\s*)?(%s)\b'
 def mover_catalogue(raw,exclude=()):
     """WORLD-BUTTONS-62: the placed references a script moves or turns (Move, MoveWorld, SetPos, SetAtStart, Rotate,
     RotateWorld, SetAngle), named ("ex_gg_portcullis_01"->MoveWorld z 70) or the script's own object when the script
-    reads OnActivate (a crank's Rotate X 20), whose record is an activator, static, door or container: the CHIM world
+    reads OnActivate (a crank's Rotate X 20) or GetWaterLevel (a crate that floats on the water a script raises),
+    whose record is an activator, static, door or container: the CHIM world
     draws them as placements without
     an entity, which the engine moves through the M rows (aw_hinged_door.c). References ascending, EXCLUDE (the hinged
     doors, D rows) left out. -> (references, {id: [script names]})."""
@@ -235,10 +236,13 @@ def mover_catalogue(raw,exclude=()):
             m=_MOVER_CALL.match(line)
             if not m:continue
             target=(m.group(1) or m.group(2) or '').casefold()
-            # the script's own object only when its use drives it (OnActivate: cranks, bar doors, the Shishi skull);
-            # a script that turns its object every frame on its own (the swinging signs, the floating crates: 950
-            # placements) waits for a cheaper per-frame path (its cost per frame, WORLD-BUTTONS-62)
-            if not target and 'onactivate' not in text.casefold():continue
+            # the script's own object only when its use drives it (OnActivate: cranks, bar doors, the Shishi skull) or
+            # the water level does (GetWaterLevel: the 9 floating crates of the Forgotten Sewer, which ride the water
+            # a crank raises, MWSCRIPT-WATER-LEVEL-STATIC-67); any other script that moves its object every frame on
+            # its own (the swinging signs; with the crates they were 950 placements) waits for a cheaper per-frame
+            # path (its cost per frame, WORLD-BUTTONS-62)
+            low=text.casefold()
+            if not target and 'onactivate' not in low and 'getwaterlevel' not in low:continue
             for ident in ([target] if target else carriers.get(name,[])):
                 if ident in kinds:moved.setdefault(ident,set()).add(name)
     refs=set()

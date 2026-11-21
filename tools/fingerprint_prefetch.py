@@ -43,7 +43,7 @@ STORE_KEEP = 24                            # analysed trees kept (the most recen
 MAGIC = b'AWPA1\n'
 # The memos of a SourceIndex the analysis fills (pure functions of the checkout and the index's form)
 MEMO_FIELDS = ('_closures', '_reached', '_keyed', '_symbols', '_includes', '_json_values', '_modules', '_exact',
-               '_selections')
+               '_selections', '_own_names')
 # The code that analyses (its SHA-256 is part of the key; build_cache's folder)
 ANALYZER_FILES = ('build_cache.py', 'engine_facts.py', 'chim_compat.py', 'engine_loader_policy.py',
                   'fingerprint_prefetch.py')
@@ -197,7 +197,7 @@ def merge(index, state):
                 index._reached[key] = reached[key]
             if key in keyed:
                 index._keyed[key] = keyed[key]
-    for field in ('_symbols', '_includes', '_json_values', '_modules', '_exact', '_selections'):
+    for field in ('_symbols', '_includes', '_json_values', '_modules', '_exact', '_selections', '_own_names'):
         values = state.get(field) or {}
         if not values:
             continue

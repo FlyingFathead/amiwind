@@ -324,6 +324,13 @@ int AW_MwvmVoice(int k,unsigned char hash[8],int *centis){
     return r[0]|r[1]|r[2]|r[3]|r[4]|r[5]|r[6]|r[7]?1:0;
 }
 int AW_MwvmMusic(int k){return ON && k>=0 && k<vm.nmusi && (vm.musi[4*k+1]&1)?vm.musi[4*k]:-1;}
+/* v0.0.68 (MW-CONSOLE-COMMANDS-62): the SNDS and MUSI rows by their names, for the console's PlaySound family and
+ * StreamMusic (aw_mwhost.c console_sound): the row counts and each row's name (a string index; SNDS u16 name at byte
+ * 16, MUSI u16 path at byte 2, tools/mwscript/awms.py), -1 past the rows */
+int AW_MwvmSoundCount(void){return ON?vm.nsnds:0;}
+int AW_MwvmSoundName(int k){return ON && k>=0 && k<vm.nsnds?(int)U16(vm.snds+18*k+16):-1;}
+int AW_MwvmMusicCount(void){return ON?vm.nmusi:0;}
+int AW_MwvmMusicName(int k){return ON && k>=0 && k<vm.nmusi?(int)U16(vm.musi+4*k+2):-1;}
 /* The OBJS row, 12 bytes (tools/mwscript/awms.py): u32 reference (0: not placed once), u16 id (a string index), u16
  * script (AWM_NONE none), u16 placed, u16 flags (1: the id names a script, its global instance). Every reader of the
  * row goes through these four (MWSCRIPT-MEMBER-READS-ID-AS-SCRIPT-66: member() read the script at the id's offset). */

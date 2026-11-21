@@ -243,13 +243,15 @@ int main(void)
         /* refused: a weather past the list, a region the table has not; a full list */
         assert(!AW_WeatherScriptChange(&sc,&table,1,AW_WEATHERS,period) && !AW_WeatherScriptChange(&sc,&table,3,0,period));
         assert(!AW_WeatherScriptModRegion(&sc,&table,-1,endgame,8,period) && sc.count==1);
-        /* a weather the new chances still allow stays for the period (only the first chances replaced: the rest kept) */
+        /* a weather the new chances still allow stays for the period; v0.0.68 (MODREGION-KEEPS-UNGIVEN-CHANCES-68): the
+         * list given is the whole list (OpenMW skyextensions.cpp OpModRegion, weather.cpp RegionWeather::setChances),
+         * the weathers past it have none (before: they kept the region's own) */
         w=AW_WeatherScripted(&sc,&table,0,days,ms);
         {int keep[AW_WEATHERS];for(r=0;r<AW_WEATHERS;r++)keep[r]=r==w?7:0;
          assert(AW_WeatherScriptModRegion(&sc,&table,0,keep,w+1,period));}
         assert(AW_WeatherScripted(&sc,&table,0,days,ms)==w);
         c=AW_WeatherChancesOf(&sc,&table,0);assert(c[w]==7);
-        for(r=w+1;r<AW_WEATHERS;r++)assert(c[r]==table.chances[0][r]);
+        for(r=w+1;r<AW_WEATHERS;r++)assert(c[r]==0);
         assert(AW_WeatherScriptModRegion(&sc,&table,2,few,2,period));           /* a zero list given cloudy 100 */
         assert(AW_WeatherScripted(&sc,&table,2,days+5,ms)==1);
         /* saved and read back the same; a bad block refused, leaving nothing changed */
@@ -264,6 +266,43 @@ int main(void)
         assert(AW_WeatherScriptImport(&back,saved,4)==-1);
         AW_WeatherScriptReset(&sc);
         assert(sc.count==0 && AW_WeatherScripted(&sc,&table,1,days,ms)==AW_WEATHER_BLIGHT);
+    }
+    {   /* v0.0.68 (MW-CONSOLE-COMMANDS-62, MODREGION-KEEPS-UNGIVEN-CHANCES-68): the console's ChangeWeather and ModRegion
+         * take the call a script line takes, on the masters' own rows: Moesring Mountains Region (Bloodmoon.esm REGN
+         * WEAT, ten chances: snow 20, blizzard 40) and Bitter Coast Region (Morrowind.esm, eight: snow and blizzard 0) */
+        static aw_weather_table_t sol;static aw_weather_script_t sc;
+        static const unsigned char moesring[10]={10,10,0,20,0,0,0,0,20,40},bitter[10]={10,60,10,0,10,10,0,0,0,0};
+        static const int endgame[8]={50,50,0,0,0,0,0,0},storm[10]={0,0,0,0,0,0,0,0,50,50},big[1]={150},none[1]={0};
+        const unsigned char *c;int days=4,ms=0,period,r,w,seen[AW_WEATHERS];
+        memset(&sol,0,sizeof sol);sol.regions=2;sol.hours=20;
+        memcpy(sol.chances[0],moesring,10);memcpy(sol.chances[1],bitter,10);
+        period=AW_WeatherPeriod(days,ms,sol.hours);
+        /* snow (8) and blizzard (9) are weathers of the list; 10 is past it (OpenMW changeWeather: no such weather) */
+        AW_WeatherScriptReset(&sc);
+        assert(AW_WeatherScriptChange(&sc,&sol,0,8,period) && AW_WeatherScripted(&sc,&sol,0,days,ms)==8);
+        assert(AW_WeatherScriptChange(&sc,&sol,0,9,period) && AW_WeatherScripted(&sc,&sol,0,days,ms)==9);
+        assert(AW_WeatherScriptChange(&sc,&sol,1,8,period) && AW_WeatherScripted(&sc,&sol,1,days,ms)==8);
+        assert(!AW_WeatherScriptChange(&sc,&sol,0,AW_WEATHERS,period) && !AW_WeatherScriptChange(&sc,&sol,2,8,period));
+        /* the masters' eight-number ModRegion (EndGame's) on a ten-chance region: snow and blizzard 0 after it (before
+         * v0.0.68 they kept 20 and 40, and a blizzard could still come) */
+        AW_WeatherScriptReset(&sc);
+        assert(AW_WeatherScriptModRegion(&sc,&sol,0,endgame,8,period));
+        c=AW_WeatherChancesOf(&sc,&sol,0);
+        assert(c && c[0]==50 && c[1]==50 && c[3]==0 && c[8]==0 && c[9]==0);
+        for(r=0;r<60;r++){w=AW_WeatherScripted(&sc,&sol,0,days+r,ms);assert(w==0 || w==1);}
+        assert(!memcmp(sol.chances[0],moesring,10));                           /* the table itself unchanged */
+        /* all ten given: only snow and blizzard from now on, both seen */
+        assert(AW_WeatherScriptModRegion(&sc,&sol,0,storm,10,period));
+        memset(seen,0,sizeof seen);
+        for(r=0;r<200;r++){w=AW_WeatherScripted(&sc,&sol,0,days+r,ms);assert(w==8 || w==9);seen[w]=1;}
+        assert(seen[8] && seen[9]);
+        /* each chance clamped to 0..100 (OpenMW: std::clamp(.., 0, 100); before: 255) */
+        assert(AW_WeatherScriptModRegion(&sc,&sol,1,big,1,period));
+        c=AW_WeatherChancesOf(&sc,&sol,1);
+        assert(c[0]==100);for(r=1;r<AW_WEATHERS;r++)assert(c[r]==0);
+        /* a list of none: no chance reaches the roll, so clear (OpenMW chooseNewWeather's default) */
+        assert(AW_WeatherScriptModRegion(&sc,&sol,1,none,0,period));
+        for(r=0;r<20;r++)assert(AW_WeatherScripted(&sc,&sol,1,days+r,ms)==AW_WEATHER_CLEAR);
     }
     puts("weather rules ok");
     return 0;

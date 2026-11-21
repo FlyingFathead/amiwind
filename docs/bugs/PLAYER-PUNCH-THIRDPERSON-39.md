@@ -2,12 +2,13 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 4 times; something has to be done
+## PERSISTING: reported 5 times; something has to be done
 
 - Reported with v0.0.39-rc1 at 2026-10-13 (time not recorded): Source candidate: two male bodies retain full8/6 gait plus punch within512 KiB;83 affected tests pass. Target/native/visual/all-appearance/RC2-package acceptance pending.
 - Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): All 20 body pairs pass binary checks with gait/punch declarations; 33 guard checks pass, earlier 83 retained. Visible punch, seams and native/package/maintainer acceptance pending.
 - Reported with v0.0.39-rc2 at 2026-10-13 (time not recorded): Scoped Nord male/Orc female candidate footage shows torso/arm punch motion and ready movement. Display only: damage, LMB, all appearances, matched A/B, seams, package/maintainer acceptance pending.
 - Reported with v0.0.39-rc2 at 2026-10-14 (time not recorded): Maintainer repeats no third-person punch from physical LMB in RC2. One exact input/damage control succeeds; maintainer-case visible animation remains unaccepted.
+- Reported with v0.0.67 at 2026-11-20 15:29 +0200: Seen again on the v0.0.67 release image: in third person the attack swing is heard but the player's body does not move; the attack animation works in first person. It worked in earlier builds, so the commit that broke it is to be found and a test written that fails on the old behaviour.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -35,6 +36,14 @@
 
 ## Timeline
 
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.67 (054bdc00) | 2026-11-20 | gate 12221 of the planning item PLAYER-PUNCH-THIRDPERSON-39 | Third-person fists draw and punch with the original hand-to-hand animations; seen in play on the v0.0.68-dev1 image. |
+| fixed in source | a gated commit | v0.0.68-dev2 (054bdc006) | 2026-11-20 | gate 12221 | Third-person punches have no visible player-body attack animation |
+| confirmed in play | an emulator session | v0.0.68-dev1 image with the engine of 054bdc006 | 2026-11-20 | a journey session at 32 MB Fast, its stills and console log | Third-person punches have no visible player-body attack animation |
+
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-10-13: reported in v0.0.39-rc1
@@ -47,6 +56,10 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-10-14: UI-INVENTORY-INTEGRATION-40: scoped native equipment: UI-INVENTORY-INTEGRATION-40/INVENTORY-CATALOG-LOOKUP-40: actual names/icons, equip, modal pause and Russula persistence scoped; missing resources separate.
 - 2026-10-14: PLAYER-PUNCH-THIRDPERSON-39: held attack during raising: PLAYER-PUNCH-THIRDPERSON-39: compiledQC old control fails heldLMB during raise; source defers latch until ready.
 - 2026-10-14: Renewed RC2 gameplay reports: PLAYER-PUNCH-THIRDPERSON-39: maintainer repeats no physicalLMB third-person punch.
+- 2026-11-20: fixed in source: a gated commit, v0.0.67 (054bdc00); gate 12221 of the planning item PLAYER-PUNCH-THIRDPERSON-39: Third-person fists draw and punch with the original hand-to-hand animations; seen in play on the v0.0.68-dev1 image.
+- 2026-11-20: fixed in source: a gated commit, v0.0.68-dev2 (054bdc006); gate 12221: Third-person punches have no visible player-body attack animation
+- 2026-11-20: confirmed in play: an emulator session, v0.0.68-dev1 image with the engine of 054bdc006; a journey session at 32 MB Fast, its stills and console log: Third-person punches have no visible player-body attack animation
+- 2026-11-20 15:29 +0200: seen again in v0.0.67: Seen again on the v0.0.67 release image: in third person the attack swing is heard but the player's body does not move; the attack animation works in first person.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -55,7 +68,7 @@ _Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
+- [PERSISTING: reported 5 times; something has to be done](#persisting-reported-5-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -291,6 +304,7 @@ Family: First-person hands and torch (`torch-hands`). First-person hands, punche
 - [HAND-PUNCH-TRANSITION-29](HAND-PUNCH-TRANSITION-29.md): Hands briefly disappear when changing into the punch animation
 - [HELD-LIGHT-ALWAYS-TORCH-61](HELD-LIGHT-ALWAYS-TORCH-61.md): Any carried light held in the hand is drawn and lit as a torch
 - [HELD-LIGHT-NOT-IN-HAND-65](HELD-LIGHT-NOT-IN-HAND-65.md): An equipped candlestick is not held in the hand; readying shows only the fists
+- [LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67](LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67.md): With a light and a one-handed weapon equipped together, the two held items replace each other and the light shines from no visible model
 - [PLAYER-3P-HELD-ITEM-STALE-65](PLAYER-3P-HELD-ITEM-STALE-65.md): After a new weapon is given and readied, the third-person body still holds the light that was equipped before
 - [PLAYER-BODY-LEG-SHAPE-39](PLAYER-BODY-LEG-SHAPE-39.md): Nord player legs appear abnormally thin in RC1
 - [PLAYER-EQUIPMENT-NOT-WORN-54](PLAYER-EQUIPMENT-NOT-WORN-54.md): The player body shows no chosen head or hair, no worn clothing or armour and no weapon: it is baked per race and sex with fixed new-game looks

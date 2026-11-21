@@ -1,6 +1,6 @@
 # Build profile and stage reuse
 
-_Last updated with AmiWind v0.0.67-dev3 (18 November 2026)._
+_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -293,7 +293,7 @@ One line per stage that runs:
 |---|---|
 | `OK` | the stage gets its planned workers (`--jobs`; one for a stage without a pool) |
 | `WILL THROTTLE` | fewer workers: the number, and why (the memory holds N at the stage's size per worker, or the CPU quota) |
-| `WILL NOT FIT` | one unit alone (named, with its estimated MiB) is larger than the memory the build plans with (80 % of the limit): the build is refused before any stage runs (`--resource-check warn` builds anyway, `off` skips the plan) |
+| `WILL NOT FIT` | a MiniWind only: one unit alone (named, with its estimated MiB) is larger than the memory the build plans with (80 % of the limit) and the swap: the build is refused before any stage runs (`--resource-check warn` builds anyway, `off` skips the plan). A full build is never refused for memory: the stage runs on one worker with a WARN line (below) |
 
 The plan counts units (BUILD-PLAN-PESSIMISTIC-48): with `--reuse-all-available`
 the reuse check looks up every unit cache's keys before any stage, and a
@@ -340,6 +340,15 @@ Where the numbers come from, said on every line in brackets:
   on disk (about 2.03 placed bytes per stored byte, one calibration point).
   With `--stair-walk off` (the default) nothing is walked and no stair figure is
   looked for or priced.
+- **measured in the reference build**: a full build's stage that neither its
+  runs nor the workspace's history measured in a full build (a first build, as a
+  rule) takes the stage's measured peak in the reference build, the v0.0.66
+  from-scratch build of the whole game (`config/build-memory.json`: its largest
+  process, its peak and its workers; stages under 1 GiB are not in it). Its
+  memory only: its from-scratch time is not counted, so a build that reuses the
+  stage's units is never planned at the reference build's hours. A MiniWind
+  never takes it (like for like). The plan prints one line naming the stages it
+  planned so.
 - **estimated, no data yet**: a stage never measured (512 MiB a worker beside a
   256 MiB parent).
 - **beside it**: the memory the other stages held at the stage's measured peak
@@ -360,6 +369,53 @@ Where the numbers come from, said on every line in brackets:
   is given (its lease), never from fixed numbers. Origin: the v0.0.59-dev6
   full build ran its CHIM area pass at 8 of 24 workers for 27 minutes beside
   about 19.8 GB held by other stages (BUILD-CHIM-POOL-MEMORY-THROTTLE-59).
+- **not side by side**: two stages that neither wait for the other, both
+  measured (their own measurement or the reference build's; an estimate without
+  data never counts), whose peaks at their planned workers together exceed the
+  memory the build gets, run one after another when the running memory guard
+  cannot make room for both: one of them keeps its memory in one process (its
+  largest process holds half its peak or more, as the CHIM world's main process
+  does: fewer workers free nothing), or one worker each beside their main
+  processes is already too much. The larger runs alone (as above) and both are
+  memory-heavy, so the scheduler never starts them together; each row names the
+  stages it does not run beside (`not_beside`). Two stages whose memory is in
+  their workers still run side by side: the running guard gives each fewer
+  workers while both run. On a first build with 32 GiB the CHIM world (its main
+  process alone about 24 GiB) and the room batches (about 17 GiB) no longer run
+  side by side; with 64 GiB they still do. Origin: a tester's 32 GB machine built
+  for 32 hours and stopped for memory; the v0.0.66 from-scratch build peaked at
+  43.7 GiB with those two side by side (BUILD-TESTER-32GB-OOM-67).
+- **the swap**: the swap the build may use (the machine's free swap, at most a
+  container's own swap limit, cgroup `memory.swap.max`; not counted for an asked
+  memory) counts only when one stage's largest unit is larger than the memory it
+  plans with: it may still fit with the swap, slower while it swaps. It never
+  counts for side by side or for the workers of a pool (a pool that swaps is the
+  slow path).
+
+Every memory decision is one `WARN memory plan:` line in the build's log, under
+the checklist, and in `build-summary.md` ("Needs attention" and its own "Memory
+plan" part; `memory_warnings` in `RESOURCE-PLAN.json`):
+
+A first build with 32 GiB and `--jobs 16` (the reference build's peaks):
+
+```text
+WARN memory plan: chim-room-batches and chim do not fit side by side: about 14594 + 26113 MiB at their planned workers (measured in the reference build (...)), more than the 32768 MiB of memory the build gets, and the memory of chim is in one process, which fewer workers do not free: they run one after another (chim runs alone; the memory-heavy stages wait while it runs)
+WARN memory plan: chim-room-batches and actor-library together need about 14594 + 25061 MiB at their planned workers (...), more than the 32768 MiB of memory the build gets: their memory is in their workers, so they run side by side with fewer workers each while both run (...)
+WARN memory plan: actor-library runs 9 of 16 workers: memory holds 9 workers at about 2619 MiB each beside a 1491 MiB parent (measured in the reference build (...))
+```
+
+and with 16 GiB:
+
+```text
+WARN memory plan: chim needs about 24669 MiB in its largest unit (...), more than the 13107 MiB the build plans with (80 % of 16.0 GiB of memory); no swap counted (...). It runs anyway, on one worker; if it stops for memory, run the same command again in the same build folder: every finished stage and unit is kept (...); more memory for the build or about 32 GiB of swap lets it finish
+```
+
+The keys are `side-by-side:A+B` (one after another), `shared:A+B` (side by side
+with fewer workers each), `alone:STAGE` (alone for the memory beside it),
+`workers:STAGE` (fewer workers for memory) and `below-need:STAGE` (one unit larger
+than the memory). The scheduler's own running guards stay as they were: a pool
+follows the memory it has while it runs, and a pool that loses a worker sends its
+units out again at half the width.
 
 Wall times are the measured wall fitted with Amdahl's law (the stage's average
 busy cores on its workers give its parallel share), so a stage that kept one

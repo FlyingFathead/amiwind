@@ -209,9 +209,13 @@ class PlannerTests(unittest.TestCase):
         self.assertLess(image.index('payload_preflight(args, out, excluded, jobs'), image.index('finalize_image(args)'))
         compact = inspect.getsource(build_aga.compact_layout)
         self.assertIn("planned_path = out/'layout-plan.json'", compact)
-        # followed, or laid out from the staged files when the payload only grew (IMAGE-LAYOUT-PLAN-ACTOR-LIBRARY-48)
-        self.assertIn('layout_plan.follows_or_grew(planned, plan, shrink=shrink)', compact)
-        self.assertLess(compact.index('follows_or_grew'), compact.index('write_layout('))
+        # followed, or laid out from the staged files when the payload only grew (IMAGE-LAYOUT-PLAN-ACTOR-LIBRARY-48),
+        # also when DH0 can no longer hold it with the planned units (IMAGE-BOOT-PAYLOAD-OVER-2GIB-48, v0.0.68-dev3)
+        self.assertIn('layout_plan.plan_following(', compact)
+        self.assertIn('planned, shrink=shrink)', compact)
+        self.assertLess(compact.index('plan_following'), compact.index('write_layout('))
+        self.assertIn('follows_or_grew(planned, plan, shrink=shrink)', inspect.getsource(build_aga.layout_plan.plan_following)
+                      if hasattr(build_aga, 'layout_plan') else inspect.getsource(__import__('layout_plan').plan_following))
         self.assertIn('compact_disk_layout', inspect.getsource(payload_preflight.check_disk_layout))
 
     def test_the_plan_counts_the_actor_library_the_image_step_installs(self):
@@ -378,6 +382,32 @@ class PlannerTests(unittest.TestCase):
         # without the plan the image step plans the same split itself
         self.assertEqual(L.plan_compact(rows, frame_maps(20), chim_payload(300 * MIB))['partitions'][1]['moved'],
                          planned['partitions'][1]['moved'])
+
+    def test_a_plan_that_moved_nothing_is_planned_again_when_the_boot_payload_outgrew_it(self):
+        # IMAGE-BOOT-PAYLOAD-OVER-2GIB-48, seen again in v0.0.68-dev3: the payload preflight planned DH0 with no unit
+        # moved; then the Solstheim store went onto DH0 and the boot payload passed one partition. Following that plan
+        # raised ("moving 0 of the 5168 units") before follows_or_grew could see the growth, and the image stopped
+        rows = self.split_payload()
+        early = {k: v for k, v in rows.items() if not k.startswith(('id1/chimi/', 'id1/progs/a_'))}
+        maps, chim = frame_maps(20), chim_payload(300 * MIB)
+        planned = L.plan_compact(early, maps, chim)
+        self.assertEqual([r.get('moved') or [] for r in planned['partitions']], [[], []])
+        with self.assertRaisesRegex(ValueError, r'moving 0 of the \d+ units'):
+            L.plan_compact(rows, maps, chim, follow=planned)   # the old route: following alone
+        plan, grown = L.plan_following(rows, maps, chim, 100, 100, planned)
+        self.assertGreater(grown[0], 500 * MIB)
+        self.assertIn('DH0 no longer fits with the units the plan moved', grown[1])
+        L.require_minimal(plan)
+        boot, dw0 = plan['partitions']
+        self.assertLess(boot['bytes'], 2 * GIB)
+        self.assertIn('id1/chimi/', dw0['moved'])
+        # the plan made fresh is the one the image step makes without a preflight plan, with one headroom of margin
+        self.assertEqual(plan['partitions'][1]['moved'],
+                         L.plan_compact(rows, maps, chim, margin=1)['partitions'][1]['moved'])
+        # a payload that still follows its plan is followed, and any other refusal still stops
+        self.assertIsNone(L.plan_following(early, maps, chim, 100, 100, planned)[1])
+        with self.assertRaisesRegex(ValueError, 'CHIM world payload'):
+            L.plan_following(early, maps, chim_payload(2100 * MIB), 100, 100, planned)
 
     def test_the_plan_counts_the_room_batches_and_the_interior_store(self):
         # IMAGE-BOOT-PAYLOAD-OVER-2GIB-48: the image step copies the room batches in after its first preflight and

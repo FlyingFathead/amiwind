@@ -101,17 +101,21 @@ CONTENT_ADDRESSED = {('npc-gallery', '--cache'), ('world-terrain', '--cache'), (
                      # the module tribunal-mournhold's own unit cache (the same UnitCache as the chim stage's, in a
                      # folder of its own): hashed as an outside folder, the units a run stored re-keyed the stage for
                      # the next run (BUILD-MODULE-UNIT-CACHE-IN-KEY-67: a resumed build would have run it again)
-                     ('tribunal-mournhold', '--unit-cache')}
+                     ('tribunal-mournhold', '--unit-cache'),
+                     # the module bloodmoon-solstheim's own unit cache, the same way
+                     ('bloodmoon-solstheim', '--unit-cache')}
 # Content-addressed cache folders by place, whatever stage or option names them. The CHIM unit cache is shared:
 # the chim stage and the CHIM rooms stage (chim-interiors, tools/chim/interior.py: the same UnitCache, every unit
 # keyed by its own fingerprint and code key) both name WORKSPACE/cache/chim-units. Listed by stage only, the
 # rooms stage hashed the shared folder, which other builds grow past EXTERNAL_DIRECTORY_LIMIT: the stage was
 # never reusable (CHIM-INTERIORS-REUSE-MISS-48, "unexpected rebuild: chim-interiors (other)").
-CONTENT_ADDRESSED_FOLDERS = frozenset({'{WORKSPACE}/cache/chim-units', '{WORKSPACE}/cache/tribunal-mournhold-units'})
+CONTENT_ADDRESSED_FOLDERS = frozenset({'{WORKSPACE}/cache/chim-units', '{WORKSPACE}/cache/tribunal-mournhold-units',
+                                       '{WORKSPACE}/cache/bloodmoon-solstheim-units'})
 # Content-addressed caches whose row is in the stage key from the stage's first run on, before the folder exists (the
 # other rows above appear with their folder, as they always have: their keys stay as they are). A new stage with a
 # cache of its own belongs here.
-CONTENT_ADDRESSED_FROM_THE_START = frozenset({('tribunal-mournhold', '--unit-cache')})
+CONTENT_ADDRESSED_FROM_THE_START = frozenset({('tribunal-mournhold', '--unit-cache'),
+                                              ('bloodmoon-solstheim', '--unit-cache')})
 # The shared storage pool (WORKSPACE/cache/asset-pool-v1, --storage-pool-dir, tools/storage_pool.py) is
 # content-addressed whatever stage or option names it: every object is stored by its own SHA-256 and every
 # reader (tools/file_cache.py FileCache) looks objects up by a reuse key made of the inputs the object depends
@@ -790,6 +794,9 @@ class SourceIndex:
         self._data_maps = None
         self._reached = {}
         self._keyed = {}
+        # {script: AMIWIND_* names of the stage's own closure}: environment_names without the code the stage hands to
+        # cache keys (stage_reads_layers, BUILD-KEY-CHIM-READS-LAYERS-VIA-UNIT-KEY-68)
+        self._own_names = {}
         self._json_values = {}
         # True: the earlier method, the raw CHIM_VERSION label and the compatibility table in every key that reaches
         # them (BUILD-CHIM-LABEL-IN-KEYS-48); False: the label counts as its compatibility line (_keyed_source)
@@ -966,6 +973,27 @@ class SourceIndex:
         """AMIWIND_* names the stage's code can read; {ENV_ANY} when it builds names dynamically."""
         return self._analysis(script)[3]
 
+    def own_environment_names(self, script):
+        """AMIWIND_* names the stage's OWN code can read: environment_names without the names of the code it hands to
+        cache keys (keyed_coverage; those count in its key as code, and their caches key what they read themselves).
+        {ENV_ANY} as environment_names. Worked out again when the closure came from a stored analysis without it."""
+        script = Path(script).resolve()
+        key = str(script)
+        self._analysis(script)
+        if key not in self._own_names:
+            try:
+                start = script.relative_to(self.root.resolve()).as_posix()
+            except ValueError:
+                self._own_names[key] = {ENV_ANY}
+                return self._own_names[key]
+            if self.scope == 'modules':
+                _, _, uncertain, constants = self._closure_modules(start)
+            else:
+                _, _, uncertain, constants = self._closure_symbols(start, 'own-names::' + key)
+            names = environment_names(constants, uncertain)
+            self._own_names[key] = names if not uncertain else {ENV_ANY}
+        return self._own_names[key]
+
     def _analysis(self, script):
         script = Path(script).resolve()
         key = str(script)
@@ -974,12 +1002,14 @@ class SourceIndex:
                 start = script.relative_to(self.root.resolve()).as_posix()
             except ValueError:
                 self._closures[key] = (set(), set(), True, {ENV_ANY})
+                self._own_names[key] = {ENV_ANY}
                 return self._closures[key]
             if self.scope == 'modules':
                 python, data, uncertain, constants = self._closure_modules(start)
             else:
                 python, data, uncertain, constants = self._closure_symbols(start, key)
             names = environment_names(constants, uncertain)
+            self._own_names[key] = names if not uncertain else {ENV_ANY}
             if self.stage_form and self.scope == 'units':
                 # a cache key computed from that code reads it (pass_cache.source_digest, environment): its reach
                 # counts in the stage key (BUILD-ROOM-BATCHES-KEY-UNDERDECLARED-48). Stage form with units: by the
@@ -1173,6 +1203,7 @@ class SourceIndex:
         self._closures.clear()
         self._reached.clear()
         self._keyed.clear()
+        self._own_names.clear()
         self._json_values.clear()
         if self._selections is not None:
             self._selections.clear()
@@ -2720,6 +2751,10 @@ STAGE_GAME_INPUTS = {
     # world of their own, from the base master and archive plus Tribunal's and from nothing of Bloodmoon's
     'tribunal-mournhold-data': BASE_GAME_INPUTS + LAYER_GAME_INPUTS['tribunal'],
     'tribunal-mournhold': BASE_GAME_INPUTS + LAYER_GAME_INPUTS['tribunal'],
+    # the module bloodmoon-solstheim (tools/bloodmoon_solstheim_module.py): Solstheim's outdoor cells as a world of
+    # their own, from the base master and archive plus Bloodmoon's and from nothing of Tribunal's
+    'bloodmoon-solstheim-data': BASE_GAME_INPUTS + LAYER_GAME_INPUTS['bloodmoon'],
+    'bloodmoon-solstheim': BASE_GAME_INPUTS + LAYER_GAME_INPUTS['bloodmoon'],
 }
 # A build module's stages read their OWN master list, whatever else the build selects: {stage: its layers in load
 # order}. Such a stage is keyed by these layers' files and this master list only (stage_components), so selecting or
@@ -2727,6 +2762,8 @@ STAGE_GAME_INPUTS = {
 MODULE_STAGE_LAYERS = {
     'tribunal-mournhold-data': ('tribunal',),
     'tribunal-mournhold': ('tribunal',),
+    'bloodmoon-solstheim-data': ('bloodmoon',),
+    'bloodmoon-solstheim': ('bloodmoon',),
 }
 # {(run, stage): digest of every game input}: the key form before the narrowing, for reuse sources fingerprinted with
 # it (comparable); kept out of the fingerprint itself. Set by stage_components.
@@ -2734,8 +2771,9 @@ PREVIOUS_GAME_INPUTS = {}
 
 # The SELECTED layers (tools/build.py --dlc / --no-dlc, CHIM-SOL-FLORA-PATH-65) reach a stage as its master list in
 # load order, in the environment variable MASTERS_ENV ("Morrowind.esm,Tribunal.esm,Bloodmoon.esm"; the merging reader
-# reads it). A stage READS THE LAYERS when its code names MASTERS_ENV (found by the source index, as for every
-# AMIWIND_* name) or it is listed in LAYER_READING_STAGES; only such a stage adds the selected layers' masters and
+# reads it). A stage READS THE LAYERS when its own code names MASTERS_ENV (found by the source index, as for every
+# AMIWIND_* name; not the code it hands to cache keys: stage_reads_layers) or it is listed in LAYER_READING_STAGES;
+# only such a stage adds the selected layers' masters and
 # archives to its game-input key, with the master list. Every other stage keeps the base key, so selecting the layers
 # (the default) re-keys no base stage; keys follow the selection, never which files are present. The variable itself
 # is in IGNORED_ENV: it is keyed here, through game_inputs, and never re-keys a stage that builds names at run time.
@@ -2762,13 +2800,21 @@ def selected_layers(metadata):
 
 
 def stage_reads_layers(name, script, index):
-    """True when stage NAME reads the selected layers (LAYER_READING_STAGES, or its code names MASTERS_ENV)."""
+    """True when stage NAME reads the selected layers (LAYER_READING_STAGES, or its own code names MASTERS_ENV).
+
+    Its OWN code: the stage's closure, not the code it hands to a cache key (keyed_coverage). That code counts in the
+    stage key as code (sources), and the cache it keys holds the selection itself (pass_cache.game_data_digest); its
+    reach names MASTERS_ENV through the merging reader's module top level whether or not the stage reads a layer. The
+    CHIM source catalogue cache (tools/chim/source_units.py: import_town.collect handed to a unit key) made the base
+    chim stage read Tribunal's and Bloodmoon's masters and archives and the master list through that alone
+    (BUILD-KEY-CHIM-READS-LAYERS-VIA-UNIT-KEY-68)."""
     if name in LAYER_READING_STAGES:
         return True
     if script is None or not Path(script).is_file() or index is None:
         return False
     try:
-        return MASTERS_ENV in index.environment_names(script)
+        own = getattr(index, 'own_environment_names', None)
+        return MASTERS_ENV in (own(script) if own is not None else index.environment_names(script))
     except (OSError, ValueError):
         return False
 
@@ -2803,7 +2849,15 @@ LAYER_ROW_TABLES = {'config/collision-hull-surface.json': (1, 'meshes'),
                     # districts or of Solstheim re-keys no base stage (BUILD-VISUAL-RECIPES-LAYER-ROWS-KEY-67). The
                     # file is written by hand, so a stage that leaves a layer out keys the remaining document's
                     # canonical text, not the file's bytes
-                    'config/visual-recipes.json': (1, 'cell_settings')}
+                    'config/visual-recipes.json': (1, 'cell_settings'),
+                    # the expansions' grounding id file (tools/actor_grounding_layers.py): the people one layer places
+                    # only in its own land are named under "layers" (their rows in "ground_npcs" or "exceptions"), so
+                    # a Solstheim person re-keys neither the base world stage nor Mournhold's module, which reach the
+                    # file but never meet her (BUILD-KEY-GROUNDING-LAYERS-WHOLE-FILE-68)
+                    'config/actor_grounding_layers.json': (1, ('ground_npcs', 'exceptions')),
+                    # the meshes whose collision unions are compiled in BSP2 (tools/chim/union_bsp2.py): Solstheim's
+                    # icebergs re-key no base stage that reads the list (chim.build frame_input)
+                    'config/collision-union-bsp2.json': (1, 'meshes')}
 # layer-row tables written by hand, not by a tool as json.dumps writes them: their whole-file key is the file's bytes,
 # a view without a layer the canonical text of what is left
 HAND_WRITTEN_LAYER_TABLES = ('config/visual-recipes.json',)
@@ -2820,11 +2874,13 @@ def layer_table_view(text, layers, indent, field):
     if not isinstance(named, dict):
         return text
     drop = {str(m).casefold() for layer in layers for m in named.get(layer, ())}
-    rows = doc.get(field)
-    if isinstance(rows, list):
-        doc[field] = [m for m in rows if str(m).casefold() not in drop]
-    elif isinstance(rows, dict):
-        doc[field] = {m: v for m, v in rows.items() if str(m).casefold() not in drop}
+    # FIELD: the rows field, or a tuple of them (a table whose rows sit in more than one field)
+    for one in (field if isinstance(field, tuple) else (field,)):
+        rows = doc.get(one)
+        if isinstance(rows, list):
+            doc[one] = [m for m in rows if str(m).casefold() not in drop]
+        elif isinstance(rows, dict):
+            doc[one] = {m: v for m, v in rows.items() if str(m).casefold() not in drop}
     kept = {layer: ms for layer, ms in named.items() if layer not in layers}
     if kept:
         doc['layers'] = kept

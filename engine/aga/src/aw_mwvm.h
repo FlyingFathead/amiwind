@@ -165,6 +165,12 @@ int AW_MwvmSound(int sound,unsigned char hash[8],int *centis,int *volume,int *ne
 int AW_MwvmSoundAmbience(int sound);                     /* 1: a mapped dungeon ambience (flags 1|2) */
 int AW_MwvmVoice(int voice,unsigned char hash[8],int *centis);                               /* 1 mapped */
 int AW_MwvmMusic(int music);                             /* track number, -1 none */
+/* v0.0.68 (MW-CONSOLE-COMMANDS-62): the rows the console finds a typed sound or music file in, and each row's name
+ * (a string index, -1 past the rows) */
+int AW_MwvmSoundCount(void);
+int AW_MwvmSoundName(int sound);
+int AW_MwvmMusicCount(void);
+int AW_MwvmMusicName(int music);
 uint32_t AW_MwvmObjectReference(int object);             /* 0: not placed once */
 int AW_MwvmObjectCount(void);
 int AW_MwvmObjectId(int object);                         /* string index of its id, -1 none */

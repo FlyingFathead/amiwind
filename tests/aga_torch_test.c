@@ -313,7 +313,13 @@ int main(void)
     cl.viewent.model=NULL;AW_TorchViewModel();assert(!cl.viewent.model);
     memset(pixels,255,sizeof(pixels));AW_TorchDraw();for(i=0;i<sizeof(pixels);i++)assert(pixels[i]==255);
     held_flames_drawn=0;AW_HeldLightDraw();assert(!held_flames_drawn);   /* no first-person place: no flames */
-    state._float=1;assert(!AW_HeldLight());state._float=2;  /* the hands lowered: out */
+    state._float=1;assert(!AW_HeldLight());                 /* the hands still rising: not lit yet */
+    /* LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67: held while the hands are up, lit or put out by V: drawn in the hand */
+    assert(AW_HeldLightShown() && AW_HeldLightShown()->flames==3);
+    state._float=2;torch._float=0;assert(!AW_HeldLight() && AW_HeldLightShown());     /* put out: still in the hand */
+    torch._float=1;goal._float=0;assert(!AW_HeldLight() && !AW_HeldLightShown());     /* the hands down: put away */
+    assert(AW_HeldLightCarried() && AW_HeldLightCarried()->flames==3);                 /* still carried (the picture) */
+    goal._float=1;
     held_equipped=0;assert(AW_TorchEquipped() && !AW_HeldLight());
     aw_held_light_item=NULL;
     memset(pixels,255,sizeof(pixels));chase_active.value=1;AW_TorchDraw();

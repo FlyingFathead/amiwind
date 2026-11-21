@@ -80,8 +80,9 @@ typedef struct {
 /* The scripts' weather (MWSCRIPT-COMPLETE-LANDMARK): rules from OpenMW 0.51 apps/openmw/mwscript/skyextensions.cpp
  * OpChangeWeather / OpModRegion and apps/openmw/mwworld/weather.cpp WeatherManager::changeWeather / modRegion,
  * RegionWeather::setWeather / setChances (read, not copied). ChangeWeather sets a region's weather until the region's
- * next weather change (here: the end of its period); ModRegion replaces the region's first chances for the rest of the
- * game, and a weather the new chances still allow stays until that change, else the new chances choose. The player in
+ * next weather change (here: the end of its period); ModRegion replaces the region's chances for the rest of the game
+ * (those given, each 0..100, and none for the weathers past them: v0.0.68, MODREGION-KEEPS-UNGIVEN-CHANCES-68), and a
+ * weather the new chances still allow stays until that change, else the new chances choose. The player in
  * that region moves to it as to any new weather (a transition, queued behind a running one). One row per changed
  * region, AW_WEATHER_SCRIPT_ROWS at most: a guard above the regions of the three masters (16: nine of Vvardenfell, one
  * of Mournhold, six of Solstheim; was 8, under them, SAVE-STATE-FIXED-CAPS-66), never reached since a region has one
@@ -108,6 +109,13 @@ int AW_WeatherModRegionByScript(int region,const int *chances,int n);
 int AW_WeatherScriptSave(unsigned char *out,int capacity);
 int AW_WeatherScriptLoad(const unsigned char *p,int bytes);
 void AW_WeatherScriptClear(void);
+/* The console's ChangeWeather and ModRegion (v0.0.68, MW-CONSOLE-COMMANDS-62; aw_mwhost.c console_weather): the
+ * weather dbg weather forces (-1 none: the region's weather shows); a region's chances in effect (the scripts' when
+ * changed), NULL without the table or for a region it has not; the region's id in the compiled scripts' region table
+ * (aw_mwhost.c, id1/mwscript.awm RGNS: the catalogue's order), 0 when unknown (no table: an older file) */
+int AW_WeatherForced(void);
+const unsigned char *AW_WeatherRegionChances(int region);
+int AW_MwscriptRegionId(int region,char *out,int capacity);
 
 /* Pure rules (aw_weather_rules.c, host-tested). */
 void AW_WeatherForce(aw_weather_state_t *s,int weather);

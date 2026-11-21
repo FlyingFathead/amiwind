@@ -1,6 +1,6 @@
 # Build cache: resuming and reusing work safely
 
-_Last updated with AmiWind v0.0.67-dev3 (18 November 2026)._
+_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -15,6 +15,8 @@ _Last updated with AmiWind v0.0.67-dev3 (18 November 2026)._
   - [World flora and world scenery regions (v0.0.64-dev4)](#world-flora-and-world-scenery-regions-v0064-dev4)
   - [The merging reader and the expansion layers (v0.0.66-dev1)](#the-merging-reader-and-the-expansion-layers-v0066-dev1)
   - [The room actor fits read the room records only (v0.0.67-dev3)](#the-room-actor-fits-read-the-room-records-only-v0067-dev3)
+  - [The CHIM areas' source catalogues across runs (v0.0.68 line)](#the-chim-areas-source-catalogues-across-runs-v0068-line)
+  - [Room residents stored as they finish (v0.0.68 line)](#room-residents-stored-as-they-finish-v0068-line)
   - [Collision defaults of v0.0.48-dev2: what rebuilds once](#collision-defaults-of-v0048-dev2-what-rebuilds-once)
 - [Narrowed reuse: what a stage really used](#narrowed-reuse-what-a-stage-really-used)
   - [Edits proven to change no output (v0.0.66-dev3)](#edits-proven-to-change-no-output-v0066-dev3)
@@ -86,6 +88,8 @@ A failure forces the builder to rebuild only the minimum, within safe limits:
 | Image step units | the NPC voice table (`npc-voices.lut`) and the dialogue table (`dialogue.lut`), one unit each | the masters' SHA-256 (the voice table also the sound sources and the media stage's converted lengths) and the code the bake runs (voice: `build_master`, `sound_resolver`; dialogue: `build_master`) | `tools/greeting_lut.py` (`npc-voice-table`), `tools/dialogue_lut.py` (`dialogue-table`) |
 | Image step units | one guard torch skip verdict (a guard whose base model the source bake does not reproduce) | the guard cache's own inputs and the code `_convert_guard` runs | `tools/actor_units.py` (`guard-torch-skip`), called by `prepare_guard_torches.prepare` |
 | Image step units | one arena fighter (its own fight frame groups, carried weapon and shield) | the game data (the build's input lock), the palette, the record id and stance, the code `bake_fighter` runs and the settings it reads | `tools/actor_units.py` (`arena-fighter`), called by `prepare_combat` |
+| Stage units | one room resident (stages `area`, `balmora-interiors`, the town rooms, `chim-room-batches`: its model, layouts, item models, voice and level files) | the appearance and greeting the stage resolved, the game data (the build's input lock, with the selected layers' view of what it reads), the palette, the level settings, ffmpeg by content, the code `build_resident` and `publish_resident` reach and the settings it reads | `prepare_area.populate` (`resident-bake`); each resident stored the moment its worker hands it back, all installed in identifier order |
+| Stage units | one CHIM area's source catalogue (stages `chim`, `chim-town-*`: the audit of its source cells, its scenery export, its reference catalogue, emitters, lava pools, fixed visibility and coverage) | the area's source receipt (geometry, the game files by SHA-256, the conversion's mode and code), the area's settings, the game data (the build's input lock, with the selected expansion layers), the code `import_town.collect` reaches and the settings it reads | `tools/chim/source_units.py` (`chim-area-source`), called by `chim.build.source_stage` |
 | Stage units | one world terrain map, one NPC gallery model, one CHIM unit, one sound or movie | each stage's own content-addressed cache (a gallery model: its appearance record, the bytes of its meshes and textures, the palette, and the code its converter can reach) | `world-terrain-v1`, `npc-gallery-v1`, `chim-units`, `asset-pool-v1` |
 
 A store is read back (`unit_store.stored`): a unit the cache did not keep prints a `STORE FAILED` line at once,
@@ -385,6 +389,39 @@ row moves the world scenery and world flora stage keys, which hold the table who
 pairs in `build_cache.PROVEN_EQUAL_SOURCES` keep both while the row is their only change. A room whose store models
 change (the rooms the everywhere recipe reaches) still fits its residents again: the inputs hold those models by
 content. The inputs do not hold the room record's placements themselves (BUILD-ROOM-ACTOR-INPUT-RECORD-67).
+
+### The CHIM areas' source catalogues across runs (v0.0.68 line)
+
+Every CHIM area starts with its source stage (`chim.build.source_stage`, which runs `import_town.collect`): the audit of
+its source cells, its scenery export (models, textures and collision of every placement), its reference catalogue,
+emitters, lava pools, fixed visibility and coverage. Up to v0.0.67 the stage reused that catalogue only from the run's own
+work folder (`RUN/chim-world/work/AREA/source-receipt.json`), so a CHIM stage that ran in a new run folder made every
+area's catalogue again: 210 of the 294 CPU minutes of a CHIM stage whose other units all came from the unit cache, 421
+CPU minutes from scratch. A build stopped for memory and started again in a new folder lost the same
+(BUILD-TESTER-32GB-OOM-67).
+
+Each area's catalogue is now one unit of the unit cache `chim-area-source` (`tools/chim/source_units.py`): its inputs
+are the area's source receipt, its settings and the game data identity, each by SHA-256; its code key is what `collect`
+reaches. A new work folder takes the files back byte for byte; the receipt file is written again from the key's receipt
+instead of being stored. Measured on the v0.0.66 from-scratch build's 1,351 areas: the catalogues hold 3.9 GiB in the
+unit cache, stored once by SHA-256 (the work folders held 5.6 GiB of them, 1.7 GiB of which were the receipts). The
+receipt hashes `tools/import_town.py` and `tools/lava.py` whole, as the source stage's own reuse always did, so an edit
+of either file makes every catalogue again; so does an edit of a data file `collect` reads (the visual recipes, for
+one). A cache that is off, a build without an input lock and `--rebuild-unit chim-area-source:AREA` run `collect` as
+before. The CHIM stages re-key once for this change. Tests: `tests/test_source_stage_units.py`.
+
+### Room residents stored as they finish (v0.0.68 line)
+
+The room stages bake their residents on the stage's pool (`prepare_area.populate`). Up to v0.0.67 the results came
+back in input order (`build_parallel.ordered_map`): a resident that finished behind a slower one waited for it,
+unstored, so a stage stopped at that moment (out of memory, a lost worker) made it again on the next run, up to about
+four times the workers' worth of residents (the room batches bake 2,280 residents, 528 minutes from scratch). The bakes
+now go through `unit_store.completed_units`: each resident is published into its own folder and stored the moment its
+worker hands it back, and a pool that loses a worker sends the residents not handed back out again at half the width
+(`build_parallel.completed_map`). Every resident is then installed in identifier order, as before, so the stage's
+output does not change with the order they finish in. No resident's unit key moves (`populate` is outside the bake's
+reach); the stages that run `populate` (the room batches, the area, the Balmora interiors, the town rooms) re-key once.
+Tests: `tests/test_resident_completed_order.py`.
 
 ### Collision defaults of v0.0.48-dev2: what rebuilds once
 

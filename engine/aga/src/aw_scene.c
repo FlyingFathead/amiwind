@@ -1755,6 +1755,27 @@ static int wet_arrival(edict_t *p,const vec3_t arrival,vec3_t point) {
     VectorCopy(tr.endpos,high);high[2]+=p->v.maxs[2]-1;
     return SV_PointContents(high)==CONTENTS_EMPTY;
 }
+/* ROOM-ARRIVAL-STAND-NO-SPOT-67, a load door into water closed above (v0.0.68; Old Mournhold: Forgotten Sewer: once a
+ * crank has raised the water to 400 the trap door's marker lies in the flooded hall under the other trap door, and the
+ * player was set back at the room's spawn beside the same trap door). The original and OpenMW 0.51 put the player at
+ * the door's marker (ActionTeleport; World::adjustPosition is skipped while the player swims there). WET-ARRIVAL above
+ * also asks that the water is open to the air, because a script's point or a dbg tp point may lie in the void under a
+ * floor, where a CHIM room's world is water everywhere under its plane. A load door's own marker is the game's data,
+ * set where a player can be: it is taken in the water, open to the air or not, when it lies in the room box, the
+ * standing box is clear there (not in solid geometry) and its feet are in water. Only a door's link (next.reference,
+ * the door bank's row); a script's PositionCell and dbg tp keep the open-water rule. */
+static int door_wet_arrival(edict_t *p,const vec3_t arrival,vec3_t point) {
+    vec3_t at,feet;trace_t tr;int k;
+    if(!next.reference || !AW_Interior() || !sv.worldmodel)return 0;
+    for(k=0;k<3;k++)if(!(arrival[k]>sv.worldmodel->mins[k] && arrival[k]<sv.worldmodel->maxs[k]))return 0;
+    VectorCopy(arrival,at);
+    tr=SV_Move(at,p->v.mins,p->v.maxs,at,MOVE_NOBODIES,p);
+    if(tr.startsolid || tr.allsolid)return 0;
+    VectorCopy(at,feet);feet[2]+=p->v.mins[2]+1;
+    if(SV_PointContents(feet)!=CONTENTS_WATER)return 0;
+    VectorCopy(at,point);
+    return 1;
+}
 /* A scene arrival tries the requested point, then (a room's water, WET-ARRIVAL above) the point in the water, then
  * the scene's own spawn point (the town default), then the highest clear floor at the requested XY (a map
  * teleport tries that first). If all fail the player stays at the spawn point,
@@ -1768,6 +1789,11 @@ static int arrival_place(edict_t *p,const vec3_t arrival,int jump) {
     if(!dry && !jump && wet_arrival(p,arrival,point)) {
         install_spot(p,point);
         Con_Printf("Interior spawn: %ld %ld %ld (in the room's water: no dry floor at the arrival)\n",
+            (long)point[0],(long)point[1],(long)point[2]);return 1;
+    }
+    if(!dry && !jump && door_wet_arrival(p,arrival,point)) {
+        install_spot(p,point);
+        Con_Printf("Interior spawn: %ld %ld %ld (the door's marker, in the room's water closed above)\n",
             (long)point[0],(long)point[1],(long)point[2]);return 1;
     }
     if(dry ||

@@ -1,5 +1,14 @@
 # CHIM-COLLISION-UNION-FALLBACK-41: Daedric ruin collision falls back to raw piece chains and puts Hla Oad's frames over the CHIM memory budget
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.68-dev1 at 2026-11-20 22:26 +0200: On Solstheim, 27 of 57 stored copies of an iceberg shard keep their raw collision piece chain because the collision compiler standard format cannot number the more than 32,767 nodes their union needs; compiled in its larger format they pass the standing check and take about half the memory.
+- Reported with v0.0.68-dev1 at 2026-11-20 23:43 +0200: Two base-game meshes, a Vivec canton piece and the Mournhold temple, also keep their raw collision piece chain because the compiler refuses their union, most likely on the same format limit; a parasol tree keeps it for a small standing-check difference instead.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -20,11 +29,25 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-16: reported in v0.0.41-dev3
+- 2026-11-20 22:26 +0200: seen again in v0.0.68-dev1: On Solstheim, 27 of 57 stored copies of an iceberg shard keep their raw collision piece chain because the collision compiler standard format cannot number the more than 32,767 nodes their union needs; compiled in its larger format they ...
+- 2026-11-20 23:43 +0200: seen again in v0.0.68-dev1: Two base-game meshes, a Vivec canton piece and the Mournhold temple, also keep their raw collision piece chain because the compiler refuses their union, most likely on the same format limit; a parasol tree keeps it for a small ...
+
+<!-- END GENERATED TIMELINE -->
+
 _Last updated with AmiWind v0.0.43 (19 October 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Timeline](#timeline)
 - [Symptom](#symptom)
 - [Where](#where)
 - [How it happened](#how-it-happened)
@@ -113,6 +136,7 @@ Family: Map heap and memory budget (`heap-memory`). The heap model must match wh
 - [AW-20260929-06](AW-20260929-06.md): Expanded scene exhausts 9 MiB heap
 - [BUILD-CHIM-HULL-RING-33](BUILD-CHIM-HULL-RING-33.md): Routed and compiled CHIM model hulls grew Balmora's ring past the zone
 - [BUILD-EDGE-PIN-SHARED-SHAPES-63](BUILD-EDGE-PIN-SHARED-SHAPES-63.md): The shared actor shapes changed the model loader without re-pinning its packed-edge heap policy
+- [CENSUS-COURTYARD-REENTRY-CRASH-68](CENSUS-COURTYARD-REENTRY-CRASH-68.md): Going back into the census office from its courtyard after a played session stops the game with a model cache error
 - [CHIM-ARENA-HUNK-GAP-36](CHIM-ARENA-HUNK-GAP-36.md): The Vivec Arena frame leaves less than 2 MiB of hunk gap (memory review before Vivec stage B)
 - [CHIM-AUTO-BANK-CLIFF-51](CHIM-AUTO-BANK-CLIFF-51.md): 32 MB of Fast RAM got no automatic CHIM cache bank: 13 MiB free gave a 7 MiB budget and the first bank needed 8 MiB
 - [CHIM-BALMORA-RING-GROWTH-36](CHIM-BALMORA-RING-GROWTH-36.md): Balmora's CHIM ring grew past the zone after v0.0.36-dev3 with the converter mesh method
@@ -121,6 +145,7 @@ Family: Map heap and memory budget (`heap-memory`). The heap model must match wh
 - [CHIM-CACHE-SURFCACHE-SQUEEZE-57](CHIM-CACHE-SURFCACHE-SQUEEZE-57.md): The larger surface cache took its memory from the CHIM cache: 7 MiB to 5 MiB at 32 MB Fast, and two gate smokes saw the CHIM zone full
 - [CHIM-HEAP-CHECK-33](CHIM-HEAP-CHECK-33.md): The heap check does not account for a CHIM map's zone bank
 - [CHIM-HEAP-GATE-NONRING-16MB-54](CHIM-HEAP-GATE-NONRING-16MB-54.md): At 16 MB the CHIM zone is 6,591 of 6,596 KiB locked: the heap gate predicts only the active ring and misses the chunk index, loading buffer, frame world and streamed statics
+- [CHIM-HEAP-SPLIT-HULL-PLANES-DRAWN-68](CHIM-HEAP-SPLIT-HULL-PLANES-DRAWN-68.md): The CHIM memory report counts the planes used only by a model's standing hull as drawn bytes, so collision-heavy models look like drawn geometry
 - [CHIM-HULL-SURFACE-HEAP-46](CHIM-HULL-SURFACE-HEAP-46.md): The walkway collision fix put six CHIM frames over the zone: every point of a convex piece kept, sides included
 - [CHIM-LAVA-HUNK-GAP-38](CHIM-LAVA-HUNK-GAP-38.md): Lava MiniWind first presentation falls below the 2 MiB hunk-gap safety
 - [CHIM-ROOM-HEART-CHAMBER-LOAD-50](CHIM-ROOM-HEART-CHAMBER-LOAD-50.md): Entering Akulakhan's Chamber when it cannot load stops the game with an error at the console instead of refusing at the door
@@ -153,6 +178,7 @@ Family: Map heap and memory budget (`heap-memory`). The heap model must match wh
 - [SKEL-TABLE-SHARED-FEMALE-52](SKEL-TABLE-SHARED-FEMALE-52.md): The female animation table repeats the common table whole for its three own groups: 561 KB of Fast RAM, kept all session
 - [SKEL-TABLE-SIZE-52](SKEL-TABLE-SIZE-52.md): The shared humanoid animation table is 4.3 MB held in RAM: all 61 skeleton nodes at 15 frames a second, too much beside the game on 16 MB
 - [SMOKE-16MB-MAPLOAD-54](SMOKE-16MB-MAPLOAD-54.md): Below the 32 MB requirement: at 16 MB Fast RAM the boot smoke loads no map (dbg tp to Seyda Neen)
+- [SOL-ICE-CELLS-RING-OVER-68](SOL-ICE-CELLS-RING-OVER-68.md): Two Solstheim ice coast cells convert but their memory ring is far above the budget: every tilted iceberg shard is stored as a model of its own
 - [STORE-MODELS-VIS-PLANES-BLOAT-64](STORE-MODELS-VIS-PLANES-BLOAT-64.md): Placed CHIM store models carry visibility data the engine may not read, and over-budget models stored as tiles repeat planes and visibility per tile
 - [VIVEC-HEAP-31](VIVEC-HEAP-31.md): Dense Vivec maps exceed the loader heap budget once mappings and extents no longer stop them
 - WORLD-FLORA-HEAP-010 (no report page): Seyda sprite payload exceeds the final map heap headroom

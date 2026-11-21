@@ -1,5 +1,14 @@
 # EXPANSION-TABLES-BASE-ONLY-66: Some of the builder's tables read the base game only while Tribunal and Bloodmoon are selected
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.66-dev2 at 2026-11-13 (time not recorded): Round 2: travel services, magic effects (read every master present, not the selection), the container census room numbers, the focus reference file list (named only the base file) and the dialogue choices measure now read the selected masters; docs/EXPANSION_TABLES.md lists every table with its source, and tests/test_expansion_tables.py refuses a base-only read outside its allow list.
+- Reported with v0.0.68-dev1 at 2026-11-20 22:26 +0200: Seen again: the script compiler's object table took references from the base game's placements only, so a script naming an object only an expansion places (the Black Dart gang, whose health Old Mournhold's lever sets) reached nothing.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -31,6 +40,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-17: v0.0.66: Rechecked on the v0.0.66 release build's tables: the dialogue table holds 3,041 NPC rows (every NPC record of the three game files) and 2,118 topics, and the lines of the Mournhold trip (Asciene Rane's and Effe-Tei's topics) are among ...
 - 2026-11-17: v0.0.66: Correction of the note above: the 928 came from a text comparison that cut a line at its first percent sign while the table writes the defines as codes.
 - 2026-11-17: v0.0.67-dev1: The creature census's levelled count reads the expansions now (fixed in source on v0.0.67-expchains, not shipped at the time of writing): an expansion's levelled creature point counts as placed by its merged reference number, as the actor ...
+- 2026-11-20 22:26 +0200: seen again in v0.0.68-dev1: Seen again: the script compiler's object table took references from the base game's placements only, so a script naming an object only an expansion places (the Black Dart gang, whose health Old Mournhold's lever sets) reached nothing.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -106,9 +116,11 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [ROOM-EMPTY-CELL-66](ROOM-EMPTY-CELL-66.md): Four expansion interior cells with no scenery were refused by the room batches stage as having no placement to convert
 - [ROOM-OBJECTS-MISSING-62](ROOM-OBJECTS-MISSING-62.md): In the Andrano Ancestral Tomb only the doors can be used: no containers, items or creatures
 - [ROOMS-SET-ASIDE-NOT-BUILT-67](ROOMS-SET-ASIDE-NOT-BUILT-67.md): Rooms that no door leads to are set aside and not built, although a script, a teleport or travel can lead there
+- [SCRIPTED-TARGETS-NOT-IN-IMAGE-68](SCRIPTED-TARGETS-NOT-IN-IMAGE-68.md): Outdoor objects that the game's scripts switch on and off (the Ghostfence's glow, the opening's barriers, parts of the Telvanni stronghold) are not in the built world at all
 - [SEYDA-CONTAINERS-NOT-DRAWN-67](SEYDA-CONTAINERS-NOT-DRAWN-67.md): Seyda Neen's crates, barrels, chest and sacks are not drawn and cannot be opened
 - [SEYDA-LANTERNS-MISSING-31](SEYDA-LANTERNS-MISSING-31.md): Seyda Neen lanterns light the night but are not in its maps
 - [SKY-FLAT-PALETTE-DRIFT-41](SKY-FLAT-PALETTE-DRIFT-41.md): Exterior sky flat with no clouds: the sampled palette drifted and the shared cloud sky silently fell back to a one-colour placeholder
+- [SOL-MODULE-CACHE-NOT-PICKLED-68](SOL-MODULE-CACHE-NOT-PICKLED-68.md): The Solstheim build module's world stage stopped at once: the shared unit cache it installs could not be handed to the converter's worker processes
 - [STAGE-READS-SELECTED-MASTERS-67](STAGE-READS-SELECTED-MASTERS-67.md): No build stage proves it read the game files the build selected, so a stage that reads only the base game goes unnoticed
 - [TP-LIST-UNBUILT-EXTERIORS-66](TP-LIST-UNBUILT-EXTERIORS-66.md): The teleport place list would list Solstheim places the image has no world for
 - [TREE-SCALE-001](TREE-SCALE-001.md): Non-unit-scale tree sprites omitted; bounds too conservative

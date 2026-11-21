@@ -56,6 +56,8 @@ def sync(data):
                 why = 'not carried out yet: ' + NOT_YET[n]
             elif not fn.run:
                 why = 'not carried out by the interpreter yet (scripts too)'
+            elif n in CONSOLE_WHY:
+                why = 'runs in scripts; typed on the console not yet: ' + CONSOLE_WHY[n]
             else:
                 why = 'an interpreter opcode with compiled arguments (a sound, topic, script or message row)'
             r['why'] = why
@@ -103,20 +105,28 @@ def render(version):
 
 FUNCTIONS_FILE = ROOT / 'config/mwconsole-functions.txt'   # staged as id1/mwconsole-functions.txt
 # The host calls whose arguments the compiler works out from the game data (a row, an index, a region): a console
-# line cannot give them as typed, so they stay planned, each with the reason (codegen.py hostcall and call)
+# line cannot give them as typed through the function table, so they stay planned, each with the reason (codegen.py
+# hostcall and call), until the console's own command finds the row from what is typed: since v0.0.68 ChangeWeather and
+# ModRegion (engine/aga/src/aw_mwconsole.c commands, aw_mwhost.c console_weather: the region by its id in the compiled
+# file's region table, tools/mwscript/awms.py RGNS), BecomeWerewolf and SetWerewolfAcrobatics (aw_mwhost.c
+# console_werewolf: the werewolf's game settings from the compiled file, awms.py WERE), PlaceAtPC, PlaceAtMe and
+# PlaceItem (aw_mwhost.c console_place: the object's row among the compiled file's placing rows, PLAC), and Cast,
+# ExplodeSpell, RemoveSpellEffects, GetSpellEffects, GetEffect, HasItemEquipped, Drop and AddTopic (aw_mwhost.c
+# console_spells: the spell's, item's or topic's row by its id, the effect's number from the compiled file's effect
+# table, EFFN); they stay here, out of the function table
 COMPILED_ARGUMENTS = {
     'cast': 'the spell\'s effect row', 'hasitemequipped': 'the item\'s row', 'getspelleffects': 'the spell\'s row',
     'becomewerewolf': 'the werewolf settings', 'setwerewolfacrobatics': 'the werewolf settings',
     'explodespell': 'the spell\'s row', 'removespelleffects': 'the spell\'s row', 'geteffect': 'the effect number', 'addtopic': 'the topic row',
     'changeweather': 'the region index', 'modregion': 'the region index', 'positioncell': 'the room and its move row',
     'placeatpc': 'the placing rows', 'placeatme': 'the placing rows', 'placeitem': 'the placing rows',
-    'placeitemcell': 'the placing rows', 'drop': 'the item\'s row', 'aifollowcell': 'the room number',
+    'placeitemcell': 'the placing rows and the cell\'s room and place', 'drop': 'the item\'s row', 'aifollowcell': 'the room number',
     'aiescortcell': 'the room number', 'choice': 'a dialogue result only', 'goodbye': 'a dialogue result only',
     'clearinfoactor': 'a dialogue result only'}
 # v0.0.63 (MWSCRIPT-GAPS-63): why each function still not carried out stays so (the console table and the tracker)
 NOT_YET = {
-    'setwaterlevel': 'a room\'s water is baked into its map; moving it needs moving water in the engine',
-    'modwaterlevel': 'a room\'s water is baked into its map; moving it needs moving water in the engine',
+    # v0.0.68 (MWSCRIPT-WATER-LEVEL-STATIC-67): SetWaterLevel and ModWaterLevel are carried by the host (the room's
+    # water plane, engine/aga/src/aw_water.c)
     'getwindspeed': 'the weather has no wind speed yet',
     'equip': 'an NPC\'s worn and held entries come from its record; the actor table has no change of them yet '
              '(the player\'s Equip works as an alias)',
@@ -142,7 +152,7 @@ NOT_YET = {
     'toggleloadfade': 'AmiWind\'s loading screen has no fade to switch',
     # batch 3 (v0.0.63): the console group's drawing switches and cell tests left, each with what it lacks
     'togglesky': 'the sky is drawn as part of the world map\'s sky surfaces; the renderer has no switch to leave it out',
-    'togglewater': 'a room\'s water is baked into its map as world surfaces; the renderer has no switch to leave it out',
+    'togglewater': 'a room\'s water is drawn as its map\'s world surfaces; the renderer has no switch to leave it out',
     'toggleworld': 'the renderer has no switch to leave out the world map while drawing the objects',
     'togglepathgrid': 'the path grids are read per actor from the ambient table; nothing draws them yet',
     'togglecollisionboxes': 'the renderer has no overlay of the collision boxes yet',
@@ -152,6 +162,14 @@ NOT_YET = {
     'togglefullhelp': 'the aim box shows the name only; it has no extended reference readout to switch on',
     'testcells': 'loading every exterior cell in turn: a test of a desktop engine, far beyond a 32 MB machine',
     'testinteriorcells': 'loading every interior cell in turn: a test of a desktop engine, far beyond a 32 MB machine',
+}
+# v0.0.68 (MW-CONSOLE-COMMANDS-62): interpreter opcodes that run in scripts and that the console's own commands do not
+# take yet, each with what is missing for the typed form
+CONSOLE_WHY = {
+    'playloopsound3d': 'a loop runs while the script that starts it runs; a typed loop has no script to keep it going, '
+                       'and the original\'s StopSound that ends it is AmiWind\'s own stopsound here',
+    'playloopsound3dvp': 'a loop runs while the script that starts it runs; a typed loop has no script to keep it going, '
+                         'and the original\'s StopSound that ends it is AmiWind\'s own stopsound here',
 }
 # the interpreter's own opcodes (functions.RUN) the console carries by name in aw_mwhost.c console_special, with the
 # host function each one calls

@@ -9,7 +9,8 @@ every stage end (tools/build_parallel.py execute_parallel) and at the end of the
 Per stage: wall time, cores allowed and used (mean over the stage, from the scheduler's live supervisor,
 tools/stage_watch.py), the longest stretch under half its share, whether it was reused, and its warnings. Warnings
 come from the run's own records: underuse occurrences (RUN/underused.jsonl), the perf guard (perf-guard.json), the
-size guard (size-ledger.json), waivers (perf guard rows with a waiver) and retired flags (build-state.json).
+size guard (size-ledger.json), waivers (perf guard rows with a waiver), retired flags (build-state.json) and the
+resource plan's memory decisions (RESOURCE-PLAN.json memory_warnings: its WARN lines, also listed under "Memory plan").
 
 'Needs attention' is a list of entries with a stable one-line key ('underused:chim', 'perf-guard:chim:CHIM world
 conversion', 'stage-failed:image', 'size-growth:chim-world', 'retired-flag:--seyda-recorded', 'slower:chim', ...):
@@ -27,6 +28,7 @@ JSON = 'build-summary.json'
 CHANGE_SHARE = 0.20        # a stage time up or down by more than this against the last build of the same kind
 CHANGE_MIN_SECONDS = 30.0  # ... and by at least this many seconds (reused stages take under a second)
 MD_STAGE_ROWS = 25
+MD_MEMORY_ROWS = 10        # the resource plan's WARN lines on the page (all of them in RESOURCE-PLAN.json)
 NAME = re.compile(r'^(\d{4}_\d{2}_\d{2})_v([^_]+)_(.+)_([0-9a-f]{7,})$')
 
 
@@ -167,6 +169,13 @@ def digest(run, receipt=None, watch=None, now_seconds=None, previous=None):
     for flag in state.get('retired_flags_used') or []:
         label = flag.get('flag') if isinstance(flag, dict) else str(flag)
         need('retired-flag:%s' % label, 'retired flag used: %s' % label)
+    # the resource plan's memory decisions (RESOURCE-PLAN.json memory_warnings, BUILD-TESTER-32GB-OOM-67): stages that
+    # run one after another, fewer workers, a stage larger than the memory; each one WARN line
+    memory_plan = []
+    for row in (_json(run / 'RESOURCE-PLAN.json') or {}).get('memory_warnings') or []:
+        if isinstance(row, dict) and row.get('key') and row.get('text'):
+            memory_plan.append(str(row['text']))
+            need('memory-plan:%s' % row['key'], str(row['text']))
     comparison = []
     previous = previous if previous is not None else previous_run(run)
     if previous is not None:
@@ -187,7 +196,7 @@ def digest(run, receipt=None, watch=None, now_seconds=None, previous=None):
                         row['name'], _duration(new), change * 100, Path(previous).name, _duration(was)))
     return {'schema': SCHEMA, 'run': run.name, 'kind': kind(run.name), 'status': state.get('status'),
             'updated_at': time.strftime('%Y-%m-%dT%H:%M:%S%z'), 'worker_budget': state.get('worker_budget'),
-            'needs_attention': attention, 'stages': stages,
+            'needs_attention': attention, 'stages': stages, 'memory_plan': memory_plan,
             'compared_with': Path(previous).name if previous is not None else None, 'stage_changes': comparison,
             'collision_top': collision.get('top') or [], 'collision_total': collision.get('total')}
 
@@ -207,6 +216,12 @@ def markdown(record):
             lines.append('- ... %d more in build-summary.json' % (len(record['needs_attention']) - 15))
     else:
         lines.append('Nothing: all is well.')
+    memory_plan = record.get('memory_plan') or []
+    if memory_plan:
+        lines.extend(['', '## Memory plan', ''])
+        lines.extend('- %s' % text for text in memory_plan[:MD_MEMORY_ROWS])
+        if len(memory_plan) > MD_MEMORY_ROWS:
+            lines.append('- ... %d more in RESOURCE-PLAN.json' % (len(memory_plan) - MD_MEMORY_ROWS))
     lines.extend(['', '## Stages', '', '| Stage | Status | Wall | Cores used / allowed | Longest under half | Reused |'
                   ' Warnings |', '| --- | --- | --- | --- | --- | --- | --- |'])
     ran = sorted(record['stages'], key=lambda s: -(s['wall_seconds'] or 0))

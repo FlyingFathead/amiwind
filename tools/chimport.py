@@ -7,6 +7,7 @@
                        [--rings N] [--cells "x,y ..."] [--retry-failed] [--timeout S] [--dry-run]
     chimport.py cell   --data-files DIR --palette PALETTE.lmp --cell X,Y --out CELLDIR [--unit-cache DIR] ...
     run, cell, world:  [--storage-pool auto|on|off] [--reuse-mode copy|hardlink|pool] [--storage-pool-dir DIR]
+                       [--frame-settings build|cell-v1]
     plan, run:         [--region NAME]  (the cells of a region of plan.json; repeatable)
     chimport.py ocean  --data-files DIR --palette PALETTE.lmp --out RUN [--rect X0,X1,Y0,Y1] [--margin N] [--dry-run]
                        [--storage-pool ...] [--tracker DIR --tracker-tool tools/cell_progress.py]
@@ -42,6 +43,10 @@ linked bytes and units reused / computed / failed (summary.json "pool", state.js
 
 A failing cell never stops the run: its error is recorded with a mechanism class, and the run moves on.
 Failures are reported grouped by mechanism so they get fixed once at the shared layer.
+
+A cell is converted as a default build converts it: the build's frame settings (FRAME_SETTING_SETS 'build') and the
+converter switches a build exports (export_build_switches), so its units carry the keys a build asks for and its
+figures are measured on what a build stores; each result records them (result.json "settings").
 """
 import argparse
 import collections
@@ -81,7 +86,112 @@ SCALE = 0.25                            # world scale of every converted frame
 HALF = int(CELL_UNITS * SCALE) // 2       # 1024 map units: half a cell
 # World settings of a one-cell frame: 8 x 8 chunks of 256 units; sectors must divide 8 (Balmora's 3 x 3 cell
 # frame uses 3), so a cell frame stores 4 x 4 chunk sectors.
-FRAME_SETTINGS = {'grain': 256, 'sector_chunks': 4}
+# build (the default since v0.0.68): also the settings a default build's CHIM stage hands chim.build.build_areas
+# (tools/build.py chim_stage_options over the defaults of tools/build_parser.py: --terrain-hull compiled,
+# --terrain-refs on, --terrain-pack generate, --uv-scroll turbulent, which tools/chim_build.py turns into these keys),
+# so a cell's frame is stored as a build stores it, its memory figures are measured on that, and its units carry the
+# keys a build asks for (CHIMPORT-UNITS-NOT-SHARED-WITH-BUILD-68, CHIMPORT-HEAP-NOT-BUILD-FRAMES-68).
+# tests/test_chimport_build_settings.py checks this copy against tools/build.py: a build default changed there
+# fails that test until the copy here follows it. cell-v1: the settings before (the island's runs of October 2026:
+# terrain copied into every chunk with the BSP29 packing, routed terrain hulls on regular ground, still scrolling
+# textures), kept selectable for A/B (--frame-settings cell-v1).
+FRAME_SETTING_SETS = {
+    'build': {'grain': 256, 'sector_chunks': 4, 'terrain_hull': 'compiled', 'terrain_refs': 'on',
+              'terrain_pack': 'generate', 'uv_scroll': 'turbulent'},
+    'cell-v1': {'grain': 256, 'sector_chunks': 4},
+}
+FRAME_SETTINGS_DEFAULT = 'build'
+FRAME_SETTINGS = FRAME_SETTING_SETS[FRAME_SETTINGS_DEFAULT]
+# The shape of a cell's frame (CHIMPORT-HEAP-NOT-BUILD-FRAMES-68, part 2). cell (the default for now): the cell's own
+# frame with nothing of its neighbours; its memory figures are the cell "alone". region: the frame a build installs for
+# the cell, made by the build's own function (chim.regions.frame_settings over chim.regions.frame_row, the margin
+# chim.regions.TERRAIN_MARGIN as tools/chim_build.py gives it): the neighbours' placements and terrain within the
+# margin are copied in (source radius 1, the apron), so its memory figures are the ones a build measures for that
+# frame. Its 15 x 15 chunks take the world's default sectors, as a build's do (no sector_chunks of CHIMport's own).
+CELL_SHAPES = ('cell', 'region')
+CELL_SHAPE_DEFAULT = 'cell'
+# A region frame is built here as a world of its own, but it stands for one frame of the build's world: a piece of a
+# neighbour's model wholly outside it is held by that neighbour's own frame when the neighbour has one
+# (chim.ownership.select_compiled_apron, CHIM-FRAME-EDGE-CLAMPS-OUTSIDE-TILES-68). The world a run's frames stand for:
+# the run's own cells and the cells the project's reference calls finished, written once per run (RUN/<this>).
+WORLD_CELLS_FILE = 'world-frame-cells.json'
+CELL_REFERENCE = ROOT / 'docs' / 'chim' / 'cell-progress-reference.json'
+
+
+def world_frame_cells(run_cells, reference=CELL_REFERENCE):
+    """{'cells': [[x, y], ...], 'run_cells', 'reference_sha256'}: RUN_CELLS and the land and seabed cells the reference
+    calls finished (chim.regions.kind_of), sorted."""
+    import hashlib
+    from chim.regions import kind_of, load_status
+    reference = Path(reference)
+    finished = set()
+    sha = None
+    if reference.is_file():
+        sha = hashlib.sha256(reference.read_bytes()).hexdigest()
+        finished = {tuple(c) for c, rec in load_status(reference).items() if kind_of(rec.get('status')) in ('land', 'seabed')}
+    cells = sorted({tuple(c) for c in run_cells} | finished)
+    return {'format': 'aw-chimport-world-cells-1', 'cells': [list(c) for c in cells],
+            'run_cells': len({tuple(c) for c in run_cells}), 'reference_sha256': sha}
+
+
+def frame_settings(name=None, qbsp=None, shape=None):
+    """The frame settings a cell is built with (FRAME_SETTING_SETS[NAME], default build). The compiled terrain hull
+    needs qbsp: without it the setting is left out, so the terrain hull is chim.build's auto (routed on regular
+    ground), which the result's settings record shows. SHAPE region: without CHIMport's sector size (a region frame's
+    15 x 15 chunks take the world's default, as in a build)."""
+    settings = dict(FRAME_SETTING_SETS[name or FRAME_SETTINGS_DEFAULT])
+    if not qbsp and settings.get('terrain_hull') == 'compiled':
+        settings.pop('terrain_hull')
+    if (shape or CELL_SHAPE_DEFAULT) == 'region':
+        settings.pop('sector_chunks', None)
+    return settings
+
+
+def export_build_switches():
+    """Export the converter switches a default build exports, with the build's own resolver and exporters
+    (tools/build.py export_converter_environment: build_font_options.resolve_font_options over
+    config/build-defaults.json, then mesh_geometry_env.export_stair_rules and export_model_hull, lava.export_lava,
+    hollow_bevels_env.export_hollow_bevels, scenery_reduce.apply_options), so every unit a cell makes is keyed as a
+    build keys it (chim.units.tool_fingerprint hashes the raw values of chim.units.SWITCHES; unset reads as the same
+    default, so nothing converts differently: CHIMPORT-UNITS-NOT-SHARED-WITH-BUILD-68). A value the caller set in the
+    environment stays (an A/B run); the cell results record what they ran with. Returns {'switches': {name: value of
+    every chim.units.SWITCHES entry}, 'explicit': [names the caller set]}."""
+    import argparse
+    import hollow_bevels_env
+    import lava
+    import scenery_reduce
+    from build_font_options import resolve_font_options
+    from chim.units import SWITCHES
+    from mesh_geometry_env import export_model_hull, export_stair_rules
+    explicit = {name: os.environ[name] for name in SWITCHES if os.environ.get(name, '').strip()}
+    options = resolve_font_options(argparse.Namespace())
+    export_stair_rules(options['follow_original_stair_rules'])
+    export_model_hull(options['model_hull'])
+    lava.export_lava(options['lava'])
+    hollow_bevels_env.export_hollow_bevels(None)
+    scenery_reduce.apply_options(argparse.Namespace(texinfo_snap=None, scenery_reduce=None,
+                                                    scenery_reduce_texels=None))
+    os.environ.update(explicit)
+    return {'switches': switch_values(), 'explicit': sorted(explicit)}
+
+
+def switch_values():
+    """{name: value} of the unit-keyed converter switches (chim.units.SWITCHES) as this process sees them."""
+    from chim.units import SWITCHES
+    return {name: os.environ.get(name, '') for name in SWITCHES}
+
+
+def settings_record(frame, palette, name=None, shape=None):
+    """The settings a cell or a run converts with, as its results record them: the frame settings (their set's name
+    and the effective keys), the cell shape, the unit-keyed switches, the palette's SHA-256 (it must be the build's
+    census palette, intro-scene/id1/gfx/palette.lmp, for the texture units to be a build's)."""
+    import hashlib
+    try:
+        palette_sha = hashlib.sha256(Path(palette).read_bytes()).hexdigest()
+    except OSError:
+        palette_sha = None
+    return {'frame_settings': name or FRAME_SETTINGS_DEFAULT, 'frame': dict(frame),
+            'cell_shape': shape or CELL_SHAPE_DEFAULT, 'switches': switch_values(), 'palette_sha256': palette_sha}
 NEIGHBOURS = [(dx, dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1) if dx or dy]
 MECHANISMS = ('format_validation', 'sky_bank_texels', 'seam_tears', 'far_terrain', 'stair_walk', 'memory_fit',
               'hull_bevels', 'hidden_faces', 'sprite_shape', 'actor_grounding', 'door_links', 'vis')
@@ -305,8 +415,16 @@ def select(plan, rings_limit=None, cells=None, regions=None):
 
 # ------------------------------------------------------------------ one cell
 
-def cell_settings(cell, missing_land='flat'):
-    """Converter settings of a one-cell frame (the town settings shape of docs/TOWN_IMPORT.md)."""
+def cell_settings(cell, missing_land='flat', shape=None):
+    """Converter settings of a one-cell frame (the town settings shape of docs/TOWN_IMPORT.md). SHAPE region: the
+    settings of the region frame a build makes for the cell, by the build's own function (chim.regions.frame_settings,
+    CELL_SHAPES), where a cell without land is always flat default ground."""
+    if (shape or CELL_SHAPE_DEFAULT) == 'region':
+        if missing_land != 'flat':          # None: --missing-land refuse
+            raise ValueError('the region shape is the frame a build installs, where a cell without land is flat ground '
+                             '(not --missing-land %s)' % (missing_land or 'refuse'))
+        from chim import regions
+        return regions.frame_settings(regions.frame_row(tuple(cell), regions.TERRAIN_MARGIN), regions.TERRAIN_MARGIN)
     x, y = cell
     ident = 'c%s%d_%s%d' % ('m' if x < 0 else 'p', abs(x), 'm' if y < 0 else 'p', abs(y))
     from visual_recipes import cell_settings as recipe_cell_settings
@@ -342,9 +460,29 @@ def _shared_put(self, kind, fp, value):
 
 
 @contextlib.contextmanager
+def generated_frames(settings_list):
+    """The region-shape frames of SETTINGS_LIST registered as a build's chim stage registers its region frames
+    (town_config.register_generated: the converter treats them as generated areas, as in a build), and taken out again
+    afterwards (an entry that was there before is put back)."""
+    import town_config
+    regional = [s for s in settings_list if s.get('region_source_apron')]
+    before = {s['town']['id']: town_config.generated_areas().get(s['town']['id']) for s in regional}
+    town_config.register_generated(regional)
+    try:
+        yield
+    finally:
+        for ident, old in before.items():
+            if old is None:
+                town_config._GENERATED.pop(ident, None)
+            else:
+                town_config._GENERATED[ident] = old
+
+
+@contextlib.contextmanager
 def cell_area(settings):
     """Make the CHIM builder read these settings for the cell's area id (the builder takes areas by id), with
-    unit cache writes that are safe while other cells share the cache."""
+    unit cache writes that are safe while other cells share the cache. A region-shape frame is also a generated area
+    while the block runs (generated_frames)."""
     import town_config
     from chim.units import UnitCache
     ident = settings['town']['id']
@@ -355,7 +493,8 @@ def cell_area(settings):
     town_config.load_settings = load
     UnitCache.put = _shared_put
     try:
-        yield ident
+        with generated_frames([settings]):
+            yield ident
     finally:
         town_config.load_settings = original
         UnitCache.put = put
@@ -426,9 +565,18 @@ def _mesh_stem(name):
 MESHLESS_LIGHT_REASON = 'light without a mesh: no CHIM light path yet (CHIM-MESHLESS-LIGHTS-33)'
 
 
-def record_accounting(work, source, chim_refs):
-    """Per record type: placed in the cell, converted (in the CHIM world), deferred (reason), failed."""
+def _placed_cell(r):
+    """The cell a source placement belongs to, (x, y) or None."""
+    c = r.get('cell')
+    return (int(c[0]), int(c[1])) if isinstance(c, (list, tuple)) and len(c) == 2 else None
+
+
+def record_accounting(work, source, chim_refs, owned=None):
+    """Per record type: placed in the cell, converted (in the CHIM world), deferred (reason), failed. OWNED: the cell
+    of a region-shape frame: only its own placements are counted (the neighbours' copies are apron_figures')."""
     placements = read_json(work / 'audit/placements.json') or []
+    if owned is not None:
+        placements = [r for r in placements if _placed_cell(r) == tuple(owned)]
     cat = read_json(work / 'source-catalogue.json') or {}
     deferred = {r['number']: r.get('status', 'deferred') for r in cat.get('deferred', [])}
     errors = read_json(work / 'scenery/conversion-errors.json') or []
@@ -466,19 +614,87 @@ def record_accounting(work, source, chim_refs):
     return {'by_type': by_type, 'totals': tot, 'conversion_errors': list(failed.values())[:20]}
 
 
-def source_facts(work):
+def source_facts(work, owned=None):
     """What the cell's source stage read for the cell (its terrain audit, work/audit/audit.json): the references, whether
     the cell had no land there (flat ground at the default height), and the SHA-256 of the master it read. {} when the
-    audit was not written."""
+    audit was not written. OWNED: the cell of a region-shape frame, whose source stage reads its neighbours too: the
+    references and the land are the owned cell's; the neighbours' are named apart (apron_references, and the
+    neighbours read as flat default ground, apron_default_land_cells)."""
     audit = read_json(Path(work) / 'audit' / 'audit.json') or {}
     area = audit.get('area') or {}
     if not area:
         return {}
-    return {'references': area.get('references'), 'default_land': bool(area.get('default_land_cells')),
-            'master_sha256': (audit.get('input') or {}).get('esm_sha256')}
+    master = (audit.get('input') or {}).get('esm_sha256')
+    if owned is None:
+        return {'references': area.get('references'), 'default_land': bool(area.get('default_land_cells')),
+                'master_sha256': master}
+    owned = tuple(owned)
+    placements = read_json(Path(work) / 'audit' / 'placements.json') or []
+    mine = sum(1 for r in placements if _placed_cell(r) == owned)
+    flat = {(int(c[0]), int(c[1])) for c in area.get('default_land_cells') or []}
+    return {'references': mine, 'default_land': owned in flat, 'master_sha256': master,
+            'apron_references': len(placements) - mine,
+            'apron_default_land_cells': [ckey(c) for c in sorted(flat - {owned})]}
+
+
+def apron_figures(work, world, owned, chim_refs):
+    """The neighbours' share of a region-shape frame (its apron; CHIMPORT-HEAP-NOT-BUILD-FRAMES-68): per neighbouring
+    cell, the placements the source stage read there, how many of them the frame holds, and the frame's chunks over
+    that cell (its terrain there); the owned cell's chunks; and the neighbours read as flat default ground (no LAND
+    record: the sea, or a cell with no record), named so that a smaller apron is never silent: a neighbour the source
+    stage did not read is a problem of the cell (problems; convert_cell records it as an error). Without a world (its
+    validation failed) the chunk figures are None: not measured."""
+    owned = tuple(owned)
+    area = (read_json(Path(work) / 'audit' / 'audit.json') or {}).get('area') or {}
+    read = {(int(c['x']), int(c['y'])) for c in area.get('cells') or []}
+    flat = {(int(c[0]), int(c[1])) for c in area.get('default_land_cells') or []}
+    measured = world is not None
+    cells = collections.OrderedDict()
+
+    def row(cell):
+        return cells.setdefault(ckey(cell), {'read': cell in read, 'ground': 'flat default' if cell in flat else 'land',
+                                             'placements_read': 0, 'placements_in_frame': 0,
+                                             'chunks': 0 if measured else None})
+    for dx, dy in sorted(NEIGHBOURS):
+        row((owned[0] + dx, owned[1] + dy))
+    for r in read_json(Path(work) / 'audit' / 'placements.json') or []:
+        c = _placed_cell(r)
+        if c is None or c == owned:
+            continue
+        rec = row(c)
+        rec['placements_read'] += 1
+        if r.get('number') in chim_refs:
+            rec['placements_in_frame'] += 1
+
+    def side(centre):
+        # the cell a chunk centre lies over, along one axis, in frame-local map units (the owned cell is -HALF..HALF);
+        # a chunk across the owned cell's edge (its centre on the edge) is the owned cell's on both sides alike
+        if abs(centre) <= HALF:
+            return 0
+        steps = 1 + int((abs(centre) - HALF) // (2 * HALF))
+        return steps if centre > 0 else -steps
+    owned_chunks = 0 if measured else None
+    for item in (world or {}).get('frames') or []:
+        frame, chunks = (item[1], item[2]) if isinstance(item, (list, tuple)) else (item, item.get('chunks') or [])
+        g, (lx, ly) = frame['grain'], frame['low']
+        for ch in chunks:
+            dx, dy = side(lx + (ch['cx'] + 0.5) * g), side(ly + (ch['cy'] + 0.5) * g)
+            if (dx, dy) == (0, 0):
+                owned_chunks += 1
+            else:
+                row((owned[0] + dx, owned[1] + dy))['chunks'] += 1
+    # without the audit (the build failed before its source stage) the cell has failed already: nothing to name here
+    problems = ['neighbour %s was not read by the source stage (the apron would be smaller than a build\'s)' % k
+                for k, v in cells.items() if area and not v['read']]
+    return {'cells': dict(cells), 'owned_chunks': owned_chunks,
+            'chunks': sum(v['chunks'] for v in cells.values()) if measured else None,
+            'placements_read': sum(v['placements_read'] for v in cells.values()),
+            'placements_in_frame': sum(v['placements_in_frame'] for v in cells.values()),
+            'flat_default_ground': [ckey(c) for c in sorted(flat - {owned})], 'problems': problems}
 
 
 PLAN_MISMATCH = 'plan-mismatch'
+APRON_INCOMPLETE = 'apron-incomplete'     # a region-shape cell whose source stage did not read a neighbour
 
 
 def plan_mismatch(row, res):
@@ -617,14 +833,23 @@ def audits_of(validate_report, stairs, heap, hulls, measured, records, receipt):
     return a
 
 
-def convert_cell(cell, data_files, palette, out, qbsp=None, unit_cache=None, jobs=1, missing_land='flat', abi_sizes=None):
-    """Build, audit and measure one cell. Writes OUT/result.json; returns it. Never raises for a cell problem."""
+def convert_cell(cell, data_files, palette, out, qbsp=None, unit_cache=None, jobs=1, missing_land='flat', abi_sizes=None,
+                 frame=None, frame_name=None, shape=None, world_cells=None):
+    """Build, audit and measure one cell. Writes OUT/result.json; returns it. Never raises for a cell problem.
+    FRAME: the frame settings (default frame_settings(None, qbsp, shape), a build's; FRAME_NAME their set's name),
+    recorded in the result with the cell shape, the switches and the palette (result['settings']). SHAPE region: the
+    frame a build installs for the cell (CELL_SHAPES): its records and plan check count the owned cell only, and the
+    neighbours' share is recorded apart (result['apron'], apron_figures). WORLD_CELLS (region): the cells with a frame
+    of their own in the world the frame stands for (chim.build build_world frame_cells; None: the cell alone);
+    the result names them and which of its eight neighbours were among them (result['world_frames'])."""
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     t0, c0 = time.time(), os.times()
+    frame = dict(frame) if frame is not None else frame_settings(frame_name, qbsp, shape)
     result = {'format': CELL_FORMAT, 'cell': list(cell), 'key': ckey(cell), 'started': now_iso(), 'errors': [],
-              'converted': False}
-    settings = cell_settings(cell, missing_land)
+              'converted': False, 'settings': settings_record(frame, palette, frame_name, shape)}
+    owned = tuple(cell) if (shape or CELL_SHAPE_DEFAULT) == 'region' else None
+    settings = cell_settings(cell, missing_land, shape)
     stages = {}
 
     def stage(name, fn):
@@ -640,16 +865,25 @@ def convert_cell(cell, data_files, palette, out, qbsp=None, unit_cache=None, job
             stages[name] = round(time.time() - s, 2)
 
     receipt = None
+    if world_cells is not None:
+        x, y = cell
+        result['world_frames'] = {
+            'cells': len(world_cells),
+            'neighbours_with_a_frame': sorted([list(c) for c in world_cells if c != tuple(cell)
+                                               and abs(c[0] - x) <= 1 and abs(c[1] - y) <= 1]),
+            'note': 'measured with these neighbours as frames of the same world: a piece of theirs wholly outside '
+                    'this frame is held by their frame, not here'}
     with cell_area(settings) as ident:
         from chim.build import build_areas
-        receipt = stage('build', lambda: build_areas([ident], data_files, out, palette, qbsp, jobs, dict(FRAME_SETTINGS), True, (),
-                                                     True, unit_cache, None, None, None, []))
+        receipt = stage('build', lambda: build_areas([ident], data_files, out, palette, qbsp, jobs, dict(frame), True, (),
+                                                     True, unit_cache, None, None, None, [],
+                                                     frame_cells=None if world_cells is None else list(world_cells)))
     work = out / 'work' / settings['town']['id']
     source = read_json(out / 'chim-source.json')
     chim_refs = {int(p['ref']) for s in (source or {}).get('frames', []) for p in s.get('placements', [])}
-    records = record_accounting(work, source, chim_refs)
+    records = record_accounting(work, source, chim_refs, owned)
     result['records'] = records
-    result['source'] = source_facts(work)
+    result['source'] = source_facts(work, owned)
     validate_report = stairs = heap = hulls = measured = None
     world = None
     if receipt is not None:
@@ -706,6 +940,11 @@ def convert_cell(cell, data_files, palette, out, qbsp=None, unit_cache=None, job
             stage('stats', run_stats)
     result['audits'] = audits_of(validate_report, stairs, heap, hulls, measured, records, receipt)
     result['stats'] = cell_stats(out, receipt, world, records, hulls, heap, measured, work)
+    if owned is not None:
+        # the neighbours' share of the frame as its own numbers (the frame's memory and faces are the whole frame's)
+        result['apron'] = stage('apron', lambda: apron_figures(work, world, owned, chim_refs))
+        for problem in (result['apron'] or {}).get('problems') or []:
+            result['errors'].append({'stage': 'apron', 'mechanism': APRON_INCOMPLETE, 'message': problem})
     c1 = os.times()
     result.update(finished=now_iso(), wall_s=round(time.time() - t0, 2),
                   cpu_s=round((c1.user - c0.user) + (c1.system - c0.system) + (c1.children_user - c0.children_user)
@@ -795,7 +1034,8 @@ def cells_area(settings_list):
     town_config.load_settings = load
     UnitCache.put = _shared_put
     try:
-        yield list(by_id)
+        with generated_frames(settings_list):
+            yield list(by_id)
     finally:
         town_config.load_settings = original
         UnitCache.put = put
@@ -812,15 +1052,16 @@ def converted_cells(run_dir, plan):
 
 
 def build_world(run_dir, data_files, palette, name, rows, qbsp=None, jobs=1, abi_sizes=None, missing_land='flat',
-                heap=True, pool=None, link=False):
+                heap=True, pool=None, link=False, frame=None, frame_name=None, shape=None):
     """One CHIM world holding every converted cell so far (a frame per cell, every unit from the run's shared
     cache: stored once), then the world audits on the whole of it: format validation, the streaming walk
     (measure), the heap rings and the stats. Each cell's source stage is reused from its cell folder (linked).
-    Writes RUN/world/NAME/ (world.json: what it holds and what the audits found)."""
+    Writes RUN/world/NAME/ (world.json: what it holds and what the audits found). FRAME, SHAPE: as convert_cell."""
     out = run_dir / 'world' / name
     out.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
-    settings = [cell_settings((r['x'], r['y']), missing_land) for r in rows]
+    frame = dict(frame) if frame is not None else frame_settings(frame_name, qbsp, shape)
+    settings = [cell_settings((r['x'], r['y']), missing_land, shape) for r in rows]
     work = out / 'work'
     work.mkdir(exist_ok=True)
     for r, s in zip(rows, settings):
@@ -829,7 +1070,7 @@ def build_world(run_dir, data_files, palette, name, rows, qbsp=None, jobs=1, abi
         if not link.exists() and target.is_dir():
             link.symlink_to(target, target_is_directory=True)
     report = {'format': 'aw-chimport-world-1', 'name': name, 'cells': [ckey((r['x'], r['y'])) for r in rows],
-              'started': now_iso(), 'errors': []}
+              'started': now_iso(), 'errors': [], 'settings': settings_record(frame, palette, frame_name, shape)}
 
     def step(label, fn):
         s0 = time.time()
@@ -848,7 +1089,7 @@ def build_world(run_dir, data_files, palette, name, rows, qbsp=None, jobs=1, abi
         units = PooledUnitCache(units, pool, link=link)
     with cells_area(settings) as ids:
         from chim.build import build_areas
-        receipt = step('build', lambda: build_areas(ids, data_files, out, palette, qbsp, jobs, dict(FRAME_SETTINGS),
+        receipt = step('build', lambda: build_areas(ids, data_files, out, palette, qbsp, jobs, dict(frame),
                                                     True, (), True, units, None, None, None, []))
     if pool is not None:
         report['pool'] = dict(units.pool_stats, dir=str(pool))
@@ -1119,10 +1360,13 @@ def inputs_identity(data_files):
     return sorted(rows)
 
 
-def cell_key(cell, data_files, palette, qbsp=None, abi_sizes=None, missing_land='flat'):
-    """(key, reason): the hash of exactly what a cell's outputs depend on - the cell and its frame settings, the
-    game inputs (input lock), the palette, the qbsp binary, the engine ABI sizes, the converter's code, the
-    AMIWIND_* switches and the Python/numpy versions. (None, reason) when an input cannot be hashed."""
+def cell_key(cell, data_files, palette, qbsp=None, abi_sizes=None, missing_land='flat', frame=None, shape=None,
+             world_cells=None):
+    """(key, reason): the hash of exactly what a cell's outputs depend on - the cell, its shape (SHAPE, CELL_SHAPES),
+    the frames of the world it stands for (WORLD_CELLS, a region frame: its neighbours' pieces outside it),
+    and its frame settings (FRAME, default frame_settings(None, qbsp, shape)), the game inputs (input lock), the
+    palette, the qbsp binary, the engine ABI sizes, the converter's code, the AMIWIND_* switches and the Python/numpy
+    versions. (None, reason) when an input cannot be hashed."""
     import hashlib
     import shutil
     from file_cache import digest_json, sha256_file
@@ -1147,14 +1391,21 @@ def cell_key(cell, data_files, palette, qbsp=None, abi_sizes=None, missing_land=
         numpy_version = numpy.__version__
     except ImportError:
         numpy_version = None
-    parts = {'format': CELL_KEY_FORMAT, 'cell': list(cell), 'settings': cell_settings(cell, missing_land),
-             'frame': FRAME_SETTINGS, 'palette': hashlib.sha256(Path(palette).read_bytes()).hexdigest(), 'qbsp': q,
+    parts = {'format': CELL_KEY_FORMAT, 'cell': list(cell), 'settings': cell_settings(cell, missing_land, shape),
+             'frame': dict(frame) if frame is not None else frame_settings(None, qbsp, shape),
+             'palette': hashlib.sha256(Path(palette).read_bytes()).hexdigest(), 'qbsp': q,
              'abi_sizes': abi_sizes, 'inputs': inputs, 'code': code_identity(),
              'env': {k: v for k, v in sorted(os.environ.items())
                      if k.startswith('AMIWIND_') and k not in CELL_KEY_IGNORED_ENV},
              'hashseed': os.environ.get('PYTHONHASHSEED'), 'python': sys.version, 'numpy': numpy_version}
     if touch:
         parts['layers'] = touch      # absent when the layers change nothing here: the base game's own key
+    if (shape or CELL_SHAPE_DEFAULT) != CELL_SHAPE_DEFAULT:
+        parts['shape'] = shape       # absent for the default shape: its keys as before
+    if world_cells is not None:
+        # every cell of the world: a neighbour's piece can lie in any cell its model reaches (a key may never
+        # under-declare)
+        parts['world_frames'] = sorted([list(c) for c in world_cells])
     return digest_json(parts), None
 
 
@@ -1314,21 +1565,31 @@ def unit_counts(stats):
 
 
 def convert_cell_pooled(cell, data_files, palette, out, qbsp=None, unit_cache=None, jobs=1, missing_land='flat',
-                        abi_sizes=None, pool=None, origin=None, reuse_mode='copy'):
+                        abi_sizes=None, pool=None, origin=None, reuse_mode='copy', frame_name=None, shape=None,
+                        world_cells=None):
     """convert_cell through the shared storage pool. POOL None: exactly convert_cell (after removing read-only shared
     links a pooled earlier attempt left in OUT). Otherwise records result['pool']: stored vs linked bytes, units
-    reused / computed / failed, and whether the whole cell was linked from an earlier identical conversion."""
+    reused / computed / failed, and whether the whole cell was linked from an earlier identical conversion.
+    FRAME_NAME: the frame settings' set (FRAME_SETTING_SETS; None: the default, build); SHAPE: the cell shape
+    (CELL_SHAPES; None: the default, cell)."""
     out = Path(out)
+    # the default set and shape pass nothing on: the calls are the ones before (named sets and shapes only)
+    named = {} if frame_name in (None, FRAME_SETTINGS_DEFAULT) else {'frame_name': frame_name}
+    if shape not in (None, CELL_SHAPE_DEFAULT):
+        named['shape'] = shape
+    if world_cells is not None:
+        named['world_cells'] = world_cells
+    frame = frame_settings(frame_name, qbsp, shape)
     if pool is None:
         release_pooled(out)              # nothing to do in a folder a pooled run never wrote
-        return convert_cell(cell, data_files, palette, out, qbsp, unit_cache, jobs, missing_land, abi_sizes)
+        return convert_cell(cell, data_files, palette, out, qbsp, unit_cache, jobs, missing_land, abi_sizes, **named)
     import storage_pool
     out.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
     setting = storage_pool.setting(pool, origin or 'option', out, log=lambda line: print(line, flush=True))
     link = setting['links'] and reuse_mode in ('hardlink', 'pool')
     cells = CellPool(pool, link=link)
-    key, why = cell_key(cell, data_files, palette, qbsp, abi_sizes, missing_land)
+    key, why = cell_key(cell, data_files, palette, qbsp, abi_sizes, missing_land, frame, shape, world_cells)
     record = {'dir': str(pool), 'origin': setting['origin'], 'links': setting['links'], 'warning': setting['warning'],
               'reuse_mode': reuse_mode if setting['links'] else 'copy', 'cell_key': key, 'cell_key_missing': why}
     if key is not None:
@@ -1345,7 +1606,7 @@ def convert_cell_pooled(cell, data_files, palette, out, qbsp=None, unit_cache=No
     release_pooled(out)
     from chim.units import PooledUnitCache
     units = PooledUnitCache(unit_cache or (out / 'work' / 'chim-units'), pool, link=link)
-    res = convert_cell(cell, data_files, palette, out, qbsp, units, jobs, missing_land, abi_sizes)
+    res = convert_cell(cell, data_files, palette, out, qbsp, units, jobs, missing_land, abi_sizes, **named)
     manifest = cells.store(out, key, res) if setting['links'] else None
     reused, built, refused = unit_counts(units.stats)
     us = units.pool_stats
@@ -1482,6 +1743,11 @@ def summarise(run, plan=None):
         t['chim_bytes'] += res['stats']['disk']['chim_bytes']
         t['records_placed'] += res['records']['totals']['placed']
         t['records_converted'] += res['records']['totals']['converted']
+        apron = res.get('apron')
+        if apron:
+            # a region-shape cell: the records above are the owned cell's; the neighbours' copies are their own numbers
+            for field in ('placements_read', 'placements_in_frame', 'chunks'):
+                t['apron_' + field] = t.get('apron_' + field, 0) + (apron.get(field) or 0)
         for e in res['errors']:
             classes['%s (%s)' % (e['mechanism'], e['stage'])] += 1
         for mech, a in res['audits'].items():
@@ -1492,6 +1758,9 @@ def summarise(run, plan=None):
     for f in ('converted', 'passed', 'empty', 'hull_pending', 'failed', 'not_converted', 'new_meshes', 'reused_meshes', 'chim_bytes', 'records_placed',
               'records_converted'):
         total[f] = sum(t[f] for t in rings_tot.values())
+    for f in ('apron_placements_read', 'apron_placements_in_frame', 'apron_chunks'):
+        if any(f in t for t in rings_tot.values()):        # region-shape cells only: the summary as before otherwise
+            total[f] = sum(t.get(f, 0) for t in rings_tot.values())
     total['wall_s'] = round(sum(t['wall_s'] for t in rings_tot.values()), 1)
     # summary-level "done": passed cells with content plus empty sea cells (each still on its own line)
     total['done'] = total['passed'] + total['empty']
@@ -1512,13 +1781,25 @@ def cell_command(args, row):
         cmd += ['--qbsp', str(args.qbsp)]
     if (args.out / 'abi-sizes.json').is_file():
         cmd += ['--abi-sizes', str(args.out / 'abi-sizes.json')]
-    return cmd
+    if (args.out / WORLD_CELLS_FILE).is_file() and getattr(args, 'cell_shape', None) == 'region':
+        cmd += ['--world-cells', str(args.out / WORLD_CELLS_FILE)]
+    return cmd + frame_arguments(args)
+
+
+def frame_arguments(args):
+    """--frame-settings and --cell-shape for a cell or world process: only a set or shape other than the default (the
+    default command line stays as it was)."""
+    name = getattr(args, 'frame_settings', None)
+    shape = getattr(args, 'cell_shape', None)
+    return (['--frame-settings', name] if name not in (None, FRAME_SETTINGS_DEFAULT) else []) + \
+        (['--cell-shape', shape] if shape not in (None, CELL_SHAPE_DEFAULT) else [])
 
 
 def world_command(args, ring):
     return ([sys.executable, str(Path(__file__).resolve()), 'world', '--data-files', str(args.data_files),
              '--palette', str(args.palette), '--out', str(args.out), '--through-ring', str(ring), '--jobs', str(args.jobs)]
-            + (['--qbsp', str(args.qbsp)] if args.qbsp else []) + pool_arguments(args, getattr(args, 'pool_dir', None)))
+            + (['--qbsp', str(args.qbsp)] if args.qbsp else []) + pool_arguments(args, getattr(args, 'pool_dir', None))
+            + frame_arguments(args))
 
 
 def probe_abi_sizes(run_dir, sdk):
@@ -1599,6 +1880,26 @@ def _run(args, pool_origin):
         state['pool'] = storage_pool.setting(args.pool_dir, pool_origin, run_dir,
                                              log=lambda line: print(line, flush=True))
         state['pool'].update(reuse_mode=getattr(args, 'reuse_mode', None) or 'copy', checked=now_iso())
+    # what every cell converts with, recorded once for the run (each cell's result records its own too):
+    # CHIMPORT-UNITS-NOT-SHARED-WITH-BUILD-68, CHIMPORT-HEAP-NOT-BUILD-FRAMES-68
+    name = getattr(args, 'frame_settings', None) or FRAME_SETTINGS_DEFAULT
+    shape = getattr(args, 'cell_shape', None) or CELL_SHAPE_DEFAULT
+    state['settings'] = dict(settings_record(frame_settings(name, args.qbsp, shape), args.palette, name, shape),
+                             explicit=(getattr(args, 'build_switches', None) or {}).get('explicit', []))
+    print('chimport: cell shape %s; frame settings %s %s; switches %s%s' % (
+        shape, name, json.dumps(state['settings']['frame'], sort_keys=True),
+        ' '.join('%s=%s' % (k[len('AMIWIND_'):], v) for k, v in sorted(state['settings']['switches'].items()) if v),
+        '; set by the caller: ' + ', '.join(state['settings']['explicit']) if state['settings']['explicit'] else ''),
+        flush=True)
+    if shape == 'region' and not args.dry_run:
+        # the world each region frame stands for: this run's cells and the reference's finished cells
+        # (chim.ownership.select_compiled_apron, CHIM-FRAME-EDGE-CLAMPS-OUTSIDE-TILES-68)
+        cells = world_frame_cells([(r['x'], r['y']) for r in rows])
+        write_json(run_dir / WORLD_CELLS_FILE, cells)
+        state['world_frame_cells'] = {'cells': len(cells['cells']), 'run_cells': cells['run_cells'],
+                                      'reference_sha256': cells['reference_sha256']}
+        print('chimport: the world of the region frames holds %d cells (%d of this run, the rest finished in the '
+              'reference)' % (len(cells['cells']), cells['run_cells']), flush=True)
     todo = pending_rows(rows, state, args.retry_failed)
     print('chimport: %d cells selected, %d to do, %d workers x %d jobs%s' % (
         len(rows), len(todo), args.workers, args.jobs,
@@ -1743,6 +2044,7 @@ def _run(args, pool_origin):
     summary = summarise(run_dir, plan)
     if args.pool_dir is not None:
         summary['pool'] = state.get('pool')
+    summary['settings'] = state.get('settings')
     write_json(run_dir / 'summary.json', summary)
     for _ in range(2):              # the last cells' feed: wait for a running feed, then feed what is left
         if feeder['proc'] is not None:
@@ -2153,6 +2455,10 @@ def tracker_cell(res, plan_row):
         'vis': st.get('vis') or {},
         'time': {'convert_s': res.get('wall_s'), 'cpu_s': res.get('cpu_s')},
     }
+    if res.get('apron'):
+        # a region-shape cell: the records are the owned cell's; what its neighbours put in the frame stands apart
+        stats['apron'] = {k: res['apron'].get(k) for k in ('placements_read', 'placements_in_frame', 'chunks',
+                                                         'owned_chunks')}
     audits = {m: dict({'status': a['status'], 'detail': a.get('detail'), 'numbers': a.get('numbers') or {}},
                       **({'outcome': a['outcome']} if a.get('outcome') else {}))
               for m, a in (res.get('audits') or {}).items() if m in TRACKER_MECHANISMS}
@@ -2290,10 +2596,19 @@ def main(argv=None):
     _own_search_path()      # stair_walk puts tools/ first, which would load tools/mwad.py as the package mwad
     before = stair_walk.DEFAULT_OFF
     stair_walk.DEFAULT_OFF = True
+    # the converter switches _cli exports (export_build_switches) are this command's: restored when it returns, so a
+    # caller in the same process (a test) keeps its own environment
+    from chim.units import SWITCHES
+    switches = {name: os.environ.get(name) for name in SWITCHES}
     try:
         return _cli(argv)
     finally:
         stair_walk.DEFAULT_OFF = before
+        for name, value in switches.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
 
 
 def _cli(argv=None):
@@ -2354,6 +2669,10 @@ def _cli(argv=None):
     add_pool_options(c)
     c.add_argument('--missing-land', default='flat', choices=('flat', 'refuse'),
                    help='a cell without land: flat seabed at the default height (default) or refuse')
+    c.add_argument('--world-cells', type=Path,
+                   help='with --cell-shape region: the cells of the world the frame stands for (the run writes '
+                        'RUN/%s: its cells and the reference\'s finished cells); a neighbour\'s piece wholly outside '
+                        'the frame is held by its own cell\'s frame when that cell is one of them' % WORLD_CELLS_FILE)
     w = sub.add_parser('world', help='build one CHIM world of every converted cell so far and audit it whole')
     w.add_argument('--data-files', type=Path, required=True)
     w.add_argument('--palette', type=Path, required=True)
@@ -2395,6 +2714,15 @@ def _cli(argv=None):
     e.add_argument('--out', type=Path, required=True)
     e.add_argument('--csv', type=Path)
     e.add_argument('--json', type=Path)
+    for q in (r, c, w):
+        q.add_argument('--frame-settings', choices=sorted(FRAME_SETTING_SETS), default=FRAME_SETTINGS_DEFAULT,
+                       help='the frame settings of a cell: build (default: those a default build\'s CHIM stage uses, '
+                            'so the cell is stored and measured as a build stores it) or cell-v1 (the settings before '
+                            'v0.0.68, for A/B)')
+        q.add_argument('--cell-shape', choices=CELL_SHAPES, default=CELL_SHAPE_DEFAULT,
+                       help='the shape of a cell\'s frame: cell (default: the cell alone, nothing of its neighbours) or '
+                            'region (the frame a build installs for the cell, its neighbours\' placements and terrain '
+                            'within the margin copied in; the records count the owned cell, the apron is named apart)')
     for q in (r, c, w, o):
         q.add_argument('--working-version', type=Path, metavar='FILE',
                        help='working-version record for the entry check (default: AMIWIND_WORKING_VERSION, then '
@@ -2402,11 +2730,17 @@ def _cli(argv=None):
         q.add_argument('--accept-version-mismatch', metavar='REASON',
                        help='convert although the source VERSION differs from the working version (say why)')
     a = ap.parse_args(argv)
+    if getattr(a, 'cell_shape', None) == 'region' and getattr(a, 'missing_land', 'flat') != 'flat':
+        ap.error('--cell-shape region is the frame a build installs, where a cell without land is flat ground: '
+                 'not --missing-land %s' % a.missing_land)
     if a.cmd in ('run', 'cell', 'world', 'ocean'):
         refused = entry(a)
         if refused:
             print(refused, file=sys.stderr)
             return 2
+        # the converter switches a default build exports, so every unit is keyed as a build keys it; the cell and
+        # world processes a run starts inherit them (main restores the environment when it returns)
+        a.build_switches = export_build_switches()
     if a.cmd == 'plan':
         plan = read_json(a.out / 'plan.json') or make_plan(a.data_files)
         write_json(a.out / 'plan.json', plan)
@@ -2423,9 +2757,15 @@ def _cli(argv=None):
             from check_world_map_heap import compile_target_sizes
             sizes = compile_target_sizes(a.sdk)[0]
         pool, origin = pool_choice(a)
+        world_cells = None
+        if a.world_cells is not None:
+            if a.cell_shape != 'region':
+                ap.error('--world-cells needs --cell-shape region')
+            world_cells = [tuple(c) for c in read_json(a.world_cells)['cells']]
         res = convert_cell_pooled((x, y), a.data_files, a.palette, a.out, a.qbsp, a.unit_cache, a.jobs,
                                   None if a.missing_land == 'refuse' else a.missing_land, sizes, pool, origin,
-                                  a.reuse_mode)
+                                  a.reuse_mode, frame_name=a.frame_settings, shape=a.cell_shape,
+                                  world_cells=world_cells)
         print(json.dumps({'cell': res['key'], 'converted': res['converted'], 'errors': [e['mechanism'] for e in res['errors']],
                           'audits_failed': [m for m, v in res['audits'].items() if v['status'] == 'failed'],
                           'wall_s': res['wall_s'], 'pool': res.get('pool', {}).get('cell')}))
@@ -2441,7 +2781,7 @@ def _cli(argv=None):
             link = storage_pool.setting(pool, origin, a.out)['links'] and a.reuse_mode != 'copy'
         rep = build_world(a.out, a.data_files, a.palette, name, rows, a.qbsp, a.jobs,
                           read_json(a.abi_sizes) if a.abi_sizes else read_json(a.out / 'abi-sizes.json'), heap=a.heap,
-                          pool=pool, link=link)
+                          pool=pool, link=link, frame_name=a.frame_settings, shape=a.cell_shape)
         print(json.dumps({'name': rep['name'], 'built': rep['built'], 'cells': len(rep['cells']), 'wall_s': rep['wall_s'],
                           'heap': rep.get('heap'), 'disk': rep.get('disk'),
                           'validation_failures': (rep.get('validation') or {}).get('failure_count'),

@@ -161,6 +161,20 @@ static int held_own(void);
  * or light in the hand and no light cast while magic is ready; its lit flag is kept, so it is back when the weapon is
  * readied or the magic lowered. */
 int (*aw_torch_put_away)(void);
+/* LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67: the notice box of V's change of the light in the left hand (aw_debug_torch.c:
+ * LIT 1 lit again, 0 put out); NULL in fixtures */
+void (*aw_torch_notice)(int lit);
+/* LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67: a carried light is in the left hand with the hands up (drawing, ready or
+ * striking) and not put away: it is drawn there, lit or put out by V (as the original holds a carried light beside a
+ * one-handed weapon or the fists: OpenMW 0.51, read not copied, mwclass/light.cpp canBeEquipped and
+ * mwrender/actoranimation.cpp updateCarriedLeftVisible: only a two-handed draw hides the carried-left item) */
+static int light_held(void)
+{
+    edict_t *p=torch_player();
+    if(!p || !hand_state(p))return 0;
+    if(aw_torch_put_away && aw_torch_put_away())return 0;
+    return !(aw_torch_item_lit && !aw_torch_item_lit() && !AW_TorchTestActive());
+}
 /* the carried light is lit (V or the equip) with the hands raised */
 static int light_lit(void)
 {
@@ -189,15 +203,16 @@ static void extinguish(void)
 }
 static void toggle(void)
 {
-    edict_t *p=torch_player();eval_t *v;
+    edict_t *p=torch_player();eval_t *v;int away;
     if(!p || sv.paused || cl.paused || AW_IntroImpulse(202)!=202 ||
        (key_dest!=key_game && key_dest!=key_console))return;
     if(!torch_assets){Con_Printf("Original torch assets unavailable; rebuild the image.\n");return;}
     if(!hand_state(p)){
         Con_Printf("Raise hands with F before equipping the torch.\n");return;
     }
-    if(aw_torch_put_away && aw_torch_put_away()){   /* READY-MAGIC-SHOWS-WEAPON-65: the light stays put away */
-        Con_Printf("The light is put away while magic is ready: ready the weapon or lower the magic to carry it.\n");
+    if(aw_torch_put_away && (away=aw_torch_put_away())!=0){   /* READY-MAGIC-SHOWS-WEAPON-65: the light stays put away */
+        if(away==2)Con_Printf("The light is put away while a two-handed weapon is drawn: sheathe it to carry the light.\n");
+        else Con_Printf("The light is put away while magic is ready: ready the weapon or lower the magic to carry it.\n");
         return;
     }
     v=GetEdictFieldValue(p,"aw_torch");
@@ -212,6 +227,8 @@ static void toggle(void)
     v->_float=v->_float==1?0:1;
     if(!v->_float)extinguish();
     Con_Printf("Torch %s.\n",v->_float?"on":"off");
+    /* LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67: V after F changes only the light, and the notice box says so */
+    if(aw_torch_notice)aw_torch_notice(v->_float!=0);
 }
 void AW_TorchInit(void){
     Cvar_RegisterVariable(&torch_radius);Cvar_RegisterVariable(&torch_flame_style);Cvar_RegisterVariable(&aw_torch_strength);Cvar_RegisterVariable(&aw_guard_torch_radius);
@@ -331,6 +348,18 @@ const aw_held_light_t *AW_HeldLight(void)
     held.radius=AW_HeldLightRadius(AW_TorchLightRadius(),held_radius,held_torch_radius);
     return &held;
 }
+/* LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67 (aw_torch.h): the held light drawn in the left hand, lit or put out */
+const aw_held_light_t *AW_HeldLightShown(void)
+{
+    if(!light_held() || !held_own())return NULL;
+    held.radius=AW_HeldLightRadius(AW_TorchLightRadius(),held_radius,held_torch_radius);
+    return &held;
+}
+/* the light in the left hand whatever the hands do (the inventory's picture) */
+const aw_held_light_t *AW_HeldLightCarried(void)
+{
+    return held_own()?&held:NULL;
+}
 /* Equipping the inventory light lights the carried torch and unequipping puts it out, as a
  * torch in the left hand; V still toggles it. The game rules put the torch out whenever the
  * hands are down (world.qc), so it is lit again when the hands come up. Only changes (equip,
@@ -343,11 +372,15 @@ static void item_torch(void)
     lit=aw_torch_item_lit()!=0;raised=hand_state(p)!=0;
     if(lit==was_lit && raised==was_raised && world==sv.worldmodel)return;
     v=GetEdictFieldValue(p,"aw_torch");
-    /* TORCH-HAND-TO-HAND-64: only equipping (with the hands up) lights it and only unequipping puts it out; raising the
-     * hands no longer lights it again, so F raises the fists or the weapon and V alone switches the torch (before, every
-     * change of the hands, a punch among them, lit it again: the fists showed for a moment, then the torch, and V could
-     * not put it away) */
-    if(v){if(lit && !was_lit && raised)v->_float=1;else if(!lit && was_lit)v->_float=0;}
+    /* TORCH-HAND-TO-HAND-64: a punch or any other change while the hands stay up never lights it again, so V alone
+     * switches it while they are up (before, every change of the hands, a punch among them, lit it again: the fists
+     * showed for a moment, then the torch, and V could not put it away); unequipping puts it out.
+     * LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67 / HELD-LIGHT-NOT-IN-HAND-65 (decided for the project 2026-11-20): the light
+     * is lit by default: equipping it with the hands up lights it, and so does raising the hands (F) with it equipped,
+     * beside the weapon or the fists; V after F puts out only the light and lights it again. Since TORCH-HAND-TO-HAND-64
+     * (06e9c4a7, v0.0.65) raising the hands left it out: F showed the weapon or the fists with the light unlit and not
+     * drawn, and V then lit it in place of the weapon. */
+    if(v){if(lit && raised && (!was_lit || !was_raised))v->_float=1;else if(!lit && was_lit)v->_float=0;}
     was_lit=lit;was_raised=raised;world=sv.worldmodel;
 }
 void AW_TorchUpdate(void)

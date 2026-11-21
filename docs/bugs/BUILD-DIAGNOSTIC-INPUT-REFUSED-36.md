@@ -113,7 +113,9 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - [BUILD-IMAGE-LAYOUT-SERIAL-49](BUILD-IMAGE-LAYOUT-SERIAL-49.md): The image step plans its disk layout and writes its partitions on about 1.6 of 24 cores for about three minutes
 - [BUILD-IMAGE-NO-RESUME-33](BUILD-IMAGE-NO-RESUME-33.md): A late failure in the image step reruns the whole image step, and the failing check could have run in its first seconds
 - [BUILD-IMAGE-STALE-PYTHONPATH-35](BUILD-IMAGE-STALE-PYTHONPATH-35.md): Builder container images put an old builder copy on PYTHONPATH
+- [BUILD-KEY-CHIM-READS-LAYERS-VIA-UNIT-KEY-68](BUILD-KEY-CHIM-READS-LAYERS-VIA-UNIT-KEY-68.md): Since the CHIM source catalogue cache, the base world's CHIM stage is keyed by the expansions' masters and archives and their selection, so an expansion change rebuilds the whole base world
 - [BUILD-KEY-FUNCTION-DEFAULTS-TOP-36](BUILD-KEY-FUNCTION-DEFAULTS-TOP-36.md): Adding a function to a shared module changed the key of every stage that imports it, although no stage runs the new code
+- [BUILD-KEY-GROUNDING-LAYERS-WHOLE-FILE-68](BUILD-KEY-GROUNDING-LAYERS-WHOLE-FILE-68.md): One new row in the expansions' grounding id file re-keys the base world stage and the Mournhold module, though neither reads it
 - BUILD-KEY-KEYED-REACH-WHOLE-51 (no report page): Code handed to an in-stage cache key counted whole in the stage key: a helper added to tools/map_files.py rebuilt the CHIM world
 - [BUILD-KEY-MESH-TABLE-WHOLE-54](BUILD-KEY-MESH-TABLE-WHOLE-54.md): A per-mesh measured table is keyed whole: one new row of collision-standing-room.json re-keyed every room, resident and model unit
 - [BUILD-KEY-OVERBROAD-33](BUILD-KEY-OVERBROAD-33.md): A new bug page or release file list change rebuilds interior, census, harvest and the CHIM stages: an import search path counted as a read of every file under tools/
@@ -185,10 +187,12 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - [CHIMPORT-POOL-CROSS-MOUNT-36](CHIMPORT-POOL-CROSS-MOUNT-36.md): CHIMport run folder and the storage pool on two mounts of one volume: hard links fail across the mounts, so pooled units were copied, not linked
 - [CHIMPORT-RETRY-AUDIT-FAILED-36](CHIMPORT-RETRY-AUDIT-FAILED-36.md): CHIMport --retry-failed never reran cells that converted but failed an audit (memory fit, doors, hull chains): the runner marks them done
 - [CHIMPORT-UNITS-NOT-SHARED-WITH-BUILD-68](CHIMPORT-UNITS-NOT-SHARED-WITH-BUILD-68.md): A build module's world stage converts again every unit a CHIMport run already made for the same cells
+- [DELIVER-RESUME-NEW-COMMIT-NO-SOURCE-68](DELIVER-RESUME-NEW-COMMIT-NO-SOURCE-68.md): A delivery resumed on an earlier finished build for a newer commit stops because that commit's source export does not exist
 - [DOOR-CHECK-KNOWN-UNKEYED-54](DOOR-CHECK-KNOWN-UNKEYED-54.md): config/door-check-known.json is in no stage key: an edit to the known list never re-runs a passed image's door check
 - [MESH-TABLE-LAYER-GROWS-67](MESH-TABLE-LAYER-GROWS-67.md): A row added to an expansion layer of a measured mesh table would re-key every unit recorded with that layer's earlier rows
 - [MESH-TABLE-SECOND-LAYER-REKEY-67](MESH-TABLE-SECOND-LAYER-REKEY-67.md): A row of a second expansion in a measured mesh table would re-key every unit recorded with the first expansion's rows
 - [MWAD-WALK-ORDER-35](MWAD-WALK-ORDER-35.md): Input check results depend on directory listing order
+- [READY-STAGE-REACH-BY-RULE-68](READY-STAGE-REACH-BY-RULE-68.md): A merge note stated the build stages a change re-keys from the rules, not from the planner's measured key, and a later file-list probe over-stated it
 - [REUSE-STOP-OLD-GROUPS-67](REUSE-STOP-OLD-GROUPS-67.md): The strict reuse check counts the units an older version of a bake left in its cache as work the build would redo, so a one-unit table with history stops a build that would reuse it
 
 <!-- END GENERATED CATEGORY -->

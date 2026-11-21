@@ -1,6 +1,6 @@
 # Magic effects
 
-_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
+_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -182,7 +182,9 @@ The player casts the spells and powers he knows and the spells he made at a spel
 
 - **Ready magic** (`R`, `dbg cast ready`): the hands come up open, whatever is equipped (the weapon, a torch or
   another light and a shield are put away while magic is ready); with magic ready the attack button casts the
-  selected spell instead of striking, once per press.
+  selected spell instead of striking, once per press. Readied magic stays readied through doors, teleports and cell
+  changes, as the drawn weapon, the fists and a held light do (v0.0.68; from v0.0.65 to v0.0.67 a door's load took it
+  for the player's death and the hands came out of the door in the weapon stance). `dbg hands` shows the stance kept.
 - **The selected spell**: `dbg cast spell list` shows the known spells and powers (with their number, cost and the
   selection), `dbg cast spell N` selects spell N, `dbg cast spell mN` the made spell N, `dbg cast spell none` clears
   it.

@@ -63,8 +63,11 @@ class DebugTorchTests(unittest.TestCase):
         self.assertIn('int (*aw_torch_item_lit)(void);', torch)
         update = torch[torch.index('void AW_TorchUpdate(void)'):]
         self.assertLess(update.index('item_torch();'), update.index('torch=AW_TorchEquipped();'))
-        # TORCH-HAND-TO-HAND-64: only equipping lights it (raising the hands does not), only unequipping puts it out
-        self.assertIn('if(v){if(lit && !was_lit && raised)v->_float=1;else if(!lit && was_lit)v->_float=0;}', torch)
+        # TORCH-HAND-TO-HAND-64: a punch or any change while the hands stay up never lights it again; only unequipping
+        # puts it out. LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67 (decided for the project 2026-11-20): lit by default, so
+        # equipping it with the hands up and raising the hands with it equipped light it
+        self.assertIn('if(v){if(lit && raised && (!was_lit || !was_raised))v->_float=1;else if(!lit && was_lit)v->_float=0;}',
+                      torch)
 
 
 if __name__ == '__main__':

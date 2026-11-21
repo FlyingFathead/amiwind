@@ -121,6 +121,19 @@ int main(void) {
     s.range=AW_PR_TARGET;assert(!strcmp(pick(s,&o),"spellcast") && !strcmp(o.start,"target start") && !strcmp(o.stop,"target stop"));
     s.range=AW_PR_SELF;assert(!strcmp(pick(s,&o),"spellcast") && !strcmp(o.start,"self start"));
     assert(!AW_PickPlayerState(AW_PW_SPELL,2,1,AW_PM_NONE,0,0,0,1,&s));             /* swimming: no stance */
+    /* PLAYER-PUNCH-THIRDPERSON-39 / TP-DRAW-WEAPON-LAGS-67: the fists raising, striking and lowering play the original's
+     * handtohand group as a drawn weapon plays its own (the caller gives AW_PW_HANDTOHAND for the bare hands in those
+     * states, aw_view.c body_stance_frame): equip, the attack by type, unequip. Since the assembled body (61b64c83f,
+     * v0.0.59-dev5) the stance pick refused the bare hands, so the fists had no third-person draw, punch or lower. */
+    assert(AW_PickPlayerState(AW_PW_HANDTOHAND,1,1,AW_PM_NONE,0,0,0,0,&s) && s.event==AW_PE_EQUIP &&
+           !strcmp(pick(s,&o),"handtohand") && !strcmp(o.start,"equip start") && !strcmp(o.stop,"equip stop"));
+    assert(AW_PickPlayerState(AW_PW_HANDTOHAND,3,1,AW_PM_NONE,0,AW_PA_CHOP,0,0,&s) && s.event==AW_PE_ATTACK &&
+           !strcmp(pick(s,&o),"handtohand") && !strcmp(o.start,"chop start") && !strcmp(o.stop,"chop large follow stop"));
+    assert(AW_PickPlayerState(AW_PW_HANDTOHAND,3,1,AW_PM_FORWARD,0,AW_PA_THRUST,0,0,&s) &&
+           !strcmp(pick(s,&o),"handtohand") && !strcmp(o.start,"thrust start"));
+    assert(AW_PickPlayerState(AW_PW_HANDTOHAND,4,0,AW_PM_NONE,0,0,0,0,&s) && s.event==AW_PE_UNEQUIP &&
+           !strcmp(pick(s,&o),"handtohand") && !strcmp(o.start,"unequip start"));
+    assert(!AW_PickPlayerState(AW_PW_HANDTOHAND,3,1,AW_PM_NONE,0,AW_PA_CHOP,0,1,&s));   /* swimming: the body's own */
     {   /* PLAYER-ANIM-GROUPS-NOT-PLAYED-66: the player body's sneak, turn on the spot, hit, knockdown and knockout, each
          * action and the group it selects (OpenMW character.cpp refreshMovementAnims / refreshHitRecoilAnims) */
         aw_pick_player_t in;int k;

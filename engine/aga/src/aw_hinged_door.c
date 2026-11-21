@@ -571,6 +571,16 @@ int AW_MoverOrigin(unsigned reference,float *out){
     if(movers[i].since<0)movers_pending();
     return movers[i].pid && aw_chim_place_origin?aw_chim_place_origin(movers[i].pid,out):0;
 }
+/* SETPOS-MOVER-NO-ENTITY-68 (v0.0.68; SetPos, OpenMW 0.51 transformationextensions.cpp OpSetPos): axis K of mover
+ * REFERENCE to VALUE (map units) from where its loaded placement stands now, the other axes kept; 1 when done (its
+ * placement loaded: its position now is known). The floating crates of Old Mournhold's Forgotten Sewer ride the water
+ * this way (script floatAboveStartHeight: SetPos Z to the level). */
+int AW_MoverSetAxis(unsigned reference,int k,float value){
+    float now[3],d[3]={0,0,0};
+    if(k<0 || k>2 || !AW_MoverOrigin(reference,now))return 0;
+    d[k]=value-now[k];
+    return d[k]==0 || AW_MoverShift(reference,d);
+}
 int AW_MoverAtStart(unsigned reference){
     int i;hd_mover_t *m;vec3_t back,unturn;
     if((i=mover_find(reference))<0)return 0;

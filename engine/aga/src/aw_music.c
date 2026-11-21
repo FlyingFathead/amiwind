@@ -396,6 +396,20 @@ int AW_MusicScriptTrack(int track) {
     if(open_track(track,"script")){title_playing=0;paused=0;fade=128;return 1;}
     advance("script-fallback");return 0;
 }
+/* v0.0.68 (MW-CONSOLE-COMMANDS-62): the soundtrack's number of a music file as StreamMusic names it ("Music\Special\
+ * MW_Triumph.mp3"): its file name's stem, spaces as '_', looked up in music/catalogue.txt as dbg ost play does (the
+ * catalogue's aliases); -1 when the catalogue has no such track or names it twice. One read of the catalogue a call:
+ * the console's StreamMusic only */
+int AW_MusicTrackByName(const char *path) {
+    char stem[96];const char *s=path,*p;int n=0,group;
+    if(!path)return -1;
+    for(p=path;*p;p++)if(*p=='/' || *p=='\\' || *p==':')s=p+1;
+    for(p=s;*p && n<(int)sizeof(stem)-1;p++)stem[n++]=*p==' '?'_':*p;
+    stem[n]=0;
+    for(p=stem+n;p>stem;)if(*--p=='.'){stem[p-stem]=0;break;}
+    for(p=stem;*p;p++)if(!manual_alias_char(*p))return -1;
+    return stem[0]?manual_lookup(stem,&group):-1;
+}
 static void music_next(void) {if(available && !title_playing){manual_changes++;fade=128;advance("next");}}
 static void music_previous(void) {
     if(!available || title_playing)return;

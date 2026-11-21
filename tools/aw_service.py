@@ -1570,7 +1570,9 @@ def chimport_commands(config, request, facts, run_name):
     workers = int(options.get('workers') or max(1, cores // cell_jobs))
     args = [build['python'], 'tools/chimport.py', 'run', '--data-files', build['inputs_mount'],
             '--palette', chim.get('palette') or f'{build["tools_dir"]}/palette.lmp', '--out', run_dir,
-            '--workers', str(workers), '--jobs', str(cell_jobs), '--cells', options['cells'].strip(),
+            # '=': a lone cell such as -21,24 is otherwise read as an option and the check refuses the request
+            # (AW-CHIMPORT-ONE-NEGATIVE-CELL-68; chimport.py cell_command passes --cell= the same way)
+            '--workers', str(workers), '--jobs', str(cell_jobs), '--cells=' + options['cells'].strip(),
             # the shared pool with reused units linked read-only, never copied, as the island's runs did (docs/chim/
             # CHIMPORT.md "The shared storage pool"; AW-CHIMPORT-REGION-POOL-COPY-67)
             '--storage-pool', 'on', '--reuse-mode', 'pool', '--workspace', workspace]
@@ -1581,6 +1583,10 @@ def chimport_commands(config, request, facts, run_name):
         # the expansions' cells are in the merged master only: the run makes the presented data folder in its own run
         # folder once (tools/presented_data.py) and its plan and cells read it (CHIMPORT-LAYER-CELL-EMPTY-67)
         args += ['--presented-data', f'{run_dir}/data']
+    if options.get('cell_shape') not in (None, 'cell'):
+        # region: each cell built as the frame a build installs for it (tools/chimport.py CELL_SHAPES,
+        # CHIMPORT-HEAP-NOT-BUILD-FRAMES-68); the default shape passes nothing, so a default request is as before
+        args += ['--cell-shape', options['cell_shape']]
     if not options.get('world'):
         args += ['--no-world']      # cells alone, the island's stage check; the growing world is a build's work
     if options.get('timeout'):
@@ -1966,7 +1972,7 @@ def make_request(args, repo_version=None):
         if args.dry_run:
             options['dry_run'] = True
     elif args.kind == 'chimport-region':
-        for key in ('cells', 'workers', 'cell_jobs', 'workspace', 'cpus', 'memory', 'jobs', 'priority'):
+        for key in ('cells', 'workers', 'cell_jobs', 'cell_shape', 'workspace', 'cpus', 'memory', 'jobs', 'priority'):
             if getattr(args, key, None) is not None:
                 options[key] = getattr(args, key)
         if getattr(args, 'masters', None):
@@ -2026,6 +2032,9 @@ def add_parsers(sub):
     request_p.add_argument('--workers', type=int, help='kind chimport-region: cells converted at once')
     request_p.add_argument('--cell-jobs', dest='cell_jobs', type=int,
                            help='kind chimport-region: worker processes inside each cell (default 2)')
+    request_p.add_argument('--cell-shape', dest='cell_shape', choices=('cell', 'region'),
+                           help='kind chimport-region: cell (default: each cell alone) or region (each cell as the '
+                                'frame a build installs for it, its neighbours\' apron included)')
     request_p.add_argument('--range')
     request_p.add_argument('--number', type=int)
     request_p.add_argument('--override', metavar='REASON', help='lift the refusals named by --allow, with a reason')

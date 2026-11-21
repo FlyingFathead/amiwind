@@ -67,6 +67,11 @@ TOOLS['tiles-budget'] = TOOLS['tiles'] + ['tools/chim/budget_tiles.py']
 # default 'mesh' key never reaches that code
 TOOLS['mesh-method2'] = _GEOMETRY + ['tools/model_method2.py', 'tools/lantern_rebuild.py', 'tools/hand_made_kinds.py']
 TOOLS['tiles-budget-placed'] = TOOLS['tiles-placed'] + ['tools/chim/budget_tiles.py']
+# collision unions the compiler refuses in BSP29, compiled in BSP2 for the meshes config/collision-union-bsp2.json
+# lists (chim.union_bsp2, CHIM-COLLISION-UNION-FALLBACK-41): own kinds, so the default kinds' keys never reach that
+# module, and Akulakhan's 'tiles-budget-placed' units stay as they are
+TOOLS['variant-bsp2'] = TOOLS['variant'] + ['tools/chim/union_bsp2.py']
+TOOLS['tiles-budget-union'] = TOOLS['tiles-budget'] + ['tools/collision_bsp.py', 'tools/chim/union_bsp2.py']
 # Build switches read from the environment by the converter functions (the stair rule:
 # mesh_geometry.collision_pieces, COLLISION-STAIR-SLOPE-32).
 # The standing-hull form (--model-hull, mesh_geometry_env.model_hull_mode) changes every big model's hull:
@@ -114,6 +119,9 @@ CODE_ENTRIES = {
 }
 # method 2 (config/model-method-2.json, MODEL-REPLACEMENT-OBJ-67): the hand-made mesh's worker, its own kind
 CODE_ENTRIES['mesh-method2'] = [('tools/model_method2.py', 'mesh_unit_method2')]
+# BSP2 collision unions (chim.union_bsp2): their workers, their own kinds
+CODE_ENTRIES['variant-bsp2'] = [('tools/chim/union_bsp2.py', 'variant_unit_bsp2')]
+CODE_ENTRIES['tiles-budget-union'] = [('tools/chim/union_bsp2.py', 'budget_tile_unit_union')]
 # Off: keys of the 'files' form only (A/B, and what every build used before code keys).
 CODE_KEYS_VARIABLE = 'AMIWIND_UNIT_CODE_KEYS'
 

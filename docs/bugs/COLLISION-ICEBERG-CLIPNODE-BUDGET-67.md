@@ -26,6 +26,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 - 2026-11-17: reported in v0.0.67-dev1
 - 2026-11-17: v0.0.67-dev1: The method to try first is the one that made Akulakhan's Chamber fit (CHIM-ROOM-CLIPNODE-BUDGET-48): one model whose collision is over what one image can address is cut into tiles of its own frame, every collision plate and face going ...
+- 2026-11-21 01:38 +0200: seen again in v0.0.68-dev2: Measured again with the ice shards collision compiled and the frame edge rule in place: the glacier cell and its eight neighbours still exceed the 32 MB memory limit, by 0.25 to 10.4 MB at their peaks; the ice shard copies are about half ...
 
 <!-- END GENERATED TIMELINE -->
 
@@ -63,6 +64,7 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [COLLISION-TRACE-COST-33](COLLISION-TRACE-COST-33.md): Movement traces near large models walk long standing-hull chains: tens of ms per trace on a slow 68040 (emulator-relative)
 - [COLLISION-TRACE-LIMIT-ROUTED-ROOM-36](COLLISION-TRACE-LIMIT-ROUTED-ROOM-36.md): The tool collision tracer stops on the Vivec Arena Pit's routed hull (visit limit), so its start spot cannot be traced
 - [HULL-SURFACE-TENT03-MISSING-57](HULL-SURFACE-TENT03-MISSING-57.md): The collision surface table left out one Ashlander yurt (ex_ashl_tent_03): its walkable collision lay 64 units under its convex pieces
+- [PELAGIAD-STAIRS-STUCK-67](PELAGIAD-STAIRS-STUCK-67.md): A stairway up in Pelagiad cannot be climbed: the player gets stuck on it
 - [RECIPE-ROW-MOVES-COLLISION-57](RECIPE-ROW-MOVES-COLLISION-57.md): A mesh reduction row changed the Imperial ship's collision: the dev4 build stopped at the collision surface gate in Vivec City (64 units)
 - RED-MOUNTAIN-SLOPE-TOO-STEEP-51 (no report page): Red Mountain (cell 2,7): a slope too steep to walk up, the player cannot go forward
 - [ROOM-PYLON-ROOF-48](ROOM-PYLON-ROOF-48.md): Grand Inquisitor and Tamira Vian (Hall of Processing) stand inside collision: a convex piece of ex_stronghold_pylon01 slopes 14 units over the floor they stand on

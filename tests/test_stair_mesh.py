@@ -506,8 +506,17 @@ class KnownMeshTests(unittest.TestCase):
         # plus the Bloodmoon layer's 3 (CHIM-SOLSTHEIM-STAIR-CHECK-64), named under layers
         # and the Tribunal layer's 2, found when Mournhold's districts were converted as exterior cells (the bazaar
         # cart and a road piece, 18 November 2026)
+        # and the Bloodmoon layer's 9 more, found when the v0.0.68-dev3 build converted Solstheim's 135 cells (21
+        # November 2026: a door, the steam machine as Bloodmoon ships it, two barrow tombs, three colony buildings, the
+        # colony pier and a bridge; each keeps method 0's collision)
         bloodmoon, tribunal = data['layers']['bloodmoon'], data['layers']['tribunal']
-        self.assertEqual(len(bloodmoon), 3)
+        self.assertEqual(len(bloodmoon), 12)
+        for mesh in ('meshes/d/ex_s_door.nif', 'meshes/f/furn_dwrv_steam_00.nif', 'meshes/x/ex_bm_tomb_02.nif',
+                     'meshes/x/ex_bm_tomb_03.nif', 'meshes/x/ex_colony_const_house01.nif',
+                     'meshes/x/ex_colony_house03.nif', 'meshes/x/ex_colony_miners_office01.nif',
+                     'meshes/x/ex_colony_pier01.nif', 'meshes/x/ex_s_bridge.nif'):
+            self.assertIn(mesh, bloodmoon)
+            self.assertIn(mesh, data['meshes'])
         self.assertEqual(sorted(tribunal), ['meshes/x/ex_mh_bazaar_cart_01.nif', 'meshes/x/ex_mh_road_03.nif'])
         self.assertEqual(len(set(data['meshes']) - set(bloodmoon) - set(tribunal)), 11)
         self.assertNotIn('meshes/f/flora_tree_gl_06.nif', data['meshes'])

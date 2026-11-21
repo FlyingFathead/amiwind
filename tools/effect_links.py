@@ -24,13 +24,18 @@ last section, the cell's effect links (small lookup tables per area, never one f
 Keys are the area keys of focus.awf and the items index (prepare_focus.exterior_key of the light's own cell); the
 references are the stable ids (tools/ref_identity.py) the world change list uses. The general hide by reference of
 an exterior placement ('P' rows) is meant for every takeable or disableable object later (OUTDOOR-ITEMS-TAKE-61);
-today it lists the carriable lights only.
+it lists the carriable lights and, since OUTDOOR-DISABLE-NOT-HIDDEN-68, every outdoor placement a script of the masters
+can Disable or Enable (scripted_placements: the strongholds' building stages, the colony's, Mournhold's trees), in
+the base world and in every store of frames the image installs (Solstheim's, Mournhold's districts at their presented
+cells: placed_outdoors).
 
 check() is the build's keeper of the rule: it refuses an image where a carriable light's flame in any map, its night
-lamp row or its exterior placement has no link to its reference (a flame cut by a map's flame cap is not drawn at
-all and is only counted).
+lamp row or its exterior placement, or a scripted placement's exterior piece, has no link to its reference (a flame
+cut by a map's flame cap is not drawn at all and is only counted); a scripted target with no CHIM piece and no entity
+of a frame map is named in the receipt (a finding: nothing hides it).
 """
 import collections
+import re
 import struct
 import sys
 from pathlib import Path
@@ -50,8 +55,9 @@ MASTERS = ('Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm')
 CARRY, NEGATIVE, OFF_DEFAULT = 0x2, 0x4, 0x20
 # engine/aga/src/aw_guard_torch.c STATIC_FLAME_MAX (tools/chim/flames.py)
 FLAME_CAP = 128
-# engine/aga/src/chim/chim_chunks.c CHIM_GONE_PIDS and aw_mwhost.c exterior_hide: placement ids of one reference
-PIECES_MAX = 16
+# CHIM-GONE-LIST-64-CAP-68: the engine hides every piece a reference's 'P' rows name (aw_inventory.c
+# AW_AreaEffectHide, a bit per placement of the loaded frame in chim/chim_chunks.c): no limit per reference any more
+# (16 pieces before, refused here)
 
 
 # ---------------------------------------------------------------- the game data: which placements the rule covers
@@ -144,8 +150,107 @@ def carriable_lights(data_files, flames=None):
     return out
 
 
+# OUTDOOR-DISABLE-NOT-HIDDEN-68: a script's Disable / Enable (OpenMW apps/openmw/mwscript/miscextensions.cpp OpEnable,
+# OpDisable: the reference the line names by id->, else the script's own object), as the masters write it
+SCRIPT_TOGGLE = re.compile(r'(?i)(?:("?)([^"\s,;>\-][^"\->]*?)\1\s*->\s*)?\b(disable|enable)\b(?!\w)')
+ACTOR_TAGS = ('NPC_', 'CREA', 'LEVC')     # an actor has an edict: its Disable hides the edict (aw_mwhost.c object_hide)
+
+
+def script_targets(raws):
+    """(ids, scripts, kinds, scripted): the folded ids a script line or a dialogue result switches by "X->Disable" /
+    "X->Enable", the folded names of the scripts with a bare Disable or Enable (their own objects), {folded id: record
+    tag} of every record and {folded id: folded script} of every record that names a script, a later master's record
+    winning; from the masters RAWS ({master: bytes}) in load order."""
+    from mwad.audit import records, string, subrecords
+    ids, scripts, kinds, scripted = set(), set(), {}, {}
+
+    def read(text, script):
+        for line in (text or '').splitlines():
+            for m in SCRIPT_TOGGLE.finditer(line.split(';', 1)[0]):
+                if m.group(2):
+                    ids.add(m.group(2).strip().casefold())
+                elif script:
+                    scripts.add(script)
+    for m in MASTERS:
+        if m not in raws:
+            continue
+        for tag, flags, payload in records(raws[m]):
+            if flags & 0x20:
+                continue
+            if tag == 'SCPT':
+                s = dict(subrecords(payload))
+                head = s.get('SCHD', b'')
+                read(string(s.get('SCTX', b''), errors='replace'), string(head[:32], errors='replace').casefold())
+            elif tag == 'INFO':
+                for t, d in subrecords(payload):
+                    if t == 'BNAM':
+                        read(string(d, errors='replace'), None)
+            elif tag not in ('CELL', 'LAND', 'PGRD', 'DIAL', 'TES3'):
+                s = {}
+                for t, d in subrecords(payload):
+                    s.setdefault(t, d)                    # the record's own NAME and SCRI, its first of each
+                if 'NAME' not in s:
+                    continue
+                ident = string(s['NAME'], errors='replace').casefold()
+                kinds[ident] = tag
+                if 'SCRI' in s:
+                    scripted[ident] = string(s['SCRI'], errors='replace').casefold()
+                else:
+                    scripted.pop(ident, None)
+    return ids, scripts, kinds, scripted
+
+
+def scripted_placements(data_files):
+    """{stable reference: {'id', 'master', 'interior', 'cell', 'position', 'flames'}} of every placement a script of
+    the masters can Disable or Enable (script_targets: every placement of an id a line names, every placement of a
+    record whose script has a bare Disable or Enable), actors left out (their edicts are hidden), read as
+    carriable_lights reads its placements (the same keys). OUTDOOR-DISABLE-NOT-HIDDEN-68."""
+    from mwad.paths import child_ci
+    from prepare_focus import cells_of
+    from ref_identity import stable_ref
+    data = Path(data_files)
+    raws = {m: p.read_bytes() for m, p in ((m, child_ci(data, m, required=False)) for m in MASTERS) if p is not None}
+    ids, scripts, kinds, scripted = script_targets(raws)
+    out = {}
+    for m in MASTERS:
+        for cell, interior, grid, _, refs in cells_of(raws[m]) if m in raws else ():
+            for ref in refs:
+                if 'DELE' in ref or 'NAME' not in ref or len(ref.get('DATA', b'')) != 24:
+                    continue
+                ident = ref['NAME'].split(b'\0')[0].decode('cp1252', 'replace').casefold()
+                if kinds.get(ident) in ACTOR_TAGS or (ident not in ids and scripted.get(ident) not in scripts):
+                    continue
+                out[stable_ref(m, ref['number'])] = {
+                    'id': ident, 'master': m, 'interior': interior, 'cell': cell if interior else tuple(grid),
+                    'position': struct.unpack_from('<3f', ref['DATA']), 'flames': False}
+    return out
+
+
 def outdoor(lights):
     return {r: light for r, light in lights.items() if not light['interior']}
+
+
+def placed_outdoors(entries, places=None):
+    """ENTRIES ({reference: entry}) that stand outdoors in AmiWind: an exterior cell's as they are, a presented
+    district's (MOURNHOLD-EXTERIOR-CELLS-66; PLACES: presented_exterior.build_places) at the cell of its presented
+    block (present_position, the move the presented master gave it); every other room's left out."""
+    out = {}
+    for r, e in entries.items():
+        if not e['interior']:
+            out[r] = e
+        elif places:
+            from presented_exterior import is_presented, present_position
+            if is_presented(places, e['cell']):
+                grid, _ = present_position(places, e['cell'], e['position'])
+                out[r] = dict(e, interior=False, cell=(int(grid[0]), int(grid[1])))
+    return out
+
+
+def hideable(lights, scripted=None, places=None):
+    """{reference: entry} of every outdoor placement a 'P' row hides: the carriable lights and the scripted ones."""
+    both = dict(scripted or {})
+    both.update(lights)
+    return placed_outdoors(both, places)
 
 
 def area_key(light):
@@ -177,10 +282,11 @@ def lamp_links(lamps, lights):
     return [(i, at[tuple(row)]) for i, row in enumerate(lamps) if tuple(row) in at]
 
 
-def place_links(world, lights):
-    """[(placement id, reference)] of every CHIM exterior placement (every cut piece) of a carriable light."""
+def place_links(world, lights, places=None):
+    """[(placement id, reference)] of every CHIM exterior placement (every cut piece) of WORLD that LIGHTS ({reference:
+    entry}: carriable lights, scripted placements: hideable) holds outdoors."""
     from chim.cut import source_ref
-    out_refs = set(outdoor(lights))
+    out_refs = set(placed_outdoors(lights, places))
     out = set()
     for _, _, chunks in world['frames']:
         for c in chunks:
@@ -241,25 +347,24 @@ def frame_maps(id1):
     return out
 
 
-def area_rows(id1, world, lights):
+def area_rows(id1, world, lights, scripted=None, layers=(), places=None):
     """{area key: sorted [(kind, aux, key, reference)]}: every effect link of the image, in the area (exterior
-    cell) of the light it belongs to."""
+    cell) of the light it belongs to. 'P' rows (OUTDOOR-DISABLE-NOT-HIDDEN-68): the pieces of the carriable lights
+    and of SCRIPTED (scripted_placements) in WORLD and in every world of LAYERS (the stores of frames the image
+    installs: Solstheim's, Mournhold's districts at their presented cells, PLACES)."""
     from prepare_area_tables import name_hash
     id1 = Path(id1)
     lit = outdoor(lights)
+    hide = hideable(lights, scripted, places)
     rows = collections.defaultdict(set)
     if (id1 / LAMPS).is_file():
         for row, ref in lamp_links(lamp_rows((id1 / LAMPS).read_bytes()), lights):
             rows[area_key(lit[ref])].add((KIND_LAMP, 0, row, ref))
+    for w in [world] + list(layers):
+        if w is not None:
+            for pid, ref in place_links(w, hide):
+                rows[area_key(hide[ref])].add((KIND_PLACE, 0, pid, ref))
     if world is not None:
-        pieces = collections.Counter()
-        for pid, ref in place_links(world, lights):
-            rows[area_key(lit[ref])].add((KIND_PLACE, 0, pid, ref))
-            pieces[ref] += 1
-        over = sorted(r for r, n in pieces.items() if n > PIECES_MAX)
-        if over:
-            raise ValueError('Carriable lights cut into more than %d pieces (the engine hides at most that many): %s'
-                             % (PIECES_MAX, ', '.join(map(str, over))))
         for stem, entities in frame_maps(id1):
             for ordinal, ref in frame_flame_links(entities, world, lights):
                 rows[area_key(lit[ref])].add((KIND_FLAME, ordinal, name_hash(stem), ref))
@@ -318,19 +423,28 @@ def patch_areas(raw, rows):
     return head + b''.join(out_index) + between + b''.join(body)
 
 
-def stage(id1, data_files, world, out=None):
+def stage(id1, data_files, world, out=None, layers=(), places=None):
     """The image step's part, after the frame maps and the night lamp table: every exterior cell's effect links into
-    its own record of id1/areas.awa; the receipt (OUT/effect-links.json when OUT is given)."""
+    its own record of id1/areas.awa; the receipt (OUT/effect-links.json when OUT is given). LAYERS: the world folders
+    of the stores of frames the image installs (Solstheim's, Mournhold's districts), read here (chim.frame_map.load);
+    PLACES: the presented districts (tools/build_aga.py presented_places)."""
     import hashlib
     import json
     import time
     t0 = time.time()
     id1 = Path(id1)
-    print('=== effect links: what a taken carriable light takes with it (TAKEN-LIGHT-FLAME-61) ===', flush=True)
+    print('=== effect links: what a taken carriable light or a script\'s Disable takes with it (TAKEN-LIGHT-FLAME-61, '
+          'OUTDOOR-DISABLE-NOT-HIDDEN-68) ===', flush=True)
     lights = carriable_lights(data_files)
-    rows = area_rows(id1, world, lights)
+    scripted = scripted_placements(data_files)
+    if layers:
+        from chim.frame_map import load
+        layers = [load(path) for path in layers]
+    rows = area_rows(id1, world, lights, scripted, layers, places)
     sizes = sorted(16 + ROW.size * len(v) for v in rows.values())
     receipt = {'carriable_light_placements': len(lights), 'outdoors': len(outdoor(lights)), 'areas': len(rows),
+               'scripted_placements': len(scripted), 'scripted_outdoors': len(placed_outdoors(scripted, places)),
+               'layer_worlds': len(layers),
                'rows': {chr(k): sum(1 for v in rows.values() for r in v if r[0] == k)
                         for k in (KIND_PLACE, KIND_FLAME, KIND_LAMP)},
                'section_bytes_median': sizes[len(sizes) // 2] if sizes else 0,
@@ -342,13 +456,16 @@ def stage(id1, data_files, world, out=None):
         raw = patch_areas(path.read_bytes(), rows)
         path.write_bytes(raw)
         receipt['areas_sha256'] = hashlib.sha256(raw).hexdigest()
-    # the rule kept: every flame, lamp row and placement of a carriable light outdoors (and in the rooms) linked
-    receipt['check'] = check(id1, lights, world, links=rows)
+    # the rule kept: every flame, lamp row and placement of a carriable light outdoors (and in the rooms) linked, and
+    # every exterior piece of a scripted placement
+    receipt['check'] = check(id1, lights, world, links=rows, scripted=scripted, layers=layers, places=places)
     receipt['seconds'] = round(time.time() - t0, 1)
-    print('[effect-links] %d carriable light placements (%d outdoors); %d exterior cells, rows %s; section median %d '
-          'bytes, largest %d; %.1f s' % (len(lights), receipt['outdoors'], len(rows), receipt['rows'],
-                                       receipt['section_bytes_median'], receipt['section_bytes_largest'],
-                                       receipt['seconds']), flush=True)
+    print('[effect-links] %d carriable light placements (%d outdoors), %d scripted (%d outdoors); %d exterior cells, '
+          'rows %s; section median %d bytes, largest %d; %d scripted targets with no piece and no entity; %.1f s'
+          % (len(lights), receipt['outdoors'], len(scripted), receipt['scripted_outdoors'], len(rows), receipt['rows'],
+             receipt['section_bytes_median'], receipt['section_bytes_largest'],
+             len(receipt['check'].get('scripted targets with no CHIM piece and no entity', ())), receipt['seconds']),
+          flush=True)
     if out is not None:
         (Path(out) / 'effect-links.json').write_text(json.dumps(receipt, indent=2) + '\n', encoding='utf-8',
                                                      newline='\n')
@@ -365,11 +482,14 @@ def image_links(id1):
     return {k: v for k, v in ((k, read_section(r)) for k, r in read_areas(path.read_bytes())[3].items()) if v}
 
 
-def check(id1, lights, world=None, limit=20, links=None):
+def check(id1, lights, world=None, limit=20, links=None, scripted=None, layers=(), places=None):
     """Refuse (ValueError naming the misses) an image where a carriable light that gives light has an effect with no
     link to its reference: a flame of its placement in a room map without aw_ref; outdoors (WORLD: the CHIM world) a
     frame map flame, a lamp row or a CHIM placement missing from its cell's effect links (LINKS: {area key: rows},
-    else read from id1/areas.awa). Returns the receipt (counts per path)."""
+    else read from id1/areas.awa). OUTDOOR-DISABLE-NOT-HIDDEN-68: every exterior piece of a placement a script can
+    Disable or Enable (SCRIPTED, in WORLD and LAYERS) linked too; a scripted target outdoors with no piece in any of
+    those worlds and no entity of a frame map (whose edict the Disable hides) is named in the receipt, a finding.
+    Returns the receipt (counts per path)."""
     from chim.flames import FLAME_CLASS, REF_KEY
     from chim.interior import installed_room_refs
     from prepare_area_tables import name_hash
@@ -401,12 +521,29 @@ def check(id1, lights, world=None, limit=20, links=None):
         counts['room placements tied'] += len(want) - len(missing)
         misses += ['%s: the flame of reference %d (%s) names no placement' % (p.name, r, lights[r]['id'])
                    for r in missing]
-    if world is not None:
-        for pid, ref in place_links(world, lights):
-            counts['exterior placements'] += 1
+    hide, reached, unreached = hideable(lights, scripted, places), set(), []
+    for w in [world] + list(layers):
+        if w is None:
+            continue
+        for pid, ref in place_links(w, hide):
+            counts['exterior placements' if ref in lights else 'scripted exterior placements'] += 1
+            reached.add(ref)
             if (KIND_PLACE, 0, pid, ref) not in have:
                 misses.append('CHIM placement %d of reference %d (%s) has no effect link in its cell, so it cannot be '
-                              'taken' % (pid, ref, lights[ref]['id']))
+                              '%s' % (pid, ref, hide[ref]['id'], 'taken' if ref in lights else 'switched off'))
+    if scripted and (world is not None or layers):
+        # a scripted target with no CHIM piece: an entity of a frame map (its edict is hidden), else nothing hides it
+        entity_refs = {int(e['aw_ref']) for _, rows in frame_maps(id1) for e in rows
+                       if str(e.get('aw_ref', '')).isdigit()}
+        for ref, e in sorted(placed_outdoors(scripted, places).items()):
+            if ref in reached:
+                continue
+            if ref in entity_refs:
+                counts['scripted placements drawn as entities (hidden by their edict)'] += 1
+            else:
+                unreached.append('%d %s %s' % (ref, e['id'], tuple(e['cell']) if not isinstance(e['cell'], str)
+                                               else e['cell']))
+    if world is not None:
         maps = frame_maps(id1)
         for stem, rows in maps:
             for ordinal, ref in frame_flame_links(rows, world, lights):
@@ -428,10 +565,15 @@ def check(id1, lights, world=None, limit=20, links=None):
                 misses.append('%s row %d of reference %d (%s) has no effect link in its cell'
                               % (LAMPS, row, ref, lights[ref]['id']))
     if misses:
-        raise ValueError('Effects of carriable lights not tied to their item (TAKEN-LIGHT-FLAME-61): %d\n  %s%s' % (
-            len(misses), '\n  '.join(misses[:limit]), '\n  ...' if len(misses) > limit else ''))
-    return dict(counts, rule='a can-carry LIGH that gives light: every flame, lamp row and exterior placement linked',
-                carriable_light_placements=len(lights))
+        raise ValueError('Effects of carriable lights not tied to their item (TAKEN-LIGHT-FLAME-61), or scripted '
+                         'placements not hidden by their switch (OUTDOOR-DISABLE-NOT-HIDDEN-68): %d\n  %s%s' % (
+                             len(misses), '\n  '.join(misses[:limit]), '\n  ...' if len(misses) > limit else ''))
+    out = dict(counts, rule='a can-carry LIGH that gives light: every flame, lamp row and exterior placement linked; a '
+                            'placement a script can Disable or Enable: every exterior piece linked',
+               carriable_light_placements=len(lights))
+    if scripted:
+        out['scripted targets with no CHIM piece and no entity'] = unreached
+    return out
 
 
 def check_image(id1, data_files, out=None, world=None):

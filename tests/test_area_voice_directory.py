@@ -38,10 +38,14 @@ class AreaVoiceDirectoryTests(unittest.TestCase):
         ref={'id':identifier,'number':17,'scale':1.,'position':[-11264.,-71680.,64.],
              'rotation_radians':[0.,0.,0.]}
         appearance={'id':identifier,'name':'Fixture Resident','female':False,'skeleton':'fixture'}
+        baked=[]
+        def bake(task):
+            # the residents' bake (populate hands each one back as it finishes: unit_store.completed_units)
+            baked.append(task[2]['id'])
+            return (identifier,rawmodel,payload,{'appearance':task[2],'step':.25,
+                    'greeting':{'text':'Fixture greeting'},'sha256':hashlib.sha256(rawmodel).hexdigest()})
         def producer(function,tasks,workers):
-            self.assertEqual(len(tasks),1)
-            return [(identifier,rawmodel,payload,{'appearance':tasks[0][2],'step':.25,
-                     'greeting':{'text':'Fixture greeting'},'sha256':hashlib.sha256(rawmodel).hexdigest()})]
+            self.assertEqual(tasks,[]);return []
         with contextlib.ExitStack() as stack:
             for name,value in {'load_master':({'NPC_':{identifier:[]}},[{'refs':[ref]}],{}),
                                'outfit':appearance,'first':b'', 'foot_class':'bare','voices_of':{},
@@ -49,9 +53,11 @@ class AreaVoiceDirectoryTests(unittest.TestCase):
                                'greeting_settings':{'distance':10,'reset_distance':20,'duration':1}}.items():
                 stack.enter_context(patch.object(area,name,return_value=value))
             stack.enter_context(patch.object(area,'ordered_map',side_effect=producer))
+            stack.enter_context(patch.object(area,'build_resident_reads',side_effect=bake))
             stack.enter_context(patch.object(area.npc_items,'attach_items',side_effect=lambda k,i,a:a))
             stack.enter_context(patch.object(area.npc_lod,'publish',return_value={'mode':'off'}))
             report=area.populate(root,scene,rooms={},reports=[],jobs=1,doors=False)
+        self.assertEqual(baked,[identifier])
         self.assertEqual(voice.read_bytes(),payload)
         self.assertEqual((scene/'id1/progs'/(stem+'.mdl')).read_bytes(),rawmodel)
         self.assertEqual(report['cast'],[{'map':'seyda','reference':17,'id':identifier,'position':[0.,0.,16.]}])

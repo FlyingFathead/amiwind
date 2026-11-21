@@ -77,10 +77,21 @@ int AW_HeldLightParse(const char *text,int size,const char *model,aw_held_light_
 float AW_HeldLightRadius(float torch_light,int item_radius,int torch_record);
 /* The held light now when one is held lit (hands raised, V or the equip) and it is not the torch; NULL otherwise. */
 const aw_held_light_t *AW_HeldLight(void);
-/* READY-MAGIC-SHOWS-WEAPON-65 (v0.0.66): aw_view.c installs it: 1 while the carried torch or light is put away (magic
- * ready; aw_hand_models.h AW_HandCarriesLeft): AW_TorchEquipped and AW_HeldLight answer none, no light is cast, V says
- * so. NULL in fixtures without it. */
+/* LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67: the held light drawn in the left hand (the hands up, drawing, ready or
+ * striking, and not put away), lit or put out by V; NULL otherwise. Its model and the left arm's pose follow this, its
+ * flames and light AW_HeldLight. */
+const aw_held_light_t *AW_HeldLightShown(void);
+/* The light in the left hand whatever the hands do (its model and carried place for the inventory's picture); NULL
+ * when the left hand holds no light of its own. */
+const aw_held_light_t *AW_HeldLightCarried(void);
+/* READY-MAGIC-SHOWS-WEAPON-65 (v0.0.66): aw_view.c installs it: not 0 while the carried torch or light is put away (1:
+ * magic ready, aw_hand_models.h AW_HandCarriesLeft; 2: a two-handed weapon drawn, LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67,
+ * as OpenMW's updateCarriedLeftVisible): AW_TorchEquipped, AW_HeldLight and AW_HeldLightShown answer none, no light is
+ * cast, V says so. NULL in fixtures without it. */
 extern int (*aw_torch_put_away)(void);
+/* LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67: aw_debug_torch.c: V's change of the held light in the notice box (LIT 1: lit
+ * again, 0: put out); NULL in fixtures. */
+extern void (*aw_torch_notice)(int lit);
 /* aw_debug_torch.c: the light in the left hand (1) with its catalogue id, item model, radius and catalogue byte 511
  * flags, and the torch record's radius (0 unknown); 0 when the left hand holds no light. NULL in fixtures. */
 extern int (*aw_held_light_item)(char id[64],char model[64],int *radius,int *flags,int *torch_radius);

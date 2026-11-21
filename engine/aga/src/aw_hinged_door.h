@@ -111,6 +111,9 @@ int AW_MoverShift(unsigned reference,const float *d);
 int AW_MoverAtStart(unsigned reference);
 /* where the mover stands now (its loaded placement, map units): 1 found (WORLD-BUTTONS-62 round two, console GetPos) */
 int AW_MoverOrigin(unsigned reference,float *out);
+/* SetPos: axis K (0-2) of the mover to VALUE (map units) from where it stands now, the others kept; 1 when done (its
+ * placement loaded). SETPOS-MOVER-NO-ENTITY-68: the Forgotten Sewer's floating crates. */
+int AW_MoverSetAxis(unsigned reference,int k,float value);
 /* Rotate / RotateWorld: turn by D (Quake angles: pitch, yaw, roll); SetAngle: Quake angle K to VALUE (its placement
  * loaded). 1 when it is a mover (and, for SetAngle, done). SetAtStart and AW_MoverReset undo turns too. */
 int AW_MoverTurn(unsigned reference,const float *d);

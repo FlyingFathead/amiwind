@@ -1,6 +1,6 @@
 # The expansions: Tribunal and Bloodmoon
 
-_Last updated with AmiWind v0.0.67 (19 November 2026)._
+_Last updated with AmiWind v0.0.68-dev3 (21 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -26,7 +26,9 @@ them today, what can be seen in the game now, how the two places are planned to 
 be missing. The short version: the data of both expansions is part of the build by default since v0.0.66-dev2 and
 their rooms are in the image. Since v0.0.67 Mournhold is reached from Ebonheart through the characters' own dialogue and
 back, and its five outdoor districts, built as a world of their own, can be walked; its quests and much of its play are
-not ready, and Solstheim's ground is not built yet.
+not ready. Since v0.0.68-dev3 the first 135 of Solstheim's 144 open terrain cells are built, as a world of their own,
+and reached only by `dbg tp` to their frames for now: no door, boat or place name leads there yet, and the glacier and
+its eight neighbouring cells are not in yet ([how the glacier is approached](chim/SOLSTHEIM_GLACIER.md)).
 
 ## What the expansions are, and your own copies
 
@@ -101,8 +103,8 @@ builder warns, names the missing expansion and builds the base game alone.
   play), while the two district doors into the Great Bazaar, walked
   through, set the player on the street.
 - **The data in the tables.** The [MWScript tracker](MWSCRIPT_FEATURES.md) counts every script of the three game files
-  and says which run: of Tribunal.esm's 255 scripts, 236 are used (233 run, 2 wait for a function: the water levers of
-  Old Mournhold, 1 belongs to a room the image does not hold); of Bloodmoon.esm's 336, 310 are used (173 run, 137
+  and says which run: of Tribunal.esm's 255 scripts, 236 are used (235 run since v0.0.68, when the water levers of
+  Old Mournhold got their functions; 1 belongs to a room the image does not hold); of Bloodmoon.esm's 336, 310 are used (173 run, 137
   belong to Solstheim's outdoor regions). The
   [world mechanisms](WORLD_MECHANISMS.md) page lists the switches and levers of Mournhold and Solstheim, marked as not in
   the image yet, and the [survey](WORLD_SURVEY.md) lists Solstheim's exterior cells. The
@@ -133,10 +135,11 @@ attack a new player
 [GAENOR-ATTACKS-AT-START-67](bugs/GAENOR-ATTACKS-AT-START-67.md)), a fight is carried over a map change
 ([COMBAT-FIGHT-CARRIED-TO-NEW-MAP-67](bugs/COMBAT-FIGHT-CARRIED-TO-NEW-MAP-67.md)), Godsreach's canal is reported dry
 and that is not proven ([GODSREACH-CANAL-NO-WATER-67](bugs/GODSREACH-CANAL-NO-WATER-67.md)), the water levers of Old
-Mournhold do not move the water
+Mournhold move the water since v0.0.68-dev2, seen working in play
 ([MWSCRIPT-WATER-LEVEL-STATIC-67](bugs/MWSCRIPT-WATER-LEVEL-STATIC-67.md)), and the Dark Brotherhood's attack in sleep
 that starts Tribunal did not come on the dev3 image; fixed in source, to be seen in play
-([GETPCSLEEP-NOT-CARRIED-OUT-67](bugs/GETPCSLEEP-NOT-CARRIED-OUT-67.md)). There is no Solstheim ground to walk on and no boat to it; and the
+([GETPCSLEEP-NOT-CARRIED-OUT-67](bugs/GETPCSLEEP-NOT-CARRIED-OUT-67.md)). Solstheim's first open terrain cells are in the
+build since v0.0.68-dev3, reached by `dbg tp` only, with no boat to the island yet; and the
 scripts of the expansions' places that are not in the image yet do not run (since v0.0.67 the build binds the
 expansions' own placements, so a script runs where the image holds its place; the v0.0.66 build bound none of them).
 The data being selected by default is the road to them, not their arrival.
@@ -219,10 +222,35 @@ your game files (no block touches a cell of the game's own grid, none is larger 
 cells that carry the districts' own collision rows are exactly the presented cells. A problem stops the build there
 with every finding named. A pass is recorded for the game files it checked, so the next build does not repeat it.
 
+The same first minute also runs **the reader of every table builder** on your selected game files, without baking
+anything (`tools/table_reader_check.py`): the exterior cells, the load doors, travel, magic, the creature and
+container census with the focus tables' read, the journal and region names, the harvest catalogue, the world survey,
+the dialogue tables and the script plan. A reader that cannot read an expansion's records is named there together
+with every other failing reader, instead of stopping its own stage somewhere later in the build. Each reader gets
+the selected files explicitly. A pass is recorded for the game files and the readers' own source, so it runs again
+only when one of them changes. With the base game alone it does nothing.
+
 **Mournhold is a small map of its own, built by a module of its own.** The expansions are build modules: an
 expansion's content is made by stages named after it, which are in a build only when its game file is selected, are
 keyed only by their own inputs, and which no stage of the base game reads. A build without an expansion, or with
 `--no-dlc`, has exactly the stages and commands it had before.
+
+Solstheim is built the same way, by the module `bloodmoon-solstheim`
+(`tools/bloodmoon_solstheim_module.py`). Its stages are in a build only when `Bloodmoon.esm` is selected and the
+tracker reference calls at least one of Solstheim's outdoor cells finished:
+
+- `bloodmoon-solstheim-data` makes the data folder from the base game file and `Bloodmoon.esm` alone;
+- `bloodmoon-solstheim` converts the finished cells, and only those, into a world folder of their own
+  (`tools/bloodmoon_solstheim.py`: the outdoor converter, unchanged, with the module's own game files and its own
+  unit cache). The stage shares its converted units through the build's storage pool, so a unit that a CHIMport run
+  of the same cells already stored is taken from there and not converted a second time.
+
+The image installs that world as the store `chimsol` with the frame maps `sl0000`, `sl0001`, ... and the rows file
+`world/regions-sl.awr`; cells that touch are open to each other. The same first-minute and after-stage checks as
+Mournhold's module hold it: every finished cell is taken, the image's last tables know the frame maps, and the
+real frame maps are tried against the image's per-map checks right after the world stage. Until the cells are
+finished in the tracker reference the module adds nothing to a build. Doors, travel, the placed people and
+creatures and the sea between the islands follow in later steps.
 
 The module `tribunal-mournhold` has two stages:
 
@@ -309,8 +337,8 @@ generated.
 ## The plan
 
 - **Tribunal (Mournhold):** the five districts as one exterior of their own, the ordinary rooms, the weather driven by Tribunal's
-  scripts, the teleport trip above, and Tribunal's scripts (233 of its 236 used scripts run since v0.0.67; the water
-  levers of Old Mournhold are left).
+  scripts, the teleport trip above, and Tribunal's scripts (235 of its 236 used scripts run since v0.0.68, the water
+  levers of Old Mournhold among them; the one left belongs to a room the image does not hold).
 - **Bloodmoon (Solstheim):** the exterior cells as part of the outdoor map, with the tree method its forests need (the
   star-shaped spruces and tree crowns are test-build methods that are measured but not settled), then its rooms and the
   245 scripts that belong to Solstheim.

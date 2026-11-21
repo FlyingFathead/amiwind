@@ -707,7 +707,8 @@ def actor_fast_ram(id1, rows, source=None):
 #   a chim_file_row_t per file and a chim_asset_t with its slot pointer per model and texture (ROOM_INDEX_ROW,
 #   ROOM_INDEX_ASSET, as the room gate counts it);
 # - chim_chunks.c ChimChunks_Begin, the frame's chunk index: a chim_entry_t per chunk (chim_local.h: the 44-byte
-#   chim_chunk_entry_t and 92 bytes of state, 136), a short per cell and two bits per owned placement;
+#   chim_chunk_entry_t and 92 bytes of state, 136), a short per cell and three bits per owned placement (drawn,
+#   visible and, since CHIM-GONE-LIST-64-CAP-68, gone: CHUNK_INDEX_BIT_ROWS);
 # - chim_statics.c ListBegin, the streamed statics' list: per stated static a chim_static_t (entity_t and 38 bytes), a
 #   chim_smodel_t (MAX_QPATH and 24 bytes, 88) and a short, an int per chunk and 2 more, and 64 (CHIM_MAX_STATICS 2048);
 # - chim_world.c MapBeginWork, the loading buffer (chim_buffer_kib, at least AW_BRUSH_SLICE_BYTES).
@@ -717,6 +718,7 @@ CHIM_ENTRY_BYTES = 136
 CHIM_STATIC_EXTRA = 38
 CHIM_SMODEL_BYTES = 88
 CHIM_MAX_STATICS = 2048
+CHUNK_INDEX_BIT_ROWS = 3   # chim_chunks.c ChimChunks_Begin: size = ... + 3*bits (drawn, visible, gone)
 
 
 def nonring_zone_users(files, models, textures, frame, chunks, stated, sizes, buffer_bytes=None):
@@ -731,7 +733,7 @@ def nonring_zone_users(files, models, textures, frame, chunks, stated, sizes, bu
     stated = min(int(stated), CHIM_MAX_STATICS)
     out = {'store_index': room_block(int(files) * ROOM_INDEX_ROW + (int(models) + int(textures)) * ROOM_INDEX_ASSET),
            'chunk_index': room_block(int(chunks) * CHIM_ENTRY_BYTES + int(frame['nx']) * int(frame['ny']) * 2
-                                     + 2 * ((int(frame.get('owned_total', 0)) + 7) // 8)),
+                                     + CHUNK_INDEX_BIT_ROWS * ((int(frame.get('owned_total', 0)) + 7) // 8)),
            'statics_list': room_block(stated * (sizes['entity'] + CHIM_STATIC_EXTRA + CHIM_SMODEL_BYTES + 2)
                                       + (int(chunks) + 2) * 4 + 64) if stated else 0,
            'loading_buffer': room_block(buffer_bytes)}

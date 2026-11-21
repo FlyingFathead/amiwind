@@ -1014,7 +1014,7 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(code, 0, result['notes'])
         self.assertEqual(aw.validate(result, aw.schema('aw-result-1')), [])
         run = [c for c in result['commands'] if 'tools/chimport.py run' in c and '--dry-run' not in c][0]
-        for part in ("--cells '-20,23 -21,23'", '--no-world', '--jobs 2',
+        for part in ("'--cells=-20,23 -21,23'", '--no-world', '--jobs 2',
                      'AMIWIND_MASTERS=Morrowind.esm,Tribunal.esm,Bloodmoon.esm', '--pull never', '--network none',
                      'amiwind.purpose=', '--storage-pool on --reuse-mode pool',   # AW-CHIMPORT-REGION-POOL-COPY-67
                      '--presented-data /vol/ws8/chimport/'):                      # CHIMPORT-LAYER-CELL-EMPTY-67
@@ -1037,6 +1037,45 @@ class ServiceTests(unittest.TestCase):
         names = runner.ran
         self.assertLess(names.index([n for n in names if '-check-' in n][0]),
                         names.index([n for n in names if '-build-' in n][0]))
+        # the default cell shape passes nothing on (the command lines as before)
+        self.assertFalse(any('--cell-shape' in c for c in result['commands']))
+
+    def test_chimport_region_with_one_negative_cell_reaches_chimport_as_that_cell(self):
+        # AW-CHIMPORT-ONE-NEGATIVE-CELL-68: "--cells -21,24" alone made chimport.py's argparse read the cell as an option
+        # ("argument --cells: expected one argument") and the check refused the request; a list with a space passed
+        import shlex
+        from unittest import mock
+        import chimport
+        options = {'cells': '-21,24', 'masters': ['Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm']}
+        code, result, _ = self.submit(self.request(kind='chimport-region', purpose='one-cell', options=options),
+                                      FakeRunner(build_log=self.chimport_log(('-21,24', True, []))))
+        self.assertEqual(code, 0, result['notes'])
+        runs = [c for c in result['commands'] if 'tools/chimport.py run' in c]
+        self.assertEqual(len(runs), 2)                                   # the check (dry run) and the run
+        for command in runs:
+            words = shlex.split(command)
+            argv = words[words.index('tools/chimport.py') + 1:]
+            seen = []
+            with mock.patch.object(chimport, 'entry', lambda a: None), \
+                    mock.patch.object(chimport, 'export_build_switches', lambda: {'switches': {}, 'explicit': []}), \
+                    mock.patch.object(chimport, 'run', lambda a: seen.append(a) or 0):
+                self.assertEqual(chimport._cli(argv), 0)                  # the old command line exits 2 here
+            self.assertEqual(seen[0].cells, '-21,24')
+            self.assertEqual(chimport.parse_cells(seen[0].cells), [(-21, 24)])
+
+    def test_chimport_region_passes_the_region_cell_shape_to_the_check_and_the_run(self):
+        # CHIMPORT-HEAP-NOT-BUILD-FRAMES-68: each cell built as the frame a build installs for it
+        options = {'cells': '-20,23', 'masters': ['Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm'],
+                   'cell_shape': 'region'}
+        request = self.request(kind='chimport-region', purpose='shape-proof', options=options)
+        self.assertEqual(aw_service.request_errors(request), [])
+        code, result, _ = self.submit(request, FakeRunner(build_log=self.chimport_log(('-20,23', True, []))))
+        self.assertEqual(code, 0, result['notes'])
+        runs = [c for c in result['commands'] if 'tools/chimport.py run' in c]
+        self.assertEqual(len(runs), 2)                                   # the check (dry run) and the run
+        self.assertTrue(all('--cell-shape region' in c for c in runs))
+        bad = self.request(kind='chimport-region', purpose='shape-proof', options=dict(options, cell_shape='ring'))
+        self.assertTrue(aw_service.request_errors(bad))
 
     def test_chimport_region_whose_cells_all_failed_is_not_passed(self):
         # AW-CHIMPORT-REGION-PASSED-ALL-FAILED-66: chimport.py run exits 0 when every cell failed (a failing cell

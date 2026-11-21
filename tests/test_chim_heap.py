@@ -457,7 +457,8 @@ class ImageGateMarksTests(unittest.TestCase):
         users = heap.nonring_zone_users(35657, 32714, 1132, {'nx': 42, 'ny': 39, 'owned_total': 2828}, 1638, 1012,
                                         {'entity': 196, 'hunk': 16}, buffer_bytes=32768)
         self.assertEqual(users['store_index'], heap.room_block(35657 * 28 + (32714 + 1132) * 24))
-        self.assertEqual(users['chunk_index'], heap.room_block(1638 * 136 + 42 * 39 * 2 + 2 * 354))
+        # three bit rows of the 2,828 owned placements (drawn, visible, gone: CHIM-GONE-LIST-64-CAP-68), 354 bytes each
+        self.assertEqual(users['chunk_index'], heap.room_block(1638 * 136 + 42 * 39 * 2 + 3 * 354))
         self.assertEqual(users['statics_list'], heap.room_block(1012 * (196 + 38 + 88 + 2) + 1640 * 4 + 64))
         self.assertEqual(users['loading_buffer'], heap.room_block(32768))
         # with the measured ring of the arrival (3,481 KiB) and the pool (768 KiB) this is the engine's locked zone

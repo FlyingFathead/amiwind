@@ -362,7 +362,10 @@ static void SlotRelease (int s);
 
 /* The frame file (chunk directory, sector table) of frame (cx, cy); each
  * chunk record lives in one of the frame's sector files. */
-static int		gone_count;		/* the gone placements (below, TAKEN-LIGHT-FLAME-61) */
+/* the gone placements (below, TAKEN-LIGHT-FLAME-61, CHIM-GONE-LIST-64-CAP-68): ids asked for with no loaded frame
+ * (counted and named in chim status: their frame sets them when it loads), the last such id */
+static unsigned long	gone_outside;
+static unsigned		gone_outside_pid;
 
 int ChimChunks_Begin (int cx, int cy)
 {
@@ -370,7 +373,10 @@ int ChimChunks_Begin (int cx, int cy)
 	int n, cells, bits, size, row, sectors;
 	static const float zero[2] = {0, 0};
 
-	gone_count = 0;		/* a new map: its areas name its gone placements again as they load */
+	/* a new map: its frame's gone bits come with its block (zeroed below), and its areas name its gone placements
+	 * again as they load */
+	gone_outside = 0;
+	gone_outside_pid = 0;
 	memset (&chim_frame, 0, sizeof(chim_frame));
 	memset (&counts, 0, sizeof(counts));
 	link_world = NULL;
@@ -389,7 +395,8 @@ int ChimChunks_Begin (int cx, int cy)
 	n = (int)h.count;
 	cells = chim_frame.frame.nx * chim_frame.frame.ny;
 	bits = (int)((chim_frame.frame.owned_total + 7) / 8);
-	size = n*sizeof(chim_entry_t) + cells*sizeof(short) + 2*bits;
+	/* three rows of a bit per placement the frame owns: drawn, visible, gone (CHIM-GONE-LIST-64-CAP-68: GoneBits) */
+	size = n*sizeof(chim_entry_t) + cells*sizeof(short) + 3*bits;
 	if (!ChimZone_Alloc (&index_user, size, CHIM_KIND_INDEX, 1))
 		return 0;
 	ChimZone_Lock (index_user.data);
@@ -397,6 +404,7 @@ int ChimChunks_Begin (int cx, int cy)
 	grid = (short *)(chim_frame.entries + n);
 	chim_frame.drawn = (unsigned char *)(grid + cells);
 	chim_frame.visible = chim_frame.drawn + bits;
+	memset (chim_frame.visible + bits, 0, bits);		/* nothing of the new map is gone yet */
 	chim_frame.view_entry = -2;
 	if (!ReadDirectory (row, &h, &chim_frame.frame, 0, grid, zero, 0))
 		return 0;
@@ -510,20 +518,46 @@ static int Hidden (const chim_place_t *p)
 /* TAKEN-LIGHT-FLAME-61 (the general hide by reference of an exterior placement;
  * carriable lights are its first users): the placement ids whose reference was
  * taken or disabled (aw_mwhost.c, from the area records' effect links,
- * aw_inventory.c) are not drawn and not solid. The list holds the map's gone
- * placements that the loaded areas name (a few: each a taken light's pieces);
- * a new map starts it empty and the areas fill it again as they load. */
-#define CHIM_GONE_PIDS	64
-static unsigned	gone_pid[CHIM_GONE_PIDS];
-static int		gone_count;
+ * aw_inventory.c) are not drawn and not solid. CHIM-GONE-LIST-64-CAP-68: a bit
+ * per placement the frame owns (its header's owned_total, the build's own
+ * count), the third row of the frame's block beside the drawn and visible rows
+ * (a window: each slot's block), so every placement of a loaded frame can be
+ * gone at once; the list before held 64 a map and refused the rest, which then
+ * stayed drawn and solid. The state itself is the world change list's (saved);
+ * a new map starts its bits empty and the areas set them again as they load (a
+ * window's frame as it joins: chim_slot_joined). An id of no loaded frame is
+ * counted and named (chim status), never taken quietly. */
+int ChimChunks_GoneNow (unsigned pid);
+void (*chim_slot_joined)(void);		/* the areas' effect links applied again (aw_inventory.c) */
+static chim_slot_t *PidSlot (unsigned pid);
+
+static unsigned char *GoneBits (unsigned pid, unsigned *bit)
+{
+	chim_slot_t *s;
+	if (!chim_frame.window)
+	{
+		if (!chim_frame.drawn || pid - chim_frame.first_pid >= chim_frame.frame.owned_total)
+			return NULL;
+		*bit = pid - chim_frame.first_pid;
+		return chim_frame.drawn + 2 * ((chim_frame.frame.owned_total + 7) >> 3);
+	}
+	if (!(s = PidSlot (pid)) || !s->drawn)
+		return NULL;
+	*bit = pid - s->first_pid;
+	return s->drawn + 2 * ((s->frame.owned_total + 7) >> 3);
+}
 
 static int Gone (unsigned pid)
 {
-	int i;
-	for (i=0 ; i<gone_count ; i++)
-		if (gone_pid[i] == pid)
-			return 1;
-	return 0;
+	unsigned bit;
+	unsigned char *bits = GoneBits (pid, &bit);
+	return bits ? (bits[bit>>3] >> (bit & 7)) & 1 : 0;
+}
+
+/* 1 while PID's placement is gone (the movers' relink, chim_room.c, leaves it so) */
+int ChimChunks_GoneNow (unsigned pid)
+{
+	return Gone (pid);
 }
 
 static void Unlink (chim_place_t *p);
@@ -531,27 +565,28 @@ static void Reconcile (void);
 
 /* PID's placement leaves (GONE 1: every copy unlinked now, owner and reach) or
  * comes back (0: linked again by the next reconcile, done here). 1 done, 0 the
- * list is full. */
+ * id belongs to no loaded frame (counted: gone_outside). */
 int ChimChunks_GonePid (unsigned pid, int gone)
 {
 	int i, j;
-	for (i=0 ; i<gone_count && gone_pid[i] != pid ; i++)
-		;
+	unsigned bit;
+	unsigned char *bits = GoneBits (pid, &bit);
+	if (!bits)
+	{
+		gone_outside++;
+		gone_outside_pid = pid;
+		return 0;
+	}
 	if (!gone)
 	{
-		if (i < gone_count)
+		if ((bits[bit>>3] >> (bit & 7)) & 1)
 		{
-			gone_pid[i] = gone_pid[--gone_count];
+			bits[bit>>3] &= (unsigned char)~(1u << (bit & 7));
 			Reconcile ();
 		}
 		return 1;
 	}
-	if (i == gone_count)
-	{
-		if (gone_count >= CHIM_GONE_PIDS)
-			return 0;
-		gone_pid[gone_count++] = pid;
-	}
+	bits[bit>>3] |= (unsigned char)(1u << (bit & 7));
 	for (i=0 ; i<chim_frame.count ; i++)
 	{
 		chim_entry_t *e = &chim_frame.entries[i];
@@ -746,7 +781,7 @@ static void Reconcile (void)
 		for (j=0 ; j<c->records ; j++)
 		{
 			chim_place_t *p = &c->places[j];
-			if (p->linked || Drawn (p->pid) || Hidden (p) || (gone_count && Gone (p->pid)) || !p->ent.model ||
+			if (p->linked || Drawn (p->pid) || Hidden (p) || Gone (p->pid) || !p->ent.model ||
 				!CoreKeeps (&chim_frame.entries[i], p->ent.origin))
 				continue;
 			if (j >= c->owned && OwnerDraws (p))
@@ -2443,9 +2478,34 @@ void ChimChunks_LastFrame (int *sent, int *one_leaf_path, int *placements)
 	}
 }
 
+/* CHIM-GONE-LIST-64-CAP-68: the gone placements now (the set bits of the loaded frame's gone row, a window's slots'
+ * rows) and the bytes of those rows */
+static unsigned long GoneCounted (unsigned long *bytes)
+{
+	unsigned long n = 0;
+	unsigned i, rows, k;
+	int s;
+	*bytes = 0;
+	for (s=-1 ; s<CHIM_WINDOW_SLOTS ; s++)
+	{
+		const unsigned char *row;
+		if (s < 0 ? chim_frame.window || !chim_frame.drawn : !chim_frame.window || !chim_frame.slot[s].used ||
+			!chim_frame.slot[s].drawn)
+			continue;
+		rows = ((s < 0 ? chim_frame.frame.owned_total : chim_frame.slot[s].frame.owned_total) + 7) >> 3;
+		row = (s < 0 ? chim_frame.drawn : chim_frame.slot[s].drawn) + 2*rows;
+		*bytes += rows;
+		for (i=0 ; i<rows ; i++)
+			for (k=row[i] ; k ; k &= k - 1)
+				n++;
+	}
+	return n;
+}
+
 void ChimChunks_Report (void)
 {
 	int sent, one_path, placements, i, flagged = 0;
+	unsigned long gone_bytes, gone_now = GoneCounted (&gone_bytes);
 	Con_Printf ("frame %ld %ld: %ld chunks, %ld loaded, %ld active (grain %ld)\n",
 		(long)chim_frame.frame.cx, (long)chim_frame.frame.cy, (long)chim_frame.count, (long)chim_frame.loaded,
 		(long)chim_frame.active, (long)chim_frame.frame.grain);
@@ -2453,6 +2513,8 @@ void ChimChunks_Report (void)
 		(long)counts.placements_linked, (long)counts.efrags, (long)counts.one_leaf, (long)counts.max_leaves);
 	Con_Printf ("actors frozen outside the ring: %lu; placements hidden by the view's list: %ld\n",
 		frozen_last, (long)counts.hidden);
+	Con_Printf ("gone placements (taken or disabled): %lu, a bit per placement of the loaded frames (%lu bytes); "
+		"%lu asked for no loaded frame (last id %lu)\n", gone_now, gone_bytes, gone_outside, (unsigned long)gone_outside_pid);
 	Con_Printf ("activations %lu, deactivations %lu, reconciles %lu\n",
 		counts.activations, counts.deactivations, counts.reconciles);
 	ChimChunks_LastFrame (&sent, &one_path, &placements);
@@ -2732,7 +2794,7 @@ static int SlotJoin (int s, int row, const chim_header_t *h, const chim_frame_t 
 	chim_slot_t *w = &chim_frame.slot[s];
 	int cells = f->nx * f->ny, bits = (int)((f->owned_total + 7) / 8), size;
 	char map[MAX_QPATH];
-	size = cells * (int)sizeof(short) + 2*bits + 16;
+	size = cells * (int)sizeof(short) + 3*bits + 16;	/* drawn, visible, gone (GoneBits) */
 	memset (w, 0, sizeof(*w));
 	if (!ChimZone_Alloc (&w->user, size, CHIM_KIND_INDEX, 2 + (unsigned)s))
 		return 0;
@@ -2771,6 +2833,9 @@ static int SlotJoin (int s, int row, const chim_header_t *h, const chim_frame_t 
 			chim_actors_join (f->cx, f->cy, map, w->offset);
 	}
 	chim_frame.joins++;
+	/* CHIM-GONE-LIST-64-CAP-68: the joined frame's gone bits start empty; the loaded areas' effect links set them */
+	if (chim_slot_joined)
+		chim_slot_joined ();
 	return 1;
 }
 

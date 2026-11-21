@@ -22,20 +22,31 @@ from .functions import lookup, ACTOR_CALLS, HOST, HOST_EFFECT_NUMBERS, MAGIC_EFF
 # A VISI row's room for an actor that may stand in any room: a follower of the player (AIFollow, AIFollowCell; v0.0.62)
 VISI_ANY = 0xFFFFFFFF
 
-# The magic effects in the game's numbering (the MGEF index; OpenMW components/esm3/loadmgef.cpp lists them in this
-# order): GetEffect names one as "sEffect<Name>" (v0.0.57)
+# The magic effects in the game's numbering (the MGEF index): GetEffect names one by its game setting id
+# "sEffect<Name>" (v0.0.57). v0.0.68 (GETEFFECT-TABLE-84-OF-143-68): all 143, Tribunal's and Bloodmoon's included, each
+# as the game writes its id (sEffectDrainSpellpoints, sEffectCorpus), the order and the ids of OpenMW
+# components/esm3/loadmgef.cpp sGmstEffectIds (434-582); the table had 84, three of them by another word. Also written
+# into the compiled file (awms.py EFFN), where the console's GetEffect finds a typed id
 EFFECT_NAMES = (
     'WaterBreathing SwiftSwim WaterWalking Shield FireShield LightningShield FrostShield Burden Feather Jump Levitate '
-    'SlowFall Lock Open FireDamage ShockDamage FrostDamage DrainAttribute DrainHealth DrainMagicka DrainFatigue '
-    'DrainSkill DamageAttribute DamageHealth DamageMagicka DamageFatigue DamageSkill Poison WeaknessToFire '
-    'WeaknessToFrost WeaknessToShock WeaknessToMagicka WeaknessToCommonDisease WeaknessToBlightDisease '
-    'WeaknessToCorprusDisease WeaknessToPoison WeaknessToNormalWeapons DisintegrateWeapon DisintegrateArmor '
+    'SlowFall Lock Open FireDamage ShockDamage FrostDamage DrainAttribute DrainHealth DrainSpellpoints DrainFatigue '
+    'DrainSkill DamageAttribute DamageHealth DamageMagicka DamageFatigue DamageSkill Poison WeaknesstoFire '
+    'WeaknesstoFrost WeaknesstoShock WeaknesstoMagicka WeaknesstoCommonDisease WeaknesstoBlightDisease '
+    'WeaknesstoCorprusDisease WeaknesstoPoison WeaknesstoNormalWeapons DisintegrateWeapon DisintegrateArmor '
     'Invisibility Chameleon Light Sanctuary NightEye Charm Paralyze Silence Blind Sound CalmHumanoid CalmCreature '
     'FrenzyHumanoid FrenzyCreature DemoralizeHumanoid DemoralizeCreature RallyHumanoid RallyCreature Dispel Soultrap '
     'Telekinesis Mark Recall DivineIntervention AlmsiviIntervention DetectAnimal DetectEnchantment DetectKey '
     'SpellAbsorption Reflect CureCommonDisease CureBlightDisease CureCorprusDisease CurePoison CureParalyzation '
-    'RestoreAttribute RestoreHealth RestoreMagicka RestoreFatigue RestoreSkill FortifyAttribute FortifyHealth '
-    'FortifyMagicka FortifyFatigue FortifySkill').split()
+    'RestoreAttribute RestoreHealth RestoreSpellPoints RestoreFatigue RestoreSkill FortifyAttribute FortifyHealth '
+    'FortifySpellpoints FortifyFatigue FortifySkill FortifyMagickaMultiplier AbsorbAttribute AbsorbHealth '
+    'AbsorbSpellPoints AbsorbFatigue AbsorbSkill ResistFire ResistFrost ResistShock ResistMagicka ResistCommonDisease '
+    'ResistBlightDisease ResistCorprusDisease ResistPoison ResistNormalWeapons ResistParalysis RemoveCurse TurnUndead '
+    'SummonScamp SummonClannfear SummonDaedroth SummonDremora SummonAncestralGhost SummonSkeletalMinion '
+    'SummonLeastBonewalker SummonGreaterBonewalker SummonBonelord SummonWingedTwilight SummonHunger SummonGoldenSaint '
+    'SummonFlameAtronach SummonFrostAtronach SummonStormAtronach FortifyAttackBonus CommandCreatures CommandHumanoids '
+    'BoundDagger BoundLongsword BoundMace BoundBattleAxe BoundSpear BoundLongbow ExtraSpell BoundCuirass BoundHelm '
+    'BoundBoots BoundShield BoundGloves Corpus Vampirism SummonCenturionSphere SunDamage StuntedMagicka '
+    'SummonFabricant SummonCreature01 SummonCreature02 SummonCreature03 SummonCreature04 SummonCreature05').split()
 # Spell effects of the first slice beyond Fortify/Drain/Damage/Restore (v0.0.57): the cures (effect number: the ASPT
 # spell type they remove) and the effects that hurt health like Damage Health
 CURE_EFFECTS = {69: 3, 70: 2, 72: 0}
@@ -283,6 +294,11 @@ class Program:
         if key in self.objects.index:
             return self.objects.index[key]
         refs = self.data.object_refs.get(key, [])
+        if not refs:
+            # EXPANSION-TABLES-BASE-ONLY-66 (seen again 2026-11-20): an object only an expansion places (the Black Dart
+            # gang of Old Mournhold, whose health torch_lever sets to 25) by its merged reference key; an id
+            # Morrowind.esm places keeps its own references as before
+            refs = getattr(self.data, 'addon_object_refs', {}).get(key, [])
         base = self.data.bases.get(key)
         row = {'id': name, 'reference': refs[0] if len(refs) == 1 else 0, 'placed': len(refs),
                'script': None, 'kind': 'object'}
@@ -1077,6 +1093,9 @@ class ScriptCompiler:
             name = name[7:] if name.startswith('seffect') else name
             folded = [n.casefold() for n in EFFECT_NAMES]
             number = folded.index(name) if name in folded else -1
+            if name.isdigit() and int(name) <= 32767:
+                # v0.0.68 (GETEFFECT-TABLE-84-OF-143-68): a whole number is the effect's number (OpenMW OpGetEffect)
+                number = int(name)
             if number < 0:
                 self.warnings.append('GetEffect of an unknown effect %r: reads 0' % name)
                 return self.push_const(('int', 0))
@@ -1093,12 +1112,14 @@ class ScriptCompiler:
                 return None
             return self.notyet(fn, None, [('int', row)], None, carried=True)
         if fn.name in ('changeweather', 'modregion'):
-            # v0.0.62 (MWSCRIPT-COMPLETE-LANDMARK): the region's index in the region catalogue (sorted Morrowind.esm
-            # region ids, as the weather table orders them) as the first number, then the weather or the chances (at
+            # v0.0.62 (MWSCRIPT-COMPLETE-LANDMARK): the region's index in the region catalogue (the sorted region ids of
+            # the build's masters, as the weather table orders them; v0.0.68, REGION-INDEX-BASE-ONLY-68: Morrowind.esm's
+            # alone before) as the first number, then the weather or the chances (at
             # most ten; OpenMW reads them in the weathers' order). A region the image has not (Mournhold, Solstheim):
             # no code, as OpenMW's weather manager finds no such region and does nothing
             name = next((a[1] for a in args if a[0] == 'str'), '')
-            regions = sorted(getattr(self.p.data, 'base_regions', ()) or ())
+            from .gamedata import region_catalogue
+            regions = region_catalogue(self.p.data)   # v0.0.68: the one list the console's RGNS table is written from
             if name.casefold() not in regions:
                 self.warnings.append('%s of %r, a region the image has not: nothing' % (fn.name, name))
                 return None

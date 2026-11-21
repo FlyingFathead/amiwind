@@ -21,6 +21,7 @@ int r_framecount;
 int aw_magic_cast_range=2;   /* aw_hands.c: the selected spell's range for the spell stance (PLAYER-CASTING-59) */
 int (*aw_hand_held_light)(float origin[3],float angles[3]);
 const aw_held_light_t *AW_HeldLight(void){return NULL;}
+const aw_held_light_t *AW_HeldLightShown(void){return NULL;}
 void Con_Printf(char *fmt,...){warnings++;}
 /* The first-person weapon table loads only with an equipped weapon (none here): never reached. */
 int Hunk_LowMark(void){assert(0);return 0;}

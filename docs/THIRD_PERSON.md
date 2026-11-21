@@ -1,6 +1,6 @@
 # Third person, vanity camera and the death scene
 
-_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
+_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -211,7 +211,16 @@ The weapon groups by type: short blades, one-handed long blades, blunt weapons a
 (`weapononehand`, `1h`); two-handed long blades, blunt weapons and axes the two-handed close set (`weapontwohand`,
 `2c`); staffs, warhammers and spears the two-handed wide set (`weapontwowide`, `2w`). The draw, the swing and the
 putting away follow the first-person hand clock, so both views and the strike's hit key stay together. A raised
-shield still plays the shield's block, and swimming, a carried torch and the bare hands keep the body's own poses.
+shield still plays the shield's block, and swimming and a carried torch without a held model of its own keep the
+body's own poses.
+
+The bare hands (v0.0.68) play the original's `handtohand` group the same way: raising the fists its `equip`, a punch its
+`chop`, `slash` or `thrust` by the movement, lowering them its `unequip`; the ready fists keep their own idle, walk and
+run (`idlehh`, `walkforwardhh`, `runforwardhh`). From v0.0.59 to v0.0.67 the assembled body had no draw, punch or
+lower for the fists: a punch was heard and struck while the body stood still, and the raised fists showed only once
+the draw had run its time. A held light in the left hand rides the stance on its arm (see "A light and a one-handed
+weapon together" below). Register: PLAYER-PUNCH-THIRDPERSON-39, TP-DRAW-WEAPON-LAGS-67 ([BUGS.md](BUGS.md)). Tests:
+`tests/test_tp_fists.py`, `tests/aga_animpick_test.c`.
 
 Nothing new is loaded for it: the groups are in the table the body already uses, and a group is looked up by name
 only when what the player does changes. `aw_player_stances 0` (saved, or `dbg camera stances off`) gives the previous
@@ -341,6 +350,20 @@ lantern's 3.2, a candle's 1.9; now 1.7, 0.1 and 0.1, as in third person). The dr
 before (its earlier tags agree with its bone within 0.05 units). In the normal view the hand holding a light sits below
 the screen's lower edge; it shows looking down. Register: FP-TORCH-OUT-OF-HAND-67 ([BUGS.md](BUGS.md)). Tests:
 `tests/test_fp_held_item.py`, `tests/aga_held_item_test.c`.
+
+**A light and a one-handed weapon together (v0.0.68).** A carried light in the left hand and a one-handed or thrown
+weapon in the right are held at once, as in the original: both are drawn in first person, in third person and in the
+inventory picture. In first person the arms take the weapon's stance and the left arm alone takes the light stance (a
+layer from the left arm's root, as the third-person body holds a light on the original's `torch` group over the rest);
+the weapon rides the right hand's bone and the light the left's. The light is lit by default: raising the hands (F by
+default) with a light equipped lights it, and the light key (V by default) after that puts out only the light, or lights it again,
+each with a short notice naming the light and the key bound to it; the light stays in the hand while it is out. The
+light key with the hands down does what it did before. A two-handed weapon, the bow or the crossbow drawn, or readied
+magic, puts the light away until it is sheathed again (OpenMW 0.51 `updateCarriedLeftVisible`). In third person a lit
+light no longer takes the weapon's stance away. Before, the held light took the hands' place in first person and the
+weapon showed only while the light was out, raising the hands left the light out and an unlit light was not drawn, and
+the inventory picture showed a shield in the left hand but never a light. Register: LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67
+([BUGS.md](BUGS.md)). Tests: `tests/test_light_and_weapon.py`, `tests/aga_torch_qc_test.c`, `tests/aga_torch_test.c`.
 
 How it is built (`tools/prepare_player_fp_parts.py`, in the image step after the player view):
 

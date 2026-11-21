@@ -149,6 +149,8 @@ int AW_HandView(int magic,int torch,int light) {
     return light?AW_HAND_VIEW_LIGHT:AW_HAND_VIEW_HANDS;
 }
 int AW_HandCarriesLeft(int magic) {return !magic;}
+/* LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67 (aw_hand_models.h): the weapon stances a carried light is held beside */
+int AW_HandStanceOneHanded(int stance) {return stance==0 || stance==5;}
 int AW_HandItemPath(const char *s) {
     int i,n=0,prefix;
     if(!s)return 0;
@@ -416,6 +418,8 @@ static int hand_weapon(int index,int with_arms) {
 }
 /* aw_view.c: the arms from parts' bone of a hand this frame as a tag in the view model's space; 0 none */
 int (*aw_hand_parts_bone_tag)(int hand,float tag[6]);
+/* aw_view.c (aw_hand_models.h): the left arm on the light stance over the stance applied; NULL in fixtures */
+int (*aw_hand_parts_left_light)(int frame);
 /* FP-TORCH-HAND-REGRESSION-67: what a hand holds, placed on that hand's own bone of the arms from parts drawn this frame
  * (AW_HandItemPlace): 1 with ORIGIN and ANGLES */
 static int hand_item_on_bone(int hand,const float carried[6],float origin[3],float angles[3]) {
@@ -460,7 +464,8 @@ static model_t *held_light_model(const char *path)
 int AW_HandLightItemApply(void) {
     extern int r_framecount;
     const aw_held_light_t *l;model_t *m;
-    if(!light_visible || !light_base || cl.viewent.model!=light_base || !(l=AW_HeldLight()) ||
+    /* LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67: drawn while held, lit or put out (its flames only when lit) */
+    if(!light_visible || !light_base || cl.viewent.model!=light_base || !(l=AW_HeldLightShown()) ||
        !(m=held_light_model(l->model)))return 0;
     /* FP-TORCH-HAND-REGRESSION-67: the one held-item placement: the view model's place, then the left hand's shield
      * bone of the arms drawn this frame, then the light's own carried-light place on it, nothing else (the light's
@@ -542,9 +547,27 @@ int AW_HandModelsApply(void)
     /* READY-MAGIC-SHOWS-WEAPON-65 (v0.0.66): readied magic first, whatever is equipped (AW_HandView); before, the lit
      * torch and a held light came first and R showed the right hand's fist beside them (v0.0.66-dev1). The torch and
      * the light are put away while magic is ready (aw_torch.c aw_torch_put_away), so they are not lit either. */
-    view=AW_HandView(spell_shown(),AW_TorchEquipped(),AW_HeldLight()!=NULL);
+    /* LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67: the light's view while it is held, lit or put out by V */
+    view=AW_HandView(spell_shown(),AW_TorchEquipped(),AW_HeldLightShown()!=NULL);
     equipped=view==AW_HAND_VIEW_TORCH;frames=equipped?8:28;
     light_visible=0;
+    if(view==AW_HAND_VIEW_LIGHT && aw_hand_parts_apply && aw_hand_parts_left_light && hand_weapon(index,0) &&
+       AW_HandStanceOneHanded(weapon_stance)){
+        /* LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67 (decided for the project 2026-11-20): a one-handed weapon and the light
+         * held together, both drawn: the arms from parts at the weapon's stance, their left arm on the light stance
+         * (aw_view.c hand_parts_left_light), the weapon on the right hand's bone and the light on the left's (the one
+         * held-item placement). A two-handed weapon puts the light away (aw_view.c left_put_away). Since the light stance
+         * (d98f71c1c, v0.0.61, HELD-LIGHT-OWN-MODEL-61) a held light took the hands' place and the weapon was not drawn
+         * while it was lit: the light and the weapon replaced each other. */
+        int stance=weapon_stance+1,frame=cl.viewent.frame;
+        if(aw_hand_parts_apply(race,female,stance,frame) && aw_hand_parts_left_light(frame)){
+            weapon_base=cl.viewent.model;weapon_frame_base=stance*AW_HAND_WEAPON_FRAMES;weapon_parts=1;
+            light_visible=1;light_base=cl.viewent.model;
+            AW_TorchUseHandAssets(1);release_owned(base,"progs/v_nord.mdl");AW_TorchReleaseLegacyCache();
+            return 1;
+        }
+        weapon_visible=0;
+    }
     if(view==AW_HAND_VIEW_LIGHT){
         /* a held light of its own (HELD-LIGHT-OWN-MODEL-61): the arms from parts at the light stance, the bare hands'
          * frame (the right hand keeps its fist and punch); the light rides their shield bone (AW_HandLightItemApply) */

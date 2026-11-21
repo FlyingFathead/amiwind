@@ -36,11 +36,29 @@ COVER = 896                              # a row's cover reaches this far past i
 # whose master names the land's regions, and whether every frame closes its own edges ('closed') or only a frame
 # with no neighbour frame does ('alone': the cells of one Mournhold district touch, and the player walks across).
 LANDS = {
+    # 'module': what differs when the store is made by the build module bloodmoon-solstheim (its data stage's folder
+    # is beside the world; land_of): the island's cells touch, so only a frame with no neighbour closes its edges, and
+    # the frames carry their static flames as the base world's region frames do. Without that folder the store is the
+    # test build's single frames (--chim-sol-test), as before.
     'chimsol': {'prefix': 'sl', 'limit': 3840, 'directory': 'world/regions-sl.awr', 'title': 'Solstheim',
-                'data_stage': 'chim-sol-data', 'edges': 'closed', 'flames': False},
+                'data_stage': 'chim-sol-data', 'edges': 'closed', 'flames': False,
+                'module': {'data_stage': 'bloodmoon-solstheim-data', 'edges': 'alone', 'flames': True}},
     'chimmh': {'prefix': 'mh', 'limit': 256, 'directory': 'world/regions-mh.awr', 'title': 'Mournhold',
                'data_stage': 'tribunal-mournhold-data', 'edges': 'alone', 'flames': True},
 }
+
+
+def land_of(store, world_dir=None):
+    """The land of STORE as LANDS gives it, with its 'module' values in place when the module's data stage folder is
+    beside WORLD_DIR (run/<data stage>): one store name, the test build's frames or the build module's. None for a
+    store that is no land."""
+    land = LANDS.get(store)
+    if land is None:
+        return None
+    module = land.get('module')
+    if module and world_dir is not None and (Path(world_dir).parent / module['data_stage']).is_dir():
+        land = dict(land, **module)
+    return {key: value for key, value in land.items() if key != 'module'}
 
 
 def map_name(index, prefix='sl', limit=3840):
@@ -120,7 +138,7 @@ def presented_master(world_dir, store):
     there the land's cells are exterior cells), or None when STORE is no land or the stage wrote none. The one place
     that names that file for the image step (the region names below, the frames' actors:
     tools/build_aga.py layer_actor_inputs)."""
-    land = LANDS.get(store)
+    land = land_of(store, world_dir)
     if land is None:
         return None
     path = Path(world_dir).parent / land['data_stage'] / 'Morrowind.esm'
@@ -136,7 +154,7 @@ def install(world_dir, id1, hand_fields, alternatives=(), store=STORE, actors=No
     them each frame map carries its cells' NPCs and creatures, fitted on the frame's own collision as the open
     world's region frames' are (DISTRICT-PEOPLE-NOT-PLACED-67); each map's record then holds 'actors'."""
     STORE = store  # noqa: N806 (the module default, or the layer plan's store name)
-    land = LANDS.get(store, LANDS['chimsol'])
+    land = land_of(store, world_dir) or land_of('chimsol', world_dir)
     from chim import frame_map as FM
     from chim.regions import TABLE_FILE, read_table
     world_dir, id1 = Path(world_dir), Path(id1)

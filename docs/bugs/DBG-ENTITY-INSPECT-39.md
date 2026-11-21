@@ -154,6 +154,7 @@ Family: Debug commands and remote control (`debug-commands`). dbg commands, tele
 
 - [AW-20260928-14](AW-20260928-14.md): Master debug toggle omits coordinates
 - [COMPANION-PICK-RMB-33](COMPANION-PICK-RMB-33.md): The right mouse button does not pick a companion: "MOUSE3 is unbound"
+- [CONSOLE-CENSUS-MISSES-FUNCTIONS-68](CONSOLE-CENSUS-MISSES-FUNCTIONS-68.md): The table of the original game's console commands leaves out 110 functions of the script language, most of which already work when typed
 - [CONSOLE-COMMAND-SHADOWED-BY-CVAR-36](CONSOLE-COMMAND-SHADOWED-BY-CVAR-36.md): dbg combat and dbg animkit options never ran: their console commands share a name with a cvar, so Quake refused the command and the cvar answered
 - [CONSOLE-EQUIP-SKIPS-ONPCEQUIP-66](CONSOLE-EQUIP-SKIPS-ONPCEQUIP-66.md): The original's console Equip on the player wears the item without its script's OnPCEquip: Wraithguard equipped with player->equip leaves wraithguardEquipped at 0
 - [CONSOLE-GETPOS-SCRATCH-ORIGIN-66](CONSOLE-GETPOS-SCRATCH-ORIGIN-66.md): The console's GetPos on an actor answers a point near 0 instead of where the actor stands (dagoth_ur_2->getpos y read -0.43 while he stood at y 3700)
@@ -210,6 +211,7 @@ Family: Debug commands and remote control (`debug-commands`). dbg commands, tele
 - [TP-MENU-LABEL-CUT-63](TP-MENU-LABEL-CUT-63.md): The dbg tp list box is narrower than the longest room names, so their (interior) mark can be cut off
 - TP-PICKER-OPEN-FRAME-COST-57 (no report page): The dbg tp list box redraws the whole paused world every frame: 100 ms a frame open against 16 ms closed
 - TP-PLACES-NO-DOOR-SEA-57 (no report page): Settlement list: Fields of Kummu arrives in the water (a place without a door used its cell middle)
+- [USE-KEY-DEAD-IN-NOCLIP-68](USE-KEY-DEAD-IN-NOCLIP-68.md): With collision off (noclip), the use key does nothing on scripted objects such as levers and cranks; the original lets the player use them
 
 Related bugs in other categories:
 

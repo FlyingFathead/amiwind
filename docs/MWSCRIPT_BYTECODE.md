@@ -1,6 +1,6 @@
 # MWScript compiled by the builder
 
-_Last updated with AmiWind v0.0.67 (19 November 2026)._
+_Last updated with AmiWind v0.0.68-dev3 (21 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -273,6 +273,7 @@ on disk.
 | PADD | 8 | every carryable item record that names a script (v0.0.62), sorted by the FNV-1a of its folded id: the hash, the script, the slot of its OnPCAdd local (0xFF: none). The item's script runs while the player carries one (OpenMW 0.51's rule): its carried instance starts when the item arrives and at every map change while it is carried, and stops when the last one leaves the inventory. A script with OnPCAdd gets that local set to 1 on arrival: on the placement the player took (its own values go on), else on the carried instance. The game's masters give 186 rows, 3 of them with OnPCAdd (the census papers and the courtyard ring among them) | 1,488 (186 rows) |
 | LACT | 8 | every NPC or creature record a levelled creature list names that has a script (v0.0.62), sorted by the FNV-1a of its folded id (the actor table's base hash): the hash, the script, 0. The actor a levelled list gives runs its record's script under the list's reference from its spawn (OpenMW 0.51's rule); its values are kept as any placed actor's | 656 (82 rows) |
 | PLAC | 12 | every object a Place call names (v0.0.62), sorted by id: the id, a template reference of the same record and its home room map's name, the record's script, the kind (NPC or creature, carried item, other) and whether the engine can make it, [below](#what-runs-today-what-is-not-yet) | 492 (41 rows) |
+| WATR | 8 | every room whose cell has the water flag (v0.0.68), sorted by the room's stable number: the number, the flag, the room's water level in the original's units (its record's INTV or WHGT, a later master's record winning; the flag alone: 0). `GetWaterLevel` reads the loaded room's row: 0 outdoors, the room's own level in a room with water, the lowest float in a room without (OpenMW 0.51's rule). Before, the engine looked for water in the player's column and read 0 where it found none, which a room whose water lies under every placement (its map holds no water) read for its own level | 1,896 (237 rows by the three masters' records) |
 | CODE | | the bytecode | 132,376 |
 | BIND | 24 | placed scripted objects, by reference: script, flags, cell (grid or the room's stable number), position | 117,768 (4,907 rows) |
 | STRS | | strings (names for the log, messages, ids of not-yet calls) | 145,333 |
@@ -281,6 +282,9 @@ on disk.
 | LOCN | 8 + 4 a variable | the scripts' variables by name (v0.0.66, on disk, read only while a game is saved or loaded): per script with variables that is not a dialogue result script, its row, variable count, flags and first key; then a key per variable (the folded name's hash and its type). Saved values carry their variable's key, so a rebuilt script gets each value back in the variable of its name ([SAVEGAME_PLAN.md](SAVEGAME_PLAN.md), eighth part) | 16,208 (811 scripts, 2,430 variables) |
 | HITM | 8 | the items placed holders hold (v0.0.66, on disk): a held item's reference and the hash of its item id, so a save keeps its script values by holder and item | 3,928 (491 rows) |
 | SCRH | 4 | every script row's name hash (v0.0.66, on disk): a saved script whose row moved is found with one read | 34,472 (8,618 rows) |
+| RGNS | 2 | the region catalogue's ids in its order (v0.0.68, on disk): the id as the region's record writes it; row N is the region index a compiled `ChangeWeather` or `ModRegion` hands the engine. The console's `ChangeWeather` and `ModRegion` find a typed id here (a few small reads a line, never in a frame of play) and `dbg weather` names the region it shows. An older file has none: the console then names no region | 32 (16 rows: the three game files' regions; 18 with the base game alone) |
+| WERE | 4 | the werewolf's game settings as a compiled `BecomeWerewolf` and `SetWerewolfAcrobatics` hand them to the engine (v0.0.68, on disk): nine rows of the eight attributes and 27 skills from the `fWereWolf` settings, a byte each, four to a row (255: no setting), then the Acrobatics value. The console's `BecomeWerewolf` and `SetWerewolfAcrobatics` read them (ten small reads a line); an older file has none and the console's player forms refuse | 40 (10 rows) |
+| EFFN | 2 | the magic effects' game setting ids without `sEffect`, in the game's numbering (v0.0.68, on disk): row N is the number a compiled `GetEffect` hands the engine. The console's `GetEffect` finds a typed id here (one read of the section, then the names up to the match, never in a frame of play); an older file has none and the console takes a number only | 286 (143 rows) |
 | | | file / resident | 446,316 / 183,212 |
 
 CODE, PCEL and PMOV measured 27 October 2026 (v0.0.54, without the media catalogue: the whole file 1,062,900 bytes
@@ -987,6 +991,20 @@ They wait for the dialogue window, moving actors between cells, spells and effec
 animation. The scripts' own values are not in saved games
 yet ([MWSCRIPT-STATE-NOT-SAVED-48](BUGS.md)).
 
+A room's water (v0.0.68). `GetWaterLevel` reads the room's own level from the WATR rows: 0 outdoors, the room's level
+in a room with the water flag, the lowest float in a room without it (OpenMW 0.51's rule). `SetWaterLevel` and
+`ModWaterLevel` set and move the level of the player's room; outdoors (where OpenMW stops the script) and in a room
+without water they change nothing. The level is kept as a named fact of the room in the world change list, so a
+save holds it and New Game clears it, and it comes back whenever the room is loaded again. The surface follows: a CHIM
+room's world holds its water as one level plane at its root (the open air above, the water below, the two water faces
+on it), and the engine moves that plane and its faces' corners, so swimming, the breath and the view under water follow
+the new level by themselves (engine/aga/src/aw_water.c). A level outside the room's box puts the plane at the box's
+edge. A room with lava carved beside its water keeps the water where it was built (four rooms of the game have both;
+no script moves their water). The setting `aw_water_movable 0` leaves every plane where it was built. Not yet: a room
+whose water lies under every placement has no plane in its map (Old Mournhold: Temple Sewers West, where the lever
+raises it), and the placements the surface passes are not yet drawn on their new side of it
+([MWSCRIPT-WATER-LEVEL-STATIC-67](bugs/MWSCRIPT-WATER-LEVEL-STATIC-67.md)).
+
 ### The import route: every call kept
 
 Every script of the game is in the file and every call in it is compiled, also the ones the engine does not carry
@@ -1013,7 +1031,10 @@ blessings of these kinds now run. `GetEffect` (v0.0.57; OpenMW miscextensions.cp
 list: the builder turns the effect's name ("sEffectPoison") into the game's effect number, and the engine answers 1
 when an effect of that number is active on the player. Effects of other kinds cannot be active yet, and no other
 actor carries effects yet, so 0 is the true answer there; the scripts ask mostly about Poison, Fire Damage,
-Invisibility and Chameleon. Scripts that run whole: 816 before, 830 after. Then the effects the remaining Casts named most: the cures
+Invisibility and Chameleon. Since v0.0.68 the builder knows all 143 effects by their game setting ids in the game's
+order (OpenMW components/esm3/loadmgef.cpp sGmstEffectIds; Tribunal's and Bloodmoon's summons last), or by a whole
+number as the effect's own number; before, it knew 84 and three of them by another word, so a `GetEffect` of
+sEffectDrainSpellpoints or of a summon read 0. Scripts that run whole: 816 before, 830 after. Then the effects the remaining Casts named most: the cures
 inside a blessing (Cure Common Disease and Cure Blight Disease remove those spells, Cure Poison changes nothing yet)
 and Fire, Frost and Shock Damage and Poison, which hurt health like Damage Health (no resistances exist here yet, so
 the full magnitude lands): 830 before, 834 after. Still waiting: the effects of other kinds (Shield, Water
@@ -1049,11 +1070,16 @@ Scripts that run: 553 before, 554 after; scripts that use a function the interpr
 
 `ChangeWeather REGION WEATHER` and `ModRegion REGION CHANCES...` (v0.0.62; OpenMW 0.51 skyextensions.cpp
 OpChangeWeather, OpModRegion; weather.cpp WeatherManager::changeWeather, modRegion, RegionWeather::setChances): the
-compiler works the region out (its index among the sorted Morrowind.esm region ids, the order of the weather table
-`world/region-weather.aww`) and hands it first; a region the image has not (Mournhold, Solstheim) is no code, as
-OpenMW finds no such region. ChangeWeather sets the region's weather until its next weather change (here the end of
-its period of "Hours Between Weather Changes"); ModRegion replaces the region's first chances for the rest of the
-game, and a weather the new chances still allow stays until that change, else the new chances choose. The player in
+compiler works the region out (its index among the sorted region ids of the build's game files, the order of the
+weather table `world/region-weather.aww`, which the world UI stage writes from the same merged files) and hands it
+first; a region those files lack is no code, as OpenMW finds no such region. Until v0.0.68 the compiler counted the
+base game's nine regions alone while an image with the expansions orders its table over all sixteen, so EndGame's
+Red Mountain lines changed the Grazelands (REGION-INDEX-BASE-ONLY-68). ChangeWeather sets the region's weather until its next weather change (here the end of
+its period of "Hours Between Weather Changes"); ModRegion replaces the region's chances for the rest of the game (the
+ones given, each 0 to 100, and none for the weathers past them, as OpenMW's OpModRegion builds the list: since v0.0.68;
+before, the weathers past the given ones kept the region's own), and a weather the new chances still allow stays
+until that change, else the new chances choose. Both also work typed on the console since v0.0.68 (the region by its
+id, from RGNS above). The player in
 that region moves to the new weather as to any other (a transition). One row per changed region, 8 at most (148 bytes
 resident), saved in the scripts' block (AWWR) and emptied by New Game and every save load. Once the Red Mountain
 region's chances have neither ash nor blight, the Red Mountain sky pull stops. The end of the main quest (EndGame:

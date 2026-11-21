@@ -62,7 +62,14 @@ int main(void) {
         CHECK(AW_HandView(magic,1,1)==AW_HAND_VIEW_TORCH);
         CHECK(AW_HandView(magic,0,0)==AW_HAND_VIEW_HANDS);
     }
+    /* LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67: the light is held beside the one-handed stances (1h 0, thrown 5), never
+     * beside a two-handed one, the bow or the crossbow (AW_HandStance's 1..4), nor beside no stance (-1) */
+    {
+        int stance,beside=0;
+        for(stance=-1;stance<=5;stance++)beside+=AW_HandStanceOneHanded(stance)?1<<(stance+1):0;
+        CHECK(beside==(1<<1|1<<6));
+    }
     if(failures)return 1;
-    printf("ready magic: 22 checks passed\n");
+    printf("ready magic: 23 checks passed\n");
     return 0;
 }

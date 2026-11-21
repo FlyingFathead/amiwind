@@ -1,6 +1,6 @@
 # Interiors on CHIM: CHIM rooms on a shared store
 
-_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
+_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -338,6 +338,13 @@ no BSP compiler:
 - **Water:** one plane at the room's water height across the whole room box (the original game's interior water is a
   flat plane over the whole cell). Below it a water leaf (swimming), above it open air; the `*water` face on the plane,
   seen from above and below, with no lightmap, as a compiled liquid face. Its texture is the room map's own `*water`.
+- **Water under every placement** (v0.0.68): a room whose cell's water lies under everything the room places has no
+  plane from its room batch (`tools/chim_room_batches.py water_plane`). Its world still gets the water plane, at the
+  room box's floor, with the batches' `*water` texture made from the game palette. The engine puts the plane at the
+  cell's own level when the room loads (a level under the room box stays at its floor) and moves it when a script
+  changes the level (`engine/aga/src/aw_water.c`).
+  The level a script reads is the cell's own (`GetWaterLevel`), never the plane's. Seven rooms of the base game are
+  like this, none with lava.
 - **Lava:** each pool's prism, 8 units deep (`tools/lava.py pool_brushes`), cut out of the open air by the same plan
   splits the exterior chunks use (`chim.terrain.lava_plan`): a lava leaf under the `*lava` warp face. The bed under
   each pool (16 units, solid) is one more collision model of the room map, as the room edge is. The `aw_lava` ember

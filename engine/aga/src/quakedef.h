@@ -538,6 +538,7 @@ void AW_MwscriptRoomShift(float shift[3]);
 int AW_MwscriptAfterCensus(void);   /* aw_mwhost.c: start AW_AfterCensus on the next tick (DBG-HORS-AFTER-CENSUS-67) */
 int AW_ObjectLockLevel(unsigned int reference,int original);
 int AW_MusicScriptTrack(int track);
+int AW_MusicTrackByName(const char *path);   /* aw_music.c: a music file's soundtrack number by its stem, -1 none */
 void AW_SceneTick(void);
 void AW_SceneryClear(void);
 void AW_SceneryBegin(const char *entities);
@@ -579,12 +580,14 @@ void AW_StaticFlamesDraw(void);
 typedef struct {vec3_t origin;float scale,shape[3];unsigned reference;int ordinal,named;} aw_static_flame_t;
 /* TAKEN-LIGHT-FLAME-61: the area records' effect links (aw_inventory.c AW_AreaEffectsApply, tools/effect_links.py):
  * the reference of a frame map's aw_flame row ORDINAL (aw_guard_torch.c), of a night lamp row (aw_lamps.c), and the
- * CHIM exterior placements of a reference hidden (GONE 1) or back (0) (chim/chim_chunks.c; 0 when the list is full). */
+ * CHIM exterior placements of a reference hidden (GONE 1) or back (0) (chim/chim_chunks.c, a bit per placement of the
+ * loaded frame: 0 when the id is of no loaded frame, CHIM-GONE-LIST-64-CAP-68); every piece of a reference at once
+ * (AW_AreaEffectHide: the pieces named). */
 void AW_StaticFlameLink(model_t *world,int ordinal,unsigned reference);
 void AW_LampLink(unsigned row,unsigned reference);
 extern int (*aw_lamp_gone)(unsigned int reference);
 int ChimChunks_GonePid(unsigned pid,int gone);
-int AW_AreaEffectPids(unsigned reference,unsigned *pids,int most);
+int AW_AreaEffectHide(unsigned reference,int hide);
 void AW_AreaEffectsApply(void);
 /* the hash the 'F' links name a frame map by: its file stem ("maps/vivec_city-chim.chim" -> "vivec_city-chim") */
 unsigned long AW_AreaMapHash(const char *path);

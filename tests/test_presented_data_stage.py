@@ -291,10 +291,17 @@ class TheFirstMinuteCheck(unittest.TestCase):
         both = ('Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm')
         finished = {'mournhold': [(-12, -30), (-12, -29)], 'solstheim': [(-22, 20)]}
         found, lines = self.problems(both, finished)
-        self.assertEqual(len(found), 1)
+        self.assertEqual(len(found), 2)
         self.assertIn('Tribunal.esm is selected', found[0])
         self.assertIn('tribunal-mournhold takes none', found[0])
-        # Solstheim's cells have no module yet: said, never failed
+        # Solstheim's cells have their module too (bloodmoon-solstheim): finished cells it does not take are a
+        # problem of their own (tests/test_bloodmoon_solstheim_module.py)
+        self.assertIn('Bloodmoon.esm is selected', found[1])
+        self.assertIn('bloodmoon-solstheim takes none', found[1])
+        # a master with a named set and no module is said, never failed
+        with mock.patch.dict(expansion_preflight.SET_MODULES, clear=True):
+            found, lines = self.problems(both, finished)
+        self.assertEqual(found, [])
         self.assertTrue(any('Bloodmoon.esm, named set solstheim: 1 finished cell(s), NOT built' in line
                             for line in lines))
 
@@ -457,8 +464,11 @@ class TheModulesMapsAreTriedRightAfterItsStage(unittest.TestCase):
     def test_the_check_is_registered_after_the_modules_world_stage(self):
         entry = [e for e in build_preflight.EARLY_CHECKS if e[0] == 'module-store-maps']
         self.assertEqual(entry, [('module-store-maps', 'after:tribunal-mournhold',
+                                  'expansion_preflight:module_store_after'),
+                                 ('module-store-maps', 'after:bloodmoon-solstheim',
                                   'expansion_preflight:module_store_after')])
-        self.assertEqual(expansion_preflight.MODULE_WORLD_STAGES, {'tribunal-mournhold': 'chimmh'})
+        self.assertEqual(expansion_preflight.MODULE_WORLD_STAGES, {'tribunal-mournhold': 'chimmh',
+                                                                   'bloodmoon-solstheim': 'chimsol'})
         self.assertEqual(set(expansion_preflight.MODULE_WORLD_STAGES), set(layer_stores.MODULE_STAGES))
 
     def test_without_the_stages_output_there_is_nothing_to_check(self):

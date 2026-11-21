@@ -186,7 +186,10 @@ int AW_ItemInfoKey(aw_iteminfo_t *b,int key,int mouse_x,int mouse_y,int use_key,
         }
         return AW_ITEMINFO_KEEP;
     }
-    if(key==K_ESCAPE || info_key)return AW_ITEMINFO_CLOSE;
+    /* ITEM-VIEW-ENTER-UNEQUIPS-67 (decided for the project 2026-11-20): Enter is the box's OK, it only closes it and
+     * never acts on the item (the window's use key is E and Enter; since the box came, 4307f71f6 v0.0.67-dev3, Enter
+     * unequipped the item being looked at). The other use key (E) and the action button still do the item's action. */
+    if(key==K_ESCAPE || key==K_ENTER || info_key)return AW_ITEMINFO_CLOSE;
     if(use_key)return b->action[0]?AW_ITEMINFO_ACTION:AW_ITEMINFO_CLOSE;
     if(key==K_UPARROW)top--;
     else if(key==K_DOWNARROW)top++;

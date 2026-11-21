@@ -80,7 +80,11 @@ def presented_problems(merged, tribunal, recipes=None, config=None):
 # A selected master's named set of cells (tools/chim/regions.py layer_sets) -> the build module that builds its
 # finished cells and the option value that holds the module's cells (tools/build.py "THE EXPANSIONS AS BUILD
 # MODULES"). A master with a named set and no module here is reported, never failed: its module is not built yet.
-SET_MODULES = {'Tribunal.esm': ('tribunal-mournhold', 'tribunal_mournhold_cells')}
+SET_MODULES = {'Tribunal.esm': ('tribunal-mournhold', 'tribunal_mournhold_cells'),
+               'Bloodmoon.esm': ('bloodmoon-solstheim', 'bloodmoon_solstheim_cells')}
+# Where each module's cells are resolved, for the problem text
+MODULE_RESOLVERS = {'tribunal-mournhold': 'tools/build.py resolve_tribunal_mournhold',
+                    'bloodmoon-solstheim': 'tools/bloodmoon_solstheim_module.py resolve'}
 
 
 def finished_set_cells(name, status_path):
@@ -117,7 +121,9 @@ def module_set_problems(masters, args, status_path, log=print):
                 problems.append('%s: the module %s takes %d cell(s) of the named set %s, the tracker file calls %d '
                                 'finished' % (master, module, count, sets[master], len(cells)))
             continue
-        reason = ('--presented-exteriors off' if (getattr(args, 'presented_exteriors', None) or 'on') == 'off'
+        # --presented-exteriors off switches off only the module of the presented districts (Mournhold's)
+        reason = ('--presented-exteriors off' if module == 'tribunal-mournhold'
+                  and (getattr(args, 'presented_exteriors', None) or 'on') == 'off'
                   else '--chim-regions names the cells of this build' if getattr(args, 'chim_regions', None)
                   else 'a MiniWind sandbox' if getattr(args, 'miniwind', False) else None)
         if not cells or reason:
@@ -125,8 +131,8 @@ def module_set_problems(masters, args, status_path, log=print):
                 % (master, sets[master], len(cells), reason or 'none finished'))
             continue
         problems.append('%s is selected and its named set %s has %d finished cell(s), but the module %s takes none '
-                        'of them: this build would hold no %s cell (tools/build.py resolve_tribunal_mournhold)'
-                        % (master, sets[master], len(cells), module, sets[master]))
+                        'of them: this build would hold no %s cell (%s)'
+                        % (master, sets[master], len(cells), module, sets[master], MODULE_RESOLVERS[module]))
     return problems
 
 
@@ -144,7 +150,7 @@ def module_sets(context):
 
 # The modules whose world the image installs as a store of its own with its own frame maps: the option value that
 # holds the module's cells -> its store (tools/chim/layer_stores.py MODULE_STAGES, tools/chim/sol_test.py LANDS).
-MODULE_STORES = {'tribunal_mournhold_cells': 'chimmh'}
+MODULE_STORES = {'tribunal_mournhold_cells': 'chimmh', 'bloodmoon_solstheim_cells': 'chimsol'}
 
 
 def module_map_names(cells_text, store):
@@ -221,7 +227,24 @@ def module_frame_maps(context):
 
 # A module's world stage -> its store: right after the stage has passed, its maps are tried against the image's
 # last per-map checks (module_store_after).
-MODULE_WORLD_STAGES = {'tribunal-mournhold': 'chimmh'}
+MODULE_WORLD_STAGES = {'tribunal-mournhold': 'chimmh', 'bloodmoon-solstheim': 'chimsol'}
+
+
+def store_unit_problem(store, sizes, headroom_mib=None, limit=None):
+    """None, or the problem of a module's store whose files (SIZES, bytes each) do not fit ONE partition below LIMIT
+    with HEADROOM_MIB free: the disk layout moves a store as one unit (tools/layout_plan.py movable_unit) and never
+    splits it, so such a store stops the image step in its last minutes. Counted as the planner counts: classic FFS
+    blocks per file, the default headroom and the 2 GiB limit unless given."""
+    import layout_plan
+    headroom_mib = layout_plan.DEFAULT_HEADROOM_MIB if headroom_mib is None else int(headroom_mib)
+    limit = layout_plan.PARTITION_LIMIT if limit is None else int(limit)
+    blocks = sum(layout_plan.file_blocks(size) for size in sizes)
+    mib = layout_plan.size_mib(blocks, headroom_mib * layout_plan.MIB)
+    if mib * layout_plan.MIB < limit:
+        return None
+    return ('the store %s is %d bytes in %d files: with %d MiB headroom it needs a %d MiB partition, and a store '
+            'moves as one unit that must stay below %d bytes (2 GiB): split the store or reduce its frames before '
+            'the image step' % (store, sum(sizes), len(sizes), headroom_mib, mib, limit))
 
 
 def store_map_problems(world, store, scratch, jobs=1, log=print):
@@ -297,7 +320,20 @@ def store_map_problems(world, store, scratch, jobs=1, log=print):
         import effect_links
         return '%d frame maps read for the effect links' % len(effect_links.frame_maps(id1))
 
-    for name, function in (('the engine\'s per-map tables', limits), ('the frame map sky check', sky),
+    def one_partition():
+        # the store moves as ONE unit (layout_plan.movable_unit): with the default headroom it has to fit one
+        # partition below 2 GiB, or the image step refuses it at the very end ("does not fit one partition")
+        problem = store_unit_problem(store, [size for _path, size in layout_plan_walk(id1 / store)])
+        if problem:
+            raise ValueError(problem)
+        return 'the store fits one partition below 2 GiB with its headroom (%d bytes)' % records[0]['bytes']
+
+    def layout_plan_walk(folder):
+        import layout_plan
+        return layout_plan.walk(folder)
+
+    for name, function in (('the disk layout\'s one-partition limit', one_partition),
+                           ('the engine\'s per-map tables', limits), ('the frame map sky check', sky),
                            ('the engine\'s map names and the rows file', names), ('the door check\'s job table', doors),
                            ('the effect links\' frame map reader', effects)):
         tried(name, function)

@@ -1,5 +1,15 @@
 # COLLISION-ROUTE-NO-SPLIT-36: Routed standing hulls of dense flora (kelp, kreshweed) stay one chain 277-305 clipnodes deep: the router finds no cut, so the cell stays hull-pending
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 3 times; something has to be done
+
+- Reported with v0.0.67-dev1 at 2026-11-17 (time not recorded): Seen in Mournhold's Temple courtyard presented as an exterior cell (cell 4,-30): the standing hull of the model `r/azura` stays one chain 484 clipnodes deep, the only model of the eleven district cells over the hull-chain limit; the cell converts and fits its memory rings, and its hull audit reads failed. The audit now names the model, its depth and its clipnodes (it said only the count).
+- Reported with v0.0.68-dev1 at 2026-11-20 18:32 +0200: Solstheim, measured on 142 converted cells: 78 stay hull-pending on five meshes, four Solstheim rocks and one tree branch, 272 to 355 clipnodes deep.
+- Reported with v0.0.68-dev1 at 2026-11-20 21:44 +0200: terrain_rock_bm_65 is another Solstheim rock the router cannot split: its walkable surface plates make each piece's chain 345 to 351 clipnodes deep.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -28,10 +38,30 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-10-10: reported in v0.0.36-dev1
 - 2026-11-17: seen again in v0.0.67-dev1: Seen in Mournhold's Temple courtyard presented as an exterior cell (cell 4,-30): the standing hull of the model `r/azura` stays one chain 484 clipnodes deep, the only model of the eleven district cells over the hull-chain limit; the cell ...
 - 2026-11-18: v0.0.67-dev2: The statue of Azura in Mournhold's Temple courtyard (`r/azura`, one chain 484 clipnodes deep, the only model of the eleven district cells over the limit) is accepted as a chain on 18 November 2026 (config/hull-chain-accepted.json, a ...
+- 2026-11-20 18:32 +0200: seen again in v0.0.68-dev1: Solstheim, measured on 142 converted cells: 78 stay hull-pending on five meshes, four Solstheim rocks and one tree branch, 272 to 355 clipnodes deep.
+- 2026-11-20 21:44 +0200: seen again in v0.0.68-dev1: terrain_rock_bm_65 is another Solstheim rock the router cannot split: its walkable surface plates make each piece's chain 345 to 351 clipnodes deep.
 
 <!-- END GENERATED TIMELINE -->
 
 _Last updated with AmiWind v0.0.43-dev3 (18 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [Timeline](#timeline)
+- [Status: 10 October 2026](#status-10-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Status: 10 October 2026
 
@@ -114,6 +144,7 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [COLLISION-TRACE-COST-33](COLLISION-TRACE-COST-33.md): Movement traces near large models walk long standing-hull chains: tens of ms per trace on a slow 68040 (emulator-relative)
 - [COLLISION-TRACE-LIMIT-ROUTED-ROOM-36](COLLISION-TRACE-LIMIT-ROUTED-ROOM-36.md): The tool collision tracer stops on the Vivec Arena Pit's routed hull (visit limit), so its start spot cannot be traced
 - [HULL-SURFACE-TENT03-MISSING-57](HULL-SURFACE-TENT03-MISSING-57.md): The collision surface table left out one Ashlander yurt (ex_ashl_tent_03): its walkable collision lay 64 units under its convex pieces
+- [PELAGIAD-STAIRS-STUCK-67](PELAGIAD-STAIRS-STUCK-67.md): A stairway up in Pelagiad cannot be climbed: the player gets stuck on it
 - [RECIPE-ROW-MOVES-COLLISION-57](RECIPE-ROW-MOVES-COLLISION-57.md): A mesh reduction row changed the Imperial ship's collision: the dev4 build stopped at the collision surface gate in Vivec City (64 units)
 - RED-MOUNTAIN-SLOPE-TOO-STEEP-51 (no report page): Red Mountain (cell 2,7): a slope too steep to walk up, the player cannot go forward
 - [ROOM-PYLON-ROOF-48](ROOM-PYLON-ROOF-48.md): Grand Inquisitor and Tamira Vian (Hall of Processing) stand inside collision: a convex piece of ex_stronghold_pylon01 slopes 14 units over the floor they stand on

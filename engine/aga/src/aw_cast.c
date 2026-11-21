@@ -645,6 +645,11 @@ static int window_status(char *out,int size){
     return 1;
 }
 static void ready_reset(int new_game){(void)new_game;ready=0;held=0;pending=0;release_at=0;memset(looks,0,sizeof(looks));aw_magic_cast_range=AW_RANGE_TARGET;}
+/* HANDS-STATE-LOST-THROUGH-DOORS-67: P is the player entity a spawned client plays (not a map's entity still waiting
+ * for the client during a load) */
+static int player_spawned(const edict_t *p){
+    return svs.clients && svs.maxclients>=1 && svs.clients[0].active && svs.clients[0].spawned && svs.clients[0].edict==p;
+}
 void AW_CastFrame(void){
     edict_t *p=sv_player;
     aw_magic_castables=window_castables;aw_magic_select=window_select;aw_magic_status=window_status;
@@ -680,7 +685,12 @@ void AW_CastFrame(void){
     if(pending && (release_at>(float)sv.time+CAST_SECONDS || p->v.health<=0)){pending=0;looks_release(-1);}
     if(pending && sv.time>=release_at)cast_release();
     if(!ready || !cast_on)return;
-    if(p->v.health<=0){ready=0;return;}
+    /* HANDS-STATE-LOST-THROUGH-DOORS-67: only the spawned player's death lowers the magic. While a door, a teleport or
+     * a cell change loads, the server runs frames on the new map's player entity before the client has spawned in it
+     * (Quake's SV_RunClients sets sv_player first), its health still 0: since 6a3b897f9 (v0.0.61-dev2) that lowered
+     * the readied magic, and since the magic and the weapon share the hands (1a0e3a3aa, v0.0.65) the hands, carried up
+     * through the door, then showed the weapon stance (the fists) instead of the spell stance. */
+    if(p->v.health<=0){if(player_spawned(p))ready=0;return;}
     /* with magic ready the attack button is the cast: taken before the fight and the hands see it */
     if(p->v.button0){
         if(!held)cast_now();   /* once per press; a held button never repeats */
