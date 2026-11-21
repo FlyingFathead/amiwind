@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 11 times; something has to be done
+## PERSISTING: reported 17 times; something has to be done
 
 - Reported with v0.0.54 at 2026-10-27 18:21 +0200: Seen first in v0.0.54 (not registered then): the tests of gates 4250 and 4252 failed with "Cannot allocate memory" in the gate's compiler wrapper while several gates, builds and an emulator session ran.
 - Reported with v0.0.66-dev10 at 2026-11-16 (time not recorded): Seen again under load: a pregate run failed every check with "Cannot allocate memory" while a long build check ran.
@@ -15,6 +15,12 @@
 - Reported with v0.0.67-dev2 at 2026-11-18 (time not recorded): Seen again on 2026-11-18 with its cause measured: a gate's pregate failed with "Cannot allocate memory" on a docs read while the build volume's collector (tools/build_gc.py plan, run with --delete for a listed set of old runs) held about 23 GiB of the Docker machine's 51 GiB for its scan of the whole volume. The collector scans the volume again for the delete after its dry run; until that scan is lighter or the dry run's plan is reused, it is not run beside gates.
 - Reported with v0.0.67-dev2 at 2026-11-18 (time not recorded): Seen again on a gate of the expansions branch: the pregate the gate runs refused it on five checks whose file reads ran out of memory (a docs index page read: Cannot allocate memory), a minute after the same pregate had passed on the same commit; the next gate of that commit was started.
 - Reported with v0.0.67-dev3 at 2026-11-19 03:21 +0200: Seen again on the v0.0.67-dev3 line: while a full test build ran, reads of the project files from the shell container failed with an out-of-memory error several times within an hour and worked again minutes later.
+- Reported with v0.0.68-dev2 at 2026-11-21 03:52 +0200: Seen again: test runs in throwaway containers that read the repository over a bind mount failed at interpreter start with an out-of-memory error from the file system while other gates ran; a rerun of the same modules passes.
+- Reported with v0.0.68-dev3 at 2026-11-21 04:37 +0200: Seen again: the gate's boot smoke step stopped on an out-of-memory read error from the file system after every other part of the gate had passed; the same commit is gated again.
+- Reported with v0.0.68-dev3 at 2026-11-21 05:47 +0200: Seen again on 21 November 2026: a pre-gate check in a container failed every check at once with out-of-memory errors on reading the repository files while a full build ran beside it; the same check passed minutes earlier.
+- Reported with v0.0.68 at 2026-11-21 07:18 +0200: In the shell container, two start-ups of the register tool failed with an out-of-memory error while reading files, while the virtual machine's page cache held almost all of its memory; a retry ran.
+- Reported with v0.0.68-dev3 at 2026-11-21 09:43 +0200: A file read inside a container failed with out of memory again, this time in a tracker step, while a build plan check ran.
+- Reported with v0.0.68-dev3 at 2026-11-21 10:34 +0200: Seen again on v0.0.68-dev3 after a day of builds; clearing the build machine's file cache once restored the reads.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -57,6 +63,12 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-18: seen again in v0.0.67-dev2: Seen again on 2026-11-18 with its cause measured: a gate's pregate failed with "Cannot allocate memory" on a docs read while the build volume's collector (tools/build_gc.py plan, run with --delete for a listed set of old runs) held about ...
 - 2026-11-18: seen again in v0.0.67-dev2: Seen again on a gate of the expansions branch: the pregate the gate runs refused it on five checks whose file reads ran out of memory (a docs index page read: Cannot allocate memory), a minute after the same pregate had passed on the same ...
 - 2026-11-19 03:21 +0200: seen again in v0.0.67-dev3: Seen again on the v0.0.67-dev3 line: while a full test build ran, reads of the project files from the shell container failed with an out-of-memory error several times within an hour and worked again minutes later.
+- 2026-11-21 03:52 +0200: seen again in v0.0.68-dev2: Seen again: test runs in throwaway containers that read the repository over a bind mount failed at interpreter start with an out-of-memory error from the file system while other gates ran; a rerun of the same modules passes.
+- 2026-11-21 04:37 +0200: seen again in v0.0.68-dev3: Seen again: the gate's boot smoke step stopped on an out-of-memory read error from the file system after every other part of the gate had passed; the same commit is gated again.
+- 2026-11-21 05:47 +0200: seen again in v0.0.68-dev3: Seen again on 21 November 2026: a pre-gate check in a container failed every check at once with out-of-memory errors on reading the repository files while a full build ran beside it; the same check passed minutes earlier.
+- 2026-11-21 07:18 +0200: seen again in v0.0.68: In the shell container, two start-ups of the register tool failed with an out-of-memory error while reading files, while the virtual machine's page cache held almost all of its memory; a retry ran.
+- 2026-11-21 09:43 +0200: seen again in v0.0.68-dev3: A file read inside a container failed with out of memory again, this time in a tracker step, while a build plan check ran.
+- 2026-11-21 10:34 +0200: seen again in v0.0.68-dev3: Seen again on v0.0.68-dev3 after a day of builds; clearing the build machine's file cache once restored the reads.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -65,7 +77,7 @@ _Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 11 times; something has to be done](#persisting-reported-11-times-something-has-to-be-done)
+- [PERSISTING: reported 17 times; something has to be done](#persisting-reported-17-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Status: 16 November 2026](#status-16-november-2026)
 - [Symptom](#symptom)
@@ -223,6 +235,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [REGRESSION-GUARD-MISSING-67](REGRESSION-GUARD-MISSING-67.md): Things the maintainer had confirmed working in play come back broken in later builds: no check kept them proven after their fix
 - [RELEASE-CHECK-NOTES-LATE-66](RELEASE-CHECK-NOTES-LATE-66.md): The release check of the notes' core-use claims ran only when the snapshot package was made, after the build and its play tests, and read a sentence about allowed workers as a claim
 - [RELEASE-CONNECT-STEP-SKIPPED-53](RELEASE-CONNECT-STEP-SKIPPED-53.md): After v0.0.52 and v0.0.53 were published the release's connect-it-fully step was skipped: the pinned previous release and the size baseline stayed at v0.0.51
+- [RELEASE-EARLY-CORES-CLAIM-MISREAD-68](RELEASE-EARLY-CORES-CLAIM-MISREAD-68.md): The release notes check took a known-fault line about idle cores for a claim of full core use, and only the gate ran it
 - [RELEASE-GATE-COMPLETENESS-LOST-67](RELEASE-GATE-COMPLETENESS-LOST-67.md): The release check passes with rooms of a shipped expansion missing and without checking the expansions' doors
 - [RELEASE-INCLUSION-CHECK-LATE-48](RELEASE-INCLUSION-CHECK-LATE-48.md): The release guard does not check the CHIM inclusion ledger: the v0.0.48 kit stopped in its source step after the guard and the full suite had passed
 - [RELEASE-KIT-NO-REPAIR-MODE-35](RELEASE-KIT-NO-REPAIR-MODE-35.md): The release kit has no repair mode for a commit already pushed

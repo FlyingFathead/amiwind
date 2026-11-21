@@ -27,7 +27,9 @@
     "meshes/x/ex_colony_house03.nif": "Bloodmoon colony house (Solstheim): 1 flight, no place on the tread for the standing box; method 0 kept (measured on the v0.0.68-dev3 build, 21 November 2026)",
     "meshes/x/ex_colony_miners_office01.nif": "Bloodmoon colony miners' office (Solstheim): 2 flights, no place on the tread for the standing box; method 0 kept (measured on the v0.0.68-dev3 build, 21 November 2026)",
     "meshes/x/ex_colony_pier01.nif": "Bloodmoon colony pier (Solstheim): 4 flights, no floor under the drawn tread; no place on the tread for the standing box; method 0 kept (measured on the v0.0.68-dev3 build, 21 November 2026)",
-    "meshes/x/ex_s_bridge.nif": "Bloodmoon bridge (Solstheim): 3 flights, no floor under the drawn tread; no place on the tread for the standing box; method 0 kept (measured on the v0.0.68-dev3 build, 21 November 2026)"
+    "meshes/x/ex_s_bridge.nif": "Bloodmoon bridge (Solstheim): 3 flights, no floor under the drawn tread; no place on the tread for the standing box; method 0 kept (measured on the v0.0.68-dev3 build, 21 November 2026)",
+    "meshes/x/bm_ex_iceberg.nif": "Bloodmoon iceberg (Solstheim, the Mortrag Glacier): 49 flights, 1 failing on 2 levels, standing surface too steep (normal z); the flight detector's reading of natural ice terraces (level facets 0.5 to 1.5 units apart, 3 to 118 levels a flight), no stairs in the mesh; its collision is the mesh itself, as in the original, which gives no standing place there either; method 0 kept (measured on CHIMport run 6 of the nine glacier cells, 21 November 2026)",
+    "meshes/x/bm_ex_iceberg_collapsed.nif": "Bloodmoon collapsed iceberg (Solstheim, the Mortrag Glacier): 38 flights, 2 failing on 3 levels, no place on the tread for the standing box (ice overhangs the facets 13 to 15 units up); the flight detector's reading of natural ice terraces, no stairs in the mesh; its collision is the mesh itself, as in the original, which gives no standing place there either; method 0 kept (measured on CHIMport run 6 of the nine glacier cells, 21 November 2026)"
   },
   "layers": {
     "bloodmoon": [
@@ -42,7 +44,9 @@
       "meshes/x/ex_colony_house03.nif",
       "meshes/x/ex_colony_miners_office01.nif",
       "meshes/x/ex_colony_pier01.nif",
-      "meshes/x/ex_s_bridge.nif"
+      "meshes/x/ex_s_bridge.nif",
+      "meshes/x/bm_ex_iceberg.nif",
+      "meshes/x/bm_ex_iceberg_collapsed.nif"
     ],
     "tribunal": [
       "meshes/x/ex_mh_bazaar_cart_01.nif",

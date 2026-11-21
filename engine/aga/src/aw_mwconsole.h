@@ -42,7 +42,49 @@ enum {AW_MWCON_ADDITEM,AW_MWCON_REMOVEITEM,AW_MWCON_GETITEMCOUNT,AW_MWCON_EQUIP,
       AW_MWCON_SCRIPTRUNNING,AW_MWCON_PLAYSOUND,AW_MWCON_PLAYSOUNDVP,AW_MWCON_PLAYSOUND3D,AW_MWCON_PLAYSOUND3DVP,
       AW_MWCON_GETSOUNDPLAYING,AW_MWCON_STREAMMUSIC,AW_MWCON_SAYDONE,AW_MWCON_PLACEATPC,AW_MWCON_PLACEATME,
       AW_MWCON_PLACEITEM,AW_MWCON_REMOVESPELLEFFECTS,AW_MWCON_EXPLODESPELL,AW_MWCON_GETSPELLEFFECTS,AW_MWCON_GETEFFECT,
-      AW_MWCON_HASITEMEQUIPPED,AW_MWCON_DROP,AW_MWCON_ADDTOPIC,AW_MWCON_CAST,AW_MWCON_COMMANDS};
+      AW_MWCON_HASITEMEQUIPPED,AW_MWCON_DROP,AW_MWCON_ADDTOPIC,AW_MWCON_CAST,AW_MWCON_PLACEITEMCELL,
+      AW_MWCON_AIFOLLOWCELL,AW_MWCON_AIESCORTCELL,AW_MWCON_GETPCCELL,AW_MWCON_COMMANDS};
+
+/* --- v0.0.68 (MW-CONSOLE-COMMANDS-62, the cell table): the compiled file's CELN and CELG sections (tools/mwscript/
+ * awms.py cell_rows, grid_rows), read through the host, and what a typed PositionCell, PlaceItemCell, AIFollowCell or
+ * AIEscortCell works out from a row, by the compiler's own rules (tools/mwscript/codegen.py Program.player_move,
+ * actor_move, place, ai_cell), so a typed line does what the same compiled line does. Nothing kept in memory. --- */
+#define AW_MWCON_CELL_ROOM 1           /* a CELN row's kind: an interior cell (awms.py CELL_ROOM) */
+#define AW_MWCON_CELL_EXTERIOR 2       /* an exterior cell's name (OpenMW's findCell finds an exterior by it) */
+#define AW_MWCON_CELL_PRESENTED 3      /* a district the build presents as exterior cells: its move */
+#define AW_MWCON_CELL_NO_MAP 1         /* a row's flag: the room has no map in the repo's room lists */
+#define AW_MWCON_MOVE_OUTDOORS 1       /* = aw_mwcode.h AWM_MOVE_OUTDOORS */
+#define AW_MWCON_MOVE_ROOM 2           /* = aw_mwcode.h AWM_MOVE_ROOM */
+#define AW_MWCON_CELL_BYTES 24
+typedef struct {
+    int kind,flags,number;   /* AW_MWCON_CELL_*; the room's stable number (the room map's _aw_cell_int), 0 none */
+    int map,name;            /* string indexes: the room map's name (-1 none), the cell's name as its record writes it */
+    float offset[3];         /* a room's recentring (subtracted first), a presented district's move (x and y added) */
+} aw_mwcon_cell_t;
+typedef struct {
+    int (*read)(void *user,unsigned long offset,unsigned char *out,unsigned long bytes);   /* 1 read */
+    int (*string)(void *user,int index,char *out,int capacity);                           /* its length, 0 none */
+    void *user;
+    unsigned long celn,celn_rows,celg,celg_rows;   /* the sections' offsets for READ and their rows (0: none) */
+} aw_mwcon_cells_t;
+/* the row of the cell named TYPED (any case): 1 found, 0 no cell of the game has that name, -1 no table */
+int AW_MwConsoleCellFind(const aw_mwcon_cells_t *t,const char *typed,aw_mwcon_cell_t *out);
+/* the name of the room NUMBER (CELN) or of the exterior cell X, Y (CELG; OpenMW's getCellName) into OUT: 1 found */
+int AW_MwConsoleCellRoomName(const aw_mwcon_cells_t *t,int number,char *out,int capacity);
+int AW_MwConsoleCellGridName(const aw_mwcon_cells_t *t,int x,int y,char *out,int capacity);
+/* OpenMW 0.51 cellextensions.cpp OpGetPCCell: 1 when the cell name CURRENT starts with TYPED, any case */
+int AW_MwConsoleCellMatches(const char *typed,const char *current);
+/* the line's verb: the player's PositionCell, anything else's, PlaceItemCell of an actor or object and of an item,
+ * AIFollowCell, AIEscortCell */
+enum {AW_MWCON_CELL_PLAYER,AW_MWCON_CELL_ACTOR,AW_MWCON_CELL_PLACE_ACTOR,AW_MWCON_CELL_PLACE_ITEM,
+      AW_MWCON_CELL_FOLLOW,AW_MWCON_CELL_ESCORT};
+/* what VERB does with FOUND (AW_MwConsoleCellFind's answer, 1 or 0) and ROW; IN: x, y, z (the original's units) and
+ * the rotation as typed (degrees; PositionCell of anything but the player: minutes of arc). OUT the point (a room: its
+ * map's own units, a placed item and outdoors: the original's), *YAW (Quake's, degrees), *KIND (AW_MWCON_MOVE_*),
+ * *NUMBER (the room's number, 0 outdoors). 1 a move, 0 nothing (a cell the game has not: OpenMW does nothing then),
+ * -1 the player into a room this image has no map for (the compiled line stays "not yet" then too) */
+int AW_MwConsoleCellMove(int verb,int found,const aw_mwcon_cell_t *row,const float in[4],float out[3],float *yaw,
+                         int *kind,int *number);
 
 typedef struct {
     void (*exec)(const char *text);                       /* an AmiWind console line */

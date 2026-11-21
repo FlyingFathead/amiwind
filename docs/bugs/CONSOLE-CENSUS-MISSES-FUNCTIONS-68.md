@@ -19,6 +19,23 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.67 (b35188d3) | 2026-11-21 | gate 12269 of the planning item CONSOLE-CENSUS-MISSES-FUNCTIONS-68 | Every function of the script language has a row in the table of the original's console commands (de18a40ee); 105 of the 107 added already ran when typed, two stay planned, and a test fails when a function has no row. |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-20: reported in v0.0.68-dev1
+- 2026-11-21: fixed in source: a gated commit, v0.0.67 (b35188d3); gate 12269 of the planning item CONSOLE-CENSUS-MISSES-FUNCTIONS-68: Every function of the script language has a row in the table of the original's console commands (de18a40ee); 105 of the 107 added already ran when typed, two stay planned, and a test fails when a function has no row.
+
+<!-- END GENERATED TIMELINE -->
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category

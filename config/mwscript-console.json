@@ -92,9 +92,8 @@
     "OpenMW 0.51"
    ],
    "group": "Ai",
-   "state": "planned",
-   "amiwind": "",
-   "why": "its arguments are worked out by the compiler (the room number)"
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_cell_line: the cell by its name in the compiled scripts' cell table, worked out as the compiler does, then the call a compiled AIEscortCell makes); a cell the game has not starts no package"
   },
   {
    "name": "aifollow",
@@ -111,9 +110,8 @@
     "OpenMW 0.51"
    ],
    "group": "Ai",
-   "state": "planned",
-   "amiwind": "",
-   "why": "its arguments are worked out by the compiler (the room number)"
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_cell_line: the cell by its name in the compiled scripts' cell table, worked out as the compiler does, then the call a compiled AIFollowCell makes)"
   },
   {
    "name": "aitravel",
@@ -168,9 +166,8 @@
     "OpenMW 0.51"
    ],
    "group": "Cell",
-   "state": "planned",
-   "amiwind": "",
-   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (AW_MwvmCellChanged), on any reference by id-> or the console target"
   },
   {
    "name": "centeroncell",
@@ -278,6 +275,60 @@
    "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
+   "name": "disableplayercontrols",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "disableplayerfighting",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "disableplayerjumping",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "disableplayerlooking",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "disableplayermagic",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "disableplayerviewswitch",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
    "name": "disableteleporting",
    "sources": [
     "OpenMW 0.51"
@@ -287,14 +338,22 @@
    "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
+   "name": "disablevanitymode",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
    "name": "dontsaveobject",
    "sources": [
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (nothing to do, as OpenMW), on any reference by id-> or the console target"
   },
   {
    "name": "drop",
@@ -396,6 +455,60 @@
    "amiwind": "dbg quickchar name"
   },
   {
+   "name": "enableplayercontrols",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "enableplayerfighting",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "enableplayerjumping",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "enableplayerlooking",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "enableplayermagic",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "enableplayerviewswitch",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
    "name": "enableracemenu",
    "sources": [
     "OpenMW 0.51"
@@ -437,6 +550,15 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "enablevanitymode",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
    "state": "vm",
    "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
@@ -500,9 +622,8 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (nothing to do, as OpenMW), on any reference by id-> or the console target"
   },
   {
    "name": "filljournal",
@@ -597,6 +718,15 @@
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
   },
   {
+   "name": "getaipackagedone",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_ai_package), on any reference by id-> or the console target"
+  },
+  {
    "name": "getalarm",
    "sources": [
     "OpenMW 0.51"
@@ -633,6 +763,15 @@
    "amiwind": "the MWScript host (aw_mwhost.c host_call GetAngle), on any reference by id-> or the console target"
   },
   {
+   "name": "getarmorbonus",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
    "name": "getarmorer",
    "sources": [
     "original"
@@ -660,6 +799,15 @@
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
   },
   {
+   "name": "getattackbonus",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
    "name": "getattacked",
    "sources": [
     "OpenMW 0.51"
@@ -676,6 +824,24 @@
    "group": "Stats",
    "state": "vm",
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getblightdisease",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_spell), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getblindness",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "getblock",
@@ -701,9 +867,35 @@
     "OpenMW 0.51"
    ],
    "group": "Gui",
-   "state": "planned",
-   "amiwind": "",
-   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_button), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getcastpenalty",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getchameleon",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getcollidingactor",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "getcollidingpc",
@@ -715,6 +907,15 @@
    "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
+   "name": "getcommondisease",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_spell), on any reference by id-> or the console target"
+  },
+  {
    "name": "getconjuration",
    "sources": [
     "original"
@@ -722,6 +923,15 @@
    "group": "Stats",
    "state": "vm",
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getcurrentaipackage",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Ai",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_ai_package), on any reference by id-> or the console target"
   },
   {
    "name": "getcurrenttime",
@@ -749,6 +959,15 @@
    "group": "Stats",
    "state": "vm",
    "amiwind": "the MWScript host by the compiler's function table (host_dead_count), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getdefendbonus",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "getdestruction",
@@ -841,6 +1060,15 @@
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
   },
   {
+   "name": "getfatiguegetratio",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_actor), on any reference by id-> or the console target"
+  },
+  {
    "name": "getfight",
    "sources": [
     "OpenMW 0.51"
@@ -859,7 +1087,25 @@
    "amiwind": "the MWScript host by the compiler's function table (host_actor), on any reference by id-> or the console target"
   },
   {
+   "name": "getflying",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
    "name": "getforcejump",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getforcemovejump",
    "sources": [
     "OpenMW 0.51"
    ],
@@ -904,6 +1150,15 @@
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
   },
   {
+   "name": "gethealthgetratio",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_actor), on any reference by id-> or the console target"
+  },
+  {
    "name": "getheavyarmor",
    "sources": [
     "original"
@@ -945,6 +1200,15 @@
     "OpenMW 0.51"
    ],
    "group": "Cell",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getinvisible",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
    "state": "vm",
    "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
@@ -1039,6 +1303,15 @@
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
   },
   {
+   "name": "getmagickagetratio",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_actor), on any reference by id-> or the console target"
+  },
+  {
    "name": "getmarksman",
    "sources": [
     "original"
@@ -1084,14 +1357,22 @@
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
   },
   {
+   "name": "getparalysis",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
    "name": "getpccell",
    "sources": [
     "OpenMW 0.51"
    ],
    "group": "Cell",
-   "state": "planned",
-   "amiwind": "",
-   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_cell_line: the player's cell's name from the compiled scripts' cell table, the room's by its number or the exterior cell's as OpenMW names it, against the typed start, any case)"
   },
   {
    "name": "getpccrimelevel",
@@ -1203,6 +1484,60 @@
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
   },
   {
+   "name": "getplayercontrolsdisabled",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getplayerfightingdisabled",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getplayerjumpingdisabled",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getplayerlookingdisabled",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getplayermagicdisabled",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getplayerviewswitchdisabled",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
    "name": "getpos",
    "sources": [
     "OpenMW 0.51"
@@ -1230,6 +1565,96 @@
    "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
+   "name": "getresistblight",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getresistcorprus",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getresistdisease",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getresistfire",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getresistfrost",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getresistmagicka",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getresistnormalweapons",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getresistparalysis",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getresistpoison",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getresistshock",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
    "name": "getrestoration",
    "sources": [
     "original"
@@ -1253,9 +1678,8 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (AW_MwvmFrameSeconds), on any reference by id-> or the console target"
   },
   {
    "name": "getsecundaphase",
@@ -1283,6 +1707,15 @@
    "group": "Stats",
    "state": "vm",
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "getsilence",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "getsneak",
@@ -1348,14 +1781,31 @@
    "amiwind": "the MWScript host (aw_mwhost.c console_spells: the spell by its id, then the call a compiled GetSpellEffects makes): 1 while an effect of it is on the target"
   },
   {
+   "name": "getspellreadied",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
    "name": "getsquareroot",
    "sources": [
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the square root, as the opcode), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getstandingactor",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "getstandingpc",
@@ -1363,6 +1813,15 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getstartingangle",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Transformation",
    "state": "vm",
    "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
@@ -1394,6 +1853,24 @@
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
   },
   {
+   "name": "getsuperjump",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getswimspeed",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
    "name": "gettarget",
    "sources": [
     "OpenMW 0.51"
@@ -1412,11 +1889,38 @@
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
   },
   {
+   "name": "getvanitymodedisabled",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Control",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getwaterbreathing",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
    "name": "getwaterlevel",
    "sources": [
     "OpenMW 0.51"
    ],
    "group": "Cell",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "getwaterwalking",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
    "state": "vm",
    "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
@@ -1600,9 +2104,8 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (host_menu_mode), on any reference by id-> or the console target"
   },
   {
    "name": "menutest",
@@ -1612,6 +2115,16 @@
    "group": "Gui",
    "state": "not applicable",
    "amiwind": "OpenMW test"
+  },
+  {
+   "name": "messagebox",
+   "sources": [
+    "original"
+   ],
+   "group": "Gui",
+   "state": "planned",
+   "amiwind": "",
+   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
   },
   {
    "name": "modacrobatics",
@@ -1659,6 +2172,15 @@
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
   },
   {
+   "name": "modarmorbonus",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
    "name": "modarmorer",
    "sources": [
     "original"
@@ -1677,6 +2199,15 @@
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
   },
   {
+   "name": "modattackbonus",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
    "name": "modaxe",
    "sources": [
     "original"
@@ -1684,6 +2215,15 @@
    "group": "Stats",
    "state": "vm",
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modblindness",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "modblock",
@@ -1702,6 +2242,24 @@
    "group": "Stats",
    "state": "vm",
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modcastpenalty",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "modchameleon",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "modconjuration",
@@ -1738,6 +2296,15 @@
    "group": "Stats",
    "state": "vm",
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "moddefendbonus",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "moddestruction",
@@ -1812,6 +2379,15 @@
    "amiwind": "the MWScript host by the compiler's function table (host_actor), on any reference by id-> or the console target"
   },
   {
+   "name": "modflying",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
    "name": "modhandtohand",
    "sources": [
     "original"
@@ -1864,6 +2440,15 @@
    "group": "Stats",
    "state": "vm",
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modinvisible",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "modlightarmor",
@@ -1938,6 +2523,15 @@
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
   },
   {
+   "name": "modparalysis",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
    "name": "modpccrimelevel",
    "sources": [
     "OpenMW 0.51"
@@ -1993,6 +2587,96 @@
    "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
+   "name": "modresistblight",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "modresistcorprus",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "modresistdisease",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "modresistfire",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "modresistfrost",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "modresistmagicka",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "modresistnormalweapons",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "modresistparalysis",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "modresistpoison",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "modresistshock",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
    "name": "modrestoration",
    "sources": [
     "original"
@@ -2027,6 +2711,15 @@
    "group": "Stats",
    "state": "vm",
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "modsilence",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "modsneak",
@@ -2074,6 +2767,24 @@
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
   },
   {
+   "name": "modsuperjump",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "modswimspeed",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
    "name": "modunarmored",
    "sources": [
     "original"
@@ -2083,11 +2794,29 @@
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
   },
   {
+   "name": "modwaterbreathing",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
    "name": "modwaterlevel",
    "sources": [
     "OpenMW 0.51"
    ],
    "group": "Cell",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "modwaterwalking",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
    "state": "vm",
    "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
@@ -2124,9 +2853,8 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (AW_MwvmOnActivate), on any reference by id-> or the console target"
   },
   {
    "name": "ondeath",
@@ -2305,9 +3033,8 @@
     "OpenMW 0.51"
    ],
    "group": "Transformation",
-   "state": "planned",
-   "amiwind": "",
-   "why": "its arguments are worked out by the compiler (the placing rows and the cell's room and place)"
+   "state": "vm",
+   "amiwind": "the MWScript host (aw_mwhost.c console_cell_line: the object among those the game's Place calls name, the cell by its name in the compiled scripts' cell table, then the call a compiled PlaceItemCell makes); a cell the game has not places nothing"
   },
   {
    "name": "playbink",
@@ -2399,7 +3126,7 @@
    ],
    "group": "Transformation",
    "state": "vm",
-   "amiwind": "the MWScript host (aw_mwhost.c dbg tp to the cell (the player only)), on any reference by id-> or the console target"
+   "amiwind": "the MWScript host (aw_mwhost.c console_cell_line: the cell by its name in the compiled scripts' cell table, worked out as the compiler does: the player into the room's map at that point, or outdoors; anything else the call a compiled PositionCell makes), on any reference by id-> or the console target"
   },
   {
    "name": "raiserank",
@@ -2416,9 +3143,8 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (AW_MwvmRandom), on any reference by id-> or the console target"
   },
   {
    "name": "reloadlua",
@@ -2560,6 +3286,16 @@
    "amiwind": "the engine's chat line (say); the script function Say runs from scripts"
   },
   {
+   "name": "say3d",
+   "sources": [
+    "original"
+   ],
+   "group": "Sound",
+   "state": "planned",
+   "amiwind": "",
+   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+  },
+  {
    "name": "saydone",
    "sources": [
     "OpenMW 0.51"
@@ -2632,6 +3368,15 @@
    "amiwind": "the MWScript host (aw_mwhost.c host_call SetAngle), on any reference by id-> or the console target"
   },
   {
+   "name": "setarmorbonus",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
    "name": "setarmorer",
    "sources": [
     "original"
@@ -2659,6 +3404,15 @@
    "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
+   "name": "setattackbonus",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
    "name": "setaxe",
    "sources": [
     "original"
@@ -2666,6 +3420,15 @@
    "group": "Stats",
    "state": "vm",
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setblindness",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "setblock",
@@ -2686,6 +3449,24 @@
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
   },
   {
+   "name": "setcastpenalty",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "setchameleon",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
    "name": "setconjuration",
    "sources": [
     "original"
@@ -2693,6 +3474,15 @@
    "group": "Stats",
    "state": "vm",
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setdefendbonus",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "setdelete",
@@ -2776,6 +3566,15 @@
    "amiwind": "the MWScript host by the compiler's function table (host_actor), on any reference by id-> or the console target"
   },
   {
+   "name": "setflying",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
    "name": "sethandtohand",
    "sources": [
     "original"
@@ -2828,6 +3627,15 @@
    "group": "Stats",
    "state": "vm",
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setinvisible",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "setjournalindex",
@@ -2929,6 +3737,15 @@
    "amiwind": "OpenMW navigation mesh"
   },
   {
+   "name": "setparalysis",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
    "name": "setpccrimelevel",
    "sources": [
     "OpenMW 0.51"
@@ -2984,6 +3801,96 @@
    "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
+   "name": "setresistblight",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "setresistcorprus",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "setresistdisease",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "setresistfire",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "setresistfrost",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "setresistmagicka",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "setresistnormalweapons",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "setresistparalysis",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "setresistpoison",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "setresistshock",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
    "name": "setrestoration",
    "sources": [
     "original"
@@ -3018,6 +3925,15 @@
    "group": "Stats",
    "state": "vm",
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
+  },
+  {
+   "name": "setsilence",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
   {
    "name": "setsneak",
@@ -3065,6 +3981,24 @@
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
   },
   {
+   "name": "setsuperjump",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "setswimspeed",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
    "name": "setunarmored",
    "sources": [
     "original"
@@ -3074,11 +4008,29 @@
    "amiwind": "the MWScript host's actor call (aw_mwhost.c host_actor), on any actor by id-> or the console target"
   },
   {
+   "name": "setwaterbreathing",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
    "name": "setwaterlevel",
    "sources": [
     "OpenMW 0.51"
    ],
    "group": "Cell",
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
+  },
+  {
+   "name": "setwaterwalking",
+   "sources": [
+    "OpenMW 0.51"
+   ],
+   "group": "Stats",
    "state": "vm",
    "amiwind": "the MWScript host by the compiler's function table (the host's call by number), on any reference by id-> or the console target"
   },
@@ -3655,9 +4607,8 @@
     "OpenMW 0.51"
    ],
    "group": "Misc",
-   "state": "planned",
-   "amiwind": "",
-   "why": "an interpreter opcode with compiled arguments (a sound, topic, script or message row)"
+   "state": "vm",
+   "amiwind": "the MWScript host by the compiler's function table (the constant 0, as OpenMW), on any reference by id-> or the console target"
   }
  ]
 }

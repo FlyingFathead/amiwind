@@ -448,6 +448,86 @@ class PlannerTests(unittest.TestCase):
         self.assertIn("room_batches=getattr(args, 'chim_room_batches', None)", wrapper)
         self.assertIn("chim_interiors=getattr(args, 'chim_interiors', None)", wrapper)
 
+    def layer_worlds(self, tmp, sol_bytes, frames=3):
+        """Two staged layer stores as their stages leave them: Solstheim's frames (a module's world: chim/ and the
+        ownership table of FRAMES cells) and Tribunal's rooms (chim/ only). The big files are sparse."""
+        from chim import regions as R
+        sol = tmp / 'run/bloodmoon-solstheim'
+        (sol / 'chim/s00').mkdir(parents=True)
+        with open(sol / 'chim/world.cwi', 'wb') as stream:
+            stream.truncate(sol_bytes)
+        (sol / 'chim/s00/s0001.ccs').write_bytes(b'p' * MIB)
+        (sol / R.TABLE_FILE).write_text(R.dumps(R.ownership({(-20 - i, 20): 'land' for i in range(frames)})),
+                                        encoding='utf-8')
+        rooms = tmp / 'run/chim-layer-tribunal'
+        (rooms / 'chim').mkdir(parents=True)
+        (rooms / 'chim/world.cwi').write_bytes(b'w' * (2 * MIB))
+        return ['chimiti=%s' % rooms, 'chimsol=%s' % sol]
+
+    def test_the_plan_counts_the_layer_stores_the_image_installs(self):
+        # IMAGE-BOOT-PAYLOAD-OVER-2GIB-48, seen again in v0.0.68-dev3: the image step installs the expansions' stores
+        # (chim.layer_stores.install: each store's files, one frame map per frame, the land's rows file) after
+        # finalize's preflight, and the plan left them out (Solstheim's 152,423,292 bytes in 3,511 files)
+        import build_aga
+        import inspect
+        import payload_preflight as P
+        layout = dict(mode='compact', headroom_mib=1, boot_headroom_mib=1)
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            boot = tmp / 'image/boot'
+            (boot / 'id1').mkdir(parents=True)
+            (boot / 'AmiWind').write_bytes(b'e' * 4096)
+            worlds = self.layer_worlds(tmp, 5 * MIB)
+            added = P.layer_store_additions(worlds)
+            without = P.check_disk_layout(boot, set(), [], None, layout)['layout_plan']
+            plan = P.check_disk_layout(boot, set(), [], None, layout, layer_worlds=worlds)['layout_plan']
+            self.assertEqual(P.layer_store_additions(None), {})
+            with self.assertRaisesRegex(ValueError, 'no CHIM world'):
+                P.layer_store_additions(['chimmh=%s' % (tmp / 'run/absent')])
+        self.assertEqual(added, {
+            'id1/chimiti/world.cwi': 2 * MIB, 'id1/chimsol/world.cwi': 5 * MIB, 'id1/chimsol/s00/s0001.ccs': MIB,
+            'id1/maps/sl0000.chim': P.LAYER_FRAME_MAP_BOUND, 'id1/maps/sl0001.chim': P.LAYER_FRAME_MAP_BOUND,
+            'id1/maps/sl0002.chim': P.LAYER_FRAME_MAP_BOUND, 'id1/world/regions-sl.awr': 8 + 3 * 52})
+        self.assertEqual((without['partitions'][0]['files'], without['partitions'][0]['payload']), (1, 4096))
+        row = plan['partitions'][0]
+        self.assertEqual((row['files'], row['payload']), (8, 4096 + sum(added.values())))
+        wrapper = inspect.getsource(build_aga.payload_preflight)
+        self.assertIn("layer_worlds=getattr(args, 'chim_layer_world', None)", wrapper)
+        self.assertIn('layer_worlds', inspect.signature(P.run).parameters)
+
+    def test_a_layer_store_over_the_boot_limit_is_moved_by_the_first_plan(self):
+        # the v0.0.68-dev3 shape: a boot payload that fits alone (1,933,999,002 bytes planned, no unit moved) and a
+        # store that puts it over 2 GiB once installed. The preflight's plan moves the store before anything is
+        # written, the planned drive holds it, and the image step's layout of the finished payload follows that plan
+        import payload_preflight as P
+        layout = dict(mode='compact', headroom_mib=100, boot_headroom_mib=100)
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            boot = tmp / 'image/boot'
+            (boot / 'id1').mkdir(parents=True)
+            with open(boot / 'id1/pak0.bin', 'wb') as stream:
+                stream.truncate(1750 * MIB)
+            worlds = self.layer_worlds(tmp, 200 * MIB, frames=135)
+            alone = P.check_disk_layout(boot, set(), [], None, layout)
+            early = P.check_disk_layout(boot, set(), [], None, layout, layer_worlds=worlds)
+            staged = dict(L.walk(boot))
+            staged.update(P.layer_store_additions(worlds))
+        self.assertEqual((alone['partitions'], alone['layout_plan']['split']['units']), (1, 0))
+        plan = early['layout_plan']
+        self.assertEqual([(r['partition'], r['role']) for r in plan['partitions']], [('DH0', 'boot'), ('DW0', 'store')])
+        self.assertEqual(plan['partitions'][1]['moved'], ['id1/chimsol/'])
+        self.assertEqual(plan['partitions'][1]['moved_bytes'], 201 * MIB)
+        self.assertLess(plan['partitions'][0]['bytes'], 2 * GIB)
+        self.assertEqual(early['drives'], 1)
+        self.assertGreater(early['bytes'], alone['bytes'] + 200 * MIB)   # the planned drive holds the store
+        # the image step, with the stores installed and the frame maps at their written sizes, follows the plan
+        for rel in staged:
+            if rel.startswith('id1/maps/sl'):
+                staged[rel] = 1551
+        followed, grown = L.plan_following(staged, [], None, 100, 100, plan)
+        self.assertIsNone(grown)
+        self.assertEqual(followed['partitions'][1]['moved'], ['id1/chimsol/'])
+
     def test_build_config_keys_are_known_and_checked(self):
         from build_font_options import _read
         with tempfile.TemporaryDirectory() as tmp:

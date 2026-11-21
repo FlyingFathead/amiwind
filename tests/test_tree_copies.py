@@ -123,9 +123,11 @@ class Wiring(unittest.TestCase):
         self.assertEqual(star[0], base[0])                          # the base chim stage: the same command
         self.assertEqual([n for n, _ in off], ['chim', 'chim-sol-data', 'chim-sol', 'image'])
         self.assertEqual([n for n, _ in star], ['chim', 'chim-sol-data', 'chim-sol-trees', 'chim-sol', 'image'])
-        self.assertEqual(dict(off)['chim-sol'][0], 'chim_build.py')
+        # off: the stage's runner (tools/solstheim_test_world.py: the layered folder's own master, the unit pool), which
+        # runs tools/chim_build.py in its process
+        self.assertEqual(dict(off)['chim-sol'][:2], ['solstheim_test_world.py', '--unit-pool'])
         self.assertEqual(dict(star)['chim-sol'][:2], ['chim_tree_star.py', '--tree-star'])
-        self.assertEqual(dict(star)['chim-sol'][3:], dict(off)['chim-sol'][1:])   # the same chim_build arguments
+        self.assertEqual(dict(star)['chim-sol'][3:], dict(off)['chim-sol'][3:])   # the same chim_build arguments
 
     def test_the_tree_stage_reads_bloodmoon_and_no_base_stage_reads_the_tree_tools(self):
         self.assertEqual(set(build_cache.STAGE_GAME_INPUTS['chim-sol-trees']),

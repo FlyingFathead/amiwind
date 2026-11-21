@@ -509,12 +509,16 @@ class KnownMeshTests(unittest.TestCase):
         # and the Bloodmoon layer's 9 more, found when the v0.0.68-dev3 build converted Solstheim's 135 cells (21
         # November 2026: a door, the steam machine as Bloodmoon ships it, two barrow tombs, three colony buildings, the
         # colony pier and a bridge; each keeps method 0's collision)
+        # and the Bloodmoon layer's 2 icebergs of the Mortrag Glacier, measured on the CHIM import of its nine cells (21
+        # November 2026: the flight detector reads their natural ice terraces as flights; their collision is the mesh
+        # itself, which gives no standing place at the failing levels in the original either)
         bloodmoon, tribunal = data['layers']['bloodmoon'], data['layers']['tribunal']
-        self.assertEqual(len(bloodmoon), 12)
+        self.assertEqual(len(bloodmoon), 14)
         for mesh in ('meshes/d/ex_s_door.nif', 'meshes/f/furn_dwrv_steam_00.nif', 'meshes/x/ex_bm_tomb_02.nif',
                      'meshes/x/ex_bm_tomb_03.nif', 'meshes/x/ex_colony_const_house01.nif',
                      'meshes/x/ex_colony_house03.nif', 'meshes/x/ex_colony_miners_office01.nif',
-                     'meshes/x/ex_colony_pier01.nif', 'meshes/x/ex_s_bridge.nif'):
+                     'meshes/x/ex_colony_pier01.nif', 'meshes/x/ex_s_bridge.nif', 'meshes/x/bm_ex_iceberg.nif',
+                     'meshes/x/bm_ex_iceberg_collapsed.nif'):
             self.assertIn(mesh, bloodmoon)
             self.assertIn(mesh, data['meshes'])
         self.assertEqual(sorted(tribunal), ['meshes/x/ex_mh_bazaar_cart_01.nif', 'meshes/x/ex_mh_road_03.nif'])

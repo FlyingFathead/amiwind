@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * Falling weather and mesh smoke, on the shared effect path (aw_magic.h AW_FxParticles / AW_FxSprite: Quake's
- * particle pool, r_part.c, and temporary sprite entities, cl_tent.c), exteriors only.
+ * Falling weather, mesh smoke and the Ghostfence's glow, on the shared effect path (aw_magic.h AW_FxParticles /
+ * AW_FxSprite: Quake's particle pool, r_part.c, and temporary sprite entities, cl_tent.c), exteriors only.
  *
  * WEATHER-RAIN (the maintainer, 27 October 2026: "we don't have i.e. rain, but we should have it ... maybe we can do it
  * with sprites"): rain, heavy rain, snow, blizzard and the ash of ash and blight storms fall in a small box around
@@ -26,6 +26,7 @@
 #include "aw_sky.h"
 #include "aw_weather.h"
 #include "aw_magic.h"
+#include "aw_curtain.h"
 
 static cvar_t aw_atmos={"aw_atmos","2",true};
 #define ATMOS_PRECIP 1
@@ -166,14 +167,115 @@ static void smoke_update(void)
     }
 }
 
+/* ---- the glow (GHOSTFENCE-PARTICLES-NOT-DRAWN-68) ----
+ * The Ghostfence pylons' plumes and the blight cloud's (tools/ghostfence_effects.py: world/glow.awg, GLOW_ROW rows by
+ * cell, each emitter placement's plume centre and size in the original's units, its frames and its reference;
+ * world/glow.spr, each plume baked from its emitter's own particle system). The rows of the 3 x 3 cells around the view
+ * are read when the view enters a cell (as the smoke's); each frame the nearest aw_glow_draw in front within
+ * aw_glow_range local units that no script disabled (AW_ObjectDisabled: the pylons' GhostfenceScript once the Heart is
+ * destroyed, EndGame the blight cloud; the world change list keeps it over saves) are drawn, one sprite each cycling
+ * its frames. Not saved: aw_glow (dbg glow on|off) 0 until its frame cost is measured on the 68040 and the Pi,
+ * aw_glow_draw (dbg glow draw, 0..GLOW_DRAW_MAX, default 8), aw_glow_range (dbg glow range, 256..8192, default 2048);
+ * the image's default-game.cfg states them. Resident: GLOW_CACHE rows of 28 bytes and the sprite. */
+#define GLOW_ROW 28                  /* tools/ghostfence_effects.py GLOW_ROW */
+#define GLOW_CACHE 64                /* the 3 x 3 cells around the view; more are dropped (counted) */
+#define GLOW_DRAW_MAX 16
+#define GLOW_FPS 5
+#define GLOW_PATH "world/glow.awg"
+#define GLOW_SPRITE "world/glow.spr"
+static cvar_t aw_glow={"aw_glow","0"};
+static cvar_t aw_glow_draw={"aw_glow_draw","8"};
+static cvar_t aw_glow_range={"aw_glow_range","2048"};
+typedef struct {float origin[3],width;unsigned reference;unsigned char frame0,frames,phase;} glow_t;
+static glow_t glows[GLOW_CACHE];
+static int glow_count,glow_dropped,glow_cell_valid,glow_cell[2],glow_sprite_tried;
+static model_t *glow_model,*glow_world;
+static void glow_read_cell(FILE *f,long base,unsigned count,int cx,int cy)
+{
+    byte row[GLOW_ROW];int lo=0,hi=(int)count,mid,rx,ry;
+    while(lo<hi){
+        mid=lo+(hi-lo)/2;
+        if(fseek(f,base+8+(long)mid*GLOW_ROW,SEEK_SET) || fread(row,1,GLOW_ROW,f)!=GLOW_ROW)return;
+        rx=le16s(row);ry=le16s(row+2);
+        if(rx<cx || (rx==cx && ry<cy))lo=mid+1;else hi=mid;
+    }
+    if(fseek(f,base+8+(long)lo*GLOW_ROW,SEEK_SET))return;
+    for(;lo<(int)count;lo++){
+        glow_t *g;int k;
+        if(fread(row,1,GLOW_ROW,f)!=GLOW_ROW || le16s(row)!=cx || le16s(row+2)!=cy)return;
+        if(glow_count>=GLOW_CACHE){glow_dropped++;continue;}
+        g=&glows[glow_count];
+        for(k=0;k<3;k++)g->origin[k]=lef(row+4+4*k);
+        g->width=(float)(row[16]|(row[17]<<8));
+        g->frame0=row[21];g->frames=row[22];g->phase=row[23];g->reference=le32(row+24);
+        if(isfinite(g->origin[0]) && isfinite(g->origin[1]) && isfinite(g->origin[2]) && g->width>0 && g->frames)glow_count++;
+    }
+}
+static void glow_load(int cx,int cy)
+{
+    FILE *f=NULL;byte head[8];long base;int size,dx,dy;unsigned count;
+    glow_count=glow_dropped=0;glow_cell_valid=1;glow_cell[0]=cx;glow_cell[1]=cy;
+    size=COM_FOpenFile(GLOW_PATH,&f);
+    if(!f)return;
+    base=ftell(f);
+    if(base>=0 && size>=8 && fread(head,1,8,f)==8 && !memcmp(head,"AWG1",4)){
+        count=le32(head+4);
+        if(count<=1024 && (long)size==8+(long)count*GLOW_ROW)
+            for(dx=-1;dx<=1;dx++)for(dy=-1;dy<=1;dy++)glow_read_cell(f,base,count,cx+dx,cy+dy);
+    }
+    fclose(f);
+}
+static void glow_update(void)
+{
+    float view[3],global[3],local[3],d,best_d[GLOW_DRAW_MAX],dx,dy,dz,range,half;
+    int best[GLOW_DRAW_MAX],found=0,i,j,most,cx,cy,frame;
+    if(cl.worldmodel!=(model_t *)glow_world){glow_world=cl.worldmodel;glow_model=NULL;glow_sprite_tried=0;glow_cell_valid=0;}
+    if(!glow_sprite_tried){
+        FILE *f=NULL;
+        glow_sprite_tried=1;
+        COM_FOpenFile(GLOW_SPRITE,&f);      /* no plume without the baked sprite */
+        if(f){fclose(f);glow_model=Mod_ForName(GLOW_SPRITE,false);}
+    }
+    if(!glow_model)return;
+    most=(int)aw_glow_draw.value;if(most>GLOW_DRAW_MAX)most=GLOW_DRAW_MAX;
+    if(most<=0)return;
+    range=aw_glow_range.value;if(!(range>=256))range=256;if(range>8192)range=8192;
+    VectorCopy(r_refdef.vieworg,view);
+    if(!AW_WorldToSource(sv.name,view,global))return;
+    cx=(int)floor(global[0]/8192.0);cy=(int)floor(global[1]/8192.0);
+    if(!glow_cell_valid || cx!=glow_cell[0] || cy!=glow_cell[1])glow_load(cx,cy);
+    for(i=0;i<glow_count;i++){
+        dx=(glows[i].origin[0]-global[0])*0.25f;dy=(glows[i].origin[1]-global[1])*0.25f;dz=(glows[i].origin[2]-global[2])*0.25f;
+        half=glows[i].width*0.125f;                              /* half the plume's width, local units */
+        if(dx*vpn[0]+dy*vpn[1]+dz*vpn[2]<-half)continue;          /* wholly behind the view */
+        d=dx*dx+dy*dy+dz*dz;
+        if(!(d<range*range))continue;
+        if(AW_ObjectDisabled(glows[i].reference))continue;      /* its emitter was disabled (or never placed) */
+        for(j=found<most?found++:most;j>0 && best_d[j-1]>d;j--)
+            if(j<most){best_d[j]=best_d[j-1];best[j]=best[j-1];}
+        if(j<most){best_d[j]=d;best[j]=i;}
+    }
+    for(j=0;j<found;j++){
+        glow_t *g=&glows[best[j]];
+        if(!AW_SourceToWorld(sv.name,g->origin,local))continue;
+        {double u=realtime*GLOW_FPS;frame=g->frame0+(int)(((long)u+g->phase)%g->frames);}
+        if(!AW_FxSprite(glow_model,local,g->width*0.25f,frame))return;   /* the frame's entities used up */
+    }
+}
+
 void AW_AtmosUpdate(void)
 {
     int bits=(int)aw_atmos.value;
     if(cls.state!=ca_connected || !sv.active || !cl.worldmodel || !R_SkyExterior()){precip_last=-1;return;}
     if(bits&ATMOS_PRECIP)precip_update();else precip_last=-1;
     if(bits&ATMOS_SMOKE)smoke_update();
+    if(aw_glow.value)glow_update();
 }
 void AW_AtmosInit(void)
 {
     Cvar_RegisterVariable(&aw_atmos);
+    Cvar_RegisterVariable(&aw_glow);
+    Cvar_RegisterVariable(&aw_glow_draw);
+    Cvar_RegisterVariable(&aw_glow_range);
+    AW_CurtainInit();      /* the Ghostfence curtain's own scroll (aw_curtain.c) */
 }

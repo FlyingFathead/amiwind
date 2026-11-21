@@ -9,7 +9,7 @@
 | Where | Old Mournhold: Forgotten Sewer (Tribunal); the script engine's SetPos |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.68-dev1 (last seen) |
+| Persists in | fixed in v0.0.68-dev2 |
 | Severity | medium: the nine crates on the trap door never float, so the room does not look or play as in the original once the cranks raise the water |
 | Family | Game logic (QuakeC) and saves (`game-logic`) |
 | Playtest version | v0.0.68-dev1 |
@@ -28,11 +28,15 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.67 (cd7cb3e0) | 2026-11-20 | gate 12280 of the planning item SETPOS-MOVER-NO-ENTITY-68 | SetPos moves a scripted object the world draws without its own entity, and GetPos reads where it stands now: the floating crates of Old Mournhold's Forgotten Sewer ride the water (seen in play: 397.5 at level 400, back at 34 when drained). |
+| confirmed in play | an emulator session | v0.0.68-dev2 (the Old Mournhold levers image with the engine and script file of gates 12280 and 12281) | 2026-11-20 | the water journey, runs 4 and 6, at 32 MB Fast: its stills and console log | A script's SetPos moves an object the world draws without its own entity, so the floating crates of Old Mournhold's Forgotten Sewer ride the water. |
+| shipped | the v0.0.68-dev2 snapshot build | v0.0.68-dev2 (ef709f6be, build 2026_11_21_v0.0.68-dev2_full-dev2_ef709f6) | 2026-11-21 | the delivered build holds the commit (gate 12133) | A script's SetPos moves an object the world draws without its own entity, so the floating crates of Old Mournhold's Forgotten Sewer ride the water. |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-20: reported in v0.0.68-dev1
 - 2026-11-20: fixed in source: a gated commit, v0.0.67 (cd7cb3e0); gate 12280 of the planning item SETPOS-MOVER-NO-ENTITY-68: SetPos moves a scripted object the world draws without its own entity, and GetPos reads where it stands now: the floating crates of Old Mournhold's Forgotten Sewer ride the water (seen in play: 397.5 at level 400, back at 34 when drained).
+- 2026-11-20: confirmed in play: an emulator session, v0.0.68-dev2 (the Old Mournhold levers image with the engine and script file of gates 12280 and 12281); the water journey, runs 4 and 6, at 32 MB Fast: its stills and console log: A script's SetPos moves an object the world draws without its own entity, so the floating crates of Old Mournhold's Forgotten Sewer ride the water.
+- 2026-11-21: shipped: the v0.0.68-dev2 snapshot build, v0.0.68-dev2 (ef709f6be, build 2026_11_21_v0.0.68-dev2_full-dev2_ef709f6); the delivered build holds the commit (gate 12133): A script's SetPos moves an object the world draws without its own entity, so the floating crates of Old Mournhold's Forgotten Sewer ride the water.
 
 <!-- END GENERATED TIMELINE -->
 

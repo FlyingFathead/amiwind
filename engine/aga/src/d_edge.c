@@ -40,6 +40,10 @@ extern void			R_TransformFrustum (void);
 
 vec3_t		transformed_modelorg;
 
+/* GHOSTFENCE-PARTICLES-NOT-DRAWN-68 (aw_curtain.c sets it; NULL in fixtures): the block a turbulent surface's texture
+ * is drawn from straight instead (the Ghostfence curtain's composed layers with aw_curtain 1), or NULL as before */
+unsigned char *(*aw_curtain_block) (texture_t *tx);
+
 /* Fog and distance culling are independent. Uncovered exterior spans must
  * sample the current sky, not the beige diagnostic clear colour. This does not
  * extend the terrain draw distance or change turbulent-water rendering. */
@@ -263,12 +267,16 @@ void D_DrawSurfaces (void)
 			}
 			else if (s->flags & SURF_DRAWTURB)
 			{
+				unsigned char *own;
 				pface = s->data;
 				miplevel = 0;
 				cacheblock = (pixel_t *)
 						((byte *)pface->texinfo->texture +
 						pface->texinfo->texture->offsets[0]);
 				cachewidth = 64;
+				own = aw_curtain_block ? aw_curtain_block (pface->texinfo->texture) : NULL;
+				if (own)
+					cacheblock = (pixel_t *)own;
 
 				if (s->insubmodel)
 				{
@@ -288,7 +296,16 @@ void D_DrawSurfaces (void)
 	#ifndef USE_FAST_RECIPROCAL
 			D_SetupFixedPointGradients();
 #endif
-				Turbulent8 (s->spans);
+				if (own)
+				{
+					/* the curtain's composed layers move by themselves: drawn straight (the still table) */
+					int *turb = r_turb_sintable;
+					r_turb_sintable = stillturbtable;
+					Turbulent8 (s->spans);
+					r_turb_sintable = turb;
+				}
+				else
+					Turbulent8 (s->spans);
 				D_DrawZSpans (s->spans);
 
 				if (s->insubmodel)

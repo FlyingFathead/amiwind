@@ -9,7 +9,7 @@
 | Where | the scripts' and the console's ModRegion (the region weather's scripted changes) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.68-dev1 (last seen) |
+| Persists in | fixed in v0.0.68-dev2 |
 | Severity | low: no line of the three masters is affected (they give eight chances of 0 to 100 to regions with no snow or blizzard chance); a ModRegion typed on the console with fewer chances, or on a Solstheim region once the image has it, gave other weather than OpenMW |
 | Family | Game logic (QuakeC) and saves (`game-logic`) |
 | Playtest version | v0.0.68-dev1 |
@@ -29,12 +29,16 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.67 (908c9003) | 2026-11-20 | gate 12260 of the planning item MODREGION-KEEPS-UNGIVEN-CHANCES-68 | ModRegion replaces the region's whole list of chances: the weathers past the given ones get none and each chance is kept within 0 to 100, as OpenMW does |
 | fixed in source | a gated commit | v0.0.68-dev2 (908c9003f) | 2026-11-20 | gate 12260 | ModRegion with fewer than ten chances leaves the other weathers no chance and keeps each chance within 0 to 100, as OpenMW does. |
+| confirmed by a test | a test module | v0.0.68-dev2 (908c9003f) | 2026-11-20 | gate 12260 | ModRegion with fewer than ten chances leaves the other weathers no chance and keeps each chance within 0 to 100, as OpenMW does. |
+| shipped | the v0.0.68-dev2 snapshot build | v0.0.68-dev2 (ef709f6be, build 2026_11_21_v0.0.68-dev2_full-dev2_ef709f6) | 2026-11-21 | the delivered build holds the commit (gate 12133) | ModRegion with fewer than ten chances leaves the other weathers no chance and keeps each chance within 0 to 100, as OpenMW does. |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-20: reported in v0.0.68-dev1
 - 2026-11-20: fixed in source: a gated commit, v0.0.67 (908c9003); gate 12260 of the planning item MODREGION-KEEPS-UNGIVEN-CHANCES-68: ModRegion replaces the region's whole list of chances: the weathers past the given ones get none and each chance is kept within 0 to 100, as OpenMW does
 - 2026-11-20: fixed in source: a gated commit, v0.0.68-dev2 (908c9003f); gate 12260: ModRegion with fewer than ten chances leaves the other weathers no chance and keeps each chance within 0 to 100, as OpenMW does.
+- 2026-11-20: confirmed by a test: a test module, v0.0.68-dev2 (908c9003f); gate 12260: ModRegion with fewer than ten chances leaves the other weathers no chance and keeps each chance within 0 to 100, as OpenMW does.
+- 2026-11-21: shipped: the v0.0.68-dev2 snapshot build, v0.0.68-dev2 (ef709f6be, build 2026_11_21_v0.0.68-dev2_full-dev2_ef709f6); the delivered build holds the commit (gate 12133): ModRegion with fewer than ten chances leaves the other weathers no chance and keeps each chance within 0 to 100, as OpenMW does.
 
 <!-- END GENERATED TIMELINE -->
 

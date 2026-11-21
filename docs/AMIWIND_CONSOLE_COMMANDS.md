@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.68-dev3._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.68-dev4._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -54,7 +54,7 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg daycycle gallery` | - | [here/off] (eight-stage camera tour; here keeps this view; Esc returns) |
 | `dbg dbattack` | - | (Tribunal; where Rest is offered) an 8-hour rest on which Tribunal's dbAttackScript attacks for certain: its roll made sure for that rest, the real path runs (asleep, its PlaceAtPC puts the Dark Brotherhood assassin by you, WakeUpPC, the fight, DBAttack 1); each step and any failure on the console |
 | `dbg dbgtorch` | `dbg debugtorch`, `dbg gear`, `dbg give dbgtorch`, `dbg give debugtorch`, `dbg give spell`, `dbg give weapons`, `dbg inventory grant`, `dbg torch`, `dbg weapon` | same as torch: one more debug torch in the inventory, with a message |
-| `dbg demowind` | - | [on / off / next / prev / effect 1-2 / dist 0-7 / status] DemoWind (docs/DEMOWIND.md): the effects test kit, fullscreen, no world; each effect with its ms a frame and bytes on screen; Left/Right effect, Up/Down distance to Red Mountain, Esc off |
+| `dbg demowind` | - | [on / off / next / prev / effect 1-4 / dist 0-7 / status] DemoWind (docs/DEMOWIND.md): the effects test kit, fullscreen, no world; each effect with its ms a frame and bytes on screen (1 and 2 the skies, 3 and 4 the Ghostfence curtain rippling as before and with the original's layers); Left/Right effect, Up/Down distance to Red Mountain, Esc off |
 | `dbg give money` | `dbg give coin`, `dbg give rich` | [N] N gold (default 1000000; at most 999999999, the gold limit, which every gold gain keeps to), saved like any grant, with a message |
 | `dbg halloween` | - | [dagoth / skeletons / bench [skeletons] / fps on/off / camera wide/director / stop / status] Halloween scene (docs/HALLOWEEN.md, an image with the cast): skeletons, Desele's dancers, Dagoth Ur dance on the beat; dagoth (default) or skeletons alone; bench: the standard benchmark, one result line |
 | `dbg halloweentest` | - | [same words as halloween] the Halloween scene with the FPS counter on (bottom left) |
@@ -108,6 +108,7 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg crosshair` | `dbg crosshairs` | [on/off or 1/0; no argument toggles / colour NAME / shape NAME / style] show the crosshair (saved; default on; also Options > Prefs); colours Warm white (default), Yellow, Green, Blue; shapes Cross (default), Open cross, Small cross, Dot (saved); a number or a name's start is enough, no name lists them; style prints all three |
 | `dbg cull` | - | far detail (saved; also Options > Video > Far detail): 1 Full (everything to the fog), 3 Light, 4 Strong (default; saves from before v0.0.42 keep Full), 6 Strong + small faces (distant models drop out sooner: faster); also 0 none, 2 fog-exact (same picture as 1), 5 small faces only, 7 debug view; on = 1, off = 0; +8 fog rule, +16 cut groups (see those) |
 | `dbg cursortype` | - | [1 / 2; no argument shows the value] the mouse cursor in every window (saved; also Options > Prefs > Mouse cursor): 2 Morrowind's own pointer from your game data (default), 1 AmiWind's drawn cursor; an image without the original's pointer always shows AmiWind's |
+| `dbg curtain` | - | [0 / 1; no argument shows the value] the Ghostfence curtain (default 0; not saved): 0 its texture ripples (Quake's warp, as before); 1 the original's three layers slide at their own speeds and sway, composed into one glowing texture with a slow pulse (needs id1/world/curtain.awc, written by the builder) |
 | `dbg cut groups` | - | [on/off, 1/0; no argument toggles] whole-structure cuts (saved as aw_cull + 16; default off until the in-game A/B): the pieces of one long structure (walkways, town walls, bridges, the Ghostfence, hillside rocks; the frame map's .cut file) are drawn, fogged and left out together, tested on the structure's box; 0 each piece on its own |
 | `dbg draw distance` | `dbg drawdistance`, `dbg fog distance` | [100..4096 local units; default 300] |
 | `dbg fog` | - | on/off or 1/0 (default on: exterior and interior fog; the console value 2 = exterior fog only, interiors without their cell fog as before) |
@@ -116,6 +117,9 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg fog location` | `dbg foglocation` | 1/0 places in id1/world/fog-locations.txt (the HUD title's place or region, or the map) set their own day/night fog distance (Ald'ruhn 300, Balmora 300 day, 250 night; default 1 on) |
 | `dbg fog rule` | - | [on/off, 1/0; no argument toggles] no distance cut before the fog is opaque (saved as aw_cull + 8; default off until the in-game A/B): the Light/Strong far detail cut-offs and the small-faces step start at the fog distance, so nothing pops out of clear air; 0 the cut-offs as before (faster) |
 | `dbg ghostfence` | - | [on/off, true/false or 1/0] animated scrolling textures (default on; not saved): on = the Ghostfence curtain, waterfalls and other turbulent textures ripple over time; off = drawn straight and still (unlit, as they are built; also stills water in interiors) |
+| `dbg glow` | - | [on/off, true/false or 1/0] the glow of the Ghostfence pylons and the plume of the blight cloud over Dagoth Ur (default off until its frame cost is measured; not saved): each emitter of the original drawn as one sprite baked from its own particle system, hidden when a script disables it |
+| `dbg glow draw` | - | [0..16; default 8] how many glowing plumes are drawn at once, the nearest in front (not saved) |
+| `dbg glow range` | - | [256..8192 local units; default 2048] how far a glowing plume is drawn (not saved) |
 | `dbg killhud` | `dbg photomode` | [on/off, true/false or 1/0; no argument toggles; hud: Ctrl+Alt+H] clean shots: hides bars, crosshair, hands, prompts, names, subtitles and overlays; full view; fog off and free camera (aw_photomode_nofog, aw_photomode_noclip, aw_photomode_hands); Ctrl+F fog, Ctrl+H dbg hud; off returns to the start point (not saved; Options > Video > Photo mode) |
 | `dbg land fill` | `dbg landfill` | 1/0 (default 1): Land Fill Independence v1, enabled LAND passes with fog on or off; 0 disables for A/B |
 | `dbg land method` | - | 1/0 legacy resident LAND rasterizer (default 0, experimental); separate from the CHIM far layer |

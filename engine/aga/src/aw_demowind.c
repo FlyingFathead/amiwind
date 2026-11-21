@@ -16,9 +16,18 @@
  *     [Weather Clear] Sky Day 95,135,203, Fog Day 206,227,255, Sun Day 255,252,238, Cloud Speed 1.25.
  * The textures are our own, made here from seeded value noise (no picture from any game). A step change bakes the
  * palette shift into the two index tiles (32,768 table lookups, once), so the per-frame work of the two effects is
- * the same: the cost shown is measured, never estimated. Nothing is resident until dbg demowind on; off frees it. */
+ * the same: the cost shown is measured, never estimated. Nothing is resident until dbg demowind on; off frees it.
+ *
+ * Effects 3 and 4 (GHOSTFENCE-PARTICLES-NOT-DRAWN-68): the Ghostfence curtain filling the whole screen, the worst case
+ * of the curtain in view, each pixel through the world's own span loop for it (d_scan.c D_DrawTurbulent8Span, on a
+ * wall facing the view, the 64 x 64 texture once every DW_CURTAIN_REPEAT pixels): 3 the rippling of today (Quake's
+ * turbulence, the curtain's composed layers held at time 0 as its texture), 4 the original's three layers composed
+ * every frame (aw_curtain_rules.c AW_CurtainCompose and AW_CurtainBlock, as aw_curtain 1 draws them) and drawn
+ * straight (the still table). Their difference is the compose; both need the image's id1/world/curtain.awc. */
 #include "quakedef.h"
+#include "r_local.h"
 #include "aw_tryalloc.h"
+#include "aw_curtain.h"
 
 byte R_SkyNearest(int r,int g,int b);	/* r_sky.c */
 
@@ -26,11 +35,16 @@ byte R_SkyNearest(int r,int g,int b);	/* r_sky.c */
 #define DW_TILE (DW_SIZE*DW_SIZE)
 #define DW_STEPS 8
 #define DW_AVG 32
-#define DW_EFFECTS 2
+#define DW_EFFECTS 4
+#define DW_CURTAIN_RIPPLE 2		/* effect 3 */
+#define DW_CURTAIN_LAYERS 3		/* effect 4 */
+#define DW_CURTAIN_REPEAT 80
+#define DW_CURTAIN_BYTES (AW_CURTAIN_SIZE*AW_CURTAIN_SIZE+AW_CURTAIN_DRAWN*AW_CURTAIN_DRAWN)
 
 typedef struct {
     byte *noise_back,*noise_cloud;	/* our own texture sources, 0..255 */
     byte *back,*cloud,*tile;		/* palette-index tiles: back layer, cloud layer (0 = hole), the composed sky */
+    byte *curtain;			/* the composed curtain and the 64 x 64 block drawn from it */
     byte lut_back[64],lut_cloud[64];
     int on,effect,step,baked_effect,baked_step,frames;
     double start,sum,avg[DW_EFFECTS],bake_ms;
@@ -38,7 +52,8 @@ typedef struct {
     float speed,coverage;
 } dw_t;
 static dw_t dw;
-static const char *dw_names[DW_EFFECTS]={"PLAIN SKY (CLEAR WEATHER)","RED MOUNTAIN SKY (BLIGHT)"};
+static const char *dw_names[DW_EFFECTS]={"PLAIN SKY (CLEAR WEATHER)","RED MOUNTAIN SKY (BLIGHT)",
+    "GHOSTFENCE CURTAIN (RIPPLE, AS BEFORE)","GHOSTFENCE CURTAIN (THE ORIGINAL'S LAYERS)"};
 static const char *dw_places[DW_STEPS]={"Seyda Neen","Ascadian Isles","Ashlands edge","Ald'ruhn",
     "Ghostfence outside","Ghostfence","inner slopes","the crater"};
 
@@ -107,6 +122,11 @@ static void dw_bake(void)
         if(v<thr)dw.cloud[i]=0;
         else{v=(v-thr)*63*3/(255-thr);if(v>63)v=63;dw.cloud[i]=dw.lut_cloud[v];if(!dw.cloud[i])dw.cloud[i]=dw.lut_cloud[63];}
     }
+    if(dw.effect==DW_CURTAIN_RIPPLE && dw.curtain && AW_CurtainTable()){
+        /* the rippling curtain's texture: the composed layers held at time 0 */
+        AW_CurtainCompose(AW_CurtainTable(),0,dw.curtain);
+        AW_CurtainBlock(dw.curtain,AW_CURTAIN_SIZE,dw.curtain+AW_CURTAIN_SIZE*AW_CURTAIN_SIZE);
+    }
     dw.baked_effect=dw.effect;dw.baked_step=dw.step;
     dw.bake_ms=(Sys_FloatTime()-t0)*1000.0;
 }
@@ -147,24 +167,50 @@ static void dw_draw_sky(double time)
     }
 }
 
-static unsigned long dw_bytes(void) {return 5UL*DW_TILE+sizeof dw.lut_back+sizeof dw.lut_cloud;}
+/* effects 3 and 4: the curtain over the whole screen, each pixel as d_scan.c D_DrawTurbulent8Span draws it; 0 without
+ * the image's curtain table */
+static int dw_curtain(double time)
+{
+    const aw_curtain_t *c=AW_CurtainTable();
+    byte *composed=dw.curtain,*block=dw.curtain+AW_CURTAIN_SIZE*AW_CURTAIN_SIZE,*dest;
+    int x,y,s,t,step=(AW_CURTAIN_DRAWN<<16)/DW_CURTAIN_REPEAT,sturb,tturb,*turb;
+    if(!c)return 0;
+    if(dw.effect==DW_CURTAIN_LAYERS){
+        AW_CurtainCompose(c,(unsigned long)(time*1000.0),composed);
+        AW_CurtainBlock(composed,AW_CURTAIN_SIZE,block);
+        turb=stillturbtable;
+    }else turb=sintable+((int)(time*SPEED)&(CYCLE-1));
+    for(y=0;y<(int)vid.height;y++){
+        dest=vid.buffer+y*vid.rowbytes;s=0;t=y*step;
+        for(x=0;x<(int)vid.width;x++){
+            sturb=((s+turb[(t>>16)&(CYCLE-1)])>>16)&63;
+            tturb=((t+turb[(s>>16)&(CYCLE-1)])>>16)&63;
+            *dest++=block[(tturb<<6)+sturb];
+            s+=step;
+        }
+    }
+    return 1;
+}
+
+static unsigned long dw_bytes(void) {return 5UL*DW_TILE+DW_CURTAIN_BYTES+sizeof dw.lut_back+sizeof dw.lut_cloud;}
 static void dw_free(void)
 {
-    free(dw.noise_back);free(dw.noise_cloud);free(dw.back);free(dw.cloud);free(dw.tile);
-    dw.noise_back=dw.noise_cloud=dw.back=dw.cloud=dw.tile=NULL;dw.on=0;
+    free(dw.noise_back);free(dw.noise_cloud);free(dw.back);free(dw.cloud);free(dw.tile);free(dw.curtain);
+    dw.noise_back=dw.noise_cloud=dw.back=dw.cloud=dw.tile=dw.curtain=NULL;dw.on=0;
 }
 static int dw_start(void)
 {
     if(dw.on)return 1;
     dw.noise_back=AW_TryMalloc(DW_TILE);dw.noise_cloud=AW_TryMalloc(DW_TILE);
     dw.back=AW_TryMalloc(DW_TILE);dw.cloud=AW_TryMalloc(DW_TILE);dw.tile=AW_TryMalloc(DW_TILE);
-    if(!dw.noise_back || !dw.noise_cloud || !dw.back || !dw.cloud || !dw.tile){
+    dw.curtain=AW_TryMalloc(DW_CURTAIN_BYTES);
+    if(!dw.noise_back || !dw.noise_cloud || !dw.back || !dw.cloud || !dw.tile || !dw.curtain){
         dw_free();Con_Printf("DemoWind: not enough memory for %lu bytes.\n",dw_bytes());return 0;
     }
     dw_make_noise();
     dw.on=1;dw.baked_effect=dw.baked_step=-1;dw.start=Sys_FloatTime();dw.frames=0;dw.sum=0;
     memset(dw.logged,0,sizeof dw.logged);
-    Con_Printf("DemoWind on: %lu bytes (5 tiles of 128x128, 2 colour tables of 64). Keys: Left/Right effect, Up/Down distance, Esc off.\n",dw_bytes());
+    Con_Printf("DemoWind on: %lu bytes (5 tiles of 128x128, the curtain's 32x32 and 64x64, 2 colour tables of 64). Keys: Left/Right effect, Up/Down distance, Esc off.\n",dw_bytes());
     return 1;
 }
 static void dw_select(int effect,int step)
@@ -183,8 +229,15 @@ void AW_DemoWindDraw(void)
     if(!dw.on || !vid.buffer)return;
     if(dw.baked_effect!=dw.effect || dw.baked_step!=dw.step)dw_bake();
     t0=Sys_FloatTime();
-    dw_compose(t0-dw.start);
-    dw_draw_sky(t0-dw.start);
+    if(dw.effect>=DW_CURTAIN_RIPPLE){
+        if(!dw_curtain(t0-dw.start)){
+            memset(vid.buffer,0,vid.rowbytes*vid.height);
+            Draw_String(4,44,"NO id1/world/curtain.awc IN THIS IMAGE");
+        }
+    }else{
+        dw_compose(t0-dw.start);
+        dw_draw_sky(t0-dw.start);
+    }
     ms=(Sys_FloatTime()-t0)*1000.0;
     dw.sum+=ms;dw.frames++;
     if(dw.frames==DW_AVG){
@@ -197,10 +250,11 @@ void AW_DemoWindDraw(void)
     }
     sprintf(line,"DEMOWIND %d/%d: %s",dw.effect+1,DW_EFFECTS,dw_names[dw.effect]);Draw_String(4,y,line);y+=10;
     if(dw.effect==1)sprintf(line,"DISTANCE %d/%d: %s",dw.step,DW_STEPS-1,dw_places[dw.step]);
-    else strcpy(line,"DISTANCE: none (the plain sky)");
+    else strcpy(line,dw.effect>=DW_CURTAIN_RIPPLE?"DISTANCE: none (the curtain fills the screen)":"DISTANCE: none (the plain sky)");
     Draw_String(4,y,line);y+=10;
     sprintf(line,"%.2f MS/FRAME  CLOUD SPEED %.2f",dw.avg_frames[dw.effect]?dw.avg[dw.effect]:ms,dw.speed);Draw_String(4,y,line);y+=10;
     if(dw.avg_frames[0] && dw.avg_frames[1]){sprintf(line,"PLAIN %.2f MS  RED %.2f MS",dw.avg[0],dw.avg[1]);Draw_String(4,y,line);y+=10;}
+    if(dw.avg_frames[2] && dw.avg_frames[3]){sprintf(line,"CURTAIN RIPPLE %.2f MS  LAYERS %.2f MS",dw.avg[2],dw.avg[3]);Draw_String(4,y,line);y+=10;}
     sprintf(line,"%lu BYTES  BAKE %.2f MS",dw_bytes(),dw.bake_ms);Draw_String(4,y,line);y+=10;
     Draw_String(4,vid.height-34,"<- -> EFFECT  UP/DOWN DISTANCE  ESC OFF");
     scr_copyeverything=1;
@@ -225,9 +279,10 @@ static void dw_command(void)
     if(!Q_strcasecmp((char *)a,"on") || !Q_strcasecmp((char *)a,"start")){if(dw_start())dw_select(dw.effect,dw.step);return;}
     if(!Q_strcasecmp((char *)a,"off") || !Q_strcasecmp((char *)a,"stop")){dw_free();Con_Printf("DemoWind off.\n");return;}
     if(!Q_strcasecmp((char *)a,"status")){
-        Con_Printf("DemoWind %s: effect %d (%s), distance step %d (%s); plain %.2f ms, red %.2f ms (averages of %d frames); %lu bytes; bake %.2f ms\n",
-                   dw.on?"on":"off",dw.effect+1,dw_names[dw.effect],dw.step,dw_places[dw.step],dw.avg[0],dw.avg[1],DW_AVG,
-                   dw_bytes(),dw.bake_ms);
+        Con_Printf("DemoWind %s: effect %d (%s), distance step %d (%s); plain %.2f ms, red %.2f ms, curtain ripple %.2f ms, "
+                   "curtain layers %.2f ms (averages of %d frames); %lu bytes; bake %.2f ms\n",
+                   dw.on?"on":"off",dw.effect+1,dw_names[dw.effect],dw.step,dw_places[dw.step],dw.avg[0],dw.avg[1],
+                   dw.avg[2],dw.avg[3],DW_AVG,dw_bytes(),dw.bake_ms);
         return;
     }
     if(!dw.on && !dw_start())return;

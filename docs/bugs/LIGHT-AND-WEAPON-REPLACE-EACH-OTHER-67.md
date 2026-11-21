@@ -9,7 +9,7 @@
 | Where | The held-item logic (the light in the left hand, the weapon in the right), the first-person hands, the third-person held models and the inventory's character preview |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.67 (last seen) |
+| Persists in | fixed in v0.0.68-dev2 |
 | Severity | high: the player loses the hands or the held light from view, and the equipped view no longer shows what is worn |
 | Family | First-person hands and torch (`torch-hands`) |
 | Playtest version | v0.0.67 |
@@ -31,6 +31,7 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | fixed in source | a gated commit | v0.0.67 (2ebc3456) | 2026-11-20 | gate 12220 of the planning item LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67 | A light and a one-handed weapon are held together in both views and the inventory picture; F lights the light, V after F puts it out or relights it with a notice; seen in play on the v0.0.68-dev1 image. |
 | fixed in source | a gated commit | v0.0.68-dev2 (2ebc34562) | 2026-11-20 | gate 12220 | A light and a one-handed weapon can be held together, both are drawn in first and third person and in the inventory preview, and neither replaces the other. |
 | confirmed in play | an emulator session | v0.0.68-dev1 image with the engine of 2ebc34562 | 2026-11-20 | a journey session at 32 MB Fast, its stills and console log | A light and a one-handed weapon can be held together, both are drawn in first and third person and in the inventory preview, and neither replaces the other. |
+| shipped | the v0.0.68-dev2 snapshot build | v0.0.68-dev2 (ef709f6be, build 2026_11_21_v0.0.68-dev2_full-dev2_ef709f6) | 2026-11-21 | the delivered build holds the commit (gate 12133) | A light and a one-handed weapon can be held together, both are drawn in first and third person and in the inventory preview, and neither replaces the other. |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
@@ -38,6 +39,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-20: fixed in source: a gated commit, v0.0.67 (2ebc3456); gate 12220 of the planning item LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67: A light and a one-handed weapon are held together in both views and the inventory picture; F lights the light, V after F puts it out or relights it with a notice; seen in play on the v0.0.68-dev1 image.
 - 2026-11-20: fixed in source: a gated commit, v0.0.68-dev2 (2ebc34562); gate 12220: A light and a one-handed weapon can be held together, both are drawn in first and third person and in the inventory preview, and neither replaces the other.
 - 2026-11-20: confirmed in play: an emulator session, v0.0.68-dev1 image with the engine of 2ebc34562; a journey session at 32 MB Fast, its stills and console log: A light and a one-handed weapon can be held together, both are drawn in first and third person and in the inventory preview, and neither replaces the other.
+- 2026-11-21: shipped: the v0.0.68-dev2 snapshot build, v0.0.68-dev2 (ef709f6be, build 2026_11_21_v0.0.68-dev2_full-dev2_ef709f6); the delivered build holds the commit (gate 12133): A light and a one-handed weapon can be held together, both are drawn in first and third person and in the inventory preview, and neither replaces the other.
 
 <!-- END GENERATED TIMELINE -->
 

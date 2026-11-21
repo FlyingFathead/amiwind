@@ -64,7 +64,10 @@ def pooled_units(pool):
             # function cannot be pickled by name (the v0.0.68-dev3 build stopped on that in the module's world
             # stage: SOL-MODULE-CACHE-NOT-PICKLED-68). In a worker it is the plain pooled cache it is, with the same
             # folder, pool and state; its counts stay in that worker, as a pooled cache's do in a CHIMport run.
-            return (PooledUnitCache, (self.folder, self.pool), self.__dict__)
+            # With a mesh method set installed it is the installing cache, so an area worker (spawned) installs the
+            # same set before it prepares its area (chim.method_sets.cache_reduce; SOL-GLACIER-METHODS-AB-COMPARE-68)
+            from chim import method_sets
+            return method_sets.cache_reduce(PooledUnitCache, (self.folder, self.pool), self.__dict__)
 
     chim.build.UnitCache = ModuleUnitCache
     return made
@@ -92,6 +95,10 @@ def main(argv=None):
         while str(path) in sys.path:
             sys.path.remove(str(path))
         sys.path.insert(0, str(path))
+    # the mesh method set (config/mesh-method-sets.json, chim.method_sets): this runner's own option, for this
+    # process only, never the converter's (SOL-GLACIER-METHODS-AB-COMPARE-68)
+    from chim import method_sets
+    method_set, argv = method_sets.take(argv)
     from mwad.masters import MASTERS_ENV
     # the module's own masters, for this process and the workers it starts (they inherit the environment)
     os.environ[MASTERS_ENV] = ','.join(MASTERS)
@@ -100,10 +107,17 @@ def main(argv=None):
     made = pooled_units(pool) if pool is not None else None
     if made is not None:
         print('MODULE bloodmoon-solstheim: units shared through the storage pool %s' % pool, flush=True)
+    restore = None
+    if method_set:
+        # the set's report (method C's figures per unit) goes into the converter's output folder
+        record, restore = method_sets.install(method_set, report=method_sets.out_folder(argv))
+        print('MODULE bloodmoon-solstheim: %s' % method_sets.line(record), flush=True)
     sys.argv = [str(Path(__file__).resolve().parent / 'chim_build.py'), *argv]
     try:
         return chim_build.main()
     finally:
+        if restore is not None:
+            restore()
         if made is not None:
             print(pool_line(made), flush=True)
 

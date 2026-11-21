@@ -1,6 +1,6 @@
 # DemoWind: the effects test kit
 
-_Last updated with AmiWind v0.0.55 (29 October 2026)._
+_Last updated with AmiWind v0.0.68 (21 November 2026)._
 
 DemoWind is a test kit of cheap animated effects: no world and no game, only the effect, fullscreen on AGA, browsed
 one after another, each with its cost on screen (milliseconds a frame and bytes). Effects that win go into the game.
@@ -10,7 +10,7 @@ one after another, each with its cost on screen (milliseconds a frame and bytes)
 - In any image: `dbg demowind` (or `dbg demowind on`). The world is not drawn while it is on.
 - The MiniWind preset `--miniwind-demowind` boots straight into it (`config/recipes/miniwind/demowind.json`).
 - Keys: Right / N next effect, Left / P previous, Up / Down the distance step, Esc off.
-- Console: `dbg demowind next`, `prev`, `effect 1-2`, `dist 0-7`, `status`, `off`.
+- Console: `dbg demowind next`, `prev`, `effect 1-4`, `dist 0-7`, `status`, `off`.
 - Every effect logs one `DEMOWIND COST` line per distance step after 32 frames: the average milliseconds a frame,
   the bytes, the bake time and the screen size. Run it at 32 MB Fast RAM, the game's requirement.
 
@@ -25,9 +25,18 @@ one after another, each with its cost on screen (milliseconds a frame and bytes)
    own weather data: the Red Mountain region's weather is Blight (100 %), and the Blight and Ash Storm weathers give
    the sky, fog and sun colours and the cloud speed (9 against Clear's 1.25).
 
+3. **The Ghostfence curtain, rippling**: the curtain as the game draws it by default, filling the whole screen (the
+   worst case of the curtain in view): Quake's turbulence over the curtain's texture, each pixel through the world's
+   own span loop for it.
+4. **The Ghostfence curtain, the original's layers**: the curtain's three layers of the original (two of one texture at
+   two speeds, one of the other, each swaying) composed into one texture every frame and drawn straight, as the game
+   draws it with `dbg curtain 1`. The difference between effects 3 and 4 is the cost of composing the layers.
+
 Effect 2 is in the game from v0.0.55: the sky turns red by the distance to Red Mountain
-([the Red Mountain sky](DAY_NIGHT_AND_SKY.md#region-weather-20-october-2026)).
+([the Red Mountain sky](DAY_NIGHT_AND_SKY.md#region-weather-20-october-2026)). Effects 3 and 4 need the image's curtain
+table (`id1/world/curtain.awc`, written by the builder); without it they say so.
 
 The textures are drawn by the engine from seeded noise when DemoWind starts: our own, no picture from any game.
 A distance step bakes the new palette into the two layer tiles once, so the frame work of both effects is the same;
-the numbers on screen are measured, not estimated. DemoWind allocates 81,920 bytes on start and frees them on Esc.
+the numbers on screen are measured, not estimated. DemoWind allocates 87,040 bytes on start (the five sky tiles and the
+curtain's two) and frees them on Esc.

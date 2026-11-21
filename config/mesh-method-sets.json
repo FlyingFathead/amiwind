@@ -1,0 +1,76 @@
+{
+ "format": "aw-mesh-method-sets-1",
+ "about": "Named mesh method sets for the listed meshes of Solstheim's stages only (the module's world stage, the --chim-sol-test stages and CHIMport runs; tools/chim/method_sets.py). A set names, per listed mesh, the method each part of it is made with; a mesh a set does not name, and every mesh of the base world, is made as today. The set 'baseline' is today's methods. The base world's command, key and output are the same with any set. Methods: C, the placed collision with exact footing (tools/chim/collision_exact.py: the pieces of the faces walkable as placed kept, the other faces as convex proxies, each tested against today's collision top on a grid over the walkable surface and split until it rises no more than the row's rise); D, the drawn mesh by method 2 (tools/model_method2.py, the row as config/model-method-2.json takes it; the collision stays the source mesh's). Lengths are in converter units (one is four game units).",
+ "layers": {
+  "bloodmoon": [
+   "x/bm_ex_iceberg_shard01",
+   "x/bm_ex_iceberg",
+   "x/bm_ex_iceberg_collapsed"
+  ]
+ },
+ "sets": {
+  "baseline": {
+   "about": "today's methods for every listed mesh",
+   "meshes": {}
+  },
+  "C": {
+   "about": "method C alone on the shard and both icebergs: the drawn meshes as today",
+   "meshes": {
+    "x/bm_ex_iceberg_shard01": {
+     "C": {"tolerance": 2.0, "grid": 2.0, "rise": 2.0, "split_min": 4}
+    },
+    "x/bm_ex_iceberg": {
+     "C": {"tolerance": 2.0, "grid": 2.0, "rise": 2.0, "split_min": 4}
+    },
+    "x/bm_ex_iceberg_collapsed": {
+     "C": {"tolerance": 2.0, "grid": 2.0, "rise": 2.0, "split_min": 4}
+    }
+   }
+  },
+  "D": {
+   "about": "method D alone on the shard: its collision as today",
+   "meshes": {
+    "x/bm_ex_iceberg_shard01": {
+     "D": {
+      "kind": "conservative",
+      "method": 2,
+      "panels": "baked",
+      "source_sha256": "4e74bc6330791df08ffa5ecf45bb6393cb53825c7b49eb4c12355ba6d5270544",
+      "recipe": {"settings": {"shapes": {"m0": {"target": 888, "qem_error": 8.0}}}, "source_triangles": 1776,
+                 "expected_triangles": 1302},
+      "source": {"batch": "glacier-compare", "date": "2026-11-21",
+                 "note": "the shard's one material simplified to half its triangles at an error bound of 8 mesh units, with every border vertex, texture seam and extreme locked (the conservative kind)"},
+      "counts": {"triangles": [1776, 1302], "faces_drawn": [1769, 1298]},
+      "ab": {"open_edges": [0, 0], "measured": "21 November 2026, one placement of each copy of the nine glacier cells against today's drawn result: no new open edge, extents and girth 1.0; the texture check in docs/chim/SOLSTHEIM_GLACIER.md"}
+     }
+    }
+   }
+  },
+  "E": {
+   "about": "method C on the shard and both icebergs, and method D on the shard",
+   "meshes": {
+    "x/bm_ex_iceberg_shard01": {
+     "C": {"tolerance": 2.0, "grid": 2.0, "rise": 2.0, "split_min": 4},
+     "D": {
+      "kind": "conservative",
+      "method": 2,
+      "panels": "baked",
+      "source_sha256": "4e74bc6330791df08ffa5ecf45bb6393cb53825c7b49eb4c12355ba6d5270544",
+      "recipe": {"settings": {"shapes": {"m0": {"target": 888, "qem_error": 8.0}}}, "source_triangles": 1776,
+                 "expected_triangles": 1302},
+      "source": {"batch": "glacier-compare", "date": "2026-11-21",
+                 "note": "the shard's one material simplified to half its triangles at an error bound of 8 mesh units, with every border vertex, texture seam and extreme locked (the conservative kind)"},
+      "counts": {"triangles": [1776, 1302], "faces_drawn": [1769, 1298]},
+      "ab": {"open_edges": [0, 0], "measured": "21 November 2026, one placement of each copy of the nine glacier cells against today's drawn result: no new open edge, extents and girth 1.0; the texture check in docs/chim/SOLSTHEIM_GLACIER.md"}
+     }
+    },
+    "x/bm_ex_iceberg": {
+     "C": {"tolerance": 2.0, "grid": 2.0, "rise": 2.0, "split_min": 4}
+    },
+    "x/bm_ex_iceberg_collapsed": {
+     "C": {"tolerance": 2.0, "grid": 2.0, "rise": 2.0, "split_min": 4}
+    }
+   }
+  }
+ }
+}

@@ -33,6 +33,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 - 2026-11-18: reported in v0.0.67-dev2
 - 2026-11-18 14:05 +0200: fixed in source: developer, v0.0.67-dev2 (tools/door_engine_check.py job_lines, tools/expansion_preflight.py module_frame_maps); a door in a frame outside the walked directory gets a row with its reason; the first-minute check builds the image's last tables from the module's frame map names; tests/test_presented_data_stage.py holds both, and the fault as the build met it: a table the image builds last must be tried on a new kind of map before the stages run
+- 2026-11-21 08:13 +0200: seen again in v0.0.68-dev3: Seen again in v0.0.68-dev3: with Solstheim's cells in the image the door audit reports all 95 Solstheim entrances and Mournhold's 28 as not usable, because it runs before the expansions' stores and frame maps are installed and the engine ...
 
 <!-- END GENERATED TIMELINE -->
 

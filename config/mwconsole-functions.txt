@@ -4,6 +4,7 @@ addsoulgem host 2 - ccX
 aiescort host 8 - cffff/l
 aifollow host 10 - cffff/llllllll
 aitravel host 12 - fff/lx
+cellchanged special 18 l -
 centeroncell host 19 - S
 centeronexterior host 20 - ll
 clearforcejump host 23 - -
@@ -21,6 +22,7 @@ disableplayermagic host 36 - -
 disableplayerviewswitch host 37 - -
 disableteleporting host 38 - -
 disablevanitymode host 39 - -
+dontsaveobject special 40 - -
 dropsoulgem host 42 - c
 enablebirthmenu host 44 - -
 enableclassmenu host 45 - -
@@ -46,6 +48,7 @@ face host 66 - ffX
 fadein host 67 - f
 fadeout host 68 - f
 fadeto host 69 - ff
+fall special 70 - -
 fixme host 73 - -
 forcegreeting host 74 - z
 forcejump host 75 - -
@@ -70,6 +73,7 @@ getblightdisease special 93 l -
 getblindness host 94 l -
 getblock actor 0 8 f
 getbluntweapon actor 0 12 f
+getbuttonpressed special 97 l -
 getcastpenalty host 98 l -
 getchameleon host 99 l -
 getcollidingactor host 100 l -
@@ -151,6 +155,7 @@ getresistpoison host 182 l -
 getresistshock host 183 l -
 getrestoration actor 0 23 f
 getscale host 185 f -
+getsecondspassed special 186 f -
 getsecundaphase host 187 l -
 getsecurity actor 0 26 f
 getshortblade actor 0 30 f
@@ -161,6 +166,7 @@ getspeechcraft actor 0 33 f
 getspeed actor 0 4 f
 getspell special 196 l c
 getspellreadied host 198 l -
+getsquareroot special 199 f f
 getstandingactor host 200 l -
 getstandingpc host 201 l -
 getstartingangle host 202 f c
@@ -188,6 +194,7 @@ iswerewolf host 228 l -
 lock special 230 - /l
 loopgroup host 231 - cl/l
 lowerrank host 232 - x
+menumode special 233 l -
 modacrobatics actor 2 28 -
 modagility actor 2 3 -
 modalarm actor 2 42 -
@@ -266,6 +273,7 @@ modwaterwalking host 312 - l
 modwillpower actor 2 2 -
 move host 314 - cf
 moveworld host 315 - cf
+onactivate special 316 l -
 ondeath actor 0 44 l
 onknockout host 318 l -
 onmurder host 319 l -
@@ -287,6 +295,7 @@ playgroup host 338 - c/l
 position host 345 - ffffz
 ra host 347 - -
 raiserank host 348 - x
+random special 349 f l
 removeeffects host 350 - l
 removesoulgem host 354 - c/l
 resetactors host 357 - -
@@ -399,3 +408,4 @@ user2 host 499 - -
 user3 host 500 - -
 user4 host 501 - -
 wakeuppc host 502 - -
+xbox special 503 l -

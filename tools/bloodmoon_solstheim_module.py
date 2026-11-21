@@ -32,11 +32,23 @@ def resolve(args, masters, builder, status, log=print):
     is not built: Bloodmoon not among MASTERS (the build's selection in load order: --no-dlc, --dlc tribunal), a
     MiniWind sandbox, a cell list of the caller's own (--chim-regions: a test of named cells builds those and nothing
     else), no CHIM builder (BUILDER: tools/build.py resolve_builder's record, or a call that gives it), or no finished
-    cell. The base world's cell list never holds these cells. Returns the record for the build log."""
+    cell. A test image of named Solstheim cells (--chim-sol-test) does not build it either, and says so: one plan line
+    and the record {'built': False, 'reason'}, which the build writes into build-state.json (tools/build.py
+    chim_sol_test_module_record). The base world's cell list never holds these cells. Returns the record for the
+    build log."""
     from chim import regions as chim_regions
     setattr(args, CELLS_OPTION, None)
     if MASTER not in masters or getattr(args, 'miniwind', False) or getattr(args, 'chim_regions', None):
         return None
+    if getattr(args, 'chim_sol_test', None):
+        # a test image of named Solstheim cells (--chim-sol-test, tools/build.py chim_sol_test_commands): its own test
+        # world is the image's Solstheim store chimsol, the store this module installs, so the module is not built,
+        # as for a cell list of the caller's own (the glacier comparison's image stopped in its image step on two
+        # chimsol stores, 21 November 2026)
+        reason = ('--chim-sol-test names Solstheim\'s cells for this image: a test image, Solstheim is only those '
+                  'cells (the store chimsol is the test world)')
+        log('Module bloodmoon-solstheim: NOT BUILT: %s' % reason)
+        return {'built': False, 'reason': reason}
     builder = builder() if callable(builder) else builder
     if builder['builder'] != 'chim':
         return None
@@ -89,6 +101,10 @@ def commands(args, steps, tool, run, tools, jobs, chim_options):
                      '--qbsp', tools['qbsp'], *chim_options(args, cells),
                      '--lighting-type', lighting,
                      '--unit-cache', args.workspace / UNIT_CACHE, '--unit-pool', pool,
+                     # the mesh method set (--chim-mesh-method-set, config/mesh-method-sets.json): the runner's own
+                     # option, only when given (SOL-GLACIER-METHODS-AB-COMPARE-68)
+                     *(('--mesh-method-set', args.chim_mesh_method_set)
+                       if getattr(args, 'chim_mesh_method_set', None) else ()),
                      '--jobs', jobs, '--validate', '--stats', '--sdk', args.sdk))]
     # strings only: the commands go into build-state.json (BUILD-NPCLOD-PATH-ARG-34)
     tracker = ['--module-chim-world', str(world)]

@@ -8,11 +8,14 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  addspell: runs
  addtopic: runs
  aiescort: runs
+ aiescortcell: runs
  aifollow: runs
+ aifollowcell: runs
  aitravel: runs
  aiwander: runs
  becomewerewolf: runs
  cast: runs
+ cellchanged: runs
  centeroncell / coc: dbg tp "<cell>"
  centeronexterior / coe: dbg tp <x*8192+4096> <y*8192+4096>
  changeweather: runs
@@ -22,7 +25,15 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  clearforcesneak: runs
  disable: runs
  disablelevitation: runs
+ disableplayercontrols: runs
+ disableplayerfighting: runs
+ disableplayerjumping: runs
+ disableplayerlooking: runs
+ disableplayermagic: runs
+ disableplayerviewswitch: runs
  disableteleporting: runs
+ disablevanitymode: runs
+ dontsaveobject: runs
  drop: runs
  dropsoulgem: runs
  enable: runs
@@ -34,17 +45,25 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  enablemagicmenu: runs
  enablemapmenu: runs
  enablenamemenu: dbg quickchar name
+ enableplayercontrols: runs
+ enableplayerfighting: runs
+ enableplayerjumping: runs
+ enableplayerlooking: runs
+ enableplayermagic: runs
+ enableplayerviewswitch: runs
  enableracemenu: dbg characterchange race
  enablerest: runs
  enablestatreviewmenu: dbg quickchar review
  enablestatsmenu: runs
  enableteleporting: runs
+ enablevanitymode: runs
  equip: runs
  explodespell: runs
  face: runs
  fadein: runs
  fadeout: runs
  fadeto: runs
+ fall: runs
  fixme: dbg unstuck
  forcegreeting: runs
  forcejump: runs
@@ -53,22 +72,34 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  forcesneak: runs
  getacrobatics: runs
  getagility: runs
+ getaipackagedone: runs
  getalarm: runs
  getalchemy: runs
  getalteration: runs
  getangle: runs
+ getarmorbonus: runs
  getarmorer: runs
  getarmortype: runs
  getathletics: runs
+ getattackbonus: runs
  getattacked: runs
  getaxe: runs
+ getblightdisease: runs
+ getblindness: runs
  getblock: runs
  getbluntweapon: runs
+ getbuttonpressed: runs
+ getcastpenalty: runs
+ getchameleon: runs
+ getcollidingactor: runs
  getcollidingpc: runs
+ getcommondisease: runs
  getconjuration: runs
+ getcurrentaipackage: runs
  getcurrenttime: runs
  getcurrentweather: runs
  getdeadcount: runs
+ getdefendbonus: runs
  getdestruction: runs
  getdetected: runs
  getdisabled: runs
@@ -79,18 +110,23 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  getendurance: runs
  getfactionreaction: runs
  getfatigue: runs
+ getfatiguegetratio: runs
  getfight: runs
  getflee: runs
+ getflying: runs
  getforcejump: runs
+ getforcemovejump: runs
  getforcerun: runs
  getforcesneak: runs
  gethandtohand: runs
  gethealth: runs
+ gethealthgetratio: runs
  getheavyarmor: runs
  gethello: runs
  getillusion: runs
  getintelligence: runs
  getinterior: runs
+ getinvisible: runs
  getitemcount: runs
  getjournalindex: aw_mwscript_status call getjournalindex "<quest>"
  getlevel: runs
@@ -101,11 +137,14 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  getlos: runs
  getluck: runs
  getmagicka: runs
+ getmagickagetratio: runs
  getmarksman: runs
  getmasserphase: runs
  getmediumarmor: runs
  getmercantile: runs
  getmysticism: runs
+ getparalysis: runs
+ getpccell: runs
  getpccrimelevel: runs
  getpcexpelled: aw_mwscript_status call pcexpelled "<faction>"
  getpcfacrep: runs
@@ -117,14 +156,32 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  getpcsneaking: runs
  getpctraveling: runs
  getpersonality: runs
+ getplayercontrolsdisabled: runs
+ getplayerfightingdisabled: runs
+ getplayerjumpingdisabled: runs
+ getplayerlookingdisabled: runs
+ getplayermagicdisabled: runs
+ getplayerviewswitchdisabled: runs
  getpos: runs
  getrace: runs
  getreputation: runs
+ getresistblight: runs
+ getresistcorprus: runs
+ getresistdisease: runs
+ getresistfire: runs
+ getresistfrost: runs
+ getresistmagicka: runs
+ getresistnormalweapons: runs
+ getresistparalysis: runs
+ getresistpoison: runs
+ getresistshock: runs
  getrestoration: runs
  getscale: runs
+ getsecondspassed: runs
  getsecundaphase: runs
  getsecurity: runs
  getshortblade: runs
+ getsilence: runs
  getsneak: runs
  getsoundplaying: runs
  getspear: runs
@@ -132,13 +189,22 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  getspeed: runs
  getspell: runs
  getspelleffects: runs
+ getspellreadied: runs
+ getsquareroot: runs
+ getstandingactor: runs
  getstandingpc: runs
+ getstartingangle: runs
  getstartingpos: runs
  getstat: runs
  getstrength: runs
+ getsuperjump: runs
+ getswimspeed: runs
  gettarget: runs
  getunarmored: runs
+ getvanitymodedisabled: runs
+ getwaterbreathing: runs
  getwaterlevel: runs
+ getwaterwalking: runs
  getweapondrawn: runs
  getweapontype: runs
  getwerewolfkills: runs
@@ -154,20 +220,27 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  lock: runs
  loopgroup: runs
  lowerrank: runs
+ menumode: runs
  modacrobatics: runs
  modagility: runs
  modalarm: runs
  modalchemy: runs
  modalteration: runs
+ modarmorbonus: runs
  modarmorer: runs
  modathletics: runs
+ modattackbonus: runs
  modaxe: runs
+ modblindness: runs
  modblock: runs
  modbluntweapon: runs
+ modcastpenalty: runs
+ modchameleon: runs
  modconjuration: runs
  modcurrentfatigue: runs
  modcurrenthealth: runs
  modcurrentmagicka: runs
+ moddefendbonus: runs
  moddestruction: runs
  moddisposition: runs
  modenchant: runs
@@ -176,12 +249,14 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  modfatigue: runs
  modfight: runs
  modflee: runs
+ modflying: runs
  modhandtohand: runs
  modhealth: runs
  modheavyarmor: runs
  modhello: runs
  modillusion: runs
  modintelligence: runs
+ modinvisible: runs
  modlightarmor: runs
  modlongblade: runs
  modluck: runs
@@ -190,25 +265,42 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  modmediumarmor: runs
  modmercantile: runs
  modmysticism: runs
+ modparalysis: runs
  modpccrimelevel: runs
  modpcfacrep: runs
  modpersonality: runs
  modregion: runs
  modreputation: runs
+ modresistblight: runs
+ modresistcorprus: runs
+ modresistdisease: runs
+ modresistfire: runs
+ modresistfrost: runs
+ modresistmagicka: runs
+ modresistnormalweapons: runs
+ modresistparalysis: runs
+ modresistpoison: runs
+ modresistshock: runs
  modrestoration: runs
  modscale: runs
  modsecurity: runs
  modshortblade: runs
+ modsilence: runs
  modsneak: runs
  modspear: runs
  modspeechcraft: runs
  modspeed: runs
  modstrength: runs
+ modsuperjump: runs
+ modswimspeed: runs
  modunarmored: runs
+ modwaterbreathing: runs
  modwaterlevel: runs
+ modwaterwalking: runs
  modwillpower: runs
  move: runs
  moveworld: runs
+ onactivate: runs
  ondeath: runs
  onknockout: runs
  onmurder: runs
@@ -228,6 +320,7 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  placeatme: runs
  placeatpc: runs
  placeitem: runs
+ placeitemcell: runs
  playgroup: runs
  playsound: runs
  playsound3d: runs
@@ -236,6 +329,7 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  position: runs
  positioncell: runs
  raiserank: runs
+ random: runs
  removeeffects: runs
  removeitem: runs
  removesoulgem: runs
@@ -255,13 +349,19 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  setalchemy: runs
  setalteration: runs
  setangle: runs
+ setarmorbonus: runs
  setarmorer: runs
  setathletics: runs
  setatstart: runs
+ setattackbonus: runs
  setaxe: runs
+ setblindness: runs
  setblock: runs
  setbluntweapon: runs
+ setcastpenalty: runs
+ setchameleon: runs
  setconjuration: runs
+ setdefendbonus: runs
  setdelete: runs
  setdestruction: runs
  setdisposition: runs
@@ -271,12 +371,14 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  setfatigue: runs
  setfight: runs
  setflee: runs
+ setflying: runs
  sethandtohand: runs
  sethealth: runs
  setheavyarmor: runs
  sethello: runs
  setillusion: runs
  setintelligence: runs
+ setinvisible: runs
  setjournalindex: aw_mwscript_status call setjournalindex "<quest>" <index>
  setlevel: dbg setlvl <n>
  setlightarmor: runs
@@ -287,22 +389,38 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  setmediumarmor: runs
  setmercantile: runs
  setmysticism: runs
+ setparalysis: runs
  setpccrimelevel: runs
  setpcfacrep: runs
  setpersonality: runs
  setpos: runs
  setreputation: runs
+ setresistblight: runs
+ setresistcorprus: runs
+ setresistdisease: runs
+ setresistfire: runs
+ setresistfrost: runs
+ setresistmagicka: runs
+ setresistnormalweapons: runs
+ setresistparalysis: runs
+ setresistpoison: runs
+ setresistshock: runs
  setrestoration: runs
  setscale: runs
  setsecurity: runs
  setshortblade: runs
+ setsilence: runs
  setsneak: runs
  setspear: runs
  setspeechcraft: runs
  setspeed: runs
  setstrength: runs
+ setsuperjump: runs
+ setswimspeed: runs
  setunarmored: runs
+ setwaterbreathing: runs
  setwaterlevel: runs
+ setwaterwalking: runs
  setwerewolfacrobatics: runs
  setwillpower: runs
  show: runs
@@ -333,6 +451,7 @@ without one: the dbg mw target, else the player). The table: docs/CONSOLE_COMMAN
  user3: runs
  user4: runs
  wakeuppc: runs
+ xbox: runs
 
 AmiWind's own command of the same name (kept):
  help

@@ -21,6 +21,25 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.68-dev3 (cdc1d3da5) | 2026-11-21 | gate 12055 | A frame keeps out the tiles of a large model that lie wholly outside it, so its memory ring holds only what can be near the player. |
+| shipped | the v0.0.68-dev3 snapshot build | v0.0.68-dev3 (9a91382c3, build 2026_11_21_v0.0.68-dev3_full-dev3_9a91382) | 2026-11-21 | the delivered build holds the commit (gate 12300) | A frame keeps out the tiles of a large model that lie wholly outside it, so its memory ring holds only what can be near the player. |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-20: reported in v0.0.68-dev1
+- 2026-11-21: fixed in source: a gated commit, v0.0.68-dev3 (cdc1d3da5); gate 12055: A frame keeps out the tiles of a large model that lie wholly outside it, so its memory ring holds only what can be near the player.
+- 2026-11-21: shipped: the v0.0.68-dev3 snapshot build, v0.0.68-dev3 (9a91382c3, build 2026_11_21_v0.0.68-dev3_full-dev3_9a91382); the delivered build holds the commit (gate 12300): A frame keeps out the tiles of a large model that lie wholly outside it, so its memory ring holds only what can be near the player.
+
+<!-- END GENERATED TIMELINE -->
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category

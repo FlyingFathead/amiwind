@@ -1,5 +1,14 @@
 # IMAGE-BOOT-PAYLOAD-OVER-2GIB-48: the boot payload outgrew one partition and the layout could not split it
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.48-dev2 at 2026-10-23 08:10 +0300: dev2 build try8 stopped in the image step payload preflight: boot payload 2751137598 bytes needs a 2778 MiB partition
+- Reported with v0.0.68-dev3 at 2026-11-21 05:24 +0200: Seen again in the v0.0.68-dev3 build: the image stopped because the boot payload grew past one partition after its early layout plan; the image step now plans the layout again from the staged files.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -24,14 +33,44 @@
 
 ## Timeline
 
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.68-dev3 (9a91382c3) | 2026-11-21 | gate 12300 | The image step plans the disk layout again from the staged files when the boot payload outgrew the early plan, instead of stopping |
+| fixed in source | a gated commit | v0.0.68 (a38d62384) | 2026-11-21 | gate 12011 | The image step's payload preflight counts the expansions' stores and frame maps the image installs, so the early layout plan holds them and shows the true drive count in its first minute |
+| shipped | the v0.0.68-dev3 snapshot build | v0.0.68-dev3 (9a91382c3, build 2026_11_21_v0.0.68-dev3_full-dev3_9a91382) | 2026-11-21 | the delivered build holds the commit (gate 12300) | The v0.0.68-dev3 image was laid out over the boot partition and a world volume with the Solstheim store |
+
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-10-23: reported in v0.0.48-dev2
 - 2026-10-23 08:10 +0300: seen again in v0.0.48-dev2: dev2 build try8 stopped in the image step payload preflight: boot payload 2751137598 bytes needs a 2778 MiB partition
+- 2026-11-21: fixed in source: a gated commit, v0.0.68-dev3 (9a91382c3); gate 12300: The image step plans the disk layout again from the staged files when the boot payload outgrew the early plan, instead of stopping
+- 2026-11-21: fixed in source: a gated commit, v0.0.68 (a38d62384); gate 12011: The image step's payload preflight counts the expansions' stores and frame maps the image installs, so the early layout plan holds them and shows the true drive count in its first minute
+- 2026-11-21: shipped: the v0.0.68-dev3 snapshot build, v0.0.68-dev3 (9a91382c3, build 2026_11_21_v0.0.68-dev3_full-dev3_9a91382); the delivered build holds the commit (gate 12300): The v0.0.68-dev3 image was laid out over the boot partition and a world volume with the Solstheim store
+- 2026-11-21 05:24 +0200: seen again in v0.0.68-dev3: Seen again in the v0.0.68-dev3 build: the image stopped because the boot payload grew past one partition after its early layout plan; the image step now plans the layout again from the staged files.
 
 <!-- END GENERATED TIMELINE -->
 
 _Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Timeline](#timeline)
+- [Status: 23 October 2026](#status-23-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 ## Status: 23 October 2026
 

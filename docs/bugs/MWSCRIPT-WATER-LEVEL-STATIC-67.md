@@ -9,7 +9,7 @@
 | Where | Old Mournhold: Forgotten Sewer and Temple Sewers West (Tribunal), the scripts changeWater_-550_400 and torch_lever |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.67-dev3 (last seen) |
+| Persists in | fixed in v0.0.68-dev2 |
 | Severity | low: two levers in Old Mournhold leave the water where it is; nothing else depends on them in the scripts, the lever's other effects run |
 | Family | Game logic (QuakeC) and saves (`game-logic`) |
 | Playtest version | unknown |
@@ -28,12 +28,16 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.67 (e881ad5a) | 2026-11-20 | gate 12064 of the planning item MWSCRIPT-WATER-LEVEL-STATIC-67 | Scripts raise and lower a room's water as in the original: SetWaterLevel and ModWaterLevel move the room's water plane, the level is saved and cleared by New Game, rooms whose water lay under every placement get their plane, placed objects are drawn on the right side of the moving surface and the floating crates ride it. |
+| confirmed in play | an emulator session | v0.0.68-dev2 (the Old Mournhold levers image with the engine and script file of gates 12280 and 12281) | 2026-11-20 | the water journey, runs 4 and 6, at 32 MB Fast: its stills and console log | The water levers of Old Mournhold raise and lower the water as in the original |
+| shipped | the v0.0.68-dev2 snapshot build | v0.0.68-dev2 (ef709f6be, build 2026_11_21_v0.0.68-dev2_full-dev2_ef709f6) | 2026-11-21 | the delivered build holds the commit (gate 12133) | The water levers of Old Mournhold raise and lower the water as in the original |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-19: reported in v0.0.67-dev3
 - 2026-11-20: fixed in source: a gated commit, v0.0.67 (e881ad5a); gate 12064 of the planning item MWSCRIPT-WATER-LEVEL-STATIC-67: Scripts raise and lower a room's water as in the original: SetWaterLevel and ModWaterLevel move the room's water plane, the level is saved and cleared by New Game, rooms whose water lay under every placement get their plane, placed objects ...
+- 2026-11-20: confirmed in play: an emulator session, v0.0.68-dev2 (the Old Mournhold levers image with the engine and script file of gates 12280 and 12281); the water journey, runs 4 and 6, at 32 MB Fast: its stills and console log: The water levers of Old Mournhold raise and lower the water as in the original
 - 2026-11-20 12:22 +0200: seen again in v0.0.67: Measured again on 20 November 2026: more than the two levers depends on the water.
+- 2026-11-21: shipped: the v0.0.68-dev2 snapshot build, v0.0.68-dev2 (ef709f6be, build 2026_11_21_v0.0.68-dev2_full-dev2_ef709f6); the delivered build holds the commit (gate 12133): The water levers of Old Mournhold raise and lower the water as in the original
 
 <!-- END GENERATED TIMELINE -->
 

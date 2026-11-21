@@ -220,6 +220,17 @@ int AW_MwvmInstanceCount(void);
  * keeps it, mwworld/refdata.cpp activate): 1 when its attached script takes the use (it read OnActivate since its
  * own Activate): OnActivate reads 1 on its next run and the object does nothing by itself; 0: the object's own use. */
 int AW_MwvmUse(uint32_t reference);
+/* MW-CONSOLE-COMMANDS-62 (v0.0.68, family 7): the interpreter's own opcodes typed on the console, read by the rules a
+ * script line follows (aw_mwvm.c AWM_RANDOM, AWM_SECONDS, AWM_CELLCHANGED, AWM_ONACTIVATE). Random: a whole number below
+ * N from the game's one generator (0 when N < 1), the next roll of the same sequence the scripts take; the seconds of
+ * the interpreter's last frame (OpenMW 0.51 OpGetSecondsPassed reads the frame's time); CellChanged and OnActivate of
+ * REFERENCE's own attached script, never the console's scratch instance (-1: it has none here). OnActivate as the
+ * opcode reads it: 1 once after the player's use, and the object's next use goes to that script (OpenMW 0.51
+ * mwworld/refdata.cpp onActivate sets Flag_SuppressActivate on any reference it is read on); its Activate gives it back. */
+float AW_MwvmRandom(int32_t n);
+float AW_MwvmFrameSeconds(void);
+int AW_MwvmCellChanged(uint32_t reference);
+int AW_MwvmOnActivate(uint32_t reference);
 /* Start scripts and StartScript. */
 void AW_MwvmStartScript(int script);
 /* a dialogue result script (_dlg_N) once on the speaker (its reference and script; -1 none); 1 ran */

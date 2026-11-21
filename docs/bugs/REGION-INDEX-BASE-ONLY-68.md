@@ -9,7 +9,7 @@
 | Where | the scripts' region weather (ChangeWeather, ModRegion): the region index the script compiler hands the engine |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.68-dev1 (last seen) |
+| Persists in | fixed in v0.0.68-dev2 |
 | Severity | medium: the end of the main quest leaves Red Mountain's blight and its red sky in place and changes the Grazelands' weather; Tribunal's weather machine has no effect; seen by reading the image's region tables against the compiler's order, not yet in play |
 | Family | Game logic (QuakeC) and saves (`game-logic`) |
 | Playtest version | v0.0.67 |
@@ -30,6 +30,7 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | fixed in source | a gated commit | v0.0.67 (908c9003) | 2026-11-20 | gate 12260 of the planning item REGION-INDEX-BASE-ONLY-68 | The scripts' ChangeWeather and ModRegion hand the region's row in the image's own region tables (the regions of the build's game files), so with the expansions the end of the main quest changes Red Mountain's weather and Mournhold's weather lines run |
 | fixed in source | a gated commit | v0.0.68-dev2 (908c9003f) | 2026-11-20 | gate 12260 | A script's weather change names the region it means in an image with the expansions: the end of the main quest clears Red Mountain's weather again, and Mournhold's weather machine changes Mournhold's. |
 | confirmed by a test | a test module | v0.0.68-dev2 (908c9003f) | 2026-11-20 | gate 12260 | A script's weather change names the region it means in an image with the expansions: the end of the main quest clears Red Mountain's weather again, and Mournhold's weather machine changes Mournhold's. |
+| shipped | the v0.0.68-dev2 snapshot build | v0.0.68-dev2 (ef709f6be, build 2026_11_21_v0.0.68-dev2_full-dev2_ef709f6) | 2026-11-21 | the delivered build holds the commit (gate 12133) | A script's weather change names the region it means in an image with the expansions: the end of the main quest clears Red Mountain's weather again, and Mournhold's weather machine changes Mournhold's. |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
@@ -37,6 +38,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-20: fixed in source: a gated commit, v0.0.67 (908c9003); gate 12260 of the planning item REGION-INDEX-BASE-ONLY-68: The scripts' ChangeWeather and ModRegion hand the region's row in the image's own region tables (the regions of the build's game files), so with the expansions the end of the main quest changes Red Mountain's weather and Mournhold's ...
 - 2026-11-20: fixed in source: a gated commit, v0.0.68-dev2 (908c9003f); gate 12260: A script's weather change names the region it means in an image with the expansions: the end of the main quest clears Red Mountain's weather again, and Mournhold's weather machine changes Mournhold's.
 - 2026-11-20: confirmed by a test: a test module, v0.0.68-dev2 (908c9003f); gate 12260: A script's weather change names the region it means in an image with the expansions: the end of the main quest clears Red Mountain's weather again, and Mournhold's weather machine changes Mournhold's.
+- 2026-11-21: shipped: the v0.0.68-dev2 snapshot build, v0.0.68-dev2 (ef709f6be, build 2026_11_21_v0.0.68-dev2_full-dev2_ef709f6); the delivered build holds the commit (gate 12133): A script's weather change names the region it means in an image with the expansions: the end of the main quest clears Red Mountain's weather again, and Mournhold's weather machine changes Mournhold's.
 
 <!-- END GENERATED TIMELINE -->
 

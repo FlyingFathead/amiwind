@@ -19,6 +19,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-20: reported in v0.0.67
+- 2026-11-21 06:54 +0200: seen again in v0.0.68-dev3: Seen again on 21 November 2026: a CHIM import of nine cells took about 41 minutes against an estimate of 15 to 30, made from an earlier run's record because the performance database holds no CHIM import times.
+
+<!-- END GENERATED TIMELINE -->
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category

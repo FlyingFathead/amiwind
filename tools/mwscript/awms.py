@@ -93,6 +93,21 @@
         Row N is the number a compiled GetEffect hands the engine; the console's GetEffect finds a typed id here (one
         read of the section and the names up to the match, per console line). On disk, optional (an older file: the
         console's GetEffect takes a number only).
+  CELN  24 bytes a cell a console line can name (v0.0.68, MW-CONSOLE-COMMANDS-62; cell_rows below): every interior
+        cell, every exterior cell name and every district the build presents as exterior cells, sorted by (u32 the
+        FNV-1a of the name's cp1252 bytes with A-Z lowered, the folded name): u32 hash, u16 name (as its record writes
+        it), u8 kind (1 a room, 2 a named exterior cell, 3 a presented district), u8 flags (1: no room map in the
+        repo's room lists), u16 the room's stable number (the room map's _aw_cell_int; 0 for an exterior name), u16 the
+        room map's name (0xFFFF none), f32 x y z: a room's recentring (rooms.room_table, subtracted before the quarter
+        scale) or a presented district's move (presented_exterior.moved_position: x and y added). The console's
+        PositionCell, PlaceItemCell, AIFollowCell and AIEscortCell find a typed cell here by a binary search (about a
+        dozen reads of 24 bytes, then its name) and work it out as the compiler does (codegen.Program.player_move,
+        actor_move, place, ai_cell); its GetPCCell reads the room's name by its number. On disk, optional (an older
+        file: the console's cell forms refuse).
+  CELG  4 bytes an exterior grid cell (v0.0.68, MW-CONSOLE-COMMANDS-62; grid_rows below), sorted by (x, y): i8 x, i8 y,
+        u16 the name OpenMW's getCellName gives it (the cell's own name, else its region's, else sDefaultCellname; a
+        presented district's block cells its name). The console's GetPCCell outdoors reads the player's cell's name
+        here (a binary search). On disk, optional.
 
 The engine keeps scripts, globals, quests and worn items in a save by the name hash of their id (aw_ledger.h,
 name_hash below): write() refuses a file in which two different names share one (their saved values would mix).
@@ -108,7 +123,7 @@ VERSION = 1
 TYPES = {'s': 0, 'l': 1, 'f': 2}
 ORDER = ('CONF', 'GLOB', 'JRNL', 'SNDS', 'VOIC', 'MUSI', 'OBJS', 'SCRP', 'STRT', 'NEWG', 'NGWE', 'NGCS', 'HELD', 'OACT', 'PCEL', 'PMOV', 'SPFX', 'VISI', 'PLAC', 'PADD', 'LACT', 'EQUP', 'WATR', 'CODE', 'BIND', 'STRS',
          'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'TOPC', 'ASPC', 'ASPE', 'AEFF', 'AMGE', 'DRSC', 'AENC', 'APCS',
-         'AIDX', 'ASPX') + ('BNAM',) + ('LOCN', 'HITM', 'SCRH') + ('RGNS', 'WERE', 'EFFN')
+         'AIDX', 'ASPX') + ('BNAM',) + ('LOCN', 'HITM', 'SCRH') + ('RGNS', 'WERE', 'EFFN') + ('CELN', 'CELG')
 # The actor sections (actors.py, docs/ACTOR_STATE.md): OACT is resident (a script's target -> its actor row); the
 # others stay on disk and are read a row at a time by the engine's actor state (aw_actorstate.c).
 ACTOR_SECTIONS = ('OACT', 'ACTB', 'AINV', 'AITM', 'ASPT', 'ASPL', 'ASPC', 'ASPE', 'AEFF', 'AMGE', 'AENC', 'APCS',
@@ -275,6 +290,92 @@ def werewolf_rows(program):
     if len(rows) != WERE_ROWS:
         raise ValueError('WERE: %d werewolf numbers, the engine reads %d' % (len(rows), WERE_ROWS))
     return rows
+
+
+# CELN kinds and flags (the engine's aw_mwconsole.h AW_MWCON_CELL_*)
+CELL_ROOM, CELL_EXTERIOR, CELL_PRESENTED = 1, 2, 3
+CELL_NO_MAP = 1
+CELL_ROW = 24
+
+
+def cell_fold(name):
+    """A cell name's bytes as the console's lookup folds them: cp1252, A-Z lowered (the engine's aw_mwconsole.c fold)."""
+    return bytes(b + 32 if 65 <= b <= 90 else b for b in name.encode('cp1252', 'replace'))
+
+
+def cell_hash(name):
+    """The CELN key of a cell name: 32-bit FNV-1a of its folded bytes (aw_mwconsole.c cell_hash)."""
+    h = 0x811C9DC5
+    for b in cell_fold(name):
+        h = ((h ^ b) * 0x01000193) & 0xFFFFFFFF
+    return h
+
+
+def cell_rows(program):
+    """The CELN rows (v0.0.68, MW-CONSOLE-COMMANDS-62): [(hash, name, kind, flags, number, map name or None, offset)]
+    sorted by (hash, folded name). Every interior cell of the build's masters by its stable number
+    (cell_numbers.number_cells, the number the room maps carry) with its room map and recentring from the program's room
+    table (rooms.room_table; a room the lists lack is flagged, as PositionCell of the player then stays "not yet"); a
+    district the build presents as exterior cells (program.presented) is kind 3 with its move instead; every exterior
+    cell name once (OpenMW's findCell finds an exterior by its name). [] for a program without game data."""
+    data = getattr(program, 'data', None)
+    if data is None or not getattr(data, 'interior_ids', None):
+        return []
+    from cell_numbers import number_cells
+    rooms = getattr(program, 'rooms', None) or {}
+    presented = getattr(program, 'presented', None) or {}
+    rows = {}
+    for r in number_cells(data.interior_ids):
+        key = r['cell'].casefold()
+        room, place = rooms.get(key), presented.get(key)
+        if r['number'] > 0xFFFF:
+            raise ValueError('CELN: interior %r has number %d, past the table\'s 16 bits' % (r['cell'], r['number']))
+        if place is not None:
+            if room and any(room.get('offset') or ()):
+                # the console moves a presented district's places by its move alone, as the compiler does
+                raise ValueError('CELN: presented district %r is also a recentred room' % r['cell'])
+            kind, offset = CELL_PRESENTED, (float(place['offset'][0]), float(place['offset'][1]), 0.0)
+        else:
+            kind, offset = CELL_ROOM, tuple(float(v) for v in ((room or {}).get('offset') or (0.0, 0.0, 0.0)))
+        rows[cell_fold(r['cell'])] = (r['cell'], kind, 0 if room else CELL_NO_MAP, r['number'],
+                                      room['map'] if room else None, offset)
+    for key, place in sorted(presented.items()):
+        if cell_fold(place['cell']) not in rows:
+            rows[cell_fold(place['cell'])] = (place['cell'], CELL_PRESENTED, CELL_NO_MAP, 0, None,
+                                              (float(place['offset'][0]), float(place['offset'][1]), 0.0))
+    for (x, y), (cell, region) in sorted(data.exteriors.items()):
+        if cell and cell_fold(cell) not in rows:
+            rows[cell_fold(cell)] = (cell, CELL_EXTERIOR, 0, 0, None, (0.0, 0.0, 0.0))
+    return sorted(((cell_hash(v[0]),) + v for k, v in rows.items()), key=lambda r: (r[0], cell_fold(r[1])))
+
+
+def grid_rows(program):
+    """The CELG rows (v0.0.68, MW-CONSOLE-COMMANDS-62): [(x, y, name)] sorted by (x, y), every exterior grid cell by the
+    name OpenMW's getCellName gives it (its own name, else its region's name, else sDefaultCellname), and the block cells
+    of every district the build presents by the district's name (as codegen.Program.pccell matches them)."""
+    data = getattr(program, 'data', None)
+    if data is None:
+        return []
+    names = {}
+    for (x, y), (cell, region) in data.exteriors.items():
+        names[(x, y)] = cell or data.regions.get(region) or data.default_cell_name
+    for place in (getattr(program, 'presented', None) or {}).values():
+        for dx in range(place['size'][0]):
+            for dy in range(place['size'][1]):
+                names[(place['block'][0] + dx, place['block'][1] + dy)] = place['cell']
+    bad = sorted(xy for xy in names if not all(-128 <= v <= 127 for v in xy))
+    if bad:
+        raise ValueError('CELG: exterior cells outside the table\'s -128..127: %s' % bad[:4])
+    return [(x, y, names[(x, y)]) for x, y in sorted(names)]
+
+
+def cell_sections(cells, grid, string):
+    """(CELN bytes, CELG bytes) of cell_rows' CELLS and grid_rows' GRID; STRING interns a string, its index."""
+    celn = b''.join(struct.pack('>IHBBHH3f', h, string(name), kind, flags, number,
+                                string(room_map) if room_map else 0xFFFF, *offset)
+                    for h, name, kind, flags, number, room_map, offset in cells)
+    celg = b''.join(struct.pack('>bbH', x, y, string(name)) for x, y, name in grid)
+    return celn, celg
 
 
 def new_game_control_rows(program, compiled):
@@ -534,6 +635,11 @@ def write(program, compiled, binds, conf=None):
     # here, before STRS is written below
     from .codegen import EFFECT_NAMES
     effn = (b''.join(struct.pack('>H', p.string(name)) for name in EFFECT_NAMES), len(EFFECT_NAMES))
+    # CELN and CELG (v0.0.68, MW-CONSOLE-COMMANDS-62): the console's cell table; on disk. Interned here, before STRS is
+    # written below
+    cells, grid = cell_rows(p), grid_rows(p)
+    celn_bytes, celg_bytes = cell_sections(cells, grid, p.string)
+    celn, celg = (celn_bytes, len(cells)), (celg_bytes, len(grid))
     # DRSC (v0.0.58, DIALOGUE-COMPLETE-58): the dialogue's result scripts, 12 bytes a row sorted by (hash, length,
     # speaker script): u32 FNV-1a of the result text, u16 its length, u16 the speaker's script (0xFFFF none), u16 the
     # compiled _dlg_N script, u16 flags (1: did not compile); on disk, read when an answer is shown
@@ -582,6 +688,8 @@ def write(program, compiled, binds, conf=None):
     were = werewolf_rows(p)
     sections['WERE'] = (b''.join(struct.pack('>i', v) for v in were), len(were))
     sections['EFFN'] = effn
+    sections['CELN'] = celn
+    sections['CELG'] = celg
     actors = getattr(p, 'actors', None)
     if actors is not None:
         sections.update(actors.sections(p.objects.rows))

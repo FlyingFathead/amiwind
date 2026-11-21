@@ -9,7 +9,7 @@
 | Where | tools/bloodmoon_solstheim.py (the build module bloodmoon-solstheim) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.68-dev3 (last seen) |
+| Persists in | fixed in v0.0.68-dev3 |
 | Severity | high: no build with Solstheim's cells could finish |
 | Family | Content silently missing from a build (`build-content-missing`) |
 | Playtest version | v0.0.68-dev3 |
@@ -19,6 +19,27 @@
 | Platform or emulator | not in game (the builder) |
 
 <!-- END GENERATED FACTS -->
+
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.67 (6429e908) | 2026-11-21 | gate 12136 of the planning item SOL-MODULE-CACHE-NOT-PICKLED-68 | the Solstheim module's pooled unit cache pickles as the plain pooled cache, so it reaches the converter's worker processes; proven in the v0.0.68-dev3 builds (the stage took 19,434 units from the storage pool, then completed) |
+| shipped | the v0.0.68-dev3 snapshot build | v0.0.68-dev3 (9a91382c3, build 2026_11_21_v0.0.68-dev3_full-dev3_9a91382) | 2026-11-21 | the delivered build holds the commit (gate 12300) | The Solstheim build module's shared unit cache reaches the converter's worker processes |
+| confirmed by a build | a release build | v0.0.68-dev3 (build 2026_11_21_v0.0.68-dev3_full-dev3_6429e90) | 2026-11-21 | the stage log's storage pool line | the v0.0.68-dev3 build 2026_11_21_v0.0.68-dev3_full-dev3_6429e90: the Solstheim world stage ran on the storage pool without the pickling error and took 19,434 units (772.9 MB) from it; the stage completed in the next run |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-21: reported in v0.0.68-dev3
+- 2026-11-21: fixed in source: a gated commit, v0.0.67 (6429e908); gate 12136 of the planning item SOL-MODULE-CACHE-NOT-PICKLED-68: the Solstheim module's pooled unit cache pickles as the plain pooled cache, so it reaches the converter's worker processes; proven in the v0.0.68-dev3 builds (the stage took 19,434 units from the storage pool, then completed)
+- 2026-11-21: shipped: the v0.0.68-dev3 snapshot build, v0.0.68-dev3 (9a91382c3, build 2026_11_21_v0.0.68-dev3_full-dev3_9a91382); the delivered build holds the commit (gate 12300): The Solstheim build module's shared unit cache reaches the converter's worker processes
+- 2026-11-21: confirmed by a build: a release build, v0.0.68-dev3 (build 2026_11_21_v0.0.68-dev3_full-dev3_6429e90); the stage log's storage pool line: the v0.0.68-dev3 build 2026_11_21_v0.0.68-dev3_full-dev3_6429e90: the Solstheim world stage ran on the storage pool without the pickling error and took 19,434 units (772.9 MB) from it; the stage completed in the next run
+
+<!-- END GENERATED TIMELINE -->
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -76,6 +97,7 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [INTERIOR-ACTIVATORS-LEFT-OUT-52](INTERIOR-ACTIVATORS-LEFT-OUT-52.md): Interiors leave out every activator but the beds: the heart of Lorkhan is missing from Akulakhan s Chamber, and bar counters, shrines and Dwemer machinery from hundreds of rooms
 - [INTERIOR-NO-AMBI-66](INTERIOR-NO-AMBI-66.md): The room stage stops on interior cells without AMBI: the Mournhold plazas with Tribunal on
 - [INTERIOR-PLACED-ITEMS-47](INTERIOR-PLACED-ITEMS-47.md): Takeable and movable items and containers in converted interiors are not live objects (placed items are left out)
+- [INVISIBLE-WALLS-NOT-BUILT-68](INVISIBLE-WALLS-NOT-BUILT-68.md): Invisible walls of the game outside the opening are not built: five at Mournhold's city edges, which show "You may not leave the city this way." in the original, and one at exterior cell 15,5, so the player can walk where the original stops him
 - [JOURNAL-EXPANSION-OVERRIDES-66](JOURNAL-EXPANSION-OVERRIDES-66.md): With the expansions selected, the world UI stage stopped on a journal stage both the base game and an expansion hold
 - [LAVA-NOT-IMPLEMENTED-33](LAVA-NOT-IMPLEMENTED-33.md): Lava is drawn as plain static meshes: no liquid surface, no damage, no view tint, never tracked
 - MINIWIND-EXTERIOR-CHIM-INTERIORS-52 (no report page): An exterior MiniWind stops in its image step: the image is told to install the CHIM interior store that the exterior scope does not build

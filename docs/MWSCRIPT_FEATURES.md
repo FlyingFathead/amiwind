@@ -1,6 +1,6 @@
 # MWScript features
 
-_Last updated with AmiWind v0.0.68-dev3 (20 November 2026)._
+_Last updated with AmiWind v0.0.68-dev4 (21 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -66,9 +66,9 @@ Dialogue answers that start or change a fight (StartCombat, SetFight, ModFight):
 | the speaker attacks (StartCombat): found by the answer's reference | 124 |
 | a fight between two actors: both are set against each other (since v0.0.63) | 5 |
 
-Measured on 20 November 2026 from the three masters (Morrowind, Tribunal, Bloodmoon) with the builder's own compiler (tools/mwscript), 11,171 placed scripted references, 11,542 bindings in the compiled file, 4 start scripts. The states are worked out again from the interpreter's function table (tools/mwscript/functions.py) whenever the page is rendered, so a function carried out later moves its scripts without a new measurement.
+Measured on 21 November 2026 from the three masters (Morrowind, Tribunal, Bloodmoon) with the builder's own compiler (tools/mwscript), 11,171 placed scripted references, 11,542 bindings in the compiled file, 4 start scripts. The states are worked out again from the interpreter's function table (tools/mwscript/functions.py) whenever the page is rendered, so a function carried out later moves its scripts without a new measurement.
 
-The image measured: build v0.0.68-dev2. Its scripts stage bound the own placements of Tribunal, Bloodmoon; the image carries 5 outdoor districts and 1,321 rooms of the interior store, and 1,837 of the 2,447 add-on bindings in the file sit in those cells (Tribunal 1,227, Bloodmoon 610). A script placed only in add-on cells outside them is "only in an add-on world".
+The image measured: build v0.0.68-dev3. Its scripts stage bound the own placements of Tribunal, Bloodmoon; the image carries 5 outdoor districts and 1,321 rooms of the interior store, and 1,837 of the 2,447 add-on bindings in the file sit in those cells (Tribunal 1,227, Bloodmoon 610). A script placed only in add-on cells outside them is "only in an add-on world".
 
 ## Why the others do not run
 
@@ -90,7 +90,7 @@ The game scripts AmiWind carries with its own code instead of running them, each
 | CharGenBoatNPC | the guard on deck: sends the player down to the dock, repeats | engine/aga/src/aw_intro.c AW_IntroTick, the deck_state steps | same | not yet | - |
 | CharGenBoatWomen | the woman on the upper deck: hurries the player, repeats | engine/aga/src/aw_intro.c AW_IntroTick, the upper_state steps | same | not yet | - |
 | CharGenDialogueMessage | the hint about talking to the captain when the player comes near him | engine/aga/src/aw_opening.c AW_OpeningTick, captain_hint | same | not yet | OPENING-CAPTAIN-HINT-SUBTITLE-63 |
-| CharGenDisable | the opening's invisible blockers (the ACTI CharGenCollision - extra placements) kept while CharGenState is 0 or over, disabled after | engine/aga/src/aw_barrier.c AW_BarrierClip (the blockers converted by tools/prepare_character.py, active while AW_StoryRestricted) | same | not yet | OPENING-SHIP-BLOCKER-NOT-CONVERTED-63 |
+| CharGenDisable | the opening's invisible blockers (the ACTI CharGenCollision - extra placements) kept while CharGenState is 0 or over, disabled after | engine/aga/src/aw_barrier.c AW_BarrierClip (the blockers converted by tools/prepare_character.py, active while AW_StoryRestricted; since v0.0.68 each one also off once a script's Disable of its reference is in the world change list, the references from id1/world-barriers.txt) | same | not yet | OPENING-SHIP-BLOCKER-NOT-CONVERTED-63 |
 | CharGenNameNPC | Jiub on the ship: wakes the player, asks the name, talks about the storm, warns of the guard, repeats his warning | engine/aga/src/aw_intro.c AW_IntroTick, the jiub_state steps | same | not yet | - |
 | CharGenRaceNPC | the dock guard: walks to the plank, greets the player, the race window, leads him to the office door, repeats | engine/aga/src/aw_opening.c AW_OpeningTick, the aw_story.dock steps | same | not yet | INTRO-DOCK-GUARD-BLOCKS-DOOR-62 |
 | CharGenWalkNPC | the ship's guard: comes to the player, the movement hint, leads him to the deck hatch, repeats his order | engine/aga/src/aw_intro.c AW_IntroTick, the guard_state steps | same | not yet | OPENING-SHIP-GUARD-STEPS-63 |
@@ -102,7 +102,7 @@ Functions whose work AmiWind's own code does (the script calls into it):
 | AIFollow, AIFollowCell, AIEscort, AIEscortCell | an actor follows or escorts a target; the packages' rules (the hours, the place, the end that GetAIPackageDone reads) in aw_ambient.c | engine/aga/src/aw_companion.c AW_FollowThink (the debug companion's follow think, aw_follow.h; the movement of the packages since v0.0.63) | same | one implementation since ESCORT-FOLLOW-63; the packages never place a follower near its target inside a cell, which is OpenMW's own rule (the follower catches up through doors with the player, aw_ambient.c) | not yet |
 | StartCombat, StopCombat, GetTarget | an actor fights the player or another actor; the fight ends; whom it fights | engine/aga/src/aw_combat.c AW_CombatEngage, AW_CombatEngageAgainst (a slot's target: the player or another actor), AW_CombatTargetOf; through aw_mwhost.c host_combat | same | fights between two actors since COMBAT-ACTOR-VS-ACTOR-62; allies (followers and escorts, both ways) and guards (against creatures in a fight) join on sight (aw_mwhost.c join_fights, OpenMW actors.cpp engageCombat); the player's own followers and escorts help the player against whoever fights him and never start a fight with the player by their Fight value; OpenMW's optional setting for followers attacking on sight (off by default) is not carried | not yet |
 
-The original game's console commands (docs/CONSOLE_COMMANDS_MORROWIND.md): 395 in all; 22 run AmiWind's own command, 309 run through the script interpreter's host, 3 are AmiWind's own names (kept), 48 planned, 13 not applicable. The aliases:
+The original game's console commands (docs/CONSOLE_COMMANDS_MORROWIND.md): 502 in all; 22 run AmiWind's own command, 428 run through the script interpreter's host, 3 are AmiWind's own names (kept), 36 planned, 13 not applicable. The aliases:
 
 | Original | AmiWind | Parity | Note |
 | --- | --- | --- | --- |
@@ -771,7 +771,7 @@ Referenced by: the records that carry the script and their placed references per
 | CharGenCustomsDoor | bitter coast region | runs | 1 door; placed 1 (Morrowind 1) | chargen_shipdoor | getdistance, menumode, messagebox, xbox | 4: getdistance, local, menumode, xbox | - | - |
 | CharGenDagger | bitter coast region | runs | 1 WEAP; placed 1 (Morrowind 1) | chargen dagger | activate, messagebox, onactivate, xbox | 9: global, local, onactivate, xbox | - | - |
 | CharGenDialogueMessage | bitter coast region | carried by AmiWind's own code | 1 NPC; placed 1 (Morrowind 1); speaker of 7 dialogue results | chargen captain | getdistance, menumode, messagebox, xbox | 4: getdistance, local, menumode, xbox | - | carried by engine/aga/src/aw_opening.c AW_OpeningTick, captain_hint |
-| CharGenDisable | bitter coast region | carried by AmiWind's own code | 1 activator; placed 23 (Morrowind 23) | chargencollision - extra | disable | 1: global | - | carried by engine/aga/src/aw_barrier.c AW_BarrierClip (the blockers converted by tools/prepare_character.py, active while AW_StoryRestricted) |
+| CharGenDisable | bitter coast region | carried by AmiWind's own code | 1 activator; placed 23 (Morrowind 23) | chargencollision - extra | disable | 1: global | - | carried by engine/aga/src/aw_barrier.c AW_BarrierClip (the blockers converted by tools/prepare_character.py, active while AW_StoryRestricted; since v0.0.68 each one also off once a script's Disable of its reference is in the world change list, the references from id1/world-barriers.txt) |
 | CharGenDoorEnterCaptain | bitter coast region | runs | 1 door; placed 1 (Morrowind 1) | chargen door captain | activate, getitemcount, messagebox, onactivate | 3: getitemcount, local, onactivate | - | - |
 | CharGenDoorExitCaptain | bitter coast region | runs | 1 door; placed 1 (Morrowind 1) | chargen exit door | activate, enableinventorymenu, enablemagicmenu, enablemapmenu, enableplayerfighting, enableplayermagic, enablestatsmenu, getitemcount, messagebox, onactivate | 3: getitemcount, local, onactivate | - | - |
 | CharGenDoorGuardTalker | bitter coast region | runs | 1 NPC; placed 1 (Morrowind 1) | chargen door guard | enableplayerfighting, enableplayermagic, getdistance, getitemcount, getsecondspassed, menumode, playsound3d, say, saydone, unlock | 8: getdistance, getitemcount, local, menumode, saydone | - | - |

@@ -297,6 +297,7 @@ OPTIONS = {
     'dlc': 'mode', 'dlc_off': 'mode',
     # the Bloodmoon layer's CHIM test frames (TEST BUILDS ONLY; the image does not take them)
     'chim_sol_test': 'opt-in, not shipped', 'chim_sol_tree_copies': 'opt-in, not shipped',
+    'chim_mesh_method_set': 'opt-in, not shipped', 'chim_sol_test_look_only': 'opt-in, not shipped',
     # the build module tribunal-mournhold (Mournhold's districts as a world of their own): part of what selecting
     # Tribunal builds; off leaves the module out
     'presented_exteriors': 'mode',

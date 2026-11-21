@@ -29,11 +29,13 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.67 (b9b215d9) | 2026-11-21 | gate 12265 of the planning item OUTDOOR-DISABLE-NOT-HIDDEN-68 | Every outdoor placement a script can switch off or on gets its hide rows, in the base world and in every store of frames the image installs (the change in f6edb6c53). |
+| shipped | the v0.0.68-dev3 snapshot build | v0.0.68-dev3 (9a91382c3, build 2026_11_21_v0.0.68-dev3_full-dev3_9a91382) | 2026-11-21 | the delivered build holds the commit (gate 12300) | A placement outdoors that a script switches off or on disappears and comes back as the script says, as in the original. |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-20: reported in v0.0.68-dev1
 - 2026-11-21: fixed in source: a gated commit, v0.0.67 (b9b215d9); gate 12265 of the planning item OUTDOOR-DISABLE-NOT-HIDDEN-68: Every outdoor placement a script can switch off or on gets its hide rows, in the base world and in every store of frames the image installs (the change in f6edb6c53).
+- 2026-11-21: shipped: the v0.0.68-dev3 snapshot build, v0.0.68-dev3 (9a91382c3, build 2026_11_21_v0.0.68-dev3_full-dev3_9a91382); the delivered build holds the commit (gate 12300): A placement outdoors that a script switches off or on disappears and comes back as the script says, as in the original.
 
 <!-- END GENERATED TIMELINE -->
 

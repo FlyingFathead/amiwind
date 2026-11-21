@@ -420,6 +420,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 
 Related bugs in other categories:
 
+- [INVISIBLE-WALLS-NOT-BUILT-68](INVISIBLE-WALLS-NOT-BUILT-68.md): Invisible walls of the game outside the opening are not built: five at Mournhold's city edges, which show "You may not leave the city this way." in the original, and one at exterior cell 15,5, so the player can walk where the original stops him
 - [NPC-STORY-DISABLED-AT-START-42](NPC-STORY-DISABLED-AT-START-42.md): Story NPCs the original disables at the start (the twelve town Dreamers, the Dreamer Prophet) stand in the world from the first minute
 
 <!-- END GENERATED CATEGORY -->

@@ -266,5 +266,115 @@ class SeydaInputTests(unittest.TestCase):
         self.assertIn('dropped %d hidden editor marker(s)', source)
 
 
+def esm_sub(tag, data):
+    import struct
+    if isinstance(data, str):
+        data = data.encode('cp1252') + b'\0'
+    return tag.encode('ascii') + struct.pack('<I', len(data)) + data
+
+
+def esm_record(tag, *subs, flags=0):
+    import struct
+    payload = b''.join(subs)
+    return tag.encode('ascii') + struct.pack('<III', len(payload), 0, flags) + payload
+
+
+def esm_cell(name, x, y, interior, refs):
+    """A CELL with REFS [(number, id, (x, y, z), (rx, ry, rz), scale)]."""
+    import struct
+    parts = [esm_sub('NAME', name), esm_sub('DATA', struct.pack('<Iii', 1 if interior else 0, x, y))]
+    for number, ident, pos, rot, scale in refs:
+        parts += [esm_sub('FRMR', struct.pack('<I', number)), esm_sub('NAME', ident)]
+        if scale != 1:
+            parts.append(esm_sub('XSCL', struct.pack('<f', scale)))
+        parts.append(esm_sub('DATA', struct.pack('<6f', *pos, *rot)))
+    return esm_record('CELL', *parts)
+
+
+class CollisionBoxTests(unittest.TestCase):
+    """OPENING-BARRIERS-PER-BOX-68 / INVISIBLE-WALLS-NOT-BUILT-68 (v0.0.68): every collision marker of the game masters
+    becomes a solid box at its placement (the model's collision box through the placement's rotation and scale), the
+    opening's boxes keep their own tables and give only their references, a box in a district the build presents is at
+    its moved place and a box in any other room is refused; the image's world-barriers.txt (engine aw_barrier.c)."""
+
+    def data(self, tmp, tribunal_cell='Mournhold, Test'):
+        import math
+        d = Path(tmp)
+        (d / 'meshes/x').mkdir(parents=True)
+        box = nif([b'Tri EditorMarker_box_01'], collision=1)     # collision x 100..108, y 0..8, z 0
+        (d / 'meshes/editormarker_box_01.nif').write_bytes(box)
+        (d / 'meshes/x/editormarker_box_02.nif').write_bytes(nif([b'Tri EditorMarker_box_02'], collision=1))
+        (d / 'meshes/plain.nif').write_bytes(nif([b'wall'], marker=None))
+        acti = lambda ident, model, script='': esm_record(   # noqa: E731
+            'ACTI', esm_sub('NAME', ident), esm_sub('MODL', model), *([esm_sub('SCRI', script)] if script else []))
+        mw = [esm_record('TES3', esm_sub('HEDR', b'\0' * 300)),
+              acti('CharGenCollision - extra', 'EditorMarker_box_01.NIF', 'CharGenDisable'),
+              acti('wall_box', 'EditorMarker_box_01.NIF'), acti('plain', 'plain.nif'),
+              esm_cell('Seyda Neen', -2, -9, False, [(101, 'CharGenCollision - extra', (0, 0, 0), (0, 0, 0), 1),
+                                                      (102, 'CharGenCollision - extra', (8, 0, 0), (0, 0, 0), 1)]),
+              esm_cell('', 15, 5, False, [(201, 'wall_box', (1000, 2000, 30), (0, 0, math.pi / 2), 2),
+                                          (202, 'plain', (0, 0, 0), (0, 0, 0), 1)]),
+              esm_cell('Imperial Prison Ship', 0, 0, True, [(103, 'CharGenCollision - extra', (1, 2, 3), (0, 0, 0), 1)])]
+        (d / 'Morrowind.esm').write_bytes(b''.join(mw))
+        tr = [esm_record('TES3', esm_sub('HEDR', b'\0' * 300), esm_sub('MAST', 'Morrowind.esm'),
+                         esm_sub('DATA', b'\0' * 8)),
+              acti('EditorMarker_box_02', 'x/EditorMarker_box_02.NIF', 'ExitBlockMessage'),
+              esm_cell(tribunal_cell, 0, 0, True, [(301, 'EditorMarker_box_02', (64, -64, 1056), (0, 0, 0), 1)])]
+        (d / 'Tribunal.esm').write_bytes(b''.join(tr))
+        return d
+
+    PLACES = {'mournhold, test': {'cell': 'Mournhold, Test', 'block': [0, -30], 'size': [1, 1],
+                                  'offset': [1000.0, -2000.0]}}
+
+    def test_every_collision_marker_is_a_box_at_its_placement(self):
+        import editor_markers
+        import world_barriers as E
+        with tempfile.TemporaryDirectory() as tmp:
+            boxes, opening = E.collision_boxes(self.data(tmp), self.PLACES)
+            editor_markers._RECORDS.clear()
+        self.assertEqual(opening, {'exterior': [101, 102], 'ship': [103]})     # prepare_character's rows, in order
+        by = {b['id']: b for b in boxes}
+        self.assertEqual(sorted(by), ['EditorMarker_box_02', 'wall_box'])       # the plain model is no marker
+        wall = by['wall_box']
+        self.assertEqual((wall['key'], wall['master'], wall['cell'], wall['script']), (201, 'Morrowind.esm', [15, 5], ''))
+        # the model's collision box centre (104, 4, 0) scaled 2 and turned by the placement (z: the TES3 sign rule)
+        self.assertEqual([round(v, 3) for v in wall['centre']], [1008.0, 1792.0, 30.0])
+        self.assertEqual(wall['half'], [8.0, 8.0, 1.0])                         # a flat box keeps one unit, scaled
+        self.assertEqual([[round(v, 6) for v in a] for a in wall['axes']], [[0.0, -1.0, 0.0], [1.0, 0.0, 0.0],
+                                                                            [0.0, 0.0, 1.0]])
+        lid = by['EditorMarker_box_02']
+        self.assertEqual(lid['key'], (1 << 22) + 301)                           # Tribunal's own placement's key
+        self.assertEqual(lid['centre'], [1168.0, -2060.0, 1056.0])              # at the district's moved place
+        self.assertEqual((lid['half'], lid['script'], lid['cell']), ([4.0, 4.0, 0.5], 'exitblockmessage',
+                                                                       'Mournhold, Test'))
+        text = E.world_barriers_text(boxes, opening).splitlines()
+        self.assertEqual(text[:3], ['AWWB1', 'opening 2 101 102', 'ship 1 103'])
+        self.assertEqual(text[3].split()[:5], ['box', '201', '1008.000', '1792.000', '30.000'])
+        self.assertEqual(len(text[3].split()), 2 + 3 + 9 + 3)
+
+    def test_a_box_in_a_room_not_presented_is_refused(self):
+        import editor_markers
+        import world_barriers as E
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(ValueError, 'outdoors only'):
+                E.collision_boxes(self.data(tmp, tribunal_cell='Some Room'), self.PLACES)
+            editor_markers._RECORDS.clear()
+
+    def test_the_image_writes_and_the_engine_reads_the_table(self):
+        aga = (ROOT / 'tools/build_aga.py').read_text(encoding='utf-8')
+        self.assertIn("write_world_barriers(args,boot/'id1',out)", aga)
+        self.assertIn("world_barriers.collision_boxes(args.data_files, presented_places(args)[0])", aga)
+        # the CHIM world stages read tools/editor_markers.py: the boxes live in a module only the image step reads
+        self.assertNotIn('def collision_boxes', (ROOT / 'tools/editor_markers.py').read_text(encoding='utf-8'))
+        barrier = (ROOT / 'engine/aga/src/aw_barrier.c').read_text(encoding='utf-8')
+        self.assertIn('COM_FOpenFile("world-barriers.txt",&f)', barrier)
+        self.assertIn('box_on=box_refs==count?bits(box_ref,count):~0UL;', barrier)
+        self.assertIn('if(!AW_SourceToWorld(sv.name,world_rows[i].centre,local))continue;', barrier)
+        server = (ROOT / 'engine/aga/src/sv_main.c').read_text(encoding='utf-8')
+        self.assertIn('AW_BarrierServerReset();', server)
+        host = (ROOT / 'engine/aga/src/aw_mwhost.c').read_text(encoding='utf-8')
+        self.assertIn('touch=ref && AW_BarrierTouching(ref);', host)
+
+
 if __name__ == '__main__':
     unittest.main()

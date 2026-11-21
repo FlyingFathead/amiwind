@@ -285,6 +285,8 @@ on disk.
 | RGNS | 2 | the region catalogue's ids in its order (v0.0.68, on disk): the id as the region's record writes it; row N is the region index a compiled `ChangeWeather` or `ModRegion` hands the engine. The console's `ChangeWeather` and `ModRegion` find a typed id here (a few small reads a line, never in a frame of play) and `dbg weather` names the region it shows. An older file has none: the console then names no region | 32 (16 rows: the three game files' regions; 18 with the base game alone) |
 | WERE | 4 | the werewolf's game settings as a compiled `BecomeWerewolf` and `SetWerewolfAcrobatics` hand them to the engine (v0.0.68, on disk): nine rows of the eight attributes and 27 skills from the `fWereWolf` settings, a byte each, four to a row (255: no setting), then the Acrobatics value. The console's `BecomeWerewolf` and `SetWerewolfAcrobatics` read them (ten small reads a line); an older file has none and the console's player forms refuse | 40 (10 rows) |
 | EFFN | 2 | the magic effects' game setting ids without `sEffect`, in the game's numbering (v0.0.68, on disk): row N is the number a compiled `GetEffect` hands the engine. The console's `GetEffect` finds a typed id here (one read of the section, then the names up to the match, never in a frame of play); an older file has none and the console takes a number only | 286 (143 rows) |
+| CELN | 24 | the cells a console line can name (v0.0.68, on disk): every interior cell (its stable number, its room map's name and recentring), every exterior cell name, every district the build presents as exterior cells (its move), sorted by the 32-bit FNV-1a of the name with A-Z lowered. The console's `PositionCell`, `PlaceItemCell`, `AIFollowCell` and `AIEscortCell` find a typed cell here by a binary search (about a dozen reads of 24 bytes, then the name) and work it out as the compiler does; its `GetPCCell` reads a room's name by its number. Rows of one hash are each checked by their own name (the three game files have no two names of one hash). An older file has none: the console's cell forms refuse | about 34,000 (1,423 rows: 1,328 interiors and 95 exterior names of the three game files) |
+| CELG | 4 | every exterior grid cell by the name OpenMW gives it (v0.0.68, on disk): its own name, else its region's, else `sDefaultCellname`; a presented district's block cells by the district's name. The console's `GetPCCell` outdoors reads the player's cell here (a binary search) | about 6,300 (1,559 grid cells of the three game files and the presented blocks) |
 | | | file / resident | 446,316 / 183,212 |
 
 CODE, PCEL and PMOV measured 27 October 2026 (v0.0.54, without the media catalogue: the whole file 1,062,900 bytes
@@ -979,6 +981,24 @@ faction is found by a scan of the file's strings on disk, which takes several se
 never a script's path (scripts carry the faction's string number). Checked in game on 30 October 2026 (Seyda Neen
 MiniWind, 32 MB Fast): crime level 1450, reputation 12, a Mages Guild rank and one known topic set, a quicksave, all
 changed, a quickload: the crime level, the reputation and the topic came back.
+
+The interpreter's own opcodes typed on the console (v0.0.68): `MenuMode`, `OnActivate`, `CellChanged`,
+`GetSecondsPassed`, `Random`, `XBox`, `GetButtonPressed`, `DontSaveObject`, `Fall` and `GetSquareRoot` answer what the
+opcode would read on that line's target (OpenMW 0.51's rules). The console is a menu, so `MenuMode` reads 1 while it is
+open. `Random N` is the next roll of the one generator the scripts use. `GetSecondsPassed` is the interpreter's last
+frame. `GetButtonPressed` takes the message box's answer, as a script's read does. `CellChanged` and `OnActivate` read
+the target's own attached script, and a target without one reads 0. As in the original, `OnActivate` read on an
+object passes the object's next use to its script; the object's `Activate` gives it back. `DontSaveObject` and `Fall`
+do nothing, and `XBox` reads 0.
+
+The cell commands typed on the console (v0.0.68): `PositionCell`, `PlaceItemCell`, `AIFollowCell`, `AIEscortCell` and
+`GetPCCell` find the cell by its name in the CELN and CELG sections, and the console works out the move with the
+compiler's own rules. The player is moved into the room's map at the given point, as a door arrival would put him, or
+outdoors. Another actor moves to the room's map units or outdoors; a cell the game does not have does nothing, as in
+OpenMW. A presented district moves by its own offset. The line then makes the same call a compiled line makes.
+`GetPCCell` compares the name of the player's cell with the typed text from its start, in any case: a room's name, or
+an exterior cell's name as OpenMW gives it. The two sections and their names cost about 103 KB in the file on disk
+(34 KB of rows, 6 KB of grid cells, about 63 KB of names in STRS) and nothing in memory.
 
 Not yet (111 functions the game's scripts call, 124 before v0.0.57). The ones that stop the most scripts, measured 30 October 2026 (`python3 -m mwscript.measure`,
 "blockers": the scripts for which the function is the only call not carried out, of the scripts using it):

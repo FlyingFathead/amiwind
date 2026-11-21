@@ -1277,6 +1277,24 @@
       "to": false,
       "source": "tools/build_parser.py, tools/reuse_all.py default_choice, tools/build.py (BUILD-OFFER-EARLIER-RUNS-67)",
       "note": "A plain build (no --reuse-from, --reuse-all-available, --no-reuse, --clean, --release-from-scratch, --no-profile, --dry-run or --recover-image-from) in a workspace whose stage index holds earlier builds now plans its stages as --reuse-all-available does, with the first-minute stops as notices, asks once in a terminal (no terminal: yes) and prints what it took from which earlier build with the from-scratch build recommended if something looks wrong; --no-reuse (false by default) turns that off for one build: every stage runs, its units still come from the workspace cache. No stage key changes; the --reuse-all-available default stays off for explicit callers"
+    },
+    {
+      "version": "0.0.68-dev3",
+      "option": "chim_mesh_method_set",
+      "flag": "--chim-mesh-method-set",
+      "change": "added",
+      "to": null,
+      "source": "tools/build_parser.py, tools/bloodmoon_solstheim_module.py, tools/bloodmoon_solstheim.py, tools/solstheim_test_world.py, tools/chim/method_sets.py, config/mesh-method-sets.json (SOL-GLACIER-METHODS-AB-COMPARE-68)",
+      "note": "Solstheim's stages only (the module's world stage and the --chim-sol-test stages): the named set of config/mesh-method-sets.json for the meshes it lists, installed by those stages' runners for their own process; unset (the default) and the set baseline are today's methods; the base world's command, key and output are the same with any set"
+    },
+    {
+      "version": "0.0.68-dev3",
+      "option": "chim_sol_test_look_only",
+      "flag": "--chim-sol-test-look-only",
+      "change": "added",
+      "to": false,
+      "source": "tools/build_parser.py, tools/build.py chim_sol_test_commands, tools/solstheim_test_world.py, tools/build_aga.py (SOL-GLACIER-METHODS-AB-COMPARE-68)",
+      "note": "Test builds only, with --chim-sol-test: the chim-sol stage's heap and zone walk gates report instead of stopping (their full reports still written), the stage's receipt and the image's record say the Solstheim test store holds frames that do not fit 32 MB, look only; refused for release candidates and finals; off by default"
     }
   ],
   "current": {
@@ -1336,6 +1354,7 @@
       "chim_hollow_bevels": null,
       "chim_lighting_type": null,
       "chim_mesh_method": null,
+      "chim_mesh_method_set": null,
       "chim_model_bevels": null,
       "chim_model_hull_patch": "on",
       "chim_model_weld": null,
@@ -1348,6 +1367,7 @@
       "chim_regions": [],
       "chim_regions_status": null,
       "chim_sol_test": null,
+      "chim_sol_test_look_only": false,
       "chim_sol_tree_copies": null,
       "chim_stream_statics": true,
       "chim_terrain_hull": "compiled",

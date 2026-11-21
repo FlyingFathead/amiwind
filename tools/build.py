@@ -799,6 +799,17 @@ def chim_sol_test_commands(args, steps, tool, run, tools, jobs):
         return steps
     from chim.regions import decode_cells
     decode_cells(cells)                                  # a bad cell list stops here, before any stage
+    # a test image: Solstheim is only the named cells (the Solstheim module is left out, below), so never a release
+    # candidate or final
+    from project_version import require_private_test_version
+    require_private_test_version(VERSION, ['--chim-sol-test'])
+    if getattr(args, 'bloodmoon_solstheim_cells', None):
+        # the Solstheim module installs its world as the store chimsol, the name this route's test world takes: two
+        # chimsol stores stop the image step (tools/bloodmoon_solstheim_module.py resolve leaves the module out of a
+        # --chim-sol-test build; this refuses the plan, before any stage, if both are ever in it)
+        raise SystemExit('--chim-sol-test and the Solstheim build module (bloodmoon-solstheim) both make the store '
+                         'chimsol: drop --chim-sol-test for a build with the module, or build the test image without '
+                         'the module (a --chim-sol-test build leaves it out; --no-dlc or --dlc tribunal do too)')
     index = next(i for i, (name, _) in enumerate(steps) if name == 'chim') + 1
     palette = run / 'intro-scene/id1/gfx/palette.lmp'
     copies = getattr(args, 'chim_sol_tree_copies', 'off') or 'off'
@@ -807,7 +818,25 @@ def chim_sol_test_commands(args, steps, tool, run, tools, jobs):
     # switch: the original trees in run/chim-sol AND the star trees in run/chim-sol-star, which the image adds to the
     # same store as alternative models for aw_tree_crowns 1 (tools/chim/alt_models.py)
     star_entry = ('chim_tree_star.py', '--tree-star', Path(__file__).resolve().parents[1] / 'config/tree-copies.json')
-    entry = star_entry if star else ('chim_build.py',)
+    # the mesh method set and the look-only image (SOL-GLACIER-METHODS-AB-COMPARE-68): the world stage through its own
+    # runner (tools/solstheim_test_world.py: units from the shared storage pool, the set, the heap gate as a report)
+    method_set = getattr(args, 'chim_mesh_method_set', None)
+    look_only = bool(getattr(args, 'chim_sol_test_look_only', False))
+    if star and (method_set or look_only):
+        raise SystemExit('--chim-sol-tree-copies star does not take --chim-mesh-method-set or --chim-sol-test-look-only')
+    if look_only:
+        # frames that do not fit 32 MB are for look-only sessions: refused for release candidates and finals
+        from project_version import require_private_test_version
+        require_private_test_version(VERSION, ['--chim-sol-test-look-only'])
+    entry = star_entry
+    if not star:
+        # always through the runner, with or without a set: it reads the layered test folder with that folder's own
+        # master alone, where the build's selection names masters the folder does not hold (the chim-sol stage stopped
+        # on 'Missing Tribunal.esm', 21 November 2026)
+        import storage_pool
+        pool = storage_pool.resolve_dir(args.workspace, getattr(args, 'storage_pool_dir', None))[0]
+        entry = ('solstheim_test_world.py', '--unit-pool', pool,
+                 *(('--mesh-method-set', method_set) if method_set else ()), *(('--look-only',) if look_only else ()))
     trees = [('chim-sol-trees', tool('chim_tree_copies.py', '--data-files', run / 'chim-sol-data', '--palette', palette,
                                      '--out', run / 'chim-sol-trees', '--jobs', jobs))] if copies != 'off' else []
 
@@ -829,6 +858,14 @@ def chim_sol_test_commands(args, steps, tool, run, tools, jobs):
     if copies == 'switch':
         extra += ['--chim-sol-alt', '1=' + str(run / 'chim-sol-star')]
     return [(name, list(command) + extra if name == 'image' else command) for name, command in steps]
+
+
+def chim_sol_test_module_record(args):
+    """build-state.json "bloodmoon_solstheim_module": the record tools/bloodmoon_solstheim_module.py resolve returns
+    when a --chim-sol-test image leaves the Solstheim module out ({'built': False, 'reason'}), else None, so every
+    other build's record is the one before."""
+    record = getattr(args, 'bloodmoon_solstheim_record', None)
+    return record if isinstance(record, dict) and record.get('built') is False else None
 
 
 # THE EXPANSIONS AS BUILD MODULES (decided for the project 2026-11-18, MOURNHOLD-EXTERIOR-CELLS-66): an expansion's
@@ -3978,6 +4015,10 @@ def _main(argv=None):
         summary.expansions = metadata['expansions']
         # The layer set --dlc / --no-dlc chose (DLC-BUILD-LATER): recorded, never a key of a base stage.
         metadata['expansion_layers'] = getattr(args, 'expansion_layers', None)
+        # A --chim-sol-test image leaves the Solstheim module out: said in build-state.json (chim_sol_test_module_record)
+        solstheim_module = chim_sol_test_module_record(args)
+        if solstheim_module is not None:
+            metadata['bloodmoon_solstheim_module'] = solstheim_module
         # the selected master list in load order, for the stages that read the layers (build_cache.MASTERS_ENV; keyed
         # through their game_inputs only)
         import build_cache as _layer_keys

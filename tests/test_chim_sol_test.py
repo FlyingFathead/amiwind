@@ -48,7 +48,8 @@ class SolTestCommands(unittest.TestCase):
         commands = dict(steps)
         self.assertEqual([n for n, _ in steps], ['chim', 'chim-sol-data', 'chim-sol-trees', 'chim-sol', 'chim-sol-star',
                                                  'image'])
-        self.assertIn('chim_build.py', ' '.join(commands['chim-sol']))
+        # the stage's runner, which runs tools/chim_build.py in its process with the layered folder's own master
+        self.assertIn('solstheim_test_world.py', ' '.join(commands['chim-sol']))
         self.assertIn('chim_tree_star.py', ' '.join(commands['chim-sol-star']))
         self.assertEqual(commands['image'][-4:], ['--chim-sol-world', str(Path('/run') / 'chim-sol'),
                                                   '--chim-sol-alt', '1=' + str(Path('/run') / 'chim-sol-star')])

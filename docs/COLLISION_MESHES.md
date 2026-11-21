@@ -466,6 +466,14 @@ The rest of the path:
   else to draw) out of the drawn scenery at the input, keeping it as an invisible sound, effect
   or collision object in the build's emitter table (`emitters.json`). The rules are in
   `src/mwad/markers.py`; [COLLISION-NC-FLAGS-32](bugs/COLLISION-NC-FLAGS-32.md).
+  Since v0.0.68 every collision marker of the game masters is solid, as in the original. The opening's 23 boxes keep
+  their own tables (`tools/prepare_character.py`). The others are written by the image step into
+  `id1/world-barriers.txt` (`tools/world_barriers.py collision_boxes`): the model's collision box, turned and scaled
+  by the placement. For the three game files these are the five lids over Mournhold's districts, the wall at exterior
+  cell 15,5 and the falling mage's platform. A box in a district the build presents as exterior cells is at its moved
+  place. The engine (`aw_barrier.c`) keeps the player out of these boxes, walking or levitating. A box goes once a
+  script disables its reference (the world change list's row; the opening's boxes also keep their story condition),
+  and `GetCollidingPC` reads the box the player last met. A plane with no thickness collides as a slab one unit thick.
 - No converter reads `Bounding Box` nodes (the actor boxes come from the creature and NPC
   converters). The flora sprite path (`tools/prepare_tree_sprites.py` `collision_metadata`) keeps
   its own ground-vegetation rule. AmiWind has no camera collision.

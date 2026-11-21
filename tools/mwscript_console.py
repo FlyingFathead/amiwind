@@ -31,11 +31,39 @@ def counts(data=None):
     return {s: c.get(s, 0) for s in STATES}
 
 
-def sync(data):
-    """The census follows the function table: a planned command the table carries becomes vm; every planned one
-    gets the reason it stays planned ("why")."""
+# CONSOLE-CENSUS-MISSES-FUNCTIONS-68 (v0.0.68): every function of the compiler's table (tools/mwscript/functions.py) has a
+# census row. complete() adds a row for each one the census lacks, grouped by the namespace OpenMW 0.51 registers it
+# in (components/compiler/extensions0.cpp): the control switches in Control's loop, and the magic effects and the
+# health, magicka and fatigue ratios in Stats'. A name registered on its own keeps its own namespace (GROUP_NAMED).
+# MessageBox and Say3D have no row in that file (the compiler parses MessageBox itself): they are the original's
+GROUPS = {'control': 'Control', 'spells': 'Stats', 'stats': 'Stats', 'ai': 'Ai', 'anim': 'Animation', 'audio': 'Sound',
+          'cell': 'Cell', 'dialogue': 'Dialogue', 'journal': 'Dialogue', 'inventory': 'Container',
+          'position': 'Transformation', 'sky': 'Sky', 'ui': 'Gui', 'console': 'Console'}
+GROUP_NAMED = {'getspellreadied': 'Misc', 'getcollidingactor': 'Misc', 'getstandingactor': 'Misc'}
+ORIGINAL_ONLY = ('messagebox', 'say3d')
+
+
+def complete(data):
+    """Add a census row (planned, sync() gives its state) for every function of the compiler's table that is neither a
+    name nor a short form of the census; the rows sorted by name. The added names."""
     sys.path.insert(0, str(ROOT / 'tools'))
     from mwscript import functions as F
+    have = {r['name'] for r in data['commands']} | {r['short'] for r in data['commands'] if r.get('short')}
+    added = [n for n in sorted(F.FUNCTIONS) if n not in have]
+    for name in added:
+        data['commands'].append({'name': name, 'sources': ['original' if name in ORIGINAL_ONLY else 'OpenMW 0.51'],
+                                 'group': GROUP_NAMED.get(name) or GROUPS.get(F.FUNCTIONS[name].group, 'Misc'),
+                                 'state': 'planned', 'amiwind': ''})
+    data['commands'].sort(key=lambda r: r['name'])
+    return added
+
+
+def sync(data):
+    """The census follows the function table: every function of the compiler has a row (complete); a planned command
+    the table carries becomes vm; every planned one gets the reason it stays planned ("why")."""
+    sys.path.insert(0, str(ROOT / 'tools'))
+    from mwscript import functions as F
+    complete(data)
     table = {r.split()[0]: r.split()[1] for r in function_rows()}
     for r in data['commands']:
         n = r['name']
@@ -113,8 +141,11 @@ FUNCTIONS_FILE = ROOT / 'config/mwconsole-functions.txt'   # staged as id1/mwcon
 # PlaceItem (aw_mwhost.c console_place: the object's row among the compiled file's placing rows, PLAC), and Cast,
 # ExplodeSpell, RemoveSpellEffects, GetSpellEffects, GetEffect, HasItemEquipped, Drop and AddTopic (aw_mwhost.c
 # console_spells: the spell's, item's or topic's row by its id, the effect's number from the compiled file's effect
-# table, EFFN); they stay here, out of the function table
+# table, EFFN), and PositionCell, PlaceItemCell, AIFollowCell, AIEscortCell and GetPCCell (aw_mwhost.c
+# console_cell_line: the cell by its name in the compiled file's cell table, CELN and CELG, worked out as the compiler
+# does by aw_mwconsole.c AW_MwConsoleCellMove); they stay here, out of the function table
 COMPILED_ARGUMENTS = {
+    'getpccell': 'the cells its name matches',
     'cast': 'the spell\'s effect row', 'hasitemequipped': 'the item\'s row', 'getspelleffects': 'the spell\'s row',
     'becomewerewolf': 'the werewolf settings', 'setwerewolfacrobatics': 'the werewolf settings',
     'explodespell': 'the spell\'s row', 'removespelleffects': 'the spell\'s row', 'geteffect': 'the effect number', 'addtopic': 'the topic row',
@@ -172,11 +203,17 @@ CONSOLE_WHY = {
                          'and the original\'s StopSound that ends it is AmiWind\'s own stopsound here',
 }
 # the interpreter's own opcodes (functions.RUN) the console carries by name in aw_mwhost.c console_special, with the
-# host function each one calls
+# host function each one calls; since v0.0.68 (family 7) also the pure opcodes, read as a script line reads them: the
+# reading the opcode takes (aw_mwvm.c), or nothing for the two OpenMW does nothing for and XBox's constant
 SPECIAL = {'lock': 'host_object', 'unlock': 'host_object', 'getlocked': 'host_object', 'activate': 'host_object',
            'startcombat': 'host_combat', 'stopcombat': 'host_combat', 'getdeadcount': 'host_dead_count',
            'getcurrentaipackage': 'host_ai_package', 'getaipackagedone': 'host_ai_package', 'getspell': 'host_spell',
-           'getcommondisease': 'host_spell', 'getblightdisease': 'host_spell', 'getdistance': 'host_distance'}
+           'getcommondisease': 'host_spell', 'getblightdisease': 'host_spell', 'getdistance': 'host_distance',
+           'menumode': 'host_menu_mode', 'getbuttonpressed': 'host_button', 'random': 'AW_MwvmRandom',
+           'getsecondspassed': 'AW_MwvmFrameSeconds', 'cellchanged': 'AW_MwvmCellChanged',
+           'onactivate': 'AW_MwvmOnActivate', 'getsquareroot': 'the square root, as the opcode',
+           'xbox': 'the constant 0, as OpenMW', 'dontsaveobject': 'nothing to do, as OpenMW',
+           'fall': 'nothing to do, as OpenMW'}
 
 def function_rows():
     """The console's function table (AWMF1), from the compiler's own table (tools/mwscript/functions.py): per line

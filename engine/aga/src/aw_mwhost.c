@@ -3755,6 +3755,14 @@ static int gap_call(int instance,int target,int function,const aw_mwcell_t *numb
         touch=e && !e->free && sv_player && e!=sv_player;
         for(i=0;i<3 && touch;i++)
             if(sv_player->v.absmin[i]>e->v.absmax[i]+1 || sv_player->v.absmax[i]<e->v.absmin[i]-1)touch=0;
+        if(!e && sv_player){
+            /* INVISIBLE-WALLS-NOT-BUILT-68 (v0.0.68): a solid box without an entity (aw_barrier.c, a collision marker
+             * outside the opening such as Mournhold's lids, whose ExitBlockMessage reads this): met by the player's move
+             * in the last tenth of a second */
+            int AW_BarrierTouching(unsigned int reference);
+            uint32_t ref=transform_reference(instance,target);
+            touch=ref && AW_BarrierTouching(ref);
+        }
         if(function==AWF_GETCOLLIDINGPC){result->i=touch;return AW_MWVM_CALL_READ;}
         if(!touch || host_menu_mode() || sv_player->v.health<=0 || ((int)sv_player->v.flags&FL_GODMODE) || count<1)return 1;
         hurt=numbers[0].f*(float)host_frametime;
@@ -7136,7 +7144,7 @@ static void console_sound(int k,int who,edict_t *e,int command,const aw_mwcon_li
  * own id checked; dbg mwscript call placeatpc finds it the same way), then the compiled line's host call (place_call).
  * PlaceAtMe places at the target given by id->, else at the player. A count below 0 or a direction outside 0..3 is
  * refused and nothing is placed. An object no Place call names is answered, nothing placed (any record: work item
- * CONSOLE-PLACE-ANY-RECORD-68). PlaceItemCell stays planned: its cell's room and place are the compiler's. Rules from
+ * CONSOLE-PLACE-ANY-RECORD-68). PlaceItemCell: console_cell_line below (its cell from the cell table). Rules from
  * OpenMW apps/openmw/mwscript/transformationextensions.cpp OpPlaceItem 541-585, OpPlaceAt 587-625 (read, not copied).
  * Nothing kept: the rows are the resident PLAC section --- */
 static int place_row_named(const char *id){
@@ -7268,6 +7276,90 @@ static void console_spells(int k,int who,int command,const aw_mwcon_line_t *l,ch
     if(command==AW_MWCON_EXPLODESPELL)
         Q_snprintf(answer,capacity,"%s %s: %s.\n",name,l->arg[0],explodes>before?"exploded":"nothing (no effects here)");
 }
+/* --- v0.0.68 (MW-CONSOLE-COMMANDS-62, the cell table): PositionCell X Y Z ZROT CELL, PlaceItemCell ID CELL X Y Z ZROT,
+ * AIFollowCell and AIEscortCell TARGET CELL DURATION X Y Z, GetPCCell CELL typed. The cell is found by its name in the
+ * compiled file's cell table (CELN, tools/mwscript/awms.py cell_rows: a binary search on disk, about a dozen reads of 24
+ * bytes and the name), worked out by the compiler's own rules (aw_mwconsole.c AW_MwConsoleCellMove: the room's number
+ * and map, its recentring, a presented district's move), then the call the compiled line makes: the player's move
+ * (host_player_move), position_cell, place_call, ai_package. GetPCCell compares the name of the player's cell (the room's
+ * by its number, an exterior cell's in CELG: OpenMW's getCellName) with the typed start, any case. Rules from OpenMW
+ * apps/openmw/mwscript/transformationextensions.cpp OpPositionCell 373-, OpPlaceItemCell 499-; aiextensions.cpp
+ * OpAiFollowCell, OpAiEscortCell; cellextensions.cpp OpGetPCCell 159-179 (read, not copied). Nothing kept. --- */
+static int cells_read(void *user,unsigned long offset,unsigned char *out,unsigned long bytes){
+    (void)user;return !actor_read(NULL,(uint32_t)offset,out,(uint32_t)bytes);}
+static int cells_string(void *user,int index,char *out,int capacity){(void)user;return read_string(index,out,capacity);}
+static int console_cells(aw_mwcon_cells_t *t){
+    uint32_t off,rows,bytes;
+    memset(t,0,sizeof(*t));t->read=cells_read;t->string=cells_string;
+    if(!AW_MwscriptActors())return 0;
+    if(AW_MwvmSection("CELN",&off,&rows,&bytes) && (uint32_t)AW_MWCON_CELL_BYTES*rows<=bytes){t->celn=off;t->celn_rows=rows;}
+    if(AW_MwvmSection("CELG",&off,&rows,&bytes) && 4u*rows<=bytes){t->celg=off;t->celg_rows=rows;}
+    return t->celn_rows>0;
+}
+static void console_cell_line(int k,int who,int command,const aw_mwcon_line_t *l,char *answer,int capacity){
+    static aw_mwcon_cells_t t;
+    const char *name=AW_MwConsoleCommandName(command,NULL),*cell;aw_mwcon_cell_t row;place_row_t r;
+    aw_mwcell_t numbers[7],result;unsigned char strings[4];float in[4],at[3],yaw;char s[AW_MWCON_TEXT];
+    int found,move,kind,number,verb,i,x,y,where,plac=-1;unsigned long before,refused,away;
+    if(!AW_MwvmScriptCount()){Q_snprintf(answer,capacity,"%s: the compiled scripts are not loaded (dbg mwscript on).\n",name);return;}
+    if(!console_cells(&t)){
+        Q_snprintf(answer,capacity,"%s: no cell table in the compiled scripts (an older id1/mwscript.awm).\n",name);return;}
+    if(command==AW_MWCON_GETPCCELL){
+        where=host_player_cell(&x,&y);
+        if(where==2)found=AW_MwConsoleCellRoomName(&t,x,s,sizeof(s));
+        else if(where==1)found=AW_MwConsoleCellGridName(&t,x,y,s,sizeof(s));
+        else found=0;
+        if(!found){Q_snprintf(answer,capacity,"%s %s -> 0 (the player's cell is not in the cell table)\n",name,l->arg[0]);return;}
+        Q_snprintf(answer,capacity,"%s %s -> %d (the player's cell: %s)\n",name,l->arg[0],AW_MwConsoleCellMatches(l->arg[0],s),s);
+        return;
+    }
+    memset(numbers,0,sizeof(numbers));memset(strings,0,sizeof(strings));result.i=0;
+    if(command==AW_MWCON_POSITIONCELL){cell=l->arg[4];for(i=0;i<4;i++)in[i]=console_number(l->arg[i]);}
+    else if(command==AW_MWCON_PLACEITEMCELL){cell=l->arg[1];for(i=0;i<4;i++)in[i]=console_number(l->arg[2+i]);}
+    else{cell=l->arg[1];for(i=0;i<3;i++)in[i]=console_number(l->arg[3+i]);in[3]=0;}
+    if((found=AW_MwConsoleCellFind(&t,cell,&row))<0){
+        Q_snprintf(answer,capacity,"%s: the cell table could not be read.\n",name);return;}
+    if(command==AW_MWCON_PLACEITEMCELL){
+        if((plac=place_row_named(l->arg[0]))<0){
+            Q_snprintf(answer,capacity,"%s: no object \"%s\" among those the game's Place calls name.\n",name,l->arg[0]);return;}
+        if(!place_row(plac,&r)){Q_snprintf(answer,capacity,"%s: %s (row %d) cannot be made yet.\n",name,l->arg[0],plac);return;}
+        verb=r.kind==PLACE_ITEM?AW_MWCON_CELL_PLACE_ITEM:AW_MWCON_CELL_PLACE_ACTOR;
+    }else if(command==AW_MWCON_POSITIONCELL)verb=who==AW_MWVM_PLAYER?AW_MWCON_CELL_PLAYER:AW_MWCON_CELL_ACTOR;
+    else verb=command==AW_MWCON_AIFOLLOWCELL?AW_MWCON_CELL_FOLLOW:AW_MWCON_CELL_ESCORT;
+    move=AW_MwConsoleCellMove(verb,found,&row,in,at,&yaw,&kind,&number);
+    if(move<0){Q_snprintf(answer,capacity,"%s: \"%s\" has no room map in this image; nothing moved.\n",name,cell);return;}
+    if(!move){Q_snprintf(answer,capacity,"%s: no cell \"%s\" in the game; nothing done (as OpenMW).\n",name,cell);return;}
+    if(verb==AW_MWCON_CELL_PLAYER){
+        i=host_player_move(k,kind,kind==AWM_MOVE_ROOM?row.map:-1,at,yaw);
+        Q_snprintf(answer,capacity,"%s: %s %s.\n",name,i?"to":"not possible here (a load under way, or the story's hold), not to",cell);
+        return;
+    }
+    for(i=0;i<3;i++)numbers[i].f=at[i];
+    numbers[3].f=yaw;numbers[4].i=kind;numbers[5].i=number;
+    console_texts[0]=l->arg[0];strings[0]=CONSOLE_STRING>>8;strings[1]=CONSOLE_STRING&255;
+    console_texts[1]=cell;strings[2]=(CONSOLE_STRING+1)>>8;strings[3]=(CONSOLE_STRING+1)&255;
+    if(command==AW_MWCON_POSITIONCELL){
+        before=poscells;refused=poscells_refused;
+        host_call(k,who,AWF_POSITIONCELL,numbers,6,strings+2,1,&result);
+        Q_snprintf(answer,capacity,"%s: %s %s.\n",name,poscells>before?"moved to":poscells_refused>refused?
+                   "not moved (no actor or reference to keep it by, or a room it has no way into) to":"nothing for",cell);
+    }else if(command==AW_MWCON_PLACEITEMCELL){
+        numbers[6].i=plac;before=places;away=places_away;refused=places_refused;
+        host_call(k,who,AWF_PLACEITEMCELL,numbers,7,strings,2,&result);
+        Q_snprintf(answer,capacity,"%s %s in %s: %lu made here, %lu kept for that place%s.\n",name,l->arg[0],cell,
+                   places-before-(places_away-away),places_away-away,places_refused>refused?", refused (aw_mwscript_status)":"");
+    }else{
+        /* the compiled line's carried form: duration, x y z, kind, the room's number; the target and the cell */
+        numbers[0].f=console_number(l->arg[2]);for(i=0;i<3;i++)numbers[1+i].f=at[i];
+        numbers[4].i=kind;numbers[5].i=number;
+        before=command==AW_MWCON_AIFOLLOWCELL?cell_follows:escorts;
+        host_call(k,who,command==AW_MWCON_AIFOLLOWCELL?AWF_AIFOLLOWCELL:AWF_AIESCORTCELL,numbers,6,strings,2,&result);
+        Q_snprintf(answer,capacity,"%s %s %s: %s.\n",name,l->arg[0],cell,
+                   (command==AW_MWCON_AIFOLLOWCELL?cell_follows:escorts)>before?"the package starts":
+                   "refused (the target is no actor here, or the one to follow is not here)");
+    }
+    console_texts[0]=console_texts[1]=NULL;
+}
 static int console_command(const char *target,int command,const aw_mwcon_line_t *l,char *answer,int capacity){
     int k,who,row,n,i;edict_t *e;aw_mwcell_t numbers[6],result;unsigned char strings[4];int32_t values[13];
     const char *name=AW_MwConsoleCommandName(command,NULL);
@@ -7318,12 +7410,12 @@ static int console_command(const char *target,int command,const aw_mwcon_line_t 
         numbers[3].f=l->args>3?console_number(l->arg[3]):0;
         host_call(k,who,command==AW_MWCON_POSITION?AWF_POSITION:AWF_AITRAVEL,numbers,4,strings,0,&result);
         break;
-    case AW_MWCON_POSITIONCELL:
-        /* PositionCell X Y Z ZROT CELL: the player to the cell by dbg tp (as CenterOnCell); the point in it is not
-         * applied yet. Another reference: not yet (its PMOV row is the compiler's) */
-        if(who!=AW_MWVM_PLAYER || l->args<5){Q_snprintf(answer,capacity,"%s: the player and a cell name only for now.\n",name);break;}
-        Q_snprintf(answer,capacity,"%s: to %s (dbg tp).\n",name,l->arg[4]);
-        {char line[128];Q_snprintf(line,sizeof(line),"dbg tp \"%s\"",l->arg[4]);console_exec(line);}
+    case AW_MWCON_POSITIONCELL:case AW_MWCON_PLACEITEMCELL:case AW_MWCON_AIFOLLOWCELL:case AW_MWCON_AIESCORTCELL:
+    case AW_MWCON_GETPCCELL:
+        /* v0.0.68: the cell by its name in the compiled file's cell table (CELN), then the compiled line's work
+         * (console_cell_line above); until v0.0.68 PositionCell took the player to the cell by dbg tp, its point not
+         * applied, and the others stayed planned */
+        console_cell_line(k,who,command,l,answer,capacity);
         break;
     case AW_MWCON_AIWANDER:
         for(n=0;n<l->args && n<AW_MWCON_ARGS;n++)values[n]=(int32_t)console_number(l->arg[n]);
@@ -7419,6 +7511,37 @@ static int console_special(const char *name,int k,int who,edict_t *e,const aw_mw
         if(!o || !e){Q_snprintf(answer,capacity,"getdistance: no such reference here.\n");return 1;}
         VectorSubtract(o->v.origin,e->v.origin,d);
         Q_snprintf(answer,capacity,"getdistance -> %g\n",(double)(sqrt(DotProduct(d,d))*4));return 1;
+    }
+    /* MW-CONSOLE-COMMANDS-62 family 7 (v0.0.68): the interpreter's own opcodes typed on the console, read as a script
+     * line reads them (aw_mwvm.c AWM_MENUMODE, AWM_SECONDS, AWM_RANDOM, AWM_SQRT, AWM_GETBUTTONPRESSED, AWM_CELLCHANGED,
+     * AWM_ONACTIVATE; codegen.py: DontSaveObject and Fall no code, XBox the constant 0). Rules from OpenMW 0.51
+     * apps/openmw/mwscript/miscextensions.cpp (OpMenuMode, OpRandom, OpGetSecondsPassed, OpXBox, OpOnActivate,
+     * OpDontSaveObject, OpGetSquareRoot, OpFall), cellextensions.cpp OpCellChanged, guiextensions.cpp OpGetButtonPressed:
+     * the console is a menu, so MenuMode reads 1 while it is open; GetButtonPressed takes the message box's answer, as
+     * OpenMW's readPressedButton does; CellChanged and OnActivate read the target's own attached script (never the
+     * scratch instance: CONSOLE-SHOWVARS-SCRATCH-INSTANCE-66), and OnActivate hands that object's next use to its
+     * script, as OpenMW's does on any reference (its Activate gives it back) */
+    if(!strcmp(name,"menumode")){Q_snprintf(answer,capacity,"menumode -> %d\n",host_menu_mode());return 1;}
+    if(!strcmp(name,"getsecondspassed")){
+        Q_snprintf(answer,capacity,"getsecondspassed -> %g\n",(double)AW_MwvmFrameSeconds());return 1;}
+    if(!strcmp(name,"random") || !strcmp(name,"getsquareroot")){
+        float x;
+        if(!l->args){Q_snprintf(answer,capacity,"%s: one number.\n",name);return 1;}
+        x=console_number(l->arg[0]);
+        if(name[0]=='r')Q_snprintf(answer,capacity,"random -> %g\n",(double)AW_MwvmRandom((int32_t)x));
+        else Q_snprintf(answer,capacity,"getsquareroot -> %g\n",x>0?sqrt(x):0.0);   /* a negative number: 0, as AWM_SQRT */
+        return 1;
+    }
+    if(!strcmp(name,"xbox")){Q_snprintf(answer,capacity,"xbox -> 0\n");return 1;}
+    if(!strcmp(name,"getbuttonpressed")){Q_snprintf(answer,capacity,"getbuttonpressed -> %d\n",host_button(k));return 1;}
+    if(!strcmp(name,"dontsaveobject") || !strcmp(name,"fall")){
+        Q_snprintf(answer,capacity,"%s: nothing to do, as in OpenMW.\n",name);return 1;}
+    if(!strcmp(name,"cellchanged") || !strcmp(name,"onactivate")){
+        aw_mwvm_instance_t *in=who==AW_MWVM_SELF?AW_MwvmInstance(k):NULL;
+        v=!in || !in->reference?-1:name[0]=='c'?AW_MwvmCellChanged(in->reference):AW_MwvmOnActivate(in->reference);
+        if(v<0)Q_snprintf(answer,capacity,"%s -> 0 (the target has no script of its own here)\n",name);
+        else Q_snprintf(answer,capacity,"%s -> %ld\n",name,(long)v);
+        return 1;
     }
     return 0;
 }

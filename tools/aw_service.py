@@ -1542,7 +1542,13 @@ def chimport_errors(options):
         selected_masters(options.get('masters'))
     except ValueError as exc:
         errors.append(f'options.masters: {exc}')
+    if options.get('mesh_method_set') is not None and not METHOD_SET_RE.match(str(options['mesh_method_set'])):
+        errors.append('options.mesh_method_set must be the name of a set of config/mesh-method-sets.json')
     return errors
+
+
+# a mesh method set's name (config/mesh-method-sets.json, chim.method_sets): the run's chimport.py checks it exists
+METHOD_SET_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_.+-]{0,63}$')
 
 
 def chimport_commands(config, request, facts, run_name):
@@ -1587,6 +1593,10 @@ def chimport_commands(config, request, facts, run_name):
         # region: each cell built as the frame a build installs for it (tools/chimport.py CELL_SHAPES,
         # CHIMPORT-HEAP-NOT-BUILD-FRAMES-68); the default shape passes nothing, so a default request is as before
         args += ['--cell-shape', options['cell_shape']]
+    if options.get('mesh_method_set'):
+        # a named mesh method set for the meshes it lists (tools/chimport.py --mesh-method-set, chim.method_sets;
+        # SOL-GLACIER-METHODS-AB-COMPARE-68); without it the command is as before
+        args += ['--mesh-method-set', options['mesh_method_set']]
     if not options.get('world'):
         args += ['--no-world']      # cells alone, the island's stage check; the growing world is a build's work
     if options.get('timeout'):
@@ -1972,7 +1982,8 @@ def make_request(args, repo_version=None):
         if args.dry_run:
             options['dry_run'] = True
     elif args.kind == 'chimport-region':
-        for key in ('cells', 'workers', 'cell_jobs', 'cell_shape', 'workspace', 'cpus', 'memory', 'jobs', 'priority'):
+        for key in ('cells', 'workers', 'cell_jobs', 'cell_shape', 'mesh_method_set', 'workspace', 'cpus', 'memory',
+                    'jobs', 'priority'):
             if getattr(args, key, None) is not None:
                 options[key] = getattr(args, key)
         if getattr(args, 'masters', None):
@@ -2035,6 +2046,9 @@ def add_parsers(sub):
     request_p.add_argument('--cell-shape', dest='cell_shape', choices=('cell', 'region'),
                            help='kind chimport-region: cell (default: each cell alone) or region (each cell as the '
                                 'frame a build installs for it, its neighbours\' apron included)')
+    request_p.add_argument('--mesh-method-set', dest='mesh_method_set', metavar='NAME',
+                           help='kind chimport-region: a named set of config/mesh-method-sets.json for the meshes it '
+                                'lists (default: today\'s methods)')
     request_p.add_argument('--range')
     request_p.add_argument('--number', type=int)
     request_p.add_argument('--override', metavar='REASON', help='lift the refusals named by --allow, with a reason')

@@ -53,6 +53,30 @@ class Census(unittest.TestCase):
                 self.assertTrue(r.get('amiwind'), r['name'])
         self.assertEqual(len({r['name'] for r in self.rows}), len(self.rows))
 
+    def test_every_function_of_the_compiler_has_a_row(self):
+        # CONSOLE-CENSUS-MISSES-FUNCTIONS-68 (v0.0.68): the census lists every function of the compiler's table
+        # (tools/mwscript/functions.py), as a name or a short form; before, 107 had no row (the control switches, the
+        # magic effect family, the ratios and nine OpenMW names), so the page understated what the console takes
+        sys.path.insert(0, str(ROOT / 'tools'))
+        from mwscript import functions as F
+        names = {r['name'] for r in self.rows} | {r['short'] for r in self.rows if r.get('short')}
+        self.assertEqual(sorted(n for n in F.FUNCTIONS if n not in names), [])
+        self.assertEqual([r['name'] for r in self.rows], sorted(r['name'] for r in self.rows))
+        groups = {r['group'] for r in self.rows}
+        self.assertTrue(set(C.GROUPS.values()) | set(C.GROUP_NAMED.values()) <= groups | {'Console'})
+        state = {r['name']: r for r in self.rows}
+        for name in ('enableplayercontrols', 'getplayercontrolsdisabled', 'setchameleon', 'getresistfire',
+                     'gethealthgetratio', 'getcurrentaipackage', 'getstartingangle'):
+            self.assertEqual(state[name]['state'], 'vm', name)               # they already ran when typed
+        self.assertEqual((state['enableplayercontrols']['group'], state['setchameleon']['group'],
+                          state['getspellreadied']['group']), ('Control', 'Stats', 'Misc'))
+        for name in C.ORIGINAL_ONLY:
+            self.assertEqual((state[name]['state'], state[name]['sources']), ('planned', ['original']), name)
+        # a census missing a function gets its row from the table again (sync), planned until the table runs it
+        doc = {'commands': [r for r in self.rows if r['name'] != 'setchameleon']}
+        self.assertEqual(C.complete(doc), ['setchameleon'])
+        self.assertEqual(next(r for r in doc['commands'] if r['name'] == 'setchameleon')['group'], 'Stats')
+
     def test_the_aliases_are_the_engine_table(self):
         aliases = c_aliases() | {'coe', 'centeronexterior'}
         census = set()
@@ -89,8 +113,9 @@ class Census(unittest.TestCase):
         names = set(re.findall(r'\{"([a-z0-9]+)",AW_MWCON_', table))
         # v0.0.68: changeweather, modregion, becomewerewolf, setwerewolfacrobatics, startscript, stopscript, scriptrunning,
         # playsound, playsoundvp, playsound3d, playsound3dvp, getsoundplaying, streammusic, saydone, placeatpc, placeatme,
-        # placeitem, removespelleffects, explodespell, getspelleffects, geteffect, hasitemequipped, drop, addtopic, cast
-        self.assertEqual(len(names), 44)
+        # placeitem, removespelleffects, explodespell, getspelleffects, geteffect, hasitemequipped, drop, addtopic, cast,
+        # placeitemcell, aifollowcell, aiescortcell, getpccell (the cell table)
+        self.assertEqual(len(names), 48)
         state = {r['name']: r['state'] for r in self.rows}
         for n in names:
             self.assertEqual(state[n], 'vm', n)
@@ -104,7 +129,8 @@ class Census(unittest.TestCase):
                      'console_script(command,l,answer,capacity);',
                      'console_sound(k,who,e,command,l,answer,capacity);',
                      'console_place(k,who,command,l,answer,capacity);',
-                     'console_spells(k,who,command,l,answer,capacity);'):
+                     'console_spells(k,who,command,l,answer,capacity);',
+                     'console_cell_line(k,who,command,l,answer,capacity);'):
             self.assertIn(call, body)
         # the target as the VM's own reference: a scratch instance (AW_MWVM_SELF), never a second lookup
         begin = host[host.index('static int console_begin('):host.index('static int console_stat(')]
@@ -278,8 +304,8 @@ class Census(unittest.TestCase):
             self.assertIn('console_place', state[name]['amiwind'])
             self.assertIn(' %s: runs' % name, C.help_text(self.doc))
             self.assertIn(name, C.COMPILED_ARGUMENTS)                       # never the function table's generic route
-        self.assertEqual(state['placeitemcell']['state'], 'planned')       # its cell's room and place are the compiler's
-        self.assertIn(C.COMPILED_ARGUMENTS['placeitemcell'], state['placeitemcell']['why'])
+        # PlaceItemCell since the cell table (v0.0.68): its cell found by name (test_the_cell_lines_find_the_cell_by_its_name)
+        self.assertIn('console_cell_line', state['placeitemcell']['amiwind'])
         self.assertFalse(any(r.split()[0].startswith('place') for r in C.function_rows()))
 
     def test_the_spell_lines_find_the_row_by_its_name(self):
@@ -326,6 +352,69 @@ class Census(unittest.TestCase):
             self.assertIn('console_spells', state[name]['amiwind'])
             self.assertIn(' %s: runs' % name, C.help_text(self.doc))
             self.assertIn(name, C.COMPILED_ARGUMENTS)                       # never the function table's generic route
+
+    def test_the_cell_lines_find_the_cell_by_its_name(self):
+        # v0.0.68 (MW-CONSOLE-COMMANDS-62, the cell table): PositionCell, PlaceItemCell, AIFollowCell, AIEscortCell and
+        # GetPCCell typed; the cell found in the compiled file's CELN / CELG (tools/mwscript/awms.py cell_rows,
+        # grid_rows; the reader and the moves natively in CellTable below), then the compiled line's call
+        host = (SRC / 'aw_mwhost.c').read_text(encoding='utf-8')
+        body = host[host.index('static int cells_read('):host.index('static int console_command(')]
+        for call in ('AW_MwvmSection("CELN",&off,&rows,&bytes)', 'AW_MwvmSection("CELG",&off,&rows,&bytes)',
+                     'AW_MwConsoleCellFind(&t,cell,&row)', 'AW_MwConsoleCellMove(verb,found,&row,in,at,&yaw,&kind,&number)',
+                     'host_player_move(k,kind,kind==AWM_MOVE_ROOM?row.map:-1,at,yaw)',
+                     'host_call(k,who,AWF_POSITIONCELL,numbers,6,strings+2,1,&result);',
+                     'host_call(k,who,AWF_PLACEITEMCELL,numbers,7,strings,2,&result);',
+                     'AW_MwConsoleCellMatches(l->arg[0],s)', 'where=host_player_cell(&x,&y);'):
+            self.assertIn(call, body)
+        command = host[host.index('static int console_command('):host.index('static int console_table_find(')]
+        self.assertNotIn('dbg tp \\"%s\\"', command)                         # the old route (the point not applied)
+        header = (SRC / 'aw_mwconsole.h').read_text(encoding='utf-8')
+        code = (SRC / 'aw_mwcode.h').read_text(encoding='utf-8')
+        for kind in ('OUTDOORS', 'ROOM'):
+            ours = re.search(r'#define AW_MWCON_MOVE_%s (\d+)' % kind, header).group(1)
+            self.assertIn('#define AWM_MOVE_%s %s\n' % (kind, ours), code)
+        con = (SRC / 'aw_mwconsole.c').read_text(encoding='utf-8')
+        for row in ('{"positioncell",AW_MWCON_POSITIONCELL,5}', '{"placeitemcell",AW_MWCON_PLACEITEMCELL,6}',
+                    '{"aifollowcell",AW_MWCON_AIFOLLOWCELL,6}', '{"aiescortcell",AW_MWCON_AIESCORTCELL,6}',
+                    '{"getpccell",AW_MWCON_GETPCCELL,1}'):
+            self.assertIn(row, con)
+        state = {r['name']: r for r in self.rows}
+        for name in ('positioncell', 'placeitemcell', 'aifollowcell', 'aiescortcell', 'getpccell'):
+            self.assertEqual(state[name]['state'], 'vm', name)
+            self.assertIn('console_cell_line', state[name]['amiwind'])
+            self.assertIn(' %s: runs' % name, C.help_text(self.doc))
+            self.assertIn(name, C.COMPILED_ARGUMENTS)                       # never the function table's generic route
+        table = {r.split()[0] for r in C.function_rows()}
+        self.assertFalse(table & {'positioncell', 'placeitemcell', 'aifollowcell', 'aiescortcell', 'getpccell'})
+
+    def test_the_pure_opcodes_read_as_a_script_line(self):
+        # v0.0.68 (MW-CONSOLE-COMMANDS-62, family 7): MenuMode, OnActivate, CellChanged, GetSecondsPassed, Random, XBox,
+        # GetButtonPressed, DontSaveObject, Fall and GetSquareRoot through the function table's special rows; each reads
+        # what its opcode reads (aw_mwvm.c; tests/test_mwscript.py for the readings themselves), CellChanged and
+        # OnActivate on the target's own attached script, never the console's scratch instance
+        names = ('menumode', 'onactivate', 'cellchanged', 'getsecondspassed', 'random', 'xbox', 'getbuttonpressed',
+                 'dontsaveobject', 'fall', 'getsquareroot')
+        kinds = {r.split()[0]: r.split()[1] for r in C.function_rows()}
+        state = {r['name']: r for r in self.rows}
+        for name in names:
+            self.assertEqual(kinds.get(name), 'special', name)
+            self.assertEqual(state[name]['state'], 'vm', name)
+            self.assertIn(C.SPECIAL[name], state[name]['amiwind'])
+            self.assertIn(' %s: runs' % name, C.help_text(self.doc))
+        self.assertIn('console_cell_line', state['getpccell']['amiwind'])  # the cell table's, not the function table's
+        self.assertNotIn('getpccell', kinds)
+        host = (SRC / 'aw_mwhost.c').read_text(encoding='utf-8')
+        body = host[host.index('static int console_special('):host.index('static int console_table(')]
+        for name in names:
+            self.assertIn('"%s"' % name, body)
+        for call in ('host_menu_mode()', 'AW_MwvmFrameSeconds()', 'AW_MwvmRandom((int32_t)x)', 'host_button(k)',
+                     'AW_MwvmCellChanged(in->reference)', 'AW_MwvmOnActivate(in->reference)', 'x>0?sqrt(x):0.0',
+                     'aw_mwvm_instance_t *in=who==AW_MWVM_SELF?AW_MwvmInstance(k):NULL;'):
+            self.assertIn(call, body)
+        vm = (SRC / 'aw_mwvm.c').read_text(encoding='utf-8')
+        self.assertIn('sp[-1].f=roll(sp[-1].i);', vm)                      # a script's roll and the console's: one
+        self.assertIn('float AW_MwvmRandom(int32_t n){return ON?roll(n):0.0f;}', vm)
+        self.assertIn('return k<0?-1:(vm.inst[k].flags&AWI_CELLCHANGED)?1:0;', vm)
 
     def test_a_placement_without_an_edict_is_a_target(self):
         # WORLD-BUTTONS-62 / MARKS-SUMMON-CARRIERS-NOT-LIVE-63 (v0.0.63 release check round two): the Ghostgate switches
@@ -446,6 +535,7 @@ class Census(unittest.TestCase):
 NATIVE = r'''
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include "aw_mwconsole.h"
 static void ex(const char *t){printf("exec %s|\n",t);}
 static int st(const char *target,int verb,int stat,float *value){
@@ -464,8 +554,23 @@ static int cm(const char *target,int command,const aw_mwcon_line_t *l,char *answ
     snprintf(answer,(size_t)capacity,"answer %d\n",least);
     return 1;
 }
+/* the function table's route (the engine reads its rows from mwconsole-functions.txt): here the family 7 rows only;
+ * any other name is not in the table (-1), as before */
+static int tb(const char *target,const aw_mwcon_line_t *l,char *answer,int capacity){
+    static const char *rows[]={"menumode","onactivate","cellchanged","getsecondspassed","random","xbox",
+                               "getbuttonpressed","dontsaveobject","fall","getsquareroot",NULL};
+    int i,known=0;
+    for(i=0;rows[i];i++)if(!strcasecmp(rows[i],l->name))known=1;
+    if(!known)return -1;
+    printf("table [%s] %s",target,l->name);
+    for(i=0;i<l->args;i++)printf(" <%s>",l->arg[i]);
+    printf("\n");
+    if(!strcmp(target,"nobody"))return 0;
+    snprintf(answer,(size_t)capacity,"read %s\n",l->name);
+    return 1;
+}
 int main(int argc,char **argv){
-    static const aw_mwcon_host_t h={ex,cm,st,pr};int i;
+    static const aw_mwcon_host_t h={ex,cm,st,pr,tb};int i;
     for(i=1;i<argc;i++)printf("ran %d\n",AW_MwConsoleRun(argv[i],&h));
     return 0;
 }
@@ -629,6 +734,40 @@ class NativeLines(unittest.TestCase):
         self.assertIn('print cast: 2 arguments.', out)                    # the host is not called
         self.assertEqual(out[-2], 'print drop: 2 arguments.')
 
+    def test_the_cell_lines(self):
+        # v0.0.68 (the cell table): the masters' own forms (PositionCell with commas and a quoted cell; an actor's
+        # AIFollowCell of the player into a room; PlaceItemCell; GetPCCell with a cell's start) reach the host's cell
+        # commands with their target and arguments; a line short of an argument does not reach the host
+        out = self.run_lines('PositionCell, -1520, 1352, -132, 0, "Seyda Neen, Census and Excise Office"',
+                             '"hlaalu guard"->AIFollowCell, Player, "Balmora, Council Club", 0, 0, 0, 0',
+                             'AIEscortCell Player "Vivec, Arena" 0 100 200 300',
+                             'PlaceItemCell "misc_dwrv_artifact00" "Mzuleft" 4000 2000 10 0', 'GetPCCell "Vivec"',
+                             'positioncell 1 2 3 0', 'placeitemcell x y 1 2 3')
+        self.assertEqual([l for l in out if l.startswith('command')], [
+            'command [] positioncell <-1520> <1352> <-132> <0> <Seyda Neen, Census and Excise Office>',
+            'command [hlaalu guard] aifollowcell <Player> <Balmora, Council Club> <0> <0> <0> <0>',
+            'command [] aiescortcell <Player> <Vivec, Arena> <0> <100> <200> <300>',
+            'command [] placeitemcell <misc_dwrv_artifact00> <Mzuleft> <4000> <2000> <10> <0>',
+            'command [] getpccell <Vivec>'])
+        self.assertIn('print positioncell: 5 arguments.', out)
+        self.assertEqual(out[-2], 'print placeitemcell: 6 arguments.')
+
+    def test_the_pure_opcode_lines(self):
+        # v0.0.68 (family 7): the masters' own forms (MenuMode, OnActivate, CellChanged, GetSecondsPassed, Random 100 and
+        # with a comma, XBox, GetButtonPressed, DontSaveObject, the falling mage's "agronian guy"->Fall, GetSquareRoot)
+        # reach the function table's route with their target and arguments; a target not here is answered as such
+        out = self.run_lines('MenuMode', 'OnActivate', 'CellChanged', 'GetSecondsPassed', 'Random 100', 'random, 100',
+                             'XBox', 'GetButtonPressed', 'DontSaveObject', '"agronian guy"->Fall', 'GetSquareRoot 16',
+                             'nobody->OnActivate')
+        self.assertEqual([l for l in out if l.startswith('table')], [
+            'table [] menumode', 'table [] onactivate', 'table [] cellchanged', 'table [] getsecondspassed',
+            'table [] random <100>', 'table [] random <100>', 'table [] xbox', 'table [] getbuttonpressed',
+            'table [] dontsaveobject', 'table [agronian guy] fall', 'table [] getsquareroot <16>',
+            'table [nobody] onactivate'])
+        self.assertIn('print read random', out)
+        self.assertEqual(out[-2], 'print onactivate: no such reference here: nobody')
+        self.assertEqual([l for l in out if l.startswith('ran')], ['ran 1'] * 12)
+
     def test_a_stat_line_runs_through_the_host(self):
         out = self.run_lines('player->SetStrength 50', 'modblock, -5', 'GetHealth', 'ModCurrentFatigue 10',
                              'SetLuck', 'ModCurrentLuck 5', 'fargoth->GetHealth')
@@ -682,6 +821,237 @@ int main(int argc,char **argv){
     return 0;
 }
 '''
+
+
+CELLS = r'''
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "aw_mwconsole.h"
+/* MW-CONSOLE-COMMANDS-62 (v0.0.68, the cell table): the console's CELN / CELG reader on a file the test writes with the
+ * builder's own writer (awms.cell_sections): u32 CELN rows, CELG rows, CELN bytes, CELG bytes (big-endian), the two
+ * sections, then the strings NUL-ended. Each argument a query: find:NAME room:N grid:X:Y match:TYPED:CURRENT
+ * move:VERB:NAME:X:Y:Z:ROT; prints one line each, with the reads it took */
+static unsigned char *blob;static long size,strs;static int nstrings;static long reads;
+static unsigned long u32(const unsigned char *b){
+    return ((unsigned long)b[0]<<24)|((unsigned long)b[1]<<16)|((unsigned long)b[2]<<8)|(unsigned long)b[3];}
+static int rd(void *u,unsigned long off,unsigned char *out,unsigned long n){
+    (void)u;if((long)(off+n)>size)return 0;memcpy(out,blob+off,n);reads++;return 1;}
+static int st(void *u,int index,char *out,int cap){
+    long at=strs;int i;(void)u;
+    if(index<0 || index>=nstrings)return 0;
+    for(i=0;i<index;i++)at+=(long)strlen((char *)blob+at)+1;
+    snprintf(out,(size_t)cap,"%s",(char *)blob+at);
+    return (int)strlen(out);
+}
+int main(int argc,char **argv){
+    FILE *f=fopen(argv[1],"rb");aw_mwcon_cells_t t;int i;long at;
+    if(!f)return 2;
+    fseek(f,0,SEEK_END);size=ftell(f);fseek(f,0,SEEK_SET);
+    blob=malloc((size_t)size);if(!blob || fread(blob,1,(size_t)size,f)!=(size_t)size)return 2;
+    fclose(f);
+    memset(&t,0,sizeof(t));t.read=rd;t.string=st;
+    t.celn_rows=u32(blob);t.celg_rows=u32(blob+4);t.celn=16;t.celg=16+u32(blob+8);strs=(long)(t.celg+u32(blob+12));
+    for(at=strs;at<size;at+=(long)strlen((char *)blob+at)+1)nstrings++;
+    for(i=2;i<argc;i++){
+        char q[200],*a[8];int n=0,r,kind,number;aw_mwcon_cell_t c;char s[64];float in[4],out[3],yaw;
+        snprintf(q,sizeof(q),"%s",argv[i]);
+        a[n++]=strtok(q,":");
+        while(n<8 && (a[n]=strtok(NULL,":"))!=NULL)n++;
+        reads=0;memset(&c,0,sizeof(c));
+        if(!strcmp(a[0],"find")){
+            r=AW_MwConsoleCellFind(&t,a[1],&c);
+            st(NULL,c.name,s,sizeof(s));
+            printf("find %s %d kind %d flags %d number %d map %d name %s offset %.2f %.2f %.2f reads %ld\n",a[1],r,c.kind,
+                   c.flags,c.number,c.map,r>0?s:"-",(double)c.offset[0],(double)c.offset[1],(double)c.offset[2],reads);
+        }else if(!strcmp(a[0],"room")){
+            r=AW_MwConsoleCellRoomName(&t,atoi(a[1]),s,sizeof(s));printf("room %s %d %s\n",a[1],r,r?s:"-");
+        }else if(!strcmp(a[0],"grid")){
+            r=AW_MwConsoleCellGridName(&t,atoi(a[1]),atoi(a[2]),s,sizeof(s));printf("grid %s %s %d %s\n",a[1],a[2],r,r?s:"-");
+        }else if(!strcmp(a[0],"match")){
+            printf("match %s|%s %d\n",a[1],a[2],AW_MwConsoleCellMatches(a[1],a[2]));
+        }else if(!strcmp(a[0],"move")){
+            r=AW_MwConsoleCellFind(&t,a[2],&c);
+            in[0]=(float)atof(a[3]);in[1]=(float)atof(a[4]);in[2]=(float)atof(a[5]);in[3]=(float)atof(a[6]);
+            r=AW_MwConsoleCellMove(atoi(a[1]),r,&c,in,out,&yaw,&kind,&number);
+            printf("move %s %d kind %d number %d at %.4f %.4f %.4f yaw %.4f map %d\n",a[1],r,kind,number,
+                   (double)out[0],(double)out[1],(double)out[2],(double)yaw,c.map);
+        }
+    }
+    return 0;
+}
+'''
+
+
+@unittest.skipUnless(shutil.which('cc'), 'no C compiler')
+class CellTable(unittest.TestCase):
+    """v0.0.68 (MW-CONSOLE-COMMANDS-62, the cell table): the builder's CELN and CELG rows from the synthetic world of
+    tests/test_mwscript.py (two rooms, one with a map and a recentring, a named and an unnamed exterior cell of a
+    region) and a presented district; the engine's reader on them, natively; and the moves a typed line works out,
+    against the compiler's own (codegen.Program.player_move and actor_move) for the same arguments."""
+    PRESENTED = {'mournhold, test district': {'cell': 'Mournhold, Test District', 'block': [20, 20], 'size': [2, 1],
+                                              'offset': [16384.0, -8192.0]}}
+
+    @classmethod
+    def setUpClass(cls):
+        sys.path[:0] = [str(ROOT / 'tests'), str(ROOT / 'src')]
+        import test_mwscript as TM
+        from mwscript import awms
+        cls.awms = awms
+        cls.prog, cls.compiled, cls.binds, cls.data = TM.program()
+        cls.prog.presented = dict(cls.PRESENTED)
+        cls.cells, cls.grid = awms.cell_rows(cls.prog), awms.grid_rows(cls.prog)
+        cls.tmp = Path(tempfile.mkdtemp(prefix='aw-mwcells-'))
+        cls.write_blob(cls.tmp / 'cells.bin', cls.cells, cls.grid)
+        (cls.tmp / 'c.c').write_text(CELLS, encoding='utf-8')
+        built = subprocess.run(['cc', '-std=gnu89', '-Wall', '-Werror', '-Wshadow', '-fsanitize=undefined,address',
+                                '-I', str(SRC), str(cls.tmp / 'c.c'), str(SRC / 'aw_mwconsole.c'), '-o',
+                                str(cls.tmp / 'c')], capture_output=True, text=True)
+        assert built.returncode == 0, built.stdout + built.stderr
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    @classmethod
+    def write_blob(cls, path, cells, grid):
+        import struct
+        strings = []
+
+        def string(s):
+            if s not in strings:
+                strings.append(s)
+            return strings.index(s)
+        celn, celg = cls.awms.cell_sections(cells, grid, string)
+        path.write_bytes(struct.pack('>IIII', len(cells), len(grid), len(celn), len(celg)) + celn + celg +
+                         b''.join(s.encode('cp1252') + b'\0' for s in strings))
+
+    def query(self, *queries, blob='cells.bin'):
+        out = subprocess.run([str(self.tmp / 'c'), str(self.tmp / blob)] + list(queries), capture_output=True,
+                             text=True, check=True).stdout.splitlines()
+        self.assertEqual(len(out), len(queries), out)
+        return out
+
+    def test_the_rows_are_the_games_cells(self):
+        A = self.awms
+        rows = {r[1]: r for r in self.cells}
+        test_room, other = self.data.interior_numbers['test room'], self.data.interior_numbers['another room']
+        self.assertEqual(rows['Test Room'][2:], (A.CELL_ROOM, 0, test_room, 'ri0123456789', (100.0, 0.0, 0.0)))
+        self.assertEqual(rows['Another Room'][2:], (A.CELL_ROOM, A.CELL_NO_MAP, other, None, (0.0, 0.0, 0.0)))
+        self.assertEqual(rows['Seyda Neen'][2], A.CELL_EXTERIOR)
+        self.assertEqual(rows['Mournhold, Test District'][2:], (A.CELL_PRESENTED, A.CELL_NO_MAP, 0, None,
+                                                                (16384.0, -8192.0, 0.0)))
+        self.assertEqual(len(self.cells), 4)
+        self.assertEqual([r[0] for r in self.cells], sorted(r[0] for r in self.cells))
+        for r in self.cells:
+            self.assertEqual(r[0], A.cell_hash(r[1].upper()))                  # the key folds A-Z
+        grid = {(x, y): n for x, y, n in self.grid}
+        self.assertEqual(grid[(-2, -9)], 'Seyda Neen')
+        self.assertEqual(grid[(-3, -9)], 'Bitter Coast Region')               # no name: its region's
+        self.assertEqual((grid[(20, 20)], grid[(21, 20)]), ('Mournhold, Test District',) * 2)
+        self.assertEqual([(x, y) for x, y, _ in self.grid], sorted(grid))
+        # the compiled file carries both sections, 24 and 4 bytes a row, on disk (after BIND)
+        raw, sizes = A.write(self.prog, self.compiled, self.binds, {'ops_per_run': 500})
+        self.assertEqual((sizes['CELN'], sizes['CELG']), (24 * len(self.cells), 4 * len(self.grid)))
+        self.assertGreater(A.ORDER.index('CELN'), A.ORDER.index('BIND'))
+        self.assertNotIn('CELN', A.RESIDENT)
+
+    def test_the_engine_finds_a_cell_by_its_name(self):
+        test_room = self.data.interior_numbers['test room']
+        out = self.query('find:TEST ROOM', 'find:seyda neen', 'find:Mournhold, Test District', 'find:No Such Cell',
+                         'room:%d' % test_room, 'room:999', 'grid:-3:-9', 'grid:21:20', 'grid:5:5',
+                         'match:Seyda:Seyda Neen', 'match:seyda neen, census:Seyda Neen', 'match:BITTER:Bitter Coast Region')
+        self.assertTrue(out[0].startswith('find TEST ROOM 1 kind 1 flags 0 number %d ' % test_room), out[0])
+        self.assertIn('name Test Room offset 100.00 0.00 0.00', out[0])
+        self.assertLessEqual(int(out[0].split()[-1]), 4)                     # a binary search, then its run
+        self.assertTrue(out[1].startswith('find seyda neen 1 kind 2 '), out[1])
+        self.assertIn('find Mournhold, Test District 1 kind 3 flags 1 number 0 map -1 ', out[2])
+        self.assertIn('offset 16384.00 -8192.00 0.00', out[2])
+        self.assertTrue(out[3].startswith('find No Such Cell 0 '), out[3])
+        self.assertEqual(out[4:9], ['room %d 1 Test Room' % test_room, 'room 999 0 -', 'grid -3 -9 1 Bitter Coast Region',
+                                    'grid 21 20 1 Mournhold, Test District', 'grid 5 5 0 -'])
+        self.assertEqual(out[9:], ['match Seyda|Seyda Neen 1', 'match seyda neen, census|Seyda Neen 0',
+                                   'match BITTER|Bitter Coast Region 1'])
+
+    def test_two_names_of_one_hash_are_both_found(self):
+        # no two names of the masters share a hash (measured 2026-11-21: 2,982 rows, 0 collisions), but the reader
+        # never relies on it: a row of another name with the same hash before the right one is passed by its name
+        A = self.awms
+        twin = (A.cell_hash('Test Room'), 'Aa Twin', A.CELL_EXTERIOR, 0, 0, None, (0.0, 0.0, 0.0))
+        cells = sorted(self.cells + [twin], key=lambda r: (r[0], A.cell_fold(r[1])))
+        self.assertLess(cells.index(twin), [r[1] for r in cells].index('Test Room'))
+        self.write_blob(self.tmp / 'twin.bin', cells, self.grid)
+        out = self.query('find:test room', blob='twin.bin')
+        self.assertIn(' 1 kind 1 ', out[0])
+        self.assertIn('name Test Room', out[0])
+
+    def test_the_moves_are_the_compilers(self):
+        from mwscript.opcodes import PLAYERMOVE_KINDS
+        p = self.prog
+        cases = [('Test Room', 228.0, 4.0, 8.0, 90.0), ('Test Room', -500.0, 64.0, -12.5, 270.0),
+                 ('Seyda Neen', -15000.0, -71000.0, 120.0, 45.0), ('No Such Cell', 10.0, 20.0, 30.0, 0.0),
+                 ('Mournhold, Test District', 100.0, 200.0, 300.0, 180.0), ('Another Room', 1.0, 2.0, 3.0, 0.0)]
+        queries = []
+        for cell, x, y, z, rot in cases:
+            queries += ['move:0:%s:%r:%r:%r:%r' % (cell, x, y, z, rot), 'move:1:%s:%r:%r:%r:%r' % (cell, x, y, z, rot)]
+        out = iter(self.query(*queries))
+        for cell, x, y, z, rot in cases:
+            args = [('float', x), ('float', y), ('float', z), ('float', rot), ('str', cell)]
+            # "move VERB RESULT kind K number N at X Y Z yaw W map M"
+            player, actor = next(out).split(), next(out).split()
+            index = p.player_move(args)
+            if index is None:                                                 # a room this build has no map for
+                self.assertEqual(player[2], '-1', (cell, player))
+            else:
+                row = p.moves.rows[index]
+                self.assertEqual(player[2], '1')
+                self.assertEqual(int(player[4]), row['kind'], cell)
+                for k in range(3):
+                    self.assertAlmostEqual(float(player[8 + k]), row['at'][k], places=3)
+                self.assertAlmostEqual(float(player[12]), row['yaw'] % 360.0, places=3)
+                if row['kind'] == PLAYERMOVE_KINDS['room']:
+                    self.assertEqual(int(player[14]), self.cells_map_index(cell))
+            move = p.actor_move(args)
+            if move == 'unknown':
+                self.assertEqual(actor[2], '0', (cell, actor))                # OpenMW: nothing
+                continue
+            kind, number, ax, ay, az, yaw = move
+            self.assertEqual((actor[2], int(actor[4]), int(actor[6])), ('1', kind, number), (cell, actor))
+            for k, v in enumerate((ax, ay, az)):
+                self.assertAlmostEqual(float(actor[8 + k]), v, places=3)
+            self.assertAlmostEqual(float(actor[12]), yaw, places=3)
+
+    def cells_map_index(self, cell):
+        # the map's index in the test's own string table, as write_blob interned it (the rows in order)
+        strings = []
+        for h, name, kind, flags, number, room_map, offset in self.cells:
+            for s in (name,) + ((room_map,) if room_map else ()):
+                if s not in strings:
+                    strings.append(s)
+        return strings.index(next(r[5] for r in self.cells if r[1] == cell))
+
+    def test_the_place_and_package_moves(self):
+        # codegen Program.place and ai_cell, the rules written out: PlaceItemCell into a room, an actor in the room
+        # map's units and an item in game units, Quake's yaw from the degrees; outdoors as typed; a cell the game has
+        # not places nothing; AIFollowCell into such a cell outdoors as typed, AIEscortCell nothing; a presented
+        # district: PlaceItemCell by its room's number (none here: nothing), the packages outdoors as typed
+        test_room = self.data.interior_numbers['test room']
+        out = self.query('move:2:Test Room:228:4:8:90', 'move:3:Test Room:228:4:8:90', 'move:2:Seyda Neen:1:2:3:30',
+                         'move:3:No Such Cell:1:2:3:0', 'move:4:No Such Cell:1:2:3:0', 'move:5:No Such Cell:1:2:3:0',
+                         'move:4:Test Room:228:4:8:0', 'move:5:Mournhold, Test District:5:6:7:0',
+                         'move:2:Mournhold, Test District:5:6:7:0')
+        self.assertEqual(out[0], 'move 2 1 kind 2 number %d at 32.0000 1.0000 2.0000 yaw 270.0000 map %d'
+                         % (test_room, self.cells_map_index('Test Room')))
+        self.assertEqual(out[1].split()[2:13], ['1', 'kind', '2', 'number', str(test_room), 'at', '228.0000',
+                                                '4.0000', '8.0000', 'yaw', '270.0000'])
+        self.assertEqual(out[2].split()[2:13], ['1', 'kind', '1', 'number', '0', 'at', '1.0000', '2.0000', '3.0000',
+                                                'yaw', '330.0000'])
+        self.assertEqual([o.split()[2] for o in out[3:6]], ['0', '1', '0'])
+        self.assertEqual(out[4].split()[3:11], ['kind', '1', 'number', '0', 'at', '1.0000', '2.0000', '3.0000'])
+        self.assertEqual(out[6].split()[2:11], ['1', 'kind', '2', 'number', str(test_room), 'at', '32.0000', '1.0000',
+                                                '2.0000'])
+        self.assertEqual(out[7].split()[2:11], ['1', 'kind', '1', 'number', '0', 'at', '5.0000', '6.0000', '7.0000'])
+        self.assertEqual(out[8].split()[2], '0')
 
 
 @unittest.skipUnless(shutil.which('cc'), 'no C compiler')

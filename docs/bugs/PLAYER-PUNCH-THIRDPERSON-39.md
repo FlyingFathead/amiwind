@@ -21,7 +21,7 @@
 | Where | Gameplay/combat: third-person player with fists readied |
 | Reproduction | unknown |
 | Duplicate of | no |
-| Persists in | v0.0.39-rc1, v0.0.39-rc2 (last seen) |
+| Persists in | fixed in v0.0.68-dev2 |
 | Severity | critical: The maintainer stopped release because basic third-person combat has no visible punch animation. |
 | Family | First-person hands and torch (`torch-hands`) |
 | Playtest version | v0.0.39-rc1 |
@@ -43,6 +43,7 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | fixed in source | a gated commit | v0.0.67 (054bdc00) | 2026-11-20 | gate 12221 of the planning item PLAYER-PUNCH-THIRDPERSON-39 | Third-person fists draw and punch with the original hand-to-hand animations; seen in play on the v0.0.68-dev1 image. |
 | fixed in source | a gated commit | v0.0.68-dev2 (054bdc006) | 2026-11-20 | gate 12221 | Third-person punches have no visible player-body attack animation |
 | confirmed in play | an emulator session | v0.0.68-dev1 image with the engine of 054bdc006 | 2026-11-20 | a journey session at 32 MB Fast, its stills and console log | Third-person punches have no visible player-body attack animation |
+| shipped | the v0.0.68-dev2 snapshot build | v0.0.68-dev2 (ef709f6be, build 2026_11_21_v0.0.68-dev2_full-dev2_ef709f6) | 2026-11-21 | the delivered build holds the commit (gate 12133) | Third-person fists draw, punch and lower with the original's hand-to-hand animations. |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
@@ -60,6 +61,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-20: fixed in source: a gated commit, v0.0.68-dev2 (054bdc006); gate 12221: Third-person punches have no visible player-body attack animation
 - 2026-11-20: confirmed in play: an emulator session, v0.0.68-dev1 image with the engine of 054bdc006; a journey session at 32 MB Fast, its stills and console log: Third-person punches have no visible player-body attack animation
 - 2026-11-20 15:29 +0200: seen again in v0.0.67: Seen again on the v0.0.67 release image: in third person the attack swing is heard but the player's body does not move; the attack animation works in first person.
+- 2026-11-21: shipped: the v0.0.68-dev2 snapshot build, v0.0.68-dev2 (ef709f6be, build 2026_11_21_v0.0.68-dev2_full-dev2_ef709f6); the delivered build holds the commit (gate 12133): Third-person fists draw, punch and lower with the original's hand-to-hand animations.
 
 <!-- END GENERATED TIMELINE -->
 

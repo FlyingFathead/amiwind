@@ -9,7 +9,7 @@
 | Where | The player's hands state on a door or cell change; seen at the door from the courtyard of the Census and Excise Office in Seyda Neen into a building |
 | Reproduction | unknown |
 | Duplicate of | no |
-| Persists in | v0.0.67 (last seen) |
+| Persists in | fixed in v0.0.68-dev2 |
 | Severity | high: the player enters a building with the wrong stance, so the readied spell is lost and fists are raised |
 | Family | Game logic (QuakeC) and saves (`game-logic`) |
 | Playtest version | v0.0.67 |
@@ -31,6 +31,7 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | fixed in source | a gated commit | v0.0.67 (054bdc00) | 2026-11-20 | gate 12221 of the planning item HANDS-STATE-LOST-THROUGH-DOORS-67 | Readied magic stays readied through doors and cell changes; seen in play on the v0.0.68-dev1 image. |
 | fixed in source | a gated commit | v0.0.68-dev2 (054bdc006) | 2026-11-20 | gate 12221 | What the player holds in the hands (weapon drawn or sheathed, spell readied, what is held) stays the same through doors and cell changes. |
 | confirmed in play | an emulator session | v0.0.68-dev1 image with the engine of 054bdc006 | 2026-11-20 | a journey session at 32 MB Fast, its stills and console log | What the player holds in the hands (weapon drawn or sheathed, spell readied, what is held) stays the same through doors and cell changes. |
+| shipped | the v0.0.68-dev2 snapshot build | v0.0.68-dev2 (ef709f6be, build 2026_11_21_v0.0.68-dev2_full-dev2_ef709f6) | 2026-11-21 | the delivered build holds the commit (gate 12133) | What the player holds in the hands (weapon drawn or sheathed, spell readied, what is held) stays the same through doors and cell changes. |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
@@ -38,6 +39,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-20: fixed in source: a gated commit, v0.0.67 (054bdc00); gate 12221 of the planning item HANDS-STATE-LOST-THROUGH-DOORS-67: Readied magic stays readied through doors and cell changes; seen in play on the v0.0.68-dev1 image.
 - 2026-11-20: fixed in source: a gated commit, v0.0.68-dev2 (054bdc006); gate 12221: What the player holds in the hands (weapon drawn or sheathed, spell readied, what is held) stays the same through doors and cell changes.
 - 2026-11-20: confirmed in play: an emulator session, v0.0.68-dev1 image with the engine of 054bdc006; a journey session at 32 MB Fast, its stills and console log: What the player holds in the hands (weapon drawn or sheathed, spell readied, what is held) stays the same through doors and cell changes.
+- 2026-11-21: shipped: the v0.0.68-dev2 snapshot build, v0.0.68-dev2 (ef709f6be, build 2026_11_21_v0.0.68-dev2_full-dev2_ef709f6); the delivered build holds the commit (gate 12133): What the player holds in the hands (weapon drawn or sheathed, spell readied, what is held) stays the same through doors and cell changes.
 
 <!-- END GENERATED TIMELINE -->
 

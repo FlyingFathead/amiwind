@@ -20,7 +20,9 @@ placeholder files in a scratch folder (tools/build_scratch.py) that is always re
 - payload-names: amiga_fs.check_payload_names (FFS names of at most 30 bytes, no case collisions);
 - host-paths: amiga_fs.check_payload_host_paths (no build path in a shipped text file);
 - disk-layout: the layout plan (tools/layout_plan.py, the compact layout: the fewest partitions, each sized
-  from its payload + headroom; written to the run as layout-plan.json, the image step follows it; the
+  from its payload + headroom, with everything the image step installs later counted: the actor library, the
+  room batches, the CHIM rooms and the expansions' stores; written to the run as layout-plan.json, the image
+  step follows it; the
   legacy layout: the world partition batches as world_volumes.pack makes them) and the planned drives
   (plan_drives: partitions below 2 GiB and starting below 2 GiB, files below the file limit, drives below
   4 GiB) for the planned payload, music, the media the image step adds and the CHIM volume included;
@@ -345,14 +347,60 @@ def interior_additions(stage, files, boot, room_batches=None):
     return add, drop
 
 
+# A layer store's frame map (slNNNN, mhNNNN) before the image step writes it (chim.sol_test.install): the empty world
+# shell, the worldspawn, the player start, the frame's flames and its placed people. Recorded upper bound, measured on
+# v0.0.68-dev3 (2026_11_21_v0.0.68-dev3_full-dev3_9a91382: 135 Solstheim and 11 Mournhold frame maps, 688 to 10,260
+# bytes, 263,588 bytes in all).
+LAYER_FRAME_MAP_BOUND = 16384
+LAYER_ROWS_HEAD = 8      # a land's rows file (chim.sol_test.directory_rows): 'AWS1' and the row count,
+LAYER_ROW_BYTES = 52     # then one row per frame
+
+
+def layer_store_additions(values):
+    """{boot-relative path: bytes} the image step's layer stores install (chim.layer_stores.install, after
+    finalize's preflight) adds to the payload, read only. VALUES: the image's --chim-layer-world STORE=WORLD values
+    (the expansions' layers and build modules: chimsol, chimmh, chimiti). Per store: every file of the store's world
+    (WORLD/chim) at id1/<store>/, at its own size; for a store of region frames also one frame map per frame of its
+    ownership table (id1/maps/<prefix>NNNN, LAYER_FRAME_MAP_BOUND each) and the land's rows file at its exact size.
+    The few names a land adds to world/region-names.awn are not counted (under 32,400 bytes for the whole file).
+    {} for no store. A store whose world is missing raises here, in the preflight, as the install would at the end.
+    IMAGE-BOOT-PAYLOAD-OVER-2GIB-48: the v0.0.68-dev3 build's plan left the stores out (Solstheim's 152,423,292
+    bytes in 3,511 files, Mournhold's 20,192,488 in 287), kept every unit on the boot partition, and the image step
+    stopped on that plan after the stores were installed."""
+    if not values:
+        return {}
+    from chim.layer_stores import OPTION, parse, store_kinds
+    from chim.regions import TABLE_FILE, read_table
+    from chim.sol_test import land_of, map_name
+    from map_files import frame_ext
+    kinds = store_kinds()
+    out = {}
+    for store, world in parse(values):
+        source = Path(world)/'chim'
+        if not (source/'world.cwi').is_file():
+            raise ValueError('%s: no CHIM world in %s (the store %s cannot be planned)' % (OPTION, source, store))
+        for p in sorted(source.rglob('*')):
+            if p.is_file():
+                out['id1/%s/%s' % (store, p.relative_to(source).as_posix())] = p.stat().st_size
+        if kinds[store] != 'frames':
+            continue
+        land = land_of(store, world)
+        frames = (read_table(Path(world)/TABLE_FILE) or {}).get('frames') or []
+        for index in range(len(frames)):
+            out['id1/maps/' + map_name(index, land['prefix'], land['limit']) + frame_ext()] = LAYER_FRAME_MAP_BOUND
+        out['id1/' + land['directory']] = LAYER_ROWS_HEAD + LAYER_ROW_BYTES * len(frames)
+    return out
+
+
 def check_disk_layout(boot, removed, music_files, chim_world, layout=None, media=None, media_catalogue=False,
-                      actor_library=None, room_batches=None, chim_interiors=None):
+                      actor_library=None, room_batches=None, chim_interiors=None, layer_worlds=None):
     """The planned partitions and drives through the disk-layout gate, before anything is written. LAYOUT: the
     disk layout settings (tools/layout_plan.resolve); the compact layout (default) is planned by
     tools/layout_plan.py and returned as layout_plan (the image step follows it), counting the media the image
-    step adds later (MEDIA, the converted media folder) and the actor library it installs later (ACTOR_LIBRARY,
-    the actor library stage, only when the image step installs it: --chim-actor-table on); the legacy layout is
-    planned as before."""
+    step adds later (MEDIA, the converted media folder), the actor library it installs later (ACTOR_LIBRARY,
+    the actor library stage, only when the image step installs it: --chim-actor-table on) and the expansions'
+    stores it installs later (LAYER_WORLDS, the --chim-layer-world values: layer_store_additions); the legacy
+    layout is planned as before."""
     import layout_plan
     layout = layout or layout_plan.resolve()
     from world_volumes import (RDB_BYTES, PlannedMap, map_bytes, partition_batches, plan_drives, plan_partitions,
@@ -378,6 +426,28 @@ def check_disk_layout(boot, removed, music_files, chim_world, layout=None, media
     for rel in dropped_rooms:
         files.pop(rel, None)
     files.update(added_rooms)
+    # The expansions' stores (the layers' and the build modules': Solstheim's chimsol, Mournhold's chimmh, Tribunal's
+    # rooms chimiti), installed by the image step after finalize's preflight: each store's files, its frame maps and
+    # its rows file are counted, so the plan moves what the boot partition cannot hold before anything is written and
+    # the planned drive holds them. A file already staged keeps its own size.
+    layer_files = layer_store_additions(layer_worlds)
+    if layer_files:
+        for rel, size in layer_files.items():
+            files.setdefault(rel, size)
+        by_store = {}
+        for rel, size in layer_files.items():
+            unit = layout_plan.movable_unit(rel)
+            if unit in layout_plan.STORE_UNITS:
+                count, total = by_store.get(unit, (0, 0))
+                by_store[unit] = (count + 1, total + size)
+        print('Payload preflight: the layout plan counts the layer stores the image installs: %s; %d frame maps and '
+              'rows files, %d bytes' % (', '.join('%s %d bytes in %d files' % (unit.split('/')[1], total, count)
+                                                  for unit, (count, total) in sorted(by_store.items())),
+                                        sum(1 for rel in layer_files
+                                            if layout_plan.movable_unit(rel) not in layout_plan.STORE_UNITS),
+                                        sum(size for rel, size in layer_files.items()
+                                            if layout_plan.movable_unit(rel) not in layout_plan.STORE_UNITS)),
+              flush=True)
     worlds, frame_maps = [], []
     directory = id1/'world/regions.awr'
     if directory.exists():
@@ -580,7 +650,8 @@ PROCESS_CHECKS = ('payload-names', 'file-formats', 'host-paths', 'actor-frames')
 
 def run(out, *, chim_world=None, music=None, jobs=1, harvest=None, data_files=None, report_path=None,
         pending=None, chim_towns=(), chim_town_dirs=(), exterior_terrain=None, layout=None, media=None,
-        layout_plan_path=None, media_catalogue=False, actor_library=None, room_batches=None, chim_interiors=None):
+        layout_plan_path=None, media_catalogue=False, actor_library=None, room_batches=None, chim_interiors=None,
+        layer_worlds=None):
     """Run every check over the staged payload OUT (OUT/boot). Prints one summary line; raises
     ValueError listing every error together. Returns the report. pending: files the image step still
     writes before its frame maps (check_chim_inputs). layout: the disk layout settings (tools/layout_plan.py);
@@ -638,7 +709,7 @@ def run(out, *, chim_world=None, music=None, jobs=1, harvest=None, data_files=No
         checks.append(('music', music_check))
     def disk_layout():
         return check_disk_layout(boot, removed, music_result.get('files', []), chim_world, layout, media,
-                                 media_catalogue, actor_library, room_batches, chim_interiors)
+                                 media_catalogue, actor_library, room_batches, chim_interiors, layer_worlds)
     layout_future = None
     with ThreadPoolExecutor(max_workers=max(1, min(int(jobs or 1), len(checks) + beside))) as pool:
         futures = [(name, pool.submit(fn)) for name, fn in checks]

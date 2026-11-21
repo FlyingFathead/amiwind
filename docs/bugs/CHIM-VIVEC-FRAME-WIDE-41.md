@@ -215,6 +215,7 @@ Family: Builder breaks and reproducibility (`builder-from-scratch`). The reposit
 - [BUILD-PLAYER-BODY-BUDGET-FALLBACK-39](BUILD-PLAYER-BODY-BUDGET-FALLBACK-39.md): Player body fitting stops before trying smaller meshes
 - [BUILD-PRESENTED-DATA-NO-WAIT-67](BUILD-PRESENTED-DATA-NO-WAIT-67.md): With the presented data folder on, the CHIM world stage did not wait for the stage that makes the folder it reads
 - [BUILD-QCC-PATH-008](BUILD-QCC-PATH-008.md): Image assembly was given the QCC source directory as its compiler
+- [BUILD-READINESS-MISSES-PLAN-WAIVERS-68](BUILD-READINESS-MISSES-PLAN-WAIVERS-68.md): The release readiness block does not list the Solstheim test route's options
 - [BUILD-REGION-NO-LAND-PRESENTED-67](BUILD-REGION-NO-LAND-PRESENTED-67.md): The CHIM region land checks refused every cell without a LAND record, which Mournhold's presented districts are by design
 - [BUILD-RELEASE-READINESS-HIDDEN-41](BUILD-RELEASE-READINESS-HIDDEN-41.md): A development build did not say what a final would refuse: dev5 passed with a waiver, an accepted plant loss and no NPC gallery
 - [BUILD-ROOM-SHELL-WRITER-UNPINNED-48](BUILD-ROOM-SHELL-WRITER-UNPINNED-48.md): The room shell form writes its conversion report without pinned encoding and line ends
@@ -232,6 +233,8 @@ Family: Builder breaks and reproducibility (`builder-from-scratch`). The reposit
 - [CHIM-LAVA-DUPLICATE-VERTEX-40](CHIM-LAVA-DUPLICATE-VERTEX-40.md): Float32 duplicate vertices falsely fail lava surface coverage
 - [CHIM-OCEAN-ROUTING-UNNAMED-41](CHIM-OCEAN-ROUTING-UNNAMED-41.md): The world-terrain stage refused ocean routing cells without naming a cell or which rule failed
 - [CHIM-ROOM-SHELL-ACTORS-EARLY-48](CHIM-ROOM-SHELL-ACTORS-EARLY-48.md): The scene stage actor check measured residents of shell rooms, which have no collision until the image: 110 refused
+- [CHIM-SOL-TEST-MASTERS-NOT-IN-FOLDER-68](CHIM-SOL-TEST-MASTERS-NOT-IN-FOLDER-68.md): The Solstheim test frames stop at once: the stage reads the build's whole master list, which its own test data folder does not hold
+- [CHIM-SOL-TEST-TWO-CHIMSOL-STORES-68](CHIM-SOL-TEST-TWO-CHIMSOL-STORES-68.md): A Solstheim test image stops in its image step: the test frames and the Solstheim build module both make the same store
 - [CHIM-VISIBILITY-APRON-SCOPE-41](CHIM-VISIBILITY-APRON-SCOPE-41.md): Fixed stronghold visibility rejects regional aprons
 - [CHIM-WINDOW-TOWER-SUPPORT-41](CHIM-WINDOW-TOWER-SUPPORT-41.md): Thatched tower omitted from decorative window facade support
 - [ENGINE-BUILD-REPRO-31](ENGINE-BUILD-REPRO-31.md): Engine builds from identical source give different binaries

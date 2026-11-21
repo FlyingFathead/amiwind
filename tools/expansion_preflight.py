@@ -15,6 +15,7 @@ nothing to check.
 """
 import json
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
 DISTRICT_RECIPE = 'mournhold-v1'
@@ -95,10 +96,31 @@ def finished_set_cells(name, status_path):
     return sorted(chim_regions.table_kinds(table))
 
 
-def module_set_problems(masters, args, status_path, log=print):
+PRIVATE_TEST_VERSION = re.compile(r'[0-9]+\.[0-9]+\.[0-9]+-dev[0-9]+')   # project_version's private-test rule
+
+
+def sol_test_reason(args, version=None):
+    """The stated reason a Solstheim test image (--chim-sol-test) takes none of Solstheim's finished cells: the
+    module's own NOT BUILT record (tools/bloodmoon_solstheim_module.py resolve, args.bloodmoon_solstheim_record), on
+    a development version only (VERSION, default project_version.run_version). None otherwise: without the option or
+    the record, or on a release candidate or final, the refusal stands (CHIM-SOL-TEST-TWO-CHIMSOL-STORES-68)."""
+    record = getattr(args, 'bloodmoon_solstheim_record', None)
+    if not getattr(args, 'chim_sol_test', None) or not isinstance(record, dict) or record.get('built') is not False:
+        return None
+    if version is None:
+        import project_version
+        version = project_version.run_version()
+    if not PRIVATE_TEST_VERSION.fullmatch(str(version)):
+        return None
+    return ('--chim-sol-test: a test image of named Solstheim cells, the module left out; a development build only, '
+            'refused for release candidates and finals')
+
+
+def module_set_problems(masters, args, status_path, log=print, version=None):
     """[problem]: a selected master whose named set has finished cells and whose module takes none of them, without
-    a stated reason (the module switched off, a cell list of the caller's own, a MiniWind sandbox). One line per
-    selected master with a named set, so the build log always says what happens to an expansion's cells."""
+    a stated reason (the module switched off, a cell list of the caller's own, a MiniWind sandbox, a Solstheim test
+    image on a development version: sol_test_reason). One line per selected master with a named set, so the build
+    log always says what happens to an expansion's cells. VERSION: for sol_test_reason."""
     from chim import regions as chim_regions
     problems = []
     sets = chim_regions.layer_sets()
@@ -125,7 +147,8 @@ def module_set_problems(masters, args, status_path, log=print):
         reason = ('--presented-exteriors off' if module == 'tribunal-mournhold'
                   and (getattr(args, 'presented_exteriors', None) or 'on') == 'off'
                   else '--chim-regions names the cells of this build' if getattr(args, 'chim_regions', None)
-                  else 'a MiniWind sandbox' if getattr(args, 'miniwind', False) else None)
+                  else 'a MiniWind sandbox' if getattr(args, 'miniwind', False)
+                  else sol_test_reason(args, version) if module == 'bloodmoon-solstheim' else None)
         if not cells or reason:
             log('Expansion cells: %s, named set %s: %d finished cell(s), none built (%s)'
                 % (master, sets[master], len(cells), reason or 'none finished'))

@@ -444,6 +444,45 @@ class TheFirstMinuteChecks(unittest.TestCase):
         self.assertEqual(found, [])
         self.assertTrue(any('none built (none finished)' in line for line in said))
 
+    def test_a_solstheim_test_image_is_the_only_build_that_may_leave_finished_cells_out(self):
+        # a --chim-sol-test image leaves the module out (resolve's NOT BUILT record): the full-parity check accepts that
+        # on a development version and says so; every other build that leaves them out is refused, a release
+        # candidate or final with the test route too (on 8b46aae03 the test image's plan check was refused here)
+        finished = {(-22, 16), (-22, 17)}
+        record = {'built': False, 'reason': '--chim-sol-test names Solstheim\'s cells for this image'}
+        test_image = SimpleNamespace(bloodmoon_solstheim_cells=None, chim_regions=[], miniwind=False,
+                                     chim_sol_test='-26,26:l', bloodmoon_solstheim_record=record)
+        with mock.patch.dict(os.environ, {'AMIWIND_RUN_VERSION': '0.0.68-dev3'}):
+            found, said = self.problems(test_image, finished)
+        self.assertEqual(found, [])
+        line = [line for line in said if line.startswith('Expansion cells: Bloodmoon.esm')]
+        self.assertEqual(len(line), 1)
+        self.assertIn('2 finished cell(s), none built (--chim-sol-test: a test image of named Solstheim cells',
+                      line[0])
+        for version in ('0.0.68-rc1', '0.0.68'):
+            with mock.patch.dict(os.environ, {'AMIWIND_RUN_VERSION': version}):
+                found, _ = self.problems(test_image, finished)
+            self.assertEqual(len(found), 1, version)
+            self.assertIn('the module bloodmoon-solstheim takes none', found[0])
+        # the option without the module's own record, or a plain build that takes none: refused as before
+        no_record = SimpleNamespace(**dict(vars(test_image), bloodmoon_solstheim_record=None))
+        plain = SimpleNamespace(bloodmoon_solstheim_cells=None, chim_regions=[], miniwind=False, chim_sol_test=None,
+                                bloodmoon_solstheim_record=None)
+        for args in (no_record, plain):
+            with mock.patch.dict(os.environ, {'AMIWIND_RUN_VERSION': '0.0.68-dev3'}):
+                found, _ = self.problems(args, finished)
+            self.assertEqual(len(found), 1)
+            self.assertIn('the module bloodmoon-solstheim takes none', found[0])
+        # the reason is Solstheim's alone: Mournhold's module taking none is never excused by it
+        self.assertEqual(expansion_preflight.SET_MODULES['Tribunal.esm'][0], 'tribunal-mournhold')
+        mournhold = SimpleNamespace(**dict(vars(test_image), tribunal_mournhold_cells=None))
+        with mock.patch.object(expansion_preflight, 'finished_set_cells', return_value=[(-12, -30)]), \
+                mock.patch.dict(os.environ, {'AMIWIND_RUN_VERSION': '0.0.68-dev3'}):
+            found = expansion_preflight.module_set_problems(['Morrowind.esm', 'Tribunal.esm'], mournhold,
+                                                            'status.json', lambda line: None)
+        self.assertEqual(len(found), 1)
+        self.assertIn('tribunal-mournhold takes none', found[0])
+
     def test_a_store_too_large_for_one_partition_is_named_right_after_its_stage(self):
         # the disk layout moves a store as one unit and never splits it: the densest forest frame measured is
         # 6.5 MB, and 144 such frames (936 MB) fit; a store that does not fit is a problem minutes after the world

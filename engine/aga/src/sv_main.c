@@ -1623,6 +1623,11 @@ void SV_SpawnServer (char *server)
     AW_AmbientServerReset();
     AW_ActorsServerReset();   /* the same map spawned again joins its cells again (ACTOR-TABLE-SAME-MAP-RELOAD-67) */
     AW_MwscriptServerReset();   /* and attaches its scripts and object state again (PLAZA-FABRICANTS-LIVE-AT-START-67) */
+    {   /* the solid boxes of the new map chosen again (aw_barrier.c; OPENING-BARRIERS-PER-BOX-68); declared here, not in
+         * a header the CHIM stages key */
+        void AW_BarrierServerReset(void);
+        AW_BarrierServerReset();
+    }
     if(aw_inspect_reset)aw_inspect_reset();
     /* the waits of the entity updates and dbg netstat start again with the map (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66) */
     memset (sv_net_missed, 0, sizeof(sv_net_missed));

@@ -1,6 +1,6 @@
 # Solstheim's glacier: how it is approached
 
-_Last updated with AmiWind v0.0.68-dev3 (21 November 2026)._
+_Last updated with AmiWind v0.0.68-dev4 (21 November 2026)._
 
 This page is reference material: why the glacier corner of Solstheim does not fit yet, what was measured, which ways
 of making it fit are being tried, and the rules every way has to pass. It is the plan, not a finished feature. The
@@ -68,6 +68,40 @@ Each way is meant to become a builder option for the listed ice models, so the s
 each one and compared side by side. This page will carry the comparison: a table and a chart of each way's memory peak
 per cell, open edges, texture checks and footing change, and pictures and short panning videos of the glacier made the
 same way for every option. Until those exist, the numbers above are the measured state.
+
+How a way is chosen for a build: the builder option `--chim-mesh-method-set NAME` names a set of
+`config/mesh-method-sets.json` (the set `baseline` is today's methods, and leaving the option out is the same). It
+reaches only Solstheim's stages, the module's world stage and the `--chim-sol-test` stages, whose own runners install
+the set for the meshes it lists; the base world's command, key and output are the same with any set. For pictures of a
+way that does not fit yet, `--chim-sol-test-look-only` lets the test stage report its memory check instead of stopping,
+and marks the test store as not fitting 32 MB: such images are for looking only, in sessions with more Fast RAM, and a
+release candidate or final refuses the option. A `--chim-sol-test` image is itself a test build: its Solstheim is only
+the named cells, so the Solstheim build module is left out of it (the plan says so, and so do the build's record and
+the image's record of the test store). The first-minute check that every finished cell of a selected expansion is
+built accepts that only for such a test image on a development version; a release candidate or final refuses the
+option. A CHIM import measures a set with `tools/chimport.py run
+--mesh-method-set NAME` (the master builder's `chimport-region` request takes it as `mesh_method_set`); the set is part
+of each cell's key and recorded in its result.
+
+The sets so far:
+
+- **`C`: the collision with exact footing**, on the shard and both icebergs (`tools/chim/collision_exact.py`). For
+  every placed copy, after its tilt and scale: the pieces of every face the player can stand on there are kept as
+  they are; the other faces become convex pieces, and each of those is tested against today's collision top on a grid
+  of 8 game units over the walkable surface: where it would rise more than 8 game units over it, it is split, and a
+  piece too small to split goes back to today's own pieces; a walkable spot that would end up lower than both
+  today's collision and the drawn ice gets today's pieces there back. So nothing is lost where the player stands and
+  nothing rises over it by more than 8 game units, measured on that grid for every copy; where today's collision
+  stood above the drawn ice, the player now stands on the ice, and those spots are counted apart (each copy's figures
+  are written beside the converted cell, `mesh-method-set.json`). The drawn meshes are not touched. The icebergs stay stored as
+  tiles of their own frame, as today.
+- **`D`: the shard's drawn mesh simplified with its seams locked** (the hand-made "conservative" kind of
+  [method 2](MESH_METHODS.md#method-2-hand-made-meshes): every border vertex, texture seam and extreme kept, about
+  half the triangles); its collision stays the source mesh's.
+- **`E`: `C` and `D` together.** It is the way measured first.
+
+Every method's mesh and variant units are keyed as their own unit kinds, so no stored unit of any other mesh, and no
+stage of the base world, is built again for a set.
 
 ## The rules a way must pass
 

@@ -39,6 +39,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-10-11: Pipeline entries, correction, the eight build rules and the persisting set: Correction, checked on the finished dev3 run: dev3 ships no legacy Seyda map.
 - 2026-10-11: IMAGE-ONE-HDF-TARGET-36, BUILD-CHIM-FRAME-SWAP-LATE-36, BUILD-IMAGE-AUDIO-SERIAL-36 and BUILD-PIPELINE-UNDERUTILIZATION-36: Four new entries from the v0.0.36-dev3 build, all open.
 - 2026-10-11 00:43 +0300: seen again in v0.0.36-dev3: two disks and three world partitions; the target is one HDF
+- 2026-11-21: v0.0.68-dev3: Since a38d62384 the image step's payload preflight shows the true drive count and bytes in its first minute, with the expansions' stores counted.
 
 <!-- END GENERATED TIMELINE -->
 

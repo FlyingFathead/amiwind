@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.68-dev3 (21 November 2026)._
+_Last updated with AmiWind v0.0.68-dev4 (21 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.68-dev4: fourth snapshot of v0.0.68, 21 November 2026](#v0068-dev4-fourth-snapshot-of-v0068-21-november-2026)
 - [v0.0.68-dev3: third snapshot of v0.0.68, 21 November 2026](#v0068-dev3-third-snapshot-of-v0068-21-november-2026)
 - [v0.0.68-dev2: second snapshot of v0.0.68, 20 November 2026](#v0068-dev2-second-snapshot-of-v0068-20-november-2026)
 - [v0.0.68-dev1: first snapshot of v0.0.68, 20 November 2026](#v0068-dev1-first-snapshot-of-v0068-20-november-2026)
@@ -210,6 +211,77 @@ _Last updated with AmiWind v0.0.68-dev3 (21 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.68-dev4: fourth snapshot of v0.0.68, 21 November 2026
+
+The fourth development snapshot of v0.0.68, in development ([release notes](releases/notes/RELEASE-v0.0.68-dev4.md)). The
+version has no title yet. This snapshot builds the game's invisible walls as solid boxes, adds the Ghostfence's glow behind
+a switch, takes more of the original's console commands and brings builder work for the glacier of Solstheim, which is
+not in the build yet ([roadmap](ROADMAP.md)). Emulator presets: `AmiWind-v0.0.68-dev4-FS-UAE.fs-uae` and
+`AmiWind-v0.0.68-dev4-WinUAE.uae`, both with 32 MB of Fast RAM. None of the changes has been seen in play; they are covered
+by their tests and the gates of their branches (walls, Ghostfence and console commands 12271 and 12273, the glacier's
+builder work 12057, 12323 and 12327, the image's disk plan 12011).
+
+**New**
+
+- Every collision marker of the game is a solid box a script can switch: the five lids over Mournhold's districts, the
+  wall at exterior cell 15,5 and the falling mage's platform at -3,-8 were not in the image and now are, from the
+  original's markers (turned and scaled by the placement; a plane with no thickness becomes a slab one unit thick), in the
+  image's wall table `id1/world-barriers.txt` (1,218 bytes). The engine sweeps them as the opening's boxes, a script's
+  Disable switches one off, and a box the player met answers `GetCollidingPC` for a tenth of a second. The opening's
+  boxes keep their tables byte for byte (INVISIBLE-WALLS-NOT-BUILT-68, OPENING-BARRIERS-PER-BOX-68). The boxes' builder is
+  its own module, so the CHIM world stages keep their keys.
+- The Ghostfence's 132 pylon emitters and the blight cloud's plume are drawn as one baked sprite each (`world/glow.spr`,
+  rows in `world/glow.awg`), nearest first, and not drawn once a script disabled their placement; the curtain's three
+  layers are composed into one texture once a frame (`world/curtain.awc`). Both behind settings that are not saved: the
+  glow off (`aw_glow 0`) until its frame cost is measured, the curtain off (`aw_curtain 0`); `dbg glow`, `dbg glow draw`,
+  `dbg glow range` and `dbg curtain`. The curtain table's read bound is 3,584 bytes. Not yet seen in play
+  (GHOSTFENCE-PARTICLES-NOT-DRAWN-68; GHOSTFENCE-NO-ANIMATION-46, open).
+- Console commands of the original typed on the console: the interpreter's own opcodes, family 7 (`MenuMode`,
+  `OnActivate`, `CellChanged`, `GetSecondsPassed`, `Random`, `XBox`, `GetButtonPressed`, `DontSaveObject`, `Fall`,
+  `GetSquareRoot`, by OpenMW's rules; `CellChanged` and `OnActivate` read the target's own script); the cell commands
+  `PositionCell` (the player goes in at the point, as a door arrival would), `PlaceItemCell`, `AIFollowCell`,
+  `AIEscortCell` and `GetPCCell`, from a cell table on disk (CELN 1,423 rows, CELG 1,559 rows, none resident; a cell the
+  game does not have does nothing); and a row for every function of the script language the list lacked (107 added, 105
+  of them already ran when typed; `MessageBox` and `Say3D` stay planned). [The console command list](CONSOLE_COMMANDS_MORROWIND.md)
+  counts 502 commands, 428 run through the script interpreter, 36 planned (MW-CONSOLE-COMMANDS-62,
+  CONSOLE-CENSUS-MISSES-FUNCTIONS-68).
+
+**Builder and tools**
+
+- Named sets of mesh methods for Solstheim's glacier ice (`config/mesh-method-sets.json`: the baseline, `C`, `D` and
+  `E`): `C` keeps the collision exact where the player can stand and replaces the rest by convex pieces tested against
+  today's collision on an 8-unit grid (the shard's pieces 0.24 of today's, the icebergs' 0.30 and 0.74 on the nine
+  glacier cells' copies), `D` simplifies the shard's drawn mesh with its seams locked, `E` is both. `--chim-mesh-method-set`
+  reaches only Solstheim's stages; a CHIM import takes `--mesh-method-set`, as part of each cell's key; the master
+  builder's request takes `mesh_method_set` (SOL-GLACIER-METHODS-AB-COMPARE-68; [the glacier page](chim/SOLSTHEIM_GLACIER.md),
+  [CHIM import](chim/CHIMPORT.md)). The glacier itself is not in the build yet.
+- The glacier test images: the test world stage goes through a runner of its own, from the shared storage pool and the
+  test folder's own master alone (CHIM-SOL-TEST-MASTERS-NOT-IN-FOLDER-68); the image leaves the Solstheim module out, says
+  so in its plan and records, and a release candidate or final refuses the route; the first-minute check of finished
+  cells accepts the missing module only for such a test image on a development version; the image step's new record call
+  is listed in the finalize table (CHIM-SOL-TEST-TWO-CHIMSOL-STORES-68). `--chim-sol-test-look-only` reports the memory
+  check instead of stopping and marks the test store as not fitting 32 MB. The tests of the route and of the sets cover each
+  of these, and the module runner's set test keeps the module's master list inside the test.
+- The Mortrag Glacier's two icebergs (`bm_ex_iceberg`, 49 flights, and `bm_ex_iceberg_collapsed`, 38) are on the stair
+  check's known list: the detector read natural ice terraces as flights, and the meshes keep the original's collision
+  (CHIM-STAIR-METHOD1-UNFIXED-48; the table now counts 14 Bloodmoon rows).
+- The payload preflight's layout plan counts the stores of the expansions' worlds that the image installs, each store's
+  files at their own sizes, so the first plan moves what the boot partition cannot hold; on the v0.0.68-dev3 build's stage
+  folders it equals the image's record byte for byte (3,511 files and 152,423,292 bytes for Solstheim, 287 files and
+  20,192,488 bytes for Mournhold) (IMAGE-BOOT-PAYLOAD-OVER-2GIB-48).
+- The bug tracker records the faults of the 20 to 21 November builds: Fort Frostmoth's dock frame rate
+  (SOL-FROSTMOTH-DOCK-FRAME-RATE-68), the area tables' read on load (AREA-TABLES-SLOW-READ-ON-LOAD-68), the image step's
+  serial minutes after the optimizer check (BUILD-IMAGE-AFTER-OPTIMIZER-SERIAL-68), the werewolf's head left whole by the
+  reduction (WEREWOLF-HEAD-NOT-REDUCED-68), Solstheim's conversion on half the cores (SOL-MODULE-CONVERSION-HALF-CORES-68),
+  the stall check's zero cores (STALL-ZERO-CORES-WHILE-POOLS-BUSY-68), the readiness list's missing options
+  (BUILD-READINESS-MISSES-PLAN-WAIVERS-68), and the two faults of the glacier test route; see [the bug tracker](BUGS.md).
+
+**Documentation**
+
+- The README and the roadmap name the v0.0.68-dev4 presets and snapshot. The MWScript tracker is measured for this
+  version (927 scripts run, 9 carried, as in dev3). The console command page, the DemoWind page (the Ghostfence's glow),
+  the glacier page and the documentation index follow the changes above.
 
 ## v0.0.68-dev3: third snapshot of v0.0.68, 21 November 2026
 

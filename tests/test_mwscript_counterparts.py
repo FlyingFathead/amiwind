@@ -66,7 +66,8 @@ class Counterparts(unittest.TestCase):
         self.assertIn('g->v.angles[1]=225;', opening)
         barrier = (ROOT / 'engine/aga/src/aw_barrier.c').read_text(encoding='utf-8')
         self.assertIn('"intro/barriers-ship.awb"', barrier)
-        self.assertIn('if(!strcmp(sv.name,"prison")){for(i=0;i<ship_count;i++)', barrier)
+        # since v0.0.68 (OPENING-BARRIERS-PER-BOX-68) each box also off once a script disabled its reference
+        self.assertIn('if(!strcmp(sv.name,"prison")){\n        for(i=0;i<ship_count;i++)if(ship_on>>i&1)', barrier)
         conv = (ROOT / 'tools/prepare_character.py').read_text(encoding='utf-8')
         self.assertIn("barriers(master, SHIP_CELL)", conv)
         self.assertIn('id1/intro/barriers-ship.awb', (ROOT / 'config/release-features.json').read_text(encoding='utf-8'))

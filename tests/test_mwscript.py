@@ -1701,6 +1701,22 @@ int main(int argc,char **argv){
                AW_MwvmAttach(((uint32_t)p[0]<<24)|(p[1]<<16)|(p[2]<<8)|p[3],(p[4]<<8)|p[5],(p[6]<<8)|p[7],-1,o));
     }
     if(getenv("NEWGAME"))printf("newgame %d\n",AW_MwvmNewGame());   /* NPC-STORY-DISABLED-AT-START-42 */
+    if(getenv("CONSOLE")){   /* MW-CONSOLE-COMMANDS-62 family 7: the console's readings of the opcodes (aw_mwvm.h) */
+        int a,b,c,d;
+        a=AW_MwvmCellChanged(108);
+        for(tick=1;tick<=2;tick++)AW_MwvmTick(dt,player);
+        b=AW_MwvmCellChanged(108);c=AW_MwvmCellChanged(999);
+        printf("console cellchanged %d then %d none %d\n",a,b,c);
+        printf("console seconds %.2f\n",(double)AW_MwvmFrameSeconds());
+        AW_MwvmSeed(7);   /* each roll its own statement: the order of a call's arguments is not defined */
+        a=(int)AW_MwvmRandom(100);b=(int)AW_MwvmRandom(0);c=(int)AW_MwvmRandom(-5);d=(int)AW_MwvmRandom(1000);
+        printf("console random %d %d %d %d\n",a,b,c,d);
+        a=AW_MwvmUse(108);b=AW_MwvmOnActivate(108);c=AW_MwvmOnActivate(108);
+        printf("console onactivate used %d read %d again %d\n",a,b,c);
+        a=AW_MwvmUse(103);b=AW_MwvmOnActivate(103);c=AW_MwvmUse(103);d=AW_MwvmOnActivate(999);
+        printf("console quiet used %d read %d used %d none %d\n",a,b,c,d);
+        return 0;
+    }
     if(getenv("HELD")){   /* SCRIPTED-EVENT-FALLING-MAGE-61: the HELD rows and the lookup by actor */
         uint32_t a,s;float at[3];int k;
         for(k=0;AW_MwvmHeld(k,&a,&s,at);k++)printf("held %u %u %.1f %.1f %.1f find %d\n",(unsigned)a,(unsigned)s,
@@ -2146,6 +2162,23 @@ class InterpreterTests(unittest.TestCase):
         activates = [l.split()[0] for l in out if l.split()[1:2] == ['object'] and l.split()[4] == str(OPCODES['ACTIVATE'][0])]
         self.assertEqual(activates, ['3'], out)
         self.assertNotIn(str(OPCODES['ACTIVATE'][0]), [l.split()[4] for l in self.run_vm(6) if l.split()[1:2] == ['object']])
+
+    def test_the_console_reads_the_opcodes_by_their_own_rules(self):
+        # MW-CONSOLE-COMMANDS-62 family 7 (v0.0.68): the console's CellChanged reads the reference's own attached script
+        # (1 until its first run, then 0; -1 for a reference with none); GetSecondsPassed the last frame's time; Random
+        # the next rolls of the scripts' one generator (0 below 1); OnActivate 1 once after a use, and it hands the next
+        # use to the object's script even when that script never read it (OpenMW 0.51 refdata.cpp onActivate)
+        out = self.run_vm(0, env={'CONSOLE': '1'})
+        line = {l.split()[1]: l.split()[2:] for l in out if l.startswith('console ')}
+        self.assertEqual(line['cellchanged'], ['1', 'then', '0', 'none', '-1'], out)
+        self.assertEqual(line['seconds'], ['0.25'])
+        rng, want = 7, []
+        for n in (100, 0, -5, 1000):
+            rng = (rng * 1664525 + 1013904223) & 0xFFFFFFFF
+            want.append(str((rng >> 8) % n if n > 0 else 0))
+        self.assertEqual(line['random'], want)
+        self.assertEqual(line['onactivate'], ['used', '1', 'read', '1', 'again', '0'])
+        self.assertEqual(line['quiet'], ['used', '0', 'read', '0', 'used', '1', 'none', '-1'])
 
     def test_messagebox_reaches_the_host_and_getbuttonpressed_reads_the_choice(self):
         # v0.0.51: MessageBox carries its text, its numbers (step 1, the constant 2, as numbers with a fraction) and

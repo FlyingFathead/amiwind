@@ -7,7 +7,7 @@
                        [--rings N] [--cells "x,y ..."] [--retry-failed] [--timeout S] [--dry-run]
     chimport.py cell   --data-files DIR --palette PALETTE.lmp --cell X,Y --out CELLDIR [--unit-cache DIR] ...
     run, cell, world:  [--storage-pool auto|on|off] [--reuse-mode copy|hardlink|pool] [--storage-pool-dir DIR]
-                       [--frame-settings build|cell-v1]
+                       [--frame-settings build|cell-v1] [--cell-shape cell|region] [--mesh-method-set NAME]
     plan, run:         [--region NAME]  (the cells of a region of plan.json; repeatable)
     chimport.py ocean  --data-files DIR --palette PALETTE.lmp --out RUN [--rect X0,X1,Y0,Y1] [--margin N] [--dry-run]
                        [--storage-pool ...] [--tracker DIR --tracker-tool tools/cell_progress.py]
@@ -1361,7 +1361,7 @@ def inputs_identity(data_files):
 
 
 def cell_key(cell, data_files, palette, qbsp=None, abi_sizes=None, missing_land='flat', frame=None, shape=None,
-             world_cells=None):
+             world_cells=None, method_set=None):
     """(key, reason): the hash of exactly what a cell's outputs depend on - the cell, its shape (SHAPE, CELL_SHAPES),
     the frames of the world it stands for (WORLD_CELLS, a region frame: its neighbours' pieces outside it),
     and its frame settings (FRAME, default frame_settings(None, qbsp, shape)), the game inputs (input lock), the
@@ -1406,6 +1406,10 @@ def cell_key(cell, data_files, palette, qbsp=None, abi_sizes=None, missing_land=
         # every cell of the world: a neighbour's piece can lie in any cell its model reaches (a key may never
         # under-declare)
         parts['world_frames'] = sorted([list(c) for c in world_cells])
+    if method_set is not None:
+        # a mesh method set (config/mesh-method-sets.json): another conversion of its meshes; absent without one, so
+        # every key is as before (its rows are in the code part, config/ being part of it)
+        parts['mesh_method_set'] = method_set
     return digest_json(parts), None
 
 
@@ -1566,12 +1570,26 @@ def unit_counts(stats):
 
 def convert_cell_pooled(cell, data_files, palette, out, qbsp=None, unit_cache=None, jobs=1, missing_land='flat',
                         abi_sizes=None, pool=None, origin=None, reuse_mode='copy', frame_name=None, shape=None,
-                        world_cells=None):
+                        world_cells=None, method_set=None):
     """convert_cell through the shared storage pool. POOL None: exactly convert_cell (after removing read-only shared
     links a pooled earlier attempt left in OUT). Otherwise records result['pool']: stored vs linked bytes, units
     reused / computed / failed, and whether the whole cell was linked from an earlier identical conversion.
     FRAME_NAME: the frame settings' set (FRAME_SETTING_SETS; None: the default, build); SHAPE: the cell shape
-    (CELL_SHAPES; None: the default, cell)."""
+    (CELL_SHAPES; None: the default, cell); METHOD_SET: the mesh method set installed for the conversion
+    (method_set_installed; None: none), in the cell key and the result's settings."""
+    if method_set is not None:
+        res = _convert_cell_pooled(cell, data_files, palette, out, qbsp, unit_cache, jobs, missing_land, abi_sizes,
+                                   pool, origin, reuse_mode, frame_name, shape, world_cells, method_set)
+        res.setdefault('settings', {})['mesh_method_set'] = method_set
+        write_json(Path(out) / 'result.json', res)
+        return res
+    return _convert_cell_pooled(cell, data_files, palette, out, qbsp, unit_cache, jobs, missing_land, abi_sizes,
+                                pool, origin, reuse_mode, frame_name, shape, world_cells)
+
+
+def _convert_cell_pooled(cell, data_files, palette, out, qbsp=None, unit_cache=None, jobs=1, missing_land='flat',
+                         abi_sizes=None, pool=None, origin=None, reuse_mode='copy', frame_name=None, shape=None,
+                         world_cells=None, method_set=None):
     out = Path(out)
     # the default set and shape pass nothing on: the calls are the ones before (named sets and shapes only)
     named = {} if frame_name in (None, FRAME_SETTINGS_DEFAULT) else {'frame_name': frame_name}
@@ -1589,7 +1607,8 @@ def convert_cell_pooled(cell, data_files, palette, out, qbsp=None, unit_cache=No
     setting = storage_pool.setting(pool, origin or 'option', out, log=lambda line: print(line, flush=True))
     link = setting['links'] and reuse_mode in ('hardlink', 'pool')
     cells = CellPool(pool, link=link)
-    key, why = cell_key(cell, data_files, palette, qbsp, abi_sizes, missing_land, frame, shape, world_cells)
+    key, why = cell_key(cell, data_files, palette, qbsp, abi_sizes, missing_land, frame, shape, world_cells,
+                        method_set)
     record = {'dir': str(pool), 'origin': setting['origin'], 'links': setting['links'], 'warning': setting['warning'],
               'reuse_mode': reuse_mode if setting['links'] else 'copy', 'cell_key': key, 'cell_key_missing': why}
     if key is not None:
@@ -1787,12 +1806,31 @@ def cell_command(args, row):
 
 
 def frame_arguments(args):
-    """--frame-settings and --cell-shape for a cell or world process: only a set or shape other than the default (the
-    default command line stays as it was)."""
+    """--frame-settings, --cell-shape and --mesh-method-set for a cell or world process: only a set or shape other
+    than the default (the default command line stays as it was)."""
     name = getattr(args, 'frame_settings', None)
     shape = getattr(args, 'cell_shape', None)
+    method_set = getattr(args, 'mesh_method_set', None)
     return (['--frame-settings', name] if name not in (None, FRAME_SETTINGS_DEFAULT) else []) + \
-        (['--cell-shape', shape] if shape not in (None, CELL_SHAPE_DEFAULT) else [])
+        (['--cell-shape', shape] if shape not in (None, CELL_SHAPE_DEFAULT) else []) + \
+        (['--mesh-method-set', method_set] if method_set else [])
+
+
+@contextlib.contextmanager
+def method_set_installed(name, out):
+    """The mesh method set NAME (config/mesh-method-sets.json, chim.method_sets) installed in this cell or world
+    process while it converts, its report written into OUT; yields the set's record for the results and the cell key
+    ({'set', 'methods'}), or None without a set (nothing installed, every key as before)."""
+    if not name:
+        yield None
+        return
+    from chim import method_sets
+    record, restore = method_sets.install(name, report=out)
+    print('chimport: %s' % method_sets.line(record), flush=True)
+    try:
+        yield {'set': record['set'], 'methods': record['methods']}
+    finally:
+        restore()
 
 
 def world_command(args, ring):
@@ -1844,6 +1882,10 @@ def presented_data_folder(data_files, folder, masters=None):
 
 def run(args):
     run_dir = args.out
+    if getattr(args, 'mesh_method_set', None):
+        # an unknown set or a bad row stops the run before any cell starts (each cell process installs it)
+        from chim import method_sets
+        print('chimport: %s' % method_sets.line(method_sets.rows(args.mesh_method_set)[0]), flush=True)
     run_dir.mkdir(parents=True, exist_ok=True)
     args.pool_dir, pool_origin = pool_choice(args)
     if getattr(args, 'presented_data', None):
@@ -2723,6 +2765,10 @@ def _cli(argv=None):
                        help='the shape of a cell\'s frame: cell (default: the cell alone, nothing of its neighbours) or '
                             'region (the frame a build installs for the cell, its neighbours\' placements and terrain '
                             'within the margin copied in; the records count the owned cell, the apron is named apart)')
+        q.add_argument('--mesh-method-set', metavar='NAME',
+                       help='the named set of config/mesh-method-sets.json for the meshes it lists (chim.method_sets; '
+                            'unset: today\'s methods): installed in every cell and world process, part of each cell\'s '
+                            'key, recorded in its result, method C\'s figures in CELL/mesh-method-set.json')
     for q in (r, c, w, o):
         q.add_argument('--working-version', type=Path, metavar='FILE',
                        help='working-version record for the entry check (default: AMIWIND_WORKING_VERSION, then '
@@ -2762,10 +2808,12 @@ def _cli(argv=None):
             if a.cell_shape != 'region':
                 ap.error('--world-cells needs --cell-shape region')
             world_cells = [tuple(c) for c in read_json(a.world_cells)['cells']]
-        res = convert_cell_pooled((x, y), a.data_files, a.palette, a.out, a.qbsp, a.unit_cache, a.jobs,
-                                  None if a.missing_land == 'refuse' else a.missing_land, sizes, pool, origin,
-                                  a.reuse_mode, frame_name=a.frame_settings, shape=a.cell_shape,
-                                  world_cells=world_cells)
+        with method_set_installed(a.mesh_method_set, a.out) as method_set:
+            named = {} if method_set is None else {'method_set': method_set}
+            res = convert_cell_pooled((x, y), a.data_files, a.palette, a.out, a.qbsp, a.unit_cache, a.jobs,
+                                      None if a.missing_land == 'refuse' else a.missing_land, sizes, pool, origin,
+                                      a.reuse_mode, frame_name=a.frame_settings, shape=a.cell_shape,
+                                      world_cells=world_cells, **named)
         print(json.dumps({'cell': res['key'], 'converted': res['converted'], 'errors': [e['mechanism'] for e in res['errors']],
                           'audits_failed': [m for m, v in res['audits'].items() if v['status'] == 'failed'],
                           'wall_s': res['wall_s'], 'pool': res.get('pool', {}).get('cell')}))
@@ -2779,9 +2827,10 @@ def _cli(argv=None):
         if pool is not None:
             import storage_pool
             link = storage_pool.setting(pool, origin, a.out)['links'] and a.reuse_mode != 'copy'
-        rep = build_world(a.out, a.data_files, a.palette, name, rows, a.qbsp, a.jobs,
-                          read_json(a.abi_sizes) if a.abi_sizes else read_json(a.out / 'abi-sizes.json'), heap=a.heap,
-                          pool=pool, link=link, frame_name=a.frame_settings, shape=a.cell_shape)
+        with method_set_installed(a.mesh_method_set, a.out / 'world' / name):
+            rep = build_world(a.out, a.data_files, a.palette, name, rows, a.qbsp, a.jobs,
+                              read_json(a.abi_sizes) if a.abi_sizes else read_json(a.out / 'abi-sizes.json'),
+                              heap=a.heap, pool=pool, link=link, frame_name=a.frame_settings, shape=a.cell_shape)
         print(json.dumps({'name': rep['name'], 'built': rep['built'], 'cells': len(rep['cells']), 'wall_s': rep['wall_s'],
                           'heap': rep.get('heap'), 'disk': rep.get('disk'),
                           'validation_failures': (rep.get('validation') or {}).get('failure_count'),

@@ -291,4 +291,8 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [WORLD-BUTTONS-62](WORLD-BUTTONS-62.md): Buttons and levers that should act do nothing, for example the Ghostgate gate buttons on both sides
 - [WORLD-OBJECT-STATE-NOT-SAVED-59](WORLD-OBJECT-STATE-NOT-SAVED-59.md): World objects taken or moved are not remembered: they come back when the cell or room reloads, and saves do not keep them
 
+Related bugs in other categories:
+
+- [WEREWOLF-HEAD-NOT-REDUCED-68](WEREWOLF-HEAD-NOT-REDUCED-68.md): The outer-measures reduction leaves the werewolf's head whole at every target and reports that as a pass
+
 <!-- END GENERATED CATEGORY -->

@@ -9,7 +9,7 @@
 | Where | every place with water; Old Mournhold: Temple Sewers West (Tribunal), the lever torch_lever and the quest The Black Dart Gang |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.67 (last seen) |
+| Persists in | fixed in v0.0.68-dev2 |
 | Severity | medium: one quest's intended way (flooding the gang's hideout) cannot work, and no actor ever drowns |
 | Family | Game logic (QuakeC) and saves (`game-logic`) |
 | Playtest version | v0.0.67 |
@@ -29,13 +29,17 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.67 (026684f9) | 2026-11-20 | gate 12066 of the planning item ACTOR-DROWNING-NOT-CARRIED-67 | People under water in rooms hold their breath for the game's time and then lose health until they surface or drown, as in the original; the breath is saved. |
 | fixed in source | a gated commit | v0.0.67 (cd7cb3e0) | 2026-11-20 | gate 12280 of the planning item ACTOR-DROWNING-NOT-CARRIED-67 | People under water in a flooded room are checked by their fight state, not an entity field residents never set, so they hold their breath and drown as in the original (seen in play: the Black Dart gang drowned under the flood of Temple Sewers West). |
+| confirmed in play | an emulator session | v0.0.68-dev2 (the Old Mournhold levers image with the engine and script file of gates 12280 and 12281) | 2026-11-20 | the water journey, runs 4 and 6, at 32 MB Fast: its stills and console log | People and creatures under water run out of breath and drown as in the original, so the flood in Old Mournhold: Temple Sewers West drowns the Black Dart gang. |
+| shipped | the v0.0.68-dev2 snapshot build | v0.0.68-dev2 (ef709f6be, build 2026_11_21_v0.0.68-dev2_full-dev2_ef709f6) | 2026-11-21 | the delivered build holds the commit (gate 12133) | People and creatures under water run out of breath and drown as in the original, so the flood in Old Mournhold: Temple Sewers West drowns the Black Dart gang. |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-20: reported in v0.0.67
 - 2026-11-20: fixed in source: a gated commit, v0.0.67 (026684f9); gate 12066 of the planning item ACTOR-DROWNING-NOT-CARRIED-67: People under water in rooms hold their breath for the game's time and then lose health until they surface or drown, as in the original; the breath is saved.
 - 2026-11-20: fixed in source: a gated commit, v0.0.67 (cd7cb3e0); gate 12280 of the planning item ACTOR-DROWNING-NOT-CARRIED-67: People under water in a flooded room are checked by their fight state, not an entity field residents never set, so they hold their breath and drown as in the original (seen in play: the Black Dart gang drowned under the flood of Temple ...
+- 2026-11-20: confirmed in play: an emulator session, v0.0.68-dev2 (the Old Mournhold levers image with the engine and script file of gates 12280 and 12281); the water journey, runs 4 and 6, at 32 MB Fast: its stills and console log: People and creatures under water run out of breath and drown as in the original, so the flood in Old Mournhold: Temple Sewers West drowns the Black Dart gang.
 - 2026-11-20 20:54 +0200: seen again in v0.0.68-dev1: Seen again on the first build that carries the fix: in a flooded room no person loses breath, because the check skipped every person (it read a health value people do not use).
+- 2026-11-21: shipped: the v0.0.68-dev2 snapshot build, v0.0.68-dev2 (ef709f6be, build 2026_11_21_v0.0.68-dev2_full-dev2_ef709f6); the delivered build holds the commit (gate 12133): People and creatures under water run out of breath and drown as in the original, so the flood in Old Mournhold: Temple Sewers West drowns the Black Dart gang.
 
 <!-- END GENERATED TIMELINE -->
 

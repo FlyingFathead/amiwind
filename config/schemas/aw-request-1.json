@@ -124,6 +124,7 @@
         "workers": {"type": "integer", "minimum": 1, "description": "cells converted at once (default: leased cores / cell_jobs)"},
         "cell_jobs": {"type": "integer", "minimum": 1, "description": "worker processes inside each cell (default 2)"},
         "cell_shape": {"enum": ["cell", "region"], "description": "cell (default: each cell alone) or region (each cell as the frame a build installs for it, with its neighbours' apron; tools/chimport.py --cell-shape)"},
+        "mesh_method_set": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.+-]{0,63}$", "description": "a named set of config/mesh-method-sets.json for the meshes it lists (tools/chimport.py --mesh-method-set; default: today's methods)"},
         "world": {"type": "boolean", "description": "also build the growing world (default false: the cells alone)"},
         "timeout": {"type": "integer", "minimum": 60, "description": "seconds per cell before it is stopped"},
         "workspace": {"type": "string", "pattern": "^/"},

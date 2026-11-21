@@ -550,6 +550,11 @@ static int attached_instance(uint32_t ref){
     for(k=0;k<vm.ninst;k++)if((vm.inst[k].flags&(AWI_USED|AWI_GLOBAL))==AWI_USED && vm.inst[k].reference==ref)return k;
     return -1;
 }
+/* Random's roll: a whole number below N (0 when N < 1) from the game's one generator, a script's and the console's */
+static float roll(int32_t n){
+    vm.rng=vm.rng*1664525u+1013904223u;
+    return n>0?(float)(int32_t)((vm.rng>>8)%(uint32_t)n):0.0f;
+}
 static void note_cells(void){int used=vm.low+(size_cells-vm.high);if(used>vm.peak_cells)vm.peak_cells=used;}
 int AW_MwvmAttach(uint32_t reference,int script,int bind_flags,int entity,const float origin[3]){
     int k,n;parked_t *p;aw_mwvm_instance_t *in;
@@ -685,6 +690,20 @@ int AW_MwvmUse(uint32_t reference){
     if(k<0 || !(vm.inst[k].flags&AWI_TAKES_USE))return 0;
     vm.inst[k].flags|=AWI_ACTIVATED;vm.inst[k].flags&=~AWI_QUIET;
     return 1;
+}
+/* MW-CONSOLE-COMMANDS-62 (v0.0.68, family 7): the console's readings of the opcodes, by the opcodes' own rules (aw_mwvm.h) */
+float AW_MwvmRandom(int32_t n){return ON?roll(n):0.0f;}
+float AW_MwvmFrameSeconds(void){return ON?vm.dt:0.0f;}
+int AW_MwvmCellChanged(uint32_t reference){
+    int k=ON && reference?attached_instance(reference):-1;
+    return k<0?-1:(vm.inst[k].flags&AWI_CELLCHANGED)?1:0;
+}
+int AW_MwvmOnActivate(uint32_t reference){
+    int k=ON && reference?attached_instance(reference):-1,was;
+    if(k<0)return -1;
+    was=(vm.inst[k].flags&AWI_ACTIVATED)?1:0;
+    vm.inst[k].flags&=~AWI_ACTIVATED;vm.inst[k].flags|=AWI_TAKES_USE;
+    return was;
 }
 int AW_MwvmStartsAtLoad(int script){
     int i;
@@ -983,9 +1002,7 @@ static int run(int k){
         case AWM_STREAMMUSIC:if(h && h->music)h->music((int)U16(pc));pc+=2;acted=1;target=AW_MWVM_SELF;break;
         case AWM_SECONDS:sp->f=elapsed;sp++;break;
         case AWM_RANDOM:{
-            int32_t n=sp[-1].i;
-            vm.rng=vm.rng*1664525u+1013904223u;
-            sp[-1].f=n>0?(float)(int32_t)((vm.rng>>8)%(uint32_t)n):0.0f;
+            sp[-1].f=roll(sp[-1].i);
             /* DBG-DBATTACK-67: a debug command's sure roll: the lowest number for that one script (AW_MwvmForceRandom) */
             if(forced_random>=0 && (int)in->script==forced_random){sp[-1].f=0.0f;vm.stats.forced_rolls++;}
             break;}

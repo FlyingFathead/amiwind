@@ -9,7 +9,7 @@
 | Where | Old Mournhold: Temple Sewers West (Tribunal), the scripts drownOnExit, waterstate_torchdisable and waterstate_torchenable; the script function GetWaterLevel |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.67 (last seen) |
+| Persists in | fixed in v0.0.68-dev2 |
 | Severity | medium: a Tribunal quest room starts as if flooded: the four quest characters get 0 health and 13 of its 16 torches show burned out, by the scripts' own rules on the engine's reading; not yet seen in play |
 | Family | Game logic (QuakeC) and saves (`game-logic`) |
 | Playtest version | v0.0.67 |
@@ -18,6 +18,27 @@
 | Unknown because | the build receipt does not record source commit, engine commit, world commit |
 
 <!-- END GENERATED FACTS -->
+
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.68-dev2 (8158a08eb) | 2026-11-20 | gate 12061 | GetWaterLevel reads the room's own water level, so the Black Dart gang and the lit torches of Old Mournhold: Temple Sewers West stay as in the original. |
+| confirmed in play | an emulator session | v0.0.68-dev2 (the Old Mournhold levers image with the engine and script file of gates 12280 and 12281) | 2026-11-20 | the water journey, runs 4 and 6, at 32 MB Fast: its stills and console log | GetWaterLevel reads the room's own water level, so the Black Dart gang and the lit torches of Old Mournhold: Temple Sewers West stay as in the original. |
+| shipped | the v0.0.68-dev2 snapshot build | v0.0.68-dev2 (ef709f6be, build 2026_11_21_v0.0.68-dev2_full-dev2_ef709f6) | 2026-11-21 | the delivered build holds the commit (gate 12133) | GetWaterLevel reads the room's own water level, so the Black Dart gang and the lit torches of Old Mournhold: Temple Sewers West stay as in the original. |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-20: reported in v0.0.67
+- 2026-11-20: fixed in source: a gated commit, v0.0.68-dev2 (8158a08eb); gate 12061: GetWaterLevel reads the room's own water level, so the Black Dart gang and the lit torches of Old Mournhold: Temple Sewers West stay as in the original.
+- 2026-11-20: confirmed in play: an emulator session, v0.0.68-dev2 (the Old Mournhold levers image with the engine and script file of gates 12280 and 12281); the water journey, runs 4 and 6, at 32 MB Fast: its stills and console log: GetWaterLevel reads the room's own water level, so the Black Dart gang and the lit torches of Old Mournhold: Temple Sewers West stay as in the original.
+- 2026-11-21: shipped: the v0.0.68-dev2 snapshot build, v0.0.68-dev2 (ef709f6be, build 2026_11_21_v0.0.68-dev2_full-dev2_ef709f6); the delivered build holds the commit (gate 12133): GetWaterLevel reads the room's own water level, so the Black Dart gang and the lit torches of Old Mournhold: Temple Sewers West stay as in the original.
+
+<!-- END GENERATED TIMELINE -->
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

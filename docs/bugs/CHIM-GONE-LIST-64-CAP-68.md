@@ -30,11 +30,13 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.67 (ad0b307a) | 2026-11-20 | gate 12264 of the planning item CHIM-GONE-LIST-64-CAP-68 | Every taken or disabled outdoor placement stays hidden however many: a bit per placement of the loaded frame, every piece of a reference hidden, an id of no loaded frame counted and named. |
+| shipped | the v0.0.68-dev3 snapshot build | v0.0.68-dev3 (9a91382c3, build 2026_11_21_v0.0.68-dev3_full-dev3_9a91382) | 2026-11-21 | the delivered build holds the commit (gate 12300) | Everything taken or switched off outdoors stays hidden, however many: the engine's list of hidden placements holds as many as the game can produce in one place. |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-20: reported in v0.0.68-dev1
 - 2026-11-20: fixed in source: a gated commit, v0.0.67 (ad0b307a); gate 12264 of the planning item CHIM-GONE-LIST-64-CAP-68: Every taken or disabled outdoor placement stays hidden however many: a bit per placement of the loaded frame, every piece of a reference hidden, an id of no loaded frame counted and named.
+- 2026-11-21: shipped: the v0.0.68-dev3 snapshot build, v0.0.68-dev3 (9a91382c3, build 2026_11_21_v0.0.68-dev3_full-dev3_9a91382); the delivered build holds the commit (gate 12300): Everything taken or switched off outdoors stays hidden, however many: the engine's list of hidden placements holds as many as the game can produce in one place.
 
 <!-- END GENERATED TIMELINE -->
 

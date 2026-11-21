@@ -33,11 +33,20 @@
 
 ## Timeline
 
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.68-dev3 (cdc1d3da5) | 2026-11-21 | gate 12055 | Daedric ruin collision falls back to raw piece chains and puts Hla Oad's frames over the CHIM memory budget |
+| shipped | the v0.0.68-dev3 snapshot build | v0.0.68-dev3 (9a91382c3, build 2026_11_21_v0.0.68-dev3_full-dev3_9a91382) | 2026-11-21 | the delivered build holds the commit (gate 12300) | Daedric ruin collision falls back to raw piece chains and puts Hla Oad's frames over the CHIM memory budget |
+
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-10-16: reported in v0.0.41-dev3
 - 2026-11-20 22:26 +0200: seen again in v0.0.68-dev1: On Solstheim, 27 of 57 stored copies of an iceberg shard keep their raw collision piece chain because the collision compiler standard format cannot number the more than 32,767 nodes their union needs; compiled in its larger format they ...
 - 2026-11-20 23:43 +0200: seen again in v0.0.68-dev1: Two base-game meshes, a Vivec canton piece and the Mournhold temple, also keep their raw collision piece chain because the compiler refuses their union, most likely on the same format limit; a parasol tree keeps it for a small ...
+- 2026-11-21: fixed in source: a gated commit, v0.0.68-dev3 (cdc1d3da5); gate 12055: Daedric ruin collision falls back to raw piece chains and puts Hla Oad's frames over the CHIM memory budget
+- 2026-11-21: shipped: the v0.0.68-dev3 snapshot build, v0.0.68-dev3 (9a91382c3, build 2026_11_21_v0.0.68-dev3_full-dev3_9a91382); the delivered build holds the commit (gate 12300): Daedric ruin collision falls back to raw piece chains and puts Hla Oad's frames over the CHIM memory budget
 
 <!-- END GENERATED TIMELINE -->
 

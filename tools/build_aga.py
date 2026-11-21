@@ -2186,6 +2186,9 @@ def image(args):
     # The jail's way out (CRIME-59): every prison marker of the master and its prison's evidence chest, for GotoJail
     # and PayFine (engine aw_crime.c; tools/world_doors.py prison_markers)
     write_prison_markers(args,boot/'id1',out)
+    # The solid boxes (OPENING-BARRIERS-PER-BOX-68): the opening's by reference, the game's other collision markers
+    # (Mournhold's lids, the wall at 15,5, the falling mage's platform) as boxes (engine aw_barrier.c)
+    write_world_barriers(args,boot/'id1',out)
     view_report=view_job.result()
     (out/'player-view.json').write_text(json.dumps(view_report,indent=2)+'\n',encoding='utf-8',newline='\n')
     if not getattr(args,'no_player_body',False):
@@ -2210,6 +2213,9 @@ def image(args):
     from prepare_world_ui import validate as validate_world_ui
     if world_ui is not None:world_ui.result()
     validate_world_ui(boot/'id1')
+    # The Ghostfence (GHOSTFENCE-PARTICLES-NOT-DRAWN-68): the pylons' glow and the blight cloud's plume, and the
+    # curtain's scrolling layers, into id1/world after the world UI's own files (engine aw_atmos.c, aw_curtain.c)
+    write_ghostfence(args,boot/'id1',out)
     logo=ROOT/'resources/media/AmiWind_wordmark.png'
     # Menu logo: the gold name without the rule, on the palette's gold ramp
     # (UI-MENU-LOGO-32); --menu-logo legacy keeps the old wordmark method.
@@ -2549,6 +2555,51 @@ def write_prison_markers(args, id1, out):
     return markers
 
 
+def awb1_rows(path):
+    """The row count of an AWB1 barrier table (tools/prepare_character.py barriers), None without the file."""
+    path = Path(path)
+    if not path.is_file():
+        return None
+    raw = path.read_bytes()
+    return raw[4] | raw[5] << 8 if raw[:4] == b'AWB1' and len(raw) >= 6 else None
+
+
+def write_world_barriers(args, id1, out):
+    """id1/world-barriers.txt (OPENING-BARRIERS-PER-BOX-68, INVISIBLE-WALLS-NOT-BUILT-68): the references of the opening's
+    boxes, row for row with intro/barriers.awb and barriers-ship.awb, so a script's Disable reaches each one; and every
+    other collision marker of the game masters as a solid box in the original's units, a box in a district this build
+    presents at its moved place (tools/world_barriers.py collision_boxes; engine aw_barrier.c). A reference count that is
+    not the AWB1 table's stops the step. Also OUT/world-barriers.json."""
+    import world_barriers
+    from collections import Counter
+    boxes, opening = world_barriers.collision_boxes(args.data_files, presented_places(args)[0])
+    for name, refs in (('barriers.awb', opening['exterior']), ('barriers-ship.awb', opening['ship'])):
+        for where in (Path(id1)/'intro'/name, Path(args.scene)/'id1/intro'/name):
+            rows = awb1_rows(where)
+            if rows is not None:
+                if rows != len(refs):
+                    raise SystemExit('world barriers: %s holds %d boxes, the master %d of its references' %
+                                     (where, rows, len(refs)))
+                break
+    (Path(id1)/world_barriers.WORLD_BARRIERS).write_text(world_barriers.world_barriers_text(boxes, opening),
+                                                         encoding='ascii', newline='\n')
+    (Path(out)/'world-barriers.json').write_text(json.dumps({'opening': opening, 'boxes': boxes}, indent=1)+'\n',
+                                                 encoding='utf-8', newline='\n')
+    print('Solid boxes: the opening %d + %d by reference, %d more of the game (%s) (world-barriers.txt)' % (
+        len(opening['exterior']), len(opening['ship']), len(boxes),
+        ', '.join('%s %d' % (k, v) for k, v in sorted(Counter(b['id'].casefold() for b in boxes).items()))), flush=True)
+    return boxes
+
+
+def write_ghostfence(args, id1, out):
+    """GHOSTFENCE-PARTICLES-NOT-DRAWN-68: the Ghostfence pylons' glow and the blight cloud's plume (id1/world/glow.awg
+    and glow.spr, each emitter's plume baked from its own particle system) and the curtain's scrolling layers
+    (id1/world/curtain.awc, from the CHIM stores this image is made from), the settings' lines in default-game.cfg and
+    OUT/ghostfence-effects.json (tools/ghostfence_effects.py; engine aw_atmos.c, aw_curtain.c). Returns the receipt."""
+    import ghostfence_effects
+    return ghostfence_effects.write(args, id1, out)
+
+
 def write_world_doors(args, id1, out, chim_frames):
     """The world door table (tools/world_doors.py, v0.0.50 The Doors): every load door and teleport marker of the
     master resolved by one holder rule (town frame box, else the CHIM region frame of the cell, else the room), written
@@ -2860,6 +2911,9 @@ def payload_preflight(args, out, excluded, jobs, pending=None):
                          # (IMAGE-BOOT-PAYLOAD-OVER-2GIB-48)
                          room_batches=getattr(args, 'chim_room_batches', None),
                          chim_interiors=getattr(args, 'chim_interiors', None),
+                         # the expansions' stores the image step installs after its preflights (the layers' and the
+                         # build modules': Solstheim, Mournhold; IMAGE-BOOT-PAYLOAD-OVER-2GIB-48)
+                         layer_worlds=getattr(args, 'chim_layer_world', None),
                          # the layout plan the image step follows (tools/layout_plan.py): written by every run of the
                          # preflight on a real image run, so finalize_image follows the latest one
                          layout_plan_path=None if getattr(args, 'payload_preflight_only', False) else out/'layout-plan.json')
@@ -3065,6 +3119,17 @@ def compact_layout(args, boot, out, part, omitted_maps, chim_frames, settings, j
               'boot_headroom_mib': settings['boot_headroom_mib'], 'plan_source': source, 'plan': summary,
               'write_seconds': timings}
     return worlds, chim_world, drive_plans, root_check, boot_paths, record
+
+
+def sol_test_module_record(layer_worlds):
+    """chim-sol-image.json "solstheim_module" of a --chim-sol-test image: its Solstheim is only the named cells, the
+    test world as the store chimsol, and the build module bloodmoon-solstheim is left out of such a build
+    (tools/bloodmoon_solstheim_module.py resolve; CHIM-SOL-TEST-TWO-CHIMSOL-STORES-68). None when LAYER_WORLDS (the
+    image's --chim-layer-world values) hold a store chimsol too: the image step refuses that."""
+    if any(str(value).startswith('chimsol=') for value in layer_worlds or ()):
+        return None
+    return {'built': False, 'text': 'the Solstheim build module is not in this test image: its Solstheim is only the '
+                                    'named cells (--chim-sol-test), never a release'}
 
 
 def finalize_image(args):
@@ -3457,6 +3522,20 @@ def finalize_image(args):
             from chim.sol_test import install as install_chim_sol
             alternatives = [tuple(a.split('=', 1)) for a in (getattr(args, 'chim_sol_alt', None) or [])]
             sol = install_chim_sol(args.chim_sol_world, boot/'id1', hand_metadata['worldspawn_fields'], alternatives)
+            # a look-only world (--chim-sol-test-look-only, tools/solstheim_test_world.py: its gates reported instead
+            # of stopping): the image's record says so, and the builder refuses that option for any release
+            # (SOL-GLACIER-METHODS-AB-COMPARE-68)
+            sol_receipt = Path(args.chim_sol_world) / 'chim-receipt.json'
+            look_only = (json.loads(sol_receipt.read_text(encoding='utf-8')).get('look_only')
+                         if sol_receipt.is_file() else None)
+            if look_only:
+                sol['look_only'] = dict(look_only, image='holds frames that do not fit 32 MB: look only')
+                print('[chim] WARNING: the Solstheim test store holds frames that do not fit 32 MB: look only, never '
+                      'a release (%d gate(s) reported)' % len(look_only.get('gates', [])), flush=True)
+            module_record = sol_test_module_record(getattr(args, 'chim_layer_world', None))
+            if module_record is not None:
+                sol['solstheim_module'] = module_record
+                print('[chim] the Solstheim test store: %s' % module_record['text'], flush=True)
             (out/'chim-sol-image.json').write_text(json.dumps(sol, indent=1, sort_keys=True)+'\n', encoding='utf-8',
                                                    newline='\n')
         if getattr(args, 'chim_layer_world', None):

@@ -78,7 +78,7 @@ WORK = frozenset('''
     chim_native_towns stage_direct_start miniwind_options stage_night_lighting image_sources chim_town_specials
     chim_frame_maps chim_town_rows region_actor_inputs region_actor_summary remove_legacy_areas staged_extra_towns
     remove_towns_not_on_chim prune_world_payload native_towns _frame_heap_cache install_chim_sol install_layer_stores
-    layer_actor_inputs
+    layer_actor_inputs sol_test_module_record
     stage_effect_links effect_link_layers presented_places rebind_chim_maps prepare_guard_torches catalogue_step creature_census_partial world_allowances
     stair_rules_enabled rebind_marked_maps bind_heap_report heap_watcher_summary add_heap image_start
     image_content_fingerprint write_catalogue stage_catalogue legacy_maps_summary share_payload miniwind_hdf_tag

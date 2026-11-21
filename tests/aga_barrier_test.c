@@ -5,6 +5,25 @@
 server_t sv;server_static_t svs;
 static float identity(float f){return f;}
 float (*LittleFloat)(float)=identity;
+/* OPENING-BARRIERS-PER-BOX-68: the world change list's answer, the map transform and the image's world-barriers.txt
+ * (aw_barrier.c world_read_file), as the engine gives them */
+static unsigned int disabled_ref;
+int AW_ObjectDisabled(unsigned int reference){return disabled_ref && reference==disabled_ref;}
+int AW_SourceToWorld(const char *name,const float *world,float *local){
+    int i;if(strcmp(name,"seyda") && strcmp(name,"mh"))return 0;
+    for(i=0;i<3;i++)local[i]=world[i]*.25f;
+    return 1;
+}
+static const char *file_text;
+int COM_FOpenFile(char *name,FILE **file){
+    FILE *f;(void)name;
+    *file=NULL;
+    if(!file_text || !(f=tmpfile()))return -1;
+    fputs(file_text,f);rewind(f);*file=f;
+    return (int)strlen(file_text);
+}
+void AW_BarrierServerReset(void);
+int AW_BarrierTouching(unsigned int reference);
 static void put(byte *raw,int index,float value){memcpy(raw+6+index*4,&value,4);}
 static trace_t check(vec3_t a,vec3_t b,edict_t *p)
 {
@@ -50,5 +69,39 @@ int main(void)
       memset(&t,0,sizeof(t));t.fraction=1;AW_BarrierClip(a,lo,hi,b,&p,&t);assert(t.fraction==1);
     }
     put(raw,3,NAN);assert(!AW_BarrierDecode(raw,sizeof(raw)));p.v.movetype=MOVETYPE_WALK;t=check(a,b,&p);assert(t.fraction==1);
+    /* OPENING-BARRIERS-PER-BOX-68: the opening's box with its reference from world-barriers.txt traces exactly as
+     * without it while no script touched it (the same sweep: the same fraction and normal as at the top), and stops
+     * clipping in the server frame after a script's Disable of that reference; its story gate is unchanged */
+    { trace_t before,after;
+      put(raw,3,1);put(raw,4,0);put(raw,6,0);put(raw,7,1);assert(AW_BarrierDecode(raw,sizeof(raw)));
+      a[0]=-10;a[1]=a[2]=0;b[0]=10;b[1]=b[2]=0;AW_StoryReset(1);strcpy(sv.name,"seyda");sv.time=1;
+      before=check(a,b,&p);
+      file_text="AWWB1\nopening 1 445155\nship 0\n";AW_BarrierServerReset();sv.time=2;
+      after=check(a,b,&p);
+      assert(before.fraction>.36 && before.fraction<.38);
+      assert(after.fraction==before.fraction && after.plane.normal[0]==before.plane.normal[0] &&
+             after.startsolid==before.startsolid && after.endpos[0]==before.endpos[0]);
+      disabled_ref=445155;after=check(a,b,&p);assert(after.fraction<1);   /* the bits are read once a server frame */
+      sv.time=3;after=check(a,b,&p);assert(after.fraction==1);
+      disabled_ref=0;sv.time=4;after=check(a,b,&p);assert(after.fraction==before.fraction);
+      /* a count that is not the table's: the references are left out, the box stays on */
+      file_text="AWWB1\nopening 2 445155 445156\nship 0\n";AW_BarrierServerReset();disabled_ref=445155;sv.time=5;
+      after=check(a,b,&p);assert(after.fraction==before.fraction);
+      disabled_ref=0;
+    }
+    /* INVISIBLE-WALLS-NOT-BUILT-68: a world box (Mournhold's lid kind: no story gate, walking or levitating) on the map
+     * that holds it, swept as the opening's; met, it answers GetCollidingPC; disabled, it is gone; on another map none */
+    { vec3_t lo={-.5,-.5,-.5},hi={.5,.5,.5};
+      file_text="AWWB1\nopening 0\nship 0\nbox 4218700 400.000 0.000 0.000 1 0 0 0 1 0 0 0 1 4.000 4.000 4.000\n";
+      AW_BarrierServerReset();AW_StateSet(&aw_state,AW_GLOBAL,"CharGenState",-1);strcpy(sv.name,"mh");sv.time=6;
+      a[0]=90;a[1]=a[2]=0;b[0]=110;b[1]=b[2]=0;
+      t=check(a,b,&p);assert(t.fraction>.40 && t.fraction<.45 && t.plane.normal[0]==-1);
+      assert(AW_BarrierTouching(4218700) && !AW_BarrierTouching(4218701));
+      p.v.movetype=MOVETYPE_FLY;memset(&t,0,sizeof(t));t.fraction=1;AW_BarrierClip(a,lo,hi,b,&p,&t);assert(t.fraction<.45);
+      p.v.movetype=MOVETYPE_WALK;sv.time=6.5;assert(!AW_BarrierTouching(4218700));   /* a tenth of a second at most */
+      disabled_ref=4218700;sv.time=7;t=check(a,b,&p);assert(t.fraction==1);
+      disabled_ref=0;strcpy(sv.name,"prison2");sv.time=8;t=check(a,b,&p);assert(t.fraction==1);   /* not on this map */
+      file_text=NULL;AW_BarrierServerReset();strcpy(sv.name,"mh");sv.time=9;t=check(a,b,&p);assert(t.fraction==1);
+    }
     return 0;
 }

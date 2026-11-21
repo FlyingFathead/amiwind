@@ -147,6 +147,8 @@ WEAK void AW_ConsoleCharacterRed(int x,int y,int c,int red){(void)x;(void)y;(voi
 WEAK int AW_PlacedFocus(const char **name,char *weight_line,char *value_line,int line_size,int *owned){(void)name;(void)weight_line;(void)value_line;(void)line_size;(void)owned;return 0;}
 WEAK void AW_MwscriptRoomShift(float shift[3]){shift[0]=shift[1]=shift[2]=0;}
 WEAK int AW_SourceToWorld(const char *name,const float *world,float *local){(void)name;(void)world;(void)local;return 0;}
+/* aw_mwhost.c: the world change list's answer, which the solid boxes read (aw_barrier.c, OPENING-BARRIERS-PER-BOX-68) */
+WEAK int AW_ObjectDisabled(unsigned int reference){(void)reference;return 0;}
 WEAK int AW_WorldToSource(const char *name,const float *local,float *world){(void)name;(void)local;(void)world;return 0;}
 WEAK void AW_UIFocusBox(const char *name,const char *line2,const char *line3,int owned){(void)name;(void)line2;(void)line3;(void)owned;}
 WEAK void AW_InventorySpawn(void){}

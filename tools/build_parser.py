@@ -129,6 +129,14 @@ def add_accept_entity_loss_group(p):
                         "billboard and four 45-degree views per tree model (tools/chim_tree_copies.py); switch: both, the "
                         "original trees in the store and the star crowns as its alternative models (stage chim-sol-star, "
                         "tools/chim/alt_models.py), picked in game by aw_tree_crowns (0 original, 1 star)")
+    p.add_argument("--chim-mesh-method-set", dest="chim_mesh_method_set", metavar="NAME", default=None,
+                   help="the Solstheim stages only (the module's world stage bloodmoon-solstheim and the --chim-sol-test "
+                        "stages): the named set of config/mesh-method-sets.json for the meshes it lists (unset: today's "
+                        "methods); the base CHIM world's command, key and output are the same with any set")
+    p.add_argument("--chim-sol-test-look-only", dest="chim_sol_test_look_only", action="store_true",
+                   help="TEST BUILDS ONLY, with --chim-sol-test: the chim-sol stage's heap gate reports instead of "
+                        "stopping (its full report still written; the stage's record says: does not fit 32 MB, look "
+                        "only); for comparison images, never a release")
     p.add_argument("--check-hashes", choices=("core", "full", "auto", "off"), default="core",
                    help="Input hashing with the workspace lock amiwind-inputs.lock: core (default; the masters, archives, "
                         "Amiga libraries and ROM are hashed every build, other inputs only when size or times changed), "

@@ -9,7 +9,7 @@
 | Where | tools/chimport.py and tools/aw_service.py (CHIMport runs), tools/chim/units.py (unit keys), tools/chim_build.py (a build stage's unit cache) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.68-dev1 (last seen) |
+| Persists in | fixed in v0.0.68-dev3 |
 | Severity | high: the conversion work of an expansion's outdoor cells is paid twice: once when the cells are measured and again in the first build that takes them, including collision units that run for tens of minutes |
 | Family | Build reuse keys and output attribution (`build-cache-reuse`) |
 | Playtest version | unknown |
@@ -18,6 +18,27 @@
 | Unknown because | found by reading the source at the v0.0.68 line head; no build was run |
 
 <!-- END GENERATED FACTS -->
+
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.67 (6429e908) | 2026-11-21 | gate 12136 of the planning item CHIMPORT-UNITS-NOT-SHARED-WITH-BUILD-68 | a build module's world stage reads and feeds the storage pool CHIMport runs store into, with the build's own converter switches and frame settings on both sides (47008ec13 gate 12007, 6b3edcb56 gate 12040, 6429e908f gate 12136); proven in the v0.0.68-dev3 build: the Solstheim stage took 19,434 units (772.9 MB) from the pool |
+| shipped | the v0.0.68-dev3 snapshot build | v0.0.68-dev3 (9a91382c3, build 2026_11_21_v0.0.68-dev3_full-dev3_9a91382) | 2026-11-21 | the delivered build holds the commit (gate 12300) | The units a CHIMport run converts are reused by the build stage that later builds the same cells, instead of being converted a second time. |
+| confirmed by a build | a release build | v0.0.68-dev3 (build 2026_11_21_v0.0.68-dev3_full-dev3_6429e90) | 2026-11-21 | the stage log's storage pool line | the v0.0.68-dev3 build 2026_11_21_v0.0.68-dev3_full-dev3_6429e90: the Solstheim world stage took 19,434 units (772.9 MB) that CHIMport runs of the same cells had stored in the pool |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-20: reported in v0.0.68-dev1
+- 2026-11-21: fixed in source: a gated commit, v0.0.67 (6429e908); gate 12136 of the planning item CHIMPORT-UNITS-NOT-SHARED-WITH-BUILD-68: a build module's world stage reads and feeds the storage pool CHIMport runs store into, with the build's own converter switches and frame settings on both sides (47008ec13 gate 12007, 6b3edcb56 gate 12040, 6429e908f gate 12136); proven in ...
+- 2026-11-21: shipped: the v0.0.68-dev3 snapshot build, v0.0.68-dev3 (9a91382c3, build 2026_11_21_v0.0.68-dev3_full-dev3_9a91382); the delivered build holds the commit (gate 12300): The units a CHIMport run converts are reused by the build stage that later builds the same cells, instead of being converted a second time.
+- 2026-11-21: confirmed by a build: a release build, v0.0.68-dev3 (build 2026_11_21_v0.0.68-dev3_full-dev3_6429e90); the stage log's storage pool line: the v0.0.68-dev3 build 2026_11_21_v0.0.68-dev3_full-dev3_6429e90: the Solstheim world stage took 19,434 units (772.9 MB) that CHIMport runs of the same cells had stored in the pool
+
+<!-- END GENERATED TIMELINE -->
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

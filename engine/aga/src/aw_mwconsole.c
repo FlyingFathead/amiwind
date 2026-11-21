@@ -134,7 +134,7 @@ static const struct {const char *name;int command,least;} commands[]={
     {"additem",AW_MWCON_ADDITEM,1},{"removeitem",AW_MWCON_REMOVEITEM,1},{"getitemcount",AW_MWCON_GETITEMCOUNT,1},
     {"equip",AW_MWCON_EQUIP,1},{"addspell",AW_MWCON_ADDSPELL,1},{"removespell",AW_MWCON_REMOVESPELL,1},
     {"enable",AW_MWCON_ENABLE,0},{"disable",AW_MWCON_DISABLE,0},{"getdisabled",AW_MWCON_GETDISABLED,0},
-    {"position",AW_MWCON_POSITION,3},{"positioncell",AW_MWCON_POSITIONCELL,4},{"setpos",AW_MWCON_SETPOS,2},
+    {"position",AW_MWCON_POSITION,3},{"positioncell",AW_MWCON_POSITIONCELL,5},{"setpos",AW_MWCON_SETPOS,2},
     {"getpos",AW_MWCON_GETPOS,1},{"setangle",AW_MWCON_SETANGLE,2},{"getangle",AW_MWCON_GETANGLE,1},
     {"aiwander",AW_MWCON_AIWANDER,3},{"aitravel",AW_MWCON_AITRAVEL,3},{"aifollow",AW_MWCON_AIFOLLOW,2},
     {"aiescort",AW_MWCON_AIESCORT,5},
@@ -154,7 +154,7 @@ static const struct {const char *name;int command,least;} commands[]={
     {"playsound3dvp",AW_MWCON_PLAYSOUND3DVP,3},{"getsoundplaying",AW_MWCON_GETSOUNDPLAYING,1},
     {"streammusic",AW_MWCON_STREAMMUSIC,1},{"saydone",AW_MWCON_SAYDONE,0},
     /* v0.0.68: PlaceAtPC and PlaceAtMe ID COUNT DISTANCE DIRECTION, PlaceItem ID X Y Z ZROT (OpenMW extensions0.cpp
-     * 525-527: "clflX", "cffffX"); PlaceItemCell stays planned (its cell is the compiler's) */
+     * 525-527: "clflX", "cffffX"); PlaceItemCell below, with the cell table */
     {"placeatpc",AW_MWCON_PLACEATPC,4},{"placeatme",AW_MWCON_PLACEATME,4},{"placeitem",AW_MWCON_PLACEITEM,5},
     /* v0.0.68: the spells, the effects, the items, the topics (OpenMW extensions0.cpp 113, 167, 237-238, 268, 271, 278,
      * 455: RemoveSpellEffects, ExplodeSpell, GetSpellEffects, HasItemEquipped "c", GetEffect and AddTopic "S", Drop "cl",
@@ -162,7 +162,12 @@ static const struct {const char *name;int command,least;} commands[]={
     {"removespelleffects",AW_MWCON_REMOVESPELLEFFECTS,1},{"explodespell",AW_MWCON_EXPLODESPELL,1},
     {"getspelleffects",AW_MWCON_GETSPELLEFFECTS,1},{"geteffect",AW_MWCON_GETEFFECT,1},
     {"hasitemequipped",AW_MWCON_HASITEMEQUIPPED,1},{"drop",AW_MWCON_DROP,2},{"addtopic",AW_MWCON_ADDTOPIC,1},
-    {"cast",AW_MWCON_CAST,2}};
+    {"cast",AW_MWCON_CAST,2},
+    /* v0.0.68 (the cell table): PositionCell X Y Z ZROT CELL (5 above), PlaceItemCell ID CELL X Y Z ZROT, AIFollowCell and
+     * AIEscortCell TARGET CELL DURATION X Y Z [RESET], GetPCCell CELL (OpenMW extensions0.cpp: "ffffS", "ccffff",
+     * "cSffff/l", "S"): the cell by its name in the compiled file's cell table (CELN, CELG) */
+    {"placeitemcell",AW_MWCON_PLACEITEMCELL,6},{"aifollowcell",AW_MWCON_AIFOLLOWCELL,6},
+    {"aiescortcell",AW_MWCON_AIESCORTCELL,6},{"getpccell",AW_MWCON_GETPCCELL,1}};
 #define NCOMMAND ((int)(sizeof(commands)/sizeof(commands[0])))
 const char *AW_MwConsoleCommandName(int command,int *least){
     int k;
@@ -223,6 +228,138 @@ int AW_MwConsoleRun(const char *text,const aw_mwcon_host_t *host){
         if(!k)snprintf(line,sizeof(line),"%s: no such reference here: %s\n",l.name,l.target[0]?l.target:"(the target)");
         if(line[0])host->print(line);
         return 1;
+    }
+    return 0;
+}
+
+/* --- v0.0.68 (MW-CONSOLE-COMMANDS-62): the cell table (see aw_mwconsole.h). CELN rows, big-endian: u32 hash, u16 name,
+ * u8 kind, u8 flags, u16 number, u16 map, f32 x y z; CELG rows: i8 x, i8 y, u16 name. The hash is 32-bit FNV-1a of the
+ * name's bytes with A-Z lowered (tools/mwscript/awms.py cell_hash), the rows sorted by it; rows of one hash are walked
+ * and each one's own name compared, so two names sharing a hash both stay found --- */
+static unsigned long be32(const unsigned char *b){
+    return ((unsigned long)b[0]<<24)|((unsigned long)b[1]<<16)|((unsigned long)b[2]<<8)|(unsigned long)b[3];}
+static int be16(const unsigned char *b){return (b[0]<<8)|b[1];}
+static float bef(const unsigned char *b){
+    /* the float's bits as a 32-bit word (IEEE single both on the 68k and the test host) */
+    unsigned int w=(unsigned int)be32(b);float f;
+    memcpy(&f,&w,sizeof(f));return f;
+}
+static unsigned long cell_hash(const char *name){
+    unsigned long h=0x811C9DC5UL;
+    for(;*name;name++)h=((h^(unsigned char)fold(*name))*0x01000193UL)&0xFFFFFFFFUL;
+    return h;
+}
+static int same_name(const char *a,const char *b){
+    for(;*a && *b;a++,b++)if(fold(*a)!=fold(*b))return 0;
+    return *a==*b;
+}
+static void cell_of(const unsigned char *b,aw_mwcon_cell_t *out){
+    int i;
+    out->name=be16(b+4);out->kind=b[6];out->flags=b[7];out->number=be16(b+8);
+    out->map=be16(b+10)==0xFFFF?-1:be16(b+10);
+    for(i=0;i<3;i++)out->offset[i]=bef(b+12+4*i);
+}
+int AW_MwConsoleCellFind(const aw_mwcon_cells_t *t,const char *typed,aw_mwcon_cell_t *out){
+    unsigned char b[AW_MWCON_CELL_BYTES];char s[AW_MWCON_TEXT];unsigned long key,lo=0,hi,mid;
+    if(!t || !t->read || !t->string || !t->celn_rows)return -1;
+    if(!typed || !typed[0])return 0;
+    key=cell_hash(typed);hi=t->celn_rows;
+    while(lo<hi){
+        mid=lo+(hi-lo)/2;
+        if(!t->read(t->user,t->celn+AW_MWCON_CELL_BYTES*mid,b,AW_MWCON_CELL_BYTES))return -1;
+        if(be32(b)<key)lo=mid+1;else hi=mid;
+    }
+    for(;lo<t->celn_rows;lo++){
+        if(!t->read(t->user,t->celn+AW_MWCON_CELL_BYTES*lo,b,AW_MWCON_CELL_BYTES))return -1;
+        if(be32(b)!=key)break;
+        if(t->string(t->user,be16(b+4),s,sizeof(s))>0 && same_name(s,typed)){if(out)cell_of(b,out);return 1;}
+    }
+    return 0;
+}
+int AW_MwConsoleCellRoomName(const aw_mwcon_cells_t *t,int number,char *out,int capacity){
+    /* a scan in blocks of 32 rows (768 bytes a read): a console line, never a frame of play */
+    static unsigned char b[32*AW_MWCON_CELL_BYTES];unsigned long i,n,k;
+    if(capacity>0)out[0]=0;
+    if(!t || !t->read || !t->string || !t->celn_rows || number<=0 || capacity<2)return 0;
+    for(i=0;i<t->celn_rows;i+=n){
+        n=t->celn_rows-i<32?t->celn_rows-i:32;
+        if(!t->read(t->user,t->celn+AW_MWCON_CELL_BYTES*i,b,AW_MWCON_CELL_BYTES*n))return 0;
+        for(k=0;k<n;k++){
+            const unsigned char *r=b+AW_MWCON_CELL_BYTES*k;
+            if(r[6]!=AW_MWCON_CELL_EXTERIOR && be16(r+8)==number)return t->string(t->user,be16(r+4),out,capacity)>0;
+        }
+    }
+    return 0;
+}
+int AW_MwConsoleCellGridName(const aw_mwcon_cells_t *t,int x,int y,char *out,int capacity){
+    unsigned char b[4];unsigned long lo=0,hi,mid;int key=x*256+y,row;
+    if(capacity>0)out[0]=0;
+    if(!t || !t->read || !t->string || !t->celg_rows || capacity<2)return 0;
+    hi=t->celg_rows;
+    while(lo<hi){
+        mid=lo+(hi-lo)/2;
+        if(!t->read(t->user,t->celg+4*mid,b,4))return 0;
+        row=(signed char)b[0]*256+(signed char)b[1];
+        if(row==key)return t->string(t->user,be16(b+2),out,capacity)>0;
+        if(row<key)lo=mid+1;else hi=mid;
+    }
+    return 0;
+}
+int AW_MwConsoleCellMatches(const char *typed,const char *current){
+    for(;*typed;typed++,current++)if(!*current || fold(*typed)!=fold(*current))return 0;
+    return 1;
+}
+static float turn360(float v){   /* Python's v % 360 (codegen.py), without libm */
+    long whole=(long)(v/360.0f);
+    v-=360.0f*(float)whole;
+    while(v<0)v+=360.0f;
+    while(v>=360.0f)v-=360.0f;
+    return v;
+}
+int AW_MwConsoleCellMove(int verb,int found,const aw_mwcon_cell_t *row,const float in[4],float out[3],float *yaw,
+                         int *kind,int *number){
+    int i,room=found>0 && row && row->kind==AW_MWCON_CELL_ROOM,presented=found>0 && row && row->kind==AW_MWCON_CELL_PRESENTED;
+    int exterior=found>0 && row && row->kind==AW_MWCON_CELL_EXTERIOR;
+    for(i=0;i<3;i++)out[i]=in[i];
+    *kind=AW_MWCON_MOVE_OUTDOORS;*number=0;*yaw=0;
+    switch(verb){
+    case AW_MWCON_CELL_PLAYER:   /* codegen Program.player_move: the rotation in degrees */
+        *yaw=in[3];
+        if(presented){out[0]=in[0]+row->offset[0];out[1]=in[1]+row->offset[1];return 1;}
+        if(room){
+            /* the room's map and the arrival a load door's would be (rooms.arrival, town_interiors.local_arrival) */
+            if(row->flags&AW_MWCON_CELL_NO_MAP)return -1;
+            for(i=0;i<3;i++)out[i]=(in[i]-row->offset[i])*0.25f;
+            out[2]+=16.875f;
+            *yaw=turn360(90.0f-in[3]);*kind=AW_MWCON_MOVE_ROOM;*number=row->number;
+        }
+        return 1;            /* an exterior name or no cell of the game: outdoors at x, y, z (OpenMW) */
+    case AW_MWCON_CELL_ACTOR:    /* codegen Program.actor_move: the rotation in minutes of arc, Quake's yaw */
+        *yaw=turn360(-in[3]/60.0f);
+        if(presented){out[0]=in[0]+row->offset[0];out[1]=in[1]+row->offset[1];return 1;}
+        if(room){
+            for(i=0;i<3;i++)out[i]=(in[i]-row->offset[i])*0.25f;
+            *kind=AW_MWCON_MOVE_ROOM;*number=row->number;return 1;
+        }
+        return exterior;     /* no cell of the game: nothing (OpenMW) */
+    case AW_MWCON_CELL_PLACE_ACTOR:case AW_MWCON_CELL_PLACE_ITEM:
+        /* codegen Program.place: an interior by its number (a presented district's too, as the compiler takes it),
+         * an actor or object in the room map's units, an item in game units; the rotation in degrees */
+        *yaw=turn360(-in[3]);
+        if((room || presented) && row->number>0){
+            if(verb==AW_MWCON_CELL_PLACE_ACTOR)
+                for(i=0;i<3;i++)out[i]=(in[i]-(room?row->offset[i]:0.0f))*0.25f;
+            *kind=AW_MWCON_MOVE_ROOM;*number=row->number;return 1;
+        }
+        return exterior;
+    case AW_MWCON_CELL_FOLLOW:case AW_MWCON_CELL_ESCORT:
+        /* codegen Program.ai_cell: actor_move's room or outdoors; outdoors the point as typed; a cell the game has
+         * not: AIEscortCell nothing, AIFollowCell outdoors */
+        if(room){
+            for(i=0;i<3;i++)out[i]=(in[i]-row->offset[i])*0.25f;
+            *kind=AW_MWCON_MOVE_ROOM;*number=row->number;return 1;
+        }
+        return presented || exterior || verb==AW_MWCON_CELL_FOLLOW;
     }
     return 0;
 }

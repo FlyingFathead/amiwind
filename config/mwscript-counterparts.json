@@ -99,7 +99,7 @@
        {"step": "once", "original": "the player within 300: a message box with an Ok button", "amiwind": "within 75 map units (300 original): the same text in a message box with an Ok button (v0.0.63)", "verdict": "same"}],
      "ingame": "not yet", "register": ["OPENING-CAPTAIN-HINT-SUBTITLE-63"]},
     {"script": "CharGenDisable", "what": "the opening's invisible blockers (the ACTI CharGenCollision - extra placements) kept while CharGenState is 0 or over, disabled after",
-     "counterpart": {"file": "engine/aga/src/aw_barrier.c", "function": "AW_BarrierClip (the blockers converted by tools/prepare_character.py, active while AW_StoryRestricted)"},
+     "counterpart": {"file": "engine/aga/src/aw_barrier.c", "function": "AW_BarrierClip (the blockers converted by tools/prepare_character.py, active while AW_StoryRestricted; since v0.0.68 each one also off once a script's Disable of its reference is in the world change list, the references from id1/world-barriers.txt)"},
      "verdict": "same",
      "steps": [
        {"step": "every frame", "original": "CharGenState below 0: Disable, on each of its 23 placed references", "amiwind": "the blockers clip the player while CharGenState is 0 or over and stop after (the same rule); all 23 are converted: the 22 outdoor ones and, since v0.0.63, the one inside the prison ship (reference 481585, intro/barriers-ship.awb)", "verdict": "same"}],

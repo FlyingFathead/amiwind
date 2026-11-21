@@ -88,4 +88,8 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [VIVEC-TEMPLE-STAIRS-33](VIVEC-TEMPLE-STAIRS-33.md): Palace steps and High Fane quarter flights fail the stair gate on the CHIM Vivec Temple frame
 - [WORLD-SLOPE-STUCK-38](WORLD-SLOPE-STUCK-38.md): Player reports being stuck beside Ashlands terrain
 
+Related bugs in other categories:
+
+- [CHIM-SOL-TEST-MASTERS-NOT-IN-FOLDER-68](CHIM-SOL-TEST-MASTERS-NOT-IN-FOLDER-68.md): The Solstheim test frames stop at once: the stage reads the build's whole master list, which its own test data folder does not hold
+
 <!-- END GENERATED CATEGORY -->

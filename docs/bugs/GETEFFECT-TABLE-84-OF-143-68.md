@@ -28,11 +28,13 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.67 (a112d621) | 2026-11-20 | gate 12263 of the planning item GETEFFECT-TABLE-84-OF-143-68 | GetEffect knows all 143 magic effects by their game setting ids in the game's order, or by a number (the change in e399dd6fd). |
+| shipped | the v0.0.68-dev3 snapshot build | v0.0.68-dev3 (9a91382c3, build 2026_11_21_v0.0.68-dev3_full-dev3_9a91382) | 2026-11-21 | the delivered build holds the commit (gate 12300) | GetEffect knows every magic effect of the game by its game setting id or its number, as OpenMW does. |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-20: reported in v0.0.68-dev1
 - 2026-11-20: fixed in source: a gated commit, v0.0.67 (a112d621); gate 12263 of the planning item GETEFFECT-TABLE-84-OF-143-68: GetEffect knows all 143 magic effects by their game setting ids in the game's order, or by a number (the change in e399dd6fd).
+- 2026-11-21: shipped: the v0.0.68-dev3 snapshot build, v0.0.68-dev3 (9a91382c3, build 2026_11_21_v0.0.68-dev3_full-dev3_9a91382); the delivered build holds the commit (gate 12300): GetEffect knows every magic effect of the game by its game setting id or its number, as OpenMW does.
 
 <!-- END GENERATED TIMELINE -->
 

@@ -1,6 +1,6 @@
 # CHIMport: the whole island on CHIM, cell by cell
 
-_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
+_Last updated with AmiWind v0.0.68-dev3 (21 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -677,6 +677,13 @@ them, so a cell's memory figure is never read without the world it was measured 
 each other this way (Solstheim's glacier -26,26 and its eight neighbours, whose frames hold the glacier's iceberg
 tiles when the glacier has no frame) are converted in one run, so each is in the others' world, and are taken as
 finished together or not at all.
+
+**A mesh method set.** `--mesh-method-set NAME` converts every cell with a named set of
+`config/mesh-method-sets.json` for the meshes it lists (from v0.0.68; the ways of fitting Solstheim's glacier corner,
+[SOLSTHEIM_GLACIER.md](SOLSTHEIM_GLACIER.md#comparing-the-ways)): each cell process installs the set while it converts,
+the set is part of the cell's key (a cell converted with one set is never taken for another) and recorded in
+`result.json` under `settings`, and a set with the exact-footing collision writes each placed copy's figures to
+`cells/<cell>/mesh-method-set.json`. Without the option every command and key is as before.
 
 ## The shared storage pool
 

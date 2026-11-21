@@ -1077,6 +1077,22 @@ class ServiceTests(unittest.TestCase):
         bad = self.request(kind='chimport-region', purpose='shape-proof', options=dict(options, cell_shape='ring'))
         self.assertTrue(aw_service.request_errors(bad))
 
+    def test_chimport_region_passes_a_mesh_method_set_to_the_check_and_the_run_only_when_named(self):
+        # SOL-GLACIER-METHODS-AB-COMPARE-68: the glacier's methods as named sets (config/mesh-method-sets.json)
+        options = {'cells': '-26,26 -27,26', 'masters': ['Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm'],
+                   'cell_shape': 'region'}
+        for named, expect in ((dict(options, mesh_method_set='E'), True), (options, False)):
+            request = self.request(kind='chimport-region', purpose='sol-ice-e', options=named)
+            self.assertEqual(aw_service.request_errors(request), [])
+            code, result, _ = self.submit(request, FakeRunner(build_log=self.chimport_log(
+                ('-26,26', True, []), ('-27,26', True, []))))
+            self.assertEqual(code, 0, result['notes'])
+            runs = [c for c in result['commands'] if 'tools/chimport.py run' in c]
+            self.assertEqual(len(runs), 2)
+            self.assertTrue(all(('--mesh-method-set E' in c) == expect for c in runs))
+        bad = self.request(kind='chimport-region', purpose='sol-ice-e', options=dict(options, mesh_method_set='E; rm'))
+        self.assertTrue(aw_service.request_errors(bad))
+
     def test_chimport_region_whose_cells_all_failed_is_not_passed(self):
         # AW-CHIMPORT-REGION-PASSED-ALL-FAILED-66: chimport.py run exits 0 when every cell failed (a failing cell
         # never stops the run); on 2026-11-12 all 8 cells stopped in 4-5 s on the palette and aw wrote passed
