@@ -29,12 +29,15 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.67-dev1 (af9d6bcd, 2c5786c7) | 2026-11-17 | gate 11030 passed on e75db7b8; tests/test_expansion_bindings.py and tests/test_expansion_held_items.py | the script stage binds the selected expansions' own placements (1,150 of Tribunal, 1,178 of Bloodmoon on the game data) and their holders' scripted items (77 and 42); with the base game alone the bindings are byte for byte as before |
+| fixed in source | a gated commit | v0.0.68-dev5 line (5ebc6981) | 2026-11-22 | gate 12441 of the planning item DBG-TP-EXPANSION-ARRIVALS-66 | The scripted objects of Mournhold's five districts are bound at their place on the district frames and the engine attaches them there (366 on the v0.0.68-dev5 data, now 0 never attached); left: the in-play check on an image of this branch and the look-book check of the districts |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-17: reported in v0.0.66
 - 2026-11-17: fixed in source: a gated commit, v0.0.67-dev1 (af9d6bcd, 2c5786c7); gate 11030 passed on e75db7b8; tests/test_expansion_bindings.py and tests/test_expansion_held_items.py: the script stage binds the selected expansions' own placements (1,150 of Tribunal, 1,178 of Bloodmoon on the game data) and their holders' scripted items (77 and 42); with the base game alone the bindings are byte for byte as before
 - 2026-11-18 17:20 +0200: v0.0.67-dev2: Counted again on the test build of 18 November 2026 from the image's record of the expansions' actors: of the people with a script, 27 in Mournhold and 47 on Solstheim do not have it attached (Mournhold: 103 people with a script, 76 ...
+- 2026-11-22: fixed in source: a gated commit, v0.0.68-dev5 line (5ebc6981); gate 12441 of the planning item DBG-TP-EXPANSION-ARRIVALS-66: The scripted objects of Mournhold's five districts are bound at their place on the district frames and the engine attaches them there (366 on the v0.0.68-dev5 data, now 0 never attached); left: the in-play check on an image of this branch ...
+- 2026-11-22 01:33 +0200: seen again in v0.0.68-dev5: Measured on the v0.0.68-dev5 build: 2,088 of 2,534 scripted references of the expansions run their script.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -138,6 +141,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [DIALOGUE-TOPIC-WHO-60](DIALOGUE-TOPIC-WHO-60.md): Shargam gro-Shagdub answers "Who?" about Ralen Hlaalo right after naming him in his rumors
 - [DISTRICT-NEW-FIGHT-ATTACKERS-ON-SAME-MAP-RELOAD-67](DISTRICT-NEW-FIGHT-ATTACKERS-ON-SAME-MAP-RELOAD-67.md): After a teleport inside Plaza Brindisi Dorom the guards and high ordinators attack the player together with the fabricants
 - [DISTRICT-PLACED-THINGS-NO-ROW-67](DISTRICT-PLACED-THINGS-NO-ROW-67.md): In Mournhold's districts no container, item, activator or door sign can be aimed at: their rows are keyed as a room's, and the game outdoors asks for the cells around the player
+- [DOOR-LOAD-DISABLED-STILL-USED-68](DOOR-LOAD-DISABLED-STILL-USED-68.md): A load door switched off by its script still shows its prompt and can be used
 - [DOOR-LOAD-LOCKS-MISSING-51](DOOR-LOAD-LOCKS-MISSING-51.md): Load doors ignore the original game's locks: every door into a room opens, locked or not
 - [DOOR-TRAPS-NOT-SPRUNG-55](DOOR-TRAPS-NOT-SPRUNG-55.md): Trapped doors and containers open without their trap
 - DROP-CHIM-REFUSED-59 (no report page): Dropping an item on a streamed outdoor map is refused: Cannot place items in this area yet
@@ -313,7 +317,9 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 
 Related bugs in other categories:
 
+- [EXPANSION-COUNTS-MISS-FRAME-STORES-68](EXPANSION-COUNTS-MISS-FRAME-STORES-68.md): The build's record of the expansions' actors and the script tracker leave out what the frame stores of the image hold: actors there count as not placed, Solstheim's built cells as missing, its attached scripts as outside the image, and scripts that only declare dialogue variables as not attached
 - [EXPANSION-TABLES-BASE-ONLY-66](EXPANSION-TABLES-BASE-ONLY-66.md): Some of the builder's tables read the base game only while Tribunal and Bloodmoon are selected
 - [PLAZA-FABRICANTS-LIVE-AT-START-67](PLAZA-FABRICANTS-LIVE-AT-START-67.md): Plaza Brindisi Dorom holds the fabricants of a later quest from the start of a new game, one ready to attack on sight
+- [TRACK-FIXED-STEPS-WHOLE-HOME-68](TRACK-FIXED-STEPS-WHOLE-HOME-68.md): Recording a fix of one register entry through its planning item marks every other entry of that item as fixed by the same commit
 
 <!-- END GENERATED CATEGORY -->

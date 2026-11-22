@@ -1371,6 +1371,12 @@ def stage_dependencies(steps, skipped=()):
             deps = tuple(d for d in ('census', 'bloodmoon-solstheim-data') if d in names)
         if name in ('image', 'cell-progress'):
             deps = (*deps, *(d for d in ('bloodmoon-solstheim-data', 'bloodmoon-solstheim') if d in names))
+        # --chim-sol-test (tools/build.py chim_sol_test_commands, test images only): the image installs the test world
+        # run/chim-sol and its tree copies as the store chimsol (--chim-sol-world, --chim-sol-alt), so it waits for those
+        # stages (BUILD-CHIM-SOL-TEST-IMAGE-NO-WAIT-68: a resume whose other stages were all reused started the image
+        # before chim-sol, which then had no glacier world to install)
+        if name == 'image':
+            deps = (*deps, *(d for d in ('chim-sol-data', 'chim-sol-trees', 'chim-sol', 'chim-sol-star') if d in names))
         if name == 'image' and 'seam-audit' in names:
             deps = (*deps, 'seam-audit')
         missing = set(deps) - set(names)

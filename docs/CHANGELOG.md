@@ -1,10 +1,12 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.68-dev4 (21 November 2026)._
+_Last updated with AmiWind v0.0.68-dev6 (22 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.68-dev6: sixth snapshot of v0.0.68, 22 November 2026](#v0068-dev6-sixth-snapshot-of-v0068-22-november-2026)
+- [v0.0.68-dev5: fifth snapshot of v0.0.68, 21 November 2026](#v0068-dev5-fifth-snapshot-of-v0068-21-november-2026)
 - [v0.0.68-dev4: fourth snapshot of v0.0.68, 21 November 2026](#v0068-dev4-fourth-snapshot-of-v0068-21-november-2026)
 - [v0.0.68-dev3: third snapshot of v0.0.68, 21 November 2026](#v0068-dev3-third-snapshot-of-v0068-21-november-2026)
 - [v0.0.68-dev2: second snapshot of v0.0.68, 20 November 2026](#v0068-dev2-second-snapshot-of-v0068-20-november-2026)
@@ -211,6 +213,108 @@ _Last updated with AmiWind v0.0.68-dev4 (21 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.68-dev6: sixth snapshot of v0.0.68, 22 November 2026
+
+The sixth development snapshot of v0.0.68, in development ([release notes](releases/notes/RELEASE-v0.0.68-dev6.md)). The
+version has no title yet. The scripts of Mournhold's five districts run on their frames, a load door that a script has
+switched off is no longer taken by the use key, and a Solstheim test image's image step waits for its test world. Emulator
+presets: `AmiWind-v0.0.68-dev6-FS-UAE.fs-uae` and `AmiWind-v0.0.68-dev6-WinUAE.uae`, both with 32 MB of Fast RAM. None of
+the changes has been seen in play; they are covered by their tests and the gates of their commits (the doors 12400, the
+expansions' scripts 12441, the builder's wait 12330).
+
+**New**
+
+- The scripted objects of Mournhold's five districts (366 on the dev5 build's data: Temple courtyard 209, Plaza Brindisi
+  Dorom 58, Godsreach 45, Great Bazaar 40, Royal Palace courtyard 13) are bound at their place in the presented world with
+  the interior mark kept, and the engine attaches them on the district frame that contains them, so every script of a
+  district runs while it is loaded: the courtyard's living and dead trees, the districts' ambient and fountain sounds, the
+  Plaza's fabricant attacks and rubble, the turning signs, the gate messages, the city gates and Azura's statue outside the
+  Temple. On the dev5 build's script file the objects bound and never attached fall from 366 to 0; the file differs only in
+  its binding rows (421 change their flags and place). No memory is added. The Temple courtyard's frame (`mh0007`) runs 63
+  more scripts on every frame, and its frame rate is not measured yet (EXPANSION-SCRIPTS-NOT-ATTACHED-66,
+  DISTRICT-FRAME-RATE-LOW-67, both open). Not seen in play.
+- A load door that a script has switched off is passed by the use key, the prompt and the map's door markers: where a script
+  switches between two doors at one place (Skaal Village's Rigmor's Hut and The Blodskaal's House, the Raven Rock colony's
+  stage doors) the door that is on is the one used, and a script's own Activate still acts on the door it names, as in the
+  original. The console's door status listing names a door that is switched off. One lookup in the world's change list per
+  door the view ray meets (DOOR-LOAD-DISABLED-STILL-USED-68, open until seen in play; [the door mapping
+  page](DOOR_MAPPING.md)). Not seen in play.
+
+**Fixed**
+
+- The actor check of the expansions and the script tracker read the frame stores of the image: the 57 district actors and
+  201 Solstheim outdoor actors that the stores place are counted as placed, Solstheim's 135 built cells as built, and 74
+  people whose scripts only declare dialogue variables as needing no binding. The script tracker on the dev5 build's data:
+  1,062 scripts run (927 before), 3 only in an add-on and not in the image (138 before)
+  (EXPANSION-COUNTS-MISS-FRAME-STORES-68, open).
+
+**Builder and tools**
+
+- A Solstheim test image's image step waits for the test world's stages, so a build that reused everything else cannot
+  assemble the image before that world exists; test images only (BUILD-CHIM-SOL-TEST-IMAGE-NO-WAIT-68, open).
+- The bug tracker records a build that reuses a run and rebuilds the stages that run had taken from an earlier run
+  (BUILD-REUSE-CHAIN-ABSENT-STAGE-68), a fix recorded for one entry that marks the other entries of its planning item as
+  fixed (TRACK-FIXED-STEPS-WHOLE-HOME-68), the write guard counting the delivery's record of what a build shipped as a write
+  outside the intake (TRACKER-GUARD-SHIPPED-STEP-68), and sightings of CONTAINER-READ-ENOMEM-66,
+  IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66 and BUILD-CHIM-WORLD-POOL-BROKEN-64; see [the bug tracker](BUGS.md).
+
+**Documentation**
+
+- The README and the roadmap name the v0.0.68-dev6 presets and snapshot. The MWScript tracker is measured for this version
+  against the dev5 build's image (1,062 scripts run, 9 carried). The game features table, the progress page's script
+  counts, the actor records page, the bytecode page and the door mapping page follow the changes above.
+
+## v0.0.68-dev5: fifth snapshot of v0.0.68, 21 November 2026
+
+The fifth development snapshot of v0.0.68, in development ([release notes](releases/notes/RELEASE-v0.0.68-dev5.md)), and a
+small step. The version has no title yet. People knocked out in water drown at once and make the drowning sound, the debug
+teleport's place list counts Solstheim's places and outdoor people and creatures, and the builder's door check walks the
+lands that have a store of their own. Emulator presets: `AmiWind-v0.0.68-dev5-FS-UAE.fs-uae`
+and `AmiWind-v0.0.68-dev5-WinUAE.uae`, both with 32 MB of Fast RAM. None of the changes has been seen in play; they are
+covered by their tests and the gates of their branches (the drowning 12274, the door check 12012).
+
+**New**
+
+- A person knocked out (by fatigue, not knocked down) with the feet under water has no breath left at once and takes the
+  suffocation damage from that frame, as in the original; a person who takes that damage makes the drowning sound whenever
+  it is not already playing, from the player's drowning sample, again once its length has passed. Water Breathing still
+  keeps the person breathing. The drowning table's rows grow from 8 to 12 bytes (32 rows, 384 bytes), and two more
+  counters on the breath status lines are cleared by New Game. People still do not swim up for air and do not yet drown in
+  the water outdoors (ACTOR-KNOCKED-OUT-IN-WATER-DROWNS-68, ACTOR-DROWN-SOUND-68; ACTOR-DROWNING-NOT-CARRIED-67 for the
+  drowning of people since v0.0.67). Not seen in play.
+- The debug teleport's place list reads the frames of the expansions' own stores: on the v0.0.68-dev4 build's data it
+  holds 94 places (82 before; the Mortrag Glacier is the one left, its cells are not in yet) and 1,104 outdoor people and
+  creatures (902 before), none of Solstheim's listed as not built (202 before); no earlier row changes
+  (TP-LIST-MODULE-STORE-PLACES-68). Covered by tests and this snapshot's gate; not seen in play.
+
+**Builder and tools**
+
+- The image step's door check runs after the stores of the lands with a frame of their own (Solstheim, Mournhold's
+  districts) are installed, reads their rows files as part of the one outdoor directory and traces a door's wall in its own
+  store's world; before, every exterior entrance of those lands was listed as not usable. A frame with no frame across any
+  side of its core is checked in itself, as a town is: six entrances of Mournhold's Royal Palace courtyard had been listed
+  as not usable for that reason alone. On the v0.0.68-dev4 build's stage folders the check reads 1,225 exterior entrances,
+  1,224 usable after walking in (1,102 before), 1,222 both ways, 1,210 with the wall traced
+  (DOOR-CHECK-MODULE-FRAME-MAPS-67, open; [the door mapping page](DOOR_MAPPING.md)).
+- The 13 entrances that the check cannot reach in the converted collision (seven ice cave doors, Castle Karstaag's Throne
+  Room door, Glenschul's Tomb, Rimhull's trapdoor, two Raven Rock houses of later colony stages, the ladder to
+  Bamz-Amschend in Mournhold) are on the known list `config/door-check-known.json` with what was measured, so a whole-world
+  image does not stop on them; each leaves the list when the check reaches it (DOOR-USE-COLLISION-EXPANSIONS-68, open).
+- The bug tracker records the glacier ice drawn brown-grey with a sheer drop (SOL-GLACIER-ICE-BROWN-SHEER-68, the fix is not
+  in this snapshot), the creatures the game places dead in rooms that are not spawned (ROOM-PLACED-CORPSES-NOT-SPAWNED-68),
+  the look book's missing colour check (LOOKBOOK-NO-COLOUR-CHECK-68), a palette change that re-bakes Balmora rooms that come
+  out unchanged (BUILD-BALMORA-KEY-PALETTE-OVERBROAD-68), a fresh census stage on few cores
+  (BUILD-CENSUS-PHASE-UNDERUSED-68), a door a script has switched off that the use key can still pick
+  (DOOR-LOAD-DISABLED-STILL-USED-68), and sightings of earlier build entries
+  (STALL-SLOW-STAGE-VS-REUSE-TIME-68, BUILD-RESOURCE-PLAN-UNIT-REUSE-66, BUILD-MODULE-UNIT-CACHE-IN-KEY-67, BUILD-MEMPLAN-CHIM-5-OF-22-68,
+  BUILD-IMAGE-AFTER-OPTIMIZER-SERIAL-68, REUSE-VERIFY-SLOW-BESIDE-MODULE-STAGES-68); see [the bug tracker](BUGS.md).
+
+**Documentation**
+
+- The README and the roadmap name the v0.0.68-dev5 presets and snapshot. The MWScript tracker is measured for this version
+  (927 scripts run, 9 carried, as in dev4). The game features page's water row and the door mapping page follow the changes
+  above.
 
 ## v0.0.68-dev4: fourth snapshot of v0.0.68, 21 November 2026
 

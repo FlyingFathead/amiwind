@@ -1,11 +1,11 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.68-dev4 (21 November 2026)._
+_Last updated with AmiWind v0.0.68-dev6 (22 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.68: in progress, fourth snapshot 21 November 2026](#v0068-in-progress-fourth-snapshot-21-november-2026)
+- [v0.0.68: in progress, sixth snapshot 22 November 2026](#v0068-in-progress-sixth-snapshot-22-november-2026)
 - [v0.0.67: Tribunal Introduced, released 19 November 2026](#v0067-tribunal-introduced-released-19-november-2026)
 - [v0.0.66: Forward It Is, released 16 November 2026](#v0066-forward-it-is-released-16-november-2026)
 - [v0.0.65: Reintroducing Vvardenfell](#v0065-reintroducing-vvardenfell)
@@ -119,10 +119,22 @@ _Last updated with AmiWind v0.0.68-dev4 (21 November 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
-## v0.0.68: in progress, fourth snapshot 21 November 2026
+## v0.0.68: in progress, sixth snapshot 22 November 2026
 
-v0.0.68 has no title yet. Its fourth development snapshot,
-[v0.0.68-dev4](releases/notes/RELEASE-v0.0.68-dev4.md), is out. What dev4 carries (checked by tests and the gates of
+v0.0.68 has no title yet. Its sixth development snapshot,
+[v0.0.68-dev6](releases/notes/RELEASE-v0.0.68-dev6.md), is out. What dev6 carries (checked by tests and the gates of their
+commits, not yet in play): **the scripts of Mournhold's five districts run on their frames** (the courtyard's living and
+dead trees, the districts' ambient sounds, the Plaza's fabricant attacks, the turning signs, the city gates and Azura's
+statue outside the Temple; 366 scripted objects on the dev5 build's data, none left unattached), which moves the script
+tracker to 1,062 of the original's 1,074 scripts running; **a load door that a script has switched off is no longer
+taken** by the use key, the prompt or the map's door markers (the Skaal village's houses before and after the attack, the
+Raven Rock colony's stage doors); and a Solstheim test image's image step waits for its test world. The districts' frame
+rate with the new scripts is still to be measured. The fifth snapshot,
+[v0.0.68-dev5](releases/notes/RELEASE-v0.0.68-dev5.md), is out. What dev5 carries (checked by tests and the
+gates of their branches, not yet in play): people knocked out in water drown at once and a drowning person makes the
+drowning sound; and the builder's door check walks the lands with a store of their own, Solstheim and Mournhold's
+districts, with the 13 entrances it cannot reach listed. The glacier's brown-grey ice is a known fault with a fix under
+test that is not in dev5. The fourth snapshot, [v0.0.68-dev4](releases/notes/RELEASE-v0.0.68-dev4.md), is out. What dev4 carries (checked by tests and the gates of
 its branches, not yet in play): **the game's invisible walls as solid boxes a script can switch** (the five lids over
 Mournhold's districts, the wall at exterior cell 15,5 and the falling mage's platform, beside the opening's own boxes);
 **the Ghostfence's glow and the curtain's own scrolling layers**, each behind a switch that is off until its frame cost

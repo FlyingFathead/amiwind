@@ -104,12 +104,14 @@ def neighbour_walks(directory, holder, stand):
     return out
 
 
-# A door whose region frame is not in the open-world directory this check walks (world/regions.awr): the frame of a
-# world of its own, installed as a store of its own with its own frame maps and rows file (Mournhold's districts,
-# mhNNNN: tools/chim/layer_stores.py). The check walks Vvardenfell's frames; such a door is listed with this reason
-# and never walked (DOOR-CHECK-MODULE-FRAME-MAPS-67: the check stopped an image's last step on the first such map).
-OWN_WORLD = ('its frame %s is not in the open-world directory this check walks (a frame of a world of its own, '
-             'installed as its own store): not walked here')
+# A door whose region frame is in none of the directories this check walks: Vvardenfell's (world/regions.awr) and the
+# rows files of the lands installed as stores of their own (Solstheim's slNNNN, Mournhold's mhNNNN:
+# door_audit.full_directory, tools/chim/layer_stores.py). The image step runs the check after those stores are
+# installed, so their frames are walked like any other; a door whose frame has no row (a rows file missing from the
+# id1 the check was given) is listed with this reason and never walked (DOOR-CHECK-MODULE-FRAME-MAPS-67: the check
+# once stopped an image's last step on the first such map, then listed all of them as not walked).
+OWN_WORLD = ('its frame %s is not in the directories this check walks (a frame of a world of its own whose rows '
+             'file is not in this image): not walked here')
 
 
 def job_lines(rows, bank, directory):
@@ -131,11 +133,10 @@ def job_lines(rows, bank, directory):
         eye, yaw, pitch = aim(stand, box)
         line = 'D %d %s %s %.2f %.2f' % (row['reference'], holder, ' '.join('%.2f' % v for v in eye), yaw, pitch)
         if row.get('holder_kind') == 'region':
-            walks = neighbour_walks(directory, holder, eye)
-            if not walks:
-                out.append((row, None, 'no neighbouring region frame to walk in from'))
-                continue
-            for running, start, cross in walks:
+            # a frame with no frame across any side of its core (a district that stands alone: Mournhold's Royal
+            # Palace courtyard) has no walk in: the player arrives in it by a door or a teleport, so the frame itself
+            # runs at the door, as a town's does (the line then has no W; DOOR-CHECK-MODULE-FRAME-MAPS-67)
+            for running, start, cross in neighbour_walks(directory, holder, eye):
                 line += ' W %s %s %s' % (running, ' '.join('%.2f' % v for v in start),
                                          ' '.join('%.2f' % v for v in cross))
         if exits:
@@ -353,40 +354,61 @@ def use_slack(engine_src):
     return float(m.group(1)) if m else 1.0
 
 
-def reach_check(entries, world_dir, id1, jobs=None, slack=1.0):
+def layer_frame_cells(layers):
+    """[(world folder, {frame map: cell})] of the stores of frames among the image step's --chim-layer-world
+    STORE=WORLD values LAYERS (Solstheim's slNNNN, Mournhold's mhNNNN: the names chim.layer_stores.frame_holders
+    gives their frames); [] for none."""
+    if not layers:
+        return []
+    from chim.layer_stores import frame_holders, parse, store_kinds
+    kinds = store_kinds()
+    return [(Path(world), {name: cell for cell, (name, _origin) in frame_holders(['%s=%s' % (store, world)]).items()})
+            for store, world in parse(layers) if kinds[store] == 'frames']
+
+
+def reach_check(entries, world_dir, id1, jobs=None, slack=1.0, layers=None):
     """{reference: reach result} for the region-frame doors of ENTRIES (their job lines give the standing spot and
     the use box comes from the audit row), one task per CHIM region frame, on every core. Town doors are not traced
-    here (their frame maps are the towns' own)."""
+    here (their frame maps are the towns' own). LAYERS: the image step's --chim-layer-world values: a door of a frame
+    of such a store is traced in that store's own world (DOOR-CHECK-MODULE-FRAME-MAPS-67)."""
     from build_jobs import resolve_jobs
     from build_parallel import in_order_map
     from chim import format as F
     from chim import reach, placed, placement_light, terc, thgt  # noqa: F401
     from chim.frame_map import region_frame_rows
     from chim.validate import _world_file
-    world_dir = Path(world_dir)
-    rows = region_frame_rows(id1, world_dir)
-    _, files, _, _ = F.read_index(_world_file(world_dir / 'chim', 'world.cwi'))
-    by_cell = {}
-    for i, f in enumerate(f for f in files if f['kind'] == b'FRAM'):
-        by_cell.setdefault(tuple(f['cell']), i)
+    worlds = []
+    if world_dir:
+        world_dir = Path(world_dir)
+        worlds.append((world_dir, {name: tuple(row['cells'][0])
+                                   for name, row in region_frame_rows(id1, world_dir).items()}))
+    worlds += layer_frame_cells(layers)
     tasks = {}
-    for e in entries:
-        if e.get('holder_kind') != 'region' or not e.get('job') or not e.get('box') or e['holder'] not in rows:
+    for folder, cells in worlds:
+        if not any(e.get('holder') in cells for e in entries):
             continue
-        index = by_cell.get(tuple(rows[e['holder']]['cells'][0]))
-        if index is None:
-            continue
-        d = e['job'].split()
-        tasks.setdefault(index, []).append((e['reference'], e['box'], (float(d[3]), float(d[4]))))
-    items = [(str(world_dir), index, doors, slack) for index, doors in sorted(tasks.items())]
+        _, files, _, _ = F.read_index(_world_file(folder / 'chim', 'world.cwi'))
+        by_cell = {}
+        for i, f in enumerate(f for f in files if f['kind'] == b'FRAM'):
+            by_cell.setdefault(tuple(f['cell']), i)
+        for e in entries:
+            if e.get('holder_kind') != 'region' or not e.get('job') or not e.get('box') or e['holder'] not in cells:
+                continue
+            index = by_cell.get(tuple(cells[e['holder']]))
+            if index is None:
+                continue
+            d = e['job'].split()
+            tasks.setdefault((str(folder), index), []).append((e['reference'], e['box'], (float(d[3]), float(d[4]))))
+    items = [(folder, index, doors, slack) for (folder, index), doors in sorted(tasks.items())]
     out = {}
     for part in in_order_map(_reach_unit, items, min(resolve_jobs(jobs), max(1, len(items)))):
         out.update(part)
     return out
 
 
-def check(rows, id1, engine_src, directory, names, jobs=None, scene_source=None, world_id1=(), world_dir=None):
-    """The report: one entry per audit row, the counts, the regions."""
+def check(rows, id1, engine_src, directory, names, jobs=None, scene_source=None, world_id1=(), world_dir=None,
+          layers=None):
+    """The report: one entry per audit row, the counts, the regions. LAYERS: reach_check."""
     import door_audit
     from build_jobs import resolve_jobs
     banks = {}
@@ -425,7 +447,7 @@ def check(rows, id1, engine_src, directory, names, jobs=None, scene_source=None,
                          both_ways='yes' if usable and checks['way_back'] in ('yes', 'not checked') else 'no')
         entries.append(entry)
     # the wall between the player and the door, with the CHIM world's own collision (region frames)
-    reached = reach_check(entries, world_dir, id1, jobs, use_slack(engine_src)) if world_dir else {}
+    reached = reach_check(entries, world_dir, id1, jobs, use_slack(engine_src), layers) if world_dir else {}
     for e in entries:
         r = reached.get(e['reference'])
         if 'checks' not in e or not e['checks']:
@@ -562,11 +584,11 @@ def write_outputs(report, out):
 
 
 def run(build=None, id1=None, engine_src=None, audit_rows=None, data_files=None, out=None, baseline=None, jobs=None,
-        scene_source=None, world_doors=None, chim_world=None, world_id1=(), known=None):
+        scene_source=None, world_doors=None, chim_world=None, world_id1=(), known=None, layers=None):
     """The check over one image; returns (report, problem or None). known: config/door-check-known.json (load_known):
-    a whole-world image then fails on an unreachable entrance it does not list."""
+    a whole-world image then fails on an unreachable entrance it does not list. layers: the image step's
+    --chim-layer-world STORE=WORLD values (the stores of frames the image installs beside the base world)."""
     import door_audit
-    from chim.frame_map import world_directory
     id1 = Path(id1 or Path(build) / 'image/boot/id1')
     engine_src = Path(engine_src or Path(build) / 'engine/runtime/src')
     chim_world = chim_world or (Path(build) / 'chim-world' if build else None)
@@ -577,12 +599,13 @@ def run(build=None, id1=None, engine_src=None, audit_rows=None, data_files=None,
         doors = original_doors(master_path(data_files).read_bytes())
         world_rows = json.loads(Path(world_doors or Path(build) / 'image/world-doors.json')
                                 .read_text(encoding='utf-8'))['rows']
-        image = door_audit.Image(id1, engine_src, chim_world, jobs)
+        image = door_audit.Image(id1, engine_src, chim_world, jobs, layer_worlds=door_audit.layer_frame_worlds(layers))
         audit_rows = door_audit.audit(doors, world_rows, image, door_audit.regions_by_cell(data_files, jobs))['rows']
     names = door_audit.engine_map_names((engine_src / 'aw_maps.h').read_text(encoding='utf-8', errors='replace'),
                                         (engine_src / 'aw_town_table.h').read_text(encoding='utf-8', errors='replace'))
     world = chim_world if chim_world and (Path(chim_world) / 'chim' / 'world.cwi').is_file() else None
-    report = check(audit_rows, id1, engine_src, world_directory(id1), names, jobs, scene_source, world_id1, world)
+    report = check(audit_rows, id1, engine_src, door_audit.full_directory(id1), names, jobs, scene_source, world_id1,
+                   world, layers)
     base = json.loads(Path(baseline).read_text(encoding='utf-8')) if baseline else None
     problem = baseline_problem(report, base)
     report['baseline_problem'] = problem
@@ -609,6 +632,9 @@ def main(argv=None):
     ap.add_argument('--baseline', type=Path)
     ap.add_argument('--known', type=Path, help='config/door-check-known.json: the entrances still blocked for a '
                                                'named reason (a whole-world image fails on any other)')
+    ap.add_argument('--layer-world', action='append', default=[], metavar='STORE=WORLD',
+                    help="a store of frames the image installs beside the base world (the image step's "
+                         '--chim-layer-world values): its doors are traced in its own world')
     ap.add_argument('--out', required=True, type=Path)
     ap.add_argument('--jobs', type=int)
     a = ap.parse_args(argv)
@@ -618,7 +644,7 @@ def main(argv=None):
         ap.error('--audit or --data-files')
     rows = json.loads(a.audit.read_text(encoding='utf-8'))['rows'] if a.audit else None
     report, problem = run(a.build, a.id1, a.engine_src, rows, a.data_files, a.out, a.baseline, a.jobs, a.scene_source,
-                          chim_world=a.chim_world, world_id1=a.world_id1, known=a.known)
+                          chim_world=a.chim_world, world_id1=a.world_id1, known=a.known, layers=a.layer_world)
     c = report['counts']
     print('door engine check: %d exterior entrances; usable after walking in %d, both ways %d; with the wall traced '
           '(%d region doors) %d; locked %d; placed %d'

@@ -1,6 +1,6 @@
 # CHIM Engine tracker
 
-_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.68-dev4._
+_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.68-dev6._
 
 <!-- Generated whole by tools/bug_register.py render from docs/bugs/bugs.json; do not edit by hand. -->
 
@@ -41,6 +41,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [CHIM-DAGOTH-UR-RUIN-CYLINDER-44](CHIM-DAGOTH-UR-RUIN-CYLINDER-44.md): Graphics translation glitch at Dagoth Ur: the blight cloud whirlwind (nested translucent cylinders) is drawn solid and still (reported 4 times, fixed)
 - [CHIM-FRAME-EDGE-EFRAG-CRASH-36](CHIM-FRAME-EDGE-EFRAG-CRASH-36.md): R_StoreEfrags: Bad entity type 270440 ends the game: a leaf link to an entity whose model is NULL (normal play in Seyda Neen; noclip past the Vivec frame edge) (reported 4 times, fixed)
 - [CHIM-ROOM-HEART-CHAMBER-LOAD-50](CHIM-ROOM-HEART-CHAMBER-LOAD-50.md): Entering Akulakhan's Chamber when it cannot load stops the game with an error at the console instead of refusing at the door (reported 4 times, open)
+- [IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66](IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66.md): The image step's CHIM room actor bake takes about two minutes on one core when every room resident is already cached (reported 4 times, open)
 - [BUILD-CHIM-FRAME-SWAP-LATE-36](BUILD-CHIM-FRAME-SWAP-LATE-36.md): The image step builds 335 legacy maps of cells already on CHIM, then removes them before packing (reported 3 times, fixed)
 - [BUILD-IMAGE-AUDIO-SERIAL-36](BUILD-IMAGE-AUDIO-SERIAL-36.md): The image step puts the audio payload in one file at a time while 22 of 24 cores sit idle (reported 3 times, fixed)
 - [BUILD-IMAGE-REGION-MAPS-SERIAL-43](BUILD-IMAGE-REGION-MAPS-SERIAL-43.md): The image step's CHIM frame-map phases run on one core: the world read six times, ground traces on whole frames (reported 3 times, open)
@@ -51,6 +52,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [BUILD-SHARED-WRITES-UNATTRIBUTED-52](BUILD-SHARED-WRITES-UNATTRIBUTED-52.md): Stages running side by side write the same files, so their records are refused and they rebuild every time: the town carried-item models, the room door audio (reported 3 times, open)
 - [BUILD-STAGE-READS-UNFINGERPRINTED-48](BUILD-STAGE-READS-UNFINGERPRINTED-48.md): Two stages read repository files their fingerprint leaves out, so their records are refused and they rerun on every reuse (reported 3 times, fixed)
 - [CHIM-AUTO-BANK-CLIFF-51](CHIM-AUTO-BANK-CLIFF-51.md): 32 MB of Fast RAM got no automatic CHIM cache bank: 13 MiB free gave a 7 MiB budget and the first bank needed 8 MiB (reported 3 times, open)
+- [CHIM-MESH-STAIR-UNIT-SLOW-67](CHIM-MESH-STAIR-UNIT-SLOW-67.md): One stair collision unit of a Solstheim glacier cell takes 19.5 minutes on one core, and its second over 25 (reported 3 times, open)
 - [CHIM-READ-RUNS-33](CHIM-READ-RUNS-33.md): CHIM crossings read little but in many separate runs, so FFS seeks dominate (reported 3 times, open)
 - [CHIM-RED-MOUNTAIN-SOLID-SKY-43](CHIM-RED-MOUNTAIN-SOLID-SKY-43.md): On the Red Mountain summit (cell 2,9) the player ends up inside solid and only the sky is drawn, no terrain (reported 3 times, open)
 - [CHIM-ROCKS-OPEN-SHELLS-43](CHIM-ROCKS-OPEN-SHELLS-43.md): Several rock meshes on CHIM do not close up: open faces where the rock should be solid (reported 3 times, open)
@@ -60,7 +62,6 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [CHIM-ZONE-RELEASE-FLICKER-42](CHIM-ZONE-RELEASE-FLICKER-42.md): Full CHIM zone: distant buildings pop in and out while standing still, and the retry costs frames (reported 3 times, open)
 - [COLLISION-ROUTE-NO-SPLIT-36](COLLISION-ROUTE-NO-SPLIT-36.md): Routed standing hulls of dense flora (kelp, kreshweed) stay one chain 277-305 clipnodes deep: the router finds no cut, so the cell stays hull-pending (reported 3 times, open)
 - [CREATURE-DAGOTH-UR-ABSENT-52](CREATURE-DAGOTH-UR-ABSENT-52.md): Dagoth Ur and the Heart of Lorkhan are not in their rooms: the room creature list never named them, so Akulakhan s Chamber has neither (reported 3 times, open)
-- [IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66](IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66.md): The image step's CHIM room actor bake takes about two minutes on one core when every room resident is already cached (reported 3 times, open)
 - [INTERIOR-CREATURES-MISSING-41](INTERIOR-CREATURES-MISSING-41.md): No creature is placed in any interior: the resident stage takes NPC records only, so the demigod Vivec is missing from his palace (reported 3 times, fixed)
 - [STAIRS-EBONHEART-CHIM-36](STAIRS-EBONHEART-CHIM-36.md): Three Ebonheart flights fail the CHIM stair gate in the whole-city Vivec frame (reported 3 times, fixed)
 - [VIVEC-TEMPLE-STAIRS-33](VIVEC-TEMPLE-STAIRS-33.md): Palace steps and High Fane quarter flights fail the stair gate on the CHIM Vivec Temple frame (reported 3 times, fixed)
@@ -72,7 +73,6 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [CHIM-COLLISION-UNION-FALLBACK-41](CHIM-COLLISION-UNION-FALLBACK-41.md): Daedric ruin collision falls back to raw piece chains and puts Hla Oad's frames over the CHIM memory budget (reported 2 times, open)
 - [CHIM-EXTERIOR-FLAMES-MISSING-48](CHIM-EXTERIOR-FLAMES-MISSING-48.md): CHIM exteriors draw no fire: campfires, braziers, fire pits and flame lamps outdoors have no flame animation (reported 2 times, fixed)
 - [CHIM-LEGACY-CHAIN-33](CHIM-LEGACY-CHAIN-33.md): CHIM builds still run the legacy exterior chain: frame maps read the legacy region maps, and the open world is built (reported 2 times, closed)
-- [CHIM-MESH-STAIR-UNIT-SLOW-67](CHIM-MESH-STAIR-UNIT-SLOW-67.md): One stair collision unit of a Solstheim glacier cell takes 19.5 minutes on one core, and its second over 25 (reported 2 times, open)
 - [CHIM-MESHLESS-LIGHTS-33](CHIM-MESHLESS-LIGHTS-33.md): Exterior lights without a mesh have no CHIM light path: 2,284 placed lights give no light in a CHIM frame (reported 2 times, open)
 - [CHIM-TERRAIN-TEXTURE-BLOCKY-43](CHIM-TERRAIN-TEXTURE-BLOCKY-43.md): Roads and paths on the ground look blocky: each texture square is drawn with hard edges instead of blending into its neighbours (reported 2 times, open)
 - [CHIM-ZONE-BUDGET-33](CHIM-ZONE-BUDGET-33.md): The engine's default CHIM zone does not hold the active ring of Seyda Neen or of Balmora's south-west corner (reported 2 times, fixed)
@@ -85,6 +85,8 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 
 Newest first: the last 10 dated events of CHIM bugs, from their entries (reports, history, closure steps).
 
+- 2026-11-22 [CHIM-MESH-STAIR-UNIT-SLOW-67](CHIM-MESH-STAIR-UNIT-SLOW-67.md): seen again in v0.0.68-dev5: On the Solstheim glacier test build with mesh method E, each of the nine test cells' stair collision units ran for over 47 minutes on one core, longer than the earlier 19.5 to 25 minutes.
+- 2026-11-22 [IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66](IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66.md): seen again in v0.0.68-dev5: Seen again in the v0.0.68-dev5 build: the image step's room actor bake took 1 minute 55 seconds on about one core.
 - 2026-11-21 [CHIM-SOL-TEST-TWO-CHIMSOL-STORES-68](CHIM-SOL-TEST-TWO-CHIMSOL-STORES-68.md): seen again in v0.0.68-dev3: The plan check of a Solstheim test image stopped on the check that every finished expansion cell is built; that check now accepts the test image alone, on a development version.
 - 2026-11-21 [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): seen again in v0.0.68-dev3: Seen again in the v0.0.68-dev3 build: the image step's early phases ran on under half its cores for about five minutes.
 - 2026-11-21 [IMAGE-BOOT-PAYLOAD-OVER-2GIB-48](IMAGE-BOOT-PAYLOAD-OVER-2GIB-48.md): seen again in v0.0.68-dev3: Seen again in the v0.0.68-dev3 build: the image stopped because the boot payload grew past one partition after its early layout plan; the image step now plans the layout again from the staged files.
@@ -93,8 +95,6 @@ Newest first: the last 10 dated events of CHIM bugs, from their entries (reports
 - 2026-11-21 [IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66](IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66.md): seen again in v0.0.68-dev2: Seen again in the v0.0.68-dev2 build: the room actor bake took about two minutes on one core
 - 2026-11-21 [OUTDOOR-DISABLE-NOT-HIDDEN-68](OUTDOOR-DISABLE-NOT-HIDDEN-68.md): fixed in source: a gated commit, v0.0.67 (b9b215d9); gate 12265 of the planning item OUTDOOR-DISABLE-NOT-HIDDEN-68: Every outdoor placement a script can switch off or on gets its hide rows, in the base world and in every store of frames the image installs (the change in f6edb6c53).
 - 2026-11-21 [OUTDOOR-DISABLE-NOT-HIDDEN-68](OUTDOOR-DISABLE-NOT-HIDDEN-68.md): shipped: the v0.0.68-dev3 snapshot build, v0.0.68-dev3 (9a91382c3, build 2026_11_21_v0.0.68-dev3_full-dev3_9a91382); the delivered build holds the commit (gate 12300): A placement outdoors that a script switches off or on disappears and comes back as the script says, as in the original.
-- 2026-11-21 [IMAGE-ONE-HDF-TARGET-36](IMAGE-ONE-HDF-TARGET-36.md): v0.0.68-dev3: Since a38d62384 the image step's payload preflight shows the true drive count and bytes in its first minute, with the expansions' stores counted.
-- 2026-11-21 [IMAGE-BOOT-PAYLOAD-OVER-2GIB-48](IMAGE-BOOT-PAYLOAD-OVER-2GIB-48.md): fixed in source: a gated commit, v0.0.68-dev3 (9a91382c3); gate 12300: The image step plans the disk layout again from the staged files when the boot payload outgrew the early plan, instead of stopping
 
 ## Engine streaming and memory
 

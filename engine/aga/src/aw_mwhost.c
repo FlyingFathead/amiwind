@@ -4884,7 +4884,9 @@ static void attach_map(void){
             if(nroom<ROOM_ROWS)memcpy(room_rows[nroom++],row,24);else attach_refused++;
             continue;
         }
-        if(!outdoors || (flags&AWB_INTERIOR))continue;
+        /* a room row outdoors waits for its room; a presented district's row (AWB_PRESENTED: its moved place) is placed
+         * on the district's frame, keeping AWB_INTERIOR (EXPANSION-SCRIPTS-NOT-ATTACHED-66) */
+        if(!outdoors || ((flags&AWB_INTERIOR) && !(flags&AWB_PRESENTED)))continue;
         if(!AW_SourceToWorld(sv.name,source,local) || !AW_WorldContains(sv.name,local))continue;
         k=flags&AWB_HELD?held_attach(ref,script,flags,-1,local):attach_script(ref,script,flags,-1,local);
         if(k>=0)attach_places++;else attach_refused++;
@@ -6342,6 +6344,7 @@ void AW_MwscriptInit(void){
     aw_opening_activate=object_intercept;      /* census type amiwind: the clerk starts his talk (OPENING-REGRESSION-64) */
     aw_inventory_intercept=object_intercept;   /* OnActivate takes a placed item's use */   /* OnActivate takes a door's use */
     aw_actor_disabled=AW_ObjectDisabled;   /* the CHIM window spawns no disabled actor */
+    aw_scene_door_disabled=AW_ObjectDisabled;   /* nor is a disabled load door used (DOOR-LOAD-DISABLED-STILL-USED-68) */
     aw_actor_killed=actor_killed;          /* an essential character's death box, whatever killed it (ESSENTIAL-DEATH-MESSAGE-66) */
     aw_actors_visitors=room_visitors;      /* PositionCell: a room spawns the actors moved into it (v0.0.62) */
     aw_scene_followers=followers;          /* the player's followers through a door (v0.0.62) */

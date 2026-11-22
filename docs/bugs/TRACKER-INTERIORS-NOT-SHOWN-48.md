@@ -143,6 +143,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [DRYRUN-LIBS-LABEL-32](DRYRUN-LIBS-LABEL-32.md): A dry-run image built with --amiga-libs still says it contains no game assets or ROMs only
 - [ESTIMATE-EVR-BELOW-CUR-31](ESTIMATE-EVR-BELOW-CUR-31.md): World estimate: "everything" comes out below "current content" in some regions
 - EVIDENCE-STAMPS-TYPED-53 (no report page): Evidence script headers carried hand-typed times instead of copies of the stamp tool
+- [EXPANSION-COUNTS-MISS-FRAME-STORES-68](EXPANSION-COUNTS-MISS-FRAME-STORES-68.md): The build's record of the expansions' actors and the script tracker leave out what the frame stores of the image hold: actors there count as not placed, Solstheim's built cells as missing, its attached scripts as outside the image, and scripts that only declare dialogue variables as not attached
 - GATE-NUMBER-RACE-53 (no report page): Two workers started gate 4074 at the same moment: the gate scripts number-is-free check is not atomic
 - HANDOFF-WRAPPER-01 (no report page): Source handoff wrapper reused an existing extraction directory
 - IMAGE-HDF-COPY-SPARSE-JDRIVE-59 (no report page): Copying a padded HDF from the build volume onto a mounted folder fails with Permission denied
@@ -197,6 +198,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [TOOLKIT-VERSION-CHECK-NO-GIT-64](TOOLKIT-VERSION-CHECK-NO-GIT-64.md): The Toolkit version check passes in a source tree without git history, so the gate lets a stale Toolkit version line through and the dev delivery stops after the build
 - [TOOLKIT-WORLD-MAP-FRAME-LOOP-64](TOOLKIT-WORLD-MAP-FRAME-LOOP-64.md): The World Map vanished in Firefox after the frame was sized to its own content
 - [TOOLKIT-WORLD-MAP-NESTED-SCROLL-64](TOOLKIT-WORLD-MAP-NESTED-SCROLL-64.md): The World Map scrolls as separate boxes: the headline stays while the map frame scrolls, and the wheel over the map never scrolls the page
+- [TRACK-FIXED-STEPS-WHOLE-HOME-68](TRACK-FIXED-STEPS-WHOLE-HOME-68.md): Recording a fix of one register entry through its planning item marks every other entry of that item as fixed by the same commit
 - [TRACK-FIXED-UMBRELLA-STEPS-ALL-67](TRACK-FIXED-UMBRELLA-STEPS-ALL-67.md): Marking one fault fixed through the tracker intake marked every fault of its plan item fixed when that item groups many
 - [TRACK-UPDATE-MOVED-ITEM-FIRST-68](TRACK-UPDATE-MOVED-ITEM-FIRST-68.md): Updating a work item whose id also exists as a moved copy in an older version file wrote the note into the old moved copy instead of the live item
 - [TRACKER-AREA-CELLS-RUN-WIDE-42](TRACKER-AREA-CELLS-RUN-WIDE-42.md): The CHIM tracker gives every area of a build all of the build's cells: Balmora holds 811 cells, so an area or shipped-towns plan selector takes most of the island
@@ -207,6 +209,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [TRACKER-DISTRICTS-COUNTED-TWICE-67](TRACKER-DISTRICTS-COUNTED-TWICE-67.md): The progress tracker counts Mournhold's five districts twice: as their open-terrain cells in the game and again as rooms not started
 - [TRACKER-ENTRIES-WITHOUT-PAGES-67](TRACKER-ENTRIES-WITHOUT-PAGES-67.md): Half of the live bug entries have no report page: the category lists and links name them without a page to open (643 of 1307, 517 of them open, 207 from v0.0.66 and v0.0.67)
 - [TRACKER-FIXED-LEFT-OPEN-36](TRACKER-FIXED-LEFT-OPEN-36.md): Fixed work whose bug entry stayed open (LAVA-NOT-IMPLEMENTED-33)
+- [TRACKER-GUARD-SHIPPED-STEP-68](TRACKER-GUARD-SHIPPED-STEP-68.md): The tracker write guard counts the delivery chain's step that records what a build shipped as a write outside the intake
 - [TRACKER-IN-GAME-SEA-LABELLED-OCEAN-48](TRACKER-IN-GAME-SEA-LABELLED-OCEAN-48.md): The cell tracker calls cells that are in the game ocean: cell -15,-8 stands alone in the sea on the World map
 - [TRACKER-INCLUSION-NOT-RUN-SINCE-44-48](TRACKER-INCLUSION-NOT-RUN-SINCE-44-48.md): The inclusion ledger was not refreshed after v0.0.44-dev1 and the Toolkit headline still names v0.0.41
 - [TRACKER-INTERIORS-IN-GAME-COUNT-64](TRACKER-INTERIORS-IN-GAME-COUNT-64.md): The tracker data counts 59 of 1,123 Vvardenfell interior rooms as in the game on CHIM rooms, while the builds since v0.0.48 convert almost all of them

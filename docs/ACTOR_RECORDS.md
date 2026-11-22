@@ -1,6 +1,6 @@
 # What every being can have: the actor records
 
-_Last updated with AmiWind v0.0.67 (19 November 2026)._
+_Last updated with AmiWind v0.0.68-dev5 (22 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -760,6 +760,18 @@ On the v0.0.66 release build's outputs (both expansions at milestone 1, about 20
 
 The missing script bindings are fixed in v0.0.67 (EXPANSION-SCRIPTS-NOT-ATTACHED-66), so the next build counts them
 attached.
+
+Since v0.0.68 the check also reads the image's stores of frames (`chim-layer-stores.json`: Mournhold's five districts
+and Solstheim's frames), whose people and creatures it had counted as not placed, and their frames as built exterior
+cells; and a script the compiler leaves out as inert (one that only declares the locals the dialogue reads, such as
+`nolore`: the base game binds none of its 148 such placements either) needs no binding. On the v0.0.68-dev5 build's
+outputs:
+
+| Land | Actors placed | Complete | What the rest lack (placements) | Places built |
+| --- | ---: | ---: | --- | --- |
+| Mournhold | 412 of 412 | 386 | inventory 22, animations 3, script locals 1 | 91 of 96 rooms with a map, the other 5 are the districts, on their frames |
+| Solstheim | 475 of 476 | 472 | inventory 3, animations 1, model 1, placed 1 | 98 of 98 rooms, 135 of 155 exterior cells |
+| Inserted into Vvardenfell | 59 of 59 | 58 | inventory 1 | |
 
 ## Sources and method
 

@@ -197,6 +197,49 @@ def directory_frame(directory, point):
     return None
 
 
+def layer_directory(id1):
+    """[(name, origin xyz, core)] of the frames of the lands that are a store of their own, from the rows files the
+    image installs with them (tools/chim/sol_test.py LANDS: world/regions-sl.awr, world/regions-mh.awr; 'AWS1', u32
+    rows, 52 bytes a row), in the engine's order (aw_world.c load_directory: Solstheim's rows, then Mournhold's).
+    [] for an image without such a store (DOOR-CHECK-MODULE-FRAME-MAPS-67)."""
+    from chim.sol_test import LANDS
+    out = []
+    for land in sorted(LANDS.values(), key=lambda l: l['prefix'] != 'sl'):
+        path = Path(id1) / land['directory']
+        if not path.is_file():
+            continue
+        raw = path.read_bytes()
+        count = struct.unpack_from('<I', raw, 4)[0] if raw[:4] == b'AWS1' and len(raw) >= 8 else -1
+        if count < 1 or count > land['limit'] or len(raw) != 8 + 52 * count:
+            raise ValueError('%s: not a rows file the engine reads (AWS1, 52 bytes a row)' % path)
+        for i in range(count):
+            at = 8 + 52 * i
+            name = '%s%04d' % (land['prefix'], i)
+            if raw[at:at + 8].rstrip(b'\0').decode('ascii', 'replace') != name:
+                raise ValueError('%s: row %d is not %s' % (path, i, name))
+            out.append((name, struct.unpack_from('<3f', raw, at + 8), struct.unpack_from('<4f', raw, at + 20)))
+    return out
+
+
+def layer_frame_worlds(values):
+    """The CHIM world folders of the stores of frames among the image step's --chim-layer-world STORE=WORLD VALUES
+    (tools/chim/layer_stores.py), in their order; [] for none."""
+    if not values:
+        return []
+    from chim.layer_stores import parse, store_kinds
+    kinds = store_kinds()
+    return [Path(world) for store, world in parse(values) if kinds[store] == 'frames']
+
+
+def full_directory(id1):
+    """The engine's one outdoor table of an image (aw_world.c load_directory): Vvardenfell's rows
+    (world/regions.awr, chim.frame_map.world_directory), then the rows of the lands with a store of their own
+    (layer_directory). The engine takes the first row whose core holds a point."""
+    from chim.frame_map import world_directory
+    base = world_directory(id1) if (Path(id1) / 'world/regions.awr').is_file() else []
+    return base + layer_directory(id1)
+
+
 def running_origin(global_point, local_point):
     """The running map's origin (map units) from the engine's position line: global Morrowind units and the same
     point in the running map's units."""
@@ -344,8 +387,9 @@ def room_record_bounds(data):
 class Image:
     """The built image as the audit reads it; tests give their own object with the same methods."""
 
-    def __init__(self, id1, engine_src, world_dir, jobs=None, store_roots=()):
-        from chim.frame_map import world_directory
+    def __init__(self, id1, engine_src, world_dir, jobs=None, store_roots=(), layer_worlds=()):
+        """LAYER_WORLDS: the CHIM world folders of the stores of frames the image installs beside the base world
+        (Solstheim's, Mournhold's districts): their frames place their doors as the base world's do."""
         self.id1 = Path(id1)
         self.store_roots = [Path(p) for p in store_roots]
         self.maps = self.id1 / 'maps'
@@ -356,12 +400,21 @@ class Image:
         self.crossing = crossing_mode(cfg.read_text(encoding='cp1252', errors='replace')) if cfg.is_file() else 0
         self.logical_doors = logical_doors((src / 'aw_scene.c').read_text(encoding='utf-8', errors='replace')
                                            if (src / 'aw_scene.c').is_file() else '')
-        self.directory = world_directory(self.id1) if (self.id1 / 'world/regions.awr').is_file() else []
+        self.directory = full_directory(self.id1)
         self.frames = source_frames(Path(world_dir) / 'chim-source.json', jobs) if world_dir else []
         table = Path(world_dir) / 'chim-regions.json' if world_dir else None
         doc = json.loads(table.read_text(encoding='utf-8')) if table and table.is_file() else {}
         self.leave_margin = doc.get('leave_margin', 0)
         self.region_ids = {tuple(f['cell']): f['id'] for f in doc.get('frames') or []}
+        for layer in layer_worlds or ():
+            # a store of frames of its own: its source frames and its frame ids beside the base world's (the lands'
+            # cells do not overlap: the engine finds every frame by its coordinates in one table)
+            layer = Path(layer)
+            if (layer / 'chim-source.json').is_file():
+                self.frames = self.frames + source_frames(layer / 'chim-source.json', jobs)
+            if (layer / 'chim-regions.json').is_file():
+                rows = json.loads((layer / 'chim-regions.json').read_text(encoding='utf-8')).get('frames') or []
+                self.region_ids.update({tuple(f['cell']): f['id'] for f in rows})
         self._banks, self._rooms = {}, {}
 
     def bank(self, name):
@@ -760,6 +813,9 @@ def main(argv=None):
     parser.add_argument('--engine-src', type=Path)
     parser.add_argument('--room-store', type=Path, action='append', default=[],
                         help='a folder holding <store>/rooms/*.crm beside id1 (default: BUILD/chim-interiors)')
+    parser.add_argument('--layer-world', action='append', default=[], metavar='STORE=WORLD',
+                        help="a store of frames the image installs beside the base world (the image step's "
+                             '--chim-layer-world values: chimsol=..., chimmh=...)')
     parser.add_argument('--out', required=True, type=Path)
     parser.add_argument('--spot', nargs=6, type=float, action='append', default=[],
                         metavar=('GX', 'GY', 'GZ', 'LX', 'LY', 'LZ'))
@@ -777,7 +833,7 @@ def main(argv=None):
     doors = original_doors(master_path(args.data_files).read_bytes())
     world_rows = json.loads(Path(world_doors_path).read_text(encoding='utf-8'))['rows']
     stores = args.room_store or ([b / 'chim-interiors'] if b and (b / 'chim-interiors').is_dir() else [])
-    image = Image(id1, engine_src, chim_world, args.jobs, stores)
+    image = Image(id1, engine_src, chim_world, args.jobs, stores, layer_frame_worlds(args.layer_world))
     report = audit(doors, world_rows, image, regions_by_cell(args.data_files, args.jobs), args.spot)
     write_outputs(report, args.out)
     c = report['counts']

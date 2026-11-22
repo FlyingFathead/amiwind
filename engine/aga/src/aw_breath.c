@@ -55,6 +55,11 @@ void AW_BreathSettingsGet(aw_breath_settings_t *out) {
     load_settings();
     if(out)*out=settings;
 }
+const char *AW_BreathSound(float *seconds) {
+    load_settings();
+    if(seconds)*seconds=sound_seconds;
+    return sound_path[0]?sound_path:NULL;
+}
 static void breath_player(void);
 /* the player's breath, then the NPCs' (ACTOR-DROWNING-NOT-CARRIED-67, aw_drown.c) */
 void AW_BreathPhysics(void) {

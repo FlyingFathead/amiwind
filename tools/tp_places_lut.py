@@ -29,7 +29,8 @@ street.
 The expansions (TP-LIST-EXPANSIONS-66): the places and the room names are read through the merging reader of exactly
 the build's selected layers (mwad.masters, AMIWIND_MASTERS); with the base game alone that is Morrowind.esm itself
 and the table is unchanged. An outdoor place that only an expansion adds (Solstheim) is listed only when the image
-holds a CHIM frame of one of its cells; the others are named in the report (places_not_built).
+holds a CHIM frame of one of its cells, in the base world or in the expansion's own store (the image's
+--chim-layer-world values); the others are named in the report (places_not_built).
 
 Rooms (TP-MENU-INTERIORS-63): the image step adds one row for every converted room the image holds
 (add_rooms, called where the image knows its room maps), labelled "<the room's cell name> (interior)" on every room
@@ -637,10 +638,13 @@ def read_table(data):
 
 # ---------------------------------------------------------------- the image step
 
-def layer_inputs(data, chim_world=None, masters=None):
+def layer_inputs(data, chim_world=None, masters=None, layer_worlds=None):
     """(masters, base exterior cells, frame cells) for the selected layers (mwad.masters.selected_masters: the
     build's AMIWIND_MASTERS, the same selection every layer-reading stage uses); (masters, None, None) with the base
-    game alone. Frame cells: the exterior cells the CHIM world CHIM_WORLD holds frames for (chim/frames/.../frame.ccf)."""
+    game alone. Frame cells: the exterior cells the CHIM world CHIM_WORLD holds frames for (chim/frames/.../frame.ccf)
+    and the cells of the frames in the expansions' own stores LAYER_WORLDS (the image's --chim-layer-world values,
+    chim.layer_stores.frame_holders: a land built by its module, Solstheim's cells in the store chimsol, is in the
+    game by that store and not by the base world; TP-LIST-MODULE-STORE-PLACES-68)."""
     from mwad.masters import selected_masters
     from mwad.paths import child_ci
     masters = selected_masters(masters)
@@ -653,10 +657,13 @@ def layer_inputs(data, chim_world=None, masters=None):
         root = Path(chim_world) / 'chim' / 'frames'
         if root.is_dir():
             frames = frame_cells(p.relative_to(Path(chim_world) / 'chim') for p in root.rglob('frame.ccf'))
+    if layer_worlds:
+        from chim.layer_stores import frame_holders
+        frames = set(frames) | {tuple(cell) for cell in frame_holders(layer_worlds)}
     return masters, base, frames
 
 
-def image_step(data, id1, out=None, jobs=1, chim_world=None):
+def image_step(data, id1, out=None, jobs=1, chim_world=None, layer_worlds=None, args=None):
     """The image step: id1/tp-places.lut from DATA's selected layers (the merging reader, mwad.masters; the base
     game alone = Morrowind.esm itself) through the unit cache (keyed by the merged master's SHA-256 and this module's
     source; with expansion layers also by the layer list and the layer-only exterior cells the image has frames for);
@@ -666,7 +673,10 @@ def image_step(data, id1, out=None, jobs=1, chim_world=None):
     from mwad.esm import sha256_file
     from mwad.masters import master_path
     from pass_cache import UnitCache
-    masters, base_cells, frames = layer_inputs(data, chim_world)
+    if args is not None:      # the image step's own options: the base CHIM world and the expansions' stores
+        chim_world = chim_world or getattr(args, 'chim_world', None)
+        layer_worlds = layer_worlds or getattr(args, 'chim_layer_world', None)
+    masters, base_cells, frames = layer_inputs(data, chim_world, layer_worlds=layer_worlds)
     master = master_path(Path(data), masters)
     inputs = {'master_sha256': sha256_file(master)}
     if base_cells is not None:

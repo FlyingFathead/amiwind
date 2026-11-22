@@ -8,6 +8,84 @@
       "place": "Unmarked Shipwreck, Upper Level (cell -15,14)",
       "class": "CHIM-STAIR-METHOD1-UNFIXED-48",
       "reason": "The trapdoor lies on the tilted deck of ex_de_shipwreck (a placement tilted about 20 degrees); the deck's collision there is steeper than the walk (normal z 0.62 under 0.69), so no player stands at the trapdoor. The shipwreck is on config/stair-check-known.json (method 1 cannot fix its flights yet); neither new rule changes it (measured). Whether the original stands a player there (the trapdoor's own collision, OpenMW's 46-degree slope) is still to check."
+    },
+    "4218838": {
+      "id": "Ex_MH_Pav_Ladder_01",
+      "place": "Mournhold: the ladder to Bamz-Amschend, Hearthfire Hall (cell -3,-30)",
+      "class": "DOOR-USE-COLLISION-EXPANSIONS-68",
+      "reason": "No standing spot at the ladder within 80 units above its threshold in the district frame's own collision (measured on the v0.0.68-dev4 world, the first image whose districts the check walks). What fills the threshold is not traced yet."
+    },
+    "8396936": {
+      "id": "ex_r_trapdoor_01",
+      "place": "Solstheim, Rimhull: the trapdoor (cell -21,25)",
+      "class": "DOOR-USE-COLLISION-EXPANSIONS-68",
+      "reason": "The trapdoor's use box (2.8 units thin) is out of the use reach from every standing spot the check tries: 82 units (measured on the v0.0.68-dev4 world). Where a player stands at it is not traced yet."
+    },
+    "8399605": {
+      "id": "Ex_colony_door05b_4",
+      "place": "Raven Rock, Factor's Estate (cell -24,19)",
+      "class": "DOOR-USE-COLLISION-EXPANSIONS-68",
+      "reason": "No standing spot at the door within 80 units above its threshold (measured on the v0.0.68-dev4 world). The building belongs to a later stage of the colony; the frame holds the collision of every stage at once, which may be what fills the threshold: to measure with only the door's own stage."
+    },
+    "8399658": {
+      "id": "Ex_colony_door03_1_uryn",
+      "place": "Raven Rock, Uryn Maren's House (cell -25,19)",
+      "class": "DOOR-USE-COLLISION-EXPANSIONS-68",
+      "reason": "The door's use box is out of the use reach from every standing spot the check finds: 86 units (measured on the v0.0.68-dev4 world). The building belongs to a later stage of the colony; the frame holds the collision of every stage at once: to measure with only the door's own stage."
+    },
+    "8402954": {
+      "id": "BM_kartaag_Door",
+      "place": "Solstheim, Castle Karstaag, Throne Room (cell -24,26)",
+      "class": "DOOR-USE-COLLISION-EXPANSIONS-68",
+      "reason": "No standing spot at the door within 80 units above its threshold in the frame's own collision (measured on the v0.0.68-dev4 world). What fills the threshold is not traced yet."
+    },
+    "8406659": {
+      "id": "BM_KA_door_dark",
+      "place": "Solstheim, Kolfinna's Dwelling (cell -21,19)",
+      "class": "DOOR-USE-COLLISION-EXPANSIONS-68",
+      "reason": "No standing spot at the ice cave door within 80 units above its threshold in the frame's own collision (measured on the v0.0.68-dev4 world); one of seven entrances with this door model. What fills the cave mouth is not traced yet."
+    },
+    "8407976": {
+      "id": "BM_KA_door_dark",
+      "place": "Solstheim, Halls of Penumbra (cell -22,19)",
+      "class": "DOOR-USE-COLLISION-EXPANSIONS-68",
+      "reason": "No standing spot at the ice cave door within 80 units above its threshold in the frame's own collision (measured on the v0.0.68-dev4 world); one of seven entrances with this door model. What fills the cave mouth is not traced yet."
+    },
+    "8409047": {
+      "id": "BM_KA_door_dark",
+      "place": "Solstheim, Caves of Fjalding (cell -20,23)",
+      "class": "DOOR-USE-COLLISION-EXPANSIONS-68",
+      "reason": "No standing spot at the ice cave door within 80 units above its threshold in the frame's own collision (measured on the v0.0.68-dev4 world); one of seven entrances with this door model. What fills the cave mouth is not traced yet."
+    },
+    "8409052": {
+      "id": "BM_KA_door_dark",
+      "place": "Solstheim, Castle Karstaag, Caverns of Karstaag (cell -24,27)",
+      "class": "DOOR-USE-COLLISION-EXPANSIONS-68",
+      "reason": "No standing spot at the ice cave door within 80 units above its threshold in the frame's own collision (measured on the v0.0.68-dev4 world); one of seven entrances with this door model. What fills the cave mouth is not traced yet."
+    },
+    "8412721": {
+      "id": "Ex_BM_tomb_door_03",
+      "place": "Solstheim, Glenschul's Tomb (cell -19,22)",
+      "class": "DOOR-USE-COLLISION-EXPANSIONS-68",
+      "reason": "No standing spot at the tomb door within 80 units above its threshold in the frame's own collision (measured on the v0.0.68-dev4 world). What fills the threshold is not traced yet."
+    },
+    "8416809": {
+      "id": "BM_KA_door_dark",
+      "place": "Solstheim, Legge (cell -22,25)",
+      "class": "DOOR-USE-COLLISION-EXPANSIONS-68",
+      "reason": "No standing spot at the ice cave door within 80 units above its threshold in the frame's own collision (measured on the v0.0.68-dev4 world); one of seven entrances with this door model. What fills the cave mouth is not traced yet."
+    },
+    "8416813": {
+      "id": "BM_KA_door_dark",
+      "place": "Solstheim, Fjell (cell -22,21)",
+      "class": "DOOR-USE-COLLISION-EXPANSIONS-68",
+      "reason": "No standing spot at the ice cave door within 80 units above its threshold in the frame's own collision (measured on the v0.0.68-dev4 world); one of seven entrances with this door model. What fills the cave mouth is not traced yet."
+    },
+    "8418105": {
+      "id": "BM_KA_door_dark",
+      "place": "Solstheim, Rimhull (cell -21,25)",
+      "class": "DOOR-USE-COLLISION-EXPANSIONS-68",
+      "reason": "No standing spot at the ice cave door within 80 units above its threshold in the frame's own collision (measured on the v0.0.68-dev4 world); one of seven entrances with this door model. What fills the cave mouth is not traced yet."
     }
   }
 }

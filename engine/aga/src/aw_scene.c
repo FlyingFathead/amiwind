@@ -40,6 +40,14 @@ int (*aw_hinged_locked_sound)(void);
 int (*aw_load_door_lock)(unsigned reference,int use);
 /* aw_talk.c AW_CanTalk (TALK-PROMPT-RULES): the prompt, E (pr_cmds.c #79) and the caravaners; NULL without it. */
 int (*aw_can_talk)(edict_t *e);
+/* DOOR-LOAD-DISABLED-STILL-USED-68: 1 when a script has switched the load door REFERENCE off (aw_mwhost.c sets it to
+ * AW_ObjectDisabled; NULL in fixtures without the script host: every door is on). OpenMW 0.51 World::disable takes a
+ * disabled reference out of the scene, so the player's use ray never meets it, and World::getDoorMarkers leaves it off
+ * the map. Two doors in one doorway are told apart by it alone: Skaal Village's Rigmor's Hut (Ex_S_door_rigmor,
+ * 8398850) and The Blodskaal's House (Ex_S_door_rigmor2, 8418049), switched by rigmorDoorScript on BM_SkaalAttack,
+ * and the colony stage doors of Raven Rock (ColonyState). Before, the pick took the first bank row of the doorway
+ * whatever its state, and a stage door led into its room before its building stood. */
+int (*aw_scene_door_disabled)(unsigned reference);
 #include "amiwind_version.h"
 
 /* CHIM rooms that need more Fast RAM than this start has (CHIM-ROOM-16MB-REFUSAL-48). The builder marks each
@@ -1154,6 +1162,11 @@ static int door_hit(aw_scene_link_t *r,vec3_t eye,vec3_t forward,vec3_t hit) {
  * and ship doors) closes the doorway 1 to 11 units in front of the door model; the original activates the door
  * there. 21 region-frame entrances were refused at 1 unit (tools/door_engine_check.py reads this value). */
 #define DOOR_USE_SLACK 16.0f
+/* DOOR-LOAD-DISABLED-STILL-USED-68: a bank row whose door a script has switched off (a row of the old links file has no
+ * reference: on). Asked only for a row the view ray meets, one binary search of the world change list. */
+static int door_off(const aw_scene_link_t *r) {
+    return r->reference && aw_scene_door_disabled && aw_scene_door_disabled(r->reference);
+}
 static int aimed_door(void) {
     int i,best=-1;edict_t *p;vec3_t eye,local,shift,delta,hit,forward,right,up;float distance,closest=57;trace_t tr;
     if(!sv.active || svs.maxclients!=1 || cls.state!=ca_connected)return -1;
@@ -1163,6 +1176,8 @@ static int aimed_door(void) {
     for(i=0;i<count;i++) {
         if(aw_story.ship_disabled && !strcmp(links[i].target,"prison"))continue;
         if(strcmp(door_scene(),links[i].source) || !door_hit(&links[i],local,forward,hit))continue;
+        /* a switched-off door is not in the scene: the other door of its doorway, or none, is aimed at */
+        if(door_off(&links[i]))continue;
         VectorAdd(hit,shift,hit);       /* back into the running map for the wall trace */
         VectorSubtract(hit,eye,delta);distance=Length(delta);if(distance>=closest)continue;
         tr=SV_Move(eye,vec3_origin,vec3_origin,hit,MOVE_NOMONSTERS,p);
@@ -1368,7 +1383,9 @@ int AW_SceneUse(void) {
     return use_link(i);
 }
 /* A script's Activate on a load door of this map (aw_mwhost.c): the door's own use, as if the player used it. 0 when
- * REFERENCE is no door here. */
+ * REFERENCE is no door here. The row is the one the script names, never another door of the same doorway; its state
+ * is not asked, as OpenMW 0.51 does not (mwscript/miscextensions.cpp OpActivate, InterpreterContext::executeActivation:
+ * a script may activate a door it has switched off; DOOR-LOAD-DISABLED-STILL-USED-68). */
 int AW_SceneActivate(unsigned reference) {
     int i;
     if(AW_PlayerDead() || pending || door_ready)return 0;
@@ -1520,6 +1537,7 @@ static void door_status(void) {
         (long)aimed_door(),(long)eye[0],(long)eye[1],(long)eye[2],(long)cl.viewangles[0]);
     for(i=0;i<count;i++)if(!strcmp(door_scene(),links[i].source)) {
         if(!door_hit(&links[i],local,forward,hit)){Con_Printf("Door %ld outside aim/reach\n",(long)i);continue;}
+        if(door_off(&links[i])){Con_Printf("Door %ld (%lu) switched off by a script\n",(long)i,(unsigned long)links[i].reference);continue;}
         VectorAdd(hit,shift,hit);
         VectorSubtract(hit,eye,delta);tr=SV_Move(eye,vec3_origin,vec3_origin,hit,MOVE_NOMONSTERS,p);
         Con_Printf("Door %ld hit %ld %ld %ld distance100 %ld clear1000 %ld solid %ld\n",
@@ -2405,12 +2423,13 @@ int AW_SceneMapMarker(float *source) {
 /* MAP-ORIGINAL-POI-66 stage 3: the I-th teleport door of the loaded scene for the map's door markers (OpenMW
  * MapWindow: a marker per door with a destination, named after where it leads). POINT gets the door's middle in the
  * running map's units; NAME its destination's name (the bank's label, else the target map). 1 a door of this scene,
- * 0 a row of another scene or a prison marker, -1 past the last row. */
+ * 0 a row of another scene, a prison marker or a door a script has switched off (OpenMW World::getDoorMarkers leaves a
+ * disabled door out; DOOR-LOAD-DISABLED-STILL-USED-68), -1 past the last row. */
 int AW_SceneMapDoor(int i,float *point,const char **name) {
     vec3_t shift;int k;
     if(i==0)read_links_for(door_scene());
     if(i<0 || i>=count)return -1;
-    if(strcmp(door_scene(),links[i].source) || !strcmp(links[i].target,"-"))return 0;
+    if(strcmp(door_scene(),links[i].source) || !strcmp(links[i].target,"-") || door_off(&links[i]))return 0;
     door_shift(shift);
     for(k=0;k<3;k++)point[k]=(links[i].bounds?(links[i].mins[k]+links[i].maxs[k])*.5f:links[i].point[k])+shift[k];
     *name=links[i].label[0]?links[i].label:links[i].target;

@@ -1,6 +1,6 @@
 # Original door mapping
 
-_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
+_Last updated with AmiWind v0.0.68-dev5 (21 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -54,6 +54,16 @@ reference. Aiming uses the transformed model bounds with half-unit padding,
 a 56-unit reach and a world occlusion trace. AWD1 and the old single-origin format remain
 readable for older conversion bundles. Both supported directions preserve current
 health/hand state and queue at most one map load per activation.
+
+A load door that a script has switched off (Disable) is out of the scene, as in OpenMW
+(`apps/openmw/mwworld/worldimp.cpp` `World::disable` and `World::getDoorMarkers`): the aim passes it by, so it shows
+no prompt and the use key does not take it, and the map shows no marker for it. Where two doors stand in one doorway,
+the one that is on is used: Skaal Village's Rigmor's Hut (`Ex_S_door_rigmor`) and The Blodskaal's House
+(`Ex_S_door_rigmor2`), which `rigmorDoorScript` swaps on `BM_SkaalAttack`, and the stage doors of the Raven Rock
+colony (`ColonyState`), once their scripts run in the image. Before, the first door of the doorway was taken whatever
+its state. A script's Activate still acts on the door it names, whatever its state, as OpenMW's does
+(`apps/openmw/mwscript/miscextensions.cpp` `OpActivate`). The rule lives in `engine/aga/src/aw_scene.c`
+(`aimed_door`, `AW_SceneMapDoor`); `tests/aga_scene_test.c` holds the case of two doors in one doorway.
 
 Hostile-pursuit, companion eligibility and original teleport-door rules are recorded in the planned [NPC cell-traversal requirements](NPC_CELL_TRAVERSAL.md); no cross-boundary NPC gameplay is claimed as shipped.
 
@@ -272,6 +282,16 @@ image step of a whole-world build, door, then entrance, then interior, and the w
   upper and lower part. The engine refuses the use when a surface lies more than the doorway slack (`DOOR_USE_SLACK` in
   `aw_scene.c`, 16 units) before the use box: the converted collision of an entrance may close the doorway a few units
   in front of the door, which the original still opens. Town doors are not traced yet.
+
+From v0.0.68 the check also covers the lands that are installed as a store of frames of their own (Solstheim's
+frame maps `slNNNN`, Mournhold's districts `mhNNNN`). The image step runs the door check after it has installed those
+stores; the audit and the engine check read the lands' own rows files (`world/regions-sl.awr`,
+`world/regions-mh.awr`) as part of the one outdoor directory, in the engine's order, and the wall is traced in each
+store's own world. A frame with no frame across any side of its core (a district that stands alone) is checked with
+the frame itself running, as a town is: the player arrives there by a door or a teleport. Before this, every entrance
+of those lands was listed as not usable although the door table linked it (DOOR-CHECK-MODULE-FRAME-MAPS-67). The
+first run over them found 13 entrances the wall check cannot reach (seven ice cave doors among them); they are on the
+known list as DOOR-USE-COLLISION-EXPANSIONS-68.
 
 The usable counts only go up: `config/door-check-baseline.json` holds the last counts (from v0.0.53-dev2: 1,102 usable
 after walking in, 1,102 both ways, 1,067 with the wall traced: the other 35, most of them Daedric shrines whose steps

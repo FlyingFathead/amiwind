@@ -43,6 +43,30 @@ ROWS = [actor('complete one'),
 
 
 class ExpansionActorCheckTests(unittest.TestCase):
+    def test_the_stores_of_frames_place_actors(self):
+        # EXPANSION-SCRIPTS-NOT-ATTACHED-66 (v0.0.68): the districts' and Solstheim's frames place their people and
+        # creatures in the image's stores; the check read only the rooms' tracker and the open world's actor table,
+        # so all 258 such actors of the v0.0.68-dev5 build were counted as not placed
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(eac.store_actor_refs(tmp), set())                   # no stores: none, as before
+            (Path(tmp) / 'chim-layer-stores.json').write_text(json.dumps([
+                {'store': 'chimmh', 'maps': [{'cell': [-12, -30], 'actors': {'actors': [{'reference': 4202005}]}}]},
+                {'store': 'chimsol', 'maps': [{'cell': [-22, 16], 'actors': {'actors': [{'reference': 8396993},
+                                                                                         {'id': 'no number'}]}},
+                                              {'cell': [-28, 19], 'actors': {}}]}]), encoding='utf-8')
+            self.assertEqual(eac.store_actor_refs(tmp), {4202005, 8396993})
+
+    def test_an_inert_script_needs_no_binding(self):
+        # nolore and nohello only declare the locals the dialogue reads: the compiler leaves them out of the bindings
+        # in the base game too, so they are not an unattached script (74 expansion people on 18 November 2026)
+        inert = {'nolore', 'nohello'}
+        self.assertIsNone(eac.script_bound('NoLore', 4201741, set(), inert))
+        self.assertIsNone(eac.script_bound(None, 4201741, set(), inert))
+        self.assertFalse(eac.script_bound('guardscript', 4201741, set(), inert))
+        self.assertTrue(eac.script_bound('guardscript', 4201741, {4201741}, inert))
+        self.assertEqual(eac.failing(actor('lore keeper', script='nolore', script_bound=None), {}), [])
+
     def test_columns_and_the_tracked_gap(self):
         tracked = SETTING['tracked_gaps']
         self.assertEqual(eac.failing(ROWS[0], tracked), [])

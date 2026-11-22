@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.68-dev4 (21 November 2026)._
+_Last updated with AmiWind v0.0.68-dev6 (22 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -60,10 +60,14 @@ the [changelog](docs/CHANGELOG.md#v0067-tribunal-introduced-19-november-2026) an
 [v0.0.67 release notes](docs/releases/notes/RELEASE-v0.0.67.md), which link the notes of the three development
 snapshots. Known problems: the notes' "Known in this build" and [the bug tracker](docs/BUGS.md).
 
-**In development: v0.0.68-dev4** (21 November 2026), the fourth snapshot of the next version. The invisible walls of
-the game are solid boxes now, the Ghostfence's glow is in behind a switch, and more of the original's console commands
-work; none of it is seen in play yet
-([v0.0.68-dev4 notes](docs/releases/notes/RELEASE-v0.0.68-dev4.md)). The snapshot before it brought Solstheim's first 135
+**In development: v0.0.68-dev6** (22 November 2026), the sixth snapshot of the next version: the scripts of Mournhold's
+five districts (the trees, the sounds, the statue and the rest) run on their frames, and a door that a script has switched
+off is no longer taken by the use key; none of it is seen in play yet ([v0.0.68-dev6
+notes](docs/releases/notes/RELEASE-v0.0.68-dev6.md)). The snapshot before it let people knocked out in water drown at once
+and made the builder's door check cover Solstheim and Mournhold's districts ([dev5](docs/releases/notes/RELEASE-v0.0.68-dev5.md)).
+The one before it made the invisible walls of the game solid boxes, put the Ghostfence's glow in behind a switch and
+added more of the original's console commands ([dev4](docs/releases/notes/RELEASE-v0.0.68-dev4.md)). Before it came
+Solstheim's first 135
 open terrain cells into the build, reached only by a debug teleport for now, and outdoor pieces that scripts take or
 switch off stay hidden, however many ([dev3](docs/releases/notes/RELEASE-v0.0.68-dev3.md)). Before it came the hands
 mended (a light and a weapon held together, third-person fists, readied magic through doors) and the moving water of
@@ -95,7 +99,7 @@ that holds its controls as the original does ([v0.0.66 notes](docs/releases/note
   frames a second in the emulator). A new game starts the city in peace (the Plaza's fabricants, the two Gaenors and
   the Hall of Ministry's rats stay out of it), the Great Bazaar's teleport arrival puts the player on the street, Godsreach's
   gate to the Plaza opens, and a fight is not carried into the next place, in Vvardenfell and in Mournhold.
-- **The game's scripts:** of the 1,074 scripts the original uses, 927 run and 9 more are carried by AmiWind's own code,
+- **The game's scripts:** of the 1,074 scripts the original uses, 1,062 run and 9 more are carried by AmiWind's own code,
   235 of Tribunal's 236 among them ([the MWScript tracker](docs/MWSCRIPT_FEATURES.md)).
 - **Hardware:** the reference target is an A1200 with AGA, a 68040 with FPU, 2 MiB Chip and 32 MiB Fast RAM (16 MiB
   starts with a warning, but parts of the game run wrongly or not at all). The figures so far come from emulators and
@@ -123,7 +127,7 @@ What is not working yet, and what is in work:
 Every system of the base game with its state: [game features](docs/GAME_FEATURES.md). Known problems:
 [the bug tracker](docs/BUGS.md).
 
-**Then v0.0.68** (in development, [dev4](docs/releases/notes/RELEASE-v0.0.68-dev4.md) is out) continues with the
+**Then v0.0.68** (in development, [dev6](docs/releases/notes/RELEASE-v0.0.68-dev6.md) is out) continues with the
 expansions' finished content: Tribunal's Mournhold with its quests and Bloodmoon's Solstheim, with their scripts; a
 build that fits a 32 GB machine; then the rest of the open plan. The order of record is the [roadmap](docs/ROADMAP.md);
 no dates are promised.
@@ -162,8 +166,8 @@ finished work is taken back; the build's last lines say what to change first
 ([the build stopped or ran out of memory: what now?](docs/LINUX_BUILD.md#the-build-stopped-or-ran-out-of-memory-what-now)).
 
 The emulator presets of this version are
-[`AmiWind-v0.0.68-dev4-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.68-dev4-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.68-dev4-WinUAE.uae`](resources/emulators/AmiWind-v0.0.68-dev4-WinUAE.uae); both start with 32 MB of Fast
+[`AmiWind-v0.0.68-dev6-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.68-dev6-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.68-dev6-WinUAE.uae`](resources/emulators/AmiWind-v0.0.68-dev6-WinUAE.uae); both start with 32 MB of Fast
 RAM, the requirement. The presets of earlier versions are beside them in [resources/emulators](resources/emulators/). Everything
 else about building and playing: [Building and playing](docs/BUILDING_AND_PLAYING.md), the
 [Linux build guide](docs/LINUX_BUILD.md) and the [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md).

@@ -452,6 +452,11 @@
 /* MWSCRIPT-INVENTORY-HITONME-62 (tools/mwscript/compiler.py BIND_HELD, held_key): an item a placed container, NPC or
  * creature holds; its reference is AWB_HELD_BIT, the item's ordinal in bits 24-29 and the holder's reference below */
 #define AWB_HELD 8
+/* EXPANSION-SCRIPTS-NOT-ATTACHED-66 (v0.0.68; tools/mwscript/compiler.py BIND_PRESENTED): a placement in a district
+ * the build presents as exterior cells. The row keeps AWB_INTERIOR (the cell's every script runs while it is loaded,
+ * as the original runs an interior cell's) and its position is the moved one: attach_map places it on the district's
+ * outdoor frame when it has no entity, where a room row is never attached outdoors. */
+#define AWB_PRESENTED 16
 #define AWB_HELD_BIT 0x40000000u
 #define AWB_HELD_KEY(r) (((r)&AWB_HELD_BIT)!=0)
 #define AWB_HELD_HOLDER(r) ((r)&0xFFFFFFu)

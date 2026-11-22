@@ -47,6 +47,9 @@ void AW_BreathInit(void);
 void AW_BreathPhysics(void);
 /* the hold and suffocation settings as the image gives them (the NPCs' drowning, aw_drown.c, uses the same) */
 void AW_BreathSettingsGet(aw_breath_settings_t *out);
+/* the "drown" sound as the image gives it (combat/settings.txt "breath sound <path> <seconds>"): its path, or NULL when
+ * the image has none, and its length in *SECONDS; the NPCs' drowning plays the same sample (ACTOR-DROWN-SOUND-68) */
+const char *AW_BreathSound(float *seconds);
 /* aw_ui.c: the breath bar (top of the view, the middle) when shown: its fill and whether it flashes; 0 none */
 extern int (*aw_breath_bar)(float *fraction,int *flashing);
 

@@ -110,6 +110,39 @@ class DrownWiringTests(unittest.TestCase):
         self.assertIn('AW_ResetRegister("breath of NPCs (drowning)",reset_drown,digest_drown);', drown)
         self.assertIn('memset(&table,0,sizeof(table));', body(drown, 'static void reset_drown(int new_game)\n{'))
 
+    def test_knocked_out_with_the_feet_in_water_drowns_at_once(self):
+        # ACTOR-KNOCKED-OUT-IN-WATER-DROWNS-68 (OpenMW 0.51 actors.cpp 1011-1019; isKnockedOut at 1667 is the knock-out,
+        # never the knock-down): the feet point, the combat layer's knock state, a row made for it, stepped as submerged
+        drown = code('aw_drown.c')
+        physics = body(drown, 'void AW_DrownPhysics(void)\n{')
+        feet = body(drown, 'static int feet_under_water(const edict_t *e)\n{')
+        self.assertIn('p[2]+=e->v.mins[2]+1;', feet)
+        self.assertIn('SV_PointContents(p)', feet)
+        self.assertIn('knocked=AW_CombatSlotKnocked(e);', physics)
+        self.assertIn('out=knocked==2 && feet_under_water(e);', physics)
+        self.assertIn('if(!under && !out)continue;', physics)
+        self.assertIn('if(AW_DrownKnockedOut(&table,row,knocked,out)){knocked_out++;under=1;}', physics)
+        self.assertLess(physics.index('AW_DrownKnockedOut('), physics.index('AW_DrownStep('))
+        combat = code('aw_combat.c')
+        self.assertIn('return s && !s->f.dead?s->f.knocked:0;', body(combat, 'int AW_CombatSlotKnocked(edict_t *e) {'))
+        self.assertIn('int AW_CombatSlotKnocked (edict_t *e);', code('aw_actors.h'))
+
+    def test_a_drowning_npc_makes_the_drown_sound(self):
+        # ACTOR-DROWN-SOUND-68 (OpenMW 0.51 actors.cpp 1039-1043): the player's sample from the image's settings, on the
+        # NPC's own body channel, timed per row; nothing when the image has no sample
+        breath = code('aw_breath.c')
+        self.assertIn('return sound_path[0]?sound_path:NULL;', body(breath, 'const char *AW_BreathSound(float *seconds) {'))
+        drown = code('aw_drown.c')
+        sound = body(drown, 'static void drown_sound(edict_t *e,float *seconds)\n{')
+        self.assertIn('if(!path || !(s=S_PrecacheSound((char *)path)))return;', sound)
+        self.assertIn('S_StartSound(NUM_FOR_EDICT(e),4,s,e->v.origin,1,1);', sound)
+        physics = body(drown, 'void AW_DrownPhysics(void)\n{')
+        self.assertIn('due=AW_DrownSoundDue(&table,row,loss,dt,AW_BreathSound(&seconds)?seconds:0);', physics)
+        self.assertIn('if(due)drown_sound(e,&seconds);', physics)
+        self.assertLess(physics.index('damage+=loss;'), physics.index('if(due)drown_sound(e,&seconds);'))
+        # New Game clears the new counters with the rest
+        self.assertIn('knocked_out=sounds=0;', body(drown, 'static void reset_drown(int new_game)\n{'))
+
     def test_the_build_lists(self):
         make = (ROOT / 'engine' / 'aga' / 'Makefile').read_text(encoding='utf-8')
         self.assertIn('aw_drown_rules.c aw_drown.c', make)

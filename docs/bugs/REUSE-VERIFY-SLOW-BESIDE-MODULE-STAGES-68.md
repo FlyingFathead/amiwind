@@ -1,5 +1,14 @@
 # REUSE-VERIFY-SLOW-BESIDE-MODULE-STAGES-68: Reusing the room batches of an earlier build took about 37 seconds where earlier reuses took 5
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.68-dev3 at 2026-11-21 04:37 +0200: Seen again in the next dev3 build: the room batches' reuse took about half a minute beside the Solstheim stage and the engine.
+- Reported with v0.0.68-dev4 at 2026-11-21 13:08 +0200: Seen again in the v0.0.68-dev4 build: a reused stage's reuse step took 22 seconds against its recorded 5.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -28,8 +37,18 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 - 2026-11-21: reported in v0.0.68-dev3
 - 2026-11-21 04:37 +0200: seen again in v0.0.68-dev3: Seen again in the next dev3 build: the room batches' reuse took about half a minute beside the Solstheim stage and the engine.
+- 2026-11-21 13:08 +0200: seen again in v0.0.68-dev4: Seen again in the v0.0.68-dev4 build: a reused stage's reuse step took 22 seconds against its recorded 5.
 
 <!-- END GENERATED TIMELINE -->
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Timeline](#timeline)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -46,6 +65,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-ACTOR-LIBRARY-SHARE-RACE-67](BUILD-ACTOR-LIBRARY-SHARE-RACE-67.md): The actor library stage's two pools wrote their worker share through one temporary file name: a write found its file gone
 - [BUILD-ACTOR-LIBRARY-UNDERUSED-54](BUILD-ACTOR-LIBRARY-UNDERUSED-54.md): The actor-library stage ran at 2.69 of 8 allowed cores with 130 units queued and 7 running
 - [BUILD-AGA-AT-TEXT-LIMIT-60](BUILD-AGA-AT-TEXT-LIMIT-60.md): tools/build_aga.py is 7 bytes under the release text size limit: the next change to it fails the gate unless a stage is split out
+- [BUILD-BALMORA-KEY-PALETTE-OVERBROAD-68](BUILD-BALMORA-KEY-PALETTE-OVERBROAD-68.md): A scene palette change re-bakes every Balmora interior room and resident although about half the rooms and all residents come out byte for byte the same
 - [BUILD-BODY-BAKE-SLOWER-44](BUILD-BODY-BAKE-SLOWER-44.md): The image step's player body bake ran 42 % slower than its baseline with the same 40 bodies
 - [BUILD-CACHE-ABSOLUTE-PATHS-33](BUILD-CACHE-ABSOLUTE-PATHS-33.md): Stage fingerprints contain absolute paths, so a moved workspace or checkout reuses nothing
 - [BUILD-CACHE-CHIM-UNITS-33](BUILD-CACHE-CHIM-UNITS-33.md): The chim stage's fingerprint changes whenever the CHIM unit cache gains units, so the stage is never reused
@@ -55,6 +75,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-CACHE-PER-WORKSPACE-33](BUILD-CACHE-PER-WORKSPACE-33.md): Per-file caches live in each build workspace, so a build on a new volume with --reuse-from converts everything again (MiniWind media 1,195 s instead of seconds)
 - [BUILD-CACHE-TRACE-PYTHONPATH-33](BUILD-CACHE-TRACE-PYTHONPATH-33.md): The stage read trace refused reuse of a reused run when another checkout was on PYTHONPATH
 - [BUILD-CELL-PROGRESS-UNDECLARED-OUTPUT-67](BUILD-CELL-PROGRESS-UNDECLARED-OUTPUT-67.md): The tracker data stage (cell-progress) writes flora-support.json at the run folder's top, outside its declared outputs, so a later build refuses to reuse the stage
+- [BUILD-CENSUS-PHASE-UNDERUSED-68](BUILD-CENSUS-PHASE-UNDERUSED-68.md): A fresh census stage ran on under 4 of 22 cores for about 6 minutes before its worker pool started
 - [BUILD-CHECK-ONE-CORE-66](BUILD-CHECK-ONE-CORE-66.md): The build's reuse check runs about six minutes on one core, and every snapshot runs it twice before its build starts
 - [BUILD-CHECK-REPEATED-AFTER-PASSED-CHECK-68](BUILD-CHECK-REPEATED-AFTER-PASSED-CHECK-68.md): Before building, the builder checks the plan again even when an identical check passed a few minutes earlier
 - [BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46](BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46.md): A change in the shared collision converter rebuilds every CHIM frame and everything after it, even where the output is identical

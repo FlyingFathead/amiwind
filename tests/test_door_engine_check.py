@@ -73,6 +73,72 @@ def rows():
              'bank': {'box': [[-5, -5, 0], [5, 5, 50]], 'target': ROOM, 'arrival': [0, 0, 30]}}]
 
 
+SL_ORIGINS = ((-57344.0, 38912.0, 0.0), (-55296.0, 38912.0, 0.0))     # two Solstheim cells side by side, map units
+
+
+def layer_image(tmp):
+    """image() with two frames of a land that is a store of its own: their rows in world/regions-sl.awr as the image
+    step writes them (chim.sol_test.directory_rows), their frame maps, a door of sl0001 into the room and its exit."""
+    from chim.sol_test import directory_rows
+    id1 = image(tmp)
+    (id1 / 'world/regions-sl.awr').write_bytes(directory_rows(
+        [{'origin': list(origin), 'core': [(-1024, -1024), (1024, 1024)]} for origin in SL_ORIGINS]))
+    for name in ('sl0000', 'sl0001'):
+        (id1 / 'maps' / (name + '.chim')).write_bytes(chim_map(
+            '{\n"classname" "worldspawn"\n"_chim_world" "chimsol"\n}\n'))
+    (id1 / 'doors-sl0001.txt').write_bytes(('AWD3\nsl0001 %s 20 -5 -5 0 5 5 50 0 0 30 0\tTest Tomb\n' % ROOM)
+                                           .encode('cp1252'))
+    (id1 / ('doors-%s.txt' % ROOM)).write_bytes(('AWD3\n%s sl0001 21 -5 95 0 5 105 50 -40 0 30 0\tExit\n' % ROOM)
+                                                .encode('cp1252'))
+    return id1
+
+
+def layer_rows():
+    return [dict(rows()[0], reference=20, cell=[-28, 19], holder='sl0001', exit_reference=21)]
+
+
+class LayerDirectory(unittest.TestCase):
+    """The rows of the lands with a store of their own are part of the directory the door checks read, and the image
+    step runs the door check after it installed those stores (DOOR-CHECK-MODULE-FRAME-MAPS-67); no compiler needed."""
+
+    def test_the_directory_holds_the_rows_of_the_lands_with_their_own_store(self):
+        from chim.sol_test import directory_rows
+        with tempfile.TemporaryDirectory() as tmp:
+            id1 = layer_image(tmp)
+            self.assertEqual(door_audit.layer_directory(id1),
+                             [('sl0000', SL_ORIGINS[0], (-1024.0, -1024.0, 1024.0, 1024.0)),
+                              ('sl0001', SL_ORIGINS[1], (-1024.0, -1024.0, 1024.0, 1024.0))])
+            (id1 / 'world/regions-mh.awr').write_bytes(directory_rows(
+                [{'origin': [90000, 90000, 0], 'core': [(-1024, -1024), (1024, 1024)]}], 'mh', 256))
+            names = [name for name, _origin, _core in door_audit.full_directory(id1)]
+            # the engine's order (aw_world.c load_directory): Vvardenfell's rows, Solstheim's, Mournhold's
+            self.assertEqual(names, ['vf0000', 'vf0001', 'sl0000', 'sl0001', 'mh0000'])
+            self.assertEqual(door_audit.directory_frame(door_audit.full_directory(id1), [-55000, 39000])[0], 'sl0001')
+            (id1 / 'world/regions-sl.awr').write_bytes(b'AWS1' + struct.pack('<I', 3) + bytes(52))
+            with self.assertRaises(ValueError):
+                door_audit.layer_directory(id1)
+            # an image without such a store: the directory before
+            base = image(Path(tmp) / 'base')
+            self.assertEqual(door_audit.full_directory(base), world_directory(base))
+
+    def test_the_image_step_checks_the_doors_after_it_installed_the_stores_of_frames(self):
+        text = (ROOT / 'tools/build_aga.py').read_text(encoding='utf-8')
+        body = text[text.index('def finalize_image(args):'):]
+        install, check = body.index('install_layer_stores(args.chim_layer_world'), body.index('write_door_check(args')
+        self.assertLess(install, check)
+        self.assertEqual(body.count('write_door_check(args'), 1)
+        # and the check is given the stores, so their own frames place and collide their doors
+        check_body = text[text.index('def write_door_check('):text.index('def write_room_batch_links(')]
+        self.assertIn('door_audit.layer_frame_worlds(layers)', check_body)
+        self.assertIn('layers=layers', check_body)
+
+    def test_the_stores_of_frames_among_the_layer_values(self):
+        self.assertEqual(door_audit.layer_frame_worlds(None), [])
+        self.assertEqual(door_audit.layer_frame_worlds(['chimiti=/run/chim-layer-tribunal', 'chimsol=/run/sol',
+                                                        'chimmh=/run/mh']), [Path('/run/sol'), Path('/run/mh')])
+        self.assertEqual(door_engine_check.layer_frame_cells(None), [])
+
+
 @unittest.skipUnless(shutil.which(os.environ.get('CC', 'cc')), 'a host C compiler builds the engine check')
 class DoorEngineCheck(unittest.TestCase):
     def check(self, scene_source=None):
@@ -109,6 +175,59 @@ class DoorEngineCheck(unittest.TestCase):
         self.assertEqual(entry['result']['scene_after_crossing'], 'vf0001')   # the crossing itself streams
         self.assertEqual(entry['usable'], 'no')
         self.assertIn("the prompt is '-'", entry['reasons'])
+
+    def test_a_door_of_a_land_with_its_own_store_is_walked_like_any_other(self):
+        # DOOR-CHECK-MODULE-FRAME-MAPS-67: Solstheim's frames (slNNNN) have their rows in world/regions-sl.awr, which
+        # the image installs with their store; the check walked only world/regions.awr and listed every such entrance
+        # as not usable (95 on Solstheim and Mournhold's 28 in the first image that held them)
+        with tempfile.TemporaryDirectory() as tmp:
+            id1 = layer_image(tmp)
+            report, problem = door_engine_check.run(id1=id1, engine_src=SRC, audit_rows=layer_rows(), jobs=1)
+        self.assertIsNone(problem)
+        entry = report['entries'][0]
+        self.assertTrue(entry['job'] and entry['job'].startswith('D 20 sl0001 ') and ' W sl0000 ' in entry['job'],
+                        entry)
+        self.assertEqual(entry['result']['scene_after_crossing'], 'sl0001', entry)
+        self.assertEqual(entry['result']['prompt'], '(Enter: E)', entry)
+        self.assertEqual((entry['result']['use'], entry['result']['activate']), (ROOM, ROOM))
+        self.assertEqual(entry['result']['back'], 'sl0001')
+        self.assertEqual((entry['usable'], entry['both_ways']), ('yes', 'yes'), entry['reasons'])
+        self.assertEqual(report['counts']['usable_after_crossing'], 1)
+
+    def test_a_door_of_a_frame_with_no_neighbour_is_checked_in_its_own_frame(self):
+        # a district that stands alone (no frame across any side of its core): the player arrives in it by a door or a
+        # teleport, so the frame itself runs at the door; before, such an entrance was listed as not usable with 'no
+        # neighbouring region frame to walk in from' (6 of Mournhold's in the first image whose stores were walked)
+        from chim.sol_test import directory_rows
+        with tempfile.TemporaryDirectory() as tmp:
+            id1 = image(tmp)
+            (id1 / 'world/regions-mh.awr').write_bytes(directory_rows(
+                [{'origin': [90000, 90000, 0], 'core': [(-1024, -1024), (1024, 1024)]}], 'mh', 256))
+            (id1 / 'maps/mh0000.chim').write_bytes(chim_map(
+                '{\n"classname" "worldspawn"\n"_chim_world" "chimmh"\n}\n'))
+            (id1 / 'doors-mh0000.txt').write_bytes(('AWD3\nmh0000 %s 20 -5 -5 0 5 5 50 0 0 30 0\tTest Hall\n' % ROOM)
+                                                   .encode('cp1252'))
+            (id1 / ('doors-%s.txt' % ROOM)).write_bytes(('AWD3\n%s mh0000 21 -5 95 0 5 105 50 -40 0 30 0\tExit\n'
+                                                         % ROOM).encode('cp1252'))
+            alone = [dict(rows()[0], reference=20, cell=[0, -30], holder='mh0000', exit_reference=21)]
+            report, problem = door_engine_check.run(id1=id1, engine_src=SRC, audit_rows=alone, jobs=1)
+        self.assertIsNone(problem)
+        entry = report['entries'][0]
+        self.assertTrue(entry['job'] and entry['job'].startswith('D 20 mh0000 ') and ' W ' not in entry['job'], entry)
+        self.assertEqual(entry['result']['scene_at_door'], 'mh0000', entry)
+        self.assertEqual((entry['result']['use'], entry['result']['activate']), (ROOM, ROOM), entry)
+        self.assertEqual(entry['result']['back'], 'mh0000', entry)
+        self.assertEqual((entry['usable'], entry['both_ways']), ('yes', 'yes'), entry['reasons'])
+
+    def test_a_frame_without_its_rows_file_is_named_not_walked(self):
+        # the rows file is not in the id1 the check was given: the door is listed with the reason, the check goes on
+        with tempfile.TemporaryDirectory() as tmp:
+            id1 = layer_image(tmp)
+            (id1 / 'world/regions-sl.awr').rename(id1 / 'world/regions-sl.away')
+            report, _ = door_engine_check.run(id1=id1, engine_src=SRC, audit_rows=layer_rows(), jobs=1)
+        entry = report['entries'][0]
+        self.assertEqual(entry['usable'], 'no')
+        self.assertIn('not walked here', entry['reasons'][0])
 
     def test_the_use_box_hit_is_the_engines(self):
         # aw_scene.c door_hit: the slab entry within the 56-unit reach, None past it or beside the box

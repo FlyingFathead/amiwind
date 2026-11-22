@@ -27,7 +27,9 @@
                             i16 cell x (or u16 the interior's stable number, the room map's _aw_cell_int)
                             i16 cell y i32 x y z (game units); flags 8 (compiler.BIND_HELD, v0.0.62): an item a
                             placed container or actor holds, its reference compiler.held_key (bit 30, the item's
-                            number in bits 24-29, the holder's reference), cell and position the holder's
+                            number in bits 24-29, the holder's reference), cell and position the holder's; flags 16
+                            (compiler.BIND_PRESENTED, v0.0.68): a placement in a district the build presents as
+                            exterior cells, the room flag and number kept, x y z its moved place
   STRT  2 bytes a start script: u16 script
   NEWG  2 bytes a script a new game starts once (Main's CharGenState block: Startup, VampireCheck; v0.0.62,
         NPC-STORY-DISABLED-AT-START-42): u16 script; resident, optional (an older file: none)

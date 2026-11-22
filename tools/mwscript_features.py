@@ -28,8 +28,9 @@ state:
                      (config/mwscript.json), or nothing it does is seen yet (left out of the file)
   not-attached       compiles whole, but nothing in the build attaches or starts it
   not-in-image       its records are placed (or made by the scripts) only in cells of an add-on's world (Mournhold,
-                     Solstheim) that the image does not carry; the districts and rooms the measured build's image
-                     holds count as carried (measure --image-build, TRACKERS-MOURNHOLD-NOT-COUNTED-67)
+                     Solstheim) that the image does not carry; the districts, rooms and add-on exterior cells (its
+                     stores' frames) the measured build's image holds count as carried (measure --image-build,
+                     TRACKERS-MOURNHOLD-NOT-COUNTED-67, EXPANSION-SCRIPTS-NOT-ATTACHED-66)
   inert              nothing names it (no record, no start, no StartScript, no dialogue), or its records are never
                      placed in any world and nothing makes them (refs made_by: the masters of the scripts whose Place
                      call names one): it never runs in the original either
@@ -513,24 +514,48 @@ def image_world(build):
     store = read('chim-interiors', 'chim-rooms-receipt.json')
     rooms = sorted({r['cell'].casefold() for r in store.get('rooms', ()) if r.get('cell')})
     named = re.search(r'v\d+\.\d+\.\d+(?:-(?:dev|rc)\d+)?', build.name)       # the version, not the folder's name
+    # EXPANSION-SCRIPTS-NOT-ATTACHED-66 (v0.0.68): the add-on worlds' exterior cells the image carries, the frames of
+    # its stores (image/chim-layer-stores.json, tools/chim/layer_stores.py: Solstheim's frames since v0.0.68-dev3;
+    # Mournhold's district frames are the districts above, bound by their interior cell)
+    layers = build / 'image' / 'chim-layer-stores.json'
+    stores = json.loads(layers.read_text(encoding='utf-8')) if layers.is_file() else []
+    blocks = set().union(*_district_blocks(inputs))
+    exteriors = sorted({tuple(m['cell']) for s in stores if isinstance(s, dict)
+                        for m in s.get('maps') or () if m.get('cell') is not None} - blocks)
     return {'build': named.group(0) if named else build.name, 'addons': list(inputs.get('bound_addons') or ()),
             'districts': districts,
-            'rooms': rooms, 'interiors': sorted(set(districts) | set(rooms))}
+            'rooms': rooms, 'interiors': sorted(set(districts) | set(rooms)), 'exteriors': exteriors}
+
+
+def _district_blocks(inputs):
+    """The grid cells of each presented district's block (the scripts stage's receipt 'presented'): those frames are
+    the districts', counted by their interior cell, not as an add-on exterior."""
+    out = []
+    for place in (inputs.get('presented') or {}).values():
+        size = place.get('size') or (1, 1)
+        out.append({(place['block'][0] + dx, place['block'][1] + dy) for dx in range(size[0]) for dy in range(size[1])})
+    return out
 
 
 def bound_in_image(binds, image, interior_names, masters=MASTERS):
     """The bindings the image attaches in cells it carries. A Morrowind.esm binding stays as it is; an add-on's own
-    binding counts only when its cell is one of the image's interior cells (the room store's rooms and the presented
-    districts). An add-on's exterior cell is never counted: no add-on exterior is in the image. IMAGE None (no build
-    given): the add-ons' bindings are all dropped, as before. interior_names: {interior number: folded cell name}."""
+    binding counts when its cell is one of the image's interior cells (the room store's rooms and the presented
+    districts) or, since v0.0.68 (EXPANSION-SCRIPTS-NOT-ATTACHED-66), one of the add-on exterior cells its stores'
+    frames carry (image_world 'exteriors': Solstheim's). Until then an add-on's exterior was never counted, so the
+    Solstheim scripts the image runs (the Skaal village's and Raven Rock's doors among them) read "only in an add-on
+    world". IMAGE None (no build given): the add-ons' bindings are all dropped, as before. interior_names: {interior
+    number: folded cell name}."""
     from mwscript.gamedata import ADDON_KEY_STRIDE
     carried = set((image or {}).get('interiors') or ())
+    outdoors = {tuple(c) for c in (image or {}).get('exteriors') or ()}
     out = []
     for b in binds:
         owner = (b['reference'] & 0xFFFFFF) // ADDON_KEY_STRIDE
         if owner == 0:
             out.append(b)
         elif owner < len(masters) and isinstance(b['cell'], int) and interior_names.get(b['cell'], '') in carried:
+            out.append(b)
+        elif owner < len(masters) and isinstance(b['cell'], tuple) and tuple(b['cell']) in outdoors:
             out.append(b)
     return out
 
@@ -573,9 +598,11 @@ def measure(data_files, image_build=None):
     if image:
         image['bound_in_image'] = {m: sum(1 for b in binds if (b['reference'] & 0xFFFFFF) // gamedata.ADDON_KEY_STRIDE ==
                                           MASTERS.index(m)) for m in image['addons']}
-        print('  image %s: add-ons %s, %d districts, %d rooms; bindings attached there %s (%d bound in the file, %d '
-              'kept)' % (image['build'], ', '.join(image['addons']) or 'none', len(image['districts']),
-                         len(image['rooms']), image['bound_in_image'], in_file, len(binds)), flush=True)    # MWSCRIPT-INVENTORY-HITONME-62: the rows of items placed containers and actors hold count apart (held)
+        print('  image %s: add-ons %s, %d districts, %d rooms, %d add-on exterior cells; bindings attached there %s (%d '
+              'bound in the file, %d kept)' % (image['build'], ', '.join(image['addons']) or 'none',
+                                               len(image['districts']), len(image['rooms']),
+                                               len(image.get('exteriors') or ()), image['bound_in_image'], in_file,
+                                               len(binds)), flush=True)    # MWSCRIPT-INVENTORY-HITONME-62: the rows of items placed containers and actors hold count apart (held)
     from mwscript.compiler import BIND_HELD
     bound = Counter(b['script'] for b in binds if not b['flags'] & BIND_HELD)
     held = Counter(b['script'] for b in binds if b['flags'] & BIND_HELD)
@@ -710,8 +737,8 @@ def measure(data_files, image_build=None):
     if image:
         # the image's own add-on worlds, counted from the build: names of cells are not kept, only how many
         measured['image'] = {'build': image['build'], 'addons': image['addons'], 'districts': len(image['districts']),
-                             'rooms': len(image['rooms']), 'bound_in_image': image['bound_in_image'],
-                             'addon_in_file': addon_in_file}
+                             'rooms': len(image['rooms']), 'exteriors': len(image.get('exteriors') or ()),
+                             'bound_in_image': image['bound_in_image'], 'addon_in_file': addon_in_file}
     return measured, rows, results
 
 
@@ -961,11 +988,12 @@ def render(doc):
     if img:
         # TRACKERS-MOURNHOLD-NOT-COUNTED-67: what the measured image carries of the add-on worlds, read from the build
         lines += ['The image measured: build %s. Its scripts stage bound the own placements of %s; the image carries %s '
-                  'outdoor districts and %s rooms of the interior store, and %s of the %s add-on bindings in the file '
-                  'sit in those cells (%s). A script placed only in add-on cells outside them is "%s".' % (
+                  'outdoor districts, %s rooms of the interior store and %s add-on exterior cells, and %s of the %s '
+                  'add-on bindings in the file sit in those cells (%s). A script placed only in add-on cells outside '
+                  'them is "%s".' % (
                       img['build'], ', '.join(a.replace('.esm', '') for a in img['addons']) or 'no add-on',
-                      _n(img['districts']), _n(img['rooms']), _n(sum(img['bound_in_image'].values())),
-                      _n(img['addon_in_file']),
+                      _n(img['districts']), _n(img['rooms']), _n(img.get('exteriors', 0)),
+                      _n(sum(img['bound_in_image'].values())), _n(img['addon_in_file']),
                       ', '.join('%s %s' % (m.replace('.esm', ''), _n(n)) for m, n in img['bound_in_image'].items()),
                       LABELS['not-in-image']), '']
     lines += why_not_run(rows)

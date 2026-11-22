@@ -2235,6 +2235,12 @@ int AW_CombatSlotState(edict_t *e,float *health) {
     if(health)*health=s->f.health;
     return s->f.dead?2:1;
 }
+/* ACTOR-KNOCKED-OUT-IN-WATER-DROWNS-68: a resident's knock state from its fight sheet (0 standing or not fighting, 1
+ * knocked down by a hit, 2 knocked out by its fatigue) */
+int AW_CombatSlotKnocked(edict_t *e) {
+    slot_t *s=slot_of(e);
+    return s && !s->f.dead?s->f.knocked:0;
+}
 int AW_CombatTestEngage(edict_t *t,int dead) {
     slot_t *s=slot_of(t);char id[32];aw_fighter_t sheet;eval_t *v;
     if(!s){

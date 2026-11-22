@@ -2759,7 +2759,11 @@ def write_door_check(args, id1, out):
         doors = [d for d in doors if d['number'] not in held_back]
         print('Door check: %d held-back doors and markers left out (world-doors.json)' % len(held_back), flush=True)
     stores = [p for p in (getattr(args, 'chim_interiors', None),) if p]
-    image = door_audit.Image(id1, engine_src, args.chim_world, jobs, stores)
+    # the stores of frames this image installs beside the base world (Solstheim's, Mournhold's districts): their
+    # frames hold doors like any region frame, so the audit reads their source frames and the engine check walks
+    # their rows files and traces their own collision (DOOR-CHECK-MODULE-FRAME-MAPS-67)
+    layers = list(getattr(args, 'chim_layer_world', None) or [])
+    image = door_audit.Image(id1, engine_src, args.chim_world, jobs, stores, door_audit.layer_frame_worlds(layers))
     audit = door_audit.audit(doors, world_rows, image, door_audit.regions_by_cell(args.data_files, jobs))
     door_audit.write_outputs(audit, out)
     # the literal file name: a path built from a variable reads as the whole config/ folder to the stage keys
@@ -2767,7 +2771,8 @@ def write_door_check(args, id1, out):
     known = ROOT/'config'/'door-check-known.json'
     report, problem = door_engine_check.run(id1=id1, engine_src=engine_src, audit_rows=audit['rows'], out=out,
                                             baseline=baseline if baseline.is_file() else None, jobs=jobs,
-                                            chim_world=args.chim_world, known=known if known.is_file() else None)
+                                            chim_world=args.chim_world, known=known if known.is_file() else None,
+                                            layers=layers)
     a, c = audit['counts'], report['counts']
     print('Door check: %d exterior entrances; the audit: %d usable on arrival, %d locked, %d with a problem; the '
           'engine after walking in: %d usable, %d both ways, %d with the wall traced (door-audit.md, '
@@ -3363,7 +3368,7 @@ def finalize_image(args):
     # The settlements table (tools/tp_places_lut.py, TP-PICKER-57): every named place of the island and its arrival
     # on the street (id1/tp-places.lut), read by `dbg tp` with no argument only while its list box is open.
     from tp_places_lut import image_step as tp_places_step
-    tp_places_step(args.data_files, boot/'id1', out, jobs=jobs, chim_world=getattr(args, 'chim_world', None))
+    tp_places_step(args.data_files, boot/'id1', out, jobs=jobs, args=args)
     # EXPERIMENTAL actor table (--chim-actor-table on, tools/chim/actors.py, CHIM-EXTERIOR-ACTORS-MISSING-46): every
     # exterior NPC and creature reference in one table beside the frame maps, for the type 1 window; off by default
     actor_library_texts = None
@@ -3478,10 +3483,8 @@ def finalize_image(args):
             # Every door and marker of the game through one table, the towns' included; the image fails when one
             # does not resolve (v0.0.50 The Doors, CHIM-REGION-DOORS-NO-ROOMS-48).
             write_world_doors(args, boot/'id1', out, chim_frames)
-            # every exterior entrance through the engine's own door code, the usable count only going up
-            # (DOOR-ENTRANCE-AUDIT-51, config/door-check-baseline.json)
-            if getattr(args, 'chim_world', None):
-                write_door_check(args, boot/'id1', out)
+            # the door check of these tables runs below, once the stores of frames are installed
+            # (DOOR-CHECK-MODULE-FRAME-MAPS-67)
         if getattr(args, 'harvest', None):
             # The final payload: every harvestable plant the CHIM world leaves out is in a shipped catalogue,
             # each CHIM region cell's in its own frame map's (HARVEST-CHIM-REGION-LOSS-41).
@@ -3556,6 +3559,13 @@ def finalize_image(args):
                         sum(len(a.get('left_out') or ()) for a in with_actors)), flush=True)
             (out/'chim-layer-stores.json').write_text(json.dumps(layer_stores, indent=1, sort_keys=True)+'\n',
                                                       encoding='utf-8', newline='\n')
+        if chim_frames['region_maps'] and getattr(args, 'data_files', None) and getattr(args, 'chim_world', None):
+            # every exterior entrance through the engine's own door code, the usable count only going up
+            # (DOOR-ENTRANCE-AUDIT-51, config/door-check-baseline.json). After the stores of frames are installed:
+            # their frame maps and rows files are then in the image, so a door of Solstheim or of a Mournhold
+            # district is walked and traced like any other (DOOR-CHECK-MODULE-FRAME-MAPS-67: before, the check ran
+            # ahead of them and called every such entrance not usable)
+            write_door_check(args, boot/'id1', out)
         # frame maps the gate marked 32 MB itself (over the 16 MB budget by this exact check, not by the CHIM stage's
         # estimate; BUILD-CHIM-HEAP-GATE-LATE-36): their records follow the marked file
         late = set(frame_heap.get('marked_32mb_late') or [])

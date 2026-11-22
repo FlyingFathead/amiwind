@@ -184,6 +184,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [JOURNEY-WALK-DIALOGUE-DESYNC-66](JOURNEY-WALK-DIALOGUE-DESYNC-66.md): The gameplay journey lost its way in the census office: its key presses talked to the clerk and chose Persuasion instead of taking the papers, and every later step ran in that window
 - KIT-CI-JOBS-SPLIT-53 (no report page): The release kit did not know the split CI workflow: its job check refused it and its publisher waited for the old job names
 - LINUX-VALID-02 (no report page): Linux test fixtures failed to link (missing stubs)
+- [LOOKBOOK-NO-COLOUR-CHECK-68](LOOKBOOK-NO-COLOUR-CHECK-68.md): The look book checks only numbers on its pages, so a palette change that alters the colours of every confirmed look cannot fail any page
 - [MWAD-NAME-CLASH-66](MWAD-NAME-CLASH-66.md): tools/mwad.py has the name of the src/mwad package and hides it for any process with tools before src
 - [MWAD-TEXT-WRITER-LF-35](MWAD-TEXT-WRITER-LF-35.md): Some JSON and text writers do not pin LF and UTF-8
 - [NOTES-MOURNHOLD-WAY-STALE-67](NOTES-MOURNHOLD-WAY-STALE-67.md): The development notes of v0.0.67 said the way to Mournhold was not in the build, while the trip to Mournhold and back already worked

@@ -96,5 +96,6 @@ Related bugs in other categories:
 
 - [CHIM-REGION-DOORS-NO-PROMPT-42](CHIM-REGION-DOORS-NO-PROMPT-42.md): Doors in CHIM region cells show no entrance at all (no prompt, not even Interior unavailable), e.g. every door in Khuul
 - DOOR-ENTRANCE-AUDIT-51 (no report page): Requested: an entrance check in every build: each exterior entrance of the original must have a door that leads into its interior, found from the map, missing ones listed
+- [DOOR-USE-COLLISION-EXPANSIONS-68](DOOR-USE-COLLISION-EXPANSIONS-68.md): 13 exterior entrances of Solstheim and Mournhold cannot be reached in the converted collision: no standing spot at the threshold, or the door out of the use reach
 
 <!-- END GENERATED CATEGORY -->

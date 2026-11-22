@@ -126,6 +126,7 @@ Family: Mesh converter geometry (`converter-geometry`). Converted faces must be 
 - [ROUTED-HULL-NODE-ORDER-33](ROUTED-HULL-NODE-ORDER-33.md): A routed standing hull can start above nodes it reaches; the engine stops with "SV_RecursiveHullCheck: bad node number"
 - [SEAM-AUDIT-IGNORES-RIM-TEARS-54](SEAM-AUDIT-IGNORES-RIM-TEARS-54.md): The seam audit reports meshes with torn rims as ok
 - [SKY-GROUND-28](SKY-GROUND-28.md): Rebuilt LAND faces invisible; clouds scroll too fast
+- [SOL-GLACIER-ICE-BROWN-SHEER-68](SOL-GLACIER-ICE-BROWN-SHEER-68.md): The Mortrag Glacier's ice draws brown instead of white and shows a sheer vertical drop where the original slopes
 - [TOOL-ALIAS-FRAMES-33](TOOL-ALIAS-FRAMES-33.md): The alias model writer refuses more than 32 frames
 - [TOWN-PAVEMENT-WEDGE-62](TOWN-PAVEMENT-WEDGE-62.md): A wedge of pavement sticks up from the street in Suran, the same kind of fault as once seen in Balmora
 - [WEREWOLF-HEAD-NOT-REDUCED-68](WEREWOLF-HEAD-NOT-REDUCED-68.md): The outer-measures reduction leaves the werewolf's head whole at every target and reports that as a pass

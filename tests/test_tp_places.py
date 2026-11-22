@@ -276,7 +276,7 @@ class EngineWiringTests(unittest.TestCase):
         make = (ROOT / 'engine' / 'aga' / 'Makefile').read_text(encoding='utf-8')
         self.assertIn('aw_msgbox.c aw_listbox_rules.c aw_listbox.c aw_tpplaces.c', make)
         build = (ROOT / 'tools' / 'build_aga.py').read_text(encoding='utf-8')
-        self.assertIn("tp_places_step(args.data_files, boot/'id1', out, jobs=jobs, chim_world=", build)
+        self.assertIn("tp_places_step(args.data_files, boot/'id1', out, jobs=jobs, args=args)", build)
         self.assertEqual(code('aw_tpplaces.c').count('"tp-places.lut"'), 1)
         self.assertEqual(T.NAME, 'tp-places.lut')
 

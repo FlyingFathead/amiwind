@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 17 times; something has to be done
+## PERSISTING: reported 19 times; something has to be done
 
 - Reported with v0.0.54 at 2026-10-27 18:21 +0200: Seen first in v0.0.54 (not registered then): the tests of gates 4250 and 4252 failed with "Cannot allocate memory" in the gate's compiler wrapper while several gates, builds and an emulator session ran.
 - Reported with v0.0.66-dev10 at 2026-11-16 (time not recorded): Seen again under load: a pregate run failed every check with "Cannot allocate memory" while a long build check ran.
@@ -21,6 +21,8 @@
 - Reported with v0.0.68 at 2026-11-21 07:18 +0200: In the shell container, two start-ups of the register tool failed with an out-of-memory error while reading files, while the virtual machine's page cache held almost all of its memory; a retry ran.
 - Reported with v0.0.68-dev3 at 2026-11-21 09:43 +0200: A file read inside a container failed with out of memory again, this time in a tracker step, while a build plan check ran.
 - Reported with v0.0.68-dev3 at 2026-11-21 10:34 +0200: Seen again on v0.0.68-dev3 after a day of builds; clearing the build machine's file cache once restored the reads.
+- Reported with v0.0.68-dev5 at 2026-11-22 02:09 +0200: Seen again: a release kit's validation could not clone the source in its container while the build machine's memory was fragmented with no large free blocks; it is retried.
+- Reported with v0.0.68-dev5 at 2026-11-22 02:45 +0200: Seen again: a release kit's validation could not read the source repository in its container (cannot allocate memory) while the machine's memory was fragmented; the one-shot cache drop restored large free blocks and the validation was retried.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -69,6 +71,8 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-21 07:18 +0200: seen again in v0.0.68: In the shell container, two start-ups of the register tool failed with an out-of-memory error while reading files, while the virtual machine's page cache held almost all of its memory; a retry ran.
 - 2026-11-21 09:43 +0200: seen again in v0.0.68-dev3: A file read inside a container failed with out of memory again, this time in a tracker step, while a build plan check ran.
 - 2026-11-21 10:34 +0200: seen again in v0.0.68-dev3: Seen again on v0.0.68-dev3 after a day of builds; clearing the build machine's file cache once restored the reads.
+- 2026-11-22 02:09 +0200: seen again in v0.0.68-dev5: Seen again: a release kit's validation could not clone the source in its container while the build machine's memory was fragmented with no large free blocks; it is retried.
+- 2026-11-22 02:45 +0200: seen again in v0.0.68-dev5: Seen again: a release kit's validation could not read the source repository in its container (cannot allocate memory) while the machine's memory was fragmented; the one-shot cache drop restored large free blocks and the validation was ...
 
 <!-- END GENERATED TIMELINE -->
 
@@ -77,7 +81,7 @@ _Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 17 times; something has to be done](#persisting-reported-17-times-something-has-to-be-done)
+- [PERSISTING: reported 19 times; something has to be done](#persisting-reported-19-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Status: 16 November 2026](#status-16-november-2026)
 - [Symptom](#symptom)
@@ -223,6 +227,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [JOURNEY-WALK-DIALOGUE-DESYNC-66](JOURNEY-WALK-DIALOGUE-DESYNC-66.md): The gameplay journey lost its way in the census office: its key presses talked to the clerk and chose Persuasion instead of taking the papers, and every later step ran in that window
 - KIT-CI-JOBS-SPLIT-53 (no report page): The release kit did not know the split CI workflow: its job check refused it and its publisher waited for the old job names
 - LINUX-VALID-02 (no report page): Linux test fixtures failed to link (missing stubs)
+- [LOOKBOOK-NO-COLOUR-CHECK-68](LOOKBOOK-NO-COLOUR-CHECK-68.md): The look book checks only numbers on its pages, so a palette change that alters the colours of every confirmed look cannot fail any page
 - [MWAD-NAME-CLASH-66](MWAD-NAME-CLASH-66.md): tools/mwad.py has the name of the src/mwad package and hides it for any process with tools before src
 - [MWAD-TEXT-WRITER-LF-35](MWAD-TEXT-WRITER-LF-35.md): Some JSON and text writers do not pin LF and UTF-8
 - [NOTES-MOURNHOLD-WAY-STALE-67](NOTES-MOURNHOLD-WAY-STALE-67.md): The development notes of v0.0.67 said the way to Mournhold was not in the build, while the trip to Mournhold and back already worked

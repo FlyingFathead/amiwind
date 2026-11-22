@@ -1,6 +1,6 @@
 # MWScript compiled by the builder
 
-_Last updated with AmiWind v0.0.68-dev3 (21 November 2026)._
+_Last updated with AmiWind v0.0.68-dev5 (22 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -465,7 +465,12 @@ bindings (NPCs, creatures and the objects the maps keep as edicts), and on an ou
 inside the map (sound markers and other activators the CHIM frames keep without an edict, placed by their position
 in the game data), and in a room every scripted placement of that room (the room map's stable interior number,
 worldspawn `_aw_cell_int`, matches the binding's; room maps are the game positions at a quarter scale, and a
-recentred room's shift is taken from one of its edicts). The bindings are read from disk at the map change and not
+recentred room's shift is taken from one of its edicts). A placement in one of Mournhold's districts, which the game
+data keeps as an interior cell and the build presents as outdoor frames, is bound with flag 16 (presented) at the
+place the presented world gives it: it keeps the room flag (every script of the district runs while it is loaded, as
+in the original's interior cell) and is placed on the district's frame when it has no edict (v0.0.68; until then none
+of the five districts' 366 scripted objects ran: the ambient sounds, the Temple courtyard's living and dead trees,
+the Plaza's attack rubble, Azura's statue outside the Temple). The bindings are read from disk at the map change and not
 kept. Not attached: the hand-written list, inert scripts, and placements past the build's planned instance count (refused
 and counted; see [the interpreter](#the-interpreter)). An
 object's values are kept while its map is not loaded, in the parking store the build sized for every object of the

@@ -4,8 +4,9 @@
  * point is tested against hull 0 (SV_PointContents); one under water gets a row of the fixed table, its breath falls,
  * and once it is gone the NPC loses the suffocation damage through its own record (aw_mwhost.c AW_MwscriptActorHurt:
  * the death by the scripts' death path). The breath left is kept as a named fact of the world change list, so a save
- * made under water loads with it. Fixed state only (the table: 32 rows of 8 bytes), no allocation; nothing runs in a dry
- * room or outdoors. */
+ * made under water loads with it. Fixed state only (the table: 32 rows of 12 bytes), no allocation; nothing runs in a
+ * dry room or outdoors. An NPC knocked out with its feet in the water drowns at once
+ * (ACTOR-KNOCKED-OUT-IN-WATER-DROWNS-68), and a drowning NPC makes the "drown" sound (ACTOR-DROWN-SOUND-68). */
 #include "quakedef.h"
 #include "aw_breath.h"
 #include "aw_drown.h"
@@ -17,7 +18,7 @@
 
 static aw_drown_table_t table;
 static void *table_map;                  /* the map the rows' edicts belong to */
-static unsigned long frames,checked,submerged_seen,restored,deaths,hurt_misses;
+static unsigned long frames,checked,submerged_seen,restored,deaths,hurt_misses,knocked_out,sounds;
 static float damage;
 
 /* a resident NPC that is alive by the combat layer and shown (aw_drown.h AW_DrownTakes); its health lives in its actor
@@ -38,33 +39,56 @@ static int under_water(const edict_t *e)
     return c==CONTENTS_WATER || c==CONTENTS_SLIME;
 }
 
+/* ACTOR-KNOCKED-OUT-IN-WATER-DROWNS-68: the feet under water (OpenMW World::isUnderwater on the actor's position) */
+static int feet_under_water(const edict_t *e)
+{
+    vec3_t p;int c;
+    VectorCopy(e->v.origin,p);
+    p[2]+=e->v.mins[2]+1;
+    c=SV_PointContents(p);
+    return c==CONTENTS_WATER || c==CONTENTS_SLIME;
+}
+
 static int water_breathing(edict_t *e)
 {
     return aw_combat_effect_magnitude && aw_combat_effect_magnitude(e,AW_EFFECT_WATER_BREATHING)>0;
 }
 
+/* ACTOR-DROWN-SOUND-68: the "drown" sample on the NPC's body channel (as aw_fall.c), the image's own or none */
+static void drown_sound(edict_t *e,float *seconds)
+{
+    const char *path=AW_BreathSound(seconds);sfx_t *s;
+    if(!path || !(s=S_PrecacheSound((char *)path)))return;
+    S_StartSound(NUM_FOR_EDICT(e),4,s,e->v.origin,1,1);
+    sounds++;
+}
+
 void AW_DrownPhysics(void)
 {
-    aw_breath_settings_t s;int i,row;float dt=(float)host_frametime,loss;char id[32];int32_t kept;
+    aw_breath_settings_t s;int i,row;float dt=(float)host_frametime,loss,seconds;char id[32];int32_t kept;
     if(table_map!=(void *)sv.worldmodel){table_map=(void *)sv.worldmodel;table.count=0;}
     if(!sv.active || !(dt>0) || !AW_MwscriptRoomWater())return;
     AW_BreathSettingsGet(&s);
     frames++;
     for(i=1;i<sv.num_edicts;i++){
-        edict_t *e=EDICT_NUM(i);uint32_t ref;int under;
+        edict_t *e=EDICT_NUM(i);uint32_t ref;int under,knocked,out,due;
         if(!npc(e))continue;
         checked++;
         under=under_water(e);
+        /* knocked out with the feet in the water: drowning at once (OpenMW actors.cpp 1013-1019) */
+        knocked=AW_CombatSlotKnocked(e);
+        out=knocked==2 && feet_under_water(e);
         ref=AW_MwscriptNpcReference(e);
         row=AW_DrownRow(&table,ref,0);
         if(row<0){
-            if(!under)continue;
+            if(!under && !out)continue;
             if((row=AW_DrownRow(&table,ref,1))<0)continue;     /* the table full: counted in table.full */
             AW_DrownFactId(id,ref);
             if(AW_LedgerFact(&aw_ledger,id,&kept) && AW_DrownFactLeft((long)kept)>=0 && AW_DrownFactLeft((long)kept)<s.hold){
                 table.row[row].left=AW_DrownFactLeft((long)kept);restored++;
             }
         }
+        if(AW_DrownKnockedOut(&table,row,knocked,out)){knocked_out++;under=1;}
         if(under)submerged_seen++;
         if(!AW_DrownStep(&table,row,under,under && water_breathing(e),s.hold,s.suffocation,dt,&loss)){
             AW_DrownFactId(id,ref);
@@ -74,10 +98,13 @@ void AW_DrownPhysics(void)
         }
         AW_DrownFactId(id,ref);
         AW_LedgerFactSet(&aw_ledger,id,(int32_t)AW_DrownFactValue(table.row[row].left));
+        /* the "drown" sound whenever it is not playing (OpenMW actors.cpp 1039-1043); its timer runs every frame */
+        due=AW_DrownSoundDue(&table,row,loss,dt,AW_BreathSound(&seconds)?seconds:0);
         if(loss>0){
             int r=AW_MwscriptActorHurt(e,loss);
             if(r<0){hurt_misses++;continue;}
             damage+=loss;
+            if(due)drown_sound(e,&seconds);
             if(r>0){deaths++;AW_DrownDrop(&table,row);}
         }
     }
@@ -90,6 +117,8 @@ void AW_DrownStatus(void)
                "%lu submerged, %lu breaths read back from the saved changes, %.1f health taken, %lu drowned, %lu without "
                "a record\n",AW_MwscriptRoomWater()?"checked in this room":"not checked here (outdoors or a dry room)",
                (long)table.count,AW_DROWN_ROWS,table.full,frames,checked,submerged_seen,restored,damage,deaths,hurt_misses);
+    Con_Printf(" NPCs: %lu frames knocked out in the water (drowning at once), %lu drown sounds started\n",knocked_out,
+               sounds);
     for(i=0;i<table.count;i++)
         Con_Printf("  reference %lu: %.1f s of breath left\n",(unsigned long)table.row[i].reference,table.row[i].left);
 }
@@ -99,7 +128,7 @@ static void reset_drown(int new_game)
 {
     (void)new_game;
     memset(&table,0,sizeof(table));table_map=NULL;
-    frames=checked=submerged_seen=restored=deaths=hurt_misses=0;damage=0;
+    frames=checked=submerged_seen=restored=deaths=hurt_misses=knocked_out=sounds=0;damage=0;
 }
 static unsigned long digest_drown(void)
 {

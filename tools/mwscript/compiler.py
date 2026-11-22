@@ -20,6 +20,26 @@ BIND_EDICT = 4           # another kind the maps keep as an edict (doors, contai
 BIND_HELD = 8
 HELD_BIT = 0x40000000
 HELD_PER_HOLDER = 64
+# EXPANSION-SCRIPTS-NOT-ATTACHED-66 (v0.0.68): a placement in a district this build presents as exterior cells
+# (MOURNHOLD-EXTERIOR-CELLS-66, program.presented: tools/presented_exterior.py build_places). The game data keeps a
+# district as an interior cell, so its rows keep BIND_INTERIOR (the original runs every script of the cell while the
+# player is in it: aw_mwvm.c active) and the cell's stable number; their position is the moved one, the place the
+# presented world gives the placement (presented_exterior.moved_position). The engine attaches such a row without an
+# entity on the district's outdoor frame at that place (aw_mwhost.c attach_map), where a room row is never attached
+# outdoors: until v0.0.68 none of the 366 scripted objects of the five districts ran (sounds, the Temple courtyard's
+# living and dead trees, the Plaza's attack rubble, Azura's statue).
+BIND_PRESENTED = 16
+
+
+def presented_spot(program, ref):
+    """The moved position of reference REF (a binding's interior placement) when its cell is a district the build
+    presents (program.presented), else None: a build without the presented districts binds every row as before."""
+    places = getattr(program, 'presented', None)
+    if not places or not ref['interior']:
+        return None
+    from presented_exterior import present_position
+    found = present_position(places, ref['cell'], ref['position'])
+    return None if found is None else found[1]
 
 
 def held_key(holder, n):
@@ -159,7 +179,8 @@ def bindings(program, compiled=None, addons=()):
     ADDONS: the add-on masters whose world the image carries (MWSCRIPT-ADDON-ATTACH-62, e.g. ('Tribunal.esm',)):
     their own placements are bound too, by their load-order key (gamedata.addon_key). The script stage gives the
     build's selected expansions (tools/prepare_mwscript.py bound_addons, EXPANSION-SCRIPTS-NOT-ATTACHED-66); none
-    with the base game alone."""
+    with the base game alone. A placement in a district the build presents as exterior cells (program.presented) is
+    written at its moved place with BIND_PRESENTED (v0.0.68), so the engine attaches it on the district's frame."""
     rows = []
     wanted = {m.casefold() for m in addons}
     extra = [r for r in getattr(program.data, 'addon_references', []) if r['master'].casefold() in wanted]
@@ -176,11 +197,16 @@ def bindings(program, compiled=None, addons=()):
             flags |= BIND_ACTOR
         elif ref['type'] in ('DOOR', 'CONT', 'ACTI'):
             flags |= BIND_EDICT
+        position = ref['position']
+        moved = presented_spot(program, ref)
+        if moved is not None:          # a presented district's placement: at its moved place (BIND_PRESENTED)
+            flags |= BIND_PRESENTED
+            position = moved
         rows.append({'reference': ref['reference'], 'script': program.scripts.index[key], 'flags': flags,
                      # an interior: its stable number, as the room map's worldspawn _aw_cell_int carries it
                      'cell': program.data.interior_numbers.get(ref['cell'].casefold(), 0) if ref['interior']
                      else tuple(ref['cell']),
-                     'position': [int(round(v)) for v in ref['position']], 'id': ref['id'], 'type': ref['type']})
+                     'position': [int(round(v)) for v in position], 'id': ref['id'], 'type': ref['type']})
     rows.extend(held_bindings(program, compiled, addons))
     rows.sort(key=lambda r: r['reference'])
     seen = set()
@@ -219,14 +245,16 @@ def held_bindings(program, compiled=None, addons=()):
             items.append((item, index))
         if not 0 < ref['reference'] <= 0xFFFFFF:
             continue
+        moved = presented_spot(program, ref)   # a holder in a presented district: its moved place (BIND_PRESENTED)
         for n, (item, index) in enumerate(items[:HELD_PER_HOLDER]):
             flags = BIND_HELD | (BIND_INTERIOR if ref['interior'] else 0) | \
-                (BIND_ACTOR if ref['type'] in ('NPC_', 'CREA') else BIND_EDICT)
+                (BIND_ACTOR if ref['type'] in ('NPC_', 'CREA') else BIND_EDICT) | \
+                (BIND_PRESENTED if moved is not None else 0)
             rows.append({'reference': held_key(ref['reference'], n), 'script': index, 'flags': flags,
                          'cell': data.interior_numbers.get(ref['cell'].casefold(), 0) if ref['interior']
                          else tuple(ref['cell']),
-                         'position': [int(round(v)) for v in ref['position']], 'id': item, 'type': 'HELD',
-                         'holder': ref['reference']})
+                         'position': [int(round(v)) for v in (ref['position'] if moved is None else moved)],
+                         'id': item, 'type': 'HELD', 'holder': ref['reference']})
     return rows
 
 

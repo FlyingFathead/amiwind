@@ -43,6 +43,24 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 _Last updated with AmiWind v0.0.62-dev1 (7 November 2026)._
 
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Timeline](#timeline)
+- [Status: 7 November 2026](#status-7-november-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## Status: 7 November 2026
 
 Open again, a regression. It was closed in an audit of 20 October 2026 as superseded, because the terrain had changed since v0.0.29-dev1 and the shoreline was not looked at again. Seen on the v0.0.61 release image in Suran (cell 6,-7) and, by the report, at ponds across the whole map. Related: WORLD-SHORE-OPEN-GEOMETRY-38 (open).
@@ -137,6 +155,7 @@ Family: Mesh converter geometry (`converter-geometry`). Converted faces must be 
 - [ROUTED-HULL-NODE-ORDER-33](ROUTED-HULL-NODE-ORDER-33.md): A routed standing hull can start above nodes it reaches; the engine stops with "SV_RecursiveHullCheck: bad node number"
 - [SEAM-AUDIT-IGNORES-RIM-TEARS-54](SEAM-AUDIT-IGNORES-RIM-TEARS-54.md): The seam audit reports meshes with torn rims as ok
 - [SKY-GROUND-28](SKY-GROUND-28.md): Rebuilt LAND faces invisible; clouds scroll too fast
+- [SOL-GLACIER-ICE-BROWN-SHEER-68](SOL-GLACIER-ICE-BROWN-SHEER-68.md): The Mortrag Glacier's ice draws brown instead of white and shows a sheer vertical drop where the original slopes
 - [TOOL-ALIAS-FRAMES-33](TOOL-ALIAS-FRAMES-33.md): The alias model writer refuses more than 32 frames
 - [TOOL-SIMPLIFY-MANIFOLD-32](TOOL-SIMPLIFY-MANIFOLD-32.md): Mesh reduction can return open or non-manifold meshes
 - [TOWN-PAVEMENT-WEDGE-62](TOWN-PAVEMENT-WEDGE-62.md): A wedge of pavement sticks up from the street in Suran, the same kind of fault as once seen in Balmora

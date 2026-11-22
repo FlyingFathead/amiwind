@@ -110,9 +110,39 @@ class LayerSelections(unittest.TestCase):
         self.assertNotIn('Raven Rock', names)
 
     def test_image_step_passes_the_world(self):
+        # the image step hands over its own options: the step reads the base CHIM world and the expansions' stores
         text = (ROOT / 'tools' / 'build_aga.py').read_text(encoding='utf-8')
-        self.assertIn("tp_places_step(args.data_files, boot/'id1', out, jobs=jobs, chim_world=getattr(args, "
-                      "'chim_world', None))", text)
+        self.assertIn("tp_places_step(args.data_files, boot/'id1', out, jobs=jobs, args=args)", text)
+        step = (ROOT / 'tools' / 'tp_places_lut.py').read_text(encoding='utf-8')
+        self.assertIn("chim_world = chim_world or getattr(args, 'chim_world', None)", step)
+        self.assertIn("layer_worlds = layer_worlds or getattr(args, 'chim_layer_world', None)", step)
+
+    def test_a_place_in_an_expansion_store_is_listed(self):
+        # TP-LIST-MODULE-STORE-PLACES-68: Solstheim is built by its module into a store of its own (chimsol); the
+        # base CHIM world holds none of its frames. A place whose cell has a frame in that store is in the game and
+        # is listed; before, the 13 named places of Solstheim and its 202 outdoor people and creatures were left out
+        # of the list of an image that held 135 of the island's cells
+        from unittest import mock
+        import chim.layer_stores as L
+        holders = {(-22, 17): ('sl0061', [0, 0, 0])}
+        with mock.patch.object(L, 'frame_holders', return_value=holders) as seen:
+            sel, base, frames = T.layer_inputs(self.data, self.chim_world, SELECTIONS['bloodmoon'],
+                                               layer_worlds=['chimsol=/nowhere'])
+        seen.assert_called_once_with(['chimsol=/nowhere'])
+        self.assertEqual(frames, FRAMES | {(-22, 17)})
+        path = master_path(self.data, sel, merged_dir=Path(self.tmp.name) / 'merged')
+        data, report = T.build_master(path, base, frames)
+        names = {r['name'] for r in T.read_table(data)}
+        self.assertIn('Fort Frostmoth', names)
+        self.assertIn('Raven Rock', names)
+        self.assertEqual(report['places_not_built'], [])
+        # without the store's frames the place is named as not built, as before
+        sel, base, frames = T.layer_inputs(self.data, self.chim_world, SELECTIONS['bloodmoon'])
+        self.assertEqual(T.build_master(path, base, frames)[1]['places_not_built'], ['Fort Frostmoth'])
+        # the base game alone asks no store
+        with mock.patch.object(L, 'frame_holders', side_effect=AssertionError('asked')):
+            self.assertEqual(T.layer_inputs(self.data, self.chim_world, SELECTIONS['base'],
+                                            layer_worlds=['chimsol=/nowhere'])[1:], (None, None))
 
 
 if __name__ == '__main__':

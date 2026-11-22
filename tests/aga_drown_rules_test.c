@@ -50,6 +50,28 @@ int main(void)
     assert(t.count==AW_DROWN_ROWS-1 && t.row[0].reference==1000+AW_DROWN_ROWS-1 && AW_DrownRow(&t,4212345,0)==-1);
     AW_DrownDrop(&t,99);assert(t.count==AW_DROWN_ROWS-1);
     assert(!AW_DrownStep(&t,-1,1,0,20,3,1,&loss) && loss==0);
+    /* ACTOR-KNOCKED-OUT-IN-WATER-DROWNS-68 (OpenMW actors.cpp 1013-1019): knocked out (2) with the feet under water, the
+     * breath is gone at once and the same frame takes its damage; a knock-down (1), dry feet or no row change nothing */
+    memset(&t,0,sizeof(t));
+    r=AW_DrownRow(&t,4212346,1);
+    assert(!AW_DrownKnockedOut(&t,r,1,1) && t.row[r].left<0);
+    assert(!AW_DrownKnockedOut(&t,r,2,0) && t.row[r].left<0);
+    assert(!AW_DrownKnockedOut(&t,5,2,1) && !AW_DrownKnockedOut(NULL,0,2,1));
+    assert(AW_DrownKnockedOut(&t,r,2,1) && t.row[r].left==0);
+    assert(AW_DrownStep(&t,r,1,0,20,3,0.5f,&loss) && near(loss,1.5f) && t.row[r].left==0);
+    /* Water Breathing still keeps a knocked-out NPC breathing (OpenMW: the magnitude check covers both cases) */
+    assert(AW_DrownKnockedOut(&t,r,2,1) && AW_DrownStep(&t,r,1,1,20,3,0.5f,&loss) && loss==0 && near(t.row[r].left,20));
+    /* ACTOR-DROWN-SOUND-68 (OpenMW actors.cpp 1039-1043): a new row's sound is due at its first damage; then again only
+     * once the sample's length has passed; no damage, no sound; a sample under 0.1 s counts as 0.1 s */
+    assert(t.row[r].sound==0);
+    assert(!AW_DrownSoundDue(&t,r,0,0.5f,1.5f) && t.row[r].sound==0);
+    assert(AW_DrownSoundDue(&t,r,3,0.5f,1.5f) && near(t.row[r].sound,1.5f));
+    assert(!AW_DrownSoundDue(&t,r,3,0.5f,1.5f) && near(t.row[r].sound,1.0f));
+    assert(!AW_DrownSoundDue(&t,r,0,0.5f,1.5f) && near(t.row[r].sound,0.5f));
+    assert(AW_DrownSoundDue(&t,r,3,0.5f,1.5f) && near(t.row[r].sound,1.5f));
+    t.row[r].sound=0;
+    assert(AW_DrownSoundDue(&t,r,3,0.5f,0) && near(t.row[r].sound,0.1f));
+    assert(!AW_DrownSoundDue(&t,-1,3,0.5f,1.5f) && !AW_DrownSoundDue(NULL,0,3,0.5f,1.5f));
     /* the saved fact: its id, the breath's exact bits there and back */
     AW_DrownFactId(id,4212345);
     assert(!strcmp(id,"amiwind:breath:4212345"));

@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.67-dev2 at 2026-11-18 (time not recorded): Seen again on 2026-11-18 in the CHIMport run of the eleven presented cells of Mournhold's districts, four cells at a time on eight cores: 4,-29 took 349 s, -7,-30 464 s and -3,-30 706 s, each ending on one stair collision unit on one core, while the other eight cells took 20 to 65 s. The run took 13 min 4 s, the longest cell's time plus its start; for its last six minutes only that unit ran. The units are stored now, so the next run of these cells takes them from the store.
 - Reported with v0.0.67-dev2 at 2026-11-18 12:40 +0200: Seen again in a build, in the stage that converts Mournhold's eleven district cells as a world of their own: the stage started on 3 workers and its allowance rose to 5, 10, 13 and then 24 workers as other stages ended, but for more than six minutes only two of its processes worked, each at one core, with four of eleven frames prepared about ten minutes in. The outdoor world stage, which the resource plan runs without another memory-heavy stage beside it, waited for this stage, so the whole build ran on 2 of 24 cores. The same stage measured outside a build on six workers: three stair collision units of 4 min 23 s, 7 min 16 s and 11 min 21 s, each on one core and one after another (each ends its own group of frames), 19 min 4 s in all at 3.7 cores. The scheduler is not the cause: the allowance followed the freed cores. The units are stored once made, so the next build of the same models takes them from the store. Open beside the unit's own time: the long units of a stage side by side, and the outdoor world stage not waiting for a stage that is down to one or two single-core units.
+- Reported with v0.0.68-dev5 at 2026-11-22 03:43 +0200: On the Solstheim glacier test build with mesh method E, each of the nine test cells' stair collision units ran for over 47 minutes on one core, longer than the earlier 19.5 to 25 minutes.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -41,6 +42,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-18: seen again in v0.0.67-dev2: Seen again on 2026-11-18 in the CHIMport run of the eleven presented cells of Mournhold's districts, four cells at a time on eight cores: 4,-29 took 349 s, -7,-30 464 s and -3,-30 706 s, each ending on one stair collision unit on one core ...
 - 2026-11-18 12:40 +0200: seen again in v0.0.67-dev2: Seen again in a build, in the stage that converts Mournhold's eleven district cells as a world of their own: the stage started on 3 workers and its allowance rose to 5, 10, 13 and then 24 workers as other stages ended, but for more than ...
 - 2026-11-18 13:25 +0200: v0.0.67-dev2: The scheduler part of the third sighting is fixed in source: a memory-heavy stage that is down to one or two running units with none queued for a minute, by its pools' own live status and never by its plan estimate, no longer keeps a stage ...
+- 2026-11-22 03:43 +0200: seen again in v0.0.68-dev5: On the Solstheim glacier test build with mesh method E, each of the nine test cells' stair collision units ran for over 47 minutes on one core, longer than the earlier 19.5 to 25 minutes.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -49,7 +51,7 @@ _Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Status: 18 November 2026](#status-18-november-2026)
 - [Symptom](#symptom)
@@ -126,6 +128,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-ACTOR-LIBRARY-SHARE-RACE-67](BUILD-ACTOR-LIBRARY-SHARE-RACE-67.md): The actor library stage's two pools wrote their worker share through one temporary file name: a write found its file gone
 - [BUILD-ACTOR-LIBRARY-UNDERUSED-54](BUILD-ACTOR-LIBRARY-UNDERUSED-54.md): The actor-library stage ran at 2.69 of 8 allowed cores with 130 units queued and 7 running
 - [BUILD-AGA-AT-TEXT-LIMIT-60](BUILD-AGA-AT-TEXT-LIMIT-60.md): tools/build_aga.py is 7 bytes under the release text size limit: the next change to it fails the gate unless a stage is split out
+- [BUILD-BALMORA-KEY-PALETTE-OVERBROAD-68](BUILD-BALMORA-KEY-PALETTE-OVERBROAD-68.md): A scene palette change re-bakes every Balmora interior room and resident although about half the rooms and all residents come out byte for byte the same
 - [BUILD-BODY-BAKE-SLOWER-44](BUILD-BODY-BAKE-SLOWER-44.md): The image step's player body bake ran 42 % slower than its baseline with the same 40 bodies
 - [BUILD-CACHE-ABSOLUTE-PATHS-33](BUILD-CACHE-ABSOLUTE-PATHS-33.md): Stage fingerprints contain absolute paths, so a moved workspace or checkout reuses nothing
 - [BUILD-CACHE-CHIM-UNITS-33](BUILD-CACHE-CHIM-UNITS-33.md): The chim stage's fingerprint changes whenever the CHIM unit cache gains units, so the stage is never reused
@@ -135,6 +138,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-CACHE-PER-WORKSPACE-33](BUILD-CACHE-PER-WORKSPACE-33.md): Per-file caches live in each build workspace, so a build on a new volume with --reuse-from converts everything again (MiniWind media 1,195 s instead of seconds)
 - [BUILD-CACHE-TRACE-PYTHONPATH-33](BUILD-CACHE-TRACE-PYTHONPATH-33.md): The stage read trace refused reuse of a reused run when another checkout was on PYTHONPATH
 - [BUILD-CELL-PROGRESS-UNDECLARED-OUTPUT-67](BUILD-CELL-PROGRESS-UNDECLARED-OUTPUT-67.md): The tracker data stage (cell-progress) writes flora-support.json at the run folder's top, outside its declared outputs, so a later build refuses to reuse the stage
+- [BUILD-CENSUS-PHASE-UNDERUSED-68](BUILD-CENSUS-PHASE-UNDERUSED-68.md): A fresh census stage ran on under 4 of 22 cores for about 6 minutes before its worker pool started
 - [BUILD-CHECK-ONE-CORE-66](BUILD-CHECK-ONE-CORE-66.md): The build's reuse check runs about six minutes on one core, and every snapshot runs it twice before its build starts
 - [BUILD-CHECK-REPEATED-AFTER-PASSED-CHECK-68](BUILD-CHECK-REPEATED-AFTER-PASSED-CHECK-68.md): Before building, the builder checks the plan again even when an identical check passed a few minutes earlier
 - [BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46](BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46.md): A change in the shared collision converter rebuilds every CHIM frame and everything after it, even where the output is identical

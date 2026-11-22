@@ -80,6 +80,28 @@ class TheScriptMeasureReadsTheImage(unittest.TestCase):
         # no build given: the add-ons' bindings all drop, as the measure did before this item
         self.assertEqual([b['reference'] for b in F.bound_in_image(binds, None, names)], [5])
 
+    def test_the_stores_frames_carry_the_addon_exteriors(self):
+        # EXPANSION-SCRIPTS-NOT-ATTACHED-66 (v0.0.68): Solstheim's frames are in the image since v0.0.68-dev3, but the
+        # measure counted no add-on exterior, so the Skaal village's and Raven Rock's door scripts (bound, attached on
+        # their frames) read "only in an add-on world". The stores' frames now count; a district's frames stay the
+        # district's (bound by its interior cell)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.build(Path(tmp))
+            write(root / 'image' / 'chim-layer-stores.json',
+                  [{'store': 'chimmh', 'maps': [{'cell': [-12, -30]}, {'cell': [-8, -30]}]},
+                   {'store': 'chimsol', 'maps': [{'cell': [-20, 25]}, {'cell': [-25, 19]}]}])
+            image = F.image_world(root)
+        self.assertEqual(image['exteriors'], [(-25, 19), (-20, 25)])
+        names = {10: 'mournhold, godsreach'}
+        binds = [{'reference': 2 * ADDON_KEY_STRIDE + 4, 'cell': (-20, 25)},     # rigmor's door: a Solstheim frame
+                 {'reference': 2 * ADDON_KEY_STRIDE + 5, 'cell': (-26, 25)},     # a cell no frame carries
+                 {'reference': ADDON_KEY_STRIDE + 9, 'cell': 10}]                # a district, by its interior cell
+        kept = [b['reference'] % ADDON_KEY_STRIDE for b in F.bound_in_image(binds, image, names)]
+        self.assertEqual(kept, [4, 9])
+        # without the stores' record (an older build) no add-on exterior counts, as before
+        self.assertEqual([b['reference'] % ADDON_KEY_STRIDE for b in
+                          F.bound_in_image(binds, dict(image, exteriors=[]), names)], [9])
+
     def test_a_script_placed_only_in_mournhold_is_not_called_absent_once_the_image_binds_it(self):
         row = {'error': False, 'handwritten': False, 'inert': False, 'notyet': [], 'bound': 0, 'start': False,
                'started_by': [], 'refs': {'records': {'NPC_': ['asciene rane']}, 'placed': {'Tribunal.esm': {'NPC_': 1}},
@@ -101,6 +123,11 @@ class TheScriptMeasureReadsTheImage(unittest.TestCase):
         self.assertGreater(image['rooms'], 0)
         self.assertGreater(image['bound_in_image']['Tribunal.esm'], 0)
         self.assertLessEqual(sum(image['bound_in_image'].values()), image['addon_in_file'])
+        # EXPANSION-SCRIPTS-NOT-ATTACHED-66: the image's Solstheim frames count, so Bloodmoon's exterior scripts run
+        self.assertGreater(image.get('exteriors', 0), 0)
+        self.assertGreater(image['bound_in_image']['Bloodmoon.esm'], 610, 'the rooms alone gave 610')
+        states = {r['id'].casefold(): r['state'] for r in doc['scripts']}
+        self.assertEqual((states['rigmordoorscript'], states['colony_door_uryn']), ('runs', 'runs'))
         tribunal = [r for r in doc['scripts'] if r['master'] == 'Tribunal.esm']
         runs = [r for r in tribunal if r['state'] == 'runs' and r['bound']]
         self.assertGreater(len(runs), 45, 'Tribunal scripts bound in the image run: 45 were all the old measure found')

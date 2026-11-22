@@ -2,11 +2,12 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 3 times; something has to be done
+## PERSISTING: reported 4 times; something has to be done
 
 - Reported with v0.0.66-dev5 at 2026-11-15 (time not recorded): Seen again in the v0.0.66-dev5 build: "[2594/2594] cached, 0 to fit", done in 2m01s at 1.2 cores, its heartbeats at 1.0 cores with no output for 90 s.
 - Reported with v0.0.67-dev1 at 2026-11-17 13:59 +0200: Seen again in the v0.0.67-dev1 build (run 2026_11_17_v0.0.67-dev1_full-v0.0.67-dev1_6458e88, commit 6458e88): the CHIM room actor bake took 2 min 3 s at 1.2 cores.
 - Reported with v0.0.68-dev2 at 2026-11-21 01:02 +0200: Seen again in the v0.0.68-dev2 build: the room actor bake took about two minutes on one core
+- Reported with v0.0.68-dev5 at 2026-11-22 00:48 +0200: Seen again in the v0.0.68-dev5 build: the image step's room actor bake took 1 minute 55 seconds on about one core.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -40,6 +41,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-15: seen again in v0.0.66-dev5: Seen again in the v0.0.66-dev5 build: "[2594/2594] cached, 0 to fit", done in 2m01s at 1.2 cores, its heartbeats at 1.0 cores with no output for 90 s.
 - 2026-11-17 13:59 +0200: seen again in v0.0.67-dev1: Seen again in the v0.0.67-dev1 build (run 2026_11_17_v0.0.67-dev1_full-v0.0.67-dev1_6458e88, commit 6458e88): the CHIM room actor bake took 2 min 3 s at 1.2 cores.
 - 2026-11-21 01:02 +0200: seen again in v0.0.68-dev2: Seen again in the v0.0.68-dev2 build: the room actor bake took about two minutes on one core
+- 2026-11-22 00:48 +0200: seen again in v0.0.68-dev5: Seen again in the v0.0.68-dev5 build: the image step's room actor bake took 1 minute 55 seconds on about one core.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -48,7 +50,7 @@ _Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Status: 17 November 2026](#status-17-november-2026)
 - [Symptom](#symptom)
@@ -121,6 +123,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-ACTOR-LIBRARY-SHARE-RACE-67](BUILD-ACTOR-LIBRARY-SHARE-RACE-67.md): The actor library stage's two pools wrote their worker share through one temporary file name: a write found its file gone
 - [BUILD-ACTOR-LIBRARY-UNDERUSED-54](BUILD-ACTOR-LIBRARY-UNDERUSED-54.md): The actor-library stage ran at 2.69 of 8 allowed cores with 130 units queued and 7 running
 - [BUILD-AGA-AT-TEXT-LIMIT-60](BUILD-AGA-AT-TEXT-LIMIT-60.md): tools/build_aga.py is 7 bytes under the release text size limit: the next change to it fails the gate unless a stage is split out
+- [BUILD-BALMORA-KEY-PALETTE-OVERBROAD-68](BUILD-BALMORA-KEY-PALETTE-OVERBROAD-68.md): A scene palette change re-bakes every Balmora interior room and resident although about half the rooms and all residents come out byte for byte the same
 - [BUILD-BODY-BAKE-SLOWER-44](BUILD-BODY-BAKE-SLOWER-44.md): The image step's player body bake ran 42 % slower than its baseline with the same 40 bodies
 - [BUILD-CACHE-ABSOLUTE-PATHS-33](BUILD-CACHE-ABSOLUTE-PATHS-33.md): Stage fingerprints contain absolute paths, so a moved workspace or checkout reuses nothing
 - [BUILD-CACHE-CHIM-UNITS-33](BUILD-CACHE-CHIM-UNITS-33.md): The chim stage's fingerprint changes whenever the CHIM unit cache gains units, so the stage is never reused
@@ -130,6 +133,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [BUILD-CACHE-PER-WORKSPACE-33](BUILD-CACHE-PER-WORKSPACE-33.md): Per-file caches live in each build workspace, so a build on a new volume with --reuse-from converts everything again (MiniWind media 1,195 s instead of seconds)
 - [BUILD-CACHE-TRACE-PYTHONPATH-33](BUILD-CACHE-TRACE-PYTHONPATH-33.md): The stage read trace refused reuse of a reused run when another checkout was on PYTHONPATH
 - [BUILD-CELL-PROGRESS-UNDECLARED-OUTPUT-67](BUILD-CELL-PROGRESS-UNDECLARED-OUTPUT-67.md): The tracker data stage (cell-progress) writes flora-support.json at the run folder's top, outside its declared outputs, so a later build refuses to reuse the stage
+- [BUILD-CENSUS-PHASE-UNDERUSED-68](BUILD-CENSUS-PHASE-UNDERUSED-68.md): A fresh census stage ran on under 4 of 22 cores for about 6 minutes before its worker pool started
 - [BUILD-CHECK-ONE-CORE-66](BUILD-CHECK-ONE-CORE-66.md): The build's reuse check runs about six minutes on one core, and every snapshot runs it twice before its build starts
 - [BUILD-CHECK-REPEATED-AFTER-PASSED-CHECK-68](BUILD-CHECK-REPEATED-AFTER-PASSED-CHECK-68.md): Before building, the builder checks the plan again even when an identical check passed a few minutes earlier
 - [BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46](BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46.md): A change in the shared collision converter rebuilds every CHIM frame and everything after it, even where the output is identical

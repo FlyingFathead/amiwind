@@ -1,6 +1,6 @@
 # The expansions in every table
 
-_Last updated with AmiWind v0.0.66-dev2 (13 November 2026)._
+_Last updated with AmiWind v0.0.68-dev5 (21 November 2026)._
 
 With Tribunal and/or Bloodmoon selected (both by default: `--dlc both`; `--no-dlc` builds the base game alone), every
 table the builder makes from the game data reads the selected masters in load order. The one way to read them is the
@@ -43,7 +43,7 @@ game file alone, by design (reason given). Round: when the table was moved onto 
 | Start-disabled references | `tools/start_disabled.py` | layers (reads the merged master) | checked 2 |
 | Terrain survey, hull surface survey | `tools/survey_vvardenfell.py`, `tools/hull_surface_survey.py` | layers (read the merged master) | checked 2 |
 | Harvest source and catalogues | `tools/harvest_build.py`, `tools/prepare_harvest.py` | layers for the placements; the harvest kinds are the Bitter Coast mushrooms and tree fungi by model name, so no Bloodmoon plant is a harvest kind yet | open |
-| Teleport places (`dbg tp`) | `tools/tp_places_lut.py` | in progress elsewhere (TP-LIST-EXPANSIONS-66) | open |
+| Teleport places (`dbg tp`) | `tools/tp_places_lut.py` | layers: the selected masters through the merging reader; an outdoor place or being that only an expansion adds is listed when the image holds a frame of one of its cells, in the base world or in the expansion's own store (TP-LIST-EXPANSIONS-66, TP-LIST-MODULE-STORE-PLACES-68) | v0.0.68 |
 
 ## Base-only by design
 

@@ -33,6 +33,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 - 2026-11-18: reported in v0.0.67-dev2
 - 2026-11-18 14:25 +0200: fixed in source: developer, v0.0.67-dev2 (tools/build_cache.py CONTENT_ADDRESSED, CONTENT_ADDRESSED_FROM_THE_START); the stage's unit cache is content-addressed in the key, from the first run on; tests/test_presented_data_stage.py: the row is the same before the folder exists, empty and grown: a cache a stage fills must never be an input of that stage's key
+- 2026-11-21 16:54 +0200: seen again in v0.0.68-dev4: Seen again: the Solstheim module's stage is reported as an unexpected rebuild because of its own unit cache folder, while the real reason (a palette change it reads) is an expected one.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -95,6 +96,7 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - [BUILD-REUSE-ATTRIBUTION-33](BUILD-REUSE-ATTRIBUTION-33.md): Two stages that ran at the same time were both refused reuse when one wrote files under a folder the other only reads
 - [BUILD-REUSE-AUDIT-WITHOUT-REASON-36](BUILD-REUSE-AUDIT-WITHOUT-REASON-36.md): The reuse audit and preflight called a stage rerun because its old record was short a replaced file UNEXPECTED, although the reason explains it
 - [BUILD-REUSE-CASCADE-36](BUILD-REUSE-CASCADE-36.md): A fix in CHIM-native town code made 23 of 36 stages rebuild: the interior stage reran with different outputs and 5 rebuilds were unexpected
+- [BUILD-REUSE-CHAIN-ABSENT-STAGE-68](BUILD-REUSE-CHAIN-ABSENT-STAGE-68.md): A build that reuses a run rebuilds the stages that run had itself taken from an earlier run, because they are not stored in it
 - [BUILD-REUSE-CUTOFF-MODE-36](BUILD-REUSE-CUTOFF-MODE-36.md): Early cutoff compared file modes with their write bits: a stage reused by hard link (read-only) never matched the same bytes written fresh, so 10 stages after dev3's bsp rerun were refused
 - BUILD-REUSE-FOREIGN-DIRS-52 (no report page): A reused stage recreates, as empty folders, the folders another stage filled beside it: the area stage then stops on its own room folder
 - [BUILD-REUSE-INTRO-CENSUS-REPLACED-48](BUILD-REUSE-INTRO-CENSUS-REPLACED-48.md): A reused MiniWind rooms build rebuilt the intro and census stages (replaced outputs) and its Balmora interiors (4 s to 1m21s)

@@ -57,6 +57,7 @@ Family: Town and interior import (`town-import`). The town importer converts eve
 Related bugs in other categories:
 
 - [DISTRICT-PLACED-THINGS-NO-ROW-67](DISTRICT-PLACED-THINGS-NO-ROW-67.md): In Mournhold's districts no container, item, activator or door sign can be aimed at: their rows are keyed as a room's, and the game outdoors asks for the cells around the player
+- [EXPANSION-COUNTS-MISS-FRAME-STORES-68](EXPANSION-COUNTS-MISS-FRAME-STORES-68.md): The build's record of the expansions' actors and the script tracker leave out what the frame stores of the image hold: actors there count as not placed, Solstheim's built cells as missing, its attached scripts as outside the image, and scripts that only declare dialogue variables as not attached
 - [PLAZA-FABRICANTS-LIVE-AT-START-67](PLAZA-FABRICANTS-LIVE-AT-START-67.md): Plaza Brindisi Dorom holds the fabricants of a later quest from the start of a new game, one ready to attack on sight
 
 <!-- END GENERATED CATEGORY -->

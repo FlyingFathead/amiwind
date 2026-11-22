@@ -12,7 +12,7 @@ int AW_DrownRow(aw_drown_table_t *t,uint32_t reference,int create){
     for(i=0;i<t->count;i++)if(t->row[i].reference==reference)return i;
     if(!create)return -1;
     if(t->count>=AW_DROWN_ROWS){t->full++;return -1;}
-    t->row[t->count].reference=reference;t->row[t->count].left=-1;
+    t->row[t->count].reference=reference;t->row[t->count].left=-1;t->row[t->count].sound=0;
     return t->count++;
 }
 
@@ -39,6 +39,23 @@ int AW_DrownStep(aw_drown_table_t *t,int index,int submerged,int breathing,float
     t->row[index].left=left;
     if(loss)*loss=AW_BreathDamage(left,suffocation,dt);
     return submerged || left<hold;
+}
+
+int AW_DrownKnockedOut(aw_drown_table_t *t,int index,int knocked,int feet_under){
+    if(!t || index<0 || index>=t->count || knocked!=2 || !feet_under)return 0;
+    t->row[index].left=0;
+    return 1;
+}
+
+int AW_DrownSoundDue(aw_drown_table_t *t,int index,float loss,float dt,float seconds){
+    aw_drown_row_t *r;
+    if(!t || index<0 || index>=t->count)return 0;
+    r=&t->row[index];
+    if(dt>0)r->sound-=dt;
+    if(r->sound<0)r->sound=0;
+    if(!(loss>0) || r->sound>0)return 0;
+    r->sound=seconds>0.1f?seconds:0.1f;
+    return 1;
 }
 
 void AW_DrownFactId(char out[32],uint32_t reference){

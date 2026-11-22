@@ -481,6 +481,9 @@ int AW_SceneUse(void);
 /* Activation (v0.0.51): a script's Activate on a load door of this map; the scripts' take-over of a door's use. */
 int AW_SceneActivate(unsigned reference);
 extern int (*aw_scene_intercept)(unsigned reference);
+/* aw_mwhost.c: 1 when a script has switched the load door REFERENCE off; the use key, the prompt and the map's door
+ * markers leave it out (DOOR-LOAD-DISABLED-STILL-USED-68). NULL: every door is on. */
+extern int (*aw_scene_door_disabled)(unsigned reference);
 int AW_TravelKey(int key);
 int AW_TravelDraw(void);
 void AW_SceneDraw(void);

@@ -8,6 +8,8 @@
 #include "chim/chim.h"
 #include "aw_harvest_runtime.h"
 #include "aw_loaderr.h"
+#include "aw_links.h"      /* AW_SceneMapDoor: the map's door markers */
+#include "aw_activate.h"   /* AW_SceneFocusKind and its kinds */
 aw_character_t aw_character;
 /* SCENE-LOAD-FAIL-FALLBACK-67: the check before leaving (aw_loadfail.c in the game): a map refused as too big for this
  * start's memory (balmora) or with a short file (census) */
@@ -48,6 +50,11 @@ static int harvest_fixture,section_doors;
 /* ROOM-ARRIVAL-STAND-NO-SPOT-67 (v0.0.68): Seyda Neen's doors into the flooded fixture room, as the Forgotten Sewer's
  * trap door leads into its hall once a crank has flooded it: a marker in the water closed above, one in the pillar */
 static int flooded_doors;
+/* DOOR-LOAD-DISABLED-STILL-USED-68: Seyda Neen's door bank with two load doors in one doorway, as Skaal Village's
+ * Rigmor's Hut (Ex_S_door_rigmor, 8398850) and The Blodskaal's House (Ex_S_door_rigmor2, 8418049); the references a
+ * script has switched off (the world change list's answer, aw_mwhost.c AW_ObjectDisabled) */
+static int twin_doors;static unsigned door_off_a,door_off_b;
+static int fixture_door_disabled(unsigned reference){return reference && (reference==door_off_a || reference==door_off_b);}
 static eval_t harvest_reference;
 static model_t harvest_world,harvest_model;
 static char object_name[80];
@@ -221,12 +228,13 @@ static int room_map(const char *name,FILE **f){
  *f=tmpfile();assert(*f);fwrite(h,1,sizeof(h),*f);fputs(text,*f);rewind(*f);return (int)(124+n);
 }
 int COM_FOpenFile(char *name,FILE **f){
- if(!strcmp(name,"world/regions-sl.awr")){*f=NULL;return -1;}   /* no Solstheim rows on this disk */
- if(!strcmp(name,"world/regions-mh.awr")){*f=NULL;return -1;}   /* no Mournhold rows on this disk */
 #ifdef AW_DOOR_ENGINE_CHECK
- /* tools/door_engine_check.c: the files of a built image instead of this fixture's (DOOR-ENTRANCE-AUDIT-51) */
+ /* tools/door_engine_check.c: the files of a built image instead of this fixture's (DOOR-ENTRANCE-AUDIT-51), the
+  * rows files of the lands with a store of their own among them (DOOR-CHECK-MODULE-FRAME-MAPS-67) */
  return door_check_open(name,f);
 #endif
+ if(!strcmp(name,"world/regions-sl.awr")){*f=NULL;return -1;}   /* no Solstheim rows on this disk */
+ if(!strcmp(name,"world/regions-mh.awr")){*f=NULL;return -1;}   /* no Mournhold rows on this disk */
  if(roulette_fixture){
   /* room maps with a worldspawn and a start (BSP29 header, entity lump), the only maps on this disk */
   const char *text=!strcmp(name,"maps/bmcaius.bsp")?
@@ -282,6 +290,11 @@ int COM_FOpenFile(char *name,FILE **f){
  if(flooded_doors && !strcmp(name,"doors-seyda.txt")){
   const char *s="AWD3\nseyda census 474499 -5 35 25 5 45 35 -12.5 -31 -60 90\tFlooded hall\n"
                 "seyda census 474500 -5 35 25 5 45 35 120 -30 7.625 90\tPillar\n";
+  *f=tmpfile();assert(*f);fputs(s,*f);rewind(*f);return strlen(s);
+ }
+ if(twin_doors && !strcmp(name,"doors-seyda.txt")){
+  const char *s="AWD3\nseyda census 8398850 -5 35 25 5 45 35 12 34 77 90\tRigmor's Hut\n"
+                "seyda census 8418049 -5 35 25 5 45 35 22 44 77 90\tThe Blodskaal's House\n";
   *f=tmpfile();assert(*f);fputs(s,*f);rewind(*f);return strlen(s);
  }
  if(section_doors && (!strcmp(name,"doors-vf0000.txt") || !strcmp(name,"doors-mi5b8154939f7aa.txt"))){
@@ -1176,6 +1189,59 @@ int main(void){
   }
   flooded=0;sv.worldmodel=world;AW_SceneCancelTransition();
   VectorCopy(vec3_origin,p.v.mins);VectorCopy(vec3_origin,p.v.maxs);
+ }
+ /* DOOR-LOAD-DISABLED-STILL-USED-68: two load doors in one doorway, one switched off by its script (Skaal Village's
+  * rigmorDoorScript keeps Rigmor's Hut on while BM_SkaalAttack < 100 and The Blodskaal's House from 100 on). The use
+  * key, the prompt and the map's door markers take the door that is on, and switching the pair swaps it; with both off
+  * (a colony stage door of Raven Rock before its stage) nothing is aimed at and the use key loads nothing; without the
+  * script host (the hook NULL) every door is on, the first row as before. Before the fix the first row of the doorway
+  * was taken whatever its state: Rigmor's Hut after the attack too, and both markers on the map. A script's Activate
+  * acts on the door it names, never the other one of the doorway, and asks no state (OpenMW 0.51 OpActivate). */
+ {
+  /* both doors lead into the census office here, each to its own arrival (x 12: Rigmor's Hut, x 22: The Blodskaal's
+   * House), so the room the use key loads is told by where the player arrives */
+  static const struct {unsigned off_a,off_b;int hooked;const char *title;float x;int markers;} cases[]={
+   {8418049,0,1,"Rigmor's Hut",12,1},                 /* BM_SkaalAttack < 100 */
+   {8398850,0,1,"The Blodskaal's House",22,1},        /* from 100 on: the pair swapped */
+   {8418049,0,1,"Rigmor's Hut",12,1},                 /* and back */
+   {8398850,8418049,1,NULL,0,0},                      /* both off */
+   {0,0,1,"Rigmor's Hut",12,2},                       /* both on: the first row */
+   {8398850,0,0,"Rigmor's Hut",12,2}};                /* no script host: every door on */
+  static const struct {unsigned ref;float x;} activated[]={{8418049,22},{8398850,12}};
+  edict_t saved_target=target;int harvest_was=harvest_fixture,k,n,markers,found;float point[3];const char *label;
+  harvest_fixture=0;target.free=1;target_trace=travel_trace=occluded=0;door_duration=0;focus_kind=0;hinged_door=0;
+  aw_story.stage=AW_STAGE_RELEASED;key_dest=key_game;
+  AW_SceneCancelTransition();strcpy(sv.name,"prison");assert(!AW_SceneActivate(999));   /* the next read is seyda's own */
+  twin_doors=1;
+  for(k=0;k<(int)(sizeof(cases)/sizeof(cases[0]));k++){
+   door_off_a=cases[k].off_a;door_off_b=cases[k].off_b;aw_scene_door_disabled=cases[k].hooked?fixture_door_disabled:NULL;
+   AW_SceneCancelTransition();strcpy(sv.name,"seyda");memset(p.v.origin,0,sizeof(p.v.origin));p.v.view_ofs[2]=30;
+   p.v.movetype=MOVETYPE_WALK;p.v.health=73;cl.viewangles[0]=0;cl.viewangles[1]=90;cl.viewangles[2]=0;
+   cls.state=ca_connected;cls.signon=SIGNONS;
+   hint[0]=object_name[0]=0;AW_SceneDraw();
+   for(markers=found=i=0;(n=AW_SceneMapDoor(i,point,&label))>=0;i++)
+    if(n){markers++;if(cases[k].title && !strcmp(label,cases[k].title))found++;}
+   assert(markers==cases[k].markers && found==(cases[k].title?1:0));
+   queued[0]=0;
+   if(cases[k].title){
+    assert(!strcmp(object_name,cases[k].title) && !strcmp(hint,"(Enter: E)"));
+    assert(AW_SceneUse() && !strcmp(queued,"map census\n"));
+    strcpy(sv.name,"census");AW_SceneSpawn(&p);assert(p.v.origin[0]==cases[k].x);
+   }else{
+    assert(!object_name[0] && !hint[0] && AW_SceneFocusKind()!=AW_FOCUS_DOOR);
+    assert(!AW_SceneUse() && !queued[0]);
+   }
+  }
+  /* a script's Activate: the door it names, switched off or not */
+  door_off_a=8398850;door_off_b=0;aw_scene_door_disabled=fixture_door_disabled;
+  for(k=0;k<2;k++){
+   AW_SceneCancelTransition();strcpy(sv.name,"seyda");queued[0]=0;
+   assert(AW_SceneActivate(activated[k].ref) && !strcmp(queued,"map census\n"));
+   strcpy(sv.name,"census");AW_SceneSpawn(&p);assert(p.v.origin[0]==activated[k].x);
+  }
+  door_off_a=door_off_b=0;aw_scene_door_disabled=NULL;
+  AW_SceneCancelTransition();strcpy(sv.name,"prison");assert(!AW_SceneActivate(999));twin_doors=0;   /* seyda's own bank next */
+  target=saved_target;harvest_fixture=harvest_was;queued[0]=0;
  }
 #ifdef BALMORA_AVAILABLE
  /* A partial-area build (aw_miniwind.c, tools/miniwind.py): the logo and New

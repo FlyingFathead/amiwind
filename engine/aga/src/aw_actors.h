@@ -84,6 +84,8 @@ void AW_ActorsPlacedStatus (void);
 
 /* aw_combat.c: 0 not fighting, 1 fighting, 2 dead (health written if asked) */
 int AW_CombatSlotState (edict_t *e, float *health);
+/* aw_combat.c: 0 standing (or no fight), 1 knocked down, 2 knocked out (the drowning check, aw_drown.c) */
+int AW_CombatSlotKnocked (edict_t *e);
 /* aw_combat.c: a test fight with this resident (dead: it dies at once) */
 int AW_CombatTestEngage (edict_t *t, int dead);
 /* aw_combat.c: a saved death laid down again as a corpse (no essential message); 0 when it has no combat slot */

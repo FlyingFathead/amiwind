@@ -15,8 +15,15 @@
  * change list as the named fact "amiwind:breath:<reference>" (the float's bits), so a save made under water loads with
  * the same breath (OpenMW keeps it in the NPC's stats); New Game clears the facts and the table. The health is lost
  * through the NPC's own record and its death through the scripts' death path (aw_mwhost.c AW_MwscriptActorHurt).
- * Not yet: an NPC swimming up for air (AiBreathe, ACTOR-BREATHE-SWIM-UP-68), the knocked-out case
- * (ACTOR-KNOCKED-OUT-IN-WATER-DROWNS-68), the "drown" sound for NPCs. */
+ * KNOCKED OUT IN WATER (ACTOR-KNOCKED-OUT-IN-WATER-DROWNS-68; OpenMW actors.cpp 1011-1019, isKnockedOut at 1667 is the
+ * CharacterController's knock-out, never the knock-down): an NPC knocked out (the combat layer's fatigue knock-out)
+ * whose feet are under water (World::isUnderwater on its position) has no breath left at once and takes the damage
+ * from that frame, whether its head is under water or not; Water Breathing still keeps it breathing. OpenMW's other
+ * case, walking on the water's surface (World::isWalkingOnWater), does not arise here: no actor walks on water yet.
+ * THE SOUND (ACTOR-DROWN-SOUND-68; OpenMW actors.cpp 1039-1043): while an NPC takes the suffocation damage, the
+ * "drown" sound starts on it whenever it is not playing; here the player's sample (aw_breath.c AW_BreathSound) on the
+ * NPC's body channel, again once its length has passed (each row's own timer).
+ * Not yet: an NPC swimming up for air (AiBreathe, ACTOR-BREATHE-SWIM-UP-68), NPCs outdoors (ACTOR-DROWNING-OUTDOORS-68). */
 #ifndef AW_DROWN_H
 #define AW_DROWN_H
 
@@ -25,7 +32,8 @@
 #define AW_DROWN_ROWS 32
 #define AW_DROWN_SWIM_HEIGHT_SCALE 0.9f    /* fSwimHeightScale, Morrowind.esm */
 
-typedef struct {uint32_t reference;float left;} aw_drown_row_t;
+/* LEFT the breath left (-1 full); SOUND the seconds until its "drown" sound may start again (0: at the next damage) */
+typedef struct {uint32_t reference;float left,sound;} aw_drown_row_t;
 typedef struct {aw_drown_row_t row[AW_DROWN_ROWS];int count;unsigned long full;} aw_drown_table_t;
 
 /* The row of REFERENCE in T: its index, or with CREATE a new row (its breath LEFT -1: full, not yet set); -1 when it has
@@ -45,6 +53,13 @@ int AW_DrownTakes(int fight_state,int drawn);
  * (under water, or its breath not full yet), 0 when it can go (out of the water, full). */
 int AW_DrownStep(aw_drown_table_t *t,int index,int submerged,int breathing,float hold,float suffocation,float dt,
                  float *loss);
+/* Row INDEX of T knocked out with its feet under water (KNOCKED 2: the combat layer's knock-out; 1, the knock-down, is
+ * not): its breath is gone at once (OpenMW setTimeToStartDrowning(0)). Returns 1 when the case applies (the caller then
+ * steps the row as submerged), 0 otherwise (nothing changed). */
+int AW_DrownKnockedOut(aw_drown_table_t *t,int index,int knocked,int feet_under);
+/* Whether row INDEX of T starts its "drown" sound now: its timer falls by DT; with a damage LOSS this frame and the
+ * timer run out, 1 and the timer set to the sample's SECONDS (at least 0.1 s); 0 otherwise. */
+int AW_DrownSoundDue(aw_drown_table_t *t,int index,float loss,float dt,float seconds);
 /* The saved fact of REFERENCE's breath: "amiwind:breath:<reference>" into OUT; the breath left in its 32 bits and back. */
 void AW_DrownFactId(char out[32],uint32_t reference);
 long AW_DrownFactValue(float left);

@@ -102,5 +102,6 @@ Family: Map heap and memory budget (`heap-memory`). The heap model must match wh
 Related bugs in other categories:
 
 - [CHIM-FRAME-EDGE-CLAMPS-OUTSIDE-TILES-68](CHIM-FRAME-EDGE-CLAMPS-OUTSIDE-TILES-68.md): A large model's tiles that lie beyond a CHIM frame's edge are all given to its edge chunks, so one memory ring at the frame's corner holds every tile of the model
+- [SOL-GLACIER-ICE-BROWN-SHEER-68](SOL-GLACIER-ICE-BROWN-SHEER-68.md): The Mortrag Glacier's ice draws brown instead of white and shows a sheer vertical drop where the original slopes
 
 <!-- END GENERATED CATEGORY -->

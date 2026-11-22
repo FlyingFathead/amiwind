@@ -54,6 +54,19 @@ class SolTestCommands(unittest.TestCase):
         self.assertEqual(commands['image'][-4:], ['--chim-sol-world', str(Path('/run') / 'chim-sol'),
                                                   '--chim-sol-alt', '1=' + str(Path('/run') / 'chim-sol-star')])
 
+    def test_image_waits_for_the_test_world(self):
+        # BUILD-CHIM-SOL-TEST-IMAGE-NO-WAIT-68: the image installs run/chim-sol, so it waits for chim-sol (and the tree
+        # stages); without the option the image's dependencies are as before
+        import build_parallel
+        base = ('world-terrain', 'world-scenery', 'npc-gallery', 'music', 'media', 'engine', 'dialogue-lookup', 'intro')
+        on = [(n, tool(n)) for n in ('census', 'chim', 'chim-sol-data', 'chim-sol-trees', 'chim-sol', 'chim-sol-star',
+                                     'image')]
+        deps = build_parallel.stage_dependencies(on, skipped=base)
+        for stage in ('chim-sol-data', 'chim-sol-trees', 'chim-sol', 'chim-sol-star', 'chim'):
+            self.assertIn(stage, deps['image'])
+        off = [(n, tool(n)) for n in ('census', 'chim', 'image')]
+        self.assertNotIn('chim-sol', build_parallel.stage_dependencies(off, skipped=base)['image'])
+
     def test_layer_data_finds_the_mwad_package_when_run_as_a_script(self):
         # BUILD-LAYER-DATA-MWAD-SHADOWED-64: run as a script, tools/ (with tools/mwad.py) is first on the path
         import subprocess

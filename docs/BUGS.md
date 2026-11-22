@@ -1,6 +1,6 @@
 # Bug tracker
 
-_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.68-dev4._
+_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.68-dev6._
 
 The one bug tracker of AmiWind: every bug, its current status, its dated events
 and how it was closed. How tracking works, the report template, the closure
@@ -20,7 +20,7 @@ a duplicate or superseded (the status says which).
 
 <!-- BEGIN GENERATED BUG REGISTER: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
-2118 bugs: 1198 open, 804 fixed, 116 closed.
+2131 bugs: 1211 open, 804 fixed, 116 closed.
 
 ### Persisting, not resolved
 
@@ -28,8 +28,8 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 
 - [CHIM-SEYDA-BALMORA-LOAD-HANG-43](bugs/CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): Travelling from Seyda Neen to Balmora sometimes hangs on the Loading screen (boot smoke, 2 of about 5 runs) (reported 48 times, open)
 - [BUILD-IMAGE-UNDERUSED-32](bugs/BUILD-IMAGE-UNDERUSED-32.md): Parts of the image step still run serially or leave most CPUs idle (reported 24 times, open)
+- [CONTAINER-READ-ENOMEM-66](bugs/CONTAINER-READ-ENOMEM-66.md): In the development container, reads of the repository files sometimes fail with "Cannot allocate memory"; a retry works, so a check that hits it can report an unrelated failure (reported 19 times, open)
 - [BUILD-CHIM-STAGE-SERIAL-TAIL-36](bugs/BUILD-CHIM-STAGE-SERIAL-TAIL-36.md): After the parallel world build the chim stage ran its validation, heap gate and zone walk on one core (about 10 minutes of the 270-frame coast build) (reported 17 times, open)
-- [CONTAINER-READ-ENOMEM-66](bugs/CONTAINER-READ-ENOMEM-66.md): In the development container, reads of the repository files sometimes fail with "Cannot allocate memory"; a retry works, so a check that hits it can report an unrelated failure (reported 17 times, open)
 - [BUILD-CHIM-CELLS-PRIVATE-LIST-47](bugs/BUILD-CHIM-CELLS-PRIVATE-LIST-47.md): The releases' CHIM cell list was not in the source tree; public builds had no CHIM exterior cells (reported 11 times, fixed)
 - [PERF-GUARD-RESIDENT-BUSY-HOST-57](bugs/PERF-GUARD-RESIDENT-BUSY-HOST-57.md): The dev5 full build's perf guard failed chim-town-balmora and chim-town-vivec_city build_resident as slower (129 s, was 52 s; 147 s, was 62 s) while two other builds ran beside it: contention, not code (reported 11 times, open)
 - [MESH-LOD-TORN-MESHES-33](bugs/MESH-LOD-TORN-MESHES-33.md): Island-wide seam audit: 49 reduced meshes tear their seams (town flora, rocks, the arrival ship) (reported 10 times, open)
@@ -74,6 +74,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [CHIM-FRAME-EDGE-EFRAG-CRASH-36](bugs/CHIM-FRAME-EDGE-EFRAG-CRASH-36.md): R_StoreEfrags: Bad entity type 270440 ends the game: a leaf link to an entity whose model is NULL (normal play in Seyda Neen; noclip past the Vivec frame edge) (reported 4 times, fixed)
 - [CHIM-ROOM-HEART-CHAMBER-LOAD-50](bugs/CHIM-ROOM-HEART-CHAMBER-LOAD-50.md): Entering Akulakhan's Chamber when it cannot load stops the game with an error at the console instead of refusing at the door (reported 4 times, open)
 - [DBG-ENTITY-INSPECT-39](bugs/DBG-ENTITY-INSPECT-39.md): Requested click-to-pin raw entity and reference inspection (reported 4 times, open)
+- [IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66](bugs/IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66.md): The image step's CHIM room actor bake takes about two minutes on one core when every room resident is already cached (reported 4 times, open)
 - [INTERIOR-MORAG-TONG-FPS-43](bugs/INTERIOR-MORAG-TONG-FPS-43.md): The Morag Tong Guild interior runs at a very low frame rate (reported 4 times, open)
 - [MESH-REDUCTION-SEAMS-62](bugs/MESH-REDUCTION-SEAMS-62.md): Reduced actor models lose seams and thin their limbs, and nothing compared them with the original (reported 4 times, open)
 - [PLAYER-BODY-LEG-SHAPE-39](bugs/PLAYER-BODY-LEG-SHAPE-39.md): Nord player legs appear abnormally thin in RC1 (reported 4 times, open)
@@ -106,6 +107,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [BUILD-VERSION-EMULATOR-PRESETS-38](bugs/BUILD-VERSION-EMULATOR-PRESETS-38.md): Version bump omitted matching emulator presets (reported 3 times, open)
 - [CHARGEN-ABILITY-DESCRIPTIONS-65](bugs/CHARGEN-ABILITY-DESCRIPTIONS-65.md): The birthsign and race menus do not show what an ability or a special power does (reported 3 times, open)
 - [CHIM-AUTO-BANK-CLIFF-51](bugs/CHIM-AUTO-BANK-CLIFF-51.md): 32 MB of Fast RAM got no automatic CHIM cache bank: 13 MiB free gave a 7 MiB budget and the first bank needed 8 MiB (reported 3 times, open)
+- [CHIM-MESH-STAIR-UNIT-SLOW-67](bugs/CHIM-MESH-STAIR-UNIT-SLOW-67.md): One stair collision unit of a Solstheim glacier cell takes 19.5 minutes on one core, and its second over 25 (reported 3 times, open)
 - [CHIM-READ-RUNS-33](bugs/CHIM-READ-RUNS-33.md): CHIM crossings read little but in many separate runs, so FFS seeks dominate (reported 3 times, open)
 - [CHIM-RED-MOUNTAIN-SOLID-SKY-43](bugs/CHIM-RED-MOUNTAIN-SOLID-SKY-43.md): On the Red Mountain summit (cell 2,9) the player ends up inside solid and only the sky is drawn, no terrain (reported 3 times, open)
 - [CHIM-ROCKS-OPEN-SHELLS-43](bugs/CHIM-ROCKS-OPEN-SHELLS-43.md): Several rock meshes on CHIM do not close up: open faces where the rock should be solid (reported 3 times, open)
@@ -121,7 +123,6 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [HARVEST-HYPHA-FACIA-FLOATING-65](bugs/HARVEST-HYPHA-FACIA-FLOATING-65.md): In Seyda Neen a Hypha Facia mushroom that grows on a tree's side floats in the air (reported 3 times, open)
 - [HORIZON-HOLES-31](bugs/HORIZON-HOLES-31.md): Distant buildings break up against the sky (reported 3 times, open)
 - [IMAGE-LOADS-SLOWER-66](bugs/IMAGE-LOADS-SLOWER-66.md): Area loads on the v0.0.66-dev2 image take 1.3 to 2.2 times as long as on v0.0.66-dev1 with the same file work (Vivec 13.6 s against 29.9 s) (reported 3 times, fixed)
-- [IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66](bugs/IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66.md): The image step's CHIM room actor bake takes about two minutes on one core when every room resident is already cached (reported 3 times, open)
 - [INTERIOR-CREATURES-MISSING-41](bugs/INTERIOR-CREATURES-MISSING-41.md): No creature is placed in any interior: the resident stage takes NPC records only, so the demigod Vivec is missing from his palace (reported 3 times, fixed)
 - [MESH-EBONHEART-DRAGON-PEDESTAL-42](bugs/MESH-EBONHEART-DRAGON-PEDESTAL-42.md): Ebonheart: the Imperial dragon statue floats; its converted model starts 236 units above its origin, nothing below (reported 3 times, fixed)
 - [NPC-HEAD-DECIMATION-33](bugs/NPC-HEAD-DECIMATION-33.md): NPC heads decimated into unrecognisable faces (reported 3 times, open)
@@ -150,6 +151,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [BUILD-CHECK-ONE-CORE-66](bugs/BUILD-CHECK-ONE-CORE-66.md): The build's reuse check runs about six minutes on one core, and every snapshot runs it twice before its build starts (reported 2 times, fixed)
 - [BUILD-CHIM-REGION-FRAMES-TAIL-43](bugs/BUILD-CHIM-REGION-FRAMES-TAIL-43.md): The CHIM region-frame step runs its last frames on one worker while the other cores sit idle (reported 2 times, open)
 - [BUILD-CHIM-STAGE-IDLE-START-36](bugs/BUILD-CHIM-STAGE-IDLE-START-36.md): The chim stage of the 270-frame coast build spends its first 35-45 minutes on 1-4 cores while it holds 12-24 workers (reported 2 times, open)
+- [BUILD-IMAGE-AFTER-OPTIMIZER-SERIAL-68](bugs/BUILD-IMAGE-AFTER-OPTIMIZER-SERIAL-68.md): After its optimizer check the image step ran on one of 22 cores for more than six minutes, with no named section (reported 2 times, open)
 - [BUILD-IMAGE-CHIM-NATIVE-TOWN-36](bugs/BUILD-IMAGE-CHIM-NATIVE-TOWN-36.md): The image step of a CHIM-native town read legacy region maps that are never built: the Bitter Coast test build failed at the end of its image step on maps/bc000.bsp (reported 2 times, fixed)
 - [BUILD-IMAGE-FINALIZE-UNDERUSED-48](bugs/BUILD-IMAGE-FINALIZE-UNDERUSED-48.md): The image step ran on about 4 of 24 cores for 85 s after the player view (serial steps, then finalize at 2.6 cores), and the underused warning named no sub-step (reported 2 times, fixed)
 - [BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66](bugs/BUILD-IMAGE-LAYOUT-WRITE-SLOWER-66.md): The image step of the v0.0.66-dev9 build wrote its partitions in 107 seconds where the earlier build took 67 (reported 2 times, fixed)
@@ -159,6 +161,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [BUILD-LEGACY-CHAIN-DEFAULT-36](bugs/BUILD-LEGACY-CHAIN-DEFAULT-36.md): Builds still prepared CHIM towns through the legacy region-map chain by default, and a retired flag (--legacy-area) was accepted with only a warning (reported 2 times, fixed)
 - [BUILD-PLAYER-VIEW-UNDERUSED-48](bugs/BUILD-PLAYER-VIEW-UNDERUSED-48.md): The image step player view remade all 80 player bodies in every build on four fresh worker pools (2m05s at 16.2 of 24 cores) (reported 2 times, open)
 - [BUILD-RESOURCE-PLAN-MINIWIND-FULL-PARENT-52](bugs/BUILD-RESOURCE-PLAN-MINIWIND-FULL-PARENT-52.md): A MiniWind build is refused by the resource plan: its one-area CHIM stage is estimated from the full build's island-wide chim parent (19,868 MiB) and labelled a stair walk although the walk is off (reported 2 times, fixed)
+- [BUILD-RESOURCE-PLAN-UNIT-REUSE-66](bugs/BUILD-RESOURCE-PLAN-UNIT-REUSE-66.md): The build's resource plan estimates the wall time as if every unit cache held, while the reuse guard finds them all stale (reported 2 times, open)
 - [BUILD-REUSE-PLAN-ENV-36](bugs/BUILD-REUSE-PLAN-ENV-36.md): The standalone reuse plan reports environment changes the real build does not have (reported 2 times, open)
 - [BUILD-REUSE-SCRATCH-UNDECLARED-33](bugs/BUILD-REUSE-SCRATCH-UNDECLARED-33.md): A rerun with --reuse-from reused 1 of 33 stages: the builder's scratch folder made the first stages non-reusable (reported 2 times, fixed)
 - [BUILD-SETUP-ONE-CORE-66](bugs/BUILD-SETUP-ONE-CORE-66.md): A full build spends about five minutes on one core before its first stage starts (reported 2 times, open)
@@ -171,7 +174,6 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [CHIM-COLLISION-UNION-FALLBACK-41](bugs/CHIM-COLLISION-UNION-FALLBACK-41.md): Daedric ruin collision falls back to raw piece chains and puts Hla Oad's frames over the CHIM memory budget (reported 2 times, open)
 - [CHIM-EXTERIOR-FLAMES-MISSING-48](bugs/CHIM-EXTERIOR-FLAMES-MISSING-48.md): CHIM exteriors draw no fire: campfires, braziers, fire pits and flame lamps outdoors have no flame animation (reported 2 times, fixed)
 - [CHIM-LEGACY-CHAIN-33](bugs/CHIM-LEGACY-CHAIN-33.md): CHIM builds still run the legacy exterior chain: frame maps read the legacy region maps, and the open world is built (reported 2 times, closed)
-- [CHIM-MESH-STAIR-UNIT-SLOW-67](bugs/CHIM-MESH-STAIR-UNIT-SLOW-67.md): One stair collision unit of a Solstheim glacier cell takes 19.5 minutes on one core, and its second over 25 (reported 2 times, open)
 - [CHIM-MESHLESS-LIGHTS-33](bugs/CHIM-MESHLESS-LIGHTS-33.md): Exterior lights without a mesh have no CHIM light path: 2,284 placed lights give no light in a CHIM frame (reported 2 times, open)
 - [CHIM-TERRAIN-TEXTURE-BLOCKY-43](bugs/CHIM-TERRAIN-TEXTURE-BLOCKY-43.md): Roads and paths on the ground look blocky: each texture square is drawn with hard edges instead of blending into its neighbours (reported 2 times, open)
 - [CHIM-ZONE-BUDGET-33](bugs/CHIM-ZONE-BUDGET-33.md): The engine's default CHIM zone does not hold the active ring of Seyda Neen or of Balmora's south-west corner (reported 2 times, fixed)
@@ -214,12 +216,14 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [PRISON-SHIP-RENDER-COST-56](bugs/PRISON-SHIP-RENDER-COST-56.md): The prison ship's hold draws slower than the Vivec Arena Pit: frame rate dips in the opening room (reported 2 times, open)
 - [RELEASE-KIT-NO-REPAIR-MODE-35](bugs/RELEASE-KIT-NO-REPAIR-MODE-35.md): The release kit has no repair mode for a commit already pushed (reported 2 times, open)
 - [REST-CUT-NO-CREATURE-67](bugs/REST-CUT-NO-CREATURE-67.md): A wilderness rest that is cut short brings no creature and no message (reported 2 times, open)
+- [REUSE-VERIFY-SLOW-BESIDE-MODULE-STAGES-68](bugs/REUSE-VERIFY-SLOW-BESIDE-MODULE-STAGES-68.md): Reusing the room batches of an earlier build took about 37 seconds where earlier reuses took 5 (reported 2 times, open)
 - [ROOM-LOAD-KEEPS-EXTERIOR-CACHE-64](bugs/ROOM-LOAD-KEEPS-EXTERIOR-CACHE-64.md): Entering a large room from a town keeps the town's CHIM model cache, so the room can run out of Fast RAM at 32 MB although it fits on its own (reported 2 times, open)
 - [ROOM-LOAD-LONG-FRAME-63](bugs/ROOM-LOAD-LONG-FRAME-63.md): A room load took one 19-second frame in a test session while a gate ran beside it (reported 2 times, open)
 - [ROOMS-SET-ASIDE-NOT-BUILT-67](bugs/ROOMS-SET-ASIDE-NOT-BUILT-67.md): Rooms that no door leads to are set aside and not built, although a script, a teleport or travel can lead there (reported 2 times, open)
 - [SEYDA-LANTERNS-MISSING-31](bugs/SEYDA-LANTERNS-MISSING-31.md): Seyda Neen lanterns light the night but are not in its maps (reported 2 times, open)
 - [SEYDA-WALL-SHAPE-31](bugs/SEYDA-WALL-SHAPE-31.md): Dark shape pokes out of a stone wall by the Seyda Neen shore (reported 2 times, fixed)
 - [SOL-ICE-CELLS-RING-OVER-68](bugs/SOL-ICE-CELLS-RING-OVER-68.md): Two Solstheim ice coast cells convert but their memory ring is far above the budget: every tilted iceberg shard is stored as a model of its own (reported 2 times, open)
+- [STALL-SLOW-STAGE-VS-REUSE-TIME-68](bugs/STALL-SLOW-STAGE-VS-REUSE-TIME-68.md): The builder's slow-stage warning compared a stage that had to run with the few seconds an earlier build took to reuse it, and so called a normal run eight times too slow (reported 2 times, open)
 - [SWEEP-SLOW-ARRIVALS-57](bugs/SWEEP-SLOW-ARRIVALS-57.md): Settlement sweep: 13 of 82 places run above 50 ms a frame just after arrival at 32 MB Fast (reported 2 times, open)
 - [TEST-BUILD-STALL-STARTUP-TIMING-67](bugs/TEST-BUILD-STALL-STARTUP-TIMING-67.md): The build stall test of a startup watch (test_a_watch_started_before_the_run_name_writes_once_it_has_one) failed once in a gate on a busy machine: it allows the watch 0.2 s to write (reported 2 times, open)
 - [TEST-PARALLEL-ORDER-FLAKY-36](bugs/TEST-PARALLEL-ORDER-FLAKY-36.md): test_processes_keep_order_and_limit_nested_threads is timing-sensitive and fails now and then (reported 2 times, closed)
@@ -235,17 +239,30 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 
 Three tables: the open bugs, the fixed ones and the closed ones. Each row links the bug's report page.
 
-#### Open (1198)
+#### Open (1211)
 
 Open bugs, most recently noticed first.
 
 | ID | Issue | Severity | Found in | State | Fixed in | Maintainer accepted | Waiting on | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| [TRACK-FIXED-STEPS-WHOLE-HOME-68](bugs/TRACK-FIXED-STEPS-WHOLE-HOME-68.md) | Recording a fix of one register entry through its planning item marks every other entry of that item as fixed by the same commit | medium | v0.0.68-dev5 | open | - | - | - | Open: the four false steps are not committed yet and need taking back. |
+| [BUILD-REUSE-CHAIN-ABSENT-STAGE-68](bugs/BUILD-REUSE-CHAIN-ABSENT-STAGE-68.md) | A build that reuses a run rebuilds the stages that run had itself taken from an earlier run, because they are not stored in it | medium | v0.0.68-dev5 (v0.0.68-dev5 glacier A1 resume ba0833e) | open | - | - | - | Seen on a test image resume that named the previous run as its reuse. |
+| [BUILD-CHIM-SOL-TEST-IMAGE-NO-WAIT-68](bugs/BUILD-CHIM-SOL-TEST-IMAGE-NO-WAIT-68.md) | In a Solstheim test image build the image step did not wait for the Solstheim test world it installs, so a build with everything else reused assembled the image before that world existed | medium | v0.0.68-dev5 (v0.0.68-dev5 glacier A1 resume ba0833e) | open (fixed in source) | - | - | - | Fixed in source on the glacier branch with a test; the gate and the next test image follow. |
+| [TRACKER-GUARD-SHIPPED-STEP-68](bugs/TRACKER-GUARD-SHIPPED-STEP-68.md) | The tracker write guard counts the delivery chain's step that records what a build shipped as a write outside the intake | medium | v0.0.68-dev5 (v0.0.68-dev5 delivery chain 4d1da82) | open | - | - | - | The guard only reports today; the delivery goes on. |
+| [EXPANSION-COUNTS-MISS-FRAME-STORES-68](bugs/EXPANSION-COUNTS-MISS-FRAME-STORES-68.md) | The build's record of the expansions' actors and the script tracker leave out what the frame stores of the image hold: actors there count as not placed, Solstheim's built cells as missing, its attached scripts as outside the image, and scripts that only declare dialogue variables as not attached | medium | v0.0.68-dev5 | open | - | - | - | Fixed in source, not gated yet: both readers take the frame stores' record of the image; an inert script needs no binding. |
+| [TP-LIST-MODULE-STORE-PLACES-68](bugs/TP-LIST-MODULE-STORE-PLACES-68.md) | The teleport list leaves out the Solstheim places and beings of an image that holds the island | medium | v0.0.68-dev4 | open (shipped, awaiting confirmation) | - | - | - | Reported in v0.0.68-dev4; cause unknown. |
+| [SOL-GLACIER-ICE-BROWN-SHEER-68](bugs/SOL-GLACIER-ICE-BROWN-SHEER-68.md) | The Mortrag Glacier's ice draws brown instead of white and shows a sheer vertical drop where the original slopes | high | v0.0.68-dev4 (v0.0.68-dev3) | open | - | - | - | Seen in both glacier test images (today's methods and method E), so the colour and the drop do not come from the method chosen for the ice; the cause is being looked for in the ice textures' path and in the drawn shape against the original. |
 | [RELEASE-EARLY-CORES-CLAIM-MISREAD-68](bugs/RELEASE-EARLY-CORES-CLAIM-MISREAD-68.md) | The release notes check took a known-fault line about idle cores for a claim of full core use, and only the gate ran it | low | v0.0.68-dev4 | open | - | - | - | A Known in this build line saying a check reported no cores in use while worker pools ran, next to a line naming a stage measured underused, is refused by the release early check as a full-core claim, while the pre-gate check passes it. |
+| [LOOKBOOK-NO-COLOUR-CHECK-68](bugs/LOOKBOOK-NO-COLOUR-CHECK-68.md) | The look book checks only numbers on its pages, so a palette change that alters the colours of every confirmed look cannot fail any page | medium | v0.0.68-dev4 (v0.0.68-dev4 glacier A1 test image 5d2226e) | open | - | - | - | Found while preparing a palette test image; the stills of the confirmed pages are compared by hand against the previous build for that change. |
+| [DOOR-USE-COLLISION-EXPANSIONS-68](bugs/DOOR-USE-COLLISION-EXPANSIONS-68.md) | 13 exterior entrances of Solstheim and Mournhold cannot be reached in the converted collision: no standing spot at the threshold, or the door out of the use reach | high | v0.0.68-dev4 | open | - | - | - | Open, cause not known per door. The door check traces, in each frame's own collision, where a player can stand at a door and whether the use reaches it. Until this version it did not look at the entrances of Solstheim and of Mournhold's districts at all. Now that it does, 11 of them have no standing spot within 80 units above the threshold and 2 have the door out of the use reach (82 and 86 units). The two Raven Rock doors belong to buildings of later colony stages. The 13 are on the check's known list with this entry as their class, so a build is not stopped by them; each leaves the list when the check reaches it. |
+| [DOOR-LOAD-DISABLED-STILL-USED-68](bugs/DOOR-LOAD-DISABLED-STILL-USED-68.md) | A load door switched off by its script still shows its prompt and can be used | medium | v0.0.68-dev4 | open (fixed in source) | - | - | - | Reported in v0.0.68-dev4; cause unknown. |
+| [BUILD-CENSUS-PHASE-UNDERUSED-68](bugs/BUILD-CENSUS-PHASE-UNDERUSED-68.md) | A fresh census stage ran on under 4 of 22 cores for about 6 minutes before its worker pool started | low | v0.0.68-dev4 (v0.0.68-dev4 glacier A1 test image 5d2226e) | open | - | - | - | Seen in a full re-bake after a palette change; the cause of the serial stretch is not traced yet. |
+| [BUILD-BALMORA-KEY-PALETTE-OVERBROAD-68](bugs/BUILD-BALMORA-KEY-PALETTE-OVERBROAD-68.md) | A scene palette change re-bakes every Balmora interior room and resident although about half the rooms and all residents come out byte for byte the same | medium | v0.0.68-dev4 (v0.0.68-dev4 glacier A1 test image 5d2226e) | open | - | - | - | Measured on a palette test image: 24 of 43 room maps and 35 of 35 rooms' resident parts unchanged after a full re-bake. |
 | [WEREWOLF-HEAD-NOT-REDUCED-68](bugs/WEREWOLF-HEAD-NOT-REDUCED-68.md) | The outer-measures reduction leaves the werewolf's head whole at every target and reports that as a pass | low | v0.0.68-dev3 (v0.0.68-seamfix development branch (not built)) | open | - | - | - | Reported in v0.0.68-dev3; cause unknown. |
 | [STALL-ZERO-CORES-WHILE-POOLS-BUSY-68](bugs/STALL-ZERO-CORES-WHILE-POOLS-BUSY-68.md) | The build's stall check reported no cores in use while a stage's worker pools were running | medium | v0.0.68-dev3 | open | - | - | - | Reported in v0.0.68-dev3; cause unknown. |
 | [SOL-MODULE-CONVERSION-HALF-CORES-68](bugs/SOL-MODULE-CONVERSION-HALF-CORES-68.md) | Solstheim's world stage converted on about half of its cores | low | v0.0.68-dev3 | open | - | - | - | Reported in v0.0.68-dev3; cause unknown. |
 | [SOL-FROSTMOTH-DOCK-FRAME-RATE-68](bugs/SOL-FROSTMOTH-DOCK-FRAME-RATE-68.md) | Fort Frostmoth's dock on Solstheim runs at about a quarter of the island's usual frame rate when looking over the dock and the ship | medium | v0.0.68-dev3 | open | - | - | - | Reported in v0.0.68-dev3; cause unknown. |
+| [ROOM-PLACED-CORPSES-NOT-SPAWNED-68](bugs/ROOM-PLACED-CORPSES-NOT-SPAWNED-68.md) | Creatures the game places dead in rooms (skeletons, dead scamps, scribs, centurions, the Hall of Ministry's dead rat) are never spawned, so their bodies are missing | medium | v0.0.68-dev3 | open | - | - | - | Open. Found by reading the image's room maps and actor table: the room's entity for a dead creature names a corpse base, and the engine's spawn of a room's placed creature takes only living actors. |
 | [REUSE-VERIFY-SLOW-BESIDE-MODULE-STAGES-68](bugs/REUSE-VERIFY-SLOW-BESIDE-MODULE-STAGES-68.md) | Reusing the room batches of an earlier build took about 37 seconds where earlier reuses took 5 | low | v0.0.68-dev3 | open | - | - | - | Reported in v0.0.68-dev3; cause unknown. |
 | [INVISIBLE-WALLS-NOT-BUILT-68](bugs/INVISIBLE-WALLS-NOT-BUILT-68.md) | Invisible walls of the game outside the opening are not built: five at Mournhold's city edges, which show "You may not leave the city this way." in the original, and one at exterior cell 15,5, so the player can walk where the original stops him | medium | v0.0.68-dev3 (v0.0.67 release run) | open (fixed in source) | - | - | - | Reported in v0.0.68-dev3; cause unknown. |
 | [CHIM-SOL-TEST-TWO-CHIMSOL-STORES-68](bugs/CHIM-SOL-TEST-TWO-CHIMSOL-STORES-68.md) | A Solstheim test image stops in its image step: the test frames and the Solstheim build module both make the same store | medium | v0.0.68-dev3 (v0.0.68-dev3 glacier compare test image E) | open (fixed in source) | - | - | - | Reported in v0.0.68-dev3; cause unknown. |
@@ -2379,8 +2396,30 @@ Closed without a fix: not a bug, a duplicate or superseded; the status says whic
 Every dated event of every bug, newest first, from the entries' own data (reports, history lines, closure steps, returns, fixes, deferrals; the first notice is the Found in column above). Nothing here is written by hand: an event goes onto its entry (`tools/bug_register.py report`, `note`, `step`, `set`) and the render lists it. The hand-written bug journal ended with v0.0.62-dev1 (7 November 2026): its entries were merged into their bugs' entries on 16 November 2026 and appear here.
 
 
+##### 22 November 2026
+
+- [CHIM-MESH-STAIR-UNIT-SLOW-67](bugs/CHIM-MESH-STAIR-UNIT-SLOW-67.md): seen again in v0.0.68-dev5: On the Solstheim glacier test build with mesh method E, each of the nine test cells' stair collision units ran for over 47 minutes on one core, longer than the earlier 19.5 to 25 minutes.
+- [CONTAINER-READ-ENOMEM-66](bugs/CONTAINER-READ-ENOMEM-66.md): seen again in v0.0.68-dev5: Seen again: a release kit's validation could not read the source repository in its container (cannot allocate memory) while the machine's memory was fragmented; the one-shot cache drop restored large free blocks and the validation was ...
+- [CONTAINER-READ-ENOMEM-66](bugs/CONTAINER-READ-ENOMEM-66.md): seen again in v0.0.68-dev5: Seen again: a release kit's validation could not clone the source in its container while the build machine's memory was fragmented with no large free blocks; it is retried.
+- [EXPANSION-SCRIPTS-NOT-ATTACHED-66](bugs/EXPANSION-SCRIPTS-NOT-ATTACHED-66.md): seen again in v0.0.68-dev5: Measured on the v0.0.68-dev5 build: 2,088 of 2,534 scripted references of the expansions run their script.
+- [IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66](bugs/IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66.md): seen again in v0.0.68-dev5: Seen again in the v0.0.68-dev5 build: the image step's room actor bake took 1 minute 55 seconds on about one core.
+- [BUILD-CHIM-WORLD-POOL-BROKEN-64](bugs/BUILD-CHIM-WORLD-POOL-BROKEN-64.md): seen again in v0.0.68-dev4: Seen again: the Solstheim test world stage of a palette test image stopped when a process of its worker pool ended abruptly while nine area tasks ran; the build resumes from that stage.
+- [TP-LIST-MODULE-STORE-PLACES-68](bugs/TP-LIST-MODULE-STORE-PLACES-68.md): fixed in source: a gated commit, v0.0.67 (4d1da821); gate 12361 of the planning item TP-LIST-MODULE-STORE-PLACES-68: The teleport place list reads the frames of the expansions' own stores (a2f390bcd, in the v0.0.68-dev5 line head): Solstheim's places and outdoor people and creatures are listed
+- [TP-LIST-MODULE-STORE-PLACES-68](bugs/TP-LIST-MODULE-STORE-PLACES-68.md): shipped: the v0.0.68-dev5 development build, v0.0.68-dev5 (4d1da821, build 2026_11_22_v0.0.68-dev5_full-v0.0.68-dev5-try2_4d1da82); the delivered build holds the commit: The delivered v0.0.68-dev5 image is built from 4d1da821, which holds the teleport list reading the expansions' own store frames.
+- [EXPANSION-SCRIPTS-NOT-ATTACHED-66](bugs/EXPANSION-SCRIPTS-NOT-ATTACHED-66.md): fixed in source: a gated commit, v0.0.68-dev5 line (5ebc6981); gate 12441 of the planning item DBG-TP-EXPANSION-ARRIVALS-66: The scripted objects of Mournhold's five districts are bound at their place on the district frames and the engine attaches them there (366 on the v0.0.68-dev5 data, now 0 never attached); left: the in-play check on an image of this branch ...
+- [DOOR-LOAD-DISABLED-STILL-USED-68](bugs/DOOR-LOAD-DISABLED-STILL-USED-68.md): fixed in source: a gated commit, v0.0.67 (aaba32fe); gate 12400 of the planning item DOOR-LOAD-DISABLED-STILL-USED-68: The use key, the door prompt and the map door markers pass by a load door a script has switched off and take the other door of the doorway; a script Activate still acts on the door it names.
+- [BUILD-CHIM-SOL-TEST-IMAGE-NO-WAIT-68](bugs/BUILD-CHIM-SOL-TEST-IMAGE-NO-WAIT-68.md): fixed in source: a gated commit, v0.0.67 (ffecafbc); gate 12330 of the planning item BUILD-CHIM-SOL-TEST-IMAGE-NO-WAIT-68: The image step of a Solstheim test image waits for the test world stages it installs
+
 ##### 21 November 2026
 
+- [STALL-SLOW-STAGE-VS-REUSE-TIME-68](bugs/STALL-SLOW-STAGE-VS-REUSE-TIME-68.md): seen again in v0.0.68-dev4: Seen again on a full palette re-bake: the slow-stage check flagged three stages that re-baked all their units, each compared against a time recorded from a run that reused its units.
+- [BUILD-BALMORA-KEY-PALETTE-OVERBROAD-68](bugs/BUILD-BALMORA-KEY-PALETTE-OVERBROAD-68.md): seen again in v0.0.68-dev4: Correction of the first measurement: the resident models do change with the palette (182 of 184 differ) and their re-bake is needed; what comes out unchanged is 24 of the 43 room maps, about a minute of the ten-minute stage.
+- [BUILD-RESOURCE-PLAN-UNIT-REUSE-66](bugs/BUILD-RESOURCE-PLAN-UNIT-REUSE-66.md): seen again in v0.0.68-dev4: The stall watcher's slow-stage check compares a stage that re-bakes every unit against that stage's recorded time from a run that reused its units, so it reports a healthy full re-bake as slow; like the resource plan, it should scale the ...
+- [BUILD-RESOURCE-PLAN-UNIT-REUSE-66](bugs/BUILD-RESOURCE-PLAN-UNIT-REUSE-66.md): seen again in v0.0.68-dev4: Seen again: a build that re-bakes every unit of 11 stages after a palette change was planned at under 3 hours while its measured progress points to about 9 to 10 hours, as the from-scratch builds took.
+- [BUILD-MODULE-UNIT-CACHE-IN-KEY-67](bugs/BUILD-MODULE-UNIT-CACHE-IN-KEY-67.md): seen again in v0.0.68-dev4: Seen again: the Solstheim module's stage is reported as an unexpected rebuild because of its own unit cache folder, while the real reason (a palette change it reads) is an expected one.
+- [BUILD-MEMPLAN-CHIM-5-OF-22-68](bugs/BUILD-MEMPLAN-CHIM-5-OF-22-68.md): seen again in v0.0.68-dev4: Seen again in a full re-bake of v0.0.68-dev4: the memory plan runs the outdoor world stage on 5 of 22 workers.
+- [BUILD-IMAGE-AFTER-OPTIMIZER-SERIAL-68](bugs/BUILD-IMAGE-AFTER-OPTIMIZER-SERIAL-68.md): seen again in v0.0.68-dev4: Seen again in the v0.0.68-dev4 build: the image step's finalize section, right after its optimizer check, ran on one core for more than six minutes.
+- [REUSE-VERIFY-SLOW-BESIDE-MODULE-STAGES-68](bugs/REUSE-VERIFY-SLOW-BESIDE-MODULE-STAGES-68.md): seen again in v0.0.68-dev4: Seen again in the v0.0.68-dev4 build: a reused stage's reuse step took 22 seconds against its recorded 5.
 - [CONTAINER-READ-ENOMEM-66](bugs/CONTAINER-READ-ENOMEM-66.md): seen again in v0.0.68-dev3: Seen again on v0.0.68-dev3 after a day of builds; clearing the build machine's file cache once restored the reads.
 - [BUILD-IMAGE-AFTER-OPTIMIZER-SERIAL-68](bugs/BUILD-IMAGE-AFTER-OPTIMIZER-SERIAL-68.md): seen again in v0.0.68-dev3: Seen on a second test image of the same line: the image step again used one core for about six minutes.
 - [CONTAINER-READ-ENOMEM-66](bugs/CONTAINER-READ-ENOMEM-66.md): seen again in v0.0.68-dev3: A file read inside a container failed with out of memory again, this time in a tracker step, while a build plan check ran.
@@ -5712,6 +5751,7 @@ Every bug from v0.0.30 on belongs to one family (bugs with a shared cause or are
 - [COLLISION-ROUTE-NO-SPLIT-36](bugs/COLLISION-ROUTE-NO-SPLIT-36.md): Routed standing hulls of dense flora (kelp, kreshweed) stay one chain 277-305 clipnodes deep: the router finds no cut, so the cell stays hull-pending (open, medium)
 - [COLLISION-TRACE-COST-33](bugs/COLLISION-TRACE-COST-33.md): Movement traces near large models walk long standing-hull chains: tens of ms per trace on a slow 68040 (emulator-relative) (open, high)
 - [COLLISION-TRACE-LIMIT-ROUTED-ROOM-36](bugs/COLLISION-TRACE-LIMIT-ROUTED-ROOM-36.md): The tool collision tracer stops on the Vivec Arena Pit's routed hull (visit limit), so its start spot cannot be traced (open, low)
+- [DOOR-USE-COLLISION-EXPANSIONS-68](bugs/DOOR-USE-COLLISION-EXPANSIONS-68.md): 13 exterior entrances of Solstheim and Mournhold cannot be reached in the converted collision: no standing spot at the threshold, or the door out of the use reach (open, high)
 - [PELAGIAD-STAIRS-STUCK-67](bugs/PELAGIAD-STAIRS-STUCK-67.md): A stairway up in Pelagiad cannot be climbed: the player gets stuck on it (open, medium)
 - [ROOM-X-MESH-ROOF-SURVEY-48](bugs/ROOM-X-MESH-ROOF-SURVEY-48.md): 57 more exterior meshes placed in rooms have a convex collision piece standing more than a step over their own floor (open, medium)
 - [SEYDA-BLOCK-31](bugs/SEYDA-BLOCK-31.md): Invisible obstacle blocks the path on a Seyda Neen slope (open, medium)
@@ -5789,6 +5829,7 @@ Every bug from v0.0.30 on belongs to one family (bugs with a shared cause or are
 
 - [ACTOR-MOVING-RUNTIME-GROUND-48](bugs/ACTOR-MOVING-RUNTIME-GROUND-48.md): Moving actors (levitation, flying creatures, jumping, swimming, knockback, scripted SetPos) need runtime grounding beyond the build-time bake (open, medium)
 - [AUDIO-MISSING-SOURCES-32](bugs/AUDIO-MISSING-SOURCES-32.md): The image step reports missing sources for 7 voices and 2 effects (open, medium)
+- [BUILD-CHIM-SOL-TEST-IMAGE-NO-WAIT-68](bugs/BUILD-CHIM-SOL-TEST-IMAGE-NO-WAIT-68.md): In a Solstheim test image build the image step did not wait for the Solstheim test world it installs, so a build with everything else reused assembled the image before that world existed (open, medium)
 - [BUILD-INTRO-SEAM-STOP-CHARGEN-CLASS-64](bugs/BUILD-INTRO-SEAM-STOP-CHARGEN-CLASS-64.md): A MiniWind build of the v0.0.64-dev2 line stops in the intro stage: the seam check stops the bake of the character creation class NPC with 14 new uncovered openings (open, high)
 - [BUILD-LAYER-SETS-NEVER-TAKEN-67](bugs/BUILD-LAYER-SETS-NEVER-TAKEN-67.md): A default build with expansions selected took none of their finished outdoor cells: the cell list was resolved before the expansions were selected (open, high)
 - [BUILD-MINIWIND-ARENA-PIT-REFUSED-36](bugs/BUILD-MINIWIND-ARENA-PIT-REFUSED-36.md): Regression against v0.0.35: the Vivec Arena Pit is in no CHIM build (no CHIM-native stage made the Arena's rooms), and its start was refused as not converted (open, high)
@@ -5813,6 +5854,7 @@ Every bug from v0.0.30 on belongs to one family (bugs with a shared cause or are
 - [SEYDA-CONTAINERS-NOT-DRAWN-67](bugs/SEYDA-CONTAINERS-NOT-DRAWN-67.md): Seyda Neen's crates, barrels, chest and sacks are not drawn and cannot be opened (open, high)
 - [SEYDA-LANTERNS-MISSING-31](bugs/SEYDA-LANTERNS-MISSING-31.md): Seyda Neen lanterns light the night but are not in its maps (open, medium)
 - [STAGE-READS-SELECTED-MASTERS-67](bugs/STAGE-READS-SELECTED-MASTERS-67.md): No build stage proves it read the game files the build selected, so a stage that reads only the base game goes unnoticed (open, high)
+- [TP-LIST-MODULE-STORE-PLACES-68](bugs/TP-LIST-MODULE-STORE-PLACES-68.md): The teleport list leaves out the Solstheim places and beings of an image that holds the island (open, medium)
 - [TP-LIST-UNBUILT-EXTERIORS-66](bugs/TP-LIST-UNBUILT-EXTERIORS-66.md): The teleport place list would list Solstheim places the image has no world for (open, medium)
 - [TREE-SCALE-001](bugs/TREE-SCALE-001.md): Non-unit-scale tree sprites omitted; bounds too conservative (open, medium)
 - [VIVEC-HOVER-VERIFY-48](bugs/VIVEC-HOVER-VERIFY-48.md): Vivec (the god) floats in meditation: verify whether it is his animation over a grounded collision origin or an active effect (open, low)
@@ -5954,9 +5996,11 @@ Every bug from v0.0.30 on belongs to one family (bugs with a shared cause or are
 - [BUILD-ACTOR-LIBRARY-SHARE-RACE-67](bugs/BUILD-ACTOR-LIBRARY-SHARE-RACE-67.md): The actor library stage's two pools wrote their worker share through one temporary file name: a write found its file gone (open, low)
 - [BUILD-ACTOR-LIBRARY-UNDERUSED-54](bugs/BUILD-ACTOR-LIBRARY-UNDERUSED-54.md): The actor-library stage ran at 2.69 of 8 allowed cores with 130 units queued and 7 running (open, high)
 - [BUILD-AGA-AT-TEXT-LIMIT-60](bugs/BUILD-AGA-AT-TEXT-LIMIT-60.md): tools/build_aga.py is 7 bytes under the release text size limit: the next change to it fails the gate unless a stage is split out (open, medium)
+- [BUILD-BALMORA-KEY-PALETTE-OVERBROAD-68](bugs/BUILD-BALMORA-KEY-PALETTE-OVERBROAD-68.md): A scene palette change re-bakes every Balmora interior room and resident although about half the rooms and all residents come out byte for byte the same (open, medium)
 - [BUILD-BODY-BAKE-SLOWER-44](bugs/BUILD-BODY-BAKE-SLOWER-44.md): The image step's player body bake ran 42 % slower than its baseline with the same 40 bodies (open, medium)
 - [BUILD-CACHE-CLOSURE-WIDE-33](bugs/BUILD-CACHE-CLOSURE-WIDE-33.md): Stage fingerprints count every module any imported module could import, so unrelated edits rebuild most stages (open, low)
 - [BUILD-CACHE-NO-CUTOFF-33](bugs/BUILD-CACHE-NO-CUTOFF-33.md): A rebuilt stage whose outputs come out unchanged still rebuilds every stage after it (open, low)
+- [BUILD-CENSUS-PHASE-UNDERUSED-68](bugs/BUILD-CENSUS-PHASE-UNDERUSED-68.md): A fresh census stage ran on under 4 of 22 cores for about 6 minutes before its worker pool started (open, low)
 - [BUILD-CHECK-REPEATED-AFTER-PASSED-CHECK-68](bugs/BUILD-CHECK-REPEATED-AFTER-PASSED-CHECK-68.md): Before building, the builder checks the plan again even when an identical check passed a few minutes earlier (open, low)
 - [BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46](bugs/BUILD-CHIM-CONVERTER-CHANGE-FULL-REBUILD-46.md): A change in the shared collision converter rebuilds every CHIM frame and everything after it, even where the output is identical (open, high)
 - [BUILD-CHIM-KEY-SKY-OVERLAY-TABLE-59](bugs/BUILD-CHIM-KEY-SKY-OVERLAY-TABLE-59.md): The CHIM world stage and its ocean units are keyed by the whole sky palette overlay module, so a new image file extension rebuilds the CHIM world (open, medium)
@@ -6183,6 +6227,7 @@ Every bug from v0.0.30 on belongs to one family (bugs with a shared cause or are
 - [BUILD-MODULE-UNIT-CACHE-IN-KEY-67](bugs/BUILD-MODULE-UNIT-CACHE-IN-KEY-67.md): The stage of Mournhold's districts was keyed by its own unit cache folder: the units a run stored re-keyed the stage for the next run (open, medium)
 - [BUILD-POOL-READONLY-SCENE-WRITE-35](bugs/BUILD-POOL-READONLY-SCENE-WRITE-35.md): A pool-mode resume failed in 17 s: npcs could not rewrite its copy of seyda.bsp (copytree kept the pool's read-only mode) (open, high)
 - [BUILD-REUSE-APPLY-SERIAL-49](bugs/BUILD-REUSE-APPLY-SERIAL-49.md): Reusing a stage links its cached files on about one core: 34,306 files took 1.4 minutes at the start of a version-only build (open, medium)
+- [BUILD-REUSE-CHAIN-ABSENT-STAGE-68](bugs/BUILD-REUSE-CHAIN-ABSENT-STAGE-68.md): A build that reuses a run rebuilds the stages that run had itself taken from an earlier run, because they are not stored in it (open, medium)
 - [BUILD-REUSE-INTRO-CENSUS-REPLACED-48](bugs/BUILD-REUSE-INTRO-CENSUS-REPLACED-48.md): A reused MiniWind rooms build rebuilt the intro and census stages (replaced outputs) and its Balmora interiors (4 s to 1m21s) (open, medium)
 - [BUILD-REUSE-NEVER-READ-STOPS-66](bugs/BUILD-REUSE-NEVER-READ-STOPS-66.md): The reuse check stops stages whose key changed only in code they never ran or read, and redoes their stored units (open, high)
 - [BUILD-REUSE-PLAN-ENV-36](bugs/BUILD-REUSE-PLAN-ENV-36.md): The standalone reuse plan reports environment changes the real build does not have (open, medium)
@@ -6558,6 +6603,7 @@ Every bug from v0.0.30 on belongs to one family (bugs with a shared cause or are
 - [ROOM-EFFECT-MODEL-NO-TRIANGLES-66](bugs/ROOM-EFFECT-MODEL-NO-TRIANGLES-66.md): A summoning effect model without drawn triangles refused the whole Dome of Sotha Sil room (open, medium)
 - [SEAM-AUDIT-IGNORES-RIM-TEARS-54](bugs/SEAM-AUDIT-IGNORES-RIM-TEARS-54.md): The seam audit reports meshes with torn rims as ok (open, medium)
 - [SKY-GROUND-28](bugs/SKY-GROUND-28.md): Rebuilt LAND faces invisible; clouds scroll too fast (open, high)
+- [SOL-GLACIER-ICE-BROWN-SHEER-68](bugs/SOL-GLACIER-ICE-BROWN-SHEER-68.md): The Mortrag Glacier's ice draws brown instead of white and shows a sheer vertical drop where the original slopes (open, high)
 - [TOOL-SIMPLIFY-MANIFOLD-32](bugs/TOOL-SIMPLIFY-MANIFOLD-32.md): Mesh reduction can return open or non-manifold meshes (open, medium)
 - [TOWN-PAVEMENT-WEDGE-62](bugs/TOWN-PAVEMENT-WEDGE-62.md): A wedge of pavement sticks up from the street in Suran, the same kind of fault as once seen in Balmora (open, medium)
 - [WEREWOLF-HEAD-NOT-REDUCED-68](bugs/WEREWOLF-HEAD-NOT-REDUCED-68.md): The outer-measures reduction leaves the werewolf's head whole at every target and reports that as a pass (open, low)
@@ -6990,6 +7036,7 @@ Every bug from v0.0.30 on belongs to one family (bugs with a shared cause or are
 - [RANDOM-SPAWN-IDLE-63](bugs/RANDOM-SPAWN-IDLE-63.md): Creatures from the Ghostgate random spawn stand idle next to the player instead of attacking (open, low)
 - [ROOM-LEVELLED-INTRO-ROOMS-62](bugs/ROOM-LEVELLED-INTRO-ROOMS-62.md): Addamasartus and Tharys Ancestral Tomb have no levelled creatures: the intro scene converts their rooms without the levelled creature points (open, medium)
 - [ROOM-NPC-DEFERRED-VIVEC-66](bugs/ROOM-NPC-DEFERRED-VIVEC-66.md): Two interior NPCs of Vivec are not placed: one in the Telvanni Mage room, one in The Lizard's Head (open, medium)
+- [ROOM-PLACED-CORPSES-NOT-SPAWNED-68](bugs/ROOM-PLACED-CORPSES-NOT-SPAWNED-68.md): Creatures the game places dead in rooms (skeletons, dead scamps, scribs, centurions, the Hall of Ministry's dead rat) are never spawned, so their bodies are missing (open, medium)
 - [ROOM-RESIDENTS-NO-FIT-48](bugs/ROOM-RESIDENTS-NO-FIT-48.md): 19 batch room residents have no spot their room's collision supports: slopes, a rope bridge's hull, no floor in reach (open, medium)
 - [SCRIB-NO-ATTACK-65](bugs/SCRIB-NO-ATTACK-65.md): A scrib walks its path but never attacks the player on its own (open, low)
 - [SKEL-ANIM-STAGE-52](bugs/SKEL-ANIM-STAGE-52.md): Requested: a MiniWind animation stage where NPCs of Seyda Neen and Balmora run every action from the shared table, nothing baked (open, high)
@@ -7410,6 +7457,7 @@ Every bug from v0.0.30 on belongs to one family (bugs with a shared cause or are
 - [DIALOGUE-TEXT-DEFINES-PARTIAL-67](bugs/DIALOGUE-TEXT-DEFINES-PARTIAL-67.md): Incomplete: the text defines %PCCrimeLevel, %PCClothingModifier and the global-variable defines are not filled in an answer (open, medium)
 - [DISTRICT-NEW-FIGHT-ATTACKERS-ON-SAME-MAP-RELOAD-67](bugs/DISTRICT-NEW-FIGHT-ATTACKERS-ON-SAME-MAP-RELOAD-67.md): After a teleport inside Plaza Brindisi Dorom the guards and high ordinators attack the player together with the fabricants (open, high)
 - [DISTRICT-PLACED-THINGS-NO-ROW-67](bugs/DISTRICT-PLACED-THINGS-NO-ROW-67.md): In Mournhold's districts no container, item, activator or door sign can be aimed at: their rows are keyed as a room's, and the game outdoors asks for the cells around the player (open, high)
+- [DOOR-LOAD-DISABLED-STILL-USED-68](bugs/DOOR-LOAD-DISABLED-STILL-USED-68.md): A load door switched off by its script still shows its prompt and can be used (open, medium)
 - [DOOR-LOAD-LOCKS-MISSING-51](bugs/DOOR-LOAD-LOCKS-MISSING-51.md): Load doors ignore the original game's locks: every door into a room opens, locked or not (open, medium)
 - [DOOR-TRAPS-NOT-SPRUNG-55](bugs/DOOR-TRAPS-NOT-SPRUNG-55.md): Trapped doors and containers open without their trap (open, medium)
 - [DROP-REFUSED-CENSUS-ROOM-67](bugs/DROP-REFUSED-CENSUS-ROOM-67.md): Dropping an item in the first room of the Census and Excise Office is refused with "Cannot place items in this area yet; kept." (open, medium)
@@ -7644,6 +7692,7 @@ Every bug from v0.0.30 on belongs to one family (bugs with a shared cause or are
 - [GATE-SUITE-WRITABLE-32](bugs/GATE-SUITE-WRITABLE-32.md): The test suite needs a writable source copy and an executable /tmp; the documented command does not say so (open, medium)
 - [HARNESS-NEWGAME-BOX-STALL-54](bugs/HARNESS-NEWGAME-BOX-STALL-54.md): An FS-UAE session stalled at the Start a new game box before any map load: the probe sent its key on a fixed delay (open, low)
 - [JOURNEY-AIM-RETRY-YAW-66](bugs/JOURNEY-AIM-RETRY-YAW-66.md): The gameplay journey aimed at a door from an eye position that had changed: its thirteen retries ran round the wrong direction (open, high)
+- [LOOKBOOK-NO-COLOUR-CHECK-68](bugs/LOOKBOOK-NO-COLOUR-CHECK-68.md): The look book checks only numbers on its pages, so a palette change that alters the colours of every confirmed look cannot fail any page (open, medium)
 - [MWAD-NAME-CLASH-66](bugs/MWAD-NAME-CLASH-66.md): tools/mwad.py has the name of the src/mwad package and hides it for any process with tools before src (open, medium)
 - [NOTES-MOURNHOLD-WAY-STALE-67](bugs/NOTES-MOURNHOLD-WAY-STALE-67.md): The development notes of v0.0.67 said the way to Mournhold was not in the build, while the trip to Mournhold and back already worked (open, low)
 - [PUBLIC-GUARD-SPELLS-TOOL-NAMES-67](bugs/PUBLIC-GUARD-SPELLS-TOOL-NAMES-67.md): The public privacy check spells the private words it refuses, split in pieces, in its own code (open, medium)
@@ -7800,6 +7849,7 @@ Every bug from v0.0.30 on belongs to one family (bugs with a shared cause or are
 - [DOCS-ROADMAP-IMPLEMENTATION-39](bugs/DOCS-ROADMAP-IMPLEMENTATION-39.md): Roadmap retains obsolete implementation and coverage claims (open, low)
 - [DOOR-GRAPH-CELL-TEST-AS-TELEPORT-67](bugs/DOOR-GRAPH-CELL-TEST-AS-TELEPORT-67.md): The door graph marks two Tribunal cells as reached by script because a script tests the player's cell name, although nothing moves the player there (open, low)
 - [DRYRUN-LIBS-LABEL-32](bugs/DRYRUN-LIBS-LABEL-32.md): A dry-run image built with --amiga-libs still says it contains no game assets or ROMs only (open, low)
+- [EXPANSION-COUNTS-MISS-FRAME-STORES-68](bugs/EXPANSION-COUNTS-MISS-FRAME-STORES-68.md): The build's record of the expansions' actors and the script tracker leave out what the frame stores of the image hold: actors there count as not placed, Solstheim's built cells as missing, its attached scripts as outside the image, and scripts that only declare dialogue variables as not attached (open, medium)
 - [MESH-EXPORT-FULL-67](bugs/MESH-EXPORT-FULL-67.md): tools/mesh_export.py writes no texture names in its material file and no texture coordinates (open, low)
 - [PACKAGE-PORTABILITY-28](bugs/PACKAGE-PORTABILITY-28.md): Rebundled ZIPs lost exec modes; Windows path aliases accepted (open, low)
 - [PERF-DB-CHIMPORT-NO-WALL-67](bugs/PERF-DB-CHIMPORT-NO-WALL-67.md): The performance database records the master builder's CHIM import runs without their times, so it cannot answer how long such a run takes (open, low)
@@ -7826,12 +7876,14 @@ Every bug from v0.0.30 on belongs to one family (bugs with a shared cause or are
 - [TOOLKIT-VERSION-CHECK-NO-GIT-64](bugs/TOOLKIT-VERSION-CHECK-NO-GIT-64.md): The Toolkit version check passes in a source tree without git history, so the gate lets a stale Toolkit version line through and the dev delivery stops after the build (open, medium)
 - [TOOLKIT-WORLD-MAP-FRAME-LOOP-64](bugs/TOOLKIT-WORLD-MAP-FRAME-LOOP-64.md): The World Map vanished in Firefox after the frame was sized to its own content (open, medium)
 - [TOOLKIT-WORLD-MAP-NESTED-SCROLL-64](bugs/TOOLKIT-WORLD-MAP-NESTED-SCROLL-64.md): The World Map scrolls as separate boxes: the headline stays while the map frame scrolls, and the wheel over the map never scrolls the page (open, low)
+- [TRACK-FIXED-STEPS-WHOLE-HOME-68](bugs/TRACK-FIXED-STEPS-WHOLE-HOME-68.md): Recording a fix of one register entry through its planning item marks every other entry of that item as fixed by the same commit (open, medium)
 - [TRACK-FIXED-UMBRELLA-STEPS-ALL-67](bugs/TRACK-FIXED-UMBRELLA-STEPS-ALL-67.md): Marking one fault fixed through the tracker intake marked every fault of its plan item fixed when that item groups many (open, high)
 - [TRACK-UPDATE-MOVED-ITEM-FIRST-68](bugs/TRACK-UPDATE-MOVED-ITEM-FIRST-68.md): Updating a work item whose id also exists as a moved copy in an older version file wrote the note into the old moved copy instead of the live item (open, low)
 - [TRACKER-AREA-CELLS-RUN-WIDE-42](bugs/TRACKER-AREA-CELLS-RUN-WIDE-42.md): The CHIM tracker gives every area of a build all of the build's cells: Balmora holds 811 cells, so an area or shipped-towns plan selector takes most of the island (open, medium)
 - [TRACKER-CHIM-COUNT-STALE-44](bugs/TRACKER-CHIM-COUNT-STALE-44.md): The CHIM progress tracker still reports 1,193 of 1,436 cells after a build with every exterior cell: it counts audits over both islands, not what the build put on CHIM (open, high)
 - [TRACKER-DISTRICTS-COUNTED-TWICE-67](bugs/TRACKER-DISTRICTS-COUNTED-TWICE-67.md): The progress tracker counts Mournhold's five districts twice: as their open-terrain cells in the game and again as rooms not started (open, medium)
 - [TRACKER-FIXED-LEFT-OPEN-36](bugs/TRACKER-FIXED-LEFT-OPEN-36.md): Fixed work whose bug entry stayed open (LAVA-NOT-IMPLEMENTED-33) (open, low)
+- [TRACKER-GUARD-SHIPPED-STEP-68](bugs/TRACKER-GUARD-SHIPPED-STEP-68.md): The tracker write guard counts the delivery chain's step that records what a build shipped as a write outside the intake (open, medium)
 - [TRACKER-OPEN-ENTRIES-STALE-41](bugs/TRACKER-OPEN-ENTRIES-STALE-41.md): Register entries stayed open after their fixes shipped: 738 of 842 entries open before the audit of 16 October 2026 (open, medium)
 - [TRACKER-PRESENTED-CELLS-UNKNOWN-67](bugs/TRACKER-PRESENTED-CELLS-UNKNOWN-67.md): The CHIM tracker knew none of Mournhold's presented cells: with no LAND record and no census row they were not in its data, and their conversion results were ignored (open, medium)
 - [TRACKER-REGISTER-SIZE-33](bugs/TRACKER-REGISTER-SIZE-33.md): The bug register outgrew the release text-file size limit (open, medium)

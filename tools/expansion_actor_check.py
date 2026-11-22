@@ -11,10 +11,12 @@ and the actors the expansions insert into Vvardenfell), from a build's stored ou
   stage 1  the expansion's rooms the image holds (image/cell-numbers.json maps, by each room's master) and its new
            exterior cells the image holds (image/entity-tracker.json converted_cells)
   stage 2  every actor placement the expansion adds and every base placement of an actor record it changes: placed
-           (rooms: entity-tracker placed_refs; outdoors: maps/chim-actors.cca in a converted cell), and complete: a
-           model the engine plays, every stat the record has (the actor record audit's fields), its inventory and
-           equipment, its combat style (tools/combat_style_audit.py), every animation kind the original gives it, its
-           own script attached (mwscript.awm BIND by the merged reference number) with its variables
+           (rooms: entity-tracker placed_refs; outdoors: maps/chim-actors.cca in a converted cell; either: the image's
+           stores of frames, chim-layer-stores.json, the districts' and Solstheim's), and complete: a model the engine
+           plays, every stat the record has (the actor record audit's fields), its inventory and equipment, its combat
+           style (tools/combat_style_audit.py), every animation kind the original gives it, its own script attached
+           (mwscript.awm BIND by the merged reference number; a script the compiler leaves out as inert, which only
+           declares the locals the dialogue reads, needs none) with its variables
   stage 3  the scripts the expansion's master defines: compiled (in the build's script file, not broken), attached
            (a binding of the expansion's own placements), running (attached, a start script or started by a script)
 
@@ -121,6 +123,41 @@ def verdict(rows, setting, limit=40):
     return lines
 
 
+def store_actor_refs(image):
+    """{merged reference} of every person and creature the image's stores of frames place (image/
+    chim-layer-stores.json, tools/chim/layer_stores.py: Mournhold's district frames and Solstheim's frames); an empty set
+    for a build without them. EXPANSION-SCRIPTS-NOT-ATTACHED-66 (v0.0.68): the check read only the rooms' entity
+    tracker and the open world's actor table, so the 57 district actors and the 201 Solstheim outdoor actors the stores
+    place were counted as not placed."""
+    out = set()
+    for frame in store_frames(image):
+        for r in (frame.get('actors') or {}).get('actors') or ():
+            if r.get('reference') is not None:
+                out.add(int(r['reference']))
+    return out
+
+
+def store_frames(image):
+    """Every frame of the image's stores of frames (image/chim-layer-stores.json maps, each with its 'cell' x, y and
+    its 'actors'); [] for a build without them."""
+    path = Path(image) / 'chim-layer-stores.json'
+    if not path.is_file():
+        return []
+    return [frame for store in json.loads(path.read_text(encoding='utf-8')) if isinstance(store, dict)
+            for frame in store.get('maps') or ()]
+
+
+def script_bound(script, number, bound, inert):
+    """True or False: the actor's own script has a binding (mwscript.awm BIND) or not; None when it has no script or
+    its script is one the compiler leaves out of the bindings as inert (INERT: their folded names), a script that only
+    declares the locals the dialogue reads (nolore, nohello: the base game binds none of its 148 such placements
+    either). EXPANSION-SCRIPTS-NOT-ATTACHED-66 (v0.0.68): those were counted as not attached (27 in Mournhold, 47 on
+    Solstheim on 18 November 2026)."""
+    if not script or script.casefold() in inert:
+        return None
+    return number in bound
+
+
 def land_of(master, interior, xy, cell, cell_masters):
     """The land a placement belongs to: a cell an expansion first defines is its land; a base game cell is
     Vvardenfell."""
@@ -159,7 +196,7 @@ def check(run, data_files, masters, audit, master_raw=None):
     import combat_style_audit as csa
     import prepare_combat
     from mwscript import awms
-    from mwscript.codegen import SCRIPT_BROKEN, SCRIPT_START, SCRIPT_GLOBAL
+    from mwscript.codegen import SCRIPT_BROKEN, SCRIPT_START, SCRIPT_GLOBAL, SCRIPT_INERT
     run = Path(run)
     image, id1 = run / 'image', run / 'image' / 'boot' / 'id1'
     setting = load_setting()
@@ -182,6 +219,8 @@ def check(run, data_files, masters, audit, master_raw=None):
     scrp = awms.scripts(f)
     bound = {struct.unpack_from('>I', f['BIND'], 24 * i)[0]: struct.unpack_from('>IHH', f['BIND'], 24 * i)
              for i in range(f['BIND_rows'])}
+    inert = {names[s['name']].casefold() for s in scrp if s['flags'] & SCRIPT_INERT}
+    in_stores = store_actor_refs(image)
     arow = {r['id']: r for r in audit['rows']}
     crecords, crefs = csa.read_masters(data_files)
     style = {r['id']: r['match'] for r in csa.audit(crecords, crefs, prepare_combat, prepare_combat)}
@@ -216,9 +255,10 @@ def check(run, data_files, masters, audit, master_raw=None):
         land = land_of(master, interior, xy, cell, definers)
         if interior:
             room = cell.casefold()
-            placed = number in placed_rooms.get('interior:' + room, ())
+            placed = number in placed_rooms.get('interior:' + room, ()) or number in in_stores
         else:
-            placed = (number & 0xFFFFFF) in table and ('exterior:%d,%d' % tuple(xy)) in converted
+            placed = ((number & 0xFFFFFF) in table and ('exterior:%d,%d' % tuple(xy)) in converted) or \
+                number in in_stores
         row = {'ref': number, 'id': ident, 'tag': tag, 'master': master, 'land': land,
                'cell': cell if interior else '%d,%d' % tuple(xy), 'placed': placed}
         if tag != 'LEVC':
@@ -229,19 +269,31 @@ def check(run, data_files, masters, audit, master_raw=None):
             row['anim'] = {k: v for k, v in a['states'].items() if k.startswith('anim ') and v not in ('carried', 'absent')}
             row['combat'] = style.get(ident)
             row['script'] = script_of.get(ident)
-            row['script_bound'] = (number in bound) if row['script'] else None
+            row['script_bound'] = script_bound(row['script'], number, bound, inert)
+            if row['script'] and row['script_bound'] is None:
+                row['script_inert'] = True
             row['script_fields'] = bad_states(a['states'], SCRIPT_FIELDS)
         rows.append(row)
     # stage 1: the rooms and the new exterior cells of each expansion the image holds
     land_name = {'Tribunal.esm': 'Mournhold', 'Bloodmoon.esm': 'Solstheim'}
+    # v0.0.68 (EXPANSION-SCRIPTS-NOT-ATTACHED-66): the stores' frames are built exterior cells too (Solstheim's), and a
+    # district the build presents on frames is a built place (its cell has no room map by design)
+    framed = {tuple(fr['cell']) for fr in store_frames(image) if fr.get('cell') is not None}
+    receipt = run / 'mwscript' / 'mwscript-receipt.json'
+    presented = {k.casefold() for k in ((json.loads(receipt.read_text(encoding='utf-8')).get('inputs') or {})
+                                        .get('presented') or {})} if receipt.is_file() else set()
     stage1 = {}
     for m in addons:
         rooms = [r for r in cn['table'] if r['master'] == m]
         cells_new = [k for k, v in definers.items() if v == m and isinstance(k, tuple)]
         stage1[land_name.get(m, m)] = {
             'rooms with a map': '%d of %d' % (sum(1 for r in rooms if r['number'] in mapped), len(rooms)),
-            'new exterior cells built': '%d of %d' % (sum(1 for k in cells_new if 'exterior:%d,%d' % k in converted),
-                                                      len(cells_new))}
+            'new exterior cells built': '%d of %d' % (sum(1 for k in cells_new if 'exterior:%d,%d' % k in converted
+                                                          or k in framed), len(cells_new))}
+        districts = [r for r in rooms if r['cell'].casefold() in presented]
+        if districts:
+            stage1[land_name.get(m, m)]['districts on frames'] = '%d of %d rooms without a map' % (
+                len(districts), sum(1 for r in rooms if r['number'] not in mapped))
     # stage 3: the scripts each expansion defines, compiled, attached by its own placements, running
     defined = {}
     for m in addons:
