@@ -1,11 +1,11 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.68-dev6 (22 November 2026)._
+_Last updated with AmiWind v0.0.68-dev7 (22 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.68: in progress, sixth snapshot 22 November 2026](#v0068-in-progress-sixth-snapshot-22-november-2026)
+- [v0.0.68: in progress, seventh snapshot 22 November 2026](#v0068-in-progress-seventh-snapshot-22-november-2026)
 - [v0.0.67: Tribunal Introduced, released 19 November 2026](#v0067-tribunal-introduced-released-19-november-2026)
 - [v0.0.66: Forward It Is, released 16 November 2026](#v0066-forward-it-is-released-16-november-2026)
 - [v0.0.65: Reintroducing Vvardenfell](#v0065-reintroducing-vvardenfell)
@@ -119,10 +119,17 @@ _Last updated with AmiWind v0.0.68-dev6 (22 November 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
-## v0.0.68: in progress, sixth snapshot 22 November 2026
+## v0.0.68: in progress, seventh snapshot 22 November 2026
 
-v0.0.68 has no title yet. Its sixth development snapshot,
-[v0.0.68-dev6](releases/notes/RELEASE-v0.0.68-dev6.md), is out. What dev6 carries (checked by tests and the gates of their
+v0.0.68 is titled **Solstheim Is Here**: the release for which Solstheim is to be complete. Its seventh development snapshot,
+[v0.0.68-dev7](releases/notes/RELEASE-v0.0.68-dev7.md), is out. What dev7 carries: **a cool ice and snow ramp in the scene
+palette** (16 little-used warm colours replaced; the ice no longer turns brown-grey; the glacier's cells stay out of the
+build while the ways to fit its ice are compared), **the census back room answers the use
+key again after a visit to the courtyard** (seen in play: the opening journey passed 50 of 50 checks on the dev6 image with
+the engine change), a debug free flight that no longer throws the player back to where it began when switched off inside a
+solid, and a builder's check of the opening that comes down the ship's plank to the dock guard and walks to the crab meat
+along the table's edge. Two more caches that tell a new map only by its model's slot are the next finding to mend. The sixth
+snapshot, [v0.0.68-dev6](releases/notes/RELEASE-v0.0.68-dev6.md), is out. What dev6 carries (checked by tests and the gates of their
 commits, not yet in play): **the scripts of Mournhold's five districts run on their frames** (the courtyard's living and
 dead trees, the districts' ambient sounds, the Plaza's fabricant attacks, the turning signs, the city gates and Azura's
 statue outside the Temple; 366 scripted objects on the dev5 build's data, none left unattached), which moves the script

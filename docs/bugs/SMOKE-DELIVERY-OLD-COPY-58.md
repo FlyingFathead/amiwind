@@ -181,14 +181,18 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [HARNESS-NEWGAME-BOX-STALL-54](HARNESS-NEWGAME-BOX-STALL-54.md): An FS-UAE session stalled at the Start a new game box before any map load: the probe sent its key on a fixed delay
 - HORS-AFTER-HALLOWEEN-STAYS-ARENA-58 (no report page): dbg aw hors after the Halloween scene no longer crashes on the v0.0.58-dev5 image but leaves the player in the Arena Pit instead of Seyda Neen
 - [JOURNEY-AIM-RETRY-YAW-66](JOURNEY-AIM-RETRY-YAW-66.md): The gameplay journey aimed at a door from an eye position that had changed: its thirteen retries ran round the wrong direction
+- [JOURNEY-CRAB-WALK-POINT-AT-TABLE-EDGE-68](JOURNEY-CRAB-WALK-POINT-AT-TABLE-EDGE-68.md): In the opening journey, the walk to the crab meat in the census office's back room can stop against the table just outside the walk's reach, so the journey stops in its second step
+- [JOURNEY-DOCK-NOCLIP-UNSTUCK-RACE-68](JOURNEY-DOCK-NOCLIP-UNSTUCK-RACE-68.md): In the opening journey's walk to the plank, the player is often moved out of a solid to the town start when the walk switches flying off, and the end-of-opening map and journal messages then show on the pier
 - [JOURNEY-DOOR-USE-GOES-TO-ACTOR-66](JOURNEY-DOOR-USE-GOES-TO-ACTOR-66.md): The opening journey's use key at the census street door went to the body of the guard killed a step before, or to a message box still showing, and the step then waited for a load it had never asked for
 - [JOURNEY-PART-B-SAVE-NOT-CARRIED-66](JOURNEY-PART-B-SAVE-NOT-CARRIED-66.md): The gameplay journey's second part never loaded the first part's save: the save was written where the session does not carry it
+- [JOURNEY-STEP1-FLIGHT-NOCLIP-TOGGLE-68](JOURNEY-STEP1-FLIGHT-NOCLIP-TOGGLE-68.md): The opening journey's first step reaches the pier only about half the time: its free-flight switch is a toggle and sometimes turns the mode off
 - [JOURNEY-STEP6-VICTIM-NEAREST-66](JOURNEY-STEP6-VICTIM-NEAREST-66.md): The opening journey's step 6 killed the nearest resident, which could be the guard by the census office's street door, whose body then took the use key instead of the door
 - [JOURNEY-STEP7-FIGHT-UNREACHABLE-66](JOURNEY-STEP7-FIGHT-UNREACHABLE-66.md): The gameplay journey fight in step 7 took no health: the nearest resident was inside the census office, could not reach the player and fled
 - [JOURNEY-STEP7-FIGHTER-NEAREST-66](JOURNEY-STEP7-FIGHTER-NEAREST-66.md): The opening journey's step 7 fights the nearest resident, which can be Fargoth, who fights unarmed, so the health may stay as it was
 - [JOURNEY-WALK-DIALOGUE-DESYNC-66](JOURNEY-WALK-DIALOGUE-DESYNC-66.md): The gameplay journey lost its way in the census office: its key presses talked to the clerk and chose Persuasion instead of taking the papers, and every later step ran in that window
 - KIT-CI-JOBS-SPLIT-53 (no report page): The release kit did not know the split CI workflow: its job check refused it and its publisher waited for the old job names
 - LINUX-VALID-02 (no report page): Linux test fixtures failed to link (missing stubs)
+- [LOOKBOOK-JOURNEY-PAGE-NEVER-JUDGED-68](LOOKBOOK-JOURNEY-PAGE-NEVER-JUDGED-68.md): The look book's journey page is not judged on the delivered development images, and the result still reads as a full pass
 - [LOOKBOOK-NO-COLOUR-CHECK-68](LOOKBOOK-NO-COLOUR-CHECK-68.md): The look book checks only numbers on its pages, so a palette change that alters the colours of every confirmed look cannot fail any page
 - [MWAD-NAME-CLASH-66](MWAD-NAME-CLASH-66.md): tools/mwad.py has the name of the src/mwad package and hides it for any process with tools before src
 - [MWAD-TEXT-WRITER-LF-35](MWAD-TEXT-WRITER-LF-35.md): Some JSON and text writers do not pin LF and UTF-8
@@ -198,6 +202,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - PREGATE-GLOBAL-SHADOW-58 (no report page): Pregate C check misses global shadowing; the engine build fails on it
 - PREGATE-SYNTAX-SKIP-SILENT-57 (no report page): The pre-gate C syntax check skipped itself without failing on worktrees in the per-version folder layout
 - [PUBLIC-GUARD-SPELLS-TOOL-NAMES-67](PUBLIC-GUARD-SPELLS-TOOL-NAMES-67.md): The public privacy check spells the private words it refuses, split in pieces, in its own code
+- [README-REST-LEVELUP-CONDITIONS-68](README-REST-LEVELUP-CONDITIONS-68.md): The front page states the level-up on resting and the attacks on a rest as if they always happen, without their conditions
 - [REGISTER-WRITE-EINVAL-67](REGISTER-WRITE-EINVAL-67.md): The register tool stops now and then with "Invalid argument" while it writes docs/BUGS.md, after it has already saved the entry
 - [REGRESSION-GUARD-MISSING-67](REGRESSION-GUARD-MISSING-67.md): Things the maintainer had confirmed working in play come back broken in later builds: no check kept them proven after their fix
 - [RELEASE-CHECK-NOTES-LATE-66](RELEASE-CHECK-NOTES-LATE-66.md): The release check of the notes' core-use claims ran only when the snapshot package was made, after the build and its play tests, and read a sentence about allowed workers as a claim
@@ -216,6 +221,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [SESSION-CLIP-UNPLAYABLE-ON-STALL-67](SESSION-CLIP-UNPLAYABLE-ON-STALL-67.md): The screen recording of an emulator session that stalls cannot be opened: the recorder is cut off before it writes the index of the MP4 file, so the clip of the session that showed the stall is lost
 - [SESSION-ENGINE-NOT-A-FILE-67](SESSION-ENGINE-NOT-A-FILE-67.md): An emulator session given an engine path that is not a file runs the image with no engine and waits 320 s for the remote control, instead of refusing at once
 - [SESSION-PASS-DEAD-ENGINE-57](SESSION-PASS-DEAD-ENGINE-57.md): The scripted test session reported PASS while the engine had crashed
+- [SESSION-SAME-JOB-NAME-CLASH-68](SESSION-SAME-JOB-NAME-CLASH-68.md): A second emulator session with the same job name fails to start on the container name, and its journey reports every check failed
 - [SESSION-STALL-CENSUS-QUICKSTART-58](SESSION-STALL-CENSUS-QUICKSTART-58.md): On the v0.0.58-dev6 image a session that quick-starts into the Census and Excise Office at 135 172 64 stalls before its first still: the runner reports game stalled with the game clock frozen at 23.23 s
 - [SESSION-STALL-EMPTY-STATE-READ-67](SESSION-STALL-EMPTY-STATE-READ-67.md): A scripted test session ends as a game stall when one read of the game's state comes back empty, although the game runs on
 - [SMOKE-END-CONSOLE-TOGGLE-OUTSIDE-PLAY-64](SMOKE-END-CONSOLE-TOGGLE-OUTSIDE-PLAY-64.md): A scripted session whose last step closes the console is judged as ended outside play while the game is in play

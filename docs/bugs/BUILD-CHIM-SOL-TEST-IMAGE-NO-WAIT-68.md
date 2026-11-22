@@ -29,11 +29,13 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.67 (ffecafbc) | 2026-11-22 | gate 12330 of the planning item BUILD-CHIM-SOL-TEST-IMAGE-NO-WAIT-68 | The image step of a Solstheim test image waits for the test world stages it installs |
+| shipped | the v0.0.68-dev6 development build | v0.0.68-dev6 (95a3d6e3, build 2026_11_22_v0.0.68-dev6_full-v0.0.68-dev6_95a3d6e) | 2026-11-22 | the delivered build holds the commit | The v0.0.68-dev6 builder at 95a3d6e3 holds the image step waiting for the Solstheim test world (516bee71a, the gated ffecafbcd, gate 12330); a glacier test image built on it installed the test world (run 2026_11_22_v0.0.68-dev5_full-glacier-a1-palette-method-e-resume_ffecafb). |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-22: reported in v0.0.68-dev5
 - 2026-11-22: fixed in source: a gated commit, v0.0.67 (ffecafbc); gate 12330 of the planning item BUILD-CHIM-SOL-TEST-IMAGE-NO-WAIT-68: The image step of a Solstheim test image waits for the test world stages it installs
+- 2026-11-22: shipped: the v0.0.68-dev6 development build, v0.0.68-dev6 (95a3d6e3, build 2026_11_22_v0.0.68-dev6_full-v0.0.68-dev6_95a3d6e); the delivered build holds the commit: The v0.0.68-dev6 builder at 95a3d6e3 holds the image step waiting for the Solstheim test world (516bee71a, the gated ffecafbcd, gate 12330); a glacier test image built on it installed the test world (run ...
 
 <!-- END GENERATED TIMELINE -->
 

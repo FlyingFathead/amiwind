@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.68-dev6 (22 November 2026)._
+_Last updated with AmiWind v0.0.68-dev7 (22 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -60,10 +60,13 @@ the [changelog](docs/CHANGELOG.md#v0067-tribunal-introduced-19-november-2026) an
 [v0.0.67 release notes](docs/releases/notes/RELEASE-v0.0.67.md), which link the notes of the three development
 snapshots. Known problems: the notes' "Known in this build" and [the bug tracker](docs/BUGS.md).
 
-**In development: v0.0.68-dev6** (22 November 2026), the sixth snapshot of the next version: the scripts of Mournhold's
-five districts (the trees, the sounds, the statue and the rest) run on their frames, and a door that a script has switched
-off is no longer taken by the use key; none of it is seen in play yet ([v0.0.68-dev6
-notes](docs/releases/notes/RELEASE-v0.0.68-dev6.md)). The snapshot before it let people knocked out in water drown at once
+**In development: v0.0.68-dev7** (22 November 2026), the seventh snapshot of the next version, **Solstheim Is Here** (the
+release for which Solstheim is to be complete), a small step: the scene palette gets a cool ice and snow ramp, the census
+back room answers the use key again after a visit to the courtyard (seen in play), and the builder's check of the opening
+comes down the ship's plank to the dock guard ([v0.0.68-dev7 notes](docs/releases/notes/RELEASE-v0.0.68-dev7.md)). The
+sixth snapshot ran the scripts of Mournhold's five districts (the trees, the sounds, the statue and the rest) on their
+frames and made the use key pass by a door that a script has switched off; none of that is seen in play yet
+([dev6](docs/releases/notes/RELEASE-v0.0.68-dev6.md)). The snapshot before it let people knocked out in water drown at once
 and made the builder's door check cover Solstheim and Mournhold's districts ([dev5](docs/releases/notes/RELEASE-v0.0.68-dev5.md)).
 The one before it made the invisible walls of the game solid boxes, put the Ghostfence's glow in behind a switch and
 added more of the original's console commands ([dev4](docs/releases/notes/RELEASE-v0.0.68-dev4.md)). Before it came
@@ -89,11 +92,18 @@ that holds its controls as the original does ([v0.0.66 notes](docs/releases/note
   with witnesses, guards, fines and jail; alchemy; containers and bodies to search (a locked container does not open
   yet); torches and lanterns for the night and the caves; weather, music and travel by silt strider, boat, gondola and
   guild guide.
-- **Levelling:** a full rest opens the original's level-up box with its attribute multipliers; the raised values stay
-  through a save and a load.
-- **Resting:** a 12-hour rest in the wilderness at level 40 brought the attack of the Dark Brotherhood, with its wake
-  message on screen, and the debug command for it works; a wilderness rest that is cut short brings a creature of the
-  region's list at the right hour (seen in the emulator on the release image).
+- **Levelling:** as in the original, the skills of the player's class build up level progress: each raise of a major or a
+  minor skill adds to it (misc skills add none), and when it reaches the game's level-up total the game says to rest and
+  meditate on what was learned. The level-up box, with its attribute multipliers, opens only at the end of a rest that
+  ran its full length with sleeping allowed (in a bed or a place not marked as no sleeping); a rest cut short or ended by
+  a script does not open it, and the next full rest does. The raised values stay through a save and a load.
+- **Resting:** a rest is refused in water, in the air and with enemies near. A wilderness rest can be cut short by a
+  creature: the chance is the original's (about one rest in four, a rest of 12 hours cut after 9; a rest of three hours or
+  less is never cut), only outdoors and only where the region has a list of creatures, and the creature is taken from that
+  list. The Dark Brotherhood's attack on a
+  rest is not certain: it comes from Tribunal's own script, and depends on the player (the level and the Tribunal start
+  state the script asks for, and its own odds). It was seen once on a 12-hour rest in the wilderness at level 40, with its
+  wake message on screen, in the emulator on the release image; the debug command for it forces the script's roll.
 - **Tribunal, the first steps:** Tribunal's additions to Vvardenfell are in the build, and Mournhold is reached from
   Ebonheart through the characters' own dialogue and back again; its five districts can be walked, slowly (8 to 16
   frames a second in the emulator). A new game starts the city in peace (the Plaza's fabricants, the two Gaenors and
@@ -127,7 +137,7 @@ What is not working yet, and what is in work:
 Every system of the base game with its state: [game features](docs/GAME_FEATURES.md). Known problems:
 [the bug tracker](docs/BUGS.md).
 
-**Then v0.0.68** (in development, [dev6](docs/releases/notes/RELEASE-v0.0.68-dev6.md) is out) continues with the
+**Then v0.0.68** (in development, [dev7](docs/releases/notes/RELEASE-v0.0.68-dev7.md) is out) continues with the
 expansions' finished content: Tribunal's Mournhold with its quests and Bloodmoon's Solstheim, with their scripts; a
 build that fits a 32 GB machine; then the rest of the open plan. The order of record is the [roadmap](docs/ROADMAP.md);
 no dates are promised.
@@ -166,8 +176,8 @@ finished work is taken back; the build's last lines say what to change first
 ([the build stopped or ran out of memory: what now?](docs/LINUX_BUILD.md#the-build-stopped-or-ran-out-of-memory-what-now)).
 
 The emulator presets of this version are
-[`AmiWind-v0.0.68-dev6-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.68-dev6-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.68-dev6-WinUAE.uae`](resources/emulators/AmiWind-v0.0.68-dev6-WinUAE.uae); both start with 32 MB of Fast
+[`AmiWind-v0.0.68-dev7-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.68-dev7-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.68-dev7-WinUAE.uae`](resources/emulators/AmiWind-v0.0.68-dev7-WinUAE.uae); both start with 32 MB of Fast
 RAM, the requirement. The presets of earlier versions are beside them in [resources/emulators](resources/emulators/). Everything
 else about building and playing: [Building and playing](docs/BUILDING_AND_PLAYING.md), the
 [Linux build guide](docs/LINUX_BUILD.md) and the [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md).

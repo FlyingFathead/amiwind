@@ -28,11 +28,13 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.67 (aaba32fe) | 2026-11-22 | gate 12400 of the planning item DOOR-LOAD-DISABLED-STILL-USED-68 | The use key, the door prompt and the map door markers pass by a load door a script has switched off and take the other door of the doorway; a script Activate still acts on the door it names. |
+| shipped | the v0.0.68-dev6 development build | v0.0.68-dev6 (95a3d6e3, build 2026_11_22_v0.0.68-dev6_full-v0.0.68-dev6_95a3d6e) | 2026-11-22 | the delivered build holds the commit | The delivered v0.0.68-dev6 image is built from 95a3d6e3, which holds the door pick that passes a door a script has switched off (aaba32fe0, gate 12400). |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-21: reported in v0.0.68-dev4
 - 2026-11-22: fixed in source: a gated commit, v0.0.67 (aaba32fe); gate 12400 of the planning item DOOR-LOAD-DISABLED-STILL-USED-68: The use key, the door prompt and the map door markers pass by a load door a script has switched off and take the other door of the doorway; a script Activate still acts on the door it names.
+- 2026-11-22: shipped: the v0.0.68-dev6 development build, v0.0.68-dev6 (95a3d6e3, build 2026_11_22_v0.0.68-dev6_full-v0.0.68-dev6_95a3d6e); the delivered build holds the commit: The delivered v0.0.68-dev6 image is built from 95a3d6e3, which holds the door pick that passes a door a script has switched off (aaba32fe0, gate 12400).
 
 <!-- END GENERATED TIMELINE -->
 
@@ -136,6 +138,8 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [DIALOGUE-TOPIC-WHO-60](DIALOGUE-TOPIC-WHO-60.md): Shargam gro-Shagdub answers "Who?" about Ralen Hlaalo right after naming him in his rumors
 - [DISTRICT-NEW-FIGHT-ATTACKERS-ON-SAME-MAP-RELOAD-67](DISTRICT-NEW-FIGHT-ATTACKERS-ON-SAME-MAP-RELOAD-67.md): After a teleport inside Plaza Brindisi Dorom the guards and high ordinators attack the player together with the fabricants
 - [DISTRICT-PLACED-THINGS-NO-ROW-67](DISTRICT-PLACED-THINGS-NO-ROW-67.md): In Mournhold's districts no container, item, activator or door sign can be aimed at: their rows are keyed as a room's, and the game outdoors asks for the cells around the player
+- [DOCK-GREETING-OUT-OF-REACH-67](DOCK-GREETING-OUT-OF-REACH-67.md): Since v0.0.67 the dock guard waits at the plank out of the greeting's reach of where the opening walk stops, and the race menu does not open
+- [DOCK-GUARD-WALK-HELD-AT-PIECE-JOINT-68](DOCK-GUARD-WALK-HELD-AT-PIECE-JOINT-68.md): The dock guard's first walk of a new game can be held about 10 units short of the foot of the plank, where two dock pieces meet
 - [DOOR-LOAD-LOCKS-MISSING-51](DOOR-LOAD-LOCKS-MISSING-51.md): Load doors ignore the original game's locks: every door into a room opens, locked or not
 - [DOOR-TRAPS-NOT-SPRUNG-55](DOOR-TRAPS-NOT-SPRUNG-55.md): Trapped doors and containers open without their trap
 - DROP-CHIM-REFUSED-59 (no report page): Dropping an item on a streamed outdoor map is refused: Cannot place items in this area yet
@@ -178,6 +182,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [LOADED-ITEMS-NOT-WEIGHED-61](LOADED-ITEMS-NOT-WEIGHED-61.md): After loading a save of another character the carried weight reads 0 until the next place load
 - [LOCKED-CONTAINERS-NEVER-OPEN-67](LOCKED-CONTAINERS-NEVER-OPEN-67.md): Locked containers never open: no key, lockpick or Open spell works on them
 - [MAGIC-SHELL-ORB-NOT-EGG-67](MAGIC-SHELL-ORB-NOT-EGG-67.md): A spell effect on the player shows the dotted orb instead of the upright egg-shaped shell, and it does not draw properly in first person
+- [MAP-CHANGE-TOLD-BY-MODEL-SLOT-68](MAP-CHANGE-TOLD-BY-MODEL-SLOT-68.md): After a map change in a long session, the scripted animations, the animation pickers and the Halloween scene's model names can keep the last map's state, because they tell a new map only by its world model's slot
 - [MAP-MENU-BLOCKED-COURTYARD-65](MAP-MENU-BLOCKED-COURTYARD-65.md): In the opening the courtyard announces the map, but the map key stays blocked until the opening ends
 - [MAP-PLACES-SHOWN-UNVISITED-67](MAP-PLACES-SHOWN-UNVISITED-67.md): The map shows places the player has never visited (Pelagiad, the Moonmoth Legion fort)
 - [MARKS-SUMMON-CARRIERS-NOT-LIVE-63](MARKS-SUMMON-CARRIERS-NOT-LIVE-63.md): The guarded items whose taking summons a guardian are not live references, so the summon never comes
@@ -249,6 +254,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [REST-CUT-NO-CREATURE-67](REST-CUT-NO-CREATURE-67.md): A wilderness rest that is cut short brings no creature and no message
 - [REST-CUT-TOO-OFTEN-67](REST-CUT-TOO-OFTEN-67.md): Wilderness rests are cut short by a creature far more often than the original's one in four
 - [REST-OWNED-BED-ALWAYS-REFUSED-62](REST-OWNED-BED-ALWAYS-REFUSED-62.md): Someone else's bed was always refused; in the original sleeping in it is a crime only when someone sees it
+- [ROOM-AIM-ROWS-OUTDOORS-AFTER-COURTYARD-68](ROOM-AIM-ROWS-OUTDOORS-AFTER-COURTYARD-68.md): After a visit to the courtyard, the Census and Excise Office's back room answers the use key with the town's outdoor rows, so its items have no focus row
 - [ROOM-HALL-OF-MINISTRY-RATS-NOT-DISABLED-67](ROOM-HALL-OF-MINISTRY-RATS-NOT-DISABLED-67.md): Mournhold Temple: Hall of Ministry holds seven Infected Rats at the start of a new game, and one attacks: their script should keep them away until the Crimson Plague quest
 - [ROOM-NORENEN-DUR-ATRONACHS-DIE-67](ROOM-NORENEN-DUR-ATRONACHS-DIE-67.md): Norenen-dur, Basilica of Divine Whispers: two of its three atronachs are dead seconds after they attack, without the player striking
 - [SAVE-ACTOR-BLOCK-OVERFLOW-59](SAVE-ACTOR-BLOCK-OVERFLOW-59.md): A full actor record pool (128 actors) can exceed the save's 32 KB actor block, which would refuse the save (calculated, not measured)

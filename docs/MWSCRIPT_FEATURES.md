@@ -1,6 +1,6 @@
 # MWScript features
 
-_Last updated with AmiWind v0.0.68-dev6 (22 November 2026)._
+_Last updated with AmiWind v0.0.68-dev7 (22 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -68,7 +68,7 @@ Dialogue answers that start or change a fight (StartCombat, SetFight, ModFight):
 
 Measured on 22 November 2026 from the three masters (Morrowind, Tribunal, Bloodmoon) with the builder's own compiler (tools/mwscript), 11,171 placed scripted references, 11,542 bindings in the compiled file, 4 start scripts. The states are worked out again from the interpreter's function table (tools/mwscript/functions.py) whenever the page is rendered, so a function carried out later moves its scripts without a new measurement.
 
-The image measured: build v0.0.68-dev5. Its scripts stage bound the own placements of Tribunal, Bloodmoon; the image carries 5 outdoor districts, 1,321 rooms of the interior store and 135 add-on exterior cells, and 2,443 of the 2,447 add-on bindings in the file sit in those cells (Tribunal 1,227, Bloodmoon 1,216). A script placed only in add-on cells outside them is "only in an add-on world".
+The image measured: build v0.0.68-dev6. Its scripts stage bound the own placements of Tribunal, Bloodmoon; the image carries 5 outdoor districts, 1,321 rooms of the interior store and 135 add-on exterior cells, and 2,443 of the 2,447 add-on bindings in the file sit in those cells (Tribunal 1,227, Bloodmoon 1,216). A script placed only in add-on cells outside them is "only in an add-on world".
 
 ## Why the others do not run
 

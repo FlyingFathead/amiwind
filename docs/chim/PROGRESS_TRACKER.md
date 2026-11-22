@@ -1,6 +1,6 @@
 # CHIM Progress Tracker
 
-_Last updated with AmiWind v0.0.68-dev6 (22 November 2026)._
+_Last updated with AmiWind v0.0.68-dev7 (22 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -46,7 +46,7 @@ _Last updated with AmiWind v0.0.68-dev6 (22 November 2026)._
 
 <!-- BEGIN GENERATED CURRENT STATE: from docs/chim/progress-state.json and docs/mwscript-features.json; run python3 tools/cell_progress_state.py render -->
 
-_Counted from the tracker data generated 2026-11-20: newest ingested build **v0.0.67 (2b086671)**, built 2026-11-18; the version in development, 0.0.68-dev6, has no ingested build yet, so these are the figures of the newest ingested one. Every number below is read from that data and from the MWScript tracker when this block is rendered; none is typed by hand._
+_Counted from the tracker data generated 2026-11-20: newest ingested build **v0.0.67 (2b086671)**, built 2026-11-18; the version in development, 0.0.68-dev7, has no ingested build yet, so these are the figures of the newest ingested one. Every number below is read from that data and from the MWScript tracker when this block is rendered; none is typed by hand._
 
 ### Ready, per land
 
@@ -96,7 +96,7 @@ Rooms that are in the game as room maps of our own, not as CHIM rooms: Imperial 
 
 ### Scripting
 
-Counted from the MWScript tracker ([MWScript features](../MWSCRIPT_FEATURES.md)), measured 22 November 2026 for AmiWind v0.0.68-dev6 with the builder's own compiler: 1,071 of the 1,074 scripts the original game uses run as scripts or are carried by AmiWind's own code (1,062 run, 9 carried); 11,542 script records are bound to placed objects.
+Counted from the MWScript tracker ([MWScript features](../MWSCRIPT_FEATURES.md)), measured 22 November 2026 for AmiWind v0.0.68-dev7 with the builder's own compiler: 1,071 of the 1,074 scripts the original game uses run as scripts or are carried by AmiWind's own code (1,062 run, 9 carried); 11,542 script records are bound to placed objects.
 
 | State | Scripts |
 | :-- | --: |

@@ -1,0 +1,209 @@
+# ROOM-AIM-ROWS-OUTDOORS-AFTER-COURTYARD-68: the opening journey's part A up to its step 3 (tests/sessions/journey_opening.txt,
+# the same lines), for a short check of the census office's back room after the courtyard and back. The model table
+# (mcache) is read in the courtyard and back in the room: the world model of each map and the table's size.
+part A
+wait 8
+cmd developer 1
+cmd dbg all on
+cmd dbg headlamp off
+cmd aw_new_game
+wait 6
+key Escape
+waitfor map 90 prison
+state map
+
+step 1 the opening to the papers: the controls held from the start until the papers are taken at the census office
+probe fight_ship aw_mwscript_status call getplayerfightingdisabled
+expect fight_ship == 1
+wait 12
+xdo type Hors
+key Return
+mark
+saw 90 Intro speech: chargenwalk1
+wait 6
+key Return
+wait 2
+cmd aw_view walk role 2
+wait 40
+cmd aw_view walk off
+cmd map seyda
+waitfor map 90 intro_docks
+until loaded 60
+cmd dbg all on
+boxes
+cmd noclip
+walkto 0 -170 30
+walkto 444.1 -315.8 30
+boxes
+walkto 595.5 -413.1 30
+walkto 636.6 -386.0 20
+cmd noclip
+wait 3
+boxes
+walkto 661.9 -402.3 20
+walkto 695.5 -486.7 25
+walkto 661.9 -402.3 25
+mark
+cmd aw_view walk 587.0 -354.1
+saw 40 Intro speech: chargendock1
+cmd aw_view walk off
+waitfor screen 40 character
+key Right
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+waitfor screen 20 game
+wait 50
+walkto 552.5 -332.0 30
+wait 25
+walkto 432 -266 45
+walkto 330 -200 50
+walkto 330 -190 25
+face 320.7 -161.5 58
+key e
+waitfor map 40 census
+state map
+cmd dbg all on
+cmd aw_view walk role 6
+wait 8
+cmd aw_view walk off
+wait 2
+key e
+wait 6
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 2
+key Return
+wait 7
+waitfor screen 20 game
+boxes
+probe papers_before player->getitemcount "chargen statssheet"
+expect papers_before == 0
+face 37.3 -45.7 66.2
+aimed 172859
+key e
+waitfor screen 8 book
+key e
+wait 3
+boxes
+probe papers_after player->getitemcount "chargen statssheet"
+expect papers_after == 1
+
+step 2 the hall door and the back room: the guard opens his door, an item is taken
+walkto 38 28 25
+wait 8
+boxes
+face 47 60 72
+aimed 172860
+key e
+wait 3
+walkto 47 100 25
+walkto 47 232 40
+walkto 76 232 15
+walkto 120 212 25
+walkto 145 205 20
+boxes
+walkto 130 181 20
+face 129.9 177.2 66.8
+aimed 119577
+probe dagger_before aw_placed aim
+key e
+wait 3
+boxes
+probe dagger_taken aw_placed aim
+expect has dagger_before 119577 Iron Dagger: at 130 177 67, edict 0 drawn 0 disabled 0
+expect has dagger_taken 119577 Iron Dagger: at 130 177 67, edict 0 drawn 0 disabled 1
+probe mc_room mcache
+
+step 3 out to the courtyard and back in: the taken item stays taken
+walkto 185 218 30
+face 201.5 224 71
+aimed 119665
+key e
+waitfor map 45 sncourt
+until loaded 60
+boxes
+probe away_map state map
+probe mc_away mcache
+face 78 -175.5 66
+aimed 113864
+key e
+waitfor map 45 census
+until loaded 60
+boxes
+probe back_map state map
+probe mc_back mcache
+walkto 150 205 20
+walkto 130 181 20
+face 129.9 177.2 66.8
+probe table_back aw_placed aim
+expect away_map != back_map
+expect has table_back 119577 Iron Dagger: at 130 177 67, edict 0 drawn 0 disabled 1

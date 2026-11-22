@@ -206,8 +206,46 @@ def read_palette_input(path):
     return raw
 
 
-def scene_palette(samples, supplied=None):
-    """Keep the historical sampled default; an explicit palette owns all indices."""
+# The cool ice and snow ramp written over 16 least used warm entries of the sampled
+# palette (SOL-GLACIER-ICE-BROWN-SHEER-68): data, measured once, in the source tree.
+PALETTE_RAMP=Path(__file__).resolve().parents[1]/'config'/'scene-palette-ramp.json'
+
+
+def palette_ramp(path=PALETTE_RAMP):
+    """The ramp rows, checked: 16 distinct entries of 1..223 with an RGB triple each."""
+    ramp=json.loads(Path(path).read_text(encoding='utf-8'))
+    if ramp.get('schema')!=1 or ramp.get('sampled_palette_bytes')!=672:
+        raise ValueError('Unsupported scene palette ramp')
+    entries=ramp.get('entries')
+    if not isinstance(entries,list) or not entries:raise ValueError('Scene palette ramp has no entries')
+    seen=set()
+    for row in entries:
+        index=row.get('index');rgb=row.get('rgb')
+        if type(index) is not int or not 1<=index<=223 or index in seen:
+            raise ValueError('Scene palette ramp entries must be distinct indices 1..223')
+        if not isinstance(rgb,list) or len(rgb)!=3 or any(type(v) is not int or not 0<=v<=255 for v in rgb):
+            raise ValueError('Scene palette ramp entry needs an RGB triple')
+        seen.add(index)
+    return ramp
+
+
+def apply_palette_ramp(palette, ramp):
+    """Write the ramp over its entries when the 224 sampled colours are the measured ones.
+
+    Returns (palette, applied). Any other sampled palette is returned unchanged: the
+    entries were chosen as near duplicates of that one palette only.
+    """
+    sampled=bytes(palette[:ramp['sampled_palette_bytes']])
+    if hashlib.sha256(sampled).hexdigest()!=ramp['sampled_palette_sha256']:
+        return list(palette),False
+    out=list(palette)
+    for row in ramp['entries']:
+        out[row['index']*3:row['index']*3+3]=row['rgb']
+    return out,True
+
+
+def scene_palette(samples, supplied=None, ramp=None):
+    """The sampled default with the ice ramp; an explicit palette owns all indices."""
     if supplied is not None:
         if len(supplied) != 768:
             raise ValueError('Conversion palette must contain exactly 768 RGB bytes')
@@ -215,7 +253,27 @@ def scene_palette(samples, supplied=None):
     import numpy as np
     from PIL import Image
     strip=Image.fromarray(samples.astype(np.uint8).reshape(1,-1,3),'RGB').quantize(colors=224)
-    return strip.getpalette()[:672]+[102,119,136]*30+[238,221,170,0,0,0]
+    palette=strip.getpalette()[:672]+[102,119,136]*30+[238,221,170,0,0,0]
+    ramp=palette_ramp() if ramp is None else ramp
+    palette,applied=apply_palette_ramp(palette,ramp)
+    if applied:
+        print('Scene palette: ice ramp written over',len(ramp['entries']),'entries',flush=True)
+    else:
+        print('Scene palette: ice ramp NOT written (the sampled colours are not the measured ones; '
+              'see config/scene-palette-ramp.json)',flush=True)
+    return palette
+
+
+def colormap_bytes(palette):
+    """The 64 light rows, each the nearest palette entry of the scaled colour (outdoor models draw near row 32)."""
+    import numpy as np
+    from PIL import Image
+    pal=Image.new('P',(1,1));pal.putpalette(list(palette))
+    cmap=bytearray()
+    for level in range(64):
+        rgb=np.array(palette,np.uint8).reshape(1,256,3).astype(float)*max(.15,1-level/63)
+        cmap.extend(Image.fromarray(rgb.astype(np.uint8),'RGB').convert('RGB').quantize(palette=pal,dither=Image.Dither.NONE).tobytes())
+    return bytes(cmap)
 
 
 def prepare(workspace,scene,out,jobs=None,fallback_font_path=None,palette_path=None):
@@ -250,11 +308,7 @@ def prepare(workspace,scene,out,jobs=None,fallback_font_path=None,palette_path=N
         rgb=colours*(1-level/15)+np.array([102,119,136])*level/15
         fog.extend(np.argmin(((rgb[:,None,:]-colours[None,:,:])**2).sum(axis=2),axis=1).astype(np.uint8).tobytes())
     (game/'gfx/fog.lmp').write_bytes(fog)
-    cmap=bytearray()
-    for level in range(64):
-        rgb=np.array(palette,np.uint8).reshape(1,256,3).astype(float)*max(.15,1-level/63)
-        cmap.extend(quantize(Image.fromarray(rgb.astype(np.uint8),'RGB')).tobytes())
-    (game/'gfx/colormap.lmp').write_bytes(cmap)
+    (game/'gfx/colormap.lmp').write_bytes(colormap_bytes(palette))
     # Original project graphics, generated from host fonts; no Quake artwork.
     font=ImageFont.truetype(str(fallback_font_path) if fallback_font_path else 'DejaVuSansMono.ttf',8);chars=Image.new('P',(128,128),0);chars.putpalette(palette);d=ImageDraw.Draw(chars)
     for c in range(256):

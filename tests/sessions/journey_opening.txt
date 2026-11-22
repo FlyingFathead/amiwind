@@ -32,7 +32,8 @@ step 1 the opening to the papers: the controls held from the start until the pap
 probe fight_ship aw_mwscript_status call getplayerfightingdisabled
 expect fight_ship == 1
 # the ship: Jiub asks the name; the guard's movement box; the guard leads on (then the console map change of the
-# v0.0.65 opening walk, in place of the hatch)
+# v0.0.65 opening walk, in place of the hatch: the walk after him ends in the hold, under the hatch and out of its use
+# reach)
 wait 12
 xdo type Hors
 key Return
@@ -59,21 +60,33 @@ cmd noclip
 # switches set); this leg keeps 114 units or more from it. A player who comes off the ship's deck is far from it until
 # the courtyard.
 walkto 0 -170 30
-cmd aw_view walk 470 -290
-wait 6
+# DOCK-GREETING-OUT-OF-REACH-67: onto the ship's side of the dock guard, as the player of the original comes to him: off
+# the deck and down the plank. The dock guard waits at his plank point (587 -354, the original's first AITravel point
+# on the pier's centre line) and greets within 27 (108 original units). The plank (chargen_plank 397559) meets the dock
+# end 13 units past him (feet 22.75 to 25.75 at T 254 on the line, measured from the dev6 world's collision) and rises
+# to the ship's deck (T 346-362, feet 50.75 then 46.5), 18 units either side of the line; a player coming down it is
+# greeted on it (measured: at 606 -368, 25.8 from him) before setting foot on the pier. With noclip the flight keeps 45
+# units south of the centre line, out of his reach also while he still walks to the plank point, lands on the plank's
+# upper half, and walks up to the deck where the hatch sets the player down (doors-prison.txt 695.5 -486.7). The
+# earlier timed walks came to him from the town's side, the last to 568 -350, 19 units short of him: a walk ends 12
+# units from its point, so the player stood about 28 units from him and the race window never opened; and a player on
+# the town's side of him stands on his way to his post.
+walkto 444.1 -315.8 30
 boxes
-cmd aw_view walk 470 -290
-wait 35
-cmd aw_view walk off
+walkto 595.5 -413.1 30
+walkto 636.6 -386.0 20
 cmd noclip
-wait 4
-cmd aw_view walk 640 -250
-wait 8
+wait 3
+boxes
+walkto 661.9 -402.3 20
+walkto 695.5 -486.7 25
+walkto 661.9 -402.3 25
+# off the ship: down the plank toward him; the walk ends with his greeting (CharGenDock1, the player held)
+mark
+cmd aw_view walk 587.0 -354.1
+saw 40 Intro speech: chargendock1
 cmd aw_view walk off
-cmd aw_view walk 568 -350
-wait 15
-cmd aw_view walk off
-# the race menu on the pier: Enter through its pages
+# the race menu on the plank: Enter through its pages
 waitfor screen 40 character
 key Right
 wait 2
@@ -93,7 +106,7 @@ key Return
 wait 2
 key Return
 waitfor screen 20 game
-# PIER-GUARD-POST-STUCK-67: the player stays on the pier where the dock guard met him while the guard says his line and
+# PIER-GUARD-POST-STUCK-67: the player stays on the plank where the dock guard met him while the guard says his line and
 # walks the pier's centre line to his post beside the census office door (about 25 s of game time from here); then
 # his walk's own check from aw_intro_status: he is done at the post, his box never stood inside a solid (a pier post)
 # on any tick of his walks, and the walk was the fixed route (the earlier one is "aw_intro_status direct")
@@ -106,9 +119,10 @@ expect dock_done == 1
 expect dock_from_post <= 3
 expect dock_in_solid == 0
 expect has dock_walk route fixed
-cmd aw_view walk 470 -420
-wait 12
-cmd aw_view walk off
+# DOCK-GREETING-OUT-OF-REACH-67: from the plank down the pier's centre line, between the post pairs (19 units of room
+# either side of the line), to its middle piece at T 200 (552.5 -332.0); the earlier timed walk to 470 -420 led off the
+# line to the south, and beside the plank there is no floor past 18 units from the line
+walkto 552.5 -332.0 30
 wait 25
 # up the pier to the office door (113893, its box 309..333 x -173..-150 in the town's door table): walked until the
 # engine says each point is reached, the door aimed at (timed walks ended short of it on a loaded host; the walk
@@ -247,7 +261,12 @@ shot a4-dagger-taken
 # 119580, owned). From the table's edge, looking at the crab meat: the game's own focus row must name the crab meat (not
 # the plate under it), E takes it, the crab meat is then in the inventory (getitemcount, as step 4 reads the ring) and
 # the plate is not: the theft ledger names no plate. The dev2 image's use key went to the plate here.
-walkto 145 181 20
+# JOURNEY-CRAB-WALK-POINT-AT-TABLE-EDGE-68: the walk goes along the table's edge, not into it. The point 145 181 lay past
+# the edge: from the dagger's spot (132 191) the table stopped the player at 135..136 189, 12.0 to 12.8 units from it,
+# and the walk ends only within 12 (aw_debug.c walkto_move), so it ended or timed out by tenths of a unit. 148 195 keeps
+# the player's centre north of the edge (it stands at y 189 and more there); the walk ends about 136 192, beside the
+# spot the crab meat was aimed from when it passed (136 189).
+walkto 148 195 20
 boxes
 probe crab_before player->getitemcount ingred_crab_meat_01
 expect crab_before == 0

@@ -3297,6 +3297,16 @@ int AW_AreaPlaceKeys(unsigned long *keys,int max,unsigned long *generation){
     *generation=place_gen;
     return i;
 }
+/* ROOM-AIM-ROWS-OUTDOORS-AFTER-COURTYARD-68: every server spawn (sv_main.c SV_SpawnServer: a door, a map change, a load,
+ * the same map spawned again) leaves the focus table and the place's keys belonging to no map, so the new map's first
+ * client frame reads its own (focus_refresh), a room's rows in a room and the 3 x 3 cells' outdoors. The world model's
+ * slot alone does not tell a new map: once the session has loaded as many models as the model table's static base
+ * (model.c Mod_FindName, ENGINE-MODEL-TABLE-58), a world of another name takes an unreferenced slot, often the one the
+ * last world had. Back in the census office's back room from the courtyard the room got the courtyard's slot, and the
+ * use key kept the town's 381 outdoor rows: the room's items had no focus row. Declared here and by its caller, not
+ * in a header a CHIM stage keys. */
+void AW_FocusServerReset(void);
+void AW_FocusServerReset(void){focus_world=NULL;place_world=NULL;}
 static void focus_load(void){
     FILE *f=NULL;long base,room=0;int i,j,dx,dy,ok=1;
     unsigned long rooms;edict_t *e;eval_t *v;vec3_t game,local;

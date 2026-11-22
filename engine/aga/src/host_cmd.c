@@ -178,6 +178,11 @@ void Host_Noclip_f (void)
             SV_ClientPrintf("Still inside solid: dbg unstuck moves you to the nearest clear spot; or fly clear, or dbg recover.\n");return;
         }
         VectorCopy(vec3_origin,sv_player->v.velocity);
+        /* JOURNEY-DOCK-NOCLIP-UNSTUCK-RACE-68: the spot noclip goes off at is the one a stuck check falls back to
+         * (sv_phys.c SV_CheckStuck: ent->v.oldorigin, kept only while walking): before, it was still the spot of the
+         * last walk before the flight, so a box that touched the world where noclip went off (the opening journey's
+         * plank end) was thrown back there, by the town start, instead of lifted clear where it stood */
+        VectorCopy(sv_player->v.origin,sv_player->v.oldorigin);
 		noclip_anglehack = false;
 		sv_player->v.movetype = MOVETYPE_WALK;
 		SV_ClientPrintf ("noclip OFF\n");

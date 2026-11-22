@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "about": "A cool off-white to blue-grey ramp in the scene palette, so the ice and snow of Solstheim keep a white-ish cast at the outdoor light rows instead of turning brown-grey (SOL-GLACIER-ICE-BROWN-SHEER-68). tools/prepare_quake.py scene_palette writes these 16 entries over the sampled palette when its 224 sampled colours are the ones measured here; any other sampled palette is left as it is and the stage says so.",
+  "decided": "Decided for the project on 2026-11-21: the plain ramp for the whole game (every converter may quantize onto it).",
+  "sampled_palette_sha256": "618049d237fd474ee631b8f1aaf3b993abe14d3f46588b98c7c0643c098b8f50",
+  "sampled_palette_bytes": 672,
+  "scene_palette_before_sha256": "f4ab7576a73b00887b4eca2192b8a162bc2fced4dc2ac241cc1f5af01488d973",
+  "scene_palette_after_sha256": "f0ce2fe010401c71088e328ede7b3b9851265dcccf4018400a70c551a86394c1",
+  "method": {
+    "replaced": "the 16 least used warm entries of 0..223 (red at least blue; never 0 or the reserved bank), cost = (texels of the whole image + colormap use on the outdoor rows 8..40) x squared distance to the nearest remaining entry, removed greedily; each lies 2 to 6 RGB units (largest channel) from an entry that stays",
+    "ramp": "k-means with 16 colours of the source textures below as the converter stages them (64x64), each taken at full light and at the colormap scales of rows 16, 24 and 32",
+    "source_textures": [
+      "tx_bm_iceberg",
+      "tx_bm_ice_05",
+      "tx_bm_ice_06",
+      "tx_bm_icelayer_01",
+      "tx_bm_karstaag",
+      "tx_bm_karstaag_door",
+      "tx_bm_snow_01",
+      "tx_bm_snow_02",
+      "tx_bm_snow_03",
+      "tx_bm_snow_03a",
+      "tx_bm_snow_04",
+      "tx_bm_snow_05",
+      "tx_bm_snow_ice_01"
+    ],
+    "rows": [0, 16, 24, 32],
+    "mean_channel_error_rows_16_32": {"before": 9.92, "ramp_12": 4.72, "ramp_16": 2.74, "ramp_20": 2.58}
+  },
+  "entries": [
+    {"index": 104, "rgb": [228, 230, 235]},
+    {"index": 97, "rgb": [205, 208, 209]},
+    {"index": 101, "rgb": [186, 189, 193]},
+    {"index": 189, "rgb": [166, 172, 179]},
+    {"index": 80, "rgb": [151, 156, 159]},
+    {"index": 90, "rgb": [141, 142, 145]},
+    {"index": 137, "rgb": [119, 133, 145]},
+    {"index": 111, "rgb": [128, 129, 130]},
+    {"index": 153, "rgb": [116, 116, 118]},
+    {"index": 78, "rgb": [104, 117, 128]},
+    {"index": 136, "rgb": [104, 105, 106]},
+    {"index": 175, "rgb": [89, 101, 110]},
+    {"index": 172, "rgb": [93, 93, 95]},
+    {"index": 107, "rgb": [79, 85, 92]},
+    {"index": 108, "rgb": [65, 74, 82]},
+    {"index": 154, "rgb": [52, 60, 67]}
+  ]
+}

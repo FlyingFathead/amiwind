@@ -20,6 +20,23 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| shipped | the v0.0.68-dev6 development build | v0.0.68-dev6 (95a3d6e3, build 2026_11_22_v0.0.68-dev6_full-v0.0.68-dev6_95a3d6e) | 2026-11-22 | the delivered build holds the commit | The delivered v0.0.68-dev6 image is built from 95a3d6e3, which holds the actor record and the script tracker reading the frame stores (5ebc69814, gate 12441); the tracker pages of this snapshot are measured with it. |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-21: reported in v0.0.68-dev5
+- 2026-11-22: shipped: the v0.0.68-dev6 development build, v0.0.68-dev6 (95a3d6e3, build 2026_11_22_v0.0.68-dev6_full-v0.0.68-dev6_95a3d6e); the delivered build holds the commit: The delivered v0.0.68-dev6 image is built from 95a3d6e3, which holds the actor record and the script tracker reading the frame stores (5ebc69814, gate 12441); the tracker pages of this snapshot are measured with it.
+
+<!-- END GENERATED TIMELINE -->
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category

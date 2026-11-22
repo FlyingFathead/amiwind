@@ -1628,6 +1628,12 @@ void SV_SpawnServer (char *server)
         void AW_BarrierServerReset(void);
         AW_BarrierServerReset();
     }
+    {   /* the use key's focus table read again for the new map, also when its world model gets the last world's model
+         * slot (aw_inventory.c; ROOM-AIM-ROWS-OUTDOORS-AFTER-COURTYARD-68); declared here, not in a header the CHIM
+         * stages key */
+        void AW_FocusServerReset(void);
+        AW_FocusServerReset();
+    }
     if(aw_inspect_reset)aw_inspect_reset();
     /* the waits of the entity updates and dbg netstat start again with the map (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66) */
     memset (sv_net_missed, 0, sizeof(sv_net_missed));

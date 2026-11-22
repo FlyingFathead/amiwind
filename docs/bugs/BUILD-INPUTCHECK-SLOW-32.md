@@ -269,6 +269,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [IMAGE-ROOM-ACTOR-BAKE-REFIT-66](IMAGE-ROOM-ACTOR-BAKE-REFIT-66.md): The image step's CHIM room actor bake fitted all 2,594 room residents again in the v0.0.66-dev3 build, where the v0.0.66-dev2 run had every one of them cached
 - [IMAGE-ROOM-HEAP-ONE-CORE-66](IMAGE-ROOM-HEAP-ONE-CORE-66.md): The image step's room heap check measures every room on one core
 - [IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66](IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66.md): The image step's CHIM room actor bake takes about two minutes on one core when every room resident is already cached
+- [IMAGE-TORCHES-GUARD-3X-BASELINE-68](IMAGE-TORCHES-GUARD-3X-BASELINE-68.md): The image step's torch check takes about three times its recorded time with the same six units
 - [MINIWIND-NO-INTERIOR-SCOPE-42](MINIWIND-NO-INTERIOR-SCOPE-42.md): A MiniWind of one room built the whole town: no scope converted only the start room
 - [MINIWIND-NOT-MINUTES-33](MINIWIND-NOT-MINUTES-33.md): A reused MiniWind build took about two hours instead of minutes
 - [MINIWIND-NPCS-ONE-WORKER-64](MINIWIND-NPCS-ONE-WORKER-64.md): The npcs stage of a MiniWind sandbox build runs alone on 1 of its 8 workers

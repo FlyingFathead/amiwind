@@ -1,6 +1,6 @@
 # CHIM Engine tracker
 
-_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.68-dev6._
+_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.68-dev7._
 
 <!-- Generated whole by tools/bug_register.py render from docs/bugs/bugs.json; do not edit by hand. -->
 
@@ -21,7 +21,7 @@ CHIM version: 0.2.2. 411 CHIM bugs: 208 open, 183 fixed, 20 closed.
 
 Bugs reported two or more times. Most reports first. Each has its report lines on its page.
 
-- [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): Travelling from Seyda Neen to Balmora sometimes hangs on the Loading screen (boot smoke, 2 of about 5 runs) (reported 48 times, open)
+- [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): Travelling from Seyda Neen to Balmora sometimes hangs on the Loading screen (boot smoke, 2 of about 5 runs) (reported 49 times, open)
 - [BUILD-CHIM-STAGE-SERIAL-TAIL-36](BUILD-CHIM-STAGE-SERIAL-TAIL-36.md): After the parallel world build the chim stage ran its validation, heap gate and zone walk on one core (about 10 minutes of the 270-frame coast build) (reported 17 times, open)
 - [BUILD-CHIM-CELLS-PRIVATE-LIST-47](BUILD-CHIM-CELLS-PRIVATE-LIST-47.md): The releases' CHIM cell list was not in the source tree; public builds had no CHIM exterior cells (reported 11 times, fixed)
 - [BUILD-ACTOR-LIBRARY-UNDERUSED-54](BUILD-ACTOR-LIBRARY-UNDERUSED-54.md): The actor-library stage ran at 2.69 of 8 allowed cores with 130 units queued and 7 running (reported 7 times, open)
@@ -85,6 +85,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 
 Newest first: the last 10 dated events of CHIM bugs, from their entries (reports, history, closure steps).
 
+- 2026-11-22 [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): seen again in v0.0.68-dev6: Seen again in an opening session on the v0.0.68-dev6 image: on the ship, the remote-console folder's request finished on the emulator side and the game was never told, so the session stopped before the dock.
 - 2026-11-22 [CHIM-MESH-STAIR-UNIT-SLOW-67](CHIM-MESH-STAIR-UNIT-SLOW-67.md): seen again in v0.0.68-dev5: On the Solstheim glacier test build with mesh method E, each of the nine test cells' stair collision units ran for over 47 minutes on one core, longer than the earlier 19.5 to 25 minutes.
 - 2026-11-22 [IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66](IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66.md): seen again in v0.0.68-dev5: Seen again in the v0.0.68-dev5 build: the image step's room actor bake took 1 minute 55 seconds on about one core.
 - 2026-11-21 [CHIM-SOL-TEST-TWO-CHIMSOL-STORES-68](CHIM-SOL-TEST-TWO-CHIMSOL-STORES-68.md): seen again in v0.0.68-dev3: The plan check of a Solstheim test image stopped on the check that every finished expansion cell is built; that check now accepts the test image alone, on a development version.
@@ -94,7 +95,6 @@ Newest first: the last 10 dated events of CHIM bugs, from their entries (reports
 - 2026-11-21 [IMAGE-ROOM-HEAP-ONE-CORE-66](IMAGE-ROOM-HEAP-ONE-CORE-66.md): seen again in v0.0.68-dev2: Seen again in the v0.0.68-dev2 build: a late part of the image step ran on one core for minutes
 - 2026-11-21 [IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66](IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66.md): seen again in v0.0.68-dev2: Seen again in the v0.0.68-dev2 build: the room actor bake took about two minutes on one core
 - 2026-11-21 [OUTDOOR-DISABLE-NOT-HIDDEN-68](OUTDOOR-DISABLE-NOT-HIDDEN-68.md): fixed in source: a gated commit, v0.0.67 (b9b215d9); gate 12265 of the planning item OUTDOOR-DISABLE-NOT-HIDDEN-68: Every outdoor placement a script can switch off or on gets its hide rows, in the base world and in every store of frames the image installs (the change in f6edb6c53).
-- 2026-11-21 [OUTDOOR-DISABLE-NOT-HIDDEN-68](OUTDOOR-DISABLE-NOT-HIDDEN-68.md): shipped: the v0.0.68-dev3 snapshot build, v0.0.68-dev3 (9a91382c3, build 2026_11_21_v0.0.68-dev3_full-dev3_9a91382); the delivered build holds the commit (gate 12300): A placement outdoors that a script switches off or on disappears and comes back as the script says, as in the original.
 
 ## Engine streaming and memory
 

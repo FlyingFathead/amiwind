@@ -304,6 +304,99 @@ class JourneySmoke(unittest.TestCase):
         self.assertTrue(all('step 1' in l for l in bad), bad)
         self.assertTrue(any('dock_in_solid' in l for l in bad), bad)
 
+    def test_step_1_comes_off_the_ship_into_the_dock_guards_reach(self):
+        """DOCK-GREETING-OUT-OF-REACH-67 (the journeys of the v0.0.67 release and the v0.0.68-dev1 and dev5 images stopped
+        in step 1): the dock guard waits at the plank point of his fixed route (aw_opening.c AW_PIER_PLANK_T on the pier's
+        centre line, the original's first AITravel point) and greets the player within near_actor(5) < 27 (the original's
+        108 units). Step 1 came to him from the town's side by timed walks, the last one to 568 -350, 19 units short of
+        him: a walk ends 12 units from its point (aw_debug.c walkto_move), so the player stopped about 28 units from him,
+        out of his reach, and the race window never opened; and a player on the town's side of him stands on his way to
+        his post. The game was right: the plank meets the dock end 13 units past him, and a player coming down it was
+        greeted on it (the dev6 image, 22 November 2026: at 606 -368, 25.8 from him). Step 1 now comes to him as that
+        player does: a flight out of his reach to the plank, up to the deck and down the plank to the guard himself, ended
+        by his greeting, never by a time."""
+        src = ROOT / 'engine' / 'aga' / 'src'
+        opening = (src / 'aw_opening.c').read_text(encoding='utf-8', errors='replace')
+        pier = {k: float(v) for k, v in re.findall(r'#define AW_PIER_(LINE_\w+|PLANK_T|END_T) (-?[0-9.]+)f', opening)}
+        reach = float(re.search(r'if\(near_actor\(5\)<([0-9.]+)\)\{', opening).group(1))
+        debug = (src / 'aw_debug.c').read_text(encoding='utf-8', errors='replace')
+        stop = float(re.search(r'float range,stop=([0-9.]+);', debug).group(1))
+        hull = (ROOT / 'tools' / 'player_hull.py').read_text(encoding='utf-8', errors='replace')
+        hx, hy = (abs(float(v)) for v in re.search(r'^MINS=\((-?[0-9.]+),(-?[0-9.]+),', hull, re.M).groups())
+        # the plank on the centre line, measured from the dev6 world's collision for that standing box (T from the
+        # line's door end): it meets the dock end at T 254 and the ship's deck at T 346-362, 18 units either side
+        plank_foot, plank_top, plank_half = 254.0, 346.0, 18.0
+        ax, ay, bx, by = pier['LINE_AX'], pier['LINE_AY'], pier['LINE_BX'], pier['LINE_BY']
+        n = ((bx - ax) ** 2 + (by - ay) ** 2) ** 0.5
+        ux, uy = (bx - ax) / n, (by - ay) / n
+        guard = (ax + ux * pier['PLANK_T'], ay + uy * pier['PLANK_T'])
+
+        def line(x, y):
+            """T along the line from the door's end toward the plank, L to its left"""
+            return (x - ax) * ux + (y - ay) * uy, -(x - ax) * uy + (y - ay) * ux
+
+        def room(p, q):
+            """the least distance from the leg p..q (T, L) to his walk, the line from END_T to PLANK_T"""
+            if (p[1] <= 0 <= q[1] or q[1] <= 0 <= p[1]) and p[1] != q[1]:
+                t = p[0] + (q[0] - p[0]) * (0 - p[1]) / (q[1] - p[1])
+                if pier['END_T'] <= t <= pier['PLANK_T']:
+                    return 0.0
+            def to_walk(t, l):
+                return ((t - min(max(t, pier['END_T']), pier['PLANK_T'])) ** 2 + l * l) ** 0.5
+            def to_leg(t, l):
+                dt, dl = q[0] - p[0], q[1] - p[1]
+                k = max(0.0, min(1.0, ((t - p[0]) * dt + (l - p[1]) * dl) / (dt * dt + dl * dl or 1)))
+                return ((t - p[0] - k * dt) ** 2 + (l - p[1] - k * dl) ** 2) ** 0.5
+            return min(to_walk(*p), to_walk(*q), to_leg(pier['END_T'], 0.0), to_leg(pier['PLANK_T'], 0.0))
+
+        with tempfile.TemporaryDirectory() as d:
+            js.write_scripts(JOURNEY, d)
+            a = (Path(d) / 'part-A.txt').read_text(encoding='utf-8').splitlines()
+        first = a.index('cmd echo JOURNEY STEP 1')
+        race = a.index('waitfor screen 40 character')
+        step = a[first:race]
+        walkto = re.compile(r'walkto (-?[0-9.]+) (-?[0-9.]+) \d+')
+        # one flight with noclip; every leg of it keeps out of his reach wherever he is on his walk to the plank point
+        # (a walk to a point ends up to 12 units short of it, where the next leg starts)
+        noclip = [i for i, l in enumerate(step) if l == 'cmd noclip']
+        self.assertEqual(len(noclip), 2, noclip)
+        flight = [line(*map(float, m.groups())) for m in map(walkto.fullmatch, step[noclip[0]:noclip[1]]) if m]
+        for p, q in zip(flight, flight[1:]):
+            self.assertGreater(room(p, q) - stop, reach, (p, q))
+        # it lands on the plank's upper half, where the box stands on the plank wherever the walk ended
+        t, l = flight[-1]
+        self.assertTrue(plank_foot + stop < t < plank_top - stop and abs(l) + stop <= plank_half, flight[-1])
+        # on foot from there: up to the deck and back to the plank's top, every point past his reach on the ship's side
+        landed = [line(*map(float, m.groups())) for m in map(walkto.fullmatch, step[noclip[1]:]) if m]
+        self.assertTrue(landed, step[noclip[1]:])
+        for t, l in landed:
+            self.assertGreater(t - stop, pier['PLANK_T'] + reach, (t, l))
+        self.assertTrue(any(t > plank_top for t, _ in landed), 'the walk does not reach the ship\'s deck')
+        # then the walk to the guard himself: where it ends at its own stop, or held against his body (two of the
+        # standing boxes side by side, corner to corner), the player stands within his reach; the old point 568 -350
+        # gave 31.4
+        walks = [i for i, l in enumerate(step) if re.fullmatch(r'cmd aw_view walk -?[0-9.]+ -?[0-9.]+', l)]
+        self.assertEqual(len(walks), 1, [step[i] for i in walks])
+        i = walks[0]
+        self.assertGreater(i, noclip[1])
+        x, y = (float(v) for v in step[i].split()[-2:])
+        off = ((x - guard[0]) ** 2 + (y - guard[1]) ** 2) ** 0.5
+        self.assertLess(off + stop, reach, step[i])
+        self.assertLess((4 * hx * hx + 4 * hy * hy) ** 0.5 + off, reach, step[i])
+        # ended by his greeting, not by a time: mark, the walk, his first line, the walk off, then the race window
+        self.assertEqual(step[i - 1], 'mark')
+        self.assertRegex(step[i + 1], r'^saw \d+ Intro speech: chargendock1$')
+        self.assertEqual(step[i + 2:], ['cmd aw_view walk off'])
+        # after his walk to his post the player goes down the centre line toward the town on foot, by a walk that ends
+        # when the engine says it is reached
+        probe = a.index('cmd echo JOURNEY PROBE dock_walk')
+        after = next(l for l in a[probe:] if l.startswith(('walkto ', 'cmd aw_view walk ')))
+        m = walkto.fullmatch(after)
+        self.assertTrue(m, after)
+        t, l = line(*map(float, m.groups()))
+        self.assertLess(t, pier['PLANK_T'])
+        self.assertLess(abs(l), 1.0)
+
     def test_the_crab_meat_step_checks_the_crab_meat_taken_and_the_plate_left(self):
         # CENSUS-CRAB-PLATE-FOCUS-66: aimed at the crab meat, the use key takes it, never the plate under it
         with tempfile.TemporaryDirectory() as d:

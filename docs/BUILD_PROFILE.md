@@ -1,6 +1,6 @@
 # Build profile and stage reuse
 
-_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
+_Last updated with AmiWind v0.0.68-dev4 (21 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -1822,6 +1822,20 @@ to scene conversion before quantization. The stage cache fingerprints its bytes,
 so changing the same file invalidates scene reuse. Omit it for the historical
 scene-sampled palette. Use the palette from the matching conversion stage,
 before UI and sky reservations; a final runtime palette is not interchangeable.
+
+The sampled palette has no white and almost no cool colours, so Solstheim's ice
+and snow drew brown-grey at the outdoor light rows
+([SOL-GLACIER-ICE-BROWN-SHEER-68](bugs/SOL-GLACIER-ICE-BROWN-SHEER-68.md)).
+Since v0.0.68 the scene stage writes a 16-colour cool off-white to blue-grey
+ramp over 16 little-used warm entries (near duplicates, 2 to 6 RGB units from an
+entry that stays). The entries, the ramp colours, the textures the ramp was
+measured from and the measurement are data in `config/scene-palette-ramp.json`;
+the ramp is written only when the 224 sampled colours are the measured ones
+(their SHA-256 is in the file), and the stage prints whether it was. Every
+converter may quantize onto the ramp, so other cool textures (water, silver,
+blue glass) also move closer to their source colours. The file is part of the
+scene stage's key: changing it rebuilds the scene and every stage that takes its
+palette.
 
 15 October 2026 source follow-up: the fresh Seyda gameplay carrier uses shared
 original intro placement and validated hand timing. The full intro retains its

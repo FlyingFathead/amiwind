@@ -1,6 +1,6 @@
 # The opening, step by step
 
-_Last updated with AmiWind v0.0.67 (18 November 2026)._
+_Last updated with AmiWind v0.0.68-dev6 (22 November 2026)._
 
 What a New Game plays, from the prison ship to leaving the Census and Excise Office, with what the player sees and
 may do at each step. This is the reference the opening checks follow: the in-game walk of every dev build and the
@@ -33,6 +33,10 @@ until the release, then -1).
   the shore end, only while the registration runs).
 - The dock guard walks toward the plank to meet the player, along the middle of the pier. When the player is near him
   he stops, the player is held, and he speaks his first line (with its text in the speech box).
+- He waits at the foot of the plank, at the original's first travel point (587 -354 in the dock map's units). The
+  plank meets the dock end 13 units past him and rises to the ship's deck, so a player coming down it from the deck is
+  within his reach (27 units, the original's 108) on the plank's lower part and is greeted there, before setting foot
+  on the pier (measured on the v0.0.68-dev6 image: greeted at 606 -368, 25.8 units from him).
 - His walks follow the pier's centre line, measured from the built world's own collision: the line of the dock pieces,
   with the posts in pairs at the middle of each piece and 19 units of room for him on either side of the line. He never
   steers round anything there: someone standing on the line is waited for. Every tick of his walks his body is tested

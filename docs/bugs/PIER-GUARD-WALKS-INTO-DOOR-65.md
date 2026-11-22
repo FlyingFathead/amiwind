@@ -208,6 +208,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 
 Related bugs in other categories:
 
+- [DOCK-GREETING-OUT-OF-REACH-67](DOCK-GREETING-OUT-OF-REACH-67.md): Since v0.0.67 the dock guard waits at the plank out of the greeting's reach of where the opening walk stops, and the race menu does not open
 - [OPENING-HOLDS-OFF-NEWGAME-64](OPENING-HOLDS-OFF-NEWGAME-64.md): A New Game clears the opening's state right after setting it: the dock guard does not meet the player and no race can be chosen
 
 <!-- END GENERATED CATEGORY -->

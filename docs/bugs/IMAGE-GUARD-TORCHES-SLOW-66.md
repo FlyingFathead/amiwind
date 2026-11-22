@@ -1,5 +1,14 @@
 # IMAGE-GUARD-TORCHES-SLOW-66: The image step's torch guards bake took 3.4 times as long, and the step ran on under half its cores
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.66-dev2 at 2026-11-14 22:22 +0200: The v0.0.66-dev2 build with Tribunal and Bloodmoon selected (source 70a33a5): the guard torches section took 16 min 47 s on 4.3 of 24 cores and made 0 models (6 guards skipped, 0 from the pass cache, 0 by a skip verdict of the unit cache), so every restart of the image step pays it again; the image step's finalize ran 25 min 31 s on 5.5 cores.
+- Reported with v0.0.68-dev5 at 2026-11-22 04:40 +0200: Seen again on a Solstheim glacier test build of v0.0.68-dev5: the torch check took 1,011 s for the same 6 units at about 4.4 cores, against the 336 s on record; a v0.0.65 release candidate build took 1,042 s. The 336 s record has not been matched since, so it may come from a run that did less work.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -28,8 +37,18 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 - 2026-11-13: reported in v0.0.65
 - 2026-11-14 22:22 +0200: seen again in v0.0.66-dev2: The v0.0.66-dev2 build with Tribunal and Bloodmoon selected (source 70a33a5): the guard torches section took 16 min 47 s on 4.3 of 24 cores and made 0 models (6 guards skipped, 0 from the pass cache, 0 by a skip verdict of the unit cache) ...
+- 2026-11-22 04:40 +0200: seen again in v0.0.68-dev5: Seen again on a Solstheim glacier test build of v0.0.68-dev5: the torch check took 1,011 s for the same 6 units at about 4.4 cores, against the 336 s on record; a v0.0.65 release candidate build took 1,042 s.
 
 <!-- END GENERATED TIMELINE -->
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Timeline](#timeline)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -217,6 +236,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [IMAGE-ROOM-ACTOR-BAKE-REFIT-66](IMAGE-ROOM-ACTOR-BAKE-REFIT-66.md): The image step's CHIM room actor bake fitted all 2,594 room residents again in the v0.0.66-dev3 build, where the v0.0.66-dev2 run had every one of them cached
 - [IMAGE-ROOM-HEAP-ONE-CORE-66](IMAGE-ROOM-HEAP-ONE-CORE-66.md): The image step's room heap check measures every room on one core
 - [IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66](IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66.md): The image step's CHIM room actor bake takes about two minutes on one core when every room resident is already cached
+- [IMAGE-TORCHES-GUARD-3X-BASELINE-68](IMAGE-TORCHES-GUARD-3X-BASELINE-68.md): The image step's torch check takes about three times its recorded time with the same six units
 - [MINIWIND-NO-INTERIOR-SCOPE-42](MINIWIND-NO-INTERIOR-SCOPE-42.md): A MiniWind of one room built the whole town: no scope converted only the start room
 - [MINIWIND-NOT-MINUTES-33](MINIWIND-NOT-MINUTES-33.md): A reused MiniWind build took about two hours instead of minutes
 - [MINIWIND-NPCS-ONE-WORKER-64](MINIWIND-NPCS-ONE-WORKER-64.md): The npcs stage of a MiniWind sandbox build runs alone on 1 of its 8 workers

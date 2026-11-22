@@ -1,6 +1,6 @@
 # Gameplay recorder
 
-_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
+_Last updated with AmiWind v0.0.68-dev6 (22 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -150,10 +150,13 @@ the courtyard, the captain's door), with the use key on what the view is aimed a
 by name (Morrowind, whose answer names his duties, then duties). Its nine steps:
 
 1. The opening to the papers taken at the census office: fighting is switched off from the ship until the papers;
-   after them the papers are carried and fighting and magic are on. After the race menu the player stays on the pier
-   while the dock guard walks to his post beside the office door; then `aw_intro_status` must show him there (done,
-   at most 3 units from his post), his body never inside a solid on any tick of his walks (a pier post), and the
-   fixed route along the pier's centre line as the walk that ran.
+   after them the papers are carried and fighting and magic are on. The player meets the dock guard from the ship's
+   side, as in the original: on the ship's deck, then down the plank toward him, and the walk ends with his greeting
+   (the race menu opens on it, never after a fixed time). He waits at the foot of the plank, which meets the dock end
+   13 units past him, so a player coming down the plank is greeted on it. After the race menu the player stays on
+   the plank while the dock guard walks to his post beside the office door; then `aw_intro_status` must show him
+   there (done, at most 3 units from his post), his body never inside a solid on any tick of his walks (a pier post),
+   and the fixed route along the pier's centre line as the walk that ran.
 2. The hall guard's door and the back room: the door opens once the papers are carried, and the iron dagger on the
    back-room table (the one the clerk's tutorial box asks for) is taken. Then the crab meat (`ingred_crab_meat_01`) on
    the Silverware Plate (`misc_imp_silverware_plate_01`): the view is aimed at the crab meat, the game's focus row must

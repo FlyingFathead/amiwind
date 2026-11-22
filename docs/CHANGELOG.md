@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.68-dev6 (22 November 2026)._
+_Last updated with AmiWind v0.0.68-dev7 (22 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.68-dev7: seventh snapshot of v0.0.68, 22 November 2026](#v0068-dev7-seventh-snapshot-of-v0068-22-november-2026)
 - [v0.0.68-dev6: sixth snapshot of v0.0.68, 22 November 2026](#v0068-dev6-sixth-snapshot-of-v0068-22-november-2026)
 - [v0.0.68-dev5: fifth snapshot of v0.0.68, 21 November 2026](#v0068-dev5-fifth-snapshot-of-v0068-21-november-2026)
 - [v0.0.68-dev4: fourth snapshot of v0.0.68, 21 November 2026](#v0068-dev4-fourth-snapshot-of-v0068-21-november-2026)
@@ -213,6 +214,53 @@ _Last updated with AmiWind v0.0.68-dev6 (22 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.68-dev7: seventh snapshot of v0.0.68, 22 November 2026
+
+The seventh development snapshot of v0.0.68, in development ([release notes](releases/notes/RELEASE-v0.0.68-dev7.md)), and
+a small step on the way to v0.0.68, **Solstheim Is Here** (the release for which Solstheim is to be complete). The game's
+scene palette gets a cool ice and snow ramp, the census back room answers the use key again after a visit to the courtyard,
+switching the debug free flight off inside a solid no longer throws the player back to where the flight began, and the
+builder's check of the opening comes down the ship's plank to the dock guard and walks to the crab meat along the table's
+edge. Emulator presets: `AmiWind-v0.0.68-dev7-FS-UAE.fs-uae` and `AmiWind-v0.0.68-dev7-WinUAE.uae`, both with 32 MB of Fast
+RAM. The back room was seen working in play (the opening journey on the dev6 image with this engine passed 50 of 50
+checks); the gates of the commits are 12480, 12481, 12460, 12482 and 12328 (the palette).
+
+**Changed**
+
+- Scene palette: 16 near-duplicate dark olive and brown colours, which cover 0.27 percent of the image's pixels, are
+  replaced by a ramp of cool off-white to blue-grey sampled from Solstheim's ice and snow textures. Ice and snow keep a cool
+  cast at the outdoor light levels instead of turning brown-grey (the palette cannot make them brighter than the light
+  allows); about 6 percent of all scenery texels move onto the ramp, each to its nearest colour. Every texture is re-baked
+  once. The glacier's nine cells stay out of the build, and from on top of a shard the field around looks empty at the
+  default draw distance (SOL-GLACIER-ICE-BROWN-SHEER-68, open). The carried lantern's and the dock guard's looks are checked
+  by the look book on this snapshot's image before delivery; not yet made.
+
+**Fixed**
+
+- Going out to the Census and Excise Office's courtyard and back in, the use key's list of reachable things kept the
+  courtyard's rows, so the back room's items and doors did not answer it. The list is read from the room at every arrival
+  now (ROOM-AIM-ROWS-OUTDOORS-AFTER-COURTYARD-68). Two more caches of the game tell a new map only by its model's slot and
+  are not changed here (MAP-CHANGE-TOLD-BY-MODEL-SLOT-68, open).
+- Debug only: switching the free flight off where the player's box touches the world lifts the player clear there and no
+  longer moves the player back to where the flight began (JOURNEY-DOCK-NOCLIP-UNSTUCK-RACE-68).
+
+**Builder and tools**
+
+- The opening journey's first step comes down the ship's plank to the dock guard, whose greeting needs the player within the
+  original's reach (DOCK-GREETING-OUT-OF-REACH-67; the game was right, the check's stop point was out of the guard's reach),
+  and its walk to the crab meat ends beside the table's edge instead of against it
+  (JOURNEY-CRAB-WALK-POINT-AT-TABLE-EDGE-68).
+- The bug tracker records the dock guard's first walk held short of the plank's foot (DOCK-GUARD-WALK-HELD-AT-PIECE-JOINT-68),
+  the look book's journey page not judged on delivered development images (LOOKBOOK-JOURNEY-PAGE-NEVER-JUDGED-68), a second
+  emulator session with the same job name failing to start (SESSION-SAME-JOB-NAME-CLASH-68) and the image step's torch check
+  taking about three times its recorded time (IMAGE-TORCHES-GUARD-3X-BASELINE-68, a duplicate of IMAGE-GUARD-TORCHES-SLOW-66);
+  see [the bug tracker](BUGS.md).
+
+**Documentation**
+
+- The README and the roadmap name the v0.0.68-dev7 presets and snapshot. No script changed since dev6, so the MWScript
+  tracker is not measured again.
 
 ## v0.0.68-dev6: sixth snapshot of v0.0.68, 22 November 2026
 
@@ -662,8 +710,9 @@ by the maintainer, and the look book passed 3 of 3 pages on it.
   hides what the scripts disabled, [PLAZA-FABRICANTS-LIVE-AT-START-67](bugs/PLAZA-FABRICANTS-LIVE-AT-START-67.md)).
 
 Seen in play on the release image (the run 2b086671), in the emulator: the Dark Brotherhood's attack on a rest, by `dbg
-dbattack` and naturally on a 12-hour rest in the wilderness at level 40 with its wake message on screen (levels 10 and 20
-are still being tested); the wilderness creature that cuts a rest, from the region's list at the right hour; Mournhold's
+dbattack` and, on that run, naturally on a 12-hour rest in the wilderness at level 40 with its wake message on screen (the
+attack is a chance that depends on the player's level and the Tribunal start; levels 10 and 20 are still being tested); a
+wilderness creature that cut a rest, from the region's list at the right hour (a cut is a chance, not every rest); Mournhold's
 start state on a new game, peaceful in the Plaza, the Temple Courtyard and the Hall of Ministry; the Great Bazaar's
 teleport arrival on the street; Godsreach's gate to the Plaza; and a fight not carried to the next map, in Vvardenfell and
 in Mournhold.

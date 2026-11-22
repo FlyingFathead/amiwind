@@ -98,5 +98,79 @@ class PaletteTests(unittest.TestCase):
             after,problems=build_cache.external_inputs('scene',command,root/'run',{})
             self.assertFalse(problems);self.assertNotEqual(before,after)
 
+ICEBERG_SOURCE=(192,213,224)      # tx_bm_iceberg's mean colour, as the converter stages it
+RAMP_INDICES=[78,80,90,97,101,104,107,108,111,136,137,153,154,172,175,189]
+
+
+def warm_sampled_palette():
+    """A sampled palette like the scene's: 224 warm entries (red at least blue), no cool ones."""
+    rng=np.random.default_rng(68)
+    base=rng.uniform(20,240,(4096,1))
+    samples=np.clip(np.hstack([base,base*rng.uniform(.86,.98,(4096,1)),base*rng.uniform(.62,.86,(4096,1))]),0,255)
+    strip=Image.fromarray(samples.astype(np.uint8).reshape(1,-1,3),'RGB').quantize(colors=224)
+    return strip.getpalette()[:672]+[102,119,136]*30+[238,221,170,0,0,0]
+
+
+def lit(palette,colour,row):
+    """The colour a texel of COLOUR shows at a colormap row, the way the scene converts it."""
+    pal=Image.new('P',(1,1));pal.putpalette(palette)
+    index=Image.new('RGB',(1,1),colour).quantize(palette=pal,dither=Image.Dither.NONE).getpixel((0,0))
+    target=prepare_quake.colormap_bytes(palette)[row*256+index]
+    return target,tuple(palette[target*3:target*3+3])
+
+
+class IceRampTests(unittest.TestCase):
+    """SOL-GLACIER-ICE-BROWN-SHEER-68: the ice drew brown-grey at the outdoor light rows."""
+
+    def test_config_pins_the_sixteen_replaced_entries(self):
+        ramp=prepare_quake.palette_ramp()
+        self.assertEqual(sorted(row['index'] for row in ramp['entries']),RAMP_INDICES)
+        self.assertEqual({row['index']:tuple(row['rgb']) for row in ramp['entries']},{
+            104:(228,230,235),97:(205,208,209),101:(186,189,193),189:(166,172,179),80:(151,156,159),
+            90:(141,142,145),137:(119,133,145),111:(128,129,130),153:(116,116,118),78:(104,117,128),
+            136:(104,105,106),175:(89,101,110),172:(93,93,95),107:(79,85,92),108:(65,74,82),154:(52,60,67)})
+        self.assertEqual(ramp['sampled_palette_sha256'],'618049d237fd474ee631b8f1aaf3b993abe14d3f46588b98c7c0643c098b8f50')
+        self.assertTrue({'tx_bm_iceberg','tx_bm_ice_05','tx_bm_ice_06','tx_bm_icelayer_01','tx_bm_karstaag',
+                         'tx_bm_karstaag_door','tx_bm_snow_02'}<=set(ramp['method']['source_textures']))
+        for row in ramp['entries']:                  # every ramp colour is cool or neutral
+            r,g,b=row['rgb'];self.assertGreaterEqual(b,r)
+
+    def test_iceberg_at_row_32_is_warm_before_and_cool_with_the_ramp(self):
+        old=warm_sampled_palette()
+        ramp=dict(prepare_quake.palette_ramp())
+        ramp['sampled_palette_sha256']=hashlib.sha256(bytes(old[:672])).hexdigest()
+        new,applied=prepare_quake.apply_palette_ramp(old,ramp)
+        self.assertTrue(applied)
+        _,before=lit(old,ICEBERG_SOURCE,32)
+        self.assertLess(before[2],before[0],before)          # the old palette: brown-grey (blue below red)
+        index,after=lit(new,ICEBERG_SOURCE,32)
+        self.assertIn(index,RAMP_INDICES)
+        self.assertGreaterEqual(after[2],after[0],after)     # with the ramp: a cool grey
+        for row in (0,16,24):
+            self.assertGreaterEqual(lit(new,ICEBERG_SOURCE,row)[1][2],lit(new,ICEBERG_SOURCE,row)[1][0],row)
+        # only the 16 entries change
+        self.assertEqual([i for i in range(256) if old[i*3:i*3+3]!=new[i*3:i*3+3]],RAMP_INDICES)
+
+    def test_another_sampled_palette_is_left_unchanged(self):
+        old=warm_sampled_palette()
+        new,applied=prepare_quake.apply_palette_ramp(old,prepare_quake.palette_ramp())
+        self.assertFalse(applied);self.assertEqual(new,old)
+
+    def test_malformed_ramp_is_refused(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'ramp.json'
+            good=json.loads(prepare_quake.PALETTE_RAMP.read_text(encoding='utf-8'))
+            for bad in ({**good,'schema':2},{**good,'entries':[]},
+                        {**good,'entries':good['entries'][:1]*2},
+                        {**good,'entries':[{'index':230,'rgb':[1,2,3]}]},
+                        {**good,'entries':[{'index':5,'rgb':[1,2]}]}):
+                path.write_text(json.dumps(bad),encoding='utf-8')
+                with self.assertRaises(ValueError):prepare_quake.palette_ramp(path)
+
+    def test_the_scene_stage_key_reads_the_ramp(self):
+        index=build_cache.SourceIndex(ROOT,top_format=build_cache.STAGE_TOP_FORMAT)
+        self.assertIn('config/scene-palette-ramp.json',index.closure(ROOT/'tools/prepare_quake.py')[1])
+
+
 if __name__=='__main__':
     unittest.main()
