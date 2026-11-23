@@ -174,11 +174,14 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [DBG-ARENA-PICKER-62](DBG-ARENA-PICKER-62.md): Requested: dbg arena offers a choose-your-opponent list of every NPC and creature
 - [DBG-SUBWORD-ROUTE-DROPPED-62](DBG-SUBWORD-ROUTE-DROPPED-62.md): dbg camera fpview/hands/parts and dbg cast casting/now/ready/spell/start/strike reach their command without their own word
 - [DBG-SUPERSPEED-62](DBG-SUPERSPEED-62.md): A bare dbg superspeed does not toggle it, and stamina drains while it is on
+- [DBG-WEREWOLF-CHANGES-COUNTS-CALLS-68](DBG-WEREWOLF-CHANGES-COUNTS-CALLS-68.md): The debug werewolf status line counts every werewolf call of a script as a change of form, so a script calling it each frame makes the number climb by thousands
+- [DBG-WEREWOLF-STATUS-ARMS-MISREAD-68](DBG-WEREWOLF-STATUS-ARMS-MISREAD-68.md): The werewolf status printed an empty first-person arms set as the player's own, which read as the wrong arms drawn
 - [DEBUG-MAP-SAVE-VALIDATION-32](DEBUG-MAP-SAVE-VALIDATION-32.md): After a debug map load of an open-world map the autosave fails validation; two of three also report Interior spawn blocked
 - [DIALOGUE-ADDON-TOPICS-NOT-PLAYABLE-67](DIALOGUE-ADDON-TOPICS-NOT-PLAYABLE-67.md): Missing: the Tribunal and Bloodmoon dialogue (topics, answers, changes to Morrowind) cannot be played: their speakers and places are not all in the game
 - [DIALOGUE-AGGRO-62](DIALOGUE-AGGRO-62.md): A robber whose answer ends in a threat does nothing once the talk closes
 - [DIALOGUE-ANSWER-VOICE-MISSING-67](DIALOGUE-ANSWER-VOICE-MISSING-67.md): Missing: an answer with a sound file does not play it
 - [DIALOGUE-BACKGROUND-EMPTY-RANK-67](DIALOGUE-BACKGROUND-EMPTY-RANK-67.md): Hul in Balmora answers Background with "I am Hul, Pauper and  of the  ." : the rank and faction words are empty
+- [DIALOGUE-CELL-FILTER-SEVERAL-CELLS-68](DIALOGUE-CELL-FILTER-SEVERAL-CELLS-68.md): A voice or greeting line with a place filter is never said by a speaker placed in several places or placed by a script
 - [DIALOGUE-CHOICES-62](DIALOGUE-CHOICES-62.md): Dialogue choices are not shown as rows to pick, and the branch after a pick is not filtered as in the original
 - [DIALOGUE-CONDITIONS-PARTIAL-67](DIALOGUE-CONDITIONS-PARTIAL-67.md): Incomplete: the dialogue conditions PcVampire, PcCorprus and PcClothingModifier read their start value, and RankRequirement is not checked in game
 - [DIALOGUE-CREATURE-SPEAKERS-66](DIALOGUE-CREATURE-SPEAKERS-66.md): Creatures that speak have no rows in the dialogue table, so their lines cannot be said: Almalexia, Vivec, ghosts, a draugr and rieklings among them
@@ -215,6 +218,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [FACTION-STATS-PAGE-64](FACTION-STATS-PAGE-64.md): The stats page shows no factions, ranks, reputation or bounty
 - [FALL-LANDING-KNOCKDOWN-62](FALL-LANDING-KNOCKDOWN-62.md): A hard landing does not knock the player or an actor down, and an NPC's landing plays no landing sound
 - [FIGHT-STANCE-KEY-IGNORED-WHILE-RUNNING-67](FIGHT-STANCE-KEY-IGNORED-WHILE-RUNNING-67.md): While the run key is held, the key that readies the fight stance does nothing
+- [FOCUS-EYE-INSIDE-ACTOR-BOX-68](FOCUS-EYE-INSIDE-ACTOR-BOX-68.md): The use key goes to a creature instead of the door under the crosshair when the player stands inside the creature's use box: the Unmarked Shipwreck's trapdoor cannot be used while a dreugh is near
 - [GETANGLE-PLAYER-Z-READS-OBJECT-AXIS-67](GETANGLE-PLAYER-Z-READS-OBJECT-AXIS-67.md): A script reading the player's angle on the z axis gets a value 90 degrees off the view
 - [GETEFFECT-TABLE-84-OF-143-68](GETEFFECT-TABLE-84-OF-143-68.md): GetEffect knew 84 of the game's 143 magic effects, three of them by another name than their game setting id
 - [GETPCSLEEP-NOT-CARRIED-OUT-67](GETPCSLEEP-NOT-CARRIED-OUT-67.md): Resting never wakes the scripts that wait for the player's sleep: the Dark Brotherhood never attacks a resting player
@@ -269,6 +273,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [MWSCRIPT-PLACE-NO-MODEL-62](MWSCRIPT-PLACE-NO-MODEL-62.md): A script cannot place an NPC or a creature whose record has no placed reference in Vvardenfell
 - [MWSCRIPT-PLACE-OTHER-KINDS-62](MWSCRIPT-PLACE-OTHER-KINDS-62.md): A script cannot place an activator, a container or a levelled creature list yet
 - [MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68](MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68.md): PlayGroup and LoopGroup play only on a person or creature with a converted skeleton: animated objects and the player do not play the group, and the start mode is not read
+- [MWSCRIPT-PLAYGROUP-FRAME-OBJECTS-68](MWSCRIPT-PLAYGROUP-FRAME-OBJECTS-68.md): A script's PlayGroup or LoopGroup on an object drawn as a placement of an outdoor frame (Mournhold's districts) changes nothing: Azura in the Temple Courtyard keeps her placed look through her appearance and departure at the end of Tribunal's main quest
 - [MWSCRIPT-POSITION-ROOM-ROTATION-68](MWSCRIPT-POSITION-ROOM-ROTATION-68.md): A script's Position ignores its rotation argument and always moves the player to the outdoor point, also from inside a room
 - [MWSCRIPT-POSITIONCELL-NPC-62](MWSCRIPT-POSITIONCELL-NPC-62.md): A script or a dialogue answer that moves an NPC or a creature to another place (PositionCell) does nothing
 - [MWSCRIPT-POSITIONCELL-OUTDOOR-62](MWSCRIPT-POSITIONCELL-OUTDOOR-62.md): An NPC or a creature a script sends outdoors appears there only while its home area is loaded
@@ -334,6 +339,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [ROOM-AIM-ROWS-OUTDOORS-AFTER-COURTYARD-68](ROOM-AIM-ROWS-OUTDOORS-AFTER-COURTYARD-68.md): After a visit to the courtyard, the Census and Excise Office's back room answers the use key with the town's outdoor rows, so its items have no focus row
 - [ROOM-HALL-OF-MINISTRY-RATS-NOT-DISABLED-67](ROOM-HALL-OF-MINISTRY-RATS-NOT-DISABLED-67.md): Mournhold Temple: Hall of Ministry holds seven Infected Rats at the start of a new game, and one attacks: their script should keep them away until the Crimson Plague quest
 - [ROOM-NORENEN-DUR-ATRONACHS-DIE-67](ROOM-NORENEN-DUR-ATRONACHS-DIE-67.md): Norenen-dur, Basilica of Divine Whispers: two of its three atronachs are dead seconds after they attack, without the player striking
+- [ROOM-SCRIPTED-ACTIVATOR-NO-USE-68](ROOM-SCRIPTED-ACTIVATOR-NO-USE-68.md): Inside a room a scripted activator drawn as a room placement shows its name but takes no use: the Halls of Penumbra's ice wall cannot be used with the Flaming Eye, so The Ritual of the Sun cannot go on
 - [SAVE-ACTOR-BLOCK-OVERFLOW-59](SAVE-ACTOR-BLOCK-OVERFLOW-59.md): A full actor record pool (128 actors) can exceed the save's 32 KB actor block, which would refuse the save (calculated, not measured)
 - [SAVE-ACTOR-ROWS-BOUND-UNDER-GAME-66](SAVE-ACTOR-ROWS-BOUND-UNDER-GAME-66.md): The world change list holds at most 8,192 actor rows while the game places about 13,800 actor references
 - [SAVE-ACTOR-ROWS-EXPANSION-ROOMS-66](SAVE-ACTOR-ROWS-EXPANSION-ROOMS-66.md): A save is refused once an NPC was in a room of an expansion: the saved actor rows took place numbers up to the base game's rooms only, and the expansions' rooms are numbered after them
@@ -367,7 +373,9 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [SKILL-RAISE-NOT-SEEN-62](SKILL-RAISE-NOT-SEEN-62.md): In a playtest of v0.0.61 no skill was ever seen to rise: no skill-increased line and no sound in normal play
 - [SPELL-EFFECTS-TABLE-CUT-64](SPELL-EFFECTS-TABLE-CUT-64.md): Game spells cast nothing: the actor table read only the first 32 sections of the compiled scripts file
 - [STEAL-WITNESSED-NO-CRIME-60](STEAL-WITNESSED-NO-CRIME-60.md): Taking an owned item in full view of its owner or other people has no consequence
+- [STORM-WALK-NOT-SLOWED-68](STORM-WALK-NOT-SLOWED-68.md): Walking into an ash storm, blight storm or blizzard is not slowed, the weathers have no sounds, and guards put their torches away in ash storms
 - [SWEEP-ARENA-PIT-TWO-FAIL-54](SWEEP-ARENA-PIT-TWO-FAIL-54.md): dbg sweep reports two failing entities in the Vivec Arena Pit (map vai000) in every session of the Arena Pit images
+- [SWIM-PLAYER-DOES-NOT-STAY-AT-DEPTH-68](SWIM-PLAYER-DOES-NOT-STAY-AT-DEPTH-68.md): A player placed deep in the water does not stay at that depth: moments later the player is near the surface or above the water
 - [TAKEN-LIGHT-FLAME-STAYS-60](TAKEN-LIGHT-FLAME-STAYS-60.md): Picking up a lit candle leaves its flame floating where it stood
 - [TAKEN-LIGHT-OUTDOOR-EFFECTS-UNLINKED-61](TAKEN-LIGHT-OUTDOOR-EFFECTS-UNLINKED-61.md): The flames and night lights of carriable lights outdoors are not tied to the item
 - [TAKEN-LIGHT-OUTDOORS-NOT-TAKEN-61](TAKEN-LIGHT-OUTDOORS-NOT-TAKEN-61.md): A carriable light placed outdoors (a lantern in Seyda Neen) cannot be taken
@@ -389,6 +397,8 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [WEATHER-STATE-NOT-SAVED-66](WEATHER-STATE-NOT-SAVED-66.md): The current weather and its change in progress are not saved: a load rolls the weather again
 - [WEREWOLF-BODY-NOT-DRAWN-63](WEREWOLF-BODY-NOT-DRAWN-63.md): A player turned into a werewolf by a script keeps his own body: the werewolf model is not drawn
 - [WEREWOLF-RUN-SPEED-63](WEREWOLF-RUN-SPEED-63.md): A player in werewolf form runs at his normal run speed: the werewolf run multiplier is not applied
+- [WEREWOLF-SET-KEPT-WITH-TORCH-68](WEREWOLF-SET-KEPT-WITH-TORCH-68.md): With a torch carried, taking the werewolf robe off by hand kept the werewolf's body and arms in memory until the torch was put away
+- [WEREWOLF-TABLES-STAY-LOADED-68](WEREWOLF-TABLES-STAY-LOADED-68.md): After the change back from the werewolf form its two animation tables stay loaded until the game is closed
 - [WEREWOLF-TRANSFORM-RULES-PARTIAL-68](WEREWOLF-TRANSFORM-RULES-PARTIAL-68.md): Turning into a werewolf changes only the stats and takes the gear off: health, the readied spell, temporary effects, the closed windows and the witnesses of the change are not carried
 - [WORLD-BUTTONS-62](WORLD-BUTTONS-62.md): Buttons and levers that should act do nothing, for example the Ghostgate gate buttons on both sides
 - [WORLD-OBJECT-STATE-NOT-SAVED-59](WORLD-OBJECT-STATE-NOT-SAVED-59.md): World objects taken or moved are not remembered: they come back when the cell or room reloads, and saves do not keep them

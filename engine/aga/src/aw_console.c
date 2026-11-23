@@ -254,6 +254,12 @@ static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capa
         if(used+7>capacity)return 0;
         strcpy(out+used," stats");used+=6;
     }
+    /* dbg werewolf [on|off] (WEREWOLF-BODY-63, v0.0.68): the compiled scripts' command's werewolf words (on and off run
+     * the script's BecomeWerewolf and UndoWerewolf, alone the status), no resident command of its own */
+    if(!strcmp(r->command,"aw_mwscript_status") && !strcmp(r->words,"werewolf")){
+        if(argc-j>1 || (argc>j && Q_strcasecmp(argv[j],"on") && Q_strcasecmp(argv[j],"off")) || used+10>capacity)return 0;
+        strcpy(out+used," werewolf");used+=9;
+    }
     /* dbg mwscript result TOPIC NPC [N] (MWSCRIPT-PLAYER-CONTROL-62): a result script without the dialogue window,
      * no resident command of its own; topics and ids may hold spaces (quoted) and apostrophes */
     if(!strcmp(r->command,"aw_mwscript_status") && !strcmp(r->words,"mwscript result")){

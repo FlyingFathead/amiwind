@@ -75,6 +75,45 @@ def appearances(kinds, ids):
     return out, left
 
 
+def part_draws(raw):
+    """False when a part's NIF holds no triangle shape at all: it draws nothing (NPC-WEREWOLF-NO-MODEL-66)."""
+    return b'NiTriShape' in raw
+
+
+def without_empty_parts(apps, data, read=None):
+    """(APPS with every part whose mesh holds no triangle shape left out, {npc id: [part ids left out]}).
+    The original draws nothing for such a part (OpenMW 0.51 components/sceneutil/attach.cpp attach: a part file adds
+    only the geometry it has), and the bake refused the whole appearance on it ("No attached geometry"): Bloodmoon's
+    WerewolfHair (wolf/hair.nif, one node and no shape) is the hair of the Skaal werewolf BM_werewolf_skaal1A3, which
+    the NPC library left out (NPC-WEREWOLF-NO-MODEL-66). The rule holds for any NPC and any part. Each distinct mesh is
+    read once (READ(game path) -> bytes; default the game's files over the selected masters' archives); an
+    appearance with no empty part is the same object as before, so its key and its model stay as they were."""
+    if read is None:
+        from mwad.archives import layered_bsa
+        from npc_geometry import Assets
+        data = Path(data)
+        key = str(data.resolve())
+        if key not in _assets:
+            _assets[key] = Assets(data, layered_bsa(data))
+        read = _assets[key].read
+    draws, out, emptied = {}, {}, {}
+    for ident, app in apps.items():
+        keep = []
+        for part in app.get('parts', ()):
+            mesh = 'meshes/' + str(part.get('mesh', '')).replace('\\', '/')
+            if mesh not in draws:
+                try:
+                    draws[mesh] = part_draws(read(mesh))
+                except (KeyError, OSError, ValueError):
+                    draws[mesh] = True          # not found: the bake reports it as before
+            if draws[mesh]:
+                keep.append(part)
+            else:
+                emptied.setdefault(ident, []).append(part.get('id'))
+        out[ident] = app if ident not in emptied else dict(app, parts=keep)
+    return out, emptied
+
+
 BYTE_BUDGET_ERROR = 'Alias byte budget exceeded with full samples'
 
 
@@ -324,6 +363,13 @@ def build(data, palette, ids, out_id1, jobs=1, kinds=None, held_items=None):
         kinds, _, _ = load_master(master_path(data))
     profile = standing_profile()
     apps, left = appearances(kinds, ids)
+    # a part that draws nothing is left out of its appearance, as the original draws nothing for it
+    # (NPC-WEREWOLF-NO-MODEL-66)
+    apps, emptied = without_empty_parts(apps, data)
+    if emptied:
+        print('NPC library: %d appearances with an empty part left out of them (the original draws nothing for it): %s'
+              % (len(emptied), ', '.join('%s (%s)' % (i, ', '.join(p)) for i, p in sorted(emptied.items()))),
+              flush=True)
     groups = {}
     for identifier, app in apps.items():
         groups.setdefault(appearance_key(app, profile), []).append(identifier)
@@ -428,7 +474,7 @@ def build(data, palette, ids, out_id1, jobs=1, kinds=None, held_items=None):
         print('NPC library: %d appearances at a smaller animation level (alias byte budget): %s' % (
             len(fallback), ', '.join('%s (%s)' % (f['npcs'][0], f['level']) for f in fallback.values())), flush=True)
     return {'format': FORMAT, 'profile': profile, 'models': models, 'npcs': npcs, 'left_out': left,
-            **({'anim_fallback': fallback} if fallback else {})}
+            **({'anim_fallback': fallback} if fallback else {}), **({'empty_parts': emptied} if emptied else {})}
 
 
 def entity_text(ident, npc, model):

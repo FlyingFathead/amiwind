@@ -5191,9 +5191,12 @@ def _copy_verified(source, target, expected, mode, link):
             try:
                 os.link(source, temporary)
             except OSError as exc:
-                if exc.errno != errno.EXDEV:
+                if exc.errno not in (errno.EXDEV, errno.EMLINK):
                     raise
-                link = False  # another file system (a prerendered store on its own volume): copy
+                # another file system (a prerendered store on its own volume), or a pool object at the file system's
+                # hard link limit (REUSE-POOL-LINK-LIMIT-68: one shared file linked from every run's work folders
+                # refused the reuse of the whole CHIM world and Solstheim stages in two builds in a row): copy
+                link = False
         if link:
             actual = sha256_file(temporary)
         else:

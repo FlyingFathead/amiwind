@@ -59,6 +59,7 @@ static void restore_list(void)
     cl_numvisedicts=n;swap_count=ent_count=0;(void)ent_list_start;
 }
 
+extern model_t *(*aw_npc_were_model)(int entity);   /* aw_npc_lod.c, set by aw_view.c (NPC-WEREWOLF-NO-MODEL-66) */
 static edict_t *resident_of(entity_t *ent)
 {
     uintptr_t ptr=(uintptr_t)ent,base=(uintptr_t)cl_entities,offset;int index;edict_t *e;
@@ -68,6 +69,8 @@ static edict_t *resident_of(entity_t *ent)
     index=(int)(offset/sizeof(entity_t));if(index<=0 || index>=sv.num_edicts)return NULL;
     e=EDICT_NUM(index);
     if(e->free || !e->v.classname || strcmp(pr_strings+e->v.classname,"aw_npc"))return NULL;
+    /* NPC-WEREWOLF-NO-MODEL-66: a resident a script turned is drawn as the werewolf (aw_view.c), not from its parts */
+    if(aw_npc_were_model && aw_npc_were_model(index))return NULL;
     return e;
 }
 

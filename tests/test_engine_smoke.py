@@ -6,6 +6,7 @@ here. These checks keep the scripts runnable and the steps that caught the dev3 
 """
 import contextlib
 import io
+import os
 import re
 import shutil
 import subprocess
@@ -1141,6 +1142,69 @@ class LoadHangExperimentTests(unittest.TestCase):
                                       text=True, timeout=30)
                 self.assertEqual(done.stdout.strip(), want, done.stderr)
 
+    def test_pass_fail_runs_are_deterministic_by_default(self):
+        """Decided 22 November 2026 (CHIM-SEYDA-BALMORA-LOAD-HANG-43, LOAD-HANG-INVESTIGATE-66): deterministic = 1 for
+        every run that does not name it (the remote-console folder's requests then complete on the emulator thread, and
+        the lost wake that stopped about one test load in a hundred cannot occur). A measurement keeps the emulator's own
+        mode with deterministic = 0 (a script line, or --emu-option none): the emulator's default, so the probe drops the
+        line. Fails on the earlier smoke, which added no line of its own."""
+        P = engine_smoke.pass_fail_options
+        self.assertEqual(P([]), [('deterministic', '1')])
+        self.assertEqual(P([('cpu_idle', '0')]), [('cpu_idle', '0'), ('deterministic', '1')])
+        self.assertEqual(P([('deterministic', '0')]), [('deterministic', '0')])
+        self.assertEqual(P([], plain=True), [('deterministic', '0')])
+        self.assertEqual(P([('deterministic', '1')], plain=True), [('deterministic', '1')])
+        probe = engine_smoke.PROBE
+        derive = probe.index('if [ ! -s $R/emu-options.txt ] && [ -s $R/script.txt ]')
+        start = probe.index("grep -q '^deterministic = ' $R/emu-options.txt")
+        end = probe.index("sed -i '/^deterministic = 0$/d' $R/emu-options.txt\n") + len(
+            "sed -i '/^deterministic = 0$/d' $R/emu-options.txt\n")
+        self.assertLess(probe.index('\nfi\n', derive), start)            # after the script's own lines are taken
+        self.assertLess(end, probe.index('[ -s $R/emu-options.txt ] && cat $R/emu-options.txt >> $R/smoke.fs-uae'))
+        with tempfile.TemporaryDirectory() as tmp:
+            engine, roms = self.setup_dirs(tmp)
+            sha = engine_smoke.sha256(engine)
+
+            def fake(*args, **kw):
+                if '/out/probe.sh' in args:
+                    out = Path(next(a for a in args if str(a).endswith(':/out'))[:-5])
+                    (out / 'logs').mkdir(parents=True, exist_ok=True)
+                    (out / 'logs' / 'steps.log').write_text('00:00 smoke RESULT PASS x\n', encoding='utf-8')
+                return subprocess.CompletedProcess(args, 0, 'world=\nreadback=%s\n' % sha, '')
+            for extra, want in (([], 'deterministic = 1\n'),
+                                (['--emu-option', 'cpu_idle=0'], 'cpu_idle = 0\ndeterministic = 1\n'),
+                                (['--emu-option', 'none'], 'deterministic = 0\n')):
+                o = Path(tmp, 'o')
+                env = {k: v for k, v in os.environ.items() if k != 'AW_SMOKE_EMU_OPTION'}
+                with unittest.mock.patch.dict(os.environ, env, clear=True), \
+                        unittest.mock.patch.object(engine_smoke, 'docker', side_effect=fake):
+                    code, text = self.run_main('--engine', str(engine), '--volume', 'v', '--image-dir', 'build/image',
+                                               '--scratch', 'workspaces/s', '--roms', str(roms), '--out', str(o), *extra)
+                self.assertEqual(code, 0, text)
+                self.assertEqual((o / 'emu-options.txt').read_text(), want, extra)
+                self.assertIn('emulator options %s' % want.replace(' = ', '=').replace('\n', ' ').strip(),
+                              (o / 'engine.txt').read_text())
+        if not shutil.which('sh'):
+            self.skipTest('a POSIX shell is required')
+        block = probe[derive:probe.index('\nfi\n', derive) + 4] + probe[start:end]
+        for script, options, want in (
+                ('wait 8\n', None, 'deterministic = 1\n'),                          # a pass/fail session
+                ('emu cpu_idle=0\n', None, 'cpu_idle = 0\ndeterministic = 1\n'),
+                ('emu deterministic=1\n', None, 'deterministic = 1\n'),             # not twice
+                ('emu deterministic=0\nemu cpu_idle=0\n', None, 'cpu_idle = 0\n'),  # a measurement: its own mode
+                ('wait 8\n', 'deterministic = 0\n', ''),                            # --emu-option none
+                ('wait 8\n', 'cpu_idle = 0\n', 'cpu_idle = 0\ndeterministic = 1\n')):
+            with tempfile.TemporaryDirectory() as tmp:
+                r = Path(tmp)
+                (r / 'logs').mkdir()
+                (r / 'script.txt').write_text(script, encoding='utf-8', newline='\n')
+                if options is not None:
+                    (r / 'emu-options.txt').write_text(options, encoding='utf-8', newline='\n')
+                done = subprocess.run(['sh', '-c', 'R=%s\n%s' % (r.as_posix(), block)], capture_output=True, text=True,
+                                      timeout=30)
+                self.assertEqual(done.returncode, 0, done.stderr)
+                self.assertEqual((r / 'emu-options.txt').read_text(encoding='utf-8'), want, (script, options))
+
     def test_warp_is_never_an_option_and_marks_its_result(self):
         """The maintainer's rule (17 November 2026): warp is off for every performance and bench test. No extra option
         and no script line can switch FS-UAE's warp on, so a smoke is never a warp run by accident; a session runner
@@ -1353,7 +1417,8 @@ rc(){ echo "dbg mwscript call journal QUEST [INDEX]: no such quest (the file mus
             prep = next(a for a in calls if '-prep' in ' '.join(map(str, a)))
             self.assertIn("printf 'aw_remote 1\\n' > /tmp/autoexec.cfg", prep[-1])
             self.assertIn('REMOTE=1', next(a for a in calls if '/out/probe.sh' in a))
-            self.assertFalse((o / 'emu-options.txt').exists())
+            # no option of its own: the pass/fail default only (deterministic = 1 since v0.0.68-dev9)
+            self.assertEqual((o / 'emu-options.txt').read_text(), 'deterministic = 1\n')
 
     def test_bad_options_exit_2_before_any_container(self):
         with tempfile.TemporaryDirectory() as tmp:

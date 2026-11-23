@@ -87,6 +87,11 @@ int AW_EffectsOwners(uint32_t *out,int max);
 int AW_EffectsForget(uint32_t owner);
 /* A's effects of SOURCE go, each undone as at its end (an item taken off); how many. */
 int AW_EffectsRemoveSource(aw_actor_t *a,int source);
+/* WEREWOLF-BODY-63 (v0.0.68): A's temporary effects end now, each undone as at its end: every effect but a worn item's
+ * constant one and a script's base modifier, the original's temporary spells (what was cast on A, drunk or eaten;
+ * OpenMW 0.51 mwmechanics/mechanicsmanagerimp.cpp setWerewolf 1917-1919 purges the Flag_Temporary ones, which
+ * spellcasting.cpp gives every cast, potion and ingredient: read, not copied). The change of form both ways. How many. */
+int AW_EffectsPurgeTemporary(aw_actor_t *a);
 /* OWNER's effects of NUMBER end now, each undone as at its end when A is OWNER's record (A may be NULL: nothing to
  * undo, as for a summoning effect); how many (a summoned creature died: OpenMW ends its effect). */
 int AW_EffectsEnd(aw_actor_t *a,uint32_t owner,int number);

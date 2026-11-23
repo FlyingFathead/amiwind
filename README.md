@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.68-dev8 (22 November 2026)._
+_Last updated with AmiWind v0.0.68-dev11 (23 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -60,13 +60,23 @@ the [changelog](docs/CHANGELOG.md#v0067-tribunal-introduced-19-november-2026) an
 [v0.0.67 release notes](docs/releases/notes/RELEASE-v0.0.67.md), which link the notes of the three development
 snapshots. Known problems: the notes' "Known in this build" and [the bug tracker](docs/BUGS.md).
 
-**In development: v0.0.68-dev8** (22 November 2026), the eighth snapshot of the next version, **Solstheim Is Here** (the
-release for which Solstheim is to be complete), mostly the game's menus: the windows of a running game keep the game's
-colours after a start by a console command, Escape in play opens the in-game menu with the original's rows and questions,
-and the map is the original's map in the menus' framed style. Containers and bodies whose script takes their use give it to
-the script, scripts can start fights for sixteen actors, and the draw distance can differ by region; the rally-game trees
-and a see-through fix for outdoor models are in behind switches that are off. None of it is seen in play yet
-([v0.0.68-dev8 notes](docs/releases/notes/RELEASE-v0.0.68-dev8.md)). The seventh snapshot gave the scene palette a cool ice
+**In development: v0.0.68-dev11** (23 November 2026), the eleventh snapshot of the next version, **Solstheim Is Here** (the
+release for which Solstheim is to be complete): fights no longer stutter when blows land (with six fighters the worst
+fight frame went from 219 ms to 50 ms, seen in play), a character in werewolf form can no longer be talked to, the
+creatures that have lines have rows in the dialogue and voice tables (talking to them is not done yet), and Solstheim's
+weather has its own look: a blizzard is a storm blowing north, with its own fog distance and cloud speed, seen on the
+glacier in a test image. The rest is not yet seen in play
+([v0.0.68-dev11 notes](docs/releases/notes/RELEASE-v0.0.68-dev11.md)). The tenth snapshot drew the characters a Bloodmoon
+script turns into werewolves as werewolves, fighting with their claws only and at their race's size, and let a script's
+animation group on a placed object leave it in its end pose, so the Halls of Penumbra's ice wall breaks and the Sotha Sil
+lever doors open; the broken ice wall cannot be passed yet
+([dev10](docs/releases/notes/RELEASE-v0.0.68-dev10.md)). The ninth snapshot built all 153 of Solstheim's
+cells, made its quest and underwater entrances usable, let named objects whose script answers on use take the use key, drew
+the player in werewolf form as the werewolf and opened the conversation by a script's ForceGreeting as the original does
+([dev9](docs/releases/notes/RELEASE-v0.0.68-dev9.md)). The eighth snapshot was mostly the game's menus: the
+windows of a running game keep the game's colours, Escape in play opens the in-game menu, the map is the original's map in
+the menus' framed style, and fights by scripts and the Mortrag Glacier came in
+([dev8](docs/releases/notes/RELEASE-v0.0.68-dev8.md)). The seventh snapshot gave the scene palette a cool ice
 and snow ramp, made the census back room answer the use key again after a visit to the courtyard (seen in play) and had
 the builder's check of the opening come down the ship's plank to the dock guard
 ([dev7](docs/releases/notes/RELEASE-v0.0.68-dev7.md)). The
@@ -115,7 +125,7 @@ that holds its controls as the original does ([v0.0.66 notes](docs/releases/note
   frames a second in the emulator). A new game starts the city in peace (the Plaza's fabricants, the two Gaenors and
   the Hall of Ministry's rats stay out of it), the Great Bazaar's teleport arrival puts the player on the street, Godsreach's
   gate to the Plaza opens, and a fight is not carried into the next place, in Vvardenfell and in Mournhold.
-- **The game's scripts:** of the 1,074 scripts the original uses, 1,062 run and 9 more are carried by AmiWind's own code,
+- **The game's scripts:** of the 1,074 scripts the original uses, 1,063 run and 9 more are carried by AmiWind's own code,
   235 of Tribunal's 236 among them ([the MWScript tracker](docs/MWSCRIPT_FEATURES.md)).
 - **Hardware:** the reference target is an A1200 with AGA, a 68040 with FPU, 2 MiB Chip and 32 MiB Fast RAM (16 MiB
   starts with a warning, but parts of the game run wrongly or not at all). The figures so far come from emulators and
@@ -128,8 +138,8 @@ What is not working yet, and what is in work:
 - **Tribunal in play:** Mournhold's quests and most of its play are still to be seen in play; the two water levers of
   Old Mournhold work in play. The districts' frame
   rate, the Plaza's view from its arrival point and Godsreach's canal are open in the bug tracker.
-- **Bloodmoon:** Solstheim is not playable yet. Its first 135 open terrain cells are in the build and are reached only by
-  a debug teleport; no door or journey leads there, and nothing of it has been seen in play.
+- **Bloodmoon:** Solstheim is not playable yet. All 153 of its cells are in the build and are reached only by a debug
+  teleport; no door or journey leads there, and only a few of its entrances and objects have been seen in play.
 - **Resting:** the wilderness creature came too often in one session, because every start of the game replays the same
   random numbers; this is fixed in source for the next build and still to be seen in play, as is a person or creature
   that a script keeps out of the world and that a debug teleport inside the loaded map drew again. The Dark Brotherhood
@@ -143,7 +153,7 @@ What is not working yet, and what is in work:
 Every system of the base game with its state: [game features](docs/GAME_FEATURES.md). Known problems:
 [the bug tracker](docs/BUGS.md).
 
-**Then v0.0.68** (in development, [dev8](docs/releases/notes/RELEASE-v0.0.68-dev8.md) is out) continues with the
+**Then v0.0.68** (in development, [dev11](docs/releases/notes/RELEASE-v0.0.68-dev11.md) is out) continues with the
 expansions' finished content: Tribunal's Mournhold with its quests and Bloodmoon's Solstheim, with their scripts; a
 build that fits a 32 GB machine; then the rest of the open plan. The order of record is the [roadmap](docs/ROADMAP.md);
 no dates are promised.
@@ -182,8 +192,8 @@ finished work is taken back; the build's last lines say what to change first
 ([the build stopped or ran out of memory: what now?](docs/LINUX_BUILD.md#the-build-stopped-or-ran-out-of-memory-what-now)).
 
 The emulator presets of this version are
-[`AmiWind-v0.0.68-dev8-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.68-dev8-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.68-dev8-WinUAE.uae`](resources/emulators/AmiWind-v0.0.68-dev8-WinUAE.uae); both start with 32 MB of Fast
+[`AmiWind-v0.0.68-dev11-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.68-dev11-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.68-dev11-WinUAE.uae`](resources/emulators/AmiWind-v0.0.68-dev11-WinUAE.uae); both start with 32 MB of Fast
 RAM, the requirement. The presets of earlier versions are beside them in [resources/emulators](resources/emulators/). Everything
 else about building and playing: [Building and playing](docs/BUILDING_AND_PLAYING.md), the
 [Linux build guide](docs/LINUX_BUILD.md) and the [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md).

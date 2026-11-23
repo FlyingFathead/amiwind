@@ -1,6 +1,6 @@
 # How AmiWind reduces a model, and how to check it
 
-_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
+_Last updated with AmiWind v0.0.68-dev8 (23 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -12,6 +12,7 @@ _Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
 - [5. Running the seam check](#5-running-the-seam-check)
 - [6. The Toolkit page](#6-the-toolkit-page)
 - [7. The outer-hull check: the original's outer measures](#7-the-outer-hull-check-the-originals-outer-measures)
+- [8. The werewolf: the shared-vertex reduction at its least passing count](#8-the-werewolf-the-shared-vertex-reduction-at-its-least-passing-count)
 
 <!-- contents end -->
 
@@ -180,3 +181,37 @@ the gallery fail it, as do 77 of the library's 83 creature models. The guar keep
 has 134 new open edges, the pack guar 70 % and 241 with two parts lost; the sampled characters' forearms and upper
 arms fall to between 0.2 and 0.5 of their girth, and some bodies are 5 to 13 % narrower than the original. The work
 that brings every model through the check is MESH-REDUCTION-SEAMS-62 in the [bug register](bugs/README.md).
+
+## 8. The werewolf: the shared-vertex reduction at its least passing count
+
+The werewolf's two models (the body in third person, the arms in first person; [THIRD_PERSON.md](THIRD_PERSON.md#the-werewolf))
+are the first models of a release made by the outer-measures reduction (`tools/outer_reduce.py`):
+
+- **One surface.** The whole model is welded (the parts that share points at a seam become one surface) and reduced as
+  one closed surface by the manifold quadric reducer: no new rim can open, the six extreme points are kept (the box
+  stays the original's), and the original's own open rims may thin along themselves but not pull inward.
+- **Thin limbs count as much as the body.** Every face's error is weighed by the size of the bone that moves it; a
+  bone whose girth still falls short gets four times its weight and the reduction runs again, up to six times.
+- **On shared vertices.** The model keeps its original textures in one atlas, each vertex is posed once, and a vertex
+  on a texture seam is one vertex per texture piece. The engine draws any triangle count on at most 2,000 shared
+  vertices (and at most 2,048 triangles), so a model may pass 1,024 triangles, where a model of today's form, three
+  vertices a triangle, stops.
+- **The fewest faces that pass, judged as drawn.** From today's face count up (the werewolf's own today's model is
+  refused by the bake's body check: its joints open at 480 faces, so the search starts there), then the ceiling (1,600
+  or the original's own count), then halving in steps of 40, the first count whose model, as the engine reads it (the
+  byte grid of its pose box), passes the outer-hull check of section 7 by the model's own bones. A werewolf no count
+  passes is refused, never drawn torn.
+
+The route is used for the werewolf only (`werewolf_parts.needed_model`); every other model keeps today's bake, byte for
+byte, and keeps its unit key. Measured on the game's data on 23 November 2026, the original as drawn (the original
+draws the skin's ten chest shapes; the method draws the skin's own head and the head part's eyes with them, see
+THIRD_PERSON.md):
+
+| Model | Original | Reduced (faces / shared vertices) | Today's form at that count | Outer hull, as drawn |
+| --- | --- | --- | --- | --- |
+| Werewolf body, the skin's own head and the head part's eyes | 3,666 / 2,918 | 1,214 / 1,180 | 1,214 / 3,642 (over its 1,024-face limit) | extent 1.005 / 0.999 / 0.998, least girth 0.85 (right hand), nothing lost, hull 99.4 %, no new open edge, joins closed |
+| Werewolf body, the head part whole (the original's shapes) | 4,254 | none passes up to 1,600 | | the head part is not reduced at all (WEREWOLF-HEAD-NOT-REDUCED-68) |
+| Werewolf arms (first person) | 2,562 / 1,375 | 362 / 208 | 362 / 1,086 | extent 1.003 / 1.000 / 1.006, least girth 0.91 (left upper arm), nothing lost, hull 100 %, no new open edge, joins closed |
+
+The shared form poses about a third of the vertices of today's form at the same count; it draws more triangles than
+a model of today's form could hold. What that costs the Pi 4B against today's form is to be measured in the game.

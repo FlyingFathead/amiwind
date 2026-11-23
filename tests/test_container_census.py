@@ -60,7 +60,8 @@ class ContainerCensusTests(unittest.TestCase):
         self.assertIn('aw_lock_pass(row->reference,AW_AreaContainerKey(row->reference,key,sizeof(key))?key:NULL)',
                       inventory)
         self.assertTrue(cc.ROOM_STABLE_IDS)
-        self.assertEqual(room.count('RoomRefIs (i, reference)'), 3)     # ChimRoom_Has, ChimRoom_RayRef, ChimRoom_Hide
+        # ChimRoom_Has, ChimRoom_RayRef, ChimRoom_Hide and ChimRoom_PoseModel (MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68)
+        self.assertEqual(room.count('RoomRefIs (i, reference)'), 4)
         self.assertEqual((cc.FOCUS_ROWS, cc.FOCUS_BOARDS), (1536, 256))
 
     def test_merged_room_numbers_read_as_stable_ids(self):

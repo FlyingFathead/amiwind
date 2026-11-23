@@ -1,6 +1,6 @@
 # Trees and Grass, Day and Night
 
-_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
+_Last updated with AmiWind v0.0.68-dev10 (23 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -138,6 +138,20 @@ A character facing into it (its facing against the wind below -0.5) while idle, 
 sneaking raises its right arm to shield its eyes with the `idlestorm` group, as in the original; rules from OpenMW
 files `apps/openmw/mwworld/weather.cpp` and `apps/openmw/mwmechanics/character.cpp`. AmiWind poses the right arm
 only (the original also leans the torso), and only characters whose carried-item table names their arm bones.
+Since v0.0.68 a blizzard is a storm too, as in the original: a weather is a storm when its wind speed passes the game
+setting `fStromWindSpeed` (0.7), which ash storms, blight storms and blizzards (0.9) do. Only ash and blight blow
+outward from Red Mountain; a blizzard blows north, so on Solstheim a character facing south shields its eyes and the
+snow drifts north.
+
+Fog depth and cloud speed per weather (v0.0.68): each weather fogs the land to its own depth and moves the clouds at
+its own speed, the values `Morrowind.ini` ships (land fog day and night depth, cloud speed). The engine's own fog is the
+clear weather's, so a weather widens or narrows that fog's span by its depth against clear weather's (0.69): snow by
+day about 1.45 times, a blizzard about 4 times, so the nearest snow already sits half in the blizzard's blue-grey fog;
+foggy weather at night about 2.75 times. The clouds run at the weather's cloud speed against clear weather's (1.25): a
+blizzard six times as fast. Clear weather keeps the fog and clouds of before; ash and blight storms keep clear
+weather's fog (no shipped value at hand), and near Red Mountain the clouds keep the mountain's own speed-up.
+`dbg weather look off` (`aw_weather_look 0`) keeps one fog and one cloud speed for every weather; `dbg weather` prints
+the numbers in effect and the storm's wind.
 
 Interior fog (v0.0.54, [INTERIOR-FOG-UNUSED-51](bugs/README.md)): every interior cell's fog colour and density
 (`id1/world/interior-fog.awf`, world UI stage, one row per room with a density above 0, by the room's map name) now
@@ -153,9 +167,14 @@ the original's flicker rule (as OpenMW's light controller has it), each light at
 Rain, snow and storm ash (v0.0.54, WEATHER-RAIN, `dbg atmos 3`; off by default until its frame cost is measured):
 in rain, thunderstorm, snow, blizzard, ash and blight weather, drops, flakes or ash fall in a box around the view
 (the sizes of `Morrowind.ini`: rain diameter 600, heights 200 to 700, precipitation gravity 575 original units, snow at
-a tenth of the speed; the ash blows outward from Red Mountain), drawn with the engine's Quake particles. They fade in
+a tenth of the speed in its own box since v0.0.68, diameter 800 and heights 400 to 700; the ash blows outward from Red
+Mountain, a blizzard's snow along its wind), drawn with the engine's Quake particles. They fade in
 over the second half of a change into such weather and out over the first half of a change away from it. AmiWind
 keeps at most 48 (64 in heavy rain and blizzards) alive, far fewer than the original's 450 to 650, for the 68040.
+A comparison since v0.0.68, off by default: `dbg ashfall 1` lets the ash of ash and blight storms fall the way a
+blizzard's snow does (the snow box, as many grains as a blizzard's flakes, blowing along the storm's wind), in ash grey
+in an ash storm and red-brown in a blight storm; `dbg ashfall 2` blows it at the old ash's speed; `dbg ashfall 0` is
+the thin drift at eye height of before. The colours are AmiWind's own choice.
 
 Smoke (v0.0.54, MESH-PARTICLE-EMITTERS, on by default, `dbg atmos 2`): the smoke and steam emitters of the placed
 meshes outdoors (chimneys, campfires, torches, braziers, steam vents and lava vents; 531 in the three masters) are in
@@ -165,8 +184,8 @@ front of the view each send up three puffs that rise their emitter's height in i
 particle simulation. `tools/particle_emitters.py sweep` lists every emitter of every placed mesh by kind (fire, fire
 ash, sparks, smoke, steam, spray, mist, bubbles, lava).
 
-Not yet: the weathers' own cloud textures, the rain and storm sounds, the rain's own drop texture, and the shorter fog
-of Foggy weather.
+Not yet: the weathers' own cloud textures, the rain and storm sounds, the rain's own drop texture, and the slower walk
+into a storm's wind.
 
 ## Clouds missing in v0.0.40 and v0.0.41 (17 October 2026)
 

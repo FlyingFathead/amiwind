@@ -282,17 +282,34 @@ def lamp_links(lamps, lights):
     return [(i, at[tuple(row)]) for i, row in enumerate(lamps) if tuple(row) in at]
 
 
+def placement_ref(number):
+    """The stable reference id (tools/ref_identity.py) of a CHIM placement's source reference NUMBER (chim.cut
+    source_ref). A store of frames (Solstheim's, Mournhold's districts) numbers an expansion's reference as the merged
+    master does, master index x 2**22 + its own number; the scripted placements and the carriable lights are keyed by
+    the stable id, master index x 2**20 + the number (REF-IDENTITY-MERGED-MASTER-66, as chim/chim_room.c RoomRefIs
+    reads both). The base game's numbers are both forms. Before, the merged number was compared with the stable id,
+    so no piece of an expansion's store of frames ever got a row: a script's Disable of Bloodmoon's ice covers in
+    front of Stahlman's Gorge and the Caves of Fjalding left them drawn and solid (EXPANSION-STORE-DISABLE-NOT-HIDDEN-68)."""
+    from ref_identity import RefIdentityError, stable_ref
+    try:
+        return stable_ref('Morrowind.esm', number)
+    except RefIdentityError:
+        return number
+
+
 def place_links(world, lights, places=None):
     """[(placement id, reference)] of every CHIM exterior placement (every cut piece) of WORLD that LIGHTS ({reference:
-    entry}: carriable lights, scripted placements: hideable) holds outdoors."""
+    entry}: carriable lights, scripted placements: hideable) holds outdoors; a placement matched by its stable id
+    (placement_ref), the row naming that id."""
     from chim.cut import source_ref
     out_refs = set(placed_outdoors(lights, places))
     out = set()
     for _, _, chunks in world['frames']:
         for c in chunks:
             for r in c['owned']:
-                if source_ref(r['ref']) in out_refs:
-                    out.add((r['pid'], source_ref(r['ref'])))
+                ref = placement_ref(source_ref(r['ref']))
+                if ref in out_refs:
+                    out.add((r['pid'], ref))
     return sorted(out)
 
 
@@ -533,7 +550,7 @@ def check(id1, lights, world=None, limit=20, links=None, scripted=None, layers=(
                               '%s' % (pid, ref, hide[ref]['id'], 'taken' if ref in lights else 'switched off'))
     if scripted and (world is not None or layers):
         # a scripted target with no CHIM piece: an entity of a frame map (its edict is hidden), else nothing hides it
-        entity_refs = {int(e['aw_ref']) for _, rows in frame_maps(id1) for e in rows
+        entity_refs = {placement_ref(int(e['aw_ref'])) for _, rows in frame_maps(id1) for e in rows
                        if str(e.get('aw_ref', '')).isdigit()}
         for ref, e in sorted(placed_outdoors(scripted, places).items()):
             if ref in reached:

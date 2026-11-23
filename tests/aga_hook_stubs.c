@@ -95,6 +95,11 @@ WEAK int AW_MoonRed(void) {return 0;}
 /* The weather's land light (WEATHER-AMBIENT-SUN-UNUSED-51): never reached without a weather (key 0). */
 WEAK int AW_WeatherLightOn(void) {return 1;}
 WEAK int AW_WeatherMountainLevel(void) {return 0;}
+/* The weather's fog depth and cloud speed (SOL-WEATHER-SKY-SNOW-68): Clear's without the weather module (r_sky.c) or
+ * without the sky (aw_fog.c): the fog table and the clouds of before. */
+WEAK int AW_WeatherFogScaleAt(int a,int b,int mix) {(void)a;(void)b;(void)mix;return AW_WEATHER_FOG_CLEAR;}
+WEAK int AW_WeatherCloudPercentNow(void) {return 100;}
+WEAK int R_SkyWeatherFogScale(void) {return AW_WEATHER_FOG_CLEAR;}
 /* The falling weather and the mesh smoke (aw_atmos.c, WEATHER-RAIN, MESH-PARTICLE-EMITTERS): nothing without it. */
 WEAK void AW_AtmosInit(void) {}
 WEAK void AW_AtmosUpdate(void) {}

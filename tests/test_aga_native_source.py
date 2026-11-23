@@ -912,6 +912,24 @@ class NativeSourceTests(unittest.TestCase):
                                         ["traps"], ["containerlocks"]],
                          cflags=["-fsanitize=undefined", "-fno-sanitize-recover=all"])
 
+    def test_object_poses_end_state_of_a_scripts_group_on_a_placed_object(self):
+        # MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68: PlayGroup / LoopGroup on a placed object takes the group's end pose from the
+        # store's pose table (aw_objpose.c): the fact at once, the swap when the group has played, mode 0 queued, a
+        # base pose swaps back, a pose that draws nothing hides, a room load applies its facts.
+        self.compile_run("aga_objpose_test.c", [ROOT/"engine/aga/src/aw_objpose.c"], defines=['AW_OBJPOSE_HOST_TEST'],
+                         cflags=["-fsanitize=undefined", "-fno-sanitize-recover=all"])
+        host = (ROOT/"engine/aga/src/aw_mwhost.c").read_text(encoding="utf-8")
+        # the script host hands a call on an object without an entity to it (before: counted as not carried out)
+        self.assertIn('AW_ObjPosePlay(transform_reference(instance,target),group,group_loops,group_mode)', host)
+        self.assertIn('AW_ObjPoseInit();', host)
+        scene = (ROOT/"engine/aga/src/aw_scene.c").read_text(encoding="utf-8")
+        self.assertIn('if(!pending && aw_objpose_tick)aw_objpose_tick();', scene)
+        room = (ROOT/"engine/aga/src/chim/chim_room.c").read_text(encoding="utf-8")
+        for name in ('int ChimRoom_PoseModel (unsigned reference, int model, const short *box)',
+                     'int ChimRoom_Loaded (char *name, int size, unsigned long *serial)', 'room_loads++;'):
+            self.assertIn(name, room)
+        self.assertIn('aw_objpose.c', (ROOT/"engine/aga/Makefile").read_text(encoding="utf-8"))
+
     def test_talk_rule_combat_dead_knocked_calm_and_one_read_a_frame(self):
         # TALK-PROMPT-RULES: one predicate for the prompt and E, from flags only (aw_talk.c).
         self.compile_run("aga_talk_test.c", [ROOT/"engine/aga/src/aw_talk.c"],
@@ -922,6 +940,16 @@ class NativeSourceTests(unittest.TestCase):
         self.assertIn('if(target && aw_can_talk && !aw_can_talk(target))target=NULL;',
                       (ROOT/"engine/aga/src/pr_cmds.c").read_text(encoding="latin-1"))
         self.assertIn('AW_TalkInit();', (ROOT/"engine/aga/src/aw_debug.c").read_text(encoding="latin-1"))
+        # NPC-WEREWOLF-TALK-OFFERED-68: the use key and the focus line do not offer Talk on a character in werewolf
+        # form, and a werewolf player uses no actor (the fixture's last part); the host gives both answers, and a
+        # script's greeting keeps its own rule (the talk rule without the werewolf part)
+        host = (ROOT/"engine/aga/src/aw_mwhost.c").read_text(encoding="latin-1")
+        self.assertIn('aw_talk_werewolf=AW_MwscriptWerewolfNpc;', host)
+        self.assertIn('aw_talk_player_werewolf=player_is_werewolf;', host)
+        greeting = host[host.index('static int talk_greeting(edict_t *e){'):]
+        greeting = greeting[:greeting.index('\n}\n')]
+        self.assertIn('facts.werewolf=facts.player_werewolf=0;', greeting)
+        self.assertLess(greeting.index('facts.werewolf=facts.player_werewolf=0;'), greeting.index('AW_TalkAllowed(&facts)'))
 
     def test_mesh_depth_crossings_and_span_coverage(self):
         self.compile_run("aga_mesh_spans_test.c", [ROOT/"engine/aga/src/r_edge.c"])

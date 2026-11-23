@@ -112,6 +112,22 @@ class AnswerChoice(unittest.TestCase):
         # a disposition test alone failing is a refusal (the Info Refusal fallback)
         self.assertEqual(P.ref_passes(TOPICS['little secret'][8], plain, st, None), (True, False))
 
+    def test_creature_rows_are_skipped_and_every_npc_row_still_matches(self):
+        # DIALOGUE-CREATURE-SPEAKERS-66: the table's rows include the creature speakers, sorted with the NPCs; this
+        # check's reference is the NPC rule, so it skips a creature row and still compares each NPC with its own row
+        from test_greeting_lut import creature_record
+        k = kinds()
+        k['CREA'] = {'mudcrab': creature_record('mudcrab', 'Mudcrab', level=1, services=0x2003)}
+        topics = dict(TOPICS, background=TOPICS['background'] + [info('cb', 'I am a mudcrab.', kind=0, ONAM='mudcrab')])
+        raw, report = D.build(k, topics, DIALS, HOMES)
+        creatures = G.creature_speakers(k, topics)
+        order = [i for i in G.plan_npcs(k, HOMES, creatures)[0] if i not in report['left_out']]
+        self.assertEqual((creatures, len(D.read(raw)['rows'])), (['mudcrab'], len(order)))
+        result = P.check(k, topics, DIALS, raw, order, HOMES, WANTED)
+        self.assertEqual(result['creature_rows_skipped'], 1)
+        self.assertEqual(result['checked'], 10 * (1 + len(WANTED)) * len(P.VARIANTS))
+        self.assertEqual(result['mismatches'], 0, result['first'])
+
 
 if __name__ == '__main__':
     unittest.main()

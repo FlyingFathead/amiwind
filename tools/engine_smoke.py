@@ -115,6 +115,13 @@ if [ ! -s $R/emu-options.txt ] && [ -s $R/script.txt ] && grep -q '^emu ' $R/scr
   if [ -n "$bad" ]; then : > $R/finished; echo "$(date -u +%T) smoke RESULT FAIL the script's emu line is malformed or names a key the smoke sets itself: $(echo $bad)" | tee -a $R/logs/steps.log; exit 0; fi
   sed 's/=/ = /' $R/emu-script.txt > $R/emu-options.txt
 fi
+# deterministic = 1 for every run that does not name it itself (decided 22 November 2026, CHIM-SEYDA-BALMORA-LOAD-HANG-43,
+# LOAD-HANG-INVESTIGATE-66): the remote-console folder's requests then complete on the emulator thread, so the lost wake
+# that stopped about one test load in a hundred cannot occur (test loads so far: 80 with it and 0 stops, 76 without it and
+# 2 stops). A measurement keeps the emulator's own mode with "deterministic = 0" (an emu line, or the run's own options):
+# that is the emulator's default, so the line is dropped here, with nothing to add and nothing to prove.
+grep -q '^deterministic = ' $R/emu-options.txt 2>/dev/null || printf 'deterministic = 1\n' >> $R/emu-options.txt
+sed -i '/^deterministic = 0$/d' $R/emu-options.txt
 # --emu-option KEY=VALUE (experiment E3: e.g. deterministic=1): extra emulator lines, checked in the start-up log
 [ -s $R/emu-options.txt ] && cat $R/emu-options.txt >> $R/smoke.fs-uae
 # WARP=1 (a session runner's warp switch, 17 November 2026): FS-UAE warp mode, the config's last line (no option can
@@ -1272,6 +1279,16 @@ def parse_emu_options(items):
     return out
 
 
+def pass_fail_options(options, plain=False):
+    """The run's emulator lines with the pass/fail default the probe also applies: deterministic=1 unless the run names
+    deterministic itself (CHIM-SEYDA-BALMORA-LOAD-HANG-43, decided 22 November 2026). plain (--emu-option none: a
+    measurement, the plain side of --alternate emu) = deterministic=0, the emulator's own mode; the probe drops that
+    line, so it is only on the run's record (engine.txt)."""
+    if any(key == 'deterministic' for key, _ in options):
+        return list(options)
+    return list(options) + [('deterministic', '0' if plain else '1')]
+
+
 def emu_config_lines(options):
     """The lines appended to the emulator config (OUT/emu-options.txt)."""
     return ''.join('%s = %s\n' % kv for kv in options)
@@ -1491,6 +1508,8 @@ def main(argv=None):
             raise ValueError('--alternate emu needs at least one --emu-option')
         if args.alternate and args.runs < 1:
             raise ValueError('--runs must be 1 or more')
+        # deterministic=1 unless the run names it; --emu-option none keeps the emulator's own mode (pass_fail_options)
+        emu_options = pass_fail_options(emu_options, plain=list(raw) == ['none'])
     except ValueError as e:
         print('engine smoke: %s' % e)
         print('smoke-exit=2')

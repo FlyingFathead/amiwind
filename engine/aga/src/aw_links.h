@@ -26,6 +26,7 @@ void AW_SetDrawDistanceAuto(int on);
 void AW_DrawDistanceArrive(const float *origin);
 void AW_DrawDistanceWatch(void);
 void AW_FogDepths(byte *table,int distance);
+void AW_FogDepthsScaled(byte *table,int distance,int scale);   /* the weather's fog depth (SOL-WEATHER-SKY-SNOW-68) */
 int AW_FogExactActive(void);
 float AW_FogExactDepth(void);
 /* aw_gallery.c */

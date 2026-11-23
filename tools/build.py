@@ -1060,7 +1060,11 @@ def chim_interior_commands(args, steps, tool, run, tools, jobs):
         *(['--sdk', args.sdk] if getattr(args, 'sdk', None) else []),
         # the rooms leave the harvestable plants out; the image places them as harvest entities, as the CHIM world
         # does outdoors (CHIM-ROOM-HARVEST-DOUBLE-48; --no-harvest: no harvest stage, the plants stay placed meshes)
-        *(['--harvest', run / 'harvest', '--data-files', args.data_files] if 'harvest' in names else []))))
+        *(['--harvest', run / 'harvest'] if 'harvest' in names else []),
+        # the game data: the harvest source's master, and the scripts and models of the end poses of the scripts'
+        # animation groups on placed objects (MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68: the Halls of Penumbra's ice wall, the
+        # Clockwork City's lever doors)
+        '--data-files', args.data_files)))
     return [(name, command + ['--chim-interiors', str(run / 'chim-interiors')] if name == 'image' else command)
             for name, command in steps]
 
@@ -3056,6 +3060,36 @@ def release_readiness_step(args):
     return record
 
 
+def completeness_plan_step(args):
+    """The completeness of the plan (tools/release_completeness.py, RELEASE-GATE-COMPLETENESS-LOST-67): which cells,
+    rooms and load doors of the selected masters this build will not contain, by name, printed before the first stage
+    of a full AGA build. A report only, never a stop (the release preflight and the release guard refuse an rc or final
+    on the same check); a failure to count is printed and the build goes on. None for other builds."""
+    if args.stage != 'aga' or getattr(args, 'miniwind', False) or args.dry_run:
+        return None
+    try:
+        import release_completeness
+        from chim.regions import decode_cells
+        masters = (getattr(args, 'expansion_layers', None) or {}).get('masters') or ('Morrowind.esm',)
+        base = decode_cells(getattr(args, 'chim_regions_cells', None) or '') or None
+        module = decode_cells(getattr(args, 'bloodmoon_solstheim_cells', None) or '') or None
+        # the CHIM towns this build makes: the region cells leave out the cells inside a town's frame ("dropped, inside
+        # a town frame"), which the town holds (COMPLETENESS-PLAN-TOWN-CELLS-MISSING-68: without them the line counted
+        # Balmora's, Seyda Neen's and Vivec's 61 cells and their 556 doors missing). The exterior checklist's towns,
+        # the same cores as the run's exterior-checklist.json
+        towns = (getattr(args, 'exterior_checklist', None) or {}).get('towns')
+        if towns is None:
+            import exterior_plan
+            towns = exterior_plan.town_cores(chim_native_towns(args, getattr(args, 'builder_options', None)))
+        result = release_completeness.build_start(ROOT, args.data_files, masters, base, module, VERSION,
+                                                  town_cores=[t['core'] for t in towns])
+    except Exception as exc:  # noqa: BLE001 (a report: it never stops a build)
+        print('Completeness of the plan: not counted (%s: %s)' % (type(exc).__name__, exc), flush=True)
+        return {'line': 'not counted', 'error': str(exc)}
+    print('Completeness of the plan (report; an rc or final is refused on it): ' + result['line'], flush=True)
+    return {'line': result['line'], 'missing': result['missing'], 'problems': result['problems'][:200]}
+
+
 def export_option_environment(args, announce=True):
     """Export the build options the stage code reads from the environment (AMIWIND_*), from parsed ARGS.
 
@@ -3934,6 +3968,7 @@ def _main(argv=None):
         # Release readiness (tools/release_readiness.py): everything a release candidate or final would refuse,
         # each with its tracker ID, before any stage; a full build with an item without one stops here.
         args.release_readiness_record = release_readiness_step(args)
+        args.completeness_plan_record = completeness_plan_step(args)
         if args.stage == "aga" and not args.dry_run:
             print("Original stair rules: " + ("on" if args.font_options["follow_original_stair_rules"] else "OFF (debugging)") +
                   " (" + args.font_options["follow_original_stair_rules_selected_by"] + ")", flush=True)
@@ -4075,6 +4110,8 @@ def _main(argv=None):
         metadata['build_argv'] = [str(part) for part in getattr(args, '_argv', None) or []]
         if getattr(args, 'release_readiness_record', None) is not None:
             metadata['release_readiness'] = args.release_readiness_record  # tools/release_readiness.py
+        if getattr(args, 'completeness_plan_record', None) is not None:
+            metadata['completeness_plan'] = args.completeness_plan_record  # tools/release_completeness.py
         # The recipe record (tools/build_recipe.py): build-state.json, build-summary.json and, through the
         # environment (never a stage key), image/build.json.
         metadata['build_recipe'] = recipe_metadata(args)

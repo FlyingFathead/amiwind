@@ -40,24 +40,54 @@ static cvar_t aw_atmos={"aw_atmos","2",true};
 #define PRECIP_HIGH 175.0f           /* Rain Height Max 700 */
 #define PRECIP_FALL 143.75f          /* Precip Gravity 575 a second, a quarter */
 #define PRECIP_AHEAD 40.0f           /* the box's centre ahead of the view: most of it in sight */
+/* v0.0.68 (SOL-WEATHER-SKY-SNOW-68): snow and blizzards fall in the Snow box ([Weather Snow] Snow Diameter 800, Snow
+ * Height Min 400 / Max 700, a quarter of them here); before, rain's box. A blizzard's flakes blow along its wind
+ * (aw_weather.h: north), at the drift speed they had (before: a fixed east-north-east drift). */
+#define SNOW_HALF_WIDTH 100.0f
+#define SNOW_LOW 100.0f
+#define SNOW_HIGH 175.0f
+#define BLIZZARD_WIND 20.0f
+/* The ash of ash and blight storms as the blizzard's falling snow (v0.0.68, BLIGHT-WIND-SPRITES-68, the maintainer's
+ * idea: the same effect in ashen grey and brown for the storms on Vvardenfell), a switch to compare, not saved, 0 by
+ * default until he has looked: aw_ashfall (dbg ashfall) 0 the ash of before (a thin brown drift at eye height), 1 the
+ * blizzard's form (the snow box, as many grains as a blizzard's flakes, falling at the snow's speed, blowing along the
+ * storm's wind at the blizzard's drift) in grey for an ash storm and brown for a blight storm, 2 the same blown at the
+ * old ash's speed (a harder wind). The colours are our own choice: ash grey, and the blight's red-brown dust. */
+static cvar_t aw_ashfall={"aw_ashfall","0"};
+#define ASH_WIND 60.0f
+static const int ash_grey[3]={140,132,122},blight_brown[3]={136,86,62};
 static double precip_carry,precip_last=-1;
 
 static void precip_update(void)
 {
-    int kind,strength,live,n,r,g,b;float at[3],vel[3],rand_v,life,dir[2],height;double now=realtime,dt;
+    int kind,strength,live,n,r,g,b,ashfall;float at[3],vel[3],rand_v,life,dir[2],height,low,high,half,wind;
+    double now=realtime,dt;
     kind=AW_WeatherFalling(&strength);
     dt=precip_last<0?0:now-precip_last;precip_last=now;
     if(!kind || strength<=0 || dt<=0 || dt>0.5){precip_carry=0;return;}
-    live=(kind==AW_PRECIP_HEAVY_RAIN || kind==AW_PRECIP_BLIZZARD?AW_PRECIP_LIVE_HEAVY:AW_PRECIP_LIVE)*strength/AW_WEATHER_STEPS;
-    height=PRECIP_HIGH-PRECIP_LOW;
+    ashfall=kind==AW_PRECIP_ASH && aw_ashfall.value>=1?(aw_ashfall.value>=2?2:1):0;
+    live=(kind==AW_PRECIP_HEAVY_RAIN || kind==AW_PRECIP_BLIZZARD || ashfall?AW_PRECIP_LIVE_HEAVY:AW_PRECIP_LIVE)*
+         strength/AW_WEATHER_STEPS;
+    low=PRECIP_LOW;high=PRECIP_HIGH;half=PRECIP_HALF_WIDTH;
+    if(kind==AW_PRECIP_SNOW || kind==AW_PRECIP_BLIZZARD || ashfall){low=SNOW_LOW;high=SNOW_HIGH;half=SNOW_HALF_WIDTH;}
+    height=high-low;
     vel[0]=vel[1]=0;
     switch(kind){
     case AW_PRECIP_SNOW:case AW_PRECIP_BLIZZARD:
         vel[2]=-PRECIP_FALL*0.1f;rand_v=6;r=g=b=230;     /* Snow Gravity Scale 0.1 */
-        if(kind==AW_PRECIP_BLIZZARD){vel[0]=18;vel[1]=8;}
+        if(kind==AW_PRECIP_BLIZZARD){
+            if(!AW_WeatherStorm(dir)){dir[0]=0;dir[1]=1;}
+            vel[0]=dir[0]*BLIZZARD_WIND;vel[1]=dir[1]*BLIZZARD_WIND;
+        }
         break;
     case AW_PRECIP_ASH:
         if(!AW_WeatherStorm(dir)){dir[0]=0;dir[1]=1;}
+        if(ashfall){
+            const int *c=AW_WeatherCurrent()==AW_WEATHER_BLIGHT?blight_brown:ash_grey;
+            wind=ashfall==2?ASH_WIND:BLIZZARD_WIND;
+            vel[0]=dir[0]*wind;vel[1]=dir[1]*wind;vel[2]=-PRECIP_FALL*0.1f;rand_v=6;r=c[0];g=c[1];b=c[2];
+            break;
+        }
         vel[0]=dir[0]*60;vel[1]=dir[1]*60;vel[2]=-6;rand_v=10;r=120;g=92;b=74;
         break;
     default:
@@ -72,9 +102,9 @@ static void precip_update(void)
     precip_carry-=n;
     at[0]=r_refdef.vieworg[0]+vpn[0]*PRECIP_AHEAD;
     at[1]=r_refdef.vieworg[1]+vpn[1]*PRECIP_AHEAD;
-    at[2]=r_refdef.vieworg[2]+(PRECIP_LOW+PRECIP_HIGH)*0.5f;
-    if(kind==AW_PRECIP_ASH)at[2]=r_refdef.vieworg[2]+16;   /* the ash drifts through the view */
-    AW_FxParticles(at,n,PRECIP_HALF_WIDTH,vel,rand_v,life,r,g,b,0);
+    at[2]=r_refdef.vieworg[2]+(low+high)*0.5f;
+    if(kind==AW_PRECIP_ASH && !ashfall)at[2]=r_refdef.vieworg[2]+16;   /* the ash drifts through the view */
+    AW_FxParticles(at,n,half,vel,rand_v,life,r,g,b,0);
 }
 
 /* ---- mesh smoke ---- */
@@ -274,6 +304,7 @@ void AW_AtmosUpdate(void)
 void AW_AtmosInit(void)
 {
     Cvar_RegisterVariable(&aw_atmos);
+    Cvar_RegisterVariable(&aw_ashfall);
     Cvar_RegisterVariable(&aw_glow);
     Cvar_RegisterVariable(&aw_glow_draw);
     Cvar_RegisterVariable(&aw_glow_range);

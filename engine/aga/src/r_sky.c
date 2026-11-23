@@ -284,10 +284,13 @@ static double R_SkyCloudBaseSpeed(void)
     return sky_cloud_speed.value>=0 && sky_cloud_speed.value<=100?
         (double)sky_cloud_speed.value:0.00333333333;
 }
-/* nearer Red Mountain the clouds race toward Blight's Cloud Speed (REDMOUNTAIN-SKY-55): x1 .. x7.2 at the crater */
+/* nearer Red Mountain the clouds race toward Blight's Cloud Speed (REDMOUNTAIN-SKY-55): x1 .. x7.2 at the crater;
+ * elsewhere (v0.0.68, SOL-WEATHER-SKY-SNOW-68) at the weather's own Cloud Speed against Clear's (a blizzard x6) */
 static double R_SkyCloudSpeed(void)
 {
-    return R_SkyCloudBaseSpeed()*(1.0+(AW_WEATHER_MOUNTAIN_CLOUDS-100)/100.0*AW_WeatherMountainLevel()/AW_WEATHER_STEPS);
+    int pull=AW_WeatherMountainLevel();
+    if(pull>0)return R_SkyCloudBaseSpeed()*(1.0+(AW_WEATHER_MOUNTAIN_CLOUDS-100)/100.0*pull/AW_WEATHER_STEPS);
+    return R_SkyCloudBaseSpeed()*AW_WeatherCloudPercentNow()/100.0;
 }
 static int R_SkyCloudType(void){return sky_cloud_type.value==2?2:1;}
 static int R_SkyVeilKeep(int x,int y,int density)
@@ -376,9 +379,17 @@ static int R_SkyWeatherLightPercent(void)
 {
     return AW_WeatherLightOn()?100:0;
 }
+/* The weather's fog depth (aw_weather.h AW_WeatherFogScale, SOL-WEATHER-SKY-SNOW-68) at this frame's time stops, for
+ * the exterior fog (aw_fog.c): AW_WEATHER_FOG_CLEAR = the fog of before. */
+static int sky_weather_fog_scale=AW_WEATHER_FOG_CLEAR;
+int R_SkyWeatherFogScale(void){return sky_phase>=0?sky_weather_fog_scale:AW_WEATHER_FOG_CLEAR;}
 static void R_SkyWeather(int days,int milliseconds)
 {
+    int a,b,mix;
     sky_weather_key=AW_WeatherFrame(days,milliseconds,&sky_weather_blend);
+    /* the stops of R_SkyColourTables' phase (the type 2 sky's fifth stop is night) */
+    a=sky_phase>>10;b=(sky_phase>>6)&15;mix=sky_phase&63;
+    sky_weather_fog_scale=AW_WeatherFogScaleAt(a==4?3:a,b==4?3:b,mix>32?32:mix);
     if(sky_weather_key){
         memcpy(sky_rgb_stops,sky_weather_blend.sky,sizeof sky_rgb_stops);memcpy(fog_rgb_stops,sky_weather_blend.fog,sizeof fog_rgb_stops);
         sky_weather_strength=sky_weather_blend.strength;sky_weather_glare=sky_weather_blend.glare;

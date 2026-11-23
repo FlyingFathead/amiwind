@@ -234,6 +234,11 @@ static void test_equipment_apply(aw_fighter_t *sheet) {
     /* A bad adapter must not let equipment refresh reset active combat. */
     sheet->health=999;sheet->fatigue=999;sheet->knocked=0;sheet->dead=0;
 }
+/* NPC-WEREWOLF-FIGHTS-ARMED-68: the characters a script turned (aw_mwhost.c AW_MwscriptWerewolfNpc): here WERE_EDICT
+ * while WERE_ON is set; the global WerewolfClawMult 25 (Bloodmoon's start value) */
+static int were_on;static edict_t *were_edict;
+static int test_werewolf(struct edict_s *e){return were_on && e==were_edict;}
+static float test_claw_mult(void){return 25;}
 /* INVENTORY-NO-ARMOR-RATING-61: an active Shield of 10 on the player */
 static int shield_asked=-1;
 static float test_shield(struct edict_s *actor,int effect){(void)actor;shield_asked=effect;return effect==3?10:0;}
@@ -751,6 +756,74 @@ int main(void){
      AW_CombatServerReset();                                                 /* nothing kept: nothing dropped */
      fields[2][4]._float=fields[3][4]._float=0;aw_combat_scene();
      printf("server spawn ok: no fight of the old map reaches the new map's actors\n");}
+    /* NPC-WEREWOLF-FIGHTS-ARMED-68 (v0.0.68): a character a script turned fights as the original's werewolf (OpenMW 0.51
+     * mechanicsmanagerimp.cpp setWerewolf, aicombataction.cpp prepareNextAction 170-174, combat.cpp getHandToHandDamage
+     * 489-514). Mevil Molor (a steel mace and a chitin shield on its sheet, two spells and the magicka for two casts on
+     * its record) turned: its claws only (no weapon, no shield, unarmoured, no load), not one spell read or cast, its
+     * blows health damage and never fatigue; its UndoWerewolf in the fight gives the mace and the shield back (and its
+     * spells are weighed again), a BecomeWerewolf takes them again. A turned hand-to-hand fighter (the guard) on another
+     * actor wounds it at once (claws x 25); the player in werewolf form fights with his claws: his worn sword and shield
+     * do not count and his blows are health damage. Fails on the code before: the mace, the shield and two casts, and the
+     * hand-to-hand blows of the turned guard and of the player were fatigue damage. */
+    {aw_fighter_t a,b;const aw_fighter_t *w;int k;
+     extern int (*aw_combat_werewolf)(struct edict_s *e);extern float (*aw_combat_claw_mult)(void);
+     AW_CombatClear();aw_combat_scene();p->v.health=100000;p->v.button0=0;npc->v.solid=SOLID_BBOX;npc->v.health=0;
+     npc->v.origin[0]=500;npc->v.origin[1]=0;p->v.origin[0]=300;p->v.origin[1]=0;
+     aw_combat_werewolf=test_werewolf;aw_combat_claw_mult=test_claw_mult;were_edict=npc;were_on=1;
+     assert(AW_CombatActorLoad("mevil molor",&a) && a.weapon==4 && a.shield);
+     spell_actor=1;cast_paid=1;magicka=20;magicka_changes=0;spell_reads=0;
+     assert(AW_CombatEngage(npc,&a,NULL));
+     w=AW_CombatFighter(npc);
+     assert(w && !w->weapon && !w->shield && w->weapon_skill==AW_SK_H2H && !w->damage[0][1] && !w->hit_classes);
+     assert(w->encumbrance==0 && w->armor>9.38f && w->armor<9.39f);   /* Unarmored 38: (0.1 x 38) x (0.065 x 38) */
+     for(k=0;k<3000 && AW_CombatStats()->npc_hits<3;k++)tick(1);
+     assert(AW_CombatStats()->npc_hits>=3 && AW_CombatStats()->taken_health>0 && AW_CombatStats()->taken_fatigue==0);
+     assert(magicka_changes==0 && spell_reads==0 && AW_CombatStats()->npc_casts==0 && AW_CombatStats()->npc_spell_choices==0);
+     printf("werewolf ok: claws only, %ld hits for %.1f health, no fatigue blow, no spell read or cast\n",
+            (long)AW_CombatStats()->npc_hits,(double)AW_CombatStats()->taken_health);
+     /* UndoWerewolf during the fight: its own mace and shield again, its spells weighed again; BecomeWerewolf again */
+     were_on=0;tick(10);
+     w=AW_CombatFighter(npc);assert(w && w->weapon==4 && w->shield && w->weapon_skill==AW_SK_BLUNT && w->damage[0][1]==14);
+     for(k=0;k<200 && spell_reads==0;k++)tick(1);
+     assert(spell_reads>0);
+     were_on=1;tick(10);
+     w=AW_CombatFighter(npc);assert(w && !w->weapon && !w->shield);
+     AW_CombatClear();spell_actor=0;cast_paid=0;
+     /* a turned hand-to-hand fighter on another actor: health damage at the first blows (dice off: every blow lands) */
+     Cvar_SetValue("aw_combat_dice",0);
+     npc->v.health=resident->v.health=0;npc->v.solid=resident->v.solid=SOLID_BBOX;
+     npc->v.origin[0]=1000;npc->v.origin[1]=0;resident->v.origin[0]=1020;resident->v.origin[1]=0;
+     assert(AW_CombatActorLoad("mevil molor",&a) && AW_CombatActorLoad("a guard",&b) && !b.weapon);
+     /* the victim's mace swings slowly (speed 0.05: 24 s a swing), so the guard's blows are never cut short by its */
+     a.health=a.health_max=500;a.speed=.05f;b.health=b.health_max=5000;were_edict=resident;were_on=1;
+     assert(AW_CombatEngageAgainst(npc,&a,resident,&b));
+     for(k=0;k<1500 && AW_CombatFighter(npc) && AW_CombatFighter(npc)->health>=500;k++)tick(1);
+     w=AW_CombatFighter(npc);
+     if(!w || !(w->health<500) || w->dead)
+         fprintf(stderr,"werewolf on an actor: after %ld ticks the victim %s (health %.1f, dead %d), the guard %s (health %.1f)\n",
+                (long)k,w?"fights":"has no slot",w?(double)w->health:0.0,w?w->dead:-1,AW_CombatFighter(resident)?"fights":
+                "has no slot",AW_CombatFighter(resident)?(double)AW_CombatFighter(resident)->health:0.0);
+     assert(w && w->health<500 && !w->dead);
+     printf("werewolf on an actor ok: the turned guard's claws took %.1f health in %ld ticks\n",(double)(500-w->health),(long)k);
+     AW_CombatClear();were_on=0;
+     /* the player in werewolf form: his worn sword and shield (the inventory adapter) do not count, his blows are his claws */
+     aw_move_werewolf=1;aw_combat_equipment=test_equipment_apply;
+     AW_CombatPlayerSheet(&a);
+     assert(!a.weapon && !a.shield && a.weapon_skill==AW_SK_H2H && a.armor<12);
+     aw_combat_equipment=NULL;
+     resident->v.solid=SOLID_BBOX;resident->v.health=0;resident->v.origin[0]=p->v.origin[0]+20;resident->v.origin[1]=p->v.origin[1];
+     p->v.v_angle[1]=0;target=resident;
+     assert(AW_CombatActorLoad("a guard",&b));b.health=b.health_max=5000;
+     assert(AW_CombatEngage(resident,&b,NULL));
+     for(k=0;k<6 && AW_CombatStats()->player_hits<2;k++){
+         p->v.button0=1;tick(1);fields[1][0]._float=3;fields[1][1]._float=(float)sv.time;p->v.button0=0;tick(50);
+         fields[1][0]._float=2;tick(1);
+     }
+     assert(AW_CombatStats()->player_hits>=2 && AW_CombatStats()->dealt_health>0 && AW_CombatStats()->dealt_fatigue==0);
+     printf("werewolf player ok: claws only, %ld blows for %.1f health, no fatigue blow\n",
+            (long)AW_CombatStats()->player_hits,(double)AW_CombatStats()->dealt_health);
+     AW_CombatClear();aw_move_werewolf=0;Cvar_SetValue("aw_combat_dice",1);target=npc;
+     aw_combat_werewolf=NULL;aw_combat_claw_mult=NULL;p->v.health=60;}
     printf("combat ok: %ld steps, %ld sounds\n",(long)steps,(long)sounds);
     AW_CombatClear();assert(items_hidden>=items_shown);   /* every release hides them */
     return 0;

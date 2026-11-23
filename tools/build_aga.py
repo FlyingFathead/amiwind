@@ -2785,10 +2785,15 @@ def write_door_check(args, id1, out):
     # the literal file name: a path built from a variable reads as the whole config/ folder to the stage keys
     baseline = ROOT/'config'/'door-check-baseline.json'
     known = ROOT/'config'/'door-check-known.json'
+    # the stages of the placements a script switches (tools/script_stages.py): a door no player reaches is traced
+    # again without the ones its script never shows with it (a colony's earlier stages, a quest's plug in front of
+    # an entrance; DOOR-USE-COLLISION-EXPANSIONS-68)
+    import script_stages
+    stages = script_stages.read(args.data_files)
     report, problem = door_engine_check.run(id1=id1, engine_src=engine_src, audit_rows=audit['rows'], out=out,
                                             baseline=baseline if baseline.is_file() else None, jobs=jobs,
                                             chim_world=args.chim_world, known=known if known.is_file() else None,
-                                            layers=layers)
+                                            layers=layers, stages=stages)
     a, c = audit['counts'], report['counts']
     print('Door check: %d exterior entrances; the audit: %d usable on arrival, %d locked, %d with a problem; the '
           'engine after walking in: %d usable, %d both ways, %d with the wall traced (door-audit.md, '
@@ -3209,6 +3214,11 @@ def finalize_image(args):
         region_census=Background(census_file, master_path(args.data_files), jobs=jobs)
     # Every read-only payload check first, all errors together, before any write (tools/payload_preflight.py).
     payload_preflight(args, out, excluded, jobs)
+    # The boot configs once more on the stage as finalized (the image step checked them after its last default line):
+    # this tail is shared with a continued image, and a later step that adds a line is caught here before any write
+    # (CFG-OVER-COMMAND-BUFFER-68).
+    from boot_cfg_fit import check as check_boot_cfgs
+    check_boot_cfgs(boot/'id1')
     gallery_report=json.loads((out/'npc-gallery-staging.json').read_text())
     torch_report=json.loads((out/'torch-conversion.json').read_text())
     combat_data=json.loads((out/'combat-data.json').read_text()) if (out/'combat-data.json').is_file() else None

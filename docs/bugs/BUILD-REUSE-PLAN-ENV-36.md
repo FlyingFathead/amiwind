@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.36-dev1 at 2026-10-10 (time not recorded): standalone plan marked scene, bsp, world-survey and others rebuilt for environment; the build's own preflight reused 18 of 26
 - Reported with v0.0.45 at 2026-10-20 05:45 +0300: plan of a6a9c6e9 against the v0.0.45 release run: 8 of 39 reused, 31 rebuilt, most for environment alone
+- Reported with v0.0.68-dev8 at 2026-11-22 23:47 +0200: The standalone reuse plan, run from the exact source tree of a v0.0.68-dev8 build against that build, still plans the converted world, both expansion module stages, the three town stages and the interiors stage as rebuilt for an environment change alone.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -36,6 +37,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-10-10: reported in v0.0.36-dev1
 - 2026-10-10: seen again in v0.0.36-dev1: standalone plan marked scene, bsp, world-survey and others rebuilt for environment; the build's own preflight reused 18 of 26
 - 2026-10-20 05:45 +0300: seen again in v0.0.45: plan of a6a9c6e9 against the v0.0.45 release run: 8 of 39 reused, 31 rebuilt, most for environment alone
+- 2026-11-22 23:47 +0200: seen again in v0.0.68-dev8: The standalone reuse plan, run from the exact source tree of a v0.0.68-dev8 build against that build, still plans the converted world, both expansion module stages, the three town stages and the interiors stage as rebuilt for an ...
 
 <!-- END GENERATED TIMELINE -->
 
@@ -44,7 +46,7 @@ _Last updated with AmiWind v0.0.45 (20 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Status: 20 October 2026](#status-20-october-2026)
 - [Symptom](#symptom)
@@ -262,6 +264,7 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - [CHIMPORT-UNITS-NOT-SHARED-WITH-BUILD-68](CHIMPORT-UNITS-NOT-SHARED-WITH-BUILD-68.md): A build module's world stage converts again every unit a CHIMport run already made for the same cells
 - [DELIVER-RESUME-NEW-COMMIT-NO-SOURCE-68](DELIVER-RESUME-NEW-COMMIT-NO-SOURCE-68.md): A delivery resumed on an earlier finished build for a newer commit stops because that commit's source export does not exist
 - [DOOR-CHECK-KNOWN-UNKEYED-54](DOOR-CHECK-KNOWN-UNKEYED-54.md): config/door-check-known.json is in no stage key: an edit to the known list never re-runs a passed image's door check
+- [JANITOR-KEEPS-RUNS-OF-FINISHED-REQUESTS-68](JANITOR-KEEPS-RUNS-OF-FINISHED-REQUESTS-68.md): The build volume's cleanup keeps old runs for ever when any earlier, finished build request named them as the source of its reused stages
 - [K-BACKUP-RUN-COPY-SYMLINKS-68](K-BACKUP-RUN-COPY-SYMLINKS-68.md): Archiving a superseded build run to the archive drive fails for runs that hold symbolic links
 - [MESH-TABLE-LAYER-GROWS-67](MESH-TABLE-LAYER-GROWS-67.md): A row added to an expansion layer of a measured mesh table would re-key every unit recorded with that layer's earlier rows
 - [MESH-TABLE-SECOND-LAYER-REKEY-67](MESH-TABLE-SECOND-LAYER-REKEY-67.md): A row of a second expansion in a measured mesh table would re-key every unit recorded with the first expansion's rows

@@ -16,6 +16,9 @@ int R_SkyExterior(void);
 const unsigned char *R_DayNightFogColours(void);
 /* Interior fog ramp toward R G B (INTERIOR-FOG-UNUSED-51): 16 x 256 bytes, NULL before the palette grid. */
 const unsigned char *R_InteriorFogColours(int r,int g,int b);
+/* The weather's land fog span against Clear's this frame, in 1/256 (256: the exterior fog of before; aw_weather.h
+ * AW_WeatherFogScale, SOL-WEATHER-SKY-SNOW-68). */
+int R_SkyWeatherFogScale(void);
 /* Light-space night: lightstyles from AW_LAMP_STYLE up are lamps and are never
  * dimmed by r_daylight (8.8 fixed point, 256 = full daylight; r_light.c). */
 #define AW_LAMP_STYLE 32

@@ -7,6 +7,10 @@ server_t sv;
 extern qboolean AW_FindSafeSpawn(edict_t *,vec3_t,vec3_t);
 extern qboolean AW_PlacePlayer(edict_t *,vec3_t);
 static int unavailable;static float water_height,ceiling,mountain,lava_height,steep_x;static int steep;
+/* the frame's terrain floor (aw_walk.c's hook, chim_far.c): the lowest height a body may reach at a point */
+static float terrain_lowest;
+int (*aw_chim_floor)(const vec3_t,float *,float *);
+static int terrain_floor(const vec3_t o,float *lowest,float *surface){(void)o;*lowest=terrain_lowest;*surface=terrain_lowest+8;return 1;}
 void Con_Printf(char *fmt,...) {}
 void SV_LinkEdict(edict_t *p,qboolean touch) {}
 /* Synthetic standing-hull space: floor at z=24 and an expanded block around
@@ -67,6 +71,32 @@ int main(void) {
  assert(p.v.origin[2]+p.v.mins[2]>60 && p.v.origin[2]+p.v.mins[2]<61);
  VectorCopy(p.v.origin,saved);water_height=220;
  assert(!AW_MapPlace(&p,preferred) && !memcmp(saved,p.v.origin,sizeof saved));
+ /* SWIM-PLAYER-DOES-NOT-STAY-AT-DEPTH-68: a height asked in the water (dbg tp X Y Z, Position): the player is set at
+  * the point (its feet 1 over the asked height) and swims there; never lifted to the surface, set on the highest
+  * surface or sent to the scene spawn. Before the fix the first floor under it (24) lay in the water too, so the
+  * surface rule refused it and every point beside it, and AW_MapPlaceBelow failed. */
+ {vec3_t at={50,0,100},block={0,0,40};
+  p.v.flags=FL_ONGROUND;p.v.velocity[2]=-5;
+  assert(AW_MapPlaceBelow(&p,at));
+  assert(p.v.origin[0]==50 && p.v.origin[1]==0 && p.v.origin[2]==at[2]-p.v.mins[2]+1);
+  assert(p.v.oldorigin[2]==p.v.origin[2] && p.v.velocity[2]==0 && !((int)p.v.flags&FL_ONGROUND));
+  /* wading (the feet in the water, the middle over it): the point as well; the walk's gravity takes it from there */
+  water_height=110;assert(AW_MapPlaceBelow(&p,at) && p.v.origin[2]==at[2]-p.v.mins[2]+1);
+  /* the asked point over the water: the surface rule as before (the feet on the water at 60) */
+  water_height=60;assert(AW_MapPlaceBelow(&p,at));
+  assert(p.v.origin[0]==50 && p.v.origin[2]+p.v.mins[2]>60 && p.v.origin[2]+p.v.mins[2]<61);
+  /* the standing box in solid at the asked point: the nearest clear point beside it in the water (32 out) */
+  water_height=220;assert(AW_MapPlaceBelow(&p,block));
+  assert(fabs(p.v.origin[0])+fabs(p.v.origin[1])==32 && p.v.origin[2]==block[2]-p.v.mins[2]+1);
+  /* under the ground where the frame's terrain answers: refused, and nothing else takes it here (nothing moves) */
+  VectorCopy(p.v.origin,saved);terrain_lowest=150;aw_chim_floor=terrain_floor;
+  assert(!AW_MapPlaceBelow(&p,at) && !memcmp(saved,p.v.origin,sizeof saved));
+  /* over the terrain's lowest height there: taken */
+  terrain_lowest=20;assert(AW_MapPlaceBelow(&p,at) && p.v.origin[0]==50 && p.v.origin[2]==at[2]-p.v.mins[2]+1);
+  aw_chim_floor=NULL;terrain_lowest=0;
+  /* a debug teleport without a height keeps its rule: the whole column in the water is refused */
+  VectorCopy(p.v.origin,saved);assert(!AW_MapPlace(&p,preferred) && !memcmp(saved,p.v.origin,sizeof saved));
+ }
  water_height=0;
  /* GODMODE-LAVA-DEATH-62 round three: lava is stood in (feet in the liquid on its bed), never refused as water;
   * dbg tp X Y Z onto it lands there, and a steep rim point lands on the nearest floor beside it */

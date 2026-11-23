@@ -706,6 +706,11 @@ static void ready_command(void){
      * ToggleSpell: the spell stance only with the Magic switch on, the stance left at any time) */
     if(!ready && !AW_ControlAllowed(AW_CONTROL_PLAYER|AW_CONTROL_MAGIC)){
         Con_DPrintf("Ready magic: switched off by a script.\n");return;}
+    /* NPC-WEREWOLF-FIGHTS-ARMED-68: a werewolf casts nothing (OpenMW 0.51 playercontrols.lua ToggleSpell checkNotWerewolf:
+     * the spell stance is refused in werewolf form, the game's sWerewolfRefusal said; the change of form put a readied
+     * spell away already, aw_mwhost.c were_player_change). The refusal's own words are not in this image's data yet:
+     * the console says it. */
+    if(!ready && aw_move_werewolf){Con_Printf("Ready magic: a werewolf casts nothing.\n");return;}
     /* READY-MAGIC-SHOWS-WEAPON-65: the spell stance: the empty hands come up (the weapon is put away), and go down
      * with the magic; from the weapon stance the hands stay up and only the weapon goes */
     goal=GetEdictFieldValue(sv_player,"aw_hand_goal");g=goal && goal->_float!=0;

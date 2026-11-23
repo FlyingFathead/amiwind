@@ -1,7 +1,7 @@
 {
  "schema": "mwscript-features 1",
- "updated": "2026-11-22",
- "version": "0.0.68-dev8",
+ "updated": "2026-11-23",
+ "version": "0.0.68-dev11",
  "intro": "One row per script record of the game: what names it, where it stands, which functions it calls and what its conditions test, and what state AmiWind has it in. The data is measured from the game's masters with the builder's own compiler; the page lists record ids, counts and states only. When the work list runs dry, the scripting work is taken from here row by row, toward the next landmark: every game script running as in the original. On Vvardenfell the scripts left are the character creation ones; the rest belong to Mournhold and Solstheim.",
  "measured": {
   "masters": {
@@ -9,7 +9,7 @@
    "Tribunal.esm": "2ace511f23cc2a9ddd5f3aa59c7919789b9378cf4b17c8ae3375dd6b782f3f2b",
    "Bloodmoon.esm": "bd27090d0e6ad4c1bf1abc83f1a2dac56fcc82cae7bfe8263c413fb301801357"
   },
-  "compiler": "6db99546d6e6100f126338804e33669fd2f4cea7c0091a8adc242a79b25da4b8",
+  "compiler": "e314d14b2ba37e359bef1f641809ec4e3cdc0495c40b0c087608fb3ddd678d24",
   "host": [
    "addsoulgem",
    "addtopic",
@@ -283,22 +283,22 @@
    "user4",
    "wakeuppc"
   ],
-  "date": "2026-11-22",
+  "date": "2026-11-23",
   "bindings": 11542,
   "start_scripts": 4,
   "placed_scripted": 11171,
   "image": {
-   "build": "v0.0.68-dev7",
+   "build": "v0.0.68-dev10",
    "addons": [
     "Tribunal.esm",
     "Bloodmoon.esm"
    ],
    "districts": 5,
    "rooms": 1321,
-   "exteriors": 135,
+   "exteriors": 153,
    "bound_in_image": {
     "Tribunal.esm": 1227,
-    "Bloodmoon.esm": 1216
+    "Bloodmoon.esm": 1220
    },
    "addon_in_file": 2447
   }
@@ -5142,7 +5142,7 @@
   {"id":"SothaSilTeleport","master":"Tribunal.esm","defined_in":["Tribunal.esm"],"area":"dialogue only","areas":{},"refs":{"records":{},"placed":{},"levelled":0,"dialogue_starts":1,"dialogue_speaker":0,"placed_by_scripts":0,"made_by":[]},"start":false,"started_by":[],"bound":0,"held":0,"handwritten":false,"inert":false,"error":false,"functions":{"menumode":1,"playsound":1,"positioncell":1,"stopscript":1},"tests":1,"conditions":["menumode"],"openmw":[],"notyet":[],"state":"runs","why":""},
   {"id":"sothasteam1Script","master":"Tribunal.esm","defined_in":["Tribunal.esm"],"area":"mournhold (tribunal)","areas":{"mournhold (tribunal)":2},"refs":{"records":{"ACTI":["act_sotha_steam00"]},"placed":{"Tribunal.esm":{"ACTI":2}},"levelled":0,"dialogue_starts":0,"dialogue_speaker":0,"placed_by_scripts":0,"made_by":[]},"start":false,"started_by":[],"bound":2,"held":0,"handwritten":false,"inert":false,"error":false,"functions":{"disable":1,"enable":1,"getdisabled":2,"playgroup":2},"tests":3,"conditions":["getdisabled","other script"],"openmw":[],"notyet":[],"state":"runs","why":""},
   {"id":"sothasteam2Script","master":"Tribunal.esm","defined_in":["Tribunal.esm"],"area":"mournhold (tribunal)","areas":{"mournhold (tribunal)":2},"refs":{"records":{"ACTI":["act_sotha_steam10"]},"placed":{"Tribunal.esm":{"ACTI":2}},"levelled":0,"dialogue_starts":0,"dialogue_speaker":0,"placed_by_scripts":0,"made_by":[]},"start":false,"started_by":[],"bound":2,"held":0,"handwritten":false,"inert":false,"error":false,"functions":{"disable":1,"enable":1,"getdisabled":2,"playgroup":2},"tests":3,"conditions":["getdisabled","other script"],"openmw":[],"notyet":[],"state":"runs","why":""},
-  {"id":"Sound_BM_IceSheet","master":"Bloodmoon.esm","defined_in":["Bloodmoon.esm"],"area":"moesring mountains region","areas":{"felsaad coast region":5,"isinfier plains region":1,"moesring mountains region":8},"refs":{"records":{"ACTI":["sound_bm_ice"]},"placed":{"Bloodmoon.esm":{"ACTI":14}},"levelled":0,"dialogue_starts":0,"dialogue_speaker":0,"placed_by_scripts":0,"made_by":[]},"start":false,"started_by":[],"bound":11,"held":0,"handwritten":false,"inert":false,"error":false,"functions":{"cellchanged":1,"getsoundplaying":1,"playloopsound3dvp":1},"tests":2,"conditions":["cellchanged","getsoundplaying"],"openmw":[],"notyet":[],"state":"runs","why":""},
+  {"id":"Sound_BM_IceSheet","master":"Bloodmoon.esm","defined_in":["Bloodmoon.esm"],"area":"moesring mountains region","areas":{"felsaad coast region":5,"isinfier plains region":1,"moesring mountains region":8},"refs":{"records":{"ACTI":["sound_bm_ice"]},"placed":{"Bloodmoon.esm":{"ACTI":14}},"levelled":0,"dialogue_starts":0,"dialogue_speaker":0,"placed_by_scripts":0,"made_by":[]},"start":false,"started_by":[],"bound":14,"held":0,"handwritten":false,"inert":false,"error":false,"functions":{"cellchanged":1,"getsoundplaying":1,"playloopsound3dvp":1},"tests":2,"conditions":["cellchanged","getsoundplaying"],"openmw":[],"notyet":[],"state":"runs","why":""},
   {"id":"Sound_Boat_Creak","master":"Morrowind.esm","defined_in":["Morrowind.esm"],"area":"bitter coast region","areas":{"ascadian isles region":43,"ashlands region":28,"azura's coast region":29,"bitter coast region":53,"grazelands region":2,"molag mar region":8,"red mountain region":17,"sheogorad":23,"west gash region":51},"refs":{"records":{"ACTI":["sound_boat_creak00"]},"placed":{"Morrowind.esm":{"ACTI":254}},"levelled":0,"dialogue_starts":0,"dialogue_speaker":0,"placed_by_scripts":0,"made_by":[]},"start":false,"started_by":[],"bound":254,"held":0,"handwritten":false,"inert":false,"error":false,"functions":{"cellchanged":1,"getsoundplaying":1,"playloopsound3dvp":1},"tests":2,"conditions":["cellchanged","getsoundplaying"],"openmw":[],"notyet":[],"state":"runs","why":""},
   {"id":"Sound_Boat_Hull","master":"Morrowind.esm","defined_in":["Morrowind.esm"],"area":"azura's coast region","areas":{"ascadian isles region":4,"azura's coast region":16,"bitter coast region":5,"interior with no way out":1,"sheogorad":3,"west gash region":4},"refs":{"records":{"ACTI":["sound_boat_hull00"],"CONT":["ship hull barrel"]},"placed":{"Morrowind.esm":{"ACTI":30,"CONT":3}},"levelled":0,"dialogue_starts":0,"dialogue_speaker":0,"placed_by_scripts":0,"made_by":[]},"start":false,"started_by":[],"bound":33,"held":0,"handwritten":false,"inert":false,"error":false,"functions":{"cellchanged":1,"getsoundplaying":1,"playloopsound3dvp":1},"tests":2,"conditions":["cellchanged","getsoundplaying"],"openmw":[],"notyet":[],"state":"runs","why":""},
   {"id":"Sound_Bubbles","master":"Morrowind.esm","defined_in":["Morrowind.esm"],"area":"mournhold (tribunal)","areas":{"mournhold (tribunal)":9},"refs":{"records":{"ACTI":["sound_bubbles00"]},"placed":{"Tribunal.esm":{"ACTI":9}},"levelled":0,"dialogue_starts":0,"dialogue_speaker":0,"placed_by_scripts":0,"made_by":[]},"start":false,"started_by":[],"bound":9,"held":0,"handwritten":false,"inert":false,"error":false,"functions":{"cellchanged":1,"getsoundplaying":1,"playloopsound3dvp":1},"tests":2,"conditions":["cellchanged","getsoundplaying"],"openmw":[],"notyet":[],"state":"runs","why":""},
@@ -5187,7 +5187,7 @@
   {"id":"SpyMasterScript","master":"Morrowind.esm","defined_in":["Morrowind.esm"],"area":"west gash region","areas":{"west gash region":1},"refs":{"records":{"NPC_":["caius cosades"]},"placed":{"Morrowind.esm":{"NPC_":1}},"levelled":0,"dialogue_starts":0,"dialogue_speaker":55,"placed_by_scripts":0,"made_by":[]},"start":false,"started_by":[],"bound":1,"held":0,"handwritten":false,"inert":false,"error":false,"functions":{"cellchanged":1,"disable":1,"getjournalindex":2,"menumode":1},"tests":6,"conditions":["cellchanged","getjournalindex","global","local","menumode"],"openmw":[],"notyet":[],"state":"runs","why":""},
   {"id":"staadaScript","master":"Morrowind.esm","defined_in":["Morrowind.esm"],"area":"sheogorad","areas":{"sheogorad":1},"refs":{"records":{"CREA":["golden saint_staada"]},"placed":{"Morrowind.esm":{"CREA":1}},"levelled":0,"dialogue_starts":0,"dialogue_speaker":0,"placed_by_scripts":0,"made_by":[]},"start":false,"started_by":[],"bound":1,"held":0,"handwritten":false,"inert":false,"error":false,"functions":{"getjournalindex":1,"journal":1,"ondeath":1},"tests":2,"conditions":["getjournalindex","ondeath"],"openmw":[],"notyet":[],"state":"runs","why":""},
   {"id":"staceyScript","master":"Morrowind.esm","defined_in":["Morrowind.esm"],"area":"ascadian isles region","areas":{"ascadian isles region":1},"refs":{"records":{"NPC_":["stacey"]},"placed":{"Morrowind.esm":{"NPC_":1}},"levelled":0,"dialogue_starts":0,"dialogue_speaker":45,"placed_by_scripts":0,"made_by":[]},"start":false,"started_by":[],"bound":1,"held":0,"handwritten":false,"inert":false,"error":false,"functions":{"additem":1,"cellchanged":1,"disable":1,"getdisabled":1,"getitemcount":2,"getjournalindex":2,"ondeath":1},"tests":8,"conditions":["cellchanged","getdisabled","getitemcount","getjournalindex","local","ondeath"],"openmw":[],"notyet":[],"state":"runs","why":""},
-  {"id":"stahldoorScript","master":"Bloodmoon.esm","defined_in":["Bloodmoon.esm"],"area":"moesring mountains region","areas":{"moesring mountains region":1},"refs":{"records":{"ACTI":["act_bm_snowdoor4"]},"placed":{"Bloodmoon.esm":{"ACTI":1}},"levelled":0,"dialogue_starts":0,"dialogue_speaker":0,"placed_by_scripts":0,"made_by":[]},"start":false,"started_by":[],"bound":0,"held":0,"handwritten":false,"inert":false,"error":false,"functions":{"disable":1,"getdisabled":1,"getjournalindex":1},"tests":2,"conditions":["getdisabled","getjournalindex"],"openmw":[],"notyet":[],"state":"not-in-image","why":"placed only in cells of an add-on world that the image does not carry"},
+  {"id":"stahldoorScript","master":"Bloodmoon.esm","defined_in":["Bloodmoon.esm"],"area":"moesring mountains region","areas":{"moesring mountains region":1},"refs":{"records":{"ACTI":["act_bm_snowdoor4"]},"placed":{"Bloodmoon.esm":{"ACTI":1}},"levelled":0,"dialogue_starts":0,"dialogue_speaker":0,"placed_by_scripts":0,"made_by":[]},"start":false,"started_by":[],"bound":1,"held":0,"handwritten":false,"inert":false,"error":false,"functions":{"disable":1,"getdisabled":1,"getjournalindex":1},"tests":2,"conditions":["getdisabled","getjournalindex"],"openmw":[],"notyet":[],"state":"runs","why":""},
   {"id":"stal1Script","master":"Bloodmoon.esm","defined_in":["Bloodmoon.esm"],"area":"isinfier plains region","areas":{"isinfier plains region":1},"refs":{"records":{"ACTI":["act_bm_pipe_01"]},"placed":{"Bloodmoon.esm":{"ACTI":1}},"levelled":0,"dialogue_starts":0,"dialogue_speaker":0,"placed_by_scripts":0,"made_by":[]},"start":false,"started_by":[],"bound":1,"held":0,"handwritten":false,"inert":false,"error":false,"functions":{"enable":1,"getjournalindex":1,"journal":1,"menumode":1,"onactivate":1,"playsound":1},"tests":7,"conditions":["getjournalindex","global","menumode","onactivate"],"openmw":[],"notyet":[],"state":"runs","why":""},
   {"id":"stal2Script","master":"Bloodmoon.esm","defined_in":["Bloodmoon.esm"],"area":"isinfier plains region","areas":{"isinfier plains region":1},"refs":{"records":{"ACTI":["act_bm_pipe_02"]},"placed":{"Bloodmoon.esm":{"ACTI":1}},"levelled":0,"dialogue_starts":0,"dialogue_speaker":0,"placed_by_scripts":0,"made_by":[]},"start":false,"started_by":[],"bound":1,"held":0,"handwritten":false,"inert":false,"error":false,"functions":{"enable":1,"getjournalindex":1,"journal":1,"menumode":1,"onactivate":1,"playsound":1},"tests":6,"conditions":["getjournalindex","global","menumode","onactivate"],"openmw":[],"notyet":[],"state":"runs","why":""},
   {"id":"stal3Script","master":"Bloodmoon.esm","defined_in":["Bloodmoon.esm"],"area":"isinfier plains region","areas":{"isinfier plains region":1},"refs":{"records":{"ACTI":["act_bm_pipe_03"]},"placed":{"Bloodmoon.esm":{"ACTI":1}},"levelled":0,"dialogue_starts":0,"dialogue_speaker":0,"placed_by_scripts":0,"made_by":[]},"start":false,"started_by":[],"bound":1,"held":0,"handwritten":false,"inert":false,"error":false,"functions":{"enable":1,"getjournalindex":1,"journal":1,"menumode":1,"onactivate":1,"playsound":1},"tests":7,"conditions":["getjournalindex","global","menumode","onactivate"],"openmw":[],"notyet":[],"state":"runs","why":""},

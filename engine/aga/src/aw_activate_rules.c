@@ -88,8 +88,14 @@ int AW_FocusChoose(const aw_focus_aim_t *aim,int previous){
     static const int order[4]={AW_FOCUS_ACTOR,AW_FOCUS_THING,AW_FOCUS_HINGED,AW_FOCUS_DOOR};
     float d,best_d=-1,held;int i,best=AW_FOCUS_NONE,actor_out;
     if(!aim)return AW_FOCUS_NONE;
-    /* an item or plant before the actor or inside his box takes him out of the choice (FOCUS-NPC-OVERRIDES-ITEM-62) */
-    actor_out=aim->actor_far<0 || AW_ActivateItemFirst(aim->thing,aim->actor_near,aim->actor_far);
+    /* an item or plant before the actor or inside his box takes him out of the choice (FOCUS-NPC-OVERRIDES-ITEM-62);
+     * FOCUS-EYE-INSIDE-ACTOR-BOX-68: so does a load or hinged door the ray meets while the eye is INSIDE the actor's use
+     * box (its entry 0): the box then says nothing of where his body is along the ray, and the original's focus is what
+     * the crosshair ray meets first (OpenMW World::getFacedObject, a ray against the drawn meshes). A creature whose
+     * drawn box is far wider than its body (a dreugh beside the sunken Unmarked Shipwreck, its box 0..50 around the
+     * swimmer's eye) kept the focus from the trapdoor the crosshair was on (20 units off), and E did nothing. */
+    actor_out=aim->actor_far<0 || AW_ActivateItemFirst(aim->thing,aim->actor_near,aim->actor_far) ||
+              (aim->actor_near<=0 && (aim->door>=0 || aim->hinged>=0));
     for(i=0;i<4;i++){
         if(order[i]==AW_FOCUS_ACTOR && actor_out)continue;
         d=AW_FocusDistance(aim,order[i]);

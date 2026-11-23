@@ -272,14 +272,19 @@ def room_selection(room, references, wanted, harvest=None):
     return every, selected, left_out
 
 
-def room_input(work, pal_bytes, qbsp, jobs, cache, timer, collision_cache, harvest=None, settings=None):
+def room_input(work, pal_bytes, qbsp, jobs, cache, timer, collision_cache, harvest=None, settings=None, poses=None):
     """One room's models, textures and placements (chim.build.frame_input with no ground), its light levels and
     bounds, from the room's own scenery export and compiled map (prepare_area.build_room's work folder).
 
     harvest: reference numbers the harvest step makes harvestable (room_harvest_numbers); the room's own are left out
     of its placements (returned as 'harvest_left_out', the image places them as harvest entities) and still count
     for its bounds, so the room's box is the same either way. None: every kept placement is placed (the earlier
-    form: a harvestable plant stays a placed mesh, drawn and solid, not pickable)."""
+    form: a harvestable plant stays a placed mesh, drawn and solid, not pickable).
+
+    poses: the scripts' animation groups on objects (build: {'objects': chim.anim_poses.scripted_groups' objects,
+    'data_files', 'work'}): the room's placements a script plays a group on get the group's end pose
+    (chim.anim_poses.room_poses: 'poses' rows and the 'pose_spec' of the end-pose models; MWSCRIPT-PLAYGROUP-ACTORS-
+    ONLY-68). None: none (the room as before)."""
     import numpy as np
     from chim.build import frame_input, mesh_fingerprint, mesh_unit
     from interior_lighting import light_tint, point_colour, point_light
@@ -374,6 +379,23 @@ def room_input(work, pal_bytes, qbsp, jobs, cache, timer, collision_cache, harve
         # map origin (harvest_build: map position = quarter-scale original position - origin)
         out['harvest_left_out'] = left_out
         out['harvest_origin'] = [float(centre[0]), float(centre[1]), 0.0]
+    if poses:
+        # MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68: the end poses of the placements a script plays a group on, made with the
+        # room's own frame settings; a pose never fails the room (its row says why it was not made)
+        from chim.anim_poses import room_poses
+        with timer.section('end poses'):
+            rows, pose_spec = room_poses(
+                work=work, index=index, archive=archive, selected=selected, models=models, profiles=profiles,
+                spec=spec, objects=poses['objects'], data_files=poses['data_files'], pose_dir=poses['work'],
+                frame_args={'frame': frame, 'centre': centre, 'palette': pal_bytes, 'step': grain, 'qbsp': qbsp,
+                            'collision_cache': collision_cache, 'jobs': jobs, 'cache': cache, 'timer': timer,
+                            'settings': {'placement_format': '0.8', 'grain': grain,
+                                         'cut_models_over': rooms['cut_models_over'],
+                                         'hollow_bevels': room_hollow_bevels(rooms)}})
+        if rows:
+            out['poses'] = rows
+            if pose_spec is not None:
+                out['pose_spec'] = pose_spec
     return out
 
 
@@ -831,10 +853,12 @@ class Store:
         return self.model_content[digest]
 
     def add_room(self, room):
-        """Store a room's models and textures; returns its record bytes and receipt row."""
+        """Store a room's models and textures; returns its record bytes and receipt row. A room with end poses
+        ('poses', MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68) leaves its record's parts in self.pose_parts for the stage's last
+        step (chim.anim_poses.store_poses), which adds the end-pose models after every room's own."""
         from chim.world import stored_box
         spec = room['spec']
-        ids, records, placed_models = [], [], {}
+        ids, records, placed_models, by_ref = [], [], {}, {}
         for pid, p in enumerate(spec['placements']):
             v = spec['variants'][p['variant']]
             if p['variant'] not in placed_models:
@@ -844,10 +868,18 @@ class Store:
                 ids.append(mid)
             angles = p.get('angles') or (0.0, p['yaw'], 0.0)
             # the drawn box as every record stores it (chim.world.stored_box: shorts, one unit outward)
-            rec = P.placement(pid, p['ref'], mid, p['origin'], angles, 0, 0, 0,
-                              stored_box(*P.placed_box(p['origin'], angles, v['lo'], v['hi'])), 1,
-                              p.get('story_hidden', False))
+            box = stored_box(*P.placed_box(p['origin'], angles, v['lo'], v['hi']))
+            rec = P.placement(pid, p['ref'], mid, p['origin'], angles, 0, 0, 0, box, 1, p.get('story_hidden', False))
             records.append(with_light(rec, room['levels'].get(p['ref'], 0), room.get('tints', {}).get(p['ref'], 0)))
+            if room.get('poses'):
+                from chim.cut import source_ref
+                by_ref[source_ref(p['ref'])] = None if source_ref(p['ref']) in by_ref else \
+                    (mid, tuple(p['origin']), tuple(angles), box)
+        if room.get('poses'):
+            if not hasattr(self, 'pose_parts'):
+                self.pose_parts = {}
+            self.pose_parts[room['room']] = (room['bounds'], ids, records,
+                                             {r: v for r, v in by_ref.items() if v is not None})
         if self.current_bytes >= PACK_BYTES:
             self.close_pack()
         data = room_record(room['bounds'], ids, records)
@@ -915,12 +947,14 @@ def _room_task(task):
     harvest = task[5] if len(task) > 5 else None
     # a room with types (room_types): (type, its settings, is the default type)
     kind = task[6] if len(task) > 6 else None
+    # the scripts' animation groups on objects (build: MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68), None without the game data
+    poses = task[7] if len(task) > 7 else None
     cache, timer = UnitCache(Path(unit_cache)), Timer()
     try:
         room = empty_room_input(work)
         if room is None:
             room = room_input(work, Path(palette).read_bytes(), qbsp, 1, cache, timer, Path(collision_cache), harvest,
-                              settings=kind[1] if kind else None)
+                              settings=kind[1] if kind else None, poses=poses)
         if kind is not None:
             room['type'], room['type_default'] = kind[0], kind[2]
     except Exception as error:  # noqa: BLE001 (one room's failure costs that room only, named: CHIM-ROOM-FAIL-STAGE-48)
@@ -946,7 +980,8 @@ def room_cost(task):
     return (work / 'room.bsp').stat().st_size
 
 
-def build(room_works, palette, out, qbsp=None, jobs=1, unit_cache=None, harvest=None, data_files=None):
+def build(room_works, palette, out, qbsp=None, jobs=1, unit_cache=None, harvest=None, data_files=None,
+          object_poses='on', sdk=None):
     """Every room side by side, one room per worker, largest first (as the CHIM areas: one room's own steps are
     serial and a room has few meshes, so rooms one after another left most cores idle); the store is then written
     here alone, rooms in their input order, so a room's models lie together.
@@ -954,12 +989,32 @@ def build(room_works, palette, out, qbsp=None, jobs=1, unit_cache=None, harvest=
     harvest, data_files: the harvest step's output and the game data (builder default): each room leaves its
     harvestable plants out of its record (room_harvest_numbers; receipt row harvest_left_out) and the image places
     them as harvest entities (CHIM-ROOM-HARVEST-DOUBLE-48). Without them (--no-harvest), every plant stays a placed
-    mesh of its room, as before."""
+    mesh of its room, as before.
+
+    object_poses 'on' (the default) with data_files: the placements a script plays an animation group on get the
+    group's end pose (chim.anim_poses: the end-pose models stored after every room's own, the rooms' model lists and
+    OUT/chimi/poses.txt; MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68). 'off': none, the store as before (A/B). sdk: the Amiga
+    SDK (target sizes): a room the 32 MB minimum cannot hold with its end-pose models stays as before
+    (chim.anim_poses.fit_poses); None: not measured here."""
     from build_parallel import ordered_map
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     unit_cache = Path(unit_cache) if unit_cache else out / 'work' / 'chim-units'
     numbers, harvest_receipt = None, None
+    pose_info, pose_census = None, None
+    if object_poses not in ('on', 'off'):
+        raise ValueError('CHIM rooms: --object-poses on|off, not %r' % object_poses)
+    if data_files and object_poses == 'on':
+        import time
+        from chim.anim_poses import scripted_groups
+        from mwad.masters import master_bytes
+        started = time.time()
+        census = scripted_groups(master_bytes(data_files))
+        pose_info = {'objects': census['objects'], 'data_files': str(data_files), 'work': str(out / 'work' / 'poses')}
+        pose_census = {k: census[k] for k in ('calls', 'actor_calls', 'unknown_targets')}
+        pose_census['objects'] = len(census['objects'])
+        _log('end poses: %d PlayGroup/LoopGroup calls in the scripts, %d on actors or the player, %d objects (%.1f s)'
+             % (census['calls'], census['actor_calls'], len(census['objects']), time.time() - started))
     if harvest:
         if not data_files:
             raise ValueError('CHIM rooms: --harvest needs --data-files (the master the harvest source was made from)')
@@ -999,10 +1054,11 @@ def build(room_works, palette, out, qbsp=None, jobs=1, unit_cache=None, harvest=
         if work.name in types_of:
             spec = types_of[work.name]
             for n, settings in sorted(spec['types'].items()):
-                tasks.append(base + ((n, settings, n == spec['default']),))
+                tasks.append(base + ((n, settings, n == spec['default']),) + ((pose_info,) if pose_info else ()))
         else:
-            tasks.append(base)
+            tasks.append(base + ((None, pose_info) if pose_info else ()))
     units, timing, failed, typed = {}, {}, [], []
+    pending = []          # (record name, room input) of the rooms with end poses (chim.anim_poses.store_poses)
     for room in ordered_map(_room_task, tasks, max(1, int(jobs or 1)), cost=room_cost):
         if room.get('type') is not None and not room['type_default'] and room.get('failed'):
             failed.append({'room': '%s%s%d' % (room['room'], TYPE_SUFFIX, room['type']), 'reason': room['failed']})
@@ -1017,6 +1073,8 @@ def build(room_works, palette, out, qbsp=None, jobs=1, unit_cache=None, harvest=
             data, row = store.add_room(dict(room, room=name))
             (out / STORE / 'rooms' / (name + '.crm')).write_bytes(data)
             typed.append(dict(row, type_of=room['room'], type=room['type'], record_sha256=hashlib.sha256(data).hexdigest()))
+            if room.get('poses'):
+                pending.append((name, room))
             _log('%s: type %d record %s: %d placements, %d models' % (room['room'], room['type'], name,
                                                                      row['placements'], row['models']))
             continue
@@ -1048,12 +1106,42 @@ def build(room_works, palette, out, qbsp=None, jobs=1, unit_cache=None, harvest=
         if room.get('visual_recipes'):
             # the meshes a visual recipe changed in this room (room_visual_profiles, VISUAL-EVERYWHERE-ROOMS-67)
             row['visual_recipes'] = room['visual_recipes']
+        if room.get('poses'):
+            pending.append((room['room'], room))
         rows.append(row)
         _log('%s: %d placements, %d models%s' % (row['room'], row['placements'], row['models'],
                                                  ', %d harvestable plants left out' % len(row['harvest_left_out'])
                                                  if row.get('harvest_left_out') else ''))
+    pose_receipt = None
+    if pose_info is not None:
+        # MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68: the end-pose models after every room's own (no other id moves), the rooms'
+        # model lists and the pose table, before the store is written
+        from chim.anim_poses import store_poses
+        pose_rows = {r['room']: r for r in rows + typed}
+        pose_receipt = store_poses(store, out, pending, pose_rows, getattr(store, 'pose_parts', {}))
+        pose_receipt['census'] = pose_census
+        _log('end poses: %d rows in %d rooms, %d models added (%d bytes), %d not made%s' % (
+            pose_receipt['rows'], len(pose_receipt['rooms']), pose_receipt['models_added'],
+            pose_receipt['model_bytes_added'], len(pose_receipt['failed']),
+            ''.join('; %s %s %s: %s' % (f['room'], f.get('id'), f['group'], f.get('reason'))
+                    for f in pose_receipt['failed'][:8])))
     receipt = {'format': 'aw-chim-rooms-1', 'store': store.write(out), 'rooms': rows, 'kept_room_maps': kept_bsp,
                'failed_rooms': failed, 'units': units, 'timing': timing, 'jobs': int(jobs or 1)}
+    if pose_receipt is not None:
+        # the rooms the 32 MB minimum cannot hold with their end-pose models stay as before; the models no room keeps
+        # leave the store, which is written again (chim.anim_poses.fit_poses)
+        from chim.anim_poses import fit_poses
+        packs_before = len(store.packs)
+        fit = fit_poses(store, out, sdk, jobs, pose_rows, pose_receipt, pose_receipt.pop('first_model'),
+                        pose_receipt.pop('first_pack'))
+        pose_receipt['fit'] = fit
+        if fit['left_out']:
+            receipt['store'] = store.write(out)
+            for k in range(len(store.packs), packs_before):
+                (out / STORE / ('p%02d.ccs' % k)).unlink()     # a pack of end-pose models nobody keeps
+        _log('end poses: 32 MB fit %s; left as before: %s' % (
+            fit['status'], '; '.join('%s: %s' % kv for kv in fit['left_out'].items()) or 'none'))
+        receipt['poses'] = pose_receipt
     if typed:
         receipt['room_types'] = typed
     if harvest_receipt is not None:
@@ -1154,7 +1242,11 @@ def main(argv=None):
     ap.add_argument('--harvest', help="the harvest step's output (tools/harvest_build.py prepare): the rooms leave its "
                                       "plants out, the image places them as harvest entities; absent: plants stay "
                                       "placed meshes")
-    ap.add_argument('--data-files', help='the game data the harvest source was made from (with --harvest)')
+    ap.add_argument('--data-files', help='the game data: the harvest source was made from it (with --harvest), and the '
+                                         'scripts and models of the end poses are read from it')
+    ap.add_argument('--object-poses', choices=('on', 'off'), default='on',
+                    help="the end pose of a script's animation group on a placed object (MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68, "
+                         "with --data-files); off: none, the store as before (A/B)")
     ap.add_argument('--sdk', help='the Amiga SDK (target structure sizes): the early room heap check '
                                   '(chim.heap.require_room_store_heap, ROOM-AKULAKHAN-HEAP-52) runs on the store, '
                                   'OUT/%s; absent: recorded as not run' % EARLY_HEAP_REPORT)
@@ -1164,7 +1256,7 @@ def main(argv=None):
         if Path(folder).is_dir():
             works += sorted(str(d) for d in Path(folder).iterdir() if (d / 'room.bsp').is_file())
     receipt = build(works, args.palette, args.out, args.qbsp, args.jobs, args.unit_cache, args.harvest,
-                    args.data_files)
+                    args.data_files, args.object_poses, args.sdk)
     print(json.dumps(receipt['store'], indent=1))
     early_room_heap(args.out, args.sdk, args.jobs)
 

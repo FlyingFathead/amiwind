@@ -1,11 +1,11 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.68-dev8 (22 November 2026)._
+_Last updated with AmiWind v0.0.68-dev11 (23 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.68: in progress, eighth snapshot 22 November 2026](#v0068-in-progress-eighth-snapshot-22-november-2026)
+- [v0.0.68: in progress, eleventh snapshot 23 November 2026](#v0068-in-progress-eleventh-snapshot-23-november-2026)
 - [v0.0.67: Tribunal Introduced, released 19 November 2026](#v0067-tribunal-introduced-released-19-november-2026)
 - [v0.0.66: Forward It Is, released 16 November 2026](#v0066-forward-it-is-released-16-november-2026)
 - [v0.0.65: Reintroducing Vvardenfell](#v0065-reintroducing-vvardenfell)
@@ -119,10 +119,39 @@ _Last updated with AmiWind v0.0.68-dev8 (22 November 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
-## v0.0.68: in progress, eighth snapshot 22 November 2026
+## v0.0.68: in progress, eleventh snapshot 23 November 2026
 
-v0.0.68 is titled **Solstheim Is Here**: the release for which Solstheim is to be complete. Its eighth development snapshot,
-[v0.0.68-dev8](releases/notes/RELEASE-v0.0.68-dev8.md), is out. What dev8 carries (checked by tests and the gates of
+v0.0.68 is titled **Solstheim Is Here**: the release for which Solstheim is to be complete. Its eleventh development
+snapshot, [v0.0.68-dev11](releases/notes/RELEASE-v0.0.68-dev11.md), is out. What dev11 carries (checked by tests and the
+gates of their commits; the fight's frame times, the werewolf character's missing offer to talk and the glacier's weathers
+also seen in play): **fights that no longer stutter when blows land** (the fighters' spell lists are kept from the start of
+the fight and its sounds load with the area; with six fighters the worst fight frame went from 219 ms to 50 ms; a voice
+line's first read is still left); **a character in werewolf form that can no longer be talked to**, as in the original;
+**rows in the dialogue and voice tables for the 46 creatures that have lines** (talking to them is not done yet);
+and **Solstheim's weather with its own look**: a blizzard is a storm blowing north, and each weather has its own fog
+distance and cloud speed (clear weather unchanged; the falling effect for ash and blight storms is a switch, off by
+default). Still open: each weather's own cloud picture, the walk slowed in storms, and the chamber behind the broken ice
+wall; for the builder, the build volume's cleanup keeps the runs a finished build request named for good. The tenth snapshot,
+[v0.0.68-dev10](releases/notes/RELEASE-v0.0.68-dev10.md), is out. What dev10 carries (checked by tests and the gates of
+their commits; the werewolves' fight, the player's werewolf size and the ice wall's breaking also seen in play on the
+emulator): **the characters a script turns into werewolves drawn as werewolves**, holding nothing, a dead one staying a
+werewolf corpse; **a werewolf fighting with its claws only**, and every werewolf drawn at its race's size; **a script's
+animation group on a placed object leaving it in its end pose** (the Halls of Penumbra's ice wall breaks, the Sotha Sil
+lever doors open, the Bamz-Amschend cave-ins fall); and, for the builder, a completeness plan that counts the cells inside
+the towns' frames and a public progress tracker written again from the dev9 build. Still open: the broken ice wall cannot
+be passed, the use key offers to talk to a werewolf, and silver weapons' extra damage, the werewolf's own sounds and the
+readier attack on a werewolf are left. The ninth snapshot, [v0.0.68-dev9](releases/notes/RELEASE-v0.0.68-dev9.md), is out.
+What dev9 carries (checked by tests and the gates of their
+commits; the entrances, the ice wall's question and the player's werewolf form also seen in play on the emulator):
+**all 153 of Solstheim's cells built** (the last two open-sea cells); **the quest and underwater entrances of Solstheim
+usable** (a placement that an expansion's script switches off is hidden, among them the ice covers at Stahlman's Gorge and
+the Caves of Fjalding and the rock at Glenschul's Tomb, and 840 placements of Mournhold; a door under the crosshair takes the
+use key from a creature around the player; a player put into water stays at that depth); **named objects whose script
+answers on use take the use key** (1,712 placed activators, the Halls of Penumbra's ice wall among them, which still
+plays no breaking animation); **the player in werewolf form drawn as the werewolf** (the people a script turns into
+werewolves not yet); **a script's ForceGreeting opening the conversation** as the original does; and, for the builder, a
+release check that refuses a release with a missing cell, room or load door, and a door check that judges by what play
+showed. The eighth snapshot, [v0.0.68-dev8](releases/notes/RELEASE-v0.0.68-dev8.md), is out. What dev8 carries (checked by tests and the gates of
 their commits, not yet in play): **the windows of a running game in the game's own colours** after a start from the main
 menu by a console command, and **Escape in play opening the in-game menu**, which now has the original's rows, its
 questions before a game in progress is lost, and a Paused caption that can be switched off; **map version 2 as the

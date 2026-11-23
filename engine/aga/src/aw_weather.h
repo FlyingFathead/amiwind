@@ -134,11 +134,42 @@ int AW_WeatherIndex(const char *name);
  * apps/openmw/mwmechanics/character.cpp (read, not copied). An ash or blight storm blows outward from Red Mountain
  * (original units 25000, 70000) at the player's position; during a transition the weather being left counts until
  * half way, then the one arriving. An actor shields its eyes (idlestorm, torso and right arm) when it faces into the
- * wind: its forward direction against the storm's below -0.5. */
+ * wind: its forward direction against the storm's below -0.5.
+ * v0.0.68 (SOL-WEATHER-SKY-SNOW-68): the blizzard is a storm too. OpenMW files/data-mw/scripts/omw/esmfallbacks.lua
+ * makes a weather a storm when its Wind Speed passes the game setting fStromWindSpeed (0.7 in Morrowind.esm): Ashstorm,
+ * Blight and Blizzard (.9 as Morrowind.ini ships it); scripts/omw/weather.lua turns only Ashstorm and Blight outward
+ * from Red Mountain, so a blizzard blows along the weather's own direction, Weather::defaultDirection (0, 1): north.
+ * Before, ash and blight only (no eye pose and no wind in a Solstheim blizzard). */
 #define AW_WEATHER_ASH 6
+#define AW_WEATHER_SNOW 8
+#define AW_WEATHER_BLIZZARD 9
 #define AW_WEATHER_RED_MOUNTAIN_X 25000.0f
 #define AW_WEATHER_RED_MOUNTAIN_Y 70000.0f
 int AW_WeatherIsStorm(int current,int next,double progress);
+/* the storm weather in effect (as AW_WeatherIsStorm), AW_WEATHER_NONE when none */
+int AW_WeatherStormOf(int current,int next,double progress);
+/* the wind of storm WEATHER at an original-world position: ash and blight outward from Red Mountain
+ * (AW_WeatherStormDirection), any other storm north (0, 1); 0 when there is none (no storm, at Red Mountain itself) */
+int AW_WeatherStormDirectionOf(int weather,const float *source,float dir[2]);
+/* The weather's fog depth and cloud speed (v0.0.68, SOL-WEATHER-SKY-SNOW-68): Morrowind.ini as it ships ([Weather NAME]
+ * Land Fog Day Depth / Land Fog Night Depth, Cloud Speed). Rule from OpenMW file apps/openmw/mwrender/fogmanager.cpp
+ * (read, not copied): the land fog runs from the view distance x (1 - depth) to the view distance, the depth blended
+ * through the day (sunrise, day and sunset take the day depth, night the night depth) and through a transition
+ * (mwworld/weather.cpp calculateTransitionResult); a blizzard (2.8) fogs the land from the eye. The engine's own fog
+ * already draws Clear (aw_fog.c AW_FogDepths, 44 % to 100 % of the draw distance), so the weather scales that fog's span
+ * by its depth against Clear's (.69), in 1/256 (256 = Clear, the table of before); the clouds run at the weather's Cloud
+ * Speed against Clear's (1.25), in percent. Ashstorm and Blight keep Clear's fog (no shipped value at hand) and the
+ * Red Mountain pull keeps its own cloud speed where it reaches (REDMOUNTAIN-SKY-55). aw_weather_look 0 (dbg weather
+ * look off): one fog and one cloud speed for every weather, as before. */
+#define AW_WEATHER_FOG_CLEAR 256
+int AW_WeatherFogDepthOf(int weather,int stop);          /* the depth x 100 at time stop 0..3 (r_sky.c order) */
+int AW_WeatherFogScale(int current,int next,int step,int a,int b,int mix);   /* stops a, b mixed by mix/32 */
+int AW_WeatherCloudPercentOf(int weather);
+int AW_WeatherCloudPercent(int current,int next,int step);
+/* Runtime (aw_weather.c): this frame's fog scale at stops a, b, mix (AW_WEATHER_FOG_CLEAR without a weather drawn or
+ * with aw_weather_look 0) and cloud percent (100 then) */
+int AW_WeatherFogScaleAt(int a,int b,int mix);
+int AW_WeatherCloudPercentNow(void);
 /* The Red Mountain sky (REDMOUNTAIN-SKY-55, the DemoWind effect in the game; SKY-REDMOUNTAIN-BLUE-44): nearer the
  * mountain (the storm origin above) the sky, fog and land light are pulled toward the Blight weather's own colours,
  * before the Red Mountain region's border is reached, and the clouds speed up toward Blight's. The pull 0..

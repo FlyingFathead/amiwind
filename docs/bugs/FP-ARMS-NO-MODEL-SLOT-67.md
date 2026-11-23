@@ -79,4 +79,8 @@ Family: First-person hands and torch (`torch-hands`). First-person hands, punche
 - [TORCH-INPUT-29](TORCH-INPUT-29.md): F cannot raise hands; V only prints torch state
 - [TORCH-INVENTORY-PICTURE-64](TORCH-INVENTORY-PICTURE-64.md): Unequipping the torch in the inventory still shows a torch in the hand
 
+Related bugs in other categories:
+
+- [WEREWOLF-SET-KEPT-WITH-TORCH-68](WEREWOLF-SET-KEPT-WITH-TORCH-68.md): With a torch carried, taking the werewolf robe off by hand kept the werewolf's body and arms in memory until the torch was put away
+
 <!-- END GENERATED CATEGORY -->

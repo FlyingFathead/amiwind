@@ -600,8 +600,13 @@ void R_DrawEntitiesOnList (void)
 		case mod_alias:
 		{
 			/* Near/far NPC models (aw_npc_lod.c): a render-only swap for
-			 * this draw; the entity keeps its own model and frame. */
+			 * this draw; the entity keeps its own model and frame. A turned
+			 * NPC's werewolf body is drawn at its race's size (the swap's
+			 * scale, WEREWOLF-RACE-SCALE-68): its own scale put back too. */
 			model_t	*own = currententity->model;
+			int		own_effects = currententity->effects;
+			float	own_scale = currententity->aw_sprite_scale;
+			float	own_zscale = currententity->aw_alias_zscale;
 			currententity->model = AW_NpcLodModel (currententity);
 			VectorCopy (currententity->origin, r_entorigin);
 			VectorSubtract (r_origin, r_entorigin, modelorg);
@@ -668,6 +673,9 @@ void R_DrawEntitiesOnList (void)
 				R_AliasDrawModel (&lighting);
 			}
 			currententity->model = own;
+			currententity->effects = own_effects;
+			currententity->aw_sprite_scale = own_scale;
+			currententity->aw_alias_zscale = own_zscale;
 			break;
 		}
 

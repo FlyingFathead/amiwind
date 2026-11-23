@@ -347,7 +347,19 @@ typedef struct {
     aw_pick_state_t last;int picked,gi,from,to,lfrom,lto,loop,inner;float t;
     char group[AW_PICK_NAME];const char *rule;
     float saved;int applied;
+    const aw_skel_table_t *table;           /* the table the picks are on (the werewolf's for a turned NPC) */
 } picker_t;
+/* NPC-WEREWOLF-NO-MODEL-66 (v0.0.68): an NPC a script turned into a werewolf is drawn with the player's werewolf set
+ * (aw_view.c: one body model and one table for all of them and the player), so its frames are picked on the
+ * werewolf's table by the same rules, whatever its own model, and named at each send: the renderer draws the werewolf
+ * body for exactly the entities named (aw_npc_lod.c AW_NpcLodModel). Rules from OpenMW 0.51 (read, not copied):
+ * mwrender/npcanimation.cpp updateNpcBase 469-531 (the werewolf's skeleton and animation for any NPC),
+ * mwmechanics/aicombataction.cpp prepareNextAction 170-174 and character.cpp updateWeaponState 1283-1288 (a werewolf
+ * fights hand to hand). A death keeps the form (the reference stays turned: its death group, then its last frame). */
+extern void AW_ViewWereNpcSend(int what,int entity);                    /* aw_view.c */
+extern const aw_skel_table_t *AW_ViewWereNpcTable(void);               /* aw_view.c */
+int AW_MwscriptWerewolfNpcs(void);                                      /* aw_mwhost.c */
+int AW_MwscriptWerewolfNpc(struct edict_s *e);                          /* aw_mwhost.c */
 static picker_t pickers[PICKERS];
 static model_t *pick_world;
 static unsigned long pick_driven,pick_changes;
@@ -407,7 +419,10 @@ static void over(picker_t *p,const aw_skel_table_t *t,aw_pick_state_t s) {
     if(p->over_from<0 || p->over_to<p->over_from)p->over_from=-1;
     else{memcpy(p->group,o.group,sizeof(p->group));p->rule=o.rule;}   /* both AW_PICK_NAME, NUL-terminated */
 }
-static void drive(picker_t *p,edict_t *e,const aw_skel_table_t *t,const aw_anim_t *a,int g,int storm) {
+/* WERE: a turned NPC on the werewolf's table (NPC-WEREWOLF-NO-MODEL-66): its weapon is its claws (hand to hand), a
+ * sidestep walks sideways, and a state its table has no group for stands on its idle: never the own frame on the
+ * werewolf's body */
+static void drive(picker_t *p,edict_t *e,const aw_skel_table_t *t,const aw_anim_t *a,int g,int storm,int were) {
     aw_pick_state_t s;aw_pick_t o;const aw_fighter_t *f=AW_CombatFighter(e);
     int frame=(int)e->v.frame,fighting=f && !f->dead,out=frame;float dt=(float)(realtime-p->last_time),progress;
     const aw_anim_group_t *src=&a->g[g];
@@ -422,7 +437,7 @@ static void drive(picker_t *p,edict_t *e,const aw_skel_table_t *t,const aw_anim_
     VectorCopy(e->v.origin,p->last_origin);p->last_yaw=e->v.angles[1];p->last_time=realtime;p->seen=realtime;
     memset(&s,0,sizeof(s));s.weapon=AW_PW_NONE;
     /* drawing and putting away (updateWeaponState: equip start .. equip stop, unequip ...) */
-    if(fighting && !p->fighting){p->weapon=weapon_of(e);s.weapon=(signed char)p->weapon;s.event=AW_PE_EQUIP;over(p,t,s);}
+    if(fighting && !p->fighting){p->weapon=were?AW_PW_HANDTOHAND:weapon_of(e);s.weapon=(signed char)p->weapon;s.event=AW_PE_EQUIP;over(p,t,s);}
     else if(!fighting && p->fighting && !(f && f->dead)){s.weapon=(signed char)p->weapon;s.event=AW_PE_UNEQUIP;over(p,t,s);}
     p->fighting=fighting;
     memset(&s,0,sizeof(s));s.weapon=(signed char)(fighting?p->weapon:AW_PW_NONE);
@@ -456,7 +471,10 @@ static void drive(picker_t *p,edict_t *e,const aw_skel_table_t *t,const aw_anim_
     case AW_ANIM_DEATH:s.event=AW_PE_DEATH;s.knocked=(unsigned char)p->knocked;break;
     case AW_ANIM_ATTACK:{int k=AW_CombatAttackType(e);s.event=AW_PE_ATTACK;s.attack=(unsigned char)(k>=0 && k<3?k:0);s.follow=AW_PF_LARGE;break;}
     case AW_ANIM_BLOCK:s.event=AW_PE_BLOCK;break;
-    default:return;      /* the dodge: the AmiWind sidestep plays as it is */
+    case AW_ANIM_DODGEL:case AW_ANIM_DODGER:
+        if(!were)return;  /* the dodge: the AmiWind sidestep plays as it is (a werewolf walks sideways on its table) */
+        s.move=g==AW_ANIM_DODGEL?AW_PM_LEFT:AW_PM_RIGHT;break;
+    default:return;
     }
     if(g!=AW_ANIM_KNOCK && g!=AW_ANIM_DEATH)p->knocked=0;
     if(s.event!=p->last.event || !p->picked)p->roll=(unsigned char)AW_Roll(256);
@@ -484,7 +502,14 @@ static void drive(picker_t *p,edict_t *e,const aw_skel_table_t *t,const aw_anim_
         }
         p->gi=gi;
     }
-    if(p->gi<0)return;                 /* nothing fits: the driver's frame stays (OpenMW keeps what plays) */
+    if(p->gi<0){
+        int gi;aw_skel_group_t gg;
+        if(!were)return;               /* nothing fits: the driver's frame stays (OpenMW keeps what plays) */
+        gi=AW_SkelGroup(t,"idle");     /* the werewolf: its idle's first frame, never the own frame on its body */
+        if(gi>=0){AW_SkelGroupAt(t,gi,&gg);out=(int)gg.first;}else out=0;
+        p->saved=e->v.frame;e->v.frame=(float)out;p->applied=1;pick_driven++;
+        return;
+    }
     progress=src->count>1?(float)(frame-src->base)/(float)(src->count-1):0;
     if(progress<0)progress=0;
     if(progress>1)progress=1;
@@ -504,22 +529,45 @@ static void drive(picker_t *p,edict_t *e,const aw_skel_table_t *t,const aw_anim_
 void AW_AnimPickPreSend(void) {
     /* the storm pose is the arm layer of aw_items.c (ACTOR-STORM-POSE-51: idlestorm on the arm facing the storm, as
      * OpenMW plays it over the upper body), so the whole-body pick leaves it out here */
-    int i,storm=0;
+    int i,storm=0,weres=0,picking;const aw_skel_table_t *wt=NULL;
     if(pick_world!=sv.worldmodel){memset(pickers,0,sizeof(pickers));pick_world=sv.worldmodel;}
-    if(!AW_ANIMKIT || !sv.active || !pick_on || !aw_anim_kit_enabled)return;
+    /* NPC-WEREWOLF-NO-MODEL-66: the send's turned NPCs named for the renderer (0 begins, 1 on the map, 2 drawn as the
+     * werewolf, 3 ends: the werewolf set let go when none is on the map and the player does not draw it); their frames
+     * on the werewolf's table whatever dbg animkit pick says (the werewolf's body is drawn at them) */
+    AW_ViewWereNpcSend(0,0);
+    if(AW_ANIMKIT && sv.active)weres=AW_MwscriptWerewolfNpcs();
+    picking=AW_ANIMKIT && sv.active && pick_on && aw_anim_kit_enabled;
+    if(!picking && !weres){AW_ViewWereNpcSend(3,0);return;}
     for(i=1+svs.maxclients;i<sv.num_edicts;i++){
-        edict_t *e=EDICT_NUM(i);const aw_skel_table_t *t;const aw_anim_t *a;picker_t *p;int g,mi;model_t *m;
+        edict_t *e=EDICT_NUM(i);const aw_skel_table_t *t;const aw_anim_t *a;picker_t *p;int g,mi,were;model_t *m;
         if(e->free || (mi=(int)e->v.modelindex)<=0 || mi>=MAX_MODELS)continue;
         if(strcmp(pr_strings+e->v.classname,"aw_npc") && !AW_CombatFighter(e))continue;   /* residents and fighters */
-        /* only a model already in the cache: Mod_Extradata would load an evicted one from disk, every frame, for every
-         * actor (a stall on a loaded scene); the renderer brings it back when it draws it */
-        if(!(m=sv.models[mi]) || m->type!=mod_alias || !Cache_Check(&m->cache))continue;
-        if(!(t=table_of(e)) || forced_now(e))continue;
+        were=weres && AW_MwscriptWerewolfNpc(e);
+        if(were){
+            AW_ViewWereNpcSend(1,i);
+            /* the set comes in with the first turned NPC on the map (one recipe read, one model lookup); an image
+             * without it keeps their own bodies (said once) */
+            if(!wt && !(wt=AW_ViewWereNpcTable())){weres=were=0;}
+        }
+        if(were)t=wt;   /* its own model is not drawn now: no cache check, no forced group (the werewolf plays on) */
+        else{
+            if(!picking)continue;
+            /* only a model already in the cache: Mod_Extradata would load an evicted one from disk, every frame, for
+             * every actor (a stall on a loaded scene); the renderer brings it back when it draws it */
+            if(!(m=sv.models[mi]) || m->type!=mod_alias || !Cache_Check(&m->cache))continue;
+            if(!(t=table_of(e)) || forced_now(e))continue;
+        }
         a=AW_AnimOf(e);
-        if(!a->from_layout || (g=engine_group_of(a,(int)e->v.frame))<0)continue;   /* a scripted or own group plays */
+        g=a->from_layout?engine_group_of(a,(int)e->v.frame):-1;
+        if(g<0){if(!were)continue;g=AW_ANIM_IDLE;}   /* a scripted or own group plays; the werewolf stands */
         if(!(p=picker_of(e,1)))continue;
-        drive(p,e,t,a,g,storm);
+        if(p->table!=t){   /* into or out of the werewolf: the picks start again on the other table */
+            p->table=t;p->picked=0;p->gi=-1;p->over_from=-1;p->over_loops=0;p->t=0;p->inner=0;p->fighting=0;
+        }
+        drive(p,e,t,a,g,storm,were);
+        if(were && p->applied)AW_ViewWereNpcSend(2,i);
     }
+    AW_ViewWereNpcSend(3,0);
 }
 void AW_AnimPickPostSend(void) {
     int i;
@@ -530,8 +578,15 @@ void AW_AnimPickPostSend(void) {
         if(p->e && !p->e->free)p->e->v.frame=p->saved;
     }
 }
+/* the table E's picks are on: a turned NPC's is the werewolf's once its picker drove it (NPC-WEREWOLF-NO-MODEL-66; a
+ * werewolf casts nothing: its table has no spellcast group), every other actor's its own */
+static const aw_skel_table_t *pick_table(edict_t *e) {
+    picker_t *p=picker_of(e,0);
+    if(p && p->table && AW_MwscriptWerewolfNpc(e))return p->table;
+    return table_of(e);
+}
 void AW_AnimPickCast(edict_t *e,int range) {
-    picker_t *p;const aw_skel_table_t *t=table_of(e);aw_pick_state_t s;
+    picker_t *p;const aw_skel_table_t *t=pick_table(e);aw_pick_state_t s;
     if(!t || !(p=picker_of(e,1)))return;
     memset(&s,0,sizeof(s));s.weapon=AW_PW_SPELL;s.event=AW_PE_CAST;s.range=(unsigned char)(range>=0 && range<3?range:0);
     over(p,t,s);
@@ -541,7 +596,7 @@ void AW_AnimPickCast(edict_t *e,int range) {
  * plays): the group's whole span over the source, as a cast plays; a hit, a fall or a death ends it. 0: the actor
  * has no skeletal table or no such group. */
 int AW_AnimPickScripted(edict_t *e,const char *group,int count) {
-    picker_t *p;const aw_skel_table_t *t=e?table_of(e):NULL;int g;aw_skel_group_t gg;
+    picker_t *p;const aw_skel_table_t *t=e?pick_table(e):NULL;int g;aw_skel_group_t gg;
     if(!t || !group || (g=AW_SkelGroup(t,group))<0 || !(p=picker_of(e,1)))return 0;
     AW_SkelGroupAt(t,g,&gg);
     p->over_from=(int)gg.first;p->over_to=(int)gg.last;p->over_t=0;p->over_loops=count>0?count:0;

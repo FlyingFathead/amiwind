@@ -1,5 +1,14 @@
 # DOOR-CHECK-NO-SWIM-CASE-68: The build's door check has no case for an entrance reached by swimming: the Stahlman's Gorge entrance under the Mortrag Glacier stops the image stage
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.68-dev8 at 2026-11-23 01:08 +0200: On the v0.0.68-dev8 frames the door check now judges an entrance under water from where a swimmer can be, as the engine lets a swimming player use a door, and it reaches the Stahlman's Gorge entrance that way; the game itself is unchanged. The swim down to it is still to be seen in play before this closes.
+- Reported with v0.0.68-dev8 at 2026-11-23 01:41 +0200: In play on the v0.0.68-dev8 image the three entrances under water were not reached: the debug teleport cannot put a player in the water. The door check keeps its rule for a swimming player as a method that is off until play shows it, and the three stay on the known list with this result.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -18,6 +27,27 @@
 | Unknown because | the image stage stopped before it wrote its build receipt |
 
 <!-- END GENERATED FACTS -->
+
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-22: reported in v0.0.68-dev8
+- 2026-11-23 01:08 +0200: seen again in v0.0.68-dev8: On the v0.0.68-dev8 frames the door check now judges an entrance under water from where a swimmer can be, as the engine lets a swimming player use a door, and it reaches the Stahlman's Gorge entrance that way; the game itself is unchanged.
+- 2026-11-23 01:41 +0200: seen again in v0.0.68-dev8: In play on the v0.0.68-dev8 image the three entrances under water were not reached: the debug teleport cannot put a player in the water.
+
+<!-- END GENERATED TIMELINE -->
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Timeline](#timeline)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -62,6 +92,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [CI-SUITE-TWICE-33](CI-SUITE-TWICE-33.md): Hosted CI runs the full test suite twice per revision
 - CI-TAG-RUN-DUPLICATE-54 (no report page): The release tag push ran the whole CI test suite again on a commit main had already passed
 - [CI-TEST-SHARD-ONE-SLOW-53](CI-TEST-SHARD-ONE-SLOW-53.md): The first test shard of the v0.0.53 GitHub run took six times as long as the others
+- [COMPLETENESS-PLAN-TOWN-CELLS-MISSING-68](COMPLETENESS-PLAN-TOWN-CELLS-MISSING-68.md): The plan-time completeness report counts the 61 cells inside the towns' frames and their 556 load doors as missing, which would refuse a release candidate
 - [CONTAINER-READ-ENOMEM-66](CONTAINER-READ-ENOMEM-66.md): In the development container, reads of the repository files sometimes fail with "Cannot allocate memory"; a retry works, so a check that hits it can report an unrelated failure
 - [DELIVERY-LEAVES-LINE-UNCLEAN-66](DELIVERY-LEAVES-LINE-UNCLEAN-66.md): A snapshot delivery wrote the cell tracker page into the release line's working copy, so the line's next gate was not clean and could not be published
 - [DELIVERY-RERUN-STOPS-ON-OWN-OUTPUT-66](DELIVERY-RERUN-STOPS-ON-OWN-OUTPUT-66.md): A second delivery of a snapshot stopped on what the first one left: its source package folder, then its Pi image, reported as a failed upload although the upload had gone through
@@ -69,6 +100,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [DOCS-PUBLIC-CHAT-QUOTES-56](DOCS-PUBLIC-CHAT-QUOTES-56.md): Public bug pages and code comments carried the maintainer's chat words and swearing
 - [DOCS-PUBLIC-PRIVATE-CHANNEL-66](DOCS-PUBLIC-PRIVATE-CHANNEL-66.md): Public register text, code comments and test data named the private channel a report came through
 - [DOCS-REGENERATE-ALL-MISSING-67](DOCS-REGENERATE-ALL-MISSING-67.md): A change that touches the bug register leaves several generated documents stale, and the checks find them one at a time: each full test run fails on the next stale page
+- [DOOR-CHECK-DOORWAY-STAGES-68](DOOR-CHECK-DOORWAY-STAGES-68.md): The door check lets the first door of a doorway answer for every door the scripts switch between there: three entrances counted as not usable both ways
 - DOOR-ENTRANCE-AUDIT-51 (no report page): Requested: an entrance check in every build: each exterior entrance of the original must have a door that leads into its interior, found from the map, missing ones listed
 - EMULATOR-SESSION-BESIDE-SMOKE-53 (no report page): A scripted FS-UAE evidence session ran beside a gate boot smoke (one emulator at a time)
 - [ENGINE-O2-STRNCPY-WARNINGS-36](ENGINE-O2-STRNCPY-WARNINGS-36.md): At -O2 the engine build printed four -Wstringop-truncation warnings for bounded strncpy copies
@@ -113,7 +145,9 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - PREGATE-SYNTAX-SKIP-SILENT-57 (no report page): The pre-gate C syntax check skipped itself without failing on worktrees in the per-version folder layout
 - [PREGATE-WORDING-ERRORS-HIDDEN-68](PREGATE-WORDING-ERRORS-HIDDEN-68.md): The pregate's public wording step refused a gate with four test errors and printed no error text; the same tests passed on a rerun
 - [PUBLIC-GUARD-SPELLS-TOOL-NAMES-67](PUBLIC-GUARD-SPELLS-TOOL-NAMES-67.md): The public privacy check spells the private words it refuses, split in pieces, in its own code
+- [PUBLIC-PROGRESS-SNAPSHOT-STALE-68](PUBLIC-PROGRESS-SNAPSHOT-STALE-68.md): The public progress tracker still counts Solstheim's land as not in the game, while the build's own tracker counts all of it as built
 - [README-REST-LEVELUP-CONDITIONS-68](README-REST-LEVELUP-CONDITIONS-68.md): The front page states the level-up on resting and the attacks on a rest as if they always happen, without their conditions
+- [REGISTER-FIXED-STEP-STALE-PAGES-68](REGISTER-FIXED-STEP-STALE-PAGES-68.md): Recording a fix in both trackers wrote the work list but refused the bug register while another job was writing the register at the same moment
 - [REGISTER-WRITE-EINVAL-67](REGISTER-WRITE-EINVAL-67.md): The register tool stops now and then with "Invalid argument" while it writes docs/BUGS.md, after it has already saved the entry
 - [REGRESSION-GUARD-MISSING-67](REGRESSION-GUARD-MISSING-67.md): Things the maintainer had confirmed working in play come back broken in later builds: no check kept them proven after their fix
 - [RELEASE-CHECK-NOTES-LATE-66](RELEASE-CHECK-NOTES-LATE-66.md): The release check of the notes' core-use claims ran only when the snapshot package was made, after the build and its play tests, and read a sentence about allowed workers as a claim
@@ -134,6 +168,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [SESSION-ENGINE-NOT-A-FILE-67](SESSION-ENGINE-NOT-A-FILE-67.md): An emulator session given an engine path that is not a file runs the image with no engine and waits 320 s for the remote control, instead of refusing at once
 - [SESSION-PASS-DEAD-ENGINE-57](SESSION-PASS-DEAD-ENGINE-57.md): The scripted test session reported PASS while the engine had crashed
 - [SESSION-SAME-JOB-NAME-CLASH-68](SESSION-SAME-JOB-NAME-CLASH-68.md): A second emulator session with the same job name fails to start on the container name, and its journey reports every check failed
+- [SESSION-SLOT-HELD-WHILE-WAITING-68](SESSION-SLOT-HELD-WHILE-WAITING-68.md): A test session that waits for another emulator run holds an emulator slot meanwhile, and a gate's smoke waits for it
 - [SESSION-STALL-CENSUS-QUICKSTART-58](SESSION-STALL-CENSUS-QUICKSTART-58.md): On the v0.0.58-dev6 image a session that quick-starts into the Census and Excise Office at 135 172 64 stalls before its first still: the runner reports game stalled with the game clock frozen at 23.23 s
 - [SESSION-STALL-EMPTY-STATE-READ-67](SESSION-STALL-EMPTY-STATE-READ-67.md): A scripted test session ends as a game stall when one read of the game's state comes back empty, although the game runs on
 - [SMOKE-DELIVERY-OLD-COPY-58](SMOKE-DELIVERY-OLD-COPY-58.md): The playtest delivery ran an old copy of the boot smoke: the v0.0.58 release smoke failed four times on a working image
@@ -198,6 +233,9 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 Related bugs in other categories:
 
 - [DOOR-USE-COLLISION-EXPANSIONS-68](DOOR-USE-COLLISION-EXPANSIONS-68.md): 13 exterior entrances of Solstheim and Mournhold cannot be reached in the converted collision: no standing spot at the threshold, or the door out of the use reach
+- [EXPANSION-STORE-DISABLE-NOT-HIDDEN-68](EXPANSION-STORE-DISABLE-NOT-HIDDEN-68.md): In the expansions' outdoor areas a placement a script switches off stays drawn and solid: the ice covers in front of the underwater entrances to Stahlman's Gorge and the Caves of Fjalding stay in place after their quest stage
+- [FOCUS-EYE-INSIDE-ACTOR-BOX-68](FOCUS-EYE-INSIDE-ACTOR-BOX-68.md): The use key goes to a creature instead of the door under the crosshair when the player stands inside the creature's use box: the Unmarked Shipwreck's trapdoor cannot be used while a dreugh is near
 - [SOL-ICE-CELLS-RING-OVER-68](SOL-ICE-CELLS-RING-OVER-68.md): Two Solstheim ice coast cells convert but their memory ring is far above the budget: every tilted iceberg shard is stored as a model of its own
+- [SWIM-PLAYER-DOES-NOT-STAY-AT-DEPTH-68](SWIM-PLAYER-DOES-NOT-STAY-AT-DEPTH-68.md): A player placed deep in the water does not stay at that depth: moments later the player is near the surface or above the water
 
 <!-- END GENERATED CATEGORY -->

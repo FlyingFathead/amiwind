@@ -64,7 +64,7 @@
   },
   "becomewerewolf": {
    "effect": "part",
-   "missing": "The player's stats change and his gear comes off, but he keeps his own body, his run speed and his health, and the readied spell, temporary effects, windows and witnesses are not handled. An NPC only gets a mark: its body does not change.",
+   "missing": "The player's stats change, his gear comes off, the hidden werewolf robe is worn, the readied spell and temporary effects end, the inventory and magic windows stay shut and the werewolf's body and arms are drawn (in source in v0.0.68, to be seen in play); his health, the witnesses, the refusals to use things, talk and sleep, the camera height and the screen overlay are not handled. An NPC it turns is drawn as the werewolf, with the player's werewolf body and animation, at its race's size, holds nothing, fights with its claws only and stays a werewolf after death, and the player in the form fights with his claws at his race's size (in source in v0.0.68, to be seen in play); silver weapons, the werewolf's own sounds and the readier attack on a werewolf are not handled.",
    "register": [
     "WEREWOLF-BODY-NOT-DRAWN-63",
     "WEREWOLF-RUN-SPEED-63",
@@ -321,9 +321,11 @@
   },
   "forcegreeting": {
    "effect": "part",
-   "missing": "Only a person the ordinary talk rules allow is greeted: a creature, a person in a fight, knocked down or with nothing to say opens no conversation; and it is not held back while the player is a werewolf.",
-   "register": [],
-   "basis": "source"
+   "missing": "A creature opens no conversation: the dialogue table holds rows for people only.",
+   "register": [
+    "DIALOGUE-CREATURE-SPEAKERS-66"
+   ],
+   "basis": "test"
   },
   "forcerun": {
    "effect": "part",
@@ -1602,7 +1604,7 @@
   },
   "undowerewolf": {
    "effect": "part",
-   "missing": "The player's own stats come back, but the werewolf form had no body or run speed of its own to undo, and its health, effects and windows are not handled. An NPC only loses its mark.",
+   "missing": "The player's own stats and body come back, the werewolf robe is removed, temporary effects end and the windows open again (in source in v0.0.68, to be seen in play); the form's health is not handled. An NPC is drawn with its own body again (in source in v0.0.68, to be seen in play).",
    "register": [
     "WEREWOLF-TRANSFORM-RULES-PARTIAL-68",
     "NPC-WEREWOLF-NO-MODEL-66"

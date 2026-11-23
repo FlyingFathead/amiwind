@@ -82,6 +82,10 @@ extern int (*aw_hand_parts_bone_tag)(int hand,float tag[6]);
  * bone tags; 0 when the table has no light stance or no left arm root (the stance applied stays whole). The layer ends
  * with the next aw_hand_parts_apply. NULL in fixtures without it. */
 extern int (*aw_hand_parts_left_light)(int frame);
+/* WEREWOLF-BODY-63 (v0.0.68), aw_view.c: 1 while the first-person arms are the werewolf's (its robe worn and the image
+ * has it): AW_HandModelsApply then draws the arms from parts at the bare hands' stance whatever is equipped, readied or
+ * carried (a werewolf holds nothing, its claws strike as the fists do). NULL in fixtures without it. */
+extern int (*aw_hand_werewolf)(void);
 /* The weapon stances (AW_HandStance) a carried light is held beside: one-handed (1h) and thrown (1t); the two-handed
  * stances, the bow and the crossbow put it away (OpenMW 0.51 updateCarriedLeftVisible: the TwoHanded weapon types,
  * read not copied). Pure. */

@@ -200,7 +200,10 @@ static void parts_release(void) {
 /* aw_player_cache 1 (the default, id1/default-game.cfg): this way; 0 = the previous way for an A/B on the same image
  * (every part in the frame that needs the body, the parts left to the cache's LRU) */
 static cvar_t player_cache_cvar={"aw_player_cache","1"};
-static void part_pin(model_t *m,int on){if(m)Cache_Pin(&m->cache,on && player_cache_cvar.value);}
+/* NPC-WEREWOLF-NO-MODEL-66 (v0.0.68): the turned NPCs draw the werewolf body too (below): a model they draw stays pinned
+ * when a set of the player's lets it go, and is released by the last one out */
+static int npc_were_holds(const model_t *m);
+static void part_pin(model_t *m,int on){if(m)Cache_Pin(&m->cache,(on || npc_were_holds(m)) && player_cache_cvar.value);}
 /* FP-ARMS-NO-MODEL-SLOT-67 (the maintainer, 2026-11-18: swapping races and sexes unloads what was before): a part model
  * that leaves its set (the body's or the first-person arms', on a race, sex or outfit change) is released at once
  * (Mod_ReleaseAlias: its data freed, its slot in the engine's model table free for the next model), unless the other
@@ -227,19 +230,86 @@ static unsigned long pend_loads;
 static double pend_t;
 extern unsigned long aw_file_finds;   /* aw_spike.c: files looked up by name (a part read from disk: 3 lookups) */
 static int parts_in_use(const model_t *m){int i;for(i=0;i<AW_PARTS_MAX;i++)if(part_models[i]==m)return 1;return 0;}
+/* ---- WEREWOLF-BODY-63 (v0.0.68): the werewolf's look ----
+ * While the robe slot holds the werewolf robe (the change of form puts it there, aw_were_rules.h, whichever route ran
+ * it; or dbg give werewolfrobe and wearing it), the third-person body and the first-person arms are the werewolf of the
+ * recipes (aw_player_parts.h AW_PARTS_WEREWOLF_RACE: its own skeleton and table, its body as its skin, no head, hair or
+ * worn item), as the original draws a werewolf (OpenMW 0.51 mwrender/npcanimation.cpp updateNpcBase 469-519 and
+ * getBodyParts 1160-1195, read not copied). The race the sets are assembled for changes with the look, so the race
+ * check below releases the previous set at once both ways (parts_race_check -> AW_ViewPartsUnload,
+ * FP-ARMS-NO-MODEL-SLOT-67). Nothing is held: no weapon, shield or light is drawn on it (parts_draws), in either view.
+ * An image without the werewolf's rows in both recipes keeps the player's own body and arms (said once): never an
+ * invisible body. Asked per sex once (one read of each recipe), then a string compare a frame. */
+static int were_rows=-1,were_rows_female=-1;   /* both recipes hold the werewolf for that sex: -1 not asked, 0 no, 1 yes */
+static int parts_were,hparts_were;            /* the body / the arms in use are the werewolf's */
+static int body_were;                         /* the body drawn last was the werewolf's (its play restarts on a change) */
+static unsigned long were_looks;              /* changes of look into the werewolf (dbg werewolf) */
+static int were_has_rows(int female){
+    static const char *const files[2]={"view/parts.txt","view/parts_1st.txt"};
+    aw_parts_body_t probe;byte *text;int mark,k,have[2];
+    if(were_rows>=0 && were_rows_female==(female?1:0))return were_rows;
+    for(k=0;k<2;k++){
+        mark=Hunk_LowMark();text=COM_LoadHunkFile((char *)files[k]);
+        have[k]=text && AW_PartsAssemble((const char *)text,com_filesize,AW_PARTS_WEREWOLF_RACE,female,NULL,NULL,NULL,0,&probe);
+        Hunk_FreeToLowMark(mark);
+    }
+    were_rows=have[0] && have[1];were_rows_female=female?1:0;
+    if(!were_rows)Con_Printf("Werewolf form: the werewolf models are not in this image (no werewolf rows in %s%s%s): "
+                             "the player's own body and arms draw.\n",have[0]?"":files[0],!have[0] && !have[1]?" and ":"",
+                             have[1]?"":files[1]);
+    return were_rows;
+}
+/* 1 while the look is the werewolf's: its robe worn and the image has it */
+static int were_look(int female){return AW_PartsWerewolfWorn(aw_state.inventory.equipped[AW_SLOT_ROBE]) && were_has_rows(female);}
+/* WEREWOLF-RACE-SCALE-68 (v0.0.68): the werewolf drawn at the player's own race and sex's size, as the original scales
+ * any character, in werewolf form too (OpenMW 0.51 mwclass/npc.cpp adjustScale 1082-1115, read not copied: the race's
+ * weight on x and y, its height on z, after the pose); the werewolf's rows carry 1 (one body for every race). Read once
+ * from the body recipe's race rows (one read of view/parts.txt) when the look is the werewolf's and the race or sex is
+ * not the one read last; never a frame. 1 and *WEIGHT, *HEIGHT the race's; 0 none (the unit size). */
+static struct {char race[AW_PARTS_RACE];int female,state;float weight,height;unsigned long reads;} were_own;
+static int were_own_scale(float *weight,float *height) {
+    static aw_parts_race_scale_t rows[32];   /* the recipe's race rows while they are read (off the stack) */
+    const char *race;int female,mark;byte *text;
+    if(!aw_character.valid || aw_character.race<0 || aw_character.race>=aw_race_count)return 0;
+    race=aw_races[aw_character.race].id;female=aw_character.female?1:0;
+    if(!were_own.state || were_own.female!=female || Q_strcasecmp(were_own.race,(char *)race)){
+        snprintf(were_own.race,sizeof(were_own.race),"%s",race);were_own.female=female;were_own.state=-1;
+        mark=Hunk_LowMark();text=COM_LoadHunkFile("view/parts.txt");
+        if(text && AW_PartsRaceScaleFind(rows,AW_PartsRaceScales((const char *)text,com_filesize,rows,32),race,female,
+                                         &were_own.weight,&were_own.height))were_own.state=1;
+        Hunk_FreeToLowMark(mark);were_own.reads++;
+        if(were_own.state<0)Con_Printf("Werewolf form: no %s row of the race %s in view/parts.txt: the werewolf is drawn "
+                                       "at the unit size.\n",female?"female":"male",race);
+    }
+    if(were_own.state<0)return 0;
+    *weight=were_own.weight;*height=were_own.height;
+    return 1;
+}
+/* WEREWOLF-TABLES-STAY-LOADED-68 (v0.0.68): the werewolf's two animation tables (its body's and its arms', from the
+ * recipes) given back when the look leaves the werewolf (AW_ViewPartsUnload, after its part models are released), and
+ * loaded again by the next change's assembly (AW_SkelTableFor). Before, the table store kept both for the session after
+ * the first change: their indexes (about 20 KB), the frames played and two open files. A table a loaded model still
+ * points into is kept and tried again at the next change back (said). */
+extern long AW_SkelTableRelease(const char *name,int (*in_use)(const aw_skel_table_t *t));   /* aw_skel_load.c */
+static char were_tables[2][AW_PARTS_PATH];   /* the tables the werewolf's body [0] and arms [1] were assembled on */
+static unsigned long were_tables_released,were_tables_kept;   /* given back, kept (dbg werewolf) */
+/* the race the body and the arms are assembled for */
+static const char *look_race(const char *race,int female){return race && were_look(female)?AW_PARTS_WEREWOLF_RACE:race;}
 static int parts_ready(const char *race,int female) {
     const char *items[AW_PARTS_ITEMS],*head=NULL,*hair=NULL;char sig[sizeof(parts_sig)];
-    aw_parts_body_t next;int n=0,s,i,ok,mark;byte *text;double t0,start;
+    aw_parts_body_t next;int n=0,s,i,ok,mark,were;byte *text;double t0,start;
+    race=look_race(race,female);were=race && !strcmp(race,AW_PARTS_WEREWOLF_RACE);   /* WEREWOLF-BODY-63 */
     parts_race_check(race,female);
     if(!parts_cvar.value || parts_failed)return 0;
-    if(aw_character.valid){
+    if(aw_character.valid && !were){   /* the werewolf: no head or hair of the race (its body has its own head) */
         if(aw_character.head>=0 && aw_character.head<aw_part_count)head=aw_parts[aw_character.head].id;
         if(aw_character.hair>=0 && aw_character.hair<aw_part_count)hair=aw_parts[aw_character.hair].id;
     }
     /* what is worn: the clothing and armour slots (helmet .. robe), their ids straight from the state (asked every
      * frame: no catalogue read, which is a disk read per item); rings, amulets and belts show nothing on the
-     * original body, the weapon and shield are held items (parts_draws) */
-    for(s=AW_SLOT_HELMET;s<=AW_SLOT_ROBE && n<AW_PARTS_ITEMS;s++)
+     * original body, the weapon and shield are held items (parts_draws); the werewolf wears nothing (its body is its
+     * robe's part, the race's skin in its recipe) */
+    for(s=AW_SLOT_HELMET;s<=AW_SLOT_ROBE && n<AW_PARTS_ITEMS && !were;s++)
         if(aw_state.inventory.equipped[s][0])items[n++]=aw_state.inventory.equipped[s];
     snprintf(sig,sizeof(sig),"%s|%d|%s|%s",race,female,head?head:"",hair?hair:"");
     for(i=0;i<n;i++){size_t used=strlen(sig);snprintf(sig+used,sizeof(sig)-used,"|%s",items[i]);}
@@ -317,6 +387,9 @@ static int parts_ready(const char *race,int female) {
         return 0;
     }
     strcpy(parts_sig,sig);parts_built++;parts_ms=(Sys_FloatTime()-t0)*1000;
+    if(were && !parts_were)were_looks++;
+    parts_were=were;
+    if(were)snprintf(were_tables[0],sizeof(were_tables[0]),"%s",parts.table);   /* WEREWOLF-TABLES-STAY-LOADED-68 */
     return 2;
 }
 /* aw_worldui.c (INVENTORY-PREVIEW-STALE-61): 1 while a changed outfit's parts are still loading, so the inventory
@@ -358,7 +431,7 @@ static int pend_in_use(const model_t *m){int i;for(i=0;i<pend_count;i++)if(pend_
 /* M, a part model that left its set: released now unless a set still draws it (FP-ARMS-NO-MODEL-SLOT-67) */
 static void part_drop(model_t *m) {
     if(!m || m->type!=mod_alias || m->needload==VIEW_NL_UNREFERENCED || strncmp(m->name,"progs/parts/",12) ||
-       parts_in_use(m) || hparts_in_use(m) || pend_in_use(m))return;
+       parts_in_use(m) || hparts_in_use(m) || pend_in_use(m) || npc_were_holds(m))return;
     part_pin(m,0);Mod_ReleaseAlias(m);parts_released++;
 }
 static model_t *hold_models[AW_PARTS_MAX];   /* the arms' set being replaced (hand_parts_ready) */
@@ -378,14 +451,207 @@ static int model_slots_in_use(int *part_slots) {
     if(part_slots)*part_slots=parts_n;
     return used;
 }
+/* WEREWOLF-TABLES-STAY-LOADED-68: 1 while a loaded model points into T (its header in memory: a model released or
+ * pushed out of the cache points nowhere; the cache's order is not touched) */
+static int table_in_use(const aw_skel_table_t *t) {
+    int i;
+    for(i=0;i<mod_numknown;i++){
+        model_t *m=Mod_Known(i);const aliashdr_t *h;
+        if(m->type!=mod_alias || m->needload==VIEW_NL_UNREFERENCED || !(h=(const aliashdr_t *)m->cache.data) || !h->aw_skel)
+            continue;
+        if((const void *)h->aw_skel_table==(const void *)t)return 1;
+    }
+    return 0;
+}
+static int npc_were_holds_table(const char *name);
+static void were_tables_release(void) {
+    int k,let=0;long given;unsigned long bytes=0;
+    for(k=0;k<2;k++){
+        if(!were_tables[k][0])continue;
+        /* NPC-WEREWOLF-NO-MODEL-66: turned NPCs still draw on it: theirs now, given back by the last of them */
+        if(npc_were_holds_table(were_tables[k])){were_tables[k][0]=0;continue;}
+        if((given=AW_SkelTableRelease(were_tables[k],table_in_use))<0){
+            were_tables_kept++;
+            Con_Printf("Werewolf form: its table %s kept: a loaded model still uses it (tried again at the next change "
+                       "back).\n",were_tables[k]);
+            continue;
+        }
+        if(given>0){let++;bytes+=(unsigned long)given;were_tables_released++;}
+        were_tables[k][0]=0;
+    }
+    if(let)Con_Printf("Werewolf tables let go: %d (%lu KB of index and frames read); loaded again at the next change.\n",
+                      let,bytes/1024);
+}
+/* ---- NPC-WEREWOLF-NO-MODEL-66 (v0.0.68): the NPCs a script turned, drawn with the player's werewolf set ----
+ * The original draws a turned NPC as it draws the player in werewolf form (OpenMW 0.51 mwrender/npcanimation.cpp
+ * updateNpcBase 469-531 and getBodyParts 1160-1195 for any NPC, mwmechanics/mechanicsmanagerimp.cpp setWerewolf
+ * 1880-1908 for any actor; read, not copied): on the werewolf's skeleton with its animation, its skin as the body,
+ * nothing held. So a turned NPC (aw_mwhost.c were_npc: a script's BecomeWerewolf on it) is drawn with the werewolf body
+ * of the body recipe's werewolf row (the male row: both rows name the same skin) on its table: ONE model and ONE table
+ * for all of them and the player. At each server send aw_animkit.c AW_AnimPickPreSend names the turned NPCs on the map
+ * (AW_ViewWereNpcSend) and picks their frames on that table; the renderer draws the werewolf body for exactly the
+ * entities named at the last send (aw_npc_lod.c AW_NpcLodModel through aw_npc_were_model, a render-only swap:
+ * collision, scripts and the entity's own model stay; a frame is on the table only while it is drawn on it). The set
+ * comes in with the first turned NPC on the map (one recipe read, one model lookup) and goes when none is, unless the
+ * player draws it: one count of who draws the werewolf set (the player's body and arms, the turned NPCs), and the
+ * last one out releases it (part_pin, part_drop and were_tables_release ask npc_were_holds*). A death keeps the form
+ * (its reference stays turned: the werewolf's death group, then its last frame), as the original. */
+#define WERE_NPC_BYTES ((MAX_EDICTS+7)/8)
+static struct {
+    model_t *model;                    /* the werewolf body the turned NPCs draw (the player's werewolf body part) */
+    const aw_skel_table_t *table;      /* its table */
+    char table_name[AW_PARTS_PATH];    /* held for them: given back by the last one out (unless the player holds it) */
+    unsigned char drawn[WERE_NPC_BYTES];   /* the entities drawn as the werewolf at the last send, by number */
+    int count,seen,seen_now;           /* drawn at the last send; turned NPCs on the map at the last send and this one */
+    int failed;                        /* not in this image or no model slot: said once, asked again at the next map */
+    unsigned long loads,releases,kept; /* dbg werewolf */
+} npc_were;
+/* WEREWOLF-RACE-SCALE-68 (v0.0.68): each turned NPC drawn at its own race's size, as the original scales any character
+ * by its record's race and sex, whatever its form (OpenMW 0.51 mwclass/npc.cpp adjustScale 1082-1115, read not copied:
+ * the weight on x and y, the height on z); the werewolf body is built at the unit size. The recipe's race rows are kept
+ * from the set's one read of view/parts.txt (AW_ViewWereNpcTable; at most WERE_RACES, about 1 KB); each NPC's race and
+ * sex is asked of the script host once while it is drawn as the werewolf (aw_view_were_race, aw_mwhost.c: its record's
+ * row, kept there per record), at most WERE_RACE_ASKS new ones a send, so a crowd turned at once is spread over a few
+ * frames (drawn at the unit size until then); an entity no send names any more is forgotten (about 1 KB for
+ * WERE_SCALES). A NULL hook (the native tests without a host) or an unknown race: the unit size. */
+#define WERE_RACES 32
+#define WERE_SCALES 64
+#define WERE_RACE_ASKS 4
+int (*aw_view_were_race)(int entity,char *race,int capacity,int *female);
+static aw_parts_race_scale_t npc_were_races[WERE_RACES];static int npc_were_race_count;
+static struct {int entity,seen;float weight,height;} npc_were_scales[WERE_SCALES];
+static int npc_were_scale_count,npc_were_asks;static unsigned long npc_were_scale_asks,npc_were_scale_unknown;
+static int npc_were_scale_index(int entity) {
+    int i;for(i=0;i<npc_were_scale_count;i++)if(npc_were_scales[i].entity==entity)return i;
+    return -1;
+}
+/* a send names ENTITY drawn as the werewolf: its race's size kept, or asked now (at most WERE_RACE_ASKS a send) */
+static void npc_were_scale_named(int entity) {
+    char race[AW_PARTS_RACE];int i=npc_were_scale_index(entity),female=0;float w=1,h=1;
+    if(i>=0){npc_were_scales[i].seen=1;return;}
+    if(npc_were_scale_count>=WERE_SCALES || npc_were_asks>=WERE_RACE_ASKS)return;
+    npc_were_asks++;npc_were_scale_asks++;
+    if(!aw_view_were_race || !aw_view_were_race(entity,race,sizeof(race),&female) ||
+       !AW_PartsRaceScaleFind(npc_were_races,npc_were_race_count,race,female,&w,&h)){w=h=1;npc_were_scale_unknown++;}
+    i=npc_were_scale_count++;
+    npc_were_scales[i].entity=entity;npc_were_scales[i].seen=1;npc_were_scales[i].weight=w;npc_were_scales[i].height=h;
+}
+/* a send's end: the entities it did not name forgotten, the asks of the next send counted afresh */
+static void npc_were_scale_sweep(void) {
+    int i,k=0;
+    for(i=0;i<npc_were_scale_count;i++)
+        if(npc_were_scales[i].seen){npc_were_scales[i].seen=0;npc_were_scales[k++]=npc_were_scales[i];}
+    npc_were_scale_count=k;npc_were_asks=0;
+}
+/* aw_npc_lod.c (aw_npc_were_scale): the weight and height ENTITY's werewolf body is drawn at; 0 none known yet */
+static int npc_were_scale(int entity,float *weight,float *height) {
+    int i=npc_were_scale_index(entity);
+    if(i<0)return 0;
+    *weight=npc_were_scales[i].weight;*height=npc_were_scales[i].height;
+    return 1;
+}
+static int npc_were_holds(const model_t *m){return m && m==npc_were.model;}
+static int npc_were_holds_table(const char *name){return name && npc_were.table_name[0] && !strcmp(name,npc_were.table_name);}
+/* the set let go: the model released unless the player's sets draw it, the table given back unless his look holds it */
+static void npc_were_release(void) {
+    model_t *m=npc_were.model;long given;
+    npc_were.model=NULL;npc_were.table=NULL;
+    if(m && !parts_in_use(m) && !hparts_in_use(m) && !pend_in_use(m))part_pin(m,0);
+    part_drop(m);
+    if(npc_were.table_name[0] && strcmp(npc_were.table_name,were_tables[0]) && strcmp(npc_were.table_name,were_tables[1])){
+        if((given=AW_SkelTableRelease(npc_were.table_name,table_in_use))<0){
+            npc_were.kept++;
+            Con_Printf("Werewolf NPCs: the table %s kept: a loaded model still uses it.\n",npc_were.table_name);
+        }
+    }
+    if(m)npc_were.releases++;
+    npc_were.table_name[0]=0;
+    npc_were_race_count=npc_were_scale_count=npc_were_asks=0;   /* WEREWOLF-RACE-SCALE-68: read again with the set */
+}
+/* aw_animkit.c AW_AnimPickPreSend: the werewolf's table for the turned NPCs' frames, the set loaded at the first one on
+ * the map; NULL: not in this image (said once) */
+const aw_skel_table_t *AW_ViewWereNpcTable(void);
+void AW_ViewWereNpcSend(int what,int entity);
+const aw_skel_table_t *AW_ViewWereNpcTable(void) {
+    aw_parts_body_t row;byte *text;int mark,ok;model_t *m;const aliashdr_t *h;const aw_skel_table_t *t=NULL;
+    unsigned long finds=aw_file_finds;
+    if(npc_were.model && npc_were.table)return npc_were.table;
+    if(npc_were.failed)return NULL;
+    mark=Hunk_LowMark();text=COM_LoadHunkFile("view/parts.txt");
+    ok=text && AW_PartsAssemble((const char *)text,com_filesize,AW_PARTS_WEREWOLF_RACE,0,NULL,NULL,NULL,0,&row) &&
+       row.count==1;
+    /* WEREWOLF-RACE-SCALE-68: the races' sizes from the same read */
+    npc_were_race_count=ok?AW_PartsRaceScales((const char *)text,com_filesize,npc_were_races,WERE_RACES):0;
+    npc_were_scale_count=npc_were_asks=0;
+    Hunk_FreeToLowMark(mark);
+    if(!ok || !(t=AW_SkelTableFor(row.table))){
+        npc_were.failed=1;
+        Con_Printf("Werewolf NPCs: %s: the turned NPCs keep their own bodies.\n",!text?"no view/parts.txt in this image":
+                   !ok?"no werewolf row of one part in view/parts.txt":"no werewolf table");
+        return NULL;
+    }
+    snprintf(npc_were.table_name,sizeof(npc_were.table_name),"%s",row.table);
+    m=Mod_CanFindName(row.model[0])?Mod_ForName(row.model[0],false):NULL;
+    h=m && m->type==mod_alias?(const aliashdr_t *)Mod_Extradata(m):NULL;
+    if(!h || !h->aw_skel || (const void *)h->aw_skel_table!=(const void *)t){
+        npc_were.failed=1;
+        Con_Printf("Werewolf NPCs: the werewolf body %s not drawn (%s): the turned NPCs keep their own bodies.\n",
+                   row.model[0],!m?"no model slot or not in this image":!h?"not a model":"not on the werewolf's table");
+        npc_were_release();
+        return NULL;
+    }
+    part_pin(m,1);
+    npc_were.model=m;npc_were.table=t;npc_were.loads++;
+    Con_Printf("Werewolf NPCs: the werewolf set in for the turned NPCs (%s on %s, %lu file lookups, %lu KB pinned).\n",
+               m->name,row.table,aw_file_finds-finds,aw_cache_pinned_bytes/1024);
+    return t;
+}
+/* aw_animkit.c AW_AnimPickPreSend: WHAT 0 a send begins; 1 turned NPC ENTITY is on the map (the set held while one is);
+ * 2 it is drawn as the werewolf (its frame on the table); 3 the send ends: the set let go when no turned NPC is on the
+ * map (the player's sets keep what they draw) */
+void AW_ViewWereNpcSend(int what,int entity) {
+    if(what==0){
+        if(npc_were.count)memset(npc_were.drawn,0,sizeof(npc_were.drawn));
+        npc_were.count=npc_were.seen_now=0;
+    }else if(what==1)npc_were.seen_now++;
+    else if(what==2){
+        if(entity>0 && entity<MAX_EDICTS && npc_were.model && !(npc_were.drawn[entity>>3]&(1<<(entity&7)))){
+            npc_were.drawn[entity>>3]|=(unsigned char)(1<<(entity&7));npc_were.count++;
+            npc_were_scale_named(entity);   /* WEREWOLF-RACE-SCALE-68: at its race's size */
+        }
+    }else{
+        npc_were.seen=npc_were.seen_now;
+        npc_were_scale_sweep();
+        if(!npc_were.seen && (npc_were.model || npc_were.table_name[0]))npc_were_release();
+    }
+}
+/* aw_npc_lod.c (aw_npc_were_model): the model ENTITY is drawn with: the werewolf body when it was named at the last
+ * send, else NULL (its own) */
+static model_t *npc_were_model(int entity) {
+    if(!npc_were.count || entity<=0 || entity>=MAX_EDICTS || !(npc_were.drawn[entity>>3]&(1<<(entity&7))))return NULL;
+    return npc_were.model;
+}
+/* WEREWOLF-BODY-63 (v0.0.68): once a frame (AW_ViewFrame), the look the player has now against the sets in memory,
+ * whether or not the body or the arms are drawn this frame, so every change of form, by whichever route (dbg werewolf,
+ * a script's BecomeWerewolf or UndoWerewolf, the console's, the robe worn or taken off by hand), lets the previous set
+ * go at the next frame. Before, only a frame that drew the assembled body or the arms from parts asked: with a torch
+ * carried (its baked body and arms) the werewolf's set stayed pinned after the robe came off by hand until the torch
+ * went. Before a character exists the body and the arms ask with their own defaults; nothing is asked here then. */
+static void were_look_frame(void) {
+    int female=aw_character.valid && aw_character.female?1:0;
+    if(!aw_character.valid || aw_character.race<0 || aw_character.race>=aw_race_count)return;
+    parts_race_check(look_race(aw_races[aw_character.race].id,female),female);
+}
 /* 0 = no arms from parts now (the baked arms draw); 1 = the parts are those of what is worn; 2 = assembled now */
 static int hand_parts_ready(const char *race,int female) {
-    const char *items[AW_PARTS_ITEMS];char sig[sizeof(hparts_sig)];aw_parts_body_t next;int n=0,s,i,ok,mark,noslot=0;
+    const char *items[AW_PARTS_ITEMS];char sig[sizeof(hparts_sig)];aw_parts_body_t next;int n=0,s,i,ok,mark,noslot=0,were;
     byte *text;double t0;
+    race=look_race(race,female);were=race && !strcmp(race,AW_PARTS_WEREWOLF_RACE);   /* WEREWOLF-BODY-63 */
     parts_race_check(race,female);
     if(!hand_parts_cvar.value || hparts_failed || !race)return 0;
-    /* what is worn, as the body asks it (parts_ready): ids straight from the state, a string compare per frame */
-    for(s=AW_SLOT_HELMET;s<=AW_SLOT_ROBE && n<AW_PARTS_ITEMS;s++)
+    /* what is worn, as the body asks it (parts_ready): ids straight from the state, a string compare per frame; the
+     * werewolf's arms wear nothing */
+    for(s=AW_SLOT_HELMET;s<=AW_SLOT_ROBE && n<AW_PARTS_ITEMS && !were;s++)
         if(aw_state.inventory.equipped[s][0])items[n++]=aw_state.inventory.equipped[s];
     snprintf(sig,sizeof(sig),"%s|%d",race,female);
     for(i=0;i<n;i++){size_t used=strlen(sig);snprintf(sig+used,sizeof(sig)-used,"|%s",items[i]);}
@@ -441,7 +707,8 @@ static int hand_parts_ready(const char *race,int female) {
         return 0;
     }
     hparts_noslot_sig[0]=0;
-    strcpy(hparts_sig,sig);hparts_built++;hparts_ms=(Sys_FloatTime()-t0)*1000;
+    strcpy(hparts_sig,sig);hparts_built++;hparts_ms=(Sys_FloatTime()-t0)*1000;hparts_were=were;
+    if(were)snprintf(were_tables[1],sizeof(were_tables[1]),"%s",hparts.table);   /* WEREWOLF-TABLES-STAY-LOADED-68 */
     Con_Printf("First-person arms from parts: %d parts in %.0f ms (%lu KB kept).\n",s,hparts_ms,aw_cache_pinned_bytes/1024);
     return 2;
 }
@@ -532,7 +799,7 @@ static int left_put_away(void) {
 /* The body of the character's race and sex (the original's player record, a Dark Elf man,
  * before a character exists). 1 = a body is ready. */
 static int body_ready(void) {
-    const char *race="dark elf";int female=0,i,mark,carried,swimming,changed;char anm[64],path[64],held[64];byte *text;size_t n;
+    const char *race="dark elf";int female=0,i,mark,carried,swimming,changed,were;char anm[64],path[64],held[64];byte *text;size_t n;
     edict_t *player=local_player();
     if(!body_cvar.value)return 0;
     if(body_count<0)load_bodies();
@@ -544,13 +811,18 @@ static int body_ready(void) {
     if(changed)torch_failed=water_failed=0;
     swimming=player && player->v.health>0 && player->v.waterlevel>=2 && death.stage==AW_DEATH_NONE && !water_failed;
     carried=AW_TorchEquipped() && player && player->v.waterlevel<2 && death.stage==AW_DEATH_NONE && !torch_failed;
+    /* WEREWOLF-BODY-63: the werewolf keeps its own body with a torch carried (none is drawn on it) and in water (its
+     * table's swim groups, else its walk and idle: aw_anim.c), never the race's baked companions */
+    were=were_look(female);
+    if(were)carried=0;
     /* the assembled body (the default): without a torch, on land and in water (SWIM-BAKED-CLOTHES-60: the image's
      * layout has the table's swim groups, so the swimmer wears what is worn); a carried torch keeps its baked
      * companion (its own pose), and so does swimming in an image whose layout has no swim groups (the previous
      * method) */
     if(!carried && (i=parts_ready(race,female))<0)return 0;   /* parts still loading (ARRIVAL-LONG-FRAME-DEV6-59) */
-    if(!carried && i!=0 && (!swimming || AW_AnimSwims(&parts_anim))){
-        if(!body_parts || changed){
+    if(!carried && i!=0 && ((!swimming || AW_AnimSwims(&parts_anim)) || (were && parts_were))){
+        if(!body_parts || changed || (i==2 && parts_were!=body_were)){
+            /* WEREWOLF-BODY-63: into or out of the werewolf, the play starts again on the other table's groups */
             if(body_model && body_model->type==mod_alias && body_model->cache.data && !body_parts)Cache_Free(&body_model->cache);
             if(held_model && held_model->type==mod_alias && held_model->cache.data)Cache_Free(&held_model->cache);
             held_model=NULL;body_emitter.count=0;held_visible=0;held_path[0]=0;
@@ -558,7 +830,7 @@ static int body_ready(void) {
         }
         body_model=part_models[0];body_parts=1;body_anim=parts_anim;memset(&body_layers,0,sizeof(body_layers));
         body_race=aw_character.valid?aw_character.race:-1;body_female=female;body_torch=body_water=0;
-        body_index=body_find(race,female);
+        body_index=body_find(race,female);body_were=parts_were;
         return 1;
     }
     if(body_parts){
@@ -729,7 +1001,7 @@ int AW_ViewInventoryEquipment(model_t *models[2],float origins[2][3],float angle
     int kind,n=0,frame;model_t *actual;aw_inventory_item_t item;float tag[6];
     if(!AW_ViewInventoryBody(&actual,&frame))return 0;
     if(inventory_parts_frame>=0 && body_parts && parts_table && actual==part_models[0])
-        return parts_inventory_items(frame,models,origins,angles);
+        return parts_were?0:parts_inventory_items(frame,models,origins,angles);   /* WEREWOLF-BODY-63: it holds nothing */
     if(!AW_ItemsAliasTag(actual,-1,0,NULL))return 0;
     for(kind=0;kind<2;kind++){
         int slot=kind?AW_SLOT_LEFT:AW_SLOT_RIGHT;
@@ -795,6 +1067,9 @@ int AW_ViewInventoryBody(model_t **model,int *frame){
     if(body_parts && parts_table && part_models[0]){
         int f=parts_inventory_frame(type,&inventory_left);
         if(ranged)inventory_left=left_shown;
+        /* WEREWOLF-BODY-63: the werewolf's table has no inventory group: its first frame, never the race's baked
+         * companion (the player's own body in his starting clothes) */
+        if(f<0 && parts_were)f=0;
         if(f>=0){inventory_parts_frame=f;*model=part_models[0];*frame=f;return 1;}
         if(!inventory_parts_said){
             inventory_parts_said=1;
@@ -1055,7 +1330,16 @@ static void body_motion_count(int air,float speed) {
         motion.window_switches=motion.window_air=0;motion.window=realtime;
     }
 }
-float AW_ViewRaceHeight(void) {return body_parts && parts.height>.5f && parts.height<2?parts.height:1;}
+/* the assembled body's drawn weight and height: the race's of its recipe, the werewolf's at the player's own race's
+ * (WEREWOLF-RACE-SCALE-68, were_own_scale) */
+static void body_scale(float *weight,float *height) {
+    *weight=parts.weight;*height=parts.height;
+    if(parts_were)(void)were_own_scale(weight,height);
+}
+float AW_ViewRaceHeight(void) {
+    float w,h;body_scale(&w,&h);
+    return body_parts && h>.5f && h<2?h:1;
+}
 entity_t *AW_ViewBody(entity_t *ent) {
     float speed=0,rate=1,dt=(float)host_frametime;int group,block=-1,air,fists,layer;edict_t *p=local_player();
     held_visible=0;held_cursor=held_draw_count=0;
@@ -1090,8 +1374,10 @@ entity_t *AW_ViewBody(entity_t *ent) {
     body.effects&=~AW_EF_ALIAS_SCALE;body.aw_alias_zscale=0;
     if(body_parts){
         /* the parts are built at the unit scale; the race's own weight (x, y) and height (z) here, after posing, as
-         * the original scales the whole actor (aw_skel.h: a non-uniform scale does not commute with the bones) */
-        body.effects|=AW_EF_ALIAS_SCALE;body.aw_sprite_scale=parts.weight;body.aw_alias_zscale=parts.height;
+         * the original scales the whole actor (aw_skel.h: a non-uniform scale does not commute with the bones); the
+         * werewolf at the player's own race's (WEREWOLF-RACE-SCALE-68) */
+        float w,h;body_scale(&w,&h);
+        body.effects|=AW_EF_ALIAS_SCALE;body.aw_sprite_scale=w;body.aw_alias_zscale=h;
     }
     return &body;
 }
@@ -1143,7 +1429,7 @@ static int player_light_layer(const model_t *m,const void *skel_table,int frame,
         *layer_frame=(float)hparts_left_layer;*root=hparts_left_root;return 1;
     }
     if(!body_parts || !parts_table || skel_table!=(const void *)parts_table || !m || !chase_active.value ||
-       !parts_in_use(m))return 0;
+       !parts_in_use(m) || parts_were)return 0;   /* WEREWOLF-BODY-63: no light is held on the werewolf */
     /* the light in the hand, lit or put out (LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67) */
     if(asked!=r_framecount){asked=r_framecount;held=AW_HeldLightShown()!=NULL;}
     return held && parts_light_layer(frame,layer_frame,root);
@@ -1163,7 +1449,9 @@ static void parts_draws(edict_t *p) {
         part_ents[i]=body;part_ents[i].model=part_models[i];
         held_draws[held_draw_count++]=&part_ents[i];
     }
-    if(!p || p->v.health<=0 || p->v.waterlevel>=2 || !parts_table)return;
+    /* WEREWOLF-BODY-63: nothing is held on the werewolf (the change takes every item off; with the robe worn by hand,
+     * dbg give werewolfrobe, a weapon or light still equipped is not drawn either) */
+    if(!p || p->v.health<=0 || p->v.waterlevel>=2 || !parts_table || parts_were)return;
     goal=GetEdictFieldValue(p,"aw_hand_goal");
     drawn=goal && AW_HandShowsWeapon(goal->_float==1,aw_magic_readied);   /* the spell stance: no weapon in the hand */
     right=parts_hand_item(0);
@@ -1660,6 +1948,7 @@ void AW_ViewFrame(void) {
     float dt=(float)host_frametime;int input,dead,mode_before,forced=view_forced;edict_t *p;
     view_forced=0;      /* a turn the game made counts in this frame only */
     if(!ready)load_settings();
+    were_look_frame();  /* WEREWOLF-BODY-63: a change of form lets the previous set go at once, drawn or not */
     if(dt<0)dt=0;
     if(dt>.25f)dt=.25f;
     p=local_player();
@@ -1762,7 +2051,13 @@ void AW_ViewSceneSpawn(void) {
     held_path[0]=0;held_next=0;
     /* a new map flushes the models: the parts are looked up again (the recipe read again at the first draw) */
     memset(part_models,0,sizeof(part_models));parts.count=0;parts_sig[0]=0;parts_table=NULL;body_parts=0;parts_failed=0;
+    parts_were=0;
     hparts_noslot_sig[0]=0;     /* FP-ARMS-NO-MODEL-SLOT-67: the flush frees slots: the arms are tried again */
+    /* NPC-WEREWOLF-NO-MODEL-66: the flush forgets the turned NPCs' werewolf body too (looked up again by the first one
+     * on the new map); its table stays named, so the first send with none on the map gives it back */
+    npc_were.model=NULL;npc_were.table=NULL;npc_were.count=0;npc_were.failed=0;
+    memset(npc_were.drawn,0,sizeof(npc_were.drawn));
+    npc_were_race_count=npc_were_scale_count=npc_were_asks=0;   /* WEREWOLF-RACE-SCALE-68: the new map's entities */
 }
 /* aw_view.h (FP-ARMS-NO-MODEL-SLOT-67, DBG-RACE-SWAP-67): a race or sex swap releases what the old one wore at once:
  * the body's and the first-person arms' part models are unpinned and released, and both sets are assembled again for
@@ -1780,7 +2075,11 @@ void AW_ViewPartsUnload(void) {
     memset(pend_models,0,sizeof(pend_models));pend_count=0;
     memset(hpart_models,0,sizeof(hpart_models));hparts.count=0;hparts_sig[0]=0;hparts_shown=0;hparts_noslot_sig[0]=0;
     parts_failed=hparts_failed=0;        /* a refusal of the old race's data is not the new one's */
+    parts_were=hparts_were=0;            /* WEREWOLF-BODY-63: neither set is the werewolf's until assembled again */
+    parts_table=hparts_table=NULL;       /* neither set's table until assembled again (a table may be given back below) */
     for(i=0;i<g;i++)part_drop(gone[i]);
+    /* WEREWOLF-TABLES-STAY-LOADED-68: out of the werewolf, its tables go with its parts */
+    if(!were_look(aw_character.valid && aw_character.female?1:0))were_tables_release();
     if(aw_character.valid && aw_character.race>=0 && aw_character.race<aw_race_count){
         snprintf(parts_race_seen,sizeof(parts_race_seen),"%s",aw_races[aw_character.race].id);
         parts_female_seen=aw_character.female?1:0;
@@ -1805,6 +2104,65 @@ int AW_ViewRaceBeast(const char *race,int female) {
     ok=text && AW_PartsAssemble((const char *)text,com_filesize,race,female,NULL,NULL,NULL,0,&next);
     Hunk_FreeToLowMark(mark);
     return ok?(next.beast?1:0):-1;
+}
+/* aw_hand_models.c (aw_hand_werewolf, WEREWOLF-BODY-63): the first-person arms are the werewolf's now */
+static int hand_werewolf(void){return were_look(aw_character.valid && aw_character.female?1:0);}
+/* aw_view.h (WEREWOLF-BODY-63, dbg werewolf): the look and its sets by number */
+void AW_ViewWerewolfStatus(void) {
+    int female=aw_character.valid && aw_character.female?1:0,slots,part_slots,i,look=were_look(female),up;
+    unsigned long held,disk,index;edict_t *p=local_player();eval_t *goal=p?GetEdictFieldValue(p,"aw_hand_goal"):NULL;
+    slots=model_slots_in_use(&part_slots);
+    AW_SkelTablesBytes(&held,&disk,&index);
+    up=goal && goal->_float!=0;
+    Con_Printf("Werewolf look: robe slot %s; the werewolf's rows in this image: %s; the look %s (%lu times into it).\n",
+               aw_state.inventory.equipped[AW_SLOT_ROBE][0]?aw_state.inventory.equipped[AW_SLOT_ROBE]:"empty",
+               were_rows<0?"not asked yet":were_rows?"yes":"no",look?"is the werewolf":"is the player's own",
+               were_looks);
+    /* WEREWOLF-BODY-63 (v0.0.68): a set is named only when it is assembled; the arms are assembled the first time the
+     * hands are up in first person after a change (claws or fists readied, F), as the original shows nothing in
+     * first person with them put away. Before, "arms: 0 parts on - (own)" read as the player's own arms drawn on the
+     * werewolf (the v0.0.68 dev9 line session's second change, whose claws were never readied). */
+    if(body_parts && parts.count && parts_table)
+        Con_Printf("  body: %d parts on %s (%s)%s\n",parts.count,parts.table,parts_were?"the werewolf":"own",
+                   parts_were!=look?"; the look changed: its own set is assembled at the next frame":"");
+    else Con_Printf("  body: none assembled now (assembled at the next frame the body is drawn)\n");
+    if(hparts.count && hparts_table)
+        Con_Printf("  arms: %d parts on %s (%s)%s\n",hparts.count,hparts.table,hparts_were?"the werewolf":"own",
+                   hparts_were!=look?"; the look changed: its own arms are assembled at the next first-person frame":"");
+    else Con_Printf("  arms: none assembled now (%s)\n",up?"the hands are up: assembled at the next first-person frame":
+                    "the hands are put away: assembled when the claws or fists are readied in first person");
+    Con_Printf("  the werewolf's tables held now: %s%s%s; given back %lu times, kept %lu times\n",
+               were_tables[0][0]?were_tables[0]:"",were_tables[0][0] && were_tables[1][0]?", ":"",
+               were_tables[0][0] || were_tables[1][0]?were_tables[1]:"none",were_tables_released,were_tables_kept);
+    /* NPC-WEREWOLF-NO-MODEL-66: the turned NPCs on this map drawn with the werewolf set, by name, record and frame */
+    Con_Printf("  turned NPCs on this map: %d, drawn as the werewolf: %d; their set: %s%s%s; in %lu times, let go %lu "
+               "times, a table kept %lu times\n",npc_were.seen,npc_were.count,npc_were.model?npc_were.model->name:"none",
+               npc_were.model?" on ":"",npc_were.model?npc_were.table_name:"",npc_were.loads,npc_were.releases,
+               npc_were.kept);
+    if(sv.active){
+        int n=0;
+        for(i=1;i<MAX_EDICTS && i<sv.num_edicts;i++){
+            edict_t *e;eval_t *src;
+            if(!(npc_were.drawn[i>>3]&(1<<(i&7))))continue;
+            if(++n>16){Con_Printf("    ...\n");break;}
+            e=EDICT_NUM(i);src=GetEdictFieldValue(e,"aw_source_id");
+            {float w=1,h=1;int known=npc_were_scale(i,&w,&h);
+             Con_Printf("    %s (%s), entity %d, the werewolf's frame %d, drawn at %s %.2f x %.2f\n",
+                        e->v.netname?pr_strings+e->v.netname:"?",src && src->string?pr_strings+src->string:"?",i,
+                        cl_entities[i].frame,known?"its race's":"the unit",(double)w,(double)h);}
+        }
+    }
+    /* WEREWOLF-RACE-SCALE-68: the races' sizes, the asks of the host, the player's own race's */
+    {float w=1,h=1;int own=parts_were && were_own_scale(&w,&h);
+     Con_Printf("  race sizes: %d rows kept, %d turned NPCs sized, %lu asked (%lu unknown: the unit size); the player's "
+                "werewolf at %s %.2f x %.2f (%lu reads)\n",npc_were_race_count,npc_were_scale_count,npc_were_scale_asks,
+                npc_were_scale_unknown,own?"his race's":parts_were?"the unit":"(not a werewolf)",(double)w,(double)h,
+                were_own.reads);}
+    for(i=0;i<parts.count && body_parts;i++)if(part_models[i])Con_Printf("  body part %s (slot %d)\n",part_models[i]->name,parts.slot[i]);
+    for(i=0;i<hparts.count;i++)if(hpart_models[i])Con_Printf("  arm part %s (slot %d)\n",hpart_models[i]->name,hparts.slot[i]);
+    Con_Printf("  model table %d slots in use (%d player parts), %lu KB pinned, %lu part models released in all; "
+               "animation tables %lu KB index + %lu KB frames held\n",slots,part_slots,aw_cache_pinned_bytes/1024,
+               parts_released,index/1024,held/1024);
 }
 /* aw_quickchar.c aw_race_swapped (dbg race, DBG-RACE-SWAP-67): after a race or sex swap, the new race's equip rules at
  * once (a beast race: nothing over the head, nothing on the feet, AW_InventoryBeastRefusal; each such piece back into
@@ -2214,12 +2572,17 @@ static void command(void) {
     }
     Con_Printf("Usage: dbg camera [first | third | toggle | distance N | vanity on/off/now | death on/off | retry on/off | body on/off | parts on/off | stances on/off | hands on/off | fpview on/off | sway 1/2/bench | npcs [on/off] | held | motion restart on/off | die]\n");
 }
+extern model_t *(*aw_npc_were_model)(int entity);   /* aw_npc_lod.c (NPC-WEREWOLF-NO-MODEL-66) */
+extern int (*aw_npc_were_scale)(int entity,float *weight,float *height);   /* aw_npc_lod.c (WEREWOLF-RACE-SCALE-68) */
 void AW_ViewInit(void) {
     Cvar_RegisterVariable(&view_cvar);Cvar_RegisterVariable(&distance_cvar);Cvar_RegisterVariable(&vanity_cvar);
     Cvar_RegisterVariable(&death_cvar);Cvar_RegisterVariable(&retry_cvar);Cvar_RegisterVariable(&body_cvar);
     Cvar_RegisterVariable(&parts_cvar);Cvar_RegisterVariable(&hand_parts_cvar);Cvar_RegisterVariable(&player_cache_cvar);
     Cvar_RegisterVariable(&stances_cvar);
     aw_hand_weapon_hidden=weapon_hidden;aw_hand_parts_apply=hand_parts_apply;aw_view_hand_part=hand_part;aw_inventory_preview_pending=parts_pending;
+    aw_hand_werewolf=hand_werewolf;   /* WEREWOLF-BODY-63: the werewolf's arms, the bare hands' stance */
+    aw_npc_were_model=npc_were_model;   /* NPC-WEREWOLF-NO-MODEL-66: the turned NPCs drawn with the werewolf set */
+    aw_npc_were_scale=npc_were_scale;   /* WEREWOLF-RACE-SCALE-68: each at its own race's size */
     aw_torch_put_away=left_put_away;   /* READY-MAGIC-SHOWS-WEAPON-65: the carried light put away while magic is ready */
     aw_hand_parts_left_light=hand_parts_left_light;   /* LIGHT-AND-WEAPON-REPLACE-EACH-OTHER-67: weapon and light at once */
     aw_inventory_player_beast=player_beast;aw_race_swapped=race_swapped;

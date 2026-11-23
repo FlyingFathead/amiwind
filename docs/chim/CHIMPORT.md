@@ -1,6 +1,6 @@
 # CHIMport: the whole island on CHIM, cell by cell
 
-_Last updated with AmiWind v0.0.68-dev3 (21 November 2026)._
+_Last updated with AmiWind v0.0.68-dev8 (22 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -773,11 +773,28 @@ references are 339,720 bytes.
 
 ```sh
 python3 tools/chimport.py ocean --data-files DATA --palette PALETTE --out RUN [--rect X0,X1,Y0,Y1] [--margin 2] \
-        [--dry-run] [--storage-pool on --reuse-mode pool --storage-pool-dir DIR] \
+        [--cells "x,y x,y ..."] [--presented-data DIR] [--dry-run] \
+        [--storage-pool on --reuse-mode pool --storage-pool-dir DIR] \
         [--tracker DIR --tracker-tool tools/cell_progress.py]
 ```
 
 `--dry-run` prints the plan and its seam figures and writes nothing. The run holds `RUN/run.lock` like `run`.
+`--cells` writes only the named cells of the plan; a named cell that is not open sea of the plan (it has LAND, holds
+placed records, is in `plan.json`, or lies beyond the rectangle with no cell record) is refused with its reason and
+nothing is written. With the expansions selected (`AMIWIND_MASTERS`), `--presented-data DIR` plans from the presented
+data folder as `run` does, so the cells only an expansion holds are open sea of the plan too.
+
+Each open-sea cell's result names the island set its map belongs to, which the tracker uses to give the cell the
+island of the nearest island cell of that set
+([TRACKER-OCEAN-CELL-ISLAND-BASE-ONLY-68](../bugs/TRACKER-OCEAN-CELL-ISLAND-BASE-ONLY-68.md)):
+
+- a cell of the base world's cell list (`config/chim-cells.json`) is Vvardenfell's, whatever master holds its record;
+- otherwise the first master in load order that holds the cell's CELL record decides: `Morrowind.esm` Vvardenfell,
+  `Bloodmoon.esm` Solstheim (a record in Bloodmoon.esm only, such as -29,23 and -28,24);
+- a cell with no record in any master names no set: the tracker gives it the island of the nearest island cell.
+
+The masters are read from the game's own files in `--data-files`, never from the merged master. Until v0.0.68 every
+open-sea result named Vvardenfell.
 
 ## Running CHIMport yourself
 

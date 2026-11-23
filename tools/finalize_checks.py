@@ -60,6 +60,10 @@ CHECKS = {
     'legacy_layout_findings': {'early': None, 'why': BUILT_MAPS},
     # the staged content
     'payload_preflight': {'early': None, 'why': STAGE_OUTPUTS},
+    'check_boot_cfgs': {'early': None,
+                        'why': 'reads the boot settings files this image has written; the image step\'s first part runs '
+                               'the same check right after its last default line, minutes before this part '
+                               '(CFG-OVER-COMMAND-BUFFER-68)'},
     'validate_world_ui': {'early': None, 'why': STAGE_OUTPUTS},
     'ready_hands_check': {'early': None, 'why': STAGE_OUTPUTS},
     'check_recorded': {'early': None, 'why': STAGE_OUTPUTS},

@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 50 times; something has to be done
+## PERSISTING: reported 51 times; something has to be done
 
 - Reported with v0.0.46 at 2026-10-20 20:09 +0300: Listed under Known in this build in the v0.0.46 release notes (still open at the release).
 - Reported with v0.0.53-dev2 at 2026-10-26 (time not recorded): 19:14 UTC door sample: the Yassu Mine room load (ri9f4c8ccd45) stopped after its BSP while a gate ran its emulator; the next try loaded in 7.6 s
@@ -54,6 +54,7 @@
 - Reported with v0.0.67-dev2 at 2026-11-18 21:48 +0200: Seen again in an emulator room check of the v0.0.67-dev2 Mournhold module test build (32 MB Fast, JIT): the first load of Seyda Neen after boot never finished (server none); the stall examination found the game waiting on SIGF_DOS with no request of the game queued on any handler port, 4 of 5 samples in exec idle. 30 other room checks of the same build and session setup in the same run loaded Seyda Neen normally.
 - Reported with v0.0.68-dev6 at 2026-11-22 05:57 +0200: Seen again in an opening session on the v0.0.68-dev6 image: on the ship, the remote-console folder's request finished on the emulator side and the game was never told, so the session stopped before the dock.
 - Reported with v0.0.68-dev8 at 2026-11-22 20:56 +0200: Seen again in the v0.0.68-dev8 delivery: the boot smoke on the emulator stopped in Seyda Neen because a finished disk request of the game was never reported back by the emulator's folder drive; the step was run again.
+- Reported with v0.0.68-dev8 at 2026-11-23 02:53 +0200: Test sessions now use the emulator's deterministic mode unless a run asks otherwise. With it, sixty arena pit loads in a row, run while other jobs shared the machine, had no stop; counting the earlier comparison, none of 140 such loads stopped, against two stops in 76 loads without it.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -137,6 +138,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-18 21:48 +0200: seen again in v0.0.67-dev2: Seen again in an emulator room check of the v0.0.67-dev2 Mournhold module test build (32 MB Fast, JIT): the first load of Seyda Neen after boot never finished (server none); the stall examination found the game waiting on SIGF_DOS with no ...
 - 2026-11-22 05:57 +0200: seen again in v0.0.68-dev6: Seen again in an opening session on the v0.0.68-dev6 image: on the ship, the remote-console folder's request finished on the emulator side and the game was never told, so the session stopped before the dock.
 - 2026-11-22 20:56 +0200: seen again in v0.0.68-dev8: Seen again in the v0.0.68-dev8 delivery: the boot smoke on the emulator stopped in Seyda Neen because a finished disk request of the game was never reported back by the emulator's folder drive; the step was run again.
+- 2026-11-23 02:53 +0200: seen again in v0.0.68-dev8: Test sessions now use the emulator's deterministic mode unless a run asks otherwise.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -145,7 +147,7 @@ _Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 50 times; something has to be done](#persisting-reported-50-times-something-has-to-be-done)
+- [PERSISTING: reported 51 times; something has to be done](#persisting-reported-51-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Symptom](#symptom)
 - [Where](#where)
@@ -587,6 +589,7 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - [CHIMPORT-RETRY-LAVA-STALE-SOURCE-36](CHIMPORT-RETRY-LAVA-STALE-SOURCE-36.md): CHIMport --retry-failed cannot rerun a lava cell of the island run: its stored source stage predates the lava conversion
 - [CHIMPORT-SEABED-NO-ISLAND-42](CHIMPORT-SEABED-NO-ISLAND-42.md): Seabed cells measured as empty sea lose their island in the tracker: they drop out of the published reference and the build calls them unknown
 - [COMBAT-PURSUIT-SLOPE-STALL-46](COMBAT-PURSUIT-SLOPE-STALL-46.md): A pursuer stops on a walkable slope: an actor step was refused when it moved more than a stair height along the slope
+- [EXPANSION-STORE-DISABLE-NOT-HIDDEN-68](EXPANSION-STORE-DISABLE-NOT-HIDDEN-68.md): In the expansions' outdoor areas a placement a script switches off stays drawn and solid: the ice covers in front of the underwater entrances to Stahlman's Gorge and the Caves of Fjalding stay in place after their quest stage
 - [IMAGE-FORMATS-CHIM-ROOMS-48](IMAGE-FORMATS-CHIM-ROOMS-48.md): The payload preflight stops a CHIM rooms build: the image step does not know the room store and room record formats
 - [IMAGE-ROOM-MAPS-ENGINE-REFUSED-48](IMAGE-ROOM-MAPS-ENGINE-REFUSED-48.md): Every CHIM room is refused at its door and the game hangs on Loading: the engine accepts a .chim map only with a CHIM frame key
 - [IMAGE-ROOM-MAPS-FINGERPRINT-48](IMAGE-ROOM-MAPS-FINGERPRINT-48.md): A CHIM rooms build stops at the content fingerprint: it requires maps/<room>.bsp after the room became maps/<room>.chim

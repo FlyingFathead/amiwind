@@ -55,6 +55,17 @@ class BootCfgFitTests(unittest.TestCase):
         self.assertIn("from boot_cfg_fit import check as check_boot_cfgs", text)
         self.assertIn("check_boot_cfgs(boot/'id1')", text)
 
+    def test_finalize_checks_the_configs_before_it_writes(self):
+        # the shared image tail (finalize_image, also run on a continued image) checks the configs again, right after
+        # its read-only payload preflight and before its first write
+        text = (ROOT / 'tools/build_aga.py').read_text(encoding='utf-8')
+        body = text[text.index('def finalize_image(args):'):]
+        body = body[:body.index('\ndef ')]
+        preflight = body.index('payload_preflight(args, out, excluded, jobs)')
+        check = body.index("check_boot_cfgs(boot/'id1')")
+        self.assertLess(preflight, check)
+        self.assertLess(check, body.index('write_text('))
+
 
 if __name__ == '__main__':
     unittest.main()

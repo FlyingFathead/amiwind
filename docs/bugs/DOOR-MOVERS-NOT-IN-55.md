@@ -21,6 +21,24 @@
 
 _Last updated with AmiWind v0.0.56 (30 October 2026)._
 
+<!-- contents start -->
+## Contents
+
+- [Status: 29 October 2026](#status-29-october-2026)
+- [Census: 29 October 2026](#census-29-october-2026)
+- [Symptom](#symptom)
+- [Where](#where)
+- [How it happened](#how-it-happened)
+- [Why it was not caught](#why-it-was-not-caught)
+- [Reproduction](#reproduction)
+- [Repair](#repair)
+- [Verification](#verification)
+- [Prevention](#prevention)
+- [Related](#related)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
+
 ## Status: 29 October 2026
 
 Open. Cause not pinned. Registered from the maintainer's report: the game has many different gates and trapdoors, and
@@ -120,6 +138,7 @@ Family: Scene changes, arrivals and handoffs (`transitions-arrivals`). Cell, reg
 - [DOOR-BANK-STREAMED-FRAME-51](DOOR-BANK-STREAMED-FRAME-51.md): After a streamed crossing into another region frame, that frame s doors cannot be used: the engine reads only the start frame s door bank (830 of 1,102 entrances)
 - [DOOR-HALL-SWING-DIRECTION-48](DOOR-HALL-SWING-DIRECTION-48.md): The census hall door may open the opposite way from the original game: it turns to closed plus 90 degrees where the original rule gives closed minus 90
 - [DOOR-PRISON-MARKER-65](DOOR-PRISON-MARKER-65.md): An invisible door by the census office in Seyda Neen drops the player under the office floor
+- [DOOR-USE-ACROSS-FRAME-EDGE-68](DOOR-USE-ACROSS-FRAME-EDGE-68.md): A load door that stands on the edge between two outdoor frames cannot be used from the far side: at Mournhold's ladder down to Bamz-Amschend, the use key does nothing where the way out arrives
 - DOOR-USE-BLOCKED-53 (no report page): 50 region-frame entrances cannot be used from where a player can stand: the use ray meets the entrance structure or the ground before the door, or there is no standing spot at it
 - [DOOR-USE-COLLISION-FILLED-53](DOOR-USE-COLLISION-FILLED-53.md): 35 region-frame entrances cannot be reached through their converted collision: 24 Daedric shrine steps the player slides off, raised trapdoors under their tower hulls, Dwemer doors inside the terrain chunk
 - [ENGINE-SCENE-NAME-BOUND-35](ENGINE-SCENE-NAME-BOUND-35.md): Scene links copied map names into 16-byte fields with strcpy

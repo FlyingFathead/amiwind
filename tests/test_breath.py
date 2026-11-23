@@ -98,7 +98,16 @@ class RaceWaterBreathingTests(unittest.TestCase):
         host = code('aw_mwhost.c')
         spells = host[host.index('static void creation_spells(aw_actor_t *a){'):]
         self.assertIn('creation_generation++;', spells[:spells.index('\n}\n')])
-        self.assertIn('unsigned long g=AW_EffectsGeneration()+creation_generation;', host)
+        # the kept answer is read again when the race's spells are applied again (the generation is in its key);
+        # since v0.0.68 the answers are kept per actor (AW_ActorPassiveKept, AMBIENT-SOUND-READ-IN-FRAME-68), by the
+        # same generation and by the list's own content, and its sums count a no-magnitude effect 1 a spell too
+        self.assertIn('return AW_ActorPassiveKept(a,ref,effect,AW_EffectsGeneration()+creation_generation);', host)
+        kept = state[state.index('float AW_ActorPassiveKept(const aw_actor_t *a,uint32_t ref,int effect,unsigned long generation){'):]
+        kept = kept[:kept.index('\n}\n')]
+        self.assertIn('passive_kept[i].generation==generation', kept)
+        self.assertIn('passive_kept[i].mix==mix', kept)
+        sums = state[state.index('int AW_ActorPassiveSums(const aw_actor_t *a,aw_passive_sum_t *out,int max,int *more){'):]
+        self.assertIn('(mg.flags&AW_MGEF_FLAG_NO_MAGNITUDE))out[j].value=(float)hits[j];', sums[:sums.index('\n}\n')])
 
     def test_an_emptied_player_record_gets_the_race_spells_again(self):
         # v0.0.63-dev5 release check: a loaded game (and the arrival snapshot's restore) empties the actor pool, the

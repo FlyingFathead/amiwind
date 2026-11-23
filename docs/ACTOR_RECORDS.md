@@ -1,6 +1,6 @@
 # What every being can have: the actor records
 
-_Last updated with AmiWind v0.0.68-dev5 (22 November 2026)._
+_Last updated with AmiWind v0.0.68-dev8 (23 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -28,6 +28,7 @@ _Last updated with AmiWind v0.0.68-dev5 (22 November 2026)._
 - [Is it all there: the audit](#is-it-all-there-the-audit)
   - [Ranged fighters](#ranged-fighters)
   - [Held weapons](#held-weapons)
+  - [A part that draws nothing](#a-part-that-draws-nothing)
   - [Combat styles](#combat-styles)
   - [The animations](#the-animations)
   - [Whole creature models and the surface check](#whole-creature-models-and-the-surface-check)
@@ -567,6 +568,23 @@ the 423 library models get a tag (28,680 bytes in all, about 100 bytes each), na
 each, shared with the residents' (the image already holds 111 item models, the guard's spear among them); the work is
 about 1.3 seconds an appearance on one core and runs on all the stage's jobs. In play it adds one small item model
 per armed person drawn. Not yet checked in a running game.
+
+### A part that draws nothing
+
+A body part whose mesh holds no shape draws nothing in the original (OpenMW 0.51 `components/sceneutil/attach.cpp`: a
+part adds only the geometry its file has). The NPC library baked such an appearance not at all: the bake refused the
+whole appearance on the empty part ("No attached geometry"), and the person had no model. From v0.0.68 the library
+leaves the empty part out of the appearance and bakes the rest (`tools/npc_library.py` `without_empty_parts`, for every
+person and every part; an appearance without an empty part keeps its key and its model byte for byte). On the game
+data the one such part is Bloodmoon's werewolf hair (`WerewolfHair`, `wolf/hair.nif`, one node and no shape), the hair
+of the Skaal werewolf `BM_werewolf_skaal1A3` (reference 8403236, Skaal Village): its record is an Argonian man, and it
+now has its model, so the library leaves no appearance out (NPC-WEREWOLF-NO-MODEL-66). Measured on 23 November 2026:
+reading the 892 distinct part meshes of the library's 630 people for it takes 0.8 seconds.
+
+In the original that person is seen only as a werewolf: its script keeps it disabled until the Skaal attack begins
+(the journal `BM_SkaalAttack` at 10), then enables it and turns it into a werewolf in the same frame. Its werewolf look
+is the player's werewolf body ([THIRD_PERSON.md](THIRD_PERSON.md#the-werewolf)); drawing a person in werewolf form is
+not done yet, so for now it stands as the Argonian its record names.
 
 ### Combat styles
 

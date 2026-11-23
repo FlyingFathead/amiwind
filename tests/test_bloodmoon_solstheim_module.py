@@ -544,9 +544,18 @@ class TheGlacierAndTheSeaCellsAreBuilt(unittest.TestCase):
         doc = json.loads((ROOT / module.SEA_CELLS).read_text(encoding='utf-8'))
         self.assertEqual(doc['format'], regions.CELLS_FORMAT)
         listed = [regions.parse_cell(c) for c in doc['cells']]
-        self.assertIn((-20, 15), listed)
+        self.assertEqual(listed, [(-20, 15), (-29, 23), (-28, 24)])
         kinds, table = self.plan()
         statuses = regions.load_status(REFERENCE)
+        # the list against the reference both ways: every open-sea cell the reference gives Solstheim is listed
+        # (-29,23 and -28,24 since the CHIM import of their open sea, TRACKER-OCEAN-CELL-ISLAND-BASE-ONLY-68), and
+        # every listed cell is Solstheim's open sea
+        solstheim_sea = sorted(c for c, v in statuses.items() if v['status'] == 'ocean' and v['set'] == 'bloodmoon')
+        self.assertEqual(solstheim_sea, sorted(listed))
+        # the base world's open-sea frames (-19,14 and -19,15 with Bloodmoon's records, -6,26 with none) and the
+        # recordless -20,14 are Vvardenfell's: never Solstheim's, never in its list
+        for cell in ((-19, 14), (-19, 15), (-6, 26), (-20, 14)):
+            self.assertEqual((statuses[cell]['status'], statuses[cell]['set']), ('ocean', 'vvardenfell'), cell)
         for cell in listed:
             # a listed cell is open sea in the reference and an ocean frame of the module (refused otherwise)
             self.assertEqual(statuses[cell]['status'], 'ocean', cell)
@@ -560,15 +569,25 @@ class TheGlacierAndTheSeaCellsAreBuilt(unittest.TestCase):
         # open sea outside the list stays out of the module, as the main game's open sea outside its list
         self.assertNotIn((-20, 14), kinds)
 
+    def test_the_modules_plan_has_every_cell_of_solstheim(self):
+        # 119 land cells, 31 seabed cells and the 3 open-sea cells with a record: 153 (151 before -29,23 and -28,24)
+        import collections
+        kinds, table = self.plan()
+        self.assertEqual(dict(collections.Counter(kinds.values())), {'land': 119, 'seabed': 31, 'ocean': 3})
+        self.assertEqual(len(kinds), 153)
+        self.assertEqual(table['dropped'], [])
+
     def test_a_listed_open_sea_cell_without_its_status_is_refused(self):
         import json
+        # a cell the reference does not hold (no status): refused by name, the rest of the list kept
+        self.assertNotIn((-35, 30), regions.load_status(REFERENCE))
         with tempfile.TemporaryDirectory() as tmp:
             (Path(tmp) / 'config').mkdir()
             (Path(tmp) / module.SEA_CELLS).write_text(json.dumps(
-                {'format': regions.CELLS_FORMAT, 'cells': ['-20,15', '-29,23']}), encoding='utf-8')
+                {'format': regions.CELLS_FORMAT, 'cells': ['-20,15', '-35,30']}), encoding='utf-8')
             table, problems = module.module_plan(REFERENCE, root=tmp)
         self.assertEqual(len(problems), 1)
-        self.assertIn('cell -29,23', problems[0])
+        self.assertIn('cell -35,30', problems[0])
         self.assertIn((-20, 15), regions.table_kinds(table))
 
     def test_the_first_minute_check_counts_them_and_names_what_it_leaves_out(self):
@@ -583,7 +602,12 @@ class TheGlacierAndTheSeaCellsAreBuilt(unittest.TestCase):
         self.assertIn('%d finished cell(s), %d built by the module bloodmoon-solstheim' % (len(kinds), len(kinds)),
                       line)
         self.assertNotIn('memory_fit', line)
-        self.assertIn('open sea requires an explicit cell selection', line)
+        # nothing of Solstheim is left out: its open sea is listed, and the base world's sea cells (-6,26, -20,14)
+        # are Vvardenfell's since the CHIM import names their island by their record (until 22 November 2026 the
+        # line said "2 left out: open sea not listed", TRACKER-OCEAN-CELL-ISLAND-BASE-ONLY-68)
+        self.assertEqual(line, 'Expansion cells: Bloodmoon.esm, named set solstheim: 153 finished cell(s), 153 built by '
+                               'the module bloodmoon-solstheim')
+        self.assertEqual(expansion_preflight.left_out_text('solstheim', REFERENCE), '')
         self.assertEqual(expansion_preflight.left_out_text('solstheim', 'no-such-status.json'), '')
 
 

@@ -932,8 +932,11 @@ def load_results(out):
                 e['empty'] = bool(v.get('empty')) or v.get('status') == 'empty'
             if v.get('ocean') is not None or v.get('status') is not None:
                 e['ocean'] = bool(v.get('ocean')) or v.get('status') == 'ocean'
-            if v.get('set'):
-                e['set'] = v['set']
+            if 'set' in v:
+                # the newest result that names a set decides, an explicit none too: an open-sea cell with no record
+                # in any master has no set and takes the nearest island cell of any set (chimport.py ocean_set,
+                # TRACKER-OCEAN-CELL-ISLAND-BASE-ONLY-68); a result without the key keeps the older one
+                e['set'] = v['set'] or None
             pv = dict(d.get('provenance') or {})
             pv.update(v.get('provenance') or {})
             if pv:
@@ -1392,7 +1395,8 @@ def ingest(out, progress=None, metrics=None, cells_detail=None, census=None, chi
     for rank, c in enumerate(ordered, 1):
         cells[ckey(*c)]['risk_rank'] = rank
     # Open-sea cells belong to the island of the nearest island cell of their own master set (the conversion job names
-    # it: the base master's sea is Vvardenfell's map), else of any set (Chebyshev distance, then the lower island).
+    # it from the master that holds the cell's record, the base world's listed cells Vvardenfell's: chimport.py
+    # ocean_set), else of any set (no record: no set; Chebyshev distance, then the lower island).
     placed = [(parse_cell(k), r['island'], r.get('set')) for k, r in cells.items() if r.get('island') and k not in pres]
     for k, rec in cells.items():
         # a seabed cell measured as empty sea (CHIMport) is a sea cell too: without an island it would drop out of the

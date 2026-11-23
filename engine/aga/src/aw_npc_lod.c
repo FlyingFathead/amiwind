@@ -458,6 +458,33 @@ void AW_NpcLodDrawLabels(void)
     }
 }
 
+/* NPC-WEREWOLF-NO-MODEL-66 (v0.0.68, aw_view.c): the werewolf body for an entity a script turned into a werewolf (named
+ * at the last server send, its frame on the werewolf's table), else NULL; NULL itself while nothing sets it (the
+ * native tests). The same render-only swap as a level: collision, scripts and the entity's own model stay. */
+model_t *(*aw_npc_were_model)(int entity);
+static model_t *were_model(entity_t *e)
+{
+    if (!aw_npc_were_model || e < cl_entities || e >= cl_entities + MAX_EDICTS)
+        return NULL;
+    return aw_npc_were_model((int)(e - cl_entities));
+}
+/* WEREWOLF-RACE-SCALE-68 (v0.0.68, aw_view.c): the race's weight and height the werewolf body of entity ENTITY is drawn
+ * at (1 known, 0 not yet: the unit size), NULL while nothing sets it. The werewolf body is built at the unit size, so
+ * the turned NPC's own race scales it here, times its own instance scale, as the original scales any character by its
+ * race (OpenMW 0.51 mwclass/npc.cpp adjustScale); for this draw only: r_main.c puts the entity's own scale back after
+ * it, as it puts its own model back. */
+int (*aw_npc_were_scale)(int entity, float *weight, float *height);
+static void were_scale(entity_t *e)
+{
+    float w, h, s;
+    if (!aw_npc_were_scale || !aw_npc_were_scale((int)(e - cl_entities), &w, &h))
+        return;
+    s = (e->effects & AW_EF_ALIAS_SCALE) ? e->aw_sprite_scale : 1;
+    e->effects |= AW_EF_ALIAS_SCALE;
+    e->aw_sprite_scale = s * w;
+    e->aw_alias_zscale = s * h;
+}
+
 void AW_NpcLodFrame(void)
 {
     int i, j, k, r, n, mode, mask, budget, planned_bytes, near_cap, near_planned, count = 0, loaded = 0, forced;
@@ -502,6 +529,8 @@ void AW_NpcLodFrame(void)
         entity_t *e = cl_visedicts[i];
         if (!e || !e->model || e->model->type != mod_alias || e == &cl_entities[cl.viewentity])
             continue;
+        if (aw_npc_were_model && were_model(e))
+            continue;       /* drawn as the werewolf (NPC-WEREWOLF-NO-MODEL-66): no level of its own model */
         old = track_valid ? track_find(track_prev, e, 0) : NULL;
         r = old && old->model == e->model ? old->row : find_row(e->model);
         if (r < 0)
@@ -619,6 +648,12 @@ model_t *AW_NpcLodModel(entity_t *e)
 {
     lod_track_t *t;
     lod_row_t *row;
+    model_t *were = were_model(e);
+    if (were)
+    {
+        were_scale(e);      /* at its race's size for this draw (WEREWOLF-RACE-SCALE-68) */
+        return were;
+    }
     if (!track_valid || aw_npc_lod.value <= 0)
         return e->model;
     t = track_find(track_cur, e, 0);

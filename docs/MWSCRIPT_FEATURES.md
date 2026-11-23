@@ -1,6 +1,6 @@
 # MWScript features
 
-_Last updated with AmiWind v0.0.68-dev8 (22 November 2026)._
+_Last updated with AmiWind v0.0.68-dev11 (23 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -34,16 +34,16 @@ _Last updated with AmiWind v0.0.68-dev8 (22 November 2026)._
 
 One row per script record of the game: what names it, where it stands, which functions it calls and what its conditions test, and what state AmiWind has it in. The data is measured from the game's masters with the builder's own compiler; the page lists record ids, counts and states only. When the work list runs dry, the scripting work is taken from here row by row, toward the next landmark: every game script running as in the original. On Vvardenfell the scripts left are the character creation ones; the rest belong to Mournhold and Solstheim.
 
-Of the 1,074 scripts the original game uses, **1,062 run** as scripts and **9 are carried by AmiWind's own code**; of the rest, 0 use a function the interpreter lacks, 0 are attached but not run, 0 are compiled but not attached, 3 are placed only in add-on cells the image does not carry, 0 are not converted. The 133 scripts that nothing in the original game ever names (test and example scripts, replaced versions, cut content) are listed apart under Not used in the original game.
+Of the 1,074 scripts the original game uses, **1,063 run** as scripts and **9 are carried by AmiWind's own code**; of the rest, 0 use a function the interpreter lacks, 0 are attached but not run, 0 are compiled but not attached, 2 are placed only in add-on cells the image does not carry, 0 are not converted. The 133 scripts that nothing in the original game ever names (test and example scripts, replaced versions, cut content) are listed apart under Not used in the original game.
 
 | State | Scripts | What it means |
 | --- | ---: | --- |
-| runs | 1,062 | compiles whole, and the build attaches it to its objects or starts it (a record that is never placed: while the player carries its item, on the actor a levelled list gives, or on the object a script places; a script with no function, whose own locals the dialogue keeps on the speaker without it, counts as running) |
+| runs | 1,063 | compiles whole, and the build attaches it to its objects or starts it (a record that is never placed: while the player carries its item, on the actor a levelled list gives, or on the object a script places; a script with no function, whose own locals the dialogue keeps on the speaker without it, counts as running) |
 | carried by AmiWind's own code | 9 | not run as a script because AmiWind's own code does what it does (the section Carried by AmiWind's own code names the code and compares it step by step) |
 | uses a function the interpreter lacks | 0 | compiles, but calls at least one function the interpreter does not carry out yet (those calls do nothing and read 0) |
 | attached, not run | 0 | the game attaches it, but the build does not run it: a hand-written rule carries it, or nothing it does is seen yet |
 | compiled, not attached | 0 | compiles whole, but nothing in the build attaches or starts it: its records are never placed, and nothing makes them at run time yet |
-| only in an add-on world | 3 | compiles whole, but its records are placed (or made by scripts) only in cells of Mournhold or Solstheim that the image does not carry (the image's own districts and rooms count as carried: the measurement reads them from the build) |
+| only in an add-on world | 2 | compiles whole, but its records are placed (or made by scripts) only in cells of Mournhold or Solstheim that the image does not carry (the image's own districts and rooms count as carried: the measurement reads them from the build) |
 | not converted | 0 | does not compile |
 | **Used in the original game** | **1,074** | |
 | Not used in the original game (listed apart) | 133 | compiles whole, but no record, start, StartScript or dialogue result names it, or the records that name it are never placed and nothing makes them: it never runs in the original either |
@@ -53,7 +53,7 @@ Of the 1,074 scripts the original game uses, **1,062 run** as scripts and **9 ar
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | Morrowind.esm | 616 | 528 | 519 | 9 | 0 | 0 | 0 | 0 | 0 | 88 |
 | Tribunal.esm | 255 | 236 | 235 | 0 | 0 | 0 | 0 | 1 | 0 | 19 |
-| Bloodmoon.esm | 336 | 310 | 308 | 0 | 0 | 0 | 0 | 2 | 0 | 26 |
+| Bloodmoon.esm | 336 | 310 | 309 | 0 | 0 | 0 | 0 | 1 | 0 | 26 |
 
 Dialogue result scripts (the lines a topic answer runs) are compiled as scripts of their own: 7,411 results, 7,411 run whole, 0 use a function the interpreter lacks, 0 are not converted.
 
@@ -67,9 +67,9 @@ Dialogue answers that start or change a fight (StartCombat, SetFight, ModFight):
 | the speaker attacks (StartCombat): found by the answer's reference | 124 |
 | a fight between two actors: both are set against each other (since v0.0.63) | 5 |
 
-Measured on 22 November 2026 from the three masters (Morrowind, Tribunal, Bloodmoon) with the builder's own compiler (tools/mwscript), 11,171 placed scripted references, 11,542 bindings in the compiled file, 4 start scripts. The states are worked out again from the interpreter's function table (tools/mwscript/functions.py) whenever the page is rendered, so a function carried out later moves its scripts without a new measurement.
+Measured on 23 November 2026 from the three masters (Morrowind, Tribunal, Bloodmoon) with the builder's own compiler (tools/mwscript), 11,171 placed scripted references, 11,542 bindings in the compiled file, 4 start scripts. The states are worked out again from the interpreter's function table (tools/mwscript/functions.py) whenever the page is rendered, so a function carried out later moves its scripts without a new measurement.
 
-The image measured: build v0.0.68-dev7. Its scripts stage bound the own placements of Tribunal, Bloodmoon; the image carries 5 outdoor districts, 1,321 rooms of the interior store and 135 add-on exterior cells, and 2,443 of the 2,447 add-on bindings in the file sit in those cells (Tribunal 1,227, Bloodmoon 1,216). A script placed only in add-on cells outside them is "only in an add-on world".
+The image measured: build v0.0.68-dev10. Its scripts stage bound the own placements of Tribunal, Bloodmoon; the image carries 5 outdoor districts, 1,321 rooms of the interior store and 153 add-on exterior cells, and 2,447 of the 2,447 add-on bindings in the file sit in those cells (Tribunal 1,227, Bloodmoon 1,220). A script placed only in add-on cells outside them is "only in an add-on world".
 
 ## Why the others do not run
 
@@ -79,7 +79,7 @@ Each script that does not run, by its reason, and where its area is: Vvardenfell
 | --- | --- | ---: | ---: | ---: |
 | named by nothing | nothing names it: it never runs in the original either | 122 | 0 | 122 |
 | named by nothing | its records are never placed and nothing makes them: it never runs in the original either | 11 | 0 | 11 |
-| only in an add-on world | placed only in cells of an add-on world that the image does not carry | 0 | 3 | 3 |
+| only in an add-on world | placed only in cells of an add-on world that the image does not carry | 0 | 2 | 2 |
 
 ## Carried by AmiWind's own code
 
@@ -233,13 +233,13 @@ The area of a script is where most of its placed references stand: the region fo
 | global scripts | 33 | 32 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | red mountain region | 22 | 22 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | thirsk region | 20 | 20 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| moesring mountains region | 17 | 16 | 0 | 0 | 0 | 0 | 1 | 0 | 0 |
+| moesring mountains region | 17 | 17 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | solstheim (bloodmoon) | 16 | 16 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | grazelands region | 14 | 14 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | sheogorad | 13 | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | brodir grove region | 7 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | interior with no way out | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| **All** | **1207** | **1062** | **9** | **0** | **0** | **0** | **3** | **133** | **0** |
+| **All** | **1207** | **1063** | **9** | **0** | **0** | **0** | **2** | **133** | **0** |
 
 ## By function
 
@@ -511,12 +511,12 @@ Every function the game's scripts call. Scripts: the script records that call it
 
 ### Effect in play
 
-Carried out says that a call is executed; Effect in play says whether what the engine then does is what the original game does. Of the 259 functions the game's scripts call, 156 have the original's effect in full, 97 in part and 6 have none yet (the call is accepted and nothing of its effect happens). How each class is known: 256 read from the source against the original's rules, 3 kept by a test, 0 checked in play. A class read from the source is not yet proven in play.
+Carried out says that a call is executed; Effect in play says whether what the engine then does is what the original game does. Of the 259 functions the game's scripts call, 156 have the original's effect in full, 97 in part and 6 have none yet (the call is accepted and nothing of its effect happens). How each class is known: 255 read from the source against the original's rules, 4 kept by a test, 0 checked in play. A class read from the source is not yet proven in play.
 
 | Function | Effect | Scripts | Dialogue | What is missing | Known from | Register |
 | --- | --- | ---: | ---: | --- | --- | --- |
 | cellchanged | in part | 201 | 0 | A global script sees it only when another map loads, and an object's script when its object is attached or comes into range; walking from one outdoor cell into the next within the same map does not set it. | source | - |
-| forcegreeting | in part | 98 | 25 | Only a person the ordinary talk rules allow is greeted: a creature, a person in a fight, knocked down or with nothing to say opens no conversation; and it is not held back while the player is a werewolf. | source | - |
+| forcegreeting | in part | 98 | 25 | A creature opens no conversation: the dialogue table holds rows for people only. | test | DIALOGUE-CREATURE-SPEAKERS-66 |
 | additem | in part | 77 | 1135 | A person given an item does not put it on when it is better than what it wears, as people do in the original; the count itself is right for the player, people, creatures and containers. | source | - |
 | aiwander | in part | 73 | 101 | A wander a script gives is not kept in a saved game: after loading, the actor goes back to the wander of its game data. The wander's area is taken around where the actor was placed, not around where it stands when the call comes. | source | - |
 | positioncell | in part | 57 | 14 | An NPC or creature sent outdoors appears at its new place only while its own home area is loaded. An object that is no actor moves only within the place the player is in, not to another place. A player move into a room the image lacks does nothing. | source | MWSCRIPT-POSITIONCELL-OUTDOOR-62 |
@@ -533,7 +533,7 @@ Carried out says that a call is executed; Effect in play says whether what the e
 | placeitem | in part | 24 | 0 | An object no map converted is made and runs its script but is not drawn; a full map leaves it out. | source | MWSCRIPT-PLACE-OTHER-KINDS-62 |
 | geteffect | in part | 21 | 0 | Only the player is asked: on any NPC or creature it reads 0. An effect of an ability, disease or curse the player has (not cast) reads 0. | source | - |
 | rotate | in part | 21 | 0 | Scenery without its own entity that is no scripted mover does not turn. Rotate on the player changes nothing he sees (his view is not turned). A turned object with its own entity is back at its angle when its map loads again or a game is loaded. | source | MWSCRIPT-ROTATE-NO-ENTITY-59, WORLD-OBJECT-STATE-NOT-SAVED-59 |
-| becomewerewolf | in part | 18 | 0 | The player's stats change and his gear comes off, but he keeps his own body, his run speed and his health, and the readied spell, temporary effects, windows and witnesses are not handled. An NPC only gets a mark: its body does not change. | source | WEREWOLF-BODY-NOT-DRAWN-63, WEREWOLF-RUN-SPEED-63, WEREWOLF-TRANSFORM-RULES-PARTIAL-68, NPC-WEREWOLF-NO-MODEL-66 |
+| becomewerewolf | in part | 18 | 0 | The player's stats change, his gear comes off, the hidden werewolf robe is worn, the readied spell and temporary effects end, the inventory and magic windows stay shut and the werewolf's body and arms are drawn (in source in v0.0.68, to be seen in play); his health, the witnesses, the refusals to use things, talk and sleep, the camera height and the screen overlay are not handled. An NPC it turns is drawn as the werewolf, with the player's werewolf body and animation, at its race's size, holds nothing, fights with its claws only and stays a werewolf after death, and the player in the form fights with his claws at his race's size (in source in v0.0.68, to be seen in play); silver weapons, the werewolf's own sounds and the readier attack on a werewolf are not handled. | source | WEREWOLF-BODY-NOT-DRAWN-63, WEREWOLF-RUN-SPEED-63, WEREWOLF-TRANSFORM-RULES-PARTIAL-68, NPC-WEREWOLF-NO-MODEL-66 |
 | placeatpc | in part | 15 | 7 | An object no map converted is made but not drawn. A fifth live copy of a scripted placed record in one map is refused, and a full map leaves a made object out. | source | MWVM-PLACE-COPIES-FOUR-66, MWSCRIPT-PLACE-OTHER-KINDS-62 |
 | getangle | in part | 15 | 0 | On the player the angle about z reads 90 degrees off the view. A scripted object drawn as part of the scenery without its own entity reads 0 instead of its angle, so a script that turns such an object from its own reading goes wrong. | source | GETANGLE-PLAYER-Z-READS-OBJECT-AXIS-67, MWSCRIPT-ROTATE-NO-ENTITY-59 |
 | position | in part | 14 | 0 | The rotation argument is not applied to anyone. The player is always moved to the outdoor point, also when he is inside a room (the original moves him within that room). Another object moves only within the map it is in now, and a moved object without the actor rules goes back when its map loads again. | source | WORLD-OBJECT-STATE-NOT-SAVED-59 |
@@ -556,7 +556,7 @@ Carried out says that a call is executed; Effect in play says whether what the e
 | onmurder | in part | 5 | 0 | The murder mark is not kept in a saved game: a script that asks after a load reads 0. | source | CRIME-SAVE-PURSUERS-62 |
 | playloopsound3d | in part | 5 | 0 | A loop started on another object (named before the call) starts again at the script's own object once its first sample ends. | source | - |
 | setflee | in part | 5 | 0 | The new Flee is kept and read back, but a fighting actor still decides whether to flee by the Flee of its game data. | source | - |
-| undowerewolf | in part | 5 | 0 | The player's own stats come back, but the werewolf form had no body or run speed of its own to undo, and its health, effects and windows are not handled. An NPC only loses its mark. | source | WEREWOLF-TRANSFORM-RULES-PARTIAL-68, NPC-WEREWOLF-NO-MODEL-66 |
+| undowerewolf | in part | 5 | 0 | The player's own stats and body come back, the werewolf robe is removed, temporary effects end and the windows open again (in source in v0.0.68, to be seen in play); the form's health is not handled. An NPC is drawn with its own body again (in source in v0.0.68, to be seen in play). | source | WEREWOLF-TRANSFORM-RULES-PARTIAL-68, NPC-WEREWOLF-NO-MODEL-66 |
 | clearforcesneak | in part | 4 | 4 | On a person or creature the flag counts only for the detection rules: the actor does not take the sneaking stance, animation or speed. | source | - |
 | modstrength | in part | 4 | 2 | Maximum fatigue does not follow the new Strength. On an NPC or creature the change does not reach its fighting: its damage keeps the game data's Strength. | source | - |
 | enableteleporting | none | 4 | 0 | The switch is kept and saved, but nothing reads it: the engine has no Mark, Recall or Intervention effects for it to allow again. | source | - |
@@ -1645,7 +1645,7 @@ Referenced by: the records that carry the script and their placed references per
 | karstcavdoorScript | moesring mountains region | runs | 1 activator; placed 2 (Bloodmoon 2) | act_bm_snowdoor3 | disable, getdisabled, getjournalindex | 3: getdisabled, getjournalindex | - | - |
 | krishScript | moesring mountains region | runs | 1 creature; placed 1 (Bloodmoon 1); speaker of 6 dialogue results | bm_riekling_krish_uniqu | aifollow, aiwander, forcegreeting, getdistance, getjournalindex, getsecondspassed, journal, menumode, ondeath, setfight | 22: getdistance, getjournalindex, global, local, menumode, ondeath | - | - |
 | Sound_BM_IceSheet | moesring mountains region | runs | 1 activator; placed 14 (Bloodmoon 14) | sound_bm_ice | cellchanged, getsoundplaying, playloopsound3dvp | 2: cellchanged, getsoundplaying | - | - |
-| stahldoorScript | moesring mountains region | only in an add-on world | 1 activator; placed 1 (Bloodmoon 1) | act_bm_snowdoor4 | disable, getdisabled, getjournalindex | 2: getdisabled, getjournalindex | - | placed only in cells of an add-on world that the image does not carry |
+| stahldoorScript | moesring mountains region | runs | 1 activator; placed 1 (Bloodmoon 1) | act_bm_snowdoor4 | disable, getdisabled, getjournalindex | 2: getdisabled, getjournalindex | - | - |
 | stoneeffect5Script | moesring mountains region | runs | 1 activator; placed 1 (Bloodmoon 1) | active_bm_stonesound5 | getjournalindex, playsound | 2: getjournalindex, local | - | - |
 | stoneeffect6Script | moesring mountains region | runs | 1 activator; placed 1 (Bloodmoon 1) | active_bm_stonesound6 | getjournalindex, playsound | 2: getjournalindex, local | - | - |
 | stoneWaterScript | moesring mountains region | runs | 1 activator; placed 1 (Bloodmoon 1) | act_bm_stone_water_01 | enable, getitemcount, getjournalindex, journal, messagebox, onactivate, removeitem | 9: getitemcount, getjournalindex, global, local, onactivate | - | - |

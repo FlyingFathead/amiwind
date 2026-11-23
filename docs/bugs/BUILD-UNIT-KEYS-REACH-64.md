@@ -2,13 +2,14 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 5 times; something has to be done
+## PERSISTING: reported 6 times; something has to be done
 
 - Reported with v0.0.64 at 2026-11-11 14:34 +0200: The release build: the Vivec room stage bakes its 269 room residents again after the world step (about 20 s a unit against 0.32 s reused, about 85 min at 24 cores), the same wide resident key as the room batches earlier in the same release.
 - Reported with v0.0.66-dev1 at 2026-11-13 01:41 +0200: the v0.0.66-dev1 build (base game only) baked all 1,769 room residents again (about 7 h) because the merging reader of the expansions is in every unit key, though its output for the base game alone is the base game file itself
 - Reported with v0.0.66-dev1 at 2026-11-13 13:50 +0200: on the v0.0.66 line after the dev1 build: a default-off parameter added to the shared skeletal bake (only the creature models pass it) and a module text edit in the NPC library re-keyed all 2,147 room residents, 2,342 room actor fits and 423 NPC appearances with no change to their output; listed with their old keys (unit_store.LEGACY_SOURCES), compared unit by unit
 - Reported with v0.0.66-dev2 at 2026-11-13 16:20 +0200: the v0.0.66-dev2 build stopped at its reuse stop on 16 stages (resident-bake 0 of 2147, interior-room 0 of 198, interior-room-chim 0 of 1059, player-parts 0 of 2158 and more): module-level lines and signature defaults count as import-time code of every unit key that reaches the module, so a new constant (the skin row limit), a new default-off parameter (the skin fit) and a new constant in the room stage (a record field name) re-keyed units whose output did not change
 - Reported with v0.0.67-dev2 at 2026-11-18 06:12 +0200: the v0.0.67-dev3 line checked against the v0.0.67-dev2 build: all 2,342 room actor fits would have run again. A fit reads a room through three readers of the room conversion (tools/chim/interior.py), so its key held the whole import-time code of that module and config/chim-rooms.json, which a default value there names; the everywhere recipe in the rooms added one module line and one room setting, neither read by a fit. The fits of 40 rooms (247 placements) of the dev2 image are byte-identical with the dev2 tree, the dev3 line and the fixed tree; the readers moved unchanged into tools/chim/room_records.py and the fits stored before are found again
+- Reported with v0.0.68-dev8 at 2026-11-23 01:27 +0200: Seen on 23 November 2026 from the other side: the player parts, first-person parts and animation table caches key their tool files' import-time code only, so a change inside a bake function leaves the stored units in use, while a change to the known-missing parts list bakes every player part again.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -44,6 +45,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-13 16:20 +0200: seen again in v0.0.66-dev2: the v0.0.66-dev2 build stopped at its reuse stop on 16 stages (resident-bake 0 of 2147, interior-room 0 of 198, interior-room-chim 0 of 1059, player-parts 0 of 2158 and more): module-level lines and signature defaults count as import-time ...
 - 2026-11-18 06:12 +0200: seen again in v0.0.67-dev2: the v0.0.67-dev3 line checked against the v0.0.67-dev2 build: all 2,342 room actor fits would have run again.
 - 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
+- 2026-11-23 01:27 +0200: seen again in v0.0.68-dev8: Seen on 23 November 2026 from the other side: the player parts, first-person parts and animation table caches key their tool files' import-time code only, so a change inside a bake function leaves the stored units in use, while a change to ...
 
 <!-- END GENERATED TIMELINE -->
 
@@ -52,7 +54,7 @@ _Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 5 times; something has to be done](#persisting-reported-5-times-something-has-to-be-done)
+- [PERSISTING: reported 6 times; something has to be done](#persisting-reported-6-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [What happens](#what-happens)
 - [Cause](#cause)
@@ -274,6 +276,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [CHIM-LEGACY-CHAIN-33](CHIM-LEGACY-CHAIN-33.md): CHIM builds still run the legacy exterior chain: frame maps read the legacy region maps, and the open world is built
 - [CHIM-MESH-STAIR-UNIT-SLOW-67](CHIM-MESH-STAIR-UNIT-SLOW-67.md): One stair collision unit of a Solstheim glacier cell takes 19.5 minutes on one core, and its second over 25
 - [CHIM-PVS-SLOW-33](CHIM-PVS-SLOW-33.md): Seyda Neen's CHIM visibility rows take 5.5 minutes and are rebuilt whenever the worker count changes
+- [CHIM-REBUILD-NOT-IDENTICAL-68](CHIM-REBUILD-NOT-IDENTICAL-68.md): The CHIM world rebuilt from unchanged inputs wrote files that differ from the cached build, so the stages after it ran again
 - [CHIM-ROOM-FAIL-STAGE-48](CHIM-ROOM-FAIL-STAGE-48.md): One CHIM room that cannot be made failed the whole CHIM interiors stage (HOLD-LEVEL with every room batch by default)
 - [CHIM-ROOM-OVER-BUDGET-RETRY-48](CHIM-ROOM-OVER-BUDGET-RETRY-48.md): A model over the image budget is tried whole again on every run before its cached tiles are used: its room runs on one core
 - [CHIM-SOL-FLORA-PATH-64](CHIM-SOL-FLORA-PATH-64.md): The Solstheim test frame converts its trees as full models, not through the world flora cards Vvardenfell uses
@@ -305,12 +308,14 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [PLAYER-VIEW-SKIN-ROWS-STOP-62](PLAYER-VIEW-SKIN-ROWS-STOP-62.md): The image step's player view stopped the v0.0.62 final build after 1 h 13 min: an Alias skin rows overflow ended it instead of trying the next smaller body
 - [RELEASE-GUARD-SLOW-CLONE-51](RELEASE-GUARD-SLOW-CLONE-51.md): The release guard, the fail-fast first step of a release, took 6 minutes on about 0.14 of a core: its release check clones the whole repository through the Windows-mounted drive
 - RELEASE-SUITE-RECORD-SERIAL-51 (no report page): The release's suite record runs the whole test suite again on one core for about 22 minutes, right after the gate ran the same tests in about 2 minutes
+- [REUSE-POOL-LINK-LIMIT-68](REUSE-POOL-LINK-LIMIT-68.md): A stage's reuse was refused because one shared file had reached the file system's hard link limit, so the whole CHIM world stage was rebuilt
 - [REUSE-VERIFY-SLOW-BESIDE-MODULE-STAGES-68](REUSE-VERIFY-SLOW-BESIDE-MODULE-STAGES-68.md): Reusing the room batches of an earlier build took about 37 seconds where earlier reuses took 5
 - [ROOM-BAKE-FOOTPRINT-SLOW-48](ROOM-BAKE-FOOTPRINT-SLOW-48.md): The room actor bake's footprint rule with the collision-box test is more than 100 times slower
 - [ROOM-BATCH-CORES-49](ROOM-BATCH-CORES-49.md): The room batches stage ran on about two of its eight cores for minutes before its first room, and kept few of its finished rooms when stopped
 - ROOM-RESIDENTS-KEY-SERIAL-49 (no report page): The room residents step opens its unit cache once per resident: 233 s on one core before any cached resident is restored
 - [SHELL-ORPHAN-STARVES-GATE-66](SHELL-ORPHAN-STARVES-GATE-66.md): A leftover process in the shell container starved a gate; nothing in the master builder noticed the stall
 - [SOL-MODULE-CONVERSION-HALF-CORES-68](SOL-MODULE-CONVERSION-HALF-CORES-68.md): Solstheim's world stage converted on about half of its cores
+- [SOL-STAGE-ASSEMBLY-SERIAL-68](SOL-STAGE-ASSEMBLY-SERIAL-68.md): The Solstheim stage, rebuilt with every CHIM unit taken from the cache, spends about six minutes of its world assembly on one core
 - [STALL-SLOW-STAGE-VS-REUSE-TIME-68](STALL-SLOW-STAGE-VS-REUSE-TIME-68.md): The builder's slow-stage warning compared a stage that had to run with the few seconds an earlier build took to reuse it, and so called a normal run eight times too slow
 - [STALL-ZERO-CORES-WHILE-POOLS-BUSY-68](STALL-ZERO-CORES-WHILE-POOLS-BUSY-68.md): The build's stall check reported no cores in use while a stage's worker pools were running
 - [UNIT-CACHE-STORE-ERRORS-SILENT-63](UNIT-CACHE-STORE-ERRORS-SILENT-63.md): A unit that the unit cache failed to store was reported as stored: a cache folder the build user could not write lost every unit without a word

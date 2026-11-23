@@ -1,6 +1,6 @@
 # The expansions: Tribunal and Bloodmoon
 
-_Last updated with AmiWind v0.0.68-dev7 (22 November 2026)._
+_Last updated with AmiWind v0.0.68-dev8 (22 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -344,8 +344,9 @@ Vvardenfell view, and the densest forest region lies at exterior cell (-27, 25) 
 The survey keeps the 155 cells in its list of expansion-only cells and plans none of them until the exterior is
 converted ([world survey](WORLD_SURVEY.md)). Of the 5 open-water cells, two (-19,14 and -19,15) are open-sea cells
 of the main game's sea, already built with Vvardenfell's; -20,15 is built by the module since v0.0.68-dev8; -29,23 and
--28,24 follow once their open sea is measured in the tracker
-([CHIM-SEA-BETWEEN-ISLANDS-64](bugs/CHIM-SEA-BETWEEN-ISLANDS-64.md)). The rest of the sea between the islands has no
+-28,24 join it in the first build after v0.0.68-dev8, now that their open sea is measured in the tracker as Solstheim's
+([CHIM-SEA-BETWEEN-ISLANDS-64](bugs/CHIM-SEA-BETWEEN-ISLANDS-64.md),
+[TRACKER-OCEAN-CELL-ISLAND-BASE-ONLY-68](bugs/TRACKER-OCEAN-CELL-ISLAND-BASE-ONLY-68.md)). The rest of the sea between the islands has no
 cell in the game data and stays beyond the edge of the world, as the main game's open sea outside its cells.
 
 ## The plan

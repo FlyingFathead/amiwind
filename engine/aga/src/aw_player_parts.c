@@ -101,9 +101,10 @@ typedef struct {
     int rank;
 } slot_t;
 
-/* SIDE "<h hex>/<k hex>" or "-" (covered: nothing). Into OUT the column of the skeleton (beast: the k column):
- * 1 = a model, 0 = covered (nothing shows), 2 = no part for this skeleton (what is under it stays), -1 = malformed. */
-static int side_model (word_t side, int beast, char out[13])
+/* SIDE "<h hex>/<k hex>" or "-" (covered: nothing). Into OUT the column of the SKELETON (h, k: the beast column; any
+ * other skeleton has no column: v0.0.68, the werewolf's): 1 = a model, 0 = covered (nothing shows), 2 = no part for
+ * this skeleton (what is under it stays), -1 = malformed. */
+static int side_model (word_t side, char skeleton, char out[13])
 {
     word_t a, b;
     const char *slash;
@@ -115,7 +116,9 @@ static int side_model (word_t side, int beast, char out[13])
         return -1;
     a.p = side.p; a.n = (int)(slash - side.p);
     b.p = slash + 1; b.n = side.n - a.n - 1;
-    a = beast ? b : a;
+    if (skeleton != 'h' && skeleton != 'k')
+        return 2;
+    a = skeleton == 'k' ? b : a;
     if (a.n == 1 && a.p[0] == '-')
         return 2;
     if (!hex12 (a))
@@ -163,9 +166,10 @@ int AW_PartsAssemble (const char *text, long size, const char *race, int female,
             if (pass == 0)
             {
                 /* R <race> <0|1> <s> <weight> <height> */
+                /* the skeleton: h, k, or (v0.0.68) a letter of its own (w: the werewolf) */
                 if (k.p[0] == 'R' && next_word (&at, line_end, &w) && same_id (w, race) && next_word (&at, line_end, &sex) &&
                     sex.n == 1 && sex.p[0] == '0' + (female ? 1 : 0) && next_word (&at, line_end, &a) && a.n == 1 &&
-                    (a.p[0] == 'h' || a.p[0] == 'k') && next_word (&at, line_end, &b) && decimal (b, &out->weight) &&
+                    a.p[0] >= 'a' && a.p[0] <= 'z' && next_word (&at, line_end, &b) && decimal (b, &out->weight) &&
                     next_word (&at, line_end, &c) && decimal (c, &out->height))
                 {
                     if (!(out->weight >= .5f && out->weight <= 2 && out->height >= .5f && out->height <= 2))
@@ -294,7 +298,7 @@ int AW_PartsAssemble (const char *text, long size, const char *race, int female,
                 return 0;
             male.p = eq + 1; male.n = (int)(comma - eq - 1);
             fem.p = comma + 1; fem.n = (int)(w.p + w.n - comma - 1);
-            if ((r = side_model (female ? fem : male, beast, model)) < 0)
+            if ((r = side_model (female ? fem : male, skeleton, model)) < 0)
                 return 0;
             if (r != 2 && worn[i].rank > slot[s].rank)
             {
@@ -767,4 +771,72 @@ int AW_PartsInventoryGroups (int type, const char *out[2], int *show_left)
     if (strcmp (fallback, out[0]))
         out[1] = fallback;
     return out[1] ? 2 : 1;
+}
+
+int AW_PartsWerewolfWorn (const char *id)
+{
+    const char *robe = AW_PARTS_WEREWOLF_ROBE;
+    if (!id)
+        return 0;
+    for ( ; *id && *robe ; id++, robe++)
+        if (lower ((unsigned char)*id) != *robe)
+            return 0;
+    return !*id && !*robe;
+}
+
+/* WEREWOLF-RACE-SCALE-68 (aw_player_parts.h): the recipe's race rows, the werewolf's own left out */
+int AW_PartsRaceScales (const char *text, long size, aw_parts_race_scale_t *out, int max)
+{
+    const char *p, *end, *line_end, *le, *at;
+    word_t k, w, sex, a, b, c;
+    int n = 0;
+    float weight, height;
+    if (!text || size < 6 || !out || max < 1 || memcmp (text, "AWPP1", 5))
+        return 0;
+    end = text + size;
+    for (p = text ; p < end && n < max ; p = line_end + 1)
+    {
+        line_end = memchr (p, '\n', (size_t)(end - p));
+        if (!line_end)
+            line_end = end;
+        le = line_end > p && line_end[-1] == '\r' ? line_end - 1 : line_end;
+        at = p;
+        /* R <race> <0|1> <s> <weight> <height>, as AW_PartsAssemble reads it */
+        if (next_word (&at, le, &k) && k.n == 1 && k.p[0] == 'R' && next_word (&at, le, &w) && w.n < AW_PARTS_RACE &&
+            !same_id (w, AW_PARTS_WEREWOLF_RACE) && next_word (&at, le, &sex) && sex.n == 1 &&
+            (sex.p[0] == '0' || sex.p[0] == '1') && next_word (&at, le, &a) && a.n == 1 && next_word (&at, le, &b) &&
+            decimal (b, &weight) && next_word (&at, le, &c) && decimal (c, &height) &&
+            weight >= .5f && weight <= 2 && height >= .5f && height <= 2)
+        {
+            copy_word (w, out[n].race, AW_PARTS_RACE);
+            out[n].female = sex.p[0] == '1';
+            out[n].weight = weight;
+            out[n].height = height;
+            n++;
+        }
+    }
+    return n;
+}
+
+int AW_PartsRaceScaleFind (const aw_parts_race_scale_t *rows, int n, const char *race, int female, float *weight,
+                           float *height)
+{
+    int i;
+    word_t w;
+    if (!rows || !race || !*race)
+        return 0;
+    for (i=0 ; i<n ; i++)
+    {
+        w.p = rows[i].race;
+        w.n = (int)strlen (rows[i].race);
+        if (rows[i].female == (female != 0) && same_id (w, race))
+        {
+            if (weight)
+                *weight = rows[i].weight;
+            if (height)
+                *height = rows[i].height;
+            return 1;
+        }
+    }
+    return 0;
 }

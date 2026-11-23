@@ -138,6 +138,12 @@ static int named;
 static struct {edict_t *actor;edict_t *light;int table;} carriers[CARRIERS];
 static int carrier_count;
 static model_t *carrier_world;
+/* NPC-WEREWOLF-NO-MODEL-66 (v0.0.68): an NPC a script turned into a werewolf holds nothing, its weapon, shield and
+ * carried light neither shown nor kept (the original's setWerewolf takes every item off any actor: OpenMW 0.51
+ * mwmechanics/mechanicsmanagerimp.cpp 1880-1908, read not copied); it is drawn as the werewolf (aw_view.c). Set by
+ * aw_mwhost.c (AW_MwscriptWerewolfNpc); NULL: nobody is turned (the tools' tests). */
+int (*aw_items_werewolf)(edict_t *actor);
+static int turned(edict_t *actor) {return aw_items_werewolf && aw_items_werewolf(actor);}
 
 /* HELD-WEAPON-WRONG-MODEL-62: the tables hold precache indices of one server. A reload of the same world (the opening
  * skipped with `dbg aw hors 0` reloads Seyda Neen) keeps sv.worldmodel, so the worldmodel test alone kept the opening's
@@ -286,7 +292,7 @@ int AW_ItemsShow(edict_t *actor,edict_t *out[AW_ITEMS_KINDS]) {
     int t,k,n=0;edict_t *e;
     level_check();
     for(k=0;k<AW_ITEMS_KINDS;k++)out[k]=NULL;
-    if(!actor || actor->free || !frames_match(model_of(actor),t=entry_of(model_of(actor))))return 0;
+    if(!actor || actor->free || turned(actor) || !frames_match(model_of(actor),t=entry_of(model_of(actor))))return 0;
     for(k=0;k<AW_ITEMS_KINDS;k++){
         int i=table[t].item[k];
         /* while torches are carried the torch has the shield hand (AW_ItemsCarriedUpdate) */
@@ -383,7 +389,8 @@ static int skel_rows(int t,int f,float rows[AW_ITEMS_ROW]) {
 
 void AW_ItemsUpdate(edict_t *actor,edict_t *items[AW_ITEMS_KINDS]) {
     int t,k,f;float skel[AW_ITEMS_ROW];const float *row;
-    if(!actor || actor->free || !frames_match(model_of(actor),t=entry_of(model_of(actor)))){AW_ItemsHide(items);return;}
+    if(!actor || actor->free || turned(actor) || !frames_match(model_of(actor),t=entry_of(model_of(actor)))){
+        AW_ItemsHide(items);return;}   /* NPC-WEREWOLF-NO-MODEL-66: a werewolf holds nothing (turned in the fight too) */
     f=(int)actor->v.frame;if(f<0 || f>=table[t].frames)f=0;
     if(table[t].skel){
         if(!skel_rows(t,f,skel)){AW_ItemsHide(items);return;}
@@ -422,7 +429,7 @@ void AW_ItemsCarriedUpdate(void) {
     for(i=0;i<carrier_count;i++){
         edict_t *a=carriers[i].actor,*e=carriers[i].light;
         t=carriers[i].table;
-        if(!wanted || !a || a->free || model_of(a)!=table[t].model){
+        if(!wanted || !a || a->free || model_of(a)!=table[t].model || turned(a)){   /* a werewolf carries no light */
             if(e && !e->free)ED_Free(e);
             carriers[i].light=NULL;continue;
         }

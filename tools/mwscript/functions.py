@@ -521,7 +521,7 @@ HOST = {'getpccrimelevel', 'setpccrimelevel', 'modpccrimelevel',
         # v0.0.63 (MWSCRIPT-GAPS-63): the werewolf set (statsextensions.cpp OpSetWerewolf, OpIsWerewolf,
         # OpSetWerewolfAcrobatics, OpGetWerewolfKills; player.cpp setWerewolfStats / restoreStats): the player's form
         # with the werewolf's stats from the game settings and his own kept, his items taken off, the kills counted,
-        # an NPC's flag; saved (AWWF); the beast's body is not drawn yet. GetPCTraveling reads 0 (a travel is one
+        # an NPC's flag; saved (AWWF); the player's werewolf body since v0.0.68. GetPCTraveling reads 0 (a travel is one
         # step here; miscextensions.cpp OpGetPcTraveling)
         'becomewerewolf', 'undowerewolf', 'iswerewolf', 'setwerewolfacrobatics', 'getwerewolfkills',
         'getpctraveling',

@@ -24,10 +24,17 @@
 
 ## Timeline
 
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.68-dev7 (bc5f1981) | 2026-11-23 | gate 12640 of the planning item HORS-FROM-MENU-REGRESSED-68 | Escape in play after a game started from the main menu by a console command opens the in-game menu with Return to game; the start itself was never broken (confirmed in play on FS-UAE routes A-D and on the Pi stick) |
+
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-22: reported in v0.0.68-dev7
 - 2026-11-22 14:29 +0200: seen again in v0.0.68-dev7: Seen again on the Pi 4B development image: Escape during play shows the start screen with no way to resume; the console key is the only way back.
+- 2026-11-23: fixed in source: a gated commit, v0.0.68-dev7 (bc5f1981); gate 12640 of the planning item HORS-FROM-MENU-REGRESSED-68: Escape in play after a game started from the main menu by a console command opens the in-game menu with Return to game; the start itself was never broken (confirmed in play on FS-UAE routes A-D and on the Pi stick)
 
 <!-- END GENERATED TIMELINE -->
 

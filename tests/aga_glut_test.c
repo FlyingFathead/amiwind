@@ -148,6 +148,7 @@ int main(int argc,char **argv) {
 server_t sv;server_static_t svs;client_static_t cls;client_state_t cl;
 char *pr_strings;double realtime;
 void (*aw_combat_voice)(edict_t *,int);
+int (*aw_combat_sound_warm)(const char *path);
 static char strings[4096];static int string_at=1;
 static edict_t edicts[6];
 static struct {eval_t source,voice,hello,reset,duration,manual,netname;} fields[6];

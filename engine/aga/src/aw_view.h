@@ -82,6 +82,9 @@ int AW_ViewLockedMode(const aw_view_t *v);
 void AW_ViewPartsUnload(void);
 /* 1 = RACE (a race id) and sex are a beast race by the body recipe, 0 not, -1 unknown (DBG-RACE-SWAP-67). */
 int AW_ViewRaceBeast(const char *race,int female);
+/* dbg werewolf (WEREWOLF-BODY-63): the werewolf's look (the robe worn, the image's werewolf rows), the body's and the
+ * arms' sets (their parts and tables), the model table's slots, the pinned bytes and the animation tables' bytes. */
+void AW_ViewWerewolfStatus(void);
 
 void AW_ViewRulesDefault(aw_view_rules_t *r);
 void AW_ViewReset(aw_view_t *v,const aw_view_rules_t *r);

@@ -132,11 +132,14 @@ def left_arm(parents, bones):
     return sorted(out)
 
 
-def fp_table(skeleton):
+def fp_table(skeleton, stances=None, spells=None, light=None):
     """(table bytes, bone names, the bare hands' view matrix, the table's sample times): the first-person table of
     the skeleton (npc_geometry.Skeleton of base_anim.1st.nif). After the weapon stances the light stance
     (LIGHT_STANCE, HELD-LIGHT-OWN-MODEL-61): the bare hands' 28 frames with the left arm on the torch group, as the
-    original layers a carried light over the hands."""
+    original layers a carried light over the hands. STANCES, SPELLS [(stance, its 28 times)] and LIGHT (the left
+    arm's 28 times on the light stance), default the skeleton's own (stance_times, spell_times, light_times): a
+    skeleton without some groups gives others' times (the werewolf's every stance on its hand-to-hand frames,
+    werewolf_parts.first_person_table)."""
     import numpy as np
     import skeletal_actor as sa
     keep = fp_bones(skeleton)
@@ -144,23 +147,24 @@ def fp_table(skeleton):
     bones = list(kept.nodes)
     parents = [-1 if kept.parents[b] is None else bones.index(kept.parents[b]) for b in bones]
     times, groups, views = [], {}, []
-    for stance, t in stance_times(skeleton):
+    stances = stance_times(skeleton) if stances is None else stances
+    for stance, t in stances:
         if len(t) != FRAMES:
             raise ValueError('First-person stance %s has %d frames, not %d' % (stance, len(t), FRAMES))
         groups[stance] = (len(times), len(times) + FRAMES - 1)
         views.extend([view_matrix(camera_at(skeleton, t[0]))] * FRAMES)
         times.extend(t)
     rot, pos = sa.sample_table(kept, bones, times)
-    hands = stance_times(skeleton)[0][1]
+    hands = stances[0][1]
     groups[LIGHT_STANCE] = (len(times), len(times) + FRAMES - 1)
     views.extend([view_matrix(camera_at(skeleton, hands[0]))] * FRAMES)
     times.extend(hands)
     lrot, lpos = sa.sample_table(kept, bones, hands)
-    trot, tpos = sa.sample_table(kept, bones, light_times(skeleton))
+    trot, tpos = sa.sample_table(kept, bones, light_times(skeleton) if light is None else light)
     arm = left_arm(kept.parents, bones)
     lrot[:, arm], lpos[:, arm] = trot[:, arm], tpos[:, arm]
     rot, pos = np.concatenate((rot, lrot)), np.concatenate((pos, lpos))
-    for stance, t in spell_times(skeleton):
+    for stance, t in (spell_times(skeleton) if spells is None else spells):
         groups[stance] = (len(times), len(times) + FRAMES - 1)
         views.extend([view_matrix(camera_at(skeleton, t[0]))] * FRAMES)
         times.extend(t)
@@ -232,11 +236,13 @@ def race_skins(kinds, assets=None):
     return rows
 
 
-def recipe_text(races, items, models, bones):
+def recipe_text(races, items, models, bones, werewolf=None):
     """The first-person recipe (AWPP1, the body's format: tools/prepare_player_parts.py recipe_text, read by the
     engine's aw_player_parts.c): one table 'h', no groups ('-'), every race at the unit scale, its skin per slot, the
     items' parts per slot as '<hex>/-' (no beast column), '-/-' where a part has no model (the one under it shows).
-    models {(slot, body id): part path}; bones (weapon bone, shield bone) of the table."""
+    models {(slot, body id): part path}; bones (weapon bone, shield bone) of the table. WEREWOLF (the werewolf's arms,
+    werewolf_parts): {'table', 'bones', 'slot', 'model'}: its own table on the letter 'w' and the pseudo-race
+    'werewolf' of both sexes with the arms in that slot."""
     from prepare_player_parts import part_hex
 
     def word(s):
@@ -244,6 +250,13 @@ def recipe_text(races, items, models, bones):
             raise ValueError('Recipe id not plain ASCII: ' + s)
         return s.replace(' ', '|')
     lines = ['AWPP1', 'T h %s %d %d' % (FP_TABLE, bones[0], bones[1]), 'A h 0 -', 'A h 1 -']
+    if werewolf:
+        import werewolf_parts as WW
+        lines += ['T %s %s %d %d' % (WW.LETTER, werewolf['table'], werewolf['bones'][0], werewolf['bones'][1]),
+                  'A %s 0 -' % WW.LETTER, 'A %s 1 -' % WW.LETTER]
+        for f in (0, 1):
+            lines += ['R %s %d %s 1.0000 1.0000' % (word(WW.RACE), f, WW.LETTER),
+                      'S %s %d %d %s' % (word(WW.RACE), f, werewolf['slot'], part_hex(werewolf['model']))]
     words = {}
     for item in items:
         if words.setdefault(word(item['id']), item['id']) != item['id']:
@@ -639,7 +652,8 @@ def fp_part_path(part):
     (skin_tag) in its key."""
     from prepare_player_parts import part_path
     skin = part.get('skin')
-    return part_path(FP_SKELETON, dict(part, mesh=part['mesh'] + '|' + skin) if skin else part)
+    # a part on a first-person skeleton of its own (the werewolf's arms, werewolf_parts.first_person_part) is keyed by it
+    return part_path(part.get('skeleton', FP_SKELETON), dict(part, mesh=part['mesh'] + '|' + skin) if skin else part)
 
 
 # ---------------------------------------------------------------- one part (a pool unit)
@@ -659,6 +673,10 @@ def _fp_rig(assets):
 
 def bake_part(task):
     """Worker: one first-person part model. task = (data, palette, part, cap). Returns (path, mdl bytes, report)."""
+    import werewolf_parts
+    if task[2].get('skeleton') == werewolf_parts.SKELETON_1ST:
+        # the werewolf's arms on its own first-person table (WEREWOLF-BODY-63): the report carries the table
+        return werewolf_parts.bake_first_person(task)
     import numpy as np
     import prepare_player_view as ppv
     import skeletal_actor as sa
@@ -715,9 +733,16 @@ def unit_inputs(task):
     data, palette, part, cap = task
     # a part's skin block names the table's frame count (aw_skel_load.c refuses a part whose count differs), so the
     # table's frames are part of the key: the light stance (v0.0.61) made every part again once
-    return {'entry': {'name': 'first-person part %d %s' % (part['slot'], part['id'])}, 'skeleton': FP_SKELETON,
-            'part': part, 'cap': cap, 'palette_sha256': hashlib.sha256(palette).hexdigest(),
-            'table_frames': FRAMES * (len(STANCES) + 1 + len(SPELL_STANCES))}
+    inputs = {'entry': {'name': 'first-person part %d %s' % (part['slot'], part['id'])}, 'skeleton': FP_SKELETON,
+              'part': part, 'cap': cap, 'palette_sha256': hashlib.sha256(palette).hexdigest(),
+              'table_frames': FRAMES * (len(STANCES) + 1 + len(SPELL_STANCES))}
+    if part.get('skeleton'):
+        # the werewolf's arms (WEREWOLF-BODY-63): its own skeleton, and the code that bakes it, which this cache's own
+        # key does not hold (it keys the import code of the modules it names only)
+        import werewolf_parts
+        inputs.update(skeleton=part['skeleton'], reducer=werewolf_parts.REDUCER,
+                      code=werewolf_parts.unit_code('bake_first_person'))
+    return inputs
 
 
 def _unit_cache():
@@ -744,9 +769,14 @@ def prepare(data, id1, palette, jobs=None, log=print):
     started = time.monotonic()
     if SEAM_MATCH not in SEAM_MATCHES:
         raise ValueError('SEAM_MATCH must be one of %s: %r' % (SEAM_MATCHES, SEAM_MATCH))
+    import prepare_player_parts as ppp
+    import werewolf_parts as WW
     kinds, assets, _ = ppv._sources(data)
     races = race_skins(kinds, assets)
-    items = fp_item_rows(kinds)
+    # WEREWOLF-BODY-63: the werewolf robe is worn on the werewolf only, whose arms are a part of their own (below):
+    # its first-person skin is not a sleeve of the humanoid arms
+    ww = WW.werewolf_set(kinds)
+    items = fp_item_rows(kinds, [r for r in ppp.item_rows(kinds) if not ww or r['id'] != ww['robe']])
     need = set()
     # a race's skin part draws the mesh its row names (a hand record naming another race's mesh: the race's own,
     # player_own_skin.own_hand_mesh); an item's part the mesh its record names
@@ -773,6 +803,9 @@ def prepare(data, id1, palette, jobs=None, log=print):
             if skin:
                 part['skin'] = skin
             tasks.append((str(data), palette, part, FP_CAP.get(slot, 64)))
+    if ww and ww['skin_1st']:
+        # first: the slowest unit (the shared-vertex search of the least passing count)
+        tasks.insert(0, (str(data), palette, WW.first_person_part(ww), WW.FP_CAP))
     unique = {}
     for t in tasks:
         unique.setdefault(fp_part_path(t[2]), t)
@@ -780,6 +813,7 @@ def prepare(data, id1, palette, jobs=None, log=print):
         flush=True)
     cache = _unit_cache()
     todo, results, failed = [], {}, []
+    extra = {}      # a unit's files beside its model (the werewolf's table)
     for path, t in unique.items():
         found = None
         if cache is not None and not forced(UNIT_CACHE, unit_inputs(t)['entry']['name']):
@@ -787,6 +821,8 @@ def prepare(data, id1, palette, jobs=None, log=print):
         if found is not None:
             row, files = found
             results[path] = (files['0'], row['report'])
+            if len(files) > 1:
+                extra[path] = {k: v for k, v in files.items() if k != '0'}
         else:
             todo.append(t)
     reused = len(results)
@@ -803,9 +839,12 @@ def prepare(data, id1, palette, jobs=None, log=print):
                 failed.append(result)
                 return
             path, raw, report = result
+            more = report.pop('_files', None)
             results[path] = (raw, report)
+            if more:
+                extra[path] = more
             if cache is not None:
-                cache.store_files(unit_inputs(todo[index]), {'report': report}, {'0': raw})
+                cache.store_files(unit_inputs(todo[index]), {'report': report}, dict(more or {}, **{'0': raw}))
         with stage_pool(jobs, 'first-person parts'):
             failed.extend(unit_store.run_each('player-fp-parts', _safe_bake, list(enumerate(todo)), names, workers,
                                               keep, fallback=lambda name: 1.0, label='First-person parts',
@@ -859,8 +898,18 @@ def prepare(data, id1, palette, jobs=None, log=print):
     names = [b.casefold() for b in bones]
     item_bones = (names.index('weapon bone') if 'weapon bone' in names else -1,
                   names.index('shield bone') if 'shield bone' in names else -1)
+    # WEREWOLF-BODY-63: the werewolf's arms, their table from the unit, and the recipe's werewolf rows
+    werewolf = None
+    if ww and ww['skin_1st']:
+        wpath = fp_part_path(WW.first_person_part(ww))
+        if wpath in results:
+            if 'table' not in extra.get(wpath, {}):
+                raise ValueError('WEREWOLF-BODY-63: the werewolf arms %s came back without their table' % wpath)
+            write_same(Path(id1) / WW.TABLE_1ST, extra[wpath]['table'])
+            werewolf = {'table': WW.TABLE_1ST, 'bones': tuple(results[wpath][1]['item_bones']), 'slot': WW.FP_SLOT,
+                        'model': wpath}
     log('=== PHASE 3/3: first-person parts: the recipe ===', flush=True)
-    recipe = recipe_text(races, items, models, item_bones)
+    recipe = recipe_text(races, items, models, item_bones, werewolf)
     (Path(id1) / FP_RECIPE).parent.mkdir(parents=True, exist_ok=True)
     (Path(id1) / FP_RECIPE).write_text(recipe, encoding='ascii', newline='\n')
     sizes = [r[1]['bytes'] for r in results.values()]
@@ -876,6 +925,10 @@ def prepare(data, id1, palette, jobs=None, log=print):
               'own_hand_meshes': [{'race': race, 'sex': sex, 'record': body, 'record_mesh': named, 'mesh': own}
                                   for race, sex, body, named, own in own_meshes],
               'races': len(races), 'seconds': round(time.monotonic() - started, 1)}
+    if werewolf:
+        report['werewolf'] = {k: v for k, v in results[werewolf['model']][1].items() if k in (
+            'model', 'bytes', 'faces', 'vertices', 'source_faces', 'source_vertices', 'reducer', 'table', 'table_bytes',
+            'table_bones', 'stances', 'shapes')}
     log('First-person parts: %d models (%d reused, %d made, %d failed), %.1f MB, %d items, table %d bytes, %.1f s' % (
         report['models'], reused, report['made'], len(failed), report['bytes'] / 1e6, len(items), len(table),
         report['seconds']), flush=True)

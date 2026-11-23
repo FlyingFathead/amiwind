@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 17 times; something has to be done
+## PERSISTING: reported 18 times; something has to be done
 
 - Reported with v0.0.36-dev3 at 2026-10-11 01:43 +0300: maintainer via the Monitor: chim 19.0-29.1 min on about 1 core in the 270-frame coast build; validation 8 min, heap gate and zone walk 1 min each (file times)
 - Reported with v0.0.36-dev4 at 2026-10-11 10:20 +0300: perf guard seed: CHIM heap gate 295 s on 0.94 of 12 cores in the dev4 whole-city Vivec MiniWind (e7a8e82); the chim-speed repair has not reached the line
@@ -21,6 +21,7 @@
 - Reported with v0.0.62-dev1 at 2026-11-07 (time not recorded): Seen again in the v0.0.62-dev1 build: the CHIM validation ran 298 s on 3.49 of 24 cores; its waiver expired on 2026-11-03.
 - Reported with v0.0.63-dev3 at 2026-11-09 15:12 +0200: Seen again in the v0.0.63-dev3 build (run 2026_11_09_v0.0.63-dev3_full-v0.0.63-dev3-try2_6e68096), the first full CHIM world rebuild since the waiver expired on 3 November: the perf guard stopped the build's perf check on "CHIM validation: 172 s on 3.75 of 24 usable cores with independent frames" (the build itself passed and was delivered). The same step took 7m16s on 14.5 cores in the v0.0.63-dev1 build, so the validation is faster but still mostly serial. Then the zone walk gate (about 70 s) and the room actor cache read run on few cores too.
 - Reported with v0.0.64-dev4 at 2026-11-11 01:51 +0200: v0.0.64-dev4 full build: the CHIM validation ran 269 s on about 3 cores while the units around it ran wide; the waiver for this entry ended on 2026-11-03, so the perf guard counted it.
+- Reported with v0.0.68-dev8 at 2026-11-23 06:54 +0200: Seen again: in a build that had to rebuild the CHIM world stage, its packing and validation ran slower and on fewer cores than in the build before.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -72,6 +73,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-07: seen again in v0.0.62-dev1: Seen again in the v0.0.62-dev1 build: the CHIM validation ran 298 s on 3.49 of 24 cores; its waiver expired on 2026-11-03.
 - 2026-11-09 15:12 +0200: seen again in v0.0.63-dev3: Seen again in the v0.0.63-dev3 build (run 2026_11_09_v0.0.63-dev3_full-v0.0.63-dev3-try2_6e68096), the first full CHIM world rebuild since the waiver expired on 3 November: the perf guard stopped the build's perf check on "CHIM validation ...
 - 2026-11-11 01:51 +0200: seen again in v0.0.64-dev4: v0.0.64-dev4 full build: the CHIM validation ran 269 s on about 3 cores while the units around it ran wide; the waiver for this entry ended on 2026-11-03, so the perf guard counted it.
+- 2026-11-23 06:54 +0200: seen again in v0.0.68-dev8: Seen again: in a build that had to rebuild the CHIM world stage, its packing and validation ran slower and on fewer cores than in the build before.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -80,7 +82,7 @@ _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 17 times; something has to be done](#persisting-reported-17-times-something-has-to-be-done)
+- [PERSISTING: reported 18 times; something has to be done](#persisting-reported-18-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Status: 3 November 2026 (v0.0.59)](#status-3-november-2026-v0059)
 - [Status: 23 October 2026 (v0.0.48)](#status-23-october-2026-v0048)
@@ -453,6 +455,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [CHIM-LEGACY-CHAIN-33](CHIM-LEGACY-CHAIN-33.md): CHIM builds still run the legacy exterior chain: frame maps read the legacy region maps, and the open world is built
 - [CHIM-MESH-STAIR-UNIT-SLOW-67](CHIM-MESH-STAIR-UNIT-SLOW-67.md): One stair collision unit of a Solstheim glacier cell takes 19.5 minutes on one core, and its second over 25
 - [CHIM-PVS-SLOW-33](CHIM-PVS-SLOW-33.md): Seyda Neen's CHIM visibility rows take 5.5 minutes and are rebuilt whenever the worker count changes
+- [CHIM-REBUILD-NOT-IDENTICAL-68](CHIM-REBUILD-NOT-IDENTICAL-68.md): The CHIM world rebuilt from unchanged inputs wrote files that differ from the cached build, so the stages after it ran again
 - [CHIM-ROOM-FAIL-STAGE-48](CHIM-ROOM-FAIL-STAGE-48.md): One CHIM room that cannot be made failed the whole CHIM interiors stage (HOLD-LEVEL with every room batch by default)
 - [CHIM-ROOM-OVER-BUDGET-RETRY-48](CHIM-ROOM-OVER-BUDGET-RETRY-48.md): A model over the image budget is tried whole again on every run before its cached tiles are used: its room runs on one core
 - [CHIM-SOL-FLORA-PATH-64](CHIM-SOL-FLORA-PATH-64.md): The Solstheim test frame converts its trees as full models, not through the world flora cards Vvardenfell uses
@@ -484,12 +487,14 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [PLAYER-VIEW-SKIN-ROWS-STOP-62](PLAYER-VIEW-SKIN-ROWS-STOP-62.md): The image step's player view stopped the v0.0.62 final build after 1 h 13 min: an Alias skin rows overflow ended it instead of trying the next smaller body
 - [RELEASE-GUARD-SLOW-CLONE-51](RELEASE-GUARD-SLOW-CLONE-51.md): The release guard, the fail-fast first step of a release, took 6 minutes on about 0.14 of a core: its release check clones the whole repository through the Windows-mounted drive
 - RELEASE-SUITE-RECORD-SERIAL-51 (no report page): The release's suite record runs the whole test suite again on one core for about 22 minutes, right after the gate ran the same tests in about 2 minutes
+- [REUSE-POOL-LINK-LIMIT-68](REUSE-POOL-LINK-LIMIT-68.md): A stage's reuse was refused because one shared file had reached the file system's hard link limit, so the whole CHIM world stage was rebuilt
 - [REUSE-VERIFY-SLOW-BESIDE-MODULE-STAGES-68](REUSE-VERIFY-SLOW-BESIDE-MODULE-STAGES-68.md): Reusing the room batches of an earlier build took about 37 seconds where earlier reuses took 5
 - [ROOM-BAKE-FOOTPRINT-SLOW-48](ROOM-BAKE-FOOTPRINT-SLOW-48.md): The room actor bake's footprint rule with the collision-box test is more than 100 times slower
 - [ROOM-BATCH-CORES-49](ROOM-BATCH-CORES-49.md): The room batches stage ran on about two of its eight cores for minutes before its first room, and kept few of its finished rooms when stopped
 - ROOM-RESIDENTS-KEY-SERIAL-49 (no report page): The room residents step opens its unit cache once per resident: 233 s on one core before any cached resident is restored
 - [SHELL-ORPHAN-STARVES-GATE-66](SHELL-ORPHAN-STARVES-GATE-66.md): A leftover process in the shell container starved a gate; nothing in the master builder noticed the stall
 - [SOL-MODULE-CONVERSION-HALF-CORES-68](SOL-MODULE-CONVERSION-HALF-CORES-68.md): Solstheim's world stage converted on about half of its cores
+- [SOL-STAGE-ASSEMBLY-SERIAL-68](SOL-STAGE-ASSEMBLY-SERIAL-68.md): The Solstheim stage, rebuilt with every CHIM unit taken from the cache, spends about six minutes of its world assembly on one core
 - [STALL-SLOW-STAGE-VS-REUSE-TIME-68](STALL-SLOW-STAGE-VS-REUSE-TIME-68.md): The builder's slow-stage warning compared a stage that had to run with the few seconds an earlier build took to reuse it, and so called a normal run eight times too slow
 - [STALL-ZERO-CORES-WHILE-POOLS-BUSY-68](STALL-ZERO-CORES-WHILE-POOLS-BUSY-68.md): The build's stall check reported no cores in use while a stage's worker pools were running
 - [UNIT-CACHE-STORE-ERRORS-SILENT-63](UNIT-CACHE-STORE-ERRORS-SILENT-63.md): A unit that the unit cache failed to store was reported as stored: a cache folder the build user could not write lost every unit without a word

@@ -597,6 +597,31 @@ class ResultTests(unittest.TestCase):
         self.assertTrue(seabed['seabed_land'])
         self.assertIn('CHIMPORT-OCEAN-LAND-41', seabed['blockers'][0])
 
+    def test_an_open_sea_cell_takes_the_island_of_the_set_its_record_names(self):
+        """TRACKER-OCEAN-CELL-ISLAND-BASE-ONLY-68: the CHIM import named every open-sea cell Vvardenfell's, so a cell
+        whose record is Bloodmoon's took Vvardenfell's island. The set its result names decides; a newer result with
+        an explicit none (no record in any master) clears an older set, the nearest island cell of any set then."""
+        census = census_doc()
+        census['land'] += ['9,9']
+        census['land_bloodmoon'] = ['9,9']            # a second island: Solstheim's land cell
+        census['cells']['9,9'] = {'counts': {}, 'placements': 0, 'flora': 0, 'meshes': [], 'doors': []}
+        ocean = {'converted': True, 'status': 'ocean', 'ocean': True}
+        cp.record_result(self.out, self.result(**{'6,6': dict(ocean, set='bloodmoon'),
+                                                  '7,7': dict(ocean, set='vvardenfell'),
+                                                  '6,5': dict(ocean, set='bloodmoon')}))
+        cp.record_result(self.out, dict(self.result(**{'7,7': dict(ocean, set=None), '6,5': dict(ocean)}),
+                                        generated='2026-10-09T07:00:00+03:00'))
+        doc = ingest(self.out, census=census)
+        land_island, sol_island = doc['cells']['0,0']['island'], doc['cells']['9,9']['island']
+        self.assertNotEqual(land_island, sol_island)
+        # Bloodmoon's record: Solstheim's island, although Vvardenfell's coast (4,4, 2 cells) is nearer than 9,9 (3)
+        self.assertEqual((doc['cells']['6,6']['set'], doc['cells']['6,6']['island']), ('bloodmoon', sol_island))
+        # no record (an explicit none, newer than its old 'vvardenfell'): the nearest island cell of any set, 9,9
+        # (2 cells) over 4,4 (3 cells)
+        self.assertEqual((doc['cells']['7,7']['set'], doc['cells']['7,7']['island']), ('', sol_island))
+        # a newer result without the key keeps the older set (4,4 is nearer, Solstheim's set decides)
+        self.assertEqual((doc['cells']['6,5']['set'], doc['cells']['6,5']['island']), ('bloodmoon', sol_island))
+
     def test_open_sea_cells_are_done_map_cells_but_never_land(self):
         """K-OCEAN: cells without LAND written as references to the shared ocean chunk (chimport.py ocean)."""
         seam = {'seam_tears': {'status': 'passed', 'detail': 'largest step 0', 'numbers': {'max_step': 0.0}}}

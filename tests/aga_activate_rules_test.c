@@ -112,6 +112,17 @@ int main(void){
         assert(AW_FocusChoose(&a,AW_FOCUS_ACTOR)==AW_FOCUS_ACTOR);
         a.door=40;
         assert(AW_FocusChoose(&a,AW_FOCUS_ACTOR)==AW_FOCUS_DOOR);
+        /* FOCUS-EYE-INSIDE-ACTOR-BOX-68: the eye inside a creature's use box (a dreugh beside the sunken shipwreck,
+         * entry 0, exit 50) and the trapdoor 20 along the ray: the trapdoor, whatever had the focus before; a hinged
+         * door likewise; with no door met he keeps it (E still acts on him), and from outside his box he is nearer */
+        a.actor_near=0;a.actor_far=50.4f;a.thing=-1;a.door=20.1f;a.hinged=-1;
+        assert(AW_FocusChoose(&a,AW_FOCUS_NONE)==AW_FOCUS_DOOR && AW_FocusChoose(&a,AW_FOCUS_ACTOR)==AW_FOCUS_DOOR);
+        a.door=-1;a.hinged=12;
+        assert(AW_FocusChoose(&a,AW_FOCUS_ACTOR)==AW_FOCUS_HINGED);
+        a.hinged=-1;
+        assert(AW_FocusChoose(&a,AW_FOCUS_NONE)==AW_FOCUS_ACTOR);
+        a.actor_near=5;a.door=20.1f;
+        assert(AW_FocusChoose(&a,AW_FOCUS_NONE)==AW_FOCUS_ACTOR);
         /* a hinged door and a load door at one distance: the hinged door; nothing met: none */
         a.actor_near=a.actor_far=-1;a.door=30;a.hinged=30;
         assert(AW_FocusChoose(&a,AW_FOCUS_NONE)==AW_FOCUS_HINGED);
@@ -172,8 +183,10 @@ int main(void){
         /* the old box: met at the eye */
         assert(AW_RayBox(origin,dir,stored_lo,stored_hi,&near_hit,&far_hit) && near_hit==0 && far_hit<5);
         a.actor_near=near_hit;a.actor_far=far_hit;a.thing=-1;a.door=35.5f;a.hinged=-1;
-        assert(AW_FocusChoose(&a,AW_FOCUS_NONE)==AW_FOCUS_ACTOR);
-        printf("Aleri Aren, stored box: actor %.1f..%.1f before the door at 35.5: the actor\n",near_hit,far_hit);
+        /* FOCUS-EYE-INSIDE-ACTOR-BOX-68: even with that old box the door has it now (a box that holds the eye says
+         * nothing of where the body is along the ray); before that rule this was the actor */
+        assert(AW_FocusChoose(&a,AW_FOCUS_NONE)==AW_FOCUS_DOOR);
+        printf("Aleri Aren, stored box: actor %.1f..%.1f around the eye, the door at 35.5: the door\n",near_hit,far_hit);
         /* the new box: her body, the stored height */
         assert(AW_ActorUseBox(1,0,1,1.0f,stored_lo,stored_hi,lo,hi)==AW_USEBOX_BODY);
         assert(lo[0]==-AW_PERSON_HALF_X && hi[0]==AW_PERSON_HALF_X && lo[1]==-AW_PERSON_HALF_Y && hi[1]==AW_PERSON_HALF_Y);

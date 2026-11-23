@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.68-dev8 at 2026-11-22 19:55 +0200: On the v0.0.68-dev8 line the public tracker snapshot still holds the counts of v0.0.67 (Solstheim open terrain 0 of 144) while the Toolkit counts v0.0.68-dev7 (135 of 150); a release candidate or final is now refused on such a difference.
 - Reported with v0.0.68-dev8 at 2026-11-22 19:56 +0200: On the v0.0.68-dev8 line the public tracker snapshot still holds the counts of v0.0.67 (Solstheim open terrain 0 of 144) while the Toolkit counts v0.0.68-dev7 (135 of 150); a release candidate or final is now refused on such a difference.
+- Reported with v0.0.68-dev9 at 2026-11-23 10:52 +0200: On the v0.0.68-dev9 build the public snapshot is still the one written for v0.0.68-dev1: Solstheim's land shows as not in the game (0 of 144), while the build's own tracker counts all 150 cells as built.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -38,13 +39,14 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-10: reported in v0.0.64-dev3
 - 2026-11-22 19:55 +0200: seen again in v0.0.68-dev8: On the v0.0.68-dev8 line the public tracker snapshot still holds the counts of v0.0.67 (Solstheim open terrain 0 of 144) while the Toolkit counts v0.0.68-dev7 (135 of 150); a release candidate or final is now refused on such a difference.
 - 2026-11-22 19:56 +0200: seen again in v0.0.68-dev8: On the v0.0.68-dev8 line the public tracker snapshot still holds the counts of v0.0.67 (Solstheim open terrain 0 of 144) while the Toolkit counts v0.0.68-dev7 (135 of 150); a release candidate or final is now refused on such a difference.
+- 2026-11-23 10:52 +0200: seen again in v0.0.68-dev9: On the v0.0.68-dev9 build the public snapshot is still the one written for v0.0.68-dev1: Solstheim's land shows as not in the game (0 of 144), while the build's own tracker counts all 150 cells as built.
 
 <!-- END GENERATED TIMELINE -->
 
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Bugs in the same category](#bugs-in-the-same-category)
 

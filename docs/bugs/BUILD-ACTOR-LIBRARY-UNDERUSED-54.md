@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 7 times; something has to be done
+## PERSISTING: reported 8 times; something has to be done
 
 - Reported with v0.0.57-dev1 at 2026-10-30 11:17 +0200: v0.0.57-dev2 full build (2026_10_30_v0.0.57-dev1_full-dev2_2a4027c): actor-library again at 1.6 of 12 cores with 415 units queued and none running, the same start-up stall as the dev1 build
 - Reported with v0.0.57-dev4 at 2026-10-30 19:19 +0200: PERSISTING: dev4 full run 2026_10_30_v0.0.57-dev4_full-...-after-the-collision-fix_c53994d, actor-library at 11.78 of 24 cores with 37 units queued and 23 running (fail_watch UNDERUSED); the resource plan had already throttled it to 19 workers for memory (672 MiB each beside a 741 MiB parent), so part of this is the memory limit, part the slowest unit's tail
@@ -11,6 +11,7 @@
 - Reported with v0.0.64-dev2 at 2026-11-10 11:40 +0200: MiniWind of the Heart Chamber (heart worktree, try3 at 8b671573): the actor-library stage at 3.78 of 8 allowed cores with 9 units queued and 0 running for 85 s (a small sandbox build)
 - Reported with v0.0.67-dev3 at 2026-11-18 21:47 +0200: Seen again on the v0.0.67-dev3 line test build: the actor-library stage ran on 1.0 of 24 planned cores for about 310 s while the NPC library was at 507-512 of 530 and the creature library baked its one remaining unit (the storm atronach fell back to the kf bake); the stage then returned to about 23 cores. The last units of one library and the single unit of the other do not overlap, so the tail runs on one core.
 - Reported with v0.0.67-dev3 at 2026-11-19 03:14 +0200: Seen again on a test build of the v0.0.67-dev3 line: the actor-library stage ran on about 4 of its 12 allowed cores for about six minutes with 31 units queued and none running.
+- Reported with v0.0.68-dev8 at 2026-11-22 22:16 +0200: Again in v0.0.68-dev8: in the NPC model step less than half the allowed cores were busy while thirty-one units waited and no unit was in work.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -54,6 +55,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-10 11:40 +0200: seen again in v0.0.64-dev2: MiniWind of the Heart Chamber (heart worktree, try3 at 8b671573): the actor-library stage at 3.78 of 8 allowed cores with 9 units queued and 0 running for 85 s (a small sandbox build)
 - 2026-11-18 21:47 +0200: seen again in v0.0.67-dev3: Seen again on the v0.0.67-dev3 line test build: the actor-library stage ran on 1.0 of 24 planned cores for about 310 s while the NPC library was at 507-512 of 530 and the creature library baked its one remaining unit (the storm atronach ...
 - 2026-11-19 03:14 +0200: seen again in v0.0.67-dev3: Seen again on a test build of the v0.0.67-dev3 line: the actor-library stage ran on about 4 of its 12 allowed cores for about six minutes with 31 units queued and none running.
+- 2026-11-22 22:16 +0200: seen again in v0.0.68-dev8: Again in v0.0.68-dev8: in the NPC model step less than half the allowed cores were busy while thirty-one units waited and no unit was in work.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -62,7 +64,7 @@ _Last updated with AmiWind v0.0.57-dev5 (30 October 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 7 times; something has to be done](#persisting-reported-7-times-something-has-to-be-done)
+- [PERSISTING: reported 8 times; something has to be done](#persisting-reported-8-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Status: 30 October 2026](#status-30-october-2026)
 - [Symptom](#symptom)
@@ -284,6 +286,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [CHIM-LEGACY-CHAIN-33](CHIM-LEGACY-CHAIN-33.md): CHIM builds still run the legacy exterior chain: frame maps read the legacy region maps, and the open world is built
 - [CHIM-MESH-STAIR-UNIT-SLOW-67](CHIM-MESH-STAIR-UNIT-SLOW-67.md): One stair collision unit of a Solstheim glacier cell takes 19.5 minutes on one core, and its second over 25
 - [CHIM-PVS-SLOW-33](CHIM-PVS-SLOW-33.md): Seyda Neen's CHIM visibility rows take 5.5 minutes and are rebuilt whenever the worker count changes
+- [CHIM-REBUILD-NOT-IDENTICAL-68](CHIM-REBUILD-NOT-IDENTICAL-68.md): The CHIM world rebuilt from unchanged inputs wrote files that differ from the cached build, so the stages after it ran again
 - [CHIM-ROOM-FAIL-STAGE-48](CHIM-ROOM-FAIL-STAGE-48.md): One CHIM room that cannot be made failed the whole CHIM interiors stage (HOLD-LEVEL with every room batch by default)
 - [CHIM-ROOM-OVER-BUDGET-RETRY-48](CHIM-ROOM-OVER-BUDGET-RETRY-48.md): A model over the image budget is tried whole again on every run before its cached tiles are used: its room runs on one core
 - [CHIM-SOL-FLORA-PATH-64](CHIM-SOL-FLORA-PATH-64.md): The Solstheim test frame converts its trees as full models, not through the world flora cards Vvardenfell uses
@@ -315,12 +318,14 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [PLAYER-VIEW-SKIN-ROWS-STOP-62](PLAYER-VIEW-SKIN-ROWS-STOP-62.md): The image step's player view stopped the v0.0.62 final build after 1 h 13 min: an Alias skin rows overflow ended it instead of trying the next smaller body
 - [RELEASE-GUARD-SLOW-CLONE-51](RELEASE-GUARD-SLOW-CLONE-51.md): The release guard, the fail-fast first step of a release, took 6 minutes on about 0.14 of a core: its release check clones the whole repository through the Windows-mounted drive
 - RELEASE-SUITE-RECORD-SERIAL-51 (no report page): The release's suite record runs the whole test suite again on one core for about 22 minutes, right after the gate ran the same tests in about 2 minutes
+- [REUSE-POOL-LINK-LIMIT-68](REUSE-POOL-LINK-LIMIT-68.md): A stage's reuse was refused because one shared file had reached the file system's hard link limit, so the whole CHIM world stage was rebuilt
 - [REUSE-VERIFY-SLOW-BESIDE-MODULE-STAGES-68](REUSE-VERIFY-SLOW-BESIDE-MODULE-STAGES-68.md): Reusing the room batches of an earlier build took about 37 seconds where earlier reuses took 5
 - [ROOM-BAKE-FOOTPRINT-SLOW-48](ROOM-BAKE-FOOTPRINT-SLOW-48.md): The room actor bake's footprint rule with the collision-box test is more than 100 times slower
 - [ROOM-BATCH-CORES-49](ROOM-BATCH-CORES-49.md): The room batches stage ran on about two of its eight cores for minutes before its first room, and kept few of its finished rooms when stopped
 - ROOM-RESIDENTS-KEY-SERIAL-49 (no report page): The room residents step opens its unit cache once per resident: 233 s on one core before any cached resident is restored
 - [SHELL-ORPHAN-STARVES-GATE-66](SHELL-ORPHAN-STARVES-GATE-66.md): A leftover process in the shell container starved a gate; nothing in the master builder noticed the stall
 - [SOL-MODULE-CONVERSION-HALF-CORES-68](SOL-MODULE-CONVERSION-HALF-CORES-68.md): Solstheim's world stage converted on about half of its cores
+- [SOL-STAGE-ASSEMBLY-SERIAL-68](SOL-STAGE-ASSEMBLY-SERIAL-68.md): The Solstheim stage, rebuilt with every CHIM unit taken from the cache, spends about six minutes of its world assembly on one core
 - [STALL-SLOW-STAGE-VS-REUSE-TIME-68](STALL-SLOW-STAGE-VS-REUSE-TIME-68.md): The builder's slow-stage warning compared a stage that had to run with the few seconds an earlier build took to reuse it, and so called a normal run eight times too slow
 - [STALL-ZERO-CORES-WHILE-POOLS-BUSY-68](STALL-ZERO-CORES-WHILE-POOLS-BUSY-68.md): The build's stall check reported no cores in use while a stage's worker pools were running
 - [UNIT-CACHE-STORE-ERRORS-SILENT-63](UNIT-CACHE-STORE-ERRORS-SILENT-63.md): A unit that the unit cache failed to store was reported as stored: a cache folder the build user could not write lost every unit without a word

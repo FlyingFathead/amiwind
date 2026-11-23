@@ -496,6 +496,17 @@ def unit_counts(groups, digests):
     return min(usable, held), held
 
 
+def units_found(groups, digests):
+    """The stored units one opener finds: the largest group under one of DIGESTS (its key and the older forms it still
+    looks up), as unit_counts counts them."""
+    best = set()
+    for digest in digests:
+        group = set(groups.get(digest, ()))
+        if len(group) > len(best):
+            best = group
+    return best
+
+
 def stage_unit_caches(openers, closure, units=None):
     """The openers a stage reaches: its module in the stage's closure, and its function in the reached units when
     the stage's unit reach is known."""
@@ -689,6 +700,11 @@ def unit_report(steps, closures, units, cache_root, workspace, rebuilt, root=ROO
     for name, _ in steps:
         if name not in rebuilt:
             continue
+        # A cache several openers of the stage bake into (the creature models: the default route and the whole-model
+        # route) holds their units side by side, each set under its own code's digest: the units found are the union
+        # of what each opener finds, against the cache's held count once (counted per opener, the whole-model route's
+        # 1 of 97 read as "96 of 97 would bake again": BUILD-UNIT-KEYS-REACH-64).
+        found, order = {}, []
         for opener in stage_unit_caches(openers, (closures or {}).get(name), (units or {}).get(name)):
             cache = opener['name']
             if not cache:
@@ -696,10 +712,15 @@ def unit_report(steps, closures, units, cache_root, workspace, rebuilt, root=ROO
             key = (cache, json.dumps(opener['scripts']))
             if cache not in groups:
                 groups[cache] = census(cache_root, cache, workspace)
-            if digests[key] is None:
-                row = (cache, None, held_units(groups[cache]))
+            if cache not in found:
+                found[cache], order = set(), order + [cache]
+            if found[cache] is None or digests[key] is None:
+                found[cache] = None
             else:
-                row = (cache, *unit_counts(groups[cache], digests[key][1]))
+                found[cache] |= units_found(groups[cache], digests[key][1])
+        for cache in order:
+            held = held_units(groups[cache])
+            row = (cache, None if found[cache] is None else min(len(found[cache]), held), held)
             limit = (limits or {}).get(name)
             if limit is not None:
                 row = (row[0], None if row[1] is None else min(row[1], limit), min(row[2], limit))

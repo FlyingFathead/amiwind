@@ -420,6 +420,8 @@ static int hand_weapon(int index,int with_arms) {
 int (*aw_hand_parts_bone_tag)(int hand,float tag[6]);
 /* aw_view.c (aw_hand_models.h): the left arm on the light stance over the stance applied; NULL in fixtures */
 int (*aw_hand_parts_left_light)(int frame);
+/* aw_view.c (aw_hand_models.h, WEREWOLF-BODY-63): the arms are the werewolf's; NULL in fixtures */
+int (*aw_hand_werewolf)(void);
 /* FP-TORCH-HAND-REGRESSION-67: what a hand holds, placed on that hand's own bone of the arms from parts drawn this frame
  * (AW_HandItemPlace): 1 with ORIGIN and ANGLES */
 static int hand_item_on_bone(int hand,const float carried[6],float origin[3],float angles[3]) {
@@ -544,6 +546,13 @@ int AW_HandModelsApply(void)
         }
     }
     if(!pair_valid || index<0)return 0;
+    /* WEREWOLF-BODY-63 (v0.0.68): the werewolf's arms (aw_view.c) at the bare hands' stance, before everything else: no
+     * weapon, light, torch or spell stance on them (the change of form takes every item off; with the robe worn by
+     * hand, dbg give werewolfrobe, what is still equipped is not drawn); its claws strike on the fists' frames */
+    if(aw_hand_werewolf && aw_hand_werewolf() && aw_hand_parts_apply && aw_hand_parts_apply(race,female,0,cl.viewent.frame)){
+        AW_TorchUseHandAssets(1);release_owned(base,"progs/v_nord.mdl");AW_TorchReleaseLegacyCache();
+        return 1;
+    }
     /* READY-MAGIC-SHOWS-WEAPON-65 (v0.0.66): readied magic first, whatever is equipped (AW_HandView); before, the lit
      * torch and a held light came first and R showed the right hand's fist beside them (v0.0.66-dev1). The torch and
      * the light are put away while magic is ready (aw_torch.c aw_torch_put_away), so they are not lit either. */

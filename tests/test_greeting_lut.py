@@ -7,7 +7,9 @@ TalkedToPc, a speaker define kept for the engine. Checked: the lines each NPC's 
 the shared filter (mwad.dialogue.Context.compile) lets that NPC say, in the original's order, up to the first one
 without a run-time condition; the condition records' opcodes; the build-time evaluation of the town residents'
 greeting is unchanged by the compile step; library NPCs (tools/npc_library.py entity texts) find their record; the
-image step writes id1/npc-voices.lut from a Data Files folder.
+image step writes id1/npc-voices.lut from a Data Files folder. Creature speakers (DIALOGUE-CREATURE-SPEAKERS-66): one
+fixture creature per record type and per kind whose rule differs from an NPC's, their rows sorted with the NPCs' and
+found by the engine's search, the NPC rows unchanged by them.
 """
 import struct
 import sys
@@ -594,6 +596,257 @@ class NativeVoiceTable(unittest.TestCase):
         self.assertEqual(report['player_voices']['dark elf/f'], 'dunmer_f')
         text = G.player_voices_text(report['player_voices']).decode('cp1252')
         self.assertTrue(text.startswith('AWPV1\n') and 'breton\tm\tbreton_m\n' in text)
+
+
+# ---- creature speakers (DIALOGUE-CREATURE-SPEAKERS-66): one fixture creature of each record type and of each kind
+# whose rule differs from an NPC's (OpenMW filter.cpp: a creature says only the INFOs that name it; their race, class,
+# faction and rank filters and the sex are not tested; no disposition test; a player-rank filter without a player
+# faction needs the speaker's faction, which a creature has not; the functions that read a sex, race or faction have
+# one value; its level, AI settings and script are its own record's)
+
+def creature_record(identifier, name, kind=0, level=5, script='', hello=0, services=0):
+    fields = [f('NAME', identifier), f('MODL', 'r\\creature.nif'), f('FNAM', name),
+              ('NPDT', struct.pack('<24i', kind, level, *([0] * 22))), ('FLAG', struct.pack('<I', 0)),
+              ('AIDT', struct.pack('<HBBB3xI', hello, 90, 0, 0, services))]
+    return fields + ([f('SCRI', script)] if script else [])
+
+
+def player_rank(fields, pcrank):
+    """FIELDS with the INFO's player rank filter set (DATA byte 10)."""
+    return [(tag, data[:10] + struct.pack('<b', pcrank) + data[11:] if tag == 'DATA' else data) for tag, data in fields]
+
+
+def function_rule(name, op, value):
+    """An SCVR function condition (rule '01' + the function's number + the comparison) and its value."""
+    return ('01%02d%d' % (dialogue.FUNCTIONS.index(name), op), value)
+
+
+SCAMP_SCRIPT = 'begin scampscript\nshort scampgreet\nend\n'
+CREATURES = {
+    'raven': creature_record('raven', 'Ettiene', kind=0, hello=100),                        # type creature
+    'scamp': creature_record('scamp', 'Creeper', kind=1, script='ScampScript', hello=50, services=0x3403),  # daedra
+    'lich': creature_record('lich', 'Gedna Relvel', kind=2, level=40),                      # undead
+    'ghost': creature_record('ghost', "Variner's Ghost", kind=2, level=30, hello=90),
+    'ash_ghoul': creature_record('ash_ghoul', 'Ash Ghoul', kind=3, level=15),                # humanoid, no script
+    'rat': creature_record('rat', 'Rat'),                                                   # no line names it
+}
+CREATURE_TOPICS = {   # appended after the NPCs' INFOs of each topic
+    'hello': [info('ch1', 'Krr- AWWGH!', ONAM='raven', gender=1, sound='vo\\misc\\raven.mp3'),     # female only
+              info('ch2', 'I smell your blood.', ONAM='lich', RNAM='Dark Elf', gender=1, disp=40,
+                   sound='vo\\misc\\lich.mp3'),
+              player_rank(info('ch3', 'Stranger! Listen!', ONAM='ghost', RNAM='Dark Elf', rank=0, gender=0,
+                               sound='vo\\misc\\ghost1.mp3'), 0),
+              info('ch4', 'Peace.', ONAM='ghost', sound='vo\\misc\\ghost2.mp3'),
+              info('ch5', 'Rrrh.', ONAM='ash_ghoul', scvr=[('0CsX0nosuch', 1)], sound='vo\\misc\\ghoul.mp3')],
+    'greeting 1': [info('cg1', 'I am %Name!', kind=2, ONAM='scamp', scvr=[('03sX0scampgreet', 0)]),
+                   info('cg2', 'I am a %Class.', kind=2, ONAM='lich'),
+                   info('cg3', 'Kin?', kind=2, ONAM='ash_ghoul', scvr=[function_rule('SameRace', 0, 1)]),
+                   info('cg4', 'You are no beast.', kind=2, ONAM='ash_ghoul', scvr=[function_rule('Werewolf', 0, 0)])],
+}
+
+
+def creature_kinds(base=None):
+    k = base or kinds()
+    k['CREA'] = {i: list(v) for i, v in CREATURES.items()}
+    k['SCPT'] = dict(k.get('SCPT', {}), scampscript=[('SCHD', b'ScampScript'.ljust(52, b'\0')), f('SCTX', SCAMP_SCRIPT)])
+    return k
+
+
+def creature_topics(base=TOPICS):
+    return {t: list(base.get(t, [])) + CREATURE_TOPICS.get(t, []) for t in list(base) + list(CREATURE_TOPICS)}
+
+
+def named_lines(t, ident, topic):
+    """G.lines with each condition's operand by what it names (the names and globals are numbered in entry order)."""
+    out = []
+    for text, sound, conds in G.lines(t, ident, topic):
+        out.append((text, sound, [(op, cmp, t['globals'][x][0] if op == G.OP_GLOBAL else
+                                   t['names'][x] if op in G.NAMED and x != G.NONE16 else x, v)
+                                  for op, cmp, x, v in conds]))
+    return out
+
+
+class CreatureSpeakers(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.kinds = creature_kinds()
+        cls.raw, cls.report = G.build(cls.kinds, creature_topics())
+        cls.t = G.read(cls.raw)
+
+    def hellos(self, ident):
+        return [line for line, _, _ in G.lines(self.t, ident, 'hello')]
+
+    def test_creatures_with_lines_get_rows_sorted_with_the_npcs(self):
+        self.assertEqual(G.creature_speakers(self.kinds, creature_topics()),
+                         ['ash_ghoul', 'ghost', 'lich', 'raven', 'scamp'])
+        self.assertEqual(sorted(self.t['npcs']), sorted(list(NPCS) + ['ash_ghoul', 'ghost', 'lich', 'raven', 'scamp']))
+        self.assertNotIn('rat', self.t['npcs'])                        # a creature no line names has no row
+        ids = [G.id_bytes(i) for i in self.t['npcs']]
+        self.assertEqual(ids, sorted(ids))                             # one order: the engine's binary search
+        self.assertEqual((self.report['npcs'], self.report['creature_rows']), (len(NPCS) + 5, 5))
+
+    def test_a_creature_row_has_no_disposition_rank_or_defines(self):
+        raven, scamp = self.t['npcs']['raven'], self.t['npcs']['scamp']
+        self.assertEqual((raven['hello'], raven['disposition'], raven['rank']), (150, 0, -1))   # Hello 100 x 6 x 0.25
+        self.assertEqual(scamp['hello'], 75)
+        self.assertEqual(raven['defines'], {'class': None, 'race': None, 'faction': None, 'rank': None, 'cell': None})
+
+    def test_only_the_lines_that_name_it_and_no_npc_filter(self):
+        # the sex filter is not tested for a creature (the NPC rule drops a female-only line for a male speaker)
+        self.assertEqual(self.hellos('raven'), ['Krr- AWWGH!'])
+        as_npc = [(tag, f('ONAM', 'fargoth')[1] if tag == 'ONAM' else data) for tag, data in CREATURE_TOPICS['hello'][0]]
+        self.assertIsNone(dialogue.Context(self.kinds, 'fargoth').compile(as_npc))
+        # the race and sex filters and the disposition are not tested: no Disposition condition either
+        self.assertEqual(G.lines(self.t, 'lich', 'hello'),
+                         [('I smell your blood.', voice_pool_name('vo\\misc\\lich.mp3')[6:22], [])])
+        # a player rank with no player faction is in the speaker's faction: a creature has none, never said
+        self.assertEqual(self.hellos('ghost'), ['Peace.'])
+        # no INFO for anyone (no actor) is ever a creature's: the NPCs' greetings and Random100 hello are not its
+        self.assertEqual(G.lines(self.t, 'raven', 'greeting'), [])
+        self.assertNotIn('Hm?', self.hellos('ash_ghoul'))
+
+    def test_scripted_and_scriptless_creatures(self):
+        # a scriptless creature: NotLocal passes, Local fails (filter.cpp testFunctionLocal), both decided here
+        self.assertEqual(G.lines(self.t, 'ash_ghoul', 'hello')[0][2], [])
+        self.assertIsNone(G.CreatureContext(self.kinds, 'ash_ghoul', G.NO_CELL).compile(
+            info('x', 'x', kind=2, ONAM='ash_ghoul', scvr=[('03sX0nosuch', 0)])))
+        # the scamp's own script declares the local: left for run time; its %Name kept for the engine
+        self.assertEqual(named_lines(self.t, 'scamp', 'greeting'),
+                         [(text_defines.encode('I am %Name!')[0], None, [(G.OP_LOCAL, 0, 'scampgreet', 0)])])
+
+    def test_functions_with_one_value_for_a_creature(self):
+        # SameRace is never true for a creature, Werewolf never: decided here (an NPC's are left for run time)
+        self.assertEqual(G.lines(self.t, 'ash_ghoul', 'greeting'), [('You are no beast.', None, [])])
+        npc = dialogue.Context(self.kinds, 'fargoth')
+        creature = G.CreatureContext(self.kinds, 'ash_ghoul')
+        for name, value in G.CREATURE_FIXED.items():
+            with self.subTest(function=name):
+                self.assertIs(npc.static(name, '', '0', value), dialogue.RUNTIME)
+                self.assertIs(creature.static(name, '', '0', value), True)
+                self.assertIs(creature.static(name, '', '1', value), False)
+        self.assertIs(creature.static('Reputation', '', '0', 0), True)            # a creature's reputation is 0
+        self.assertIs(creature.static('Level', '', '0', 15), True)                # its record's level
+        self.assertIs(creature.static('Hello', '', '0', 0), True)                 # its record's AI settings
+        self.assertIs(creature.static('NotClass', 'mage', '0', 1), True)
+
+    def test_defines_a_creature_cannot_fill(self):
+        # %Class is an NPC's only: the line is said without text (as an NPC's unfillable define), %Name is its name
+        self.assertEqual(G.lines(self.t, 'lich', 'greeting'), [(None, None, [])])
+        self.assertTrue(G.creature_fillable(self.kinds, 'scamp', 'I am %Name, %PCName!'))
+        for line in ('a %Class', 'a %Race', 'of the %Faction', 'my %Rank', 'in %Cell', '%Nonsense'):
+            self.assertFalse(G.creature_fillable(self.kinds, 'scamp', line), line)
+        self.assertTrue(G.creature_fillable(self.kinds, 'scamp', 'in %Cell', 'Caldera'))
+
+    def test_the_record_type_changes_nothing(self):
+        # creature, daedra, undead, humanoid: the same INFO compiles the same for each (filter.cpp has no type test)
+        k = creature_kinds()
+        line = info('t', 'Any.', ONAM='', RNAM='Dark Elf', CNAM='Mage', FNAM='Mages Guild', rank=2, gender=0, disp=80,
+                    scvr=[function_rule('Health_Percent', 4, 50)])
+        got = []
+        for kind, name in enumerate(G.CREATURE_TYPES):
+            ident = 'type_%d' % kind
+            k['CREA'][ident] = creature_record(ident, name, kind=kind)
+            fields = [(tag, f('ONAM', ident)[1] if tag == 'ONAM' else data) for tag, data in line]
+            context = G.CreatureContext(k, ident)
+            self.assertEqual(context.npc['type'], name)
+            got.append(context.compile(fields))
+        self.assertEqual(got, [[('Health_Percent', '', '4', 50)]] * 4)
+
+    def test_npc_rows_unchanged_by_the_creature_rows(self):
+        raw, report = G.build(kinds(), TOPICS)
+        before = G.read(raw)
+        for ident in NPCS:
+            for topic in before['topics']:
+                with self.subTest(npc=ident, topic=topic):
+                    self.assertEqual(named_lines(self.t, ident, topic), named_lines(before, ident, topic))
+            self.assertEqual({k: v for k, v in self.t['npcs'][ident].items() if k != 'set'},
+                             {k: v for k, v in before['npcs'][ident].items() if k != 'set'})
+
+    def test_coverage_counts_the_creature_speakers_apart(self):
+        c = self.report['coverage']
+        self.assertEqual((c['npcs_voiced'], c['npcs_total'], c['npcs_unmapped']), (len(NPCS), len(NPCS), {}))
+        self.assertEqual((c['creature_speakers'], c['creature_speakers_voiced']), (5, 4))   # the scamp has no voice
+        self.assertEqual(G.unexplained(c), [])
+        self.assertIn('creature speakers 5 (4 voiced), left out: none', G.coverage_line(c))
+        self.assertNotIn('raven', self.report['player_voices'].values())
+
+
+@unittest.skipUnless(__import__('shutil').which('cc'), 'a C compiler is required')
+class NativeCreatureRows(unittest.TestCase):
+    """engine/aga/src/aw_glut.c on a table with creature rows (tests/aga_glut_test.c): every row found by its id (the
+    binary search over one sorted order), its hello distance, and the creatures' picks against the reference."""
+
+    def test_lookup_hello_and_pick(self):
+        import subprocess
+        sys.path.insert(0, str(ROOT / 'tests'))
+        from test_aga_native_source import tree_project_version
+        raw, _ = G.build(creature_kinds(), creature_topics())
+        t = G.read(raw)
+        with tempfile.TemporaryDirectory(prefix='amiwind-glut-crea-') as folder:
+            tmp = Path(folder)
+            (tmp / G.NAME).write_bytes(raw)
+            tree_project_version().generate_native(ROOT / 'VERSION', tmp)
+            src = ROOT / 'engine/aga/src'
+            built = subprocess.run(['cc', '-std=gnu89', '-O1', '-Wall', '-Wno-unused', '-fsanitize=undefined',
+                                    '-fno-sanitize-recover=all', '-include', str(ROOT / 'tests/aga_test_files.h'),
+                                    '-I' + str(tmp), '-I' + str(src), str(ROOT / 'tests/aga_glut_test.c'),
+                                    str(src / 'aw_glut.c'), '-DAW_GLUT_HOST_TEST', '-lm', '-o', str(tmp / 'pure')],
+                                   capture_output=True, text=True)
+            self.assertEqual(built.returncode, 0, built.stderr)
+            order, lines = list(t['npcs']), ['find\trat\t-1']
+            for ident in order:
+                # the engine lowers ASCII letters only (aw_glut.c idcmp): an accented id keeps its other bytes
+                lines.append('find\t%s\t%d' % (''.join(c.upper() if c.isascii() else c for c in ident),
+                                               order.index(ident)))
+                lines.append('hello\t%s\t%d' % (ident, t['npcs'][ident]['hello']))
+            for ident in ('raven', 'lich', 'ghost', 'ash_ghoul'):
+                for topic in t['topics']:
+                    state = {'talked': 0, 'random': 50, 'speaker': 100, 'player': 100}
+                    lines.append('pick\t%s\t%s\t0\t50\t100\t100\t%d' % (ident, topic, ref_pick(t, ident, topic, state)))
+            (tmp / 'expect.txt').write_text('\n'.join(lines) + '\n', encoding='cp1252')
+            result = subprocess.run([str(tmp / 'pure'), 'pure', str(tmp / G.NAME), str(tmp / 'expect.txt')],
+                                    capture_output=True, text=True, cwd=folder)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn('%d checks' % len(lines), result.stdout)
+
+
+class CreatureRowKeepsEveryVoice(unittest.TestCase):
+    """DIALOGUE-CREATURE-SPEAKERS-66: a creature with a row takes its voice lines from the table (aw_anim.c
+    AW_VoiceSay) and no longer from the lines its model's layout names. 37 of the 46 creature rows hold text only, so
+    this would silence them in a fight IF the layout route had ever given a creature a line. It never did: a layout's
+    voice words come only from an appearance's 'voices', which only npc_anim.voices_of sets, and every caller hands it
+    an NPC record's appearance. So a text-only creature is as silent as before and the voiced ones gain their lines.
+    (A creature's moan, roar and scream are its sound generator's: another route, aw_anim.c emit.)"""
+
+    def test_only_an_npc_record_ever_had_layout_voice_lines(self):
+        tools = ROOT / 'tools'
+        callers = sorted(p.name for p in tools.glob('*.py')
+                         if p.name != 'npc_anim.py' and 'voices_of(' in p.read_text(encoding='utf-8', errors='replace'))
+        self.assertEqual(callers, ['halloween_cast.py', 'import_town.py', 'prepare_area.py', 'prepare_combat.py'])
+        area = (tools / 'prepare_area.py').read_text(encoding='utf-8')
+        # one call, in the loop over the cast's NPC records (the record is read from kinds['NPC_'] just before it)
+        self.assertEqual(area.count('voices_of('), 1)
+        at = area.index("appearance['voices']=voices_of(topics,appearance)")
+        loop = area[area.rindex('for identifier in identifiers:', 0, at):at]
+        self.assertIn("first(kinds['NPC_'][identifier],'NPDT')", loop)
+        # both bakes read the words from the appearance alone: an actor without 'voices' gets none
+        self.assertEqual(area.count("(appearance.get('voices') or {}).items()"), 2)
+        # the creature residents' selection gives an appearance no voices
+        self.assertNotIn('voices', (tools / 'creature_residents.py').read_text(encoding='utf-8'))
+        # the other callers resolve an NPC's outfit or a town's NPC appearance
+        self.assertIn('npc_anim.voices_of(master[2], outfit(master[0], identifier))',
+                      (tools / 'prepare_combat.py').read_text(encoding='utf-8'))
+
+    def test_the_layout_route_reads_only_those_words_and_the_table_comes_first(self):
+        anim = (ROOT / 'engine/aga/src/aw_anim.c').read_text(encoding='utf-8')
+        say = anim[anim.index('int AW_VoiceSay(edict_t *e,int topic,int odds) {'):]
+        say = say[:say.index('\n}\n')]
+        table = say.index('if(aw_voice_table_row && (row=aw_voice_table_row(e))>=0){')
+        layout = say.index('AW_VoicePick(a,topic,health_percent(e),player,AW_Roll(101),voice_pick.value!=0,rand())')
+        self.assertLess(table, layout)
+        self.assertIn('return AW_VoicePlay(e,a->voice[topic][line].hash);', say)
+        # the layout's lines are the '!TOPIC:HEX16' words of the model's .anm, nothing else fills a->voice
+        self.assertEqual(anim.count('t.voice[k][t.voices[k]++]=line;'), 1)
 
 
 class EngineSource(unittest.TestCase):

@@ -48,7 +48,8 @@ class ActorVsActor(unittest.TestCase):
 
     def test_the_strike_between_actors_uses_the_swing_and_the_outcome(self):
         strike = body(self.c, 'static void npc_strike_actor(slot_t *s,slot_t *v) {')
-        self.assertIn('AW_CombatSwing(&aw_combat_settings,&s->f,&v->f,', strike)
+        # the swing with the attacker's claws when it is a turned werewolf (NPC-WEREWOLF-FIGHTS-ARMED-68, v0.0.68)
+        self.assertIn('AW_CombatSwingClaws(&aw_combat_settings,&s->f,&v->f,', strike)
         self.assertIn('victim_outcome(v,s->e,&out)', strike)
         self.assertNotIn('aw_combat_killed', strike)              # no crime of the player's
         self.assertNotIn('you.', strike)

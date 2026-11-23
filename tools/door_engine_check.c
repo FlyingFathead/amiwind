@@ -5,7 +5,7 @@
  * per exterior entrance and reads one result line back:
  *
  *   job:    D <ref> <holder map> <ex> <ey> <ez> <yaw> <pitch> [W <running map> <sx> <sy> <sz> <cx> <cy> <cz>]...
- *           [B <room> <rx> <ry> <rz> <ryaw> <rpitch>]
+ *           [B <room> <rx> <ry> <rz> <ryaw> <rpitch>] [X <ref>,<ref>...]
  *   result: R <ref>\t<scene after the crossing>\t<scene at the door>\t<prompt>\t<name>\t<use>\t<activate>\t<back>\t<note>
  *
  * A region frame's door (W): the game runs the neighbouring frame <running map>; the player stands at S (inside it),
@@ -17,9 +17,14 @@
  * the prompt (AW_SceneDraw), the use key (AW_SceneUse) and a script's Activate (AW_SceneActivate): each queues
  * "map <room>" when the door works. B: the way back, the room running and the eye at its exit (the room's own
  * coordinates): its use must queue the exterior. The wall trace is open (the maps' collision is not loaded here).
+ * X: the load doors a script has switched off while this door is shown (the other doors of its doorway and of its
+ * exit's doorway, one per stage: tools/door_engine_check.py doorway_off), as the script host tells the scene code
+ * (aw_scene_door_disabled, DOOR-LOAD-DISABLED-STILL-USED-68).
  */
 #define AW_DOOR_ENGINE_CHECK 1
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 static int door_check_open(char *name,FILE **f);
 #define main aw_scene_fixture_main
 #include "aga_scene_test.c"
@@ -56,6 +61,23 @@ static void queued_map(char *out,size_t size){
     char *end;
     if(!strncmp(queued,"map ",4)){field(out,size,queued+4);if((end=strchr(out,' '))!=NULL)*end=0;}
     else field(out,size,"");
+}
+/* X: the job's switched-off load doors, by reference */
+static unsigned job_off[32];static int job_off_count;
+static int job_door_off(unsigned reference){
+    int i;
+    for(i=0;i<job_off_count;i++)if(job_off[i]==reference)return 1;
+    return 0;
+}
+static void read_off(const char *line){
+    const char *x=strstr(line," X ");char *end;unsigned long v;
+    job_off_count=0;
+    if(!x)return;
+    for(x+=3;*x && job_off_count<32;x=*end==','?end+1:end){
+        v=strtoul(x,&end,10);
+        if(end==x)break;
+        job_off[job_off_count++]=(unsigned)v;
+    }
 }
 static edict_t player_edict;static client_t player_client;
 static void place(const char *map,const float *origin,float yaw,float pitch){
@@ -108,9 +130,11 @@ int main(int argc,char **argv){
     {extern int (*aw_chim_cross)(const float *origin,int *cx,int *cy);aw_chim_cross=stream_cross_hook;}
     {extern int aw_chim_world;aw_chim_world=1;}   /* a CHIM image: maps/<name>.chim (aw_mappath.c) */
     aw_chim_town_map=town_map;
+    aw_scene_door_disabled=job_door_off;
     while(fgets(line,sizeof(line),jobs)){
         char *b,*w;int walked=0;
         if(line[0]!='D')continue;
+        read_off(line);
         n=sscanf(line,"D %u %31s %f %f %f %f %f",&ref,holder,&e[0],&e[1],&e[2],&yaw,&pitch);
         if(n!=7){printf("R ?\tbad job line\n");continue;}
         region=strstr(line," W ")!=NULL;note[0]=0;

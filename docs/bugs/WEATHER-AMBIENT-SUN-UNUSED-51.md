@@ -72,6 +72,8 @@ Family: Lighting, lamps and night (`lighting-night`). Morrowind lights become Qu
 - [TORCH-LIGHT-29](TORCH-LIGHT-29.md): Torch flames look weak and provide little immediate light
 - [TORCH-NPC-LIGHT-29](TORCH-NPC-LIGHT-29.md): Nearby NPCs do not visibly respond to torchlight
 - [TORCHTEST-DARKNESS-29](TORCHTEST-DARKNESS-29.md): Torch test room floor stays dim gray at zero light
+- [WEATHER-CLOUD-TEXTURES-68](WEATHER-CLOUD-TEXTURES-68.md): Every weather shows the same clouds, recoloured: the original has a cloud texture per weather
+- [WEATHER-FOG-CLOUDS-ONE-LOOK-68](WEATHER-FOG-CLOUDS-ONE-LOOK-68.md): Every weather drew the clear weather's fog distance and cloud speed: a blizzard looked as far and as calm as a clear day apart from its colour
 
 Related bugs in other categories:
 

@@ -154,7 +154,7 @@ class OnPCHitMeContractTests(unittest.TestCase):
         # on every attempt in reach, a hit or a miss: after the reach test, before the swing is rolled
         self.assertIn('if(aw_combat_pc_hit)aw_combat_pc_hit(t);', strike)
         self.assertLess(strike.index('gap_to(p,t,&dz)>reach'), strike.index('aw_combat_pc_hit(t)'))
-        self.assertLess(strike.index('aw_combat_pc_hit(t)'), strike.index('AW_CombatSwing('))
+        self.assertLess(strike.index('aw_combat_pc_hit(t)'), strike.index('AW_CombatSwingClaws('))   # the claws: v0.0.68
         spell = function(combat, 'int AW_CombatSpellHit(edict_t *e,float health,int harmful) {')
         self.assertIn('if(harmful && aw_combat_pc_hit)aw_combat_pc_hit(e);', spell)
         host = code('aw_mwhost.c')

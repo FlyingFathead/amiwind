@@ -1,6 +1,6 @@
 # Modular NPCs: every body part stored once, assembled per actor
 
-_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
+_Last updated with AmiWind v0.0.68-dev8 (23 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -546,6 +546,12 @@ row is read with the index and stands in for a chunk that cannot be read. The ta
 frames before a room sizes its block (`aw_skel_release.c`), as before. `dbg animkit tables` prints the bytes held
 against the bytes on disk; `dbg animkit tables whole` is the previous method (the whole file in one block) for the
 next table loaded, `dbg animkit tables paged` the default.
+
+Since v0.0.68 a table only one look uses can also be given back on its own (`AW_SkelTableRelease`,
+WEREWOLF-TABLES-STAY-LOADED-68): its index, the frames read, its open file and the views of it. The player's werewolf
+tables go so when the change back ends the werewolf look ([THIRD_PERSON.md](THIRD_PERSON.md), "The werewolf"). The slot
+keeps the table's name, so the next lookup loads the same file into the same slot; a table that a loaded model or an
+appended table still uses is kept.
 
 ## Getting NPC movement right
 

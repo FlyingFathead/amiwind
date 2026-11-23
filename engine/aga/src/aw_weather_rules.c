@@ -291,10 +291,61 @@ void AW_WeatherMountainBlend(const aw_weather_table_t *table,int pull,aw_weather
     out->strength=strength;
     out->glare=(out->glare*(AW_WEATHER_STEPS-pull)+b->glare*pull)/AW_WEATHER_STEPS;
 }
-int AW_WeatherIsStorm(int current,int next,double progress)
+/* v0.0.68 (SOL-WEATHER-SKY-SNOW-68): Wind Speed past fStromWindSpeed: Ashstorm, Blight and Blizzard (aw_weather.h) */
+int AW_WeatherStormOf(int current,int next,double progress)
 {
     int w=next!=AW_WEATHER_NONE && progress>=0.5?next:current;
-    return w==AW_WEATHER_ASH || w==AW_WEATHER_BLIGHT;
+    return w==AW_WEATHER_ASH || w==AW_WEATHER_BLIGHT || w==AW_WEATHER_BLIZZARD?w:AW_WEATHER_NONE;
+}
+int AW_WeatherIsStorm(int current,int next,double progress)
+{
+    return AW_WeatherStormOf(current,next,progress)!=AW_WEATHER_NONE;
+}
+int AW_WeatherStormDirectionOf(int weather,const float *source,float dir[2])
+{
+    if(weather==AW_WEATHER_ASH || weather==AW_WEATHER_BLIGHT)return AW_WeatherStormDirection(source,dir);
+    dir[0]=0;dir[1]=1;
+    return weather==AW_WEATHER_BLIZZARD;
+}
+/* Land Fog Day Depth, Land Fog Night Depth x 100 and Cloud Speed x 100, Morrowind.ini as it ships; 0: no shipped value
+ * at hand (Ashstorm, Blight), Clear's is used (aw_weather.h) */
+static const short fog_depth[AW_WEATHERS][2]={{69,69},{72,72},{100,190},{70,70},{80,80},{100,115},{0,0},{0,0},
+                                               {100,120},{280,300}};
+static const short cloud_speed[AW_WEATHERS]={125,200,125,150,200,300,0,900,150,750};
+int AW_WeatherFogDepthOf(int weather,int stop)
+{
+    int d;
+    if(weather<0 || weather>=AW_WEATHERS)weather=AW_WEATHER_CLEAR;
+    d=fog_depth[weather][stop==3];
+    return d?d:fog_depth[AW_WEATHER_CLEAR][stop==3];
+}
+int AW_WeatherFogScale(int current,int next,int step,int a,int b,int mix)
+{
+    long from,to,depth,clear;
+    if(next<0 || next>=AW_WEATHERS)next=current,step=0;
+    if(step<0)step=0;
+    if(step>AW_WEATHER_STEPS)step=AW_WEATHER_STEPS;
+    if(mix<0)mix=0;
+    if(mix>32)mix=32;
+    from=(long)AW_WeatherFogDepthOf(current,a)*(32-mix)+(long)AW_WeatherFogDepthOf(current,b)*mix;
+    to=(long)AW_WeatherFogDepthOf(next,a)*(32-mix)+(long)AW_WeatherFogDepthOf(next,b)*mix;
+    depth=(from*(AW_WEATHER_STEPS-step)+to*step)/AW_WEATHER_STEPS;
+    clear=(long)AW_WeatherFogDepthOf(AW_WEATHER_CLEAR,a)*(32-mix)+(long)AW_WeatherFogDepthOf(AW_WEATHER_CLEAR,b)*mix;
+    return clear>0?(int)((depth*AW_WEATHER_FOG_CLEAR+clear/2)/clear):AW_WEATHER_FOG_CLEAR;
+}
+int AW_WeatherCloudPercentOf(int weather)
+{
+    if(weather<0 || weather>=AW_WEATHERS || !cloud_speed[weather])return 100;
+    return (cloud_speed[weather]*100+cloud_speed[AW_WEATHER_CLEAR]/2)/cloud_speed[AW_WEATHER_CLEAR];
+}
+int AW_WeatherCloudPercent(int current,int next,int step)
+{
+    int a=AW_WeatherCloudPercentOf(current),b;
+    if(next<0 || next>=AW_WEATHERS)return a;
+    b=AW_WeatherCloudPercentOf(next);
+    if(step<0)step=0;
+    if(step>AW_WEATHER_STEPS)step=AW_WEATHER_STEPS;
+    return (a*(AW_WEATHER_STEPS-step)+b*step)/AW_WEATHER_STEPS;
 }
 int AW_WeatherPrecipOf(int weather)
 {

@@ -1,8 +1,8 @@
 {
  "format": "aw-door-check-baseline-1",
- "doors": 1102,
- "usable_after_crossing": 1102,
- "both_ways": 1102,
- "reachable": 1067,
- "note": "tools/door_engine_check.py on the v0.0.53-dev2 image (26 October 2026): every exterior entrance of the original usable after a walk over a frame border into its frame and back out (the 5 doors of the opening's rooms, census and prison, have no way back to check); the v0.0.52 scene code over the same image: 272. With the wall between the player and the door traced in the CHIM world's collision (region frames), a walkable floor where the player stands and the engine's doorway slack (aw_scene.c DOOR_USE_SLACK, DOOR-USE-BLOCKED-53): 1,067 (1,036 with the old 1-unit rule); the other 35 are DOOR-USE-COLLISION-FILLED-53 (v0.0.54). A whole-world image may not use fewer (DOOR-ENTRANCE-AUDIT-51); raise these numbers when a build uses more."
+ "doors": 1226,
+ "usable_after_crossing": 1225,
+ "both_ways": 1223,
+ "reachable": 1217,
+ "note": "tools/door_engine_check.py on the v0.0.68-dev8 image (23 November 2026) with the kinds of entrance play has shown (DOOR-USE-COLLISION-EXPANSIONS-68: a door set into a slope, used from the floor its way out leads onto, within the frame's core and the original's reach): 1,226 exterior entrances of Vvardenfell, Solstheim and Mournhold's districts, 1,225 usable after a walk into their frame, 1,223 both ways, 1,217 reached with the wall traced (946 of 954 region-frame entrances; the other 8 are on config/door-check-known.json with their play result). Before (v0.0.53-dev2, 26 October 2026): 1,102 entrances, 1,067 reachable. A whole-world image may not use fewer (DOOR-ENTRANCE-AUDIT-51); raise these numbers when a build uses more."
 }

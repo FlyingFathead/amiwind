@@ -2115,16 +2115,18 @@ def parse_rect(text):
     return tuple(parts)
 
 
-def master_lands(data_files):
+def master_lands(data_files, masters=None):
     """(base, others): the base master's LAND heights {(x, y): rows} (Morrowind.esm, mwad.audit.load_esm) and the
     cells that have a LAND record in any other master of the data folder (Tribunal, Bloodmoon: never open sea),
-    plus the base master's exterior cells {(x, y): {name, region, refs}}."""
+    plus the base master's exterior cells {(x, y): {name, region, refs}}. MASTERS: the masters merged into the base
+    file (default AMIWIND_MASTERS); a presented data folder passes the base file alone, as its Morrowind.esm already
+    is the merged master of the selected ones (tools/presented_data.py)."""
     from mwad.audit import load_esm
     from mwad.esm import is_deleted, records, subrecords
     from mwad.paths import child_ci, resolve_data_files
     from mwad.masters import master_path
     data = resolve_data_files(data_files)
-    esm = load_esm(master_path(data))
+    esm = load_esm(master_path(data, masters))
     base = {k: v['heights'] for k, v in esm['lands'].items()}
     others = set()
     for path in sorted(p for p in data.iterdir() if p.is_file() and p.suffix.casefold() == '.esm'
@@ -2140,6 +2142,96 @@ def master_lands(data_files):
     cells = {k: {'name': c['name'], 'region': c['region'], 'refs': sum(1 for r in c['refs'] if not r.get('deleted'))}
              for k, c in esm['cells'].items()}
     return base, others, cells, esm['sha256']
+
+
+def ocean_record_masters(data_files, masters=None):
+    """{(x, y): (master, ...)}: the selected game masters (MASTERS, default AMIWIND_MASTERS; in load order) that hold
+    a live exterior CELL record of the cell, each read from its own file in the original data folder. The merged
+    master no longer says where a record came from, and a presented data folder holds the other masters header-only,
+    so this reads the game's own files. A selected master missing from the folder is left out (the caller says what
+    was read)."""
+    import struct
+    from mwad.esm import is_deleted, records, subrecords
+    from mwad.masters import selected_masters
+    from mwad.paths import child_ci, resolve_data_files
+    try:
+        data = resolve_data_files(data_files)
+    except ValueError:
+        data = Path(data_files)
+    out = {}
+    for name in selected_masters(masters):
+        path = child_ci(data, name, required=False) if data.is_dir() else None
+        if path is None or not path.is_file():
+            continue
+        for tag, flags, payload in records(path.read_bytes()):
+            if tag != 'CELL':
+                continue
+            header = []
+            for sub, body in subrecords(payload):       # the cell header ends at its DATA (refs follow)
+                header.append((sub, body))
+                if sub == 'DATA':
+                    break
+            body = dict(header).get('DATA', b'')
+            if len(body) < 12 or is_deleted(flags, header, header_only=True):
+                continue
+            bits, x, y = struct.unpack_from('<Iii', body)
+            if bits & 1:                                 # an interior
+                continue
+            held = out.setdefault((x, y), [])
+            if name not in held:
+                held.append(name)
+    return {c: tuple(v) for c, v in out.items()}
+
+
+def ocean_base_world_cells(root=None):
+    """The cells of the base world's default cell list (config/chim-cells.json, format aw-chim-cells-1). An open-sea
+    cell in it is a frame of the base world whatever master holds its record, so it is Vvardenfell's (the routing-row
+    cell -6,26 has no record at all). Empty when the list cannot be read (the caller says how many it read)."""
+    path = Path(root or ROOT) / 'config' / ('chim-cells' + '.json')
+    try:
+        doc = json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return frozenset()
+    out = set()
+    for c in doc.get('cells') or ():
+        x, y = c.split(',') if isinstance(c, str) else c
+        out.add((int(x), int(y)))
+    return frozenset(out)
+
+
+def ocean_set(cell, holders=(), listed=()):
+    """The master set an open-sea cell's map belongs to, for the tracker (tools/cell_progress.py ingest gives the cell
+    the island of the nearest island cell of that set; TRACKER-OCEAN-CELL-ISLAND-BASE-ONLY-68):
+    - a cell of the base world's cell list (LISTED): 'vvardenfell', whatever master holds its record (the base world
+      builds it as one of its frames);
+    - else the first master in load order that holds its CELL record (HOLDERS): Morrowind.esm 'vvardenfell',
+      Tribunal.esm 'tribunal', Bloodmoon.esm 'bloodmoon' (a record in Bloodmoon.esm only: Solstheim's sea);
+    - a cell with no record in any master: None, no set hint (the nearest island cell of any set)."""
+    from mwad.esm import GAME_MASTERS
+    if tuple(cell) in listed:
+        return 'vvardenfell'
+    names = {'morrowind.esm': 'vvardenfell', 'tribunal.esm': 'tribunal', 'bloodmoon.esm': 'bloodmoon'}
+    held = {h.casefold() for h in holders or ()}
+    for name in GAME_MASTERS:
+        if name.casefold() in held:
+            return names.get(name.casefold())
+    return None
+
+
+def ocean_left_out(cell, base_lands, other_lands, cells, planned):
+    """Why CELL is not one of the open-sea plan's cells (chimport.py ocean --cells names only cells of the plan)."""
+    cell = tuple(cell)
+    if cell in base_lands:
+        return 'it has a LAND record (land or seabed: a CHIMport cell of its own, chimport.py run)'
+    if cell in other_lands:
+        return 'it has a LAND record in another master of the data folder'
+    refs = (cells.get(cell) or {}).get('refs')
+    if refs:
+        return ('it holds %d placed record(s) (a sea cell with content: a CHIMport cell of its own, or an ocean frame '
+                'named in a cell list)' % refs)
+    if cell in planned:
+        return 'it is in the run\'s plan.json'
+    return 'it lies outside the open-sea plan (beyond the rectangle and its margin, with no cell record)'
 
 
 def plan_ocean(base_lands, other_lands=(), cells=None, rect=None, margin=OCEAN_MARGIN, planned=()):
@@ -2244,6 +2336,11 @@ def ocean_cell_result(row, ref, chunk_audits, chunk_info, ref_bytes):
            'cpu_s': 0.0, 'started': now_iso(), 'finished': now_iso(), 'stages': {}, 'units': None,
            'ring': None, 'order': None, 'name': row['name'], 'region': row['region'], 'land': False,
            'margin': row['margin']}
+    if 'set' in row:
+        # the master set of the cell's map (ocean_set) and the masters that hold its CELL record: the tracker feed
+        # passes the set on (None = no record: no set hint); a row without it (an older plan) passes none
+        res['set'] = row['set']
+        res['record_masters'] = list(row.get('record_masters') or ())
     res['status'] = cell_status(res)
     return res
 
@@ -2337,7 +2434,14 @@ def ocean(args):
     one result per cell, and feed the tracker. One writer per run folder (run.lock)."""
     run_dir = args.out
     run_dir.mkdir(parents=True, exist_ok=True)
-    base, others, cells, esm_sha = master_lands(args.data_files)
+    originals, masters = args.data_files, None
+    if getattr(args, 'presented_data', None):
+        # with expansions selected their cells exist only in the merged master: read the presented data folder as
+        # `run` does (its Morrowind.esm IS the merged master of the selected ones, the others header-only)
+        args.data_files, receipt = presented_data_folder(args.data_files, args.presented_data)
+        if receipt is not None:
+            masters = (receipt['masters'][0],)
+    base, others, cells, esm_sha = master_lands(args.data_files, masters)
     plan = read_json(run_dir / 'plan.json') or {'cells': []}
     planned = {(r['x'], r['y']) for r in plan['cells']}
     doc = plan_ocean(base, others, cells, parse_rect(args.rect) if args.rect else None, args.margin, planned)
@@ -2349,6 +2453,36 @@ def ocean(args):
           % (*doc['rect'], doc['margin'], doc['map_cells'], c['ocean'], c['inside_rect'], c['margin'], c['beyond'],
              ', '.join('%s %d' % kv for kv in sorted(doc['left_out'].items())) or 'none', c['seam_edges'],
              c['seam_over']), flush=True)
+    # each cell's set: the master that holds its CELL record, read from the game's own files (the base world's listed
+    # cells stay Vvardenfell's; no record, no set: TRACKER-OCEAN-CELL-ISLAND-BASE-ONLY-68)
+    holders = ocean_record_masters(originals)
+    listed = ocean_base_world_cells()
+    for row in doc['cells']:
+        cell = (row['x'], row['y'])
+        row['record_masters'] = list(holders.get(cell, ()))
+        row['set'] = ocean_set(cell, holders.get(cell, ()), listed)
+    wanted = parse_cells(getattr(args, 'cells', None))
+    if wanted:
+        have = {(r['x'], r['y']): r for r in doc['cells']}
+        refused = ['%s: %s' % (ckey(cell), ocean_left_out(cell, base, others, cells, planned))
+                   for cell in wanted if cell not in have]
+        if refused:
+            print('chimport ocean: REFUSED: %d of the %d named cells are not open sea of the plan: %s'
+                  % (len(refused), len(wanted), '; '.join(refused)), file=sys.stderr, flush=True)
+            return 2
+        doc['selection'] = {'cells': [ckey(cell) for cell in wanted], 'of': len(doc['cells'])}
+        doc['cells'] = [have[cell] for cell in dict.fromkeys(wanted)]
+    sets = collections.Counter(row['set'] or 'none' for row in doc['cells'])
+    print('chimport ocean: %s%d cells; their set by the master of their CELL record: %s (%d record(s) read from %s; '
+          '%d cells of the base world\'s list kept on Vvardenfell)'
+          % ('named: ' if wanted else '', len(doc['cells']), ', '.join('%s %d' % kv for kv in sorted(sets.items())),
+             len(holders), ', '.join(sorted({m for v in holders.values() for m in v})) or 'no master',
+             sum(1 for row in doc['cells'] if (row['x'], row['y']) in listed)), flush=True)
+    for row in doc['cells'] if wanted else ():
+        print('  %d,%d: set %s; CELL record in %s; seam: %d LAND edge(s), largest step %.0f'
+              % (row['x'], row['y'], row['set'] or 'none (the nearest island)',
+                 ', '.join(row['record_masters']) or 'no master', len(row['seam']['edges']), row['seam']['max_step']),
+              flush=True)
     if args.dry_run:
         return 0
     pool, origin = pool_choice(args)
@@ -2513,8 +2647,13 @@ def tracker_cell(res, plan_row):
     extra = {}
     if cell_status(res) == OCEAN_STATUS:
         # open sea (no LAND): a reference to the shared ocean chunk; its own tracker status, counted as done
-        # 'set': the master whose map the sea belongs to (the tracker gives the cell that island)
-        extra = {'ocean': True, 'margin': bool((plan_row or {}).get('margin')), 'set': 'vvardenfell'}
+        extra = {'ocean': True, 'margin': bool((plan_row or {}).get('margin'))}
+        if 'set' in res:
+            # 'set': the master set whose map the sea belongs to, from the master that holds the cell's record
+            # (chimport.py ocean, ocean_set); None for a cell without one, the nearest island of any set. It was
+            # 'vvardenfell' for every ocean cell, so Solstheim's open sea got Vvardenfell's island
+            # (TRACKER-OCEAN-CELL-ISLAND-BASE-ONLY-68); a result written before it carries none and names no set
+            extra['set'] = res['set']
     return {'converted': bool(res['converted']), 'status': cell_status(res), 'empty': cell_status(res) == 'empty',
             **extra,
             # usable now: passed (lighting aside, which the lighting audit judges) or empty sea
@@ -2741,6 +2880,13 @@ def _cli(argv=None):
     o.add_argument('--margin', type=int, default=OCEAN_MARGIN,
                    help='cells of open sea around the rectangle for the horizon (default %d)' % OCEAN_MARGIN)
     o.add_argument('--dry-run', action='store_true', help='print the plan and its seam figures only')
+    o.add_argument('--cells', help='only these cells of the open-sea plan, "x,y x,y ...": a named cell that is not '
+                   'open sea of the plan (LAND, placed records, plan.json, beyond it) is refused with its reason and '
+                   'nothing is written')
+    o.add_argument('--presented-data', type=Path, metavar='DIR',
+                   help='with expansions selected (AMIWIND_MASTERS), make the presented data folder DIR from '
+                        '--data-files (tools/presented_data.py) and plan from it, as `run` does; the masters that hold '
+                        'each cell\'s record (its set) are read from --data-files itself')
     o.add_argument('--tracker', type=Path, help='CHIM Progress Tracker folder to feed afterwards')
     o.add_argument('--tracker-tool', type=Path, help='the tracker ingester (tools/cell_progress.py)')
     o.add_argument('--tracker-ingest', default='', help='extra arguments of the tracker ingest, one string')

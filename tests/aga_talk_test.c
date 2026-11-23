@@ -36,6 +36,10 @@ aw_actor_t *AW_ActorGet(uint32_t reference,int row,int create){
     return reference==record.reference?&record:NULL;
 }
 static int can(int i){host_framecount++;return AW_CanTalk(&edicts[i]);}
+/* NPC-WEREWOLF-TALK-OFFERED-68: the host's two answers (aw_mwhost.c): the turned characters, the player's form */
+static edict_t *turned;static int player_form,turned_asks;
+static int is_turned(edict_t *e){turned_asks++;return e==turned;}
+static int player_turned(void){return player_form;}
 
 int main(void){
     aw_talk_facts_t f;int i,reads;
@@ -73,6 +77,31 @@ int main(void){
     assert(fighter_reads+record_reads==reads+2);
     /* nothing there */
     assert(!AW_TalkFacts(NULL,&f) && !AW_CanTalk(NULL));
-    puts("talk: rule, voice/table/nothing to say, story roles, combat, knocked, dead, calm, record, one read a frame");
+    /* NPC-WEREWOLF-TALK-OFFERED-68, per kind (OpenMW 0.51 npc.cpp Npc::activate, creature.cpp Creature::activate).
+     * The rule: a character in werewolf form is never talked to by the use; a werewolf player uses no actor */
+    memset(&f,0,sizeof(f));f.actor=f.dialogue=1;
+    f.werewolf=1;assert(!AW_TalkAllowed(&f));f.werewolf=0;
+    f.player_werewolf=1;assert(!AW_TalkAllowed(&f));f.player_werewolf=0;assert(AW_TalkAllowed(&f));
+    /* without the host's answers nobody is turned (the hooks are NULL in a fixture) */
+    assert(!aw_talk_werewolf && !aw_talk_player_werewolf && can(0) && can(2));
+    aw_talk_werewolf=is_turned;aw_talk_player_werewolf=player_turned;
+    /* a character in its own form: as before */
+    assert(can(0) && can(2) && AW_TalkFacts(&edicts[0],&f) && !f.werewolf && !f.player_werewolf);
+    /* the character a script turned (edict 0): its name stays on the focus line, the talk is not offered; the one
+     * beside it keeps its talk */
+    turned=&edicts[0];assert(!can(0) && can(2) && AW_TalkFacts(&edicts[0],&f) && f.werewolf && f.actor && f.dialogue);
+    /* turned and dead: dead as anyone (looted) */
+    record.flags=AWL_USED|AWL_DEAD;assert(!can(0) && AW_TalkFacts(&edicts[0],&f) && f.dead && f.werewolf);record.flags=AWL_USED;
+    /* its own form again (UndoWerewolf): the talk comes back */
+    turned=NULL;assert(can(0));
+    /* what is no character (here: flora; a creature record is an aw_creature edict) is never asked for the form: the
+     * form is a character's */
+    turned=&edicts[3];turned_asks=0;assert(!can(3) && AW_TalkFacts(&edicts[3],&f) && !f.werewolf && !turned_asks);turned=NULL;
+    /* the player in werewolf form: no talk with anyone, turned or not; back in his own form: as before */
+    player_form=1;assert(!can(0) && !can(2) && AW_TalkFacts(&edicts[2],&f) && f.player_werewolf && !f.werewolf);
+    player_form=0;assert(can(0) && can(2));
+    aw_talk_werewolf=NULL;aw_talk_player_werewolf=NULL;
+    puts("talk: rule, voice/table/nothing to say, story roles, combat, knocked, dead, calm, record, one read a frame, "
+         "werewolf form (the character's, the player's)");
     return 0;
 }

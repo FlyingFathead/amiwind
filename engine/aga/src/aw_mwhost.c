@@ -47,6 +47,9 @@
 #include "aw_story.h"     /* the player's control switches (v0.0.62, MWSCRIPT-PLAYER-CONTROL-62) */
 #include "aw_weather.h"   /* GetCurrentWeather (v0.0.62, MWSCRIPT-SMALL-FUNCTIONS-62) */
 #include "aw_forced_rules.h"   /* the AWFS save block (v0.0.62, MWSCRIPT-GAP-FUNCTIONS-62) */
+#include "aw_were_rules.h"     /* the change of form (v0.0.68, WEREWOLF-BODY-63) */
+#include "aw_combat_were.h"    /* the claws' default multiplier (v0.0.68, NPC-WEREWOLF-FIGHTS-ARMED-68) */
+#include "aw_view.h"           /* dbg werewolf: the look's sets by number */
 #include "aw_lava.h"           /* HurtStandingActor holds the lava volume's own damage back */
 #include "aw_mwconsole.h"      /* the original's console commands (v0.0.63, MW-CONSOLE-COMMANDS-62) */
 #include "aw_listbox.h"        /* the console target finder */
@@ -57,6 +60,7 @@
 #include "aw_roll.h"        /* the spell magnitude and resistance rolls (REST-CUT-TOO-OFTEN-67) */
 #include "aw_water.h"       /* a room's water level (GETWATERLEVEL-COLUMN-NOT-ROOM-67, v0.0.68) */
 #include "aw_drown.h"       /* NPCs drown (ACTOR-DROWNING-NOT-CARRIED-67, v0.0.68): the health path, the room's water */
+#include "aw_objpose.h"     /* PlayGroup/LoopGroup on a placed object: its end pose (MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68) */
 
 #define FILE_NAME "mwscript.awm"
 #define MAX_RESIDENT (1024*1024)
@@ -846,10 +850,30 @@ static int32_t object_op(uint32_t ref,int op,int32_t value){
  * Activate, aw_mwvm.c AW_MwvmUse; OpenMW 0.51 mwworld/refdata.cpp): a script that returns before its OnActivate line
  * (the census doors' "done" check, after their first opening) leaves the object its own use, every time after. */
 static unsigned long intercepted,activated;
+/* ROOM-SCRIPTED-ACTIVATOR-NO-USE-68 (REF-IDENTITY-MERGED-MASTER-66, as chim_room.c RoomRefIs): a script's instance is
+ * bound under the merged master's number of an expansion's reference (master index x 2^22 + number: its BIND row); the
+ * focus rows, the use table and the saves name it by the stable id (master index x 2^20 + number). The other form of
+ * REFERENCE (itself for a base game number, which is both): the Halls of Penumbra's ice wall is 8417459 to its script
+ * and 2126003 to its focus row, so E on the row reached no script. */
+static uint32_t ref_other_form(uint32_t r){
+    if(r>=(1u<<22) && r<(3u<<22))return ((r>>22)<<20)|(r&0x3FFFFFu);
+    if(r>=(1u<<20) && r<(3u<<20))return ((r>>20)<<22)|(r&0xFFFFFu);
+    return r;
+}
+int AW_MwvmTakesUse(uint32_t reference);    /* aw_mwvm.c */
+extern int (*aw_inventory_takes_use)(unsigned reference);    /* aw_inventory.c */
 static int object_intercept(unsigned reference){
-    if(!mwscript.value || !resident || !reference || !AW_MwvmUse(reference))return 0;
+    uint32_t other=ref_other_form(reference);
+    if(!mwscript.value || !resident || !reference || (!AW_MwvmUse(reference) && (other==reference || !AW_MwvmUse(other))))
+        return 0;
     intercepted++;
     return 1;
+}
+/* ROOM-SCRIPTED-ACTIVATOR-NO-USE-68: 1 while REFERENCE's script would take the player's use (object_intercept without
+ * the use): a named activator under the crosshair is then a thing to use, not a name alone */
+static int object_takes_use(unsigned reference){
+    if(!mwscript.value || !resident || !reference)return 0;
+    return AW_MwvmTakesUse(reference) || (ref_other_form(reference)!=reference && AW_MwvmTakesUse(ref_other_form(reference)));
 }
 /* E on an object with no NPC under the crosshair (v0.0.57): the scripted placement that reads OnActivate nearest the
  * view's line, within the activation distance (iMaxActivateDist 192 game units, the original's GMST; OpenMW
@@ -1347,23 +1371,15 @@ int AW_MwscriptLand(edict_t *target,const aw_spell_effect_t *e,const aw_mgef_t *
  * edict E now (the player's or an NPC's or creature's by its reference): its active effects (cast spells, worn items)
  * plus, since v0.0.62, the always-active spells of its list (AW_ActorPassiveMagnitude: the "immune to normal weapons"
  * ability of 68 creatures and 1 NPC of the masters, the vampires' 50 %, Almalexia's shield). The list part reads the
- * actor's spells from disk, so it is kept: PASSIVE_MEMO answers by reference, effect, list size and record, refreshed
- * when the list changes or a game loads; once per landed blow, no file read when kept. */
-#define PASSIVE_MEMO 8
-static struct {uint32_t ref;int effect,nspells;uint16_t base;unsigned long generation;float value;} passive_memo[PASSIVE_MEMO];
-static int passive_next;
-static unsigned long passive_reads,passive_kept;
+ * actor's spells from disk, so it is kept. AMBIENT-SOUND-READ-IN-FRAME-68 (v0.0.68): kept per ACTOR, not per answer
+ * (aw_actorstate.c AW_ActorPassiveKept: one read of the list answers every effect; 24 actors). The 8 answers kept
+ * before were fewer than one blow asks (about seven effects of each of the two fighters, HIT-CHANCE-CHECK-62), so
+ * every blow of a fight read the lists again: 50 to 220 ms of disk wait a blow in the v0.0.68-dev9 session. Read
+ * again when the list changes or a game loads; a fight's start reads its fighters' lists (aw_combat.c), so no blow
+ * does. */
 static float passive_of(const aw_actor_t *a,uint32_t ref,int effect){
-    int i;unsigned long g=AW_EffectsGeneration()+creation_generation;   /* either changes: read again */
     if(!a)return 0;
-    for(i=0;i<PASSIVE_MEMO;i++)
-        if(passive_memo[i].ref==ref && passive_memo[i].effect==effect && passive_memo[i].nspells==a->nspells &&
-           passive_memo[i].base==a->base && passive_memo[i].generation==g){passive_kept++;return passive_memo[i].value;}
-    i=passive_next;passive_next=(passive_next+1)%PASSIVE_MEMO;
-    passive_memo[i].ref=ref;passive_memo[i].effect=effect;passive_memo[i].nspells=a->nspells;passive_memo[i].base=a->base;
-    passive_memo[i].generation=g;passive_memo[i].value=AW_ActorPassiveMagnitude(a,effect);
-    passive_reads++;
-    return passive_memo[i].value;
+    return AW_ActorPassiveKept(a,ref,effect,AW_EffectsGeneration()+creation_generation);   /* either changes: read again */
 }
 static float effect_magnitude_of(edict_t *e,int effect){
     uint32_t ref;
@@ -1907,9 +1923,11 @@ static int host_player_move(int instance,int kind,int map,const float *at,float 
  * dialogueextensions.cpp OpGetReputation, OpSetReputation, OpModReputation). A faction not named is the target
  * actor's own (the player has none: rank -1). */
 static unsigned long standing_calls,standing_misses,anim_plays,anim_misses,topics_added,cures,effects_cast;
+static unsigned long pose_plays;     /* PlayGroup/LoopGroup on a placed object: its end pose (aw_objpose.c) */
 static unsigned long binks,binks_missed;   /* PlayBink: started, and absent from the build (MWSCRIPT-UNPLACED-ATTACH-62) */
 static unsigned long weather_calls,weather_refused;   /* ChangeWeather and ModRegion (MWSCRIPT-COMPLETE-LANDMARK) */
 static unsigned long greetings,greetings_missed,rotations,rotations_missed;
+static unsigned long greetings_forced,greetings_werewolf,greetings_norow;   /* script_greeting (below pc_hit) */
 dfunction_t *ED_FindFunction(char *name);
 /* The topics the player knows (AddTopic, v0.0.57): one bit per row of the file's TOPC section (the game's dialogue
  * topics, sorted; the names stay on disk), taken when the file loads; saved with the game. */
@@ -1976,18 +1994,34 @@ int AW_MwscriptTopicHashes(unsigned long *out,int max){
     fclose(f);
     return (int)rows;
 }
-/* ForceGreeting's act on actor E (see AWF_FORCEGREETING below); 1 when the greeting was played */
-static int force_greeting(edict_t *e){
-    dfunction_t *greet;int self,other;
-    if(!e || e->free || e==sv_player || !sv_player || strcmp(pr_strings+e->v.classname,"aw_npc") ||
-       (aw_can_talk && !aw_can_talk(e)) || !(greet=ED_FindFunction("aw_greet"))){greetings_missed++;return 0;}
+/* the greeting a talk to actor E plays (QC aw_greet: the voice table's line and the dialogue window), by the talk rule
+ * (aw_talk.c: a person, alive, not hostile, something to say); 1 played, 0 the rule refuses (nothing counted) */
+static int talk_greeting(edict_t *e){
+    dfunction_t *greet;int self,other;aw_talk_facts_t facts;
+    if(!e || e->free || e==sv_player || !sv_player || strcmp(pr_strings+e->v.classname,"aw_npc"))return 0;
+    /* the talk rule without its werewolf part (NPC-WEREWOLF-TALK-OFFERED-68): that part is the use key's alone; a
+     * script's greeting opens for a turned character and for a werewolf player as before (script_greeting has the
+     * player's own rule, AllowWerewolfForceGreeting) */
+    if(aw_can_talk){
+        if(!AW_TalkFacts(e,&facts))return 0;
+        facts.werewolf=facts.player_werewolf=0;
+        if(!AW_TalkAllowed(&facts))return 0;
+    }
+    if(!(greet=ED_FindFunction("aw_greet")))return 0;
     self=pr_global_struct->self;other=pr_global_struct->other;
     pr_global_struct->self=EDICT_TO_PROG(sv_player);
     G_INT(OFS_PARM0)=EDICT_TO_PROG(e);G_INT(OFS_PARM1)=EDICT_TO_PROG(sv_player);G_FLOAT(OFS_PARM2)=0;
     PR_ExecuteProgram(greet-pr_functions);
     pr_global_struct->self=self;pr_global_struct->other=other;
-    greetings++;return 1;
+    return 1;
 }
+/* the greeting by the talk rule alone, counted (the arrest's first try, crime_greet); a script's ForceGreeting is
+ * script_greeting (below pc_hit) */
+static int force_greeting(edict_t *e){
+    if(talk_greeting(e)){greetings++;return 1;}
+    greetings_missed++;return 0;
+}
+static int script_greeting(edict_t *e);
 /* MW-CONSOLE-COMMANDS-62: a console line's own words (an axis, a target id) given to a host call as the string
  * indexes CONSOLE_STRING+k, never a row of the file's strings (whose count stays far below it) */
 #define CONSOLE_STRING 0xFFF0
@@ -2995,13 +3029,32 @@ static uint32_t attacked[ATTACKED];static int attacked_next;
  * OpSetWerewolfAcrobatics, OpGetWerewolfKills; mechanicsmanagerimp.cpp setWerewolf, applyWerewolfAcrobatics;
  * player.cpp setWerewolfStats / restoreStats): the player's form with his own attributes and skills kept while the
  * werewolf's (the game settings fWerewolf*, handed by the compiler) stand, every item taken off; the NPCs a script
- * turned (a short list by reference); the werewolf kills. Kept in saved games (the AWWF block). The beast's body is
- * not drawn yet: the player keeps his own model (said in docs/MWSCRIPT_BYTECODE.md). */
-#define WERE_NPCS 16
-static aw_were_t were;static uint32_t were_npc[WERE_NPCS];
+ * turned (a short list by reference); the werewolf kills. Kept in saved games (the AWWF block). Since v0.0.68
+ * (WEREWOLF-BODY-63) the player's change is the original's whole setWerewolf (were_player_change below, the rules in
+ * aw_were_rules.c): every route runs that one function, and the werewolf robe it puts in the robe slot is what draws
+ * the werewolf's body and arms (aw_view.c). An NPC a script turns keeps its own body (the list only).
+ * NPC-WEREWOLF-NO-MODEL-66 (v0.0.68): an NPC a script turned is drawn with the player's werewolf set (aw_view.c, its
+ * frames on the werewolf's table: aw_animkit.c AW_AnimPickPreSend) and holds nothing (aw_items.c); the list holds every
+ * werewolf of the game at once (placed: the maze's 31, the ceremony's 10, the Skaal hunt's 7 and 2, Tharsten
+ * Heart-Fang; by scripts: the wild hunt's 4, the bear hunt's; and the wilderness ones the levelled lists give: 16
+ * refused the rest), as many as its saved block holds (255), kept packed and in the order turned (were_npc_n in use,
+ * the first ones; when full, the one turned the longest ago goes, said), and a reference stays in it when its actor
+ * dies (the corpse stays the werewolf: the original keeps the form). were_bloom: one bit per reference hash, so the
+ * frame's ask for every actor on the map (AW_MwscriptWerewolfNpc) is one bit test for an actor not turned. */
+#define WERE_NPCS 255
+#define WERE_BIT(r) (((r)^((r)>>8)^((r)>>16)^((r)>>24))&255u)
+static aw_were_t were;static uint32_t were_npc[WERE_NPCS];static int were_npc_n;
+static unsigned char were_bloom[32];static unsigned long were_npc_dropped;
+static void were_bloom_build(void){
+    int i;memset(were_bloom,0,sizeof(were_bloom));
+    for(i=0;i<were_npc_n;i++)were_bloom[WERE_BIT(were_npc[i])>>3]|=(unsigned char)(1u<<(WERE_BIT(were_npc[i])&7u));
+}
 static unsigned long were_calls;
+static aw_were_report_t were_last;   /* the last change of form (were_player_change), for dbg werewolf */
+static unsigned long were_robes_missing;
 static void forced_reset(void){
-    memset(&were,0,sizeof(were));memset(were_npc,0,sizeof(were_npc));aw_move_werewolf=0;
+    memset(&were,0,sizeof(were));memset(were_npc,0,sizeof(were_npc));were_npc_n=0;were_bloom_build();aw_move_werewolf=0;
+    memset(&were_last,0,sizeof(were_last));   /* WEREWOLF-BODY-63: a new game reports no change of the last one */
     memset(attacked,0,sizeof(attacked));attacked_next=0;
     memset(forced_sneak,0,sizeof(forced_sneak));aw_move_force_sneak=0;
     memset(forced_run,0,sizeof(forced_run));aw_move_force_run=0;
@@ -3027,18 +3080,130 @@ static void were_kill_hook(edict_t *e){
     if(were.player && e && !strcmp(pr_strings+e->v.classname,"aw_npc") && were.kills<0xFFFF){were.kills++;AW_MwvmStateChanged();}
 }
 static int were_export(unsigned char *out,int capacity){
-    uint32_t refs[WERE_NPCS];int i,n=0;
-    for(i=0;i<WERE_NPCS;i++)if(were_npc[i])refs[n++]=were_npc[i];
-    return AW_WerePack(out,capacity,&were,refs,n);
+    /* NPC-WEREWOLF-NO-MODEL-66: the list is packed (no copy on the stack: 255 references) */
+    return AW_WerePack(out,capacity,&were,were_npc,were_npc_n);
 }
 static int were_import(const unsigned char *p,int bytes){
     int n,k;
-    memset(&were,0,sizeof(were));memset(were_npc,0,sizeof(were_npc));
+    memset(&were,0,sizeof(were));memset(were_npc,0,sizeof(were_npc));were_npc_n=0;were_bloom_build();
     if((k=AW_WereUnpack(p,bytes,&were,were_npc,WERE_NPCS,&n))<0){memset(&were,0,sizeof(were));memset(were_npc,0,sizeof(were_npc));return -1;}
+    were_npc_n=n;were_bloom_build();   /* NPC-WEREWOLF-NO-MODEL-66: the block's list is packed (were_export) */
     aw_move_werewolf=were.player;
     return k;
 }
-static int were_npc_find(uint32_t ref){int i;for(i=0;ref && i<WERE_NPCS;i++)if(were_npc[i]==ref)return i;return -1;}
+static int were_npc_find(uint32_t ref){int i;for(i=0;ref && i<were_npc_n;i++)if(were_npc[i]==ref)return i;return -1;}
+/* NPC-WEREWOLF-NO-MODEL-66 (v0.0.68): a reference into the list (at its end) or out of it (the later ones moved up), the
+ * order kept; a full list lets the one turned the longest ago go first (said) */
+static void were_npc_set(uint32_t ref,int set){
+    int i=were_npc_find(ref);
+    if(set && i<0){
+        if(were_npc_n>=WERE_NPCS){
+            Con_DPrintf("MWScript: %d werewolf NPCs kept already: the one turned the longest ago (%lu) is no longer one\n",
+                        WERE_NPCS,(unsigned long)were_npc[0]);
+            memmove(were_npc,were_npc+1,(size_t)(WERE_NPCS-1)*sizeof(were_npc[0]));were_npc_n--;were_npc_dropped++;
+        }
+        were_npc[were_npc_n++]=ref;
+    }else if(!set && i>=0){
+        memmove(were_npc+i,were_npc+i+1,(size_t)(were_npc_n-1-i)*sizeof(were_npc[0]));were_npc[--were_npc_n]=0;
+    }else return;
+    were_bloom_build();AW_MwvmStateChanged();
+}
+/* NPC-WEREWOLF-NO-MODEL-66: the NPCs a script turned, for their drawing (aw_animkit.c AW_AnimPickPreSend: their frames
+ * on the werewolf's table; aw_view.c: the werewolf set) and their hands (aw_items.c: nothing held): how many, and
+ * whether E is one; a packed list of at most WERE_NPCS, asked only while it holds any */
+int AW_MwscriptWerewolfNpcs(void);
+int AW_MwscriptWerewolfNpc(struct edict_s *e);
+int AW_MwscriptWerewolfNpcs(void){return were_npc_n;}
+static int player_is_werewolf(void){return aw_move_werewolf!=0;}   /* aw_talk.c's hook (NPC-WEREWOLF-TALK-OFFERED-68) */
+int AW_MwscriptWerewolfNpc(struct edict_s *e){
+    uint32_t r;
+    if(!were_npc_n || !e || !(r=ref_of_edict(e)) || !(were_bloom[WERE_BIT(r)>>3]&(1u<<(WERE_BIT(r)&7u))))return 0;
+    return were_npc_find(r)>=0;
+}
+extern int (*aw_items_werewolf)(struct edict_s *actor);   /* aw_items.c: a turned NPC holds nothing (set below) */
+/* NPC-WEREWOLF-FIGHTS-ARMED-68 (v0.0.68): the hooks of the combat layer (aw_combat.c: a turned NPC fights with its claws,
+ * the claws' multiplier now) and of the view (aw_view.c: a turned NPC drawn at its race's size, WEREWOLF-RACE-SCALE-68),
+ * declared here, not in aw_combat.h (the CHIM world stage keys it); set in the init below */
+extern int (*aw_combat_werewolf)(struct edict_s *e);
+extern float (*aw_combat_claw_mult)(void);
+extern int (*aw_view_were_race)(int entity,char *race,int capacity,int *female);
+/* The global WerewolfClawMult now (OpenMW 0.51 combat.cpp getHandToHandDamage 503-508 reads the global, not a setting,
+ * at each blow: Bloodmoon's Dream of Hircine sets it from 25 to 35). Its index found by name once (the names' one read,
+ * at a change of form or a load: never in a fight's frame) and kept while the scripts' globals are the same; the
+ * original's own default global (25) when the game's scripts have none. */
+static int claw_global=-1,claw_count=-2;
+static void claw_global_find(void){
+    int g;
+    if(!AW_MwvmLoaded())return;
+    global_names_load();
+    if(claw_count==global_count)return;
+    claw_global=-1;claw_count=global_count;
+    for(g=0;global_names && global_offsets && g<global_count;g++)
+        if(global_offsets[g]>=0 && same_id(global_names+global_offsets[g],"werewolfclawmult")){claw_global=g;break;}
+}
+static float were_claw_mult(void){
+    int type=0;
+    if(claw_count!=global_count)claw_global_find();
+    if(claw_global<0 || !AW_MwvmLoaded())return AW_WERE_CLAW_MULT_DEFAULT;
+    AW_MwvmGlobalName(claw_global,&type);
+    return type==2?AW_MwvmGlobalFloat(claw_global):(float)AW_MwvmGlobalInt(claw_global);
+}
+/* WEREWOLF-RACE-SCALE-68 (v0.0.68, aw_view.c aw_view_were_race): the race and sex of the record of the actor at ENTITY,
+ * for a turned NPC's werewolf drawn at its race's size (OpenMW 0.51 mwclass/npc.cpp adjustScale 1082-1115: the NPC
+ * record's race and sex scale it, whatever its form). One row read per record, kept (the maze's 31 werewolves share
+ * one record), the race's name through the kept strings; 0 when the entity has no actor record or its record no race. */
+#define RACE_ROWS 32
+static struct {int row;uint16_t race;unsigned char female;} race_rows[RACE_ROWS];
+static int race_rows_n,race_rows_next;static unsigned long race_row_reads;
+static int actor_race(int entity,char *race,int capacity,int *female){
+    edict_t *e;aw_actor_base_t b;int i,row;
+    if(!sv.active || entity<=0 || entity>=sv.num_edicts || capacity<2 || !AW_MwscriptActors())return 0;
+    e=EDICT_NUM(entity);
+    if(e->free || (row=row_of_edict(e))==AW_ACTOR_NONE)return 0;
+    for(i=0;i<race_rows_n && race_rows[i].row!=row;i++);
+    if(i==race_rows_n){
+        if(!AW_ActorBase(row,&b) || b.kind!=0)return 0;
+        race_row_reads++;
+        i=race_rows_n<RACE_ROWS?race_rows_n++:(race_rows_next++)%RACE_ROWS;
+        race_rows[i].row=row;race_rows[i].race=b.race;race_rows[i].female=(unsigned char)((b.flags&AWR_FEMALE)!=0);
+    }
+    if(race_rows[i].race==AW_ACTOR_NONE || !read_string(race_rows[i].race,race,capacity) || !race[0])return 0;
+    *female=race_rows[i].female;
+    return 1;
+}
+/* WEREWOLF-BODY-63, WEREWOLF-TRANSFORM-RULES-PARTIAL-68 (v0.0.68): the player's change of form, the ONE function the
+ * script's BecomeWerewolf and UndoWerewolf, the console's typed lines (console_werewolf, the function table) and dbg
+ * werewolf on|off all reach (through host_call). The original's setWerewolf (OpenMW 0.51 mwmechanics/
+ * mechanicsmanagerimp.cpp 1880-1937, read not copied): the readied spell put away first (1890-1892, a werewolf casts
+ * nothing: the hands go down with it), then the state rules of aw_were_rules.c (the form, every item off, the hidden
+ * werewolf robe added and worn, the temporary effects ended, the stats kept and set or given back), the player's record
+ * stored; the inventory and magic windows are refused while the form holds (aw_worldui.c, aw_worldui_werewolf). The robe
+ * in the robe slot is what draws the werewolf (aw_view.c). NUMBERS: the werewolf's settings as a script's line hands
+ * them (tools/mwscript/codegen.py werewolf_settings). One catalogue read (the robe's row) per change, never per frame. */
+static void were_player_change(int set,const aw_mwcell_t *numbers,int count){
+    aw_actor_t *p=player_record();aw_inventory_item_t robe;int32_t n[16];int i,have_robe=0;
+    set=set!=0;
+    if(were.player==set)return;                                   /* 1884-1886 */
+    if(aw_magic_readied){                                          /* 1890-1892 */
+        eval_t *g=sv_player?GetEdictFieldValue(sv_player,"aw_hand_goal"):NULL;
+        aw_magic_readied=0;if(g)g->_float=0;
+    }
+    if(set){
+        have_robe=AW_InventoryRead(AW_WERE_ROBE,&robe);
+        if(!have_robe){
+            were_robes_missing++;
+            Con_Printf("Werewolf: no %s in this game's data (an image without Bloodmoon): the form holds, the body stays "
+                       "the player's own.\n",AW_WERE_ROBE);
+        }
+    }
+    if(count>16)count=16;
+    for(i=0;i<count;i++)n[i]=numbers[i].i;
+    AW_WereChange(&were,set,&aw_state,have_robe?&robe:NULL,p,n,count,&were_last);
+    if(p)player_store(p);
+    aw_move_werewolf=were.player;were_calls++;AW_MwvmStateChanged();
+}
+/* aw_worldui.c (aw_worldui_werewolf): the player is a werewolf now */
+static int were_form(void){return were.player;}
 static void attacked_hook(edict_t *e){
     uint32_t ref=ref_of_edict(e);int i;
     if(!ref)return;
@@ -4216,11 +4381,10 @@ static int host_call(int instance,int target,int function,const aw_mwcell_t *num
         return 1;
     case AWF_FORCEGREETING:{
         /* ForceGreeting (OpenMW dialogueextensions.cpp OpForceGreeting: the actor opens the dialogue with its
-         * greeting): the greeting the engine plays when the player talks to the actor (QC aw_greet, the voice table
-         * and its hello line), by the same talk rule (aw_talk.c: alive, not hostile, something to say); the dialogue
-         * window itself comes with DIALOGUE-57. Nothing happens with no actor, no player or a line still playing. */
+         * greeting, whatever the use key's talk rule says): script_greeting, below pc_hit. Nothing happens with no
+         * actor or no player. */
         vec3_t at;int n=locate(instance,target,at);
-        force_greeting(n>0?edict_of(n):NULL);
+        script_greeting(n>0?edict_of(n):NULL);
         return 1;}
     case AWF_AITRAVEL:{
         /* AITravel X Y Z [repeat] (OpenMW aiextensions.cpp OpAiTravel, aitravel.cpp): the actor walks to the point
@@ -4334,46 +4498,23 @@ static int host_call(int instance,int target,int function,const aw_mwcell_t *num
         return 1;
     case AWF_BECOMEWEREWOLF:case AWF_UNDOWEREWOLF:case AWF_ISWEREWOLF:{
         int set=function==AWF_BECOMEWEREWOLF,i;
+        if(set)claw_global_find();   /* NPC-WEREWOLF-FIGHTS-ARMED-68: the claws' global found now, not in a fight's frame */
         if(target!=AW_MWVM_PLAYER){
             vec3_t at;int n=locate(instance,target,at);uint32_t ref=n>0?ref_of_edict(edict_of(n)):0;
             if(!ref)ref=target_reference(instance,target);
             i=were_npc_find(ref);
             if(function==AWF_ISWEREWOLF){result->i=i>=0;return AW_MWVM_CALL_READ;}
             if(!ref)return 1;
-            if(set && i<0){
-                for(i=0;i<WERE_NPCS && were_npc[i];i++);
-                if(i==WERE_NPCS){Con_DPrintf("MWScript: a werewolf NPC not kept (16 at most)\n");return 1;}
-                were_npc[i]=ref;AW_MwvmStateChanged();
-            }else if(!set && i>=0){were_npc[i]=0;AW_MwvmStateChanged();}
+            /* NPC-WEREWOLF-NO-MODEL-66: the mark is what draws it as the werewolf (aw_view.c) and empties its hands
+             * (aw_items.c), as the original's setWerewolf on any actor (mechanicsmanagerimp.cpp 1880-1908) */
+            were_npc_set(ref,set);
             were_calls++;return 1;
         }
         if(function==AWF_ISWEREWOLF){result->i=were.player;return AW_MWVM_CALL_READ;}
-        if(were.player==set)return 1;
-        {aw_actor_t *p=player_record();
-         if(set){
-             /* player.cpp setWerewolfStats: his own kept, the werewolf's from the game settings (Acrobatics apart:
-              * SetWerewolfAcrobatics); inventorystore.cpp unequipAll */
-             if(p){
-                 for(i=0;i<8;i++)were.attr[i]=p->attr_base[i];
-                 for(i=0;i<27;i++)were.skill[i]=p->skill_base[i];
-                 were.kept=1;
-                 for(i=0;i<8+27;i++){
-                     int v=count>i/4?(int)(((uint32_t)numbers[i/4].i>>(8*(3-i%4)))&255):255;
-                     if(v==255 || i==8+20)continue;   /* no setting; Acrobatics stays */
-                     if(i<8)p->attr_base[i]=(short)v;else p->skill_base[i-8]=(short)v;
-                 }
-                 player_store(p);
-             }
-             for(i=0;i<AW_INVENTORY_SLOTS;i++)if(aw_state.inventory.equipped[i][0]){
-                 char id[64];Q_strncpy(id,aw_state.inventory.equipped[i],sizeof(id)-1);id[sizeof(id)-1]=0;
-                 AW_InventoryUnequip(&aw_state,id);
-             }
-         }else if(p && were.kept){   /* player.cpp restoreStats */
-             for(i=0;i<8;i++)p->attr_base[i]=were.attr[i];
-             for(i=0;i<27;i++)p->skill_base[i]=were.skill[i];
-             were.kept=0;player_store(p);
-         }}
-        were.player=set;aw_move_werewolf=set;were_calls++;AW_MwvmStateChanged();return 1;}
+        /* WEREWOLF-BODY-63 (v0.0.68): the one change of every route, the original's whole setWerewolf (player.cpp
+         * setWerewolfStats / restoreStats for the stats, inventorystore.cpp unequipAll, the werewolf robe) */
+        were_player_change(set,numbers,count);
+        return 1;}
     case AWF_SETWEREWOLFACROBATICS:{
         /* mechanicsmanagerimp.cpp applyWerewolfAcrobatics: Acrobatics to fWerewolfAcrobatics (the compiler's number) */
         aw_actor_t *p=target==AW_MWVM_PLAYER?player_record():NULL;
@@ -4464,9 +4605,15 @@ static int host_call(int instance,int target,int function,const aw_mwcell_t *num
         /* PlayGroup group [flags] / LoopGroup group count [flags] (aw_animkit.c AW_AnimPickScripted, OpenMW's
          * animationextensions.cpp): on a skeletal actor whose map is loaded; else nothing happens, counted */
         const char *group=call_string(strings,nstrings,0);vec3_t at;edict_t *e;int n=locate(instance,target,at);
+        int group_loops=function==AWF_LOOPGROUP && count>0?numbers[0].i:0;
+        int group_mode=function==AWF_LOOPGROUP?(count>1?numbers[1].i:0):(count>0?numbers[0].i:0);
         e=n>0?edict_of(n):NULL;
-        if(group && e && !e->free && e!=sv_player &&
-           AW_AnimPickScripted(e,group,function==AWF_LOOPGROUP && count>0?numbers[0].i:0))anim_plays++;
+        if(group && e && !e->free && e!=sv_player && AW_AnimPickScripted(e,group,group_loops))anim_plays++;
+        else if(group && (!e || e->free) && target!=AW_MWVM_PLAYER &&
+                AW_ObjPosePlay(transform_reference(instance,target),group,group_loops,group_mode))pose_plays++;
+        /* MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68: a placed object without an entity (a CHIM room's placement: the Halls of
+         * Penumbra's ice wall, the Clockwork City's lever doors) takes the group's end pose when it has played
+         * (aw_objpose.c, the store's pose table) */
         else anim_misses++;
         return 1;}
     case AWF_GETRACE:{
@@ -5435,6 +5582,12 @@ static void status_counts(void){
                AW_StandingCrime(),AW_StandingReputation(),standing_calls,standing_misses,
                AW_StandingFull()?"; faction table full":"",anim_plays,anim_misses,topics_added,topic_rows,topic_bytes,cures,
                effects_cast,AW_EffectsCount(),AW_EffectsRefused(),greetings,greetings_missed,rotations,rotations_missed,travels,travels_refused,follows,follows_refused,positions,positions_refused);
+    {unsigned long pc[4];AW_ObjPoseCounts(pc);   /* MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68 */
+     Con_Printf("PlayGroup on placed objects: %lu taken (%lu rows in the pose table, %lu end poses put in place, %lu "
+                "calls with no row)\n",pose_plays,pc[0],pc[2],pc[3]);}
+    Con_Printf("ForceGreeting: %lu opened past the talk rule (a fighting or knocked person); not possible: %lu held back "
+               "from a werewolf player, %lu with no row in the dialogue table (creatures)\n",greetings_forced,
+               greetings_werewolf,greetings_norow);
     Con_Printf("PositionCell: %lu moved here, %lu to another place, %lu not possible; arrivals spawned %lu (%lu with no "
                "entity to spawn); %d leaving\n",poscells,poscells_away,poscells_refused,visitors_spawned,visitors_no_text,
                leaving_count);
@@ -5543,15 +5696,64 @@ static void stats_readout(void){
                combat_sheets_from_stats,made,blocks,ms,AW_AreaActorFillWorstFrame());
 #ifdef AW_COMBAT_EFFECT_MAGNITUDE
     if(ref && AW_MwscriptActors()){
-        aw_actor_t *a=AW_ActorGet(ref,AW_ACTOR_NONE,0);
-        Con_Printf("  resistance to normal weapons from its abilities: %.0f (weakness %.0f); ability lookups read %lu, "
-                   "kept %lu\n",a?AW_ActorPassiveMagnitude(a,AW_EFFECT_RESIST_NORMAL_WEAPONS):0.0f,
-                   a?AW_ActorPassiveMagnitude(a,AW_EFFECT_WEAKNESS_NORMAL_WEAPONS):0.0f,passive_reads,passive_kept);
+        aw_actor_t *a=AW_ActorGet(ref,AW_ACTOR_NONE,0);unsigned long pc[3];
+        AW_ActorPassiveCounts(pc);
+        Con_Printf("  resistance to normal weapons from its abilities: %.0f (weakness %.0f); ability lists read %lu, "
+                   "answers from a kept list %lu, asked one by one %lu\n",
+                   a?AW_ActorPassiveMagnitude(a,AW_EFFECT_RESIST_NORMAL_WEAPONS):0.0f,
+                   a?AW_ActorPassiveMagnitude(a,AW_EFFECT_WEAKNESS_NORMAL_WEAPONS):0.0f,pc[0],pc[1],pc[2]);
     }
 #endif
 }
+/* "aw_mwscript_status werewolf [on|off]" (dbg werewolf, WEREWOLF-BODY-63, v0.0.68): on runs the console's
+ * BecomeWerewolf (the werewolf's settings read from the compiled file, console_werewolf), off the compiled
+ * UndoWerewolf's host call: the one change of every route (were_player_change). Then, and alone, the status: the form,
+ * the last change by number, the look and its sets (aw_view.c AW_ViewWerewolfStatus). */
+static void console_werewolf(int k,int who,int command,const char *target,char *answer,int capacity);
+static void werewolf_status(void){
+    int i,npcs=were_npc_n;
+    Con_Printf("Werewolf form: %s; werewolf kills %d; his own stats kept: %s; NPCs a script turned: %d of %d at most "
+               "(%lu let go for room); changes %lu.\n",were.player?"the player is a werewolf":"the player is himself",
+               were.kills,were.kept?"yes":"no",npcs,WERE_NPCS,were_npc_dropped,were_calls);
+    /* NPC-WEREWOLF-NO-MODEL-66: their references (those on this map, drawn as the werewolf, are listed by the view) */
+    if(npcs){
+        Con_Printf("  turned NPCs' references:");
+        for(i=0;i<npcs && i<24;i++)Con_Printf(" %lu",(unsigned long)were_npc[i]);
+        Con_Printf("%s\n",npcs>24?" ...":"");
+    }
+    if(were_last.changed)
+        Con_Printf("  the last change: %d slots taken off, the robe added %d, worn %d, taken away %d; %d temporary effects "
+                   "ended; stats %s%s\n",were_last.taken_off,were_last.robe_added,were_last.robe_worn,
+                   were_last.robe_removed,were_last.purged,were_last.stats==1?"kept and the werewolf's set":
+                   were_last.stats==2?"given back":"not changed (no player record)",
+                   were_robes_missing?"; the robe is not in this game's data":"");
+    /* NPC-WEREWOLF-FIGHTS-ARMED-68, WEREWOLF-RACE-SCALE-68: the claws' multiplier now, and the records whose race was read */
+    Con_Printf("  claws: x%.0f (%s); the turned NPCs' races: %d records read (%lu reads)\n",(double)were_claw_mult(),
+               claw_global>=0?"the global WerewolfClawMult":"no such global in the scripts: the original's default",
+               race_rows_n,race_row_reads);
+    AW_ViewWerewolfStatus();
+}
+static void werewolf_command(void){
+    char *w=Cmd_Argc()>2?Cmd_Argv(2):"";static char answer[512];
+    answer[0]=0;
+    if(!Q_strcasecmp(w,"on"))console_werewolf(-1,AW_MWVM_PLAYER,AW_MWCON_BECOMEWEREWOLF,"",answer,sizeof(answer));
+    else if(!Q_strcasecmp(w,"off")){
+        aw_mwcell_t numbers[1],result;unsigned char strings[2]={0,0};int was=were.player;
+        numbers[0].i=0;result.i=0;
+        host_call(-1,AW_MWVM_PLAYER,AWF_UNDOWEREWOLF,numbers,0,strings,0,&result);
+        Q_snprintf(answer,sizeof(answer),"UndoWerewolf: %s\n",!was?"the player is not a werewolf.":
+                   "the player is himself again: his own attributes and skills back, the werewolf robe taken off and "
+                   "away; his other items stay in the inventory, taken off (the original puts nothing back on).");
+    }else if(w[0]){
+        Con_Printf("dbg werewolf [on / off]: on and off run the script's BecomeWerewolf and UndoWerewolf; alone: the status.\n");
+        return;
+    }
+    if(answer[0])Con_Printf("%s",answer);
+    werewolf_status();
+}
 static void status(void){
     char *a=Cmd_Argc()>1?Cmd_Argv(1):"";int k,on=-1;
+    if(!Q_strcasecmp(a,"werewolf")){werewolf_command();return;}   /* dbg werewolf (WEREWOLF-BODY-63) */
     if(!Q_strcasecmp(a,"on") || !Q_strcasecmp(a,"true") || !Q_strcasecmp(a,"yes") || !strcmp(a,"1"))on=1;
     else if(!Q_strcasecmp(a,"off") || !Q_strcasecmp(a,"false") || !Q_strcasecmp(a,"no") || !strcmp(a,"0"))on=0;
     if(!Q_strcasecmp(a,"stats")){stats_readout();return;}
@@ -5764,7 +5966,7 @@ static void status(void){
         }
         if(!Q_strcasecmp(f,"forcegreeting")){   /* the actor under the crosshair greets, as a script's ForceGreeting */
             edict_t *e=sv_player?AW_NPCTarget(sv_player,sv_player->v.v_angle):NULL;
-            Con_Printf("dbg mwscript call forcegreeting: %s (%s)\n",force_greeting(e)?"greeting played":"not possible",
+            Con_Printf("dbg mwscript call forcegreeting: %s (%s)\n",script_greeting(e)?"greeting played":"not possible",
                        e?pr_strings+e->v.netname:"no actor under the crosshair");
             return;
         }
@@ -5955,6 +6157,49 @@ static void pc_hit(edict_t *e){
     }
     if(script<0 || (slot=pchit_slot(script))<0)return;
     if(AW_MwvmLocalSet(ref,script,slot,1)){pchit_set++;AW_MwvmStateChanged();}
+}
+/* MWSCRIPT-FORCEGREETING-TALK-RULES-68: a script's ForceGreeting on actor E. The original opens the conversation for
+ * any enabled actor, whatever the use key would do (OpenMW 0.51 mwscript/dialogueextensions.cpp OpForceGreeting:
+ * pushGuiMode(GM_Dialogue, ptr); mwdialogue/dialoguemanagerimp.cpp startDialogue refuses a dead actor), and holds it
+ * back while the player is a werewolf unless the actor's own script declares the variable AllowWerewolfForceGreeting.
+ * Before, only an actor the talk rule allows was greeted, so a person in a fight (Toralf of Raven Rock after the blow),
+ * knocked down, or asked in the frame its fight ended, opened nothing, and a werewolf player was greeted by anyone.
+ * Now: the talk's own greeting when the rule allows; else, for a living person with a row in the dialogue table, the
+ * window opens directly with the greeting picked from the table (as the arrest does, crime_greet). The world stands
+ * still while the window is open (key_dest), so a fight waits and goes on after it unless the script or the
+ * conversation ended it. Still refused, each counted: a dead actor, an opening-scene role (it talks by its own
+ * story), an actor without a row in the dialogue table (every creature: the table holds people only,
+ * DIALOGUE-CREATURE-SPEAKERS-66), an open window.
+ * Cost: flags; for a werewolf player one walk of the script instances and, once per script, the names table (8 kept). */
+#define WEREGREET_MEMO 8
+static struct {int script,allowed;} weregreet_memo[WEREGREET_MEMO];static int weregreet_count,weregreet_next;
+static int werewolf_greeting(uint32_t ref){
+    int i,n=0,script=-1,allowed=0;const uint32_t *keys;
+    uint32_t want=AW_LedgerNameHash("allowwerewolfforcegreeting")&0x3FFFFFFFu;
+    if(!ref || !AW_MwvmLoaded())return 0;
+    for(i=0;i<AW_MwvmInstanceCount();i++){
+        aw_mwvm_instance_t *in=AW_MwvmInstance(i);
+        if(in && (in->flags&(AWI_USED|AWI_GLOBAL))==AWI_USED && in->reference==ref){script=in->script;break;}
+    }
+    if(script<0)return 0;
+    for(i=0;i<weregreet_count;i++)if(weregreet_memo[i].script==script)return weregreet_memo[i].allowed;
+    keys=locn_keys(script,&n);
+    for(i=0;keys && i<n;i++)if((keys[i]&0x3FFFFFFFu)==want){allowed=1;break;}   /* bits 30-31: the variable's type */
+    script_names_done();locn_now_script=-1;
+    i=weregreet_count<WEREGREET_MEMO?weregreet_count++:(weregreet_next=(weregreet_next+1)%WEREGREET_MEMO);
+    weregreet_memo[i].script=script;weregreet_memo[i].allowed=allowed;
+    return allowed;
+}
+static int script_greeting(edict_t *e){
+    aw_talk_facts_t f;
+    if(!e || e->free || e==sv_player || !sv_player || !is_actor(e)){greetings_missed++;return 0;}
+    if(aw_move_werewolf && !werewolf_greeting(ref_of_edict(e))){greetings_werewolf++;greetings_missed++;return 0;}
+    if(talk_greeting(e)){greetings++;return 1;}
+    if(!AW_TalkFacts(e,&f) || f.dead || AW_DialWindowActive() ||
+       (!f.actor && !strcmp(pr_strings+e->v.classname,"aw_npc"))){greetings_missed++;return 0;}
+    if(AW_GlutNpcOf(e)<0){greetings_norow++;greetings_missed++;return 0;}
+    if(!AW_DialWindowOpen(e,"",0)){greetings_missed++;return 0;}
+    greetings_forced++;greetings++;return 1;
 }
 /* HITM: the held key of (HOLDER, ITEM), 0 none; the item of held key KEY, 0 none */
 static uint32_t hitm_key(uint32_t holder,uint32_t item){
@@ -6328,6 +6573,7 @@ static void actors_import(const unsigned char *data,int bytes){
                 if(rest+79<=tail && !memcmp(p+rest,"AWWF",4)){   /* the werewolf state (v0.0.63) */
                     int k=were_import(p+rest,(int)(tail-rest));
                     if(k<0)Con_Printf("Saved werewolf state unreadable: none kept.\n");else rest+=(unsigned long)k;
+                    if(k>=0 && (were.player || were_npc_n))claw_global_find();   /* at the load, not in a fight's frame */
                 }
                 if(rest+7<=tail && !memcmp(p+rest,"AWMV",4)){   /* the scripts' moved placements (v0.0.63) */
                     int k=AW_MoverImport(p+rest,(int)(tail-rest));
@@ -6391,6 +6637,9 @@ unsigned long AW_MwscriptDigest(void){
     for(i=0;known_topics && i<topic_bytes;i++)if(known_topics[i])known++;
     h=((h^changed)*16777619UL)&0xffffffffUL;
     h=((h^known)*16777619UL)&0xffffffffUL;
+    /* the werewolf form, its kept stats and kills (WEREWOLF-BODY-63): none at a fresh start; New Game clears them
+     * (actors_import -> forced_reset), the robe goes with the inventory (story and globals) */
+    h=((h^(unsigned long)((were.player?1:0)|(were.kept?2:0)|((unsigned long)were.kills<<2)))*16777619UL)&0xffffffffUL;
     /* the fight orders on the actors' records (MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68): none at a fresh start */
     return ((h^(unsigned long)(AW_ActorStateReady()?AW_ActorOrderCount():0))*16777619UL)&0xffffffffUL;
 }
@@ -6467,6 +6716,7 @@ void AW_MwscriptInit(void){
     aw_save_new_game=new_game_hook;   /* the original's run-once new-game scripts (NPC-STORY-DISABLED-AT-START-42) */
     AW_FallInit();                    /* held and falling actors (SCRIPTED-EVENT-FALLING-MAGE-61) */
     AW_WaterInit();                   /* the rooms' water planes (MWSCRIPT-WATER-LEVEL-STATIC-67) */
+    AW_ObjPoseInit();                 /* the end poses of the scripts' groups on objects (MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68) */
     aw_worldui_equip_script=equip_script;   /* OnPCEquip and PCSkipEquip (MWSCRIPT-GAP-FUNCTIONS-62) */
     aw_inventory_equip_script=equip_script;   /* and the console's equip / unequip (MWSCRIPT-UNPLACED-RECORD-SCRIPTS-61) */
     AW_StandingReset();AW_EffectsReset();
@@ -6482,11 +6732,19 @@ void AW_MwscriptInit(void){
     aw_scene_intercept=aw_hinged_intercept=object_intercept;
     aw_trap_cast=trap_cast;   /* a sprung trap's spell on the player (TRAPS-WHEN-OPENED-63) */
     aw_item_added=item_added;   /* OnPCAdd (CENSUS-INTRO-SCRIPTS-62) */
+    aw_worldui_werewolf=were_form;   /* the inventory and magic windows refused while a werewolf (WEREWOLF-BODY-63) */
+    aw_items_werewolf=AW_MwscriptWerewolfNpc;   /* a turned NPC holds nothing (NPC-WEREWOLF-NO-MODEL-66) */
+    aw_combat_werewolf=AW_MwscriptWerewolfNpc;  /* and fights with its claws only (NPC-WEREWOLF-FIGHTS-ARMED-68) */
+    aw_talk_werewolf=AW_MwscriptWerewolfNpc;    /* and is not talked to by the use key (NPC-WEREWOLF-TALK-OFFERED-68) */
+    aw_talk_player_werewolf=player_is_werewolf; /* nor does a werewolf player use any actor */
+    aw_combat_claw_mult=were_claw_mult;         /* the claws' multiplier now: the global WerewolfClawMult */
+    aw_view_were_race=actor_race;               /* drawn at its race's size (WEREWOLF-RACE-SCALE-68) */
     aw_item_removed=item_removed;   /* a carried item's script stops with the last one (MWSCRIPT-UNPLACED-ATTACH-62) */
     aw_actors_levelled_spawned=levelled_spawned;   /* a levelled pick runs its record's script (the same item) */
     aw_rest_spawn=rest_creature;   /* a wilderness rest cut short brings its creature (REST-CUT-NO-CREATURE-67) */
     aw_opening_activate=object_intercept;      /* census type amiwind: the clerk starts his talk (OPENING-REGRESSION-64) */
     aw_inventory_intercept=object_intercept;   /* OnActivate takes a placed item's use */   /* OnActivate takes a door's use */
+    aw_inventory_takes_use=object_takes_use;   /* a named activator whose script reads OnActivate is used (ROOM-SCRIPTED-ACTIVATOR-NO-USE-68) */
     aw_actor_disabled=AW_ObjectDisabled;   /* the CHIM window spawns no disabled actor */
     aw_scene_door_disabled=AW_ObjectDisabled;   /* nor is a disabled load door used (DOOR-LOAD-DISABLED-STILL-USED-68) */
     aw_actor_killed=actor_killed;          /* an essential character's death box, whatever killed it (ESSENTIAL-DEATH-MESSAGE-66) */
@@ -7199,7 +7457,10 @@ static void console_werewolf(int k,int who,int command,const char *target,char *
                        were_calls!=before?"is a werewolf (IsWerewolf 1)":"not kept (no reference, or the 16 werewolf NPCs kept already)");
         else if(was)Q_snprintf(answer,capacity,"%s: the player is a werewolf already.\n",name);
         else Q_snprintf(answer,capacity,"%s: the player is a werewolf: the werewolf's attributes and skills from the game settings, "
-                        "his own kept for UndoWerewolf, his equipped items taken off.\n",name);
+                        "his own kept for UndoWerewolf, his equipped items taken off, the werewolf robe worn%s, his "
+                        "temporary effects ended.\n",name,were_last.robe_worn?"":were_last.robe_added?
+                        " (added, but its catalogue row cannot be worn: his own body stays)":
+                        " (not in this game's data: his own body stays)");
         return;
     }
     numbers[0].i=rows[CONSOLE_WERE_ROWS-1];

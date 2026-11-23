@@ -448,7 +448,34 @@ int main(int argc,char **argv){
      P(" removed %.0f npc %.0f none %.0f",AW_ActorPassiveMagnitude(x,98),
        AW_ActorPassiveMagnitude(AW_ActorGet(31338,row,1),98),AW_ActorPassiveMagnitude(NULL,98));
      /* UNDERWATER-BREATH-62: the NoMagnitude ability (stored magnitude 0) counts 1 */
-     P(" water breathing %.0f\n",AW_ActorPassiveMagnitude(x,0));}
+     P(" water breathing %.0f",AW_ActorPassiveMagnitude(x,0));
+     /* AMBIENT-SOUND-READ-IN-FRAME-68: every always-acting effect in one read of the list, the same numbers as the
+      * single questions for all 143 effects; the kept lists: seven fighters asked seven effects each, five blows:
+      * the table is read in the first round only; a changed list is read again; a list with more kinds than kept
+      * still answers right (asked one by one) */
+     {aw_actor_t *r2=AW_ActorGet(31339,rat,1),*fg[7];aw_passive_sum_t sums[8];int more=9,k,nsum,same=1,e,j;
+      unsigned long r0,r1=0,r3,c0[3],c1[3];static const int fx[7]={98,36,14,0,45,3,39};float k98,k14,gone,small;
+      nsum=AW_ActorPassiveSums(r2,sums,8,&more);
+      for(e=0;e<143;e++){float want=AW_ActorPassiveMagnitude(r2,e),got=0;
+          for(k=0;k<nsum;k++)if(sums[k].effect==e)got=sums[k].value;
+          if(want!=got)same=0;}
+      for(j=0;j<7;j++)fg[j]=AW_ActorGet(40000+j,j&1?rat:row,1);
+      AW_ActorPassiveCounts(c0);r0=AW_ActorStateStats()->reads;
+      for(k=0;k<5;k++){
+          for(j=0;j<7;j++)for(e=0;e<7;e++)if(AW_ActorPassiveKept(fg[j],40000+j,fx[e],1)!=AW_ActorPassiveMagnitude(fg[j],fx[e]))same=0;
+          if(!k){r1=AW_ActorStateStats()->reads;
+                 for(j=0;j<7;j++)for(e=0;e<7;e++)(void)AW_ActorPassiveKept(fg[j],40000+j,fx[e],1);
+                 r1=AW_ActorStateStats()->reads-r1;}
+      }
+      AW_ActorPassiveCounts(c1);(void)r0;
+      r3=AW_ActorStateStats()->reads;
+      for(j=0;j<7;j++)for(e=0;e<7;e++)(void)AW_ActorPassiveKept(fg[j],40000+j,fx[e],1);
+      r3=AW_ActorStateStats()->reads-r3;
+      k98=AW_ActorPassiveKept(r2,31339,98,1);k14=AW_ActorPassiveKept(r2,31339,14,1);
+      AW_ActorRemoveSpell(r2,immunity);gone=AW_ActorPassiveKept(r2,31339,98,1);
+      nsum=AW_ActorPassiveSums(fg[1],sums,1,&more);small=more?1:0;
+      P(" | sums same %d lists read %lu table reads of a kept blow %lu and %lu kept %.0f %.0f list changed %.0f small %d more %.0f"
+        " generation %.0f\n",same,c1[0]-c0[0],r1,r3,k98,k14,gone,nsum,small,AW_ActorPassiveKept(fg[1],40001,98,2));}}
     /* UNDERWATER-BREATH-62 (v0.0.63-dev5 release check): an ability added to the player's record (the race's) is gone
      * after a load, since the player's record is not in the actor block; the pool's epoch moves so the host adds it
      * again */
@@ -638,7 +665,19 @@ class EngineTests(unittest.TestCase):
         # RESIST-NORMAL-WEAPONS-61 (v0.0.62, OpenMW 0.51 activespells.cpp): abilities, blights, diseases and curses of
         # the actor's list act always (the ability's 100 + the disease's 5; the disease's weakness 30, the middle of
         # 20-40); a castable spell and a power only when cast; a removed ability no longer counts; no record, nothing
-        self.assertEqual(self.out[44], 'passive 105 30 0 removed 5 npc 0 none 0 water breathing 1')
+        self.assertEqual(self.out[44].split(' | ')[0], 'passive 105 30 0 removed 5 npc 0 none 0 water breathing 1')
+
+    def test_a_blow_asks_the_kept_ability_lists_not_the_disk(self):
+        # AMBIENT-SOUND-READ-IN-FRAME-68: a blow asks about seven effects of each of its fighters; the host kept the
+        # last 8 single answers, so every blow of a fight read the lists from disk again (50 to 220 ms a blow in the
+        # v0.0.68-dev9 session). One read of an actor's list now answers every effect (the same numbers as the single
+        # questions, for all 143 effects), kept for 24 actors: seven fighters' lists are read once (7), a blow's
+        # questions after that read nothing from the table (0 and 0); the rat's 105 and 0 from its kept list; a list a
+        # script changed is read again (5); a list with more kinds than are kept says so; another generation (a
+        # loaded game) reads again and answers the same (105)
+        self.assertEqual(self.out[44].split(' | ')[1],
+                         'sums same 1 lists read 7 table reads of a kept blow 0 and 0 kept 105 0 list changed 5 '
+                         'small 1 more 1 generation 105')
 
     def test_a_load_empties_the_player_record_and_moves_the_epoch(self):
         # UNDERWATER-BREATH-62 (v0.0.63-dev5): the race's ability added to the player is gone after a load; the

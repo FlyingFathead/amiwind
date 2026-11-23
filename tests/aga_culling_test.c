@@ -11,6 +11,7 @@ int AW_DrawDistance(void);
 void AW_SetDrawDistance(int);
 void AW_DrawDistanceArrive(const float *);
 void AW_FogDepths(byte *,int);
+void AW_FogDepthsScaled(byte *,int,int);
 static void (*distance_command)(void);
 static int argc=1;
 static char *argument="";
@@ -88,6 +89,20 @@ static void fog_exact_tests(void){
   assert(full==32767 || depths[full+1]<15);
  }
  assert(AW_FogFullDepthValue(540)==60);
+ /* The weather's fog depth (SOL-WEATHER-SKY-SNOW-68, AW_FogDepthsScaled): scale 256 is Clear's table byte for byte;
+  * a wider span (a blizzard, 1039/256) still reaches level 15 at the distance, fogs every nearer level more, and the
+  * nearest ground already at about level 8 (Morrowind.ini's 2.8: the fog starts before the eye); a thin span less */
+ {
+  static byte clear[32768],storm[32768],thin[32768];int k,more=0;
+  for(i=100;i<=4096;i+=211){
+   AW_FogDepths(clear,i);AW_FogDepthsScaled(storm,i,256);assert(!memcmp(clear,storm,sizeof clear));
+  }
+  AW_FogDepths(clear,540);AW_FogDepthsScaled(storm,540,1039);AW_FogDepthsScaled(thin,540,200);
+  full=AW_FogFullDepthValue(540);
+  for(j=1;j<=full;j++)assert(storm[j]==15);
+  for(k=1;k<32768;k++){assert(storm[k]>=clear[k] && thin[k]<=clear[k]);more+=storm[k]>clear[k];}
+  assert(more>1000 && clear[32767]==0 && storm[32767]>=7 && storm[32767]<=9 && storm[0]==15);
+ }
  /* Viewport 320x200, Quake's projection (r_main.c R_ViewChanged). */
  vid.width=320;vid.height=200;r_refdef.vrect.x=r_refdef.vrect.y=0;r_refdef.vrect.width=320;r_refdef.vrect.height=200;
  xcenter=320*.5f-.5f;ycenter=200*.5f-.5f;xscale=160;yscale=160;

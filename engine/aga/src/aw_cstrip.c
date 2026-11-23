@@ -7,6 +7,7 @@
  * All and Close. All of it is allocated on open and freed on close (no resident cost while closed). */
 #include "quakedef.h"
 #include "aw_inventory.h"
+#include "aw_were_rules.h"   /* the werewolf robe is never listed (WEREWOLF-BODY-63) */
 #include "aw_icons.h"
 #include "aw_tryalloc.h"
 #include "aw_cstrip.h"
@@ -92,7 +93,11 @@ static void strip_fill_inventory(aw_cstrip_list_t *l,const aw_cstrip_list_t *old
         aw_cstrip_entry_t *e;const char *id;
         at[i]=-1;
         if(AW_ITEM_ROW(&aw_state,i)->value<=0)continue;
-        id=AW_ITEM_ID(&aw_state,i);e=&row[n];
+        id=AW_ITEM_ID(&aw_state,i);
+        /* WEREWOLF-BODY-63: the werewolf robe is never listed, so never put away (OpenMW 0.51 mwworld/class.cpp
+         * showsInInventory 289-295, read not copied) */
+        if(AW_WERE_ROBE_ID(id))continue;
+        e=&row[n];
         e->count=AW_ITEM_ROW(&aw_state,i)->value;
         Q_strcpy_bounded(e->id,id,sizeof(e->id));e->name[0]=0;
         known=NULL;

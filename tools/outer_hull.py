@@ -226,15 +226,77 @@ def shape_faces(shapes, names=None):
             for k, v in names.items()}
 
 
-def bone_faces(shapes):
+DETAIL_BONES = ('finger', 'toe', 'eye', 'jaw', 'teeth', 'tongue', 'ear', 'hair')    # word stems of detail bones
+DETAIL_NAMES = ('weapon bone', 'shield bone')
+
+
+def is_detail_bone(name):
+    """A bone of a detail (a finger, a toe, an eye, the jaw, an ear, hair; the weapon and shield bones): a word of
+    its name starts with one of DETAIL_BONES ('bip01 l finger11', 'bip01 r toe0'; not 'bip01 r forearm')."""
+    name = str(name).casefold()
+    return name in DETAIL_NAMES or any(w.startswith(DETAIL_BONES) for w in name.replace('_', ' ').split())
+
+
+def bone_faces(shapes, main_piece=True):
     """{bone: source face indices into the source whole}: the faces each bone carries (the label at least two of
-    their corners share: the arms, legs, neck and tail as the engine moves them, whichever worn piece covers them).
-    Shapes without 'bone_name' (NpcSource.shapes sets it): {}."""
+    their corners share: the arms, legs, neck and tail as the engine moves them, whichever worn piece covers them),
+    the bones of details (fingers, toes, eyes, jaws: DETAIL_BONES) left out, and with MAIN_PIECE only the largest
+    connected piece of each bone (a belt buckle or a horn riding the same bone is a detail; lost_pieces reads it).
+    Shapes without 'bone_name' (NpcSource.shapes, creature_source set it): {}."""
     if not shapes or not all('bone_name' in s for s in shapes):
         return {}
-    _, sf = source_whole(shapes)
+    sp, sf = source_whole(shapes)
     labels = _face_label(np.concatenate([np.asarray(s['bone_name'], dtype=object) for s in shapes]), sf)
-    return {str(b): np.flatnonzero(labels == b) for b in sorted(set(labels.tolist())) if b}
+    out = {}
+    for b in sorted(set(labels.tolist())):
+        if not b or is_detail_bone(b):
+            continue
+        idx = np.flatnonzero(labels == b)
+        if main_piece and len(idx):
+            parts = pieces(sp, sf[idx])
+            idx = idx[max(parts, key=len)] if parts else idx
+        out[str(b)] = idx
+    return out
+
+
+def label_bones(shapes, sources, parents=None, keep=None):
+    """Set each shape's 'bone_name' (every vertex's bone) from its export_actor-like source (same order and vertex
+    counts): its own bone, or the nearest of KEEP up its PARENTS (skeletal_actor.kept_ancestor) when given. Returns
+    True when every shape was labelled."""
+    import skeletal_actor as S
+    if len(sources) != len(shapes) or not all(
+            s['positions'].shape[1] == len(src['rest']) for s, src in zip(shapes, sources)):
+        return False
+    for s, src in zip(shapes, sources):
+        names = list(src['bones'])
+        if parents is not None and keep is not None:
+            names = [S.kept_ancestor(parents, keep, n) or '' for n in names]
+        s['bone_name'] = np.array([names[b] for b in np.asarray(src['bone'], int)], dtype=object)
+    return True
+
+
+def creature_source(data, mesh, biped):
+    """A creature's visible source shapes posed at its idle's first time (creature_surface.source_shapes) with each
+    vertex's own bone ('bone_name', from halloween_cast.creature_shapes' sources)."""
+    import creature_library
+    import creature_tables as T
+    import halloween_cast
+    from prepare_scenery import nif_reader
+    creature_library.layered_assets(data)
+    assets = T._open(data)
+    N = nif_reader()
+    rig = T.open_rig(N, assets.read, mesh, biped)
+    idle = rig.window('idle')
+    if idle is None:
+        raise ValueError('no idle group')
+    source, start, _ = idle
+    shapes, _, _, sources, _, _ = halloween_cast.creature_shapes(N, rig.raw, halloween_cast.RigSkeleton(rig, source).pose,
+                                                                [start], assets)
+    effects = {e['shape'] for e in T.effect_shapes(N, rig.raw)}
+    keep = [i for i, s in enumerate(shapes) if s['name'] not in effects]
+    shapes, sources = [shapes[i] for i in keep], [sources[i] for i in keep]
+    label_bones(shapes, sources)
+    return shapes
 
 
 SEAM_TOL = 0.25         # Quake units: a join's inset point this far from the reduced model is open (npc_seam_audit.TOL)
@@ -268,8 +330,10 @@ def seam_joins(shapes, src_points, src_faces, red_tris, tol=SEAM_TOL):
 
 
 def creature_groups(shapes):
-    """A creature's parts: each shape on its own (its limbs, plates and body), as source face indices."""
-    return shape_faces(shapes)
+    """A creature's parts: the faces each of its bones carries (bone_faces: its limbs and body segments as the engine
+    moves them) when the shapes carry their bones (creature_source), else each shape on its own; source face
+    indices."""
+    return bone_faces(shapes) or shape_faces(shapes)
 
 
 def _src_first():
@@ -383,9 +447,9 @@ def read_model(raw):
 
 
 def check_creature(data, mesh, model_raw, table_raw=None, biped=False):
-    """The row of one creature model against its source mesh posed at its idle's first time (the bake's rest pose)."""
-    from creature_surface import source_shapes
-    shapes = source_shapes(data, mesh, biped)
+    """The row of one creature model against its source mesh posed at its idle's first time (the bake's rest pose),
+    its girth per bone (creature_groups)."""
+    shapes = creature_source(data, mesh, biped)
     pos, faces = read_model(model_raw)
     row = measure(shapes, pos, faces, creature_groups(shapes))
     if table_raw is not None:
@@ -436,14 +500,9 @@ class NpcSource:
                                       attack_stance=appearance.get('attack_stance'))
         shapes, _, _ = assemble(self.assets, appearance, poser, np.array([0.0]))
         names = list(report['bone_names'])
-        sources = S.export_actor(self.assets, appearance, skeleton)
         parents = getattr(skeleton, 'parents', None)
-        if parents is not None and len(sources) == len(shapes) and all(
-                s['positions'].shape[1] == len(src['rest']) for s, src in zip(shapes, sources)):
-            keep = set(names)
-            for s, src in zip(shapes, sources):
-                kept = [S.kept_ancestor(parents, keep, n) for n in src['bones']]
-                s['bone_name'] = np.array([kept[b] or '' for b in np.asarray(src['bone'], int)], dtype=object)
+        if parents is not None:
+            label_bones(shapes, S.export_actor(self.assets, appearance, skeleton), parents, set(names))
         return shapes, names
 
 

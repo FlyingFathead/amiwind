@@ -1,5 +1,14 @@
 # DOOR-USE-COLLISION-EXPANSIONS-68: 13 exterior entrances of Solstheim and Mournhold cannot be reached in the converted collision: no standing spot at the threshold, or the door out of the use reach
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.68-dev8 at 2026-11-23 01:03 +0200: Measured again on the v0.0.68-dev8 frames: nothing in the converted collision fills these thresholds. The door check had no case for a door set into a slope, for an entrance under water or for placements that a scripted stage hides; with those rules it reaches all 13, and the game itself is unchanged. Each entrance still has to be walked up to and used in play before this closes.
+- Reported with v0.0.68-dev8 at 2026-11-23 01:38 +0200: Walked up to in play on the v0.0.68-dev8 image: the five ice caves and the Caverns of Karstaag were entered from the floor their way out leads onto, and left the known list. Rimhull's trapdoor and Mournhold's ladder showed no prompt where their way out arrives; Glenschul's Tomb, the castle's throne room and the two Raven Rock houses were not reached or not set up. Those stay on the list with this result, and the door check now counts only what play has shown.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -19,6 +28,18 @@
 | Platform or emulator | all |
 
 <!-- END GENERATED FACTS -->
+
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-21: reported in v0.0.68-dev4
+- 2026-11-23 01:03 +0200: seen again in v0.0.68-dev8: Measured again on the v0.0.68-dev8 frames: nothing in the converted collision fills these thresholds.
+- 2026-11-23 01:38 +0200: seen again in v0.0.68-dev8: Walked up to in play on the v0.0.68-dev8 image: the five ice caves and the Caverns of Karstaag were entered from the floor their way out leads onto, and left the known list.
+
+<!-- END GENERATED TIMELINE -->
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -56,6 +77,7 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [COLLISION-TRACE-LIMIT-ROUTED-ROOM-36](COLLISION-TRACE-LIMIT-ROUTED-ROOM-36.md): The tool collision tracer stops on the Vivec Arena Pit's routed hull (visit limit), so its start spot cannot be traced
 - [HULL-SURFACE-TENT03-MISSING-57](HULL-SURFACE-TENT03-MISSING-57.md): The collision surface table left out one Ashlander yurt (ex_ashl_tent_03): its walkable collision lay 64 units under its convex pieces
 - [PELAGIAD-STAIRS-STUCK-67](PELAGIAD-STAIRS-STUCK-67.md): A stairway up in Pelagiad cannot be climbed: the player gets stuck on it
+- [PENUMBRA-ICE-WALL-NO-PASSAGE-68](PENUMBRA-ICE-WALL-NO-PASSAGE-68.md): After the ice wall of the Halls of Penumbra breaks, the player cannot get past it into the chamber behind it
 - [RECIPE-ROW-MOVES-COLLISION-57](RECIPE-ROW-MOVES-COLLISION-57.md): A mesh reduction row changed the Imperial ship's collision: the dev4 build stopped at the collision surface gate in Vivec City (64 units)
 - RED-MOUNTAIN-SLOPE-TOO-STEEP-51 (no report page): Red Mountain (cell 2,7): a slope too steep to walk up, the player cannot go forward
 - [ROOM-PYLON-ROOF-48](ROOM-PYLON-ROOF-48.md): Grand Inquisitor and Tamira Vian (Hall of Processing) stand inside collision: a convex piece of ex_stronghold_pylon01 slopes 14 units over the floor they stand on
@@ -77,13 +99,16 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [VIVEC-ARENA-ACTORS-32](VIVEC-ARENA-ACTORS-32.md): Five Vivec Arena residents fail the actor placement gate
 - [VIVEC-ARENA-TP-ARRIVAL-32](VIVEC-ARENA-TP-ARRIVAL-32.md): dbg tp vivec_arena leaves the player at the frame origin under the water
 - [VIVEC-TEMPLE-STAIRS-33](VIVEC-TEMPLE-STAIRS-33.md): Palace steps and High Fane quarter flights fail the stair gate on the CHIM Vivec Temple frame
+- [WALK-TRACE-VISIT-GUARD-FOUNTAIN-68](WALK-TRACE-VISIT-GUARD-FOUNTAIN-68.md): The offline collision tracer gives up on traces through the fountain beside Mournhold's ladder down to Bamz-Amschend: its visit guard ends the trace
 - [WORLD-SLOPE-STUCK-38](WORLD-SLOPE-STUCK-38.md): Player reports being stuck beside Ashlands terrain
 
 Related bugs in other categories:
 
+- [DOOR-CHECK-DOORWAY-STAGES-68](DOOR-CHECK-DOORWAY-STAGES-68.md): The door check lets the first door of a doorway answer for every door the scripts switch between there: three entrances counted as not usable both ways
 - [DOOR-CHECK-MODULE-FRAME-MAPS-67](DOOR-CHECK-MODULE-FRAME-MAPS-67.md): The image's door check stopped on the first frame map of Mournhold's districts: its table of neighbouring frames knew only the open-world directory
 - [DOOR-CHECK-NO-SWIM-CASE-68](DOOR-CHECK-NO-SWIM-CASE-68.md): The build's door check has no case for an entrance reached by swimming: the Stahlman's Gorge entrance under the Mortrag Glacier stops the image stage
 - [DOOR-LOAD-DISABLED-STILL-USED-68](DOOR-LOAD-DISABLED-STILL-USED-68.md): A load door switched off by its script still shows its prompt and can be used
+- [DOOR-USE-ACROSS-FRAME-EDGE-68](DOOR-USE-ACROSS-FRAME-EDGE-68.md): A load door that stands on the edge between two outdoor frames cannot be used from the far side: at Mournhold's ladder down to Bamz-Amschend, the use key does nothing where the way out arrives
 - [DOOR-USE-COLLISION-FILLED-53](DOOR-USE-COLLISION-FILLED-53.md): 35 region-frame entrances cannot be reached through their converted collision: 24 Daedric shrine steps the player slides off, raised trapdoors under their tower hulls, Dwemer doors inside the terrain chunk
 
 <!-- END GENERATED CATEGORY -->

@@ -24,8 +24,23 @@
 #include "aw_actorstate.h"
 #include "aw_glut.h"
 
+/* NPC-WEREWOLF-TALK-OFFERED-68 (v0.0.68), per kind of actor, from OpenMW 0.51 (read, not copied):
+ *   a character (an NPC record) in werewolf form: mwclass/npc.cpp Npc::activate: allowTalking = !inCombatWithActor &&
+ *     !getNpcStats(ptr).isWerewolf(): the use never talks to it (it fails silently); dead or knocked down it is looted
+ *     as anyone;
+ *   a creature record (the werewolf creatures of Bloodmoon too): mwclass/creature.cpp Creature::activate has no
+ *     werewolf test (the form is a character's stat): nothing changes for it here;
+ *   the player in werewolf form: Npc::activate and Creature::activate both ask getWerewolfRefusalAction(actor) first:
+ *     a werewolf uses no character and no creature (the refusal's sound is not played here);
+ *   a script's ForceGreeting opens the conversation whatever the use would do (aw_mwhost.c script_greeting: its
+ *     direct open when this rule refuses), so the scripted talks of the werewolf hunts stay.
+ * The two hooks are the host's (aw_mwhost.c: the turned characters' list, one bit test for anyone else; the player's
+ * form); NULL: nobody is turned (the tools' tests). */
+int (*aw_talk_werewolf)(struct edict_s *e);
+int (*aw_talk_player_werewolf)(void);
 int AW_TalkAllowed(const aw_talk_facts_t *f) {
-    return f->actor && f->dialogue && !f->dead && !f->hostile && !f->knocked && !f->paralyzed;
+    return f->actor && f->dialogue && !f->dead && !f->hostile && !f->knocked && !f->paralyzed && !f->werewolf &&
+           !f->player_werewolf;
 }
 static const char *text(edict_t *e,char *field) {
     eval_t *v=GetEdictFieldValue(e,field);
@@ -51,6 +66,9 @@ int AW_TalkFacts(edict_t *e,aw_talk_facts_t *f) {
         if(a->flags&AWL_DEAD)f->dead=1;
         if(a->flags&AWL_COMBAT)f->hostile=1;
     }
+    /* NPC-WEREWOLF-TALK-OFFERED-68: a character in werewolf form (never a creature record), and the player's form */
+    f->werewolf=(unsigned char)(f->actor && aw_talk_werewolf && aw_talk_werewolf(e));
+    f->player_werewolf=(unsigned char)(aw_talk_player_werewolf && aw_talk_player_werewolf());
     return 1;
 }
 /* once per frame for the same edict (the prompt and E ask in the same frame) */

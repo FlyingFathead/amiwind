@@ -18,6 +18,11 @@ int AW_PartsAssemble(const char *t,long n,const char *r,int f,const char *h,cons
 const aw_skel_table_t *AW_SkelTableFor(const char *name){(void)name;assert(0);return NULL;}
 /* the assembled body's inventory picture (INVENTORY-PREVIEW-BAKED-BODY-59): not reached with the parts off */
 int AW_PartsInventoryGroups(int t,const char *o[2],int *l){(void)t;(void)o;(void)l;assert(0);return 0;}
+/* WEREWOLF-BODY-63: the werewolf's look (aw_player_parts.c): never worn in this fixture */
+int AW_PartsWerewolfWorn(const char *id){(void)id;return 0;}
+/* WEREWOLF-TABLES-STAY-LOADED-68: the table store's one-table give-back (aw_skel_load.c): no werewolf table is ever
+ * recorded here, so it is never asked */
+long AW_SkelTableRelease(const char *name,int (*in_use)(const aw_skel_table_t *t)){(void)name;(void)in_use;assert(0);return 0;}
 int AW_SkelGroup(const aw_skel_table_t *t,const char *n){(void)t;(void)n;assert(0);return -1;}
 int AW_SkelKeyFrame(const aw_skel_table_t *t,int g,const char *n){(void)t;(void)g;(void)n;assert(0);return -1;}
 void AW_SkelGroupAt(const aw_skel_table_t *t,int i,aw_skel_group_t *o){(void)t;(void)i;(void)o;assert(0);}

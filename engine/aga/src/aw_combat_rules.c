@@ -8,6 +8,7 @@
 #include <string.h>
 #include <math.h>
 #include "aw_combat.h"
+#include "aw_combat_were.h"
 
 static const char *const names[AW_COMBAT_SETTING_COUNT]={
     "fFatigueBase","fFatigueMult","fCombatDistance","fHandToHandReach",
@@ -225,8 +226,9 @@ float AW_CombatNormalWeaponFactor(int normal,float resist,int *no_effect) {
     if(resist>=1){if(no_effect)*no_effect=1;return 0;}
     return 1-resist;                    /* a weakness (resist < 0) makes the blow stronger */
 }
-void AW_CombatSwing(const aw_combat_settings_t *s,aw_fighter_t *a,aw_fighter_t *v,int attack,float strength,
-                    float angle,int still,aw_combat_rng_t *r,aw_swing_t *out) {
+/* the swing; CLAWS below 0: no werewolf, else the werewolf's claws (aw_combat_were.h AW_CombatSwingClaws) */
+static void swing(const aw_combat_settings_t *s,aw_fighter_t *a,aw_fighter_t *v,int attack,float strength,
+                  float angle,int still,float claws,aw_combat_rng_t *r,aw_swing_t *out) {
     float d,agility;int health;
     memset(out,0,sizeof(*out));out->strength=strength=clampf(strength,0,1);out->blocked_roll=-1;
     /* applyFatigueLoss: every swing, hit or miss, with the load (ACTOR-MECHANICS-USE-STATS-66; not clamped there) */
@@ -263,6 +265,9 @@ void AW_CombatSwing(const aw_combat_settings_t *s,aw_fighter_t *a,aw_fighter_t *
          * row 4; strength does not count: the original rule, OpenMW's default) */
         d=a->skills[AW_SK_H2H]*(s->fMinHandToHandMult+(s->fMaxHandToHandMult-s->fMinHandToHandMult)*strength);
         health=v->knocked!=0 || v->paralyzed;
+        /* NPC-WEREWOLF-FIGHTS-ARMED-68 (combat.cpp getHandToHandDamage 503-508): a werewolf's claws are health damage,
+         * times the global WerewolfClawMult (strength still does not count: the setting's default ignores werewolves) */
+        if(claws>=0){health=1;d*=claws;}
         if(health)d*=s->fHandtoHandHealthPer;
     }
     out->raw=d;
@@ -289,6 +294,27 @@ void AW_CombatSwing(const aw_combat_settings_t *s,aw_fighter_t *a,aw_fighter_t *
     /* under 1 health is death (OpenMW 0.51 creaturestats.cpp setDynamic; MWSCRIPT-SETHEALTH-ZERO-NO-DEATH-66) */
     if(AW_ACTOR_HEALTH_DEAD(v->health)){v->health=0;v->dead=1;v->knocked=0;}
     else if(v->fatigue<0)v->knocked=2;
+}
+void AW_CombatSwing(const aw_combat_settings_t *s,aw_fighter_t *a,aw_fighter_t *v,int attack,float strength,
+                    float angle,int still,aw_combat_rng_t *r,aw_swing_t *out) {
+    swing(s,a,v,attack,strength,angle,still,-1,r,out);
+}
+/* ---- the werewolf's fight (aw_combat_were.h, NPC-WEREWOLF-FIGHTS-ARMED-68) ---- */
+void AW_CombatSwingClaws(const aw_combat_settings_t *s,aw_fighter_t *a,aw_fighter_t *v,int attack,float strength,
+                         float angle,int still,float claws,aw_combat_rng_t *r,aw_swing_t *out) {
+    swing(s,a,v,attack,strength,angle,still,claws<0?-1:claws,r,out);
+}
+/* setWerewolf 1898-1903 (every item off, the robe worn), getEncumbrance (no load) */
+void AW_CombatWerewolfClaws(const aw_combat_settings_t *s,aw_fighter_t *f) {
+    f->weapon=0;f->weapon_skill=AW_SK_H2H;memset(f->damage,0,sizeof(f->damage));
+    f->reach=0;f->speed=1;f->weight=0;f->weapon_health=f->weapon_health_max=0;f->weapon_normal=0;
+    f->shield=0;f->shield_class=0;f->shield_health=f->shield_health_max=0;
+    f->hit_classes=0;f->armor=AW_CombatUnarmoredRating(s,f);
+    f->encumbrance=0;
+}
+/* getMaxAttackDistance 363-375: hand to hand (dist 1) times the combat distance, the werewolf's by 1 + the mod */
+float AW_CombatWerewolfAttackDistance(const aw_combat_settings_t *s,int werewolf,float mod) {
+    return s->fCombatDistance*(werewolf?mod+1.0f:1.0f);
 }
 /* ---- the aggro and flee ratings (aw_combat.h) ---- */
 static const char *const ai_names[AW_COMBAT_AI_COUNT]={

@@ -1,6 +1,6 @@
 # Interiors on CHIM: CHIM rooms on a shared store
 
-_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
+_Last updated with AmiWind v0.0.68-dev8 (23 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -15,6 +15,7 @@ _Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
   - [The interior store](#the-interior-store)
   - [The room record](#the-room-record)
   - [The room map's keys](#the-room-maps-keys)
+  - [End poses of the scripts' animation groups (v0.0.68)](#end-poses-of-the-scripts-animation-groups-v0068)
 - [Engine changes](#engine-changes)
 - [Builder changes](#builder-changes)
 - [The A/B](#the-ab)
@@ -195,6 +196,40 @@ re-keyed all 2,342 room actor fits).
 
 Worldspawn of `maps/<room>.chim`: `"_chim_world" "chimi"` (the store folder, at most 8 characters, `a-z 0-9 _`) and
 `"_chim_room" "<room>"` (the record `chimi/rooms/<room>.crm`).
+
+### End poses of the scripts' animation groups (v0.0.68)
+
+A script's `PlayGroup` or `LoopGroup` on a placed object plays the group on the object's own model in the original,
+and the group's last pose stays; its collision follows the moved parts (MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68; the rules in
+[MWSCRIPT_BYTECODE.md](../MWSCRIPT_BYTECODE.md)). A room's placement has no entity and no skeleton, so the store holds
+the group's end state instead:
+
+- The `chim-interiors` stage reads the game's scripts and dialogue results (the merged master, `--data-files`;
+  `tools/chim/anim_poses.py` scripted_groups): every object that is not a person or a creature a call plays a group
+  on, its own script's calls and the calls that name it.
+- For each such placement of a room, each group's end pose: the model's NIF with its keyframe, visibility and
+  material alpha controllers evaluated at the group's stop key (posed_nif), read by the same converter and the same
+  collision rule as every model (`prepare_scenery.model_geometry`, `tools/collision_source.py`). A pose that draws and
+  collides as the model as placed is kind B (no model); one that draws nothing is kind H; any other becomes a model
+  of the store (kind M), made like the room's own (its mesh unit, its variant at the placement's scale, the room's
+  settings).
+- The end-pose models are stored after every room's own models, so no other model id and no other room record
+  changes; only the record of a room with end poses lists them after its own (the engine loads them with the room).
+  A room the 32 MB minimum cannot hold with its end-pose models keeps its record as before (`fit_poses`, the early
+  room heap check's own measure; the receipt says so). A placement drawn as cut tiles takes no pose (one model per
+  placement is swapped).
+- `chimi/poses.txt`, one row per placement and group:
+  `R <room record> <reference> <group> <M|B|H> <store model> <seconds> <loop seconds> <box: 6 ints>`; the reference
+  as the record holds it, the seconds of one play and of one more loop from the model's text keys, the drawn box with
+  that model. The receipt's `poses` part lists every row, the models added and their bytes, and every pose not made
+  with its reason.
+- The engine (`aw_objpose.c`) swaps the placement's model and box when the group has played (`chim_room.c`
+  ChimRoom_PoseModel: drawing and collision together, the placement's angles kept), keeps the pose as the named fact
+  `amiwind:pose:<reference>` (saved games, cleared by New Game) and puts every saved pose in place when a room loads.
+  `--object-poses off` builds the store as before (A/B).
+
+Measured on the rooms of the v0.0.68-dev8 line (see the receipt of a build): the census found 19 model and group
+pairs whose end pose differs from the model as placed, 50 placements in 16 rooms.
 
 ## Engine changes
 

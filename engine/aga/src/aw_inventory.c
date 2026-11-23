@@ -2225,14 +2225,20 @@ static unsigned long area_name_hash(const char *s){
 /* TAKEN-LIGHT-FLAME-61: the CHIM exterior placements of REFERENCE in the loaded areas' effect links (every cut piece;
  * the place's areas and the cache) out of the world (HIDE 1) or back (0); their count. A take or a Disable outdoors
  * hides them. CHIM-GONE-LIST-64-CAP-68: each piece as its row names it, no array between (16 pieces at most before) */
+/* EXPANSION-STORE-DISABLE-NOT-HIDDEN-68 (REF-IDENTITY-MERGED-MASTER-66, as chim_room.c RoomRefIs): a 'P' row names its
+ * reference by the stable id (master index x 2^20 + number, tools/effect_links.py placement_ref); a script names an
+ * expansion's reference by the merged master's number (master index x 2^22 + number: its instance's BIND row), a take
+ * by the stable id. The base game's numbers are both forms. The stable id of REFERENCE, and its merged number. */
+static unsigned ref_stable(unsigned r){return r>=(1u<<22) && r<(3u<<22)?((r>>22)<<20)|(r&0x3FFFFFu):r;}
+static unsigned ref_merged(unsigned r){return r>=(1u<<20) && r<(3u<<20)?((r>>20)<<22)|(r&0xFFFFFu):r;}
 int AW_AreaEffectHide(unsigned reference,int hide){
-    int i,k,n=0;
+    int i,k,n=0;unsigned stable=ref_stable(reference);
     for(i=0;reference && i<AREA_SLOTS;i++){
         const area_t *a=&areas[i];
         if(!a->blob || !a->links)continue;
         for(k=0;k<a->link_rows;k++){
             const byte *r=a->links+k*AREA_LINK;
-            if(r[0]=='P' && focus_u32(r+8)==reference){ChimChunks_GonePid((unsigned)focus_u32(r+4),hide);n++;}
+            if(r[0]=='P' && ref_stable((unsigned)focus_u32(r+8))==stable){ChimChunks_GonePid((unsigned)focus_u32(r+4),hide);n++;}
         }
     }
     return n;
@@ -2259,7 +2265,9 @@ void AW_AreaEffectsApply(void){
         if(!a->blob || !a->links)continue;
         for(k=0;k<a->link_rows;k++){
             const byte *r=a->links+k*AREA_LINK;unsigned key=(unsigned)focus_u32(r+4),ref=(unsigned)focus_u32(r+8);
-            if(r[0]=='P'){if(AW_ObjectDisabled(ref))ChimChunks_GonePid(key,1);}
+            /* the world change list holds a script's Disable under the merged number, a take under the stable id */
+            if(r[0]=='P'){if(AW_ObjectDisabled(ref) || (ref_merged(ref)!=ref && AW_ObjectDisabled(ref_merged(ref))))
+                              ChimChunks_GonePid(key,1);}
             else if(r[0]=='F'){if(key==map)AW_StaticFlameLink(sv.worldmodel,r[2]|(r[3]<<8),ref);}
             else if(r[0]=='L')AW_LampLink(key,ref);
         }
@@ -3467,6 +3475,18 @@ static unsigned view_reference(edict_t *p,vec3_t eye,vec3_t f,float reach,float 
     *hit=tr.fraction*reach;
     return (unsigned)v->_float;
 }
+/* ROOM-SCRIPTED-ACTIVATOR-NO-USE-68 (aw_mwhost.c object_takes_use; NULL without the scripts): 1 while REFERENCE's script
+ * would take the player's use, asked without using it. A named activator ('N' row) whose script reads OnActivate is a
+ * thing to use, as the original activates the faced object and its script's OnActivate takes it (OpenMW 0.51
+ * mwclass/activator.cpp Activator::activate, mwworld/refdata.cpp): before, every such row (1,712 placements of the
+ * three masters, 1,678 of them in rooms: beds, levers, shrines, the Halls of Penumbra's ice wall) showed its name and
+ * E reached its script only through the view-cone fallback of aw_mwhost.c AW_MwscriptUseInView, which tests the
+ * script's origin, not the object the crosshair is on */
+extern int (*aw_inventory_takes_use)(unsigned reference);
+int (*aw_inventory_takes_use)(unsigned reference);
+static int scripted_board(const focus_row_t *row){
+    return row->kind=='N' && aw_inventory_takes_use && aw_inventory_takes_use(row->reference);
+}
 static int placed_target(void){
     int i,best=-1;float reach=AW_ActivateDistance(),nearest,along,side,length,shift[3],hit,rank,view_hit;edict_t *p;
     vec3_t f,r,u,eye,delta,at;unsigned view_ref;
@@ -3547,7 +3567,8 @@ static int placed_target(void){
         nearest=rank;best=i;
     }
     /* what the use key takes or opens (placed_use): an item or a container */
-    if(best>=0 && (focus_rows[best].kind=='I' || focus_rows[best].kind=='C'))placed_aim=nearest;
+    if(best>=0 && (focus_rows[best].kind=='I' || focus_rows[best].kind=='C' || scripted_board(&focus_rows[best])))
+        placed_aim=nearest;
     return best;
 }
 /* aw_placed aim (PLACED-PIT-AXE-NO-FOCUS-61, a check command): every focus row within twice the reach of the eye and
@@ -3794,6 +3815,10 @@ static int placed_use(void){
         if(aw_inventory_intercept && aw_inventory_intercept(focus_rows[best].reference))return 1;
         return inventory_allowed()?container_open(&focus_rows[best]):1;   /* CONTAINER-WINDOW-59 */
     }
+    /* ROOM-SCRIPTED-ACTIVATOR-NO-USE-68: a named activator under the crosshair whose script reads OnActivate gives it the
+     * use (the ice wall's question box, a lever, a bed's rest); one without such a script stays a name alone */
+    if(best>=0 && focus_rows[best].kind=='N')
+        return aw_inventory_intercept && aw_inventory_intercept(focus_rows[best].reference)?1:0;
     if(best<0 || (row=&focus_rows[best])->kind!='I')return 0;
     /* an item whose script reads OnActivate takes the use (the original's rule, as for doors and actors: aw_mwhost.c
      * object_intercept); the item does nothing until the script's Activate (AW_PlacedActivate above) */

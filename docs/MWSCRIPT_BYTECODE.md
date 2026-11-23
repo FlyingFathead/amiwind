@@ -1,6 +1,6 @@
 # MWScript compiled by the builder
 
-_Last updated with AmiWind v0.0.68-dev5 (22 November 2026)._
+_Last updated with AmiWind v0.0.68-dev8 (23 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -24,6 +24,7 @@ _Last updated with AmiWind v0.0.68-dev5 (22 November 2026)._
   - [What runs today, what is "not yet"](#what-runs-today-what-is-not-yet)
   - [The import route: every call kept](#the-import-route-every-call-kept)
 - [Spell effects: the design (SPELL-EFFECTS-57)](#spell-effects-the-design-spell-effects-57)
+- [The werewolf form (v0.0.68)](#the-werewolf-form-v0068)
 - [Sizes and costs](#sizes-and-costs)
 - [Builder stage](#builder-stage)
 - [Next](#next)
@@ -871,6 +872,26 @@ way a cast plays (`aw_animkit.c`), then the state's own group again; a hit, a fa
 without a skeletal table, or a group its table lacks, nothing happens (counted in `aw_mwscript_status`). Scripts that
 run whole: 765 before, 783 after (of 1,207).
 
+On a placed object (v0.0.68, MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68; rule from OpenMW's mechanicsmanagerimp.cpp
+playAnimationGroup, objects.cpp and character.cpp playGroup and updateAnimQueue: a non-actor plays the group on its own
+model and keeps the group's last pose; its collision follows the moved parts, nifbullet/bulletnifloader.cpp and
+mwphysics/object.cpp): a CHIM room's placement takes the group's end pose when the group has played (its seconds from
+the model's text keys, plus a loop's for each extra loop of a LoopGroup; mode 0 waits for a group still playing). The
+room conversion stores the model of each end pose and the pose table (`chimi/poses.txt`, [the interior
+store](chim/INTERIOR_STORE.md#end-poses-of-the-scripts-animation-groups-v0068)); the engine swaps the placement's model,
+drawn and collided together (`aw_objpose.c`, `chim_room.c` ChimRoom_PoseModel). A group whose end pose is the model as
+placed (a lever back up, a door closed) swaps it back; one whose end pose draws nothing takes the placement out (its
+disabled state untouched). The pose is kept as the named fact `amiwind:pose:<reference>` (saved games, cleared by New
+Game) and a room that loads shows it at once. The animation between the group's start and its end is not drawn yet
+(OBJECT-GROUP-ANIMATION-PLAYED-68), and a placement of an outdoor frame takes no pose yet
+(MWSCRIPT-PLAYGROUP-FRAME-OBJECTS-68). Counted in `aw_mwscript_status` ("PlayGroup on placed objects"). Found by the
+census of the game's scripts and dialogue results: 89 PlayGroup and LoopGroup calls, 136 objects (not people or
+creatures) in 138 model and group pairs, 19 whose end pose draws or collides differently from the model as placed;
+in the rooms, 50 placements in 16 rooms: the Halls of Penumbra's ice wall, the Clockwork City's levers and lever doors
+(Sotha Sil), the cave-ins and levers of Bamz-Amschend, Old Mournhold's rockslide, torch lever and shrine, the Dagoth
+bridge of Akulakhan's Chamber and Azura in the Facility Cavern. The banners outdoors (80 records, 134 placements) play
+wind cycles that end as placed.
+
 `AddTopic` (v0.0.57; rule from OpenMW's dialogueextensions.cpp OpAddTopic): the topic joins the player's known
 topics, which the dialogue window will list (DIALOGUE-57). The builder writes the game's 2,098 dialogue topics (DIAL
 records of the topic type, sorted) as the TOPC section, on disk (4,196 bytes, a name index each); a script's AddTopic
@@ -899,6 +920,26 @@ line, QC `aw_greet`), by the same talk rule (alive, not hostile, not knocked dow
 window itself is DIALOGUE-57; until it exists the greeting is what talking does. An actor that is not loaded, or
 cannot talk, does nothing (counted in `aw_mwscript_status`). Cost: one QC call when a script asks, nothing resident.
 Scripts that run whole: 834 before, 899 after (of 1,207).
+
+Since v0.0.68 (MWSCRIPT-FORCEGREETING-TALK-RULES-68) the call no longer stops at the talk rule, as in the original
+(OpenMW opens the dialogue for any enabled actor and refuses only a dead one). A living person the talk rule refuses
+(in a fight, knocked down, or asked in the frame its fight ended) gets the conversation window directly, with the
+greeting picked from the dialogue table; Toralf of Raven Rock (`toralf`), who is to talk after the player's blow, is
+the case in point. The world stands still while the window is open, so a fight waits and goes on afterwards unless
+the script or the conversation ended it. While the player is a werewolf the greeting is held back unless the actor's
+own script declares the variable `AllowWerewolfForceGreeting` (found by its name among the script's saved variable
+names, read once per script, eight scripts kept). Still refused and counted in `aw_mwscript_status`: a dead actor,
+an opening-scene role, an open window, and an actor without a row in the dialogue table, which is every creature
+(DIALOGUE-CREATURE-SPEAKERS-66: eight scripts, four of them on Solstheim, call it on a creature). Reach: 94 scripts
+(32 on Solstheim, 27 of them on people) and 25 dialogue results. Resident memory: 64 bytes for the kept scripts and
+three counters. Kept by `tests/test_forcegreeting.py`.
+
+The use key's own rule has a werewolf part since v0.0.68 (NPC-WEREWOLF-TALK-OFFERED-68; rule from OpenMW 0.51
+`mwclass/npc.cpp` and `creature.cpp`, `activate`): a character a script has turned into a werewolf (`BecomeWerewolf`)
+shows its name on the focus line but offers no talk, and the use key does nothing on it; turned back, it talks again.
+A creature record is never in that form (the werewolf creatures of Bloodmoon are creatures and follow the creatures'
+rule). While the player is a werewolf the use key talks to nobody. A script's `ForceGreeting` is not held by this
+part: it opens the conversation for a turned character as before. Not done: the refusal's sound for a werewolf player.
 
 `Rotate` (v0.0.57; OpenMW transformationextensions.cpp OpRotate: the given degrees a second times the frame's
 duration, the player only around z) turns an object that has an entity; CHIM scenery without one cannot turn yet
@@ -1163,6 +1204,37 @@ spelleffects.cpp for what each effect does, spellcasting.cpp for casting), writt
 - **The first slice.** Fortify, Drain, Damage and Restore of the attributes and of health, magicka and fatigue, with
   durations, applied by `Cast` on the player and by the shrine blessings (their spells are of those kinds); then
   measure how many scripts run whole. `GetEffect` reads the active list.
+
+## The werewolf form (v0.0.68)
+
+`BecomeWerewolf` and `UndoWerewolf` on the player run one change, whichever way they come: a script's line, the
+same lines typed on the console, and `dbg werewolf on` / `off` (engine `aw_mwhost.c` were_player_change, the state
+rules in `aw_were_rules.c`; rules from OpenMW 0.51 `mwmechanics/mechanicsmanagerimp.cpp` setWerewolf, our own code).
+In the original's order:
+
+- nothing happens when the form is already so;
+- a readied spell is put away (a werewolf casts nothing);
+- into the form: every equipped item is taken off, and the werewolf robe (`werewolfrobe`, Bloodmoon) is added to the
+  inventory and worn in the robe slot; back: the robe is taken off and away. The original puts nothing back on:
+  the earlier items stay in the inventory, taken off;
+- the temporary magic effects end, both ways (what was cast on the player, drunk or eaten; a worn item's constant
+  effects go with the item, a script's resistance changes stay);
+- into the form: the player's own attributes and skills are kept and the werewolf's are set from the game settings
+  (the compiled `WERE` rows, the `fWereWolf` settings; Acrobatics is set by `SetWerewolfAcrobatics`); back: his own
+  are given back;
+- the inventory and magic windows do not open while the form holds.
+
+The werewolf robe in the robe slot is what draws the werewolf: the third-person body and the first-person arms are
+the werewolf's own model of the image (no head, hair or worn item of the player's race, nothing held), and the
+player's own parts are let go at once, both ways ([THIRD_PERSON.md](THIRD_PERSON.md)). The robe is never listed in
+a container's, a corpse's or a trade list; the player's own inventory lists it only while he is not a werewolf, so
+`dbg give werewolfrobe` can be worn and taken off there as a test. The form, its kept stats and the werewolf kills
+are in the save (the `AWWF` block), the robe with the inventory; New Game clears all of it. An image without the
+werewolf's model keeps the player's own body and arms and says so once on the console.
+
+Not carried yet (WEREWOLF-TRANSFORM-RULES-PARTIAL-68): the werewolf's health (`fWereWolfHealth`), the witnesses of the
+change (`sWerewolfAlarmMessage`, `PCKnownWerewolf`, the bounty), the werewolf's refusals of items, doors, talk and rest,
+and the werewolf NPCs' own bodies (a script's `BecomeWerewolf` on an NPC keeps its list only).
 
 ## Sizes and costs
 

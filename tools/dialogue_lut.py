@@ -2,7 +2,9 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """The dialogue table (AWDL1, id1/dialogue.lut): every NPC record's conversation topics, their answers in the
 original's order with the run-time conditions as the voice table's 8-byte condition records, the answers' result
-scripts and hyperlinks, and every quest's journal entries (DIALOGUE-57; docs/DIALOGUE_DESIGN.md).
+scripts and hyperlinks, and every quest's journal entries (DIALOGUE-57; docs/DIALOGUE_DESIGN.md). The creatures that
+have lines get rows too, in the voice table's order, by a creature's rule (TopicCreatureContext;
+DIALOGUE-CREATURE-SPEAKERS-66).
 
 The method is the voice table's (tools/greeting_lut.py): for every NPC record and every Topic and Persuasion INFO of
 Morrowind.esm, the tests that read only the speaker's record are decided here (mwad.dialogue.Context.compile, the rule
@@ -215,6 +217,21 @@ class TopicContext(_Context):
         return _Context.compile(self, fields)
 
 
+class TopicCreatureContext(G.CreatureContext):
+    """greeting_lut.CreatureContext for a conversation topic or greeting of a creature speaker
+    (DIALOGUE-CREATURE-SPEAKERS-66): Choice is decided while the game runs, as for an NPC (TopicContext)."""
+
+    def static(self, function, variable, op, value):
+        if function == 'Choice':
+            return _RUNTIME
+        return G.CreatureContext.static(self, function, variable, op, value)
+
+
+def topic_context(kinds, ident, cell):
+    """The topic filter of a speaker: TopicCreatureContext for a creature record, TopicContext for an NPC."""
+    return (TopicCreatureContext if G.is_creature(kinds, ident) else TopicContext)(kinds, ident, cell)
+
+
 def info_index(topics, names):
     """[(generic [(i, fields)], {actor: [(i, fields)]})] per table topic: the INFOs that name one actor kept apart,
     so an NPC compiles only its own and the generic ones (11,594 of 13,082 Topic INFOs name one actor)."""
@@ -231,11 +248,11 @@ def info_index(topics, names):
 
 def script_slots(kinds, ident):
     """{folded local name: (type letter, slot)} of the speaker's script, by the script compiler's own declaration
-    reader (tools/mwscript: the interpreter's slots); {} without a script."""
+    reader (tools/mwscript: the interpreter's slots); {} without a script. A creature speaker's script is its CREA
+    record's (greeting_lut.speaker_of)."""
     from mwad.esm import text
-    from mwad.dialogue import speaker
     from mwscript.lexer import tokenize, declarations
-    script = speaker(kinds, ident)['script']
+    script = G.speaker_of(kinds, ident)['script']
     source = text(kinds.get('SCPT', {}).get(script, []), 'SCTX') if script else ''
     return declarations(tokenize(source, [])) if source else {}
 
@@ -253,13 +270,18 @@ def with_slots(runtime, slots):
 
 
 def speaker_entries(kinds, index, ident, home):
-    """[(topic index, INFO index, run-time conditions)] of one NPC: every table INFO it can ever say."""
-    context = TopicContext(kinds, ident, home or NO_CELL)
+    """[(topic index, INFO index, run-time conditions)] of one NPC: every table INFO it can ever say. A creature
+    speaker says only the INFOs that name it (OpenMW filter.cpp testActor; topic_context)."""
+    context = topic_context(kinds, ident, home or NO_CELL)
+    creature = G.is_creature(kinds, ident)
     slots = script_slots(kinds, ident) if context.locals else {}
     out = []
     for t, (generic, by_actor) in enumerate(index):
         own = by_actor.get(ident)
-        candidates = sorted(generic + own, key=lambda x: x[0]) if own else generic
+        if creature:
+            candidates = own or []
+        else:
+            candidates = sorted(generic + own, key=lambda x: x[0]) if own else generic
         for i, fields in candidates:
             runtime = context.compile(fields)
             if runtime is not None:
@@ -511,7 +533,13 @@ def skill_attributes(kinds):
 
 
 def services_of(kinds, ident):
+    """The speaker's service flags: an NPC's AIDT, or its class's when the NPC is auto-calculated; a creature's
+    AIDT (a creature has no class: OpenMW mwclass/creature.cpp getServices), e.g. the Creeper's and the Mudcrab's
+    barter (DIALOGUE-CREATURE-SPEAKERS-66)."""
     from mwad.esm import first
+    if G.is_creature(kinds, ident):
+        aidt = first(kinds['CREA'][ident], 'AIDT')
+        return struct.unpack_from('<I', aidt, 8)[0] if len(aidt) >= 12 else 0
     npc = kinds.get('NPC_', {}).get(ident, [])
     flag = first(npc, 'FLAG')
     if len(flag) == 4 and struct.unpack('<I', flag)[0] & NPC_AUTOCALC:
@@ -1182,7 +1210,7 @@ def build(kinds, topics, dials, homes=None, masks=None, left=None):
     """(AWDL1 bytes, report) from loaded records (kinds with the dialogue records, topics, dial_names())."""
     homes = homes or {}
     names = table_topics(dials)
-    order, facts, early = G.plan_npcs(kinds, homes)
+    order, facts, early = G.plan_npcs(kinds, homes, G.creature_speakers(kinds, topics))
     left = dict(early, **(left or {}))
     bits = {i: n for n, i in enumerate(order)}
     if masks is None:
@@ -1197,6 +1225,8 @@ def build(kinds, topics, dials, homes=None, masks=None, left=None):
     t = tables(kinds, topics, dials, names, masks, keep)
     raw = pack(t)
     report = report_of(t, raw, keep, left, names, dials)
+    # DIALOGUE-CREATURE-SPEAKERS-66: the rows that are creatures (greeting_lut.creature_speakers), in the same order
+    report['creature_rows'] = sum(1 for i in keep if G.is_creature(kinds, i))
     table = read(raw)
     report.update(conversation_buffer(table, keep))
     report['coverage'] = coverage(table)
@@ -1388,14 +1418,15 @@ def build_master(path, jobs=1):
     kinds, topics = G.load(path)
     kinds = dict(kinds, SKIL=skill_records(path))
     dials = dial_names(path)
-    homes = G.home_cells(path, kinds)
+    creatures = G.creature_speakers(kinds, topics)
+    homes = G.home_cells(path, kinds, creatures)
     names = table_topics(dials)
-    order, _facts, _left = G.plan_npcs(kinds, homes)
+    order, _facts, _left = G.plan_npcs(kinds, homes, creatures)
     bits = {i: n for n, i in enumerate(order)}
     size = max(16, len(order) // max(1, jobs * 4))
     chunks = [order[i:i + size] for i in range(0, len(order), size)]
-    print('=== PHASE 2/3: Dialogue table: %d NPC records x %d topics, %d units on %d jobs ===' % (
-        len(order), len(names), len(chunks), jobs), flush=True)
+    print('=== PHASE 2/3: Dialogue table: %d NPC records and %d creature speakers x %d topics, %d units on %d jobs '
+          '===' % (len(order) - len(creatures), len(creatures), len(names), len(chunks), jobs), flush=True)
     masks, left, done, t1 = {}, {}, 0, time.time()
     for out, gone in ordered_map(_chunk, [(str(path), homes, names, bits, c) for c in chunks], jobs=max(1, jobs),
                                  cost=lambda task: len(task[4])):

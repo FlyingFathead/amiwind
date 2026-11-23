@@ -2,11 +2,16 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 3 times; something has to be done
+## PERSISTING: reported 8 times; something has to be done
 
 - Reported with v0.0.68-dev3 at 2026-11-21 04:37 +0200: Seen again in the next dev3 build: the room batches' reuse took about half a minute beside the Solstheim stage and the engine.
 - Reported with v0.0.68-dev4 at 2026-11-21 13:08 +0200: Seen again in the v0.0.68-dev4 build: a reused stage's reuse step took 22 seconds against its recorded 5.
 - Reported with v0.0.68-dev8 at 2026-11-22 19:46 +0200: Seen again in the v0.0.68-dev8 build: the reused room batches stage took 19 s against the 5 s of an earlier reuse while three stages built beside it; the slow-stage warning fired for it.
+- Reported with v0.0.68-dev8 at 2026-11-23 03:42 +0200: Seen again: a reused stage that verifies about 25,700 stored files took 30 seconds instead of its recorded 5 while other stages compiled beside it; the build went on.
+- Reported with v0.0.68-dev8 at 2026-11-23 06:08 +0200: Seen again in a reuse build: the reused Solstheim stage took about 15 seconds against its recorded 5 while other work ran beside the build.
+- Reported with v0.0.68-dev9 at 2026-11-23 11:55 +0200: A test build of the v0.0.68-dev10 line spent 17 s checking a stage it took over from an earlier build, three and a half times its usual time, while other work ran.
+- Reported with v0.0.68-dev10 at 2026-11-23 13:29 +0200: The v0.0.68-dev10 build spent 34 s checking the world stage it took over from an earlier build, about seven times its usual time, while the engine was being compiled.
+- Reported with v0.0.68-dev10 at 2026-11-23 16:47 +0200: A third build today spent 18 s checking the room batches stage it took over, against its usual 5 s, while the engine was being compiled.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -40,13 +45,19 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-21 04:37 +0200: seen again in v0.0.68-dev3: Seen again in the next dev3 build: the room batches' reuse took about half a minute beside the Solstheim stage and the engine.
 - 2026-11-21 13:08 +0200: seen again in v0.0.68-dev4: Seen again in the v0.0.68-dev4 build: a reused stage's reuse step took 22 seconds against its recorded 5.
 - 2026-11-22 19:46 +0200: seen again in v0.0.68-dev8: Seen again in the v0.0.68-dev8 build: the reused room batches stage took 19 s against the 5 s of an earlier reuse while three stages built beside it; the slow-stage warning fired for it.
+- 2026-11-23: v0.0.68-dev8: Correction: the report of 23 November about the reused Solstheim stage taking 15 seconds was a misreading.
+- 2026-11-23 03:42 +0200: seen again in v0.0.68-dev8: Seen again: a reused stage that verifies about 25,700 stored files took 30 seconds instead of its recorded 5 while other stages compiled beside it; the build went on.
+- 2026-11-23 06:08 +0200: seen again in v0.0.68-dev8: Seen again in a reuse build: the reused Solstheim stage took about 15 seconds against its recorded 5 while other work ran beside the build.
+- 2026-11-23 11:55 +0200: seen again in v0.0.68-dev9: A test build of the v0.0.68-dev10 line spent 17 s checking a stage it took over from an earlier build, three and a half times its usual time, while other work ran.
+- 2026-11-23 13:29 +0200: seen again in v0.0.68-dev10: The v0.0.68-dev10 build spent 34 s checking the world stage it took over from an earlier build, about seven times its usual time, while the engine was being compiled.
+- 2026-11-23 16:47 +0200: seen again in v0.0.68-dev10: A third build today spent 18 s checking the room batches stage it took over, against its usual 5 s, while the engine was being compiled.
 
 <!-- END GENERATED TIMELINE -->
 
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [PERSISTING: reported 8 times; something has to be done](#persisting-reported-8-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Bugs in the same category](#bugs-in-the-same-category)
 
@@ -223,6 +234,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [CHIM-LEGACY-CHAIN-33](CHIM-LEGACY-CHAIN-33.md): CHIM builds still run the legacy exterior chain: frame maps read the legacy region maps, and the open world is built
 - [CHIM-MESH-STAIR-UNIT-SLOW-67](CHIM-MESH-STAIR-UNIT-SLOW-67.md): One stair collision unit of a Solstheim glacier cell takes 19.5 minutes on one core, and its second over 25
 - [CHIM-PVS-SLOW-33](CHIM-PVS-SLOW-33.md): Seyda Neen's CHIM visibility rows take 5.5 minutes and are rebuilt whenever the worker count changes
+- [CHIM-REBUILD-NOT-IDENTICAL-68](CHIM-REBUILD-NOT-IDENTICAL-68.md): The CHIM world rebuilt from unchanged inputs wrote files that differ from the cached build, so the stages after it ran again
 - [CHIM-ROOM-FAIL-STAGE-48](CHIM-ROOM-FAIL-STAGE-48.md): One CHIM room that cannot be made failed the whole CHIM interiors stage (HOLD-LEVEL with every room batch by default)
 - [CHIM-ROOM-OVER-BUDGET-RETRY-48](CHIM-ROOM-OVER-BUDGET-RETRY-48.md): A model over the image budget is tried whole again on every run before its cached tiles are used: its room runs on one core
 - [CHIM-SOL-FLORA-PATH-64](CHIM-SOL-FLORA-PATH-64.md): The Solstheim test frame converts its trees as full models, not through the world flora cards Vvardenfell uses
@@ -254,11 +266,13 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [PLAYER-VIEW-SKIN-ROWS-STOP-62](PLAYER-VIEW-SKIN-ROWS-STOP-62.md): The image step's player view stopped the v0.0.62 final build after 1 h 13 min: an Alias skin rows overflow ended it instead of trying the next smaller body
 - [RELEASE-GUARD-SLOW-CLONE-51](RELEASE-GUARD-SLOW-CLONE-51.md): The release guard, the fail-fast first step of a release, took 6 minutes on about 0.14 of a core: its release check clones the whole repository through the Windows-mounted drive
 - RELEASE-SUITE-RECORD-SERIAL-51 (no report page): The release's suite record runs the whole test suite again on one core for about 22 minutes, right after the gate ran the same tests in about 2 minutes
+- [REUSE-POOL-LINK-LIMIT-68](REUSE-POOL-LINK-LIMIT-68.md): A stage's reuse was refused because one shared file had reached the file system's hard link limit, so the whole CHIM world stage was rebuilt
 - [ROOM-BAKE-FOOTPRINT-SLOW-48](ROOM-BAKE-FOOTPRINT-SLOW-48.md): The room actor bake's footprint rule with the collision-box test is more than 100 times slower
 - [ROOM-BATCH-CORES-49](ROOM-BATCH-CORES-49.md): The room batches stage ran on about two of its eight cores for minutes before its first room, and kept few of its finished rooms when stopped
 - ROOM-RESIDENTS-KEY-SERIAL-49 (no report page): The room residents step opens its unit cache once per resident: 233 s on one core before any cached resident is restored
 - [SHELL-ORPHAN-STARVES-GATE-66](SHELL-ORPHAN-STARVES-GATE-66.md): A leftover process in the shell container starved a gate; nothing in the master builder noticed the stall
 - [SOL-MODULE-CONVERSION-HALF-CORES-68](SOL-MODULE-CONVERSION-HALF-CORES-68.md): Solstheim's world stage converted on about half of its cores
+- [SOL-STAGE-ASSEMBLY-SERIAL-68](SOL-STAGE-ASSEMBLY-SERIAL-68.md): The Solstheim stage, rebuilt with every CHIM unit taken from the cache, spends about six minutes of its world assembly on one core
 - [STALL-SLOW-STAGE-VS-REUSE-TIME-68](STALL-SLOW-STAGE-VS-REUSE-TIME-68.md): The builder's slow-stage warning compared a stage that had to run with the few seconds an earlier build took to reuse it, and so called a normal run eight times too slow
 - [STALL-ZERO-CORES-WHILE-POOLS-BUSY-68](STALL-ZERO-CORES-WHILE-POOLS-BUSY-68.md): The build's stall check reported no cores in use while a stage's worker pools were running
 - [UNIT-CACHE-STORE-ERRORS-SILENT-63](UNIT-CACHE-STORE-ERRORS-SILENT-63.md): A unit that the unit cache failed to store was reported as stored: a cache folder the build user could not write lost every unit without a word

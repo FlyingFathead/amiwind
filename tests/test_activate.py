@@ -44,6 +44,52 @@ class ActivateNativeTests(unittest.TestCase):
         native.NativeSourceTests().compile_run('aga_corpse_activate_test.c', [SRC / 'aw_corpse.c'], cflags=UBSAN)
 
 
+class ScriptedActivatorUseTests(unittest.TestCase):
+    """ROOM-SCRIPTED-ACTIVATOR-NO-USE-68: a named activator ('N' focus row) whose script reads OnActivate takes the use
+    key (OpenMW 0.51 Activator::activate: the script's OnActivate), found on the Halls of Penumbra's ice wall
+    (bm_ice_wall, icewallScript): its focus row names it by the stable id 2126003, its script's instance is bound under
+    the merged number 8417459, and an 'N' row was a name alone."""
+
+    def code(self, name):
+        return (SRC / name).read_text(encoding='latin-1')
+
+    def test_a_named_activator_whose_script_takes_the_use_is_used(self):
+        inv = self.code('aw_inventory.c')
+        body = inv[inv.index('static int placed_use(void){'):inv.index('/* COLLECT-CAPACITY-REJECTED-60')]
+        self.assertIn("if(best>=0 && focus_rows[best].kind=='N')\n"
+                      "        return aw_inventory_intercept && aw_inventory_intercept(focus_rows[best].reference)?1:0;",
+                      body)
+        self.assertIn("return row->kind=='N' && aw_inventory_takes_use && aw_inventory_takes_use(row->reference);", inv)
+        self.assertIn("focus_rows[best].kind=='C' || scripted_board(&focus_rows[best])))\n        placed_aim=nearest;", inv)
+        host = self.code('aw_mwhost.c')
+        self.assertIn('aw_inventory_takes_use=object_takes_use;', host)
+        vm = self.code('aw_mwvm.c')
+        query = vm[vm.index('int AW_MwvmTakesUse(uint32_t reference){'):]
+        query = query[:query.index('}') + 1]
+        self.assertNotIn('flags|=', query)          # a question: the instance's flags stay as they are
+        self.assertNotIn('flags&=', query)
+
+    def test_the_script_is_found_under_either_form_of_the_reference(self):
+        host = self.code('aw_mwhost.c')
+        self.assertIn('if(r>=(1u<<22) && r<(3u<<22))return ((r>>22)<<20)|(r&0x3FFFFFu);', host)
+        self.assertIn('if(r>=(1u<<20) && r<(3u<<20))return ((r>>20)<<22)|(r&0xFFFFFu);', host)
+        self.assertIn('(!AW_MwvmUse(reference) && (other==reference || !AW_MwvmUse(other)))', host)
+
+        def other(r):
+            if (1 << 22) <= r < (3 << 22):
+                return ((r >> 22) << 20) | (r & 0x3FFFFF)
+            if (1 << 20) <= r < (3 << 20):
+                return ((r >> 20) << 22) | (r & 0xFFFFF)
+            return r
+        import sys
+        sys.path[:0] = [str(ROOT / 'tools')]
+        from ref_identity import stable_ref
+        wall = stable_ref('Bloodmoon.esm', 8417459 - (2 << 22))
+        self.assertEqual(wall, 2126003)
+        self.assertEqual((other(wall), other(8417459)), (8417459, 2126003))
+        self.assertEqual(other(225480), 225480)      # a base game number: both forms
+
+
 class ActivateSourceTests(unittest.TestCase):
     def test_nothing_is_taken_or_opened_before_the_inventory_is_allowed(self):
         # PRISON-SHIP-ITEMS-TAKEABLE-65: the original's NullAction while the Inventory window is not allowed (OpenMW
@@ -192,7 +238,10 @@ class ActivateSourceTests(unittest.TestCase):
     def test_an_actors_own_focus_row_never_hides_an_item(self):
         placed = body('aw_inventory.c', 'static int placed_target(void){')
         self.assertIn("if(row->kind=='A')continue;", placed)
-        self.assertIn("(focus_rows[best].kind=='I' || focus_rows[best].kind=='C'))placed_aim=nearest;", placed)
+        # an item, a container, or a named activator whose script takes the use (ROOM-SCRIPTED-ACTIVATOR-NO-USE-68);
+        # never an actor's row
+        self.assertIn("(focus_rows[best].kind=='I' || focus_rows[best].kind=='C' || scripted_board(&focus_rows[best])))"
+                      "\n        placed_aim=nearest;", placed)
 
     def test_an_item_lying_on_another_goes_to_what_the_ray_meets_first(self):
         # CENSUS-CRAB-PLATE-FOCUS-66: the crab meat on the census office's silver plate (their centres half a game

@@ -482,6 +482,29 @@ static int pool_has(const char *name) {
     if(f)fclose(f);
     return bytes>=44;
 }
+/* AMBIENT-SOUND-READ-IN-FRAME-68: a line found in the pool once is not looked up again (the look was one file open
+ * at every bark, 7 to 70 ms in a fight frame, although the line itself was in memory): the last 16 found, 128 bytes */
+#define POOL_KNOWN 16
+static unsigned char pool_known[POOL_KNOWN][8];
+static int pool_known_next;
+static unsigned long pool_looks,pool_looks_saved;
+static int pool_has_line(const unsigned char hash[8],const char *path) {
+    int k;
+    for(k=0;k<POOL_KNOWN;k++)if(!memcmp(pool_known[k],hash,8) && (hash[0]|hash[1]|hash[2]|hash[3]|hash[4]|hash[5]|hash[6]|hash[7])){
+        pool_looks_saved++;return 1;}
+    pool_looks++;
+    if(!pool_has(path))return 0;
+    memcpy(pool_known[pool_known_next],hash,8);pool_known_next=(pool_known_next+1)%POOL_KNOWN;
+    return 1;
+}
+/* aw_combat.c's hook (its declaration is there: aw_combat.h is keyed by the CHIM world stage): one of the fight's own
+ * sounds into the sound cache, before the blows; 1 in memory */
+extern int (*aw_combat_sound_warm)(const char *path);
+static int combat_sound_warm(const char *path) {
+    sfx_t *sfx;
+    if(!path || !*path || cls.state!=ca_connected || !(sfx=S_PrecacheSound((char *)path)))return 0;
+    return S_LoadSound(sfx)!=NULL;
+}
 static int voice_file(const unsigned char hash[8],char *out) {
     static const char hex[]="0123456789abcdef";int i;
     strcpy(out,"pool/a");
@@ -506,7 +529,7 @@ int AW_VoicePlay(edict_t *e,const unsigned char hash[8]) {
     if(!e || e->free || !voices_on.value || cls.state!=ca_connected || (slot_k=speaker_slot(e))<0)return 0;
     voice_file(hash,name);
     strcpy(path,"sound/");strcat(path,name);
-    if(!pool_has(path))return 0;                        /* left out of this build's voice pool: silent */
+    if(!pool_has_line(hash,path))return 0;              /* left out of this build's voice pool: silent */
     if(!(sfx=S_PrecacheSound(name)) || !(sc=S_LoadSound(sfx)))return 0;
     S_StartSound(NUM_FOR_EDICT(e),2,sfx,e->v.origin,1,1);    /* the voice channel (aw_greet uses 2 too) */
     speaking[slot_k].e=e;speaking[slot_k].until=realtime+(sc->speed>0?(double)sc->length/sc->speed:2);
@@ -563,6 +586,7 @@ void AW_AnimInit(void) {
     Cvar_RegisterVariable(&footsteps);Cvar_RegisterVariable(&footstep_volume);Cvar_RegisterVariable(&movers_on);
     Cvar_RegisterVariable(&voices_on);Cvar_RegisterVariable(&voice_pick);
     aw_combat_voice=combat_voice;
+    aw_combat_sound_warm=combat_sound_warm;
 }
 
 static int worn_slot(edict_t *e) {int i;for(i=0;i<MOVERS;i++)if(worn[i].e==e)return i;return -1;}

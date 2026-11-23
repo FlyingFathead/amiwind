@@ -36,6 +36,9 @@ int (*aw_hinged_hint)(const char **name,const char **action);
 void (*aw_hinged_spawn)(void);
 void (*aw_hinged_tick)(double seconds);
 int (*aw_hinged_locked_sound)(void);
+/* aw_objpose.c AW_ObjPoseTick (MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68: the end poses of the scripts' groups on placed
+ * objects); NULL in fixtures without it */
+void (*aw_objpose_tick)(void);
 /* aw_hinged_door.c AW_HingedDoorLoadLock (DEBUG-GOD-LOCKED-DOORS-51); NULL in fixtures without it: no locks. */
 int (*aw_load_door_lock)(unsigned reference,int use);
 /* aw_talk.c AW_CanTalk (TALK-PROMPT-RULES): the prompt, E (pr_cmds.c #79) and the caravaners; NULL without it. */
@@ -1748,8 +1751,10 @@ int AW_Unstuck(edict_t *p) {
  * under a floor). Bodies do not count here (an actor on the point is the arrival watch's,
  * DOOR-ARRIVAL-INSIDE-ACTOR-66). A point in solid
  * geometry, outside the room box, in dry air over no floor, or in water closed above still falls back as before;
- * every arrival with a dry spot is unchanged (the dry search runs first). Outdoors this does not apply (aw_spawn.c
- * keeps its water surface rule). The build's mirror: tools/arrival_spot.py wet_spot, tools/tp_arrivals.py in-water. */
+ * every arrival with a dry spot is unchanged (the dry search runs first). Outdoors this does not apply: there a
+ * teleport with a height whose standing box has its feet in the water swims at the point (aw_spawn.c water_place,
+ * SWIM-PLAYER-DOES-NOT-STAY-AT-DEPTH-68), and one over the water keeps the surface rule. The build's mirror:
+ * tools/arrival_spot.py wet_spot, tools/tp_arrivals.py in-water. */
 #define WET_REACH 88    /* standing_try's deepest floor under the point: 24 under the last drop of 64 */
 static int wet_arrival(edict_t *p,const vec3_t arrival,vec3_t point) {
     vec3_t at,low,feet,high;trace_t tr;int k;
@@ -2049,6 +2054,7 @@ void AW_SceneTick(void) {
     arrival_clear_tick();   /* DOOR-ARRIVAL-INSIDE-ACTOR-66: an actor that joined onto the arrival point */
     AW_NPCFloorRetry();
     if(!pending && aw_hinged_tick)aw_hinged_tick(host_frametime);   /* nothing unless a door turns */
+    if(!pending && aw_objpose_tick)aw_objpose_tick();   /* nothing unless a room loads or a group's end waits */
     if(!pending && sv.active && cls.state==ca_connected && cls.signon==SIGNONS &&
        key_dest==key_game && svs.maxclients==1 && svs.clients && (p=svs.clients[0].edict))
         AW_StreamTick(AW_CellChangeMethod()==2?AW_RegionAhead(p->v.origin,p->v.velocity,

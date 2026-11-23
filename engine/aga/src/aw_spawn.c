@@ -114,13 +114,46 @@ static qboolean map_clear_start(edict_t *p,vec3_t top,vec3_t bottom)
     return false;
 }
 
+/* SWIM-PLAYER-DOES-NOT-STAY-AT-DEPTH-68 (the v0.0.68-dev8 door session: player->position 40 units out from the
+ * Stahlman's Gorge door, original height -1958, left the player at -218 near the surface; the same at the Caves of
+ * Fjalding, which went to the scene spawn, and at the Unmarked Shipwreck, which went to the frame's middle): a height
+ * asked in the water was searched like one on land. The first floor under it lies in the water too, so the surface
+ * rule below (map_water_surface) refused it, every point beside it likewise, and the arrival fell back to the highest
+ * surface at the XY (the water's surface, or under the glacier a spot near it) or to the scene spawn. The original
+ * sets the player at the point (OpenMW 0.51 transformationextensions.cpp OpPosition; the room rule WET-ARRIVAL,
+ * aw_scene.c wet_arrival, takes such a point in a room the same way), and under the water a living swimmer stays
+ * where it is: no gravity and no lift, only its own movement (OpenMW movementsolver.cpp 156-167; here sv_phys.c adds
+ * no gravity while SV_CheckWater swims and sv_user.c SV_WaterMove has no idle drift, so nothing in the physics moved
+ * him). So a height whose standing box has its feet in the water (or slime; never lava, which is walked on:
+ * docs/LAVA.md) and is clear there is taken as it is: the player wades or swims at the point. Never under the ground:
+ * where the frame's terrain answers (chim_far.c, the floor AW_WalkPlayer keeps bodies over), feet under its lowest
+ * height there are refused as OpenMW lifts a point under the terrain to it; the search below then runs as before. A
+ * point above the water keeps the surface rule; a debug teleport without a height (AW_MapPlace) is unchanged. */
+extern int (*aw_chim_floor)(const vec3_t origin,float *lowest,float *surface);   /* aw_walk.c */
+static qboolean water_place(edict_t *p,vec3_t at)
+{
+    vec3_t feet;trace_t t;float lowest,surface;int contents;
+    VectorCopy(at,feet);feet[2]+=p->v.mins[2]+1;
+    contents=SV_PointContents(feet);
+    if(contents!=CONTENTS_WATER && contents!=CONTENTS_SLIME)return false;
+    if(aw_chim_floor && aw_chim_floor(at,&lowest,&surface) && feet[2]<lowest)return false;
+    t=SV_Move(at,p->v.mins,p->v.maxs,at,MOVE_NORMAL,p);
+    if(t.startsolid || t.allsolid)return false;
+    VectorCopy(at,p->v.origin);VectorCopy(at,p->v.oldorigin);
+    VectorCopy(vec3_origin,p->v.velocity);
+    p->v.flags=(int)p->v.flags & ~FL_ONGROUND;SV_LinkEdict(p,false);
+    return true;
+}
+
 /* Explicit debug-map arrival: keep the chosen XY, find the highest walkable
  * surface below the scene ceiling (or below a given height), and test the
  * complete standing hull. A failed request must not install unchecked
  * coordinates. */
 /* Why the last map placement failed (said by a debug teleport that falls back). */
 const char *aw_map_place_failure="";
-static qboolean map_place(edict_t *p,const float *xy,float ceiling)
+/* SWIM: a height was asked (AW_MapPlaceBelow), so a standing box in the water at exactly that height is a place to
+ * swim (water_place above) */
+static qboolean map_search(edict_t *p,const float *xy,float ceiling,int swim)
 {
     vec3_t top,bottom,point;
     aw_map_place_failure="outside the map";
@@ -135,6 +168,7 @@ static qboolean map_place(edict_t *p,const float *xy,float ceiling)
     if(top[2]>AW_COORD_BOUND-10)top[2]=AW_COORD_BOUND-10;
     if(bottom[2]<-(AW_COORD_BOUND-10))bottom[2]=-(AW_COORD_BOUND-10);
     if(!isfinite(top[2]) || !isfinite(bottom[2]) || top[2]<=bottom[2])return false;
+    if(swim && top[2]==ceiling && water_place(p,top)){aw_map_place_failure="";return true;}
     aw_map_place_failure="no clear space at the top of the search";
     if(!map_clear_start(p,top,bottom))return false;
     aw_map_place_failure="no walkable floor below";
@@ -147,9 +181,13 @@ static qboolean map_place(edict_t *p,const float *xy,float ceiling)
     p->v.flags=(int)p->v.flags & ~FL_ONGROUND;SV_LinkEdict(p,false);
     return true;
 }
+static qboolean map_place(edict_t *p,const float *xy,float ceiling)
+{
+    return map_search(p,xy,ceiling,1);
+}
 qboolean AW_MapPlace(edict_t *p,const float *xy)
 {
-    return map_place(p,xy,AW_COORD_BOUND);
+    return map_search(p,xy,AW_COORD_BOUND,0);
 }
 /* dbg tp X Y Z: the first walkable surface at or below Z (a solid start steps
  * down up to 128 units), so a bridge, a roof or an upper floor is kept instead

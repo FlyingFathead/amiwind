@@ -17,6 +17,11 @@ static cvar_t aw_weather={"aw_weather","1",true};
 /* The Red Mountain sky (REDMOUNTAIN-SKY-55, aw_weather.h AW_WeatherMountainPull): 1 (saved, default) pulls the sky,
  * fog and land light toward the Blight weather nearer the mountain; 0 = the region weather alone, as before. */
 static cvar_t aw_redmountain={"aw_redmountain","1",true};
+/* The weather's own fog depth and cloud speed (aw_weather.h AW_WeatherFogScale, SOL-WEATHER-SKY-SNOW-68): 1 (saved,
+ * default) the weather's, 0 one fog and one cloud speed for every weather, as before v0.0.68. */
+static cvar_t aw_weather_look={"aw_weather_look","1",true};
+/* this frame's weather for the fog and the clouds: set by AW_WeatherFrame only when it draws a weather */
+static int look_on,look_current,look_next=AW_WEATHER_NONE,look_step;
 static int mountain_pull;
 int AW_WeatherMountainLevel(void) {return mountain_pull;}
 static aw_weather_table_t table;
@@ -137,7 +142,7 @@ int AW_WeatherFalling(int *strength)
 int AW_WeatherFrame(int days,int milliseconds,aw_weather_blend_t *out)
 {
     float source[3];int target,region,step,key;double now=realtime,seconds;long hour;
-    storm=0;falling=AW_PRECIP_NONE;falling_strength=0;mountain_pull=0;
+    storm=0;falling=AW_PRECIP_NONE;falling_strength=0;mountain_pull=0;look_on=0;
     load();
     if(!loaded || (aw_weather.value<=0 && forced<0)){
         instant=1;have_last=0;last_time=-1;return 0;
@@ -158,18 +163,21 @@ int AW_WeatherFrame(int days,int milliseconds,aw_weather_blend_t *out)
     }
     instant=0;have_last=1;last_time=now;last_target=target;last_hour=hour;
     last_source[0]=source[0];last_source[1]=source[1];last_source[2]=source[2];
-    storm=AW_WeatherIsStorm(state.current,state.next,state.progress) && AW_WeatherStormDirection(source,storm_dir);
+    /* the storm's own wind (v0.0.68: a blizzard blows north, SOL-WEATHER-SKY-SNOW-68) */
+    storm=AW_WeatherStormDirectionOf(AW_WeatherStormOf(state.current,state.next,state.progress),source,storm_dir);
     falling=AW_WeatherPrecip(state.current,state.next,state.progress,&falling_strength);
     if(state.next==AW_WEATHER_NONE){
         AW_WeatherBlend(&table,state.current,state.current,AW_WEATHER_STEPS,out);
         key=state.current==AW_WEATHER_CLEAR?0:
             1+state.current*AW_WEATHERS*(AW_WEATHER_STEPS+1)+state.current*(AW_WEATHER_STEPS+1)+AW_WEATHER_STEPS;
+        step=0;
     }else{
         step=(int)(state.progress*AW_WEATHER_STEPS);
         if(step>AW_WEATHER_STEPS)step=AW_WEATHER_STEPS;
         AW_WeatherBlend(&table,state.current,state.next,step,out);
         key=1+state.current*AW_WEATHERS*(AW_WEATHER_STEPS+1)+state.next*(AW_WEATHER_STEPS+1)+step;
     }
+    look_on=aw_weather_look.value>0;look_current=state.current;look_next=state.next;look_step=step;
     /* the Red Mountain pull on top (REDMOUNTAIN-SKY-55): one distance a frame; the key changes with the pull, so
      * the sky tables are rebuilt at most AW_WEATHER_STEPS times on the way to the crater */
     if(aw_redmountain.value>0 && forced<0 && !mountain_cleared())mountain_pull=AW_WeatherMountainPull(source);
@@ -180,6 +188,15 @@ int AW_WeatherLightOn(void)
 {
     return aw_weather.value<1.5f; /* 2 = sky and fog only (WEATHER-AMBIENT-SUN-UNUSED-51) */
 }
+/* The weather's fog depth and cloud speed this frame (SOL-WEATHER-SKY-SNOW-68): Clear's outside a drawn weather. */
+int AW_WeatherFogScaleAt(int a,int b,int mix)
+{
+    return look_on?AW_WeatherFogScale(look_current,look_next,look_step,a,b,mix):AW_WEATHER_FOG_CLEAR;
+}
+int AW_WeatherCloudPercentNow(void)
+{
+    return look_on?AW_WeatherCloudPercent(look_current,look_next,look_step):100;
+}
 static void weather_command(void)
 {
     char *s=Cmd_Argv(1);int w;float source[3];const char *now;
@@ -189,9 +206,11 @@ static void weather_command(void)
         else if(!strcmp(s,"on") || !strcmp(s,"1")){Cvar_SetValue(aw_weather.name,1);forced=-1;}
         else if(!strcmp(s,"skyonly") || !strcmp(s,"2")){Cvar_SetValue(aw_weather.name,2);forced=-1;}
         else if((w=AW_WeatherIndex(s))>=0)forced=w;
-        else{Con_Printf("Usage: dbg weather [on/off / skyonly / auto / clear cloudy foggy overcast rain thunder ash blight snow blizzard]\n");return;}
+        else{Con_Printf("Usage: dbg weather [on/off / skyonly / auto / clear cloudy foggy overcast rain thunder ash blight snow blizzard / look on/off]\n");return;}
         instant=1;
-    }else if(Cmd_Argc()!=1){Con_Printf("Usage: dbg weather [on/off / auto / NAME]\n");return;}
+    }else if(Cmd_Argc()==3 && !strcmp(s,"look") && (!strcmp(Cmd_Argv(2),"on") || !strcmp(Cmd_Argv(2),"off"))){
+        Cvar_SetValue(aw_weather_look.name,!strcmp(Cmd_Argv(2),"on"));   /* the weather's fog depth and cloud speed */
+    }else if(Cmd_Argc()!=1){Con_Printf("Usage: dbg weather [on/off / auto / NAME / look on/off]\n");return;}
     load();
     now=aw_weather_names[state.current<0 || state.current>=AW_WEATHERS?0:state.current];
     Con_Printf("Region weather %s%s: %s",aw_weather.value>0?(AW_WeatherLightOn()?"on":"on, sky only"):"off",forced>=0?", forced":"",now);
@@ -199,6 +218,19 @@ static void weather_command(void)
     if(state.next!=AW_WEATHER_NONE)Con_Printf(" changing to %s %ld%%",aw_weather_names[state.next],(long)(state.progress*100));
     if(state.queued!=AW_WEATHER_NONE)Con_Printf(", then %s",aw_weather_names[state.queued]);
     Con_Printf("; Red Mountain pull %d/%d%s",mountain_pull,AW_WEATHER_STEPS,aw_redmountain.value>0?"":" (aw_redmountain 0)");
+    /* the weather's look (SOL-WEATHER-SKY-SNOW-68): fog span against Clear's at day and night, clouds, the storm */
+    Con_Printf("; look %s: fog x%ld/256 day x%ld/256 night, clouds %ld%%",aw_weather_look.value>0?"on":"off",
+        (long)AW_WeatherFogScaleAt(0,0,0),(long)AW_WeatherFogScaleAt(3,3,0),(long)AW_WeatherCloudPercentNow());
+    if(storm)Con_Printf("; storm, wind %ld %ld /100",(long)(storm_dir[0]*100),(long)(storm_dir[1]*100));
+    /* the land's light of this weather against Clear's by day and by night, per channel in 1/256 (AW_WeatherLightTone) */
+    if(loaded && table.light){
+        aw_weather_blend_t b;int day[3],night[3],cur=state.current<0 || state.current>=AW_WEATHERS?0:state.current;
+        AW_WeatherBlend(&table,cur,state.next==AW_WEATHER_NONE?cur:state.next,
+                        state.next==AW_WEATHER_NONE?AW_WEATHER_STEPS:(int)(state.progress*AW_WEATHER_STEPS),&b);
+        AW_WeatherLightTone(&b,0,0,0,day);AW_WeatherLightTone(&b,3,3,0,night);
+        Con_Printf("; light day %ld %ld %ld night %ld %ld %ld /256",(long)day[0],(long)day[1],(long)day[2],
+                   (long)night[0],(long)night[1],(long)night[2]);
+    }
     Con_Printf(" (table %s",loaded?"loaded":"missing: clear sky");
     if(loaded && player_source(source)){
         int region=AW_RegionIndexAt(source);const unsigned char *c=AW_WeatherChancesOf(&script,&table,region);
@@ -221,5 +253,6 @@ void AW_WeatherInit(void)
 {
     Cvar_RegisterVariable(&aw_weather);
     Cvar_RegisterVariable(&aw_redmountain);
+    Cvar_RegisterVariable(&aw_weather_look);
     Cmd_AddCommand("aw_weather_set",weather_command);
 }

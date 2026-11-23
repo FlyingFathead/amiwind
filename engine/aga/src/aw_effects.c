@@ -137,6 +137,17 @@ int AW_EffectsRemoveSource(aw_actor_t *a,int source){
     }
     return n;
 }
+int AW_EffectsPurgeTemporary(aw_actor_t *a){
+    int i,n=0;
+    if(!a)return 0;
+    for(i=0;i<AW_EFFECTS_MAX;i++){
+        effect_t *e=&fx[i];
+        if(!e->used || e->owner!=a->reference || (e->flags&FL_CONSTANT))continue;   /* worn and script entries stay */
+        if(!(e->flags&FL_PER_SECOND) && (e->flags&FL_STAT))act_entry(a,e,e->magnitude,-1);   /* undone, as at its end */
+        e->used=0;n++;
+    }
+    return n;
+}
 int AW_EffectsEnd(aw_actor_t *a,uint32_t owner,int number){
     int i,n=0;
     for(i=0;i<AW_EFFECTS_MAX;i++){

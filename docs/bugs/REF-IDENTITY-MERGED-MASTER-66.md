@@ -163,4 +163,8 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [VIVEC-HOVER-VERIFY-48](VIVEC-HOVER-VERIFY-48.md): Vivec (the god) floats in meditation: verify whether it is his animation over a grounded collision origin or an active effect
 - [WORLD-SURVEY-EXPANSION-ATLAS-66](WORLD-SURVEY-EXPANSION-ATLAS-66.md): With both expansions selected the build stops in its world survey: a terrain subdivision outside the island's atlas
 
+Related bugs in other categories:
+
+- [EXPANSION-STORE-DISABLE-NOT-HIDDEN-68](EXPANSION-STORE-DISABLE-NOT-HIDDEN-68.md): In the expansions' outdoor areas a placement a script switches off stays drawn and solid: the ice covers in front of the underwater entrances to Stahlman's Gorge and the Caves of Fjalding stay in place after their quest stage
+
 <!-- END GENERATED CATEGORY -->

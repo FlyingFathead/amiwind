@@ -291,6 +291,26 @@ void AW_FogDepths(byte *table,int distance) {
         if(last>=first){memset(table+first,level,last-first+1);first=last+1;}
     }
 }
+/* The weather's fog depth (v0.0.68, SOL-WEATHER-SKY-SNOW-68; aw_weather.h AW_WeatherFogScale): the same profile with its
+ * span (56 % of the distance at Clear, AW_FogDepths) scaled by SCALE/256, still ending at the distance; a span past the
+ * distance starts the fog before the eye, so the nearest ground is already fogged (a blizzard: about level 8 of 15).
+ * SCALE 256 is AW_FogDepths itself, byte for byte. */
+void AW_FogDepthsScaled(byte *table,int distance,int scale) {
+    int level,first=1,last;long span,start,t;
+    if(scale==256 || scale<=0){AW_FogDepths(table,distance);return;}
+    if(scale>2048)scale=2048;
+    if(distance<100)distance=100;
+    if(distance>4096)distance=4096;
+    span=(long)distance*14*scale/(25L*256);if(span<16)span=16;
+    start=distance-span;
+    memset(table,0,32768);table[0]=15;
+    for(level=15;level>=1;level--){
+        t=start+span*(level-1)/14;                 /* level LEVEL from this depth on (AW_FogDepths: distance*(10+level)/25) */
+        if(t<=1){memset(table+first,level,32768-first);break;}   /* nearer than the eye: this level to the end */
+        last=(int)(32768L/t);if(last>32767)last=32767;
+        if(last>=first){memset(table+first,level,last-first+1);first=last+1;}
+    }
+}
 /* Interior fog (INTERIOR-FOG-UNUSED-51): every interior cell's AMBI fog colour
  * and density (world/interior-fog.awf, tools/prepare_world_ui.interior_fog,
  * one 20-byte row per foggy room, sorted by map name). Rule from OpenMW file
@@ -431,7 +451,10 @@ void AW_FogDraw(void) {
     fog=colours && aw_fog.value;
     if(!ramp || (!fog && !environment && !aw_land_fill.value))return;
     distance=AW_DrawDistance();
-    if(fog && distance!=old_distance){old_distance=distance;AW_FogDepths(depths,distance);}
+    /* the weather's fog depth (SOL-WEATHER-SKY-SNOW-68): the table is rebuilt only when the distance or the scale moves */
+    {static int old_scale=256;int scale=R_SkyWeatherFogScale();
+     if(fog && (distance!=old_distance || scale!=old_scale)){old_distance=distance;old_scale=scale;
+         AW_FogDepthsScaled(depths,distance,scale);}}
     w=r_refdef.vrect.width;h=r_refdef.vrect.height;extent=w>h?w:h;
     if(extent<=0)return;
     step=2.0f/extent;for(k=0;k<3;k++)delta[k]=vright[k]*step;

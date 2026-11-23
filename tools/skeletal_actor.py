@@ -1424,6 +1424,54 @@ def skeletal_from_shapes(shapes, materials, textures, palette, sources, rest_wor
                    'shape_of': shape_of, 'distance': distance, 'nearest': nearest, 'rest_model': rest_model}
 
 
+def _skeletal_finish(frames, faces, uv, skin_image, shapes, sources, rest_world, actor_scale, table_bytes, bone_names,
+                     table_path, every, vertex_limit, parents, fit_skin, budget, topology):
+    """skeletal_from_shapes' second half on one baked model (frames, faces, uv, skin): the shape tags, the bones
+    carried from the source, the pose box and the MDL with its block. Returns (MDL bytes, facts, the rest frame, the
+    box's lo, its step)."""
+    rest_model = frames[0]
+    if len(rest_model) > vertex_limit:
+        raise ValueError('A skeletal model takes at most %d vertices (the alias stream reader): %d'
+                         % (vertex_limit, len(rest_model)))
+    if fit_skin:
+        skin_image = fit_skin_rows(skin_image, uv)
+    tag = frames[-1] - rest_model
+    shape_of = np.rint(tag[:, 0] / SHAPE_TAG).astype(int) - 1
+    if np.any(np.abs(tag[:, 0] - (shape_of + 1) * SHAPE_TAG) > 1e-3) or np.any(np.abs(tag[:, 1:]) > 1e-3) or \
+            np.any(shape_of < 0) or np.any(shape_of >= len(shapes)):
+        raise ValueError('A baked vertex lost its shape tag')
+    index = {name: i for i, name in enumerate(bone_names)}
+    carried = []
+    for shape, src in zip(shapes, sources):
+        if parents is not None:
+            src = onto_kept(src, parents, set(bone_names), rest_world)     # the stick figure (STICK_BONES)
+        missing = [n for n in src['bones'] if n not in index]
+        if missing:
+            raise ValueError('Shape %s hangs on bones the table lacks: %s' % (src['name'], missing))
+        carried.append({**src, 'points': shape['positions'][0], 'index': [index[n] for n in src['bones']]})
+    bone, second, weight, rest, rest2, distance, nearest = carry_bones(carried, rest_model, shape_of, rest_world,
+                                                                       actor_scale)
+    table = read_table(table_bytes)
+    picked = box_frames(table, every)
+    lo = rest_model.min(axis=0)
+    hi = rest_model.max(axis=0)
+    for f in picked:
+        posed = skin_many(rest, bone, second, weight, rest2, table_world(table, f)) * actor_scale
+        lo = np.minimum(lo, posed.min(axis=0))
+        hi = np.maximum(hi, posed.max(axis=0))
+    lo, step = ground_grid(lo, hi, rest_model[:, 2].min())
+    blob, rest_scale = write_verts(bone, second, weight, rest, rest2)
+    block = write_block(table_path, blob, rest_scale, len(rest), table['frames'], lo / actor_scale,
+                        step / actor_scale)
+    model = skeletal_mdl(rest_model, faces, uv, skin_image, lo, step, block, vertex_limit)
+    return model, {'vertices': len(rest), 'faces': len(faces), 'bytes': len(model), 'block_bytes': len(block),
+                   'budget': budget, 'topology': topology, 'box_frames': len(picked), 'box_lo': lo.tolist(), 'box_step': step.tolist(),
+                   'kept_vertices': int(np.sum(distance < 1e-4)), 'moved_vertices': int(np.sum(distance >= 1e-4)),
+                   'largest_move': float(distance.max()), 'joint_vertices': int(np.sum(second >= 0)),
+                   'shape_of': shape_of, 'distance': distance, 'nearest': nearest, 'rest_model': rest_model}, \
+        rest_model, lo, step
+
+
 def skeletal_model(assets, appearance, skeleton, palette, table_bytes, bone_names, times=None, poser=None,
                    rest_time=None, **options):
     """One appearance's skeletal model (MDL bytes, report), exported by export_actor and reduced from the poses

@@ -127,8 +127,9 @@ class DeathWiringTests(unittest.TestCase):
         self.assertIn('int dead=AW_ACTOR_HEALTH_DEAD(health);', spell)
         self.assertIn('s->f.health=!dead && health>0?health:0;', spell)
         self.assertNotIn('if(health<=0)', spell)
+        # the swing's one body (AW_CombatSwing and, since v0.0.68, the werewolf's AW_CombatSwingClaws run it)
         self.assertIn('if(AW_ACTOR_HEALTH_DEAD(v->health)){v->health=0;v->dead=1;v->knocked=0;}',
-                      body('aw_combat_rules.c', 'void AW_CombatSwing('))
+                      body('aw_combat_rules.c', 'static void swing('))
         landed = body('aw_fall.c', 'static void landed(')
         self.assertIn('if(AW_ACTOR_HEALTH_DEAD(health)){', landed)
         self.assertNotIn('if(health<=0)', landed)

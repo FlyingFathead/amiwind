@@ -288,7 +288,13 @@ static int allowed(void){return allowed_in_play() && !AW_StoryRestricted();}
 /* MAP-MENU-BLOCKED-COURTYARD-65: a window the opening's scripts switched on (EnableMapMenu, EnableStatsMenu,
  * EnableMagicMenu: CharGenFatigueBarrel, the census office) opens while the opening still restricts the rest, as the
  * inventory does (aw_story.c AW_StoryInventoryAllowed); before, M stayed shut after "You now have a map menu". */
-static int menu_allowed(int menu){return allowed_in_play() && (!AW_StoryRestricted() || (AW_StoryMenus()&menu));}
+/* WEREWOLF-BODY-63 (v0.0.68, aw_inventory.h): the player is a werewolf: the inventory and magic windows stay shut */
+int (*aw_worldui_werewolf)(void);
+static int werewolf_now(void){return aw_worldui_werewolf && aw_worldui_werewolf();}
+static int menu_allowed(int menu){
+    if(menu==AW_MENU_MAGIC && werewolf_now())return 0;
+    return allowed_in_play() && (!AW_StoryRestricted() || (AW_StoryMenus()&menu));
+}
 static void opened(int kind){
     strncpy(opened_scene,sv.name,sizeof(opened_scene)-1);opened_scene[sizeof(opened_scene)-1]=0;
     modal=kind;key_dest=key_menu;IN_AWClearButtons();
@@ -320,7 +326,7 @@ void AW_InventoryOpen(void){
     /* the inventory opens during the registration from the papers on, as in the original (aw_story.c
      * AW_StoryInventoryAllowed, CHARGEN-INVENTORY-LOCKED-60); the map and journal keep the released-game rule */
     if(!allowed_in_play() || !AW_StoryInventoryAllowed() || !AW_ControlAllowed(AW_CONTROL_PLAYER) ||
-       svs.clients[0].edict->v.health<=0)return;
+       svs.clients[0].edict->v.health<=0 || werewolf_now())return;
     inventory=(inventory_panel_t *)AW_TryCalloc(1,sizeof(*inventory));
     if(!inventory){Con_Printf("Inventory: not enough memory.\n");return;}
     for(i=0;i<INV_VISIBLE;i++)inventory->icon_row[i]=-1;

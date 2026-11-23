@@ -22,6 +22,7 @@
 #include "quakedef.h"
 #include "aw_npcpath.h"
 #include "aw_combat.h"
+#include "aw_combat_were.h"     /* the werewolf's claws (NPC-WEREWOLF-FIGHTS-ARMED-68): not in aw_combat.h (CHIM-keyed) */
 #include "aw_items.h"
 #include "aw_character.h"
 #include "aw_levelup.h"
@@ -89,11 +90,25 @@ typedef struct {
      * live record (AITM row, rounds left, its chop), and 1 while the swing under way is a shot */
     unsigned char shooting,ammo_known,ammo_chop[2];
     short ammo_item;int ammo_left;
+    /* NPC-WEREWOLF-FIGHTS-ARMED-68: 1 while its character is in werewolf form (a script's BecomeWerewolf: claws only,
+     * aw_combat_were.h), and what its sheet held before (given back at UndoWerewolf, as the original's actor takes up
+     * its best weapon again at its next action; about 48 bytes) */
+    unsigned char were;
+    struct {unsigned char weapon,weapon_skill,shield,shield_class,damage[3][2];unsigned int hit_classes;
+            float reach,speed,weight,armor,weapon_health,weapon_health_max,shield_health,shield_health_max;} worn;
 } slot_t;
 
 aw_combat_settings_t aw_combat_settings;
 aw_combat_ai_t aw_combat_ai;
 static float were_level,were_flee_mod;     /* iWereWolfLevelToAttack, iWereWolfFleeMod (0: not in the image) */
+/* NPC-WEREWOLF-FIGHTS-ARMED-68: fCombatDistanceWerewolfMod ("werewolf" line of combat/settings.txt; the original's
+ * fallback when the image has none), and the hooks aw_mwhost.c sets: whether an actor is a character a script turned
+ * (AW_MwscriptWerewolfNpc) and the global WerewolfClawMult now (a quest raises it). NULL: nobody is turned, the global's
+ * default (the host tests). Declared here, not in aw_combat.h (the CHIM world stage keys it). */
+static float were_distance_mod=AW_WERE_DISTANCE_MOD_DEFAULT;
+int (*aw_combat_werewolf)(struct edict_s *e);
+float (*aw_combat_claw_mult)(void);
+static unsigned long were_turns,were_backs,were_spells_left,were_claw_blows;   /* dbg combat */
 static int settings_ok,ai_ok,settings_tried;   /* settings_tried: read this load already (COMBAT-SETTINGS-REREAD-63) */
 static char sound_path[AW_SND_COUNT][32];
 static const char *const sound_key[AW_SND_COUNT]={"health","miss","punch","light","medium","heavy","swish","critical","fall","punch2"};
@@ -118,6 +133,48 @@ static struct {
 static edict_t *enemy;static float enemy_until;
 static aw_combat_stats_t totals;
 static struct {unsigned long thinks,swings,traces;double seconds,max;} cost;
+/* MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68, slice 3: where a fight's time goes, said by "dbg combat". Measured in play
+ * with six fighters (v0.0.68-dev8): the mean think 0.3 to 0.5 ms, single thinks of 80 and 111 ms, and one frame with
+ * 297 ms in this file of which the thinks were the smaller part. So the worst frame of the encounter is kept with its
+ * parts (the thinks, the blows landing, the casts leaving, the player's own part, the music's switch; the rest is the
+ * animation and the held items), the worst think with its fighter and its state, and the worst frame of fight starts
+ * (the sheets read and the engages); each with its disk wait (the frame's wait counter, aw_spike.h; 0 in a host
+ * build). The clock is read around the thinks (as before), around a blow, a release and a start when one happens, and
+ * four times a frame while anyone fights: no clock read per fighter and frame. */
+#ifdef AMIGA
+#define disk_wait() (aw_wait_time[AW_WAIT_DISK])
+#else
+#define disk_wait() 0.0
+#endif
+enum {FP_THINK,FP_BLOW,FP_CAST,FP_YOU,FP_MUSIC,FP_COUNT};
+typedef struct {double total,disk,part[FP_COUNT];int thinks;long frame;} frame_cost_t;
+static frame_cost_t frame_now,frame_worst;
+static struct {double seconds,disk;long frame;unsigned char state;char name[32];} think_worst;
+static struct {double seconds,disk;int sheets,starts;long frame;} start_now,start_worst;
+static void start_cost(double seconds,double disk,int sheet) {
+    if(start_now.frame!=(long)host_framecount){memset(&start_now,0,sizeof(start_now));start_now.frame=(long)host_framecount;}
+    start_now.seconds+=seconds;start_now.disk+=disk;
+    if(sheet)start_now.sheets++;else start_now.starts++;
+    if(start_now.seconds>start_worst.seconds)start_worst=start_now;
+}
+/* The think cap (aw_combat_think_cap, not saved; 0 = off, every fighter thinks when its time comes, the behaviour
+ * before): at most that many thinks a frame, taken in turn, so the fighters a script starts in one tick do not all
+ * think in one frame for the rest of the fight; a held think runs in a following frame with its true time step. The
+ * share grows past the cap when it must, so that no fighter waits longer than the original's reaction time (OpenMW
+ * 0.51 aitimer.hpp AI_REACTION_TIME, 0.25 s) at the frame time of the machine. The swings, the casts and the
+ * animation run every frame either way. AW_CombatThinkShare: the rule alone, for its test (its prototype here:
+ * aw_combat.h is keyed by the CHIM world stage). */
+#define THINK_REACTION .25f
+static cvar_t think_cap={"aw_combat_think_cap","0"};
+static int think_from;static unsigned long thinks_held,think_frames_capped;
+int AW_CombatThinkShare(int due,int cap,float frametime);
+int AW_CombatThinkShare(int due,int cap,float frametime) {
+    int need;
+    if(cap<=0 || due<=cap)return due<0?0:due;
+    need=frametime>0?(int)ceil(due*frametime/THINK_REACTION):cap;
+    if(need<cap)need=cap;
+    return need<due?need:due;
+}
 
 static cvar_t combat_on={"aw_combat","1"};
 static cvar_t readout={"aw_combat_readout","1"};
@@ -235,6 +292,7 @@ int AW_CombatSettingsLoad(void) {
     settings_tried=1;
     memset(&aw_combat_settings,0,sizeof(aw_combat_settings));memset(sound_path,0,sizeof(sound_path));
     memset(&aw_combat_ai,0,sizeof(aw_combat_ai));ai_ok=0;were_level=were_flee_mod=0;
+    were_distance_mod=AW_WERE_DISTANCE_MOD_DEFAULT;
     if(COM_FOpenFile("combat/settings.txt",&f)<0 || !f)return 0;
     if(!read_line(f,line,sizeof(line)) || strcmp(line,"AWCS1")){fclose(f);return 0;}
     while(read_line(f,line,sizeof(line))){
@@ -244,6 +302,7 @@ int AW_CombatSettingsLoad(void) {
         if(Q_sscanf(line,"werewolf %63s %f",name,&value)==2){
             if(!Q_strcasecmp(name,"iWereWolfLevelToAttack"))were_level=value;
             else if(!Q_strcasecmp(name,"iWereWolfFleeMod"))were_flee_mod=value;
+            else if(!Q_strcasecmp(name,"fCombatDistanceWerewolfMod"))were_distance_mod=value;   /* NPC-WEREWOLF-FIGHTS-ARMED-68 */
             continue;
         }
         {float a=0,b=0;
@@ -372,9 +431,44 @@ void AW_CombatEssentialKilled(unsigned long ref,const char *name) {essential_mes
  * attacks stay the sheet's. */
 void (*aw_combat_sheet_stats)(const char *id,aw_fighter_t *out);
 static int actor_load(const char *id,aw_fighter_t *out);
+/* AMBIENT-SOUND-READ-IN-FRAME-68: what a blow reads is in memory BEFORE the blows. Measured in the v0.0.68-dev9
+ * session (six fighters on the player): the worst fight frames (219 and 296 ms) were the blows' disk waits: the
+ * fight's own sounds read at their first use (sound/combat/swish.wav 152 ms, punch.wav 81 ms) and the fighters'
+ * ability lists read again at every blow (aw_actorstate.c AW_ActorPassiveKept). So: the fight's sounds (the ten of
+ * combat/settings.txt, about 60 KiB of the sound cache, none of it resident outside the cache) are loaded with the
+ * area's first fighter sheet (the area load reads the sheets) and looked at again at every fight's start (a sound
+ * the cache dropped is read there, not at a blow); a fight's start reads its fighter's and the player's ability
+ * lists once. aw_combat_sound_warm: the sound system's part (aw_anim.c; NULL in the host tests): 1 in memory. */
+int (*aw_combat_sound_warm)(const char *path);
+static unsigned char sounds_warmed;
+static unsigned long warm_calls,warm_sound_reads,warm_list_calls;
+static void fight_sounds_warm(void) {
+    int i;
+    if(!aw_combat_sound_warm || !settings_ok)return;
+    for(i=0;i<AW_SND_COUNT;i++){
+        double d0=disk_wait();
+        if(!sound_path[i][0])continue;
+        (void)aw_combat_sound_warm(sound_path[i]);
+        if(disk_wait()>d0)warm_sound_reads++;
+    }
+    sounds_warmed=1;warm_calls++;
+}
+/* the fight's start of E: its ability list and the player's (one question each fills the kept list), the sounds */
+static void fight_warm(edict_t *e) {
+    edict_t *p=svs.clients && svs.maxclients==1?svs.clients[0].edict:NULL;
+    if(aw_combat_effect_magnitude){
+        (void)aw_combat_effect_magnitude(e,AW_EFFECT_PARALYZE);
+        if(p && sv.active)(void)aw_combat_effect_magnitude(p,AW_EFFECT_PARALYZE);
+        warm_list_calls++;
+    }
+    fight_sounds_warm();
+}
 int AW_CombatActorLoad(const char *id,aw_fighter_t *out) {
+    double t0=Sys_FloatTime(),d0=disk_wait();
     int ok=actor_load(id,out);
     if(ok && aw_combat_sheet_stats)aw_combat_sheet_stats(id,out);
+    if(ok && !sounds_warmed)fight_sounds_warm();   /* with the area's first sheet: the area load, not a blow */
+    start_cost(Sys_FloatTime()-t0,disk_wait()-d0,1);
     return ok;
 }
 static int actor_load(const char *id,aw_fighter_t *out) {
@@ -437,6 +531,7 @@ void AW_CombatPlayerSheet(aw_fighter_t *o) {
         o->fatigue=aw_character.valid?aw_character.current[2]:o->fatigue_max;
         if(o->fatigue>o->fatigue_max)o->fatigue=o->fatigue_max;
         if(aw_combat_equipment)aw_combat_equipment(o);
+        if(aw_move_werewolf)AW_CombatWerewolfClaws(&aw_combat_settings,o);   /* NPC-WEREWOLF-FIGHTS-ARMED-68 */
         return;
     }
     memset(o,0,sizeof(*o));strcpy(o->id,"player");strcpy(o->name,"You");o->aware=1;
@@ -455,6 +550,9 @@ void AW_CombatPlayerSheet(aw_fighter_t *o) {
     o->weapon_skill=AW_SK_H2H;
     o->armor=settings_ok?AW_CombatUnarmoredRating(&aw_combat_settings,o):0;
     if(aw_combat_equipment)aw_combat_equipment(o);
+    /* NPC-WEREWOLF-FIGHTS-ARMED-68: the player in werewolf form fights with his claws only (the change of form took
+     * every item off already, aw_were_rules.c; a script's Equip in the form changes nothing here) */
+    if(aw_move_werewolf)AW_CombatWerewolfClaws(&aw_combat_settings,o);
 }
 /* HAND-TO-HAND-NO-HIT-64: the fight's sheet of the player is taken when the fight starts and kept until it ends; the
  * character's attributes, skills, level and maxima are read into it again every frame, so a change during the fight (dbg
@@ -471,6 +569,8 @@ static void you_refresh(aw_fighter_t *o) {
     if(aw_character.maximum[0]>0)o->health_max=aw_character.maximum[0];
     if(aw_character.maximum[2]>0)o->fatigue_max=aw_character.maximum[2];
     {float cap=0,load=AW_PlayerEncumbrance(&cap);o->encumbrance=load<=0?0:cap>0?load/cap:1.000001f;}   /* getNormalizedEncumbrance */
+    /* NPC-WEREWOLF-FIGHTS-ARMED-68: a change of form during the fight counts at the next blow (no load, claws only) */
+    if(aw_move_werewolf)AW_CombatWerewolfClaws(&aw_combat_settings,o);
 }
 /* INVENTORY-NO-ARMOR-RATING-61: the player's armour rating as the inventory window shows it under the picture (OpenMW
  * 0.51 mwgui/inventorywindow.cpp updateArmorRating: the whole number of mwclass/npc.cpp getArmorRating): the worn pieces
@@ -498,6 +598,7 @@ void AW_CombatEquipmentChanged(void) {
     you.armor=changed.armor;you.shield=changed.shield;you.shield_class=changed.shield_class;you.hit_classes=changed.hit_classes;
     you.weapon_health=changed.weapon_health;you.weapon_health_max=changed.weapon_health_max;
     you.shield_health=changed.shield_health;you.shield_health_max=changed.shield_health_max;
+    if(aw_move_werewolf)AW_CombatWerewolfClaws(&aw_combat_settings,&you);   /* NPC-WEREWOLF-FIGHTS-ARMED-68 */
 }
 static void you_store(edict_t *p) {
     AW_CombatEquipmentStore();
@@ -784,6 +885,8 @@ static void begin_encounter(void) {
     AW_CombatSeed(&rng,seed);seed_used=seed;encounters++;
     memset(&totals,0,sizeof(totals));totals.seed=seed;totals.started=sv.time;
     memset(&cost,0,sizeof(cost));      /* the thinks per second of dbg combat are this encounter's */
+    memset(&frame_worst,0,sizeof(frame_worst));memset(&think_worst,0,sizeof(think_worst));   /* and its worst frame and think */
+    thinks_held=think_frames_capped=0;think_from=0;   /* the turns from the first slot: a seed replays the fight */
     AW_CombatPlayerSheet(&you);you_valid=1;punch_started=-1;dead_music=0;
     memset(&retry,0,sizeof(retry));
     {edict_t *p=player();
@@ -835,8 +938,56 @@ static int items_spare(void) {
     }
     return AW_CombatItemsRule(n,spare);
 }
+/* ---- NPC-WEREWOLF-FIGHTS-ARMED-68 (v0.0.68): a character a script turned fights as the original's werewolf ----
+ * OpenMW 0.51 (read, not copied; aw_combat_were.h): mechanicsmanagerimp.cpp setWerewolf takes every item off any actor
+ * it turns; aicombataction.cpp prepareNextAction 170-174 gives a werewolf character hand to hand and nothing else (no
+ * spell, potion or magic item is weighed, nor fleeing by the rating); combat.cpp getHandToHandDamage 489-514 makes its
+ * blow health damage times the global WerewolfClawMult. Asked at the engage and at every think (one bit test for a
+ * character not turned, aw_mwhost.c AW_MwscriptWerewolfNpc), so a BecomeWerewolf or an UndoWerewolf in the middle of a
+ * fight changes how it fights at once; its own weapon, shield and armour come back with its own form. A creature is no
+ * werewolf. The player's form is aw_move_werewolf (his sheet: AW_CombatPlayerSheet, you_refresh). */
+static int were_of(edict_t *e) {return e && aw_combat_werewolf && aw_combat_werewolf(e);}
+/* the claws' multiplier now: the global WerewolfClawMult (25 when the game has none, as OpenMW's default global) */
+static float claw_mult(void) {
+    float m=aw_combat_claw_mult?aw_combat_claw_mult():AW_WERE_CLAW_MULT_DEFAULT;
+    return m==m && m>=0?m:AW_WERE_CLAW_MULT_DEFAULT;
+}
+static float claws_of(const slot_t *s) {return s->were?claw_mult():-1;}
+static void fighter_were(slot_t *s) {
+    int now=!s->f.creature && were_of(s->e);
+    if(now==s->were)return;
+    if(now){
+        s->worn.weapon=s->f.weapon;s->worn.weapon_skill=s->f.weapon_skill;s->worn.shield=s->f.shield;
+        s->worn.shield_class=s->f.shield_class;memcpy(s->worn.damage,s->f.damage,sizeof(s->worn.damage));
+        s->worn.hit_classes=s->f.hit_classes;s->worn.reach=s->f.reach;s->worn.speed=s->f.speed;s->worn.weight=s->f.weight;
+        s->worn.armor=s->f.armor;s->worn.weapon_health=s->f.weapon_health;s->worn.weapon_health_max=s->f.weapon_health_max;
+        s->worn.shield_health=s->f.shield_health;s->worn.shield_health_max=s->f.shield_health_max;
+        AW_CombatWerewolfClaws(&aw_combat_settings,&s->f);
+        if(s->spell>=0)were_spells_left++;
+        /* a cast under way is put away with the spell (setWerewolf 1890-1892) */
+        if(s->state==S_CAST){
+            if(s->cast_look){AW_MagicCastLookRelease(s->cast_look,-1);s->cast_look=0;}
+            s->f.attacking=0;set_state(s,S_CHASE,G_IDLE);
+        }
+        s->spell=-1;s->shooting=0;s->ammo_known=0;   /* no spell, no shot: the claws (prepareNextAction 170-174) */
+        AW_ItemsHide(s->item);                       /* nothing held (aw_items.c draws nothing for it either) */
+        were_turns++;
+    }else{
+        s->f.weapon=s->worn.weapon;s->f.weapon_skill=s->worn.weapon_skill;s->f.shield=s->worn.shield;
+        s->f.shield_class=s->worn.shield_class;memcpy(s->f.damage,s->worn.damage,sizeof(s->f.damage));
+        s->f.hit_classes=s->worn.hit_classes;s->f.reach=s->worn.reach;s->f.speed=s->worn.speed;s->f.weight=s->worn.weight;
+        s->f.armor=s->worn.armor;s->f.weapon_health=s->worn.weapon_health;s->f.weapon_health_max=s->worn.weapon_health_max;
+        s->f.shield_health=s->worn.shield_health;s->f.shield_health_max=s->worn.shield_health_max;
+        fighter_load(s);s->spell_at=(float)sv.time;  /* its load again; its next action weighed at once */
+        if(!s->f.dead && items_spare())AW_ItemsShow(s->e,s->item);
+        were_backs++;
+    }
+    s->were=(unsigned char)now;
+    if(readout.value)Con_Printf("Combat: %s fights %s\n",s->f.name,now?"as a werewolf: its claws only, no weapon and no spell":
+                                "in its own form again: its own weapon and spells");
+}
 int AW_CombatEngage(edict_t *e,const aw_fighter_t *fighter,const char *layout) {
-    slot_t *s=slot_of(e);int i;
+    slot_t *s=slot_of(e);int i;double t0=Sys_FloatTime(),d0=disk_wait();
     if(!combat_on.value || !e || e->free || !fighter || !AW_CombatSettingsLoad())return 0;
     /* a disabled actor starts no fight and joins none: on sight (the ambient aggro), a script's StartCombat, a crime,
      * an ally's join or a resumed fight of the change list alike (the Plaza's fabricants, which their own script
@@ -872,17 +1023,22 @@ int AW_CombatEngage(edict_t *e,const aw_fighter_t *fighter,const char *layout) {
     s->next_think=s->last_think=(float)sv.time;s->cooldown=.5f;
     s->spell=-1;s->spell_at=(float)sv.time;   /* the first decision at its first think */
     fighter_load(s);
+    fighter_were(s);                           /* NPC-WEREWOLF-FIGHTS-ARMED-68: a turned character fights with its claws */
     set_state(s,S_CHASE,G_IDLE);
     if(retry.valid && retry.npc[s-slots].e!=e){
         retry.npc[s-slots].e=e;VectorCopy(e->v.origin,retry.npc[s-slots].origin);VectorCopy(e->v.angles,retry.npc[s-slots].angles);
         retry.npc[s-slots].f=s->f;retry.npc[s-slots].health=e->v.health;
     }
-    if(engage_dead)return 1;    /* a corpse: the caller marks it dead at once */
+    if(engage_dead){start_cost(Sys_FloatTime()-t0,disk_wait()-d0,0);return 1;}    /* a corpse: the caller marks it dead at once */
     /* a resident draws its weapon and shield (NPC-WEAPON-MESH-33); past the kept edicts only with room to spare */
+    /* (a turned character, NPC-WEREWOLF-FIGHTS-ARMED-68: aw_items.c shows nothing in its hands, AW_ItemsShow's turned rule) */
     if(!items_spare())items_left_out++;
     else AW_ItemsShow(e,s->item);
-    if(readout.value)Con_Printf("Combat: %s (level %ld) attacks; seed %lu\n",s->f.name,(long)s->f.level,seed_used);
+    if(readout.value)Con_Printf("Combat: %s (level %ld) attacks%s; seed %lu\n",s->f.name,(long)s->f.level,
+                                s->were?" with its claws (a werewolf)":"",seed_used);
+    fight_warm(e);              /* AMBIENT-SOUND-READ-IN-FRAME-68: what its blows read, read now */
     voice(e,AW_VOICE_START);
+    start_cost(Sys_FloatTime()-t0,disk_wait()-d0,0);
     return 1;
 }
 static void shots_clear(void);
@@ -1019,8 +1175,10 @@ static void npc_strike(slot_t *s,edict_t *p) {
     hit_effects(s->e,&s->f);hit_effects(p,&you);                     /* HIT-CHANCE-CHECK-62 */
     /* fBlockStillBonus while not moving forward (combat.cpp: movement mPosition[1] <= 0) */
     {aw_fighter_t before=you;
-     AW_CombatSwing(&aw_combat_settings,&s->f,&you,s->attack,s->strength,bearing(p,s->e,0),
-        svs.clients[0].cmd.forwardmove<=0,&rng,&out);
+     /* NPC-WEREWOLF-FIGHTS-ARMED-68: a werewolf's blow is its claws' (claws_of: -1 for any other fighter) */
+     if(s->were)were_claw_blows++;
+     AW_CombatSwingClaws(&aw_combat_settings,&s->f,&you,s->attack,s->strength,bearing(p,s->e,0),
+        svs.clients[0].cmd.forwardmove<=0,claws_of(s),&rng,&out);
      /* GODMODE-COMBAT-DAMAGE-61: dbg god on (Quake's FL_GODMODE): no damage, no knockdown (OpenMW npc.cpp) */
      if((int)p->v.flags&FL_GODMODE){AW_CombatGodVictim(&you,&before,&out);god_blows++;}}
     you.block_off=0;
@@ -1108,7 +1266,9 @@ static void npc_strike_actor(slot_t *s,slot_t *v) {
     s->f.weapon_normal=(unsigned char)(s->f.weapon!=0);
     v->f.resist_normal=s->f.weapon_normal?normal_resistance(v->e,0):0;
     hit_effects(s->e,&s->f);hit_effects(v->e,&v->f);
-    AW_CombatSwing(&aw_combat_settings,&s->f,&v->f,s->attack,s->strength,bearing(v->e,s->e,90),!v->f.moving,&rng,&out);
+    if(s->were)were_claw_blows++;
+    AW_CombatSwingClaws(&aw_combat_settings,&s->f,&v->f,s->attack,s->strength,bearing(v->e,s->e,90),!v->f.moving,
+                        claws_of(s),&rng,&out);
     v->f.aware=1;actor_strikes++;
     if(p && original_distance(s->e,p)<1024)swing_sounds(&out,&v->f,0);
     if(out.outcome!=AW_HIT_MISS && out.outcome!=AW_HIT_BLOCKED)actor_hits++;
@@ -1379,7 +1539,10 @@ static void player_strike(edict_t *p) {
     s->f.resist_normal=you.weapon_normal?normal_resistance(t,1):0;   /* percent */
     hit_effects(p,&you);hit_effects(t,&s->f);                        /* HIT-CHANCE-CHECK-62 */
     {aw_fighter_t before=you;
-     AW_CombatSwing(&aw_combat_settings,&you,&s->f,attack,player_strength(),bearing(t,p,90),!s->f.moving,&rng,&out);
+     /* NPC-WEREWOLF-FIGHTS-ARMED-68: the player in werewolf form strikes with the claws (his sheet: AW_CombatPlayerSheet) */
+     if(aw_move_werewolf)were_claw_blows++;
+     AW_CombatSwingClaws(&aw_combat_settings,&you,&s->f,attack,player_strength(),bearing(t,p,90),!s->f.moving,
+                         aw_move_werewolf?claw_mult():-1,&rng,&out);
      /* GODMODE-COMBAT-DAMAGE-61: no fatigue, no weapon wear in god mode (OpenMW combat.cpp) */
      if((int)p->v.flags&FL_GODMODE)AW_CombatGodAttacker(&you,&before,&out);}
     s->f.aware=1;cost.swings++;
@@ -1538,6 +1701,8 @@ static void choose_spell(slot_t *s,edict_t *p) {
     aw_actor_t *a=AW_MwscriptActorOf(s->e,NULL);aw_spell_ai_t c;spell_ctx_t ctx;
     int n,i,best=-1;float best_rating,cost_mult=AW_DialwinEffectCostMult();
     s->spell=-1;
+    /* NPC-WEREWOLF-FIGHTS-ARMED-68 (prepareNextAction 170-174): a werewolf weighs no spell: its claws, nothing read */
+    if(s->were)return;
     if(!a || !p)return;
     if(!s->spells_cached)cache_spells(s,a);
     n=s->nspells;
@@ -1746,6 +1911,7 @@ static void think(slot_t *s,edict_t *p,float dt) {
     s->f.moving=0;s->f.attacking=s->state==S_SWING;
     if(AW_CombatRecover(&aw_combat_settings,&s->f,dt))set_state(s,S_CHASE,G_IDLE);
     if(s->state==S_DEAD)return;
+    fighter_were(s);   /* NPC-WEREWOLF-FIGHTS-ARMED-68: a BecomeWerewolf or UndoWerewolf during the fight counts at once */
     if(s->f.fatigue<0 && !s->f.knocked){s->f.knocked=2;set_state(s,S_KNOCK,G_KNOCK);sound(SND_FALL);}   /* knocked out */
     if(s->state==S_KNOCK){
         /* the knockdown lasts its clip (character.cpp: the hit state ends with the group) */
@@ -1792,6 +1958,10 @@ static void think(slot_t *s,edict_t *p,float dt) {
          * when the target is within its attack distance) */
         if(flee_on){
             reach=AW_CombatReach(&aw_combat_settings,&s->f)*SCALE;gap=gap_to(s->e,p,&dz);
+            /* NPC-WEREWOLF-FIGHTS-ARMED-68: a werewolf after it: its own attack distance (getMaxAttackDistance of the
+             * target, aicombat.cpp 393: fCombatDistance x (1 + fCombatDistanceWerewolfMod)) */
+            if(s->target_num?were_of(p):aw_move_werewolf)
+                reach=AW_CombatWerewolfAttackDistance(&aw_combat_settings,1,were_distance_mod)*SCALE;
             if(gap<=reach && sv.time<s->decide_at){s->state_time=0;return;}
         }
         if(sv.time<s->decide_at)return;
@@ -1827,11 +1997,15 @@ static void think(slot_t *s,edict_t *p,float dt) {
     gap=gap_to(s->e,p,&dz);
     /* the flee rule on: the flee decision of every next action (aicombat.cpp: prepareNextAction whenever the actor is
      * ready; a melee action has no cooldown, ActionFlee 3 s) */
-    if(flee_on && ai_ok && s->state==S_CHASE){
+    /* NPC-WEREWOLF-FIGHTS-ARMED-68: a werewolf never weighs fleeing (prepareNextAction 170-174 returns its claws before
+     * makeFleeDecision); it still flees a place it cannot reach (below) */
+    if(flee_on && ai_ok && s->state==S_CHASE && !s->were){
         float d=original_distance(s->e,p);
         /* ACTOR-MECHANICS-USE-STATS-66 row 16: the werewolf case, and a spell that is the best action rates against
-         * fleeing by its own success chance (prepareNextAction: the masters' fAIMagicSpellMult 3, fAIRangeMagicSpellMult 5) */
-        float were=AW_CombatWerewolfFleeMod(&s->f,aw_move_werewolf,were_level,were_flee_mod);
+         * fleeing by its own success chance (prepareNextAction: the masters' fAIMagicSpellMult 3, fAIRangeMagicSpellMult 5);
+         * NPC-WEREWOLF-FIGHTS-ARMED-68: the enemy a werewolf is the player in that form or a character a script turned
+         * (vanillaRateFlee 475-482: any NPC enemy in werewolf form) */
+        float were=AW_CombatWerewolfFleeMod(&s->f,s->target_num?were_of(p):aw_move_werewolf,were_level,were_flee_mod);
         float anti=spells_on && s->spell>=0?AW_CombatSpellAntiFlee(s->spell_chance,s->spell_ranges,3,5,AW_AmbientInWater(p->v.origin)):
                    AW_CombatAntiFleeRating(&aw_combat_ai,&s->f);
         if(AW_CombatFleeDecisionVs(&aw_combat_ai,&s->f,d,were,anti)){
@@ -1988,7 +2162,7 @@ static void think(slot_t *s,edict_t *p,float dt) {
 }
 /* SV_Physics, after the entities and the companion. */
 void AW_CombatPhysics(void) {
-    edict_t *p;int i,any=0;float dt=(float)host_frametime,interval;double t0;
+    edict_t *p;int i,any=0,fought=0;float dt=(float)host_frametime,interval;double t0,f0,fd0,b0;unsigned int allow=~0u;
     if(!combat_on.value || !(p=player()))return;
     /* Only for a spawned player (MUSIC-DEATH-TRACK-RANDOM-60): a new map's settle frames (sv_main.c SV_SpawnServer runs
      * SV_Physics twice) and the signon frames after "connect local" see the fresh client edict at health 0 before
@@ -1996,6 +2170,26 @@ void AW_CombatPhysics(void) {
      * read as the player's death and played the death track on an area change. */
     if(!svs.clients[0].active || !svs.clients[0].spawned)return;
     aw_combat_dice=dice_cvar.value!=0;
+    for(i=0;i<FIGHTS;i++)fought+=slots[i].e!=NULL;
+    /* slice 3: this frame's account (only while anyone fights), and the fighters that may think in it */
+    if(fought){
+        int cap=(int)think_cap.value;
+        memset(&frame_now,0,sizeof(frame_now));frame_now.frame=(long)host_framecount;f0=Sys_FloatTime();fd0=disk_wait();
+        if(cap>0){
+            int due=0,share,j,last=-1;
+            for(i=0;i<FIGHTS;i++)due+=slots[i].e && !slots[i].e->free && sv.time>=slots[i].next_think;
+            share=AW_CombatThinkShare(due,cap,(float)host_frametime);
+            if(share<due){
+                allow=0;
+                for(j=0;j<FIGHTS && share>0;j++){
+                    i=(think_from+j)%FIGHTS;
+                    if(slots[i].e && !slots[i].e->free && sv.time>=slots[i].next_think){allow|=1u<<i;share--;last=i;}
+                }
+                if(last>=0)think_from=(last+1)%FIGHTS;
+                think_frames_capped++;
+            }
+        }
+    }else f0=fd0=0;
     for(i=0;i<FIGHTS;i++){
         slot_t *s=&slots[i];
         if(!s->e)continue;
@@ -2006,10 +2200,11 @@ void AW_CombatPhysics(void) {
         any=any || !s->target_num;s->state_time+=dt;
         if(s->state==S_SWING){
             if(!s->struck && s->state_time>=s->swing_time*s->hit_fraction){
-                s->struck=1;
+                s->struck=1;b0=Sys_FloatTime();
                 if(s->shooting){if(!you.dead && !((int)p->v.flags&FL_NOTARGET))shot_fire(s,p);}   /* the release */
                 else if(s->target_num){slot_t *v=actor_target(s);if(v)npc_strike_actor(s,v);}
                 else if(!you.dead && !((int)p->v.flags&FL_NOTARGET))npc_strike(s,p);
+                frame_now.part[FP_BLOW]+=Sys_FloatTime()-b0;
             }
             if(s->state_time>=s->swing_time){
                 s->f.attacking=0;s->shooting=0;set_state(s,S_CHASE,G_IDLE);
@@ -2019,14 +2214,19 @@ void AW_CombatPhysics(void) {
         }
         /* NPC-NO-SPELLCASTING-65: a cast leaves on its release key, then the group's rest, then the next action */
         if(s->state==S_CAST){
-            if(!s->cast_left && s->state_time>=s->cast_release){if(!you.dead)cast_release(s);else s->cast_left=1;}
+            if(!s->cast_left && s->state_time>=s->cast_release){
+                if(!you.dead){b0=Sys_FloatTime();cast_release(s);frame_now.part[FP_CAST]+=Sys_FloatTime()-b0;}
+                else s->cast_left=1;
+            }
             if(s->state_time>=s->cast_end){
                 s->f.attacking=0;set_state(s,S_CHASE,G_IDLE);s->spell_at=(float)sv.time;
                 s->cooldown=aw_combat_settings.fCombatDelayNPC+.01f*AW_CombatRoll100(&rng);
                 if(s->cooldown>aw_combat_settings.fCombatDelayNPC+.9f)s->cooldown=aw_combat_settings.fCombatDelayNPC+.9f;
             }
         }else if(s->cast_look){AW_MagicCastLookRelease(s->cast_look,-1);s->cast_look=0;}   /* interrupted (a hit) */
-        if(sv.time>=s->next_think){
+        if(sv.time>=s->next_think && !(allow>>i&1))thinks_held++;   /* the think cap: its turn comes in a following frame */
+        else if(sv.time>=s->next_think){
+            int state=s->state;double d0=disk_wait();
             interval=think_interval.value<.05f?.05f:think_interval.value>.2f?.2f:think_interval.value;
             dt=(float)(sv.time-s->last_think);if(dt>.3f)dt=.3f;if(dt<0)dt=interval;
             s->last_think=(float)sv.time;s->next_think=(float)sv.time+interval;
@@ -2034,6 +2234,12 @@ void AW_CombatPhysics(void) {
             {slot_t *v=s->target_num?actor_target(s):NULL;if(!s->target_num || v)think(s,v?v->e:p,dt);}
             t0=Sys_FloatTime()-t0;
             cost.thinks++;cost.seconds+=t0;if(t0>cost.max)cost.max=t0;
+            frame_now.part[FP_THINK]+=t0;frame_now.thinks++;
+            if(t0>think_worst.seconds){
+                think_worst.seconds=t0;think_worst.disk=disk_wait()-d0;think_worst.frame=(long)host_framecount;
+                think_worst.state=(unsigned char)state;
+                strncpy(think_worst.name,s->f.name,sizeof(think_worst.name)-1);think_worst.name[sizeof(think_worst.name)-1]=0;
+            }
             dt=(float)host_frametime;
         }
         if(s->state==S_SWING)s->group=G_ATTACK;
@@ -2041,6 +2247,7 @@ void AW_CombatPhysics(void) {
         AW_ItemsUpdate(s->e,s->item);
     }
     shots_update(p,(float)host_frametime);            /* ACTOR-RANGED-COMBAT-MISSING-66: the shots in flight */
+    b0=fought?Sys_FloatTime():0;
     /* The player: punch, fatigue return, the knockout clock. */
     if((watching || p->v.button0 || any) && !you_valid && AW_CombatSettingsLoad()){AW_CombatPlayerSheet(&you);you_valid=1;}
     if(you_valid){
@@ -2063,12 +2270,19 @@ void AW_CombatPhysics(void) {
         aw_character.current[2]=f.fatigue;
     }
     if(enemy && (enemy->free || sv.time>=enemy_until))enemy=NULL;
+    if(fought){t0=Sys_FloatTime();frame_now.part[FP_YOU]=t0-b0;b0=t0;}
     /* Battle music while anyone fights the player (OpenMW music.lua:
      * the battle playlist is active while an actor has combat targets). */
     if(music.value){
         int want=AW_PlayerInCombat();
         if(you_valid && you.dead){if(!dead_music){dead_music=1;AW_MusicDeath();}}
         else if(want!=battle){battle=want;AW_MusicCombat(want);}
+    }
+    /* slice 3: the frame's account closes; the worst of the encounter is kept for "dbg combat" */
+    if(fought){
+        t0=Sys_FloatTime();frame_now.part[FP_MUSIC]=t0-b0;
+        frame_now.total=t0-f0;frame_now.disk=disk_wait()-fd0;
+        if(frame_now.total>frame_worst.total)frame_worst=frame_now;
     }
 }
 /* HUD::setEnemy / updateEnemyHealthBar: shown fNPCHealthBarTime seconds
@@ -2137,6 +2351,8 @@ void AW_CombatServerReset(void) {
 void AW_CombatSceneSpawn(void) {
     int i;for(i=0;i<FIGHTS;i++)memset(&slots[i],0,sizeof(slots[i]));
     memset(&pv,0,sizeof(pv));block_shown_until=0;settings_tried=0;
+    sounds_warmed=0;            /* the new area's first sheet looks at the fight's sounds again */
+    memset(&start_now,0,sizeof(start_now));memset(&start_worst,0,sizeof(start_worst));think_from=0;
     enemy=NULL;you_valid=0;memset(&retry,0,sizeof(retry));shots_clear();
     if(battle){battle=0;AW_MusicCombat(0);}
 }
@@ -2160,6 +2376,12 @@ static void report(void) {
     Con_Printf("Spells: %s; spell choices %lu, casts %lu, failed %lu (ratings %lu; all actors' casts %lu; spell reads %lu, at the fight's start only)\n",
         spells_on?"fighters cast the spells they know (dbg combat spells off: weapons only)":"weapons only",
         totals.npc_spell_choices,totals.npc_casts,totals.npc_cast_fails,spell_ratings,AW_CastActorCasts(),totals.npc_spell_reads);
+    /* NPC-WEREWOLF-FIGHTS-ARMED-68: the werewolves in the fights, their claws' multiplier and attack distance */
+    {int n=0;for(i=0;i<FIGHTS;i++)n+=slots[i].e!=NULL && slots[i].were;
+     Con_Printf("Werewolves: %d fighting with their claws%s; turned in a fight %lu, back %lu (spells put away %lu); claw "
+        "blows %lu; claws x%.0f (the global WerewolfClawMult%s), attack distance x%.2f (fCombatDistanceWerewolfMod)\n",n,
+        aw_move_werewolf?", and you":"",were_turns,were_backs,were_spells_left,were_claw_blows,(double)claw_mult(),
+        aw_combat_claw_mult?"":", the default",(double)(1+were_distance_mod));}
     /* MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68 */
     {int used=0;for(i=0;i<FIGHTS;i++)used+=slots[i].e!=NULL;
      Con_Printf("Fight slots: %d in use of %d (aw_combat_slots %d, built for %d); refused for no slot %lu; held items "
@@ -2170,6 +2392,25 @@ static void report(void) {
     if(you_valid)Con_Printf(" You: health %ld/%ld fatigue %ld/%ld\n",(long)you.health,(long)you.health_max,(long)you.fatigue,(long)you.fatigue_max);
     Con_Printf("thinks %lu (%.1f/s) swings %lu move traces %lu; ms/think avg %.3f max %.3f\n",cost.thinks,cost.thinks/span,
         cost.swings,cost.traces,cost.thinks?cost.seconds*1000/cost.thinks:0.0,cost.max*1000);
+    /* MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68, slice 3: where the time went, and the think cap */
+    {double other=frame_worst.total;int k;for(k=0;k<FP_COUNT;k++)other-=frame_worst.part[k];
+     if(other<0)other=0;
+     Con_Printf("Worst fight frame: %.1f ms at f%ld (disk wait %.1f ms): %d thinks %.1f ms, blows %.1f, casts %.1f, you %.1f, "
+        "music %.1f, animation and held items %.1f\n",frame_worst.total*1000,frame_worst.frame,frame_worst.disk*1000,
+        frame_worst.thinks,frame_worst.part[FP_THINK]*1000,frame_worst.part[FP_BLOW]*1000,frame_worst.part[FP_CAST]*1000,
+        frame_worst.part[FP_YOU]*1000,frame_worst.part[FP_MUSIC]*1000,other*1000);}
+    Con_Printf("Worst think: %.1f ms (disk wait %.1f ms) by %s in state %d at f%ld\n",think_worst.seconds*1000,
+        think_worst.disk*1000,think_worst.name[0]?think_worst.name:"nobody",(int)think_worst.state,think_worst.frame);
+    Con_Printf("Worst frame of fight starts (since the area loaded): %d sheets read, %d fighters engaged, %.1f ms (disk wait "
+        "%.1f ms) at f%ld\n",start_worst.sheets,start_worst.starts,start_worst.seconds*1000,start_worst.disk*1000,start_worst.frame);
+    /* AMBIENT-SOUND-READ-IN-FRAME-68: what the blows would read, read before them */
+    Con_Printf("Before the blows: the fight's sounds looked at %lu times (%lu read from disk then, %s since this area "
+        "loaded), the fighters' ability lists asked at %lu fight starts\n",warm_calls,warm_sound_reads,
+        sounds_warmed?"done":"not yet",warm_list_calls);
+    {int cap=(int)think_cap.value;
+     if(cap>0)Con_Printf("Think cap: at most %d thinks a frame, more when a fighter would wait over %.2f s (aw_combat_think_cap "
+        "%d); frames capped %lu, think turns held %lu\n",cap,(double)THINK_REACTION,cap,think_frames_capped,thinks_held);
+     else Con_Printf("Think cap: off (aw_combat_think_cap 0: every fighter thinks when its time comes)\n");}
     {int n=0;for(i=0;i<AW_PROJECTILES;i++)n+=shots[i].used;
      Con_Printf("Shots: fired %lu, hit you %lu, missed %lu; in flight %d of %d (%ld bytes)\n",shots_fired,shots_hit,
         shots_missed,n,AW_PROJECTILES,(long)sizeof(shots));}
@@ -2277,7 +2518,7 @@ static void command(void) {
 void AW_CombatInit(void) {
     Cvar_RegisterVariable(&combat_on);Cvar_RegisterVariable(&readout);Cvar_RegisterVariable(&music);
     Cvar_RegisterVariable(&seed_cvar);Cvar_RegisterVariable(&punch_hit);Cvar_RegisterVariable(&think_interval);
-    Cvar_RegisterVariable(&chase_speed);Cvar_RegisterVariable(&slots_cvar);
+    Cvar_RegisterVariable(&chase_speed);Cvar_RegisterVariable(&slots_cvar);Cvar_RegisterVariable(&think_cap);
     Cvar_RegisterVariable(&miss_cvar);Cvar_RegisterVariable(&dice_cvar);Cvar_RegisterVariable(&best_cvar);
     Cvar_RegisterVariable(&block_cvar);aw_combat_buttons=guard_buttons;aw_combat_guard_marker=AW_CombatGuarding;
     aw_combat_input_locked=player_locked;

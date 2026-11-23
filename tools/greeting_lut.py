@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """The NPC voice and greeting table (AWGL2, id1/npc-voices.lut): every NPC record's voice lines and conversation
 greeting, resolved at build time as far as the game's rules are static, for the engine to look up by record
-(NPC-GREETINGS-LIBRARY-MUTE-48; docs/NPC_VOICE_TABLE.md).
+(NPC-GREETINGS-LIBRARY-MUTE-48; docs/NPC_VOICE_TABLE.md). The creatures that have lines get rows too, by a creature's
+rule (CreatureContext; DIALOGUE-CREATURE-SPEAKERS-66).
 
 For every NPC record of Morrowind.esm and every Voice topic of the data (Hello, Idle, Intruder, Thief, Hit, Attack,
 Flee, and any other) plus the conversation greeting (the Greeting 0-9 topics in OpenMW's order), each INFO record
@@ -40,6 +41,7 @@ for _p in (ROOT / 'tools', ROOT / 'src'):
     sys.path.insert(0, str(_p))
 
 import text_defines  # noqa: E402  (the engine's define codes, aw_textdef.c)
+from mwad.dialogue import Context as _Context  # noqa: E402  (the shared filter; CreatureContext below)
 
 MAGIC = b'AWGL'
 VERSION = 2                      # 2: the creature sound rows and the named sound slots (docs/NPC_DEFAULTS.md)
@@ -132,13 +134,14 @@ def topic_infos(kinds, topics, name):
     return [fields for t in greeting_topics(topics, kinds.get('DIAL')) for fields in topics[t]]
 
 
-def home_cells(path, kinds):
+def home_cells(path, kinds, creatures=()):
     """{npc id: cell name} for NPC records placed in exactly one cell (the name the cell filter sees: an interior's
-    name; an exterior cell's own name, else its region's name); NPCs placed in several cells or nowhere are absent."""
+    name; an exterior cell's own name, else its region's name); NPCs placed in several cells or nowhere are absent.
+    CREATURES (creature_speakers()) are looked for the same way."""
     from mwad.audit import cell_data
     from mwad.esm import records, subrecords, text
     seen = {}
-    npcs = kinds['NPC_']
+    npcs = set(kinds['NPC_']) | set(creatures)
     for tag, _flags, raw in records(Path(path).read_bytes()):
         if tag != 'CELL':
             continue
@@ -372,6 +375,147 @@ def rank_without_faction(npc, fields):
     return parsed is not None and not npc['faction'] and not parsed[7] and parsed[1] != -1
 
 
+# ---- creature speakers (DIALOGUE-CREATURE-SPEAKERS-66)
+# The creatures that talk (Almalexia, Vivec, Yagrum Bagarn, the Dagoth brothers, the Glenmoril raven, ...) are creature
+# records (CREA), not NPC records. Both tables give them rows too, sorted with the NPCs' rows (the engine finds a row
+# by its id with one binary search, aw_glut.c AW_GlutFind); only the creatures some line names get a row. The
+# original's rule for a creature speaker (OpenMW 0.51 mwdialogue/filter.cpp, our own code): it says only the INFOs
+# that name its id; on those its race, class, faction and rank filters and the sex are not tested; its disposition
+# is never tested; it has no race, sex or faction, so what reads them has one value; its level, AI settings and
+# script are its record's. The record's type (creature, daedra, undead, humanoid) changes none of it: the filter
+# only asks whether the speaker is an NPC.
+DIAL_JOURNAL = 4                 # a journal dialogue (DIAL type 4) names no actor
+CREATURE_TYPES = ('creature', 'daedra', 'undead', 'humanoid')      # CREA NPDT type 0 .. 3
+# the select functions with one value for every creature (filter.cpp: no sex, race or faction, not a werewolf)
+CREATURE_FIXED = {'SameSex': 0, 'SameRace': 0, 'SameFaction': 0, 'Werewolf': 0, 'PcExpelled': 0,
+                  'FactionRankDifference': 0, 'RankRequirement': 0, 'FacReactionLowest': 0, 'FacReactionHighest': 0}
+
+
+def is_creature(kinds, ident):
+    """True for the id of a creature record that no NPC record shares (an NPC's id always names the NPC)."""
+    return ident not in kinds.get('NPC_', {}) and ident in kinds.get('CREA', {})
+
+
+def creature_speakers(kinds, topics):
+    """[creature id] the actor field (ONAM) of some INFO names, in id_bytes order: the creatures that have lines in a
+    topic, voice, greeting or persuasion dialogue. Every other creature record has no row."""
+    from mwad.esm import text
+    types = kinds.get('DIAL', {})
+    found = set()
+    for name, infos in topics.items():
+        if types.get(name) == DIAL_JOURNAL:
+            continue
+        for fields in infos:
+            actor = text(fields, 'ONAM').casefold()
+            if actor and is_creature(kinds, actor):
+                found.add(actor)
+    return sorted(found, key=id_bytes)
+
+
+def creature_speaker(kinds, ident):
+    """What the filter reads of a creature record, in mwad.dialogue.speaker()'s form: no race, class or faction (rank
+    -1), reputation 0 (filter.cpp: a creature's), its level (NPDT), its AI settings (AIDT) and its script (SCRI);
+    'type' is its record type's name (CREATURE_TYPES)."""
+    from mwad.esm import first, text
+    fields = kinds['CREA'][ident.casefold()]
+    stats = first(fields, 'NPDT')
+    if len(stats) < 8:
+        raise ValueError('Malformed creature NPDT for ' + ident)
+    kind, level = struct.unpack_from('<ii', stats)
+    ai = first(fields, 'AIDT')
+    hello, fight, flee, alarm = struct.unpack_from('<HBBB', ai) if len(ai) >= 5 else (0, 0, 0, 0)
+    return {'id': ident.casefold(), 'race': '', 'class': '', 'faction': '', 'rank': -1, 'level': level,
+            'reputation': 0, 'female': False, 'ai': {'Hello': hello, 'Fight': fight, 'Flee': flee, 'Alarm': alarm},
+            'script': text(fields, 'SCRI').casefold(),
+            'type': CREATURE_TYPES[kind] if 0 <= kind < len(CREATURE_TYPES) else str(kind)}
+
+
+def speaker_of(kinds, ident):
+    """The filter's view of a speaker's record: mwad.dialogue.speaker() for an NPC, creature_speaker() for a creature."""
+    if is_creature(kinds, ident):
+        return creature_speaker(kinds, ident)
+    from mwad.dialogue import speaker
+    return speaker(kinds, ident)
+
+
+class CreatureContext(_Context):
+    """mwad.dialogue.Context for a creature speaker (the rule above): the speaker is creature_speaker(); compile() runs
+    the original's tests in their order with a creature's answers; static() decides the CREATURE_FIXED functions."""
+
+    def __init__(self, kinds, actor_id, cell=None, disposition=50, talked_to=False):
+        from mwad.dialogue import globals_of, script_locals, starting_clothing_value
+        from mwad.esm import text
+        self.npc = creature_speaker(kinds, actor_id)
+        self.globals = kinds.get('_globals')
+        if self.globals is None:
+            self.globals = kinds['_globals'] = globals_of(kinds)
+        script = self.npc['script']
+        source = text(kinds.get('SCPT', {}).get(script, []), 'SCTX') if script else ''
+        self.locals = script_locals(source) if script else None
+        self.cell = cell.casefold() if cell else None
+        self.disposition = disposition
+        self.talked_to = talked_to
+        if '_clothing' not in kinds:
+            kinds['_clothing'] = starting_clothing_value(kinds)
+        self.clothing = kinds['_clothing']
+
+    def static(self, function, variable, op, value):
+        if function in CREATURE_FIXED:
+            from mwad.dialogue import _compare
+            return _compare(CREATURE_FIXED[function], op, value)
+        return _Context.static(self, function, variable, op, value)
+
+    def compile(self, fields):
+        from mwad.dialogue import RUNTIME, _parsed
+        parsed = _parsed(fields)
+        if parsed is None:
+            return None
+        _disposition, _rank, _sex, pcrank, actor, _race, _cls, _faction, pc_faction, cell, rules = parsed
+        # testActor: only the INFOs that name this creature; their race, class, faction and rank filters and the sex
+        # are not tested for a creature
+        if actor != self.npc['id']:
+            return None
+        runtime = []
+        # testPlayer: the player's faction and rank; a rank with no faction named is in the speaker's faction, which a
+        # creature has not: never
+        if pc_faction or pcrank != -1:
+            if not pc_faction:
+                return None
+            runtime.append(('PcFaction', pc_faction, '3', pcrank))
+        if cell:
+            if self.cell is None:
+                runtime.append(('Cell', cell, '0', 1))
+            elif not self.cell.startswith(cell):
+                return None
+        # testSelectStructs
+        for condition in rules:
+            result = self.static(*condition)
+            if result is False:
+                return None
+            if result is RUNTIME:
+                runtime.append(condition)
+        # testDisposition: a creature always passes (no Disposition condition)
+        return runtime
+
+
+def creature_fillable(kinds, ident, line, cell=None):
+    """True when a creature speaker can fill every define of LINE by mwad.dialogue.fill_defines' rule with a creature's
+    values: %Name is its name, %Cell its home cell (CELL); %Class and %Race are an NPC's only and %Faction and %Rank
+    need a faction (OpenMW mwscript/interpretercontext.cpp); a word after '%' that is no define fails as there."""
+    from mwad.dialogue import PLAYER_DEFINES, SPEAKER_DEFINES
+    from mwad.esm import text
+    values = {'name': text(kinds['CREA'][ident], 'FNAM'), 'cell': cell or ''}
+    names = sorted(list(PLAYER_DEFINES) + list(SPEAKER_DEFINES), key=len, reverse=True)
+    at = line.find('%')
+    while at >= 0:
+        rest = line[at + 1:].casefold()
+        key = next((k for k in names if rest.startswith(k)), None)
+        if key is None or (key in SPEAKER_DEFINES and not values.get(key)):
+            return False
+        at = line.find('%', at + 1 + len(key))
+    return True
+
+
 def speaker_entries(kinds, infos, ident, home):
     """[(topic index, INFO index, text, SNAM, run-time conditions)] of one NPC: every INFO of every table topic
     (infos: [[fields]] per topic) it can ever say. The cell test is decided here against the NPC's home cell
@@ -379,20 +523,23 @@ def speaker_entries(kinds, infos, ident, home):
     fails, NotCell passes). A text keeps its defines for the engine (the speaker's from the NPC row, the player's
     from the game), '' when one of them cannot be filled for this speaker (mwad.dialogue.fill_defines: the line
     is then said without text), so NPCs share entries. An INFO that asks for a rank without a faction is never a
-    factionless speaker's (rank_without_faction)."""
+    factionless NPC's (rank_without_faction). A creature speaker (is_creature) is compiled by its own rule
+    (CreatureContext, creature_fillable), never the NPC's."""
     from mwad.dialogue import Context, fill_defines
     from mwad.esm import text
-    context = Context(kinds, ident, cell=home or NO_CELL)
+    creature = is_creature(kinds, ident)
+    context = (CreatureContext if creature else Context)(kinds, ident, cell=home or NO_CELL)
     out = []
     for t, fields_list in enumerate(infos):
         for i, fields in enumerate(fields_list):
-            if rank_without_faction(context.npc, fields):
+            if not creature and rank_without_faction(context.npc, fields):
                 continue
             runtime = context.compile(fields)
             if runtime is None:
                 continue
             line = text(fields, 'NAME')
-            if '%' in line and fill_defines(kinds, ident, line, home) is None:
+            if '%' in line and not (creature_fillable(kinds, ident, line, home) if creature
+                                    else fill_defines(kinds, ident, line, home) is not None):
                 line = ''
             out.append((t, i, line, text(fields, 'SNAM'), tuple(tuple(c) for c in runtime)))
     return out
@@ -444,6 +591,15 @@ def npc_facts(kinds, ident, multiplier, home=None):
                'faction': _display(kinds, 'FACT', npc['faction']),
                'rank': _rank_name(kinds, npc['faction'], npc['rank']), 'cell': home or ''}
     return hello, max(0, min(100, disposition)), npc['rank'] if npc['faction'] else -1, defines
+
+
+def creature_facts(kinds, ident, multiplier, home=None):
+    """npc_facts() of a creature speaker: its Hello distance by the NPCs' rule (OpenMW actors.cpp
+    updateGreetingState greets for every actor), disposition 0 (a creature has none; filter.cpp testDisposition never
+    tests one), rank -1 and no define but the home cell (no class, race or faction; %Name is the entity's name)."""
+    s = creature_speaker(kinds, ident)
+    hello = min(NONE16 - 1, int(round(s['ai']['Hello'] * multiplier * SCALE)))
+    return hello, 0, -1, {'class': '', 'race': '', 'faction': '', 'rank': '', 'cell': home or ''}
 
 
 def fixture_values(kinds):
@@ -747,16 +903,20 @@ def id_bytes(ident):
     return ident.encode('cp1252', errors='replace').lower()
 
 
-def plan_npcs(kinds, homes=None):
-    """([NPC id] in table order (by id_bytes), {id: npc_facts()}, {id: reason left out}). Ids with accented
-    letters (atúlg gro-largúm, yatúr gro-shak) are kept: the strings are Windows-1252 bytes and the engine looks
-    them up with the same bytes (NPC-VOICE-NONASCII-IDS-48)."""
+def plan_npcs(kinds, homes=None, creatures=()):
+    """([speaker id] in table order (by id_bytes), {id: npc_facts() or creature_facts()}, {id: reason left out}):
+    every NPC record and the CREATURES (creature_speakers()), sorted together (the engine's binary search over the
+    rows needs one order, so an NPC's row number moves past a creature's id; nothing keeps a row number). Ids with
+    accented letters (atúlg gro-largúm, yatúr gro-shak) are kept: the strings are Windows-1252 bytes and the engine
+    looks them up with the same bytes (NPC-VOICE-NONASCII-IDS-48)."""
     multiplier = greet_settings(kinds)[0]
     homes = homes or {}
     order, facts, left = [], {}, {}
-    for ident in sorted(kinds['NPC_'], key=id_bytes):
+    ids = list(kinds['NPC_']) + [c for c in dict.fromkeys(creatures) if is_creature(kinds, c)]
+    for ident in sorted(ids, key=id_bytes):
         try:
-            facts[ident] = npc_facts(kinds, ident, multiplier, homes.get(ident))
+            facts[ident] = (creature_facts if is_creature(kinds, ident) else npc_facts)(
+                kinds, ident, multiplier, homes.get(ident))
             order.append(ident)
         except (ValueError, KeyError, struct.error, IndexError) as error:
             left[ident] = str(error)
@@ -772,7 +932,7 @@ def build(kinds, topics, homes=None, resolve=None, masks=None, left=None, sound=
     homes = homes or {}
     names = topic_names(kinds, topics)
     settings = greet_settings(kinds)
-    order, facts, early = plan_npcs(kinds, homes)
+    order, facts, early = plan_npcs(kinds, homes, creature_speakers(kinds, topics))
     left = dict(early, **(left or {}))
     index = {i: n for n, i in enumerate(order)}
     if masks is None:
@@ -792,7 +952,8 @@ def build(kinds, topics, homes=None, resolve=None, masks=None, left=None, sound=
               'sound_table': dict(sound_report, creature_bytes=sum(len(r) for r in t['creatures']),
                                   slot_bytes=2 * len(t['slots']), soun_bytes=sum(len(r) for r in t['soun']),
                                   sounds_with_length=sum(1 for r in t['sounds'] if r[8:10] != b'\0\0')),
-              'npcs': len(t['npcs']), 'sets': len(t['sets']), 'list_sets': len(t['listsets']),
+              'npcs': len(t['npcs']), 'creature_rows': sum(1 for i in keep if is_creature(kinds, i)),
+              'sets': len(t['sets']), 'list_sets': len(t['listsets']),
               'lists': len(t['lists']), 'entries': len(t['entries']), 'conditions': len(t['conds']),
               'sounds': len(t['sounds']), 'globals': len(t['globals']), 'names': len(t['names']),
               'string_bytes': len(t['strings']), 'text_bytes': len(t['texts']),
@@ -828,6 +989,8 @@ def player_voices(kinds, keep, hit_sets):
     from mwad.dialogue import speaker
     groups = {}
     for ident in keep:
+        if is_creature(kinds, ident):
+            continue                     # a creature speaker's lines are its own, never the player's
         try:
             s = speaker(kinds, ident)
         except (ValueError, KeyError, struct.error):
@@ -877,18 +1040,28 @@ def coverage(kinds, keep, masks, left, creature_rows):
     for key, mask in masks.items():
         if key[3]:
             voiced |= mask
-    unmapped = {}
+    unmapped, speakers, speakers_voiced, speakers_left = {}, 0, 0, {}
     for bit, ident in enumerate(keep):
-        if not voiced >> bit & 1:
+        if is_creature(kinds, ident):
+            # a creature speaker's sounds are its creature row's (below); its voiced lines are counted apart: many
+            # of the original's talking creatures have text only
+            speakers += 1
+            speakers_voiced += voiced >> bit & 1
+        elif not voiced >> bit & 1:
             unmapped[ident] = SILENT_BY_DESIGN.get(ident.casefold())
     for ident, reason in left.items():
-        unmapped[ident] = 'left out of the table: ' + str(reason)
+        if is_creature(kinds, ident):
+            speakers_left[ident] = str(reason)
+        else:
+            unmapped[ident] = 'left out of the table: ' + str(reason)
     silent_creatures = {ident: SILENT_BY_DESIGN.get(ident.casefold()) for ident, row in creature_rows
                         if all(p is None for p in row)}
     npcs_total = len(kinds['NPC_'])
     return {'npcs_total': npcs_total, 'npcs_voiced': npcs_total - len(unmapped),
             'creatures_total': len(creature_rows), 'creatures_sounded': len(creature_rows) - len(silent_creatures),
-            'npcs_unmapped': unmapped, 'creatures_unmapped': silent_creatures}
+            'npcs_unmapped': unmapped, 'creatures_unmapped': silent_creatures,
+            'creature_speakers': speakers, 'creature_speakers_voiced': speakers_voiced,
+            'creature_speakers_left': speakers_left}
 
 
 def coverage_line(c):
@@ -898,6 +1071,12 @@ def coverage_line(c):
         c['npcs_voiced'], c['npcs_total'], c['creatures_sounded'], c['creatures_total'],
         ', '.join('%s (%s)' % (i, c['npcs_unmapped'].get(i) or c['creatures_unmapped'].get(i) or 'NO REASON')
                   for i in named) or 'none')
+    if 'creature_speakers' in c:
+        # DIALOGUE-CREATURE-SPEAKERS-66: the creatures with rows of their own lines, how many have a voiced one, and
+        # any left out (named with the reason)
+        line += '; creature speakers %d (%d voiced), left out: %s' % (
+            c['creature_speakers'], c['creature_speakers_voiced'],
+            ', '.join('%s (%s)' % x for x in sorted(c['creature_speakers_left'].items())) or 'none')
     # the sound table's part (a table built with the sound table): creature moments without a sound, named slots
     # whose SOUN record the data lacks, SOUN rows the media stage did not convert; each named
     if 'moments_unmapped' in c:
@@ -923,14 +1102,15 @@ def build_master(path, data=None, jobs=1, resolver=None, media=None):
     from build_parallel import ordered_map
     t0 = time.time()
     kinds, topics = load(path)
-    homes = home_cells(path, kinds)
+    creatures = creature_speakers(kinds, topics)
+    homes = home_cells(path, kinds, creatures)
     names = topic_names(kinds, topics)
-    order, _facts, _left = plan_npcs(kinds, homes)
+    order, _facts, _left = plan_npcs(kinds, homes, creatures)
     index = {i: n for n, i in enumerate(order)}
     size = max(16, len(order) // max(1, jobs * 4))
     chunks = [order[i:i + size] for i in range(0, len(order), size)]
-    print('Voice table: %d NPC records, %d topics (%s), %d units on %d jobs' % (
-        len(order), len(names), ', '.join(names), len(chunks), jobs), flush=True)
+    print('Voice table: %d NPC records and %d creature speakers, %d topics (%s), %d units on %d jobs' % (
+        len(order) - len(creatures), len(creatures), len(names), ', '.join(names), len(chunks), jobs), flush=True)
     masks, left, done = {}, {}, 0
     for out, gone in ordered_map(_chunk, [(str(path), homes, names, index, c) for c in chunks], jobs=max(1, jobs),
                                  cost=lambda task: len(task[4])):

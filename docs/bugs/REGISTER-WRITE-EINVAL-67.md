@@ -2,12 +2,14 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 4 times; something has to be done
+## PERSISTING: reported 6 times; something has to be done
 
 - Reported with v0.0.67-dev2 at 2026-11-18 (time not recorded): Seen again on 2026-11-18 at about 12:37, this time on the save of docs/bugs/bugs.json itself: the report was not saved and the run stopped; the file stayed whole (the open failed before any write) and a second run saved it. A failure in the middle of a write would leave the file cut short, so the tool should write to a temporary file and rename it, and try again on this error.
 - Reported with v0.0.67-dev3 at 2026-11-19 03:27 +0200: Seen again on the v0.0.67-dev3 line: writing the bug list from the shell container failed once with an invalid-argument error; the next write worked and the list was intact.
 - Reported with v0.0.67-dev3 at 2026-11-19 12:25 +0200: Seen again while several jobs wrote the register at the same time: writing a rendered page or the docs index failed with an invalid-argument error; a retry passed.
 - Reported with v0.0.68 at 2026-11-20 12:19 +0200: Seen again while two jobs wrote the register: writing an archive file of the bug list failed with an invalid-argument error after the new entry had been written, and the intake reported that nothing was written; the entry was there without its work-list item until it was added by hand.
+- Reported with v0.0.68-dev8 at 2026-11-23 08:42 +0200: Seen again on 23 November 2026: the register tool stopped twice with the same error while writing other files after a new entry; the first time only the new page was left, the second time the entry was saved without its work item, which was then added.
+- Reported with v0.0.68-dev9 at 2026-11-23 13:16 +0200: Twice more today a register page write failed with an invalid argument error in the middle of a filing, leaving the entry without its plan item until it was finished by hand.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -41,13 +43,15 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-19 03:27 +0200: seen again in v0.0.67-dev3: Seen again on the v0.0.67-dev3 line: writing the bug list from the shell container failed once with an invalid-argument error; the next write worked and the list was intact.
 - 2026-11-19 12:25 +0200: seen again in v0.0.67-dev3: Seen again while several jobs wrote the register at the same time: writing a rendered page or the docs index failed with an invalid-argument error; a retry passed.
 - 2026-11-20 12:19 +0200: seen again in v0.0.68: Seen again while two jobs wrote the register: writing an archive file of the bug list failed with an invalid-argument error after the new entry had been written, and the intake reported that nothing was written; the entry was there without ...
+- 2026-11-23 08:42 +0200: seen again in v0.0.68-dev8: Seen again on 23 November 2026: the register tool stopped twice with the same error while writing other files after a new entry; the first time only the new page was left, the second time the entry was saved without its work item, which ...
+- 2026-11-23 13:16 +0200: seen again in v0.0.68-dev9: Twice more today a register page write failed with an invalid argument error in the middle of a filing, leaving the entry without its plan item until it was finished by hand.
 
 <!-- END GENERATED TIMELINE -->
 
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
+- [PERSISTING: reported 6 times; something has to be done](#persisting-reported-6-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Bugs in the same category](#bugs-in-the-same-category)
 
@@ -96,6 +100,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [CI-SUITE-TWICE-33](CI-SUITE-TWICE-33.md): Hosted CI runs the full test suite twice per revision
 - CI-TAG-RUN-DUPLICATE-54 (no report page): The release tag push ran the whole CI test suite again on a commit main had already passed
 - [CI-TEST-SHARD-ONE-SLOW-53](CI-TEST-SHARD-ONE-SLOW-53.md): The first test shard of the v0.0.53 GitHub run took six times as long as the others
+- [COMPLETENESS-PLAN-TOWN-CELLS-MISSING-68](COMPLETENESS-PLAN-TOWN-CELLS-MISSING-68.md): The plan-time completeness report counts the 61 cells inside the towns' frames and their 556 load doors as missing, which would refuse a release candidate
 - [CONTAINER-READ-ENOMEM-66](CONTAINER-READ-ENOMEM-66.md): In the development container, reads of the repository files sometimes fail with "Cannot allocate memory"; a retry works, so a check that hits it can report an unrelated failure
 - [DELIVERY-LEAVES-LINE-UNCLEAN-66](DELIVERY-LEAVES-LINE-UNCLEAN-66.md): A snapshot delivery wrote the cell tracker page into the release line's working copy, so the line's next gate was not clean and could not be published
 - [DELIVERY-RERUN-STOPS-ON-OWN-OUTPUT-66](DELIVERY-RERUN-STOPS-ON-OWN-OUTPUT-66.md): A second delivery of a snapshot stopped on what the first one left: its source package folder, then its Pi image, reported as a failed upload although the upload had gone through
@@ -103,6 +108,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [DOCS-PUBLIC-CHAT-QUOTES-56](DOCS-PUBLIC-CHAT-QUOTES-56.md): Public bug pages and code comments carried the maintainer's chat words and swearing
 - [DOCS-PUBLIC-PRIVATE-CHANNEL-66](DOCS-PUBLIC-PRIVATE-CHANNEL-66.md): Public register text, code comments and test data named the private channel a report came through
 - [DOCS-REGENERATE-ALL-MISSING-67](DOCS-REGENERATE-ALL-MISSING-67.md): A change that touches the bug register leaves several generated documents stale, and the checks find them one at a time: each full test run fails on the next stale page
+- [DOOR-CHECK-DOORWAY-STAGES-68](DOOR-CHECK-DOORWAY-STAGES-68.md): The door check lets the first door of a doorway answer for every door the scripts switch between there: three entrances counted as not usable both ways
 - [DOOR-CHECK-NO-SWIM-CASE-68](DOOR-CHECK-NO-SWIM-CASE-68.md): The build's door check has no case for an entrance reached by swimming: the Stahlman's Gorge entrance under the Mortrag Glacier stops the image stage
 - DOOR-ENTRANCE-AUDIT-51 (no report page): Requested: an entrance check in every build: each exterior entrance of the original must have a door that leads into its interior, found from the map, missing ones listed
 - EMULATOR-SESSION-BESIDE-SMOKE-53 (no report page): A scripted FS-UAE evidence session ran beside a gate boot smoke (one emulator at a time)
@@ -148,7 +154,9 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - PREGATE-SYNTAX-SKIP-SILENT-57 (no report page): The pre-gate C syntax check skipped itself without failing on worktrees in the per-version folder layout
 - [PREGATE-WORDING-ERRORS-HIDDEN-68](PREGATE-WORDING-ERRORS-HIDDEN-68.md): The pregate's public wording step refused a gate with four test errors and printed no error text; the same tests passed on a rerun
 - [PUBLIC-GUARD-SPELLS-TOOL-NAMES-67](PUBLIC-GUARD-SPELLS-TOOL-NAMES-67.md): The public privacy check spells the private words it refuses, split in pieces, in its own code
+- [PUBLIC-PROGRESS-SNAPSHOT-STALE-68](PUBLIC-PROGRESS-SNAPSHOT-STALE-68.md): The public progress tracker still counts Solstheim's land as not in the game, while the build's own tracker counts all of it as built
 - [README-REST-LEVELUP-CONDITIONS-68](README-REST-LEVELUP-CONDITIONS-68.md): The front page states the level-up on resting and the attacks on a rest as if they always happen, without their conditions
+- [REGISTER-FIXED-STEP-STALE-PAGES-68](REGISTER-FIXED-STEP-STALE-PAGES-68.md): Recording a fix in both trackers wrote the work list but refused the bug register while another job was writing the register at the same moment
 - [REGRESSION-GUARD-MISSING-67](REGRESSION-GUARD-MISSING-67.md): Things the maintainer had confirmed working in play come back broken in later builds: no check kept them proven after their fix
 - [RELEASE-CHECK-NOTES-LATE-66](RELEASE-CHECK-NOTES-LATE-66.md): The release check of the notes' core-use claims ran only when the snapshot package was made, after the build and its play tests, and read a sentence about allowed workers as a claim
 - [RELEASE-CONNECT-STEP-SKIPPED-53](RELEASE-CONNECT-STEP-SKIPPED-53.md): After v0.0.52 and v0.0.53 were published the release's connect-it-fully step was skipped: the pinned previous release and the size baseline stayed at v0.0.51
@@ -168,6 +176,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [SESSION-ENGINE-NOT-A-FILE-67](SESSION-ENGINE-NOT-A-FILE-67.md): An emulator session given an engine path that is not a file runs the image with no engine and waits 320 s for the remote control, instead of refusing at once
 - [SESSION-PASS-DEAD-ENGINE-57](SESSION-PASS-DEAD-ENGINE-57.md): The scripted test session reported PASS while the engine had crashed
 - [SESSION-SAME-JOB-NAME-CLASH-68](SESSION-SAME-JOB-NAME-CLASH-68.md): A second emulator session with the same job name fails to start on the container name, and its journey reports every check failed
+- [SESSION-SLOT-HELD-WHILE-WAITING-68](SESSION-SLOT-HELD-WHILE-WAITING-68.md): A test session that waits for another emulator run holds an emulator slot meanwhile, and a gate's smoke waits for it
 - [SESSION-STALL-CENSUS-QUICKSTART-58](SESSION-STALL-CENSUS-QUICKSTART-58.md): On the v0.0.58-dev6 image a session that quick-starts into the Census and Excise Office at 135 172 64 stalls before its first still: the runner reports game stalled with the game clock frozen at 23.23 s
 - [SESSION-STALL-EMPTY-STATE-READ-67](SESSION-STALL-EMPTY-STATE-READ-67.md): A scripted test session ends as a game stall when one read of the game's state comes back empty, although the game runs on
 - [SMOKE-DELIVERY-OLD-COPY-58](SMOKE-DELIVERY-OLD-COPY-58.md): The playtest delivery ran an old copy of the boot smoke: the v0.0.58 release smoke failed four times on a working image

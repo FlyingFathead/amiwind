@@ -246,6 +246,7 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - [CHIMPORT-RETRY-LAVA-STALE-SOURCE-36](CHIMPORT-RETRY-LAVA-STALE-SOURCE-36.md): CHIMport --retry-failed cannot rerun a lava cell of the island run: its stored source stage predates the lava conversion
 - [CHIMPORT-SEABED-NO-ISLAND-42](CHIMPORT-SEABED-NO-ISLAND-42.md): Seabed cells measured as empty sea lose their island in the tracker: they drop out of the published reference and the build calls them unknown
 - [COMBAT-PURSUIT-SLOPE-STALL-46](COMBAT-PURSUIT-SLOPE-STALL-46.md): A pursuer stops on a walkable slope: an actor step was refused when it moved more than a stair height along the slope
+- [EXPANSION-STORE-DISABLE-NOT-HIDDEN-68](EXPANSION-STORE-DISABLE-NOT-HIDDEN-68.md): In the expansions' outdoor areas a placement a script switches off stays drawn and solid: the ice covers in front of the underwater entrances to Stahlman's Gorge and the Caves of Fjalding stay in place after their quest stage
 - [IMAGE-FORMATS-CHIM-ROOMS-48](IMAGE-FORMATS-CHIM-ROOMS-48.md): The payload preflight stops a CHIM rooms build: the image step does not know the room store and room record formats
 - [IMAGE-ROOM-MAPS-ENGINE-REFUSED-48](IMAGE-ROOM-MAPS-ENGINE-REFUSED-48.md): Every CHIM room is refused at its door and the game hangs on Loading: the engine accepts a .chim map only with a CHIM frame key
 - [IMAGE-ROOM-MAPS-FINGERPRINT-48](IMAGE-ROOM-MAPS-FINGERPRINT-48.md): A CHIM rooms build stops at the content fingerprint: it requires maps/<room>.bsp after the room became maps/<room>.chim

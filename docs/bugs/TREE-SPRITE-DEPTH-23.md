@@ -70,6 +70,7 @@ Not recorded.
 
 Family: Rendering cost and visibility (`render-performance`). Read the visibility data and renderer counters before any performance claim. See [families](README.md#families).
 
+- [AMBIENT-SOUND-READ-IN-FRAME-68](AMBIENT-SOUND-READ-IN-FRAME-68.md): In a fight, one play frame stalled for half a second while an ambient sound and fight data were read from disk
 - [AW-20260928-07](AW-20260928-07.md): Slow opening exterior / excessive residency
 - [CHIM-MODEL-FENCE-FACES-64](CHIM-MODEL-FENCE-FACES-64.md): CHIM model faces cannot be alpha-tested, so crossed tree panels cannot be drawn as model variants
 - [CHIM-SLOWCPU-FRAMETIME-33](CHIM-SLOWCPU-FRAMETIME-33.md): Balmora on CHIM runs at about 1 frame per second on a slow 68040 (cycle-exact emulation)

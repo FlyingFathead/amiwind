@@ -163,7 +163,11 @@ def bake(data, palette, meshes, out_id1, jobs=1, method=DEFAULT_METHOD, bipedal=
         len(tasks), cached, actor_units.CREATURE_CACHE, len(tasks) - cached), flush=True)
     if whole_tasks:
         entry = ((creature_whole.__file__, 'unit'),)
-        whole_cache = actor_units.open_cache(actor_units.CREATURE_CACHE, entry, pass_cache.source_digest(*entry),
+        # the digest's script written out, not through `entry`: the reuse check reads it from the source and counts this
+        # cache's units for the plan (a starred variable left it unreadable, and the check stopped the actor library
+        # whenever the stage rebuilt: BUILD-UNIT-KEYS-REACH-64)
+        whole_cache = actor_units.open_cache(actor_units.CREATURE_CACHE, entry,
+                                             pass_cache.source_digest((creature_whole.__file__, 'unit')),
                                              pass_cache.previous_digests(*entry), pass_cache.covered_lines(*entry))
         more, more_cached = actor_units.bake_creatures(
             whole_tasks, jobs, whole_cache, lambda task: actor_units.creature_inputs(task, palette_sha256),

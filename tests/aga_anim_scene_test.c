@@ -11,6 +11,7 @@
 server_t sv;server_static_t svs;client_static_t cls;client_state_t cl;
 char *pr_strings;double realtime;
 void (*aw_combat_voice)(edict_t *,int);
+int (*aw_combat_sound_warm)(const char *path);
 static char strings[256];
 static model_t world,base,mover;
 static int loaded,freed,layouts;

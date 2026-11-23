@@ -186,6 +186,23 @@ class ReleaseLibraryRows(unittest.TestCase):
     }
     RACER = {'extent': [1.0, 0.99, 1.0], 'girth': {'Tri CliffRacer 2': 0.87, 'Tri CliffRacer 1': 0.94}, 'hull': 1.0,
              'open': 0, 'seam_gap': 0.0, 'seam_open': 0.0, 'lost': []}
+    # the werewolf form (Bloodmoon's wolf/skin.nif, the body the werewolf model is made from; no model of it is built
+    # yet): the welded reduction measured at 662 and 902 triangles fails, the first by lost claws and stick feet, the
+    # second only by its head standing off the chest (a join open); it passes from 942
+    WEREWOLF = {
+        'wolf/skin.nif at 662': {'extent': [1.0, 1.0, 1.0], 'girth': {'bip01 l foot': 0.0}, 'hull': 0.829, 'open': 0,
+                                 'seam_gap': 0.0, 'seam_open': 0.0,
+                                 'lost': ['Tri Chest 4', 'Tri Chest 4 #2', 'Tri Chest 6 #2', 'Tri Chest 6 #3']},
+        'wolf/skin.nif at 902': {'extent': [1.0, 1.0, 1.0], 'girth': {'bip01 head': 0.81}, 'hull': 0.99, 'open': 0,
+                                 'seam_gap': 0.38, 'seam_open': 0.17, 'seam_gap_at': 'Tri Chest 2 / Tri B_N_Werewolf_Head 0',
+                                 'lost': []},
+    }
+
+    def test_the_werewolf_body_with_its_head_off_the_chest_fails(self):
+        for key, row in self.WEREWOLF.items():
+            with self.subTest(model=key):
+                self.assertTrue(H.problems(row), key)
+        self.assertIn('seam open', '; '.join(H.problems(self.WEREWOLF['wolf/skin.nif at 902'])))
 
     def test_every_broken_row_fails(self):
         for key, row in self.ROWS.items():

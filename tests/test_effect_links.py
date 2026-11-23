@@ -222,6 +222,55 @@ class ScriptedPlacements(unittest.TestCase):
             got = L.check(im.id1, {}, world, links=rows, scripted=lone)
             self.assertEqual(got['scripted targets with no CHIM piece and no entity'], ['105 lone_piece (-5, -5)'])
 
+    def test_an_expansion_piece_of_a_store_of_frames_gets_its_row_under_its_stable_id(self):
+        # EXPANSION-STORE-DISABLE-NOT-HIDDEN-68: Solstheim's store of frames numbers Bloodmoon's ice cover in front of
+        # Stahlman's Gorge (act_bm_snowdoor4, its own number 33009) as the merged master does, 2 x 2**22 + 33009; the
+        # scripted placements key it by its stable id, 2 x 2**20 + 33009. Before, the two were compared as they are and
+        # no piece of an expansion's store ever got a row, so its script's Disable hid nothing.
+        from ref_identity import stable_ref
+        ice = stable_ref('Bloodmoon.esm', 33009)
+        merged = (2 << 22) + 33009
+        self.assertEqual((ice, merged), (2130161, 8421617))
+        scripted = {ice: {'id': 'act_bm_snowdoor4', 'master': 'Bloodmoon.esm', 'interior': False, 'cell': (-27, 26),
+                          'position': (-219465.0, 217321.0, -1917.0), 'flames': False}}
+        layer = {'frames': [(0, {'cell': (-27, 26)}, [{'owned': [{'pid': 77, 'ref': merged},
+                                                                 {'pid': 78, 'ref': (1 << 24) | merged}]}])],
+                 'models': []}
+        self.assertEqual(L.place_links(layer, scripted), [(77, ice), (78, ice)])
+        self.assertEqual(L.placement_ref(merged), ice)
+        self.assertEqual(L.placement_ref(225480), 225480)               # a base game number: both forms
+        with Image({}) as im:
+            rows = L.area_rows(im.id1, None, {}, scripted, layers=[layer])
+            self.assertEqual(rows, {L.area_key(scripted[ice]): [(L.KIND_PLACE, 0, 77, ice),
+                                                                (L.KIND_PLACE, 0, 78, ice)]})
+            got = L.check(im.id1, {}, None, links=rows, scripted=scripted, layers=[layer])
+        self.assertEqual(got['scripted exterior placements'], 2)
+        self.assertEqual(got['scripted targets with no CHIM piece and no entity'], [])
+
+    def test_the_engine_hides_a_row_by_a_reference_in_either_form(self):
+        # EXPANSION-STORE-DISABLE-NOT-HIDDEN-68: the row holds the stable id; a script's Disable names the reference by
+        # the merged number (its instance's binding), a take by the stable id: the engine's match and the area-load
+        # apply take both, by the same conversion as chim_room.c RoomRefIs and tools/ref_identity.py
+        inv = (SRC / 'aw_inventory.c').read_text(encoding='latin-1')
+        self.assertIn('static unsigned ref_stable(unsigned r){return r>=(1u<<22) && r<(3u<<22)?((r>>22)<<20)|'
+                      '(r&0x3FFFFFu):r;}', inv)
+        self.assertIn('static unsigned ref_merged(unsigned r){return r>=(1u<<20) && r<(3u<<20)?((r>>20)<<22)|'
+                      '(r&0xFFFFFu):r;}', inv)
+        self.assertIn("if(r[0]=='P' && ref_stable((unsigned)focus_u32(r+8))==stable)", inv)
+        self.assertIn('if(AW_ObjectDisabled(ref) || (ref_merged(ref)!=ref && AW_ObjectDisabled(ref_merged(ref))))', inv)
+        from ref_identity import stable_ref
+
+        def c_stable(r):
+            return ((r >> 22) << 20) | (r & 0x3FFFFF) if (1 << 22) <= r < (3 << 22) else r
+
+        def c_merged(r):
+            return ((r >> 20) << 22) | (r & 0xFFFFF) if (1 << 20) <= r < (3 << 20) else r
+        for master, number in (('Morrowind.esm', 225480), ('Tribunal.esm', 2001), ('Bloodmoon.esm', 33009),
+                               ('Bloodmoon.esm', 33635)):
+            stable = stable_ref(master, number)
+            merged = (['Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm'].index(master) << 22) + number
+            self.assertEqual((c_stable(merged), c_stable(stable), c_merged(stable)), (stable, stable, merged))
+
     def test_a_district_piece_goes_into_its_presented_cell(self):
         # Mournhold's districts (MOURNHOLD-EXTERIOR-CELLS-66): an interior cell the build presents outdoors; its pieces
         # are in the store of frames (a layer world) and their rows in the area of the presented block's cell

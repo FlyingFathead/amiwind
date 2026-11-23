@@ -1,6 +1,6 @@
 # Combat and the Vivec Arena minigame
 
-_Last updated with AmiWind v0.0.68 (22 November 2026)._
+_Last updated with AmiWind v0.0.68 (23 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -14,6 +14,7 @@ _Last updated with AmiWind v0.0.68 (22 November 2026)._
 - [Ordinary weapons and creatures that resist them (v0.0.61)](#ordinary-weapons-and-creatures-that-resist-them-v0061)
 - [Weapons, stances and the debug menus (v0.0.61)](#weapons-stances-and-the-debug-menus-v0061)
 - [Spells, enchanted weapons and theft in a fight (v0.0.61)](#spells-enchanted-weapons-and-theft-in-a-fight-v0061)
+- [The werewolf's claws (v0.0.68)](#the-werewolfs-claws-v0068)
 - [Two-handed weapons](#two-handed-weapons)
 - [Cost on a 68040](#cost-on-a-68040)
 - [Known limits](#known-limits)
@@ -523,6 +524,39 @@ message text the image carries.
   weapon and casts the best from that spell's range, with its spellcast animation
   ([MAGIC_EFFECTS.md](MAGIC_EFFECTS.md), "Characters cast too"). `dbg combat spells off` keeps them to their weapons.
 
+## The werewolf's claws (v0.0.68)
+
+A werewolf fights as in the original: with its claws only (NPC-WEREWOLF-FIGHTS-ARMED-68 in the bug register). This
+holds for the player in werewolf form and
+for every character a script turns (the Skaal hunt, the wild hunt, the maze of Mortrag Glacier, the ceremony in the
+Tombs of Skaalara, the wilderness werewolves).
+
+- **No weapon, no shield, no armour.** The change of form takes every item off, so the werewolf strikes hand to hand
+  with its own Hand-to-hand skill, never blocks with a shield and is unarmoured (its Unarmored skill counts). It carries
+  no load.
+- **No spells and no magic items.** A werewolf weighs no spell and casts none, and it never weighs fleeing by the Flee
+  rating; it still runs from a place it cannot reach. A cast under way when the change comes is put away. The player in
+  werewolf form cannot ready magic (the console says "Ready magic: a werewolf casts nothing."); the game's own refusal
+  message is not in the image yet.
+- **The claws' damage.** A claw blow is health damage, never fatigue: Hand-to-hand x (fMinHandToHandMult + the swing's
+  strength x (fMaxHandToHandMult - fMinHandToHandMult)) x the global WerewolfClawMult x fHandtoHandHealthPer, then the
+  victim's armour as any blow. WerewolfClawMult is a global of the game's scripts, read at every blow: 25 at the start,
+  35 after the Dream of Hircine (25 when a game has no such global). With the original settings a werewolf of skill 100
+  strikes up to 125 health at full strength. The attack type is a random one, as for any hand-to-hand fighter.
+- **Its own form again.** At UndoWerewolf in the middle of a fight the character takes up its own weapon, shield and
+  armour again and weighs its spells again.
+- **Against a werewolf.** A character below iWereWolfLevelToAttack that faces a werewolf, the player in that form or a
+  turned character, rates fleeing by iWereWolfFleeMod; a fleeing actor turns to fight again once the werewolf is within
+  its attack distance, fCombatDistance x (1 + fCombatDistanceWerewolfMod) (0.3 when the image has no such setting).
+- `dbg combat` prints the werewolves in the fights, how many turned or changed back during a fight, the claw blows, the
+  claws' multiplier and the attack distance; `dbg werewolf` prints the multiplier and where it comes from.
+
+Rules from OpenMW 0.51, read and not copied: `mechanicsmanagerimp.cpp` setWerewolf, `aicombataction.cpp`
+prepareNextAction, vanillaRateFlee and getMaxAttackDistance, `combat.cpp` getHandToHandDamage, `npc.cpp`
+getEncumbrance, the player controls' ToggleSpell. Cost: about 48 bytes more per fight slot (what a turned character
+held, given back at UndoWerewolf), one bit test per think for a character not turned, one name lookup of the global at
+the change of form; no read in a fight's frame.
+
 ## Two-handed weapons
 
 As in the original, the weapon's type decides: two-handed long blades, two-handed close and wide blunt weapons
@@ -574,6 +608,30 @@ plus the step's own moves) and per frame only the animation frame. Nothing
 runs while nobody is hostile except the player's fatigue return; the punch is
 followed only from the moment the attack button is pressed. `dbg combat`
 prints the measured thinks, traces, time per think and bytes.
+
+Measured in the game with six fighters a greeting starts at the player at once (v0.0.68-dev8, the 68040 preset, 32 MB
+Fast RAM): 40 to 45 thinks a second, 0.3 to 0.5 ms a think on average, single thinks of 80 and 111 ms, and one frame
+that spent 297 ms in the combat layer during the fight, most of it outside the thinks. The frame the six started in
+stayed under half a second. To name such a frame, `dbg combat` prints since v0.0.68 the worst frame of the encounter
+with its parts (the thinks, the blows landing, the casts leaving, the player's own part, the music's switch, and the
+animation with the held items), the worst think with its fighter, and the worst frame of fight starts (the sheets read
+and the fighters engaged), each with the time it waited for the disk.
+
+Fighters started in the same moment think in the same frame from then on. The setting `aw_combat_think_cap` N (not
+saved; 0, the default, is off) lets at most N fighters think in one frame, in turn; the share grows when a fighter
+would otherwise wait longer than the original's reaction time of a quarter of a second, and the swings, the casts and
+the animation run every frame either way. It stays off until the comparison in the game is recorded here.
+
+What a blow reads from disk is read before the blows. A blow asks for about seven magic effects of each of its two
+fighters (the hit chance and the resistance to normal weapons), and each answer includes the fighter's always-acting
+abilities, which are read from the actor table. Each actor's list is read once and kept (24 actors, about 2.2 KiB;
+read again when a script changes the list or a game loads), and a fight's start reads its fighter's and the player's
+list, so no blow reads them. The fight's own sounds (the ten of `combat/settings.txt`) are loaded with the area's first
+fighter sheet, during the area load, and looked at again at every fight's start. A voice line found in the voice pool
+once is not looked up on disk again. `dbg combat` prints a "Before the blows" line with these counts. Measured before
+the change (v0.0.68-dev9, six fighters attacking the player, 32 MB Fast RAM, the default emulator preset): the worst
+fight frames were 219 ms and 296 ms, nearly all of it disk wait inside the blows. Still read in the frame it is first
+said: a fighter's voice line (one file).
 
 Disk: combat/actors.txt (about 490 KB, every NPC record, read one letter's
 rows per lookup), combat/settings.txt, ten sounds (about 40 KB), the creatures'

@@ -28,6 +28,7 @@
 #include "aw_travel.h"
 #include "aw_clock.h"
 #include "aw_inventory.h"
+#include "aw_were_rules.h"   /* the werewolf robe is never traded (WEREWOLF-BODY-63) */
 #include "aw_listbox.h"
 #include "aw_statswin.h"
 #include "aw_tryalloc.h"
@@ -902,6 +903,7 @@ static void barter_open(int page){
     n=page==4?AW_MwscriptStock(speaker_record,speaker_reference,wares,WARE_ROWS):AW_MwscriptPlayerWares(wares,WARE_ROWS);
     for(i=0;i<n;i++){
         if(!trades(wares[i].category,wares[i].enchanted))continue;
+        if(AW_WERE_ROBE_ID(wares[i].id))continue;   /* WEREWOLF-BODY-63: never sold or bought (class.cpp showsInInventory) */
         wares[k]=wares[i];
         ware_price[k]=AW_DialBarterOffer(&table,wares[k].value,page==4,&player,&npc,disposition);
         Q_snprintf(ware_label[k],64,"%s (%d) - %d%s",wares[k].name,wares[k].count,ware_price[k],T(AW_DIAL_TEXT_GP,"gp"));

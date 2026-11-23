@@ -1,97 +1,31 @@
 {
   "format": "aw-door-check-known-1",
-  "about": "Exterior entrances the door engine check (tools/door_engine_check.py, the wall traced in the CHIM world's own collision) still cannot reach, each with its measured reason and register class. A whole-world image fails on any unreachable entrance not listed here (every entrance of the original is reachable or a known case, never dropped); a listed entrance the check reaches again is named under known_passing and leaves the list. v0.0.54 (DOOR-USE-COLLISION-FILLED-53): the v0.0.54-dev2 world rebuild (decision (b): plate bevels everywhere, the standing-room rule for the Redoran guard tower, door detail tiles) reached 25 of v0.0.53's 35; 10 Daedric shrine entrances (ex_dae_ruin_entry.max) still had no standing spot, because plate bevels alone leave the entry's steps filled. The entry then joined config/collision-standing-room.json, measured offline on the dev2 frames to clear all 10; they were listed here for the dev2 image and left the list with that change. One stays: the shipwreck's upper trapdoor.",
+  "about": "Exterior entrances the door engine check (tools/door_engine_check.py, the wall traced in the CHIM world's own collision) still cannot reach, or that play has not yet shown used, each with its measured reason and register class. A whole-world image fails on any unreachable entrance not listed here (every entrance of the original is reachable or a known case, never dropped); a listed entrance the check reaches is named under known_passing and leaves the list once play shows it used. v0.0.54 (DOOR-USE-COLLISION-FILLED-53): the v0.0.54-dev2 world rebuild (decision (b): plate bevels everywhere, the standing-room rule for the Redoran guard tower, door detail tiles) reached 25 of v0.0.53's 35; 10 Daedric shrine entrances (ex_dae_ruin_entry.max) still had no standing spot, because plate bevels alone leave the entry's steps filled. The entry then joined config/collision-standing-room.json, measured offline on the dev2 frames to clear all 10; they were listed here for the dev2 image and left the list with that change. v0.0.68 (DOOR-USE-COLLISION-EXPANSIONS-68, DOOR-CHECK-NO-SWIM-CASE-68): of the 14 entrances of Solstheim and Mournhold listed since v0.0.68-dev4 and dev8, six (five ice caves and the Caverns of Karstaag, doors set into a slope) are reached from the floor their way out leads onto and were walked up to and entered in play on the v0.0.68-dev8 image (FS-UAE, 32 MB Fast, 23 November 2026); they left the list. Two more left it with the dive session on the same image (the swim fix's engine, 23 November 2026): Rimhull's well (8396936), locked with key_Lassnr_well as in the original, entered with its key from the check's spot on the way in; Mournhold's ladder to Bamz-Amschend (4218838), which its own script keeps switched off until the quest An Attack on Mournhold, entered at that stage from inside its frame and from its walk-out arrival in mh0004, whose bank holds the ladder too (a border copy: the check now counts the cores of the frames holding such a copy). Three more left it with the swim rule turned on by default (the swimming session on the same image with the gated engine of 4974f47ac, 23 November 2026): the Unmarked Shipwreck's trapdoor (225480), the Caves of Fjalding (8409047) and Stahlman's Gorge (8420566), each entered by swimming down to it once its quest stage had removed the ice in front of it. The others stay with their play result: each is an entrance the player cannot use yet, or one play has not reached.",
   "class": "DOOR-USE-COLLISION-FILLED-53",
   "entrances": {
-    "225480": {
-      "id": "ex_de_ship_trapdoor",
-      "place": "Unmarked Shipwreck, Upper Level (cell -15,14)",
-      "class": "CHIM-STAIR-METHOD1-UNFIXED-48",
-      "reason": "The trapdoor lies on the tilted deck of ex_de_shipwreck (a placement tilted about 20 degrees); the deck's collision there is steeper than the walk (normal z 0.62 under 0.69), so no player stands at the trapdoor. The shipwreck is on config/stair-check-known.json (method 1 cannot fix its flights yet); neither new rule changes it (measured). Whether the original stands a player there (the trapdoor's own collision, OpenMW's 46-degree slope) is still to check."
-    },
-    "4218838": {
-      "id": "Ex_MH_Pav_Ladder_01",
-      "place": "Mournhold: the ladder to Bamz-Amschend, Hearthfire Hall (cell -3,-30)",
-      "class": "DOOR-USE-COLLISION-EXPANSIONS-68",
-      "reason": "No standing spot at the ladder within 80 units above its threshold in the district frame's own collision (measured on the v0.0.68-dev4 world, the first image whose districts the check walks). What fills the threshold is not traced yet."
-    },
-    "8396936": {
-      "id": "ex_r_trapdoor_01",
-      "place": "Solstheim, Rimhull: the trapdoor (cell -21,25)",
-      "class": "DOOR-USE-COLLISION-EXPANSIONS-68",
-      "reason": "The trapdoor's use box (2.8 units thin) is out of the use reach from every standing spot the check tries: 82 units (measured on the v0.0.68-dev4 world). Where a player stands at it is not traced yet."
-    },
     "8399605": {
       "id": "Ex_colony_door05b_4",
       "place": "Raven Rock, Factor's Estate (cell -24,19)",
       "class": "DOOR-USE-COLLISION-EXPANSIONS-68",
-      "reason": "No standing spot at the door within 80 units above its threshold (measured on the v0.0.68-dev4 world). The building belongs to a later stage of the colony; the frame holds the collision of every stage at once, which may be what fills the threshold: to measure with only the door's own stage."
+      "reason": "The door and its building are shown only at colony state 35; the frame holds every stage's collision at once, and a tree and the construction stage of the earlier states fill the spots in front of it (the walk-out arrival 55 units off). The check's stage rule (a selectable method, off until play shows it) reaches it at state 35. In play on the v0.0.68-dev8 image not judged: the console has no command to set the colony's state."
     },
     "8399658": {
       "id": "Ex_colony_door03_1_uryn",
       "place": "Raven Rock, Uryn Maren's House (cell -25,19)",
       "class": "DOOR-USE-COLLISION-EXPANSIONS-68",
-      "reason": "The door's use box is out of the use reach from every standing spot the check finds: 86 units (measured on the v0.0.68-dev4 world). The building belongs to a later stage of the colony; the frame holds the collision of every stage at once: to measure with only the door's own stage."
+      "reason": "The door is shown from colony state 3; the construction stage of states 1 and 2 and the rocks of the ground before the colony fill the spots in front of it, and its walk-out arrival lies in the collision of the finished house. The check's stage rule (off until play shows it) reaches it at state 3. In play on the v0.0.68-dev8 image not judged: the console has no command to set the colony's state."
     },
     "8402954": {
       "id": "BM_kartaag_Door",
       "place": "Solstheim, Castle Karstaag, Throne Room (cell -24,26)",
       "class": "DOOR-USE-COLLISION-EXPANSIONS-68",
-      "reason": "No standing spot at the door within 80 units above its threshold in the frame's own collision (measured on the v0.0.68-dev4 world). What fills the threshold is not traced yet."
-    },
-    "8406659": {
-      "id": "BM_KA_door_dark",
-      "place": "Solstheim, Kolfinna's Dwelling (cell -21,19)",
-      "class": "DOOR-USE-COLLISION-EXPANSIONS-68",
-      "reason": "No standing spot at the ice cave door within 80 units above its threshold in the frame's own collision (measured on the v0.0.68-dev4 world); one of seven entrances with this door model. What fills the cave mouth is not traced yet."
-    },
-    "8407976": {
-      "id": "BM_KA_door_dark",
-      "place": "Solstheim, Halls of Penumbra (cell -22,19)",
-      "class": "DOOR-USE-COLLISION-EXPANSIONS-68",
-      "reason": "No standing spot at the ice cave door within 80 units above its threshold in the frame's own collision (measured on the v0.0.68-dev4 world); one of seven entrances with this door model. What fills the cave mouth is not traced yet."
-    },
-    "8409047": {
-      "id": "BM_KA_door_dark",
-      "place": "Solstheim, Caves of Fjalding (cell -20,23)",
-      "class": "DOOR-USE-COLLISION-EXPANSIONS-68",
-      "reason": "No standing spot at the ice cave door within 80 units above its threshold in the frame's own collision (measured on the v0.0.68-dev4 world); one of seven entrances with this door model. What fills the cave mouth is not traced yet."
-    },
-    "8409052": {
-      "id": "BM_KA_door_dark",
-      "place": "Solstheim, Castle Karstaag, Caverns of Karstaag (cell -24,27)",
-      "class": "DOOR-USE-COLLISION-EXPANSIONS-68",
-      "reason": "No standing spot at the ice cave door within 80 units above its threshold in the frame's own collision (measured on the v0.0.68-dev4 world); one of seven entrances with this door model. What fills the cave mouth is not traced yet."
+      "reason": "The castle's closed gate (bm_ex_karstaag_doorclosed) stands in front of the door until a script switches it off and the open gate on; with the closed gate left out the check's stage rule (off until play shows it) reaches it. In play on the v0.0.68-dev8 image not judged: the console's disable and enable were given before the castle was loaded and found no such references."
     },
     "8412721": {
       "id": "Ex_BM_tomb_door_03",
       "place": "Solstheim, Glenschul's Tomb (cell -19,22)",
       "class": "DOOR-USE-COLLISION-EXPANSIONS-68",
-      "reason": "No standing spot at the tomb door within 80 units above its threshold in the frame's own collision (measured on the v0.0.68-dev4 world). What fills the threshold is not traced yet."
-    },
-    "8416809": {
-      "id": "BM_KA_door_dark",
-      "place": "Solstheim, Legge (cell -22,25)",
-      "class": "DOOR-USE-COLLISION-EXPANSIONS-68",
-      "reason": "No standing spot at the ice cave door within 80 units above its threshold in the frame's own collision (measured on the v0.0.68-dev4 world); one of seven entrances with this door model. What fills the cave mouth is not traced yet."
-    },
-    "8416813": {
-      "id": "BM_KA_door_dark",
-      "place": "Solstheim, Fjell (cell -22,21)",
-      "class": "DOOR-USE-COLLISION-EXPANSIONS-68",
-      "reason": "No standing spot at the ice cave door within 80 units above its threshold in the frame's own collision (measured on the v0.0.68-dev4 world); one of seven entrances with this door model. What fills the cave mouth is not traced yet."
-    },
-    "8418105": {
-      "id": "BM_KA_door_dark",
-      "place": "Solstheim, Rimhull (cell -21,25)",
-      "class": "DOOR-USE-COLLISION-EXPANSIONS-68",
-      "reason": "No standing spot at the ice cave door within 80 units above its threshold in the frame's own collision (measured on the v0.0.68-dev4 world); one of seven entrances with this door model. What fills the cave mouth is not traced yet."
-    },
-    "8420566": {
-      "id": "BM_KA_door_dark_SG",
-      "place": "Solstheim, the entrance to Stahlman's Gorge under the Mortrag Glacier (cell -27,26)",
-      "class": "DOOR-CHECK-NO-SWIM-CASE-68",
-      "reason": "The threshold lies about 2100 units under the cell's water (the original's z -2100, water at the exterior default 0): in the original the player reaches it by swimming under the ice. The check needs a standing spot within 80 units above a threshold and has no case for an entrance reached by swimming (measured on the v0.0.68-dev8 world, the first with the glacier's cells). It leaves this list when the check judges underwater doors from the water."
+      "reason": "A rock (act_bm_tombdoor3) closes the way to the door until the quest stage that removes it; with the rock left out the check's stage rule (off until play shows it) reaches it 40 units out from its face. In play on the v0.0.68-dev8 image with the expansions' hide rows (the gated engine of 4974f47ac) the rock is gone at its stage and the door was entered; it stays listed until the stage rule is turned on, which waits for the other stage doors (Raven Rock's colony, Castle Karstaag) to be shown in play."
     }
   }
 }

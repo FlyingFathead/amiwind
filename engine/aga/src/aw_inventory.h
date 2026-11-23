@@ -395,6 +395,11 @@ int AW_AreaContainerKey(unsigned reference,char *id,int size);
  * Class::defaultItemActivate, mwclass/light.cpp for a carryable light: a NullAction): the use key does nothing then and
  * no action line shows; a book is still read, and a script that takes an object's activation still has it. */
 extern int (*aw_inventory_allowed)(void);
+/* WEREWOLF-BODY-63 (v0.0.68): 1 while the player is a werewolf (aw_mwhost.c sets it; aw_worldui.c defines it, NULL in
+ * the fixtures: never). While it holds the inventory and magic windows do not open (OpenMW 0.51 mwmechanics/
+ * mechanicsmanagerimp.cpp setWerewolf 1926-1927 and 1932-1933 force-hide them, windowmanagerimp.cpp updatePlayer
+ * 1911-1914 again after a load; read not copied). */
+extern int (*aw_worldui_werewolf)(void);
 /* PRISON-SHIP-ITEMS-TAKEABLE-65: placed objects' text overlays allowed (aw_debug.c sets it to aw_story.c
  * AW_StoryObjectLabels; NULL in the tools' tests: allowed). While they are not, an aimed item, carryable light, book,
  * container or named piece of furniture (a hammock) shows no name and no action line (AW_PlacedFocus, AW_ItemPrompt);

@@ -49,6 +49,9 @@ int ChimRoom_Active (void)
 	return room.on;
 }
 
+/* rooms loaded since the start (RoomLoad): aw_objpose.c tells a new load by it (ChimRoom_Loaded) */
+static unsigned long	room_loads;
+
 /* Placement i's yaw: its entity (drawn), its sine and cosine (the yaw
  * collision path) and its matrix (the turned and piece-table paths). */
 static void RoomYaw (int i, float yaw)
@@ -511,6 +514,7 @@ static int RoomLoad (const char *name)
 		p->linked = 1;
 	}
 	room.on = 1;
+	room_loads++;
 	room.seconds = Sys_FloatTime () - started;
 	if (chim_debug.value)
 		Con_Printf ("CHIM: room %s: %ld placements, %ld models (%ld KiB), record %ld bytes, %ld ms\n", room.name,
@@ -690,6 +694,13 @@ float ChimRoom_RayRef (unsigned reference, const float *eye, const float *dir)
 	}
 	return best;
 }
+/* MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68 (aw_objpose.c): a placement whose group's end pose draws nothing is out of the
+ * room (ROOM_POSE_HIDDEN) apart from a script's Disable (ROOM_DISABLED): an Enable does not bring back a placement its
+ * pose hides, a pose that draws again does not bring back a disabled one. Run-time bits above the record's flags and
+ * the movers' (CHIM_PLACE_HINGED, CHIM_PLACE_TURNED). */
+#define ROOM_POSE_HIDDEN	0x100000
+#define ROOM_DISABLED		0x200000
+
 int ChimRoom_Hide (unsigned reference, int hide)
 {
 	int i, changed = 0;
@@ -698,7 +709,13 @@ int ChimRoom_Hide (unsigned reference, int hide)
 	for (i=0 ; i<room.count ; i++)
 	{
 		chim_place_t *p = &room.places[i];
-		if (!RoomRefIs (i, reference) || p->linked == !hide)
+		if (!RoomRefIs (i, reference))
+			continue;
+		if (hide)
+			p->flags |= ROOM_DISABLED;
+		else
+			p->flags &= ~ROOM_DISABLED;
+		if (p->linked == !hide || (!hide && (p->flags & ROOM_POSE_HIDDEN)))
 			continue;
 		if (hide)
 		{
@@ -713,6 +730,85 @@ int ChimRoom_Hide (unsigned reference, int hide)
 			if (room.link_world && room.link_world == cl.worldmodel)
 				LinkOne (p);
 		}
+		changed++;
+	}
+	return changed;
+}
+
+/* MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68: the loaded room's record name into NAME and its load serial (a new load, also of
+ * the same room, has another): 1, 0 with no room (aw_objpose.c applies a room's saved poses once per load) */
+int ChimRoom_Loaded (char *name, int size, unsigned long *serial);
+int ChimRoom_Loaded (char *name, int size, unsigned long *serial)
+{
+	if (!room.on)
+		return 0;
+	if (name && size > 0)
+	{
+		strncpy (name, room.name, size-1);
+		name[size-1] = 0;
+	}
+	if (serial)
+		*serial = room_loads;
+	return 1;
+}
+
+/* MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68 (aw_objpose.c, the end pose of a script's animation group): every placement of
+ * REFERENCE in the loaded room takes the store model MODEL, which the record lists (the room conversion adds the
+ * end-pose models to it: tools/chim/anim_poses.py), with its drawn box BOX (mins, maxs, the record's stored form); the
+ * model is the block's first member, so its drawing and its collision (ChimChunks_ClipPlace: the model's piece table or
+ * hull, turned by the placement's matrix, which stays) change together. MODEL -1: the end pose draws nothing, the
+ * placement leaves the room until a pose that draws (ROOM_POSE_HIDDEN). A placement linked into the client's world is
+ * linked again at its new box. Returns the placements changed (0: none of REFERENCE, or a model the record does not
+ * list: left as it is). */
+int ChimRoom_PoseModel (unsigned reference, int model, const short *box);
+int ChimRoom_PoseModel (unsigned reference, int model, const short *box)
+{
+	int i, j, k, changed = 0;
+	if (!room.on || !reference)
+		return 0;
+	for (i=0 ; i<room.count ; i++)
+	{
+		chim_place_t *p = &room.places[i];
+		if (!RoomRefIs (i, reference))
+			continue;
+		if (model < 0)
+		{
+			p->flags |= ROOM_POSE_HIDDEN;
+			if (p->linked)
+			{
+				if (p->ent.efrag)
+					R_RemoveEfrags (&p->ent);
+				p->ent.efrag = NULL;
+				p->linked = 0;
+			}
+			changed++;
+			continue;
+		}
+		for (j=0 ; j<room.models && room.model[j]->id != (unsigned)model ; j++)
+			;
+		if (j == room.models || !box)
+			continue;
+		if (p->linked && p->ent.efrag)
+		{
+			R_RemoveEfrags (&p->ent);
+			p->ent.efrag = NULL;
+			room.efrags -= p->leaves;
+			room.linked--;
+		}
+		p->model = (unsigned)model;
+		p->ent.model = &room.model[j]->model;
+		for (k=0 ; k<3 ; k++)
+		{
+			p->mins[k] = box[k];
+			p->maxs[k] = box[3+k];
+			if (p->mins[k] < room.mins[k]) room.mins[k] = p->mins[k];
+			if (p->maxs[k] > room.maxs[k]) room.maxs[k] = p->maxs[k];
+		}
+		p->flags &= ~ROOM_POSE_HIDDEN;
+		if (!p->linked && !(p->flags & ROOM_DISABLED))
+			p->linked = 1;
+		if (p->linked && room.link_world && room.link_world == cl.worldmodel)
+			LinkOne (p);
 		changed++;
 	}
 	return changed;

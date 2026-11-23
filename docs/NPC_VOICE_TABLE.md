@@ -1,12 +1,13 @@
 # NPC voice table (AWGL1)
 
-_Last updated with AmiWind v0.0.58 (31 October 2026)._
+_Last updated with AmiWind v0.0.68 (23 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [Status: how far the voices are (23 October 2026)](#status-how-far-the-voices-are-23-october-2026)
 - [What it holds](#what-it-holds)
+- [Creatures that speak](#creatures-that-speak)
 - [How a line is chosen](#how-a-line-is-chosen)
 - [Engine](#engine)
 - [Cost](#cost)
@@ -78,6 +79,24 @@ in the game; and for the run-time conditions as bytecode, so that they are not s
   cell). The greet reset distance and duration (`fGreetDistanceReset`, `iGreetDuration`) are in the header.
 - Sounds are the converted voice files the media stage already ships (`sound/pool/a<16 hex>.wav`, the media
   catalogue's own names): the table stores the 8-byte hash once per file and converts nothing.
+
+## Creatures that speak
+
+The talking creatures of the three masters are creature records, not NPC records: Almalexia (`almalexia`), Vivec
+(`vivec_god`), Yagrum Bagarn (`yagrum bagarn`), Dagoth Ur (`dagoth_ur_1`, `dagoth_ur_2`) and the Dagoth brothers,
+Variner's ghost (`ancestor_ghost_variner`), the Creeper (`scamp_creeper`) and others: 46 creatures with 538 lines.
+Since v0.0.68 each of them has a row in this table and in the dialogue table, sorted with the NPC rows by id. A
+creature's row follows the original's rule for a creature speaker: only the lines that name it; on those the race,
+class, faction and rank filters and the sex are not tested; no disposition test; its level, AI settings, script values
+and services are its own record's. The record's type (creature, daedra, undead, humanoid) changes none of it.
+
+Nine of the 46 have voiced lines; the other 37 have text only. A creature never had voice lines by any other route
+(the lines a model's animation layout names are made for NPC records only), so a text-only creature is as silent in a
+fight as before, and the voiced ones say their own lines. A creature's moan, roar and scream come from its sound
+generators (below), not from these rows.
+
+Not done yet: the conversation itself. The use key offers no talk on a creature, and the dialogue window, its
+disposition bar and the creature merchants are not wired to these rows.
 
 ## How a line is chosen
 

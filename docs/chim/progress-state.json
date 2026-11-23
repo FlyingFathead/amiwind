@@ -1,6 +1,231 @@
 {
  "builds": [
   {
+   "built_at": "2026-11-21T20:29:59+00:00",
+   "cells": 1573,
+   "commit": "32bffc95",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 117
+    },
+    {
+     "land": 144,
+     "name": "Solstheim",
+     "sea": 9
+    },
+    {
+     "land": 11,
+     "name": "Mournhold",
+     "sea": 0
+    }
+   ],
+   "label": "v0.0.68-dev9 (32bffc95)",
+   "land": 1447,
+   "sea": 126
+  },
+  {
+   "built_at": "2026-11-21T20:29:59+00:00",
+   "cells": 1571,
+   "commit": "08793a6d",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 117
+    },
+    {
+     "land": 144,
+     "name": "Solstheim",
+     "sea": 7
+    },
+    {
+     "land": 11,
+     "name": "Mournhold",
+     "sea": 0
+    }
+   ],
+   "label": "v0.0.68-dev8 (08793a6d)",
+   "land": 1447,
+   "sea": 124
+  },
+  {
+   "built_at": "2026-11-21T20:29:59+00:00",
+   "cells": 1555,
+   "commit": "24d3fb04",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 117
+    },
+    {
+     "land": 135,
+     "name": "Solstheim",
+     "sea": 0
+    },
+    {
+     "land": 11,
+     "name": "Mournhold",
+     "sea": 0
+    }
+   ],
+   "label": "v0.0.68-dev7 (24d3fb04)",
+   "land": 1438,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-18T10:28:16+00:00",
+   "cells": 1555,
+   "commit": "95a3d6e3",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 117
+    },
+    {
+     "land": 135,
+     "name": "Solstheim",
+     "sea": 0
+    },
+    {
+     "land": 11,
+     "name": "Mournhold",
+     "sea": 0
+    }
+   ],
+   "label": "v0.0.68-dev6 (95a3d6e3)",
+   "land": 1438,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-18T10:28:16+00:00",
+   "cells": 1555,
+   "commit": "4d1da821",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 117
+    },
+    {
+     "land": 135,
+     "name": "Solstheim",
+     "sea": 0
+    },
+    {
+     "land": 11,
+     "name": "Mournhold",
+     "sea": 0
+    }
+   ],
+   "label": "v0.0.68-dev5 (4d1da821)",
+   "land": 1438,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-18T10:28:16+00:00",
+   "cells": 1555,
+   "commit": "9b63c3c4",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 117
+    },
+    {
+     "land": 135,
+     "name": "Solstheim",
+     "sea": 0
+    },
+    {
+     "land": 11,
+     "name": "Mournhold",
+     "sea": 0
+    }
+   ],
+   "label": "v0.0.68-dev4 (9b63c3c4)",
+   "land": 1438,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-18T10:28:16+00:00",
+   "cells": 1555,
+   "commit": "9a91382c",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 117
+    },
+    {
+     "land": 135,
+     "name": "Solstheim",
+     "sea": 0
+    },
+    {
+     "land": 11,
+     "name": "Mournhold",
+     "sea": 0
+    }
+   ],
+   "label": "v0.0.68-dev3 (9a91382c)",
+   "land": 1438,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-18T10:28:16+00:00",
+   "cells": 1420,
+   "commit": "ef709f6b",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 117
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 0
+    },
+    {
+     "land": 11,
+     "name": "Mournhold",
+     "sea": 0
+    }
+   ],
+   "label": "v0.0.68-dev2 (ef709f6b)",
+   "land": 1303,
+   "sea": 117
+  },
+  {
+   "built_at": "2026-11-18T10:28:16+00:00",
+   "cells": 1420,
+   "commit": "d0c95b15",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 117
+    },
+    {
+     "land": 0,
+     "name": "Solstheim",
+     "sea": 0
+    },
+    {
+     "land": 11,
+     "name": "Mournhold",
+     "sea": 0
+    }
+   ],
+   "label": "v0.0.68-dev1 (d0c95b15)",
+   "land": 1303,
+   "sea": 117
+  },
+  {
    "built_at": "2026-11-18T10:28:16+00:00",
    "cells": 1420,
    "commit": "2b086671",
@@ -8,12 +233,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 11,
@@ -33,12 +258,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 11,
@@ -58,12 +283,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 11,
@@ -83,12 +308,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 11,
@@ -108,12 +333,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -133,12 +358,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -158,12 +383,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -183,12 +408,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -208,12 +433,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -233,12 +458,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -258,12 +483,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -283,12 +508,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -308,12 +533,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -333,12 +558,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -358,12 +583,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -383,12 +608,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -408,12 +633,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -433,12 +658,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -458,12 +683,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -483,12 +708,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -508,12 +733,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -533,12 +758,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -558,12 +783,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -583,12 +808,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -608,12 +833,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -633,12 +858,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -658,12 +883,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -683,12 +908,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -708,12 +933,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -733,12 +958,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -758,12 +983,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -783,12 +1008,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -808,12 +1033,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -833,12 +1058,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -858,12 +1083,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -883,12 +1108,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -908,12 +1133,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -933,12 +1158,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -958,12 +1183,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -983,12 +1208,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1008,12 +1233,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1033,12 +1258,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1058,12 +1283,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1083,12 +1308,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1108,12 +1333,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1133,12 +1358,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1158,12 +1383,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1183,12 +1408,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1208,12 +1433,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1233,12 +1458,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1258,12 +1483,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1283,12 +1508,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1308,12 +1533,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1333,12 +1558,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1358,12 +1583,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1383,12 +1608,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1408,12 +1633,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1433,12 +1658,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1458,12 +1683,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1483,12 +1708,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1508,12 +1733,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1533,12 +1758,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1558,12 +1783,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1583,12 +1808,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1608,12 +1833,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1633,12 +1858,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1658,12 +1883,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1683,12 +1908,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1708,12 +1933,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1733,12 +1958,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1758,12 +1983,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1783,12 +2008,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1808,12 +2033,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1833,12 +2058,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1858,12 +2083,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1883,12 +2108,12 @@
     {
      "land": 1292,
      "name": "Vvardenfell",
-     "sea": 116
+     "sea": 117
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1908,12 +2133,12 @@
     {
      "land": 1253,
      "name": "Vvardenfell",
-     "sea": 102
+     "sea": 103
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1933,12 +2158,12 @@
     {
      "land": 1215,
      "name": "Vvardenfell",
-     "sea": 102
+     "sea": 103
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1958,12 +2183,12 @@
     {
      "land": 1171,
      "name": "Vvardenfell",
-     "sea": 4
+     "sea": 5
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -1983,12 +2208,12 @@
     {
      "land": 779,
      "name": "Vvardenfell",
-     "sea": 4
+     "sea": 5
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -2033,12 +2258,12 @@
     {
      "land": 779,
      "name": "Vvardenfell",
-     "sea": 4
+     "sea": 5
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -2058,12 +2283,12 @@
     {
      "land": 779,
      "name": "Vvardenfell",
-     "sea": 4
+     "sea": 5
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -2083,12 +2308,12 @@
     {
      "land": 657,
      "name": "Vvardenfell",
-     "sea": 4
+     "sea": 5
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -2108,12 +2333,12 @@
     {
      "land": 547,
      "name": "Vvardenfell",
-     "sea": 4
+     "sea": 5
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -2133,12 +2358,12 @@
     {
      "land": 421,
      "name": "Vvardenfell",
-     "sea": 4
+     "sea": 5
     },
     {
      "land": 0,
      "name": "Solstheim",
-     "sea": 1
+     "sea": 0
     },
     {
      "land": 0,
@@ -2403,15 +2628,15 @@
  ],
  "eligible_release": "v0.0.68",
  "format": "aw-progress-state-1",
- "generated": "2026-11-20T10:22:10+00:00",
+ "generated": "2026-11-23T08:41:06+00:00",
  "groups": {
-  "accounted_for": 2169,
+  "accounted_for": 2322,
   "cells": 2322,
-  "in_game": 1420,
-  "not_in_game": 153,
+  "in_game": 1573,
+  "not_in_game": 0,
   "settled": 749
  },
- "in_game_label": "v0.0.67 (2b086671)",
+ "in_game_label": "v0.0.68-dev9 (32bffc95)",
  "interiors": {
   "classic_rooms": [
    {
@@ -2595,10 +2820,10 @@
     "partial": 137,
     "unlit": 1056
    },
-   "map_cells": 2156,
+   "map_cells": 2158,
    "name": "Vvardenfell",
    "not_started": 0,
-   "ocean": 766,
+   "ocean": 768,
    "passed": 1193,
    "percent": 100.0,
    "playtested": 0,
@@ -2608,29 +2833,29 @@
   {
    "approved": 0,
    "audits_passed": 0,
-   "cells": 144,
+   "cells": 150,
    "complete": 0,
-   "complete_unlit": 0,
-   "converted": 0,
-   "done": 0,
-   "eligible": 0,
-   "empty_sea": 0,
+   "complete_unlit": 2,
+   "converted": 119,
+   "done": 150,
+   "eligible": 150,
+   "empty_sea": 31,
    "island": 2,
    "lighting": {
     "lit": 0,
-    "not_measured": 144,
-    "partial": 0,
-    "unlit": 0
+    "not_measured": 25,
+    "partial": 14,
+    "unlit": 105
    },
-   "map_cells": 147,
+   "map_cells": 153,
    "name": "Solstheim",
-   "not_started": 144,
+   "not_started": 0,
    "ocean": 3,
-   "passed": 0,
-   "percent": 0.0,
+   "passed": 119,
+   "percent": 100.0,
    "playtested": 0,
    "terrain_complete": 0,
-   "terrain_complete_unlit": 0
+   "terrain_complete_unlit": 117
   },
   {
    "approved": 0,
@@ -2668,17 +2893,17 @@
     "total": 1323
    },
    "terrain": {
-    "percent": 90.7,
-    "ready": 1401,
-    "total": 1545
+    "percent": 100.0,
+    "ready": 1551,
+    "total": 1551
    },
    "total": {
-    "percent": 95.0,
-    "ready": 2724,
-    "total": 2868
+    "percent": 100.0,
+    "ready": 2874,
+    "total": 2874
    }
   },
-  "build": "v0.0.67 (2b086671)",
+  "build": "v0.0.68-dev9 (32bffc95)",
   "definition": "Ready = in the game on CHIM, the same for every land. Open terrain: the land's exterior cells of land or empty sea (open ocean and cells beyond the world's edge are not counted), ready when the newest ingested build holds the cell on CHIM and no audit of it failed. Rooms: every interior cell, counted for the land of its master, ready when it is in the game: on CHIM rooms, or as a room map of our own (special interiors, named under the count); a district the land presents as open terrain is counted once, under open terrain. Everything else is not ready, with its reason; a room no door leads to is a room still to build, never left out.",
   "format": "aw-land-readiness-2",
   "lands": [
@@ -2728,21 +2953,15 @@
      "total": 101
     },
     "terrain": {
-     "not_ready": [
-      {
-       "count": 144,
-       "label": "not in the game yet (Solstheim)",
-       "reason": "solstheim"
-      }
-     ],
-     "percent": 0.0,
-     "ready": 0,
-     "total": 144
+     "not_ready": [],
+     "percent": 100.0,
+     "ready": 150,
+     "total": 150
     },
     "total": {
-     "percent": 41.2,
-     "ready": 101,
-     "total": 245
+     "percent": 100.0,
+     "ready": 251,
+     "total": 251
     }
    },
    {
@@ -2784,7 +3003,7 @@
   "approved": 0,
   "audits_passed": 377,
   "complete": 0,
-  "complete_unlit": 13,
+  "complete_unlit": 15,
   "converted_failing": 0,
   "converted_unmeasured": 0,
   "empty_sea": 0,
@@ -2794,11 +3013,11 @@
   "not_started": 0,
   "ocean": 0,
   "playtested": 0,
-  "sea_in_game": 216,
+  "sea_in_game": 250,
   "settled": 749,
-  "solstheim": 153,
+  "solstheim": 0,
   "terrain_complete": 0,
-  "terrain_complete_unlit": 814
+  "terrain_complete_unlit": 931
  },
  "version_stamp": {
   "release": "v0.0.68",

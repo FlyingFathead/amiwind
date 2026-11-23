@@ -1,6 +1,6 @@
 # Build completion output
 
-_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
+_Last updated with AmiWind v0.0.68-dev9 (23 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -15,6 +15,7 @@ _Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 - [Warnings](#warnings)
 - [Failures, modes and saved results](#failures-modes-and-saved-results)
   - [Release readiness](#release-readiness)
+  - [Completeness](#completeness)
 
 <!-- contents end -->
 
@@ -380,6 +381,42 @@ block reads `none: nothing here stops a release candidate or final`. Origin:
 v0.0.41-dev5 passed with a waiver, an accepted plant loss and no NPC gallery,
 and the final found all three on its first run
 ([BUILD-RELEASE-READINESS-HIDDEN-41](bugs/BUILD-RELEASE-READINESS-HIDDEN-41.md)).
+
+### Completeness
+
+Every cell, room and load door of every master a release ships is in the game:
+a place without a door, reached only by a script or a teleport, behaving like an
+exterior or over a limit is still built. `tools/release_completeness.py` checks
+it from the masters themselves (read with the repository's own reader, merged as
+the game merges them) and lists, by master and by name, every exterior cell
+(land, seabed and open sea), every interior cell and every load door a build
+does not contain, every load door whose way back the build loses (a door the
+original itself has no way back through is a note, not a refusal), and where the
+Toolkit's progress tracker and the public tracker page count differently.
+
+- `plan` reads the source tree's plan: the base world's cell list
+  (`config/chim-cells.json`, or the region cells the build resolved), the
+  Bloodmoon module's cells and the room batch lists; a cell inside the core of
+  a CHIM town the build makes counts as in, by the same rule as the run (the
+  resolved region cells leave the towns' cells out). Before the first stage
+  every full AGA build prints its line, for
+  example `Completeness of the plan (report; an rc or final is refused on it):
+  completeness (plan, dev): 2 missing: -29,23; -28,24`, and saves it in
+  `build-state.json` as `completeness_plan`.
+- `run --run RUN` reads what the image holds: the engine's outdoor table and the
+  frame maps in the image (a cell inside a CHIM town's core counts when the
+  town is installed), the image's interior maps and the districts built as
+  frames, and the image's door table.
+
+A development snapshot only reports. A release candidate or final is refused
+while any place is missing, unless the maintainer approved that one place in
+`config/release-completeness-approved.json` (master, kind, place, date and
+reason; it starts empty; no entrance, teleport only, unreachable and over a limit
+are never reasons, and one entry approves one place). The check takes a few
+seconds and writes `release-completeness.json` and `release-completeness.md`
+with `--out`. Origin: the v0.0.67 release checks passed while rooms of a shipped
+expansion were not in the game
+([RELEASE-GATE-COMPLETENESS-LOST-67](bugs/RELEASE-GATE-COMPLETENESS-LOST-67.md)).
 
 Private diagnostic builds with explicitly accepted actor findings use the footer
 `Private test image assembled; production actor gate DID NOT PASS`. They do not

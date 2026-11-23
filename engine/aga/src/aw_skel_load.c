@@ -1,6 +1,8 @@
 /* aw_skel_load.c: the shared animation tables skeletal models name (aw_skel.h), each loaded once by its path and
  * kept for the session: one table serves every humanoid (docs/MODULAR_NPCS.md, "Runtime method C"). A table that
- * cannot be read or is invalid says so once on the console; its models then draw their rest frame. */
+ * cannot be read or is invalid says so once on the console; its models then draw their rest frame. A table only one
+ * look uses (the werewolf's) is given back on its own when that look ends (AW_SkelTableRelease) and loaded again by
+ * the next lookup. */
 #include "quakedef.h"
 #include "aw_skel.h"
 #include "aw_tryalloc.h"
@@ -30,12 +32,14 @@ static void *table_alloc (long size)
  * window or a room shows at once (8 before the creature tables, CREATURE-TABLES-54) */
 #define AW_SKEL_TABLES	24
 
+/* released (WEREWOLF-TABLES-STAY-LOADED-68): the table given back on its own (AW_SkelTableRelease); the slot keeps its
+ * name, so the next lookup of that name loads the same file into the same slot */
 static struct {
 	char			name[AW_SKEL_TABLE_NAME];
 	unsigned char	*data;
 	long			size;
 	aw_skel_table_t	table;
-	int				failed;
+	int				failed, released;
 } tables[AW_SKEL_TABLES];
 
 /* ---- paged frames (WALK-CYCLES-57) ----
@@ -137,6 +141,81 @@ unsigned long AW_SkelTablesRelease (void)
 	return given;
 }
 
+/* ---- one table given back (WEREWOLF-TABLES-STAY-LOADED-68, v0.0.68) ----
+ * The maintainer's rule (every swap releases the previous set at once, FP-ARMS-NO-MODEL-SLOT-67): the werewolf's two
+ * tables (progs/werewolf.awsk 431,734 bytes, progs/werewolf_1st.awsk 80,460 bytes on disk) are held only while the form
+ * is drawn. AW_SkelTableRelease gives back the table NAME (a file's table, not a view): its index, the frames read so
+ * far, its open file, and the views of it ("NAME|f": copies that point into it). The slots keep their names (released),
+ * so the next lookup loads the same file into the same slot and a table pointer a caller kept never means another
+ * table. IN_USE (the caller's model table, aw_view.c) says whether a loaded model still points into a table; a table a
+ * model or an appended table (its base link, AW_SkelAppend) still uses is kept. Returns the bytes given back, 0 when the
+ * table is not held, -1 when it is kept. */
+static unsigned long pages_held_bytes (const aw_skel_pages_t *p)
+{
+	unsigned long bytes = 0;
+	int c, n;
+	for (c=0 ; p && p->chunk && c<p->chunks ; c++)
+		if (p->chunk[c])
+		{
+			n = p->frames - c * AW_SKEL_CHUNK;
+			bytes += (unsigned long)(n > AW_SKEL_CHUNK ? AW_SKEL_CHUNK : n) * (unsigned long)p->row;
+		}
+	return bytes;
+}
+
+static int is_view_of (const char *view, const char *name)
+{
+	size_t n = strlen (name);
+	return !strncmp (view, name, n) && view[n] == '|';
+}
+
+/* declared here, as AW_SkelLinkAlias below, not in aw_skel.h: that header is in the reach of the build stages that read
+ * the engine's limits (tools/build_cache.py C_HEADER_READERS), and its one caller declares it (aw_view.c) */
+long AW_SkelTableRelease (const char *name, int (*in_use) (const aw_skel_table_t *t));
+long AW_SkelTableRelease (const char *name, int (*in_use) (const aw_skel_table_t *t))
+{
+	int i, j;
+	unsigned long given;
+	aw_skel_pages_t *p;
+	if (!name || strchr (name, '|'))
+		return 0;
+	for (i=0 ; i<AW_SKEL_TABLES && strcmp (tables[i].name, name) ; i++)
+		;
+	if (i == AW_SKEL_TABLES || tables[i].failed || tables[i].released || !tables[i].data)
+		return 0;
+	for (j=0 ; j<AW_SKEL_TABLES && tables[j].name[0] ; j++)
+	{
+		if (j == i || tables[j].failed || tables[j].released)
+			continue;
+		if (tables[j].table.more == &tables[i].table)
+			return -1;		/* an appended table rests on it */
+		if (is_view_of (tables[j].name, name) && in_use && in_use (&tables[j].table))
+			return -1;
+	}
+	if (in_use && in_use (&tables[i].table))
+		return -1;
+	p = (aw_skel_pages_t *)tables[i].table.pages;
+	given = (unsigned long)tables[i].size + pages_held_bytes (p);
+	if (p)
+	{
+		paged_held -= pages_held_bytes (p);
+		paged_disk -= (unsigned long)p->frames * (unsigned long)p->row;
+		pages_free (p);		/* its chunks, frame 0's row and the open file */
+	}
+	free (tables[i].data);
+	tables[i].data = NULL;
+	tables[i].size = 0;
+	memset (&tables[i].table, 0, sizeof(tables[i].table));
+	tables[i].released = 1;
+	for (j=0 ; j<AW_SKEL_TABLES && tables[j].name[0] ; j++)
+		if (!tables[j].failed && !tables[j].released && is_view_of (tables[j].name, name))
+		{
+			memset (&tables[j].table, 0, sizeof(tables[j].table));
+			tables[j].released = 1;
+		}
+	return (long)given;
+}
+
 /* The table at NAME's open file F (SIZE bytes) as its index and paged frames; 0 when it cannot be (said by the caller) */
 static int load_paged (int i, FILE *f, int size)
 {
@@ -196,10 +275,16 @@ const aw_skel_table_t *AW_SkelTableFor (const char *name)
 	FILE *f;
 	for (i=0 ; i<AW_SKEL_TABLES && tables[i].name[0] ; i++)
 		if (!strcmp (tables[i].name, name))
-			return tables[i].failed ? NULL : &tables[i].table;
+		{
+			if (!tables[i].released)
+				return tables[i].failed ? NULL : &tables[i].table;
+			tables[i].released = 0;		/* given back on its own: loaded again into its own slot */
+			break;
+		}
 	if (i == AW_SKEL_TABLES)
 		return NULL;		/* more tables than any game has: refuse quietly, the rest frame draws */
-	strncpy (tables[i].name, name, AW_SKEL_TABLE_NAME - 1);
+	if (!tables[i].name[0])
+		strncpy (tables[i].name, name, AW_SKEL_TABLE_NAME - 1);
 	{
 		/* "progs/humanoid.awsk|f": a view of a table, its file loaded once with the table's (SKEL-TABLE-SHARED-
 		 * FEMALE-52: the female groups live in the common table as "f:..."); its lookups try "f:" + name first */

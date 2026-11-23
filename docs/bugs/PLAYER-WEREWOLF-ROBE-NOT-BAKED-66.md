@@ -22,10 +22,17 @@
 
 ## Timeline
 
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.68-dev8 (f5e70930) | 2026-11-23 | gate 12780 of the planning item PLAYER-WEREWOLF-ROBE-66 | The werewolf robe's body part is built as the werewolf's own part on its own skeleton and table, the known-missing row is gone and the parts coverage check passes with it (a slice of the real stages run on the game data); not in an image yet |
+
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-14: reported in v0.0.66-dev2
 - 2026-11-17: v0.0.67-dev1: Cause narrowed, read from the failed build's own log and the game data: the selected masters hold the werewolf robe's chest part (werewolfskin) with its mesh, and the player parts stage tried it for the base skeleton ("part h 3 ...
+- 2026-11-23: fixed in source: a gated commit, v0.0.68-dev8 (f5e70930); gate 12780 of the planning item PLAYER-WEREWOLF-ROBE-66: The werewolf robe's body part is built as the werewolf's own part on its own skeleton and table, the known-missing row is gone and the parts coverage check passes with it (a slice of the real stages run on the game data); not in an image ...
 
 <!-- END GENERATED TIMELINE -->
 

@@ -79,5 +79,7 @@ Family: Lighting, lamps and night (`lighting-night`). Morrowind lights become Qu
 - [TORCH-NPC-LIGHT-29](TORCH-NPC-LIGHT-29.md): Nearby NPCs do not visibly respond to torchlight
 - [TORCHTEST-DARKNESS-29](TORCHTEST-DARKNESS-29.md): Torch test room floor stays dim gray at zero light
 - [WEATHER-AMBIENT-SUN-UNUSED-51](WEATHER-AMBIENT-SUN-UNUSED-51.md): Exteriors take only the sky and fog colours of the weather: its ambient and sun colours are never used, so the land under an ash or blight storm (Red Mountain) is lit neutral
+- [WEATHER-CLOUD-TEXTURES-68](WEATHER-CLOUD-TEXTURES-68.md): Every weather shows the same clouds, recoloured: the original has a cloud texture per weather
+- [WEATHER-FOG-CLOUDS-ONE-LOOK-68](WEATHER-FOG-CLOUDS-ONE-LOOK-68.md): Every weather drew the clear weather's fog distance and cloud speed: a blizzard looked as far and as calm as a clear day apart from its colour
 
 <!-- END GENERATED CATEGORY -->

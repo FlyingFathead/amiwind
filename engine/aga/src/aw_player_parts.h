@@ -27,9 +27,33 @@ typedef struct {
 
 /* The parts of RACE (its id; the recipe writes a space as '|'), FEMALE, the chosen HEAD and HAIR (BODY ids; NULL or "" = the race's
  * first) wearing the ITEMS (their ids, any order, NULL entries skipped) from the recipe TEXT (SIZE bytes, need not be
- * NUL-terminated). 1 = OUT holds a body; 0 = no such race and sex in the recipe or a malformed recipe. */
+ * NUL-terminated). 1 = OUT holds a body; 0 = no such race and sex in the recipe or a malformed recipe.
+ * A race's skeleton letter is h (the humanoid table), k (the beast table) or, since v0.0.68, any other lower-case
+ * letter for a skeleton of its own (w: the werewolf, below); an item's parts have a column for h and k only, so a race
+ * on another skeleton wears none of them (what is under them stays: its own skin). */
 int AW_PartsAssemble(const char *text, long size, const char *race, int female, const char *head, const char *hair,
                      const char *const *items, int nitems, aw_parts_body_t *out);
+/* WEREWOLF-BODY-63 (v0.0.68): the werewolf's look. The original draws a werewolf on the werewolf skeleton with no race
+ * skin part, the equipped werewolf robe's own part as the body and the werewolf head instead of the race's head and
+ * hair (OpenMW 0.51 apps/openmw/mwrender/npcanimation.cpp updateNpcBase 469-519 and getBodyParts 1160-1195, read not
+ * copied). The builder writes it as the pseudo-race AW_PARTS_WEREWOLF_RACE on a skeleton letter of its own in
+ * view/parts.txt and view/parts_1st.txt (tools/prepare_player_parts.py): its skin per slot is the werewolf's whole body
+ * (in first person its arms), assembled with no head, hair or worn item. AW_PartsWerewolfWorn: 1 when ID (the robe
+ * slot's worn item) is the werewolf robe, the original's werewolfrobe (any case). Pure. */
+#define AW_PARTS_WEREWOLF_ROBE "werewolfrobe"
+#define AW_PARTS_WEREWOLF_RACE "werewolf"
+int AW_PartsWerewolfWorn(const char *id);
+/* WEREWOLF-RACE-SCALE-68 (v0.0.68): the werewolf is drawn at the size of the race of the one turned. The original scales
+ * any character, the player and the NPCs, in werewolf form too, by its race and sex's weight (x, y) and height (z)
+ * (OpenMW 0.51 apps/openmw/mwclass/npc.cpp adjustScale 1082-1115, read not copied); the werewolf's own rows carry 1 (one
+ * body for every race). AW_PartsRaceScales reads the race rows of a recipe TEXT ("R <race> <0|1> <skeleton> <weight>
+ * <height>"), at most MAX into OUT, the werewolf's own left out; the count. AW_PartsRaceScaleFind: the row of RACE (as
+ * the game data writes it: a space, or '|' as the recipe does) and FEMALE among N ROWS, 1 and *WEIGHT, *HEIGHT. Pure. */
+#define AW_PARTS_RACE 24
+typedef struct {char race[AW_PARTS_RACE]; int female; float weight, height;} aw_parts_race_scale_t;
+int AW_PartsRaceScales(const char *text, long size, aw_parts_race_scale_t *out, int max);
+int AW_PartsRaceScaleFind(const aw_parts_race_scale_t *rows, int n, const char *race, int female, float *weight,
+                          float *height);
 /* The inventory picture's pose on the shared table (INVENTORY-PREVIEW-BAKED-BODY-59): the group names for the right
  * hand's weapon TYPE (-1 or anything outside 0..8: unarmed; 0..8 the original's melee types), the first the
  * original's own group, the second its one- or two-handed fallback (NULL when none); the picture starts the group

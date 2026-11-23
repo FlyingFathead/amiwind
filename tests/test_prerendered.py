@@ -75,6 +75,22 @@ class EntryFolderTests(unittest.TestCase):
             self.assertEqual(temporary.read_bytes(), b'stored')
             self.assertEqual(os.stat(temporary).st_ino != os.stat(source).st_ino, True)
 
+    def test_a_file_at_the_hard_link_limit_is_copied_not_refused(self):
+        # REUSE-POOL-LINK-LIMIT-68: os.link failing with EMLINK (the pool object linked from too many work folders)
+        # refused a reused stage's whole output; the reuse copies that one file instead
+        with tempfile.TemporaryDirectory() as folder:
+            source, target = Path(folder) / 'source.bin', Path(folder) / 'target.bin'
+            source.write_bytes(b'stored')
+            with patch('os.link', side_effect=OSError(errno.EMLINK, 'Too many links')):
+                temporary = build_cache._copy_verified(source, target, hashlib.sha256(b'stored').hexdigest(), 0o644, True)
+            self.assertEqual(temporary.read_bytes(), b'stored')
+            self.assertNotEqual(os.stat(temporary).st_ino, os.stat(source).st_ino)
+            # any other link error still stops the reuse
+            with patch('os.link', side_effect=OSError(errno.EACCES, 'Permission denied')):
+                with self.assertRaises(OSError):
+                    build_cache._copy_verified(source, Path(folder) / 'other.bin',
+                                               hashlib.sha256(b'stored').hexdigest(), 0o644, True)
+
     def test_the_chim_unit_cache_is_not_part_of_the_fingerprint(self):
         # BUILD-CACHE-CHIM-UNITS-33: the unit cache keys units by their own fingerprints; hashing the
         # folder changed the chim stage's fingerprint whenever a build added units.

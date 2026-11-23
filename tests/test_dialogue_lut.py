@@ -475,6 +475,129 @@ class DialogueTable(unittest.TestCase):
         self.assertEqual(t['text'](t['entries'][refused][0]), 'I do not want to talk about that.')
 
 
+# ---- creature speakers (DIALOGUE-CREATURE-SPEAKERS-66): the voice table's creature fixture (tests/test_greeting_lut.py)
+# plus a creature merchant and a unique story character with topics, greetings and a script local
+CREATURE_TOPICS = {   # appended after the NPCs' INFOs of each topic
+    'background': [info('cb1', 'Whaddaya think? I am a mudcrab.', kind=0, ONAM='mudcrab', disp=30),
+                   info('cb2', 'Guild business.', kind=0, ONAM='vivec_god', DNAM='Mages Guild'),
+                   info('cb3', 'I am Vivec.', kind=0, ONAM='vivec_god', FNAM='Temple', RNAM='Dark Elf', rank=5)],
+    'help': [info('cc1', 'Pick one.', kind=0, ONAM='scamp', scvr=[CHOICE]),
+             info('cc2', 'Greeted twice.', kind=0, ONAM='scamp', scvr=[('03sX0scampgreet', 1)])],
+    'greeting 0': [info('cg0', 'Mortal.', kind=2, ONAM='vivec_god', gender=1)],
+}
+
+
+def creature_dialogue():
+    """(kinds, topics) of the dialogue fixture with the creature speakers."""
+    import test_greeting_lut as voice_fixture
+    k = voice_fixture.creature_kinds(kinds())
+    k['CREA'].update(mudcrab=voice_fixture.creature_record('mudcrab', 'Mudcrab', level=1, services=0x2003),
+                     vivec_god=voice_fixture.creature_record('vivec_god', 'Vivec', level=100))
+    topics = voice_fixture.creature_topics(TOPICS)
+    for t, extra in CREATURE_TOPICS.items():
+        topics[t] = topics[t] + extra
+    return k, topics
+
+
+def named_answers(t, row, topic):
+    """D.answers with each condition's operand by what it names (a Local's is its script slot)."""
+    return [(text, script, links, [(op, cmp, t['globals'][x][0] if op == G.OP_GLOBAL else
+                                    t['names'][x] if op in G.NAMED and op not in (G.OP_LOCAL, G.OP_NOTLOCAL) and
+                                    x != G.NONE16 else x, v) for op, cmp, x, v in conds])
+            for text, script, links, conds in D.answers(t, row, topic)]
+
+
+class CreatureSpeakerRows(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.kinds, cls.topics = creature_dialogue()
+        cls.raw, cls.report = D.build(cls.kinds, cls.topics, DIALS)
+        cls.t = D.read(cls.raw)
+        cls.voices = G.read(G.build(cls.kinds, cls.topics)[0])
+        cls.order = list(cls.voices['npcs'])
+        cls.names = [n for n, _ in cls.t['topics']]
+
+    def answers(self, ident, name):
+        return named_answers(self.t, self.order.index(ident), self.names.index(name))
+
+    def test_rows_in_the_voice_tables_order(self):
+        creatures = ['ash_ghoul', 'ghost', 'lich', 'mudcrab', 'raven', 'scamp', 'vivec_god']
+        self.assertEqual(G.creature_speakers(self.kinds, self.topics), creatures)
+        self.assertEqual(len(self.t['rows']), len(NPCS) + len(creatures))
+        self.assertEqual(self.report['creature_rows'], len(creatures))
+        import hashlib
+        self.assertEqual(self.t['order_sha'],
+                         hashlib.sha256('\n'.join(self.order).encode('cp1252', 'replace')).digest()[:8])
+
+    def test_a_creature_answers_only_its_own_lines_unfiltered_by_npc_rules(self):
+        # no disposition test for a creature (the NPC rule gives the same INFO a Disposition condition)
+        self.assertEqual(self.answers('mudcrab', 'Background'), [('Whaddaya think? I am a mudcrab.', None, [], [])])
+        as_npc = [(tag, f('ONAM', 'fargoth')[1] if tag == 'ONAM' else d) for tag, d in CREATURE_TOPICS['background'][0]]
+        self.assertEqual(D.TopicContext(self.kinds, 'fargoth', G.NO_CELL).compile(as_npc), [('Disposition', '', '3', 30)])
+        # the player's faction is tested as for anyone; its own INFO's faction, race and rank filters are not; the
+        # answers for anyone ("Welcome, guild member.", "Nothing much.") are never a creature's
+        self.assertEqual(self.answers('vivec_god', 'Background'),
+                         [('Guild business.', None, [], [(G.OP_PCFACTION, 3, 'mages guild', -1)]),
+                          ('I am Vivec.', None, [], [])])
+        # the sex is not tested on a creature's greeting
+        self.assertEqual(self.answers('vivec_god', 'Greeting 0'), [('Mortal.', None, [], [])])
+        self.assertEqual(self.t['rows'][self.order.index('raven')], {})        # voice lines only: no topic
+
+    def test_choice_and_the_creatures_script_local_at_run_time(self):
+        # Choice is left for run time in a topic (TopicCreatureContext); the local by its slot in ScampScript
+        self.assertEqual(self.answers('scamp', 'Help'),
+                         [('Pick one.', None, [], [(G.OP_FUNC, 0, dialogue.FUNCTIONS.index('Choice'), 1)]),
+                          ('Greeted twice.', None, [], [(G.OP_LOCAL, 0, 0, 1)])])
+        self.assertIs(D.TopicCreatureContext(self.kinds, 'scamp', G.NO_CELL).static('Choice', '', '0', 1),
+                      dialogue.RUNTIME)
+        self.assertIs(G.CreatureContext(self.kinds, 'scamp', G.NO_CELL).static('Choice', '', '0', 1), False)
+        self.assertEqual(D.script_slots(self.kinds, 'scamp'), {'scampgreet': ('s', 0)})
+
+    def test_services_from_the_creature_record(self):
+        # a creature merchant's services are its own AIDT's (no class); a creature without services has 0
+        services = self.t['services']
+        self.assertEqual(services[self.order.index('scamp')], 0x3403)
+        self.assertEqual(services[self.order.index('mudcrab')], 0x2003)
+        self.assertEqual(services[self.order.index('vivec_god')], 0)
+        self.assertEqual(D.services_of(self.kinds, 'mudcrab'), 0x2003)
+
+    def test_npc_rows_unchanged_by_the_creature_rows(self):
+        before = D.read(D.build(kinds(), TOPICS, DIALS)[0])
+        old = G.plan_npcs(kinds())[0]
+        for ident in NPCS:
+            b, a = old.index(ident), self.order.index(ident)
+            self.assertEqual(sorted(before['rows'][b]), sorted(self.t['rows'][a]), ident)
+            for topic in before['rows'][b]:
+                with self.subTest(npc=ident, topic=self.names[topic]):
+                    self.assertEqual(named_answers(self.t, a, topic), named_answers(before, b, topic))
+            self.assertEqual(before['services'][b], self.t['services'][a])
+
+    def test_image_steps_agree_on_the_rows(self):
+        # the voice and dialogue image steps from a master with creature records: the same rows (the dialogue step
+        # checks its order against the voice table it finds)
+        from test_greeting_lut import esm
+        k = self.kinds
+        records = [('GMST', v) for v in k['GMST'].values()]
+        records += [(tag, v) for tag in ('RACE', 'CLAS', 'FACT', 'SCPT') for v in k[tag].values()]
+        records += [('NPC_', v) for v in k['NPC_'].values()] + [('CREA', v) for v in k['CREA'].values()]
+        raw = esm(records)
+        for topic, infos in self.topics.items():
+            name = DIALS.get(topic, (topic, 0))
+            raw += esm([('DIAL', [('NAME', name[0]), ('DATA', bytes([name[1]]))])] + [('INFO', i) for i in infos])
+        from unittest import mock
+        # this master has no sound records and the dialogue fixture's NPCs no voiced line: written reasons for them
+        silent = {i: 'a fixture character without sounds' for i in list(k['CREA']) + list(k['NPC_'])}
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(G.SILENT_BY_DESIGN, silent):
+            data = Path(tmp) / 'Data Files'
+            data.mkdir()
+            (data / 'Morrowind.esm').write_bytes(raw)
+            voice = G.image_step(data, Path(tmp) / 'id1', Path(tmp) / 'out')
+            report = D.image_step(data, Path(tmp) / 'id1', Path(tmp) / 'out')
+            rows = list(G.read((Path(tmp) / 'id1' / G.NAME).read_bytes())['npcs'])
+        self.assertEqual((voice['creature_rows'], report['creature_rows']), (7, 7))
+        self.assertEqual(rows, self.order)
+
+
 class ImageStep(unittest.TestCase):
     def test_image_step_writes_the_table_beside_the_voice_table(self):
         from test_greeting_lut import esm

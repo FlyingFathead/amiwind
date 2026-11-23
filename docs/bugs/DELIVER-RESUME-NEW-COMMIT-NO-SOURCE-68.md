@@ -130,6 +130,7 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - [CHIMPORT-RETRY-AUDIT-FAILED-36](CHIMPORT-RETRY-AUDIT-FAILED-36.md): CHIMport --retry-failed never reran cells that converted but failed an audit (memory fit, doors, hull chains): the runner marks them done
 - [CHIMPORT-UNITS-NOT-SHARED-WITH-BUILD-68](CHIMPORT-UNITS-NOT-SHARED-WITH-BUILD-68.md): A build module's world stage converts again every unit a CHIMport run already made for the same cells
 - [DOOR-CHECK-KNOWN-UNKEYED-54](DOOR-CHECK-KNOWN-UNKEYED-54.md): config/door-check-known.json is in no stage key: an edit to the known list never re-runs a passed image's door check
+- [JANITOR-KEEPS-RUNS-OF-FINISHED-REQUESTS-68](JANITOR-KEEPS-RUNS-OF-FINISHED-REQUESTS-68.md): The build volume's cleanup keeps old runs for ever when any earlier, finished build request named them as the source of its reused stages
 - [K-BACKUP-RUN-COPY-SYMLINKS-68](K-BACKUP-RUN-COPY-SYMLINKS-68.md): Archiving a superseded build run to the archive drive fails for runs that hold symbolic links
 - [MESH-TABLE-LAYER-GROWS-67](MESH-TABLE-LAYER-GROWS-67.md): A row added to an expansion layer of a measured mesh table would re-key every unit recorded with that layer's earlier rows
 - [MESH-TABLE-SECOND-LAYER-REKEY-67](MESH-TABLE-SECOND-LAYER-REKEY-67.md): A row of a second expansion in a measured mesh table would re-key every unit recorded with the first expansion's rows

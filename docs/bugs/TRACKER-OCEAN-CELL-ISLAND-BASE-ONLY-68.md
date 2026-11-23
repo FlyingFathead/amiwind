@@ -19,6 +19,23 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.68-dev8 (aa9305a1) | 2026-11-23 | gate 12760 of the planning item TRACKER-OCEAN-CELL-ISLAND-BASE-ONLY-68 | the CHIM import of the open sea names each cell's island set from the master that holds its record; -29,23 and -28,24 measured as Solstheim's open sea and listed for the module (153 cells); -6,26 and -20,14 back on Vvardenfell |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-22: reported in v0.0.68-dev7
+- 2026-11-23: fixed in source: a gated commit, v0.0.68-dev8 (aa9305a1); gate 12760 of the planning item TRACKER-OCEAN-CELL-ISLAND-BASE-ONLY-68: the CHIM import of the open sea names each cell's island set from the master that holds its record; -29,23 and -28,24 measured as Solstheim's open sea and listed for the module (153 cells); -6,26 and -20,14 back on Vvardenfell
+
+<!-- END GENERATED TIMELINE -->
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category

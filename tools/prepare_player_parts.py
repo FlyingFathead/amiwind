@@ -100,6 +100,11 @@ def race_rows(kinds):
                 part, vampire, bflags, kind = bydt
                 if kind or vampire or identifier.endswith('.1st') or text(body, 'FNAM').casefold() != race:
                     continue
+                # a part flagged not playable (BYDT flags 2) is no race's own: Bloodmoon's WerewolfHead and
+                # WerewolfHair name the Argonian race and were listed as an Argonian man's head and hair (OpenMW 0.51
+                # mwrender/npcanimation.cpp getBodyParts leaves BPF_NotPlayable out; prepare_hands.appearance_parts too)
+                if bflags & 2:
+                    continue
                 own = bool(bflags & 1) == female
                 if part == 0 and own:
                     heads.append(identifier)
@@ -169,6 +174,8 @@ def needed_parts(kinds, races, items):
         for body in r['hairs']:
             need.add((r['skeleton'], 1, body))
     for item in items:
+        if item.get('worn_on'):
+            continue        # worn on its own skeleton only (the werewolf robe: werewolf_parts.robe_row), baked there
         for slot, (male, female) in item['slots'].items():
             for body in (male, female):
                 if body and body in kinds['BODY']:
@@ -181,7 +188,9 @@ def needed_parts(kinds, races, items):
 def recipe_text(races, items, models, anms, tables, bones):
     """The recipe table, ASCII lines (the engine's aw_player_parts.c):
       AWPP1
-      T <s> <table path> <weapon bone> <shield bone>     per skeleton (s: h or k), the item bones' table indices
+      T <s> <table path> <weapon bone> <shield bone>     per skeleton (s: h or k, or the letter of a race on a
+                                                          skeleton of its own: w the werewolf, werewolf_parts), the
+                                                          item bones' table indices
       A <s> <0|1> <anm path>                              the player's groups per skeleton and sex
       R <race id> <0|1> <s> <weight> <height>             a race and sex
       S <race id> <0|1> <slot> <model>                    its skin part per slot
@@ -208,7 +217,8 @@ def recipe_text(races, items, models, anms, tables, bones):
     for (s, female), path in sorted(anms.items()):
         lines.append('A %s %d %s' % (s, female, path))
     for r in races:
-        s, f, race = SKELETONS[r['skeleton']], int(r['female']), word(r['race'])
+        # a race on a skeleton of its own names its letter (the werewolf's 'w', werewolf_parts.race_rows)
+        s, f, race = r.get('letter') or SKELETONS[r['skeleton']], int(r['female']), word(r['race'])
         lines.append('R %s %d %s %.4f %.4f' % (race, f, s, r['weight'], r['height']))
         for slot, body in sorted(r['skin'].items()):
             if (r['skeleton'], slot, body) in models:
@@ -251,8 +261,11 @@ def part_coverage(items, models, skeletons):
         named = [(slot, body) for slot, pair in item['slots'].items() for body in {b for b in pair if b}]
         out['multi_part_items'] += len(item['slots']) > 1
         out['robes'] += item.get('rank') == 24
-        for skeleton in sorted(skeletons):
-            row = out['skeletons'].setdefault(SKELETONS[skeleton], {'parts': 0, 'built': 0, 'missing': 0})
+        # an item worn on a skeleton of its own only (the werewolf robe, werewolf_parts.robe_row) counts there
+        worn_on = item.get('worn_on')
+        for skeleton in [worn_on[0]] if worn_on else sorted(skeletons):
+            row = out['skeletons'].setdefault(worn_on[1] if worn_on else SKELETONS[skeleton],
+                                              {'parts': 0, 'built': 0, 'missing': 0})
             for slot, body in named:
                 # beast races wear no shoes or boots (OpenMW 0.51 mwclass/clothing.cpp and armor.cpp canBeEquipped):
                 # their feet and ankles are never drawn from an item
@@ -334,6 +347,10 @@ def quotas_for(shapes, cap):
 def bake_part(task):
     """Worker: one part model. task = (data, palette, skeleton, part, cap). Returns (path, mdl bytes, report)."""
     data, palette, skeleton, part, cap = task
+    import werewolf_parts
+    if skeleton == werewolf_parts.SKELETON:
+        # the werewolf's body on its own skeleton and table (WEREWOLF-BODY-63): the report carries its table and layout
+        return werewolf_parts.bake_body(task)
     import prepare_player_view as ppv
     import skeletal_actor as sa
     from npc_geometry import assemble
@@ -393,6 +410,19 @@ def bake_part(task):
                       'sha256': hashlib.sha256(raw).hexdigest(), 'cap': cap, 'cap_used': use}
 
 
+def player_profile():
+    """The player body's groups (npc_anim.plan's profile): the 'move' profile, block, jump, land and the hand-to-hand
+    ready sections (prepare_player_view's body), and the baked swimmer's swim groups. The werewolf's layout takes the
+    same (werewolf_parts.body_layout)."""
+    import npc_anim
+    import prepare_player_view as ppv
+    profile = list(npc_anim.profiles()[PROFILE]) + [list(g) for g in ppv.BODY_EXTRA + ppv.BODY_READY]
+    # SWIM-BAKED-CLOTHES-60: the swim groups of the baked swimmer (prepare_player_view BODY_SWIM), so the assembled
+    # body swims in what is worn instead of the baked swimmer's starting clothes
+    have = {g[0] for g in profile}
+    return profile + [list(g) for g in ppv.BODY_SWIM if g[0] in SWIM_GROUPS and g[0] not in have]
+
+
 def player_layout(data, skeleton, female):
     """The player's groups on the table frames for one skeleton and sex: (layout text, table frames)."""
     import npc_anim
@@ -403,12 +433,7 @@ def player_layout(data, skeleton, female):
     appearance = {'skeleton': skeleton, 'female': female, 'weight': 1.0, 'height': 1.0, 'parts': []}
     table_bytes, report, table, _, rig, over = sa.game_table(str(data), appearance, of)
     path = sa.table_view(sa.table_choice(appearance)[2], list(table['groups']))
-    profile = list(npc_anim.profiles()[PROFILE]) + [list(g) for g in ppv.BODY_EXTRA + ppv.BODY_READY]
-    # SWIM-BAKED-CLOTHES-60: the swim groups of the baked swimmer (prepare_player_view BODY_SWIM), so the assembled
-    # body swims in what is worn instead of the baked swimmer's starting clothes
-    have = {g[0] for g in profile}
-    profile += [list(g) for g in ppv.BODY_SWIM if g[0] in SWIM_GROUPS and g[0] not in have]
-    _, groups = npc_anim.plan(rig, profile, over, 1.0, player_block_hit=True)
+    _, groups = npc_anim.plan(rig, player_profile(), over, 1.0, player_block_hit=True)
     kit = npc_anim.table_groups(table, groups, None, report['times'], prefix=sa.table_prefixes(path))
     return npc_anim.layout(kit), table['frames'], table_bytes, report['bone_names']
 
@@ -417,6 +442,14 @@ def player_layout(data, skeleton, female):
 
 def unit_inputs(task):
     data, palette, skeleton, part, cap = task
+    import werewolf_parts
+    if skeleton == werewolf_parts.SKELETON:
+        # the werewolf's body (WEREWOLF-BODY-63): also its method and the code that bakes it, which this cache's own
+        # key does not hold (it keys the import code of the modules it names only)
+        return {'entry': {'name': 'part %s %d %s' % (werewolf_parts.LETTER, part['slot'], part['id'])},
+                'skeleton': skeleton, 'part': part, 'cap': cap, 'palette_sha256': hashlib.sha256(palette).hexdigest(),
+                'head_from': werewolf_parts.HEAD_FROM, 'reducer': werewolf_parts.REDUCER,
+                'code': werewolf_parts.unit_code('bake_body')}
     return {'entry': {'name': 'part %s %d %s' % (SKELETONS[skeleton], part['slot'], part['id'])},
             'skeleton': skeleton, 'part': part, 'cap': cap, 'palette_sha256': hashlib.sha256(palette).hexdigest()}
 
@@ -482,12 +515,19 @@ def prepare(data, id1, palette, jobs=None, log=print):
     import prepare_player_view as ppv
     from build_parallel import stage_pool
     from pass_cache import forced
+    import werewolf_parts as WW
     started = time.monotonic()
     kinds, assets, _ = ppv._sources(data)
     races = race_rows(kinds)
     items = item_rows(kinds)
+    # WEREWOLF-BODY-63: the werewolf's look, when the masters have it (Bloodmoon): its robe worn on its own skeleton
+    ww = WW.werewolf_set(kinds)
+    WW.robe_row(items, ww)
     need = needed_parts(kinds, races, items)
     tasks = []
+    if ww:
+        # first: the slowest unit (the shared-vertex search of the least passing count)
+        tasks.append((str(data), palette, WW.SKELETON, WW.body_part(ww), SLOT_CAP.get(WW.SLOT, 32)))
     for skeleton, slot, body in sorted(need):
         record = kinds['BODY'].get(body)
         if record is None:
@@ -502,7 +542,7 @@ def prepare(data, id1, palette, jobs=None, log=print):
                 % (body, slot, mesh, own))
         tasks.append((str(data), palette, skeleton, part_dict(slot, body, own), SLOT_CAP.get(slot, 32)))
     from player_own_skin import OWN_HAND_MESHES
-    foreign = foreign_skin_parts(kinds, sorted({(t[3]['id'], t[3]['mesh']) for t in tasks}))
+    foreign = foreign_skin_parts(kinds, sorted({(t[3]['id'], t[3]['mesh']) for t in tasks if t[2] != WW.SKELETON}))
     if OWN_HAND_MESHES and foreign:
         raise ValueError('FP-HANDS-PER-RACE-67: a player body part is another race\'s or sex\'s: %s' % '; '.join(
             '%s %s' % f for f in foreign))
@@ -513,6 +553,7 @@ def prepare(data, id1, palette, jobs=None, log=print):
     log('=== PHASE 1/3: player parts: %d part uses, %d models to bake or reuse ===' % (len(tasks), len(unique)))
     cache = _unit_cache()
     todo, results, failed = [], {}, []
+    extra = {}      # a unit's files beside its model (the werewolf's table and layout)
     for path, t in unique.items():
         found = None
         if cache is not None and not forced(UNIT_CACHE, unit_inputs(t)['entry']['name']):
@@ -520,6 +561,8 @@ def prepare(data, id1, palette, jobs=None, log=print):
         if found is not None:
             row, files = found
             results[path] = (files['0'], row['report'])
+            if len(files) > 1:
+                extra[path] = {k: v for k, v in files.items() if k != '0'}
         else:
             todo.append(t)
     reused = len(results)
@@ -535,9 +578,12 @@ def prepare(data, id1, palette, jobs=None, log=print):
                 failed.append(result)
                 return
             path, raw, report = result
+            more = report.pop('_files', None)
             results[path] = (raw, report)
+            if more:
+                extra[path] = more
             if cache is not None:
-                cache.store_files(unit_inputs(todo[index]), {'report': report}, {'0': raw})
+                cache.store_files(unit_inputs(todo[index]), {'report': report}, dict(more or {}, **{'0': raw}))
         with stage_pool(jobs, 'player parts'):
             failed.extend(unit_store.run_each('player-parts', _safe_bake, list(enumerate(todo)), names, workers, keep,
                                               fallback=lambda name: 1.0, label='Player parts', already=reused,
@@ -570,6 +616,22 @@ def prepare(data, id1, palette, jobs=None, log=print):
             names = [n.casefold() for n in bone_names]
             bones[s] = (names.index('weapon bone') if 'weapon bone' in names else -1,
                         names.index('shield bone') if 'shield bone' in names else -1)
+    # WEREWOLF-BODY-63: the werewolf's table and layout from its unit, and its race rows (werewolf_parts)
+    were_rows, were = [], None
+    if ww:
+        path = part_path(WW.SKELETON, WW.body_part(ww))
+        if path in results:
+            if not {'table', 'layout'} <= set(extra.get(path, ())):
+                raise ValueError('WEREWOLF-BODY-63: the werewolf body %s came back without its table and layout' % path)
+            write_same(Path(id1) / WW.TABLE, extra[path]['table'])
+            (Path(id1) / WW.LAYOUT).write_bytes(extra[path]['layout'])
+            tables[WW.LETTER] = WW.TABLE
+            anms[(WW.LETTER, 0)] = anms[(WW.LETTER, 1)] = WW.LAYOUT
+            bones[WW.LETTER] = tuple(results[path][1]['item_bones'])
+            were_rows = WW.race_rows(ww)
+            were = {k: v for k, v in results[path][1].items() if k in (
+                'model', 'bytes', 'faces', 'vertices', 'source_faces', 'source_vertices', 'reducer', 'head_from',
+                'table', 'table_bytes', 'table_frames', 'table_bones', 'layout_groups', 'shapes')}
     coverage = part_coverage(items, models, {r['skeleton'] for r in races})
     log('player parts coverage (multi-part items: robes, skirts, cuirasses, greaves, paired pieces): %s' %
         json.dumps({k: v for k, v in coverage.items() if k != 'missing'}), flush=True)
@@ -579,7 +641,7 @@ def prepare(data, id1, palette, jobs=None, log=print):
         raise ValueError('ROBE-PART-NOT-BAKED-62: %d drawn parts have no model (first: %s); fix the part or list it '
                          'with its register ID in %s' % (len(unexplained), unexplained[:5], KNOWN_MISSING))
     log('=== PHASE 3/3: player parts: the recipe table ===', flush=True)
-    text = recipe_text(races, items, models, anms, tables, bones)
+    text = recipe_text(races + were_rows, items, models, anms, tables, bones)
     (Path(id1) / RECIPE_PATH).parent.mkdir(parents=True, exist_ok=True)
     (Path(id1) / RECIPE_PATH).write_text(text, encoding='ascii', newline='\n')
     sizes = [r[1]['bytes'] for r in results.values()]
@@ -588,6 +650,8 @@ def prepare(data, id1, palette, jobs=None, log=print):
               'bytes': sum(sizes), 'faces_median': sorted(faces)[len(faces) // 2] if faces else 0,
               'recipe_sha256': hashlib.sha256(text.encode('ascii')).hexdigest(), 'items': len(items),
               'races': len(races), 'seconds': round(time.monotonic() - started, 1), 'coverage': coverage}
+    if were:
+        report['werewolf'] = were
     log('Player parts: %d models (%d reused, %d made, %d failed), %.1f MB, %d items, %.1f s' % (
         report['models'], reused, report['made'], len(failed), report['bytes'] / 1e6, len(items), report['seconds']),
         flush=True)

@@ -1,0 +1,5 @@
+{
+ "format": "aw-completeness-approved-1",
+ "about": "The places of the game a release may ship without (tools/release_completeness.py; RELEASE-GATE-COMPLETENESS-LOST-67). Every exterior cell, interior cell and load door of every master a release ships is in the build; a release candidate or final is refused while one is missing, unless the maintainer approved that one place here. One entry per place: master (Morrowind.esm, Tribunal.esm or Bloodmoon.esm), kind (exterior, interior or door), place ('x,y' of an exterior cell, the interior cell's name, 'ref N' of a load door as the report prints it), date (YYYY-MM-DD) and reason. 'No entrance', 'teleport only', 'unreachable' and 'over a limit' are never reasons; an entry naming more than one place approves nothing. Starts empty.",
+ "approved": []
+}

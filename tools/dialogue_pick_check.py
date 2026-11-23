@@ -353,6 +353,11 @@ def check(kinds, topics, dials, raw, order, homes, wanted=TOPICS, limit=20, vari
             rate = row / max(0.1, time.time() - started)
             print('Answer choice: %d/%d NPCs, %d checked, %d mismatches (%.0f NPCs/s, ETA %.0f s)' % (
                 row, len(order), out['checked'], out['mismatches'], rate, (len(order) - row) / rate), flush=True)
+        if G.is_creature(kinds, ident):
+            # a creature row (DIALOGUE-CREATURE-SPEAKERS-66): this check's reference search is the NPC rule; the
+            # creature rule is tested in tests/test_dialogue_lut.py, its rows are skipped here (counted)
+            out['creature_rows_skipped'] = out.get('creature_rows_skipped', 0) + 1
+            continue
         npc = speaker(kinds, ident)
         base = state(kinds, npc, homes.get(ident))
         locals_ = _locals_of(kinds, npc)
@@ -405,8 +410,10 @@ def main(argv=None):
     raw, report = D.build_master(master, a.jobs)
     kinds, topics = G.load(master)
     dials = D.dial_names(master)
-    homes = G.home_cells(master, kinds)
-    order = [i for i in G.plan_npcs(kinds, homes)[0] if i not in report['left_out']]
+    # the table's rows: the NPC records and the creature speakers, in one order (DIALOGUE-CREATURE-SPEAKERS-66)
+    creatures = G.creature_speakers(kinds, topics)
+    homes = G.home_cells(master, kinds, creatures)
+    order = [i for i in G.plan_npcs(kinds, homes, creatures)[0] if i not in report['left_out']]
     wanted = 'all' if a.topics == 'all' else tuple(w.strip().casefold() for w in a.topics.split(',') if w.strip())
     print('=== PHASE 2/2: %d NPCs x %s topics and the greeting, the table against the original\'s rule ===' % (
         len(order), wanted if wanted == 'all' else len(wanted)), flush=True)

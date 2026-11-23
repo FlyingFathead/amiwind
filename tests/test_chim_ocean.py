@@ -259,6 +259,120 @@ class Cells(unittest.TestCase):
         self.assertIn('8 open-sea cells', out)
         self.assertEqual(list(run.iterdir()), [])
 
+    def run_with_records(self, args, lands, holders, listed=frozenset()):
+        with patch.object(C, 'ocean_record_masters', return_value=holders), \
+                patch.object(C, 'ocean_base_world_cells', return_value=listed):
+            return self.run_ocean(args, lands)
+
+    def test_each_cells_set_comes_from_the_master_that_holds_its_record(self):
+        """TRACKER-OCEAN-CELL-ISLAND-BASE-ONLY-68: every open-sea cell was fed as Vvardenfell's, so a cell whose only
+        record is in Bloodmoon.esm (Solstheim's open sea, -29,23 and -28,24) got Vvardenfell's island."""
+        run = self.root / 'run'
+        holders = {(0, 1): ('Bloodmoon.esm',), (1, 1): ('Morrowind.esm', 'Bloodmoon.esm'), (-1, 0): ('Bloodmoon.esm',)}
+        rc, out = self.run_with_records(self.args(run), {(0, 0): land()}, holders, frozenset({(-1, 0)}))
+        self.assertEqual(rc, 0, out)
+        fed = json.loads(C.feed(run).read_text())['cells']
+        self.assertEqual(fed['0,1']['set'], 'bloodmoon')         # a record in Bloodmoon.esm only: Solstheim's sea
+        self.assertEqual(fed['1,1']['set'], 'vvardenfell')       # the base master holds it too: Vvardenfell's
+        self.assertEqual(fed['-1,0']['set'], 'vvardenfell')      # a frame of the base world's cell list stays its own
+        self.assertIn('set', fed['1,-1'])                        # no record in any master: no set hint, said so
+        self.assertIsNone(fed['1,-1']['set'])
+        res = json.loads((run / 'cells' / C.cell_dir((0, 1)) / 'result.json').read_text())
+        self.assertEqual((res['set'], res['record_masters']), ('bloodmoon', ['Bloodmoon.esm']))
+        self.assertIn('bloodmoon 1, none 5, vvardenfell 2', out)
+        # a result written before the rule carries no set and the feed names none (the tracker keeps what it had)
+        res.pop('set')
+        self.assertNotIn('set', C.tracker_cell(res, {}))
+
+    def test_named_cells_only_and_a_cell_that_is_not_open_sea_is_refused(self):
+        run = self.root / 'run'
+        lands = {(0, 0): land()}
+        rc, out = self.run_with_records(self.args(run, cells='0,1 1,1'), lands, {(1, 1): ('Bloodmoon.esm',)})
+        self.assertEqual(rc, 0, out)
+        doc = json.loads((run / 'ocean' / 'plan.json').read_text())
+        self.assertEqual([(r['x'], r['y']) for r in doc['cells']], [(0, 1), (1, 1)])
+        self.assertEqual(doc['selection'], {'cells': ['0,1', '1,1'], 'of': 8})
+        self.assertEqual(sorted(json.loads(C.feed(run).read_text())['cells']), ['0,1', '1,1'])
+        self.assertIn('1,1: set bloodmoon; CELL record in Bloodmoon.esm', out)
+        self.assertIn('0,1: set none (the nearest island); CELL record in no master', out)
+        other = self.root / 'other'
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            rc, _ = self.run_with_records(self.args(other, cells='0,1 0,0 5,5'), lands, {})
+        self.assertEqual(rc, 2)
+        self.assertIn('2 of the 3 named cells are not open sea', err.getvalue())
+        self.assertIn('0,0: it has a LAND record', err.getvalue())
+        self.assertIn('5,5: it lies outside the open-sea plan', err.getvalue())
+        self.assertFalse((other / 'ocean').exists())             # refused before anything is written
+
+    def test_the_presented_folder_is_planned_from_its_base_file_and_the_records_from_the_game_files(self):
+        run = self.root / 'run'
+        folder = self.root / 'presented'
+        seen = {}
+
+        def lands(data_files, masters=None):
+            seen['lands'] = (data_files, masters)
+            return {(0, 0): land()}, set(), {}, 'sha'
+
+        def records(data_files, masters=None):
+            seen['records'] = data_files
+            return {}
+
+        with patch.object(C, 'presented_data_folder',
+                          return_value=(folder, {'masters': ['Morrowind.esm', 'Bloodmoon.esm']})), \
+                patch.object(C, 'master_lands', side_effect=lands), \
+                patch.object(C, 'ocean_record_masters', side_effect=records), \
+                patch.object(C, 'ocean_ground_textures', return_value=dict(GROUND)), \
+                contextlib.redirect_stdout(io.StringIO()):
+            rc = C.ocean(self.args(run, presented_data=folder, dry_run=True))
+        self.assertEqual(rc, 0)
+        self.assertEqual(seen['lands'], (folder, ('Morrowind.esm',)))   # its Morrowind.esm is the merged master
+        self.assertEqual(seen['records'], self.root)                   # where each record comes from: the game's files
+
+
+def raw_record(tag, subs, flags=0):
+    payload = b''.join(struct.pack('<4sI', t, len(d)) + d for t, d in subs)
+    return struct.pack('<4sIII', tag, len(payload), 0, flags) + payload
+
+
+def raw_cell(x, y, bits=0, flags=0, refs=False):
+    subs = [(b'NAME', b'\0'), (b'DATA', struct.pack('<Iii', bits, x, y))]
+    if refs:
+        subs += [(b'FRMR', struct.pack('<I', 1)), (b'NAME', b'kelp\0'), (b'DATA', bytes(24))]
+    return raw_record(b'CELL', subs, flags)
+
+
+class TheSetRule(unittest.TestCase):
+    """TRACKER-OCEAN-CELL-ISLAND-BASE-ONLY-68: an open-sea cell's set from the master that holds its CELL record."""
+
+    def test_the_first_master_in_load_order_listed_cells_and_no_record(self):
+        self.assertEqual(C.ocean_set((0, 1), ('Bloodmoon.esm',)), 'bloodmoon')
+        self.assertEqual(C.ocean_set((0, 1), ('Bloodmoon.esm', 'Morrowind.esm')), 'vvardenfell')   # load order
+        self.assertEqual(C.ocean_set((0, 1), ('bloodmoon.ESM',)), 'bloodmoon')
+        self.assertEqual(C.ocean_set((0, 1), ('Tribunal.esm',)), 'tribunal')
+        self.assertEqual(C.ocean_set((-19, 14), ('Bloodmoon.esm',), {(-19, 14)}), 'vvardenfell')   # the base world's
+        self.assertEqual(C.ocean_set((-6, 26), (), {(-6, 26)}), 'vvardenfell')
+        self.assertIsNone(C.ocean_set((-20, 14), ()))
+
+    def test_the_base_worlds_list_holds_its_three_open_sea_frames_of_bloodmoon_or_no_record(self):
+        listed = C.ocean_base_world_cells()
+        self.assertTrue({(-19, 14), (-19, 15), (-6, 26)} <= listed)
+        self.assertFalse({(-29, 23), (-28, 24), (-20, 14)} & listed)
+
+    def test_the_masters_that_hold_a_cells_record_are_read_from_their_own_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / 'Morrowind.esm').write_bytes(raw_cell(1, 1) + raw_cell(2, 2, refs=True) + raw_cell(5, 5, bits=1)
+                                                 + raw_cell(3, 3, flags=0x20))
+            (root / 'Morrowind.bsa').write_bytes(b'')
+            (root / 'Bloodmoon.esm').write_bytes(raw_cell(0, 1) + raw_cell(1, 1, refs=True))
+            got = C.ocean_record_masters(root, ('Morrowind.esm', 'Bloodmoon.esm'))
+            self.assertEqual(got, {(1, 1): ('Morrowind.esm', 'Bloodmoon.esm'), (2, 2): ('Morrowind.esm',),
+                                   (0, 1): ('Bloodmoon.esm',)})     # no interior, no deleted cell
+            # a selected master missing from the folder is left out
+            self.assertEqual(C.ocean_record_masters(root, ('Morrowind.esm', 'Tribunal.esm')),
+                             {(1, 1): ('Morrowind.esm',), (2, 2): ('Morrowind.esm',)})
+
 
 if __name__ == '__main__':
     unittest.main()

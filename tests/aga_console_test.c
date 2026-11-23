@@ -120,6 +120,7 @@ static void every_entry_translates(void){
        !strcmp(bar1+1,"date")?" date":
        !strcmp(bar1+1,"creatures")?" actors creatures":!strcmp(bar1+1,"mwscript")?" about":
        !strcmp(bar1+1,"mwscript stats")?" stats":!strcmp(bar1+1,"mwscript result")?" result":
+       !strcmp(bar1+1,"werewolf")?" werewolf":   /* WEREWOLF-BODY-63: the compiled scripts' command's werewolf words */
        !strcmp(bar1+1,"kill")?" actors killpick":
        !strcmp(bar1+1,"spawn")?" actors spawn":!strcmp(bar1+1,"despawn")?" actors despawnpick":
        !strcmp(bar1+1,"weapon")?" box weapon":!strcmp(bar1+1,"gear")?" box gear":

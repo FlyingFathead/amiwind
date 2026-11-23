@@ -192,8 +192,12 @@ class EngineWiring(unittest.TestCase):
         self.assertTrue(set(ppp.SWIM_GROUPS) <= {g[0] for g in ppv.BODY_SWIM})
         self.assertTrue(set(ppp.SWIM_GROUPS) <= set(npc_anim.GROUPS))
         layout = (ROOT / 'tools/prepare_player_parts.py').read_text(encoding='utf-8')
+        # the player's profile (player_profile, the werewolf's layout takes it too: tools/werewolf_parts.py)
+        profile = layout[layout.index('def player_profile('):layout.index('def player_layout(')]
+        self.assertIn('ppv.BODY_SWIM', profile)
         body = layout[layout.index('def player_layout('):]
-        self.assertIn('ppv.BODY_SWIM', body[:body.index('npc_anim.plan(')])
+        self.assertIn('player_profile()', body[:body.index('return npc_anim.layout(kit)')])
+        self.assertTrue(set(ppp.SWIM_GROUPS) <= {g[0] for g in ppp.player_profile()})
         view = (SRC / 'aw_view.c').read_text(encoding='utf-8')
         ready = view[view.index('static int body_ready('):view.index('static int held_ready(')]
         self.assertIn('(!swimming || AW_AnimSwims(&parts_anim))', ready)

@@ -149,6 +149,7 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [DOOR-USE-COLLISION-EXPANSIONS-68](DOOR-USE-COLLISION-EXPANSIONS-68.md): 13 exterior entrances of Solstheim and Mournhold cannot be reached in the converted collision: no standing spot at the threshold, or the door out of the use reach
 - [HULL-SURFACE-TENT03-MISSING-57](HULL-SURFACE-TENT03-MISSING-57.md): The collision surface table left out one Ashlander yurt (ex_ashl_tent_03): its walkable collision lay 64 units under its convex pieces
 - [PELAGIAD-STAIRS-STUCK-67](PELAGIAD-STAIRS-STUCK-67.md): A stairway up in Pelagiad cannot be climbed: the player gets stuck on it
+- [PENUMBRA-ICE-WALL-NO-PASSAGE-68](PENUMBRA-ICE-WALL-NO-PASSAGE-68.md): After the ice wall of the Halls of Penumbra breaks, the player cannot get past it into the chamber behind it
 - [RECIPE-ROW-MOVES-COLLISION-57](RECIPE-ROW-MOVES-COLLISION-57.md): A mesh reduction row changed the Imperial ship's collision: the dev4 build stopped at the collision surface gate in Vivec City (64 units)
 - RED-MOUNTAIN-SLOPE-TOO-STEEP-51 (no report page): Red Mountain (cell 2,7): a slope too steep to walk up, the player cannot go forward
 - [ROOM-PYLON-ROOF-48](ROOM-PYLON-ROOF-48.md): Grand Inquisitor and Tamira Vian (Hall of Processing) stand inside collision: a convex piece of ex_stronghold_pylon01 slopes 14 units over the floor they stand on
@@ -169,6 +170,7 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 - [VIVEC-ARENA-ACTORS-32](VIVEC-ARENA-ACTORS-32.md): Five Vivec Arena residents fail the actor placement gate
 - [VIVEC-ARENA-TP-ARRIVAL-32](VIVEC-ARENA-TP-ARRIVAL-32.md): dbg tp vivec_arena leaves the player at the frame origin under the water
 - [VIVEC-TEMPLE-STAIRS-33](VIVEC-TEMPLE-STAIRS-33.md): Palace steps and High Fane quarter flights fail the stair gate on the CHIM Vivec Temple frame
+- [WALK-TRACE-VISIT-GUARD-FOUNTAIN-68](WALK-TRACE-VISIT-GUARD-FOUNTAIN-68.md): The offline collision tracer gives up on traces through the fountain beside Mournhold's ladder down to Bamz-Amschend: its visit guard ends the trace
 - [WORLD-SLOPE-STUCK-38](WORLD-SLOPE-STUCK-38.md): Player reports being stuck beside Ashlands terrain
 
 <!-- END GENERATED CATEGORY -->

@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "aw_combat.h"
+#include "aw_combat_were.h"
 
 static aw_combat_settings_t s;
 static int near(float a,float b){return fabsf(a-b)<.01f;}
@@ -505,6 +506,35 @@ int main(void) {
      memset(&o,0,sizeof(o));assert(!AW_CombatCreatureWeapon(&o,&arrow) && o.weapon==0);
      printf("shot rules ok: the flight lands within %.2f units after %d steps\n",(double)fabsf(pos[2]-to[2]),steps);
     }
+
+    /* NPC-WEREWOLF-FIGHTS-ARMED-68 (v0.0.68, aw_combat_were.h): the werewolf's claws, worked by hand from OpenMW 0.51
+     * combat.cpp getHandToHandDamage 478-514 and aicombataction.cpp getMaxAttackDistance 363-375 */
+    {aw_fighter_t w,v;aw_swing_t o2;aw_combat_rng_t low=seeded_for(1);
+     /* the sheet: Mevil Molor's mace and shield gone, unarmoured (Unarmored 38: 3.8 x 2.47), no load; stats stay */
+     w=mevil();w.encumbrance=.5f;w.hit_classes=0x15;
+     AW_CombatWerewolfClaws(&s,&w);
+     assert(!w.weapon && w.weapon_skill==AW_SK_H2H && !w.shield && !w.damage[0][1] && !w.damage[2][1] && w.reach==0);
+     assert(w.speed==1 && w.weight==0 && w.weapon_health_max==0 && w.shield_health_max==0 && !w.hit_classes);
+     assert(near(w.armor,9.386f) && w.encumbrance==0 && w.skills[AW_SK_H2H]==38 && w.health==94 && w.attributes[AW_AGI]==63);
+     {aw_combat_rng_t t=low;int k2=AW_CombatBestAttack(&w,&t);assert(k2>=0 && k2<3);}   /* hand to hand: a random type */
+     /* the blow at full strength on the player (unarmoured 0.65): 38 x 0.5 = 19, x 25 claws x 0.1 = 47.5 health, armour
+      * 47.5 / 48.15 -> 46.86; the same fighter without the claws (AW_CombatSwing, or CLAWS below 0): 19 fatigue */
+     v=y;q=low;AW_CombatSwingClaws(&s,&w,&v,AW_ATTACK_CHOP,1,0,1,25,&q,&o2);
+     assert(o2.outcome==AW_HIT_HEALTH && near(o2.raw,47.5f) && near(o2.damage,46.86f) && near(v.health,60-46.86f));
+     assert(v.fatigue==v.fatigue_max);
+     v=y;q=low;AW_CombatSwingClaws(&s,&w,&v,AW_ATTACK_CHOP,1,0,1,-1,&q,&o2);
+     assert(o2.outcome==AW_HIT_FATIGUE && near(o2.damage,19) && v.health==60);
+     v=y;q=low;AW_CombatSwing(&s,&w,&v,AW_ATTACK_CHOP,1,0,1,&q,&o2);
+     assert(o2.outcome==AW_HIT_FATIGUE && near(o2.damage,19));
+     /* the Dream of Hircine's 35, and a global of 0: health damage of 0 (no fatigue blow) */
+     v=y;q=low;AW_CombatSwingClaws(&s,&w,&v,AW_ATTACK_CHOP,1,0,1,35,&q,&o2);
+     assert(o2.outcome==AW_HIT_HEALTH && near(o2.raw,66.5f));
+     v=y;q=low;AW_CombatSwingClaws(&s,&w,&v,AW_ATTACK_CHOP,1,0,1,0,&q,&o2);
+     assert(o2.outcome==AW_HIT_HEALTH && o2.damage==0 && v.health==60 && v.fatigue==v.fatigue_max);
+     /* the attack distance (128 units): x 1.3 for a werewolf, as before for anyone else */
+     assert(near(AW_CombatWerewolfAttackDistance(&s,1,.3f),166.4f) && near(AW_CombatWerewolfAttackDistance(&s,0,.3f),128));
+     printf("werewolf rules ok: claws 47.5 -> %.2f health (no claws: 19 fatigue), attack distance %.1f\n",
+            (double)46.86f,(double)AW_CombatWerewolfAttackDistance(&s,1,AW_WERE_DISTANCE_MOD_DEFAULT));}
 
     /* a fighter sheet stays small (bytes per actor) */
     assert(sizeof(aw_fighter_t)<=192);   /* +4 since v0.0.63: the hit chance's effect terms (HIT-CHANCE-CHECK-62); +4 since

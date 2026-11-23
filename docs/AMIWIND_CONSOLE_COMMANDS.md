@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.68-dev8._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.68-dev11._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -80,6 +80,7 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg torchgallery` | `dbg torchtest` | [npc ID/name] same as torchtest: one NPC in the dark room, V toggles your torch |
 | `dbg tpscene` | - | [list/headselection] (fresh debug scene; resets unsaved progress) |
 | `dbg ver` | `dbg version` | (the AmiWind build version, the build commit and date as the image records them, and the CHIM engine version) |
+| `dbg werewolf` | - | [on / off; no argument: the status] the werewolf form as the script's BecomeWerewolf and UndoWerewolf make it (items off, the werewolf robe worn, the werewolf drawn, the inventory and magic windows shut; off: own stats back, the robe away, nothing put back on); alone: the form, the parts, tables and model slots by number |
 
 ## Audio
 
@@ -97,6 +98,7 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 
 | Command | Also | Arguments and notes |
 | --- | --- | --- |
+| `dbg ashfall` | - | 0..2 (not saved, default 0, a comparison): the ash of ash and blight storms falls as a blizzard's snow, grey in ash storms and brown in blight storms (1), blown at the old ash's speed (2); 0 the thin drift of before; with dbg atmos 1 or 3 |
 | `dbg atmos` | - | 0..3 (saved, default 2): 1 rain, snow and storm ash outdoors (off until measured), 2 chimney, fire and steam smoke; 3 both |
 | `dbg cam` | - | [mark NAME / recall NAME / list / orbit [photo] [speed DEG] [ref N / mark NAME] / orbit off / pan / track] (docs/CAMERA_MARKS.md) mark saves place, view, time, headlamp, fog; recall: a public mark (bm1..bm5, sn1..sn5, vivec-palace) or yours, as dbg tp; orbit circles the crosshair target, player detached: +/- speed, 0 holds, wheel zoom, right click or Esc ends |
 | `dbg cam pan` | `dbg pan cam` | [DEGREES] [HOLD] [speed DEG] [photo] / off: a tripod pan for video from the view now: DEGREES default 360 (negative: to the left), HOLD s on the opening and closing frame (default 3), eased start and stop; speed default the field of view over 6 s (15 deg/s); player detached; nothing on screen; Esc or right click ends (docs/CAMERA_MARKS.md) |
@@ -208,7 +210,7 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg torch radius` | - | [32..288] (player + admitted guard lights; default 192, classic 144) |
 | `dbg torch strength` | - | [0..1] (player + admitted guards; default 0.7; local light only) |
 | `dbg warm light` | - | 1/0 torch, lamp and window light takes the light hue (default 1) |
-| `dbg weather` | - | [on/off / skyonly / auto / clear cloudy foggy overcast rain thunder ash blight snow blizzard] region weather: sky, fog and land light from the region's chances (default on, saved; skyonly: sky and fog only; off: clear sky); a name forces it until auto; no argument: the weather, region id (ChangeWeather, ModRegion take it), chances |
+| `dbg weather` | - | [on/off / skyonly / auto / NAME / look on/off] region weather from the region's chances (default on, saved; skyonly: sky and fog only; off: clear sky); NAME (clear .. blizzard) forces one until auto; look: each weather's fog depth, cloud speed (on, saved); no argument: weather, region id (ChangeWeather, ModRegion take it), chances, fog |
 
 ## Ui / Console
 

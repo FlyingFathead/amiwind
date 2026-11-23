@@ -691,6 +691,14 @@ int AW_MwvmUse(uint32_t reference){
     vm.inst[k].flags|=AWI_ACTIVATED;vm.inst[k].flags&=~AWI_QUIET;
     return 1;
 }
+/* ROOM-SCRIPTED-ACTIVATOR-NO-USE-68: 1 while REFERENCE's attached script would take the player's use (the test of
+ * AW_MwvmUse without the use itself): the focus asks it for a named activator under the crosshair (aw_mwhost.c
+ * object_takes_use declares it there; no header carries it, so no stage key moves) */
+int AW_MwvmTakesUse(uint32_t reference);
+int AW_MwvmTakesUse(uint32_t reference){
+    int k=ON && reference?attached_instance(reference):-1;
+    return k>=0 && (vm.inst[k].flags&AWI_TAKES_USE)?1:0;
+}
 /* MW-CONSOLE-COMMANDS-62 (v0.0.68, family 7): the console's readings of the opcodes, by the opcodes' own rules (aw_mwvm.h) */
 float AW_MwvmRandom(int32_t n){return ON?roll(n):0.0f;}
 float AW_MwvmFrameSeconds(void){return ON?vm.dt:0.0f;}

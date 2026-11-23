@@ -83,7 +83,23 @@ class AtmosWiringTests(unittest.TestCase):
         atmos = code('aw_atmos.c')
         self.assertIn('static cvar_t aw_atmos={"aw_atmos","2",true};', atmos)    # smoke on, falling weather off
         self.assertIn('kind=AW_WeatherFalling(&strength);', atmos)
-        self.assertIn('AW_FxParticles(at,n,PRECIP_HALF_WIDTH,vel,rand_v,life,r,g,b,0);', atmos)
+        self.assertIn('AW_FxParticles(at,n,half,vel,rand_v,life,r,g,b,0);', atmos)
+        # SOL-WEATHER-SKY-SNOW-68: snow and blizzards fall in the Snow box (Morrowind.ini [Weather Snow] Snow Diameter
+        # 800, Height 400 to 700, a quarter here), and a blizzard's flakes blow along its wind, not a fixed drift
+        self.assertIn('if(kind==AW_PRECIP_SNOW || kind==AW_PRECIP_BLIZZARD || ashfall){low=SNOW_LOW;high=SNOW_HIGH;'
+                      'half=SNOW_HALF_WIDTH;}', atmos)
+        self.assertIn('#define SNOW_HALF_WIDTH 100.0f', atmos)
+        self.assertIn('vel[0]=dir[0]*BLIZZARD_WIND;vel[1]=dir[1]*BLIZZARD_WIND;', atmos)
+        self.assertNotIn('vel[0]=18;vel[1]=8;', atmos)
+        # BLIGHT-WIND-SPRITES-68: the storms' ash as the blizzard's falling snow, a comparison switch that is off by
+        # default (the ash of before), grey in an ash storm and brown in a blight storm, listed under dbg
+        self.assertIn('static cvar_t aw_ashfall={"aw_ashfall","0"};', atmos)
+        self.assertIn('ashfall=kind==AW_PRECIP_ASH && aw_ashfall.value>=1?(aw_ashfall.value>=2?2:1):0;', atmos)
+        self.assertIn('const int *c=AW_WeatherCurrent()==AW_WEATHER_BLIGHT?blight_brown:ash_grey;', atmos)
+        self.assertIn('vel[0]=dir[0]*60;vel[1]=dir[1]*60;vel[2]=-6;rand_v=10;r=120;g=92;b=74;', atmos)   # 0: as before
+        self.assertIn('Cvar_RegisterVariable(&aw_ashfall);', atmos)
+        commands = (ROOT / 'config' / 'debug-commands.txt').read_text(encoding='utf-8')
+        self.assertIn('VIDEO|ashfall|aw_ashfall|0..2 (not saved, default 0', commands)
         self.assertIn('AW_FxSprite(smoke_model,at,s->size*0.25f*scale,frame)', atmos)
         self.assertIn('!R_SkyExterior()', atmos)
         self.assertIn('AW_AtmosUpdate ();', (SRC / 'cl_main.c').read_text(encoding='utf-8'))

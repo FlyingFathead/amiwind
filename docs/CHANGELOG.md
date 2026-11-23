@@ -1,10 +1,13 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.68-dev8 (22 November 2026)._
+_Last updated with AmiWind v0.0.68-dev11 (23 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.68-dev11: eleventh snapshot of v0.0.68, 23 November 2026](#v0068-dev11-eleventh-snapshot-of-v0068-23-november-2026)
+- [v0.0.68-dev10: tenth snapshot of v0.0.68, 23 November 2026](#v0068-dev10-tenth-snapshot-of-v0068-23-november-2026)
+- [v0.0.68-dev9: ninth snapshot of v0.0.68, 23 November 2026](#v0068-dev9-ninth-snapshot-of-v0068-23-november-2026)
 - [v0.0.68-dev8: eighth snapshot of v0.0.68, 22 November 2026](#v0068-dev8-eighth-snapshot-of-v0068-22-november-2026)
 - [v0.0.68-dev7: seventh snapshot of v0.0.68, 22 November 2026](#v0068-dev7-seventh-snapshot-of-v0068-22-november-2026)
 - [v0.0.68-dev6: sixth snapshot of v0.0.68, 22 November 2026](#v0068-dev6-sixth-snapshot-of-v0068-22-november-2026)
@@ -215,6 +218,149 @@ _Last updated with AmiWind v0.0.68-dev8 (22 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.68-dev11: eleventh snapshot of v0.0.68, 23 November 2026
+
+The eleventh development snapshot of v0.0.68, in development ([release notes](releases/notes/RELEASE-v0.0.68-dev11.md)), on
+the way to v0.0.68, **Solstheim Is Here** (the release for which Solstheim is to be complete). Fights no longer stutter when
+blows land, a character in werewolf form can no longer be talked to, the creatures that have lines have rows in the dialogue
+and voice tables, and each of Solstheim's weathers has its own look. Emulator presets: `AmiWind-v0.0.68-dev11-FS-UAE.fs-uae`
+and `AmiWind-v0.0.68-dev11-WinUAE.uae`, both with 32 MB of Fast RAM. All of it is covered by tests and the gates of the
+commits; the fight's frame times, the werewolf character's missing offer to talk and the glacier's weathers are seen in
+play, the rest not yet.
+
+**Changed**
+
+- Each blow read the fighters' whole spell lists from disk again, and the fight's sounds were read in the frame that needed
+  them. The lists are now kept from the start of the fight and the sounds are loaded with the area
+  (AMBIENT-SOUND-READ-IN-FRAME-68, MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68). With six fighters the worst fight frame went from
+  219 ms to 50 ms (296 ms to 28 ms with the think cap), and blows read nothing from disk. A voice line's first read still
+  happens in its frame. `dbg combat` prints the worst fight frame, the worst think and the fight's sounds; the cvar
+  `aw_combat_think_cap` limits the thinks per frame and is off by default.
+- A character in werewolf form can no longer be talked to, as in the original (NPC-WEREWOLF-TALK-OFFERED-68, seen in play).
+- The creatures that have lines (46 over the three masters, 9 with recorded voices) have rows in the dialogue and voice
+  tables (DIALOGUE-CREATURE-SPEAKERS-66); talking to them is not done yet.
+- A blizzard is a storm blowing north: characters facing into it shield their eyes and its snow drifts with the wind. Each
+  weather has its own fog distance and cloud speed scaled from the original's (clear weather unchanged), and snow falls in
+  its own space (BLIZZARD-NOT-A-STORM-68, WEATHER-FOG-CLOUDS-ONE-LOOK-68); `dbg weather look off` gives the old look. Seen in
+  play on a test image at the glacier: a blizzard's fog about four times nearer, its clouds six times faster.
+- The falling effect for ash and blight storms is a switch, off by default (`dbg ashfall 1` or `2`,
+  BLIGHT-WIND-SPRITES-68).
+
+**Builder and tools**
+
+- The build volume's cleanup keeps the old runs of a build for good when a finished build request named them
+  (open, JANITOR-KEEPS-RUNS-OF-FINISHED-REQUESTS-68).
+
+**Known**
+
+- Each weather's own cloud picture and the slowed walk in storms are left (WEATHER-CLOUD-TEXTURES-68,
+  STORM-WALK-NOT-SLOWED-68); the chamber behind the broken ice wall cannot be entered (PENUMBRA-ICE-WALL-NO-PASSAGE-68).
+
+**Documentation**
+
+- The README, the roadmap and the releases index name the v0.0.68-dev11 snapshot and presets; the docs index is written
+  again.
+
+## v0.0.68-dev10: tenth snapshot of v0.0.68, 23 November 2026
+
+The tenth development snapshot of v0.0.68, in development ([release notes](releases/notes/RELEASE-v0.0.68-dev10.md)), on
+the way to v0.0.68, **Solstheim Is Here** (the release for which Solstheim is to be complete). The characters a Bloodmoon
+script turns into werewolves are drawn as werewolves and fight with their claws only, every werewolf is drawn at its race's
+size, and a script's animation group on a placed object leaves it in its end pose. Emulator presets:
+`AmiWind-v0.0.68-dev10-FS-UAE.fs-uae` and `AmiWind-v0.0.68-dev10-WinUAE.uae`, both with 32 MB of Fast RAM. All of it is
+covered by tests and the gates of the commits; the werewolves' fight, the player's werewolf size and the ice wall's breaking
+are seen on the PC emulator, the rest not yet in play.
+
+**Changed**
+
+- The characters a script turns into werewolves (the Skaal hunt, the wild hunt, the maze and the ceremony) are drawn as
+  werewolves, hold nothing, and a dead one stays a werewolf corpse (NPC-WEREWOLF-NO-MODEL-66, seen in play).
+- A werewolf fights with its claws only, without weapon, shield, armour or spells, and has its own gear back on the change
+  back; the player in werewolf form cannot ready magic; a fleeing actor turns back from a werewolf near it
+  (NPC-WEREWOLF-FIGHTS-ARMED-68). The claws-only fight is seen in play; the refusal to ready magic is not yet.
+- Every werewolf is drawn at its own race's and sex's size (WEREWOLF-RACE-SCALE-68, seen in play for six races).
+  UndoWerewolf gives the player's own attributes and skills back and takes the werewolf robe away (seen in play).
+- A script's PlayGroup or LoopGroup on a placed object leaves it in the animation's end pose, drawn and collided together
+  and kept in the save: the Halls of Penumbra's ice wall breaks, the Sotha Sil lever doors open and the Bamz-Amschend
+  cave-ins fall (MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68). Seen in play: the ice wall and a lever door in the Outer Flooded Halls.
+
+**Builder and tools**
+
+- The plan's completeness report counts the cells inside the towns' frames as built
+  (COMPLETENESS-PLAN-TOWN-CELLS-MISSING-68).
+- The public progress tracker is written again from the dev9 build: Solstheim 150 of 150 land cells and 101 of 101 rooms
+  (DOCS-PROGRESS-TRACKER-STALE-64).
+
+**Known**
+
+- The player cannot get past the broken ice wall into the chamber behind it (the quest does not need it,
+  PENUMBRA-ICE-WALL-NO-PASSAGE-68); the use key offers to talk to a werewolf (NPC-WEREWOLF-TALK-OFFERED-68); silver
+  weapons' extra damage, the werewolf's own sounds and the readier attack on a werewolf are left
+  (WEREWOLF-FIGHT-RULES-LEFT-68); Akulakhan's Chamber keeps its old look, as it cannot hold its end poses within 32 MB yet;
+  creatures get no conversation (DIALOGUE-CREATURE-SPEAKERS-66).
+
+**Documentation**
+
+- The README, the roadmap and the releases index name the v0.0.68-dev10 snapshot and presets; the docs index is written
+  again.
+
+## v0.0.68-dev9: ninth snapshot of v0.0.68, 23 November 2026
+
+The ninth development snapshot of v0.0.68, in development ([release notes](releases/notes/RELEASE-v0.0.68-dev9.md)), on
+the way to v0.0.68, **Solstheim Is Here** (the release for which Solstheim is to be complete). All 153 of Solstheim's
+cells are built, the quest and underwater entrances of Solstheim can be used, named objects whose script answers on use
+take the use key, the player in werewolf form is drawn as the werewolf, and a script's ForceGreeting opens the conversation
+as the original does. Emulator presets: `AmiWind-v0.0.68-dev9-FS-UAE.fs-uae` and `AmiWind-v0.0.68-dev9-WinUAE.uae`, both
+with 32 MB of Fast RAM. All of it is covered by tests and the gates of the commits (12547, 12760, 12783, 12828, 12840,
+12841, 12842); the entrances, the ice wall's question and the player's werewolf form are seen on the PC emulator, the rest
+not yet in play.
+
+**Changed**
+
+- Solstheim's last two open-sea cells, -29,23 and -28,24, are built: the CHIM import names each open-sea cell's island from
+  the master that holds its record, and Solstheim has all 153 cells (TRACKER-OCEAN-CELL-ISLAND-BASE-ONLY-68).
+- A placement that an expansion's script switches off is hidden, matched by its stable reference: the ice covers at
+  Stahlman's Gorge and the Caves of Fjalding and the rock at Glenschul's Tomb no longer stay in the way, and 840 placements
+  of Mournhold are hidden as well (EXPANSION-STORE-DISABLE-NOT-HIDDEN-68). Seen in play: the three entrances were entered.
+- A load or hinged door under the crosshair takes the use key from a creature whose use box holds the player's eye: the
+  Unmarked Shipwreck's trapdoor opens with a dreugh attacking (FOCUS-EYE-INSIDE-ACTOR-BOX-68, seen in play).
+- A teleport with a height into water leaves the player at that depth (SWIM-PLAYER-DOES-NOT-STAY-AT-DEPTH-68).
+- A named object whose script reads OnActivate takes the use key: 1,712 placed activators, among them beds, levers,
+  cave-ins, shrines, the Skaal stones and the Halls of Penumbra's ice wall, whose question and quest stage work in play
+  (ROOM-SCRIPTED-ACTIVATOR-NO-USE-68).
+- The player in werewolf form is drawn as the werewolf in third person and with its claws in first person, by the script's
+  change, the console, `dbg werewolf on|off` and the werewolf robe; the change back is the original's, and the werewolf's
+  animation tables are let go on it (WEREWOLF-BODY-63, WEREWOLF-TABLES-STAY-LOADED-68, WEREWOLF-SET-KEPT-WITH-TORCH-68,
+  DBG-WEREWOLF-STATUS-ARMS-MISREAD-68). Seen in play.
+- A script's ForceGreeting opens the conversation with someone in a fight or knocked down, and is held back from a werewolf
+  player (MWSCRIPT-FORCEGREETING-TALK-RULES-68). Seen in play for those two cases.
+
+**Builder and tools**
+
+- A release candidate or final is refused while a cell, room or load door of a shipped master is missing
+  (RELEASE-GATE-COMPLETENESS-LOST-67); the boot settings size is checked again in the image's last step
+  (CFG-OVER-COMMAND-BUFFER-68).
+- The door check judges by what play showed: the walk-out arrival, a door under water used by a swimmer, a door in a
+  neighbouring frame's border copy, and each door of a doorway that scripts switch between (DOOR-USE-COLLISION-EXPANSIONS-68,
+  DOOR-CHECK-NO-SWIM-CASE-68, DOOR-CHECK-DOORWAY-STAGES-68).
+- A reused stage copies a file at the file system's link limit instead of refusing the stage (REUSE-POOL-LINK-LIMIT-68), and
+  the reuse check reads every cache opener, the creature models' caches included.
+- Test sessions run the emulator in its deterministic mode by default; the shipped presets are unchanged.
+
+**Known**
+
+- The Halls of Penumbra's ice wall plays no breaking animation and stays in the way after its quest stage
+  (MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68, being fixed); the people a script turns into werewolves are not drawn as werewolves
+  yet (NPC-WEREWOLF-NO-MODEL-66, being fixed); creatures get no conversation (DIALOGUE-CREATURE-SPEAKERS-66); the rally-game
+  trees await the maintainer's choice.
+
+**Documentation**
+
+- The README, the roadmap and the releases index name the v0.0.68-dev9 snapshot and presets; the docs index is written
+  again. The MWScript tracker is measured again against the dev8 image: 1,063 of the original's 1,074 scripts run and 9 are
+  carried (one more than before); 2 are placed only in cells the image does not
+  carry.
 
 ## v0.0.68-dev8: eighth snapshot of v0.0.68, 22 November 2026
 

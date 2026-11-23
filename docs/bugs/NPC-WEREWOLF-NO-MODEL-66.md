@@ -2,11 +2,12 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 3 times; something has to be done
+## PERSISTING: reported 4 times; something has to be done
 
 - Reported with v0.0.67-dev2 at 2026-11-18 (time not recorded): Seen again on the v0.0.67-dev2 image (the maintainer's picture, 2026-11-18): the werewolf `BM_werewolf_skaal2a` (reference 8418104) in Skaal Village, The Greathall is drawn as a thin scaled humanoid that looks like an Argonian, not as a werewolf.
 - Reported with v0.0.67-dev2 at 2026-11-18 (time not recorded): Seen again in the Mournhold test build of 58d58089 (2026-11-18): the NPC library left out `bm_werewolf_skaal1a3` ("NPC library [496/496] bm_werewolf_skaal1a3 FAILED", 495 appearances, 1 left out).
 - Reported with v0.0.68-dev8 at 2026-11-22 20:24 +0200: Still in v0.0.68-dev8: one werewolf of the Skaal (BM_werewolf_skaal1A3) is left out of Solstheim because the actor library makes no model for werewolves.
+- Reported with v0.0.68-dev8 at 2026-11-23 01:25 +0200: In source on 23 November 2026 the actor library leaves out a part that has no geometry instead of refusing the whole character, so the Skaal Village werewolf gets a model: the body its record names. A character that a script turns into a werewolf is still drawn with that body, not the werewolf's; drawing it as the werewolf is the open part.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -34,12 +35,20 @@
 
 ## Timeline
 
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.68-dev8 (81755190) | 2026-11-23 | gate 12784 of the planning item DEV2-EXPANSION-STAGES-AUDIT-66 | The characters a script turns into werewolves are drawn with the player's werewolf body and animation, hold nothing and keep the werewolf corpse (v0.0.68-wolflead); to be seen in play. |
+
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-14: reported in v0.0.66-dev2
 - 2026-11-18: seen again in v0.0.67-dev2: Seen again on the v0.0.67-dev2 image (the maintainer's picture, 2026-11-18): the werewolf `BM_werewolf_skaal2a` (reference 8418104) in Skaal Village, The Greathall is drawn as a thin scaled humanoid that looks like an Argonian, not as a ...
 - 2026-11-18: seen again in v0.0.67-dev2: Seen again in the Mournhold test build of 58d58089 (2026-11-18): the NPC library left out `bm_werewolf_skaal1a3` ("NPC library [496/496] bm_werewolf_skaal1a3 FAILED", 495 appearances, 1 left out).
 - 2026-11-22 20:24 +0200: seen again in v0.0.68-dev8: Still in v0.0.68-dev8: one werewolf of the Skaal (BM_werewolf_skaal1A3) is left out of Solstheim because the actor library makes no model for werewolves.
+- 2026-11-23: fixed in source: a gated commit, v0.0.68-dev8 (81755190); gate 12784 of the planning item DEV2-EXPANSION-STAGES-AUDIT-66: The characters a script turns into werewolves are drawn with the player's werewolf body and animation, hold nothing and keep the werewolf corpse (v0.0.68-wolflead); to be seen in play.
+- 2026-11-23 01:25 +0200: seen again in v0.0.68-dev8: In source on 23 November 2026 the actor library leaves out a part that has no geometry instead of refusing the whole character, so the Skaal Village werewolf gets a model: the body its record names.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -48,7 +57,7 @@ _Last updated with AmiWind v0.0.67-dev3 (18 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Status: 18 November 2026](#status-18-november-2026)
 - [Symptom](#symptom)
@@ -144,6 +153,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - AW25-10 (no report page): Actor-contact failures stopped image assembly only after terrain
 - [BALMORA-PEOPLE-FLOATING-65](BALMORA-PEOPLE-FLOATING-65.md): In Balmora several people stand in the air above the street, as in early versions
 - BARTER-SOLD-ITEM-LOST-58 (no report page): A thing the player sells to a merchant who does not stock it leaves the game instead of going into the merchants stock
+- [BLIZZARD-NOT-A-STORM-68](BLIZZARD-NOT-A-STORM-68.md): A blizzard was not treated as a storm: no eye-shielding pose and a fixed drift for its snow
 - [BUILD-ACTOR-SPEC-EMPTY-ROOMS-66](BUILD-ACTOR-SPEC-EMPTY-ROOMS-66.md): The image stage stopped on the actor spec check: the check did not read the room batch stage's new list of empty cells, so the one NPC of an empty Tribunal cell counted as missing
 - [BUILD-ACTOR-SPEC-UNSPAWNABLE-67](BUILD-ACTOR-SPEC-UNSPAWNABLE-67.md): The actor spec check counted every actor table row outdoors as placed, also rows the game cannot spawn
 - [CAMERA-POV-TAP-LOST-36](CAMERA-POV-TAP-LOST-36.md): A Toggle POV (Tab) tap released before the next frame did not switch the view
@@ -231,6 +241,8 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [NPC-VOICE-TABLE-ADDONS-54](NPC-VOICE-TABLE-ADDONS-54.md): The 368 Tribunal and Bloodmoon NPCs have no voices
 - [NPC-WANDER-NOT-EXECUTED-35](NPC-WANDER-NOT-EXECUTED-35.md): Residents stand still: the original's Wander AI packages (radius, duration, idles) are decoded but not executed
 - [NPC-WEAPON-MESH-33](NPC-WEAPON-MESH-33.md): NPCs hold no weapons or shields; combat uses them unseen
+- [NPC-WEREWOLF-FIGHTS-ARMED-68](NPC-WEREWOLF-FIGHTS-ARMED-68.md): A character turned into a werewolf by a script is drawn holding nothing but still uses its own weapon and spells in a fight
+- [NPC-WEREWOLF-TALK-OFFERED-68](NPC-WEREWOLF-TALK-OFFERED-68.md): The use key offers to talk to a character that a script has turned into a werewolf
 - [OUTDOOR-CORPSE-NEIGHBOUR-JOIN-67](OUTDOOR-CORPSE-NEIGHBOUR-JOIN-67.md): The dead bodies the original places outdoors show only when the player arrives in their cell, never when their cell joins around the player
 - [OUTDOOR-CREATURES-HOME-CELL-67](OUTDOOR-CREATURES-HOME-CELL-67.md): The cell the player arrives in has none of its levelled creatures: the window's home frame never joins the actor table
 - [OUTDOOR-CREATURES-REGRESSION-66](OUTDOOR-CREATURES-REGRESSION-66.md): Regression: no outdoor creatures spawn, no mudcrabs or slaughterfish, though earlier versions had them
@@ -265,5 +277,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [SWIM-BAKED-CLOTHES-60](SWIM-BAKED-CLOTHES-60.md): Swimming in third-person view shows default clothes instead of the player's own
 - [TOMB-NO-CREATURES-60](TOMB-NO-CREATURES-60.md): Samarys Ancestral Tomb has no ghosts, skeletons or other creatures
 - [WANDER-DOOR-RULE-66](WANDER-DOOR-RULE-66.md): A wandering resident can stop at a destination right by a door and stand there; the original sends an idle wanderer near a door walking
+- [WEREWOLF-FIGHT-RULES-LEFT-68](WEREWOLF-FIGHT-RULES-LEFT-68.md): In a fight with a werewolf, silver weapons do no extra damage, the werewolf's own sounds are missing and nobody is readier to attack it
+- [WEREWOLF-RACE-SCALE-68](WEREWOLF-RACE-SCALE-68.md): A werewolf is drawn at one size whatever the race of the player or the character turned
 
 <!-- END GENERATED CATEGORY -->

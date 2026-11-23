@@ -236,6 +236,17 @@ int AW_ActorSpellFlags(int spell);
  * number for every ability of the game data (minimum = maximum in all of them). Reads the actor's list and those
  * spells' effects from disk: the caller keeps the answer. 0 none. */
 float AW_ActorPassiveMagnitude(const aw_actor_t *a,int effect);
+/* AMBIENT-SOUND-READ-IN-FRAME-68 (v0.0.68): a blow asks about seven effects of each of its two fighters, and each
+ * question read the actor's whole list from disk again (the host kept only the last 8 answers: fewer than one blow
+ * asks, so every blow of a fight waited 50 to 220 ms for the disk). AW_ActorPassiveSums: every always-acting effect
+ * of A's list in ONE read of it: OUT[k] = an effect and its sum, the same number AW_ActorPassiveMagnitude gives; how
+ * many kinds; MORE 1 when the list holds more kinds than MAX (those are not in OUT). AW_ActorPassiveKept: the answer
+ * for EFFECT from the kept sums of the actor REFERENCE (read once, read again when its list, GENERATION, the pool's
+ * epoch or the table changes). AW_ActorPassiveCounts: lists read, answers from a kept list, asked one by one. */
+typedef struct {int16_t effect;float value;} aw_passive_sum_t;
+int AW_ActorPassiveSums(const aw_actor_t *a,aw_passive_sum_t *out,int max,int *more);
+float AW_ActorPassiveKept(const aw_actor_t *a,uint32_t reference,int effect,unsigned long generation);
+void AW_ActorPassiveCounts(unsigned long out[3]);
 /* Things the player made (bounded, saved: AWMD, AWEN): spells and enchanted items, up to 8 effects each. */
 #define AW_MADE_EFFECTS 8
 /* The game's enchantments (AENC, v0.0.61; tools/mwscript/actors.py): TYPE 0 cast once, 1 when strikes, 2 when used,

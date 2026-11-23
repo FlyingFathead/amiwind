@@ -1,6 +1,6 @@
 # Third person, vanity camera and the death scene
 
-_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
+_Last updated with AmiWind v0.0.68-dev8 (23 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -16,6 +16,7 @@ _Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
 - [First-person arms](#first-person-arms)
   - [The first-person view](#the-first-person-view)
   - [What the hands hold in first person](#what-the-hands-hold-in-first-person)
+- [The werewolf](#the-werewolf)
 - [Console](#console)
 - [Build switches](#build-switches)
 
@@ -394,6 +395,112 @@ The baked arms stay selectable (`aw_hand_parts 0`, saved, or `dbg camera hands o
 while a torch is carried and while the shield is raised to guard (their own baked poses). While magic is ready the
 torch, a held light and the shield are put away and both paths show the open hands of the spell stance, whatever is
 equipped; the third-person body puts them away too (since v0.0.66-dev2; [MAGIC_EFFECTS.md](MAGIC_EFFECTS.md)).
+
+## The werewolf
+
+Since v0.0.68 a player in werewolf form is drawn as the werewolf in both views (WEREWOLF-BODY-63). How the original
+draws a werewolf (OpenMW 0.51, read for the logic only): on the werewolf's own skeleton (`meshes/wolf/skin.nif`, in
+first person `meshes/wolf/skin.1st.nif`) with the werewolf's own animation and no other, with no skin part of the
+player's race, the werewolf's head (`WerewolfHead`) instead of the race's head and hair, and as its body the part of the
+werewolf robe it equips on the change (`WerewolfSkin`, in first person `WerewolfSkin.1st`); the robe is kept out of the
+inventory and of taking (`npcanimation.cpp` `updateNpcBase` and `getBodyParts`, `mechanicsmanagerimp.cpp`
+`setWerewolf`, `class.cpp`). A skinned part file gives only its skinned shapes named after the slot's bone, here the
+chest (`attach.cpp`), so the original draws the skin's ten chest shapes and the head part whole; the head's hair part
+(`wolf/hair.nif`) has no shape and draws nothing.
+
+The builder (`tools/werewolf_parts.py`, inside the player parts stages) makes, when the selected game files hold
+Bloodmoon's werewolf robe:
+
+- the body as **one part model** on a table of its own, `progs/werewolf.awsk`: the werewolf's own keyframes
+  (`wolf/xskin.kf`, every group of the file, on the bones they move), with the player's groups (idle, walk, run, the
+  jump and landing, the hand-to-hand ready set, swimming, hit, death; the block stands on the idle, the werewolf has no
+  shield group) in `view/parts_wm.txt`, the same file for both sexes; the attacks are the table's own `handtohand`
+  group, played by name;
+- the first-person arms as one part model on `progs/werewolf_1st.awsk`, in the first-person table's own frame contract
+  (28 frames a stance, the engine's stance order, the root carrying the view): the werewolf's file
+  (`wolf/xskin.1st.kf`) has only the hand-to-hand group, so every stance the engine can ask for (the weapons, the held
+  light, the spells) stands on the hand-to-hand frames, as a werewolf fights with its claws only;
+- the recipes' rows: the pseudo-race `werewolf` of both sexes on the skeleton letter `w` (`T w progs/werewolf.awsk ...`,
+  `A w 0|1 view/parts_wm.txt`, `R werewolf 0|1 w 1.0000 1.0000`, `S werewolf 0|1 3 <the body part>`; in
+  `view/parts_1st.txt` `T w progs/werewolf_1st.awsk ...`, `A w 0|1 -`, `R`, and `S werewolf 0|1 6 <the arms>`), no
+  head, hair or worn item. The game draws that race while the werewolf robe is worn.
+
+The head is a switch in the source (`werewolf_parts.HEAD_FROM`): `skin` (the default, decided for the project on 21
+November 2026 with the werewolf's budget sheet) takes the skin's own head, which the skin file carries as four
+textured shapes (660 triangles, the head part's own box at a lower detail, which the original does not draw), and the
+head part's two eyes; `part` takes the head part whole, as the original does. The werewolf robe is worn only by a
+werewolf, so its part is baked on the werewolf's skeleton alone and counted there by the parts coverage check (before,
+the stage tried it on the humanoid skeleton, where it cannot be posed by its tail bones, and listed it as known
+missing: PLAYER-WEREWOLF-ROBE-NOT-BAKED-66). The werewolf's head and hair records name the Argonian race and are flagged
+not playable; they are no longer offered as an Argonian's head and hair.
+
+Both parts are reduced by the shared-vertex route of [MODEL_REDUCTION.md](MODEL_REDUCTION.md) section 8 at its least
+passing count, judged as drawn by the outer-hull check by the werewolf's own bones. Measured on the game's data on 23
+November 2026 (the source as drawn; the reduced model on shared vertices):
+
+| | Source | Reduced | Outer hull (as drawn) | Model | Table |
+| --- | --- | --- | --- | --- | --- |
+| Body (third person) | 3,666 triangles, 2,918 vertices | 1,214 triangles, 1,180 vertices | extent 1.005 / 0.999 / 0.998, least girth 0.85 (right hand), nothing lost, hull 99.4 %, no new open edge, joins closed | 124,960 bytes | 431,734 bytes, 1,599 frames, 40 bones, 74 groups |
+| Arms (first person) | 2,562 triangles, 1,375 vertices | 362 triangles, 208 vertices | extent 1.003 / 1.000 / 1.006, least girth 0.91 (left upper arm), nothing lost, hull 100 %, no new open edge, joins closed | 78,176 bytes | 80,460 bytes, 308 frames, 41 bones |
+
+With the head part whole (`part`) the body passes at no count up to 1,600 triangles: the route leaves the head part
+itself whole (WEREWOLF-HEAD-NOT-REDUCED-68). Each model is a unit of the player-parts or player-fp-parts unit cache,
+keyed also by the code that bakes it. Tests: `tests/test_werewolf_parts.py`.
+
+In play the look follows the robe slot, whichever way the werewolf robe got there: `dbg werewolf on` and `off`, a
+script's `BecomeWerewolf` and `UndoWerewolf` (the same change, the original's rule), the console's, or the robe worn and
+taken off by hand after `dbg give werewolfrobe`. The look is checked once a frame before anything is drawn, so the set
+of the look that ended is let go at the next frame even when that frame draws neither the assembled body nor the arms
+from parts (a torch carried has its own baked body and arms). In first person the werewolf's arms are drawn when its
+claws are readied (the ready-weapon key), as the original draws nothing in first person while the claws are put away;
+they are assembled then, on every change, however often. On the change back the werewolf's two animation tables
+(`progs/werewolf.awsk`, `progs/werewolf_1st.awsk`) are given back with its part models (their indexes, the frames read
+and their open files) and loaded again by the next change; a table a loaded model still uses is kept and given back at
+the next change back (WEREWOLF-TABLES-STAY-LOADED-68). `dbg werewolf` prints the look, each set only when it is
+assembled (with why the arms are not: the hands put away), the model table, the pinned bytes and the werewolf's tables
+held. Tests: `tests/test_werewolf_change.py` (on the real code: four routes of 30 changes each with the claws readied
+before, after and never, the tables given back every time; the table store's give-back on the builder's own tables).
+
+The characters a script turns into werewolves (NPC-WEREWOLF-NO-MODEL-66, since v0.0.68: the Skaal hunt at the Felsaad
+Coast, the ceremony's and the maze's werewolves, the Wild Hunt, Tharsten Heart-Fang, the wilderness werewolves the
+levelled lists give at night) are drawn the same way, as the original draws any character in werewolf form
+(`npcanimation.cpp` `updateNpcBase` and `getBodyParts` for every NPC, `setWerewolf` for every actor): with the very
+werewolf body model and table the player's werewolf uses (the body recipe's werewolf row; both sexes name the same
+skin), one model and one table for all of them and the player. At each server frame the characters a script turned
+that are on the map are named and their frames picked on the werewolf's table by the actors' own rules (the original's
+group names: idle, walk, run, hand to hand, hit, death; a werewolf fights with its claws, a sidestep walks sideways, a
+state the table has no group for stands on the idle); the renderer draws the werewolf body for exactly those, a swap
+for the drawing only (collision, scripts and the character's own model stay). They hold nothing: no weapon, shield or
+carried light is shown. `UndoWerewolf` on one draws its own body again at the next frame; a character that dies as a
+werewolf keeps the werewolf's body as its corpse (the form holds after death, as in the original). The list of turned
+characters holds every werewolf of the game at once (up to 255, as many as the saved game's block holds; it held 16
+before), kept in saved games and cleared by New Game.
+
+The werewolf set is loaded when the first turned character is on the map (one recipe read, one model lookup) and let
+go when none is, unless the player draws it: one count of who draws the set (the player's body and arms, and the turned
+characters), and the last one out releases the model and gives its table back. The player's change back while a
+character is a werewolf keeps the shared body and its table (his arms and their table go); a character's going while
+the player is a werewolf keeps his. `dbg werewolf` lists the turned characters on the map drawn as the werewolf (name,
+record, entity and the werewolf's frame) and the set's loads and releases. Since v0.0.68 a werewolf also fights with
+its claws only, the player and the turned characters alike ([COMBAT.md](COMBAT.md), "The werewolf's claws"). Not
+handled yet: a turned character's own stats stay (the original keeps them too; only the player takes the werewolf's).
+Tests: `tests/test_werewolf_npc.py` (on the real view code: three characters sharing the set, the player turning too in
+three orders 50 times, the model table, the pinned bytes and the tables as before; the list sized from the game's own
+script table).
+
+The werewolf is drawn at the size of the race of the one turned (WEREWOLF-RACE-SCALE-68, since v0.0.68), as the original
+scales any character by its race and sex, in werewolf form too (`npc.cpp` `adjustScale`: the race's weight across, its
+height up). The werewolf's own recipe rows carry 1 (one body for every race), so the size comes from the race rows of
+the same body recipe (`view/parts.txt`, `R <race> <sex> <skeleton> <weight> <height>`): the player's werewolf at his own
+race and sex's row (read once when the look becomes the werewolf's or his race or sex changes under it), each turned
+character at its record's race and sex (asked of the script host once while it is drawn as the werewolf, its record's
+row kept there; at most four new ones a server frame, so a crowd turned at once is spread over a few frames, drawn at
+the unit size until then), times the character's own scale, for the drawing only. A Nord man's werewolf is drawn
+taller and broader than a Breton woman's. First person is unchanged (the arms stand in the view as the player's own
+do). Cost: about 2 KB resident (the races' rows, about 22 of them, and the sizes of up to 64 turned characters on the
+map), one row read per record and one name read per race, none in a frame after that. `dbg werewolf` prints each
+turned character's size and the player's werewolf's. Tests: section (j) of `tests/aga_werewolf_parts_test.c` on the
+real view code (run by `tests/test_werewolf_npc.py`) and `tests/test_werewolf_fight.py`.
 
 ## Console
 

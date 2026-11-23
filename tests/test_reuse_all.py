@@ -375,6 +375,45 @@ class UnitCacheOpeners(unittest.TestCase):
         self.assertEqual([s[1] for s in resident['scripts']], ['build_resident', 'publish_resident'])
         self.assertIn(('tools/chim_room_batches.py', 'interior-room-chim'), found)
 
+    def test_every_build_opener_names_its_key_code(self):
+        """An opener whose key code the check cannot read makes the check stop its stage whenever the stage rebuilds
+        ("this build's key for them cannot be read"): the creature library's whole-model cache did, on the dev9 line,
+        through source_digest(*entry). Only the seed import tool, which no build stage runs, is left unread."""
+        rows = RA.unit_cache_openers(ROOT)
+        unread = sorted((row['module'], row['name']) for row in rows if row['name'] and not row['scripts'])
+        self.assertEqual(unread, [('tools/actor_units_seed.py', 'npc-appearance')])
+        creature = sorted(script[1] for row in rows if row['name'] == 'creature-model' for script in row['scripts'])
+        self.assertEqual(creature, ['_unit', 'unit'])
+
+    def test_two_openers_of_one_cache_count_their_units_together(self):
+        """The creature models: the default route finds 96 stored units under its digest, the whole-model route its 1
+        under its own; together the cache's 97. Counted per opener, the whole-model route read as 96 of 97 to bake
+        again and stopped the build (the dev9 line's test build)."""
+        from unittest import mock
+
+        class Groups(dict):
+            batch = 97
+        groups = Groups({'a': {'u%d' % i for i in range(96)}, 'b': {'w0'}, 'older': {'o%d' % i for i in range(97)}})
+        first, second = [['x.py', '_unit']], [['y.py', 'unit']]
+        openers = [{'module': 'tools/creature_library.py', 'function': 'bake', 'name': 'creature-model',
+                    'scripts': first},
+                   {'module': 'tools/creature_library.py', 'function': 'bake', 'name': 'creature-model',
+                    'scripts': second}]
+        digests = {('creature-model', json.dumps(first)): ('a', ('a',)),
+                   ('creature-model', json.dumps(second)): ('b', ('b',))}
+        with mock.patch.object(RA, 'census', return_value=groups), \
+                mock.patch.object(RA, 'unit_digests', return_value=digests):
+            report = RA.unit_report([('actor-library', None)], {}, {}, Path('/cache'), None, {'actor-library'},
+                                    openers=openers, workers=1)
+        self.assertEqual(report, {'actor-library': [('creature-model', 97, 97)]})
+        # one opener unreadable: the cache's count is unknown, as before
+        digests[('creature-model', json.dumps(second))] = None
+        with mock.patch.object(RA, 'census', return_value=groups), \
+                mock.patch.object(RA, 'unit_digests', return_value=digests):
+            report = RA.unit_report([('actor-library', None)], {}, {}, Path('/cache'), None, {'actor-library'},
+                                    openers=openers, workers=1)
+        self.assertEqual(report, {'actor-library': [('creature-model', None, 97)]})
+
 
 class UncachedBakes(unittest.TestCase):
     def test_no_new_uncached_bake_path(self):

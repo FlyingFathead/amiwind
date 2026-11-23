@@ -1063,6 +1063,72 @@ float AW_ActorPassiveMagnitude(const aw_actor_t *a,int effect){
     }
     return sum;
 }
+/* AMBIENT-SOUND-READ-IN-FRAME-68 (aw_actorstate.h): the same sums for every effect of the list, in one read of it */
+#define PASSIVE_SUMS_MAX 32
+int AW_ActorPassiveSums(const aw_actor_t *a,aw_passive_sum_t *out,int max,int *more){
+    int held[64],n,i,k,m,j,type,count=0;aw_spell_effect_t e[AW_MADE_EFFECTS];aw_mgef_t mg;short hits[PASSIVE_SUMS_MAX];
+    if(more)*more=0;
+    if(!st || !a || !out || max<1)return 0;
+    if(max>PASSIVE_SUMS_MAX)max=PASSIVE_SUMS_MAX;
+    n=AW_ActorSpells(a,held,64);
+    for(i=0;i<n;i++){
+        type=spell_type(held[i]);
+        if(type<0 || type==0 || type==5)continue;          /* a castable spell or a power: only when cast */
+        m=AW_ActorSpellEffects(held[i],e,AW_MADE_EFFECTS);
+        for(k=0;k<m;k++){
+            if(e[k].effect<0)continue;
+            for(j=0;j<count && out[j].effect!=e[k].effect;j++){}
+            if(j==count){
+                if(count>=max){if(more)*more=1;continue;}   /* more kinds than the caller keeps: it asks one by one */
+                out[j].effect=e[k].effect;out[j].value=0;hits[j]=0;count++;
+            }
+            out[j].value+=.5f*((float)e[k].magnitude_min+(float)e[k].magnitude_max);hits[j]++;
+        }
+    }
+    /* an effect without a magnitude counts 1 per spell (UNDERWATER-BREATH-62), as AW_ActorPassiveMagnitude */
+    for(j=0;j<count;j++)if(AW_ActorMagicEffect(out[j].effect,&mg) && (mg.flags&AW_MGEF_FLAG_NO_MAGNITUDE))out[j].value=(float)hits[j];
+    return count;
+}
+/* the kept answers: one entry an actor (its list's sums), found again by the reference, the list as it is now (its
+ * base and every change of it), the caller's generation, the pool's epoch and the table. 24 actors (the 16 fighters,
+ * the player and a few more) x 12 kinds of effect: about 2.2 KiB, static. A list with more kinds is asked one by one
+ * for the kinds not kept (counted). */
+#define PASSIVE_ACTORS 24
+#define PASSIVE_PAIRS 12
+static struct {
+    uint32_t ref,mix;unsigned long generation,epoch;const void *table;uint16_t base;unsigned char n,more,used;
+    aw_passive_sum_t sum[PASSIVE_PAIRS];
+} passive_kept[PASSIVE_ACTORS];
+static int passive_next;
+static unsigned long passive_counts[3];   /* lists read, answers from a kept list, asked one by one */
+static uint32_t passive_mix(const aw_actor_t *a){
+    uint32_t x=(uint32_t)a->nspells;int i;
+    for(i=0;i<a->nspells;i++)x=x*31u+(uint32_t)a->spells[i].spell*5u+(uint32_t)(a->spells[i].change>0?1:2);
+    return x;
+}
+float AW_ActorPassiveKept(const aw_actor_t *a,uint32_t ref,int effect,unsigned long generation){
+    int i,k,more=0;uint32_t mix;
+    if(!st || !a || effect<0)return 0;
+    mix=passive_mix(a);
+    for(i=0;i<PASSIVE_ACTORS;i++)
+        if(passive_kept[i].used && passive_kept[i].ref==ref && passive_kept[i].mix==mix && passive_kept[i].base==a->base &&
+           passive_kept[i].generation==generation && passive_kept[i].epoch==pool_epoch && passive_kept[i].table==(const void *)st)break;
+    if(i<PASSIVE_ACTORS)passive_counts[1]++;
+    else{
+        /* the actor's own entry again when its list changed, else the next one in turn */
+        for(i=0;i<PASSIVE_ACTORS && !(passive_kept[i].used && passive_kept[i].ref==ref);i++){}
+        if(i==PASSIVE_ACTORS){i=passive_next;passive_next=(passive_next+1)%PASSIVE_ACTORS;}
+        passive_kept[i].used=1;passive_kept[i].ref=ref;passive_kept[i].mix=mix;passive_kept[i].base=a->base;
+        passive_kept[i].generation=generation;passive_kept[i].epoch=pool_epoch;passive_kept[i].table=(const void *)st;
+        passive_kept[i].n=(unsigned char)AW_ActorPassiveSums(a,passive_kept[i].sum,PASSIVE_PAIRS,&more);
+        passive_kept[i].more=(unsigned char)more;
+        passive_counts[0]++;
+    }
+    for(k=0;k<passive_kept[i].n;k++)if(passive_kept[i].sum[k].effect==effect)return passive_kept[i].sum[k].value;
+    if(passive_kept[i].more){passive_counts[2]++;return AW_ActorPassiveMagnitude(a,effect);}
+    return 0;
+}
+void AW_ActorPassiveCounts(unsigned long out[3]){out[0]=passive_counts[0];out[1]=passive_counts[1];out[2]=passive_counts[2];}
 /* --- enchantments (AENC, v0.0.61; PLAYER-CASTING-59): read when an item is used, strikes or is worn --- */
 int AW_ActorEnchantCount(void){return st?(int)st->aenc.rows:0;}
 int AW_ActorEnchant(int row,aw_enchant_t *out){

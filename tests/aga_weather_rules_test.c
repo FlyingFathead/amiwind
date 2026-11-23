@@ -146,13 +146,24 @@ int main(void)
         assert(tone[0]==256);
     }
     {
-        /* Storms (ACTOR-STORM-POSE-51; rules from OpenMW mwworld/weather.cpp, mwmechanics/character.cpp): ash and
-         * blight only; the weather left counts until half way; the wind blows outward from Red Mountain; an actor
-         * faces into it below -0.5. */
-        float dir[2],ald[3]={-16000.0f,50000.0f,0},rm[3]={25000.0f,70000.0f,0};
+        /* Storms (ACTOR-STORM-POSE-51; rules from OpenMW mwworld/weather.cpp, mwmechanics/character.cpp): ash,
+         * blight and (v0.0.68, SOL-WEATHER-SKY-SNOW-68: Wind Speed .9 past fStromWindSpeed 0.7, OpenMW
+         * esmfallbacks.lua) the blizzard; the weather left counts until half way; ash and blight blow outward from
+         * Red Mountain, a blizzard north (weather.lua turns only those two); an actor faces into it below -0.5. */
+        float dir[2],ald[3]={-16000.0f,50000.0f,0},rm[3]={25000.0f,70000.0f,0},sol[3]={-180000.0f,170000.0f,0};
         assert(AW_WeatherIsStorm(AW_WEATHER_ASH,AW_WEATHER_NONE,0.0) && AW_WeatherIsStorm(AW_WEATHER_BLIGHT,AW_WEATHER_NONE,0.0));
         assert(!AW_WeatherIsStorm(AW_WEATHER_CLEAR,AW_WEATHER_NONE,0.0) && !AW_WeatherIsStorm(4,AW_WEATHER_NONE,0.0));
-        assert(!AW_WeatherIsStorm(9,AW_WEATHER_NONE,0.0));                      /* blizzard: no eye pose */
+        assert(AW_WeatherIsStorm(AW_WEATHER_BLIZZARD,AW_WEATHER_NONE,0.0));      /* the old rule said no: no eye pose */
+        assert(!AW_WeatherIsStorm(AW_WEATHER_SNOW,AW_WEATHER_NONE,0.0) && !AW_WeatherIsStorm(5,AW_WEATHER_NONE,0.0));
+        assert(AW_WeatherStormOf(AW_WEATHER_SNOW,AW_WEATHER_BLIZZARD,0.49)==AW_WEATHER_NONE);
+        assert(AW_WeatherStormOf(AW_WEATHER_SNOW,AW_WEATHER_BLIZZARD,0.5)==AW_WEATHER_BLIZZARD);
+        assert(AW_WeatherStormOf(AW_WEATHER_ASH,AW_WEATHER_NONE,0.0)==AW_WEATHER_ASH);
+        /* a Solstheim blizzard blows north, whatever the distance from Red Mountain; snow is no storm */
+        assert(AW_WeatherStormDirectionOf(AW_WEATHER_BLIZZARD,sol,dir) && dir[0]==0 && dir[1]==1);
+        assert(AW_WeatherStormDirectionOf(AW_WEATHER_BLIZZARD,rm,dir) && dir[1]==1);
+        assert(AW_WeatherFacesStorm(270.0f,dir) && !AW_WeatherFacesStorm(90.0f,dir));   /* facing south: into it */
+        assert(!AW_WeatherStormDirectionOf(AW_WEATHER_SNOW,sol,dir) && !AW_WeatherStormDirectionOf(AW_WEATHER_NONE,sol,dir));
+        assert(AW_WeatherStormDirectionOf(AW_WEATHER_ASH,ald,dir) && dir[0]<-0.85f);
         assert(AW_WeatherIsStorm(AW_WEATHER_ASH,0,0.49) && !AW_WeatherIsStorm(AW_WEATHER_ASH,0,0.5));
         assert(!AW_WeatherIsStorm(0,AW_WEATHER_BLIGHT,0.49) && AW_WeatherIsStorm(0,AW_WEATHER_BLIGHT,0.5));
         /* Ald'ruhn lies west-south-west of Red Mountain: the wind blows toward -x, a little -y */
@@ -182,6 +193,33 @@ int main(void)
         /* rain to heavy rain: keeps raining */
         assert(AW_WeatherPrecip(4,5,0.6,&s)==AW_PRECIP_HEAVY_RAIN && s>0);
         assert(AW_WeatherPrecip(4,4,0.3,&s)==AW_PRECIP_RAIN && s==AW_WEATHER_STEPS);
+    }
+    {
+        /* The weather's fog depth and cloud speed (SOL-WEATHER-SKY-SNOW-68; Morrowind.ini as it ships; OpenMW
+         * mwrender/fogmanager.cpp: fog from view x (1 - depth)): Clear is the fog of before (256) at every hour, so
+         * nothing under Clear moves; a blizzard's span is 2.8 / .69 of Clear's by day, 3.0 / .69 by night; a
+         * transition and the hour blend linearly; the storms without a shipped value keep Clear's. */
+        assert(AW_WeatherFogScale(AW_WEATHER_CLEAR,AW_WEATHER_NONE,0,0,0,0)==AW_WEATHER_FOG_CLEAR);
+        assert(AW_WeatherFogScale(AW_WEATHER_CLEAR,AW_WEATHER_NONE,0,3,3,0)==AW_WEATHER_FOG_CLEAR);
+        assert(AW_WeatherFogScale(AW_WEATHER_CLEAR,AW_WEATHER_NONE,0,2,3,17)==AW_WEATHER_FOG_CLEAR);
+        assert(AW_WeatherFogScale(AW_WEATHER_BLIZZARD,AW_WEATHER_NONE,0,0,0,0)==1039);     /* 280 * 256 / 69 */
+        assert(AW_WeatherFogScale(AW_WEATHER_BLIZZARD,AW_WEATHER_NONE,0,3,3,0)==1113);     /* 300 * 256 / 69 */
+        assert(AW_WeatherFogScale(AW_WEATHER_SNOW,AW_WEATHER_NONE,0,0,0,0)==371);
+        assert(AW_WeatherFogScale(AW_WEATHER_SNOW,AW_WEATHER_NONE,0,1,3,32)==445);         /* all night: 1.2 */
+        assert(AW_WeatherFogScale(AW_WEATHER_SNOW,AW_WEATHER_BLIZZARD,AW_WEATHER_STEPS/2,0,0,0)==705);
+        assert(AW_WeatherFogScale(AW_WEATHER_CLEAR,AW_WEATHER_BLIZZARD,AW_WEATHER_STEPS,0,0,0)==1039);
+        assert(AW_WeatherFogScale(AW_WEATHER_ASH,AW_WEATHER_NONE,0,0,0,0)==AW_WEATHER_FOG_CLEAR);
+        assert(AW_WeatherFogScale(AW_WEATHER_BLIGHT,AW_WEATHER_NONE,0,3,3,0)==AW_WEATHER_FOG_CLEAR);
+        assert(AW_WeatherFogScale(99,-5,0,0,0,0)==AW_WEATHER_FOG_CLEAR);                 /* out of range: Clear */
+        assert(AW_WeatherFogDepthOf(2,3)==190 && AW_WeatherFogDepthOf(2,1)==100);          /* Foggy by night 1.9 */
+        /* Cloud Speed against Clear's 1.25: Clear 100 %, Snow 120 %, Blizzard 600 %, Blight 720 % (the Red Mountain
+         * pull's own top, REDMOUNTAIN-SKY-55), Ashstorm without a shipped value: as Clear */
+        assert(AW_WeatherCloudPercentOf(AW_WEATHER_CLEAR)==100 && AW_WeatherCloudPercentOf(AW_WEATHER_SNOW)==120);
+        assert(AW_WeatherCloudPercentOf(AW_WEATHER_BLIZZARD)==600 && AW_WeatherCloudPercentOf(AW_WEATHER_BLIGHT)==720);
+        assert(AW_WeatherCloudPercentOf(AW_WEATHER_BLIGHT)==AW_WEATHER_MOUNTAIN_CLOUDS);
+        assert(AW_WeatherCloudPercentOf(AW_WEATHER_ASH)==100 && AW_WeatherCloudPercentOf(-1)==100);
+        assert(AW_WeatherCloudPercent(AW_WEATHER_CLEAR,AW_WEATHER_NONE,5)==100);
+        assert(AW_WeatherCloudPercent(AW_WEATHER_SNOW,AW_WEATHER_BLIZZARD,AW_WEATHER_STEPS/2)==360);
     }
     {
         /* The Red Mountain pull (REDMOUNTAIN-SKY-55): none at Seyda Neen or Ald'ruhn (the maintainer: "ald'ruhn is

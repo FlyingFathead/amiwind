@@ -19,6 +19,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-21: reported in v0.0.68-dev3
+- 2026-11-23 01:23 +0200: seen again in v0.0.68-dev8: Seen again on 23 November 2026 with the reduction on shared vertices: the werewolf body with the separate head model whole (4,254 triangles) passes the outer-hull check at no count up to 1,600, because the head is not reduced; the body ...
+
+<!-- END GENERATED TIMELINE -->
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category

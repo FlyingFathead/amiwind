@@ -1,6 +1,6 @@
 # Original door mapping
 
-_Last updated with AmiWind v0.0.68-dev5 (21 November 2026)._
+_Last updated with AmiWind v0.0.68-dev8 (23 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -290,13 +290,65 @@ stores; the audit and the engine check read the lands' own rows files (`world/re
 store's own world. A frame with no frame across any side of its core (a district that stands alone) is checked with
 the frame itself running, as a town is: the player arrives there by a door or a teleport. Before this, every entrance
 of those lands was listed as not usable although the door table linked it (DOOR-CHECK-MODULE-FRAME-MAPS-67). The
-first run over them found 13 entrances the wall check cannot reach (seven ice cave doors among them); they are on the
-known list as DOOR-USE-COLLISION-EXPANSIONS-68.
+first run over them found 13 entrances the wall check cannot reach (seven ice cave doors among them), and the first
+image with the Mortrag Glacier one more, the entrance to Stahlman's Gorge under the ice. Nothing filled their
+thresholds: they are kinds of entrance the check had no case for (DOOR-USE-COLLISION-EXPANSIONS-68,
+DOOR-CHECK-NO-SWIM-CASE-68). A rule for a kind of entrance is on only once play has shown its doors used; the others
+are methods that can be selected for an A/B run (`AMIWIND_DOOR_CHECK_RULES=walk_out,swim,stages,doorway`, an empty
+value for the check before them), and their doors stay on the known list with their play result:
 
-The usable counts only go up: `config/door-check-baseline.json` holds the last counts (from v0.0.53-dev2: 1,102 usable
-after walking in, 1,102 both ways, 1,067 with the wall traced: the other 35, most of them Daedric shrines whose steps
-the player slides off, are DOOR-USE-COLLISION-FILLED-53, for v0.0.54), and a whole-world image that uses fewer stops the
-build. A build that uses more raises the numbers in that file. From v0.0.54 the check also goes over every entrance:
+- on: a door set into a slope (the ice caves' dark doors, the Caverns of Karstaag): its use box reaches deep into the
+  rock and the ground in front of it, so no spot near its threshold is open, and the player stands on the floor its
+  own way out leads onto. The check puts the player where the game puts a player walking out of the room (the room
+  exit's arrival, moved into the door's frame when it lies across the frame edge) and on the way from there to the
+  door, each on the floor under that spot, inside the frame's core (the engine reads the door bank of the frame the
+  player stands in) and within the original's activation reach (192 units, 48 map units, short of the engine's 56).
+  In play on the v0.0.68-dev8 image (FS-UAE, 32 MB Fast) five ice caves and the Caverns of Karstaag were walked up to
+  and entered from those spots; Rimhull's trapdoor showed no prompt from its arrival 54 units away, which set the reach
+  limit. A door the image also writes into the bank of the frame across its core edge (a border copy) is used from
+  that frame's core as well, since the engine reads the bank of the frame the player stands in: Mournhold's ladder
+  down to Bamz-Amschend entered in play from its walk-out arrival across the frame edge, 48.8 units off. A locked door
+  is judged as the player with its key uses it (Rimhull's well, locked with its key as in the original, entered with
+  the key), and a door its own script keeps switched off as it is at the stage that shows it (the ladder, off until
+  the quest An Attack on Mournhold, entered at that stage). A trapdoor is used through the engine's own box, the box
+  the door bank holds;
+- off until play shows it, 'swim': an entrance under water (Stahlman's Gorge, the Caves of Fjalding at the bottom of
+  Lake Fjalding, the sunken Unmarked Shipwreck's trapdoor): the player swims to it and uses it from the water. A
+  player whose middle is in the terrain's water swims, with no gravity, and stays where it swims to (`SV_CheckWater`
+  in `sv_phys.c`, `AW_WalkPlayer` in `aw_walk.c`; OpenMW lets an actor swim once the water stands over most of its
+  height and activates objects from the water as on land). The check tries its spots around the door at every height
+  in the water there, nearest the door's middle first. In play on the v0.0.68-dev8 image the swimmer stopped short of
+  Stahlman's Gorge and the Caves of Fjalding on their ice covers (`act_bm_snowdoor4`, `act_bm_snowdoor5`), which their
+  own scripts switch off at the quest stage (The Ritual of Water at stage 10, the Caves of Fjalding at stage 20): the
+  image gave no piece of the expansions' stores of frames a hide row, so a script's Disable there left the piece drawn
+  and solid (EXPANSION-STORE-DISABLE-NOT-HIDDEN-68); the pieces are matched by their stable reference id now;
+- off until play shows it, 'stages': a placement a script hides while the door is shown is not in its way: Raven
+  Rock's colony buildings come stage by stage, each with its own script on the colony's state, and the frame holds the
+  collision of every stage at once (the trees cleared for the Factor's Estate, the construction stage of Uryn Maren's
+  house), and some entrances have a plug a quest's script removes (the rock in front of Glenschul's Tomb, the closed
+  gate of Castle Karstaag). The stages are read from the scripts of the masters (`tools/script_stages.py`: a script
+  whose own Disable and Enable depend on one global is run for each value of that global, from shown and from hidden;
+  a script that depends on anything else, a journal entry for one, has no stage that is read, and its placement is
+  left out alone). The engine hides such a placement when its script switches it off (OUTDOOR-DISABLE-NOT-HIDDEN-68),
+  so the door is traced again without the ones hidden at a moment the door is shown; a placement shown with the door
+  stays in its way;
+- off until play shows it, 'doorway': where two or three load doors stand in one doorway and the scripts switch
+  between them (Raven Rock's Factor's Estate, one door per colony stage outside and one exit per stage inside; a Skaal
+  hut that becomes another house; the two doors of Thirsk's hall at one place), the engine takes only the door that is
+  on (DOOR-LOAD-DISABLED-STILL-USED-68), and the check runs each door of such a doorway with the others switched off;
+  without it the doorway's first door answers for all of them, and three entrances count as not usable both ways
+  (DOOR-CHECK-DOORWAY-STAGES-68).
+
+Measured on the v0.0.68-dev8 image with the rules that are on: 946 of the 954 region-frame entrances reached, the
+eight others and Rimhull's trapdoor on the known list with their play result; since the dive session on the same
+image Rimhull's well and Mournhold's ladder are off the list (the ladder reached through its border copy), seven
+remain.
+
+The usable counts only go up: `config/door-check-baseline.json` holds the last counts (from the v0.0.68-dev8 image:
+1,226 entrances, 1,225 usable after walking in, 1,223 both ways, 1,217 with the wall traced; before, from v0.0.53-dev2:
+1,102 usable after walking in, 1,102 both ways, 1,067 with the wall traced: the other 35, most of them Daedric shrines
+whose steps the player slides off, were DOOR-USE-COLLISION-FILLED-53, for v0.0.54), and a whole-world image that uses
+fewer stops the build. A build that uses more raises the numbers in that file. From v0.0.54 the check also goes over every entrance:
 an entrance the wall check cannot reach must be listed in `config/door-check-known.json` with its measured reason and
 register class, or a whole-world image stops the build; a listed entrance the check reaches again is named so it
 leaves the list. The 35 of v0.0.53 came from three converter causes, each fixed for its whole class (measured on the
@@ -322,7 +374,8 @@ v0.0.53 image's own frames, the models rebuilt with the CHIM model builder's wor
   under residents does (measured on the v0.0.53 image: 251 entrances in 192 frames, most of them cave and tomb doors
   the coarse ground buried 10 to 60 units).
 
-The shipwreck's upper trapdoor (Unmarked Shipwreck) stays listed: its tilted deck is steeper than the walk.
+The shipwreck's upper trapdoor (Unmarked Shipwreck) stays listed: its tilted deck is steeper than the walk, and the
+wreck lies under water, so the player would swim to the trapdoor (the rule 'swim', not yet shown in play).
 For A/B tests on development builds only: `AMIWIND_COLLISION_STANDING_ROOM=off` (or `all`, every mesh),
 `AMIWIND_COLLISION_PLATE_BEVELS=drop` and the build setting `terrain_door_detail` `off` keep the methods before; an
 rc or final build refuses the environment values before any stage. The same check with the v0.0.52 scene code over the same image finds 272: the

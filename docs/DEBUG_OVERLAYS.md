@@ -1,6 +1,6 @@
 # Development overlays
 
-_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
+_Last updated with AmiWind v0.0.68-dev8 (23 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -609,7 +609,11 @@ must resolve to an available converted destination. The existing checked map
 teleport route preserves player state and validates the standing hull at arrival.
 It places the feet above terrain, or above the actual BSP water surface when
 terrain is submerged. A blocked arrival uses the existing checked scene-spawn
-fallback and reports it. The four focused Linux native fixtures pass; emulator/target acceptance is pending.
+fallback and reports it. With a height (`dbg tp X Y Z`, and the Position function
+of scripts) whose standing box has its feet in the water, the player is set at
+that point and swims there, as the original sets him: no lift to the surface and
+no fallback, and under the water a living swimmer stays at its depth until it
+moves (since v0.0.68; a point under the frame's terrain is not taken this way). The four focused Linux native fixtures pass; emulator/target acceptance is pending.
 
  **F, then V** equips the temporary
 [carried torch](TORCH.md); Alt+V (Shift+V before v0.0.43) continues to cycle draw distance.

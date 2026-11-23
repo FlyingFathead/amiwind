@@ -150,8 +150,10 @@ class CombatSourceContractTests(unittest.TestCase):
         self.assertIn('*block_hit', start)
         # one per strike, at the hit key: the player's, an actor's on the player, and since v0.0.63 an actor's on
         # another actor (COMBAT-ACTOR-VS-ACTOR-62), and since v0.0.66 a shot's on the player when it lands
-        # (ACTOR-RANGED-COMBAT-MISSING-66, shot_hit)
-        self.assertEqual(combat.count('AW_CombatSwing('), 4)
+        # (ACTOR-RANGED-COMBAT-MISSING-66, shot_hit); since v0.0.68 the three melee strikes carry the werewolf's claws
+        # (AW_CombatSwingClaws, NPC-WEREWOLF-FIGHTS-ARMED-68: -1 for a fighter in its own form, tests/test_werewolf_fight.py)
+        self.assertEqual(combat.count('AW_CombatSwing('), 1)
+        self.assertEqual(combat.count('AW_CombatSwingClaws('), 3)
         shot = combat[combat.index('static void shot_hit'):combat.index('static void shots_update')]
         self.assertEqual(shot.count('AW_CombatSwing('), 1)
         self.assertIn('you.block_off=1', shot)

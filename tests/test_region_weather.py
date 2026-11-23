@@ -102,6 +102,34 @@ class WeatherWiringTests(unittest.TestCase):
         self.assertIn('if(!player_source(source)){last_time=-1;return 0;}', frame)
         self.assertIn('AW_WeatherRegionKeep(&state,AW_RegionIndexAt(source))', weather)
 
+    def test_the_weather_fogs_and_moves_the_clouds_and_a_blizzard_is_a_storm(self):
+        # SOL-WEATHER-SKY-SNOW-68: the storm's own wind (a blizzard north), the weather's fog depth into the exterior fog
+        # table (rebuilt only when the distance or the scale moves) and its cloud speed where the Red Mountain pull does
+        # not reach; aw_weather_look 0 (dbg weather look off) keeps the one fog and cloud speed of before
+        weather = code('aw_weather.c')
+        frame = weather[weather.index('int AW_WeatherFrame'):weather.index('static void weather_command')]
+        self.assertIn('storm=AW_WeatherStormDirectionOf(AW_WeatherStormOf(state.current,state.next,state.progress),'
+                      'source,storm_dir);', frame)
+        self.assertNotIn('AW_WeatherStormDirection(source,storm_dir)', frame)
+        self.assertIn('look_on=aw_weather_look.value>0;look_current=state.current;look_next=state.next;look_step=step;',
+                      frame)
+        self.assertIn('static cvar_t aw_weather_look={"aw_weather_look","1",true};', weather)
+        self.assertIn('return look_on?AW_WeatherFogScale(look_current,look_next,look_step,a,b,mix):AW_WEATHER_FOG_CLEAR;',
+                      weather)
+        sky = code('r_sky.c')
+        self.assertIn('sky_weather_fog_scale=AW_WeatherFogScaleAt(a==4?3:a,b==4?3:b,mix>32?32:mix);', sky)
+        self.assertIn('if(pull>0)return R_SkyCloudBaseSpeed()*(1.0+(AW_WEATHER_MOUNTAIN_CLOUDS-100)/100.0*pull/'
+                      'AW_WEATHER_STEPS);', sky)
+        self.assertIn('return R_SkyCloudBaseSpeed()*AW_WeatherCloudPercentNow()/100.0;', sky)
+        fog = code('aw_fog.c')
+        draw = fog[fog.index('void AW_FogDraw'):]
+        self.assertIn('int scale=R_SkyWeatherFogScale();', draw)
+        self.assertIn('if(fog && (distance!=old_distance || scale!=old_scale))', draw)
+        self.assertIn('AW_FogDepthsScaled(depths,distance,scale);', draw)
+        self.assertIn('if(scale==256 || scale<=0){AW_FogDepths(table,distance);return;}', fog)
+        commands = (ROOT / 'config' / 'debug-commands.txt').read_text(encoding='utf-8')
+        self.assertIn('look on/off', commands[commands.index('|weather|aw_weather_set|'):].splitlines()[0])
+
     def test_build_payload_and_console(self):
         makefile = (ROOT / 'engine' / 'aga' / 'Makefile').read_text(encoding='utf-8')
         self.assertIn('aw_weather_rules.c aw_weather.c', makefile)

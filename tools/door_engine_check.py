@@ -24,7 +24,9 @@ Writes OUT/door-engine-check.json and OUT/door-engine-check.md (private: built f
 (config/door-check-baseline.json) a whole-world image fails when fewer entrances are usable than the last build's
 count: the count only goes up. With --known (config/door-check-known.json) a whole-world image also fails when an
 exterior entrance the wall check cannot reach is not listed there with its reason and class
-(DOOR-USE-COLLISION-FILLED-53): every entrance is reachable or a known, registered case.
+(DOOR-USE-COLLISION-FILLED-53): every entrance is reachable or a known, registered case. With --data-files the
+masters' script stages are read (tools/script_stages.py): a door no player reaches is traced again without the
+placements a script hides while it is shown (DOOR-USE-COLLISION-EXPANSIONS-68).
 """
 import argparse
 import json
@@ -58,6 +60,40 @@ ENGINE_FILES = ('aw_scene.c', 'aw_region.c', 'aw_story.c', 'aw_state.c', 'mathli
 
 def _inside(core, point, margin=0.0):
     return core[0] - margin <= point[0] <= core[2] + margin and core[1] - margin <= point[1] <= core[3] + margin
+
+
+def door_cores(core):
+    """The cores (x0, y0, x1, y1 in the door frame's coordinates) a player may stand in to use a door: CORE is one core
+    or a sequence of them (the door frame's own and those of the frames whose bank holds a border copy of the door,
+    copy_cores); () for none."""
+    if not core:
+        return ()
+    if isinstance(core[0], (int, float)):
+        return (tuple(core),)
+    return tuple(tuple(c) for c in core if c)
+
+
+def copy_cores(reference, holder, frames, cores, bank):
+    """DOOR-USE-ACROSS-FRAME-EDGE-68: the cores, in HOLDER's coordinates, of the neighbouring frames whose door bank
+    holds the door REFERENCE too (a border copy, tools/world_doors.py border_copies: a door within reach of its frame's
+    core edge is written into the bank of the frame across it). The engine reads the bank of the frame the player
+    stands in (aw_scene.c read_links_for(door_scene())), so such a door is used from that frame's core as well: in play
+    on the v0.0.68-dev8 image Mournhold's ladder down to Bamz-Amschend (mh0005, copied into mh0004) entered from its
+    walk-out arrival in mh0004, 48.8 units from it. FRAMES {name: origin}, CORES {name: core}, BANK(name) the parsed
+    bank or None."""
+    if holder not in frames:
+        return []
+    out = []
+    ho = frames[holder]
+    for name, origin in frames.items():
+        if name == holder or name not in cores or abs(origin[0] - ho[0]) > 3072 or abs(origin[1] - ho[1]) > 3072:
+            continue
+        links = (bank(name) or {}).get('links', [])
+        if any(l.get('reference') == reference for l in links):
+            dx, dy = origin[0] - ho[0], origin[1] - ho[1]
+            c = cores[name]
+            out.append((c[0] + dx, c[1] + dy, c[2] + dx, c[3] + dy))
+    return out
 
 
 def aim(stand, box):
@@ -230,6 +266,35 @@ STAND_DROP = 80.0       # the standing spot is searched up to this far above the
                         # eaves first; over a doorway structure a player stands on, the use reach decides)
 BELOW_THRESHOLD = 24.0  # a standing spot this far below the threshold is off a platform: not at the door
 WALKABLE = 0.7          # sv_phys.c: a floor whose normal points up less than this is a slope the player slides off
+CONTENTS_WATER = -3     # bspfile.h: the chunk terrain's water leaf (chim_thgt.c), as SV_PointContents reads it
+ARRIVAL_LIFT = 2 * HULL_FEET    # an arrival whose start is in a floor or a step: lifted up to a hull's height
+# From a spot the player is put at (the walk-out arrival and the way from it), the use must land within the original's
+# activation reach, iMaxActivateDist 192 units (48 map units; OpenMW mwworld/worldimp.cpp getMaxActivationDistance),
+# short of the engine's 56: in play on the v0.0.68-dev8 image the walk-out spots that worked used their doors from 0 to
+# 44 units, and Rimhull's trapdoor, 54 units from its walk-out arrival, showed no prompt there.
+WALK_OUT_REACH = 48.0
+# The kinds of entrance the check judges beyond a spot at the threshold (DOOR-USE-COLLISION-EXPANSIONS-68): each stays
+# on only once play has shown its doors used. 'walk_out' (the room exit's arrival and the way from it: shown on the
+# v0.0.68-dev8 image, six entrances of Solstheim entered from it); 'swim' (a door under water used by a swimming
+# player, DOOR-CHECK-NO-SWIM-CASE-68: shown on the v0.0.68-dev8 image with the gated engine of 4974f47ac, Stahlman's
+# Gorge, the Caves of Fjalding and the Unmarked Shipwreck's trapdoor entered by swimming down to them); 'stages' (the
+# placements a script hides while the door is shown left out) and 'doorway' (the other doors of a doorway the scripts
+# switch between switched off, DOOR-CHECK-DOORWAY-STAGES-68): kept as selectable methods until play shows them;
+# AMIWIND_DOOR_CHECK_RULES=walk_out,swim,stages,doorway selects them for an A/B run (an empty value: the check before
+# these rules).
+RULES = ('walk_out', 'swim')
+ALL_RULES = ('walk_out', 'swim', 'stages', 'doorway')
+
+
+def active_rules(rules=None):
+    """The rules the check judges by: RULES, or the environment's AMIWIND_DOOR_CHECK_RULES, or RULES given."""
+    if rules is None:
+        value = os.environ.get('AMIWIND_DOOR_CHECK_RULES')
+        rules = RULES if value is None else tuple(r.strip() for r in value.split(',') if r.strip())
+    bad = [r for r in rules if r not in ALL_RULES]
+    if bad:
+        raise ValueError('door check: unknown rules %s (known: %s)' % (', '.join(bad), ', '.join(ALL_RULES)))
+    return tuple(rules)
 
 
 def door_hit(mins, maxs, eye, forward, reach=56.0):
@@ -250,23 +315,70 @@ def door_hit(mins, maxs, eye, forward, reach=56.0):
     return [eye[k] + forward[k] * near for k in range(3)]
 
 
+def _leave_out(row, refs):
+    """The frame row (path, frame, chunks) with the placements of source references REFS taken out of every chunk
+    (a moment of the door's stage: placements a script hides while the door is shown, tools/script_stages.py)."""
+    from chim.cut import source_ref
+    path, frame, chunks = row
+    return (path, frame, [dict(c, owned=[r for r in c['owned'] if source_ref(r['ref']) not in refs])
+                          for c in chunks])
+
+
 def _reach_unit(task):
     """Worker: the doors of one CHIM region frame against the frame's own collision (chim.collision.FrameScene: its
     chunk terrain and the hulls of everything it places, as the engine collides them): where a player stands at the
     door (dropped from just above the threshold), the eye there, and the engine's wall trace from the eye to the
-    use box (aw_scene.c aimed_door: the use is refused when a surface lies more than DOOR_USE_SLACK before the box)."""
-    world_dir, index, doors, slack = task
+    use box (aw_scene.c aimed_door: the use is refused when a surface lies more than DOOR_USE_SLACK before the box).
+    A door is (reference, box, spot[, arrival[, (door stage, switched)[, core]]]); the task (world, frame, doors,
+    slack[, rules]) names the rules judged by (active_rules; the four RULES kinds). 'walk_out': ARRIVAL, the spot the
+    game puts a player walking out of the room, is where the player stands when no spot at the threshold serves (a
+    door set into a slope, whose box reaches deep into the ground in front of it), it and the way from it inside the
+    frame's CORE (x0, y0, x1, y1: the engine reads the door bank of the frame the player stands in) and the use within
+    WALK_OUT_REACH; 'swim': a door under water is used by a player swimming at it; 'stages' (with the stages,
+    tools/script_stages.py: the door's own, SWITCHED {source reference: stage}): a door no player reaches is tried
+    again without the placements near it a script hides while the door is shown."""
+    world_dir, index, doors, slack = task[:4]
+    rules = task[4] if len(task) > 4 else ALL_RULES
+    swim = 'swim' in rules
     from chim import reach, placed, placement_light, terc, thgt  # noqa: F401 (world formats 0.8 .. 0.13)
     from chim.collision import FrameScene, stand_height
     from chim.validate import load_frame
     row, models = load_frame(world_dir, index)
-    world = {'frames': {index: row}, 'models': models}
-    standing, point = FrameScene(world, index, hull=1), FrameScene(world, index, hull=0)
+    scenes = {}
+
+    def scenes_for(leave):
+        """The standing and point scenes of the frame, without the placements LEAVE (a door's stage)."""
+        key = frozenset(leave or ())
+        if key not in scenes:
+            for old in [k for k in scenes if k]:
+                scenes.pop(old)         # the whole frame's scenes and the latest moment's: never more
+            world = {'frames': {index: _leave_out(row, key) if key else row}, 'models': models}
+            scenes[key] = (FrameScene(world, index, hull=1), FrameScene(world, index, hull=0))
+        return scenes[key]
+    standing = point = None
+
+    def free(x, y, z):
+        """A standing player fits with its origin at (x, y, z) (no solid at the start)."""
+        hit = standing.trace((x, y, z), (x, y, z + 0.5))
+        return not hit or hit['fraction'] > 0
+
+    def floats(x, y, z):
+        """A player with its origin at (x, y, z) swims there: the origin is in the terrain's water (sv_phys.c
+        SV_CheckWater: waterlevel 2 and over; aw_walk.c AW_WalkPlayer adds no gravity while swimming, and an idle
+        swimmer does not sink, sv_user.c SV_WaterMove), so the player stays where it swims to (OpenMW: an actor swims
+        once the water stands over fSwimHeightScale of its height, mwworld/worldimp.cpp isSwimming). Only with the
+        rule 'swim'."""
+        return swim and point.contents((x, y, z)) == CONTENTS_WATER and free(x, y, z)
+
     def stand_at(x, y, mins):
         """The standing origin z of the lowest spot a standing player fits in at (x, y), searched from just above the
-        threshold up (a start in the ground or under an eave is solid: stand_height gives its start height back)."""
+        threshold up (a start in the ground or under an eave is solid: stand_height gives its start height back); a
+        start in the water is where a swimming player stays (DOOR-CHECK-NO-SWIM-CASE-68: an entrance under water, the
+        player swims to it and uses it from the water)."""
         for lift in range(1, int(STAND_DROP) + 1, 4):
             top = mins[2] + HULL_FEET + lift
+            if floats(x, y, top):
+                return top
             hit = standing.trace((x, y, top), (x, y, -4096.0))
             if not hit:
                 return None
@@ -281,29 +393,68 @@ def _reach_unit(task):
                 return z        # resting on the ground already, not inside it
         return None
 
-    def try_use(eye, mins, maxs, aim):
+    def stand_under(x, y, z, lowest):
+        """The standing origin z where a player put with its origin at (x, y, Z) comes to rest: the floor under it
+        (the engine drops a player walking out of a room at the arrival onto it), a start in a floor or a step lifted
+        up to ARRIVAL_LIFT; in the water it swims there. None when it falls under LOWEST or onto a slope it slides
+        off, or nothing holds it."""
+        for lift in range(0, int(ARRIVAL_LIFT) + 1, 4):
+            top = z + lift
+            if not free(x, y, top):
+                continue
+            if floats(x, y, top):
+                return top
+            hit = standing.trace((x, y, top), (x, y, -4096.0))
+            if not hit:
+                return None
+            floor = top + (-4096.0 - top) * hit['fraction']
+            if floor < lowest or (hit.get('normal') or (0, 0, 1))[2] < WALKABLE:
+                return None
+            return floor
+        return None
+
+    def try_use(eye, mins, maxs, aim, reach=56.0):
         """None when the use works from EYE looking at AIM, else why not (aw_scene.c door_hit and the wall trace)."""
         d = [aim[k] - eye[k] for k in range(3)]
         n = math.sqrt(sum(v * v for v in d)) or 1.0
-        hit = door_hit(mins, maxs, eye, [v / n for v in d])
+        hit = door_hit(mins, maxs, eye, [v / n for v in d], reach)
         if hit is None:
             return 'the use box is out of reach (%.0f units)' % n
         dist = math.dist(eye, hit)
-        trace = point.trace(tuple(eye), tuple(hit)) if dist > 0 else None
+        try:
+            trace = point.trace(tuple(eye), tuple(hit)) if dist > 0 else None
+        except ValueError as err:
+            # the offline tracer's visit guard (audit_walkability.Scene.trace) on a deep collision tree: not judged
+            # usable from this eye, never a stop of the whole check
+            return 'the use ray could not be traced (%s)' % err
         if trace and (1 - trace['fraction']) * dist > slack:
             return 'the use ray meets %s %.0f units before the door' % (
                 'the ground' if str(trace['reference']).startswith('chunk') else 'reference %s' % trace['reference'],
                 (1 - trace['fraction']) * dist)
         return None
-    out = {}
-    for ref, box, spot in doors:
-        mins, maxs = box
+
+    def swim_to(x, y, low, high, aim_z):
+        """The origin z nearest AIM_Z between LOW and HIGH where a player swims at (x, y), or None."""
+        steps = int((high - low) // 4) + 1
+        for z in sorted((low + 4 * k for k in range(steps)), key=lambda z: abs(z - aim_z)):
+            if floats(x, y, z):
+                return z
+        return None
+
+    def attempt(door, leave):
+        """(result or None, {'first': why, 'walk_out': why from the walk-out arrival}) of one door, with the
+        placements of source references LEAVE left out of the frame."""
+        nonlocal standing, point
+        ref, (mins, maxs), spot = door[:3]
+        arrival = door[3] if len(door) > 3 and 'walk_out' in rules else None
+        cores = door_cores(door[5] if len(door) > 5 else None)
+        standing, point = scenes_for(leave)
         centre = [(mins[k] + maxs[k]) / 2 for k in range(3)]
         h = maxs[2] - mins[2]
         trapdoor = h < min(maxs[0] - mins[0], maxs[1] - mins[1])
-        if trapdoor:
-            # a trapdoor (lying flat, thinnest upright): the player stands at its top, beside it, and looks down at it
-            mins = [mins[0], mins[1], maxs[2]]
+        # the use box is the engine's (aw_scene.c door_hit reads the bank's box as it is); a trapdoor (lying flat,
+        # thinnest upright) is stood at from its top: the player stands on it or beside it and looks down at it
+        floor = [mins[0], mins[1], maxs[2] if trapdoor else mins[2]]
         # where a player stands: on the line from the door out to the spot the game puts a player walking out of
         # the room, at the use reach and nearer; looking at the door's middle, its upper and its lower part
         u = [spot[0] - centre[0], spot[1] - centre[1]]
@@ -313,7 +464,7 @@ def _reach_unit(task):
         thin = 0 if maxs[0] - mins[0] < maxs[1] - mins[1] else 1
         face = [0.0, 0.0]
         face[thin] = 1.0 if u[thin] >= 0 else -1.0
-        result, first_why = None, None
+        why = {'first': None, 'walk_out': None}
         # straight out from the face, and 12 units to either side of that line (a step, a post or a slope at the
         # middle leaves room beside it), then toward the way-out arrival
         side = [-face[1], face[0]]
@@ -325,25 +476,115 @@ def _reach_unit(task):
             sides = ([1.0, 0.0], [-1.0, 0.0], [0.0, 1.0], [0.0, -1.0])
             spots = [(0.0, 0.0)] + [(s[0] * half / 2, s[1] * half / 2) for s in sides] + \
                 [(s[0] * (half + d), s[1] * (half + d)) for d in (10.0, 20.0) for s in sides] + spots
+
+        def use_from(x, y, origin, how, walk_out=False):
+            """The result when a player at origin (x, y, ORIGIN) uses the door, else None (the first why kept); from a
+            walk-out spot, inside the frame's core and within WALK_OUT_REACH."""
+            eye = [x, y, origin + VIEW]
+            if walk_out and cores and not any(_inside(c, eye) for c in cores):
+                why['walk_out'] = why['walk_out'] or ('the spot lies outside the frame\'s core and the cores of the '
+                                                      'frames whose bank holds the door (the engine reads the door '
+                                                      'bank of the frame the player stands in)')
+                return None
+            for z in (centre[2], floor[2] + .75 * h, floor[2] + .25 * h):
+                got = try_use(eye, mins, maxs, [centre[0], centre[1], z], WALK_OUT_REACH if walk_out else 56.0)
+                if got is None:
+                    res = {'reach': 'yes', 'eye': [round(v, 1) for v in eye],
+                           'ground_over_threshold': round(origin - HULL_FEET - floor[2], 1)}
+                    if floats(x, y, origin):
+                        res['swimming'] = 'yes'
+                    if how:
+                        res['stands'] = how
+                    return res
+                why['first'] = why['first'] or got
+                if walk_out:
+                    why['walk_out'] = why['walk_out'] or got
+            return None
         for dx, dy in spots:
             x, y = centre[0] + dx, centre[1] + dy
-            origin = stand_at(x, y, mins)
+            origin = stand_at(x, y, floor)
             if origin is None:
-                first_why = first_why or ('no standing spot at the door within %d units above its threshold'
-                                          % STAND_DROP)
+                why['first'] = why['first'] or ('no standing spot at the door within %d units above its threshold'
+                                                % STAND_DROP)
                 continue
-            eye = [x, y, origin + VIEW]
-            ground = round(origin - HULL_FEET - mins[2], 1)
-            for z in (centre[2], mins[2] + .75 * h, mins[2] + .25 * h):
-                why = try_use(eye, mins, maxs, [centre[0], centre[1], z])
-                if why is None:
-                    result = {'reach': 'yes', 'eye': [round(v, 1) for v in eye], 'ground_over_threshold': ground}
-                    break
-                first_why = first_why or why
+            result = use_from(x, y, origin, None)
             if result:
-                break
-        result = result or {'reach': 'no', 'why': first_why}
-        out[ref] = result
+                return result, why
+        way = []
+        if arrival:
+            # the spot the game puts a player walking out of the room, and the way from it to the door at the use
+            # reach and nearer, each on the floor under the arrival's height: a door set into a slope (an ice cave's
+            # dark door, a tomb door in a hillside: their boxes reach deep into the rock and the ground in front of
+            # them, so no spot near the threshold is open) is used from the floor its own way out leads onto
+            # (DOOR-USE-COLLISION-EXPANSIONS-68)
+            a = [arrival[0] - centre[0], arrival[1] - centre[1]]
+            d = math.hypot(*a) or 1.0
+            way = [(centre[0] + a[0] / d * k, centre[1] + a[1] / d * k) for k in (REACH, 28.0, 16.0) if k < d]
+            ground = stand_under(arrival[0], arrival[1], arrival[2], -4096.0)
+            if ground is None:
+                why['walk_out'] = 'the walk-out arrival has no floor a player stands on'
+            else:
+                result = use_from(arrival[0], arrival[1], ground, 'at the walk-out arrival', True)
+                if result:
+                    return result, why
+                for x, y in way:
+                    origin = stand_under(x, y, ground, ground - BELOW_THRESHOLD)
+                    if origin is not None:
+                        result = use_from(x, y, origin, 'on the way from the walk-out arrival', True)
+                        if result:
+                            return result, why
+        # an entrance under water (Stahlman's Gorge under the Mortrag Glacier, the Caves of Fjalding at the bottom of
+        # Lake Fjalding: the player swims down to them): wherever around the door the player swims, at the height
+        # nearest the box's middle (DOOR-CHECK-NO-SWIM-CASE-68; the rule 'swim')
+        low, high = floor[2] - BELOW_THRESHOLD + HULL_FEET, maxs[2] + HULL_FEET + VIEW
+        for x, y in ([(centre[0] + dx, centre[1] + dy) for dx, dy in spots] + way +
+                     ([(arrival[0], arrival[1])] if arrival else [])) if swim else ():
+            origin = swim_to(x, y, low, high, centre[2] - VIEW)
+            if origin is not None:
+                result = use_from(x, y, origin, 'swimming at the door')
+                if result:
+                    return result, why
+        return None, why
+
+    def near(box, arrival, frame_refs):
+        """The source references of the frame's placements within reach of the door box (and its walk-out arrival)."""
+        lo = [box[0][k] - REACH - HULL_FEET * 2 for k in range(3)]
+        hi = [box[1][k] + REACH + HULL_FEET * 2 for k in range(3)]
+        if arrival:
+            lo = [min(lo[k], arrival[k] - HULL_FEET * 4) for k in range(3)]
+            hi = [max(hi[k], arrival[k] + HULL_FEET * 4) for k in range(3)]
+        return {r for r, (a, b) in frame_refs.items() if all(a[k] <= hi[k] and b[k] >= lo[k] for k in range(3))}
+    frame_refs = None
+    out = {}
+    for door in doors:
+        result, why = attempt(door, ())
+        if not result and len(door) > 4 and door[4] and 'stages' in rules:
+            # the placements a script hides while this door is shown (a colony's earlier stages and the trees cleared
+            # for its buildings, a quest's ice block or rock in front of an entrance): not in this door's way
+            # (tools/script_stages.py; the engine hides a switched-off placement, OUTDOOR-DISABLE-NOT-HIDDEN-68)
+            import script_stages
+            from chim.cut import source_ref
+            door_stage, switched = door[4]
+            if frame_refs is None:
+                frame_refs = {}
+                for c in row[2]:
+                    for r in c['owned']:
+                        k, (a, b) = source_ref(r['ref']), r['box']
+                        old = frame_refs.get(k)
+                        frame_refs[k] = (a, b) if old is None else (
+                            [min(old[0][i], a[i]) for i in range(3)], [max(old[1][i], b[i]) for i in range(3)])
+            near_switched = {r: switched[r] for r in near(door[1], door[3] if len(door) > 3 else None, frame_refs)
+                             if r in switched}
+            for how, leave in script_stages.moments(door_stage, near_switched):
+                result, _ = attempt(door, tuple(leave))
+                if result:
+                    result['stage'] = '%s: %s left out' % (how, ', '.join(map(str, leave)))
+                    break
+        if not result:
+            result = {'reach': 'no', 'why': why['first']}
+            if len(door) > 3 and door[3] and 'walk_out' in rules:
+                result['walk_out'] = why['walk_out'] or 'no floor on the way from the walk-out arrival'
+        out[door[0]] = result
     return out
 
 
@@ -366,11 +607,20 @@ def layer_frame_cells(layers):
             for store, world in parse(layers) if kinds[store] == 'frames']
 
 
-def reach_check(entries, world_dir, id1, jobs=None, slack=1.0, layers=None):
+def reach_check(entries, world_dir, id1, jobs=None, slack=1.0, layers=None, stages=None, rules=None):
     """{reference: reach result} for the region-frame doors of ENTRIES (their job lines give the standing spot and
     the use box comes from the audit row), one task per CHIM region frame, on every core. Town doors are not traced
     here (their frame maps are the towns' own). LAYERS: the image step's --chim-layer-world values: a door of a frame
-    of such a store is traced in that store's own world (DOOR-CHECK-MODULE-FRAME-MAPS-67)."""
+    of such a store is traced in that store's own world (DOOR-CHECK-MODULE-FRAME-MAPS-67). An entry's walk_out (the
+    room exit's arrival in the door's frame) is where its player stands when no spot at the threshold serves. STAGES
+    (tools/script_stages.Stages): the doors no player reaches are traced again, frame by frame, without the
+    placements near them a script hides while the door is shown (the rule 'stages'). RULES: active_rules."""
+    import door_audit
+    rules = active_rules(rules)
+    try:
+        cores = {name: core for name, _origin, core in door_audit.full_directory(id1)}
+    except (OSError, ValueError):
+        cores = {}
     from build_jobs import resolve_jobs
     from build_parallel import in_order_map
     from chim import format as F
@@ -398,17 +648,88 @@ def reach_check(entries, world_dir, id1, jobs=None, slack=1.0, layers=None):
             if index is None:
                 continue
             d = e['job'].split()
-            tasks.setdefault((str(folder), index), []).append((e['reference'], e['box'], (float(d[3]), float(d[4]))))
-    items = [(folder, index, doors, slack) for (folder, index), doors in sorted(tasks.items())]
+            own = cores.get(e['holder'])
+            tasks.setdefault((str(folder), index), []).append(
+                (e['reference'], e['box'], (float(d[3]), float(d[4])), e.get('walk_out'), None,
+                 ([own] if own else []) + list(e.get('copy_cores') or []) if e.get('copy_cores') else own))
+    items = [(folder, index, doors, slack, rules) for (folder, index), doors in sorted(tasks.items())]
     out = {}
     for part in in_order_map(_reach_unit, items, min(resolve_jobs(jobs), max(1, len(items)))):
         out.update(part)
+    if stages is not None and 'stages' in rules:
+        ids = {e['reference']: e.get('id') for e in entries}
+        again = [(folder, index, [door[:4] + ((stages.of_record(ids[door[0]]), stages.switched), door[5])
+                                  for door in doors if out.get(door[0], {}).get('reach') == 'no'], slack, rules)
+                 for folder, index, doors, slack, rules in items]
+        again = [item for item in again if item[2]]
+        for part in in_order_map(_reach_unit, again, min(resolve_jobs(jobs), max(1, len(again)))):
+            out.update({ref: r for ref, r in part.items() if r['reach'] == 'yes'})
     return out
 
 
+def _overlap(a, b):
+    """Two door bank rows' use boxes meet (one doorway)."""
+    return all(a['mins'][k] <= b['maxs'][k] and b['mins'][k] <= a['maxs'][k] for k in range(3))
+
+
+def doorway_off(link, links, stages):
+    """The references of the load doors of LINKS (one bank's rows) that stand in the doorway of LINK (their use boxes
+    meet) and that a script hides while LINK's door is shown: where two or three doors stand in one doorway and the
+    scripts switch between them (Raven Rock's colony houses, one door per stage; a Skaal hut that becomes another
+    house), the engine takes only the door that is on (DOOR-LOAD-DISABLED-STILL-USED-68), and the check runs the door
+    with the others switched off. With STAGES (tools/script_stages.Stages): a door its own script never switches is in
+    no such doorway; of two read stages of one global, the other door is off when it is hidden at the first value this
+    door is shown at; a stage not read alternates with the door's (DOOR-USE-COLLISION-EXPANSIONS-68)."""
+    import script_stages
+    if not stages or link.get('reference') not in stages.switched:
+        return []
+    own = stages.switched[link['reference']]
+    at = None
+    if own not in (None, script_stages.ALWAYS) and own[1]:
+        at = (own[0], min(own[1]))
+    out = []
+    for other in links:
+        ref = other.get('reference')
+        if not ref or ref == link['reference'] or ref not in stages.switched or not _overlap(link, other):
+            continue
+        stage = stages.switched[ref]
+        if stage not in (None, script_stages.ALWAYS) and at and stage[0] == at[0]:
+            if at[1] in stage[2]:
+                out.append(ref)
+        elif stage is not script_stages.ALWAYS:
+            out.append(ref)
+    return sorted(out)
+
+
+def switched_off(row, bank, stages):
+    """The job line's ' X r1,r2' (or ''): the load doors switched off while the audit ROW's door is shown, of its own
+    doorway in its frame's bank and of its room exit's doorway in the room's bank (doorway_off)."""
+    off = []
+    target = (row.get('bank') or {}).get('target')
+    for name, ref in ((row.get('holder'), row.get('reference')), (target, row.get('exit_reference'))):
+        links = (bank(name) or {}).get('links', []) if name and name != '-' else []
+        own = [l for l in links if l.get('reference') == ref]
+        if own:
+            off += doorway_off(own[0], links, stages)
+    return ' X ' + ','.join(map(str, sorted(set(off)))) if off else ''
+
+
+def walk_out_spot(exit_link, holder, origins):
+    """Where the game puts a player walking out of the room through EXIT_LINK (its bank row: target map and arrival),
+    in the coordinates of the door's frame HOLDER, or None when either is not a frame of ORIGINS ({frame: origin}). An
+    arrival just across the frame's core edge is in the neighbouring frame's coordinates (Mournhold's ladder down to
+    Bamz-Amschend: its way out arrives in the district frame beside the ladder's)."""
+    target = exit_link.get('target')
+    if target not in origins or holder not in origins:
+        return None
+    return [round(exit_link['arrival'][k] + origins[target][k] - origins[holder][k], 2) for k in range(3)]
+
+
 def check(rows, id1, engine_src, directory, names, jobs=None, scene_source=None, world_id1=(), world_dir=None,
-          layers=None):
-    """The report: one entry per audit row, the counts, the regions. LAYERS: reach_check."""
+          layers=None, stages=None, rules=None):
+    """The report: one entry per audit row, the counts, the regions. LAYERS, STAGES, RULES: reach_check; with the
+    rule 'doorway' and STAGES, each door of a doorway the scripts switch between runs with the others off."""
+    rules = active_rules(rules)
     import door_audit
     from build_jobs import resolve_jobs
     banks = {}
@@ -419,6 +740,10 @@ def check(rows, id1, engine_src, directory, names, jobs=None, scene_source=None,
             banks[name] = door_audit.parse_bank(path.read_text(encoding='cp1252'), names) if path.is_file() else None
         return banks[name]
     planned = job_lines(rows, bank, directory)
+    if stages is not None and 'doorway' in rules:
+        planned = [(row, line + switched_off(row, bank, stages) if line else line, why) for row, line, why in planned]
+    frames = {name: origin for name, origin, _core in directory}
+    frame_cores = {name: core for name, _origin, core in directory}
     from build_scratch import scratch_dir
     with scratch_dir(prefix='door-engine-check-', keep_on_failure=False) as tmp:
         exe = compile_harness(engine_src, tmp, scene_source)
@@ -440,6 +765,12 @@ def check(rows, id1, engine_src, directory, names, jobs=None, scene_source=None,
             exits = [l for l in (bank(entry['target']) or {}).get('links', [])
                      if l['reference'] == row.get('exit_reference')] if entry['target'] else []
             checks, reasons = judge(row, result, exits[0]['target'] if exits else None)
+            spot = walk_out_spot(exits[0], entry['holder'], frames) if exits else None
+            if spot:
+                entry['walk_out'] = spot
+                copies = copy_cores(entry['reference'], entry['holder'], frames, frame_cores, bank)
+                if copies:
+                    entry['copy_cores'] = copies
             if entry['placed'] == 'no':
                 reasons.append('its CHIM frame does not place the door model (the audit)')
             usable = all(checks[k] == 'yes' for k in ('crossing', 'in_frame_at_door', 'prompt', 'enters', 'activate'))
@@ -447,7 +778,8 @@ def check(rows, id1, engine_src, directory, names, jobs=None, scene_source=None,
                          both_ways='yes' if usable and checks['way_back'] in ('yes', 'not checked') else 'no')
         entries.append(entry)
     # the wall between the player and the door, with the CHIM world's own collision (region frames)
-    reached = reach_check(entries, world_dir, id1, jobs, use_slack(engine_src), layers) if world_dir else {}
+    reached = reach_check(entries, world_dir, id1, jobs, use_slack(engine_src), layers, stages,
+                          rules) if world_dir else {}
     for e in entries:
         r = reached.get(e['reference'])
         if 'checks' not in e or not e['checks']:
@@ -556,9 +888,12 @@ def write_outputs(report, out):
              'With the wall between the player and the door traced in the CHIM world\'s own collision (the %d '
              'region-frame doors; town doors not traced): %d usable. A player stands in front of the door (straight '
              'out from its face, and on the way to where the game puts a player walking out of the room; at the use '
-             'reach and nearer) and looks at its middle, upper and lower part; the engine refuses the use when a '
+             'reach and nearer) and looks at its middle, upper and lower part; when no such spot serves, by the rules '
+             'on in this run (%s; walk_out: at that walk-out arrival and on the way from it; swim: swimming around a '
+             'door under water; stages: without the placements a script hides while the door is shown; doorway: the '
+             'other doors of a doorway the scripts switch between switched off); the engine refuses the use when a '
              'surface lies more than the doorway slack (aw_scene.c DOOR_USE_SLACK) before the door\'s use box.'
-             % (c['reach_traced'], c['reachable']), '',
+             % (c['reach_traced'], c['reachable'], ', '.join(report.get('rules') or ()) or 'none'), '',
              '| Check | yes |', '| --- | --- |']
     lines += ['| %s | %d |' % (k, c['check ' + k]) for k in ('crossing', 'in_frame_at_door', 'prompt', 'enters',
                                                               'activate', 'way_back', 'reach')]
@@ -584,10 +919,14 @@ def write_outputs(report, out):
 
 
 def run(build=None, id1=None, engine_src=None, audit_rows=None, data_files=None, out=None, baseline=None, jobs=None,
-        scene_source=None, world_doors=None, chim_world=None, world_id1=(), known=None, layers=None):
+        scene_source=None, world_doors=None, chim_world=None, world_id1=(), known=None, layers=None, stages=None,
+        rules=None):
     """The check over one image; returns (report, problem or None). known: config/door-check-known.json (load_known):
     a whole-world image then fails on an unreachable entrance it does not list. layers: the image step's
-    --chim-layer-world STORE=WORLD values (the stores of frames the image installs beside the base world)."""
+    --chim-layer-world STORE=WORLD values (the stores of frames the image installs beside the base world). stages:
+    tools/script_stages.Stages of the masters (given data_files and no stages, read from them): a door no player
+    reaches is traced again without the placements a script hides while it is shown (the rule 'stages'). rules:
+    active_rules (default RULES: the kinds play has shown)."""
     import door_audit
     id1 = Path(id1 or Path(build) / 'image/boot/id1')
     engine_src = Path(engine_src or Path(build) / 'engine/runtime/src')
@@ -604,8 +943,13 @@ def run(build=None, id1=None, engine_src=None, audit_rows=None, data_files=None,
     names = door_audit.engine_map_names((engine_src / 'aw_maps.h').read_text(encoding='utf-8', errors='replace'),
                                         (engine_src / 'aw_town_table.h').read_text(encoding='utf-8', errors='replace'))
     world = chim_world if chim_world and (Path(chim_world) / 'chim' / 'world.cwi').is_file() else None
+    if stages is None and data_files:
+        import script_stages
+        stages = script_stages.read(data_files)
+    rules = active_rules(rules)
     report = check(audit_rows, id1, engine_src, door_audit.full_directory(id1), names, jobs, scene_source, world_id1,
-                   world, layers)
+                   world, layers, stages, rules)
+    report['rules'] = list(rules)
     base = json.loads(Path(baseline).read_text(encoding='utf-8')) if baseline else None
     problem = baseline_problem(report, base)
     report['baseline_problem'] = problem
