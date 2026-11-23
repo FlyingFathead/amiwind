@@ -11,7 +11,10 @@ Usage:
   mwscript_features.py render                     recompute every row's state against the interpreter's current
                                                   function table (tools/mwscript/functions.py), rewrite the JSON's
                                                   states and docs/MWSCRIPT_FEATURES.md
-  mwscript_features.py check                      validate the JSON and fail if a state or the page is stale
+  mwscript_features.py check                      validate the JSON and fail if a state or the page is stale, or if a
+                                                  function the scripts call has no effect class
+                                                  (config/mwscript-effects.json: full, part or none in play, with
+                                                  what is missing and how it is known: source, test or play)
 
 measure needs the game data (run it in the builder container: the masters are read there and nothing of their text
 is written; the JSON keeps record ids, counts and function names only). render and check need only the repository.
@@ -808,6 +811,8 @@ def problems(doc):
             out.append('dialogue results: function %s is not in tools/mwscript/functions.py' % n)
     if not doc['scripts']:
         out.append('no scripts')
+    if not out:
+        out += effect_problems(doc)    # every called function has its effect class (config/mwscript-effects.json)
     return out
 
 
@@ -875,6 +880,88 @@ def function_table(doc):
     for g in doc['dialogue_results']['gaps']:
         for n in missing_now(g['notyet']):
             out.setdefault(n, Counter())['dialogue_missing'] += 1
+    return out
+
+
+# --- the effect in play of each function (MWSCRIPT-IN-PLAY-PARITY-68) ---
+# "Carried out" above is static: the call compiles and the engine executes it. config/mwscript-effects.json says, per
+# function the game's scripts call, whether what the engine then does is the original's effect: full, part (with the
+# line of what is missing) or none (accepted, nothing of the effect happens), and how that is known (basis).
+EFFECTS = ROOT / 'config' / 'mwscript-effects.json'
+EFFECTS_SCHEMA = 'mwscript-effects 1'
+EFFECT_CLASSES = ('full', 'part', 'none')
+EFFECT_LABELS = {'full': 'full', 'part': 'in part', 'none': 'none'}
+EFFECT_BASES = ('source', 'test', 'play')
+_effects = None
+
+
+def effects(path=None):
+    """{function: {effect, missing, register, basis}} of config/mwscript-effects.json; {} when the file is missing."""
+    global _effects
+    if path is not None or _effects is None:
+        p = Path(path) if path else EFFECTS
+        found = json.loads(p.read_text(encoding='utf-8')) if p.exists() else {'schema': EFFECTS_SCHEMA, 'functions': {}}
+        if path is not None:
+            return found
+        _effects = found
+    return _effects
+
+
+def effect_problems(doc, table=None):
+    """What the effects file is refused for: a function the game's scripts call without a class (DOC = the features
+    data), a class or basis outside the lists, a part or none row without its line of what is missing, a full row
+    with one, a name that is no function, a register field that is no list."""
+    eff = table if table is not None else effects()
+    out = []
+    if eff.get('schema') != EFFECTS_SCHEMA:
+        out.append('config/mwscript-effects.json: schema must be %r' % EFFECTS_SCHEMA)
+    rows = eff.get('functions', {})
+    for n, e in sorted(rows.items()):
+        if n not in FUNCTIONS:
+            out.append('effects: %s is not in tools/mwscript/functions.py' % n)
+        if e.get('effect') not in EFFECT_CLASSES:
+            out.append('effects: %s: effect must be one of %s' % (n, ', '.join(EFFECT_CLASSES)))
+            continue
+        if e.get('basis') not in EFFECT_BASES:
+            out.append('effects: %s: basis must be one of %s' % (n, ', '.join(EFFECT_BASES)))
+        if e['effect'] != 'full' and not str(e.get('missing') or '').strip():
+            out.append('effects: %s: a %s effect needs its line of what is missing' % (n, e['effect']))
+        if e['effect'] == 'full' and e.get('missing'):
+            out.append('effects: %s: a full effect has nothing missing' % n)
+        if not isinstance(e.get('register'), list):
+            out.append('effects: %s: register is a list' % n)
+    for n in sorted(function_table(doc)):
+        if n not in rows:
+            out.append('effects: %s is called by the game\'s scripts and has no effect class in '
+                       'config/mwscript-effects.json' % n)
+    return out
+
+
+def effects_section(table):
+    """The lines under the "By function" table: the counts by class and, per function whose effect is not full, what
+    is missing, by the number of scripts that call it."""
+    rows = effects().get('functions', {})
+    called = [n for n in table if n in rows]
+    count = Counter(rows[n]['effect'] for n in called)
+    known = Counter(rows[n]['basis'] for n in called)
+    out = ['### Effect in play', '',
+           'Carried out says that a call is executed; Effect in play says whether what the engine then does is what '
+           'the original game does. Of the %d functions the game\'s scripts call, %d have the original\'s effect in '
+           'full, %d in part and %d have none yet (the call is accepted and nothing of its effect happens). How each '
+           'class is known: %d read from the source against the original\'s rules, %d kept by a test, %d checked in '
+           'play. A class read from the source is not yet proven in play.' % (
+               len(called), count['full'], count['part'], count['none'], known['source'], known['test'],
+               known['play']), '']
+    gaps = [n for n in called if rows[n]['effect'] != 'full']
+    if gaps:
+        out += ['| Function | Effect | Scripts | Dialogue | What is missing | Known from | Register |',
+                '| --- | --- | ---: | ---: | --- | --- | --- |']
+        for n in sorted(gaps, key=lambda n: (-table[n]['scripts'], -table[n]['dialogue'], n)):
+            e = rows[n]
+            out.append('| %s | %s | %d | %d | %s | %s | %s |' % (
+                n, EFFECT_LABELS[e['effect']], table[n]['scripts'], table[n]['dialogue'], _cell(e['missing']),
+                e['basis'], ', '.join(e['register']) or '-'))
+        out.append('')
     return out
 
 
@@ -1033,10 +1120,13 @@ def render(doc):
               'out; Only gap: the scripts it alone keeps from running whole; Dialogue: the result scripts that call '
               'it, and of those the ones where the call is not carried out. Carried out "host" means the engine '
               'carries the call out through the import route; "in part" means some of its calls are carried out '
-              '(the player\'s PositionCell to a known room, a Cast of a cure) and the others are not.', '',
-              '| Function | Group | Carried out | Scripts | Uses | In conditions | Missing in | Only gap | Dialogue '
-              '| Dialogue missing |',
-              '| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |']
+              '(the player\'s PositionCell to a known room, a Cast of a cure) and the others are not. Effect in play: '
+              'whether what the engine does for the call is the original\'s effect, in full, in part or none (the '
+              'list under the table says what is missing).', '',
+              '| Function | Group | Carried out | Effect in play | Scripts | Uses | In conditions | Missing in | Only gap '
+              '| Dialogue | Dialogue missing |',
+              '| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |']
+    eff = effects().get('functions', {})
     for n, c in sorted(table.items(), key=lambda kv: (-(kv[1]['missing_in'] + kv[1]['dialogue_missing']),
                                                       -kv[1]['scripts'], kv[0])):
         fn = FUNCTIONS[n]
@@ -1046,11 +1136,12 @@ def render(doc):
             carried = 'in part'          # some calls compile to their own form (the player's PositionCell)
         elif carried == 'host' and gaps:
             carried = 'host, in part'
-        lines.append('| %s | %s | %s | %d | %d | %d | %d | %d | %d | %d |' % (
-            n, fn.group, carried, c['scripts'], c['uses'], c['conditions'], c['missing_in'], c['only_gap'],
-            c['dialogue'], c['dialogue_missing']))
+        lines.append('| %s | %s | %s | %s | %d | %d | %d | %d | %d | %d | %d |' % (
+            n, fn.group, carried, EFFECT_LABELS.get((eff.get(n) or {}).get('effect'), 'not classed'), c['scripts'],
+            c['uses'], c['conditions'], c['missing_in'], c['only_gap'], c['dialogue'], c['dialogue_missing']))
     unused = sorted(n for n in FUNCTIONS if n not in table)
     lines += ['', '%d functions of the compiler\'s table are called by no script of the game.' % len(unused), '']
+    lines += effects_section(table)
     # every script
     lines += ['## Every script', '',
               'Referenced by: the records that carry the script and their placed references per master, levelled '

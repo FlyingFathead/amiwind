@@ -470,6 +470,7 @@ void (*aw_actor_killed)(const aw_actor_t *a);
 void AW_ActorKill(aw_actor_t *a){
     if(!a || (a->flags&AWL_DEAD))return;
     a->flags|=AWL_DEAD|AWL_DIED;
+    a->flags&=~AWL_COMBAT;a->fight_ref=0;   /* its fight order ends with it */
     if(a->dyn_cur[0]>0)a->dyn_cur[0]=0;
     if(a->base<st->nactors && st->dead[a->base]<0xFFFF)st->dead[a->base]++;
     changed(a);
@@ -481,6 +482,39 @@ int AW_ActorOnDeath(aw_actor_t *a){
     return 1;
 }
 int AW_ActorDeadCount(int row){return st && row>=0 && row<st->nactors?st->dead[row]:0;}
+/* --- the fight orders (MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68; aw_actorstate.h AWL_COMBAT) --- */
+#define ORDERED(a) (((a)->flags&(AWL_USED|AWL_COMBAT|AWL_DEAD))==(AWL_USED|AWL_COMBAT))
+void AW_ActorOrder(aw_actor_t *a,uint32_t target){
+    if(!a || !st || a->reference==AW_ACTOR_PLAYER_REF)return;
+    if(!target){a->flags&=~AWL_COMBAT;a->fight_ref=0;return;}
+    if(a->flags&AWL_DEAD)return;
+    a->flags|=AWL_COMBAT;a->fight_ref=target;
+    changed(a);
+}
+int AW_ActorOrders(int *cursor,uint32_t *refs,uint32_t *targets,int max){
+    int i=cursor?*cursor:0,n=0;
+    if(!st){if(cursor)*cursor=0;return 0;}
+    if(i<0 || i>=RECORDS())i=0;
+    for(;i<RECORDS() && n<max;i++){
+        const aw_actor_t *a=REC(i);
+        if(!ORDERED(a))continue;
+        refs[n]=a->reference;targets[n]=a->fight_ref?a->fight_ref:AW_ACTOR_PLAYER_REF;n++;
+    }
+    if(cursor)*cursor=i>=RECORDS()?0:i;
+    return n;
+}
+int AW_ActorOrderCount(void){
+    int i,n=0;
+    if(!st)return 0;
+    for(i=0;i<RECORDS();i++)if(ORDERED(REC(i)))n++;
+    return n;
+}
+int AW_ActorOrdersEnd(void){
+    int i,n=0;
+    if(!st)return 0;
+    for(i=0;i<RECORDS();i++)if(REC(i)->flags&AWL_COMBAT){REC(i)->flags&=~AWL_COMBAT;REC(i)->fight_ref=0;n++;}
+    return n;
+}
 
 /* --- inventory --- */
 static int base_count(const aw_actor_t *a,int item,int *equipped){
@@ -700,13 +734,17 @@ int AW_ActorSpells(const aw_actor_t *a,int *out,int max){
  * big-endian; a record: u32 reference u16 base u16 flags i16 level i16 attr base/mod [16] i16 skill base/mod [54]
  * f32 dynamic base/current [6] u8 ai[4] i16 disposition u8 items u8 spells, then (u16 item i16 change) per item and
  * (u16 spell i16 change) per spell; a count: u16 base u16 count. The player's record is not here: its sheet is
- * saved with the character. --- */
+ * saved with the character.
+ * MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68: a version 2 record (the AWAR block only) carries the fight order's target, a
+ * u32, between the fixed part and the item changes. A version 1 record's order (its AWL_COMBAT flag) is against the
+ * player: the one fight a script could start when those were written. --- */
 #define RECORD_FIXED (4+2+2+2+32+108+24+4+2+2)
+#define RECORD_ORDER(version) ((version)>=2?4:0)
 static unsigned char *put16(unsigned char *p,unsigned v){p[0]=(unsigned char)(v>>8);p[1]=(unsigned char)v;return p+2;}
 static unsigned char *put32(unsigned char *p,uint32_t v){p[0]=(unsigned char)(v>>24);p[1]=(unsigned char)(v>>16);p[2]=(unsigned char)(v>>8);p[3]=(unsigned char)v;return p+4;}
 static unsigned char *putf(unsigned char *p,float f){uint32_t u;memcpy(&u,&f,4);return put32(p,u);}
 #define KEPT(a) (((a)->flags&(AWL_USED|AWL_CHANGED))==(AWL_USED|AWL_CHANGED))
-static unsigned char *put_record(unsigned char *p,const aw_actor_t *a){
+static unsigned char *put_record(unsigned char *p,const aw_actor_t *a,int version){
     int j;
     p=put32(p,a->reference);p=put16(p,a->base);p=put16(p,a->flags&(AWL_CHANGED|AWL_DEAD|AWL_DIED|AWL_COMBAT));
     p=put16(p,(unsigned)(uint16_t)a->level);
@@ -715,27 +753,38 @@ static unsigned char *put_record(unsigned char *p,const aw_actor_t *a){
     for(j=0;j<3;j++){p=putf(p,a->dyn_base[j]);p=putf(p,a->dyn_cur[j]);}
     for(j=0;j<4;j++)*p++=a->ai[j];
     p=put16(p,(unsigned)(uint16_t)a->disposition);*p++=a->nitems;*p++=a->nspells;
+    if(version>=2)p=put32(p,(a->flags&AWL_COMBAT)?(a->fight_ref?a->fight_ref:AW_ACTOR_PLAYER_REF):0);
     for(j=0;j<a->nitems;j++){p=put16(p,a->items[j].item);p=put16(p,(unsigned)(uint16_t)a->items[j].change);}
     for(j=0;j<a->nspells;j++){p=put16(p,a->spells[j].spell);p=put16(p,(unsigned)(uint16_t)a->spells[j].change);}
     return p;
 }
-/* the changed records' count and bytes */
-static int records_need(int *records){
+/* the changed records' count and bytes as records of VERSION */
+static int records_need(int *records,int version){
     int i,n=0,need=0;
-    for(i=0;i<RECORDS();i++)if(KEPT(REC(i))){n++;need+=RECORD_FIXED+4*(REC(i)->nitems+REC(i)->nspells);}
+    for(i=0;i<RECORDS();i++)
+        if(KEPT(REC(i))){n++;need+=RECORD_FIXED+RECORD_ORDER(version)+4*(REC(i)->nitems+REC(i)->nspells);}
     *records=n;
     return need;
+}
+/* the version the changed records need: 2 when a living record's order names another actor, else 1 */
+static int records_version(void){
+    int i;
+    for(i=0;i<RECORDS();i++){
+        const aw_actor_t *a=REC(i);
+        if(KEPT(a) && ORDERED(a) && a->fight_ref && a->fight_ref!=AW_ACTOR_PLAYER_REF)return 2;
+    }
+    return 1;
 }
 static int export_block(unsigned char *out,int capacity,int with_records){
     int i,records=0,counts=0,need=10;unsigned char *p;
     if(!st)return 0;
-    if(with_records)need+=records_need(&records);
+    if(with_records)need+=records_need(&records,1);
     if(records>0xFFFF)return -1;                   /* AWAS1 counts in 16 bits: the records go as AWAR */
     for(i=0;i<st->nactors;i++)if(st->dead[i]){counts++;need+=4;}
     if(!records && !counts)return 0;
     if(need>capacity)return -1;
     p=out;memcpy(p,"AWAS",4);p+=4;*p++=1;*p++=0;p=put16(p,(unsigned)records);p=put16(p,(unsigned)counts);
-    if(with_records)for(i=0;i<RECORDS();i++)if(KEPT(REC(i)))p=put_record(p,REC(i));
+    if(with_records)for(i=0;i<RECORDS();i++)if(KEPT(REC(i)))p=put_record(p,REC(i),1);
     for(i=0;i<st->nactors;i++)if(st->dead[i]){p=put16(p,(unsigned)i);p=put16(p,st->dead[i]);}
     return (int)(p-out);
 }
@@ -750,20 +799,21 @@ int AW_ActorStateRecordsCopy(void *(*alloc)(unsigned long),unsigned long max,uns
 int AW_ActorStateExport(unsigned char *out,int capacity){return export_block(out,capacity,1);}
 int AW_ActorStateExportCounts(unsigned char *out,int capacity){return export_block(out,capacity,0);}
 int AW_ActorStateExportRecords(unsigned char *out,int capacity){
-    int i,records,need;unsigned char *p;
+    int i,records,need,version;unsigned char *p;
     if(!st)return 0;
-    need=12+records_need(&records);
+    version=records_version();
+    need=12+records_need(&records,version);
     if(!records)return 0;
     if(!out)return need;
     if(need>capacity)return -1;
-    p=out;memcpy(p,"AWAR",4);p+=4;*p++=1;*p++=0;p=put16(p,0);p=put32(p,(uint32_t)records);
-    for(i=0;i<RECORDS();i++)if(KEPT(REC(i)))p=put_record(p,REC(i));
+    p=out;memcpy(p,"AWAR",4);p+=4;*p++=(unsigned char)version;*p++=0;p=put16(p,0);p=put32(p,(uint32_t)records);
+    for(i=0;i<RECORDS();i++)if(KEPT(REC(i)))p=put_record(p,REC(i),version);
     return (int)(p-out);
 }
-/* one record from P (END the block's end) into A (released, zero); the bytes read, 0 bad */
-static int get_record(const unsigned char *p,const unsigned char *end,aw_actor_t *a){
-    const unsigned char *start=p;int j;unsigned char ni,ns;
-    if(end-p<RECORD_FIXED)return 0;
+/* one record of VERSION from P (END the block's end) into A (released, zero); the bytes read, 0 bad */
+static int get_record(const unsigned char *p,const unsigned char *end,aw_actor_t *a,int version){
+    const unsigned char *start=p;int j;unsigned char ni,ns;uint32_t order=0;
+    if(end-p<RECORD_FIXED+RECORD_ORDER(version))return 0;
     a->reference=u32(p);a->base=(uint16_t)U16(p+4);a->flags=(uint16_t)(U16(p+6)|AWL_USED|AWL_CHANGED);p+=8;
     if(a->base>=st->nactors || a->reference==AW_ACTOR_PLAYER_REF)return 0;
     a->level=(short)U16(p);p+=2;
@@ -773,6 +823,7 @@ static int get_record(const unsigned char *p,const unsigned char *end,aw_actor_t
         if(!(a->dyn_base[j]>-1e7f && a->dyn_base[j]<1e7f) || !(a->dyn_cur[j]>-1e7f && a->dyn_cur[j]<1e7f))return 0;}
     for(j=0;j<4;j++)a->ai[j]=*p++;
     a->disposition=(short)U16(p);ni=p[2];ns=p[3];p+=4;
+    if(version>=2){order=u32(p);p+=4;}
     if(end-p<4*(ni+ns))return 0;
     for(j=0;j<ni;j++){
         int item=(int)U16(p),change=(int16_t)U16(p+2);p+=4;
@@ -787,26 +838,29 @@ static int get_record(const unsigned char *p,const unsigned char *end,aw_actor_t
         a->spells[a->nspells].spell=(uint16_t)spell;a->spells[a->nspells].change=(int16_t)change;a->nspells++;
     }
     a->flags=(uint16_t)(a->flags|AWL_USED|AWL_CHANGED);   /* item_change marked it changed too */
+    /* the order: a dead record holds none; a version 1 order, or a version 2 one without a target, is the player's */
+    if(a->flags&AWL_DEAD)a->flags&=~AWL_COMBAT;
+    a->fight_ref=!(a->flags&AWL_COMBAT)?0:(order && order!=a->reference)?order:AW_ACTOR_PLAYER_REF;
     {aw_actor_base_t b;if(AW_ActorBase(a->base,&b)){a->kind=b.kind;a->record_flags=b.flags;}}
     return (int)(p-start);
 }
-static int import_records(const unsigned char *p,const unsigned char *end,int records){
+static int import_records(const unsigned char *p,const unsigned char *end,int records,int version){
     int i,n;
     if(records>AW_ACTOR_POOL_MAX)return 0;
     for(i=0;i<records;i++){
         aw_actor_t *a=import_slot(end-p>=4?u32(p):0);
         if(!a)return 0;
         memset(a,0,sizeof(*a));
-        if(!(n=get_record(p,end,a))){release(a);memset(a,0,sizeof(*a));return 0;}
+        if(!(n=get_record(p,end,a,version))){release(a);memset(a,0,sizeof(*a));return 0;}
         p+=n;
     }
     return 1;
 }
-static const unsigned char *skip_records(const unsigned char *p,const unsigned char *end,int records){
-    int i;
+static const unsigned char *skip_records(const unsigned char *p,const unsigned char *end,int records,int version){
+    int i,fixed=RECORD_FIXED+RECORD_ORDER(version);
     for(i=0;i<records;i++){
-        if(end-p<RECORD_FIXED)return NULL;
-        {int extra=4*(p[RECORD_FIXED-2]+p[RECORD_FIXED-1]);if(end-p<RECORD_FIXED+extra)return NULL;p+=RECORD_FIXED+extra;}
+        if(end-p<fixed)return NULL;
+        {int extra=4*(p[RECORD_FIXED-2]+p[RECORD_FIXED-1]);if(end-p<fixed+extra)return NULL;p+=fixed+extra;}
     }
     return p;
 }
@@ -819,7 +873,7 @@ int AW_ActorStateImport(const unsigned char *data,int bytes){
     if(bytes<10 || memcmp(p,"AWAS",4) || p[4]!=1)return 0;
     records=(int)U16(p+6);counts=(int)U16(p+8);p+=10;
     /* an older save's records (at most 128 then) are taken into the pool as they are: migrated */
-    if(!(q=skip_records(p,end,records)) || !import_records(p,q,records))goto bad;
+    if(!(q=skip_records(p,end,records,1)) || !import_records(p,q,records,1))goto bad;
     p=q;
     for(i=0;i<counts;i++){
         int row;
@@ -834,22 +888,22 @@ bad:
     return 0;
 }
 int AW_ActorStateImportRecords(const unsigned char *data,int bytes){
-    const unsigned char *p=data,*end=data+bytes,*q;int i,records;
+    const unsigned char *p=data,*end=data+bytes,*q;int i,records,version;
     if(!st)return 0;
     if(!data || !bytes)return 1;
-    if(bytes<12 || memcmp(p,"AWAR",4) || p[4]!=1 || p[5] || U16(p+6))return 0;
-    records=(int)u32(p+8);p+=12;
-    if(records<1 || records>AW_ACTOR_POOL_MAX || !(q=skip_records(p,end,records)) || q!=end)return 0;
+    if(bytes<12 || memcmp(p,"AWAR",4) || (p[4]!=1 && p[4]!=2) || p[5] || U16(p+6))return 0;
+    version=p[4];records=(int)u32(p+8);p+=12;
+    if(records<1 || records>AW_ACTOR_POOL_MAX || !(q=skip_records(p,end,records,version)) || q!=end)return 0;
     {   /* every record checked first, so a bad block adds nothing */
         aw_actor_t check;const unsigned char *r=p;int n;
         for(i=0;i<records;i++){
             memset(&check,0,sizeof(check));
-            n=get_record(r,q,&check);release(&check);
+            n=get_record(r,q,&check,version);release(&check);
             if(!n)return 0;
             r+=n;
         }
     }
-    return import_records(p,q,records);
+    return import_records(p,q,records,version);
 }
 /* The items A holds now (its base list and the changes, gold not counted: it is the record's gold), with counts and
  * whether equipped; up to MAX; the count of distinct items. For a merchant's stock (the dialogue's Barter). */

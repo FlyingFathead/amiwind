@@ -82,6 +82,7 @@ Family: Collision shapes and climbing (stairs, ramps, walkways) (`stairs-collisi
 Related bugs in other categories:
 
 - [DOOR-CHECK-MODULE-FRAME-MAPS-67](DOOR-CHECK-MODULE-FRAME-MAPS-67.md): The image's door check stopped on the first frame map of Mournhold's districts: its table of neighbouring frames knew only the open-world directory
+- [DOOR-CHECK-NO-SWIM-CASE-68](DOOR-CHECK-NO-SWIM-CASE-68.md): The build's door check has no case for an entrance reached by swimming: the Stahlman's Gorge entrance under the Mortrag Glacier stops the image stage
 - [DOOR-LOAD-DISABLED-STILL-USED-68](DOOR-LOAD-DISABLED-STILL-USED-68.md): A load door switched off by its script still shows its prompt and can be used
 - [DOOR-USE-COLLISION-FILLED-53](DOOR-USE-COLLISION-FILLED-53.md): 35 region-frame entrances cannot be reached through their converted collision: 24 Daedric shrine steps the player slides off, raised trapdoors under their tower hulls, Dwemer doors inside the terrain chunk
 

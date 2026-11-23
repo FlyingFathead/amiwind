@@ -20,6 +20,7 @@
 #define FOG_PLACES 48
 #define FOG_NAME 40
 extern int (*aw_fog_location_hook)(int);
+extern int (*aw_fog_location_key)(void);
 static cvar_t aw_fog_location={"aw_fog_location","1",true};
 typedef struct {char name[FOG_NAME];int day,night;} fog_place_t;
 static fog_place_t places[FOG_PLACES];
@@ -104,7 +105,16 @@ static int location(int distance)
     value=night_distance+(day_distance-night_distance)*(light-FOG_NIGHT_DAYLIGHT)/(256-FOG_NIGHT_DAYLIGHT);
     return value<distance?value:distance;
 }
+/* What the draw distance's watch compares (aw_fog.c AW_DrawDistanceWatch, REGIONAL-DRAW-DISTANCE-68): the switch and,
+ * while a place is matched, the daylight its blend follows; the title and the map are the view's cell and map, which
+ * the watch compares itself. The value is used only while a place is matched, so nothing is looked up here. */
+static int key(void)
+{
+    if(aw_fog_location.value<=0)return -1;
+    if(!have)return 0;
+    return 1+(r_daylight>256?256:r_daylight<FOG_NIGHT_DAYLIGHT?FOG_NIGHT_DAYLIGHT:r_daylight);
+}
 void AW_FogLocationInit(void)
 {
-    Cvar_RegisterVariable(&aw_fog_location);aw_fog_location_hook=location;
+    Cvar_RegisterVariable(&aw_fog_location);aw_fog_location_hook=location;aw_fog_location_key=key;
 }

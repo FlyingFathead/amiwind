@@ -182,6 +182,7 @@ Family: Loading and disk reads (`disk-loading`). Load time follows bytes read an
 - [ROOM-LOAD-LONG-FRAME-63](ROOM-LOAD-LONG-FRAME-63.md): A room load took one 19-second frame in a test session while a gate ran beside it
 - [SESSION-STALL-AFTER-LONG-FRAME-62](SESSION-STALL-AFTER-LONG-FRAME-62.md): The game stops with its clock frozen right after a frame of several seconds spent on console output or file reads, in three of ten scripted Seyda Neen sessions
 - [SEYDA-LOAD-HANG-30](SEYDA-LOAD-HANG-30.md): Rare freeze during a Seyda Neen region load
+- [STARTCOMBAT-SHEET-READ-BEFORE-SLOT-68](STARTCOMBAT-SHEET-READ-BEFORE-SLOT-68.md): A script's StartCombat reads the fighter's sheet from disk before it knows that a fight slot is free
 - [STREAM-FFS-SEEK-32](STREAM-FFS-SEEK-32.md): Random 16 KiB reads on FFS run at 0.44 MB/s and take most of the CPU
 
 Related bugs in other categories:

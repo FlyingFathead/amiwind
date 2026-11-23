@@ -79,7 +79,7 @@ class Tracker(unittest.TestCase):
             return text.split(head, 1)[1].split('\n}\n', 1)[0]
         reads = ('fread', 'fseek', 'COM_FOpenFile', 'AW_ActorFind', 'read_string', 'AW_ActorBase', 'AW_GlutSpeaker',
                  'AW_MwscriptDispositionFacts', 'AW_DialNpcPrepare', 'AW_CombatActorLoad', 'load()', 'aggro_facts(')
-        tick = body('aw_ambient.c', 'static void aggro(slot_t *s) {').split('AW_CombatHostiles()', 1)[0]
+        tick = body('aw_ambient.c', 'static void aggro(slot_t *s) {').split('AW_CombatSlotsFree()', 1)[0]
         for part in (tick, body('aw_dialwin.c', 'int AW_DialNpcDisposition(edict_t *e,const aw_dial_npc_cache_t *c){'),
                      body('aw_mwhost.c', 'void AW_MwscriptDispositionNow(int actor_row,')):
             for word in reads:

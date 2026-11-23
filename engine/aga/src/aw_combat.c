@@ -10,7 +10,8 @@
  * only watches its state and strikes at the hit key, so the progs CRC does
  * not change. Rolls come from one seeded generator per encounter.
  *
- * Cost per hostile NPC: one slot of about 1.9 KB with its kept spells (no allocation), one think per
+ * Cost per hostile NPC: one slot of about 1.9 KB with its kept spells (no allocation; sixteen slots and their retry
+ * rows are about 34 KB resident, "dbg combat" says the bytes), one think per
  * 0.1 s (at most AW_PATH_TRACES search traces plus the step's own moves),
  * and per frame a pointer test and a frame index. Nothing runs while no NPC
  * is hostile apart from the player's fatigue return.
@@ -31,8 +32,19 @@
 #include "aw_effects.h"
 #include "aw_cast.h"
 #include "aw_animkit.h"
+#include "aw_state.h"           /* AW_INVENTORY_DROPS: the edicts kept for dropped items (ITEMS_KEPT) */
 
-#define SLOTS 4               /* hostile NPCs at a time */
+#define SLOTS 4               /* fighters whose held weapon and shield have edicts kept for them on every map */
+/* MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68: the fight slots. The original has no limit on the actors fighting at once
+ * (OpenMW 0.51 mechanicsmanagerimp.cpp startCombat stacks an AiCombat package on the actor); the game's largest single
+ * start is fifteen actors in one script tick (the Skaal village attack), and three scripts and one greeting start six
+ * at the player. Four slots lost every StartCombat past the fourth. SLOTS above keeps its value and its one reader
+ * (tools/map_engine_limits.py runtime_edicts: the edicts every map keeps free for held items); a fighter past those
+ * draws its weapon and shield only while the map has edicts to spare beyond what is kept for others (items_spare).
+ * aw_combat_slots (1..FIGHTS, not saved; "dbg combat slots N") lowers the slots in use for a comparison: 4 = the cap
+ * before v0.0.68. Resident cost: sizeof(slot_t) and one retry row per slot, said by "dbg combat". */
+#define FIGHTS 16
+typedef char aw_fights_fit_the_list[AW_COMBAT_FIGHTERS_MAX>=FIGHTS?1:-1];
 #define SCALE .25f              /* original units -> game units (tools/prepare_quake.py SCALE) */
 #define STEP_UP 8.5f
 enum {S_CHASE,S_SWING,S_HIT,S_KNOCK,S_DEAD,S_FLEE,S_BLOCK,S_DODGE,S_CAST};
@@ -88,7 +100,7 @@ static const char *const sound_key[AW_SND_COUNT]={"health","miss","punch","light
 enum {SND_HEALTH=AW_SND_HEALTH,SND_MISS=AW_SND_MISS,SND_PUNCH=AW_SND_PUNCH,SND_LIGHT=AW_SND_LIGHT,SND_MEDIUM=AW_SND_MEDIUM,
       SND_HEAVY=AW_SND_HEAVY,SND_SWISH=AW_SND_SWISH,SND_CRITICAL=AW_SND_CRITICAL,SND_FALL=AW_SND_FALL};
 
-static slot_t slots[SLOTS];
+static slot_t slots[FIGHTS];
 static aw_fighter_t you;        /* the player's sheet while anything is hostile */
 static int you_valid,battle,dead_music;
 static aw_combat_rng_t rng;
@@ -101,7 +113,7 @@ static float you_hit_at=-1,you_down_at;static int you_hit_roll,you_down_seen;
  * everyone stood and how they were when the fight began. */
 static struct {
     int valid;vec3_t origin,angles;aw_fighter_t you;
-    struct {edict_t *e;vec3_t origin,angles;aw_fighter_t f;float health;} npc[SLOTS];
+    struct {edict_t *e;vec3_t origin,angles;aw_fighter_t f;float health;} npc[FIGHTS];
 } retry;
 static edict_t *enemy;static float enemy_until;
 static aw_combat_stats_t totals;
@@ -538,7 +550,7 @@ static float original_distance(edict_t *a,edict_t *b) {
     vec3_t d;VectorSubtract(a->v.origin,b->v.origin,d);
     return (float)Length(d)/SCALE;
 }
-static slot_t *slot_of(edict_t *e) {int i;for(i=0;i<SLOTS;i++)if(slots[i].e==e)return &slots[i];return NULL;}
+static slot_t *slot_of(edict_t *e) {int i;for(i=0;i<FIGHTS;i++)if(slots[i].e==e)return &slots[i];return NULL;}
 /* OWN: the attacker strikes with a creature's own attacks: its record's attack 1, 2 or 3 (OpenMW mwclass/creature.cpp
  * hit takes them as the chop, slash and thrust types; CREATURE-NIXHOUND-HUMAN-MOVES-67: the readout said "chop", a
  * weapon's word, for a nix-hound's bite) */
@@ -704,6 +716,9 @@ static void face_player(edict_t *e,edict_t *p) {
 /* ---- engagement ---- */
 void (*aw_combat_actor_released)(edict_t *e);
 void (*aw_combat_actor_died)(edict_t *e);
+/* `dbg combat calm` and `dbg combat off` (NULL: none; aw_mwhost.c binds it and declares it there: aw_combat.h is keyed
+ * by the CHIM world stage) */
+void (*aw_combat_calmed)(void);
 static void release(slot_t *s) {
     edict_t *alive=s->e && !s->e->free && s->state!=S_DEAD?s->e:NULL;
     AW_ItemsHide(s->item);
@@ -738,7 +753,7 @@ int AW_CombatHostiles(void) {
     int i,n=0;
     /* COMBAT-ACTOR-VS-ACTOR-62: a slot that fights another actor is no hostile of the player (no battle music, no
      * wait refusal, no win) */
-    for(i=0;i<SLOTS;i++)if(slots[i].e && !slots[i].e->free && !slots[i].f.dead && !slots[i].target_num)n++;
+    for(i=0;i<FIGHTS;i++)if(slots[i].e && !slots[i].e->free && !slots[i].f.dead && !slots[i].target_num)n++;
     return n;
 }
 /* GAME-RECORDER-FIGHT-SEED-61: while the gameplay recorder records or plays back, the fights draw their seeds from the
@@ -790,6 +805,36 @@ static int disabled_actor(edict_t *e) {
     eval_t *v=e?GetEdictFieldValue(e,"aw_ref"):NULL;
     return v && v->_float>=1 && v->_float<=16777215.0f && AW_ObjectDisabled((unsigned int)v->_float);
 }
+/* MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68: the slots in use at most (aw_combat_slots), a slot whose fighter has fallen
+ * (a new fighter may take it), and the slots a new fighter can take now. AW_CombatSlotsFree is declared by its callers
+ * (aw_mwhost.c, aw_ambient.c), not in aw_combat.h, which the CHIM world stage keys. */
+static cvar_t slots_cvar={"aw_combat_slots","16"};
+static unsigned long full_refused,items_left_out;
+static int slot_cap(void) {int n=(int)slots_cvar.value;return n<1?1:n>FIGHTS?FIGHTS:n;}
+static int slot_fallen(const slot_t *s) {return s->e && (s->f.dead || s->state==S_DEAD || s->e->free);}
+int AW_CombatSlotsFree(void);
+int AW_CombatSlotsFree(void) {
+    int i,n=slot_cap();
+    for(i=0;i<FIGHTS;i++)if(slots[i].e && !slot_fallen(&slots[i]))n--;
+    return n>0?n:0;
+}
+/* The held weapon and shield of a fighter past the SLOTS the maps keep edicts for: drawn only while the map has edicts
+ * to spare beyond everything kept for others (tools/map_engine_limits.py runtime_edicts: the companion and the arena
+ * foe, SLOTS x AW_ITEMS_KINDS held items, the dropped items, the guards' torches), so a full map never stops the game
+ * for a fifth fighter's sword (ED_Alloc ends the game when no edict is free). ED_Alloc's own rule for a freed edict. */
+#define ITEMS_KEPT (2+SLOTS*AW_ITEMS_KINDS+AW_INVENTORY_DROPS+AW_ITEMS_CARRIERS)
+int AW_CombatItemsRule(int drawn,int spare);    /* the rule alone, for its test: DRAWN fighters hold items, SPARE edicts */
+int AW_CombatItemsRule(int drawn,int spare) {return drawn<SLOTS || spare>=ITEMS_KEPT+AW_ITEMS_KINDS;}
+static int items_spare(void) {
+    int i,k,n=0,spare=MAX_EDICTS-sv.num_edicts;edict_t *e;
+    for(i=0;i<FIGHTS;i++)if(slots[i].e)for(k=0;k<AW_ITEMS_KINDS;k++)if(slots[i].item[k]){n++;break;}
+    if(n<SLOTS)return 1;                        /* the common case: no edict is looked at */
+    for(i=svs.maxclients+1;i<sv.num_edicts;i++){
+        e=EDICT_NUM(i);
+        if(e->free && (e->freetime<2 || sv.time-e->freetime>.5))spare++;
+    }
+    return AW_CombatItemsRule(n,spare);
+}
 int AW_CombatEngage(edict_t *e,const aw_fighter_t *fighter,const char *layout) {
     slot_t *s=slot_of(e);int i;
     if(!combat_on.value || !e || e->free || !fighter || !AW_CombatSettingsLoad())return 0;
@@ -798,15 +843,18 @@ int AW_CombatEngage(edict_t *e,const aw_fighter_t *fighter,const char *layout) {
      * fab_attack_1 / fab_attack_2 disables until FabAttack is 1). A corpse's slot (engage_dead) is not a fight. */
     if(!engage_dead && disabled_actor(e)){disabled_refused++;return 0;}
     if(!s){
-        for(i=0;i<SLOTS && slots[i].e;i++){}
-        /* every slot taken: a fallen fighter's slot is reused (a pack of more than SLOTS keeps coming as the first
-         * ones die, COMBAT-PACK-SLOTS-57); its death is handed to the actors' change list first, so the corpse stays
-         * dead when its cell joins again (aw_actors.c) */
-        if(i==SLOTS)for(i=0;i<SLOTS;i++)if(slots[i].e && (slots[i].f.dead || slots[i].state==S_DEAD || slots[i].e->free)){
+        int cap=slot_cap(),used=0;
+        for(i=0;i<FIGHTS;i++)used+=slots[i].e!=NULL;
+        /* every slot in use: a fallen fighter's slot is reused (a pack of more than the slots keeps coming as the
+         * first ones die, COMBAT-PACK-SLOTS-57); its death is handed to the actors' change list first, so the corpse
+         * stays dead when its cell joins again (aw_actors.c) */
+        if(used>=cap)for(i=0;i<FIGHTS;i++)if(slot_fallen(&slots[i])){
             if(!slots[i].e->free && aw_combat_actor_died)aw_combat_actor_died(slots[i].e);
-            release(&slots[i]);break;
+            release(&slots[i]);used--;break;
         }
-        if(i==SLOTS){Con_Printf("Combat: %ld hostile NPCs already.\n",(long)SLOTS);return 0;}s=&slots[i];}
+        if(used>=cap){full_refused++;Con_Printf("Combat: %ld hostile NPCs already.\n",(long)cap);return 0;}
+        for(i=0;i<FIGHTS && slots[i].e;i++){}
+        s=&slots[i];}
     if(!engage_dead && !AW_CombatHostiles())begin_encounter();
     AW_ItemsHide(s->item);      /* a re-engaged NPC: its items again from the start */
     memset(s,0,sizeof(*s));s->e=e;s->f=*fighter;s->f.aware=1;
@@ -830,14 +878,16 @@ int AW_CombatEngage(edict_t *e,const aw_fighter_t *fighter,const char *layout) {
         retry.npc[s-slots].f=s->f;retry.npc[s-slots].health=e->v.health;
     }
     if(engage_dead)return 1;    /* a corpse: the caller marks it dead at once */
-    AW_ItemsShow(e,s->item);    /* a resident draws its weapon and shield (NPC-WEAPON-MESH-33) */
+    /* a resident draws its weapon and shield (NPC-WEAPON-MESH-33); past the kept edicts only with room to spare */
+    if(!items_spare())items_left_out++;
+    else AW_ItemsShow(e,s->item);
     if(readout.value)Con_Printf("Combat: %s (level %ld) attacks; seed %lu\n",s->f.name,(long)s->f.level,seed_used);
     voice(e,AW_VOICE_START);
     return 1;
 }
 static void shots_clear(void);
 void AW_CombatClear(void) {
-    int i;for(i=0;i<SLOTS;i++)if(slots[i].e)release(&slots[i]);enemy=NULL;you_valid=0;retry.valid=0;
+    int i;for(i=0;i<FIGHTS;i++)if(slots[i].e)release(&slots[i]);enemy=NULL;you_valid=0;retry.valid=0;
     you_hit_at=-1;you_down_seen=0;shots_clear();
 }
 int AW_CombatPlayerReaction(float *age,int *roll) {
@@ -867,7 +917,7 @@ int AW_CombatRetry(void) {
     if(p->v.movetype==MOVETYPE_NONE)p->v.movetype=MOVETYPE_WALK;
     you=retry.you;you.dead=you.knocked=0;you.staggered=0;you_store(p);
     SV_LinkEdict(p,true);
-    for(i=0;i<SLOTS;i++){
+    for(i=0;i<FIGHTS;i++){
         slot_t *s=&slots[i];
         if(!s->e || s->e->free || retry.npc[i].e!=s->e)continue;
         s->f=retry.npc[i].f;s->f.aware=1;s->e->v.health=retry.npc[i].health;
@@ -889,7 +939,7 @@ const aw_fighter_t *AW_CombatFighter(edict_t *e) {slot_t *s=slot_of(e);return s?
 /* MWSCRIPT-TICK-SHARE-66: the edicts that hold a fight slot now (in slot order), up to MAX; how many */
 int AW_CombatFighterEdicts(edict_t **out,int max) {
     int i,n=0;
-    for(i=0;i<SLOTS && n<max;i++)if(slots[i].e && !slots[i].e->free)out[n++]=slots[i].e;
+    for(i=0;i<FIGHTS && n<max;i++)if(slots[i].e && !slots[i].e->free)out[n++]=slots[i].e;
     return n;
 }
 int AW_CombatAttackType(edict_t *e) {slot_t *s=slot_of(e);return s?s->attack:-1;}
@@ -1212,6 +1262,9 @@ void AW_CombatLastHitReset(void){memset(last_hit,0,sizeof(last_hit));last_hit_ne
 int AW_CombatLastHitCount(void){int k,n=0;for(k=0;k<AW_COMBAT_LAST_HITS;k++)n+=last_hit[k].victim!=0;return n;}
 void (*aw_combat_assault)(struct edict_s *victim);
 void (*aw_combat_attacked)(struct edict_s *victim);
+/* MWSCRIPT-ONPCHITME-NEVER-SET-68 (NULL: none; aw_mwhost.c binds it and declares it there, not aw_combat.h, which the
+ * CHIM world stage keys): the player's blow or harmful spell reached for VICTIM */
+void (*aw_combat_pc_hit)(struct edict_s *victim);
 void (*aw_combat_player_kill)(struct edict_s *victim);
 void (*aw_combat_killed)(struct edict_s *victim);
 static float resist_test=-1;
@@ -1255,7 +1308,7 @@ static edict_t *contact_target(edict_t *p,float reach){
     int i;edict_t *e,*best=NULL;float best_gap=0,gap,dz,eye,to[3],forward[3],right[3],up[3];vec3_t from,at;trace_t tr;
     AngleVectors(p->v.v_angle,forward,right,up);
     eye=p->v.view_ofs[2]>1?p->v.view_ofs[2]-p->v.mins[2]:22-p->v.mins[2];   /* eye over the feet; 22: Quake's eye */
-    for(i=0;i<SLOTS;i++){
+    for(i=0;i<FIGHTS;i++){
         e=slots[i].e;
         if(!e || e->free || slots[i].f.dead || slots[i].state==S_DEAD)continue;
         gap=gap_to(p,e,&dz);
@@ -1313,6 +1366,9 @@ static void player_strike(edict_t *p) {
         return;
     }
     enemy=t;enemy_until=(float)sv.time+aw_combat_settings.fNPCHealthBarTime;   /* HUD::setEnemy: on every attempt in reach */
+    /* MWSCRIPT-ONPCHITME-NEVER-SET-68: the player's blow at an actor in reach, a hit or a miss (OpenMW 0.51 mwclass/
+     * npc.cpp and creature.cpp onHit set the script's OnPCHitMe before the blow's outcome is looked at) */
+    if(aw_combat_pc_hit)aw_combat_pc_hit(t);
     /* The attack type: by the movement at the swing's start, or the best attack
      * (character.cpp); the strength: how long the attack button was held. */
     attack=best_cvar.value?AW_CombatBestAttackPlayer(&you):AW_CombatMovementAttack(pv.move_fwd,pv.move_side);
@@ -1940,7 +1996,7 @@ void AW_CombatPhysics(void) {
      * read as the player's death and played the death track on an area change. */
     if(!svs.clients[0].active || !svs.clients[0].spawned)return;
     aw_combat_dice=dice_cvar.value!=0;
-    for(i=0;i<SLOTS;i++){
+    for(i=0;i<FIGHTS;i++){
         slot_t *s=&slots[i];
         if(!s->e)continue;
         if(s->e->free){AW_ItemsHide(s->item);memset(s,0,sizeof(*s));continue;}
@@ -2074,12 +2130,12 @@ static unsigned long server_resets,stale_dropped;
 void AW_CombatServerReset(void);    /* its prototype here: aw_combat.h is keyed by the CHIM world stage (sv_main.c) */
 void AW_CombatServerReset(void) {
     int i;
-    for(i=0;i<SLOTS;i++)if(slots[i].e){stale_dropped++;memset(&slots[i],0,sizeof(slots[i]));}
+    for(i=0;i<FIGHTS;i++)if(slots[i].e){stale_dropped++;memset(&slots[i],0,sizeof(slots[i]));}
     enemy=NULL;memset(&retry,0,sizeof(retry));shots_clear();server_resets++;
 }
 /* aw_scene.c: a new map; the old edicts are gone. */
 void AW_CombatSceneSpawn(void) {
-    int i;for(i=0;i<SLOTS;i++)memset(&slots[i],0,sizeof(slots[i]));
+    int i;for(i=0;i<FIGHTS;i++)memset(&slots[i],0,sizeof(slots[i]));
     memset(&pv,0,sizeof(pv));block_shown_until=0;settings_tried=0;
     enemy=NULL;you_valid=0;memset(&retry,0,sizeof(retry));shots_clear();
     if(battle){battle=0;AW_MusicCombat(0);}
@@ -2104,7 +2160,11 @@ static void report(void) {
     Con_Printf("Spells: %s; spell choices %lu, casts %lu, failed %lu (ratings %lu; all actors' casts %lu; spell reads %lu, at the fight's start only)\n",
         spells_on?"fighters cast the spells they know (dbg combat spells off: weapons only)":"weapons only",
         totals.npc_spell_choices,totals.npc_casts,totals.npc_cast_fails,spell_ratings,AW_CastActorCasts(),totals.npc_spell_reads);
-    for(i=0;i<SLOTS;i++)if(slots[i].e)Con_Printf(" %s: health %ld/%ld fatigue %ld/%ld %s\n",slots[i].f.name,
+    /* MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68 */
+    {int used=0;for(i=0;i<FIGHTS;i++)used+=slots[i].e!=NULL;
+     Con_Printf("Fight slots: %d in use of %d (aw_combat_slots %d, built for %d); refused for no slot %lu; held items "
+        "left out for no spare edict %lu\n",used,slot_cap(),slot_cap(),FIGHTS,full_refused,items_left_out);}
+    for(i=0;i<FIGHTS;i++)if(slots[i].e)Con_Printf(" %s: health %ld/%ld fatigue %ld/%ld %s\n",slots[i].f.name,
         (long)slots[i].f.health,(long)slots[i].f.health_max,(long)slots[i].f.fatigue,(long)slots[i].f.fatigue_max,
         slots[i].f.dead?"dead":slots[i].f.knocked?"down":"fighting");
     if(you_valid)Con_Printf(" You: health %ld/%ld fatigue %ld/%ld\n",(long)you.health,(long)you.health_max,(long)you.fatigue,(long)you.fatigue_max);
@@ -2201,14 +2261,23 @@ static void command(void) {
         Con_Printf("Hit contact: %s.\n",on?"the original's hit cone when the crosshair misses (OpenMW getHitContact)":"the crosshair's ray only (the earlier rule)");return;}
     if(Cmd_Argc()==3 && !Q_strcasecmp(a,"spells") && (on=AW_CompanionToggleWord(Cmd_Argv(2)))>=0){AW_CombatRule(AW_RULE_SPELLS,on);
         Con_Printf("Fighters' spells: %s.\n",on?"each fighter weighs its spells against its weapon and casts the best (OpenMW prepareNextAction)":"weapons and fists only (the earlier rule)");return;}
-    if(!Q_strcasecmp(a,"calm") && Cmd_Argc()==2){AW_CombatClear();if(battle){battle=0;AW_MusicCombat(0);}Con_Printf("Combat: everyone calms down.\n");return;}
-    if((on=AW_CompanionToggleWord(a))>=0 && Cmd_Argc()==2){Cvar_SetValue(combat_on.name,(float)on);if(!on)AW_CombatClear();return;}
-    Con_Printf("Usage: dbg combat [on/off | seed N | readout on/off | music on/off | dice on/off | style amiwind/original | block hold/auto | flee on/off | sounds on/off | bestattack on/off | contact on/off | spells on/off | loadout NAME/off | calm]\n");
+    /* dbg combat slots [N] (MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68, not saved): the fight slots in use at most, 1 to
+     * FIGHTS; 4 = the cap before v0.0.68, for a comparison. Fights under way keep their slots. */
+    if(!Q_strcasecmp(a,"slots") && Cmd_Argc()<=3){
+        if(Cmd_Argc()==3)Cvar_SetValue(slots_cvar.name,(float)(int)Q_atof(Cmd_Argv(2)));
+        Con_Printf("Fight slots: at most %d fight at a time (1 to %d; 4 = the cap before v0.0.68); %d free now.\n",
+                   slot_cap(),FIGHTS,AW_CombatSlotsFree());return;
+    }
+    /* DBG-COMBAT-CALM-LEAVES-HOSTILE-MARK-68: the calm also ends the fight orders kept on the actors' records (the
+     * script host's, through aw_combat_calmed), so nobody stays marked hostile and no order starts the fight again */
+    if(!Q_strcasecmp(a,"calm") && Cmd_Argc()==2){AW_CombatClear();if(aw_combat_calmed)aw_combat_calmed();if(battle){battle=0;AW_MusicCombat(0);}Con_Printf("Combat: everyone calms down.\n");return;}
+    if((on=AW_CompanionToggleWord(a))>=0 && Cmd_Argc()==2){Cvar_SetValue(combat_on.name,(float)on);if(!on){AW_CombatClear();if(aw_combat_calmed)aw_combat_calmed();}return;}
+    Con_Printf("Usage: dbg combat [on/off | seed N | readout on/off | music on/off | dice on/off | style amiwind/original | block hold/auto | flee on/off | sounds on/off | bestattack on/off | contact on/off | spells on/off | loadout NAME/off | slots N | calm]\n");
 }
 void AW_CombatInit(void) {
     Cvar_RegisterVariable(&combat_on);Cvar_RegisterVariable(&readout);Cvar_RegisterVariable(&music);
     Cvar_RegisterVariable(&seed_cvar);Cvar_RegisterVariable(&punch_hit);Cvar_RegisterVariable(&think_interval);
-    Cvar_RegisterVariable(&chase_speed);
+    Cvar_RegisterVariable(&chase_speed);Cvar_RegisterVariable(&slots_cvar);
     Cvar_RegisterVariable(&miss_cvar);Cvar_RegisterVariable(&dice_cvar);Cvar_RegisterVariable(&best_cvar);
     Cvar_RegisterVariable(&block_cvar);aw_combat_buttons=guard_buttons;aw_combat_guard_marker=AW_CombatGuarding;
     aw_combat_input_locked=player_locked;
@@ -2282,6 +2351,7 @@ int AW_CombatSpellHit(edict_t *e,float health,int harmful) {
                                !(s=slot_of(e))))return 0;
     }
     if(s->f.dead)return 1;
+    if(harmful && aw_combat_pc_hit)aw_combat_pc_hit(e);   /* OnPCHitMe: the player's harmful spell is a hit too (OpenMW) */
     if(harmful){enemy=e;enemy_until=(float)sv.time+aw_combat_settings.fNPCHealthBarTime;}
     s->f.health=!dead && health>0?health:0;
     if(dead){

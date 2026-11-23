@@ -18,8 +18,8 @@ static int heading_rows,marker_x=-1,marker_y=-1,char_width=4,region_calls;
 static char footer[80];static int footer_left,footer_right;
 static const char *region_override;
 /* Model the registered values used by the real panel; do not bypass mode logic. */
-static cvar_t *map_vars[16];static int map_var_count,debug_overlays=1;
-void Cvar_RegisterVariable(cvar_t *v){assert(map_var_count<16);v->value=atof(v->string);map_vars[map_var_count++]=v;}
+static cvar_t *map_vars[20];static int map_var_count,debug_overlays=1;   /* 20: aw_map_version too (MAP-VERSION-2-DEFAULT-68) */
+void Cvar_RegisterVariable(cvar_t *v){assert(map_var_count<20);v->value=atof(v->string);map_vars[map_var_count++]=v;}
 void Cvar_SetValue(char *name,float value){int i;for(i=0;i<map_var_count;i++)if(!strcmp(name,map_vars[i]->name)){map_vars[i]->value=value;return;}assert(0);}
 int AW_DebugOverlaysEnabled(void){return debug_overlays;}
 int Cmd_Argc(void){return 1;}
@@ -122,6 +122,7 @@ int main(int argc,char **argv){
     strcpy(sv.name,"balmora");strcpy(aw_story.name,"Hors");
     vid.width=320;vid.height=200;vid.rowbytes=320;vid.buffer=pixels;
     AW_WorldUIInit();IN_Init();m_filter.value=0;in_mlook.state=1;
+    Cvar_SetValue("aw_map_version",1);   /* MAP-VERSION-2-DEFAULT-68: these routes are version 1's header buttons */
     /* Real cvars receive numeric values on registration, not field four. */
     Cvar_RegisterVariable(&sensitivity);Cvar_RegisterVariable(&lookstrafe);
     Cvar_RegisterVariable(&m_side);Cvar_RegisterVariable(&m_pitch);

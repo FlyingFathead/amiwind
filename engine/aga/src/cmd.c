@@ -73,7 +73,11 @@ Cbuf_Init
 */
 void Cbuf_Init (void)
 {
-	SZ_Alloc (&cmd_text, 8192);		// space for commands and script files
+	/* space for commands and script files. 32768, was Quake's 8192 (CFG-OVER-COMMAND-BUFFER-68): an exec'd file that
+	 * does not fit is dropped whole by Cbuf_AddText, and the image's default-game.cfg had grown to 8511 bytes, so none
+	 * of the game's defaults ran (the actor table among them: no outdoor creatures). The builder refuses a boot .cfg
+	 * over half of this (tools/build_aga.py ENGINE_CMD_BUFFER, check_boot_cfgs_fit). */
+	SZ_Alloc (&cmd_text, 32768);
 }
 
 

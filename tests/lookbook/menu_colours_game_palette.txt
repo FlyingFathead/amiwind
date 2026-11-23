@@ -1,0 +1,53 @@
+# Look book page MENU-COLOURS-GAME-PALETTE (tests/lookbook/pages.json): the menus of a running game are drawn through
+# the game palette, never through the title art's own palette (gfx/menu.awb). The book's prelude starts the game from the
+# title menu by a console command (aw_debug_hors 0), the start that kept the title art's palette in the inventory, the map
+# and the other windows until Escape was pressed (v0.0.68-dev7 and before); no page before this one presses Escape. Each
+# window is opened by its key and read back by aw_ui_palette (dbg ui palette): the palette the screen is drawn through
+# and the screen it is read on; then a still. Every window is closed again by its key, so the next page starts in play.
+key i
+wait 3
+probe palette_inventory aw_ui_palette
+expect has palette_inventory UI palette: game palette
+expect lacks palette_inventory title art
+expect has palette_inventory screen: inventory
+still menu-inventory
+key i
+wait 2
+key m
+wait 3
+probe palette_map aw_ui_palette
+expect has palette_map UI palette: game palette
+expect lacks palette_map title art
+expect has palette_map screen: map
+still menu-map
+key m
+wait 2
+key j
+wait 3
+probe palette_journal aw_ui_palette
+expect has palette_journal UI palette: game palette
+expect lacks palette_journal title art
+expect has palette_journal screen: journal
+still menu-journal
+key j
+wait 2
+key p
+wait 3
+probe palette_stats aw_ui_palette
+expect has palette_stats UI palette: game palette
+expect lacks palette_stats title art
+expect lacks palette_stats screen: game
+still menu-stats
+key p
+wait 2
+key o
+wait 3
+probe palette_magic aw_ui_palette
+expect has palette_magic UI palette: game palette
+expect lacks palette_magic title art
+expect lacks palette_magic screen: game
+still menu-magic
+key o
+wait 2
+probe palette_play aw_ui_palette
+expect has palette_play screen: game

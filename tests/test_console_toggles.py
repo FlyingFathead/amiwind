@@ -30,6 +30,7 @@ SELF_TOGGLING = {
     'chim': ('aw_actors.c', 'creatures_on = !creatures_on;'),
     'aw_magicfx': ('aw_cast.c', 'else cast_on=!cast_on;'),
     'aw_cull': ('aw_console.c', 'if(argc==j)on=!(value&bit);'),
+    'aw_map_debug': ('aw_worldui.c', 'if(Cmd_Argc()<2)on=aw_map_version.value!=1;'),   # MAP-VERSION-2-DEFAULT-68
 }
 # plain switches whose bare form stays something else, by an earlier decision
 EXCEPTIONS = {

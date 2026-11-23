@@ -814,16 +814,19 @@ def chim_sol_test_commands(args, steps, tool, run, tools, jobs):
     palette = run / 'intro-scene/id1/gfx/palette.lmp'
     copies = getattr(args, 'chim_sol_tree_copies', 'off') or 'off'
     star = copies == 'star'
+    rally = copies in ('rally', 'rally-switch')
     # --chim-sol-tree-copies star (TREES-DEPTH-56): the same chim_build arguments through tools/chim_tree_star.py;
     # switch: the original trees in run/chim-sol AND the star trees in run/chim-sol-star, which the image adds to the
     # same store as alternative models for aw_tree_crowns 1 (tools/chim/alt_models.py)
-    star_entry = ('chim_tree_star.py', '--tree-star', Path(__file__).resolve().parents[1] / 'config/tree-copies.json')
+    tree_config = Path(__file__).resolve().parents[1] / 'config/tree-copies.json'
+    star_entry = ('chim_tree_star.py', '--tree-star', tree_config)
     # the mesh method set and the look-only image (SOL-GLACIER-METHODS-AB-COMPARE-68): the world stage through its own
     # runner (tools/solstheim_test_world.py: units from the shared storage pool, the set, the heap gate as a report)
     method_set = getattr(args, 'chim_mesh_method_set', None)
     look_only = bool(getattr(args, 'chim_sol_test_look_only', False))
-    if star and (method_set or look_only):
-        raise SystemExit('--chim-sol-tree-copies star does not take --chim-mesh-method-set or --chim-sol-test-look-only')
+    if (star or rally) and (method_set or look_only):
+        raise SystemExit('--chim-sol-tree-copies %s does not take --chim-mesh-method-set or --chim-sol-test-look-only'
+                         % copies)
     if look_only:
         # frames that do not fit 32 MB are for look-only sessions: refused for release candidates and finals
         from project_version import require_private_test_version
@@ -837,8 +840,26 @@ def chim_sol_test_commands(args, steps, tool, run, tools, jobs):
         pool = storage_pool.resolve_dir(args.workspace, getattr(args, 'storage_pool_dir', None))[0]
         entry = ('solstheim_test_world.py', '--unit-pool', pool,
                  *(('--mesh-method-set', method_set) if method_set else ()), *(('--look-only',) if look_only else ()))
+    # the rally-game trees (SOLSTHEIM-TREES-THREE-LOD-68, tools/chim_tree_rally.py: trunk polygons, the crown as
+    # see-through picture planes rendered from the original): the same runner arguments through the rally tool.
+    # rally: the chim-sol stage draws them so (the config's own pane picture and trunk); rally-switch: the original
+    # trees in run/chim-sol and one stage per method of the config's rally 'methods' (chim-sol-altN, N the
+    # aw_tree_crowns value), which the image adds to the same store as alternative models
+    rally_methods = []
+    if rally:
+        def rally_entry(*kinds):
+            return ('chim_tree_rally.py', '--tree-rally', tree_config, *kinds, '--unit-pool', pool)
+        if copies == 'rally':
+            entry = rally_entry()
+        else:
+            methods = json.loads(tree_config.read_text(encoding='utf-8'))['rally']['methods']
+            rally_methods = [(int(value), m['pane_texture'], m['trunk'])
+                             for value, m in sorted(methods.items(), key=lambda kv: int(kv[0]))]
+            if not rally_methods or any(not 2 <= value <= 15 for value, _, _ in rally_methods):
+                raise SystemExit('config/tree-copies.json rally methods: aw_tree_crowns values 2 to 15 (1 is the star)')
     trees = [('chim-sol-trees', tool('chim_tree_copies.py', '--data-files', run / 'chim-sol-data', '--palette', palette,
-                                     '--out', run / 'chim-sol-trees', '--jobs', jobs))] if copies != 'off' else []
+                                     '--out', run / 'chim-sol-trees', '--jobs', jobs))] if copies in ('star', 'switch') \
+        else []
 
     def frames(name, how, out, units):
         return (name, tool(*how, '--data-files', run / 'chim-sol-data', '--palette', palette,
@@ -846,10 +867,16 @@ def chim_sol_test_commands(args, steps, tool, run, tools, jobs):
                            *chim_stage_options(args), '--chim-regions-cells=' + cells,
                            '--lighting-type', 'hybrid', '--unit-cache', args.workspace / units,
                            '--jobs', jobs, '--validate', '--stats', '--sdk', args.sdk))
+    # the rally methods' stages come before chim-sol, so chim-sol (which the image waits for) waits for them: each
+    # stage without a rule of its own waits for the one before it (build_parallel.stage_dependencies)
+    alt_stages = [frames('chim-sol-alt%d' % value, rally_entry('--pane-texture', panes, '--trunk', trunk),
+                         run / ('chim-sol-alt%d' % value), 'cache/chim-sol-units')
+                  for value, panes, trunk in rally_methods]
     steps[index:index] = [
         ('chim-sol-data', tool('chim_layer_data.py', '--data-files', args.data_files, '--layer', 'Bloodmoon',
                                '--out', run / 'chim-sol-data')),
         *trees,
+        *alt_stages,
         frames('chim-sol', entry, run / 'chim-sol', 'cache/chim-sol-units'),
         *([frames('chim-sol-star', star_entry, run / 'chim-sol-star', 'cache/chim-sol-units')]
           if copies == 'switch' else [])]
@@ -857,6 +884,8 @@ def chim_sol_test_commands(args, steps, tool, run, tools, jobs):
     extra = ['--chim-sol-world', str(run / 'chim-sol')]
     if copies == 'switch':
         extra += ['--chim-sol-alt', '1=' + str(run / 'chim-sol-star')]
+    for value, _, _ in rally_methods:
+        extra += ['--chim-sol-alt', '%d=%s' % (value, run / ('chim-sol-alt%d' % value))]
     return [(name, list(command) + extra if name == 'image' else command) for name, command in steps]
 
 

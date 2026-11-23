@@ -51,6 +51,10 @@ def answers_for(journey, overrides=None):
             good[name] = ['position 120 340 64 / movement 3']
         elif cmd == 'aw_blockers':
             good[name] = ['position 120 340 64 / movement 3', 'dir 0 frac 1000 solid 0/0 hit none normal 0 0 0']
+        elif cmd == 'aw_ui_palette':   # MENU-COLOURS-GAME-PALETTE: the game palette, on the window the page opened
+            screen = {'inventory': 'inventory', 'map': 'map', 'journal': 'journal', 'play': 'game'}.get(
+                name.split('_', 1)[1], 'window')
+            good[name] = ['UI palette: game palette; screen: %s' % screen]
         else:
             good[name] = ['%s -> 1' % cmd]
     good.update(overrides)
@@ -206,6 +210,23 @@ class JudgeTests(unittest.TestCase):
         page = next(p for p in report['pages'] if p['page'] == 'HELD-LIGHT-IN-HAND')
         self.assertEqual(page['state'], 'FAIL')
         self.assertTrue(any('no number' in c for c in page['checks']))
+
+    def test_the_title_art_palette_in_a_window_fails_the_menu_colours_page(self):
+        # MENU-PALETTE-RED-CAST-68: after a start from the title menu by a console command the inventory and the map were
+        # drawn through the title art's own palette (v0.0.68-dev7 and before); the page fails on that answer, and on an
+        # engine without the readout; the other pages are not touched
+        title = ['UI palette: title art palette (gfx/menu.awb); screen: inventory']
+        ok, lines, report = self.run_book({'palette_inventory': title})
+        self.assertFalse(ok)
+        page = next(p for p in report['pages'] if p['page'] == 'MENU-COLOURS-GAME-PALETTE')
+        self.assertEqual(page['state'], 'FAIL')
+        self.assertTrue(any('title art' in c and c.startswith('FAIL') for c in page['checks']), page['checks'])
+        self.assertEqual(next(p for p in report['pages'] if p['page'] == 'HELD-LIGHT-IN-HAND')['state'], 'PASS')
+        unknown = ['Unknown command "aw_ui_palette"']
+        names = ('palette_inventory', 'palette_map', 'palette_journal', 'palette_stats', 'palette_magic', 'palette_play')
+        ok, lines, report = self.run_book({n: unknown for n in names})
+        self.assertFalse(ok)
+        self.assertEqual(next(p for p in report['pages'] if p['page'] == 'MENU-COLOURS-GAME-PALETTE')['state'], 'FAIL')
 
     def test_a_light_not_lit_fails_its_page(self):
         ok, lines, report = self.run_book({'torch_hands': ['hands state 0 goal 0 frame 0 torch 0 / time 9000']})

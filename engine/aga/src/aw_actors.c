@@ -436,6 +436,15 @@ void (*aw_actors_levelled_spawned)(edict_t *ent, unsigned hash);
  * row (ApplyLoaded, SPAWNED 0: a window's actor its spawn told already keeps that one): aw_ambient.c
  * AW_AmbientPlacedAt keeps its package's routes there (NULL: nothing told) */
 void (*aw_actors_placed)(edict_t *ent, const float placed[3], int spawned);
+/* COMBAT-RESUMED-FIGHT-TARGETS-PLAYER-68: a row's kept fight starts again (SpawnOne, ApplyLoaded) through the script
+ * host, which knows whom the actor was told to fight (aw_mwhost.c fight_resume: its order's target, the player only
+ * when the order names the player or there is none). NULL (builds and tests without the script host): against the
+ * player, as before. 1 when it fights. */
+int (*aw_actors_fight_resume)(edict_t *ent);
+static int FightResume (edict_t *ent)
+{
+	return aw_actors_fight_resume ? aw_actors_fight_resume (ent) : AW_CombatTestEngage (ent, 0);
+}
 static edict_t	*spawned_last;	/* SpawnOne's edict when it spawned one */
 
 static pending_t	pending[MAX_PENDING];
@@ -721,7 +730,7 @@ static int SpawnOne (pending_t *q)
 		VectorCopy (c->angles, ent->v.angles);
 		SV_LinkEdict (ent, false);
 		/* a fight it was in goes on, with the health it had (the combat sheet's) */
-		if (!c->dead && c->fight && AW_CombatTestEngage (ent, 0))
+		if (!c->dead && c->fight && FightResume (ent))
 			AW_CombatSetHealth (ent, c->health);
 	}
 	/* its package's routes stay where the placement put it, wherever its row moved it (aw_ambient.c) */
@@ -2143,7 +2152,7 @@ static void ApplyLoaded (void)
 			Con_Printf ("actors: %s (ref %.0f) dead again: %s\n", e->v.netname ? pr_strings + e->v.netname : "?",
 					RefOf (e), held ? "lying" : "no combat slot, not laid down");
 		}
-		else if (c->fight && AW_CombatTestEngage (e, 0))
+		else if (c->fight && FightResume (e))
 			AW_CombatSetHealth (e, c->health);
 		applied++;
 	}

@@ -24,11 +24,49 @@ CELLS_OPTION = 'bloodmoon_solstheim_cells'        # the build option value that 
 # its own rule (tools/chim/layer_stores.py image_options: every module stage in the plan); the tracker data counts the
 # module's world as the build's own cells.
 TRACKER_STAGE = 'cell-progress'
+# Solstheim's open-sea cells that have a CELL record (no LAND): named explicitly, as config/chim-cells.json names the
+# main game's (the regions preflight takes open sea only from an explicit cell list, tools/chim/regions.py
+# preflight); each is an ocean frame of the module's world, its row in the module's rows file. A list of its own, so
+# the base world's cell list and key stay as they are (CHIM-SEA-BETWEEN-ISLANDS-64).
+SEA_CELLS = 'config/solstheim-sea-cells.json'
+METHOD_SETS = 'config/mesh-method-sets.json'
+
+
+def method_set(args, path=None):
+    """The mesh method set the module's world stage builds with: the build's --chim-mesh-method-set, else the shipped
+    default of config/mesh-method-sets.json (its "default": method E for the Mortrag Glacier's ice, decided for the
+    project on 22 November 2026; SOL-GLACIER-METHODS-AB-COMPARE-68). Read here with the standard library, as
+    chim.method_sets.default_name reads it: the builder's plan runs on a bare Python, and chim.method_sets imports the
+    converter's unit cache; the stage's runner checks the whole set (chim.method_sets.install)."""
+    chosen = getattr(args, 'chim_mesh_method_set', None)
+    if chosen:
+        return chosen
+    import json
+    from pathlib import Path
+    table = Path(path) if path else Path(__file__).resolve().parents[1] / METHOD_SETS
+    data = json.loads(table.read_text(encoding='utf-8'))
+    name = data.get('default', 'baseline')
+    if name not in (data.get('sets') or {}):
+        raise ValueError('%s: the default set %r is not a set of the file' % (table, name))
+    return name
+
+
+def module_plan(status, root=None):
+    """(table, problems): the regions preflight of the module's cells against the tracker file STATUS: the named set of
+    Bloodmoon.esm (every Solstheim cell the file calls finished) and the open-sea cells of SEA_CELLS, explicitly. The
+    one rule for the module's cells, read by resolve and by the first-minute check expansion-module-cells
+    (tools/expansion_preflight.py)."""
+    from pathlib import Path
+    from chim import regions as chim_regions
+    sea = Path(root or Path(__file__).resolve().parents[1]) / SEA_CELLS
+    specs = [chim_regions.layer_sets()[MASTER]] + (['@' + str(sea)] if sea.is_file() else [])
+    return chim_regions.plan(specs, status, towns=())
 
 
 def resolve(args, masters, builder, status, log=print):
-    """The module's cells: Solstheim's cells that the tracker file STATUS calls finished (the named set of
-    Bloodmoon.esm, tools/chim/regions.py layer_sets), set as args.bloodmoon_solstheim_cells; None when the module
+    """The module's cells (module_plan): Solstheim's cells that the tracker file STATUS calls finished (the named set
+    of Bloodmoon.esm, tools/chim/regions.py layer_sets) and its open-sea cells with a CELL record (SEA_CELLS, the
+    status file calling them ocean), set as args.bloodmoon_solstheim_cells; None when the module
     is not built: Bloodmoon not among MASTERS (the build's selection in load order: --no-dlc, --dlc tribunal), a
     MiniWind sandbox, a cell list of the caller's own (--chim-regions: a test of named cells builds those and nothing
     else), no CHIM builder (BUILDER: tools/build.py resolve_builder's record, or a call that gives it), or no finished
@@ -52,7 +90,7 @@ def resolve(args, masters, builder, status, log=print):
     builder = builder() if callable(builder) else builder
     if builder['builder'] != 'chim':
         return None
-    table, problems = chim_regions.plan([chim_regions.layer_sets()[MASTER]], status, towns=())
+    table, problems = module_plan(status)
     kinds = chim_regions.table_kinds(table)
     if not kinds:
         # no finished cell yet (the plan says so as "holds no cell"): the module is not built, and a build with
@@ -62,16 +100,18 @@ def resolve(args, masters, builder, status, log=print):
             log('Module bloodmoon-solstheim: not built: %s' % problem)
         return None
     problems += chim_regions.owned_land_problems(kinds, getattr(args, 'data_files', None))
+    # the open-sea cells taken have no LAND in the masters (the main game's rule, in seconds before any stage)
+    problems += chim_regions.ocean_land_problems(kinds, getattr(args, 'data_files', None))
     if problems:
         raise ValueError('The module bloodmoon-solstheim (Solstheim\'s outdoor cells) failed its cell preflight before '
                          'any stage (--no-dlc or --dlc tribunal builds without it):' + (chr(10) + '  ')
                          + (chr(10) + '  ').join(problems))
     setattr(args, CELLS_OPTION, chim_regions.encode_cells(kinds))
     c = table['counts']
-    log('Module bloodmoon-solstheim: %d Solstheim cells in %d frames, a world of their own (the stages '
-        'bloodmoon-solstheim-data and bloodmoon-solstheim); %d dropped' % (c['cells'], c['frames'],
-                                                                         len(table['dropped'])))
-    return {'selection': table['selection'], 'counts': c, 'dropped': table['dropped']}
+    log('Module bloodmoon-solstheim: %d Solstheim cells (%s) in %d frames, a world of their own (the stages '
+        'bloodmoon-solstheim-data and bloodmoon-solstheim), mesh method set %s; %d dropped'
+        % (c['cells'], chim_regions.kind_summary(c), c['frames'], method_set(args), len(table['dropped'])))
+    return {'selection': table['selection'], 'counts': c, 'dropped': table['dropped'], 'method_set': method_set(args)}
 
 
 def commands(args, steps, tool, run, tools, jobs, chim_options):
@@ -101,10 +141,10 @@ def commands(args, steps, tool, run, tools, jobs, chim_options):
                      '--qbsp', tools['qbsp'], *chim_options(args, cells),
                      '--lighting-type', lighting,
                      '--unit-cache', args.workspace / UNIT_CACHE, '--unit-pool', pool,
-                     # the mesh method set (--chim-mesh-method-set, config/mesh-method-sets.json): the runner's own
-                     # option, only when given (SOL-GLACIER-METHODS-AB-COMPARE-68)
-                     *(('--mesh-method-set', args.chim_mesh_method_set)
-                       if getattr(args, 'chim_mesh_method_set', None) else ()),
+                     # the mesh method set (config/mesh-method-sets.json): the runner's own option, always named, so
+                     # the stage is keyed by it: the build's --chim-mesh-method-set, else the shipped default (method
+                     # E since v0.0.68-dev8, decided for the project on 22 November 2026; method_set below)
+                     '--mesh-method-set', method_set(args),
                      '--jobs', jobs, '--validate', '--stats', '--sdk', args.sdk))]
     # strings only: the commands go into build-state.json (BUILD-NPCLOD-PATH-ARG-34)
     tracker = ['--module-chim-world', str(world)]

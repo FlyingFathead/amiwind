@@ -1,11 +1,11 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.68-dev7 (22 November 2026)._
+_Last updated with AmiWind v0.0.68-dev8 (22 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.68: in progress, seventh snapshot 22 November 2026](#v0068-in-progress-seventh-snapshot-22-november-2026)
+- [v0.0.68: in progress, eighth snapshot 22 November 2026](#v0068-in-progress-eighth-snapshot-22-november-2026)
 - [v0.0.67: Tribunal Introduced, released 19 November 2026](#v0067-tribunal-introduced-released-19-november-2026)
 - [v0.0.66: Forward It Is, released 16 November 2026](#v0066-forward-it-is-released-16-november-2026)
 - [v0.0.65: Reintroducing Vvardenfell](#v0065-reintroducing-vvardenfell)
@@ -119,10 +119,20 @@ _Last updated with AmiWind v0.0.68-dev7 (22 November 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
-## v0.0.68: in progress, seventh snapshot 22 November 2026
+## v0.0.68: in progress, eighth snapshot 22 November 2026
 
-v0.0.68 is titled **Solstheim Is Here**: the release for which Solstheim is to be complete. Its seventh development snapshot,
-[v0.0.68-dev7](releases/notes/RELEASE-v0.0.68-dev7.md), is out. What dev7 carries: **a cool ice and snow ramp in the scene
+v0.0.68 is titled **Solstheim Is Here**: the release for which Solstheim is to be complete. Its eighth development snapshot,
+[v0.0.68-dev8](releases/notes/RELEASE-v0.0.68-dev8.md), is out. What dev8 carries (checked by tests and the gates of
+their commits, not yet in play): **the windows of a running game in the game's own colours** after a start from the main
+menu by a console command, and **Escape in play opening the in-game menu**, which now has the original's rows, its
+questions before a game in progress is lost, and a Paused caption that can be switched off; **map version 2 as the
+default map screen**, the original's map in the menus' framed style (the map before it stays behind `dbg maptype 1`);
+**containers and bodies whose script takes their use give it to the script**; **fights started by scripts for sixteen
+actors** instead of four (a StartCombat past the sixteenth is still not taken up later); **a draw distance by region**,
+with the option Fog distance auto on by default and Solstheim's longer distance a trial until the frame rate is
+measured on real hardware; two debug camera moves for video; and Solstheim's rally-game trees and a see-through fix for
+outdoor models, both behind switches that are off until the pictures are seen and the maintainer chooses the trees'
+method. The seventh snapshot, [v0.0.68-dev7](releases/notes/RELEASE-v0.0.68-dev7.md), is out. What dev7 carries: **a cool ice and snow ramp in the scene
 palette** (16 little-used warm colours replaced; the ice no longer turns brown-grey; the glacier's cells stay out of the
 build while the ways to fit its ice are compared), **the census back room answers the use
 key again after a visit to the courtyard** (seen in play: the opening journey passed 50 of 50 checks on the dev6 image with

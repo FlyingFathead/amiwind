@@ -445,7 +445,10 @@ def startup_config(config, draw_distance=DEFAULT_FOG_DISTANCE):
         'r_maxsurfs 12288\nr_maxedges 24576\nshowram 0\nbind MOUSE1 +attack\nbind F10 toggleconsole\nbind e +aw_use\nbind f "impulse 202"\nbind q +movedown',config)
     if count!=1:raise ValueError('Expected exactly one startup map in the converted default.cfg')
     config=re.sub(r'(?m)^(?:bind |unbindall)[^\n]*\n?', '', config)
-    return 'exec keymaps-default.cfg\naw_drawdistance %d\n' % int(draw_distance)+config.rstrip()+'\n'
+    # another starting distance (a DEBUG ONLY MiniWind) is the player's own value: Fog distance auto off with it
+    # (REGIONAL-DRAW-DISTANCE-68; Auto, the default, would give each region its own)
+    auto='' if int(draw_distance)==DEFAULT_FOG_DISTANCE else 'aw_drawdistance_auto 0\n'
+    return 'exec keymaps-default.cfg\naw_drawdistance %d\n' % int(draw_distance)+auto+config.rstrip()+'\n'
 
 def validate_quakec(path):
     """Reject incompatible compiler output before it reaches an Amiga image."""
@@ -1826,7 +1829,10 @@ ACTOR_LOGIC_LINES = (b'// Compiled game logic (default on since v0.0.57): the ga
                      b'// Bodies that already overlap collide as the original\'s actors: only a move toward the other\'s\n'
                      b'// centre stops, so they walk apart; an arrival steps the player off an actor on the point\n'
                      b'// (DOOR-ARRIVAL-INSIDE-ACTOR-66). 0 = Quake\'s box clip / no step, the methods before v0.0.66.\n'
-                     b'aw_body_overlap 1\naw_arrival_clear 1\n')
+                     b'aw_body_overlap 1\naw_arrival_clear 1\n'
+                     b'// Fight slots (sixteen since v0.0.68): the actors that fight at a time. "dbg combat slots 4" in\n'
+                     b'// the console gives the cap before, for a comparison (MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68).\n'
+                     b'aw_combat_slots 16\n')
 
 
 def stage_water_plane_config(id1):
@@ -2098,6 +2104,8 @@ def image(args):
     if logs_record['diagnostic_logs']=='live':
         print('[diagnostics] --live-logs: this image writes its diagnostic logs as they happen (benchmark/diagnostic image)',flush=True)
     stage_debug_catalogues(boot/'id1', debug_luma=engine_record.get('debug_luma',False))
+    from boot_cfg_fit import check as check_boot_cfgs   # the whole file must fit the engine (CFG-OVER-COMMAND-BUFFER-68)
+    check_boot_cfgs(boot/'id1')
     if args.data_files:
         from prepare_ui import convert as convert_ui
         from ui_palette import reserve as reserve_ui_palette
@@ -2216,6 +2224,14 @@ def image(args):
     # The Ghostfence (GHOSTFENCE-PARTICLES-NOT-DRAWN-68): the pylons' glow and the blight cloud's plume, and the
     # curtain's scrolling layers, into id1/world after the world UI's own files (engine aw_atmos.c, aw_curtain.c)
     write_ghostfence(args,boot/'id1',out)
+    # The draw distance by region (REGIONAL-DRAW-DISTANCE-68): config/region-draw-distance.json in the image's region
+    # catalogue order (the world UI's masters), read once by the engine (aw_fog.c)
+    if args.data_files:
+        import region_draw
+        region_draw_report=region_draw.write(args.data_files,boot/'id1')
+        (out/'region-draw.json').write_text(json.dumps(region_draw_report,indent=2)+'\n',encoding='utf-8',newline='\n')
+        print('Region draw distance: %d rows (%d trial, off by default), universal %d'%(len(region_draw_report['rows']),
+              region_draw_report['trial_rows'],region_draw_report['universal']),flush=True)
     logo=ROOT/'resources/media/AmiWind_wordmark.png'
     # Menu logo: the gold name without the rule, on the palette's gold ramp
     # (UI-MENU-LOGO-32); --menu-logo legacy keeps the old wordmark method.

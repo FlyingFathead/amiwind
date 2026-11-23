@@ -1295,6 +1295,15 @@
       "to": false,
       "source": "tools/build_parser.py, tools/build.py chim_sol_test_commands, tools/solstheim_test_world.py, tools/build_aga.py (SOL-GLACIER-METHODS-AB-COMPARE-68)",
       "note": "Test builds only, with --chim-sol-test: the chim-sol stage's heap and zone walk gates report instead of stopping (their full reports still written), the stage's receipt and the image's record say the Solstheim test store holds frames that do not fit 32 MB, look only; refused for release candidates and finals; off by default"
+    },
+    {
+      "version": "0.0.68-dev7",
+      "option": "chim_sol_tree_copies",
+      "flag": "--chim-sol-tree-copies",
+      "change": "meaning",
+      "to": null,
+      "source": "tools/build_parser.py, tools/build.py chim_sol_test_commands, tools/chim_tree_rally.py, tools/chim/alt_models.py merge_many, tools/chim/sol_test.py (SOLSTHEIM-TREES-THREE-LOD-68)",
+      "note": "Test builds only, with --chim-sol-test: two more values. rally: the chim-sol stage draws the Solstheim trees as rally-game trees (the trunk in polygons, the crown as see-through picture planes rendered from the original model); rally-switch: the original trees in the store and every rally method of config/tree-copies.json (rally methods 2 to 5) as alternative models, one stage chim-sol-altN each, picked in game by aw_tree_crowns. Unset, off, star and switch build exactly as before; no base stage reads the rally tool"
     }
   ],
   "current": {

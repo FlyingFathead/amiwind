@@ -36,6 +36,13 @@ cvar_t	aw_seethrough_material = {"aw_seethrough_material", "1"};
  * Since v0.0.64-dev4 aw_seethrough_material 2 selects the same route; this name is kept as a quiet alias. */
 cvar_t	aw_fence_twosided = {"aw_fence_twosided", "0"};
 extern int	r_fence_twosided;	/* r_bsp.c */
+/* aw_seethrough_placed (FENCE-PLACED-ORIGIN-68): a see-through face of a placed model (any entity but the world: the
+ * CHIM world's trees, vines and moss) is clipped and projected from that entity's own origin: 1 = so; 0 = as before,
+ * from the world's origin, which puts the face where the placement would stand at the world origin: off screen for
+ * nearly every placement, so the listed faces were not drawn at all (and every face past the list drawn solid).
+ * Default 0 until the maintainer has seen the pictures (it changes the look of every outdoor see-through face);
+ * the rally-game trees' panes (tools/chim_tree_rally.py, SOLSTHEIM-TREES-THREE-LOD-68) need 1. */
+cvar_t	aw_seethrough_placed = {"aw_seethrough_placed", "0"};
 
 extern int	r_fence_cache_on;	/* r_surf.c: the fence block drawer for SURF_DRAWFENCE tiles */
 extern vec3_t	transformed_modelorg;	/* d_edge.c */
@@ -72,6 +79,7 @@ void D_FenceInit (void)
 {
 	Cvar_RegisterVariable (&aw_seethrough_material);
 	Cvar_RegisterVariable (&aw_fence_twosided);
+	Cvar_RegisterVariable (&aw_seethrough_placed);
 	r_fence_add = R_FenceAdd;
 	r_fence_begin = D_FenceBeginFrame;
 	r_fence_draw = D_DrawFences;
@@ -491,6 +499,10 @@ void D_DrawFences (void)
 		{
 			VectorSubtract (r_origin, f->ent->origin, local);
 			TransformVector (local, transformed_modelorg);
+			/* the eye in the entity's own frame, as R_DrawBEntitiesOnList sets it before R_RotateBmodel turns it
+			 * (the clip planes, the near plane and the projection below all read modelorg) */
+			if (aw_seethrough_placed.value)
+				VectorCopy (local, modelorg);
 			R_RotateBmodel ();
 		}
 		else

@@ -9,6 +9,7 @@
 #include "aw_sky.h"
 #include "aw_horizon.h"
 #include "aw_rcount.h"
+#include "aw_world.h"
 extern short *d_pzbuffer;
 extern unsigned int d_zwidth;
 extern cvar_t aw_drawdistance;
@@ -73,6 +74,10 @@ static cvar_t aw_horizon_defaults={"aw_horizon_defaults","0",true};
 void (*aw_defaults_migrate)(int level);
 static void horizon_migrate(void) {
     int level=(int)aw_horizon_defaults.value;
+    /* The Auto box (REGIONAL-DRAW-DISTANCE-68): a config.cfg saved before it keeps the player's own value when that was
+     * not the old default 300 (Auto off with it); one at 300, and a fresh install, start on Auto. */
+    if((int)aw_drawdistance.value!=300 && AW_DrawDistanceAuto() && AW_ConfigWithout("aw_drawdistance_auto"))
+        AW_SetDrawDistance((int)aw_drawdistance.value);
     if(level>=DEFAULTS_LEVEL)return;
     if(level<1)Cvar_SetValue("aw_skyline_fill",0);
     if(level<3)Cvar_SetValue("aw_magic_fx",1);
@@ -96,43 +101,165 @@ int (*aw_chim_view_reach)(void);
 /* CHIM (chim/chim_far.c): the frame's far terrain beyond the fog plane, in the
  * full fog colour, after the fog pass; NULL on legacy data. */
 void (*aw_chim_far_draw)(byte colour,int distance);
-/* Why the effective distance differs from the setting, for the command. */
+/* What the watch compares of the location fog (aw_fog_location.c): its switch and, while a place is matched, the
+ * daylight its day/night blend follows; NULL until that module is initialised. */
+int (*aw_fog_location_key)(void);
+/* The draw distance (REGIONAL-DRAW-DISTANCE-68): ONE owner and ONE number, because two values written from several
+ * places race each other (the maintainer, 2026-11-22). `effective` is written only by draw_update(); the renderer, the
+ * CHIM ring, the sky haze and the menu read it through AW_DrawDistance(), which does no work:
+ *   requested = aw_drawdistance_auto ? the region's default (world/region-draw.txt; the universal 300 elsewhere)
+ *                                    : the player's own value aw_drawdistance (100..4096)
+ *   effective = the location fog (aw_fog_location.c: it only shortens) of min(requested, the map's limit)
+ * a pure function of the inputs at that moment, so the order of the events cannot change the result. It runs only on
+ * events: a map arrival (AW_DrawDistanceArrive, aw_scene.c: New Game, a load, a door, a crossing; before the CHIM
+ * ring is primed), a setting (AW_SetDrawDistance: the player's value and Auto off, from the menu, dbg fog distance N,
+ * the view-distance cycle and a camera mark; AW_SetDrawDistanceAuto) and the watch (AW_DrawDistanceWatch, once per
+ * rendered view), which only compares the view's cell, the map, the settings and the location fog's key: no rule, no
+ * table walk and no file read per frame (tests/aga_drawdist_test.c counts). Nothing new is saved with the game: the
+ * result follows from the position (in the save) and the settings (config.cfg). A walk across a region border eases
+ * the region's default over about a second; an arrival or a jump applies it at once (a load).
+ * Auto (Options > Video > Fog distance auto, saved, on by default): each region's own default, 300 most places. */
+static cvar_t aw_drawdistance_auto={"aw_drawdistance_auto","1",true};
+/* The table's "trial" rows (config/region-draw-distance.json: Solstheim's 540 until the maintainer's yes on the Pi
+ * numbers) apply only with this on (saved, off by default; dbg fog region trial). */
+static cvar_t aw_fog_region_trial={"aw_fog_region_trial","0",true};
+#define DRAW_UNIVERSAL 300       /* the universal default: tools/build_aga.py DEFAULT_FOG_DISTANCE, the table's universal */
+#define REGION_ROWS 16
+#define REGION_DRAW_PATH "world/region-draw.txt"
+#define EASE_STEPS 10
+#define EASE_SECONDS 1.0
+#define NO_CELL 0x7fffffff
+typedef struct {short index,distance;char trial;} region_draw_t;
+static region_draw_t region_rows[REGION_ROWS];
+static int region_count=-1;      /* -1: not read yet (read once, at the first cell with a region) */
+static int effective=DRAW_UNIVERSAL,asked=DRAW_UNIVERSAL,eased=DRAW_UNIVERSAL,ease_to=DRAW_UNIVERSAL,ease_step,rearm;
+static double ease_next;
+static struct {int x,y,active,key;float manual,automatic,trial;char map[MAX_QPATH];} seen;
+/* Why the effective distance differs from the requested one, for the command. */
 static const char *limit_reason;
-int AW_DrawDistance(void) {
-    int d,reach=aw_chim_view_reach?aw_chim_view_reach():0,town=sv.active?AW_TownFind(sv.name):-1;
-    int limit=reach>0?reach:town>=0?AW_Town(town)->draw_distance:540;
+/* "index distance state id" rows in the image's region catalogue order (tools/region_draw.py); # comments and the
+ * universal line are skipped (the universal is DRAW_UNIVERSAL). */
+static void region_table_read(void) {
+    FILE *f=NULL;char line[96];const char *p;int index,distance;
+    region_count=0;
+    if(COM_FOpenFile(REGION_DRAW_PATH,&f)<0 || !f)return;
+    while(fgets(line,sizeof line,f) && region_count<REGION_ROWS){
+        if(line[0]<'0' || line[0]>'9')continue;
+        index=atoi(line);if(!(p=strchr(line,' ')))continue;
+        distance=atoi(++p);if(!(p=strchr(p,' ')))continue;
+        if(index>1023 || distance<100 || distance>4096)continue;
+        region_rows[region_count].index=(short)index;region_rows[region_count].distance=(short)distance;
+        region_rows[region_count++].trial=p[1]=='t';
+    }
+    fclose(f);
+}
+/* The region's default: its row (a trial row only with aw_fog_region_trial on), else the universal one; a cell without
+ * a region takes the universal one too (never "the last region": that would depend on the way taken). */
+static int region_default(int region) {
+    int i;
+    if(region<0)return DRAW_UNIVERSAL;
+    if(region_count<0)region_table_read();
+    for(i=0;i<region_count;i++)
+        if(region_rows[i].index==region && (!region_rows[i].trial || aw_fog_region_trial.value>0))return region_rows[i].distance;
+    return DRAW_UNIVERSAL;
+}
+/* The original-world cell of POINT (map coordinates) and, when REGION is given, its region's catalogue index. */
+static void cell_at(const float *point,int *x,int *y,int *region) {
+    float source[3];
+    *x=*y=NO_CELL;if(region)*region=-1;
+    if(!sv.active || !point || !AW_WorldToSource(sv.name,point,source))return;
+    *x=(int)floor(source[0]/8192.0);*y=(int)floor(source[1]/8192.0);
+    if(region)*region=AW_RegionIndexAt(source);
+}
+/* The rule, the only writer of `effective`. SNAP: the region's default applies at once (an arrival, a jump, a
+ * setting); otherwise a changed default eases there in EASE_STEPS steps (AW_DrawDistanceWatch). */
+static void draw_update(const float *point,int snap) {
+    int d,x,y,region,target,reach=aw_chim_view_reach?aw_chim_view_reach():0,town=sv.active?AW_TownFind(sv.name):-1;
+    int limit=reach>0?reach:town>=0?AW_Town(town)->draw_distance:540;float want;
+    cell_at(point,&x,&y,&region);
+    target=region_default(region);
+    if(snap){eased=ease_to=target;ease_step=0;}
+    else if(target!=ease_to){         /* the first step at once, the rest from the watch */
+        ease_to=target;ease_step=(target-eased+(target>eased?EASE_STEPS-1:1-EASE_STEPS))/EASE_STEPS;   /* <= 10 steps */
+        eased+=ease_step;if(ease_step>0?eased>ease_to:eased<ease_to)eased=ease_to;
+        ease_next=cl.time+EASE_SECONDS/EASE_STEPS;
+    }
+    want=aw_drawdistance_auto.value?(float)eased:aw_drawdistance.value;
     /* A legacy exterior's converted overlap is certified for its town table
      * range (540 for every converted town and the open world): its region
      * maps hold their neighbours that far. A CHIM map has no such cap: the
      * chunk ring follows the view distance, and the only limit is how far
-     * its world's visibility data reaches. Other scenes keep the user's
-     * setting up to Quake's coordinate range. */
+     * its world's visibility data reaches. Other scenes keep the requested
+     * distance up to Quake's coordinate range. */
     limit_reason=NULL;
-    if(sv.active && (reach>0 || town>=0 || AW_TerrainId(sv.name)>=0) && aw_drawdistance.value>limit){
+    asked=!(want>=100)?100:want>4096?4096:(int)want;
+    if(sv.active && (reach>0 || town>=0 || AW_TerrainId(sv.name)>=0) && want>limit){
         d=limit;
         limit_reason=reach>0?"this CHIM world's visibility data (the draw distance + hysteresis it was built with)":
             "this exterior's region maps (the town table's range)";
     }
-    else if(!(aw_drawdistance.value>=100))d=100;
-    else if(aw_drawdistance.value>4096){d=4096;limit_reason="Quake's coordinate range";}
-    else d=(int)aw_drawdistance.value;
-    return aw_fog_location_hook?aw_fog_location_hook(d):d;
+    else if(!(want>=100))d=100;
+    else if(want>4096){d=4096;limit_reason="Quake's coordinate range";}
+    else d=(int)want;
+    effective=aw_fog_location_hook?aw_fog_location_hook(d):d;
+    seen.x=x;seen.y=y;seen.active=sv.active;seen.key=aw_fog_location_key?aw_fog_location_key():0;
+    seen.manual=aw_drawdistance.value;seen.automatic=aw_drawdistance_auto.value;seen.trial=aw_fog_region_trial.value;
+    Q_strcpy_bounded(seen.map,sv.name,sizeof seen.map);
 }
+int AW_DrawDistance(void) {return effective;}
+/* Once per rendered view (AW_CullBegin): compares only; the rule runs when something it reads has changed, or for the
+ * next step of an ease. */
+void AW_DrawDistanceWatch(void) {
+    int x,y,key=aw_fog_location_key?aw_fog_location_key():0,step=0;
+    if(rearm){rearm=0;draw_update(r_refdef.vieworg,1);return;}   /* the first view after an arrival: from the view itself */
+    cell_at(r_refdef.vieworg,&x,&y,NULL);
+    if(eased!=ease_to && (cl.time>=ease_next || ease_next-cl.time>EASE_SECONDS)){
+        eased+=ease_step;if(ease_step>0?eased>ease_to:eased<ease_to)eased=ease_to;
+        ease_next=cl.time+EASE_SECONDS/EASE_STEPS;step=1;
+    }
+    if(!step && x==seen.x && y==seen.y && key==seen.key && (int)sv.active==seen.active && aw_drawdistance.value==seen.manual &&
+       aw_drawdistance_auto.value==seen.automatic && aw_fog_region_trial.value==seen.trial && !strncmp(seen.map,sv.name,sizeof seen.map-1))return;
+    /* a step to the next cell eases; a map change, a jump or a cell off the world applies at once */
+    draw_update(r_refdef.vieworg,!!strncmp(seen.map,sv.name,sizeof seen.map-1) || x==NO_CELL || seen.x==NO_CELL ||
+                x-seen.x>1 || seen.x-x>1 || y-seen.y>1 || seen.y-y>1);
+}
+/* A map arrival (aw_scene.c AW_SceneSpawn: New Game, a load, a door, a crossing), with the arrival point, before the
+ * CHIM ring is primed at it; the first rendered view then reads its own place once more (the view is stale here). */
+void AW_DrawDistanceArrive(const float *origin) {
+    draw_update(origin?origin:r_refdef.vieworg,1);rearm=1;
+}
+/* The player's own value (Options slider, dbg fog distance N, the view-distance cycle, a camera mark): it applies
+ * everywhere, so Auto goes off. */
 void AW_SetDrawDistance(int value) {
     if(value<100)value=100;
     if(value>4096)value=4096;
+    if(aw_drawdistance_auto.value)Cvar_SetValue("aw_drawdistance_auto",0);
     Cvar_SetValue("aw_drawdistance",value);
+    draw_update(r_refdef.vieworg,1);
+}
+int AW_DrawDistanceAuto(void) {return aw_drawdistance_auto.value!=0;}
+/* The Auto box. Unchecking starts the player's value at the region's default here, so nothing jumps. */
+void AW_SetDrawDistanceAuto(int on) {
+    if(!on && aw_drawdistance_auto.value)Cvar_SetValue("aw_drawdistance",(float)ease_to);
+    if(!on != !aw_drawdistance_auto.value)Cvar_SetValue("aw_drawdistance_auto",on?1:0);
+    draw_update(r_refdef.vieworg,1);
 }
 /* Said, never silent: what limits the distance here when it is not the
- * setting. */
+ * requested one. */
 static void distance_report(void) {
-    int effective=AW_DrawDistance();
-    if(effective!=(int)aw_drawdistance.value)
+    if(effective!=asked)
         Con_Printf("Here: %ld local units, limited by %s.\n",(long)effective,limit_reason?limit_reason:"location fog");
 }
 static void distance_command(void) {
     char *s;int value=0;
-    if(Cmd_Argc()==1){Con_Printf("Fog/draw distance: %ld local units (default 300).\n",(long)aw_drawdistance.value);distance_report();return;}
+    if(Cmd_Argc()==2 && !strcmp(Cmd_Argv(1),"auto"))AW_SetDrawDistanceAuto(1);
+    else if(Cmd_Argc()!=1)goto set;
+    if(aw_drawdistance_auto.value)
+        Con_Printf("Fog/draw distance: auto, %ld local units for this region%s (your own value %ld; default 300).\n",
+                   (long)asked,aw_fog_region_trial.value>0?", trial rows on":"",(long)aw_drawdistance.value);
+    else Con_Printf("Fog/draw distance: %ld local units (default 300).\n",(long)aw_drawdistance.value);
+    distance_report();return;
+set:
     if(Cmd_Argc()!=2)goto invalid;
     s=Cmd_Argv(1);if(!*s)goto invalid;
     while(*s){if(*s<'0'||*s>'9')goto invalid;value=value*10+*s++-'0';if(value>4096)goto invalid;}
@@ -143,14 +270,15 @@ static void distance_command(void) {
     if(AW_Interior())Con_Printf("Exterior setting; indoor visibility is unchanged.\n");
     return;
 invalid:
-    Con_Printf("Usage: dbg fog distance 100..4096 (default 300)\n");
+    Con_Printf("Usage: dbg fog distance 100..4096 or auto (default auto)\n");
 }
 static void cycle_distance(void) {
     int value=aw_drawdistance.value<300?300:aw_drawdistance.value<540?540:aw_drawdistance.value<1000?1000:300;
     AW_SetDrawDistance(value);
     Con_Printf("View distance: %ld (effective %ld).\n",(long)value,(long)AW_DrawDistance());
 }
-void AW_FogInit(void) { Cvar_RegisterVariable(&aw_land_fill);Cvar_RegisterVariable(&aw_terrain_horizon);Cvar_RegisterVariable(&aw_skyline_fill);Cvar_RegisterVariable(&aw_sky_haze);Cvar_RegisterVariable(&aw_horizon_defaults);Cmd_AddCommand("aw_horizon_migrate",horizon_migrate);Cmd_AddCommand("aw_horizon_stats",AW_HorizonReport);Cvar_RegisterVariable(&aw_fog);Cvar_RegisterVariable(&aw_fog_large_rooms);Cvar_RegisterVariable(&aw_fog_distance_interior);Cvar_RegisterVariable(&aw_cull);Cmd_AddCommand("aw_fog_distance",distance_command);Cmd_AddCommand("aw_viewdistance_cycle",cycle_distance);colours=COM_LoadHunkFile("gfx/fog.lmp"); }
+void AW_FogInit(void) { Cvar_RegisterVariable(&aw_land_fill);Cvar_RegisterVariable(&aw_terrain_horizon);Cvar_RegisterVariable(&aw_skyline_fill);Cvar_RegisterVariable(&aw_sky_haze);Cvar_RegisterVariable(&aw_horizon_defaults);Cmd_AddCommand("aw_horizon_migrate",horizon_migrate);Cmd_AddCommand("aw_horizon_stats",AW_HorizonReport);Cvar_RegisterVariable(&aw_fog);Cvar_RegisterVariable(&aw_fog_large_rooms);Cvar_RegisterVariable(&aw_fog_distance_interior);Cvar_RegisterVariable(&aw_cull);Cmd_AddCommand("aw_fog_distance",distance_command);Cmd_AddCommand("aw_viewdistance_cycle",cycle_distance);colours=COM_LoadHunkFile("gfx/fog.lmp");
+    Cvar_RegisterVariable(&aw_drawdistance_auto);Cvar_RegisterVariable(&aw_fog_region_trial);draw_update(NULL,1); }
 /* Fill inverse-depth bands with 15 integer divisions, not 32767 floating-point
  * divisions on each live adjustment. Same 40%-to-100% linear fog profile. */
 void AW_FogDepths(byte *table,int distance) {
@@ -472,8 +600,10 @@ geometry:
     return 1;
 }
 void AW_CullBegin(void) {
-    int large=AW_LargeRoomDistance();
-    float distance=AW_Interior()?4096:AW_DrawDistance();int mode=CULL_MODE;
+    int large;float distance;int mode=CULL_MODE;
+    AW_DrawDistanceWatch();            /* the draw distance's events (compares only; REGIONAL-DRAW-DISTANCE-68) */
+    large=AW_LargeRoomDistance();
+    distance=AW_Interior()?4096:AW_DrawDistance();
     if(large)distance=large;           /* a large room draws nothing past its fog (FOG-300-DEFAULT-57) */
     if(!++far_frame){memset(far_cache,0,sizeof(far_cache));far_frame=1;}
     VectorCopy(vpn,far_normal);

@@ -1,6 +1,6 @@
 # World tree sprites and the Balmora comparison zone
 
-_Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
+_Last updated with AmiWind v0.0.68-dev7 (22 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -8,6 +8,9 @@ _Last updated with AmiWind v0.0.66-dev12 (16 November 2026)._
 - [Floating trunks and the base depth push (6 November 2026)](#floating-trunks-and-the-base-depth-push-6-november-2026)
 - [Open sprite-root regression - 4 October 2026](#open-sprite-root-regression---4-october-2026)
 - [Study: cheap trees with some depth (29 October 2026)](#study-cheap-trees-with-some-depth-29-october-2026)
+  - [Tree type 2 for Solstheim: the star prism and the baked copies (10 November 2026)](#tree-type-2-for-solstheim-the-star-prism-and-the-baked-copies-10-november-2026)
+  - [The rally-game trees: picture planes from the original (22 November 2026)](#the-rally-game-trees-picture-planes-from-the-original-22-november-2026)
+  - [Bloodmoon: Solstheim's forests (29 October 2026)](#bloodmoon-solstheims-forests-29-october-2026)
 - [Balmora mesh exclusion](#balmora-mesh-exclusion)
 - [Reproducible shared sprite conversion](#reproducible-shared-sprite-conversion)
 - [Scale and visibility investigation](#scale-and-visibility-investigation)
@@ -145,6 +148,62 @@ changes. The base CHIM stage reads none of these files and keeps its key (tests/
 densest Solstheim forest frame: the median view falls from 45,964 to 6,096 faces
 ([SOLSTHEIM-FIRST-FRAME-v0.0.64.md](performance/SOLSTHEIM-FIRST-FRAME-v0.0.64.md)). Still to do: the distance level
 in the engine (star prisms in a near ring, billboards beyond) and the frame time on the emulator and the Pi.
+
+### The rally-game trees: picture planes from the original (22 November 2026)
+
+On the Raspberry Pi 4B the frame rate fell to about 8 frames a second among the spruces of the Brodir Grove Region,
+and most of Solstheim is that kind of forest. The renderer counters of the same forest frame (-23,20) on FS-UAE show
+where the time goes: the spruces' faces. Each tree is 472 to 724 faces after the converter; every front face is
+clipped face by face down the terrain tree (22,000 to 59,000 nodes visited a frame at fog 540), and the brush models
+take 41 to 60 % of the renderer's time, more than the edges, spans and fill that follow. The maintainer's direction:
+the trees of the 1990s rally games, the trunk in polygons and the crown as a few flat pictures.
+
+`tools/chim_tree_rally.py` builds them from each original spruce model:
+
+- seen from above, the crown is cut into wedges by vertical planes through the trunk's axis: 4 planes = 8 panes;
+- each plane is one flat face per side (a mirrored copy behind it), cut to the convex outline of what it shows (at
+  most 8 corners), with a picture rendered offline from the original crown: its needle textures with their
+  see-through texels, its vertex colours and tint, at one texel per map unit, supersampled three times;
+- two kinds of picture: the whole crown seen across the plane (silhouette), or only the needles in that plane's own
+  wedge (slice: every needle in exactly one plane);
+- the trunk: the model's own 120 bark triangles (original), or a tapered bark prism of 6 faces (prism), as wide as
+  the bark at its foot and its top, with the bark's own texel density;
+- all panes of one model share one picture atlas (the converter's baked-panel material), made a see-through texture:
+  palette index 255 wherever the picture is clear;
+- collision stays the model's own.
+
+The panes are see-through model faces, not sprites: the engine draws such faces in its see-through pass, off the edge
+list and off the face-by-face clip down the terrain tree, depth-tested per texel, and they go through the CHIM model
+path that already carries the trees. Sprites would be entities (512 static entities, shared with torches and lights,
+against 321 trees in the frame) and CHIM placements have no sprite path. That pass drew the see-through faces of
+placed models from the world's origin, so outdoors they were not drawn at all and every face past its list was
+drawn solid (the spruce needle cards show as solid sheets): `aw_seethrough_placed 1` draws them from each placement's
+own origin ([FENCE-PLACED-ORIGIN-68](BUGS.md)). The panes need it; the default stays 0 until the pictures are seen.
+
+Settings in `config/tree-copies.json` under `rally`: planes, the picture kind, the trunk, texels per map unit,
+supersampling, the coverage a texel needs to be solid, the outline's corners. A test image built with
+`--chim-sol-tree-copies rally-switch` (recipe `config/recipes/miniwind-solstheim-rally.json`) holds the original trees
+and four rally methods in one store, picked in game by `aw_tree_crowns` at the next map load: 2 silhouette with the
+original trunk, 3 slice with the original trunk, 4 silhouette with the prism, 5 slice with the prism.
+`--chim-sol-tree-copies rally` builds the rally trees alone. Nothing else changes: no base stage reads the rally tool.
+
+Measured on the built frame -23,20 (one-frame test build, the same builder and data for every method):
+
+| Frame -23,20 | original trees | 2 silhouette, original trunk | 3 slice, original trunk | 4 silhouette, prism | 5 slice, prism |
+| --- | --- | --- | --- | --- | --- |
+| Faces per spruce | 472 to 724 | 128 (8 panes, 120 trunk) | 128 | 14 (8 panes, 6 trunk) | 14 |
+| Tree faces placed (321 trees) | 204,640 | 41,088 | 41,088 | 4,494 | 4,494 |
+| Faces drawn per view, median / maximum | 45,964 / 61,175 | 12,330 / 23,418 | 12,330 / 23,418 | 4,985 / 15,780 | 4,985 / 15,780 |
+| Tree models' render bytes | 1,785,920 | 451,664 | 451,064 | 86,980 | 86,380 |
+| Ring peak: model bytes / texture bytes | 3,084,564 / 75,360 | 2,019,576 / 975,920 | 2,019,072 / 975,920 | 1,725,476 / 975,920 | 1,724,972 / 975,920 |
+| Ring peak, all | 3,173,492 | 3,009,064 | 3,008,560 | 2,714,964 | 2,714,460 |
+| Picture atlases (14 models) | none | 320 x 112 to 576 x 160 texels, 57,120 to 122,400 bytes with mip levels each | as 2 | as 2 | as 2 |
+
+The pictures cost texture memory (about 0.9 MB more texture bytes in the frame's ring peak) and save more in model
+bytes. The median view of the frame falls below Vvardenfell's median (7,562 faces) with the prism trunk. Their fill is the see-through pass's per-texel cost, which a face count does not show: the frame time on
+FS-UAE and the Pi 4B, the pass's own counters (`dbg rcount`: faces, texels visited and written) and the pictures go
+to the maintainer before any default is chosen. Still to do: a distance level (rally trees far, the spruce near) if
+the numbers call for it.
 
 ### Bloodmoon: Solstheim's forests (29 October 2026)
 

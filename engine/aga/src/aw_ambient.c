@@ -859,7 +859,9 @@ static void begin_walk(slot_t *s) {
  * aggro mode); this module runs it for the actors it moves. Our own code. A creature's disposition bias takes 50; an
  * NPC's is its derived disposition toward the player (DIALOGUE-FIGHT-DISPOSITION-57; aw_dialwin.c AW_DialNpcDisposition:
  * the NPC's own facts looked up once into the slot, then only its current disposition and the player's side). */
-#define FIGHT_SLOTS 4           /* aw_combat.c SLOTS: hostiles at a time; a check with no slot free waits */
+/* a check with no fight slot free waits (MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68: the slots themselves are asked, which
+ * also counts fights between two actors and fallen fighters; a literal 4 against the player's hostiles before) */
+int AW_CombatSlotsFree(void);   /* aw_combat.c; declared here: aw_combat.h is keyed by the CHIM world stage */
 static int aggro_on=1;          /* "chim actors ambient aggro on|off" (default on, not saved) */
 /* The aggro's facts, read once when the slot is made (the cell's load, with the actor's other data) and never on an
  * engage tick (a disk read in a fight stutters): the record's Fight, and an NPC's own disposition facts. A Fight that
@@ -902,7 +904,7 @@ static void aggro(slot_t *s) {
         VectorSubtract(s->e->v.origin,p->v.origin,d);
         if(AW_CombatFightRating(&aw_combat_ai,s->fight,disposition,(float)Length(d)/AW_MOVE_UNIT_SCALE)<100)return;
     }
-    if(AW_CombatHostiles()>=FIGHT_SLOTS){st.aggro_full++;return;}
+    if(AW_CombatSlotsFree()<=0){st.aggro_full++;return;}
     if(!AW_CombatActorLoad(source_id(s->e),&sheet)){s->fight=-1;return;}
     if(now>=0)sheet.fight=(unsigned char)(now>100?100:now);   /* the Fight it has now, not the record's */
     got=AW_CombatAggro(s->e,&sheet,NULL,disposition,NULL,NULL);

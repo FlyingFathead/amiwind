@@ -1,11 +1,12 @@
 # Keyboard and command reference
 
-_Last updated with AmiWind v0.0.67-dev2 (18 November 2026)._
+_Last updated with AmiWind v0.0.68-dev7 (22 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [v0.0.29 F/V regression gate](#v0029-fv-regression-gate)
+- [The menu in play](#the-menu-in-play)
 - [Options](#options)
 - [Options > Controls](#options--controls)
 - [Configurable gameplay bindings](#configurable-gameplay-bindings)
@@ -38,6 +39,22 @@ writes the current bindings to `keymaps.cfg` and settings to `config.cfg`.
 Edit the personal file while the game is closed; an active session saves its own
 bindings when it exits. Keep the shipped defaults for recovery.
 
+## The menu in play
+
+Escape during play pauses the game and opens the original game's menu over it:
+Return To Game, New Game, Save Game, Load Game, Options Menu and Exit Game, each
+label the game's own text where the game data carries it. The top of the menu
+says Paused where the title menu shows the AmiWind logo; the original game shows
+no such caption, and `aw_menu_paused_caption 0` (dbg ui paused 0, saved) puts the
+logo back. Escape or Return To Game goes back into the game.
+
+While a game runs, the menu asks the original game's own questions before the
+current game is lost, each with No (Escape) and Yes: Exit Game asks whether to
+quit the current game, warning that unsaved progress will be lost, and on Yes
+leaves for the title menu; New Game asks whether to start a new game and lose the
+current one; loading a saved game asks whether to load it and lose the current
+game. The title menu keeps its own rows and questions.
+
 ## Options
 
 Options (from the pause menu or the title screen) fills the whole screen. Like
@@ -58,9 +75,19 @@ Prefs     Show crosshairs, Crosshair colour, Crosshair shape, Mouse cursor,
 Audio     Master, Music, Effects, Dialogue (sliders)
 Controls  Mouse sensitivity (slider), Invert Y axis, the gameplay actions,
           Combat style, Dice rolls, Blocking, Weapon sway, Reset to defaults
-Video     Fog distance, Reset distance, Far detail, Photo mode, Area loading,
-          Load method, Read-ahead buffer, Extra RAM
+Video     Fog distance outdoors, Fog distance auto, Fog distance indoors,
+          Fog in large rooms, Far detail, Photo mode, Area loading,
+          Load method, Read-ahead buffer, Extra RAM, Tree crowns
 ```
+
+Video > Fog distance auto is on by default: each region uses its own draw distance
+from the game's region table, 300 in most places. While it is on, the Fog distance
+outdoors row shows the distance of the region you are in and cannot be changed;
+switch Auto off and the distance you set applies everywhere (a place with its own
+shorter fog, such as a dense town at night, still shortens it). Turning Auto off
+starts your value at the distance shown, so nothing jumps. Auto replaced the
+earlier Reset distance row: Auto on is the default. The indoor fog distance has no
+Auto, as rooms have no region.
 
 Until v0.0.48 these were one list with Interface..., Audio... and Controls...
 sub-menus; every setting kept its name and its saved value.

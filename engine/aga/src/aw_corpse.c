@@ -39,7 +39,20 @@ static int corpse_prompt(char *line,int size,const char **name){
 static int corpse_use(void){
     unsigned reference;edict_t *e=corpse_target(&reference);
     if(!e || !aw_container_open)return 0;
+    /* CONTAINER-SCRIPT-ACTIVATE-67: a body whose script reads OnActivate gives its use to the script (the original's
+     * rule for every object: aw_mwhost.c object_intercept; OpenMW 0.51 mwworld/refdata.cpp activate). It is searched
+     * by the script's Activate (AW_CorpseActivate below): the Spriggans of Solstheim, whose bodies can be searched
+     * only after their last death */
+    if(aw_scene_intercept && aw_scene_intercept(reference))return 1;
     return aw_container_open(reference,e->v.netname?pr_strings+e->v.netname:"",0);
+}
+/* A script's Activate on the actor E with REFERENCE (aw_mwhost.c object_activate): a dead actor's own use is the
+ * search of its body, as E without a script (OpenMW 0.51 mwclass/npc.cpp and creature.cpp activate: a dead actor
+ * opens its inventory). 1 when E is dead (searched, or no strip to open); 0 alive: the caller's talk. */
+int AW_CorpseActivate(edict_t *e,unsigned reference){
+    if(!e || e->free || AW_CombatSlotState(e,NULL)!=2)return 0;
+    if(aw_container_open && reference)aw_container_open(reference,e->v.netname?pr_strings+e->v.netname:"",0);
+    return 1;
 }
 static void look_at(edict_t *p,const vec3_t mid){
     vec3_t eye,delta;

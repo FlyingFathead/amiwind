@@ -58,7 +58,11 @@ enum {AWV_GET=0,AWV_SET=1,AWV_MOD=2,AWV_MODCURRENT=3,AWV_RATIO=4};
 #define AWL_CHANGED 2              /* differs from its base: kept and saved */
 #define AWL_DEAD 4
 #define AWL_DIED 8                 /* died and OnDeath has not read it yet */
-#define AWL_COMBAT 16              /* a script started combat with the player (StartCombat) */
+/* a fight order (MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68): a StartCombat of a script or a conversation, a crime's attack
+ * or an ally's join told this actor to fight fight_ref. It stays until StopCombat, a paid fine, the actor's death, its
+ * target's death or a Resurrect of the actor (OpenMW 0.51: the AiCombat package stacked on the actor), whether or not
+ * a fight slot holds the actor now: the script host takes a waiting order up (aw_mwhost.c fight_orders) */
+#define AWL_COMBAT 16
 /* Inventory entry flags (AINV). */
 #define AWI_INV_EQUIPPED 1
 #define AWI_INV_LEVELLED 2
@@ -99,6 +103,7 @@ typedef struct {
     short disposition;
     unsigned char kind,record_flags;
     unsigned char nitems,nspells,items_capacity,spells_capacity;
+    uint32_t fight_ref;                  /* AWL_COMBAT: whom to fight (AW_ACTOR_PLAYER_REF the player); else 0 */
     struct aw_actor_item_s {uint16_t item;int16_t change;} *items;      /* grown on demand (NULL: none) */
     struct aw_actor_spell_s {uint16_t spell;int16_t change;} *spells;   /* change: +1 added, -1 removed */
 } aw_actor_t;
@@ -163,6 +168,14 @@ int AW_ActorHealthDeath(aw_actor_t *a,int was_dead,float before);
  * essential death box for a record flagged AWR_ESSENTIAL, OpenMW 0.51 actors.cpp sKilledEssential on any death) */
 extern void (*aw_actor_killed)(const aw_actor_t *a);
 int AW_ActorDeadCount(int row);                                   /* GetDeadCount of an actor id */
+/* The fight orders (AWL_COMBAT above). Order: A is to fight TARGET (a placed reference, AW_ACTOR_PLAYER_REF the
+ * player); the record counts as changed, so it is kept and saved. TARGET 0: the order ends. Orders: the living records
+ * that hold an order, from record *CURSOR on, up to MAX (their references and targets); *CURSOR is where the next call
+ * goes on, 0 once the last record was passed. OrderCount: all of them. OrdersEnd: every order ends (how many). */
+void AW_ActorOrder(aw_actor_t *a,uint32_t target);
+int AW_ActorOrders(int *cursor,uint32_t *refs,uint32_t *targets,int max);
+int AW_ActorOrderCount(void);
+int AW_ActorOrdersEnd(void);
 /* Inventory: the base list plus the changes; ITEM an AITM row. */
 int AW_ActorItemCount(const aw_actor_t *a,int item);
 int AW_ActorAddItem(aw_actor_t *a,int item,int count);            /* 0 when the change list is full */
@@ -300,7 +313,10 @@ int AW_SoldImport(const unsigned char *p,int bytes);
 int AW_ActorStateExport(unsigned char *out,int capacity);
 int AW_ActorStateImport(const unsigned char *data,int bytes);
 /* Slice 6 (the save's world change list, aw_ledger.h RECORDS): the dead counts alone as an AWAS1 block (records 0), and
- * the changed records alone as "AWAR": u8 version (1) u8 0 u16 0 u32 records, then each record as in AWAS1. Export
+ * the changed records alone as "AWAR": u8 version u8 0 u16 0 u32 records, then each record: version 1 as in AWAS1;
+ * version 2 (v0.0.68) with the fight order's target, a u32, after its fixed part. A block is written as version 2
+ * only when a record's order names another actor (an order against the player is the flag alone, as before), so a
+ * game without such an order saves the bytes it always did; both versions are read. Export
  * returns the bytes (OUT NULL: the bytes needed; 0 nothing; -1 too small). ImportRecords adds the records to the pool
  * after an Import (a reference already there is replaced); 1 good (also for 0 bytes), 0 a bad block (nothing added). */
 int AW_ActorStateExportCounts(unsigned char *out,int capacity);

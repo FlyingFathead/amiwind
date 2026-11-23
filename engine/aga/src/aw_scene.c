@@ -1941,6 +1941,8 @@ void AW_SceneSpawn(edict_t *p) {
     /* Quake's stuck recovery returns to oldorigin, which a fresh client edict
      * leaves at the frame origin; anchor it at the scene spawn instead. */
     VectorCopy(p->v.origin,p->v.oldorigin);
+    /* the draw distance at the arrival point first, so the CHIM ring is primed at it (REGIONAL-DRAW-DISTANCE-68) */
+    AW_DrawDistanceArrive(pending && !strcmp(sv.name,next.target)?next.arrival:p->v.origin);
     if(aw_chim_spawn)aw_chim_spawn(pending && !strcmp(sv.name,next.target)?next.arrival:p->v.origin);
     if(region_crossing && (!pending || strcmp(sv.name,next.target)))S_CancelSceneVoice();
     crossing_view_ready=0;hand_clock_ready=0;door_ready=0;

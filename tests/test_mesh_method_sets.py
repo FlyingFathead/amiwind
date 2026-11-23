@@ -2,8 +2,9 @@
 """Mesh method sets for Solstheim's stages and the test route's own runner (SOL-GLACIER-METHODS-AB-COMPARE-68).
 
 Held here: the sets file is checked (format, the baseline set names no mesh, a set names only meshes a layer lists
-and only methods this tree builds); the set is the runners' own option and never reaches the converter; without it
-the module's and the test route's commands are the ones before; the test route's world stage goes through its runner
+and only methods this tree builds, its default names a set); the set is the runners' own option and never reaches the
+converter; the module's world stage always names its set, the shipped default E when the build names none; without
+the option the test route's commands are the ones before; the test route's world stage goes through its runner
 (the star trees' route keeps its own entry), and a release candidate or final refuses the route and its look-only
 option; a test image leaves the Solstheim module out, says so and refuses a plan with both; the runner's look-only
 gates report a budget failure instead of stopping, write the receipt's mark, and stop on any other failure; everything
@@ -105,13 +106,33 @@ class TheModuleRunner(unittest.TestCase):
         made = module.commands(args, steps, tool, Path('/run'), {'qbsp': '/q'}, 8, build.module_chim_options)
         return dict(made)['bloodmoon-solstheim']
 
-    def test_the_modules_command_takes_the_set_only_when_given(self):
+    def test_the_modules_command_names_the_shipped_default_set_unless_the_build_names_one(self):
+        # method E is the shipped default of the Solstheim module (decided for the project on 22 November 2026,
+        # config/mesh-method-sets.json "default"): a build that names no set builds the glacier's ice with E; until
+        # v0.0.68-dev7 such a build named none and built today's methods (the nine glacier cells did not fit 32 MB)
         plain = self.stage(self.args())
-        self.assertNotIn('--mesh-method-set', plain)
-        with_set = self.stage(self.args('baseline'))
-        at = with_set.index('--mesh-method-set')
-        self.assertEqual(with_set[at + 1], 'baseline')
-        self.assertEqual(with_set[:at] + with_set[at + 2:], plain)
+        at = plain.index('--mesh-method-set')
+        self.assertEqual(plain[at + 1], 'E')
+        self.assertEqual(module.method_set(self.args()), 'E')
+        for name in ('baseline', 'C'):
+            with_set = self.stage(self.args(name))
+            self.assertEqual(with_set[with_set.index('--mesh-method-set') + 1], name)
+            self.assertEqual(with_set[:at] + with_set[at + 2:], plain[:at] + plain[at + 2:])
+            self.assertEqual(with_set.count('--mesh-method-set'), 1)
+
+    def test_the_shipped_default_is_read_from_the_sets_file_and_checked(self):
+        self.assertEqual(method_sets.default_name(), 'E')
+        self.assertEqual(method_sets.load()['default'], 'E')
+        with tempfile.TemporaryDirectory() as tmp:
+            # a file without a default builds today's methods; a default that names no set is refused
+            self.assertEqual(method_sets.default_name(write(tmp, sets_file())), method_sets.BASELINE)
+            self.assertEqual(module.method_set(self.args(), write(tmp, sets_file())), method_sets.BASELINE)
+            with self.assertRaisesRegex(ValueError, 'default set'):
+                method_sets.load(write(tmp, dict(sets_file(), default='F')))
+        # E is method C on the shard and both icebergs and method D on the shard, as measured
+        record = method_sets.rows('E')[0]
+        self.assertEqual(record['methods'], {'x/bm_ex_iceberg_shard01': ['C', 'D'], 'x/bm_ex_iceberg': ['C'],
+                                             'x/bm_ex_iceberg_collapsed': ['C']})
 
 
 class TheTestRoute(unittest.TestCase):

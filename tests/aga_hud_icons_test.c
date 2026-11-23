@@ -11,6 +11,7 @@ viddef_t vid;
 aw_state_t aw_state;
 int (*aw_hud_item_boxes)(int y,int channels);
 int (*aw_title_bar)(int x,int y,int w,const char *title);
+int (*aw_title_plaque)(int x,int y,int w,int *plaque_x,int *plaque_w);
 const char *(*aw_hand_to_hand_name)(void);
 int (*aw_inventory_row_icon)(int slot,const char *id,int equipped,int x,int y);
 static byte screen[200][320];
@@ -94,6 +95,16 @@ int AW_MagicSelectedItem(aw_inventory_item_t *out){
 }
 float AW_MagicCharge(const aw_state_t *s,const aw_inventory_item_t *item){(void)s;(void)item;return charge;}
 static int count(int x,int y,int w,int h,int c){int n=0,i,j;for(j=y;j<y+h;j++)for(i=x;i<x+w;i++)n+=screen[j][i]==c;return n;}
+/* MAP-VERSION-2-DEFAULT-68: one title bar drawn on a grey screen, hashed with the box its text was centred in (FNV-1a) */
+static unsigned long title_hash(const char *title){
+    unsigned long h=2166136261UL;int k;const byte *p=&screen[0][0];int box[4];
+    memset(screen,7,sizeof(screen));text_x=text_y=text_w=text_h=-1;
+    assert(aw_title_bar(6,6,308,title));
+    box[0]=text_x;box[1]=text_y;box[2]=text_w;box[3]=text_h;
+    for(k=0;k<320*200;k++){h^=p[k];h=(h*16777619UL)&0xffffffffUL;}
+    for(k=0;k<4;k++){h^=(unsigned long)(box[k]&0xffff);h=(h*16777619UL)&0xffffffffUL;}
+    return h;
+}
 int main(void){
     int y=174,i,reads;
     vid.width=320;vid.height=200;vid.rowbytes=320;vid.buffer=&screen[0][0];
@@ -141,6 +152,20 @@ int main(void){
     assert(screen[6][203]==19 && screen[6][204]==18 && screen[6][313]==20 && screen[6][314]==7 && screen[5][6]==7 && screen[18][6]==7);
     assert(count(6,6,111,12,18)==109*12 && count(203,6,111,12,18)==109*12);
     reads=opens;assert(aw_title_bar(6,6,308,"Inventory"));assert(opens==reads);   /* loaded once */
+    /* MAP-VERSION-2-DEFAULT-68: the title bar split into its plaque and its text (aw_icons.c title_plaque, the map's
+     * console-font title) draws the stats, inventory and magic titles exactly as before: each screen and its text's box,
+     * hashed, equals what the title bar drew before the split (pinned from aw_icons.c of v0.0.68-dev7, 24d3fb04d): a
+     * player's name (the stats title), a weapon's name (the inventory title), "Magic", and a title wider than the bar
+     * (its plaque capped six pixels short of the bar) */
+    {
+        static const char *const titles[4]={"Hors","Steel Longsword","Magic","A title much wider than the window's own title bar"};
+        static const unsigned long before[4]={1645306132UL,2136987904UL,542246456UL,1870307476UL};
+        for(i=0;i<4;i++){unsigned long h=title_hash(titles[i]);if(h!=before[i])printf("TITLE_HASH %d %lu\n",i,h);assert(h==before[i]);}
+        /* the plaque alone: centred, its left edge given back, the blocks either side, capped six pixels short */
+        {int left=-1,w=100;memset(screen,7,sizeof(screen));assert(aw_title_plaque && aw_title_plaque(6,6,308,&left,&w));
+         assert(left==110 && w==100 && count(110,6,100,12,0)==100*12 && screen[6][109]==20 && screen[6][210]==19);
+         w=400;assert(aw_title_plaque(6,6,308,&left,&w) && w==302 && left==9);}
+    }
     /* Inventory rows (UI-ICONS-INVENTORY-42): the item's 16 x 16 icon, the equipped variant when
      * equipped, the plain one when no equipped variant exists; unknown items fall back. */
     memset(screen,0,sizeof(screen));assert(aw_inventory_row_icon && aw_inventory_row_icon(0,"steel longsword",0,132,54));

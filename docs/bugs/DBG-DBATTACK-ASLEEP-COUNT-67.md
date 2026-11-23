@@ -33,6 +33,8 @@ Family: Debug commands and remote control (`debug-commands`). dbg commands, tele
 - [CONSOLE-GETPOS-SCRATCH-ORIGIN-66](CONSOLE-GETPOS-SCRATCH-ORIGIN-66.md): The console's GetPos on an actor answers a point near 0 instead of where the actor stands (dagoth_ur_2->getpos y read -0.43 while he stood at y 3700)
 - [CONSOLE-SHOWVARS-SCRATCH-INSTANCE-66](CONSOLE-SHOWVARS-SCRATCH-INSTANCE-66.md): The console's ShowVars on a reference prints the console's own empty instance, not the reference's script (heart_akulakhan->sv: script 0, 0 locals)
 - [CONSOLE-TP-ROOM-NAME-63](CONSOLE-TP-ROOM-NAME-63.md): The console teleport to a room map name stays in the current town instead of entering the room
+- [DBG-CAM-ORBIT-FAR-TARGET-68](DBG-CAM-ORBIT-FAR-TARGET-68.md): The debug orbit camera refuses a placed model farther than a few hundred units away although it fills the crosshair: it looks for its centre only in the collision near the player
+- [DBG-COMBAT-CALM-LEAVES-HOSTILE-MARK-68](DBG-COMBAT-CALM-LEAVES-HOSTILE-MARK-68.md): `dbg combat calm` ends the fights but leaves the actors marked as hostile, so they still refuse to talk
 - [DBG-CONTAINER-AIM-NO-SPOT-59](DBG-CONTAINER-AIM-NO-SPOT-59.md): aw_placed container aim finds no standing spot the room collision accepts in Arrille's Tradehouse
 - [DBG-CONTAINER-AIM-OUT-OF-REACH-67](DBG-CONTAINER-AIM-OUT-OF-REACH-67.md): aw_placed container aim stands the player 40 units from the container, past the reach for a container on the floor, and aims above a small one
 - [DBG-DOOR-GO-AIM-CHIM-59](DBG-DOOR-GO-AIM-CHIM-59.md): aw_hinged_door go does not bring the door under the crosshair in a CHIM room
@@ -63,6 +65,7 @@ Family: Debug commands and remote control (`debug-commands`). dbg commands, tele
 - [GAME-RECORDER-MISSING-61](GAME-RECORDER-MISSING-61.md): Requested: a gameplay recorder that records a play session and plays it back in another game instance
 - [GODMODE-LOST-ON-MAP-CHANGE-64](GODMODE-LOST-ON-MAP-CHANGE-64.md): God mode switched on before a teleport, a door or a load is off again after the map change
 - HORS-FROM-MENU-58 (no report page): dbg aw hors cannot be started from the main menu
+- [HORS-FROM-MENU-REGRESSED-68](HORS-FROM-MENU-REGRESSED-68.md): From the main menu, dbg aw hors 0 stops on a loading screen and returns to the main menu
 - [HORS-IN-PLAY-NO-NEW-GAME-RESET-67](HORS-IN-PLAY-NO-NEW-GAME-RESET-67.md): dbg aw hors 0 started during play keeps the game before's script state: revealed map places, the explored map, the scripts' instances
 - [HUD-GLOBAL-NO-REGIONS-33](HUD-GLOBAL-NO-REGIONS-33.md): The debug HUD said "GLOBAL XYZ: unavailable" on a CHIM town on a disk without the world directory (MiniWind)
 - [INSPECT-ACTOR-HEALTH-ZERO-67](INSPECT-ACTOR-HEALTH-ZERO-67.md): The inspect line shows health 0.0 for every living actor: it printed the engine's own health field, which holds the player's health only
@@ -71,6 +74,7 @@ Family: Debug commands and remote control (`debug-commands`). dbg commands, tele
 - [INSPECT-OVER-VIEWPORT-42](INSPECT-OVER-VIEWPORT-42.md): Inspect mode (dbg hud) draws its hint and pinned panel on black boxes over the 3D view
 - [INSPECT-PIN-LOAD-DOOR-51](INSPECT-PIN-LOAD-DOOR-51.md): The inspect pin at an exterior load door names the building shell around it, not the door: the drawn door looks absent
 - [MAP-TELEPORT-28](MAP-TELEPORT-28.md): F10 map teleport intermittently fails
+- [MENU-TITLE-AFTER-CONSOLE-START-68](MENU-TITLE-AFTER-CONSOLE-START-68.md): After a game is started from the main menu by a console command (dbg aw hors, a typed map), Escape in play opens the title main menu over the running game, and Escape does not close it
 - [MINIWIND-CITY-COORD-TP-36](MINIWIND-CITY-COORD-TP-36.md): dbg tp X Y Z does not work inside the whole-city Vivec MiniWind: Coordinate teleport unavailable (no map on this disk holds that point)
 - [MWSCRIPT-MOVE-WAITS-FOR-CONSOLE-67](MWSCRIPT-MOVE-WAITS-FOR-CONSOLE-67.md): A script that moves the player to another place runs only after the console is closed
 - [REMOTE-CONSOLE-APPEND-31](REMOTE-CONSOLE-APPEND-31.md): Remote console log keeps only the last message

@@ -167,5 +167,15 @@ void AW_ViewOrbitPending(int photo,float rate);   /* start on the crosshair targ
 void AW_ViewOrbitEnd(int say);                    /* restores everything the orbit changed */
 void AW_ViewOrbitSpeed(float rate);
 int AW_ViewOrbitActive(void);
+/* dbg cam pan / dbg cam track (aw_cam.c, docs/CAMERA_MARKS.md "Pan" and "Track"): camera shots on the orbit's camera
+ * owner, from the view as it is now. The pan turns it about its own point by DEGREES (negative: the other way) at
+ * SPEED degrees a second; the track glides it to TO (VIEW_TURN: how far its pitch and yaw turn on the way, NULL:
+ * held) at SPEED map units a second; both hold HOLD seconds on the opening and the closing frame. 0 = not now (said
+ * why). */
+int AW_ViewPanStart(float degrees,float speed,float hold,int photo);
+int AW_ViewTrackStart(const float *to,const float *view_turn,float speed,float hold,int photo);
+/* The kind of camera move running: AW_VIEW_CAM_NONE, ORBIT, PAN or TRACK. */
+enum {AW_VIEW_CAM_NONE,AW_VIEW_CAM_ORBIT,AW_VIEW_CAM_PAN,AW_VIEW_CAM_TRACK};
+int AW_ViewCameraMove(void);
 #endif
 #endif

@@ -129,6 +129,7 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - [CHIMPORT-UNITS-NOT-SHARED-WITH-BUILD-68](CHIMPORT-UNITS-NOT-SHARED-WITH-BUILD-68.md): A build module's world stage converts again every unit a CHIMport run already made for the same cells
 - [DELIVER-RESUME-NEW-COMMIT-NO-SOURCE-68](DELIVER-RESUME-NEW-COMMIT-NO-SOURCE-68.md): A delivery resumed on an earlier finished build for a newer commit stops because that commit's source export does not exist
 - [DOOR-CHECK-KNOWN-UNKEYED-54](DOOR-CHECK-KNOWN-UNKEYED-54.md): config/door-check-known.json is in no stage key: an edit to the known list never re-runs a passed image's door check
+- [K-BACKUP-RUN-COPY-SYMLINKS-68](K-BACKUP-RUN-COPY-SYMLINKS-68.md): Archiving a superseded build run to the archive drive fails for runs that hold symbolic links
 - [MESH-TABLE-LAYER-GROWS-67](MESH-TABLE-LAYER-GROWS-67.md): A row added to an expansion layer of a measured mesh table would re-key every unit recorded with that layer's earlier rows
 - [MWAD-WALK-ORDER-35](MWAD-WALK-ORDER-35.md): Input check results depend on directory listing order
 - [READY-STAGE-REACH-BY-RULE-68](READY-STAGE-REACH-BY-RULE-68.md): A merge note stated the build stages a change re-keys from the rules, not from the planner's measured key, and a later file-list probe over-stated it

@@ -1,6 +1,6 @@
 # Look book page HELD-LIGHT-IN-HAND
 
-_Generated from tests/lookbook/pages.json with AmiWind v0.0.67._
+_Generated from tests/lookbook/pages.json with AmiWind v0.0.68-dev7._
 
 A carried light (the debug torch, the glass lantern, a candle) is held in the left hand in first and in third person.
 

@@ -86,6 +86,12 @@
       "place": "Solstheim, Rimhull (cell -21,25)",
       "class": "DOOR-USE-COLLISION-EXPANSIONS-68",
       "reason": "No standing spot at the ice cave door within 80 units above its threshold in the frame's own collision (measured on the v0.0.68-dev4 world); one of seven entrances with this door model. What fills the cave mouth is not traced yet."
+    },
+    "8420566": {
+      "id": "BM_KA_door_dark_SG",
+      "place": "Solstheim, the entrance to Stahlman's Gorge under the Mortrag Glacier (cell -27,26)",
+      "class": "DOOR-CHECK-NO-SWIM-CASE-68",
+      "reason": "The threshold lies about 2100 units under the cell's water (the original's z -2100, water at the exterior default 0): in the original the player reaches it by swimming under the ice. The check needs a standing spot within 80 units above a threshold and has no case for an entrance reached by swimming (measured on the v0.0.68-dev8 world, the first with the glacier's cells). It leaves this list when the check judges underwater doors from the water."
     }
   }
 }

@@ -17,7 +17,10 @@ const aw_layout_metrics_t aw_layout_metrics={
     48,     /* button_min */
     6,      /* bottom_margin */
     4,      /* content_gap */
-    4       /* button_edge */
+    4,      /* button_edge */
+    14,     /* plaque_margin: the original title bar's gap is the title's width + 24, scaled 12/20 (UI-WINDOW-TITLE-BAR-42) */
+    3,      /* plaque_end */
+    4       /* console_char */
 };
 #define M aw_layout_metrics
 
@@ -64,6 +67,18 @@ int AW_LayoutButtonAt(const aw_layout_t *l,int px,int py) {
         if(px>=r[0] && px<r[0]+r[2] && py>=r[1] && py<r[1]+r[3])return i;
     }
     return -1;
+}
+
+int AW_LayoutTitle(aw_layout_title_t *t,int bar_w,int game_w,int chars) {
+    int room=bar_w-2*M.plaque_end-M.plaque_margin;
+    if(room<0)room=0;
+    if(chars<0)chars=0;
+    t->room=room;
+    if(game_w>=0 && game_w<=room){t->font=AW_TITLE_GAME_FONT;t->chars=chars;t->plaque=game_w+M.plaque_margin;return t->font;}
+    if(chars*M.console_char<=room)t->font=AW_TITLE_CONSOLE;
+    else{t->font=AW_TITLE_CONSOLE_CUT;chars=room/M.console_char;}
+    t->chars=chars;t->plaque=chars*M.console_char+M.plaque_margin;
+    return t->font;
 }
 
 /* the recorder: aw_ui.c calls it for every box, button and line of text while a check records a screen */

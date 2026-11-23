@@ -22,11 +22,18 @@
 
 ## Timeline
 
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.68-dev7 (26490365) | 2026-11-22 | gate 12521 of the planning item COLLISION-ICEBERG-CLIPNODE-BUDGET-67 | The glacier cell -26,26 and its eight neighbours convert with method E, the icebergs' collision as their own method C pieces and tiles, every audit passed, and the Solstheim module builds them |
+
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-17: reported in v0.0.67-dev1
 - 2026-11-17: v0.0.67-dev1: The method to try first is the one that made Akulakhan's Chamber fit (CHIM-ROOM-CLIPNODE-BUDGET-48): one model whose collision is over what one image can address is cut into tiles of its own frame, every collision plate and face going ...
 - 2026-11-21 01:38 +0200: seen again in v0.0.68-dev2: Measured again with the ice shards collision compiled and the frame edge rule in place: the glacier cell and its eight neighbours still exceed the 32 MB memory limit, by 0.25 to 10.4 MB at their peaks; the ice shard copies are about half ...
+- 2026-11-22: fixed in source: a gated commit, v0.0.68-dev7 (26490365); gate 12521 of the planning item COLLISION-ICEBERG-CLIPNODE-BUDGET-67: The glacier cell -26,26 and its eight neighbours convert with method E, the icebergs' collision as their own method C pieces and tiles, every audit passed, and the Solstheim module builds them
 
 <!-- END GENERATED TIMELINE -->
 

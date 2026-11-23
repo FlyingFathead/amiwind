@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "aw_halloween.h"
+#include "aw_ease.h"        /* the camera moves' one easing curve (dbg cam pan and track use it too) */
 /* mathlib.c's FPU-safe forms: libm's sin, cos and atan2 reach instructions a 68040 does not implement */
 float Q_SinRad(float radians);
 float Q_CosRad(float radians);
@@ -223,7 +224,7 @@ int AW_HalloweenShot(float seconds,float beat,int locked,float *u) {
     t=(seconds-(float)n*span)/span;
     if(t<0)t=0;
     if(t>1)t=1;
-    *u=t*t*(3-2*t);                         /* eased: slow in, slow out, never a jump inside a shot */
+    *u=AW_EaseSmooth(t);                    /* eased: slow in, slow out, never a jump inside a shot */
     return (int)(n%AW_HW_SHOTS);
 }
 /* The eye DIST from SUBJECT, turned YAW degrees from straight in front (the cast faces back along FORWARD) and raised

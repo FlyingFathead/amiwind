@@ -10,6 +10,9 @@ aw_character_t aw_character;
 viddef_t vid;refdef_t r_refdef;keydest_t key_dest;double realtime;double host_frametime=.02;
 client_static_t cls;server_t sv;server_static_t svs;int scr_copyeverything;
 byte pal[768],glyphs[16384],frame[64004];byte *host_basepal=pal,*draw_chars=glyphs;
+int AW_UIColorUsable(int i);   /* aw_ui.c, declared there and by its callers (MENU-PALETTE-RED-CAST-68) */
+const char *AW_UIGameText(const char *key,const char *fallback,char *out,int size);   /* aw_ui.c (PAUSE-MENU-CONTINUE-CONFIRM-68) */
+void AW_UIGameTexts(const char *const keys[],const char *const fallbacks[],char *out,int stride,int count);
 static char *directory;
 static int hud_tracking,hud_allocations,file_reads;
 void *__real_malloc(size_t size);
@@ -122,6 +125,44 @@ int main(int argc,char **argv){
  sprintf(path,"%s/gfx/magic14.awf",directory);f=fopen(path,"wb");assert(f);assert(fwrite(raw,1,sizeof(raw),f)==sizeof(raw));fclose(f);
  raw[4]=12;raw[5]=14;
  sprintf(path,"%s/gfx/book12.awf",directory);f=fopen(path,"wb");assert(f);assert(fwrite(raw,1,sizeof(raw),f)==sizeof(raw));fclose(f);
+ /* MENU-PALETTE-RED-CAST-68: the UI's colour picks skip the textures' ice ramp while the palette holds it: white asks
+  * for 255,255,255 and gets the scene palette's cream at 254, not the ramp's cool white at 104 (v0.0.68-dev7 drew the
+  * inventory's burden and armour lines there); a book's grey keeps its warm grey, not the ramp's grey at 189. An entry
+  * whose colour is not the ramp's is picked as before; the console's background colour skips the same entries. */
+ {
+  byte saved[768];
+  memcpy(saved,pal,sizeof(saved));memset(pal,0,sizeof(pal));
+  pal[254*3]=238;pal[254*3+1]=221;pal[254*3+2]=170;   /* the cream entry (tools/prepare_quake.py scene_palette) */
+  pal[104*3]=228;pal[104*3+1]=230;pal[104*3+2]=235;   /* the ramp's cool white (config/scene-palette-ramp.json) */
+  pal[189*3]=166;pal[189*3+1]=172;pal[189*3+2]=179;   /* the ramp's grey */
+  pal[2*3]=189;pal[2*3+1]=178;pal[2*3+2]=153;         /* the warm grey a book's grey ink took before the ramp */
+  assert(AW_UIColor(255,255,255)==254 && AW_UIColor(170,170,170)==2);
+  assert(!AW_UIColorUsable(104) && !AW_UIColorUsable(189) && AW_UIColorUsable(254) && AW_UIColorUsable(2));
+  pal[104*3+2]=234;                                   /* no longer the ramp's colour there: picked as any entry */
+  assert(AW_UIColor(255,255,255)==104 && AW_UIColorUsable(104) && !AW_UIColorUsable(189));
+  memcpy(pal,saved,sizeof(saved));assert(AW_UIColorUsable(104) && AW_UIColorUsable(189));
+ }
+ /* PAUSE-MENU-CONTINUE-CONFIRM-68: the game's own texts from view/settings.txt ('NAME VALUE' lines, a newline written as
+  * \n, as tools/prepare_player_view.py writes them): no file or no line gives the fallback, an empty value too; a key is
+  * matched whole, never as a prefix of a longer one; a long text is cut at the buffer. */
+ {
+  char out[96],small[8];
+  assert(!strcmp(AW_UIGameText("sMessage5","the fallback",out,sizeof(out)),"the fallback"));   /* no file yet */
+  sprintf(path,"%s/view",directory);assert(!mkdir(path,0700));
+  sprintf(path,"%s/view/settings.txt",directory);f=fopen(path,"wb");assert(f);
+  fputs("AWVS1\nfVanityDelay 30\nsMessage5 Quit your game?\\nUnsaved progress is lost.\nsYes Ja\nsNo \n",f);fclose(f);
+  assert(!strcmp(AW_UIGameText("sMessage5","x",out,sizeof(out)),"Quit your game?\nUnsaved progress is lost."));
+  assert(!strcmp(AW_UIGameText("sYes","Yes",out,sizeof(out)),"Ja"));
+  assert(!strcmp(AW_UIGameText("sNo","No",out,sizeof(out)),"No"));
+  assert(!strcmp(AW_UIGameText("sMessage","none",out,sizeof(out)),"none"));
+  assert(!strcmp(AW_UIGameText("sMessage5","x",small,sizeof(small)),"Quit yo"));
+  {   /* the same for a menu's set of keys, in one pass over the file */
+   static const char *const keys[3]={"sYes","sNo","sMessage5"},*const words[3]={"Yes","No","fallback"};
+   char outs[3][48];
+   AW_UIGameTexts(keys,words,outs[0],(int)sizeof(outs[0]),3);
+   assert(!strcmp(outs[0],"Ja") && !strcmp(outs[1],"No") && !strcmp(outs[2],"Quit your game?\nUnsaved progress is lost."));
+  }
+ }
  for(i=0;i<256;i++)pal[i*3]=pal[i*3+1]=pal[i*3+2]=i;
  memset(frame,137,sizeof(frame));vid.width=320;vid.height=200;vid.rowbytes=320;vid.buffer=frame+2;
  AW_UIInit();AW_UIBox(-12,-12,80,80);AW_UIBox(300,190,80,80);

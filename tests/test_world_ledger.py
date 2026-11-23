@@ -147,7 +147,8 @@ class ActorStateWiringTests(unittest.TestCase):
         self.assertIn('if (IsActor (e) && AW_CombatSlotState (e, NULL) != 0)', body(actors, 'static void Tick (void)'))
         self.assertIn('c->fight = state == 1;', body(actors, 'static void Capture (edict_t *e, change_t *c)'))
         # coming back: the row's fight is taken up again with the health it had
-        self.assertIn('else if (c->fight && AW_CombatTestEngage (e, 0))', body(actors, 'static void ApplyLoaded (void)\n{'))
+        # (FightResume: against the one its order names, COMBAT-RESUMED-FIGHT-TARGETS-PLAYER-68)
+        self.assertIn('else if (c->fight && FightResume (e))', body(actors, 'static void ApplyLoaded (void)\n{'))
         # never through the door: the followers handed to the door are AIFollow ones, a fighting one is left
         followers = body(code('aw_ambient.c'), 'int AW_AmbientFollowersOf(edict_t *p,edict_t **out,int max) {')
         self.assertIn('(s->travel!=3 && s->travel!=4)', followers)

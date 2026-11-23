@@ -102,6 +102,9 @@ ROUTE_ALIASES = {('aw_inventory', 'additem'): 'give', ('aw_inventory', 'give coi
 OWN_ROUTES |= {('aw_levelup', 'setlvl'), ('aw_levelup', 'restorestats'), ('aw_levelup', 'maxstats')}
 ROUTE_ALIASES.update({('aw_levelup', 'setlevel'): 'setlvl', ('aw_levelup', 'restore stats'): 'restorestats',
                       ('aw_levelup', 'stats restore'): 'restorestats', ('aw_levelup', 'maxstat'): 'maxstats'})
+# the camera shots of the camera marks command (DBG-CAM-PAN-TRACK-68): commands of their own; dbg pan cam on the pan's row
+OWN_ROUTES |= {('aw_cam', 'cam pan'), ('aw_cam', 'cam track')}
+ROUTE_ALIASES[('aw_cam', 'pan cam')] = 'cam pan'
 
 
 def render(text, stamp=None):

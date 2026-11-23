@@ -163,6 +163,12 @@ static cvar_t animate_item_pickups={"aw_animate_item_pickups","1",true};
  * per-frame slide) and nothing outside its own rectangle drawn, so the stat bars beside it stay visible. The HUD
  * (AW_UIHud) repaints the strip every frame, so the box leaves no pixels behind when it goes. */
 static cvar_t text_box_type={"aw_text_box_type","2",true};
+/* PAUSE-MENU-CONTINUE-CONFIRM-68 (the maintainer, 22 November 2026: the screen Escape opens in play should say that the
+ * game is paused): 1 (the default) writes "Paused" in the game's font where the title menu has the AmiWind logo, on the
+ * menu opened in play; 0 draws the logo there as the title menu does (the original game shows no such caption). Saved. */
+static cvar_t paused_caption={"aw_menu_paused_caption","1",true};
+int AW_UIPausedCaption(void);
+int AW_UIPausedCaption(void){return paused_caption.value!=0;}
 int AW_UITextBoxType(void){return text_box_type.value==1?1:2;}
 void AW_UITextBoxTypeSet(int type){Cvar_SetValue(text_box_type.name,type==1?1:2);scr_copyeverything=1;}
 static unsigned subtitle_revision;
@@ -183,9 +189,80 @@ int AW_UIValidateFont(const byte *p,int n) {
     }
     return 1;
 }
+/* MENU-PALETTE-RED-CAST-68: the scene palette's cool ice and snow ramp (config/scene-palette-ramp.json; tools/prepare_quake.py
+ * scene_palette writes it over 16 near-duplicate warm entries) is for the textures. The UI's own colour picks skip it, so
+ * the menus, the HUD and the console keep the colours they had before the ramp: white text stays the cream of entry 254
+ * (238,221,170), not the ramp's cool white of entry 104. An entry is skipped only while the live palette holds the ramp's
+ * colour there; any other palette skips nothing. tests/test_prepare_quake_palette.py keeps this table equal to the
+ * config file. The mask is rebuilt only when the 48 bytes it reads change (one small compare a pick). */
+static const byte ice_ramp[16][4]={
+    {104,228,230,235},{97,205,208,209},{101,186,189,193},{189,166,172,179},{80,151,156,159},{90,141,142,145},
+    {137,119,133,145},{111,128,129,130},{153,116,116,118},{78,104,117,128},{136,104,105,106},{175,89,101,110},
+    {172,93,93,95},{107,79,85,92},{108,65,74,82},{154,52,60,67}};
+static byte ramp_skip[256],ramp_seen[48];static const byte *ramp_palette;
+static void ramp_refresh(void) {
+    byte now[48];int k;
+    if(!host_basepal){ramp_palette=NULL;memset(ramp_skip,0,sizeof(ramp_skip));return;}
+    for(k=0;k<16;k++)memcpy(now+k*3,host_basepal+ice_ramp[k][0]*3,3);
+    if(ramp_palette==host_basepal && !memcmp(now,ramp_seen,sizeof(now)))return;
+    ramp_palette=host_basepal;memcpy(ramp_seen,now,sizeof(now));memset(ramp_skip,0,sizeof(ramp_skip));
+    for(k=0;k<16;k++)if(!memcmp(now+k*3,ice_ramp[k]+1,3))ramp_skip[ice_ramp[k][0]]=1;
+}
+/* 1 when the UI may pick palette entry I (aw_console.c's background colour asks it too; declared here and by its caller,
+ * not in a header a CHIM stage keys) */
+int AW_UIColorUsable(int i);
+int AW_UIColorUsable(int i){ramp_refresh();return i>=0 && i<256 && !ramp_skip[i];}
+/* PAUSE-MENU-CONTINUE-CONFIRM-68: the game's own text of the game setting KEY (a GMST of the owned master) as
+ * tools/prepare_player_view.py writes it into view/settings.txt ('NAME VALUE' lines, a newline written as \n), read
+ * from disk when asked (a menu opening or a confirmation, never a frame); FALLBACK, the original's English, when the
+ * image has no such line. Copied into OUT (SIZE bytes, cut there); returns OUT. Declared here and by its callers. */
+const char *AW_UIGameText(const char *key,const char *fallback,char *out,int size);
+const char *AW_UIGameText(const char *key,const char *fallback,char *out,int size) {
+    FILE *f=NULL;char line[256];const char *src=fallback?fallback:"";size_t n=strlen(key);int i=0;
+    if(!out || size<=0)return out;
+    if(COM_FOpenFile("view/settings.txt",&f)>=0 && f){
+        while(fgets(line,sizeof(line),f)){
+            line[strcspn(line,"\r\n")]=0;
+            if(!strncmp(line,key,n) && line[n]==' ' && line[n+1]){src=line+n+1;break;}
+        }
+        fclose(f);
+    }
+    for(;*src && i<size-1;src++){
+        if(src[0]=='\\' && src[1]=='n'){out[i++]='\n';src++;}
+        else out[i++]=*src;
+    }
+    out[i]=0;
+    return out;
+}
+/* The same for COUNT keys in ONE pass over the file (a menu's labels and questions: one file open, not one a key):
+ * KEYS[k] into OUT + k*STRIDE (STRIDE bytes each), FALLBACKS[k] where the file has no line for it. */
+void AW_UIGameTexts(const char *const keys[],const char *const fallbacks[],char *out,int stride,int count);
+static void game_text_copy(char *out,int size,const char *src) {
+    int i=0;
+    for(;*src && i<size-1;src++){
+        if(src[0]=='\\' && src[1]=='n'){out[i++]='\n';src++;}
+        else out[i++]=*src;
+    }
+    out[i]=0;
+}
+void AW_UIGameTexts(const char *const keys[],const char *const fallbacks[],char *out,int stride,int count) {
+    FILE *f=NULL;char line[256];int k;size_t n;
+    if(!out || stride<=0 || count<=0)return;
+    for(k=0;k<count;k++)game_text_copy(out+k*stride,stride,fallbacks && fallbacks[k]?fallbacks[k]:"");
+    if(COM_FOpenFile("view/settings.txt",&f)<0 || !f)return;
+    while(fgets(line,sizeof(line),f)){
+        line[strcspn(line,"\r\n")]=0;
+        for(k=0;k<count;k++){
+            n=strlen(keys[k]);
+            if(!strncmp(line,keys[k],n) && line[n]==' ' && line[n+1]){game_text_copy(out+k*stride,stride,line+n+1);break;}
+        }
+    }
+    fclose(f);
+}
 int AW_UIColor(int r,int g,int b) {
     int i,best=0,distance=2147483647,dr,dg,db,d;
-    for(i=0;i<256;i++){dr=host_basepal[i*3]-r;dg=host_basepal[i*3+1]-g;db=host_basepal[i*3+2]-b;
+    ramp_refresh();
+    for(i=0;i<256;i++){if(ramp_skip[i])continue;dr=host_basepal[i*3]-r;dg=host_basepal[i*3+1]-g;db=host_basepal[i*3+2]-b;
         d=dr*dr+dg*dg+db*db;if(d<distance){distance=d;best=i;}}
     return best;
 }
@@ -1169,6 +1246,17 @@ void AW_UIDraw(void) {
 }
 
 static void preview(void){AW_UISubtitle("AmiWind","Proportional text, original borders and three ink shades. The console keeps its own font.",12);}
+/* MENU-PALETTE-RED-CAST-68: aw_ui_palette (dbg ui palette), the palette the screen is drawn through now, as
+ * AW_UIMenuPalette picks it for view.c V_UpdatePalette: the game's (with its colour shifts), the game's unshifted (the
+ * death prompt, a region's loading), the title art's own (gfx/menu.awb: the title menu only), a loading art's own, or
+ * black (a blank loading); and the screen it is read on (the open window as the remote state file names it, else menu,
+ * game or console). The look book's MENU-COLOURS-GAME-PALETTE page reads it with each menu of a game open. */
+static void palette_command(void){
+    byte *p=AW_UIMenuPalette();
+    Con_Printf("UI palette: %s; screen: %s\n",!p?"game palette":p==host_basepal?"game palette (unshifted)":
+        p==background+8?"title art palette (gfx/menu.awb)":p==loading_background+8?"loading art palette":"black palette (blank loading)",
+        AW_WorldUIActive()?AW_WorldUIName():key_dest==key_menu?"menu":key_dest==key_game?"game":"console");
+}
 void AW_UIInit(void) {
     Cvar_RegisterVariable(&ui_readable);Cvar_RegisterVariable(&ui_font);Cvar_RegisterVariable(&ui_hud);Cvar_RegisterVariable(&ui_frame);
     Cvar_RegisterVariable(&modal_freeze);Cvar_RegisterVariable(&modal_black);Cvar_RegisterVariable(&ui_mode);
@@ -1180,10 +1268,12 @@ void AW_UIInit(void) {
     Cvar_RegisterVariable(&voice_style);
     Cvar_RegisterVariable(&animate_item_pickups);
     Cvar_RegisterVariable(&text_box_type);
+    Cvar_RegisterVariable(&paused_caption);   /* PAUSE-MENU-CONTINUE-CONFIRM-68 */
     Cvar_RegisterVariable(&button_frame);   /* UI-OK-BUTTON-THIN-FRAME-67 */
     Cvar_RegisterVariable(&pickup_message);   /* PICKUP-NAME-ONLY-BOX-67 */
     Cmd_AddCommand("aw_text_box",text_box_command);
     Cvar_RegisterVariable(&cursor_type);
     Cmd_AddCommand("aw_dialogue_method",dialogue_command);Cmd_AddCommand("aw_dialogue_layout",layout_command);
     Cmd_AddCommand("aw_ui_ink",ink_command);Cmd_AddCommand("aw_ui_select",font_command);Cmd_AddCommand("aw_ui_preview",preview);
+    Cmd_AddCommand("aw_ui_palette",palette_command);   /* MENU-PALETTE-RED-CAST-68 */
 }

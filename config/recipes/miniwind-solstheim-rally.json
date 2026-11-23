@@ -1,0 +1,19 @@
+{
+  "schema": "build-recipe-1",
+  "name": "miniwind-solstheim-rally",
+  "description": "TEST ONLY. As miniwind-solstheim, with the rally-game trees beside the original ones in one store (--chim-sol-tree-copies rally-switch, SOLSTHEIM-TREES-THREE-LOD-68): the original trees, and the four rally methods of config/tree-copies.json as their alternative models, picked in game by aw_tree_crowns (0 original; 2 silhouette pictures + original trunk, 3 slice pictures + original trunk, 4 silhouette + prism trunk, 5 slice + prism trunk; from the console, at the next map load); load the frame with map sl0000.",
+  "options": {
+    "miniwind": true,
+    "miniwind_scope": "exterior",
+    "miniwind_description": "Solstheim trees, original and rally-game: Bloodmoon cell -23,20 (map sl0000)",
+    "direct_to_game_map": "balmora",
+    "exclude_unreferenced": "voice,npcs",
+    "chim_frame_ext": "chim",
+    "chim_sol_test": "-23,20:l",
+    "chim_sol_tree_copies": "rally-switch"
+  },
+  "inputs": [],
+  "written_with": null,
+  "checked_with": null,
+  "status": "unverified"
+}

@@ -1,6 +1,6 @@
 # MWScript features
 
-_Last updated with AmiWind v0.0.68-dev7 (22 November 2026)._
+_Last updated with AmiWind v0.0.68-dev8 (22 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -18,6 +18,7 @@ _Last updated with AmiWind v0.0.68-dev7 (22 November 2026)._
 - [Follows OpenMW's fix](#follows-openmws-fix)
 - [By area](#by-area)
 - [By function](#by-function)
+  - [Effect in play](#effect-in-play)
 - [Every script](#every-script)
   - [Morrowind](#morrowind)
   - [Tribunal](#tribunal)
@@ -68,7 +69,7 @@ Dialogue answers that start or change a fight (StartCombat, SetFight, ModFight):
 
 Measured on 22 November 2026 from the three masters (Morrowind, Tribunal, Bloodmoon) with the builder's own compiler (tools/mwscript), 11,171 placed scripted references, 11,542 bindings in the compiled file, 4 start scripts. The states are worked out again from the interpreter's function table (tools/mwscript/functions.py) whenever the page is rendered, so a function carried out later moves its scripts without a new measurement.
 
-The image measured: build v0.0.68-dev6. Its scripts stage bound the own placements of Tribunal, Bloodmoon; the image carries 5 outdoor districts, 1,321 rooms of the interior store and 135 add-on exterior cells, and 2,443 of the 2,447 add-on bindings in the file sit in those cells (Tribunal 1,227, Bloodmoon 1,216). A script placed only in add-on cells outside them is "only in an add-on world".
+The image measured: build v0.0.68-dev7. Its scripts stage bound the own placements of Tribunal, Bloodmoon; the image carries 5 outdoor districts, 1,321 rooms of the interior store and 135 add-on exterior cells, and 2,443 of the 2,447 add-on bindings in the file sit in those cells (Tribunal 1,227, Bloodmoon 1,216). A script placed only in add-on cells outside them is "only in an add-on world".
 
 ## Why the others do not run
 
@@ -242,271 +243,381 @@ The area of a script is where most of its placed references stand: the region fo
 
 ## By function
 
-Every function the game's scripts call. Scripts: the script records that call it; In conditions: of those, the ones whose if or while tests read it; Missing in: the scripts where the call is not carried out; Only gap: the scripts it alone keeps from running whole; Dialogue: the result scripts that call it, and of those the ones where the call is not carried out. Carried out "host" means the engine carries the call out through the import route; "in part" means some of its calls are carried out (the player's PositionCell to a known room, a Cast of a cure) and the others are not.
+Every function the game's scripts call. Scripts: the script records that call it; In conditions: of those, the ones whose if or while tests read it; Missing in: the scripts where the call is not carried out; Only gap: the scripts it alone keeps from running whole; Dialogue: the result scripts that call it, and of those the ones where the call is not carried out. Carried out "host" means the engine carries the call out through the import route; "in part" means some of its calls are carried out (the player's PositionCell to a known room, a Cast of a cure) and the others are not. Effect in play: whether what the engine does for the call is the original's effect, in full, in part or none (the list under the table says what is missing).
 
-| Function | Group | Carried out | Scripts | Uses | In conditions | Missing in | Only gap | Dialogue | Dialogue missing |
-| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| cast | spells | host, in part | 53 | 126 | 0 | 1 | 1 | 5 | 0 |
-| getjournalindex | journal | yes | 547 | 1371 | 535 | 0 | 0 | 0 | 0 |
-| disable | world | yes | 390 | 832 | 0 | 0 | 0 | 52 | 0 |
-| journal | journal | yes | 378 | 610 | 0 | 0 | 0 | 3091 | 0 |
-| enable | world | yes | 299 | 500 | 0 | 0 | 0 | 111 | 0 |
-| menumode | core | yes | 289 | 297 | 289 | 0 | 0 | 0 | 0 |
-| onactivate | world | yes | 258 | 280 | 257 | 0 | 0 | 0 | 0 |
-| getdisabled | world | yes | 225 | 434 | 225 | 0 | 0 | 0 | 0 |
-| ondeath | combat | yes | 221 | 245 | 216 | 0 | 0 | 0 | 0 |
-| cellchanged | core | yes | 201 | 208 | 201 | 0 | 0 | 0 | 0 |
-| getdistance | core | yes | 194 | 301 | 183 | 0 | 0 | 0 | 0 |
-| messagebox | ui | yes | 172 | 413 | 0 | 0 | 0 | 11 | 0 |
-| getsecondspassed | core | yes | 169 | 237 | 0 | 0 | 0 | 0 | 0 |
-| stopscript | core | yes | 124 | 143 | 0 | 0 | 0 | 2 | 0 |
-| getitemcount | inventory | yes | 120 | 241 | 118 | 0 | 0 | 0 | 0 |
-| activate | world | yes | 118 | 146 | 0 | 0 | 0 | 0 | 0 |
-| startcombat | combat | yes | 106 | 205 | 0 | 0 | 0 | 138 | 0 |
-| getdeadcount | stats | yes | 105 | 247 | 102 | 0 | 0 | 0 | 0 |
-| forcegreeting | dialogue | host | 98 | 134 | 0 | 0 | 0 | 25 | 0 |
-| removeitem | inventory | yes | 81 | 239 | 0 | 0 | 0 | 782 | 0 |
-| say | audio | yes | 79 | 182 | 0 | 0 | 0 | 0 | 0 |
-| additem | inventory | yes | 77 | 157 | 0 | 0 | 0 | 1135 | 0 |
-| getpccell | cell | yes | 77 | 139 | 77 | 0 | 0 | 0 | 0 |
-| aiwander | ai | yes | 73 | 130 | 0 | 0 | 0 | 101 | 0 |
-| setfight | ai | yes | 73 | 234 | 0 | 0 | 0 | 173 | 0 |
-| gethealth | stats | yes | 69 | 94 | 63 | 0 | 0 | 0 | 0 |
-| playsound | audio | yes | 62 | 108 | 0 | 0 | 0 | 3 | 0 |
-| positioncell | position | host | 57 | 96 | 0 | 0 | 0 | 14 | 0 |
-| addspell | spells | yes | 52 | 175 | 0 | 0 | 0 | 50 | 0 |
-| getbuttonpressed | ui | yes | 48 | 76 | 1 | 0 | 0 | 0 | 0 |
-| getcurrentaipackage | ai | yes | 48 | 51 | 48 | 0 | 0 | 0 | 0 |
-| getsoundplaying | audio | yes | 40 | 48 | 40 | 0 | 0 | 0 | 0 |
-| stopcombat | combat | yes | 40 | 119 | 0 | 0 | 0 | 8 | 0 |
-| playloopsound3dvp | audio | yes | 39 | 41 | 0 | 0 | 0 | 0 | 0 |
-| getcommondisease | spells | yes | 37 | 37 | 37 | 0 | 0 | 0 | 0 |
-| getpos | position | yes | 37 | 127 | 2 | 0 | 0 | 0 | 0 |
-| getaipackagedone | ai | yes | 35 | 99 | 35 | 0 | 0 | 0 | 0 |
-| sethealth | stats | yes | 33 | 56 | 0 | 0 | 0 | 3 | 0 |
-| sethello | ai | yes | 30 | 75 | 0 | 0 | 0 | 5 | 0 |
-| playgroup | anim | host | 29 | 84 | 0 | 0 | 0 | 0 | 0 |
-| getblightdisease | spells | yes | 28 | 67 | 28 | 0 | 0 | 0 | 0 |
-| startscript | core | yes | 28 | 51 | 0 | 0 | 0 | 140 | 0 |
-| getpcrank | stats | host | 26 | 43 | 23 | 0 | 0 | 0 | 0 |
-| dontsaveobject | world | yes | 25 | 25 | 0 | 0 | 0 | 0 | 0 |
-| aitravel | ai | host | 24 | 89 | 0 | 0 | 0 | 5 | 0 |
-| placeitem | position | host | 24 | 37 | 0 | 0 | 0 | 0 | 0 |
-| saydone | audio | yes | 24 | 79 | 24 | 0 | 0 | 0 | 0 |
-| getpccrimelevel | stats | host | 23 | 45 | 0 | 0 | 0 | 2 | 0 |
-| random | core | yes | 22 | 27 | 2 | 0 | 0 | 0 | 0 |
-| geteffect | spells | host | 21 | 32 | 21 | 0 | 0 | 0 | 0 |
-| rotate | position | host | 21 | 51 | 0 | 0 | 0 | 0 | 0 |
-| addtopic | dialogue | host | 20 | 105 | 0 | 0 | 0 | 86 | 0 |
-| becomewerewolf | stats | host | 18 | 22 | 0 | 0 | 0 | 0 | 0 |
-| getspell | spells | yes | 18 | 52 | 17 | 0 | 0 | 0 | 0 |
-| lock | world | yes | 18 | 18 | 0 | 0 | 0 | 1 | 0 |
-| aifollow | ai | host | 17 | 21 | 0 | 0 | 0 | 85 | 0 |
-| removespell | spells | yes | 17 | 82 | 0 | 0 | 0 | 8 | 0 |
-| unlock | world | yes | 17 | 17 | 0 | 0 | 0 | 0 | 0 |
-| modhealth | stats | yes | 16 | 27 | 0 | 0 | 0 | 0 | 0 |
-| setdisposition | dialogue | yes | 16 | 38 | 0 | 0 | 0 | 65 | 0 |
-| disableplayercontrols | control | host | 15 | 19 | 0 | 0 | 0 | 0 | 0 |
-| getangle | position | host | 15 | 17 | 0 | 0 | 0 | 0 | 0 |
-| gettarget | ai | host | 15 | 36 | 15 | 0 | 0 | 0 | 0 |
-| placeatpc | position | host | 15 | 30 | 0 | 0 | 0 | 7 | 0 |
-| enableplayercontrols | control | host | 14 | 20 | 0 | 0 | 0 | 0 | 0 |
-| iswerewolf | stats | host | 14 | 23 | 14 | 0 | 0 | 0 | 0 |
-| playsound3d | audio | yes | 14 | 15 | 0 | 0 | 0 | 0 | 0 |
-| position | position | host | 14 | 23 | 0 | 0 | 0 | 0 | 0 |
-| getstandingpc | world | host | 13 | 13 | 12 | 0 | 0 | 0 | 0 |
-| modreputation | dialogue | host | 12 | 15 | 0 | 0 | 0 | 175 | 0 |
-| getpcsleep | stats | host | 11 | 13 | 11 | 0 | 0 | 0 | 0 |
-| getdetected | ai | host | 10 | 13 | 10 | 0 | 0 | 0 | 0 |
-| playbink | ui | host | 10 | 50 | 0 | 0 | 0 | 0 | 0 |
-| resurrect | stats | host | 10 | 16 | 0 | 0 | 0 | 0 | 0 |
-| setdelete | world | host | 10 | 10 | 0 | 0 | 0 | 0 | 0 |
-| xbox | core | yes | 10 | 13 | 10 | 0 | 0 | 0 | 0 |
-| getwaterlevel | cell | host | 9 | 10 | 4 | 0 | 0 | 0 | 0 |
-| modcurrenthealth | stats | yes | 9 | 12 | 0 | 0 | 0 | 0 | 0 |
-| moddisposition | dialogue | yes | 9 | 10 | 0 | 0 | 0 | 1219 | 0 |
-| setpos | position | host | 8 | 12 | 0 | 0 | 0 | 0 | 0 |
-| wakeuppc | stats | host | 8 | 23 | 0 | 0 | 0 | 0 | 0 |
-| fadein | ui | host | 7 | 10 | 0 | 0 | 0 | 0 | 0 |
-| fadeout | ui | host | 7 | 10 | 0 | 0 | 0 | 0 | 0 |
-| modrestoration | stats | yes | 7 | 7 | 0 | 0 | 0 | 0 | 0 |
-| setangle | position | host | 7 | 16 | 0 | 0 | 0 | 0 | 0 |
-| modfatigue | stats | yes | 6 | 9 | 0 | 0 | 0 | 0 | 0 |
-| modresistfire | spells | host | 6 | 6 | 0 | 0 | 0 | 0 | 0 |
-| modresistfrost | spells | host | 6 | 6 | 0 | 0 | 0 | 0 | 0 |
-| modresistmagicka | spells | host | 6 | 6 | 0 | 0 | 0 | 0 | 0 |
-| modresistparalysis | spells | host | 6 | 12 | 0 | 0 | 0 | 0 | 0 |
-| modresistpoison | spells | host | 6 | 12 | 0 | 0 | 0 | 0 | 0 |
-| setatstart | position | host | 6 | 6 | 0 | 0 | 0 | 0 | 0 |
-| setscale | position | host | 6 | 12 | 0 | 0 | 0 | 0 | 0 |
-| stopsound | audio | yes | 6 | 9 | 0 | 0 | 0 | 0 | 0 |
-| changeweather | sky | host | 5 | 12 | 0 | 0 | 0 | 0 | 0 |
-| enableplayerfighting | control | host | 5 | 5 | 0 | 0 | 0 | 0 | 0 |
-| enableplayermagic | control | host | 5 | 5 | 0 | 0 | 0 | 0 | 0 |
-| explodespell | spells | host | 5 | 5 | 0 | 0 | 0 | 0 | 0 |
-| getattacked | combat | host | 5 | 5 | 5 | 0 | 0 | 0 | 0 |
-| getfatigue | stats | yes | 5 | 8 | 2 | 0 | 0 | 0 | 0 |
-| loopgroup | anim | host | 5 | 5 | 0 | 0 | 0 | 0 | 0 |
-| move | position | host | 5 | 5 | 0 | 0 | 0 | 0 | 0 |
-| moveworld | position | host | 5 | 7 | 0 | 0 | 0 | 0 | 0 |
-| onknockout | combat | host | 5 | 5 | 5 | 0 | 0 | 0 | 0 |
-| onmurder | combat | host | 5 | 5 | 5 | 0 | 0 | 0 | 0 |
-| pcraiserank | stats | host | 5 | 9 | 0 | 0 | 0 | 55 | 0 |
-| playloopsound3d | audio | yes | 5 | 7 | 0 | 0 | 0 | 0 | 0 |
-| setfatigue | stats | yes | 5 | 6 | 0 | 0 | 0 | 1 | 0 |
-| setflee | ai | yes | 5 | 10 | 0 | 0 | 0 | 0 | 0 |
-| undowerewolf | stats | host | 5 | 7 | 0 | 0 | 0 | 0 | 0 |
-| aiescort | ai | host | 4 | 5 | 0 | 0 | 0 | 0 | 0 |
-| clearforcesneak | control | host | 4 | 19 | 0 | 0 | 0 | 4 | 0 |
-| enableteleporting | control | host | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
-| forcesneak | control | host | 4 | 12 | 0 | 0 | 0 | 0 | 0 |
-| getlocked | world | yes | 4 | 4 | 4 | 0 | 0 | 0 | 0 |
-| hassoulgem | inventory | host | 4 | 85 | 4 | 0 | 0 | 0 | 0 |
-| modregion | sky | host | 4 | 12 | 0 | 0 | 0 | 0 | 0 |
-| modspeed | stats | yes | 4 | 7 | 0 | 0 | 0 | 0 | 0 |
-| modstrength | stats | yes | 4 | 7 | 0 | 0 | 0 | 2 | 0 |
-| playsound3dvp | audio | yes | 4 | 6 | 0 | 0 | 0 | 0 | 0 |
-| setalarm | ai | yes | 4 | 7 | 0 | 0 | 0 | 2 | 0 |
-| showrestmenu | ui | host | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
-| disableteleporting | control | host | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
-| drop | inventory | host | 3 | 6 | 0 | 0 | 0 | 0 | 0 |
-| enableinventorymenu | ui | host | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
-| enablemagicmenu | ui | host | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
-| enablemapmenu | ui | host | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
-| enablestatsmenu | ui | host | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
-| getlevel | stats | yes | 3 | 10 | 3 | 0 | 0 | 0 | 0 |
-| getrace | stats | host | 3 | 22 | 3 | 0 | 0 | 0 | 0 |
-| getspelleffects | spells | host | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
-| getweapondrawn | combat | host | 3 | 5 | 3 | 0 | 0 | 0 | 0 |
-| getwerewolfkills | stats | host | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
-| hurtcollidingactor | combat | host | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
-| modwillpower | stats | yes | 3 | 5 | 0 | 0 | 0 | 0 | 0 |
-| setmagicka | stats | yes | 3 | 4 | 0 | 0 | 0 | 0 | 0 |
-| setmarksman | stats | yes | 3 | 4 | 0 | 0 | 0 | 0 | 0 |
-| setwaterlevel | world | host | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
-| setwerewolfacrobatics | stats | host | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
-| disablelevitation | control | host | 2 | 3 | 0 | 0 | 0 | 0 | 0 |
-| enablelevitation | control | host | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
-| getcollidingpc | world | host | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| getinterior | cell | host | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| getlos | ai | host | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| getpcinjail | stats | host | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| getpcsneaking | control | host | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| getpctraveling | stats | host | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| getsecurity | stats | yes | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| getsneak | stats | yes | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
-| getstrength | stats | yes | 2 | 2 | 1 | 0 | 0 | 0 | 0 |
-| hasitemequipped | inventory | host | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
-| hitonme | combat | host | 2 | 3 | 0 | 0 | 0 | 0 | 0 |
-| hurtstandingactor | combat | host | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
-| modagility | stats | yes | 2 | 3 | 0 | 0 | 0 | 0 | 0 |
-| modblock | stats | yes | 2 | 3 | 0 | 0 | 0 | 0 | 0 |
-| modcurrentfatigue | stats | yes | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
-| modendurance | stats | yes | 2 | 3 | 0 | 0 | 0 | 0 | 0 |
-| modmagicka | stats | yes | 2 | 3 | 0 | 0 | 0 | 0 | 0 |
-| modmediumarmor | stats | yes | 2 | 3 | 0 | 0 | 0 | 0 | 0 |
-| modpcfacrep | stats | host | 2 | 3 | 0 | 0 | 0 | 482 | 0 |
-| placeatme | position | host | 2 | 6 | 0 | 0 | 0 | 0 | 0 |
-| removesoulgem | inventory | host | 2 | 42 | 0 | 0 | 0 | 0 | 0 |
-| setagility | stats | yes | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
-| setathletics | stats | yes | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
-| setblock | stats | yes | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
-| setlongblade | stats | yes | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
-| setpccrimelevel | stats | host | 2 | 3 | 0 | 0 | 0 | 34 | 0 |
-| setrestoration | stats | yes | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
-| setspeed | stats | yes | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
-| setstrength | stats | yes | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
-| setwillpower | stats | yes | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
-| showmap | ui | host | 2 | 7 | 0 | 0 | 0 | 249 | 0 |
-| disableplayerfighting | control | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| disableplayerjumping | control | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| disableplayermagic | control | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| disableplayerviewswitch | control | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| disablevanitymode | control | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| enablebirthmenu | ui | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| enableclassmenu | ui | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| enablenamemenu | ui | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| enableplayerjumping | control | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| enableplayerviewswitch | control | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| enableracemenu | ui | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| enablerest | ui | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| enablestatreviewmenu | ui | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| enablevanitymode | control | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| face | ai | host | 1 | 6 | 0 | 0 | 0 | 0 | 0 |
-| fall | position | yes | 1 | 3 | 0 | 0 | 0 | 0 | 0 |
-| forcerun | control | host | 1 | 2 | 0 | 0 | 0 | 0 | 0 |
-| getagility | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| getchameleon | spells | host | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
-| getcollidingactor | world | host | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
-| getcurrentweather | sky | host | 1 | 4 | 1 | 0 | 0 | 0 | 0 |
-| getdisposition | dialogue | yes | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
-| getendurance | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| getflee | ai | yes | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
-| getintelligence | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| getluck | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| getmagicka | stats | yes | 1 | 2 | 1 | 0 | 0 | 0 | 0 |
-| getmarksman | stats | yes | 1 | 2 | 1 | 0 | 0 | 0 | 0 |
-| getparalysis | spells | host | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
-| getpersonality | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| getspeed | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| getsquareroot | core | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| getstandingactor | world | host | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
-| getstat | stats | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| getweapontype | combat | host | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
-| getwillpower | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| gotojail | stats | host | 1 | 1 | 0 | 0 | 0 | 1 | 0 |
-| modarmorer | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| modathletics | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| modaxe | stats | yes | 1 | 1 | 0 | 0 | 0 | 1 | 0 |
-| modbluntweapon | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| modfactionreaction | dialogue | host | 1 | 2 | 0 | 0 | 0 | 6 | 0 |
-| modfight | ai | yes | 1 | 1 | 0 | 0 | 0 | 83 | 0 |
-| modheavyarmor | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| modintelligence | stats | yes | 1 | 2 | 0 | 0 | 0 | 0 | 0 |
-| modlongblade | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| modluck | stats | yes | 1 | 2 | 0 | 0 | 0 | 0 | 0 |
-| modmarksman | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| modmercantile | stats | yes | 1 | 1 | 0 | 0 | 0 | 8 | 0 |
-| modpersonality | stats | yes | 1 | 2 | 0 | 0 | 0 | 0 | 0 |
-| modshortblade | stats | yes | 1 | 2 | 0 | 0 | 0 | 0 | 0 |
-| modspear | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| modwaterlevel | world | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| payfine | stats | host | 1 | 1 | 0 | 0 | 0 | 3 | 0 |
-| pcclearexpelled | stats | host | 1 | 1 | 0 | 0 | 0 | 23 | 0 |
-| pcexpelled | stats | host | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
-| pcjoinfaction | stats | host | 1 | 1 | 0 | 0 | 0 | 13 | 0 |
-| placeitemcell | position | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| playsoundvp | audio | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| raiserank | stats | host | 1 | 1 | 0 | 0 | 0 | 1 | 0 |
-| rotateworld | position | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| scriptrunning | core | yes | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
-| setalchemy | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| setalteration | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| setarmorer | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| setaxe | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| setbluntweapon | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| setconjuration | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| setdestruction | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| setenchant | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| setendurance | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| setheavyarmor | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| setillusion | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| setmediumarmor | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| setmysticism | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| setspear | stats | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| streammusic | audio | yes | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| turnmoonred | sky | host | 1 | 2 | 0 | 0 | 0 | 0 | 0 |
-| turnmoonwhite | sky | host | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| aifollowcell | ai | host | 0 | 0 | 0 | 0 | 0 | 19 | 0 |
-| choice | dialogue | host | 0 | 0 | 0 | 0 | 0 | 1103 | 0 |
-| clearinfoactor | dialogue | host | 0 | 0 | 0 | 0 | 0 | 31 | 0 |
-| goodbye | dialogue | host | 0 | 0 | 0 | 0 | 0 | 1012 | 0 |
-| modflee | ai | yes | 0 | 0 | 0 | 0 | 0 | 3 | 0 |
-| payfinethief | stats | host | 0 | 0 | 0 | 0 | 0 | 10 | 0 |
-| pcexpell | stats | host | 0 | 0 | 0 | 0 | 0 | 11 | 0 |
-| setmercantile | stats | yes | 0 | 0 | 0 | 0 | 0 | 1 | 0 |
+| Function | Group | Carried out | Effect in play | Scripts | Uses | In conditions | Missing in | Only gap | Dialogue | Dialogue missing |
+| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| cast | spells | host, in part | in part | 53 | 126 | 0 | 1 | 1 | 5 | 0 |
+| getjournalindex | journal | yes | full | 547 | 1371 | 535 | 0 | 0 | 0 | 0 |
+| disable | world | yes | full | 390 | 832 | 0 | 0 | 0 | 52 | 0 |
+| journal | journal | yes | full | 378 | 610 | 0 | 0 | 0 | 3091 | 0 |
+| enable | world | yes | full | 299 | 500 | 0 | 0 | 0 | 111 | 0 |
+| menumode | core | yes | full | 289 | 297 | 289 | 0 | 0 | 0 | 0 |
+| onactivate | world | yes | full | 258 | 280 | 257 | 0 | 0 | 0 | 0 |
+| getdisabled | world | yes | full | 225 | 434 | 225 | 0 | 0 | 0 | 0 |
+| ondeath | combat | yes | full | 221 | 245 | 216 | 0 | 0 | 0 | 0 |
+| cellchanged | core | yes | in part | 201 | 208 | 201 | 0 | 0 | 0 | 0 |
+| getdistance | core | yes | full | 194 | 301 | 183 | 0 | 0 | 0 | 0 |
+| messagebox | ui | yes | full | 172 | 413 | 0 | 0 | 0 | 11 | 0 |
+| getsecondspassed | core | yes | full | 169 | 237 | 0 | 0 | 0 | 0 | 0 |
+| stopscript | core | yes | full | 124 | 143 | 0 | 0 | 0 | 2 | 0 |
+| getitemcount | inventory | yes | full | 120 | 241 | 118 | 0 | 0 | 0 | 0 |
+| activate | world | yes | full | 118 | 146 | 0 | 0 | 0 | 0 | 0 |
+| startcombat | combat | yes | full | 106 | 205 | 0 | 0 | 0 | 138 | 0 |
+| getdeadcount | stats | yes | full | 105 | 247 | 102 | 0 | 0 | 0 | 0 |
+| forcegreeting | dialogue | host | in part | 98 | 134 | 0 | 0 | 0 | 25 | 0 |
+| removeitem | inventory | yes | full | 81 | 239 | 0 | 0 | 0 | 782 | 0 |
+| say | audio | yes | full | 79 | 182 | 0 | 0 | 0 | 0 | 0 |
+| additem | inventory | yes | in part | 77 | 157 | 0 | 0 | 0 | 1135 | 0 |
+| getpccell | cell | yes | full | 77 | 139 | 77 | 0 | 0 | 0 | 0 |
+| aiwander | ai | yes | in part | 73 | 130 | 0 | 0 | 0 | 101 | 0 |
+| setfight | ai | yes | full | 73 | 234 | 0 | 0 | 0 | 173 | 0 |
+| gethealth | stats | yes | full | 69 | 94 | 63 | 0 | 0 | 0 | 0 |
+| playsound | audio | yes | full | 62 | 108 | 0 | 0 | 0 | 3 | 0 |
+| positioncell | position | host | in part | 57 | 96 | 0 | 0 | 0 | 14 | 0 |
+| addspell | spells | yes | in part | 52 | 175 | 0 | 0 | 0 | 50 | 0 |
+| getbuttonpressed | ui | yes | full | 48 | 76 | 1 | 0 | 0 | 0 | 0 |
+| getcurrentaipackage | ai | yes | in part | 48 | 51 | 48 | 0 | 0 | 0 | 0 |
+| getsoundplaying | audio | yes | in part | 40 | 48 | 40 | 0 | 0 | 0 | 0 |
+| stopcombat | combat | yes | in part | 40 | 119 | 0 | 0 | 0 | 8 | 0 |
+| playloopsound3dvp | audio | yes | in part | 39 | 41 | 0 | 0 | 0 | 0 | 0 |
+| getcommondisease | spells | yes | full | 37 | 37 | 37 | 0 | 0 | 0 | 0 |
+| getpos | position | yes | in part | 37 | 127 | 2 | 0 | 0 | 0 | 0 |
+| getaipackagedone | ai | yes | full | 35 | 99 | 35 | 0 | 0 | 0 | 0 |
+| sethealth | stats | yes | full | 33 | 56 | 0 | 0 | 0 | 3 | 0 |
+| sethello | ai | yes | none | 30 | 75 | 0 | 0 | 0 | 5 | 0 |
+| playgroup | anim | host | in part | 29 | 84 | 0 | 0 | 0 | 0 | 0 |
+| getblightdisease | spells | yes | full | 28 | 67 | 28 | 0 | 0 | 0 | 0 |
+| startscript | core | yes | in part | 28 | 51 | 0 | 0 | 0 | 140 | 0 |
+| getpcrank | stats | host | full | 26 | 43 | 23 | 0 | 0 | 0 | 0 |
+| dontsaveobject | world | yes | full | 25 | 25 | 0 | 0 | 0 | 0 | 0 |
+| aitravel | ai | host | full | 24 | 89 | 0 | 0 | 0 | 5 | 0 |
+| placeitem | position | host | in part | 24 | 37 | 0 | 0 | 0 | 0 | 0 |
+| saydone | audio | yes | full | 24 | 79 | 24 | 0 | 0 | 0 | 0 |
+| getpccrimelevel | stats | host | full | 23 | 45 | 0 | 0 | 0 | 2 | 0 |
+| random | core | yes | full | 22 | 27 | 2 | 0 | 0 | 0 | 0 |
+| geteffect | spells | host | in part | 21 | 32 | 21 | 0 | 0 | 0 | 0 |
+| rotate | position | host | in part | 21 | 51 | 0 | 0 | 0 | 0 | 0 |
+| addtopic | dialogue | host | full | 20 | 105 | 0 | 0 | 0 | 86 | 0 |
+| becomewerewolf | stats | host | in part | 18 | 22 | 0 | 0 | 0 | 0 | 0 |
+| getspell | spells | yes | full | 18 | 52 | 17 | 0 | 0 | 0 | 0 |
+| lock | world | yes | full | 18 | 18 | 0 | 0 | 0 | 1 | 0 |
+| aifollow | ai | host | full | 17 | 21 | 0 | 0 | 0 | 85 | 0 |
+| removespell | spells | yes | full | 17 | 82 | 0 | 0 | 0 | 8 | 0 |
+| unlock | world | yes | full | 17 | 17 | 0 | 0 | 0 | 0 | 0 |
+| modhealth | stats | yes | full | 16 | 27 | 0 | 0 | 0 | 0 | 0 |
+| setdisposition | dialogue | yes | full | 16 | 38 | 0 | 0 | 0 | 65 | 0 |
+| disableplayercontrols | control | host | full | 15 | 19 | 0 | 0 | 0 | 0 | 0 |
+| getangle | position | host | in part | 15 | 17 | 0 | 0 | 0 | 0 | 0 |
+| gettarget | ai | host | full | 15 | 36 | 15 | 0 | 0 | 0 | 0 |
+| placeatpc | position | host | in part | 15 | 30 | 0 | 0 | 0 | 7 | 0 |
+| enableplayercontrols | control | host | full | 14 | 20 | 0 | 0 | 0 | 0 | 0 |
+| iswerewolf | stats | host | full | 14 | 23 | 14 | 0 | 0 | 0 | 0 |
+| playsound3d | audio | yes | full | 14 | 15 | 0 | 0 | 0 | 0 | 0 |
+| position | position | host | in part | 14 | 23 | 0 | 0 | 0 | 0 | 0 |
+| getstandingpc | world | host | in part | 13 | 13 | 12 | 0 | 0 | 0 | 0 |
+| modreputation | dialogue | host | in part | 12 | 15 | 0 | 0 | 0 | 175 | 0 |
+| getpcsleep | stats | host | full | 11 | 13 | 11 | 0 | 0 | 0 | 0 |
+| getdetected | ai | host | in part | 10 | 13 | 10 | 0 | 0 | 0 | 0 |
+| playbink | ui | host | in part | 10 | 50 | 0 | 0 | 0 | 0 | 0 |
+| resurrect | stats | host | in part | 10 | 16 | 0 | 0 | 0 | 0 | 0 |
+| setdelete | world | host | full | 10 | 10 | 0 | 0 | 0 | 0 | 0 |
+| xbox | core | yes | full | 10 | 13 | 10 | 0 | 0 | 0 | 0 |
+| getwaterlevel | cell | host | full | 9 | 10 | 4 | 0 | 0 | 0 | 0 |
+| modcurrenthealth | stats | yes | full | 9 | 12 | 0 | 0 | 0 | 0 | 0 |
+| moddisposition | dialogue | yes | full | 9 | 10 | 0 | 0 | 0 | 1219 | 0 |
+| setpos | position | host | in part | 8 | 12 | 0 | 0 | 0 | 0 | 0 |
+| wakeuppc | stats | host | full | 8 | 23 | 0 | 0 | 0 | 0 | 0 |
+| fadein | ui | host | full | 7 | 10 | 0 | 0 | 0 | 0 | 0 |
+| fadeout | ui | host | full | 7 | 10 | 0 | 0 | 0 | 0 | 0 |
+| modrestoration | stats | yes | full | 7 | 7 | 0 | 0 | 0 | 0 | 0 |
+| setangle | position | host | in part | 7 | 16 | 0 | 0 | 0 | 0 | 0 |
+| modfatigue | stats | yes | in part | 6 | 9 | 0 | 0 | 0 | 0 | 0 |
+| modresistfire | spells | host | full | 6 | 6 | 0 | 0 | 0 | 0 | 0 |
+| modresistfrost | spells | host | full | 6 | 6 | 0 | 0 | 0 | 0 | 0 |
+| modresistmagicka | spells | host | full | 6 | 6 | 0 | 0 | 0 | 0 | 0 |
+| modresistparalysis | spells | host | full | 6 | 12 | 0 | 0 | 0 | 0 | 0 |
+| modresistpoison | spells | host | full | 6 | 12 | 0 | 0 | 0 | 0 | 0 |
+| setatstart | position | host | full | 6 | 6 | 0 | 0 | 0 | 0 | 0 |
+| setscale | position | host | in part | 6 | 12 | 0 | 0 | 0 | 0 | 0 |
+| stopsound | audio | yes | in part | 6 | 9 | 0 | 0 | 0 | 0 | 0 |
+| changeweather | sky | host | full | 5 | 12 | 0 | 0 | 0 | 0 | 0 |
+| enableplayerfighting | control | host | full | 5 | 5 | 0 | 0 | 0 | 0 | 0 |
+| enableplayermagic | control | host | full | 5 | 5 | 0 | 0 | 0 | 0 | 0 |
+| explodespell | spells | host | in part | 5 | 5 | 0 | 0 | 0 | 0 | 0 |
+| getattacked | combat | host | in part | 5 | 5 | 5 | 0 | 0 | 0 | 0 |
+| getfatigue | stats | yes | full | 5 | 8 | 2 | 0 | 0 | 0 | 0 |
+| loopgroup | anim | host | in part | 5 | 5 | 0 | 0 | 0 | 0 | 0 |
+| move | position | host | in part | 5 | 5 | 0 | 0 | 0 | 0 | 0 |
+| moveworld | position | host | in part | 5 | 7 | 0 | 0 | 0 | 0 | 0 |
+| onknockout | combat | host | full | 5 | 5 | 5 | 0 | 0 | 0 | 0 |
+| onmurder | combat | host | in part | 5 | 5 | 5 | 0 | 0 | 0 | 0 |
+| pcraiserank | stats | host | full | 5 | 9 | 0 | 0 | 0 | 55 | 0 |
+| playloopsound3d | audio | yes | in part | 5 | 7 | 0 | 0 | 0 | 0 | 0 |
+| setfatigue | stats | yes | in part | 5 | 6 | 0 | 0 | 0 | 1 | 0 |
+| setflee | ai | yes | in part | 5 | 10 | 0 | 0 | 0 | 0 | 0 |
+| undowerewolf | stats | host | in part | 5 | 7 | 0 | 0 | 0 | 0 | 0 |
+| aiescort | ai | host | full | 4 | 5 | 0 | 0 | 0 | 0 | 0 |
+| clearforcesneak | control | host | in part | 4 | 19 | 0 | 0 | 0 | 4 | 0 |
+| enableteleporting | control | host | none | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
+| forcesneak | control | host | in part | 4 | 12 | 0 | 0 | 0 | 0 | 0 |
+| getlocked | world | yes | full | 4 | 4 | 4 | 0 | 0 | 0 | 0 |
+| hassoulgem | inventory | host | full | 4 | 85 | 4 | 0 | 0 | 0 | 0 |
+| modregion | sky | host | full | 4 | 12 | 0 | 0 | 0 | 0 | 0 |
+| modspeed | stats | yes | in part | 4 | 7 | 0 | 0 | 0 | 0 | 0 |
+| modstrength | stats | yes | in part | 4 | 7 | 0 | 0 | 0 | 2 | 0 |
+| playsound3dvp | audio | yes | in part | 4 | 6 | 0 | 0 | 0 | 0 | 0 |
+| setalarm | ai | yes | full | 4 | 7 | 0 | 0 | 0 | 2 | 0 |
+| showrestmenu | ui | host | full | 4 | 4 | 0 | 0 | 0 | 0 | 0 |
+| disableteleporting | control | host | none | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
+| drop | inventory | host | full | 3 | 6 | 0 | 0 | 0 | 0 | 0 |
+| enableinventorymenu | ui | host | full | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
+| enablemagicmenu | ui | host | full | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
+| enablemapmenu | ui | host | full | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
+| enablestatsmenu | ui | host | full | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
+| getlevel | stats | yes | full | 3 | 10 | 3 | 0 | 0 | 0 | 0 |
+| getrace | stats | host | full | 3 | 22 | 3 | 0 | 0 | 0 | 0 |
+| getspelleffects | spells | host | in part | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
+| getweapondrawn | combat | host | full | 3 | 5 | 3 | 0 | 0 | 0 | 0 |
+| getwerewolfkills | stats | host | full | 3 | 3 | 3 | 0 | 0 | 0 | 0 |
+| hurtcollidingactor | combat | host | in part | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
+| modwillpower | stats | yes | in part | 3 | 5 | 0 | 0 | 0 | 0 | 0 |
+| setmagicka | stats | yes | full | 3 | 4 | 0 | 0 | 0 | 0 | 0 |
+| setmarksman | stats | yes | in part | 3 | 4 | 0 | 0 | 0 | 0 | 0 |
+| setwaterlevel | world | host | in part | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
+| setwerewolfacrobatics | stats | host | full | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
+| disablelevitation | control | host | none | 2 | 3 | 0 | 0 | 0 | 0 | 0 |
+| enablelevitation | control | host | none | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
+| getcollidingpc | world | host | in part | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
+| getinterior | cell | host | in part | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
+| getlos | ai | host | full | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
+| getpcinjail | stats | host | full | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
+| getpcsneaking | control | host | full | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
+| getpctraveling | stats | host | none | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
+| getsecurity | stats | yes | full | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
+| getsneak | stats | yes | full | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
+| getstrength | stats | yes | full | 2 | 2 | 1 | 0 | 0 | 0 | 0 |
+| hasitemequipped | inventory | host | full | 2 | 2 | 2 | 0 | 0 | 0 | 0 |
+| hitonme | combat | host | in part | 2 | 3 | 0 | 0 | 0 | 0 | 0 |
+| hurtstandingactor | combat | host | in part | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
+| modagility | stats | yes | in part | 2 | 3 | 0 | 0 | 0 | 0 | 0 |
+| modblock | stats | yes | in part | 2 | 3 | 0 | 0 | 0 | 0 | 0 |
+| modcurrentfatigue | stats | yes | in part | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
+| modendurance | stats | yes | in part | 2 | 3 | 0 | 0 | 0 | 0 | 0 |
+| modmagicka | stats | yes | full | 2 | 3 | 0 | 0 | 0 | 0 | 0 |
+| modmediumarmor | stats | yes | in part | 2 | 3 | 0 | 0 | 0 | 0 | 0 |
+| modpcfacrep | stats | host | full | 2 | 3 | 0 | 0 | 0 | 482 | 0 |
+| placeatme | position | host | in part | 2 | 6 | 0 | 0 | 0 | 0 | 0 |
+| removesoulgem | inventory | host | full | 2 | 42 | 0 | 0 | 0 | 0 | 0 |
+| setagility | stats | yes | in part | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
+| setathletics | stats | yes | in part | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
+| setblock | stats | yes | in part | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
+| setlongblade | stats | yes | in part | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
+| setpccrimelevel | stats | host | in part | 2 | 3 | 0 | 0 | 0 | 34 | 0 |
+| setrestoration | stats | yes | full | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
+| setspeed | stats | yes | in part | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
+| setstrength | stats | yes | in part | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
+| setwillpower | stats | yes | in part | 2 | 2 | 0 | 0 | 0 | 0 | 0 |
+| showmap | ui | host | full | 2 | 7 | 0 | 0 | 0 | 249 | 0 |
+| disableplayerfighting | control | host | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| disableplayerjumping | control | host | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| disableplayermagic | control | host | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| disableplayerviewswitch | control | host | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| disablevanitymode | control | host | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| enablebirthmenu | ui | host | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| enableclassmenu | ui | host | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| enablenamemenu | ui | host | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| enableplayerjumping | control | host | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| enableplayerviewswitch | control | host | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| enableracemenu | ui | host | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| enablerest | ui | host | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| enablestatreviewmenu | ui | host | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| enablevanitymode | control | host | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| face | ai | host | in part | 1 | 6 | 0 | 0 | 0 | 0 | 0 |
+| fall | position | yes | full | 1 | 3 | 0 | 0 | 0 | 0 | 0 |
+| forcerun | control | host | in part | 1 | 2 | 0 | 0 | 0 | 0 | 0 |
+| getagility | stats | yes | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| getchameleon | spells | host | full | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
+| getcollidingactor | world | host | in part | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
+| getcurrentweather | sky | host | full | 1 | 4 | 1 | 0 | 0 | 0 | 0 |
+| getdisposition | dialogue | yes | in part | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
+| getendurance | stats | yes | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| getflee | ai | yes | full | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
+| getintelligence | stats | yes | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| getluck | stats | yes | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| getmagicka | stats | yes | full | 1 | 2 | 1 | 0 | 0 | 0 | 0 |
+| getmarksman | stats | yes | full | 1 | 2 | 1 | 0 | 0 | 0 | 0 |
+| getparalysis | spells | host | full | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
+| getpersonality | stats | yes | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| getspeed | stats | yes | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| getsquareroot | core | yes | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| getstandingactor | world | host | in part | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
+| getstat | stats | host | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| getweapontype | combat | host | in part | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
+| getwillpower | stats | yes | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| gotojail | stats | host | full | 1 | 1 | 0 | 0 | 0 | 1 | 0 |
+| modarmorer | stats | yes | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| modathletics | stats | yes | in part | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| modaxe | stats | yes | in part | 1 | 1 | 0 | 0 | 0 | 1 | 0 |
+| modbluntweapon | stats | yes | in part | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| modfactionreaction | dialogue | host | full | 1 | 2 | 0 | 0 | 0 | 6 | 0 |
+| modfight | ai | yes | full | 1 | 1 | 0 | 0 | 0 | 83 | 0 |
+| modheavyarmor | stats | yes | in part | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| modintelligence | stats | yes | in part | 1 | 2 | 0 | 0 | 0 | 0 | 0 |
+| modlongblade | stats | yes | in part | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| modluck | stats | yes | full | 1 | 2 | 0 | 0 | 0 | 0 | 0 |
+| modmarksman | stats | yes | in part | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| modmercantile | stats | yes | full | 1 | 1 | 0 | 0 | 0 | 8 | 0 |
+| modpersonality | stats | yes | full | 1 | 2 | 0 | 0 | 0 | 0 | 0 |
+| modshortblade | stats | yes | in part | 1 | 2 | 0 | 0 | 0 | 0 | 0 |
+| modspear | stats | yes | in part | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| modwaterlevel | world | host | in part | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| payfine | stats | host | in part | 1 | 1 | 0 | 0 | 0 | 3 | 0 |
+| pcclearexpelled | stats | host | full | 1 | 1 | 0 | 0 | 0 | 23 | 0 |
+| pcexpelled | stats | host | full | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
+| pcjoinfaction | stats | host | full | 1 | 1 | 0 | 0 | 0 | 13 | 0 |
+| placeitemcell | position | host | in part | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| playsoundvp | audio | yes | in part | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| raiserank | stats | host | full | 1 | 1 | 0 | 0 | 0 | 1 | 0 |
+| rotateworld | position | host | in part | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| scriptrunning | core | yes | full | 1 | 1 | 1 | 0 | 0 | 0 | 0 |
+| setalchemy | stats | yes | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| setalteration | stats | yes | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| setarmorer | stats | yes | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| setaxe | stats | yes | in part | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| setbluntweapon | stats | yes | in part | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| setconjuration | stats | yes | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| setdestruction | stats | yes | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| setenchant | stats | yes | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| setendurance | stats | yes | in part | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| setheavyarmor | stats | yes | in part | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| setillusion | stats | yes | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| setmediumarmor | stats | yes | in part | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| setmysticism | stats | yes | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| setspear | stats | yes | in part | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| streammusic | audio | yes | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| turnmoonred | sky | host | full | 1 | 2 | 0 | 0 | 0 | 0 | 0 |
+| turnmoonwhite | sky | host | full | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
+| aifollowcell | ai | host | full | 0 | 0 | 0 | 0 | 0 | 19 | 0 |
+| choice | dialogue | host | full | 0 | 0 | 0 | 0 | 0 | 1103 | 0 |
+| clearinfoactor | dialogue | host | full | 0 | 0 | 0 | 0 | 0 | 31 | 0 |
+| goodbye | dialogue | host | full | 0 | 0 | 0 | 0 | 0 | 1012 | 0 |
+| modflee | ai | yes | in part | 0 | 0 | 0 | 0 | 0 | 3 | 0 |
+| payfinethief | stats | host | full | 0 | 0 | 0 | 0 | 0 | 10 | 0 |
+| pcexpell | stats | host | in part | 0 | 0 | 0 | 0 | 0 | 11 | 0 |
+| setmercantile | stats | yes | full | 0 | 0 | 0 | 0 | 0 | 1 | 0 |
 
 245 functions of the compiler's table are called by no script of the game.
+
+### Effect in play
+
+Carried out says that a call is executed; Effect in play says whether what the engine then does is what the original game does. Of the 259 functions the game's scripts call, 156 have the original's effect in full, 97 in part and 6 have none yet (the call is accepted and nothing of its effect happens). How each class is known: 256 read from the source against the original's rules, 3 kept by a test, 0 checked in play. A class read from the source is not yet proven in play.
+
+| Function | Effect | Scripts | Dialogue | What is missing | Known from | Register |
+| --- | --- | ---: | ---: | --- | --- | --- |
+| cellchanged | in part | 201 | 0 | A global script sees it only when another map loads, and an object's script when its object is attached or comes into range; walking from one outdoor cell into the next within the same map does not set it. | source | - |
+| forcegreeting | in part | 98 | 25 | Only a person the ordinary talk rules allow is greeted: a creature, a person in a fight, knocked down or with nothing to say opens no conversation; and it is not held back while the player is a werewolf. | source | - |
+| additem | in part | 77 | 1135 | A person given an item does not put it on when it is better than what it wears, as people do in the original; the count itself is right for the player, people, creatures and containers. | source | - |
+| aiwander | in part | 73 | 101 | A wander a script gives is not kept in a saved game: after loading, the actor goes back to the wander of its game data. The wander's area is taken around where the actor was placed, not around where it stands when the call comes. | source | - |
+| positioncell | in part | 57 | 14 | An NPC or creature sent outdoors appears at its new place only while its own home area is loaded. An object that is no actor moves only within the place the player is in, not to another place. A player move into a room the image lacks does nothing. | source | MWSCRIPT-POSITIONCELL-OUTDOOR-62 |
+| cast | in part | 53 | 5 | A spell cast at the player lands only when every effect is a stat change, a cure or a plain effect, and its fire, frost, shock and poison damage lands with no resistance. Cast by the player himself does nothing. A Target spell lands at once with no bolt flying. | source | - |
+| addspell | in part | 52 | 50 | The spell joins the actor's list and can be cast, and resistances, water breathing and similar effects of an ability count where they are read, but the attribute, skill, health, magicka and fatigue effects of an ability, disease or curse added this way (a disease's drain, vampirism's gains) are never applied to the stats. | source | - |
+| getcurrentaipackage | in part | 48 | 0 | After a follow or an escort has ended, the actor reads 1 (travel) where the original keeps reading the package that ran last (3 or 2). | source | - |
+| stopcombat | in part | 40 | 8 | Only the actor's own fight ends: an actor it was fighting, and that actor's allies, go on fighting it. | source | - |
+| getsoundplaying | in part | 40 | 0 | It asks only about sounds the same script started: a sound another script or the game started on that object reads as not playing, and an object named before the call is not looked at. | source | - |
+| playloopsound3dvp | in part | 39 | 0 | The pitch argument is not used (the mixer has no pitch); the volume is. A loop started on another object starts again at the script's own object once its first sample ends. | source | - |
+| getpos | in part | 37 | 0 | An object named by its id that is drawn as scenery without its own entity and is no scripted mover reads 0 on every axis. | source | MWSCRIPT-ROTATE-NO-ENTITY-59 |
+| sethello | none | 30 | 5 | The value is kept and read back by GetHello, but nothing uses it: the distance at which a person greets the player stays the one from its game data. | source | - |
+| playgroup | in part | 29 | 0 | Only a loaded person or creature with a converted skeleton plays the group; animated objects (doors, levers, machines) and the player do not, and the start-mode argument is not read. | source | - |
+| startscript | in part | 28 | 140 | A global script started from an object's script or from a conversation does not take that object or speaker as its own, so its calls that name no object act on nothing. | source | - |
+| placeitem | in part | 24 | 0 | An object no map converted is made and runs its script but is not drawn; a full map leaves it out. | source | MWSCRIPT-PLACE-OTHER-KINDS-62 |
+| geteffect | in part | 21 | 0 | Only the player is asked: on any NPC or creature it reads 0. An effect of an ability, disease or curse the player has (not cast) reads 0. | source | - |
+| rotate | in part | 21 | 0 | Scenery without its own entity that is no scripted mover does not turn. Rotate on the player changes nothing he sees (his view is not turned). A turned object with its own entity is back at its angle when its map loads again or a game is loaded. | source | MWSCRIPT-ROTATE-NO-ENTITY-59, WORLD-OBJECT-STATE-NOT-SAVED-59 |
+| becomewerewolf | in part | 18 | 0 | The player's stats change and his gear comes off, but he keeps his own body, his run speed and his health, and the readied spell, temporary effects, windows and witnesses are not handled. An NPC only gets a mark: its body does not change. | source | WEREWOLF-BODY-NOT-DRAWN-63, WEREWOLF-RUN-SPEED-63, WEREWOLF-TRANSFORM-RULES-PARTIAL-68, NPC-WEREWOLF-NO-MODEL-66 |
+| placeatpc | in part | 15 | 7 | An object no map converted is made but not drawn. A fifth live copy of a scripted placed record in one map is refused, and a full map leaves a made object out. | source | MWVM-PLACE-COPIES-FOUR-66, MWSCRIPT-PLACE-OTHER-KINDS-62 |
+| getangle | in part | 15 | 0 | On the player the angle about z reads 90 degrees off the view. A scripted object drawn as part of the scenery without its own entity reads 0 instead of its angle, so a script that turns such an object from its own reading goes wrong. | source | GETANGLE-PLAYER-Z-READS-OBJECT-AXIS-67, MWSCRIPT-ROTATE-NO-ENTITY-59 |
+| position | in part | 14 | 0 | The rotation argument is not applied to anyone. The player is always moved to the outdoor point, also when he is inside a room (the original moves him within that room). Another object moves only within the map it is in now, and a moved object without the actor rules goes back when its map loads again. | source | WORLD-OBJECT-STATE-NOT-SAVED-59 |
+| getstandingpc | in part | 13 | 0 | Only an object with its own entity is asked; scenery without one (pressure plates and platforms drawn with the world) reads 0. | source | MWSCRIPT-ROTATE-NO-ENTITY-59 |
+| modreputation | in part | 12 | 175 | Only the player's reputation changes: on a person (the speaker of a conversation, or the script's own object when no one is named) nothing happens. | source | - |
+| getdetected | in part | 10 | 0 | When the observer is not a person (a creature or an object), only people nearby are asked whether they notice the actor; creatures nearby, the observer itself included, are not. | source | - |
+| playbink | in part | 10 | 0 | The video plays over the game and the game goes on after it, but the second argument is ignored: every video can be skipped, also those the original does not let the player skip. | source | - |
+| resurrect | in part | 10 | 0 | Only an NPC or creature loaded in the player's map is brought back; one elsewhere, or the player, is not. | source | - |
+| setpos | in part | 8 | 0 | A changed place of an object with its own entity is not kept when its map loads again or a game is loaded. Scenery without an entity that is no scripted mover does not move. | source | MWSCRIPT-ROTATE-NO-ENTITY-59, WORLD-OBJECT-STATE-NOT-SAVED-59 |
+| setangle | in part | 7 | 0 | On the player the angle about z is set 90 degrees off from the original's. A changed angle of an object with its own entity is not kept when its map loads again or a game is loaded. | source | GETANGLE-PLAYER-Z-READS-OBJECT-AXIS-67, WORLD-OBJECT-STATE-NOT-SAVED-59 |
+| modfatigue | in part | 6 | 0 | An NPC or creature whose fatigue falls below zero this way falls unconscious only if it is fighting. While the player fights, a change of his fatigue is lost. | source | - |
+| setscale | in part | 6 | 0 | The new size is not kept: a room or area load builds the object at the game data's size again, and a saved game does not hold it. An object without its own entity is not scaled. Collision keeps its size. | source | WORLD-OBJECT-STATE-NOT-SAVED-59 |
+| stopsound | in part | 6 | 0 | It stops only a sound the same script started: a sound another script started on that object goes on, and an object named before the call is not looked at. | source | - |
+| setfatigue | in part | 5 | 1 | An NPC or creature set below zero fatigue falls unconscious only if it is fighting. While the player fights, the new value is lost. | source | - |
+| explodespell | in part | 5 | 0 | The Self and Touch effects with an area reach the actors around the object, but the spell's Target effects are not sent off as a bolt. Called on an actor or on the player it explodes at once where they stand instead of the actor casting the spell itself (the player only readies it in the original). | source | - |
+| getattacked | in part | 5 | 0 | Only an attack by the player marks the actor; an attack by another person or creature does not, and the mark goes when the fight ends instead of staying until the crime is settled. It is not kept in a saved game. | source | - |
+| loopgroup | in part | 5 | 0 | Only a loaded person or creature with a converted skeleton plays the group; animated objects (doors, levers, machines) and the player do not, and the start-mode argument is not read. | source | - |
+| move | in part | 5 | 0 | A scripted object drawn as scenery without its own entity does not move along its own axes (only along the world's axes). A moved object with its own entity goes back to its place when its map loads again or a game is loaded. Only the player is carried along when standing on it. | source | MWSCRIPT-ROTATE-NO-ENTITY-59, WORLD-OBJECT-STATE-NOT-SAVED-59 |
+| moveworld | in part | 5 | 0 | A moved object with its own entity goes back to its place when its map loads again or a game is loaded; only the player is carried along when standing on it. Scenery without an entity that is no scripted mover does not move. | source | WORLD-OBJECT-STATE-NOT-SAVED-59 |
+| onmurder | in part | 5 | 0 | The murder mark is not kept in a saved game: a script that asks after a load reads 0. | source | CRIME-SAVE-PURSUERS-62 |
+| playloopsound3d | in part | 5 | 0 | A loop started on another object (named before the call) starts again at the script's own object once its first sample ends. | source | - |
+| setflee | in part | 5 | 0 | The new Flee is kept and read back, but a fighting actor still decides whether to flee by the Flee of its game data. | source | - |
+| undowerewolf | in part | 5 | 0 | The player's own stats come back, but the werewolf form had no body or run speed of its own to undo, and its health, effects and windows are not handled. An NPC only loses its mark. | source | WEREWOLF-TRANSFORM-RULES-PARTIAL-68, NPC-WEREWOLF-NO-MODEL-66 |
+| clearforcesneak | in part | 4 | 4 | On a person or creature the flag counts only for the detection rules: the actor does not take the sneaking stance, animation or speed. | source | - |
+| modstrength | in part | 4 | 2 | Maximum fatigue does not follow the new Strength. On an NPC or creature the change does not reach its fighting: its damage keeps the game data's Strength. | source | - |
+| enableteleporting | none | 4 | 0 | The switch is kept and saved, but nothing reads it: the engine has no Mark, Recall or Intervention effects for it to allow again. | source | - |
+| forcesneak | in part | 4 | 0 | On a person or creature the flag counts only for the detection rules: the actor does not take the sneaking stance, animation or speed. | source | - |
+| modspeed | in part | 4 | 0 | On an NPC or creature the change counts for its walking but not in a fight, where it moves at the game data's Speed. | source | - |
+| playsound3dvp | in part | 4 | 0 | The pitch argument is not used (the mixer has no pitch); the volume is. | source | - |
+| disableteleporting | none | 3 | 0 | The switch is kept and saved, but nothing reads it: the engine has no Mark, Recall or Intervention effects for it to stop. | source | - |
+| getspelleffects | in part | 3 | 0 | Reads 1 only while effects of the spell that were cast are active; an ability, disease or curse the actor carries (always active in the original) reads 0. | source | - |
+| hurtcollidingactor | in part | 3 | 0 | Only the player touching the object is hurt; people and creatures touching it are not. | source | - |
+| modwillpower | in part | 3 | 0 | Maximum fatigue does not follow the new Willpower. On an NPC or creature it counts for its spellcasting and its resistance to spells, not for its fatigue in a fight. | source | - |
+| setmarksman | in part | 3 | 0 | On an NPC the change does not reach its fighting with bows and thrown weapons. | source | - |
+| setwaterlevel | in part | 3 | 0 | The water moves only in a room whose water is one flat level of its map; a room built otherwise keeps its water where it was built. | source | MWSCRIPT-WATER-LEVEL-STATIC-67 |
+| setpccrimelevel | in part | 2 | 34 | The bounty changes and pursuit ends at 0, but a crime level set to 0 does not clear the marks the crime left on the witnesses (their alarm and the disposition change). | source | - |
+| disablelevitation | none | 2 | 0 | The switch is kept and saved, but nothing reads it: the engine has no Levitate movement or Levitate casting for it to stop. | source | - |
+| enablelevitation | none | 2 | 0 | The switch is kept and saved, but nothing reads it: the engine has no Levitate movement or Levitate casting for it to allow again. | source | - |
+| getcollidingpc | in part | 2 | 0 | Scenery without its own entity reads 0, except the invisible walls built as barrier boxes. | source | MWSCRIPT-ROTATE-NO-ENTITY-59 |
+| getinterior | in part | 2 | 0 | In the Mournhold districts shown as outdoor areas it reads 0, where the original reads 1 (they are interior cells that behave like outdoors). | source | - |
+| getpctraveling | none | 2 | 0 | Always reads 0: the frame right after a paid travel, in which the original reads 1, is never given. | source | - |
+| hitonme | in part | 2 | 0 | Only a blow with the player's weapon is recorded: a blow by another person's or creature's weapon is not, and the player's own HitOnMe always reads 0. | source | - |
+| hurtstandingactor | in part | 2 | 0 | Only the player standing on the object is hurt; people and creatures standing on it are not, and scenery drawn without an entity hurts no one. | source | - |
+| modagility | in part | 2 | 0 | Maximum fatigue does not follow the new Agility. On an NPC or creature the change does not reach its fighting (hit chance, evasion and block keep the game data's Agility). | source | - |
+| modblock | in part | 2 | 0 | On an NPC or creature the change does not reach its blocking in a fight, which keeps the game data's skill. | source | - |
+| modcurrentfatigue | in part | 2 | 0 | An NPC or creature whose fatigue a script takes below zero falls unconscious only if it is fighting. While the player fights, a change of his fatigue is lost. | source | - |
+| modendurance | in part | 2 | 0 | Maximum fatigue does not follow the new Endurance. On an NPC or creature the change does not reach its fighting (fatigue return in a fight keeps the game data's value). | source | - |
+| modmediumarmor | in part | 2 | 0 | On an NPC or creature the change does not reach its armour rating in a fight. | source | - |
+| placeatme | in part | 2 | 0 | An object no map converted (a record placed only by scripts) is made where it should be and runs its script, but it is not drawn. A fifth live copy of a scripted placed record in one map is refused, and a full map leaves a made object out. | source | MWVM-PLACE-COPIES-FOUR-66, MWSCRIPT-PLACE-OTHER-KINDS-62 |
+| setagility | in part | 2 | 0 | Maximum fatigue does not follow the new Agility. On an NPC the change does not reach its fighting. | source | - |
+| setathletics | in part | 2 | 0 | On an NPC the change does not reach its movement in a fight. | source | - |
+| setblock | in part | 2 | 0 | On an NPC the change does not reach its blocking in a fight. | source | - |
+| setlongblade | in part | 2 | 0 | On an NPC the change does not reach its fighting with long blades. | source | - |
+| setspeed | in part | 2 | 0 | On an NPC the change counts for its walking but not in a fight. | source | - |
+| setstrength | in part | 2 | 0 | Maximum fatigue does not follow the new Strength. On an NPC the change does not reach its damage in a fight. | source | - |
+| setwillpower | in part | 2 | 0 | Maximum fatigue does not follow the new Willpower. On an NPC it counts for spellcasting and spell resistance, not for its fatigue in a fight. | source | - |
+| payfine | in part | 1 | 3 | The bounty goes, stolen goods are taken and the witnesses calm down, but the player's weapon or spell is not put away as in the original. | source | - |
+| modaxe | in part | 1 | 1 | On an NPC or creature the change does not reach its fighting: its axe attacks keep the game data's skill. | source | - |
+| face | in part | 1 | 0 | The actor turns to the point at once instead of turning there at its turning speed. | source | - |
+| forcerun | in part | 1 | 0 | A person or creature runs by it only on its wander and travel walks: as a follower or an escort it keeps its own pace. | source | - |
+| getcollidingactor | in part | 1 | 0 | Only an object with its own entity is asked; scenery without one reads 0. | source | MWSCRIPT-ROTATE-NO-ENTITY-59 |
+| getdisposition | in part | 1 | 0 | It reads the person's own base disposition, without the race, faction, reputation, personality and temporary changes the original adds, and without the limit to 0 to 100. | source | - |
+| getstandingactor | in part | 1 | 0 | Only an object with its own entity is asked; scenery without one reads 0. | source | MWSCRIPT-ROTATE-NO-ENTITY-59 |
+| getweapontype | in part | 1 | 0 | A lockpick or a probe in the player's hand reads -1 instead of -2 or -3, and a person reads the weapon of its game data rather than the one it holds now. | source | - |
+| modathletics | in part | 1 | 0 | On an NPC or creature the change does not reach its movement in a fight, which keeps the game data's Athletics. | source | - |
+| modbluntweapon | in part | 1 | 0 | On an NPC or creature the change does not reach its fighting with blunt weapons. | source | - |
+| modheavyarmor | in part | 1 | 0 | On an NPC or creature the change does not reach its armour rating in a fight. | source | - |
+| modintelligence | in part | 1 | 0 | Maximum magicka does not follow the new Intelligence (the original recalculates it at once). | source | - |
+| modlongblade | in part | 1 | 0 | On an NPC or creature the change does not reach its fighting with long blades. | source | - |
+| modmarksman | in part | 1 | 0 | On an NPC or creature the change does not reach its fighting with bows and thrown weapons. | source | - |
+| modshortblade | in part | 1 | 0 | On an NPC or creature the change does not reach its fighting with short blades. | source | - |
+| modspear | in part | 1 | 0 | On an NPC or creature the change does not reach its fighting with spears. | source | - |
+| modwaterlevel | in part | 1 | 0 | The water moves only in a room whose water is one flat level of its map; a room built otherwise (lava carved under its water) keeps its water where it was built. | source | MWSCRIPT-WATER-LEVEL-STATIC-67 |
+| placeitemcell | in part | 1 | 0 | An object no map converted is made but not drawn. A placement into an outdoor place appears only while that place's area is loaded. | source | MWSCRIPT-POSITIONCELL-OUTDOOR-62, MWSCRIPT-PLACE-OTHER-KINDS-62 |
+| playsoundvp | in part | 1 | 0 | The pitch argument is not used (the mixer has no pitch); the volume is. | source | - |
+| rotateworld | in part | 1 | 0 | Scenery without its own entity that is no scripted mover does not turn, and a turned object with its own entity is back at its angle when its map loads again or a game is loaded. | source | MWSCRIPT-ROTATE-NO-ENTITY-59, WORLD-OBJECT-STATE-NOT-SAVED-59 |
+| setaxe | in part | 1 | 0 | On an NPC the change does not reach its fighting with axes. | source | - |
+| setbluntweapon | in part | 1 | 0 | On an NPC the change does not reach its fighting with blunt weapons. | source | - |
+| setendurance | in part | 1 | 0 | Maximum fatigue does not follow the new Endurance. On an NPC the change does not reach its fighting. | source | - |
+| setheavyarmor | in part | 1 | 0 | On an NPC the change does not reach its armour rating in a fight. | source | - |
+| setmediumarmor | in part | 1 | 0 | On an NPC the change does not reach its armour rating in a fight. | source | - |
+| setspear | in part | 1 | 0 | On an NPC the change does not reach its fighting with spears. | source | - |
+| pcexpell | in part | 0 | 11 | The player is marked expelled, but the message that tells him he was expelled from the faction is not shown. | source | - |
+| modflee | in part | 0 | 3 | The changed Flee is kept and read back, but a fighting actor still decides whether to flee by the Flee of its game data. | source | - |
 
 ## Every script
 

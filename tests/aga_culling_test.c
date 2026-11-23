@@ -8,6 +8,8 @@ float xcenter,ycenter,xscale,yscale;
 static int inside;
 int AW_Interior(void){return inside;}
 int AW_DrawDistance(void);
+void AW_SetDrawDistance(int);
+void AW_DrawDistanceArrive(const float *);
 void AW_FogDepths(byte *,int);
 static void (*distance_command)(void);
 static int argc=1;
@@ -282,7 +284,8 @@ int main(void) {
   byte pixels[5]={7,7,7,7,7};short z[5]={AW_SKY_BACKGROUND_DEPTH,-1,0,32767,128};
   for(i=0;i<4096;i++)fog_colours[i]=i>>8;
   vid.buffer=pixels;vid.rowbytes=5;d_pzbuffer=z;d_zwidth=5;r_refdef.vrect.width=5;r_refdef.vrect.height=1;
-  AW_FogInit();AW_FogDraw();
+  AW_FogInit();AW_SetDrawDistance(700);   /* the player's own 700 (Auto off; REGIONAL-DRAW-DISTANCE-68) */
+  AW_FogDraw();
   assert(pixels[0]==7);assert(pixels[1]==15 && pixels[2]==15);assert(pixels[3]==0);assert(pixels[4]!=7);
   inside=1;memset(pixels,7,sizeof pixels);AW_FogDraw();for(i=0;i<5;i++)assert(pixels[i]==7);inside=0;
  }
@@ -309,21 +312,22 @@ int main(void) {
  argument="4097";distance_command();assert(AW_DrawDistance()==400);
  argument="700junk";distance_command();assert(AW_DrawDistance()==400);
  argument="700";distance_command();assert(AW_DrawDistance()==700);
- sv.active=true;strcpy(sv.name,"balmora");assert(AW_DrawDistance()==540);
- assert(aw_drawdistance.value==700);strcpy(sv.name,"seyda");assert(AW_DrawDistance()==540);
- strcpy(sv.name,"prison");assert(AW_DrawDistance()==700);
+ /* a map change reaches the draw distance as an arrival (aw_scene.c AW_SceneSpawn; REGIONAL-DRAW-DISTANCE-68) */
+ sv.active=true;strcpy(sv.name,"balmora");AW_DrawDistanceArrive(NULL);assert(AW_DrawDistance()==540);
+ assert(aw_drawdistance.value==700);strcpy(sv.name,"seyda");AW_DrawDistanceArrive(NULL);assert(AW_DrawDistance()==540);
+ strcpy(sv.name,"prison");AW_DrawDistanceArrive(NULL);assert(AW_DrawDistance()==700);
  /* No artificial clamps: beyond the old 1500 the setting holds where nothing
   * else limits it; a CHIM map follows it up to its own world's data, and the
   * command says what limits it. */
  argument="2000";said[0]=0;distance_command();assert(AW_DrawDistance()==2000 && !strstr(said,"Here:"));
- aw_chim_view_reach=view_reach;chim_reach=0;assert(AW_DrawDistance()==2000);
- strcpy(sv.name,"balmora");assert(AW_DrawDistance()==540);
+ aw_chim_view_reach=view_reach;chim_reach=0;AW_DrawDistanceArrive(NULL);assert(AW_DrawDistance()==2000);
+ strcpy(sv.name,"balmora");AW_DrawDistanceArrive(NULL);assert(AW_DrawDistance()==540);
  said[0]=0;argc=1;distance_command();assert(strstr(said,"Here: 540") && strstr(said,"region maps"));argc=2;
  chim_reach=636;said[0]=0;distance_command();
  assert(AW_DrawDistance()==636 && strstr(said,"Here: 636") && strstr(said,"CHIM world's visibility data"));
  argument="600";said[0]=0;distance_command();assert(AW_DrawDistance()==600 && !strstr(said,"Here:"));
  chim_reach=1200;argument="1100";distance_command();assert(AW_DrawDistance()==1100);
- aw_chim_view_reach=NULL;assert(AW_DrawDistance()==540);
+ aw_chim_view_reach=NULL;AW_DrawDistanceArrive(NULL);assert(AW_DrawDistance()==540);
  fog_exact_tests();
  fog_rule_tests();
  cut_group_tests();

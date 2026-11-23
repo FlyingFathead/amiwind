@@ -65,7 +65,11 @@ class ActorVsActor(unittest.TestCase):
     def test_the_scripts_reach_it(self):
         host = code('aw_mwhost.c')
         hc = body(host, 'static void host_combat(int instance,int target,int verb,int other){')
-        self.assertIn('AW_CombatEngageAgainst(e,&sheet,o,&other_sheet)', hc)
+        # since v0.0.68 through the fight order (MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68): host_combat -> fight_order ->
+        # fight_start
+        self.assertIn('fight_order(a,e,o,b);', hc)
+        self.assertIn('AW_CombatEngageAgainst(e,&sheet,o,&other_sheet)',
+                      body(host, 'static int fight_start(aw_actor_t *a,edict_t *e,edict_t *o,aw_actor_t *b){'))
         self.assertIn('if(!sv_player || sv_player->v.health<=0)return;', hc)          # the player's path as before
         gt = host[host.index('case AWF_GETTARGET:'):host.index('case AWF_ROTATE:')]
         self.assertIn('AW_CombatTargetOf(e,&pl)', gt)

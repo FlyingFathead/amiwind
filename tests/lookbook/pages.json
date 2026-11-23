@@ -160,6 +160,36 @@
    "checks": [
     "965 of 965 triangles, 667 vertices, 0 open edges, the whole surface within 0.5 units of its source"
    ]
+  },
+  {
+   "id": "MENU-COLOURS-GAME-PALETTE",
+   "title": "The windows of a running game are drawn in the game's own colours, not in the title screen's palette",
+   "what": "The inventory with its item icons and the character picture, the map, the journal, and the stats and magic windows show the game palette's colours after any start, a start from the title menu by a console command included; only the title menu itself shows the title art's own palette. The UI's own colours (white text, greys) keep the entries they had before the scene palette's ice ramp.",
+   "confirmed": [
+    {"date": "2026-11-22", "version": "v0.0.68-dev7", "how": "the maintainer's report of the regression on the v0.0.68-dev7 image: the map and the inventory with its icons showed a red cast they had not had; the windows of a game started by New Game or Load in v0.0.68-dev6 are the confirmed look"}
+   ],
+   "register": ["LOOKBOOK-NO-COLOUR-CHECK-68"],
+   "docs": ["docs/INVENTORY.md", "docs/WORLD_MAP_AND_JOURNAL.md", "docs/AMIWIND_CONSOLE_COMMANDS.md"],
+   "code": [
+    {"file": "engine/aga/src/aw_menu.c", "functions": ["AW_MenuFrontEnd", "game_menu"], "what": "the title menu: the menu with no game behind it"},
+    {"file": "engine/aga/src/aw_ui.c", "functions": ["AW_UIMenuPalette", "AW_UIColor", "AW_UIColorUsable", "palette_command"], "what": "the palette the screen is drawn through, the UI's colour picks off the textures' ice ramp, and the readout of both"},
+    {"file": "engine/aga/src/view.c", "functions": ["V_UpdatePalette"], "what": "the palette each frame is shown through"},
+    {"file": "tools/prepare_ui.py", "functions": ["background_packet"], "what": "the title art's own palette, which shares only the UI's entries with the game palette"}
+   ],
+   "kind": "session",
+   "status": "active",
+   "steps": "menu_colours_game_palette.txt",
+   "checks": [
+    "after the book's start from the title menu by a console command (no Escape pressed before), each window opened by its key reads back the game palette and not the title art's (aw_ui_palette), on its own screen: inventory, map, journal, and a window over the game for stats and magic",
+    "closed again, the screen is the game's"
+   ],
+   "stills": [
+    {"name": "menu-inventory", "what": "the inventory with its item icons and the character picture", "regions": [], "reference": false},
+    {"name": "menu-map", "what": "the map screen", "regions": [], "reference": false},
+    {"name": "menu-journal", "what": "the journal", "regions": [], "reference": false},
+    {"name": "menu-stats", "what": "the stats window", "regions": [], "reference": false},
+    {"name": "menu-magic", "what": "the magic window", "regions": [], "reference": false}
+   ]
   }
  ],
  "seeds": [
@@ -169,6 +199,7 @@
   {"what": "The dock guard's walk to his post in the opening", "register": ["PIER-GUARD-WALKS-INTO-DOOR-65"], "source": "reported again 2026-11-18", "status": "written", "page": "DOCK-GUARD-POST"},
   {"what": "The inventory's key line per item kind", "register": ["EQUIP-ACTION-REGRESSION-62"], "source": "reported again 2026-11-18", "status": "written", "page": "INVENTORY-HINT-PER-KIND"},
   {"what": "The cliff racer drawn whole", "register": ["CREATURE-RACER-MESH-SPIKE-58"], "source": "reported again 2026-11-18", "status": "written", "page": "CLIFF-RACER-WHOLE"},
+  {"what": "The windows of a running game in the game's own colours after any start", "register": ["LOOKBOOK-NO-COLOUR-CHECK-68"], "source": "reported 2026-11-22", "status": "written", "page": "MENU-COLOURS-GAME-PALETTE"},
   {"what": "First-person clothing drawn on the arms: robes, long sleeves and gloves (page FP-CLOTHING-VISIBLE)", "register": ["ROBE-PART-NOT-BAKED-62"], "source": "confirmed by the maintainer, 2026-11-18, on v0.0.67-dev2", "status": "to write"},
   {"what": "A held weapon or item sits in the hand in first and third person (page HELD-ITEM-IN-HAND)", "register": ["FP-TORCH-OUT-OF-HAND-67"], "source": "the held-light regression of 2026-11-18", "status": "to write"},
   {"what": "The OK box of the character windows highlighted when the keys reach it", "register": ["RACE-MENU-OK-HIGHLIGHT-65"], "source": "confirmed by the maintainer (register closure)", "status": "to write"},

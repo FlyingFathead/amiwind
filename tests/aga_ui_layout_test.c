@@ -113,6 +113,19 @@ int main(void){
         printf("the helper: box, title, content and a centred button row %d rows above the bottom edge ok\n",
                aw_layout_metrics.bottom_margin);
     }
+    /* 1b. MAP-VERSION-2-DEFAULT-68: a window title in the 308-pixel title bar (the map's place name): 288 pixels of text
+     * (the bar less two 3-pixel end blocks and the plaque's 14); the game's font when the name fits, else the console
+     * glyphs (4 pixels each: 72 fit), else 72 of them (the caller ends the name in "...") */
+    {
+        aw_layout_title_t t;
+        assert(AW_LayoutTitle(&t,308,120,20)==AW_TITLE_GAME_FONT && t.room==288 && t.plaque==134 && t.chars==20);
+        assert(AW_LayoutTitle(&t,308,288,40)==AW_TITLE_GAME_FONT && t.plaque==302);          /* exactly the room */
+        assert(AW_LayoutTitle(&t,308,289,40)==AW_TITLE_CONSOLE && t.plaque==40*4+14 && t.chars==40);
+        assert(AW_LayoutTitle(&t,308,400,72)==AW_TITLE_CONSOLE && t.plaque==302);
+        assert(AW_LayoutTitle(&t,308,500,80)==AW_TITLE_CONSOLE_CUT && t.chars==72 && t.plaque==302);
+        assert(AW_LayoutTitle(&t,10,5,1)==AW_TITLE_CONSOLE_CUT && t.room==0 && t.chars==0);   /* no room at all */
+        printf("the title helper: game font up to 288 pixels, then the console glyphs, then cut ok\n");
+    }
 
     /* 2. THE CHECK CATCHES EACH FAULT, drawn as v0.0.67-dev1 drew it */
     /* a. the message box's OK against the bottom edge (the layout before: the button's foot on the frame's inner edge) */

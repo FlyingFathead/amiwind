@@ -1,0 +1,13 @@
+{
+  "format": "AmiWind region draw distance 1",
+  "note": "The draw (fog) distance by region, in local units: with Options > Video > Fog distance auto on (the default) the game uses the row of the region the player is in, and the universal value everywhere else; the player's own value applies everywhere once Auto is off. Regions by the game's own region ids (case folded). A row in state trial applies only with the setting aw_fog_region_trial on (off by default): it waits for the frame rate measured on real hardware and the maintainer's decision; state default applies in every image. tools/region_draw.py writes world/region-draw.txt at the image step; the engine is engine/aga/src/aw_fog.c (REGIONAL-DRAW-DISTANCE-68). The CHIM world's own visibility reach is 540, so a row up to 540 needs no world rebuild.",
+  "universal": 300,
+  "regions": [
+    {"id": "brodir grove region", "name": "Brodir Grove", "distance": 540, "state": "trial", "why": "Solstheim: open snowfields and forest seen from afar"},
+    {"id": "felsaad coast region", "name": "Felsaad Coast", "distance": 540, "state": "trial", "why": "Solstheim: open snowfields and forest seen from afar"},
+    {"id": "hirstaang forest region", "name": "Hirstaang Forest", "distance": 540, "state": "trial", "why": "Solstheim: open snowfields and forest seen from afar"},
+    {"id": "isinfier plains region", "name": "Isinfier Plains", "distance": 540, "state": "trial", "why": "Solstheim: open snowfields and forest seen from afar"},
+    {"id": "moesring mountains region", "name": "Moesring Mountains", "distance": 540, "state": "trial", "why": "Solstheim: the mountains and the glacier seen from afar"},
+    {"id": "thirsk region", "name": "Thirsk", "distance": 540, "state": "trial", "why": "Solstheim: open snowfields and forest seen from afar"}
+  ]
+}

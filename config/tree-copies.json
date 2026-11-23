@@ -16,6 +16,24 @@
     "needle_texture": "baked",
     "texture_units": 128
   },
+  "rally": {
+    "note": "The rally-game trees (SOLSTHEIM-TREES-THREE-LOD-68, the maintainer, 22 November 2026): the trunk in polygons, the crown cut from above into wedges by vertical planes through the trunk's axis, each plane one see-through picture face per side, its picture rendered from the original crown (tools/chim_tree_rally.py). planes 4 = 8 panes. pane_texture: silhouette (the whole crown seen across the plane) or slice (only the crown's triangles in that plane's wedge). trunk: original (the model's bark triangles) or prism (trunk_sides tapered bark faces). texels_per_unit: picture texels per map unit at scale 1 (lowered per model when a pane would pass the converter's 240-texel face extent). supersample: the picture is rendered this many times larger and a texel is solid where at least coverage of its samples are. outline_corners: each pane face is the convex outline of its solid texels with at most this many corners. methods: the alternative model numbers of a test image built with --chim-sol-tree-copies rally-switch, picked in game by aw_tree_crowns.",
+    "planes": 4,
+    "first_angle_degrees": 0,
+    "pane_texture": "silhouette",
+    "trunk": "original",
+    "trunk_sides": 6,
+    "texels_per_unit": 1.0,
+    "supersample": 3,
+    "coverage": 0.34,
+    "outline_corners": 8,
+    "methods": {
+      "2": {"pane_texture": "silhouette", "trunk": "original"},
+      "3": {"pane_texture": "slice", "trunk": "original"},
+      "4": {"pane_texture": "silhouette", "trunk": "prism"},
+      "5": {"pane_texture": "slice", "trunk": "prism"}
+    }
+  },
   "layers": {
     "bloodmoon": {
       "model_stem_contains": ["tree_bm"]

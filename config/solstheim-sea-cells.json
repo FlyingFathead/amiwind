@@ -1,0 +1,8 @@
+{
+  "format": "aw-chim-cells-1",
+  "cells": [
+    "-20,15"
+  ],
+  "reason": "Solstheim's open-sea cells that have a CELL record and no LAND: named explicitly, as config/chim-cells.json names the main game's open-sea cells with a record (the regions preflight takes open sea only from an explicit cell list). The build module bloodmoon-solstheim takes them with the named set solstheim (tools/bloodmoon_solstheim_module.py module_plan); each is an ocean frame of the module's world with its row in the module's rows file, its levelled creature placements deferred as in every ocean cell (tools/chim/ocean_runtime.py admit_cell). A cell listed here needs the status ocean in the tracker reference, or the module's preflight refuses the build (CHIM-SEA-BETWEEN-ISLANDS-64).",
+  "notes": "-20,15: two levelled horker lists (bm_ex_horker_h20), no LAND, status ocean. -19,14 and -19,15, of the same kind, are the base world's ocean frames (config/chim-cells.json) and are not listed here. -29,23 and -28,24 (a CELL record each, no LAND, nothing placed) are added once a CHIM import of the open sea has given them the status ocean."
+}

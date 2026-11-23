@@ -2,11 +2,12 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 3 times; something has to be done
+## PERSISTING: reported 4 times; something has to be done
 
 - Reported with v0.0.32-dev1 at 2026-10-08 (time not recorded): BUILD-IMAGE-SERIAL-32: image step on one core
 - Reported with v0.0.36-dev3 at 2026-10-11 00:43 +0300: audio payload and CHIM maps serial, stats on one core
 - Reported with v0.0.45 at 2026-10-20 02:30 +0300: v0.0.45 release-try2 perf guard: image finalize 2.76/24 cores 4m09s, CHIM world volume 1.00, boot partition 0.98, payload preflight 1.08
+- Reported with v0.0.68-dev7 at 2026-11-22 16:46 +0200: Seen again: the image step of a test build ran on one core for about five minutes in its serial steps; its usual run is about twelve minutes at four cores.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -39,6 +40,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-10-08: BUILD-IMAGE-SERIAL-32: cause and repair
 - 2026-10-11 00:43 +0300: seen again in v0.0.36-dev3: audio payload and CHIM maps serial, stats on one core
 - 2026-10-20 02:30 +0300: seen again in v0.0.45: v0.0.45 release-try2 perf guard: image finalize 2.76/24 cores 4m09s, CHIM world volume 1.00, boot partition 0.98, payload preflight 1.08
+- 2026-11-22 16:46 +0200: seen again in v0.0.68-dev7: Seen again: the image step of a test build ran on one core for about five minutes in its serial steps; its usual run is about twelve minutes at four cores.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -47,7 +49,7 @@ _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
+- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Status: 8 October 2026](#status-8-october-2026)
 - [Symptom](#symptom)

@@ -33,7 +33,7 @@ class LargeRoomFogSetting(unittest.TestCase):
     def test_menu_rows_and_help(self):
         menu = (SRC / 'aw_menu.c').read_text(encoding='utf-8')
         for text in ('"Fog distance outdoors: %ld"', '"Fog distance indoors: %ld"', '"Fog in large rooms: On"',
-                     'ROW_FOG,ROW_RESET,ROW_FOG_INDOORS,ROW_ROOMFOG,ROW_FAR'):
+                     'ROW_FOG,ROW_FOG_AUTO,ROW_FOG_INDOORS,ROW_ROOMFOG,ROW_FAR'):
             self.assertIn(text, menu)
         table = (ROOT / 'config/debug-commands.txt').read_text(encoding='utf-8')
         self.assertRegex(table, re.compile(r'^VIDEO\|fog indoors\|aw_fog_distance_interior\|', re.M))

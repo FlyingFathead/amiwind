@@ -123,12 +123,14 @@ static void every_entry_translates(void){
        !strcmp(bar1+1,"kill")?" actors killpick":
        !strcmp(bar1+1,"spawn")?" actors spawn":!strcmp(bar1+1,"despawn")?" actors despawnpick":
        !strcmp(bar1+1,"weapon")?" box weapon":!strcmp(bar1+1,"gear")?" box gear":
-       (!strcmp(bar1+1,"set race") || !strcmp(bar1+1,"set playerrace"))?" playerrace":"");
+       (!strcmp(bar1+1,"set race") || !strcmp(bar1+1,"set playerrace"))?" playerrace":
+       !strcmp(bar1+1,"pan cam")?" pan":"");
   /* DBG-SUPERSPEED-62: the camera and cast words keep their own word; a bare switch with a state gets the other
    * value (every setting reads 0 here: "1" for a setting, "on" for a command); fog rule / cut groups flip a bit */
   {char *sub=strchr(bar1+1,' ');const char *state;
    if(sub && ((!strcmp(handler,"aw_camera") && !strncmp(bar1+1,"camera ",7)) ||
-              (!strcmp(handler,"aw_magicfx") && !strncmp(bar1+1,"cast ",5))))
+              (!strcmp(handler,"aw_magicfx") && !strncmp(bar1+1,"cast ",5)) ||
+              (!strcmp(handler,"aw_cam") && !strncmp(bar1+1,"cam ",4))))
        snprintf(expect,sizeof expect,"%s%s\n",handler,sub);
    if(AW_DebugPureToggle(bar3+1) && (state=AW_DebugToggleState(bar1+1,handler))!=NULL){
        expect[strlen(expect)-1]=0;strcat(expect,!strcmp(state,handler)?" 1\n":" on\n");}
@@ -175,6 +177,19 @@ int main(int count,char **values){
     assert(AW_DebugTranslate(3,de,output,sizeof(output))==1 && !strcmp(output,"chim actors despawn all\n"));
     assert(!AW_DebugTranslate(4,de,output,sizeof(output)));
     de[2]="fargoth";assert(!AW_DebugTranslate(3,de,output,sizeof(output)));
+  }
+  { /* DBG-CAM-PAN-TRACK-68: dbg cam pan / dbg pan cam (the alias) and dbg cam track keep their word; the words after
+     * them, a negative angle and the off a session script ends a shot with, reach the camera marks command */
+    char *pan[]={"dbg","cam","pan","180","5"},*alias[]={"dbg","pan","cam","-90","2","speed","10"},
+         *track[]={"dbg","cam","track","40","to","sn1","4"},*off[]={"dbg","cam","track","off"},*orbit[]={"dbg","cam","orbit","off"};
+    assert(AW_DebugTranslate(5,pan,output,sizeof(output))==1 && !strcmp(output,"aw_cam pan 180 5\n"));
+    assert(AW_DebugTranslate(3,pan,output,sizeof(output))==1 && !strcmp(output,"aw_cam pan\n"));
+    assert(AW_DebugTranslate(7,alias,output,sizeof(output))==1 && !strcmp(output,"aw_cam pan -90 2 speed 10\n"));
+    assert(AW_DebugTranslate(3,alias,output,sizeof(output))==1 && !strcmp(output,"aw_cam pan\n"));
+    assert(AW_DebugTranslate(7,track,output,sizeof(output))==1 && !strcmp(output,"aw_cam track 40 to sn1 4\n"));
+    assert(AW_DebugTranslate(4,off,output,sizeof(output))==1 && !strcmp(output,"aw_cam track off\n"));
+    assert(AW_DebugTranslate(4,orbit,output,sizeof(output))==1 && !strcmp(output,"aw_cam orbit off\n"));
+    pan[3]="180;quit";assert(AW_DebugTranslate(5,pan,output,sizeof(output))==0);
   }
   assert(AW_DebugTranslate(2,tracker,output,sizeof(output))==1 && !strcmp(output,"aw_shroomtracker\n"));
   { /* DBG-TOGGLE-WORDS-31: toggle words reach settings as 1/0; commands keep their words. */

@@ -31,7 +31,8 @@ static byte fog_colours[4096];static int inside;
 int AW_Interior(void){return inside;}
 void Cvar_RegisterVariable(cvar_t *v){v->value=atof(v->string);if(!strcmp(v->name,"aw_terrain_horizon"))horizon_switch=v;if(!strcmp(v->name,"aw_fog"))fog_switch=v;
     if(!strcmp(v->name,"aw_land_fill"))land_fog_switch=v;
-    if(!strcmp(v->name,"aw_skyline_fill"))skyline_switch=v;if(!strcmp(v->name,"aw_horizon_defaults"))defaults_switch=v;}
+    if(!strcmp(v->name,"aw_skyline_fill"))skyline_switch=v;if(!strcmp(v->name,"aw_horizon_defaults"))defaults_switch=v;
+    if(!strcmp(v->name,"aw_drawdistance_auto"))v->value=0;}   /* this fixture draws at its own aw_drawdistance (Auto off) */
 void Cvar_SetValue(char *name,float value){
     if(!strcmp(name,"aw_skyline_fill"))skyline_switch->value=value;
     else if(!strcmp(name,"aw_horizon_defaults"))defaults_switch->value=value;

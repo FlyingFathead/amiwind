@@ -534,6 +534,8 @@ int AW_ObjectDisabled(unsigned int reference);
  * on this map to hide (an exterior CHIM static: not yet). */
 int AW_ObjectTake(unsigned int reference,int stolen);
 int AW_PlacedActivate(unsigned reference);   /* aw_inventory.c: a script's Activate on a placed item; 1 used */
+int AW_ContainerActivate(unsigned reference);   /* aw_inventory.c: a script's Activate on a container; 1 used */
+int AW_CorpseActivate(struct edict_s *e,unsigned reference);   /* aw_corpse.c: a script's Activate on a dead actor */
 extern int (*aw_inventory_intercept)(unsigned reference);   /* aw_inventory.c; aw_mwhost.c sets it */
 int ChimRoom_Hide(unsigned reference,int hide);   /* chim/chim_room.c: a room's placements of REFERENCE out (1) or back */
 int ChimRoom_Has(unsigned reference);             /* chim/chim_room.c: the loaded room's drawn placements of REFERENCE */
@@ -705,6 +707,9 @@ extern void (*aw_hud_compass_draw)(void);   /* aw_ui.c; set by aw_worldui.c (NAV
 void AW_UITextBox(int,int,int,int,const char *,int);
 void AW_UITextCentred(int,int,int,int,const char *,int);   /* centred by painted bounds */
 extern int (*aw_title_bar)(int x,int y,int w,const char *title);   /* aw_icons.c: the original title bar */
+/* aw_icons.c: the same bar with its black plaque only (*PLAQUE_W wide, its left edge into *PLAQUE_X), for a title the
+ * caller draws itself (the map's title in the console glyphs, MAP-VERSION-2-DEFAULT-68); 0 without the art */
+extern int (*aw_title_plaque)(int x,int y,int w,int *plaque_x,int *plaque_w);
 extern const char *(*aw_hand_to_hand_name)(void);   /* aw_icons.c: GMST sSkillHandtohand */
 extern int (*aw_inventory_row_icon)(int slot,const char *id,int equipped,int x,int y);   /* aw_icons.c */
 int AW_UILogo(int,int);

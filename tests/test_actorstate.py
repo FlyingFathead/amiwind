@@ -415,7 +415,7 @@ int main(int argc,char **argv){
      /* refusals: cut, a longer block, a wrong version, no records, a block that is not AWAR; nothing added */
      AW_ActorStateImport(save,n);
      k=AW_ActorStateImportRecords(big,m-1)+AW_ActorStateImportRecords(big,m+1);
-     big[4]=2;k+=AW_ActorStateImportRecords(big,m);big[4]=1;
+     big[4]=3;k+=AW_ActorStateImportRecords(big,m);big[4]=1;
      memcpy(save+4096,"AWAR\1\0\0\0\0\0\0\0",12);k+=AW_ActorStateImportRecords(save+4096,12);
      k+=AW_ActorStateImportRecords(save,n);
      live=AW_ActorStateLive(&changed);P(" refused %d live %d",k,live);
@@ -467,6 +467,34 @@ int main(int argc,char **argv){
      k2=AW_ActorStateRecordsCopy(host_alloc,8,&b,&bytes);P(" small %d %d",k2,b==NULL);
      k3=AW_ActorStateRecordsCopy(host_alloc,1000000,&b,&bytes);
      P(" kept %d %d %d\n",k3,bytes==AW_ActorStateExportRecords(NULL,0),b && !memcmp(b,"AWAR",4));free(b);}
+    /* MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68: the fight orders. An order against the player alone leaves the block at
+     * version 1 (the bytes a save always had); one against another actor makes it version 2 (4 bytes a record more);
+     * the walk by cursor; a death ends the order; both versions read back with their targets (a version 1 order is the
+     * player's); a cut or longer block, an unknown version and version 2 bytes named version 1 add nothing; the end of
+     * every order */
+    {static unsigned char v1[4096],v2[4096];int n1,n2,k,cur=0,c1,c2,ch;uint32_t refs[4],tg[4];aw_actor_t *x,*y,*z;
+     int rat=AW_ActorFind("test_rat");
+     AW_ActorStateImport(NULL,0);
+     x=AW_ActorGet(501,row,1);y=AW_ActorGet(502,rat,1);z=AW_ActorGet(503,rat,1);
+     AW_ActorOrder(x,AW_ACTOR_PLAYER_REF);
+     P("orders count %d changed %d",AW_ActorOrderCount(),(x->flags&AWL_CHANGED)!=0);
+     n1=AW_ActorStateExportRecords(v1,sizeof(v1));P(" v1 %d bytes %d",v1[4],n1);
+     AW_ActorOrder(y,501);AW_ActorOrder(z,502);
+     n2=AW_ActorStateExportRecords(v2,sizeof(v2));P(" v2 %d bytes %d need %d",v2[4],n2,AW_ActorStateExportRecords(NULL,0));
+     c1=AW_ActorOrders(&cur,refs,tg,2);
+     P(" walk %d %u>%u %u>%u",c1,(unsigned)refs[0],tg[0]==AW_ACTOR_PLAYER_REF?0u:(unsigned)tg[0],(unsigned)refs[1],(unsigned)tg[1]);
+     c2=AW_ActorOrders(&cur,refs,tg,2);P(" then %d %u>%u cursor %d",c2,(unsigned)refs[0],(unsigned)tg[0],cur);
+     AW_ActorKill(z);P(" killed %d %d",(z->flags&AWL_COMBAT)!=0,AW_ActorOrderCount());
+     AW_ActorStateImport(NULL,0);k=AW_ActorStateImportRecords(v2,n2);
+     x=AW_ActorGet(501,row,0);y=AW_ActorGet(502,rat,0);z=AW_ActorGet(503,rat,0);
+     P(" back2 %d %d %u %u",k,x && x->fight_ref==AW_ACTOR_PLAYER_REF,y?(unsigned)y->fight_ref:0u,z?(unsigned)z->fight_ref:0u);
+     AW_ActorStateImport(NULL,0);k=AW_ActorStateImportRecords(v1,n1);x=AW_ActorGet(501,row,0);
+     P(" back1 %d %d %d",k,x && (x->flags&AWL_COMBAT),x && x->fight_ref==AW_ACTOR_PLAYER_REF);
+     AW_ActorStateImport(NULL,0);
+     k=AW_ActorStateImportRecords(v2,n2-1)+AW_ActorStateImportRecords(v2,n2+1);
+     v2[4]=3;k+=AW_ActorStateImportRecords(v2,n2);v2[4]=1;k+=AW_ActorStateImportRecords(v2,n2);v2[4]=2;
+     P(" refused %d live %d",k,AW_ActorStateLive(&ch));
+     k=AW_ActorStateImportRecords(v2,n2);c1=AW_ActorOrdersEnd();P(" again %d end %d %d\n",k,c1,AW_ActorOrderCount());}
     AW_ActorStateClose();free(file);return 0;
 }
 '''
@@ -503,6 +531,17 @@ class EngineTests(unittest.TestCase):
         # over the limit return 0 (the save is refused) and hand out nothing; then the AWAR block is kept whole
         line = next(l for l in self.out if l.startswith('recordscopy '))
         self.assertEqual(line, 'recordscopy empty 1 1 0 noalloc 0 1 0 small 0 1 kept 1 1 1')
+
+    def test_fight_orders_and_the_record_block_versions(self):
+        # MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68: an order marks its record changed (kept and saved). With orders against
+        # the player only the block stays version 1, 12 + 182 bytes, as every save before; an order against another
+        # actor makes it version 2, 12 + 3 x 186. The walk gives two, then the third and wraps; a death ends the order.
+        # Version 2 reads back with each target, version 1 with the player as the target; a cut or longer block, an
+        # unknown version and version 2 bytes named version 1 add nothing; all three orders end at once.
+        line = next(l for l in self.out if l.startswith('orders '))
+        self.assertEqual(line, 'orders count 1 changed 1 v1 1 bytes 194 v2 2 bytes 570 need 570 '
+                               'walk 2 501>0 502>501 then 1 503>502 cursor 0 killed 0 2 '
+                               'back2 1 1 501 502 back1 1 1 1 refused 0 live 0 again 1 end 3 0')
 
     def test_lookup_and_base(self):
         self.assertEqual(self.out[0], 'open 1 count 4')

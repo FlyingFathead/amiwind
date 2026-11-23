@@ -96,5 +96,6 @@ Related bugs in other categories:
 
 - [CHIM-FENCE-WRONG-ARCHIVE-64](CHIM-FENCE-WRONG-ARCHIVE-64.md): The see-through texture check read a texture from the wrong archive and stopped the CHIM stage
 - [CHIM-MODEL-FENCE-FACES-64](CHIM-MODEL-FENCE-FACES-64.md): CHIM model faces cannot be alpha-tested, so crossed tree panels cannot be drawn as model variants
+- [FENCE-PLACED-ORIGIN-68](FENCE-PLACED-ORIGIN-68.md): See-through faces of outdoor placed models are not drawn see-through: the spruce needle cards show as solid sheets, and many such faces are not drawn at all
 
 <!-- END GENERATED CATEGORY -->

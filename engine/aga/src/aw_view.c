@@ -38,6 +38,7 @@
 #include "aw_move.h"       /* the sneak for the body's sneak groups (PLAYER-ANIM-GROUPS-NOT-PLAYED-66) */
 #include "aw_msgbox.h"     /* the death box's button rectangles (MSGBOX-NO-CURSOR-62) */
 #include "aw_tryalloc.h"   /* dbg camera held's measure, allocated per call (CONFIRMED-LOOKBOOK-67) */
+#include "aw_cam.h"        /* the camera shots' timeline (dbg cam pan, dbg cam track; aw_cam_rules.c) */
 
 extern cvar_t chase_active;
 /* The hooks (defined beside their callers, NULL in fixtures without this file). */
@@ -83,10 +84,13 @@ static float vanity_delay_setting=30;
 /* dbg vanitycamera on: an orbit started by hand runs until any input, also with the automatic orbit off */
 static int vanity_forced;
 static aw_view_t view;
-/* dbg cam orbit (the orbit section below) */
+/* dbg cam orbit, pan and track (the orbit section below): the one camera owner. KIND: AW_VIEW_CAM_ORBIT, PAN or
+ * TRACK; a shot (pan, track) moves from FROM to TO and turns START_ANGLES by TURN along SHOT's timeline; BODY: the
+ * player's body stays drawn (a shot started in third person, the camera outside it). */
 static struct {
-    int active,photo,edict,pending,pending_photo,anglehack;double pending_since;
+    int active,photo,edict,pending,pending_photo,anglehack,kind,body;double pending_since;
     vec3_t point,offset,origin,angles,view;float yaw,pitch,distance,rate,pending_rate,movetype,flags;
+    aw_cam_shot_t shot;vec3_t from,to,start_angles,turn;
 } orbit;
 static aw_death_t death;
 static int death_mouse_x=-1,death_mouse_y=-1;   /* the death box's pointer (MSGBOX-NO-CURSOR-62) */
@@ -1055,7 +1059,8 @@ float AW_ViewRaceHeight(void) {return body_parts && parts.height>.5f && parts.he
 entity_t *AW_ViewBody(entity_t *ent) {
     float speed=0,rate=1,dt=(float)host_frametime;int group,block=-1,air,fists,layer;edict_t *p=local_player();
     held_visible=0;held_cursor=held_draw_count=0;
-    if(!owned || !body_ready() || orbit.active)return NULL;     /* the orbit: the player is not there */
+    /* the orbit: the player is not there; a shot started in third person keeps the body standing in its view */
+    if(!owned || !body_ready() || (orbit.active && !orbit.body))return NULL;
     fists=body_fists_ready(p);
     if(dt<0)dt=0;
     if(dt>.25f)dt=.25f;
@@ -1323,15 +1328,26 @@ void AW_ViewOrbitSpeed(float rate) {
     if(rate>360)rate=360;
     orbit.rate=rate;if(orbit.active)orbit_say();
 }
+/* The camera owner's detachment, for the orbit and the shots alike: the player's state kept when no camera move runs
+ * yet (AW_ViewOrbitEnd puts it back), then noclip, god, notarget, no velocity, nothing touched (SV_LinkEdict without
+ * triggers) and no button held. */
+static void camera_detach(edict_t *p) {
+    if(!orbit.active){
+        VectorCopy(p->v.origin,orbit.origin);VectorCopy(p->v.angles,orbit.angles);VectorCopy(cl.viewangles,orbit.view);
+        orbit.movetype=p->v.movetype;orbit.flags=p->v.flags;orbit.anglehack=noclip_anglehack;
+    }
+    p->v.movetype=MOVETYPE_NOCLIP;noclip_anglehack=true;
+    p->v.flags=(float)((int)p->v.flags|FL_GODMODE|FL_NOTARGET);
+    VectorCopy(vec3_origin,p->v.velocity);SV_LinkEdict(p,false);
+    IN_AWClearButtons();
+}
 /* Start (or move) the orbit: around edict EDICT (0: the fixed point) whose centre is FOCAL now,
  * the camera starting where the view is, at that distance. 0 = not now. */
 int AW_ViewOrbitStart(int edict,const float *focal,int photo,float rate) {
     edict_t *p=local_player();vec3_t d;float flat;
     if(!p || death.stage!=AW_DEATH_NONE || p->v.health<=0){Con_Printf("Orbit: not now (no live player in a running scene).\n");return 0;}
-    if(!orbit.active){
-        VectorCopy(p->v.origin,orbit.origin);VectorCopy(p->v.angles,orbit.angles);VectorCopy(cl.viewangles,orbit.view);
-        orbit.movetype=p->v.movetype;orbit.flags=p->v.flags;orbit.anglehack=noclip_anglehack;
-    }
+    camera_detach(p);      /* detached: noclip, god, notarget; the state kept unless a camera move already runs */
+    orbit.kind=AW_VIEW_CAM_ORBIT;orbit.body=0;
     orbit.edict=edict>0 && edict<cl.num_entities?edict:0;
     VectorCopy(focal,orbit.point);
     if(orbit.edict){VectorSubtract(focal,cl_entities[orbit.edict].origin,orbit.offset);}else{VectorCopy(vec3_origin,orbit.offset);}
@@ -1345,21 +1361,67 @@ int AW_ViewOrbitStart(int edict,const float *focal,int photo,float rate) {
     if(orbit.pitch>80)orbit.pitch=80;
     if(orbit.pitch<-80)orbit.pitch=-80;
     orbit.photo=photo;orbit.rate=rate;orbit.pending=0;orbit.active=1;
-    /* detached: noclip, god, notarget; no velocity, nothing touched (SV_LinkEdict without triggers) */
-    p->v.movetype=MOVETYPE_NOCLIP;noclip_anglehack=true;
-    p->v.flags=(float)((int)p->v.flags|FL_GODMODE|FL_NOTARGET);
-    VectorCopy(vec3_origin,p->v.velocity);SV_LinkEdict(p,false);
-    IN_AWClearButtons();
     orbit_say();
     Con_Printf("Orbit keys: + / - speed, 0 holds, mouse wheel distance, mouse turns, right click or Esc ends.\n");
     return 1;
 }
+/* ---- dbg cam pan and dbg cam track (aw_cam.c, docs/CAMERA_MARKS.md "Pan" and "Track") ----
+ * Camera shots for video and demo reels, on the orbit's camera owner: one writer of the view (orbit_camera), the
+ * player detached as for the orbit (camera_detach) and everything put back at the end (AW_ViewOrbitEnd). A fixed
+ * camera: the view's own point and angles when the shot starts (the player's eye in first person; the camera behind
+ * the player in third person, where the player's body stays drawn, standing where it was). Then the opening frame
+ * held, the move along aw_cam_rules.c's timeline (an eased start and stop, a constant speed between, a function of the
+ * shot's own clock), the closing frame held, and the end. The pan turns the view about its own point, as a tripod pan:
+ * the position fixed, the pitch as it was; the track glides the camera along a straight line, through walls (noclip
+ * for the camera only, the player stays), its heading held or turning to a camera mark's view. The clock runs while the
+ * game is played (not paused, the console closed): a shot typed in the console starts when the console closes; a
+ * session's command starts at once. Nothing is printed on the screen over a shot: its lines go to the console and the
+ * log only (shot_say). Esc or right click ends it early. No per-frame cost when no shot runs; nothing allocated. */
+extern int con_notify_quiet;
+static void shot_say(const char *text) {con_notify_quiet=1;Con_Printf("%s",text);con_notify_quiet=0;}
+static const char *shot_name(int kind) {return kind==AW_VIEW_CAM_PAN?"pan":"track";}
+/* KIND from the view now: to TO (NULL: where it is) and turned by VIEW_TURN (pitch and yaw; NULL: held), DISTANCE
+ * (degrees or units) at SPEED a second, HOLD seconds on each end frame. */
+static int shot_start(int kind,const float *to,const float *view_turn,float distance,float speed,float hold,int photo) {
+    edict_t *p=local_player();aw_cam_shot_t shot;char line[200];
+    int keep_body=orbit.active?orbit.body:owned && view.mode!=AW_VIEW_FIRST && body_ready();
+    if(!p || death.stage!=AW_DEATH_NONE || p->v.health<=0){
+        Con_Printf("Camera %s: not now (no live player in a running scene).\n",shot_name(kind));return 0;
+    }
+    if(!AW_CamShotBegin(&shot,distance,speed,hold)){Con_Printf("Camera %s: nothing to move.\n",shot_name(kind));return 0;}
+    camera_detach(p);
+    orbit.kind=kind;orbit.shot=shot;orbit.body=keep_body;
+    VectorCopy(r_refdef.vieworg,orbit.from);
+    VectorCopy(r_refdef.viewangles,orbit.start_angles);orbit.start_angles[ROLL]=0;
+    if(orbit.start_angles[PITCH]>80)orbit.start_angles[PITCH]=80;
+    if(orbit.start_angles[PITCH]<-80)orbit.start_angles[PITCH]=-80;
+    if(to){VectorCopy(to,orbit.to);}else{VectorCopy(orbit.from,orbit.to);}
+    orbit.turn[PITCH]=view_turn?view_turn[0]:0;orbit.turn[YAW]=view_turn?view_turn[1]:0;orbit.turn[ROLL]=0;
+    orbit.photo=photo;orbit.rate=0;orbit.pending=0;orbit.active=1;
+    snprintf(line,sizeof(line),"Camera %s: %.2f s held, %.2f s moving, %.2f s held: %.2f s in all; Esc or right click "
+             "ends it.\n",shot_name(kind),shot.hold,AW_CamShotMoveSeconds(&shot),shot.hold,AW_CamShotSeconds(&shot));
+    shot_say(line);
+    return 1;
+}
+/* DEGREES > 0 pans to the right (clockwise seen from above), < 0 to the left. */
+int AW_ViewPanStart(float degrees,float speed,float hold,int photo) {
+    float view_turn[2];
+    view_turn[0]=0;view_turn[1]=-degrees;  /* Quake's yaw grows to the left */
+    return shot_start(AW_VIEW_CAM_PAN,NULL,view_turn,degrees<0?-degrees:degrees,speed,hold,photo);
+}
+int AW_ViewTrackStart(const float *to,const float *view_turn,float speed,float hold,int photo) {
+    vec3_t d;
+    VectorSubtract(to,r_refdef.vieworg,d);
+    return shot_start(AW_VIEW_CAM_TRACK,to,view_turn,Length(d),speed,hold,photo);
+}
+int AW_ViewCameraMove(void) {return orbit.active?orbit.kind:AW_VIEW_CAM_NONE;}
 static void set_chase(int on);
 void AW_ViewOrbitEnd(int say) {
-    edict_t *p=local_player();
+    edict_t *p=local_player();int kind=orbit.kind,shot=orbit.active && (kind==AW_VIEW_CAM_PAN || kind==AW_VIEW_CAM_TRACK);
+    int done=shot && AW_CamShotDone(&orbit.shot);char line[160];
     orbit.pending=0;
     if(!orbit.active)return;
-    orbit.active=0;
+    orbit.active=0;orbit.kind=AW_VIEW_CAM_NONE;orbit.body=0;
     if(p){
         VectorCopy(orbit.origin,p->v.origin);VectorCopy(vec3_origin,p->v.velocity);
         p->v.movetype=orbit.movetype;p->v.flags=orbit.flags;noclip_anglehack=orbit.anglehack;
@@ -1368,14 +1430,31 @@ void AW_ViewOrbitEnd(int say) {
     }
     IN_AWClearButtons();
     set_chase(AW_ViewBehind(&view));
-    if(say)Con_Printf("Orbit ended: position, view, movement and flags restored.\n");
+    if(say && !shot)Con_Printf("Orbit ended: position, view, movement and flags restored.\n");
+    else if(say){
+        snprintf(line,sizeof(line),"Camera %s %s: position, view, movement and flags restored.\n",shot_name(kind),
+                 done?"ended":"stopped early");
+        shot_say(line);
+    }
 }
 /* dbg cam orbit mark NAME: start on what the mark's shot shows once it has arrived. */
 void AW_ViewOrbitPending(int photo,float rate) {
     orbit.pending=1;orbit.pending_photo=photo;orbit.pending_rate=rate;orbit.pending_since=realtime;
 }
 int AW_SceneStarting(void);
-static void orbit_frame(float dt) {
+static int playing(void);
+/* A shot's frame: the player's view is held (the mouse does not move a shot), the clock runs while the game is played,
+ * and the shot ends by itself after its closing hold. */
+static void shot_frame(float dt) {
+    VectorCopy(orbit.view,cl.viewangles);
+    if(playing())AW_CamShotStep(&orbit.shot,dt);
+    if(AW_CamShotDone(&orbit.shot))AW_ViewOrbitEnd(1);
+}
+/* FORCED: the game turned the player since the last frame (svc_setangle): that is the heading the end restores
+ * (VIEW-VANITY-UNDOES-SET-VIEW-67), and no turn of the orbit. */
+static void orbit_frame(float dt,int forced) {
+    if(orbit.active && forced){VectorCopy(cl.viewangles,orbit.view);orbit.angles[YAW]=cl.viewangles[YAW];}
+    if(orbit.active && orbit.kind!=AW_VIEW_CAM_ORBIT){shot_frame(dt);return;}
     if(orbit.pending && !orbit.active){
         int n;vec3_t focal;
         if(AW_SceneStarting() || cls.signon!=SIGNONS){orbit.pending_since=realtime;return;}
@@ -1396,6 +1475,8 @@ static void orbit_frame(float dt) {
 }
 static int orbit_key(int key) {
     if(!orbit.active || key_dest!=key_game)return 0;
+    /* a shot: right click or Esc ends it early; every other game key does nothing */
+    if(orbit.kind!=AW_VIEW_CAM_ORBIT){if(key==K_ESCAPE || key==K_MOUSE2)AW_ViewOrbitEnd(1);return 1;}
     if(key=='+' || key=='=')AW_ViewOrbitSpeed(orbit.rate+ORBIT_STEP);
     else if(key=='-')AW_ViewOrbitSpeed(orbit.rate-ORBIT_STEP);
     else if(key=='0')AW_ViewOrbitSpeed(0);
@@ -1407,8 +1488,19 @@ static int orbit_key(int key) {
     else if(key==K_ESCAPE || key==K_MOUSE2)AW_ViewOrbitEnd(1);
     return 1;                                                  /* every other game key: nothing */
 }
+/* A shot's view: the point and the angles the share of the distance covered puts it at (AW_CamShotTravel). */
+static int shot_camera(void) {
+    float f=AW_CamShotTravel(&orbit.shot)/orbit.shot.distance;int i;
+    for(i=0;i<3;i++){
+        r_refdef.vieworg[i]=orbit.from[i]+(orbit.to[i]-orbit.from[i])*f;
+        r_refdef.viewangles[i]=orbit.start_angles[i]+orbit.turn[i]*f;
+    }
+    return 1;
+}
+/* The camera owner's one writer of the view: the orbit around its centre, or a shot. */
 static int orbit_camera(void) {
     vec3_t focal,angles,forward,right,up,end,hit;float fraction,d;
+    if(orbit.kind!=AW_VIEW_CAM_ORBIT)return shot_camera();
     orbit_focal(focal);
     angles[PITCH]=orbit.pitch;angles[YAW]=orbit.yaw;angles[ROLL]=0;
     AngleVectors(angles,forward,right,up);
@@ -1572,7 +1664,7 @@ void AW_ViewFrame(void) {
     if(dt>.25f)dt=.25f;
     p=local_player();
     if(!p){if(death.stage!=AW_DEATH_NONE)end_death();orbit.active=0;set_chase(0);return;}
-    orbit_frame(dt);
+    orbit_frame(dt,forced);
     if(orbit.active){if(p->v.health<=0)AW_ViewOrbitEnd(0);else{set_chase(1);return;}}
     /* Story permission is separate from the saved camera preferences and
      * body availability. Clear pending input so locked Tab taps cannot fire

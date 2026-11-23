@@ -886,11 +886,14 @@ static void object_activate(uint32_t reference){
     if(AW_HingedDoorActivate(reference))return;
     if(AW_SceneActivate(reference))return;    /* a load door of this map */
     if(AW_PlacedActivate(reference))return;   /* a placed item: its reader with Take, or taken (the census papers) */
+    if(AW_ContainerActivate(reference))return;   /* a container: its lock, trap and strip (CONTAINER-SCRIPT-ACTIVATE-67) */
     {   /* an NPC: its conversation, as E opens it (OpenMW: Activate on an actor is its default use, the dialogue; the
          * census clerk's CharGenClassNPC passes his use on this way; CENSUS-INTRO-SCRIPTS-62). Other objects' own
          * use: not yet */
         int n=entity_of_reference(reference);edict_t *e=edict_of(n);
-        if(e && !e->free && !strcmp(pr_strings+e->v.classname,"aw_npc"))AW_DialWindowTalkTo(e);
+        /* CONTAINER-SCRIPT-ACTIVATE-67: a dead actor's own use is the search of its body (aw_corpse.c), never a talk */
+        if(e && !e->free && !strcmp(pr_strings+e->v.classname,"aw_npc") && !AW_CorpseActivate(e,reference))
+            AW_DialWindowTalkTo(e);
     }
 }
 /* gone from the world: taken or disabled (not drawn, no aim box, no actor spawned) */
@@ -1604,36 +1607,118 @@ static int32_t host_spell(int instance,int target,int verb,int spell){
     if(verb==AWM_SPELL_BLIGHT_DISEASE)return AW_ActorHasSpellType(a,2);   /* ASPT type 2: a blight disease */
     return AW_ActorHasSpell(a,spell);
 }
+/* --- the fight orders (MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68, slice 2). OpenMW 0.51 aiextensions.cpp OpStartCombat ->
+ * mechanicsmanagerimp.cpp startCombat stacks an AiCombat package on the actor, which stays until StopCombat, the
+ * actor's death or its target's (aicombat.cpp). Here the order is kept on the actor's record (aw_actorstate.h
+ * AWL_COMBAT and fight_ref: whom it fights), saved with it, and a fight slot holds the actor while it can fight: when
+ * the order is given, or once a second after it (fight_orders) when the actor and its target are loaded near the
+ * player and a slot is free. So a StartCombat on an actor that is not loaded, or past the slots, is taken up later
+ * instead of lost. The sheet is read from disk only for a fight that can start
+ * (STARTCOMBAT-SHEET-READ-BEFORE-SLOT-68). --- */
+int AW_CombatSlotsFree(void);   /* aw_combat.c; declared here: aw_combat.h is keyed by the CHIM world stage */
+extern void (*aw_combat_calmed)(void);   /* aw_combat.c, as above */
+static unsigned long orders_kept,orders_taken,orders_dropped;   /* given without a fight starting; taken up; ended unfought */
+static unsigned long pchit_blows,pchit_set,pchit_unnamed;static int pchit_count;   /* OnPCHitMe (pc_hit, below) */
+static int orders_live,orders_cursor;static float orders_clock;
+static void order_set(aw_actor_t *a,uint32_t target){if(a && target){AW_ActorOrder(a,target);orders_live=1;}}
+/* A (its edict E) starts its fight now: against the player (O NULL), or against the actor O (record B), each with its
+ * own sheet; the one attacked takes its attacker as its order unless it holds one. 1 fighting; 0 not now (no slot for
+ * it, or the combat layer said no: the order waits) or never (no fight sheet: the order ends). */
+static int fight_start(aw_actor_t *a,edict_t *e,edict_t *o,aw_actor_t *b){
+    aw_fighter_t sheet,other_sheet;eval_t *v,*w;
+    if(!a || !e || e->free || e==sv_player || (a->flags&AWL_DEAD) || (o && (!b || o==e || o->free)))return 0;
+    if(AW_CombatSlotsFree()<(AW_CombatFighter(e)?0:1)+(o && !AW_CombatFighter(o)?1:0))return 0;
+    v=field_source(e);
+    if(!v || !v->string || !AW_CombatActorLoad(pr_strings+v->string,&sheet)){AW_ActorOrder(a,0);orders_dropped++;return 0;}
+    to_fighter(a,&sheet);
+    if(!o)return AW_CombatEngage(e,&sheet,NULL);
+    w=field_source(o);
+    if(!w || !w->string || !AW_CombatActorLoad(pr_strings+w->string,&other_sheet)){
+        AW_ActorOrder(a,0);orders_dropped++;combat_refused++;return 0;}
+    to_fighter(b,&other_sheet);
+    if(!AW_CombatEngageAgainst(e,&sheet,o,&other_sheet))return 0;
+    if(!(b->flags&AWL_COMBAT))order_set(b,a->reference);
+    return 1;
+}
+/* the one way a fight is ordered: the order on A's record first, then the fight when it can start now. 1 fighting,
+ * 0 the order waits (or ended in fight_start) */
+static int fight_order(aw_actor_t *a,edict_t *e,edict_t *o,aw_actor_t *b){
+    order_set(a,o?b->reference:AW_ACTOR_PLAYER_REF);
+    if(e && fight_start(a,e,o,b)){combat_starts++;if(o)combat_between++;return 1;}
+    if(a->flags&AWL_COMBAT)orders_kept++;
+    return 0;
+}
+static int is_actor(const edict_t *e);
+int AW_ObjectDisabled(unsigned int reference);
+#define ORDERS_PASS 32          /* orders looked at in one pass (a second); more go on in the next */
+/* once a second while any record holds an order: the orders whose actor is loaded, alive, not disabled and not fighting,
+ * within the actors' processing range (7168 original units) of the player, and whose target is here and alive, start
+ * their fights, the nearest first, while a slot is free. An order whose target died ends. One walk of the records
+ * (a flag test each) and one of the edicts, nothing while no record holds an order. */
+static void fight_orders(float dt){
+    uint32_t refs[ORDERS_PASS],targets[ORDERS_PASS];edict_t *who[ORDERS_PASS],*whom[ORDERS_PASS];float away[ORDERS_PASS];
+    int i,k,n,from,ready=0;float range=7168*AW_MOVE_UNIT_SCALE;aw_actor_t *a,*b;
+    if(!orders_live)return;
+    orders_clock+=dt;if(orders_clock<1)return;orders_clock=0;
+    if(!sv_player || !AW_MwscriptActors() || !Cvar_VariableValue("aw_combat"))return;   /* dbg combat off: no fights */
+    from=orders_cursor;
+    n=AW_ActorOrders(&orders_cursor,refs,targets,ORDERS_PASS);
+    if(!n){if(!from)orders_live=0;return;}
+    for(k=0;k<n;k++){who[k]=whom[k]=NULL;away[k]=-1;}
+    for(i=1;i<sv.num_edicts;i++){
+        edict_t *x=EDICT_NUM(i);uint32_t r;
+        if(x->free || x==sv_player || !(r=ref_of_edict(x)))continue;
+        for(k=0;k<n;k++){if(refs[k]==r)who[k]=x;if(targets[k]==r)whom[k]=x;}
+    }
+    for(k=0;k<n;k++){
+        edict_t *e=who[k];vec3_t d;
+        if(targets[k]!=AW_ACTOR_PLAYER_REF){
+            b=AW_ActorGet(targets[k],AW_ACTOR_NONE,0);
+            if(b && (b->flags&AWL_DEAD)){
+                if((a=AW_ActorGet(refs[k],AW_ACTOR_NONE,0))!=NULL)AW_ActorOrder(a,0);
+                orders_dropped++;continue;
+            }
+            if(!whom[k] || !is_actor(whom[k]) || whom[k]->v.health<0)continue;
+        }else if(sv_player->v.health<=0)continue;
+        if(!e || !is_actor(e) || e->v.health<0 || AW_CombatFighter(e) || AW_ObjectDisabled(refs[k]))continue;
+        VectorSubtract(e->v.origin,sv_player->v.origin,d);
+        if(DotProduct(d,d)>range*range)continue;
+        away[k]=DotProduct(d,d);ready++;
+    }
+    while(ready>0 && AW_CombatSlotsFree()>0){
+        int best=-1;
+        for(k=0;k<n;k++)if(away[k]>=0 && (best<0 || away[k]<away[best]))best=k;
+        if(best<0)break;
+        away[best]=-1;ready--;
+        a=record_of_edict(who[best]);b=whom[best]?record_of_edict(whom[best]):NULL;
+        if(!a || !(a->flags&AWL_COMBAT) || (whom[best] && !b))continue;
+        if(fight_start(a,who[best],whom[best],b)){orders_taken++;combat_starts++;if(whom[best])combat_between++;}
+    }
+}
+/* DBG-COMBAT-CALM-LEAVES-HOSTILE-MARK-68: `dbg combat calm` and `dbg combat off` end every order too (aw_combat.c) */
+static void orders_calmed(void){if(AW_MwscriptActors() && AW_ActorOrdersEnd())AW_MwvmStateChanged();}
 static void host_combat(int instance,int target,int verb,int other){
     edict_t *e;aw_actor_t *a=actor_of(instance,target,&e);
     actor_calls++;
-    if(!a || !e || e==sv_player){actor_misses++;return;}
+    if(!a || e==sv_player){actor_misses++;return;}
     if(verb==0){
-        /* StartCombat with the player (the one fight the combat layer has): not when either is dead (OpenMW) */
-        aw_fighter_t sheet;eval_t *v=field_source(e);
+        /* StartCombat: not when either is dead (OpenMW). The actor itself need not be loaded: its order is kept */
         if((a->flags&AWL_DEAD))return;
         if(other!=AW_MWVM_PLAYER){
             /* COMBAT-ACTOR-VS-ACTOR-62 (v0.0.63): StartCombat on another actor (OpenMW mechanicsmanagerimp.cpp
              * startCombat): both fight each other, each with its own sheet; the other one only when it has an entity
-             * here and is alive */
-            vec3_t at;int n=locate(instance,other,at);edict_t *o=n>0?edict_of(n):NULL;aw_actor_t *b;eval_t *w;
-            aw_fighter_t other_sheet;
-            if(!o || o==e || o==sv_player || !(b=record_of_edict(o)) || (b->flags&AWL_DEAD)){combat_refused++;return;}
-            w=field_source(o);
-            if(!v || !v->string || !AW_CombatActorLoad(pr_strings+v->string,&sheet) ||
-               !w || !w->string || !AW_CombatActorLoad(pr_strings+w->string,&other_sheet)){combat_refused++;return;}
-            to_fighter(a,&sheet);to_fighter(b,&other_sheet);
-            if(AW_CombatEngageAgainst(e,&sheet,o,&other_sheet)){a->flags|=AWL_COMBAT;b->flags|=AWL_COMBAT;combat_starts++;
-                                                                combat_between++;}
+             * here and is alive (OpStartCombat finds its target in the active cells only) */
+            vec3_t at;int n=locate(instance,other,at);edict_t *o=n>0?edict_of(n):NULL;aw_actor_t *b;
+            if(!o || o==e || o==sv_player || !(b=record_of_edict(o)) || b==a || (b->flags&AWL_DEAD)){combat_refused++;return;}
+            fight_order(a,e,o,b);
             return;
         }
         if(!sv_player || sv_player->v.health<=0)return;
-        if(!v || !v->string || !AW_CombatActorLoad(pr_strings+v->string,&sheet))return;
-        to_fighter(a,&sheet);
-        if(AW_CombatEngage(e,&sheet,NULL)){a->flags|=AWL_COMBAT;combat_starts++;}
+        fight_order(a,e,NULL,NULL);
         return;
     }
-    a->flags&=~AWL_COMBAT;
+    AW_ActorOrder(a,0);
+    if(!e)return;      /* not loaded: no fight to end; its order is gone */
     if(aw_mwscript_combat_end){aw_mwscript_combat_end(e);combat_stops++;}
     else Con_DPrintf("MWScript: StopCombat waits for the combat layer's per-actor end.\n");
 }
@@ -4931,8 +5016,9 @@ static int fight_sheet(edict_t *e,aw_fighter_t *out){
 static void join_against(edict_t *e,edict_t *x){
     aw_fighter_t sheet;aw_actor_t *a=record_of_edict(e);
     if(!fight_sheet(e,&sheet))return;
-    if(x==sv_player){if(AW_CombatEngage(e,&sheet,NULL) && a)a->flags|=AWL_COMBAT;}
-    else if(AW_CombatEngageAgainst(e,&sheet,x,NULL) && a)a->flags|=AWL_COMBAT;
+    /* the one it joins against is its order's target (the resume after a load fights the same one) */
+    if(x==sv_player){if(AW_CombatEngage(e,&sheet,NULL))order_set(a,AW_ACTOR_PLAYER_REF);}
+    else if(AW_CombatEngageAgainst(e,&sheet,x,NULL))order_set(a,ref_of_edict(x));
 }
 static void join_fights(float dt){
     /* the fighters once (at most the combat layer's 16 slots), then each actor against them: the cost is the actors
@@ -5246,6 +5332,7 @@ void AW_MwscriptTick(float dt){
     AW_FallTick(dt);
     AW_CrimeTick(dt);   /* CRIME-59: the guards' pursuit and arrest on sight, a jail waiting for its conversation to end */
     join_fights(dt);    /* COMBAT-ACTOR-VS-ACTOR-62: allies and guards join fights (OpenMW Actors::engageCombat) */
+    fight_orders(dt);   /* MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68: the kept fight orders are taken up */
 }
 static void status_counts(void){
     const aw_mwvm_stats_t *s=AW_MwvmStats();int k,n=AW_MwvmInstanceCount(),attached=0,global=0,active=0,looping=0;
@@ -5311,6 +5398,9 @@ static void status_counts(void){
      Con_Printf("HitOnMe: %lu weapon blows kept (%d of %d rows held, %d bytes), %lu by NPCs not kept; %lu reads, %lu "
                 "matched\n",hits_kept,AW_CombatLastHitCount(),AW_COMBAT_LAST_HITS,
                 (int)(AW_COMBAT_LAST_HITS*2*sizeof(unsigned long)),hits_npc,hits_read,hits_matched);
+     Con_Printf("OnPCHitMe: %lu of the player's blows and harmful spells at an actor, %lu set the variable of its "
+                "script (%d scripts looked up, %lu with no variable names in the file)\n",pchit_blows,pchit_set,
+                pchit_count,pchit_unnamed);
      Con_Printf("region weather by scripts: %lu ChangeWeather and ModRegion calls kept, %lu refused (%d bytes)\n",
                 weather_calls,weather_refused,(int)sizeof(aw_weather_script_t));
      /* GETWATERLEVEL-COLUMN-NOT-ROOM-67: the room's water as the scripts read it */
@@ -5334,7 +5424,11 @@ static void status_counts(void){
                 "dropped %lu, full %lu, disk reads %lu; combat started %lu stopped %lu (%lu by a Disable); wanders %lu; "
                 "killed by a script's health %lu\n",AW_ActorCount(),
                 AW_ActorStateResident(),actor_calls,actor_misses,a->created,a->changed,a->evicted,a->full,a->reads,
-                combat_starts,combat_stops,disabled_fights_ended,wanders,script_deaths);}
+                combat_starts,combat_stops,disabled_fights_ended,wanders,script_deaths);
+     /* MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68: the orders on the records (the waiting ones: no fight slot holds them) */
+     Con_Printf("fight orders: %d on the actors' records; this session %lu kept without a fight starting, %lu taken up "
+                "later, %lu ended unfought (no fight sheet, or the target died)\n",AW_ActorOrderCount(),orders_kept,
+                orders_taken,orders_dropped);}
     Con_Printf("player standing: crime level %d, reputation %d; calls %lu (%lu not carried out)%s; PlayGroup %lu "
                "(%lu with no skeletal actor or group); topics added %lu (of %d, %d bytes kept); cures cast %lu; spell effects "
                "landed %lu, active %d, refused %lu; ForceGreeting %lu (%lu not possible); Rotate %lu (%lu with no entity); AITravel %lu (%lu not possible); AIFollow %lu (%lu not possible); Position %lu (%lu not possible)\n",
@@ -5830,6 +5924,38 @@ static const uint32_t *locn_keys(int s,int *count){
     locn_now_script=s;*count=n;
     return locn_now;
 }
+/* MWSCRIPT-ONPCHITME-NEVER-SET-68: the player's blow at an NPC or creature (a hit or a miss in reach, or a harmful
+ * spell) sets the variable OnPCHitMe of that actor's own script to 1; the script sets it back itself (OpenMW 0.51
+ * mwclass/npc.cpp and creature.cpp onHit: setVarByInt(script, "onpchitme", 1)). 32 scripts of the three masters
+ * declare it (19 of them Solstheim's) and 31 test it; nothing set it, so they waited for a blow for ever.
+ * The variable's slot is found by its name's key among the script's LOCN keys (the save's table of variable names, on
+ * disk: one read of that table for the first blow at an actor of a script, then kept here per script row; an older
+ * file without LOCN: never set, counted). An actor without a script instance costs one walk of the instances. */
+extern void (*aw_combat_pc_hit)(struct edict_s *victim);   /* aw_combat.c; not in aw_combat.h (the CHIM world's key) */
+#define PCHIT_MEMO 16
+static struct {int script,slot;} pchit_memo[PCHIT_MEMO];static int pchit_next;   /* the counts: with the status' own */
+static int pchit_slot(int script){
+    int i,n=0,slot=-1;const uint32_t *keys;uint32_t want=AW_LedgerNameHash("onpchitme")&0x3FFFFFFFu;
+    for(i=0;i<pchit_count;i++)if(pchit_memo[i].script==script)return pchit_memo[i].slot;
+    keys=locn_keys(script,&n);
+    if(!keys)pchit_unnamed++;
+    for(i=0;keys && i<n;i++)if((keys[i]&0x3FFFFFFFu)==want){slot=i;break;}   /* bits 30-31: the variable's type */
+    script_names_done();locn_now_script=-1;
+    i=pchit_count<PCHIT_MEMO?pchit_count++:(pchit_next=(pchit_next+1)%PCHIT_MEMO);
+    pchit_memo[i].script=script;pchit_memo[i].slot=slot;
+    return slot;
+}
+static void pc_hit(edict_t *e){
+    uint32_t ref=ref_of_edict(e);int i,slot,script=-1;
+    pchit_blows++;
+    if(!ref || !AW_MwvmLoaded())return;
+    for(i=0;i<AW_MwvmInstanceCount();i++){
+        aw_mwvm_instance_t *in=AW_MwvmInstance(i);
+        if(in && (in->flags&(AWI_USED|AWI_GLOBAL))==AWI_USED && in->reference==ref){script=in->script;break;}
+    }
+    if(script<0 || (slot=pchit_slot(script))<0)return;
+    if(AW_MwvmLocalSet(ref,script,slot,1)){pchit_set++;AW_MwvmStateChanged();}
+}
 /* HITM: the held key of (HOLDER, ITEM), 0 none; the item of held key KEY, 0 none */
 static uint32_t hitm_key(uint32_t holder,uint32_t item){
     uint32_t i;
@@ -6040,6 +6166,7 @@ static void script_import(const aw_ledger_t *l){
     if(l->records_bytes){
         if(AW_MwscriptActors() && !AW_ActorStateImportRecords(l->records,l->records_bytes))
             Con_Printf("Saved actor records unreadable: changed actors start from the game data.\n");
+        orders_live=1;orders_cursor=0;   /* the save's fight orders: the first pass looks (and rests when there are none) */
         AW_LedgerRecordsSet((aw_ledger_t *)l,NULL,0);
     }
     if(!resident || !AW_MwvmLoaded())return;     /* load() applies the list when the scripts come */
@@ -6228,6 +6355,8 @@ static void actors_import(const unsigned char *data,int bytes){
             }
         }
     }
+    /* the fight orders go with the records (a New Game: none; a save: its own, through the world change list's records) */
+    orders_kept=orders_taken=orders_dropped=0;orders_cursor=0;orders_clock=0;orders_live=1;
     if(!AW_MwscriptActors())return;
     if(!AW_ActorStateImport(data,actors))Con_Printf("Saved actor records unreadable: actors start from the game data.\n");
 }
@@ -6261,7 +6390,9 @@ unsigned long AW_MwscriptDigest(void){
     for(g=0;g<AW_MwvmGlobalCount();g++)if(AW_MwvmGlobalBits(g)!=AW_MwvmGlobalStart(g))changed++;
     for(i=0;known_topics && i<topic_bytes;i++)if(known_topics[i])known++;
     h=((h^changed)*16777619UL)&0xffffffffUL;
-    return ((h^known)*16777619UL)&0xffffffffUL;
+    h=((h^known)*16777619UL)&0xffffffffUL;
+    /* the fight orders on the actors' records (MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68): none at a fresh start */
+    return ((h^(unsigned long)(AW_ActorStateReady()?AW_ActorOrderCount():0))*16777619UL)&0xffffffffUL;
 }
 /* CELL-CHANGES-59 slice 7: the save's hooks for respawn and migration (aw_save.h) */
 static int save_other_ok(void){return AW_PlacedRefs()!=NULL;}
@@ -6284,6 +6415,19 @@ extern int (*aw_actor_hurt_record)(unsigned reference,float health);
 static int actor_hurt_record(unsigned reference,float health){
     aw_actor_t *a=AW_ActorStateReady() && reference?AW_ActorGet((uint32_t)reference,AW_ACTOR_NONE,0):NULL;
     return a && health<a->dyn_base[0]-0.5f?1:0;
+}
+/* COMBAT-RESUMED-FIGHT-TARGETS-PLAYER-68 (aw_actors.c SpawnOne, ApplyLoaded): the change list's kept fight of E starts
+ * again against its order's target. An order against another actor: against that actor when it is here and alive; when
+ * it is not, nothing now (the order waits for it, fight_orders), never the player in its place. No order on its record
+ * (a fight the actor began on sight, a save from before v0.0.68): against the player, as before. 1 when it fights. */
+extern int (*aw_actors_fight_resume)(edict_t *e);
+static int fight_resume(edict_t *e){
+    uint32_t ref=ref_of_edict(e);edict_t *o;aw_actor_t *b;
+    aw_actor_t *a=ref && AW_MwscriptActors()?AW_ActorGet(ref,AW_ACTOR_NONE,0):NULL;
+    if(!a || !(a->flags&AWL_COMBAT) || !a->fight_ref || a->fight_ref==AW_ACTOR_PLAYER_REF)return AW_CombatTestEngage(e,0);
+    o=edict_of(edict_of_ref(a->fight_ref));
+    if(!o || o==e || !is_actor(o) || o->v.health<0 || !(b=record_of_edict(o)) || (b->flags&AWL_DEAD))return 0;
+    return fight_start(a,e,o,b);
 }
 /* ESSENTIAL-DEATH-MESSAGE-66: an actor record's death (any cause) of an essential character shows the game's box */
 static void actor_killed(const aw_actor_t *a){
@@ -6364,6 +6508,9 @@ void AW_MwscriptInit(void){
     /* StopCombat and the crime's calm end an actor's fight (MWSCRIPT-STOPCOMBAT-UNWIRED-62: the hook was never set,
      * so StopCombat and a paid fine left the fight going) */
     if(!aw_mwscript_combat_end)aw_mwscript_combat_end=AW_CombatActorEnd;
+    aw_combat_calmed=orders_calmed;     /* DBG-COMBAT-CALM-LEAVES-HOSTILE-MARK-68 */
+    aw_combat_pc_hit=pc_hit;            /* OnPCHitMe (MWSCRIPT-ONPCHITME-NEVER-SET-68) */
+    aw_actors_fight_resume=fight_resume;   /* COMBAT-RESUMED-FIGHT-TARGETS-PLAYER-68 */
     aw_combat_attacked=attacked_hook;   /* GetAttacked (MWSCRIPT-GAPS-63) */
     aw_combat_player_kill=were_kill_hook;   /* GetWerewolfKills (MWSCRIPT-GAPS-63) */
     aw_combat_weapon_hit=weapon_hit;   /* HitOnMe: the last weapon per victim (MWSCRIPT-INVENTORY-HITONME-62) */
@@ -6381,7 +6528,7 @@ int AW_MwscriptSpeakerAggro(edict_t *e,int disposition){
     to_fighter(a,&sheet);
     /* DIALOGUE-AGGRO-62: the Fight the actor has now (an answer's SetFight, a persuasion's change), not the sheet's */
     {float f=AW_ActorStat(a,AWA_FIGHT);sheet.fight=(unsigned char)(f<0?0:f>100?100:f);}
-    if((got=AW_CombatAggro(e,&sheet,NULL,disposition,NULL,NULL))>0){a->flags|=AWL_COMBAT;combat_starts++;}
+    if((got=AW_CombatAggro(e,&sheet,NULL,disposition,NULL,NULL))>0){order_set(a,AW_ACTOR_PLAYER_REF);combat_starts++;}
     return got;
 }
 /* STEAL-WITNESSED-NO-CRIME-61 (aw_crime.h): what the crime rules read of NPC E and of the player, and a witness's
@@ -6450,7 +6597,7 @@ static void crime_calm(edict_t *e){
     aw_actor_t *a=crime_actor(e);aw_actor_base_t b;
     if(AW_CombatFighter(e) && aw_mwscript_combat_end){aw_mwscript_combat_end(e);combat_stops++;}
     if(!a)return;
-    a->flags&=~AWL_COMBAT;
+    AW_ActorOrder(a,0);
     if(AW_ActorBase(a->base,&b))AW_ActorSetStat(a,AWA_FIGHT,(float)b.fight);   /* getBaseFightRating */
     AW_MwvmStateChanged();
 }
@@ -6492,13 +6639,16 @@ static int crime_attack(edict_t *e,int fight){
     if(!a || (a->flags&AWL_DEAD))return 0;
     AW_ActorSetStat(a,AWA_FIGHT,(float)(fight>100?100:fight));   /* the Fight kept: it fights on after a Calm (OpenMW) */
     if(AW_CombatFighter(e))return 1;                              /* already fighting */
-    /* every fight slot taken (aw_combat.c SLOTS 4): no sheet read from disk for a fight that cannot start (s4: two of
-     * the six reads of combat/actors.txt at a theft were for such witnesses) */
-    if(AW_CombatHostiles()>=4)return 0;
+    /* every fight slot taken: no sheet read from disk for a fight that cannot start (s4: two of the six reads of
+     * combat/actors.txt at a theft were for such witnesses). The slots themselves are asked
+     * (MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68; a literal 4 against the player's hostiles before, which missed the slots
+     * held by fights between two actors) */
+    {int AW_CombatSlotsFree(void);   /* aw_combat.c; declared here: aw_combat.h is keyed by the CHIM world stage */
+     if(AW_CombatSlotsFree()<=0)return 0;}
     if(!AW_CombatActorLoad(pr_strings+v->string,&sheet))return 0;
     to_fighter(a,&sheet);sheet.fight=(unsigned char)(fight>100?100:fight);sheet.aware=1;
     if(!AW_CombatEngage(e,&sheet,NULL))return 0;
-    a->flags|=AWL_COMBAT;combat_starts++;
+    order_set(a,AW_ACTOR_PLAYER_REF);combat_starts++;
     return 1;
 }
 static void crime_thief(aw_crime_thief_t *t){

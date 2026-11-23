@@ -25,4 +25,6 @@ qboolean AW_MapPlace(edict_t *,const float *);
 int AW_WorldContains(const char *,const float *);
 int AW_WorldRegionCentres(float *,int);
 const char *AW_RegionNameAt(const float *source_coordinates);int AW_RegionIndexAt(const float *source_coordinates);
+/* the original's name of the exterior cell there: its own name, else its region's (MAP-VERSION-2-DEFAULT-68) */
+const char *AW_CellNameAt(const float *source_coordinates);
 #endif

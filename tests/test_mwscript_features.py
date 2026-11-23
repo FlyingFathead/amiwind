@@ -201,6 +201,50 @@ class Tracker(unittest.TestCase):
             self.assertLessEqual(set(r['refs'].get('made_by', [])), set(F.MASTERS) | {'dialogue'}, r['id'])
             self.assertIsInstance(r['error'], bool)
 
+    def test_every_called_function_has_its_effect_in_play(self):
+        """MWSCRIPT-IN-PLAY-PARITY-68: "carried out" is static; config/mwscript-effects.json says per function the
+        game's scripts call whether the engine's effect in play is the original's (full, part, none), and the page
+        shows it. A called function without a class, or a gap without its line, is refused."""
+        eff = F.effects(F.EFFECTS)
+        self.assertEqual(F.effect_problems(self.doc, eff), [])
+        table = F.function_table(self.doc)
+        self.assertLessEqual(set(table), set(eff['functions']))
+        # the refusals: no class, a gap with no line, a full row with one, a class outside the list, no basis
+        name = sorted(table)[0]
+        for change, word in ((lambda e: e['functions'].pop(name), 'has no effect class'),
+                             (lambda e: e['functions'][name].update(effect='part', missing=''), 'what is missing'),
+                             (lambda e: e['functions'][name].update(effect='full', missing='x'), 'nothing missing'),
+                             (lambda e: e['functions'][name].update(effect='mostly'), 'effect must be'),
+                             (lambda e: e['functions'][name].update(basis='guess'), 'basis must be'),
+                             (lambda e: e['functions'].update(nosuchfunction=dict(e['functions'][name])),
+                              'is not in tools/mwscript/functions.py')):
+            bad = copy.deepcopy(eff)
+            change(bad)
+            self.assertTrue(any(word in p for p in F.effect_problems(self.doc, bad)), word)
+        # the page: the column, the counts and one row per gap with its line
+        page = F.OUT.read_text(encoding='utf-8')
+        self.assertIn('| Function | Group | Carried out | Effect in play |', page)
+        self.assertIn('### Effect in play', page)
+        gaps = [n for n in table if eff['functions'][n]['effect'] != 'full']
+        self.assertGreater(len(gaps), 0)
+        section = page.split('### Effect in play', 1)[1].split('\n## ', 1)[0]
+        for n in gaps:
+            e = eff['functions'][n]
+            self.assertIn('| %s | %s |' % (n, F.EFFECT_LABELS[e['effect']]), section, n)
+            self.assertIn(F._cell(e['missing']), section, n)
+        # the static measure alone must not read as parity: a function carried out by the engine can be a gap
+        self.assertTrue(any(F.FUNCTIONS[n].run for n in gaps))
+
+    def test_effect_lines_are_public_text(self):
+        """The lines of what is missing go on a public page: the file keeps the class, the line, the register IDs and
+        the basis only, and a line names no source place (a file with a line number)."""
+        eff = F.effects(F.EFFECTS)
+        for n, e in eff['functions'].items():
+            self.assertLessEqual(set(e), {'effect', 'missing', 'register', 'basis'}, n)
+            low = e['missing'].casefold()
+            for word in ('.c:', '.py:', '.cpp:', '.h:'):
+                self.assertNotIn(word, low, n)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -88,12 +88,44 @@ MODULE_RESOLVERS = {'tribunal-mournhold': 'tools/build.py resolve_tribunal_mourn
                     'bloodmoon-solstheim': 'tools/bloodmoon_solstheim_module.py resolve'}
 
 
+def set_plan(name, status_path):
+    """The regions preflight's table of the named set NAME against the tracker file STATUS_PATH, by its module's own
+    rule: Solstheim's module also takes its open-sea cells with a record from its explicit list
+    (tools/bloodmoon_solstheim_module.py module_plan, CHIM-SEA-BETWEEN-ISLANDS-64)."""
+    from chim import regions as chim_regions
+    if name == chim_regions.layer_sets().get('Bloodmoon.esm'):
+        import bloodmoon_solstheim_module
+        return bloodmoon_solstheim_module.module_plan(status_path)[0]
+    return chim_regions.plan([name], status_path, towns=())[0]
+
+
 def finished_set_cells(name, status_path):
     """The cells of the named set NAME that the tracker file STATUS_PATH calls finished (the cells a build takes), as
-    (x, y), sorted; the set's own preflight problems are not this check's."""
+    (x, y), sorted, with the open-sea cells its module names explicitly (set_plan); the set's own preflight problems
+    are not this check's."""
     from chim import regions as chim_regions
-    table, _problems = chim_regions.plan([name], status_path, towns=())
-    return sorted(chim_regions.table_kinds(table))
+    return sorted(chim_regions.table_kinds(set_plan(name, status_path)))
+
+
+def left_out_text(name, status_path, limit=6):
+    """One line on the cells of the named set NAME that a build leaves out, grouped by reason (the regions preflight's
+    dropped list: not finished, open sea not listed), so the log names every space of the set it does not build (the
+    project's full-parity rule: every space of a shipped master is built); '' when none, or when the tracker file
+    cannot be read here."""
+    try:
+        dropped = set_plan(name, status_path)['dropped']
+    except (OSError, ValueError, KeyError):
+        return ''
+    if not dropped:
+        return ''
+    groups = {}
+    for row in dropped:
+        reason = str(row.get('reason') or '')
+        reason = reason.split(': ', 1)[1] if ': CHIMport' in reason else reason    # the region name in front
+        groups.setdefault(reason.split(' (')[0][:90], []).append('%d,%d' % tuple(row['cell']))
+    return '; %d left out: %s' % (len(dropped), '; '.join(
+        '%d %s (%s%s)' % (len(cells), reason, ' '.join(cells[:limit]), ' ...' if len(cells) > limit else '')
+        for reason, cells in sorted(groups.items())))
 
 
 PRIVATE_TEST_VERSION = re.compile(r'[0-9]+\.[0-9]+\.[0-9]+-dev[0-9]+')   # project_version's private-test rule
@@ -137,8 +169,8 @@ def module_set_problems(masters, args, status_path, log=print, version=None):
         if taken:
             from chim.regions import decode_cells
             count = len(decode_cells(taken))
-            log('Expansion cells: %s, named set %s: %d finished cell(s), %d built by the module %s'
-                % (master, sets[master], len(cells), count, module))
+            log('Expansion cells: %s, named set %s: %d finished cell(s), %d built by the module %s%s'
+                % (master, sets[master], len(cells), count, module, left_out_text(sets[master], status_path)))
             if count != len(cells):
                 problems.append('%s: the module %s takes %d cell(s) of the named set %s, the tracker file calls %d '
                                 'finished' % (master, module, count, sets[master], len(cells)))

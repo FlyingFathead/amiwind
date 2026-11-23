@@ -30,14 +30,32 @@ static int cyan_pixels,cyan_left,cyan_right,cyan_top,cyan_bottom,button_x,button
 /* six since OPENING-TUTORIAL-KEYS-65: the inventory's own key lists (aw_key_inv_use, aw_key_inv_drop) */
 /* eight since MAP-MULTI-MARKERS-66: aw_map_markers_max and aw_compass, registered last */
 /* nine since INVENTORY-ITEM-INFO-67: the inventory's information key (aw_key_inv_info) */
-static cvar_t *map_vars[9];static int map_var_count,debug_overlays=1;
-void Cvar_RegisterVariable(cvar_t *v){assert(map_var_count<9);v->value=atof(v->string);map_vars[map_var_count++]=v;}
+/* ten since MAP-VERSION-2-DEFAULT-68: aw_map_version, registered last (map_vars[9]) */
+static cvar_t *map_vars[10];static int map_var_count,debug_overlays=1;
+void Cvar_RegisterVariable(cvar_t *v){assert(map_var_count<10);v->value=atof(v->string);map_vars[map_var_count++]=v;}
 void Cvar_SetValue(char *name,float value){int i;for(i=0;i<map_var_count;i++)if(!strcmp(name,map_vars[i]->name)){map_vars[i]->value=value;return;}assert(0);}
 int AW_DebugOverlaysEnabled(void){return debug_overlays;}
-int Cmd_Argc(void){return 1;}
+/* the console's words for the map's commands (MAP-VERSION-2-DEFAULT-68: dbg dbgmap, dbg maptype); 1 word otherwise */
+static int test_argc=1;static char *test_argv[3]={"","",""};
+int Cmd_Argc(void){return test_argc;}
+char *Cmd_Argv(int i){return i>=0 && i<test_argc && i<3?test_argv[i]:"";}
 const char *AW_RegionNameAt(const float *p){region_calls++;return region_override?region_override:p[0]<0?"West test region":"East test region";}
 int AW_MapTeleport(const float *p){int i;for(i=0;i<3;i++)destination[i]=p[i];if(!jump_available)return 0;jumps++;return 1;}
-void Cmd_AddCommand(char *name,void (*fn)(void)){if(!strcmp(name,"aw_teleport_map"))teleport_command=fn;else if(!strcmp(name,"aw_worldmap"))map_command=fn;else if(!strcmp(name,"aw_journal"))journal_command=fn;}
+static void (*map_debug_command)(void),(*map_type_command)(void);
+void Cmd_AddCommand(char *name,void (*fn)(void)){if(!strcmp(name,"aw_teleport_map"))teleport_command=fn;else if(!strcmp(name,"aw_worldmap"))map_command=fn;else if(!strcmp(name,"aw_journal"))journal_command=fn;
+    else if(!strcmp(name,"aw_map_debug"))map_debug_command=fn;else if(!strcmp(name,"aw_map_type"))map_type_command=fn;}
+/* MAP-VERSION-2-DEFAULT-68: the player's cell as aw_hud.c answers (1 outdoors at cell_x,cell_y; 2 a room, cell_room) and
+ * the cell's original name as aw_world.c answers (cell_name: NULL none) */
+static int cell_kind;static long cell_x,cell_y;static const char *cell_room="",*cell_name;static int cell_name_calls;
+int AW_HudPlayerCell(long *x,long *y,char *id,int size,const char **region){
+    *x=cell_x;*y=cell_y;strncpy(id,cell_room,size-1);id[size-1]=0;*region=NULL;return cell_kind;
+}
+const char *AW_CellNameAt(const float *p){
+    cell_name_calls++;assert((long)floor(p[0]/8192)==cell_x && (long)floor(p[1]/8192)==cell_y);return cell_name;
+}
+/* the key the player bound to the map's command (aw_textdef.c), its name for the footer: none unless a test binds one */
+static const char *bound_map_key;
+const char *AW_TextBoundKeyForCommand(const char *command){return command && !strcmp(command,"aw_worldmap")?bound_map_key:NULL;}
 void IN_AWClearButtons(void){}
 int AW_StoryRestricted(void){return story_restricted;}
 /* CHARGEN-INVENTORY-LOCKED-60: the registration's inventory rule (aw_story.c); story_inventory = the papers activated */
@@ -75,7 +93,10 @@ void AW_ConsoleCharacter(int x,int y,int c){int n=strlen(drawn);assert(n<16383);
 static int squares_n,square_xy[16][2];
 /* stage 3: the door markers drawn (3x3 in the door colour), the last one's centre */
 static int door_fills,door_x,door_y;
+/* MAP-VERSION-2-DEFAULT-68: version 2's footer tabs filled as lit (1 World, 2 Local, 4 Markers) */
+static int tabs_lit;
 void AW_UIFill(int x,int y,int w,int h,int c){
+    if(h==9 && y==174 && c==AW_UIColor(48,39,22))tabs_lit|=x==216?1:x==242?2:x==268?4:8;
     if(w==3 && h==3 && c==AW_UIColor(214,96,64)){door_fills++;door_x=x+1;door_y=y+1;}
     if(w==5 && h==5 && c==AW_UIColor(202,165,96) && squares_n<16){square_xy[squares_n][0]=x+2;square_xy[squares_n][1]=y+2;squares_n++;}
     if(c==AW_UIColor(48,240,240) && w==1 && h==1){
@@ -100,7 +121,19 @@ void AW_UIBookBegin(void){}
 void AW_UIBookEnd(void){}
 int AW_UIWidth(const char *s){return (int)strlen(s)*6;}
 void AW_UIText(int x,int y,const char *s,int c){strcat(drawn,s);}
+const char *AW_WorldUIName(void);
+/* MAP-VERSION-2-DEFAULT-68: map version 2's title as drawn: in the game's font (title_game, centred in the title bar's
+ * band) or in the console glyphs (title_console, at title_console_x) */
+static char title_game[80],title_console[80];static int title_console_x;
 void AW_SmallStringColor(int x,int y,int width,const char *s,int c){
+    if(!strcmp(AW_WorldUIName(),"map")){
+        /* map version 2: the title in the title bar's band (6..313 x 6..17), else the footer box's inner rows
+         * (8..311 x 174..191), a clear row from its frame */
+        assert((int)strlen(s)*4<=width);
+        if(y<18){assert(x>=6 && x+width<=314 && y>=6 && y+5<=18);strncpy(title_console,s,79);title_console_x=x;}
+        else assert(x>=8 && x+width<=312 && y>=175 && y+5<=191);
+        strcat(drawn,s);return;
+    }
     /* the list panel, or the burden bar's band above the picture with its one-pixel shadow
      * (INVENTORY-BURDEN-TEXT-UNREADABLE-61: bar 8..122 x 21..30), or the armour rating's band under the picture
      * (INVENTORY-NO-ARMOR-RATING-61: 7..123 x 182..195, inside the picture's box), or the item information box's text
@@ -115,6 +148,9 @@ void AW_SmallStringColor(int x,int y,int width,const char *s,int c){
 
 void AW_UITextBox(int x,int y,int w,int h,const char *s,int c){
     if(AW_InventoryActive()){assert(x>=0 && y>=0 && x+w<=320 && y+h<=200);}
+    else if(!strcmp(AW_WorldUIName(),"map")){   /* map version 2's title in the game's font: the title bar's band */
+        assert(x==6 && y==6 && w==308 && h==12 && AW_UIWidth(s)<=288);strncpy(title_game,s,79);
+    }
     else {
         assert((x>=10 && x+w<=154) || (x>=166 && x+w<=302));
         assert(AW_UIWidth(s)<=w);assert(y>=5 && y+h<=188);
@@ -181,7 +217,7 @@ int COM_FOpenFile(char *name,FILE **out){
     else assert(0);
     size=ftell(f)-base;fseek(f,base,SEEK_SET);return size;
 }
-static void draw(void){squares_n=0;door_fills=0;door_x=door_y=-1;cyan_pixels=red_pixels=0;cyan_left=cyan_top=1000;cyan_right=cyan_bottom=-1;button_x=button_y=-1;drawn[0]=footer[0]=0;heading_rows=0;marker_x=marker_y=-1;assert(AW_WorldUIDraw());}
+static void draw(void){title_game[0]=title_console[0]=0;title_console_x=-1;tabs_lit=0;squares_n=0;door_fills=0;door_x=door_y=-1;cyan_pixels=red_pixels=0;cyan_left=cyan_top=1000;cyan_right=cyan_bottom=-1;button_x=button_y=-1;drawn[0]=footer[0]=0;heading_rows=0;marker_x=marker_y=-1;assert(AW_WorldUIDraw());}
 /* Exercise physical right/middle virtual keys through the real panel.
  * Map-marker movement proves pan state; host pointer transport is separate. */
 static void drag_test_require(int good,const char *reason)
@@ -609,17 +645,122 @@ static void local_map_test(void){
     inside=doors_on=0;sv.worldmodel=NULL;strcpy(sv.name,"balmora");memset(player->v.origin,0,sizeof player->v.origin);
     AW_MapFogReset();debug_overlays=1;Cvar_SetValue("aw_map_mode",0);
 }
+/* MAP-VERSION-2-DEFAULT-68: map version 2, the default. The original's map in the frame of the attributes, inventory
+ * and magic views: no DEBUG or IN-GAME button and no lava colour or legend (even with the debug HUD on and lava on the
+ * explored land), the picture inside the map's box only, the place's name in the title (the game's font, else the
+ * console glyphs, else cut), the footer's tabs; dbg dbgmap and dbg maptype bring version 1 back and forth. */
+static int lava_pixels(void){int i,n=0;for(i=0;i<320*200;i++)n+=pixels[i]==LAVA_INDEX;return n;}
+static void map_command_words(void (*command)(void),const char *word){
+    test_argv[1]=(char *)word;test_argc=word?2:1;command();test_argc=1;
+}
+static void map_reopen(void){if(AW_WorldUIActive())AW_WorldUIKey(K_ESCAPE,1);key_dest=key_game;map_command();assert(AW_WorldUIActive());}
+static void map_v2_test(void){
+    edict_t *player=svs.clients[0].edict;int x,y,outside=0,inside=0;
+    static const char forty_eight[]="A place name of exactly forty-eight characters!!";
+    static const char fifty[]="A place name of fifty characters, too wide to fit.";
+    static const char eighty[]="A place name of eighty characters that the console glyphs cannot hold wholly ...";
+    if(AW_WorldUIActive())AW_WorldUIKey(K_ESCAPE,1);
+    assert(strlen(forty_eight)==48 && strlen(fifty)==50 && strlen(eighty)==80);
+    Cvar_SetValue("aw_map_version",2);map_version=2;debug_overlays=1;Cvar_SetValue("aw_map_mode",0);Cvar_SetValue("aw_map_lava",1);
+    strcpy(sv.name,"vf0000");memset(player->v.origin,0,sizeof player->v.origin);
+    AW_MapFogReset();AW_MapFogReveal(2048,2048);AW_MapFogReveal(0,0);
+    cell_kind=1;cell_x=0;cell_y=0;cell_name="Bitter Coast Region";
+    /* the default: no button, no lava, the in-game view (the debug HUD on and aw_map_mode Debug make no difference) */
+    map_reopen();AW_WorldUIKey(K_HOME,1);memset(pixels,250,sizeof pixels);draw();
+    assert(!strstr(drawn,"DEBUG") && !strstr(drawn,"IN-GAME") && !strstr(drawn,"LAVA") && !strstr(drawn,"PROTOTYPE"));
+    assert(!strstr(drawn,"WORLD") && !strstr(drawn,"MARKERS") && !strstr(drawn,"REGION"));
+    assert(lava_pixels()==0);
+    assert(!strcmp(title_game,"Bitter Coast Region") && !title_console[0]);
+    assert(strstr(drawn,"Esc close") && !strstr(drawn,"M/Esc") && strstr(drawn,"World") && strstr(drawn,"Local") &&
+           strstr(drawn,"K markers"));                                   /* no key bound to the map: Esc alone */
+    assert(tabs_lit==1);                                                        /* World lit */
+    /* the picture only inside the map's box: 304 x 142 at 8,22 (version 1's 312 x 154 at 4,19 untouched around it) */
+    for(y=19;y<173;y++)for(x=4;x<316;x++){
+        int in=x>=8 && x<312 && y>=22 && y<164;
+        if(in)inside+=pixels[y*320+x]!=250;else outside+=pixels[y*320+x]!=250;
+    }
+    assert(inside==304*142 && outside==0);
+    /* the footer's second line: the zoom and pan keys (the maintainer, 22 November 2026: the zoom keys said) */
+    assert(strstr(drawn,"+/- wheel zoom") && strstr(drawn,"drag/arrows/WASD pan") && strstr(drawn,"Home fit"));
+    /* and they work as in version 1: + and the wheel zoom in, - and the wheel out (the picture changes, then is back) */
+    memcpy(lava_before,pixels,sizeof pixels);AW_WorldUIKey('+',1);draw();assert(memcmp(pixels,lava_before,sizeof pixels));
+    AW_WorldUIKey('-',1);draw();assert(!memcmp(pixels,lava_before,sizeof pixels));
+    AW_WorldUIKey(K_MWHEELUP,1);draw();assert(memcmp(pixels,lava_before,sizeof pixels));
+    AW_WorldUIKey(K_MWHEELDOWN,1);draw();assert(!memcmp(pixels,lava_before,sizeof pixels));
+    /* G (version 1's grid) does nothing; the debug HUD's right click sets a marker, never a teleport target */
+    AW_MapMarksReset();drag_test_point(160,96);map_click(K_MOUSE3);draw();
+    assert(AW_MapMarksCount()==1 && red_pixels==0 && cyan_pixels>0 && cyan_left>=8 && cyan_right<312);
+    drag_test_point(6,96);map_click(K_MOUSE2);assert(AW_MapMarksCount()==1);   /* outside version 2's picture */
+    AW_MapMarksReset();
+    /* the footer's tabs: Local, World, Markers; the close key's words close */
+    drag_test_point(250,185);map_click(K_MOUSE1);draw();assert(tabs_lit==2);
+    drag_test_point(220,185);map_click(K_MOUSE1);draw();assert(tabs_lit==1);
+    drag_test_point(280,185);map_click(K_MOUSE1);draw();assert((tabs_lit&4) && strstr(drawn,"MARKERS"));
+    AW_WorldUIKey(K_ESCAPE,1);assert(AW_WorldUIActive());draw();assert(!(tabs_lit&4));
+    drag_test_point(20,185);map_click(K_MOUSE1);assert(!AW_WorldUIActive());
+    /* the key the player bound to the map is named in the footer and closes the map (never a fixed letter) */
+    bound_map_key="N";keybindings['n']="aw_worldmap";map_reopen();draw();assert(strstr(drawn,"N/Esc close"));
+    AW_WorldUIKey('n',1);assert(!AW_WorldUIActive());bound_map_key=NULL;keybindings['n']=NULL;
+    /* the title: the cell's own name; a room's name; an outdoor cell without one (the GMST sDefaultCellname) */
+    cell_name="Seyda Neen";map_reopen();draw();assert(!strcmp(title_game,"Seyda Neen"));
+    cell_kind=2;cell_room="Seyda Neen, Census and Excise Office";x=cell_name_calls;map_reopen();draw();
+    assert(!strcmp(title_game,"Seyda Neen, Census and Excise Office") && cell_name_calls==x);
+    cell_kind=1;cell_name=NULL;map_reopen();draw();assert(!strcmp(title_game,"Wilderness"));
+    cell_kind=0;map_reopen();draw();assert(!strcmp(title_game,"Map"));
+    /* its font: the game's while it fits the 288 pixels (6 a character here: 48), else the console glyphs centred in the
+     * plaque (no title bar art here: the bar's whole 308), else 72 glyphs ending in "..." */
+    cell_kind=1;cell_name=forty_eight;map_reopen();draw();assert(!strcmp(title_game,forty_eight) && !title_console[0]);
+    cell_name=fifty;map_reopen();draw();assert(!title_game[0] && !strcmp(title_console,fifty) && title_console_x==6+(308-199)/2);
+    /* a name past the original's 63 characters (the game data's limit) is held to 63: in the console glyphs, whole
+     * (the cut with "..." is the layout helper's, tests/aga_ui_layout_test.c) */
+    cell_name=eighty;map_reopen();draw();
+    assert(!title_game[0] && strlen(title_console)==63 && !strncmp(title_console,eighty,63));
+    /* dbg dbgmap on: version 1 again, its buttons and lava legend; off: version 2; true/false, 1/0; bare: the other way */
+    cell_name="Bitter Coast Region";AW_WorldUIKey(K_ESCAPE,1);
+    map_command_words(map_debug_command,"on");assert(map_vars[9]->value==1);
+    debug_overlays=0;map_reopen();AW_WorldUIKey(K_HOME,1);draw();
+    assert(strstr(drawn,"IN-GAME MAP PROTOTYPE") && strstr(drawn,"LAVA") && strstr(drawn,"DEBUG") && lava_pixels()>0 && !title_game[0]);
+    debug_overlays=1;map_reopen();draw();assert(strstr(drawn,"DEBUG MAP"));
+    AW_WorldUIKey(K_ESCAPE,1);
+    map_command_words(map_debug_command,"off");assert(map_vars[9]->value==2);
+    map_reopen();draw();assert(!strstr(drawn,"DEBUG") && !strstr(drawn,"LAVA") && !strcmp(title_game,"Bitter Coast Region"));
+    AW_WorldUIKey(K_ESCAPE,1);
+    map_command_words(map_debug_command,"TRUE");assert(map_vars[9]->value==1);
+    map_command_words(map_debug_command,"0");assert(map_vars[9]->value==2);
+    map_command_words(map_debug_command,"1");assert(map_vars[9]->value==1);
+    map_command_words(map_debug_command,"false");assert(map_vars[9]->value==2);
+    map_command_words(map_debug_command,NULL);assert(map_vars[9]->value==1);   /* bare: the other way */
+    map_command_words(map_debug_command,NULL);assert(map_vars[9]->value==2);
+    map_command_words(map_debug_command,"maybe");assert(map_vars[9]->value==2 && strstr(console_message,"Usage: dbg dbgmap"));
+    /* dbg maptype 1 / 2; anything else is refused */
+    map_command_words(map_type_command,"1");assert(map_vars[9]->value==1);
+    map_reopen();draw();assert(strstr(drawn,"DEBUG MAP"));AW_WorldUIKey(K_ESCAPE,1);
+    map_command_words(map_type_command,"2");assert(map_vars[9]->value==2);
+    map_command_words(map_type_command,"3");assert(map_vars[9]->value==2 && strstr(console_message,"Usage: dbg maptype"));
+    map_command_words(map_type_command,NULL);assert(map_vars[9]->value==2);
+    /* the debug teleport map stays the version 1 screen */
+    key_dest=key_console;teleport_command();assert(AW_WorldUIActive());draw();assert(strstr(drawn,"DEBUG TELEPORT"));
+    AW_WorldUIKey(K_ESCAPE,1);
+    Cvar_SetValue("aw_map_version",1);map_version=0;debug_overlays=1;Cvar_SetValue("aw_map_mode",0);AW_MapFogReset();
+    cell_kind=0;cell_name=NULL;strcpy(sv.name,"balmora");key_dest=key_game;
+}
 int main(int argc,char **argv){
     edict_t player;client_t client;int before;
     memset(&player,0,sizeof(player));memset(&client,0,sizeof(client));
     sv.active=1;svs.maxclients=1;svs.clients=&client;client.edict=&player;cls.state=ca_connected;
     strcpy(sv.name,"balmora");strcpy(aw_story.name,"Hors");
     vid.width=320;vid.height=200;vid.rowbytes=320;vid.buffer=pixels;
-    AW_WorldUIInit();assert(map_command && journal_command);
+    AW_WorldUIInit();assert(map_command && journal_command && map_debug_command && map_type_command);
+    /* MAP-VERSION-2-DEFAULT-68: map version 2 is the default (aw_map_version, registered last); the map tests below are
+     * version 1's, the map before it, kept as it was (aw_map_version 1); map_v2_test checks version 2 */
+    assert(map_var_count==10 && !strcmp(map_vars[9]->name,"aw_map_version") && !strcmp(map_vars[9]->string,"2") &&
+           map_vars[9]->value==2);
+    Cvar_SetValue("aw_map_version",1);
     /* one part alone (test_aga_native_source.py runs these apart too, so each fails on its own on a broken engine) */
     if(argc>1){
         if(!strcmp(argv[1],"world_first_view"))world_first_view_test();
         else if(!strcmp(argv[1],"showmap_starts"))showmap_starts_test();
+        else if(!strcmp(argv[1],"map_v2"))map_v2_test();
         else assert(!"unknown part");
         return 0;
     }
@@ -765,6 +906,7 @@ int main(int argc,char **argv){
     lava_layer_test();
     place_markers_test();
     local_map_test();
+    map_v2_test();
     world_first_view_test();
     return 0;
 }

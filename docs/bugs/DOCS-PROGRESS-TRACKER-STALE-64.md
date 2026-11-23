@@ -1,5 +1,14 @@
 # DOCS-PROGRESS-TRACKER-STALE-64: The CHIM Progress Tracker page carried the newest version in its last-updated line while its current state stopped at v0.0.48 and listed its builds oldest first
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.68-dev8 at 2026-11-22 19:55 +0200: On the v0.0.68-dev8 line the public tracker snapshot still holds the counts of v0.0.67 (Solstheim open terrain 0 of 144) while the Toolkit counts v0.0.68-dev7 (135 of 150); a release candidate or final is now refused on such a difference.
+- Reported with v0.0.68-dev8 at 2026-11-22 19:56 +0200: On the v0.0.68-dev8 line the public tracker snapshot still holds the counts of v0.0.67 (Solstheim open terrain 0 of 144) while the Toolkit counts v0.0.68-dev7 (135 of 150); a release candidate or final is now refused on such a difference.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -19,6 +28,27 @@
 | Platform or emulator | not in game (public documentation page and tracker data) |
 
 <!-- END GENERATED FACTS -->
+
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-10: reported in v0.0.64-dev3
+- 2026-11-22 19:55 +0200: seen again in v0.0.68-dev8: On the v0.0.68-dev8 line the public tracker snapshot still holds the counts of v0.0.67 (Solstheim open terrain 0 of 144) while the Toolkit counts v0.0.68-dev7 (135 of 150); a release candidate or final is now refused on such a difference.
+- 2026-11-22 19:56 +0200: seen again in v0.0.68-dev8: On the v0.0.68-dev8 line the public tracker snapshot still holds the counts of v0.0.67 (Solstheim open terrain 0 of 144) while the Toolkit counts v0.0.68-dev7 (135 of 150); a release candidate or final is now refused on such a difference.
+
+<!-- END GENERATED TIMELINE -->
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Timeline](#timeline)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -46,6 +76,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - BUILD-SUMMARY-INTERIOR-COUNTS-48 (no report page): The build summary and the inclusion ledger do not say how many interiors a build includes
 - [CELL-PROGRESS-SOURCE-UNREADABLE-SILENT-67](CELL-PROGRESS-SOURCE-UNREADABLE-SILENT-67.md): The CHIM Progress Tracker's result and ingest steps write the tracker data without any remembered input they cannot read, with no error: a step run without one of those inputs drops the mapping quality, the limits, the place names, the build history or the rooms in the game
 - [CENSUS-DISTRICT-CONTAINERS-AS-ROOMS-67](CENSUS-DISTRICT-CONTAINERS-AS-ROOMS-67.md): The container count still reads a Mournhold district as a room: its 171 containers would be counted as having no row once their rows are keyed outdoors
+- [CHANGES-LOG-STAMP-LOCAL-ONLY-68](CHANGES-LOG-STAMP-LOCAL-ONLY-68.md): The archive move tool writes its change-log lines with the local time only, without the UTC half
 - [CHIMPORT-CLI-MWAD-SHADOW-66](CHIMPORT-CLI-MWAD-SHADOW-66.md): chimport.py run stops on a fresh run folder: stair_walk puts tools/ first, so tools/mwad.py loads in place of the package mwad
 - [CHIMPORT-DOOR-MARKER-AUDIT-36](CHIMPORT-DOOR-MARKER-AUDIT-36.md): The CHIMport door audit counted marker DOOR records (PrisonMarker) as missing door links: 6 cells failed door_links, Seyda Neen among them
 - [CHIMPORT-LAYER-CELL-EMPTY-67](CHIMPORT-LAYER-CELL-EMPTY-67.md): CHIM import counts a cell only an expansion holds as empty: it is built as flat ground with nothing placed
@@ -95,6 +126,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [ROOM-RESIDENTS-NOT-CACHED-48](ROOM-RESIDENTS-NOT-CACHED-48.md): The room stages bake every resident again on every run: 26 s of a 39 s rerun with every room unit reused
 - [ROUTE-UPLOAD-AFTER-PUSH-67](ROUTE-UPLOAD-AFTER-PUSH-67.md): The release route's upload to the download site is refused when the release was published on the code host first
 - [SESSION-AW-VIEW-IN-SOLID-54](SESSION-AW-VIEW-IN-SOLID-54.md): The session tooling's aw_view puts the camera outside the room or inside a wall without a warning
+- [SETTLEMENT-SWEEP-TABLE-VERSION-68](SETTLEMENT-SWEEP-TABLE-VERSION-68.md): The settlement sweep check reads only the first version of the teleport place table, so it refuses the table every image has written since v0.0.66
 - [SMOKE-START-ENTER-MENU-52](SMOKE-START-ENTER-MENU-52.md): An engine smoke script started with START enter can stay in the main menu: its Return skipped the intro movie instead
 - [STUCK-WATCH-NIGHT-BY-HOUR-ONLY-68](STUCK-WATCH-NIGHT-BY-HOUR-ONLY-68.md): The stall watcher judged night only by the clock, so an alert the session had not yet acknowledged still reached the maintainer after night mode was switched on in the evening
 - [TEST-CHIMPORT-POOL-COPY-MODE-48](TEST-CHIMPORT-POOL-COPY-MODE-48.md): test_chimport_pool's copy-mode reuse test fails in the gate container: the units are computed again
@@ -127,7 +159,9 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [TOOLKIT-WORLD-MAP-NESTED-SCROLL-64](TOOLKIT-WORLD-MAP-NESTED-SCROLL-64.md): The World Map scrolls as separate boxes: the headline stays while the map frame scrolls, and the wheel over the map never scrolls the page
 - [TRACK-FIXED-STEPS-WHOLE-HOME-68](TRACK-FIXED-STEPS-WHOLE-HOME-68.md): Recording a fix of one register entry through its planning item marks every other entry of that item as fixed by the same commit
 - [TRACK-FIXED-UMBRELLA-STEPS-ALL-67](TRACK-FIXED-UMBRELLA-STEPS-ALL-67.md): Marking one fault fixed through the tracker intake marked every fault of its plan item fixed when that item groups many
+- [TRACK-NEW-REGISTER-BEFORE-TODO-68](TRACK-NEW-REGISTER-BEFORE-TODO-68.md): A fault filed through the tracker intake stays without its planning item while the register renders, and an item made by hand in that time makes the intake refuse its own item as a duplicate
 - [TRACK-UPDATE-MOVED-ITEM-FIRST-68](TRACK-UPDATE-MOVED-ITEM-FIRST-68.md): Updating a work item whose id also exists as a moved copy in an older version file wrote the note into the old moved copy instead of the live item
+- [TRACK-UPDATE-SET-LAST-ONLY-68](TRACK-UPDATE-SET-LAST-ONLY-68.md): The tracker intake's update command applied only the last of several field options and dropped the others without a message
 - [TRACKER-AREA-CELLS-RUN-WIDE-42](TRACKER-AREA-CELLS-RUN-WIDE-42.md): The CHIM tracker gives every area of a build all of the build's cells: Balmora holds 811 cells, so an area or shipped-towns plan selector takes most of the island
 - [TRACKER-CHIM-COUNT-STALE-44](TRACKER-CHIM-COUNT-STALE-44.md): The CHIM progress tracker still reports 1,193 of 1,436 cells after a build with every exterior cell: it counts audits over both islands, not what the build put on CHIM
 - [TRACKER-CHIM-LINK-MERGE-33](TRACKER-CHIM-LINK-MERGE-33.md): A merge dropped the CHIM Engine tracker link from the register; the integration head fails a tracker test
@@ -142,6 +176,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [TRACKER-INTERIORS-IN-GAME-COUNT-64](TRACKER-INTERIORS-IN-GAME-COUNT-64.md): The tracker data counts 59 of 1,123 Vvardenfell interior rooms as in the game on CHIM rooms, while the builds since v0.0.48 convert almost all of them
 - [TRACKER-INTERIORS-NOT-SHOWN-48](TRACKER-INTERIORS-NOT-SHOWN-48.md): The CHIM Progress Tracker does not show the interiors: no room list, no counts per island and state, and 16 rooms with no entrance area left out of every batch
 - [TRACKER-MAP-BLANK-31](TRACKER-MAP-BLANK-31.md): World progress map vanished when the mouse moved over it
+- [TRACKER-OCEAN-CELL-ISLAND-BASE-ONLY-68](TRACKER-OCEAN-CELL-ISLAND-BASE-ONLY-68.md): An open-sea cell measured by the CHIM import is always counted as Vvardenfell's, so Solstheim's open-sea cells get the wrong island in the progress tracker
 - [TRACKER-OCEAN-COUNTED-DONE-36](TRACKER-OCEAN-COUNTED-DONE-36.md): The tracker counts the 867 open-ocean cells as done, although the engine does not place the ocean chunk yet
 - [TRACKER-OPEN-ENTRIES-STALE-41](TRACKER-OPEN-ENTRIES-STALE-41.md): Register entries stayed open after their fixes shipped: 738 of 842 entries open before the audit of 16 October 2026
 - [TRACKER-PRESENTED-CELLS-UNKNOWN-67](TRACKER-PRESENTED-CELLS-UNKNOWN-67.md): The CHIM tracker knew none of Mournhold's presented cells: with no LAND record and no census row they were not in its data, and their conversion results were ignored

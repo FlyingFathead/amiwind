@@ -7,6 +7,11 @@ static char names[32][32],descriptions[21][96],notice[80];
 static unsigned char slot_states[21];
 /* SAVE-INSIDE-SCRIPT-STEP-66: AW_SaveWrite returned 2, the save waits for the settled frame (aw_save.h aw_save_busy) */
 #define QUEUED "Save queued: written when the script step ends."
+/* PAUSE-MENU-CONTINUE-CONFIRM-68: loading over a running game asks the original's own question (sMessage1, read from
+ * view/settings.txt when the confirmation opens; the original's English when the image does not carry it) */
+#define LOAD_OVER_GAME "Do you want to Load a save game and lose your current game?"
+const char *AW_UIGameText(const char *key,const char *fallback,char *out,int size);   /* aw_ui.c */
+static char load_question[96];
 static void refresh(void)
 {
     int i;
@@ -63,7 +68,7 @@ int AW_SaveMenuKey(int key)
     }
     if(key==K_UPARROW || key==K_DOWNARROW || key==K_TAB)row=(row+(key==K_UPARROW?slots-1:1))%slots;
     if(key==K_ENTER){
-        if(load_mode){if(profile_count && descriptions[row][0])confirm=1;
+        if(load_mode){if(profile_count && descriptions[row][0]){confirm=1;AW_UIGameText("sMessage1",LOAD_OVER_GAME,load_question,sizeof(load_question));}
             else strcpy(notice,slot_states[row]==AW_SLOT_UNREADABLE?"This save cannot be read (damaged or another format).":
                                slot_states[row]==AW_SLOT_OTHER_DATA?"This save belongs to other game data or another build.":
                                "No save in this slot.");}
@@ -83,7 +88,8 @@ void AW_SaveMenuDraw(void)
     if(!active || key_dest!=key_menu)return;
     AW_UIBox(2,2,316,196);AW_UITextBox(10,8,300,20,load_mode?"Load game":"Save game",gold);
     if(confirm){
-        AW_UITextBox(12,67,296,22,load_mode?"Load this saved game?":"Overwrite this manual slot?",gold);
+        if(load_mode && sv.active)AW_UICenteredLinesUpTo(12,50,296,58,load_question[0]?load_question:LOAD_OVER_GAME,3);
+        else AW_UITextBox(12,67,296,22,load_mode?"Load this saved game?":"Overwrite this manual slot?",gold);
         AW_UITextBox(12,112,296,22,"Enter / Y: yes   Esc / N: cancel",gold);return;
     }
     AW_UITextBox(10,32,300,20,profile_count?names[profile_at]:load_mode?"No saved characters":aw_story.name,gold);

@@ -10,6 +10,7 @@
  * 100..4096 or "-"; NOTE free printable text without "|". Lines starting with
  * "#" and empty lines are comments. No engine dependencies: host-tested
  * (tests/aga_cam_test.c), the same rules as tools/camera_marks.py.
+ * Also the camera shots' timeline (dbg cam pan, dbg cam track; the end of the file).
  */
 #include <math.h>
 #include <stdio.h>
@@ -17,6 +18,7 @@
 #include <string.h>
 #include "aw_format.h"
 #include "aw_cam.h"
+#include "aw_ease.h"
 
 static int lower(int c){return c>='A' && c<='Z'?c-'A'+'a':c;}
 int AW_CamValidName(const char *name) {
@@ -133,4 +135,52 @@ int AW_CamFormat(const aw_cam_mark_t *m,char *out,int size) {
                m->headlamp<0?"-":m->headlamp?"on":"off",fog,m->note);
     if(n<1 || n>=AW_CAM_LINE || n>=size || AW_CamParse(line,&check)!=1)return 0;
     strcpy(out,line);return n;
+}
+
+/* ---- camera shots (aw_cam.h: dbg cam pan, dbg cam track) ----
+ * The timeline: [0, hold) the opening frame; the move for AW_CamShotMoveSeconds; then the closing frame for hold.
+ * The move: the speed rises along the smoothstep from 0 to SPEED over EASE seconds (the distance covered is the
+ * curve's area, SPEED * EASE / 2), stays at SPEED, and falls the same way, ending exactly at DISTANCE; so the move
+ * lasts DISTANCE / SPEED + EASE. A move too short for two full ramps (DISTANCE / SPEED < AW_CAM_SHOT_EASE) eases over
+ * DISTANCE / SPEED seconds at each end, with no constant middle. */
+int AW_CamShotBegin(aw_cam_shot_t *s,float distance,float speed,float hold) {
+    if(!s || !(distance>0) || !(distance<1e6f) || !(speed>0) || !(speed<1e5f) || !(hold>=0) || !(hold<=AW_CAM_SHOT_HOLD_MAX))
+        return 0;
+    s->distance=distance;s->speed=speed;s->hold=hold;s->clock=0;
+    s->ease=distance/speed<AW_CAM_SHOT_EASE?distance/speed:AW_CAM_SHOT_EASE;
+    return 1;
+}
+float AW_CamShotMoveSeconds(const aw_cam_shot_t *s) {return s->distance/s->speed+s->ease;}
+float AW_CamShotSeconds(const aw_cam_shot_t *s) {return 2*s->hold+AW_CamShotMoveSeconds(s);}
+void AW_CamShotStep(aw_cam_shot_t *s,float dt) {
+    float total=AW_CamShotSeconds(s);
+    if(!(dt>0))return;                     /* also not a number */
+    if(dt>AW_CAM_SHOT_MAX_DT)dt=AW_CAM_SHOT_MAX_DT;
+    s->clock+=dt;
+    if(s->clock>total)s->clock=total;
+}
+float AW_CamShotTravel(const aw_cam_shot_t *s) {
+    float t=s->clock-s->hold,move=AW_CamShotMoveSeconds(s),e=s->ease,v=s->speed,d;
+    if(!(t>0))return 0;                    /* the opening frame */
+    if(t>=move)return s->distance;         /* the closing frame */
+    if(t<e)d=v*e*AW_EaseSmoothArea(t/e);   /* easing in */
+    else if(t<=move-e)d=v*e/2+v*(t-e);     /* the constant middle */
+    else d=s->distance-v*e*AW_EaseSmoothArea((move-t)/e);   /* easing out: the start mirrored */
+    if(d<0)d=0;
+    if(d>s->distance)d=s->distance;
+    return d;
+}
+int AW_CamShotDone(const aw_cam_shot_t *s) {return s->clock>=AW_CamShotSeconds(s);}
+float AW_CamPanSpeed(float fov_x) {
+    float speed;
+    if(!(fov_x>=10 && fov_x<=170))fov_x=90;   /* the fov setting's own range (screen.c) */
+    speed=fov_x/AW_CAM_PAN_CROSS;
+    return speed>AW_CAM_PAN_SPEED_MAX?AW_CAM_PAN_SPEED_MAX:speed;
+}
+float AW_CamTurn(float from,float to) {
+    double d=(double)to-(double)from;
+    if(!(fabs(d)<1e6))return 0;
+    d-=360.0*floor(d/360.0);               /* 0..<360 */
+    if(d>180)d-=360;                       /* -180 < turn <= 180 */
+    return (float)d;
 }

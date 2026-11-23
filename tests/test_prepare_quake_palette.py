@@ -171,6 +171,19 @@ class IceRampTests(unittest.TestCase):
         index=build_cache.SourceIndex(ROOT,top_format=build_cache.STAGE_TOP_FORMAT)
         self.assertIn('config/scene-palette-ramp.json',index.closure(ROOT/'tools/prepare_quake.py')[1])
 
+    def test_the_ui_skips_exactly_the_configured_ramp(self):
+        # MENU-PALETTE-RED-CAST-68: the engine's UI colour picks (engine/aga/src/aw_ui.c AW_UIColor, ice_ramp) skip the
+        # ramp's entries while the palette holds them, so the menus keep their colours (white text the cream of 254, not
+        # the ramp's white at 104); its table must be the config's, entry for entry, or a changed ramp would leave the UI
+        # picking it again (the native check of the skip itself: tests/aga_ui_test.c)
+        import re
+        source=(ROOT/'engine/aga/src/aw_ui.c').read_text(encoding='utf-8')
+        table=re.search(r'static const byte ice_ramp\[16\]\[4\]=\{(.*?)\};',source,re.S)
+        self.assertIsNotNone(table,'aw_ui.c ice_ramp table')
+        rows={int(i):(int(r),int(g),int(b)) for i,r,g,b in re.findall(r'\{(\d+),(\d+),(\d+),(\d+)\}',table.group(1))}
+        self.assertEqual(rows,{row['index']:tuple(row['rgb']) for row in prepare_quake.palette_ramp()['entries']})
+        self.assertIn('if(ramp_skip[i])continue;',source)
+
 
 if __name__=='__main__':
     unittest.main()

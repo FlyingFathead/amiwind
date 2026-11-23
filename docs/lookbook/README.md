@@ -1,6 +1,6 @@
 # The confirmed look book
 
-_Generated from tests/lookbook/pages.json with AmiWind v0.0.67._
+_Generated from tests/lookbook/pages.json with AmiWind v0.0.68-dev7._
 
 Every look and behaviour the maintainer has confirmed in play, checked on every development build before it is delivered ([LOOKBOOK.md](../LOOKBOOK.md)). One reference page per page below.
 
@@ -12,6 +12,7 @@ Every look and behaviour the maintainer has confirmed in play, checked on every 
 | [DOCK-GUARD-POST](DOCK-GUARD-POST.md) | journey | active | [PIER-GUARD-WALKS-INTO-DOOR-65](../bugs/PIER-GUARD-WALKS-INTO-DOOR-65.md) | `aw_intro.c`, `aw_nav.c` | 0 | - |
 | [INVENTORY-HINT-PER-KIND](INVENTORY-HINT-PER-KIND.md) | session | draft | [EQUIP-ACTION-REGRESSION-62](../bugs/EQUIP-ACTION-REGRESSION-62.md), [INVENTORY-EQUIPPED-LABEL-67](../bugs/INVENTORY-EQUIPPED-LABEL-67.md) | `aw_worldui.c`, `aw_inventory.c` | 0 | - |
 | [CLIFF-RACER-WHOLE](CLIFF-RACER-WHOLE.md) | image | draft | [CREATURE-RACER-MESH-SPIKE-58](../bugs/CREATURE-RACER-MESH-SPIKE-58.md) | `creature_library.py`, `creature_tables.py` | 0 | - |
+| [MENU-COLOURS-GAME-PALETTE](MENU-COLOURS-GAME-PALETTE.md) | session | active | [LOOKBOOK-NO-COLOUR-CHECK-68](../bugs/LOOKBOOK-NO-COLOUR-CHECK-68.md) | `aw_menu.c`, `aw_ui.c`, `view.c`, `prepare_ui.py` | 0 | - |
 
 ## Pages to write
 

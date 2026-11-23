@@ -20,6 +20,11 @@ int AW_StuckMethod(int kind);
 /* aw_fog.c */
 int AW_DrawDistance(void);
 void AW_SetDrawDistance(int value);
+/* the draw distance's one owner (REGIONAL-DRAW-DISTANCE-68): the Auto box, a map arrival, the per-view watch */
+int AW_DrawDistanceAuto(void);
+void AW_SetDrawDistanceAuto(int on);
+void AW_DrawDistanceArrive(const float *origin);
+void AW_DrawDistanceWatch(void);
 void AW_FogDepths(byte *table,int distance);
 int AW_FogExactActive(void);
 float AW_FogExactDepth(void);

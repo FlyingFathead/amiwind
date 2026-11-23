@@ -267,17 +267,27 @@ static void title_block(int x,int y,int w){
         for(xx=1;xx<w-1;xx+=n){n=w-1-xx;if(n>s->w)n=s->w;memcpy(row+x+xx,s->pixels+yy*s->w,n);}
     }
 }
-static int title_bar(int x,int y,int w,const char *title){
-    int plaque,side;
+/* MAP-VERSION-2-DEFAULT-68: the bar with its black plaque, no text: *PLAQUE_W wide (at most the bar less 6), centred;
+ * *PLAQUE_X gets its left edge. The title bar below draws its text in it; the map draws its title in the console glyphs
+ * in it when the name is too wide for the game's font (aw_worldui.c through aw_title_plaque, aw_layout.c
+ * AW_LayoutTitle). 0 without the art. */
+static int title_plaque(int x,int y,int w,int *plaque_x,int *plaque_w){
+    int plaque=*plaque_w,side;
     if(!hud_icons.value || !AW_StripLoad(&title_strip,"ui:head:block") || !AW_IconLoad(&title_edge[0],"ui:head:left") ||
        !AW_IconLoad(&title_edge[1],"ui:head:right") || title_strip.h!=12 || title_edge[0].w!=1 || title_edge[1].w!=1 ||
        title_edge[0].h!=12 || title_edge[1].h!=12)return 0;
     if(x<0 || y<0 || x+w>(int)vid.width || y+12>(int)vid.height)return 0;
-    plaque=AW_UIWidth(title)+14;if(plaque>w-6)plaque=w-6;
+    if(plaque>w-6)plaque=w-6;
     side=(w-plaque)/2;
     title_block(x,y,side);title_block(x+side+plaque,y,w-side-plaque);
     AW_UIFill(x+side,y,plaque,12,AW_UIColor(0,0,0));
-    AW_UITextCentred(x+side,y,plaque,12,title,AW_UIColor(223,199,144));
+    *plaque_x=x+side;*plaque_w=plaque;
+    return 1;
+}
+static int title_bar(int x,int y,int w,const char *title){
+    int plaque=AW_UIWidth(title)+14,left;
+    if(!title_plaque(x,y,w,&left,&plaque))return 0;
+    AW_UITextCentred(left,y,plaque,12,title,AW_UIColor(223,199,144));
     return 1;
 }
 /* GMST sSkillHandtohand from gfx/hud-settings.txt (tools/prepare_icons.py), read once. */
@@ -316,5 +326,5 @@ static int area_picture_read(const char *key,int *w,int *h,byte *pixels,int maxw
 }
 void AW_IconsInit(void) {
     aw_area_picture_read=area_picture_read;
-    Cvar_RegisterVariable(&hud_icons);Cmd_AddCommand("aw_magic",AW_MagicCommand);aw_hud_item_boxes=hud_item_boxes;aw_title_bar=title_bar;aw_hand_to_hand_name=hand_to_hand_name;aw_inventory_row_icon=inventory_row_icon;
+    Cvar_RegisterVariable(&hud_icons);Cmd_AddCommand("aw_magic",AW_MagicCommand);aw_hud_item_boxes=hud_item_boxes;aw_title_bar=title_bar;aw_title_plaque=title_plaque;aw_hand_to_hand_name=hand_to_hand_name;aw_inventory_row_icon=inventory_row_icon;
 }

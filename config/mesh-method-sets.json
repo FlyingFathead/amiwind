@@ -1,6 +1,8 @@
 {
  "format": "aw-mesh-method-sets-1",
  "about": "Named mesh method sets for the listed meshes of Solstheim's stages only (the module's world stage, the --chim-sol-test stages and CHIMport runs; tools/chim/method_sets.py). A set names, per listed mesh, the method each part of it is made with; a mesh a set does not name, and every mesh of the base world, is made as today. The set 'baseline' is today's methods. The base world's command, key and output are the same with any set. Methods: C, the placed collision with exact footing (tools/chim/collision_exact.py: the pieces of the faces walkable as placed kept, the other faces as convex proxies, each tested against today's collision top on a grid over the walkable surface and split until it rises no more than the row's rise); D, the drawn mesh by method 2 (tools/model_method2.py, the row as config/model-method-2.json takes it; the collision stays the source mesh's). Lengths are in converter units (one is four game units).",
+ "default": "E",
+ "default_about": "the set the build module bloodmoon-solstheim builds Solstheim's world with when the build names none (--chim-mesh-method-set unset): method E, decided for the project on 22 November 2026 (docs/chim/SOLSTHEIM_GLACIER.md); 'baseline' or another set is chosen by name. The --chim-sol-test stages and CHIMport runs build with the set they name, baseline when they name none.",
  "layers": {
   "bloodmoon": [
    "x/bm_ex_iceberg_shard01",

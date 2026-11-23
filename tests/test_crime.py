@@ -213,8 +213,12 @@ class CrimeSourceTests(unittest.TestCase):
                           'startcombat-actor': 5})
         unhandled = {k: v for k, v in paths.items() if k not in dc.HANDLED}
         self.assertEqual(unhandled, {}, 'an answer that starts a fight is not carried out')
-        self.assertIn('AW_CombatEngageAgainst(e,&sheet,o,&other_sheet)',
+        # (since v0.0.68 through the fight order: host_combat -> fight_order -> fight_start,
+        # MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68)
+        self.assertIn('fight_order(a,e,o,b);',
                       body('aw_mwhost.c', 'static void host_combat(int instance,int target,int verb,int other){'))
+        self.assertIn('AW_CombatEngageAgainst(e,&sheet,o,&other_sheet)',
+                      body('aw_mwhost.c', 'static int fight_start(aw_actor_t *a,edict_t *e,edict_t *o,aw_actor_t *b){'))
         # the engine side of each path
         self.assertIn('if(!e)e=speaker_edict(ref);', body('aw_mwhost.c', 'static aw_actor_t *actor_of('))
         self.assertIn('AW_MwscriptSpeakerAggro(e,dispo);', body('aw_dialwin.c', 'static void closed(void)'))

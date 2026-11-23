@@ -152,10 +152,16 @@ static int route_format(route_t *r,int argc,char **argv,int j,char *out,int capa
     /* dbg camera fpview|hands|parts and dbg cast casting|now|ready|spell|start|strike (DBG-SUPERSPEED-62): the
      * command's own word goes with what follows; up to v0.0.62-dev2 the route dropped it ("aw_camera off") */
     if((!strcmp(r->command,"aw_camera") && !strncmp(r->words,"camera ",7)) ||
-       (!strcmp(r->command,"aw_magicfx") && !strncmp(r->words,"cast ",5))){
+       (!strcmp(r->command,"aw_magicfx") && !strncmp(r->words,"cast ",5)) ||
+       (!strcmp(r->command,"aw_cam") && !strncmp(r->words,"cam ",4))){
         const char *sub=strchr(r->words,' ');
         n=(int)strlen(sub);if(used+n+2>capacity)return 0;
         strcpy(out+used,sub);used+=n;
+    }
+    /* dbg pan cam (DBG-CAM-PAN-TRACK-68): the alias of dbg cam pan, the camera marks command's pan, no resident command */
+    if(!strcmp(r->command,"aw_cam") && !strcmp(r->words,"pan cam")){
+        if(used+5>capacity)return 0;
+        strcpy(out+used," pan");used+=4;
     }
     /* The appearance-only alias reuses quickchar; no second resident command. */
     if(!strcmp(r->words,"characterchange") && argc==j){
@@ -499,6 +505,7 @@ static int integer(char *s,int maximum,int *out) {
     while(*s){if(*s<'0'||*s>'9')return 0;n=n*10+*s++-'0';if(n>maximum)return 0;}
     *out=n;return 1;
 }
+int AW_UIColorUsable(int i);   /* aw_ui.c: not an entry of the textures' ice ramp (MENU-PALETTE-RED-CAST-68) */
 static void set_colour(void) {
     int rgb[3],i,best=255;long distance,best_distance=0x7fffffff;char *s=Cmd_Argv(1);
     if(Cmd_Argc()==1) {
@@ -514,6 +521,7 @@ static void set_colour(void) {
     else {Con_Printf("Color: black/blue/gray, or R G B (0..255)\n");return;}
     for(i=0;i<256;i++) {
         long r=host_basepal[i*3]-rgb[0],g=host_basepal[i*3+1]-rgb[1],b=host_basepal[i*3+2]-rgb[2];
+        if(!AW_UIColorUsable(i))continue;
         distance=r*r+g*g+b*b;if(distance<best_distance){best=i;best_distance=distance;}
     }
     Cvar_SetValue(colour.name,best);

@@ -24,6 +24,7 @@
 #include "aw_listbox.h"
 #include "aw_msgbox.h"
 #include "aw_iteminfo.h"
+#include "aw_layout.h"
 #include <stdint.h>
 #include <ctype.h>
 static void mm_close_all(void);   /* the map markers' boxes and menu (MAP-MULTI-MARKERS-66) */
@@ -146,6 +147,32 @@ static int map_view_ready,teleport_mode,teleport_selected;
 static int map_world_placed;
 static cvar_t aw_map_mode={"aw_map_mode","0",true}; /* 0=Debug, 1=In-Game */
 static cvar_t aw_map_debug_available={"aw_map_debug_available","1",true};
+/* MAP-VERSION-2-DEFAULT-68 (the maintainer, 20 November 2026: map version 2 is the default, the map before it stays as
+ * version 1 with dbg dbgmap and dbg maptype): aw_map_version 2 (the default, saved) is the original's map in the frame
+ * of the attributes, inventory and magic views, the place's name in its title, no debug buttons, no lava colour; 1 is
+ * the map before it (its Debug and In-Game views, buttons and lava legend). Read when the map opens (map_v2); the
+ * debug teleport map (dbg tp map) is always the version 1 screen. VIEW_*: the map picture on the screen for the version
+ * open (version 1: 4,19 312 x 154, as before). */
+static cvar_t aw_map_version={"aw_map_version","2",true};
+static int map_v2,teleport_opening,view_x=4,view_y=19,view_w=312,view_h=154;
+#define VIEW_MAX_W 312
+/* version 2's layout, the shared menu layout's places (aw_statswin.c window_frame, aw_worldui.c inventory_draw): the
+ * window box and its title bar, the map's box (its picture 304 x 142 inside the 4-pixel frame) and the footer's box
+ * (two lines of console glyphs: the close keys, a hint and the World / Local / Markers tabs in the inventory's tab
+ * style; then the zoom and pan keys) */
+#define MAPV2_MAP_BOX_Y 18
+#define MAPV2_MAP_BOX_H 150
+#define MAPV2_FOOT_BOX_Y 170
+#define MAPV2_FOOT_BOX_H 26
+#define MAPV2_FOOT_Y 176      /* the footer's first line: the close keys, a hint or message, the tabs */
+#define MAPV2_FOOT_Y2 184     /* its second: zoom and pan (the maintainer, 22 November 2026: the zoom keys said) */
+#define MAPV2_CLOSE_X 10
+#define MAPV2_HINT_END 212
+/* the close key's words as drawn ("M/Esc close": the key bound to the map's command, else "Esc close"), their width */
+static int mapv2_close_w=36;
+static const struct {const char *label;int x,w;} mapv2_tabs[3]={{"World",216,24},{"Local",242,24},{"K markers",268,40}};
+/* the title: the original's name of the cell the player is in, worked out when the map opens, and its font */
+static char map_name[64];static aw_layout_title_t map_name_fit;
 /* v2 map layers: lava pools on by default; aw_map_format 1 draws a v2 file as v1. */
 static cvar_t aw_map_lava={"aw_map_lava","1",true};
 static cvar_t aw_map_format={"aw_map_format","2",true};
@@ -924,6 +951,7 @@ static void inventory_preview(int muted){
 /* The original window title bar (UI-WINDOW-TITLE-BAR-42), drawn by aw_icons.c from the
  * imported art; without it the title is centred alone in the same band. */
 int (*aw_title_bar)(int x,int y,int w,const char *title);
+int (*aw_title_plaque)(int x,int y,int w,int *plaque_x,int *plaque_w);   /* MAP-VERSION-2-DEFAULT-68 (aw_icons.c) */
 const char *(*aw_hand_to_hand_name)(void);
 /* The original inventory window's title is the equipped weapon's name, or the hand-to-hand skill's
  * name when unarmed (OpenMW mwgui/windowmanagerimp.cpp setSelectedWeapon / hud.cpp
@@ -1081,7 +1109,7 @@ static void inventory_draw(void){
     if(inventory->info)AW_ItemInfoDraw(inventory->info,mouse_x,mouse_y);   /* INVENTORY-ITEM-INFO-67: over it all */
 }
 static void map_fit(void){
-    float sx=(float)map_w/310,sy=(float)map_h/150;
+    float sx=(float)map_w/(view_w-2),sy=(float)map_h/(view_h-4);   /* version 1: 310 x 150 */
     map_step=(sx>sy?sx:sy)/(1<<zoom);
 }
 static void map_home(void){zoom=0;map_x=map_w*.5f;map_y=map_h*.5f;map_fit();}
@@ -1108,6 +1136,7 @@ static void map_player(void){
 /* Hiding the HUD diagnostics must not disable explicit map commands/tabs. */
 static int map_debug_enabled(void){return aw_map_debug_available.value!=0;}
 static int map_in_game(void){
+    if(map_v2)return 1;   /* MAP-VERSION-2-DEFAULT-68: version 2 is the in-game view only; aw_map_mode is version 1's */
     if(aw_map_mode.value<0 || aw_map_mode.value>1)Cvar_SetValue(aw_map_mode.name,0);
     if(!map_debug_enabled() && aw_map_mode.value<1)Cvar_SetValue(aw_map_mode.name,1);
     return aw_map_mode.value>=1;
@@ -1233,8 +1262,11 @@ static int fog_open_at(float x,float y){
  * map opens from the loaded map's own faces (walls bright, floors dim, ceilings left out) into a 312 x 154 picture
  * (48,048 bytes, freed on close; no file read), under the room's own fog (aw_mapfog.c AW_MapFogRoom*), with the
  * room's doors named on mouse-over after where they lead (docs/WORLD_MAP_AND_JOURNAL.md "Local map"). */
-#define LOCAL_W 312
-#define LOCAL_H 154
+/* MAP-VERSION-2-DEFAULT-68: the plan is the map picture's size of the version open (version 1 312 x 154, version 2
+ * 304 x 148), set when it is built */
+static int local_w=312,local_h=154;
+#define LOCAL_W local_w
+#define LOCAL_H local_h
 #define LOCALBTN_WORLD_X 168
 #define LOCALBTN_LOCAL_X 208
 #define LOCALBTN_W 38
@@ -1248,12 +1280,13 @@ static void local_line(int x0,int y0,int x1,int y1,int color){
 }
 /* the room's point X, Y (engine units) on the screen */
 static void local_to_screen(float x,float y,int *mx,int *my){
-    *mx=4+(int)floor(local_ox+(x-local_min[0])*local_scale);*my=19+(int)floor(local_oy+(local_max[1]-y)*local_scale);
+    *mx=view_x+(int)floor(local_ox+(x-local_min[0])*local_scale);*my=view_y+(int)floor(local_oy+(local_max[1]-y)*local_scale);
 }
 static void local_build(void){
     model_t *m=sv.worldmodel;int i,j,edges=0,faces=0,wall=AW_UIColor(232,214,160),floorc=AW_UIColor(110,92,58);
     float w,h,nz;double t0=Sys_FloatTime();
     local_free();
+    local_w=view_w;local_h=view_h;   /* MAP-VERSION-2-DEFAULT-68: the picture of the version open */
     if(!sv.active || !m || m->type!=mod_brush || m->numsurfaces<1 || !AW_Interior())return;
     local_min[0]=m->mins[0];local_min[1]=m->mins[1];local_max[0]=m->maxs[0];local_max[1]=m->maxs[1];
     w=local_max[0]-local_min[0];h=local_max[1]-local_min[1];
@@ -1284,7 +1317,7 @@ static void local_build(void){
 }
 /* outdoors: the zoom where about 3 x 3 cells fill the window, centred on the player */
 static void local_zoom(void){
-    float cells=map_w*(3*AW_MAPFOG_CELL)/(float)(map_bounds[2]-map_bounds[0]),want=cells/310,base;int z;
+    float cells=map_w*(3*AW_MAPFOG_CELL)/(float)(map_bounds[2]-map_bounds[0]),want=cells/(view_w-2),base;int z;
     zoom=0;map_fit();base=map_step;
     for(z=0;z<5 && base/(1<<(z+1))>=want*.75f;z++){}
     zoom=z;map_fit();map_player();
@@ -1305,7 +1338,8 @@ static void map_explored_view(void){
     ry=player_y-(fog_gy0+fog_y0)*square;if((fog_gy0+fog_y1+1)*square-player_y>ry)ry=(fog_gy0+fog_y1+1)*square-player_y;
     rx*=kx;ry*=ky;
     zoom=0;map_fit();base=map_step;
-    for(z=top;z>0;z--)if(rx*(1<<z)<=150*base && ry*(1<<z)<=74*base)break;   /* half the view: 156 x 77 pixels */
+    /* half the view less a margin (version 1: 156 x 77 pixels, so 150 x 74) */
+    for(z=top;z>0;z--)if(rx*(1<<z)<=(view_w/2-6)*base && ry*(1<<z)<=(view_h/2-3)*base)break;
     zoom=z;map_fit();map_player();
 }
 /* the in-game World view placed on the player once a game (open_map, the World tab, the IN-GAME button all lead here:
@@ -1320,9 +1354,35 @@ static void map_set_local(int local){
     if(map_local && !local_room && !AW_Interior() && marker)local_zoom();
     else if(!map_local && !marker)map_home();
 }
+/* MAP-VERSION-2-DEFAULT-68: the version this opening shows and its picture's rectangle */
+static void map_view_set(void){
+    map_v2=aw_map_version.value!=1 && !teleport_opening;
+    if(map_v2){
+        view_x=4+AW_UI_FRAME_EDGE;view_y=MAPV2_MAP_BOX_Y+AW_UI_FRAME_EDGE;
+        view_w=312-2*AW_UI_FRAME_EDGE;view_h=MAPV2_MAP_BOX_H-2*AW_UI_FRAME_EDGE;
+    }else{view_x=4;view_y=19;view_w=312;view_h=154;}
+}
+/* MAP-VERSION-2-DEFAULT-68: the title, as the original names the cell the player is in (OpenMW mwworld/worldimp.cpp
+ * World::getCellName, the map window's caption through mwgui/windowmanagerimp.cpp changeCell): a room's own name (its
+ * map's _aw_cell_id, aw_hud.c AW_HudPlayerCell), outdoors the cell's own name, else its region's name exactly as the
+ * game data has it (aw_world.c AW_CellNameAt: no expansion tag), else the GMST sDefaultCellname's value, "Wilderness";
+ * "Map" (the GMST sMap) when neither the room nor an outdoor position is known. Then its font: the game's own (the
+ * inventory title's) when it fits the plaque, else the console glyphs (aw_layout.c AW_LayoutTitle). Once an opening. */
+static void map_title_set(void){
+    long x=0,y=0;char id[64];const char *region,*name;float p[3];int game_w;
+    switch(AW_HudPlayerCell(&x,&y,id,sizeof(id),&region)){
+    case 2:name=id;break;
+    case 1:p[0]=(x+.5f)*8192.0f;p[1]=(y+.5f)*8192.0f;p[2]=0;name=AW_CellNameAt(p);if(!name || !*name)name="Wilderness";break;
+    default:name="Map";
+    }
+    strncpy(map_name,name,sizeof(map_name)-1);map_name[sizeof(map_name)-1]=0;
+    AW_UISmallBegin();game_w=AW_UIWidth(map_name);AW_UISmallEnd();
+    AW_LayoutTitle(&map_name_fit,308,game_w,(int)strlen(map_name));
+}
 static void open_map(void){
     FILE *f=NULL;int size,i,off,version;byte *p;
     if(!menu_allowed(AW_MENU_MAP))return;   /* the teleport map checked the full rule before calling */
+    map_view_set();
     map_in_game();
     size=COM_FOpenFile("world/map.awm",&f);
     if(!f || size<32 || size>MAP_MAX)goto bad;
@@ -1356,6 +1416,7 @@ static void open_map(void){
     /* MAP-WORLD-TAB-BLANK-67: the World view, once placed in this game, opens centred on the player at the zoom kept
      * (OpenMW MapWindow::centerView); its first placement waits for the first draw (map_world_place) */
     if(map_world_placed && !map_local && marker && map_in_game())map_player();
+    if(map_v2)map_title_set();
     mm_close_all();mm_max();mm_migrate();
     opened(1);
     if(marker)Con_Printf("World map position: %ld %ld %ld (%s).\n",(long)player_x,(long)player_y,(long)player_z,sv.name);
@@ -1383,15 +1444,16 @@ static int teleport_button_hit(void){
     return teleport_selected && (teleport_mode || normal_teleport_enabled()) &&
         mouse_x>=TELEPORT_X && mouse_x<TELEPORT_X+TELEPORT_W && mouse_y>=y && mouse_y<y+TELEPORT_H;
 }
-static int clear_button_hit(void){
-    return mouse_x>=CLEAR_X && mouse_x<CLEAR_X+CLEAR_W && mouse_y>=CLEAR_Y && mouse_y<CLEAR_Y+CLEAR_H;
+static int clear_button_hit(void){   /* version 1's MARKERS button (version 2: its footer tab) */
+    return !map_v2 && mouse_x>=CLEAR_X && mouse_x<CLEAR_X+CLEAR_W && mouse_y>=CLEAR_Y && mouse_y<CLEAR_Y+CLEAR_H;
 }
+/* the pointer over the map picture (MAP-VERSION-2-DEFAULT-68: the version open's rectangle) */
+static int in_view(void){return mouse_x>=view_x && mouse_x<view_x+view_w && mouse_y>=view_y && mouse_y<view_y+view_h;}
 /* Both picks use the exact AWM1 texture-to-original-source transform. */
 static int map_source_at(float point[3]){
-    float px=map_x-156*map_step+(mouse_x-4)*map_step;
-    float py=map_y-77*map_step+(mouse_y-19)*map_step;
-    if(mouse_x<4 || mouse_x>=316 || mouse_y<19 || mouse_y>=173 ||
-       px<0 || px>=map_w || py<0 || py>=map_h)return 0;
+    float px=map_x-(view_w/2)*map_step+(mouse_x-view_x)*map_step;
+    float py=map_y-(view_h/2)*map_step+(mouse_y-view_y)*map_step;
+    if(!in_view() || px<0 || px>=map_w || py<0 || py>=map_h)return 0;
     point[0]=map_bounds[0]+px*(map_bounds[2]-map_bounds[0])/map_w;
     point[1]=map_bounds[3]-py*(map_bounds[3]-map_bounds[1])/map_h;
     point[2]=0;return 1;
@@ -1418,9 +1480,9 @@ static const char *const mm_menu_buttons[6]={"Centre","Rename","Follow","Delete"
 static const char *const mm_yes_no[2]={"Yes","No"};
 static void mm_max(void){AW_MapMarksSetMax((int)aw_map_markers_max.value);}
 static void source_to_screen(float x,float y,int *mx,int *my){
-    float left=map_x-156*map_step,top=map_y-77*map_step;
+    float left=map_x-(view_w/2)*map_step,top=map_y-(view_h/2)*map_step;
     float px=(x-map_bounds[0])*map_w/(map_bounds[2]-map_bounds[0]),py=(map_bounds[3]-y)*map_h/(map_bounds[3]-map_bounds[1]);
-    *mx=4+(int)((px-left)/map_step);*my=19+(int)((py-top)/map_step);
+    *mx=view_x+(int)((px-left)/map_step);*my=view_y+(int)((py-top)/map_step);
 }
 static int map_point_inside(float x,float y){
     return x>=map_bounds[0] && x<map_bounds[2] && y>map_bounds[1] && y<=map_bounds[3];
@@ -1654,7 +1716,7 @@ static void open_teleport_map(void){
         key_dest=previous;
         Con_Printf("Teleport map requires active single-player gameplay outside story/reader/gallery panels.\n");return;
     }
-    open_map();
+    teleport_opening=1;open_map();teleport_opening=0;   /* MAP-VERSION-2-DEFAULT-68: the version 1 screen */
     if(modal!=1){key_dest=previous;return;}
     teleport_mode=1;teleport_selected=0;teleport_message=NULL;map_local=0;
     mouse_x=160;mouse_y=100;
@@ -2037,6 +2099,27 @@ static void compass_draw(void){
     how=dist<AW_MAPFOG_CELL/16?"here":dist<AW_MAPFOG_CELL*2?"near":"far";
     AW_UIText(x0+w+3,y,how,-1);
 }
+/* MAP-VERSION-2-DEFAULT-68: dbg dbgmap on/off (true/false, 1/0; bare: the other way) shows map version 1, the debug map,
+ * or version 2; dbg maptype 1/2 sets the version (bare: prints it). One saved value, aw_map_version, read when the map
+ * opens (the console closes the map, so the next opening shows it). */
+static void map_version_said(void){
+    Con_Printf("Map version %d%s, from the next opening of the map.\n",aw_map_version.value==1?1:2,
+               aw_map_version.value==1?" (the debug map)":" (the default)");
+}
+static void map_debug_command(void){
+    const char *s=Cmd_Argv(1);int on;
+    if(Cmd_Argc()<2)on=aw_map_version.value!=1;
+    else if(Cmd_Argc()==2 && (!Q_strcasecmp((char *)s,"on") || !Q_strcasecmp((char *)s,"true") || !strcmp(s,"1")))on=1;
+    else if(Cmd_Argc()==2 && (!Q_strcasecmp((char *)s,"off") || !Q_strcasecmp((char *)s,"false") || !strcmp(s,"0")))on=0;
+    else{Con_Printf("Usage: dbg dbgmap on/off, true/false or 1/0 (no argument toggles)\n");return;}
+    Cvar_SetValue(aw_map_version.name,on?1:2);map_version_said();
+}
+static void map_type_command(void){
+    const char *s=Cmd_Argv(1);
+    if(Cmd_Argc()<2){map_version_said();return;}
+    if(Cmd_Argc()!=2 || (strcmp(s,"1") && strcmp(s,"2"))){Con_Printf("Usage: dbg maptype 1/2 (1 the debug map, 2 the default)\n");return;}
+    Cvar_SetValue(aw_map_version.name,s[0]=='1'?1:2);map_version_said();
+}
 void AW_WorldUIInit(void){aw_journal_entry_exists=journal_entry_exists;AW_InventoryInit();Cvar_RegisterVariable(&aw_map_mode);
     Cmd_AddCommand("marker",mm_command);
     aw_save_markers_encode=AW_MapMarksEncode;aw_save_markers_decode=AW_MapMarksDecode;
@@ -2046,6 +2129,8 @@ void AW_WorldUIInit(void){aw_journal_entry_exists=journal_entry_exists;AW_Invent
     Cvar_RegisterVariable(&aw_key_inv_use);Cvar_RegisterVariable(&aw_key_inv_drop);   /* OPENING-TUTORIAL-KEYS-65 */
     Cvar_RegisterVariable(&aw_key_inv_info);   /* INVENTORY-ITEM-INFO-67 */
     Cvar_RegisterVariable(&aw_map_markers_max);Cvar_RegisterVariable(&aw_compass);    /* MAP-MULTI-MARKERS-66 */
+    Cvar_RegisterVariable(&aw_map_version);   /* MAP-VERSION-2-DEFAULT-68 */
+    Cmd_AddCommand("aw_map_debug",map_debug_command);Cmd_AddCommand("aw_map_type",map_type_command);
     Cmd_AddCommand("aw_teleport_map",open_teleport_map);Cmd_AddCommand("aw_worldmap",open_normal_map);Cmd_AddCommand("aw_journal",open_journal);Cmd_AddCommand("aw_inventory",inventory_command);}
 void AW_WorldUIMouse(int dx,int dy){
     int top;
@@ -2076,6 +2161,9 @@ void AW_WorldUIMouse(int dx,int dy){
         if(top>=0){book->index_top=top;book->selection=top;AW_UIBookBegin();index_layout();AW_UIBookEnd();}
     }
 }
+/* MAP-VERSION-2-DEFAULT-68: the key the player bound to the map's command closes it too (as the stats window's own key),
+ * and version 2's footer names that key (aw_textdef.c AW_TextBoundKeyForCommand), never a fixed letter */
+static int map_own_key(int key){return key>=0 && key<256 && keybindings[key] && !Q_strcasecmp(keybindings[key],"aw_worldmap");}
 static void flip(int direction){
     int entry;
     if(direction>0 && book->spread+2<book->count){book->spread+=2;return;}
@@ -2102,12 +2190,23 @@ int AW_WorldUIKey(int key,int down){
     if(modal==3 && inventory && inventory->confirm && (key==K_ESCAPE || key=='i' || key=='I')){inventory_confirm_close();return 1;}
     /* INVENTORY-ITEM-INFO-67: Esc (or I) in the information box is its OK: back to the window */
     if(modal==3 && inventory && inventory->info && (key==K_ESCAPE || key=='i' || key=='I')){inventory_info_close();return 1;}
-    if(key==K_ESCAPE || (modal==1 && (key=='m' || key=='M')) || (modal==2 && (key=='j' || key=='J')) || (modal==3 && (key=='i' || key=='I'))){close_panel();return 1;}
+    if(key==K_ESCAPE || (modal==1 && (key=='m' || key=='M' || map_own_key(key))) || (modal==2 && (key=='j' || key=='J')) || (modal==3 && (key=='i' || key=='I'))){close_panel();return 1;}
     if(modal==3){inventory_key(key);return 1;}
     if(modal==4){if(key==K_MOUSE1)drag=K_MOUSE1;if(!panel_key(key,mouse_x,mouse_y))close_panel();return 1;}
     if(modal==1){
         if(key!=K_MOUSE1 && key!=K_MOUSE2 && key!=K_MOUSE3)marker_click=0;
-        if(key==K_MOUSE1 && !teleport_mode && mouse_y>=1 && mouse_y<16){
+        /* MAP-VERSION-2-DEFAULT-68: version 2's footer: the close key's words close, the tabs switch the view or open
+         * the Markers menu (the footer box's inner rows) */
+        if(key==K_MOUSE1 && map_v2 && mouse_y>=MAPV2_FOOT_BOX_Y+AW_UI_FRAME_EDGE &&
+           mouse_y<MAPV2_FOOT_BOX_Y+MAPV2_FOOT_BOX_H-AW_UI_FRAME_EDGE){
+            marker_click=drag=0;
+            if(mouse_x>=MAPV2_CLOSE_X-2 && mouse_x<MAPV2_CLOSE_X+mapv2_close_w)close_panel();
+            else if(mouse_x>=mapv2_tabs[0].x && mouse_x<mapv2_tabs[0].x+mapv2_tabs[0].w)map_set_local(0);
+            else if(mouse_x>=mapv2_tabs[1].x && mouse_x<mapv2_tabs[1].x+mapv2_tabs[1].w && (marker || local_room))map_set_local(1);
+            else if(mouse_x>=mapv2_tabs[2].x && mouse_x<mapv2_tabs[2].x+mapv2_tabs[2].w)mm_menu_open();
+            return 1;
+        }
+        if(key==K_MOUSE1 && !teleport_mode && !map_v2 && mouse_y>=1 && mouse_y<16){
             marker_click=drag=teleport_selected=0;teleport_message=NULL;
             if(mouse_x>=4 && mouse_x<66 && map_debug_enabled())Cvar_SetValue(aw_map_mode.name,0);
             else if(mouse_x>=250 && mouse_x<316)Cvar_SetValue(aw_map_mode.name,1);
@@ -2117,7 +2216,7 @@ int AW_WorldUIKey(int key,int down){
         }
         if(key==K_TAB && !teleport_mode && (map_local || marker || local_room)){map_set_local(!map_local);return 1;}
         /* the room's plan has no pan, zoom or marker: the pointer only names doors */
-        if(map_local && local_room && key==K_MOUSE1 && mouse_x>=4 && mouse_x<316 && mouse_y>=19 && mouse_y<173)return 1;
+        if(map_local && local_room && key==K_MOUSE1 && in_view())return 1;
         /* MAP-WORLD-TAB-BLANK-67: a view the player sets (zoom, pan, Home, P) is kept: no first placement over it */
         if(key==K_MWHEELUP || key==K_MWHEELDOWN || key=='+' || key=='=' || key=='-' || key==K_HOME || key=='p' ||
            key==K_LEFTARROW || key==K_RIGHTARROW || key==K_UPARROW || key==K_DOWNARROW ||
@@ -2134,14 +2233,14 @@ int AW_WorldUIKey(int key,int down){
         if(teleport_mode){
             /* Amiga sends right as MOUSE3 and middle as MOUSE2. Keep both
              * secondary buttons usable here without changing global bindings. */
-            if((key==K_MOUSE2 || key==K_MOUSE3) && mouse_x>=4 && mouse_x<316 && mouse_y>=19 && mouse_y<173)drag=key;
+            if((key==K_MOUSE2 || key==K_MOUSE3) && in_view())drag=key;
             if(key==K_ENTER)confirm_teleport();
             if(key==K_MOUSE1){
-                if(mouse_x>=4 && mouse_x<316 && mouse_y>=19 && mouse_y<173)select_teleport_point();
+                if(in_view())select_teleport_point();
                 else if(teleport_button_hit())confirm_teleport();
             }
         }else{
-            int on_map=mouse_x>=4 && mouse_x<316 && mouse_y>=19 && mouse_y<173 && !(map_local && local_room);
+            int on_map=in_view() && !(map_local && local_room);
             if(key=='k' || key=='K'){mm_menu_open();return 1;}
             if((key=='h' || key=='H') && !(map_local && local_room))mm_hot_key();
             if(normal_teleport_enabled()){
@@ -2157,9 +2256,9 @@ int AW_WorldUIKey(int key,int down){
                 if(teleport_button_hit())confirm_teleport();
                 else if(clear_button_hit())mm_menu_open();
                 else if(on_map && (hit=mm_at_pointer())>=0)mm_edit_open(hit);
-                else if(mouse_x>=4 && mouse_x<316 && mouse_y>=19 && mouse_y<173){
+                else if(in_view()){
                     drag=K_MOUSE1;marker_click=1;marker_drag_x=marker_drag_y=0;
-                }else if(mouse_y>=184)close_panel();
+                }else if(!map_v2 && mouse_y>=184)close_panel();
             }
         }
     }else if(book->index_mode==2){
@@ -2280,23 +2379,24 @@ static void teleport_button_draw(int gold){
  * where a pixel centre lies inside it; a pool too small to cover a pixel centre marks
  * the one pixel holding its centre. Rejected by its bounds first; drawn only while the
  * map is open, straight into the frame like the terrain pixels. */
-static int lava_visible(void){return lava_count>0 && aw_map_lava.value!=0 && aw_map_format.value>=2;}
+/* MAP-VERSION-2-DEFAULT-68: version 2 marks no lava (the original's map has no lava colour); version 1 as before */
+static int lava_visible(void){return !map_v2 && lava_count>0 && aw_map_lava.value!=0 && aw_map_format.value>=2;}
 static void lava_draw(float left,float top){
-    int i,j,n,k,r,r0,r1,c,c0,c1,painted,mx,my;const byte *q,*pt=lava_points;byte *dst;
+    int i,j,n,k,r,r0,r1,c,c0,c1,painted,mx,my,x1v=view_x+view_w,y1v=view_y+view_h;const byte *q,*pt=lava_points;byte *dst;
     float kx=map_w/((float)(map_bounds[2]-map_bounds[0])*map_step),ky=map_h/((float)(map_bounds[3]-map_bounds[1])*map_step);
-    float ox=4-left/map_step-map_bounds[0]*kx,oy=19-top/map_step+map_bounds[3]*ky;
+    float ox=view_x-left/map_step-map_bounds[0]*kx,oy=view_y-top/map_step+map_bounds[3]*ky;
     float sx[LAVA_POINTS],sy[LAVA_POINTS],x0,x1,y0,y1,yc,xl,xr,xi,ax,ay,bx,by,cx,cy;
     lava_painted=0;
     for(i=0;i<lava_count;i++,pt+=n*8){
         q=lava_pools+i*24;n=q[4]|(q[5]<<8);
         x0=(int32_t)u32(q+8)*kx+ox;x1=(int32_t)u32(q+16)*kx+ox;
         y0=oy-(int32_t)u32(q+20)*ky;y1=oy-(int32_t)u32(q+12)*ky;
-        if(x1<4 || x0>=316 || y1<19 || y0>=173)continue;
+        if(x1<view_x || x0>=x1v || y1<view_y || y0>=y1v)continue;
         cx=cy=0;
         for(j=0;j<n;j++){sx[j]=(int32_t)u32(pt+j*8)*kx+ox;sy[j]=oy-(int32_t)u32(pt+j*8+4)*ky;cx+=sx[j];cy+=sy[j];}
         painted=0;
         if(n>=3){
-            r0=(int)ceil(y0-.5f);r1=(int)floor(y1-.5f);if(r0<19)r0=19;if(r1>172)r1=172;
+            r0=(int)ceil(y0-.5f);r1=(int)floor(y1-.5f);if(r0<view_y)r0=view_y;if(r1>y1v-1)r1=y1v-1;
             for(r=r0;r<=r1;r++){
                 yc=r+.5f;xl=1e9f;xr=-1e9f;
                 for(j=0,k=n-1;j<n;k=j++){
@@ -2306,7 +2406,7 @@ static void lava_draw(float left,float top){
                     }
                 }
                 if(xl>xr)continue;
-                c0=(int)ceil(xl-.5f);c1=(int)floor(xr-.5f);if(c0<4)c0=4;if(c1>315)c1=315;
+                c0=(int)ceil(xl-.5f);c1=(int)floor(xr-.5f);if(c0<view_x)c0=view_x;if(c1>x1v-1)c1=x1v-1;
                 if(c0>c1)continue;
                 dst=vid.buffer+r*vid.rowbytes;for(c=c0;c<=c1;c++)dst[c]=(byte)lava_colour;
                 painted+=c1-c0+1;
@@ -2314,7 +2414,7 @@ static void lava_draw(float left,float top){
         }
         if(!painted){
             mx=(int)floor(cx/n);my=(int)floor(cy/n);
-            if(mx>=4 && mx<316 && my>=19 && my<173){vid.buffer[my*vid.rowbytes+mx]=(byte)lava_colour;painted=1;}
+            if(mx>=view_x && mx<x1v && my>=view_y && my<y1v){vid.buffer[my*vid.rowbytes+mx]=(byte)lava_colour;painted=1;}
         }
         lava_painted+=painted;
     }
@@ -2330,9 +2430,9 @@ static int map_arrow(int cx,int cy,float yaw){
     turn=(90.0f-yaw)*(3.14159265f/180.0f);   /* clockwise from up */
     c=Q_CosRad(turn);s=Q_SinRad(turn);
     for(y=-12;y<=12;y++){
-        if(cy+y<19 || cy+y>=173)continue;
+        if(cy+y<view_y || cy+y>=view_y+view_h)continue;
         for(x=-12;x<=12;x++){
-            if(cx+x<4 || cx+x>=316)continue;
+            if(cx+x<view_x || cx+x>=view_x+view_w)continue;
             /* the screen pixel turned back onto the arrow (y down: a clockwise turn) */
             u=x*c+y*s;v=y*c-x*s;
             sx=(int)floor(u+8.0f);sy=(int)floor(v+8.0f);
@@ -2345,7 +2445,7 @@ static int map_arrow(int cx,int cy,float yaw){
 /* a door marker (3 x 3, OpenMW draws a door icon) at MX, MY; the nearest within 4 pixels of the pointer is named */
 static void door_marker(int mx,int my,const char *name,int *best){
     int d;
-    if(mx<5 || mx>=315 || my<20 || my>=172)return;
+    if(mx<view_x+1 || mx>=view_x+view_w-1 || my<view_y+1 || my>=view_y+view_h-1)return;
     AW_UIFill(mx-1,my-1,3,3,AW_UIColor(214,96,64));
     d=(mx-mouse_x)*(mx-mouse_x)+(my-mouse_y)*(my-mouse_y);
     if(d<*best){*best=d;map_hover_name=name;}
@@ -2353,7 +2453,7 @@ static void door_marker(int mx,int my,const char *name,int *best){
 /* the room's plan under its fog, its doors and the player (stage 3, inside) */
 static void local_draw(int in_game,int *best){
     int x,y,gx,gy,fog=AW_UIColor(20,18,14),i,mx,my;byte seen[AW_MAPFOG_ROOM_GRID*AW_MAPFOG_ROOM_GRID],*dst;
-    int cols[LOCAL_W];float w=(local_max[0]-local_min[0])/AW_MAPFOG_ROOM_GRID,h=(local_max[1]-local_min[1])/AW_MAPFOG_ROOM_GRID;
+    int cols[VIEW_MAX_W];float w=(local_max[0]-local_min[0])/AW_MAPFOG_ROOM_GRID,h=(local_max[1]-local_min[1])/AW_MAPFOG_ROOM_GRID;
     float point[3];const char *name;
     /* MAP-EXPLORED-ROOMS-CAP-66: the room's bits looked up once a frame (was 256 searches by name) */
     const unsigned char *bits=in_game?AW_MapFogRoomBits(local_name):NULL;
@@ -2368,7 +2468,7 @@ static void local_draw(int in_game,int *best){
         const byte *row=local_pixels+y*LOCAL_W,*s;
         gy=(int)floor((local_max[1]-local_min[1]-(y+.5f-local_oy)/local_scale)/h);
         gy=gy<0?0:gy>=AW_MAPFOG_ROOM_GRID?AW_MAPFOG_ROOM_GRID-1:gy;
-        s=seen+gy*AW_MAPFOG_ROOM_GRID;dst=vid.buffer+(y+19)*vid.rowbytes+4;
+        s=seen+gy*AW_MAPFOG_ROOM_GRID;dst=vid.buffer+(y+view_y)*vid.rowbytes+view_x;
         for(x=0;x<LOCAL_W;x++)dst[x]=s[cols[x]]?row[x]:(byte)fog;
     }
     for(i=0;(x=AW_SceneMapDoor(i,point,&name))>=0;i++){
@@ -2378,36 +2478,87 @@ static void local_draw(int in_game,int *best){
     if(svs.clients && svs.clients[0].edict){
         edict_t *e=svs.clients[0].edict;
         local_to_screen(e->v.origin[0],e->v.origin[1],&mx,&my);
-        if(mx>=9 && mx<311 && my>=24 && my<168 && !map_arrow(mx,my,cl.viewangles[YAW])){
+        if(mx>=view_x+5 && mx<view_x+view_w-5 && my>=view_y+5 && my<view_y+view_h-5 && !map_arrow(mx,my,cl.viewangles[YAW])){
             AW_UIFill(mx-4,my,9,1,AW_UIColor(255,255,255));AW_UIFill(mx,my-4,1,9,AW_UIColor(255,255,255));
         }
     }
 }
+/* MAP-VERSION-2-DEFAULT-68: version 2 in the shared menu layout, the same calls at the same places as the attributes,
+ * inventory and magic views (aw_statswin.c window_frame, inventory_draw above): black, the window's box (its title bar
+ * comes with the chrome), then the map's box and the footer's box inside it */
+static void mapv2_frame(void){
+    AW_UIFill(0,0,320,200,AW_UIColor(0,0,0));AW_UIBox(2,2,316,196);
+    AW_UIBox(4,MAPV2_MAP_BOX_Y,312,MAPV2_MAP_BOX_H);AW_UIBox(4,MAPV2_FOOT_BOX_Y,312,MAPV2_FOOT_BOX_H);
+}
+/* a line of console glyphs in WIDTH pixels, ending in "..." when cut (as aw_statswin.c small) */
+static void mapv2_small(int x,int y,int width,const char *value,int color){
+    char clipped[96];int n=(int)strlen(value),limit=width/4;
+    if(limit<1)return;
+    if(limit>(int)sizeof(clipped)-1)limit=sizeof(clipped)-1;
+    if(n>limit)n=limit;
+    memcpy(clipped,value,n);clipped[n]=0;
+    if(value[n] && n>=3)memcpy(clipped+n-3,"...",3);
+    if(n>0)AW_SmallStringColor(x,y,n*4,clipped,color);
+}
+/* the title (the place's name in the title bar's plaque: the game's font, as the inventory's title, when it fits, else
+ * the console glyphs in the same plaque, aw_layout.c AW_LayoutTitle) and the footer (the close key, a hint or the
+ * markers' message, the World / Local / Markers tabs; the one lit is filled as the inventory's chosen category) */
+static void mapv2_chrome(void){
+    int gold=AW_UIColor(223,199,144),muted=AW_UIColor(150,135,104),tab=AW_UIColor(48,39,22),i,on,lit;
+    if(map_name_fit.font==AW_TITLE_GAME_FONT){AW_UISmallBegin();window_title(6,6,308,map_name,gold);AW_UISmallEnd();}
+    else{
+        char cut[80];int n=map_name_fit.chars,left=6,plaque=map_name_fit.plaque;
+        if(n>(int)sizeof(cut)-1)n=sizeof(cut)-1;
+        memcpy(cut,map_name,(size_t)n);cut[n]=0;
+        if(map_name_fit.font==AW_TITLE_CONSOLE_CUT && n>=3)memcpy(cut+n-3,"...",3);
+        if(!aw_title_plaque || !aw_title_plaque(6,6,308,&left,&plaque)){left=6;plaque=308;}
+        if(n>0)AW_SmallStringColor(left+(plaque-(n*4-1))/2,9,n*4,cut,gold);
+    }
+    {   char close[40];const char *key=AW_TextBoundKeyForCommand("aw_worldmap");int hint_x;
+        if(key && *key && strlen(key)<16)snprintf(close,sizeof(close),"%s/Esc close",key);else strcpy(close,"Esc close");
+        mapv2_close_w=(int)strlen(close)*4;
+        mapv2_small(MAPV2_CLOSE_X,MAPV2_FOOT_Y,mapv2_close_w,close,gold);
+        hint_x=MAPV2_CLOSE_X+mapv2_close_w+8;
+        mapv2_small(hint_x,MAPV2_FOOT_Y,MAPV2_HINT_END-hint_x,marker_message?marker_message:
+                    map_local && local_room?"Tab view":"Tab view  R-click mark  H hot",muted);
+    }
+    /* the view's own keys (AW_WorldUIKey): zoom 0..5 by +/- or the wheel, pan by a drag, the arrows or WASD, Home fits the
+     * island, P centres the player; a room's plan has none of them */
+    if(!(map_local && local_room))
+        mapv2_small(MAPV2_CLOSE_X,MAPV2_FOOT_Y2,300,"+/- wheel zoom  drag/arrows/WASD pan  Home fit  P player",muted);
+    for(i=0;i<3;i++){
+        on=i==0?!map_local:i==1?map_local:mm_menu;
+        lit=i==1?(marker || local_room):1;
+        if(on)AW_UIFill(mapv2_tabs[i].x,MAPV2_FOOT_Y-2,mapv2_tabs[i].w,9,tab);
+        mapv2_small(mapv2_tabs[i].x+2,MAPV2_FOOT_Y,mapv2_tabs[i].w-4,mapv2_tabs[i].label,lit?gold:muted);
+    }
+}
 static void map_draw(void){
-    int x,y,sx,sy,cols[312],fog_cols[312],ocean=map_ocean,gold=AW_UIColor(248,225,136),i,mx,my,in_game=map_in_game();
+    int x,y,sx,sy,cols[VIEW_MAX_W],fog_cols[VIEW_MAX_W],ocean=map_ocean,gold=AW_UIColor(248,225,136),i,mx,my,in_game=map_in_game();
     int fog=AW_UIColor(20,18,14),best=17,edge=AW_UIColor(202,165,96),inner=AW_UIColor(15,20,23),d;
-    float left=map_x-156*map_step,top=map_y-77*map_step,px,py,angle,dx,dy;byte *dst;char line[96];
-    const char *region;float source[3];int width,limit;
+    float left=map_x-(view_w/2)*map_step,top=map_y-(view_h/2)*map_step,px,py,angle,dx,dy;byte *dst;char line[96];
+    const char *region;float source[3];int width,limit,vx1=view_x+view_w,vy1=view_y+view_h;
     update_player();map_hover_name=NULL;
-    AW_UIFill(0,0,320,200,AW_UIColor(15,20,23));
+    if(map_v2)mapv2_frame();   /* MAP-VERSION-2-DEFAULT-68: the menus' frame, the map's and the footer's boxes */
+    else AW_UIFill(0,0,320,200,AW_UIColor(15,20,23));
     if(map_local && local_pixels){
         local_draw(in_game,&best);snprintf(line,sizeof(line),"Local map: %s",local_name);goto chrome;
     }
-    for(x=0;x<312;x++)cols[x]=(int)floor(left+x*map_step);
+    for(x=0;x<view_w;x++)cols[x]=(int)floor(left+x*map_step);
     if(in_game){   /* MAP-ORIGINAL-POI-66 stage 2: the fog square of each column, once per frame */
         const float square=AW_MAPFOG_CELL/AW_MAPFOG_GRID;
-        for(x=0;x<312;x++)fog_cols[x]=(int)floor((map_bounds[0]+(cols[x]+.5f)*(map_bounds[2]-map_bounds[0])/map_w)/square)-fog_gx0;
+        for(x=0;x<view_w;x++)fog_cols[x]=(int)floor((map_bounds[0]+(cols[x]+.5f)*(map_bounds[2]-map_bounds[0])/map_w)/square)-fog_gx0;
     }
-    for(y=0;y<154;y++){
-        sy=(int)floor(top+y*map_step);dst=vid.buffer+(y+19)*vid.rowbytes+4;
-        for(x=0;x<312;x++){sx=cols[x];dst[x]=(sx>=0 && sx<map_w && sy>=0 && sy<map_h)?map_pixels[sy*map_w+sx]:ocean;}
+    for(y=0;y<view_h;y++){
+        sy=(int)floor(top+y*map_step);dst=vid.buffer+(y+view_y)*vid.rowbytes+view_x;
+        for(x=0;x<view_w;x++){sx=cols[x];dst[x]=(sx>=0 && sx<map_w && sy>=0 && sy<map_h)?map_pixels[sy*map_w+sx]:ocean;}
     }
     if(lava_visible())lava_draw(left,top);
-    if(in_game)for(y=0;y<154;y++){   /* the unexplored land, sea and lava in the fog colour */
+    if(in_game)for(y=0;y<view_h;y++){   /* the unexplored land, sea and lava in the fog colour */
         int gy;
-        sy=(int)floor(top+y*map_step);dst=vid.buffer+(y+19)*vid.rowbytes+4;
+        sy=(int)floor(top+y*map_step);dst=vid.buffer+(y+view_y)*vid.rowbytes+view_x;
         gy=(int)floor((map_bounds[3]-(sy+.5f)*(map_bounds[3]-map_bounds[1])/map_h)/(AW_MAPFOG_CELL/AW_MAPFOG_GRID))-fog_gy0;
-        for(x=0;x<312;x++)if(!fog_open(fog_cols[x],gy))dst[x]=(byte)fog;
+        for(x=0;x<view_w;x++)if(!fog_open(fog_cols[x],gy))dst[x]=(byte)fog;
     }
     if(grid && !in_game){
         for(i=map_bounds[0]/8192;i<=map_bounds[2]/8192;i++){
@@ -2428,12 +2579,12 @@ static void map_draw(void){
     for(i=0;i<area_count;i++){
         int known=0,k;
         px=(areas[i].x-map_bounds[0])*map_w/(map_bounds[2]-map_bounds[0]);py=(map_bounds[3]-areas[i].y)*map_h/(map_bounds[3]-map_bounds[1]);
-        mx=4+(int)((px-left)/map_step);my=19+(int)((py-top)/map_step);
+        mx=view_x+(int)((px-left)/map_step);my=view_y+(int)((py-top)/map_step);
         /* MAP-PLACES-SHOWN-UNVISITED-67: a settlement a script's ShowMap revealed shows like any other place (the
          * opening's Sellus Gravius reveals Balmora with Pelagiad and Moonmoth Legion Fort; it stayed hidden before) */
         for(k=0;k<map_place_count;k++)if(!strcmp(map_places[k].name,areas[i].title)){known=map_places[k].known;break;}
         if(!in_game){if(mx>=6 && mx<313 && my>=22 && my<161){AW_UIFill(mx-1,my-1,3,3,gold);text(mx+4,my,areas[i].title,314);}}
-        else if(mx>=6 && mx<314 && my>=21 && my<171 && (known || fog_open_at(areas[i].x,areas[i].y))){
+        else if(mx>=view_x+2 && mx<vx1-2 && my>=view_y+2 && my<vy1-2 && (known || fog_open_at(areas[i].x,areas[i].y))){
             /* in play a settlement is a place square like the others, named only on mouse-over */
             AW_UIFill(mx-2,my-2,5,5,edge);AW_UIFill(mx-1,my-1,3,3,inner);
             d=(mx-mouse_x)*(mx-mouse_x)+(my-mouse_y)*(my-mouse_y);
@@ -2449,8 +2600,8 @@ static void map_draw(void){
             if(k<area_count)continue;                      /* a settlement already drawn above */
             px=(map_places[i].x-map_bounds[0])*map_w/(map_bounds[2]-map_bounds[0]);
             py=(map_bounds[3]-map_places[i].y)*map_h/(map_bounds[3]-map_bounds[1]);
-            mx=4+(int)((px-left)/map_step);my=19+(int)((py-top)/map_step);
-            if(mx<6 || mx>=314 || my<21 || my>=171)continue;
+            mx=view_x+(int)((px-left)/map_step);my=view_y+(int)((py-top)/map_step);
+            if(mx<view_x+2 || mx>=vx1-2 || my<view_y+2 || my>=vy1-2)continue;
             AW_UIFill(mx-2,my-2,5,5,edge);AW_UIFill(mx-1,my-1,3,3,inner);
             d=(mx-mouse_x)*(mx-mouse_x)+(my-mouse_y)*(my-mouse_y);
             if(d<best){best=d;map_hover_name=map_places[i].name;}
@@ -2461,13 +2612,13 @@ static void map_draw(void){
         for(i=0;(n=AW_SceneMapDoor(i,point,&name))>=0;i++){
             if(!n || !AW_WorldToSource(sv.name,point,world) || (in_game && !fog_open_at(world[0],world[1])))continue;
             px=(world[0]-map_bounds[0])*map_w/(map_bounds[2]-map_bounds[0]);py=(map_bounds[3]-world[1])*map_h/(map_bounds[3]-map_bounds[1]);
-            door_marker(4+(int)((px-left)/map_step),19+(int)((py-top)/map_step),name,&best);
+            door_marker(view_x+(int)((px-left)/map_step),view_y+(int)((py-top)/map_step),name,&best);
         }
     }
     if(marker){
         px=(player_x-map_bounds[0])*map_w/(map_bounds[2]-map_bounds[0]);py=(map_bounds[3]-player_y)*map_h/(map_bounds[3]-map_bounds[1]);
-        mx=4+(int)((px-left)/map_step);my=19+(int)((py-top)/map_step);
-        if(mx>=9 && mx<311 && my>=24 && my<168){
+        mx=view_x+(int)((px-left)/map_step);my=view_y+(int)((py-top)/map_step);
+        if(mx>=view_x+5 && mx<vx1-5 && my>=view_y+5 && my<vy1-5){
             /* UI-MAP-PLAYER-ARROW-51: the original game's arrow, turned with the view, in both maps */
             if(map_arrow(mx,my,cl.viewangles[YAW])){}
             else if(in_game){edict_t *e=svs.clients[0].edict;angle=e->v.angles[1]*(3.14159265f/180.0f);dx=Q_CosRad(angle);dy=-Q_SinRad(angle);
@@ -2491,7 +2642,7 @@ static void map_draw(void){
             r=k<0?5:4;
             /* A clipped diamond remains distinct from the red teleport cross. */
             for(oy=-r;oy<=r;oy++)for(ox=-r;ox<=r;ox++)if(abs(ox)+abs(oy)==r || (!ox && !oy) || (k<0 && abs(ox)<=1 && abs(oy)<=1))
-                if(mx+ox>=4 && mx+ox<316 && my+oy>=19 && my+oy<173)AW_UIFill(mx+ox,my+oy,1,1,k<0?orange:cyan);
+                if(mx+ox>=view_x && mx+ox<vx1 && my+oy>=view_y && my+oy<vy1)AW_UIFill(mx+ox,my+oy,1,1,k<0?orange:cyan);
             d=(mx-mouse_x)*(mx-mouse_x)+(my-mouse_y)*(my-mouse_y);
             if(d<=best){best=d;map_hover_name=k<0?"Hot marker":AW_MapMark(k)->name;}
         }
@@ -2499,24 +2650,25 @@ static void map_draw(void){
     if(teleport_selected && (teleport_mode || normal_teleport_enabled())){
         px=(teleport_point[0]-map_bounds[0])*map_w/(map_bounds[2]-map_bounds[0]);
         py=(map_bounds[3]-teleport_point[1])*map_h/(map_bounds[3]-map_bounds[1]);
-        mx=4+(int)((px-left)/map_step);my=19+(int)((py-top)/map_step);
+        mx=view_x+(int)((px-left)/map_step);my=view_y+(int)((py-top)/map_step);
         for(i=-5;i<=5;i++){
-            if(mx+i>=4 && mx+i<316 && my>=19 && my<173)AW_UIFill(mx+i,my,1,1,AW_UIColor(255,32,32));
-            if(mx>=4 && mx<316 && my+i>=19 && my+i<173)AW_UIFill(mx,my+i,1,1,AW_UIColor(255,32,32));
+            if(mx+i>=view_x && mx+i<vx1 && my>=view_y && my<vy1)AW_UIFill(mx+i,my,1,1,AW_UIColor(255,32,32));
+            if(mx>=view_x && mx<vx1 && my+i>=view_y && my+i<vy1)AW_UIFill(mx,my+i,1,1,AW_UIColor(255,32,32));
         }
     }
  chrome:
     if(map_hover_name){   /* the hovered place's name, in a box beside the pointer, kept inside the map view */
         const char *name=map_hover_name;
         int bw=(int)strlen(name)*AW_ConsoleCharWidth()+6,bx=mouse_x+10,by=mouse_y-14;
-        if(bw>312)bw=312;
-        if(bx+bw>316)bx=mouse_x-10-bw;
-        if(bx<4)bx=4;
-        if(by<19)by=mouse_y+12;
-        if(by+11>173)by=162;
+        if(bw>view_w)bw=view_w;
+        if(bx+bw>vx1)bx=mouse_x-10-bw;
+        if(bx<view_x)bx=view_x;
+        if(by<view_y)by=mouse_y+12;
+        if(by+11>vy1)by=vy1-11;
         AW_UIFill(bx,by,bw,11,AW_UIColor(202,165,96));AW_UIFill(bx+1,by+1,bw-2,9,AW_UIColor(15,20,23));
         text(bx+3,by+2,name,bx+bw-2);
     }
+    if(map_v2){mapv2_chrome();mm_draw();return;}   /* MAP-VERSION-2-DEFAULT-68: the title and the footer */
     if(teleport_mode){
         text(8,1,"DEBUG TELEPORT",315);
         text(8,10,"CLICK ON TARGET TO TELEPORT",315);

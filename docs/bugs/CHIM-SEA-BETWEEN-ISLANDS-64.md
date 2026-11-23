@@ -1,5 +1,14 @@
 # CHIM-SEA-BETWEEN-ISLANDS-64: The CHIM cell list holds no sea between Vvardenfell and Solstheim
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.64-dev4 at 2026-11-11 (time not recorded): Counted on the original data: Bloodmoon.esm holds 173 exterior cells, 18 of them cells Morrowind.esm also has and 155 new; of the new ones 144 have land with heights, 6 a land record without heights (seabed) and 5 no land record (open water). Solstheim spans cells x -29 to -16, y 14 to 28. Next to its land lie 59 cells that are land in neither file: 4 are water cells of Bloodmoon.esm and 55 have no cell record. Between the islands (the rectangle x -29 to -8, y 6 to 28) 214 of 506 cells have no record in either file. OpenMW makes such a cell on first use as an empty exterior cell with water and no land (apps/openmw/mwworld/worldmodel.cpp, createExteriorCell), so in the original game the sea between the islands is open everywhere. Vvardenfell on CHIM uses its records plus 5 open-sea cells; the same model for Solstheim is its 6 seabed and 5 water records plus generated cells for the recordless sea the player can reach.
+- Reported with v0.0.68-dev6 at 2026-11-22 10:46 +0200: Seen again in v0.0.68-dev6: besides the nine glacier cells, eleven Solstheim cells are in no frame of the build: six seabed cells with a land record, three sea cells holding six placed horkers, and two empty sea cells; the cell set the build takes from the tracker reference leaves them out.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -28,8 +37,18 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 - 2026-11-10: reported in v0.0.64-dev2
 - 2026-11-11: seen again in v0.0.64-dev4: Counted on the original data: Bloodmoon.esm holds 173 exterior cells, 18 of them cells Morrowind.esm also has and 155 new; of the new ones 144 have land with heights, 6 a land record without heights (seabed) and 5 no land record (open ...
+- 2026-11-22 10:46 +0200: seen again in v0.0.68-dev6: Seen again in v0.0.68-dev6: besides the nine glacier cells, eleven Solstheim cells are in no frame of the build: six seabed cells with a land record, three sea cells holding six placed horkers, and two empty sea cells; the cell set the ...
 
 <!-- END GENERATED TIMELINE -->
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Timeline](#timeline)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -169,5 +188,6 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 Related bugs in other categories:
 
 - [BUILD-EXPANSIONS-31](BUILD-EXPANSIONS-31.md): Tribunal and Bloodmoon cannot be converted with today's tools
+- [TRACKER-OCEAN-CELL-ISLAND-BASE-ONLY-68](TRACKER-OCEAN-CELL-ISLAND-BASE-ONLY-68.md): An open-sea cell measured by the CHIM import is always counted as Vvardenfell's, so Solstheim's open-sea cells get the wrong island in the progress tracker
 
 <!-- END GENERATED CATEGORY -->

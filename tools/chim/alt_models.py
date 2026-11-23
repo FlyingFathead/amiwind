@@ -4,8 +4,8 @@
 A store built with the original trees (BASE) and the same frames built with another tree method (ALT, for example the
 star crowns of tools/chim_tree_star.py) become one store: the base store byte for byte, plus compact sector files that hold only ALT's
 model and texture records (never its chunk, terrain or placement records), one per ALT sector file that holds any, under
-cells no frame uses (the frame's cell x + CELL_SHIFT, so the engine's own file path rule names them and no frame or
-prefetch plan ever reads them). Only the models the map pairs are carried (same name in both builds, made
+cells no frame uses (the frame's cell x + CELL_SHIFT x the method value, so the engine's own file path rule names them,
+no frame or prefetch plan ever reads them and two methods never share a file). Only the models the map pairs are carried (same name in both builds, made
 differently), and only the textures they use that the base lacks (a texture of the same name and bytes is the base's
 own); they follow the base ones in the index (names with '#alt<method>'), the texture ids inside the carried model
 images renumbered to the merged ids, and a map file
@@ -15,7 +15,8 @@ alternative id at chunk load (engine/aga/src/chim/chim_chunks.c). Only models wh
 
 Format of alt-models.bin (big-endian, as the store): 'AWA1', u32 methods; per method: u8 value, 3 pad bytes,
 u32 pairs, then pairs x (u32 base id, u32 alternative id), sorted by the base id.
-TEST BUILDS ONLY for now (tools/build.py --chim-sol-tree-copies switch)."""
+TEST BUILDS ONLY for now (tools/build.py --chim-sol-tree-copies switch: method 1, the star crowns; rally-switch:
+methods 2 to 5, the rally-game trees, merge_many)."""
 import hashlib
 import shutil
 import struct
@@ -73,6 +74,31 @@ def merge(base_store, alt_store, out_store, method):
             target = out_store / path.relative_to(base_store)
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(path, target)
+    return _add_method(base_store, alt_store, out_store, method)
+
+
+def merge_many(base_store, alternatives, out_store):
+    """Write OUT_STORE = BASE_STORE plus each ALTERNATIVES [(method, alternative store)] as its method, in the order
+    given (the rally-game trees' several methods, SOLSTHEIM-TREES-THREE-LOD-68). Each method's compact sector files
+    live under cells of their own (the frame's cell x + CELL_SHIFT x method), so methods never share a file; the
+    first method's store bytes are exactly what merge() writes for it alone. Returns the records."""
+    methods = [int(m) for m, _ in alternatives]
+    if len(set(methods)) != len(methods) or any(not 1 <= m <= 15 for m in methods):
+        raise ValueError('alternative methods must be distinct values 1 to 15: %s' % methods)
+    records = []
+    for k, (method, alt_store) in enumerate(alternatives):
+        if k == 0:
+            records.append(merge(base_store, alt_store, out_store, int(method)))
+        else:
+            # the merged store so far is the base of the next method: its models keep their ids, the earlier
+            # methods' models (named '#altN') pair with nothing
+            records.append(_add_method(Path(out_store), Path(alt_store), Path(out_store), int(method)))
+    return records
+
+
+def _add_method(base_store, alt_store, out_store, method):
+    """ALT_STORE's models that BASE_STORE holds by name and that differ, added to OUT_STORE (which holds BASE_STORE's
+    files) as method METHOD."""
     raw_b = (base_store / 'world.cwi').read_bytes()
     raw_a = (alt_store / 'world.cwi').read_bytes()
     version = F.read_header(raw_b, b'INDX')['version']
@@ -151,7 +177,7 @@ def merge(base_store, alt_store, out_store, method):
         offsets, _ = F.sector_layout(records)
         for key, (kind, rid, _d) in zip(keys, records):
             new_at[key] = offsets[(kind, rid)]
-        cell = (f['cell'][0] + CELL_SHIFT, f['cell'][1])
+        cell = (f['cell'][0] + CELL_SHIFT * method, f['cell'][1])
         path = 'frames/x%+03d/y%+03d/%s' % (cell[0], cell[1], f['path'].rsplit('/', 1)[1])
         target = out_store / path
         target.parent.mkdir(parents=True, exist_ok=True)

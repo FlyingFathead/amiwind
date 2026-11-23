@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.68-dev7._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.68-dev8._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -45,7 +45,7 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg census type` | - | [amiwind / legacy / original (0 / 1 / 2); no argument prints it] census office registration (default amiwind, not saved; set before the office): amiwind = the scripts with AmiWind's own (the clerk talks as you walk up and holds you, lines boxed, nothing taken before his review); legacy = old hand-written; original = scripts alone |
 | `dbg characterchange` | `dbg quickchar` | [race class birthsign review / all] reopen the pier race, gender, head and hair menu over the current scene; confirm to apply (after registration) |
 | `dbg choosecompanion` | `dbg pickcompanion` | same as companion pick |
-| `dbg combat` | - | [on/off / seed N / readout on/off / music on/off / dice / style amiwind/original / block hold/auto / flee / sounds / bestattack / contact on/off / spells on/off / loadout NAME/off / resistnormal N/off / calm] melee combat: no argument = status; bestattack = Options > Prefs; contact off = ray only (defaults: all on, block auto) |
+| `dbg combat` | - | [on/off / seed N / readout on/off / music on/off / dice / style amiwind/original / block hold/auto / flee / sounds / bestattack / contact on/off / spells on/off / loadout NAME/off / resistnormal N/off / slots N / calm] melee combat: no argument = status; bestattack = Options > Prefs; contact off = ray only (defaults: all on, block auto) |
 | `dbg combattest` | - | [opponent] same as arenapit; combattest gallery (or floor): the empty floor test, current hands, then idle/draw/lower/punch/center/help/exit |
 | `dbg companion` | - | [pick/choose/test/off/distance N/mimic speed on/off] NPC follower test (not saved): no argument = status and counters; pick = attack the NPC under the red crosshair; test = spawn one beside you; off = it goes home / is removed; distance 48..512 (default 96); mimic speed (default on) |
 | `dbg companiontest` | - | [on/off] same as companion test / companion off; no argument: status |
@@ -98,7 +98,9 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | Command | Also | Arguments and notes |
 | --- | --- | --- |
 | `dbg atmos` | - | 0..3 (saved, default 2): 1 rain, snow and storm ash outdoors (off until measured), 2 chimney, fire and steam smoke; 3 both |
-| `dbg cam` | - | [mark NAME / recall NAME / list / orbit [photo] [speed DEG] [ref N / mark NAME] / orbit off] (docs/CAMERA_MARKS.md) mark saves place, view, time, headlamp, fog; recall: a public mark (bm1..bm5, sn1..sn5, vivec-palace) or yours, as dbg tp; orbit circles the crosshair target, player detached: +/- speed, 0 holds, wheel distance, right click or Esc ends |
+| `dbg cam` | - | [mark NAME / recall NAME / list / orbit [photo] [speed DEG] [ref N / mark NAME] / orbit off / pan / track] (docs/CAMERA_MARKS.md) mark saves place, view, time, headlamp, fog; recall: a public mark (bm1..bm5, sn1..sn5, vivec-palace) or yours, as dbg tp; orbit circles the crosshair target, player detached: +/- speed, 0 holds, wheel zoom, right click or Esc ends |
+| `dbg cam pan` | `dbg pan cam` | [DEGREES] [HOLD] [speed DEG] [photo] / off: a tripod pan for video from the view now: DEGREES default 360 (negative: to the left), HOLD s on the opening and closing frame (default 3), eased start and stop; speed default the field of view over 6 s (15 deg/s); player detached; nothing on screen; Esc or right click ends (docs/CAMERA_MARKS.md) |
+| `dbg cam track` | - | [SPEED] forward N / to MARK [HOLD] [speed U] [photo] / off: a steadicam glide for video from the view now: N map units along the heading (negative: back) or to a mark on this map, turning to its view; eased start and stop, HOLD s on each end frame (default 3), SPEED default 32 units/s; camera noclip, player stays; Esc or right click ends |
 | `dbg camera` | `dbg pov`, `dbg thirdperson` | [first / third / toggle / distance 7.5..200 / vanity on/off/now / death on/off / retry on/off / body on/off / stances on/off / sway 1/2/bench / motion restart on/off / die] player view: no argument = status; vanity = idle orbit; motion restart off = the earlier body animation, to compare; die = test death (docs/THIRD_PERSON.md) |
 | `dbg camera fpview` | - | [on/off] the first-person view of the original (default on, saved): its own field of view and the arms lag the pitch; off is the world's projection with the arms following the whole pitch |
 | `dbg camera hands` | - | [on/off] the first-person arms assembled from what is worn (default on, saved); off shows the baked arms |
@@ -110,11 +112,13 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg cursortype` | - | [1 / 2; no argument shows the value] the mouse cursor in every window (saved; also Options > Prefs > Mouse cursor): 2 Morrowind's own pointer from your game data (default), 1 AmiWind's drawn cursor; an image without the original's pointer always shows AmiWind's |
 | `dbg curtain` | - | [0 / 1; no argument shows the value] the Ghostfence curtain (default 0; not saved): 0 its texture ripples (Quake's warp, as before); 1 the original's three layers slide at their own speeds and sway, composed into one glowing texture with a slow pulse (needs id1/world/curtain.awc, written by the builder) |
 | `dbg cut groups` | - | [on/off, 1/0; no argument toggles] whole-structure cuts (saved as aw_cull + 16; default off until the in-game A/B): the pieces of one long structure (walkways, town walls, bridges, the Ghostfence, hillside rocks; the frame map's .cut file) are drawn, fogged and left out together, tested on the structure's box; 0 each piece on its own |
-| `dbg draw distance` | `dbg drawdistance`, `dbg fog distance` | [100..4096 local units; default 300] |
+| `dbg draw distance` | `dbg drawdistance`, `dbg fog distance` | [100..4096 local units / auto; default auto] the outdoor fog/draw distance: a number is your own value everywhere (Fog distance auto off), auto = each region's own default (300 most places); no argument says which, and what limits it here |
 | `dbg fog` | - | on/off or 1/0 (default on: exterior and interior fog; the console value 2 = exterior fog only, interiors without their cell fog as before) |
+| `dbg fog auto` | - | [on/off or 1/0] fog distance auto (saved; default on; also Options > Video > Fog distance auto): each region uses its own default from id1/world/region-draw.txt (300 most places); off = your own fog distance everywhere; the location fog still only shortens it |
 | `dbg fog indoors` | - | [100..4096 local units] the indoor fog distance, its own value (saved; default 300; also Options > Video > Fog distance indoors): where a large room's fog is full and its drawing stops; aw_fog_distance stays the outdoor one |
 | `dbg fog large rooms` | - | [on/off or 1/0] fog in large rooms (saved; default on; also Options > Video > Fog in large rooms): rooms at least 1,024 units across fade into their fog at the indoor fog distance and draw nothing past it; off = they draw as small rooms |
 | `dbg fog location` | `dbg foglocation` | 1/0 places in id1/world/fog-locations.txt (the HUD title's place or region, or the map) set their own day/night fog distance (Ald'ruhn 300, Balmora 300 day, 250 night; default 1 on) |
+| `dbg fog region trial` | - | [on/off or 1/0] the region table's trial rows (saved; default off): on = Solstheim's regions take 540 with fog distance auto, the distance still being measured before it becomes the default; off = 300 there as everywhere |
 | `dbg fog rule` | - | [on/off, 1/0; no argument toggles] no distance cut before the fog is opaque (saved as aw_cull + 8; default off until the in-game A/B): the Light/Strong far detail cut-offs and the small-faces step start at the fog distance, so nothing pops out of clear air; 0 the cut-offs as before (faster) |
 | `dbg ghostfence` | - | [on/off, true/false or 1/0] animated scrolling textures (default on; not saved): on = the Ghostfence curtain, waterfalls and other turbulent textures ripple over time; off = drawn straight and still (unlit, as they are built; also stills water in interiors) |
 | `dbg glow` | - | [on/off, true/false or 1/0] the glow of the Ghostfence pylons and the plume of the blight cloud over Dagoth Ur (default off until its frame cost is measured; not saved): each emitter of the original drawn as one sprite baked from its own particle system, hidden when a script disables it |
@@ -129,8 +133,9 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg playvid` | `dbg playvideo`, `dbg videoplay`, `dbg vidplay` | <1..17 / 01..17 / catalogue name> (drains queued game audio first) |
 | `dbg render order` | - | 1 legacy / 2 mesh intersections (default) |
 | `dbg seethrough` | - | [0/1/2 or on/off; no value lists them] see-through textures (default 1; not saved): 1 = cobwebs, hanging moss and leaves drawn with their see-through parts instead of solid rectangles; 2 = also seen from behind; 0 = solid rectangles as before; build option --chim-fence-twosided-faces mirror builds the back sides in |
+| `dbg seethroughplaced` | - | [0 / 1; no argument shows the value] see-through faces of placed models (default 0; not saved): 1 = drawn from each placement's own origin (outdoor trees, vines and moss with their see-through parts; needed by the rally-game trees); 0 = as before (most of them not drawn, the rest solid) |
 | `dbg setpov` | - | [1 first / 2 vanity / 3 third / off; no argument: the state] lock the view (for test stills): no idle vanity camera, Toggle POV, wheel or camera command changes it until off; a message on the screen and in the console (docs/THIRD_PERSON.md) |
-| `dbg treecrowns` | - | [0 / 1 / 2; no argument shows the value] how trees with an alternative in the image are drawn, from the next map load (saved; default 0; Options > Video > Tree crowns): 0 the original models, 1 fast (star crowns), 2 sprite crowns; an image without alternatives draws the originals |
+| `dbg treecrowns` | - | [0 to 5; no argument shows the value] how trees with an alternative in the image are drawn, from the next map load (saved; default 0; Options > Video > Tree crowns): 0 the originals, 1 star crowns, 2 to 5 rally-game trees of a test image (2 crown, 3 slices, 4 crown and simple trunk, 5 slices and simple trunk) |
 | `dbg vanitycam` | `dbg vanitycamera` | same as vanitycamera |
 
 ## World / Travel
@@ -138,6 +143,7 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | Command | Also | Arguments and notes |
 | --- | --- | --- |
 | `dbg breath` | - | (no argument) breath under water and drowning (docs/PLAYER_MOVEMENT.md): the breath left of fHoldBreathTime, head under water, Water Breathing, drowning damage taken, and what god mode held back (world damage, script and spell losses) |
+| `dbg dbgmap` | - | [on/off, true/false or 1/0; no argument toggles] the debug map (M), map version 1: its DEBUG / IN-GAME / WORLD / LOCAL buttons, lava colour and legend; off: map version 2, the default (the original's map in the menus' frame, the place in its title); saved as aw_map_version, from the next opening |
 | `dbg door` | `dbg doorlocks` | [status / list; no argument: open or close the hinged door under the crosshair, locks ignored] ordinary hinged doors (docs/DOOR_MAPPING.md): status counts the table and this map's doors, list prints each (reference, edict or CHIM, how far open, lock) |
 | `dbg door roulette` | - | [SEED] one random interior: loads you straight into a room of this disk at the room's own start and prints which (name, map id, cell number) and the seed; the same SEED loads the same room again (random tests of interior loading) |
 | `dbg god` | `dbg godmode` | [on/off, true/false or 1/0; no argument toggles] Quake god mode (no damage of any kind: blows, lava, falls, drowning, spells and scripts; the HUD shows GOD) (not saved) |
@@ -147,6 +153,7 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg map marker` | - | [find TEXT / show NAME or N / add NAME / del NAME or N / clear / hot [off / NAME]; no argument lists them] the named map markers (also the marker command): find lists them with their region, show opens the map on one, add sets one at the player, clear asks Yes/No, hot sets the hot marker (saved) |
 | `dbg map markers max` | - | 1-4096 how many named map markers can be set (default 256, saved); lowering it keeps the markers already set |
 | `dbg map tp` | `dbg tp map` | select a destination on the world map (alias) |
+| `dbg maptype` | - | [1 / 2; no argument prints it] the map's version (M): 2 the default (the original's map in the menus' frame, the place in its title, no debug buttons, no lava colour), 1 the debug map before it (also dbg dbgmap on/off); saved as aw_map_version, from the next opening |
 | `dbg noburden` | `dbg noweight`, `dbg unburdened` | [on/off, true/false or 1/0; no argument toggles] no burden (not saved; off at New Game): the carried weight counts in no rule, no slower walk, run, swim or jump, no extra fatigue, never over-encumbered; the inventory's bar shows the load over 999999; a message says on or off (docs/INVENTORY.md) |
 | `dbg noclip` | - | - |
 | `dbg recover` | - | - |
@@ -220,6 +227,8 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg ui labels` | - | below/topright/hudleft |
 | `dbg ui layout` | - | 1 legacy / 2 full width / 3 padded content (default) |
 | `dbg ui namelabels` | - | amiwind/morrowind (amiwind: name and action only below the view, the default; morrowind: also the framed box over the view) |
+| `dbg ui palette` | - | (no argument) the palette the screen is drawn through now: game palette (with its colour shifts), game palette (unshifted), title art palette (the title menu only), loading art palette or black palette; a menu of a running game always reads game palette |
+| `dbg ui paused` | - | [1/0] the Paused caption on the menu Escape opens in play (default 1, saved): 0 shows the AmiWind logo there, as on the title menu (the original game has no caption) |
 | `dbg ui preview` | - | - |
 | `dbg ui targetnames` | - | on/off (after creation) |
 | `dbg ui targetplace` | - | below/topright/hudleft |

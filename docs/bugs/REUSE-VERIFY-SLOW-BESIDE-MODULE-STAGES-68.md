@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.68-dev3 at 2026-11-21 04:37 +0200: Seen again in the next dev3 build: the room batches' reuse took about half a minute beside the Solstheim stage and the engine.
 - Reported with v0.0.68-dev4 at 2026-11-21 13:08 +0200: Seen again in the v0.0.68-dev4 build: a reused stage's reuse step took 22 seconds against its recorded 5.
+- Reported with v0.0.68-dev8 at 2026-11-22 19:46 +0200: Seen again in the v0.0.68-dev8 build: the reused room batches stage took 19 s against the 5 s of an earlier reuse while three stages built beside it; the slow-stage warning fired for it.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -38,13 +39,14 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-21: reported in v0.0.68-dev3
 - 2026-11-21 04:37 +0200: seen again in v0.0.68-dev3: Seen again in the next dev3 build: the room batches' reuse took about half a minute beside the Solstheim stage and the engine.
 - 2026-11-21 13:08 +0200: seen again in v0.0.68-dev4: Seen again in the v0.0.68-dev4 build: a reused stage's reuse step took 22 seconds against its recorded 5.
+- 2026-11-22 19:46 +0200: seen again in v0.0.68-dev8: Seen again in the v0.0.68-dev8 build: the reused room batches stage took 19 s against the 5 s of an earlier reuse while three stages built beside it; the slow-stage warning fired for it.
 
 <!-- END GENERATED TIMELINE -->
 
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Bugs in the same category](#bugs-in-the-same-category)
 

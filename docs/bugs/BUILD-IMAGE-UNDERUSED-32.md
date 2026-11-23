@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 24 times; something has to be done
+## PERSISTING: reported 26 times; something has to be done
 
 - Reported with v0.0.32-dev at 2026-10-08 (time not recorded): BUILD-IMAGE-UNDERUSED-32: parts of the image step still serial
 - Reported with v0.0.36-dev3 at 2026-10-11 00:43 +0300: audio payload and CHIM maps serial, stats on one core
@@ -28,6 +28,8 @@
 - Reported with v0.0.67 at 2026-11-19 16:41 +0200: Seen again in the v0.0.67 release build: the image step ran on one core for over six minutes while 23 stayed idle.
 - Reported with v0.0.67 at 2026-11-20 13:48 +0200: Seen again in the v0.0.67 respin build: the image step ran its phase after the room batches on one of 24 cores for more than six minutes.
 - Reported with v0.0.67 at 2026-11-20 13:50 +0200: Seen again in the v0.0.67 release build: the image step's room actor bake ran on one of 24 cores for more than six minutes.
+- Reported with v0.0.68-dev7 at 2026-11-22 12:09 +0200: Seen again on v0.0.68-dev7: the image step's late checks ran one after another on about one of 24 cores for over five minutes.
+- Reported with v0.0.68-dev8 at 2026-11-22 20:51 +0200: Seen again in the v0.0.68-dev8 build: the image step ran on one or two of 24 cores for minutes at a time (the actor ground check, the finalize phase, the room heap check measuring every room in turn); over its last six builds it averaged about 4 of 24 cores for 13.5 minutes.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -84,6 +86,8 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-19 16:41 +0200: seen again in v0.0.67: Seen again in the v0.0.67 release build: the image step ran on one core for over six minutes while 23 stayed idle.
 - 2026-11-20 13:48 +0200: seen again in v0.0.67: Seen again in the v0.0.67 respin build: the image step ran its phase after the room batches on one of 24 cores for more than six minutes.
 - 2026-11-20 13:50 +0200: seen again in v0.0.67: Seen again in the v0.0.67 release build: the image step's room actor bake ran on one of 24 cores for more than six minutes.
+- 2026-11-22 12:09 +0200: seen again in v0.0.68-dev7: Seen again on v0.0.68-dev7: the image step's late checks ran one after another on about one of 24 cores for over five minutes.
+- 2026-11-22 20:51 +0200: seen again in v0.0.68-dev8: Seen again in the v0.0.68-dev8 build: the image step ran on one or two of 24 cores for minutes at a time (the actor ground check, the finalize phase, the room heap check measuring every room in turn); over its last six builds it averaged ...
 
 <!-- END GENERATED TIMELINE -->
 
@@ -92,7 +96,7 @@ _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 24 times; something has to be done](#persisting-reported-24-times-something-has-to-be-done)
+- [PERSISTING: reported 26 times; something has to be done](#persisting-reported-26-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Seen again: 7 November 2026 (v0.0.62-dev1)](#seen-again-7-november-2026-v0062-dev1)
 - [Status: 23 October 2026 (v0.0.48)](#status-23-october-2026-v0048)

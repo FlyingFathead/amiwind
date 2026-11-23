@@ -153,6 +153,9 @@ extern int (*aw_lock_pass)(unsigned reference,const char *key);
 static int pass_answer,passes;static unsigned pass_ref;
 static int pass_stand_in(unsigned reference,const char *key){(void)key;passes++;pass_ref=reference;return pass_answer;}
 static int open_stand_in(unsigned reference,const char *name,int owned){(void)reference;(void)name;(void)owned;opens++;return 1;}
+/* CONTAINER-SCRIPT-ACTIVATE-67: a stand-in for the scripts' hold on an object's use (aw_mwhost.c object_intercept) */
+static int intercept_answer,intercepts;static unsigned intercept_ref;
+static int intercept_stand_in(unsigned reference){intercepts++;intercept_ref=reference;return intercept_answer;}
 static int reader_opened;
 static int fake_reader(unsigned reference){reader_opened=(int)reference;return 1;}
 /* PRISON-SHIP-ITEMS-TAKEABLE-65: the Inventory window not allowed / allowed (aw_story.c AW_StoryInventoryAllowed) */
@@ -277,8 +280,30 @@ int main(void){
      level(1);sv.num_edicts=3;view_entity=2;view_fraction=19.5f/48;
      assert(!AW_PlacedFocus(&name,weight,value,sizeof(weight),&owned) && !AW_InventoryUse() && opens==3);
      put32(row+4,QUILL);ref_edicts=0;view_entity=0;
+     /* CONTAINER-SCRIPT-ACTIVATE-67: a container whose script holds the use (aw_mwhost.c object_intercept, a stand-in
+      * here) gives E to the script: nothing opens, no trap springs, no lock is asked. The script's Activate
+      * (AW_ContainerActivate) is then the container's own use: the lock first, the trap, then the strip, and nothing
+      * while the Inventory window is not allowed; 0 for a reference that is no container here. A script that does
+      * not hold the use leaves E to the container, as before. */
+     level(1);opens=springs=intercepts=0;trap_armed=0;aw_inventory_intercept=intercept_stand_in;intercept_answer=1;
+     assert(AW_InventoryUse() && opens==0 && intercepts==1 && intercept_ref==QUILL);
+     assert(AW_ContainerActivate(QUILL) && opens==1);
+     assert(!AW_ContainerActivate(QUILL+1) && opens==1);
+     trap_armed=1;assert(AW_InventoryUse() && springs==0 && opens==1 && trap_armed);     /* held: the trap waits */
+     assert(AW_ContainerActivate(QUILL) && springs==1 && opens==1);                       /* Activate: the trap */
+     assert(AW_ContainerActivate(QUILL) && springs==1 && opens==2);                       /* then the strip */
+     row[3]=50;level(1);
+     {int before=subtitles;
+      assert(AW_InventoryUse() && subtitles==before && opens==2);                         /* held: no Locked line */
+      assert(AW_ContainerActivate(QUILL) && subtitles==before+1 && opens==2);}            /* Activate: Locked */
+     row[3]=0;level(1);
+     aw_inventory_allowed=not_allowed;assert(AW_ContainerActivate(QUILL) && opens==2);aw_inventory_allowed=NULL;
+     intercept_answer=0;assert(AW_InventoryUse() && opens==3 && intercepts==4);
      aw_trap_spring=NULL;aw_container_open=NULL;
      tables();level(1);
+     /* and an item whose script holds the use is not taken by E (MWSCRIPT-MORE-57, the same hook) */
+     intercept_answer=1;assert(AW_InventoryUse() && !taken && intercepts==5);
+     aw_inventory_intercept=NULL;
     }
     /* STEAL-PROMPT-58: the owned quill reads "E: Steal" (drawn red); unowned it reads the GMST's "E: Take" */
     {char prompt[48];int steal=-1;

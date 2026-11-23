@@ -38,6 +38,11 @@ class ActivateNativeTests(unittest.TestCase):
         native.NativeSourceTests().compile_run('aga_activate_rules_test.c', [SRC / 'aw_activate_rules.c'],
                                                cflags=UBSAN)
 
+    def test_a_body_gives_its_use_to_a_script_that_reads_onactivate(self):
+        # CONTAINER-SCRIPT-ACTIVATE-67: a dead actor whose script holds the use is not searched by E; the script's
+        # Activate searches it; a living actor is left to the talk (aga_corpse_activate_test.c plays aw_corpse.c)
+        native.NativeSourceTests().compile_run('aga_corpse_activate_test.c', [SRC / 'aw_corpse.c'], cflags=UBSAN)
+
 
 class ActivateSourceTests(unittest.TestCase):
     def test_nothing_is_taken_or_opened_before_the_inventory_is_allowed(self):
@@ -66,6 +71,34 @@ class ActivateSourceTests(unittest.TestCase):
         self.assertIn("(key=='e' || key=='E' || key==K_ENTER) && take_allowed())close_reader(1);",
                       body('aw_reader.c', 'int AW_ReaderKey(int key)'))
         self.assertIn('if(take_allowed()){', body('aw_reader.c', 'void AW_ReaderDraw(void)'))
+
+    def test_a_container_gives_its_use_to_a_script_that_reads_onactivate(self):
+        # CONTAINER-SCRIPT-ACTIVATE-67: the original's rule for every object (OpenMW 0.51 mwworld/refdata.cpp
+        # activate, mwscript/miscextensions.cpp OpActivate): a container whose script holds the use stays shut on E
+        # (the script's OnActivate reads 1 on its next run) and opens by the script's Activate, through the
+        # container's own rules (the Inventory window's flag, the lock, the trap, the strip). The hook is the items'
+        # (aw_mwhost.c object_intercept); the host C test aga_focus_pickup_test.c plays both halves
+        use = body('aw_inventory.c', 'static int placed_use(void){')
+        held = use.index('aw_inventory_intercept(focus_rows[best].reference))return 1;')
+        self.assertLess(held, use.index('return inventory_allowed()?container_open(&focus_rows[best]):1;'))
+        # the census registration's refusal stays first (OPENING-REGRESSION-64)
+        self.assertLess(use.index('aw_census_take_refused()'), held)
+        activate = body('aw_inventory.c', 'int AW_ContainerActivate(unsigned reference){')
+        self.assertIn("if(focus_rows[i].kind!='C' || focus_rows[i].reference!=reference)continue;", activate)
+        self.assertIn('if(inventory_allowed())container_open(&focus_rows[i]);', activate)
+        host = body('aw_mwhost.c', 'static void object_activate(uint32_t reference){')
+        self.assertLess(host.index('if(AW_PlacedActivate(reference))return;'),
+                        host.index('if(AW_ContainerActivate(reference))return;'))
+        self.assertLess(host.index('if(AW_ContainerActivate(reference))return;'), host.index('AW_DialWindowTalkTo(e)'))
+        self.assertIn('aw_inventory_intercept=object_intercept;', code('aw_mwhost.c'))
+        # a dead actor's body the same way (the Spriggans of Solstheim): E is the script's while it holds the use,
+        # and the script's Activate on a dead actor searches the body instead of opening a talk
+        corpse = body('aw_corpse.c', 'static int corpse_use(void){')
+        self.assertLess(corpse.index('if(aw_scene_intercept && aw_scene_intercept(reference))return 1;'),
+                        corpse.index('return aw_container_open('))
+        self.assertIn('&& !AW_CorpseActivate(e,reference))', host)
+        self.assertLess(host.index('!AW_CorpseActivate(e,reference))'), host.index('AW_DialWindowTalkTo(e)'))
+        self.assertIn('aw_scene_intercept=aw_hinged_intercept=object_intercept;', code('aw_mwhost.c'))
 
     def test_no_text_overlay_on_placed_objects_before_the_papers(self):
         # PRISON-SHIP-ITEMS-TAKEABLE-65 (the maintainer's rule, 17 November 2026): before the papers no placed object

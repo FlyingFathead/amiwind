@@ -1,6 +1,6 @@
 # Build AmiWind on Linux
 
-_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
+_Last updated with AmiWind v0.0.68-dev7 (22 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -664,6 +664,13 @@ boot image's `id1/world/`, the ones the engine reads for night lighting:
 | `night-windows.txt` | Per town map, the textures of window and lamp glass that glow at night | `tools/night_windows.py` |
 | `fog-locations.txt` | Per place day and night fog distance (`dbg fog location`, on by default; the HUD title's place or region, or the map) | validated copy of `config/fog-locations.txt` |
 | `large-rooms.txt` | Large interiors that fade into fog at the draw distance and draw nothing past it | validated copy of `config/large-rooms.txt` (rooms chosen by size with `tools/large_rooms.py`) |
+
+Beside them the image step writes `region-draw.txt`: the draw distance by region that Options > Video > Fog
+distance auto uses (300 everywhere but the listed regions), from `config/region-draw-distance.json` by
+`tools/region_draw.py`, each row under the region's index in the image's own region catalogue
+(`region-names.awn`, from the same game files; a region your game files lack is left out and named in
+`image/region-draw.json`). A row in state `trial` (Solstheim's regions at 540, until the frame rate on real
+hardware is measured) applies only with `dbg fog region trial on`.
 
 The window table traces the final maps' textures back to the scenery they were
 converted from: `--balmora-scenery` (Balmora cache `scenery/`, default

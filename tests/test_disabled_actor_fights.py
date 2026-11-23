@@ -94,7 +94,11 @@ class ServerSpawnFightTests(unittest.TestCase):
         actors = code('aw_actors.c')
         tick = body(actors, 'static void Tick (void)\n{')
         self.assertIn('AW_CombatSlotState (e, NULL) != 0', tick)
-        self.assertIn('else if (c->fight && AW_CombatTestEngage (e, 0))', body(actors, 'static void ApplyLoaded (void)\n{'))
+        # (FightResume: through the script host's order target when it is bound, else AW_CombatTestEngage as before;
+        # COMBAT-RESUMED-FIGHT-TARGETS-PLAYER-68)
+        self.assertIn('else if (c->fight && FightResume (e))', body(actors, 'static void ApplyLoaded (void)\n{'))
+        self.assertIn('return aw_actors_fight_resume ? aw_actors_fight_resume (ent) : AW_CombatTestEngage (ent, 0);',
+                      actors)
 
 
 if __name__ == '__main__':

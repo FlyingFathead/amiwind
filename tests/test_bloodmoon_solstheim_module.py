@@ -294,7 +294,8 @@ class TheCellLists(unittest.TestCase):
     def test_the_module_takes_bloodmoons_set_when_bloodmoon_is_selected(self):
         for masters in (self.THREE, ['Morrowind.esm', 'Bloodmoon.esm']):
             args, record, seen, said = self.resolve(masters)
-            self.assertEqual(seen, [(['solstheim'], 'status.json', ())], masters)
+            # the named set, and the open-sea cells with a record named explicitly (CHIM-SEA-BETWEEN-ISLANDS-64)
+            self.assertEqual(seen, [(['solstheim', '@' + str(ROOT / module.SEA_CELLS)], 'status.json', ())], masters)
             self.assertEqual(args.bloodmoon_solstheim_cells, '-22,16:l -22,17:l', masters)
             self.assertEqual(record['counts']['cells'], 2, masters)
             self.assertEqual(len(said), 1)
@@ -506,6 +507,84 @@ class TheFirstMinuteChecks(unittest.TestCase):
         context = build_preflight.EarlyContext('inputs', module_args(), log=said.append)
         self.assertEqual(expansion_preflight.module_frame_maps(context), [])
         self.assertTrue(any('store chimsol, 3 frame maps (sl0000 .. sl0002)' in line for line in said))
+
+
+GLACIER = [(x, y) for x in (-27, -26, -25) for y in (25, 26, 27)]
+SEABED = [(-28, 18), (-25, 14), (-24, 14), (-23, 14), (-19, 28), (-18, 28)]
+REFERENCE = ROOT / 'docs' / 'chim' / 'cell-progress-reference.json'
+
+
+class TheGlacierAndTheSeaCellsAreBuilt(unittest.TestCase):
+    """Every space of Solstheim is built (the project's full-parity rule; SOL-GLACIER-METHODS-AB-COMPARE-68,
+    CHIM-SEA-BETWEEN-ISLANDS-64): the Mortrag Glacier's nine cells, with method E as the module's shipped default
+    set, and the sea cells by the main game's rules. Until v0.0.68-dev7 the module's plan left all of them out."""
+
+    def plan(self):
+        table, problems = module.module_plan(REFERENCE)
+        self.assertEqual(problems, [])
+        return regions.table_kinds(table), table
+
+    def test_the_nine_glacier_cells_are_in_the_modules_plan_as_one_set(self):
+        # measured as one set by a CHIM import in the region shape with set E (the nine fit 32 MB: the glacier cell's
+        # active ring peak 13,191,424 bytes, the limit 13,582,336) and published into the reference
+        kinds, _ = self.plan()
+        self.assertEqual([c for c in GLACIER if kinds.get(c) != 'land'], [])
+        statuses = regions.load_status(REFERENCE)
+        for cell in GLACIER:
+            self.assertIn(statuses[cell]['status'], regions.LAND_DONE, cell)
+            self.assertEqual(statuses[cell]['set'], 'bloodmoon', cell)
+
+    def test_the_six_heightless_cells_are_seabed_frames_as_the_main_games(self):
+        # a CELL record and LAND without heights, nothing placed: the main game's empty-sea kind (empty_sea)
+        kinds, _ = self.plan()
+        self.assertEqual({c: kinds.get(c) for c in SEABED}, {c: 'seabed' for c in SEABED})
+
+    def test_the_open_sea_cells_with_a_record_are_named_explicitly_as_the_main_games(self):
+        import json
+        doc = json.loads((ROOT / module.SEA_CELLS).read_text(encoding='utf-8'))
+        self.assertEqual(doc['format'], regions.CELLS_FORMAT)
+        listed = [regions.parse_cell(c) for c in doc['cells']]
+        self.assertIn((-20, 15), listed)
+        kinds, table = self.plan()
+        statuses = regions.load_status(REFERENCE)
+        for cell in listed:
+            # a listed cell is open sea in the reference and an ocean frame of the module (refused otherwise)
+            self.assertEqual(statuses[cell]['status'], 'ocean', cell)
+            self.assertEqual(kinds.get(cell), 'ocean', cell)
+            self.assertEqual(table['cells'][regions.cell_key(cell)]['frame'], regions.frame_id(cell))
+        # the two of the same kind that the base world already frames are not listed twice
+        base = {regions.parse_cell(c) for c in json.loads((ROOT / 'config' / 'chim-cells.json').read_text(
+            encoding='utf-8'))['cells']}
+        self.assertTrue({(-19, 14), (-19, 15)} <= base)
+        self.assertEqual(set(listed) & base, set())
+        # open sea outside the list stays out of the module, as the main game's open sea outside its list
+        self.assertNotIn((-20, 14), kinds)
+
+    def test_a_listed_open_sea_cell_without_its_status_is_refused(self):
+        import json
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / 'config').mkdir()
+            (Path(tmp) / module.SEA_CELLS).write_text(json.dumps(
+                {'format': regions.CELLS_FORMAT, 'cells': ['-20,15', '-29,23']}), encoding='utf-8')
+            table, problems = module.module_plan(REFERENCE, root=tmp)
+        self.assertEqual(len(problems), 1)
+        self.assertIn('cell -29,23', problems[0])
+        self.assertIn((-20, 15), regions.table_kinds(table))
+
+    def test_the_first_minute_check_counts_them_and_names_what_it_leaves_out(self):
+        kinds, _ = self.plan()
+        self.assertEqual(expansion_preflight.finished_set_cells('solstheim', REFERENCE), sorted(kinds))
+        args = SimpleNamespace(bloodmoon_solstheim_cells=regions.encode_cells(kinds), chim_regions=[], miniwind=False)
+        said = []
+        found = expansion_preflight.module_set_problems(['Morrowind.esm', 'Bloodmoon.esm'], args, REFERENCE,
+                                                        said.append)
+        self.assertEqual(found, [])
+        line = [s for s in said if s.startswith('Expansion cells: Bloodmoon.esm')][0]
+        self.assertIn('%d finished cell(s), %d built by the module bloodmoon-solstheim' % (len(kinds), len(kinds)),
+                      line)
+        self.assertNotIn('memory_fit', line)
+        self.assertIn('open sea requires an explicit cell selection', line)
+        self.assertEqual(expansion_preflight.left_out_text('solstheim', 'no-such-status.json'), '')
 
 
 if __name__ == '__main__':

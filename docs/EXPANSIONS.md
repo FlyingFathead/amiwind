@@ -1,6 +1,6 @@
 # The expansions: Tribunal and Bloodmoon
 
-_Last updated with AmiWind v0.0.68-dev3 (21 November 2026)._
+_Last updated with AmiWind v0.0.68-dev7 (22 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -26,9 +26,11 @@ them today, what can be seen in the game now, how the two places are planned to 
 be missing. The short version: the data of both expansions is part of the build by default since v0.0.66-dev2 and
 their rooms are in the image. Since v0.0.67 Mournhold is reached from Ebonheart through the characters' own dialogue and
 back, and its five outdoor districts, built as a world of their own, can be walked; its quests and much of its play are
-not ready. Since v0.0.68-dev3 the first 135 of Solstheim's 144 open terrain cells are built, as a world of their own,
-and reached only by `dbg tp` to their frames for now: no door, boat or place name leads there yet, and the glacier and
-its eight neighbouring cells are not in yet ([how the glacier is approached](chim/SOLSTHEIM_GLACIER.md)).
+not ready. Since v0.0.68-dev3 Solstheim's open terrain cells are built, as a world of their own, and reached only by
+`dbg tp` to their frames for now: no door, boat or place name leads there yet. Since v0.0.68-dev8 all 144 are in,
+the Mortrag Glacier and its eight neighbouring cells with the glacier's own ice method
+([how the glacier is approached](chim/SOLSTHEIM_GLACIER.md)), and so are the island's seabed and open-sea cells that
+the game data defines (see [Solstheim](#solstheim)).
 
 ## What the expansions are, and your own copies
 
@@ -243,7 +245,16 @@ tracker reference calls at least one of Solstheim's outdoor cells finished:
 - `bloodmoon-solstheim` converts the finished cells, and only those, into a world folder of their own
   (`tools/bloodmoon_solstheim.py`: the outdoor converter, unchanged, with the module's own game files and its own
   unit cache). The stage shares its converted units through the build's storage pool, so a unit that a CHIMport run
-  of the same cells already stored is taken from there and not converted a second time.
+  of the same cells already stored is taken from there and not converted a second time. It builds the glacier's ice
+  models with the mesh method set the build names (`--chim-mesh-method-set`), else the shipped default of
+  `config/mesh-method-sets.json`, method `E` since v0.0.68-dev8 ([the glacier](chim/SOLSTHEIM_GLACIER.md)); the set
+  is named on the stage's own command line.
+
+The module takes Solstheim's sea cells by the main game's rules: a seabed cell (a LAND record without heights, nothing
+placed) once the tracker reference calls it empty sea, as the main game's seabed cells; an open-sea cell that has a
+cell record (no LAND) only when it is named in `config/solstheim-sea-cells.json` and the reference calls it open sea,
+as `config/chim-cells.json` names the main game's. Each is a frame of its own with its row in the module's rows file;
+the levelled creatures placed in open sea wait, as in every open-sea cell of the main game.
 
 The image installs that world as the store `chimsol` with the frame maps `sl0000`, `sl0001`, ... and the rows file
 `world/regions-sl.awr`; cells that touch are open to each other. The same first-minute and after-stage checks as
@@ -331,8 +342,11 @@ land, 6 seabed and 5 open water). The island lies at cells x -29 to -16, y 14 to
 placements and the densest 579. Its forests are heavy: a dense forest view draws about six times the faces of a median
 Vvardenfell view, and the densest forest region lies at exterior cell (-27, 25) ([census](performance/EXPANSIONS-CENSUS-v0.0.64.md)).
 The survey keeps the 155 cells in its list of expansion-only cells and plans none of them until the exterior is
-converted ([world survey](WORLD_SURVEY.md)). The sea around the island and between it and Vvardenfell has to be
-generated.
+converted ([world survey](WORLD_SURVEY.md)). Of the 5 open-water cells, two (-19,14 and -19,15) are open-sea cells
+of the main game's sea, already built with Vvardenfell's; -20,15 is built by the module since v0.0.68-dev8; -29,23 and
+-28,24 follow once their open sea is measured in the tracker
+([CHIM-SEA-BETWEEN-ISLANDS-64](bugs/CHIM-SEA-BETWEEN-ISLANDS-64.md)). The rest of the sea between the islands has no
+cell in the game data and stays beyond the edge of the world, as the main game's open sea outside its cells.
 
 ## The plan
 

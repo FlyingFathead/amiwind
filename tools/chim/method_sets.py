@@ -34,6 +34,9 @@ TABLE = ROOT / 'config' / 'mesh-method-sets.json'
 FORMAT = 'aw-mesh-method-sets-1'
 OPTION = '--mesh-method-set'
 BASELINE = 'baseline'
+# the set the build module bloodmoon-solstheim builds with when the build names none (the file's "default"; baseline
+# when the file names none): method E since v0.0.68-dev8, decided for the project on 22 November 2026
+DEFAULT_KEY = 'default'
 METHODS = ('C', 'D')       # the methods this tree builds
 REPORT = 'mesh-method-set.json'
 REPORT_LINES = 'mesh-method-set.jsonl'
@@ -58,6 +61,8 @@ def load(path=None):
     sets = data.get('sets') or {}
     if BASELINE not in sets or sets[BASELINE].get('meshes'):
         raise ValueError('%s: the set %r is today\'s methods and names no mesh' % (where, BASELINE))
+    if data.get(DEFAULT_KEY, BASELINE) not in sets:
+        raise ValueError('%s: the default set %r is not a set of the file' % (where, data.get(DEFAULT_KEY)))
     for name, row in sets.items():
         for mesh, methods in (row.get('meshes') or {}).items():
             if mesh not in listed:
@@ -75,6 +80,12 @@ def load(path=None):
                     raise ValueError('%s: set %r: the D row of %s needs %s (source_sha256: the NIF file\'s SHA-256)'
                                      % (where, name, mesh, ', '.join(D_KEYS)))
     return data
+
+
+def default_name(path=None):
+    """The shipped default set's name (the file's "default", checked by load): what the build module
+    bloodmoon-solstheim names on its world stage's command line when the build names no set."""
+    return load(path).get(DEFAULT_KEY, BASELINE)
 
 
 def take(argv):

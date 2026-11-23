@@ -2747,6 +2747,8 @@ STAGE_GAME_INPUTS = {
     'chim-sol': BASE_GAME_INPUTS + LAYER_GAME_INPUTS['bloodmoon'],
     'chim-sol-star': BASE_GAME_INPUTS + LAYER_GAME_INPUTS['bloodmoon'],
     'chim-sol-trees': BASE_GAME_INPUTS + LAYER_GAME_INPUTS['bloodmoon'],   # --chim-sol-tree-copies star
+    # --chim-sol-tree-copies rally-switch: one world per rally method (config/tree-copies.json rally 'methods')
+    **{'chim-sol-alt%d' % value: BASE_GAME_INPUTS + LAYER_GAME_INPUTS['bloodmoon'] for value in range(2, 16)},
     # the module tribunal-mournhold (tools/build.py "THE EXPANSIONS AS BUILD MODULES"): Mournhold's districts as a
     # world of their own, from the base master and archive plus Tribunal's and from nothing of Bloodmoon's
     'tribunal-mournhold-data': BASE_GAME_INPUTS + LAYER_GAME_INPUTS['tribunal'],

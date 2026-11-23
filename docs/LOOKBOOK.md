@@ -1,6 +1,6 @@
 # The confirmed look book
 
-_Last updated with AmiWind v0.0.67 (19 November 2026)._
+_Last updated with AmiWind v0.0.68-dev7 (22 November 2026)._
 
 ## State at v0.0.67
 
@@ -65,6 +65,11 @@ Where a page needs a number the console did not give, the engine has a small rea
   person). It poses the vertices of the arms (or of the body) that hang on the left hand as the renderer draws them,
   places the light as it is drawn, and prints how far the light's attach point and its nearest vertex are from the
   hand. A light floating away from the hand reads several units; a light in the hand under two.
+- `dbg ui palette` (`aw_ui_palette`): the palette the screen is drawn through now (the game palette, the title art's own,
+  a loading art's or black) and the screen it is read on (inventory, map, journal, a window, menu, game). The page of
+  the windows' colours reads it with each window open after the book's start from the title menu by a console command:
+  until v0.0.68-dev7 such a start left the inventory, the map and the other windows on the title art's palette until
+  Escape was pressed ([MENU-COLOURS-GAME-PALETTE](lookbook/MENU-COLOURS-GAME-PALETTE.md)).
 
 ## Marked code
 

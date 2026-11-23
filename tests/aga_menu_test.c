@@ -68,8 +68,12 @@ void Cvar_SetValue(char *name,float value){cvar_t *rows[]={&volume,&bgmvolume,&e
 void AW_UISmallBegin(void){}void AW_UISmallEnd(void){}
 int AW_UIFrameEnabled(void){return gold_frame;}
 void AW_UIFrameToggle(void){gold_frame=!gold_frame;}
+/* aw_fog.c's one owner (REGIONAL-DRAW-DISTANCE-68): the player's own value turns Auto off; Auto on by default */
+static int fog_auto=1;
 int AW_DrawDistance(void){return distance;}
-void AW_SetDrawDistance(int n){if(n<100)n=100;if(n>1500)n=1500;distance=n;}
+void AW_SetDrawDistance(int n){if(n<100)n=100;if(n>1500)n=1500;distance=n;fog_auto=0;}
+int AW_DrawDistanceAuto(void){return fog_auto;}
+void AW_SetDrawDistanceAuto(int on){fog_auto=on;}
 int Cmd_Argc(void){return 1;}
 void Con_Printf(char *fmt,...){}
 int COM_FOpenFile(char *name,FILE **f){if(missing || (intro_missing && !strcmp(name,"intro/chargenname1.txt"))){*f=NULL;return -1;}*f=tmpfile();return 124;}
@@ -78,7 +82,14 @@ int AW_SceneMapSize(const char *n,char *p,int s){char b[64];FILE *f=NULL;int k;s
 void IN_AWClearButtons(void){clears++;}
 void Cmd_AddCommand(char *name,void (*fn)(void)){if(!strcmp(name,"aw_scene_menu"))picker=fn;else if(!strcmp(name,"aw_main_menu"))front=fn;}
 void Cbuf_AddText(char *s){if(!strcmp(s,"quit\n"))quit++;else{strcpy(queued,s);changes++;}}
-int AW_UIBackground(void){return 1;}int AW_UILogo(int x,int y){assert(x==60 && y==10);return 1;}
+/* PAUSE-MENU-CONTINUE-CONFIRM-68: every text the menu draws, in order ("|" after each), the logo's draws, the
+ * wrapped questions (the box pipeline) and the Paused caption's switch (aw_ui.c aw_menu_paused_caption) */
+static char drawn[4096];static int logos,paused_caption=1;
+static void note(const char *s){size_t d=strlen(drawn),n=strlen(s);if(d+n+2<sizeof(drawn)){memcpy(drawn+d,s,n);drawn[d+n]='|';drawn[d+n+1]=0;}}
+void AW_UICenteredLinesUpTo(int x,int y,int w,int h,const char *s,int most){
+ assert(x>=0 && y>=0 && x+w<=320 && y+h<=200 && most>=1);note(s);}
+int AW_UIPausedCaption(void){return paused_caption;}
+int AW_UIBackground(void){return 1;}int AW_UILogo(int x,int y){assert(x==60 && y==10);logos++;return 1;}
 int AW_UIWidth(const char *s){return strlen(s)*7;}
 int AW_UIColor(int r,int g,int b){return r;}
 void AW_UIFill(int x,int y,int w,int h,int c){if(c==62){highlight_y=y;highlight_w=w;}if(c==210 && w==2 && h==6)own_cursor++;}
@@ -86,14 +97,15 @@ void AW_UIScrollbar(int x,int y,int h,int total,int visible,int top){assert(x>=0
 int AW_UIScrollHit(int mx,int my,int x,int y,int h,int total,int visible,int top){return -1;}
 /* What the Options page drew: labels by their start, every tab and box. */
 static char crosshair_label[64],photo_label[64],far_label[64],colour_label[64],shape_label[64],invert_label[64],cursor_label[64],
-            best_label[64],room_fog_label[64],indoor_label[64];
+            best_label[64],room_fog_label[64],indoor_label[64],outdoor_label[64],fog_auto_label[64];
+static int outdoor_colour;
 /* The mouse cursor (aw_ui.c, CURSOR-MW-58): aw_cursor_type 2 = Morrowind's pointer (drawn when the image has it), 1 = AmiWind's. */
 static int cursor_kind=2,cursor_calls,cursor_art=1;
 int AW_UICursorType(void){return cursor_kind;}
 void AW_UICursorTypeSet(int type){assert(type==1 || type==2);cursor_kind=type;}
 int AW_UICursor(int x,int y){assert(x>=0 && x<320 && y>=0 && y<200);cursor_calls++;return cursor_kind==2 && cursor_art;}
 static char sens_value[16],help[64];static int photo_colour,tabs_drawn,audio_draws,boxes,full_box,preview_x,previews;
-void AW_UITextBox(int x,int y,int w,int h,const char *s,int c){assert(y>=0 && y+h<=200 && x>=0 && x+w<=320);
+void AW_UITextBox(int x,int y,int w,int h,const char *s,int c){assert(y>=0 && y+h<=200 && x>=0 && x+w<=320);note(s);
  if(!strcmp(s,"Prefs") || !strcmp(s,"Controls") || !strcmp(s,"Video"))tabs_drawn++;
  if(!strcmp(s,"Audio")){tabs_drawn++;audio_draws++;}
  if(!strncmp(s,"Show crosshairs",15))strcpy(crosshair_label,s);
@@ -105,7 +117,9 @@ void AW_UITextBox(int x,int y,int w,int h,const char *s,int c){assert(y>=0 && y+
  if(x==252)strcpy(sens_value,s); /* the value beside the sensitivity rail */
  if(x==10 && y==176)strcpy(help,s);
  if(!strncmp(s,"Far detail",10)){strcpy(far_label,s);assert(AW_UIWidth(s)<=w-4);}
- if(!strncmp(s,"Fog ",4)){if(s[4]=='i')strcpy(room_fog_label,s);else if(!strncmp(s,"Fog distance indoors",20))strcpy(indoor_label,s);}
+ if(!strncmp(s,"Fog ",4)){if(s[4]=='i')strcpy(room_fog_label,s);else if(!strncmp(s,"Fog distance indoors",20))strcpy(indoor_label,s);
+  else if(!strncmp(s,"Fog distance outdoors",21)){strcpy(outdoor_label,s);outdoor_colour=c;}
+  else if(!strncmp(s,"Fog distance auto",17))strcpy(fog_auto_label,s);}
  if(!strcmp(s,"Photo mode") || !strcmp(s,"Leave photo mode")){strcpy(photo_label,s);photo_colour=c;}}
 /* Photo mode and the crosshair preference (aw_photo.c). */
 static int crosshair_on=1,photo_on,photo_available=1,photo_sets,crosshair_style[2];
@@ -258,11 +272,18 @@ static void check_controls(void){
  * screen or without a running game), area loading, load method, read-ahead buffer, extra RAM. */
 static void check_video(void){
  open_options();page(3);
- down(1);M_Keydown('a');assert(distance==530);keydown[K_SHIFT]=true;M_Keydown('D');assert(distance==531);keydown[K_SHIFT]=false;
- M_Keydown('s');M_Keydown(K_ENTER);assert(distance==300);   /* reset = the universal default 300 */
+ /* Fog distance auto (REGIONAL-DRAW-DISTANCE-68), on by default: the outdoor row shows the region's distance, greyed
+  * and inert (arrows and Enter change nothing, no slider) until Auto is off; then it is set by hand */
+ down(1);M_Draw();assert(fog_auto && !strcmp(outdoor_label,"Fog distance outdoors: 540") && outdoor_colour==114);
+ M_Keydown('a');M_Keydown(K_ENTER);M_Draw();assert(distance==540 && fog_auto && !strcmp(outdoor_label,"Fog distance outdoors: 540"));
+ M_Keydown('s');M_Draw();assert(!strcmp(fog_auto_label,"Fog distance auto: On") && highlight_y==36+19);
+ M_Keydown(K_ENTER);M_Draw();assert(!fog_auto && !strcmp(fog_auto_label,"Fog distance auto: Off"));
+ M_Keydown('w');M_Draw();assert(outdoor_colour==210);
+ M_Keydown('a');assert(distance==530);keydown[K_SHIFT]=true;M_Keydown('D');assert(distance==531);keydown[K_SHIFT]=false;
+ M_Keydown('s');M_Keydown(K_ENTER);assert(fog_auto && distance==531);   /* Auto again = the default (each region's own) */
  /* Fog distance indoors (aw_fog_distance_interior, its own value; 300 by default): arrows 10, Enter steps */
  down(1);M_Draw();assert(!strcmp(indoor_label,"Fog distance indoors: 300") && highlight_y==36+2*19);
- M_Keydown(K_RIGHTARROW);assert(fog_indoors==310 && distance==300);M_Keydown(K_ENTER);assert(fog_indoors==540);
+ M_Keydown(K_RIGHTARROW);assert(fog_indoors==310 && distance==531 && fog_auto);M_Keydown(K_ENTER);assert(fog_indoors==540);
  M_Keydown(K_ENTER);M_Keydown(K_ENTER);assert(fog_indoors==150);M_Keydown(K_ENTER);assert(fog_indoors==300);
  /* Fog in large rooms (aw_fog_large_rooms): on by default, Enter or an arrow switches */
  down(1);M_Draw();assert(!strcmp(room_fog_label,"Fog in large rooms: On"));
@@ -338,6 +359,57 @@ int main(void){
  M_Menu_Quit_f();M_Draw();M_Keydown(K_ENTER);assert(!quit);M_Menu_Quit_f();M_Keydown(K_RIGHTARROW);M_Keydown(K_ENTER);assert(quit==1);
  check_title_options();
  open_pause();AW_MenuMouse(10000,10000);M_Draw();AW_MenuMouse(-10000,-10000);M_Draw();
+ /* MENU-TITLE-AFTER-CONSOLE-START-68: a game started from the title menu by a console command (dbg aw hors 0 or a typed
+  * map: the menu goes, a game runs, the menu's own New Game and Load were not used). Escape in play (togglemenu) opens
+  * the in-game menu, which Escape closes; before the fix it opened the title menu, which Escape could not close. With
+  * no game running the title menu stays the title menu. */
+ sv.active=false;front();assert(AW_MenuFrontEnd() && key_dest==key_menu);
+ key_dest=key_game;sv.active=true;
+ M_ToggleMenu_f();M_Draw();assert(key_dest==key_menu && !AW_MenuFrontEnd());
+ M_Keydown(K_ESCAPE);assert(key_dest==key_game);
+ sv.active=false;front();key_dest=key_game;M_ToggleMenu_f();assert(AW_MenuFrontEnd());
+ M_Keydown(K_ESCAPE);assert(key_dest==key_menu && AW_MenuFrontEnd());
+ /* MENU-PALETTE-RED-CAST-68: the same console start, and before any Escape a screen of the running game opens as a
+  * key_menu modal of its own (aw_worldui.c: the inventory, the map, the journal; aw_wait.c: wait), not through game_menu.
+  * It is not the title, so aw_ui.c AW_UIMenuPalette keeps the game palette for it (the title art's own palette only while
+  * AW_MenuFrontEnd()). Before the fix the title flag alone answered here: those screens showed the art's colours. */
+ sv.active=false;front();assert(AW_MenuFrontEnd() && key_dest==key_menu);
+ key_dest=key_game;sv.active=true;               /* the console start: the map runs; the title's New Game and Load unused */
+ key_dest=key_menu;assert(!AW_MenuFrontEnd());   /* the inventory (or the map, the journal, wait) opens */
+ key_dest=key_game;assert(!AW_MenuFrontEnd());   /* and closes: play */
+ sv.active=false;front();assert(AW_MenuFrontEnd()); /* the game ended (disconnect, aw_main_menu): the title again */
+ /* PAUSE-MENU-CONTINUE-CONFIRM-68: Escape in play opens the original's in-game menu: the caption says the game is paused
+  * where the title has the logo (aw_menu_paused_caption 0: the logo), the rows are the original's (sReturnToGame ...
+  * sExitGame; the original's English here, no view/settings.txt line in this fixture). Exit Game asks the original's
+  * sMessage5 with No (the default) and Yes, and leaves for the title menu only on Yes; New Game asks sNotifyMessage54;
+  * the title menu keeps its own rows and questions. */
+ {
+  int before;
+  key_dest=key_game;sv.active=true;M_ToggleMenu_f();assert(key_dest==key_menu && !AW_MenuFrontEnd());
+  drawn[0]=0;logos=0;M_Draw();
+  assert(!strncmp(drawn,"Paused|",7) && !logos);   /* the first text drawn, in the logo's band */
+  assert(strstr(drawn,"Return To Game|") && strstr(drawn,"|New Game|") && strstr(drawn,"|Save Game|") &&
+         strstr(drawn,"|Load Game|") && strstr(drawn,"|Options Menu|") && strstr(drawn,"|Exit Game|"));
+  assert(!strstr(drawn,"Main menu") && !strstr(drawn,"Return to game"));
+  paused_caption=0;drawn[0]=0;M_Draw();assert(!strstr(drawn,"Paused") && logos==1);paused_caption=1;
+  before=changes;
+  down(4);M_Keydown(K_ENTER);                       /* Return To Game, New Game, (Save Game greyed), Load Game, Options Menu, Exit Game */
+  drawn[0]=0;M_Draw();
+  assert(strstr(drawn,"Do you wish to quit your current game?\nAll unsaved progress will be lost.|") &&
+         strstr(drawn,"|No|") && strstr(drawn,"|Yes|") && !strstr(drawn,"Return to main menu?"));
+  M_Keydown(K_ENTER);assert(changes==before && key_dest==key_menu);   /* Enter on No, the default: the game stays */
+  M_Keydown(K_ENTER);M_Keydown(K_ESCAPE);assert(changes==before && key_dest==key_menu);   /* Escape: the same */
+  M_Keydown(K_ENTER);M_Keydown(K_RIGHTARROW);M_Keydown(K_ENTER);   /* Yes: the game is left for the title menu */
+  assert(changes==before+1 && !strcmp(queued,"disconnect\naw_main_menu\n") && key_dest==key_game);
+  M_ToggleMenu_f();down(1);M_Keydown(K_ENTER);drawn[0]=0;M_Draw();
+  assert(strstr(drawn,"Do you want to start a new game and lose your current game?|") && strstr(drawn,"|Yes|"));
+  M_Keydown(K_ESCAPE);M_Keydown(K_ESCAPE);assert(key_dest==key_game && changes==before+1);
+  sv.active=false;front();drawn[0]=0;logos=0;M_Draw();   /* the title menu: its own rows, no caption */
+  assert(strstr(drawn,"New game") && strstr(drawn,"Exit game") && !strstr(drawn,"Paused") && !strstr(drawn,"Return To Game"));
+  M_Keydown(K_UPARROW);M_Keydown(K_ENTER);drawn[0]=0;M_Draw();   /* Exit game on the title: its own question */
+  assert(strstr(drawn,"Exit the game?") && strstr(drawn,"|Cancel|") && !strstr(drawn,"unsaved"));
+  M_Keydown(K_ESCAPE);
+ }
  return 0;
 }
 

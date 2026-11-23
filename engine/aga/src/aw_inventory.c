@@ -3754,6 +3754,23 @@ int AW_PlacedActivate(unsigned reference){
     if(!inventory_allowed())return 1;     /* PRISON-SHIP-ITEMS-TAKEABLE-65: the class's NullAction, as for E */
     return take_row(row);
 }
+/* CONTAINER-SCRIPT-ACTIVATE-67: a script's Activate on the container REFERENCE (aw_mwhost.c object_activate; the
+ * Stalhrim deposits' ColonyStalhrim takes the player's use and passes it on when the pick is in his hand): the
+ * container's own use, as E without a script: nothing while the Inventory window is not allowed, else its lock, its
+ * trap, its strip (container_open). 0 when REFERENCE is no container among this place's rows (OpenMW 0.51
+ * mwscript/miscextensions.cpp OpActivate runs the class's own activation, mwclass/container.cpp; rule read). */
+int AW_ContainerActivate(unsigned reference){
+    int i;
+    if(!reference || !sv.active || !svs.clients || !svs.clients[0].edict)return 0;
+    focus_refresh(svs.clients[0].edict);
+    for(i=0;i<focus_count;i++){
+        if(focus_rows[i].kind!='C' || focus_rows[i].reference!=reference)continue;
+        if(AW_ObjectDisabled(reference))return 0;
+        if(inventory_allowed())container_open(&focus_rows[i]);
+        return 1;
+    }
+    return 0;
+}
 /* OPENING-REGRESSION-64: 1 while the census office's registration forbids taking and using (aw_opening.c
  * AW_OpeningTakeRefused, set in aw_debug.c); NULL in the host tests */
 int (*aw_census_take_refused)(void);
@@ -3770,8 +3787,13 @@ static int placed_use(void){
      * EnableInventoryMenu) a container does not open and an item is not taken: the use key is spent on nothing, as the
      * original's NullAction (OpenMW 0.53 mwclass/container.cpp Container::activate, mwworld/class.cpp
      * Class::defaultItemActivate, mwclass/light.cpp for a carryable light) */
-    if(best>=0 && focus_rows[best].kind=='C')
+    if(best>=0 && focus_rows[best].kind=='C'){
+        /* CONTAINER-SCRIPT-ACTIVATE-67: a container whose script reads OnActivate gives its use to the script (the
+         * original's rule, as for items, doors and actors: aw_mwhost.c object_intercept; OpenMW 0.51
+         * mwworld/refdata.cpp activate): it stays shut until the script's Activate (AW_ContainerActivate above) */
+        if(aw_inventory_intercept && aw_inventory_intercept(focus_rows[best].reference))return 1;
         return inventory_allowed()?container_open(&focus_rows[best]):1;   /* CONTAINER-WINDOW-59 */
+    }
     if(best<0 || (row=&focus_rows[best])->kind!='I')return 0;
     /* an item whose script reads OnActivate takes the use (the original's rule, as for doors and actors: aw_mwhost.c
      * object_intercept); the item does nothing until the script's Activate (AW_PlacedActivate above) */

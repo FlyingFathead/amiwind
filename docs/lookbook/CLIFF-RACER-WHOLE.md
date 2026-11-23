@@ -1,6 +1,6 @@
 # Look book page CLIFF-RACER-WHOLE
 
-_Generated from tests/lookbook/pages.json with AmiWind v0.0.67._
+_Generated from tests/lookbook/pages.json with AmiWind v0.0.68-dev7._
 
 The cliff racer is drawn whole: wings joined to the body, no holes.
 

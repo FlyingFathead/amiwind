@@ -589,11 +589,13 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_world_map_first_view_and_showmap_rule_parts(self):
         # MAP-WORLD-TAB-BLANK-67 (the in-game World view's first showing in a game: on the player, the explored land in
-        # view, by every route) and MAP-PLACES-SHOWN-UNVISITED-67 (ShowMap: a cell name starting with the text), each
-        # part alone so each fails on its own when its rule breaks; the full run above has them too
+        # view, by every route), MAP-PLACES-SHOWN-UNVISITED-67 (ShowMap: a cell name starting with the text) and
+        # MAP-VERSION-2-DEFAULT-68 (map version 2, the default: no debug buttons or lava legend, the place's name in the
+        # title and its font fallback, dbg dbgmap and dbg maptype), each part alone so each fails on its own when its rule
+        # breaks; the full run above has them too
         self.compile_run('aga_worldui_test.c', [Path(SOURCE)/'src'/n for n in ('aw_worldui.c','aw_mapfog.c','aw_mapmarks.c','aw_listbox_rules.c','aw_msgbox_rules.c','aw_questbook.c','aw_jhist.c','aw_ledger.c','aw_textdef.c','aw_inventory.c','aw_state.c','aw_save_codec.c','mathlib.c')],
             defines=['AW_INVENTORY_RULES_ONLY','AW_TEXTDEF_HOST_TEST'], cflags=['-fsanitize=undefined','-fno-sanitize-recover=all'],
-            argument_sets=[('world_first_view',), ('showmap_starts',)])
+            argument_sets=[('world_first_view',), ('showmap_starts',), ('map_v2',)])
 
     def test_mouse_event_order_accumulation_modal_reset_and_signed_deltas(self):
         cases = ('same_batch_tabs', 'sequential_clamp', 'game_accumulation',
@@ -1129,6 +1131,12 @@ class NativeSourceTests(unittest.TestCase):
 
     def test_far_plane_matches_fog_depth(self):
         self.compile_run('aga_culling_test.c', [ROOT/'engine/aga/src/aw_fog.c',ROOT/'engine/aga/src/aw_horizon.c'])
+
+    def test_draw_distance_one_owner_on_events_only(self):
+        # REGIONAL-DRAW-DISTANCE-68: one rule writes the draw distance; every order of the events ends at the rule's
+        # value for the final state, quiet frames run the rule 0 times, the region's trial rows are off by default
+        self.compile_run('aga_drawdist_test.c', [ROOT/'engine/aga/src/aw_fog.c', ROOT/'engine/aga/src/aw_fog_location.c',
+                                                 ROOT/'engine/aga/src/aw_horizon.c'])
 
     def test_nearby_door_depth_order(self):
         self.compile_run('aga_depth_test.c', [Path(SOURCE)/'src/r_edge.c'])

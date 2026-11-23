@@ -123,11 +123,13 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - [LORE-DATE-FORMAT-62](LORE-DATE-FORMAT-62.md): Game dates are printed as 18/08/427 instead of the original's form: day, month name, era and year
 - [MADE-ITEM-NO-PICTURE-62](MADE-ITEM-NO-PICTURE-62.md): A made potion or a made enchanted item shows an empty picture in the inventory list
 - [MAP-FOCUS-DRAG-29](MAP-FOCUS-DRAG-29.md): Map or journal keeps dragging after window focus returns
+- [MAP-LOCAL-ROOM-PLAN-CHIM-ROOMS-68](MAP-LOCAL-ROOM-PLAN-CHIM-ROOMS-68.md): Inside a room the map opens on the World view instead of the room's plan in rooms built on the shared room store
 - [MAP-MARKER-29](MAP-MARKER-29.md): Requested: click to place a user map marker
 - [MAP-ORIGINAL-FEATURES-66](MAP-ORIGINAL-FEATURES-66.md): The map window lacks the original's map: the explored fog, the local map, the interior map and the place markers
 - MAP-REG-01 (no report page): In-Game map mode hid settlement markers (regression)
 - [MAP-RIGHT-DRAG-29](MAP-RIGHT-DRAG-29.md): Advertised right-drag does not pan teleport map
 - [MAP-SPOTS-28](MAP-SPOTS-28.md): In-game map screen has white/yellow spots
+- [MENU-PALETTE-RED-CAST-68](MENU-PALETTE-RED-CAST-68.md): The map screen, the inventory and the item icons have a red cast since the scene palette change for ice and snow
 - [MSGBOX-NO-CURSOR-62](MSGBOX-NO-CURSOR-62.md): The death message box shows no mouse cursor
 - [NAMED-ACTIVATOR-FOCUS-66](NAMED-ACTIVATOR-FOCUS-66.md): Named objects such as beds and shrines show no name when looked at
 - [NOCLIP-BOB-DEFAULT-42](NOCLIP-BOB-DEFAULT-42.md): Head bob still on in noclip mode by default, although the noclip bob was set to off by default

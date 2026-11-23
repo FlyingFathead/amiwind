@@ -1,11 +1,13 @@
 # Combat and the Vivec Arena minigame
 
-_Last updated with AmiWind v0.0.67 (19 November 2026)._
+_Last updated with AmiWind v0.0.68 (22 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [Playing the Vivec Arena (testing guide)](#playing-the-vivec-arena-testing-guide)
+  - [Fight orders](#fight-orders)
+  - [The script variable OnPCHitMe](#the-script-variable-onpchitme)
 - [Combat playground](#combat-playground)
 - [How combat works](#how-combat-works)
 - [Blocking](#blocking)
@@ -89,9 +91,39 @@ Other switches:
   chance, the roll, the outcome and the damage (cvar `aw_combat_readout`,
   default on).
 - `dbg combat`: status, both sheets, thinks per second, trace counts and the
-  bytes per NPC. `dbg combat calm` ends every fight; `dbg combat off` turns
+  bytes per NPC. `dbg combat calm` ends every fight and every fight order
+  (below), so nobody stays hostile; `dbg combat off` does the same and turns
   the layer off (`aw_combat`).
 - `dbg combat music on/off`: the battle music switch (`aw_combat_music`).
+- `dbg combat slots N`: at most N actors fight at a time, 1 to 16 (cvar `aw_combat_slots`, default 16, not saved).
+  4 is the cap before v0.0.68, kept for a comparison. Fights under way keep their slots.
+
+### Fight orders
+
+A fight a script or a conversation starts (StartCombat), a crime witness's attack and an ally's or a guard's join are
+kept as an order on the actor's record: that it fights, and whom (the player or another actor). The order stays until
+StopCombat, a paid fine, the actor's death or its target's, as the original keeps a combat package on the actor
+(OpenMW 0.51 `mechanicsmanagerimp.cpp` startCombat, `aicombat.cpp`). A fight slot holds the actor only while it can
+fight. So a StartCombat on an actor whose place is not loaded, or given while every slot is taken, is not lost: once a
+second the orders whose actor and target are both loaded and alive within 7,168 original units of the player start
+their fights, the nearest first, while a slot is free. The orders are saved with the game, and a fight between two
+actors that a load or a return to their place starts again is against the same actor, not the player. New Game clears
+them. `aw_mwscript_status` prints how many records hold an order and how many were kept, taken up later and ended
+unfought this session. Up to v0.0.68-dev7 a StartCombat past the slots or on an actor that was not loaded did nothing,
+and a kept fight between two actors came back as a fight against the player.
+
+### The script variable OnPCHitMe
+
+When the player's blow reaches for an NPC or a creature, a hit or a miss, or the player's harmful spell lands on it,
+the variable `OnPCHitMe` of that actor's own script is set to 1; the script sets it back itself, as in the original
+(OpenMW 0.51 `mwclass/npc.cpp` and `creature.cpp` onHit). 32 scripts of the game declare it and 31 test it, 19 of them
+on Solstheim: Toralf (`Toralf`) and his band, the other Raven Rock colony scripts, Hroldar the Strange, the Glenmoril
+raven, the Ghost of Ulfgar the Unending; in Mournhold Gaenor, Karrod, King Helseth and Almalexia; on Vvardenfell the
+vampires' cattle and four writ targets. The engine finds the variable by its name in the table a saved game names
+script variables by, once per script. `aw_mwscript_status` counts the blows and the variables set. Up to v0.0.68-dev7
+nothing set it. Not yet: the original's rule that an actor whose script declares the variable and whose Fight is 0
+(25 records: the cattle, Hroldar, the raven, Ulfgar's ghost, the Almalexia of the last fight) does not fight back
+when the player strikes it; here it fights back like anyone.
 - `dbgmode arenapit setup`: fighter setup before the title card arrives with
   the quick character screen; until then fighters use their own sheets.
 
@@ -525,7 +557,18 @@ Bows and crossbows: the Chop column is their damage. The names, by type:
 
 ## Cost on a 68040
 
-Per hostile NPC: one fixed slot of about 300 bytes (at most four), no allocation; one
+Up to sixteen actors fight at a time since v0.0.68 (four before: a script that started a fifth fight lost it, and the
+game's scripts start six at the player at once and fifteen against each other in the Skaal village attack). The
+original has no such limit. Each fighter has one fixed slot of 1,946 bytes (its sheet, its path and the spells it
+knows, read once when the fight starts), no allocation; the sixteen slots and their rows for the quick retry are about
+34 KB of resident memory, 26 KB more than the four had. `dbg combat` prints the slots in use and the starts refused
+for no slot.
+
+Every map keeps edicts free for the held weapon and shield of four fighters. A fifth armed fighter draws its weapon
+and shield only while the map has 76 or more edicts to spare; on a map that full it fights with the same rules and
+nothing drawn in its hands, and `dbg combat` counts it ("held items left out").
+
+Per fighter: one
 think every 0.1 s using the companion's navigation (at most two search traces
 plus the step's own moves) and per frame only the animation frame. Nothing
 runs while nobody is hostile except the player's fatigue return; the punch is
@@ -539,8 +582,9 @@ the four fighters (about 0.3 MB each).
 
 ## Known limits
 
-- Combat state is not saved: after loading a game nobody is hostile, and an
-  NPC killed in normal play stands again after loading (its health is saved).
+- A saved game keeps who is dead, who was fighting and every fight order with its target (the actors' rows of the
+  world change list and the actor records), and the fights start again after loading. It does not keep a fight's
+  moment: a swing or a spell under way, a knockdown, the recovery timers and the fighters' paths start fresh.
 - Fighters hold the weapon and shield the rules use. Arena fighters have them
   baked into their model (weapon on the weapon bone, shield on the shield
   bone). Town residents draw them only while fighting: each item is its own
@@ -556,7 +600,7 @@ the four fighters (about 0.3 MB each).
   not yet checked in a running game). A weapon loadout (`dbgmode arenapit loadout sword_shield`, config/arena_player.json) fights
   with the weapon's rules.
 - The world's NPCs do not yet start fights on their own, other than the witnesses of a theft (their disposition toward the player is not modelled);
-  creatures that wander do since v0.0.57, at most four at once; in a larger pack the next one joins as soon as one
+  creatures that wander do since v0.0.57, at most sixteen at once since v0.0.68 (four before); in a larger pack the next one joins as soon as one
   falls (a fallen fighter's slot is reused and its death kept, COMBAT-PACK-SLOTS-57). Alarms are not in. Fleeing by the Flee rating is in, on by default since v0.0.66 (`dbg combat flee off` for the earlier rule).
 - Sounds play at the listener, not from the fighter's position. Creatures do not yet play their own sound
   generators from their animations' sound keys; the table is built and the `sounds` mode plays it.

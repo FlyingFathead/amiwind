@@ -122,13 +122,18 @@ def add_accept_entity_loss_group(p):
                         "installs that world as a store of its own. off: the module is left out. Without Tribunal "
                         "(--no-dlc), with a cell list of your own (--chim-regions) or in a MiniWind sandbox the "
                         "stages and their commands are exactly the ones without the module; no base stage reads it")
-    p.add_argument("--chim-sol-tree-copies", dest="chim_sol_tree_copies", choices=("off", "star", "switch"), default=None,
+    p.add_argument("--chim-sol-tree-copies", dest="chim_sol_tree_copies",
+                   choices=("off", "star", "switch", "rally", "rally-switch"), default=None,
                    help="TEST BUILDS ONLY, with --chim-sol-test (TREES-DEPTH-56): off (unset, the default) the Solstheim trees as "
                         "their original models; star: the chim-sol stage draws them as closed star prisms "
                         "(tools/chim_tree_star.py, config/tree-copies.json) and the stage chim-sol-trees bakes the "
                         "billboard and four 45-degree views per tree model (tools/chim_tree_copies.py); switch: both, the "
                         "original trees in the store and the star crowns as its alternative models (stage chim-sol-star, "
-                        "tools/chim/alt_models.py), picked in game by aw_tree_crowns (0 original, 1 star)")
+                        "tools/chim/alt_models.py), picked in game by aw_tree_crowns (0 original, 1 star); rally: the "
+                        "chim-sol stage draws them as rally-game trees, the trunk in polygons and the crown as see-through "
+                        "picture planes rendered from the original (tools/chim_tree_rally.py, SOLSTHEIM-TREES-THREE-LOD-68); "
+                        "rally-switch: the original trees in the store and every rally method of the config's rally "
+                        "'methods' as alternative models (stages chim-sol-altN), picked by aw_tree_crowns N (2 to 5)")
     p.add_argument("--chim-mesh-method-set", dest="chim_mesh_method_set", metavar="NAME", default=None,
                    help="the Solstheim stages only (the module's world stage bloodmoon-solstheim and the --chim-sol-test "
                         "stages): the named set of config/mesh-method-sets.json for the meshes it lists (unset: today's "

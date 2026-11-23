@@ -32,6 +32,8 @@ static int region_label(FILE *f,long at,char *out) {
  * is then "Region / Place". ARN1 (region only) is still read. The region's
  * catalogue index is kept with the label (AW_RegionIndexAt: region weather). */
 static int region_index=-1;
+/* MAP-VERSION-2-DEFAULT-68: the cached row's two names apart (AW_CellNameAt) */
+static char cell_region[64],cell_place[64];
 const char *AW_RegionNameAt(const float *position){
     static int cached,old_x,old_y;
     static char title[132];
@@ -43,7 +45,7 @@ const char *AW_RegionNameAt(const float *position){
     /* floor is essential west/south of zero: C truncation selects the wrong cell. */
     x=(int)floor(position[0]/8192.0);y=(int)floor(position[1]/8192.0);
     if(cached && old_x==x && old_y==y)return title[0]?title:NULL;
-    cached=1;old_x=x;old_y=y;title[0]=0;region_index=-1;
+    cached=1;old_x=x;old_y=y;title[0]=0;region_index=-1;cell_region[0]=cell_place[0]=0;
     size=COM_FOpenFile("world/region-names.awn",&f);if(!f)return NULL;base=ftell(f);
     if(base<0 || size<12 || fread(header,1,12,f)!=12)goto done;
     if(!memcmp(header,"ARN1",4)){head=12;width=12;cells=word(header+8);}
@@ -61,19 +63,28 @@ const char *AW_RegionNameAt(const float *position){
         if(rx==x && ry==y){
             index=word(row+8);where=width==16?word(row+12):0xFFFFFFFFu;
             if(index!=0xFFFFFFFFu && (index>=names || !region_label(f,base+head+(long)index*64,title))){title[0]=0;goto done;}
-            if(index!=0xFFFFFFFFu)region_index=(int)index;
+            if(index!=0xFFFFFFFFu){region_index=(int)index;strcpy(cell_region,title);}
             if(where!=0xFFFFFFFFu){
                 if(where>=places || !region_label(f,base+head+(long)(names+where)*64,place)){title[0]=0;goto done;}
                 if(title[0])strcat(title," / ");
-                strcat(title,place);
+                strcat(title,place);strcpy(cell_place,place);
             }
             goto done;
         }
         if(rx<x || (rx==x && ry<y))lo=mid+1;else hi=mid;
     }
 done:
-    if(!title[0])region_index=-1;
+    if(!title[0]){region_index=-1;cell_region[0]=cell_place[0]=0;}
     fclose(f);return title[0]?title:NULL;
+}
+/* MAP-VERSION-2-DEFAULT-68: the name the original gives the exterior cell at POSITION (OpenMW mwworld/worldimp.cpp
+ * World::getCellName, the map window's title): the cell's own name (Seyda Neen, Mournhold, Great Bazaar), else its
+ * region's display name as the game data has it (REGN FNAM: Bitter Coast Region; Bloodmoon's own carry "Solstheim, ");
+ * NULL when the cell has neither (the caller then says the GMST sDefaultCellname). The same cached row as
+ * AW_RegionNameAt: no further disk read. */
+const char *AW_CellNameAt(const float *position){
+    if(!AW_RegionNameAt(position))return NULL;
+    return cell_place[0]?cell_place:cell_region[0]?cell_region:NULL;
 }
 /* The original region's catalogue index (sorted region IDs) of the cell at
  * position, -1 when the cell has no region or the catalogue is missing. */

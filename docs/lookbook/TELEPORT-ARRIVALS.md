@@ -1,6 +1,6 @@
 # Look book page TELEPORT-ARRIVALS
 
-_Generated from tests/lookbook/pages.json with AmiWind v0.0.67._
+_Generated from tests/lookbook/pages.json with AmiWind v0.0.68-dev7._
 
 A teleport to a settlement arrives on its ground, not under it, in a wall or in the air.
 

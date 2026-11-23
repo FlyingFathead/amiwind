@@ -1,5 +1,14 @@
 # SOL-MODULE-CONVERSION-HALF-CORES-68: Solstheim's world stage converted on about half of its cores
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.68-dev3 at 2026-11-21 07:17 +0200: The same stage's record shows one episode of about two and a half minutes on 7 of 22 allowed cores, in the converter's visibility rows phase.
+- Reported with v0.0.68-dev7 at 2026-11-22 12:00 +0200: Seen again on v0.0.68-dev7: with every converted piece taken from the cache, Solstheim's world stage still wrote its 135 world frames one after another on about two of 24 cores, about three times its usual time.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -28,8 +37,18 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 - 2026-11-21: reported in v0.0.68-dev3
 - 2026-11-21 07:17 +0200: seen again in v0.0.68-dev3: The same stage's record shows one episode of about two and a half minutes on 7 of 22 allowed cores, in the converter's visibility rows phase.
+- 2026-11-22 12:00 +0200: seen again in v0.0.68-dev7: Seen again on v0.0.68-dev7: with every converted piece taken from the cache, Solstheim's world stage still wrote its 135 world frames one after another on about two of 24 cores, about three times its usual time.
 
 <!-- END GENERATED TIMELINE -->
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Timeline](#timeline)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

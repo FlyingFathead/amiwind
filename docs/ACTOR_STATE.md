@@ -1,6 +1,6 @@
 # The actor record
 
-_Last updated with AmiWind v0.0.66-dev10 (16 November 2026)._
+_Last updated with AmiWind v0.0.68-dev7 (22 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -191,8 +191,12 @@ tables, so the engine reads no names while scripts run. The engine side (`aw_mwh
 - While an NPC fights, its fighter sheet (`aw_combat.c`) holds its health, magicka and fatigue; the scripts' calls
   read and write both, and once a frame during a fight its health and its death reach the record (the dead count,
   OnDeath) and wake the scripts that read actors. Combat reading the record itself is the combat work's next step.
-- StartCombat starts the one fight the combat layer has, with the player, unless either is dead (OpenMW);
-  StopCombat ends that actor's fight through the combat layer's per-actor end, and AIWander hands its arguments,
+- StartCombat writes a fight order on the actor's record (that it fights, and whom: the player or another actor),
+  unless either is dead (OpenMW), and starts the fight at once when the actor is loaded and a fight slot is free;
+  otherwise the order waits and is taken up later ([COMBAT.md](COMBAT.md) "Fight orders"). The order is saved with
+  the record: a record block whose orders name only the player is written as version 1, as before v0.0.68; an order
+  against another actor makes it version 2, which adds that actor's reference to each record. Both are read.
+  StopCombat ends the order and that actor's fight through the combat layer's per-actor end, and AIWander hands its arguments,
   read as OpenMW reads them, to the ambient tables' wander; both are hooks those parts of the engine fill
   (`aw_mwscript_combat_end`, `aw_mwscript_wander` in `quakedef.h`), and until they do the call is logged and does
   nothing. `AW_MwscriptSpeedAttribute` gives the ambient walk an actor's Speed from its record.

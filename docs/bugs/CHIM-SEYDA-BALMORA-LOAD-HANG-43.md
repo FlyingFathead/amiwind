@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 49 times; something has to be done
+## PERSISTING: reported 50 times; something has to be done
 
 - Reported with v0.0.46 at 2026-10-20 20:09 +0300: Listed under Known in this build in the v0.0.46 release notes (still open at the release).
 - Reported with v0.0.53-dev2 at 2026-10-26 (time not recorded): 19:14 UTC door sample: the Yassu Mine room load (ri9f4c8ccd45) stopped after its BSP while a gate ran its emulator; the next try loaded in 7.6 s
@@ -53,6 +53,7 @@
 - Reported with v0.0.66 at 2026-11-17 (time not recorded): Seen again on 17 November 2026 on the v0.0.66 release image, with the emulator in warp mode (warp_mode = 1): the opening journey stopped at its very first map load (map seyda). The stall examination found the game waiting on FINDOUTPUT of AWCTL:state.txt with the handler's word -1 (the request finished by the host side, the handler never told) and the state file left empty. Without warp this stop comes about once in 100 loads; warp emulates thousands of frames per second (about 23,000 in the first 15 s), and every frame updates the shared interrupt word that the folder's host thread also writes, so the race comes at once. A warp session needs the deterministic option (EMU-WARP-STARVES-GAME-CPU-67).
 - Reported with v0.0.67-dev2 at 2026-11-18 21:48 +0200: Seen again in an emulator room check of the v0.0.67-dev2 Mournhold module test build (32 MB Fast, JIT): the first load of Seyda Neen after boot never finished (server none); the stall examination found the game waiting on SIGF_DOS with no request of the game queued on any handler port, 4 of 5 samples in exec idle. 30 other room checks of the same build and session setup in the same run loaded Seyda Neen normally.
 - Reported with v0.0.68-dev6 at 2026-11-22 05:57 +0200: Seen again in an opening session on the v0.0.68-dev6 image: on the ship, the remote-console folder's request finished on the emulator side and the game was never told, so the session stopped before the dock.
+- Reported with v0.0.68-dev8 at 2026-11-22 20:56 +0200: Seen again in the v0.0.68-dev8 delivery: the boot smoke on the emulator stopped in Seyda Neen because a finished disk request of the game was never reported back by the emulator's folder drive; the step was run again.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -135,6 +136,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-17: seen again in v0.0.66: Seen again on 17 November 2026 on the v0.0.66 release image, with the emulator in warp mode (warp_mode = 1): the opening journey stopped at its very first map load (map seyda).
 - 2026-11-18 21:48 +0200: seen again in v0.0.67-dev2: Seen again in an emulator room check of the v0.0.67-dev2 Mournhold module test build (32 MB Fast, JIT): the first load of Seyda Neen after boot never finished (server none); the stall examination found the game waiting on SIGF_DOS with no ...
 - 2026-11-22 05:57 +0200: seen again in v0.0.68-dev6: Seen again in an opening session on the v0.0.68-dev6 image: on the ship, the remote-console folder's request finished on the emulator side and the game was never told, so the session stopped before the dock.
+- 2026-11-22 20:56 +0200: seen again in v0.0.68-dev8: Seen again in the v0.0.68-dev8 delivery: the boot smoke on the emulator stopped in Seyda Neen because a finished disk request of the game was never reported back by the emulator's folder drive; the step was run again.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -143,7 +145,7 @@ _Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 49 times; something has to be done](#persisting-reported-49-times-something-has-to-be-done)
+- [PERSISTING: reported 50 times; something has to be done](#persisting-reported-50-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Symptom](#symptom)
 - [Where](#where)

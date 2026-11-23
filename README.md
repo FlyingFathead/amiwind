@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.68-dev7 (22 November 2026)._
+_Last updated with AmiWind v0.0.68-dev8 (22 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -60,10 +60,16 @@ the [changelog](docs/CHANGELOG.md#v0067-tribunal-introduced-19-november-2026) an
 [v0.0.67 release notes](docs/releases/notes/RELEASE-v0.0.67.md), which link the notes of the three development
 snapshots. Known problems: the notes' "Known in this build" and [the bug tracker](docs/BUGS.md).
 
-**In development: v0.0.68-dev7** (22 November 2026), the seventh snapshot of the next version, **Solstheim Is Here** (the
-release for which Solstheim is to be complete), a small step: the scene palette gets a cool ice and snow ramp, the census
-back room answers the use key again after a visit to the courtyard (seen in play), and the builder's check of the opening
-comes down the ship's plank to the dock guard ([v0.0.68-dev7 notes](docs/releases/notes/RELEASE-v0.0.68-dev7.md)). The
+**In development: v0.0.68-dev8** (22 November 2026), the eighth snapshot of the next version, **Solstheim Is Here** (the
+release for which Solstheim is to be complete), mostly the game's menus: the windows of a running game keep the game's
+colours after a start by a console command, Escape in play opens the in-game menu with the original's rows and questions,
+and the map is the original's map in the menus' framed style. Containers and bodies whose script takes their use give it to
+the script, scripts can start fights for sixteen actors, and the draw distance can differ by region; the rally-game trees
+and a see-through fix for outdoor models are in behind switches that are off. None of it is seen in play yet
+([v0.0.68-dev8 notes](docs/releases/notes/RELEASE-v0.0.68-dev8.md)). The seventh snapshot gave the scene palette a cool ice
+and snow ramp, made the census back room answer the use key again after a visit to the courtyard (seen in play) and had
+the builder's check of the opening come down the ship's plank to the dock guard
+([dev7](docs/releases/notes/RELEASE-v0.0.68-dev7.md)). The
 sixth snapshot ran the scripts of Mournhold's five districts (the trees, the sounds, the statue and the rest) on their
 frames and made the use key pass by a door that a script has switched off; none of that is seen in play yet
 ([dev6](docs/releases/notes/RELEASE-v0.0.68-dev6.md)). The snapshot before it let people knocked out in water drown at once
@@ -137,7 +143,7 @@ What is not working yet, and what is in work:
 Every system of the base game with its state: [game features](docs/GAME_FEATURES.md). Known problems:
 [the bug tracker](docs/BUGS.md).
 
-**Then v0.0.68** (in development, [dev7](docs/releases/notes/RELEASE-v0.0.68-dev7.md) is out) continues with the
+**Then v0.0.68** (in development, [dev8](docs/releases/notes/RELEASE-v0.0.68-dev8.md) is out) continues with the
 expansions' finished content: Tribunal's Mournhold with its quests and Bloodmoon's Solstheim, with their scripts; a
 build that fits a 32 GB machine; then the rest of the open plan. The order of record is the [roadmap](docs/ROADMAP.md);
 no dates are promised.
@@ -176,8 +182,8 @@ finished work is taken back; the build's last lines say what to change first
 ([the build stopped or ran out of memory: what now?](docs/LINUX_BUILD.md#the-build-stopped-or-ran-out-of-memory-what-now)).
 
 The emulator presets of this version are
-[`AmiWind-v0.0.68-dev7-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.68-dev7-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.68-dev7-WinUAE.uae`](resources/emulators/AmiWind-v0.0.68-dev7-WinUAE.uae); both start with 32 MB of Fast
+[`AmiWind-v0.0.68-dev8-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.68-dev8-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.68-dev8-WinUAE.uae`](resources/emulators/AmiWind-v0.0.68-dev8-WinUAE.uae); both start with 32 MB of Fast
 RAM, the requirement. The presets of earlier versions are beside them in [resources/emulators](resources/emulators/). Everything
 else about building and playing: [Building and playing](docs/BUILDING_AND_PLAYING.md), the
 [Linux build guide](docs/LINUX_BUILD.md) and the [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md).

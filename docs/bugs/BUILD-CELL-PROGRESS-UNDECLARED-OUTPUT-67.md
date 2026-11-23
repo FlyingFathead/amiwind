@@ -14,7 +14,7 @@
 | Family | Build speed (`build-speed`) |
 | Fix commit | `2955617b` |
 | Fixed on | 2026-11-17 |
-| Planning item | `DBG-TP-EXPANSION-ARRIVALS-66` |
+| Planning item | `BUILD-CELL-PROGRESS-UNDECLARED-OUTPUT-67` |
 | Playtest version | v0.0.67-dev1 |
 | From commit | source unknown, engine unknown, CHIM world unknown |
 | CHIM engine version | CHIM 0.2.2, engine unknown, world format 0.11 |

@@ -1,6 +1,6 @@
 # Build profile and stage reuse
 
-_Last updated with AmiWind v0.0.68-dev4 (21 November 2026)._
+_Last updated with AmiWind v0.0.68-dev7 (22 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -1835,7 +1835,11 @@ the ramp is written only when the 224 sampled colours are the measured ones
 converter may quantize onto the ramp, so other cool textures (water, silver,
 blue glass) also move closer to their source colours. The file is part of the
 scene stage's key: changing it rebuilds the scene and every stage that takes its
-palette.
+palette. The engine's own colour picks for the menus, the HUD and the console
+skip the ramp's entries while the palette holds them (`engine/aga/src/aw_ui.c`,
+a copy of the file's table that a test keeps equal to it), so white text keeps
+the cream of entry 254 and the menus keep the colours they had before the ramp
+([MENU-PALETTE-RED-CAST-68](BUGS.md)).
 
 15 October 2026 source follow-up: the fresh Seyda gameplay carrier uses shared
 original intro placement and validated hand timing. The full intro retains its

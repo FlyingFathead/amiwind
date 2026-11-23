@@ -2,10 +2,12 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 4 times; something has to be done
 
 - Reported with v0.0.68-dev3 at 2026-11-21 03:29 +0200: Room batching took 21 seconds while running and was judged against a 5 second figure from a run that only reused it.
 - Reported with v0.0.68-dev4 at 2026-11-21 22:52 +0200: Seen again on a full palette re-bake: the slow-stage check flagged three stages that re-baked all their units, each compared against a time recorded from a run that reused its units.
+- Reported with v0.0.68-dev7 at 2026-11-22 16:33 +0200: Seen again: a test image reusing the base world copied its 11 GB of files in about three and a half minutes, and the slow-stage warning compared that copy with a few seconds of an earlier reuse.
+- Reported with v0.0.68-dev8 at 2026-11-22 19:52 +0200: Seen again in the v0.0.68-dev8 build: the cell progress stage ran (its input stage was rebuilt) and the slow-stage warning compared its 29 s with the 5 s of a reuse.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -38,13 +40,15 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-20: reported in v0.0.68-dev2
 - 2026-11-21 03:29 +0200: seen again in v0.0.68-dev3: Room batching took 21 seconds while running and was judged against a 5 second figure from a run that only reused it.
 - 2026-11-21 22:52 +0200: seen again in v0.0.68-dev4: Seen again on a full palette re-bake: the slow-stage check flagged three stages that re-baked all their units, each compared against a time recorded from a run that reused its units.
+- 2026-11-22 16:33 +0200: seen again in v0.0.68-dev7: Seen again: a test image reusing the base world copied its 11 GB of files in about three and a half minutes, and the slow-stage warning compared that copy with a few seconds of an earlier reuse.
+- 2026-11-22 19:52 +0200: seen again in v0.0.68-dev8: Seen again in the v0.0.68-dev8 build: the cell progress stage ran (its input stage was rebuilt) and the slow-stage warning compared its 29 s with the 5 s of a reuse.
 
 <!-- END GENERATED TIMELINE -->
 
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Bugs in the same category](#bugs-in-the-same-category)
 

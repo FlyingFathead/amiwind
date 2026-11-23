@@ -178,6 +178,28 @@ WEAK void AW_CombatEquipmentStore(void){}
 WEAK void AW_CombatEquipmentChanged(void){}
 
 WEAK void AW_UIBox(int x,int y,int w,int h){(void)x;(void)y;(void)w;(void)h;}
+/* MENU-PALETTE-RED-CAST-68: the UI's palette entries (aw_ui.c skips the textures' ice ramp): every entry in fixtures
+ * without aw_ui.c (the console's background colour asks it) */
+int AW_UIColorUsable(int i);
+WEAK int AW_UIColorUsable(int i){return i>=0 && i<256;}
+/* the open window (aw_worldui.c), which aw_ui.c's palette readout names: none in fixtures without the world UI */
+WEAK int AW_WorldUIActive(void){return 0;}
+WEAK const char *AW_WorldUIName(void){return "";}
+/* the loading screen (screen.c) and the title menu (aw_menu.c), which aw_ui.c's palette pick reads (the readout made it
+ * reachable from every fixture with aw_ui.c): not loading and not the title in fixtures without them */
+WEAK int AW_LoadingScreen(void){return 0;}
+WEAK int AW_MenuFrontEnd(void){return 0;}
+/* PAUSE-MENU-CONTINUE-CONFIRM-68: the game's own texts (aw_ui.c AW_UIGameText reads view/settings.txt) are the
+ * original's English in fixtures without aw_ui.c, and the Paused caption (aw_menu_paused_caption) is on */
+const char *AW_UIGameText(const char *key,const char *fallback,char *out,int size);
+WEAK const char *AW_UIGameText(const char *key,const char *fallback,char *out,int size){
+    (void)key;if(out && size>0){strncpy(out,fallback?fallback:"",(size_t)size-1);out[size-1]=0;}return out;}
+void AW_UIGameTexts(const char *const keys[],const char *const fallbacks[],char *out,int stride,int count);
+WEAK void AW_UIGameTexts(const char *const keys[],const char *const fallbacks[],char *out,int stride,int count){
+    int k;(void)keys;
+    for(k=0;k<count && out && stride>0;k++){strncpy(out+k*stride,fallbacks && fallbacks[k]?fallbacks[k]:"",(size_t)stride-1);out[k*stride+stride-1]=0;}}
+int AW_UIPausedCaption(void);
+WEAK int AW_UIPausedCaption(void){return 1;}
 /* Morrowind's mouse pointer (aw_ui.c, CURSOR-MW-58): fixtures without aw_ui.c draw their window's own cursor. */
 WEAK int AW_UICursor(int x,int y){(void)x;(void)y;return 0;}
 WEAK void AW_UIThinBox(int x,int y,int w,int h,int lit){(void)x;(void)y;(void)w;(void)h;(void)lit;}
@@ -291,7 +313,18 @@ WEAK int AW_RevealedCount(void){return 0;}
 WEAK const char *AW_RevealedAt(int i){(void)i;return NULL;}
 WEAK int AW_RevealedAdd(const char *text){(void)text;return 0;}
 WEAK const char *AW_RegionNameAt(const float *position){(void)position;return NULL;}
+/* MAP-VERSION-2-DEFAULT-68: the map's title (aw_world.c AW_CellNameAt, aw_hud.c AW_HudPlayerCell): no name, no cell */
+WEAK const char *AW_CellNameAt(const float *position){(void)position;return NULL;}
+WEAK int AW_HudPlayerCell(long *x,long *y,char *id,int size,const char **region){
+    (void)x;(void)y;if(size>0)id[0]=0;if(region)*region=NULL;return 0;}
+/* the map's close key (aw_worldui.c map_own_key, the footer's words): the player's bindings (keys.c) and the bound key's
+ * name (aw_textdef.c, not in its host-test build): none bound in fixtures without them */
+WEAK char *keybindings[256];
+#include "aw_textdef.h"
+WEAK const char *AW_TextBoundKeyForCommand(const char *command){(void)command;return NULL;}
 WEAK int AW_RegionIndexAt(const float *position){(void)position;return -1;}
+/* The draw distance's arrival event (aw_fog.c, REGIONAL-DRAW-DISTANCE-68): nothing to recompute in fixtures without it. */
+WEAK void AW_DrawDistanceArrive(const float *origin){(void)origin;}
 /* The map's explored land (aw_mapfog.c, MAP-ORIGINAL-POI-66 stage 2): nothing explored in fixtures without it. */
 WEAK void AW_MapFogReset(void){}
 WEAK int AW_MapFogReveal(float x,float y){(void)x;(void)y;return 0;}

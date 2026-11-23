@@ -22,6 +22,9 @@ typedef struct {
     int bottom_margin;  /* the clear rows between the button row and the frame's inner bottom edge */
     int content_gap;    /* the clear rows between the content and the button row, and under the title row */
     int button_edge;    /* the thick (skin) button frame's edge; the thin outline's is 1 */
+    int plaque_margin;  /* a window title's plaque: its text's width and this (aw_icons.c title_bar) */
+    int plaque_end;     /* the narrowest end block either side of the plaque in the title bar */
+    int console_char;   /* a console glyph's advance (aw_console_glyphs.c AW_SmallStringColor) */
 } aw_layout_metrics_t;
 extern const aw_layout_metrics_t aw_layout_metrics;
 
@@ -44,6 +47,15 @@ void AW_LayoutBox(aw_layout_t *l,int x,int y,int w,int h,int title_h,int count,c
 int AW_LayoutBoxHeight(int content_h,int title_h,int buttons,int button_h);
 /* The button under the pointer PX PY, -1 none (the hit test uses the same rectangles as the drawing) */
 int AW_LayoutButtonAt(const aw_layout_t *l,int px,int py);
+
+/* MAP-VERSION-2-DEFAULT-68: a window title in the title bar's plaque (the map's place name). BAR_W: the bar's width;
+ * GAME_W: the name's width in the game's font; CHARS: its length in console glyphs. The game's font when the name fits
+ * the plaque (the bar less both end blocks and the plaque's margin), else the console glyphs when they fit, else the
+ * console glyphs cut to the room (the caller ends the cut name in "..."). FONT the choice, PLAQUE the plaque's width,
+ * CHARS the glyphs shown (the game font: the whole name), ROOM the text's widest. */
+enum {AW_TITLE_GAME_FONT=0,AW_TITLE_CONSOLE=1,AW_TITLE_CONSOLE_CUT=2};
+typedef struct {int font,plaque,chars,room;} aw_layout_title_t;
+int AW_LayoutTitle(aw_layout_title_t *t,int bar_w,int game_w,int chars);
 
 /* THE CHECK: what a screen drew, recorded as it is drawn (aw_ui.c records while AW_LayoutRecording is set) */
 enum {AW_LAYOUT_BOX=1,AW_LAYOUT_BUTTON,AW_LAYOUT_TEXT,AW_LAYOUT_THIN_BOX};

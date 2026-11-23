@@ -45,6 +45,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [BUILD-VERSION-EMULATOR-PRESETS-38](BUILD-VERSION-EMULATOR-PRESETS-38.md): Version bump omitted matching emulator presets
 - [BUILD-WORLD-FINGERPRINT-RETIRED-38](BUILD-WORLD-FINGERPRINT-RETIRED-38.md): Content fingerprint requires an explicitly retired exterior BSP
 - [BUILD-WORLD-PACK-RETIRED-38](BUILD-WORLD-PACK-RETIRED-38.md): World disk packer requires explicitly omitted exterior BSP maps
+- [CFG-OVER-COMMAND-BUFFER-68](CFG-OVER-COMMAND-BUFFER-68.md): The game's default settings file outgrew the engine's command buffer and was dropped whole, so none of the defaults ran and no outdoor creatures appeared
 - [CHECKS-NO-WILD-WALK-67](CHECKS-NO-WILD-WALK-67.md): The delivery checks never walk through the open world and never fail on engine error lines in the console, so the packet overflow reached the release
 - [CHIM-SEYDA-RECEIPT-TEXT-40](CHIM-SEYDA-RECEIPT-TEXT-40.md): New Seyda metadata and carrier writers omit explicit UTF-8 and LF
 - CI-01 (no report page): Windows short aliases mismatch resolved discovery paths in tests
@@ -68,6 +69,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [DOCS-PUBLIC-CHAT-QUOTES-56](DOCS-PUBLIC-CHAT-QUOTES-56.md): Public bug pages and code comments carried the maintainer's chat words and swearing
 - [DOCS-PUBLIC-PRIVATE-CHANNEL-66](DOCS-PUBLIC-PRIVATE-CHANNEL-66.md): Public register text, code comments and test data named the private channel a report came through
 - [DOCS-REGENERATE-ALL-MISSING-67](DOCS-REGENERATE-ALL-MISSING-67.md): A change that touches the bug register leaves several generated documents stale, and the checks find them one at a time: each full test run fails on the next stale page
+- [DOOR-CHECK-NO-SWIM-CASE-68](DOOR-CHECK-NO-SWIM-CASE-68.md): The build's door check has no case for an entrance reached by swimming: the Stahlman's Gorge entrance under the Mortrag Glacier stops the image stage
 - DOOR-ENTRANCE-AUDIT-51 (no report page): Requested: an entrance check in every build: each exterior entrance of the original must have a door that leads into its interior, found from the map, missing ones listed
 - EMULATOR-SESSION-BESIDE-SMOKE-53 (no report page): A scripted FS-UAE evidence session ran beside a gate boot smoke (one emulator at a time)
 - [ENGINE-O2-STRNCPY-WARNINGS-36](ENGINE-O2-STRNCPY-WARNINGS-36.md): At -O2 the engine build printed four -Wstringop-truncation warnings for bounded strncpy copies
@@ -109,6 +111,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [PLAYTEST-SHIPPED-WITHOUT-SMOKE-36](PLAYTEST-SHIPPED-WITHOUT-SMOKE-36.md): The v0.0.36-dev3 private playtest package was published with an engine that dies on every map load: no ship step or gate booted it
 - PREGATE-GLOBAL-SHADOW-58 (no report page): Pregate C check misses global shadowing; the engine build fails on it
 - PREGATE-SYNTAX-SKIP-SILENT-57 (no report page): The pre-gate C syntax check skipped itself without failing on worktrees in the per-version folder layout
+- [PREGATE-WORDING-ERRORS-HIDDEN-68](PREGATE-WORDING-ERRORS-HIDDEN-68.md): The pregate's public wording step refused a gate with four test errors and printed no error text; the same tests passed on a rerun
 - [PUBLIC-GUARD-SPELLS-TOOL-NAMES-67](PUBLIC-GUARD-SPELLS-TOOL-NAMES-67.md): The public privacy check spells the private words it refuses, split in pieces, in its own code
 - [README-REST-LEVELUP-CONDITIONS-68](README-REST-LEVELUP-CONDITIONS-68.md): The front page states the level-up on resting and the attacks on a rest as if they always happen, without their conditions
 - [REGISTER-WRITE-EINVAL-67](REGISTER-WRITE-EINVAL-67.md): The register tool stops now and then with "Invalid argument" while it writes docs/BUGS.md, after it has already saved the entry
@@ -126,6 +129,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [RELEASE-PATCH-TARGET-VERSION-39](RELEASE-PATCH-TARGET-VERSION-39.md): RC1 publication baseline lacks its target version
 - [ROOM-TRACE-VISIT-GUARD-48](ROOM-TRACE-VISIT-GUARD-48.md): Long downward traces on the Hall of Processing's collision raise the trace visit guard (Cyclic or excessive collision tree)
 - [ROUTE-PREFLIGHT-OWN-PROOFS-STOP-67](ROUTE-PREFLIGHT-OWN-PROOFS-STOP-67.md): The release route's final preflight stops on the proof sessions of its own release image
+- [SESSION-CLIP-MUSIC-CRACKLE-68](SESSION-CLIP-MUSIC-CRACKLE-68.md): The music crackles in one of two emulator session recordings made in the same session
 - [SESSION-CLIP-UNPLAYABLE-ON-STALL-67](SESSION-CLIP-UNPLAYABLE-ON-STALL-67.md): The screen recording of an emulator session that stalls cannot be opened: the recorder is cut off before it writes the index of the MP4 file, so the clip of the session that showed the stall is lost
 - [SESSION-ENGINE-NOT-A-FILE-67](SESSION-ENGINE-NOT-A-FILE-67.md): An emulator session given an engine path that is not a file runs the image with no engine and waits 320 s for the remote control, instead of refusing at once
 - [SESSION-PASS-DEAD-ENGINE-57](SESSION-PASS-DEAD-ENGINE-57.md): The scripted test session reported PASS while the engine had crashed

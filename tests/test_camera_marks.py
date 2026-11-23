@@ -116,7 +116,8 @@ class Command(unittest.TestCase):
     def test_one_command_under_dbg_cam(self):
         rows = doc.entries(doc.CATALOGUE.read_text(encoding='utf-8'))
         cam = [(words, handler) for _, words, handler, _ in rows if handler == 'aw_cam']
-        self.assertEqual(cam, [('cam', 'aw_cam')])
+        # one command; the camera shots' own lines and the pan's alias route onto it (DBG-CAM-PAN-TRACK-68)
+        self.assertEqual(cam, [('cam', 'aw_cam'), ('cam pan', 'aw_cam'), ('cam track', 'aw_cam'), ('pan cam', 'aw_cam')])
         # Mark and Recall are spells of the game: never a bare dbg mark / dbg recall
         self.assertFalse([w for _, w, _, _ in rows if w.split()[0] in ('mark', 'recall', 'marks')])
         engine = ''.join(f.read_text(encoding='latin-1') for f in sorted(SRC.rglob('*.c')))
@@ -166,18 +167,22 @@ class Orbit(unittest.TestCase):
     """dbg cam orbit: the vanity camera's placement around another centre, the player detached while it runs."""
     def setUp(self):
         self.view = (SRC / 'aw_view.c').read_text(encoding='utf-8')
-        self.start = self.view[self.view.index('int AW_ViewOrbitStart('):self.view.index('static void set_chase(int on);')]
+        # the detachment the orbit and the shots share (camera_detach), and the orbit's start
+        self.start = self.view[self.view.index('static void camera_detach(edict_t *p) {'):
+                               self.view.index('/* ---- dbg cam pan and dbg cam track')]
         self.end = self.view[self.view.index('void AW_ViewOrbitEnd('):self.view.index('/* dbg cam orbit mark NAME')]
 
     def test_detached_while_it_runs_and_restored_after(self):
-        for text in ('p->v.movetype=MOVETYPE_NOCLIP;', 'FL_GODMODE|FL_NOTARGET', 'SV_LinkEdict(p,false);'):
+        for text in ('p->v.movetype=MOVETYPE_NOCLIP;', 'FL_GODMODE|FL_NOTARGET', 'SV_LinkEdict(p,false);', 'camera_detach(p);'):
             self.assertIn(text, self.start)
         self.assertNotIn('SV_LinkEdict(p,true)', self.start + self.end)
         for text in ('VectorCopy(orbit.origin,p->v.origin);', 'p->v.movetype=orbit.movetype;', 'p->v.flags=orbit.flags;',
                      'VectorCopy(orbit.view,cl.viewangles);', 'noclip_anglehack=orbit.anglehack;'):
             self.assertIn(text, self.end)
-        # the player's body is not drawn, every game key goes to the orbit, Esc / right click end it
-        self.assertIn('|| orbit.active)return NULL;', self.view)
+        # the player's body is not drawn (a shot started in third person keeps it), every game key goes to the orbit,
+        # Esc / right click end it
+        self.assertIn('|| (orbit.active && !orbit.body))return NULL;', self.view)
+        self.assertIn('orbit.kind=AW_VIEW_CAM_ORBIT;orbit.body=0;', self.start)
         key = self.view[self.view.index('static int orbit_key('):self.view.index('static int orbit_camera(')]
         self.assertIn('return 1;                                                  /* every other game key: nothing */', key)
         self.assertIn('key==K_ESCAPE || key==K_MOUSE2', key)
@@ -217,6 +222,128 @@ class Orbit(unittest.TestCase):
         self.assertIn('orbit [photo] [speed DEG] [ref N / mark NAME]', doc.CATALOGUE.read_text(encoding='utf-8'))
         inspect = (SRC / 'aw_inspect.c').read_text(encoding='utf-8')
         self.assertIn('r=pick(&best,&st,&slot,&bounds,eye,dir,&limit);', inspect)   # dbg ent and the orbit share the pick
+
+
+class Shots(unittest.TestCase):
+    """dbg cam pan (also dbg pan cam) and dbg cam track (DBG-CAM-PAN-TRACK-68): film-style shots on the orbit's camera
+    owner. The motion against time (holds, ease, constant middle, frame-time sequences, the speed word, the ending) is
+    run natively in tests/aga_cam_test.c (EngineReader above); these keep the engine's parts joined."""
+
+    def setUp(self):
+        self.view = (SRC / 'aw_view.c').read_text(encoding='utf-8')
+        self.cam = (SRC / 'aw_cam.c').read_text(encoding='utf-8')
+        self.shots = self.view[self.view.index('/* ---- dbg cam pan and dbg cam track'):self.view.index('static void set_chase(int on);')]
+
+    def section(self, text, start, end):
+        return text[text.index(start):text.index(end)]
+
+    def test_the_commands(self):
+        pan = self.section(self.cam, 'static void pan_command(int argc)', 'static int mark_eye(')
+        for word in ('"photo"', '"off"', '"speed"', '"hold"'):
+            self.assertIn(word, pan)
+        # DEGREES first (default 360, negative allowed), HOLD second (default 3 s at each end)
+        self.assertIn('float degrees=360,hold=AW_CAM_SHOT_HOLD', pan)
+        self.assertIn('number_arg(w,-AW_CAM_PAN_DEGREES_MAX,AW_CAM_PAN_DEGREES_MAX,&value)', pan)
+        self.assertIn('numbers==1 && number_arg(w,0,AW_CAM_SHOT_HOLD_MAX,&value)', pan)
+        # the default speed from the real field of view: the frame's width in 6 s (15 degrees a second at 90)
+        self.assertIn('if(!speed)speed=AW_CamPanSpeed(r_refdef.fov_x);', pan)
+        header = (SRC / 'aw_cam.h').read_text(encoding='utf-8')
+        for text in ('#define AW_CAM_PAN_CROSS 6.0f', '#define AW_CAM_SHOT_HOLD 3.0f', '#define AW_CAM_SHOT_EASE 1.25f',
+                     '#define AW_CAM_TRACK_SPEED 32.0f'):
+            self.assertIn(text, header)
+        self.assertIn('cvar_t scr_fov = {"fov","90"};', re.sub(r'\s+', ' ', (SRC / 'screen.c').read_text(encoding='latin-1')))
+        track = self.section(self.cam, 'static void track_command(int argc)', '#define CAM_USAGE')
+        for word in ('"forward"', '"to"', '"speed"', '"hold"', '"photo"', '"off"'):
+            self.assertIn(word, track)
+        self.assertIn('AW_CamTurn(r_refdef.viewangles[YAW],m.yaw)', track)       # the short way round to the mark's view
+        self.assertIn('if(!mark_eye(p,&m,to))', track)                          # a mark on another map is refused
+        for sub in ('"pan"', '"track"'):
+            self.assertIn('if(!Q_strcasecmp(sub,%s))' % sub, self.cam)
+
+    def test_a_negative_angle_pans_the_other_way(self):
+        start = self.section(self.view, 'int AW_ViewPanStart(', 'int AW_ViewTrackStart(')
+        self.assertIn('view_turn[1]=-degrees;', start)                            # Quake's yaw grows to the left
+        self.assertIn('degrees<0?-degrees:degrees', start)                        # the distance is the size of the turn
+
+    def test_one_writer_of_the_view(self):
+        # the orbit's camera function is the one writer; a shot is a kind of it
+        camera = self.section(self.view, 'static int orbit_camera(', 'int AW_ViewCamera(void) {')
+        self.assertIn('if(orbit.kind!=AW_VIEW_CAM_ORBIT)return shot_camera();', camera)
+        self.assertIn('if(orbit.active)return orbit_camera();', self.view)
+        writers = re.findall(r'r_refdef\.(?:vieworg|viewangles)\[i\]=', self.view)
+        self.assertEqual(len(writers), 2)                                         # shot_camera's position and angles
+        # the commands read the view, never write it
+        self.assertFalse(re.search(r'r_refdef\.(?:vieworg|viewangles)(?:\[\w+\])?\s*=[^=]', self.cam))
+        self.assertNotIn(',r_refdef.vieworg)', self.cam)
+        self.assertNotIn(',r_refdef.viewangles)', self.cam)
+        # the shots use the orbit's detachment and its end; nothing allocated, nothing per frame when none runs
+        self.assertIn('camera_detach(p);', self.shots)
+        for text in ('malloc', 'AW_TryMalloc', 'Hunk_', 'Z_Malloc'):
+            self.assertNotIn(text, self.shots)
+        frame = self.section(self.view, 'static void orbit_frame(float dt,int forced) {', 'static int orbit_key(int key) {')
+        self.assertIn('if(orbit.active && orbit.kind!=AW_VIEW_CAM_ORBIT){shot_frame(dt);return;}', frame)
+
+    def test_the_timeline_and_the_endings(self):
+        frame = self.section(self.view, 'static void shot_frame(float dt) {', 'static void orbit_frame(')
+        self.assertIn('if(playing())AW_CamShotStep(&orbit.shot,dt);', frame)     # the clock runs while the game is played
+        self.assertIn('if(AW_CamShotDone(&orbit.shot))AW_ViewOrbitEnd(1);', frame)   # it ends by itself after the hold
+        self.assertIn('VectorCopy(orbit.view,cl.viewangles);', frame)            # the mouse does not move a shot
+        # Esc or right click ends it early; every other game key does nothing
+        key = self.section(self.view, 'static int orbit_key(', 'static int shot_camera(')
+        self.assertIn('if(orbit.kind!=AW_VIEW_CAM_ORBIT){if(key==K_ESCAPE || key==K_MOUSE2)AW_ViewOrbitEnd(1);return 1;}', key)
+        end = self.section(self.view, 'void AW_ViewOrbitEnd(', '/* dbg cam orbit mark NAME')
+        self.assertIn('done?"ended":"stopped early"', end)
+        # the lines a session script waits on: "Camera pan ended" / "Camera track ended"
+        self.assertIn('"Camera %s %s: position, view, movement and flags restored.\\n"', end)
+        self.assertIn('kind==AW_VIEW_CAM_PAN?"pan":"track"', self.shots)
+        # dbg cam pan off / dbg cam track off end a running shot
+        self.assertIn('static int shot_off(const char *what) {', self.cam)
+
+    def test_nothing_on_the_screen(self):
+        say = self.section(self.view, 'static void shot_say(const char *text) {', 'static const char *shot_name(')
+        self.assertIn('con_notify_quiet=1;Con_Printf("%s",text);con_notify_quiet=0;', say)
+        self.assertIn('con_notify_quiet ? 0 : realtime', (SRC / 'console.c').read_text(encoding='latin-1'))
+        self.assertNotIn('AW_UISubtitle', self.shots)
+        self.assertEqual(self.shots.count('shot_say(line);'), 1)                 # the start line
+        self.assertIn('shot_say(line);', self.section(self.view, 'void AW_ViewOrbitEnd(', '/* dbg cam orbit mark NAME'))
+        self.assertIn('static void quiet_line(const char *line) {con_notify_quiet=1;Con_Printf("%s",line);con_notify_quiet=0;}',
+                      self.cam)
+        for name in ('pan_command', 'track_command'):
+            command = self.cam[self.cam.index('static void %s(int argc)' % name):]
+            command = command[:command.index('\n}\n')]
+            self.assertIn('quiet_line(line);', command)
+
+    def test_the_body_in_third_person(self):
+        start = self.section(self.view, 'static int shot_start(', 'int AW_ViewPanStart(')
+        self.assertIn('int keep_body=orbit.active?orbit.body:owned && view.mode!=AW_VIEW_FIRST && body_ready();', start)
+        self.assertIn('VectorCopy(r_refdef.vieworg,orbit.from);', start)          # the view's own point: a tripod
+        self.assertIn('VectorCopy(r_refdef.viewangles,orbit.start_angles);orbit.start_angles[ROLL]=0;', start)
+
+    def test_one_easing_curve_with_the_halloween_director(self):
+        ease = (SRC / 'aw_ease.h').read_text(encoding='utf-8')
+        self.assertIn('return t * t * (3 - 2 * t);', ease)
+        rules = (SRC / 'aw_halloween_rules.c').read_text(encoding='utf-8')
+        self.assertIn('*u=AW_EaseSmooth(t);', rules)
+        self.assertNotIn('t*t*(3-2*t)', rules)
+        cam_rules = (SRC / 'aw_cam_rules.c').read_text(encoding='utf-8')
+        self.assertIn('#include "aw_ease.h"', cam_rules)
+        self.assertEqual(cam_rules.count('AW_EaseSmoothArea('), 2)                # the ramp in, its mirror out
+
+    def test_listed_with_the_other_cameras(self):
+        rows = {words: help_text for _, words, handler, help_text in doc.entries(doc.CATALOGUE.read_text(encoding='utf-8'))}
+        self.assertIn('/ pan / track]', rows['cam'])
+        self.assertTrue(rows['cam pan'].startswith('[DEGREES] [HOLD] [speed DEG] [photo] / off:'))
+        self.assertTrue(rows['cam track'].startswith('[SPEED] forward N / to MARK [HOLD] [speed U] [photo] / off:'))
+        self.assertEqual(rows['pan cam'], 'same as cam pan')
+        page = (ROOT / 'docs' / 'AMIWIND_CONSOLE_COMMANDS.md').read_text(encoding='utf-8')
+        self.assertIn('| `dbg cam pan` | `dbg pan cam` |', page)
+        self.assertIn('| `dbg cam track` | - |', page)
+        marks = (ROOT / 'docs' / 'CAMERA_MARKS.md').read_text(encoding='utf-8')
+        for text in ('## Pan', '## Track', '`dbg pan cam`', '`dbg cam pan 180 5`', 'saw 60 Camera pan ended'):
+            self.assertIn(text, marks)
+        console = (SRC / 'aw_console.c').read_text(encoding='utf-8')
+        self.assertIn('(!strcmp(r->command,"aw_cam") && !strncmp(r->words,"cam ",4))', console)
+        self.assertIn('if(!strcmp(r->command,"aw_cam") && !strcmp(r->words,"pan cam")){', console)
 
 
 class Staging(unittest.TestCase):

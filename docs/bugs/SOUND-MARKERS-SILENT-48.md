@@ -62,6 +62,7 @@ Family: Music and sound (`audio`). The mixer must stay fed through loads and sce
 - [MUSIC-STARTUP-TRACK-31](MUSIC-STARTUP-TRACK-31.md): A random world track plays under the startup logo
 - [MWSCRIPT-AUDIO-FIRST-48](MWSCRIPT-AUDIO-FIRST-48.md): The game's scripts start no sounds, lines or music cues: MWScript compiled by the builder, audio first
 - [MWSCRIPT-ONESHOT-SLOTS-LEAK-54](MWSCRIPT-ONESHOT-SLOTS-LEAK-54.md): Script one-shot sounds never freed their slot: after 32 distinct one-shots in a map new script sounds were dropped
+- [MWSCRIPT-SOUND-OWN-SCRIPT-ONLY-68](MWSCRIPT-SOUND-OWN-SCRIPT-ONLY-68.md): GetSoundPlaying and StopSound see only sounds the same script started, a loop on another object moves to the script's own object, and the pitch argument of the VP sound calls is not used
 - [NPC-GREETING-PICK-33](NPC-GREETING-PICK-33.md): Greetings take the highest disposition threshold at a fixed 50, OpenMW takes the first line that matches
 - [NPC-VOICE-BARKS-33](NPC-VOICE-BARKS-33.md): NPCs never say their combat, hit, flee or idle voice lines
 - [NPC-VOICE-INTRUDER-THIEF-NO-EVENT-58](NPC-VOICE-INTRUDER-THIEF-NO-EVENT-58.md): NPCs never say their Intruder or Thief lines: the voice table holds them for 2,654 NPCs, but no engine event says them

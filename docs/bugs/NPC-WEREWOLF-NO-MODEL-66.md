@@ -2,10 +2,11 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 3 times; something has to be done
 
 - Reported with v0.0.67-dev2 at 2026-11-18 (time not recorded): Seen again on the v0.0.67-dev2 image (the maintainer's picture, 2026-11-18): the werewolf `BM_werewolf_skaal2a` (reference 8418104) in Skaal Village, The Greathall is drawn as a thin scaled humanoid that looks like an Argonian, not as a werewolf.
 - Reported with v0.0.67-dev2 at 2026-11-18 (time not recorded): Seen again in the Mournhold test build of 58d58089 (2026-11-18): the NPC library left out `bm_werewolf_skaal1a3` ("NPC library [496/496] bm_werewolf_skaal1a3 FAILED", 495 appearances, 1 left out).
+- Reported with v0.0.68-dev8 at 2026-11-22 20:24 +0200: Still in v0.0.68-dev8: one werewolf of the Skaal (BM_werewolf_skaal1A3) is left out of Solstheim because the actor library makes no model for werewolves.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -38,6 +39,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-14: reported in v0.0.66-dev2
 - 2026-11-18: seen again in v0.0.67-dev2: Seen again on the v0.0.67-dev2 image (the maintainer's picture, 2026-11-18): the werewolf `BM_werewolf_skaal2a` (reference 8418104) in Skaal Village, The Greathall is drawn as a thin scaled humanoid that looks like an Argonian, not as a ...
 - 2026-11-18: seen again in v0.0.67-dev2: Seen again in the Mournhold test build of 58d58089 (2026-11-18): the NPC library left out `bm_werewolf_skaal1a3` ("NPC library [496/496] bm_werewolf_skaal1a3 FAILED", 495 appearances, 1 left out).
+- 2026-11-22 20:24 +0200: seen again in v0.0.68-dev8: Still in v0.0.68-dev8: one werewolf of the Skaal (BM_werewolf_skaal1A3) is left out of Solstheim because the actor library makes no model for werewolves.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -46,7 +48,7 @@ _Last updated with AmiWind v0.0.67-dev3 (18 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [PERSISTING: reported 3 times; something has to be done](#persisting-reported-3-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Status: 18 November 2026](#status-18-november-2026)
 - [Symptom](#symptom)
@@ -157,9 +159,11 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 - [COMBAT-PACK-SLOTS-57](COMBAT-PACK-SLOTS-57.md): In a pack of more than four hostiles the fifth never attacks: fallen fighters keep their combat slots
 - [COMBAT-PLAYGROUND-CREATURE-HUMANOID-61](COMBAT-PLAYGROUND-CREATURE-HUMANOID-61.md): The combat playground group mode draws a cliff racer as a humanoid figure walking on the ground
 - [COMBAT-RUN-ROOT-DRIFT-33](COMBAT-RUN-ROOT-DRIFT-33.md): Arena fighters' run frames carry the root's forward motion: the body slides ahead and snaps back each cycle
+- [COMBAT-SHOT-POOL-FULL-SKIPS-68](COMBAT-SHOT-POOL-FULL-SKIPS-68.md): A ranged fighter's shot is skipped without a count when sixteen shots are already in flight
 - [COMBAT-SUMMON-ALLY-62](COMBAT-SUMMON-ALLY-62.md): A summoned creature does not fight for the player: the fight has no side where one actor attacks another
 - [COMPANION-NO-RUN-ANIM-33](COMPANION-NO-RUN-ANIM-33.md): The companion slides instead of walking or running, and mimic mode does not mirror the gait
 - [CORPSE-CLOTHES-NOT-UPDATED-62](CORPSE-CLOTHES-NOT-UPDATED-62.md): Clothing, armour and held items taken from a body or a living actor stay drawn on it
+- [CORPSE-NEEDS-FIGHT-SLOT-68](CORPSE-NEEDS-FIGHT-SLOT-68.md): A dead actor's body is not laid down when every fight slot holds a living fighter: the body is missing and cannot be searched
 - [CREATURE-BAKE-NIF-UNSUPPORTED-47](CREATURE-BAKE-NIF-UNSUPPORTED-47.md): The creature bake refuses 14 of the 39 creature meshes the outdoor world can show, the cliff racer, the rat, the guar and the nix-hound among them
 - [CREATURE-BONES-OVER-MAX-54](CREATURE-BONES-OVER-MAX-54.md): Four creature meshes have more bones than AW_SKEL_MAX_BONES (64): 67, 84, 69 and 74
 - CREATURE-COMBAT-ANIM-GROUPS-54 (no report page): A creature does not use its own animation groups in a fight

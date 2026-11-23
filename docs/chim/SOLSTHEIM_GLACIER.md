@@ -1,11 +1,37 @@
 # Solstheim's glacier: how it is approached
 
-_Last updated with AmiWind v0.0.68-dev4 (21 November 2026)._
+_Last updated with AmiWind v0.0.68-dev7 (22 November 2026)._
 
-This page is reference material: why the glacier corner of Solstheim does not fit yet, what was measured, which ways
-of making it fit are being tried, and the rules every way has to pass. It is the plan, not a finished feature. The
-other 135 of Solstheim's 144 open terrain cells are in the build since v0.0.68-dev3; the glacier cell (-26,26) and
-its eight neighbouring cells are not, and they go in together or not at all.
+This page is reference material: why the glacier corner of Solstheim did not fit, what was measured, which ways of
+making it fit were tried, the way chosen, and the rules every way has to pass. The other 135 of Solstheim's 144 open
+terrain cells are in the build since v0.0.68-dev3; the glacier cell (-26,26) and its eight neighbouring cells go in
+together or not at all, and since v0.0.68-dev8 they are in, built with method `E`
+([the way chosen](#the-way-chosen-method-e)).
+
+## The way chosen: method E
+
+Method `E` (the sets below: `C` and `D` together) is the shipped default for the listed ice models, decided for the
+project on 22 November 2026: `config/mesh-method-sets.json` names it as its `default`, and the Solstheim build module
+builds with it whenever a build names no set (`--chim-mesh-method-set baseline` still builds today's methods, for a
+comparison). Only the module's own world stage re-keys for it; the base world's stages and stored units are the same.
+
+The nine cells were converted again as one set, each in the shape a build installs it with the other eight as frames of
+its world, with set `E` (a CHIM import of 22 November 2026, 15 cells in 156 seconds, most units taken from the shared
+pool), and every one of them passes every check, the 32 MB memory check among them. The tracker reference calls them
+finished, so the module takes them as it takes every finished cell. The active ring's peak per cell, against the
+32 MB limit of 13,582,336 bytes:
+
+| Cell | Peak (bytes) | | Cell | Peak (bytes) | | Cell | Peak (bytes) |
+| --- | ---: | --- | --- | ---: | --- | --- | ---: |
+| -27,25 | 7,521,808 | | -26,25 | 11,975,024 | | -25,25 | 9,710,192 |
+| -27,26 | 12,473,472 | | -26,26 | 13,191,424 | | -25,26 | 11,074,368 |
+| -27,27 | 9,433,760 | | -26,27 | 11,190,544 | | -25,27 | 8,347,024 |
+
+Measured on the test images of 21 November 2026, `E` against today's methods: the nine cells' store 51,663,984 bytes
+against 92,618,372 (the shard copies 20.9 MB against 48.3 MB); open edges the same as the original (shard 0, iceberg
+330, collapsed iceberg 204); 3 of the shard's 1,298 drawn faces shift by about 49 texels (0.097 % of its area), every
+other face by at most 0.2 texel; no walkable spot lost and none raised by more than 8 game units, and 218 spots of the
+shard's walkable grid (0.075 %) where today's collision stood above the drawn ice now stand on the ice.
 
 ## Why the glacier corner is hard
 

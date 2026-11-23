@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.68-dev7 (22 November 2026)._
+_Last updated with AmiWind v0.0.68-dev8 (22 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.68-dev8: eighth snapshot of v0.0.68, 22 November 2026](#v0068-dev8-eighth-snapshot-of-v0068-22-november-2026)
 - [v0.0.68-dev7: seventh snapshot of v0.0.68, 22 November 2026](#v0068-dev7-seventh-snapshot-of-v0068-22-november-2026)
 - [v0.0.68-dev6: sixth snapshot of v0.0.68, 22 November 2026](#v0068-dev6-sixth-snapshot-of-v0068-22-november-2026)
 - [v0.0.68-dev5: fifth snapshot of v0.0.68, 21 November 2026](#v0068-dev5-fifth-snapshot-of-v0068-21-november-2026)
@@ -214,6 +215,72 @@ _Last updated with AmiWind v0.0.68-dev7 (22 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.68-dev8: eighth snapshot of v0.0.68, 22 November 2026
+
+The eighth development snapshot of v0.0.68, in development ([release notes](releases/notes/RELEASE-v0.0.68-dev8.md)), on
+the way to v0.0.68, **Solstheim Is Here** (the release for which Solstheim is to be complete). The Mortrag Glacier and
+the sea between the islands come into the build, fights ordered by scripts are kept until they can start, and OnPCHitMe is
+set by the player's blow. Otherwise mostly the game's menus: the
+windows of a running game keep the game's colours after a start from the main menu by a console command, Escape in play
+opens the in-game menu with the original's rows and questions, and the map is the original's map in the menus' framed
+style. Beside them, scripts' containers and bodies, fights for sixteen actors, a regional draw distance, two debug camera
+moves, and the rally-game trees and a see-through fix for outdoor models behind switches that are off. Emulator presets:
+`AmiWind-v0.0.68-dev8-FS-UAE.fs-uae` and `AmiWind-v0.0.68-dev8-WinUAE.uae`, both with 32 MB of Fast RAM. All of it is
+covered by tests and the gates of the commits (12521, 12541, 12542, 12544, 12545, 12580, 12620, 12661, 12680, 12681,
+12702, 12703); the menus' colours, the Escape menu and the map are seen on the PC emulator, the rest not yet in play.
+
+**Changed**
+
+- The windows of a running game (inventory and its icons, map, journal, stats, magic) are drawn in the game's palette after a
+  start from the main menu by a console command, where they had taken the title art's orange-brown; the interface's colour
+  picks skip the ice ramp's 16 entries, so white text and the windows keep their colours, and `dbg ui palette` reads the
+  palette back (MENU-PALETTE-RED-CAST-68). A look book page checks it.
+- Escape in play opens the in-game menu after such a start, where the main menu had opened over the running game
+  (MENU-TITLE-AFTER-CONSOLE-START-68).
+- The in-game menu has the original's rows (Return To Game, New Game, Save Game, Load Game, Options Menu, Exit Game), the
+  original's questions with Yes and No before a game in progress is left, restarted or replaced by a load, and a Paused
+  caption that can be switched off (`dbg ui paused 0`) (PAUSE-MENU-CONTINUE-CONFIRM-68).
+- Map version 2 is the default map screen: the menus' golden frame, the place or region name in the title as the game data
+  names it, the zoom and pan keys in the footer, no debug buttons and no lava colour. The map before it stays as version 1
+  (`dbg maptype 1`, `dbg dbgmap`) (MAP-VERSION-2-DEFAULT-68).
+- A container or a dead actor's body whose script reads OnActivate gives its use to the script
+  (CONTAINER-SCRIPT-ACTIVATE-67); the script tracker states the effect in play of each of the 259 functions the scripts
+  call.
+- Fights started by scripts have sixteen slots instead of four, and a StartCombat is an order kept on the actor's record,
+  taken up when a slot frees or the actor loads; a kept fight between two actors starts again against that actor, and
+  `dbg combat calm` ends the orders and the hostile mark (MWSCRIPT-STARTCOMBAT-FOUR-FIGHTERS-68 in part,
+  COMBAT-RESUMED-FIGHT-TARGETS-PLAYER-68, DBG-COMBAT-CALM-LEAVES-HOSTILE-MARK-68, STARTCOMBAT-SHEET-READ-BEFORE-SLOT-68).
+- OnPCHitMe is set by the player's blow in reach and by a harmful spell, so the 32 scripts that test it see it
+  (MWSCRIPT-ONPCHITME-NEVER-SET-68).
+- The Mortrag Glacier's nine cells are in the build: the exact-footing collision and the seam-locked simplified shard are
+  the builder's default for its ice models, and all nine fit the 32 MB mark (SOL-ICE-CELLS-RING-OVER-68,
+  COLLISION-ICEBERG-CLIPNODE-BUDGET-67). Six seabed cells and one ocean cell between the islands are built as the main
+  island's sea cells are; Solstheim has 151 built cells (CHIM-SEA-BETWEEN-ISLANDS-64, two cells left).
+- The outdoor draw distance is written by one rule: with the new option Fog distance auto (Options, Video; on) each region's
+  own default applies, 300 where a region has none; Solstheim's six regions at 540 are a trial behind `dbg fog region trial`,
+  off until the frame rate is measured (REGIONAL-DRAW-DISTANCE-68).
+- New debug camera moves `dbg cam pan` and `dbg cam track` for pans and glides on video (DBG-CAM-PAN-TRACK-68).
+- Behind switches that are off by default: Solstheim's rally-game trees, made as polygons and see-through panes from the
+  original crown, in test builds only (`--chim-sol-tree-copies rally`), and `aw_seethrough_placed`, which draws the
+  see-through faces of outdoor models from each placement's own position (SOLSTHEIM-TREES-THREE-LOD-68,
+  FENCE-PLACED-ORIGIN-68, both open until the pictures are seen).
+
+**Builder and tools**
+
+- New tools: `tools/region_draw.py` (the region draw table), `tools/chim_tree_rally.py` (the rally trees) and
+  `tools/map_title_fit.py` (every map title measured in the game's font: all 16 regions, 95 named outdoor cells and 1,328
+  rooms fit).
+- The engine's command buffer is 32,768 bytes instead of 8,192: the image's default settings file had grown to 8,511
+  bytes with this snapshot's new settings and was dropped whole, so none of the defaults ran (no outdoor creatures); the
+  image step now refuses a start-up settings file at or over half of the buffer (`tools/boot_cfg_fit.py`,
+  CFG-OVER-COMMAND-BUFFER-68).
+
+**Documentation**
+
+- The README, the roadmap and the releases index name the v0.0.68-dev8 snapshot and presets; the docs index is written
+  again. The MWScript tracker is measured again for this snapshot against the dev7 build image: its counts are unchanged
+  (1,062 run, 9 carried, of 1,074).
 
 ## v0.0.68-dev7: seventh snapshot of v0.0.68, 22 November 2026
 

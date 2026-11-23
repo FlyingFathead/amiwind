@@ -429,7 +429,8 @@ class AmbientSourceContractTests(unittest.TestCase):
         # fallen fighter's slot is reused, its death handed to the actors' change list first (no respawn alive)
         c = self.code('aw_combat.c')
         engage = c.split('int AW_CombatEngage(edict_t *e,const aw_fighter_t *fighter,const char *layout) {')[1][:900]
-        self.assertIn('slots[i].f.dead || slots[i].state==S_DEAD', engage)
+        self.assertIn('if(slot_fallen(&slots[i])){', engage)     # the rule by name since v0.0.68 (sixteen slots)
+        self.assertIn('static int slot_fallen(const slot_t *s) {return s->e && (s->f.dead || s->state==S_DEAD || s->e->free);}', c)
         self.assertLess(engage.index('aw_combat_actor_died(slots[i].e)'), engage.index('release(&slots[i])'))
         a = self.code('aw_actors.c')
         self.assertIn('aw_combat_actor_died = Died;', a)

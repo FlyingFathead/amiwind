@@ -33,11 +33,18 @@
 
 ## Timeline
 
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.68-dev7 (26490365) | 2026-11-22 | gate 12521 of the planning item COLLISION-ICEBERG-CLIPNODE-BUDGET-67 | The Mortrag Glacier's nine cells fit 32 MB with method E, the Solstheim module's shipped default set, and are built by the module |
+
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-20: reported in v0.0.68-dev1
 - 2026-11-20 18:27 +0200: seen again in v0.0.68-dev1: A third ice coast cell, -26,25, passes the memory check but its ring measured alone is more than twice the budget: ice chunks and iceberg shards again.
 - 2026-11-20 21:20 +0200: seen again in v0.0.68-dev1: Measured as built (each cell as the frame a build installs, with its neighbours' edge), the glacier's eight neighbouring cells need 39 to 57 MB of memory ring against 6.2 MB: the glacier's icebergs reach into each of their frames.
+- 2026-11-22: fixed in source: a gated commit, v0.0.68-dev7 (26490365); gate 12521 of the planning item COLLISION-ICEBERG-CLIPNODE-BUDGET-67: The Mortrag Glacier's nine cells fit 32 MB with method E, the Solstheim module's shipped default set, and are built by the module
 
 <!-- END GENERATED TIMELINE -->
 
@@ -76,6 +83,7 @@ Family: Map heap and memory budget (`heap-memory`). The heap model must match wh
 - [ESTIMATE-HEAP-STALE-32](ESTIMATE-HEAP-STALE-32.md): World estimate heap coefficients were fitted to the old loader model
 - [HEAP-12MB-FAST-ROOM-33](HEAP-12MB-FAST-ROOM-33.md): A 12 MiB game heap leaves 342 KB of Fast RAM in one block: the guard torch's 1 MiB probe can never pass
 - [HEAP-MODEL-SUM-32](HEAP-MODEL-SUM-32.md): Summing per-object costs overestimates a map's heap (11 % median, 39 % worst)
+- [HELD-ITEM-NAME-HUNK-GROWS-68](HELD-ITEM-NAME-HUNK-GROWS-68.md): Every held weapon, shield or torch shown takes 32 bytes of level memory that are not given back until the map changes
 - [HOLLOW-COLLISION-PLATE-PER-TRIANGLE-64](HOLLOW-COLLISION-PLATE-PER-TRIANGLE-64.md): A hollow model gets one exact-bevel collision plate per authored collision triangle, and a visual recipe ratio reduces only the drawn mesh
 - HUNK-RESERVE-SN012-29 (no report page): Dev4 first-presented sn012 reserve below 2 MiB target
 - [LOADER-STAGING-PEAK-32](LOADER-STAGING-PEAK-32.md): Map loading stages most lumps in temporary memory before decoding, raising the heap peak
@@ -102,6 +110,7 @@ Family: Map heap and memory budget (`heap-memory`). The heap model must match wh
 Related bugs in other categories:
 
 - [CHIM-FRAME-EDGE-CLAMPS-OUTSIDE-TILES-68](CHIM-FRAME-EDGE-CLAMPS-OUTSIDE-TILES-68.md): A large model's tiles that lie beyond a CHIM frame's edge are all given to its edge chunks, so one memory ring at the frame's corner holds every tile of the model
+- [DOOR-CHECK-NO-SWIM-CASE-68](DOOR-CHECK-NO-SWIM-CASE-68.md): The build's door check has no case for an entrance reached by swimming: the Stahlman's Gorge entrance under the Mortrag Glacier stops the image stage
 - [SOL-GLACIER-ICE-BROWN-SHEER-68](SOL-GLACIER-ICE-BROWN-SHEER-68.md): The Mortrag Glacier's ice draws brown instead of white and shows a sheer vertical drop where the original slopes
 
 <!-- END GENERATED CATEGORY -->

@@ -21,11 +21,15 @@ int COM_FOpenFile(char *path,FILE **file){
     f=tmpfile();assert(f);fputs(text,f);rewind(f);*file=f;return (int)strlen(text);
 }
 int (*aw_fog_location_hook)(int);
+int (*aw_fog_location_key)(void);
 void AW_FogLocationInit(void);
 int main(void){
     AW_FogLocationInit();assert(aw_fog_location_hook && var && var->value==1 && var->archive);  /* on by default */
     sv.active=1;strcpy(sv.name,"vf1446");
     assert(aw_fog_location_hook(540)==280 && opens==1);             /* the place in the title, CHIM world map */
+    /* the draw distance's watch key (REGIONAL-DRAW-DISTANCE-68): the daylight while a place is matched */
+    assert(aw_fog_location_key && aw_fog_location_key()==257);
+    r_daylight=128;assert(aw_fog_location_key()==129);
     r_daylight=128;assert(aw_fog_location_hook(540)==240);          /* night */
     r_daylight=192;assert(aw_fog_location_hook(540)==260);          /* dusk: halfway */
     r_daylight=40;assert(aw_fog_location_hook(540)==240);           /* darker than full night */
@@ -33,10 +37,12 @@ int main(void){
     assert(aw_fog_location_hook(200)==200);                         /* player's shorter setting wins */
     title="Bitter Coast Region / Hla Oad";assert(aw_fog_location_hook(540)==450);  /* unlisted place: its region */
     title="Ascadian Isles Region";assert(aw_fog_location_hook(540)==540);          /* unlisted */
+    assert(aw_fog_location_key()==0);                               /* no place: the daylight does not matter */
     on_world=0;strcpy(sv.name,"balmora");assert(aw_fog_location_hook(540)==300);   /* map name */
     on_world=1;title="";
     exterior=0;assert(aw_fog_location_hook(540)==540);exterior=1;   /* interiors unchanged */
     var->value=0;assert(aw_fog_location_hook(540)==540);            /* off */
+    assert(aw_fog_location_key()==-1);                              /* the switch is part of the key */
     assert(opens==1);                                               /* read once */
     puts("location fog: on by default, place/region/map match, day/night blend, player bound, interiors");
     return 0;

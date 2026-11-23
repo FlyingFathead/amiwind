@@ -1,6 +1,19 @@
 # Camera marks
 
-_Last updated with AmiWind v0.0.42-dev1 (17 October 2026)._
+_Last updated with AmiWind v0.0.68-dev7 (22 November 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [What a recall does](#what-a-recall-does)
+- [The marks files](#the-marks-files)
+- [In scripts](#in-scripts)
+- [Orbit](#orbit)
+- [Pan](#pan)
+- [Track](#track)
+- [Pan and track together](#pan-and-track-together)
+
+<!-- contents end -->
 
 A camera mark is a named shot: the map (or the original Morrowind position), the position, heading and pitch, the
 time of day, the headlamp and the fog distance. One console command saves the shot you are looking at, another
@@ -17,6 +30,11 @@ The commands live under `dbg cam`, because Mark and Recall are spells of the gam
 
 `NAME` is 1 to 31 letters, digits, `_`, `-` or `.`; names are matched without regard to case. A private mark cannot
 take the name of a public one.
+
+The same command moves the camera for clips and demo reels: [`dbg cam orbit`](#orbit) circles something,
+[`dbg cam pan`](#pan) turns the view through a smooth pan from where it is, and [`dbg cam track`](#track) glides it
+along a line or to a mark. The game's own idle camera, the vanity camera (`dbg vanitycamera`, see
+[THIRD_PERSON.md](THIRD_PERSON.md)), circles the player.
 
 ## What a recall does
 
@@ -62,11 +80,13 @@ vivec-palace|vpi015|0 -64.7 -83.9|90 0|1200|off|-|Palace of Vivec
 - `yaw pitch`: yaw 0 up to 360 (not included), pitch -80 to 80, as `aw_aim` and `aw_view` take them.
 - `time`: `HHMM` (0000 to 2359), or `-` to leave the clock alone.
 - `headlamp`: `on`, `off` or `-`.
-- `fog`: the fog/draw distance 100 to 4096 local units, or `-`.
+- `fog`: the fog/draw distance 100 to 4096 local units, or `-`. A number is set as your own fog distance (Fog
+  distance auto goes off, as with `dbg fog distance N`); `-` leaves the setting alone.
 - `note`: free text without `|`, at most 159 characters.
 
 `dbg cam mark` writes a map mark at the exact point (with the original Morrowind position in the note when the map
-has one), the current time to the minute, the headlamp and the fog distance.
+has one), the current time to the minute, the headlamp and the fog distance: your own value when Fog distance auto is
+off, `-` when it is on (the place's own default then makes the same picture).
 
 Check a file with `python3 tools/camera_marks.py check [FILE ...]` (default: the public file); `show NAME` prints
 one mark. The engine reads the same format (`engine/aga/src/aw_cam_rules.c`), and the tests check that both accept
@@ -107,3 +127,87 @@ front of walls, the same full view. While it runs the player is not there for th
 notarget (fighting characters stop chasing and attacking, nobody starts an idle line), the player's body hidden, the
 position held and every game key taken by the orbit, so no door, trigger, pick-up or dialogue starts. When it ends
 the position, view, movement mode and the god and notarget switches are as they were before.
+
+## Pan
+
+`dbg cam pan` (also `dbg pan cam`) is a pan as a film camera on a tripod makes it: the camera stays where the view
+is and turns about its own point, level, at a steady speed, with a held frame at each end.
+
+| Command | What it does |
+| --- | --- |
+| `dbg cam pan` | a 360-degree pan to the right from the view now, ending where it began |
+| `dbg cam pan DEGREES` | a pan through `DEGREES` (up to 3600); a negative angle pans to the left |
+| `dbg cam pan DEGREES HOLD` | the opening and the closing frame held `HOLD` seconds each (default 3, up to 60): `dbg cam pan 180 5` holds 5 s, pans 180 degrees, holds 5 s |
+| `... speed DEG` | the speed in degrees a second (1 to 90) |
+| `... photo` | the same without the HUD, full screen (as photo mode) |
+| `dbg cam pan off` | ends the pan early (as Esc or the right mouse button) |
+
+The shot, in order:
+
+1. The opening frame, held for `HOLD` seconds.
+2. The move: the speed rises smoothly over 1.25 s (the same easing curve as the Halloween scene's camera director),
+   stays steady, and falls smoothly over the last 1.25 s, so it never starts or stops with a jerk. A pan too short for
+   that eases over less time at each end.
+3. The closing frame, held for `HOLD` seconds; then the shot ends and the view is the player's again.
+
+The default speed follows film's rule of thumb for a pan that does not judder: anything in the picture should take
+at least 5 to 7 seconds to cross the frame. The pan takes 6 seconds per frame width, the horizontal field of view
+over 6 seconds: 15 degrees a second at the game's field of view of 90 degrees (the `fov` setting). So the default
+360-degree pan lasts 3 + 25.25 + 3 = 31.25 seconds, and `dbg cam pan 180 5` lasts 5 + 13.25 + 5 = 23.25 seconds.
+
+The pan starts from what is on the screen: in first person the camera turns at the player's eye; in third person
+it turns at the third-person camera's own point, with the player's body standing in the picture. The pitch stays as
+it was.
+
+## Track
+
+`dbg cam track` is a steadicam glide: the camera leaves the view's point and moves along a straight line, through
+walls if need be (noclip for the camera only: the player stays where it was), with the same eased start and stop and
+the same held frames as the pan.
+
+| Command | What it does |
+| --- | --- |
+| `dbg cam track forward N` | glides `N` map units along the view's heading, level (the height and the pitch kept); a negative `N` moves back while looking ahead |
+| `dbg cam track to MARK` | glides to a camera mark on this map (see the marks above), the view turning smoothly to the mark's own heading and pitch, the short way round; the mark's time, headlamp and fog are not applied (`dbg cam recall` does that) |
+| `dbg cam track SPEED ...` or `... speed U` | the speed in map units a second (1 to 1024; default 32, a slow walk) |
+| `... HOLD` after the target, or `... hold S` | the held frames at each end, seconds (default 3) |
+| `... photo` | the same without the HUD, full screen |
+| `dbg cam track off` | ends the glide early (as Esc or the right mouse button) |
+
+A mark on another map is refused (`dbg cam recall` travels there). A mark in original coordinates without a height
+ends at the floor `dbg tp X Y` would put the player on, at eye height. The game around the player is what is loaded
+and sent to the screen: a long glide far away from the player, or into another room, can reach places whose
+characters and objects the player's own place does not see.
+
+## Pan and track together
+
+Both run on the orbit's camera, one at a time (a new camera move replaces the running one), and both detach the
+player as the orbit does (noclip, god mode, notarget, the position held, every game key taken; only Esc and the right
+mouse button do something: they end the shot). The mouse does not move a shot. Nothing is printed on the screen while
+a shot runs: its lines go to the console and the log only, so a recording shows the world alone; with photo mode
+(`dbg photomode`, `dbg killhud`) the HUD is gone as well. The shot's clock runs while the game is played: typed in the
+console, a shot starts when the console closes; from a session script (one command, no console) it starts at once.
+
+Each shot prints, to the console and the log only:
+
+```
+Camera pan: 3.00 s held, 25.25 s moving, 3.00 s held: 31.25 s in all; Esc or right click ends it.
+Camera pan: 360 degrees to the right at 15.0 degrees a second (field of view 90).
+...
+Camera pan ended: position, view, movement and flags restored.
+```
+
+A script can wait for the `Camera pan ended` (or `Camera track ended`) line; an early end says `stopped early`. In a
+session script:
+
+```
+mark
+rec seyda-pan
+cmd dbg cam pan 360 3
+saw 60 Camera pan ended
+recstop
+```
+
+The shot is a function of its own clock: frame times that add up to the same time give the same frame, and a slow
+frame moves further, never a fixed step per frame. A frame longer than a quarter of a second (a load) counts as a
+quarter of a second, so a hitch never makes the camera jump.

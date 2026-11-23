@@ -112,6 +112,18 @@
   },
   {
    "file": "engine/aga/src/aw_fog.c",
+   "contains": "asked=!(want>=100)?100:want>4096?4096:(int)want;",
+   "class": "kept",
+   "note": "view distance cap of the requested distance (REGIONAL-DRAW-DISTANCE-68): a distance, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_fog.c",
+   "contains": "if(index>1023 || distance<100 || distance>4096)continue;",
+   "class": "kept",
+   "note": "region draw distance table row: the view distance cap (REGIONAL-DRAW-DISTANCE-68), a distance, not a position"
+  },
+  {
+   "file": "engine/aga/src/aw_fog.c",
    "contains": "#define LARGE_ROOM_MAX 4096",
    "class": "kept",
    "note": "large-room fog distance cap, the view distance cap (FOG-300-DEFAULT-57): a distance, not a position"

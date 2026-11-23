@@ -5,6 +5,9 @@
  *   dbg cam mark NAME     save the current shot as a private mark
  *   dbg cam recall NAME   restore a public or private mark
  *   dbg cam list          the marks of both files
+ *   dbg cam orbit ...     circle the crosshair target (the camera itself: aw_view.c)
+ *   dbg cam pan ...       a tripod pan from the view now (also dbg pan cam)
+ *   dbg cam track ...     a steadicam glide from the view now, forward or to a mark
  *
  * Public marks: camera-marks.txt in the game data (config/camera-marks.txt in
  * the repository: the benchmark cameras, bug-evidence spots). Private marks:
@@ -162,7 +165,10 @@ static int current_shot(edict_t *p,const char *name,aw_cam_mark_t *m) {
     m->yaw=yaw;m->pitch=pitch;
     if(AW_ClockEnsure()){AW_ClockDate(&year,&month,&day,&hour,&minute);m->time=hour*100+minute;}else m->time=-1;
     m->headlamp=Cvar_VariableValue("aw_headlamp")!=0;
-    m->fog=(int)aw_drawdistance.value;if(m->fog<100)m->fog=100;if(m->fog>4096)m->fog=4096;
+    /* the player's own fog distance; with Auto on (REGIONAL-DRAW-DISTANCE-68) "-": the recall keeps Auto, and the
+     * place's own default makes the same picture */
+    if(AW_DrawDistanceAuto())m->fog=-1;
+    else{m->fog=(int)aw_drawdistance.value;if(m->fog<100)m->fog=100;if(m->fog>4096)m->fog=4096;}
     if(AW_WorldToSource(sv.name,p->v.origin,global))
         snprintf(m->note,sizeof(m->note),"marked in game; global %ld %ld %ld",(long)global[0],(long)global[1],(long)global[2]);
     else snprintf(m->note,sizeof(m->note),"marked in game");
@@ -263,15 +269,127 @@ static void orbit_command(int argc) {
     if(AW_ViewOrbitStart(number,focal,photo,rate))
         Con_Printf("Orbit around %s%s.\n",number?"entity ":"the point under the crosshair",number?va("%ld",(long)number):"");
 }
+/* ---- dbg cam pan and dbg cam track (the shots themselves: aw_view.c, the timeline: aw_cam_rules.c) ---- */
+#define PAN_USAGE "Usage: dbg cam pan [DEGREES] [HOLD] [speed DEG] [photo] / dbg cam pan off (also dbg pan cam): DEGREES " \
+    "default 360, negative to the left; HOLD seconds on each end frame, default 3\n"
+#define TRACK_USAGE "Usage: dbg cam track [SPEED] forward N [HOLD] / dbg cam track [SPEED] to MARK [HOLD] (also speed U, " \
+    "hold S, photo) / dbg cam track off\n"
+/* A shot's line: in the console and the log, never a notify line over the shot (console.c con_notify_quiet). */
+extern int con_notify_quiet;
+static void quiet_line(const char *line) {con_notify_quiet=1;Con_Printf("%s",line);con_notify_quiet=0;}
+static int shot_off(const char *what) {
+    if(AW_ViewCameraMove()==AW_VIEW_CAM_NONE){Con_Printf("Camera %s: not running.\n",what);return 1;}
+    AW_ViewOrbitEnd(1);return 1;
+}
+/* dbg cam pan [DEGREES] [HOLD] [speed DEG] [photo]: a tripod pan from the view now. The default speed is the field of
+ * view over AW_CAM_PAN_CROSS seconds (aw_cam.h; 15 degrees a second at the field of view of 90). */
+static void pan_command(int argc) {
+    int i,numbers=0,photo=0,off=0;float degrees=360,hold=AW_CAM_SHOT_HOLD,speed=0,value;char line[160];
+    for(i=2;i<argc;i++){
+        char *w=Cmd_Argv(i);
+        if(!Q_strcasecmp(w,"photo"))photo=1;
+        else if(!Q_strcasecmp(w,"off") || !Q_strcasecmp(w,"stop"))off=1;
+        else if(!Q_strcasecmp(w,"speed") && i+1<argc && number_arg(Cmd_Argv(i+1),1,AW_CAM_PAN_SPEED_MAX,&speed))i++;
+        else if(!Q_strcasecmp(w,"hold") && i+1<argc && number_arg(Cmd_Argv(i+1),0,AW_CAM_SHOT_HOLD_MAX,&hold))i++;
+        else if(numbers==0 && number_arg(w,-AW_CAM_PAN_DEGREES_MAX,AW_CAM_PAN_DEGREES_MAX,&value) && (value>=1 || value<=-1)){
+            degrees=value;numbers++;
+        }
+        else if(numbers==1 && number_arg(w,0,AW_CAM_SHOT_HOLD_MAX,&value)){hold=value;numbers++;}
+        else{Con_Printf(PAN_USAGE);return;}
+    }
+    if(off){if(argc>3)Con_Printf(PAN_USAGE);else shot_off("pan");return;}
+    if(!player())return;
+    if(!speed)speed=AW_CamPanSpeed(r_refdef.fov_x);
+    if(!AW_ViewPanStart(degrees,speed,hold,photo))return;
+    snprintf(line,sizeof(line),"Camera pan: %.0f degrees to the %s at %.1f degrees a second (field of view %.0f).\n",
+             degrees<0?-degrees:degrees,degrees<0?"left":"right",speed,r_refdef.fov_x);
+    quiet_line(line);
+}
+/* The camera point a mark's shot is taken from on this map: its player's eye (a map mark holds the player's origin;
+ * a global mark with Z names the floor; without Z the floor dbg tp X Y finds, AW_MapPlace asked and the player put
+ * back where it stood). 0 = the mark is not on this map. */
+static int mark_eye(edict_t *p,const aw_cam_mark_t *m,vec3_t eye) {
+    vec3_t local,keep_origin,keep_old,keep_velocity;float point[3],keep_flags;
+    if(!m->global){
+        if(strcmp(m->map,sv.name))return 0;
+        VectorCopy(m->point,local);
+    }else{
+        point[0]=m->point[0];point[1]=m->point[1];point[2]=m->has_z?m->point[2]:0;
+        if(!AW_SourceToWorld(sv.name,point,local) || !AW_WorldContains(sv.name,local))return 0;
+        if(m->has_z)local[2]-=p->v.mins[2];          /* the floor: the standing origin above it */
+        else{
+            VectorCopy(p->v.origin,keep_origin);VectorCopy(p->v.oldorigin,keep_old);VectorCopy(p->v.velocity,keep_velocity);
+            keep_flags=p->v.flags;
+            if(!AW_MapPlace(p,local))return 0;
+            VectorCopy(p->v.origin,local);
+            VectorCopy(keep_origin,p->v.origin);VectorCopy(keep_old,p->v.oldorigin);VectorCopy(keep_velocity,p->v.velocity);
+            p->v.flags=keep_flags;SV_LinkEdict(p,false);
+        }
+    }
+    VectorCopy(local,eye);eye[2]+=p->v.view_ofs[2];
+    return 1;
+}
+/* dbg cam track [SPEED] forward N [HOLD] / to MARK [HOLD]: a steadicam glide from the view now. */
+static void track_command(int argc) {
+    int i,numbers=0,photo=0,off=0,have_n=0,have_mark=0,found;float speed=AW_CAM_TRACK_SPEED,hold=AW_CAM_SHOT_HOLD,n=0,value;
+    char mark[AW_CAM_NAME],line[200];vec3_t to,angles,forward,right,up;float view_turn[2];edict_t *p;aw_cam_mark_t m;
+    mark[0]=0;
+    for(i=2;i<argc;i++){
+        char *w=Cmd_Argv(i);
+        if(!Q_strcasecmp(w,"photo"))photo=1;
+        else if(!Q_strcasecmp(w,"off") || !Q_strcasecmp(w,"stop"))off=1;
+        else if(!Q_strcasecmp(w,"speed") && i+1<argc && number_arg(Cmd_Argv(i+1),1,AW_CAM_TRACK_SPEED_MAX,&speed))i++;
+        else if(!Q_strcasecmp(w,"hold") && i+1<argc && number_arg(Cmd_Argv(i+1),0,AW_CAM_SHOT_HOLD_MAX,&hold))i++;
+        else if(!have_n && !have_mark && !Q_strcasecmp(w,"forward") && i+1<argc &&
+                number_arg(Cmd_Argv(i+1),-AW_CAM_TRACK_MAX,AW_CAM_TRACK_MAX,&n) && (n>=1 || n<=-1)){i++;have_n=1;}
+        else if(!have_n && !have_mark && !Q_strcasecmp(w,"to") && i+1<argc && AW_CamValidName(Cmd_Argv(i+1))){
+            Q_strcpy_bounded(mark,Cmd_Argv(i+1),sizeof(mark));i++;have_mark=1;
+        }
+        else if(!have_n && !have_mark && !numbers && number_arg(w,1,AW_CAM_TRACK_SPEED_MAX,&value)){speed=value;numbers++;}
+        else if((have_n || have_mark) && number_arg(w,0,AW_CAM_SHOT_HOLD_MAX,&value))hold=value;
+        else{Con_Printf(TRACK_USAGE);return;}
+    }
+    if(off){if(argc>3)Con_Printf(TRACK_USAGE);else shot_off("track");return;}
+    if(!have_n && !have_mark){Con_Printf(TRACK_USAGE);return;}
+    if(!(p=player()))return;
+    if(have_n){
+        /* along the view's heading, level: the height and the pitch kept */
+        angles[PITCH]=0;angles[YAW]=r_refdef.viewangles[YAW];angles[ROLL]=0;
+        AngleVectors(angles,forward,right,up);
+        VectorMA(r_refdef.vieworg,n,forward,to);
+        if(!AW_ViewTrackStart(to,NULL,speed,hold,photo))return;
+        snprintf(line,sizeof(line),"Camera track: %.0f units %s at %.0f units a second.\n",n<0?-n:n,
+                 n<0?"back":"forward",speed);
+    }else{
+        found=find_in(1,mark,&m);
+        if(found==0)found=find_in(0,mark,&m);
+        if(found<=0){if(!found)Con_Printf("No camera mark \"%s\"; dbg cam list shows the marks.\n",mark);return;}
+        if(!mark_eye(p,&m,to)){
+            Con_Printf("Camera track: mark %s is not on this map (dbg cam recall %s travels there).\n",m.name,m.name);return;
+        }
+        VectorSubtract(to,r_refdef.vieworg,forward);
+        if(Length(forward)<1){Con_Printf("Camera track: the camera is at mark %s already.\n",m.name);return;}
+        /* the view turns to the mark's on the way, the short way round */
+        view_turn[0]=m.pitch-r_refdef.viewangles[PITCH];view_turn[1]=AW_CamTurn(r_refdef.viewangles[YAW],m.yaw);
+        if(!AW_ViewTrackStart(to,view_turn,speed,hold,photo))return;
+        snprintf(line,sizeof(line),"Camera track: to mark %s, %.0f units at %.0f units a second, the view turning "
+                 "to its own.\n",m.name,Length(forward),speed);
+    }
+    quiet_line(line);
+}
+#define CAM_USAGE "Usage: dbg cam mark NAME / dbg cam recall NAME / dbg cam list / dbg cam orbit ... / dbg cam pan ... / " \
+    "dbg cam track ...\n"
 static void cam_command(void) {
     char sub[16],name[AW_CAM_NAME];int n=Cmd_Argc();
-    if(n<2){Con_Printf("Usage: dbg cam mark NAME / dbg cam recall NAME / dbg cam list / dbg cam orbit ...\n");return;}
+    if(n<2){Con_Printf(CAM_USAGE);return;}
     Q_strcpy_bounded(sub,Cmd_Argv(1),sizeof(sub));
     name[0]=0;if(n>2){if(strlen(Cmd_Argv(2))>=sizeof(name))name[0]='?',name[1]=0;else strcpy(name,Cmd_Argv(2));}
     if(!Q_strcasecmp(sub,"orbit")){orbit_command(n);return;}
+    if(!Q_strcasecmp(sub,"pan")){pan_command(n);return;}
+    if(!Q_strcasecmp(sub,"track")){track_command(n);return;}
     if(!Q_strcasecmp(sub,"list") && n==2)list_command();
     else if(!Q_strcasecmp(sub,"recall") && n==3)(void)recall_command(name);
     else if(!Q_strcasecmp(sub,"mark") && n==3)mark_command(name);
-    else Con_Printf("Usage: dbg cam mark NAME / dbg cam recall NAME / dbg cam list / dbg cam orbit ...\n");
+    else Con_Printf(CAM_USAGE);
 }
 void AW_CamInit(void) {Cmd_AddCommand("aw_cam",cam_command);}

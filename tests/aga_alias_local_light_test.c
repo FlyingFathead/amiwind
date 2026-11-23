@@ -69,7 +69,8 @@ int AW_TerrainId(const char *name){return -1;}
 void AW_HorizonReport(void){}
 void AW_HorizonDraw(byte colour,int distance){assert(0);}
 int AW_DayGalleryClock(int actual_ms){return actual_ms;}
-void Cvar_RegisterVariable(cvar_t *c){c->value=atof(c->string);if(!strcmp(c->name,"aw_daynight"))daynight=c;if(!strcmp(c->name,"aw_fog"))fog_enabled=c;}
+void Cvar_RegisterVariable(cvar_t *c){c->value=atof(c->string);if(!strcmp(c->name,"aw_daynight"))daynight=c;if(!strcmp(c->name,"aw_fog"))fog_enabled=c;
+    if(!strcmp(c->name,"aw_drawdistance_auto"))c->value=0;}   /* the fixture's own aw_drawdistance (Auto off) */
 void Cvar_SetValue(char *name,float value){assert(!strcmp(name,"aw_drawdistance"));aw_drawdistance.value=value;}
 void Cmd_AddCommand(char *name,void (*fn)(void)){}
 int Cmd_Argc(void){return 1;}

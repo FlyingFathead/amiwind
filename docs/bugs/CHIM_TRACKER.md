@@ -1,6 +1,6 @@
 # CHIM Engine tracker
 
-_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.68-dev7._
+_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.68-dev8._
 
 <!-- Generated whole by tools/bug_register.py render from docs/bugs/bugs.json; do not edit by hand. -->
 
@@ -21,7 +21,7 @@ CHIM version: 0.2.2. 411 CHIM bugs: 208 open, 183 fixed, 20 closed.
 
 Bugs reported two or more times. Most reports first. Each has its report lines on its page.
 
-- [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): Travelling from Seyda Neen to Balmora sometimes hangs on the Loading screen (boot smoke, 2 of about 5 runs) (reported 49 times, open)
+- [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): Travelling from Seyda Neen to Balmora sometimes hangs on the Loading screen (boot smoke, 2 of about 5 runs) (reported 50 times, open)
 - [BUILD-CHIM-STAGE-SERIAL-TAIL-36](BUILD-CHIM-STAGE-SERIAL-TAIL-36.md): After the parallel world build the chim stage ran its validation, heap gate and zone walk on one core (about 10 minutes of the 270-frame coast build) (reported 17 times, open)
 - [BUILD-CHIM-CELLS-PRIVATE-LIST-47](BUILD-CHIM-CELLS-PRIVATE-LIST-47.md): The releases' CHIM cell list was not in the source tree; public builds had no CHIM exterior cells (reported 11 times, fixed)
 - [BUILD-ACTOR-LIBRARY-UNDERUSED-54](BUILD-ACTOR-LIBRARY-UNDERUSED-54.md): The actor-library stage ran at 2.69 of 8 allowed cores with 130 units queued and 7 running (reported 7 times, open)
@@ -63,6 +63,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [COLLISION-ROUTE-NO-SPLIT-36](COLLISION-ROUTE-NO-SPLIT-36.md): Routed standing hulls of dense flora (kelp, kreshweed) stay one chain 277-305 clipnodes deep: the router finds no cut, so the cell stays hull-pending (reported 3 times, open)
 - [CREATURE-DAGOTH-UR-ABSENT-52](CREATURE-DAGOTH-UR-ABSENT-52.md): Dagoth Ur and the Heart of Lorkhan are not in their rooms: the room creature list never named them, so Akulakhan s Chamber has neither (reported 3 times, open)
 - [INTERIOR-CREATURES-MISSING-41](INTERIOR-CREATURES-MISSING-41.md): No creature is placed in any interior: the resident stage takes NPC records only, so the demigod Vivec is missing from his palace (reported 3 times, fixed)
+- [NPC-WEREWOLF-NO-MODEL-66](NPC-WEREWOLF-NO-MODEL-66.md): The werewolf NPCs of Bloodmoon get no model: their hair part has no attached geometry (reported 3 times, open)
 - [STAIRS-EBONHEART-CHIM-36](STAIRS-EBONHEART-CHIM-36.md): Three Ebonheart flights fail the CHIM stair gate in the whole-city Vivec frame (reported 3 times, fixed)
 - [VIVEC-TEMPLE-STAIRS-33](VIVEC-TEMPLE-STAIRS-33.md): Palace steps and High Fane quarter flights fail the stair gate on the CHIM Vivec Temple frame (reported 3 times, fixed)
 - [BUILD-CHIM-STAGE-IDLE-START-36](BUILD-CHIM-STAGE-IDLE-START-36.md): The chim stage of the 270-frame coast build spends its first 35-45 minutes on 1-4 cores while it holds 12-24 workers (reported 2 times, open)
@@ -74,27 +75,27 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [CHIM-EXTERIOR-FLAMES-MISSING-48](CHIM-EXTERIOR-FLAMES-MISSING-48.md): CHIM exteriors draw no fire: campfires, braziers, fire pits and flame lamps outdoors have no flame animation (reported 2 times, fixed)
 - [CHIM-LEGACY-CHAIN-33](CHIM-LEGACY-CHAIN-33.md): CHIM builds still run the legacy exterior chain: frame maps read the legacy region maps, and the open world is built (reported 2 times, closed)
 - [CHIM-MESHLESS-LIGHTS-33](CHIM-MESHLESS-LIGHTS-33.md): Exterior lights without a mesh have no CHIM light path: 2,284 placed lights give no light in a CHIM frame (reported 2 times, open)
+- [CHIM-SEA-BETWEEN-ISLANDS-64](CHIM-SEA-BETWEEN-ISLANDS-64.md): The CHIM cell list holds no sea between Vvardenfell and Solstheim (reported 2 times, open)
 - [CHIM-TERRAIN-TEXTURE-BLOCKY-43](CHIM-TERRAIN-TEXTURE-BLOCKY-43.md): Roads and paths on the ground look blocky: each texture square is drawn with hard edges instead of blending into its neighbours (reported 2 times, open)
 - [CHIM-ZONE-BUDGET-33](CHIM-ZONE-BUDGET-33.md): The engine's default CHIM zone does not hold the active ring of Seyda Neen or of Balmora's south-west corner (reported 2 times, fixed)
 - [IMAGE-BOOT-PAYLOAD-OVER-2GIB-48](IMAGE-BOOT-PAYLOAD-OVER-2GIB-48.md): The v0.0.48-dev2 image stopped in its payload preflight: the boot payload (2.75 GB with the batch room residents and the CHIM interior store) is over one partition and the layout could not split it (reported 2 times, open)
 - [IMAGE-ONE-HDF-TARGET-36](IMAGE-ONE-HDF-TARGET-36.md): The game ships on two drive images and three world partitions; the project target is the whole game on one HDF (reported 2 times, fixed)
 - [IMAGE-ROOM-HEAP-ONE-CORE-66](IMAGE-ROOM-HEAP-ONE-CORE-66.md): The image step's room heap check measures every room on one core (reported 2 times, open)
-- [NPC-WEREWOLF-NO-MODEL-66](NPC-WEREWOLF-NO-MODEL-66.md): The werewolf NPCs of Bloodmoon get no model: their hair part has no attached geometry (reported 2 times, open)
 
 ## Latest changes
 
 Newest first: the last 10 dated events of CHIM bugs, from their entries (reports, history, closure steps).
 
+- 2026-11-22 [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): seen again in v0.0.68-dev8: Seen again in the v0.0.68-dev8 delivery: the boot smoke on the emulator stopped in Seyda Neen because a finished disk request of the game was never reported back by the emulator's folder drive; the step was run again.
+- 2026-11-22 [NPC-WEREWOLF-NO-MODEL-66](NPC-WEREWOLF-NO-MODEL-66.md): seen again in v0.0.68-dev8: Still in v0.0.68-dev8: one werewolf of the Skaal (BM_werewolf_skaal1A3) is left out of Solstheim because the actor library makes no model for werewolves.
+- 2026-11-22 [CHIM-SOLSTHEIM-TREE-FACES-64](CHIM-SOLSTHEIM-TREE-FACES-64.md): seen again in v0.0.68-dev7: Seen again on v0.0.68-dev7 on the Pi 4B: in the dense spruce forest of the Brodir Grove region the frame rate drops to about 8 frames a second.
+- 2026-11-22 [CHIM-SEA-BETWEEN-ISLANDS-64](CHIM-SEA-BETWEEN-ISLANDS-64.md): seen again in v0.0.68-dev6: Seen again in v0.0.68-dev6: besides the nine glacier cells, eleven Solstheim cells are in no frame of the build: six seabed cells with a land record, three sea cells holding six placed horkers, and two empty sea cells; the cell set the ...
 - 2026-11-22 [CHIM-SEYDA-BALMORA-LOAD-HANG-43](CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): seen again in v0.0.68-dev6: Seen again in an opening session on the v0.0.68-dev6 image: on the ship, the remote-console folder's request finished on the emulator side and the game was never told, so the session stopped before the dock.
 - 2026-11-22 [CHIM-MESH-STAIR-UNIT-SLOW-67](CHIM-MESH-STAIR-UNIT-SLOW-67.md): seen again in v0.0.68-dev5: On the Solstheim glacier test build with mesh method E, each of the nine test cells' stair collision units ran for over 47 minutes on one core, longer than the earlier 19.5 to 25 minutes.
 - 2026-11-22 [IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66](IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66.md): seen again in v0.0.68-dev5: Seen again in the v0.0.68-dev5 build: the image step's room actor bake took 1 minute 55 seconds on about one core.
 - 2026-11-21 [CHIM-SOL-TEST-TWO-CHIMSOL-STORES-68](CHIM-SOL-TEST-TWO-CHIMSOL-STORES-68.md): seen again in v0.0.68-dev3: The plan check of a Solstheim test image stopped on the check that every finished expansion cell is built; that check now accepts the test image alone, on a development version.
 - 2026-11-21 [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): seen again in v0.0.68-dev3: Seen again in the v0.0.68-dev3 build: the image step's early phases ran on under half its cores for about five minutes.
 - 2026-11-21 [IMAGE-BOOT-PAYLOAD-OVER-2GIB-48](IMAGE-BOOT-PAYLOAD-OVER-2GIB-48.md): seen again in v0.0.68-dev3: Seen again in the v0.0.68-dev3 build: the image stopped because the boot payload grew past one partition after its early layout plan; the image step now plans the layout again from the staged files.
-- 2026-11-21 [CHIM-STAIR-METHOD1-UNFIXED-48](CHIM-STAIR-METHOD1-UNFIXED-48.md): seen again in v0.0.68-dev3: Nine more Solstheim meshes (a door, a steam machine, two barrow tombs, three colony buildings, the colony pier and a bridge) join the list of meshes whose stairs keep their original collision for now.
-- 2026-11-21 [IMAGE-ROOM-HEAP-ONE-CORE-66](IMAGE-ROOM-HEAP-ONE-CORE-66.md): seen again in v0.0.68-dev2: Seen again in the v0.0.68-dev2 build: a late part of the image step ran on one core for minutes
-- 2026-11-21 [IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66](IMAGE-ROOM-RESIDENTS-CACHED-ONE-CORE-66.md): seen again in v0.0.68-dev2: Seen again in the v0.0.68-dev2 build: the room actor bake took about two minutes on one core
-- 2026-11-21 [OUTDOOR-DISABLE-NOT-HIDDEN-68](OUTDOOR-DISABLE-NOT-HIDDEN-68.md): fixed in source: a gated commit, v0.0.67 (b9b215d9); gate 12265 of the planning item OUTDOOR-DISABLE-NOT-HIDDEN-68: Every outdoor placement a script can switch off or on gets its hide rows, in the base world and in every store of frames the image installs (the change in f6edb6c53).
 
 ## Engine streaming and memory
 

@@ -172,12 +172,14 @@ def install(world_dir, id1, hand_fields, alternatives=(), store=STORE, actors=No
     alt_records = []
     if alternatives:
         # ALTERNATIVES: [(method value, the other build's world folder)]: one store, the original trees plus their
-        # alternative models for aw_tree_crowns (tools/chim/alt_models.py); only one method per store for now
-        if len(alternatives) != 1:
-            raise ValueError('--chim-sol-test: one alternative tree method per store')
-        from chim.alt_models import merge
-        method, alt_dir = alternatives[0]
-        alt_records.append(merge(source, Path(alt_dir) / 'chim', target, int(method)))
+        # alternative models for aw_tree_crowns (tools/chim/alt_models.py): one method (the star crowns) or several
+        # (the rally-game trees' methods, SOLSTHEIM-TREES-THREE-LOD-68)
+        from chim.alt_models import merge, merge_many
+        if len(alternatives) == 1:
+            method, alt_dir = alternatives[0]
+            alt_records.append(merge(source, Path(alt_dir) / 'chim', target, int(method)))
+        else:
+            alt_records += merge_many(source, [(int(m), Path(d) / 'chim') for m, d in alternatives], target)
     else:
         for path in sorted(source.rglob('*')):
             if path.is_file():

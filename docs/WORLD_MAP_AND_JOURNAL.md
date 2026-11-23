@@ -1,11 +1,12 @@
 # World map and progression journal
 
-_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
+_Last updated with AmiWind v0.0.68-dev7 (22 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [Open map reports - 4 October 2026](#open-map-reports---4-october-2026)
+- [Map version 2, the default (since v0.0.68)](#map-version-2-the-default-since-v0068)
 - [M: Vvardenfell overview](#m-vvardenfell-overview)
   - [Place markers (since v0.0.66)](#place-markers-since-v0066)
   - [Explored land (since v0.0.66)](#explored-land-since-v0066)
@@ -46,9 +47,67 @@ The post-RC3 development checkpoint adds two on-demand screens. They use the
 normal single-player menu pause, leave music servicing active, capture mouse
 movement and return to play without changing the player's location.
 
+## Map version 2, the default (since v0.0.68)
+
+M opens map version 2: the original game's map in the same golden frame as the attributes, inventory and magic views.
+The map before it stays in the game as map version 1, the debug map (below).
+
+- **The frame.** The window's box and its title bar, the map in a box of its own (a 304 by 142 pixel picture) and a
+  footer box, the same frame and borders as the other menus. There is no DEBUG or IN-GAME button, and no lava colour
+  or legend (the original's map marks no lava). Everything else of the in-game view is there: the explored land, the
+  place squares named on mouse-over, your markers and the hot marker, the original arrow, and the World and Local
+  views.
+- **The title** names the place you are in, the way the original's map window does (OpenMW: the world's cell name):
+  - a room shows its own name (Seyda Neen, Census and Excise Office);
+  - outdoors, a named cell shows its own name (Balmora, Mournhold, Great Bazaar), and any other cell its region's name
+    exactly as the game data has it (Bitter Coast Region; Bloodmoon's regions are named "Solstheim, Hirstaang Forest"
+    and so on in the data itself);
+  - a cell with neither shows Wilderness (the game's own default cell name).
+
+  The name is drawn in the game's own font, like the inventory's title. A shared layout helper measures it against the
+  plaque (288 pixels of text in the 308-pixel title bar). Only a name too wide for that is drawn in the console glyphs,
+  and a name too wide even for those ends in "...".
+- **The footer**, two lines:
+  - the close keys (the key bound to the map, M by default, and Esc; the bound key also closes it), a hint or the
+    markers' last message, and three tabs in the inventory's tab style: World, Local (also Tab) and K markers;
+  - the view's keys, as in version 1: + / - or the mouse wheel zoom (six steps), a drag, the arrows or WASD pan, Home
+    fits the island and P centres the player. A room's plan has no zoom or pan, so this line is left out there.
+- **Version 1 on the console:**
+  - `dbg dbgmap on` (or `true` / `1`) shows the debug map: its DEBUG / IN-GAME / WORLD / LOCAL buttons, the lava
+    colour and legend, and the debug view's right-click teleport, as before v0.0.68;
+  - `dbg dbgmap off` (`false` / `0`) goes back to version 2, and `dbg dbgmap` alone switches between them;
+  - `dbg maptype 1` and `dbg maptype 2` do the same.
+
+  It is one saved setting, `aw_map_version` (2 by default), read when the map opens. `dbg tp map` always shows the
+  version 1 teleport screen.
+
+**Which names fit.** Measured with `tools/map_title_fit.py` on the three masters (Morrowind, Tribunal, Bloodmoon) and
+the title font of the v0.0.68-dev7 image:
+
+| | Names | In the game's font | Widest |
+| --- | --- | --- | --- |
+| Regions | 16 | 16 | 159 pixels: Solstheim, Felsaad Coast Region |
+| Named outdoor cells | 95 | 95 | 191 pixels: Solstheim, Gyldenhul Barrow Entrance |
+| Rooms | 1,328 | 1,328 | 251 pixels: Balmora, Nalcarya of White Haven: Fine Alchemist |
+
+Every name fits the game's font, with 37 pixels to spare, so no name falls back to the console glyphs with the shipped
+font. The fallback is still there for a font that draws wider. The image's own tables (`world/region-names.awn` with
+Mournhold's five districts, and the 1,323 built rooms of `cell-numbers.json`) give the same result.
+
+**Budget.**
+
+| | Cost |
+| --- | --- |
+| RAM | one setting and a 64-byte title |
+| Disk | none: the name comes from the cached region row and the loaded map's keys |
+| CPU on open | one name worked out and measured |
+| CPU per frame | the frame's boxes and the footer's glyphs; the picture is 4,880 pixels smaller than version 1's |
+
 ## M: Vvardenfell overview
 
-M, or the bindable command `aw_worldmap`, opens the whole base-master island.
+M, or the bindable command `aw_worldmap`, opens the whole base-master island. Since v0.0.68 this section describes
+the map as both versions draw it. Version 1 (`dbg dbgmap on`) keeps the DEBUG / IN-GAME / WORLD / LOCAL buttons and the
+lava legend.
 Drag or use arrows/WASD to pan; wheel or +/- to zoom. P centres the player, G
 shows the original exterior-cell grid, and Home fits the island. M or Escape
 closes it. A white cross is the player; labelled points mark current converted
@@ -257,8 +316,9 @@ unpainted, with the land at most 83 units above the surface under any painted sa
 covered, buried, rectangles and the audit areas. `python3 tools/lava_map.py --data-files DIR` prints the audit per
 cell and a TOTALS row.
 
-In the game both views (Debug and In-Game) draw the pools by default, with a "LAVA" legend in the map's
-lower left corner. A pool's outline is filled where a screen pixel's centre lies inside it; a pool smaller
+In the game both views (Debug and In-Game) of map version 1 (`dbg dbgmap on`) draw the pools by default, with a
+"LAVA" legend in the map's lower left corner; map version 2, the default since v0.0.68, marks no lava, as the
+original's map. A pool's outline is filled where a screen pixel's centre lies inside it; a pool smaller
 than a pixel marks the one pixel that holds its centre. The settings:
 
 | Setting | Default | Meaning |
@@ -274,8 +334,8 @@ on 68040 hardware.
 
 ## Region name and debug teleport
 
-The regular map shows **REGION: <name>** at the bottom right beneath the map
-viewport. It uses the player's original source coordinates, not the mouse,
+The debug view of map version 1 shows **REGION: <name>** at the bottom right beneath the map
+viewport (map version 2 names the place in its title instead). It uses the player's original source coordinates, not the mouse,
 view direction or panned map centre. The same name appears beside the optional
 compass/heading HUD. Original exterior CELL coordinates select CELL.RGNN; that
 identifier resolves through REGN.NAME to the original REGN.FNAM display name.

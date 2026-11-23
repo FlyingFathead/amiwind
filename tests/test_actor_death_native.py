@@ -117,7 +117,7 @@ class DeathWiringTests(unittest.TestCase):
         self.assertIn('if(is_actor(e) && !AW_CombatSpellHit(e,0,0))AW_CombatTestEngage(e,1);', death)
         raw = (SRC / 'aw_mwhost.c').read_text(encoding='utf-8')
         self.assertIn('killed by a script', raw)                 # aw_mwscript_status counts them
-        self.assertIn('wanders,script_deaths);}', raw)
+        self.assertIn('wanders,script_deaths);\n', raw)
 
     def test_every_path_that_decides_a_death_has_the_rule(self):
         host = code('aw_mwhost.c')

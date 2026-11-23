@@ -53,7 +53,30 @@ static int scene_picker,scene_available[AW_MAP_COUNT],scene_top,graphics,intro_a
 static keydest_t picker_return;
 static int colours[4],ready;
 static const char *front_items[]={"New game","Load game","Options","Exit game"};
-static const char *items[]={"Return to game","New game","Save game","Load game","Options","Main menu"};
+/* PAUSE-MENU-CONTINUE-CONFIRM-68: the menu Escape opens in play is the original's (OpenMW apps/openmw/mwgui/mainmenu.cpp
+ * in a running game): Return To Game, New Game, Save Game, Load Game, Options Menu, Exit Game, its labels the game's own
+ * settings (sReturnToGame, sNewGame, sSaveGame, sLoadGame, sOptions, sExitGame) and its questions while a game runs the
+ * game's own: Exit Game asks sMessage5 (the current game is left for the title menu), New Game sNotifyMessage54, with
+ * the game's Yes and No. Read from view/settings.txt when the menu opens (aw_ui.c AW_UIGameText), the original's
+ * English when the image does not carry them. The title menu keeps its own rows and questions. */
+static const char *const item_keys[6]={"sReturnToGame","sNewGame","sSaveGame","sLoadGame","sOptions","sExitGame"};
+static const char *const item_words[6]={"Return To Game","New Game","Save Game","Load Game","Options Menu","Exit Game"};
+static char items[6][32];
+enum{TEXT_LEAVE,TEXT_NEW,TEXT_YES,TEXT_NO,TEXTS};
+static const char *const text_keys[TEXTS]={"sMessage5","sNotifyMessage54","sYes","sNo"};
+static const char *const text_words[TEXTS]={"Do you wish to quit your current game?\nAll unsaved progress will be lost.",
+    "Do you want to start a new game and lose your current game?","Yes","No"};
+static char texts[TEXTS][96];
+void AW_UIGameTexts(const char *const keys[],const char *const fallbacks[],char *out,int stride,int count);   /* aw_ui.c */
+int AW_UIPausedCaption(void);   /* aw_ui.c: the "Paused" caption on the menu opened in play (aw_menu_paused_caption) */
+/* read once a session, at the first opening (the boot's title menu): two passes over one small file, never in play */
+static int texts_read;
+static void menu_texts(void){
+    if(texts_read)return;
+    texts_read=1;
+    AW_UIGameTexts(item_keys,item_words,items[0],(int)sizeof(items[0]),6);
+    AW_UIGameTexts(text_keys,text_words,texts[0],(int)sizeof(texts[0]),TEXTS);
+}
 #define ROW_Y 54
 #define ROW_H 19
 
@@ -96,7 +119,7 @@ static int tab,focus;
 #define BACK_H 20
 /* Prefs and Video rows (Prefs: the HUD and gameplay; Video: view, loading, memory). */
 enum {ROW_CROSSHAIR,ROW_COLOUR,ROW_SHAPE,ROW_FRAME,ROW_FONT,ROW_VOICE,ROW_DIALOGUE,ROW_AIMED,ROW_NPC,ROW_OBJECTS,
-    ROW_AUTOSAVE,ROW_FOG,ROW_RESET,ROW_FAR,ROW_PHOTO,ROW_AREA,ROW_METHOD,ROW_BUFFER,ROW_MEMORY,ROW_GRAPHICS,ROW_CURSOR,
+    ROW_AUTOSAVE,ROW_FOG,ROW_FOG_AUTO,ROW_FAR,ROW_PHOTO,ROW_AREA,ROW_METHOD,ROW_BUFFER,ROW_MEMORY,ROW_GRAPHICS,ROW_CURSOR,
     ROW_TOPICS,ROW_LABELS,ROW_BEST,ROW_TEXTBOX,ROW_ROOMFOG,ROW_FOG_INDOORS,ROW_TREES};
 /* Mouse cursor (CURSOR-MW-58): Morrowind's own pointer or AmiWind's, beside the crosshair's choices.
  * Always use best attack (BEST-ATTACK-OPTION-62): the original's Preferences setting, the same saved value as the
@@ -106,9 +129,12 @@ static const unsigned char prefs_rows[]={ROW_CROSSHAIR,ROW_COLOUR,ROW_SHAPE,ROW_
 /* Fog in large rooms and the indoor fog distance (LARGE-ROOM-FOG-SETTING-64): aw_fog_large_rooms (on by default) and
  * aw_fog_distance_interior (arrows 10 units, Shift 1; Enter steps 150, 300, 540, 1000), both saved (aw_fog.c); the
  * Fog distance row above is the outdoor one (aw_drawdistance).
+ * Fog distance auto (REGIONAL-DRAW-DISTANCE-68; in the place of the Reset distance row, whose default it now is): on by
+ * default, each region's own default (300 most places, aw_fog.c); the outdoor row is greyed and inert while it is on,
+ * and its value applies everywhere once it is off. The indoor row has no Auto: interiors have no region.
  * Tree crowns (TREES-DEPTH-56): the same saved value as the console's aw_tree_crowns (chim_world.c): original,
  * fast (star crowns) or sprite crowns, taken at the next map load where the image carries the alternative models. */
-static const unsigned char video_rows[]={ROW_FOG,ROW_RESET,ROW_FOG_INDOORS,ROW_ROOMFOG,ROW_FAR,ROW_PHOTO,ROW_AREA,ROW_METHOD,
+static const unsigned char video_rows[]={ROW_FOG,ROW_FOG_AUTO,ROW_FOG_INDOORS,ROW_ROOMFOG,ROW_FAR,ROW_PHOTO,ROW_AREA,ROW_METHOD,
     ROW_BUFFER,ROW_MEMORY,ROW_TREES
 #if defined(AMIWIND_DEBUG_LUMA) && AMIWIND_DEBUG_LUMA
     ,ROW_GRAPHICS
@@ -314,7 +340,13 @@ static void font_step(int direction){
 }
 static int inside(int x,int y,int w,int h){return mouse_x>=x && mouse_x<x+w && mouse_y>=y && mouse_y<y+h;}
 static int enabled(int row){return row==3 || (row==2 && AW_SaveAllowed()) || row==0 || (row==1 && intro_available) || row==4 || row==5;}
-int AW_MenuFrontEnd(void){return frontend && !graphics && !confirming && key_dest==key_menu;}
+/* MENU-PALETTE-RED-CAST-68: the title menu is the menu with no game behind it (as game_menu below), so the screens of a
+ * running game (the inventory, the map, the journal, stats, magic, wait: aw_worldui.c and aw_wait.c open them as key_menu
+ * modals without game_menu) are never the title. While this read only the flag, a game started from the title by a console
+ * command (dbg aw hors 0, a typed map) kept it until Escape, and aw_ui.c AW_UIMenuPalette showed those screens through the
+ * title art's own palette (gfx/menu.awb): only the UI's own entries are shared with the game palette, so the icons, the
+ * paper doll and the map took the art's orange-brown colours. */
+int AW_MenuFrontEnd(void){return frontend && !sv.active && !graphics && !confirming && key_dest==key_menu;}
 /* Photo mode is offered from the pause menu's Options, not the title screen. */
 static int photo_ready(void){return !frontend && AW_PhotoModeAvailable();}
 
@@ -326,6 +358,7 @@ static int row_active(int row){
     if(tab==TAB_CONTROLS)return control_ready(row);
     if(tab==TAB_VIDEO && row_id(row)==ROW_BUFFER)return AW_CellChangeMethod()==2;
     if(tab==TAB_VIDEO && row_id(row)==ROW_PHOTO)return photo_ready();
+    if(tab==TAB_VIDEO && row_id(row)==ROW_FOG)return !AW_DrawDistanceAuto();   /* by hand only with Auto off */
     return 1;
 }
 static void keep_visible(void){
@@ -374,10 +407,11 @@ static void prefs_video_change(int id,int direction,int enter){
     case ROW_BEST:Cvar_SetValue("aw_combat_best_attack",Cvar_VariableValue("aw_combat_best_attack")?0:1);break;
     case ROW_AUTOSAVE:if(enter)AW_SetAutosaveCount((AW_AutosaveCount()+1)%17);else AW_SetAutosaveCount(AW_AutosaveCount()+direction);break;
     case ROW_FOG:
+        if(AW_DrawDistanceAuto())break;   /* greyed: the region's own default while Auto is on */
         if(enter){fog_slider=1;fog_drag=fog_typing=0;fog_typed[0]=0;fog_before=fog_value();}
         else AW_SetDrawDistance(AW_DrawDistance()+direction*(keydown[K_SHIFT]?1:10));
         break;
-    case ROW_RESET:if(enter)AW_SetDrawDistance(300);break;
+    case ROW_FOG_AUTO:AW_SetDrawDistanceAuto(!AW_DrawDistanceAuto());break;
     case ROW_ROOMFOG:Cvar_SetValue("aw_fog_large_rooms",Cvar_VariableValue("aw_fog_large_rooms")?0:1);break;
     case ROW_FOG_INDOORS:{
         int d=(int)Cvar_VariableValue("aw_fog_distance_interior");
@@ -472,8 +506,14 @@ void M_Menu_Main_f(void){
     brightness_reset();
     IN_AWClearButtons();key_dest=key_menu;selection=confirming=scene_picker=graphics=fog_slider=audio_drag=sens_drag=controls_capture=mouse_visible=graphics_top=scroll_drag=0;
     mouse_x=160;mouse_y=ROW_Y+ROW_H/2;
+    menu_texts();   /* the game's own labels and questions (read at the first opening only, never in a frame) */
 }
-void M_ToggleMenu_f(void){if(key_dest==key_menu)close_menu();else M_Menu_Main_f();}
+/* MENU-TITLE-AFTER-CONSOLE-START-68: the title menu (frontend) is the menu with no game behind it; only its own New Game
+ * and Load cleared the flag, so a game started from it by a console command (dbg aw hors 0, a typed map, the quick
+ * start) kept it, and Escape in play opened the title menu over the running game, which Escape could not close. Opened
+ * from play (Escape, togglemenu, menu_main) while a game runs, the menu is the in-game one. */
+static void game_menu(void){if(sv.active)frontend=0;M_Menu_Main_f();}
+void M_ToggleMenu_f(void){if(key_dest==key_menu)close_menu();else game_menu();}
 static void confirm(int action){
     confirmation_return=selection;confirming=action;selection=action==3;
     mouse_visible=0;mouse_x=selection?219:100;mouse_y=144;
@@ -493,7 +533,7 @@ static void scene_menu(void){
 }
 void M_Init(void){
     Cmd_AddCommand("aw_main_menu",main_menu);Cmd_AddCommand("togglemenu",M_ToggleMenu_f);
-    Cmd_AddCommand("menu_main",M_Menu_Main_f);Cmd_AddCommand("menu_quit",M_Menu_Quit_f);
+    Cmd_AddCommand("menu_main",game_menu);Cmd_AddCommand("menu_quit",M_Menu_Quit_f);
     Cmd_AddCommand("aw_scene_menu",scene_menu);
     aw_menu_fullscreen=fullscreen;
 }
@@ -674,7 +714,7 @@ static void prefs_video_line(int id,char *line){
     }
     case ROW_FOG:sprintf(line,"Fog distance outdoors: %ld",(long)AW_DrawDistance());break;
     case ROW_FOG_INDOORS:sprintf(line,"Fog distance indoors: %ld",(long)Cvar_VariableValue("aw_fog_distance_interior"));break;
-    case ROW_RESET:strcpy(line,"Reset distance: 300");break;
+    case ROW_FOG_AUTO:strcpy(line,AW_DrawDistanceAuto()?"Fog distance auto: On":"Fog distance auto: Off");break;
     case ROW_ROOMFOG:strcpy(line,Cvar_VariableValue("aw_fog_large_rooms")?"Fog in large rooms: On":"Fog in large rooms: Off");break;
     case ROW_FAR:if(far_index()<0)strcpy(line,"Far detail: Custom");else sprintf(line,"Far detail: %s",far_names[far_index()]);break;
     case ROW_TREES:{
@@ -804,17 +844,27 @@ void M_Draw(void){
     else for(yy=0;yy<(int)vid.height;yy++)for(xx=0;xx<(int)vid.width;xx++)
         if((xx&3)!=((yy&1)<<1))vid.buffer[yy*vid.rowbytes+xx]=colours[0];
     AW_UIBox(28,6,264,188);
-    if(!AW_UILogo(60,10))AW_UITextBox(44,10,232,40,"AmiWind",colours[1]);
+    /* PAUSE-MENU-CONTINUE-CONFIRM-68: on the menu opened in play the logo's band says that the game is paused, in the
+     * game's font (aw_menu_paused_caption 1, the default; 0 the logo as on the title menu; the original has no caption) */
+    if(!frontend && sv.active && !scene_picker && AW_UIPausedCaption())AW_UITextBox(44,10,232,40,"Paused",colours[1]);
+    else if(!AW_UILogo(60,10))AW_UITextBox(44,10,232,40,"AmiWind",colours[1]);
     if(scene_picker){
         for(i=scene_top;i<=AW_MAP_COUNT && i<scene_top+6;i++)
             label(44,55+(i-scene_top)*19,230,19,AW_MapTitle(i),i==AW_MAP_COUNT || scene_available[i],selection==i);
         AW_UIScrollbar(276,54,114,AW_MAP_COUNT+1,6,scene_top);
+    }else if(confirming && sv.active && (confirming==2 || confirming==3)){
+        /* PAUSE-MENU-CONTINUE-CONFIRM-68: the original's own question while a game runs (Exit Game: sMessage5, the game
+         * is left for the title menu; New Game: sNotifyMessage54), wrapped by the box pipeline, and the game's No / Yes */
+        int which=confirming==2?TEXT_LEAVE:TEXT_NEW;
+        AW_UICenteredLinesUpTo(36,58,248,68,texts[which][0]?texts[which]:text_words[which],4);
+        button(48,132,106,25,texts[TEXT_NO][0]?texts[TEXT_NO]:text_words[TEXT_NO],1,selection==0);
+        button(166,132,106,25,texts[TEXT_YES][0]?texts[TEXT_YES]:text_words[TEXT_YES],1,selection==1);
     }else if(confirming){
         AW_UITextBox(40,69,240,26,confirming==3?"Start a new game?":confirming==2?"Return to main menu?":"Exit the game?",colours[1]);
         if(sv.active)AW_UITextBox(40,97,240,24,"Current progress will be lost.",colours[2]);
         button(48,132,106,25,"Cancel",1,selection==0);
         button(166,132,106,25,confirming==3?"New game":confirming==2?"Leave":"Exit",1,selection==1);
-    }else for(i=0;i<6;i++)label(44,ROW_Y+i*ROW_H,232,ROW_H,items[i],enabled(i),selection==i);
+    }else for(i=0;i<6;i++)label(44,ROW_Y+i*ROW_H,232,ROW_H,items[i][0]?items[i]:item_words[i],enabled(i),selection==i);
     AW_UITextBox(36,174,248,17,"Enter / click   Esc: back",colours[1]);
     cursor();
 }

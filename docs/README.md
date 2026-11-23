@@ -1,6 +1,6 @@
 # AmiWind documentation
 
-_Generated from `docs/README.topics.json` with AmiWind v0.0.68-dev7._
+_Generated from `docs/README.topics.json` with AmiWind v0.0.68-dev8._
 
 Every document of the project, by topic, with the version and date of its last update. A document marked "needs a refresh" predates the current state of its subject and is due for a review; its facts may be out of date. Release notes and whitespace baselines are listed in [releases](releases/README.md); one-off records and replaced documents in [history](history/README.md).
 
@@ -38,7 +38,7 @@ Every document of the project, by topic, with the version and date of its last u
 | [BUILD_MANIFEST.md](BUILD_MANIFEST.md) | World map manifest (design) | v0.0.54 (27 October 2026) |
 | [EXPANSION_TABLES.md](EXPANSION_TABLES.md) | The expansions in every table | v0.0.68-dev5 (21 November 2026) |
 | [BUILD_OUTPUT.md](BUILD_OUTPUT.md) | Build completion output | v0.0.66-dev12 (16 November 2026) |
-| [BUILD_PROFILE.md](BUILD_PROFILE.md) | Build profile and stage reuse | v0.0.68-dev4 (21 November 2026) |
+| [BUILD_PROFILE.md](BUILD_PROFILE.md) | Build profile and stage reuse | v0.0.68-dev7 (22 November 2026) |
 | [BUILD_RECIPES.md](BUILD_RECIPES.md) | Build recipes | v0.0.36 (11 October 2026), needs a refresh |
 | [BUILD_STATUS.md](BUILD_STATUS.md) | Build status folder: a file interface for stall alerts | v0.0.67-dev1 (17 November 2026) |
 | [KNOWN_INPUTS.md](KNOWN_INPUTS.md) | Known inputs: which files did the builder get? | v0.0.63 (2026-11-10), needs a refresh |
@@ -49,7 +49,7 @@ Every document of the project, by topic, with the version and date of its last u
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Development and source packaging | v0.0.53 (27 October 2026) |
 | [DOCKER_BUILD.md](DOCKER_BUILD.md) | Docker builder | v0.0.67-dev1 (17 November 2026) |
 | [DOCKER_BUILD_ROADMAP.md](DOCKER_BUILD_ROADMAP.md) | Docker builder roadmap | v0.0.53 (27 October 2026) |
-| [LINUX_BUILD.md](LINUX_BUILD.md) | Build AmiWind on Linux | v0.0.68-dev1 (20 November 2026) |
+| [LINUX_BUILD.md](LINUX_BUILD.md) | Build AmiWind on Linux | v0.0.68-dev7 (22 November 2026) |
 | [WINDOWS_BUILD.md](WINDOWS_BUILD.md) | Windows build entry points and WSL notes | v0.0.67-dev3 (18 November 2026) |
 | [WINDOWS_BUILD_ROADMAP.md](WINDOWS_BUILD_ROADMAP.md) | Windows build roadmap | v0.0.66-dev12 (16 November 2026), needs a refresh |
 | [FS-UAE-DEVELOPMENT.md](FS-UAE-DEVELOPMENT.md) | FS-UAE development access | v0.0.68-dev1 (20 November 2026), needs a refresh |
@@ -80,8 +80,8 @@ Every document of the project, by topic, with the version and date of its last u
 | [DEBUG_OVERLAYS.md](DEBUG_OVERLAYS.md) | Development overlays | v0.0.67-dev1 (17 November 2026) |
 | [GAME_RECORDER.md](GAME_RECORDER.md) | Gameplay recorder | v0.0.68-dev6 (22 November 2026) |
 | [ITEM_CYCLING.md](ITEM_CYCLING.md) | The light test and the item tester (dbg lighttest, dbg cycleitems) | v0.0.67-dev2 (18 November 2026) |
-| [LOOKBOOK.md](LOOKBOOK.md) | The confirmed look book | v0.0.67 (19 November 2026) |
-| [AMIWIND_CONSOLE_COMMANDS.md](AMIWIND_CONSOLE_COMMANDS.md) | AmiWind console commands | generated (v0.0.68-dev7) |
+| [LOOKBOOK.md](LOOKBOOK.md) | The confirmed look book | v0.0.68-dev7 (22 November 2026) |
+| [AMIWIND_CONSOLE_COMMANDS.md](AMIWIND_CONSOLE_COMMANDS.md) | AmiWind console commands | generated (v0.0.68-dev8) |
 | [CONSOLE_COMMANDS_MORROWIND.md](CONSOLE_COMMANDS_MORROWIND.md) | The original game's console commands in AmiWind | v0.0.68-dev4 (21 November 2026) |
 | [GAME_STATE_RESET.md](GAME_STATE_RESET.md) | Game state reset and failed loads | v0.0.67-dev1 (17 November 2026) |
 | [LOAD_ERRORS.md](LOAD_ERRORS.md) | When a place cannot be loaded | v0.0.67-dev1 (17 November 2026) |
@@ -129,9 +129,9 @@ Every document of the project, by topic, with the version and date of its last u
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [GAME_FEATURES.md](GAME_FEATURES.md) | Game features | v0.0.68-dev7 (20 November 2026) |
+| [GAME_FEATURES.md](GAME_FEATURES.md) | Game features | v0.0.68-dev8 (20 November 2026) |
 | [game-features.json](game-features.json) | game-features.json | data file |
-| [MWSCRIPT_FEATURES.md](MWSCRIPT_FEATURES.md) | MWScript features | v0.0.68-dev7 (22 November 2026) |
+| [MWSCRIPT_FEATURES.md](MWSCRIPT_FEATURES.md) | MWScript features | v0.0.68-dev8 (22 November 2026) |
 | [WORLD_MECHANISMS.md](WORLD_MECHANISMS.md) | World mechanisms | v0.0.64-dev1 (10 November 2026) |
 | [OPENING_SEQUENCE.md](OPENING_SEQUENCE.md) | The opening, step by step | v0.0.68-dev6 (22 November 2026) |
 | [mwscript-features.json](mwscript-features.json) | mwscript-features.json | data file |
@@ -141,11 +141,11 @@ Every document of the project, by topic, with the version and date of its last u
 | [WORLD_BOUNDS.md](WORLD_BOUNDS.md) | World bounds: the sea current at the edge of the world | v0.0.45 (19 October 2026) |
 | [WORLD_ESTIMATE.md](WORLD_ESTIMATE.md) | World estimate | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [WORLD_SURVEY.md](WORLD_SURVEY.md) | Vvardenfell terrain and cell-density survey | v0.0.66-dev2 (13 November 2026), needs a refresh |
-| [EXPANSIONS.md](EXPANSIONS.md) | The expansions: Tribunal and Bloodmoon | v0.0.68-dev3 (21 November 2026) |
+| [EXPANSIONS.md](EXPANSIONS.md) | The expansions: Tribunal and Bloodmoon | v0.0.68-dev7 (22 November 2026) |
 | [MOURNHOLD_NOTES.md](MOURNHOLD_NOTES.md) | Mournhold: observations on how Tribunal's city works | v0.0.67 (19 November 2026) |
 | [WORLD_TERRAIN.md](WORLD_TERRAIN.md) | Playable Vvardenfell terrain | v0.0.42-dev1 (17 October 2026), needs a refresh |
-| [WORLD_MAP_AND_JOURNAL.md](WORLD_MAP_AND_JOURNAL.md) | World map and progression journal | v0.0.67-dev1 (17 November 2026), needs a refresh |
-| [WORLD_TREE_SPRITES.md](WORLD_TREE_SPRITES.md) | World tree sprites and the Balmora comparison zone | v0.0.66-dev12 (16 November 2026), needs a refresh |
+| [WORLD_MAP_AND_JOURNAL.md](WORLD_MAP_AND_JOURNAL.md) | World map and progression journal | v0.0.68-dev7 (22 November 2026), needs a refresh |
+| [WORLD_TREE_SPRITES.md](WORLD_TREE_SPRITES.md) | World tree sprites and the Balmora comparison zone | v0.0.68-dev7 (22 November 2026), needs a refresh |
 | [BOUNDED_WORLD_CANDIDATES.md](BOUNDED_WORLD_CANDIDATES.md) | Bounded world candidates | v0.0.28 (4 October 2026), needs a refresh |
 | [POI_CHECKLIST.md](POI_CHECKLIST.md) | Points-of-interest checklist | v0.0.30 (7 October 2026), needs a refresh |
 | [DOOR_MAPPING.md](DOOR_MAPPING.md) | Original door mapping | v0.0.68-dev5 (21 November 2026) |
@@ -172,7 +172,7 @@ Every document of the project, by topic, with the version and date of its last u
 | --- | --- | --- |
 | [ANIMATION.md](ANIMATION.md) | Character animation | v0.0.63-dev2 (2026-11-09) |
 | [ANIMKIT.md](ANIMKIT.md) | Animation kit | v0.0.66-dev1 (13 November 2026) |
-| [ACTOR_STATE.md](ACTOR_STATE.md) | The actor record | v0.0.66-dev10 (16 November 2026) |
+| [ACTOR_STATE.md](ACTOR_STATE.md) | The actor record | v0.0.68-dev7 (22 November 2026) |
 | [ACTOR_STATS.md](ACTOR_STATS.md) | Every being's stats | v0.0.61-dev3 (2026-11-06) |
 | [CHARACTER_CREATION.md](CHARACTER_CREATION.md) | Next milestone: dock and Census Office character creation | v0.0.67 (19 November 2026), needs a refresh |
 | [CHARACTER_EQUIPMENT_ROADMAP.md](CHARACTER_EQUIPMENT_ROADMAP.md) | Mutable character equipment and shared assets | v0.0.67-dev2 (18 November 2026), needs a refresh |
@@ -193,7 +193,7 @@ Every document of the project, by topic, with the version and date of its last u
 | [PLAYER_BODY.md](PLAYER_BODY.md) | The player's body: parts per race and sex, first and third person | v0.0.67 (19 November 2026) |
 | [PLAYER_MOVEMENT.md](PLAYER_MOVEMENT.md) | Player scale, collision and camera motion | v0.0.66-dev9 (15 November 2026) |
 | [MOVEMENT_SPEED_STUDY.md](MOVEMENT_SPEED_STUDY.md) | Movement speed study | v0.0.48-dev2 (23 October 2026) |
-| [COMBAT.md](COMBAT.md) | Combat and the Vivec Arena minigame | v0.0.67 (19 November 2026) |
+| [COMBAT.md](COMBAT.md) | Combat and the Vivec Arena minigame | v0.0.68 (22 November 2026) |
 | [MECHANICS_PARITY.md](MECHANICS_PARITY.md) | Mechanics parity: every actor by its own stats | v0.0.66-dev1 (13 November 2026) |
 | [RESTING.md](RESTING.md) | Resting and waiting | v0.0.67 (19 November 2026) |
 | [MAGIC_EFFECTS.md](MAGIC_EFFECTS.md) | Magic effects | v0.0.68-dev1 (20 November 2026) |
@@ -217,7 +217,7 @@ Every document of the project, by topic, with the version and date of its last u
 | [VOICED_DIALOGUE.md](VOICED_DIALOGUE.md) | Voiced dialogue: event lookup and runtime plan | v0.0.66-dev12 (16 November 2026) |
 | [DIALOGUE_AND_WAIT.md](DIALOGUE_AND_WAIT.md) | Dialogue, character confirmation and waiting — v0.0.23-dev4 | v0.0.63-dev5 (9 November 2026), needs a refresh |
 | [DIALOGUE_DESIGN.md](DIALOGUE_DESIGN.md) | Dialogue: design (topics, conditions, choices, disposition, journal) | v0.0.62-dev2 (2026-11-08) |
-| [DIALOGUE_FEATURES.md](DIALOGUE_FEATURES.md) | Dialogue features | v0.0.68-dev7 (18 November 2026) |
+| [DIALOGUE_FEATURES.md](DIALOGUE_FEATURES.md) | Dialogue features | v0.0.68-dev8 (18 November 2026) |
 | [dialogue-features.json](dialogue-features.json) | dialogue-features.json | data file |
 | [dialogue-choices.json](dialogue-choices.json) | dialogue-choices.json | data file |
 | [VOICE_FEATURES.md](VOICE_FEATURES.md) | Voices and sounds | v0.0.67-dev2 (19 November 2026) |
@@ -231,12 +231,12 @@ Every document of the project, by topic, with the version and date of its last u
 | --- | --- | --- |
 | [HUD.md](HUD.md) | HUD: weapon and magic boxes | v0.0.67-dev2 (18 November 2026), needs a refresh |
 | [HUD_ACTIVE_EFFECTS.md](HUD_ACTIVE_EFFECTS.md) | Active-effect HUD, icons and magic indicators | v0.0.64-dev5 (11 November 2026), needs a refresh |
-| [KEYMAPS.md](KEYMAPS.md) | Keyboard and command reference | v0.0.67-dev2 (18 November 2026) |
+| [KEYMAPS.md](KEYMAPS.md) | Keyboard and command reference | v0.0.68-dev7 (22 November 2026) |
 | [IN_GAME_BUTTONS.md](IN_GAME_BUTTONS.md) | In-game action buttons | v0.0.29-dev4 (6 October 2026), needs a refresh |
 | [INTERACTION_LAYOUTS.md](INTERACTION_LAYOUTS.md) | Interaction layouts | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [PAPER_FONT_OPTIONS.md](PAPER_FONT_OPTIONS.md) | Paper font conversion options | v0.0.42-dev1 (17 October 2026), needs a refresh |
 | [UI_FONT_VARIANTS.md](UI_FONT_VARIANTS.md) | Original-font and message-box direction | v0.0.42-dev1 (17 October 2026), needs a refresh |
-| [CAMERA_MARKS.md](CAMERA_MARKS.md) | Camera marks | v0.0.42-dev1 (17 October 2026), needs a refresh |
+| [CAMERA_MARKS.md](CAMERA_MARKS.md) | Camera marks | v0.0.68-dev7 (22 November 2026), needs a refresh |
 
 ## Tools and the Toolkit
 
@@ -269,14 +269,14 @@ Every document of the project, by topic, with the version and date of its last u
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [BUGS.md](BUGS.md) | Bug tracker | generated (v0.0.68-dev7) |
+| [BUGS.md](BUGS.md) | Bug tracker | generated (v0.0.68-dev8) |
 
 ## Releases
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [CHANGELOG.md](CHANGELOG.md) | Changelog | v0.0.68-dev7 (22 November 2026) |
-| [ROADMAP.md](ROADMAP.md) | Roadmap and implementation options | v0.0.68-dev7 (22 November 2026) |
+| [CHANGELOG.md](CHANGELOG.md) | Changelog | v0.0.68-dev8 (22 November 2026) |
+| [ROADMAP.md](ROADMAP.md) | Roadmap and implementation options | v0.0.68-dev8 (22 November 2026) |
 | [RELEASE_WORKFLOW.md](RELEASE_WORKFLOW.md) | AmiWind release workflow | v0.0.66-dev12 (16 November 2026) |
 | [CI.md](CI.md) | Build audit and the local pipeline | v0.0.54 (27 October 2026) |
 | [CI_DRY_RUN.md](CI_DRY_RUN.md) | Asset-free compilation and boot image | v0.0.54 (27 October 2026) |
