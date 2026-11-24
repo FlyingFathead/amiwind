@@ -1,6 +1,6 @@
 # When a place cannot be loaded
 
-_Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
+_Last updated with AmiWind v0.0.68 (24 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -10,6 +10,7 @@ _Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 - [The console](#the-console)
 - [Before anything is left](#before-anything-is-left)
 - [After the load has started](#after-the-load-has-started)
+- [When memory fills: the emergency purge](#when-memory-fills-the-emergency-purge)
 - [No error in play ends the game](#no-error-in-play-ends-the-game)
 - [Every way into a place](#every-way-into-a-place)
 - [Testing it](#testing-it)
@@ -30,8 +31,12 @@ The box shows the error itself:
 
 - `Map <name> was not found.` (the place's name beside the map's name when it is known)
 - `Map <name> was found but could not be loaded.` with the reason on the next line:
-  `Broken map file (bad header / short read / bad lump N).`, `Not enough memory (needs N KB, N KB free).`,
-  `The map did not spawn.`, `The load did not finish.`, `A file it needs is missing (...).` or `Load error: ...`
+  `Broken map file (bad header / short read / bad lump N).`, `The map did not spawn.`, `The load did not finish.`,
+  `A file it needs is missing (...).` or `Load error: ...`
+- `Not enough memory to load <place> (needs N KiB, M KiB available).` (the place's name, or the map's when it is not
+  known) when the place does not fit, even after the
+  emergency purge below; once the way back has arrived, the last line is `OK returns you to <place>, where you came
+  in.`
 - `No map holds the point <X> <Y>.` (a teleport to coordinates)
 - when the way back failed too: `..., and the way back to <map> failed as well.`, then where the game went on
   (`The last autosave (Autosave 2) was loaded. You are in Seyda Neen.` or `The previous map, balmora, was loaded.`);
@@ -47,6 +52,13 @@ Broken map file (bad lump 7). Code LF4.
 You are in Balmora.
 ```
 
+and for a room whose models do not fit:
+
+```text
+Not enough memory to load Akulakhan's Chamber (needs 18130 KiB, 14783 KiB available). Code LF5.
+OK returns you to Balmora, where you came in.
+```
+
 ## The codes
 
 | Code | Kind | When |
@@ -55,7 +67,7 @@ You are in Balmora.
 | LF2 | map not on this disk | a map of the game this build leaves out (a door whose room was not converted, a test build) |
 | LF3 | no map holds the point | a teleport to original coordinates that no map of this disk covers |
 | LF4 | broken map file | the map file's header does not read, the file ends before its lumps do (a short read), or a lump holds data that does not decode (bad lump N, Quake's lump numbers 0-14) |
-| LF5 | not enough memory | the map's world does not fit the memory left for a map, or an allocation failed while it loaded |
+| LF5 | not enough memory | the map's world does not fit the memory left for a map, an allocation failed while it loaded, or a room's record or models found no room after every growth step; the emergency purge and one more try come first |
 | LF6 | the map did not spawn | the file loaded but the map could not start (too many models, a CHIM frame without its world) |
 | LF7 | the load did not finish | the load made no progress for the time limit (120 seconds by default) |
 | LF8 | a file the map needs is missing | a model or another file the map names is not on the disk |
@@ -110,6 +122,32 @@ load started runs (`engine/aga/src/aw_scene.c` `AW_SceneLoadFailed`):
 
 The design follows Quake III Arena's rule that a failed hunk allocation ends the level, not the program (the idea only;
 no code is taken from it).
+
+## When memory fills: the emergency purge
+
+A load that fails because memory ran out (LF5) is not given up at once. Before the way back, the game gives back every
+cache it can make again on demand: the animation tables and posed frames of the skeletal actors and the cached tables
+of the areas left (each with its own console line), then one line of figures (the numbers here show the form, not a
+measurement):
+
+```text
+Memory purge for rifa4ef181ed: 2304 KiB of re-makeable memory given back by 2 releasers; Fast RAM free 2519 -> 4823 KiB, largest block 2366 -> 4670 KiB.
+Memory: rifa4ef181ed needs 18130 KiB, 14783 KiB available (room); tried once more after the purge.
+```
+
+The same load then runs once more, from the same place left and to the same arrival. When it loads, the console says
+`Memory: <map> loaded on the retry after the emergency purge.`; when it still does not fit, the way back runs and the
+box above names the place and the memory figures. The load is tried again only when that can change the answer: not
+when the purge gave nothing back (the same load would fail the same way), and not when the memory that ran out was the
+Hunk's (the Hunk is set at the start, so a purge of the Fast RAM does not grow it; the Quake cache inside it is already
+taken back by every allocation there). A CHIM room grows by the free Fast RAM and then by the rest of the Hunk before it
+gives up (its own steps); a room that still does not fit now ends as LF5 with its models' need and what the zone and its
+banks give, instead of a general load error. The place the player came from, his position and facing, and the game
+state are kept through all of it, so the way back always finds its place.
+
+`dbg mempurge` shows whether the purge is on, how many purges ran and what they gave back, how many loads were tried
+again and how many of them loaded, and the free Fast RAM. `dbg mempurge off` switches the purge and its retry off (a
+load that does not fit goes to the box and the way back at once), `dbg mempurge on` back on (the default; not saved).
 
 ## No error in play ends the game
 
@@ -168,12 +206,16 @@ fails), `lump` (the map's first section read gets bad data, so the loader's own 
 `hang` (the load never finishes; with `dbg loadfail timeout 10` the limit comes after 10 seconds). `dbg hosterror
 script`, `client` or `now` makes an error in play: inside the next frame's script step, in the screen side's read of
 the next server message, or at once. A teleport to a name that does not exist (`dbg tp nowhere`) shows LF1. A
-truncated file (a short read) and a bad header are tested on the host with real damaged files.
+truncated file (a short read) and a bad header are tested on the host with real damaged files. `dbg mempurge test`
+makes the next map load short of memory once, at its start: with the purge on, the purge runs and the load is tried
+once more and arrives; after `dbg mempurge off`, the box names the place and the memory figures and the way back runs
+(`tests/sessions/memory_purge.txt` is the session that pictures both).
 
 The host tests: `tests/aga_loaderr_test.c` (the codes, the box and notice texts, the console block, the header check),
 `tests/aga_scene_test.c` (the refusals, a door's failed load and its way back, a way back that fails, a saved game's
-failed load, a travel ride refused before the fare, and the chain: an error in play, again within a minute, the
-autosave and the previous map), `tests/aga_heap_watcher_test.c` (the allocators), and
+failed load, a travel ride refused before the fare, the chain: an error in play, again within a minute, the
+autosave and the previous map, and the emergency purge: the purge, the one retry and its arrival, a retry that fails
+as well, the purge switched off, a purge with nothing to give back and the Hunk's memory), `tests/aga_heap_watcher_test.c` (the allocators), and
 `tests/aga_bsp_slice_load_test.c` (a broken or truncated map file, another version, bad data from the read-ahead and a
 section's memory not had, each named with its kind, its lump and where the lump starts). `tests/test_recover_in_play.py`
 keeps the wiring the host tests leave out (the test aids, the save hooks, the counters and the engine smoke's check).
@@ -182,4 +224,6 @@ keeps the wiring the host tests leave out (the test aids, the save hooks, the co
 
 Resident: two error records, the box's text and two positions, under 3 KB; per frame of play, the player's position
 copied once. During a map load, a few comparisons a frame for the time limit. Per scene load: one file open and its
-124-byte header for the check before leaving.
+124-byte header for the check before leaving. The emergency purge costs nothing until a load fails for memory: then the
+releasers' frees and, when it can help, one more load of the same place; what it gave back is made again from disk
+when it is needed (the first skeletal actor drawn, the first area table asked for).

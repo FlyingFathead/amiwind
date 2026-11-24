@@ -22,7 +22,7 @@
 | Persists in | v0.0.66-dev12 (last seen) |
 | Severity | medium: Regressed in v0.0.66-dev12 (was low): a resident can stand on a door's arrival point or in front of a door; since DOOR-ARRIVAL-INSIDE-ACTOR-66 it no longer t... |
 | Family | Actors and NPCs (`actors-npc`) |
-| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
+| Deferred by the maintainer | 2026-11-24: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up |
 | Came back (regression) | in v0.0.66-dev12 (fixed in v0.0.66-dev11 before) |
 | Playtest version | 2026_11_15_v0.0.66-dev7_full-v0.0.66-dev7_a33bba9 |
 | From commit | source and engine a33bba9 |
@@ -56,7 +56,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-18: v0.0.67-dev2: The same session with the fixed engine (gate 11462 on d9556d22): the use key went to the street door on the 4th aim from its arrival point, no actor in the way (aims 1 to 3 had the door 6.0 to 6.7 units off the aim).
 - 2026-11-18: fixed in source: a gated commit, v0.0.67-dev2 (3e7308b9); tests/aga_ambient_test.c (Fargoth's compiled Wander package as the v0.0.67-dev2 build has it, after a load that left him by the census street door; it fails with the old rule) and tests/test_ambient_lut.py test_routes_stay_at_the_placement (the wiring): a loaded wanderer's routes stay where the game data has them and its current destination is the one nearest it, so the door rule sends it on from a door as before the save; the cause of the return in the v0.0.67-dev2 journey (every ...
 - 2026-11-18: confirmed by a test: the opening journey, v0.0.67-dev2 image with the engine of 2d772eb7 (gate 11463); tests/sessions/journey_opening.txt, both parts in FS-UAE at 32 MB Fast, warp off, with that engine; and two sessions from the v0.0.67-dev2 journey's quicksave, on that image's own engine and on the engine of gate 11462: the journey passed 46 of 46 checks: after the game's own quicksave was loaded, step 9 went through the census office's street door (the census map, the package carried, no save held back), with no resident standing at the door (Fargoth was ...
-- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
+- 2026-11-24: deferred by the maintainer: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up
 
 <!-- END GENERATED TIMELINE -->
 

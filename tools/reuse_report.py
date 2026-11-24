@@ -107,8 +107,8 @@ def upstream_difference(run, old_run, stage):
         return f"{stage}: old record refused ({'; '.join(old.get('reasons') or ['unknown'])[:120]})"
     if not new.get('reusable'):
         return f"{stage}: new record refused ({'; '.join(new.get('reasons') or ['unknown'])[:120]})"
-    from unit_tree import describe, differences, of_manifest
-    found = differences(new.get('tree') or of_manifest(new), old.get('tree') or of_manifest(old))
+    from unit_tree import describe, differences, tree_of
+    found = differences(tree_of(new), tree_of(old))
     return f'{stage}: {len(found)} units differ ({describe(found, 3)})' if found else f'{stage}: same outputs'
 
 

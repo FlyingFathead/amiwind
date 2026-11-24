@@ -48,6 +48,7 @@ Family: Scene changes, arrivals and handoffs (`transitions-arrivals`). Cell, reg
 - [DISTRICT-ARRIVAL-DRIFT-67](DISTRICT-ARRIVAL-DRIFT-67.md): After a teleport into three of Mournhold's districts the player does not stand still: 9 to 48 units of drift in four seconds
 - [DISTRICT-DOOR-SIDE-WALL-NO-FOCUS-67](DISTRICT-DOOR-SIDE-WALL-NO-FOCUS-67.md): Two doors of the Royal Palace courtyard cannot be used from outside: the game focuses nothing when the player stands in front of them
 - [DOOR-BANK-STREAMED-FRAME-51](DOOR-BANK-STREAMED-FRAME-51.md): After a streamed crossing into another region frame, that frame s doors cannot be used: the engine reads only the start frame s door bank (830 of 1,102 entrances)
+- [DOOR-CHECK-SEA-STORE-NAMES-68](DOOR-CHECK-SEA-STORE-NAMES-68.md): The image's door check traced Solstheim's doors in the far sea's world and counted 83 of them as unreachable
 - [DOOR-HALL-SWING-DIRECTION-48](DOOR-HALL-SWING-DIRECTION-48.md): The census hall door may open the opposite way from the original game: it turns to closed plus 90 degrees where the original rule gives closed minus 90
 - [DOOR-MOVERS-NOT-IN-55](DOOR-MOVERS-NOT-IN-55.md): Gates, trapdoors and bar counter flaps do not move: only doors that turn on a vertical hinge open
 - [DOOR-PRISON-MARKER-65](DOOR-PRISON-MARKER-65.md): An invisible door by the census office in Seyda Neen drops the player under the office floor
@@ -76,5 +77,7 @@ Related bugs in other categories:
 
 - [CHIM-ROOM-HEART-CHAMBER-LOAD-50](CHIM-ROOM-HEART-CHAMBER-LOAD-50.md): Entering Akulakhan's Chamber when it cannot load stops the game with an error at the console instead of refusing at the door
 - [HEART-CHAMBER-LOAD-HANG-62](HEART-CHAMBER-LOAD-HANG-62.md): The game stops on the Loading screen when teleporting to the heart chamber, with the music still playing
+- [LF5-BOX-DESTINATION-MAP-NAME-68](LF5-BOX-DESTINATION-MAP-NAME-68.md): When a load runs out of memory, the box writes the target as an internal file label instead of its in-game place
+- [ROOM-NO-FIT-LOAD-ERROR-NOT-MEMORY-68](ROOM-NO-FIT-LOAD-ERROR-NOT-MEMORY-68.md): A room whose models do not fit is reported as a general load error, without the memory it needs and has
 
 <!-- END GENERATED CATEGORY -->

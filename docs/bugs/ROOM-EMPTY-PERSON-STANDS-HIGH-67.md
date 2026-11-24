@@ -49,6 +49,7 @@ Family: Object placement and in-game geometry (`placement-geometry`). Placed obj
 - [ROCK-FLORA-SURFACE-29](ROCK-FLORA-SURFACE-29.md): Angular rock-like surfaces newly appearing in Bitter Coast
 - [ROOM-GROUND-STEEP-ICE-66](ROOM-GROUND-STEEP-ICE-66.md): With Bloodmoon selected, the image stage stopped on one Hound of Hircine in the Mortrag Glacier Inner Ring: its feet stand on a steep part of the converted ice floor
 - SHACK-VISIBILITY-29 (no report page): Indrele Rathryon shack front walls missing
+- [SOL-SEA-INVISIBLE-BLOCKER-68](SOL-SEA-INVISIBLE-BLOCKER-68.md): An object in Solstheim's eastern waters is not drawn but still stops a player walking on the water
 - [VODUNIUS-HOUSE-HOLES-23](VODUNIUS-HOUSE-HOLES-23.md): Visibility holes in Vodunius Nuccius' house in Seyda Neen
 - [WEDGE-TRAP-24](WEDGE-TRAP-24.md): wedge1: the player is trapped at -225,348,131
 - [WORLD-SHORE-OPEN-GEOMETRY-38](WORLD-SHORE-OPEN-GEOMETRY-38.md): Shoreline objects show large open sections and thin disconnected edges

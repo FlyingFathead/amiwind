@@ -1,6 +1,6 @@
 # The CHIM progress map: what CHIMport is and what every colour means
 
-_Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
+_Last updated with AmiWind v0.0.68 (24 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -199,7 +199,7 @@ the successful successor does not transfer acceptance to a later repair.
 
 ## What CHIMport is
 
-Morrowind's world is one big outdoor space made of square cells (Vvardenfell has 1,292 land cells, Solstheim 144; with its 98 sea-floor cells and 19 open-sea cells Vvardenfell's
+Morrowind's world is one big outdoor space made of square cells (Vvardenfell has 1,292 land cells, Solstheim 144 land cells in the game since v0.0.68; with its 98 sea-floor cells and 19 open-sea cells Vvardenfell's
 outdoors on CHIM is 1,409 cells, see [what we count](CELL_TRACKER.md#what-we-count)).
 AmiWind started by cutting that space into many small Quake maps, one per region, and loading them one at a time.
 **CHIMport** is the work of moving the whole island from those legacy Quake region maps onto CHIM, the project's
@@ -342,9 +342,9 @@ as the current count or as evidence that lava is still wholly unconverted.
 In the grouped legend, Solstheim's cells have a chip and colour of their own (greyish violet, "Solstheim (Bloodmoon)") under
 "not in the game yet", so "not started" is left for any other cell the conversion has not reached.
 
-The public reference includes **144 Solstheim land cells** as not started.
-Vvardenfell has been reached throughout. These are separate island totals;
-Solstheim is not in the 1,292-cell Vvardenfell denominator.
+Since v0.0.68 no cell is left in this colour: Solstheim's 153 cells (144 land and 9 sea) are built and in the game, and
+Vvardenfell has been reached throughout. These are separate island totals; Solstheim is not in the 1,292-cell
+Vvardenfell denominator.
 
 ## Blue: empty sea
 

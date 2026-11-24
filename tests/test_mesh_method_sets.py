@@ -136,6 +136,14 @@ class TheModuleRunner(unittest.TestCase):
 
 
 class TheTestRoute(unittest.TestCase):
+    def setUp(self):
+        # the test route is a -devN option (project_version.require_private_test_version refuses it on an rc or final
+        # VERSION): its commands are checked under a dev version, so the tests hold on a release line too; a test of the
+        # refusal sets its own VERSION inside
+        patcher = mock.patch.object(build, 'VERSION', '0.0.0-dev1')
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def commands(self, **options):
         values = dict(chim_sol_test='-26,26:l', chim_sol_tree_copies=None, workspace=Path('/ws'), data_files='/data',
                       sdk='/sdk')

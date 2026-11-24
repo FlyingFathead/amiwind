@@ -1,6 +1,6 @@
 # The expansions: Tribunal and Bloodmoon
 
-_Last updated with AmiWind v0.0.68-dev8 (22 November 2026)._
+_Last updated with AmiWind v0.0.68 (24 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -26,11 +26,10 @@ them today, what can be seen in the game now, how the two places are planned to 
 be missing. The short version: the data of both expansions is part of the build by default since v0.0.66-dev2 and
 their rooms are in the image. Since v0.0.67 Mournhold is reached from Ebonheart through the characters' own dialogue and
 back, and its five outdoor districts, built as a world of their own, can be walked; its quests and much of its play are
-not ready. Since v0.0.68-dev3 Solstheim's open terrain cells are built, as a world of their own, and reached only by
-`dbg tp` to their frames for now: no door, boat or place name leads there yet. Since v0.0.68-dev8 all 144 are in,
-the Mortrag Glacier and its eight neighbouring cells with the glacier's own ice method
-([how the glacier is approached](chim/SOLSTHEIM_GLACIER.md)), and so are the island's seabed and open-sea cells that
-the game data defines (see [Solstheim](#solstheim)).
+not ready. Since v0.0.68 Solstheim is in the game: all 153 of its cells are built, land and sea, with the Mortrag
+Glacier ([how the glacier is approached](chim/SOLSTHEIM_GLACIER.md)); one open sea joins it to Vvardenfell, and it is
+reached by the boat from Khuul, by swimming or by Water Walking (see [Solstheim](#solstheim)); its quests
+and much of its play are not ready.
 
 ## What the expansions are, and your own copies
 
@@ -97,7 +96,7 @@ builder warns, names the missing expansion and builds the base game alone.
   where the boat from Khuul lands; `dbg tp ravenrock` at Raven Rock's dock; `dbg tp skaal` in Skaal Village; and
   `godsreach`, `greatbazaar`, `brindisi`, `palacecourtyard` and `templecourtyard` in Mournhold's districts. Each works
   when the build selected its expansion and the image holds the place; otherwise it says which of the two is missing and
-  the player stays where he is. Today the Reception Area and the five districts are held; Solstheim's places are not yet
+  the player stays where he is. Today the Reception Area, the five districts and Solstheim's places are held
   (`config/expansion-arrivals.json`). On the v0.0.67-dev3 image all five districts were visited by teleport (19 November
   2026); the teleport to the Great Bazaar landed under its street and under water
   ([MOURNHOLD-BAZAAR-UNDER-WATER-67](bugs/MOURNHOLD-BAZAAR-UNDER-WATER-67.md), open; a landing that searches for the
@@ -125,7 +124,7 @@ builder warns, names the missing expansion and builds the base game alone.
 
 ## What you cannot see yet
 
-No finished Mournhold or Solstheim is in the game. Mournhold's five outdoor districts are in the image and can be
+Neither Mournhold nor Solstheim is finished: their quests are not played through yet. Mournhold's five outdoor districts are in the image and can be
 walked, but they are not ready: they draw at 8 to 16 frames a second
 ([DISTRICT-FRAME-RATE-LOW-67](bugs/DISTRICT-FRAME-RATE-LOW-67.md)), the Plaza is not drawn looking south from its
 arrival point ([DISTRICT-PLAZA-NOT-DRAWN-FROM-ARRIVAL-67](bugs/DISTRICT-PLAZA-NOT-DRAWN-FROM-ARRIVAL-67.md)), Godsreach's
@@ -140,8 +139,8 @@ and that is not proven ([GODSREACH-CANAL-NO-WATER-67](bugs/GODSREACH-CANAL-NO-WA
 Mournhold move the water since v0.0.68-dev2, seen working in play
 ([MWSCRIPT-WATER-LEVEL-STATIC-67](bugs/MWSCRIPT-WATER-LEVEL-STATIC-67.md)), and the Dark Brotherhood's attack in sleep
 that starts Tribunal did not come on the dev3 image; fixed in source, to be seen in play
-([GETPCSLEEP-NOT-CARRIED-OUT-67](bugs/GETPCSLEEP-NOT-CARRIED-OUT-67.md)). Solstheim's first open terrain cells are in the
-build since v0.0.68-dev3, reached by `dbg tp` only, with no boat to the island yet; and the
+([GETPCSLEEP-NOT-CARRIED-OUT-67](bugs/GETPCSLEEP-NOT-CARRIED-OUT-67.md)). Solstheim's 153 cells are in the
+build since v0.0.68, reached by the boat from Khuul, by `dbg tp` and across the open sea; and the
 scripts of the expansions' places that are not in the image yet do not run (since v0.0.67 the build binds the
 expansions' own placements, so a script runs where the image holds its place; the v0.0.66 build bound none of them).
 The data being selected by default is the road to them, not their arrival.
@@ -164,6 +163,9 @@ Counted on the v0.0.66 build (17 November 2026):
 | Mournhold (Tribunal) | the five districts 0 of 5; the rooms in the image except the districts and two set-aside cells | 354 / 90 of 412 | 194 / 0 |
 | Solstheim (Bloodmoon) | 0 of 144 land cells; its rooms in the image | 274 / 8 of 476 | 256 / 0 |
 | Placed in Vvardenfell by the expansions | (base game cells) | 59 / 12 of 59 | Tribunal 42 in use, all run; Bloodmoon 54 in use, 48 run |
+
+(Counts of 17 November 2026; v0.0.68 builds all of Solstheim's 153 cells, see the
+[CHIM progress tracker](chim/PROGRESS_TRACKER.md).)
 
 Most of the incomplete ones lack one of three things: the script attached to them, a place that is not built yet (57
 stand in Mournhold's districts, 202 outdoors on Solstheim), or an inventory rolled from a levelled list, a gap the base
@@ -261,7 +263,7 @@ The image installs that world as the store `chimsol` with the frame maps `sl0000
 Mournhold's module hold it: every finished cell is taken, the image's last tables know the frame maps, and the
 real frame maps are tried against the image's per-map checks right after the world stage. Until the cells are
 finished in the tracker reference the module adds nothing to a build. Doors, travel, the placed people and
-creatures and the sea between the islands follow in later steps.
+creatures and the sea between the islands came with v0.0.68 (below).
 
 The module `tribunal-mournhold` has two stages:
 
@@ -300,8 +302,8 @@ off` leaves the module out.
 
 A cell that an expansion adds to the shared exterior grid (one of Solstheim's own) has no open-world map and is not
 planned by the world survey. The exterior checklist can plan it as a cell of its own, with a row in the region table
-after every existing row, so no existing row, name or saved position moves. No build takes such a cell yet:
-Solstheim's module follows Mournhold's.
+after every existing row, so no existing row, name or saved position moves. Solstheim's module builds such cells
+since v0.0.68-dev3.
 
 A district counts as built when every cell of its block is converted. For such a district the image step reads the
 doors, the arrivals and the jail's marker where the presented world has them, with the same move that placed the
@@ -344,19 +346,24 @@ Vvardenfell view, and the densest forest region lies at exterior cell (-27, 25) 
 The survey keeps the 155 cells in its list of expansion-only cells and plans none of them until the exterior is
 converted ([world survey](WORLD_SURVEY.md)). Of the 5 open-water cells, two (-19,14 and -19,15) are open-sea cells
 of the main game's sea, already built with Vvardenfell's; -20,15 is built by the module since v0.0.68-dev8; -29,23 and
--28,24 join it in the first build after v0.0.68-dev8, now that their open sea is measured in the tracker as Solstheim's
+-28,24 are built by the module since v0.0.68-dev9, now that their open sea is measured in the tracker as Solstheim's
 ([CHIM-SEA-BETWEEN-ISLANDS-64](bugs/CHIM-SEA-BETWEEN-ISLANDS-64.md),
-[TRACKER-OCEAN-CELL-ISLAND-BASE-ONLY-68](bugs/TRACKER-OCEAN-CELL-ISLAND-BASE-ONLY-68.md)). The rest of the sea between the islands has no
-cell in the game data and stays beyond the edge of the world, as the main game's open sea outside its cells.
+[TRACKER-OCEAN-CELL-ISLAND-BASE-ONLY-68](bugs/TRACKER-OCEAN-CELL-ISLAND-BASE-ONLY-68.md)). The rest of the sea between
+and around the islands has no cell in the game data; the original game makes such a cell as open water when it is
+needed, and since v0.0.68 AmiWind builds every one of them inside the world map's box (cells x
+-29 to 23, y -19 to 28): the 542 inside the base game's own box with Vvardenfell's world, the 440 of the area Bloodmoon
+adds as a world of their own beside Solstheim's ([CHIM_REGIONS.md](chim/CHIM_REGIONS.md), "The recordless open sea").
+You can swim, walk on water or jump from Vvardenfell to Solstheim and back, as well as take the boat; the
+edge of the world is only at the edge of the map. The world map spans the same box.
 
 ## The plan
 
 - **Tribunal (Mournhold):** the five districts as one exterior of their own, the ordinary rooms, the weather driven by Tribunal's
   scripts, the teleport trip above, and Tribunal's scripts (235 of its 236 used scripts run since v0.0.68, the water
   levers of Old Mournhold among them; the one left belongs to a room the image does not hold).
-- **Bloodmoon (Solstheim):** the exterior cells as part of the outdoor map, with the tree method its forests need (the
-  star-shaped spruces and tree crowns are test-build methods that are measured but not settled), then its rooms and the
-  245 scripts that belong to Solstheim.
+- **Bloodmoon (Solstheim):** done in v0.0.68 for the cells, the rooms, the sea and the scripts (309 of 310 used scripts
+  run); the tree method its forests need (the star-shaped spruces and tree crowns are test-build methods that are
+  measured but not settled) and the quests played through are next.
 - **Both:** the builder checks the expansion files before any stage, and every table reads the expansions. The
   [roadmap](ROADMAP.md) has the order and the current state.
 
@@ -393,7 +400,7 @@ the expansions make to the base game is being made; the chains below are what is
      player to find his airship, which lies at a crash site in central Solstheim, west of the Altar of Thrond. Needs him
      placed in Ald'ruhn, his quest in the journal, and the crash site present on Solstheim.
 3. **Solstheim.** The next island of the one outdoor grid, built through the same conversion and reduction methods as
-   Vvardenfell. Raven Rock's stages are measured one by one, the sea between the islands is generated, and its rooms are
+   Vvardenfell. Raven Rock's stages are measured one by one, the sea between the islands is generated (done in v0.0.68), and its rooms are
    ordinary rooms.
 4. **Mournhold.** The five districts become one exterior of their own, joined by their doors; the rooms are ordinary
    interiors. The trip there and back gets its own playtest.

@@ -1,13 +1,16 @@
 # Current project state
 
-_Last updated with AmiWind v0.0.67 (19 November 2026)._
+_Last updated with AmiWind v0.0.68 (24 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [19 November 2026: v0.0.67 - Tribunal Introduced](#19-november-2026-v0067---tribunal-introduced)
+- [24 November 2026: v0.0.68 - Solstheim Is Here](#24-november-2026-v0068---solstheim-is-here)
   - [What already works](#what-already-works)
   - [What comes next](#what-comes-next)
+- [19 November 2026: v0.0.67 - Tribunal Introduced](#19-november-2026-v0067---tribunal-introduced)
+  - [What already works (v0.0.67)](#what-already-works-v0067)
+  - [What comes next (v0.0.67)](#what-comes-next-v0067)
 - [6 November 2026: v0.0.61-dev3 - development snapshot](#6-november-2026-v0061-dev3---development-snapshot)
 - [25 October 2026: v0.0.51 - Let There Be More Inner Light](#25-october-2026-v0051---let-there-be-more-inner-light)
 - [21 October 2026: v0.0.47-dev1 - development snapshot](#21-october-2026-v0047-dev1---development-snapshot)
@@ -34,13 +37,43 @@ _Last updated with AmiWind v0.0.67 (19 November 2026)._
 
 <!-- contents end -->
 
-## 19 November 2026: v0.0.67 - Tribunal Introduced
+## 24 November 2026: v0.0.68 - Solstheim Is Here
 
-The newest release is [v0.0.67: Tribunal Introduced](releases/notes/RELEASE-v0.0.67.md), running on CHIM Engine v0.2.2
+The newest release is [v0.0.68: Solstheim Is Here](releases/notes/RELEASE-v0.0.68.md), running on CHIM Engine v0.2.2
 and needing 32 MB of Fast RAM. The sections below this one describe the project as it stood on earlier dates and are
 kept as history; the [changelog](CHANGELOG.md) and the release notes have every version in between.
 
 ### What already works
+
+The framework of the Game of the Year edition is in the game: from your own copy of Morrowind, Tribunal and Bloodmoon,
+AmiWind builds the three game files into one game. Vvardenfell's outdoors (1,409 exterior cells on CHIM, 1,292 of them
+land and 117 sea) and 1,121 of its 1,123 interiors are CHIM maps, with the people and creatures the game places in them
+(the other two rooms are room maps of our own, in the game all the same). Every room of the three game files is in the
+game: 1,134 of 1,134 interiors of Morrowind, 96 of 96 of Tribunal and 98 of 98 of Bloodmoon. Tribunal's Mournhold is
+reached from Ebonheart and walked from the palace to the Plaza. Bloodmoon's Solstheim is in: all 153 of its cells (land
+and sea) and all of its rooms are built, one open sea joins it to Vvardenfell, so you can take the boat from Khuul or
+swim across, its quest and underwater entrances can be used, and its werewolves, weathers and ice are in. The game's
+scripts run: of the 1,074 the original uses, 1,063 run and 9 more are carried by AmiWind's own code. Character creation
+through the opening, the inventory, the journal and the map, saving and loading with what the player changes staying
+changed, combat and casting, talking and the services, crime with witnesses, guards and jail, alchemy, and containers
+are in. The tracker of the base game's systems ([game features](GAME_FEATURES.md)) counts what is done, partial and
+missing.
+
+### What comes next
+
+Playing Tribunal's and Bloodmoon's quests through from start to finish, conversation with the creatures that have lines,
+the journal's dated quest entries (they carry no link spans yet) and its topic list (no letter index yet), a marker for
+each Solstheim site on the world map, the frame rate of the heaviest places (Mournhold's districts above all), the end of
+the main quest, pickpocketing, locks, making your own enchantments and real-hardware speed (the first figures from
+testers are in [AmiWind on real hardware](REAL_HARDWARE.md)). The order is in the [roadmap](ROADMAP.md); the known
+problems are in the [bug tracker](BUGS.md) and under "Known in this build" in the release notes.
+
+## 19 November 2026: v0.0.67 - Tribunal Introduced
+
+The newest release before it was [v0.0.67: Tribunal Introduced](releases/notes/RELEASE-v0.0.67.md). This section and
+the ones below it are kept as history of the project's state on earlier dates.
+
+### What already works (v0.0.67)
 
 All of Vvardenfell's outdoors (1,408 exterior cells) and 1,121 of its 1,123 interiors are CHIM maps, with the people and
 creatures the game places in them; character creation through the opening, the inventory, the journal and the map,
@@ -51,7 +84,7 @@ city in peace, the Great Bazaar's teleport arrival and Godsreach's gate work, a 
 and the Dark Brotherhood's attack on a rest was seen at level 40. The tracker of the base game's systems
 ([game features](GAME_FEATURES.md)) counts what is done, partial and missing.
 
-### What comes next
+### What comes next (v0.0.67)
 
 Mournhold's quests and most of its play, the districts' frame rate, Solstheim and Bloodmoon, the end of the main quest,
 pickpocketing, locks, making your own enchantments and real-hardware speed (the first figures from testers are in

@@ -1181,6 +1181,17 @@ class NativeSourceTests(unittest.TestCase):
         self.compile_run('aga_step_rules_test.c', [ROOT/'engine/aga/src/aw_walk.c', ROOT/'engine/aga/src/sv_phys.c',
                                                    Path(SOURCE)/'src/mathlib.c'])
 
+    def test_water_walking_holds_the_player_on_the_surface(self):
+        # WATER-WALKING-NOT-ON-SURFACE-68: the real walk (aw_walk.c, sv_phys.c) over a synthetic sea. With a Water
+        # Walking magnitude the surface holds the player as ground (OpenMW 0.51 physicssystem.cpp setCanWaterWalk,
+        # mtphysics.cpp's lift onto the surface); without it he swims as before. aw_move.c gives the magnitude.
+        self.compile_run('aga_waterwalk_test.c', [ROOT/'engine/aga/src/aw_walk.c', ROOT/'engine/aga/src/sv_phys.c',
+                                                  Path(SOURCE)/'src/mathlib.c'],
+                         cflags=['-fsanitize=undefined', '-fno-sanitize-recover=all'])
+        move = (ROOT/'engine/aga/src/aw_move.c').read_text(encoding='utf-8')
+        self.assertIn('aw_walk_water_walking=water_walking;', move)
+        self.assertIn('aw_combat_effect_magnitude(p,AW_EFFECT_WATER_WALKING)', move)
+
     def test_overlapping_bodies_walk_apart(self):
         # DOOR-ARRIVAL-INSIDE-ACTOR-66: the player arrived inside the Seyda Neen guard and could not move. world.c's
         # body rule (AW_BodyOverlap, aw_body_overlap 1; OpenMW 0.51 actorconvexcallback.cpp) lets two overlapping

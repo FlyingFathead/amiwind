@@ -385,6 +385,8 @@ EARLY_CHECKS = [
     ('module-store-maps', AFTER + 'tribunal-mournhold', 'expansion_preflight:module_store_after'),
     # the same right after Solstheim's world stage (module bloodmoon-solstheim): its slNNNN frame maps and rows file
     ('module-store-maps', AFTER + 'bloodmoon-solstheim', 'expansion_preflight:module_store_after'),
+    # and right after its second world, the recordless open sea of the map's box (store chimsea, SOL-SEA-CROSSING-68)
+    ('module-store-maps', AFTER + 'bloodmoon-solstheim-sea', 'expansion_preflight:module_store_after'),
     # the expansions' actors at milestone 2 or more (config/expansion-stages.json): every incomplete one of the reuse
     # source's stored outputs, before the first stage; nothing at milestone 1 (tools/expansion_actor_check.py)
     ('expansion-actors', 'stored', 'expansion_actor_check:early'),

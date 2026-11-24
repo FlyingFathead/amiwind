@@ -12,7 +12,7 @@
 | Persists in | v0.0.67-dev2 (last seen) |
 | Severity | high: Regressed in v0.0.67-dev2 (was medium): Every cliff racer in the game is affected if it is the shared model; it is the most common hostile creature outdoors |
 | Family | Actors and NPCs (`actors-npc`) |
-| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
+| Deferred by the maintainer | 2026-11-24: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up |
 | Came back (regression) | in v0.0.67-dev2 (fixed in v0.0.58 before) |
 | Playtest version | v0.0.57-dev4 (c53994d6) |
 | From commit | source c53994d, engine unknown, CHIM world c53994d |
@@ -41,7 +41,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-18: came back in v0.0.67-dev2 (fixed in v0.0.58 before): A regression on the v0.0.67-dev2 image (the maintainer's picture, 2026-11-18): a cliff racer in the Ashlands (`cliff racer`, reference 393760, model progs/c_64031b3f740e_k.mdl) is drawn as flat wing plates apart from a thin body, full of ...
 - 2026-11-18: fixed in source: a commit on the dev line, v0.0.67-dev3 line (cfcc4d9a); tests/test_creature_whole.py and the whole route baked on the game data, measured against the v0.0.65 whole model: the cliff racer baked whole on its own table: 965 of 965 triangles on its 667 vertices with the original textures, its root held, every pose drawn within 1.75 units
 - 2026-11-19: shipped: a development build, v0.0.67-dev3 (a375b13f); the fix commit cfcc4d9a is an ancestor of the delivered dev3 head a375b13f (git merge-base --is-ancestor) and not of the dev2 head 0d6f7ab7: the whole-model route for the cliff racer is in the dev3 build; it stays open until a play check shows the creature
-- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
+- 2026-11-24: deferred by the maintainer: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up
 
 <!-- END GENERATED TIMELINE -->
 

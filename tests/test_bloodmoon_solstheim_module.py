@@ -294,9 +294,13 @@ class TheCellLists(unittest.TestCase):
     def test_the_module_takes_bloodmoons_set_when_bloodmoon_is_selected(self):
         for masters in (self.THREE, ['Morrowind.esm', 'Bloodmoon.esm']):
             args, record, seen, said = self.resolve(masters)
-            # the named set, and the open-sea cells with a record named explicitly (CHIM-SEA-BETWEEN-ISLANDS-64)
-            self.assertEqual(seen, [(['solstheim', '@' + str(ROOT / module.SEA_CELLS)], 'status.json', ())], masters)
+            # the named set, and the open-sea cells with a record named explicitly (CHIM-SEA-BETWEEN-ISLANDS-64); then
+            # the recordless open sea of the area Bloodmoon adds to the map's box, a world of its own
+            # (SOL-SEA-CROSSING-68): Solstheim's own cells and their text stay as they were
+            self.assertEqual(seen, [(['solstheim', '@' + str(ROOT / module.SEA_CELLS)], 'status.json', ()),
+                                    (['@' + str(ROOT / module.SEA_GRID)], 'status.json', ())], masters)
             self.assertEqual(args.bloodmoon_solstheim_cells, '-22,16:l -22,17:l', masters)
+            self.assertEqual(args.bloodmoon_solstheim_sea_cells, '-22,16:l -22,17:l', masters)
             self.assertEqual(record['counts']['cells'], 2, masters)
             self.assertEqual(len(said), 1)
             self.assertIn('Module bloodmoon-solstheim: 2 Solstheim cells', said[0])

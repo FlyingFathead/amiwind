@@ -17,6 +17,14 @@ def tool(name, *parts):
 
 
 class SolTestCommands(unittest.TestCase):
+    def setUp(self):
+        # --chim-sol-test is a -devN option (project_version.require_private_test_version refuses it on an rc or final
+        # VERSION): the commands are checked under a dev version, so the tests hold on a release line too
+        from unittest import mock
+        patcher = mock.patch.object(build, 'VERSION', '0.0.0-dev1')
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def steps(self):
         return [('chim', tool('chim_build.py', '--out', '/run/chim-world')), ('image', tool('build_aga.py', 'image'))]
 

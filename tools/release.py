@@ -129,6 +129,10 @@ DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.66-mournhold-reception-ar
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.67-mournhold-{name}.png" for name in (
     "greatbazaar-awning", "greatbazaar-market-north", "greatbazaar-street-from-plaza", "godsreach-street",
     "godsreach-street-east", "palace-courtyard-arcade", "palace-courtyard-south", "plaza-brindisi-dorom-water"))
+# The v0.0.68 gallery: on the way to Solstheim (Water Walking on the sea) and the initial views of Solstheim (Brodir
+# Grove), FS-UAE frames enlarged two times with nearest neighbour (docs/GALLERY.md).
+DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.68-{name}.png" for name in (
+    "on-the-way-to-solstheim", "initial-views-of-solstheim"))
 # Toolkit screenshots (amiwind-toolkit/README.md): World with the CHIM progress tracker, the 3D Inspector on a .chim map
 # and on a CHIM world with the memory overlay.
 DOCUMENTATION_IMAGES.update(f"docs/images/amiwind-v0.0.36-toolkit-{name}.png" for name in ("world-chim-tracker", "inspector-chim-map", "inspector-chim-world-memory", "monitor"))

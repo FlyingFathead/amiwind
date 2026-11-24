@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 26 times; something has to be done
+## PERSISTING: reported 27 times; something has to be done
 
 - Reported with v0.0.32-dev at 2026-10-08 (time not recorded): BUILD-IMAGE-UNDERUSED-32: parts of the image step still serial
 - Reported with v0.0.36-dev3 at 2026-10-11 00:43 +0300: audio payload and CHIM maps serial, stats on one core
@@ -30,6 +30,7 @@
 - Reported with v0.0.67 at 2026-11-20 13:50 +0200: Seen again in the v0.0.67 release build: the image step's room actor bake ran on one of 24 cores for more than six minutes.
 - Reported with v0.0.68-dev7 at 2026-11-22 12:09 +0200: Seen again on v0.0.68-dev7: the image step's late checks ran one after another on about one of 24 cores for over five minutes.
 - Reported with v0.0.68-dev8 at 2026-11-22 20:51 +0200: Seen again in the v0.0.68-dev8 build: the image step ran on one or two of 24 cores for minutes at a time (the actor ground check, the finalize phase, the room heap check measuring every room in turn); over its last six builds it averaged about 4 of 24 cores for 13.5 minutes.
+- Reported with v0.0.68 at 2026-11-24 16:24 +0200: The v0.0.68 release build's image step again ran most of its 19 minutes on about 4 of 24 cores, its finishing part over 10 minutes of it.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -45,7 +46,7 @@
 | Persists in | v0.0.62-dev1, v0.0.67-dev1 (last seen) |
 | Severity | high: Regressed in v0.0.62-dev1 (was medium): Several image passes run serially or leave most CPUs idle, slowing builds. |
 | Family | Build speed (`build-speed`) |
-| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
+| Deferred by the maintainer | 2026-11-24: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up |
 | Came back (regression) | in v0.0.62-dev1 (fixed in v0.0.48 before) |
 
 <!-- END GENERATED FACTS -->
@@ -79,7 +80,6 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-18: seen again in v0.0.67-dev2: Seen again in the Mournhold test build of 58d58089 (2026-11-18): the image step's early phases ran one after another on 1 to 3 cores for about 4 minutes (the stall watcher: 1.0 of 24 cores for 5 min): torch 6.6 s, player view 15.0 s, world ...
 - 2026-11-18: seen again in v0.0.67-dev2: Seen again in the Mournhold module test build of 104174ce (2026-11-18, resumed from the run before): the image step went through its 1348 CHIM region frame maps one after another on 1 of 24 planned cores for over 5 minutes.
 - 2026-11-18 22:06 +0200: seen again in v0.0.67-dev3: Seen again on the v0.0.67-dev3 line test build: the image step ran on 9.1 of 24 planned cores for 5 min; the builder's own underuse warning gave 4.3 of 24 cores for 176 s with 1291 units queued and 23 running in the finalize phase (held by ...
-- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
 - 2026-11-19 03:25 +0200: seen again in v0.0.67-dev3: Seen again on a test build of the v0.0.67-dev3 line: the image step's actor record check ran on one core for about six minutes while the other cores sat idle.
 - 2026-11-19 09:41 +0200: seen again in v0.0.67-dev3: Seen again on the v0.0.67-dev3 build: the image step ran on one core for about six minutes while the other cores sat idle.
 - 2026-11-19 10:07 +0200: seen again in v0.0.67-dev3: The v0.0.67-dev3 image stage ran under half of its cores three times while units were queued (11 minutes 22 seconds at an average of 4.6 of 24 cores).
@@ -88,6 +88,8 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-20 13:50 +0200: seen again in v0.0.67: Seen again in the v0.0.67 release build: the image step's room actor bake ran on one of 24 cores for more than six minutes.
 - 2026-11-22 12:09 +0200: seen again in v0.0.68-dev7: Seen again on v0.0.68-dev7: the image step's late checks ran one after another on about one of 24 cores for over five minutes.
 - 2026-11-22 20:51 +0200: seen again in v0.0.68-dev8: Seen again in the v0.0.68-dev8 build: the image step ran on one or two of 24 cores for minutes at a time (the actor ground check, the finalize phase, the room heap check measuring every room in turn); over its last six builds it averaged ...
+- 2026-11-24: deferred by the maintainer: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up
+- 2026-11-24 16:24 +0200: seen again in v0.0.68: The v0.0.68 release build's image step again ran most of its 19 minutes on about 4 of 24 cores, its finishing part over 10 minutes of it.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -96,7 +98,7 @@ _Last updated with AmiWind v0.0.61-dev1 (5 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 26 times; something has to be done](#persisting-reported-26-times-something-has-to-be-done)
+- [PERSISTING: reported 27 times; something has to be done](#persisting-reported-27-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Seen again: 7 November 2026 (v0.0.62-dev1)](#seen-again-7-november-2026-v0062-dev1)
 - [Status: 23 October 2026 (v0.0.48)](#status-23-october-2026-v0048)
@@ -407,6 +409,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [CHIM-ROOM-FAIL-STAGE-48](CHIM-ROOM-FAIL-STAGE-48.md): One CHIM room that cannot be made failed the whole CHIM interiors stage (HOLD-LEVEL with every room batch by default)
 - [CHIM-ROOM-OVER-BUDGET-RETRY-48](CHIM-ROOM-OVER-BUDGET-RETRY-48.md): A model over the image budget is tried whole again on every run before its cached tiles are used: its room runs on one core
 - [CHIM-SOL-FLORA-PATH-64](CHIM-SOL-FLORA-PATH-64.md): The Solstheim test frame converts its trees as full models, not through the world flora cards Vvardenfell uses
+- [CHIM-STAGE-QUEUED-IDLE-68](CHIM-STAGE-QUEUED-IDLE-68.md): The world stage runs on about 2 of 24 cores for over 5 minutes while many units wait in its queue
 - [CHIM-STAIR-GATE-WORLD-RELOAD-36](CHIM-STAIR-GATE-WORLD-RELOAD-36.md): The CHIM stair gate's workers read the whole CHIM world again every time they switch frames (about 14.5 s per read on the 273-frame world)
 - [CHIM-STAIRGATE-SLOW-33](CHIM-STAIRGATE-SLOW-33.md): The CHIM stair gate takes over 10 minutes on the Balmora and Vivec Arena world
 - [EXPANSION-READER-ONE-MASTER-64](EXPANSION-READER-ONE-MASTER-64.md): Most builder readers load only the base game file; the roadmap calls the readers master-list readers

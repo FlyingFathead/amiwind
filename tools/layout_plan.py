@@ -70,8 +70,10 @@ MAP_BASE = 'id1/maps/'
 # <gamedir>/music directly), saves, configs and everything else stay on DH0.
 # The expansions' CHIM stores of the v0.0.64 layer plan (BUILD-EXPANSIONS-31: chimsol for Solstheim, chimiti for
 # Tribunal, chimibm for Bloodmoon's rooms) and chimmh (Mournhold's outdoor districts, the module tribunal-mournhold)
-# move the same way, each a whole folder. A base build has none of them, so its plan is unchanged.
-STORE_UNITS = ('id1/chimi/', 'id1/chimsol/', 'id1/chimiti/', 'id1/chimibm/', 'id1/chimmh/')
+# move the same way, each a whole folder, and so does chimsea (the recordless open sea of the area Bloodmoon adds to
+# the map's box, the module's second world, SOL-SEA-CROSSING-68). A base build has none of them, so its plan is
+# unchanged.
+STORE_UNITS = ('id1/chimi/', 'id1/chimsol/', 'id1/chimiti/', 'id1/chimibm/', 'id1/chimmh/', 'id1/chimsea/')
 ACTOR_PREFIX = 'id1/progs/a_'
 
 

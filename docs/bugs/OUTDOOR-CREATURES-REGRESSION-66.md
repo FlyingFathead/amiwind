@@ -21,7 +21,7 @@
 | Persists in | v0.0.65, v0.0.66, v0.0.67-dev1 (last seen) |
 | Severity | critical: the island has no wildlife: no creatures to fight, a core part of the game gone |
 | Family | Actors and NPCs (`actors-npc`) |
-| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
+| Deferred by the maintainer | 2026-11-24: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up |
 | Playtest version | v0.0.65 |
 | From commit | source unknown, engine unknown, CHIM world unknown |
 | CHIM engine version | CHIM 0.2.2, engine unknown, world format 0.11 |
@@ -42,7 +42,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-17: v0.0.66: When it changed, from the delivery hops of every version (the same teleports each time): the region frames of v0.0.62, v0.0.65 and v0.0.66-dev1 join the same three cells around the arrival with the same counts (by Ald'ruhn -3 6, -3 7, -2 ...
 - 2026-11-17: v0.0.66: Seen again in play on the v0.0.66 release on 17 November: no wildlife outdoors.
 - 2026-11-17 19:42 +0200: seen again in v0.0.66: seen again in play on the v0.0.66 release: no outdoor creatures at all; v0.0.67-dev1 has the same engine
-- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
+- 2026-11-24: deferred by the maintainer: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up
 
 <!-- END GENERATED TIMELINE -->
 

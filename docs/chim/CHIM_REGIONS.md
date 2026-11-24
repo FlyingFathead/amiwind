@@ -1,6 +1,19 @@
 # CHIM regions: exterior cells on CHIM inside the legacy open world
 
-_Last updated with AmiWind v0.0.48-dev2 (22 October 2026)._
+_Last updated with AmiWind v0.0.68 (24 November 2026)._
+
+<!-- contents start -->
+## Contents
+
+- [How a cell joins](#how-a-cell-joins)
+- [The frame and its margin](#the-frame-and-its-margin)
+- [Selecting cells](#selecting-cells)
+- [The recordless open sea](#the-recordless-open-sea)
+- [Preflight (seconds, before any stage)](#preflight-seconds-before-any-stage)
+- [The ownership table](#the-ownership-table)
+- [Not yet](#not-yet)
+
+<!-- contents end -->
 
 Status: the default of a full CHIM build since v0.0.47 (`--chim-regions`, BUILD-CHIM-CELLS-PRIVATE-LIST-47): with no
 `--chim-regions`, `tools/build.py --builder chim` takes the cell list in the source tree, `config/chim-cells.json`
@@ -104,7 +117,50 @@ bytes of the open-world maps they replace (copies with the routed hull: 4.3 and 
 - a region name (`"Bitter Coast"` finds "Bitter Coast Region"): its finished cells;
 - `@FILE`: a CSV with `x` and `y` columns (the tracker's Export CSV as it is), a JSON cell list
   (`aw-chim-cells-1`, schema `config/schemas/aw-chim-cells-1.json`: `cells`, `regions`, `reason`,
-  `notes`), or the Toolkit World Map state export (`selected_cells[].cell`).
+  `notes`, `recordless`), or the Toolkit World Map state export (`selected_cells[].cell`).
+
+With no `--chim-regions`, the default is `config/chim-cells.json` and `config/chim-sea-grid.json` (the recordless
+open sea inside the base game's box, below).
+
+## The recordless open sea
+
+The world map ends at the box of every exterior cell record of the selected game files: OpenMW draws its world map
+over exactly that box (`apps/openmw/mwrender/globalmap.cpp`, lines 291-308). With Morrowind.esm, Tribunal.esm and
+Bloodmoon.esm that box is cells x -29 to 23, y -19 to 28 (2,544 cells); with the base game alone it is x -18 to 23,
+y -19 to 27. Inside the box the original game has open sea wherever no cell is defined: a cell that no game file has
+a record for is made the first time it is needed, as an empty exterior cell with water
+(`apps/openmw/mwworld/worldmodel.cpp`, lines 55-62, the `HasWater` flag), the water at the sea level
+(`apps/openmw/mwworld/cell.cpp`, lines 98-102) over the flat default height of -2048 units
+(`components/esm3/loadland.hpp`, line 77; `components/esmterrain/storage.cpp`, lines 571-577). So the player can swim,
+walk on water or jump between Vvardenfell and Solstheim, and around both, as far as the map reaches.
+
+AmiWind builds every cell of that box. A cell with a record is built as before. The cells without any record (982 of
+them) are the open-sea frame of the shared ocean chunk ([WORLD_FORMAT.md](WORLD_FORMAT.md), "Shared ocean chunk"),
+listed in two cell files marked `"recordless": true` and written from the game data by `tools/chim/sea_grid.py write`:
+
+- `config/chim-sea-grid.json`: the 542 recordless cells inside the base game's own box, part of the base world, so a
+  build without Bloodmoon has its own whole map;
+- `config/solstheim-sea-grid.json`: the 440 recordless cells of the area Bloodmoon adds to the box, a world of their
+  own in the Bloodmoon module (the stage `bloodmoon-solstheim-sea`, the store `chimsea`). They are not in Solstheim's
+  world, so Solstheim's store index does not grow: its densest forest frame has little room left at 32 MB.
+
+The rule for these cells, in the preflight: a cell of a recordless list is open sea even when the tracker file has no
+finished status for it (every such cell is the same shared ocean chunk, measured once); the preflight checks with the
+game files, in seconds, that no file has a CELL or LAND record for any of them, and refuses the build otherwise. Their
+frames come after every other cell of their world, so the frames, the frame map names (`vfNNNN`, `slNNNN`) and the
+placement order of the cells built before stay as they were; the base world's routing rows for them follow its
+earlier ones. The progress tracker counts them as sea in the game once a build that holds them is ingested.
+
+The edge of the world (the sea current of [WORLD_BOUNDS.md](../WORLD_BOUNDS.md)) is then only at the edge of the box.
+Where two worlds meet (Vvardenfell's and Solstheim's, Solstheim's and its open sea's, the open sea's and Vvardenfell's),
+the engine hands the player over by the open-world directory, which holds every world's rows; that crossing is a
+change of level, as the engine streams one store at a time.
+
+The image step checks every frame of every store, every room and every crossing between two worlds against 32 MB of
+Fast RAM in its first seconds (`tools/chim/traversal_heap.py`, the report `image/traversal-memory.json`): each frame
+with its own store's index, each room by the rooms stage's early report, each edge between two stores and each door
+between a room and a frame by the larger of its two ends (the area left behind is freed on a change of level). A
+frame, room, edge or door over 32 MB stops the image step there, named.
 
 `FILE` is a CHIM progress tracker file (`cell-progress.json`) or the public reference
 `docs/chim/cell-progress-reference.json`. The selection is resolved before any stage; the chim stage gets
@@ -118,8 +174,8 @@ A build is refused, with every cell and its reason, when a selected cell:
 
 - is not finished in CHIMport (taken: cell / terrain complete with or without lighting, owner states,
   audits passed, empty sea);
-- is open sea without LAND (no legacy map to replace; the square lies beyond the game's own cells, outside the playable world:
-  [WORLD_FORMAT.md](WORLD_FORMAT.md), [WORLD_BOUNDS.md](../WORLD_BOUNDS.md));
+- is open sea without LAND and not listed by name (open sea is taken only from an explicit cell list; the recordless
+  open sea of the map's box is listed, above: [WORLD_FORMAT.md](WORLD_FORMAT.md), [WORLD_BOUNDS.md](../WORLD_BOUNDS.md));
 - lies in a town's frame (named on purpose; cells of `seabed`, `coast` and region names that do are left
   out and listed instead: towns keep their own frame);
 - or leaves a pocket: up to 8 unselected cells enclosed by selected cells (4-connected, so a pocket open
@@ -139,7 +195,8 @@ lists the replaced maps under `chim_rebind.replaced_by_region_frames`.
 
 ## Not yet
 
-- Open-sea squares beyond the game's own cells (no cell record) stay outside the playable world by design; cells the game defines without land are built as flat seabed with water and are in the game.
+- Open sea outside the map's box stays outside the playable world (the original game's sea goes on; AmiWind's ends at
+  the edge of the map). Inside the box every cell is built, with or without a record (above).
 - Harvest catalogues of replaced maps, night-lamp entries of their cells, and the entity tracker's view of
   the replaced maps (it is taken before the replacement).
 - Prefetch across the hand-over. (The border audit measures region frames: `tools/chim/stitch.py audit

@@ -718,6 +718,15 @@ static char via_next[96],load_via[96];   /* how the next / the running load star
  * machine's free Fast (0) or Chip (1) RAM in bytes; NULL in the host fixtures: no check, not known. */
 int (*aw_load_precheck)(const char *map,aw_loaderr_t *e);
 long (*aw_load_memory_free)(int chip);
+/* MEMORY-EMERGENCY-PURGE-64 (the maintainer, 2026-11-10 and 2026-11-24: an emergency clean-up when memory fills, then
+ * the box and the way back to where the player came in): aw_loadfail.c's emergency purge, asked once a scene load has
+ * failed for lack of memory, before the way back: every re-makeable cache given back with one console line of figures;
+ * the bytes it gave back, -1 while it is switched off (dbg mempurge off); NULL in the host fixtures that do not set it
+ * (no purge, no retry). aw_scene_purge_test: dbg mempurge test forced this shortage, which the retry cures (taken once).
+ * mem_retry: the load in flight is that one retry. The counts for dbg mempurge. */
+long (*aw_scene_memory_purge)(const char *map);
+int aw_scene_purge_test,aw_scene_mem_retries,aw_scene_mem_retry_loads;
+static int mem_retry;
 static void load_from_capture(edict_t *p,int kind) {
     if(load_recovering || !p || !sv.active || !map_valid(sv.name)){if(!load_recovering)load_from.valid=0;return;}
     load_from.valid=1;load_from.kind=kind;copy_name(load_from.map,sizeof(load_from.map),sv.name);
@@ -858,6 +867,7 @@ static void recover_load_spot(const spot_t *s) {
 /* The chain from step FROM on (SPOT: the last good position for step 1). The first error stays the box's. */
 static void recover_from(int from,const spot_t *spot) {
     char label[32];
+    mem_retry=0;   /* MEMORY-EMERGENCY-PURGE-64: the chain's loads are never the purge's retry */
     if(from<=1 && spot && spot->valid){
         recover_step=1;lerr.way=AW_WAY_BACK;copy_name(lerr.back_map,sizeof(lerr.back_map),spot->map);
         Con_Printf("Recovery 1 of 3: %s again at %ld %ld %ld, the last good position.\n",spot->map,(long)spot->origin[0],
@@ -893,6 +903,34 @@ static void recover_arrived(edict_t *p) {
     Con_Printf("Recovery: in play again in %s at %ld %ld %ld (%s).\n",sv.name,(long)p->v.origin[0],(long)p->v.origin[1],
         (long)p->v.origin[2],recovered.step==2?"the last autosave":recovered.step==3?"the previous map":"the last good position");
     recover_step=0;error_here(&lerr);load_box_wanted=1;
+}
+/* MEMORY-EMERGENCY-PURGE-64: a scene load that failed for lack of memory (lerr, LF5), before the way back. The server
+ * and the client are already down (Host_Error), as when a room grows (chim_world.c Chim_RoomGrow), so the emergency
+ * purge gives back every re-makeable cache (aw_scene_memory_purge), and when that can change the answer
+ * (AW_LoadErrPurgeRetry) the same load runs once more: the place left, the arrival and the followers stay those of the
+ * first try. A retry that fails as well takes the way back and the box (his text, aw_loaderr.c). 1 = the retry is
+ * queued (no way back, no box). */
+static int mem_retry_after_purge(void) {
+    char command[32];long given;int test=aw_scene_purge_test;
+    aw_scene_purge_test=0;
+    if(mem_retry){
+        mem_retry=0;
+        Con_Printf("Memory: %s did not fit on the retry after the purge either (needs %ld KiB, %ld KiB available).\n",
+            next.target,(lerr.need+1023)/1024,(lerr.have+1023)/1024);
+        return 0;
+    }
+    given=aw_scene_memory_purge?aw_scene_memory_purge(next.target):-1;
+    if(!AW_LoadErrPurgeRetry(&lerr,0,given,test)){
+        if(given>=0)Con_Printf("Memory: %s is not tried again: %s.\n",next.target,given?"the purge does not grow that memory (the Hunk's)":
+            "the purge had nothing to give back");
+        return 0;
+    }
+    mem_retry=1;aw_scene_mem_retries++;
+    Con_Printf("Memory: %s needs %ld KiB, %ld KiB available (%s); tried once more after the purge.\n",next.target,
+        (lerr.need+1023)/1024,(lerr.have+1023)/1024,lerr.arena[0]?lerr.arena:"?");
+    started=Sys_FloatTime();
+    sprintf(command,"map %s\n",next.target);Cbuf_InsertText(command);
+    return 1;
 }
 /* Host_Error / Host_EndGame (host.c, before the longjmp) and Host_Map_f when the map does not spawn. */
 void AW_SceneLoadFailed(const char *why) {
@@ -935,6 +973,7 @@ void AW_SceneLoadFailed(const char *why) {
     }
     error_count(why);
     error_begin(&lerr,AW_LOADERR_ERROR,next.target,next.label);cause_from_message(&lerr,why);
+    if(lerr.kind==AW_LOADERR_MEMORY && mem_retry_after_purge())return;   /* MEMORY-EMERGENCY-PURGE-64 */
     if(!load_from.valid){
         /* there was no place to go back to: the rest of the chain */
         Con_Printf("Load failed: %s; no earlier place to return to.\n",load_reason);
@@ -1019,6 +1058,7 @@ static void load_scene(aw_scene_link_t *link,int immediate) {
     edict_t *p=svs.clients[0].edict;char command[32],how[96];
     copy_name(how,sizeof(how),via_next);via_next[0]=0;   /* the caller's way (via), for this load only */
     if(pending || !map_valid(link->target))return;
+    mem_retry=0;   /* MEMORY-EMERGENCY-PURGE-64: a new load has its own one retry */
     /* a marked room or frame on less Fast RAM (CHIM-32MB-SAVE-ENTRY-48): the strider, a door out of a room, dbg tp;
      * a region crossing was checked by the tick (AW_SceneFrameRefuse) */
     if(!region_crossing && AW_SceneEntryRefuse(link->target,link->arrival,0))return;
@@ -1940,6 +1980,11 @@ void AW_SceneSpawn(edict_t *p) {
     arrival_watch.on=0;arrival_hold.on=0;
     map_loading=0;crossing_refused[0]=0;   /* the map arrived (SCENE-LOAD-FAIL-FALLBACK-67) */
     aw_scene_error_forced=0;   /* AW-RECOVER: a test aid's failure that did not come is not kept for a later error */
+    aw_scene_purge_test=0;     /* MEMORY-EMERGENCY-PURGE-64: the same for dbg mempurge test */
+    if(mem_retry && pending && !strcmp(sv.name,next.target)){
+        mem_retry=0;aw_scene_mem_retry_loads++;
+        Con_Printf("Memory: %s loaded on the retry after the emergency purge.\n",sv.name);
+    }
     if(aw_godmode_kept)p->v.flags=(float)((int)p->v.flags|FL_GODMODE);
     area_last_ok=0;frame_last_ok=0;frame_refused[0]=frame_mark_map[0]=0;
     logical_map[0]=0;VectorCopy(vec3_origin,logical_offset);logical_used=0;
@@ -2725,6 +2770,7 @@ void AW_SceneLoadReset(void) {
     memset(&play_spot,0,sizeof(play_spot));   /* the spot of play an error loads again (NET-VIVEC-ENTITY-PACKET-OVERFLOW-66) */
     /* AW-RECOVER: the previous map's spot, the chain's step and the last recovery are session state */
     memset(&prev_spot,0,sizeof(prev_spot));memset(&recovered,0,sizeof(recovered));play_now=recover_step=0;
+    mem_retry=aw_scene_purge_test=0;   /* MEMORY-EMERGENCY-PURGE-64: the one retry and the test aid's shortage */
     if(aw_scene_followers && sv.active && svs.clients && svs.clients[0].edict)aw_scene_followers(svs.clients[0].edict,-1);
 }
 void AW_SceneInit(void) {

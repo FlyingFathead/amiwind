@@ -78,6 +78,17 @@ static int no_place(const aw_loaderr_t *e){return e->way==AW_WAY_FAILED || e->wa
  * records before the chain say both with their way alone (AW_WAY_FAILED; in play AW_WAY_NOWHERE) */
 static int back_failed(const aw_loaderr_t *e){return e->back_failed || e->way==AW_WAY_FAILED;}
 static int again(const aw_loaderr_t *e){return e->again || (e->in_play && e->way==AW_WAY_NOWHERE);}
+/* a load that did not fit (LF5; an error in play is said as one, LF9) */
+static int memory(const aw_loaderr_t *e){return e->kind==AW_LOADERR_MEMORY && !e->in_play;}
+/* MEMORY-EMERGENCY-PURGE-64 (aw_loaderr.h) */
+static int hunk_arena(const char *arena){
+    return !strcmp(arena,"hunk") || !strcmp(arena,"cache") || !strcmp(arena,"zone") || !strcmp(arena,"map");
+}
+int AW_LoadErrPurgeRetry(const aw_loaderr_t *e,int retried,long given,int test){
+    if(!e || e->kind!=AW_LOADERR_MEMORY || retried || given<0)return 0;
+    if(test)return 1;
+    return given>0 && !hunk_arena(e->arena);
+}
 int AW_LoadErrBox(const aw_loaderr_t *e,char *out,int size){
     text_t t;char reason[192];
     t.out=out;t.size=size;t.used=0;
@@ -91,10 +102,15 @@ int AW_LoadErrBox(const aw_loaderr_t *e,char *out,int size){
         else if(e->way==AW_WAY_BACK)put(&t,"; it was loaded again");
     }
     else if(e->kind==AW_LOADERR_NO_POINT)putf_long(&t,"No map holds the point %ld %ld",(long)e->x,(long)e->y);
+    else if(memory(e)){
+        /* MEMORY-EMERGENCY-PURGE-64, the maintainer's text: the place that did not fit and the memory figures */
+        put(&t,"Not enough memory to load ");put_clean(&t,e->place[0]?e->place:e->map[0]?e->map:"?");   /* the place by name */
+        putf_long(&t," (needs %ld KiB, %ld KiB available)",kb(e->need),kb(e->have));
+    }
     else{put(&t,"Map ");put_map(&t,e);put(&t,not_found(e->kind)?" was not found":" was found but could not be loaded");}
     if(!e->in_play && back_failed(e)){put(&t,", and the way back to ");put_clean(&t,e->back_map[0]?e->back_map:"?");put(&t," failed as well");}
     put(&t,".");
-    if(AW_LoadErrReason(e,reason,sizeof(reason))){put(&t,"\n");put(&t,reason);}
+    if(!memory(e) && AW_LoadErrReason(e,reason,sizeof(reason))){put(&t,"\n");put(&t,reason);}
     put_code(&t,e);
     put(&t,"\n");
     /* AW-RECOVER: the later steps that were tried and did not load either */
@@ -116,6 +132,12 @@ int AW_LoadErrBox(const aw_loaderr_t *e,char *out,int size){
         if(e->here_place[0] || e->here_map[0]){
             put(&t," was loaded. You are in ");put_clean(&t,e->here_place[0]?e->here_place:e->here_map);put(&t,".");
         }else put(&t," is loading.");
+    }
+    else if(memory(e) && e->way==AW_WAY_BACK && !back_failed(e)){
+        /* the way back to the place the load started from: OK returns the player to play there */
+        put(&t,"OK returns you to ");
+        put_clean(&t,e->here_place[0]?e->here_place:e->here_map[0]?e->here_map:e->back_map[0]?e->back_map:"the place you left");
+        put(&t,", where you came in.");
     }
     else if(!e->here_place[0] && !e->here_map[0] && e->way==AW_WAY_BACK && e->back_map[0]){
         /* the console's block is written when the load fails, before the way back has arrived */

@@ -1,6 +1,6 @@
 # Build cache: resuming and reusing work safely
 
-_Last updated with AmiWind v0.0.68-dev11 (23 November 2026)._
+_Last updated with AmiWind v0.0.68 (24 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -150,10 +150,22 @@ every `--clean` build does the same. `--allow-release-reuse` is still accepted
    `chim-stats.json`) records the file's SHA-256 as an input and is reused only when
    the file has exactly those bytes again (BUILD-DIAGNOSTIC-INPUT-REFUSED-36); a file
    it could not read makes the stage not reusable.
-5. **The from-scratch build is the final check.** A release image is reproduced by
+5. **Memos are not compared either.** A stage keeps some results it computes as
+   content-addressed memos in its own work folders, each file named by the SHA-256 key
+   of its inputs: the compiled collision hulls of the CHIM areas, rooms and modules
+   (`collision-cache/KEY.CHECK.pickle`, `build_cache.MEMO_FOLDERS`). A stage writes one
+   only for the units it computes; a unit taken from a unit cache writes none. So two
+   runs of a stage with the same inputs leave more or fewer memos, depending on how many
+   of their units the cache held, while every other file comes out byte for byte the
+   same; a memo that is there gives what the compile gives. Memos are recorded and copied
+   on reuse like any file, but no comparison counts them: early cutoff, the unit tree,
+   the reuse audit and the stage hashes leave them out (CHIM-REBUILD-NOT-IDENTICAL-68:
+   the v0.0.68-dev8 CHIM world, rebuilt from its stored units, wrote every game file as
+   its source run did and 110,543 memos fewer, and seven stages after it ran again).
+6. **The from-scratch build is the final check.** A release image is reproduced by
    a build without any reuse and compared file by file; any difference blocks the
    release.
-6. **Every refusal is reported.** `tools/build.py --reuse-report RUN` lists each
+7. **Every refusal is reported.** `tools/build.py --reuse-report RUN` lists each
    stage a `--reuse-from` run did not reuse, with the recorded reason, as EXPECTED
    (a real input change, the image step, a stage that never reuses) or UNEXPECTED
    (an over-broad key, a refused record, outputs that differ although the inputs
@@ -814,7 +826,10 @@ room, head preview or catalogue file), grouped into **segments** (a town's maps,
 block of 100 open-world regions, the rooms, the character heads), and one **stage
 hash** over the segment hashes. Each level's hash covers the level below, so two runs
 compare a stage in one step and drill down only on a mismatch, to the segments and
-units that differ. Logs and timing reports are left out. The tree is stored in every
+units that differ. Logs, timing reports and memos (above) are left out. Since tree
+schema 2 (v0.0.68 line) the memos are left out; a record whose stored tree schema 1
+made is compared by a tree made again from its files (`unit_tree.tree_of`), so the
+change rebuilds nothing. The tree is stored in every
 stage's output record, used by the "wrote the same outputs" check, named by the reuse
 audit ("census: 1 units differ (scene/census.txt changed)"), and recorded per segment
 in the release reference checksums, so a build that differs from a release is told
@@ -905,8 +920,8 @@ our cached builds is a release blocker, registered like any other bug.
 
 ## Stage hashes and reference checksums
 
-Every build records, per stage, the hash of its outputs (the SHA-256 of its
-sorted per-file hashes without diagnostics) in `build-summary.json`, so two
+Every build records, per stage, the hash of its outputs (the top of its unit tree,
+without diagnostics and memos) in `build-summary.json`, so two
 builds can be compared stage by stage even when the disk image wrapper differs.
 A release's reference file, `checksums/v<VERSION>.json`, holds per game edition
 those stage hashes, the per-file payload hashes and the drive hashes; the release

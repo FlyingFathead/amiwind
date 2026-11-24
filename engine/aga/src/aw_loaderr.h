@@ -75,13 +75,22 @@ int AW_LoadErrReason(const aw_loaderr_t *e,char *out,int size);
  * loaded." with the reason on the next line / "No map holds the point <X> <Y>." / "... and the way back to <map>
  * failed as well."; the code on the last error line ("Code LF4."); the later steps that did not load either; the last
  * line "You are in <place>." (after the autosave or the previous map: which one was loaded, then where he is; with no
- * place to stay, that a saved game is the way on). Returns its length. */
+ * place to stay, that a saved game is the way on). Not enough memory (LF5) in the maintainer's words
+ * (MEMORY-EMERGENCY-PURGE-64): "Not enough memory to load <name> (needs N KiB, M KiB available). Code LF5." and, after
+ * the way back, "OK returns you to <place>, where you came in." Returns its length. */
 int AW_LoadErrBox(const aw_loaderr_t *e,char *out,int size);
 /* One short line for the load menu's notice (at most SIZE-1, e.g. 79): the code and the map. */
 int AW_LoadErrNotice(const aw_loaderr_t *e,char *out,int size);
 /* The console's debug block: a head line with the code, the kind and the box's text, then the command, the map and
  * its file, the error, the memory, the place left and where the player is now. Lines end in '\n'. */
 int AW_LoadErrConsole(const aw_loaderr_t *e,char *out,int size);
+/* MEMORY-EMERGENCY-PURGE-64: whether a load that failed for lack of memory (LF5) is tried once more after the emergency
+ * purge (aw_loadfail.c: every re-makeable cache given back). No when it is the one retry already (RETRIED), the purge is
+ * switched off (GIVEN < 0, dbg mempurge off), the purge gave nothing back (GIVEN 0: the same load would fail the same
+ * way), or the memory was the Hunk's ("hunk", "cache", "zone", "map": the Hunk is set at the start, a purge of the Fast
+ * RAM does not grow it, and the Quake cache inside it is taken back by every Hunk allocation already). TEST: a shortage
+ * the test aid forced (dbg mempurge test), which the retry cures. 1 = try the same load once more. */
+int AW_LoadErrPurgeRetry(const aw_loaderr_t *e,int retried,long given,int test);
 /* A map file's 124-byte header (Quake BSP version 29, little-endian) against the file's size, before anything is
  * left: 0 when it reads, else AW_BROKEN_HEADER (too short, another version, a negative lump) or AW_BROKEN_SHORT (a
  * lump past the end of the file: a truncated file), with *LUMP the first bad lump (-1 for the header itself). */
@@ -102,4 +111,9 @@ extern int (*aw_scene_autosave_load)(char *label,int size);
 extern void (*aw_scene_save_drop)(void);
 int AW_SceneInPlay(void);
 extern int aw_scene_errors,aw_scene_errors_forced,aw_scene_error_forced;
+/* MEMORY-EMERGENCY-PURGE-64 (aw_scene.c; aw_loadfail.c binds the purge): the emergency purge asked once a scene load
+ * failed for lack of memory (the bytes it gave back for MAP, -1 while switched off); the test aid's shortage, which the
+ * retry cures (taken once); the loads tried once more after a purge and those of them that loaded. */
+extern long (*aw_scene_memory_purge)(const char *map);
+extern int aw_scene_purge_test,aw_scene_mem_retries,aw_scene_mem_retry_loads;
 #endif

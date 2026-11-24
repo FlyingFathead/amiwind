@@ -1,6 +1,6 @@
 # AmiWind FAQ
 
-_Last updated with AmiWind v0.0.66-dev8 (2026-11-15)._
+_Last updated with AmiWind v0.0.68 (24 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -37,10 +37,8 @@ _Last updated with AmiWind v0.0.66-dev8 (2026-11-15)._
 
 *Harry Horsperg's perspective as the project's author.*
 
-**Latest release:** v0.0.60 - Work With What You've Got (4 November 2026, CHIM Engine v0.2.2, 32 MB of Fast RAM)
-([release notes](releases/notes/RELEASE-v0.0.60.md)). **In development:** v0.0.61, "Keep Your Lantern Lit", whose third
-snapshot, [v0.0.61-dev3](releases/notes/RELEASE-v0.0.61-dev3.md), adds casting and enchanted items, weapons of every
-type, held lights, witnessed theft and an in-game recorder for testing. Since v0.0.48, 1,132 of the 1,134 base-game
+**Latest release:** v0.0.68, Solstheim Is Here (24 November 2026, CHIM Engine v0.2.2, 32 MB of Fast RAM)
+([release notes](releases/notes/RELEASE-v0.0.68.md)). Since v0.0.48, 1,132 of the 1,134 base-game
 interiors are CHIM rooms with the actors standing in them; since v0.0.50 every door leads in and back out.
 Since v0.0.43 every exterior cell of Vvardenfell is on the CHIM engine: 1,409 cells, 1,348 in one-cell region
 frames and 61 in the town frames of Balmora, Seyda Neen and Vivec
@@ -389,6 +387,10 @@ contains CyberGraphX/RTG paths. Their presence does not establish a validated
 PiStorm/RTG release. The documented configuration and supplied startup checks
 still target AGA, and the current renderer uses software drawing.
 
+A tester has run AmiWind unchanged on a machine with an RTG card when AGA is also present, with a suitable screen mode,
+at the same frame rate as on AGA: the frame time is in the 3D rendering on that machine, not in the display. A machine
+without AGA needs a change to the start-up check, planned for the next version.
+
 Picasso96 and CyberGraphX, the two common graphics card systems on the Amiga,
 are nearly compatible: Picasso96 also provides the CyberGraphX programming
 interface, so one RTG display path can serve both. The renderer already draws
@@ -576,8 +578,8 @@ result are substantial parts of that work. The current scope is described below.
 
 ## How much of Morrowind is currently working?
 
-As of **6 November 2026**, the latest release is **v0.0.60: Work With What You've Got** (CHIM Engine v0.2.2;
-[release notes](releases/notes/RELEASE-v0.0.60.md)); the development snapshot is v0.0.61-dev3. Since
+As of **24 November 2026**, the latest release is **v0.0.68: Solstheim Is Here** (CHIM Engine v0.2.2, 32 MB of Fast RAM;
+[release notes](releases/notes/RELEASE-v0.0.68.md)). Since
 v0.0.43 (**Let There Be CHIM: Vvardenfell's Outdoors, All of It**) every exterior cell of Vvardenfell runs on the CHIM
 engine (1,409 cells: 1,292 land cells, 98 sea-floor cells and 19 open-sea cells; [what these numbers count](chim/CELL_TRACKER.md#what-we-count)), from Seyda Neen, Balmora and the whole city of Vivec to Ald-ruhn, Maar Gan, Suran and Red
 Mountain; no classic region maps are left outdoors. Since v0.0.48, 1,132 of the 1,134 base-game interiors are CHIM
@@ -628,7 +630,7 @@ World coverage and converted assets do not mean complete Morrowind gameplay.
 Quest simulation (many of the game's scripts do not run yet), guards who arrest and jail, pickpocketing, alchemy,
 ranged shots, schedules and the rest of the complete inventory and magic systems remain unfinished
 ([the game feature tracker](GAME_FEATURES.md) lists each system and its state). Wider settlements, world actors and
-interiors also need further work. Tribunal and Bloodmoon world content are outside the current playable scope.
+interiors also need further work. Tribunal's Mournhold and Bloodmoon's Solstheim are in the game and can be walked; their quests are not played through yet.
 
 Speed on real hardware is the main open question. The first real-machine figure (an earlier
 build on an A4000 with a 68060 at 100 MHz) was about 0.2 frames per second, so frame cost is

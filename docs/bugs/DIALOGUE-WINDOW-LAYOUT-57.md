@@ -24,10 +24,17 @@
 
 ## Timeline
 
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.68-dev11 (dd344b5f) | 2026-11-24 | gate 12964 of the planning item DIALOGUE-COMPLETE-67 | The talk window laid out as the original: the title bar with the speaker's name in the game's header font and a thin line under it; the disposition bar; Persuasion and the person's services in their own block, a divider row, then the topics; confirmed by the maintainer on the stills of the dev11 image |
+
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-10-31: reported in v0.0.57-dev4
 - 2026-11-23 22:14 +0200: seen again in v0.0.68-dev11: The talk window's right column gets the original's order: the disposition bar on top, Persuasion and the person's services in their own block, a divider line, then the topics, and Goodbye at the bottom.
+- 2026-11-24: fixed in source: a gated commit, v0.0.68-dev11 (dd344b5f); gate 12964 of the planning item DIALOGUE-COMPLETE-67: The talk window laid out as the original: the title bar with the speaker's name in the game's header font and a thin line under it; the disposition bar; Persuasion and the person's services in their own block, a divider row, then the ...
 
 <!-- END GENERATED TIMELINE -->
 

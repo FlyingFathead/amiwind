@@ -24,6 +24,7 @@
 #include "aw_region.h"
 #include "amiwind_version.h"
 #include "chim_version.h"
+#include "aw_fastrelease.h"
 #ifdef AMIGA
 #include <proto/exec.h>
 #include <exec/memory.h>
@@ -58,9 +59,14 @@ static size_t prefetch_bad(const char *name,long offset,byte *out,size_t bytes) 
     return bytes+1;
 }
 
+/* MEMORY-EMERGENCY-PURGE-64: dbg mempurge test armed (the purge, its switch and the test aid below, after the free RAM) */
+static int purge_test_armed;
+static void purge_test_fail(void);
+
 /* dbg loadfail N KIND: arm the kind inside this load (Host_Map_f); 0 for the plain error (Host_Map_f says it). */
 int AW_LoadFailTestArm(void) {
     aw_scene_error_forced=1;   /* AW-RECOVER: this load's error is a test aid's (the state file's errors_forced) */
+    if(purge_test_armed)purge_test_fail();   /* dbg mempurge test (Host_Error: does not return) */
     switch(fail_kind){
     case FAIL_MEMORY:aw_hunk_fail_test=1;break;
     case FAIL_LUMP:
@@ -138,6 +144,67 @@ static long memory_free(int chip) {
 #else
     (void)chip;return -1;
 #endif
+}
+/* MEMORY-EMERGENCY-PURGE-64: the emergency purge (aw_scene.c asks it once a scene load failed for lack of memory, the
+ * server and the client already down): every releaser of re-makeable session memory (aw_fastrelease.c: the animation
+ * tables and posed frames, the cached area tables of the areas left), each with its own console line, then one line of
+ * figures. The Quake cache needs no step: it sits in the Hunk's gap and every Hunk allocation takes it back already;
+ * the CHIM banks' unlocked blocks are taken back by the zone on demand. aw_mem_purge 0 (dbg mempurge off) switches the
+ * purge and its retry off: the load goes straight to the box and the way back. Not saved. */
+static cvar_t aw_mem_purge={"aw_mem_purge","1"};
+extern void (*chim_room_short)(const char *room,unsigned long need,unsigned long have);   /* chim/chim_world.c */
+static int purges;static unsigned long purged_bytes;
+static long fast_largest(void) {
+#ifdef AMIGA
+    return (long)AvailMem(MEMF_FAST|MEMF_LARGEST);
+#else
+    return -1;
+#endif
+}
+static long kib(long bytes){return bytes<0?-1:bytes/1024;}
+static long memory_purge(const char *map) {
+    long free_before,largest_before;unsigned long given;
+    if(!aw_mem_purge.value){
+        Con_Printf("Memory purge: off (dbg mempurge on); %s goes to the box and the way back.\n",map?map:"?");
+        return -1;
+    }
+    free_before=memory_free(0);largest_before=fast_largest();
+    given=AW_FastReleaseAll ("the emergency purge");
+    purges++;purged_bytes+=given;
+    Con_Printf("Memory purge for %s: %lu KiB of re-makeable memory given back by %d releasers; Fast RAM free %ld -> %ld KiB, "
+        "largest block %ld -> %ld KiB.\n",map?map:"?",given/1024,AW_FastReleasers(),kib(free_before),kib(memory_free(0)),
+        kib(largest_before),kib(fast_largest()));
+    return (long)given;
+}
+/* dbg mempurge test (Host_Map_f, through aw_load_fail_test): this load is short of Fast RAM once, at its start, through
+ * the real path (alloc_failed: the load's memory record, Host_Error); the retry after the purge is not short. */
+static void purge_test_fail(void) {
+    long have=fast_largest();
+    if(have<0)have=0;
+    purge_test_armed=0;aw_scene_purge_test=1;
+    Con_Printf("dbg mempurge test: this load is short of memory on purpose (%s).\n",aw_mem_purge.value?
+        "the purge, then the load once more":"the purge is off: the box, then the way back");
+    alloc_failed("fast","dbg mempurge test",have+65536L,have);
+}
+/* A CHIM room whose record or models found no room after every growth step (chim_world.c RefuseRoom): its load ends as
+ * not enough memory with the figures (outside a load alloc_failed returns and the refusal stays as it was). */
+static void room_short(const char *room,unsigned long need,unsigned long have) {
+    alloc_failed("room",room,(long)need,(long)have);
+}
+static void mem_purge_command(void) {
+    const char *w=Cmd_Argc()>=2?Cmd_Argv(1):"";
+    if(!Q_strcasecmp((char *)w,"on") || !strcmp(w,"1"))Cvar_SetValue("aw_mem_purge",1);
+    else if(!Q_strcasecmp((char *)w,"off") || !strcmp(w,"0"))Cvar_SetValue("aw_mem_purge",0);
+    else if(!Q_strcasecmp((char *)w,"test")){
+        purge_test_armed=1;Cvar_SetValue("aw_load_fail_test",1);
+        Con_Printf("dbg mempurge test: the next map load is short of memory once (%s).\n",aw_mem_purge.value?
+            "the purge and one more try load it":"the purge is off: the box, then the way back");
+        return;
+    }
+    else if(w[0]){Con_Printf("dbg mempurge [on / off / test]\n");return;}
+    Con_Printf("Memory purge %s: %d purges, %lu KiB given back; %d loads tried once more, %d of them loaded; "
+        "Fast RAM free %ld KiB, largest block %ld KiB.\n",aw_mem_purge.value?"on":"off",purges,purged_bytes/1024,
+        aw_scene_mem_retries,aw_scene_mem_retry_loads,kib(memory_free(0)),kib(fast_largest()));
 }
 /* The check before anything is left (aw_scene.c load_scene): the map file's header against its size (a damaged or
  * truncated file), then the bytes its world needs once decoded (model.c AW_BrushBound, from the header alone) against
@@ -269,7 +336,7 @@ static unsigned long digest_ledger(void){
     c[8]=aw_ledger.records_bytes;c[9]=aw_ledger.stamp_count;c[10]=aw_ledger.ident_count;c[11]=aw_ledger.placed;
     return AW_ResetHash(AW_ResetHash(AW_RESET_SEED,c,sizeof(c)),aw_ledger.value_count,sizeof(aw_ledger.value_count));
 }
-static void reset_scene(int new_game){AW_SceneLoadReset();}       /* scene loads, the way back, followers */
+static void reset_scene(int new_game){AW_SceneLoadReset();purge_test_armed=0;}   /* scene loads, the way back, followers */
 static void reset_box(int new_game){box_open=0;AW_MsgBoxClear();}
 static unsigned long digest_box(void){return (unsigned long)(AW_MsgBoxActive()*2+box_open);}
 static void reset_scripts(int new_game){AW_MwscriptNewGameReset();}
@@ -345,6 +412,11 @@ void AW_LoadFailInit(void) {
     /* SCENE-LOAD-FAIL-FALLBACK-67: what ends a load instead of the game, the check before leaving, the free RAM */
     aw_alloc_failed=alloc_failed;aw_fatal_hook=fatal;
     aw_load_precheck=precheck;aw_load_memory_free=memory_free;
+    /* MEMORY-EMERGENCY-PURGE-64: the emergency purge and its one retry, a room that does not fit named as memory, and
+     * dbg mempurge (status, on, off, test) */
+    Cvar_RegisterVariable(&aw_mem_purge);
+    Cmd_AddCommand("aw_mempurge",mem_purge_command);
+    aw_scene_memory_purge=memory_purge;chim_room_short=room_short;
     register_resets();
     aw_game_reset=game_reset;     /* aw_intro.c: New Game resets through the registry */
 }

@@ -12,7 +12,7 @@
 | Persists in | v0.0.67-dev2 (last seen) |
 | Severity | critical: Regressed in v0.0.66-dev1 (was high): the opening looks broken and the way to the census office is blocked while he pushes against the door |
 | Family | Actors and NPCs (`actors-npc`) |
-| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
+| Deferred by the maintainer | 2026-11-24: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up |
 | Came back (regression) | in v0.0.66-dev1 (fixed in v0.0.65 before); in v0.0.67-dev2 (fixed in v0.0.66-dev2 before) |
 | Playtest version | v0.0.65-rc2 |
 | From commit | source unknown, engine unknown, CHIM world unknown |
@@ -44,7 +44,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-18: v0.0.67-dev2: Measured on the built images (SHA-256): no commit between v0.0.66 and v0.0.67-dev2 changed the dock guard's walk or the pier.
 - 2026-11-18: came back in v0.0.67-dev2 (fixed in v0.0.66-dev2 before): Came back on the v0.0.67-dev2 image (the maintainer's pictures, 2026-11-18): in the opening the dock guard stands inside a pier post on the Seyda Neen dock and stays there (cell -2,-9, local 445 -267 and 346 -187 at two moments of one ...
 - 2026-11-18: fixed in source: a gated commit, v0.0.67-dev2 (916b21de, with 4386e297; gate 11561 passed on 1b67c7aa); tests/aga_nav_test.c, tests/aga_opening_test.c, tests/test_pier_guard_route.py, tests/test_journey_smoke.py; gate 11561: both of the dock guard's walks follow the pier's centre line measured from the built world's collision, with no detour or side step, then the front of the office door and his post beside it; the route keeps clear of every measured post ...
-- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
+- 2026-11-24: deferred by the maintainer: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up
 
 <!-- END GENERATED TIMELINE -->
 

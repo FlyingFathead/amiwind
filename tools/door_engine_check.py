@@ -601,10 +601,13 @@ def layer_frame_cells(layers):
     gives their frames); [] for none."""
     if not layers:
         return []
-    from chim.layer_stores import frame_holders, parse, store_kinds
-    kinds = store_kinds()
-    return [(Path(world), {name: cell for cell, (name, _origin) in frame_holders(['%s=%s' % (store, world)]).items()})
-            for store, world in parse(layers) if kinds[store] == 'frames']
+    from chim.layer_stores import frame_holders_by_store, parse
+    worlds = dict(parse(layers))
+    # all the stores at once: a store numbered on after another's (the far sea after Solstheim) takes the names the
+    # image gives it, never the other store's (DOOR-CHECK-SEA-STORE-NAMES-68)
+    held = frame_holders_by_store(layers)
+    return [(Path(worlds[store]), {name: cell for cell, (name, _origin) in cells.items()})
+            for store, cells in held.items()]
 
 
 def reach_check(entries, world_dir, id1, jobs=None, slack=1.0, layers=None, stages=None, rules=None):

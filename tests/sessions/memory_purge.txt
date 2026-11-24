@@ -1,0 +1,43 @@
+# The emergency memory purge (MEMORY-EMERGENCY-PURGE-64; docs/LOAD_ERRORS.md "When memory fills"): a load that runs out
+# of memory gives back every re-makeable cache and is tried once more; with the purge switched off, the OK box names the
+# place and the KiB needed and available, and OK returns the player to where he came in. Run as a scripted session from
+# a place in play (a full image's start map, or a save), 32 MB Fast, warp off, the position overlay on, with the engine
+# of the branch under test (fsuae_session.py --engine: the image's own engine has no purge). The console lines to read
+# afterwards (DEBUG.TXT): "Memory purge for ...", "Memory: ... tried once more after the purge.", "Memory: ... loaded on
+# the retry after the emergency purge." for the first part; "Memory purge: off" and the LF5 console block for the second.
+emu deterministic=1
+wait 8
+cmd aw_crosshair off
+cmd dbg all on
+cmd dbg headlamp off
+state map
+shot mp0-start-in-play
+cmd dbg mempurge
+# 1. the purge on (the default): the next load is short of memory once; the purge runs, the same load runs once more
+# and arrives: Seyda Neen in play, no box
+cmd dbg mempurge test
+cmd dbg tp seydaneen
+wait 120
+state map
+shot mp1-purge-on-retry-arrived-seyda-no-box
+cmd dbg mempurge
+wait 2
+shot mp1-status-one-purge-one-retry-loaded
+# 2. the purge off: the same shortage goes to the way back; the box in the maintainer's words, then OK in Seyda Neen
+cmd dbg mempurge off
+cmd dbg mempurge test
+cmd dbg tp balmora
+wait 150
+state map
+shot mp2-purge-off-lf5-box-ok-returns-you
+key Return
+wait 3
+state map
+shot mp2-after-ok-back-where-he-came-in
+# the purge back on; a real load goes through
+cmd dbg mempurge on
+cmd dbg tp balmora
+wait 150
+state map
+shot mp3-real-load-balmora-after-the-test
+cmd dbg mempurge

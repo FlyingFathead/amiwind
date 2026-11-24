@@ -41,8 +41,21 @@ static void boxes(void){
     e.broken=AW_BROKEN_SHORT;assert(strstr(box(&e),"\nBroken map file (short read). Code LF4.\n"));
     e.broken=AW_BROKEN_LUMP;e.lump=7;assert(strstr(box(&e),"\nBroken map file (bad lump 7). Code LF4.\n"));
     e.broken=AW_BROKEN_DATA;e.lump=-1;assert(strstr(box(&e),"\nBroken map file (bad data). Code LF4.\n"));
+    /* MEMORY-EMERGENCY-PURGE-64, the maintainer's text: the place, the memory figures in KiB, the code; refused before
+     * leaving, where he is; after the way back, OK returns him to the place he came in from */
     e=make(AW_LOADERR_MEMORY,"vivec_city","Vivec");e.need=3*1024*1024+1;e.have=512*1024;
-    assert(strstr(box(&e),"Map vivec_city (Vivec) was found but could not be loaded.\nNot enough memory (needs 3073 KB, 512 KB free). Code LF5.\n"));
+    assert(!strcmp(box(&e),"Not enough memory to load Vivec (needs 3073 KiB, 512 KiB available). Code LF5.\n"
+                           "You are in Seyda Neen."));
+    e.way=AW_WAY_BACK;strcpy(e.back_map,"balmora");
+    assert(!strcmp(box(&e),"Not enough memory to load Vivec (needs 3073 KiB, 512 KiB available). Code LF5.\n"
+                           "OK returns you to Seyda Neen, where you came in."));
+    e.place[0]=0;assert(!strncmp(box(&e),"Not enough memory to load vivec_city (needs",43));   /* no name: the map */
+    strcpy(e.place,"Vivec");
+    e.here_place[0]=e.here_map[0]=0;e.here_ok=0;   /* the console's block, before the way back has arrived */
+    assert(strstr(box(&e),"\nOK returns you to balmora, where you came in."));
+    e.back_failed=1;   /* the way back failed too: no promise of a return */
+    assert(strstr(box(&e),"(needs 3073 KiB, 512 KiB available), and the way back to balmora failed as well. Code LF5.\n"));
+    assert(!strstr(box(&e),"OK returns you"));
     e=make(AW_LOADERR_NO_SPAWN,"census","");assert(strstr(box(&e),"\nThe map did not spawn. Code LF6.\n"));
     e=make(AW_LOADERR_TIMEOUT,"census","");assert(strstr(box(&e),"\nThe load did not finish. Code LF7.\n"));
     e=make(AW_LOADERR_MISSING_FILE,"census","");strcpy(e.detail,"Model progs/x.mdl not found");
@@ -187,8 +200,26 @@ static void header(void){
     put32(h+4+5*8,-4);assert(AW_LoadErrMapHeader(h,124,1624,&lump)==AW_BROKEN_HEADER && lump==5);
     assert(AW_LoadErrMapHeader(NULL,0,0,NULL)==AW_BROKEN_HEADER);
 }
+/* MEMORY-EMERGENCY-PURGE-64: a load that did not fit is tried once more after the emergency purge only when that can
+ * change the answer */
+static void purge_retry(void){
+    aw_loaderr_t e=make(AW_LOADERR_MEMORY,"rifa4ef181ed","");strcpy(e.arena,"room");
+    assert(AW_LoadErrPurgeRetry(&e,0,2048L*1024,0));          /* the purge gave back 2 MiB of the Fast RAM: once more */
+    assert(!AW_LoadErrPurgeRetry(&e,1,2048L*1024,0));         /* the one retry is used */
+    assert(!AW_LoadErrPurgeRetry(&e,0,-1,0) && !AW_LoadErrPurgeRetry(&e,0,-1,1));   /* switched off, the test too */
+    assert(!AW_LoadErrPurgeRetry(&e,0,0,0));                  /* nothing given back: it would fail the same way */
+    assert(AW_LoadErrPurgeRetry(&e,0,0,1));                   /* the test aid's shortage, which the retry cures */
+    strcpy(e.arena,"fast");assert(AW_LoadErrPurgeRetry(&e,0,1,0));
+    {   /* the Hunk's own memory: a purge of the Fast RAM does not grow it */
+        const char *hunk[4]={"hunk","cache","zone","map"};int i;
+        for(i=0;i<4;i++){strcpy(e.arena,hunk[i]);assert(!AW_LoadErrPurgeRetry(&e,0,4096L*1024,0));
+                         assert(AW_LoadErrPurgeRetry(&e,0,4096L*1024,1));}
+    }
+    e.kind=AW_LOADERR_ERROR;strcpy(e.arena,"room");assert(!AW_LoadErrPurgeRetry(&e,0,4096L*1024,1));   /* not memory */
+    assert(!AW_LoadErrPurgeRetry(NULL,0,4096L*1024,1));
+}
 int main(void){
-    codes();boxes();no_place();in_play();recovered();cleaning();console();header();
-    puts("load errors: codes, boxes, the way back, notices, cleaning, the console block and the header check passed");
+    codes();boxes();no_place();in_play();recovered();cleaning();console();header();purge_retry();
+    puts("load errors: codes, boxes, the way back, notices, cleaning, the console block, the header check and the purge's retry rule passed");
     return 0;
 }

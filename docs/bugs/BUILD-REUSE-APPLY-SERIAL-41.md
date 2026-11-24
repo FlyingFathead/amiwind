@@ -26,6 +26,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 - 2026-10-14: INVENTORY-CATALOG-LOOKUP-40: native catalogue failure: BUILD-REUSE-APPLY-SERIAL-41: 17 October 2026, v0.0.42-dev1: the v0.0.41 final build applied the reused world terrain, scenery and flora on under one core each, about 30 s on the ...
 - 2026-10-16: reported in v0.0.41
+- 2026-11-24 04:53 +0200: seen again in v0.0.68-dev12: A reused stage took 16 seconds against its recorded 5 seconds while another job was reading the same build storage; the next reused stage ran at its usual speed.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -269,6 +270,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [CHIM-ROOM-FAIL-STAGE-48](CHIM-ROOM-FAIL-STAGE-48.md): One CHIM room that cannot be made failed the whole CHIM interiors stage (HOLD-LEVEL with every room batch by default)
 - [CHIM-ROOM-OVER-BUDGET-RETRY-48](CHIM-ROOM-OVER-BUDGET-RETRY-48.md): A model over the image budget is tried whole again on every run before its cached tiles are used: its room runs on one core
 - [CHIM-SOL-FLORA-PATH-64](CHIM-SOL-FLORA-PATH-64.md): The Solstheim test frame converts its trees as full models, not through the world flora cards Vvardenfell uses
+- [CHIM-STAGE-QUEUED-IDLE-68](CHIM-STAGE-QUEUED-IDLE-68.md): The world stage runs on about 2 of 24 cores for over 5 minutes while many units wait in its queue
 - [CHIM-STAIR-GATE-WORLD-RELOAD-36](CHIM-STAIR-GATE-WORLD-RELOAD-36.md): The CHIM stair gate's workers read the whole CHIM world again every time they switch frames (about 14.5 s per read on the 273-frame world)
 - [CHIM-STAIRGATE-SLOW-33](CHIM-STAIRGATE-SLOW-33.md): The CHIM stair gate takes over 10 minutes on the Balmora and Vivec Arena world
 - [EXPANSION-READER-ONE-MASTER-64](EXPANSION-READER-ONE-MASTER-64.md): Most builder readers load only the base game file; the roadmap calls the readers master-list readers

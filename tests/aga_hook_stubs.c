@@ -147,6 +147,10 @@ WEAK float AW_ActivateDistance(void){return 48;}
 WEAK int AW_ConsoleWidth(void){return 38;}   /* aw_console.c: dbg give weapons lines its table up to it */
 WEAK int AW_MoveSneaking(void){return 0;}   /* aw_move.c (SNEAK-58): the HUD's sneak indicator asks it */
 WEAK float (*aw_view_sneak)(void);   /* view.c's hook (SNEAK-58), for fixtures with aw_move.c and no view.c */
+/* WATER-WALKING-NOT-ON-SURFACE-68: aw_walk.c's Water Walking hook and aw_combat.c's effect hook, which aw_move.c sets
+ * and asks, for fixtures with aw_move.c and neither of them (NULL: no hook) */
+WEAK float (*aw_walk_water_walking)(struct edict_s *p);
+WEAK float (*aw_combat_effect_magnitude)(struct edict_s *actor,int effect);
 WEAK int AW_ItemPrompt(char *line,int size,int *steal){(void)line;(void)size;if(steal)*steal=0;return 0;}
 WEAK void AW_ConsoleCharacterRed(int x,int y,int c,int red){(void)x;(void)y;(void)c;(void)red;}
 WEAK int AW_PlacedFocus(const char **name,char *weight_line,char *value_line,int line_size,int *owned){(void)name;(void)weight_line;(void)value_line;(void)line_size;(void)owned;return 0;}

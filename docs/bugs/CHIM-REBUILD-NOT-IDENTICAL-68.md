@@ -1,5 +1,14 @@
 # CHIM-REBUILD-NOT-IDENTICAL-68: The CHIM world rebuilt from unchanged inputs wrote files that differ from the cached build, so the stages after it ran again
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.68-dev8 at 2026-11-23 06:51 +0200: Seen again: the Solstheim stage, rebuilt from its stored units with unchanged inputs, wrote files that differ from the earlier build, so the cell progress stage ran again.
+- Reported with v0.0.68-dev12 at 2026-11-24 09:34 +0200: The second pair of runs differs only in two diagnostic reports of the Solstheim stage (one carries a time); the game files are identical. Those two reports are to be left out of the comparison like the other diagnostics.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -23,12 +32,31 @@
 
 ## Timeline
 
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.68-dev12 (82014624) | 2026-11-24 | gate 13040 of the planning item CHIM-REBUILD-NOT-IDENTICAL-68 | A stage rebuilt from its stored units leaves out the compiled collision memos its computed units would write; these content-addressed memos no longer count when early cutoff, the unit tree, the reuse audit and the stage hashes compare a stage's outputs, so the rebuild is seen as identical |
+| fixed in source | a gated commit | v0.0.68-dev12 (5e77e121) | 2026-11-24 | gate 13060 of the planning item CHIM-REBUILD-NOT-IDENTICAL-68 | A rebuilt CHIM world now compares equal to the cached one: compiled collision memos and the mesh-method diagnostics are left out of the comparison (820146245 gate 13040, the last two diagnostic names in 5e77e121b gate 13060); proven game-identical on both pairs. |
+
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-22: reported in v0.0.68-dev8
 - 2026-11-23 06:51 +0200: seen again in v0.0.68-dev8: Seen again: the Solstheim stage, rebuilt from its stored units with unchanged inputs, wrote files that differ from the earlier build, so the cell progress stage ran again.
+- 2026-11-24: fixed in source: a gated commit, v0.0.68-dev12 (82014624); gate 13040 of the planning item CHIM-REBUILD-NOT-IDENTICAL-68: A stage rebuilt from its stored units leaves out the compiled collision memos its computed units would write; these content-addressed memos no longer count when early cutoff, the unit tree, the reuse audit and the stage hashes compare a ...
+- 2026-11-24: fixed in source: a gated commit, v0.0.68-dev12 (5e77e121); gate 13060 of the planning item CHIM-REBUILD-NOT-IDENTICAL-68: A rebuilt CHIM world now compares equal to the cached one: compiled collision memos and the mesh-method diagnostics are left out of the comparison (820146245 gate 13040, the last two diagnostic names in 5e77e121b gate 13060); proven ...
+- 2026-11-24 09:34 +0200: seen again in v0.0.68-dev12: The second pair of runs differs only in two diagnostic reports of the Solstheim stage (one carries a time); the game files are identical.
 
 <!-- END GENERATED TIMELINE -->
+
+<!-- contents start -->
+## Contents
+
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [Timeline](#timeline)
+- [Bugs in the same category](#bugs-in-the-same-category)
+
+<!-- contents end -->
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -204,6 +232,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [CHIM-ROOM-FAIL-STAGE-48](CHIM-ROOM-FAIL-STAGE-48.md): One CHIM room that cannot be made failed the whole CHIM interiors stage (HOLD-LEVEL with every room batch by default)
 - [CHIM-ROOM-OVER-BUDGET-RETRY-48](CHIM-ROOM-OVER-BUDGET-RETRY-48.md): A model over the image budget is tried whole again on every run before its cached tiles are used: its room runs on one core
 - [CHIM-SOL-FLORA-PATH-64](CHIM-SOL-FLORA-PATH-64.md): The Solstheim test frame converts its trees as full models, not through the world flora cards Vvardenfell uses
+- [CHIM-STAGE-QUEUED-IDLE-68](CHIM-STAGE-QUEUED-IDLE-68.md): The world stage runs on about 2 of 24 cores for over 5 minutes while many units wait in its queue
 - [CHIM-STAIR-GATE-WORLD-RELOAD-36](CHIM-STAIR-GATE-WORLD-RELOAD-36.md): The CHIM stair gate's workers read the whole CHIM world again every time they switch frames (about 14.5 s per read on the 273-frame world)
 - [CHIM-STAIRGATE-SLOW-33](CHIM-STAIRGATE-SLOW-33.md): The CHIM stair gate takes over 10 minutes on the Balmora and Vivec Arena world
 - [EXPANSION-READER-ONE-MASTER-64](EXPANSION-READER-ONE-MASTER-64.md): Most builder readers load only the base game file; the roadmap calls the readers master-list readers

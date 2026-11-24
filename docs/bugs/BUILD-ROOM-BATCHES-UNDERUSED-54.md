@@ -22,7 +22,7 @@
 | Persists in | v0.0.54-dev2, v0.0.62, v0.0.65 (last seen) |
 | Severity | medium: Rule 6: a stage under half its cores for minutes; the build waits on it. |
 | Family | Build speed (`build-speed`) |
-| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
+| Deferred by the maintainer | 2026-11-24: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up |
 | Playtest version | 2026_10_28_v0.0.54-dev2_full-dev2-try2_dea1bef |
 | From commit | source dea1bef, engine dea1bef, CHIM world dea1bef |
 | CHIM engine version | CHIM 0.2.2, engine dea1bef, world format 0.13 |
@@ -40,7 +40,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-02: seen again in v0.0.59-dev5: v0.0.59-dev5 full build at 2026-11-02 16:02 +0200 / 2026-11-02 14:02 UTC (f08583e0, reuse dev4, lease 44 GiB): the resource plan throttles chim-room-batches to 8 of 24 workers (about 894 MiB a worker beside 26.9 GiB the other stages held) ...
 - 2026-11-08: seen again in v0.0.62: Seen again in the v0.0.62 release build: the Vivec rooms stage ran at about 4 of 24 cores for a while.
 - 2026-11-17: seen again in v0.0.66: Seen again in the v0.0.66 from-scratch check (commit ac37e80b, 20 cores, 628 minutes): five underuse warnings for chim-room-batches: 2.2 of 5 cores for 142 s with 3 units queued and none running; 1.0 of 7 cores for 61 s with 1,701 queued ...
-- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
+- 2026-11-24: deferred by the maintainer: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up
 
 <!-- END GENERATED TIMELINE -->
 
@@ -275,6 +275,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [CHIM-ROOM-FAIL-STAGE-48](CHIM-ROOM-FAIL-STAGE-48.md): One CHIM room that cannot be made failed the whole CHIM interiors stage (HOLD-LEVEL with every room batch by default)
 - [CHIM-ROOM-OVER-BUDGET-RETRY-48](CHIM-ROOM-OVER-BUDGET-RETRY-48.md): A model over the image budget is tried whole again on every run before its cached tiles are used: its room runs on one core
 - [CHIM-SOL-FLORA-PATH-64](CHIM-SOL-FLORA-PATH-64.md): The Solstheim test frame converts its trees as full models, not through the world flora cards Vvardenfell uses
+- [CHIM-STAGE-QUEUED-IDLE-68](CHIM-STAGE-QUEUED-IDLE-68.md): The world stage runs on about 2 of 24 cores for over 5 minutes while many units wait in its queue
 - [CHIM-STAIR-GATE-WORLD-RELOAD-36](CHIM-STAIR-GATE-WORLD-RELOAD-36.md): The CHIM stair gate's workers read the whole CHIM world again every time they switch frames (about 14.5 s per read on the 273-frame world)
 - [CHIM-STAIRGATE-SLOW-33](CHIM-STAIRGATE-SLOW-33.md): The CHIM stair gate takes over 10 minutes on the Balmora and Vivec Arena world
 - [EXPANSION-READER-ONE-MASTER-64](EXPANSION-READER-ONE-MASTER-64.md): Most builder readers load only the base game file; the roadmap calls the readers master-list readers

@@ -29,6 +29,13 @@ TRACKER_STAGE = 'cell-progress'
 # preflight); each is an ocean frame of the module's world, its row in the module's rows file. A list of its own, so
 # the base world's cell list and key stay as they are (CHIM-SEA-BETWEEN-ISLANDS-64).
 SEA_CELLS = 'config/solstheim-sea-cells.json'
+# The recordless open sea of the area Bloodmoon's records add to the map's box (tools/chim/sea_grid.py, written from
+# the game data; SOL-SEA-CROSSING-68): taken as open sea without a tracker status, after Solstheim's other cells, so
+# its frame maps slNNNN keep their names (tools/chim/regions.py, the recordless rule)
+SEA_GRID = 'config/solstheim-sea-grid.json'
+SEA_STAGE = 'bloodmoon-solstheim-sea'           # their world: the store chimsea (tools/chim/layer_stores.py)
+SEA_CELLS_OPTION = 'bloodmoon_solstheim_sea_cells'
+SEA_UNIT_CACHE = 'cache/bloodmoon-solstheim-sea-units'
 METHOD_SETS = 'config/mesh-method-sets.json'
 
 
@@ -63,6 +70,19 @@ def module_plan(status, root=None):
     return chim_regions.plan(specs, status, towns=())
 
 
+def sea_plan(status, root=None):
+    """(table, problems) of the recordless open sea of the area Bloodmoon adds to the map's box (SEA_GRID): the
+    regions preflight takes them as open sea by the recordless rule (tools/chim/regions.py). (None, []) without the
+    list. Their world is the module's second world stage (SEA_STAGE), the store chimsea: Solstheim's own world, its
+    store index and its frame map names stay as they were (tools/chim/sol_test.py LANDS 'chimsea')."""
+    from pathlib import Path
+    from chim import regions as chim_regions
+    grid = Path(root or Path(__file__).resolve().parents[1]) / SEA_GRID
+    if not grid.is_file():
+        return None, []
+    return chim_regions.plan(['@' + str(grid)], status, towns=())
+
+
 def resolve(args, masters, builder, status, log=print):
     """The module's cells (module_plan): Solstheim's cells that the tracker file STATUS calls finished (the named set
     of Bloodmoon.esm, tools/chim/regions.py layer_sets) and its open-sea cells with a CELL record (SEA_CELLS, the
@@ -76,6 +96,7 @@ def resolve(args, masters, builder, status, log=print):
     build log."""
     from chim import regions as chim_regions
     setattr(args, CELLS_OPTION, None)
+    setattr(args, SEA_CELLS_OPTION, None)
     if MASTER not in masters or getattr(args, 'miniwind', False) or getattr(args, 'chim_regions', None):
         return None
     if getattr(args, 'chim_sol_test', None):
@@ -102,16 +123,29 @@ def resolve(args, masters, builder, status, log=print):
     problems += chim_regions.owned_land_problems(kinds, getattr(args, 'data_files', None))
     # the open-sea cells taken have no LAND in the masters (the main game's rule, in seconds before any stage)
     problems += chim_regions.ocean_land_problems(kinds, getattr(args, 'data_files', None))
+    # the recordless open sea of the area Bloodmoon adds to the map's box: a world of its own (SEA_STAGE); no master
+    # has a record for any of its cells (seconds, SOL-SEA-CROSSING-68)
+    sea, sea_problems = sea_plan(status)
+    problems += sea_problems
+    if sea is not None:
+        problems += chim_regions.recordless_problems(sea, getattr(args, 'data_files', None))
+        problems += chim_regions.ocean_land_problems(chim_regions.table_kinds(sea), getattr(args, 'data_files', None))
     if problems:
         raise ValueError('The module bloodmoon-solstheim (Solstheim\'s outdoor cells) failed its cell preflight before '
                          'any stage (--no-dlc or --dlc tribunal builds without it):' + (chr(10) + '  ')
                          + (chr(10) + '  ').join(problems))
     setattr(args, CELLS_OPTION, chim_regions.encode_cells(kinds))
+    if sea is not None and chim_regions.table_kinds(sea):
+        setattr(args, SEA_CELLS_OPTION, chim_regions.encode_cells(chim_regions.table_kinds(sea),
+                                                                  after=chim_regions.table_after(sea)))
     c = table['counts']
     log('Module bloodmoon-solstheim: %d Solstheim cells (%s) in %d frames, a world of their own (the stages '
-        'bloodmoon-solstheim-data and bloodmoon-solstheim), mesh method set %s; %d dropped'
-        % (c['cells'], chim_regions.kind_summary(c), c['frames'], method_set(args), len(table['dropped'])))
-    return {'selection': table['selection'], 'counts': c, 'dropped': table['dropped'], 'method_set': method_set(args)}
+        'bloodmoon-solstheim-data and bloodmoon-solstheim), mesh method set %s; %d dropped%s'
+        % (c['cells'], chim_regions.kind_summary(c), c['frames'], method_set(args), len(table['dropped']),
+           '; the open sea of the area Bloodmoon adds to the map\'s box: %d cells in a world of their own (the stage '
+           '%s, store chimsea)' % (sea['counts']['cells'], SEA_STAGE) if getattr(args, SEA_CELLS_OPTION, None) else ''))
+    return {'selection': table['selection'], 'counts': c, 'dropped': table['dropped'], 'method_set': method_set(args),
+            **({'sea_cells': sea['counts']['cells']} if getattr(args, SEA_CELLS_OPTION, None) else {})}
 
 
 def commands(args, steps, tool, run, tools, jobs, chim_options):
@@ -148,4 +182,20 @@ def commands(args, steps, tool, run, tools, jobs, chim_options):
                      '--jobs', jobs, '--validate', '--stats', '--sdk', args.sdk))]
     # strings only: the commands go into build-state.json (BUILD-NPCLOD-PATH-ARG-34)
     tracker = ['--module-chim-world', str(world)]
+    sea_cells = getattr(args, SEA_CELLS_OPTION, None)
+    if sea_cells:
+        # the recordless open sea of the area Bloodmoon adds to the map's box: the same converter on the same data
+        # folder, its own cells, world and unit cache (the store chimsea; SOL-SEA-CROSSING-68), after Solstheim's
+        # world, so Solstheim's stage, key and store stay as they were
+        sea_world = run / SEA_STAGE
+        at = next(i for i, (name, _) in enumerate(steps) if name == STAGE) + 1
+        steps[at:at] = [
+            (SEA_STAGE, tool('bloodmoon_solstheim.py', '--data-files', folder,
+                             '--palette', run / 'intro-scene/id1/gfx/palette.lmp', '--out', sea_world,
+                             '--qbsp', tools['qbsp'], *chim_options(args, sea_cells),
+                             '--lighting-type', lighting,
+                             '--unit-cache', args.workspace / SEA_UNIT_CACHE, '--unit-pool', pool,
+                             '--mesh-method-set', method_set(args),
+                             '--jobs', jobs, '--validate', '--stats', '--sdk', args.sdk))]
+        tracker += ['--module-chim-world', str(sea_world)]
     return [(name, list(command) + tracker if name == TRACKER_STAGE else command) for name, command in steps]

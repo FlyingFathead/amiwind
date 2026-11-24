@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Stage output hashes and reference checksums per release (docs/BUILD_CACHE.md).
 
-Every stage's output hash: the SHA-256 of its sorted (path, SHA-256) output list without diagnostics
-(tools/build_cache.py diagnostic), so two builds can be compared stage by stage even when a disk image wrapper
+Every stage's output hash: the SHA-256 of its sorted (path, SHA-256) output list without diagnostics and memos
+(tools/build_cache.py uncompared), so two builds can be compared stage by stage even when a disk image wrapper
 differs. A release's reference file (checksums/v<VERSION>.json, written by the release tooling from the release
 build) holds, per game edition, those stage hashes, the payload's per-file hashes and the disk image hashes.
 A build of the same VERSION compares itself with it and REPORTS: it never stops or changes a build.
@@ -32,22 +32,22 @@ def load(path):
 
 
 def stage_hash(manifest):
-    """A stage's output hash: the top of its unit tree (units -> segments -> stage, diagnostics left out;
+    """A stage's output hash: the top of its unit tree (units -> segments -> stage, diagnostics and memos left out;
     tools/unit_tree.py)."""
-    from unit_tree import of_manifest
-    return (manifest.get('tree') or of_manifest(manifest))['stage_hash']
+    from unit_tree import tree_of
+    return tree_of(manifest)['stage_hash']
 
 
 def stage_trees(run):
     """{stage: {'hash', 'segments': {segment: hash}}} of RUN, for the reference file."""
     from build_cache import load_manifest
-    from unit_tree import of_manifest
+    from unit_tree import tree_of
     state = load(Path(run) / 'build-state.json') or {}
     result = {}
     for step in state.get('steps', []):
         manifest = load_manifest(run, step['name'])
         if manifest and manifest.get('status') == 'complete':
-            found = manifest.get('tree') or of_manifest(manifest)
+            found = tree_of(manifest)
             result[step['name']] = {'hash': found['stage_hash'],
                                     'segments': {s: v['hash'] for s, v in found['segments'].items()}}
     return result

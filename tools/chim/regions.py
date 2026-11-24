@@ -137,13 +137,19 @@ def read_cell_file(path):
         if not isinstance(data, dict) or data.get('format') != CELLS_FORMAT:
             raise ValueError('%s: a cell file is %s JSON, a Toolkit World Map state export or CSV'
                              % (path.name, CELLS_FORMAT))
-        extra = set(data) - {'format', 'cells', 'regions', 'reason', 'notes'}
+        extra = set(data) - {'format', 'cells', 'regions', 'reason', 'notes', 'recordless'}
         if extra:
             raise ValueError('%s: unknown keys %s' % (path.name, ', '.join(sorted(extra))))
         regions = data.get('regions') or []
         if not isinstance(regions, list) or not all(isinstance(r, str) for r in regions):
             raise ValueError('%s: "regions" must be a list of names' % path.name)
+        if not isinstance(data.get('recordless', False), bool):
+            raise ValueError('%s: "recordless" must be true or false' % path.name)
         record.update(format=CELLS_FORMAT, reason=data.get('reason', ''), notes=data.get('notes', ''))
+        if data.get('recordless'):
+            # RECORDLESS: the open sea of the map's box that no master has a record for (SOL-SEA-CROSSING-68, the rule
+            # above select): taken as open sea without a tracker status, after every other cell
+            record['recordless'] = True
         return [parse_cell(c) for c in data.get('cells') or []], regions, record
     rows = [r for r in csv.reader(io.StringIO(text)) if any(v.strip() for v in r)]
     if not rows:
@@ -206,16 +212,28 @@ def region_cells(region, statuses):
     return [c for c, v in statuses.items() if v['region'] == region and kind_of(v['status']) in ('seabed', 'land')]
 
 
+# THE RECORDLESS OPEN SEA (SOL-SEA-CROSSING-68, decided for the project 2026-11-24): a cell file marked
+# "recordless": true lists the cells of the map's box that no selected master has a CELL or LAND record for. The
+# original game makes each such cell on first use as an empty exterior with water over the flat default height
+# (OpenMW apps/openmw/mwworld/worldmodel.cpp 55-62 createEsmCell with HasWater; components/esm3/loadland.hpp 77
+# DEFAULT_HEIGHT -2048; components/esmterrain/storage.cpp 571-577), so every one is the same shared ocean chunk
+# (tools/chim/ocean.py), measured once: plan() takes such a cell as open sea when the tracker file has no finished
+# status for it, and the callers check with the masters, in seconds, that none has a record (recordless_problems).
+# Their frames come after every other cell of the table (ownership 'after'), so the frame map names and the order
+# of the cells a build held before stay as they were. docs/chim/CHIM_REGIONS.md "The recordless open sea".
 def select(specs, statuses, read_file=read_cell_file):
     """(cells, explicit, record): the union of every --chim-regions value. A value is a named set (seabed,
     coast, sea-ring), a region name (its finished cells), comma-separated names, or @FILE (explicit cells
-    and/or regions). Explicit cells are taken as given: the preflight judges them."""
+    and/or regions). Explicit cells are taken as given: the preflight judges them. record['recordless_cells']: the
+    cells of the files marked recordless (the rule above), only when there are any."""
     cells, explicit, record = set(), set(), {'values': [], 'files': []}
     for spec in specs:
         parts = [spec] if spec.startswith('@') else [p.strip() for p in spec.split(',') if p.strip()]
         for part in parts:
             if part.startswith('@'):
                 found, regions, rec = read_file(part[1:])
+                if rec.get('recordless'):
+                    record.setdefault('recordless_cells', []).extend(found)
                 explicit.update(found)
                 cells.update(found)
                 for region in regions:
@@ -434,13 +452,19 @@ def frame_row(cell, margin=TERRAIN_MARGIN):
             'ground': [[-HALF - margin, -HALF - margin], [HALF + margin, HALF + margin]]}
 
 
-def ownership(kinds, selection=None, dropped=(), margin=TERRAIN_MARGIN):
-    """The ownership table (aw-chim-ownership-1) of preflighted cells. kinds: {(x, y): 'seabed' | 'land'}."""
-    cells = sorted(kinds)
+def ownership(kinds, selection=None, dropped=(), margin=TERRAIN_MARGIN, after=()):
+    """The ownership table (aw-chim-ownership-1) of preflighted cells. kinds: {(x, y): 'seabed' | 'land'}.
+    AFTER: cells whose frames come after every other cell's (the recordless open sea, select), each group sorted, so
+    the frames of the other cells keep the order and the frame map names they had without them; the table then lists
+    them as 'appended'. Without AFTER the table is the one before, byte for byte."""
+    after = {tuple(c) for c in after} & set(kinds)
+    cells = sorted(set(kinds) - after) + sorted(after)
     frames = [dict(frame_row(c, margin), **({'kind': 'ocean'} if kinds[c] == 'ocean' else {})) for c in cells]
     table = {'format': FORMAT, 'cell_map_units': CELL_MAP, 'leave_margin': LEAVE_MARGIN, 'terrain_margin': margin,
-             'cells': {cell_key(c): {'frame': frame_id(c), 'kind': kinds[c]} for c in cells},
+             'cells': {cell_key(c): {'frame': frame_id(c), 'kind': kinds[c]} for c in sorted(kinds)},
              'frames': frames, 'dropped': list(dropped), 'selection': selection or {}}
+    if after:
+        table['appended'] = [list(c) for c in sorted(after)]
     table['counts'] = {'cells': len(cells), 'frames': len(frames),
                        'seabed': sum(1 for k in kinds.values() if k == 'seabed'),
                        'land': sum(1 for k in kinds.values() if k == 'land'),
@@ -471,21 +495,45 @@ def check_table(table):
     return problems
 
 
-def encode_cells(kinds):
-    """The stage-command form of preflighted cells: "x,y:k ..." (k = s seabed, l land), sorted. The chim stage
-    takes the cells on its command line, so its fingerprint covers exactly them (not the tracker file)."""
-    return ' '.join('%d,%d:%s' % (c[0], c[1], KIND_CODES[kinds[c]]) for c in sorted(kinds))
+APPENDED_MARK = '|'      # in the stage-command form: the cells after it come after every other cell (ownership AFTER)
+
+
+def encode_cells(kinds, after=()):
+    """The stage-command form of preflighted cells: "x,y:k ..." (k = s seabed, l land, o ocean), sorted. The chim
+    stage takes the cells on its command line, so its fingerprint covers exactly them (not the tracker file). AFTER:
+    the appended cells (ownership), written after a "|" token, sorted; without them the text is the one before."""
+    after = {tuple(c) for c in after} & set(kinds)
+    text = ' '.join('%d,%d:%s' % (c[0], c[1], KIND_CODES[kinds[c]]) for c in sorted(set(kinds) - after))
+    if after:
+        text = ' '.join(t for t in (text, APPENDED_MARK, ' '.join('%d,%d:%s' % (c[0], c[1], KIND_CODES[kinds[c]])
+                                                                  for c in sorted(after))) if t)
+    return text
 
 
 def decode_cells(text):
     codes = {v: k for k, v in KIND_CODES.items()}
     out = {}
     for token in text.split():
+        if token == APPENDED_MARK:
+            continue
         cell, _, code = token.partition(':')
         if code not in codes:
             raise ValueError('CHIM region cell %r: kind must be s (seabed), l (land) or o (ocean)' % token)
         out[parse_cell(cell)] = codes[code]
     return out
+
+
+def decode_after(text):
+    """The appended cells of a stage-command form (the cells after its "|" token), as a set of (x, y)."""
+    tokens = (text or '').split()
+    if APPENDED_MARK not in tokens:
+        return set()
+    return set(decode_cells(' '.join(tokens[tokens.index(APPENDED_MARK) + 1:])))
+
+
+def table_after(table):
+    """The appended cells of an ownership table (ownership AFTER), as a set of (x, y)."""
+    return {tuple(c) for c in (table or {}).get('appended') or ()}
 
 
 def frame_settings(frame, margin=TERRAIN_MARGIN):
@@ -585,13 +633,40 @@ def plan(specs, status_path, towns=(), root=None, read_file=read_cell_file, marg
     cells, explicit, record = select(specs, statuses, read_file)
     record['status_file'] = {'file': Path(status_path).name,
                              'sha256': hashlib.sha256(Path(status_path).read_bytes()).hexdigest()}
+    # the recordless open sea (the rule above select): open sea without a finished status of its own; the callers check
+    # with the masters that no master has a record for any of them (recordless_problems)
+    recordless = {tuple(c) for c in record.pop('recordless_cells', ())}
+    if recordless:
+        record['recordless'] = len(recordless)
+        for cell in recordless:
+            rec = statuses.get(cell)
+            if rec is None or kind_of(rec['status']) is None:
+                statuses[cell] = dict(rec or {'ring': None, 'region': '', 'set': '', 'legacy_maps': None, 'failing': [],
+                                              'audited': {}, 'file_generated': None, 'name': ''},
+                                      status=OCEAN[0], recordless=True)
     if boxes is None:
         boxes = town_boxes(towns, root) if towns else {}
     kept, problems, dropped = preflight(cells, set(explicit), statuses, boxes, one_map_only)
     if not kept and not problems:
         problems.append('the selection %s holds no cell' % ', '.join(specs))
     kinds = {c: kind_of(statuses[c]['status']) for c in kept}
-    return ownership(kinds, record, dropped, margin), problems
+    return ownership(kinds, record, dropped, margin, after=recordless), problems
+
+
+def recordless_problems(table, data_files):
+    """The appended (recordless) cells of TABLE that a master in DATA_FILES has a CELL or a LAND record for, in seconds
+    before any stage (the recordless rule above select: such a cell is no open sea of the box). [] without appended
+    cells or data files."""
+    after = table_after(table)
+    if not after or not data_files:
+        return []
+    from chim.sea_grid import recorded_cells
+    bad = sorted(after & recorded_cells(data_files))
+    if not bad:
+        return []
+    return ['%d cell(s) of the recordless open sea have a CELL or LAND record in the game data, so they are no '
+            'recordless sea: %s (write the lists again: python3 tools/chim/sea_grid.py write)'
+            % (len(bad), ' '.join(cell_key(c) for c in bad[:20]) + (' ...' if len(bad) > 20 else ''))]
 
 
 def ocean_land_problems(kinds, data_files):

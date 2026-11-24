@@ -148,8 +148,16 @@ void AW_MovePlayerInputs(aw_move_inputs_t *in) {
     /* DBG-SUPERSPEED-62: superspeed reads Speed, Athletics and Acrobatics at the game's maximum, 100 (the character
      * sheet itself untouched, so off gives the real values back at once) */
     if(AW_MoveSuperspeed())in->speed=in->athletics=in->acrobatics=AW_MOVE_SUPERSPEED_STAT;
-    /* paralysis, Levitate, Swift Swim, Jump, Slowfall,
-     * Water Walking: no input or magic effect in the engine yet (0 = no effect). */
+    /* paralysis, Levitate, Swift Swim, Jump, Slowfall: no input or magic effect in the engine yet (0 = no effect).
+     * Water Walking is not a speed: the walk reads it (aw_walk.c, water_walking below). */
+}
+/* WATER-WALKING-NOT-ON-SURFACE-68: the player's Water Walking magnitude for the walk (aw_walk.c aw_walk_water_walking,
+ * asked only while his feet are in the water): the active effects and the always-active spells of his list by the
+ * combat layer's effect hook, as the breath asks Water Breathing (aw_breath.c); without it the active effects alone. */
+extern float (*aw_walk_water_walking)(edict_t *p);
+static float water_walking(edict_t *p) {
+    if(aw_combat_effect_magnitude)return aw_combat_effect_magnitude(p,AW_EFFECT_WATER_WALKING);
+    return AW_EffectsCount()?AW_EffectsMagnitude(AW_ACTOR_PLAYER_REF,AW_EFFECT_WATER_WALKING,AW_EFFECT_NO_ARG):0;
 }
 /* The command's input as a fraction of full input on each axis (Shift scales
  * the command by cl_movespeedkey, so it is divided out). */
@@ -302,4 +310,5 @@ void AW_MoveInit(void) {
     Cvar_RegisterVariable(&superspeed);
     Cmd_AddCommand("superspeed",superspeed_command);
     aw_move_ground=ground;aw_move_water=water;aw_move_after=after;aw_view_sneak=view_sneak;
+    aw_walk_water_walking=water_walking;
 }

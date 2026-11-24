@@ -217,6 +217,33 @@ class WhatEndsALoadInsteadOfTheGame(unittest.TestCase):
         self.assertIn('engine/aga/src/aw_loaderr.c', (ROOT / 'tools' / 'release-files.json').read_text(encoding='utf-8'))
         self.assertIn('docs/LOAD_ERRORS.md', (ROOT / 'tools' / 'release-files.json').read_text(encoding='utf-8'))
 
+    def test_the_emergency_purge_is_wired(self):
+        # MEMORY-EMERGENCY-PURGE-64: the game binds the purge and the room's memory report; the purge is every
+        # releaser of re-makeable memory with one line of figures, and the scene asks it before the way back of a load
+        # that failed for memory; the retry's rule and its order are host-tested (aga_loaderr_test.c, aga_scene_test.c)
+        loadfail = strip_comments(code('aw_loadfail.c'))
+        self.assertIn('aw_scene_memory_purge=memory_purge;chim_room_short=room_short;', loadfail)
+        self.assertIn('Cmd_AddCommand("aw_mempurge",mem_purge_command);', loadfail)
+        purge = body(loadfail, 'static long memory_purge(const char *map) {')
+        self.assertLess(purge.index('if(!aw_mem_purge.value)'), purge.index('AW_FastReleaseAll ("the emergency purge")'))
+        self.assertIn('Con_Printf("Memory purge for %s:', purge)
+        self.assertIn('static cvar_t aw_mem_purge={"aw_mem_purge","1"};', loadfail)   # on by default, not saved
+        self.assertIn('if(purge_test_armed)purge_test_fail();', body(loadfail, 'int AW_LoadFailTestArm(void) {'))
+        scene = strip_comments(code('aw_scene.c'))
+        failed = body(scene, 'void AW_SceneLoadFailed(const char *why) {')
+        retry = failed.index('if(lerr.kind==AW_LOADERR_MEMORY && mem_retry_after_purge())return;')
+        self.assertLess(retry, failed.index('recover_from(1,&back);', retry))   # before the way back
+        self.assertGreater(retry, failed.index('if(load_recovering){'))          # never for a step of the chain
+        world = strip_comments((SRC / 'chim' / 'chim_world.c').read_text(encoding='utf-8', errors='replace'))
+        refuse = body(world, 'static void RefuseRoom (const char *name, const char *why)\n{')
+        self.assertLess(refuse.index('chim_room_short (name, need, have);'), refuse.index('Host_Error'))
+        catalogue = (ROOT / 'config' / 'debug-commands.txt').read_text(encoding='utf-8')
+        line = next(l for l in catalogue.splitlines() if l.startswith('PLAYTESTING|mempurge|aw_mempurge|'))
+        for word in ('on', 'off', 'test'):
+            self.assertIn(word, line)
+        self.assertIn('dbg mempurge test', (ROOT / 'docs' / 'LOAD_ERRORS.md').read_text(encoding='utf-8'))
+        self.assertIn('tests/sessions/memory_purge.txt', (ROOT / 'tools' / 'release-files.json').read_text(encoding='utf-8'))
+
 
 if __name__ == '__main__':
     unittest.main()

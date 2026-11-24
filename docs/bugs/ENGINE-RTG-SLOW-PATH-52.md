@@ -19,6 +19,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-26: reported in v0.0.50
+- 2026-11-24 14:26 +0200: seen again in v0.0.68-dev12: A tester ran the game on a machine with an RTG graphics card: with AGA also present and a suitable screen mode it runs unchanged, at the same frame rate as on AGA; a change to the start-up check lets a machine without AGA start it (that ...
+
+<!-- END GENERATED TIMELINE -->
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category

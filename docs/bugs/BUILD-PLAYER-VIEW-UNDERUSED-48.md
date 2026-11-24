@@ -21,7 +21,7 @@
 | Persists in | v0.0.62 (last seen) |
 | Severity | high: Regressed in v0.0.62 (was medium): two minutes of every image step; the project rule is every core busy |
 | Family | Build speed (`build-speed`) |
-| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
+| Deferred by the maintainer | 2026-11-24: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up |
 | Came back (regression) | in v0.0.62 (fixed in v0.0.48-dev2 before) |
 | Playtest version | 2026_10_22_v0.0.48-dev2_miniwind-balmora-rooms-bsp_1336ba94 |
 | From commit | source 1336ba9, engine 1336ba9, CHIM world 1336ba9 |
@@ -49,7 +49,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-08 18:18 +0000: seen again in v0.0.62: Release build 7011540: the player view used all 24 cores for about 15 minutes, 11 to 12 cores from about 37 minutes in and 7 cores after 63 minutes.
 - 2026-11-09: fixed in source: a gated commit, v0.0.63 (dc440813, branch v0.0.63-speed); tools/player_view_schedule.py: one flow, each torch body after its own body, the fitting tries of a body as units over idle workers; tests/test_player_view_schedule.py: on the v0.0.62 release build's unit times the stage falls from 95 to about 44 minutes once the fitted tries are known
 - 2026-11-15: shipped: the v0.0.66-dev2 release build, v0.0.66-dev2 (3988c6e4, build 2026_11_14_v0.0.66-dev2_full); the delivered dev2 build holds the commit: a numbered build carries the fix
-- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
+- 2026-11-24: deferred by the maintainer: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up
 
 <!-- END GENERATED TIMELINE -->
 
@@ -318,6 +318,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [CHIM-ROOM-FAIL-STAGE-48](CHIM-ROOM-FAIL-STAGE-48.md): One CHIM room that cannot be made failed the whole CHIM interiors stage (HOLD-LEVEL with every room batch by default)
 - [CHIM-ROOM-OVER-BUDGET-RETRY-48](CHIM-ROOM-OVER-BUDGET-RETRY-48.md): A model over the image budget is tried whole again on every run before its cached tiles are used: its room runs on one core
 - [CHIM-SOL-FLORA-PATH-64](CHIM-SOL-FLORA-PATH-64.md): The Solstheim test frame converts its trees as full models, not through the world flora cards Vvardenfell uses
+- [CHIM-STAGE-QUEUED-IDLE-68](CHIM-STAGE-QUEUED-IDLE-68.md): The world stage runs on about 2 of 24 cores for over 5 minutes while many units wait in its queue
 - [CHIM-STAIR-GATE-WORLD-RELOAD-36](CHIM-STAIR-GATE-WORLD-RELOAD-36.md): The CHIM stair gate's workers read the whole CHIM world again every time they switch frames (about 14.5 s per read on the 273-frame world)
 - [CHIM-STAIRGATE-SLOW-33](CHIM-STAIRGATE-SLOW-33.md): The CHIM stair gate takes over 10 minutes on the Balmora and Vivec Arena world
 - [EXPANSION-READER-ONE-MASTER-64](EXPANSION-READER-ONE-MASTER-64.md): Most builder readers load only the base game file; the roadmap calls the readers master-list readers

@@ -1,6 +1,6 @@
 # Architecture
 
-_Last updated with AmiWind v0.0.68-dev12 (24 November 2026)._
+_Last updated with AmiWind v0.0.68 (24 November 2026)._
 
 How AmiWind is put together today: a host-side builder that converts your own Morrowind files, and the CHIM Engine
 (the AmiQuake engine with a world streamer added) that runs the result on an Amiga. Each claim below points at the

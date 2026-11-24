@@ -12,7 +12,7 @@
 | Persists in | v0.0.43 (last seen) |
 | Severity | medium: Regressed in v0.0.43 (was low): Audit false failure: 6 of 1,292 island cells (Seyda Neen among them) counted as failed for a door no player uses |
 | Family | Development tooling, receipts and packaging (`tracker-tooling`) |
-| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
+| Deferred by the maintainer | 2026-11-24: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up |
 | Came back (regression) | in v0.0.43 (fixed in v0.0.36 before) |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
@@ -36,7 +36,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-10-10: reported in v0.0.36-dev1
 - 2026-11-17 14:56 +0200: came back in v0.0.43 (fixed in v0.0.36 before): Seen again while measuring Mournhold's Royal Palace courtyard: 8 of its 9 door records converted, the ninth a hidden marker, and the door audit read failed.
 - 2026-11-17 14:56 +0200: fixed in source: developer, v0.0.67-dev1 (d767aade); the audit leaves out a door deferred under either marker text, the editor markers' own taken from that module; tests/test_chimport.py holds 8 of 8 walkable doors as a pass and 7 of 8 as a failure: a marker is a destination of the game's scripts, not a door anyone walks through
-- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
+- 2026-11-24: deferred by the maintainer: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up
 
 <!-- END GENERATED TIMELINE -->
 
@@ -164,6 +164,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [PLAYTEST-KNOWN-ISSUES-STALE-54](PLAYTEST-KNOWN-ISSUES-STALE-54.md): The v0.0.54 playtest package's KNOWN-ISSUES list was made from the register of the build commit, older than the release's register
 - PREFLIGHT-DISK-FIGURE-53 (no report page): The release preflight does not check the shipped disk figure, so the final commit failed its gate on it (gate 4078)
 - PREFLIGHT-PERSISTING-PARSE-53 (no report page): The release preflight counted only persisting bugs whose line ended in NOT SCHEDULED, so lapsed deferrals printed 0 bugs and half a list
+- [PROGRESS-SNAPSHOT-TAKES-RAW-RUN-DATA-68](PROGRESS-SNAPSHOT-TAKES-RAW-RUN-DATA-68.md): The public progress snapshot accepts a build's raw tracker data without readiness counts and writes rooms 0 of 0 and no build history
 - [PUBLIC-REFERENCE-SCREENSHOT-40](PUBLIC-REFERENCE-SCREENSHOT-40.md): Original-game reference screenshot included in the public source list
 - [README-STATUS-STALE-SCATTERED-68](README-STATUS-STALE-SCATTERED-68.md): The main page's status section is stuck at the previous release and several of its claims no longer match the bug tracker
 - [REGISTER-ADD-NO-RELEASE-ROW-48](REGISTER-ADD-NO-RELEASE-ROW-48.md): bug_register.py add does not list a new report page in tools/release-files.json or write its contents list: the v0.0.48 final gate failed on both
@@ -172,6 +173,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [REGISTER-REGRESSION-HANDLER-52](REGISTER-REGRESSION-HANDLER-52.md): Requested: a bug that comes back after it was fixed or closed must be found and reopened as a regression, never registered again as new
 - [REGISTER-REPORT-PERSISTS-STALE-64](REGISTER-REPORT-PERSISTS-STALE-64.md): bug_register.py report records a new sighting but leaves the versions the bug persists in unchanged
 - [REGISTER-STEP-RENDERS-ALL-PAGES-68](REGISTER-STEP-RENDERS-ALL-PAGES-68.md): Every single closure step or field change in the bug register rewrites all of its generated pages, so a batch of steps for a handful of entries takes half an hour
+- [REGISTER-WRITE-EINVAL-68](REGISTER-WRITE-EINVAL-68.md): Writing the bug tracker's files sometimes fails with an invalid-argument error and leaves them half written
 - [RELEASE-WORKING-VERSION-ISOLATION-39](RELEASE-WORKING-VERSION-ISOLATION-39.md): Publishing an earlier release reads the next development version record
 - [RELEASE-WS-BASELINE-VERSION-33](RELEASE-WS-BASELINE-VERSION-33.md): Every new VERSION failed the whitespace preflight until a docs/PATCH-v<VERSION>.json was made by hand
 - [ROOM-RESIDENTS-NOT-CACHED-48](ROOM-RESIDENTS-NOT-CACHED-48.md): The room stages bake every resident again on every run: 26 s of a 39 s rerun with every room unit reused

@@ -2,10 +2,12 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 2 times; something has to be done
+## PERSISTING: reported 4 times; something has to be done
 
 - Reported with v0.0.64-dev4 at 2026-11-11 (time not recorded): Counted on the original data: Bloodmoon.esm holds 173 exterior cells, 18 of them cells Morrowind.esm also has and 155 new; of the new ones 144 have land with heights, 6 a land record without heights (seabed) and 5 no land record (open water). Solstheim spans cells x -29 to -16, y 14 to 28. Next to its land lie 59 cells that are land in neither file: 4 are water cells of Bloodmoon.esm and 55 have no cell record. Between the islands (the rectangle x -29 to -8, y 6 to 28) 214 of 506 cells have no record in either file. OpenMW makes such a cell on first use as an empty exterior cell with water and no land (apps/openmw/mwworld/worldmodel.cpp, createExteriorCell), so in the original game the sea between the islands is open everywhere. Vvardenfell on CHIM uses its records plus 5 open-sea cells; the same model for Solstheim is its 6 seabed and 5 water records plus generated cells for the recordless sea the player can reach.
 - Reported with v0.0.68-dev6 at 2026-11-22 10:46 +0200: Seen again in v0.0.68-dev6: besides the nine glacier cells, eleven Solstheim cells are in no frame of the build: six seabed cells with a land record, three sea cells holding six placed horkers, and two empty sea cells; the cell set the build takes from the tracker reference leaves them out.
+- Reported with v0.0.68-dev12 at 2026-11-24 08:16 +0200: Solstheim cannot be reached by swimming, walking on water or jumping from Vvardenfell: the open sea between the islands is not built, so the world ends at Vvardenfell's sea ring; only the boat from Khuul reaches the island.
+- Reported with v0.0.68-dev12 at 2026-11-24 08:49 +0200: Measured in v0.0.68-dev12: inside the box of the original world map (cells x -29 to 23, y -19 to 28), 982 open-sea cells without any record are not built, 542 around Vvardenfell and 440 in the area Bloodmoon adds, so the edge of the world runs along each island instead of along the edge of the map.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -33,18 +35,27 @@
 
 ## Timeline
 
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.68-dev12 (5e77e121) | 2026-11-24 | gate 13060 of the planning item SOL-SEA-CROSSING-68 | The open sea of the whole map's box is built (542 cells in the base world, 440 in a world of their own beside Solstheim's), the world map spans the same box, and the image step checks every frame, room and crossing of every store at 32 MB in its first seconds; the in-play proof follows. |
+
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-10: reported in v0.0.64-dev2
 - 2026-11-11: seen again in v0.0.64-dev4: Counted on the original data: Bloodmoon.esm holds 173 exterior cells, 18 of them cells Morrowind.esm also has and 155 new; of the new ones 144 have land with heights, 6 a land record without heights (seabed) and 5 no land record (open ...
 - 2026-11-22 10:46 +0200: seen again in v0.0.68-dev6: Seen again in v0.0.68-dev6: besides the nine glacier cells, eleven Solstheim cells are in no frame of the build: six seabed cells with a land record, three sea cells holding six placed horkers, and two empty sea cells; the cell set the ...
+- 2026-11-24: fixed in source: a gated commit, v0.0.68-dev12 (5e77e121); gate 13060 of the planning item SOL-SEA-CROSSING-68: The open sea of the whole map's box is built (542 cells in the base world, 440 in a world of their own beside Solstheim's), the world map spans the same box, and the image step checks every frame, room and crossing of every store at 32 MB ...
+- 2026-11-24 08:16 +0200: seen again in v0.0.68-dev12: Solstheim cannot be reached by swimming, walking on water or jumping from Vvardenfell: the open sea between the islands is not built, so the world ends at Vvardenfell's sea ring; only the boat from Khuul reaches the island.
+- 2026-11-24 08:49 +0200: seen again in v0.0.68-dev12: Measured in v0.0.68-dev12: inside the box of the original world map (cells x -29 to 23, y -19 to 28), 982 open-sea cells without any record are not built, 542 around Vvardenfell and 440 in the area Bloodmoon adds, so the edge of the world ...
 
 <!-- END GENERATED TIMELINE -->
 
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
+- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Bugs in the same category](#bugs-in-the-same-category)
 
@@ -177,11 +188,13 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - [COMBAT-PURSUIT-SLOPE-STALL-46](COMBAT-PURSUIT-SLOPE-STALL-46.md): A pursuer stops on a walkable slope: an actor step was refused when it moved more than a stair height along the slope
 - [EXPANSION-STORE-DISABLE-NOT-HIDDEN-68](EXPANSION-STORE-DISABLE-NOT-HIDDEN-68.md): In the expansions' outdoor areas a placement a script switches off stays drawn and solid: the ice covers in front of the underwater entrances to Stahlman's Gorge and the Caves of Fjalding stay in place after their quest stage
 - [IMAGE-FORMATS-CHIM-ROOMS-48](IMAGE-FORMATS-CHIM-ROOMS-48.md): The payload preflight stops a CHIM rooms build: the image step does not know the room store and room record formats
+- [IMAGE-FRAME-HEAP-LAYER-STORES-UNCHECKED-68](IMAGE-FRAME-HEAP-LAYER-STORES-UNCHECKED-68.md): The image step's per-map memory check reads only the main island's frame maps: Solstheim's and Mournhold's frame maps are not checked with their store index and the other memory users at 32 MB
 - [IMAGE-ROOM-MAPS-ENGINE-REFUSED-48](IMAGE-ROOM-MAPS-ENGINE-REFUSED-48.md): Every CHIM room is refused at its door and the game hangs on Loading: the engine accepts a .chim map only with a CHIM frame key
 - [IMAGE-ROOM-MAPS-FINGERPRINT-48](IMAGE-ROOM-MAPS-FINGERPRINT-48.md): A CHIM rooms build stops at the content fingerprint: it requires maps/<room>.bsp after the room became maps/<room>.chim
 - [IMAGE-ROOM-MAPS-LATE-PASSES-48](IMAGE-ROOM-MAPS-LATE-PASSES-48.md): Image checks after the CHIM rooms install skip CHIM rooms: entity tracker 47 cells against 52, dressing 81 pieces against 99, actor contact 0 placements against 93
 - [IMAGE-ROOM-MAPS-OPTIMIZER-RECEIPT-48](IMAGE-ROOM-MAPS-OPTIMIZER-RECEIPT-48.md): A CHIM rooms build stops at the map optimizer check: the room maps are staged but not in the optimizer receipt
 - [IMAGE-ROOM-MAPS-SKIP-PASSES-48](IMAGE-ROOM-MAPS-SKIP-PASSES-48.md): CHIM rooms were installed before the image passes that write a room worldspawn, so CHIM room maps would miss interior sky, hand metadata and cell numbers
+- [OCEAN-APRON-EXPANSION-HEIGHTLESS-68](OCEAN-APRON-EXPANSION-HEIGHTLESS-68.md): The world build stops on an expansion land record without heights next to the open sea
 - [OUTDOOR-DISABLE-NOT-HIDDEN-68](OUTDOOR-DISABLE-NOT-HIDDEN-68.md): Outdoors, a placement a script switches off stays drawn and solid unless it is a carriable light
 - [WORLD-REGION-NAMES-VF-ONLY-64](WORLD-REGION-NAMES-VF-ONLY-64.md): The open-world region directory accepts only Vvardenfell region names
 - [WORLDMAP-ONE-ISLAND-64](WORLDMAP-ONE-ISLAND-64.md): The in-game world map covers Vvardenfell only

@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.68-dev12 (24 November 2026)._
+_Last updated with AmiWind v0.0.68 (24 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.68: Solstheim Is Here, 24 November 2026](#v0068-solstheim-is-here-24-november-2026)
 - [v0.0.68-dev12: twelfth snapshot of v0.0.68, 24 November 2026](#v0068-dev12-twelfth-snapshot-of-v0068-24-november-2026)
 - [v0.0.68-dev11: eleventh snapshot of v0.0.68, 23 November 2026](#v0068-dev11-eleventh-snapshot-of-v0068-23-november-2026)
 - [v0.0.68-dev10: tenth snapshot of v0.0.68, 23 November 2026](#v0068-dev10-tenth-snapshot-of-v0068-23-november-2026)
@@ -220,10 +221,89 @@ _Last updated with AmiWind v0.0.68-dev12 (24 November 2026)._
 
 <!-- contents end -->
 
+## v0.0.68: Solstheim Is Here, 24 November 2026
+
+v0.0.68 is made from the twelfth development snapshot, from the snapshots' builds and caches ([release
+notes](releases/notes/RELEASE-v0.0.68.md)). It carries every snapshot of the line, each with its own notes:
+[dev1](releases/notes/RELEASE-v0.0.68-dev1.md), [dev2](releases/notes/RELEASE-v0.0.68-dev2.md),
+[dev3](releases/notes/RELEASE-v0.0.68-dev3.md), [dev4](releases/notes/RELEASE-v0.0.68-dev4.md),
+[dev5](releases/notes/RELEASE-v0.0.68-dev5.md), [dev6](releases/notes/RELEASE-v0.0.68-dev6.md),
+[dev7](releases/notes/RELEASE-v0.0.68-dev7.md), [dev8](releases/notes/RELEASE-v0.0.68-dev8.md),
+[dev9](releases/notes/RELEASE-v0.0.68-dev9.md), [dev10](releases/notes/RELEASE-v0.0.68-dev10.md),
+[dev11](releases/notes/RELEASE-v0.0.68-dev11.md) and [dev12](releases/notes/RELEASE-v0.0.68-dev12.md). It runs on CHIM
+Engine v0.2.2 and needs 32 MB of Fast RAM; emulator presets `AmiWind-v0.0.68-FS-UAE.fs-uae` and
+`AmiWind-v0.0.68-WinUAE.uae`. It brings Bloodmoon's island into the game: all 153 cells of Solstheim are built, the
+quest and underwater entrances can be used, and the werewolves are drawn and fight as in the original. Every room of the
+three game files is in the game (1,134 of 1,134 of Morrowind, 96 of 96 of Tribunal, 98 of 98 of Bloodmoon), and one open
+sea joins Vvardenfell and Solstheim as in the original. Water Walking holds the player on the water, and a load that runs
+out of memory frees the game's caches and tries once more before the box takes the player back. Lines marked "seen in
+play" were
+seen on the PC emulator or the Raspberry Pi 4B; the others are covered by tests and the gates of their commits, and the
+[bug tracker](BUGS.md) keeps their entries open until they are seen.
+
+**New**
+
+- Solstheim: 135 open terrain cells (dev3), the Mortrag Glacier's nine cells and Solstheim's own sea cells (dev8) and its
+  last two open-sea cells (dev9), 153 in all; one open sea of 982 cells over the whole map's box joins it to Vvardenfell
+  with walls only at the map's outer edge, and the world map spans it (map v2 shows Solstheim as it is explored, the debug
+  map all of it); a cool ramp in the scene palette keeps ice and snow cool (dev7); every weather
+  has its own look and a blizzard is a storm (dev11); the outdoor draw distance can differ by region (dev8). The entrances
+  a quest stage opens, among them Stahlman's Gorge, the Caves of Fjalding and Glenschul's Tomb, and the Unmarked
+  Shipwreck's underwater entrance were entered in play (dev9).
+- The werewolf: the player in werewolf form and the characters a script turns into werewolves are drawn as werewolves,
+  fight with claws only and keep their race's size; a werewolf cannot be talked to (dev9, dev10, dev11).
+- Scripts and objects: 1,712 named activators answer the use key as their scripts say, containers and bodies give their use
+  to their script, a script's animation leaves an object in its end pose (the Halls of Penumbra's ice wall breaks, the
+  Sotha Sil lever doors open), the scripted objects of Mournhold's districts run, every invisible wall is a box a script can
+  switch, OnPCHitMe is set, fights have sixteen slots, and the original's console commands for weather, werewolves,
+  scripts, sounds, placing, spells, items, topics, cells and every other function of the script language are typed on the
+  console (dev2 to dev10).
+- Fights with several fighters no longer stutter when blows land (dev11, seen in play); a light and a one-handed weapon
+  are held together, the third-person fists punch with the original's animations and readied magic crosses doors (dev2,
+  seen in play); water moves in rooms and people drown under it (dev2, seen in play; a person knocked out in water
+  drowns at once, dev5, covered by tests, not yet seen in play); Water Walking holds the player on the water's surface,
+  and he drops in and swims as before when it ends (seen in play).
+- Memory: a load that runs out of memory gives back the caches the game can make again and is tried once more; if it still
+  does not fit, a box names the place and the memory needed and available, and OK returns the player to where he came
+  in; `dbg mempurge` (seen in play at 32 MB of Fast RAM).
+- Menus and talking: the game's own colours in every window, the in-game menu and its questions, the original's map in the
+  framed style (dev8), the talk window laid out as the original's and persuasion (dev12), rows for the creatures that have
+  lines (dev11).
+
+**Fixed**
+
+- The census back room answers the use key after a visit to the courtyard; the debug free flight lifts the player clear;
+  a door that a script switched off is not taken; a door under the crosshair is not lost to a creature standing around
+  the player; a player put into water stays at that depth (dev9; covered by tests, not yet seen in play).
+- A script's region is the region it names (dev2); the taken and disabled outdoor pieces have no limit and the pieces a
+  script switches off are hidden (dev3); a scripted `Drop` leaves what the actor carries (dev3).
+
+**Builder and tools**
+
+- A build that stops ends with a plain block; a memory plan from measured stage peaks; a build cache that ages; a door
+  check that judges by what play showed; the release check that refuses a release with a space missing (dev1, dev2, dev9,
+  dev12).
+- Every frame of every world, every room, every switch between worlds and every door is measured at 32 MB before an image
+  is made; a rebuilt CHIM world compares equal to the cached one.
+- The open sea beside Bloodmoon's land records without heights is built, and the image's door check names the far sea's
+  maps apart from Solstheim's, so the release build's checks pass
+  ([OCEAN-APRON-EXPANSION-HEIGHTLESS-68](bugs/OCEAN-APRON-EXPANSION-HEIGHTLESS-68.md),
+  [DOOR-CHECK-SEA-STORE-NAMES-68](bugs/DOOR-CHECK-SEA-STORE-NAMES-68.md)).
+
+**Known**
+
+- Creatures that have lines cannot be talked to yet and a companion has no Companion Share entry; a script's videos can
+  always be skipped; each weather's own cloud picture and the slowed storm walk are left; silver weapons' extra damage
+  and the werewolf's own sounds are left; the broken ice wall's chamber cannot be entered; Mournhold's districts run at a
+  low frame rate; the water gives no ripples under a swimmer or a player walking on water; the journal's topic list has
+  no letter index; the memory box can name its target by a map label and offers OK only (Load Game and New Game follow);
+  Water Walking is applied deep under the water, where the original refuses it; an object in Solstheim's eastern waters
+  is not drawn but still stops a player walking on the water. The full lists are in the release notes.
+
 ## v0.0.68-dev12: twelfth snapshot of v0.0.68, 24 November 2026
 
-The twelfth development snapshot of v0.0.68, in development ([release notes](releases/notes/RELEASE-v0.0.68-dev12.md)), on
-the way to v0.0.68, **Solstheim Is Here** (the release for which Solstheim is to be complete). The talk window is laid out
+The twelfth development snapshot of v0.0.68 ([release notes](releases/notes/RELEASE-v0.0.68-dev12.md)), the snapshot
+v0.0.68, **Solstheim Is Here**, is made from. The talk window is laid out
 as the original's, the builder ages its caches, and the main page is a short summary of where the project stands. Emulator
 presets: `AmiWind-v0.0.68-dev12-FS-UAE.fs-uae` and `AmiWind-v0.0.68-dev12-WinUAE.uae`, both with 32 MB of Fast RAM. All of
 it is covered by tests and the gates of the commits; the talk window and persuasion are seen in play.
@@ -261,8 +341,8 @@ it is covered by tests and the gates of the commits; the talk window and persuas
 
 ## v0.0.68-dev11: eleventh snapshot of v0.0.68, 23 November 2026
 
-The eleventh development snapshot of v0.0.68, in development ([release notes](releases/notes/RELEASE-v0.0.68-dev11.md)), on
-the way to v0.0.68, **Solstheim Is Here** (the release for which Solstheim is to be complete). Fights no longer stutter when
+The eleventh development snapshot of v0.0.68 ([release notes](releases/notes/RELEASE-v0.0.68-dev11.md)), one of the
+snapshots of the line that became v0.0.68, **Solstheim Is Here**. Fights no longer stutter when
 blows land, a character in werewolf form can no longer be talked to, the creatures that have lines have rows in the dialogue
 and voice tables, and each of Solstheim's weathers has its own look. Emulator presets: `AmiWind-v0.0.68-dev11-FS-UAE.fs-uae`
 and `AmiWind-v0.0.68-dev11-WinUAE.uae`, both with 32 MB of Fast RAM. All of it is covered by tests and the gates of the

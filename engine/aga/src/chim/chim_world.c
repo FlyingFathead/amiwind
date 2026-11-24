@@ -1174,10 +1174,21 @@ static void MapBegin (const char *entities)
 	MapBeginWork (entities, spike_t0);
 }
 
+/* MEMORY-EMERGENCY-PURGE-64: a room whose record or models found no room after every growth step ends its load as not
+ * enough memory (LF5) with the figures: aw_loadfail.c sets it (the load's memory record, then Host_Error, the emergency
+ * purge and the way back); NULL in the host fixtures, and outside a load it returns and the refusal stays as it was. */
+void	(*chim_room_short)(const char *room, unsigned long need, unsigned long have);
+/* chim_room.c: 1 when the last ChimRoom_Begin failed because its record or models found no room after every growth
+ * step, with *NEED the bytes its models need (the store index's estimate) and *HAVE what the zone and its banks give
+ * (free plus unlocked); taken once; 0 for any other failure. Declared here, not in chim_local.h, so the header the
+ * builder's CHIM stages read keeps its facts (no re-key of the world). */
+int	ChimRoom_ShortOfMemory (unsigned long *need, unsigned long *have);
+
 /* A room map (docs/chim/INTERIOR_STORE.md) that cannot load is not a
  * playable map either: its placements are its geometry. */
 static void RefuseRoom (const char *name, const char *why)
 {
+	unsigned long need, have;
 	strncpy (failure, why, sizeof(failure)-1);
 	failure[sizeof(failure)-1] = 0;
 	MapEnd ();
@@ -1185,6 +1196,8 @@ static void RefuseRoom (const char *name, const char *why)
 	if (hunk_mark >= 0)
 		Hunk_FreeToLowMark (hunk_mark);
 	hunk_mark = -1;
+	if (ChimRoom_ShortOfMemory (&need, &have) && chim_room_short)
+		chim_room_short (name, need, have);
 	Host_Error ("CHIM room map %s (room %s): %s", MapModel () ? MapModel ()->name : "?", name, why);
 }
 

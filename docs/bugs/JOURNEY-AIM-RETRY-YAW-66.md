@@ -12,7 +12,7 @@
 | Persists in | v0.0.66-dev10 (last seen) |
 | Severity | high: Regressed in v0.0.66-dev10 (was medium): part B of the journey stopped in step 9 and its later checks never ran |
 | Family | Gates, CI and tests (`tests-ci`) |
-| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
+| Deferred by the maintainer | 2026-11-24: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up |
 | Came back (regression) | in v0.0.66-dev10 (fixed in v0.0.66-dev6 before) |
 | Playtest version | 2026_11_15_v0.0.66-dev5 |
 | From commit | source and engine 1427e0d |
@@ -33,7 +33,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-15: came back in v0.0.66-dev10 (fixed in v0.0.66-dev6 before): The v0.0.66-dev10 opening journey stopped part B in step 9: neither the use key's focus nor the crosshair's pick was on the door 113833 in 13 tries around pitch 9.0 and yaw 270.7; the dev7 and dev9 journeys had passed step 9, the dev11 ...
 - 2026-11-18: v0.0.67-dev2: Seen in the v0.0.67-dev2 opening journey: in step 7 the player stands at the census office's street door's arrival point (266 36) and the summoned guard's blows that miss are dodged; each dodge slides the player 10 map units to its right ...
 - 2026-11-18: v0.0.67-dev2: Changed after v0.0.67-dev2 (the v0.0.67-wanderdoor branch): the opening journey's step 9 (tests/sessions/journey_opening.txt) walks to the census street door's arrival point first (walkto 264 34 20), then turns, aims and uses the door, as ...
-- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
+- 2026-11-24: deferred by the maintainer: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up
 
 <!-- END GENERATED TIMELINE -->
 
@@ -147,6 +147,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - CI-TAG-RUN-DUPLICATE-54 (no report page): The release tag push ran the whole CI test suite again on a commit main had already passed
 - [CI-TEST-SHARD-ONE-SLOW-53](CI-TEST-SHARD-ONE-SLOW-53.md): The first test shard of the v0.0.53 GitHub run took six times as long as the others
 - [COMPLETENESS-PLAN-TOWN-CELLS-MISSING-68](COMPLETENESS-PLAN-TOWN-CELLS-MISSING-68.md): The plan-time completeness report counts the 61 cells inside the towns' frames and their 556 load doors as missing, which would refuse a release candidate
+- [CONTAINER-COUNT-LOOSE-ROOM-PATH-68](CONTAINER-COUNT-LOOSE-ROOM-PATH-68.md): The build's container count report stops on a room it looks for as a loose file, while the image keeps its rooms in the room store
 - [CONTAINER-READ-ENOMEM-66](CONTAINER-READ-ENOMEM-66.md): In the development container, reads of the repository files sometimes fail with "Cannot allocate memory"; a retry works, so a check that hits it can report an unrelated failure
 - [DELIVERY-LEAVES-LINE-UNCLEAN-66](DELIVERY-LEAVES-LINE-UNCLEAN-66.md): A snapshot delivery wrote the cell tracker page into the release line's working copy, so the line's next gate was not clean and could not be published
 - [DELIVERY-RERUN-STOPS-ON-OWN-OUTPUT-66](DELIVERY-RERUN-STOPS-ON-OWN-OUTPUT-66.md): A second delivery of a snapshot stopped on what the first one left: its source package folder, then its Pi image, reported as a failed upload although the upload had gone through
@@ -271,6 +272,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [TEST-PROFILE-TIMELINE-BOUND-33](TEST-PROFILE-TIMELINE-BOUND-33.md): A profiler test bounds the sampled CPU too tightly and fails on a loaded machine
 - [TEST-PROFILE-TIMELINE-SUM-33](TEST-PROFILE-TIMELINE-SUM-33.md): The build profile test's sampled-timeline check fails on a loaded machine (timeline CPU above the stage's own CPU)
 - [TEST-RC1-INTEGRATION-CONTRACTS-39](TEST-RC1-INTEGRATION-CONTRACTS-39.md): RC1 regression tests assume the old fingerprint location and a separate class cache unit
+- [TEST-ROUTE-TESTS-FAIL-ON-RELEASE-68](TEST-ROUTE-TESTS-FAIL-ON-RELEASE-68.md): Tests of the Solstheim test route stop the gate when the version is a release
 - [TEST-SAVED-EQUIPMENT-NATIVE-FLAKY-64](TEST-SAVED-EQUIPMENT-NATIVE-FLAKY-64.md): The saved equipment native test errors once in a full suite run while the machine is busy and passes when run alone
 - [TEST-SKEL-NATIVE-FLAKY-UNDER-LOAD-60](TEST-SKEL-NATIVE-FLAKY-UNDER-LOAD-60.md): Native test test_skel_native (left_arm_takes_the_layer_frame) fails once under host load
 - [TEST-SPAWN-SCAN-DOCSTRING-KEY-48](TEST-SPAWN-SCAN-DOCSTRING-KEY-48.md): The spawn contract scan read a docstring example in hand_metadata.py as a map key named key

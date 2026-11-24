@@ -6,9 +6,13 @@ A stage's outputs (run-relative path -> SHA-256) are grouped into UNITS (one map
 or catalogue file) and units into SEGMENTS (a town, a block of 100 open-world regions, the rooms, the character
 heads). Each unit's hash covers its files, each segment's hash its unit hashes, and the stage hash its segment
 hashes (a Merkle tree). Two runs compare by the stage hash in one step; only on a mismatch do they drill down to
-the segments and units that differ. Diagnostics (logs, timing reports: build_cache.diagnostic) are left out.
+the segments and units that differ. Diagnostics (logs, timing reports: build_cache.diagnostic) and memos
+(content-addressed result memos a stage writes only for the units it computes: build_cache.memo) are left out.
 
 The grouping is a pure function of the path, so the same outputs always give the same tree.
+
+Schema 2 (CHIM-REBUILD-NOT-IDENTICAL-68): memos left out. A tree stored by schema 1 counted them, so a record's stored
+tree is used only when this schema made it (tree_of); an older record's tree is made again from its files.
 """
 import hashlib
 import re
@@ -18,7 +22,7 @@ from pathlib import Path
 if str(Path(__file__).resolve().parent) not in sys.path:  # run as a script; never ahead of src/ when imported
     sys.path.append(str(Path(__file__).resolve().parent))
 
-SCHEMA = 'AmiWind unit tree 1'
+SCHEMA = 'AmiWind unit tree 2'
 # Folders whose next path part is the unit (a map, a room, a head preview), wherever they sit in the path.
 UNIT_FOLDERS = ('area-work', 'maps', 'character', 'progs')
 NUMBERED = re.compile(r'^([a-z_]+?)(\d+)$')
@@ -53,12 +57,12 @@ def _digest(rows):
 
 
 def tree(files):
-    """The unit tree of {run-relative path: SHA-256} (diagnostics left out):
+    """The unit tree of {run-relative path: SHA-256} (diagnostics and memos left out: build_cache.uncompared):
     {'schema', 'stage_hash', 'segments': {segment: {'hash', 'units': {unit: hash}}}}."""
-    from build_cache import diagnostic
+    from build_cache import uncompared
     grouped = {}
     for path, sha in files.items():
-        if diagnostic(path):
+        if uncompared(path):
             continue
         segment, unit = place(path)
         grouped.setdefault(segment, {}).setdefault(unit, []).append((path, sha))
@@ -74,6 +78,15 @@ def of_manifest(manifest):
     files = {path: row['sha256'] for path, row in (manifest.get('files') or {}).items()}
     files.update({path: 'link:' + str(target) for path, target in (manifest.get('links') or {}).items()})
     return tree(files)
+
+
+def tree_of(manifest):
+    """The unit tree of a stage output manifest: the one it stores when this SCHEMA made it, else of_manifest (a
+    record of an older schema, whose stored tree counted what this one leaves out)."""
+    stored = manifest.get('tree')
+    if isinstance(stored, dict) and stored.get('schema') == SCHEMA and 'stage_hash' in stored:
+        return stored
+    return of_manifest(manifest)
 
 
 def differences(new, old):

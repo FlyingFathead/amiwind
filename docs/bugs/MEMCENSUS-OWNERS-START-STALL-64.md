@@ -57,6 +57,7 @@ Family: Map heap and memory budget (`heap-memory`). The heap model must match wh
 - [HELD-ITEM-NAME-HUNK-GROWS-68](HELD-ITEM-NAME-HUNK-GROWS-68.md): Every held weapon, shield or torch shown takes 32 bytes of level memory that are not given back until the map changes
 - [HOLLOW-COLLISION-PLATE-PER-TRIANGLE-64](HOLLOW-COLLISION-PLATE-PER-TRIANGLE-64.md): A hollow model gets one exact-bevel collision plate per authored collision triangle, and a visual recipe ratio reduces only the drawn mesh
 - HUNK-RESERVE-SN012-29 (no report page): Dev4 first-presented sn012 reserve below 2 MiB target
+- [LF5-BOX-DESTINATION-MAP-NAME-68](LF5-BOX-DESTINATION-MAP-NAME-68.md): When a load runs out of memory, the box writes the target as an internal file label instead of its in-game place
 - [LOADER-STAGING-PEAK-32](LOADER-STAGING-PEAK-32.md): Map loading stages most lumps in temporary memory before decoding, raising the heap peak
 - [MAP-UNUSED-HULL2-32](MAP-UNUSED-HULL2-32.md): Shipped maps carry about 1.1 MB of collision data for a hull the engine never uses
 - [MEM-EXTRA-HDF-27](MEM-EXTRA-HDF-27.md): Map loads bypassed the engine's file search paths: a map on an extra world disk image fell back to a whole-file read
@@ -67,6 +68,7 @@ Family: Map heap and memory budget (`heap-memory`). The heap model must match wh
 - ROOM-AKULAKHAN-HEAP-52 (no report page): Akulakhan s Chamber needs 18.8 MB for its models and textures with its activators kept: more than the 14.3 MB the 32 MB minimum gives a room, so the image step stops
 - [ROOM-LOAD-FAIL-LEAKS-FAST-RAM-64](ROOM-LOAD-FAIL-LEAKS-FAST-RAM-64.md): A room load that fails and returns to the town leaves about 1.4 MB less Fast RAM free than before
 - [ROOM-LOAD-KEEPS-EXTERIOR-CACHE-64](ROOM-LOAD-KEEPS-EXTERIOR-CACHE-64.md): Entering a large room from a town keeps the town's CHIM model cache, so the room can run out of Fast RAM at 32 MB although it fits on its own
+- [ROOM-NO-FIT-LOAD-ERROR-NOT-MEMORY-68](ROOM-NO-FIT-LOAD-ERROR-NOT-MEMORY-68.md): A room whose models do not fit is reported as a general load error, without the memory it needs and has
 - SDK-MALLOC-TRAPS-52 (no report page): The toolchain's malloc never returns NULL: a failed allocation stops the game with Software Failure #80000027 (TRAP #7); 45 engine malloc sites test for a NULL that cannot come
 - [SKEL-HEAP-ACCOUNTING-52](SKEL-HEAP-ACCOUNTING-52.md): Audit: every heap and size estimate of actor models must count a skeletal model s block (16 bytes a vertex) and its shared table
 - [SKEL-TABLE-SHARED-FEMALE-52](SKEL-TABLE-SHARED-FEMALE-52.md): The female animation table repeats the common table whole for its three own groups: 561 KB of Fast RAM, kept all session

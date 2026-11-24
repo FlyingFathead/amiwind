@@ -1,11 +1,11 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.68-dev12 (24 November 2026)._
+_Last updated with AmiWind v0.0.68 (24 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.68: in progress, twelfth snapshot 24 November 2026](#v0068-in-progress-twelfth-snapshot-24-november-2026)
+- [v0.0.68: Solstheim Is Here, released 24 November 2026](#v0068-solstheim-is-here-released-24-november-2026)
 - [v0.0.67: Tribunal Introduced, released 19 November 2026](#v0067-tribunal-introduced-released-19-november-2026)
 - [v0.0.66: Forward It Is, released 16 November 2026](#v0066-forward-it-is-released-16-november-2026)
 - [v0.0.65: Reintroducing Vvardenfell](#v0065-reintroducing-vvardenfell)
@@ -119,10 +119,26 @@ _Last updated with AmiWind v0.0.68-dev12 (24 November 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
-## v0.0.68: in progress, twelfth snapshot 24 November 2026
+## v0.0.68: Solstheim Is Here, released 24 November 2026
 
-v0.0.68 is titled **Solstheim Is Here**: the release for which Solstheim is to be complete. Its twelfth development
-snapshot, [v0.0.68-dev12](releases/notes/RELEASE-v0.0.68-dev12.md), is out. What dev12 carries (checked by tests and the
+v0.0.68, "Solstheim Is Here", is made from the twelfth development snapshot and the snapshots' builds and caches
+([release notes](releases/notes/RELEASE-v0.0.68.md); every change with links to the twelve snapshots' notes). What it
+brings: all 153 of Solstheim's cells built, land and sea, with the Mortrag Glacier; the quest and underwater entrances
+used in play; the werewolves drawn and fighting as in the original; scripted objects that answer the use key and move as
+their scripts say; fights that no longer stutter; the menus, the map and the talk window as the original's; and a builder
+whose cache ages and whose plan fits a 32 GB machine. Every room of the three game files is in the game, and one open sea
+joins Vvardenfell and Solstheim as in the original, with the world map spanning it. Water Walking holds the player on the
+water, and a load that runs out of memory frees the game's caches and tries once more before a box takes the player
+back to where he came in; both were seen in play.
+
+**What comes next, moved to v0.0.69 and later:** playing Tribunal's and Bloodmoon's quests through from start to finish,
+every creature checked against its original record, every lever and valve listed, the progress summary's converted
+cells, conversation with the creatures that have lines and the Companion Share entry, each weather's own cloud picture and the
+slowed walk in storms, the werewolf's remaining rules (silver weapons, its own sounds), the frame rate of Mournhold's
+districts, the trees' method for Solstheim's forests and the region draw distance once the frame rate is measured on real
+hardware, and the open builder entries (the reuse keys read by lookup, the build volume's cleanup). No dates are promised.
+
+The twelve development snapshots, newest first, as they were written: the twelfth snapshot, [v0.0.68-dev12](releases/notes/RELEASE-v0.0.68-dev12.md), is out. What dev12 carries (checked by tests and the
 gates of their commits; the talk window and persuasion also seen in play): **the talk window laid out as the original's**,
 with the disposition bar and its number on top, only the services the speaker offers in the original's order, a divider,
 the topics and Goodbye at the bottom, and the speaker's name on the title bar; **persuasion seen working**; for the
@@ -212,21 +228,22 @@ werewolf, scripts, sounds, placing); the region table that made weather scripts 
 converter for Solstheim's open terrain, which is converted but not in the game yet; the build's memory plan; and the
 outer-hull measure of reduced models. The first snapshot,
 [v0.0.68-dev1](releases/notes/RELEASE-v0.0.68-dev1.md), carried the opening rooms counted as ready, the plain block of a
-stopped build and the playthroughs' waits by condition. The work of the line is the plan under "Next version"
-below: Tribunal's Mournhold with its quests and Bloodmoon's Solstheim, with their scripts, dialogue and save, in the
-order of record there; no dates are promised.
+stopped build and the playthroughs' waits by condition. The work of this line was Tribunal's Mournhold scripts and
+Bloodmoon's Solstheim; what is left moved to v0.0.69 (above).
 
 Planned in this line, besides the plan below:
 
-- **Every creature as its original record.** Every creature of the game carries the level, health, attributes, attacks,
-  soul, diseases and items of its original record, checked field by field with a count for each, and the netch roam where
-  the original places them (CREATURE-RECORDS-PARITY-AUDIT-68).
-- **Every lever, valve, button and crank listed.** Each one the player can use is listed with what it does and whether it
-  works in the game, land by land, and each one that does nothing is tracked as a fault (ACTIVATORS-AUDIT-ALL-LANDS-68).
-- **The progress summary shows converted cells.** For every land, the cells already converted but not yet in a built
-  image, with each cell's state, next to the cells that are ready in the game (TOOLKIT-SOL-CONVERTED-COUNT-68).
-- **The werewolf drawn without gaps.** A player who becomes a werewolf is drawn as the werewolf, and the body passes the
-  outer-hull measure before it is drawn (WEREWOLF-BODY-63).
+- **Every creature as its original record.** Moved to v0.0.69 and later (CREATURE-RECORDS-PARITY-AUDIT-68): every
+  creature of the game carries the level, health, attributes, attacks, soul, diseases and items of its original record,
+  checked field by field with a count for each, and the netch roam where the original places them.
+- **Every lever, valve, button and crank listed.** Moved to v0.0.69 and later (ACTIVATORS-AUDIT-ALL-LANDS-68): each one
+  the player can use is listed with what it does and whether it works in the game, land by land, and each one that does
+  nothing is tracked as a fault.
+- **The progress summary shows converted cells.** Moved to v0.0.69 and later (TOOLKIT-SOL-CONVERTED-COUNT-68): for every
+  land, the cells already converted but not yet in a built image, with each cell's state, next to the cells that are
+  ready in the game.
+- **The werewolf drawn without gaps.** Done in v0.0.68 (dev9, dev10, seen in play for six races): a player who becomes a
+  werewolf is drawn as the werewolf (WEREWOLF-BODY-63).
 
 - **A build that fits a 32 GB machine, and continues after a stop.** A plan from the measured stage peaks in the build's
   first minute, stages that do not fit side by side run one after another, every reduction written as a warning in the
@@ -323,9 +340,8 @@ v0.0.66, and in it the census office becomes a room built like every other inter
 
 ## Next version: the two expansion worlds
 
-The next line, v0.0.68, continues with the expansions' finished content, Tribunal's Mournhold and Bloodmoon's
-Solstheim, and takes up what v0.0.67 moved on; no dates are promised. The plan below was begun in v0.0.66 and carried on
-in v0.0.67 (see its section above), and the v0.0.66 snapshots are kept under it as they were written. The measured speed figures of the v0.0.66 line and what is still to
+The next line, v0.0.69, carries the expansions on to their finished content and takes up what v0.0.68 moved on; no dates
+are promised. The plan below was begun in v0.0.66 and carried on in v0.0.67 and v0.0.68 (see their sections above), and the v0.0.66 snapshots are kept under it as they were written. The measured speed figures of the v0.0.66 line and what is still to
 be measured, among it the frame rate on the Raspberry Pi 4B, are on the
 [v0.0.66 performance page](performance/V0.0.66-PERFORMANCE.md).
 

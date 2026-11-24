@@ -113,7 +113,9 @@ class Wiring(unittest.TestCase):
         tool = lambda script, *rest: [script, *map(str, rest)]  # noqa: E731
         base = [('chim', ['chim_build.py', '--out', 'run/chim']), ('image', ['build_aga.py'])]
         from unittest.mock import patch
-        with patch.object(build, 'chim_stage_options', lambda a: []):
+        # the Solstheim test image is a -devN option (project_version.require_private_test_version refuses it on an rc
+        # or final VERSION): the wiring is checked under a dev version, so the test holds on a release line too
+        with patch.object(build, 'chim_stage_options', lambda a: []), patch.object(build, 'VERSION', '0.0.0-dev1'):
             return build.chim_sol_test_commands(args, list(base), tool, Path('run'), {'qbsp': 'qbsp'}, 8), base
 
     def test_off_is_the_old_path_and_base_steps_are_untouched(self):

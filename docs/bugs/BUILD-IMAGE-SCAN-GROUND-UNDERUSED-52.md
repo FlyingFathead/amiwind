@@ -23,7 +23,7 @@
 | Persists in | v0.0.52-dev1, v0.0.53, v0.0.64-dev1 (last seen) |
 | Severity | medium: About 3 minutes of a 16-minute image step on a few of 24 cores |
 | Family | Build speed (`build-speed`) |
-| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
+| Deferred by the maintainer | 2026-11-24: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
 | Playtest version | 2026_10_25_v0.0.52-dev1_dev1-try2_d27706d6 |
 | From commit | source d27706d, engine d27706d, CHIM world d27706d |
@@ -42,8 +42,8 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-10-27 07:45 +0200: seen again in v0.0.53: Seen again: the v0.0.53 final run 2026_10_27_v0.0.53_final_45f4c426 ran its image stage under half its cores with units queued, 4 times (the build summary Needs attention item)
 - 2026-11-10 05:31 +0200: seen again in v0.0.64-dev1: dev1 build of 4bd67418: the image step's hidden-surface cull walked its 1,136 maps at about one core (107 percent of 24)
 - 2026-11-12 01:55 +0200: seen again in v0.0.65-rc1: v0.0.65-rc1 build (reusing the v0.0.65-dev1 world): the image step ran on 1.5 of 24 cores for 95 s with 1136 units queued and none running, in the actor ground check phase; in the v0.0.65-dev1 build the same phase took 53 s on 12.4 cores.
-- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
 - 2026-11-21 05:51 +0200: seen again in v0.0.68-dev3: Seen again in the v0.0.68-dev3 build: the image step's early phases ran on under half its cores for about five minutes.
+- 2026-11-24: deferred by the maintainer: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up
 
 <!-- END GENERATED TIMELINE -->
 
@@ -255,6 +255,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [CHIM-ROOM-FAIL-STAGE-48](CHIM-ROOM-FAIL-STAGE-48.md): One CHIM room that cannot be made failed the whole CHIM interiors stage (HOLD-LEVEL with every room batch by default)
 - [CHIM-ROOM-OVER-BUDGET-RETRY-48](CHIM-ROOM-OVER-BUDGET-RETRY-48.md): A model over the image budget is tried whole again on every run before its cached tiles are used: its room runs on one core
 - [CHIM-SOL-FLORA-PATH-64](CHIM-SOL-FLORA-PATH-64.md): The Solstheim test frame converts its trees as full models, not through the world flora cards Vvardenfell uses
+- [CHIM-STAGE-QUEUED-IDLE-68](CHIM-STAGE-QUEUED-IDLE-68.md): The world stage runs on about 2 of 24 cores for over 5 minutes while many units wait in its queue
 - [CHIM-STAIR-GATE-WORLD-RELOAD-36](CHIM-STAIR-GATE-WORLD-RELOAD-36.md): The CHIM stair gate's workers read the whole CHIM world again every time they switch frames (about 14.5 s per read on the 273-frame world)
 - [CHIM-STAIRGATE-SLOW-33](CHIM-STAIRGATE-SLOW-33.md): The CHIM stair gate takes over 10 minutes on the Balmora and Vivec Arena world
 - [EXPANSION-READER-ONE-MASTER-64](EXPANSION-READER-ONE-MASTER-64.md): Most builder readers load only the base game file; the roadmap calls the readers master-list readers

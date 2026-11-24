@@ -1,10 +1,16 @@
 # World bounds: the sea current at the edge of the world
 
-_Last updated with AmiWind v0.0.45 (19 October 2026)._
+_Last updated with AmiWind v0.0.68 (24 November 2026)._
 
-An AmiWind extension: in the original game the open sea goes on past the island. AmiWind's open world ends a
+An AmiWind extension: in the original game the open sea goes on past the islands. AmiWind's open world ends a
 little past its outermost cells (896 units, the overlap of the open-world maps), and until v0.0.36 an
 invisible wall stopped you there.
+
+Since the build after v0.0.68-dev12 the open world is every cell of the world map's box: with Bloodmoon, cells x -29
+to 23, y -19 to 28, the box OpenMW's world map spans (every exterior cell record of the game files). Every cell of it
+is built, the open sea that no game file defines included ([CHIM_REGIONS.md](chim/CHIM_REGIONS.md), "The recordless
+open sea"), so the sea between Vvardenfell and Solstheim is open and the edge described here is only at the edge of the
+box: four straight sides of 202 cell edges.
 
 ## What it does
 
@@ -51,7 +57,13 @@ Measured on the v0.0.36 development builds (both tables agree cell for cell):
 | Pockets inside the box that no map covers | none |
 
 When more cells join the open world (such as the shared ocean chunk of [CHIMport](chim/CHIMPORT.md#open-sea-one-shared-ocean-chunk)
-once the game places it), the edge moves out with the directory; nothing else changes.
+once the game places it), the edge moves out with the directory; nothing else changes. The engine builds the table
+from every row of its one outdoor table: Vvardenfell's rows and the rows of the lands with a store of their own
+(Solstheim, its open sea and Mournhold's districts), so the edge follows every world the image holds.
+
+Measured from the cell lists of the build after v0.0.68-dev12 (`tools/chim/sea_grid.py report`): before it, the edge
+of the built world had 236 open cell edges, 208 of them inside the map's box (158 on Vvardenfell's cells, 50 on
+Solstheim's); with the recordless open sea built, all 202 lie on the box's outer edge.
 
 ## How it works
 

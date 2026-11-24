@@ -204,6 +204,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [PLAYTEST-KNOWN-ISSUES-STALE-54](PLAYTEST-KNOWN-ISSUES-STALE-54.md): The v0.0.54 playtest package's KNOWN-ISSUES list was made from the register of the build commit, older than the release's register
 - PREFLIGHT-DISK-FIGURE-53 (no report page): The release preflight does not check the shipped disk figure, so the final commit failed its gate on it (gate 4078)
 - PREFLIGHT-PERSISTING-PARSE-53 (no report page): The release preflight counted only persisting bugs whose line ended in NOT SCHEDULED, so lapsed deferrals printed 0 bugs and half a list
+- [PROGRESS-SNAPSHOT-TAKES-RAW-RUN-DATA-68](PROGRESS-SNAPSHOT-TAKES-RAW-RUN-DATA-68.md): The public progress snapshot accepts a build's raw tracker data without readiness counts and writes rooms 0 of 0 and no build history
 - [PUBLIC-REFERENCE-SCREENSHOT-40](PUBLIC-REFERENCE-SCREENSHOT-40.md): Original-game reference screenshot included in the public source list
 - [README-STATUS-STALE-SCATTERED-68](README-STATUS-STALE-SCATTERED-68.md): The main page's status section is stuck at the previous release and several of its claims no longer match the bug tracker
 - [REGISTER-ADD-NO-RELEASE-ROW-48](REGISTER-ADD-NO-RELEASE-ROW-48.md): bug_register.py add does not list a new report page in tools/release-files.json or write its contents list: the v0.0.48 final gate failed on both
@@ -212,6 +213,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [REGISTER-REGRESSION-HANDLER-52](REGISTER-REGRESSION-HANDLER-52.md): Requested: a bug that comes back after it was fixed or closed must be found and reopened as a regression, never registered again as new
 - [REGISTER-REPORT-PERSISTS-STALE-64](REGISTER-REPORT-PERSISTS-STALE-64.md): bug_register.py report records a new sighting but leaves the versions the bug persists in unchanged
 - [REGISTER-STEP-RENDERS-ALL-PAGES-68](REGISTER-STEP-RENDERS-ALL-PAGES-68.md): Every single closure step or field change in the bug register rewrites all of its generated pages, so a batch of steps for a handful of entries takes half an hour
+- [REGISTER-WRITE-EINVAL-68](REGISTER-WRITE-EINVAL-68.md): Writing the bug tracker's files sometimes fails with an invalid-argument error and leaves them half written
 - [RELEASE-WORKING-VERSION-ISOLATION-39](RELEASE-WORKING-VERSION-ISOLATION-39.md): Publishing an earlier release reads the next development version record
 - [RELEASE-WS-BASELINE-VERSION-33](RELEASE-WS-BASELINE-VERSION-33.md): Every new VERSION failed the whitespace preflight until a docs/PATCH-v<VERSION>.json was made by hand
 - [ROOM-RESIDENTS-NOT-CACHED-48](ROOM-RESIDENTS-NOT-CACHED-48.md): The room stages bake every resident again on every run: 26 s of a 39 s rerun with every room unit reused

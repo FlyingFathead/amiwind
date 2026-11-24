@@ -1,6 +1,6 @@
 # Study: AmiWind on a PiStorm-equipped Amiga 500 (RTG backend or AGA-STORM)
 
-_Last updated with AmiWind v0.0.66-dev8 (15 November 2026)._
+_Last updated with AmiWind v0.0.68 (24 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -22,8 +22,11 @@ _Last updated with AmiWind v0.0.66-dev8 (15 November 2026)._
 
 <!-- contents end -->
 
-This is a feasibility study, not a plan or a compatibility claim. No AmiWind run on a PiStorm, on any Amiga 500 or
-under AGA-STORM has been made or reported yet. Every statement below is marked as one of:
+This is a feasibility study, not a plan or a compatibility claim. One report since it was written: a tester ran AmiWind
+unchanged on a machine with an RTG card when AGA is also present, with a suitable screen mode, at the same frame rate as
+on AGA; the frame time is in the 3D rendering on that machine, not in the display. A machine without AGA needs a change
+to the start-up check, planned for the next version. No run on an Amiga 500 or under AGA-STORM on its own has been
+reported. Every statement below is marked as one of:
 
 - **Measured**: a recorded measurement, with the page it comes from.
 - **From the code**: read on 13 November 2026 in the v0.0.66 source (VERSION 0.0.66-dev2), with file and function; the
@@ -40,6 +43,7 @@ snapshot; everything here was checked again in the current tree.
 | Setup | What the code and the measurements show | Verdict |
 | --- | --- | --- |
 | Amiga 1200 / 4000 with AGA (the current target) | The tested display path: the frame is converted to bitplanes (chunky-to-planar) into three screen buffers in Chip RAM. | Supported |
+| A machine with an RTG card and AGA both present, today's build | A tester ran the unchanged build with a suitable screen mode; no RTG change was needed, and the frame rate matched AGA (the frame time is in the 3D rendering, not the display). | Reported working |
 | Amiga 500 + PiStorm with its RTG output, today's build | The start-up check stops: no AGA chipset, less than 2 MiB of Chip RAM. The engine itself is not AGA-only: it still carries an inherited CyberGraphX display path that opens an RTG screen when a graphics card library is installed, but it hands each frame over through a slow generic call and has never been tested in AmiWind. | Blocked at the start-up check |
 | Amiga 500 + PiStorm + AGA-STORM, today's build | Likely blockers: the start-up check's AGA and Chip RAM rows as seen under AGA-STORM, the AGA screen modes the engine asks for, and the fact that with Picasso96 installed (which AGA-STORM's setup asks for) the engine picks the RTG screen, not the emulated AGA one. | Worth one test |
 | Amiga 500 + PiStorm + a CHIM RTG backend | Technically possible and contained: the screen code sits in one engine file; the world, streaming and game code never touch the screen hardware. About three engine files, one builder file and a few tests, six to ten functions. | Feasible with work |

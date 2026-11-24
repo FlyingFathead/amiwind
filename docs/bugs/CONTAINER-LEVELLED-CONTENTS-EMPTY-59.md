@@ -384,6 +384,9 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [WAIT-DURING-COMBAT-36](WAIT-DURING-COMBAT-36.md): Waiting is allowed in the middle of a fight
 - [WAIT-FEET-IN-WATER-36](WAIT-FEET-IN-WATER-36.md): Waiting is allowed with the feet in water (the original refuses it)
 - [WATER-GAMEPLAY-PARITY-38](WATER-GAMEPLAY-PARITY-38.md): Water gameplay lacks complete original behavior verification
+- [WATER-RIPPLES-UNDER-ACTORS-MISSING-68](WATER-RIPPLES-UNDER-ACTORS-MISSING-68.md): No ripples on the water: a swimmer at the surface or a player walking on water leaves no rings of ripples, which the original draws
+- [WATER-WALKING-DEEP-CAST-NOT-REFUSED-68](WATER-WALKING-DEEP-CAST-NOT-REFUSED-68.md): Water Walking cast deep under the water is applied and lifts the player to the surface, where the original refuses the effect
+- [WATER-WALKING-NOT-ON-SURFACE-68](WATER-WALKING-NOT-ON-SURFACE-68.md): Water Walking does not hold the player on the water: the effect is in the effects table, but the movement does not read it, so the player swims as without it
 - [WEAPON-STRIKE-ENCHANT-NOT-CAST-61](WEAPON-STRIKE-ENCHANT-NOT-CAST-61.md): A weapon's Cast When Strikes enchantment is not cast when the weapon hits
 - [WEATHER-STATE-NOT-SAVED-66](WEATHER-STATE-NOT-SAVED-66.md): The current weather and its change in progress are not saved: a load rolls the weather again
 - [WEREWOLF-BODY-NOT-DRAWN-63](WEREWOLF-BODY-NOT-DRAWN-63.md): A player turned into a werewolf by a script keeps his own body: the werewolf model is not drawn

@@ -12,7 +12,7 @@
 | Persists in | v0.0.63 (last seen) |
 | Severity | high: Regressed in v0.0.63 (was medium): gates and mechanisms that the world uses to let the player through do not respond |
 | Family | Game logic (QuakeC) and saves (`game-logic`) |
-| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
+| Deferred by the maintainer | 2026-11-24: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up |
 | Came back (regression) | in v0.0.63 (fixed in v0.0.63 before) |
 | Playtest version | v0.0.62-dev1 |
 | From commit | source unknown, engine unknown, CHIM world unknown |
@@ -41,7 +41,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-10 02:34 +0200: came back in v0.0.63 (fixed in v0.0.63 before): Not working on the v0.0.63 release image: at the Ghostgate the switches and portcullises answer "no such reference here", so they cannot be activated.
 - 2026-11-10 06:01 +0200: seen again in v0.0.64-dev1: Seen again in the v0.0.64-dev1 in-game check (FS-UAE, 32 MB Fast): at the Ghostgate "ex_gg_gateswitch_01"->Activate answers "activate: no such reference here"; the portcullis ex_gg_portcullis_01 stays at z 1408, also after a save and a ...
 - 2026-11-16: v0.0.66-dev11: No in-game check of the Ghostgate switches on a v0.0.64 or later build is recorded: the opening journeys and the end-of-quest sessions of the v0.0.66 dev builds do not reach the Ghostgate.
-- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
+- 2026-11-24: deferred by the maintainer: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up
 
 <!-- END GENERATED TIMELINE -->
 
@@ -427,6 +427,9 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [WAIT-DURING-COMBAT-36](WAIT-DURING-COMBAT-36.md): Waiting is allowed in the middle of a fight
 - [WAIT-FEET-IN-WATER-36](WAIT-FEET-IN-WATER-36.md): Waiting is allowed with the feet in water (the original refuses it)
 - [WATER-GAMEPLAY-PARITY-38](WATER-GAMEPLAY-PARITY-38.md): Water gameplay lacks complete original behavior verification
+- [WATER-RIPPLES-UNDER-ACTORS-MISSING-68](WATER-RIPPLES-UNDER-ACTORS-MISSING-68.md): No ripples on the water: a swimmer at the surface or a player walking on water leaves no rings of ripples, which the original draws
+- [WATER-WALKING-DEEP-CAST-NOT-REFUSED-68](WATER-WALKING-DEEP-CAST-NOT-REFUSED-68.md): Water Walking cast deep under the water is applied and lifts the player to the surface, where the original refuses the effect
+- [WATER-WALKING-NOT-ON-SURFACE-68](WATER-WALKING-NOT-ON-SURFACE-68.md): Water Walking does not hold the player on the water: the effect is in the effects table, but the movement does not read it, so the player swims as without it
 - [WEAPON-STRIKE-ENCHANT-NOT-CAST-61](WEAPON-STRIKE-ENCHANT-NOT-CAST-61.md): A weapon's Cast When Strikes enchantment is not cast when the weapon hits
 - [WEATHER-STATE-NOT-SAVED-66](WEATHER-STATE-NOT-SAVED-66.md): The current weather and its change in progress are not saved: a load rolls the weather again
 - [WEREWOLF-BODY-NOT-DRAWN-63](WEREWOLF-BODY-NOT-DRAWN-63.md): A player turned into a werewolf by a script keeps his own body: the werewolf model is not drawn

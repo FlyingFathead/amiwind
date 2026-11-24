@@ -2,12 +2,13 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 4 times; something has to be done
+## PERSISTING: reported 5 times; something has to be done
 
 - Reported with v0.0.66-dev5 at 2026-11-15 (time not recorded): Seen again in the v0.0.66-dev5 build: "[2594/2594] cached, 0 to fit", done in 2m01s at 1.2 cores, its heartbeats at 1.0 cores with no output for 90 s.
 - Reported with v0.0.67-dev1 at 2026-11-17 13:59 +0200: Seen again in the v0.0.67-dev1 build (run 2026_11_17_v0.0.67-dev1_full-v0.0.67-dev1_6458e88, commit 6458e88): the CHIM room actor bake took 2 min 3 s at 1.2 cores.
 - Reported with v0.0.68-dev2 at 2026-11-21 01:02 +0200: Seen again in the v0.0.68-dev2 build: the room actor bake took about two minutes on one core
 - Reported with v0.0.68-dev5 at 2026-11-22 00:48 +0200: Seen again in the v0.0.68-dev5 build: the image step's room actor bake took 1 minute 55 seconds on about one core.
+- Reported with v0.0.68-dev12 at 2026-11-24 04:57 +0200: The image step's room actor bake ran on one core again for about two minutes with every room resident cached.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -42,6 +43,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-17 13:59 +0200: seen again in v0.0.67-dev1: Seen again in the v0.0.67-dev1 build (run 2026_11_17_v0.0.67-dev1_full-v0.0.67-dev1_6458e88, commit 6458e88): the CHIM room actor bake took 2 min 3 s at 1.2 cores.
 - 2026-11-21 01:02 +0200: seen again in v0.0.68-dev2: Seen again in the v0.0.68-dev2 build: the room actor bake took about two minutes on one core
 - 2026-11-22 00:48 +0200: seen again in v0.0.68-dev5: Seen again in the v0.0.68-dev5 build: the image step's room actor bake took 1 minute 55 seconds on about one core.
+- 2026-11-24 04:57 +0200: seen again in v0.0.68-dev12: The image step's room actor bake ran on one core again for about two minutes with every room resident cached.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -50,7 +52,7 @@ _Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 4 times; something has to be done](#persisting-reported-4-times-something-has-to-be-done)
+- [PERSISTING: reported 5 times; something has to be done](#persisting-reported-5-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Status: 17 November 2026](#status-17-november-2026)
 - [Symptom](#symptom)
@@ -283,6 +285,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [CHIM-ROOM-FAIL-STAGE-48](CHIM-ROOM-FAIL-STAGE-48.md): One CHIM room that cannot be made failed the whole CHIM interiors stage (HOLD-LEVEL with every room batch by default)
 - [CHIM-ROOM-OVER-BUDGET-RETRY-48](CHIM-ROOM-OVER-BUDGET-RETRY-48.md): A model over the image budget is tried whole again on every run before its cached tiles are used: its room runs on one core
 - [CHIM-SOL-FLORA-PATH-64](CHIM-SOL-FLORA-PATH-64.md): The Solstheim test frame converts its trees as full models, not through the world flora cards Vvardenfell uses
+- [CHIM-STAGE-QUEUED-IDLE-68](CHIM-STAGE-QUEUED-IDLE-68.md): The world stage runs on about 2 of 24 cores for over 5 minutes while many units wait in its queue
 - [CHIM-STAIR-GATE-WORLD-RELOAD-36](CHIM-STAIR-GATE-WORLD-RELOAD-36.md): The CHIM stair gate's workers read the whole CHIM world again every time they switch frames (about 14.5 s per read on the 273-frame world)
 - [CHIM-STAIRGATE-SLOW-33](CHIM-STAIRGATE-SLOW-33.md): The CHIM stair gate takes over 10 minutes on the Balmora and Vivec Arena world
 - [EXPANSION-READER-ONE-MASTER-64](EXPANSION-READER-ONE-MASTER-64.md): Most builder readers load only the base game file; the roadmap calls the readers master-list readers

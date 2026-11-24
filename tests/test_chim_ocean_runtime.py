@@ -276,6 +276,18 @@ class OriginalTerrain(unittest.TestCase):
             (p/'Bloodmoon.esm').write_bytes(rec('LAND',sub('INTV',struct.pack('<ii',11,23))))
             with self.assertRaises(ValueError):resolve_grids(p,{(11,23)})
 
+    def test_expansion_heightless_land_alone_in_its_cell_takes_the_default_height(self):
+        # SOL-SEA-CROSSING-68 (the v0.0.68 release build stopped on Bloodmoon's heightless LAND -18,28 by the open sea):
+        # the only LAND of its cell, so nothing can be inherited: the base's default-height policy, as OpenMW
+        from chim.ocean_terrain import resolve_grids
+        with tempfile.TemporaryDirectory() as temp:
+            p=Path(temp);(p/'Morrowind.esm').write_bytes(self.ltex('base.tga')+self.land(0,0))
+            (p/'Bloodmoon.esm').write_bytes(rec('LAND',sub('INTV',struct.pack('<ii',-18,28))+sub('WNAM',bytes(81))))
+            grids,_,receipt=resolve_grids(p,{(0,0),(-18,28)})
+            self.assertEqual(sorted(grids),[(0,0)])
+            self.assertEqual([(r['cell'],r['master']) for r in receipt['heightless_base_records']],
+                             [([-18,28],'Bloodmoon.esm')])
+
     def test_unresolved_or_deleted_expansion_land_is_refused(self):
         from chim.ocean_terrain import resolve_grids
         with tempfile.TemporaryDirectory() as temp:

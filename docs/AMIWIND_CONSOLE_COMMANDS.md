@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.68-dev12._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.68._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -66,6 +66,7 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg loadtrace` | - | [on / off / dump] the load trace (off by default; console aw_loadtrace 0/1): every file open, read, seek and close kept in memory with its time and load stage, printed and written to RAM:amiwind-loadtrace.txt when a scene is ready; dump: now |
 | `dbg maxstats` | `dbg maxstat` | every attribute and skill to 100 and the level to 83 (the highest the game's levelling reaches), health, magicka and fatigue worked out again by the character's own rules and full; the sheet before and after on the console |
 | `dbg memcensus` | - | [owners [on/off]] (the free Fast RAM and its largest block now, the map and the Hunk in use, in one console line; owners: the live blocks of 4 KiB or more by the address that asked for them, counted only after owners on, off by default) |
+| `dbg mempurge` | - | [on / off / test] emergency memory purge (on, not saved): a load that does not fit frees the re-makeable caches and runs once more, else the box with the KiB and the way back; no argument: the purges, KiB freed, loads retried and loaded; off: the box at once; test: the next map load is short of memory once |
 | `dbg netstat` | - | [reset] the frame message: method (aw_net_method) and budget, room and its growth; the last frame's updates in sight, bytes wanted, sent, waiting; since the map or the reset: the fullest frame against the room, waits, frame time, the client's reading time; the models with the most bytes |
 | `dbg nightgallery` | - | [here/off] (23:00 wide view, Masser, Secunda, stars; Esc returns) |
 | `dbg opening dock` | - | [fixed / direct; no argument: the opening's state] the dock guard's walk in the opening (default fixed: along the middle of the pier to his place beside the census office door, then he faces you; direct: the earlier walk, for comparison; not saved); no argument prints the opening's state, the guard's place, walk and its check counts |

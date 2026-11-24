@@ -215,11 +215,13 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - [COMBAT-PURSUIT-SLOPE-STALL-46](COMBAT-PURSUIT-SLOPE-STALL-46.md): A pursuer stops on a walkable slope: an actor step was refused when it moved more than a stair height along the slope
 - [EXPANSION-STORE-DISABLE-NOT-HIDDEN-68](EXPANSION-STORE-DISABLE-NOT-HIDDEN-68.md): In the expansions' outdoor areas a placement a script switches off stays drawn and solid: the ice covers in front of the underwater entrances to Stahlman's Gorge and the Caves of Fjalding stay in place after their quest stage
 - [IMAGE-FORMATS-CHIM-ROOMS-48](IMAGE-FORMATS-CHIM-ROOMS-48.md): The payload preflight stops a CHIM rooms build: the image step does not know the room store and room record formats
+- [IMAGE-FRAME-HEAP-LAYER-STORES-UNCHECKED-68](IMAGE-FRAME-HEAP-LAYER-STORES-UNCHECKED-68.md): The image step's per-map memory check reads only the main island's frame maps: Solstheim's and Mournhold's frame maps are not checked with their store index and the other memory users at 32 MB
 - [IMAGE-ROOM-MAPS-ENGINE-REFUSED-48](IMAGE-ROOM-MAPS-ENGINE-REFUSED-48.md): Every CHIM room is refused at its door and the game hangs on Loading: the engine accepts a .chim map only with a CHIM frame key
 - [IMAGE-ROOM-MAPS-FINGERPRINT-48](IMAGE-ROOM-MAPS-FINGERPRINT-48.md): A CHIM rooms build stops at the content fingerprint: it requires maps/<room>.bsp after the room became maps/<room>.chim
 - [IMAGE-ROOM-MAPS-LATE-PASSES-48](IMAGE-ROOM-MAPS-LATE-PASSES-48.md): Image checks after the CHIM rooms install skip CHIM rooms: entity tracker 47 cells against 52, dressing 81 pieces against 99, actor contact 0 placements against 93
 - [IMAGE-ROOM-MAPS-OPTIMIZER-RECEIPT-48](IMAGE-ROOM-MAPS-OPTIMIZER-RECEIPT-48.md): A CHIM rooms build stops at the map optimizer check: the room maps are staged but not in the optimizer receipt
 - [IMAGE-ROOM-MAPS-SKIP-PASSES-48](IMAGE-ROOM-MAPS-SKIP-PASSES-48.md): CHIM rooms were installed before the image passes that write a room worldspawn, so CHIM room maps would miss interior sky, hand metadata and cell numbers
+- [OCEAN-APRON-EXPANSION-HEIGHTLESS-68](OCEAN-APRON-EXPANSION-HEIGHTLESS-68.md): The world build stops on an expansion land record without heights next to the open sea
 - [OUTDOOR-DISABLE-NOT-HIDDEN-68](OUTDOOR-DISABLE-NOT-HIDDEN-68.md): Outdoors, a placement a script switches off stays drawn and solid unless it is a carriable light
 - [WORLD-REGION-NAMES-VF-ONLY-64](WORLD-REGION-NAMES-VF-ONLY-64.md): The open-world region directory accepts only Vvardenfell region names
 - [WORLDMAP-ONE-ISLAND-64](WORLDMAP-ONE-ISLAND-64.md): The in-game world map covers Vvardenfell only

@@ -880,6 +880,12 @@ class Builder(unittest.TestCase):
         listed = {tuple(c) for c in data['cells']}
         self.assertEqual(data['format'], R.CELLS_FORMAT)
         self.assertEqual(len(listed), len(data['cells']))
+        # and the recordless open sea of the base game's box (SOL-SEA-CROSSING-68), after every other cell
+        sea = json.loads(build.CHIM_SEA_GRID_DEFAULT.read_text(encoding='utf-8'))
+        self.assertTrue(sea['recordless'])
+        sea_cells = {R.parse_cell(c) for c in sea['cells']}
+        self.assertFalse(sea_cells & listed)
+        listed |= sea_cells
         args = build.parser().parse_args(['--dry-run', '--builder', 'chim'])
         self.assertEqual(args.chim_regions, [])
         record = build.resolve_chim_regions(args)
@@ -890,9 +896,11 @@ class Builder(unittest.TestCase):
         self.assertEqual(resolved | dropped, listed)
         self.assertEqual(record['counts']['cells'], len(listed) - len(dropped))
         self.assertIn('--chim-regions-cells', build.chim_stage_options(args))
-        # the same cells as naming the file explicitly
+        self.assertEqual(R.decode_after(args.chim_regions_cells), sea_cells)
+        # the same cells as naming the two files explicitly
         explicit = build.parser().parse_args(['--dry-run', '--builder', 'chim', '--chim-regions',
-                                              '@' + str(build.CHIM_CELLS_DEFAULT)])
+                                              '@' + str(build.CHIM_CELLS_DEFAULT), '--chim-regions',
+                                              '@' + str(build.CHIM_SEA_GRID_DEFAULT)])
         build.resolve_chim_regions(explicit)
         self.assertEqual(explicit.chim_regions_cells, args.chim_regions_cells)
 
@@ -1075,8 +1083,11 @@ class LayerSetsInTheBuild(unittest.TestCase):
 
     def test_no_selected_layer_adds_its_set_to_the_base_list(self):
         both = ['Morrowind.esm', 'Tribunal.esm', 'Bloodmoon.esm']
+        # after the default list only the recordless open sea of the base game's own box (SOL-SEA-CROSSING-68), the
+        # same whatever is selected: no expansion's named set
+        sea = ['@' + str(ROOT / 'config' / 'chim-sea-grid.json')]
         for masters in (both, ['Morrowind.esm', 'Bloodmoon.esm'], ['Morrowind.esm', 'Tribunal.esm'], ['Morrowind.esm']):
-            self.assertEqual(self.resolve(masters, None), [], masters)
+            self.assertEqual(self.resolve(masters, None), sea, masters)
         # the named sets themselves stay known (the modules and the tracker read them)
         self.assertEqual(R.layer_sets(), {'Bloodmoon.esm': 'solstheim', 'Tribunal.esm': 'mournhold'})
 

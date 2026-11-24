@@ -28,6 +28,10 @@ static int fixture_autosave(char *label,int size){
  fixture_autosaves++;snprintf(label,size,"Autosave 2");Cbuf_InsertText("map census\n");return 1;
 }
 static void fixture_save_drop(void){fixture_drops++;}
+/* MEMORY-EMERGENCY-PURGE-64: the emergency purge (aw_loadfail.c in the game): counted, for which place, and the bytes it
+ * says it gave back (-1: switched off) */
+static int fixture_purges;static long fixture_purge_given;static char fixture_purge_map[32];
+static long fixture_purge(const char *map){fixture_purges++;snprintf(fixture_purge_map,sizeof(fixture_purge_map),"%s",map);return fixture_purge_given;}
 void AW_HeapAuditReport(const char *scene){}
 qboolean noclip_anglehack;
 kbutton_t in_mlook;
@@ -645,7 +649,8 @@ int main(void){
   aw_load_precheck=precheck_hook;queued[0]=0;
   assert(AW_TravelKey(K_ENTER) && !queued[0] && key_dest==key_game && AW_StateGet(&aw_state,AW_ITEM,"gold_001")==87);
   assert(AW_SceneLoadBoxTake()==1);
-  assert(strstr(AW_SceneLoadBoxText(),"Map balmora was found but could not be loaded.\nNot enough memory (needs 20000 KB, 9000 KB free). Code LF5.\nYou are in "));
+  assert(!strncmp(AW_SceneLoadBoxText(),"Not enough memory to load ",26));
+  assert(strstr(AW_SceneLoadBoxText()," (needs 20000 KiB, 9000 KiB available). Code LF5.\nYou are in "));
   aw_load_precheck=NULL;assert(AW_SceneUse() && key_dest==key_menu);}
  assert(AW_TravelKey(K_ENTER));assert(!strcmp(queued,"map balmora\n"));
  assert(key_dest==key_game && AW_StateGet(&aw_state,AW_ITEM,"gold_001")==87);
@@ -1574,8 +1579,86 @@ int main(void){
   assert(fabs(p.v.origin[0]-at[0])<1 && fabs(p.v.origin[1]-at[1])<1 && fabs(p.v.origin[2]-at[2])<1 && p.v.health==73);
   assert(AW_SceneLoadBoxTake()==1);
   box=AW_SceneLoadBoxText();
-  assert(!strncmp(box,"Map census",10));
-  assert(strstr(box,"was found but could not be loaded.\nNot enough memory (needs 293 KB, 118 KB free). Code LF5.\nYou are in Seyda Neen."));
+  /* MEMORY-EMERGENCY-PURGE-64: the maintainer's text; no purge here (the fixture sets none), the Hunk's memory anyway */
+  assert(!strncmp(box,"Not enough memory to load ",26));
+  assert(strstr(box," (needs 293 KiB, 118 KiB available). Code LF5.\nOK returns you to Seyda Neen, where you came in."));
+  /* MEMORY-EMERGENCY-PURGE-64: the emergency purge, the one retry of the same load and its arrival; a retry that does
+   * not fit either takes the way back and the box; the purge switched off, a purge with nothing to give back and the
+   * Hunk's memory go to the way back at once; the test aid's shortage is tried again even with nothing given back */
+  {
+   extern long (*aw_scene_memory_purge)(const char *);extern int aw_scene_purge_test,aw_scene_mem_retries,aw_scene_mem_retry_loads;
+   int retries=aw_scene_mem_retries,loads=aw_scene_mem_retry_loads;
+   aw_scene_memory_purge=fixture_purge;
+   /* 1. a room's models do not fit (the Fast RAM): the purge gives back 2 MiB, the same load once more, it arrives */
+   fixture_purge_given=2048L*1024;fixture_purges=0;
+   p.v.origin[0]=0;p.v.origin[1]=200;p.v.origin[2]=0;VectorCopy(p.v.origin,at);cl.viewangles[0]=0;cl.viewangles[1]=90;
+   queued[0]=0;assert(AW_SceneUse() && !strcmp(queued,"map census\n") && AW_SceneStarting());
+   AW_SceneMapBegin("census");
+   memset(&e,0,sizeof(e));e.kind=AW_LOADERR_MEMORY;e.need=18130L*1024;e.have=14783L*1024;strcpy(e.arena,"room");
+   e.lump=-1;e.offset=-1;AW_SceneLoadNote(&e);
+   queued[0]=0;AW_SceneLoadFailed("Not enough memory for the load: room rifa4ef181ed needs 18565120 bytes, 15137792 free");
+   assert(fixture_purges==1 && !strcmp(fixture_purge_map,"census"));   /* the purge first, for that place */
+   assert(!strcmp(queued,"map census\n") && AW_SceneStarting());       /* the same load again, not the way back */
+   assert(aw_scene_mem_retries==retries+1 && !AW_SceneLoadBoxTake());
+   AW_SceneMapBegin("census");CL_ClearState();strcpy(cl.levelname,"Census and Excise Office");strcpy(sv.name,"census");
+   AW_SceneSpawn(&p);finish_signon(&p);
+   assert(!AW_SceneStarting() && !AW_SceneLoadInFlight() && !AW_SceneLoadBoxTake());   /* arrived: no box */
+   assert(aw_scene_mem_retry_loads==loads+1);
+   /* back to Seyda Neen for the next cases (a plain load) */
+#define AT_SEYDA_DOOR() do{CL_ClearState();strcpy(cl.levelname,"Seyda Neen");strcpy(sv.name,"seyda");AW_SceneSpawn(&p); \
+   finish_signon(&p);p.v.origin[0]=0;p.v.origin[1]=200;p.v.origin[2]=0;VectorCopy(p.v.origin,at);cl.viewangles[0]=0; \
+   cl.viewangles[1]=90;queued[0]=0;}while(0)
+   AT_SEYDA_DOOR();
+   /* 2. the retry does not fit either: one purge only, then the way back and the box in his words */
+   fixture_purges=0;
+   assert(AW_SceneUse() && !strcmp(queued,"map census\n"));
+   AW_SceneMapBegin("census");AW_SceneLoadNote(&e);
+   queued[0]=0;AW_SceneLoadFailed("Not enough memory for the load: room rifa4ef181ed needs 18565120 bytes, 15137792 free");
+   assert(!strcmp(queued,"map census\n") && fixture_purges==1);
+   AW_SceneMapBegin("census");AW_SceneLoadNote(&e);
+   queued[0]=0;AW_SceneLoadFailed("Not enough memory for the load: room rifa4ef181ed needs 18565120 bytes, 15137792 free");
+   assert(fixture_purges==1 && !strcmp(queued,"map seyda\n") && !AW_SceneLoadBoxTake());   /* the way back */
+   AW_SceneMapBegin("seyda");CL_ClearState();strcpy(cl.levelname,"Seyda Neen");strcpy(sv.name,"seyda");
+   AW_SceneSpawn(&p);finish_signon(&p);
+   assert(fabs(p.v.origin[0]-at[0])<1 && fabs(p.v.origin[1]-at[1])<1 && fabs(p.v.origin[2]-at[2])<1);   /* where he came in */
+   assert(AW_SceneLoadBoxTake()==1);
+   assert(!strncmp(AW_SceneLoadBoxText(),"Not enough memory to load ",26));
+   assert(strstr(AW_SceneLoadBoxText()," (needs 18130 KiB, 14783 KiB available). Code LF5.\n"
+                                       "OK returns you to Seyda Neen, where you came in."));
+   /* 3. the purge switched off (dbg mempurge off: -1), 4. nothing given back, 5. the Hunk's memory: the way back at once */
+   {
+    long given[3]={-1,0,4096L*1024};const char *arena[3]={"room","room","hunk"};int k;
+    for(k=0;k<3;k++){
+     fixture_purge_given=given[k];fixture_purges=0;strcpy(e.arena,arena[k]);
+     AT_SEYDA_DOOR();assert(AW_SceneUse() && !strcmp(queued,"map census\n"));
+     AW_SceneMapBegin("census");AW_SceneLoadNote(&e);
+     queued[0]=0;AW_SceneLoadFailed("Not enough memory for the load");
+     assert(fixture_purges==1 && !strcmp(queued,"map seyda\n"));
+     AW_SceneMapBegin("seyda");CL_ClearState();strcpy(cl.levelname,"Seyda Neen");strcpy(sv.name,"seyda");
+     AW_SceneSpawn(&p);finish_signon(&p);
+     assert(AW_SceneLoadBoxTake()==1 && !strncmp(AW_SceneLoadBoxText(),"Not enough memory to load ",26));
+    }
+   }
+   /* 6. the test aid's shortage (dbg mempurge test): tried again although the purge gave nothing back */
+   fixture_purge_given=0;fixture_purges=0;strcpy(e.arena,"fast");
+   AT_SEYDA_DOOR();assert(AW_SceneUse() && !strcmp(queued,"map census\n"));
+   AW_SceneMapBegin("census");aw_scene_purge_test=1;AW_SceneLoadNote(&e);
+   queued[0]=0;AW_SceneLoadFailed("Not enough memory for the load: fast dbg mempurge test needs 65536 bytes, 0 free");
+   assert(fixture_purges==1 && !strcmp(queued,"map census\n") && !aw_scene_purge_test);
+   AW_SceneMapBegin("census");CL_ClearState();strcpy(cl.levelname,"Census and Excise Office");strcpy(sv.name,"census");
+   AW_SceneSpawn(&p);finish_signon(&p);
+   assert(!AW_SceneLoadBoxTake() && aw_scene_mem_retry_loads==loads+2);
+   /* a load that fails for another reason is never tried again (no purge) */
+   fixture_purges=0;AT_SEYDA_DOOR();assert(AW_SceneUse() && !strcmp(queued,"map census\n"));
+   AW_SceneMapBegin("census");queued[0]=0;AW_SceneLoadFailed("map census: forced load failure (aw_load_fail_test)");
+   assert(!fixture_purges && !strcmp(queued,"map seyda\n"));
+   AW_SceneMapBegin("seyda");CL_ClearState();strcpy(cl.levelname,"Seyda Neen");strcpy(sv.name,"seyda");
+   AW_SceneSpawn(&p);finish_signon(&p);while(AW_SceneLoadBoxTake());
+   aw_scene_memory_purge=NULL;
+#undef AT_SEYDA_DOOR
+   /* the cases below start where the block above left the player: at the door, as after its way back */
+   p.v.origin[0]=0;p.v.origin[1]=200;p.v.origin[2]=0;VectorCopy(p.v.origin,at);p.v.health=73;
+  }
   /* the way back fails as well: the load menu, the error on its notice line */
   command_argc=2;command_args[0]="aw_teleport";command_args[1]="prisonship";queued[0]=0;teleport();
   assert(!strcmp(queued,"map prison\n"));

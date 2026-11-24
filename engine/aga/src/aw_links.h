@@ -54,5 +54,9 @@ int AW_SceneryCount(void);
 /* aw_walk.c */
 int AW_TerrainFloor(edict_t *e,int player);
 void AW_WalkPlayer(edict_t *p);
+/* WATER-WALKING-NOT-ON-SURFACE-68: the player's Water Walking magnitude (aw_move.c sets it; NULL = none) and how often
+ * the water's surface held him / could not (no open surface over him, no room to get there) */
+extern float (*aw_walk_water_walking)(edict_t *p);
+void AW_WaterWalkCounts(unsigned long *lifts,unsigned long *refused);
 
 #endif

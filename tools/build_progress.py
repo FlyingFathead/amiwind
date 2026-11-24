@@ -110,7 +110,8 @@ def _option_values(command, option):
 def chim_frames(command):
     """Frames the chim stage builds: one per --area, one per --chim-regions-cells cell."""
     count = len(_option_values(command, '--area'))
-    count += sum(len(value.split()) for value in _option_values(command, '--chim-regions-cells'))
+    # a "|" token is no cell: the recordless open sea follows it (tools/chim/regions.py encode_cells AFTER)
+    count += sum(len([t for t in value.split() if t != '|']) for value in _option_values(command, '--chim-regions-cells'))
     return count or None
 
 

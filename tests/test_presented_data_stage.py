@@ -246,8 +246,12 @@ class TheCellLists(unittest.TestCase):
         for more in ({}, {'dlc': 'tribunal'}, {'dlc': 'bloodmoon'}, {'no_dlc': True}):
             args = self.args(**more)
             seen, _ = self.plans(args)
-            self.assertEqual(len(seen[0]), 1, more)
-            self.assertTrue(seen[0][0].startswith('@'), more)
+            # the default list and the recordless open sea of the base game's box (SOL-SEA-CROSSING-68), both in the
+            # source tree, whatever expansion is selected
+            self.assertEqual(len(seen[0]), 2, more)
+            self.assertTrue(all(v.startswith('@') for v in seen[0]), more)
+            self.assertEqual([v.rsplit('/', 1)[-1].rsplit('\\', 1)[-1] for v in seen[0]],
+                             ['chim-cells.json', 'chim-sea-grid.json'], more)
             self.assertEqual(args.chim_regions_cells, '1,1:l', more)
 
     def test_the_module_takes_tribunals_set_when_tribunal_is_selected(self):
@@ -466,9 +470,12 @@ class TheModulesMapsAreTriedRightAfterItsStage(unittest.TestCase):
         self.assertEqual(entry, [('module-store-maps', 'after:tribunal-mournhold',
                                   'expansion_preflight:module_store_after'),
                                  ('module-store-maps', 'after:bloodmoon-solstheim',
+                                  'expansion_preflight:module_store_after'),
+                                 ('module-store-maps', 'after:bloodmoon-solstheim-sea',
                                   'expansion_preflight:module_store_after')])
         self.assertEqual(expansion_preflight.MODULE_WORLD_STAGES, {'tribunal-mournhold': 'chimmh',
-                                                                   'bloodmoon-solstheim': 'chimsol'})
+                                                                   'bloodmoon-solstheim': 'chimsol',
+                                                                   'bloodmoon-solstheim-sea': 'chimsea'})
         self.assertEqual(set(expansion_preflight.MODULE_WORLD_STAGES), set(layer_stores.MODULE_STAGES))
 
     def test_without_the_stages_output_there_is_nothing_to_check(self):

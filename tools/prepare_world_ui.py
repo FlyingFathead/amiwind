@@ -631,11 +631,50 @@ def wnam_picture(heights, bounds):
     return out
 
 
+def record_bounds(master):
+    """The world map's bounds in cells (x0, y0, x1, y1; the ends exclusive, as terrain_bounds): the box of every live
+    exterior CELL record of the master (the merged master of the selected masters, mwad.masters.master_path). OpenMW's
+    world map spans exactly that box (apps/openmw/mwrender/globalmap.cpp 291-308: every exterior cell record), so with
+    Bloodmoon the map holds Solstheim and the open sea between the islands, and the sea margin of both: cells x -29..23,
+    y -19..28 (SOL-SEA-CROSSING-68, WORLDMAP-ONE-ISLAND-64). The LAND-with-heights box the terrain overview covers is
+    smaller (dev12: x -28..23, y -16..28) and left out the westernmost sea column and Vvardenfell's southern rows.
+    None when the master has no exterior cell record."""
+    xs,ys=[],[]
+    for tag,flags,payload in records(master):
+        if tag!='CELL' or flags&0x20:continue
+        fields={}
+        for k,v in subrecords(payload):
+            if k=='FRMR':break
+            fields.setdefault(k,v)
+        data=fields.get('DATA',b'')
+        if 'DELE' in fields or len(data)<12:continue
+        bits,x,y=struct.unpack_from('<Iii',data)
+        if bits&1:continue
+        xs.append(x);ys.append(y)
+    return (min(xs),min(ys),max(xs)+1,max(ys)+1) if xs else None
+
+
+def map_picture(image, picture_bounds, bounds):
+    """IMAGE (drawn over PICTURE_BOUNDS, cells, ends exclusive) placed on a transparent canvas over BOUNDS at the same
+    pixels per cell; the canvas outside the picture is the open sea (map_asset lays the ocean colour under it). The
+    image itself when both are the same box."""
+    pb,b=[int(v) for v in picture_bounds],[int(v) for v in bounds]
+    if pb==b:return image
+    if pb[0]<b[0] or pb[1]<b[1] or pb[2]>b[2] or pb[3]>b[3]:
+        raise ValueError('the terrain picture %s reaches past the map bounds %s'%(pb,b))
+    kx,ky=image.size[0]/(pb[2]-pb[0]),image.size[1]/(pb[3]-pb[1])
+    canvas=Image.new('RGBA',(round(kx*(b[2]-b[0])),round(ky*(b[3]-b[1]))),(0,0,0,0))
+    canvas.paste(image.convert('RGBA'),(round(kx*(pb[0]-b[0])),round(ky*(b[3]-pb[3]))))
+    return canvas
+
+
 def map_asset(report, image, palette, version='v1', lava_rows=None):
-    """map.awm: v1 = AWM1; v2 = the same bytes under AWM2 followed by the LAVA section of lava_rows."""
+    """map.awm: v1 = AWM1; v2 = the same bytes under AWM2 followed by the LAVA section of lava_rows. The bounds:
+    report['map_bounds'] (the box of every exterior cell record, record_bounds; IMAGE already drawn over it) when
+    the report has them, else the terrain overview's own box."""
     if version not in WORLD_MAPS:raise ValueError('world_map must be v1 or v2')
     if len(palette)!=768:raise ValueError('Expected runtime palette')
-    bounds=report['terrain_bounds'];dx=bounds[2]-bounds[0];dy=bounds[3]-bounds[1]
+    bounds=report.get('map_bounds') or report['terrain_bounds'];dx=bounds[2]-bounds[0];dy=bounds[3]-bounds[1]
     height=512;width=round(height*dx/dy)
     if not 1<=width<=512: # Keep the longest dimension bounded.
         width=512;height=round(width*dy/dx)
@@ -686,7 +725,12 @@ def prepare(data_files,survey,scene,world_map=None,lava_pools=None,colours=None)
         land=lava_map.land_heights(master)      # the visible lava only: land above a pool buries it (WORLDMAP-LAVA-MISMATCH-36)
         rows=lava_layer(lava_pools,land);lava_report=check_lava_layer(rows,lava_pools,land)
     colours=map_colours(colours)
-    picture=wnam_picture(wnam_heights(master),report['terrain_bounds']) if colours=='openmw' else Image.open(survey/'terrain.png')
+    # the map spans the box of every exterior cell record (record_bounds, OpenMW's world map); the terrain overview
+    # is drawn over its own LAND box and placed in it (map_picture)
+    bounds=record_bounds(master)
+    report=dict(report,map_bounds=list(bounds) if bounds else list(report['terrain_bounds']))
+    picture=wnam_picture(wnam_heights(master),report['map_bounds']) if colours=='openmw' else \
+        map_picture(Image.open(survey/'terrain.png'),report['terrain_bounds'],report['map_bounds'])
     worldmap=map_asset(report,picture,palette,version,rows)
     looks,hours,weather_info=weather_settings(data_files)
     # MESH-PARTICLE-EMITTERS: the exterior smoke and steam emitters of the placed meshes (tools/particle_emitters.py)

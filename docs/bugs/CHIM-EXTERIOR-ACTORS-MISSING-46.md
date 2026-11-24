@@ -24,7 +24,7 @@
 | Persists in | v0.0.46, v0.0.48-dev2, v0.0.65 (last seen) |
 | Severity | high: the open world is empty of people and creatures; gameplay outdoors is missing |
 | Family | CHIM world streamer (`chim-streamer`) |
-| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
+| Deferred by the maintainer | 2026-11-24: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up |
 | CHIM | Builder ([CHIM Engine tracker](CHIM_TRACKER.md)) |
 | Playtest version | v0.0.46 release |
 | From commit | source a3fb9b7, engine a3fb9b7, CHIM world a3fb9b7 |
@@ -56,7 +56,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-13: fixed in source: a gated commit, v0.0.66-dev2 (d3dc2493); a town map joins its own cells' creatures and levelled points from the actor table; tools/chim/actor_census_check.py stops a build whose placed counts per area fall short of the original: the 116 creature points of the Seyda Neen and Balmora cells are placed; a shortfall fails the build
 - 2026-11-13 10:28 +0200: seen again in v0.0.65: Seen again with v0.0.65: no mudcrabs or slaughterfish around Seyda Neen.
 - 2026-11-15: shipped: the v0.0.66-dev2 release build, v0.0.66-dev2 (3988c6e4, build 2026_11_14_v0.0.66-dev2_full); the delivered dev2 build holds the commit: a numbered build carries the fix
-- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
+- 2026-11-24: deferred by the maintainer: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up
 
 <!-- END GENERATED TIMELINE -->
 
@@ -332,11 +332,13 @@ Family: CHIM world streamer (`chim-streamer`). The CHIM streamer keeps Quake's v
 - [COMBAT-PURSUIT-SLOPE-STALL-46](COMBAT-PURSUIT-SLOPE-STALL-46.md): A pursuer stops on a walkable slope: an actor step was refused when it moved more than a stair height along the slope
 - [EXPANSION-STORE-DISABLE-NOT-HIDDEN-68](EXPANSION-STORE-DISABLE-NOT-HIDDEN-68.md): In the expansions' outdoor areas a placement a script switches off stays drawn and solid: the ice covers in front of the underwater entrances to Stahlman's Gorge and the Caves of Fjalding stay in place after their quest stage
 - [IMAGE-FORMATS-CHIM-ROOMS-48](IMAGE-FORMATS-CHIM-ROOMS-48.md): The payload preflight stops a CHIM rooms build: the image step does not know the room store and room record formats
+- [IMAGE-FRAME-HEAP-LAYER-STORES-UNCHECKED-68](IMAGE-FRAME-HEAP-LAYER-STORES-UNCHECKED-68.md): The image step's per-map memory check reads only the main island's frame maps: Solstheim's and Mournhold's frame maps are not checked with their store index and the other memory users at 32 MB
 - [IMAGE-ROOM-MAPS-ENGINE-REFUSED-48](IMAGE-ROOM-MAPS-ENGINE-REFUSED-48.md): Every CHIM room is refused at its door and the game hangs on Loading: the engine accepts a .chim map only with a CHIM frame key
 - [IMAGE-ROOM-MAPS-FINGERPRINT-48](IMAGE-ROOM-MAPS-FINGERPRINT-48.md): A CHIM rooms build stops at the content fingerprint: it requires maps/<room>.bsp after the room became maps/<room>.chim
 - [IMAGE-ROOM-MAPS-LATE-PASSES-48](IMAGE-ROOM-MAPS-LATE-PASSES-48.md): Image checks after the CHIM rooms install skip CHIM rooms: entity tracker 47 cells against 52, dressing 81 pieces against 99, actor contact 0 placements against 93
 - [IMAGE-ROOM-MAPS-OPTIMIZER-RECEIPT-48](IMAGE-ROOM-MAPS-OPTIMIZER-RECEIPT-48.md): A CHIM rooms build stops at the map optimizer check: the room maps are staged but not in the optimizer receipt
 - [IMAGE-ROOM-MAPS-SKIP-PASSES-48](IMAGE-ROOM-MAPS-SKIP-PASSES-48.md): CHIM rooms were installed before the image passes that write a room worldspawn, so CHIM room maps would miss interior sky, hand metadata and cell numbers
+- [OCEAN-APRON-EXPANSION-HEIGHTLESS-68](OCEAN-APRON-EXPANSION-HEIGHTLESS-68.md): The world build stops on an expansion land record without heights next to the open sea
 - [OUTDOOR-DISABLE-NOT-HIDDEN-68](OUTDOOR-DISABLE-NOT-HIDDEN-68.md): Outdoors, a placement a script switches off stays drawn and solid unless it is a carriable light
 - [WORLD-REGION-NAMES-VF-ONLY-64](WORLD-REGION-NAMES-VF-ONLY-64.md): The open-world region directory accepts only Vvardenfell region names
 - [WORLDMAP-ONE-ISLAND-64](WORLDMAP-ONE-ISLAND-64.md): The in-game world map covers Vvardenfell only

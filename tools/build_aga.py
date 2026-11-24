@@ -2041,6 +2041,11 @@ def image(args):
         raise ValueError('--music is required unless the quick test build leaves the music out (--exclude music)')
     scene=ensure_external(args.scene,'AGA scene');out=new_output(args.out)
     if 'music' not in excluded:ensure_external(args.music,'converted music')
+    # THE TRAVERSAL MEMORY CHECK, in seconds, before any slow work (SOL-SEA-CROSSING-68,
+    # IMAGE-FRAME-HEAP-LAYER-STORES-UNCHECKED-68): every frame of every store (the base world, Solstheim's, its open sea's,
+    # Mournhold's districts) with its own store index, every room, every store edge and every door at 32 MB
+    # (tools/chim/traversal_heap.py); an overflow stops the image step here, naming the place
+    traversal_memory_check(args, out)
     # before the image's slow work, its measurements in the image's own folder (BUILD-CELL-PROGRESS-UNDECLARED-OUTPUT-67)
     flora_support_check(args, out)
     boot=out/'boot';copy_tree(scene/'id1',boot/'id1');(boot/'S').mkdir()
@@ -2525,6 +2530,18 @@ def presented_places(args):
     receipt = json.loads(Path(path).read_text(encoding='utf-8'))
     return presented_exterior.build_places(receipt,
                                            presented_exterior.cells_of_text(getattr(args, 'presented_cells', '') or ''))
+
+
+def traversal_memory_check(args, out):
+    """The image step's first check (tools/chim/traversal_heap.py run): OUT/traversal-memory.json, a ValueError naming
+    every frame, room, store edge or door over 32 MB. Nothing without a CHIM world (a MiniWind of legacy maps)."""
+    if getattr(args, 'miniwind', False) or not getattr(args, 'chim_world', None):
+        return None
+    from chim import traversal_heap
+    return traversal_heap.run(out, chim_world=args.chim_world, layer_worlds=getattr(args, 'chim_layer_world', None),
+                              chim_interiors=getattr(args, 'chim_interiors', None),
+                              room_batches=getattr(args, 'chim_room_batches', None),
+                              data_files=getattr(args, 'data_files', None))
 
 
 def effect_link_layers(args):

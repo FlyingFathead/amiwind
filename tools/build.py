@@ -1961,6 +1961,9 @@ def chim_region_skip(args):
 # names these files: the chim stage gets the resolved cells on its command line and is keyed on exactly them.
 CHIM_CELLS_DEFAULT_NAME = 'config/chim-cells.json'
 CHIM_CELLS_DEFAULT = ROOT / 'config' / 'chim-cells.json'
+# The recordless open sea inside the base game's box (tools/chim/sea_grid.py, SOL-SEA-CROSSING-68): part of the
+# default cell list, after every other cell (tools/chim/regions.py, the recordless rule)
+CHIM_SEA_GRID_DEFAULT = ROOT / 'config' / 'chim-sea-grid.json'
 CHIM_CELLS_STATUS_DEFAULT = ROOT / 'docs' / 'chim' / 'cell-progress-reference.json'
 
 
@@ -1986,6 +1989,8 @@ def resolve_chim_regions(args, builder=None):
             args.chim_regions_cells = None
             return None
         values, default = ['@' + str(CHIM_CELLS_DEFAULT)], True
+        if CHIM_SEA_GRID_DEFAULT.is_file():
+            values.append('@' + str(CHIM_SEA_GRID_DEFAULT))
         # The base world's cell list is this list alone, whatever expansions are selected: an expansion's cells (its
         # named set, tools/chim/regions.py layer_sets) belong to its build module (resolve_tribunal_mournhold below
         # for Mournhold's districts), so the base world's cell list, checklist and stages are the ones of a build
@@ -2005,6 +2010,8 @@ def resolve_chim_regions(args, builder=None):
     table, problems = chim_regions.plan(values, status, towns=builder['chim_areas'], one_map_only=one_map)
     problems += chim_regions.ocean_land_problems(chim_regions.table_kinds(table), getattr(args, 'data_files', None))
     problems += chim_regions.owned_land_problems(chim_regions.table_kinds(table), getattr(args, 'data_files', None))
+    # the recordless open sea of the map's box: no master has a record for any of them (seconds, SOL-SEA-CROSSING-68)
+    problems += chim_regions.recordless_problems(table, getattr(args, 'data_files', None))
     # the world terrain planner's ocean rule, from the master in seconds (CHIM-OCEAN-CELL-RECORD-ROUTING-43)
     replaced, routing, more = chim_regions.ocean_map_split(chim_regions.table_kinds(table),
                                                            getattr(args, 'data_files', None))
@@ -2019,7 +2026,8 @@ def resolve_chim_regions(args, builder=None):
                 % CHIM_CELLS_DEFAULT_NAME) if default else ''
         raise ValueError('CHIM regions preflight failed before any stage%s:%s' % (hint, chr(10) + '  ')
                          + (chr(10) + '  ').join(problems))
-    args.chim_regions_cells = chim_regions.encode_cells(chim_regions.table_kinds(table))
+    args.chim_regions_cells = chim_regions.encode_cells(chim_regions.table_kinds(table),
+                                                        after=chim_regions.table_after(table))
     args.chim_regions_table = (table, chim_regions.load_status(status))  # the world manifest
     c = table['counts']
     shown = ('default (%s)' % CHIM_CELLS_DEFAULT_NAME) if default else ', '.join(values)

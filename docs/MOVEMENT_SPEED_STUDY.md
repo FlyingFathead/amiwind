@@ -1,6 +1,6 @@
 # Movement speed study
 
-_Last updated with AmiWind v0.0.48-dev2 (23 October 2026)._
+_Last updated with AmiWind v0.0.68 (24 November 2026)._
 
 **Implemented in v0.0.48-dev2:** the original speeds from the live character sheet, the load, race weight
 and movement fatigue are now the default, and the old speeds are the `superspeed` debug mode; see
@@ -61,7 +61,7 @@ The inspected OpenMW reference also scales final horizontal motion by actor refe
 
 OpenMW normalizes movement direction and applies a 0.75 factor to movement classified as strafing; its camera/turn-to-movement and smoothing settings affect that classification and the transient. Holding two direction keys should not be compared as if it were the same test as forward input. [Reference direction, race scaling and final motion](https://github.com/OpenMW/openmw/blob/a882697616a186ef394ae049df79f96de793d053/apps/openmw/mwmechanics/character.cpp).
 
-Fortify/Drain/Damage changes to Speed, Athletics or Strength affect the terms they modify. Feather and Burden change load; Swift Swim changes swimming only. For example, Swift Swim 100 doubles reference swim speed. Do not clamp these examples to 100 as if modified attributes could never exceed the unfortified range. Paralysis, knockdown, death, water walking and levitation require state-specific checks. AmiWind's audited normal movement paths do not read Speed, Athletics, carried weight or these movement effects. An inventory weight display alone does not establish movement encumbrance support.
+Fortify/Drain/Damage changes to Speed, Athletics or Strength affect the terms they modify. Feather and Burden change load; Swift Swim changes swimming only. For example, Swift Swim 100 doubles reference swim speed. Do not clamp these examples to 100 as if modified attributes could never exceed the unfortified range. Paralysis, knockdown, death, water walking and levitation require state-specific checks. AmiWind's audited normal movement paths do not read Speed, Athletics, carried weight or these movement effects. An inventory weight display alone does not establish movement encumbrance support. (Water Walking is read since v0.0.68, see [Player movement](PLAYER_MOVEMENT.md#water-walking).)
 
 ## Fatigue is a separate comparison
 

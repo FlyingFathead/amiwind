@@ -20,6 +20,23 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.68-dev12 (968790cc) | 2026-11-24 | gate 13021 of the planning item README-STATUS-STALE-SCATTERED-68 | The main page is a short summary of the release line: a status without a date, the current snapshot in one paragraph, what works and what comes next checked against the bug tracker, and a test that refuses a stale status |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-23: reported in v0.0.68-dev11
+- 2026-11-24: fixed in source: a gated commit, v0.0.68-dev12 (968790cc); gate 13021 of the planning item README-STATUS-STALE-SCATTERED-68: The main page is a short summary of the release line: a status without a date, the current snapshot in one paragraph, what works and what comes next checked against the bug tracker, and a test that refuses a stale status
+
+<!-- END GENERATED TIMELINE -->
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -85,6 +102,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [PLAYTEST-KNOWN-ISSUES-STALE-54](PLAYTEST-KNOWN-ISSUES-STALE-54.md): The v0.0.54 playtest package's KNOWN-ISSUES list was made from the register of the build commit, older than the release's register
 - PREFLIGHT-DISK-FIGURE-53 (no report page): The release preflight does not check the shipped disk figure, so the final commit failed its gate on it (gate 4078)
 - PREFLIGHT-PERSISTING-PARSE-53 (no report page): The release preflight counted only persisting bugs whose line ended in NOT SCHEDULED, so lapsed deferrals printed 0 bugs and half a list
+- [PROGRESS-SNAPSHOT-TAKES-RAW-RUN-DATA-68](PROGRESS-SNAPSHOT-TAKES-RAW-RUN-DATA-68.md): The public progress snapshot accepts a build's raw tracker data without readiness counts and writes rooms 0 of 0 and no build history
 - [PUBLIC-REFERENCE-SCREENSHOT-40](PUBLIC-REFERENCE-SCREENSHOT-40.md): Original-game reference screenshot included in the public source list
 - [REGISTER-ADD-NO-RELEASE-ROW-48](REGISTER-ADD-NO-RELEASE-ROW-48.md): bug_register.py add does not list a new report page in tools/release-files.json or write its contents list: the v0.0.48 final gate failed on both
 - [REGISTER-CONCURRENT-WRITE-LOST-67](REGISTER-CONCURRENT-WRITE-LOST-67.md): Two register writes at the same time in one checkout lose an entry: the later writer saves the register from a copy read before the earlier writer's change
@@ -92,6 +110,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - [REGISTER-REGRESSION-HANDLER-52](REGISTER-REGRESSION-HANDLER-52.md): Requested: a bug that comes back after it was fixed or closed must be found and reopened as a regression, never registered again as new
 - [REGISTER-REPORT-PERSISTS-STALE-64](REGISTER-REPORT-PERSISTS-STALE-64.md): bug_register.py report records a new sighting but leaves the versions the bug persists in unchanged
 - [REGISTER-STEP-RENDERS-ALL-PAGES-68](REGISTER-STEP-RENDERS-ALL-PAGES-68.md): Every single closure step or field change in the bug register rewrites all of its generated pages, so a batch of steps for a handful of entries takes half an hour
+- [REGISTER-WRITE-EINVAL-68](REGISTER-WRITE-EINVAL-68.md): Writing the bug tracker's files sometimes fails with an invalid-argument error and leaves them half written
 - [RELEASE-WORKING-VERSION-ISOLATION-39](RELEASE-WORKING-VERSION-ISOLATION-39.md): Publishing an earlier release reads the next development version record
 - [RELEASE-WS-BASELINE-VERSION-33](RELEASE-WS-BASELINE-VERSION-33.md): Every new VERSION failed the whitespace preflight until a docs/PATCH-v<VERSION>.json was made by hand
 - [ROOM-RESIDENTS-NOT-CACHED-48](ROOM-RESIDENTS-NOT-CACHED-48.md): The room stages bake every resident again on every run: 26 s of a 39 s rerun with every room unit reused

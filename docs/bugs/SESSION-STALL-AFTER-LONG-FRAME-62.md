@@ -12,7 +12,7 @@
 | Persists in | v0.0.64-dev3 (last seen) |
 | Severity | high: Regressed in v0.0.64-dev3 (was medium): a frozen game in play, or a session that cannot finish its check |
 | Family | Loading and disk reads (`disk-loading`) |
-| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
+| Deferred by the maintainer | 2026-11-24: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up |
 | Came back (regression) | in v0.0.64-dev3 (fixed in v0.0.62-dev1 before) |
 | Playtest version | MiniWind v0.0.62-dev1 seyda-enabledraw2 7bb679e |
 | From commit | source 7bb679e, engine 7bb679e, CHIM world 7bb679e |
@@ -30,7 +30,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-07: The falling mage is drawn after his Enable; SCRIPTED-EVENT-PAST-DRAW-DISTANCE-62 registered: SCRIPT-ENABLED-ACTOR-NOT-DRAWN-62 is closed: it was no fault of the Enable.
 - 2026-11-10: came back in v0.0.64-dev3 (fixed in v0.0.62-dev1 before): Seen again once in a scripted Akulakhan Chamber MiniWind session (commit 86c595a5, FS-UAE JIT, 32 MB Fast): after the room load failed and the console teleport back to Balmora, a 1,448 ms frame, then the game stopped at the console picture ...
 - 2026-11-16: v0.0.66-dev11: Seen once since the regression (a v0.0.64-dev3 session).
-- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
+- 2026-11-24: deferred by the maintainer: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up
 
 <!-- END GENERATED TIMELINE -->
 

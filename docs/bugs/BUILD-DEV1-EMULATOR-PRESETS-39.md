@@ -111,6 +111,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - CI-TAG-RUN-DUPLICATE-54 (no report page): The release tag push ran the whole CI test suite again on a commit main had already passed
 - [CI-TEST-SHARD-ONE-SLOW-53](CI-TEST-SHARD-ONE-SLOW-53.md): The first test shard of the v0.0.53 GitHub run took six times as long as the others
 - [COMPLETENESS-PLAN-TOWN-CELLS-MISSING-68](COMPLETENESS-PLAN-TOWN-CELLS-MISSING-68.md): The plan-time completeness report counts the 61 cells inside the towns' frames and their 556 load doors as missing, which would refuse a release candidate
+- [CONTAINER-COUNT-LOOSE-ROOM-PATH-68](CONTAINER-COUNT-LOOSE-ROOM-PATH-68.md): The build's container count report stops on a room it looks for as a loose file, while the image keeps its rooms in the room store
 - [CONTAINER-READ-ENOMEM-66](CONTAINER-READ-ENOMEM-66.md): In the development container, reads of the repository files sometimes fail with "Cannot allocate memory"; a retry works, so a check that hits it can report an unrelated failure
 - [DELIVERY-LEAVES-LINE-UNCLEAN-66](DELIVERY-LEAVES-LINE-UNCLEAN-66.md): A snapshot delivery wrote the cell tracker page into the release line's working copy, so the line's next gate was not clean and could not be published
 - [DELIVERY-RERUN-STOPS-ON-OWN-OUTPUT-66](DELIVERY-RERUN-STOPS-ON-OWN-OUTPUT-66.md): A second delivery of a snapshot stopped on what the first one left: its source package folder, then its Pi image, reported as a failed upload although the upload had gone through
@@ -236,6 +237,7 @@ Family: Gates, CI and tests (`tests-ci`). A check that is skipped, tests the wro
 - [TEST-PROFILE-TIMELINE-BOUND-33](TEST-PROFILE-TIMELINE-BOUND-33.md): A profiler test bounds the sampled CPU too tightly and fails on a loaded machine
 - [TEST-PROFILE-TIMELINE-SUM-33](TEST-PROFILE-TIMELINE-SUM-33.md): The build profile test's sampled-timeline check fails on a loaded machine (timeline CPU above the stage's own CPU)
 - [TEST-RC1-INTEGRATION-CONTRACTS-39](TEST-RC1-INTEGRATION-CONTRACTS-39.md): RC1 regression tests assume the old fingerprint location and a separate class cache unit
+- [TEST-ROUTE-TESTS-FAIL-ON-RELEASE-68](TEST-ROUTE-TESTS-FAIL-ON-RELEASE-68.md): Tests of the Solstheim test route stop the gate when the version is a release
 - [TEST-SAVED-EQUIPMENT-NATIVE-FLAKY-64](TEST-SAVED-EQUIPMENT-NATIVE-FLAKY-64.md): The saved equipment native test errors once in a full suite run while the machine is busy and passes when run alone
 - [TEST-SKEL-NATIVE-FLAKY-UNDER-LOAD-60](TEST-SKEL-NATIVE-FLAKY-UNDER-LOAD-60.md): Native test test_skel_native (left_arm_takes_the_layer_frame) fails once under host load
 - [TEST-SPAWN-SCAN-DOCSTRING-KEY-48](TEST-SPAWN-SCAN-DOCSTRING-KEY-48.md): The spawn contract scan read a docstring example in hand_metadata.py as a map key named key

@@ -103,19 +103,23 @@ CONTENT_ADDRESSED = {('npc-gallery', '--cache'), ('world-terrain', '--cache'), (
                      # the next run (BUILD-MODULE-UNIT-CACHE-IN-KEY-67: a resumed build would have run it again)
                      ('tribunal-mournhold', '--unit-cache'),
                      # the module bloodmoon-solstheim's own unit cache, the same way
-                     ('bloodmoon-solstheim', '--unit-cache')}
+                     ('bloodmoon-solstheim', '--unit-cache'),
+                     # and its second world's, the recordless open sea of the map's box (SOL-SEA-CROSSING-68)
+                     ('bloodmoon-solstheim-sea', '--unit-cache')}
 # Content-addressed cache folders by place, whatever stage or option names them. The CHIM unit cache is shared:
 # the chim stage and the CHIM rooms stage (chim-interiors, tools/chim/interior.py: the same UnitCache, every unit
 # keyed by its own fingerprint and code key) both name WORKSPACE/cache/chim-units. Listed by stage only, the
 # rooms stage hashed the shared folder, which other builds grow past EXTERNAL_DIRECTORY_LIMIT: the stage was
 # never reusable (CHIM-INTERIORS-REUSE-MISS-48, "unexpected rebuild: chim-interiors (other)").
 CONTENT_ADDRESSED_FOLDERS = frozenset({'{WORKSPACE}/cache/chim-units', '{WORKSPACE}/cache/tribunal-mournhold-units',
-                                       '{WORKSPACE}/cache/bloodmoon-solstheim-units'})
+                                       '{WORKSPACE}/cache/bloodmoon-solstheim-units',
+                                       '{WORKSPACE}/cache/bloodmoon-solstheim-sea-units'})
 # Content-addressed caches whose row is in the stage key from the stage's first run on, before the folder exists (the
 # other rows above appear with their folder, as they always have: their keys stay as they are). A new stage with a
 # cache of its own belongs here.
 CONTENT_ADDRESSED_FROM_THE_START = frozenset({('tribunal-mournhold', '--unit-cache'),
-                                              ('bloodmoon-solstheim', '--unit-cache')})
+                                              ('bloodmoon-solstheim', '--unit-cache'),
+                                              ('bloodmoon-solstheim-sea', '--unit-cache')})
 # The shared storage pool (WORKSPACE/cache/asset-pool-v1, --storage-pool-dir, tools/storage_pool.py) is
 # content-addressed whatever stage or option names it: every object is stored by its own SHA-256 and every
 # reader (tools/file_cache.py FileCache) looks objects up by a reuse key made of the inputs the object depends
@@ -2757,6 +2761,8 @@ STAGE_GAME_INPUTS = {
     # their own, from the base master and archive plus Bloodmoon's and from nothing of Tribunal's
     'bloodmoon-solstheim-data': BASE_GAME_INPUTS + LAYER_GAME_INPUTS['bloodmoon'],
     'bloodmoon-solstheim': BASE_GAME_INPUTS + LAYER_GAME_INPUTS['bloodmoon'],
+    # its second world: the recordless open sea of the area Bloodmoon adds to the map's box (SOL-SEA-CROSSING-68)
+    'bloodmoon-solstheim-sea': BASE_GAME_INPUTS + LAYER_GAME_INPUTS['bloodmoon'],
 }
 # A build module's stages read their OWN master list, whatever else the build selects: {stage: its layers in load
 # order}. Such a stage is keyed by these layers' files and this master list only (stage_components), so selecting or
@@ -2766,6 +2772,7 @@ MODULE_STAGE_LAYERS = {
     'tribunal-mournhold': ('tribunal',),
     'bloodmoon-solstheim-data': ('bloodmoon',),
     'bloodmoon-solstheim': ('bloodmoon',),
+    'bloodmoon-solstheim-sea': ('bloodmoon',),
 }
 # {(run, stage): digest of every game input}: the key form before the narrowing, for reuse sources fingerprinted with
 # it (comparable); kept out of the fingerprint itself. Set by stage_components.
@@ -5235,7 +5242,11 @@ OUTPUT_FIELDS = ('files', 'links', 'deleted', 'directories', 'deleted_directorie
 # same outputs" for the stages after it; they are still recorded and copied on reuse. No stage may read one: the
 # stage trace lists every run-folder diagnostic a stage opens, and such a stage is not reused (Recorder.after).
 DIAGNOSTIC_SUFFIXES = ('.log',)
-DIAGNOSTIC_NAMES = frozenset({'chim-stats.json', 'chim-timing.json', 'gallery-cache.json', 'world-terrain-cache.json'})
+DIAGNOSTIC_NAMES = frozenset({'chim-stats.json', 'chim-timing.json', 'gallery-cache.json', 'world-terrain-cache.json',
+                              # the mesh method set's report and its lines (tools/chim/method_sets.py REPORT,
+                              # REPORT_LINES): seconds and the fresh units' figures, read by no stage
+                              # (CHIM-REBUILD-NOT-IDENTICAL-68: the only difference of a module world rebuilt from units)
+                              'mesh-method-set.json', 'mesh-method-set.jsonl'})
 
 
 def diagnostic(path):
@@ -5244,12 +5255,35 @@ def diagnostic(path):
     return name.endswith(DIAGNOSTIC_SUFFIXES) or name in DIAGNOSTIC_NAMES
 
 
-def _without_diagnostics(manifest, field):
+# Memo folders (CHIM-REBUILD-NOT-IDENTICAL-68): content-addressed result memos a stage keeps in its own work folders,
+# one file per computed result, named by the SHA-256 key of that result's inputs (tools/collision_bsp.py and
+# tools/chim/union_bsp2.py: the compiled collision hulls, AREA_WORK/collision-cache/KEY.CHECK.pickle). A stage writes
+# one only for the units it computes; a unit taken from a unit cache writes none. So the same inputs leave more or
+# fewer of them, by the unit cache's hits: the v0.0.68-dev8 CHIM world rebuilt from its stored units wrote every game
+# file byte for byte as its source run, and 110,543 such memos (in 1,149 folders) fewer, and seven stages after it
+# were refused as "outputs differ". A memo that is there gives what the compile gives, so nothing a stage writes
+# depends on whether it is there. Memos are recorded and copied on reuse like every file; no comparison counts them
+# (same_outputs, tools/unit_tree.py). A new memo folder of this kind is added here (tests/test_stage_memo_outputs.py).
+MEMO_FOLDERS = frozenset({'collision-cache'})
+
+
+def memo(path):
+    """True for a run-relative path inside a memo folder, or naming one (MEMO_FOLDERS)."""
+    return not MEMO_FOLDERS.isdisjoint(path.split('/'))
+
+
+def uncompared(path):
+    """True for an output no reuse comparison counts: a diagnostic or a memo."""
+    return diagnostic(path) or memo(path)
+
+
+def _compared(manifest, field):
+    """FIELD of MANIFEST without the outputs no comparison counts (uncompared)."""
     value = manifest.get(field)
     if isinstance(value, dict):
-        return {path: row for path, row in value.items() if not diagnostic(path)}
+        return {path: row for path, row in value.items() if not uncompared(path)}
     if isinstance(value, list):
-        return [path for path in value if not diagnostic(path)]
+        return [path for path in value if not uncompared(path)]
     return value
 
 
@@ -5307,38 +5341,39 @@ def outputs_recorded(manifest):
 
 
 def output_modes(manifest):
-    """{path: mode without the write bits} of a manifest's non-diagnostic files."""
+    """{path: mode without the write bits} of a manifest's compared files (no diagnostics, no memos)."""
     return {path: (row.get('mode') & ~0o222 if isinstance(row.get('mode'), int) else row.get('mode'))
-            for path, row in _without_diagnostics(manifest, 'files').items()}
+            for path, row in _compared(manifest, 'files').items()}
 
 
 def same_outputs(run, old_run, stage):
     """True when STAGE wrote, in RUN, exactly the files (SHA-256 and mode), links and deletions it wrote
-    when it last ran for OLD_RUN."""
+    when it last ran for OLD_RUN (diagnostics and memos left out: uncompared)."""
     new, old = load_manifest(run, stage), ran_manifest(old_run, stage)
     if not outputs_recorded(new) or not outputs_recorded(old):
         return False
-    from unit_tree import of_manifest
-    # The stage hash first (units -> segments -> stage, diagnostics left out): one comparison when nothing changed.
-    if (new.get('tree') or of_manifest(new))['stage_hash'] != (old.get('tree') or of_manifest(old))['stage_hash']:
+    from unit_tree import tree_of
+    # The stage hash first (units -> segments -> stage, diagnostics and memos left out): one comparison when nothing
+    # changed. A record whose stored tree an older schema made (memos counted) is compared by its files.
+    if tree_of(new)['stage_hash'] != tree_of(old)['stage_hash']:
         return False
     # Modes without the write bits: a stage reused by hard link is read-only in the reusing run (link_file), so its
     # recorded mode is 0o444 where the same file written fresh is 0o644 (BUILD-REUSE-CUTOFF-MODE-36: dev3's bsp
     # rerun wrote byte-identical files and 11 stages after it were refused). Read and execute bits still count.
     if output_modes(new) != output_modes(old):
         return False
-    return all(_without_diagnostics(new, field) == _without_diagnostics(old, field)
+    return all(_compared(new, field) == _compared(old, field)
                for field in ('deleted', 'directories', 'deleted_directories'))
 
 
 def output_differences(run, old_run, stage):
     """[(segment, unit, change)] between STAGE's outputs in RUN and in OLD_RUN (tools/unit_tree.py), or None
     when either record is missing."""
-    from unit_tree import differences, of_manifest
+    from unit_tree import differences, tree_of
     new, old = load_manifest(run, stage), ran_manifest(old_run, stage)
     if not new or not old:
         return None
-    return differences(new.get('tree') or of_manifest(new), old.get('tree') or of_manifest(old))
+    return differences(tree_of(new), tree_of(old))
 
 
 def live_hazard(plan, run):

@@ -645,7 +645,8 @@ def compile_region(task):
     return result
 
 
-def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=None,chim_cells=None,exterior_plan=None,ocean_cells=None):
+def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=None,chim_cells=None,exterior_plan=None,ocean_cells=None,
+            appended=None):
     survey=survey.resolve();out=ensure_external(out,'world terrain').resolve();out.mkdir(parents=True,exist_ok=True)
     scene=ensure_external(scene,'private scene').resolve();bindir=bindir.resolve()
     report, entries=plan(survey)
@@ -700,7 +701,8 @@ def prepare(survey,data,scene,out,bindir,jobs,only=None,vis_mode='fast',cache=No
               '%d get a routing row' % (len(replaced), ' '.join('%d,%d' % c for c in replaced), len(routing)), flush=True)
     ocean_cells = set(routing)
     from chim.ocean_runtime import append_routing_rows
-    entries, ocean_rows = append_routing_rows(entries, ocean_cells, data)
+    # the recordless open sea of the map's box (APPENDED, SOL-SEA-CROSSING-68): rows after the other ocean rows
+    entries, ocean_rows = append_routing_rows(entries, ocean_cells, data, after=appended or ())
     layer_rows = []
     if layer_cells:
         from chim.ocean_runtime import append_layer_rows
@@ -787,10 +789,10 @@ if __name__=='__main__':
                         'their directory rows (docs/BUILD_MANIFEST.md)')
     add_jobs(p);add_vis_option(p);a=p.parse_args();apply_options(a)
     import build_profile;build_profile.instrument('world-terrain')
-    cells=None
+    cells=None;appended=None
     if a.chim_regions_cells:
-        from chim.regions import decode_cells
+        from chim.regions import decode_after, decode_cells
         kinds=decode_cells(a.chim_regions_cells)
-        cells=set(kinds)
+        cells=set(kinds);appended=decode_after(a.chim_regions_cells)
     prepare(a.survey,a.data_files,a.scene,a.out,a.bindir,resolve_jobs(a.jobs),a.only,a.vis_mode,a.cache,cells,a.exterior_plan,
-            {c for c,k in kinds.items() if k=='ocean'} if a.chim_regions_cells else None)
+            {c for c,k in kinds.items() if k=='ocean'} if a.chim_regions_cells else None,appended)

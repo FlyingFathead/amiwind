@@ -22,7 +22,7 @@
 | Persists in | v0.0.64-dev2 (last seen) |
 | Severity | critical: Regressed in v0.0.64-dev2 (was high): each refused reuse of the stage costs 2,600 to 2,750 s re-baking 418 appearances and 57 creature models whose own input... |
 | Family | Build speed (`build-speed`) |
-| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
+| Deferred by the maintainer | 2026-11-24: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up |
 | Came back (regression) | in v0.0.64-dev2 (fixed in v0.0.63 before) |
 | Playtest version | 2026_11_09_v0.0.63-dev1_full-v0.0.63-dev1_dc356e3 |
 | From commit | source dc356e3, engine dc356e3, CHIM world dc356e3 |
@@ -44,7 +44,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-10 07:40 +0200: came back in v0.0.64-dev2 (fixed in v0.0.63 before): The v0.0.64-dev2 build (d031c7b5, reusing the dev1 run) took 0 of 418 NPC appearances and 0 of 48 creature models from their unit caches and baked them all, about 20 minutes; the dev1 build had taken 418 of 418 from the cache.
 - 2026-11-10 12:11 +0200: seen again in v0.0.64-dev2: Creature half: two MiniWind runs of the same source tree (akulakhan-chamber try2 and try3, 10 November) each baked all 48 creature models of the actor library again while the NPC appearances came from their unit cache (450 of 451).
 - 2026-11-16: v0.0.66-dev11: The v0.0.66-dev11 chain build took the actor library from its unit caches (the stage took 2.0 s on 4 cores); the rebakes after a change outside the actors' own inputs are BUILD-UNIT-KEYS-REACH-64.
-- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
+- 2026-11-24: deferred by the maintainer: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up
 
 <!-- END GENERATED TIMELINE -->
 
@@ -279,6 +279,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [CHIM-ROOM-FAIL-STAGE-48](CHIM-ROOM-FAIL-STAGE-48.md): One CHIM room that cannot be made failed the whole CHIM interiors stage (HOLD-LEVEL with every room batch by default)
 - [CHIM-ROOM-OVER-BUDGET-RETRY-48](CHIM-ROOM-OVER-BUDGET-RETRY-48.md): A model over the image budget is tried whole again on every run before its cached tiles are used: its room runs on one core
 - [CHIM-SOL-FLORA-PATH-64](CHIM-SOL-FLORA-PATH-64.md): The Solstheim test frame converts its trees as full models, not through the world flora cards Vvardenfell uses
+- [CHIM-STAGE-QUEUED-IDLE-68](CHIM-STAGE-QUEUED-IDLE-68.md): The world stage runs on about 2 of 24 cores for over 5 minutes while many units wait in its queue
 - [CHIM-STAIR-GATE-WORLD-RELOAD-36](CHIM-STAIR-GATE-WORLD-RELOAD-36.md): The CHIM stair gate's workers read the whole CHIM world again every time they switch frames (about 14.5 s per read on the 273-frame world)
 - [CHIM-STAIRGATE-SLOW-33](CHIM-STAIRGATE-SLOW-33.md): The CHIM stair gate takes over 10 minutes on the Balmora and Vivec Arena world
 - [EXPANSION-READER-ONE-MASTER-64](EXPANSION-READER-ONE-MASTER-64.md): Most builder readers load only the base game file; the roadmap calls the readers master-list readers

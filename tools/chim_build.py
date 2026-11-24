@@ -250,7 +250,9 @@ def _main(ap, a):
                 kinds = chim_regions.decode_cells(a.chim_regions_cells)
                 problems = ['cells %s: a legacy pocket enclosed by CHIM region cells'
                             % ' '.join(map(chim_regions.cell_key, p)) for p in chim_regions.holes(kinds)]
-                regions_table = chim_regions.ownership(kinds, {'cells': 'resolved by tools/build.py'})
+                # the recordless open sea after every other cell (the "|" part, SOL-SEA-CROSSING-68)
+                regions_table = chim_regions.ownership(kinds, {'cells': 'resolved by tools/build.py'},
+                                                       after=chim_regions.decode_after(a.chim_regions_cells))
             else:
                 if not a.chim_regions_status:
                     raise ValueError('--chim-regions needs --chim-regions-status FILE')

@@ -166,6 +166,7 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - [JOURNAL-HYPERLINKS-QUEST-ENTRIES-67](JOURNAL-HYPERLINKS-QUEST-ENTRIES-67.md): Incomplete: the journal hyperlinks work on topic pages only: the quest entries (the dated pages) carry no link spans
 - [JOURNAL-NOTICE-EMPTY-ENTRY-67](JOURNAL-NOTICE-EMPTY-ENTRY-67.md): Incomplete: the journal updated notice is shown for a new entry with empty text, where OpenMW skips it
 - [JOURNAL-QUEST-ENTRIES-NOT-SEEN-67](JOURNAL-QUEST-ENTRIES-NOT-SEEN-67.md): Incomplete: the quests and their finished and restart marks in the journal book are not seen in a built game
+- [JOURNAL-TOPIC-LETTER-INDEX-68](JOURNAL-TOPIC-LETTER-INDEX-68.md): The journal's Topics view lists every topic in one scrolling list instead of the original's A to Z letter index
 - [JOURNAL-TOPIC-PAGES-VALUES-AT-READ-67](JOURNAL-TOPIC-PAGES-VALUES-AT-READ-67.md): Incomplete: the journal topic pages fill the %-values of an entry when the page is read, not when it was said
 - [LEVEL-UP-MISSING-57](LEVEL-UP-MISSING-57.md): Requested: levelling as in the original: skills rise with use, the level-up box with its text and sound, attributes raised, the new values used by every check
 - [LOOT-WINDOW-ITEM-PROPERTIES-60](LOOT-WINDOW-ITEM-PROPERTIES-60.md): Loot window does not show the selected item's type, weight and value

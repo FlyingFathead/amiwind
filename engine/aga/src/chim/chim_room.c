@@ -291,6 +291,24 @@ static const char	*room_why;
  * refused (the zone counts it failed), so a room that grew twice and loaded shows 2 failed requests with every model
  * in place (CHIM-ROOM-HEART-CHAMBER-LOAD-50); ChimRoom_Report says so. */
 static int	room_tries, room_grown;
+/* MEMORY-EMERGENCY-PURGE-64: the last ChimRoom_Begin ran out of room (ChimRoom_ShortOfMemory), the bytes its models need
+ * (RoomPreGrow's estimate, or the record's block when even that found no room) and what the zone and banks gave */
+static int	room_short;
+static unsigned long	room_need, room_have;
+
+/* chim_world.c RefuseRoom's (declared there too, not in chim_local.h: the header the builder's CHIM stages read keeps
+ * its facts, so the world is not re-keyed) */
+int ChimRoom_ShortOfMemory (unsigned long *need, unsigned long *have);
+int ChimRoom_ShortOfMemory (unsigned long *need, unsigned long *have)
+{
+	int s = room_short;
+	if (need)
+		*need = room_need;
+	if (have)
+		*have = room_have;
+	room_short = 0;
+	return s;
+}
 
 static int Fail (const char *why)
 {
@@ -312,8 +330,10 @@ static int RoomLoad (const char *name);
 int ChimRoom_Begin (const char *name)
 {
 	unsigned long failures;
-	int ok, full, settle = 0;
+	int ok, full = 0, settle = 0;
 	room_tries = room_grown = 0;
+	room_short = 0;
+	room_need = room_have = 0;
 	for (;;)
 	{
 		failures = ChimZone_Failures (NULL);
@@ -336,6 +356,17 @@ int ChimRoom_Begin (const char *name)
 		}
 		else
 			room_grown++;
+	}
+	if (full)
+	{
+		/* MEMORY-EMERGENCY-PURGE-64: the zone refused it after every growth step: not enough memory, with the figures */
+		chim_zone_stats_t s;
+		ChimZone_Stats (&s);
+		room_have = s.free_bytes + ((unsigned long)s.used_bytes > (unsigned long)s.locked_bytes
+		                            ? (unsigned long)s.used_bytes - (unsigned long)s.locked_bytes : 0UL);
+		room_short = 1;
+		Con_Printf ("CHIM: room %s: not enough memory: its models need about %lu KiB, the zone and banks give %lu KiB\n",
+			ChimFormat_RoomNameValid (name) ? name : "?", room_need/1024, room_have/1024);
 	}
 	Con_Printf ("CHIM: room %s: %s\n", ChimFormat_RoomNameValid (name) ? name : "?", room_why ? room_why :
 		"it does not load");
@@ -360,6 +391,7 @@ static void RoomPreGrow (const char *name, const byte *file, long directory)
 		if (id < chim_world.models && !ChimModels_Find (id))
 			need += (unsigned long)chim_world.model[id].bytes + ROOM_PREGROW_MODEL_EXTRA;
 	}
+	room_need = need;	/* MEMORY-EMERGENCY-PURGE-64: the figure the box gives when they do not fit */
 	for (;;)
 	{
 		ChimZone_Stats (&s);
@@ -414,6 +446,8 @@ static int RoomLoad (const char *name)
 		!ChimZone_Alloc (&room.block, (int)size, CHIM_KIND_CHUNK, 0x7f10))
 	{
 		Chim_PackClose (&pack);
+		if (size > 0 && size <= 0x7fffff00L && (unsigned long)size > room_need)
+			room_need = (unsigned long)size;	/* MEMORY-EMERGENCY-PURGE-64: the record alone did not fit */
 		return Fail ("no room in the zone for its record");
 	}
 	ChimZone_Lock (room.block.data);

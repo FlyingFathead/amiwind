@@ -104,8 +104,15 @@ class CallSites(unittest.TestCase):
         return out
 
     def test_the_callers_are_the_large_block_sizings(self):
-        self.assertEqual(self.calls(), {'chim/chim_world.c': ['a room\'s models', '-chimcache',
+        # MEMORY-EMERGENCY-PURGE-64: the emergency purge, once a scene load failed for memory (the server and the
+        # client down, as when a room grows), never per frame
+        self.assertEqual(self.calls(), {'aw_loadfail.c': ['the emergency purge'],
+                                        'chim/chim_world.c': ['a room\'s models', '-chimcache',
                                                               'the CHIM cache banks']})
+        loadfail = (SRC / 'aw_loadfail.c').read_text(encoding='utf-8')
+        purge = loadfail[loadfail.index('static long memory_purge(const char *map) {'):]
+        self.assertIn('AW_FastReleaseAll ("the emergency purge")', purge[:purge.index('\n}\n')])
+        self.assertIn('aw_scene_memory_purge=memory_purge;', loadfail)
         world = (SRC / 'chim/chim_world.c').read_text(encoding='utf-8')
         grow = world[world.index('int Chim_RoomGrow (const char *name)'):]
         self.assertLess(grow.index('AW_FastReleaseAll ("a room\'s models")'), grow.index('ChimZone_RoomStep ('))
@@ -120,6 +127,8 @@ class CallSites(unittest.TestCase):
         known = {'aw_skel_load.c': 'a table load: the releaser\'s own consumer',
                  'aw_tryalloc.c': 'every checked allocation: per-frame paths too',
                  'aw_fastrelease.c': 'the registry\'s own console line',
+                 'aw_loadfail.c': 'the emergency purge\'s line of figures and dbg mempurge (a report; the releasers '
+                                  'run first), and dbg mempurge test\'s shortage (a test aid)',
                  'aw_census.c': 'dbg memcensus: the free Fast RAM and its largest block in one line (a report only)',
                  'aw_tpplaces.c': 'dbg tp: the name list is read whole only when the largest Fast block holds it with '
                                   'the low-memory spare, else it is paged from disk (a debug list; nothing released first)',

@@ -122,12 +122,84 @@ static void ground(edict_t *p, trace_t *t)
     p->v.groundentity=EDICT_TO_PROG(t->ent);
 }
 
+/* WATER-WALKING-NOT-ON-SURFACE-68 (v0.0.68): Water Walking. The rule is the original's as OpenMW 0.51 states it,
+ * written independently: with a Water Walking magnitude over 0 in a cell with water the actor collides with the water
+ * surface, a level plane (apps/openmw/mwphysics/physicssystem.cpp 656-665 setCanWaterWalk, 836-841 the plane;
+ * mwphysics/actor.cpp 147-155: the collision mask takes CollisionType_Water), so it stands, walks, runs and jumps on it
+ * as on ground and lands on it from a fall; an actor whose feet are under the surface when the effect holds is lifted
+ * onto it at the start of the physics step when the way up is clear (mwphysics/mtphysics.cpp 177-182; actor.cpp
+ * 325-335 canMoveToWaterSurface: one sweep of its box from where it is to the surface), else it stays and swims. When
+ * the magnitude is gone nothing holds the player: he drops into the water and swims as before. Swimming itself is not
+ * changed. The surface is the contents boundary over the feet (hull 0, as SV_CheckWater reads the water), never an
+ * assumed height. The hook gives the player's magnitude (aw_move.c: the active effects and the always-active spells,
+ * as the breath asks Water Breathing); NULL (the fixtures, a build without it): none. Asked only while the feet are in
+ * the water. Lava is walked on already (docs/LAVA.md) and never counts here. */
+float (*aw_walk_water_walking)(edict_t *p);
+static unsigned long water_walk_lifts,water_walk_refused;
+#define WATER_WALK_REACH 8192.0f    /* how far over the feet the surface is looked for (map units) */
+static int walk_water(const vec3_t at)
+{
+    vec3_t q;int c;
+    VectorCopy(at,q);c=SV_PointContents(q);
+    return c==CONTENTS_WATER || c==CONTENTS_SLIME;   /* what SV_CheckWater swims in, lava aside */
+}
+/* The height where the water over FEET (a point in it) ends: up in doubling steps to a point out of it, then halved
+ * down to 1/32 unit (the side out of the water kept). 0 when it ends in anything but open air (a solid, the sky) or
+ * not within reach: no surface to stand on. */
+static int water_surface(const vec3_t feet,float *surface)
+{
+    vec3_t q;float low=feet[2],high,step=2,middle;
+    VectorCopy(feet,q);
+    for(;;){
+        high=low+step;q[2]=high;
+        if(!walk_water(q))break;
+        low=high;step*=2;
+        if(low-feet[2]>WATER_WALK_REACH)return 0;
+    }
+    while(high-low>0.03125f){
+        middle=(low+high)*.5f;q[2]=middle;
+        if(walk_water(q))low=middle;else high=middle;
+    }
+    q[2]=high;
+    if(SV_PointContents(q)!=CONTENTS_EMPTY)return 0;
+    *surface=high;
+    return 1;
+}
+/* The player on the surface: feet in the water and the magnitude over 0 = up onto the surface if the box gets there,
+ * standing (on the ground flag, no fall speed, not in the water for the swim and the breath). 1 when it held him. */
+static int water_walk(edict_t *p)
+{
+    vec3_t feet,up;trace_t t;float surface;
+    if(!aw_walk_water_walking || actor_step || p->v.movetype!=MOVETYPE_WALK)return 0;
+    VectorCopy(p->v.origin,feet);feet[2]+=p->v.mins[2];
+    if(!walk_water(feet) || !(aw_walk_water_walking(p)>0))return 0;
+    if(!water_surface(feet,&surface)){water_walk_refused++;return 0;}   /* ice, a roof over the water: he swims */
+    VectorCopy(p->v.origin,up);up[2]=surface-p->v.mins[2];
+    t=SV_Move(p->v.origin,p->v.mins,p->v.maxs,up,MOVE_NORMAL,p);
+    if(t.startsolid || t.allsolid || t.fraction<1){water_walk_refused++;return 0;}   /* no room up there */
+    VectorCopy(up,p->v.origin);
+    if(p->v.velocity[2]<0)p->v.velocity[2]=0;
+    p->v.flags=(int)p->v.flags | FL_ONGROUND;
+    p->v.groundentity=EDICT_TO_PROG(sv.edicts);
+    p->v.waterlevel=0;p->v.watertype=CONTENTS_EMPTY;
+    water_walk_lifts++;
+    return 1;
+}
+/* how often the surface held the player and how often it could not (tests/aga_waterwalk_test.c reads them) */
+void AW_WaterWalkCounts(unsigned long *lifts,unsigned long *refused)
+{
+    if(lifts)*lifts=water_walk_lifts;
+    if(refused)*refused=water_walk_refused;
+}
+
 void AW_WalkPlayer(edict_t *p)
 {
     trace_t floor;
     qboolean swimming, held=false, waterjump;
     /* CHIM: load the chunk ring around the player before moving it. */
     if(aw_chim_player)aw_chim_player(p->v.origin);
+    /* Water Walking: feet under the surface go up onto it before the move (OpenMW's step start) */
+    water_walk(p);
     swimming=SV_CheckWater(p);
     waterjump=((int)p->v.flags & FL_WATERJUMP)!=0;
     SV_CheckStuck(p);
@@ -154,6 +226,8 @@ void AW_WalkPlayer(edict_t *p)
     }
     /* Never below the terrain (the player; an actor's trial step is atomic). */
     if(!actor_step){if(swimming)floor_held=0;else AW_TerrainFloor(p,1);}
+    /* Water Walking: the surface stops the move as ground does (a step, a fall, gravity's pull) */
+    water_walk(p);
 }
 
 /* Use the same stair/slide behavior for scripted humanoids. The old monster

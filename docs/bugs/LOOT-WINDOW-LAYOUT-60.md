@@ -12,6 +12,7 @@
 | Persists in | v0.0.67 (last seen) |
 | Severity | medium: Regressed in v0.0.67 (was low): readable but cramped; the key help line is cut off at the bottom |
 | Family | Menus, HUD, map screen and text (`ui-text`) |
+| Deferred by the maintainer | 2026-11-24: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up |
 | Came back (regression) | in v0.0.67 (fixed in v0.0.61 before) |
 | Playtest version | v0.0.61-dev1 |
 | From commit | source 374d59b, engine 374d59b, CHIM world 374d59b |
@@ -29,6 +30,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 - 2026-11-05: reported in v0.0.61-dev1
 - 2026-11-20 14:47 +0200: came back in v0.0.67 (fixed in v0.0.61 before): Seen again in the v0.0.67 release: the container window's Take All and Close buttons have too little room above and below them; the room to their sides is right.
+- 2026-11-24: deferred by the maintainer: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up
 
 <!-- END GENERATED TIMELINE -->
 
@@ -100,6 +102,7 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - [JOURNAL-HYPERLINKS-QUEST-ENTRIES-67](JOURNAL-HYPERLINKS-QUEST-ENTRIES-67.md): Incomplete: the journal hyperlinks work on topic pages only: the quest entries (the dated pages) carry no link spans
 - [JOURNAL-NOTICE-EMPTY-ENTRY-67](JOURNAL-NOTICE-EMPTY-ENTRY-67.md): Incomplete: the journal updated notice is shown for a new entry with empty text, where OpenMW skips it
 - [JOURNAL-QUEST-ENTRIES-NOT-SEEN-67](JOURNAL-QUEST-ENTRIES-NOT-SEEN-67.md): Incomplete: the quests and their finished and restart marks in the journal book are not seen in a built game
+- [JOURNAL-TOPIC-LETTER-INDEX-68](JOURNAL-TOPIC-LETTER-INDEX-68.md): The journal's Topics view lists every topic in one scrolling list instead of the original's A to Z letter index
 - [JOURNAL-TOPIC-PAGES-VALUES-AT-READ-67](JOURNAL-TOPIC-PAGES-VALUES-AT-READ-67.md): Incomplete: the journal topic pages fill the %-values of an entry when the page is read, not when it was said
 - [LEVEL-UP-MISSING-57](LEVEL-UP-MISSING-57.md): Requested: levelling as in the original: skills rise with use, the level-up box with its text and sound, attributes raised, the new values used by every check
 - [LOOT-WINDOW-ITEM-PROPERTIES-60](LOOT-WINDOW-ITEM-PROPERTIES-60.md): Loot window does not show the selected item's type, weight and value

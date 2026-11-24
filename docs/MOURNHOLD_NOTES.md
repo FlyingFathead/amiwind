@@ -314,8 +314,8 @@ Known gaps for a base game with the expansions on:
   to be seen in play (`DISTRICT-PEOPLE-NOT-PLACED-67`). The rooms' people are placed.
 - Some people's scripts were not attached to them (27 in Mournhold and 47 on Solstheim); since v0.0.67 the script stage
   binds them, to be seen in play (`EXPANSION-SCRIPTS-NOT-ATTACHED-66`).
-- S'virr stands in Khuul, and his boat to Fort Frostmoth is left out of the travel table until Solstheim's outdoors
-  are built; the boat from Fort Frostmoth back to Khuul is in it.
+- S'virr stands in Khuul and his boat to Fort Frostmoth is in the travel table since v0.0.68, with the boat from Fort
+  Frostmoth back to Khuul.
 - Whether the Dark Brotherhood attack plays (a sleeping player woken, the attackers placed beside him) has not
   been checked in the game yet; the sleep test the script waits on is fixed in source and `dbg dbattack` tests the path.
 

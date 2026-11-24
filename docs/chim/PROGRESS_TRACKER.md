@@ -1,6 +1,6 @@
 # CHIM Progress Tracker
 
-_Last updated with AmiWind v0.0.68-dev12 (24 November 2026)._
+_Last updated with AmiWind v0.0.68 (24 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -46,7 +46,7 @@ _Last updated with AmiWind v0.0.68-dev12 (24 November 2026)._
 
 <!-- BEGIN GENERATED CURRENT STATE: from docs/chim/progress-state.json and docs/mwscript-features.json; run python3 tools/cell_progress_state.py render -->
 
-_Counted from the tracker data generated 2026-11-23: newest ingested build **v0.0.68-dev9 (32bffc95)**, built 2026-11-21. Every number below is read from that data and from the MWScript tracker when this block is rendered; none is typed by hand._
+_Counted from the tracker data generated 2026-11-24: newest ingested build **v0.0.68 (85116a7a)**, built 2026-11-24. Every number below is read from that data and from the MWScript tracker when this block is rendered; none is typed by hand._
 
 ### Ready, per land
 
@@ -69,11 +69,11 @@ The tracker draws the open world as one square per cell. "On CHIM" counts what a
 
 | Land | On CHIM in the newest build | Done (audited) | Fully approved cells | Fully approved terrain | Awaiting lighting | Passed, something deferred | Not started |
 | :-- | --: | --: | --: | --: | --: | --: | --: |
-| Vvardenfell (main game) | 1,292 land + 117 sea cells | 1,390 of 1,390 (100.0 %) | 0 | 0 | 817 | 376 | 0 |
-| Solstheim (Bloodmoon) | 144 land + 9 sea cells | 150 of 150 (100.0 %) | 0 | 0 | 119 | 0 | 0 |
+| Vvardenfell (main game) | 1,292 land + 1,029 sea cells | 1,390 of 1,390 (100.0 %) | 0 | 0 | 817 | 376 | 0 |
+| Solstheim (Bloodmoon) | 144 land + 79 sea cells | 150 of 150 (100.0 %) | 0 | 0 | 119 | 0 | 0 |
 | Mournhold (Tribunal) | 11 land + 0 sea cells | 11 of 11 (100.0 %) | 0 | 0 | 10 | 1 | 0 |
 
-Every cell of the tracker in three groups: **in the game 1,573**, not in the game yet 0, settled (beyond the world's edge, nothing to build) 749; accounted for 2,322 of 2,322.
+Every cell of the tracker in three groups: **in the game 2,555**, not in the game yet 0, settled (beyond the world's edge, nothing to build) 140; accounted for 2,695 of 2,695.
 
 ### Interiors, per land
 
@@ -94,7 +94,7 @@ Rooms that are in the game as room maps of our own, not as CHIM rooms: Imperial 
 
 ### Scripting
 
-Counted from the MWScript tracker ([MWScript features](../MWSCRIPT_FEATURES.md)), measured 24 November 2026 for AmiWind v0.0.68-dev12 with the builder's own compiler: 1,072 of the 1,074 scripts the original game uses run as scripts or are carried by AmiWind's own code (1,063 run, 9 carried); 11,542 script records are bound to placed objects.
+Counted from the MWScript tracker ([MWScript features](../MWSCRIPT_FEATURES.md)), measured 24 November 2026 for AmiWind v0.0.68 with the builder's own compiler: 1,072 of the 1,074 scripts the original game uses run as scripts or are carried by AmiWind's own code (1,063 run, 9 carried); 11,542 script records are bound to placed objects.
 
 | State | Scripts |
 | :-- | --: |
@@ -110,9 +110,11 @@ Cells on CHIM (land + sea) in each ingested build since v0.0.49, from the tracke
 
 | Build | Built | Vvardenfell | Solstheim | Mournhold | All cells on CHIM |
 | :-- | --: | --: | --: | --: | --: |
+| v0.0.68 (85116a7a) | 2026-11-24 | 1,292 + 1,029 | 144 + 79 | 11 + 0 | 2,555 |
 | v0.0.68-dev9 (32bffc95) | 2026-11-21 | 1,292 + 117 | 144 + 9 | 11 + 0 | 1,573 |
 | v0.0.68-dev8 (08793a6d) | 2026-11-21 | 1,292 + 117 | 144 + 7 | 11 + 0 | 1,571 |
 | v0.0.68-dev7 (24d3fb04) | 2026-11-21 | 1,292 + 117 | 135 + 0 | 11 + 0 | 1,555 |
+| v0.0.68-dev12 (968790cc) | 2026-11-21 | 1,292 + 117 | 144 + 9 | 11 + 0 | 1,573 |
 | v0.0.68-dev11 (371a2c27) | 2026-11-21 | 1,292 + 117 | 144 + 9 | 11 + 0 | 1,573 |
 | v0.0.68-dev10 (72439e7b) | 2026-11-21 | 1,292 + 117 | 144 + 9 | 11 + 0 | 1,573 |
 | v0.0.68-dev6 (95a3d6e3) | 2026-11-18 | 1,292 + 117 | 135 + 0 | 11 + 0 | 1,555 |

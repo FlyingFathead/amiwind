@@ -279,11 +279,11 @@ def finish_plans(taken, dependencies):
 def stage_hash(run, stage):
     """The recorded output hash of STAGE where it last ran for RUN (None: no complete record)."""
     import build_cache
-    from unit_tree import of_manifest
+    from unit_tree import tree_of
     record = build_cache.ran_manifest(Path(run), stage)
     if not build_cache.outputs_recorded(record):
         return None
-    return (record.get('tree') or of_manifest(record))['stage_hash']
+    return tree_of(record)['stage_hash']
 
 
 def outputs_equal_from_records():

@@ -23,12 +23,13 @@ def resolve_grids(data_files, wanted):
     Deleted LAND is refused here rather than resurrecting an earlier record.
     """
     wanted=set(map(tuple,wanted)); grids={}; materials={}; masters=[]; dependencies=[]; heightless=[]
+    earlier=set()   # the cells an earlier master already has a LAND record for (with heights or without)
     for master_index,name in enumerate(GAME_MASTERS):
         path=child_ci(Path(data_files),name,required=False)
         if path is None or not path.is_file():
             if master_index==0:raise ValueError('Ocean terrain needs Morrowind.esm')
             continue
-        sha=hashlib.sha256(); local={}; lands={}
+        sha=hashlib.sha256(); local={}; lands={}; here=set()
         with path.open('rb') as stream:
             while True:
                 h=stream.read(16)
@@ -50,17 +51,23 @@ def resolve_grids(data_files, wanted):
                     xy=struct.unpack('<ii',s['INTV'])
                     if xy not in wanted:continue
                     if is_deleted(flags,s):raise ValueError('Deleted apron LAND needs content-loader resolution: %s'% (xy,))
+                    here.add(xy)
                     if 'VHGT' not in s:
                         # Match mwad.audit.load_esm/far.land_heights for base map-only LAND.
-                        # Expansion records requiring inherited data stay outside this adapter.
-                        if master_index:
+                        # An expansion record over an earlier master's LAND of the same cell may need inherited
+                        # data: that stays outside this adapter. An expansion's heightless LAND that is the only
+                        # LAND of its cell (the open sea's edge by Solstheim, -18,28: SOL-SEA-CROSSING-68) takes the
+                        # same default-height policy as the base's (OpenMW: a LAND without VHGT is flat).
+                        if master_index and xy in earlier:
                             raise ValueError('Expansion apron LAND lacks heights: %s' % (xy,))
                         heightless.append({'cell':list(xy),'master':name,
                                            'land_sha256':hashlib.sha256(raw).hexdigest(),
-                                           'status':'no VHGT; established base default-height policy'})
+                                           'status':'no VHGT; established base default-height policy' if not master_index
+                                           else 'no VHGT, no earlier LAND of the cell; the base default-height policy'})
                         continue
                     lands[xy]=(s,hashlib.sha256(raw).hexdigest())
         masters.append({'name':name,'sha256':sha.hexdigest(),'bytes':path.stat().st_size})
+        earlier|=here
         for xy,(s,digest) in lands.items():
             source_ids=decode_materials(s['VTEX']) if 'VTEX' in s else [[0]*16 for _ in range(16)]
             used=set(v for row in source_ids for v in row)

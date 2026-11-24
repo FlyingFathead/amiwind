@@ -205,6 +205,8 @@ def layer_directory(id1):
     from chim.sol_test import LANDS
     out = []
     for land in sorted(LANDS.values(), key=lambda l: l['prefix'] != 'sl'):
+        if land.get('after'):
+            continue            # its rows are in the rows file of the land it follows (the recordless sea, chimsea)
         path = Path(id1) / land['directory']
         if not path.is_file():
             continue

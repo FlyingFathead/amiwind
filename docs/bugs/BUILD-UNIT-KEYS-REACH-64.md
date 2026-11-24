@@ -25,7 +25,7 @@
 | Persists in | v0.0.64-dev5, v0.0.66-dev1, v0.0.65 (last seen) |
 | Severity | high: The v0.0.64-dev5 build stopped at its reuse check: about 3 hours of bakes would have run again; no effect on the game. |
 | Family | Build speed (`build-speed`) |
-| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
+| Deferred by the maintainer | 2026-11-24: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up |
 | Playtest version | none: found in source (development branch, tests or gates), not in a playtest build |
 | From commit | source and engine 8a36dfa |
 | CHIM engine version | none: legacy engine |
@@ -44,8 +44,8 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-13 13:50 +0200: seen again in v0.0.66-dev1: on the v0.0.66 line after the dev1 build: a default-off parameter added to the shared skeletal bake (only the creature models pass it) and a module text edit in the NPC library re-keyed all 2,147 room residents, 2,342 room actor fits and ...
 - 2026-11-13 16:20 +0200: seen again in v0.0.66-dev2: the v0.0.66-dev2 build stopped at its reuse stop on 16 stages (resident-bake 0 of 2147, interior-room 0 of 198, interior-room-chim 0 of 1059, player-parts 0 of 2158 and more): module-level lines and signature defaults count as import-time ...
 - 2026-11-18 06:12 +0200: seen again in v0.0.67-dev2: the v0.0.67-dev3 line checked against the v0.0.67-dev2 build: all 2,342 room actor fits would have run again.
-- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
 - 2026-11-23 01:27 +0200: seen again in v0.0.68-dev8: Seen on 23 November 2026 from the other side: the player parts, first-person parts and animation table caches key their tool files' import-time code only, so a change inside a bake function leaves the stored units in use, while a change to ...
+- 2026-11-24: deferred by the maintainer: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up
 
 <!-- END GENERATED TIMELINE -->
 
@@ -280,6 +280,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [CHIM-ROOM-FAIL-STAGE-48](CHIM-ROOM-FAIL-STAGE-48.md): One CHIM room that cannot be made failed the whole CHIM interiors stage (HOLD-LEVEL with every room batch by default)
 - [CHIM-ROOM-OVER-BUDGET-RETRY-48](CHIM-ROOM-OVER-BUDGET-RETRY-48.md): A model over the image budget is tried whole again on every run before its cached tiles are used: its room runs on one core
 - [CHIM-SOL-FLORA-PATH-64](CHIM-SOL-FLORA-PATH-64.md): The Solstheim test frame converts its trees as full models, not through the world flora cards Vvardenfell uses
+- [CHIM-STAGE-QUEUED-IDLE-68](CHIM-STAGE-QUEUED-IDLE-68.md): The world stage runs on about 2 of 24 cores for over 5 minutes while many units wait in its queue
 - [CHIM-STAIR-GATE-WORLD-RELOAD-36](CHIM-STAIR-GATE-WORLD-RELOAD-36.md): The CHIM stair gate's workers read the whole CHIM world again every time they switch frames (about 14.5 s per read on the 273-frame world)
 - [CHIM-STAIRGATE-SLOW-33](CHIM-STAIRGATE-SLOW-33.md): The CHIM stair gate takes over 10 minutes on the Balmora and Vivec Arena world
 - [EXPANSION-READER-ONE-MASTER-64](EXPANSION-READER-ONE-MASTER-64.md): Most builder readers load only the base game file; the roadmap calls the readers master-list readers

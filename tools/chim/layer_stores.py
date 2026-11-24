@@ -40,6 +40,10 @@ MODULE_STAGES = {
     # Solstheim's outdoor cells (module bloodmoon-solstheim, tools/bloodmoon_solstheim_module.py): region frames in
     # the store chimsol, one frame map slNNNN per frame and the rows file world/regions-sl.awr
     'bloodmoon-solstheim': {'layer': 'Bloodmoon', 'store': 'chimsol', 'kind': 'frames'},
+    # the recordless open sea of the area Bloodmoon adds to the map's box (the module's second world stage,
+    # SOL-SEA-CROSSING-68): the store chimsea, its frame maps numbered on after Solstheim's (tools/chim/sol_test.py
+    # LANDS 'after'), so it comes after bloodmoon-solstheim in this table and in the image's options
+    'bloodmoon-solstheim-sea': {'layer': 'Bloodmoon', 'store': 'chimsea', 'kind': 'frames'},
 }
 
 
@@ -99,17 +103,35 @@ def frame_holders(values):
     names install() gives their frame maps (the store's world table in order: mh0000, mh0001, ...): the shape of
     room_batches.region_frames, so the image's door tables link a door in or into such a frame as they link one of
     the base world's region frames (MOURNHOLD-EXTERIOR-CELLS-66: a district's doors). {} for none."""
+    out = {}
+    for held in frame_holders_by_store(values).values():
+        out.update(held)
+    return out
+
+
+def frame_holders_by_store(values):
+    """{store: {(x, y): (frame map, origin)}}: frame_holders kept apart by store. A land whose maps are numbered on
+    after another's (sol_test LANDS 'after': chimsea after chimsol) counts that land's frames whatever the order of
+    VALUES; so a check that walks one store's world (the door check) names its frames as the image does, and the far
+    sea's sl0153.. never take the names of Solstheim's own sl0000.. (the v0.0.68 release build's door check, 83
+    Solstheim doors traced in the far sea's world: DOOR-CHECK-SEA-STORE-NAMES-68). A store given without its 'after'
+    land is numbered from 0, as install() numbers it alone (the expansion preflight checks one store by itself)."""
     from chim.regions import TABLE_FILE, read_table
     from chim.sol_test import land_of, map_name
     kinds = store_kinds()
-    out = {}
+    stores, counts = [], {}
     for store, world in parse(values):
         if kinds[store] != 'frames':
             continue
-        land = land_of(store, world)
         table = read_table(Path(world) / TABLE_FILE) or {}
-        for index, frame in enumerate(table.get('frames') or []):
-            out[tuple(frame['cell'])] = (map_name(index, land['prefix'], land['limit']), list(frame['origin']))
+        frames = table.get('frames') or []
+        counts[store] = len(frames)
+        stores.append((store, land_of(store, world), frames))
+    out = {}
+    for store, land, frames in stores:
+        offset = counts.get(land.get('after'), 0)
+        out[store] = {tuple(frame['cell']): (map_name(offset + index, land['prefix'], land['limit']),
+                                             list(frame['origin'])) for index, frame in enumerate(frames)}
     return out
 
 

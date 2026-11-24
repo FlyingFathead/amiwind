@@ -205,17 +205,22 @@ def module_sets(context):
 
 # The modules whose world the image installs as a store of its own with its own frame maps: the option value that
 # holds the module's cells -> its store (tools/chim/layer_stores.py MODULE_STAGES, tools/chim/sol_test.py LANDS).
-MODULE_STORES = {'tribunal_mournhold_cells': 'chimmh', 'bloodmoon_solstheim_cells': 'chimsol'}
+MODULE_STORES = {'tribunal_mournhold_cells': 'chimmh', 'bloodmoon_solstheim_cells': 'chimsol',
+                 # the recordless open sea of the area Bloodmoon adds to the map's box (SOL-SEA-CROSSING-68)
+                 'bloodmoon_solstheim_sea_cells': 'chimsea'}
 
 
-def module_map_names(cells_text, store):
+def module_map_names(cells_text, store, offset=0):
     """The frame map names the image gives a module's cells (CELLS_TEXT: "x,y:k ..."), in its world table's order:
-    the names tools/chim/layer_stores.py install and frame_holders use (mh0000, mh0001, ...)."""
+    the names tools/chim/layer_stores.py install and frame_holders use (mh0000, mh0001, ...). OFFSET: the frame maps
+    of the land whose numbering this one continues (tools/chim/sol_test.py LANDS 'after': the sea after Solstheim)."""
     from chim import regions
     from chim.sol_test import LANDS, map_name
     land = LANDS[store]
-    table = regions.ownership(regions.decode_cells(cells_text), {'values': ['module']})
-    return [map_name(index, land['prefix'], land['limit']) for index, _frame in enumerate(table['frames'])]
+    # the recordless open sea after every other cell (the "|" part), as the module's world table orders it
+    table = regions.ownership(regions.decode_cells(cells_text), {'values': ['module']},
+                              after=regions.decode_after(cells_text))
+    return [map_name(offset + index, land['prefix'], land['limit']) for index, _frame in enumerate(table['frames'])]
 
 
 def finalize_table_problems(names, store):
@@ -269,11 +274,16 @@ def module_frame_maps(context):
     installs as stores of their own (finalize_table_problems). Nothing to check without such a module."""
     args = context.args
     problems = []
+    from chim.regions import decode_cells
+    from chim.sol_test import LANDS
     for attribute, store in MODULE_STORES.items():
         cells = getattr(args, attribute, None) if args is not None else None
         if not cells:
             continue
-        names = module_map_names(cells, store)
+        # a land that continues another's numbering (LANDS 'after'): its names start after the other's frames
+        after = LANDS[store].get('after')
+        before = next((getattr(args, a, None) for a, s in MODULE_STORES.items() if s == after), None) if after else None
+        names = module_map_names(cells, store, len(decode_cells(before)) if before else 0)
         context.log('Early check module-frame-maps: store %s, %d frame maps (%s .. %s) against the engine\'s map '
                     'names, the door check\'s job table and the disk layout' % (store, len(names), names[0], names[-1]))
         problems += finalize_table_problems(names, store)
@@ -282,7 +292,8 @@ def module_frame_maps(context):
 
 # A module's world stage -> its store: right after the stage has passed, its maps are tried against the image's
 # last per-map checks (module_store_after).
-MODULE_WORLD_STAGES = {'tribunal-mournhold': 'chimmh', 'bloodmoon-solstheim': 'chimsol'}
+MODULE_WORLD_STAGES = {'tribunal-mournhold': 'chimmh', 'bloodmoon-solstheim': 'chimsol',
+                       'bloodmoon-solstheim-sea': 'chimsea'}
 
 
 def store_unit_problem(store, sizes, headroom_mib=None, limit=None):

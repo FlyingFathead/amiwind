@@ -96,6 +96,8 @@ def requested_cells(cells_file=None, cells_text=None):
     elif cells_file:
         out |= {key(c) for c in json.loads(Path(cells_file).read_text(encoding='utf-8')).get('cells', [])}
     for token in (cells_text or '').split():
+        if token == '|':        # the recordless open sea follows (tools/chim/regions.py encode_cells AFTER)
+            continue
         out.add(key(int(v) for v in token.partition(':')[0].split(',')))
     return out
 

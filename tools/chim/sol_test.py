@@ -45,6 +45,14 @@ LANDS = {
                 'module': {'data_stage': 'bloodmoon-solstheim-data', 'edges': 'alone', 'flames': True}},
     'chimmh': {'prefix': 'mh', 'limit': 256, 'directory': 'world/regions-mh.awr', 'title': 'Mournhold',
                'data_stage': 'tribunal-mournhold-data', 'edges': 'alone', 'flames': True},
+    # The recordless open sea of the area Bloodmoon adds to the map's box (tools/chim/sea_grid.py; the stage
+    # bloodmoon-solstheim-sea, SOL-SEA-CROSSING-68): a store of its own so Solstheim's store index does not grow (its
+    # densest forest frame had 90,544 bytes left at 32 MB, the sea's 440 frames would add about 320 KB). Its frame
+    # maps continue Solstheim's slNNNN numbering ('after': the land whose rows come first) and its rows are appended
+    # to the same rows file, so the engine reads them in its one table (aw_world.c load_directory); each map names
+    # its own store. Open sea borders the islands or the edge of the map, so no frame closes its edges ('open').
+    'chimsea': {'prefix': 'sl', 'limit': 3840, 'directory': 'world/regions-sl.awr', 'title': 'Solstheim',
+                'data_stage': 'bloodmoon-solstheim-data', 'edges': 'open', 'flames': False, 'after': 'chimsol'},
 }
 
 
@@ -70,18 +78,28 @@ def map_name(index, prefix='sl', limit=3840):
     return '%s%04d' % (prefix, index)
 
 
-def directory_rows(frames, prefix='sl', limit=3840):
+def directory_rows(frames, prefix='sl', limit=3840, before=b''):
     """world/regions-sl.awr (Mournhold: world/regions-mh.awr, PREFIX mh): 'AWS1', u32 rows, then per frame (in order)
     the 52-byte row the engine reads: its name (slNNNN, NUL padded to 8), origin (3 f32, map units), core (4 f32: x0
-    y0 x1 y1, frame-local) and cover (the core COVER units wider), little-endian."""
-    out = [b'AWS1' + struct.pack('<I', len(frames))]
+    y0 x1 y1, frame-local) and cover (the core COVER units wider), little-endian. BEFORE: a rows file already written
+    for the land whose rows come first (LANDS 'after'): its rows are kept and these follow, numbered on."""
+    start = rows_count(before) if before else 0
+    out = [b'AWS1' + struct.pack('<I', start + len(frames)), before[8:]]
     for i, frame in enumerate(frames):
         (x0, y0), (x1, y1) = frame['core']
         core = (x0, y0, x1, y1)
         cover = (x0 - COVER, y0 - COVER, x1 + COVER, y1 + COVER)
-        out.append(map_name(i, prefix, limit).encode('ascii').ljust(8, b'\0') +
+        out.append(map_name(start + i, prefix, limit).encode('ascii').ljust(8, b'\0') +
                    struct.pack('<3f4f4f', *[float(v) for v in frame['origin']], *core, *cover))
     return b''.join(out)
+
+
+def rows_count(raw):
+    """The row count of a rows file ('AWS1', u32 rows, 52 bytes a row); a ValueError when it is not one."""
+    count = struct.unpack_from('<I', raw, 4)[0] if raw[:4] == b'AWS1' and len(raw) >= 8 else -1
+    if count < 0 or len(raw) != 8 + 52 * count:
+        raise ValueError('not a rows file the engine reads (AWS1, 52 bytes a row)')
+    return count
 
 
 def closed_frames(frames, edges):
@@ -90,6 +108,8 @@ def closed_frames(frames, edges):
     cells = {tuple(f['cell']) for f in frames}
     if edges == 'closed':
         return cells
+    if edges == 'open':
+        return set()
     return {(x, y) for x, y in cells
             if not {(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)} & cells}
 
@@ -193,9 +213,14 @@ def install(world_dir, id1, hand_fields, alternatives=(), store=STORE, actors=No
     world = FM.load(world_dir)
     maps = []
     closed = closed_frames(table['frames'], land['edges'])
+    # a land whose rows follow another's in the same rows file (LANDS 'after'): its maps are numbered on from the rows
+    # already there (the other land's store installed first: layer_stores.install in the image's order)
+    rows_path = id1 / land['directory']
+    before = rows_path.read_bytes() if land.get('after') and rows_path.is_file() else b''
+    offset = rows_count(before) if before else 0
     for index, frame in enumerate(table['frames']):
         cell = tuple(frame['cell'])
-        name = map_name(index, land['prefix'], land['limit'])
+        name = map_name(offset + index, land['prefix'], land['limit'])
         _, record, chunks = (FM.frames_at(world['frames'], cell) or [(0, next(
             f for f in world['frames'] if tuple(f[1]['cell']) == cell))])[0][1]
         g, (lx, ly) = record['grain'], record['low']
@@ -250,10 +275,11 @@ def install(world_dir, id1, hand_fields, alternatives=(), store=STORE, actors=No
     # the land's rows of the region table, and the region names of its cells (the layer's REGN and CELL rows, read
     # from the master the land's data stage wrote next to WORLD_DIR)
     (id1 / land['directory']).parent.mkdir(parents=True, exist_ok=True)
-    (id1 / land['directory']).write_bytes(directory_rows(table['frames'], land['prefix'], land['limit']))
+    (id1 / land['directory']).write_bytes(directory_rows(table['frames'], land['prefix'], land['limit'], before))
     layered = world_dir.parent / land['data_stage'] / 'Morrowind.esm'
     names_path = id1 / REGION_NAMES
-    if layered.is_file() and names_path.is_file():
+    # a land that follows another (the recordless sea) has no region or place of its own: the names are the other's
+    if layered.is_file() and names_path.is_file() and not land.get('after'):
         from prepare_world_ui import region_names
         names_path.write_bytes(merged_region_names(names_path.read_bytes(), region_names(layered.read_bytes())))
     print('[chim-layer] store %s (%d files, %d bytes) and %d %s frame maps: %s' % (

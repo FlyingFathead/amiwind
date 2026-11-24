@@ -1,11 +1,12 @@
 # Player scale, collision and camera motion
 
-_Last updated with AmiWind v0.0.66-dev9 (15 November 2026)._
+_Last updated with AmiWind v0.0.68 (24 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
 - [Movement speed](#movement-speed)
+- [Water Walking](#water-walking)
 - [Breath and drowning](#breath-and-drowning)
 - [Verified base dimensions](#verified-base-dimensions)
 - [Physical recheck, v0.0.24-dev2](#physical-recheck-v0024-dev2)
@@ -97,14 +98,14 @@ Every factor of the OpenMW rules, and where it comes from in AmiWind:
 | Feather / Burden | load | in (v0.0.61, `AW_EncumbranceSetEffects`): the spell effects Burden and Feather feed the carry weight | magic effects |
 | Fortify / Drain / Damage Speed, Athletics, Strength, Acrobatics | the stats | later (the sheet's damage field already counts) | magic effects |
 | Swift Swim | swim x (1 + magnitude/100) | later | magic effects |
-| Levitate | fly speed from fMinFlySpeed / fMaxFlySpeed | later | magic effects |
+| Levitate | fly speed from fMinFlySpeed / fMaxFlySpeed | later (the effect only stops a fall's damage so far) | magic effects |
 | Jump effect, Acrobatics, load, fatigue | jump height (getJump) | later (rule written and tested, not applied) | needs the gravity scale first ([PHYSICS-GRAVITY-SCALE-36](bugs/PHYSICS-GRAVITY-SCALE-36.md)) |
 | Acrobatics | in-air control (fJumpMoveBase / fJumpMoveMult) | later | Quake air control is kept |
 | Slowfall | the falling speed, no fall height | v0.0.62 | the factor 1 - magnitude x 0.005 once each 1/60 s of falling; the engine's gravity stays Quake's |
 | Acrobatics, Jump, fatigue | fall damage on landing (fFallDamageDistanceMin, fFallDistanceBase/Mult, fFallAcroBase/Mult) | v0.0.62 | [MWSCRIPT_BYTECODE.md "Held actors and falls"](MWSCRIPT_BYTECODE.md#held-actors-and-falls); no knockdown yet |
 | Water Breathing | no breath used under water | v0.0.63 | [Breath and drowning](#breath-and-drowning) |
-| Water Walking | water surface | later | magic effects |
-| Werewolf | run x fWereWolfRunMult | later | no werewolf form |
+| Water Walking | the water's surface is ground: stand, walk, run, jump and land on it; no swimming and no breath used while on it | v0.0.68 | [Water Walking](#water-walking) |
+| Werewolf | run x fWereWolfRunMult | later (the werewolf form itself is in since v0.0.68; its run multiplier is not applied yet) | the player in werewolf form is drawn as the werewolf, see the [release notes](releases/notes/RELEASE-v0.0.68.md#the-werewolf) |
 
 The rules are pure functions in `engine/aga/src/aw_move_rules.c` (tested against hand-worked OpenMW
 values in `tests/aga_move_rules_test.c`); `engine/aga/src/aw_move.c` gathers the inputs into one
@@ -112,6 +113,26 @@ structure (`aw_move_inputs_t`, a field per factor above, 0 = no effect) and appl
 `sv_user.c`, so a later effect only fills its field. `tests/aga_move_test.c` checks the engine side:
 the old numbers under superspeed, the live sheet, the load, the fatigue costs and the command. In-game
 timing against the original is not measured yet.
+
+## Water Walking
+
+From v0.0.68 a Water Walking effect on the player (a spell, a potion, a scroll, an enchanted item, an ability, or a
+script's SetWaterWalking / ModWaterWalking) holds him on the water as on ground, as the original does (the rule as
+OpenMW 0.51 implements it in `mwphysics/physicssystem.cpp`, `mwphysics/actor.cpp` and `mwphysics/mtphysics.cpp`,
+written independently in `engine/aga/src/aw_walk.c`):
+
+| What | Rule |
+| --- | --- |
+| The surface | while the magnitude is over 0, the water's surface stops the player as ground does: he stands, walks, runs and jumps on it, lands on it from a fall (a fall still hurts, as on land) and steps onto it from a shore or a quay |
+| Under the water when it starts | lifted onto the surface at once when the way up is clear; under a roof or a ledge he stays and swims |
+| When it ends | nothing holds him: he drops into the water and swims as before |
+| Lava | walked on already ([LAVA.md](LAVA.md)); Water Walking does not change it |
+| Swimming | unchanged |
+
+The surface is read from the level's own water (the height where the water above the feet ends), never an assumed sea
+level. While the player stands on it the walk tests about ten points and sweeps the box once a frame; the effect is
+asked only while his feet are in the water. `tests/aga_waterwalk_test.c` drives the engine's own walk over a synthetic
+sea. Not done yet: the original refuses the spell on someone too deep under the water to be lifted.
 
 ## Breath and drowning
 

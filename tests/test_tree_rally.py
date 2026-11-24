@@ -233,7 +233,9 @@ class Wiring(unittest.TestCase):
         tool = lambda script, *rest: [script, *map(str, rest)]  # noqa: E731
         base = [('chim', ['chim_build.py', '--out', 'run/chim']), ('image', ['build_aga.py'])]
         from unittest.mock import patch
-        with patch.object(build, 'chim_stage_options', lambda a: []):
+        # the Solstheim test image is a -devN option (project_version.require_private_test_version refuses it on an rc
+        # or final VERSION): the wiring is checked under a dev version, so the test holds on a release line too
+        with patch.object(build, 'chim_stage_options', lambda a: []), patch.object(build, 'VERSION', '0.0.0-dev1'):
             return build.chim_sol_test_commands(args, list(base), tool, Path('run'), {'qbsp': 'qbsp'}, 8), base
 
     def test_rally_switch_builds_every_method_before_the_original(self):
@@ -286,7 +288,8 @@ class Wiring(unittest.TestCase):
                                                 'image'])
         args = argparse.Namespace(chim_sol_test='-23,20:l', chim_sol_tree_copies='rally-switch', data_files=Path('/d'),
                                   workspace=Path('/w'), sdk=Path('/sdk'), chim_mesh_method_set='E')
-        with self.assertRaises(SystemExit):
+        from unittest.mock import patch
+        with self.assertRaises(SystemExit), patch.object(build, 'VERSION', '0.0.0-dev1'):   # a -devN option (above)
             build.chim_sol_test_commands(args, [('chim', []), ('image', [])], lambda *a: list(a), Path('run'), {}, 8)
 
     def test_no_base_stage_reads_the_rally_tools(self):

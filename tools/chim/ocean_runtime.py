@@ -52,12 +52,117 @@ def land_cells(data_files, masters=None):
     return found
 
 
+_MASTER_SCANS = {}
+
+
+def _master_scan(name, path):
+    """One master read and hashed once per process and file (path, size, modification time): its SHA-256 and size,
+    its object definitions in record order ([(id casefolded, tag or None for a deleted one)]), its live LAND cells and
+    the byte spans of its live exterior CELL records by cell. SOL-SEA-CROSSING-68: admit_cell read and hashed every
+    master for each cell (about a hundred MB a call), so the 982 open-sea cells of the map's box would have read the
+    masters about a thousand times in the world terrain step alone; the result of admit_cell is the same."""
+    stat = path.stat()
+    key = (str(path.resolve()), stat.st_size, stat.st_mtime_ns)
+    if key in _MASTER_SCANS:
+        return _MASTER_SCANS[key]
+    sha, definitions, land, spans = hashlib.sha256(), [], set(), {}
+    with path.open('rb') as stream:
+        at = 0
+        while True:
+            header = stream.read(16)
+            if not header:
+                break
+            if len(header) != 16:
+                raise ValueError('Truncated original record header')
+            raw_tag, size, _, flags = struct.unpack('<4sIII', header)
+            payload = stream.read(size)
+            if len(payload) != size:
+                raise ValueError('Truncated original record')
+            sha.update(header)
+            sha.update(payload)
+            tag = raw_tag.decode('ascii')
+            if tag in OBJECT_TYPES:
+                subs = list(subrecords(payload))
+                ident = string(dict(subs).get('NAME', b''), 'object NAME').casefold()
+                if ident:
+                    definitions.append((ident, None if is_deleted(flags, subs) else tag))
+            elif tag == 'LAND':
+                subs = list(subrecords(payload))
+                if not is_deleted(flags, subs):
+                    xy = dict(subs).get('INTV', b'')
+                    if len(xy) == 8:
+                        land.add(struct.unpack('<ii', xy))
+            elif tag == 'CELL':
+                subs = list(subrecords(payload))
+                if not is_deleted(flags, subs, header_only=True):
+                    parsed = cell_data(subs)
+                    if not parsed['flags'] & 1:
+                        spans.setdefault((parsed['x'], parsed['y']), []).append((at + 16, size, flags))
+            at += 16 + size
+    scan = {'name': name, 'path': path, 'sha256': sha.hexdigest(), 'bytes': stat.st_size,
+            'definitions': definitions, 'land': land, 'spans': spans}
+    _MASTER_SCANS[key] = scan
+    return scan
+
+
+def _master_scans(data_files):
+    out = []
+    for name in MASTERS:
+        try:
+            path = child_ci(Path(data_files), name)
+        except (FileNotFoundError, ValueError):
+            if name == MASTERS[0]:
+                raise
+            continue
+        if not path.is_file():
+            if name == MASTERS[0]:
+                raise ValueError('Ocean admission needs Morrowind.esm')
+            continue
+        out.append(_master_scan(name, path))
+    return out
+
+
 def admit_cell(data_files, cell):
     """Read/hash original masters; reject non-ocean/unsupported content, retain LEVC identity.
 
-    This is a bounded-memory read, not a terrain or asset conversion. A master is
-    identified on every call, so a changed expansion cannot reuse a zero-ref result.
+    This is a bounded-memory read, not a terrain or asset conversion. A master is identified by its SHA-256 (read
+    once per process and file: _master_scan), so a changed expansion cannot reuse a zero-ref result.
     """
+    if len(cell) != 2 or any(isinstance(v, bool) or not isinstance(v, int) for v in cell):
+        raise ValueError('Ocean cell needs two integer original coordinates')
+    cell = tuple(cell)
+    if any(abs(v) > 100 for v in cell):
+        raise ValueError('Ocean cell is outside the supported original-world range')
+    definitions, refs, masters, land = {}, [], [], []
+    for scan in _master_scans(data_files):
+        name = scan['name']
+        for ident, tag in scan['definitions']:
+            if tag is None:
+                definitions.pop(ident, None)
+            else:
+                definitions[ident] = tag
+        if cell in scan['land']:
+            land.append(name)
+        spans = scan['spans'].get(cell, ())
+        if spans:
+            with scan['path'].open('rb') as stream:
+                for offset, size, flags in spans:
+                    stream.seek(offset)
+                    parsed = cell_data(list(subrecords(stream.read(size))))
+                    for ref in parsed['refs']:
+                        if ref.get('deleted'):
+                            continue
+                        pos = ref.get('position')
+                        if pos is None or len(pos) != 3 or not all(math.isfinite(v) for v in pos):
+                            raise ValueError('Ocean reference lacks a finite source position')
+                        refs.append(dict(ref, master=name, source_cell=list(cell)))
+        masters.append({'name': name, 'sha256': scan['sha256'], 'bytes': scan['bytes']})
+    return _admitted(cell, definitions, refs, masters, land)
+
+
+def admit_cell_full_read(data_files, cell):
+    """admit_cell as it was before SOL-SEA-CROSSING-68: every master read and hashed for this one cell. Kept for the
+    test that the cached scan gives the same result (tests/test_sea_crossing.py)."""
     if len(cell) != 2 or any(isinstance(v, bool) or not isinstance(v, int) for v in cell):
         raise ValueError('Ocean cell needs two integer original coordinates')
     cell = tuple(cell)
@@ -119,6 +224,12 @@ def admit_cell(data_files, cell):
                             raise ValueError('Ocean reference lacks a finite source position')
                         refs.append(dict(ref, master=name, source_cell=list(cell)))
         masters.append({'name': name, 'sha256': sha.hexdigest(), 'bytes': path.stat().st_size})
+    return _admitted(cell, definitions, refs, masters, land)
+
+
+def _admitted(cell, definitions, refs, masters, land):
+    """The admission record of CELL from what the masters hold (admit_cell); refuses LAND and any reference that is
+    not a levelled creature list."""
     if land:
         raise ValueError('Ocean cell %s has LAND in %s' % (cell, ', '.join(land)))
     for ref in refs:
@@ -167,14 +278,17 @@ def append_layer_rows(entries, cells):
     return entries + added, added
 
 
-def append_routing_rows(entries, cells, data_files):
+def append_routing_rows(entries, cells, data_files, after=()):
     """Append stable sequential AWR2 rows for explicit ocean cells lacking a legacy core.
 
     Existing vf names and rows stay unchanged; new rows are metadata only. They use
     normal frame maps generated from game data, not fabricated legacy BSP payloads.
+    AFTER: the recordless open sea of the map's box (tools/chim/regions.py, the recordless rule): their rows come
+    after the other ocean cells' rows, so those keep the names they had without them (SOL-SEA-CROSSING-68).
     """
     entries = list(entries)
-    cells = sorted(set(map(tuple, cells)))
+    after = set(map(tuple, after))
+    cells = sorted(set(map(tuple, cells)) - after) + sorted(set(map(tuple, cells)) & after)
     if not cells:
         return entries, []
     if any(e['name'] != 'vf%04d' % i for i, e in enumerate(entries)):

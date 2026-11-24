@@ -1369,8 +1369,13 @@ def stage_dependencies(steps, skipped=()):
             deps = ()
         if name == 'bloodmoon-solstheim':
             deps = tuple(d for d in ('census', 'bloodmoon-solstheim-data') if d in names)
+        # its second world, the recordless open sea of the map's box (SOL-SEA-CROSSING-68): the same inputs; the image
+        # installs it after Solstheim's world (its frame maps are numbered on), so the image waits for both
+        if name == 'bloodmoon-solstheim-sea':
+            deps = tuple(d for d in ('census', 'bloodmoon-solstheim-data') if d in names)
         if name in ('image', 'cell-progress'):
-            deps = (*deps, *(d for d in ('bloodmoon-solstheim-data', 'bloodmoon-solstheim') if d in names))
+            deps = (*deps, *(d for d in ('bloodmoon-solstheim-data', 'bloodmoon-solstheim', 'bloodmoon-solstheim-sea')
+                             if d in names))
         # --chim-sol-test (tools/build.py chim_sol_test_commands, test images only): the image installs the test world
         # run/chim-sol and its tree copies as the store chimsol (--chim-sol-world, --chim-sol-alt), so it waits for those
         # stages (BUILD-CHIM-SOL-TEST-IMAGE-NO-WAIT-68: a resume whose other stages were all reused started the image

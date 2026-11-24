@@ -1,6 +1,6 @@
 # World map and progression journal
 
-_Last updated with AmiWind v0.0.68-dev7 (22 November 2026)._
+_Last updated with AmiWind v0.0.68 (24 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -126,7 +126,18 @@ occlusion. rc1 keeps the entire island overview visible.
 
 The terrain is a reduced, palette-matched overview. The 489 by 512 pixel packet
 is **250,520 bytes**, including bounds, ocean colour and area transforms. It is
-allocated/read only when opened and freed on close. Map pixels stay in memory while open. The region-name lookup reads a small
+allocated/read only when opened and freed on close.
+
+**The map's box (since the build after v0.0.68-dev12).** The map spans the box of every exterior cell record of the
+selected game files, the box OpenMW's world map draws (`apps/openmw/mwrender/globalmap.cpp`, lines 291-308): with
+Bloodmoon, cells x -29 to 23 and y -19 to 28, so Solstheim, the sea between the islands and the sea around both are on
+it, a 512 by 464 pixel picture (about 237,600 bytes while the map is open). Before, the box was that of the land with
+heights (cells x -28 to 23, y -16 to 28), which left out the westernmost sea column and three rows south of Vvardenfell.
+The terrain overview is drawn over its own land box and placed in the larger box; the rest is the map's water. The
+in-game map (version 2) shows Solstheim as you explore it, by the same explored-land rule and the same saved state as
+Vvardenfell (below); the debug map (`dbg maptype 1`) shows all of it. Solstheim's place markers come from the same
+table, with Bloodmoon's places added, grouped by the name before the first comma as OpenMW groups them
+(`apps/openmw/mwgui/mapwindow.cpp`, lines 1103-1139). Map pixels stay in memory while open. The region-name lookup reads a small
 record on first use or a changed exterior cell and caches that result. Ocean beyond the image has the same colour as the map's
 water; panning has a bounded ocean margin. The separate
 [terrain pass](WORLD_TERRAIN.md) supplies playable regions and their origins.

@@ -21,7 +21,7 @@
 | Persists in | v0.0.65, v0.0.66, v0.0.67-dev1 (last seen) |
 | Severity | high: the opening's limits do not hold: the ship's items can be carried off before the papers, against the game's own rules |
 | Family | Game logic (QuakeC) and saves (`game-logic`) |
-| Deferred by the maintainer | 2026-11-19: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only) |
+| Deferred by the maintainer | 2026-11-24: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up |
 | Playtest version | v0.0.65 |
 | From commit | source unknown, engine unknown, CHIM world unknown |
 | CHIM engine version | CHIM 0.2.2, engine unknown, world format 0.11 |
@@ -39,7 +39,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-12: reported in v0.0.65
 - 2026-11-17 17:10 +0200: seen again in v0.0.66: Seen again in the container count on the v0.0.66 release build and in the engine: nothing holds the use key before the release papers, so the Imperial Prison Ship's dishes are taken and, once its containers are aimable, its 46 barrels ...
 - 2026-11-17 18:41 +0200: seen again in v0.0.66: PERSISTING, seen again on the v0.0.66 release in three pictures of the prison ship before the release papers: in the hold the hammock shows its name under the view, and the travel lantern its name with E: Take; on the upper deck a bottle ...
-- 2026-11-19: deferred by the maintainer: deferred by the maintainer to v0.0.68 (the v0.0.67 release triage of the bugs seen in three or more releases; v0.0.67 is released from its third snapshot with fixes only)
+- 2026-11-24: deferred by the maintainer: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up
 
 <!-- END GENERATED TIMELINE -->
 
@@ -420,6 +420,9 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [WAIT-DURING-COMBAT-36](WAIT-DURING-COMBAT-36.md): Waiting is allowed in the middle of a fight
 - [WAIT-FEET-IN-WATER-36](WAIT-FEET-IN-WATER-36.md): Waiting is allowed with the feet in water (the original refuses it)
 - [WATER-GAMEPLAY-PARITY-38](WATER-GAMEPLAY-PARITY-38.md): Water gameplay lacks complete original behavior verification
+- [WATER-RIPPLES-UNDER-ACTORS-MISSING-68](WATER-RIPPLES-UNDER-ACTORS-MISSING-68.md): No ripples on the water: a swimmer at the surface or a player walking on water leaves no rings of ripples, which the original draws
+- [WATER-WALKING-DEEP-CAST-NOT-REFUSED-68](WATER-WALKING-DEEP-CAST-NOT-REFUSED-68.md): Water Walking cast deep under the water is applied and lifts the player to the surface, where the original refuses the effect
+- [WATER-WALKING-NOT-ON-SURFACE-68](WATER-WALKING-NOT-ON-SURFACE-68.md): Water Walking does not hold the player on the water: the effect is in the effects table, but the movement does not read it, so the player swims as without it
 - [WEAPON-STRIKE-ENCHANT-NOT-CAST-61](WEAPON-STRIKE-ENCHANT-NOT-CAST-61.md): A weapon's Cast When Strikes enchantment is not cast when the weapon hits
 - [WEATHER-STATE-NOT-SAVED-66](WEATHER-STATE-NOT-SAVED-66.md): The current weather and its change in progress are not saved: a load rolls the weather again
 - [WEREWOLF-BODY-NOT-DRAWN-63](WEREWOLF-BODY-NOT-DRAWN-63.md): A player turned into a werewolf by a script keeps his own body: the werewolf model is not drawn

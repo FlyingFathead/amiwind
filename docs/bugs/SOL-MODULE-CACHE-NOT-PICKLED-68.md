@@ -121,6 +121,7 @@ Family: Content silently missing from a build (`build-content-missing`). Every o
 - [SEYDA-LANTERNS-MISSING-31](SEYDA-LANTERNS-MISSING-31.md): Seyda Neen lanterns light the night but are not in its maps
 - [SKY-FLAT-PALETTE-DRIFT-41](SKY-FLAT-PALETTE-DRIFT-41.md): Exterior sky flat with no clouds: the sampled palette drifted and the shared cloud sky silently fell back to a one-colour placeholder
 - [STAGE-READS-SELECTED-MASTERS-67](STAGE-READS-SELECTED-MASTERS-67.md): No build stage proves it read the game files the build selected, so a stage that reads only the base game goes unnoticed
+- [SWIM-SINKS-BELOW-SURFACE-68](SWIM-SINKS-BELOW-SURFACE-68.md): A swimming player sinks back below the surface after swimming up: the crossing is swum fully under water
 - [TP-LIST-MODULE-STORE-PLACES-68](TP-LIST-MODULE-STORE-PLACES-68.md): The teleport list leaves out the Solstheim places and beings of an image that holds the island
 - [TP-LIST-UNBUILT-EXTERIORS-66](TP-LIST-UNBUILT-EXTERIORS-66.md): The teleport place list would list Solstheim places the image has no world for
 - [TREE-SCALE-001](TREE-SCALE-001.md): Non-unit-scale tree sprites omitted; bounds too conservative

@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.68-dev12 (24 November 2026)._
+_Last updated with AmiWind v0.0.68 (24 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -27,60 +27,73 @@ More in the [gallery](docs/GALLERY.md).
 
 ## Where AmiWind stands
 
-**The newest release is v0.0.67: Tribunal Introduced.** It brings Tribunal, the first expansion, into the game:
-Tribunal's additions to Vvardenfell are in the build, and Mournhold can be reached from Ebonheart through the
-characters' own dialogue and walked from the palace to the Plaza. Its quests and much of its play are not ready, and in
-this release Solstheim is not in the game. It runs on CHIM Engine v0.2.2 and needs 32 MB of Fast RAM. The detail:
-the [v0.0.67 release notes](docs/releases/notes/RELEASE-v0.0.67.md). The release before it, **v0.0.66: Forward It Is**,
-is in [its notes](docs/releases/notes/RELEASE-v0.0.66.md).
+The framework of the Game of the Year edition is in the game, both expansions included: **Tribunal** with the city of
+**Mournhold**, and **Bloodmoon** with the island of **Solstheim**, beside the whole of Vvardenfell. From your own copy of
+Morrowind, Tribunal and Bloodmoon, AmiWind builds the three game files into one game for the Amiga. You can walk
+Vvardenfell, take the road from Ebonheart into Tribunal's Mournhold, and cross the sea to Bloodmoon's Solstheim, with
+their people, creatures, doors and scripts around you. It runs on CHIM Engine v0.2.2 with 32 MB of Fast RAM.
 
-**In development: v0.0.68-dev12**, the twelfth snapshot of the next version, **Solstheim Is Here** (the release for
-which Solstheim is to be complete). Since v0.0.67 all 153 of Solstheim's cells are built and its quest and underwater
-entrances can be used (seen in play), fights no longer stutter when blows land, and Solstheim's weathers have their own
-look; the snapshot itself lays out the talk window as the original's, with the disposition bar, the speaker's services
-and the name on the title bar (seen in play), and lets the builder clear the cache entries no recent build uses. Most of
-the expansions' play is not yet seen in play. The notes of this snapshot:
-[v0.0.68-dev12](docs/releases/notes/RELEASE-v0.0.68-dev12.md); the earlier snapshots, dev1 to dev11, are in the
-[changelog](docs/CHANGELOG.md).
+**The newest release is v0.0.68: Solstheim Is Here**, which brings Bloodmoon's island into the game, so that both
+expansions are now in it: all 153 of
+Solstheim's cells are built, one open sea joins it to Vvardenfell as in the original, its quest and underwater entrances
+can be used, and the werewolves fight and change as in the original. Fights no longer stutter when blows land,
+Solstheim's weathers have their own look, the world map spans both islands, and the talk window is laid out as the
+original's, with the disposition bar, the speaker's services and the name on the title bar. The detail: the
+[v0.0.68 release notes](docs/releases/notes/RELEASE-v0.0.68.md), with its twelve development snapshots in the
+[changelog](docs/CHANGELOG.md). The release before it, **v0.0.67: Tribunal Introduced**, brought Tribunal and Mournhold
+into the game ([its notes](docs/releases/notes/RELEASE-v0.0.67.md)).
 
 ## What already works
 
-- **Vvardenfell, whole.** All 1,408 exterior cells of the main island on CHIM, streamed as you walk, and 1,121 of its
-  1,123 interiors as CHIM rooms (the prison ship and the census office are room maps of their own, counted as ready), with the
+- **Vvardenfell.** All 1,409 exterior cells of the main island on CHIM (1,292 land and 117 sea), streamed as you walk;
+  the tracker counts 1,390 of them as ready by its own rule, the cells with terrain data (land and flat seabed), so the
+  two figures are two groupings of the same island ([what the tracker counts](docs/chim/CELL_TRACKER.md#what-we-count)).
+  The open sea built around and between the islands adds sea cells of its own, which the tracker counts too (1,029 sea
+  cells by Vvardenfell, 79 by Solstheim).
+  1,121 of its
+  1,123 interiors as CHIM rooms (the prison ship and the census office are room maps of our own, in the game all the same), with the
   people and creatures the game places in them ([CHIM progress tracker](docs/chim/PROGRESS_TRACKER.md),
   [the map's colours](docs/chim/CHIM_PROGRESS_MAP.md)). Every load door
   of the base game leads in and back out.
+- **Every room of the three game files is in the game:** 1,134 of 1,134 interiors of Morrowind, 96 of 96 of Tribunal and
+  98 of 98 of Bloodmoon, with the exterior cells of all three, and every load door leading in and back out except the few
+  that are one-way in the original.
+- **Tribunal, Mournhold:** its five districts and all of its rooms are in the game, reached from Ebonheart as
+  in the original and walked from the palace to the Plaza, together with Tribunal's additions to Vvardenfell. Of its 236
+  scripts, 235 run.
+- **Bloodmoon, Solstheim:** all 153 of its cells (land and sea) and all of its rooms are built, one open sea joins it to
+  Vvardenfell, so you can take the boat from Khuul or swim across, its quest and underwater entrances can be used, and its
+  werewolves, its weathers and its ice are in. Of Bloodmoon's 310 scripts, 309 run.
 - **Play:** character creation through the opening; the inventory, the journal and the map; saving and loading, with what
-  you change staying changed; combat and casting by the original's rules; talking and the services; crime with
+  you change staying changed; combat and casting by the original's rules; talking, persuasion and the services; crime with
   witnesses, guards, fines and jail; alchemy; containers and bodies to search; torches and lanterns; weather, music and
   travel by silt strider, boat, gondola and guild guide; levelling and resting as in the original
   ([game features](docs/GAME_FEATURES.md)).
-- **Tribunal, the first steps:** Tribunal's additions to Vvardenfell are in the build, and Mournhold is reached from
-  Ebonheart through the characters' own dialogue; its five districts can be walked, slowly (8 to 16 frames a second in
-  the emulator).
-- **The game's scripts:** of the 1,074 scripts the original uses, 1,063 run and 9 more are carried by AmiWind's own code,
-  235 of Tribunal's 236 among them ([the MWScript tracker](docs/MWSCRIPT_FEATURES.md)).
+- **Dialogue, the journal and the quests:** the clickable topic words in conversation; the journal with dated entries
+  and the quest book, its indexes kept by the dialogue and the scripts so that quests progress, the entry of the ending
+  each quest reaches, quests moving under the finished ones (success and failure alike), a restart entry that reopens a
+  quest, and dates read as in the original; the topic pages of the journal carry working links.
+- **The game's scripts:** of the 1,074 scripts the original uses, 1,063 run and 9 more are carried by AmiWind's own code
+  ([the MWScript tracker](docs/MWSCRIPT_FEATURES.md)).
 - **Hardware:** the target is an A1200-class machine with AGA, a 68040 with FPU, 2 MiB Chip and 32 MiB Fast RAM, in
-  emulators with JIT; accelerators such as the PiStorm are a route to real hardware (16 MiB starts with a warning, and
-  parts of the game run wrongly or not at all). The figures so far come from emulators and the Raspberry Pi 4B
-  ([real hardware](docs/REAL_HARDWARE.md)).
+  emulators with JIT; accelerators such as the PiStorm are a route to real hardware. The figures so far come from
+  emulators and the Raspberry Pi 4B ([real hardware](docs/REAL_HARDWARE.md)).
 
 ## What comes next
 
-- **Tribunal in play:** Mournhold's quests and most of its play are still to be seen in play, and so are the districts'
-  frame rate, the Plaza's view from its arrival point and Godsreach's canal.
-- **Bloodmoon:** Solstheim's cells are built and its entrances can be used, but no door or journey leads there from
-  Vvardenfell yet; most of its objects and quests are not yet seen in play.
-- **Talking:** conversation with the creatures that have lines and the Companion Share entry are still to come; the
-  talk window and persuasion are seen working in play ([the bug tracker](docs/BUGS.md)).
-- **Resting:** the wilderness creature came too often in one session; fixed in source, still to be seen in play.
-- **The base game:** the end of the main quest in the Heart Chamber; pickpocketing, picking owned locks and locks on
-  doors and containers; making your own enchantments; schedules by the time of day; the shores still run in saw-tooth steps.
+With the framework in place, the next work is playing it through:
 
-**Then v0.0.68** continues with the expansions' finished content: Tribunal's Mournhold with its quests and Bloodmoon's
-Solstheim, with their scripts; a build that fits a 32 GB machine; then the rest of the open plan. The order of record is
-the [roadmap](docs/ROADMAP.md); no dates are promised. Every system of the base game with its state:
-[game features](docs/GAME_FEATURES.md). Known problems: [the bug tracker](docs/BUGS.md).
+- **Quests:** playing Tribunal's and Bloodmoon's quests through from start to finish.
+- **Talking:** conversation with the creatures that have lines, and the Companion Share entry.
+- **The journal's dated quest entries:** they carry no link spans yet, and the topic list has no letter index yet.
+- **Solstheim on the world map:** each of its sites with a marker of its own.
+- **Frame rate:** the heaviest places, Mournhold's districts above all, which run at 8 to 16 frames a second in the
+  emulator.
+- **The base game's last parts:** the end of the main quest in the Heart Chamber, pickpocketing, picking owned locks and
+  locks on doors and containers, making your own enchantments, schedules by the time of day, and smoother shores.
+
+**v0.0.69** carries the expansions on to their finished content, and the rest of the open plan follows. The order of record is the [roadmap](docs/ROADMAP.md); no dates are promised. Every system with
+its state: [game features](docs/GAME_FEATURES.md). Known problems: [the bug tracker](docs/BUGS.md).
 
 ## Build it from your own Morrowind
 
@@ -116,8 +129,8 @@ finished work is taken back; the build's last lines say what to change first
 ([the build stopped or ran out of memory: what now?](docs/LINUX_BUILD.md#the-build-stopped-or-ran-out-of-memory-what-now)).
 
 The emulator presets of this version are
-[`AmiWind-v0.0.68-dev12-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.68-dev12-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.68-dev12-WinUAE.uae`](resources/emulators/AmiWind-v0.0.68-dev12-WinUAE.uae); both start with 32 MB of Fast
+[`AmiWind-v0.0.68-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.68-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.68-WinUAE.uae`](resources/emulators/AmiWind-v0.0.68-WinUAE.uae); both start with 32 MB of Fast
 RAM, the requirement. The presets of earlier versions are beside them in [resources/emulators](resources/emulators/). Everything
 else about building and playing: [Building and playing](docs/BUILDING_AND_PLAYING.md), the
 [Linux build guide](docs/LINUX_BUILD.md) and the [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md).
@@ -138,8 +151,12 @@ else about building and playing: [Building and playing](docs/BUILDING_AND_PLAYIN
 
 ## About
 
-Created by **FlyingFathead a.k.a. Horstator**. Thanks to: **ChaosWhisperer**.
+Created by **FlyingFathead a.k.a. Horstator**.
 **Official project repository:** [FlyingFathead/amiwind](https://github.com/FlyingFathead/amiwind).
+
+Thanks to: **ChaosWhisperer**, and to the people of the SAKU (Finnish Amiga Users Group) community, especially
+**tohtoris** and **jvaltane**, for beta testing and tips on hardware implementation, and **jtsiren** for positive
+feedback.
 
 AmiWind runs on the CHIM engine, built on GPLv2 code from **id Software's Quake** (John Carmack and the id team) and
 its Amiga port **AmiQuake** (Peter McGavin, NovaCoder, Stephen Leary). The CHIM builder that converts your own

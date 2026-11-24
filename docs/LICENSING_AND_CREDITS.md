@@ -175,7 +175,11 @@ original project code; no OpenMW source is included ([MWSCRIPT_BYTECODE.md](MWSC
 
 ## Acknowledgements
 
-Created by **FlyingFathead a.k.a. Horstator**. Thanks to **ChaosWhisperer**.
+Created by **FlyingFathead a.k.a. Horstator**.
+
+Thanks to: **ChaosWhisperer**, and to the people of the SAKU (Finnish Amiga Users Group) community, especially
+**tohtoris** and **jvaltane**, for beta testing and tips on hardware implementation, and **jtsiren** for positive
+feedback.
 
 - Bethesda Softworks and the Morrowind creators for the original game, and
   Jeremy Soule for its soundtrack. The original is available from

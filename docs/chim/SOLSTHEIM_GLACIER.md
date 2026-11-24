@@ -1,6 +1,6 @@
 # Solstheim's glacier: how it is approached
 
-_Last updated with AmiWind v0.0.68-dev7 (22 November 2026)._
+_Last updated with AmiWind v0.0.68 (24 November 2026)._
 
 This page is reference material: why the glacier corner of Solstheim did not fit, what was measured, which ways of
 making it fit were tried, the way chosen, and the rules every way has to pass. The other 135 of Solstheim's 144 open

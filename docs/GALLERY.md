@@ -7,6 +7,7 @@ What changed in each version: [changelog](CHANGELOG.md).
 <!-- contents start -->
 ## Contents
 
+- [v0.0.68: Solstheim Is Here](#v0068-solstheim-is-here)
 - [v0.0.67: Tribunal Introduced: Mournhold's districts](#v0067-tribunal-introduced-mournholds-districts)
 - [v0.0.66: A first look at Mournhold (Tribunal)](#v0066-a-first-look-at-mournhold-tribunal)
 - [v0.0.56-dev1: Ald'ruhn on a Raspberry Pi](#v0056-dev1-aldruhn-on-a-raspberry-pi)
@@ -26,7 +27,23 @@ What changed in each version: [changelog](CHANGELOG.md).
 
 <!-- contents end -->
 
-_Last updated with AmiWind v0.0.67 (19 November 2026)._
+_Last updated with AmiWind v0.0.68 (24 November 2026)._
+
+## v0.0.68: Solstheim Is Here
+
+Bloodmoon's island in the game. Taken in FS-UAE (32 MB Fast RAM, first person, the debug lines on), enlarged two times
+without smoothing.
+
+**On the way to Solstheim:** walking on the sea with Water Walking, just across from Vvardenfell's waters into
+Solstheim's cell (-20,15), at noon, while Water Walking was checked in play on a test image of v0.0.68.
+
+![On the way to Solstheim: walking on the open sea with Water Walking, grey sky and the sea to the horizon, v0.0.68](images/amiwind-v0.0.68-on-the-way-to-solstheim.png)
+
+**Initial views of Solstheim:** the pine forest of Brodir Grove (cell -23,20) at noon, on the seventh development
+snapshot. The trees in this picture are one of the trial tree methods (slice pictures for the crowns and a six-sided
+bark); those methods are behind a switch that is off by default, and the release draws the trees the usual way.
+
+![Initial views of Solstheim: pines on a grassy slope in Brodir Grove, pale trees in the fog beyond, v0.0.68](images/amiwind-v0.0.68-initial-views-of-solstheim.png)
 
 ## v0.0.67: Tribunal Introduced: Mournhold's districts
 

@@ -19,6 +19,7 @@
     },
     "regions": {"type": "array", "items": {"type": "string", "minLength": 1}},
     "reason": {"type": "string"},
-    "notes": {"type": "string"}
+    "notes": {"type": "string"},
+    "recordless": {"type": "boolean", "description": "true: the cells are the open sea of the map's box that no master has a CELL or LAND record for (tools/chim/sea_grid.py); taken as open sea without a tracker status and placed after every other cell (docs/chim/CHIM_REGIONS.md, The recordless open sea)"}
   }
 }
