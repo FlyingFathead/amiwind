@@ -272,7 +272,7 @@ DIAGNOSTICS|hud type|aw_debug_hud_type|1 original / 2 compact (default)
 DIAGNOSTICS|logs live|aw_logs_live_set|[on/off, true/false or 1/0] write the diagnostic logs (DEBUG.TXT, walk-profile.csv, frame-stalls.csv, heap-audit.log, cell-load-profile.tsv, music-events.csv, ...) as they happen, for benchmarks; default off: kept in memory (oldest lines drop) and written at Exit game or with dbg savelogs (saved once set)
 DIAGNOSTICS|npcfloors|aw_npc_floors|(read-only ground-contact report)
 DIAGNOSTICS|npclod|aw_npclod|[auto/0/1/2/3 / target <0..3/auto> / show on/off / bands <d0> <d1> <d2> / stats] NPC model levels (--npc-lod on builds): 0..3 forces a level on every NPC, auto = distance bands; target = the NPC under the crosshair; show labels level, triangles, KiB, distance; bands sets the edges live; stats (not saved)
-DIAGNOSTICS|npcs|aw_npcs|[talk [ID]] the NPCs of the area with their positions; talk: open the dialogue window with the nearest NPC that has topics (or record ID), turned to face it, as Talk (E) does
+DIAGNOSTICS|npcs|aw_npcs|[talk [ID]] the NPCs of the area with their positions; talk: open the dialogue window with the nearest NPC or talking creature that has topics (or record ID), turned to face it, as Talk (E) does
 DIAGNOSTICS|overlay|amiwind_show_debug|on/off true/false 1/0
 DIAGNOSTICS|pos|aw_pos|
 DIAGNOSTICS|probe|aw_probe|(slow floor audit)

@@ -1,6 +1,6 @@
 # Build cache: resuming and reusing work safely
 
-_Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
+_Last updated with AmiWind v0.0.68-dev11 (23 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -39,6 +39,8 @@ _Last updated with AmiWind v0.0.68-dev1 (20 November 2026)._
 - [Shared storage pool: store once](#shared-storage-pool-store-once)
 - [One pool for several workspaces and the CHIMporter](#one-pool-for-several-workspaces-and-the-chimporter)
 - [Garbage collector: one retention policy](#garbage-collector-one-retention-policy)
+  - [Unit cache ageing](#unit-cache-ageing)
+  - [What the plan also reports](#what-the-plan-also-reports)
 - [Free disk space](#free-disk-space)
 - [Work pool: leased workspaces](#work-pool-leased-workspaces)
 
@@ -1035,9 +1037,65 @@ job scratch. It applies the same rules everywhere:
 | kept: pinned | release and release-candidate references, maintainer pins (`WORKSPACE/cache/pins.json`, edited with `build_gc.py pin` / `unpin`) |
 | kept: reuse source | the newest passed run of every build line (version, builder type and recipe) |
 | expires: age | a run of a release series older than the newest three (`--keep-series`, default 3: the line being built and the last two releases with their dev builds), whatever its line, unless it is pinned or still building; `--keep-series 0` turns the rule off |
-| kept: active | runs still building; items whose owning job is still active; build caches |
-| expires | run folders, played or smoke copies, package and extraction scratch and test workspaces whose owning job is done; scratch left in a finished run; pooled objects that no run links and no reuse key (or CHIMport cell manifest key) names; pool temporaries older than a day |
+| kept: active | runs still building; items whose owning job is still active; build caches whose use is not recorded per entry |
+| kept: in use | unit cache entries and reuse keys used or written within the grace period (`--grace-days`, default 14), or used or written by a named run (below) |
+| expires: unused | unit cache entries and reuse keys used and written only before the grace period and by no named run, with their sidecar files and the shared files no kept entry names |
+| expires | run folders, played or smoke copies, package and extraction scratch and test workspaces whose owning job is done; scratch left in a finished run; pooled objects that no kept reuse key (or CHIMport cell manifest key) names and that nothing outside this plan's expiring items links; pool temporaries older than a day |
 | unregistered | anything without an owner: reported with its size, never deleted |
+
+### Unit cache ageing
+
+Every read of an entry of the CHIM unit cache (`cache/chim-units`), the image
+pass and unit cache (`cache/image-passes`) and the world terrain cache
+(`cache/world-terrain-v1`) writes one line to that cache's use log
+(`.provenance/reuse.jsonl`: when, which key, which run), and every entry
+records the run that wrote it (`tools/cache_provenance.py`). The collector
+reads those records:
+
+- **Named runs** are the kept runs and, for each stage a kept run carries, the
+  run where that stage last really ran (the stage record copied into
+  `profile/manifests-ran/`). A reused stage's outputs came from the units that
+  run used, so those units stay as long as the kept run does.
+- An entry is **kept** when it was used or written within the grace period, or
+  when a named run used it (its line in the use log) or wrote it (its
+  provenance). Otherwise it **expires**, with its sidecar file; the shared
+  files of a unit cache (`NAME/files/`) go only when no kept entry names them.
+- Entries a named run may have written but whose writer is not recorded are
+  kept.
+- **Kept whole**, because their use is not recorded per entry or they are
+  records rather than a cache: the frame heap results (`chim-units/heap`,
+  `image-passes/chim-frame-heap`), the stair walk records
+  (`image-passes/stair-walk*`), the partition cache (it keeps its own most
+  recently used), the NPC gallery cache, and the reuse keys read without a use
+  line (`chim-unit`, `chimport-cell`, `chim-ocean`). A cache without a use log,
+  or a sub-cache holding a file outside its usual form, is kept whole too.
+- The pool's reuse keys of `sound`, `video`, `mwscript` and `npc-resident-v2`
+  age the same way; a pooled object only expired keys name expires in the same
+  plan.
+
+A sub-cache in which nothing was used or written within the grace period is
+marked **dormant** in the plan. That happens when the builds take a stage by
+stage reuse rather than from its unit cache. `--grace-days 0` turns the
+ageing off.
+
+### What the plan also reports
+
+- **Each pool:** its objects and bytes, the bytes the kept set alone needs
+  (the objects that kept runs, kept caches or kept reuse keys link or name),
+  what expires in this plan, and what only items that are not kept hold.
+- **The retire order:** the runs that are not kept (expired and unregistered
+  ones), in the order that frees the most when each run goes together with
+  every run before it, pooled objects included.
+- **The use-log trim:** for each use log, the lines older than the grace
+  period and of no named run, with their bytes. The cutoff and the named runs
+  are in the JSON, so the lines can be moved to an archive. The collector
+  never edits a log.
+
+With `--json FILE`, every expired path, one per line, is written to
+`FILE.expired-paths.txt` beside the plan, and the plan names that file. A
+unit cache row gives its entry count and a sample rather than every path.
+`--delete --item PATH` accepts a row's path, which removes all its expired
+entries, or a single expired entry file.
 
 Owners come from a registry file (`--registry FILE`):
 `{"items": [{"path": ..., "owner": ..., "purpose": ..., "state": "active"|"done"}]}`.
@@ -1053,7 +1111,7 @@ unregistered items are never deleted, and a run that started building again
 since the plan was made is left alone.
 
 ```
-python tools/build_gc.py plan VOLUME_OR_WORKSPACE... [--registry FILE] [--json plan.json]
+python tools/build_gc.py plan VOLUME_OR_WORKSPACE... [--registry FILE] [--grace-days 14] [--jobs N] [--json plan.json]
 python tools/build_gc.py plan ... --delete --item PATH [--item PATH ...]
 python tools/build_gc.py pin WORKSPACE build/RUN --kind rc --reason "release candidate reference"
 ```

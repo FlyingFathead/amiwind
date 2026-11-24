@@ -38,6 +38,7 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.68-dev7 (26490365) | 2026-11-22 | gate 12521 of the planning item COLLISION-ICEBERG-CLIPNODE-BUDGET-67 | The Mortrag Glacier's nine cells fit 32 MB with method E, the Solstheim module's shipped default set, and are built by the module |
+| shipped | the v0.0.68-dev8 build | v0.0.68-dev8 (26490365) | 2026-11-23 | the delivered build holds the commit (the planning item's shipped list) | the fix is in a numbered build; not yet confirmed by a play check |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
@@ -45,6 +46,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-20 18:27 +0200: seen again in v0.0.68-dev1: A third ice coast cell, -26,25, passes the memory check but its ring measured alone is more than twice the budget: ice chunks and iceberg shards again.
 - 2026-11-20 21:20 +0200: seen again in v0.0.68-dev1: Measured as built (each cell as the frame a build installs, with its neighbours' edge), the glacier's eight neighbouring cells need 39 to 57 MB of memory ring against 6.2 MB: the glacier's icebergs reach into each of their frames.
 - 2026-11-22: fixed in source: a gated commit, v0.0.68-dev7 (26490365); gate 12521 of the planning item COLLISION-ICEBERG-CLIPNODE-BUDGET-67: The Mortrag Glacier's nine cells fit 32 MB with method E, the Solstheim module's shipped default set, and are built by the module
+- 2026-11-23: shipped: the v0.0.68-dev8 build, v0.0.68-dev8 (26490365); the delivered build holds the commit (the planning item's shipped list): the fix is in a numbered build; not yet confirmed by a play check
 
 <!-- END GENERATED TIMELINE -->
 

@@ -4,5 +4,5 @@
 // Toolkit pages (the inspector's JSON copies, the World Map state) carries this value as its "version"; nothing else
 // in the pages types a version number. The Toolkit's own counter is a separate field, "toolkit_build".
 (function (root) {
-  root.AMIWIND_VERSION = '0.0.68-dev11';
+  root.AMIWIND_VERSION = '0.0.68-dev12';
 })(typeof window !== 'undefined' ? window : this);

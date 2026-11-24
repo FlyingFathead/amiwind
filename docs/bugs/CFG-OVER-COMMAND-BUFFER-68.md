@@ -27,11 +27,13 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.68-dev8 (08793a6d) | 2026-11-22 | gate 12726 of the planning item CFG-OVER-COMMAND-BUFFER-68 | The engine command buffer holds 32768 bytes and the image step refuses a start-up settings file at or over half of it; the dev8 boot smoke shows the defaults back (53 creatures alive at Seyda Neen after 1 s, the actor table 530 levelled). |
+| shipped | the v0.0.68-dev8 build | v0.0.68-dev8 (08793a6d) | 2026-11-23 | the delivered build holds the commit (the planning item's shipped list) | the fix is in a numbered build; not yet confirmed by a play check |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-22: reported in v0.0.68-dev8
 - 2026-11-22: fixed in source: a gated commit, v0.0.68-dev8 (08793a6d); gate 12726 of the planning item CFG-OVER-COMMAND-BUFFER-68: The engine command buffer holds 32768 bytes and the image step refuses a start-up settings file at or over half of it; the dev8 boot smoke shows the defaults back (53 creatures alive at Seyda Neen after 1 s, the actor table 530 levelled).
+- 2026-11-23: shipped: the v0.0.68-dev8 build, v0.0.68-dev8 (08793a6d); the delivered build holds the commit (the planning item's shipped list): the fix is in a numbered build; not yet confirmed by a play check
 
 <!-- END GENERATED TIMELINE -->
 

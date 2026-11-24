@@ -215,6 +215,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [EXPANSION-READER-ONE-MASTER-64](EXPANSION-READER-ONE-MASTER-64.md): Most builder readers load only the base game file; the roadmap calls the readers master-list readers
 - [GATE-IMAGE-REMOVED-52](GATE-IMAGE-REMOVED-52.md): A cleanup removed the image the gate s Linux host-parity step runs: the in-use check looked at containers only
 - [GATE-PRIVACY-NOT-IN-PREGATE-52](GATE-PRIVACY-NOT-IN-PREGATE-52.md): The privacy word check runs only in the full gate: the quick pre-gate checks passed text the gate then refused
+- [GC-RUN-WALK-ONE-CORE-68](GC-RUN-WALK-ONE-CORE-68.md): The garbage collector walks the run folders one after another on one core (about six minutes on a large build volume)
 - [GUARD-TORCH-SCRATCH-SERIAL-67](GUARD-TORCH-SCRATCH-SERIAL-67.md): From scratch, the guard torch step bakes the six boat guard models one after another only to skip every one of them
 - [HARVEST-CHIM-COVERAGE-ONE-AREA-48](HARVEST-CHIM-COVERAGE-ONE-AREA-48.md): The image step harvest coverage check failed on every CHIM world of one area (every MiniWind sandbox of one town)
 - [IMAGE-BIGGER-THAN-ORIGINAL-62](IMAGE-BIGGER-THAN-ORIGINAL-62.md): The game image (3,022 MB in v0.0.62) is bigger than the original game data it is made from (1.93 GB)

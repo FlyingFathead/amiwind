@@ -29,11 +29,13 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.67 (6ec05cc3) | 2026-11-22 | gate 12460 of the planning item DOCK-GREETING-OUT-OF-REACH-67 | The game was right: a player coming down the plank is greeted on it; the opening journey's stop point was out of the dock guard's reach, and its step 1 now meets him from the ship's side and waits for his greeting |
+| shipped | the v0.0.68-dev7 build | v0.0.68-dev7 (6ec05cc3) | 2026-11-23 | the delivered build holds the commit (the planning item's shipped list) | the fix is in a numbered build; not yet confirmed by a play check |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-22: reported in v0.0.67
 - 2026-11-22: fixed in source: a gated commit, v0.0.67 (6ec05cc3); gate 12460 of the planning item DOCK-GREETING-OUT-OF-REACH-67: The game was right: a player coming down the plank is greeted on it; the opening journey's stop point was out of the dock guard's reach, and its step 1 now meets him from the ship's side and waits for his greeting
+- 2026-11-23: shipped: the v0.0.68-dev7 build, v0.0.68-dev7 (6ec05cc3); the delivered build holds the commit (the planning item's shipped list): the fix is in a numbered build; not yet confirmed by a play check
 
 <!-- END GENERATED TIMELINE -->
 
@@ -130,6 +132,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [DIALOGUE-BACKGROUND-EMPTY-RANK-67](DIALOGUE-BACKGROUND-EMPTY-RANK-67.md): Hul in Balmora answers Background with "I am Hul, Pauper and  of the  ." : the rank and faction words are empty
 - [DIALOGUE-CELL-FILTER-SEVERAL-CELLS-68](DIALOGUE-CELL-FILTER-SEVERAL-CELLS-68.md): A voice or greeting line with a place filter is never said by a speaker placed in several places or placed by a script
 - [DIALOGUE-CHOICES-62](DIALOGUE-CHOICES-62.md): Dialogue choices are not shown as rows to pick, and the branch after a pick is not filtered as in the original
+- [DIALOGUE-COMPANION-SHARE-MISSING-68](DIALOGUE-COMPANION-SHARE-MISSING-68.md): Missing: the talk window has no Companion Share entry for a companion, and there is no share window
 - [DIALOGUE-CONDITIONS-PARTIAL-67](DIALOGUE-CONDITIONS-PARTIAL-67.md): Incomplete: the dialogue conditions PcVampire, PcCorprus and PcClothingModifier read their start value, and RankRequirement is not checked in game
 - [DIALOGUE-CREATURE-SPEAKERS-66](DIALOGUE-CREATURE-SPEAKERS-66.md): Creatures that speak have no rows in the dialogue table, so their lines cannot be said: Almalexia, Vivec, ghosts, a draugr and rieklings among them
 - [DIALOGUE-DISPOSITION-CHARM-ZERO-67](DIALOGUE-DISPOSITION-CHARM-ZERO-67.md): Incomplete: a Charm effect adds nothing to an NPC disposition in a conversation: it is read as 0
@@ -218,6 +221,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [MWSCRIPT-ONPCHITME-NEVER-SET-68](MWSCRIPT-ONPCHITME-NEVER-SET-68.md): The script variable OnPCHitMe is never set: a script that waits for the player to strike its actor never sees the blow
 - [MWSCRIPT-PLACE-NO-MODEL-62](MWSCRIPT-PLACE-NO-MODEL-62.md): A script cannot place an NPC or a creature whose record has no placed reference in Vvardenfell
 - [MWSCRIPT-PLACE-OTHER-KINDS-62](MWSCRIPT-PLACE-OTHER-KINDS-62.md): A script cannot place an activator, a container or a levelled creature list yet
+- [MWSCRIPT-PLAYBINK-SKIP-FLAG-68](MWSCRIPT-PLAYBINK-SKIP-FLAG-68.md): A video started by a script can always be skipped, also the ones the original plays to the end without a skip
 - [MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68](MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68.md): PlayGroup and LoopGroup play only on a person or creature with a converted skeleton: animated objects and the player do not play the group, and the start mode is not read
 - [MWSCRIPT-PLAYGROUP-FRAME-OBJECTS-68](MWSCRIPT-PLAYGROUP-FRAME-OBJECTS-68.md): A script's PlayGroup or LoopGroup on an object drawn as a placement of an outdoor frame (Mournhold's districts) changes nothing: Azura in the Temple Courtyard keeps her placed look through her appearance and departure at the end of Tribunal's main quest
 - [MWSCRIPT-POSITION-ROOM-ROTATION-68](MWSCRIPT-POSITION-ROOM-ROTATION-68.md): A script's Position ignores its rotation argument and always moves the player to the outdoor point, also from inside a room

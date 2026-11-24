@@ -1,0 +1,229 @@
+# Persuasion in play (PERSUASION-BROKEN-62, DIALOGUE-FIGHT-DISPOSITION-57): Admire, Intimidate, Taunt and the three
+# bribes on one person, then Taunt again and again until the person attacks. A FULL image, FS-UAE at 32 MB Fast, warp
+# off, started with --map seyda; on an image older than a fix, the engine (--engine) of the fixed commit. A
+# character after the census (dbg aw hors walks the player out of the census office in Seyda Neen, whatever map was
+# loaded; its last message box answered with boxes), 1200 gold added for the bribes. The person is the nearest one
+# with a dialogue row (dbg npcs talk without a name; the console's "Talk: NAME (N units)" line names who). Runs of
+# 2026-11-23: the first stopped at the census's last message box and Tolvise Othralen (of the v0.0.62-dev1 report) was
+# not among the references loaded at the office's door; the second asked for Hul, who is in Balmora, not Seyda Neen.
+# Expected, on the pictures (the disposition bar's number on top of the window, the answer in the text):
+# - p0: the window opens with the greeting and the disposition before;
+# - p1: Persuasion opens the persuasion list (Admire, Intimidate, Taunt, Bribe 10, 100 and 1000 Gold, Back), never the
+#   topics again (the v0.0.62-dev1 fault: Admire and Intimidate fell back to the topics, Taunt showed nothing);
+# - p2..p7: each action adds its name as a heading and the person's own "<Kind> Success" or "<Kind> Fail" answer, and
+#   the bar's number moves (up on an Admire or bribe success, down on a Taunt; a failed bribe keeps the gold);
+# - t01..t40: Taunt again and again. A successful taunt raises the person's Fight and lowers the disposition; once the
+#   Fight with the disposition's bias reaches 100 the person attacks and the conversation ends at once (OpenMW: the
+#   actor turns hostile). From then the window is shut, so the NEXT "topic Taunt" stops the run with "FAIL topic Taunt:
+#   the dialogue window is not open" and its picture topic-no-window: THAT IS THE EXPECTED END of this script (the
+#   last t-picture and topic-no-window show the attack; the state lines log screen none). A run that reaches t40 with
+#   the window still open means the person never attacked: the console's getfight / getdisposition lines after the
+#   loop give the numbers.
+wait 8
+cmd dbg all on
+cmd dbg headlamp off
+cmd dbg god on
+cmd dbg aw hors
+wait 60
+boxes
+wait 2
+boxes
+state map
+state screen
+cmd player->additem gold_001 1200
+wait 1
+boxes
+cmd dbg npcs talk
+waitfor screen 10 dialogue
+wait 2
+shot p0-disposition-before
+topic Persuasion
+wait 2
+state screen
+shot p1-persuasion-list
+topic Admire
+wait 2
+shot p2-admire
+topic Intimidate
+wait 2
+shot p3-intimidate
+topic Taunt
+wait 2
+shot p4-taunt
+topic Bribe 10 Gold
+wait 2
+shot p5-bribe-10
+topic Bribe 100 Gold
+wait 2
+shot p6-bribe-100
+topic Bribe 1000 Gold
+wait 2
+shot p7-bribe-1000
+state screen
+topic Taunt
+wait 1
+state screen
+shot t01-taunt
+topic Taunt
+wait 1
+state screen
+shot t02-taunt
+topic Taunt
+wait 1
+state screen
+shot t03-taunt
+topic Taunt
+wait 1
+state screen
+shot t04-taunt
+topic Taunt
+wait 1
+state screen
+shot t05-taunt
+topic Taunt
+wait 1
+state screen
+shot t06-taunt
+topic Taunt
+wait 1
+state screen
+shot t07-taunt
+topic Taunt
+wait 1
+state screen
+shot t08-taunt
+topic Taunt
+wait 1
+state screen
+shot t09-taunt
+topic Taunt
+wait 1
+state screen
+shot t10-taunt
+topic Taunt
+wait 1
+state screen
+shot t11-taunt
+topic Taunt
+wait 1
+state screen
+shot t12-taunt
+topic Taunt
+wait 1
+state screen
+shot t13-taunt
+topic Taunt
+wait 1
+state screen
+shot t14-taunt
+topic Taunt
+wait 1
+state screen
+shot t15-taunt
+topic Taunt
+wait 1
+state screen
+shot t16-taunt
+topic Taunt
+wait 1
+state screen
+shot t17-taunt
+topic Taunt
+wait 1
+state screen
+shot t18-taunt
+topic Taunt
+wait 1
+state screen
+shot t19-taunt
+topic Taunt
+wait 1
+state screen
+shot t20-taunt
+topic Taunt
+wait 1
+state screen
+shot t21-taunt
+topic Taunt
+wait 1
+state screen
+shot t22-taunt
+topic Taunt
+wait 1
+state screen
+shot t23-taunt
+topic Taunt
+wait 1
+state screen
+shot t24-taunt
+topic Taunt
+wait 1
+state screen
+shot t25-taunt
+topic Taunt
+wait 1
+state screen
+shot t26-taunt
+topic Taunt
+wait 1
+state screen
+shot t27-taunt
+topic Taunt
+wait 1
+state screen
+shot t28-taunt
+topic Taunt
+wait 1
+state screen
+shot t29-taunt
+topic Taunt
+wait 1
+state screen
+shot t30-taunt
+topic Taunt
+wait 1
+state screen
+shot t31-taunt
+topic Taunt
+wait 1
+state screen
+shot t32-taunt
+topic Taunt
+wait 1
+state screen
+shot t33-taunt
+topic Taunt
+wait 1
+state screen
+shot t34-taunt
+topic Taunt
+wait 1
+state screen
+shot t35-taunt
+topic Taunt
+wait 1
+state screen
+shot t36-taunt
+topic Taunt
+wait 1
+state screen
+shot t37-taunt
+topic Taunt
+wait 1
+state screen
+shot t38-taunt
+topic Taunt
+wait 1
+state screen
+shot t39-taunt
+topic Taunt
+wait 1
+state screen
+shot t40-taunt
+topic Back
+wait 1
+key Escape
+wait 2
+state screen
+wait 2
+shot t99-never-attacked

@@ -28,12 +28,14 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.67 (be16eec5) | 2026-11-22 | gate 12481 of the planning item JOURNEY-DOCK-NOCLIP-UNSTUCK-RACE-68 | Switching noclip off now keeps that spot as the one the stuck check falls back to, so a box touching the world there is lifted clear in place; the opening journey's flight to the plank went through and the journey passed all 50 checks. |
+| shipped | the v0.0.68-dev7 build | v0.0.68-dev7 (be16eec5) | 2026-11-23 | the delivered build holds the commit (the planning item's shipped list) | the fix is in a numbered build; not yet confirmed by a play check |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-22: reported in v0.0.68-dev6
 - 2026-11-22: fixed in source: a gated commit, v0.0.67 (be16eec5); gate 12481 of the planning item JOURNEY-DOCK-NOCLIP-UNSTUCK-RACE-68: Switching noclip off now keeps that spot as the one the stuck check falls back to, so a box touching the world there is lifted clear in place; the opening journey's flight to the plank went through and the journey passed all 50 checks.
 - 2026-11-22 08:01 +0200: seen again in v0.0.68-dev6: Counted over the night's runs: the first step's flight failed in 6 of 11 runs, the player left walking into the town's walls by the start point with the free-flight mode off.
+- 2026-11-23: shipped: the v0.0.68-dev7 build, v0.0.68-dev7 (be16eec5); the delivered build holds the commit (the planning item's shipped list): the fix is in a numbered build; not yet confirmed by a play check
 
 <!-- END GENERATED TIMELINE -->
 

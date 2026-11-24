@@ -19,6 +19,24 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.68-dev11 (b9a88230) | 2026-11-23 | gate 12942 of the planning item BUILD-CACHE-NO-RETENTION-55 | The garbage collector ages the unit caches by their use logs and the entries' writers (kept when used or written within 14 days or by a kept run or the run a kept run's stage came from), reports the pool's needs, the retire order and the use-log trim, and walks the run folders on every core |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-28: reported in v0.0.55
+- 2026-11-23: fixed in source: a gated commit, v0.0.68-dev11 (b9a88230); gate 12942 of the planning item BUILD-CACHE-NO-RETENTION-55: The garbage collector ages the unit caches by their use logs and the entries' writers (kept when used or written within 14 days or by a kept run or the run a kept run's stage came from), reports the pool's needs, the retire order and the ...
+- 2026-11-23 20:37 +0200: seen again in v0.0.68-dev11: Seen again during a development delivery: the build volume reached 97 % full; the shared cache held 561 GB and nothing ages its unit entries yet.
+
+<!-- END GENERATED TIMELINE -->
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -105,5 +123,8 @@ Family: Builder breaks and reproducibility (`builder-from-scratch`). The reposit
 Related bugs in other categories:
 
 - [BUILD-STORAGE-DUPLICATES-33](BUILD-STORAGE-DUPLICATES-33.md): Build storage keeps full duplicate copies of images, stage outputs and packages, and nothing removes them
+- [CACHE-KEY-LOOKUP-NO-USE-68](CACHE-KEY-LOOKUP-NO-USE-68.md): Reuse keys read by lookup (CHIM units, CHIMport cells, ocean) record no use, so the collector cannot age them
+- [CACHE-REUSE-LOG-UNBOUNDED-68](CACHE-REUSE-LOG-UNBOUNDED-68.md): The build cache's use log grows by one line per unit hit and is never trimmed (18 GB for the CHIM unit cache)
+- [GC-RUN-WALK-ONE-CORE-68](GC-RUN-WALK-ONE-CORE-68.md): The garbage collector walks the run folders one after another on one core (about six minutes on a large build volume)
 
 <!-- END GENERATED CATEGORY -->

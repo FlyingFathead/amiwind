@@ -28,11 +28,13 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.67 (951a01b5) | 2026-11-22 | gate 12482 of the planning item JOURNEY-CRAB-WALK-POINT-AT-TABLE-EDGE-68 | The journey's walk to the crab meat now ends north of the back-room table's edge, where the table cannot stop the player outside the walk's reach; not yet run in a session. |
+| shipped | the v0.0.68-dev7 build | v0.0.68-dev7 (951a01b5) | 2026-11-23 | the delivered build holds the commit (the planning item's shipped list) | the fix is in a numbered build; not yet confirmed by a play check |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-22: reported in v0.0.68-dev6
 - 2026-11-22: fixed in source: a gated commit, v0.0.67 (951a01b5); gate 12482 of the planning item JOURNEY-CRAB-WALK-POINT-AT-TABLE-EDGE-68: The journey's walk to the crab meat now ends north of the back-room table's edge, where the table cannot stop the player outside the walk's reach; not yet run in a session.
+- 2026-11-23: shipped: the v0.0.68-dev7 build, v0.0.68-dev7 (951a01b5); the delivered build holds the commit (the planning item's shipped list): the fix is in a numbered build; not yet confirmed by a play check
 
 <!-- END GENERATED TIMELINE -->
 

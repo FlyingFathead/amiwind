@@ -28,12 +28,14 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.68-dev8 (181c71f0) | 2026-11-22 | gate 12744 of the planning item RELEASE-GATE-COMPLETENESS-LOST-67 | A completeness check lists every cell, room and load door of the shipped masters a build or its image does not contain, and a release candidate or final is refused while one is missing |
+| shipped | the v0.0.68-dev9 build | v0.0.68-dev9 (181c71f0) | 2026-11-23 | the delivered build holds the commit (the planning item's shipped list) | the fix is in a numbered build; not yet confirmed by a play check |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-19: reported in v0.0.67
 - 2026-11-22: fixed in source: a gated commit, v0.0.68-dev8 (181c71f0); gate 12744 of the planning item RELEASE-GATE-COMPLETENESS-LOST-67: A completeness check lists every cell, room and load door of the shipped masters a build or its image does not contain, and a release candidate or final is refused while one is missing
 - 2026-11-22 19:53 +0200: seen again in v0.0.68-dev7: The refusal was lost on 14 November 2026 (commit 8175ab268, v0.0.66-dev2): the image door table had stopped a build whose doors led to places it did not hold; from that commit such doors were held back and left out of the door check, so a ...
+- 2026-11-23: shipped: the v0.0.68-dev9 build, v0.0.68-dev9 (181c71f0); the delivered build holds the commit (the planning item's shipped list): the fix is in a numbered build; not yet confirmed by a play check
 
 <!-- END GENERATED TIMELINE -->
 

@@ -19,6 +19,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-28: reported in v0.0.54-dev2
+- 2026-11-23 21:49 +0200: seen again in v0.0.68-dev11: Seen again: the CHIM unit cache's use log is now about 18 GB and grows by about 0.4 GB a day; the garbage collector's plan now lists the lines a trim would move out.
+
+<!-- END GENERATED TIMELINE -->
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -118,7 +129,9 @@ Family: Build reuse keys and output attribution (`build-cache-reuse`). A unit is
 - [BUILD-UNIT-KEYS-LAYER-BLIND-66](BUILD-UNIT-KEYS-LAYER-BLIND-66.md): Unit cache keys do not change with the selected expansion layers: an expansions-on build would reuse base-game units
 - [BUILD-VERSION-GETATTR-TRACE-49](BUILD-VERSION-GETATTR-TRACE-49.md): The v0.0.49 final rebuilt the CHIM world: the lazy VERSION (a module __getattr__ in project_version) ran in the CHIM stage, its read trace recorded it and the key could not
 - [BUILD-VISUAL-RECIPES-LAYER-ROWS-KEY-67](BUILD-VISUAL-RECIPES-LAYER-ROWS-KEY-67.md): An expansion's visual recipe or cell row re-keyed every base stage that reads the visual recipes: the file was keyed whole
+- [CACHE-KEY-LOOKUP-NO-USE-68](CACHE-KEY-LOOKUP-NO-USE-68.md): Reuse keys read by lookup (CHIM units, CHIMport cells, ocean) record no use, so the collector cannot age them
 - [CACHE-NO-PROVENANCE-36](CACHE-NO-PROVENANCE-36.md): Cache and pool entries were keyed by SHA-256 but did not record when, by which run, from which version and commit they were made, and some recorded no output hash
+- [CACHE-REUSE-LOG-UNBOUNDED-68](CACHE-REUSE-LOG-UNBOUNDED-68.md): The build cache's use log grows by one line per unit hit and is never trimmed (18 GB for the CHIM unit cache)
 - [CHIM-COLLISION-UNION-FAIL-NOT-CACHED-48](CHIM-COLLISION-UNION-FAIL-NOT-CACHED-48.md): A collision union that fails is compiled again for every room that uses the same mesh packet
 - [CHIM-INTERIORS-REUSE-MISS-48](CHIM-INTERIORS-REUSE-MISS-48.md): The CHIM rooms stage (chim-interiors) is never reused: it hashed the shared CHIM unit cache, which is past the 512 MiB folder limit
 - [CHIMPORT-CELL-KEY-LAYERS-65](CHIMPORT-CELL-KEY-LAYERS-65.md): Selecting the expansion layers re-keys every CHIMport cell of the island

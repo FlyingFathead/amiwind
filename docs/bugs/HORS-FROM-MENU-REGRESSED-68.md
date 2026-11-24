@@ -9,7 +9,7 @@
 | Where | the debug character start from the main menu (dbg aw hors) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.68-dev7 (last seen) |
+| Persists in | fixed in v0.0.68-dev8 |
 | Severity | medium: the fastest way to test a dev image is broken from the main menu; it works only from inside a game |
 | Family | Debug commands and remote control (`debug-commands`) |
 | Playtest version | v0.0.68-dev7 |
@@ -29,11 +29,15 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.68-dev7 (bc5f1981) | 2026-11-23 | gate 12640 of the planning item HORS-FROM-MENU-REGRESSED-68 | Escape in play after a game started from the main menu by a console command opens the in-game menu with Return to game; the start itself was never broken (confirmed in play on FS-UAE routes A-D and on the Pi stick) |
+| shipped | the v0.0.68-dev8 build | v0.0.68-dev8 (bc5f1981) | 2026-11-23 | the delivered build holds the commit (the planning item's shipped list) | the fix is in a numbered build |
+| confirmed in play | a play session | v0.0.68-dev7 image with the gate 12640 engine | 2026-11-23 | FS-UAE session confirm-g12640, routes A to D (32 MB Fast) | Escape in play after a start from the main menu by a console command opens the in-game menu with Return to game, and Escape again returns to play; smoke passed |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-22: reported in v0.0.68-dev7
 - 2026-11-23: fixed in source: a gated commit, v0.0.68-dev7 (bc5f1981); gate 12640 of the planning item HORS-FROM-MENU-REGRESSED-68: Escape in play after a game started from the main menu by a console command opens the in-game menu with Return to game; the start itself was never broken (confirmed in play on FS-UAE routes A-D and on the Pi stick)
+- 2026-11-23: shipped: the v0.0.68-dev8 build, v0.0.68-dev8 (bc5f1981); the delivered build holds the commit (the planning item's shipped list): the fix is in a numbered build
+- 2026-11-23: confirmed in play: a play session, v0.0.68-dev7 image with the gate 12640 engine; FS-UAE session confirm-g12640, routes A to D (32 MB Fast): Escape in play after a start from the main menu by a console command opens the in-game menu with Return to game, and Escape again returns to play; smoke passed
 
 <!-- END GENERATED TIMELINE -->
 

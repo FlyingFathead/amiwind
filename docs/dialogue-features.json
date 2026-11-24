@@ -1,6 +1,6 @@
 {
   "schema": "dialogue-features 1",
-  "updated": "2026-11-18",
+  "updated": "2026-11-23",
   "requirement": "v0.0.58 ships the dialogue feature-complete against the original and OpenMW 0.51 (decided for the project, 31 October 2026); a row that is not done blocks the release unless it carries the maintainer's written deferral. Status on 8 November 2026: dialogue choices show as rows in the conversation text, picked by a click or the arrow keys and Enter, and each pick is answered by the first answer of the topic whose filters pass, such as paying only when you have the gold; this still needs its check in the game (DIALOGUE-CHOICES-62). Characters who threaten you in dialogue attacking when the talk ends, and fights that start from dialogue results across the whole game, are being checked (DIALOGUE-AGGRO-62). They lead the next landmark, every game script running as in the original, measured by the MWScript feature tracker; other fixes continue alongside.",
   "measured": {
     "source": "tools/dialogue_lut.py on Morrowind.esm (the report's coverage block), measured again on 18 November 2026 with the v0.0.67-dev3 table and engine: the answers for faction members no longer reach speakers without a faction (3 answers and 6 conditions fewer, DIALOGUE-RANK-WITHOUT-FACTION-67), and the player's diseases, the value worn, Corprus, vampirism and the speaker attacked are read live (235 conditions that read their start value before, DIALOGUE-CONDITIONS-PARTIAL-67); before that on 7 November 2026 with the v0.0.62 table and the Alarmed condition live (CRIME-59); first measured 31 October 2026, the 114 RankRequirement conditions moved to live on 1 November 2026 (FACTION-RANK-58)",
@@ -90,9 +90,10 @@
       "id": "disposition-bar",
       "name": "Disposition bar",
       "area": "window",
-      "state": "done",
-      "what": "The blue bar with its number across the top of the window.",
-      "proof": "The v0.0.57 release image: Fargoth and a guard, 50 (clips 2026_10_31_v0.0.57_dialogue-rc1_7ff625e).",
+      "state": "partial",
+      "what": "The right column as the original's (since v0.0.68): the blue bar with \"N/100\" on top of the column, for a person only; the special entries the speaker offers in the original's order (Persuasion for a person only, Barter, Spells, Travel, Spellmaking, Enchanting, Training, Repair); a separator line; the topics; Goodbye at the bottom; the conversation text on the left starts on the bar's row.",
+      "proof": "The v0.0.57 release image: Fargoth and a guard, 50 (clips 2026_10_31_v0.0.57_dialogue-rc1_7ff625e), the bar across the window. The v0.0.68 column: the entries' order, the creature rule and the separator rule run natively (tests/aga_dial_links_test.c), the window's wiring in tests/test_dialogue_window_ui.py RightColumn.",
+      "missing": "The v0.0.68 right column's in-game stills (a merchant with Barter, a trainer). Companion Share, the original's last entry, is not offered: no companion test and no share window yet (DIALOGUE-COMPANION-SHARE-MISSING-68).",
       "bugs": [
         "DIALOGUE-WINDOW-LAYOUT-57"
       ]

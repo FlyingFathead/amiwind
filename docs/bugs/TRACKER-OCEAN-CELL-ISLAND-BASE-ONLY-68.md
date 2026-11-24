@@ -28,11 +28,13 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.68-dev8 (aa9305a1) | 2026-11-23 | gate 12760 of the planning item TRACKER-OCEAN-CELL-ISLAND-BASE-ONLY-68 | the CHIM import of the open sea names each cell's island set from the master that holds its record; -29,23 and -28,24 measured as Solstheim's open sea and listed for the module (153 cells); -6,26 and -20,14 back on Vvardenfell |
+| shipped | the v0.0.68-dev9 build | v0.0.68-dev9 (aa9305a1) | 2026-11-23 | the delivered build holds the commit (the planning item's shipped list) | the fix is in a numbered build; not yet confirmed by a play check |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-22: reported in v0.0.68-dev7
 - 2026-11-23: fixed in source: a gated commit, v0.0.68-dev8 (aa9305a1); gate 12760 of the planning item TRACKER-OCEAN-CELL-ISLAND-BASE-ONLY-68: the CHIM import of the open sea names each cell's island set from the master that holds its record; -29,23 and -28,24 measured as Solstheim's open sea and listed for the module (153 cells); -6,26 and -20,14 back on Vvardenfell
+- 2026-11-23: shipped: the v0.0.68-dev9 build, v0.0.68-dev9 (aa9305a1); the delivered build holds the commit (the planning item's shipped list): the fix is in a numbered build; not yet confirmed by a play check
 
 <!-- END GENERATED TIMELINE -->
 
@@ -102,6 +104,7 @@ Family: Development tooling, receipts and packaging (`tracker-tooling`). Receipt
 - PREFLIGHT-DISK-FIGURE-53 (no report page): The release preflight does not check the shipped disk figure, so the final commit failed its gate on it (gate 4078)
 - PREFLIGHT-PERSISTING-PARSE-53 (no report page): The release preflight counted only persisting bugs whose line ended in NOT SCHEDULED, so lapsed deferrals printed 0 bugs and half a list
 - [PUBLIC-REFERENCE-SCREENSHOT-40](PUBLIC-REFERENCE-SCREENSHOT-40.md): Original-game reference screenshot included in the public source list
+- [README-STATUS-STALE-SCATTERED-68](README-STATUS-STALE-SCATTERED-68.md): The main page's status section is stuck at the previous release and several of its claims no longer match the bug tracker
 - [REGISTER-ADD-NO-RELEASE-ROW-48](REGISTER-ADD-NO-RELEASE-ROW-48.md): bug_register.py add does not list a new report page in tools/release-files.json or write its contents list: the v0.0.48 final gate failed on both
 - [REGISTER-CONCURRENT-WRITE-LOST-67](REGISTER-CONCURRENT-WRITE-LOST-67.md): Two register writes at the same time in one checkout lose an entry: the later writer saves the register from a copy read before the earlier writer's change
 - REGISTER-DEFERRAL-EXPIRES-53 (no report page): A maintainer deferral naming a release (deferred to v0.0.52) still counted as a reason inside that release, so deferrals never expired

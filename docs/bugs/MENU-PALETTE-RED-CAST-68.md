@@ -29,11 +29,13 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.68-dev7 (d65c8677) | 2026-11-22 | gate 12680 of the planning item MENU-PALETTE-RED-CAST-68 | The windows of a running game are drawn in the game palette after a start from the title menu by a console command, and the interface's own colour picks skip the ice ramp's entries; the menu colours look book page added |
+| shipped | the v0.0.68-dev8 build | v0.0.68-dev8 (d65c8677) | 2026-11-23 | the delivered build holds the commit (the planning item's shipped list) | the fix is in a numbered build; not yet confirmed by a play check |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-22: reported in v0.0.68-dev7
 - 2026-11-22: fixed in source: a gated commit, v0.0.68-dev7 (d65c8677); gate 12680 of the planning item MENU-PALETTE-RED-CAST-68: The windows of a running game are drawn in the game palette after a start from the title menu by a console command, and the interface's own colour picks skip the ice ramp's entries; the menu colours look book page added
+- 2026-11-23: shipped: the v0.0.68-dev8 build, v0.0.68-dev8 (d65c8677); the delivered build holds the commit (the planning item's shipped list): the fix is in a numbered build; not yet confirmed by a play check
 
 <!-- END GENERATED TIMELINE -->
 

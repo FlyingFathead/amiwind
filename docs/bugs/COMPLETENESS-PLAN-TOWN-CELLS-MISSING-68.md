@@ -28,11 +28,13 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.68-dev9 (76947206) | 2026-11-23 | gate 12745 of the planning item COMPLETENESS-PLAN-TOWN-CELLS-MISSING-68 | The completeness line of a build's plan counts the cells inside the CHIM towns' cores as in, by the same rule as the run; the dev9 line's plan reads complete |
+| shipped | the v0.0.68-dev10 build | v0.0.68-dev10 (76947206) | 2026-11-23 | the delivered build holds the commit (the planning item's shipped list) | the fix is in a numbered build; not yet confirmed by a play check |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-23: reported in v0.0.68-dev9
 - 2026-11-23: fixed in source: a gated commit, v0.0.68-dev9 (76947206); gate 12745 of the planning item COMPLETENESS-PLAN-TOWN-CELLS-MISSING-68: The completeness line of a build's plan counts the cells inside the CHIM towns' cores as in, by the same rule as the run; the dev9 line's plan reads complete
+- 2026-11-23: shipped: the v0.0.68-dev10 build, v0.0.68-dev10 (76947206); the delivered build holds the commit (the planning item's shipped list): the fix is in a numbered build; not yet confirmed by a play check
 
 <!-- END GENERATED TIMELINE -->
 

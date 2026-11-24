@@ -1,6 +1,6 @@
 # AmiWind documentation
 
-_Generated from `docs/README.topics.json` with AmiWind v0.0.68-dev11._
+_Generated from `docs/README.topics.json` with AmiWind v0.0.68-dev12._
 
 Every document of the project, by topic, with the version and date of its last update. A document marked "needs a refresh" predates the current state of its subject and is due for a review; its facts may be out of date. Release notes and whitespace baselines are listed in [releases](releases/README.md); one-off records and replaced documents in [history](history/README.md).
 
@@ -33,7 +33,7 @@ Every document of the project, by topic, with the version and date of its last u
 | --- | --- | --- |
 | [AW.md](AW.md) | aw: the master builder command line | v0.0.67-dev1 (17 November 2026) |
 | [AGA_BUILD.md](AGA_BUILD.md) | AGA checkpoint build and controls | v0.0.57 (30 October 2026) |
-| [BUILD_CACHE.md](BUILD_CACHE.md) | Build cache: resuming and reusing work safely | v0.0.68-dev1 (20 November 2026) |
+| [BUILD_CACHE.md](BUILD_CACHE.md) | Build cache: resuming and reusing work safely | v0.0.68-dev11 (23 November 2026) |
 | [BUILD_DEPENDENCIES.md](BUILD_DEPENDENCIES.md) | Dependency checks and reference versions | v0.0.66-dev2 (13 November 2026) |
 | [BUILD_MANIFEST.md](BUILD_MANIFEST.md) | World map manifest (design) | v0.0.54 (27 October 2026) |
 | [EXPANSION_TABLES.md](EXPANSION_TABLES.md) | The expansions in every table | v0.0.68-dev5 (21 November 2026) |
@@ -72,7 +72,7 @@ Every document of the project, by topic, with the version and date of its last u
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Architecture | v0.0.64-dev1 (10 November 2026) |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Architecture | v0.0.68-dev12 (24 November 2026) |
 | [AGA_RUNTIME.md](AGA_RUNTIME.md) | AmiWind AGA runtime source | v0.0.66-dev12 (16 November 2026), needs a refresh |
 | [ENGINE_PROFILES.md](ENGINE_PROFILES.md) | Engine profiles | v0.0.46 (20 October 2026) |
 | [EXPERIMENTAL_FLAGS.md](EXPERIMENTAL_FLAGS.md) | Experimental flags | v0.0.67-dev2 (18 November 2026) |
@@ -81,7 +81,7 @@ Every document of the project, by topic, with the version and date of its last u
 | [GAME_RECORDER.md](GAME_RECORDER.md) | Gameplay recorder | v0.0.68-dev6 (22 November 2026) |
 | [ITEM_CYCLING.md](ITEM_CYCLING.md) | The light test and the item tester (dbg lighttest, dbg cycleitems) | v0.0.67-dev2 (18 November 2026) |
 | [LOOKBOOK.md](LOOKBOOK.md) | The confirmed look book | v0.0.68-dev7 (22 November 2026) |
-| [AMIWIND_CONSOLE_COMMANDS.md](AMIWIND_CONSOLE_COMMANDS.md) | AmiWind console commands | generated (v0.0.68-dev11) |
+| [AMIWIND_CONSOLE_COMMANDS.md](AMIWIND_CONSOLE_COMMANDS.md) | AmiWind console commands | generated (v0.0.68-dev12) |
 | [CONSOLE_COMMANDS_MORROWIND.md](CONSOLE_COMMANDS_MORROWIND.md) | The original game's console commands in AmiWind | v0.0.68-dev4 (21 November 2026) |
 | [GAME_STATE_RESET.md](GAME_STATE_RESET.md) | Game state reset and failed loads | v0.0.67-dev1 (17 November 2026) |
 | [LOAD_ERRORS.md](LOAD_ERRORS.md) | When a place cannot be loaded | v0.0.67-dev1 (17 November 2026) |
@@ -129,9 +129,9 @@ Every document of the project, by topic, with the version and date of its last u
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [GAME_FEATURES.md](GAME_FEATURES.md) | Game features | v0.0.68-dev11 (20 November 2026) |
+| [GAME_FEATURES.md](GAME_FEATURES.md) | Game features | v0.0.68-dev12 (20 November 2026) |
 | [game-features.json](game-features.json) | game-features.json | data file |
-| [MWSCRIPT_FEATURES.md](MWSCRIPT_FEATURES.md) | MWScript features | v0.0.68-dev11 (23 November 2026) |
+| [MWSCRIPT_FEATURES.md](MWSCRIPT_FEATURES.md) | MWScript features | v0.0.68-dev12 (24 November 2026) |
 | [WORLD_MECHANISMS.md](WORLD_MECHANISMS.md) | World mechanisms | v0.0.64-dev1 (10 November 2026) |
 | [OPENING_SEQUENCE.md](OPENING_SEQUENCE.md) | The opening, step by step | v0.0.68-dev6 (22 November 2026) |
 | [mwscript-features.json](mwscript-features.json) | mwscript-features.json | data file |
@@ -216,8 +216,8 @@ Every document of the project, by topic, with the version and date of its last u
 | [NPC_VOICE_TABLE.md](NPC_VOICE_TABLE.md) | NPC voice table (AWGL1) | v0.0.68 (23 November 2026) |
 | [VOICED_DIALOGUE.md](VOICED_DIALOGUE.md) | Voiced dialogue: event lookup and runtime plan | v0.0.66-dev12 (16 November 2026) |
 | [DIALOGUE_AND_WAIT.md](DIALOGUE_AND_WAIT.md) | Dialogue, character confirmation and waiting — v0.0.23-dev4 | v0.0.63-dev5 (9 November 2026), needs a refresh |
-| [DIALOGUE_DESIGN.md](DIALOGUE_DESIGN.md) | Dialogue: design (topics, conditions, choices, disposition, journal) | v0.0.62-dev2 (2026-11-08) |
-| [DIALOGUE_FEATURES.md](DIALOGUE_FEATURES.md) | Dialogue features | v0.0.68-dev11 (18 November 2026) |
+| [DIALOGUE_DESIGN.md](DIALOGUE_DESIGN.md) | Dialogue: design (topics, conditions, choices, disposition, journal) | v0.0.68 (23 November 2026) |
+| [DIALOGUE_FEATURES.md](DIALOGUE_FEATURES.md) | Dialogue features | v0.0.68-dev12 (23 November 2026) |
 | [dialogue-features.json](dialogue-features.json) | dialogue-features.json | data file |
 | [dialogue-choices.json](dialogue-choices.json) | dialogue-choices.json | data file |
 | [VOICE_FEATURES.md](VOICE_FEATURES.md) | Voices and sounds | v0.0.67-dev2 (19 November 2026) |
@@ -269,14 +269,14 @@ Every document of the project, by topic, with the version and date of its last u
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [BUGS.md](BUGS.md) | Bug tracker | generated (v0.0.68-dev11) |
+| [BUGS.md](BUGS.md) | Bug tracker | generated (v0.0.68-dev12) |
 
 ## Releases
 
 | Document | Title | Last updated |
 | --- | --- | --- |
-| [CHANGELOG.md](CHANGELOG.md) | Changelog | v0.0.68-dev11 (23 November 2026) |
-| [ROADMAP.md](ROADMAP.md) | Roadmap and implementation options | v0.0.68-dev11 (23 November 2026) |
+| [CHANGELOG.md](CHANGELOG.md) | Changelog | v0.0.68-dev12 (24 November 2026) |
+| [ROADMAP.md](ROADMAP.md) | Roadmap and implementation options | v0.0.68-dev12 (24 November 2026) |
 | [RELEASE_WORKFLOW.md](RELEASE_WORKFLOW.md) | AmiWind release workflow | v0.0.66-dev12 (16 November 2026) |
 | [CI.md](CI.md) | Build audit and the local pipeline | v0.0.54 (27 October 2026) |
 | [CI_DRY_RUN.md](CI_DRY_RUN.md) | Asset-free compilation and boot image | v0.0.54 (27 October 2026) |
@@ -291,7 +291,7 @@ Every document of the project, by topic, with the version and date of its last u
 | [REPOSITORY_LAYOUT.md](REPOSITORY_LAYOUT.md) | One AmiWind repository | v0.0.54 (28 October 2026) |
 | [IMPLEMENTATION_IDEAS.md](IMPLEMENTATION_IDEAS.md) | Implementation ideas and research queue | v0.0.59-dev6 (3 November 2026), needs a refresh |
 | [IMPLEMENTATION_JOURNAL.md](IMPLEMENTATION_JOURNAL.md) | Implementation journal: mappings, failures and decisions | v0.0.66-dev12 (16 November 2026), needs a refresh |
-| [README_ARCHIVE.md](README_ARCHIVE.md) | Earlier README sections | v0.0.66-dev12 (16 November 2026) |
+| [README_ARCHIVE.md](README_ARCHIVE.md) | Earlier README sections | v0.0.68-dev12 (24 November 2026) |
 | [ROADMAP_HISTORY.md](ROADMAP_HISTORY.md) | Roadmap history: v0.0.29 and earlier | v0.0.66-dev12 (16 November 2026), needs a refresh |
 
 ## Folders

@@ -9,7 +9,7 @@
 | Where | Dialogue window, Persuasion page (seen with Tolvise Othralen in Seyda Neen) |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.62-dev1 (last seen) |
+| Persists in | fixed in v0.0.62 |
 | Severity | high: A whole dialogue feature (Admire, Intimidate, Taunt and the bribes) does not work |
 | Family | Game logic (QuakeC) and saves (`game-logic`) |
 | Playtest version | 2026_11_07_v0.0.62-dev1 |
@@ -19,6 +19,28 @@
 | Platform or emulator | unknown (the report names the build, not the emulator) |
 
 <!-- END GENERATED FACTS -->
+
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.62-dev1 (5f8bc26f) | 2026-11-23 | gate 9440 of the planning item PERSUASION-BROKEN-62 | Persuasion rows got their own list codes (v0.0.62); seen working in play on v0.0.68-dev11: Admire, Intimidate, Taunt and the three bribes each answer and move the disposition, and repeated taunts make the person attack |
+| shipped | the v0.0.62 build | v0.0.62 (5f8bc26f) | 2026-11-23 | the delivered build holds the commit (the planning item's shipped list) | the fix is in a numbered build |
+| confirmed in play | a play session | v0.0.68-dev11 | 2026-11-23 | FS-UAE session persuade3 (32 MB Fast) | Admire, Intimidate, Taunt and the three bribes each answered with their line and moved the disposition; the 40th Taunt made the person attack |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-07: reported in v0.0.62-dev1
+- 2026-11-23: fixed in source: a gated commit, v0.0.62-dev1 (5f8bc26f); gate 9440 of the planning item PERSUASION-BROKEN-62: Persuasion rows got their own list codes (v0.0.62); seen working in play on v0.0.68-dev11: Admire, Intimidate, Taunt and the three bribes each answer and move the disposition, and repeated taunts make the person attack
+- 2026-11-23: shipped: the v0.0.62 build, v0.0.62 (5f8bc26f); the delivered build holds the commit (the planning item's shipped list): the fix is in a numbered build
+- 2026-11-23: confirmed in play: a play session, v0.0.68-dev11; FS-UAE session persuade3 (32 MB Fast): Admire, Intimidate, Taunt and the three bribes each answered with their line and moved the disposition; the 40th Taunt made the person attack
+- 2026-11-23 22:12 +0200: seen again in v0.0.68-dev11: Persuasion is to be checked again in play on the current build: Taunt repeated until the person attacks was seen working in an earlier playtest.
+
+<!-- END GENERATED TIMELINE -->
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
@@ -113,6 +135,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [DIALOGUE-BACKGROUND-EMPTY-RANK-67](DIALOGUE-BACKGROUND-EMPTY-RANK-67.md): Hul in Balmora answers Background with "I am Hul, Pauper and  of the  ." : the rank and faction words are empty
 - [DIALOGUE-CELL-FILTER-SEVERAL-CELLS-68](DIALOGUE-CELL-FILTER-SEVERAL-CELLS-68.md): A voice or greeting line with a place filter is never said by a speaker placed in several places or placed by a script
 - [DIALOGUE-CHOICES-62](DIALOGUE-CHOICES-62.md): Dialogue choices are not shown as rows to pick, and the branch after a pick is not filtered as in the original
+- [DIALOGUE-COMPANION-SHARE-MISSING-68](DIALOGUE-COMPANION-SHARE-MISSING-68.md): Missing: the talk window has no Companion Share entry for a companion, and there is no share window
 - [DIALOGUE-CONDITIONS-PARTIAL-67](DIALOGUE-CONDITIONS-PARTIAL-67.md): Incomplete: the dialogue conditions PcVampire, PcCorprus and PcClothingModifier read their start value, and RankRequirement is not checked in game
 - [DIALOGUE-CREATURE-SPEAKERS-66](DIALOGUE-CREATURE-SPEAKERS-66.md): Creatures that speak have no rows in the dialogue table, so their lines cannot be said: Almalexia, Vivec, ghosts, a draugr and rieklings among them
 - [DIALOGUE-DISPOSITION-CHARM-ZERO-67](DIALOGUE-DISPOSITION-CHARM-ZERO-67.md): Incomplete: a Charm effect adds nothing to an NPC disposition in a conversation: it is read as 0
@@ -202,6 +225,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [MWSCRIPT-ONPCHITME-NEVER-SET-68](MWSCRIPT-ONPCHITME-NEVER-SET-68.md): The script variable OnPCHitMe is never set: a script that waits for the player to strike its actor never sees the blow
 - [MWSCRIPT-PLACE-NO-MODEL-62](MWSCRIPT-PLACE-NO-MODEL-62.md): A script cannot place an NPC or a creature whose record has no placed reference in Vvardenfell
 - [MWSCRIPT-PLACE-OTHER-KINDS-62](MWSCRIPT-PLACE-OTHER-KINDS-62.md): A script cannot place an activator, a container or a levelled creature list yet
+- [MWSCRIPT-PLAYBINK-SKIP-FLAG-68](MWSCRIPT-PLAYBINK-SKIP-FLAG-68.md): A video started by a script can always be skipped, also the ones the original plays to the end without a skip
 - [MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68](MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68.md): PlayGroup and LoopGroup play only on a person or creature with a converted skeleton: animated objects and the player do not play the group, and the start mode is not read
 - [MWSCRIPT-PLAYGROUP-FRAME-OBJECTS-68](MWSCRIPT-PLAYGROUP-FRAME-OBJECTS-68.md): A script's PlayGroup or LoopGroup on an object drawn as a placement of an outdoor frame (Mournhold's districts) changes nothing: Azura in the Temple Courtyard keeps her placed look through her appearance and departure at the end of Tribunal's main quest
 - [MWSCRIPT-POSITION-ROOM-ROTATION-68](MWSCRIPT-POSITION-ROOM-ROTATION-68.md): A script's Position ignores its rotation argument and always moves the player to the outdoor point, also from inside a room
@@ -336,5 +360,6 @@ Related bugs in other categories:
 
 - [DIALOGUE-FIGHT-DISPOSITION-57](DIALOGUE-FIGHT-DISPOSITION-57.md): Requested: disposition drives combat as in the original: a low-disposition NPC turns hostile (effective Fight from disposition), Taunt can start a fight
 - [DIALOGUE-WINDOW-LAYOUT-57](DIALOGUE-WINDOW-LAYOUT-57.md): Requested: the dialogue window has no disposition bar, no Persuasion and no service entries, as the original has
+- [README-STATUS-STALE-SCATTERED-68](README-STATUS-STALE-SCATTERED-68.md): The main page's status section is stuck at the previous release and several of its claims no longer match the bug tracker
 
 <!-- END GENERATED CATEGORY -->

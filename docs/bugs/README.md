@@ -346,8 +346,8 @@ family links to its list in the register.
 | [Seyda Neen recorded stage](../BUGS.md#seyda-neen-recorded-stage-seyda-recorded) | `seyda-recorded` | 0 of 8 | Recorded v0.0.31 maps are kept byte for byte; their heap headroom limits what can be added and the public builder cannot regenerate them. |
 | [Content silently missing from a build](../BUGS.md#content-silently-missing-from-a-build-build-content-missing) | `build-content-missing` | 31 of 80 | Every omission is receipted; payload and entity counts are compared with the last release; shipped features are on by default. |
 | [Builder breaks and reproducibility](../BUGS.md#builder-breaks-and-reproducibility-builder-from-scratch) | `builder-from-scratch` | 23 of 77 | The repository builder builds the whole game from the user's own data with no private step, byte for byte the same each time. |
-| [Build speed](../BUGS.md#build-speed-build-speed) | `build-speed` | 125 of 210 | Every stage on the shared worker pool; per-stage time and CPU in the build profile. |
-| [Build reuse keys and output attribution](../BUGS.md#build-reuse-keys-and-output-attribution-build-cache-reuse) | `build-cache-reuse` | 56 of 112 | A unit is rebuilt only when the content hash of all its inputs changes or its output is missing or damaged. Keys never under-declare (a missed input allows a wrong reuse) and should not over-declare (a file no output depends on forces rebuilds); outputs carry no wall-clock values; every changed file is credited to the stage that wrote it. |
+| [Build speed](../BUGS.md#build-speed-build-speed) | `build-speed` | 126 of 211 | Every stage on the shared worker pool; per-stage time and CPU in the build profile. |
+| [Build reuse keys and output attribution](../BUGS.md#build-reuse-keys-and-output-attribution-build-cache-reuse) | `build-cache-reuse` | 57 of 114 | A unit is rebuilt only when the content hash of all its inputs changes or its output is missing or damaged. Keys never under-declare (a missed input allows a wrong reuse) and should not over-declare (a file no output depends on forces rebuilds); outputs carry no wall-clock values; every changed file is credited to the stage that wrote it. |
 | [Console, keyboard and mouse input](../BUGS.md#console-keyboard-and-mouse-input-console-input) | `console-input` | 5 of 16 | The console line editor, qualifier keys and the emulator key path. |
 | [Music and sound](../BUGS.md#music-and-sound-audio) | `audio` | 33 of 46 | The mixer must stay fed through loads and scene changes; music starts after loads settle. |
 | [Lighting, lamps and night](../BUGS.md#lighting-lamps-and-night-lighting-night) | `lighting-night` | 35 of 50 | Morrowind lights become Quake light entities baked by the light compiler and animated with lightstyles; night tables and dynamic lights follow the original. |
@@ -369,11 +369,11 @@ family links to its list in the register.
 | [Town and interior import](../BUGS.md#town-and-interior-import-town-import) | `town-import` | 11 of 17 | The town importer converts every town and interior within engine limits; doors lead somewhere. |
 | [Scene changes, arrivals and handoffs](../BUGS.md#scene-changes-arrivals-and-handoffs-transitions-arrivals) | `transitions-arrivals` | 17 of 35 | Cell, region and scene changes keep the player, view, equipment and sound intact. |
 | [Menus, HUD, map screen and text](../BUGS.md#menus-hud-map-screen-and-text-ui-text) | `ui-text` | 82 of 129 | Menus, HUD, map screen, fonts and messages. |
-| [Debug commands and remote control](../BUGS.md#debug-commands-and-remote-control-debug-commands) | `debug-commands` | 43 of 65 | dbg commands, teleports, debug map loads and the remote console. |
+| [Debug commands and remote control](../BUGS.md#debug-commands-and-remote-control-debug-commands) | `debug-commands` | 42 of 65 | dbg commands, teleports, debug map loads and the remote console. |
 | [Boot and engine start-up](../BUGS.md#boot-and-engine-start-up-boot-startup) | `boot-startup` | 5 of 15 | The boot check and engine start-up report problems clearly and never stop the game silently. |
-| [Game logic (QuakeC) and saves](../BUGS.md#game-logic-quakec-and-saves-game-logic) | `game-logic` | 224 of 306 | QuakeC entities, saves and game state. |
+| [Game logic (QuakeC) and saves](../BUGS.md#game-logic-quakec-and-saves-game-logic) | `game-logic` | 224 of 308 | QuakeC entities, saves and game state. |
 | [Gates, CI and tests](../BUGS.md#gates-ci-and-tests-tests-ci) | `tests-ci` | 88 of 175 | A check that is skipped, tests the wrong tree or depends on the host is not a check; skips fail loudly. |
-| [Development tooling, receipts and packaging](../BUGS.md#development-tooling-receipts-and-packaging-tracker-tooling) | `tracker-tooling` | 70 of 135 | Receipts, packaging, development tools and the tracker itself. |
+| [Development tooling, receipts and packaging](../BUGS.md#development-tooling-receipts-and-packaging-tracker-tooling) | `tracker-tooling` | 71 of 136 | Receipts, packaging, development tools and the tracker itself. |
 
 <!-- END GENERATED FAMILIES -->
 

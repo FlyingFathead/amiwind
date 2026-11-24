@@ -46,4 +46,24 @@ int AW_DialBarFirst(int total,int visible,int track,int y);
 #define AW_DIAL_BAR_ARROW 4
 int AW_DialBarClick(int total,int visible,int first,int h,int y,int *grab);
 
+/* DIALOGUE-WINDOW-LAYOUT-57: the talk window's right column as the original's (OpenMW 0.51 mwgui/dialogue.cpp
+ * DialogueWindow::updateTopicsPane and updateDisposition): the disposition bar on top (a person only), then the
+ * special entries, each only when the speaker offers it, in this order, then a separator line, then the topics, and
+ * Goodbye at the bottom. The entries' words are the game settings sPersuasion, sBarter, sSpells, sTravel,
+ * sSpellmakingMenuTitle, sEnchanting, sServiceTrainingTitle, sRepair and sCompanionShare. */
+enum {AW_DIAL_SPECIAL_PERSUASION,AW_DIAL_SPECIAL_BARTER,AW_DIAL_SPECIAL_SPELLS,AW_DIAL_SPECIAL_TRAVEL,
+      AW_DIAL_SPECIAL_SPELLMAKING,AW_DIAL_SPECIAL_ENCHANTING,AW_DIAL_SPECIAL_TRAINING,AW_DIAL_SPECIAL_REPAIR,
+      AW_DIAL_SPECIAL_COMPANION,AW_DIAL_SPECIALS};
+#define AW_DIAL_OFFER(k) (1u<<(k))
+/* the special entries of OFFERS (AW_DIAL_OFFER bits) in the original's order into OUT (room for AW_DIAL_SPECIALS),
+ * how many; a speaker that is not a PERSON (a creature) never has Persuasion (OpenMW: an NPC record only) */
+int AW_DialSpecialEntries(unsigned offers,int person,int *out);
+/* the separator line goes under shown row I of SHOWN[0..N) (indices into LIST, whose special entries have negative
+ * codes and whose topics are table topics, 0 or more): row I is a special entry and the next shown row a topic, so a
+ * search that hides every special entry, or every topic, draws none (OpenMW: a separator only after an entry) */
+/* DIALOGUE-WINDOW-LAYOUT-57: whether the divider row stands between the special entries and the topics: both exist and
+ * the window is not left with Goodbye only */
+int AW_DialDividerWanted(int entries,int topics,int goodbye_only);
+int AW_DialSeparatorUnder(const int *list,const int *shown,int n,int i);
+
 #endif

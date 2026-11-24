@@ -1,6 +1,6 @@
 # AmiWind console commands
 
-_Generated from `config/debug-commands.txt` with AmiWind v0.0.68-dev11._
+_Generated from `config/debug-commands.txt` with AmiWind v0.0.68-dev12._
 
 Open the console with F10 or the backquote key and type
 a command, for example `dbg headlamp on`. This page is generated from
@@ -266,7 +266,7 @@ original: [the table of them](CONSOLE_COMMANDS_MORROWIND.md).
 | `dbg logs live` | - | [on/off, true/false or 1/0] write the diagnostic logs (DEBUG.TXT, walk-profile.csv, frame-stalls.csv, heap-audit.log, cell-load-profile.tsv, music-events.csv, ...) as they happen, for benchmarks; default off: kept in memory (oldest lines drop) and written at Exit game or with dbg savelogs (saved once set) |
 | `dbg npcfloors` | - | (read-only ground-contact report) |
 | `dbg npclod` | - | [auto/0/1/2/3 / target <0..3/auto> / show on/off / bands <d0> <d1> <d2> / stats] NPC model levels (--npc-lod on builds): 0..3 forces a level on every NPC, auto = distance bands; target = the NPC under the crosshair; show labels level, triangles, KiB, distance; bands sets the edges live; stats (not saved) |
-| `dbg npcs` | - | [talk [ID]] the NPCs of the area with their positions; talk: open the dialogue window with the nearest NPC that has topics (or record ID), turned to face it, as Talk (E) does |
+| `dbg npcs` | - | [talk [ID]] the NPCs of the area with their positions; talk: open the dialogue window with the nearest NPC or talking creature that has topics (or record ID), turned to face it, as Talk (E) does |
 | `dbg pos` | - | - |
 | `dbg probe` | - | (slow floor audit) |
 | `dbg rcount` | - | [0/1/2/3/4] once a second: renderer counts per frame (brush models, faces, clip fragments, edges, spans, surface cache, alias models) and timing split; 2 = remote state file only; 3 = 2 + brush-slot profile (walk/emit split, distance x size table, leaves per placement); 4 = 3 printed |

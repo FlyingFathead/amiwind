@@ -1,0 +1,60 @@
+# The talk window's right column as the original's (DIALOGUE-WINDOW-LAYOUT-57). A FULL image, FS-UAE at 32 MB Fast,
+# warp off, started with --map seyda, with the engine (--engine) of the commit that lays the column out (the image's
+# own engine draws the old window: the bar across the top, no separator). A character after the census (dbg aw hors
+# walks the player out of the census office in Seyda Neen; its last message box answered with boxes).
+# Expected, on the pictures: the disposition bar on top of the right column with "N/100" on it; under the search
+# line the special entries, each only when the speaker offers it, in the original's order; a thin line under the last
+# of them; the topics; Goodbye at the bottom; the conversation text on the left starting on the bar's row.
+# - l1 Fargoth (a person with no service): Persuasion alone above the line;
+# - l2 Arrille (a merchant): Persuasion, Barter (and any other service his record has, in the order) above the line;
+# - l3 Eydis Fire-Eye (Balmora's Fighters Guild, a trainer): Persuasion, then Training (after any other service);
+# - l4 the Creeper (scamp_creeper, Caldera, Ghorak Manor; a talking creature): NO disposition bar and NO Persuasion,
+#   Barter alone above the line. The creature's talk is the least certain step, so it runs last: a run that stops at
+#   it with "FAIL waitfor screen dialogue" says the talk did not open for a creature (the console's line says why).
+wait 8
+cmd dbg all on
+cmd dbg headlamp off
+cmd dbg god on
+cmd dbg aw hors
+wait 60
+boxes
+wait 2
+boxes
+state map
+cmd dbg npcs talk fargoth
+waitfor screen 10 dialogue
+wait 2
+shot l1-person-fargoth
+key Escape
+wait 2
+cmd coc "seyda neen, arrille's tradehouse"
+wait 40
+boxes
+state map
+cmd dbg npcs talk arrille
+waitfor screen 10 dialogue
+wait 2
+shot l2-merchant-arrille
+key Escape
+wait 2
+cmd coc "balmora, guild of fighters"
+wait 40
+boxes
+state map
+cmd aw_npcs talk "eydis fire-eye"
+waitfor screen 10 dialogue
+wait 2
+shot l3-trainer-eydis
+key Escape
+wait 2
+cmd coc "caldera, ghorak manor"
+wait 40
+boxes
+state map
+cmd aw_npcs talk scamp_creeper
+waitfor screen 10 dialogue
+wait 2
+shot l4-creature-creeper
+key Escape
+wait 2
+state screen

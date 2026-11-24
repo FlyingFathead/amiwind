@@ -1,6 +1,6 @@
 # Architecture
 
-_Last updated with AmiWind v0.0.64-dev1 (10 November 2026)._
+_Last updated with AmiWind v0.0.68-dev12 (24 November 2026)._
 
 How AmiWind is put together today: a host-side builder that converts your own Morrowind files, and the CHIM Engine
 (the AmiQuake engine with a world streamer added) that runs the result on an Amiga. Each claim below points at the
@@ -82,8 +82,8 @@ current release is described in the [v0.0.53 notes](releases/notes/RELEASE-v0.0.
 
 Interiors: since v0.0.48, 1,132 of the 1,134 base-game interiors are CHIM rooms, on CHIM's store-once layout. Only
 the prison ship and the census office, where the opening sequence runs, stay classic Quake room maps on purpose
-until rooms have object state. Solstheim is not converted
-([README](../README.md#where-amiwind-stands-19-november-2026)).
+until rooms have object state. Solstheim's land and rooms are converted in the v0.0.68 line
+([README](../README.md#where-amiwind-stands), [CHIM progress tracker](chim/PROGRESS_TRACKER.md)).
 
 ## Crossing from one cell to the next
 

@@ -29,11 +29,13 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.68-dev7 (db15e97a) | 2026-11-22 | gate 12545 of the planning item STARTCOMBAT-SHEET-READ-BEFORE-SLOT-68 | The fight slots are asked before the fighter's sheet is read from disk (aw_mwhost.c fight_start, 9667c3275; a source contract test). |
+| shipped | the v0.0.68-dev8 build | v0.0.68-dev8 (db15e97a) | 2026-11-23 | the delivered build holds the commit (the planning item's shipped list) | the fix is in a numbered build; not yet confirmed by a play check |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-22: reported in v0.0.68-dev6
 - 2026-11-22: fixed in source: a gated commit, v0.0.68-dev7 (db15e97a); gate 12545 of the planning item STARTCOMBAT-SHEET-READ-BEFORE-SLOT-68: The fight slots are asked before the fighter's sheet is read from disk (aw_mwhost.c fight_start, 9667c3275; a source contract test).
+- 2026-11-23: shipped: the v0.0.68-dev8 build, v0.0.68-dev8 (db15e97a); the delivered build holds the commit (the planning item's shipped list): the fix is in a numbered build; not yet confirmed by a play check
 
 <!-- END GENERATED TIMELINE -->
 

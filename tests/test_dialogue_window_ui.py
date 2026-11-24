@@ -54,7 +54,7 @@ class Choices(unittest.TestCase):
         # the longest option of the masters fits (docs/dialogue-choices.json: tests/test_dialogue_choices.py)
         self.assertIn('#define CHOICE_CHARS 200', win)
         self.assertIn('#define CHOICES 10', win)
-        self.assertIn('if(choice_count)return 1;', body(win, 'static int greyed(int r){'))
+        self.assertIn('if(choice_count || list[r]==CODE_SEPARATOR)return 1;', body(win, 'static int greyed(int r){'))
 
     def test_pick_by_row_only(self):
         win = code('aw_dialwin.c')
@@ -70,7 +70,7 @@ class Choices(unittest.TestCase):
         self.assertNotIn('AW_ListBoxType', keys)
         key = body(win, 'static int key(int k,int mouse_x,int mouse_y){')
         self.assertLess(key.index('if(choice_count){int c=choice_key('), key.index('switch(k){'))
-        self.assertIn('if(r<0 || r>=listed || choice_count)return;', body(win, 'static void ask(int r){'))
+        self.assertIn('if(r<0 || r>=listed || choice_count || list[r]==CODE_SEPARATOR)return;', body(win, 'static void ask(int r){'))
         self.assertIn('hits[h].para<0 || goodbye_only || choice_count', body(win, 'static void ask_link(int h){'))
         # a greeting's Choice holds Escape from the moment the window opens
         self.assertIn('aw_worldui_panel_holds_escape=choice_count>0;', body(win, 'int AW_DialWindowOpen('))
@@ -145,7 +145,8 @@ class Links(unittest.TestCase):
         # the set follows the topic list in every mode (aw_dial_links.c; the barter list too: v0.0.62-dev1)
         self.assertIn('AW_DialLinksSet(linkable,', refresh)
         self.assertLess(refresh.index('AW_DialTopicList('), refresh.index('AW_DialLinksSet(linkable,'))
-        self.assertLess(refresh.index('}else{\n        int fixed=0;'), refresh.index('if(linkable){'))
+        # (the topic list's branch: since DIALOGUE-WINDOW-LAYOUT-57 it opens with the special entries' comment)
+        self.assertLess(refresh.index('int fixed=0,special[AW_DIAL_SPECIALS]'), refresh.index('if(linkable){'))
 
     def test_click_and_enter_ask_the_topic(self):
         win = code('aw_dialwin.c')
@@ -249,6 +250,71 @@ class LootWindow(unittest.TestCase):
         self.assertNotIn('dark', draw)                                   # no dark brown slot
         self.assertNotIn('Q_strcpy_bounded(line,e->name,5)', draw)   # no name cut to four letters
         self.assertIsNone(re.search(r'AW_UIText\(left,y\+11', draw))
+
+
+class RightColumn(unittest.TestCase):
+    """DIALOGUE-WINDOW-LAYOUT-57: the talk window's right column as the original's (OpenMW 0.51 mwgui/dialogue.cpp
+    DialogueWindow::updateTopicsPane and updateDisposition): the disposition bar on top of the column with "N/100" (a
+    person only), the special entries in the original's order and only when offered (the order and the creature rule
+    run natively in tests/aga_dial_links_test.c), a separator line, the topics, Goodbye at the bottom. Before v0.0.68
+    the bar ran across the whole window with the number alone, Persuasion was listed for every speaker and no line
+    parted the entries from the topics."""
+
+    def test_entries_from_the_original_order(self):
+        win = code('aw_dialwin.c')
+        refresh = body(win, 'static void refresh(void){')
+        self.assertIn('n=AW_DialSpecialEntries(offers,person,special);', refresh)
+        self.assertNotIn('list[fixed++]=CODE_PERSUASION;', refresh)        # the old rule: Persuasion for anyone
+        self.assertIn('person=strcmp(pr_strings+e->v.classname,"aw_creature") &&', win)
+        self.assertIn('!(aw_actor_creature && aw_actor_creature(e)==1);', win)
+
+    def test_bar_on_top_of_the_column_and_the_separator(self):
+        win = code('aw_dialwin.c')
+        draw = body(win, 'static void draw(void){')
+        self.assertIn('if(person){', draw)
+        self.assertIn('Q_snprintf(line,sizeof(line),"%d/100",disposition);', draw)
+        self.assertIn('AW_UIFill(list_x(),bar_y()-1,LIST_W,char_h()+2,dark);', draw)
+        self.assertNotIn('int bw=BOX_W-2*PAD', draw)                     # the old bar across the window
+        # the divider is a row of its own (one row's height, the line centred in it), not a line in the gap
+        self.assertNotIn('AW_DialSeparatorUnder(', draw)
+        self.assertIn('#define CODE_SEPARATOR (-3500)', win)
+        self.assertIn('list[box.shown[box.top+i]]==CODE_SEPARATOR', draw)
+        self.assertIn('AW_UIFill(list_x()+2,y+char_h()/2,LIST_W-AW_DIAL_BAR_W-4,1,', draw)
+        self.assertNotIn('y+char_h(),LIST_W-AW_DIAL_BAR_W-4,1,', draw)
+        refresh = body(win, 'static void refresh(void){')
+        self.assertIn('AW_DialDividerWanted(fixed,n,goodbye_only))list[fixed]=CODE_SEPARATOR', refresh)
+        self.assertIn('topics_at=fixed+sep;', refresh)                   # the linkable set stays the topics only
+        self.assertIn('list[r]==CODE_SEPARATOR)return;', body(win, 'static void ask(int r){'))
+        self.assertIn('static void step_over(int dir){', win)             # the arrows step over it
+        self.assertIn('step_over(AW_LBKEY_DOWN)', body(win, 'static int key('))
+        # the conversation text starts on the bar's row: the left side has no bar any more
+        self.assertIn('static int text_y(void){return bar_y();}', win)
+        self.assertIn('y=text_y()', body(win, 'static int history_lines('))
+
+    def test_the_speakers_name_is_the_windows_header(self):
+        """The name is drawn as the title of the inventory, map and magic windows: the original title bar through
+        aw_title_bar inside the small-font pair, the plain centred name without the art; not in the console font."""
+        win = code('aw_dialwin.c')
+        draw = body(win, 'static void draw(void){')
+        self.assertIn('AW_UISmallBegin();\n    if(!aw_title_bar || !aw_title_bar(BOX_X+4,BOX_Y+4,BOX_W-8,who))', draw)
+        self.assertIn('AW_UITextCentred(BOX_X+4,BOX_Y+4,BOX_W-8,12,who,', draw)
+        self.assertIn('AW_UISmallEnd();', draw)
+        # a gap between the Find line and the first entry (the old list_y was body_y()+char_h()+6: no space above it)
+        self.assertIn('static int list_y(void){return body_y()+char_h()+9;}', win)
+        self.assertNotIn('static int list_y(void){return body_y()+char_h()+6;}', win)
+        # the bar's row and the text start below the thin line (BOX_Y+16): the old start was BOX_Y+PAD+char_h()+4
+        self.assertIn('static int bar_y(void){return BOX_Y+PAD+char_h()+7;}', win)
+        self.assertNotIn('static int bar_y(void){return BOX_Y+PAD+char_h()+4;}', win)
+        # the thin line along the bar's bottom edge, as the inventory's pane frames start under its bar
+        self.assertIn('AW_UIFill(BOX_X+4,BOX_Y+4+12,BOX_W-8,AW_UI_THIN_LINE,AW_UIColor(120,109,87));', draw)
+        self.assertNotIn('text(BOX_X+(BOX_W-w)/2,BOX_Y+PAD,who,right);', draw)   # the old name in the console font
+        # the bar (12 rows from BOX_Y+4) ends above the disposition bar's row
+        self.assertLess(4 + 12, 6 + 8 + 4 - 1)
+
+    def test_the_native_rules_are_compiled(self):
+        native = (ROOT / 'tests' / 'test_aga_native_source.py').read_text(encoding='utf-8')
+        self.assertIn("self.compile_run('aga_dial_links_test.c', [Path(SOURCE)/'src/aw_dial_links.c']", native)
+        self.assertIn('AW_DialSpecialEntries', (ROOT / 'tests' / 'aga_dial_links_test.c').read_text(encoding='utf-8'))
 
 
 if __name__ == '__main__':

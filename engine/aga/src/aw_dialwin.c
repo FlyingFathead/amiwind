@@ -9,12 +9,20 @@
  *
  *   +--------------------------------------------+
  *   |                 Fargoth                    |
- *   | Hello, outlander...         | Find: _      |
+ *   | Hello, outlander...         |[==50/100==]  |
+ *   |                             | Find: _      |
+ *   | [my trade]                  |  Persuasion  |
+ *   | I work the fields...        |  Barter      |
+ *   |                             |  ----------  |
  *   |                             |  Background  |
- *   | [my trade]                  |  my trade    |
- *   | I work the fields...        |  ...         |
+ *   |                             |  my trade    |
  *   |                             |   Goodbye    |
  *   +--------------------------------------------+
+ *
+ * The right column as the original's (DIALOGUE-WINDOW-LAYOUT-57; OpenMW 0.51 DialogueWindow): the disposition bar on
+ * top (a person only), the special entries the speaker offers in the original's order (aw_dial_links.c
+ * AW_DialSpecialEntries), a separator line, the topics, Goodbye at the bottom; the Find line is AmiWind's search as
+ * you type (aw_listbox_rules.c).
  *
  * Memory: the table's resident index once per session (about 25 KB on Morrowind.esm) and the known-topic set (one
  * bit per topic); while a conversation is open, its buffer (AW_DIAL_BUFFER), the shown topics' names and the
@@ -69,6 +77,8 @@ static aw_dial_facts_t facts;      /* the speaker's disposition facts while the 
 #define CODE_PERSUASION (-1)
 #define CODE_BACK (-2)
 #define CODE_TRAVEL (-3)
+#define CODE_SEPARATOR (-3500)     /* DIALOGUE-WINDOW-LAYOUT-57: the divider row between the special entries and the topics: empty,
+                                      * inert, the arrows step over it, drawn as a line across the middle of its row */
 #define CODE_SERVICE(k) (-30-(k))     /* k an index of services_shown[] */
 /* PERSUASION-BROKEN-62: the persuasion rows had -10..-15, the codes the enchanting page took later
  * (CODE_EN_ITEM -10 ... CODE_EN_BUY -15), and ask() tests those first: Admire opened the item page, Intimidate the
@@ -83,6 +93,11 @@ static const unsigned long services_mask[]={AW_DIAL_SERVICE_BARTER,AW_DIAL_SERVI
 static const char *const services_shown[]={"Barter","Spells","Travel","Spellmaking","Enchanting","Training","Repair"};
 #define SERVICE_TRAVEL 2
 #define SERVICE_TRAINING 5
+/* DIALOGUE-WINDOW-LAYOUT-57: the speaker is a person (an NPC record), read when the conversation opens; a creature
+ * (aw_scene.c aw_actor_creature: its slot's creature flag) gets no disposition bar and no Persuasion (OpenMW 0.51
+ * DialogueWindow::updateDisposition and updateTopicsPane read isNpc) */
+extern int (*aw_actor_creature)(edict_t *e);
+static int person=1;
 #define CODE_TRAIN(k) (-50-(k))      /* the training page's rows: k an index of train_skill[] */
 static const char *const skill_names[AW_DIAL_SKILLS]={"Block","Armorer","Medium Armor","Heavy Armor","Blunt Weapon",
     "Long Blade","Axe","Spear","Athletics","Enchant","Destruction","Alteration","Illusion","Conjuration","Mysticism",
@@ -299,14 +314,21 @@ void AW_DialWindowMessage(const char *text){if(active && text && text[0])append(
 static int char_w(void){int w=AW_ConsoleCharWidth();return w<1?8:w;}
 static int char_h(void){int h=AW_ConsoleCharHeight();return h<1?8:h;}
 static int row_h(void){return char_h()+2;}
-static int bar_y(void){return BOX_Y+PAD+char_h()+4;}
+/* the row under the title bar and its thin line (the line is at BOX_Y+16): the disposition bar and the conversation text
+ * start 3 pixels below the old row so the line no longer cuts the text's first row (DIALOGUE-WINDOW-LAYOUT-57) */
+static int bar_y(void){return BOX_Y+PAD+char_h()+7;}
 static int body_y(void){return bar_y()+char_h()+8;}
+/* DIALOGUE-WINDOW-LAYOUT-57: the disposition bar is the right column's top row (the original's), so the conversation
+ * text on the left starts on that row: two more text rows than when the bar ran across the whole window */
+static int text_y(void){return bar_y();}
 static int list_x(void){return BOX_X+BOX_W-PAD-LIST_W;}
-static int list_y(void){return body_y()+char_h()+6;}
+/* the first entry stands 3 pixels lower than before: a gap between the Find line and the first row (Persuasion), as the
+ * original leaves one (DIALOGUE-WINDOW-LAYOUT-57) */
+static int list_y(void){return body_y()+char_h()+9;}
 static int button_y(void){return BOX_Y+BOX_H-PAD-row_h();}
 static int list_rows(void){int r=(button_y()-4-list_y())/row_h();return r<1?1:r;}
 static int text_cols(void){return (list_x()-8-(BOX_X+PAD))/char_w();}
-static int text_rows(void){return (BOX_Y+BOX_H-PAD-body_y())/row_h();}
+static int text_rows(void){return (BOX_Y+BOX_H-PAD-text_y())/row_h();}
 
 static void text(int x,int y,const char *s,int right){
     int w=char_w();
@@ -314,7 +336,7 @@ static void text(int x,int y,const char *s,int right){
 }
 static const char *label(void *ctx,int r){
     int k;(void)ctx;
-    if(r<0 || r>=listed)return "";
+    if(r<0 || r>=listed || list[r]==CODE_SEPARATOR)return "";
     if(list[r]==CODE_PERSUASION)return T(AW_DIAL_TEXT_PERSUASION,"Persuasion");
     if(list[r]==CODE_BACK)return T(AW_DIAL_TEXT_BACK,"Back");
     if(list[r]==CODE_TRAVEL)return T(AW_DIAL_TEXT_TRAVEL,"Travel");
@@ -430,14 +452,28 @@ static void refresh(void){
         for(i=0;i<sale_count;i++)list[i]=CODE_SPELL(i);
         list[sale_count]=CODE_BACK;listed=sale_count+1;
     }else{
-        int fixed=0;
-        list[fixed++]=CODE_PERSUASION;
+        /* DIALOGUE-WINDOW-LAYOUT-57: the special entries in the original's order, each only when this speaker offers
+         * it (aw_dial_links.c AW_DialSpecialEntries), then the topics; the separator line is drawn under the last
+         * entry (draw). The service SERVICE_* and its window as before; Companion Share is not offered yet (no
+         * companion test and no share window in this build: DIALOGUE-COMPANION-SHARE-MISSING-68) */
+        static const int special_code[AW_DIAL_SPECIALS]={CODE_PERSUASION,CODE_SERVICE(SERVICE_BARTER),
+            CODE_SERVICE(SERVICE_SPELLS),CODE_TRAVEL,CODE_SERVICE(SERVICE_SPELLMAKING),CODE_SERVICE(SERVICE_ENCHANTING),
+            CODE_SERVICE(SERVICE_TRAINING),CODE_SERVICE(SERVICE_REPAIR),0};
+        int fixed=0,special[AW_DIAL_SPECIALS],n;unsigned offers=AW_DIAL_OFFER(AW_DIAL_SPECIAL_PERSUASION);
         for(i=0;i<SERVICES;i++){
-            if(i==SERVICE_TRAVEL){if(AW_SceneTravelOffers(speaker))list[fixed++]=CODE_TRAVEL;}
-            else if(services&services_mask[i])list[fixed++]=CODE_SERVICE(i);
+            static const int special_of[SERVICES]={AW_DIAL_SPECIAL_BARTER,AW_DIAL_SPECIAL_SPELLS,AW_DIAL_SPECIAL_TRAVEL,
+                AW_DIAL_SPECIAL_SPELLMAKING,AW_DIAL_SPECIAL_ENCHANTING,AW_DIAL_SPECIAL_TRAINING,AW_DIAL_SPECIAL_REPAIR};
+            if(i==SERVICE_TRAVEL?AW_SceneTravelOffers(speaker)!=0:(services&services_mask[i])!=0)
+                offers|=AW_DIAL_OFFER(special_of[i]);
         }
-        listed=fixed+AW_DialTopicList(&conv,known,&state,list+fixed,AW_DIAL_MAX_TOPICS-fixed);
-        topics_at=fixed;
+        n=AW_DialSpecialEntries(offers,person,special);
+        for(i=0;i<n;i++)if(special_code[special[i]])list[fixed++]=special_code[special[i]];
+        /* the divider is a row of its own (one row's height, the line centred in it) between the entries and the
+         * topics, only when both exist */
+        {int sep=fixed>0 && !goodbye_only;
+         n=AW_DialTopicList(&conv,known,&state,list+fixed+sep,AW_DIAL_MAX_TOPICS-fixed-sep);
+         if(AW_DialDividerWanted(fixed,n,goodbye_only))list[fixed]=CODE_SEPARATOR;else sep=0;
+         listed=fixed+sep+n;topics_at=fixed+sep;}
     }
     /* DIALOGUE-LINKS-62 (v0.0.62-dev1: a link click worked once, then the links of the new answer stayed dead): the
      * linkable set follows the topic list after EVERY change, in every mode. It was rebuilt only while the window
@@ -483,7 +519,7 @@ static int affordable(int kind){return !bribe_gold[kind] || AW_MwscriptPlayerGol
 /* a row the player cannot choose now: a bribe of more gold than he has (OpenMW greys those buttons out) */
 static int greyed(int r){
     if(r<0 || r>=listed)return 0;
-    if(choice_count)return 1;        /* DIALOGUE-CHOICES-62: nothing in the list is chosen while a Choice is open */
+    if(choice_count || list[r]==CODE_SEPARATOR)return 1;   /* DIALOGUE-CHOICES-62: nothing is chosen while a Choice is open; the divider row never */
     if(list[r]<=CODE_TRAIN(0) && list[r]>CODE_TRAIN(3))return AW_MwscriptPlayerGold(0)<train_price[CODE_TRAIN(0)-list[r]];
     if(list[r]<=CODE_SPELL(0) && list[r]>CODE_SPELL(SPELL_ROWS))return AW_MwscriptPlayerGold(0)<sale_price[CODE_SPELL(0)-list[r]];
     if(list[r]<=CODE_WARE(0) && list[r]>CODE_WARE(WARE_ROWS))return (mode==4 || mode==6) && AW_MwscriptPlayerGold(0)<ware_price[CODE_WARE(0)-list[r]];
@@ -567,7 +603,7 @@ static int span_at(const para_t *p,int at){
  * counting them (DRAW 0) or drawing those from line FIRST on, the links in link blue (the focused one on a band) and
  * each visible run of a link recorded in hits[] for the mouse and Tab */
 static int history_lines(int draw,int first){
-    int cols=text_cols(),rows=text_rows(),line=0,y=body_y(),i,j,k,x0,blue=AW_UIColor(112,126,207);
+    int cols=text_cols(),rows=text_rows(),line=0,y=text_y(),i,j,k,x0,blue=AW_UIColor(112,126,207);
     char text_[1100],out[64];const char *q;
     if(cols>(int)sizeof(out)-2)cols=(int)sizeof(out)-2;
     if(draw)nhits=0;
@@ -637,8 +673,8 @@ static int history_lines(int draw,int first){
 #define BAR_LIST 1
 static int bar_drag=-1;              /* the bar a mouse press started on (held: a drag moves it), -1 none */
 static int bar_x(int which){return which==BAR_TEXT?list_x()-5:list_x()+LIST_W-AW_DIAL_BAR_W;}
-static int sbar_y(int which){return which==BAR_TEXT?body_y()-2:list_y()-1;}
-static int bar_h(int which){return which==BAR_TEXT?BOX_Y+BOX_H-PAD-body_y()+2:list_rows()*row_h();}
+static int sbar_y(int which){return which==BAR_TEXT?text_y()-2:list_y()-1;}
+static int bar_h(int which){return which==BAR_TEXT?BOX_Y+BOX_H-PAD-text_y()+2:list_rows()*row_h();}
 static int rgb(unsigned c){return AW_UIColor((int)(c>>16)&255,(int)(c>>8)&255,(int)c&255);}
 /* the pane's lines: total, visible and the first shown */
 static void bar_lines(int which,int *total,int *visible,int *first){
@@ -692,16 +728,27 @@ static void draw_history(void){
 }
 static void draw(void){
     char line[64];int i,y,rows=list_rows(),right=BOX_X+BOX_W-PAD,dark=AW_UIColor(29,23,17),pick=AW_UIColor(62,53,36);
-    const char *who=speaker?pr_strings+speaker->v.netname:"";int w=(int)strlen(who)*char_w();
+    const char *who=speaker?pr_strings+speaker->v.netname:"";
     AW_ListBoxSetVisible(&box,rows);
     AW_UIBox(BOX_X,BOX_Y,BOX_W,BOX_H);
-    text(BOX_X+(BOX_W-w)/2,BOX_Y+PAD,who,right);
-    {   /* the disposition bar: the NPC's disposition toward the player, 0..100, blue, its number in the middle */
-        int bw=BOX_W-2*PAD,fill=bw*disposition/100;
-        Q_snprintf(line,sizeof(line),"%d",disposition);
-        AW_UIFill(BOX_X+PAD,bar_y()-1,bw,char_h()+2,dark);
-        if(fill>0)AW_UIFill(BOX_X+PAD,bar_y()-1,fill,char_h()+2,AW_UIColor(38,56,170));
-        text(BOX_X+(BOX_W-(int)strlen(line)*char_w())/2,bar_y(),line,right);
+    /* DIALOGUE-WINDOW-LAYOUT-57: the speaker's name is the window's header, as the title of the inventory, map and
+     * magic windows: the original title bar (aw_icons.c) with the name in the game's own font in its plaque, drawn as
+     * they draw it (the small font around it, the plain centred name where the art is missing); the body text and the
+     * right column stay in the console font. The bar is 12 rows high and ends above the disposition bar's row. */
+    AW_UISmallBegin();
+    if(!aw_title_bar || !aw_title_bar(BOX_X+4,BOX_Y+4,BOX_W-8,who))
+        AW_UITextCentred(BOX_X+4,BOX_Y+4,BOX_W-8,12,who,AW_UIColor(223,199,144));
+    AW_UISmallEnd();
+    /* the thin line along the title bar's bottom edge, where the inventory's pane frames start under its bar: the house
+     * thin line (AW_UIThinBox's muted gold, AW_UI_THIN_LINE), in the row just under the 12-row bar */
+    AW_UIFill(BOX_X+4,BOX_Y+4+12,BOX_W-8,AW_UI_THIN_LINE,AW_UIColor(120,109,87));
+    if(person){   /* the disposition bar, the right column's top row (DIALOGUE-WINDOW-LAYOUT-57; OpenMW 0.51
+                   * DialogueWindow::updateDisposition: a person only, "N/100" on it): 0..100, blue */
+        int d=disposition<0?0:disposition>100?100:disposition,fill=LIST_W*d/100;
+        Q_snprintf(line,sizeof(line),"%d/100",disposition);
+        AW_UIFill(list_x(),bar_y()-1,LIST_W,char_h()+2,dark);
+        if(fill>0)AW_UIFill(list_x(),bar_y()-1,fill,char_h()+2,AW_UIColor(38,56,170));
+        text(list_x()+(LIST_W-(int)strlen(line)*char_w())/2,bar_y(),line,right);
     }
     (void)pick;draw_bar(BAR_TEXT);   /* the text's thin bar stands where the column rule was (DIALOGUE-SCROLLBARS-62) */
     draw_history();
@@ -710,12 +757,18 @@ static void draw(void){
     text(list_x()+2,body_y(),line,right);
     {   /* DIALOGUE-ARROWS-MOVE-POINTER-60: the pane the keys work in, framed (Tab switches it) */
         int x0=pane==PANE_TEXT?BOX_X+PAD-1:list_x()-2,x1=pane==PANE_TEXT?list_x()-6:list_x()+LIST_W+1;
-        int y0=body_y()-3,y1=BOX_Y+BOX_H-PAD+1,c=AW_UIColor(150,126,80);
+        int y0=(pane==PANE_TEXT?text_y():body_y())-3,y1=BOX_Y+BOX_H-PAD+1,c=AW_UIColor(150,126,80);
         AW_UIFill(x0,y0,x1-x0+1,1,c);AW_UIFill(x0,y1,x1-x0+1,1,c);AW_UIFill(x0,y0,1,y1-y0+1,c);AW_UIFill(x1,y0,1,y1-y0+1,c);
     }
     for(i=0;i<rows && box.top+i<box.shown_count;i++){
         y=list_y()+i*row_h();
         /* the highlighted row: bright while the list has the keys, dim while the text has them */
+        if(box.shown[box.top+i]<listed && list[box.shown[box.top+i]]==CODE_SEPARATOR){
+            /* DIALOGUE-WINDOW-LAYOUT-57: the divider row (OpenMW 0.51 updateTopicsPane addSeparator): no highlight, the
+             * line across the middle of its row */
+            AW_UIFill(list_x()+2,y+char_h()/2,LIST_W-AW_DIAL_BAR_W-4,1,AW_UIColor(150,126,80));
+            continue;
+        }
         if(box.top+i==box.selection)AW_UIFill(list_x(),y-1,LIST_W,row_h(),pane==PANE_LIST?pick:AW_UIColor(44,38,28));
         if(greyed(box.shown[box.top+i]) || (box.shown[box.top+i]<listed && spent[box.shown[box.top+i]])){
             /* OpenMW's colours: specific 0.45 0.5 0.8, exhausted 0.3 0.3 0.3; a greyed-out row as before */
@@ -1223,7 +1276,7 @@ static void pick_choice(int k){
 /* a row of the list: a topic, or the persuasion page's entries (nothing while a Choice is open: OpenMW
  * DialogueWindow::onSelectListItem while isInChoice) */
 static void ask(int r){
-    if(r<0 || r>=listed || choice_count)return;
+    if(r<0 || r>=listed || choice_count || list[r]==CODE_SEPARATOR)return;
     if(list[r]==CODE_PERSUASION){mode=1;refresh();return;}
     if(list[r]==CODE_BACK){mode=mode==8?7:mode>=10 && mode<=12?9:0;refresh();return;}
     if(list[r]==CODE_EN_ITEM){mode=10;refresh();return;}
@@ -1308,6 +1361,11 @@ static int choice_key(int k,int mouse_x,int mouse_y){
     default:return 1;
     }
 }
+/* DIALOGUE-WINDOW-LAYOUT-57: an arrow that landed on the divider row goes on in the same direction (the list box cannot skip) */
+static void step_over(int dir){
+    int s=AW_ListBoxSelected(&box);
+    if(s>=0 && s<listed && list[s]==CODE_SEPARATOR)AW_ListBoxKey(&box,dir);
+}
 static int key(int k,int mouse_x,int mouse_y){
     int r=AW_LB_NONE;
     if(choice_count){int c=choice_key(k,mouse_x,mouse_y);if(c>=0)return c?!fight_started && !travel_after && !leave_after:0;}
@@ -1318,10 +1376,10 @@ static int key(int k,int mouse_x,int mouse_y){
      * conversation text they step through its links (the current one on a band) and Enter asks it; Tab switches */
     case K_UPARROW:
         if(pane==PANE_TEXT){step_link(-1);return 1;}
-        r=AW_ListBoxKey(&box,AW_LBKEY_UP);break;
+        r=AW_ListBoxKey(&box,AW_LBKEY_UP);step_over(AW_LBKEY_UP);break;
     case K_DOWNARROW:
         if(pane==PANE_TEXT){step_link(1);return 1;}
-        r=AW_ListBoxKey(&box,AW_LBKEY_DOWN);break;
+        r=AW_ListBoxKey(&box,AW_LBKEY_DOWN);step_over(AW_LBKEY_DOWN);break;
     case K_TAB:pane=pane==PANE_TEXT?PANE_LIST:PANE_TEXT;focus=-1;return 1;
     case K_PGUP:scroll+=text_rows()-1;break;                  /* the conversation text */
     case K_PGDN:scroll-=text_rows()-1;break;
@@ -1344,8 +1402,8 @@ static int key(int k,int mouse_x,int mouse_y){
         if(pane==PANE_TEXT && focus>=0 && focus<nhits){ask_link(focus);return 1;}
         if(pane==PANE_TEXT)return 1;                          /* no link chosen: nothing to ask */
         r=AW_ListBoxKey(&box,AW_LBKEY_CHOOSE);break;
-    case K_MWHEELUP:if(mouse_x<list_x())scroll+=3;else r=AW_ListBoxKey(&box,AW_LBKEY_UP);break;
-    case K_MWHEELDOWN:if(mouse_x<list_x())scroll-=3;else r=AW_ListBoxKey(&box,AW_LBKEY_DOWN);break;
+    case K_MWHEELUP:if(mouse_x<list_x())scroll+=3;else{r=AW_ListBoxKey(&box,AW_LBKEY_UP);step_over(AW_LBKEY_UP);}break;
+    case K_MWHEELDOWN:if(mouse_x<list_x())scroll-=3;else{r=AW_ListBoxKey(&box,AW_LBKEY_DOWN);step_over(AW_LBKEY_DOWN);}break;
     case K_MOUSE1:
         if(on_goodbye(mouse_x,mouse_y))return 0;               /* Goodbye */
         {int b=bar_at(mouse_x,mouse_y);bar_drag=-1;           /* DIALOGUE-SCROLLBARS-62: a pane's bar */
@@ -1353,7 +1411,10 @@ static int key(int k,int mouse_x,int mouse_y){
         {int h=AW_DialLinkHit(hits,nhits,mouse_x,mouse_y,row_h());   /* a link in the conversation: ask its topic */
             if(h>=0){ask_link(h);return 1;}}
         if(mouse_x>=list_x() && mouse_x<list_x()+LIST_W && mouse_y>=list_y()-1 && mouse_y<list_y()-1+list_rows()*row_h()){
-            pane=PANE_LIST;focus=-1;r=AW_ListBoxClick(&box,(mouse_y-(list_y()-1))/row_h());}
+            int was=box.selection;
+            pane=PANE_LIST;focus=-1;r=AW_ListBoxClick(&box,(mouse_y-(list_y()-1))/row_h());
+            {int s=AW_ListBoxSelected(&box);   /* the divider row is no choice: the selection stays where it was */
+             if(s>=0 && s<listed && list[s]==CODE_SEPARATOR){box.selection=was;r=AW_LB_NONE;}}}
         else if(mouse_x<BOX_X || mouse_x>=BOX_X+BOX_W || mouse_y<BOX_Y || mouse_y>=BOX_Y+BOX_H)return 0;
         break;
     default:
@@ -1403,6 +1464,8 @@ int AW_DialWindowOpen(edict_t *e,const char *greeting,int again){
         cond.disposition=disposition=AW_DialDisposition(&table,&facts,1);
         Q_snprintf(speaker_record,sizeof(speaker_record),"%s",id && id->string?pr_strings+id->string:"");
         speaker_reference=ref?(unsigned long)ref->_float:0;
+        person=strcmp(pr_strings+e->v.classname,"aw_creature") &&   /* DIALOGUE-WINDOW-LAYOUT-57 */
+               !(aw_actor_creature && aw_actor_creature(e)==1);
         original_base=current_base=facts.base;permanent_change=0;mode=0;fight_started=travel_after=leave_after=0;
         choice_count=0;choice_topic=-1;goodbye_only=0;train_count=sale_count=0;
         AW_MwscriptResultsPrepare();   /* MWSCRIPT-RESULT-LONG-FRAME-62: the results' index, once per load (in "facts") */
@@ -1588,7 +1651,7 @@ int AW_DialNpcDisposition(edict_t *e,const aw_dial_npc_cache_t *c){
     return AW_DialDisposition(&table,&f,1);
 }
 
-/* dbg npcs talk [record id] (aw_debug.c): Talk with the nearest NPC that can be talked to (or the named record), as E does on
+/* dbg npcs talk [record id] (aw_debug.c): Talk with the nearest NPC or talking creature that can be talked to (or the named record), as E does on
  * the one under the crosshair, the player turned to face it; for checks and pictures (the window is the same). */
 void AW_DialWindowTalk(const char *want){
     edict_t *p,*e,*best=NULL;int i;float best_d=1e9f,d;vec3_t delta;
@@ -1596,7 +1659,9 @@ void AW_DialWindowTalk(const char *want){
     if(!sv.active || svs.maxclients<1 || !(p=svs.clients[0].edict)){Con_Printf("Not in a game.\n");return;}
     for(i=1;i<sv.num_edicts;i++){
         e=EDICT_NUM(i);
-        if(e->free || strcmp(pr_strings+e->v.classname,"aw_npc") || !AW_CanTalk(e) || AW_GlutNpcOf(e)<0)continue;
+        /* a talking creature too (its row since DIALOGUE-CREATURE-SPEAKERS-66; DIALOGUE-WINDOW-LAYOUT-57's pictures) */
+        if(e->free || (strcmp(pr_strings+e->v.classname,"aw_npc") && strcmp(pr_strings+e->v.classname,"aw_creature")) ||
+           !AW_CanTalk(e) || AW_GlutNpcOf(e)<0)continue;
         if(want){v=GetEdictFieldValue(e,"aw_source_id");if(!v || !v->string || Q_strcasecmp(pr_strings+v->string,(char *)want))continue;}
         VectorSubtract(e->v.origin,p->v.origin,delta);d=Length(delta);
         if(d<best_d){best_d=d;best=e;}

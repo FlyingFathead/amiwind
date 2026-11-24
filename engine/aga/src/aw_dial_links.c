@@ -66,3 +66,14 @@ int AW_DialChoiceStep(int count,int focus,int dir){
     if(focus<0 || focus>=count)return dir>0?0:count-1;
     return dir>0?(focus+1)%count:(focus+count-1)%count;
 }
+int AW_DialSpecialEntries(unsigned offers,int person,int *out){
+    int k,n=0;
+    if(!person)offers&=~AW_DIAL_OFFER(AW_DIAL_SPECIAL_PERSUASION);
+    for(k=0;k<AW_DIAL_SPECIALS;k++)if(offers&AW_DIAL_OFFER(k))out[n++]=k;
+    return n;
+}
+int AW_DialDividerWanted(int entries,int topics,int goodbye_only){return entries>0 && topics>0 && !goodbye_only;}
+int AW_DialSeparatorUnder(const int *list,const int *shown,int n,int i){
+    if(!list || !shown || i<0 || i+1>=n)return 0;
+    return list[shown[i]]<0 && list[shown[i+1]]>=0;
+}

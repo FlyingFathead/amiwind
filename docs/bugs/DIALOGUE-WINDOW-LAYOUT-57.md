@@ -20,6 +20,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-10-31: reported in v0.0.57-dev4
+- 2026-11-23 22:14 +0200: seen again in v0.0.68-dev11: The talk window's right column gets the original's order: the disposition bar on top, Persuasion and the person's services in their own block, a divider line, then the topics, and Goodbye at the bottom.
+
+<!-- END GENERATED TIMELINE -->
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -187,6 +198,7 @@ Family: Actors and NPCs (`actors-npc`). Actor placement, models and behaviour; t
 
 Related bugs in other categories:
 
+- [DIALOGUE-COMPANION-SHARE-MISSING-68](DIALOGUE-COMPANION-SHARE-MISSING-68.md): Missing: the talk window has no Companion Share entry for a companion, and there is no share window
 - [PERSUASION-BROKEN-62](PERSUASION-BROKEN-62.md): Persuasion in dialogue does nothing: Admire and Intimidate return to the topic list, Taunt shows nothing
 
 <!-- END GENERATED CATEGORY -->

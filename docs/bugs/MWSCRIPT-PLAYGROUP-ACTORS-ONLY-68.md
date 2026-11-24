@@ -29,11 +29,13 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.68-dev9 (0b2287c2) | 2026-11-23 | gate 12861 of the planning item MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68 | A script PlayGroup or LoopGroup on a placed object in a room takes the group end pose when it has played (drawing and collision; the end-pose models stored after every room own, the pose table, the engine swap, kept in saves): the Halls of Penumbra ice wall, the Clockwork City lever doors, the Bamz-Amschend cave-ins; the animation itself and outdoor frame placements are tracked apart |
+| shipped | the v0.0.68-dev10 build | v0.0.68-dev10 (0b2287c2) | 2026-11-23 | the delivered build holds the commit (the planning item's shipped list) | the fix is in a numbered build; not yet confirmed by a play check |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-22: reported in v0.0.68-dev6
 - 2026-11-23: fixed in source: a gated commit, v0.0.68-dev9 (0b2287c2); gate 12861 of the planning item MWSCRIPT-PLAYGROUP-ACTORS-ONLY-68: A script PlayGroup or LoopGroup on a placed object in a room takes the group end pose when it has played (drawing and collision; the end-pose models stored after every room own, the pose table, the engine swap, kept in saves): the Halls of ...
+- 2026-11-23: shipped: the v0.0.68-dev10 build, v0.0.68-dev10 (0b2287c2); the delivered build holds the commit (the planning item's shipped list): the fix is in a numbered build; not yet confirmed by a play check
 - 2026-11-23 07:37 +0200: seen again in v0.0.68-dev8: Seen again: when its quest script breaks it, the Halls of Penumbra's ice wall plays no animation and keeps blocking the passage behind it.
 
 <!-- END GENERATED TIMELINE -->
@@ -131,6 +133,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [DIALOGUE-BACKGROUND-EMPTY-RANK-67](DIALOGUE-BACKGROUND-EMPTY-RANK-67.md): Hul in Balmora answers Background with "I am Hul, Pauper and  of the  ." : the rank and faction words are empty
 - [DIALOGUE-CELL-FILTER-SEVERAL-CELLS-68](DIALOGUE-CELL-FILTER-SEVERAL-CELLS-68.md): A voice or greeting line with a place filter is never said by a speaker placed in several places or placed by a script
 - [DIALOGUE-CHOICES-62](DIALOGUE-CHOICES-62.md): Dialogue choices are not shown as rows to pick, and the branch after a pick is not filtered as in the original
+- [DIALOGUE-COMPANION-SHARE-MISSING-68](DIALOGUE-COMPANION-SHARE-MISSING-68.md): Missing: the talk window has no Companion Share entry for a companion, and there is no share window
 - [DIALOGUE-CONDITIONS-PARTIAL-67](DIALOGUE-CONDITIONS-PARTIAL-67.md): Incomplete: the dialogue conditions PcVampire, PcCorprus and PcClothingModifier read their start value, and RankRequirement is not checked in game
 - [DIALOGUE-CREATURE-SPEAKERS-66](DIALOGUE-CREATURE-SPEAKERS-66.md): Creatures that speak have no rows in the dialogue table, so their lines cannot be said: Almalexia, Vivec, ghosts, a draugr and rieklings among them
 - [DIALOGUE-DISPOSITION-CHARM-ZERO-67](DIALOGUE-DISPOSITION-CHARM-ZERO-67.md): Incomplete: a Charm effect adds nothing to an NPC disposition in a conversation: it is read as 0
@@ -220,6 +223,7 @@ Family: Game logic (QuakeC) and saves (`game-logic`). QuakeC entities, saves and
 - [MWSCRIPT-ONPCHITME-NEVER-SET-68](MWSCRIPT-ONPCHITME-NEVER-SET-68.md): The script variable OnPCHitMe is never set: a script that waits for the player to strike its actor never sees the blow
 - [MWSCRIPT-PLACE-NO-MODEL-62](MWSCRIPT-PLACE-NO-MODEL-62.md): A script cannot place an NPC or a creature whose record has no placed reference in Vvardenfell
 - [MWSCRIPT-PLACE-OTHER-KINDS-62](MWSCRIPT-PLACE-OTHER-KINDS-62.md): A script cannot place an activator, a container or a levelled creature list yet
+- [MWSCRIPT-PLAYBINK-SKIP-FLAG-68](MWSCRIPT-PLAYBINK-SKIP-FLAG-68.md): A video started by a script can always be skipped, also the ones the original plays to the end without a skip
 - [MWSCRIPT-PLAYGROUP-FRAME-OBJECTS-68](MWSCRIPT-PLAYGROUP-FRAME-OBJECTS-68.md): A script's PlayGroup or LoopGroup on an object drawn as a placement of an outdoor frame (Mournhold's districts) changes nothing: Azura in the Temple Courtyard keeps her placed look through her appearance and departure at the end of Tribunal's main quest
 - [MWSCRIPT-POSITION-ROOM-ROTATION-68](MWSCRIPT-POSITION-ROOM-ROTATION-68.md): A script's Position ignores its rotation argument and always moves the player to the outdoor point, also from inside a room
 - [MWSCRIPT-POSITIONCELL-NPC-62](MWSCRIPT-POSITIONCELL-NPC-62.md): A script or a dialogue answer that moves an NPC or a creature to another place (PositionCell) does nothing

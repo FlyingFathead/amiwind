@@ -36,11 +36,13 @@ Closure steps (how this bug was closed, [the schema](README.md#closure)):
 | Stage | Who | Where | When | How | Why |
 | --- | --- | --- | --- | --- | --- |
 | fixed in source | a gated commit | v0.0.68-dev8 (60096ffc) | 2026-11-23 | gate 12828 of the planning item REUSE-POOL-LINK-LIMIT-68 | A reused stage copies a file whose shared copy is at the file system's hard link limit instead of refusing the whole stage's reuse; the reuse code is in no stage key, so nothing re-keys |
+| shipped | the v0.0.68-dev9 build | v0.0.68-dev9 (60096ffc) | 2026-11-23 | the delivered build holds the commit (the planning item's shipped list) | the fix is in a numbered build; not yet confirmed by a play check |
 
 Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
 
 - 2026-11-22: reported in v0.0.68-dev8
 - 2026-11-23: fixed in source: a gated commit, v0.0.68-dev8 (60096ffc); gate 12828 of the planning item REUSE-POOL-LINK-LIMIT-68: A reused stage copies a file whose shared copy is at the file system's hard link limit instead of refusing the whole stage's reuse; the reuse code is in no stage key, so nothing re-keys
+- 2026-11-23: shipped: the v0.0.68-dev9 build, v0.0.68-dev9 (60096ffc); the delivered build holds the commit (the planning item's shipped list): the fix is in a numbered build; not yet confirmed by a play check
 - 2026-11-23 04:23 +0200: seen again in v0.0.68-dev8: Seen again: a build planned the CHIM world stage for reuse, but the reuse was refused when one stored file had reached the file system's link limit, so the stage was converted again from its stored units, about fifteen minutes.
 - 2026-11-23 06:49 +0200: seen again in v0.0.68-dev8: Seen again in the next reuse build: the Solstheim stage and the CHIM world stage both lost their reuse to the same shared file at the link limit and were converted again from their stored units.
 
@@ -235,6 +237,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [EXPANSION-READER-ONE-MASTER-64](EXPANSION-READER-ONE-MASTER-64.md): Most builder readers load only the base game file; the roadmap calls the readers master-list readers
 - [GATE-IMAGE-REMOVED-52](GATE-IMAGE-REMOVED-52.md): A cleanup removed the image the gate s Linux host-parity step runs: the in-use check looked at containers only
 - [GATE-PRIVACY-NOT-IN-PREGATE-52](GATE-PRIVACY-NOT-IN-PREGATE-52.md): The privacy word check runs only in the full gate: the quick pre-gate checks passed text the gate then refused
+- [GC-RUN-WALK-ONE-CORE-68](GC-RUN-WALK-ONE-CORE-68.md): The garbage collector walks the run folders one after another on one core (about six minutes on a large build volume)
 - [GUARD-TORCH-SCRATCH-SERIAL-67](GUARD-TORCH-SCRATCH-SERIAL-67.md): From scratch, the guard torch step bakes the six boat guard models one after another only to skip every one of them
 - [HARVEST-CHIM-COVERAGE-ONE-AREA-48](HARVEST-CHIM-COVERAGE-ONE-AREA-48.md): The image step harvest coverage check failed on every CHIM world of one area (every MiniWind sandbox of one town)
 - [IMAGE-BIGGER-THAN-ORIGINAL-62](IMAGE-BIGGER-THAN-ORIGINAL-62.md): The game image (3,022 MB in v0.0.62) is bigger than the original game data it is made from (1.93 GB)

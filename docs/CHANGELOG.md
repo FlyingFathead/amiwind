@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.68-dev11 (23 November 2026)._
+_Last updated with AmiWind v0.0.68-dev12 (24 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.68-dev12: twelfth snapshot of v0.0.68, 24 November 2026](#v0068-dev12-twelfth-snapshot-of-v0068-24-november-2026)
 - [v0.0.68-dev11: eleventh snapshot of v0.0.68, 23 November 2026](#v0068-dev11-eleventh-snapshot-of-v0068-23-november-2026)
 - [v0.0.68-dev10: tenth snapshot of v0.0.68, 23 November 2026](#v0068-dev10-tenth-snapshot-of-v0068-23-november-2026)
 - [v0.0.68-dev9: ninth snapshot of v0.0.68, 23 November 2026](#v0068-dev9-ninth-snapshot-of-v0068-23-november-2026)
@@ -218,6 +219,45 @@ _Last updated with AmiWind v0.0.68-dev11 (23 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.68-dev12: twelfth snapshot of v0.0.68, 24 November 2026
+
+The twelfth development snapshot of v0.0.68, in development ([release notes](releases/notes/RELEASE-v0.0.68-dev12.md)), on
+the way to v0.0.68, **Solstheim Is Here** (the release for which Solstheim is to be complete). The talk window is laid out
+as the original's, the builder ages its caches, and the main page is a short summary of where the project stands. Emulator
+presets: `AmiWind-v0.0.68-dev12-FS-UAE.fs-uae` and `AmiWind-v0.0.68-dev12-WinUAE.uae`, both with 32 MB of Fast RAM. All of
+it is covered by tests and the gates of the commits; the talk window and persuasion are seen in play.
+
+**Changed**
+
+- The talk window's right column is the original's: the disposition bar with its number out of 100 on top (a person only),
+  only the services the speaker offers in the original's order (Persuasion for a person, Barter, Spells, Travel,
+  Spellmaking, Enchanting, Training, Repair), a divider row the arrows and the wheel step over, the topics, and Goodbye at
+  the bottom; the speaker's name is on the window's title bar in the game's header font (DIALOGUE-WINDOW-LAYOUT-57, seen in
+  play). `dbg npcs talk` also reaches a creature that has lines.
+- Persuasion seen working in play on the v0.0.68-dev11 image: Admire, Intimidate, Taunt and the three bribes answer and move
+  the disposition (PERSUASION-BROKEN-62).
+
+**Builder and tools**
+
+- The build cache ages: a unit cache entry (CHIM units, image passes, world terrain) or a pool key of the sound, video,
+  script and resident NPC stages is kept while it was used or written within 14 days (`--grace-days`) or by a kept run or
+  the run a kept stage came from; the rest expires with its files (BUILD-CACHE-NO-RETENTION-55,
+  [the build cache](BUILD_CACHE.md#unit-cache-ageing)).
+- The collector walks the build runs on all its worker processes (GC-RUN-WALK-ONE-CORE-68).
+
+**Known**
+
+- No Companion Share entry for a companion yet (DIALOGUE-COMPANION-SHARE-MISSING-68); a video started by a script can
+  always be skipped (MWSCRIPT-PLAYBINK-SKIP-FLAG-68); the reuse keys read by lookup record no use, so the collector keeps
+  them whole (CACHE-KEY-LOOKUP-NO-USE-68).
+
+**Documentation**
+
+- The README is written again as a short summary: a status without a date, the current snapshot in one paragraph, what
+  works and what comes next checked against the bug tracker, and a test that refuses a stale status
+  (README-STATUS-STALE-SCATTERED-68). The roadmap and the releases index name the v0.0.68-dev12 snapshot and presets; the
+  docs index is written again.
 
 ## v0.0.68-dev11: eleventh snapshot of v0.0.68, 23 November 2026
 

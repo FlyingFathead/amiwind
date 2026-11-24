@@ -1,11 +1,11 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.68-dev11 (23 November 2026)._
+_Last updated with AmiWind v0.0.68-dev12 (24 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.68: in progress, eleventh snapshot 23 November 2026](#v0068-in-progress-eleventh-snapshot-23-november-2026)
+- [v0.0.68: in progress, twelfth snapshot 24 November 2026](#v0068-in-progress-twelfth-snapshot-24-november-2026)
 - [v0.0.67: Tribunal Introduced, released 19 November 2026](#v0067-tribunal-introduced-released-19-november-2026)
 - [v0.0.66: Forward It Is, released 16 November 2026](#v0066-forward-it-is-released-16-november-2026)
 - [v0.0.65: Reintroducing Vvardenfell](#v0065-reintroducing-vvardenfell)
@@ -119,9 +119,17 @@ _Last updated with AmiWind v0.0.68-dev11 (23 November 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
-## v0.0.68: in progress, eleventh snapshot 23 November 2026
+## v0.0.68: in progress, twelfth snapshot 24 November 2026
 
-v0.0.68 is titled **Solstheim Is Here**: the release for which Solstheim is to be complete. Its eleventh development
+v0.0.68 is titled **Solstheim Is Here**: the release for which Solstheim is to be complete. Its twelfth development
+snapshot, [v0.0.68-dev12](releases/notes/RELEASE-v0.0.68-dev12.md), is out. What dev12 carries (checked by tests and the
+gates of their commits; the talk window and persuasion also seen in play): **the talk window laid out as the original's**,
+with the disposition bar and its number on top, only the services the speaker offers in the original's order, a divider,
+the topics and Goodbye at the bottom, and the speaker's name on the title bar; **persuasion seen working**; for the
+builder, **a build cache that ages**: unit cache entries and pool keys no build used or wrote within 14 days and no kept
+run needs expire, and the collector walks the runs on all its worker processes; and **the main page written again** as a
+short summary checked against the bug tracker. Still open: the Companion Share entry, conversation with the creatures that
+have lines, the skip rule of a script's videos, and the reuse keys read by lookup that record no use. The eleventh
 snapshot, [v0.0.68-dev11](releases/notes/RELEASE-v0.0.68-dev11.md), is out. What dev11 carries (checked by tests and the
 gates of their commits; the fight's frame times, the werewolf character's missing offer to talk and the glacier's weathers
 also seen in play): **fights that no longer stutter when blows land** (the fighters' spell lists are kept from the start of

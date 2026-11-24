@@ -1,6 +1,6 @@
 # Dialogue: design (topics, conditions, choices, disposition, journal)
 
-_Last updated with AmiWind v0.0.62-dev2 (2026-11-08)._
+_Last updated with AmiWind v0.0.68 (23 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -270,6 +270,21 @@ toward the player as OpenMW works it out (MechanicsManager::getDerivedDispositio
 reaction toward the player's factions, by rank) and the crime level, with the game's own settings (fDisp*) and
 faction reactions, which the table now carries. OpenMW has no reputation term; disease, a drawn weapon and Charm
 are not read yet. Every Disposition test of the conversation reads this value. Read only: persuasion comes later.
+
+**The right column as the original's (v0.0.68).** Since v0.0.68 the talk window's right column is laid out as the
+original's (OpenMW 0.51 DialogueWindow::updateTopicsPane and updateDisposition, our own code), in the console font:
+the speaker's name on the window's top bar (the original's title bar with the name in the game's header font, drawn as
+the inventory, map and magic windows draw their titles, with a thin line along its bottom edge; the conversation text and the column stay in the console
+font); the disposition bar on top of the column, with "N/100" on it, for a person only (a creature has none); then the
+special entries, each only when the speaker offers it, in the original's order: Persuasion (a person only), Barter,
+Spells, Travel, Spellmaking, Enchanting, Training and Repair, their words from the game settings (sPersuasion,
+sBarter, sSpells, sTravel, sSpellmakingMenuTitle, sEnchanting, sServiceTrainingTitle, sRepair); then a separator
+row (an empty row of its own, one row's height, with the line across its middle; the arrows step over it and a click on
+it does nothing); then the topics; Goodbye at the bottom. The search line (type to find a topic) stays under the bar. The
+conversation text on the left now starts on the bar's row, two rows more than before. Companion Share (the
+original's last entry, for an actor whose script marks it a companion) is not offered yet: there is no companion
+test and no share window in this build. The entries' order and the separator rule run as native tests
+(tests/aga_dial_links_test.c); the change adds no memory (the column is drawn from the list the window keeps).
 
 **Defines (v0.0.57 rc1).** %PCRank and %NextPCRank (the player's rank in the speaker's faction, rank 0 when not a
 member, as OpenMW; "%" when the speaker has none; the rank names from the table) and %Cell (the player's place, as

@@ -1,6 +1,6 @@
 # CHIM Progress Tracker
 
-_Last updated with AmiWind v0.0.68-dev11 (23 November 2026)._
+_Last updated with AmiWind v0.0.68-dev12 (24 November 2026)._
 
 <!-- contents start -->
 ## Contents
@@ -94,7 +94,7 @@ Rooms that are in the game as room maps of our own, not as CHIM rooms: Imperial 
 
 ### Scripting
 
-Counted from the MWScript tracker ([MWScript features](../MWSCRIPT_FEATURES.md)), measured 23 November 2026 for AmiWind v0.0.68-dev11 with the builder's own compiler: 1,072 of the 1,074 scripts the original game uses run as scripts or are carried by AmiWind's own code (1,063 run, 9 carried); 11,542 script records are bound to placed objects.
+Counted from the MWScript tracker ([MWScript features](../MWSCRIPT_FEATURES.md)), measured 24 November 2026 for AmiWind v0.0.68-dev12 with the builder's own compiler: 1,072 of the 1,074 scripts the original game uses run as scripts or are carried by AmiWind's own code (1,063 run, 9 carried); 11,542 script records are bound to placed objects.
 
 | State | Scripts |
 | :-- | --: |
@@ -113,6 +113,8 @@ Cells on CHIM (land + sea) in each ingested build since v0.0.49, from the tracke
 | v0.0.68-dev9 (32bffc95) | 2026-11-21 | 1,292 + 117 | 144 + 9 | 11 + 0 | 1,573 |
 | v0.0.68-dev8 (08793a6d) | 2026-11-21 | 1,292 + 117 | 144 + 7 | 11 + 0 | 1,571 |
 | v0.0.68-dev7 (24d3fb04) | 2026-11-21 | 1,292 + 117 | 135 + 0 | 11 + 0 | 1,555 |
+| v0.0.68-dev11 (371a2c27) | 2026-11-21 | 1,292 + 117 | 144 + 9 | 11 + 0 | 1,573 |
+| v0.0.68-dev10 (72439e7b) | 2026-11-21 | 1,292 + 117 | 144 + 9 | 11 + 0 | 1,573 |
 | v0.0.68-dev6 (95a3d6e3) | 2026-11-18 | 1,292 + 117 | 135 + 0 | 11 + 0 | 1,555 |
 | v0.0.68-dev5 (4d1da821) | 2026-11-18 | 1,292 + 117 | 135 + 0 | 11 + 0 | 1,555 |
 | v0.0.68-dev4 (9b63c3c4) | 2026-11-18 | 1,292 + 117 | 135 + 0 | 11 + 0 | 1,555 |

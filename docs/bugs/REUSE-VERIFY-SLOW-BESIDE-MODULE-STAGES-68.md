@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 8 times; something has to be done
+## PERSISTING: reported 9 times; something has to be done
 
 - Reported with v0.0.68-dev3 at 2026-11-21 04:37 +0200: Seen again in the next dev3 build: the room batches' reuse took about half a minute beside the Solstheim stage and the engine.
 - Reported with v0.0.68-dev4 at 2026-11-21 13:08 +0200: Seen again in the v0.0.68-dev4 build: a reused stage's reuse step took 22 seconds against its recorded 5.
@@ -12,6 +12,7 @@
 - Reported with v0.0.68-dev9 at 2026-11-23 11:55 +0200: A test build of the v0.0.68-dev10 line spent 17 s checking a stage it took over from an earlier build, three and a half times its usual time, while other work ran.
 - Reported with v0.0.68-dev10 at 2026-11-23 13:29 +0200: The v0.0.68-dev10 build spent 34 s checking the world stage it took over from an earlier build, about seven times its usual time, while the engine was being compiled.
 - Reported with v0.0.68-dev10 at 2026-11-23 16:47 +0200: A third build today spent 18 s checking the room batches stage it took over, against its usual 5 s, while the engine was being compiled.
+- Reported with v0.0.68-dev11 at 2026-11-23 19:26 +0200: The v0.0.68-dev11 build spent 39 s checking the world stage it took over, about eight times its usual time, while the engine was being compiled.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -51,13 +52,14 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-23 11:55 +0200: seen again in v0.0.68-dev9: A test build of the v0.0.68-dev10 line spent 17 s checking a stage it took over from an earlier build, three and a half times its usual time, while other work ran.
 - 2026-11-23 13:29 +0200: seen again in v0.0.68-dev10: The v0.0.68-dev10 build spent 34 s checking the world stage it took over from an earlier build, about seven times its usual time, while the engine was being compiled.
 - 2026-11-23 16:47 +0200: seen again in v0.0.68-dev10: A third build today spent 18 s checking the room batches stage it took over, against its usual 5 s, while the engine was being compiled.
+- 2026-11-23 19:26 +0200: seen again in v0.0.68-dev11: The v0.0.68-dev11 build spent 39 s checking the world stage it took over, about eight times its usual time, while the engine was being compiled.
 
 <!-- END GENERATED TIMELINE -->
 
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 8 times; something has to be done](#persisting-reported-8-times-something-has-to-be-done)
+- [PERSISTING: reported 9 times; something has to be done](#persisting-reported-9-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Bugs in the same category](#bugs-in-the-same-category)
 
@@ -243,6 +245,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [EXPANSION-READER-ONE-MASTER-64](EXPANSION-READER-ONE-MASTER-64.md): Most builder readers load only the base game file; the roadmap calls the readers master-list readers
 - [GATE-IMAGE-REMOVED-52](GATE-IMAGE-REMOVED-52.md): A cleanup removed the image the gate s Linux host-parity step runs: the in-use check looked at containers only
 - [GATE-PRIVACY-NOT-IN-PREGATE-52](GATE-PRIVACY-NOT-IN-PREGATE-52.md): The privacy word check runs only in the full gate: the quick pre-gate checks passed text the gate then refused
+- [GC-RUN-WALK-ONE-CORE-68](GC-RUN-WALK-ONE-CORE-68.md): The garbage collector walks the run folders one after another on one core (about six minutes on a large build volume)
 - [GUARD-TORCH-SCRATCH-SERIAL-67](GUARD-TORCH-SCRATCH-SERIAL-67.md): From scratch, the guard torch step bakes the six boat guard models one after another only to skip every one of them
 - [HARVEST-CHIM-COVERAGE-ONE-AREA-48](HARVEST-CHIM-COVERAGE-ONE-AREA-48.md): The image step harvest coverage check failed on every CHIM world of one area (every MiniWind sandbox of one town)
 - [IMAGE-BIGGER-THAN-ORIGINAL-62](IMAGE-BIGGER-THAN-ORIGINAL-62.md): The game image (3,022 MB in v0.0.62) is bigger than the original game data it is made from (1.93 GB)

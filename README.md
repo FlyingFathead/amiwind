@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.68-dev11 (23 November 2026)._
+_Last updated with AmiWind v0.0.68-dev12 (24 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -25,138 +25,62 @@ Like community projects such as
 
 More in the [gallery](docs/GALLERY.md).
 
-## Where AmiWind stands (19 November 2026)
+## Where AmiWind stands
 
-The newest release is **v0.0.67: Tribunal Introduced**. It introduces Tribunal, the first expansion, into the game:
+**The newest release is v0.0.67: Tribunal Introduced.** It brings Tribunal, the first expansion, into the game:
 Tribunal's additions to Vvardenfell are in the build, and Mournhold can be reached from Ebonheart through the
-characters' own dialogue and walked from the palace to the Plaza (shown in the emulator on a development build of this
-release). Its quests and much of its play are not ready yet, and Solstheim is not in the game. It runs on CHIM Engine v0.2.2 and needs
-32 MB of Fast RAM.
+characters' own dialogue and walked from the palace to the Plaza. Its quests and much of its play are not ready, and in
+this release Solstheim is not in the game. It runs on CHIM Engine v0.2.2 and needs 32 MB of Fast RAM. The detail:
+the [v0.0.67 release notes](docs/releases/notes/RELEASE-v0.0.67.md). The release before it, **v0.0.66: Forward It Is**,
+is in [its notes](docs/releases/notes/RELEASE-v0.0.66.md).
 
-**New**
-
-- Mournhold's five districts are a build module of their own, with their containers, items, doors and people placed in
-  source (still to be seen in play), and the scripts of the expansions' placed objects run.
-- Every race and sex has its own first-person hands, and the held light is in the left hand again.
-- The inventory shows one action per kind of item and casts scrolls.
-- A place that cannot be loaded names its error and leaves you where you were.
-- The confirmed look book checks every look the maintainer confirmed on each development build.
-
-**Fixed**
-
-- The game no longer stops on a loading screen in busy places such as Vivec and the Bitter Coast.
-- Autosaves are written again on every map change, and wild creatures are back outdoors (measured in the emulator; the
-  entries stay open until a played game shows them).
-- Spell effects show the original's shell, creatures move and fight as in the original, and most errors in play send
-  you back instead of ending the game.
-
-**Builder and tools**
-
-- A build reuses earlier builds by default, checks for problems in its first minutes, and a failed build writes one
-  failure page.
-
-Several fixes are made in source and covered by tests, and are still to be seen in play. Every change, with the detail:
-the [changelog](docs/CHANGELOG.md#v0067-tribunal-introduced-19-november-2026) and the
-[v0.0.67 release notes](docs/releases/notes/RELEASE-v0.0.67.md), which link the notes of the three development
-snapshots. Known problems: the notes' "Known in this build" and [the bug tracker](docs/BUGS.md).
-
-**In development: v0.0.68-dev11** (23 November 2026), the eleventh snapshot of the next version, **Solstheim Is Here** (the
-release for which Solstheim is to be complete): fights no longer stutter when blows land (with six fighters the worst
-fight frame went from 219 ms to 50 ms, seen in play), a character in werewolf form can no longer be talked to, the
-creatures that have lines have rows in the dialogue and voice tables (talking to them is not done yet), and Solstheim's
-weather has its own look: a blizzard is a storm blowing north, with its own fog distance and cloud speed, seen on the
-glacier in a test image. The rest is not yet seen in play
-([v0.0.68-dev11 notes](docs/releases/notes/RELEASE-v0.0.68-dev11.md)). The tenth snapshot drew the characters a Bloodmoon
-script turns into werewolves as werewolves, fighting with their claws only and at their race's size, and let a script's
-animation group on a placed object leave it in its end pose, so the Halls of Penumbra's ice wall breaks and the Sotha Sil
-lever doors open; the broken ice wall cannot be passed yet
-([dev10](docs/releases/notes/RELEASE-v0.0.68-dev10.md)). The ninth snapshot built all 153 of Solstheim's
-cells, made its quest and underwater entrances usable, let named objects whose script answers on use take the use key, drew
-the player in werewolf form as the werewolf and opened the conversation by a script's ForceGreeting as the original does
-([dev9](docs/releases/notes/RELEASE-v0.0.68-dev9.md)). The eighth snapshot was mostly the game's menus: the
-windows of a running game keep the game's colours, Escape in play opens the in-game menu, the map is the original's map in
-the menus' framed style, and fights by scripts and the Mortrag Glacier came in
-([dev8](docs/releases/notes/RELEASE-v0.0.68-dev8.md)). The seventh snapshot gave the scene palette a cool ice
-and snow ramp, made the census back room answer the use key again after a visit to the courtyard (seen in play) and had
-the builder's check of the opening come down the ship's plank to the dock guard
-([dev7](docs/releases/notes/RELEASE-v0.0.68-dev7.md)). The
-sixth snapshot ran the scripts of Mournhold's five districts (the trees, the sounds, the statue and the rest) on their
-frames and made the use key pass by a door that a script has switched off; none of that is seen in play yet
-([dev6](docs/releases/notes/RELEASE-v0.0.68-dev6.md)). The snapshot before it let people knocked out in water drown at once
-and made the builder's door check cover Solstheim and Mournhold's districts ([dev5](docs/releases/notes/RELEASE-v0.0.68-dev5.md)).
-The one before it made the invisible walls of the game solid boxes, put the Ghostfence's glow in behind a switch and
-added more of the original's console commands ([dev4](docs/releases/notes/RELEASE-v0.0.68-dev4.md)). Before it came
-Solstheim's first 135
-open terrain cells into the build, reached only by a debug teleport for now, and outdoor pieces that scripts take or
-switch off stay hidden, however many ([dev3](docs/releases/notes/RELEASE-v0.0.68-dev3.md)). Before it came the hands
-mended (a light and a weapon held together, third-person fists, readied magic through doors) and the moving water of
-Old Mournhold's levers, seen working in play ([dev2](docs/releases/notes/RELEASE-v0.0.68-dev2.md);
-[dev1](docs/releases/notes/RELEASE-v0.0.68-dev1.md)).
-
-The release before it, **v0.0.66: Forward It Is**, took the game forward on the road to the expansions: people and
-creatures cast spells and shoot bows, the dead stay dead, a fuller map, a save that keeps every change, and an opening
-that holds its controls as the original does ([v0.0.66 notes](docs/releases/notes/RELEASE-v0.0.66.md)).
+**In development: v0.0.68-dev12**, the twelfth snapshot of the next version, **Solstheim Is Here** (the release for
+which Solstheim is to be complete). Since v0.0.67 all 153 of Solstheim's cells are built and its quest and underwater
+entrances can be used (seen in play), fights no longer stutter when blows land, and Solstheim's weathers have their own
+look; the snapshot itself lays out the talk window as the original's, with the disposition bar, the speaker's services
+and the name on the title bar (seen in play), and lets the builder clear the cache entries no recent build uses. Most of
+the expansions' play is not yet seen in play. The notes of this snapshot:
+[v0.0.68-dev12](docs/releases/notes/RELEASE-v0.0.68-dev12.md); the earlier snapshots, dev1 to dev11, are in the
+[changelog](docs/CHANGELOG.md).
 
 ## What already works
 
-- **Vvardenfell, whole.** All 1,408 exterior cells of the main island (1,292 land and 116 sea) on CHIM, streamed as you walk, and 1,121 of its
-  1,123 interiors as CHIM rooms (the prison ship and the census office are room maps of their own, counted as ready), with the people and
-  creatures the game places in them ([CHIM progress tracker](docs/chim/PROGRESS_TRACKER.md),
-  [the map's colours](docs/chim/CHIM_PROGRESS_MAP.md)). Every load door of the base game leads in and back out.
+- **Vvardenfell, whole.** All 1,408 exterior cells of the main island on CHIM, streamed as you walk, and 1,121 of its
+  1,123 interiors as CHIM rooms (the prison ship and the census office are room maps of their own, counted as ready), with the
+  people and creatures the game places in them ([CHIM progress tracker](docs/chim/PROGRESS_TRACKER.md),
+  [the map's colours](docs/chim/CHIM_PROGRESS_MAP.md)). Every load door
+  of the base game leads in and back out.
 - **Play:** character creation through the opening; the inventory, the journal and the map; saving and loading, with what
-  you change staying changed; combat and casting by the original's rules; talking and the services; crime
-  with witnesses, guards, fines and jail; alchemy; containers and bodies to search (a locked container does not open
-  yet); torches and lanterns for the night and the caves; weather, music and travel by silt strider, boat, gondola and
-  guild guide.
-- **Levelling:** as in the original, the skills of the player's class build up level progress: each raise of a major or a
-  minor skill adds to it (misc skills add none), and when it reaches the game's level-up total the game says to rest and
-  meditate on what was learned. The level-up box, with its attribute multipliers, opens only at the end of a rest that
-  ran its full length with sleeping allowed (in a bed or a place not marked as no sleeping); a rest cut short or ended by
-  a script does not open it, and the next full rest does. The raised values stay through a save and a load.
-- **Resting:** a rest is refused in water, in the air and with enemies near. A wilderness rest can be cut short by a
-  creature: the chance is the original's (about one rest in four, a rest of 12 hours cut after 9; a rest of three hours or
-  less is never cut), only outdoors and only where the region has a list of creatures, and the creature is taken from that
-  list. The Dark Brotherhood's attack on a
-  rest is not certain: it comes from Tribunal's own script, and depends on the player (the level and the Tribunal start
-  state the script asks for, and its own odds). It was seen once on a 12-hour rest in the wilderness at level 40, with its
-  wake message on screen, in the emulator on the release image; the debug command for it forces the script's roll.
+  you change staying changed; combat and casting by the original's rules; talking and the services; crime with
+  witnesses, guards, fines and jail; alchemy; containers and bodies to search; torches and lanterns; weather, music and
+  travel by silt strider, boat, gondola and guild guide; levelling and resting as in the original
+  ([game features](docs/GAME_FEATURES.md)).
 - **Tribunal, the first steps:** Tribunal's additions to Vvardenfell are in the build, and Mournhold is reached from
-  Ebonheart through the characters' own dialogue and back again; its five districts can be walked, slowly (8 to 16
-  frames a second in the emulator). A new game starts the city in peace (the Plaza's fabricants, the two Gaenors and
-  the Hall of Ministry's rats stay out of it), the Great Bazaar's teleport arrival puts the player on the street, Godsreach's
-  gate to the Plaza opens, and a fight is not carried into the next place, in Vvardenfell and in Mournhold.
+  Ebonheart through the characters' own dialogue; its five districts can be walked, slowly (8 to 16 frames a second in
+  the emulator).
 - **The game's scripts:** of the 1,074 scripts the original uses, 1,063 run and 9 more are carried by AmiWind's own code,
   235 of Tribunal's 236 among them ([the MWScript tracker](docs/MWSCRIPT_FEATURES.md)).
-- **Hardware:** the reference target is an A1200 with AGA, a 68040 with FPU, 2 MiB Chip and 32 MiB Fast RAM (16 MiB
-  starts with a warning, but parts of the game run wrongly or not at all). The figures so far come from emulators and
-  the Raspberry Pi 4B ([real hardware](docs/REAL_HARDWARE.md)).
+- **Hardware:** the target is an A1200-class machine with AGA, a 68040 with FPU, 2 MiB Chip and 32 MiB Fast RAM, in
+  emulators with JIT; accelerators such as the PiStorm are a route to real hardware (16 MiB starts with a warning, and
+  parts of the game run wrongly or not at all). The figures so far come from emulators and the Raspberry Pi 4B
+  ([real hardware](docs/REAL_HARDWARE.md)).
 
 ## What comes next
 
-What is not working yet, and what is in work:
-
-- **Tribunal in play:** Mournhold's quests and most of its play are still to be seen in play; the two water levers of
-  Old Mournhold work in play. The districts' frame
-  rate, the Plaza's view from its arrival point and Godsreach's canal are open in the bug tracker.
-- **Bloodmoon:** Solstheim is not playable yet. All 153 of its cells are in the build and are reached only by a debug
-  teleport; no door or journey leads there, and only a few of its entrances and objects have been seen in play.
-- **Resting:** the wilderness creature came too often in one session, because every start of the game replays the same
-  random numbers; this is fixed in source for the next build and still to be seen in play, as is a person or creature
-  that a script keeps out of the world and that a debug teleport inside the loaded map drew again. The Dark Brotherhood
-  was seen at level 40 only; other levels are still being checked.
-- **Persuasion and skills:** persuasion in dialogue does nothing yet (open, cause not known); that skills rise with use
-  is repaired and its in-game check is pending.
+- **Tribunal in play:** Mournhold's quests and most of its play are still to be seen in play, and so are the districts'
+  frame rate, the Plaza's view from its arrival point and Godsreach's canal.
+- **Bloodmoon:** Solstheim's cells are built and its entrances can be used, but no door or journey leads there from
+  Vvardenfell yet; most of its objects and quests are not yet seen in play.
+- **Talking:** conversation with the creatures that have lines and the Companion Share entry are still to come; the
+  talk window and persuasion are seen working in play ([the bug tracker](docs/BUGS.md)).
+- **Resting:** the wilderness creature came too often in one session; fixed in source, still to be seen in play.
 - **The base game:** the end of the main quest in the Heart Chamber; pickpocketing, picking owned locks and locks on
   doors and containers; making your own enchantments; schedules by the time of day; the shores still run in saw-tooth steps.
-- **Hardware:** real 68060 machines are not playable yet ([the 68060](docs/68060.md)).
 
-Every system of the base game with its state: [game features](docs/GAME_FEATURES.md). Known problems:
-[the bug tracker](docs/BUGS.md).
-
-**Then v0.0.68** (in development, [dev11](docs/releases/notes/RELEASE-v0.0.68-dev11.md) is out) continues with the
-expansions' finished content: Tribunal's Mournhold with its quests and Bloodmoon's Solstheim, with their scripts; a
-build that fits a 32 GB machine; then the rest of the open plan. The order of record is the [roadmap](docs/ROADMAP.md);
-no dates are promised.
+**Then v0.0.68** continues with the expansions' finished content: Tribunal's Mournhold with its quests and Bloodmoon's
+Solstheim, with their scripts; a build that fits a 32 GB machine; then the rest of the open plan. The order of record is
+the [roadmap](docs/ROADMAP.md); no dates are promised. Every system of the base game with its state:
+[game features](docs/GAME_FEATURES.md). Known problems: [the bug tracker](docs/BUGS.md).
 
 ## Build it from your own Morrowind
 
@@ -192,8 +116,8 @@ finished work is taken back; the build's last lines say what to change first
 ([the build stopped or ran out of memory: what now?](docs/LINUX_BUILD.md#the-build-stopped-or-ran-out-of-memory-what-now)).
 
 The emulator presets of this version are
-[`AmiWind-v0.0.68-dev11-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.68-dev11-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.68-dev11-WinUAE.uae`](resources/emulators/AmiWind-v0.0.68-dev11-WinUAE.uae); both start with 32 MB of Fast
+[`AmiWind-v0.0.68-dev12-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.68-dev12-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.68-dev12-WinUAE.uae`](resources/emulators/AmiWind-v0.0.68-dev12-WinUAE.uae); both start with 32 MB of Fast
 RAM, the requirement. The presets of earlier versions are beside them in [resources/emulators](resources/emulators/). Everything
 else about building and playing: [Building and playing](docs/BUILDING_AND_PLAYING.md), the
 [Linux build guide](docs/LINUX_BUILD.md) and the [FS-UAE launcher](docs/FS-UAE-LAUNCHER.md).

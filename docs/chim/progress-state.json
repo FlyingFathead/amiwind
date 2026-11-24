@@ -76,6 +76,56 @@
    "sea": 117
   },
   {
+   "built_at": "2026-11-21T20:29:59+00:00",
+   "cells": 1573,
+   "commit": "371a2c27",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 117
+    },
+    {
+     "land": 144,
+     "name": "Solstheim",
+     "sea": 9
+    },
+    {
+     "land": 11,
+     "name": "Mournhold",
+     "sea": 0
+    }
+   ],
+   "label": "v0.0.68-dev11 (371a2c27)",
+   "land": 1447,
+   "sea": 126
+  },
+  {
+   "built_at": "2026-11-21T20:29:59+00:00",
+   "cells": 1573,
+   "commit": "72439e7b",
+   "islands": [
+    {
+     "land": 1292,
+     "name": "Vvardenfell",
+     "sea": 117
+    },
+    {
+     "land": 144,
+     "name": "Solstheim",
+     "sea": 9
+    },
+    {
+     "land": 11,
+     "name": "Mournhold",
+     "sea": 0
+    }
+   ],
+   "label": "v0.0.68-dev10 (72439e7b)",
+   "land": 1447,
+   "sea": 126
+  },
+  {
    "built_at": "2026-11-18T10:28:16+00:00",
    "cells": 1555,
    "commit": "95a3d6e3",
@@ -2628,7 +2678,7 @@
  ],
  "eligible_release": "v0.0.68",
  "format": "aw-progress-state-1",
- "generated": "2026-11-23T08:41:06+00:00",
+ "generated": "2026-11-23T18:30:48+00:00",
  "groups": {
   "accounted_for": 2322,
   "cells": 2322,

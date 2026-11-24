@@ -185,6 +185,44 @@ int main(void){
      expect("choice: Down wraps",AW_DialChoiceStep(2,1,1),0);
      expect("choice: Up wraps",AW_DialChoiceStep(2,0,-1),1);
      expect("choice: no rows",AW_DialChoiceStep(0,-1,1),-1);}
+    /* DIALOGUE-WINDOW-LAYOUT-57: the right column's special entries in the original's order (OpenMW 0.51
+     * DialogueWindow::updateTopicsPane), each only when offered, Persuasion for a person only, and the separator line
+     * under the last shown entry before the topics. Before v0.0.68 the list had Persuasion for every speaker and no
+     * line at all between the entries and the topics (these functions did not exist). */
+    {int out[AW_DIAL_SPECIALS],n,k,all=0;
+     static const int order[AW_DIAL_SPECIALS]={AW_DIAL_SPECIAL_PERSUASION,AW_DIAL_SPECIAL_BARTER,AW_DIAL_SPECIAL_SPELLS,
+         AW_DIAL_SPECIAL_TRAVEL,AW_DIAL_SPECIAL_SPELLMAKING,AW_DIAL_SPECIAL_ENCHANTING,AW_DIAL_SPECIAL_TRAINING,
+         AW_DIAL_SPECIAL_REPAIR,AW_DIAL_SPECIAL_COMPANION};
+     for(k=0;k<AW_DIAL_SPECIALS;k++)all|=(int)AW_DIAL_OFFER(k);
+     n=AW_DialSpecialEntries((unsigned)all,1,out);
+     expect("special: a person offering all has nine entries",n,9);
+     for(k=0;k<n && k<AW_DIAL_SPECIALS;k++)expect("special: the original's order",out[k],order[k]);
+     n=AW_DialSpecialEntries((unsigned)all,0,out);
+     expect("special: a creature never has Persuasion",n,8);
+     expect("special: a creature's first entry is Barter",out[0],AW_DIAL_SPECIAL_BARTER);
+     /* a merchant who trains (Barter, Training) and a plain person (Persuasion only) */
+     n=AW_DialSpecialEntries(AW_DIAL_OFFER(AW_DIAL_SPECIAL_TRAINING)|AW_DIAL_OFFER(AW_DIAL_SPECIAL_BARTER)|
+                             AW_DIAL_OFFER(AW_DIAL_SPECIAL_PERSUASION),1,out);
+     expect("special: merchant-trainer count",n,3);
+     expect("special: Persuasion first",out[0],AW_DIAL_SPECIAL_PERSUASION);
+     expect("special: Barter before Training",out[1],AW_DIAL_SPECIAL_BARTER);
+     expect("special: Training last",out[2],AW_DIAL_SPECIAL_TRAINING);
+     n=AW_DialSpecialEntries(AW_DIAL_OFFER(AW_DIAL_SPECIAL_TRAVEL),0,out);
+     expect("special: a creature with travel only",n,1);expect("special: its Travel",out[0],AW_DIAL_SPECIAL_TRAVEL);
+     expect("special: nothing offered",AW_DialSpecialEntries(0,0,out),0);}
+    {int list[6]={-1,-30,4,7,9,-31},shown[6]={0,1,2,3,4,5},filtered[2]={2,3},only[2]={0,1};
+     expect("separator: not under the first entry",AW_DialSeparatorUnder(list,shown,6,0),0);
+     expect("separator: under the last entry before the topics",AW_DialSeparatorUnder(list,shown,6,1),1);
+     expect("separator: not under a topic",AW_DialSeparatorUnder(list,shown,6,2),0);
+     expect("separator: not under a topic before an entry",AW_DialSeparatorUnder(list,shown,6,4),0);
+     expect("separator: not under the last row",AW_DialSeparatorUnder(list,shown,6,5),0);
+     expect("separator: a search that shows topics only",AW_DialSeparatorUnder(list,filtered,2,0),0);
+     expect("separator: a search that shows entries only",AW_DialSeparatorUnder(list,only,2,1),0);
+     expect("separator: no list",AW_DialSeparatorUnder(NULL,shown,6,1),0);}
+    expect("divider row: entries and topics",AW_DialDividerWanted(2,5,0),1);
+    expect("divider row: none without entries",AW_DialDividerWanted(0,5,0),0);
+    expect("divider row: none without topics",AW_DialDividerWanted(2,0,0),0);
+    expect("divider row: none with Goodbye only",AW_DialDividerWanted(2,5,1),0);
     printf(failures?"FAIL %d\n":"OK\n",failures);
     return failures!=0;
 }

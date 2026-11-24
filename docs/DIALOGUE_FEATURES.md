@@ -1,12 +1,12 @@
 # Dialogue features
 
-_Last updated with AmiWind v0.0.68-dev11 (18 November 2026)._
+_Last updated with AmiWind v0.0.68-dev12 (23 November 2026)._
 
 <!-- Generated whole by tools/dialogue_features.py render from docs/dialogue-features.json; do not edit by hand. -->
 
 What of the original's dialogue AmiWind does, row by row, against the original and OpenMW 0.51. v0.0.58 ships the dialogue feature-complete against the original and OpenMW 0.51 (decided for the project, 31 October 2026); a row that is not done blocks the release unless it carries the maintainer's written deferral. Status on 8 November 2026: dialogue choices show as rows in the conversation text, picked by a click or the arrow keys and Enter, and each pick is answered by the first answer of the topic whose filters pass, such as paying only when you have the gold; this still needs its check in the game (DIALOGUE-CHOICES-62). Characters who threaten you in dialogue attacking when the talk ends, and fights that start from dialogue results across the whole game, are being checked (DIALOGUE-AGGRO-62). They lead the next landmark, every game script running as in the original, measured by the MWScript feature tracker; other fixes continue alongside.
 
-**5 of 29 done**, 20 partial, 4 missing.
+**4 of 29 done**, 21 partial, 4 missing.
 
 ## Measured on the game data
 
@@ -52,7 +52,7 @@ Start value: Detected 7.
 
 | Part | State | What | Proof | Missing | Register |
 | --- | --- | --- | --- | --- | --- |
-| Disposition bar | done | The blue bar with its number across the top of the window. | The v0.0.57 release image: Fargoth and a guard, 50 (clips 2026_10_31_v0.0.57_dialogue-rc1_7ff625e). | - | [DIALOGUE-WINDOW-LAYOUT-57](bugs/DIALOGUE-WINDOW-LAYOUT-57.md) |
+| Disposition bar | partial | The right column as the original's (since v0.0.68): the blue bar with "N/100" on top of the column, for a person only; the special entries the speaker offers in the original's order (Persuasion for a person only, Barter, Spells, Travel, Spellmaking, Enchanting, Training, Repair); a separator line; the topics; Goodbye at the bottom; the conversation text on the left starts on the bar's row. | The v0.0.57 release image: Fargoth and a guard, 50 (clips 2026_10_31_v0.0.57_dialogue-rc1_7ff625e), the bar across the window. The v0.0.68 column: the entries' order, the creature rule and the separator rule run natively (tests/aga_dial_links_test.c), the window's wiring in tests/test_dialogue_window_ui.py RightColumn. | The v0.0.68 right column's in-game stills (a merchant with Barter, a trainer). Companion Share, the original's last entry, is not offered: no companion test and no share window yet (DIALOGUE-COMPANION-SHARE-MISSING-68). | [DIALOGUE-WINDOW-LAYOUT-57](bugs/DIALOGUE-WINDOW-LAYOUT-57.md) |
 | Links: topic names in the text | partial | The topic names an answer names, found at build time by OpenMW's rule (a name starts after a word separator, the longest of overlapping names wins), stored as spans; drawn in link blue, clicked or reached with Tab and Enter to ask that topic; the topics named become known. | OpenMW 0.51's own keyword search as the oracle on all 9,956 distinct Topic answer texts of Morrowind.esm: the same shown text and the same 27,260 links (31 October 2026); tests/test_dialogue_lut.py (the rule, the spans through the define filling, natively). | The greeting's names (the greeting comes from the voice table); not yet seen in game (the build hold). | [DIALOGUE-TEXT-LINKS-57](bugs/DIALOGUE-TEXT-LINKS-57.md) |
 | Links: @topic# markers | partial | The data's explicit link markers ('@name#') become links to that topic, the markers stripped from the shown text. | The same oracle run (explicit links to a topic: equal; a marker naming no topic is plain text here, a dead link in OpenMW); tests/test_dialogue_lut.py. | Not yet seen in game (the build hold). | [DIALOGUE-TEXT-LINKS-57](bugs/DIALOGUE-TEXT-LINKS-57.md) |
 | Exhausted topics | partial | A topic whose answer is already in the journal is drawn greyed. | aw_dialwin.c topic_spent (OpenMW's rule: the answer this NPC gives now is on its topic's journal page and every topic it names is known; worked out once per list, drawn dimmer, still chosen); aw_dial.c AW_DialHeardHas, checked natively in tests/aga_dial_test.c. | No in-game still yet (build hold). | - |
