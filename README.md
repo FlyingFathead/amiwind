@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.68 (24 November 2026)._
+_Last updated with AmiWind v0.0.69-dev1 (25 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -42,6 +42,12 @@ original's, with the disposition bar, the speaker's services and the name on the
 [v0.0.68 release notes](docs/releases/notes/RELEASE-v0.0.68.md), with its twelve development snapshots in the
 [changelog](docs/CHANGELOG.md). The release before it, **v0.0.67: Tribunal Introduced**, brought Tribunal and Mournhold
 into the game ([its notes](docs/releases/notes/RELEASE-v0.0.67.md)).
+
+The snapshot in development is **v0.0.69-dev1**, the first of v0.0.69: a place shows on the world map as soon as any of
+its own cells is explored, and the builder's check of the v0.0.68 release from nothing is written down
+([its notes](docs/releases/notes/RELEASE-v0.0.69-dev1.md)). Its emulator presets are
+[`AmiWind-v0.0.69-dev1-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.69-dev1-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.69-dev1-WinUAE.uae`](resources/emulators/AmiWind-v0.0.69-dev1-WinUAE.uae), both with 32 MB of Fast RAM.
 
 ## What already works
 

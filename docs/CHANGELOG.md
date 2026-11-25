@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.68 (24 November 2026)._
+_Last updated with AmiWind v0.0.69-dev1 (25 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.69-dev1: first snapshot of v0.0.69, 25 November 2026](#v0069-dev1-first-snapshot-of-v0069-25-november-2026)
 - [v0.0.68: Solstheim Is Here, 24 November 2026](#v0068-solstheim-is-here-24-november-2026)
 - [v0.0.68-dev12: twelfth snapshot of v0.0.68, 24 November 2026](#v0068-dev12-twelfth-snapshot-of-v0068-24-november-2026)
 - [v0.0.68-dev11: eleventh snapshot of v0.0.68, 23 November 2026](#v0068-dev11-eleventh-snapshot-of-v0068-23-november-2026)
@@ -220,6 +221,34 @@ _Last updated with AmiWind v0.0.68 (24 November 2026)._
 - [CHIM source candidate - 14 October 2026, v0.0.40-dev1](#chim-source-candidate---14-october-2026-v0040-dev1)
 
 <!-- contents end -->
+
+## v0.0.69-dev1: first snapshot of v0.0.69, 25 November 2026
+
+The first development snapshot of v0.0.69 ([release notes](releases/notes/RELEASE-v0.0.69-dev1.md)), cut from the v0.0.68
+release. A place shows on the world map as soon as any of its own cells is explored, and the builder's check of the
+v0.0.68 release from nothing is written down. Emulator presets: `AmiWind-v0.0.69-dev1-FS-UAE.fs-uae` and
+`AmiWind-v0.0.69-dev1-WinUAE.uae`, both with 32 MB of Fast RAM. The change is covered by tests and the gate of its commit;
+it has not been seen in play yet.
+
+**Fixed**
+
+- The world map marks a place on the normal map as soon as the player has explored any one of its own cells, as the
+  original does. Before, only the explored state of the place's averaged marker spot counted, so a place whose cells
+  spread out, such as Raven Rock on Solstheim, stayed hidden while the player stood in it
+  (MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68). Checked in play on the snapshot's image: Raven Rock's marker shows after a
+  short walk into it.
+
+**Builder and tools**
+
+- The v0.0.68 release was built again from nothing, in an empty workspace with nothing reused, and every game data file
+  came out identical to the released image. The check measured the expansion stages using under half of their cores
+  (TRIBUNAL-STAGE-UNDERUSED-68) and the actor library limited by memory (BUILD-MEMPLAN-CHIM-5-OF-22-68); both are planned
+  for the next snapshots.
+
+**Known**
+
+- The open items of the v0.0.68 release stand ([its Known list](releases/notes/RELEASE-v0.0.68.md#known-in-this-build));
+  the two builder entries above are added.
 
 ## v0.0.68: Solstheim Is Here, 24 November 2026
 

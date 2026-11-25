@@ -1182,6 +1182,18 @@ static int ci_starts(const char *text,const char *part){
 }
 /* The place markers from world/region-names.awn (ARN2: names, places, cells; 64-byte labels; rows <iiII> x, y,
  * region, place). Bounded: 128 groups; a missing or bad file leaves the map without markers. */
+/* MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68: a place is known on the map as soon as any one of its own cells holds explored
+ * land, as the original shows a place once the player has been in it; before, only the explored state of the place's
+ * averaged marker spot counted, so a place whose cells spread (Raven Rock) stayed hidden while the player stood in it.
+ * The explored mask is built before the places when the map opens (below), so the cells are tested as they are read. */
+static int fog_open(int gx,int gy);
+static int place_cell_explored(int32_t cx,int32_t cy){
+    int gx0,gy0,gx,gy;
+    if(!fog_mask)return 0;
+    gx0=(int)cx*AW_MAPFOG_GRID-fog_gx0;gy0=(int)cy*AW_MAPFOG_GRID-fog_gy0;
+    for(gy=0;gy<AW_MAPFOG_GRID;gy++)for(gx=0;gx<AW_MAPFOG_GRID;gx++)if(fog_open(gx0+gx,gy0+gy))return 1;
+    return 0;
+}
 static void map_places_load(void){
     FILE *f=NULL;byte head[16],row[16];char *labels=NULL;short *group=NULL;long base;
     int size,i,j,k,n;unsigned names,places,cells,where;const char *cut;map_place_t *m;
@@ -1219,6 +1231,7 @@ static void map_places_load(void){
         if(group[where]<0)continue;
         m=&map_places[group[where]];
         m->x+=((int32_t)u32(row)+.5f)*8192.0f;m->y+=((int32_t)u32(row+4)+.5f)*8192.0f;m->cells++;
+        if(!m->known && place_cell_explored((int32_t)u32(row),(int32_t)u32(row+4)))m->known=1;
     }
     for(i=j=0;i<map_place_count;i++){
         if(!map_places[i].cells)continue;
@@ -1412,7 +1425,7 @@ static void open_map(void){
              areas[i].y>=-2000000 && areas[i].y<=2000000))goto bad;
     }
     update_player();map_pixels=map_data+off;
-    map_places_load();map_fog_build();local_build();
+    map_fog_build();map_places_load();local_build();   /* the mask first: the places test their cells against it */
     if(!map_view_ready){map_home();map_view_ready=1;}else map_fit();
     /* stage 3: inside, always the room's own map; outdoors the view last chosen there */
     if(local_room){

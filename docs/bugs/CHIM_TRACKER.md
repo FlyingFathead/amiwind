@@ -1,6 +1,6 @@
 # CHIM Engine tracker
 
-_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.68._
+_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.69-dev1._
 
 <!-- Generated whole by tools/bug_register.py render from docs/bugs/bugs.json; do not edit by hand. -->
 
@@ -87,6 +87,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 
 Newest first: the last 10 dated events of CHIM bugs, from their entries (reports, history, closure steps).
 
+- 2026-11-24 [CHIM-STAGE-QUEUED-IDLE-68](CHIM-STAGE-QUEUED-IDLE-68.md): seen again in v0.0.68: Seen again in a build from scratch: the Bloodmoon stage held 77 units in its queue with none running, using under 2 of its 8 cores.
 - 2026-11-24 [CHIM-REBUILD-NOT-IDENTICAL-68](CHIM-REBUILD-NOT-IDENTICAL-68.md): seen again in v0.0.68-dev12: The second pair of runs differs only in two diagnostic reports of the Solstheim stage (one carries a time); the game files are identical.
 - 2026-11-24 [WORLDMAP-ONE-ISLAND-64](WORLDMAP-ONE-ISLAND-64.md): seen again in v0.0.68-dev12: In v0.0.68-dev12 the world map picture already shows Solstheim, but its bounds follow the land with heights instead of every exterior cell of the game, so the westernmost sea column and the three southern rows of the map are cut off.
 - 2026-11-24 [CHIM-SEA-BETWEEN-ISLANDS-64](CHIM-SEA-BETWEEN-ISLANDS-64.md): seen again in v0.0.68-dev12: Measured in v0.0.68-dev12: inside the box of the original world map (cells x -29 to 23, y -19 to 28), 982 open-sea cells without any record are not built, 542 around Vvardenfell and 440 in the area Bloodmoon adds, so the edge of the world ...
@@ -96,7 +97,6 @@ Newest first: the last 10 dated events of CHIM bugs, from their entries (reports
 - 2026-11-24 [OCEAN-APRON-EXPANSION-HEIGHTLESS-68](OCEAN-APRON-EXPANSION-HEIGHTLESS-68.md): reported in v0.0.68
 - 2026-11-24 [IMAGE-FRAME-HEAP-LAYER-STORES-UNCHECKED-68](IMAGE-FRAME-HEAP-LAYER-STORES-UNCHECKED-68.md): reported in v0.0.68-dev12
 - 2026-11-24 [IMAGE-FRAME-HEAP-LAYER-STORES-UNCHECKED-68](IMAGE-FRAME-HEAP-LAYER-STORES-UNCHECKED-68.md): fixed in source: a gated commit, v0.0.68-dev12 (5e77e121); gate 13060 of the planning item SOL-SEA-CROSSING-68: The open sea of the whole map's box is built (542 cells in the base world, 440 in a world of their own beside Solstheim's), the world map spans the same box, and the image step checks every frame, room and crossing of every store at 32 MB ...
-- 2026-11-24 [CHIMPORT-DOOR-MARKER-AUDIT-36](CHIMPORT-DOOR-MARKER-AUDIT-36.md): deferred by the maintainer: deferred by the maintainer to v0.0.69 (the v0.0.68 release triage): it stays open and on the work list, so the Solstheim release goes out first and the next version takes it up
 
 ## Engine streaming and memory
 

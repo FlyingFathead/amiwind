@@ -2726,7 +2726,7 @@
    "sea": 0
   }
  ],
- "eligible_release": "v0.0.68",
+ "eligible_release": "v0.0.69",
  "format": "aw-progress-state-1",
  "generated": "2026-11-24T14:32:49+00:00",
  "groups": {
@@ -3120,7 +3120,7 @@
   "terrain_complete_unlit": 931
  },
  "version_stamp": {
-  "release": "v0.0.68",
+  "release": "v0.0.69",
   "source": "the version file"
  }
 }

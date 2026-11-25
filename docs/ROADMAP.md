@@ -1,10 +1,11 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.68 (24 November 2026)._
+_Last updated with AmiWind v0.0.69-dev1 (25 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.69: in development, first snapshot 25 November 2026](#v0069-in-development-first-snapshot-25-november-2026)
 - [v0.0.68: Solstheim Is Here, released 24 November 2026](#v0068-solstheim-is-here-released-24-november-2026)
 - [v0.0.67: Tribunal Introduced, released 19 November 2026](#v0067-tribunal-introduced-released-19-november-2026)
 - [v0.0.66: Forward It Is, released 16 November 2026](#v0066-forward-it-is-released-16-november-2026)
@@ -118,6 +119,14 @@ _Last updated with AmiWind v0.0.68 (24 November 2026)._
 [CHIM-RECIPE-APRON-SCOPE-41](bugs/CHIM-RECIPE-APRON-SCOPE-41.md) — 15 October 2026, v0.0.41 candidate: recipe repair converted all four affected frames with structural PASS. Three still failed the unchanged memory gate (peaks 6,957,632; 6,939,952; 6,644,768 bytes for (10,0), (10,1), (9,2)); (11,0) passed at 5,875,568 bytes. The separate placed-model reserve repair passes all four on identical world bytes. A complete successor world and recipe/model/sprite equivalence and native checks remain pending.
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
+
+## v0.0.69: in development, first snapshot 25 November 2026
+
+The first snapshot, [v0.0.69-dev1](releases/notes/RELEASE-v0.0.69-dev1.md), is out. It carries the world map fix (a place
+shows as soon as any of its own cells is explored; not yet seen in play) and the written result of building the v0.0.68
+release again from nothing, which came out identical and showed two things to improve: the expansion stages use under half
+of their cores and the actor library is limited by memory. Those two are planned for the next snapshots. The line goes on
+with what v0.0.68 moved on, listed below; no dates are promised.
 
 ## v0.0.68: Solstheim Is Here, released 24 November 2026
 

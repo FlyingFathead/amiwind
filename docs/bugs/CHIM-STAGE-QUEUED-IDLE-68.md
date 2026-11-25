@@ -20,6 +20,17 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-24: reported in v0.0.68
+- 2026-11-24 23:43 +0200: seen again in v0.0.68: Seen again in a build from scratch: the Bloodmoon stage held 77 units in its queue with none running, using under 2 of its 8 cores.
+
+<!-- END GENERATED TIMELINE -->
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category
@@ -234,6 +245,7 @@ Family: Build speed (`build-speed`). Every stage on the shared worker pool; per-
 - [SOL-STAGE-ASSEMBLY-SERIAL-68](SOL-STAGE-ASSEMBLY-SERIAL-68.md): The Solstheim stage, rebuilt with every CHIM unit taken from the cache, spends about six minutes of its world assembly on one core
 - [STALL-SLOW-STAGE-VS-REUSE-TIME-68](STALL-SLOW-STAGE-VS-REUSE-TIME-68.md): The builder's slow-stage warning compared a stage that had to run with the few seconds an earlier build took to reuse it, and so called a normal run eight times too slow
 - [STALL-ZERO-CORES-WHILE-POOLS-BUSY-68](STALL-ZERO-CORES-WHILE-POOLS-BUSY-68.md): The build's stall check reported no cores in use while a stage's worker pools were running
+- [TRIBUNAL-STAGE-UNDERUSED-68](TRIBUNAL-STAGE-UNDERUSED-68.md): The builder's Tribunal stage uses fewer than half of the cores it is given
 - [UNIT-CACHE-STORE-ERRORS-SILENT-63](UNIT-CACHE-STORE-ERRORS-SILENT-63.md): A unit that the unit cache failed to store was reported as stored: a cache folder the build user could not write lost every unit without a word
 - [UNIT-KEY-WHOLE-FILE-63](UNIT-KEY-WHOLE-FILE-63.md): The resident and room unit caches keyed every unit on the whole of their tool files, so an unrelated edit to tools/prepare_area.py re-keyed all 1,769 residents and every room, and the v0.0.63-dev1 build baked them all again
 - [UNIT-STORED-AT-MAP-END-62](UNIT-STORED-AT-MAP-END-62.md): The image step's player view stored its finished bodies only when its whole pool map ended: a step stopped midway kept none of them, so every resume baked every player body again

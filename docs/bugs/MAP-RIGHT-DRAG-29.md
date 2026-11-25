@@ -105,6 +105,7 @@ Family: Menus, HUD, map screen and text (`ui-text`). Menus, HUD, map screen, fon
 - [MAP-LOCAL-ROOM-PLAN-CHIM-ROOMS-68](MAP-LOCAL-ROOM-PLAN-CHIM-ROOMS-68.md): Inside a room the map opens on the World view instead of the room's plan in rooms built on the shared room store
 - [MAP-MARKER-29](MAP-MARKER-29.md): Requested: click to place a user map marker
 - [MAP-ORIGINAL-FEATURES-66](MAP-ORIGINAL-FEATURES-66.md): The map window lacks the original's map: the explored fog, the local map, the interior map and the place markers
+- [MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68](MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68.md): The normal map does not show a place while the player stands in it, until the place's averaged marker spot is explored
 - MAP-REG-01 (no report page): In-Game map mode hid settlement markers (regression)
 - [MAP-SPOTS-28](MAP-SPOTS-28.md): In-game map screen has white/yellow spots
 - [MAP-WORLD-TAB-BLANK-67](MAP-WORLD-TAB-BLANK-67.md): The World tab of the in-game map draws no land: only the player arrow and the place markers show on a blank background
