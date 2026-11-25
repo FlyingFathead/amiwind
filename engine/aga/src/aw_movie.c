@@ -37,6 +37,10 @@ static int debug_return_dest,debug_music_paused,debug_pending,debug_drain_until;
 static int holding;static byte prompt_colour;
 static long pictures,dropped;
 static double started;
+/* MWSCRIPT-PLAYBINK-SKIP-FLAG-68: a script's PlayBink whose second argument is 0 cannot be skipped (OpenMW 0.51
+ * WindowManager::playVideo installs no key handler then): no key ends or cancels it, it plays to its end. Every start
+ * clears it (start_movie), so the startup logo and the debug video stay skippable. */
+static int script_no_skip;
 /* The Fast RAM warning box before the startup logo (draw_ram_warning): up, shown once, its time to go on. */
 static int ram_warning,ram_warning_shown;
 static double ram_warning_until;
@@ -158,6 +162,7 @@ static void draw_memory_notice(void){
 static int start_movie(char *path,int brand){
     byte h[32];long size,audio_size,expected;int i;
     close_movie();
+    script_no_skip=0;
     branding=brand;size=COM_FOpenFile(path,&video);
     if(!video){
         /* A quick test build without videos says so instead (aw_excluded.c). */
@@ -293,8 +298,9 @@ static void playvid(void){
 }
 /* PlayBink FILE (MWSCRIPT-UNPLACED-ATTACH-62; OpenMW 0.51 miscextensions.cpp OpPlayBink): the video of that catalogue
  * name (the file name less its extension, "mw_end.bik" -> mw_end) plays over the scene as the debug video does, and
- * the scene goes on after it; absent (a build without videos, a name the catalogue lacks): said once, 0. */
-int AW_MovieScript(const char *file){
+ * the scene goes on after it; absent (a build without videos, a name the catalogue lacks): said once, 0. SKIP is the
+ * script's second argument: 0 = it plays to its end, no key skips it (MWSCRIPT-PLAYBINK-SKIP-FLAG-68). */
+int AW_MovieScript(const char *file,int skip){
     char name[32],path[64];int i;
     if(!file)return 0;
     for(i=0;file[i] && file[i]!='.' && i<31;i++)name[i]=(char)(file[i]>='A' && file[i]<='Z'?file[i]+32:file[i]);
@@ -305,6 +311,7 @@ int AW_MovieScript(const char *file){
     }
     debug_return_dest=key_dest;
     if(!start_movie(path,2))return 0;
+    script_no_skip=!skip;
     IN_AWClearButtons();Key_ClearStates();key_dest=key_game;
     return 1;
 }
@@ -318,7 +325,7 @@ void AW_MovieUpdate(void){
         else clock_start=paintedtime;
         S_MovieAudioBegin();debug_music_paused=CDAudio_IsPaused();CDAudio_Pause();
         shown=0;pcm_start=pcm_count=0;broken=0;pictures=1;dropped=0;started=Sys_FloatTime();
-        debug_pending=0;Con_Printf("Video: %ld frames; Esc skips.\n",frames);return;
+        debug_pending=0;Con_Printf(script_no_skip?"Video: %ld frames; plays to its end.\n":"Video: %ld frames; Esc skips.\n",frames);return;
     }
     if(holding)return;
     if(broken){finish("read error");return;}
@@ -368,6 +375,7 @@ int AW_MovieKey(int key,int down){
         return 1;
     }
     if(!buffers)return 0;
+    if(script_no_skip)return 1;   /* a script's PlayBink with 0: no key ends it (MWSCRIPT-PLAYBINK-SKIP-FLAG-68) */
     if(debug_pending && down && key==K_ESCAPE){
         close_movie();IN_AWClearButtons();Key_ClearStates();key_dest=debug_return_dest;V_UpdatePalette();
         Con_Printf("Debug video cancelled before playback.\n");return 1;

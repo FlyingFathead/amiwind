@@ -1,11 +1,11 @@
 # Roadmap and implementation options
 
-_Last updated with AmiWind v0.0.69-dev2 (25 November 2026)._
+_Last updated with AmiWind v0.0.69-dev3 (25 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
-- [v0.0.69: in development, second snapshot 25 November 2026](#v0069-in-development-second-snapshot-25-november-2026)
+- [v0.0.69: in development, third snapshot 25 November 2026](#v0069-in-development-third-snapshot-25-november-2026)
 - [v0.0.68: Solstheim Is Here, released 24 November 2026](#v0068-solstheim-is-here-released-24-november-2026)
 - [v0.0.67: Tribunal Introduced, released 19 November 2026](#v0067-tribunal-introduced-released-19-november-2026)
 - [v0.0.66: Forward It Is, released 16 November 2026](#v0066-forward-it-is-released-16-november-2026)
@@ -120,7 +120,11 @@ _Last updated with AmiWind v0.0.69-dev2 (25 November 2026)._
 
 15 October 2026: exact-source validation completed 4,231 tests: 4,225 passed, three Windows-only skips and three tracked Census expected failures. The 71 focused tests and original-data readback across nine frame positions passed, consistently hiding 33 of 158 original references at stronghold state 6 while preserving unknown scripts. All 243 player resources are reusable after exact producer, input and file verification. Complete combined-world conversion, native comparison, packaging and shipment remain pending; coverage counts are unchanged.
 
-## v0.0.69: in development, second snapshot 25 November 2026
+## v0.0.69: in development, third snapshot 25 November 2026
+
+The third snapshot, [v0.0.69-dev3](releases/notes/RELEASE-v0.0.69-dev3.md), starts on the Known lists, small items first:
+a video a script plays to its end can no longer be skipped. Water Walking deep under the water comes next; its rule is
+found.
 
 The second snapshot, [v0.0.69-dev2](releases/notes/RELEASE-v0.0.69-dev2.md), makes the start more reliable with a graphics
 card: the game checks the screen mode the card offers, searches the card's modes when that offer cannot be used, and

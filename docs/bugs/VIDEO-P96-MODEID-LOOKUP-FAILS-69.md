@@ -20,6 +20,23 @@
 
 <!-- END GENERATED FACTS -->
 
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.69-dev2 (7dfbbe60) | 2026-11-25 | gate 13202 of the planning item VIDEO-P96-MODEID-LOOKUP-FAILS-69 | With a graphics card the game checks the screen mode the card offers, searches the card's modes when it cannot be used, and opens the native AGA screen when none can; every step is logged. |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-25: reported in v0.0.68
+- 2026-11-25: fixed in source: a gated commit, v0.0.69-dev2 (7dfbbe60); gate 13202 of the planning item VIDEO-P96-MODEID-LOOKUP-FAILS-69: With a graphics card the game checks the screen mode the card offers, searches the card's modes when it cannot be used, and opens the native AGA screen when none can; every step is logged.
+
+<!-- END GENERATED TIMELINE -->
+
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 ## Bugs in the same category

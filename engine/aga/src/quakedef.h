@@ -945,7 +945,7 @@ int AW_CompanionDistance(void);
 int AW_CompanionMimic(void);
 int AW_CompanionToggleWord(char *word);
 int AW_MovieStart(void);
-int AW_MovieScript(const char *file);   /* PlayBink: a catalogue video over the scene (MWSCRIPT-UNPLACED-ATTACH-62) */
+int AW_MovieScript(const char *file,int skip);   /* PlayBink: a catalogue video over the scene (MWSCRIPT-UNPLACED-ATTACH-62); SKIP 0: plays to its end (MWSCRIPT-PLAYBINK-SKIP-FLAG-68) */
 void AW_MovieInit(void);
 void AW_MovieStartup(void);
 int AW_MovieActive(void);

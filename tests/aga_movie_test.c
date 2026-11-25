@@ -146,11 +146,21 @@ int main(void){
      * one at a time, and the scene's input comes back after it; a name the catalogue lacks does nothing */
     if(AW_MovieActive())AW_MovieKey(K_ESCAPE,1);
     key_dest=key_console;sound_started=0;fixture();soundtime=paintedtime=5000;
-    assert(!AW_MovieScript("mw_end.bik") && !AW_MovieActive());
-    assert(!AW_MovieScript(NULL));
-    assert(AW_MovieScript("MW_Logo.bik") && AW_MovieDebugActive() && key_dest==key_game);
-    assert(!AW_MovieScript("MW_Logo.bik"));
+    assert(!AW_MovieScript("mw_end.bik",1) && !AW_MovieActive());
+    assert(!AW_MovieScript(NULL,1));
+    assert(AW_MovieScript("MW_Logo.bik",1) && AW_MovieDebugActive() && key_dest==key_game);
+    assert(!AW_MovieScript("MW_Logo.bik",1));
     AW_MovieUpdate();assert(AW_MovieKey(K_ESCAPE,1) && !AW_MovieActive() && key_dest==key_console);
+    /* MWSCRIPT-PLAYBINK-SKIP-FLAG-68: PlayBink "MW_Logo.bik" 0 cannot be skipped (OpenMW 0.51 playVideo with
+     * allowSkipping false): Esc neither cancels it before it starts nor ends it while it plays; it ends on its own,
+     * and the next video (here the debug one) is skippable again */
+    key_dest=key_console;fixture();soundtime=paintedtime=6000;
+    assert(AW_MovieScript("MW_Logo.bik",0) && AW_MovieDebugActive());
+    assert(AW_MovieKey(K_ESCAPE,1) && AW_MovieActive());
+    AW_MovieUpdate();assert(AW_MovieKey(K_ESCAPE,1) && AW_MovieKey(K_SPACE,1) && AW_MovieActive());
+    soundtime=paintedtime=9000;AW_MovieUpdate();assert(!AW_MovieActive() && key_dest==key_console);
+    soundtime=paintedtime=9500;playvid_command();AW_MovieUpdate();
+    assert(AW_MovieDebugActive());AW_MovieKey(K_ESCAPE,1);assert(!AW_MovieActive());
     /* A partial-area build (aw_miniwind.c): the startup logo's last frame stays up
      * with "Press ENTER to start" in the console font; only Enter starts the game. */
     {

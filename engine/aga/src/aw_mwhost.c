@@ -4493,8 +4493,10 @@ static int host_call(int instance,int target,int function,const aw_mwcell_t *num
         /* PlayBink FILE SKIP (OpenMW 0.51 miscextensions.cpp OpPlayBink, WindowManager::playVideo: the video plays over
          * the game, then the game goes on; a video that cannot be played is skipped): the converted video of that
          * catalogue name plays as the debug video does, and the scene goes on after it (aw_movie.c AW_MovieScript);
-         * a build without it says so once and the script goes on. Esc skips it whatever SKIP says. */
-        if(AW_MovieScript(call_string(strings,nstrings,0)))binks++;else binks_missed++;
+         * a build without it says so once and the script goes on. SKIP (the second argument, "Sl" as OpenMW's
+         * extensions0.cpp registers it): 0 = it plays to its end, no key skips it, as OpPlayBink's allowSkipping
+         * (MWSCRIPT-PLAYBINK-SKIP-FLAG-68); absent: skippable, as before. */
+        if(AW_MovieScript(call_string(strings,nstrings,0),count>=1?numbers[0].i!=0:1))binks++;else binks_missed++;
         return 1;
     case AWF_BECOMEWEREWOLF:case AWF_UNDOWEREWOLF:case AWF_ISWEREWOLF:{
         int set=function==AWF_BECOMEWEREWOLF,i;

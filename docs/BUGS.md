@@ -1,6 +1,6 @@
 # Bug tracker
 
-_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.69-dev2._
+_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.69-dev3._
 
 The one bug tracker of AmiWind: every bug, its current status, its dated events
 and how it was closed. How tracking works, the report template, the closure
@@ -41,15 +41,16 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [CHIM-AZURA-FLOATING-FLORA-43](bugs/CHIM-AZURA-FLOATING-FLORA-43.md): Plant or tree pieces hang in the air at Azura's Coast (cell 16,7) (reported 7 times, open)
 - [TRACKER-REGISTER-SIZE-33](bugs/TRACKER-REGISTER-SIZE-33.md): The bug register outgrew the release text-file size limit (reported 7 times, open)
 - [BUILD-ENGINE-SOURCE-KEY-BROAD-36](bugs/BUILD-ENGINE-SOURCE-KEY-BROAD-36.md): Any engine source edit changes the keys of the chim and world-flora stages (reported 6 times, fixed)
+- [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](bugs/BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): The image step scans maps on about one core and runs the actor ground check under half the pool (reported 6 times, open)
 - [BUILD-UNIT-KEYS-REACH-64](bugs/BUILD-UNIT-KEYS-REACH-64.md): New collision settings re-keyed the NPC, creature, player-body and resident unit caches, which never read them (reported 6 times, open)
 - [ENGINE-CRASH-EXIT-KEYBOARD-36](bugs/ENGINE-CRASH-EXIT-KEYBOARD-36.md): After AmiWind crashes, the AmigaDOS shell mangles typing: shift/caps latched, M and N never appear (reported 6 times, open)
 - [GATE-SMOKE-NO-REMOTE-CONTROL-60](bugs/GATE-SMOKE-NO-REMOTE-CONTROL-60.md): Gate boot smokes sometimes fail with no remote control after boot (reported 6 times, open)
 - [HUD-STATS-29](bugs/HUD-STATS-29.md): Health uses fixed 100; other bars hardcoded full (reported 6 times, open)
 - [REGISTER-WRITE-EINVAL-67](bugs/REGISTER-WRITE-EINVAL-67.md): The register tool stops now and then with "Invalid argument" while it writes docs/BUGS.md, after it has already saved the entry (reported 6 times, open)
 - [SMOKE-MUSIC-REREAD-FLAKY-57](bugs/SMOKE-MUSIC-REREAD-FLAKY-57.md): The boot smoke's music check fails now and then: music is not read again after dbg music on (reads 35 -> 35), a rerun passes (reported 6 times, open)
+- [STALL-SLOW-STAGE-VS-REUSE-TIME-68](bugs/STALL-SLOW-STAGE-VS-REUSE-TIME-68.md): The builder's slow-stage warning compared a stage that had to run with the few seconds an earlier build took to reuse it, and so called a normal run eight times too slow (reported 6 times, open)
 - [WATER-GAMEPLAY-PARITY-38](bugs/WATER-GAMEPLAY-PARITY-38.md): Water gameplay lacks complete original behavior verification (reported 6 times, open)
 - [ANIMKIT-COVERAGE-35](bugs/ANIMKIT-COVERAGE-35.md): NPCs that move or fight have no walk, run or attack animation: Fargoth and other Seyda Neen villagers glitch toward the player (reported 5 times, fixed)
-- [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](bugs/BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): The image step scans maps on about one core and runs the actor ground check under half the pool (reported 5 times, open)
 - [BUILD-IMAGE-STAIR-WALK-SERIAL-36](bugs/BUILD-IMAGE-STAIR-WALK-SERIAL-36.md): The image step's stair walk runs one map per worker: a single heavy room keeps one core busy for 13-19 minutes while the others sit idle (reported 5 times, fixed)
 - [BUILD-PIPELINE-UNDERUTILIZATION-36](bugs/BUILD-PIPELINE-UNDERUTILIZATION-36.md): Umbrella: several builder phases run on one core while the rest of the machine idles, and some do work the build no longer needs (reported 5 times, open)
 - [BUILD-PROFILE-REAPED-CHILD-DOUBLE-COUNT-42](bugs/BUILD-PROFILE-REAPED-CHILD-DOUBLE-COUNT-42.md): The build profiler's sampled timeline counts a finished child process twice (reported 5 times, fixed)
@@ -61,7 +62,6 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [INTERIOR-PLACED-ITEMS-47](bugs/INTERIOR-PLACED-ITEMS-47.md): Takeable and movable items and containers in converted interiors are not live objects (placed items are left out) (reported 5 times, open)
 - [PLAYER-PUNCH-THIRDPERSON-39](bugs/PLAYER-PUNCH-THIRDPERSON-39.md): Third-person punches have no visible player-body attack animation (reported 5 times, fixed)
 - [REGISTER-CONCURRENT-WRITE-LOST-67](bugs/REGISTER-CONCURRENT-WRITE-LOST-67.md): Two register writes at the same time in one checkout lose an entry: the later writer saves the register from a copy read before the earlier writer's change (reported 5 times, open)
-- [STALL-SLOW-STAGE-VS-REUSE-TIME-68](bugs/STALL-SLOW-STAGE-VS-REUSE-TIME-68.md): The builder's slow-stage warning compared a stage that had to run with the few seconds an earlier build took to reuse it, and so called a normal run eight times too slow (reported 5 times, open)
 - [TEST-PARALLEL-ORDER-LOAD-33](bugs/TEST-PARALLEL-ORDER-LOAD-33.md): The process-pool order test fails on a fully loaded machine (one worker process takes every item) (reported 5 times, open)
 - [TEST-POOL-QUEUE-REFILL-TIMING-64](bugs/TEST-POOL-QUEUE-REFILL-TIMING-64.md): The pool queue refill test (test_longest_first) failed once in a gate on a busy machine and passed on the rerun of the same commit (reported 5 times, open)
 - [AKULAKHAN-CHAMBER-32MB-STALL-53](bugs/AKULAKHAN-CHAMBER-32MB-STALL-53.md): Akulakhan's Chamber does not fit in 32 MB of Fast RAM: its room models need more memory than is free (reported 4 times, open)
@@ -260,7 +260,7 @@ Open bugs, most recently noticed first.
 
 | ID | Issue | Severity | Found in | State | Fixed in | Maintainer accepted | Waiting on | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| [VIDEO-P96-MODEID-LOOKUP-FAILS-69](bugs/VIDEO-P96-MODEID-LOOKUP-FAILS-69.md) | On some Picasso96 setups, such as one on PiStorm, the game cannot find its screen mode at start | medium | v0.0.68 | open | - | - | - | Reported in v0.0.68; cause unknown. |
+| [VIDEO-P96-MODEID-LOOKUP-FAILS-69](bugs/VIDEO-P96-MODEID-LOOKUP-FAILS-69.md) | On some Picasso96 setups, such as one on PiStorm, the game cannot find its screen mode at start | medium | v0.0.68 | open (fixed in source) | - | - | - | Reported in v0.0.68; cause unknown. |
 | [TEST-ROUTE-TESTS-FAIL-ON-RELEASE-68](bugs/TEST-ROUTE-TESTS-FAIL-ON-RELEASE-68.md) | Tests of the Solstheim test route stop the gate when the version is a release | high | v0.0.68 | open | - | - | - | Reported in v0.0.68; cause unknown. |
 | [SOL-SEA-INVISIBLE-BLOCKER-68](bugs/SOL-SEA-INVISIBLE-BLOCKER-68.md) | An object in Solstheim's eastern waters is not drawn but still stops a player walking on the water | medium | v0.0.68 | open | - | - | - | Reported in v0.0.68; cause unknown. |
 | [REGISTER-WRITE-EINVAL-68](bugs/REGISTER-WRITE-EINVAL-68.md) | Writing the bug tracker's files sometimes fails with an invalid-argument error and leaves them half written | medium | v0.0.68 | open | - | - | - | Reported in v0.0.68; cause unknown. |
@@ -2526,10 +2526,13 @@ Every dated event of every bug, newest first, from the entries' own data (report
 
 ##### 25 November 2026
 
+- [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](bugs/BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): seen again in v0.0.69-dev2: Seen again on v0.0.69-dev2: the image step ran on about 10 of 24 cores for six minutes.
+- [STALL-SLOW-STAGE-VS-REUSE-TIME-68](bugs/STALL-SLOW-STAGE-VS-REUSE-TIME-68.md): seen again in v0.0.69-dev2: Seen again on v0.0.69-dev2: a 28 s stage was flagged as 5.8 times its recorded 5 s.
 - [CONTAINER-READ-ENOMEM-66](bugs/CONTAINER-READ-ENOMEM-66.md): seen again in v0.0.69-dev1: Seen again on v0.0.69-dev1: register writes in the shell container failed with a memory error while a build ran, and went through after it.
 - [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](bugs/BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): seen again in v0.0.69-dev1: Seen again on v0.0.69-dev1: the image step ran on 7 of 24 cores for about six minutes.
 - [STALL-SLOW-STAGE-VS-REUSE-TIME-68](bugs/STALL-SLOW-STAGE-VS-REUSE-TIME-68.md): seen again in v0.0.69-dev1: Seen again on v0.0.69-dev1: a 16 s stage was flagged as 3.4 times its recorded 5 s.
 - [VERSION-BUMP-TOOLKIT-HEADER-67](bugs/VERSION-BUMP-TOOLKIT-HEADER-67.md): seen again in v0.0.69-dev1: Opening v0.0.69, the Toolkit header and the previous-release and size-baseline pins were again left on the old release; the checks caught it late, at the Toolkit check and the delivery smoke.
+- [VIDEO-P96-MODEID-LOOKUP-FAILS-69](bugs/VIDEO-P96-MODEID-LOOKUP-FAILS-69.md): fixed in source: a gated commit, v0.0.69-dev2 (7dfbbe60); gate 13202 of the planning item VIDEO-P96-MODEID-LOOKUP-FAILS-69: With a graphics card the game checks the screen mode the card offers, searches the card's modes when it cannot be used, and opens the native AGA screen when none can; every step is logged.
 - [MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68](bugs/MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68.md): fixed in source: a gated commit, v0.0.69-dev1 (1021cef6); gate 13201 of the planning item MAP-SOLSTHEIM-SITE-MARKERS-68: A place shows on the normal map as soon as any one of its own cells is explored (Raven Rock checked in play on the v0.0.69-dev1 image).
 - [MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68](bugs/MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68.md): shipped: a development snapshot, v0.0.69-dev1 (bbcef677a); the v0.0.69-dev1 kit, gate 13201, build of 1021cef6b: the place marker rule is in the published snapshot
 - [MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68](bugs/MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68.md): confirmed in play: an emulator session, v0.0.69-dev1 (1021cef6b); a map check session: a short walk into Raven Rock, then the world map zoomed in: Raven Rock's marker shows on the normal map, where the v0.0.68 image showed none after the same walk
