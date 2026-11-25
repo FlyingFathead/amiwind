@@ -1,6 +1,6 @@
 # Bug tracker
 
-_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.69-dev1._
+_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.69-dev2._
 
 The one bug tracker of AmiWind: every bug, its current status, its dated events
 and how it was closed. How tracking works, the report template, the closure
@@ -20,7 +20,7 @@ a duplicate or superseded (the status says which).
 
 <!-- BEGIN GENERATED BUG REGISTER: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
-2243 bugs: 1312 open, 807 fixed, 124 closed.
+2244 bugs: 1312 open, 808 fixed, 124 closed.
 
 ### Persisting, not resolved
 
@@ -28,7 +28,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 
 - [CHIM-SEYDA-BALMORA-LOAD-HANG-43](bugs/CHIM-SEYDA-BALMORA-LOAD-HANG-43.md): Travelling from Seyda Neen to Balmora sometimes hangs on the Loading screen (boot smoke, 2 of about 5 runs) (reported 51 times, open)
 - [BUILD-IMAGE-UNDERUSED-32](bugs/BUILD-IMAGE-UNDERUSED-32.md): Parts of the image step still run serially or leave most CPUs idle (reported 27 times, open)
-- [CONTAINER-READ-ENOMEM-66](bugs/CONTAINER-READ-ENOMEM-66.md): In the development container, reads of the repository files sometimes fail with "Cannot allocate memory"; a retry works, so a check that hits it can report an unrelated failure (reported 26 times, open)
+- [CONTAINER-READ-ENOMEM-66](bugs/CONTAINER-READ-ENOMEM-66.md): In the development container, reads of the repository files sometimes fail with "Cannot allocate memory"; a retry works, so a check that hits it can report an unrelated failure (reported 27 times, open)
 - [BUILD-CHIM-STAGE-SERIAL-TAIL-36](bugs/BUILD-CHIM-STAGE-SERIAL-TAIL-36.md): After the parallel world build the chim stage ran its validation, heap gate and zone walk on one core (about 10 minutes of the 270-frame coast build) (reported 18 times, open)
 - [BUILD-CHIM-CELLS-PRIVATE-LIST-47](bugs/BUILD-CHIM-CELLS-PRIVATE-LIST-47.md): The releases' CHIM cell list was not in the source tree; public builds had no CHIM exterior cells (reported 11 times, fixed)
 - [PERF-GUARD-RESIDENT-BUSY-HOST-57](bugs/PERF-GUARD-RESIDENT-BUSY-HOST-57.md): The dev5 full build's perf guard failed chim-town-balmora and chim-town-vivec_city build_resident as slower (129 s, was 52 s; 147 s, was 62 s) while two other builds ran beside it: contention, not code (reported 11 times, open)
@@ -49,6 +49,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [SMOKE-MUSIC-REREAD-FLAKY-57](bugs/SMOKE-MUSIC-REREAD-FLAKY-57.md): The boot smoke's music check fails now and then: music is not read again after dbg music on (reads 35 -> 35), a rerun passes (reported 6 times, open)
 - [WATER-GAMEPLAY-PARITY-38](bugs/WATER-GAMEPLAY-PARITY-38.md): Water gameplay lacks complete original behavior verification (reported 6 times, open)
 - [ANIMKIT-COVERAGE-35](bugs/ANIMKIT-COVERAGE-35.md): NPCs that move or fight have no walk, run or attack animation: Fargoth and other Seyda Neen villagers glitch toward the player (reported 5 times, fixed)
+- [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](bugs/BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): The image step scans maps on about one core and runs the actor ground check under half the pool (reported 5 times, open)
 - [BUILD-IMAGE-STAIR-WALK-SERIAL-36](bugs/BUILD-IMAGE-STAIR-WALK-SERIAL-36.md): The image step's stair walk runs one map per worker: a single heavy room keeps one core busy for 13-19 minutes while the others sit idle (reported 5 times, fixed)
 - [BUILD-PIPELINE-UNDERUTILIZATION-36](bugs/BUILD-PIPELINE-UNDERUTILIZATION-36.md): Umbrella: several builder phases run on one core while the rest of the machine idles, and some do work the build no longer needs (reported 5 times, open)
 - [BUILD-PROFILE-REAPED-CHILD-DOUBLE-COUNT-42](bugs/BUILD-PROFILE-REAPED-CHILD-DOUBLE-COUNT-42.md): The build profiler's sampled timeline counts a finished child process twice (reported 5 times, fixed)
@@ -60,6 +61,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [INTERIOR-PLACED-ITEMS-47](bugs/INTERIOR-PLACED-ITEMS-47.md): Takeable and movable items and containers in converted interiors are not live objects (placed items are left out) (reported 5 times, open)
 - [PLAYER-PUNCH-THIRDPERSON-39](bugs/PLAYER-PUNCH-THIRDPERSON-39.md): Third-person punches have no visible player-body attack animation (reported 5 times, fixed)
 - [REGISTER-CONCURRENT-WRITE-LOST-67](bugs/REGISTER-CONCURRENT-WRITE-LOST-67.md): Two register writes at the same time in one checkout lose an entry: the later writer saves the register from a copy read before the earlier writer's change (reported 5 times, open)
+- [STALL-SLOW-STAGE-VS-REUSE-TIME-68](bugs/STALL-SLOW-STAGE-VS-REUSE-TIME-68.md): The builder's slow-stage warning compared a stage that had to run with the few seconds an earlier build took to reuse it, and so called a normal run eight times too slow (reported 5 times, open)
 - [TEST-PARALLEL-ORDER-LOAD-33](bugs/TEST-PARALLEL-ORDER-LOAD-33.md): The process-pool order test fails on a fully loaded machine (one worker process takes every item) (reported 5 times, open)
 - [TEST-POOL-QUEUE-REFILL-TIMING-64](bugs/TEST-POOL-QUEUE-REFILL-TIMING-64.md): The pool queue refill test (test_longest_first) failed once in a gate on a busy machine and passed on the rerun of the same commit (reported 5 times, open)
 - [AKULAKHAN-CHAMBER-32MB-STALL-53](bugs/AKULAKHAN-CHAMBER-32MB-STALL-53.md): Akulakhan's Chamber does not fit in 32 MB of Fast RAM: its room models need more memory than is free (reported 4 times, open)
@@ -68,7 +70,6 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [BUILD-CHIM-STAIR-WALK-UNCACHED-36](bugs/BUILD-CHIM-STAIR-WALK-UNCACHED-36.md): CHIM frames are stair-walked again on every build: about 69 minutes for 270 frames (reported 4 times, fixed)
 - [BUILD-IDLE-STAGES-33](bugs/BUILD-IDLE-STAGES-33.md): Scene-chain stages leave most of the workers they hold idle (reported 4 times, open)
 - [BUILD-IMAGE-CHIM-MAPS-SERIAL-36](bugs/BUILD-IMAGE-CHIM-MAPS-SERIAL-36.md): The image step writes the CHIM region cells' .chim maps one by one on half a core, silently (reported 4 times, fixed)
-- [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](bugs/BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): The image step scans maps on about one core and runs the actor ground check under half the pool (reported 4 times, open)
 - [BUILD-IMAGE-SERIAL-32](bugs/BUILD-IMAGE-SERIAL-32.md): The image step runs on one core for about 23 minutes per pass (reported 4 times, open)
 - [BUILD-OPTIMIZER-CACHE-KEY-BROAD-36](bugs/BUILD-OPTIMIZER-CACHE-KEY-BROAD-36.md): Regression: the image step's BSP optimizer pass cache reused 13 of 2,658 maps; its key covers the whole image tool, so any image-code change redoes every map (reported 4 times, fixed)
 - [BUILD-PROFILER-NO-WASTE-ALARM-36](bugs/BUILD-PROFILER-NO-WASTE-ALARM-36.md): No profiler, perf ledger or gate flagged idle cores, work done for maps that are removed, or growth of the image (reported 4 times, fixed)
@@ -89,7 +90,6 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [REF-IDENTITY-MERGED-MASTER-66](bugs/REF-IDENTITY-MERGED-MASTER-66.md): With both expansions selected the build stops in its focus stage: a merged reference number does not fit the stable id (reported 4 times, open)
 - [SCRIPTED-EVENT-FALLING-MAGE-61](bugs/SCRIPTED-EVENT-FALLING-MAGE-61.md): The falling mage north of Seyda Neen does not fall: he is in the world from the start and his scripted fall does not run (reported 4 times, open)
 - [SEYDA-LOAD-HANG-30](bugs/SEYDA-LOAD-HANG-30.md): Rare freeze during a Seyda Neen region load (reported 4 times, open)
-- [STALL-SLOW-STAGE-VS-REUSE-TIME-68](bugs/STALL-SLOW-STAGE-VS-REUSE-TIME-68.md): The builder's slow-stage warning compared a stage that had to run with the few seconds an earlier build took to reuse it, and so called a normal run eight times too slow (reported 4 times, open)
 - [TESTS-HEAD-REDUCER-BYTES-CI-45](bugs/TESTS-HEAD-REDUCER-BYTES-CI-45.md): A byte-exact head reducer test fails on some GitHub runners (reported 4 times, open)
 - [UNDERWATER-BREATH-62](bugs/UNDERWATER-BREATH-62.md): Underwater there is no breath meter and no drowning, and Water Breathing is not applied (reported 4 times, open)
 - [ACTOR-WANDER-AGGRO-52](bugs/ACTOR-WANDER-AGGRO-52.md): Requested: NPCs and creatures wander, idle and aggro by their own record variables (AI packages, Fight), as the original game does (reported 3 times, fixed)
@@ -245,6 +245,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [UI-INVENTORY-ORIGINAL-LAYOUT-42](bugs/UI-INVENTORY-ORIGINAL-LAYOUT-42.md): The inventory lacks the original encumbrance bar, armour rating and item icon grid (reported 2 times, open)
 - [UI-MAP-CLICK-DRAGS-SCREEN-36](bugs/UI-MAP-CLICK-DRAGS-SCREEN-36.md): A click on the game screen with the Amiga qualifier (held, or latched by a crashed program) drags the game screen down and reveals the AmigaDOS screen behind it (reported 2 times, fixed)
 - [UNIT-KEY-WHOLE-FILE-63](bugs/UNIT-KEY-WHOLE-FILE-63.md): The resident and room unit caches keyed every unit on the whole of their tool files, so an unrelated edit to tools/prepare_area.py re-keyed all 1,769 residents and every room, and the v0.0.63-dev1 build baked them all again (reported 2 times, open)
+- [VERSION-BUMP-TOOLKIT-HEADER-67](bugs/VERSION-BUMP-TOOLKIT-HEADER-67.md): A version opening leaves the Toolkit header, the previous-release pin and the size baseline at the old release, and the gate checks none of them (reported 2 times, open)
 - [WEREWOLF-BODY-NOT-DRAWN-63](bugs/WEREWOLF-BODY-NOT-DRAWN-63.md): A player turned into a werewolf by a script keeps his own body: the werewolf model is not drawn (reported 2 times, open)
 - [WORLD-SLOPE-STUCK-38](bugs/WORLD-SLOPE-STUCK-38.md): Player reports being stuck beside Ashlands terrain (reported 2 times, open)
 - [WORLD-THIRD-PARTITION-32](bugs/WORLD-THIRD-PARTITION-32.md): The world image now needs a fourth partition (DW2); launchers were only used with three (reported 2 times, closed)
@@ -259,11 +260,11 @@ Open bugs, most recently noticed first.
 
 | ID | Issue | Severity | Found in | State | Fixed in | Maintainer accepted | Waiting on | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| [VIDEO-P96-MODEID-LOOKUP-FAILS-69](bugs/VIDEO-P96-MODEID-LOOKUP-FAILS-69.md) | On some Picasso96 setups, such as one on PiStorm, the game cannot find its screen mode at start | medium | v0.0.68 | open | - | - | - | Reported in v0.0.68; cause unknown. |
 | [TEST-ROUTE-TESTS-FAIL-ON-RELEASE-68](bugs/TEST-ROUTE-TESTS-FAIL-ON-RELEASE-68.md) | Tests of the Solstheim test route stop the gate when the version is a release | high | v0.0.68 | open | - | - | - | Reported in v0.0.68; cause unknown. |
 | [SOL-SEA-INVISIBLE-BLOCKER-68](bugs/SOL-SEA-INVISIBLE-BLOCKER-68.md) | An object in Solstheim's eastern waters is not drawn but still stops a player walking on the water | medium | v0.0.68 | open | - | - | - | Reported in v0.0.68; cause unknown. |
 | [REGISTER-WRITE-EINVAL-68](bugs/REGISTER-WRITE-EINVAL-68.md) | Writing the bug tracker's files sometimes fails with an invalid-argument error and leaves them half written | medium | v0.0.68 | open | - | - | - | Reported in v0.0.68; cause unknown. |
 | [OCEAN-APRON-EXPANSION-HEIGHTLESS-68](bugs/OCEAN-APRON-EXPANSION-HEIGHTLESS-68.md) | The world build stops on an expansion land record without heights next to the open sea | high | v0.0.68 | open | - | - | - | Reported in v0.0.68; cause unknown. |
-| [MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68](bugs/MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68.md) | The normal map does not show a place while the player stands in it, until the place's averaged marker spot is explored | medium | v0.0.68 | open | - | - | - | Reported in v0.0.68; cause unknown. |
 | [DOOR-CHECK-SEA-STORE-NAMES-68](bugs/DOOR-CHECK-SEA-STORE-NAMES-68.md) | The image's door check traced Solstheim's doors in the far sea's world and counted 83 of them as unreachable | high | v0.0.68 | open | - | - | - | Reported in v0.0.68; cause unknown. |
 | [CONTAINER-COUNT-LOOSE-ROOM-PATH-68](bugs/CONTAINER-COUNT-LOOSE-ROOM-PATH-68.md) | The build's container count report stops on a room it looks for as a loose file, while the image keeps its rooms in the room store | low | v0.0.68 | open | - | - | - | Reported in v0.0.68; cause unknown. |
 | [CHIM-STAGE-QUEUED-IDLE-68](bugs/CHIM-STAGE-QUEUED-IDLE-68.md) | The world stage runs on about 2 of 24 cores for over 5 minutes while many units wait in its queue | medium | v0.0.68 | open | - | - | - | Reported in v0.0.68; cause unknown. |
@@ -1572,12 +1573,13 @@ Open bugs, most recently noticed first.
 | [ENTITY-DIAGNOSTIC-009](bugs/ENTITY-DIAGNOSTIC-009.md) | Entity-exhaustion warning reports the high-water count as live slots | low | unknown | open | - | - | - | Fixed in source on v0.0.51-dev (25 October 2026), not shipped at the time of writing: the warning counts the live edicts at the moment the table runs out and prints them beside the slots used (sv.num_edicts) and the freed slots not yet reusable |
 | [AUDIO-APPEARANCE-29](bugs/AUDIO-APPEARANCE-29.md) | Music pause entering character race selection | medium | unknown | open | - | - | - | Still present in v0.0.30-rc1 (maintainer, WinUAE, 7 October 2026): small music clicks and crackles on the pier when entering head selection and on Choose and OK. Earlier: reopened by the RC2 WinUAE playtest on 6 October; earlier RC1 entry acceptance is preserved in the journal. A current fix is not established. |
 
-#### Fixed (807)
+#### Fixed (808)
 
 Fixed bugs by the version that fixed them, newest first (fixed = shipped in that numbered build and confirmed; the State column shows the closure stage reached when the steps are recorded).
 
 | ID | Issue | Severity | Found in | State | Fixed in | Maintainer accepted | Waiting on | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| [MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68](bugs/MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68.md) | The normal map does not show a place while the player stands in it, until the place's averaged marker spot is explored | medium | v0.0.68 | fixed (confirmed in play) | v0.0.69-dev1 | - | - | Fixed in v0.0.69-dev1: a place shows on the world map as soon as any one of its own cells is explored; Raven Rock checked in play. |
 | [WEREWOLF-TABLES-STAY-LOADED-68](bugs/WEREWOLF-TABLES-STAY-LOADED-68.md) | After the change back from the werewolf form its two animation tables stay loaded until the game is closed | low | v0.0.68-dev8 | fixed (confirmed in play) | v0.0.68-dev9 | - | - | Reported in v0.0.68-dev8; cause unknown. |
 | [HORS-FROM-MENU-REGRESSED-68](bugs/HORS-FROM-MENU-REGRESSED-68.md) | From the main menu, dbg aw hors 0 stops on a loading screen and returns to the main menu | medium | v0.0.68-dev7 | fixed (confirmed in play) | v0.0.68-dev8 | - | - | Reported in v0.0.68-dev7; cause unknown. |
 | [SOL-MODULE-CACHE-NOT-PICKLED-68](bugs/SOL-MODULE-CACHE-NOT-PICKLED-68.md) | The Solstheim build module's world stage stopped at once: the shared unit cache it installs could not be handed to the converter's worker processes | high | v0.0.68-dev3 | fixed (confirmed by a build) | v0.0.68-dev3 | - | - | Fixed in v0.0.68-dev3 (6429e908f, gate 12136); confirmed by the v0.0.68-dev3 builds. |
@@ -2521,6 +2523,16 @@ Closed without a fix: not a bug, a duplicate or superseded; the status says whic
 
 Every dated event of every bug, newest first, from the entries' own data (reports, history lines, closure steps, returns, fixes, deferrals; the first notice is the Found in column above). Nothing here is written by hand: an event goes onto its entry (`tools/bug_register.py report`, `note`, `step`, `set`) and the render lists it. The hand-written bug journal ended with v0.0.62-dev1 (7 November 2026): its entries were merged into their bugs' entries on 16 November 2026 and appear here.
 
+
+##### 25 November 2026
+
+- [CONTAINER-READ-ENOMEM-66](bugs/CONTAINER-READ-ENOMEM-66.md): seen again in v0.0.69-dev1: Seen again on v0.0.69-dev1: register writes in the shell container failed with a memory error while a build ran, and went through after it.
+- [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](bugs/BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): seen again in v0.0.69-dev1: Seen again on v0.0.69-dev1: the image step ran on 7 of 24 cores for about six minutes.
+- [STALL-SLOW-STAGE-VS-REUSE-TIME-68](bugs/STALL-SLOW-STAGE-VS-REUSE-TIME-68.md): seen again in v0.0.69-dev1: Seen again on v0.0.69-dev1: a 16 s stage was flagged as 3.4 times its recorded 5 s.
+- [VERSION-BUMP-TOOLKIT-HEADER-67](bugs/VERSION-BUMP-TOOLKIT-HEADER-67.md): seen again in v0.0.69-dev1: Opening v0.0.69, the Toolkit header and the previous-release and size-baseline pins were again left on the old release; the checks caught it late, at the Toolkit check and the delivery smoke.
+- [MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68](bugs/MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68.md): fixed in source: a gated commit, v0.0.69-dev1 (1021cef6); gate 13201 of the planning item MAP-SOLSTHEIM-SITE-MARKERS-68: A place shows on the normal map as soon as any one of its own cells is explored (Raven Rock checked in play on the v0.0.69-dev1 image).
+- [MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68](bugs/MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68.md): shipped: a development snapshot, v0.0.69-dev1 (bbcef677a); the v0.0.69-dev1 kit, gate 13201, build of 1021cef6b: the place marker rule is in the published snapshot
+- [MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68](bugs/MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68.md): confirmed in play: an emulator session, v0.0.69-dev1 (1021cef6b); a map check session: a short walk into Raven Rock, then the world map zoomed in: Raven Rock's marker shows on the normal map, where the v0.0.68 image showed none after the same walk
 
 ##### 24 November 2026
 
@@ -7564,7 +7576,6 @@ Every bug from v0.0.30 on belongs to one family (bugs with a shared cause or are
 - [MAP-LOCAL-ROOM-PLAN-CHIM-ROOMS-68](bugs/MAP-LOCAL-ROOM-PLAN-CHIM-ROOMS-68.md): Inside a room the map opens on the World view instead of the room's plan in rooms built on the shared room store (open, medium)
 - [MAP-MARKER-29](bugs/MAP-MARKER-29.md): Requested: click to place a user map marker (open, low)
 - [MAP-ORIGINAL-FEATURES-66](bugs/MAP-ORIGINAL-FEATURES-66.md): The map window lacks the original's map: the explored fog, the local map, the interior map and the place markers (open, high)
-- [MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68](bugs/MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68.md): The normal map does not show a place while the player stands in it, until the place's averaged marker spot is explored (open, medium)
 - [MAP-RIGHT-DRAG-29](bugs/MAP-RIGHT-DRAG-29.md): Advertised right-drag does not pan teleport map (open, low)
 - [MAP-SPOTS-28](bugs/MAP-SPOTS-28.md): In-game map screen has white/yellow spots (open, low)
 - [MENU-PALETTE-RED-CAST-68](bugs/MENU-PALETTE-RED-CAST-68.md): The map screen, the inventory and the item icons have a red cast since the scene palette change for ice and snow (open, high)
@@ -7629,6 +7640,7 @@ Every bug from v0.0.30 on belongs to one family (bugs with a shared cause or are
 - [ITEM-VIEW-ENTER-UNEQUIPS-67](bugs/ITEM-VIEW-ENTER-UNEQUIPS-67.md): In the inventory's item information view, Enter unequips the item being viewed instead of only closing the view (fixed, medium)
 - [LOOT-WINDOW-ITEM-PROPERTIES-60](bugs/LOOT-WINDOW-ITEM-PROPERTIES-60.md): Loot window does not show the selected item's type, weight and value (fixed, low)
 - [LORE-DATE-FORMAT-62](bugs/LORE-DATE-FORMAT-62.md): Game dates are printed as 18/08/427 instead of the original's form: day, month name, era and year (fixed, low)
+- [MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68](bugs/MAP-PLACE-HIDDEN-IN-ITS-OWN-CELL-68.md): The normal map does not show a place while the player stands in it, until the place's averaged marker spot is explored (fixed, medium)
 - MAP-REG-01: In-Game map mode hid settlement markers (regression) (fixed, medium)
 - [MAP-WORLD-TAB-BLANK-67](bugs/MAP-WORLD-TAB-BLANK-67.md): The World tab of the in-game map draws no land: only the player arrow and the place markers show on a blank background (fixed, high)
 - [OPENING-QUOTE-OVERLAY-23](bugs/OPENING-QUOTE-OVERLAY-23.md): The first prophecy quote of the intro showed unreadable burned-in lettering again (fixed, low)
@@ -7725,6 +7737,7 @@ Every bug from v0.0.30 on belongs to one family (bugs with a shared cause or are
 - [ENGINE-CRASH-EXIT-KEYBOARD-36](bugs/ENGINE-CRASH-EXIT-KEYBOARD-36.md): After AmiWind crashes, the AmigaDOS shell mangles typing: shift/caps latched, M and N never appear (open, high)
 - [LAUNCHER-GL-CONTEXT-FALLBACK-36](bugs/LAUNCHER-GL-CONTEXT-FALLBACK-36.md): When FS-UAE cannot create an OpenGL context, the Linux launcher ends in a raw X error instead of explaining it and offering software rendering (open, low)
 - [NET-UDP-INIT-CRASH-32](bugs/NET-UDP-INIT-CRASH-32.md): UDP network start-up can stop the game at boot when bsdsocket.library is present (open, medium)
+- [VIDEO-P96-MODEID-LOOKUP-FAILS-69](bugs/VIDEO-P96-MODEID-LOOKUP-FAILS-69.md): On some Picasso96 setups, such as one on PiStorm, the game cannot find its screen mode at start (open, medium)
 - [BOOT-CONSOLE-WIDTH-32](bugs/BOOT-CONSOLE-WIDTH-32.md): Boot check lines wrap on the 64-column boot console (fixed, low)
 - [BOOT-VOLUME-NOT-VALIDATED-33](bugs/BOOT-VOLUME-NOT-VALIDATED-33.md): At boot AmigaOS asks Volume AMIWIND is not validated (Retry/Cancel) while the game starts (fixed, medium)
 - CFG-01: Semicolons in default-config comments ran as console commands (fixed, low)

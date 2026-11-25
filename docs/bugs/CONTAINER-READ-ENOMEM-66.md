@@ -2,7 +2,7 @@
 
 <!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
 
-## PERSISTING: reported 26 times; something has to be done
+## PERSISTING: reported 27 times; something has to be done
 
 - Reported with v0.0.54 at 2026-10-27 18:21 +0200: Seen first in v0.0.54 (not registered then): the tests of gates 4250 and 4252 failed with "Cannot allocate memory" in the gate's compiler wrapper while several gates, builds and an emulator session ran.
 - Reported with v0.0.66-dev10 at 2026-11-16 (time not recorded): Seen again under load: a pregate run failed every check with "Cannot allocate memory" while a long build check ran.
@@ -30,6 +30,7 @@
 - Reported with v0.0.68-dev8 at 2026-11-22 20:31 +0200: Seen again during the v0.0.68-dev8 build: register writes and a pre-check inside the containers failed with out-of-memory reads while the virtual machine held 27 GB of file cache and almost no large free blocks; dropping the cache and compacting memory cleared it.
 - Reported with v0.0.68-dev8 at 2026-11-23 02:35 +0200: Seen again: two reads of the register in a test container failed for want of memory while plenty was available but fragmented; after the virtual machine's caches were dropped the large free blocks came back and the read succeeded.
 - Reported with v0.0.68-dev8 at 2026-11-23 09:39 +0200: Seen again in a gate smoke step: a read failed with Cannot allocate memory while a full build ran beside it; the smoke passed.
+- Reported with v0.0.69-dev1 at 2026-11-25 13:36 +0200: Seen again on v0.0.69-dev1: register writes in the shell container failed with a memory error while a build ran, and went through after it.
 
 <!-- END GENERATED PERSISTING -->
 
@@ -87,6 +88,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 - 2026-11-22 20:31 +0200: seen again in v0.0.68-dev8: Seen again during the v0.0.68-dev8 build: register writes and a pre-check inside the containers failed with out-of-memory reads while the virtual machine held 27 GB of file cache and almost no large free blocks; dropping the cache and ...
 - 2026-11-23 02:35 +0200: seen again in v0.0.68-dev8: Seen again: two reads of the register in a test container failed for want of memory while plenty was available but fragmented; after the virtual machine's caches were dropped the large free blocks came back and the read succeeded.
 - 2026-11-23 09:39 +0200: seen again in v0.0.68-dev8: Seen again in a gate smoke step: a read failed with Cannot allocate memory while a full build ran beside it; the smoke passed.
+- 2026-11-25 13:36 +0200: seen again in v0.0.69-dev1: Seen again on v0.0.69-dev1: register writes in the shell container failed with a memory error while a build ran, and went through after it.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -95,7 +97,7 @@ _Last updated with AmiWind v0.0.66-dev11 (16 November 2026)._
 <!-- contents start -->
 ## Contents
 
-- [PERSISTING: reported 26 times; something has to be done](#persisting-reported-26-times-something-has-to-be-done)
+- [PERSISTING: reported 27 times; something has to be done](#persisting-reported-27-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Status: 16 November 2026](#status-16-november-2026)
 - [Symptom](#symptom)

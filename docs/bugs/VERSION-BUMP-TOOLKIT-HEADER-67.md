@@ -1,5 +1,14 @@
 # VERSION-BUMP-TOOLKIT-HEADER-67: A version opening leaves the Toolkit header, the previous-release pin and the size baseline at the old release, and the gate checks none of them
 
+<!-- BEGIN GENERATED PERSISTING: edit the reports list in docs/bugs/bugs.json (bug_register.py report), then run tools/bug_register.py render -->
+
+## PERSISTING: reported 2 times; something has to be done
+
+- Reported with v0.0.68-dev1 at 2026-11-20 16:56 +0200: Seen again when v0.0.68 opened: the Toolkit header, the previous-release pin and the size baseline were left at v0.0.67's predecessor and were each caught late, one before the build and two at delivery.
+- Reported with v0.0.69-dev1 at 2026-11-25 12:43 +0200: Opening v0.0.69, the Toolkit header and the previous-release and size-baseline pins were again left on the old release; the checks caught it late, at the Toolkit check and the delivery smoke. The pins should move in the same step as the version, and the early checks should refuse an old pin.
+
+<!-- END GENERATED PERSISTING -->
+
 <!-- BEGIN GENERATED FACTS: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 
 | Fact | Value |
@@ -28,6 +37,7 @@ Dated events, oldest first, from the entry's own data (first noticed, reports, h
 
 - 2026-11-17: reported in v0.0.67-dev1
 - 2026-11-20 16:56 +0200: seen again in v0.0.68-dev1: Seen again when v0.0.68 opened: the Toolkit header, the previous-release pin and the size baseline were left at v0.0.67's predecessor and were each caught late, one before the build and two at delivery.
+- 2026-11-25 12:43 +0200: seen again in v0.0.69-dev1: Opening v0.0.69, the Toolkit header and the previous-release and size-baseline pins were again left on the old release; the checks caught it late, at the Toolkit check and the delivery smoke.
 
 <!-- END GENERATED TIMELINE -->
 
@@ -36,6 +46,7 @@ _Last updated with AmiWind v0.0.67-dev1 (17 November 2026)._
 <!-- contents start -->
 ## Contents
 
+- [PERSISTING: reported 2 times; something has to be done](#persisting-reported-2-times-something-has-to-be-done)
 - [Timeline](#timeline)
 - [Status: 17 November 2026](#status-17-november-2026)
 - [Symptom](#symptom)

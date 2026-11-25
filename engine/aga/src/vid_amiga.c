@@ -222,6 +222,96 @@ static ULONG __saveds __asm smr_filter (register __a0 struct Hook *smr_filter_ho
 #endif
 
 /**********************************************************************/
+/* VIDEO-P96-MODEID-LOOKUP-FAILS-69: the screen mode on a graphics card. Some Picasso96 setups (seen on PiStorm)
+ * answer BestCModeIDTags with no mode or with one the game cannot use, and the start stopped on "Can't
+ * FindDisplayInfo()". So the card's own answer is checked first (a setup that works keeps its mode), a refused answer
+ * makes the game search the card's modes itself, and with no usable card mode at all VID_Init falls back to the native
+ * AGA screen. The rule between the RULE markers uses no library: tests/test_vid_rtg_mode.py compiles it on its own. */
+/* AW-RTGMODE-RULE-BEGIN */
+struct aw_rtgmode {
+  unsigned long id;
+  long width, height, depth;
+  int available;                /* ModeNotAvailable() said 0 */
+};
+
+/* why the mode cannot carry a W x H 8-bit screen, or NULL when it can */
+static const char *aw_rtgmode_refusal (const struct aw_rtgmode *m, long w, long h)
+{
+  if (!m->available)
+    return "not available";
+  if (m->depth != 8)
+    return "not 8 bits deep";
+  if (m->width < w || m->height < h)
+    return "too small";
+  return NULL;
+}
+
+/* 1 when CAND is usable and a better choice than BEST (NULL: none yet): the least area wins, which is the exact size
+ * when the card has it, else the closest larger mode; on a tie the mode met first stays */
+static int aw_rtgmode_better (const struct aw_rtgmode *cand, const struct aw_rtgmode *best, long w, long h)
+{
+  if (aw_rtgmode_refusal (cand, w, h) != NULL)
+    return 0;
+  return best == NULL || cand->width * cand->height < best->width * best->height;
+}
+/* AW-RTGMODE-RULE-END */
+
+static void aw_rtgmode_read (ULONG id, struct aw_rtgmode *m)
+{
+  m->id = id;
+  m->width = (long)GetCyberIDAttr (CYBRIDATTR_WIDTH, id);
+  m->height = (long)GetCyberIDAttr (CYBRIDATTR_HEIGHT, id);
+  m->depth = (long)GetCyberIDAttr (CYBRIDATTR_DEPTH, id);
+  m->available = ModeNotAvailable (id) == 0;
+}
+
+/* the graphics card's mode for a W x H 8-bit screen, or INVALID_ID when it has none; every step to the console, so a
+ * player's log shows the mode asked for, why it was refused and the one chosen */
+static ULONG aw_rtg_mode (long w, long h)
+{
+  struct aw_rtgmode offered = {0, 0, 0, 0, 0}, cand, best = {0, 0, 0, 0, 0};
+  const char *why = NULL;
+  ULONG id;
+  int cards = 0, found = 0;
+
+  id = BestCModeIDTags (CYBRBIDTG_NominalWidth,  w,
+                        CYBRBIDTG_NominalHeight, h,
+                        CYBRBIDTG_Depth,         8,
+                        TAG_DONE);
+  if (id == INVALID_ID)
+    why = "no mode";
+  else if (!IsCyberModeID (id))
+    why = "not a graphics card mode";
+  else {
+    aw_rtgmode_read (id, &offered);
+    why = aw_rtgmode_refusal (&offered, w, h);
+  }
+  if (why == NULL) {
+    Con_Printf ("Screen mode: graphics card mode %08lx (%ldx%ld, 8 bits)\n",
+                (unsigned long)id, offered.width, offered.height);
+    return id;
+  }
+  Con_Printf ("Screen mode: the graphics card offered %08lx (%s): searching its modes\n", (unsigned long)id, why);
+  for (id = NextDisplayInfo (INVALID_ID); id != INVALID_ID; id = NextDisplayInfo (id)) {
+    if (!IsCyberModeID (id))
+      continue;
+    cards++;
+    aw_rtgmode_read (id, &cand);
+    if (aw_rtgmode_better (&cand, found ? &best : NULL, w, h)) {
+      best = cand;
+      found = 1;
+    }
+  }
+  if (!found) {
+    Con_Printf ("Screen mode: none of the graphics card's %d modes is a usable %ldx%ld 8-bit mode\n", cards, w, h);
+    return INVALID_ID;
+  }
+  Con_Printf ("Screen mode: chose %08lx (%ldx%ld, 8 bits) of the graphics card's %d modes\n",
+              best.id, best.width, best.height, cards);
+  return (ULONG)best.id;
+}
+
+/**********************************************************************/
 void	VID_Init (unsigned char *palette)
 {
   int mode, width, height, nbytes, d;
@@ -261,12 +351,16 @@ void	VID_Init (unsigned char *palette)
 
   propertymask = DIPF_IS_EXTRAHALFBRITE | DIPF_IS_DUALPF | DIPF_IS_PF2PRI |
                  DIPF_IS_HAM;
+  mode = INVALID_ID;
   if (CyberGfxBase != NULL)
-    mode = BestCModeIDTags (CYBRBIDTG_NominalWidth,  BASEWIDTH,
-                            CYBRBIDTG_NominalHeight, BASEHEIGHT,
-                            CYBRBIDTG_Depth,         8,
-                            TAG_DONE);
+    mode = aw_rtg_mode (BASEWIDTH, BASEHEIGHT);
+  /* no usable graphics card mode (or no card): the native screen; is_cyber_mode below follows the mode chosen, so the
+   * native AGA path draws it (VIDEO-P96-MODEID-LOOKUP-FAILS-69) */
+  if (mode != INVALID_ID)
+    ;
   else if (GfxBase->LibNode.lib_Version >= 39) {
+    if (CyberGfxBase != NULL)
+      Con_Printf ("Screen mode: no graphics card mode: using the native AGA screen\n");
     mode = BestModeID (BIDTAG_NominalWidth,     BASEWIDTH,
                        BIDTAG_NominalHeight,    BASEHEIGHT,
                        BIDTAG_Depth,            8,
@@ -323,7 +417,7 @@ void	VID_Init (unsigned char *palette)
     Con_Printf ("Screen mode requester failed, using default mode\n");
     width = BASEWIDTH;
     height = BASEHEIGHT;
-    // mode already set from BestCModeIDTags/BestModeID above
+    // mode already set above (aw_rtg_mode on a graphics card, else BestModeID)
   }
 
   if ((handle = FindDisplayInfo (mode)) == NULL) {

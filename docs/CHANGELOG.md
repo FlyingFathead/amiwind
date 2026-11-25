@@ -1,10 +1,11 @@
 # Changelog
 
-_Last updated with AmiWind v0.0.69-dev1 (25 November 2026)._
+_Last updated with AmiWind v0.0.69-dev2 (25 November 2026)._
 
 <!-- contents start -->
 ## Contents
 
+- [v0.0.69-dev2: second snapshot of v0.0.69, 25 November 2026](#v0069-dev2-second-snapshot-of-v0069-25-november-2026)
 - [v0.0.69-dev1: first snapshot of v0.0.69, 25 November 2026](#v0069-dev1-first-snapshot-of-v0069-25-november-2026)
 - [v0.0.68: Solstheim Is Here, 24 November 2026](#v0068-solstheim-is-here-24-november-2026)
 - [v0.0.68-dev12: twelfth snapshot of v0.0.68, 24 November 2026](#v0068-dev12-twelfth-snapshot-of-v0068-24-november-2026)
@@ -222,13 +223,32 @@ _Last updated with AmiWind v0.0.69-dev1 (25 November 2026)._
 
 <!-- contents end -->
 
+## v0.0.69-dev2: second snapshot of v0.0.69, 25 November 2026
+
+The second development snapshot of v0.0.69 ([release notes](releases/notes/RELEASE-v0.0.69-dev2.md)). The start is more
+reliable on Amigas with a graphics card. Emulator presets: `AmiWind-v0.0.69-dev2-FS-UAE.fs-uae` and
+`AmiWind-v0.0.69-dev2-WinUAE.uae`, both with 32 MB of Fast RAM. The change is covered by tests and the gate of its commit;
+it has not been seen on an affected graphics card yet.
+
+**Fixed**
+
+- With a graphics card, the game checks the screen mode the card's software offers (available, 8 bits deep, at least
+  the game's screen size). Some Picasso96 setups, one of them on PiStorm, offered no mode or one the game could not use,
+  and the start stopped with "Can't FindDisplayInfo()". A refused offer now makes the game search the card's modes for
+  the exact size or else the closest larger one, and with no usable card mode the normal AGA screen is opened. Each step
+  is written to the console; a setup whose offered mode was usable keeps it (VIDEO-P96-MODEID-LOOKUP-FAILS-69).
+
+**Known**
+
+- The open items of v0.0.69-dev1 stand ([its Known list](releases/notes/RELEASE-v0.0.69-dev1.md#known-in-this-build)).
+
 ## v0.0.69-dev1: first snapshot of v0.0.69, 25 November 2026
 
 The first development snapshot of v0.0.69 ([release notes](releases/notes/RELEASE-v0.0.69-dev1.md)), cut from the v0.0.68
 release. A place shows on the world map as soon as any of its own cells is explored, and the builder's check of the
 v0.0.68 release from nothing is written down. Emulator presets: `AmiWind-v0.0.69-dev1-FS-UAE.fs-uae` and
-`AmiWind-v0.0.69-dev1-WinUAE.uae`, both with 32 MB of Fast RAM. The change is covered by tests and the gate of its commit;
-it has not been seen in play yet.
+`AmiWind-v0.0.69-dev1-WinUAE.uae`, both with 32 MB of Fast RAM. The change is covered by tests and the gate of its commit,
+and was checked in play on the snapshot's image.
 
 **Fixed**
 

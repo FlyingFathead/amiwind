@@ -9,9 +9,11 @@
 | Where | the world map (normal view), Raven Rock on Solstheim |
 | Reproduction | always |
 | Duplicate of | no |
-| Persists in | v0.0.68 (last seen) |
+| Persists in | fixed in v0.0.69-dev1 |
 | Severity | medium: a place the player has reached is missing from the normal map; the debug map shows it |
 | Family | Menus, HUD, map screen and text (`ui-text`) |
+| Fix commit | `3a9088f46` |
+| Fixed on | 2026-11-25 |
 | Playtest version | v0.0.68 |
 | From commit | source 85116a7, engine 85116a7, CHIM world 85116a7 |
 | CHIM engine version | CHIM 0.2.2, engine 85116a7, world format unknown |
@@ -19,6 +21,27 @@
 | Platform or emulator | FS-UAE, JIT, 32 MB Fast (the release image's proof sessions) |
 
 <!-- END GENERATED FACTS -->
+
+<!-- BEGIN GENERATED TIMELINE: edit docs/bugs/bugs.json (bug_register.py step, note, report), then run tools/bug_register.py render -->
+
+## Timeline
+
+Closure steps (how this bug was closed, [the schema](README.md#closure)):
+
+| Stage | Who | Where | When | How | Why |
+| --- | --- | --- | --- | --- | --- |
+| fixed in source | a gated commit | v0.0.69-dev1 (1021cef6) | 2026-11-25 | gate 13201 of the planning item MAP-SOLSTHEIM-SITE-MARKERS-68 | A place shows on the normal map as soon as any one of its own cells is explored (Raven Rock checked in play on the v0.0.69-dev1 image). |
+| shipped | a development snapshot | v0.0.69-dev1 (bbcef677a) | 2026-11-25 | the v0.0.69-dev1 kit, gate 13201, build of 1021cef6b | the place marker rule is in the published snapshot |
+| confirmed in play | an emulator session | v0.0.69-dev1 (1021cef6b) | 2026-11-25 | a map check session: a short walk into Raven Rock, then the world map zoomed in | Raven Rock's marker shows on the normal map, where the v0.0.68 image showed none after the same walk |
+
+Dated events, oldest first, from the entry's own data (first noticed, reports, history, closure steps, returns, the fix, a deferral):
+
+- 2026-11-24: reported in v0.0.68
+- 2026-11-25: fixed in source: a gated commit, v0.0.69-dev1 (1021cef6); gate 13201 of the planning item MAP-SOLSTHEIM-SITE-MARKERS-68: A place shows on the normal map as soon as any one of its own cells is explored (Raven Rock checked in play on the v0.0.69-dev1 image).
+- 2026-11-25: shipped: a development snapshot, v0.0.69-dev1 (bbcef677a); the v0.0.69-dev1 kit, gate 13201, build of 1021cef6b: the place marker rule is in the published snapshot
+- 2026-11-25: confirmed in play: an emulator session, v0.0.69-dev1 (1021cef6b); a map check session: a short walk into Raven Rock, then the world map zoomed in: Raven Rock's marker shows on the normal map, where the v0.0.68 image showed none after the same walk
+
+<!-- END GENERATED TIMELINE -->
 
 <!-- BEGIN GENERATED CATEGORY: edit docs/bugs/bugs.json, then run tools/bug_register.py render -->
 

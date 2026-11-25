@@ -1,6 +1,6 @@
 # CHIM Engine tracker
 
-_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.69-dev1._
+_Generated from `docs/bugs/bugs.json` with AmiWind v0.0.69-dev2._
 
 <!-- Generated whole by tools/bug_register.py render from docs/bugs/bugs.json; do not edit by hand. -->
 
@@ -27,6 +27,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [BUILD-ACTOR-LIBRARY-UNDERUSED-54](BUILD-ACTOR-LIBRARY-UNDERUSED-54.md): The actor-library stage ran at 2.69 of 8 allowed cores with 130 units queued and 7 running (reported 8 times, open)
 - [BUILD-CHIM-SERIAL-SECTIONS-44](BUILD-CHIM-SERIAL-SECTIONS-44.md): The CHIM stage runs several sections on one core while units wait: visibility rows starve their workers (reported 7 times, open)
 - [CHIM-AZURA-FLOATING-FLORA-43](CHIM-AZURA-FLOATING-FLORA-43.md): Plant or tree pieces hang in the air at Azura's Coast (cell 16,7) (reported 7 times, open)
+- [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): The image step scans maps on about one core and runs the actor ground check under half the pool (reported 5 times, open)
 - [BUILD-PIPELINE-UNDERUTILIZATION-36](BUILD-PIPELINE-UNDERUTILIZATION-36.md): Umbrella: several builder phases run on one core while the rest of the machine idles, and some do work the build no longer needs (reported 5 times, open)
 - [BUILD-STATS-SERIAL-36](BUILD-STATS-SERIAL-36.md): The CHIM stats step runs serially and silently on one core (reported 5 times, fixed)
 - [CHIM-EXTERIOR-ACTORS-MISSING-46](CHIM-EXTERIOR-ACTORS-MISSING-46.md): Most outdoor NPCs and every outdoor creature are missing: region frames place no actors (93 of 566 exterior NPC references, 0 of 5,415 creature references) (reported 5 times, open)
@@ -34,7 +35,6 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 - [BUILD-CHIM-MAIN-MEMORY-46](BUILD-CHIM-MAIN-MEMORY-46.md): The CHIM stage main process holds so much memory that the memory guard starves its own workers (reported 4 times, open)
 - [BUILD-CHIM-STAIR-WALK-UNCACHED-36](BUILD-CHIM-STAIR-WALK-UNCACHED-36.md): CHIM frames are stair-walked again on every build: about 69 minutes for 270 frames (reported 4 times, fixed)
 - [BUILD-IMAGE-CHIM-MAPS-SERIAL-36](BUILD-IMAGE-CHIM-MAPS-SERIAL-36.md): The image step writes the CHIM region cells' .chim maps one by one on half a core, silently (reported 4 times, fixed)
-- [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): The image step scans maps on about one core and runs the actor ground check under half the pool (reported 4 times, open)
 - [BUILD-OPTIMIZER-CACHE-KEY-BROAD-36](BUILD-OPTIMIZER-CACHE-KEY-BROAD-36.md): Regression: the image step's BSP optimizer pass cache reused 13 of 2,658 maps; its key covers the whole image tool, so any image-code change redoes every map (reported 4 times, fixed)
 - [BUILD-PROFILER-NO-WASTE-ALARM-36](BUILD-PROFILER-NO-WASTE-ALARM-36.md): No profiler, perf ledger or gate flagged idle cores, work done for maps that are removed, or growth of the image (reported 4 times, fixed)
 - [CHIM-BALMORA-INSET-SLIVERS-43](CHIM-BALMORA-INSET-SLIVERS-43.md): Balmora's town frame hands over 96 units inside its cells: the 8 cells around the town keep classic strips, built as 15 legacy maps (11.5 MB) with every object of those cells (reported 4 times, fixed)
@@ -87,6 +87,7 @@ Bugs reported two or more times. Most reports first. Each has its report lines o
 
 Newest first: the last 10 dated events of CHIM bugs, from their entries (reports, history, closure steps).
 
+- 2026-11-25 [BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52](BUILD-IMAGE-SCAN-GROUND-UNDERUSED-52.md): seen again in v0.0.69-dev1: Seen again on v0.0.69-dev1: the image step ran on 7 of 24 cores for about six minutes.
 - 2026-11-24 [CHIM-STAGE-QUEUED-IDLE-68](CHIM-STAGE-QUEUED-IDLE-68.md): seen again in v0.0.68: Seen again in a build from scratch: the Bloodmoon stage held 77 units in its queue with none running, using under 2 of its 8 cores.
 - 2026-11-24 [CHIM-REBUILD-NOT-IDENTICAL-68](CHIM-REBUILD-NOT-IDENTICAL-68.md): seen again in v0.0.68-dev12: The second pair of runs differs only in two diagnostic reports of the Solstheim stage (one carries a time); the game files are identical.
 - 2026-11-24 [WORLDMAP-ONE-ISLAND-64](WORLDMAP-ONE-ISLAND-64.md): seen again in v0.0.68-dev12: In v0.0.68-dev12 the world map picture already shows Solstheim, but its bounds follow the land with heights instead of every exterior cell of the game, so the westernmost sea column and the three southern rows of the map are cut off.
@@ -96,7 +97,6 @@ Newest first: the last 10 dated events of CHIM bugs, from their entries (reports
 - 2026-11-24 [WORLDMAP-ONE-ISLAND-64](WORLDMAP-ONE-ISLAND-64.md): fixed in source: a gated commit, v0.0.68-dev12 (5e77e121); gate 13060 of the planning item SOL-SEA-CROSSING-68: The open sea of the whole map's box is built (542 cells in the base world, 440 in a world of their own beside Solstheim's), the world map spans the same box, and the image step checks every frame, room and crossing of every store at 32 MB ...
 - 2026-11-24 [OCEAN-APRON-EXPANSION-HEIGHTLESS-68](OCEAN-APRON-EXPANSION-HEIGHTLESS-68.md): reported in v0.0.68
 - 2026-11-24 [IMAGE-FRAME-HEAP-LAYER-STORES-UNCHECKED-68](IMAGE-FRAME-HEAP-LAYER-STORES-UNCHECKED-68.md): reported in v0.0.68-dev12
-- 2026-11-24 [IMAGE-FRAME-HEAP-LAYER-STORES-UNCHECKED-68](IMAGE-FRAME-HEAP-LAYER-STORES-UNCHECKED-68.md): fixed in source: a gated commit, v0.0.68-dev12 (5e77e121); gate 13060 of the planning item SOL-SEA-CROSSING-68: The open sea of the whole map's box is built (542 cells in the base world, 440 in a world of their own beside Solstheim's), the world map spans the same box, and the image step checks every frame, room and crossing of every store at 32 MB ...
 
 ## Engine streaming and memory
 

@@ -81,5 +81,6 @@ Family: Boot and engine start-up (`boot-startup`). The boot check and engine sta
 - [NET-UDP-INIT-CRASH-32](NET-UDP-INIT-CRASH-32.md): UDP network start-up can stop the game at boot when bsdsocket.library is present
 - [STARTUP-THEME-TIMING-23](STARTUP-THEME-TIMING-23.md): The startup logo faded too quickly and the theme started late
 - VIDEO-NTSC-NO-PAL-MODE-58 (no report page): On an NTSC machine the game stops at start: it asks for a PAL screen mode by name
+- [VIDEO-P96-MODEID-LOOKUP-FAILS-69](VIDEO-P96-MODEID-LOOKUP-FAILS-69.md): On some Picasso96 setups, such as one on PiStorm, the game cannot find its screen mode at start
 
 <!-- END GENERATED CATEGORY -->

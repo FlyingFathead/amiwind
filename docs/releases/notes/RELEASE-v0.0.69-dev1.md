@@ -10,7 +10,7 @@ release was built: a place shows on the world map as soon as the player has expl
 builder's check of that release from nothing is written down with the two weak spots it measured. Its emulator presets,
 `AmiWind-v0.0.69-dev1-FS-UAE.fs-uae` and `AmiWind-v0.0.69-dev1-WinUAE.uae`, both start with 32 MB of Fast RAM, which the
 game needs. Otherwise the game is the one of v0.0.68. The map change is checked by the test suite and the gate of this
-snapshot and has not been seen in play yet.
+snapshot, and was checked in play on its image.
 
 ## New since v0.0.68
 

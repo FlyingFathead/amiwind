@@ -368,9 +368,9 @@ family links to its list in the register.
 | [Harvestable plants](../BUGS.md#harvestable-plants-harvest) | `harvest` | 12 of 20 | Harvest catalogues are built by the builder for the shipped maps and counted by the entity tracker. |
 | [Town and interior import](../BUGS.md#town-and-interior-import-town-import) | `town-import` | 11 of 17 | The town importer converts every town and interior within engine limits; doors lead somewhere. |
 | [Scene changes, arrivals and handoffs](../BUGS.md#scene-changes-arrivals-and-handoffs-transitions-arrivals) | `transitions-arrivals` | 18 of 36 | Cell, region and scene changes keep the player, view, equipment and sound intact. |
-| [Menus, HUD, map screen and text](../BUGS.md#menus-hud-map-screen-and-text-ui-text) | `ui-text` | 84 of 131 | Menus, HUD, map screen, fonts and messages. |
+| [Menus, HUD, map screen and text](../BUGS.md#menus-hud-map-screen-and-text-ui-text) | `ui-text` | 83 of 131 | Menus, HUD, map screen, fonts and messages. |
 | [Debug commands and remote control](../BUGS.md#debug-commands-and-remote-control-debug-commands) | `debug-commands` | 42 of 65 | dbg commands, teleports, debug map loads and the remote console. |
-| [Boot and engine start-up](../BUGS.md#boot-and-engine-start-up-boot-startup) | `boot-startup` | 5 of 15 | The boot check and engine start-up report problems clearly and never stop the game silently. |
+| [Boot and engine start-up](../BUGS.md#boot-and-engine-start-up-boot-startup) | `boot-startup` | 6 of 16 | The boot check and engine start-up report problems clearly and never stop the game silently. |
 | [Game logic (QuakeC) and saves](../BUGS.md#game-logic-quakec-and-saves-game-logic) | `game-logic` | 227 of 311 | QuakeC entities, saves and game state. |
 | [Gates, CI and tests](../BUGS.md#gates-ci-and-tests-tests-ci) | `tests-ci` | 90 of 177 | A check that is skipped, tests the wrong tree or depends on the host is not a check; skips fail loudly. |
 | [Development tooling, receipts and packaging](../BUGS.md#development-tooling-receipts-and-packaging-tracker-tooling) | `tracker-tooling` | 73 of 138 | Receipts, packaging, development tools and the tracker itself. |

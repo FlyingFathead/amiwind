@@ -4,7 +4,7 @@
 
 # AmiWind
 
-_Last updated with AmiWind v0.0.69-dev1 (25 November 2026)._
+_Last updated with AmiWind v0.0.69-dev2 (25 November 2026)._
 
 An unofficial, experimental RPG engine and enthusiast project bringing Morrowind
 to the Commodore Amiga, featuring CHIM: an AmiQuake-based engine and an asset
@@ -43,11 +43,13 @@ original's, with the disposition bar, the speaker's services and the name on the
 [changelog](docs/CHANGELOG.md). The release before it, **v0.0.67: Tribunal Introduced**, brought Tribunal and Mournhold
 into the game ([its notes](docs/releases/notes/RELEASE-v0.0.67.md)).
 
-The snapshot in development is **v0.0.69-dev1**, the first of v0.0.69: a place shows on the world map as soon as any of
-its own cells is explored, and the builder's check of the v0.0.68 release from nothing is written down
-([its notes](docs/releases/notes/RELEASE-v0.0.69-dev1.md)). Its emulator presets are
-[`AmiWind-v0.0.69-dev1-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.69-dev1-FS-UAE.fs-uae) and
-[`AmiWind-v0.0.69-dev1-WinUAE.uae`](resources/emulators/AmiWind-v0.0.69-dev1-WinUAE.uae), both with 32 MB of Fast RAM.
+The snapshot in development is **v0.0.69-dev2**, the second of v0.0.69: with a graphics card the game checks the screen
+mode the card offers, searches the card's modes when that offer cannot be used, and opens the normal AGA screen when the
+card has no usable mode ([its notes](docs/releases/notes/RELEASE-v0.0.69-dev2.md)). The first,
+[v0.0.69-dev1](docs/releases/notes/RELEASE-v0.0.69-dev1.md), shows a place on the world map as soon as any of its own
+cells is explored. The emulator presets are
+[`AmiWind-v0.0.69-dev2-FS-UAE.fs-uae`](resources/emulators/AmiWind-v0.0.69-dev2-FS-UAE.fs-uae) and
+[`AmiWind-v0.0.69-dev2-WinUAE.uae`](resources/emulators/AmiWind-v0.0.69-dev2-WinUAE.uae), both with 32 MB of Fast RAM.
 
 ## What already works
 
